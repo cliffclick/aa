@@ -101,5 +101,9 @@ public class TypeNode extends Node {
   }
 
   // Check TypeNode for being in-error
-  @Override public String err(GVNGCM gvn) { return _error_parse.typerr(gvn.type(arg()),mem(),_t); }
+  @Override public ErrMsg err(GVNGCM gvn, boolean fast) {
+    Type arg = gvn.type(arg());
+    Type mem = gvn.type(mem());
+    return ErrMsg.typerr(_error_parse,arg,mem,_t);
+  }
 }

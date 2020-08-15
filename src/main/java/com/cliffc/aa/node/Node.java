@@ -2,10 +2,12 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.HashSet;
 import java.util.function.Predicate;
 
 // Sea-of-Nodes
@@ -103,7 +105,7 @@ public abstract class Node implements Cloneable {
             Node msp = nm == null ? null : nm.get_mem_writer();
             if( msp instanceof MemSplitNode )
               gvn.add_work(((MemSplitNode)msp).join());
-          }
+          } else if( nn instanceof MemJoinNode ) gvn.add_work(nn);
         }
         // Displays for FunPtrs update
         if( this instanceof ParmNode && ((ParmNode)this)._idx==0 && old instanceof FunNode ) {
@@ -404,7 +406,7 @@ public abstract class Node implements Cloneable {
   public boolean live_changes_value() { return false; }
 
   // Return any type error message, or null if no error
-  public String err(GVNGCM gvn) { return null; }
+  public ErrMsg err(GVNGCM gvn, boolean fast) { return null; }
 
   // Operator precedence is only valid for ConNode of binary functions
   public byte  op_prec() { return -1; }
@@ -470,17 +472,17 @@ public abstract class Node implements Cloneable {
   }
 
   // Gather errors; backwards reachable control uses only
-  public void walkerr_use( Ary<String> errs, VBitSet bs, GVNGCM gvn ) {
+  public void walkerr_use( HashSet<ErrMsg> errs, VBitSet bs, GVNGCM gvn ) {
     assert !is_dead();
     if( bs.tset(_uid) ) return;  // Been there, done that
     if( gvn.type(this) != Type.CTRL ) return; // Ignore non-control
-    if( this instanceof ErrNode ) errs.add(((ErrNode)this)._msg); // Gather errors
+    if( this instanceof ErrNode ) adderr(gvn,errs);
     for( Node use : _uses )     // Walk control users for more errors
       use.walkerr_use(errs,bs,gvn);
   }
 
   // Gather errors; forwards reachable data uses only.  This is an RPO walk.
-  public void walkerr_def( Ary<String> errs0, Ary<String> errs1, Ary<String> errs2, Ary<String> errs3, VBitSet bs, GVNGCM gvn ) {
+  public void walkerr_def( HashSet<ErrMsg> errs, VBitSet bs, GVNGCM gvn ) {
     assert !is_dead();
     if( bs.tset(_uid) ) return; // Been there, done that
     if( is_uncalled(gvn) ) return; // FunPtr is a constant, but never executed, do not check for errors
@@ -488,34 +490,25 @@ public abstract class Node implements Cloneable {
     for( int i=0; i<_defs._len; i++ ) {
       Node def = _defs.at(i);   // Walk data defs for more errors
       if( def == null || gvn.type(def) == Type.XCTRL ) continue;
-      def.walkerr_def(errs0,errs1,errs2,errs3,bs,gvn);
+      def.walkerr_def(errs,bs,gvn);
     }
     // Post-Order walk: check after walking
-    String msg = err(gvn);      // Get any error
-    if( msg != null ) {         // Gather errors
-      Ary<String> errs;
-      if( is_forward_ref() ) errs = errs0;      // Report unknown refs first
-      else if( this instanceof ErrNode ) errs=errs1; // Report ErrNodes next
-      // Report unresolved calls last, as some other error generally
-      // triggered this one.
-      else if( this instanceof UnresolvedNode ||
-               (this instanceof CallNode && msg.contains("Unable to resolve")) )
-        errs=errs3;
-      else errs=errs2;          // Other errors (e.g. bad fields for Loads)
-      if( errs.find(msg::equals) == -1 ) // Filter dups; happens due to e.g. inlining replicated busted code
-        errs.add(msg);
-    }
+    adderr(gvn,errs);
   }
 
   // Gather errors; forwards reachable data uses only
-  // TODO: Moved error to PhiNode.err
-  public void walkerr_gc( Ary<String> errs, VBitSet bs, GVNGCM gvn ) {
+  public void walkerr_gc( HashSet<ErrMsg> errs, VBitSet bs, GVNGCM gvn ) {
     if( bs.tset(_uid) ) return;  // Been there, done that
     if( is_uncalled(gvn) ) return; // FunPtr is a constant, but never executed, do not check for errors
-    String msg = this instanceof PhiNode ? err(gvn) : null;
-    if( msg != null ) errs.add(msg);
+    adderr(gvn,errs);
     for( int i=0; i<_defs._len; i++ )
       if( in(i) != null ) in(i).walkerr_gc(errs,bs,gvn);
+  }
+  private void adderr(GVNGCM gvn, HashSet<ErrMsg> errs ) {
+    ErrMsg msg = err(gvn,false);
+    if( msg==null ) return;
+    msg._order = errs.size();
+    errs.add(msg);
   }
   public boolean is_dead() { return _uses == null; }
   public void set_dead( ) { _defs = _uses = null; }   // TODO: Poor-mans indication of a dead node, probably needs to recycle these...
@@ -567,5 +560,93 @@ public abstract class Node implements Cloneable {
     Node n = in(0).walk_dom_last(P);
     if( n != null ) return n;   // Take last answer first
     return P.test(this) ? this : null;
+  }
+
+
+  // Error levels
+  public enum Level {
+    ForwardRef,               // Forward refs
+    ErrNode,                  // ErrNodes
+    Syntax,                   // Syntax
+    Field,                    // Field naming errors
+    TypeErr,                  // Type errors
+    NilAdr,                   // Address might be nil on mem op
+    BadArgs,                  // Unspecified primitive bad args
+    UnresolvedCall,           // Unresolved calls
+    TrailingJunk,             // Trailing syntax junk
+    MixedPrimGC,              // Mixed primitives & GC
+  }
+
+  // Error messages
+  public static class ErrMsg implements Comparable<ErrMsg> {
+    public final Parse _loc;
+    public final String _msg;
+    public final Level _lvl;
+    public int _order;
+    public static final ErrMsg FAST = new ErrMsg(null,"fast",Level.Syntax);
+    public static final ErrMsg BADARGS = new ErrMsg(null,"bad arguments",Level.BadArgs);
+    public ErrMsg(Parse loc, String msg, Level lvl) { _loc=loc; _msg=msg; _lvl=lvl; }
+    public static ErrMsg forward_ref(Parse loc, FunNode fun) {
+      return new ErrMsg(loc,"Unknown ref '"+fun._name+"'",Level.ForwardRef);
+    }
+    public static ErrMsg syntax(Parse loc, String msg) {
+      return new ErrMsg(loc,msg,Level.Syntax);
+    }
+    public static ErrMsg unresolved(Parse loc, String msg) {
+      return new ErrMsg(loc,msg,Level.UnresolvedCall);
+    }
+    public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type expected ) {
+      TypeMem tmem = t0mem instanceof TypeMem ? (TypeMem)t0mem : null;
+      String s0 = typerr(actual  ,tmem);
+      String s1 = typerr(expected,null); // Expected is already a complex ptr, does not depend on memory
+      return new ErrMsg(loc,s0+" is not a "+s1,Level.TypeErr);
+    }
+    public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type[] expecteds ) {
+      TypeMem tmem = t0mem instanceof TypeMem ? (TypeMem)t0mem : null;
+      SB sb = new SB().p(typerr(actual,tmem));
+      sb.p( expecteds.length==1 ? " is not a " : " is none of (");
+      for( Type expect : expecteds ) sb.p(typerr(expect,null)).p(',');
+      sb.unchar().p(expecteds.length==1 ? "" : ")");
+      return new ErrMsg(loc,sb.toString(),Level.TypeErr);
+    }
+    private static String typerr( Type t, TypeMem tmem ) {
+      return t.is_forward_ref()
+        ? ((TypeFunPtr)t).names(false)
+        : (t instanceof TypeMemPtr
+           ? t.str(new SB(), null, tmem).toString()
+           : t.toString());
+    }
+    public static ErrMsg field(Parse loc, String msg, String fld) {
+      String f = msg+" field '."+fld+"'";
+      return new ErrMsg(loc,f,Level.Field);
+    }
+    public static ErrMsg niladr(Parse loc, String msg, String fld) {
+      String f = msg+" field '."+fld+"'";
+      return new ErrMsg(loc,f,Level.NilAdr);
+    }
+    public static ErrMsg badGC(Parse loc) {
+      return new ErrMsg(loc,"Cannot mix GC and non-GC types",Level.MixedPrimGC);
+    }
+    public static ErrMsg trailingjunk(Parse loc) {
+      return new ErrMsg(loc,"Syntax error; trailing junk",Level.TrailingJunk);
+    }
+
+    @Override public String toString() {
+      return _loc==null ? _msg : _loc.errLocMsg(_msg);
+    }
+    @Override public int compareTo(ErrMsg msg) {
+      int cmp = _lvl.compareTo(msg._lvl);
+      if( cmp != 0 ) return cmp;
+      return _order-msg._order;
+    }
+    @Override public boolean equals(Object obj) {
+      if( this==obj ) return true;
+      if( !(obj instanceof ErrMsg) ) return false;
+      ErrMsg err = (ErrMsg)obj;
+      return _lvl==err._lvl && _loc.equals(err._loc) && _msg.equals(err._msg);
+    }
+    @Override public int hashCode() {
+      return (_loc==null ? 0 : _loc.hashCode())+_msg.hashCode()+_lvl.hashCode();
+    }
   }
 }

@@ -70,11 +70,11 @@ public class PhiNode extends Node {
     return basic_liveness() && !def.basic_liveness() ? TypeMem.ANYMEM : _live;
   }
 
-  @Override public String err(GVNGCM gvn) {
+  @Override public ErrMsg err(GVNGCM gvn, boolean fast) {
     if( !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar
         (gvn.type(this).contains(Type.SCALAR) ||
          gvn.type(this).contains(Type.NSCALR)) ) // Cannot have code that deals with unknown-GC-state
-      return _badgc.errMsg("Cannot mix GC and non-GC types");
+      return ErrMsg.badGC(_badgc);
     return null;
   }
 }

@@ -225,7 +225,7 @@ public class CallNode extends Node {
     if( fidx != -1 && !(unk instanceof FunPtrNode) ) {
       // Check that the single target is well-formed
       FunNode fun = FunNode.find_fidx(Math.abs(fidx));
-      if( fun != null ) {
+      if( fun != null && !fun.is_dead() ) {
         RetNode ret = fun.ret();
         if( ret != null ) {
           // The same function might be called with different displays; make
@@ -286,7 +286,7 @@ public class CallNode extends Node {
         // Verify call entry is not stale relative to call exit
         if( gvn.type(mem).isa(tmcepi) ) {
           // If call returns same as new (via recursion), cannot split, but CAN swap.
-          BitsAlias esc_out = CallEpiNode.esc_out(tmcepi,gvn.type(cepid));
+          BitsAlias esc_out = CallEpiNode.esc_out(tmcepi,cepid==null ? Type.XNIL : gvn.type(cepid));
           int alias = ((MrgProjNode)mem).nnn()._alias;
           if( !esc_out.test_recur(alias) ) // No return conflict, so parallelize memory
             return MemSplitNode.insert_split(gvn,cepim,this,mem,mem);
@@ -308,7 +308,7 @@ public class CallNode extends Node {
     gvn.revalive(this,cepim,mrg);
     return this;
   }
-  
+
   // Pass thru all inputs directly - just a direct gather/scatter.  The gather
   // enforces SESE which in turn allows more precise memory and aliasing.  The
   // full scatter lets users decide the meaning; e.g. wired FunNodes will take
@@ -616,7 +616,7 @@ public class CallNode extends Node {
 
         if( cvts < best_cvts ) {
           best_cvts = cvts;
-          best_fptr = get_fptr(fun,unk);
+          best_fptr = get_fptr(fun,unk); // This can be null, if function is run-time computed & has multiple displays.
           best_formals = formals;
           tied=false;
         } else if( cvts==best_cvts ) {
@@ -652,31 +652,30 @@ public class CallNode extends Node {
   }
 
 
-  @Override public String err(GVNGCM gvn) { return err(gvn,false); }
-  String err(GVNGCM gvn, boolean fast) {
+  @Override public ErrMsg err(GVNGCM gvn, boolean fast) {
     // Fail for passed-in unknown references directly.
     for( int j=1; j<nargs(); j++ )
       if( arg(j).is_forward_ref() )
-        return fast ? "" : _badargs[j].forward_ref_err( FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx) );
+        return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[j], FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx));
 
     // Expect a function pointer
     Type tfun = gvn.type(fun());
     if( !(tfun instanceof TypeFunPtr) )
-      return fast ? "" : _badargs[0].errMsg("A function is being called, but "+tfun+" is not a function type");
+      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"A function is being called, but "+tfun+" is not a function type");
     TypeFunPtr tfp = (TypeFunPtr)tfun;
 
     // Indirectly, forward-ref for function type
     if( tfp.is_forward_ref() ) // Forward ref on incoming function
-      return _badargs[0].forward_ref_err(FunNode.find_fidx(tfp.fidx()));
+      return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[0], FunNode.find_fidx(tfp.fidx()));
 
     // bad-arg-count
     if( tfp._nargs != nargs() )
-      return fast ? "" : _badargs[0].errMsg("Passing "+(nargs()-1)+" arguments to "+tfp.names(false)+" which takes "+(tfp._nargs-1)+" arguments");
+      return fast ? ErrMsg.FAST : ErrMsg.syntax(_badargs[0],"Passing "+(nargs()-1)+" arguments to "+tfp.names(false)+" which takes "+(tfp._nargs-1)+" arguments");
 
     // Call did not resolve
     BitsFun fidxs = tfp.fidxs();
     if( fidxs.is_empty() || fidxs.above_center() ) // This is an unresolved call
-      return fast ? "" : _badargs[0].errMsg("Unable to resolve call");
+      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
 
     // If ANY args are ANY they will fail the arg check, BUT will be reported
     // first where they became an ANY.
@@ -693,18 +692,18 @@ public class CallNode extends Node {
       Ary<Type> ts=null;
       for( int fidx : tfp._fidxs ) {
         FunNode fun = FunNode.find_fidx(fidx);
-        if( fun==null || fun.is_dead() ) return "";
+        if( fun==null || fun.is_dead() ) return ErrMsg.FAST;
         TypeStruct formals = fun._sig._formals; // Type of each argument
         if( fun.parm(j)==null ) continue;  // Formal is dead
         Type formal = formals.at(j);
         if( actual.isa(formal) ) continue; // Actual is a formal
-        if( fast ) return "";              // Fail-fast
+        if( fast ) return ErrMsg.FAST;     // Fail-fast
         if( ts==null ) ts = new Ary<>(new Type[1],0);
         if( ts.find(formal) == -1 ) // Dup filter
           ts.push(formal);          // Add broken type
       }
       if( ts!=null )
-        return _badargs[j].typerr(actual,mem(),ts.asAry());
+        return ErrMsg.typerr(_badargs[j],actual,gvn.type(mem()),ts.asAry());
     }
 
     return null;

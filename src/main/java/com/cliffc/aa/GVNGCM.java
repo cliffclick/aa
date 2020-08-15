@@ -308,7 +308,7 @@ public class GVNGCM {
     if( n instanceof ProjNode && n.in(0) instanceof CallNode )
       return false;
     // Is in-error; do not remove the error.
-    if( n.err(this) != null )
+    if( n.err(this,true) != null )
       return false;
     // Is a constant (or could be)
     if( !t.is_con() ) {
@@ -417,7 +417,7 @@ public class GVNGCM {
     }
 
     // [ts!] If completely dead, exit now.
-    if( !nliv.is_live() && !n.is_prim() && n.err(this)==null &&
+    if( !nliv.is_live() && !n.is_prim() && n.err(this,true)==null &&
         !(n instanceof CallNode) &&       // Keep for proper errors
         !(n instanceof UnresolvedNode) && // Keep for proper errors
         !(n instanceof RetNode) &&        // Keep for proper errors
@@ -697,6 +697,7 @@ public class GVNGCM {
 
   private void check_and_wire( CallEpiNode cepi ) {
     if( !cepi.check_and_wire(this) ) return;
+    add_work(cepi.call().fun());
     add_work(cepi.call());
     add_work(cepi);
     assert Env.START.more_flow(this,new VBitSet(),false,0)==0;

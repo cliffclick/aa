@@ -234,6 +234,11 @@ public class FunNode extends RegionNode {
       }
     }
 
+    // Check for dups (already done this but failed to resolve all calls, so trying again).
+    TypeStruct fformals = formals;
+    if( path == -1 && FUNS.find(fun -> fun != null && fun._sig._formals==fformals && fun._sig._ret == _sig._ret && fun.in(1)==in(1) ) != -1 )
+      return null;              // Done this before
+
     assert level==2; // Do not actually inline, if just checking that all forward progress was found
 
     // --------------
@@ -364,6 +369,12 @@ public class FunNode extends RegionNode {
       case OP_LOAD:
         if( !(to instanceof TypeStruct) ||
             ((LoadNode)use).find((TypeStruct)to)== -1 )
+          return true;          // Did not find field
+        break;
+      case OP_STORE:
+        if( ((StoreNode)use).val()==n) break; // Storing as value is ok
+        if( !(to instanceof TypeStruct) ||    // Address needs to find field
+            ((StoreNode)use).find((TypeStruct)to)== -1 )
           return true;          // Did not find field
         break;
       case OP_CALL: break; // Argument pass-thru probably needs to check formals

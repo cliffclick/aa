@@ -106,7 +106,7 @@ public class ParmNode extends PhiNode {
   // TODO: for mem(), include ScopeNode.compute_live_mem forall args & mem.
   // Needed to sharpen args for e.g. value OOB and errors
 
-  @Override public String err( GVNGCM gvn ) {
+  @Override public ErrMsg err( GVNGCM gvn, boolean fast ) {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere
     FunNode fun = fun();
     assert fun._defs._len==_defs._len;
@@ -127,12 +127,12 @@ public class ParmNode extends PhiNode {
               return null;      // #args errors reported before bad-args
             Type argc = gvn.sharptr(call.arg(_idx),call.mem()); // Call arg type
             if( argc!=Type.ALL && !argc.isa(formal) ) // Check this call
-              return call._badargs[_idx].typerr(argc,call.mem(),formal);
+              return ErrMsg.typerr(call._badargs[_idx],argc,gvn.type(call.mem()),formal);
             // Must be a different call that is in-error
           }
         }
         // meet of args is not the formal, but no single arg is not the formal?
-        return _badgc.typerr(argt,mem.in(i),formal); // Can be the default
+        return ErrMsg.typerr(_badgc,argt,gvn.type(mem.in(i)),formal); // Can be the default
       }
     }
     return null;

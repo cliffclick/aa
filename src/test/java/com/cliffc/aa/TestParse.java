@@ -31,7 +31,7 @@ public class TestParse {
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",3);
     test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),3,tdisp)); // {Scalar Scalar -> Scalar}
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",19);
-    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x:=;y:=;...}",21);
+    testerr("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x:=;y:=;...}",21);
     test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
     test("x=@{a:=1;noinline_b= {a=a+1;b=0}}; x.noinline_b(); x.a",TypeInt.NINT8);
 
@@ -461,7 +461,8 @@ public class TestParse {
                     "     ? @{ll=map(tree.l);rr=map(tree.r);vv=tree.v&tree.v}"+
                     "     : 0};"+
                     "map(tmp)",
-             "!@{map=~Scalar;ll=*[$]$?;rr=$;vv=int8}");
+             "@{map=~Scalar;ll=*[$]@{map=~Scalar;ll=*[$]$?;rr=$;vv=int8}?;rr=$;vv=int8}");
+
 
     // Failed attempt at a Tree-structure inference test.  Triggered all sorts
     // of bugs and error reporting issues, so keeping it as a regression test.
@@ -497,7 +498,7 @@ public class TestParse {
          "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
-         "!@{map=~Scalar;l=*[$]$?;r=$;v=int64}");
+         "@{map=~Scalar;l=*[$]@{map=~Scalar;l=*[$]$?;r=$;v=int64}?;r=$;v=int64}");
 
     // A linked-list mixing ints and strings, always in pairs
     String ll_cona = "a=0; ";
@@ -569,7 +570,7 @@ public class TestParse {
     test_obj_isa("x=@{n:=1;v:=2}", TypeStruct.make(FLDS, ts,new byte[]{TypeStruct.FFNL,TypeStruct.FRW,TypeStruct.FRW}));
     testerr ("x=@{n =1;v:=2}; x.n  = 3; x.n", "Cannot re-assign final field '.n'",18);
     test    ("x=@{n:=1;v:=2}; x.n  = 3", TypeInt.con(3));
-    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "!@{n:=3;v:=2}");
+    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
     testerr ("x=@{n:=1;v:=2}; x.n  = 3; x.v = 1; x.n = 4; x.n", "Cannot re-assign final field '.n'",37);
     test    ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n", TypeInt.NINT8);
     testerr ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5; tmp.n", "Cannot re-assign read-only field '.n'",63);
@@ -577,18 +578,18 @@ public class TestParse {
     // Tuple assignment
     testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0'",11);
     // Final-only and read-only type syntax.
-    testerr ("ptr2rw = @{f:=1}; ptr2final:@{f=} = ptr2rw; ptr2final", "*[$]!@{f:=1} is not a *[$]!@{f=;...}",27); // Cannot cast-to-final
+    testerr ("ptr2rw = @{f:=1}; ptr2final:@{f=} = ptr2rw; ptr2final", "*[$]@{f:=1} is not a *[$]@{f=;...}",27); // Cannot cast-to-final
 
     test_obj_isa("ptr2   = @{f =1}; ptr2final:@{f=} = ptr2  ; ptr2final", // Good cast
                  TypeStruct.make(new String[]{"^","f"},new Type[]{TypeMemPtr.DISPLAY_PTR,TypeInt.con(1)},TypeStruct.ffnls(2)));
-    testerr ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; ptr2rw", "*[$]!@{f=1} is not a *[$]!@{f:=;...}", 18); // Cannot cast-away final
+    testerr ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; ptr2rw", "*[$]@{f=1} is not a *[$]@{f:=;...}", 18); // Cannot cast-away final
     test    ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; 2", TypeInt.con(2)); // Dead cast-away of final
     test    ("@{x:=1;y =2}:@{x;y=}.y", TypeInt.con(2)); // Allowed reading final field
-    testerr ("f={ptr2final:@{x;y=} -> ptr2final.y  }; f(@{x:=1;y:=2})", "*[$]!@{x:=1;y:=2} is not a *[$]!@{x:=;y=;...}",42); // Another version of casting-to-final
+    testerr ("f={ptr2final:@{x;y=} -> ptr2final.y  }; f(@{x:=1;y:=2})", "*[$]@{x:=1;y:=2} is not a *[$]@{x:=;y=;...}",42); // Another version of casting-to-final
     testerr ("f={ptr2final:@{x;y=} -> ptr2final.y=3; ptr2final}; f(@{x:=1;y =2})", "Cannot re-assign final field '.y'",34);
     test    ("f={ptr:@{x==;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).y", TypeInt.con(3)); // On field x, cast-away r/w for r/o
     test    ("f={ptr:@{x=;y:=} -> ptr.y=3; ptr}; f(@{x =1;y:=2}).y", TypeInt.con(3)); // On field x, cast-up r/o for final but did not read
-    testerr ("f={ptr:@{x=;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).x", "*[$]!@{x:=1;y:=2} is not a *[$]!@{x=;y:=;...}",37); // On field x, cast-up r/w for final and read
+    testerr ("f={ptr:@{x=;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).x", "*[$]@{x:=1;y:=2} is not a *[$]@{x=;y:=;...}",37); // On field x, cast-up r/w for final and read
     test    ("f={ptr:@{x;y} -> ptr.y }; f(@{x:=1;y:=2}:@{x;y==})", TypeInt.con(2)); // cast r/w to r/o, and read
     test    ("f={ptr:@{x==;y==} -> ptr }; f(@{x=1;y=2}).y", TypeInt.con(2)); // cast final to r/o and read
     test    ("ptr=@{f:=1}; ptr:@{f=}.f=2",TypeInt.con(2)); // Checking that it is-a final does not make it final
@@ -898,10 +899,10 @@ HashTable = {@{
   }
   static private void testerr( String program, String err, int cur_off ) {
     TypeEnv te = Exec.go(Env.file_scope(Env.top_scope()),"args",program);
-    assertTrue(te._errs != null && te._errs._len>=1);
+    assertTrue(te._errs != null && te._errs.size()>=1);
     String cursor = new String(new char[cur_off]).replace('\0', ' ');
     String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";
-    assertEquals(err2,strip_alias_numbers(te._errs.at(0)));
+    assertEquals(err2,strip_alias_numbers(te._errs.get(0).toString()));
   }
   private static String strip_alias_numbers( String err ) {
     // Remove alias#s from the result string: *[123]@{x=1,y=2} ==> *[$]@{x=1,y=2}

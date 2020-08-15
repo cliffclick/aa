@@ -97,12 +97,12 @@ public abstract class PrimNode extends Node {
     }
     return is_con ? apply(ts) : (has_high ? _sig._ret.dual() : _sig._ret);
   }
-  @Override public String err(GVNGCM gvn) {
+  @Override public ErrMsg err(GVNGCM gvn, boolean fast) {
     for( int i=1; i<_defs._len; i++ ) { // first is control
       Type tactual = gvn.type(in(i));
       Type tformal = _sig.arg(i);
       if( !tactual.isa(tformal) )
-        return _badargs==null ? "bad arguments" : _badargs[i].typerr(tactual,null,tformal);
+        return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[i],tactual,null,tformal);
     }
     return null;
   }
@@ -158,11 +158,11 @@ static class ConvertTypeName extends PrimNode {
     assert formal.dual().isa(actual) && actual.isa(formal);
     return actual.set_name(_sig._ret._name);
   }
-  @Override public String err(GVNGCM gvn) {
+  @Override public ErrMsg err(GVNGCM gvn,boolean fast) {
     Type actual = gvn.type(in(1));
     Type formal = _sig.arg(1);
     if( !actual.isa(formal) ) // Actual is not a formal
-      return _badargs[0].typerr(actual,null,formal);
+      return ErrMsg.typerr(_badargs[0],actual,null,formal);
     return null;
   }
 }

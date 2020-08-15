@@ -9,10 +9,10 @@ import com.cliffc.aa.type.*;
 // TypeFunPtr with a constant fidx and variable displays.  Used to allow 1st
 // class functions to be passed about.
 public final class FunPtrNode extends Node {
-  private final String _referr;
+  private final ErrMsg _referr;
   public  FunPtrNode( RetNode ret, Node display ) { this(null,ret,display); }
   // For forward-refs only; super weak display & function.
-  private FunPtrNode( String referr, RetNode ret, Node display ) {
+  private FunPtrNode( ErrMsg referr, RetNode ret, Node display ) {
     super(OP_FUNPTR,ret,display);
     _referr = referr;
   }
@@ -113,7 +113,7 @@ public final class FunPtrNode extends Node {
   public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(name));
     RetNode ret = gvn.init(new RetNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun));
-    return new FunPtrNode(unkref.forward_ref_err(fun),ret,gvn.con(TypeMemPtr.DISP_SIMPLE));
+    return new FunPtrNode( ErrMsg.forward_ref(unkref,fun),ret,gvn.con(TypeMemPtr.DISP_SIMPLE));
   }
 
   // True if this is a forward_ref
@@ -147,5 +147,5 @@ public final class FunPtrNode extends Node {
     dfun.bind(tok);
   }
 
-  @Override public String err(GVNGCM gvn) { return is_forward_ref() ? _referr : null; }
+  @Override public ErrMsg err(GVNGCM gvn,boolean fast) { return is_forward_ref() ? _referr : null; }
 }

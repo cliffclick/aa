@@ -99,7 +99,7 @@ public class LoadNode extends Node {
       if( mem instanceof StoreNode ) {
         StoreNode st = (StoreNode)mem;
         if( Util.eq(st._fld,fld) ) {
-          if( st.adr()==adr ) return st.err(gvn)== null ? st : null; // Exact matching store
+          if( st.adr()==adr ) return st.err(gvn,true)== null ? st : null; // Exact matching store
           // Matching field, wrong address.  Look for no-overlap in aliases
           Type tst = gvn.type(st.adr());
           if( !(tst instanceof TypeMemPtr) ) return null; // Store has weird address
@@ -136,7 +136,8 @@ public class LoadNode extends Node {
         mem = jmem;
 
       } else if( mem instanceof PhiNode ||
-                 mem instanceof StartMemNode ) {
+                 mem instanceof StartMemNode ||
+                 mem instanceof ConNode) {
         return null;            // Would have to match on both sides, and Phi the results
       } else {
         throw com.cliffc.aa.AA.unimpl(); // decide cannot be equal, and advance, or maybe-equal andreturn null
@@ -160,9 +161,10 @@ public class LoadNode extends Node {
 
 
   @Override public Type value(GVNGCM gvn) {
-    Type adr = gvn.type(adr());
-    if( !(adr instanceof TypeMemPtr) ) return adr.oob();
-    TypeMemPtr tmp = (TypeMemPtr)adr;
+    Node adr = adr();
+    Type tadr = gvn.type(adr);
+    if( !(tadr instanceof TypeMemPtr) ) return tadr.oob();
+    TypeMemPtr tmp = (TypeMemPtr)tadr;
 
     // Loading from TypeMem - will get a TypeObj out.
     Node mem = mem();
@@ -190,25 +192,25 @@ public class LoadNode extends Node {
     return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases);
   }
 
-  @Override public String err(GVNGCM gvn) {
+  @Override public ErrMsg err(GVNGCM gvn, boolean fast) {
     Type tadr = gvn.type(adr());
     if( tadr==Type.ALL ) return null; // Error already
-    if( tadr.must_nil() ) return bad("Struct might be nil when reading");
+    if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when reading",_fld);
     if( !(tadr instanceof TypeMemPtr) )
-      return bad("Unknown"); // Not a pointer nor memory, cannot load a field
+      return bad("Unknown",fast); // Not a pointer nor memory, cannot load a field
     TypeMemPtr ptr = (TypeMemPtr)tadr;
     Type tmem = gvn.type(mem());
     if( tmem==Type.ALL ) return null; // An error, reported earlier
+    if( tmem==Type.ANY ) return null; // An error, reported earlier
     TypeObj objs = tmem instanceof TypeMem
       ? ((TypeMem)tmem).ld(ptr) // General load from memory
       : ((TypeObj)tmem);
     if( !(objs instanceof TypeStruct) || find((TypeStruct)objs) == -1 )
-      return bad("Unknown");
+      return bad("Unknown",fast);
     return null;
   }
-  private String bad( String msg ) {
-    String f = msg+" field '."+_fld+"'";
-    return _bad==null ? f : _bad.errMsg(f);
+  private ErrMsg bad( String msg, boolean fast ) {
+    return fast ? ErrMsg.FAST : ErrMsg.field(_bad,msg,_fld);
   }
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }
   @Override public boolean equals(Object o) {

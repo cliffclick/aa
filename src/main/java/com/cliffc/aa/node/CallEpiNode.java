@@ -216,7 +216,7 @@ public final class CallEpiNode extends Node {
       case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); live = TypeMem.ALIVE; break; // Always RPC is a constant
       case -2: actual = new MProjNode(call,CallNode.MEMIDX); live = arg._live; break;    // Memory into the callee
       default: actual = idx >= call.nargs()              // Check for args present
-          ? new ConNode<>(Type.XSCALAR) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
+          ? new ConNode<>(Type.ALL) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
           : new ProjNode(idx+CallNode.ARGIDX, call); // Normal args
         live = TypeMem.ESCAPE;
         break;
@@ -340,9 +340,10 @@ public final class CallEpiNode extends Node {
 
   static BitsAlias esc_out( TypeMem tmem, Type trez ) {
     if( trez == Type.XNIL || trez == Type.NIL ) return BitsAlias.EMPTY;
-    return trez instanceof TypeMemPtr
-      ? tmem.all_reaching_aliases(((TypeMemPtr)trez)._aliases)
-      : (TypeMemPtr.OOP0.dual().isa(trez) ? BitsAlias.NZERO : BitsAlias.EMPTY);
+    if( trez instanceof TypeFunPtr ) trez = ((TypeFunPtr)trez)._disp;
+    if( trez instanceof TypeMemPtr )
+      return tmem.all_reaching_aliases(((TypeMemPtr)trez)._aliases);
+    return TypeMemPtr.OOP0.dual().isa(trez) ? BitsAlias.NZERO : BitsAlias.EMPTY;
   }
 
   // If pre-GCP, must lift the types

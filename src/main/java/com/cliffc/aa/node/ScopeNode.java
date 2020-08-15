@@ -192,8 +192,8 @@ public class ScopeNode extends Node {
       if( vars.isEmpty() ) return mem;
       mem.unhook();             // Passed-in 'hooked' memory
       for( String name : vars.keySet() ) {
-        String msg = bad.errMsg("'"+name+"' not defined on "+arm+" arm of trinary");
-        Node err = gvn.xform(new ErrNode(ctrl,msg,null));
+        String msg = "'"+name+"' not defined on "+arm+" arm of trinary";
+        Node err = gvn.xform(new ErrNode(ctrl,bad,msg));
         // Exactly like a parser store of an error, on the missing side
         mem = gvn.xform(new StoreNode(mem,scope.ptr(),err,TypeStruct.FFNL,name,bad));
       }

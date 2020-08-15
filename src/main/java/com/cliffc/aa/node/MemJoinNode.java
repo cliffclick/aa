@@ -23,7 +23,7 @@ public class MemJoinNode extends Node {
     // If some Split/Join path clears out, remove the (useless) split.
     MemSplitNode msp = msp();
     for( int i=1; i<_defs._len; i++ )
-      if( in(i) instanceof MProjNode && in(i).in(0)==msp ) {
+      if( in(i) instanceof MProjNode && in(i).in(0)==msp && in(i)._uses._len==1 ) {
         gvn.setype(in(0),in(0).value(gvn)); // Update the default type
         msp.remove_alias(gvn,i);
         return remove(i,gvn);

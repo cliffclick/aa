@@ -25,6 +25,7 @@ public class StoreNode extends Node {
   Node mem() { return in(1); }
   Node adr() { return in(2); }
   Node val() { return in(3); }
+  public int find(TypeStruct ts) { return ts.find(_fld); }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node mem = mem();
@@ -111,28 +112,28 @@ public class StoreNode extends Node {
     throw com.cliffc.aa.AA.unimpl();       // Should not reach here
   }
 
-  @Override public String err(GVNGCM gvn) {
-    String msg = err0(gvn);
-    if( msg == null ) return null;
-    return _bad.errMsg(msg+_fld+"'");
-  }
-  private String err0(GVNGCM gvn) {
+  @Override public ErrMsg err(GVNGCM gvn, boolean fast) {
     Type t = gvn.type(adr());
-    if( t.must_nil() ) return "Struct might be nil when writing '";
+    if( t.must_nil() ) return ErrMsg.niladr(_bad,"Struct might be nil when writing",_fld);
+    String msg = err0(gvn,t);
+    if( msg == null ) return null;
+    return ErrMsg.field(_bad,msg,_fld);
+  }
+  private String err0(GVNGCM gvn, Type t) {
     if( t==Type.ANY ) return null;
     if( !(t instanceof TypeMemPtr) ) return "Unknown"; // Too low, might not have any fields
     Type mem = gvn.type(mem());
     if( mem == Type.ANY ) return null;
     if( mem instanceof TypeMem )
       mem = ((TypeMem)mem).ld((TypeMemPtr)t);
-    if( !(mem instanceof TypeStruct) ) return "No such field '";
+    if( !(mem instanceof TypeStruct) ) return "No such";
     TypeStruct ts = (TypeStruct)mem;
     int idx = ts.find(_fld);
-    if( idx == -1 )  return "No such field '";
+    if( idx == -1 )  return "No such";
     if( !ts.can_update(idx) ) {
       String fstr = TypeStruct.fstring(ts.fmod(idx));
-      String ftype = adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure ? "val '" : "field '.";
-      return "Cannot re-assign "+fstr+" "+ftype;
+      //String ftype = adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure ? "val '" : "field '.";
+      return "Cannot re-assign "+fstr;
     }
     return null;
   }

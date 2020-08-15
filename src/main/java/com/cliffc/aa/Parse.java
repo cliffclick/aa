@@ -10,7 +10,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.text.NumberFormat;
 import java.text.ParsePosition;
-import java.util.BitSet;
+import java.util.*;
 
 /** an implementation of language AA
  *
@@ -117,6 +117,8 @@ public class Parse {
     remove_unknown_callers();
     _gvn.gcp(_e._scope); // Global Constant Propagation
     _gvn.iter(3);   // Re-check all ideal calls now that types have been maximally lifted
+    _gvn.gcp(_e._scope); // Global Constant Propagation
+    _gvn.iter(4);   // Re-check all ideal calls now that types have been maximally lifted
     return gather_errors();
   }
 
@@ -152,23 +154,15 @@ public class Parse {
     bs.set(Env.STK_0._uid);     // Do not walk initial memory
     bs.set(_e._scope._uid);     // Do not walk top-level scope
     bs.set(Env.DEFMEM._uid);    // Do not walk default memory
-    Ary<String> errs0 = new Ary<>(new String[1],0);
-    Ary<String> errs1 = new Ary<>(new String[1],0);
-    Ary<String> errs2 = new Ary<>(new String[1],0);
-    Ary<String> errs3 = new Ary<>(new String[1],0);
-    res   .walkerr_def(errs0,errs1,errs2,errs3,bs,_gvn);
-    ctrl().walkerr_def(errs0,errs1,errs2,errs3,bs,_gvn);
-    mem   .walkerr_def(errs0,errs1,errs2,errs3,bs,_gvn);
-    if( errs0.isEmpty() ) errs0.addAll(errs1);
-    if( errs0.isEmpty() ) errs0.addAll(errs2);
-    if( errs0.isEmpty() ) _e._scope.walkerr_use(errs0,new VBitSet(),_gvn);
-    if( errs0.isEmpty() && skipWS() != -1 ) errs0.add(errMsg("Syntax error; trailing junk"));
-    if( errs0.isEmpty() ) res.walkerr_gc(errs0,new VBitSet(),_gvn);
-    // Most errors result in unresolved calls, so report others first.
-    errs0.addAll(errs3);
-    // Do not sort the errors, because they are reported in Reverse Post-Order
-    // which means control-dependent errors are reported after earlier control
-    // errors... i.e., you get the errors in execution order.
+    HashSet<Node.ErrMsg> errs = new HashSet<>();
+    res   .walkerr_def(errs,bs,_gvn);
+    ctrl().walkerr_def(errs,bs,_gvn);
+    mem   .walkerr_def(errs,bs,_gvn);
+    if( errs.isEmpty() ) _e._scope.walkerr_use(errs,new VBitSet(),_gvn);
+    if( errs.isEmpty() && skipWS() != -1 ) errs.add(Node.ErrMsg.trailingjunk(this));
+    if( errs.isEmpty() ) res.walkerr_gc(errs,new VBitSet(),_gvn);
+    ArrayList<Node.ErrMsg> errs0 = new ArrayList<>(errs);
+    Collections.sort(errs0);
 
     kill(res);       // Kill Node for returned Type result
 
@@ -323,7 +317,7 @@ public class Parse {
       if( peek(":=") ) _x=oldx2; // Avoid confusion with typed assignment test
       else if( peek(':') && (t=type())==null ) { // Check for typed assignment
         if( _e._scope.test_if() ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
-        else                      err_ctrl0("Missing type after ':'",null);
+        else                      err_ctrl0("Missing type after ':'");
       }
       if( peek(":=") ) rs.set(toks._len);              // Re-assignment parse
       else if( !peek_not('=','=') ) {                  // Not any assignment
@@ -627,7 +621,7 @@ public class Parse {
     Node ptr = get_display_ptr(scope);
     n = gvn(new LoadNode(mem(),ptr,tok,null));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
-      return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
+      return err_ctrl1(Node.ErrMsg.forward_ref(this,((FunPtrNode)n).fun()));
     // Do a full lookup on "+", and execute the function
     Node plus = _e.lookup_filter("+",_gvn,2);
     Node sum = do_call(new CallNode(true,errMsgs(2),ctrl(),mem(),plus,n.keep(),con(TypeInt.con(d))));
@@ -809,7 +803,7 @@ public class Parse {
         else {
           // Might be: "{ x y z:bad -> body }" which cannot be any stmt.  This
           // is an error in any case.  Treat as a bad type on a valid function.
-          err_ctrl0(peek(',') ? "Bad type arg, found a ',' did you mean to use a ';'?" : "Missing or bad type arg",null);
+          err_ctrl0(peek(',') ? "Bad type arg, found a ',' did you mean to use a ';'?" : "Missing or bad type arg");
           t = Type.SCALAR;
           skipNonWS();         // Skip possible type sig, looking for next arg
         }
@@ -1097,7 +1091,7 @@ public class Parse {
     if( peek(c) ) return;
     Parse bad = errMsg();       // Generic error
     bad._x = oldx;              // Openning point
-    err_ctrl0("Expected closing '"+c+"' but "+(_x>=_buf.length?"ran out of text":"found '"+(char)(_buf[_x])+"' instead"),bad);
+    err_ctrl3("Expected closing '"+c+"' but "+(_x>=_buf.length?"ran out of text":"found '"+(char)(_buf[_x])+"' instead"),bad);
   }
 
   // Skip WS, return true&skip if match, false & do not skip if miss.
@@ -1210,9 +1204,11 @@ public class Parse {
   }
 
   // Whack current control with a syntax error
-  private ErrNode err_ctrl2( String s ) { return init(new ErrNode(Env.START,errMsg(s),null)); }
-  private void err_ctrl0(String s, Parse bad) {
-    set_ctrl(gvn(new ErrNode(ctrl(),errMsg(s),bad)));
+  private ErrNode err_ctrl1( Node.ErrMsg msg ) { return init(new ErrNode(Env.START,msg)); }
+  private ErrNode err_ctrl2( String msg ) { return init(new ErrNode(Env.START,errMsg(),msg)); }
+  private void err_ctrl0(String s) { err_ctrl3(s,errMsg()); }
+  private void err_ctrl3(String s, Parse open) {
+    set_ctrl(gvn(new ErrNode(ctrl(),open,s)));
   }
 
   // Make a private clone just for delayed error messages
@@ -1232,41 +1228,9 @@ public class Parse {
     return n==1 ? new Parse[]{null,e,e} : new Parse[]{null,e,e,e};
   }
 
-  // Polite error message for mismatched types
-  public String typerr( Type actual, Node mem, Type expected ) {
-    Type t = mem==null ? null : _gvn.type(mem);
-    TypeMem tmem = t instanceof TypeMem ? (TypeMem)t : null;
-    String s0 = typerr(actual  ,tmem);
-    String s1 = typerr(expected,null); // Expected is already a complex ptr, does not depend on memory
-    return errMsg(s0+" is not a "+s1);
-  }
-  public String typerr( Type actual, Node mem, Type[] expecteds ) {
-    Type t = mem==null ? null : _gvn.type(mem);
-    TypeMem tmem = t instanceof TypeMem ? (TypeMem)t : null;
-    SB sb = new SB().p(typerr(actual,tmem));
-    sb.p( expecteds.length==1 ? " is not a " : " is none of (");
-    for( Type expect : expecteds ) sb.p(typerr(expect,null)).p(',');
-    sb.unchar().p(expecteds.length==1 ? "" : ")");
-    return errMsg(sb.toString());
-  }
-  private static String typerr( Type t, TypeMem tmem ) {
-    return t.is_forward_ref()
-      ? ((TypeFunPtr)t).names(false)
-      : (t instanceof TypeMemPtr
-         ? t.str(new SB(), null, tmem).toString()
-         : t.toString());
-  }
-
-  // Standard mis-use of a forward-ref error (assumed to be a forward-decl of a
-  // recursive function; all other uses are treated as an unknown-ref error).
-  public String forward_ref_err(FunNode fun) {
-    String name = fun._name;
-    return errMsg("Unknown ref '"+name+"'");
-  }
-
   // Build a string of the given message, the current line being parsed,
   // and line of the pointer to the current index.
-  public String errMsg(String s) {
+  public String errLocMsg(String s) {
     if( s.charAt(0)=='\n' ) return s;
     // find line start
     int a=_x;
@@ -1286,5 +1250,13 @@ public class Parse {
   }
   // Handy for the debugger to print
   @Override public String toString() { return new String(_buf,_x,_buf.length-_x); }
-
+  @Override public boolean equals(Object loc) {
+    if( this==loc ) return true;
+    if( !(loc instanceof Parse) ) return false;
+    Parse p = (Parse)loc;
+    return _x==p._x && _src.equals(p._src);
+  }
+  @Override public int hashCode() {
+    return _src.hashCode()+_x;
+  }
 }
