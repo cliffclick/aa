@@ -63,14 +63,15 @@ public final class CallEpiNode extends Node {
     if( nwired()==1 && fidxs.abit() != -1 ) { // Wired to 1 target
       RetNode ret = wired(0);                 // One wired return
       FunNode fun = ret.fun();
+      Type tdef = gvn.type(Env.DEFMEM);
+      Type tretmem = ((TypeTuple)gvn.type(ret)).at(1);
       if( fun != null && fun._defs._len==2 && // Function is only called by 1 (and not the unknown caller)
           call.err(gvn,true)==null &&   // And args are ok
-          // And memory types are aligned
-          gvn.type(ret.mem()).isa(((TypeTuple)gvn.self_type(this)).at(1)) &&
+          CallNode.emem(tcall).isa(tdef) &&
+          tretmem.isa(tdef) &&          // Call and return memory at least as good as default
           call.mem().in(0) != call &&   // Dead self-recursive
           !fun.noinline() ) {           // And not turned off
         assert fun.in(1).in(0)==call;   // Just called by us
-        // TODO: Bring back SESE opts
         fun.set_is_copy(gvn);
         return inline(gvn,level, call, ret.ctl(), ret.mem(), ret.val(), null/*do not unwire, because using the entire function body inplace*/);
       }
@@ -212,7 +213,7 @@ public final class CallEpiNode extends Node {
       int idx = ((ParmNode)arg)._idx;
       TypeMem live;
       switch( idx ) {
-      case  0: actual = new FP2ClosureNode(call); live = TypeMem.ALIVE; break; // Filter Function Pointer to Closure
+      case  0: actual = new FP2ClosureNode(call); live = arg._live; break; // Filter Function Pointer to Closure
       case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); live = TypeMem.ALIVE; break; // Always RPC is a constant
       case -2: actual = new MProjNode(call,CallNode.MEMIDX); live = arg._live; break;    // Memory into the callee
       default: actual = idx >= call.nargs()              // Check for args present

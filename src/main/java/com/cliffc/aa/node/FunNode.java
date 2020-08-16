@@ -386,6 +386,9 @@ public class FunNode extends RegionNode {
           return true;
         break;
       case OP_NAME: break; // Pointer to a nameable struct
+      case OP_PRIM:
+        if( use instanceof PrimNode.EQ_OOP ) break;
+        throw AA.unimpl();
       default: throw AA.unimpl();
       }
     }

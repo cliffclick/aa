@@ -45,6 +45,9 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
+    //test("-1== -1",   TypeInt.TRUE);
+    //test("2==-1",   TypeInt.FALSE);
+
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -498,7 +501,7 @@ public class TestParse {
          "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
-         "@{map=~Scalar;l=*[$]@{map=~Scalar;l=*[$]$?;r=$;v=int64}?;r=$;v=int64}");
+         "@{map=~Scalar;l=*[$]$?;r=$;v=int64}");
 
     // A linked-list mixing ints and strings, always in pairs
     String ll_cona = "a=0; ";
@@ -641,17 +644,16 @@ public class TestParse {
   // To 'continue', use '^0'.  To 'break' with non-zero 'val' use '^val'.
   // Break cannot exit with '0'.
   private final String FORELSE="for={pred->{body->!pred()?^;(tmp=body())?^tmp; for pred body}};";
-  // If 'pred' is false, the loop exits with false, else loop continues.
-  // 'body' value is ignored.  Early exit is same as a 'continue' and there is no 'break'.
+  // If 'pred' is false, the loop exits with false, else loop continues.  'body' value is ignored.
+  // To 'continue', use '^'.
+  // There is no 'break'.
   private final String FOR="for={pred->{body->!pred()?^;body(); for pred body}};";
-  @Ignore
+
   @Test public void testParse13() {
-    test(FORELSE+"i:=0; for {i++ < 100} {i==50?i}",TypeInt.INT64); // Early exit on condition i==5
+    test(FOR+"i:=0; for {i++ < 2} {i== 9} ? ",Type.XNIL);    // Late exit, body never returns true.
+    test(FORELSE+"i:=0; for {i++ < 100} {i== 5} ",TypeInt.BOOL); // Not sure of exit value, except bool
+    test(FORELSE+"i:=0; for {i++ < 100} {i==50?i}",TypeInt.INT64); // Early exit on condition i==50
     test(FOR+"sum:=0; i:=0; for {i++ < 100} {sum:=sum+i}; sum",TypeInt.INT64);
-    test("i:=0; for {i++ < 2} {i==-1} ? ",Type.XNIL);    // Late exit, body never returns true.
-    test("i:=0; for {i++ < 100} {i== 5} ? ",TypeInt.BOOL); // Not sure of exit value, except bool
-
-
   }
 
   /* Closures

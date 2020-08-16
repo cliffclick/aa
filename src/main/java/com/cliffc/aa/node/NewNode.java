@@ -146,4 +146,9 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     if( !(ptr instanceof MrgProjNode) ) ptr = _uses.at(1);
     return (MrgProjNode)ptr;
   }
+  ProjNode ptr() {
+    Node ptr = _uses.at(0);
+    if( ptr instanceof MrgProjNode ) ptr = _uses.at(1);
+    return (ProjNode)ptr;
+  }
 }

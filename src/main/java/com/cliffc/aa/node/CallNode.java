@@ -335,8 +335,7 @@ public class CallNode extends Node {
     // Recursively search memory for aliases; compute escaping aliases
     BitsAlias as2 = tmem.all_reaching_aliases(as);
     ts[_defs._len] = TypeMemPtr.make(as2,TypeObj.UNUSED);
-    TypeMem tcallee = tmem.remove_no_escapes(as2);
-    ts[MEMIDX]=tcallee;         // Memory into the callee, not caller
+    ts[MEMIDX]=tmem;         // Memory into the callee, not caller
 
     // Not a function to call?
     Type tfx = gvn.type(fun());

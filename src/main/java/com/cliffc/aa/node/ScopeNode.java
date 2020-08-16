@@ -80,7 +80,7 @@ public class ScopeNode extends Node {
         rez != null &&          // Have a return result
         // If type(rez) can never lift to any TMP, then we will not return a
         // pointer, and do not need the memory state on exit.
-        !TypeMemPtr.OOP0.dual().isa(trez) &&
+        (!TypeMemPtr.OOP0.dual().isa(trez) || trez==Type.XNIL) &&
         // And not already wiped it out
         !(mem instanceof ConNode && gvn.type(mem)==TypeMem.XMEM) )
       // Wipe out return memory
