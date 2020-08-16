@@ -45,14 +45,11 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
-    //test("-1== -1",   TypeInt.TRUE);
-    //test("2==-1",   TypeInt.FALSE);
-
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
     test("-1",  TypeInt.con( -1));
-    test("!1",  TypeInt.con(  0));
+    test("!1",  Type.XNIL);
     // Binary operators
     test("1+2", TypeInt.con(  3));
     test("1-2", TypeInt.con( -1));
@@ -91,8 +88,9 @@ public class TestParse {
     test("math_pi", TypeFlt.PI);
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk",0);
+    testerr("!", "Syntax error; trailing junk",0);
     test_prim("{+}", "+");
-    test_prim("!", "!"); // uniops are just like normal functions
+    test_prim("{!}", "!"); // uniops are just like normal functions
     // Function application, traditional paren/comma args
     test("{+}(1,2)", TypeInt.con( 3));
     test("{-}(1,2)", TypeInt.con(-1)); // binary version
@@ -111,6 +109,13 @@ public class TestParse {
     test("(1;2;)", TypeInt.con(2)); // final semicolon is optional
     test("{+}(1;2 ,3)", TypeInt.con(5)); // statements in arguments
     test("{+}(1;2;,3)", TypeInt.con(5)); // statements in arguments
+    // Operators squished together
+    test("-1== -1",  TypeInt.TRUE);
+    test("0== !!1",  TypeInt.FALSE);
+    test("2==-1",    TypeInt.FALSE);
+    test("-1== --1", TypeInt.FALSE);
+    test("-1== ---1",TypeInt.TRUE);
+    testerr("-1== --", "missing expr after binary op ==",5);
   }
 
   @Test public void testParse01() {

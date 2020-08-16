@@ -379,10 +379,13 @@ static class Not extends PrimNode {
   Not() { super("!",TypeStruct.SCALAR1,TypeInt.BOOL); }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(1));
-    if( t== Type.NIL ) return TypeInt.TRUE;
+    if( t== Type.XNIL ||
+        t== Type. NIL ||
+        t== TypeInt.ZERO )
+      return TypeInt.TRUE;
     if( t. may_nil() ) return TypeInt.BOOL.dual();
     if( t.must_nil() ) return TypeInt.BOOL;
-    return TypeInt.FALSE;       // Cannot be a nil
+    return Type.XNIL;           // Cannot be a nil, so return a nil
   }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   @Override public byte op_prec() { return 9; }

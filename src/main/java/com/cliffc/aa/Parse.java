@@ -20,10 +20,12 @@ import java.util.*;
  *  tstmt= tvar = :type            // type variable assignment
  *  stmt = [id[:type] [:]=]* ifex  // ids are (re-)assigned, and are available in later statements
  *  stmt = ^ifex                   // Early function exit
- *  ifex = expr [? stmt [: stmt]]  // trinary short-circuit logic; missing ":stmt" will default to 0
- *  expr = [uniop] term [binop term]*  // gather all the binops and sort by precedence
- *  term = id++ | id--             //
- *  term = tfact post              // A term is a tfact and some more stuff...
+ *  ifex = apply [? stmt [: stmt]] // trinary short-circuit logic; missing ":stmt" will default to 0
+ *  apply= expr  | expr expr*      // Lisp-like application-as-adjacent
+ *  expr = term [binop term]*      // gather all the binops and sort by precedence
+ *  term = uniop term              // Any number of uniops
+ *  term = id++ | id--             //   then a postfix op
+ *  term = tfact post              //   A term is a tfact and some more stuff...
  *  post = empty                   // A term can be just a plain 'tfact'
  *  post = (tuple) post            // Application argument list
  *  post = tfact tfact             // Application as adjacent value
@@ -385,7 +387,7 @@ public class Parse {
    *  ifex = expr [? stmt [: stmt]]
    */
   private Node ifex() {
-    Node expr = expr();
+    Node expr = apply();
     if( expr == null ) return null; // Expr is required, so missing expr implies not any ifex
     if( !peek('?') ) return expr;   // No if-expression
 
@@ -419,29 +421,37 @@ public class Parse {
     return  gvn(new PhiNode(Type.SCALAR ,bad,r.unhook(),tex.unhook(),  fex.unhook())) ; // Ifex result
   }
 
+  /** Parse a lisp-like function application
+      apply = expr
+      apply = expr expr*
+   */
+  private Node apply() {
+    Node expr = expr();
+    if( expr == null ) return null;
+    while( true ) {
+      skipWS();
+      int oldx = _x;
+      Node arg = expr();
+      if( arg==null ) return expr;
+      Parse bad = errMsg(oldx);
+      expr = do_call(new CallNode(true,new Parse[]{bad,bad},ctrl(),mem(),expr,arg)); // Pass the 1 arg
+    }
+  }
+  
   /** Parse an expression, a list of terms and infix operators.  The whole list
    *  is broken up into a tree based on operator precedence.
    *  expr = term [binop term]*
    */
   private Node expr() {
-    Node unifun=null;
-    int oldx = _x;
-    String uni = token();
-    if( uni!=null ) {
-      unifun = _e.lookup_filter(uni.intern(),_gvn,1); // UniOp, or null
-      if( unifun==null || unifun.op_prec() == -1 ) { unifun=null; _x=oldx; } // Not a uniop
-    }
-
-    // [unifun] term [binop term]*
     skipWS();
-    oldx = _x;
+    int oldx = _x;
     Node term = term();
-    if( term == null ) return unifun; // Term is required, so missing term implies not any expr
+    if( term == null ) return null; // Term is required, so missing term implies not any expr
     // Collect 1st fcn/arg pair
     Ary<Node > funs = new Ary<>(new Node [1],0);
     Ary<Parse> bads = new Ary<>(new Parse[1],0);
     try( TmpNode args = new TmpNode() ) {
-      funs.add(unifun==null ? null : unifun.keep());
+      funs.add(null);
       args.add_def(term);
       bads.add(errMsg(oldx));
 
@@ -488,52 +498,29 @@ public class Parse {
     }
   }
 
-  /** Parse a term of a lisp-like application.  Field lookups and C-like calls
-   *  associate have higher precedence than lisp-like application.
-   *    term = arg post
-   *    post = e | _ arg post
+  /** Any number of uniops, then a field-lookup/assignment, then a post-fix op
+   *    term = uniop term
+   *    term = id++ | id--
+   *    term = tfact [tuple | .field]* [.field[:]=stmt | .field++ | .field-- | e]
    */
   private Node term() {
-    // Normal term expansion
-    Node n = arg();
-    if( n == null ) return null;
-    while( true ) {             // Repeated application or field lookup is fine
-      int oldx = _x;            // Parser reset point
-      skipWS();                 // Skip to start of 1st arg
-      int arg_start = _x;       // For errors
-      Node arg = arg();         // Get argument
-      if( arg == null )         // just 1 arg is just the arg
-        return n;
-      Type tn = _gvn.type(n);
-      boolean may_fun = tn.isa(TypeFunPtr.GENERIC_FUNPTR);
-      if( !may_fun && arg.may_prec() >= 0 ) { _x=oldx; return n; }
-      if( !may_fun &&
-          // Notice the backwards condition: n was already tested for !(tn instanceof TypeFun).
-          // Now we test the other way: the generic function can never be an 'n'.
-          // Only if we cannot 'isa' in either direction do we bail out early
-          // here.  Otherwise, e.g. 'n' might be an unknown function argument
-          // and during GCP be 'lifted' to a function; if we bail out now we
-          // may disallow a legal program with function arguments.  However,
-          // if 'n' is a e.g. Float there's no way it can 'lift' to a function.
-          !TypeFunPtr.GENERIC_FUNPTR.isa(tn) ) {
-        kill(arg);
-        n = err_ctrl2("A function is being called, but "+tn+" is not a function");
-      } else {
-        Parse[] badargs = new Parse[]{null,errMsg(arg_start)}; // The one arg start
-        badargs[0] = errMsg(oldx-1); // Base call error reported at the opening paren
-        n = do_call(new CallNode(true,badargs,ctrl(),mem(),n,arg)); // Pass the 1 arg
-      }
-    } // Else no trailing arg, just return value
-  }
-
-  /** Parse an argument.  Field lookups and C-like calls associate
-   *  left-to-right with higher precedence than lisp-like application.
-   *    arg  = id++ | id--
-   *    arg  = tfact [tuple | .field]* [.field[:]=stmt | .field++ | .field-- | e]
-   */
-  private Node arg() {
-    // Check for id++ / id--
     int oldx = _x;
+    String uni = token();
+    if( uni!=null ) {
+      Node unifun = _e.lookup_filter(uni.intern(),_gvn,1); // UniOp, or null
+      if( unifun==null || unifun.op_prec() == -1 ) _x=oldx;// Not a uniop
+      else {
+        FunPtrNode fptr = (FunPtrNode)(unifun.keep() instanceof UnresolvedNode ? unifun.in(0) : unifun);
+        _x = oldx+fptr.fun()._name.length();
+        Node term = term();
+        unifun.unhook();
+        if( term==null ) { _x = oldx; return null; }
+        Parse[] bads = new Parse[]{null,errMsg(oldx),};
+        return do_call(new CallNode(true,bads,ctrl(),mem(),unifun,term));
+      }
+    }
+
+    // Check for id++ / id--
     String tok = token();
     if( tok != null ) {
       Node n;
@@ -917,6 +904,12 @@ public class Parse {
     if( c=='-' && _x-x>2 && _buf[x+1]=='>' ) // Disallow leading "->", confusing with function parameter list end; eg "not={x->!x}"
       _x=x+2;                                // Just return the "->"
     return new String(_buf,x,_x-x);
+  }
+  static boolean isOp(String s) {
+    if( !isOp0((byte)s.charAt(0)) ) return false;
+    for( int i=1; i<s.length(); i++ )
+      if( !isOp1((byte)s.charAt(i)) ) return false;
+    return true;
   }
 
   // Parse a number; WS already skipped and sitting at a digit.  Relies on

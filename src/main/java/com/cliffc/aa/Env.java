@@ -184,11 +184,16 @@ public class Env implements AutoCloseable {
     return t;
   }
 
-  // Lookup the name.  If the result is an UnresolvedNode of functions, filter out all
-  // the wrong-arg-count functions.  Only returns nodes registered with GVN.
+  // Lookup the operator name.  Use the longest name that's found, so that long
+  // strings of operator characters are naturally broken by (greedy) strings.
+  // IFF an Unresolved is returned, also filter by nargs.
   Node lookup_filter( String name, GVNGCM gvn, int nargs ) {
-    Node n = lookup(name);
-    return n == null ? null : (n instanceof UnresolvedNode ? ((UnresolvedNode)n).filter(gvn,nargs) : n);
+    if( !Parse.isOp(name) ) return null; // Limit to operators
+    for( int i=name.length(); i>0; i-- ) {
+      Node n = lookup(name.substring(0,i).intern());
+      if( n != null ) return n instanceof UnresolvedNode ? ((UnresolvedNode)n).filter(gvn,nargs) : n;
+    }
+    return null;
   }
 
   // Update function name token to Node mapping in the current scope
