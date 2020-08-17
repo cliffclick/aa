@@ -31,17 +31,17 @@ public class PhiNode extends Node {
   }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
-    if( gvn.type(in(0)) == Type.XCTRL ) return null;
+    if( in(0)._val == Type.XCTRL ) return null;
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
-    if( gvn.type(r) == Type.XCTRL ) return null; // All dead, c-prop will fold up
+    if( r._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
     if( r._defs.len() > 1 &&  r.in(1) == Env.ALL_CTRL ) return null;
     if( r instanceof FunNode && ((FunNode)r).noinline() )
       return null; // Do not start peeling apart parameters to a no-inline function
     // If only 1 unique live input, return that
     Node live=null;
     for( int i=1; i<_defs._len; i++ ) {
-      if( gvn.type(r.in(i))==Type.XCTRL ) continue; // Ignore dead path
+      if( r.in(i)._val==Type.XCTRL ) continue; // Ignore dead path
       Node n = in(i);
       if( n==this || n==live ) continue; // Ignore self or duplicates
       if( live==null ) live = n;         // Found unique live input
@@ -52,28 +52,29 @@ public class PhiNode extends Node {
     return null;
   }
 
-  @Override public Type value(GVNGCM gvn) {
-    Type ctl = gvn.type(in(0));
+  @Override public Type value(byte opt_mode) {
+    Type ctl = in(0)._val;
     if( ctl != Type.CTRL ) return ctl.oob();
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
     Type t = Type.ANY;
     for( int i=1; i<_defs._len; i++ )
-      if( gvn.type(r.in(i))==Type.CTRL ) // Only meet alive paths
-        t = t.meet(gvn.type(in(i)));
+      if( r.in(i)._val==Type.CTRL ) // Only meet alive paths
+        t = t.meet(in(i)._val);
     return t;
   }
-  @Override BitsAlias escapees( GVNGCM gvn) { return BitsAlias.FULL; }
+  @Override BitsAlias escapees() { return BitsAlias.FULL; }
   @Override public boolean basic_liveness() { return _t==Type.SCALAR; }
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+  @Override public TypeMem live_use( byte opt_mode, Node def ) {
     if( def==in(0) ) return TypeMem.ALIVE;
     return basic_liveness() && !def.basic_liveness() ? TypeMem.ANYMEM : _live;
   }
 
-  @Override public ErrMsg err(GVNGCM gvn, boolean fast) {
+  @Override public ErrMsg err( boolean fast ) {
     if( !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar
-        (gvn.type(this).contains(Type.SCALAR) ||
-         gvn.type(this).contains(Type.NSCALR)) ) // Cannot have code that deals with unknown-GC-state
+        (_val!=null &&
+         (_val.contains(Type.SCALAR) ||
+          _val.contains(Type.NSCALR))) ) // Cannot have code that deals with unknown-GC-state
       return ErrMsg.badGC(_badgc);
     return null;
   }

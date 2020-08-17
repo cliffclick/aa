@@ -48,68 +48,68 @@ public class TestNodeSmall {
 
 
     // Compute Node.all_type() and all_type.startype()
-    Type uaddALL = gvn.type(uadd), uaddSTART = Type.ANY;
-    Type anumALL = gvn.type(anum), anumSTART = Type.ANY;
-    Type afltALL = gvn.type(aflt), afltSTART = Type.ANY;
-    Type aintALL = gvn.type(aint), aintSTART = Type.ANY;
-    Type astrALL = gvn.type(astr), astrSTART = Type.ANY;
+    Type uaddALL = uadd._val, uaddSTART = Type.ANY;
+    Type anumALL = anum._val, anumSTART = Type.ANY;
+    Type afltALL = aflt._val, afltSTART = Type.ANY;
+    Type aintALL = aint._val, aintSTART = Type.ANY;
+    Type astrALL = astr._val, astrSTART = Type.ANY;
 
     // Compute Node.value() where initial GVN is startype()
-    gvn.setype(uadd,uaddSTART);
-    gvn.setype(anum,anumSTART);
-    gvn.setype(aflt,afltSTART);
-    gvn.setype(aint,aintSTART);
-    gvn.setype(astr,astrSTART);
+    uadd._val = uaddSTART;
+    anum._val = anumSTART;
+    aflt._val = afltSTART;
+    aint._val = aintSTART;
+    astr._val = astrSTART;
     gvn._opt_mode=1;
-    Type uaddVAL1START = uadd.value(gvn);
-    Type anumVAL1START = anum.value(gvn);
-    Type afltVAL1START = aflt.value(gvn);
-    Type aintVAL1START = aint.value(gvn);
-    Type astrVAL1START = astr.value(gvn);
+    Type uaddVAL1START = uadd.value(gvn._opt_mode);
+    Type anumVAL1START = anum.value(gvn._opt_mode);
+    Type afltVAL1START = aflt.value(gvn._opt_mode);
+    Type aintVAL1START = aint.value(gvn._opt_mode);
+    Type astrVAL1START = astr.value(gvn._opt_mode);
     gvn._opt_mode=2;
-    Type uaddVAL2START = uadd.value(gvn);
-    Type anumVAL2START = anum.value(gvn);
-    Type afltVAL2START = aflt.value(gvn);
-    Type aintVAL2START = aint.value(gvn);
-    Type astrVAL2START = astr.value(gvn);
+    Type uaddVAL2START = uadd.value(gvn._opt_mode);
+    Type anumVAL2START = anum.value(gvn._opt_mode);
+    Type afltVAL2START = aflt.value(gvn._opt_mode);
+    Type aintVAL2START = aint.value(gvn._opt_mode);
+    Type astrVAL2START = astr.value(gvn._opt_mode);
 
     // Compute Node.value() where initial GVN is all_type.dual()
-    gvn.setype(uadd,uaddALL.dual());
-    gvn.setype(anum,anumALL.dual());
-    gvn.setype(aflt,afltALL.dual());
-    gvn.setype(aint,aintALL.dual());
-    gvn.setype(astr,astrALL.dual());
+    uadd._val = uaddALL.dual();
+    anum._val = anumALL.dual();
+    aflt._val = afltALL.dual();
+    aint._val = aintALL.dual();
+    astr._val = astrALL.dual();
     gvn._opt_mode=1;
-    Type uaddVAL1XALL = uadd.value(gvn);
-    Type anumVAL1XALL = anum.value(gvn);
-    Type afltVAL1XALL = aflt.value(gvn);
-    Type aintVAL1XALL = aint.value(gvn);
-    Type astrVAL1XALL = astr.value(gvn);
+    Type uaddVAL1XALL = uadd.value(gvn._opt_mode);
+    Type anumVAL1XALL = anum.value(gvn._opt_mode);
+    Type afltVAL1XALL = aflt.value(gvn._opt_mode);
+    Type aintVAL1XALL = aint.value(gvn._opt_mode);
+    Type astrVAL1XALL = astr.value(gvn._opt_mode);
     gvn._opt_mode=2;
-    Type uaddVAL2XALL = uadd.value(gvn);
-    Type anumVAL2XALL = anum.value(gvn);
-    Type afltVAL2XALL = aflt.value(gvn);
-    Type aintVAL2XALL = aint.value(gvn);
-    Type astrVAL2XALL = astr.value(gvn);
+    Type uaddVAL2XALL = uadd.value(gvn._opt_mode);
+    Type anumVAL2XALL = anum.value(gvn._opt_mode);
+    Type afltVAL2XALL = aflt.value(gvn._opt_mode);
+    Type aintVAL2XALL = aint.value(gvn._opt_mode);
+    Type astrVAL2XALL = astr.value(gvn._opt_mode);
 
     // Compute Node.value() where initial GVN is all_type()
-    gvn.setype(uadd,uaddALL);
-    gvn.setype(anum,uaddALL);
-    gvn.setype(aflt,afltALL);
-    gvn.setype(aint,aintALL);
-    gvn.setype(astr,astrALL);
+    uadd._val = uaddALL;
+    anum._val = uaddALL;
+    aflt._val = afltALL;
+    aint._val = aintALL;
+    astr._val = astrALL;
     gvn._opt_mode=1;
-    Type uaddVAL1ALL = uadd.value(gvn);
-    Type anumVAL1ALL = anum.value(gvn);
-    Type afltVAL1ALL = aflt.value(gvn);
-    Type aintVAL1ALL = aint.value(gvn);
-    Type astrVAL1ALL = astr.value(gvn);
+    Type uaddVAL1ALL = uadd.value(gvn._opt_mode);
+    Type anumVAL1ALL = anum.value(gvn._opt_mode);
+    Type afltVAL1ALL = aflt.value(gvn._opt_mode);
+    Type aintVAL1ALL = aint.value(gvn._opt_mode);
+    Type astrVAL1ALL = astr.value(gvn._opt_mode);
     gvn._opt_mode=2;
-    Type uaddVAL2ALL = uadd.value(gvn);
-    Type anumVAL2ALL = anum.value(gvn);
-    Type afltVAL2ALL = aflt.value(gvn);
-    Type aintVAL2ALL = aint.value(gvn);
-    Type astrVAL2ALL = astr.value(gvn);
+    Type uaddVAL2ALL = uadd.value(gvn._opt_mode);
+    Type anumVAL2ALL = anum.value(gvn._opt_mode);
+    Type afltVAL2ALL = aflt.value(gvn._opt_mode);
+    Type aintVAL2ALL = aint.value(gvn._opt_mode);
+    Type astrVAL2ALL = astr.value(gvn._opt_mode);
 
     Type[] uadds = new Type[]{uaddSTART,uaddALL.dual(),uaddVAL1START,uaddVAL2START,uaddVAL1XALL,uaddVAL2XALL,uaddVAL1ALL,uaddVAL2ALL,uaddALL};
     Type[] anums = new Type[]{anumSTART,anumALL.dual(),anumVAL1START,anumVAL2START,anumVAL1XALL,anumVAL2XALL,anumVAL1ALL,anumVAL2ALL,anumALL};
@@ -175,8 +175,8 @@ public class TestNodeSmall {
     TypeTuple[] tns= new TypeTuple[argss.length];
     for( int i=0; i<argss.length; i++ ) {
       for( int j=0; j<ins.length; j++ )
-        gvn.setype(ins[j], argss[i].at(j));
-      tns[i] = (TypeTuple)n.value(gvn);
+        ins[j]._val = argss[i].at(j);
+      tns[i] = (TypeTuple)n.value(gvn._opt_mode);
     }
     // Equals check after computing them all
     for( int i=0; i<argss.length; i++ ) {
@@ -188,7 +188,7 @@ public class TestNodeSmall {
   }
 
 
-  private static TypeFunPtr v(Node n, GVNGCM gvn) { return (TypeFunPtr)n.value(gvn); }
+  private static TypeFunPtr v(Node n, GVNGCM gvn) { return (TypeFunPtr)n.value(gvn._opt_mode); }
 
   /** Validate monotonicity of CallNode.resolve().  There are only a couple of
    *  interesting variants; this test also tests e.g. XCTRL for correctness but
@@ -398,7 +398,7 @@ public class TestNodeSmall {
     //   FunPtr - Ret
     gvn._opt_mode=0;
     ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
-    gvn.setype(ctl,Type.CTRL);
+    ctl._val = Type.CTRL;
     ConNode mem = (ConNode)gvn.xform(new ConNode<>(TypeMem.ANYMEM));
     ConNode rpc = (ConNode)gvn.xform(new ConNode<>(TypeRPC.ALL_CALL));
     ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISP_SIMPLE));
@@ -409,7 +409,7 @@ public class TestNodeSmall {
     ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(1, dsp_file));
     Env.DISPLAYS = Env.DISPLAYS.set(dsp_file._alias);
     // The Fun and Fun._tf:
-    TypeStruct formals = TypeStruct.make_args(TypeAry.ts(gvn.type(dsp_file_ptr), // File-scope display as arg0
+    TypeStruct formals = TypeStruct.make_args(TypeAry.ts(dsp_file_ptr._val, // File-scope display as arg0
                                                          Type.SCALAR));          // Some scalar arg1
     TypeFunSig sig = TypeFunSig.make(formals,Type.SCALAR);
     FunNode fun = new FunNode("fact",sig,-1);
@@ -417,7 +417,7 @@ public class TestNodeSmall {
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
     ParmNode parm_mem = new ParmNode(-2,"mem",fun,mem,null);
-    ParmNode parm_dsp = new ParmNode( 0,"^"  ,fun,Type.SCALAR,gvn.con(gvn.type(dsp_file_ptr)),null);
+    ParmNode parm_dsp = new ParmNode( 0,"^"  ,fun,Type.SCALAR,gvn.con(dsp_file_ptr._val),null);
     gvn.init(parm_mem.add_def(dsp_file_obj));
     gvn.init(parm_dsp.add_def(dsp_file_ptr));
     // Close the function up
@@ -441,8 +441,8 @@ public class TestNodeSmall {
     // loose on it.  Just check the types flow correctly.
     gvn._opt_mode=1;
     for( Node n : nodes ) {
-      Type old = gvn.type(n);
-      Type nnn = n.value(gvn);
+      Type old = n._val;
+      Type nnn = n.value(gvn._opt_mode);
       assert nnn.isa(old);
     }
 
@@ -450,12 +450,12 @@ public class TestNodeSmall {
     gvn.gcp(env);
 
     // Validate cyclic display/function type
-    TypeFunPtr tfptr0 = (TypeFunPtr)gvn.type(fptr);
+    TypeFunPtr tfptr0 = (TypeFunPtr)fptr._val;
     Type tdptr0 = tfptr0._disp;
-    Type tret = ((TypeTuple)gvn.type(ret)).at(2);
+    Type tret = ((TypeTuple)ret._val).at(2);
     assertEquals(tdptr0,tret); // Returning the display
     // Display contains 'fact' pointing to self
-    TypeMem tmem = (TypeMem)gvn.type(dsp_file_obj);
+    TypeMem tmem = (TypeMem)dsp_file_obj._val;
     TypeStruct tdisp0 = (TypeStruct)tmem.ld((TypeMemPtr)tdptr0);
     assertEquals(tfptr0,tdisp0.at(tdisp0.find("fact")));
   }
@@ -586,9 +586,9 @@ public class TestNodeSmall {
     ParmNode parm2 = gvn.init(new ParmNode( 2,"arg2",fun,arg2,null));
 
     // Types for normal args before memory type
-    Type tp1 = parm1 .value(gvn);  gvn.setype(parm1,tp1);
-    Type tp2 = parm2 .value(gvn);  gvn.setype(parm2,tp2);
-    Type tpm = parmem.value(gvn);
+    Type tp1 = parm1 .xval (gvn._opt_mode);
+    Type tp2 = parm2 .xval (gvn._opt_mode);
+    Type tpm = parmem.value(gvn._opt_mode);
 
     // Check the isa(sig) on complex pointer args
     Type actual1 = tpm.sharptr(tp1);

@@ -122,8 +122,8 @@ public class CallNode extends Node {
   public void set_mem( Node mem, GVNGCM gvn) { set_def(1, mem, gvn); }
   Node set_fun( Node fun, GVNGCM gvn) { return set_def(2,fun,gvn); }
   public void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,2,fun); }
-  public BitsFun fidxs(GVNGCM gvn) {
-    Type tf = gvn.type(fun());
+  public BitsFun fidxs() {
+    Type tf = fun()._val;
     return tf instanceof TypeFunPtr ? ((TypeFunPtr)tf).fidxs() : null;
   }
 
@@ -174,7 +174,7 @@ public class CallNode extends Node {
   }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
-    Type tc = gvn.type(this);
+    Type tc = _val;
     if( !(tc instanceof TypeTuple) ) return null;
     TypeTuple tcall = (TypeTuple)tc;
 
@@ -197,7 +197,7 @@ public class CallNode extends Node {
       assert nargs()==2;        // The return, Display plus the arg tuple
       Node mem = mem();
       Node arg1 = arg(1);
-      Type tadr = gvn.type(arg1);
+      Type tadr = arg1._val;
       // Bypass a merge on the 2-arg input during unpacking
       if( mem instanceof MrgProjNode && tadr instanceof TypeMemPtr &&
           arg1 instanceof ProjNode && mem.in(0)==arg1.in(0) ) {
@@ -247,7 +247,7 @@ public class CallNode extends Node {
     // Fidxs are typically low during iter, but can be high during
     // iter post-GCP on error calls where nothing resolves.
     if( fidx == -1 && !fidxs.above_center() && !fidxs.test(1)) {
-      BitsFun rfidxs = resolve(fidxs,tcall._ts,(TypeMem)gvn.type(mem()),gvn._opt_mode==2);
+      BitsFun rfidxs = resolve(fidxs,tcall._ts,(TypeMem)mem()._val,gvn._opt_mode==2);
       if( rfidxs==null ) return null;            // Dead function, stall for time
       FunPtrNode fptr = least_cost(gvn, rfidxs, unk); // Check for least-cost target
       if( fptr != null ) return set_fun(fptr, gvn); // Resolve to 1 choice
@@ -264,11 +264,11 @@ public class CallNode extends Node {
     // alive args still need to resolve.  Constants are an issue, because they
     // fold into the Parm and the Call can lose the matching DProj while the
     // arg is still alive.
-    if( gvn._opt_mode > 2 && err(gvn,true)==null ) {
+    if( gvn._opt_mode > 2 && err(true)==null ) {
       Node progress = null;
       for( int i=1; i<nargs(); i++ ) // Skip the FP/DISPLAY arg, as its useful for error messages
         if( ProjNode.proj(this,i+ARGIDX)==null &&
-            !(arg(i) instanceof ConNode && gvn.type(arg(i))==Type.ANY) ) // Not already folded
+            !(arg(i) instanceof ConNode && arg(i)._val==Type.ANY) ) // Not already folded
           progress = set_arg(i,gvn.con(Type.ANY),gvn); // Kill dead arg
       if( progress != null ) return this;
     }
@@ -281,12 +281,12 @@ public class CallNode extends Node {
       ProjNode cepim = ProjNode.proj(cepi,1); // Memory projection from CEPI
       ProjNode cepid = ProjNode.proj(cepi,2); // Return projection from CEPI
       // Verify no extra mem readers in-between, no alias overlaps on input
-      if( cepim != null && MemSplitNode.check_split(gvn,this,escapees(gvn)) ) {
-        TypeMem tmcepi = (TypeMem)gvn.type(cepim);
+      if( cepim != null && MemSplitNode.check_split(gvn,this,escapees()) ) {
+        TypeMem tmcepi = (TypeMem)cepim._val;
         // Verify call entry is not stale relative to call exit
-        if( gvn.type(mem).isa(tmcepi) ) {
+        if( mem._val.isa(tmcepi) ) {
           // If call returns same as new (via recursion), cannot split, but CAN swap.
-          BitsAlias esc_out = CallEpiNode.esc_out(tmcepi,cepid==null ? Type.XNIL : gvn.type(cepid));
+          BitsAlias esc_out = CallEpiNode.esc_out(tmcepi,cepid==null ? Type.XNIL : cepid._val);
           int alias = ((MrgProjNode)mem).nnn()._alias;
           if( !esc_out.test_recur(alias) ) // No return conflict, so parallelize memory
             return MemSplitNode.insert_split(gvn,cepim,this,mem,mem);
@@ -314,16 +314,16 @@ public class CallNode extends Node {
   // full scatter lets users decide the meaning; e.g. wired FunNodes will take
   // the full arg set but if the call is not reachable the FunNode will not
   // merge from that path.  Result tuple type:
-  @Override public Type value(GVNGCM gvn) {
+  @Override public Type value(byte opt_mode) {
     // Pinch to XCTRL/CTRL
-    Type ctl = gvn.type(ctl());
-    if( gvn._opt_mode>0 && cepi()==null ) ctl = Type.XCTRL; // Dead from below
+    Type ctl = ctl()._val;
+    if( opt_mode>0 && cepi()==null ) ctl = Type.XCTRL; // Dead from below
     if( ctl != Type.CTRL ) return ctl.oob();
     final Type[] ts = TypeAry.get(_defs._len+1);
     ts[0] = Type.CTRL;
 
     // Not a memory to the call?
-    Type mem = gvn.type(mem());
+    Type mem = mem()._val;
     if( !(mem instanceof TypeMem) ) return mem.oob();
     TypeMem tmem = (TypeMem)mem;
 
@@ -331,23 +331,23 @@ public class CallNode extends Node {
     // Also gather all aliases from all args
     BitsAlias as = BitsAlias.EMPTY;
     for( int i=0; i<nargs(); i++ )
-      as = as.meet(get_alias(gvn,ts[i+ARGIDX] = gvn.type(arg(i))));
+      as = as.meet(get_alias(opt_mode,ts[i+ARGIDX] = arg(i)._val));
     // Recursively search memory for aliases; compute escaping aliases
     BitsAlias as2 = tmem.all_reaching_aliases(as);
     ts[_defs._len] = TypeMemPtr.make(as2,TypeObj.UNUSED);
     ts[MEMIDX]=tmem;         // Memory into the callee, not caller
 
     // Not a function to call?
-    Type tfx = gvn.type(fun());
+    Type tfx = fun()._val;
     if( !(tfx instanceof TypeFunPtr) )
       tfx = tfx.above_center() ? TypeFunPtr.GENERIC_FUNPTR.dual() : TypeFunPtr.GENERIC_FUNPTR;
     TypeFunPtr tfp = (TypeFunPtr)tfx;
     BitsFun fidxs = tfp.fidxs();
     if( !fidxs.is_empty() && fidxs.above_center()!=tfp._disp.above_center() )
-      return gvn.self_type(this); // Display and FIDX mis-aligned; stall
+      return _val; // Display and FIDX mis-aligned; stall
     // Resolve; only keep choices with sane arguments during GCP
-    BitsFun rfidxs = resolve(fidxs,ts,tmem,gvn._opt_mode==2);
-    if( rfidxs==null ) return gvn.self_type(this); // Dead function input, stall until this dies
+    BitsFun rfidxs = resolve(fidxs,ts,tmem,opt_mode==2);
+    if( rfidxs==null ) return _val; // Dead function input, stall until this dies
     // nargs is min nargs across the resolved fidxs for below-center, max for above.
     boolean rup = rfidxs.above_center();
     int nargs = rup ? -1 : 9999;
@@ -365,36 +365,36 @@ public class CallNode extends Node {
     return TypeTuple.make(ts);
   }
   // Get (shallow) aliases from the type
-  private BitsAlias get_alias(GVNGCM gvn, Type t) {
+  private BitsAlias get_alias(byte opt_mode, Type t) {
     if( t instanceof TypeMemPtr ) return ((TypeMemPtr)t)._aliases;
     if( t instanceof TypeFunPtr ) {
-      if( gvn._opt_mode >= 2 && _uses.find(e->e instanceof FP2ClosureNode)==-1 )
+      if( opt_mode >= 2 && _uses.find(e->e instanceof FP2ClosureNode)==-1 )
         return BitsAlias.EMPTY; // Fully wired call still not using display
       return ((TypeFunPtr)t)._disp._aliases;
     }
     if( TypeMemPtr.OOP.isa(t)   ) return BitsAlias.FULL;
     return BitsAlias.EMPTY;
   }
-  @Override BitsAlias escapees( GVNGCM gvn) {
-    BitsAlias esc_in  = tesc(gvn.type(this))._aliases;
+  @Override BitsAlias escapees() {
+    BitsAlias esc_in  = tesc(_val)._aliases;
     CallEpiNode cepi = cepi();
-    TypeTuple tcepi = (TypeTuple)gvn.type(cepi);
+    TypeTuple tcepi = (TypeTuple)cepi._val;
     BitsAlias esc_out = CallEpiNode.esc_out((TypeMem)tcepi.at(1),tcepi.at(2));
-    TypeMem precall = (TypeMem)gvn.type(mem());
+    TypeMem precall = (TypeMem)mem()._val;
     BitsAlias esc_out2 = precall.and_unused(esc_out); // Filter by unused pre-call
     return esc_out2.meet(esc_in);
   }
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
   // have not seen all possible function-body uses.  Check for #FIDXs == nwired().
-  @Override public TypeMem live( GVNGCM gvn) {
-    if( gvn._opt_mode < 2 ) {
-      BitsFun fidxs = fidxs(gvn);
+  @Override public TypeMem live( byte opt_mode) {
+    if( opt_mode < 2 ) {
+      BitsFun fidxs = fidxs();
       if( fidxs == null ) return TypeMem.ALLMEM; // Assume Something Good will yet happen
       if( fidxs.above_center() ) return _live; // Got choices, dunno which one will stick
       CallEpiNode cepi = cepi();
       if( cepi==null ) return _live; // Collapsing
-      if( gvn.type(ctl()) == Type.XCTRL ) return _live; // Unreachable
+      if( ctl()._val == Type.XCTRL ) return _live; // Unreachable
       // Expand (actually fail) if any parents
       BitSet bs = fidxs.tree().plus_kids(fidxs);
       if( bs.cardinality() > cepi.nwired() ) // More things to call
@@ -403,21 +403,21 @@ public class CallNode extends Node {
     // All choices discovered during GCP.  If the call is in-error it may not
     // resolve and so will have no uses other than the CallEpi - which is good
     // enough to declare this live, so it exists for errors.
-    return super.live(gvn);
+    return super.live(opt_mode);
   }
   @Override public boolean basic_liveness() { return false; }
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+  @Override public TypeMem live_use( byte opt_mode, Node def ) {
     if( def==fun() ) {                         // Function argument
-      if( gvn._opt_mode < 2 ) return TypeMem.ESCAPE;   // Prior to GCP, assume all fptrs are alive and display escapes
+      if( opt_mode < 2 ) return TypeMem.ESCAPE;   // Prior to GCP, assume all fptrs are alive and display escapes
       if( _not_resolved_by_gcp ) return TypeMem.ESCAPE;// GCP failed to resolve, this call is in-error
       // During GCP, unresolved calls might resolve & remove this use.  Keep dead till resolve fails.
       // If we have a fidx directly, use it more precisely.
       int dfidx = def instanceof FunPtrNode ? ((FunPtrNode)def).ret()._fidx : -1;
-      return live_use_call(gvn,dfidx);
+      return live_use_call(dfidx);
     }
     if( def==ctl() ) return TypeMem.ALIVE;
     if( def!=mem() ) {          // Some argument
-      if( gvn._opt_mode > 2 && !(def instanceof ConNode && (((ConNode)def)._t == Type.ANY)) ) { // If all are wired, we can check projs for uses
+      if( opt_mode > 2 && !(def instanceof ConNode && (((ConNode)def)._t == Type.ANY)) ) { // If all are wired, we can check projs for uses
         int argn = idx2arg_num(_defs.find(def));
         ProjNode proj = ProjNode.proj(this, argn + ARGIDX);
         if( proj == null || proj._live == TypeMem.DEAD )
@@ -428,8 +428,8 @@ public class CallNode extends Node {
     }
 
     // Needed to sharpen args for e.g. resolve and errors.
-    Type tcall = gvn.type(this);
-    Type tcmem = gvn.type(mem());
+    Type tcall = _val;
+    Type tcmem = mem()._val;
     if( !(tcall instanceof TypeTuple) || !(tcmem instanceof TypeMem) ) return _live; // No type to sharpen
     TypeMem caller_mem = (TypeMem)tcmem;
     BitsAlias aliases = BitsAlias.EMPTY;
@@ -447,8 +447,8 @@ public class CallNode extends Node {
     return (TypeMem)tmem2.meet(_live);
   }
 
-  TypeMem live_use_call( GVNGCM gvn, int dfidx ) {
-    Type tcall = gvn.type(this);
+  TypeMem live_use_call( int dfidx ) {
+    Type tcall = _val;
     if( !(tcall instanceof TypeTuple) ) return tcall.above_center() ? TypeMem.DEAD : _live;
     TypeFunPtr tfp = ttfp(tcall);
     // If resolve has chosen this dfidx, then the FunPtr is alive.
@@ -605,7 +605,7 @@ public class CallNode extends Node {
         int cvts=0;                        // Arg conversion cost
         for( int j=1; j<nargs(); j++ ) {   // Skip arg#0, the display
           if( fun.parm(j)==null ) continue; // Formal is ignored
-          Type actual = gvn.type(arg(j));
+          Type actual = arg(j)._val;
           Type formal = formals.at(j);
           if( actual==formal ) continue;
           byte cvt = actual.isBitShape(formal); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
@@ -651,14 +651,14 @@ public class CallNode extends Node {
   }
 
 
-  @Override public ErrMsg err(GVNGCM gvn, boolean fast) {
+  @Override public ErrMsg err( boolean fast ) {
     // Fail for passed-in unknown references directly.
     for( int j=1; j<nargs(); j++ )
       if( arg(j).is_forward_ref() )
         return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[j], FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx));
 
     // Expect a function pointer
-    Type tfun = gvn.type(fun());
+    Type tfun = fun()._val;
     if( !(tfun instanceof TypeFunPtr) )
       return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"A function is being called, but "+tfun+" is not a function type");
     TypeFunPtr tfp = (TypeFunPtr)tfun;
@@ -680,14 +680,14 @@ public class CallNode extends Node {
     // first where they became an ANY.
     if( !fast )
       for( int j=1; j<nargs(); j++ ) {
-        Type ta = gvn.type(arg(j));
+        Type ta = arg(j)._val;
         if( ta==Type.ANY || ta==Type.ALL )
           return null;
       }
 
     // Now do an arg-check.
     for( int j=1; j<nargs(); j++ ) {
-      Type actual = gvn.sharptr(arg(j),mem());
+      Type actual = arg(j).sharptr(mem());
       Ary<Type> ts=null;
       for( int fidx : tfp._fidxs ) {
         FunNode fun = FunNode.find_fidx(fidx);
@@ -702,7 +702,7 @@ public class CallNode extends Node {
           ts.push(formal);          // Add broken type
       }
       if( ts!=null )
-        return ErrMsg.typerr(_badargs[j],actual,gvn.type(mem()),ts.asAry());
+        return ErrMsg.typerr(_badargs[j],actual,mem()._val,ts.asAry());
     }
 
     return null;

@@ -12,7 +12,7 @@ public class MrgProjNode extends ProjNode {
   Node    mem() { return          in(1); }
   @Override public Node ideal(GVNGCM gvn, int level) {
     if( nnn().is_unused() ) {   // New is dead for no pointers
-      Type t = gvn.type(mem());
+      Type t = mem()._val;
       if( t instanceof TypeMem && ((TypeMem)t).at(nnn()._alias)==TypeObj.UNUSED )
         return mem();
     }
@@ -26,11 +26,11 @@ public class MrgProjNode extends ProjNode {
 
     return null;
   }
-  @Override public Type value(GVNGCM gvn) {
+  @Override public Type value(byte opt_mode) {
     if( !(in(0) instanceof NewNode) ) return Type.ANY;
     NewNode nnn = nnn();
-    Type tn = gvn.type(nnn);
-    Type tm = gvn.type(mem());
+    Type tn = nnn._val;
+    Type tm = mem()._val;
     if( !(tn instanceof TypeTuple) ) return tn.oob();
     if( !(tm instanceof TypeMem  ) ) return tm.oob();
     TypeObj to = (TypeObj)((TypeTuple)tn).at(0);
@@ -40,8 +40,8 @@ public class MrgProjNode extends ProjNode {
       : tmem.st_new(nnn._alias, to);
   }
 
-  @Override BitsAlias escapees( GVNGCM gvn) { return in(0).escapees(gvn); }
+  @Override BitsAlias escapees() { return in(0).escapees(); }
   @Override public boolean basic_liveness() { return false; }
   // Only called here if alive, and input is more-than-basic-alive
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return def==in(0) ? TypeMem.ALIVE : _live; }
+  @Override public TypeMem live_use( byte opt_mode, Node def ) { return def==in(0) ? TypeMem.ALIVE : _live; }
 }

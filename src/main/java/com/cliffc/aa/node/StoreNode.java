@@ -30,7 +30,7 @@ public class StoreNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node mem = mem();
     Node adr = adr();
-    Type ta = gvn.type(adr);
+    Type ta = adr._val;
     TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
 
     // If Store is by a New and no other Stores, fold into the New.
@@ -53,7 +53,7 @@ public class StoreNode extends Node {
       else if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) head2 = mem.in(0).in(0);
       else head2 = null;
       // Check no extra readers/writers at the split point
-      if( head2 != null && MemSplitNode.check_split(gvn,this,escapees(gvn)) )
+      if( head2 != null && MemSplitNode.check_split(gvn,this,escapees()) )
         return MemSplitNode.insert_split(gvn,this,this,mem,head2);
     }
 
@@ -67,10 +67,10 @@ public class StoreNode extends Node {
       if( memw != null && adr instanceof ProjNode && adr.in(0) instanceof NewNode ) {
         MemJoinNode mjn = (MemJoinNode)mem;
         StoreNode st = (StoreNode)gvn.xform(new StoreNode(keep(),mem,adr).keep());
-        mjn.add_alias_below(gvn,st,st.escapees(gvn),st.unhook());
+        mjn.add_alias_below(gvn,st,st.escapees(),st.unhook());
         unhook();
-        gvn.setype(st ,st .value(gvn));
-        gvn.setype(mjn,mjn.value(gvn));
+        st .xval(gvn._opt_mode);
+        mjn.xval(gvn._opt_mode);
         gvn.add_work_defs(mjn);
         return mjn;
       }
@@ -79,24 +79,24 @@ public class StoreNode extends Node {
     // Is this Store dead from below?
     if( tmp!=null && _live.ld(tmp)==TypeObj.UNUSED )
       return mem;
-    
+
     return null;
   }
 
   // StoreNode needs to return a TypeObj for the Parser.
-  @Override public TypeMem value(GVNGCM gvn) {
+  @Override public TypeMem value(byte opt_mode) {
     Node mem = mem(), adr = adr(), val = val();
-    Type tmem = gvn.type(mem);
-    Type tadr = gvn.type(adr);
-    Type tval = gvn.type(val);  // Value
+    Type tmem = mem._val;
+    Type tadr = adr._val;
+    Type tval = val._val;  // Value
     if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM);
     if( !(tadr instanceof TypeMemPtr) ) return tadr.oob(TypeMem.ALLMEM);
     TypeMem    tm  = (TypeMem   )tmem;
     TypeMemPtr tmp = (TypeMemPtr)tadr;
     return tm.update(tmp._aliases,_fin,_fld,tval);
   }
-  @Override BitsAlias escapees( GVNGCM gvn) {
-    Type adr = gvn.type(adr());
+  @Override BitsAlias escapees() {
+    Type adr = adr()._val;
     if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? BitsAlias.EMPTY : BitsAlias.FULL;
     return ((TypeMemPtr)adr)._aliases;
   }
@@ -105,24 +105,24 @@ public class StoreNode extends Node {
   // Compute the liveness local contribution to def's liveness.  Ignores the
   // incoming memory types, as this is a backwards propagation of demanded
   // memory.
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+  @Override public TypeMem live_use( byte opt_mode, Node def ) {
     if( def==mem() ) return _live; // Pass full liveness along
     if( def==adr() ) return TypeMem.ALIVE; // Basic aliveness
     if( def==val() ) return TypeMem.ESCAPE;// Value escapes
     throw com.cliffc.aa.AA.unimpl();       // Should not reach here
   }
 
-  @Override public ErrMsg err(GVNGCM gvn, boolean fast) {
-    Type t = gvn.type(adr());
+  @Override public ErrMsg err( boolean fast ) {
+    Type t = adr()._val;
     if( t.must_nil() ) return ErrMsg.niladr(_bad,"Struct might be nil when writing",_fld);
-    String msg = err0(gvn,t);
+    String msg = err0(t);
     if( msg == null ) return null;
     return ErrMsg.field(_bad,msg,_fld);
   }
-  private String err0(GVNGCM gvn, Type t) {
+  private String err0( Type t ) {
     if( t==Type.ANY ) return null;
     if( !(t instanceof TypeMemPtr) ) return "Unknown"; // Too low, might not have any fields
-    Type mem = gvn.type(mem());
+    Type mem = mem()._val;
     if( mem == Type.ANY ) return null;
     if( mem instanceof TypeMem )
       mem = ((TypeMem)mem).ld((TypeMemPtr)t);

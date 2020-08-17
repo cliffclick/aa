@@ -80,22 +80,22 @@ public class Env implements AutoCloseable {
     for( IntrinsicNewNode lib : IntrinsicNewNode.INTRINSICS() )
       STK_0.add_fun(null,lib ._name,(FunPtrNode) GVN.xform(lib .as_fun(GVN)), GVN);
     // Top-level constants
-    STK_0.create_active("math_pi", GVN.con(TypeFlt.PI),TypeStruct.FFNL,GVN);
+    STK_0.create_active("math_pi", GVN.con(TypeFlt.PI),TypeStruct.FFNL);
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
     for( Node val : STK_0._defs )  if( val instanceof UnresolvedNode ) GVN.init0(val);
-    GVN.rereg(STK_0,STK_0.value(GVN));
-    for( Node use : STK_0._uses ) GVN.rereg(use,use.value(GVN));
+    GVN.rereg(STK_0,STK_0.value(GVN._opt_mode));
+    for( Node use : STK_0._uses ) GVN.rereg(use,use.value(GVN._opt_mode));
     STK_0.no_more_fields();
-    GVN.rereg(SCP_0,SCP_0.value(GVN));
+    GVN.rereg(SCP_0,SCP_0.value(GVN._opt_mode));
     // Uplift all types once, since early Parm:mem got early versions of prims,
     // and later prims *added* choices which *lowered* types.
     for( int i=0; i<3; i++ )
       for( Node n : GVN.valsKeySet() )
-        GVN.setype(n,n.value(GVN));
+        n.xval(GVN._opt_mode);
     GVN.add_work(MEM_0);
     // Run the worklist dry
-    GVN.iter(1);
+    GVN.iter((byte)1);
 
     if( first_time ) record_for_top_reset2();
     return top;
@@ -176,12 +176,9 @@ public class Env implements AutoCloseable {
   // Test support, return top-level name type
   Type lookup_valtype( String name ) {
     Node n = lookup(name);
-    Type t = GVN.type(n);
-    if( !(n instanceof UnresolvedNode) ) return t;
+    if( !(n instanceof UnresolvedNode) ) return n._val;
     // For unresolved, use the ambiguous type
-    GVN._opt_mode=2;
-    t = n.value(GVN);
-    return t;
+    return n.value((byte)2);
   }
 
   // Lookup the operator name.  Use the longest name that's found, so that long

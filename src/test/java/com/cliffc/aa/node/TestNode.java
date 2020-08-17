@@ -200,23 +200,26 @@ public class TestNode {
     for( int i=1; i<_ins.length; i++ )
       _ins[i] = new ConNode<>(Type.SCALAR);
     Node mem = new ConNode<Type>(TypeMem.MEM);
+    mem._val = TypeMem.MEM;
     FunNode fun_forward_ref = new FunNode("anon");
-    _gvn.setype(Env.DEFMEM,TypeMem.MEM);
+    Env.DEFMEM._val = TypeMem.MEM;
 
     Node unr = top.lookup("+"); // All the "+" functions
     FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
     RetNode ret = fun_plus.ret();
     CallNode call = new CallNode(false,null,_ins[0],unr,mem);
+    call._val = TypeTuple.CALLE;
     TypeStruct tname = TypeStruct.NAMEPT;
 
     // Testing 1 set of types into a value call.
     // Comment out when not debugging.
-    Type rez0 = test1jig(new CallEpiNode(_ins[0],Env.DEFMEM,_ins[2]), TypeTuple.TEST0,TypeTuple.RET, Type.ANY, Type.ANY);
+    CallEpiNode cepi = new CallEpiNode(call,Env.DEFMEM,_ins[2]);
+    Type rez0 = test1jig(cepi, TypeTuple.TEST0,TypeTuple.RET, Type.ANY, Type.ANY);
 
     // All the Nodes, all Values, all Types
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
-    test1monotonic(new CallEpiNode(_ins[0],Env.DEFMEM,_ins[2])); // CallNode, then some count of RetNode, not flowing
+    test1monotonic(new CallEpiNode(call,Env.DEFMEM,_ins[2])); // CallNode, then some count of RetNode, not flowing
     test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
     test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));
     test1monotonic(new    ConNode<Type>(          TypeFlt.FLT64));
@@ -237,13 +240,13 @@ public class TestNode {
     test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
     NewObjNode nnn1 = new NewObjNode(false,TypeStruct.DISPLAY,_gvn.con(Type.NIL));
-    set_type(1,Type.SCALAR);  nnn1.create_active("x",_ins[1],TypeStruct.FFNL,_gvn);
-    set_type(2,Type.SCALAR);  nnn1.create_active("y",_ins[2],TypeStruct.FFNL,_gvn);
+    set_type(1,Type.SCALAR);  nnn1.create_active("x",_ins[1],TypeStruct.FFNL);
+    set_type(2,Type.SCALAR);  nnn1.create_active("y",_ins[2],TypeStruct.FFNL);
     test1monotonic(nnn1);
     NewObjNode nnn2 = new NewObjNode(false,TypeStruct.DISPLAY,_gvn.con(Type.NIL));
-    set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[1],TypeStruct.FFNL,_gvn);
-    set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[2],TypeStruct.FFNL,_gvn);
-    nnn2.set_name(tname);
+    set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[1],TypeStruct.FFNL);
+    set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[2],TypeStruct.FFNL);
+    nnn2.sets_out(tname);
     test1monotonic(nnn2);
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],null).add_def(_ins[2]));
@@ -268,11 +271,11 @@ public class TestNode {
   @SuppressWarnings("unchecked")
   private Type test1jig(final Node n, Type t0, Type t1, Type t2, Type t3) {
     // Prep graph edges
-    _gvn.setype(_ins[0],                        t0);
-    _gvn.setype(_ins[1],((ConNode)_ins[1])._t = t1);
-    _gvn.setype(_ins[2],((ConNode)_ins[2])._t = t2);
-    _gvn.setype(_ins[3],((ConNode)_ins[3])._t = t3);
-    return n.value(_gvn);
+    _ins[0]._val =                         t0;
+    _ins[1]._val = ((ConNode)_ins[1])._t = t1;
+    _ins[2]._val = ((ConNode)_ins[2])._t = t2;
+    _ins[3]._val = ((ConNode)_ins[3])._t = t3;
+    return n.value(_gvn._opt_mode);
   }
 
   private void test1monotonic(Node n) {
@@ -318,10 +321,10 @@ public class TestNode {
       Type vn = get_value_type(xx);
       int x0 = xx(xx,0), x1 = xx(xx,1), x2 = xx(xx,2), x3 = xx(xx,3);
       // Prep graph edges
-      _gvn.setype(_ins[0],                        all[x0]);
-      _gvn.setype(_ins[1],((ConNode)_ins[1])._t = all[x1]);
-      _gvn.setype(_ins[2],((ConNode)_ins[2])._t = all[x2]);
-      _gvn.setype(_ins[3],((ConNode)_ins[3])._t = all[x3]);
+      _ins[0]._val=                        all[x0];
+      _ins[1]._val=((ConNode)_ins[1])._t = all[x1];
+      _ins[2]._val=((ConNode)_ins[2])._t = all[x2];
+      _ins[3]._val=((ConNode)_ins[3])._t = all[x3];
 
       // Subtypes in 4 node input directions
       int[] stx0 = stx(n,xx,0);
@@ -361,7 +364,7 @@ public class TestNode {
     Type vm = get(xxx);
     if( vm == null ) {
       set_type(idx,all[yx]);
-      vm = n.value(_gvn);
+      vm = n.value(_gvn._opt_mode);
       Type old = put(xxx,vm);
       assert old==null;
       push(xxx);            // Now visit all children
@@ -380,10 +383,10 @@ public class TestNode {
   // Stop in debugger and repeat as needed to debug
   private void redo_(Node n, int idx, int xidx, int yx, Type[] all) {
     set_type(idx,all[xidx]);
-    Type err_n = n.value(_gvn);
+    Type err_n = n.value(_gvn._opt_mode);
 
     set_type(idx,all[yx]);
-    Type err_m = n.value(_gvn);
+    Type err_m = n.value(_gvn._opt_mode);
 
     assert err_n.isa(err_m);
   }
@@ -391,7 +394,7 @@ public class TestNode {
   @SuppressWarnings("unchecked")
   private void set_type(int idx, Type tyx) {
     if( idx > 0 ) ((ConNode)_ins[idx])._t = tyx;
-    _gvn.setype(_ins[idx], tyx);
+    _ins[idx]._val = tyx;
   }
 
   private static final int[] stx_any = new int[]{};

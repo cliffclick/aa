@@ -15,20 +15,20 @@ public class TestLive {
     ScopeNode scope = new ScopeNode(null,false);
 
     Node fullmem = new ConNode<>(TypeMem.FULL);
-    gvn.setype(fullmem,TypeMem.FULL);
+    fullmem._val = TypeMem.FULL;
     scope.set_mem(fullmem,gvn);
 
     // Return the number '5' - should be alive with no special memory.
     Node rez = new ConNode<>(TypeInt.con(5));
-    gvn.setype(rez,TypeInt.con(5));
+    rez._val = TypeInt.con(5);
     scope.set_rez(rez,gvn);
 
     // Check liveness base case
-    scope._live = scope.live(gvn);
+    scope.xliv(gvn._opt_mode);
     assertEquals(scope._live,TypeMem.ANYMEM);
 
     // Check liveness recursive back one step
-    rez._live = rez.live(gvn);
+    rez.xliv(gvn._opt_mode);
     assertEquals(rez._live,TypeMem.ALIVE);
   }
 
@@ -39,61 +39,63 @@ public class TestLive {
     GVNGCM._INIT0_CNT = 1; // No prims
     // Always memory for the NewObj
     Node mmm = new ConNode<>(TypeMem.ANYMEM);
-    gvn.setype(mmm,TypeMem.ANYMEM);
+    mmm._val = TypeMem.ANYMEM;
 
     // Fields
     Type ti5 = TypeInt.con(5);
     ConNode fdx = new ConNode(ti5);
-    gvn.setype(fdx,ti5);
+    fdx._val = ti5;
     Type ti9 = TypeInt.con(9);
     ConNode<Type> fdy = new ConNode<>(ti9);
-    gvn.setype(fdy,ti9);
+    fdy._val = ti9;
 
     // New object, fields x,y holding ints
     NewObjNode nnn = new NewObjNode(false,TypeStruct.DISPLAY,gvn.con(Type.NIL));
-    nnn.create_active("x",fdx,TypeStruct.FFNL,gvn);
-    nnn.create_active("y",fdy,TypeStruct.FFNL,gvn);
+    nnn.create_active("x",fdx,TypeStruct.FFNL);
+    nnn.create_active("y",fdy,TypeStruct.FFNL);
+    nnn._val = Type.ANY;
     nnn.no_more_fields();
-    gvn.setype(nnn,nnn.value(gvn));
+    nnn.xval(gvn._opt_mode);
+    nnn._live = TypeMem.ESCAPE;
 
     // Proj, OProj
     Node mem = new MrgProjNode(nnn,mmm);
-    gvn.setype(mem,mem.value(gvn));
+    mem.xval(gvn._opt_mode);
     Node ptr = new  ProjNode(1, nnn);
-    gvn.setype(ptr,ptr.value(gvn));
+    ptr.xval(gvn._opt_mode);
 
     // Use the object for scope exit
     ScopeNode scope = new ScopeNode(null,false);
     scope.set_mem(mem,gvn);
     scope.set_rez(ptr,gvn);
-    gvn.setype(scope,Type.ALL);
+    scope._val = Type.ALL;
 
     // Check 'live' is stable on creation, except for mem & scope
     // which are 'turning around' liveness.
     // Value was computed in a forwards flow.
     for( Node n : new Node[]{mmm,fdx,fdy,nnn,mem,ptr,scope} ) {
       if( n != mem && n != scope )
-        assertTrue(n.live(gvn).isa(n._live));
-      assertEquals(gvn.type(n),n.value(gvn));
+        assertTrue(n.live(gvn._opt_mode).isa(n._live));
+      assertEquals(n._val,n.value(gvn._opt_mode));
     }
 
     // Check liveness base case
-    scope._live = scope.live(gvn);
+    scope.xliv(gvn._opt_mode);
     // Since simple forwards-flow, the default memory is known UNUSED.
     // However, we got provided at least one object.
-    TypeMem expected_live = ((TypeMem)gvn.type(mem)).flatten_fields();
+    TypeMem expected_live = ((TypeMem)mem._val).flatten_fields();
     assertEquals(scope._live,expected_live);
 
     // Check liveness recursive back one step
-    ptr._live = ptr.live(gvn);
+    ptr.xliv(gvn._opt_mode);
     assertEquals(TypeMem.ALIVE,ptr._live); // Ptr is all_type, conservative so all memory alive
-    mem._live = mem.live(gvn);
+    mem.xliv(gvn._opt_mode);
     assertEquals(mem._live,expected_live); // Object demands of OProj, but OProj passes along request to NewObj
-    nnn._live = nnn.live(gvn);
+    nnn.xliv(gvn._opt_mode);
     assertEquals(TypeMem.ALIVE,nnn._live); // NewObj supplies object, needs what its input needs
-    mmm._live = mmm.live(gvn);
+    mmm.xliv(gvn._opt_mode);
     assertEquals(TypeMem.ALIVE,mmm._live); // Since ptr is scalar, all memory is alive
-    fdx._live = fdx.live(gvn);
+    fdx.xliv(gvn._opt_mode);
     assertEquals(TypeMem.ALIVE,fdx._live); // Since ptr is scalar, all memory is alive
 
   }

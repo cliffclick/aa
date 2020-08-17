@@ -18,11 +18,11 @@ public final class ErrNode extends Node {
   @Override String xstr() { return _err._msg; }
   @Override String str() { return "Err"; }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-  @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(in(0));
+  @Override public Type value(byte opt_mode) {
+    Type t = in(0)._val;
     return t == Type.ANY || t == Type.XCTRL ? Type.ANY : Type.ALL; // For dead data errors return ANY (no error)
   }
-  @Override public ErrMsg err(GVNGCM gvn, boolean fast) { return _err; }
+  @Override public ErrMsg err( boolean fast ) { return _err; }
   @Override public int hashCode() { return super.hashCode()+_err.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

@@ -81,13 +81,13 @@ public abstract class PrimNode extends Node {
   public abstract Type apply( Type[] args ); // Execute primitive
   @Override public String xstr() { return _name+":"+_sig._formals.at(1); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-  @Override public Type value(GVNGCM gvn) {
+  @Override public Type value(byte opt_mode) {
     Type[] ts = new Type[_defs._len]; // 1-based
     // If all inputs are constants we constant fold.  If any input is high, we
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
     for( int i=1; i<_defs._len; i++ ) { // first is control
-      Type tactual = gvn.type(in(i));
+      Type tactual = in(i)._val;
       Type tformal = _sig.arg(i);
       Type t = tformal.dual().meet(ts[i] = tactual);
       if( !t.is_con() ) {
@@ -97,9 +97,9 @@ public abstract class PrimNode extends Node {
     }
     return is_con ? apply(ts) : (has_high ? _sig._ret.dual() : _sig._ret);
   }
-  @Override public ErrMsg err(GVNGCM gvn, boolean fast) {
+  @Override public ErrMsg err( boolean fast ) {
     for( int i=1; i<_defs._len; i++ ) { // first is control
-      Type tactual = gvn.type(in(i));
+      Type tactual = in(i)._val;
       Type tformal = _sig.arg(i);
       if( !tactual.isa(tformal) )
         return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[i],tactual,null,tformal);
@@ -144,10 +144,10 @@ static class ConvertTypeName extends PrimNode {
     super(to._name,TypeStruct.make_args(TypeStruct.ts(TypeStruct.NO_DISP,from)),to);
     _badargs = new Parse[]{badargs};
   }
-  @Override public Type value(GVNGCM gvn) {
+  @Override public Type value(byte opt_mode) {
     Type[] ts = new Type[_defs._len];
     for( int i=1; i<_defs._len; i++ )
-      ts[i] = gvn.type(_defs.at(i));
+      ts[i] = _defs.at(i)._val;
     return apply(ts);     // Apply (convert) even if some args are not constant
   }
   @Override public Type apply( Type[] args ) {
@@ -158,8 +158,8 @@ static class ConvertTypeName extends PrimNode {
     assert formal.dual().isa(actual) && actual.isa(formal);
     return actual.set_name(_sig._ret._name);
   }
-  @Override public ErrMsg err(GVNGCM gvn,boolean fast) {
-    Type actual = gvn.type(in(1));
+  @Override public ErrMsg err( boolean fast ) {
+    Type actual = in(1)._val;
     Type formal = _sig.arg(1);
     if( !actual.isa(formal) ) // Actual is not a formal
       return ErrMsg.typerr(_badargs[0],actual,null,formal);
@@ -176,7 +176,7 @@ static class ConvertInt64F64 extends PrimNode {
 static class ConvertStrStr extends PrimNode {
   ConvertStrStr() { super("str",TypeStruct.STRPTR,TypeMemPtr.OOP); }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
+  @Override public Type value(byte opt_mode) { return in(1)._val; }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
 }
 
@@ -275,8 +275,8 @@ static class MulI64 extends Prim2OpI64 {
 static class AndI64 extends Prim2OpI64 {
   AndI64() { super("&"); }
   // And can preserve bit-width
-  @Override public Type value(GVNGCM gvn) {
-    Type t1 = gvn.type(in(1)), t2 = gvn.type(in(2));
+  @Override public Type value(byte opt_mode) {
+    Type t1 = in(1)._val, t2 = in(2)._val;
     // 0 AND anything is 0
     if( t1 == Type. NIL || t2 == Type. NIL ) return Type. NIL;
     if( t1 == Type.XNIL || t2 == Type.XNIL ) return Type.XNIL;
@@ -316,7 +316,7 @@ static class NE_I64 extends Prim2RelOpI64 { NE_I64() { super("!="); } boolean op
 
 static class EQ_OOP extends PrimNode {
   EQ_OOP() { super("==",TypeStruct.OOP_OOP,TypeInt.BOOL); }
-  @Override public Type value(GVNGCM gvn) {
+  @Override public Type value(byte opt_mode) {
     // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
     // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
     // equals if your inputs are the same node, and you are unequals if your
@@ -330,8 +330,8 @@ static class EQ_OOP extends PrimNode {
     // Constants can only do nil-vs-not-nil, since e.g. two strings "abc" and
     // "abc" are equal constants in the type system but can be two different
     // string pointers.
-    Type t1 = gvn.type(in(1));
-    Type t2 = gvn.type(in(2));
+    Type t1 = in(1)._val;
+    Type t2 = in(2)._val;
     if( t1==Type.NIL || t1==Type.XNIL ) return vs_nil(t2,TypeInt.TRUE,TypeInt.FALSE);
     if( t2==Type.NIL || t2==Type.XNIL ) return vs_nil(t1,TypeInt.TRUE,TypeInt.FALSE);
     if( t1.above_center() || t2.above_center() ) return TypeInt.BOOL.dual();
@@ -348,7 +348,7 @@ static class EQ_OOP extends PrimNode {
 
 static class NE_OOP extends PrimNode {
   NE_OOP() { super("!=",TypeStruct.OOP_OOP,TypeInt.BOOL); }
-  @Override public Type value(GVNGCM gvn) {
+  @Override public Type value(byte opt_mode) {
     // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
     // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
     // equals if your inputs are the same node, and you are unequals if your
@@ -362,8 +362,8 @@ static class NE_OOP extends PrimNode {
     // Constants can only do nil-vs-not-nil, since e.g. two strings "abc" and
     // "abc" are equal constants in the type system but can be two different
     // string pointers.
-    Type t1 = gvn.type(in(1));
-    Type t2 = gvn.type(in(2));
+    Type t1 = in(1)._val;
+    Type t2 = in(2)._val;
     if( t1==Type.NIL || t1==Type.XNIL ) return EQ_OOP.vs_nil(t2,TypeInt.FALSE,TypeInt.TRUE);
     if( t2==Type.NIL || t2==Type.XNIL ) return EQ_OOP.vs_nil(t1,TypeInt.FALSE,TypeInt.TRUE);
     if( t1.above_center() || t2.above_center() ) return TypeInt.BOOL.dual();
@@ -377,8 +377,8 @@ static class NE_OOP extends PrimNode {
 static class Not extends PrimNode {
   // Rare function which takes a Scalar (works for both ints and ptrs)
   Not() { super("!",TypeStruct.SCALAR1,TypeInt.BOOL); }
-  @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(in(1));
+  @Override public Type value(byte opt_mode) {
+    Type t = in(1)._val;
     if( t== Type.XNIL ||
         t== Type. NIL ||
         t== TypeInt.ZERO )
@@ -394,8 +394,8 @@ static class Not extends PrimNode {
 
 static class RandI64 extends PrimNode {
   RandI64() { super("math_rand",TypeStruct.INT64,TypeInt.INT64); }
-  @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(in(1));
+  @Override public Type value(byte opt_mode) {
+    Type t = in(1)._val;
     if( t.above_center() ) return TypeInt.BOOL.dual();
     if( TypeInt.INT64.dual().isa(t) && t.isa(TypeInt.INT64) )
       return t.meet(TypeInt.FALSE);
@@ -409,7 +409,7 @@ static class RandI64 extends PrimNode {
 static class Id extends PrimNode {
   Id(Type arg) { super("id",TypeStruct.make_args(TypeStruct.ts(TypeStruct.NO_DISP,arg)),arg); }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
+  @Override public Type value(byte opt_mode) { return in(1)._val; }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
 }
 

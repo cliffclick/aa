@@ -41,7 +41,7 @@ public class ScopeNode extends Node {
   public void set_rez ( Node n, GVNGCM gvn) { set_def(3,n,gvn); }
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
   public Node set_mem( Node n, GVNGCM gvn) {
-    assert n==null || (gvn.touched(n) && (gvn.type(n) instanceof TypeMem || gvn.type(n)==Type.ANY));
+    assert n==null || (n.touched() && (n._val instanceof TypeMem || n._val==Type.ANY));
     set_def(1,n,gvn);
     return this;
   }
@@ -75,29 +75,29 @@ public class ScopeNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node mem = mem();
     Node rez = rez();
-    Type trez = rez==null ? null : gvn.type(rez);
+    Type trez = rez==null ? null : rez._val;
     if( gvn._opt_mode != 0 &&   // Past parsing
         rez != null &&          // Have a return result
         // If type(rez) can never lift to any TMP, then we will not return a
         // pointer, and do not need the memory state on exit.
         (!TypeMemPtr.OOP0.dual().isa(trez) || trez==Type.XNIL) &&
         // And not already wiped it out
-        !(mem instanceof ConNode && gvn.type(mem)==TypeMem.XMEM) )
+        !(mem instanceof ConNode && mem._val==TypeMem.XMEM) )
       // Wipe out return memory
       return set_mem(gvn.add_work(gvn.con(TypeMem.XMEM)), gvn);
 
     return null;
   }
-  @Override public Type value(GVNGCM gvn) { return Type.ALL; }
+  @Override public Type value(byte opt_mode) { return Type.ALL; }
   @Override public boolean basic_liveness() { return false; }
 
   // From a memory and a possible pointer-to-memory, find all the reachable
   // aliases and fold them into 'live'.  This is unlike other live_use
   // because this "turns around" the incoming live memory to also be the
   // demanded/used memory.
-  static TypeMem compute_live_mem(GVNGCM gvn, Node mem, Node rez) {
-    Type tmem = gvn.type(mem);
-    Type trez = gvn.type(rez);
+  static TypeMem compute_live_mem(Node mem, Node rez) {
+    Type tmem = mem._val;
+    Type trez = rez._val;
     if( !(tmem instanceof TypeMem ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
     if( TypeMemPtr.OOP.isa(trez) ) return (TypeMem)tmem; // All possible pointers, so all memory is alive
     if( !(trez instanceof TypeMemPtr) ) return TypeMem.ANYMEM; // Not a pointer, basic live only
@@ -107,21 +107,21 @@ public class ScopeNode extends Node {
     BitsAlias aliases = tmem0.all_reaching_aliases(((TypeMemPtr)trez)._aliases);
     return tmem0.slice_reaching_aliases(aliases);
   }
-  @Override public TypeMem live( GVNGCM gvn) {
+  @Override public TypeMem live( byte opt_mode) {
     // The top scope is always alive, and represents what all future unparsed
     // code MIGHT do.
     if( this==Env.SCP_0 )
-      return gvn._opt_mode < 2 ? TypeMem.ALLMEM : TypeMem.DEAD;
+      return opt_mode < 2 ? TypeMem.ALLMEM : TypeMem.DEAD;
     assert _uses._len==0;
     // All fields in all reachable pointers from rez() will be marked live
-    return compute_live_mem(gvn,mem(),rez()).flatten_fields();
+    return compute_live_mem(mem(),rez()).flatten_fields();
   }
 
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+  @Override public TypeMem live_use( byte opt_mode, Node def ) {
     // The top scope is always alive, and represents what all future unparsed
     // code MIGHT do.
     if( this==Env.SCP_0 )
-      return gvn._opt_mode < 2 ? TypeMem.ALLMEM : TypeMem.DEAD;
+      return opt_mode < 2 ? TypeMem.ALLMEM : TypeMem.DEAD;
     // Basic liveness ("You are Alive!") for control and returned value
     if( def == ctrl() ) return TypeMem.ALIVE;
     if( def == rez () ) return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM;

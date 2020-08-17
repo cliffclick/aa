@@ -48,9 +48,10 @@ public abstract class Node implements Cloneable {
 
   private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "DefMem", "Err", "FP2Clo", "Fun", "FunPtr", "If", "Join", "LibCall", "Load", "Loop", "Name", "NewObj", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Tmp", "Type", "Unresolved" };
 
-  public int _uid;  // Unique ID, will have gaps, used to give a dense numbering to nodes
-  final byte _op;   // Opcode (besides the object class), used to avoid v-calls in some places
-  public byte _keep;// Keep-alive in parser, even as last use goes away
+  public int _uid;      // Unique ID, will have gaps, used to give a dense numbering to nodes
+  final byte _op;       // Opcode (besides the object class), used to avoid v-calls in some places
+  public byte _keep;    // Keep-alive in parser, even as last use goes away
+  public Type _val;     // Value; starts at ALL and lifts towards ANY.
   public TypeMem _live; // Liveness; assumed live in gvn.iter(), assumed dead in gvn.gcp().
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
@@ -172,8 +173,12 @@ public abstract class Node implements Cloneable {
     _defs = new Ary<>(defs);
     _uses = new Ary<>(new Node[1],0);
     for( Node def : defs ) if( def != null ) def._uses.add(this);
+    _val = null;
     _live = basic_liveness() ? TypeMem.ESCAPE : TypeMem.ALLMEM;
-   }
+  }
+
+  // Is 'touched' is just 'has a value', and also 'is in the GVN system'
+  public boolean touched() { return _val != null; }
 
   // Is a primitive
   public boolean is_prim() { return GVNGCM._INIT0_CNT==0 || _uid<GVNGCM._INIT0_CNT; }
@@ -211,8 +216,7 @@ public abstract class Node implements Cloneable {
     for( Node n : _uses ) sb.p(String.format("%4d ",n._uid));
     sb.p("]]  ");
     sb.p(str());
-    Type t = Env.GVN.self_type(this);
-    sb.s().p(t==null ? "----" : t.toString());
+    sb.s().p(_val==null ? "----" : _val.toString());
     return sb;
   }
   // Dump one node IF not already dumped, no recursion
@@ -359,7 +363,10 @@ public abstract class Node implements Cloneable {
   // Compute the current best Type for this Node, based on the types of its
   // inputs.  May return Type.ALL, especially if its inputs are in error.  It
   // must be monotonic.  This is a forwards-flow transfer-function computation.
-  abstract public Type value(GVNGCM gvn);
+  abstract public Type value(byte opt_mode);
+
+  // Shortcut to update self-value
+  public Type xval( byte opt_mode ) { return _val = value(opt_mode); }
 
   // Compute the current best liveness for this Node, based on the liveness of
   // its uses.  If basic_liveness(), returns a simple DEAD/ALIVE.  Otherwise
@@ -367,12 +374,12 @@ public abstract class Node implements Cloneable {
   // TypeMem.FULL, especially if its uses are of unwired functions.
   // It must be monotonic.
   // This is a reverse-flow transfer-function computation.
-  public TypeMem live( GVNGCM gvn ) {
+  public TypeMem live( byte opt_mode ) {
     if( basic_liveness() ) {    // Basic liveness only; e.g. primitive math ops
       boolean alive=false;
       for( Node use : _uses ) // Computed across all uses
         if( use._live != TypeMem.DEAD ) {
-          TypeMem live = use.live_use(gvn,this);
+          TypeMem live = use.live_use(opt_mode,this);
           if( live == TypeMem.ALIVE ) alive = true;
           else if( live != TypeMem.DEAD ) return TypeMem.ESCAPE;
         }
@@ -382,14 +389,16 @@ public abstract class Node implements Cloneable {
     TypeMem live = TypeMem.DEAD; // Start at lattice top
     for( Node use : _uses )      // Computed across all uses
       if( use._live != TypeMem.DEAD )
-        live = (TypeMem)live.meet(use.live_use(gvn, this)); // Make alive used fields
+        live = (TypeMem)live.meet(use.live_use(opt_mode, this)); // Make alive used fields
     live = live.flatten_fields();
     assert !(live.at(1) instanceof TypeLive);
     return live;
   }
+  // Shortcut to update self-live
+  public Type xliv( byte opt_mode ) { return _live = live(opt_mode); }
   // Compute local contribution of use liveness to this def.
   // Overridden in subclasses that do per-def liveness.
-  public TypeMem live_use( GVNGCM gvn, Node def ) {
+  public TypeMem live_use( byte opt_mode, Node def ) {
     return _keep>0 ? TypeMem.MEM : _live;
   }
 
@@ -406,7 +415,7 @@ public abstract class Node implements Cloneable {
   public boolean live_changes_value() { return false; }
 
   // Return any type error message, or null if no error
-  public ErrMsg err(GVNGCM gvn, boolean fast) { return null; }
+  public ErrMsg err( boolean fast ) { return null; }
 
   // Operator precedence is only valid for ConNode of binary functions
   public byte  op_prec() { return -1; }
@@ -432,6 +441,17 @@ public abstract class Node implements Cloneable {
     return true;
   }
 
+  // Forward reachable walk, setting types to all_type().dual() and making all dead.
+  public final void walk_initype( GVNGCM gvn, VBitSet bs ) {
+    if( bs.tset(_uid) ) return;    // Been there, done that
+    _val = Type.ANY;               // Highest value
+    _live = TypeMem.DEAD;          // Not alive
+    // Walk reachable graph
+    gvn.add_work(this);
+    for( Node use : _uses ) use.walk_initype(gvn,bs);
+    for( Node def : _defs ) if( def != null ) def.walk_initype(gvn,bs);
+  }
+
   // Assert all ideal, value and liveness calls are done
   public final boolean more_ideal(GVNGCM gvn, VBitSet bs, int level) {
     if( bs.tset(_uid) ) return false; // Been there, done that
@@ -439,10 +459,10 @@ public abstract class Node implements Cloneable {
       Node idl = ideal(gvn,level);
       if( idl != null )
         return true;            // Found an ideal call
-      Type t = value(gvn);
-      if( gvn.type(this) != t )
+      Type t = value(gvn._opt_mode);
+      if( _val != t )
         return true;            // Found a value improvement
-      TypeMem live = live(gvn);
+      TypeMem live = live(gvn._opt_mode);
       if( _live != live )
         return true;            // Found a liveness improvement
     }
@@ -454,8 +474,8 @@ public abstract class Node implements Cloneable {
   public final int more_flow(GVNGCM gvn, VBitSet bs, boolean lifting, int errs) {
     if( bs.tset(_uid) ) return errs; // Been there, done that
     // Check for only forwards flow, and if possible then also on worklist
-    Type    oval=gvn.type(this), nval = value(gvn);
-    TypeMem oliv=_live         , nliv = live (gvn);
+    Type    oval=_val , nval = value(gvn._opt_mode);
+    TypeMem oliv=_live, nliv = live (gvn._opt_mode);
     if( nval != oval || nliv != oliv ) {
       boolean ok = lifting
         ? nval.isa(oval) && nliv.isa(oliv)
@@ -475,7 +495,7 @@ public abstract class Node implements Cloneable {
   public void walkerr_use( HashSet<ErrMsg> errs, VBitSet bs, GVNGCM gvn ) {
     assert !is_dead();
     if( bs.tset(_uid) ) return;  // Been there, done that
-    if( gvn.type(this) != Type.CTRL ) return; // Ignore non-control
+    if( _val != Type.CTRL ) return; // Ignore non-control
     if( this instanceof ErrNode ) adderr(gvn,errs);
     for( Node use : _uses )     // Walk control users for more errors
       use.walkerr_use(errs,bs,gvn);
@@ -489,7 +509,7 @@ public abstract class Node implements Cloneable {
     // Reverse walk: start at exit/return of graph and walk towards root/start.
     for( int i=0; i<_defs._len; i++ ) {
       Node def = _defs.at(i);   // Walk data defs for more errors
-      if( def == null || gvn.type(def) == Type.XCTRL ) continue;
+      if( def == null || def._val == Type.XCTRL ) continue;
       def.walkerr_def(errs,bs,gvn);
     }
     // Post-Order walk: check after walking
@@ -505,7 +525,7 @@ public abstract class Node implements Cloneable {
       if( in(i) != null ) in(i).walkerr_gc(errs,bs,gvn);
   }
   private void adderr(GVNGCM gvn, HashSet<ErrMsg> errs ) {
-    ErrMsg msg = err(gvn,false);
+    ErrMsg msg = err(false);
     if( msg==null ) return;
     msg._order = errs.size();
     errs.add(msg);
@@ -548,9 +568,12 @@ public abstract class Node implements Cloneable {
     return found;
   }
 
+  // Shortcut
+  public Type sharptr( Node mem ) { return mem._val.sharptr(_val); }
+
   // Aliases that a MemJoin might choose between.  Not valid for nodes which do
   // not manipulate memory.
-  BitsAlias escapees( GVNGCM gvn) { throw com.cliffc.aa.AA.unimpl("graph error"); }
+  BitsAlias escapees() { throw com.cliffc.aa.AA.unimpl("graph error"); }
 
   // Walk a subset of the dominator tree, looking for the last place (highest
   // in tree) this predicate passes, or null if it never does.

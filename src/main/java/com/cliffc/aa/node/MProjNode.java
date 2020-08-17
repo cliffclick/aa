@@ -14,13 +14,13 @@ public class MProjNode extends ProjNode {
       return x == this ? gvn.con(TypeMem.ANYMEM) : x; // Happens in dead self-recursive functions
     if( in(0) instanceof CallEpiNode ) {
       Node precall = in(0).is_pure_call(); // See if memory can bypass pure calls (most primitives)
-      if( precall != null && gvn.type(this)==gvn.type(precall) )
+      if( precall != null && _val==precall._val )
         return precall;
     }
     return null;
   }
-  @Override BitsAlias escapees( GVNGCM gvn) { return in(0).escapees(gvn); }
+  @Override BitsAlias escapees() { return in(0).escapees(); }
   @Override public boolean basic_liveness() { return false; }
   // Only called here if alive, and input is more-than-basic-alive
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return _live; }
+  @Override public TypeMem live_use( byte opt_mode, Node def ) { return _live; }
 }

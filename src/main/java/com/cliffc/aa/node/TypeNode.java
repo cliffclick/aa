@@ -27,7 +27,7 @@ public class TypeNode extends Node {
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node arg= arg(), mem = mem();
-    Type actual = gvn.sharptr(arg,mem);
+    Type actual = arg.sharptr(mem);
     if( actual.isa(_t) )
       return arg;
     // If TypeNode check is for a function, it will wrap any incoming function
@@ -37,7 +37,7 @@ public class TypeNode extends Node {
       TypeFunSig sig = (TypeFunSig)_t;
       Node[] args = new Node[sig.nargs()-1/*not display*/+/*+ctrl+mem+tfp+all args*/3];
       FunNode fun = gvn.init((FunNode)(new FunNode(null,sig,-1).add_def(Env.ALL_CTRL)));
-      gvn.setype(fun,Type.CTRL);
+      fun._val = Type.CTRL;
       args[0] = fun;            // Call control
       args[1] = gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
       args[2] = arg;            // The whole TFP to the call
@@ -81,29 +81,29 @@ public class TypeNode extends Node {
 
     return null;
   }
-  @Override public Type value(GVNGCM gvn) {
+  @Override public Type value(byte opt_mode) {
     Node arg = arg();
-    Type t1 = gvn.type(arg);
+    Type t1 = arg._val;
     Type t0 = _t.simple_ptr();
     if( t1.isa(t0) ) {
-      Type actual = gvn.sharptr(arg,mem());
+      Type actual = arg.sharptr(mem());
       if( actual.isa(_t) )
         return t1;
     }
     return t1.oob(t0);
   }
   @Override public boolean basic_liveness() { return true; }
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+  @Override public TypeMem live_use( byte opt_mode, Node def ) {
     if( def==arg() ) return _live;                   // Alive as I am
     // Alive (like normal liveness), plus the address, plus whatever can be
     // reached from the address.
-    return ScopeNode.compute_live_mem(gvn,mem(),arg());
+    return ScopeNode.compute_live_mem(mem(),arg());
   }
 
   // Check TypeNode for being in-error
-  @Override public ErrMsg err(GVNGCM gvn, boolean fast) {
-    Type arg = gvn.type(arg());
-    Type mem = gvn.type(mem());
+  @Override public ErrMsg err( boolean fast ) {
+    Type arg = arg()._val;
+    Type mem = mem()._val;
     return ErrMsg.typerr(_error_parse,arg,mem,_t);
   }
 }

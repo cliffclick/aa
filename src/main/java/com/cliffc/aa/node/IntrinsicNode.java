@@ -56,21 +56,21 @@ public class IntrinsicNode extends Node {
     Node ptr = ptr();
     if( mem instanceof MrgProjNode &&
         mem.in(0)==ptr.in(0) && mem._uses._len==2 ) { // Only self and DefMem users
-      TypeMemPtr tptr = (TypeMemPtr)gvn.type(ptr);
+      TypeMemPtr tptr = (TypeMemPtr)ptr._val;
       int alias = tptr._aliases.abit();
       if( alias > 0 ) {         // Not a mixed set of aliases
         NewObjNode nnn = (NewObjNode)mem.in(0);
         // NewObjNode is well-typed and producing a pointer to memory with the
         // correct type?  Fold into the NewObjNode and remove this Convert.
-        TypeTuple tnnn = (TypeTuple)gvn.type(nnn);
-        Type actual = gvn.type(mem).sharptr(tnnn.at(1));
+        TypeTuple tnnn = (TypeTuple)nnn._val;
+        Type actual = mem._val.sharptr(tnnn.at(1));
         if( actual instanceof TypeMemPtr ) actual = ((TypeMemPtr)actual)._obj; // Get the struct
         Type formal = _tn.remove_name();
         if( actual.isa(formal) ) { // Actual struct isa formal struct?
           TypeStruct tn = nnn._ts.make_from(_tn._name);
           nnn.set_name(tn);
-          gvn.setype(nnn,nnn.value(gvn)); // Update immediately to preserve monotonicity
-          gvn.setype(mem,mem.value(gvn));
+          nnn.xval(gvn._opt_mode); // Update immediately to preserve monotonicity
+          mem.xval(gvn._opt_mode);
           return mem;
         }
       }
@@ -85,9 +85,9 @@ public class IntrinsicNode extends Node {
   // The inputs are a TypeMem and a TypeMemPtr to an unnamed TypeObj.  If the
   // ptr is of the "from" type, we cast a Name to it and produce a pointer to
   // the "to" type, otherwise we get the most conservative "to" type.
-  @Override public Type value(GVNGCM gvn) {
-    Type mem = gvn.type(mem());
-    Type ptr = gvn.type(ptr());
+  @Override public Type value(byte opt_mode) {
+    Type mem = mem()._val;
+    Type ptr = ptr()._val;
     if( !(mem instanceof TypeMem   ) ) return mem.oob(); // Inputs are confused
     if( !(ptr instanceof TypeMemPtr) ) return ptr.oob(); // Inputs are confused
     TypeMem tmem = (TypeMem)mem;
@@ -102,14 +102,14 @@ public class IntrinsicNode extends Node {
     return tmem.set(alias,rez);
   }
   @Override public boolean basic_liveness() { return false; }
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+  @Override public TypeMem live_use( byte opt_mode, Node def ) {
     if( def==mem() ) return _live;
     return TypeMem.ALIVE;
   }
   //
-  @Override public ErrMsg err(GVNGCM gvn, boolean fast) {
-    Type ptr = gvn.type(ptr());
-    Type mem = gvn.type(mem());
+  @Override public ErrMsg err( boolean fast ) {
+    Type ptr = ptr()._val;
+    Type mem = mem()._val;
     return ErrMsg.typerr(_badargs,ptr,mem,TypeMemPtr.make(BitsAlias.RECORD,_tn)); // Did not remove the aliasing
   }
 

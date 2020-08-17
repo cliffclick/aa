@@ -99,9 +99,9 @@ public class Parse {
     prog();        // Parse a program
     _gvn.rereg(_e._scope,Type.ALL);
     _gvn.rereg(_e._par._scope,Type.ALL);
-    _gvn.iter(1);   // Pessimistic optimizations; might improve error situation
-    _gvn.gcp(_e._scope); // Global Constant Propagation
-    _gvn.iter(3);   // Re-check all ideal calls now that types have been maximally lifted
+    _gvn.iter((byte)1); // Pessimistic optimizations; might improve error situation
+    _gvn.gcp(_e._scope);// Global Constant Propagation
+    _gvn.iter((byte)3); // Re-check all ideal calls now that types have been maximally lifted
     return gather_errors();
   }
 
@@ -114,13 +114,13 @@ public class Parse {
     // Delete names at the top scope before final optimization.
     _e.close_display(_gvn);
     _gvn.rereg(_e._scope,Type.ALL);
-    _e._scope._live = _e._scope.live(_gvn);
-    _gvn.iter(1);   // Pessimistic optimizations; might improve error situation
+    _e._scope.xliv(_gvn._opt_mode);
+    _gvn.iter((byte)1);  // Pessimistic optimizations; might improve error situation
     remove_unknown_callers();
     _gvn.gcp(_e._scope); // Global Constant Propagation
-    _gvn.iter(3);   // Re-check all ideal calls now that types have been maximally lifted
+    _gvn.iter((byte)3);  // Re-check all ideal calls now that types have been maximally lifted
     _gvn.gcp(_e._scope); // Global Constant Propagation
-    _gvn.iter(4);   // Re-check all ideal calls now that types have been maximally lifted
+    _gvn.iter((byte)4);  // Re-check all ideal calls now that types have been maximally lifted
     return gather_errors();
   }
 
@@ -146,8 +146,8 @@ public class Parse {
     _gvn.unreg(_e._par._scope);
     Node res = _e._scope.pop(); // New and improved result
     Node mem = _e._scope.mem();
-    Type tres = _gvn.type(res);
-    TypeMem tmem = (TypeMem)_gvn.type(mem);
+    Type tres = res._val;
+    TypeMem tmem = (TypeMem)mem._val;
 
     // Hunt for typing errors in the alive code
     assert _e._par._par==null; // Top-level only
@@ -263,7 +263,7 @@ public class Parse {
         _gvn.init0(rez2._uses.at(0));      // Force init of Unresolved
       }
     }
-    _gvn.rereg(stk,stk.value(_gvn)); // Re-install display in GVN
+    _gvn.rereg(stk,stk.value(_gvn._opt_mode)); // Re-install display in GVN
     _gvn.revalive(Env.DEFMEM);       // Update DEFMEM for both functions added
     // TODO: Add reverse cast-away
     return rez;
@@ -368,7 +368,7 @@ public class Parse {
       if( n.is_forward_ref() ) { // Prior is actually a forward-ref, so this is the def
         assert !scope.stk().is_mutable(tok) && scope == _e._scope;
         if( ifex instanceof FunPtrNode )
-          ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex,(TypeMemPtr)_gvn.type(scope.ptr()));
+          ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex,(TypeMemPtr)scope.ptr()._val);
         else ; // Can be here if already in-error
       } else { // Store into scope/NewObjNode/display
         // Assign into display
@@ -416,7 +416,7 @@ public class Parse {
     f_mem = _e._scope.check_if(false,bad,_gvn,f_ctrl,f_mem); // Insert errors if created only 1 side
     _e._scope.pop_if();         // Pop the if-scope
     RegionNode r = set_ctrl(init(new RegionNode(null,t_ctrl.unhook(),f_ctrl.unhook())).keep());
-    _gvn.setype(r,Type.CTRL);
+    r._val = Type.CTRL;
     set_mem(gvn(new PhiNode(TypeMem.FULL,bad,r       ,t_mem.unhook(),f_mem.unhook())));
     return  gvn(new PhiNode(Type.SCALAR ,bad,r.unhook(),tex.unhook(),  fex.unhook())) ; // Ifex result
   }
@@ -437,7 +437,7 @@ public class Parse {
       expr = do_call(new CallNode(true,new Parse[]{bad,bad},ctrl(),mem(),expr,arg)); // Pass the 1 arg
     }
   }
-  
+
   /** Parse an expression, a list of terms and infix operators.  The whole list
    *  is broken up into a tree based on operator precedence.
    *  expr = term [binop term]*
@@ -562,7 +562,7 @@ public class Parse {
         Node arg = tuple(oldx,stmts(),first_arg_start); // Parse argument list
         if( arg == null )       // tfact but no arg is just the tfact
           { _x = oldx; return n; }
-        Type tn = _gvn.type(n);
+        Type tn = n._val;
         boolean may_fun = tn.isa(TypeFunPtr.GENERIC_FUNPTR);
         if( !may_fun && arg.may_prec() >= 0 ) { _x=oldx; return n; }
         if( !may_fun &&
@@ -723,7 +723,7 @@ public class Parse {
     TypeStruct mt_tuple = TypeStruct.make(false,new String[]{"^"},TypeStruct.ts(Type.XNIL),new byte[]{TypeStruct.FFNL},true);
     NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,mt_tuple,con(Type.XNIL));
     for( int i=0; i<args._len; i++ )
-      nn.create_active((""+i).intern(),args.at(i),TypeStruct.FFNL,_gvn);
+      nn.create_active((""+i).intern(),args.at(i),TypeStruct.FFNL);
     nn._fld_starts = bads.asAry();
     NewObjNode nnn = (NewObjNode)gvn(nn);
     nnn.no_more_fields();
@@ -769,7 +769,7 @@ public class Parse {
     // Push an extra hidden display argument.  Similar to java inner-class ptr
     // or when inside of a struct definition: 'this'.
     Node parent_display = _e._scope.ptr();
-    TypeMemPtr tpar_disp = (TypeMemPtr)_gvn.type(parent_display); // Just a TMP of the right alias
+    TypeMemPtr tpar_disp = (TypeMemPtr)parent_display._val; // Just a TMP of the right alias
     ids .push("^");
     ts  .push(tpar_disp);
     bads.push(null);
@@ -857,7 +857,7 @@ public class Parse {
     s.early_kill();
     if( ctrl == null ) return rez.unhook(); // No other exits to merge into
     set_ctrl(ctrl=init(ctrl.add_def(ctrl())));
-    _gvn.setype(ctrl,Type.CTRL);
+    ctrl._val = Type.CTRL;
     mem.set_def(0,ctrl,null);
     val.set_def(0,ctrl,null);
     set_mem (gvn(mem.add_def(mem())));
@@ -885,7 +885,7 @@ public class Parse {
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.
   private Node typechk(Node x, Type t, Node mem, Parse bad) {
-    return t == null || _gvn.type(x).isa(t) ? x : gvn(new TypeNode(mem,x,t,bad));
+    return t == null || x._val.isa(t) ? x : gvn(new TypeNode(mem,x,t,bad));
   }
 
   private String token() { skipWS();  return token0(); }
@@ -1164,7 +1164,7 @@ public class Parse {
   public  Node lookup( String tok ) { return _e.lookup(tok); }
   private ScopeNode lookup_scope( String tok, boolean lookup_current_scope_only ) { return _e.lookup_scope(tok,lookup_current_scope_only); }
   public  ScopeNode scope( ) { return _e._scope; }
-  private void create( String tok, Node n, byte mutable ) { _e._scope.stk().create(tok,n,mutable,_gvn ); }
+  private void create( String tok, Node n, byte mutable ) { _e._scope.stk().create(tok,n,mutable,_gvn); }
   private static byte ts_mutable(boolean mutable) { return mutable ? TypeStruct.FRW : TypeStruct.FFNL; }
 
   // Get the display pointer.  The function call
@@ -1179,7 +1179,7 @@ public class Parse {
     while( true ) {
       if( scope == e._scope ) return ptr;
       ptr = gvn(new LoadNode(mmem,ptr,"^",null)); // Gen linked-list walk code, walking display slot
-      assert _gvn.sharptr(ptr,mmem).is_display_ptr();
+      assert ptr.sharptr(mmem).is_display_ptr();
       e = e._par;                                 // Walk linked-list in parser also
     }
   }

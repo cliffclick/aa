@@ -40,41 +40,41 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public void no_more_fields() { sets_in(_ts.close()); }
 
   // Create a field from parser for an inactive this
-  public void create( String name, Node val, byte mutable, GVNGCM gvn  ) {
+  public void create( String name, Node val, byte mutable, GVNGCM gvn) {
     assert !Util.eq(name,"^"); // Closure field created on init
     gvn.unreg(this);
-    create_active(name,val,mutable,gvn);
-    gvn.rereg(this,value(gvn)); // Re-insert with field added
+    create_active(name,val,mutable);
+    gvn.rereg(this,value(gvn._opt_mode)); // Re-insert with field added
     for( Node use : _uses ) {
-      gvn.setype(use,use.value(gvn)); // Record "downhill" type for OProj, DProj
-      gvn.add_work_uses(use);         // Neighbors on worklist
+      use.xval(gvn._opt_mode);  // Record "downhill" type for OProj, DProj
+      gvn.add_work_uses(use);   // Neighbors on worklist
     }
-    assert gvn.touched(this);
+    assert touched();
   }
 
   // Create a field from parser for an active this
-  public void create_active( String name, Node val, byte mutable, GVNGCM gvn  ) {
-    assert !gvn.touched(this);
+  public void create_active( String name, Node val, byte mutable ) {
+    assert !touched();
     assert def_idx(_ts._ts.length)== _defs._len;
     assert _ts.find(name) == -1; // No dups
     add_def(val);
-    sets_out(_ts.add_fld(name,mutable,mutable==TypeStruct.FFNL ? gvn.type(val) : Type.SCALAR));
+    sets_out(_ts.add_fld(name,mutable,mutable==TypeStruct.FFNL ? val._val : Type.SCALAR));
   }
   public void update( String tok, byte mutable, Node val, GVNGCM gvn  ) { update(_ts.find(tok),mutable,val,gvn); }
   // Update the field & mod
   public void update( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
     assert def_idx(_ts._ts.length)== _defs._len;
     gvn.set_def_reg(this,def_idx(fidx),val);
-    sets_in(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? gvn.type(val) : Type.SCALAR,mutable));
+    sets_in(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? val._val : Type.SCALAR,mutable));
   }
   // Update default value.  Used by StoreNode folding into a NewObj initial
   // state.  Used by the Parser when updating local variables... basically
   // another store.
   public void update_active( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
-    assert !gvn.touched(this);
+    assert !touched();
     assert def_idx(_ts._ts.length)== _defs._len;
     set_def(def_idx(fidx),val,gvn);
-    sets_out(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? gvn.type(val) : Type.SCALAR,mutable));
+    sets_out(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? val._val : Type.SCALAR,mutable));
   }
 
 
@@ -82,12 +82,12 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public FunPtrNode add_fun( Parse bad, String name, FunPtrNode ptr, GVNGCM gvn ) {
     int fidx = _ts.find(name);
     if( fidx == -1 ) {
-      create_active(name,ptr,TypeStruct.FFNL,gvn);
+      create_active(name,ptr,TypeStruct.FFNL);
     } else {
       Node n = _defs.at(def_idx(fidx));
       if( n instanceof UnresolvedNode ) n.add_def(ptr);
       else n = new UnresolvedNode(bad,n,ptr);
-      gvn.setype(n,n.value(gvn)); // Update the input type, so the _ts field updates
+      n.xval(gvn._opt_mode); // Update the input type, so the _ts field updates
       update_active(fidx,TypeStruct.FFNL,n,gvn);
     }
     return ptr;
@@ -128,9 +128,8 @@ public class NewObjNode extends NewNode<TypeStruct> {
     if( progress ) return this;
 
     // If the value lifts a final field, so does the default lift.
-    Type ts0 = gvn.type(this);
-    if( ts0 instanceof TypeTuple ) {
-      TypeTuple ts1 = (TypeTuple)ts0;
+    if( _val instanceof TypeTuple ) {
+      TypeTuple ts1 = (TypeTuple)_val;
       TypeObj ts3 = (TypeObj)ts1.at(0);
       if( ts3 != TypeObj.UNUSED ) {
         TypeStruct ts4 = _ts.make_from(((TypeStruct)ts3)._ts);
@@ -145,18 +144,18 @@ public class NewObjNode extends NewNode<TypeStruct> {
     return null;
   }
 
-  @Override public Type value(GVNGCM gvn) {
+  @Override public Type value(byte opt_mode) {
     TypeObj newt=TypeObj.UNUSED; // If dead
     if( !is_unused() ) {
       // Gather args and produce a TypeStruct
       Type[] ts = TypeAry.get(_ts._ts.length);
       for( int i=0; i<ts.length; i++ )
-        ts[i] = gvn.type(fld(i));
+        ts[i] = fld(i)._val;
       newt = _ts.make_from(ts);  // Pick up field names and mods
     }
     return TypeTuple.make(newt,_tptr);   // Complex obj, simple ptr.
   }
   @Override TypeStruct dead_type() { return TypeStruct.ANYSTRUCT; }
   // All fields are escaping
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return TypeMem.ESCAPE; }
+  @Override public TypeMem live_use( byte opt_mode, Node def ) { return TypeMem.ESCAPE; }
 }

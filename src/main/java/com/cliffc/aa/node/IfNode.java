@@ -9,10 +9,10 @@ public class IfNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node ctl = in(0);
     Node tst = in(1);
-    if( gvn.type(ctl) == Type.XCTRL ) return gvn.con(TypeTuple.IF_ANY);
+    if( ctl._val == Type.XCTRL ) return gvn.con(TypeTuple.IF_ANY);
     // Binary test vs 0?
     if( tst._defs._len==3 &&
-        (gvn.type(tst.in(1))==Type.XNIL || gvn.type(tst.in(2))==Type.XNIL) ) {
+        (tst.in(1)._val==Type.XNIL || tst.in(2)._val==Type.XNIL) ) {
       // Remove leading test-vs-0
       if( tst instanceof PrimNode.EQ_I64 ) throw AA.unimpl();
       if( tst instanceof PrimNode.EQ_F64 ) throw AA.unimpl();
@@ -41,16 +41,16 @@ public class IfNode extends Node {
   }
 
   
-  @Override public TypeTuple value(GVNGCM gvn) {
+  @Override public TypeTuple value(byte opt_mode) {
     // If the input is exactly zero, we can return false: {ANY,CONTROL}
     // If the input excludes   zero, we can return true : {CONTROL,ANY}
     // If the input excludes   both, we can return ANY:   {ANY,ANY}
     // If the input includes   both, we can return both:  {CONTROL,CONTROL}
-    Type ctrl = gvn.type(in(0));
+    Type ctrl = in(0)._val;
     if( ctrl!=Type.CTRL && ctrl != Type.ALL ) return TypeTuple.IF_ANY; // Test is dead
     if( in(0) instanceof ProjNode && in(0).in(0)==this )
       return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
-    Type pred = gvn.type(in(1));
+    Type pred = in(1)._val;
     if( pred instanceof TypeTuple)return TypeTuple.IF_ANY;// Nonsense, so test is dead
     if( pred instanceof TypeObj ) return TypeTuple.IF_ANY;// Nonsense, so test is dead
     if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY; // Choice of {0,1}
@@ -72,9 +72,8 @@ public class IfNode extends Node {
     throw AA.unimpl(); // Dunno what test this is?
   }
   @Override public Node is_copy(GVNGCM gvn, int idx) {
-    Type t = gvn.type(this);
-    if( !(t instanceof TypeTuple) ) return null;
-    TypeTuple tt = (TypeTuple)t;
+    if( !(_val instanceof TypeTuple) ) return null;
+    TypeTuple tt = (TypeTuple)_val;
     if( tt==TypeTuple.IF_ANY ) return gvn.con(Type.XCTRL);
     if( tt==TypeTuple.IF_TRUE  && idx==1 ) return in(0);
     if( tt==TypeTuple.IF_FALSE && idx==0 ) return in(0);

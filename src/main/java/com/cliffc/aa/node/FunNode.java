@@ -228,8 +228,8 @@ public class FunNode extends RegionNode {
       if( mem!=null ) {
         Type mt = Type.ANY;
         for( int i=1; i<_defs._len; i++ )
-          mt = mt.meet(gvn.type(mem.in(i)));
-        if( !mt.isa(gvn.type(Env.DEFMEM)) )
+          mt = mt.meet(mem.in(i)._val);
+        if( !mt.isa(Env.DEFMEM._val) )
           return null;          // Do not inline a bad memory type
       }
     }
@@ -268,7 +268,7 @@ public class FunNode extends RegionNode {
   // Gather the ParmNodes into an array.  Return null if any input path is dead
   // (would rather fold away dead paths before inlining).
   private RetNode split_callers_gather( GVNGCM gvn, ParmNode[] parms ) {
-    for( int i=1; i<_defs._len; i++ ) if( gvn.type(in(i))==Type.XCTRL ) return null;
+    for( int i=1; i<_defs._len; i++ ) if( in(i)._val==Type.XCTRL ) return null;
 
     // Gather the ParmNodes and the RetNode.  Ignore other (control) uses
     RetNode ret = null;
@@ -293,24 +293,16 @@ public class FunNode extends RegionNode {
         for( Node call : parm._uses ) { // See if a parm-user needs a type-specialization split
           if( call instanceof CallNode &&
               ((CallNode)call).fun() instanceof UnresolvedNode ) { // Call overload not resolved
-            Type t0 = gvn.type(parm.in(1));            // Generic type in slot#1
-            for( int i=2; i<parm._defs._len; i++ ) {   // For all other inputs
-              Type tp = gvn.type(parm.in(i));
-              if( tp.above_center() ) continue;        // This parm input is in-error
-              Type ti = tp.widen();                    // Get the widen'd type
+            Type t0 = parm.in(1)._val;               // Generic type in slot#1
+            for( int i=2; i<parm._defs._len; i++ ) { // For all other inputs
+              Type tp = parm.in(i)._val;
+              if( tp.above_center() ) continue; // This parm input is in-error
+              Type ti = tp.widen();             // Get the widen'd type
               if( !ti.isa(t0) ) continue; // Must be isa-generic type, or else type-error
               if( ti != t0 ) return i; // Sharpens?  Then splitting here should help
             }
             // Else no split will help this call, look for other calls to help
           }
-          //if( call instanceof TypeNode ) {
-          //  Type t0 = gvn.type(parm.in(1));            // Generic type in slot#1
-          //  for( int i=2; i<parm._defs._len; i++ ) {   // For all other inputs
-          //    Type tp = gvn.type(parm.in(i));
-          //    if( tp.above_center() ) continue;        // This parm input is in-error
-          //    System.out.println("Can we sharpen by inlining here?");
-          //  }
-          //}
         }
 
     return -1; // No unresolved calls; no point in type-specialization
@@ -324,26 +316,26 @@ public class FunNode extends RegionNode {
       Type[] sig = TypeAry.get(parms.length);
       sig[0] = parms[0]==null
         ? _sig.display().make_from(TypeStr.NO_DISP)
-        : gvn.type(parms[0].in(idx));
+        : parms[0].in(idx)._val;
       for( int i=1; i<parms.length; i++ ) // 0 for display
-        sig[i] = parms[i]==null ? Type.SCALAR : gvn.type(parms[i].in(idx)).widen();
+        sig[i] = parms[i]==null ? Type.SCALAR : parms[i].in(idx)._val.widen();
       return sig;
     }
 
     // Look for splitting to help a pointer from an unspecialized type
     boolean progress = false;
     Type[] sig = new Type[parms.length];
-    TypeMem tmem = (TypeMem)gvn.type(parm(-2));
+    TypeMem tmem = (TypeMem)parm(-2)._val;
     for( int i=0; i<parms.length; i++ ) { // For all parms
       Node parm = parms[i];
       if( parm == null ) { sig[i]=Type.SCALAR; continue; } // (some can be dead)
-      sig[i] = gvn.type(parm);                             // Current type
+      sig[i] = parm._val;                                  // Current type
       if( i==0 ) continue;                                 // No split on the display
       // Best possible type
       Type tp = Type.ALL;
       for( Node def : parm._defs )
         if( def != this )
-          tp = tp.join(gvn.type(def));
+          tp = tp.join(def._val);
       if( !(tp instanceof TypeMemPtr) ) continue; // Not a pointer
       TypeObj to = (TypeObj)tmem.ld((TypeMemPtr)tp).widen(); //
       // Are all the uses of parm compatible with this TMP?
@@ -503,13 +495,13 @@ public class FunNode extends RegionNode {
       Node call = in(i).in(0);
       if( !(call instanceof CallNode) ) continue; // Not well formed
       if( ((CallNode)call).nargs() != nargs() ) continue; // Will not inline
-      TypeFunPtr tfp = CallNode.ttfp(gvn.type(call));
+      TypeFunPtr tfp = CallNode.ttfp(call._val);
       int fidx = tfp.fidxs().abit();
       if( fidx < 0 || BitsFun.is_parent(fidx) ) continue;  // Call must only target one fcn
       int ncon=0;
       for( ParmNode parm : parms )
         if( parm != null ) {    // Some can be dead
-          Type actual = gvn.sharptr(parm.in(i),mem.in(i));
+          Type actual = parm.in(i).sharptr(mem.in(i));
           Type formal = formal(parm._idx);
           if( !actual.isa(formal) ) // Path is in-error?
             { ncon = -2; break; }   // This path is in-error, cannot inline even if small & constants
@@ -556,7 +548,7 @@ public class FunNode extends RegionNode {
     // of a size-split (single caller only, so inlines).
     for( Node old_fptr : ret._uses )
       if( old_fptr instanceof FunPtrNode ) { // Can be many old funptrs with different displays
-        gvn.setype(old_fptr,old_fptr.value(gvn));
+        old_fptr.xval(gvn._opt_mode);
         gvn.add_work_uses(old_fptr);
       }
     return fun;
@@ -604,6 +596,7 @@ public class FunNode extends RegionNode {
       if( n==this ) continue;   // Already cloned the FunNode
       int old_alias = n instanceof NewNode ? ((NewNode)n)._alias : -1;
       Node c = n.copy(false,gvn); // Make a blank copy with no edges
+      c._val = null;              // Flag as not-in system
       map.put(n,c);               // Map from old to new
       if( old_alias != -1 )       // Was a NewNode?
         aliases.set(old_alias);   // Record old alias before copy/split
@@ -639,21 +632,21 @@ public class FunNode extends RegionNode {
           Node old_funptr = use;
           Node new_funptr = map.get(old_funptr);
           gvn.replace(new_funptr,old_funptr);
-          gvn.setype(new_funptr,new_funptr.value(gvn)); // Build type so Unresolved can compute type
+          new_funptr.xval(gvn._opt_mode); // Build type so Unresolved can compute type
           UnresolvedNode new_unr = new UnresolvedNode(null,new_funptr);
           gvn.replace(old_funptr,new_unr);
           new_unr.add_def(old_funptr);
-          gvn.rereg(new_unr,new_unr.value(gvn));
-          gvn.untype(new_funptr,null); // Remove type, to preserve new invariant
+          gvn.rereg(new_unr,new_unr.value(gvn._opt_mode));
+          new_funptr._val = null; // Remove type, to preserve new invariant
         }
     } else {                           // Path split
       Node old_funptr = path_call.fun(); // Find the funptr for the path split
       Node new_funptr = map.get(old_funptr);
       gvn.replace(new_funptr,old_funptr);
-      TypeFunPtr ofptr = (TypeFunPtr)gvn.type(old_funptr);
+      TypeFunPtr ofptr = (TypeFunPtr)old_funptr._val;
       path_call.set_fun_reg(new_funptr, gvn); // Force new_funptr, will re-wire later
       TypeFunPtr nfptr = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,ofptr._disp);
-      gvn.setype(path_call, CallNode.set_ttfp((TypeTuple)gvn.type(path_call),nfptr));
+      path_call._val = CallNode.set_ttfp((TypeTuple)path_call._val,nfptr);
     } // Else other funptr/displays on unrelated path, dead, can be ignored
 
     // For all aliases split in this pass, update in-node both old and new.
@@ -680,7 +673,7 @@ public class FunNode extends RegionNode {
     for( Map.Entry<Node,Node> e : map.entrySet() ) {
       Node oo = e.getKey();     // Old node
       Node nn = e.getValue();   // New node
-      Type nt = gvn.type(oo);   // Generally just copy type from original nodes
+      Type nt = oo._val;        // Generally just copy type from original nodes
       if( nn instanceof MrgProjNode ) { // Cloned allocations registers with default memory
         Env.DEFMEM.make_mem(gvn,(NewNode)nn.in(0),(MrgProjNode)nn);
         Env.DEFMEM.make_mem(gvn,(NewNode)oo.in(0),(MrgProjNode)oo);
@@ -696,7 +689,7 @@ public class FunNode extends RegionNode {
 
       gvn.rereg(nn,nt);
     }
-    gvn.setype(Env.DEFMEM,Env.DEFMEM.value(gvn));
+    Env.DEFMEM.xval(gvn._opt_mode);
 
     // Eagerly lift any Unresolved types, so they quit propagating the parent
     // (and both children) to all targets.
@@ -704,7 +697,7 @@ public class FunNode extends RegionNode {
       if( fptr instanceof FunPtrNode )
         for( Node unr : fptr._uses )
           if( unr instanceof UnresolvedNode ) {
-            gvn.setype(unr,unr.value(gvn));
+            unr.xval(gvn._opt_mode);
             gvn.add_work_uses(unr);
           }
 
@@ -713,7 +706,7 @@ public class FunNode extends RegionNode {
       CallNode call = cepi.call();
       CallEpiNode cepi2 = (CallEpiNode)map.get(cepi);
       if( path < 0 ) {          // Type-split, wire both & resolve later
-        BitsFun call_fidxs = ((TypeFunPtr)gvn.type(call.fun())).fidxs();
+        BitsFun call_fidxs = ((TypeFunPtr)call.fun()._val).fidxs();
         assert call_fidxs.test_recur(    fidx());
         assert call_fidxs.test_recur(fun.fidx());
         cepi.wire1(gvn,call,this,oldret);
@@ -723,7 +716,7 @@ public class FunNode extends RegionNode {
           // self-call.  wire the clone, same as the original was wired, so the
           // clone keeps knowledge about its return type.
           CallNode call2 = cepi2.call();
-          BitsFun call_fidxs2 = ((TypeFunPtr)gvn.type(call2.fun())).fidxs();
+          BitsFun call_fidxs2 = ((TypeFunPtr)call2.fun()._val).fidxs();
           assert call_fidxs2.test_recur(    fidx());
           assert call_fidxs2.test_recur(fun.fidx());
           cepi2.wire1(gvn,call2,this,oldret);
@@ -738,7 +731,7 @@ public class FunNode extends RegionNode {
           // self-call.  wire the clone, same as the original was wired, so the
           // clone keeps knowledge about its return type.
           cepi2.wire1(gvn,call2,this,oldret);
-          gvn.setype(call2,call2.value(gvn));
+          call2.xval(gvn._opt_mode);
         }
       }
     }
@@ -759,8 +752,8 @@ public class FunNode extends RegionNode {
 
     // Retype memory, so we can everywhere lift the split-alias parents "up and
     // out".
-    retype_mem(gvn,aliases,this.parm(-2));
-    retype_mem(gvn,aliases,fun .parm(-2));
+    retype_mem(gvn._opt_mode,aliases,this.parm(-2));
+    retype_mem(gvn._opt_mode,aliases,fun .parm(-2));
 
     // Unhook the hooked FunPtrs
     for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) use.unhook();
@@ -772,7 +765,7 @@ public class FunNode extends RegionNode {
   // 'iter').  Used when inlining, and the inlined body needs to acknowledge
   // bypasses aliases.  Used during code-clone, to lift the split alias parent
   // up & out.
-  private static void retype_mem(GVNGCM gvn, BitSet aliases, Node mem) {
+  private static void retype_mem(byte opt_mode, BitSet aliases, Node mem) {
     Ary<Node> work = new Ary<>(new Node[1],0);
     work.push(mem);
     // Update all memory ops
@@ -780,15 +773,15 @@ public class FunNode extends RegionNode {
       Node wrk = work.pop();
       if( wrk.is_mem() ) {
         boolean un=false;
-        Type twrk = gvn.type(wrk);
+        Type twrk = wrk._val;
         TypeMem tmem = (TypeMem)(twrk instanceof TypeTuple ? ((TypeTuple)twrk).at(1) : twrk);
         for( int alias = aliases.nextSetBit(0); alias != -1; alias = aliases.nextSetBit(alias + 1))
           if( tmem.at(alias)!= TypeObj.UNUSED )
             { un=true; break; }
         if( un ) {
-          Type tval = wrk.value(gvn);
+          Type tval = wrk.value(opt_mode);
           if( twrk != tval ) {
-            gvn.setype(wrk,tval);
+            wrk._val = tval;
             if( wrk instanceof MProjNode && wrk.in(0) instanceof CallNode ) {
               CallEpiNode cepi = ((CallNode)wrk.in(0)).cepi();
               if( cepi != null ) work.push(cepi);
@@ -802,19 +795,19 @@ public class FunNode extends RegionNode {
 
 
   // Compute value from inputs.  Simple meet over inputs.
-  @Override public Type value(GVNGCM gvn) {
+  @Override public Type value(byte opt_mode) {
     // Will be an error eventually, but act like its executed so the trailing
     // EpilogNode gets visited during GCP
     if( is_forward_ref() ) return Type.CTRL;
     if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
-    if( in(0)==this ) return gvn.type(in(1)); // is_copy
+    if( in(0)==this ) return in(1)._val; // is_copy
     for( int i=1; i<_defs._len; i++ ) {
-      Type c = gvn.type(in(i));
+      Type c = in(i)._val;
       if( c != Type.CTRL && c != Type.ALL ) continue; // Not control
       if( !(in(i) instanceof CProjNode) ) return Type.CTRL; // A constant control
       // Call might be alive and executing and calling many targets, just not this one.
       CallNode call = (CallNode)in(i).in(0);
-      TypeFunPtr ttfp = CallNode.ttfpx(gvn.type(call));
+      TypeFunPtr ttfp = CallNode.ttfpx(call._val);
       if( ttfp != null && !ttfp.above_center() && ttfp._fidxs.test_recur(_fidx) )
         return Type.CTRL;       // Call us
     }

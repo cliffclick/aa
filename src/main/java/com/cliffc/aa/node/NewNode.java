@@ -53,12 +53,12 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
   // Recompute default memory cache on a change
   protected final void sets_out( T ts ) {
-    assert !Env.GVN.touched(this);
+    assert !touched();
     _ts = ts;
     _crushed = ts.crush();
   }
   protected final void sets_in( T ts ) {
-    assert Env.GVN.touched(this);
+    assert touched();
     _ts = ts;
     _crushed = ts.crush();
     Env.GVN.revalive(this,ProjNode.proj(this,0),Env.DEFMEM);
@@ -72,7 +72,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     return null;
   }
 
-  @Override BitsAlias escapees( GVNGCM gvn) { return _tptr._aliases; }
+  @Override BitsAlias escapees() { return _tptr._aliases; }
   abstract T dead_type();
   boolean is_unused() { return _ts==dead_type(); }
   // Kill all inputs, inform all users
@@ -99,7 +99,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       if( mem instanceof MrgProjNode ) return true; // No pointer, just dead memory
       // Just a pointer; currently on Strings become memory constants and
       // constant-fold - leaving the allocation dead.
-      return !(gvn.type(in(1)) instanceof TypeStr);
+      return !(in(1)._val instanceof TypeStr);
     }
     Node ptr = _uses.at(1);
     if( ptr instanceof MrgProjNode ) ptr = _uses.at(0); // Get ptr not mem
@@ -129,7 +129,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     NewNode<T> nnn = (NewNode<T>)super.copy(copy_edges, gvn);
     nnn._init(_alias,_ts);      // Children alias classes, split from parent
     // The original NewNode also splits from the parent alias
-    assert gvn.touched(this);
+    assert touched();
     Type oldt = gvn.unreg(this);
     _init(_alias,_ts);
     gvn.rereg(this,oldt);

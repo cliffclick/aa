@@ -35,5 +35,4 @@ public abstract class AA {
   public static String p    () { return Env.START.dumprpo(false,false); }  // Debugging hook
   public static String plive() { return Env.START.dumprpo(false,true ); }  // Debugging hook
   public static Node f(int uid) { return Env.START.find(uid); }        // Debugging hook
-  public static Type t(int uid) { return Env.GVN.raw_type(uid); }      // Debugging hook
 }

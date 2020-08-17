@@ -32,8 +32,8 @@ public class MemSplitNode extends Node {
     return sb.unchar().p(')').toString();
   }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-  @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(mem());
+  @Override public Type value(byte opt_mode) {
+    Type t = mem()._val;
     if( !(t instanceof TypeMem) ) return t.oob();
     // Normal type is for an MProj of the input memory, one per alias class
     Type[] ts = TypeAry.get(_escs._len);
@@ -48,7 +48,7 @@ public class MemSplitNode extends Node {
     if( all.join(esc) == BitsAlias.EMPTY ) { // No overlap
       _escs.set(0,all.meet(esc));  // Update summary
       _escs.add(esc);              // Add escape set
-      gvn.setype(this,value(gvn)); // Expand tuple result
+      xval(gvn._opt_mode);         // Expand tuple result
       return _escs._len-1;
     }
     for( int i=1; i<_escs._len; i++ )
@@ -60,8 +60,7 @@ public class MemSplitNode extends Node {
     // Remove (non-overlapping) bits from the rollup
     _escs.set(0,(BitsAlias)_escs.at(0).subtract(_escs.at(idx)));
     _escs.remove(idx);          // Remove the escape set
-    TypeTuple tt = (TypeTuple)value(gvn);
-    gvn.setype(this,tt);        // Reduce tuple result
+    TypeTuple tt = (TypeTuple)xval(gvn._opt_mode); // Reduce tuple result
     // Renumber all trailing projections to match
     for( Node use : _uses ) {
       MProjNode mprj = (MProjNode)use;
@@ -110,8 +109,8 @@ public class MemSplitNode extends Node {
   // Call/CallEpi pairs are: MProj->{CallEpi}->Call.
   static Node insert_split(GVNGCM gvn, Node tail1, Node head1, Node tail2, Node head2) {
     assert tail1.is_mem() && head1.is_mem() && tail2.is_mem() && head2.is_mem();
-    BitsAlias head1_escs = head1.escapees(gvn);
-    BitsAlias head2_escs = head2.escapees(gvn);
+    BitsAlias head1_escs = head1.escapees();
+    BitsAlias head2_escs = head2.escapees();
     assert check_split(gvn,head1,head1_escs);
     // Insert empty split/join above head2
     MemSplitNode msp = gvn.xform(new MemSplitNode(head2.in(1))).keep();
@@ -131,7 +130,7 @@ public class MemSplitNode extends Node {
     // Must have only 1 mem-writer (this can fail if used by different control paths)
     if( !tail2.check_solo_mem_writer(head1) ) return false;
     // No alias overlaps
-    if( head1_escs.overlaps(tail2.escapees(gvn)) ) return false;
+    if( head1_escs.overlaps(tail2.escapees()) ) return false;
     // TODO: This is too strong.
     // Cannot have any Loads following head1; because after the split
     // they will not see the effects of previous stores that also move
@@ -152,5 +151,5 @@ public class MemSplitNode extends Node {
     return null;
   }
     // Modifies all of memory - just does it in parts
-  @Override BitsAlias escapees( GVNGCM gvn) { return BitsAlias.FULL; }
+  @Override BitsAlias escapees() { return BitsAlias.FULL; }
 }

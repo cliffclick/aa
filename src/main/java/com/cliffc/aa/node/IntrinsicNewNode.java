@@ -62,7 +62,7 @@ public abstract class IntrinsicNewNode extends Node {
     Node mem = Env.DEFMEM.make_mem_proj(gvn,nnn,memp);
     Node ptr = gvn.xform(new ProjNode(1, nnn.unhook()));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,ptr,rpc,fun));
-    mem._live = mem.live(gvn); // Refine initial memory
+    mem.xliv(gvn._opt_mode); // Refine initial memory
     return new FunPtrNode(ret,gvn.con(TypeFunPtr.NO_DISP));
   }
 
@@ -72,8 +72,8 @@ public abstract class IntrinsicNewNode extends Node {
 class ConvertI64Str extends IntrinsicNewNode {
   ConvertI64Str() { super("str",TypeStruct.ts(null,TypeInt.INT64)); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-  @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(in(3));
+  @Override public Type value(byte opt_mode) {
+    Type t = in(3)._val;
     if( t.above_center() || !(t instanceof TypeInt) ) return t.oob();
     if( !t.is_con() ) return TypeStr.STR;
     return TypeStr.make(false,Long.toString(t.getl()).intern());
@@ -84,8 +84,8 @@ class ConvertI64Str extends IntrinsicNewNode {
 class ConvertF64Str extends IntrinsicNewNode {
   ConvertF64Str() { super("str",TypeStruct.ts(null,TypeFlt.FLT64)); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-  @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(in(3));
+  @Override public Type value(byte opt_mode) {
+    Type t = in(3)._val;
     if( t.above_center() || !(t instanceof TypeFlt) ) return t.oob();
     if( !t.is_con() ) return TypeStr.STR;
     return TypeStr.make(false,Double.toString(t.getd()).intern());
@@ -100,10 +100,10 @@ class ConvertF64Str extends IntrinsicNewNode {
 class AddStrStr extends IntrinsicNewNode {
   AddStrStr() { super("+",TypeStruct.ts(null,TypeMemPtr.STR0,TypeMemPtr.STR0)); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-  @Override public Type value(GVNGCM gvn) {
-    Type m   = gvn.type(in(1));
-    Type sp0 = gvn.type(in(3));
-    Type sp1 = gvn.type(in(4));
+  @Override public Type value(byte opt_mode) {
+    Type m   = in(1)._val;
+    Type sp0 = in(3)._val;
+    Type sp1 = in(4)._val;
     if( m.above_center() || sp0.above_center() || sp1.above_center() ) return Type.ANY;
     if( !(m instanceof TypeMem) ) return Type.ALL;
     if( !sp0.isa(TypeMemPtr.STRPTR) ) return Type.ALL;

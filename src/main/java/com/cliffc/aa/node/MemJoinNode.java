@@ -17,14 +17,14 @@ public class MemJoinNode extends Node {
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     // If the split count is lower than 2, then the split serves no purpose
-    if( _defs._len == 2 && gvn.type(in(1)).isa(gvn.self_type(this)) && _keep==0 )
+    if( _defs._len == 2 && in(1)._val.isa(_val) && _keep==0 )
       return in(1);             // Just become the last split
 
     // If some Split/Join path clears out, remove the (useless) split.
     MemSplitNode msp = msp();
     for( int i=1; i<_defs._len; i++ )
       if( in(i) instanceof MProjNode && in(i).in(0)==msp && in(i)._uses._len==1 ) {
-        gvn.setype(in(0),in(0).value(gvn)); // Update the default type
+        in(0).xval(gvn._opt_mode); // Update the default type
         msp.remove_alias(gvn,i);
         return remove(i,gvn);
       }
@@ -88,21 +88,20 @@ public class MemJoinNode extends Node {
     gvn.remove_reg(this,_defs._len-1);
 
     // Moving this can *lower* the upper Join type, if an allocation moves up.
-    Type tt = mjn.value(gvn);
-    gvn.setype(mjn,tt);
-    gvn.setype(msp,msp.value(gvn));
+    Type tt = mjn.xval(gvn._opt_mode);
+    msp.xval(gvn._opt_mode);
     for( Node use : msp._uses )
-      gvn.setype(use,tt);
+      use._val = tt;
 
     return this;
   }
 
-  @Override public Type value(GVNGCM gvn) {
+  @Override public Type value(byte opt_mode) {
     // Gather all memories
     boolean diff=false;
     TypeMem[] mems = new TypeMem[_defs._len];
     for( int i=0; i<_defs._len; i++ ) {
-      Type t = gvn.type(in(i));
+      Type t = in(i)._val;
       if( !(t instanceof TypeMem) ) return t.oob(TypeMem.ALLMEM);
       mems[i] = (TypeMem)t;
       if( i>0 && !diff ) diff = mems[i]!=mems[0];
@@ -134,7 +133,7 @@ public class MemJoinNode extends Node {
     Node base = msp.mem();                  // Base of SESE region
     assert base.check_solo_mem_writer(msp); // msp is only memory writer after base
     assert head.in(1).check_solo_mem_writer(head);   // head is the 1 memory writer after head.in
-    int idx = msp.add_alias(gvn,head.escapees(gvn)); // Add escape set, find index
+    int idx = msp.add_alias(gvn,head.escapees()); // Add escape set, find index
     Node mprj;
     if( idx == _defs._len ) {         // Escape set added at the end
       add_def(mprj = gvn.xform(new MProjNode(msp,idx))); // Add a new MProj from MemSplit
@@ -157,18 +156,18 @@ public class MemJoinNode extends Node {
     while( !work.isEmpty() ) {
       Node n = work.pop();
       assert n.is_mem();
-      Type t0 = gvn.type(n);
-      Type t1 = n.value(gvn);
+      Type t0 = n._val;
+      Type t1 = n.value(gvn._opt_mode);
       if( t0==t1 ) continue;
-      gvn.setype(n,t1);
+      n._val = t1;
       if( n == this ) continue;
       for( Node use : n._uses ) if( use.is_mem() ) work.add(use);
     }
     // Update live same way
-    base._live = base.live(gvn);
-    if( base != head ) head._live = head.live(gvn);
-    mprj._live = mprj.live(gvn);
-    msp ._live = msp .live(gvn);
+    base.xliv(gvn._opt_mode);
+    if( base != head ) head.xliv(gvn._opt_mode);
+    mprj.xliv(gvn._opt_mode);
+    msp .xliv(gvn._opt_mode);
     return this;
   }
 
@@ -213,5 +212,5 @@ public class MemJoinNode extends Node {
     return null;                // Not fully contained within any 1 alias set
   }
   // Modifies all of memory
-  @Override BitsAlias escapees( GVNGCM gvn) { return BitsAlias.FULL; }
+  @Override BitsAlias escapees() { return BitsAlias.FULL; }
 }

@@ -12,7 +12,7 @@ public class CastNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     // Cast is useless?  Remove same as a TypeNode
     Node ctrl = in(0), addr = in(1);
-    Type c = gvn.type(ctrl), t = gvn.type(addr);
+    Type c = ctrl._val, t = addr._val;
     if( c != Type.CTRL ) return null;
     if( t.isa(_t) ) return in(1);
 
@@ -26,10 +26,10 @@ public class CastNode extends Node {
     set_def(0,tru,gvn);
     return this;
   }
-  @Override public Type value(GVNGCM gvn) {
-    Type c = gvn.type(in(0));
+  @Override public Type value(byte opt_mode) {
+    Type c = in(0)._val;
     if( c != Type.CTRL ) return c.oob();
-    Type t = gvn.type(in(1));
+    Type t = in(1)._val;
     if( t.is_forward_ref() ) return Type.SCALAR;
 
     // If the cast is in-error, we cannot lift.
@@ -37,7 +37,7 @@ public class CastNode extends Node {
     // Lift result.
     return _t.join(t);
   }
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+  @Override public TypeMem live_use( byte opt_mode, Node def ) {
     return def==in(0) ? TypeMem.ALIVE : _live;
   }
 

@@ -35,7 +35,7 @@ public class LoadNode extends Node {
     Node mem  = mem();
     Node adr = adr();
 
-    Type tadr = gvn.type(adr);
+    Type tadr = adr._val;
     BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
 
     // If we can find an exact previous store, fold immediately to the value.
@@ -50,7 +50,7 @@ public class LoadNode extends Node {
     if( mem instanceof MemJoinNode && aliases != null ) {
       Node jmem = ((MemJoinNode)mem).can_bypass(aliases);
       if( jmem != null ) {
-        gvn.setype(jmem,jmem.value(gvn));
+        jmem.xval(gvn._opt_mode);
         set_mem(jmem,gvn);
         return this;
       }
@@ -91,7 +91,7 @@ public class LoadNode extends Node {
   // Find a matching prior Store or NewObj - matching field name and address.
   // Returns null if highest available memory does not match name & address.
   static Node find_previous_store(GVNGCM gvn, Node mem, Node adr, BitsAlias aliases, String fld, boolean is_load ) {
-    Type tmem0 = gvn.type(mem);
+    Type tmem0 = mem._val;
     if( !(tmem0 instanceof TypeMem) || aliases==null ) return null;
     TypeMem tmem = (TypeMem)tmem0;
     // Walk up the memory chain looking for an exact matching Store or New
@@ -99,9 +99,9 @@ public class LoadNode extends Node {
       if( mem instanceof StoreNode ) {
         StoreNode st = (StoreNode)mem;
         if( Util.eq(st._fld,fld) ) {
-          if( st.adr()==adr ) return st.err(gvn,true)== null ? st : null; // Exact matching store
+          if( st.adr()==adr ) return st.err(true)== null ? st : null; // Exact matching store
           // Matching field, wrong address.  Look for no-overlap in aliases
-          Type tst = gvn.type(st.adr());
+          Type tst = st.adr()._val;
           if( !(tst instanceof TypeMemPtr) ) return null; // Store has weird address
           BitsAlias st_alias = ((TypeMemPtr)tst)._aliases;
           if( aliases.join(st_alias) != BitsAlias.EMPTY )
@@ -153,22 +153,22 @@ public class LoadNode extends Node {
     CallNode call = cepi.call();
     if( tmem.fld_is_final(aliases,fld) )
       return call.mem(); // Loads from final memory can bypass calls.  Stores cannot, store-over-final is in error.
-    TypeMemPtr escs = call.tesc(gvn.type(call));
+    TypeMemPtr escs = call.tesc(call._val);
     if( escs._aliases.join(aliases)==BitsAlias.EMPTY )
       return call.mem(); // Load from call; if memory is made *in* the call this will fail later on an address mismatch.
     return null;         // Stuck behind call
   }
 
 
-  @Override public Type value(GVNGCM gvn) {
+  @Override public Type value(byte opt_mode) {
     Node adr = adr();
-    Type tadr = gvn.type(adr);
+    Type tadr = adr._val;
     if( !(tadr instanceof TypeMemPtr) ) return tadr.oob();
     TypeMemPtr tmp = (TypeMemPtr)tadr;
 
     // Loading from TypeMem - will get a TypeObj out.
     Node mem = mem();
-    Type tmem = gvn.type(mem); // Memory
+    Type tmem = mem._val; // Memory
     if( !(tmem instanceof TypeMem) ) return tmem.oob(); // Nothing sane
     TypeObj tobj = ((TypeMem)tmem).ld(tmp);
 
@@ -183,23 +183,23 @@ public class LoadNode extends Node {
   }
 
   // The only memory required here is what is needed to support the Load
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+  @Override public TypeMem live_use( byte opt_mode, Node def ) {
     if( def==adr() ) return TypeMem.ALIVE;
-    Type tmem = gvn.type(mem());
-    Type tptr = gvn.type(adr());
+    Type tmem = mem()._val;
+    Type tptr = adr()._val;
     if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
     if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
     return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases);
   }
 
-  @Override public ErrMsg err(GVNGCM gvn, boolean fast) {
-    Type tadr = gvn.type(adr());
+  @Override public ErrMsg err( boolean fast ) {
+    Type tadr = adr()._val;
     if( tadr==Type.ALL ) return null; // Error already
     if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when reading",_fld);
     if( !(tadr instanceof TypeMemPtr) )
       return bad("Unknown",fast); // Not a pointer nor memory, cannot load a field
     TypeMemPtr ptr = (TypeMemPtr)tadr;
-    Type tmem = gvn.type(mem());
+    Type tmem = mem()._val;
     if( tmem==Type.ALL ) return null; // An error, reported earlier
     if( tmem==Type.ANY ) return null; // An error, reported earlier
     TypeObj objs = tmem instanceof TypeMem
