@@ -367,6 +367,7 @@ public abstract class Node implements Cloneable {
 
   // Shortcut to update self-value
   public Type xval( byte opt_mode ) { return _val = value(opt_mode); }
+  public Type val(int idx) { return in(idx)._val; }
 
   // Compute the current best liveness for this Node, based on the liveness of
   // its uses.  If basic_liveness(), returns a simple DEAD/ALIVE.  Otherwise

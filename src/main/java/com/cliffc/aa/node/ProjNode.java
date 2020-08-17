@@ -20,7 +20,7 @@ public class ProjNode extends Node {
   }
 
   @Override public Type value(byte opt_mode) {
-    Type c = in(0)._val;
+    Type c = val(0);
     if( c instanceof TypeTuple ) {
       TypeTuple ct = (TypeTuple)c;
       if( _idx < ct._ts.length )

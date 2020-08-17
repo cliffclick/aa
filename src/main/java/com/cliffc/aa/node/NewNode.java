@@ -99,7 +99,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       if( mem instanceof MrgProjNode ) return true; // No pointer, just dead memory
       // Just a pointer; currently on Strings become memory constants and
       // constant-fold - leaving the allocation dead.
-      return !(in(1)._val instanceof TypeStr);
+      return !(val(1) instanceof TypeStr);
     }
     Node ptr = _uses.at(1);
     if( ptr instanceof MrgProjNode ) ptr = _uses.at(0); // Get ptr not mem

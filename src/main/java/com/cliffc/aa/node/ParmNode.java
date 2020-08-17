@@ -57,7 +57,7 @@ public class ParmNode extends PhiNode {
     Node mem = fun.parm(-2);
     for( int i=1; i<_defs._len; i++  ) { // For all arguments
       Node n = in(i);
-      if( fun.in(i)._val==Type.CTRL &&     // Dead path
+      if( fun.val(i)==Type.CTRL &&     // Dead path
           valid_args(gvn,fun,i,mem) ) {    // And valid arguments
         if( n==this || n==live ) continue; // Ignore self or duplicates
         if( live==null ) live = n;         // Found unique live input
@@ -76,7 +76,7 @@ public class ParmNode extends PhiNode {
 
   @Override public Type value(byte opt_mode) {
     // Not executing, go the
-    Type ctl = in(0)._val;
+    Type ctl = val(0);
     if( ctl != Type.CTRL ) return ctl.oob();
     Node in0 = in(0);
     if( !(in0 instanceof FunNode) )  return in0._val.oob();
@@ -85,12 +85,12 @@ public class ParmNode extends PhiNode {
     // accounted for.
     FunNode fun = (FunNode)in0;
     if( opt_mode < 2 && fun.has_unknown_callers() )
-      return in(1)._val;
+      return val(1);
     Node mem = fun.parm(-2);    // Memory for sharpening pointers
     // All callers known; merge the wired & flowing ones
     Type t = Type.ANY;
     for( int i=1; i<_defs._len; i++ ) {
-      if( fun.in(i)._val!=Type.CTRL ) continue; // Only meet alive paths
+      if( fun.val(i)!=Type.CTRL ) continue; // Only meet alive paths
       // Check arg type, after sharpening
       Type ta = in(i).sharptr(mem.in(i));
       t = t.meet(ta);
@@ -114,7 +114,7 @@ public class ParmNode extends PhiNode {
     Node mem = fun.parm(-2);
     Type formal = fun.formal(_idx);
     for( int i=1; i<_defs._len; i++ ) {
-      if( fun.in(i)._val!=Type.CTRL ) continue; // Ignore dead paths
+      if( fun.val(i)!=Type.CTRL ) continue; // Ignore dead paths
       Type argt = in(i).sharptr(mem.in(i)); // Arg type for this incoming path
       if( argt!=Type.ALL && !argt.isa(formal) ) { // Argument is legal?  ALL args are in-error elsewhere
         // The merge of all incoming calls for this argument is not legal.
@@ -132,7 +132,7 @@ public class ParmNode extends PhiNode {
           }
         }
         // meet of args is not the formal, but no single arg is not the formal?
-        return ErrMsg.typerr(_badgc,argt,mem.in(i)._val,formal); // Can be the default
+        return ErrMsg.typerr(_badgc,argt,mem.val(i),formal); // Can be the default
       }
     }
     return null;

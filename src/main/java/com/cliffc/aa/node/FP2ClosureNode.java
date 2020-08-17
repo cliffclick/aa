@@ -22,7 +22,7 @@ public final class FP2ClosureNode extends Node {
   }
   @Override public Type value(byte opt_mode) {
     // Expect either a TFP from a FunPtrNode, or a TypeTuple from a CallNode.
-    Type t0 = in(0)._val;
+    Type t0 = val(0);
     Type tfp = t0 instanceof TypeTuple ? CallNode.ttfp(t0) : t0;
     return convert(tfp).simple_ptr();
   }

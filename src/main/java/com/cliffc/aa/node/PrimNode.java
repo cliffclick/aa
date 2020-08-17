@@ -28,48 +28,47 @@ public abstract class PrimNode extends Node {
   private static PrimNode[] PRIMS = null;
   public static void reset() { PRIMS=null; }
   public static PrimNode[] PRIMS() {
-    if( PRIMS==null )
-      PRIMS = new PrimNode[] {
-        new RandI64(),
-        new Id(TypeMemPtr.OOP0), // Pre-split OOP from non-OOP
-        new Id(TypeFunPtr.GENERIC_FUNPTR),
-        new Id(Type.REAL),
+    if( PRIMS!=null ) return PRIMS;
+    return PRIMS = new PrimNode[] {
+      new RandI64(),
+      new Id(TypeMemPtr.OOP0), // Pre-split OOP from non-OOP
+      new Id(TypeFunPtr.GENERIC_FUNPTR),
+      new Id(Type.REAL),
+      
+      new ConvertInt64F64(),
+      new ConvertStrStr(),
+      
+      new MinusF64(),
+      new MinusI64(),
+      new Not(),
+      
+      new AddF64(),
+      new SubF64(),
+      new MulF64(),
 
-        new ConvertInt64F64(),
-        new ConvertStrStr(),
+      new LT_F64(),
+      new LE_F64(),
+      new GT_F64(),
+      new GE_F64(),
+      new EQ_F64(),
+      new NE_F64(),
 
-        new MinusF64(),
-        new MinusI64(),
-        new Not(),
+      new AddI64(),
+      new SubI64(),
+      new MulI64(),
 
-        new   AddF64(),
-        new   SubF64(),
-        new   MulF64(),
+      new AndI64(),
 
-        new   LT_F64(),
-        new   LE_F64(),
-        new   GT_F64(),
-        new   GE_F64(),
-        new   EQ_F64(),
-        new   NE_F64(),
+      new LT_I64(),
+      new LE_I64(),
+      new GT_I64(),
+      new GE_I64(),
+      new EQ_I64(),
+      new NE_I64(),
 
-        new   AddI64(),
-        new   SubI64(),
-        new   MulI64(),
-
-        new   AndI64(),
-
-        new   LT_I64(),
-        new   LE_I64(),
-        new   GT_I64(),
-        new   GE_I64(),
-        new   EQ_I64(),
-        new   NE_I64(),
-
-        new   EQ_OOP(),
-        new   NE_OOP(),
-      };
-    return PRIMS;
+      new EQ_OOP(),
+      new NE_OOP(),
+    };
   }
 
   public static PrimNode convertTypeName( Type from, Type to, Parse badargs ) {
@@ -87,7 +86,7 @@ public abstract class PrimNode extends Node {
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
     for( int i=1; i<_defs._len; i++ ) { // first is control
-      Type tactual = in(i)._val;
+      Type tactual = val(i);
       Type tformal = _sig.arg(i);
       Type t = tformal.dual().meet(ts[i] = tactual);
       if( !t.is_con() ) {
@@ -99,7 +98,7 @@ public abstract class PrimNode extends Node {
   }
   @Override public ErrMsg err( boolean fast ) {
     for( int i=1; i<_defs._len; i++ ) { // first is control
-      Type tactual = in(i)._val;
+      Type tactual = val(i);
       Type tformal = _sig.arg(i);
       if( !tactual.isa(tformal) )
         return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[i],tactual,null,tformal);
@@ -159,7 +158,7 @@ static class ConvertTypeName extends PrimNode {
     return actual.set_name(_sig._ret._name);
   }
   @Override public ErrMsg err( boolean fast ) {
-    Type actual = in(1)._val;
+    Type actual = val(1);
     Type formal = _sig.arg(1);
     if( !actual.isa(formal) ) // Actual is not a formal
       return ErrMsg.typerr(_badargs[0],actual,null,formal);
@@ -176,7 +175,7 @@ static class ConvertInt64F64 extends PrimNode {
 static class ConvertStrStr extends PrimNode {
   ConvertStrStr() { super("str",TypeStruct.STRPTR,TypeMemPtr.OOP); }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
-  @Override public Type value(byte opt_mode) { return in(1)._val; }
+  @Override public Type value(byte opt_mode) { return val(1); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
 }
 
@@ -276,7 +275,7 @@ static class AndI64 extends Prim2OpI64 {
   AndI64() { super("&"); }
   // And can preserve bit-width
   @Override public Type value(byte opt_mode) {
-    Type t1 = in(1)._val, t2 = in(2)._val;
+    Type t1 = val(1), t2 = val(2);
     // 0 AND anything is 0
     if( t1 == Type. NIL || t2 == Type. NIL ) return Type. NIL;
     if( t1 == Type.XNIL || t2 == Type.XNIL ) return Type.XNIL;
@@ -330,8 +329,8 @@ static class EQ_OOP extends PrimNode {
     // Constants can only do nil-vs-not-nil, since e.g. two strings "abc" and
     // "abc" are equal constants in the type system but can be two different
     // string pointers.
-    Type t1 = in(1)._val;
-    Type t2 = in(2)._val;
+    Type t1 = val(1);
+    Type t2 = val(2);
     if( t1==Type.NIL || t1==Type.XNIL ) return vs_nil(t2,TypeInt.TRUE,TypeInt.FALSE);
     if( t2==Type.NIL || t2==Type.XNIL ) return vs_nil(t1,TypeInt.TRUE,TypeInt.FALSE);
     if( t1.above_center() || t2.above_center() ) return TypeInt.BOOL.dual();
@@ -362,8 +361,8 @@ static class NE_OOP extends PrimNode {
     // Constants can only do nil-vs-not-nil, since e.g. two strings "abc" and
     // "abc" are equal constants in the type system but can be two different
     // string pointers.
-    Type t1 = in(1)._val;
-    Type t2 = in(2)._val;
+    Type t1 = val(1);
+    Type t2 = val(2);
     if( t1==Type.NIL || t1==Type.XNIL ) return EQ_OOP.vs_nil(t2,TypeInt.FALSE,TypeInt.TRUE);
     if( t2==Type.NIL || t2==Type.XNIL ) return EQ_OOP.vs_nil(t1,TypeInt.FALSE,TypeInt.TRUE);
     if( t1.above_center() || t2.above_center() ) return TypeInt.BOOL.dual();
@@ -378,7 +377,7 @@ static class Not extends PrimNode {
   // Rare function which takes a Scalar (works for both ints and ptrs)
   Not() { super("!",TypeStruct.SCALAR1,TypeInt.BOOL); }
   @Override public Type value(byte opt_mode) {
-    Type t = in(1)._val;
+    Type t = val(1);
     if( t== Type.XNIL ||
         t== Type. NIL ||
         t== TypeInt.ZERO )
@@ -395,7 +394,7 @@ static class Not extends PrimNode {
 static class RandI64 extends PrimNode {
   RandI64() { super("math_rand",TypeStruct.INT64,TypeInt.INT64); }
   @Override public Type value(byte opt_mode) {
-    Type t = in(1)._val;
+    Type t = val(1);
     if( t.above_center() ) return TypeInt.BOOL.dual();
     if( TypeInt.INT64.dual().isa(t) && t.isa(TypeInt.INT64) )
       return t.meet(TypeInt.FALSE);
@@ -409,7 +408,7 @@ static class RandI64 extends PrimNode {
 static class Id extends PrimNode {
   Id(Type arg) { super("id",TypeStruct.make_args(TypeStruct.ts(TypeStruct.NO_DISP,arg)),arg); }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
-  @Override public Type value(byte opt_mode) { return in(1)._val; }
+  @Override public Type value(byte opt_mode) { return val(1); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
 }
 

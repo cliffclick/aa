@@ -66,6 +66,7 @@ public abstract class IntrinsicNewNode extends Node {
     return new FunPtrNode(ret,gvn.con(TypeFunPtr.NO_DISP));
   }
 
+  @Override public boolean basic_liveness() { return false; }
 }
 
 // --------------------------------------------------------------------------
@@ -73,24 +74,22 @@ class ConvertI64Str extends IntrinsicNewNode {
   ConvertI64Str() { super("str",TypeStruct.ts(null,TypeInt.INT64)); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(byte opt_mode) {
-    Type t = in(3)._val;
+    Type t = val(3);
     if( t.above_center() || !(t instanceof TypeInt) ) return t.oob();
     if( !t.is_con() ) return TypeStr.STR;
     return TypeStr.make(false,Long.toString(t.getl()).intern());
   }
-  @Override public boolean basic_liveness() { return false; }
 }
 
 class ConvertF64Str extends IntrinsicNewNode {
   ConvertF64Str() { super("str",TypeStruct.ts(null,TypeFlt.FLT64)); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(byte opt_mode) {
-    Type t = in(3)._val;
+    Type t = val(3);
     if( t.above_center() || !(t instanceof TypeFlt) ) return t.oob();
     if( !t.is_con() ) return TypeStr.STR;
     return TypeStr.make(false,Double.toString(t.getd()).intern());
   }
-  @Override public boolean basic_liveness() { return false; }
 }
 
 // String concat.  NIL values are treated "as-if" the empty string.
@@ -101,9 +100,9 @@ class AddStrStr extends IntrinsicNewNode {
   AddStrStr() { super("+",TypeStruct.ts(null,TypeMemPtr.STR0,TypeMemPtr.STR0)); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(byte opt_mode) {
-    Type m   = in(1)._val;
-    Type sp0 = in(3)._val;
-    Type sp1 = in(4)._val;
+    Type m   = val(1);
+    Type sp0 = val(3);
+    Type sp1 = val(4);
     if( m.above_center() || sp0.above_center() || sp1.above_center() ) return Type.ANY;
     if( !(m instanceof TypeMem) ) return Type.ALL;
     if( !sp0.isa(TypeMemPtr.STRPTR) ) return Type.ALL;
@@ -119,6 +118,16 @@ class AddStrStr extends IntrinsicNewNode {
     if( !str0.is_con() || !str1.is_con() ) return TypeStr.STR;
     return TypeStr.make(false,(str0.getstr()+str1.getstr()).intern());
   }
-  @Override public boolean basic_liveness() { return false; }
   @Override public byte op_prec() { return 5; }
+}
+
+// "[" defines a new array, and expects an integer size.  Produces
+// partial-alloc type which is consumed by "]" to produce the array.
+class NewAry extends IntrinsicNewNode {
+  NewAry() { super("[",TypeStruct.ts(null,TypeInt.INT64)); }
+  @Override public byte op_prec() { return 2; }
+  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
+  @Override public Type value(byte opt_mode) {
+    throw com.cliffc.aa.AA.unimpl();
+  }
 }

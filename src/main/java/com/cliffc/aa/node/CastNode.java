@@ -27,9 +27,9 @@ public class CastNode extends Node {
     return this;
   }
   @Override public Type value(byte opt_mode) {
-    Type c = in(0)._val;
+    Type c = val(0);
     if( c != Type.CTRL ) return c.oob();
-    Type t = in(1)._val;
+    Type t = val(1);
     if( t.is_forward_ref() ) return Type.SCALAR;
 
     // If the cast is in-error, we cannot lift.

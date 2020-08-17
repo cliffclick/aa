@@ -31,7 +31,7 @@ public class PhiNode extends Node {
   }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
-    if( in(0)._val == Type.XCTRL ) return null;
+    if( val(0) == Type.XCTRL ) return null;
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
     if( r._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
@@ -41,7 +41,7 @@ public class PhiNode extends Node {
     // If only 1 unique live input, return that
     Node live=null;
     for( int i=1; i<_defs._len; i++ ) {
-      if( r.in(i)._val==Type.XCTRL ) continue; // Ignore dead path
+      if( r.val(i)==Type.XCTRL ) continue; // Ignore dead path
       Node n = in(i);
       if( n==this || n==live ) continue; // Ignore self or duplicates
       if( live==null ) live = n;         // Found unique live input
@@ -53,14 +53,14 @@ public class PhiNode extends Node {
   }
 
   @Override public Type value(byte opt_mode) {
-    Type ctl = in(0)._val;
+    Type ctl = val(0);
     if( ctl != Type.CTRL ) return ctl.oob();
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
     Type t = Type.ANY;
     for( int i=1; i<_defs._len; i++ )
-      if( r.in(i)._val==Type.CTRL ) // Only meet alive paths
-        t = t.meet(in(i)._val);
+      if( r.val(i)==Type.CTRL ) // Only meet alive paths
+        t = t.meet(val(i));
     return t;
   }
   @Override BitsAlias escapees() { return BitsAlias.FULL; }

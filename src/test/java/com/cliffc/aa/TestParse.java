@@ -661,64 +661,10 @@ public class TestParse {
     test(FOR+"sum:=0; i:=0; for {i++ < 100} {sum:=sum+i}; sum",TypeInt.INT64);
   }
 
-  /* Closures
-
-----
-Sequential looping constructs, not recursion.  Pondering keyword 'for' for
-sequential iteration.  Using a 3-ascii-char keyword, because sequential
-iteration cannot be parallelized.
-
-^expr // early function return, can be used instead of 'break'
-
-'for' becomes a 2-arg function taking a boolean (with side-effects) and a
-no-arg function.  In this case, the iterator is outside the for-scope.
-    sum:=0; i:=0; for (i++ < 100) {sum+=i}
-    sum:=0; i:=0; for(i++ < 100,{sum+=i})
-    sum:=0; for { i:=0; i++ < 100; {sum+=i} }
-    for( i++ < 100, sum += i )
-    sum:=0; i:=0; for{i++<100}{sum+=i;} // this version takes 2 functions
-
-Python uses "iteratables" for tight syntax on for-loops.
-Still has while loops, which do not introduce a scope.
-    sum:=0; i:=0; while( i++ < 100 ) { sum+=i }; sum
-
-No 'break' but early function exit ^.
-    sum := 0;
-    i := 0;
-    for {i++ < 100 } {
-      (sum+=i) > 1000 ? ^sum;     // ?: syntax, no colon, break in the 'then' clause
-    }
-
-Hiding the scope of 'i' via burying in another function:
-    { i:=0; do {i++ < 100} { sum+=i; sum > 1000 ? ^0; } }()
-
-Defining 'for' as a function; exit from the body with truthy continues loop (but
-exits body early) - same as a continue.  Falling off bottom defaults to true???
-Exit with false exits loop - same as break.
-
-    for = { pred body -> pred && !body ? for pred body }
-Using:
-    sum:=0;i:=0; for {i++<100} {sum+=i; sum > 1000}; sys.p(sum);
-
-Other forms of for:
-x:=0; for {
-  !(x < 10) ? ^0; // return false, so loop exit
-  ! x%2 ? ^1;     // return true, so loop "continues"
-  sys.p(x)
-  ++x
-}
-x:=0; for {x<10} {x++} {
-  ! x%2 ? ^1;
-  sys.p(x)
-}
-
-
-  */
-
 /*
   Array creation: just [7] where '[' is a unary prefix, and ']' is a unary postfix.
   ary = [7]; // untyped, will infer
-  ary = [7]:int; // typed as array of int
+  ary = [7]:[int]; // typed as array of int
   #ary == 7 // array length
 
   Index: "ary [ int" with '[' as an infix operator.
@@ -751,12 +697,6 @@ x:=0; for {x<10} {x++} {
   }
 
   /*
-
-// No ambiguity:
- { x } // no-arg-function returning external variable x; same as { -> x }
- { x,} // 1-elem struct    wrapping external variable x, without using '@{}'
-@{ x } // 1-elem struct type with field named x
-
 // type variables are free in : type expressions
 
 // Define a pair as 2 fields "a" and "b" both with the same type T.  Note that
@@ -776,20 +716,6 @@ map:MapType  = { f list -> ... }
 // Field 'next' can be null or List(A).
 // Field 'val' is type A.
 List = :@{ next:List?, val:A }
-
-list = @{ next:nil, val:1.2 }
-
-List = :@{ next, val }
-head = { list -> list.val  } // fails to compile if list is nil
-tail = { list -> list.next } // fails to compile if list is nil
-
-map = { f list -> list ? List(@{map(f,list.next),f(list.val)}) : 0 }
-
-// Type A can allow nulls, or not
-strs:List(0)    = ... // List of nulls
-strs:List(str)  = ... // List of not-null strings
-strs:List(str?) = ... // List of null-or-strings
-
    */
 
   /*** Fanciful attempt at a HashTable class.  No resize, size, clear, etc.

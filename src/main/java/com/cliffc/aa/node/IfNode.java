@@ -12,7 +12,7 @@ public class IfNode extends Node {
     if( ctl._val == Type.XCTRL ) return gvn.con(TypeTuple.IF_ANY);
     // Binary test vs 0?
     if( tst._defs._len==3 &&
-        (tst.in(1)._val==Type.XNIL || tst.in(2)._val==Type.XNIL) ) {
+        (tst.val(1)==Type.XNIL || tst.val(2)==Type.XNIL) ) {
       // Remove leading test-vs-0
       if( tst instanceof PrimNode.EQ_I64 ) throw AA.unimpl();
       if( tst instanceof PrimNode.EQ_F64 ) throw AA.unimpl();
@@ -46,11 +46,11 @@ public class IfNode extends Node {
     // If the input excludes   zero, we can return true : {CONTROL,ANY}
     // If the input excludes   both, we can return ANY:   {ANY,ANY}
     // If the input includes   both, we can return both:  {CONTROL,CONTROL}
-    Type ctrl = in(0)._val;
+    Type ctrl = val(0);
     if( ctrl!=Type.CTRL && ctrl != Type.ALL ) return TypeTuple.IF_ANY; // Test is dead
     if( in(0) instanceof ProjNode && in(0).in(0)==this )
       return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
-    Type pred = in(1)._val;
+    Type pred = val(1);
     if( pred instanceof TypeTuple)return TypeTuple.IF_ANY;// Nonsense, so test is dead
     if( pred instanceof TypeObj ) return TypeTuple.IF_ANY;// Nonsense, so test is dead
     if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY; // Choice of {0,1}

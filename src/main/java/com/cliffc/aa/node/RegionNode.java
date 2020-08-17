@@ -19,7 +19,7 @@ public class RegionNode extends Node {
     // Node, and return-for-progress.
     int dlen = _defs.len();
     for( int i=1; i<dlen; i++ )
-      if( in(i)._val==Type.XCTRL && !in(i).is_prim() ) { // Found dead path; cut out
+      if( val(i)==Type.XCTRL && !in(i).is_prim() ) { // Found dead path; cut out
         for( Node phi : _uses )
           if( phi instanceof PhiNode ) {
             assert !phi.is_dead();
@@ -109,7 +109,7 @@ public class RegionNode extends Node {
   @Override public Type value(byte opt_mode) {
     if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
     for( int i=1; i<_defs._len; i++ ) {
-      Type c = in(i)._val;
+      Type c = val(i);
       if( c == Type.CTRL || c == Type.ALL )
         return Type.CTRL;
     }

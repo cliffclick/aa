@@ -23,7 +23,7 @@ import java.util.*;
  *  ifex = apply [? stmt [: stmt]] // trinary short-circuit logic; missing ":stmt" will default to 0
  *  apply= expr  | expr expr*      // Lisp-like application-as-adjacent
  *  expr = term [binop term]*      // gather all the binops and sort by precedence
- *  term = uniop term              // Any number of uniops
+ *  term = uniop term              // Any number of prefix uniops
  *  term = id++ | id--             //   then a postfix op
  *  term = tfact post              //   A term is a tfact and some more stuff...
  *  post = empty                   // A term can be just a plain 'tfact'
@@ -44,8 +44,8 @@ import java.util.*;
  *  fact = {binop}                 // Special syntactic form of binop; no spaces allowed; returns function constant
  *  fact = {uniop}                 // Special syntactic form of uniop; no spaces allowed; returns function constant
  *  tuple= (stmts,[stmts,])        // Tuple; final comma is optional, first comma is required
- *  binop= +-*%&|/<>!= [] ]=       // etc; primitive lookup; can determine infix binop at parse-time
- *  uniop= -!~ []                  // etc; primitive lookup; can determine infix uniop at parse-time
+ *  binop= +-*%&|/<>!= [ ]=        // etc; primitive lookup; can determine infix binop at parse-time
+ *  uniop= -!~ [                   // etc; primitive lookup; can determine infix uniop at parse-time
  *  func = { [id[:type]* ->]? stmts} // Anonymous function declaration, if no args then the -> is optional
  *                                 // Pattern matching: 1 arg is the arg; 2+ args break down a (required) tuple
  *  str  = [.\%]*                  // String contents; \t\n\r\% standard escapes

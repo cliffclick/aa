@@ -228,7 +228,7 @@ public class FunNode extends RegionNode {
       if( mem!=null ) {
         Type mt = Type.ANY;
         for( int i=1; i<_defs._len; i++ )
-          mt = mt.meet(mem.in(i)._val);
+          mt = mt.meet(mem.val(i));
         if( !mt.isa(Env.DEFMEM._val) )
           return null;          // Do not inline a bad memory type
       }
@@ -268,7 +268,7 @@ public class FunNode extends RegionNode {
   // Gather the ParmNodes into an array.  Return null if any input path is dead
   // (would rather fold away dead paths before inlining).
   private RetNode split_callers_gather( GVNGCM gvn, ParmNode[] parms ) {
-    for( int i=1; i<_defs._len; i++ ) if( in(i)._val==Type.XCTRL ) return null;
+    for( int i=1; i<_defs._len; i++ ) if( val(i)==Type.XCTRL ) return null;
 
     // Gather the ParmNodes and the RetNode.  Ignore other (control) uses
     RetNode ret = null;
@@ -293,9 +293,9 @@ public class FunNode extends RegionNode {
         for( Node call : parm._uses ) { // See if a parm-user needs a type-specialization split
           if( call instanceof CallNode &&
               ((CallNode)call).fun() instanceof UnresolvedNode ) { // Call overload not resolved
-            Type t0 = parm.in(1)._val;               // Generic type in slot#1
+            Type t0 = parm.val(1);                   // Generic type in slot#1
             for( int i=2; i<parm._defs._len; i++ ) { // For all other inputs
-              Type tp = parm.in(i)._val;
+              Type tp = parm.val(i);
               if( tp.above_center() ) continue; // This parm input is in-error
               Type ti = tp.widen();             // Get the widen'd type
               if( !ti.isa(t0) ) continue; // Must be isa-generic type, or else type-error
@@ -316,9 +316,9 @@ public class FunNode extends RegionNode {
       Type[] sig = TypeAry.get(parms.length);
       sig[0] = parms[0]==null
         ? _sig.display().make_from(TypeStr.NO_DISP)
-        : parms[0].in(idx)._val;
+        : parms[0].val(idx);
       for( int i=1; i<parms.length; i++ ) // 0 for display
-        sig[i] = parms[i]==null ? Type.SCALAR : parms[i].in(idx)._val.widen();
+        sig[i] = parms[i]==null ? Type.SCALAR : parms[i].val(idx).widen();
       return sig;
     }
 
@@ -800,9 +800,9 @@ public class FunNode extends RegionNode {
     // EpilogNode gets visited during GCP
     if( is_forward_ref() ) return Type.CTRL;
     if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
-    if( in(0)==this ) return in(1)._val; // is_copy
+    if( in(0)==this ) return val(1); // is_copy
     for( int i=1; i<_defs._len; i++ ) {
-      Type c = in(i)._val;
+      Type c = val(i);
       if( c != Type.CTRL && c != Type.ALL ) continue; // Not control
       if( !(in(i) instanceof CProjNode) ) return Type.CTRL; // A constant control
       // Call might be alive and executing and calling many targets, just not this one.
