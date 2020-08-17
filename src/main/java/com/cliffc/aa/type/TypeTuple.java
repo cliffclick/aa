@@ -29,7 +29,7 @@ public class TypeTuple extends Type<TypeTuple> {
     if( this==o ) return true;
     if( !(o instanceof TypeTuple) ) return false;
     TypeTuple t = (TypeTuple)o;
-    return _any==t._any && _hash == t._hash && TypeAry.eq(_ts,t._ts);
+    return _any==t._any && _hash == t._hash && Types.eq(_ts,t._ts);
   }
   // Never part of a cycle so the normal equals works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
@@ -57,7 +57,7 @@ public class TypeTuple extends Type<TypeTuple> {
   @Override protected TypeTuple free( TypeTuple ret ) { FREE=this; return ret; }
   @SuppressWarnings("unchecked")
   public static TypeTuple make0( boolean any, Type[] ts ) {
-    ts = TypeAry.hash_cons(ts);
+    ts = Types.hash_cons(ts);
     TypeTuple t1 = FREE;
     if( t1 == null ) t1 = new TypeTuple(TTUPLE, any, ts);
     else { FREE = null; t1.init(TTUPLE, any, ts); }
@@ -66,18 +66,18 @@ public class TypeTuple extends Type<TypeTuple> {
     return t1==t2 ? t1 : t1.free(t2);
   }
   public static TypeTuple make( Type[] ts ) { return make0(false,ts); }
-  public static TypeTuple make( ) { Type[] ts = TypeAry.get(0);  return make0(false,ts); }
-  public static TypeTuple make( Type t0 ) { Type[] ts = TypeAry.get(1);  ts[0]=t0;  return make0(false,ts); }
-  public static TypeTuple make( Type t0, Type t1 ) { Type[] ts = TypeAry.get(2);  ts[0]=t0; ts[1]=t1; return make0(false,ts); }
-  public static TypeTuple make( Type t0, Type t1, Type t2 ) { Type[] ts = TypeAry.get(3); ts[0]=t0; ts[1]=t1; ts[2]=t2; return make0(false,ts); }
-  public static TypeTuple make( Type t0, Type t1, Type t2, Type t3 ) { Type[] ts = TypeAry.get(4); ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; return make0(false,ts); }
+  public static TypeTuple make( ) { Type[] ts = Types.get(0);  return make0(false,ts); }
+  public static TypeTuple make( Type t0 ) { Type[] ts = Types.get(1);  ts[0]=t0;  return make0(false,ts); }
+  public static TypeTuple make( Type t0, Type t1 ) { Type[] ts = Types.get(2);  ts[0]=t0; ts[1]=t1; return make0(false,ts); }
+  public static TypeTuple make( Type t0, Type t1, Type t2 ) { Type[] ts = Types.get(3); ts[0]=t0; ts[1]=t1; ts[2]=t2; return make0(false,ts); }
+  public static TypeTuple make( Type t0, Type t1, Type t2, Type t3 ) { Type[] ts = Types.get(4); ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; return make0(false,ts); }
   public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4 ) {
-    Type[] ts = TypeAry.get(5);
+    Type[] ts = Types.get(5);
     ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; ts[4]=t4;
     return make0(false,ts);
   }
   public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4, Type t5 ) {
-    Type[] ts = TypeAry.get(6);
+    Type[] ts = Types.get(6);
     ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; ts[4]=t4; ts[5]=t5;
     return make0(false,ts);
   }
@@ -98,9 +98,9 @@ public class TypeTuple extends Type<TypeTuple> {
   // just dual each element.  Also flip the infinitely extended tail type.
   @SuppressWarnings("unchecked")
   @Override protected TypeTuple xdual() {
-    Type[] ts = TypeAry.get(_ts.length);
+    Type[] ts = Types.get(_ts.length);
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].dual();
-    ts = TypeAry.hash_cons(ts);
+    ts = Types.hash_cons(ts);
     return new TypeTuple(TTUPLE, !_any, ts);
   }
   // Standard Meet.  Tuples have an infinite extent of 'ALL' for low, or 'ANY'
@@ -117,7 +117,7 @@ public class TypeTuple extends Type<TypeTuple> {
     // Short is low ; short extended by ALL so tail is ALL so trimmed to short.
     int len = _any ? tmax._ts.length : _ts.length;
     // Meet of common elements
-    Type[] ts = TypeAry.get(len);
+    Type[] ts = Types.get(len);
     for( int i=0; i<_ts.length; i++ )  ts[i] = _ts[i].meet(tmax._ts[i]);
     // Elements only in the longer tuple.
     for( int i=_ts.length; i<len; i++ )
@@ -129,7 +129,7 @@ public class TypeTuple extends Type<TypeTuple> {
 
   // Same as the original, with one field changed
   public TypeTuple set( int idx, Type t ) {
-    Type[] ts = TypeAry.clone(_ts);
+    Type[] ts = Types.clone(_ts);
     ts[idx]=t;
     return make(ts);
   }

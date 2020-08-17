@@ -409,7 +409,7 @@ public class TestNodeSmall {
     ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(1, dsp_file));
     Env.DISPLAYS = Env.DISPLAYS.set(dsp_file._alias);
     // The Fun and Fun._tf:
-    TypeStruct formals = TypeStruct.make_args(TypeAry.ts(dsp_file_ptr._val, // File-scope display as arg0
+    TypeStruct formals = TypeStruct.make_args(Types.ts(dsp_file_ptr._val, // File-scope display as arg0
                                                          Type.SCALAR));          // Some scalar arg1
     TypeFunSig sig = TypeFunSig.make(formals,Type.SCALAR);
     FunNode fun = new FunNode("fact",sig,-1);

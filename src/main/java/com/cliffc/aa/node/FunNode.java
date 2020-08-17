@@ -313,7 +313,7 @@ public class FunNode extends RegionNode {
     // Look for splitting to help an Unresolved Call.
     int idx = find_type_split_index(gvn,parms);
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
-      Type[] sig = TypeAry.get(parms.length);
+      Type[] sig = Types.get(parms.length);
       sig[0] = parms[0]==null
         ? _sig.display().make_from(TypeStr.NO_DISP)
         : parms[0].val(idx);

@@ -319,7 +319,7 @@ public class CallNode extends Node {
     Type ctl = ctl()._val;
     if( opt_mode>0 && cepi()==null ) ctl = Type.XCTRL; // Dead from below
     if( ctl != Type.CTRL ) return ctl.oob();
-    final Type[] ts = TypeAry.get(_defs._len+1);
+    final Type[] ts = Types.get(_defs._len+1);
     ts[0] = Type.CTRL;
 
     // Not a memory to the call?

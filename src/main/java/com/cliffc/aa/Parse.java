@@ -28,17 +28,17 @@ import java.util.*;
  *  term = tfact post              //   A term is a tfact and some more stuff...
  *  post = empty                   // A term can be just a plain 'tfact'
  *  post = (tuple) post            // Application argument list
- *  post = tfact tfact             // Application as adjacent value
  *  post = .field post             // Field and tuple lookup
  *  post = .field [:]= stmt        // Field (re)assignment.  Plain '=' is a final assignment
  *  post = .field++ | .field--     // Allowed anytime a := is allowed
+ *  post = unipostop               // A balancing post-op
  *  post = :type post              // TODO: Add this, remove 'tfact'
  *  tfact= fact[:type]             // Typed fact
  *  fact = id                      // variable lookup
  *  fact = num                     // number
  *  fact = "string"                // string
  *  fact = (stmts)                 // General statements parsed recursively
- *  fact = tuple                   // Tuple builder
+ *  fact = (tuple)                 // Tuple builder
  *  fact = func                    // Anonymous function declaration
  *  fact = @{ stmts }              // Anonymous struct declaration, assignments define fields
  *  fact = {binop}                 // Special syntactic form of binop; no spaces allowed; returns function constant
@@ -501,7 +501,7 @@ public class Parse {
   /** Any number of uniops, then a field-lookup/assignment, then a post-fix op
    *    term = uniop term
    *    term = id++ | id--
-   *    term = tfact [tuple | .field]* [.field[:]=stmt | .field++ | .field-- | e]
+   *    term = tfact [tuple | .field]* [.field[:]=stmt | .field++ | .field-- | tuple | e]
    */
   private Node term() {
     int oldx = _x;
@@ -583,9 +583,10 @@ public class Parse {
         }
 
       } else {
-        return n;               // Just an arg
+        break;
       }
-    } // Else no trailing arg, just return value
+    }
+        return n;               // Just an arg
   }
 
   // Handle post-increment/post-decrement operator.

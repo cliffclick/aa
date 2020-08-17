@@ -62,7 +62,6 @@ BNF                           | Comment
 `term = tfact post`           |   A term is a tfact and some more stuff...
 `post = empty`                | A term can be just a plain 'tfact'
 `post = (tuple) post`         | Application argument list
-`post = tfact post`           | Application as adjacent value
 `post = .field post`          | Field and tuple lookup
 `post = .field [:]= stmt`     | Field (re)assignment.  Plain '=' is a final assignment
 `post = .field++ OR .field--` | Field reassignment.

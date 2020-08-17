@@ -148,7 +148,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     TypeObj newt=TypeObj.UNUSED; // If dead
     if( !is_unused() ) {
       // Gather args and produce a TypeStruct
-      Type[] ts = TypeAry.get(_ts._ts.length);
+      Type[] ts = Types.get(_ts._ts.length);
       for( int i=0; i<ts.length; i++ )
         ts[i] = fld(i)._val;
       newt = _ts.make_from(ts);  // Pick up field names and mods

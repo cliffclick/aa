@@ -6,9 +6,9 @@ import java.util.Arrays;
 
 // Class to make hashcons Type[].
 // Bug to change after interning.
-public class TypeAry {
+public class Types {
   // Lazy expanding list of TypeAry customed to handle various Type[] lengths.
-  private static final Ary<TypeAry> TYPEARY = new Ary<>(new TypeAry[1],0);
+  private static final Ary<Types> TYPEARY = new Ary<>(new Types[1],0);
   private static final Key K = new Key(null,0);
 
   // Wrapper to customize array.equals
@@ -37,15 +37,15 @@ public class TypeAry {
   private final int _len;       // Length of arrays being handled
   private final IHashMap _intern = new IHashMap();
   private final Ary<Type[]> _free = new Ary<>(new Type[1][],0);
-  private TypeAry( int len ) { _len=len; }
+  private Types( int len ) { _len=len; }
 
   // Make a TypeAry to handle Type[] of length 'len'
-  private static TypeAry tary(int len) {
-    TypeAry tary = TYPEARY.atX(len);
-    return tary==null ? TYPEARY.setX(len,new TypeAry(len)) : tary;
+  private static Types tary( int len) {
+    Types tary = TYPEARY.atX(len);
+    return tary==null ? TYPEARY.setX(len,new Types(len)) : tary;
   }
 
-  private TypeAry check() { assert check_();  return this; }
+  private Types check() { assert check_();  return this; }
   private boolean check_() {
     //for( Object k : _intern.keySet() )
     //  assert Key.hash(((Key)k)._ts)==((Key)k)._hash; // Basically asserting array not hacked
@@ -82,20 +82,20 @@ public class TypeAry {
   public static void free(Type[] ts) { tary(ts.length)._free.push(ts); }
   public static Type[] hash_cons(Type[] ts) { return tary(ts.length).check().hash_cons_(ts); }
   public static Type[] ts(Type t0) {
-    TypeAry t1 = tary(1).check();
+    Types t1 = tary(1).check();
     Type[] ts = t1.get();
     ts[0] = t0;
     return ts;
   }
   public static Type[] ts(Type t0, Type t1) {
-    TypeAry t2 = tary(2).check();
+    Types t2 = tary(2).check();
     Type[] ts = t2.get();
     ts[0] = t0;
     ts[1] = t1;
     return ts;
   }
   public static Type[] ts(Type t0, Type t1, Type t2) {
-    TypeAry t3 = tary(3).check();
+    Types t3 = tary(3).check();
     Type[] ts = t3.get();
     ts[0] = t0;
     ts[1] = t1;

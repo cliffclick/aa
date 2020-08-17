@@ -35,6 +35,7 @@ public abstract class IntrinsicNewNode extends Node {
         new ConvertI64Str(),
         new ConvertF64Str(),
         new AddStrStr(),
+        new NewAry(),
       };
     return INTRINSICS;
   }
@@ -130,4 +131,5 @@ class NewAry extends IntrinsicNewNode {
   @Override public Type value(byte opt_mode) {
     throw com.cliffc.aa.AA.unimpl();
   }
+  public String postop() { return "]"; } // Balancing function name
 }

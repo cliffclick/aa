@@ -36,7 +36,7 @@ public class MemSplitNode extends Node {
     Type t = mem()._val;
     if( !(t instanceof TypeMem) ) return t.oob();
     // Normal type is for an MProj of the input memory, one per alias class
-    Type[] ts = TypeAry.get(_escs._len);
+    Type[] ts = Types.get(_escs._len);
     Arrays.fill(ts,t);
     return TypeTuple.make(ts);
   }

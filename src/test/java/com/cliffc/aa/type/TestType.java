@@ -268,8 +268,8 @@ public class TestType {
     Type tsx= TypeStruct. FLT64; // @{x:flt64}; fixed  leading field name
     Type tff = tsx.meet(tf);     //
     assertEquals(tf,tff);        // tsx.isa(tf)
-    TypeStruct t0 = TypeStruct.make(TypeAry.ts(nil)); //  (nil)
-    TypeStruct ts0= TypeStruct.make(new String[]{"x"},TypeAry.ts(nil));  // @{x:nil}
+    TypeStruct t0 = TypeStruct.make(Types.ts(nil)); //  (nil)
+    TypeStruct ts0= TypeStruct.make(new String[]{"x"}, Types.ts(nil));  // @{x:nil}
     Type tss = ts0.meet(t0);
     assertEquals(t0,tss);      // t0.isa(ts0)
     byte[] finals = new byte[]{TypeStruct.FFNL};
@@ -438,7 +438,7 @@ public class TestType {
     // less than 5.  Any data loop must contain a Phi; if structures are
     // nesting infinitely deep, then it must contain a NewNode also.
     int alias = BitsAlias.new_alias(BitsAlias.RECORD);
-    Type[] tts = TypeAry.ts(Type.NIL,TypeInt.con(0));
+    Type[] tts = Types.ts(Type.NIL,TypeInt.con(0));
     String[] flds2 = new String[]{".","."};
     TypeStruct ts = TypeStruct.make(flds2,tts,finals);
     TypeMemPtr phi = TypeMemPtr.make(alias,ts);

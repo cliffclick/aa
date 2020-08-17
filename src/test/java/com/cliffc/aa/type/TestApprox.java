@@ -710,7 +710,7 @@ public class TestApprox {
     // for this test, as the cyclic approx is supposed to be low - and it has
     // args known post-parse but not pre-parse.
     Type tY = TypeMemPtr.DISPLAY_PTR;
-    TypeStruct tfp0_args = TypeStruct.make_x_args(true,TypeAry.ts(tY.simple_ptr()));
+    TypeStruct tfp0_args = TypeStruct.make_x_args(true, Types.ts(tY.simple_ptr()));
 
     TypeFunPtr tfp0 = TypeFunPtr.make(BitsFun.ANY,2,(TypeMemPtr)TypeFunPtr.DISP.simple_ptr()); // fib with generic display
     TypeStruct dsp0 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp0),fmods); // The display with weak fib-type
