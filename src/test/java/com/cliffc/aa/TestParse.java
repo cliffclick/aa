@@ -747,7 +747,7 @@ x:=0; for {x<10} {x++} {
     testerr("ary=[3]; ary[-1]",null,0); // AIOOBE vs end-of-array math
     test("ary=[3];#ary",Type.ALL); // Array length
 
-    test("ary=[99]; i:=0; do (i++ < #ary) {ary[i]=i*i}", Type.ALL); // sequential iteration over array
+    test("ary=[99]; i:=0; for {i++ < #ary} {ary[i]:=i*i}", Type.ALL); // sequential iteration over array
   }
 
   /*
@@ -797,12 +797,13 @@ HashTable = {@{
   _tab = [7];
 
   get = { key ->
-    entry = _tab[key.hash() % _tab.len];
-    entry && key.equals(entry.key) ? entry.val;
+    entry = _tab[key.hash() % #_tab];
+    entry && key.eq(entry.key) ? entry.val;
   }
   put = { key val ->
-    idx = key.hash() % _tab.len;
+    idx = key.hash() % #_tab;
     entry = _tab[idx];
+    entry && key.eq(entry.key) ? (oldval=entry.val; entry.val:=val; ^oldval);
     _tab[idx]= @{key=key; val=val; next=entry};
     entry ? entry.val;
   }
