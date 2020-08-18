@@ -24,12 +24,12 @@ public abstract class Node implements Cloneable {
   static final byte OP_FUNPTR =10;
   static final byte OP_IF     =11;
   static final byte OP_JOIN   =12;
-  static final byte OP_LIBCALL=13;
-  static final byte OP_LOAD   =14;
-  static final byte OP_LOOP   =15;
-  static final byte OP_NAME   =16; // Cast a prior NewObj to have a runtime Name
-  static final byte OP_NEWOBJ =17; // Allocate a new struct
-  static final byte OP_NEWSTR =18; // Allocate a new string (array)
+  static final byte OP_LOAD   =13;
+  static final byte OP_LOOP   =14;
+  static final byte OP_NAME   =15; // Cast a prior NewObj to have a runtime Name
+  static final byte OP_NEWOBJ =16; // Allocate a new struct
+  static final byte OP_NEWARY =17; // Allocate a new array
+  static final byte OP_NEWSTR =18; // Allocate a new string
   static final byte OP_PARM   =19;
   static final byte OP_PHI    =20;
   static final byte OP_PRIM   =21;
@@ -46,7 +46,8 @@ public abstract class Node implements Cloneable {
   static final byte OP_UNR    =32;
   static final byte OP_MAX    =33;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "DefMem", "Err", "FP2Clo", "Fun", "FunPtr", "If", "Join", "LibCall", "Load", "Loop", "Name", "NewObj", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Tmp", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "DefMem", "Err", "FP2Clo", "Fun", "FunPtr", "If", "Join", "Load", "Loop", "Name", "NewObj", "NewAry", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Tmp", "Type", "Unresolved" };
+  static { assert STRS.length==OP_MAX; }
 
   public int _uid;      // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;       // Opcode (besides the object class), used to avoid v-calls in some places
@@ -269,7 +270,7 @@ public abstract class Node implements Cloneable {
       return dump(d,sb,plive).nl();
     }
   }
-  public boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_LIBCALL || _op==OP_LOOP || _op==OP_NEWOBJ || _op==OP_NEWSTR || _op==OP_REGION || _op==OP_SPLIT || _op==OP_START; }
+  public boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_LOOP || _op==OP_NEWOBJ || _op==OP_NEWSTR || _op==OP_REGION || _op==OP_SPLIT || _op==OP_START; }
   private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ || _op==OP_CPROJ || _op==OP_FP2CLO; }
   boolean is_CFG() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_LOOP || _op==OP_REGION || _op==OP_START || _op==OP_CPROJ || _op==OP_SCOPE; }
 
@@ -396,7 +397,7 @@ public abstract class Node implements Cloneable {
     return live;
   }
   // Shortcut to update self-live
-  public Type xliv( byte opt_mode ) { return _live = live(opt_mode); }
+  public void xliv( byte opt_mode ) { _live = live(opt_mode); }
   // Compute local contribution of use liveness to this def.
   // Overridden in subclasses that do per-def liveness.
   public TypeMem live_use( byte opt_mode, Node def ) {
@@ -493,13 +494,13 @@ public abstract class Node implements Cloneable {
   }
 
   // Gather errors; backwards reachable control uses only
-  public void walkerr_use( HashSet<ErrMsg> errs, VBitSet bs, GVNGCM gvn ) {
+  public void walkerr_use( HashSet<ErrMsg> errs, VBitSet bs ) {
     assert !is_dead();
     if( bs.tset(_uid) ) return;  // Been there, done that
     if( _val != Type.CTRL ) return; // Ignore non-control
-    if( this instanceof ErrNode ) adderr(gvn,errs);
+    if( this instanceof ErrNode ) adderr(errs);
     for( Node use : _uses )     // Walk control users for more errors
-      use.walkerr_use(errs,bs,gvn);
+      use.walkerr_use(errs,bs);
   }
 
   // Gather errors; forwards reachable data uses only.  This is an RPO walk.
@@ -514,18 +515,18 @@ public abstract class Node implements Cloneable {
       def.walkerr_def(errs,bs,gvn);
     }
     // Post-Order walk: check after walking
-    adderr(gvn,errs);
+    adderr(errs);
   }
 
   // Gather errors; forwards reachable data uses only
   public void walkerr_gc( HashSet<ErrMsg> errs, VBitSet bs, GVNGCM gvn ) {
     if( bs.tset(_uid) ) return;  // Been there, done that
     if( is_uncalled(gvn) ) return; // FunPtr is a constant, but never executed, do not check for errors
-    adderr(gvn,errs);
+    adderr(errs);
     for( int i=0; i<_defs._len; i++ )
       if( in(i) != null ) in(i).walkerr_gc(errs,bs,gvn);
   }
-  private void adderr(GVNGCM gvn, HashSet<ErrMsg> errs ) {
+  private void adderr( HashSet<ErrMsg> errs ) {
     ErrMsg msg = err(false);
     if( msg==null ) return;
     msg._order = errs.size();

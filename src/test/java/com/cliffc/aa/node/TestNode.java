@@ -235,7 +235,7 @@ public class TestNode {
     test1monotonic(new FunPtrNode(ret,_gvn.con(TypeFunPtr.NO_DISP)));
     test1monotonic(new FP2ClosureNode(_ins[1])); // Only takes in a TFP
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
-    for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS() )
+    for( NewNode.NewPrimNode prim : NewNode.NewPrimNode.INTRINSICS() )
       test1monotonic_intrinsic(prim);
     test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
@@ -294,8 +294,8 @@ public class TestNode {
   }
 
   // Fill a Node with {null,edge,edge} and start the search
-  private void test1monotonic_intrinsic(IntrinsicNewNode prim) {
-    IntrinsicNewNode n = (IntrinsicNewNode)prim.copy(false,_gvn);
+  private void test1monotonic_intrinsic(NewNode.NewPrimNode prim) {
+    NewNode.NewPrimNode n = (NewNode.NewPrimNode)prim.copy(false,_gvn);
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);         // memory

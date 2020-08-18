@@ -65,6 +65,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTR:   break;
+    case TARY:
     case TLIVE:
     case TSTRUCT:return OBJ;
     case TOBJ:   return t.xmeet(this);

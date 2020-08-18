@@ -235,7 +235,8 @@ public class TypeMem extends Type<TypeMem> {
     TypeObj[] tos = new TypeObj[Math.max(BitsAlias.RECORD,BitsAlias.ABC)+1];
     tos[BitsAlias.ALL] = TypeObj.ISUSED;
     tos[BitsAlias.RECORD]=TypeStruct.ALLSTRUCT;
-    tos[BitsAlias.ARY] = TypeStr.STR; // TODO: Proxy for all-arrays
+    tos[BitsAlias.ARY] = TypeAry.ARY; //
+    tos[BitsAlias.STR] = TypeStr.STR; //
     tos[BitsAlias.ABC] = TypeStr.ABC; //
     MEM  = make0(tos);
     XMEM = MEM.dual();

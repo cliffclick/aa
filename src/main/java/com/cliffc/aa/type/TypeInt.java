@@ -72,6 +72,7 @@ public class TypeInt extends Type<TypeInt> {
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
     case TFUNSIG:
+    case TARY:
     case TLIVE:
     case TOBJ:
     case TSTR:

@@ -445,7 +445,7 @@ public class TestType {
     for( int i=1; i<20; i++ ) {
       Type[] ntts = TypeStruct.ts(phi,TypeInt.con(i));
       TypeStruct newt = TypeStruct.make(flds2,ntts,finals);
-      TypeStruct approx = newt.approx(NewNode.CUTOFF,alias);
+      TypeStruct approx = newt.approx(2/*CUTOFF*/,alias);
       phi = TypeMemPtr.make(alias,approx);
     }
     HashMap<Type,Integer> ds = phi.depth();

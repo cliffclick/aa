@@ -69,8 +69,8 @@ public class FunNode extends RegionNode {
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
-  public FunNode(        PrimNode prim) { this(prim._name,prim._sig,prim.op_prec()); }
-  public FunNode(IntrinsicNewNode prim) { this(prim._name,prim._sig,prim.op_prec()); }
+  public FunNode(           PrimNode prim) { this(prim._name,prim._sig,prim.op_prec()); }
+  public FunNode(NewNode.NewPrimNode prim) { this(prim._name,prim._sig,prim.op_prec()); }
   // Used to start an anonymous function in the Parser
   public FunNode(String[] flds, Type[] ts) { this(null,TypeFunSig.make(TypeStruct.make_args(flds,ts),Type.SCALAR),-1); }
   // Used to forward-decl anon functions
@@ -371,8 +371,8 @@ public class FunNode extends RegionNode {
         break;
       case OP_CALL: break; // Argument pass-thru probably needs to check formals
       case OP_RET: break;  // Return pass-thru should be ok
-      case OP_LIBCALL:
-        TypeFunSig sig = ((IntrinsicNewNode)use)._sig;
+      case OP_NEWSTR:
+        TypeFunSig sig = ((NewStrNode)use)._sig;
         Type formal = sig._formals.at(use._defs.find(n)-2);
         if( !TypeMemPtr.OOP0.dual().isa(formal) )
           return true;

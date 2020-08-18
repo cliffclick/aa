@@ -96,6 +96,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     case TINT:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
+    case TARY:
     case TLIVE:
     case TOBJ:
     case TSTR:

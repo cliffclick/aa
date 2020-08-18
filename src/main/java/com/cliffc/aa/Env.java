@@ -77,7 +77,7 @@ public class Env implements AutoCloseable {
     for( Node use : STK_0._uses ) GVN.unreg(use); // Also the OProj,DProj will rapidly change types
     for( PrimNode prim : PrimNode.PRIMS() )
       STK_0.add_fun(null,prim._name,(FunPtrNode) GVN.xform(prim.as_fun(GVN)), GVN);
-    for( IntrinsicNewNode lib : IntrinsicNewNode.INTRINSICS() )
+    for( NewNode.NewPrimNode lib : NewNode.NewPrimNode.INTRINSICS() )
       STK_0.add_fun(null,lib ._name,(FunPtrNode) GVN.xform(lib .as_fun(GVN)), GVN);
     // Top-level constants
     STK_0.create_active("math_pi", GVN.con(TypeFlt.PI),TypeStruct.FFNL);
@@ -154,7 +154,7 @@ public class Env implements AutoCloseable {
     BitsRPC   .reset_to_init0();
     GVN       .reset_to_init0();
     FunNode   .reset();
-    IntrinsicNewNode.reset();
+    NewNode.NewPrimNode.reset();
     PrimNode  .reset();
     DISPLAYS = BitsAlias.EMPTY; // Reset aliases declared as Displays
   }

@@ -160,7 +160,7 @@ public class Parse {
     res   .walkerr_def(errs,bs,_gvn);
     ctrl().walkerr_def(errs,bs,_gvn);
     mem   .walkerr_def(errs,bs,_gvn);
-    if( errs.isEmpty() ) _e._scope.walkerr_use(errs,new VBitSet(),_gvn);
+    if( errs.isEmpty() ) _e._scope.walkerr_use(errs,new VBitSet());
     if( errs.isEmpty() && skipWS() != -1 ) errs.add(Node.ErrMsg.trailingjunk(this));
     if( errs.isEmpty() ) res.walkerr_gc(errs,new VBitSet(),_gvn);
     ArrayList<Node.ErrMsg> errs0 = new ArrayList<>(errs);
@@ -948,11 +948,11 @@ public class Parse {
       if( c=='\\' ) throw AA.unimpl();
       if( _x == _buf.length ) return null;
     }
-    TypeStr ts = TypeStr.con(new String(_buf,oldx,_x-oldx-1).intern());
+    String str = new String(_buf,oldx,_x-oldx-1).intern();
     // Convert to ptr-to-constant-memory-string
-    NewStrNode nnn = gvn( new NewStrNode(ts,con(ts))).keep();
+    NewNode nnn = (NewNode)gvn( new NewStrNode.ConStr(str) );
     set_mem(Env.DEFMEM.make_mem_proj(_gvn,nnn,mem()));
-    return gvn( new ProjNode(1, nnn.unhook()));
+    return gvn( new ProjNode(1, nnn));
   }
 
   /** Parse a type or return null

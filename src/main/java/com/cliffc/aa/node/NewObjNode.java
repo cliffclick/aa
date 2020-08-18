@@ -144,16 +144,12 @@ public class NewObjNode extends NewNode<TypeStruct> {
     return null;
   }
 
-  @Override public Type value(byte opt_mode) {
-    TypeObj newt=TypeObj.UNUSED; // If dead
-    if( !is_unused() ) {
-      // Gather args and produce a TypeStruct
-      Type[] ts = Types.get(_ts._ts.length);
-      for( int i=0; i<ts.length; i++ )
-        ts[i] = fld(i)._val;
-      newt = _ts.make_from(ts);  // Pick up field names and mods
-    }
-    return TypeTuple.make(newt,_tptr);   // Complex obj, simple ptr.
+  @Override TypeObj valueobj() {
+    // Gather args and produce a TypeStruct
+    Type[] ts = Types.get(_ts._ts.length);
+    for( int i=0; i<ts.length; i++ )
+      ts[i] = fld(i)._val;
+    return _ts.make_from(ts);  // Pick up field names and mods
   }
   @Override TypeStruct dead_type() { return TypeStruct.ANYSTRUCT; }
   // All fields are escaping

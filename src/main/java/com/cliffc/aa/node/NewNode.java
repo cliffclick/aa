@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
 // Allocates a TypeObj and produces a Tuple with the TypeObj and a TypeMemPtr.
@@ -29,11 +30,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
   // Just TMP.make(_alias,OBJ)
   public TypeMemPtr _tptr;
-
-  // NewNodes can participate in cycles, where the same structure is appended
-  // to in a loop until the size grows without bound.  If we detect this we
-  // need to approximate a new cyclic type.
-  public final static int CUTOFF=2; // Depth of types before we start forcing approximations
 
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
@@ -71,6 +67,11 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     if( _defs._len > 1 && captured(gvn) ) return kill(gvn);
     return null;
   }
+
+  @Override public Type value(byte opt_mode) {
+    return TypeTuple.make(is_unused() ? TypeObj.UNUSED : valueobj(),_tptr);   // Complex obj, simple ptr.
+  }
+  abstract TypeObj valueobj();
 
   @Override BitsAlias escapees() { return _tptr._aliases; }
   abstract T dead_type();
@@ -150,5 +151,51 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     Node ptr = _uses.at(0);
     if( ptr instanceof MrgProjNode ) ptr = _uses.at(1);
     return (ProjNode)ptr;
+  }
+
+  // --------------------------------------------------------------------------
+  public static abstract class NewPrimNode<T extends TypeObj<T>> extends NewNode<T> {
+    public final String _name;    // Unique library call name
+    final TypeFunSig _sig;        // Arguments
+    final boolean _reads;         // Reads old memory (all of these ops *make* new memory, none *write* old memory)
+    NewPrimNode(byte op, int parent_alias, T to, String name, boolean reads, Type... args) {
+      super(op,parent_alias,to);
+      _name = name;
+      _reads = reads;
+      args[0] = TypeFunPtr.NO_DISP; // No display
+      String[] flds = args.length==1 ? TypeStruct.ARGS_ :  (args.length==2 ? TypeStruct.ARGS_X : TypeStruct.ARGS_XY);
+      _sig = TypeFunSig.make(TypeStruct.make_args(flds,args),Type.SCALAR);
+    }
+
+    private static final Ary<NewPrimNode> INTRINSICS = new Ary<>(NewPrimNode.class);
+    static { reset(); }
+    public static void reset() { INTRINSICS.clear(); }
+    public static Ary<NewPrimNode> INTRINSICS() {
+      if( INTRINSICS.isEmpty() ) {
+        NewAryNode.add_libs(INTRINSICS);
+        NewStrNode.add_libs(INTRINSICS);
+      }
+      return INTRINSICS;
+    }
+
+    // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
+    public FunPtrNode as_fun( GVNGCM gvn ) {
+      FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL));
+      ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
+      Node memp= gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+      gvn.add_work(memp);         // This may refine more later
+
+      // Add input edges to the intrinsic
+      add_def(_reads ? memp : null); // Memory  for the primitive in slot 1
+      add_def(null);                 // Closure for the primitive in slot 2
+      for( int i=1; i<_sig.nargs(); i++ ) // Args follow, closure in formal 0
+        add_def( gvn.xform(new ParmNode(i,_sig.fld(i),fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
+      NewNode nnn = (NewNode)gvn.xform(this);
+      Node mem = Env.DEFMEM.make_mem_proj(gvn,nnn,memp);
+      Node ptr = gvn.xform(new ProjNode(1, nnn));
+      RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,ptr,rpc,fun));
+      mem.xliv(gvn._opt_mode); // Refine initial memory
+      return new FunPtrNode(ret,gvn.con(TypeFunPtr.NO_DISP));
+    }
   }
 }

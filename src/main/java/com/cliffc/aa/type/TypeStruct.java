@@ -330,6 +330,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // Default tuple field names - all bottom-field names
   static String[] flds(String... fs) { return fs; }
+  public  static final String[] ARGS_ = flds("^");           // Used for functions of 0 args
   public  static final String[] ARGS_X  = flds("^","x");     // Used for functions of 1 arg
   public  static final String[] ARGS_XY = flds("^","x","y"); // Used for functions of 2 args
   public  static Type[] ts() { return Types.get(0); }
@@ -584,6 +585,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTRUCT:break;
+    case TARY:
     case TLIVE:
     case TSTR:   return OBJ;
     case TOBJ:   return t.xmeet(this);

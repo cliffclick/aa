@@ -58,7 +58,7 @@ public class ParmNode extends PhiNode {
     for( int i=1; i<_defs._len; i++  ) { // For all arguments
       Node n = in(i);
       if( fun.val(i)==Type.CTRL &&     // Dead path
-          valid_args(gvn,fun,i,mem) ) {    // And valid arguments
+          valid_args(fun,i,mem) ) {    // And valid arguments
         if( n==this || n==live ) continue; // Ignore self or duplicates
         if( live==null ) live = n;         // Found unique live input
         else live=this;         // Found 2nd live input, no collapse
@@ -67,7 +67,7 @@ public class ParmNode extends PhiNode {
     return live == this ? null : live; // Return single unique live input
   }
 
-  private boolean valid_args(GVNGCM gvn, FunNode fun, int i, Node mem) {
+  private boolean valid_args( FunNode fun, int i, Node mem ) {
     // Check arg type, after sharpening
     Type actual = in(i).sharptr(mem.in(i));
     Type formal = fun.formal(_idx);

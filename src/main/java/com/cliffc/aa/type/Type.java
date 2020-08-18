@@ -617,6 +617,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     ts = concat(ts,TypeStr   .TYPES);
     ts = concat(ts,TypeStruct.TYPES);
     ts = concat(ts,TypeTuple .TYPES);
+    ts = concat(ts,TypeAry   .TYPES);
     // Partial order Sort, makes for easier tests later.  Arrays.sort requires
     // a total order (i.e., the obvious Comparator breaks the sort contract),
     // so we hand-roll a simple bubble sort.

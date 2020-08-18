@@ -52,6 +52,7 @@ public class TypeLive extends TypeObj<TypeLive> {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TLIVE:   break;
+    case TARY:
     case TSTR:
     case TSTRUCT:return OBJ;
     case TOBJ:   return t.xmeet(this);

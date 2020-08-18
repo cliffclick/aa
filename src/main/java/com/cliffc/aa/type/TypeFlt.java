@@ -60,6 +60,7 @@ public class TypeFlt extends Type<TypeFlt> {
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
     case TFUNSIG:
+    case TARY:
     case TLIVE:
     case TOBJ:
     case TSTR:

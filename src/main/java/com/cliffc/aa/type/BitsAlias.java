@@ -24,7 +24,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   @Override public Tree<BitsAlias> tree() { return TREE; }
   public static final int ALL, ARY, STR, RECORD, ABC;
   public static BitsAlias RECORD_BITS, STRBITS0;
-  public static BitsAlias FULL, NZERO, ANY, EMPTY, NIL, STRBITS, RECORD_BITS0;
+  public static BitsAlias FULL, NZERO, ANY, EMPTY, NIL, STRBITS, RECORD_BITS0, ARYBITS;
 
   static {
     // The All-Memory alias class
@@ -41,6 +41,7 @@ public class BitsAlias extends Bits<BitsAlias> {
 
     // Arrays
     ARY = type_alias(ALL);
+    ARYBITS = make0(ARY);
     // Split Arrays into Strings (vs other arrays)
     STRBITS = make0(STR = type_alias(ARY));
     STRBITS0 = STRBITS.meet_nil();

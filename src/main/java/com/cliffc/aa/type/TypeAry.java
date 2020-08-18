@@ -1,0 +1,86 @@
+package com.cliffc.aa.type;
+
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
+
+// A TypeObj where fields are indexed by dynamic integer.
+public class TypeAry extends TypeObj<TypeAry> {
+  private TypeInt _size;        // Count of elements
+  private Type _elem;           // MEET over all elements.
+  private TypeObj _stor;        // Storage class; widened over elements.  Can be, e.g. bits or complex structs with embedded pointers
+
+  private TypeAry ( String name, boolean any, TypeInt sz, Type elem, TypeObj stor ) { super(TARY,name,any); init(name,any,sz,elem,stor); }
+  private void init(String name, boolean any, TypeInt sz, Type elem, TypeObj stor ) {
+    super.init(TARY,name,any);
+    _size = sz;
+    _elem = elem;
+    _stor = stor;
+  }
+  @Override int compute_hash() { return super.compute_hash() + _size._hash + _elem._hash + _stor._hash;  }
+  @Override public boolean equals( Object o ) {
+    if( this==o ) return true;
+    if( !(o instanceof TypeAry) || !super.equals(o) ) return false;
+    TypeAry ta = (TypeAry)o;
+    return _size == ta._size && _elem == ta._elem && _stor == ta._stor;
+  }
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
+  @Override String str( VBitSet dups) {
+    SB sb = new SB();
+    if( _any ) sb.p('~');
+    sb.p('[');
+    if( _size != TypeInt.INT64 ) sb.p(_size);
+    sb.p(']');
+    sb.p(_elem);
+    if( _elem != _stor ) sb.p('/').p(_stor);
+    return sb.toString();
+  }
+  private static TypeAry FREE=null;
+  @Override protected TypeAry free( TypeAry ret ) { FREE=this; return ret; }
+  public static TypeAry make( String name, boolean any, TypeInt sz, Type elem, TypeObj stor ) {
+    TypeAry t1 = FREE;
+    if( t1 == null ) t1 = new TypeAry(name,any,sz,elem,stor);
+    else {   FREE = null;     t1.init(name,any,sz,elem,stor); }
+    TypeAry t2 = (TypeAry)t1.hashcons();
+    if( t1!=t2 ) return t1.free(t2);
+    return t1;
+  }
+
+  public static TypeAry make( TypeInt sz, Type elem, TypeObj stor ) { return make("",true,sz,elem,stor); }
+  public static final TypeAry ARY   = make("",false,TypeInt.INT64 ,Type.XNIL,TypeObj.OBJ );
+  public static final TypeAry BYTES = make("",false,TypeInt.con(3),Type.XNIL,TypeObj.OBJ ); // TODO: TypeObjBits2
+  static final TypeAry[] TYPES = new TypeAry[]{BYTES,ARY};
+
+  @Override protected TypeAry xdual() { return new TypeAry(_name, !_any,_size.dual(),_elem.dual(),(TypeObj)_stor.dual()); }
+  @Override
+  TypeAry rdual() {
+    if( _dual != null ) return _dual;
+    TypeAry dual = _dual = xdual();
+    dual._dual = this;
+    dual._hash = dual.compute_hash();
+    return dual;
+  }
+  @Override protected Type xmeet( Type t ) {
+    switch( t._type ) {
+    case TARY:   break;
+    case TSTR:
+    case TLIVE:
+    case TSTRUCT:return OBJ;
+    case TOBJ:   return t.xmeet(this);
+    case TFUNSIG:
+    case TTUPLE:
+    case TFUNPTR:
+    case TMEMPTR:
+    case TFLT:
+    case TINT:
+    case TRPC:
+    case TMEM:   return ALL;
+    default: throw typerr(t);
+    }
+    TypeAry ta = (TypeAry)t;
+    boolean any = _any&ta._any;
+    TypeInt size = (TypeInt)_size.meet(ta._size);
+    Type elem = _elem.meet(ta._elem);
+    TypeObj stor = (TypeObj)_stor.meet(ta._stor);
+    return make("",any,size,elem,stor);
+  }
+}
