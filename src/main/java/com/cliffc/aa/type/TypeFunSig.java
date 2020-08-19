@@ -35,7 +35,7 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   private static TypeFunSig FREE=null;
   @Override protected TypeFunSig free( TypeFunSig ret ) { FREE=this; return ret; }
   public static TypeFunSig make( TypeStruct formals, Type ret ) {
-    assert formals._ts[0].is_display_ptr() && ret.isa(SCALAR);
+    assert formals._ts[0].is_display_ptr() && (ret.isa(SCALAR) || ret instanceof TypeTuple);
     TypeFunSig t1 = FREE;
     if( t1 == null ) t1 = new TypeFunSig(formals,ret);
     else {   FREE = null;        t1.init(formals,ret); }

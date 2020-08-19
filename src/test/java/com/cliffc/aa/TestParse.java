@@ -11,12 +11,20 @@ import static org.junit.Assert.*;
 
 public class TestParse {
   private static final String[] FLDS = new String[]{"^","n","v"};
+  private static BitsFun TEST_FUNBITS = BitsFun.make0(41);
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeStr.NO_DISP);
-    //test("[3]", TypeAry.make(TypeInt.con(3),Type.XNIL,Type.SCALAR)); // Array of 3 XNILs in SCALARs.
+    //test    ("ary = [3]; ary[0]", Type.XNIL);
+    //test("[3] [0]");
+    //test    ("ary = [3]; ary[0]:=2", TypeInt.con(2));
+    //test_obj("ary = [3]; ary[0]:=0; ary[1]:=1; ary[2]:=2; (ary[0],ary[1],ary[2])", // array create, array storing
+    //         TypeStruct.make_tuple(Type.XNIL,TypeInt.INT8,TypeInt.INT8,TypeInt.INT8));
+    //test_err("0[0]");
+    //test_err("[3] [4]");
+    test_ptr("[3]", "~[$]~nil/obj");
     //test("[3,]", TypeAry.make(TypeInt.con(1),TypeInt.con(3),TypeInt.INT8)); // Array of a "3", base is widened
     //test("[3]:[int]", TypeAry.make(TypeInt.con(3),Type.XNIL,TypeInt.INT64)); // Array of 3 XNILs in INTs.
 
@@ -32,7 +40,7 @@ public class TestParse {
     test("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
     testerr("math_rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",3);
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(36),3,tdisp)); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(TEST_FUNBITS,3,tdisp)); // {Scalar Scalar -> Scalar}
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",19);
     testerr("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x:=;y:=;...}",21);
     test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
@@ -118,7 +126,7 @@ public class TestParse {
     test("2==-1",    TypeInt.FALSE);
     test("-1== --1", TypeInt.FALSE);
     test("-1== ---1",TypeInt.TRUE);
-    testerr("-1== --", "missing expr after binary op ==",5);
+    testerr("-1== --", "missing term after binary op ==",5);
   }
 
   @Test public void testParse01() {
@@ -169,10 +177,10 @@ public class TestParse {
     // hidden internal call from {&} to the primitive is never inlined (has ~Scalar args)
     // so 'x&1' never sees the TypeInt return from primitive AND.
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(11),TypeStr.NO_DISP);
-    test_isa("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(36),2,tdisp)); // {Int -> Int}
+    test_isa("{x -> x&1}", TypeFunPtr.make(TEST_FUNBITS,2,tdisp)); // {Int -> Int}
 
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(36),3,tdisp)); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(TEST_FUNBITS,3,tdisp)); // {Scalar Scalar -> Scalar}
 
     // ID in different contexts; in general requires a new TypeVar per use; for
     // such a small function it is always inlined completely, has the same effect.
@@ -304,7 +312,7 @@ public class TestParse {
     test_obj("(1,\"abc\").1", TypeStr.ABC);
 
     // Named type variables
-    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(36),2,TypeFunPtr.NO_DISP));
+    test("gal=:flt; gal", TypeFunPtr.make(TEST_FUNBITS,2,TypeFunPtr.NO_DISP));
     test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?

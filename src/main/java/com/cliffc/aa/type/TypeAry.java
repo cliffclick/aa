@@ -83,4 +83,8 @@ public class TypeAry extends TypeObj<TypeAry> {
     TypeObj stor = (TypeObj)_stor.meet(ta._stor);
     return make("",any,size,elem,stor);
   }
+
+  public Type ld(TypeInt idx) {
+    return _elem;
+  }
 }

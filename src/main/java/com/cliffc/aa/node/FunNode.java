@@ -107,7 +107,7 @@ public class FunNode extends RegionNode {
   String name(boolean debug) { return name(_name,fidx(),_op_prec,is_forward_ref(),debug); }
   String name() { return name(true); }
   static String name(String name, int fidx, int op_prec, boolean fref, boolean debug) {
-    if( op_prec >= 0 && name != null ) name = '{'+name+'}'; // Primitives wrap
+    if( (op_prec >= 0 || op_prec==-3) && name != null ) name = '{'+name+'}'; // Primitives wrap
     if( name==null ) name="";
     if( debug ) name = name + "["+fidx+"]"; // FIDX in debug
     return fref ? "?"+name : name;          // Leading '?'
@@ -380,6 +380,9 @@ public class FunNode extends RegionNode {
       case OP_NAME: break; // Pointer to a nameable struct
       case OP_PRIM:
         if( use instanceof PrimNode.EQ_OOP ) break;
+        if( use instanceof PrimNode.LValue )
+          if( use.in(2) == n ) return true; // Use as index is broken
+          else break;   // Use for array base is fine
         throw AA.unimpl();
       default: throw AA.unimpl();
       }

@@ -95,20 +95,17 @@ public final class CallEpiNode extends Node {
     RetNode ret = fun.ret();    // Return from function
     if( ret==null ) return null;
 
-    // Single choice; check compatible args and no conversions needed.
+    // Single choice; check no conversions needed.
     TypeStruct formals = fun._sig._formals;
     for( Node parm : fun._uses ) {
       if( parm instanceof ParmNode && parm.in(0)==fun ) {
         int idx = ((ParmNode)parm)._idx;
-        if( idx == -1 ) continue; // RPC not an arg
-        Type actual = idx==-2 ? CallNode.emem(tcall) : CallNode.targ(tcall,idx);
+        if( idx < 0 ) continue; // RPC, Mem
+        Type actual = CallNode.targ(tcall,idx);
         // Display arg comes from function pointer
         if( idx==0 ) actual = (actual instanceof TypeFunPtr) ? ((TypeFunPtr)actual)._disp : Type.SCALAR;
-        Type tparm = parm._val;   // Pre-GCP this should be the default type
-        if( !actual.isa(tparm) || // Not compatible
-            (idx >= 0 && actual.isBitShape(formals.at(idx)) == 99) ) { // Requires user-specified conversion
+        if( actual.isBitShape(formals.at(idx)) == 99 ) // Requires user-specified conversion
           return null;
-        }
       }
     }
 

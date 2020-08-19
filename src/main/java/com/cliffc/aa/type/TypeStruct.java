@@ -433,6 +433,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static final TypeStruct FLT64_FLT64= make_args(ARGS_XY,ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64)); // {flt flt->flt }
   public  static final TypeStruct OOP_OOP    = make_args(ARGS_XY,ts(NO_DISP,TypeMemPtr.USE0,TypeMemPtr.USE0));
   public  static final TypeStruct SCALAR1    = make_args(ARGS_X ,ts(NO_DISP,SCALAR));
+  public  static final TypeStruct LVAL       = make_args(ARGS_XY,ts(NO_DISP,TypeMemPtr.ARYPTR,TypeInt.INT64));
+  public  static final TypeStruct LVAL_READ  = make_args(ARGS_X ,ts(NO_DISP,TypeTuple.LVAL));
+  public  static final TypeStruct LVAL_ASGN  = make_args(ARGS_XY,ts(NO_DISP,TypeTuple.LVAL,Type.SCALAR));
 
   // A bunch of types for tests
   public  static final TypeStruct NAMEPT= make("Point:",flds("^","x","y"),ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64),ffnls(3));

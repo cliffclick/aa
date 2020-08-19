@@ -92,6 +92,7 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple CALLE= make(CTRL, TypeMem.ALLMEM, ALL); // Type of CallEpiNodes
   public  static final TypeTuple TEST0= make(CTRL, TypeMem.MEM  , TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
   public  static final TypeTuple TEST1= make(CTRL, TypeMem.EMPTY, TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
+  public  static final TypeTuple LVAL = make(TypeMemPtr.ARYPTR,TypeInt.INT64); // Array & index
   static final TypeTuple[] TYPES = new TypeTuple[]{CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE, TEST0, TEST1};
 
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
@@ -149,6 +150,19 @@ public class TypeTuple extends Type<TypeTuple> {
   @Override public boolean must_nil() { return false; }
   @Override Type not_nil() { return this; }
   @Override public Type meet_nil(Type t) { throw AA.unimpl(); }
+  
+  public TypeTuple sharptr( TypeMem mem ) {
+    Type[] ts = Types.clone(_ts);
+    for( int i=0; i<ts.length; i++ )
+      ts[i] = mem.sharptr(ts[i]);
+    return make0(_any,ts);
+  }
+  @Override public Type simple_ptr() {
+    Type[] ts = Types.clone(_ts);
+    for( int i=0; i<ts.length; i++ )
+      ts[i] = ts[i].simple_ptr();
+    return make0(_any,ts);
+  }
 
   // Return true if this is a function pointer (return type from EpilogNode)
   // 0 - Control for the function
@@ -166,7 +180,6 @@ public class TypeTuple extends Type<TypeTuple> {
   // True if isBitShape on all bits
   @Override public byte isBitShape(Type t) {
     if( isa(t) ) return 0; // Can choose compatible format
-    if( t instanceof TypeStruct ) return 99; // Not allowed to upcast a tuple to a struct
     if( t instanceof TypeTuple ) {
       TypeTuple tt = (TypeTuple)t;
       if( tt._ts.length != _ts.length ) return 99;
@@ -174,8 +187,8 @@ public class TypeTuple extends Type<TypeTuple> {
       for( int i=0; i<_ts.length; i++ )
         if( (x=_ts[i].isBitShape(tt._ts[i])) != 0 )
           return x;
+      return 0;
     }
-
-    throw AA.unimpl();
+    return 99;
   }
 }

@@ -188,7 +188,10 @@ public class Env implements AutoCloseable {
     if( !Parse.isOp(name) ) return null; // Limit to operators
     for( int i=name.length(); i>0; i-- ) {
       Node n = lookup(name.substring(0,i).intern());
-      if( n != null ) return n instanceof UnresolvedNode ? ((UnresolvedNode)n).filter(gvn,nargs) : n;
+      if( n != null )
+        return n instanceof UnresolvedNode
+          ? ((UnresolvedNode)n).filter(gvn,nargs)
+          : ((    FunPtrNode)n).filter(gvn,nargs);
     }
     return null;
   }

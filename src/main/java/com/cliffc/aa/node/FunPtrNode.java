@@ -84,6 +84,13 @@ public final class FunPtrNode extends Node {
   @Override public TypeMem live_use( byte opt_mode, Node def ) {
     return def==ret() ? TypeMem.ANYMEM : TypeMem.ESCAPE;
   }
+  
+  // Filter out all the wrong-arg-count functions
+  public Node filter( GVNGCM gvn, int nargs ) {
+    // User-nargs are user-visible #arguments.
+    // Fun-nargs include the display, hence the +1.
+    return fun().nargs() == nargs+1 ? this : null;
+  }
 
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.

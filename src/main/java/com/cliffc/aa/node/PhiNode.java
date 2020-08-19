@@ -13,6 +13,7 @@ public class PhiNode extends Node {
     super(op,vals);
     if( t instanceof TypeMem ) _t = TypeMem.ALLMEM;
     else if( t instanceof TypeObj ) _t = TypeObj.OBJ; // Need to check liveness
+    else if( t instanceof TypeTuple ) _t = Type.SCALAR;
     else { assert t.isa(Type.SCALAR); _t = Type.SCALAR; }
     _badgc = badgc;
     _live = _t==Type.SCALAR ? TypeMem.ESCAPE : TypeMem.ALLMEM;

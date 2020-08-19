@@ -372,7 +372,10 @@ public class TypeMem extends Type<TypeMem> {
     return sharp;               // return new not old
   }
   // Sharpen if a maybe-pointer
-  @Override public Type sharptr( Type ptr ) { return ptr instanceof TypeMemPtr ? sharpen((TypeMemPtr)ptr) : ptr; }
+  @Override public Type sharptr( Type ptr ) {
+    return ptr instanceof TypeMemPtr ? sharpen((TypeMemPtr)ptr) :
+      (ptr instanceof TypeTuple ? ((TypeTuple)ptr).sharptr(this) : ptr);
+  }
 
   // Widen (lose info), to make it suitable as the default memory.
   public TypeMem crush() {

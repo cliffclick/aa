@@ -22,16 +22,15 @@ import java.util.*;
  *  stmt = ^ifex                   // Early function exit
  *  ifex = apply [? stmt [: stmt]] // trinary short-circuit logic; missing ":stmt" will default to 0
  *  apply= expr  | expr expr*      // Lisp-like application-as-adjacent
- *  expr = term [binop term]*      // gather all the binops and sort by precedence
+ *  expr = term [binop term]* [postop]  // gather all the binops and sort by precedence
  *  term = uniop term              // Any number of prefix uniops
- *  term = id++ | id--             //   then a postfix op
+ *  term = id++ | id--             //   then postfix update ops
  *  term = tfact post              //   A term is a tfact and some more stuff...
  *  post = empty                   // A term can be just a plain 'tfact'
  *  post = (tuple) post            // Application argument list
  *  post = .field post             // Field and tuple lookup
  *  post = .field [:]= stmt        // Field (re)assignment.  Plain '=' is a final assignment
  *  post = .field++ | .field--     // Allowed anytime a := is allowed
- *  post = unipostop               // A balancing post-op
  *  post = :type post              // TODO: Add this, remove 'tfact'
  *  tfact= fact[:type]             // Typed fact
  *  fact = id                      // variable lookup
@@ -440,7 +439,7 @@ public class Parse {
 
   /** Parse an expression, a list of terms and infix operators.  The whole list
    *  is broken up into a tree based on operator precedence.
-   *  expr = term [binop term]*
+   *  expr = term [binop term]* [postop]
    */
   private Node expr() {
     skipWS();
@@ -462,10 +461,14 @@ public class Parse {
         if( bin==null ) break;    // Valid parse, but no more Kleene star
         Node binfun = _e.lookup_filter(bin.intern(),_gvn,2); // BinOp, or null
         if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
-        skipWS();  oldx = _x;
+        skipWS();
+        int oldx2 = _x;
         term = term();
-        if( term == null ) term = err_ctrl2("missing expr after binary op "+bin);
-        funs.add(binfun.keep());  args.add_def(term);  bads.add(errMsg(oldx));
+        if( term == null )
+          // if we aborted-no-term & binfun has a post-op, unwind & allow post-op. 
+          if( _e.lookup_filter(bin.intern(),_gvn,-3) != null ) { _x = oldx; break; } // Unwind & reparse as post-op
+          else term = err_ctrl2("missing term after binary op "+bin); // Else plain olde missing term
+        funs.add(binfun.keep());  args.add_def(term);  bads.add(errMsg(oldx2));
       }
 
       // Have a list of interspersed operators and terms.
@@ -494,8 +497,25 @@ public class Parse {
         max--;
       }
       if( funs.last() != null ) funs.pop().unhook();
-      return args.del(0);       // Return the remaining expression
+      term = args.del(0);       // Return the remaining expression
     }
+    // Parse a uni-post-op
+    oldx = _x;
+    String uni = token();
+    if( term != null && uni!=null ) {
+      Node unifun = _e.lookup_filter(uni.intern(),_gvn,1); // UniOp, or null
+      if( unifun==null || unifun.op_prec() != -3 ) _x=oldx;// Not a post-uni-op
+      else {
+        FunPtrNode fptr = (FunPtrNode)(unifun instanceof UnresolvedNode ? unifun.in(0) : unifun);
+        // Actual minimal length uniop might be smaller than the parsed token
+        // (greedy algo vs not-greed)
+        _x = oldx+fptr.fun()._name.length();
+        Parse[] bads2 = new Parse[]{null,errMsg(oldx),};
+        return do_call(new CallNode(true,bads2,ctrl(),mem(),unifun,term));
+      }
+    }
+
+    return term;
   }
 
   /** Any number of uniops, then a field-lookup/assignment, then a post-fix op
@@ -511,6 +531,8 @@ public class Parse {
       if( unifun==null || unifun.op_prec() == -1 ) _x=oldx;// Not a uniop
       else {
         FunPtrNode fptr = (FunPtrNode)(unifun.keep() instanceof UnresolvedNode ? unifun.in(0) : unifun);
+        // Actual minimal length uniop might be smaller than the parsed token
+        // (greedy algo vs not-greed)
         _x = oldx+fptr.fun()._name.length();
         Node term = term();
         unifun.unhook();
@@ -586,7 +608,7 @@ public class Parse {
         break;
       }
     }
-        return n;               // Just an arg
+    return n;
   }
 
   // Handle post-increment/post-decrement operator.
@@ -663,7 +685,7 @@ public class Parse {
     // Anonymous function or operator
     if( peek1(c,'{') ) {
       String tok = token0();
-      Node op = tok == null ? null : _e.lookup_filter(tok.intern(),_gvn,2); // TODO: filter by >2 not ==3
+      Node op = tok == null ? null : _e.lookup(tok.intern()); // TODO: filter by >2 not ==3
       if( peek('}') && op != null && op.op_prec() > 0 ) {
         // If a primitive unresolved, clone to give a proper error message.
         if( op instanceof UnresolvedNode && op.is_prim() )
@@ -1086,6 +1108,10 @@ public class Parse {
     Parse bad = errMsg();       // Generic error
     bad._x = oldx;              // Openning point
     err_ctrl3("Expected closing '"+c+"' but "+(_x>=_buf.length?"ran out of text":"found '"+(char)(_buf[_x])+"' instead"),bad);
+  }
+  private void require( String s, int oldx ) {
+    for( int i=0; i<s.length(); i++ )
+      require(s.charAt(i),oldx);
   }
 
   // Skip WS, return true&skip if match, false & do not skip if miss.

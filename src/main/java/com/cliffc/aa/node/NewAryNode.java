@@ -22,8 +22,8 @@ abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
   // "[" defines a new array, and expects an integer size.  Produces
   // partial-alloc type which is consumed by "]" to produce the array.
   public static class NewAry extends NewAryNode {
-    public NewAry( TypeAry tary, TypeInt sz ) { super(tary,"[",sz); }
-    @Override public byte op_prec() { return 2; }
+    public NewAry( TypeAry tary, TypeInt sz ) { super(tary,"]",sz); }
+    @Override public byte op_prec() { return -3; } // Post-op
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override TypeObj valueobj() {
       Type sz = val(3);
@@ -31,7 +31,6 @@ abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
       // Storage class can be found by looking at _live, needs the reverse-flow of use sizes.
       return TypeAry.make((TypeInt)sz,Type.XNIL,TypeObj.OBJ);
     }
-    public String postop() { return "]"; } // Balancing function name
   }
 
 }
