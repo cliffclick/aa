@@ -652,13 +652,13 @@ public class TestParse {
   // If 'pred' is false, the loop exits with false, else loop continues.  'body' value is ignored.
   // To 'continue', use '^'.
   // There is no 'break'.
-  private final String FOR="for={pred->{body->!pred()?^;body(); for pred body}};";
+  private final String DO="do={pred->{body->!pred()?^;body(); do pred body}};";
 
   @Test public void testParse13() {
-    test(FOR+"i:=0; for {i++ < 2} {i== 9} ? ",Type.XNIL);    // Late exit, body never returns true.
+    test(DO+"i:=0; do {i++ < 2} {i== 9} ? ",Type.XNIL);    // Late exit, body never returns true.
     test(FORELSE+"i:=0; for {i++ < 100} {i== 5} ",TypeInt.BOOL); // Not sure of exit value, except bool
     test(FORELSE+"i:=0; for {i++ < 100} {i==50?i}",TypeInt.INT64); // Early exit on condition i==50
-    test(FOR+"sum:=0; i:=0; for {i++ < 100} {sum:=sum+i}; sum",TypeInt.INT64);
+    test(DO+"sum:=0; i:=0; do {i++ < 100} {sum:=sum+i}; sum",TypeInt.INT64);
   }
 
   // Array syntax examples
@@ -675,7 +675,7 @@ public class TestParse {
     test_obj("[3]:[int]", TypeAry.make(TypeInt.con(3),Type.XNIL,TypeObj.OBJ)); // Array of 3 XNILs in INTs.
     //test("[1,2,3]", TypeAry.make(TypeInt.con(1),TypeInt.con(3),TypeInt.INT8)); // Array of 3 elements
     test("ary=[3];#ary",TypeInt.con(3)); // Array length
-    //test("ary=[99]; i:=0; for {i++ < #ary} {ary[i]:=i*i}", Type.ALL); // sequential iteration over array
+    test_ptr(DO+"ary=[99]; i:=0; do {i++ < #ary} {ary[i]:=i*i};ary", "[$]int64/obj"); // sequential iteration over array
     // ary.{e -> f(e)} // map over array elements
     // ary.{e -> f(e)}.{e0 e1 -> f(e0,e1) } // map/reduce over array elements
   }

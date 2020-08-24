@@ -394,10 +394,19 @@ for={pred->{body->!pred()?^;(tmp=body())?^tmp; for pred body}};
 Here is a version which ignores the `body` return and continues until the
 `pred` is false:
 ```C
-do={pred->{body->!pred()?^;body(); for pred body}};
+do={pred->{body->!pred()?^;body(); do pred body}};
 ```
 
-
+Computing an array of squares:
+```C
+ary=[100];
+i:=0;
+do {i++ < #ary} {
+  ary[i]:=i*i
+};
+ary
+```
+Returns `[]int64`, with the elements filled with the squares from 0 to 99.
 
 
 

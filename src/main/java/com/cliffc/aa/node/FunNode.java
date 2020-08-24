@@ -186,7 +186,7 @@ public class FunNode extends RegionNode {
     ParmNode rpc_parm = rpc();
     if( rpc_parm == null ) return null; // Single caller const-folds the RPC, but also inlines in CallNode
     ParmNode[] parms = new ParmNode[nargs()];
-    if( split_callers_gather(gvn,parms) == null ) return null;
+    if( split_callers_gather(parms) == null ) return null;
 
     if( _defs._len <= 2 ) return null; // No need to split callers if only 1
 
@@ -201,20 +201,21 @@ public class FunNode extends RegionNode {
     // Every input path is wired to an output path
     for( int i=1+(has_unknown_callers() ? 1 : 0); i<_defs._len; i++ ) {
       Node c = in(i);
-      CallNode call = (CallNode)c.in(0); // If this is not a CallNode, just bail
+      if( !(c.in(0) instanceof CallNode) ) return null; // If this is not a CallNode, just bail
+      CallNode call = (CallNode)c.in(0);
       CallEpiNode cepi = call.cepi();
       assert cepi._defs.find(ret)!= -1;  // If this is not wired, just bail
     }
 
     // Look for appropriate type-specialize callers
-    TypeStruct formals = type_special(gvn, parms);
+    TypeStruct formals = type_special(parms);
     Ary<Node> body = find_body(ret);
     int path = -1;              // Paths will split according to type
     if( formals == null ) {     // No type-specialization to do
       formals = _sig._formals;  // Use old args
       if( _cnt_size_inlines >= 10 && !is_prim() ) return null;
       // Large code-expansion allowed; can inline for other reasons
-      path = split_size(gvn,body,parms);
+      path = split_size(body,parms);
       if( path == -1 ) return null;
       CallNode call = (CallNode)in(path).in(0);
       if( !(call.fun() instanceof FunPtrNode) )
@@ -268,8 +269,8 @@ public class FunNode extends RegionNode {
 
   // Gather the ParmNodes into an array.  Return null if any input path is dead
   // (would rather fold away dead paths before inlining).
-  private RetNode split_callers_gather( GVNGCM gvn, ParmNode[] parms ) {
-    for( int i=1; i<_defs._len; i++ ) if( val(i)==Type.XCTRL ) return null;
+  private RetNode split_callers_gather( ParmNode[] parms ) {
+    for( int i=1; i<_defs._len; i++ ) if( val(i)==Type.XCTRL && !in(i).is_prim() ) return null;
 
     // Gather the ParmNodes and the RetNode.  Ignore other (control) uses
     RetNode ret = null;
@@ -287,7 +288,7 @@ public class FunNode extends RegionNode {
 
   // Visit all ParmNodes, looking for unresolved call uses that can be improved
   // by type-splitting
-  private int find_type_split_index( GVNGCM gvn, ParmNode[] parms ) {
+  private int find_type_split_index( ParmNode[] parms ) {
     assert has_unknown_callers(); // Only overly-wide calls.
     for( ParmNode parm : parms ) // For all parms
       if( parm != null && parm._idx > 0 ) // (some can be dead) and skipping the display
@@ -309,10 +310,10 @@ public class FunNode extends RegionNode {
     return -1; // No unresolved calls; no point in type-specialization
   }
 
-  private Type[] find_type_split( GVNGCM gvn, ParmNode[] parms ) {
+  private Type[] find_type_split( ParmNode[] parms ) {
     assert has_unknown_callers(); // Only overly-wide calls.
     // Look for splitting to help an Unresolved Call.
-    int idx = find_type_split_index(gvn,parms);
+    int idx = find_type_split_index(parms);
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
       Type[] sig = Types.get(parms.length);
       sig[0] = parms[0]==null
@@ -402,9 +403,9 @@ public class FunNode extends RegionNode {
   // on arguments that help immediately.
   //
   // Same argument for field Loads from unspecialized values.
-  private TypeStruct type_special( GVNGCM gvn, ParmNode[] parms ) {
+  private TypeStruct type_special( ParmNode[] parms ) {
     if( !has_unknown_callers() ) return null; // Only overly-wide calls.
-    Type[] sig = find_type_split(gvn,parms);
+    Type[] sig = find_type_split(parms);
     if( sig == null ) return null; // No unresolved calls; no point in type-specialization
     // Make a new function header with new signature
     TypeStruct formals = TypeStruct.make_args(_sig._formals._flds,sig);
@@ -465,7 +466,7 @@ public class FunNode extends RegionNode {
   // Split a single-use copy (e.g. fully inline) if the function is "small
   // enough".  Include anything with just a handful of primitives, or a single
   // call, possible with a single if.
-  private int split_size( GVNGCM gvn, Ary<Node> body, ParmNode[] parms ) {
+  private int split_size( Ary<Node> body, ParmNode[] parms ) {
     if( _defs._len <= 1 ) return -1; // No need to split callers if only 2
     BitSet recursive = new BitSet();    // Heuristic to limit unrolling recursive methods
 
