@@ -65,10 +65,14 @@ BNF                           | Comment
 `post = .field post`          | Field and tuple lookup
 `post = .field [:]= stmt`     | Field (re)assignment.  Plain '=' is a final assignment
 `post = .field++ OR .field--` | Field reassignment.
+`post = [stmts] post`         | Array lookup
+`post = [stmts]:= stmt`       | Array assignment
 `tfact= fact[:type]`          | Optionally typed fact
 `fact = id`                   | variable lookup
 `fact = num`                  | number
 `fact = "string"`             | string
+`fact = [stmts]`              | array decl with size
+`fact = [stmts,[stmts,]*]`    | array decl with tuple
 `fact = (stmts)`              | General statements parsed recursively
 `fact = tuple`                | Tuple builder
 `fact = func`                 | Anonymous function declaration
@@ -95,51 +99,51 @@ SIMPLE EXAMPLES
 Code            | Comment
 ----            | -------
 `1`             | ` 1:int`
-Prefix unary operator | ---
+**Prefix unary operator** | ---
 `-1`            | ` -1:int` application of unary minus to a positive 1
 `!1`            | `  0:int` convert 'truthy' to false
-Infix binary operator | ---
+**Infix binary operator** | ---
 `1+2`           | `  3:int`
 `1-2`           | ` -1:int`
 `1<=2`          | `1:int` Truth === 1
 `1>=2`          | `0:int` False === 0
-Binary operators have precedence | ---
+**Binary operators have precedence** | ---
 `1+2*3`         | `  7:int` standard precedence
 ` 1+2 * 3+4 *5` | ` 27:int`
 `(1+2)*(3+4)*5` | `105:int` parens overrides precedence
 `1// some comment`<br>`+2`  | `3:int` with bad comment
 `1 < 2`         | `1:int` true  is 1, 1 is true
 `1 > 2`         | `0:int` false is 0, 0 is false
-Float           | ---
+**Float**       | ---
 `1.2+3.4`       | `4.6:flt`
 `1+2.3`         | `3.3:flt` standard auto-widening of int to flt
 `1.0==1`        | `1:int` True; int widened to float
-Simple strings  | ---
+**Simple strings** | ---
 `"Hello, world"`| `"Hello, world":str`
 `str(3.14)`     | `"3.14":str` Overloaded `str(:flt)`
 `str(3)`        | `"3":str`    Overloaded `str(:int)`
 `str("abc")`    | `"abc":str`  Overloaded `str(:str)`
-Variable lookup | ---
+**Variable lookup** | ---
 `math_pi`       | `3.141592653589793:flt` Should be `math.pi` but name spaces not implemented
-primitive function lookup | ---
+**primitive function lookup** | ---
 `+`             | `"Syntax error; trailing junk"` unadorned primitive not allowed
 `{+}`           | `{{+:{int int -> int}, +:{flt flt -> flt}}` returns a union of '+' functions
 `{!}`           | `!:{int -> int1}` function taking an `int` and returning a `bool`
-Function application, traditional paren/comma args | ---
+**Function application, traditional paren/comma args** | ---
 `{+}(1,2)`      | `3:int`
 `{-}(1,2)`      | `-1:int` binary version
 `{-}(1)`        | `-1:int` unary version
-Errors; mismatch arg count | ---
+**Errors; mismatch arg count** | ---
 `!()`           | `Call to unary function '!', but missing the one required argument`
 `math_pi(1)`    | `A function is being called, but 3.141592653589793 is not a function type`
 `{+}(1,2,3)`    | `Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments`
-Arguments separated by commas and are full statements | ---
+**Arguments separated by commas and are full statements** | ---
 `{+}(1, 2 * 3)` | `7:int`
 `{+}(1 + 2 * 3, 4 * 5 + 6)` | `33:int`
 `(1;2 )`        | `2:int` just parens around two statements
 `(1;2;)`        | `2:int` final semicolon is optional
 `{+}(1;2 ,3)`   | `5:int` full statements in arguments
-Syntax for variable assignment | ---
+**Syntax for variable assignment** | ---
 `x=1`           | `1:int` assignments have values
 `x:=1`          | `1:int` Same thing, not final
 `x=y=1`         | `1:int` stacked assignments ok
@@ -152,7 +156,7 @@ Syntax for variable assignment | ---
 `x++`           | `0:int` Define new variable as 0, and return it before the addition
 `x:=0; x++; x`  | `1:int` Define new variable as 0, then add 1 to it, then return it
 `x++ + x--`     | `1:int` Can be used in expressions
-Conditionals    | ---
+**Conditionals** | ---
 `0 ?    2  : 3` | `3:int` Zero is false
 `2 ?    2  : 3` | `2:int` Any non-zero is true; "truthy"
 `math_rand(1)?(x=4):(x=3);x` | `:int8` x defined on both arms, so available after but range bound
@@ -175,16 +179,16 @@ Conditionals    | ---
 `x:=0; math_rand(1) ? (x:=4):3; x:=x+1` | `:int8`  x partially updated, remains mutable after
 `x:=0; 1 ? (x =4):; x` | `4:int8` x final on 1 arm, dead on other arm, so final after
 `x:=0; math_rand(1) ? (x =4):3; x` | `'x' not final on false arm of trinary` Must be fully final after trinary
-Anonymous function definition | ---
+**Anonymous function definition** | ---
 `{x y -> x+y}`    | Types as a 2-arg function { int int -> int } or { flt flt -> flt }
 `{5}()`           | `5:int` No args nor `->` required; this is simply a no-arg function returning 5, being executed
-Identity mimics having type-vars via inlining during typing | ---
+**Identity mimics having type-vars via inlining during typing** | ---
 `id`              | `{A->A}` No type-vars yet
 `id(1)`           | `1:int`
 `id(3.14)`        | `3.14:flt`
 `id({+})`         | `{{+:{int int -> int}, +:{flt flt -> flt}}`
 `id({+})(id(1),id(math_pi))` | `4.141592653589793:flt`
-Function execution and result typing | ---
+**Function execution and result typing** | ---
 `x=3; andx={y -> x & y}; andx(2)` | `2:int` capture external variable
 `x=3; and2={x -> x & 2}; and2(x)` | `2:int` shadow  external variable
 `plus2={x -> x+2}; x` | `Unknown ref 'x'` Scope exit ends lifetime
@@ -194,7 +198,7 @@ Function execution and result typing | ---
 `x=3; mul2={x -> x*2}; mul2(2.1)` | `4.2:flt` Overloaded `{+}:flt` resolves with I->F conversion
 `x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)` | `10.2:flt` Overloaded `mul2` specialized into int and flt variants
 `sq={x -> x*x}; sq 2.1` | `4.41:flt` No `()` required for single args
-Type annotations  | ---
+**Type annotations** | ---
 `-1:int`          | `-1:int`
 `(1+2.3):flt`     | `3.3:flt`  Any expression can have a type annotation
 `x:int = 1`       | `1:int`  Variable assignment can also have one
@@ -209,15 +213,15 @@ Type annotations  | ---
 `fun:{real->flt32} = {x -> x}; fun(123456789)` | `123456789 is not a flt32`
 `{x:int -> x*2}(1)` | `2:int` types on parmeters too
 `{x:str -> x}(1)`   | `1 is not a str`
-Recursive and co-recursive functions | ---
+**Recursive and co-recursive functions** | ---
 `fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)` | `6:int` fully evaluates at typing time
 `fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)` | `:int` does not collapse at typing time
 `is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)` | `1:int`
 `is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)` | `0:int`
-Simple anonymous tuples | ---
+**Simple anonymous tuples** | ---
 `(1,\"abc\").0` | `1:int`  .n loads from the nth field; only parse-time constants are supported
 `(1,\"abc\").1` | `"abc"`
-Simple anonymous structures | ---
+**Simple anonymous structures** | ---
 `  @{x;y}`        | `@{x,y}` Simple anon struct decl
 `a=@{x=1.2;y}; x` | `Unknown ref 'x'` Field name does not escape structure
 `a=@{x=1;x=2}`    | `Cannot define field '.x' twice`
@@ -243,7 +247,7 @@ Named type variables | Named types are simple subtypes
 `Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))` | `5:int` type variables can be used anywhere a type can, including function arguments
 `Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))` | `5:int` this `dist` takes any argument with fields `@{x;y}`, `Point` included
 `Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(@{x=1;y=2})` | `@{x:1,y:2} is not a Point:@{x,y}` this `dist` only takes a `Point` argument
-Nilable and not-nil modeled after Kotlin | ---
+**Nilable and not-nil modeled after Kotlin** | ---
 `x:str? = 0`      | `nil`  question-type allows nil or not; zero digit is nil
 `x:str? = "abc"`  | `"abc":str` question-type allows nil or not
 `x:str  = 0`      | `"nil is not a str"`
@@ -255,7 +259,7 @@ Nilable and not-nil modeled after Kotlin | ---
 `"abc"!=0`        | `1:int` Compare vs nil
 `nil=0; "abc"!=nil` | `1:int` Another name for 0/nil
 `a = math_rand(1) ? 0 : @{x=1}; b = math_rand(1) ? 0 : @{c=a}; b ? (b.c ? b.c.x : 0) : 0` | `int1` Nested nilable structs
-Recursive types   | ---
+**Recursive types** | ---
 `A= :(A?, int); A((0,2))`|`A:(nil,2)` Simple recursive tuple
 `A= :(A?, int); A(0,2)`|`A:(nil,2)` Same thing using explicit args
 `A= :(A?, int); A(A(0,2),3)`|`A:(A:(nil,2),3)` Simple recursive tuple
@@ -267,7 +271,7 @@ Recursive types   | ---
 `List(List(0,1.2),2.3)` | `List:@{next:List:@{next:nil;val:1.2};val:2.3}` Sample linked-list, with all types shown
 `map_sq={x -> x ? (map_sq(x.0),x.1*x.1) : 0}; map_sq((0,1.2))` | `(nil,1.44)` Strongly typed `map_sq` with a simple tuple
 `map={tree fun -> tree ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)} : 0}` | Map a function over a tree in postfix order
-Final fields are made with a final store not a final declaration | ---
+**Final fields are made with a final store not a final declaration** | ---
 `x=1`             | `1:int` Final local variable
 `x:=1`            | `1:int` Non-final local variable
 `x:=0; a=x; x:=1; (a,x)` | `(0,1)` Reassign local variable
@@ -279,6 +283,33 @@ Final fields are made with a final store not a final declaration | ---
 `x=@{n =1;v:=2}; x.n=3` | `Cannot re-assign read-only field '.n'` Field initialized as final/read-only, cannot be changed
 `ptr0=@{p:=0;v:=1}; ptr1=@{p=ptr0;v:=2}; ptr0.p=ptr1; ptr0.p.v+ptr1.p.v` | `3:int` final pointer-cycle is ok
 `ptr2rw = @{f:=1}; ptr2final:@{f=} = ptr2rw; ptr2final` |  `*@{f:=1} is not a *{f=}`  Cannot cast-to-final, can only make finals with a store
+**Early function exit** | ---
+`{ ^3; 5}()` | `3:int`              Early exit
+`x:=0; {1 ? ^2; x=3}(); x` |  `0`   Following assignment is ignored
+`x:=0; {^1 ? x=1 ; x=3}(); x` | `1:int` Return of an ifex includes the side effect
+**Find: returns 0 if not found, or first element which passes predicate.** | ---
+`find={list pred -> !list ? ^0; pred(list.1) ? ^list.1; find(list.0,pred)}; find(((0,3),2),{e -> e&1})` | `int`
+**Curried functions** | ---
+`for={A->    A+3 }; for 2  `  | `5:int`
+`for={A->{B->A+B}}; for 2 3`  | `5:int`
+`for={pred->{body->!pred()?^;tmp=body(); tmp?^tmp;7}}; for {1}{0}` | `7:int`
+`for={pred->{body->!pred()?^;(tmp=body())?^tmp; for pred body}};` |  `for` is not a keyword, just an ordinary variable | ---
+`sum:=0; i:=0; for {i++ < 100} {sum:=sum+i;^}; sum"` | `int`  Using a `for` loop to sum 0..99
+**True closures can make hidden state** | ---
+`incA= {cnt:=0; {cnt++}       }(); incA();incA()"` | `1:int` Returns a closure, which increments a private counter
+`cnt:=0; incA={cnt++}; incA();incA()+cnt"` | `3:int` Bumps an upwards exposed variable
+`tmp = {cnt:=0;({cnt++},{cnt})}();incA=tmp.0;getA=tmp.1;incA();incA()+getA()` | `3:int` Public functions to get & inc a private counter
+**Arrays**          | ---
+`[3]`               | `[3]:0` Create an array of length 3, typed as being all nils
+`ary = [3]; ary[0]` | `0` Get the zeroeth element
+`[3][0]`            | `0` Get the zeroeth element
+`ary = [3]; ary[0]:=2` | `2:int` Set an element
+`ary = [3]; ary[0]:=0; ary[1]:=1; ary[2]:=2; (ary[0],ary[1],ary[2])` | `(0,1,2)` 
+`[3]:[int]`         | `[3]:0` Create an array of length 3, typed as being all nils, and assert that `nil` isa `int`
+`ary=[3];#ary`      | `3` Array length
+`ary=[math_rand(10)];#ary`      | `int8` Unknown array length
+
+
 
 
 LARGER EXAMPLES:
@@ -325,6 +356,49 @@ Both `map` and `+` calls are generic, so a list of strings work as well:
 map( ("abc", ("def", 0)), {x -> x+x} )
 ```
 Returns `("abcabc", ("defdef", 0))`.
+
+
+Full closures.
+--------------
+Here `gen` reduces a pair of functions to inspect or increment
+the private counter.
+```C
+gen = {cnt:=0;({cnt++},{cnt})};
+```
+
+Calling `gen` twice makes two counters (and two sets of get/inc functions).
+```C
+tmp:=gen(); incA=tmp.0;getA=tmp.1;
+tmp:=gen(); incB=tmp.0;getB=tmp.1;
+```
+
+The two different sets of functions work on independent counters:
+```C
+incA();incB();incA(); getA()*10+getB()
+```
+Returns: `2*10+1` or `21`.
+
+
+`for` is an ordinary variable
+-----------------------------
+This version of `for` takes a `pred` predicate function and a `body` body
+function.  The predicate is executed and if it returns `nil` the for-loop
+returns `nil`.  Then the body is executed, and if it returns a truthy value,
+that is the for-loop's result, otherwise the loop repeats.  Early function
+exit works in the normal way for both `pred` and `body`.
+
+```C
+for={pred->{body->!pred()?^;(tmp=body())?^tmp; for pred body}};
+```
+
+Here is a version which ignores the `body` return and continues until the
+`pred` is false:
+```C
+do={pred->{body->!pred()?^;body(); for pred body}};
+```
+
+
+
 
 
 Done Stuff

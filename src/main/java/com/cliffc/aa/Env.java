@@ -183,15 +183,17 @@ public class Env implements AutoCloseable {
 
   // Lookup the operator name.  Use the longest name that's found, so that long
   // strings of operator characters are naturally broken by (greedy) strings.
-  // IFF an Unresolved is returned, also filter by nargs.
+  // If nargs is positive, filter by nargs
   Node lookup_filter( String name, GVNGCM gvn, int nargs ) {
     if( !Parse.isOp(name) ) return null; // Limit to operators
     for( int i=name.length(); i>0; i-- ) {
       Node n = lookup(name.substring(0,i).intern());
-      if( n != null )
+      if( n != null ) {
+        if( nargs == 0 ) return n;
         return n instanceof UnresolvedNode
           ? ((UnresolvedNode)n).filter(gvn,nargs)
           : ((    FunPtrNode)n).filter(gvn,nargs);
+      }
     }
     return null;
   }

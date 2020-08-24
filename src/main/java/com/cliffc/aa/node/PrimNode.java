@@ -69,9 +69,8 @@ public abstract class PrimNode extends Node {
       new EQ_OOP(),
       new NE_OOP(),
 
-      new AryNew(), // Array new
-      new LValue(), // L-Value on a collection: "ary [ idx" ==> (ary,idx)
-      new LValueRead(), // Read an L-Value: (ary,idx) ==> elem
+      new MemPrimNode.ReadPrimNode.LValueRead (), // Read  an L-Value: (ary,idx) ==> elem
+      new MemPrimNode.ReadPrimNode.LValueWrite(), // Write an L-Value: (ary,idx,elem) ==> elem
     };
   }
 
@@ -414,63 +413,5 @@ public abstract class PrimNode extends Node {
     @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
     @Override public Type value(byte opt_mode) { return val(1); }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
-  }
-
-  // Syntax sugar, ID function.  "[3]" is the same as the unbalanced "3]" where
-  // "]" is the NewAryNode function and takes an int and makes an array.
-  static class AryNew extends PrimNode {
-    AryNew() { super("[",TypeStruct.INT64,TypeInt.INT64); }
-    @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-    @Override public Type value(byte opt_mode) { return val(1); }
-    @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
-    @Override public byte op_prec() { return 2; }
-  }
-  // Produces a binop LValue, where the leading TMP is a non-zero array.  CNC:
-  // the "right" way to do this is to malloc a tuple, and feed the TMP into
-  // either an LValueRead or an LValueAsgn.  TODO: Cheating right now and use
-  // out-of-lang TypeTuple.
-  static class LValue extends PrimNode {
-    LValue() { super("[",TypeStruct.LVAL,TypeTuple.LVAL); }
-    @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-    @Override public Type value(byte opt_mode) {
-      Type adr = val(1);
-      Type idx = val(2);
-      if( !(adr instanceof TypeMemPtr) ) return adr.oob();
-      if( !(idx instanceof TypeInt) && idx != Type.XNIL ) return idx.oob();
-      return TypeTuple.make(adr,idx);
-    }
-    @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
-    @Override public byte op_prec() { return 2; }
-  }
-  // Produces a binop LValue, where the leading TMP is a non-zero array
-  static class LValueRead extends PrimNode {
-    LValueRead() { super("]",TypeStruct.LVAL_READ,Type.SCALAR); }
-    @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-    @Override public Type value(byte opt_mode) {
-      Type mem  = val(1);
-      Type lval = val(2);
-      if( !(mem  instanceof TypeMem  ) ) return mem .oob();
-      if( !(lval instanceof TypeTuple) ) return lval.oob();
-      TypeTuple tt = (TypeTuple)lval;
-      Type adr = tt.at(0);
-      Type idx = tt.at(1);
-      if( !(adr instanceof TypeMemPtr) ) return adr.oob();
-      if( !(idx instanceof TypeInt) && idx != Type.XNIL ) return idx.oob();
-      TypeMemPtr ptr = (TypeMemPtr)adr;
-      TypeInt idx2 = idx==Type.XNIL ? TypeInt.ZERO : (TypeInt)idx;
-      if( !(ptr._obj instanceof TypeAry) ) return adr.oob();
-      TypeAry ary = (TypeAry)ptr._obj;
-      return ary.ld(idx2);
-    }
-    @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
-    @Override public byte op_prec() { return -3; } // Postfix
-  }
-  // Produces a binop LValue, where the leading TMP is a non-zero array
-  static class LValueAsgn extends PrimNode {
-    LValueAsgn(Type arg) { super("]=",TypeStruct.LVAL_ASGN,Type.SCALAR); }
-    @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-    @Override public Type value(byte opt_mode) { throw AA.unimpl(); }
-    @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
-    @Override public byte op_prec() { return 2; }
   }
 }

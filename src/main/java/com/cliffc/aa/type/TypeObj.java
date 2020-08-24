@@ -63,6 +63,11 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
       
   // Update (approximately) the current TypeObj.  Merges fields.
   public TypeObj update(byte fin, String fld, Type val) { return this; }
+  // Approximate array update.
+  public TypeObj update(TypeInt idx, Type val) {
+    if( this==ISUSED || this==OBJ ) return this;
+    return TypeAry.ARY.dual().update(idx,val);
+  }
   // Exact object update.  Replaces fields.
   public TypeObj st    (byte fin, String fld, Type val) { return this; }
   // Keep the same basic type, and meet related fields.  Type error if basic

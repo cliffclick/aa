@@ -15,15 +15,16 @@ abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
   @Override public TypeMem live_use( byte opt_mode, Node def ) { return TypeMem.ANYMEM; }
 
   protected static void add_libs( Ary<NewPrimNode> INTRINSICS ) {
-    INTRINSICS.push(new NewAry(TypeAry.ARY,TypeInt.INT64));
+    INTRINSICS.push(new NewAry(TypeAry.ARY0,TypeInt.INT64));
   }
 
   // --------------------------------------------------------------------------
   // "[" defines a new array, and expects an integer size.  Produces
   // partial-alloc type which is consumed by "]" to produce the array.
   public static class NewAry extends NewAryNode {
-    public NewAry( TypeAry tary, TypeInt sz ) { super(tary,"]",sz); }
-    @Override public byte op_prec() { return -3; } // Post-op
+    public NewAry( TypeAry tary, TypeInt sz ) { super(tary,"[",sz); }
+    @Override public String bal_close() { return "]"; } // Balanced op
+    @Override public byte op_prec() { return 0; } // Balanced op
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override TypeObj valueobj() {
       Type sz = val(3);

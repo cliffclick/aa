@@ -59,6 +59,7 @@ import java.util.Map;
 
 public class FunNode extends RegionNode {
   public String _name; // Optional for anon functions; can be set later via bind()
+  public String _bal_close; // null for everything except "balanced functions", e.g. "[]"
   public int _fidx;
   public final TypeFunSig _sig;
   // Operator precedence; only set on top-level primitive wrappers.
@@ -101,13 +102,13 @@ public class FunNode extends RegionNode {
   // Name from fidx alone
   private static String name( int fidx, boolean debug) {
     FunNode fun = find_fidx(fidx);
-    return fun==null ? name(null,fidx,-1,false,debug) : fun.name(debug);
+    return fun==null ? name(null,null,fidx,-1,false,debug) : fun.name(debug);
   }
   // Name from FunNode
-  String name(boolean debug) { return name(_name,fidx(),_op_prec,is_forward_ref(),debug); }
+  String name(boolean debug) { return name(_name,_bal_close,fidx(),_op_prec,is_forward_ref(),debug); }
   String name() { return name(true); }
-  static String name(String name, int fidx, int op_prec, boolean fref, boolean debug) {
-    if( (op_prec >= 0 || op_prec==-3) && name != null ) name = '{'+name+'}'; // Primitives wrap
+  static String name(String name, String bal, int fidx, int op_prec, boolean fref, boolean debug) {
+    if( (op_prec >= 0 || op_prec==-3) && name != null ) name = '{'+name+(bal==null?"":bal)+'}'; // Primitives wrap
     if( name==null ) name="";
     if( debug ) name = name + "["+fidx+"]"; // FIDX in debug
     return fref ? "?"+name : name;          // Leading '?'
@@ -165,7 +166,7 @@ public class FunNode extends RegionNode {
     return idx == -1 ? TypeRPC.ALL_CALL :
       (idx == -2 ? TypeMem.MEM : _sig.arg(idx));
   }
-  int nargs() { return _sig.nargs(); } // Slot 0 is the return and not an arg, and is included in the length
+  public int nargs() { return _sig.nargs(); }
   void set_is_copy(GVNGCM gvn) { gvn.set_def_reg(this,0,this); }
 
   // ----
@@ -380,9 +381,12 @@ public class FunNode extends RegionNode {
       case OP_NAME: break; // Pointer to a nameable struct
       case OP_PRIM:
         if( use instanceof PrimNode.EQ_OOP ) break;
-        if( use instanceof PrimNode.LValue )
-          if( use.in(2) == n ) return true; // Use as index is broken
+        if( use instanceof MemPrimNode.LValueRead )
+          if( ((MemPrimNode)use).idx() == n ) return true; // Use as index is broken
           else break;   // Use for array base is fine
+        if( use instanceof MemPrimNode.LValueWrite )
+          if( ((MemPrimNode)use).idx() == n ) return true; // Use as index is broken
+          else break;   // Use for array base or value is fine
         throw AA.unimpl();
       default: throw AA.unimpl();
       }
@@ -604,8 +608,10 @@ public class FunNode extends RegionNode {
       if( old_alias != -1 )       // Was a NewNode?
         aliases.set(old_alias);   // Record old alias before copy/split
       // Slightly better error message when cloning constructors
-      if( path > 0 && n instanceof IntrinsicNode )
-        ((IntrinsicNode)c)._badargs = path_call._badargs[1];
+      if( path > 0 ) {
+        if( n instanceof IntrinsicNode ) ((IntrinsicNode)c)._badargs = path_call._badargs[1];
+        if( n instanceof   MemPrimNode ) ((  MemPrimNode)c)._badargs = path_call._badargs;
+      }
     }
 
     // Fill in edges.  New Nodes point to New instead of Old; everybody

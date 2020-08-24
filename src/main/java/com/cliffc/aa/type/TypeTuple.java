@@ -92,7 +92,6 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple CALLE= make(CTRL, TypeMem.ALLMEM, ALL); // Type of CallEpiNodes
   public  static final TypeTuple TEST0= make(CTRL, TypeMem.MEM  , TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
   public  static final TypeTuple TEST1= make(CTRL, TypeMem.EMPTY, TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
-  public  static final TypeTuple LVAL = make(TypeMemPtr.ARYPTR,TypeInt.INT64); // Array & index
   static final TypeTuple[] TYPES = new TypeTuple[]{CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE, TEST0, TEST1};
 
   // The length of Tuples is a constant, and so is its own dual.  Otherwise

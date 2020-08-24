@@ -646,7 +646,7 @@ public abstract class Node implements Cloneable {
       return new ErrMsg(loc,f,Level.Field);
     }
     public static ErrMsg niladr(Parse loc, String msg, String fld) {
-      String f = msg+" field '."+fld+"'";
+      String f = fld==null ? msg : msg+" field '."+fld+"'";
       return new ErrMsg(loc,f,Level.NilAdr);
     }
     public static ErrMsg badGC(Parse loc) {

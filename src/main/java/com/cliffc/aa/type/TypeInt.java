@@ -7,7 +7,7 @@ import java.util.function.Predicate;
 
 public class TypeInt extends Type<TypeInt> {
   private byte _x;        // -2 bot, -1 not-null, 0 con, +1 not-null-top +2 top
-  private byte _z;        // bitsiZe, one of: 1,8,16,32,64
+  public  byte _z;        // bitsiZe, one of: 1,8,16,32,64
   private long _con;      // hi or lo according to _x
   private TypeInt ( int x, int z, long con ) { super(TINT); init(x,z,con); }
   private void init(int x, int z, long con ) { super.init(TINT); _x=(byte)x; _z=(byte)z; _con = con; }

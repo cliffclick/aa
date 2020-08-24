@@ -333,6 +333,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static final String[] ARGS_ = flds("^");           // Used for functions of 0 args
   public  static final String[] ARGS_X  = flds("^","x");     // Used for functions of 1 arg
   public  static final String[] ARGS_XY = flds("^","x","y"); // Used for functions of 2 args
+  public  static final String[] ARGS_XYZ= flds("^","x","y","z"); // Used for functions of 3 args
   public  static Type[] ts() { return Types.get(0); }
   public  static Type[] ts(Type t0) { Type[] ts = Types.get(1); ts[0]=t0; return ts;}
   public  static Type[] ts(Type t0, Type t1) { Type[] ts = Types.get(2); ts[0]=t0; ts[1]=t1; return ts;}
@@ -433,9 +434,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static final TypeStruct FLT64_FLT64= make_args(ARGS_XY,ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64)); // {flt flt->flt }
   public  static final TypeStruct OOP_OOP    = make_args(ARGS_XY,ts(NO_DISP,TypeMemPtr.USE0,TypeMemPtr.USE0));
   public  static final TypeStruct SCALAR1    = make_args(ARGS_X ,ts(NO_DISP,SCALAR));
-  public  static final TypeStruct LVAL       = make_args(ARGS_XY,ts(NO_DISP,TypeMemPtr.ARYPTR,TypeInt.INT64));
-  public  static final TypeStruct LVAL_READ  = make_args(ARGS_X ,ts(NO_DISP,TypeTuple.LVAL));
-  public  static final TypeStruct LVAL_ASGN  = make_args(ARGS_XY,ts(NO_DISP,TypeTuple.LVAL,Type.SCALAR));
+  public  static final TypeStruct LVAL_RD    = make_args(ARGS_XY,ts(NO_DISP,TypeMemPtr.ARYPTR,TypeInt.INT64)); // Array & index
+  public  static final TypeStruct LVAL_WR    = make_args(ARGS_XYZ,ts(NO_DISP,TypeMemPtr.ARYPTR,TypeInt.INT64,Type.SCALAR)); // Array & index & element
 
   // A bunch of types for tests
   public  static final TypeStruct NAMEPT= make("Point:",flds("^","x","y"),ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64),ffnls(3));
@@ -1196,7 +1196,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     Type t = TypeObj.UNUSED;
     for( int alias : dull._aliases )
       if( alias != 0 )
-        t = t.meet(mem.at(alias));
+        for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
+          t = t.meet(mem.at(kid));
     TypeMemPtr dptr = dull.make_from((TypeObj)t);
     if( _is_sharp(t) ) {        // If sharp, install and return
       mem.sharput(dull,dptr);

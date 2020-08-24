@@ -185,7 +185,10 @@ public final class RetNode extends Node {
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
   @Override public byte op_prec() {
-    return val().is_prim() ? val().op_prec() : -1;
+    if( !is_prim() ) return -1;
+    byte op = val().op_prec();
+    if( op != -1 ) return op;
+    return mem().op_prec();
   }
 
   @Override public boolean is_forward_ref() { return fun().is_forward_ref(); }

@@ -2,7 +2,6 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.function.Function;
@@ -11,22 +10,12 @@ import static org.junit.Assert.*;
 
 public class TestParse {
   private static final String[] FLDS = new String[]{"^","n","v"};
-  private static BitsFun TEST_FUNBITS = BitsFun.make0(41);
+  private static final BitsFun TEST_FUNBITS = BitsFun.make0(38);
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeStr.NO_DISP);
-    //test    ("ary = [3]; ary[0]", Type.XNIL);
-    //test("[3] [0]");
-    //test    ("ary = [3]; ary[0]:=2", TypeInt.con(2));
-    //test_obj("ary = [3]; ary[0]:=0; ary[1]:=1; ary[2]:=2; (ary[0],ary[1],ary[2])", // array create, array storing
-    //         TypeStruct.make_tuple(Type.XNIL,TypeInt.INT8,TypeInt.INT8,TypeInt.INT8));
-    //test_err("0[0]");
-    //test_err("[3] [4]");
-    test_ptr("[3]", "~[$]~nil/obj");
-    //test("[3,]", TypeAry.make(TypeInt.con(1),TypeInt.con(3),TypeInt.INT8)); // Array of a "3", base is widened
-    //test("[3]:[int]", TypeAry.make(TypeInt.con(3),Type.XNIL,TypeInt.INT64)); // Array of 3 XNILs in INTs.
 
     // A collection of tests which like to fail easily
     test("-1",  TypeInt.con( -1));
@@ -126,7 +115,7 @@ public class TestParse {
     test("2==-1",    TypeInt.FALSE);
     test("-1== --1", TypeInt.FALSE);
     test("-1== ---1",TypeInt.TRUE);
-    testerr("-1== --", "missing term after binary op ==",5);
+    testerr("-1== --", "Missing term after '=='",5);
   }
 
   @Test public void testParse01() {
@@ -176,7 +165,7 @@ public class TestParse {
     // Since call not-taken, post GCP Parms not loaded from _tf, limited to ~Scalar.  The
     // hidden internal call from {&} to the primitive is never inlined (has ~Scalar args)
     // so 'x&1' never sees the TypeInt return from primitive AND.
-    TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(11),TypeStr.NO_DISP);
+    TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(12),TypeStr.NO_DISP);
     test_isa("{x -> x&1}", TypeFunPtr.make(TEST_FUNBITS,2,tdisp)); // {Int -> Int}
 
     // Anonymous function definition
@@ -672,39 +661,23 @@ public class TestParse {
     test(FOR+"sum:=0; i:=0; for {i++ < 100} {sum:=sum+i}; sum",TypeInt.INT64);
   }
 
-/*
-  Array creation: just [7] where '[' is a unary prefix, and ']' is a unary postfix.
-  ary = [7]; // untyped, will infer
-  ary = [7]:[int]; // typed as array of int
-  #ary == 7 // array length
-
-  Index: "ary [ int" with '[' as an infix operator.
-  Yields a "fat pointer".
-  Get: ']' postfix operator.  Example: ary[3] looks up item #3
-  Put: ']='  infix operator.  Example: ary[2]=5;
-
-  Parallel map on arrays; yields a new array
-    ary.{e idx -> fun e}
-  Parallel map/reduce
-    (ary2, reduction) = ary.{e -> fun e}.{b1 b2 -> b1+b2 }
-  For loop, serial order
-    ary.for({e idx -> .... })
-  For loop, no array
-    for( i:=0; i<#ary; i++ ) ...
-
- */
-
   // Array syntax examples
-  @Ignore
   @Test public void testParse14() {
-    test("[3]:int", Type.ALL);      // Array of 3 ints, all zeroed.  Notice ambiguity with array-of-1 element being a 3.
-    test("ary = [3]; ary[0]:=0; ary[1]:=1; ary[2]:=2; (ary[0],ary[1],ary[2])", Type.ALL); // array create, array storing
-    test("[0,1,2]", Type.ALL); // array create syntax, notice ambiguity with making a new sized array.
-    testerr("ary=[3]; ary[3]",null,0); // AIOOBE
-    testerr("ary=[3]; ary[-1]",null,0); // AIOOBE vs end-of-array math
-    test("ary=[3];#ary",Type.ALL); // Array length
-
-    test("ary=[99]; i:=0; for {i++ < #ary} {ary[i]:=i*i}", Type.ALL); // sequential iteration over array
+    test_ptr("[3]", "[$]~nil/obj");
+    test    ("ary = [3]; ary[0]", Type.XNIL);
+    test    ("[3][0]", Type.XNIL);
+    test    ("ary = [3]; ary[0]:=2", TypeInt.con(2));
+    test_obj("ary = [3]; ary[0]:=0; ary[1]:=1; ary[2]:=2; (ary[0],ary[1],ary[2])", // array create, array storing
+      TypeStruct.make_tuple(Type.XNIL,TypeInt.INT8,TypeInt.INT8,TypeInt.INT8));
+    testary("0[0]","~nil is not a *[6][]Scalar/obj",2);
+    testary("[3] [4]","Index must be out of bounds",5);
+    testary("[3] [-1]","Index must be out of bounds",5);
+    test_obj("[3]:[int]", TypeAry.make(TypeInt.con(3),Type.XNIL,TypeObj.OBJ)); // Array of 3 XNILs in INTs.
+    //test("[1,2,3]", TypeAry.make(TypeInt.con(1),TypeInt.con(3),TypeInt.INT8)); // Array of 3 elements
+    //test("ary=[3];#ary",Type.ALL); // Array length
+    //test("ary=[99]; i:=0; for {i++ < #ary} {ary[i]:=i*i}", Type.ALL); // sequential iteration over array
+    // ary.{e -> f(e)} // map over array elements
+    // ary.{e -> f(e)}.{e0 e1 -> f(e0,e1) } // map/reduce over array elements
   }
 
   /*
@@ -860,6 +833,13 @@ HashTable = {@{
     //     \\[     Replacement [ because the first one got matched and replaced.
     //     \\$     Prevent $ being interpreted as a regex group start
     return err.replaceAll("\\[[,0-9]*", "\\[\\$");
+  }
+  static private void testary( String program, String err, int cur_off ) {
+    TypeEnv te = Exec.go(Env.file_scope(Env.top_scope()),"args",program);
+    assertTrue(te._errs != null && te._errs.size()>=1);
+    String cursor = new String(new char[cur_off]).replace('\0', ' ');
+    String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";
+    assertEquals(err2,te._errs.get(0).toString());
   }
 
 }

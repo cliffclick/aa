@@ -166,6 +166,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       String[] flds = args.length==1 ? TypeStruct.ARGS_ :  (args.length==2 ? TypeStruct.ARGS_X : TypeStruct.ARGS_XY);
       _sig = TypeFunSig.make(TypeStruct.make_args(flds,args),Type.SCALAR);
     }
+    String bal_close() { return null; }
 
     private static final Ary<NewPrimNode> INTRINSICS = new Ary<>(NewPrimNode.class);
     static { reset(); }
@@ -184,6 +185,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
       Node memp= gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
       gvn.add_work(memp);         // This may refine more later
+      fun._bal_close = bal_close();
 
       // Add input edges to the intrinsic
       add_def(_reads ? memp : null); // Memory  for the primitive in slot 1
