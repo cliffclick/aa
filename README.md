@@ -284,9 +284,10 @@ Named type variables | Named types are simple subtypes
 `ptr0=@{p:=0;v:=1}; ptr1=@{p=ptr0;v:=2}; ptr0.p=ptr1; ptr0.p.v+ptr1.p.v` | `3:int` final pointer-cycle is ok
 `ptr2rw = @{f:=1}; ptr2final:@{f=} = ptr2rw; ptr2final` |  `*@{f:=1} is not a *{f=}`  Cannot cast-to-final, can only make finals with a store
 **Early function exit** | ---
-`{ ^3; 5}()` | `3:int`              Early exit
-`x:=0; {1 ? ^2; x=3}(); x` |  `0`   Following assignment is ignored
+`{ ^3; 5}()`                  | `3:int`              Early exit
+`x:=0; {1 ? ^2; x=3}(); x`    |  `0`   Following assignment is ignored
 `x:=0; {^1 ? x=1 ; x=3}(); x` | `1:int` Return of an ifex includes the side effect
+`x:=1; {1 ? ^; x=2}()+x`      |  `1` Early exit defaults to `nil`
 **Find: returns 0 if not found, or first element which passes predicate.** | ---
 `find={list pred -> !list ? ^0; pred(list.1) ? ^list.1; find(list.0,pred)}; find(((0,3),2),{e -> e&1})` | `int`
 **Curried functions** | ---
@@ -300,12 +301,12 @@ Named type variables | Named types are simple subtypes
 `cnt:=0; incA={cnt++}; incA();incA()+cnt"` | `3:int` Bumps an upwards exposed variable
 `tmp = {cnt:=0;({cnt++},{cnt})}();incA=tmp.0;getA=tmp.1;incA();incA()+getA()` | `3:int` Public functions to get & inc a private counter
 **Arrays**          | ---
-`[3]`               | `[3]:0` Create an array of length 3, typed as being all nils
+`[3]`               | `[0]` Create an array of length 3, typed as being all nils
 `ary = [3]; ary[0]` | `0` Get the zeroeth element
 `[3][0]`            | `0` Get the zeroeth element
 `ary = [3]; ary[0]:=2` | `2:int` Set an element
 `ary = [3]; ary[0]:=0; ary[1]:=1; ary[2]:=2; (ary[0],ary[1],ary[2])` | `(0,1,2)` 
-`[3]:[int]`         | `[3]:0` Create an array of length 3, typed as being all nils, and assert that `nil` isa `int`
+`[3]:[int]`         | `[0]` Create an array of length 3, typed as being all nils, and assert that `nil` isa `int`
 `ary=[3];#ary`      | `3` Array length
 `ary=[math_rand(10)];#ary`      | `int8` Unknown array length
 
@@ -381,11 +382,14 @@ Returns: `2*10+1` or `21`.
 
 `for` is an ordinary variable
 -----------------------------
+
 This version of `for` takes a `pred` predicate function and a `body` body
 function.  The predicate is executed and if it returns `nil` the for-loop
 returns `nil`.  Then the body is executed, and if it returns a truthy value,
-that is the for-loop's result, otherwise the loop repeats.  Early function
-exit works in the normal way for both `pred` and `body`.
+that is the for-loop's result, otherwise the loop repeats.  Early function exit
+works in the normal way for both `pred` and `body`.  To *continue*, do an early
+return from the body with nil: `^`.  To *break*, do an early return from the
+body with not-nil: `^1`.
 
 ```C
 for={pred->{body->!pred()?^;(tmp=body())?^tmp; for pred body}};
@@ -406,7 +410,7 @@ do {i++ < #ary} {
 };
 ary
 ```
-Returns `[]int64`, with the elements filled with the squares from 0 to 99.
+Returns `[int64]`, with the elements filled with the squares from 0 to 99.
 
 
 
