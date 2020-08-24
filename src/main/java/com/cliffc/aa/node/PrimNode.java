@@ -69,8 +69,9 @@ public abstract class PrimNode extends Node {
       new EQ_OOP(),
       new NE_OOP(),
 
-      new MemPrimNode.ReadPrimNode.LValueRead (), // Read  an L-Value: (ary,idx) ==> elem
-      new MemPrimNode.ReadPrimNode.LValueWrite(), // Write an L-Value: (ary,idx,elem) ==> elem
+      new MemPrimNode.ReadPrimNode.LValueLength(), // Read  an L-Value: (ary) ==> size
+      new MemPrimNode.ReadPrimNode.LValueRead  (), // Read  an L-Value: (ary,idx) ==> elem
+      new MemPrimNode.ReadPrimNode.LValueWrite (), // Write an L-Value: (ary,idx,elem) ==> elem
     };
   }
 
@@ -392,7 +393,6 @@ public abstract class PrimNode extends Node {
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
     @Override public byte op_prec() { return 9; }
   }
-
 
   static class RandI64 extends PrimNode {
     RandI64() { super("math_rand",TypeStruct.INT64,TypeInt.INT64); }

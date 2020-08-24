@@ -12,12 +12,12 @@ public abstract class MemPrimNode extends PrimNode {
   Node idx() { return in(3); }
   Node val() { return in(4); }
   abstract String bal_close();
-  @Override public String xstr() { return _name+bal_close(); }
+  @Override public String xstr() { return _name+(bal_close()==null?"":bal_close()); }
 
   @Override public ErrMsg err(boolean fast) {
     Type tmem = mem()._val;
     Type tadr = adr()._val;
-    Type tidx = idx()._val;
+    Type tidx = _defs._len <= 3 ? Type.XNIL : idx()._val;
     if( tmem==Type.ALL || tmem==Type.ANY ) return null; // An error, reported earlier
     if( tadr==Type.ALL || tadr==Type.ANY ) return null; // An error, reported earlier
     if( tidx==Type.ALL || tidx==Type.ANY ) return null; // An error, reported earlier
@@ -65,7 +65,7 @@ public abstract class MemPrimNode extends PrimNode {
     // The only memory required here is what is needed to support the Load
     @Override public TypeMem live_use( byte opt_mode, Node def ) {
       if( def==adr() ) return TypeMem.ALIVE;
-      if( def==idx() ) return TypeMem.ALIVE;
+      if( _defs._len>3 && def==idx() ) return TypeMem.ALIVE;
       Type tmem = mem()._val;
       Type tptr = adr()._val;
       if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
@@ -73,6 +73,25 @@ public abstract class MemPrimNode extends PrimNode {
       return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases);
     }
 
+  }
+
+  // Array length
+  static class LValueLength extends ReadPrimNode {
+    LValueLength() { super("#",TypeStruct.LVAL_LEN,TypeInt.INT64); }
+    @Override public String bal_close() { return null; } // Balanced op
+    @Override public byte op_prec() { return 9; } // Max precidence
+    @Override public Node ideal(GVNGCM gvn, int level) { return null; }
+    @Override public Type value(byte opt_mode) {
+      Type mem = val(1);
+      Type adr = val(2);
+      if( !(mem  instanceof TypeMem  ) ) return mem .oob();
+      if( !(adr instanceof TypeMemPtr) ) return adr.oob();
+      TypeMemPtr ptr = (TypeMemPtr)mem.sharptr(adr);
+      if( !(ptr._obj instanceof TypeAry) ) return adr.oob();
+      TypeAry ary = (TypeAry)ptr._obj;
+      return ary._size;
+    }
+    @Override public TypeInt apply( Type[] args ) { throw com.cliffc.aa.AA.unimpl(); }
   }
 
   // Produces a binop LValue, where the leading TMP is a non-zero array

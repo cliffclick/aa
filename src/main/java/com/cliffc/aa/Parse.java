@@ -48,7 +48,7 @@ import java.util.*;
  *  fact = {uniop}                 // Special syntactic form of uniop; no spaces allowed; returns function constant
  *  tuple= (stmts,[stmts,])        // Tuple; final comma is optional, first comma is required
  *  binop= +-*%&|/<>!= [ ]=        // etc; primitive lookup; can determine infix binop at parse-time
- *  uniop= -!~ [                   // etc; primitive lookup; can determine infix uniop at parse-time
+ *  uniop= -!~# a                   // etc; primitive lookup; can determine infix uniop at parse-time
  *  func = { [id[:type]* ->]? stmts} // Anonymous function declaration, if no args then the -> is optional
  *                                 // Pattern matching: 1 arg is the arg; 2+ args break down a (required) tuple
  *  str  = [.\%]*                  // String contents; \t\n\r\% standard escapes

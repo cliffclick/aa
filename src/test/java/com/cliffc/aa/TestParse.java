@@ -10,7 +10,7 @@ import static org.junit.Assert.*;
 
 public class TestParse {
   private static final String[] FLDS = new String[]{"^","n","v"};
-  private static final BitsFun TEST_FUNBITS = BitsFun.make0(38);
+  private static final BitsFun TEST_FUNBITS = BitsFun.make0(39);
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
@@ -674,7 +674,7 @@ public class TestParse {
     testary("[3] [-1]","Index must be out of bounds",5);
     test_obj("[3]:[int]", TypeAry.make(TypeInt.con(3),Type.XNIL,TypeObj.OBJ)); // Array of 3 XNILs in INTs.
     //test("[1,2,3]", TypeAry.make(TypeInt.con(1),TypeInt.con(3),TypeInt.INT8)); // Array of 3 elements
-    //test("ary=[3];#ary",Type.ALL); // Array length
+    test("ary=[3];#ary",TypeInt.con(3)); // Array length
     //test("ary=[99]; i:=0; for {i++ < #ary} {ary[i]:=i*i}", Type.ALL); // sequential iteration over array
     // ary.{e -> f(e)} // map over array elements
     // ary.{e -> f(e)}.{e0 e1 -> f(e0,e1) } // map/reduce over array elements
