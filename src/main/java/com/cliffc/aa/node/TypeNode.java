@@ -81,7 +81,7 @@ public class TypeNode extends Node {
 
     return null;
   }
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     Node arg = arg();
     Type t1 = arg._val;
     Type t0 = _t.simple_ptr();
@@ -93,7 +93,7 @@ public class TypeNode extends Node {
     return t1.oob(t0);
   }
   @Override public boolean basic_liveness() { return true; }
-  @Override public TypeMem live_use( byte opt_mode, Node def ) {
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==arg() ) return _live;                   // Alive as I am
     // Alive (like normal liveness), plus the address, plus whatever can be
     // reached from the address.

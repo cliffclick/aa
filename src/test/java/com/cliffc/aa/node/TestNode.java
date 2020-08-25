@@ -262,8 +262,8 @@ public class TestNode {
     test1monotonic(new   TypeNode(_ins[1],_ins[2],TypeInt.FALSE    ,null));
     test1monotonic(new   TypeNode(_ins[1],_ins[2],TypeMemPtr.STRPTR,null));
     test1monotonic(new   TypeNode(_ins[1],_ins[2],TypeFlt.FLT64    ,null));
-    _gvn._opt_mode=1;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=0;
-    _gvn._opt_mode=2;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=0;
+    _gvn._opt_mode=GVNGCM.Mode.PesiNoCG;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=GVNGCM.Mode.Parse;
+    _gvn._opt_mode=GVNGCM.Mode.PesiCG  ;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=GVNGCM.Mode.Parse;
 
     assertEquals(0,_errs);
   }

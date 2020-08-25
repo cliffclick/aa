@@ -101,10 +101,12 @@ public class Parse {
   TypeEnv go_partial( ) {
     prog();        // Parse a program
     _gvn.rereg(_e._scope,Type.ALL);
-    _gvn.rereg(_e._par._scope,Type.ALL);
-    _gvn.iter((byte)1); // Pessimistic optimizations; might improve error situation
-    _gvn.gcp(_e._scope);// Global Constant Propagation
-    _gvn.iter((byte)3); // Re-check all ideal calls now that types have been maximally lifted
+    _e._scope.xliv(_gvn._opt_mode);
+    _gvn.iter(GVNGCM.Mode.PesiNoCG); // Pessimistic optimizations; might improve error situation
+    _gvn.gcp(_e._scope);             // Global Constant Propagation
+    _gvn.iter(GVNGCM.Mode.PesiCG);   // Re-check all ideal calls now that types have been maximally lifted
+    _gvn.gcp(_e._scope);             // Global Constant Propagation
+    _gvn.iter(GVNGCM.Mode.PesiCG);   // Re-check all ideal calls now that types have been maximally lifted
     return gather_errors();
   }
 
@@ -118,12 +120,12 @@ public class Parse {
     _e.close_display(_gvn);
     _gvn.rereg(_e._scope,Type.ALL);
     _e._scope.xliv(_gvn._opt_mode);
-    _gvn.iter((byte)1);  // Pessimistic optimizations; might improve error situation
+    _gvn.iter(GVNGCM.Mode.PesiNoCG); // Pessimistic optimizations; might improve error situation
     remove_unknown_callers();
-    _gvn.gcp(_e._scope); // Global Constant Propagation
-    _gvn.iter((byte)3);  // Re-check all ideal calls now that types have been maximally lifted
-    _gvn.gcp(_e._scope); // Global Constant Propagation
-    _gvn.iter((byte)4);  // Re-check all ideal calls now that types have been maximally lifted
+    _gvn.gcp(_e._scope);           // Global Constant Propagation
+    _gvn.iter(GVNGCM.Mode.PesiCG); // Re-check all ideal calls now that types have been maximally lifted
+    _gvn.gcp(_e._scope);           // Global Constant Propagation
+    _gvn.iter(GVNGCM.Mode.PesiCG); // Re-check all ideal calls now that types have been maximally lifted
     return gather_errors();
   }
 
@@ -177,7 +179,7 @@ public class Parse {
   /** Parse a top-level:
    *  prog = stmts END */
   private void prog() {
-    _gvn._opt_mode = 0;
+    _gvn._opt_mode = GVNGCM.Mode.Parse;
     Node res = stmts();
     if( res == null ) res = con(Type.ANY);
     _e._scope.set_rez(res,_gvn);  // Hook result
@@ -1147,7 +1149,7 @@ public class Parse {
       if( e==null ) e=Type.SCALAR;
       return peek(']') ? TypeAry.make(TypeInt.INT64,e,TypeObj.OBJ) : null;
     }
-    
+
     // Primitive type
     int oldx = _x;
     String tok = token();

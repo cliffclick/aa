@@ -12,7 +12,7 @@ abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
   }
   @Override TypeAry dead_type() { return TypeAry.ARY.dual(); }
   // The one string field is memory-alive
-  @Override public TypeMem live_use( byte opt_mode, Node def ) { return TypeMem.ANYMEM; }
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ANYMEM; }
 
   protected static void add_libs( Ary<NewPrimNode> INTRINSICS ) {
     INTRINSICS.push(new NewAry(TypeAry.ARY0,TypeInt.INT64));

@@ -157,7 +157,7 @@ public final class RetNode extends Node {
     gvn.rereg(phi,parm._val);
   }
 
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     if( ctl()==null ) return _val; // No change if a copy
     TypeTuple TALL = TypeTuple.RET;
     Type ctl = ctl()._val;
@@ -170,11 +170,11 @@ public final class RetNode extends Node {
 
 
   @Override public boolean basic_liveness() { return false; }
-  @Override public TypeMem live( byte opt_mode) {
+  @Override public TypeMem live(GVNGCM.Mode opt_mode) {
     // Pre-GCP, might be used anywhere (still finding CFG)
-    return opt_mode < 2 ? TypeMem.ALLMEM : super.live(opt_mode);
+    return !opt_mode._CG ? TypeMem.ALLMEM : super.live(opt_mode);
   }
-  @Override public TypeMem live_use( byte opt_mode, Node def ) {
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==mem() ) return _live;
     if( def==val() ) return TypeMem.ESCAPE;
     return TypeMem.ALIVE;       // Basic aliveness

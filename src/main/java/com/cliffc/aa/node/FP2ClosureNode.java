@@ -20,13 +20,13 @@ public final class FP2ClosureNode extends Node {
 
     return c==null ? null : this;
   }
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     // Expect either a TFP from a FunPtrNode, or a TypeTuple from a CallNode.
     Type t0 = val(0);
     Type tfp = t0 instanceof TypeTuple ? CallNode.ttfp(t0) : t0;
     return convert(tfp).simple_ptr();
   }
-  @Override public TypeMem live_use( byte opt_mode, Node def ) { return def.basic_liveness() ? TypeMem.ALIVE: TypeMem.ANYMEM; }
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def.basic_liveness() ? TypeMem.ALIVE: TypeMem.ANYMEM; }
   static public Type convert( Type t ) {
     if( !(t instanceof TypeFunPtr) )
       return t.above_center() ? TypeFunPtr.DISP.dual() : TypeFunPtr.DISP;

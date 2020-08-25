@@ -30,7 +30,7 @@ public class Env implements AutoCloseable {
 
   // A file-level Env, or below.  Contains user written code.
   Env( Env par, Parse P, boolean is_closure ) {
-    GVN._opt_mode=0;
+    GVN._opt_mode=GVNGCM.Mode.Parse;
     _P = P;
     _par = par;
     ScopeNode s = par._scope;   // Parent scope
@@ -95,7 +95,7 @@ public class Env implements AutoCloseable {
         n.xval(GVN._opt_mode);
     GVN.add_work(MEM_0);
     // Run the worklist dry
-    GVN.iter((byte)1);
+    GVN.iter(GVNGCM.Mode.PesiNoCG);
 
     if( first_time ) record_for_top_reset2();
     return top;
@@ -178,7 +178,7 @@ public class Env implements AutoCloseable {
     Node n = lookup(name);
     if( !(n instanceof UnresolvedNode) ) return n._val;
     // For unresolved, use the ambiguous type
-    return n.value((byte)2);
+    return n.value(GVNGCM.Mode.Opto);
   }
 
   // Lookup the operator name.  Use the longest name that's found, so that long

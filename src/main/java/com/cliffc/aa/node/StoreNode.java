@@ -84,7 +84,7 @@ public class StoreNode extends Node {
   }
 
   // StoreNode needs to return a TypeObj for the Parser.
-  @Override public TypeMem value(byte opt_mode) {
+  @Override public TypeMem value(GVNGCM.Mode opt_mode) {
     Node mem = mem(), adr = adr(), val = val();
     Type tmem = mem._val;
     Type tadr = adr._val;
@@ -105,7 +105,7 @@ public class StoreNode extends Node {
   // Compute the liveness local contribution to def's liveness.  Ignores the
   // incoming memory types, as this is a backwards propagation of demanded
   // memory.
-  @Override public TypeMem live_use( byte opt_mode, Node def ) {
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==mem() ) return _live; // Pass full liveness along
     if( def==adr() ) return TypeMem.ALIVE; // Basic aliveness
     if( def==val() ) return TypeMem.ESCAPE;// Value escapes

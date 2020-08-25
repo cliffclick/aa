@@ -47,7 +47,7 @@ public final class FunPtrNode extends Node {
 
     // Remove unused displays.  Track uses; Calls with no FPClosure are OK.
     // Uses storing the FPTR and passing it along are dangerous.
-    if( gvn._opt_mode>0 && !(display() instanceof ConNode) ) {
+    if( gvn._opt_mode!=GVNGCM.Mode.Parse && !(display() instanceof ConNode) ) {
       boolean safe=true;
       for( Node use : _uses )  {
         if( !(use instanceof CallNode) ) { safe=false; break; }
@@ -66,7 +66,7 @@ public final class FunPtrNode extends Node {
 
     return null;
   }
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
@@ -77,11 +77,11 @@ public final class FunPtrNode extends Node {
   }
 
   @Override public boolean basic_liveness() { return true; }
-  @Override public TypeMem live( byte opt_mode) {
+  @Override public TypeMem live(GVNGCM.Mode opt_mode) {
     // Pre-GCP, might be used anywhere (still finding the CFG)
-    return opt_mode < 2 ? TypeMem.ESCAPE : super.live(opt_mode);
+    return !opt_mode._CG ? TypeMem.ESCAPE : super.live(opt_mode);
   }
-  @Override public TypeMem live_use( byte opt_mode, Node def ) {
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     return def==ret() ? TypeMem.ANYMEM : TypeMem.ESCAPE;
   }
   

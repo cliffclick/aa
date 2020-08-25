@@ -76,7 +76,7 @@ public class ScopeNode extends Node {
     Node mem = mem();
     Node rez = rez();
     Type trez = rez==null ? null : rez._val;
-    if( gvn._opt_mode != 0 &&   // Past parsing
+    if( gvn._opt_mode != GVNGCM.Mode.Parse &&   // Past parsing
         rez != null &&          // Have a return result
         // If type(rez) can never lift to any TMP, then we will not return a
         // pointer, and do not need the memory state on exit.
@@ -88,7 +88,7 @@ public class ScopeNode extends Node {
 
     return null;
   }
-  @Override public Type value(byte opt_mode) { return Type.ALL; }
+  @Override public Type value(GVNGCM.Mode opt_mode) { return Type.ALL; }
   @Override public boolean basic_liveness() { return false; }
 
   // From a memory and a possible pointer-to-memory, find all the reachable
@@ -107,21 +107,21 @@ public class ScopeNode extends Node {
     BitsAlias aliases = tmem0.all_reaching_aliases(((TypeMemPtr)trez)._aliases);
     return tmem0.slice_reaching_aliases(aliases);
   }
-  @Override public TypeMem live( byte opt_mode) {
+  @Override public TypeMem live(GVNGCM.Mode opt_mode) {
     // The top scope is always alive, and represents what all future unparsed
     // code MIGHT do.
     if( this==Env.SCP_0 )
-      return opt_mode < 2 ? TypeMem.ALLMEM : TypeMem.DEAD;
+      return opt_mode._CG ? TypeMem.DEAD : TypeMem.ALLMEM;
     assert _uses._len==0;
     // All fields in all reachable pointers from rez() will be marked live
     return compute_live_mem(mem(),rez()).flatten_fields();
   }
 
-  @Override public TypeMem live_use( byte opt_mode, Node def ) {
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     // The top scope is always alive, and represents what all future unparsed
     // code MIGHT do.
     if( this==Env.SCP_0 )
-      return opt_mode < 2 ? TypeMem.ALLMEM : TypeMem.DEAD;
+      return opt_mode._CG ? TypeMem.DEAD : TypeMem.ALLMEM;
     // Basic liveness ("You are Alive!") for control and returned value
     if( def == ctrl() ) return TypeMem.ALIVE;
     if( def == rez () ) return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM;

@@ -8,7 +8,7 @@ import com.cliffc.aa.type.TypeObj;
 public class DefMemNode extends Node {
   public DefMemNode( Node ctrl) { super(OP_DEFMEM,ctrl); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-  @Override public TypeMem value(byte opt_mode) {
+  @Override public TypeMem value(GVNGCM.Mode opt_mode) {
     if( _defs._len <= 1 ) return TypeMem.ANYMEM;
     TypeObj[] tos = new TypeObj[_defs._len];
     for( int i=1; i<_defs._len; i++ ) {
@@ -25,7 +25,7 @@ public class DefMemNode extends Node {
     return TypeMem.make0(tos);
   }
   @Override public boolean basic_liveness() { return false; }
-  @Override public TypeMem live_use( byte opt_mode, Node def ) { return opt_mode < 2 ? _live : TypeMem.DEAD; }
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return !opt_mode._CG ? _live : TypeMem.DEAD; }
   @Override public boolean equals(Object o) { return this==o; } // Only one
 
   // Make an MProj for a New, and 'hook' it into the default memory

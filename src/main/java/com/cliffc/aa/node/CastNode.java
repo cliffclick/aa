@@ -26,7 +26,7 @@ public class CastNode extends Node {
     set_def(0,tru,gvn);
     return this;
   }
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     Type c = val(0);
     if( c != Type.CTRL ) return c.oob();
     Type t = val(1);
@@ -37,7 +37,7 @@ public class CastNode extends Node {
     // Lift result.
     return _t.join(t);
   }
-  @Override public TypeMem live_use( byte opt_mode, Node def ) {
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     return def==in(0) ? TypeMem.ALIVE : _live;
   }
 

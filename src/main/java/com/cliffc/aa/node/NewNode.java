@@ -68,7 +68,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     return null;
   }
 
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     return TypeTuple.make(is_unused() ? TypeObj.UNUSED : valueobj(),_tptr);   // Complex obj, simple ptr.
   }
   abstract TypeObj valueobj();
@@ -116,7 +116,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   }
 
   boolean escaped(GVNGCM gvn) {
-    if( gvn._opt_mode==0 ) return true; // Assume escaped in parser
+    if( gvn._opt_mode==GVNGCM.Mode.Parse ) return true; // Assume escaped in parser
     if( _uses._len!=2 ) return false; // Dying/dead, not escaped
     Node ptr = _uses.at(0);
     if( ptr instanceof MrgProjNode ) ptr = _uses.at(1); // Get ptr not mem

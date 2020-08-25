@@ -18,7 +18,15 @@ public class GVNGCM {
 
   public int uid() { assert CNT < 100000 : "infinite node create loop"; _live.set(CNT);  return CNT++; }
 
-  public byte _opt_mode;         // 0 - Parse (discovery), 1 - iter (lifting), 2 - gcp/opto (falling)
+  public static enum Mode {
+    Parse(false),               // Parsing
+    PesiNoCG(false),            // Lifting, unknown Call Graph, no more code
+    Opto(true),                 // Falling, Call Graph discovery, no more code
+    PesiCG(true);               // Lifting,   known Call Graph
+    public final boolean _CG;   // True if full CG is known or being discovered.  Only for whole programs during or after Opto.
+    Mode(boolean CG) { _CG=CG; }
+  }
+  public Mode _opt_mode=Mode.Parse;
 
   // Iterative worklist
   private final Ary<Node> _work = new Ary<>(new Node[1], 0);
@@ -80,7 +88,7 @@ public class GVNGCM {
   void reset_to_init0() {
     _work .clear(); _wrk_bits .clear();
     _work2.clear(); _wrk2_bits.clear();
-    _opt_mode = 0;
+    _opt_mode = Mode.Parse;
     CNT = 0;
     _live.clear();
     _vals.clear();
@@ -311,6 +319,8 @@ public class GVNGCM {
         add_work(use);
         if( use instanceof RegionNode ) // Region users need to recheck PhiNode
           add_work_uses(use);
+        if( use instanceof DefMemNode )
+          add_work_uses(use); // Changing input to DefMem impacts all CallEpi
         if( use instanceof ParmNode && ((ParmNode)use)._idx==-2 )
           add_work(use.in(0));  // Recheck function inlining
         if( use instanceof MProjNode && ((MProjNode)use)._idx==0 && use._uses.at(0) instanceof MemJoinNode )
@@ -464,6 +474,8 @@ public class GVNGCM {
           for( Node n : u._uses ) if( n instanceof LoadNode ) add_work(n);
         if( u instanceof CallNode )
           for( Node n : u._uses ) if( n instanceof CallEpiNode ) add_work(n);
+        if( u instanceof DefMemNode )
+          add_work_uses(u); // Killing a New triggers value rollups on most CallEpis
         if( nnn.in(0) != null ) add_work(nnn.in(0));
       }
     }
@@ -479,7 +491,7 @@ public class GVNGCM {
 
   // Once the program is complete, any time anything is on the worklist we can
   // always conservatively iterate on it.
-  void iter(byte opt_mode) {
+  void iter(Mode opt_mode) {
     _opt_mode = opt_mode;
     assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
     // As a debugging convenience, avoid inlining (which blows up the graph)
@@ -543,7 +555,7 @@ public class GVNGCM {
   // first, and then inserting conversions using a greedy decision.  If this is
   // not sufficient to resolve all calls, the program is ambiguous and wrong.
   public void gcp(ScopeNode rez ) {
-    _opt_mode = 2;
+    _opt_mode = Mode.Opto;
     // Set all types to all_type().startype(), their most optimistic type.
     // This is mostly the dual(), except a the Start memory is always XOBJ.
     // Set all liveness to TypeMem.DEAD, their most optimistic type.
@@ -616,6 +628,8 @@ public class GVNGCM {
           add_work_defs(n);    // Put defs on worklist... liveness flows uphill
           if( n.live_changes_value() )
             add_work(n);
+          if( n instanceof  ProjNode && n.in(0) instanceof CallNode )
+            add_work_defs(n.in(0)); // Args are alive, if Call Projs are alive
           if( n instanceof CProjNode && n.in(0) instanceof CallEpiNode )
             add_work(((CallEpiNode)n.in(0)).call());
         }

@@ -364,10 +364,10 @@ public abstract class Node implements Cloneable {
   // Compute the current best Type for this Node, based on the types of its
   // inputs.  May return Type.ALL, especially if its inputs are in error.  It
   // must be monotonic.  This is a forwards-flow transfer-function computation.
-  abstract public Type value(byte opt_mode);
+  abstract public Type value(GVNGCM.Mode opt_mode);
 
   // Shortcut to update self-value
-  public Type xval( byte opt_mode ) { return _val = value(opt_mode); }
+  public Type xval( GVNGCM.Mode opt_mode ) { return _val = value(opt_mode); }
   public Type val(int idx) { return in(idx)._val; }
 
   // Compute the current best liveness for this Node, based on the liveness of
@@ -376,7 +376,7 @@ public abstract class Node implements Cloneable {
   // TypeMem.FULL, especially if its uses are of unwired functions.
   // It must be monotonic.
   // This is a reverse-flow transfer-function computation.
-  public TypeMem live( byte opt_mode ) {
+  public TypeMem live( GVNGCM.Mode opt_mode ) {
     if( basic_liveness() ) {    // Basic liveness only; e.g. primitive math ops
       boolean alive=false;
       for( Node use : _uses ) // Computed across all uses
@@ -397,10 +397,10 @@ public abstract class Node implements Cloneable {
     return live;
   }
   // Shortcut to update self-live
-  public void xliv( byte opt_mode ) { _live = live(opt_mode); }
+  public void xliv( GVNGCM.Mode opt_mode ) { _live = live(opt_mode); }
   // Compute local contribution of use liveness to this def.
   // Overridden in subclasses that do per-def liveness.
-  public TypeMem live_use( byte opt_mode, Node def ) {
+  public TypeMem live_use( GVNGCM.Mode opt_mode, Node def ) {
     return _keep>0 ? TypeMem.MEM : _live;
   }
 

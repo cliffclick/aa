@@ -84,7 +84,7 @@ public abstract class PrimNode extends Node {
   public abstract Type apply( Type[] args ); // Execute primitive
   @Override public String xstr() { return _name+":"+_sig._formals.at(1); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     Type[] ts = new Type[_defs._len]; // 1-based
     // If all inputs are constants we constant fold.  If any input is high, we
     // return high otherwise we return low.
@@ -147,7 +147,7 @@ public abstract class PrimNode extends Node {
       super(to._name,TypeStruct.make_args(TypeStruct.ts(TypeStruct.NO_DISP,from)),to);
       _badargs = new Parse[]{badargs};
     }
-    @Override public Type value(byte opt_mode) {
+    @Override public Type value(GVNGCM.Mode opt_mode) {
       Type[] ts = new Type[_defs._len];
       for( int i=1; i<_defs._len; i++ )
         ts[i] = _defs.at(i)._val;
@@ -179,7 +179,7 @@ public abstract class PrimNode extends Node {
   static class ConvertStrStr extends PrimNode {
     ConvertStrStr() { super("str",TypeStruct.STRPTR,TypeMemPtr.OOP); }
     @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
-    @Override public Type value(byte opt_mode) { return val(1); }
+    @Override public Type value(GVNGCM.Mode opt_mode) { return val(1); }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   }
 
@@ -278,7 +278,7 @@ public abstract class PrimNode extends Node {
   static class AndI64 extends Prim2OpI64 {
     AndI64() { super("&"); }
     // And can preserve bit-width
-    @Override public Type value(byte opt_mode) {
+    @Override public Type value(GVNGCM.Mode opt_mode) {
       Type t1 = val(1), t2 = val(2);
       // 0 AND anything is 0
       if( t1 == Type. NIL || t2 == Type. NIL ) return Type. NIL;
@@ -319,7 +319,7 @@ public abstract class PrimNode extends Node {
 
   static class EQ_OOP extends PrimNode {
     EQ_OOP() { super("==",TypeStruct.OOP_OOP,TypeInt.BOOL); }
-    @Override public Type value(byte opt_mode) {
+    @Override public Type value(GVNGCM.Mode opt_mode) {
       // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
       // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
       // equals if your inputs are the same node, and you are unequals if your
@@ -351,7 +351,7 @@ public abstract class PrimNode extends Node {
 
   static class NE_OOP extends PrimNode {
     NE_OOP() { super("!=",TypeStruct.OOP_OOP,TypeInt.BOOL); }
-    @Override public Type value(byte opt_mode) {
+    @Override public Type value(GVNGCM.Mode opt_mode) {
       // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
       // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
       // equals if your inputs are the same node, and you are unequals if your
@@ -380,7 +380,7 @@ public abstract class PrimNode extends Node {
   static class Not extends PrimNode {
     // Rare function which takes a Scalar (works for both ints and ptrs)
     Not() { super("!",TypeStruct.SCALAR1,TypeInt.BOOL); }
-    @Override public Type value(byte opt_mode) {
+    @Override public Type value(GVNGCM.Mode opt_mode) {
       Type t = val(1);
       if( t== Type.XNIL ||
           t== Type. NIL ||
@@ -396,7 +396,7 @@ public abstract class PrimNode extends Node {
 
   static class RandI64 extends PrimNode {
     RandI64() { super("math_rand",TypeStruct.INT64,TypeInt.INT64); }
-    @Override public Type value(byte opt_mode) {
+    @Override public Type value(GVNGCM.Mode opt_mode) {
       Type t = val(1);
       if( t.above_center() ) return TypeInt.BOOL.dual();
       if( TypeInt.INT64.dual().isa(t) && t.isa(TypeInt.INT64) )
@@ -411,7 +411,7 @@ public abstract class PrimNode extends Node {
   static class Id extends PrimNode {
     Id(Type arg) { super("id",TypeStruct.make_args(TypeStruct.ts(TypeStruct.NO_DISP,arg)),arg); }
     @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
-    @Override public Type value(byte opt_mode) { return val(1); }
+    @Override public Type value(GVNGCM.Mode opt_mode) { return val(1); }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   }
 }

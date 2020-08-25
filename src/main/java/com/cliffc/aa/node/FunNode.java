@@ -178,7 +178,7 @@ public class FunNode extends RegionNode {
     // If no trailing RetNode and hence no FunPtr... function is uncallable
     // from the unknown caller.
     RetNode ret = ret();
-    if( has_unknown_callers() && ret == null && gvn._opt_mode != 0 ) // Dead after construction?
+    if( has_unknown_callers() && ret == null && gvn._opt_mode != GVNGCM.Mode.Parse ) // Dead after construction?
       return null;
 
     if( is_forward_ref() ) return null; // No mods on a forward ref
@@ -775,7 +775,7 @@ public class FunNode extends RegionNode {
   // 'iter').  Used when inlining, and the inlined body needs to acknowledge
   // bypasses aliases.  Used during code-clone, to lift the split alias parent
   // up & out.
-  private static void retype_mem(byte opt_mode, BitSet aliases, Node mem) {
+  private static void retype_mem(GVNGCM.Mode opt_mode, BitSet aliases, Node mem) {
     Ary<Node> work = new Ary<>(new Node[1],0);
     work.push(mem);
     // Update all memory ops
@@ -805,7 +805,7 @@ public class FunNode extends RegionNode {
 
 
   // Compute value from inputs.  Simple meet over inputs.
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     // Will be an error eventually, but act like its executed so the trailing
     // EpilogNode gets visited during GCP
     if( is_forward_ref() ) return Type.CTRL;

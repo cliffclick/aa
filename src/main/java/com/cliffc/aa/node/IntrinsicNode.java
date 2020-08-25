@@ -85,7 +85,7 @@ public class IntrinsicNode extends Node {
   // The inputs are a TypeMem and a TypeMemPtr to an unnamed TypeObj.  If the
   // ptr is of the "from" type, we cast a Name to it and produce a pointer to
   // the "to" type, otherwise we get the most conservative "to" type.
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     Type mem = mem()._val;
     Type ptr = ptr()._val;
     if( !(mem instanceof TypeMem   ) ) return mem.oob(); // Inputs are confused
@@ -102,7 +102,7 @@ public class IntrinsicNode extends Node {
     return tmem.set(alias,rez);
   }
   @Override public boolean basic_liveness() { return false; }
-  @Override public TypeMem live_use( byte opt_mode, Node def ) {
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==mem() ) return _live;
     return TypeMem.ALIVE;
   }

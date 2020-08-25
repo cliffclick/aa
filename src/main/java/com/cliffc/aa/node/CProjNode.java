@@ -13,13 +13,13 @@ public class CProjNode extends ProjNode {
       return _idx==0 ? "False" : "True";
     return "CProj"+_idx;
   }
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     Type x = super.value(opt_mode);
     if( x==Type.ANY ) return Type.XCTRL;
     if( x==Type.ALL ) return Type. CTRL;
     return x;
   }
-  @Override public TypeMem live_use( byte opt_mode, Node def ) { return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.
   @Override public byte op_prec() { return _defs.at(0).op_prec(); }

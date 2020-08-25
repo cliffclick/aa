@@ -106,7 +106,7 @@ public class RegionNode extends Node {
   
   void unwire(GVNGCM gvn, int idx) { }
 
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
     for( int i=1; i<_defs._len; i++ ) {
       Type c = val(i);
@@ -115,7 +115,7 @@ public class RegionNode extends Node {
     }
     return Type.XCTRL;
   }
-  @Override public TypeMem live_use( byte opt_mode, Node def ) { return TypeMem.ALIVE; }
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ALIVE; }
 
   // Complex dominator tree.  Ok to subset, attempt the easy walk
   @Override Node walk_dom_last(Predicate<Node> P) {

@@ -96,7 +96,7 @@ public class MemJoinNode extends Node {
     return this;
   }
 
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     // Gather all memories
     boolean diff=false;
     TypeMem[] mems = new TypeMem[_defs._len];

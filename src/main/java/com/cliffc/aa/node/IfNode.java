@@ -41,7 +41,7 @@ public class IfNode extends Node {
   }
 
   
-  @Override public TypeTuple value(byte opt_mode) {
+  @Override public TypeTuple value(GVNGCM.Mode opt_mode) {
     // If the input is exactly zero, we can return false: {ANY,CONTROL}
     // If the input excludes   zero, we can return true : {CONTROL,ANY}
     // If the input excludes   both, we can return ANY:   {ANY,ANY}

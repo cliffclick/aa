@@ -63,7 +63,7 @@ public abstract class MemPrimNode extends PrimNode {
     }
 
     // The only memory required here is what is needed to support the Load
-    @Override public TypeMem live_use( byte opt_mode, Node def ) {
+    @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
       if( def==adr() ) return TypeMem.ALIVE;
       if( _defs._len>3 && def==idx() ) return TypeMem.ALIVE;
       Type tmem = mem()._val;
@@ -81,7 +81,7 @@ public abstract class MemPrimNode extends PrimNode {
     @Override public String bal_close() { return null; } // Balanced op
     @Override public byte op_prec() { return 9; } // Max precidence
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-    @Override public Type value(byte opt_mode) {
+    @Override public Type value(GVNGCM.Mode opt_mode) {
       Type mem = val(1);
       Type adr = val(2);
       if( !(mem  instanceof TypeMem  ) ) return mem .oob();
@@ -100,7 +100,7 @@ public abstract class MemPrimNode extends PrimNode {
     @Override public String bal_close() { return "]"; } // Balanced op
     @Override public byte op_prec() { return 0; } // Balanced op
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-    @Override public Type value(byte opt_mode) {
+    @Override public Type value(GVNGCM.Mode opt_mode) {
       Type mem = val(1);
       Type adr = val(2);
       Type idx = val(3);
@@ -137,7 +137,7 @@ public abstract class MemPrimNode extends PrimNode {
 
     @Override public boolean basic_liveness() { return false; }
     // The only memory required here is what is needed to support the Load
-    @Override public TypeMem live_use( byte opt_mode, Node def ) {
+    @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
       if( def==mem() ) return _live; // Pass full liveness along
       if( def==adr() ) return TypeMem.ALIVE; // Basic aliveness
       if( def==idx() ) return TypeMem.ALIVE ;// Basic aliveness
@@ -152,7 +152,7 @@ public abstract class MemPrimNode extends PrimNode {
     @Override public String bal_close() { return "]:="; } // Balanced op
     @Override public byte op_prec() { return 0; }
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-    @Override public Type value(byte opt_mode) {
+    @Override public Type value(GVNGCM.Mode opt_mode) {
       Type mem = val(1);
       Type ary = val(2);
       Type idx = val(3);

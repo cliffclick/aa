@@ -160,7 +160,7 @@ public class LoadNode extends Node {
   }
 
 
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     Node adr = adr();
     Type tadr = adr._val;
     if( !(tadr instanceof TypeMemPtr) ) return tadr.oob();
@@ -183,7 +183,7 @@ public class LoadNode extends Node {
   }
 
   // The only memory required here is what is needed to support the Load
-  @Override public TypeMem live_use( byte opt_mode, Node def ) {
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==adr() ) return TypeMem.ALIVE;
     Type tmem = mem()._val;
     Type tptr = adr()._val;

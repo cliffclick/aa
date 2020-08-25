@@ -35,7 +35,7 @@ public class TestNodeSmall {
     //                   if FunPtr below center, flip to high and JOIN.  Also high/ignore args kept high, and low args moved high for JOIN.
     // Kinda sorta looks like: use startype on incoming, and JOIN.
 
-    gvn._opt_mode=0;
+    gvn._opt_mode=GVNGCM.Mode.Parse;
     UnresolvedNode uadd = (UnresolvedNode)top.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
     FunPtrNode aflt = (FunPtrNode)uadd.in(0);
     FunPtrNode aint = (FunPtrNode)uadd.in(1);
@@ -60,13 +60,13 @@ public class TestNodeSmall {
     aflt._val = afltSTART;
     aint._val = aintSTART;
     astr._val = astrSTART;
-    gvn._opt_mode=1;
+    gvn._opt_mode=GVNGCM.Mode.PesiNoCG;
     Type uaddVAL1START = uadd.value(gvn._opt_mode);
     Type anumVAL1START = anum.value(gvn._opt_mode);
     Type afltVAL1START = aflt.value(gvn._opt_mode);
     Type aintVAL1START = aint.value(gvn._opt_mode);
     Type astrVAL1START = astr.value(gvn._opt_mode);
-    gvn._opt_mode=2;
+    gvn._opt_mode=GVNGCM.Mode.PesiCG;
     Type uaddVAL2START = uadd.value(gvn._opt_mode);
     Type anumVAL2START = anum.value(gvn._opt_mode);
     Type afltVAL2START = aflt.value(gvn._opt_mode);
@@ -79,13 +79,13 @@ public class TestNodeSmall {
     aflt._val = afltALL.dual();
     aint._val = aintALL.dual();
     astr._val = astrALL.dual();
-    gvn._opt_mode=1;
+    gvn._opt_mode=GVNGCM.Mode.PesiNoCG;
     Type uaddVAL1XALL = uadd.value(gvn._opt_mode);
     Type anumVAL1XALL = anum.value(gvn._opt_mode);
     Type afltVAL1XALL = aflt.value(gvn._opt_mode);
     Type aintVAL1XALL = aint.value(gvn._opt_mode);
     Type astrVAL1XALL = astr.value(gvn._opt_mode);
-    gvn._opt_mode=2;
+    gvn._opt_mode=GVNGCM.Mode.PesiCG;
     Type uaddVAL2XALL = uadd.value(gvn._opt_mode);
     Type anumVAL2XALL = anum.value(gvn._opt_mode);
     Type afltVAL2XALL = aflt.value(gvn._opt_mode);
@@ -98,13 +98,13 @@ public class TestNodeSmall {
     aflt._val = afltALL;
     aint._val = aintALL;
     astr._val = astrALL;
-    gvn._opt_mode=1;
+    gvn._opt_mode=GVNGCM.Mode.PesiNoCG;
     Type uaddVAL1ALL = uadd.value(gvn._opt_mode);
     Type anumVAL1ALL = anum.value(gvn._opt_mode);
     Type afltVAL1ALL = aflt.value(gvn._opt_mode);
     Type aintVAL1ALL = aint.value(gvn._opt_mode);
     Type astrVAL1ALL = astr.value(gvn._opt_mode);
-    gvn._opt_mode=2;
+    gvn._opt_mode=GVNGCM.Mode.PesiCG;
     Type uaddVAL2ALL = uadd.value(gvn._opt_mode);
     Type anumVAL2ALL = anum.value(gvn._opt_mode);
     Type afltVAL2ALL = aflt.value(gvn._opt_mode);
@@ -230,7 +230,7 @@ public class TestNodeSmall {
 
     // Make a Unknown/CallNode/CallEpi combo.
     // Unwired.  Validate the resolve process and monotonicity.
-    gvn._opt_mode=0;
+    gvn._opt_mode=GVNGCM.Mode.Parse;
     ConNode ctrl = (ConNode) gvn.xform(new ConNode<>(Type.CTRL));
     UnresolvedNode fp_mul = (UnresolvedNode)top.lookup("*"); // {int int -> int} and {flt flt -> flt}
     UnresolvedNode fp_add = (UnresolvedNode)top.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
@@ -259,7 +259,7 @@ public class TestNodeSmall {
 
     // iter(), not gcp().  Types always rise.  Very low types might lift to be
     // valid, but e.g. a 2:int will never lift to a str.
-    gvn._opt_mode=1;
+    gvn._opt_mode=GVNGCM.Mode.PesiNoCG;
 
     // The various kinds of results we expect
     TypeFunPtr tmul1 = v(fp_mul,gvn), tmul1X = tmul1.dual();
@@ -318,7 +318,7 @@ public class TestNodeSmall {
 
     // gcp(), not iter().  Types always lower.  Very high types might lower to be
     // valid, but e.g. a 2:int will never lower to a str.
-    gvn._opt_mode=2;
+    gvn._opt_mode=GVNGCM.Mode.PesiCG;
 
     // The various kinds of results we expect
     TypeFunPtr tmul2X = v(fp_mul,gvn), tmul2 = tmul2X.dual();
@@ -396,7 +396,7 @@ public class TestNodeSmall {
     //   Parm:mem - Default mem and the MemMerge of OProj
     //   Ret - {Fun,Mem,Parm:^} - Not really fact() nor gen_ctr() code but upwards exposed closure
     //   FunPtr - Ret
-    gvn._opt_mode=0;
+    gvn._opt_mode=GVNGCM.Mode.Parse;
     ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
     ctl._val = Type.CTRL;
     ConNode mem = (ConNode)gvn.xform(new ConNode<>(TypeMem.ANYMEM));
@@ -439,7 +439,7 @@ public class TestNodeSmall {
     // Validate graph initial conditions.  No optimizations, as this
     // pile-o-bits is all dead and will vaporize if the optimizer is turned
     // loose on it.  Just check the types flow correctly.
-    gvn._opt_mode=1;
+    gvn._opt_mode=GVNGCM.Mode.PesiNoCG;
     for( Node n : nodes ) {
       Type old = n._val;
       Type nnn = n.value(gvn._opt_mode);

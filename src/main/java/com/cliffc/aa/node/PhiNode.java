@@ -53,7 +53,7 @@ public class PhiNode extends Node {
     return null;
   }
 
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     Type ctl = val(0);
     if( ctl != Type.CTRL ) return ctl.oob();
     RegionNode r = (RegionNode) in(0);
@@ -66,7 +66,7 @@ public class PhiNode extends Node {
   }
   @Override BitsAlias escapees() { return BitsAlias.FULL; }
   @Override public boolean basic_liveness() { return _t==Type.SCALAR; }
-  @Override public TypeMem live_use( byte opt_mode, Node def ) {
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==in(0) ) return TypeMem.ALIVE;
     return basic_liveness() && !def.basic_liveness() ? TypeMem.ANYMEM : _live;
   }

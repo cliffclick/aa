@@ -22,7 +22,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
     public ConStr( String str ) { super(TypeStr.con(str),"con",false,(Type)null); }
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override TypeStr valueobj() { return _ts; }
-    @Override public TypeMem live_use( byte opt_mode, Node def ) { throw com.cliffc.aa.AA.unimpl(); } // No inputs
+    @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { throw com.cliffc.aa.AA.unimpl(); } // No inputs
   }
 
   public static class ConvertI64Str extends NewStrNode {
@@ -34,7 +34,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       if( !t.is_con() ) return TypeStr.STR;
       return TypeStr.make(false,Long.toString(t.getl()).intern());
     }
-    @Override public TypeMem live_use( byte opt_mode, Node def ) { return TypeMem.ALIVE; }
+    @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ALIVE; }
   }
 
   public static class ConvertF64Str extends NewStrNode {
@@ -46,7 +46,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       if( !t.is_con() ) return TypeStr.STR;
       return TypeStr.make(false,Double.toString(t.getd()).intern());
     }
-    @Override public TypeMem live_use( byte opt_mode, Node def ) { return TypeMem.ALIVE; }
+    @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ALIVE; }
   }
 
   // String concat.  NIL values are treated "as-if" the empty string.
@@ -56,7 +56,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   public static class AddStrStr extends NewStrNode {
     public AddStrStr( ) { super(TypeStr.STR,"+",true,null,TypeMemPtr.STR0,TypeMemPtr.STR0); }
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-    @Override public Type value(byte opt_mode) {
+    @Override public Type value(GVNGCM.Mode opt_mode) {
       if( is_unused() ) return Type.ANY;
       Type m   = val(1);
       Type sp0 = val(3);
@@ -80,7 +80,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
     TypeTuple _value(TypeObj tobj) { return TypeTuple.make(tobj,_tptr); }
     @Override TypeObj valueobj() { throw com.cliffc.aa.AA.unimpl(); }
     @Override public byte op_prec() { return 5; }
-    @Override public TypeMem live_use( byte opt_mode, Node def ) {
+    @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
       if( def==in(3) || def==in(4) ) return TypeMem.ALIVE;
       assert def==in(1);
       // Memory for aliases is alive, as-if a READ/LOAD

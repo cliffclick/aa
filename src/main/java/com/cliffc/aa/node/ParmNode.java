@@ -74,7 +74,7 @@ public class ParmNode extends PhiNode {
     return actual.isa(formal);
   }
 
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     // Not executing, go the
     Type ctl = val(0);
     if( ctl != Type.CTRL ) return ctl.oob();
@@ -84,7 +84,7 @@ public class ParmNode extends PhiNode {
     // caller can be that bad.  During & after GCP all unknown callers are
     // accounted for.
     FunNode fun = (FunNode)in0;
-    if( opt_mode < 2 && fun.has_unknown_callers() )
+    if( !opt_mode._CG && fun.has_unknown_callers() )
       return val(1);
     Node mem = fun.parm(-2);    // Memory for sharpening pointers
     // All callers known; merge the wired & flowing ones

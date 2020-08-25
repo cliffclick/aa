@@ -37,14 +37,14 @@ public class UnresolvedNode extends Node {
     return progress ? this : null;
   }
 
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     // Freeze after GVN - only still around for errors
-    if( opt_mode > 2 ) return _val;
+    if( opt_mode == GVNGCM.Mode.PesiCG ) return _val;
     // If any arg is ALL - that wins; if ANY - ignored.
     // If any arg is not a TFP, then OOB.
     // If any arg is high, ignore - FunPtrs always fall.
     // If opt_mode==2, then high else low
-    boolean lifting = opt_mode!=2;
+    boolean lifting = opt_mode!=GVNGCM.Mode.Opto;
     Type initial = lifting ? Type.ANY : Type.ALL;
     Type t = initial;
     for( Node def : _defs ) {
@@ -89,8 +89,8 @@ public class UnresolvedNode extends Node {
   // Compute local contribution of use liveness to this def.
   // If pre-GCP, same as value() above, use the conservative answer.
   // During GCP, this will resolve so use the optimistic answer.
-  @Override public TypeMem live_use( byte opt_mode, Node def ) {
-    if( opt_mode < 2 ) return super.live_use(opt_mode,def);
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+    if( !opt_mode._CG ) return super.live_use(opt_mode,def);
     if( !(def instanceof FunPtrNode) ) return _live;
     // If any Call has resolved to this def, its alive.
     // If not a Call, must assume it props to some unknown Call and is alive.

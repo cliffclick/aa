@@ -247,7 +247,7 @@ public class CallNode extends Node {
     // Fidxs are typically low during iter, but can be high during
     // iter post-GCP on error calls where nothing resolves.
     if( fidx == -1 && !fidxs.above_center() && !fidxs.test(1)) {
-      BitsFun rfidxs = resolve(fidxs,tcall._ts,(TypeMem)mem()._val,gvn._opt_mode==2);
+      BitsFun rfidxs = resolve(fidxs,tcall._ts,(TypeMem)mem()._val,gvn._opt_mode==GVNGCM.Mode.Opto);
       if( rfidxs==null ) return null;            // Dead function, stall for time
       FunPtrNode fptr = least_cost(gvn, rfidxs, unk); // Check for least-cost target
       if( fptr != null ) return set_fun(fptr, gvn); // Resolve to 1 choice
@@ -264,7 +264,7 @@ public class CallNode extends Node {
     // alive args still need to resolve.  Constants are an issue, because they
     // fold into the Parm and the Call can lose the matching DProj while the
     // arg is still alive.
-    if( gvn._opt_mode > 2 && err(true)==null ) {
+    if( gvn._opt_mode._CG && err(true)==null ) {
       Node progress = null;
       for( int i=1; i<nargs(); i++ ) // Skip the FP/DISPLAY arg, as its useful for error messages
         if( ProjNode.proj(this,i+ARGIDX)==null &&
@@ -277,7 +277,7 @@ public class CallNode extends Node {
     // behavior down).  The New address must not be reachable from the Call
     // arguments transitively, which is detected in the escape-in set.
     Node mem = mem();
-    if( gvn._opt_mode > 0 && mem instanceof MrgProjNode && cepi != null ) {
+    if( gvn._opt_mode != GVNGCM.Mode.Parse && mem instanceof MrgProjNode && cepi != null ) {
       ProjNode cepim = ProjNode.proj(cepi,1); // Memory projection from CEPI
       ProjNode cepid = ProjNode.proj(cepi,2); // Return projection from CEPI
       // Verify no extra mem readers in-between, no alias overlaps on input
@@ -314,10 +314,10 @@ public class CallNode extends Node {
   // full scatter lets users decide the meaning; e.g. wired FunNodes will take
   // the full arg set but if the call is not reachable the FunNode will not
   // merge from that path.  Result tuple type:
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     // Pinch to XCTRL/CTRL
     Type ctl = ctl()._val;
-    if( opt_mode>0 && cepi()==null ) ctl = Type.XCTRL; // Dead from below
+    if( opt_mode!=GVNGCM.Mode.Parse && cepi()==null ) ctl = Type.XCTRL; // Dead from below
     if( ctl != Type.CTRL ) return ctl.oob();
     final Type[] ts = Types.get(_defs._len+1);
     ts[0] = Type.CTRL;
@@ -346,7 +346,7 @@ public class CallNode extends Node {
     if( !fidxs.is_empty() && fidxs.above_center()!=tfp._disp.above_center() )
       return _val; // Display and FIDX mis-aligned; stall
     // Resolve; only keep choices with sane arguments during GCP
-    BitsFun rfidxs = resolve(fidxs,ts,tmem,opt_mode==2);
+    BitsFun rfidxs = resolve(fidxs,ts,tmem,opt_mode==GVNGCM.Mode.Opto);
     if( rfidxs==null ) return _val; // Dead function input, stall until this dies
     // nargs is min nargs across the resolved fidxs for below-center, max for above.
     boolean rup = rfidxs.above_center();
@@ -365,10 +365,10 @@ public class CallNode extends Node {
     return TypeTuple.make(ts);
   }
   // Get (shallow) aliases from the type
-  private BitsAlias get_alias(byte opt_mode, Type t) {
+  private BitsAlias get_alias(GVNGCM.Mode opt_mode, Type t) {
     if( t instanceof TypeMemPtr ) return ((TypeMemPtr)t)._aliases;
     if( t instanceof TypeFunPtr ) {
-      if( opt_mode >= 2 && _uses.find(e->e instanceof FP2ClosureNode)==-1 )
+      if( opt_mode._CG && _uses.find(e->e instanceof FP2ClosureNode)==-1 )
         return BitsAlias.EMPTY; // Fully wired call still not using display
       return ((TypeFunPtr)t)._disp._aliases;
     }
@@ -387,8 +387,8 @@ public class CallNode extends Node {
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
   // have not seen all possible function-body uses.  Check for #FIDXs == nwired().
-  @Override public TypeMem live( byte opt_mode) {
-    if( opt_mode < 2 ) {
+  @Override public TypeMem live(GVNGCM.Mode opt_mode) {
+    if( !opt_mode._CG ) {
       BitsFun fidxs = fidxs();
       if( fidxs == null ) return TypeMem.ALLMEM; // Assume Something Good will yet happen
       if( fidxs.above_center() ) return _live; // Got choices, dunno which one will stick
@@ -406,9 +406,9 @@ public class CallNode extends Node {
     return super.live(opt_mode);
   }
   @Override public boolean basic_liveness() { return false; }
-  @Override public TypeMem live_use( byte opt_mode, Node def ) {
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==fun() ) {                         // Function argument
-      if( opt_mode < 2 ) return TypeMem.ESCAPE;   // Prior to GCP, assume all fptrs are alive and display escapes
+      if( !opt_mode._CG ) return TypeMem.ESCAPE; // Prior to GCP, assume all fptrs are alive and display escapes
       if( _not_resolved_by_gcp ) return TypeMem.ESCAPE;// GCP failed to resolve, this call is in-error
       // During GCP, unresolved calls might resolve & remove this use.  Keep dead till resolve fails.
       // If we have a fidx directly, use it more precisely.
@@ -417,7 +417,7 @@ public class CallNode extends Node {
     }
     if( def==ctl() ) return TypeMem.ALIVE;
     if( def!=mem() ) {          // Some argument
-      if( opt_mode > 2 && !(def instanceof ConNode && (((ConNode)def)._t == Type.ANY)) ) { // If all are wired, we can check projs for uses
+      if( opt_mode._CG && !(def instanceof ConNode && (((ConNode)def)._t == Type.ANY)) ) { // If all are wired, we can check projs for uses
         int argn = idx2arg_num(_defs.find(def));
         ProjNode proj = ProjNode.proj(this, argn + ARGIDX);
         if( proj == null || proj._live == TypeMem.DEAD )
@@ -588,7 +588,7 @@ public class CallNode extends Node {
   public FunPtrNode least_cost(GVNGCM gvn, BitsFun choices, Node unk) {
     if( choices==BitsFun.EMPTY ) return null;
     assert choices.bitCount() > 0; // Must be some choices
-    assert choices.above_center() == (gvn._opt_mode==2);
+    assert choices.above_center() == (gvn._opt_mode==GVNGCM.Mode.Opto);
     int best_cvts=99999;           // Too expensive
     FunPtrNode best_fptr=null;     //
     TypeStruct best_formals=null;  //

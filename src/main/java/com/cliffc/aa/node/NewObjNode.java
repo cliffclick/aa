@@ -153,5 +153,5 @@ public class NewObjNode extends NewNode<TypeStruct> {
   }
   @Override TypeStruct dead_type() { return TypeStruct.ANYSTRUCT; }
   // All fields are escaping
-  @Override public TypeMem live_use( byte opt_mode, Node def ) { return TypeMem.ESCAPE; }
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ESCAPE; }
 }

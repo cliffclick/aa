@@ -19,7 +19,7 @@ public class ProjNode extends Node {
     return null;
   }
 
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     Type c = val(0);
     if( c instanceof TypeTuple ) {
       TypeTuple ct = (TypeTuple)c;
@@ -29,7 +29,7 @@ public class ProjNode extends Node {
     return c.oob();
   }
   // Only called here if alive, and input is more-than-basic-alive
-  @Override public TypeMem live_use( byte opt_mode, Node def ) { return def.basic_liveness() ? _live : TypeMem.ANYMEM; }
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def.basic_liveness() ? _live : TypeMem.ANYMEM; }
 
   public static ProjNode proj( Node head, int idx ) {
     for( Node use : head._uses )

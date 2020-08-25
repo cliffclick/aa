@@ -18,7 +18,7 @@ public final class ErrNode extends Node {
   @Override String xstr() { return _err._msg; }
   @Override String str() { return "Err"; }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
-  @Override public Type value(byte opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     Type t = val(0);
     return t == Type.ANY || t == Type.XCTRL ? Type.ANY : Type.ALL; // For dead data errors return ANY (no error)
   }
