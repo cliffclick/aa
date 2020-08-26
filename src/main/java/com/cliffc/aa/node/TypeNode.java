@@ -104,6 +104,6 @@ public class TypeNode extends Node {
   @Override public ErrMsg err( boolean fast ) {
     Type arg = arg()._val;
     Type mem = mem()._val;
-    return ErrMsg.typerr(_error_parse,arg,mem,_t);
+    return ErrMsg.asserterr(_error_parse,arg,mem,_t);
   }
 }

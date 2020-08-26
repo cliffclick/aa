@@ -84,7 +84,7 @@ public final class FunPtrNode extends Node {
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     return def==ret() ? TypeMem.ANYMEM : TypeMem.ESCAPE;
   }
-  
+
   // Filter out all the wrong-arg-count functions
   public Node filter( GVNGCM gvn, int nargs ) {
     // User-nargs are user-visible #arguments.
@@ -96,11 +96,6 @@ public final class FunPtrNode extends Node {
   // on primitives.
   @Override public byte op_prec() { return ret().op_prec(); }
 
-  // True if function is uncalled (but possibly returned or stored as
-  // a constant).  Such code is not searched for errors.
-  @Override boolean is_uncalled(GVNGCM gvn) {
-    return !is_forward_ref() && !ret().is_copy() && ((TypeTuple)ret()._val).at(0)==Type.XCTRL;
-  }
   // Instead of returning the pre-call memory on true, returns self.
   // Changes as the graph changes, because works purely off of graph shape.
   @Override Node is_pure_call() {

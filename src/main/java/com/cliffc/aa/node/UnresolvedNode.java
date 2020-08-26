@@ -126,8 +126,7 @@ public class UnresolvedNode extends Node {
   public UnresolvedNode copy(Parse bad) {
     return new UnresolvedNode(bad,Arrays.copyOf(_defs._es,_defs._len));
   }
-  // Do not walk into the unresolved calls; there is only an error if a Call uses an Unresolved.
-  @Override boolean is_uncalled(GVNGCM gvn) { return true; }
+
   // Choice of typically primitives, all of which are pure.
   // Instead of returning the pre-call memory on true, returns self.
   @Override Node is_pure_call() {

@@ -447,7 +447,7 @@ public class TestNodeSmall {
     }
 
     // Now run GCP to closure.  This is the key call being tested.
-    gvn.gcp(env);
+    gvn.gcp(GVNGCM.Mode.Opto,env);
 
     // Validate cyclic display/function type
     TypeFunPtr tfptr0 = (TypeFunPtr)fptr._val;

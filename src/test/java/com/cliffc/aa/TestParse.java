@@ -25,7 +25,7 @@ public class TestParse {
     test("math_rand(1)?x=4:x=3;x", TypeInt.NINT8); // x defined on both arms, so available after
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
-    testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is not a flt64",9);
+    testerr("sq={x -> x*x}; sq(\"abc\")", "Unable to resolve call",10);
     test("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
     testerr("math_rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",3);
@@ -192,7 +192,7 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
     testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",9);
-    testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is not a flt64",9);
+    testerr("sq={x -> x*x}; sq(\"abc\")", "Unable to resolve call",10);
     testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0 which takes 2 arguments",16);
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));

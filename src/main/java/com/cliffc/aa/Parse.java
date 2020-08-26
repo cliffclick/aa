@@ -64,7 +64,7 @@ import java.util.*;
  *  tvar = id                      // Type variable lookup
  */
 
-public class Parse {
+public class Parse implements Comparable<Parse> {
   private final String _src;            // Source for error messages; usually a file name
   private Env _e;                       // Lookup context; pushed and popped as scopes come and go
   private final byte[] _buf;            // Bytes being parsed
@@ -102,11 +102,12 @@ public class Parse {
     prog();        // Parse a program
     _gvn.rereg(_e._scope,Type.ALL);
     _e._scope.xliv(_gvn._opt_mode);
-    _gvn.iter(GVNGCM.Mode.PesiNoCG); // Pessimistic optimizations; might improve error situation
-    _gvn.gcp(_e._scope);             // Global Constant Propagation
-    _gvn.iter(GVNGCM.Mode.PesiCG);   // Re-check all ideal calls now that types have been maximally lifted
-    _gvn.gcp(_e._scope);             // Global Constant Propagation
-    _gvn.iter(GVNGCM.Mode.PesiCG);   // Re-check all ideal calls now that types have been maximally lifted
+    _gvn.iter(GVNGCM.Mode.PesiREPL); // Pessimistic optimizations; might improve error situation
+    _gvn.gcp (GVNGCM.Mode.OptoREPL,_e._scope); // Global Constant Propagation
+    _gvn.iter(GVNGCM.Mode.PesiREPL); // Re-check all ideal calls now that types have been maximally lifted
+    _gvn.gcp (GVNGCM.Mode.OptoREPL,_e._scope); // Global Constant Propagation
+    _gvn.iter(GVNGCM.Mode.PesiREPL); // Re-check all ideal calls now that types have been maximally lifted
+    _gvn.unreg(_e._scope);
     return gather_errors();
   }
 
@@ -122,9 +123,9 @@ public class Parse {
     _e._scope.xliv(_gvn._opt_mode);
     _gvn.iter(GVNGCM.Mode.PesiNoCG); // Pessimistic optimizations; might improve error situation
     remove_unknown_callers();
-    _gvn.gcp(_e._scope);           // Global Constant Propagation
+    _gvn.gcp (GVNGCM.Mode.Opto,_e._scope); // Global Constant Propagation
     _gvn.iter(GVNGCM.Mode.PesiCG); // Re-check all ideal calls now that types have been maximally lifted
-    _gvn.gcp(_e._scope);           // Global Constant Propagation
+    _gvn.gcp (GVNGCM.Mode.Opto,_e._scope); // Global Constant Propagation
     _gvn.iter(GVNGCM.Mode.PesiCG); // Re-check all ideal calls now that types have been maximally lifted
     return gather_errors();
   }
@@ -147,33 +148,18 @@ public class Parse {
   }
 
   private TypeEnv gather_errors() {
-    _gvn.unreg(_e._scope);
-    _gvn.unreg(_e._par._scope);
-    Node res = _e._scope.pop(); // New and improved result
-    Node mem = _e._scope.mem();
-    Type tres = res._val;
-    TypeMem tmem = (TypeMem)mem._val;
-
     // Hunt for typing errors in the alive code
     assert _e._par._par==null; // Top-level only
-    VBitSet bs = new VBitSet();
-    bs.set(Env.MEM_0._uid);     // Do not walk initial memory
-    bs.set(Env.STK_0._uid);     // Do not walk initial memory
-    bs.set(_e._scope._uid);     // Do not walk top-level scope
-    bs.set(Env.DEFMEM._uid);    // Do not walk default memory
     HashSet<Node.ErrMsg> errs = new HashSet<>();
-    res   .walkerr_def(errs,bs,_gvn);
-    ctrl().walkerr_def(errs,bs,_gvn);
-    mem   .walkerr_def(errs,bs,_gvn);
-    if( errs.isEmpty() ) _e._scope.walkerr_use(errs,new VBitSet());
-    if( errs.isEmpty() && skipWS() != -1 ) errs.add(Node.ErrMsg.trailingjunk(this));
-    if( errs.isEmpty() ) res.walkerr_gc(errs,new VBitSet(),_gvn);
+    VBitSet bs = new VBitSet();
+    _e._scope.walkerr_def(errs,bs);
+    if( skipWS() != -1 ) errs.add(Node.ErrMsg.trailingjunk(this));
     ArrayList<Node.ErrMsg> errs0 = new ArrayList<>(errs);
     Collections.sort(errs0);
 
-    kill(res);       // Kill Node for returned Type result
-
-    return new TypeEnv(tres,tmem,_e,errs0.isEmpty() ? null : errs0);
+    Node res = _e._scope.rez(); // New and improved result
+    Node mem = _e._scope.mem();
+    return new TypeEnv(res._val,(TypeMem)mem._val,_e,errs0.isEmpty() ? null : errs0);
   }
 
   /** Parse a top-level:
@@ -453,14 +439,17 @@ public class Parse {
     if( term == null ) return null; // Term is required, so missing term implies not any expr
     // Collect 1st fcn/arg pair
     Ary<Node > funs = new Ary<>(new Node [1],0);
-    Ary<Parse> bads = new Ary<>(new Parse[1],0);
+    Ary<Parse> bafs = new Ary<>(new Parse[1],0);
+    Ary<Parse> bats = new Ary<>(new Parse[1],0);
     try( TmpNode args = new TmpNode() ) {
       funs.add(null);
       args.add_def(term);
-      bads.add(errMsg(oldx));
+      bafs.add(null);
+      bats.add(errMsg(oldx));
 
       // Now loop for binop/term pairs: parse Kleene star of [binop term]
       while( true ) {
+        skipWS();
         oldx = _x;
         String bin = token();
         if( bin==null ) break;    // Valid parse, but no more Kleene star
@@ -470,7 +459,10 @@ public class Parse {
         int oldx2 = _x;
         if( (term=term()) == null )
           term = err_ctrl2("Missing term after '"+bin+"'");
-        funs.add(binfun.keep());  args.add_def(term);  bads.add(errMsg(oldx2));
+        funs.add(binfun.keep());
+        args.add_def(term);
+        bafs.add(errMsg(oldx ));
+        bats.add(errMsg(oldx2));
       }
 
       // Have a list of interspersed operators and terms.
@@ -481,19 +473,19 @@ public class Parse {
       while( max >= 0 && args._defs._len > 0 ) {
         for( int i=0; i<funs.len(); i++ ) { // For all ops of this precedence level, left-to-right
           Node  fun = funs.at(i);
-          Parse bad = bads.at(i);
           if( fun==null ) continue;
-          assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
+          Parse baf = bafs.at(i);
+          Parse bat = bats.at(i);
           if( i==0 ) {
-            Node call = do_call(new Parse[]{bad,bad},args(fun.unhook(),args.in(0)));
+            Node call = do_call(new Parse[]{baf,bat},args(fun.unhook(),args.in(0)));
             args.set_def(0,call,_gvn);
             funs.setX(0,null);
           } else {
-            Parse bad1 = bads.at(i-1);
-            Node call = do_call(new Parse[]{bad1,bad1,bad},args(fun.unhook(),args.in(i-1),args.in(i)));
+            Parse bat1 = bats.at(i-1); // Prior term start
+            Node call = do_call(new Parse[]{baf,bat1,bat},args(fun.unhook(),args.in(i-1),args.in(i)));
             args.set_def(i-1,call,_gvn);
-            funs.remove(i);  args.remove(i);  bads.remove(i);  i--;
+            funs.remove(i);  args.remove(i);  bafs.remove(i);  bats.remove(i);  i--;
           }
         }
         max--;
@@ -1297,7 +1289,7 @@ public class Parse {
 
   // Whack current control with a syntax error
   private ErrNode err_ctrl1( Node.ErrMsg msg ) { return init(new ErrNode(Env.START,msg)); }
-  private ErrNode err_ctrl2( String msg ) { return init(new ErrNode(Env.START,errMsg(),msg)); }
+  private ErrNode err_ctrl2( String msg ) { return init(new ErrNode(ctrl(),errMsg(),msg)); }
   private void err_ctrl0(String s) { err_ctrl3(s,errMsg()); }
   private void err_ctrl3(String s, Parse open) {
     set_ctrl(gvn(new ErrNode(ctrl(),open,s)));
@@ -1352,5 +1344,10 @@ public class Parse {
   }
   @Override public int hashCode() {
     return _src.hashCode()+_x;
+  }
+  @Override public int compareTo(Parse loc) {
+    int x = _src.compareTo(loc._src);
+    if( x!=0 ) return x;
+    return _x - loc._x;
   }
 }

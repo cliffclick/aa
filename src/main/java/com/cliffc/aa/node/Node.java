@@ -493,39 +493,21 @@ public abstract class Node implements Cloneable {
     return errs;
   }
 
-  // Gather errors; backwards reachable control uses only
-  public void walkerr_use( HashSet<ErrMsg> errs, VBitSet bs ) {
-    assert !is_dead();
-    if( bs.tset(_uid) ) return;  // Been there, done that
-    if( _val != Type.CTRL ) return; // Ignore non-control
-    if( this instanceof ErrNode ) adderr(errs);
-    for( Node use : _uses )     // Walk control users for more errors
-      use.walkerr_use(errs,bs);
-  }
-
-  // Gather errors; forwards reachable data uses only.  This is an RPO walk.
-  public void walkerr_def( HashSet<ErrMsg> errs, VBitSet bs, GVNGCM gvn ) {
-    assert !is_dead();
+  // Gather errors, walking from Scope to START.
+  public void walkerr_def( HashSet<ErrMsg> errs, VBitSet bs ) {
     if( bs.tset(_uid) ) return; // Been there, done that
-    if( is_uncalled(gvn) ) return; // FunPtr is a constant, but never executed, do not check for errors
-    // Reverse walk: start at exit/return of graph and walk towards root/start.
     for( int i=0; i<_defs._len; i++ ) {
       Node def = _defs.at(i);   // Walk data defs for more errors
       if( def == null || def._val == Type.XCTRL ) continue;
-      def.walkerr_def(errs,bs,gvn);
+      // Walk function bodies that are wired, but not bare FunPtrs.
+      if( def instanceof FunPtrNode && !def.is_forward_ref() )
+        continue;
+      def.walkerr_def(errs,bs);
     }
-    // Post-Order walk: check after walking
-    adderr(errs);
+    if( !is_prim() )
+      adderr(errs);
   }
 
-  // Gather errors; forwards reachable data uses only
-  public void walkerr_gc( HashSet<ErrMsg> errs, VBitSet bs, GVNGCM gvn ) {
-    if( bs.tset(_uid) ) return;  // Been there, done that
-    if( is_uncalled(gvn) ) return; // FunPtr is a constant, but never executed, do not check for errors
-    adderr(errs);
-    for( int i=0; i<_defs._len; i++ )
-      if( in(i) != null ) in(i).walkerr_gc(errs,bs,gvn);
-  }
   private void adderr( HashSet<ErrMsg> errs ) {
     ErrMsg msg = err(false);
     if( msg==null ) return;
@@ -540,10 +522,6 @@ public abstract class Node implements Cloneable {
   // node optimizes, each ProjNode becomes a copy of some other value... based
   // on the ProjNode index
   public Node is_copy(GVNGCM gvn, int idx) { return null; }
-
-  // True if function is uncalled (but possibly returned or stored as
-  // a constant).  Such code is not searched for errors.
-  boolean is_uncalled(GVNGCM gvn) { return false; }
 
   // Only true for some RetNodes and FunNodes
   public boolean is_forward_ref() { return false; }
@@ -598,6 +576,8 @@ public abstract class Node implements Cloneable {
     NilAdr,                   // Address might be nil on mem op
     BadArgs,                  // Unspecified primitive bad args
     UnresolvedCall,           // Unresolved calls
+    AllTypeErr,               // Type errors, with one of the types All
+    Assert,                   // Assert type errors
     TrailingJunk,             // Trailing syntax junk
     MixedPrimGC,              // Mixed primitives & GC
   }
@@ -620,11 +600,13 @@ public abstract class Node implements Cloneable {
     public static ErrMsg unresolved(Parse loc, String msg) {
       return new ErrMsg(loc,msg,Level.UnresolvedCall);
     }
-    public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type expected ) {
+    public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type expected ) { return typerr(loc,actual,t0mem,expected,Level.TypeErr); }
+    public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type expected, Level lvl ) {
       TypeMem tmem = t0mem instanceof TypeMem ? (TypeMem)t0mem : null;
       String s0 = typerr(actual  ,tmem);
       String s1 = typerr(expected,null); // Expected is already a complex ptr, does not depend on memory
-      return new ErrMsg(loc,s0+" is not a "+s1,Level.TypeErr);
+      if( actual==Type.ALL && lvl==Level.TypeErr ) lvl=Level.AllTypeErr; // ALLs have failed earlier, so this is a lower priority error report
+      return new ErrMsg(loc,s0+" is not a "+s1,lvl);
     }
     public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type[] expecteds ) {
       TypeMem tmem = t0mem instanceof TypeMem ? (TypeMem)t0mem : null;
@@ -640,6 +622,9 @@ public abstract class Node implements Cloneable {
         : (t instanceof TypeMemPtr
            ? t.str(new SB(), null, tmem).toString()
            : t.toString());
+    }
+    public static ErrMsg asserterr( Parse loc, Type actual, Type t0mem, Type expected ) {
+      return typerr(loc,actual,t0mem,expected,Level.Assert);
     }
     public static ErrMsg field(Parse loc, String msg, String fld) {
       String f = msg+" field '."+fld+"'";
@@ -662,7 +647,9 @@ public abstract class Node implements Cloneable {
     @Override public int compareTo(ErrMsg msg) {
       int cmp = _lvl.compareTo(msg._lvl);
       if( cmp != 0 ) return cmp;
-      return _order-msg._order;
+      cmp = _loc.compareTo(msg._loc);
+      if( cmp != 0 ) return cmp;
+      return _msg.compareTo(msg._msg);
     }
     @Override public boolean equals(Object obj) {
       if( this==obj ) return true;

@@ -77,6 +77,7 @@ public class ScopeNode extends Node {
     Node rez = rez();
     Type trez = rez==null ? null : rez._val;
     if( gvn._opt_mode != GVNGCM.Mode.Parse &&   // Past parsing
+        gvn._opt_mode._whole &&                 // And whole program
         rez != null &&          // Have a return result
         // If type(rez) can never lift to any TMP, then we will not return a
         // pointer, and do not need the memory state on exit.
@@ -121,11 +122,11 @@ public class ScopeNode extends Node {
     // The top scope is always alive, and represents what all future unparsed
     // code MIGHT do.
     if( this==Env.SCP_0 )
-      return opt_mode._CG ? TypeMem.DEAD : TypeMem.ALLMEM;
+      return opt_mode._CG && opt_mode._whole ? TypeMem.DEAD : TypeMem.ALLMEM;
     // Basic liveness ("You are Alive!") for control and returned value
     if( def == ctrl() ) return TypeMem.ALIVE;
     if( def == rez () ) return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM;
-    if( def == ptr () ) return TypeMem.DEAD; // Returned display is dead
+    if( def == ptr () ) return opt_mode._whole ? TypeMem.DEAD : TypeMem.ESCAPE; // Returned display is dead
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.
     assert def == mem();

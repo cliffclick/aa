@@ -18,13 +18,16 @@ public class GVNGCM {
 
   public int uid() { assert CNT < 100000 : "infinite node create loop"; _live.set(CNT);  return CNT++; }
 
-  public static enum Mode {
-    Parse(false),               // Parsing
-    PesiNoCG(false),            // Lifting, unknown Call Graph, no more code
-    Opto(true),                 // Falling, Call Graph discovery, no more code
-    PesiCG(true);               // Lifting,   known Call Graph
+  public enum Mode {
+    Parse   (false,false),      // Parsing
+    PesiNoCG(false,true ),      // Lifting, unknown Call Graph, no more code
+    Opto    (true ,true ),      // Falling, Call Graph discovery, no more code
+    PesiCG  (true ,true ),      // Lifting,   known Call Graph
+    PesiREPL(false,false),      // Lifting, unknown Call Graph, more code
+    OptoREPL(false,false);      // Falling, Call Graph discovery, more code
     public final boolean _CG;   // True if full CG is known or being discovered.  Only for whole programs during or after Opto.
-    Mode(boolean CG) { _CG=CG; }
+    public final boolean _whole;// True if whole program has been seen.  False in the REPL.
+    Mode(boolean CG, boolean whole) { _CG=CG; _whole=whole; }
   }
   public Mode _opt_mode=Mode.Parse;
 
@@ -554,8 +557,8 @@ public class GVNGCM {
   // GCP resolves all ambiguous (overloaded) calls, using the precise types
   // first, and then inserting conversions using a greedy decision.  If this is
   // not sufficient to resolve all calls, the program is ambiguous and wrong.
-  public void gcp(ScopeNode rez ) {
-    _opt_mode = Mode.Opto;
+  public void gcp(Mode mode, ScopeNode rez ) {
+    _opt_mode = mode;
     // Set all types to all_type().startype(), their most optimistic type.
     // This is mostly the dual(), except a the Start memory is always XOBJ.
     // Set all liveness to TypeMem.DEAD, their most optimistic type.
