@@ -186,7 +186,7 @@ public abstract class Node implements Cloneable {
 
   // Make a copy of the base node, with no defs nor uses and a new UID.
   // Some variations will use the CallEpi for e.g. better error messages.
-  @NotNull Node copy( boolean copy_edges, GVNGCM gvn) {
+  @NotNull public Node copy( boolean copy_edges, GVNGCM gvn) {
     try {
       Node n = (Node)clone();
       n._uid = Env.GVN.uid();             // A new UID

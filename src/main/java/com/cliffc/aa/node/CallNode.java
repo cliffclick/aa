@@ -159,7 +159,7 @@ public class CallNode extends Node {
   // splits into 2, and the two new children RPCs replace it entirely.  The
   // original RPC may exist in the type system for a little while, until the
   // children propagate everywhere.
-  @Override @NotNull CallNode copy( boolean copy_edges, GVNGCM gvn) {
+  @Override @NotNull public CallNode copy( boolean copy_edges, GVNGCM gvn) {
     CallNode call = (CallNode)super.copy(copy_edges,gvn);
     ConNode old_rpc = gvn.con(TypeRPC.make(_rpc));
     call._rpc = BitsRPC.new_rpc(_rpc); // Children RPC

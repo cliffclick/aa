@@ -27,6 +27,12 @@ public class ScopeNode extends Node {
     _ifs = null;
     keep();
   }
+  public ScopeNode(HashMap<String,Type> types,  Node ctl, Node mem, Node ptr, Node rez) {
+    super(OP_SCOPE,ctl,mem,ptr,rez);
+    _debug_open = null;
+    _types = types;
+    keep();
+  }
 
   // Add base types on startup
   public void init0() { Type.init0(_types); }
@@ -41,7 +47,7 @@ public class ScopeNode extends Node {
   public void set_rez ( Node n, GVNGCM gvn) { set_def(3,n,gvn); }
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
   public Node set_mem( Node n, GVNGCM gvn) {
-    assert n==null || (n.touched() && (n._val instanceof TypeMem || n._val==Type.ANY));
+    assert n==null || (n.touched() && (n._val instanceof TypeMem || n._val==Type.ANY || n._val==Type.ALL));
     set_def(1,n,gvn);
     return this;
   }

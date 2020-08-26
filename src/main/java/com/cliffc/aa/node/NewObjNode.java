@@ -154,4 +154,11 @@ public class NewObjNode extends NewNode<TypeStruct> {
   @Override TypeStruct dead_type() { return TypeStruct.ANYSTRUCT; }
   // All fields are escaping
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ESCAPE; }
+  @Override public TypeMem live(GVNGCM.Mode opt_mode) {
+    // The top scope is always alive, and represents what all future unparsed
+    // code MIGHT do.
+    if( _keep==1 && _uses._len==0 )
+      return TypeMem.ALIVE;
+    return super.live(opt_mode);
+  }
 }

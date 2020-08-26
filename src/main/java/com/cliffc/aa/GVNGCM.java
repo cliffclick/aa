@@ -394,8 +394,6 @@ public class GVNGCM {
     // [ts!,vals?] Remove before ideal or value-wiring hacks edges & changes hash
     _vals.remove(n);
 
-    assert n._uses._len>0 || n instanceof ScopeNode;
-
     // [ts!] Compute uses & live bits.  If progress, push the defs on the
     // worklist.  This is a reverse flow computation.
     TypeMem oliv = n._live;
@@ -559,9 +557,7 @@ public class GVNGCM {
   // not sufficient to resolve all calls, the program is ambiguous and wrong.
   public void gcp(Mode mode, ScopeNode rez ) {
     _opt_mode = mode;
-    // Set all types to all_type().startype(), their most optimistic type.
-    // This is mostly the dual(), except a the Start memory is always XOBJ.
-    // Set all liveness to TypeMem.DEAD, their most optimistic type.
+    // Set all values to ALL and lives to DEAD, their most optimistic types.
     Env.START.walk_initype(this,new VBitSet());
     assert Env.START.more_flow(this,new VBitSet(),false,0)==0; // Initial conditions are correct
     // Prime the worklist

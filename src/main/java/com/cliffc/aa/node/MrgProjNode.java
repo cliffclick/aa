@@ -18,7 +18,7 @@ public class MrgProjNode extends ProjNode {
     }
 
     // New is dead from below.
-    if( _live.at(nnn()._alias)==TypeObj.UNUSED ) {
+    if( _live.at(nnn()._alias)==TypeObj.UNUSED && nnn()._keep==0 ) {
       gvn.unreg(nnn());         // Unregister before self-kill
       nnn().kill(gvn);          // Killing a NewNode has to do more updates than normal
       return mem();             // Kill NewNode

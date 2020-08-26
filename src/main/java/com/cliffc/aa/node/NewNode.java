@@ -48,7 +48,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   Node fld(int fld) { return in(def_idx(fld)); } // Node for field#
 
   // Recompute default memory cache on a change
-  protected final void sets_out( T ts ) {
+  public final void sets_out( T ts ) {
     assert !touched();
     _ts = ts;
     _crushed = ts.crush();
@@ -142,7 +142,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // NewNodes and join alias classes, but this is not the normal CSE and so is
   // not done by default.
   @Override public boolean equals(Object o) {  return this==o; }
-  MrgProjNode mrg() {
+  public MrgProjNode mrg() {
     Node ptr = _uses.at(0);
     if( !(ptr instanceof MrgProjNode) ) ptr = _uses.at(1);
     return (MrgProjNode)ptr;

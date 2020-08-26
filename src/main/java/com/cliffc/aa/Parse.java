@@ -99,6 +99,10 @@ public class Parse implements Comparable<Parse> {
   // file-sized ScopeNode with existing variables which survive to the next call.
   // Used by the REPL to do incremental typing.
   TypeEnv go_partial( ) {
+    Node xnil = _gvn.con(Type.XNIL);
+    // Replicate the top-scope & display chain, and set it aside.
+    NewObjNode orig_disp = init(_e._scope.stk().copy(true,_gvn).keep());
+
     prog();        // Parse a program
     _gvn.rereg(_e._scope,Type.ALL);
     _e._scope.xliv(_gvn._opt_mode);
@@ -107,8 +111,31 @@ public class Parse implements Comparable<Parse> {
     _gvn.iter(GVNGCM.Mode.PesiREPL); // Re-check all ideal calls now that types have been maximally lifted
     _gvn.gcp (GVNGCM.Mode.OptoREPL,_e._scope); // Global Constant Propagation
     _gvn.iter(GVNGCM.Mode.PesiREPL); // Re-check all ideal calls now that types have been maximally lifted
+    TypeEnv te = gather_errors();
+    if( te._errs!=null )
+      reset_partial(orig_disp);
     _gvn.unreg(_e._scope);
-    return gather_errors();
+    orig_disp.unkeep(_gvn);
+    _e._scope.set_rez(xnil,_gvn);
+    return te;
+  }
+
+  private void reset_partial(NewObjNode orig_disp) {
+    // Reset display chain back to the saved
+    NewObjNode nnn = _e._scope.stk();
+    _gvn.unreg(nnn);
+    while( !nnn._defs.isEmpty() ) nnn.pop(_gvn);
+    for( Node def : orig_disp._defs )
+      nnn.add_def(def);
+    nnn.sets_out(orig_disp._ts);
+    _gvn.rereg(nnn,nnn.value(GVNGCM.Mode.PesiREPL));
+    _gvn.set_def_reg(_e._scope,1,nnn.mrg());
+    // Everybody has flowed the bad types; unwind them all
+    for( int i=0; i<3; i++ )
+      for( Node n : _gvn.valsKeySet() )
+        n.xval(GVNGCM.Mode.Parse);
+    // Run the worklist dry
+    _gvn.iter(GVNGCM.Mode.PesiREPL);
   }
 
   // Parse the string in the given lookup context, and return an executable
@@ -157,9 +184,9 @@ public class Parse implements Comparable<Parse> {
     ArrayList<Node.ErrMsg> errs0 = new ArrayList<>(errs);
     Collections.sort(errs0);
 
-    Node res = _e._scope.rez(); // New and improved result
-    Node mem = _e._scope.mem();
-    return new TypeEnv(res._val,(TypeMem)mem._val,_e,errs0.isEmpty() ? null : errs0);
+    Type res = _e._scope.rez()._val; // New and improved result
+    Type mem = _e._scope.mem()._val;
+    return new TypeEnv(res,mem == Type.ALL ? TypeMem.ALLMEM : (TypeMem)mem,_e,errs0.isEmpty() ? null : errs0);
   }
 
   /** Parse a top-level:
@@ -557,10 +584,10 @@ public class Parse implements Comparable<Parse> {
         }
 
       } else if( peek('(') ) {  // Attempt a function-call
-        oldx = _x;              // At the paren
+        oldx = _x;              // Just past paren
         skipWS();               // Skip to start of 1st arg
         int first_arg_start = _x;
-        Node arg = tuple(oldx,stmts(),first_arg_start); // Parse argument list
+        Node arg = tuple(oldx-1,stmts(),first_arg_start); // Parse argument list
         if( arg == null )       // tfact but no arg is just the tfact
           { _x = oldx; return n; }
         Type tn = n._val;

@@ -157,7 +157,7 @@ public class FunNode extends RegionNode {
   public boolean noinline() { return _name != null && _name.startsWith("noinline") && in(0)==null; }
 
   // Never inline with a nested function
-  @Override @NotNull Node copy( boolean copy_edges, GVNGCM gvn) { throw AA.unimpl(); }
+  @Override @NotNull public Node copy( boolean copy_edges, GVNGCM gvn) { throw AA.unimpl(); }
 
   // True if may have future unknown callers.
   boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
