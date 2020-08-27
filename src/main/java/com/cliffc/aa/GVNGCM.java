@@ -603,6 +603,7 @@ public class GVNGCM {
               add_work_uses(use.in(0));
             if( n instanceof CallNode && use instanceof CProjNode )
               add_work_uses(use); // Call lowers fidxs, Funs might get turned on
+            if( use instanceof DefMemNode ) add_work_uses(use);
           }
           if( n.value_changes_live() ) {
             add_work_defs(n);
