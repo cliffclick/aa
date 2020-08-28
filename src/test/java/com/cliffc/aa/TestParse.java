@@ -16,6 +16,8 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeStr.NO_DISP);
+    final String FORELSE2="for={pred->{body->!pred()?^;(tmp=body())?^tmp; for pred body}};";
+    test(FORELSE2+"i:=0; for {i++ < 100} {i==50?i}",TypeInt.INT64); // Early exit on condition i==50
 
     // A collection of tests which like to fail easily
     test("-1",  TypeInt.con( -1));
@@ -506,7 +508,7 @@ public class TestParse {
          "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
-         "@{map=~Scalar;l=*[$]$?;r=$;v=int64}");
+         "@{map=~Scalar;l=*[$]@{map=~Scalar;l=~nil;r=*[$]@{map=~Scalar;l=~nil;r=~nil;v=14};v=10};r=*[$]@{map=~Scalar;l=~nil;r=*[$]@{map=~Scalar;l=~nil;r=~nil;v=44};v=40};v=24}");
 
     // A linked-list mixing ints and strings, always in pairs
     String ll_cona = "a=0; ";

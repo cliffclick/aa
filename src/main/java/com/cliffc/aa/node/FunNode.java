@@ -262,6 +262,7 @@ public class FunNode extends RegionNode {
         if( ridx != -1 ) gvn.remove_reg(cepi,ridx);
       }
     }
+    if( is_dead() ) return;
     // Single-target CallEpi can now inline
     RetNode ret = ret();
     if( _defs._len==3 && ret != null ) gvn.add_work_uses(ret);
@@ -292,16 +293,19 @@ public class FunNode extends RegionNode {
     assert has_unknown_callers(); // Only overly-wide calls.
     for( ParmNode parm : parms ) // For all parms
       if( parm != null && parm._idx > 0 ) // (some can be dead) and skipping the display
-        for( Node call : parm._uses ) { // See if a parm-user needs a type-specialization split
-          if( call instanceof CallNode &&
-              ((CallNode)call).fun() instanceof UnresolvedNode ) { // Call overload not resolved
-            Type t0 = parm.val(1);                   // Generic type in slot#1
-            for( int i=2; i<parm._defs._len; i++ ) { // For all other inputs
-              Type tp = parm.val(i);
-              if( tp.above_center() ) continue; // This parm input is in-error
-              Type ti = tp.widen();             // Get the widen'd type
-              if( !ti.isa(t0) ) continue; // Must be isa-generic type, or else type-error
-              if( ti != t0 ) return i; // Sharpens?  Then splitting here should help
+        for( Node use : parm._uses ) { // See if a parm-user needs a type-specialization split
+          if( use instanceof CallNode ) {
+            CallNode call = (CallNode)use;
+            if( (call.fun()==parm && !parm._val.isa(TypeFunPtr.GENERIC_FUNPTR) ) ||
+                call.fun() instanceof UnresolvedNode ) { // Call overload not resolved
+              Type t0 = parm.val(1);                   // Generic type in slot#1
+              for( int i=2; i<parm._defs._len; i++ ) { // For all other inputs
+                Type tp = parm.val(i);
+                if( tp.above_center() ) continue; // This parm input is in-error
+                Type ti = tp.widen();             // Get the widen'd type
+                if( !ti.isa(t0) ) continue; // Must be isa-generic type, or else type-error
+                if( ti != t0 ) return i; // Sharpens?  Then splitting here should help
+              }
             }
             // Else no split will help this call, look for other calls to help
           }
@@ -503,6 +507,7 @@ public class FunNode extends RegionNode {
       Node call = in(i).in(0);
       if( !(call instanceof CallNode) ) continue; // Not well formed
       if( ((CallNode)call).nargs() != nargs() ) continue; // Will not inline
+      if( call._val == Type.ALL ) continue;
       TypeFunPtr tfp = CallNode.ttfp(call._val);
       int fidx = tfp.fidxs().abit();
       if( fidx < 0 || BitsFun.is_parent(fidx) ) continue;  // Call must only target one fcn
@@ -671,10 +676,11 @@ public class FunNode extends RegionNode {
         // Change the unknown caller parm types to match the new sig.  Default
         // memory includes the other half of alias splits, which might be
         // passed in from recursive calls.
-        ParmNode parm;
         for( Node p : fun._uses )
-          if( p instanceof ParmNode && (parm=(ParmNode)p)._idx != 0 )
+          if( p instanceof ParmNode ) {
+            ParmNode parm = (ParmNode)p;
             parm.set_def(1,parm._idx==-2 ? Env.DEFMEM : gvn.con(fun.formal(parm._idx)),gvn);
+          }
       } else                     // Path Split
         fun.set_def(1,gvn.con(Type.XCTRL),gvn);
     }

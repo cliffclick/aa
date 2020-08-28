@@ -378,7 +378,7 @@ public class CallNode extends Node {
   @Override BitsAlias escapees() {
     BitsAlias esc_in  = tesc(_val)._aliases;
     CallEpiNode cepi = cepi();
-    TypeTuple tcepi = (TypeTuple)cepi._val;
+    TypeTuple tcepi = cepi._val instanceof TypeTuple ? (TypeTuple)cepi._val : (TypeTuple)cepi._val.oob(TypeTuple.CALLE);
     BitsAlias esc_out = CallEpiNode.esc_out((TypeMem)tcepi.at(1),tcepi.at(2));
     TypeMem precall = (TypeMem)mem()._val;
     BitsAlias esc_out2 = precall.and_unused(esc_out); // Filter by unused pre-call

@@ -11,18 +11,22 @@ public class MrgProjNode extends ProjNode {
   NewNode nnn() { return (NewNode)in(0); }
   Node    mem() { return          in(1); }
   @Override public Node ideal(GVNGCM gvn, int level) {
-    if( nnn().is_unused() ) {   // New is dead for no pointers
-      Type t = mem()._val;
-      if( t instanceof TypeMem && ((TypeMem)t).at(nnn()._alias)==TypeObj.UNUSED )
-        return mem();
-    }
+    boolean doe = false;        // Dead-On-Entry
+    Type t = mem()._val;
+    if( t instanceof TypeMem && ((TypeMem)t).at(nnn()._alias)==TypeObj.UNUSED )
+      doe = true;                  // Dead-On-Entry
+
+    if( doe && nnn().is_unused() ) // New is dead for no pointers
+      return mem();
 
     // New is dead from below.
-    if( _live.at(nnn()._alias)==TypeObj.UNUSED && nnn()._keep==0 ) {
+    if( _live.at(nnn()._alias)==TypeObj.UNUSED && nnn()._keep==0 && !nnn().is_unused() ) {
       gvn.unreg(nnn());         // Unregister before self-kill
       nnn().kill(gvn);          // Killing a NewNode has to do more updates than normal
-      return mem();             // Kill NewNode
+      return this;
     }
+    if( doe && nnn().is_unused() )
+      return mem();             // Kill MrgNode when it no longer lifts values
 
     return null;
   }
@@ -35,7 +39,7 @@ public class MrgProjNode extends ProjNode {
     if( !(tm instanceof TypeMem  ) ) return tm.oob();
     TypeObj to = (TypeObj)((TypeTuple)tn).at(0);
     TypeMem tmem = (TypeMem)tm;
-    return nnn.is_unused()
+    return nnn.is_unused()      // This is a cycle-breaking lifting value
       ? tmem.set   (nnn._alias,TypeObj.UNUSED)
       : tmem.st_new(nnn._alias, to);
   }

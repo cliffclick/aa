@@ -189,6 +189,7 @@ public class LoadNode extends Node {
     Type tptr = adr()._val;
     if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
     if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
+    if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
     return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases);
   }
 

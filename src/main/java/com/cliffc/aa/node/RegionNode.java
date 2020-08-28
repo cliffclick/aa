@@ -27,7 +27,7 @@ public class RegionNode extends Node {
             phi.remove(i,gvn);
             if( !phi.is_dead() ) gvn.rereg(phi,oldt);
           }
-        if( !is_dead() ) { unwire(gvn,i);  remove(i,gvn); }
+        if( !is_dead() ) { unwire(gvn,i);  if( !is_dead() ) remove(i,gvn); }
         return this; // Progress
       }
 
@@ -58,7 +58,7 @@ public class RegionNode extends Node {
     // Check for stacked Region (not Fun) and collapse.
     Node stack = stacked_region(gvn);
     if( stack != null ) return stack;
-      
+
     return null;
   }
 
@@ -82,7 +82,7 @@ public class RegionNode extends Node {
             phi.in(idx) != rphi )               // Matching along idx
           return null;                          // Not exact shape
       }
-    
+
     // Collapse stacked Phis
     for( Node phi : _uses )
       if( phi._op == OP_PHI ) {
@@ -95,7 +95,7 @@ public class RegionNode extends Node {
         assert !stacked_phi || rphi.is_dead();
         gvn.rereg(phi,oldt);
       }
-    
+
     // Collapse stacked Region
     for( int i = 1; i<r._defs._len; i++ )
       add_def(r.in(i));
@@ -103,7 +103,7 @@ public class RegionNode extends Node {
     assert r.is_dead();
     return this;
   }
-  
+
   void unwire(GVNGCM gvn, int idx) { }
 
   @Override public Type value(GVNGCM.Mode opt_mode) {

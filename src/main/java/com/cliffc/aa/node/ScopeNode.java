@@ -117,6 +117,7 @@ public class ScopeNode extends Node {
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
     // The top scope is always alive, and represents what all future unparsed
     // code MIGHT do.
+    if( !opt_mode._whole && _uses._len==0 ) return TypeMem.ALLMEM; // In the REPL, future code can touch all memory
     if( this==Env.SCP_0 )
       return opt_mode._CG ? TypeMem.DEAD : TypeMem.ALLMEM;
     assert _uses._len==0;

@@ -106,13 +106,14 @@ public class Parse implements Comparable<Parse> {
     prog();        // Parse a program
     _gvn.rereg(_e._scope,Type.ALL);
     _e._scope.xliv(_gvn._opt_mode);
+    for( Node n : _gvn.valsKeySet() ) _gvn.add_work(n); // Adding top-level defs must flow everywhere
     _gvn.iter(GVNGCM.Mode.PesiREPL); // Pessimistic optimizations; might improve error situation
     _gvn.gcp (GVNGCM.Mode.OptoREPL,_e._scope); // Global Constant Propagation
     _gvn.iter(GVNGCM.Mode.PesiREPL); // Re-check all ideal calls now that types have been maximally lifted
     _gvn.gcp (GVNGCM.Mode.OptoREPL,_e._scope); // Global Constant Propagation
     _gvn.iter(GVNGCM.Mode.PesiREPL); // Re-check all ideal calls now that types have been maximally lifted
     TypeEnv te = gather_errors();
-    if( te._errs!=null )
+    if( te._errs!=null )        // If errors, roll back - no effects from the bad code
       reset_partial(orig_disp);
     _gvn.unreg(_e._scope);
     orig_disp.unkeep(_gvn);
@@ -131,9 +132,8 @@ public class Parse implements Comparable<Parse> {
     _gvn.rereg(nnn,nnn.value(GVNGCM.Mode.PesiREPL));
     _gvn.set_def_reg(_e._scope,1,nnn.mrg());
     // Everybody has flowed the bad types; unwind them all
-    for( int i=0; i<3; i++ )
-      for( Node n : _gvn.valsKeySet() )
-        n.xval(GVNGCM.Mode.Parse);
+    for( Node n : _gvn.valsKeySet() ) { n._val = Type.ALL; _gvn.add_work(n); }
+    for( Node n : _gvn.valsKeySet() )   n._val = n.value(GVNGCM.Mode.PesiREPL);
     // Run the worklist dry
     _gvn.iter(GVNGCM.Mode.PesiREPL);
   }
@@ -186,7 +186,7 @@ public class Parse implements Comparable<Parse> {
 
     Type res = _e._scope.rez()._val; // New and improved result
     Type mem = _e._scope.mem()._val;
-    return new TypeEnv(res,mem == Type.ALL ? TypeMem.ALLMEM : (TypeMem)mem,_e,errs0.isEmpty() ? null : errs0);
+    return new TypeEnv(res, mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM),_e,errs0.isEmpty() ? null : errs0);
   }
 
   /** Parse a top-level:

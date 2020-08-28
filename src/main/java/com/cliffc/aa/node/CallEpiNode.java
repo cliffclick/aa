@@ -64,7 +64,8 @@ public final class CallEpiNode extends Node {
       RetNode ret = wired(0);                 // One wired return
       FunNode fun = ret.fun();
       Type tdef = Env.DEFMEM._val;
-      Type tretmem = ((TypeTuple)ret._val).at(1);
+      TypeTuple tret = ret._val instanceof TypeTuple ? (TypeTuple)ret._val : (TypeTuple)ret._val.oob(TypeTuple.RET);
+      Type tretmem = tret.at(1);
       if( fun != null && fun._defs._len==2 && // Function is only called by 1 (and not the unknown caller)
           call.err(true)==null &&   // And args are ok
           CallNode.emem(tcall).isa(tdef) &&
@@ -268,6 +269,7 @@ public final class CallEpiNode extends Node {
     // Default memory: global worse-case scenario
     Node defnode = in(1);
     Type defmem = defnode._val;
+    if( !(defmem instanceof TypeMem) ) defmem = defmem.oob(TypeMem.ALLMEM);
 
     // Any not-wired unknown call targets?
     if( fidxs!=BitsFun.FULL ) {
@@ -309,9 +311,10 @@ public final class CallEpiNode extends Node {
       for( int i=0; i<nwired(); i++ ) {
         RetNode ret = wired(i);
         if( fidxs.test_recur(ret._fidx) ) { // Can be wired, but later fidx is removed
-          TypeTuple tret = (TypeTuple)ret._val;
-          tmem = tmem.meet(tret.at(1));
-          trez = trez.meet(tret.at(2));
+          Type tret = ret._val;
+          if( !(tret instanceof TypeTuple) ) tret = tret.oob(TypeTuple.RET);
+          tmem = tmem.meet(((TypeTuple)tret).at(1));
+          trez = trez.meet(((TypeTuple)tret).at(2));
         }
       }
     }

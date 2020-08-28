@@ -77,7 +77,7 @@ public class StoreNode extends Node {
     }
 
     // Is this Store dead from below?
-    if( tmp!=null && _live.ld(tmp)==TypeObj.UNUSED && err(true)==null )
+    if( tmp!=null && _live.ld(tmp)==TypeObj.UNUSED )
       return mem;
 
     return null;

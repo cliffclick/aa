@@ -114,7 +114,7 @@ public class ParmNode extends PhiNode {
     Node mem = fun.parm(-2);
     Type formal = fun.formal(_idx);
     for( int i=1; i<_defs._len; i++ ) {
-      if( fun.val(i)!=Type.CTRL ) continue; // Ignore dead paths
+      if( fun.val(i)==Type.XCTRL ) continue;// Ignore dead paths
       Type argt = in(i).sharptr(mem.in(i)); // Arg type for this incoming path
       if( argt!=Type.ALL && !argt.isa(formal) ) { // Argument is legal?  ALL args are in-error elsewhere
         // The merge of all incoming calls for this argument is not legal.
