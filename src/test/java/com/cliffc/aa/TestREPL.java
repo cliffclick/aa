@@ -1,7 +1,6 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.util.SB;
-
 import org.junit.*;
 import org.junit.contrib.java.lang.system.SystemErrRule;
 import org.junit.contrib.java.lang.system.SystemOutRule;
@@ -14,7 +13,7 @@ import static org.junit.Assert.assertTrue;
 
 
 public class TestREPL {
-
+  // Replace STDIN/STDOUT and track them
   @Rule public final SystemOutRule sysOut = new SystemOutRule().enableLog().muteForSuccessfulTests();
   @Rule public final SystemErrRule sysErr = new SystemErrRule().enableLog().muteForSuccessfulTests();
   @Rule public final TextFromStandardInputStream sysIn = TextFromStandardInputStream.emptyStandardInputStream();
@@ -24,6 +23,7 @@ public class TestREPL {
   @Before public void open_repl() {
     _env = Env.file_scope(Env.top_scope());
     _stdin = REPL.init(_env);
+    // Drain the initial prompt string so tests do not expect one
     String actual = sysOut.getLog();
     String expected = REPL.prompt;
     assertEquals(expected,actual);
@@ -44,17 +44,17 @@ public class TestREPL {
     test("x=3", "3");
     test("x*x", "9");
     testerr("y*y", "Unknown ref 'y'",0);
-    testerr("x=4", "Cannot re-assign final field 'x'",0);
+    testerr("x=4", "Cannot re-assign final val 'x'",0);
     test("x+x", "6");
   }
 
   // Requires
-  @Ignore
   @Test public void testREPL02() {
     test("do={pred->{body->pred()?body():^; do pred body}}","do={pred -> }");
     test("sum:=0; i:=0; do {i++ < 100} {sum:=sum+i}; sum","int");
   }
 
+  // Jam the code into STDIN, run the REPL one-step, read the STDOUT and compare.
   private void test( String partial, String expected ) {
     sysIn.provideLines(partial);
     REPL.go_one(_env,_stdin);
@@ -64,6 +64,8 @@ public class TestREPL {
     sysOut.clearLog();
     assertTrue(sysErr.getLog().isEmpty());
   }
+  // Jam the code into STDIN, run the REPL one-step, read the STDOUT and compare.
+  // Includes the lengthy error message.
   private void testerr( String partial, String expected, int cur_off ) {
     sysIn.provideLines(partial);
     REPL.go_one(_env,_stdin);

@@ -102,6 +102,7 @@ public class Parse implements Comparable<Parse> {
     Node xnil = _gvn.con(Type.XNIL);
     // Replicate the top-scope & display chain, and set it aside.
     NewObjNode orig_disp = init(_e._scope.stk().copy(true,_gvn).keep());
+    Node orig_ctrl = _e._scope.ctrl();
 
     prog();        // Parse a program
     _gvn.rereg(_e._scope,Type.ALL);
@@ -114,14 +115,15 @@ public class Parse implements Comparable<Parse> {
     _gvn.iter(GVNGCM.Mode.PesiREPL); // Re-check all ideal calls now that types have been maximally lifted
     TypeEnv te = gather_errors();
     if( te._errs!=null )        // If errors, roll back - no effects from the bad code
-      reset_partial(orig_disp);
+      reset_partial(orig_ctrl, orig_disp);
     _gvn.unreg(_e._scope);
     orig_disp.unkeep(_gvn);
     _e._scope.set_rez(xnil,_gvn);
     return te;
   }
 
-  private void reset_partial(NewObjNode orig_disp) {
+  private void reset_partial(Node orig_ctrl, NewObjNode orig_disp) {
+    _gvn.set_def_reg(_e._scope,0,orig_ctrl);
     // Reset display chain back to the saved
     NewObjNode nnn = _e._scope.stk();
     _gvn.unreg(nnn);
