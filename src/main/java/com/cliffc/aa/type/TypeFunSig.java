@@ -27,9 +27,21 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     sb.p('{');
     for( int i=0; i<nargs(); i++ ) {
       if( !TypeStruct.fldBot(fld(i)) ) sb.p(fld(i)).p(':');
-      arg(i).dstr(sb,dups).p(", ");
+      arg(i).dstr(sb,dups).p(",");
     }
-    return sb.unchar().unchar().p(" -> ").p(_ret).p('}');
+    return sb.unchar().p(" -> ").p(_ret).p('}');
+  }
+  // Fancier version for REPL printing
+  SB ystr( SB sb, VBitSet dups ) {
+    sb.p('{');
+    for( int i=1; i<nargs(); i++ ) { // Skip display?
+      if( !TypeStruct.fldBot(fld(i)) ) sb.p(fld(i));
+      if( arg(i) != Type.SCALAR ) arg(i).dstr(sb.p(':'),dups);
+      sb.p(",");
+    }
+    sb.unchar().p(" -> ");
+    if( _ret != Type.SCALAR ) sb.p(_ret);
+    return sb.p('}');
   }
 
   private static TypeFunSig FREE=null;

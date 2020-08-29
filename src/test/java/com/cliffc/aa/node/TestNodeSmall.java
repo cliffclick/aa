@@ -66,7 +66,7 @@ public class TestNodeSmall {
     Type afltVAL1START = aflt.value(gvn._opt_mode);
     Type aintVAL1START = aint.value(gvn._opt_mode);
     Type astrVAL1START = astr.value(gvn._opt_mode);
-    gvn._opt_mode=GVNGCM.Mode.PesiCG;
+    gvn._opt_mode=GVNGCM.Mode.Opto;
     Type uaddVAL2START = uadd.value(gvn._opt_mode);
     Type anumVAL2START = anum.value(gvn._opt_mode);
     Type afltVAL2START = aflt.value(gvn._opt_mode);
@@ -85,7 +85,7 @@ public class TestNodeSmall {
     Type afltVAL1XALL = aflt.value(gvn._opt_mode);
     Type aintVAL1XALL = aint.value(gvn._opt_mode);
     Type astrVAL1XALL = astr.value(gvn._opt_mode);
-    gvn._opt_mode=GVNGCM.Mode.PesiCG;
+    gvn._opt_mode=GVNGCM.Mode.Opto;
     Type uaddVAL2XALL = uadd.value(gvn._opt_mode);
     Type anumVAL2XALL = anum.value(gvn._opt_mode);
     Type afltVAL2XALL = aflt.value(gvn._opt_mode);
@@ -104,7 +104,7 @@ public class TestNodeSmall {
     Type afltVAL1ALL = aflt.value(gvn._opt_mode);
     Type aintVAL1ALL = aint.value(gvn._opt_mode);
     Type astrVAL1ALL = astr.value(gvn._opt_mode);
-    gvn._opt_mode=GVNGCM.Mode.PesiCG;
+    gvn._opt_mode=GVNGCM.Mode.Opto;
     Type uaddVAL2ALL = uadd.value(gvn._opt_mode);
     Type anumVAL2ALL = anum.value(gvn._opt_mode);
     Type afltVAL2ALL = aflt.value(gvn._opt_mode);
@@ -318,7 +318,7 @@ public class TestNodeSmall {
 
     // gcp(), not iter().  Types always lower.  Very high types might lower to be
     // valid, but e.g. a 2:int will never lower to a str.
-    gvn._opt_mode=GVNGCM.Mode.PesiCG;
+    gvn._opt_mode=GVNGCM.Mode.Opto;
 
     // The various kinds of results we expect
     TypeFunPtr tmul2X = v(fp_mul,gvn), tmul2 = tmul2X.dual();
@@ -613,13 +613,13 @@ public class TestNodeSmall {
 
   // Helper to make memory
   private static TypeMem tmem(int[] as, TypeObj... ts) {
-    int max = BitsAlias.ABC;
+    int max = BitsAlias.ARY;
     if( as !=null && as.length> 0 ) max = Math.max(max,as[as.length-1]);
     TypeObj[] tos = new TypeObj[max+1];
     tos[BitsAlias.ALL] = TypeObj.OBJ;
     tos[BitsAlias.RECORD]=TypeStruct.ALLSTRUCT;
-    tos[BitsAlias.ARY] = TypeStr.STR; // TODO: Proxy for all-arrays
     tos[BitsAlias.ABC] = TypeStr.ABC; //
+    tos[BitsAlias.ARY] = TypeStr.STR; // TODO: Proxy for all-arrays
     if( as != null )
       for( int i=0; i<as.length; i++ )
         tos[as[i]] = ts[i];

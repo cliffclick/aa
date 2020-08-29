@@ -194,7 +194,7 @@ public class TestNode {
 
     // Setup to compute a value() call: we need a tiny chunk of Node graph with
     // known inputs.
-    _gvn = new GVNGCM();
+    _gvn = Env.GVN;
     _ins = new Node[4];
     _ins[0] = new RegionNode(null,new ConNode<>(Type.CTRL),new ConNode<>(Type.CTRL));
     for( int i=1; i<_ins.length; i++ )
@@ -252,7 +252,7 @@ public class TestNode {
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],null).add_def(_ins[2]));
     test1monotonic(new    PhiNode(Type.SCALAR,null,_ins[0],_ins[1],_ins[2]));
     for( PrimNode prim : PrimNode.PRIMS() )
-      test1monotonic_prim(prim);
+      test1monotonic_prim(prim,mem);
     test1monotonic(new   ProjNode(1, _ins[0]));
     test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
     test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],fun_plus)); // ctl,mem,val,rpc,fun
@@ -284,15 +284,16 @@ public class TestNode {
   }
 
   // Fill a Node with {null,edge,edge} and start the search
-  private void test1monotonic_prim(PrimNode prim) {
+  private void test1monotonic_prim(PrimNode prim, Node mem) {
     PrimNode n = (PrimNode)prim.copy(false,_gvn);
     assert n._defs._len==0;
     n.add_def( null  );
-    n.add_def(_ins[1]);
-    if( n._sig.nargs() >= 3 ) n.add_def(_ins[2]);
+    n.add_def(_ins[n._defs._len]);
+    if( n instanceof MemPrimNode ) n.add_def(mem);
+    if( n._sig.nargs() >= 3 )      n.add_def(_ins[n._defs._len-1]);
+    if( n._sig.nargs() >= 4 )      n.add_def(_ins[n._defs._len-1]);
     test1monotonic_init(n);
   }
-
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_intrinsic(NewNode.NewPrimNode prim) {
     NewNode.NewPrimNode n = (NewNode.NewPrimNode)prim.copy(false,_gvn);

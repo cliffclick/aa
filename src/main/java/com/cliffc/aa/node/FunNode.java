@@ -105,10 +105,10 @@ public class FunNode extends RegionNode {
     return fun==null ? name(null,null,fidx,-1,false,debug) : fun.name(debug);
   }
   // Name from FunNode
-  String name(boolean debug) { return name(_name,_bal_close,fidx(),_op_prec,is_forward_ref(),debug); }
+  public String name(boolean debug) { return name(_name,_bal_close,fidx(),_op_prec,is_forward_ref(),debug); }
   String name() { return name(true); }
   static String name(String name, String bal, int fidx, int op_prec, boolean fref, boolean debug) {
-    if( (op_prec >= 0 || op_prec==-3) && name != null ) name = '{'+name+(bal==null?"":bal)+'}'; // Primitives wrap
+    if( op_prec >= 0 && name != null ) name = '{'+name+(bal==null?"":bal)+'}'; // Primitives wrap
     if( name==null ) name="";
     if( debug ) name = name + "["+fidx+"]"; // FIDX in debug
     return fref ? "?"+name : name;          // Leading '?'

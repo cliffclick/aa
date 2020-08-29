@@ -33,12 +33,12 @@ public class TestREPL {
 
   @After public void close_repl() {  _env.close(); }
 
-
-
+  // Does the REPL test work?
   @Test public void testREPL00() {
     test("2", "2");
   }
 
+  // Basic REPL, with errors & recovery
   @Test public void testREPL01() {
     test("2+3", "5");
     test("x=3", "3");
@@ -48,6 +48,12 @@ public class TestREPL {
     test("x+x", "6");
   }
 
+  // Requires
+  @Ignore
+  @Test public void testREPL02() {
+    test("do={pred->{body->pred()?body():^; do pred body}}","do={pred -> }");
+    test("sum:=0; i:=0; do {i++ < 100} {sum:=sum+i}; sum","int");
+  }
 
   private void test( String partial, String expected ) {
     sysIn.provideLines(partial);

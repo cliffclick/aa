@@ -2,6 +2,7 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.function.Predicate;
@@ -48,6 +49,38 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
     return "*"+names(true)+"{"+_disp+"}";
+  }
+  // Fancier version for REPL?
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem ) {
+    if( dups == null ) dups = new VBitSet();
+    if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
+
+    // For all fidxs, if name & sig are unique, print them.
+    // Print singleton as: name={x y -> z}.
+    // Print collection as: {name={x y -> z}, name=....}
+    BitsFun fidxs = BitsFun.EMPTY;
+    for( int fidx : _fidxs ) {
+      middle:
+      for( int kid=fidx; kid != 0; kid=BitsFun.next_kid(fidx,kid) ) {
+        FunNode fun = FunNode.find_fidx(kid);
+        if( fun==null ) sb.p('[').p(kid).p(']');
+        else {
+          // Check for dups.
+          if( fidxs!=BitsFun.EMPTY )
+            for( int fidx2 : fidxs ) {
+              FunNode fun2 = FunNode.find_fidx(fidx2);
+              if( Util.eq(fun2._name,fun._name) && fun2._sig==fun._sig )
+                continue middle;
+            }
+          // Unique; add to unique set & print
+          fidxs = fidxs.set(kid);
+          sb.p(fun.name(false)).p('=');
+          fun._sig.ystr(sb,dups);
+        }
+        sb.p(',');
+      }
+    }
+    return sb.unchar();
   }
 
   @Override SB dstr( SB sb, VBitSet dups ) {
