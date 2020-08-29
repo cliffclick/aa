@@ -626,8 +626,8 @@ public abstract class Node implements Cloneable {
     public static ErrMsg asserterr( Parse loc, Type actual, Type t0mem, Type expected ) {
       return typerr(loc,actual,t0mem,expected,Level.Assert);
     }
-    public static ErrMsg field(Parse loc, String msg, String fld) {
-      String f = msg+" field '."+fld+"'";
+    public static ErrMsg field(Parse loc, String msg, String fld, boolean closure) {
+      String f = msg+(closure ? " val '" : " field '.")+fld+"'";
       return new ErrMsg(loc,f,Level.Field);
     }
     public static ErrMsg niladr(Parse loc, String msg, String fld) {

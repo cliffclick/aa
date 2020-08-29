@@ -104,7 +104,7 @@ public class Env implements AutoCloseable {
   // A new Env for the current Parse scope (generally a file-scope or a
   // test-scope), above this is the basic public Env with all the primitives
   public static Env file_scope(Env top_scope) {
-    return new Env(top_scope,null, false);
+    return new Env(top_scope,null, true);
   }
 
   // Wire up an early function exit

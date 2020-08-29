@@ -117,7 +117,8 @@ public class StoreNode extends Node {
     if( t.must_nil() ) return ErrMsg.niladr(_bad,"Struct might be nil when writing",_fld);
     String msg = err0(t);
     if( msg == null ) return null;
-    return ErrMsg.field(_bad,msg,_fld);
+    boolean closure = adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure;
+    return ErrMsg.field(_bad,msg,_fld,closure);
   }
   private String err0( Type t ) {
     if( t==Type.ANY ) return null;
@@ -132,7 +133,6 @@ public class StoreNode extends Node {
     if( idx == -1 )  return "No such";
     if( !ts.can_update(idx) ) {
       String fstr = TypeStruct.fstring(ts.fmod(idx));
-      //String ftype = adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure ? "val '" : "field '.";
       return "Cannot re-assign "+fstr;
     }
     return null;

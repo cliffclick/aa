@@ -25,7 +25,7 @@ public class TypeLive extends TypeObj<TypeLive> {
     if( _flags== -1 &&  _any ) return "~LIVE";
     SB sb = new SB();
     if( _any ) sb.p('~');
-    if( (_flags&FLAG_ESCAPE)!=0 ) sb.p("ESCAPE");
+    if( (_flags&FLAG_ESCAPE)!=0 ) sb.p("ESCP");
     
     return sb.toString();
   }

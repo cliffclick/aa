@@ -198,7 +198,7 @@ public class LoadNode extends Node {
     if( tadr==Type.ALL ) return null; // Error already
     if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when reading",_fld);
     if( !(tadr instanceof TypeMemPtr) )
-      return bad("Unknown",fast); // Not a pointer nor memory, cannot load a field
+      return bad(fast); // Not a pointer nor memory, cannot load a field
     TypeMemPtr ptr = (TypeMemPtr)tadr;
     Type tmem = mem()._val;
     if( tmem==Type.ALL ) return null; // An error, reported earlier
@@ -207,11 +207,11 @@ public class LoadNode extends Node {
       ? ((TypeMem)tmem).ld(ptr) // General load from memory
       : ((TypeObj)tmem);
     if( !(objs instanceof TypeStruct) || find((TypeStruct)objs) == -1 )
-      return bad("Unknown",fast);
+      return bad(fast);
     return null;
   }
-  private ErrMsg bad( String msg, boolean fast ) {
-    return fast ? ErrMsg.FAST : ErrMsg.field(_bad,msg,_fld);
+  private ErrMsg bad( boolean fast ) {
+    return fast ? ErrMsg.FAST : ErrMsg.field(_bad,"Unknown",_fld,adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure);
   }
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }
   @Override public boolean equals(Object o) {

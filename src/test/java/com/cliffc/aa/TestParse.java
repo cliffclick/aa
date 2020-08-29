@@ -16,8 +16,6 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeStr.NO_DISP);
-    final String FORELSE2="for={pred->{body->!pred()?^;(tmp=body())?^tmp; for pred body}};";
-    test(FORELSE2+"i:=0; for {i++ < 100} {i==50?i}",TypeInt.INT64); // Early exit on condition i==50
 
     // A collection of tests which like to fail easily
     test("-1",  TypeInt.con( -1));
@@ -131,7 +129,7 @@ public class TestParse {
     test("x=2; y=x+1; x*y", TypeInt.con(6));
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
     test("1+(x=2*3)+x*x", TypeInt.con(1+6+6*6));
-    testerr("x=(1+(x=2)+x); x", "Cannot re-assign final field '.x'",0);
+    testerr("x=(1+(x=2)+x); x", "Cannot re-assign final val 'x'",0);
     test("x:=1;x++"  ,TypeInt.con(1));
     test("x:=1;x++;x",TypeInt.con(2));
     test("x:=1;x++ + x--",TypeInt.con(3));
@@ -149,7 +147,7 @@ public class TestParse {
     testerr("0 ? x=2 : 3;x", "'x' not defined on false arm of trinary",11);
     test   ("2 ? x=2 : 3;x", TypeInt.con(2)); // off-side is constant-dead, so missing x-assign is ignored
     test   ("2 ? x=2 : y  ", TypeInt.con(2)); // off-side is constant-dead, so missing 'y'      is ignored
-    testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign final field '.x'",7);
+    testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign final val 'x'",7);
     test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
     test   ("math_rand(1)?1:int:2:int",TypeInt.NINT8); // no ambiguity between conditionals and type annotations
     testerr("math_rand(1)?1: :2:int","missing expr after ':'",16); // missing type
@@ -545,15 +543,15 @@ public class TestParse {
     test("x:=1", TypeInt.TRUE);
     test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make_tuple(Type.XNIL,Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
 
-    testerr("x=1; x:=2; x", "Cannot re-assign final field '.x'", 5);
-    testerr("x=1; x =2; x", "Cannot re-assign final field '.x'", 5);
+    testerr("x=1; x:=2; x", "Cannot re-assign final val 'x'", 5);
+    testerr("x=1; x =2; x", "Cannot re-assign final val 'x'", 5);
 
     test("math_rand(1)?(x=4):(x=3);x", TypeInt.NINT8); // x defined on both arms, so available after
     test("math_rand(1)?(x:=4):(x:=3);x", TypeInt.NINT8); // x defined on both arms, so available after
     test("math_rand(1)?(x:=4):(x:=3);x:=x+1", TypeInt.INT64); // x mutable on both arms, so mutable after
     test   ("x:=0; 1 ? (x:=4):; x:=x+1", TypeInt.con(5)); // x mutable ahead; ok to mutate on 1 arm and later
     test   ("x:=0; 1 ? (x =4):; x", TypeInt.con(4)); // x final on 1 arm, dead on other arm
-    testerr("x:=0; math_rand(1) ? (x =4):3; x=2; x", "Cannot re-assign read-only field '.x'",31);
+    testerr("x:=0; math_rand(1) ? (x =4):3; x=2; x", "Cannot re-assign read-only val 'x'",31);
   }
 
   // Ffnls are declared with an assignment.  This is to avoid the C++/Java
@@ -817,7 +815,7 @@ HashTable = {@{
     System.out.println("fix test, cur_off="+cursor.length());
     fail();
   }
-  static private void testerr( String program, String err, int cur_off ) {
+  static void testerr( String program, String err, int cur_off ) {
     TypeEnv te = Exec.go(Env.file_scope(Env.top_scope()),"args",program);
     assertTrue(te._errs != null && te._errs.size()>=1);
     String cursor = new String(new char[cur_off]).replace('\0', ' ');
