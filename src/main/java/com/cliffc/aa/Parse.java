@@ -1354,12 +1354,12 @@ public class Parse implements Comparable<Parse> {
     while( b < _buf.length && _buf[b] != '\n' ) b++;
     if( b < _buf.length ) b--; // do not include trailing \n or \n\r
     // error message
-    SB sb = new SB().p('\n').p(_src).p(':').p(_line).p(':').p(s).p('\n');
-    sb.p(new String(_buf,a,b-a)).p('\n');
+    SB sb = new SB().p(_src).p(':').p(_line).p(':').p(s).nl();
+    sb.p(new String(_buf,a,b-a)).nl();
     int line_start = 0;
     for( int i=line_start; i<_x; i++ )
       sb.p(' ');
-    return sb.p("^\n").toString();
+    return sb.p('^').nl().toString();
   }
   // Handy for the debugger to print
   @Override public String toString() { return new String(_buf,_x,_buf.length-_x); }

@@ -45,7 +45,7 @@ public final class SB {
   // Decrease indentation
   public SB di( int i) { _indent -= i; return this; }
 
-  public SB nl( ) { return p('\n'); }
+  public SB nl( ) { return p(System.lineSeparator()); }
 
   // Delete last char.  Useful when doing string-joins and JSON printing and an
   // extra seperater char needs to be removed:

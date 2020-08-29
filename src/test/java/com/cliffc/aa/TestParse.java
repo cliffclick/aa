@@ -819,7 +819,7 @@ HashTable = {@{
     TypeEnv te = Exec.go(Env.file_scope(Env.top_scope()),"args",program);
     assertTrue(te._errs != null && te._errs.size()>=1);
     String cursor = new String(new char[cur_off]).replace('\0', ' ');
-    String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";
+    String err2 = new SB().p("args:0:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
     assertEquals(err2,strip_alias_numbers(te._errs.get(0).toString()));
   }
   private static String strip_alias_numbers( String err ) {
@@ -838,7 +838,7 @@ HashTable = {@{
     TypeEnv te = Exec.go(Env.file_scope(Env.top_scope()),"args",program);
     assertTrue(te._errs != null && te._errs.size()>=1);
     String cursor = new String(new char[cur_off]).replace('\0', ' ');
-    String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";
+    String err2 = new SB().p("args:0:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
     assertEquals(err2,te._errs.get(0).toString());
   }
 

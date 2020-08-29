@@ -165,13 +165,15 @@ conf:
 	which jar
 
 # Download libs from maven
-lib:	lib/junit-4.12.jar lib/hamcrest-core-1.3.jar lib/annotations-16.0.2.jar
+lib:	lib/junit-4.12.jar lib/hamcrest-core-1.3.jar lib/system-rules-1.19.0.jar lib/annotations-16.0.2.jar
 
 # Unit testing
-lib/junit-4.12.jar lib/hamcrest-core-1.3.jar:
+lib/junit-4.12.jar lib/hamcrest-core-1.3.jar lib/system-rules-1.19.0.jar:
 	@[ -d lib ] || mkdir -p lib
 	@(cd lib; wget https://repo1.maven.org/maven2/junit/junit/4.12/junit-4.12.jar)
 	@(cd lib; wget https://repo1.maven.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar)
+	@(cd lib; wget https://repo1.maven.org/maven2/com/github/stefanbirkner/system-rules/1.19.0/system-rules-1.19.0.jar)
+
 # @NotNull annotations
 lib/annotations-16.0.2.jar:
 	@[ -d lib ] || mkdir -p lib
