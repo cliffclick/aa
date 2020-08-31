@@ -35,18 +35,18 @@ public class DefMemNode extends Node {
   // Make an MProj for a New, and 'hook' it into the default memory
   public MrgProjNode make_mem_proj(GVNGCM gvn, NewNode nn, Node mem) {
     MrgProjNode mrg = (MrgProjNode)gvn.xform(new MrgProjNode(nn,mem));
-    return make_mem(gvn,nn,mrg);
+    return make_mem(gvn,nn._alias,mrg);
   }
-  public MrgProjNode make_mem(GVNGCM gvn, NewNode nn, MrgProjNode mrg) {
+  public <N extends Node> N make_mem(GVNGCM gvn, int alias, N obj) {
     TypeObj[] tos0 = TypeMem.MEM.alias2objs();
     while( _defs._len < tos0.length )
       gvn.add_def(this,gvn.con(TypeMem.MEM.at(_defs._len)));
-    while( _defs._len <= nn._alias ) gvn.add_def(this,null);
-    gvn.set_def_reg(this,nn._alias,mrg);
+    while( _defs._len <= alias ) gvn.add_def(this,null);
+    gvn.set_def_reg(this,alias,obj);
     // Lift default immediately; default mem used by the Parser to load-thru displays.
     xval(gvn._opt_mode);
     gvn.add_work_uses(this);
-    return mrg;
+    return obj;
   }
 }
 

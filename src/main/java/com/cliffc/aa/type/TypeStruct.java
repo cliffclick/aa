@@ -473,8 +473,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // Make a type-variable with no definition - it is assumed to be a
   // forward-reference, to be resolved before the end of parsing.
-  public static Type make_forward_def_type(String tok) {
-    return make((tok+":").intern(),flds("$fref"),ts(SCALAR),fbots(1),true);
+  public static TypeStruct make_forward_def_type(String tok) {
+    // Make a new top-level alias
+    int alias = BitsAlias.type_alias(BitsAlias.RECORD);
+    return make((tok+":").intern(),flds("$fref"),ts(TypeInt.con(alias)),fbots(1),true);
+  }
+  // Return the alias for a forward-ref type, or 0 if not a forward-ref
+  public int fref_alias() {
+    if( !has_name() || !Util.eq(_flds[0],"$fref") ) return BitsAlias.RECORD; // Not a forward ref
+    return (int)_ts[0].getl();
   }
   // We have a cycle because we are unioning {t,this} and we have a graph from
   // t->...->this.  This cycle may pre-exist once closed and can be detected
@@ -482,7 +489,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // INTERN table, but if a prior cycle version exists, we need to remove the
   // new cycle and use the prior one.
   public TypeStruct merge_recursive_type( TypeStruct ts ) {
-    assert has_name() && Util.eq(_flds[0],"$fref");
+    assert fref_alias()!=BitsAlias.RECORD;
     // Remove from INTERN table, since hacking type will not match hash
     untern()._dual.untern();
     ts.untern().dual().untern();
@@ -491,6 +498,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     _ts    = ts._ts   ; _dual._ts   = ts._dual._ts   ;
     _flags = ts._flags; _dual._flags= ts._dual._flags;
     _cyclic= _dual._cyclic = true;
+    _open  = _dual._open   = false;
     // Hash changes, e.g. field names.
     _hash = compute_hash();  _dual._hash = _dual.compute_hash();
 
@@ -1169,14 +1177,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       return sharp;
     // On exit, cyclic-intern all cyclic things; remove from dull cache.
     RECURSIVE_MEET++;
-    TypeStruct mt = malloc(new Type[]{sharp}); // Bogus top-struct for API
+    TypeStruct mt = (TypeStruct)sharp._obj;
     mt = shrink(mt.reachable(),mt); // No shrinking nor UF expected
     Ary<Type> reaches = mt.reachable(); // Recompute reaches after shrink
     assert check_uf(reaches);
     UF.clear();
     RECURSIVE_MEET--;
     mt = mt.install_cyclic(reaches); // But yes cycles
-    sharp = (TypeMemPtr)(mt._ts[0]); // Peek thru bogus top-struct
+    sharp = sharp.make_from(mt);
     return mem.sharput(dull,sharp);
   }
 
@@ -1242,7 +1250,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( !dptr.interned() )      // Closed a cycle
       return dptr; // Not-yet-sharp and not interned; return the work-in-progress
     // Copy, replace dull with not-interned dull clone
-    TypeStruct dts2 = ((TypeStruct)dptr._obj)._sharpen_clone();
+    TypeStruct dts2 = ((TypeStruct)dptr._obj)._clone();
     TypeMemPtr dptr2 = (TypeMemPtr)dptr.clone();
     dptr2._obj = dts2;  dptr2._hash = dptr2.compute_hash();
     dull_cache.put(dull._aliases,dptr2);
@@ -1266,10 +1274,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return mem.sharput(dull,dull.make_from(sts));
   }
   // Shallow clone
-  private TypeStruct _sharpen_clone() {
-    assert !_cyclic;
-    return _clone();
-  }
   private TypeStruct _clone() {
     assert interned();
     Type[] ts = Types.clone(_ts);

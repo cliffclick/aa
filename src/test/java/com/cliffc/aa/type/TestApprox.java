@@ -704,7 +704,7 @@ public class TestApprox {
     final int fidx = BitsFun.new_fidx(1), fidx0 = BitsFun.new_fidx(fidx), fidx1 = BitsFun.new_fidx(fidx);
     final BitsFun fidxs = BitsFun.make0(fidx0,fidx1).dual();
     final int alias = BitsAlias.new_alias(BitsAlias.RECORD);
-    Env.DISPLAYS = Env.DISPLAYS.set(alias); // Declare a display
+    Env.ALL_DISPLAYS = Env.ALL_DISPLAYS.set(alias); // Declare a display
 
     // Args for the forward-ref fib(^ ->Scalar).  This has to start as hi-args
     // for this test, as the cyclic approx is supposed to be low - and it has

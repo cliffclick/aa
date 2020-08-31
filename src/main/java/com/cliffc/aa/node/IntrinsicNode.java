@@ -122,15 +122,16 @@ public class IntrinsicNode extends Node {
     assert Util.eq(to._flds[0],"^"); // Display already
     assert to.fmod(0)==TypeStruct.FFNL; // Display is final
     // Upgrade the type to one with no display for nnn.
-    TypeStruct to1 = to.set_fld(0,TypeMemPtr.NO_DISP,TypeStruct.FFNL);
-    TypeStruct formals = to1.remove_name();
+    to = to.set_fld(0,TypeMemPtr.NO_DISP,TypeStruct.FFNL);
+    // Formal is unnamed, and this function adds the name.
+    TypeStruct formals = to.remove_name();
     TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(BitsAlias.make0(alias),to));
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,sig,-1).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node memp= gvn.init(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
     // Add input edges to the NewNode
     ConNode nodisp = gvn.con(TypeMemPtr.NO_DISP);
-    NewObjNode nnn = new NewObjNode(false,alias,to1.close(),nodisp).keep();
+    NewObjNode nnn = new NewObjNode(false,alias,to,nodisp).keep();
     for( int i=1; i<to._ts.length; i++ ) { // Display in 0, fields in 1+
       String argx = to._flds[i];
       if( TypeStruct.fldBot(argx) ) argx = null;

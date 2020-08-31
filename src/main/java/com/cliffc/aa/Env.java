@@ -12,8 +12,11 @@ public class Env implements AutoCloseable {
   public static    ScopeNode SCP_0; // Program start scope
   public static   DefMemNode DEFMEM;// Default memory (all structure types)
   public static      ConNode ALL_CTRL; // Default control
-  // Set of display aliases, used to track escaped displays at call sites
-  public static BitsAlias DISPLAYS = BitsAlias.EMPTY;
+  // Set of all display aliases, used to track escaped displays at call sites for asserts.
+  public static BitsAlias ALL_DISPLAYS = BitsAlias.EMPTY;
+  // Set of lexically active display aliases, used for a conservative display
+  // approx for forward references.
+  public static BitsAlias LEX_DISPLAYS = BitsAlias.EMPTY;
 
 
   final Env _par;                // Parent environment
@@ -42,7 +45,8 @@ public class Env implements AutoCloseable {
     NewObjNode nnn = (NewObjNode)GVN.xform(new NewObjNode(is_closure,tdisp,clo));
     MrgProjNode  frm = DEFMEM.make_mem_proj(GVN,nnn,mem);
     Node ptr = GVN.xform(new ProjNode(1, nnn));
-    DISPLAYS = DISPLAYS.set(nnn._alias);   // Displays for all time
+    ALL_DISPLAYS = ALL_DISPLAYS.set(nnn._alias);   // Displays for all time
+    LEX_DISPLAYS = LEX_DISPLAYS.set(nnn._alias);   // Lexically active displays
     ScopeNode scope = new ScopeNode(errmsg,is_closure);
     scope.set_ctrl(ctl,GVN);
     scope.set_ptr (ptr,GVN);  // Address for 'nnn', the local stack frame
@@ -122,6 +126,7 @@ public class Env implements AutoCloseable {
     stk.no_more_fields();
     gvn.add_work_uses(stk);     // Scope object going dead, trigger following projs to cleanup
     _scope.set_ptr(null,gvn);   // Clear pointer to display
+    LEX_DISPLAYS = LEX_DISPLAYS.clear(stk._alias);
   }
 
   // Close the current Env and lexical scope.
@@ -156,7 +161,8 @@ public class Env implements AutoCloseable {
     FunNode   .reset();
     NewNode.NewPrimNode.reset();
     PrimNode  .reset();
-    DISPLAYS = BitsAlias.EMPTY; // Reset aliases declared as Displays
+    ALL_DISPLAYS = BitsAlias.EMPTY; // Reset aliases declared as Displays
+    LEX_DISPLAYS = BitsAlias.EMPTY;
   }
 
   // Return Scope for a name, so can be used to determine e.g. mutability

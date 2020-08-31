@@ -31,7 +31,7 @@ public class TestParse {
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",3);
     test_isa("{x y -> x+y}", TypeFunPtr.make(TEST_FUNBITS,3,tdisp)); // {Scalar Scalar -> Scalar}
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",19);
-    testerr("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x:=;y:=;...}",21);
+    testerr("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x:=;y:=}",21);
     test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
     test("x=@{a:=1;noinline_b= {a=a+1;b=0}}; x.noinline_b(); x.a",TypeInt.NINT8);
 
@@ -309,8 +309,8 @@ public class TestParse {
 
     test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x=1;y=2} is not a *[$]Point:@{x:=;y:=;...}",55);
-    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x:=;y:=;...}",21);
+    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x=1;y=2} is not a *[$]Point:@{x:=;y:=}",55);
+    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x:=;y:=}",21);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
     test_obj_isa("x=@{n}",TypeStruct.make(new String[]{"^","n"},TypeStruct.ts(TypeMemPtr.OOP,Type.XNIL),new byte[]{TypeStruct.FFNL,TypeStruct.FRW}));

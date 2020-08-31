@@ -106,10 +106,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     int alias1 = x.abit();                 // Just a single alias
     // The GENERIC function allows the generic record, otherwise must be on the display list
     if( alias1 != -1 )
-      return Math.abs(alias1)==BitsAlias.RECORD || com.cliffc.aa.Env.DISPLAYS.test_recur(Math.abs(alias1));
+      return Math.abs(alias1)==BitsAlias.RECORD || com.cliffc.aa.Env.ALL_DISPLAYS.test_recur(Math.abs(alias1));
     // If closures are being used, can be multiple valid displays
     for( int alias : _aliases )
-      if( alias != 0 && !com.cliffc.aa.Env.DISPLAYS.test_recur(alias) )
+      if( alias != 0 && !com.cliffc.aa.Env.ALL_DISPLAYS.test_recur(alias) )
         return false;           // This alias is not on the DISPLAYS list
     return true;
   }

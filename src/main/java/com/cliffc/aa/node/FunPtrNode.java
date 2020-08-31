@@ -115,7 +115,9 @@ public final class FunPtrNode extends Node {
   public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(name));
     RetNode ret = gvn.init(new RetNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun));
-    return new FunPtrNode( ErrMsg.forward_ref(unkref,fun),ret,gvn.con(TypeMemPtr.DISP_SIMPLE));
+    // Display is limited to any one of the current lexical scopes.
+    TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS,TypeObj.ISUSED);
+    return new FunPtrNode( ErrMsg.forward_ref(unkref,fun),ret,gvn.con(tdisp));
   }
 
   // True if this is a forward_ref

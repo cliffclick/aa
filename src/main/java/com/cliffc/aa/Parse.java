@@ -101,8 +101,10 @@ public class Parse implements Comparable<Parse> {
   TypeEnv go_partial( ) {
     Node xnil = _gvn.con(Type.XNIL);
     // Replicate the top-scope & display chain, and set it aside.
-    NewObjNode orig_disp = init(_e._scope.stk().copy(true,_gvn).keep());
     Node orig_ctrl = _e._scope.ctrl();
+    Ary<Node> orig_disp = _e._scope.stk()._defs.deepCopy();
+    for( Node def : orig_disp ) if( def != null ) def.keep();
+    TypeStruct orig_t = _e._scope.stk()._ts;
 
     prog();        // Parse a program
     _gvn.rereg(_e._scope,Type.ALL);
@@ -115,22 +117,22 @@ public class Parse implements Comparable<Parse> {
     _gvn.iter(GVNGCM.Mode.PesiREPL); // Re-check all ideal calls now that types have been maximally lifted
     TypeEnv te = gather_errors();
     if( te._errs!=null )        // If errors, roll back - no effects from the bad code
-      reset_partial(orig_ctrl, orig_disp);
+      reset_partial(orig_ctrl, orig_disp, orig_t);
+    for( Node def : orig_disp ) if( def != null ) def.unkeep(_gvn);
     _gvn.unreg(_e._scope);
-    orig_disp.unkeep(_gvn);
     _e._scope.set_rez(xnil,_gvn);
     return te;
   }
 
-  private void reset_partial(Node orig_ctrl, NewObjNode orig_disp) {
+  private void reset_partial(Node orig_ctrl, Ary<Node> orig_disp, TypeStruct orig_t) {
     _gvn.set_def_reg(_e._scope,0,orig_ctrl);
     // Reset display chain back to the saved
     NewObjNode nnn = _e._scope.stk();
     _gvn.unreg(nnn);
     while( !nnn._defs.isEmpty() ) nnn.pop(_gvn);
-    for( Node def : orig_disp._defs )
+    for( Node def : orig_disp )
       nnn.add_def(def);
-    nnn.sets_out(orig_disp._ts);
+    nnn.sets_out(orig_t);
     _gvn.rereg(nnn,nnn.value(GVNGCM.Mode.PesiREPL));
     _gvn.set_def_reg(_e._scope,1,nnn.mrg());
     // Everybody has flowed the bad types; unwind them all
@@ -245,17 +247,29 @@ public class Parse implements Comparable<Parse> {
     // Which means a TypeObj knows its Name.  Its baked into the vtable.
     // Which means TypeObj is named and not the pointer-to-TypeObj.
     // "Point= :@{x,y}" declares "Point" to be a type Name for "@{x,y}".
+    Type tn, tn_crush = null;
+    int alias = -1;             // No alias for named primitives
     Type ot = _e.lookup_type(tvar);
-    Type tn = null;
-    if( ot == null ) {        // Name does not pre-exist
-      tn = t.set_name((tvar+":").intern());  // Add a name
-      _e.add_type(tvar,tn);   // Assign type-name
+    if( ot == null ) {                      // Name does not pre-exist
+      tn = t.set_name((tvar+":").intern()); // Add a name
+      if( tn instanceof TypeStruct ) {      // TypeObj decl
+        alias = BitsAlias.type_alias(BitsAlias.RECORD); // Assign an alias
+        tn = ((TypeStruct)tn).close();
+        tn_crush = ((TypeStruct)tn).crush();
+      }
+      _e.add_type(tvar,tn);                 // Assign type-name
     } else {
-      if( ot instanceof TypeStruct && t instanceof TypeStruct )
-        tn = ot.has_name() ? ((TypeStruct)ot).merge_recursive_type((TypeStruct)t) : null;
-      if( tn == null ) return err_ctrl2("Cannot re-assign type '"+tvar+"'");
-      else _e.def_type(tvar,tn);
+      if( !(ot instanceof TypeStruct) || !(t instanceof TypeStruct) || !ot.has_name() )
+        return err_ctrl2("Cannot re-assign type '"+tvar+"'");
+      TypeStruct ots = (TypeStruct)ot;
+      alias = ots.fref_alias(); // Forward-ref alias was allocated at the forward ref
+      tn = ots.merge_recursive_type((TypeStruct)t);
+      tn_crush = ((TypeStruct)tn).crush();
+      _e.def_type(tvar,tn);
     }
+    // Assign a generic alias & type to default memory
+    if( alias != -1 )
+      Env.DEFMEM.make_mem(_gvn,alias,con(tn_crush));
 
     // Add a constructor function.  If this is a primitive, build a constructor
     // taking the primitive.
@@ -277,8 +291,8 @@ public class Parse implements Comparable<Parse> {
       FunPtrNode epi1 = IntrinsicNode.convertTypeName((TypeObj)tn,bad,_gvn);
       rez = _e.add_fun(bad,tvar,epi1); // Return type-name constructor
       // For Structs, add a second constructor taking an expanded arg list
-      if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
-        FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)tn, BitsAlias.RECORD, _gvn, errMsg());
+      if( tn instanceof TypeStruct ) {     // Add struct types with expanded arg lists
+        FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)tn, alias, _gvn, errMsg());
         Node rez2 = _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
         _gvn.init0(rez2._uses.at(0));      // Force init of Unresolved
       }
@@ -1085,7 +1099,7 @@ public class Parse implements Comparable<Parse> {
     if( !(t instanceof TypeObj) ) return t; // Primitives are not wrapped
     // Automatically convert to reference for fields.
     // Make a reasonably precise alias.
-    int type_alias = t instanceof TypeStruct ? BitsAlias.RECORD : (t instanceof TypeStr ? BitsAlias.STR : BitsAlias.ARY);
+    int type_alias = t instanceof TypeStruct ? ((TypeStruct)t).fref_alias() : (t instanceof TypeStr ? BitsAlias.STR : BitsAlias.ARY);
     TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.make0(type_alias),(TypeObj)t);
     return typeq(tmp);          // And check for null-ness
   }
@@ -1184,7 +1198,11 @@ public class Parse implements Comparable<Parse> {
         _x = oldx;               // Unwind if not a known type var
         return null;             // Not a type
       }
-      _e.add_type(tok,t=TypeStruct.make_forward_def_type(tok));
+      TypeStruct fref = TypeStruct.make_forward_def_type(tok);
+      _e.add_type(tok,t=fref);
+      // Make a generic alias for the type
+      int alias = fref.fref_alias();
+      Env.DEFMEM.make_mem(_gvn,alias,con(TypeStruct.ALLSTRUCT.make_from(fref._name)));
     }
     return t;
   }
@@ -1364,6 +1382,7 @@ public class Parse implements Comparable<Parse> {
     return sb.p('^').nl().toString();
   }
   // Handy for the debugger to print
+
   @Override public String toString() { return new String(_buf,_x,_buf.length-_x); }
   @Override public boolean equals(Object loc) {
     if( this==loc ) return true;

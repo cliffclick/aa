@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -103,6 +104,11 @@ public class NewObjNode extends NewNode<TypeStruct> {
     for( int i=0; i<ts._ts.length; i++ ) {
       Node n = fld(i);
       if( n != null && n.is_forward_ref() ) {
+        // Remove current display from forward-refs display choices.
+        assert Env.LEX_DISPLAYS.test(_alias);
+        TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS.clear(_alias),TypeObj.ISUSED);
+        gvn.set_def_reg(n,1,gvn.con(tdisp));
+        n._val = n.value(GVNGCM.Mode.Parse);
         // Make field in the parent
         parent.create(ts._flds[i],n,ts.fmod(i),gvn);
         // Stomp field locally to XSCALAR

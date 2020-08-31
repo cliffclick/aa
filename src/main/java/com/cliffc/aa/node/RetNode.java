@@ -45,8 +45,6 @@ public final class RetNode extends Node {
     FunNode fun = FunNode.find_fidx(_fidx);
     return "Ret_"+(is_copy() ? "!copy!" : (fun==null ? ""+_fidx : fun.name()));
   }
-  // Inline longer name
-  @Override public String str() { return in(4) instanceof FunNode ? "Ret"+fun().str() : xstr(); }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     // If control is dead, but the Ret is alive, we're probably only using the

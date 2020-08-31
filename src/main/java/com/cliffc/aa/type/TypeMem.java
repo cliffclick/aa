@@ -306,7 +306,7 @@ public class TypeMem extends Type<TypeMem> {
     VBitSet visit = new VBitSet();
     for( int alias : aliases )
       for( int kid=alias; kid!=0; kid = BitsAlias.next_kid(alias,kid) )
-        work.push(kid);
+        { work.push(kid); visit.set(kid); }
 
     while( !work.isEmpty() ) {
       int alias=work.pop();
@@ -319,7 +319,7 @@ public class TypeMem extends Type<TypeMem> {
       // Incomplete struct?  This is an early escapee from Parse times; more
       // fields may be added which we assume is a pointer to all.
       if( ts._open )
-        return BitsAlias.FULL;
+        return BitsAlias.FULL;  // Generic open struct points to all
       for( int i=0; i<ts._ts.length; i++ ) {
         Type fld = ts._ts[i];
         if( TypeMemPtr.OOP.isa(fld) )

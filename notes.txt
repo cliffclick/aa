@@ -1,4 +1,25 @@
 =======================================
+Notes from 08/29/2020
+
+REPL-
+
+- Want no impact on error; thinking about giant assert of copy-all Nodes &
+  verify after cleanup that all nodes are back the same.
+- Might be OK right now, just copy/reset top-level Display.
+- All funcs kept conservative with the default input.  Prevents typing.
+- Ponder cloning aggressively without the default, on all call-sites LIVE from
+  current exit value (as opposed to live-for-all-time).  'nuther flavor of LIVE?
+- Like LIVE>>ESCP>>REPL?
+  LIVE: Regular alive for future, but not needed now for result.
+  ESCP: Regular alive for future, but not needed now for result.  Exits local scope .
+  REPL: Regular alive for future, and YES needed now for result.  Exits  all  scopes.
+  Or just walk backwards once?
+
+- Rename ESCAPE to 4 chars: ESCP.
+- TestREPL calls REPL directly.
+
+
+=======================================
 Notes from 08/12/2020
 
 Yanked priv/public notion.  Failed when calling many fcns, returning the same alias many times.
