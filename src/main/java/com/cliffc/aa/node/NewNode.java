@@ -120,7 +120,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     if( _uses._len!=2 ) return false; // Dying/dead, not escaped
     Node ptr = _uses.at(0);
     if( ptr instanceof MrgProjNode ) ptr = _uses.at(1); // Get ptr not mem
-    return ptr._live==TypeMem.ESCAPE;
+    return ptr._live==TypeMem.ESCAPE || ptr._live==TypeMem.LIVE_BOT;
   }
 
   // clones during inlining all become unique new sites

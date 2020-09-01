@@ -212,8 +212,9 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem EMPTY;// Every alias filled with anything
   public static final TypeMem  MEM; // FULL, except lifts REC, arrays, STR
   public static final TypeMem XMEM; //
-  public static final TypeMem DEAD, ALIVE; // Sentinel for liveness flow; not part of lattice
+  public static final TypeMem DEAD, ALIVE, LIVE_BOT; // Sentinel for liveness flow; not part of lattice
   public static final TypeMem ESCAPE; // Sentinel for liveness, where the value "escapes" the local scope
+  public static final TypeMem REPL; // Sentinel for liveness, where the value is used by the REPL; tentative
   public static final TypeMem ANYMEM,ALLMEM; // Every alias is unused (so above XOBJ or below OBJ)
   public static final TypeMem MEM_ABC, MEM_STR;
   static {
@@ -223,11 +224,6 @@ public class TypeMem extends Type<TypeMem> {
     // All memory, all aliases, holding anything.
     FULL = make0(new TypeObj[]{null,TypeObj.OBJ});
     EMPTY= FULL.dual();
-
-    // Sentinel for liveness flow; not part of lattice
-    DEAD  = make (new TypeObj[1]);
-    ALIVE = make0(new TypeObj[]{null,TypeLive.BASIC});
-    ESCAPE= make0(new TypeObj[]{null,TypeLive.ESCAPE});
 
     // All memory.  Includes breakouts for all structs and all strings.
     // Triggers BitsAlias.<clinit> which makes all the initial alias splits.
@@ -243,8 +239,15 @@ public class TypeMem extends Type<TypeMem> {
 
     MEM_STR = make(BitsAlias.STR,TypeStr.STR);
     MEM_ABC = make(BitsAlias.ABC,TypeStr.ABC.dual());
+
+    // Sentinel for liveness flow; not part of lattice
+    DEAD   = make (new TypeObj[1]);
+    ALIVE  = make0(new TypeObj[]{null,TypeLive.LIVE    }); // Basic alive for all time
+    ESCAPE = make0(new TypeObj[]{null,TypeLive.ESCAPE  }); // Alive, plus escapes some call/memory
+    REPL   = make0(new TypeObj[]{null,TypeLive.REPL    }); // Alive by the REPL; tentative assuming type-checks.
+    LIVE_BOT=make0(new TypeObj[]{null,TypeLive.LIVE_BOT});
   }
-  static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC,ANYMEM};
+  static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC,ANYMEM,ESCAPE,REPL};
 
   // All mapped memories remain, but each memory flips internally.
   @Override protected TypeMem xdual() {
@@ -504,7 +507,16 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean must_nil() { return false; } // never a nil
   @Override Type not_nil() { return this; }
 
-  // For node liveness, anything alive means the node is alive
-  public boolean is_live() { return this!=DEAD; }
+  // null if not a basic TypeLive, such as TypeMem.DEAD, OR
+  // the TypeLive.
+  public TypeLive live() { return _pubs.length>1 && _pubs[1] instanceof TypeLive ? (TypeLive)_pubs[1] : null; }
+  public boolean is_live() { return this != DEAD; }
+  static public TypeMem live(TypeLive lv) {
+    if( lv==TypeLive.LIVE    ) return ALIVE;
+    if( lv==TypeLive.ESCAPE  ) return ESCAPE;
+    if( lv==TypeLive.REPL    ) return REPL;
+    if( lv==TypeLive.LIVE_BOT) return LIVE_BOT;
+    throw com.cliffc.aa.AA.unimpl();
+  }
 
 }

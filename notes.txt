@@ -1,4 +1,14 @@
 =======================================
+Notes from 09/01/2020
+
+REPL- Lots of cleanup/improvements already.
+Think I'm needing a use-driven inline/clone.
+FunNode with REPL usage & unknown caller & REPL-use Call clone to remove unknown.
+Call has to resolve to clone.
+
+
+
+=======================================
 Notes from 08/29/2020
 
 REPL-
@@ -17,7 +27,6 @@ REPL-
 
 - Rename ESCAPE to 4 chars: ESCP.
 - TestREPL calls REPL directly.
-
 
 =======================================
 Notes from 08/12/2020

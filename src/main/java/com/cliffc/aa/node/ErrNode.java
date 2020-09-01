@@ -13,7 +13,7 @@ public final class ErrNode extends Node {
   public ErrNode( Node ctrl, ErrMsg err ) {
     super(OP_ERR,ctrl);
     _err = err;
-    _live= TypeMem.ESCAPE;
+    _live= TypeMem.LIVE_BOT;
   }
   @Override String xstr() { return _err._msg; }
   @Override String str() { return "Err"; }
@@ -22,6 +22,7 @@ public final class ErrNode extends Node {
     Type t = val(0);
     return t == Type.ANY || t == Type.XCTRL ? Type.ANY : Type.ALL; // For dead data errors return ANY (no error)
   }
+  @Override public TypeMem live_use( GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ALIVE; }
   @Override public ErrMsg err( boolean fast ) { return _err; }
   @Override public int hashCode() { return super.hashCode()+_err.hashCode(); }
   @Override public boolean equals(Object o) {

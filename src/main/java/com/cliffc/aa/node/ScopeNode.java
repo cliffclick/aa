@@ -128,12 +128,13 @@ public class ScopeNode extends Node {
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     // The top scope is always alive, and represents what all future unparsed
     // code MIGHT do.
-    if( this==Env.SCP_0 )
-      return opt_mode._CG && opt_mode._whole ? TypeMem.DEAD : TypeMem.ALLMEM;
+    if( this==Env.SCP_0 && opt_mode._CG && opt_mode._whole )
+      return TypeMem.DEAD;
     // Basic liveness ("You are Alive!") for control and returned value
-    if( def == ctrl() ) return TypeMem.ALIVE;
-    if( def == rez () ) return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM;
-    if( def == ptr () ) return opt_mode._whole ? TypeMem.DEAD : TypeMem.ESCAPE; // Returned display is dead
+    // If in the REPL, then "REPL-alive" also.
+    if( def == ctrl() ) return opt_mode._whole ? TypeMem.ALIVE : TypeMem.LIVE_BOT;
+    if( def == rez () ) return def.basic_liveness() ? (opt_mode._whole ? TypeMem.ALIVE : TypeMem.REPL) : TypeMem.ANYMEM;
+    if( def == ptr () ) return opt_mode._whole ? TypeMem.DEAD : TypeMem.LIVE_BOT; // Returned display is dead, alive & escape in the REPL
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.
     assert def == mem();

@@ -175,7 +175,7 @@ public abstract class Node implements Cloneable {
     _uses = new Ary<>(new Node[1],0);
     for( Node def : defs ) if( def != null ) def._uses.add(this);
     _val = null;
-    _live = basic_liveness() ? TypeMem.ESCAPE : TypeMem.ALLMEM;
+    _live = basic_liveness() ? TypeMem.LIVE_BOT : TypeMem.ALLMEM;
   }
 
   // Is 'touched' is just 'has a value', and also 'is in the GVN system'
@@ -377,15 +377,18 @@ public abstract class Node implements Cloneable {
   // It must be monotonic.
   // This is a reverse-flow transfer-function computation.
   public TypeMem live( GVNGCM.Mode opt_mode ) {
-    if( basic_liveness() ) {    // Basic liveness only; e.g. primitive math ops
-      boolean alive=false;
-      for( Node use : _uses ) // Computed across all uses
-        if( use._live != TypeMem.DEAD ) {
-          TypeMem live = use.live_use(opt_mode,this);
-          if( live == TypeMem.ALIVE ) alive = true;
-          else if( live != TypeMem.DEAD ) return TypeMem.ESCAPE;
-        }
-      return alive ? TypeMem.ALIVE : TypeMem.DEAD;
+    if( basic_liveness() ) {    // Basic liveness only; e.g. primitive math ops, no memory
+      TypeLive alive=null;
+      for( Node use : _uses ) { // Computed across all uses
+        if( use._live == TypeMem.DEAD ) continue;
+        TypeMem live = use.live_use(opt_mode,this);
+        if( live==TypeMem.DEAD ) continue;
+        TypeLive lv = live.live();
+        if( lv == null ) lv=TypeLive.LIVE_BOT;
+        alive = alive==null ? lv : alive.lmeet(lv);
+        if( alive==TypeLive.LIVE_BOT ) return TypeMem.LIVE_BOT;
+      }
+      return alive==null ? TypeMem.DEAD : TypeMem.live(alive);
     }
     // Compute meet/union of all use livenesses
     TypeMem live = TypeMem.DEAD; // Start at lattice top

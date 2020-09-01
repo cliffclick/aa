@@ -73,7 +73,6 @@ public class Env implements AutoCloseable {
     Env top = new Env();
     // Top-level display defining all primitives
     SCP_0 = top._scope;
-    SCP_0.add_def(DEFMEM);
     SCP_0.init0();              // Add base types
     STK_0  = SCP_0.stk();
 
@@ -99,7 +98,7 @@ public class Env implements AutoCloseable {
         n.xval(GVN._opt_mode);
     GVN.add_work(MEM_0);
     // Run the worklist dry
-    GVN.iter(GVNGCM.Mode.PesiNoCG);
+    GVN.iter(GVNGCM.Mode.Parse);
 
     if( first_time ) record_for_top_reset2();
     return top;

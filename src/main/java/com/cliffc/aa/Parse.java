@@ -151,7 +151,8 @@ public class Parse implements Comparable<Parse> {
     // Delete names at the top scope before final optimization.
     _e.close_display(_gvn);
     _gvn.rereg(_e._scope,Type.ALL);
-    _e._scope.xliv(_gvn._opt_mode);
+    _e._scope.xliv(GVNGCM.Mode.PesiNoCG);
+    _gvn.add_work_defs(Env.SCP_0);
     _gvn.iter(GVNGCM.Mode.PesiNoCG); // Pessimistic optimizations; might improve error situation
     remove_unknown_callers();
     _gvn.gcp (GVNGCM.Mode.Opto,_e._scope); // Global Constant Propagation
@@ -811,7 +812,7 @@ public class Parse implements Comparable<Parse> {
     nn._fld_starts = bads.asAry();
     NewObjNode nnn = (NewObjNode)gvn(nn);
     nnn.no_more_fields();
-    nnn._live = TypeMem.ESCAPE;
+    nnn._live = TypeMem.LIVE_BOT;
 
     // NewNode returns a TypeMem and a TypeMemPtr (the reference).
     set_mem( Env.DEFMEM.make_mem_proj(_gvn,nn,mem()) );

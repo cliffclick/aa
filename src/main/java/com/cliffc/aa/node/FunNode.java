@@ -238,7 +238,7 @@ public class FunNode extends RegionNode {
 
     // Check for dups (already done this but failed to resolve all calls, so trying again).
     TypeStruct fformals = formals;
-    if( path == -1 && FUNS.find(fun -> fun != null && fun._sig._formals==fformals && fun._sig._ret == _sig._ret && fun.in(1)==in(1) ) != -1 )
+    if( path == -1 && FUNS.find(fun -> fun != null && !fun.is_dead() && fun._sig._formals==fformals && fun._sig._ret == _sig._ret && fun.in(1)==in(1) ) != -1 )
       return null;              // Done this before
 
     assert level==2; // Do not actually inline, if just checking that all forward progress was found

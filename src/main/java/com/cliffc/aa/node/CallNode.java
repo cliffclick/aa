@@ -232,7 +232,7 @@ public class CallNode extends Node {
           // sure we get the right one.  See if there is a single un-escaped
           // FunPtr.  Common for non-upwardsly exposed targets.
           FunPtrNode fptr = ret.funptr();
-          if( fptr != null && fptr.display()._live != TypeMem.ESCAPE )
+          if( fptr != null && !fptr.display()._live.live().is_escape() )
             return set_fun(fptr, gvn);
           // See if FunPtr is available just above an Unresolved.
           if( unk instanceof UnresolvedNode ) {
@@ -346,7 +346,7 @@ public class CallNode extends Node {
     if( !fidxs.is_empty() && fidxs.above_center()!=tfp._disp.above_center() )
       return _val; // Display and FIDX mis-aligned; stall
     // Resolve; only keep choices with sane arguments during GCP
-    BitsFun rfidxs = resolve(fidxs,ts,tmem,opt_mode==GVNGCM.Mode.Opto);
+    BitsFun rfidxs = resolve(fidxs,ts,tmem,opt_mode==GVNGCM.Mode.Opto || opt_mode==GVNGCM.Mode.OptoREPL);
     if( rfidxs==null ) return _val; // Dead function input, stall until this dies
     // nargs is min nargs across the resolved fidxs for below-center, max for above.
     boolean rup = rfidxs.above_center();

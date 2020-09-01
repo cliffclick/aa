@@ -16,7 +16,7 @@ public class PhiNode extends Node {
     else if( t instanceof TypeTuple ) _t = Type.SCALAR;
     else { assert t.isa(Type.SCALAR); _t = Type.SCALAR; }
     _badgc = badgc;
-    _live = _t==Type.SCALAR ? TypeMem.ESCAPE : TypeMem.ALLMEM;
+    _live = basic_liveness() ? TypeMem.LIVE_BOT : TypeMem.ALLMEM;
   }
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
   // For ParmNodes

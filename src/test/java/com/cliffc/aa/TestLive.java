@@ -56,7 +56,7 @@ public class TestLive {
     nnn._val = Type.ANY;
     nnn.no_more_fields();
     nnn.xval(gvn._opt_mode);
-    nnn._live = TypeMem.ESCAPE;
+    nnn._live = TypeMem.LIVE_BOT;
 
     // Proj, OProj
     Node mem = new MrgProjNode(nnn,mmm);

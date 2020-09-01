@@ -5,7 +5,7 @@ import com.cliffc.aa.type.*;
 
 // Split control
 public class IfNode extends Node {
-  public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); _live=TypeMem.ALIVE; }
+  public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); }
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node ctl = in(0);
     Node tst = in(1);
@@ -17,15 +17,15 @@ public class IfNode extends Node {
       if( tst instanceof PrimNode.EQ_I64 ) throw AA.unimpl();
       if( tst instanceof PrimNode.EQ_F64 ) throw AA.unimpl();
       if( tst instanceof PrimNode.EQ_OOP ) throw AA.unimpl();
-    
+
       // Remove leading negation-vs-0 by inverting
       if( tst instanceof PrimNode.NE_I64 ) throw AA.unimpl();
       if( tst instanceof PrimNode.NE_F64 ) throw AA.unimpl();
       if( tst instanceof PrimNode.NE_OOP ) throw AA.unimpl();
     }
-    
+
     if( tst instanceof PrimNode.Not ) return flip(gvn, gvn.xform(new IfNode(ctl,tst.in(1))));
-    
+
     return null;
   }
 
@@ -37,10 +37,11 @@ public class IfNode extends Node {
     Node x1 = gvn.xform(new CProjNode(that,1));
     if( p0!=null ) gvn.replace(p0,x1);
     if( p1!=null ) gvn.replace(p1,x0);
+    x0._live = x1._live = that._live = this._live;
     return that;
   }
 
-  
+
   @Override public TypeTuple value(GVNGCM.Mode opt_mode) {
     // If the input is exactly zero, we can return false: {ANY,CONTROL}
     // If the input excludes   zero, we can return true : {CONTROL,ANY}
