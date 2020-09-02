@@ -111,7 +111,7 @@ public class GVNGCM {
       con._val = t.simple_ptr(); // Constant is this value
       _vals.put(con,con);
     }
-    con._live = TypeMem.ALIVE; // Alive, but demands no memory
+    con._live = TypeMem.LIVE_BOT; // Alive, but demands no memory
     add_work(con);
     return con;
   }

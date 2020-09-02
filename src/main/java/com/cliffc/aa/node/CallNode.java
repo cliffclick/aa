@@ -346,7 +346,8 @@ public class CallNode extends Node {
     if( !fidxs.is_empty() && fidxs.above_center()!=tfp._disp.above_center() )
       return _val; // Display and FIDX mis-aligned; stall
     // Resolve; only keep choices with sane arguments during GCP
-    BitsFun rfidxs = resolve(fidxs,ts,tmem,opt_mode==GVNGCM.Mode.Opto || opt_mode==GVNGCM.Mode.OptoREPL);
+    // Unpacked: to be monotonic, skip resolve until unpacked.
+    BitsFun rfidxs = _unpacked ? resolve(fidxs,ts,tmem,opt_mode==GVNGCM.Mode.Opto || opt_mode==GVNGCM.Mode.OptoREPL) : fidxs;
     if( rfidxs==null ) return _val; // Dead function input, stall until this dies
     // nargs is min nargs across the resolved fidxs for below-center, max for above.
     boolean rup = rfidxs.above_center();
@@ -658,10 +659,9 @@ public class CallNode extends Node {
         return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[j], FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx));
 
     // Expect a function pointer
-    Type tfun = fun()._val;
-    if( !(tfun instanceof TypeFunPtr) )
-      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"A function is being called, but "+tfun+" is not a function type");
-    TypeFunPtr tfp = (TypeFunPtr)tfun;
+    TypeFunPtr tfp = ttfpx(_val);
+    if( tfp==null )
+      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"A function is being called, but "+((TypeTuple)_val).at(ARGIDX)+" is not a function type");
 
     // Indirectly, forward-ref for function type
     if( tfp.is_forward_ref() ) // Forward ref on incoming function

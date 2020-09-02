@@ -131,9 +131,8 @@ public class ScopeNode extends Node {
     if( this==Env.SCP_0 && opt_mode._CG && opt_mode._whole )
       return TypeMem.DEAD;
     // Basic liveness ("You are Alive!") for control and returned value
-    // If in the REPL, then "REPL-alive" also.
-    if( def == ctrl() ) return opt_mode._whole ? TypeMem.ALIVE : TypeMem.LIVE_BOT;
-    if( def == rez () ) return def.basic_liveness() ? (opt_mode._whole ? TypeMem.ALIVE : TypeMem.REPL) : TypeMem.ANYMEM;
+    if( def == ctrl() ) return TypeMem.ALIVE;
+    if( def == rez () ) return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM;
     if( def == ptr () ) return opt_mode._whole ? TypeMem.DEAD : TypeMem.LIVE_BOT; // Returned display is dead, alive & escape in the REPL
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.

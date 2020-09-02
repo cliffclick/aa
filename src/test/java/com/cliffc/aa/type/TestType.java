@@ -1,13 +1,13 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.node.NewNode;
 import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.util.Ary;
 import org.junit.Test;
 
 import java.util.HashMap;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 
 public class TestType {
@@ -398,7 +398,6 @@ public class TestType {
     // Meet:  SAS0AS0AS0AS0AS0AS0...
     // which is the Once yet again
     TypeObj[] tos = new TypeObj[alias4+1];
-    tos[0]=null;
     tos[1]=TypeObj.XOBJ;
     tos[alias2]=ta2;
     tos[alias3]=ta3;
@@ -515,12 +514,12 @@ public class TestType {
 
     // All are ISA
     TypeMem[] tmems = new TypeMem[]{
-      TypeMem.ANYMEM,
-      TypeMem.MEM_ABC,            // [1:~obj,5:"abc"]
-      TypeMem.MEM.dual(),         // [1:~obj,2:~(),3:~str,5:"abc"]
-      TypeMem.MEM,
-      TypeMem.MEM_ABC.dual(),     // [1: obj,5:"abc"]
-      TypeMem.ALLMEM,
+      TypeMem.ANYMEM,             // [1:~obj,3:~obj,5:~obj ]
+      TypeMem.MEM_ABC,            // [1:~obj,3:~obj,5:"abc"]
+      TypeMem.MEM.dual(),         // [1:~obj,3:~str,5:"abc"]
+      TypeMem.MEM,                // [1: obj,3: str,5:"abc"]
+      TypeMem.MEM_ABC.dual(),     // [1: obj,3: obj,5:"abc"]
+      TypeMem.ALLMEM,             // [1: obj,3: obj,5: obj ]
     };
     for( int j=0; j<tmems.length-1; j++ )
       assertTrue(tmems[j].isa(tmems[j+1]));

@@ -28,7 +28,7 @@ public class TestLive {
     assertEquals(scope._live,TypeMem.ALLMEM);
 
     // Check liveness recursive back one step
-    rez.xliv(gvn._opt_mode);
+    rez.xliv(GVNGCM.Mode.PesiCG);
     assertEquals(rez._live,TypeMem.ALIVE);
   }
 
@@ -80,23 +80,23 @@ public class TestLive {
     }
 
     // Check liveness base case
-    scope.xliv(gvn._opt_mode);
+    scope.xliv(GVNGCM.Mode.PesiNoCG);
     // Since simple forwards-flow, the default memory is known UNUSED.
     // However, we got provided at least one object.
     TypeMem expected_live = ((TypeMem)mem._val).flatten_fields();
     assertEquals(scope._live,expected_live);
 
     // Check liveness recursive back one step
-    ptr.xliv(gvn._opt_mode);
+    ptr.xliv(GVNGCM.Mode.PesiNoCG);
     assertEquals(TypeMem.ALIVE,ptr._live); // Ptr is all_type, conservative so all memory alive
-    mem.xliv(gvn._opt_mode);
+    mem.xliv(GVNGCM.Mode.PesiNoCG);
     assertEquals(mem._live,expected_live); // Object demands of OProj, but OProj passes along request to NewObj
-    nnn.xliv(gvn._opt_mode);
+    nnn.xliv(GVNGCM.Mode.PesiNoCG);
     assertEquals(TypeMem.ALIVE,nnn._live); // NewObj supplies object, needs what its input needs
-    mmm.xliv(gvn._opt_mode);
+    mmm.xliv(GVNGCM.Mode.PesiNoCG);
     assertEquals(TypeMem.ALIVE,mmm._live); // Since ptr is scalar, all memory is alive
-    fdx.xliv(gvn._opt_mode);
-    assertEquals(TypeMem.ALIVE,fdx._live); // Since ptr is scalar, all memory is alive
+    fdx.xliv(GVNGCM.Mode.PesiNoCG);
+    assertEquals(TypeMem.ESCAPE,fdx._live); // Since ptr is scalar, all memory is alive
 
   }
 }

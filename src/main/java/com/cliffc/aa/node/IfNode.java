@@ -5,7 +5,7 @@ import com.cliffc.aa.type.*;
 
 // Split control
 public class IfNode extends Node {
-  public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); }
+  public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); _live = TypeMem.ALIVE; }
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node ctl = in(0);
     Node tst = in(1);

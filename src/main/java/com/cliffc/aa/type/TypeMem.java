@@ -70,14 +70,14 @@ public class TypeMem extends Type<TypeMem> {
   // False if not 'tight' (no trailing null pairs) or any matching pairs (should
   // collapse to their parent) or any mixed parent/child.
   private static boolean check(TypeObj[] as) {
-    if( as.length == 0 ) return true;
-    if( as[0]!=null ) return false;          // Slot 0 reserved
+    if( !(as[0] instanceof TypeLive) ) return false; // Slot 0 reserved for live-ness
     if( as.length == 1 ) return true;
     if( as[1]!=TypeObj.OBJ    && as[1]!=TypeObj.XOBJ   &&
         as[1]!=TypeObj.ISUSED && as[1]!=TypeObj.UNUSED &&
         !(as[1] instanceof TypeLive) &&
         as[1] != null )
       return false;             // Only 2 choices
+    if( as[0].above_center()!=as[1].above_center() ) return false;
     if( as.length==2 ) return true; // Trivial all of memory
     // "tight" - something in the last slot
     if( as[as.length-1] == null ) return false;
@@ -108,13 +108,20 @@ public class TypeMem extends Type<TypeMem> {
   }
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
+  private static char[] LIVEC = new char[]{' ','#','R','3'};
   @Override String str( VBitSet dups ) {
-    if( this==FULL ) return "[ all ]";
-    if( this==EMPTY) return "[_____]";
-    if( this== MEM ) return "[ mem ]";
-    if( this==XMEM ) return "[~mem ]";
-    if( this==DEAD ) return "[dead ]";
+    if( this==FULL ) return " [ all ]";
+    if( this==EMPTY) return " [_____]";
+    if( this== MEM ) return " [ mem ]";
+    if( this==XMEM ) return " [~mem ]";
+    if( this==DEAD ) return "![dead ]";
+    if( this==ALIVE) return " [live ]";
+    if( this==ESCAPE)return "#[escap]";
+    if( this==LIVE_BOT) return "3[!repl]";
     SB sb = new SB();
+    if( _pubs[0]==TypeLive.DEAD ) sb.p('!');
+    else sb.p(LIVEC[((TypeLive)_pubs[0])._flags]);
+    if( _pubs.length==1 ) return sb.p("[]").toString();
     sb.p('[');
     for( int i = 1; i< _pubs.length; i++ )
       if( _pubs[i] != null )
@@ -124,14 +131,15 @@ public class TypeMem extends Type<TypeMem> {
 
   // Alias-at.  Out of bounds or null uses the parent value.
   public TypeObj at   (int alias) { return at(_pubs ,alias); }
-  static TypeObj at(TypeObj[] tos, int alias) { return tos[at_idx(tos,alias)]; }
+  static TypeObj at(TypeObj[] tos, int alias) { return tos.length==1 ? tos[0].oob(TypeObj.ISUSED): tos[at_idx(tos,alias)]; }
   // Alias-at index
   static int at_idx(TypeObj[]tos, int alias) {
+    if( alias==0 ) return 1;    // Either base memory, or assert
     while( true ) {
-      if( alias==0 ) return 0;
       if( alias < tos.length && tos[alias] != null )
         return alias;
       alias = BitsAlias.TREE.parent(alias);
+      assert alias!=0;
     }
   }
   //
@@ -161,6 +169,8 @@ public class TypeMem extends Type<TypeMem> {
 
   // Canonicalize memory before making.  Unless specified, the default memory is "do not care"
   public static TypeMem make0( TypeObj[] as ) {
+    assert as.length==1 || as[0]==null;
+    if( as.length> 1 ) as[0] = as[1].oob(TypeLive.LIVE);
     TypeObj[] tos = _make1(as);
     if( tos==null ) return DEAD; // All things are dead, so dead
     return make(tos);
@@ -169,14 +179,14 @@ public class TypeMem extends Type<TypeMem> {
   // Canonicalize memory before making.  Unless specified, the default memory is "do not care"
   private static TypeObj[] _make1( TypeObj[] as ) {
     int len = as.length;
-    if( as[1]==null ) {
+    if( len > 1 && as[1]==null ) {
       int i; for( i=2; i<len; i++ )
         if( as[i]!=null && as[i] != TypeObj.XOBJ )
           break;
       if( i==len ) return null; // All things are dead, so dead
       as[1] = TypeObj.XOBJ;     // Default memory is "do not care"
     }
-    if( len == 2 ) return as;
+    if( len <= 2 ) return as;
     // No dups of a parent
     for( int i=1; i<as.length; i++ )
       if( as[i] != null )
@@ -208,13 +218,14 @@ public class TypeMem extends Type<TypeMem> {
     return make0(as);
   }
 
+  public static TypeMem make_live(TypeLive live) { return make0(new TypeObj[]{live}); }
+  
   public static final TypeMem FULL; // Every alias filled with something
   public static final TypeMem EMPTY;// Every alias filled with anything
   public static final TypeMem  MEM; // FULL, except lifts REC, arrays, STR
   public static final TypeMem XMEM; //
   public static final TypeMem DEAD, ALIVE, LIVE_BOT; // Sentinel for liveness flow; not part of lattice
   public static final TypeMem ESCAPE; // Sentinel for liveness, where the value "escapes" the local scope
-  public static final TypeMem REPL; // Sentinel for liveness, where the value is used by the REPL; tentative
   public static final TypeMem ANYMEM,ALLMEM; // Every alias is unused (so above XOBJ or below OBJ)
   public static final TypeMem MEM_ABC, MEM_STR;
   static {
@@ -241,13 +252,12 @@ public class TypeMem extends Type<TypeMem> {
     MEM_ABC = make(BitsAlias.ABC,TypeStr.ABC.dual());
 
     // Sentinel for liveness flow; not part of lattice
-    DEAD   = make (new TypeObj[1]);
-    ALIVE  = make0(new TypeObj[]{null,TypeLive.LIVE    }); // Basic alive for all time
-    ESCAPE = make0(new TypeObj[]{null,TypeLive.ESCAPE  }); // Alive, plus escapes some call/memory
-    REPL   = make0(new TypeObj[]{null,TypeLive.REPL    }); // Alive by the REPL; tentative assuming type-checks.
-    LIVE_BOT=make0(new TypeObj[]{null,TypeLive.LIVE_BOT});
+    DEAD   = make_live(TypeLive.DEAD    );
+    ALIVE  = make_live(TypeLive.LIVE    ); // Basic alive for all time
+    ESCAPE = make_live(TypeLive.ESCAPE  ); // Alive, plus escapes some call/memory
+    LIVE_BOT=make_live(TypeLive.LIVE_BOT);
   }
-  static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC,ANYMEM,ESCAPE,REPL};
+  static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC,ANYMEM,ESCAPE};
 
   // All mapped memories remain, but each memory flips internally.
   @Override protected TypeMem xdual() {
@@ -260,17 +270,24 @@ public class TypeMem extends Type<TypeMem> {
   @Override protected Type xmeet( Type t ) {
     if( t._type != TMEM ) return ALL;
     TypeMem tf = (TypeMem)t;
-    // Sentinel only, not part of lattice.  Not symmetric, but we allow this shortcut here
-    if( this==DEAD ) return t;
-    if( tf  ==DEAD ) return this;
     // Meet of default values, meet of element-by-element.
-    return make0(_meet(_pubs,tf._pubs));
+    TypeObj[] as = _meet(_pubs,tf._pubs);
+    TypeObj[] tos = _make1(as);
+    return tos==null ? DEAD : make(tos); // All things are dead, so dead
   }
 
   private static TypeObj[] _meet(TypeObj[] as, TypeObj[] bs) {
+    TypeObj mt_live = (TypeObj)as[0].meet(bs[0]);
     int  len = Math.max(as.length,bs.length);
     int mlen = Math.min(as.length,bs.length);
+    if( mlen==1 ) {             // At least 1 is short
+      // Short & low "wins": result is short.
+      if( (!as[0].above_center() && as.length==1) ||
+          (!bs[0].above_center() && bs.length==1) )
+        return new TypeObj[]{mt_live};
+    }
     TypeObj[] objs = new TypeObj[len];
+    objs[0] = mt_live;
     for( int i=1; i<len; i++ )
       objs[i] = i<mlen && as[i]==null && bs[i]==null // Shortcut null-vs-null
         ? null : (TypeObj)at(as,i).meet(at(bs,i)); // meet element-by-element
@@ -393,6 +410,7 @@ public class TypeMem extends Type<TypeMem> {
     if( at(alias)==obj ) return this; // Shortcut
     int max = Math.max(_pubs.length,alias+1);
     TypeObj[] tos = Arrays.copyOf(_pubs,max);
+    tos[0] = null;
     tos[alias] = obj;
     return make0(tos);
   }
@@ -405,6 +423,7 @@ public class TypeMem extends Type<TypeMem> {
     TypeObj pub  = at(pubs ,alias); // Current value for alias
     if( pub==obj ) return this;     // Shortcut
     (pubs = _st_new(_pubs,pubs,alias))[alias] = (TypeObj)pub.meet(obj);
+    pubs[0] = null;
     return make0(pubs);
   }
   private static TypeObj[] _st_new( TypeObj[] base, TypeObj[] as, int alias ) {
@@ -488,6 +507,7 @@ public class TypeMem extends Type<TypeMem> {
     if( i== _pubs.length ) return this;
 
     TypeObj[] tos = _pubs.clone();
+    tos[0] = null;
     tos[i++] = tof;
     for( ; i< _pubs.length; i++ )
       if( tos[i] != null )
@@ -507,16 +527,8 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean must_nil() { return false; } // never a nil
   @Override Type not_nil() { return this; }
 
-  // null if not a basic TypeLive, such as TypeMem.DEAD, OR
-  // the TypeLive.
-  public TypeLive live() { return _pubs.length>1 && _pubs[1] instanceof TypeLive ? (TypeLive)_pubs[1] : null; }
-  public boolean is_live() { return this != DEAD; }
-  static public TypeMem live(TypeLive lv) {
-    if( lv==TypeLive.LIVE    ) return ALIVE;
-    if( lv==TypeLive.ESCAPE  ) return ESCAPE;
-    if( lv==TypeLive.REPL    ) return REPL;
-    if( lv==TypeLive.LIVE_BOT) return LIVE_BOT;
-    throw com.cliffc.aa.AA.unimpl();
-  }
+  public TypeLive live() { return (TypeLive)_pubs[0]; }
+  public boolean is_live() { return live()!=TypeLive.DEAD; }
+  public boolean basic_live() { return _pubs.length==1; }
 
 }

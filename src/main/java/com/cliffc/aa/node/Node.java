@@ -377,26 +377,15 @@ public abstract class Node implements Cloneable {
   // It must be monotonic.
   // This is a reverse-flow transfer-function computation.
   public TypeMem live( GVNGCM.Mode opt_mode ) {
-    if( basic_liveness() ) {    // Basic liveness only; e.g. primitive math ops, no memory
-      TypeLive alive=null;
-      for( Node use : _uses ) { // Computed across all uses
-        if( use._live == TypeMem.DEAD ) continue;
-        TypeMem live = use.live_use(opt_mode,this);
-        if( live==TypeMem.DEAD ) continue;
-        TypeLive lv = live.live();
-        if( lv == null ) lv=TypeLive.LIVE_BOT;
-        alive = alive==null ? lv : alive.lmeet(lv);
-        if( alive==TypeLive.LIVE_BOT ) return TypeMem.LIVE_BOT;
-      }
-      return alive==null ? TypeMem.DEAD : TypeMem.live(alive);
-    }
     // Compute meet/union of all use livenesses
     TypeMem live = TypeMem.DEAD; // Start at lattice top
     for( Node use : _uses )      // Computed across all uses
       if( use._live != TypeMem.DEAD )
         live = (TypeMem)live.meet(use.live_use(opt_mode, this)); // Make alive used fields
     live = live.flatten_fields();
-    assert !(live.at(1) instanceof TypeLive);
+    assert live==TypeMem.DEAD || live.basic_live()==basic_liveness();
+    assert live!=TypeMem.LIVE_BOT || (_val!=Type.CTRL && _val!=Type.XCTRL);
+    assert live!=TypeMem.LIVE_BOT || !(this instanceof IfNode);
     return live;
   }
   // Shortcut to update self-live
@@ -587,10 +576,10 @@ public abstract class Node implements Cloneable {
 
   // Error messages
   public static class ErrMsg implements Comparable<ErrMsg> {
-    public final Parse _loc;
-    public final String _msg;
-    public final Level _lvl;
-    public int _order;
+    public final Parse _loc;    // Point in code to blame
+    public final String _msg;   // Printable error message, minus code context
+    public final Level _lvl;    // Priority for printing
+    public int _order;          // Message order as they are found.
     public static final ErrMsg FAST = new ErrMsg(null,"fast",Level.Syntax);
     public static final ErrMsg BADARGS = new ErrMsg(null,"bad arguments",Level.BadArgs);
     public ErrMsg(Parse loc, String msg, Level lvl) { _loc=loc; _msg=msg; _lvl=lvl; }
@@ -650,9 +639,10 @@ public abstract class Node implements Cloneable {
     @Override public int compareTo(ErrMsg msg) {
       int cmp = _lvl.compareTo(msg._lvl);
       if( cmp != 0 ) return cmp;
-      cmp = _loc.compareTo(msg._loc);
-      if( cmp != 0 ) return cmp;
-      return _msg.compareTo(msg._msg);
+      return _order - msg._order;
+      //cmp = _loc.compareTo(msg._loc);
+      //if( cmp != 0 ) return cmp;
+      //return _msg.compareTo(msg._msg);
     }
     @Override public boolean equals(Object obj) {
       if( this==obj ) return true;

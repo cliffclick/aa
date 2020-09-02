@@ -32,6 +32,7 @@ abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
       // Storage class can be found by looking at _live, needs the reverse-flow of use sizes.
       return TypeAry.make((TypeInt)sz,Type.XNIL,TypeObj.OBJ);
     }
+    @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return _live; }
   }
 
 }

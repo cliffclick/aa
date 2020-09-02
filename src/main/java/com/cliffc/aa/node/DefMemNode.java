@@ -1,9 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeObj;
+import com.cliffc.aa.type.*;
 
 public class DefMemNode extends Node {
   public DefMemNode( Node ctrl) { super(OP_DEFMEM,ctrl); }

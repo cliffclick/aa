@@ -366,6 +366,8 @@ public class TestNodeSmall {
       TypeTuple.make( tctl, tfull, tadd2X, tscl , tscl , tadd2 ), //   S     S   [ int,flt,str] (L__,L__,L__) ; All  low , keep all, meet
     };
     _testMonotonicChain(ins,call,argss_add2);
+
+    gvn.kill(cepi);
   }
 
 

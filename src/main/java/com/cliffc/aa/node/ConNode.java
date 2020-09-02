@@ -2,8 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.*;
 
 public class ConNode<T extends Type> extends Node {
   T _t;                         // Not final for testing
@@ -22,10 +21,12 @@ public class ConNode<T extends Type> extends Node {
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
     // If any use is alive, the Con is alive... but it never demands memory.
     // Indeed, it may supply memory.
+    TypeLive live = TypeLive.DEAD; // Start at lattice top
     for( Node use : _uses )
-      if( use._live != TypeMem.DEAD && use.live_use(opt_mode,this) != TypeMem.DEAD )
-        return TypeMem.ALIVE;
-    return TypeMem.DEAD;
+      if( use._live != TypeMem.DEAD )
+        live = live.lmeet(use.live_use(opt_mode,this).live());
+    if( live.above_center() ) live = TypeLive.LIVE;
+    return TypeMem.make_live(live);
   }
   @Override public String toString() { return str(); }
   @Override public int hashCode() { return _t.hashCode(); }// In theory also slot 0, but slot 0 is always Start

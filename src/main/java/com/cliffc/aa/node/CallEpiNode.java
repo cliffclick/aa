@@ -214,7 +214,7 @@ public final class CallEpiNode extends Node {
       TypeMem live = arg._live;
       switch( idx ) {
       case  0: actual = new FP2ClosureNode(call); break; // Filter Function Pointer to Closure
-      case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); break; // Always RPC is a constant
+      case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); actual._live = live; break; // Always RPC is a constant
       case -2: actual = new MProjNode(call,CallNode.MEMIDX); break;    // Memory into the callee
       default: actual = idx >= call.nargs()              // Check for args present
           ? new ConNode<>(Type.ALL) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
@@ -222,7 +222,7 @@ public final class CallEpiNode extends Node {
         live = TypeMem.ESCAPE;
         break;
       }
-      actual = gvn._opt_mode == GVNGCM.Mode.Opto ? gvn.new_gcp(actual) : gvn.xform(actual);
+      actual = (gvn._opt_mode == GVNGCM.Mode.Opto || gvn._opt_mode == GVNGCM.Mode.OptoREPL) ? gvn.new_gcp(actual) : gvn.xform(actual);
       gvn.add_def(arg,actual);
       actual._live = (TypeMem)actual._live.meet(live);
       gvn.add_work(actual);
