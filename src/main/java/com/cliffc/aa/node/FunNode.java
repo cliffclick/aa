@@ -206,6 +206,18 @@ public class FunNode extends RegionNode {
       CallEpiNode cepi = call.cepi();
       assert cepi._defs.find(ret)!= -1;  // If this is not wired, just bail
     }
+    // Memory is not 'lifted' by DefMem, a sign that a bad-memory-arg is being
+    // passed in.
+    if( has_unknown_callers() ) {
+      ParmNode mem = parm(-2);
+      if( mem!=null ) {
+        Type mt = Type.ANY;
+        for( int i=1; i<_defs._len; i++ )
+          mt = mt.meet(mem.val(i));
+        if( !mt.isa(Env.DEFMEM._val) )
+          return null;          // Do not inline a bad memory type
+      }
+    }
 
     // Look for appropriate type-specialize callers
     TypeStruct formals = type_special(parms);
@@ -217,22 +229,19 @@ public class FunNode extends RegionNode {
       // Large code-expansion allowed; can inline for other reasons
       path = split_size(body,parms);
       if( path == -1 ) return null;
-      CallNode call = (CallNode)in(path).in(0);
-      if( !(call.fun() instanceof FunPtrNode) )
-        return null;
       if( noinline() ) return null;
       if( !is_prim() ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
-    }
-    // Memory is not 'lifted' by DefMem, a sign that a bad-memory-arg is being
-    // passed in.
-    if( has_unknown_callers() ) {
-      ParmNode mem = parm(-2);
-      if( mem!=null ) {
-        Type mt = Type.ANY;
-        for( int i=1; i<_defs._len; i++ )
-          mt = mt.meet(mem.val(i));
-        if( !mt.isa(Env.DEFMEM._val) )
-          return null;          // Do not inline a bad memory type
+      // To do a size-split, we are splitting so this one path can inline.  The
+      // one path needs to directly reference the existing function with a
+      // FunPtr, so after the split the Call can be pointed directly to the new
+      // function.
+      CallNode call = (CallNode)in(path).in(0);
+      if( !(call.fun() instanceof FunPtrNode) ) {
+        // Make a local FunPtr with the current Display.
+        Node disp = gvn.xform(new FP2ClosureNode(call.fun()));
+        Node fptr = gvn.xform(new FunPtrNode(ret,disp));
+        body.add(fptr);
+        call.set_fun_reg(fptr,gvn);
       }
     }
 
@@ -314,8 +323,10 @@ public class FunNode extends RegionNode {
     return -1; // No unresolved calls; no point in type-specialization
   }
 
+  // Find types for which splitting appears to help.
   private Type[] find_type_split( ParmNode[] parms ) {
     assert has_unknown_callers(); // Only overly-wide calls.
+
     // Look for splitting to help an Unresolved Call.
     int idx = find_type_split_index(parms);
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
@@ -352,7 +363,14 @@ public class FunNode extends RegionNode {
       sig[i] = TypeMemPtr.make(BitsAlias.RECORD_BITS0,to); // Signature takes any alias but has sharper guts
       progress = true;
     }
-    return progress ?  sig : null;
+    if( progress ) return sig;
+
+    // Look for splitting default input off, with multiple resolved calls.
+    // Specifically to help the REPL.
+    if( _defs._len > 3 )
+      return null; // Split here
+
+    return null;
   }
 
   // Check all uses are compatible with sharpening to a pointer
@@ -440,6 +458,10 @@ public class FunNode extends RegionNode {
       if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
       if( op == OP_DEFMEM ) continue;       // Never part of body, but reachable from all allocations
       if( op == OP_RET && n != ret ) continue; // Return (of other function)
+      // OP_FUNPTR: Can be reached from an internal NewObjNode/display, or
+      // following the local Return.  The local FunPtrs are added below.
+      // Adding the reached FunPtrs here clones them, making new FunPtrs using
+      // either the old or new display.
       if( freached.tset(n._uid) ) continue; // Already visited?
       if( op == OP_RET ) continue;          // End of this function
       if( n instanceof ProjNode && n.in(0) instanceof CallNode ) continue; // Wired call; all projs lead to other functions

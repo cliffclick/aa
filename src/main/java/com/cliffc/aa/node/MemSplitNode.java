@@ -60,14 +60,14 @@ public class MemSplitNode extends Node {
     // Remove (non-overlapping) bits from the rollup
     _escs.set(0,(BitsAlias)_escs.at(0).subtract(_escs.at(idx)));
     _escs.remove(idx);          // Remove the escape set
-    TypeTuple tt = (TypeTuple)xval(gvn._opt_mode); // Reduce tuple result
+    Type tt = xval(gvn._opt_mode); // Reduce tuple result
     // Renumber all trailing projections to match
     for( Node use : _uses ) {
       MProjNode mprj = (MProjNode)use;
       if( mprj._idx > idx ) {
-        gvn.unreg(mprj);
+        Type old = gvn.unreg(mprj);
         mprj._idx--;
-        gvn.rereg(mprj,tt.at(mprj._idx));
+        gvn.rereg(mprj,tt instanceof TypeTuple ? ((TypeTuple)tt).at(mprj._idx) : tt);
       }
     }
   }

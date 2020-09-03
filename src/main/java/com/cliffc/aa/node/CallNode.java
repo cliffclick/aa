@@ -143,7 +143,7 @@ public class CallNode extends Node {
   static        TypeMem    emem( Type tcall ) { return emem(       ((TypeTuple)tcall)._ts ); }
   static        TypeMem    emem( Type[] ts  ) { return (TypeMem   ) ts[MEMIDX]; } // callee memory passed into function
   TypeMemPtr tesc( Type tcall ) {
-    return tcall==Type.ANY ? TypeMemPtr.OOP.dual() : (TypeMemPtr)((TypeTuple)tcall).at(_defs._len);
+    return tcall instanceof TypeTuple ? (TypeMemPtr)((TypeTuple)tcall).at(_defs._len) : tcall.oob(TypeMemPtr.OOP);
   }
   static public TypeFunPtr ttfp( Type tcall ) { return (TypeFunPtr)((TypeTuple)tcall).at(ARGIDX); }
   static public TypeFunPtr ttfpx(Type tcall ) {

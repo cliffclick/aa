@@ -47,7 +47,7 @@ public final class FunPtrNode extends Node {
 
     // Remove unused displays.  Track uses; Calls with no FPClosure are OK.
     // Uses storing the FPTR and passing it along are dangerous.
-    if( gvn._opt_mode!=GVNGCM.Mode.Parse && !(display() instanceof ConNode) ) {
+    if( gvn._opt_mode._CG && !(display() instanceof ConNode) ) {
       boolean safe=true;
       for( Node use : _uses )  {
         if( !(use instanceof CallNode) ) { safe=false; break; }

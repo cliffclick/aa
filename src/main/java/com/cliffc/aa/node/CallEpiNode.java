@@ -72,6 +72,7 @@ public final class CallEpiNode extends Node {
           tretmem.isa(tdef) &&          // Call and return memory at least as good as default
           call.mem().in(0) != call &&   // Dead self-recursive
           fun.in(1)._uses._len==1 &&    // And only calling fun
+          ret._live.isa(_live) &&       // Call and return liveness compatible
           !fun.noinline() ) {           // And not turned off
         assert fun.in(1).in(0)==call;   // Just called by us
         fun.set_is_copy(gvn);

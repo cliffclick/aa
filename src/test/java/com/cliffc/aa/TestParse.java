@@ -16,7 +16,6 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeStr.NO_DISP);
-    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x=1;y=2} is not a *[$]Point:@{x:=;y:=}",55);
 
     // A collection of tests which like to fail easily
     test("-1",  TypeInt.con( -1));
@@ -656,6 +655,8 @@ public class TestParse {
   private final String DO="do={pred->{body->!pred()?^;body(); do pred body}};";
 
   @Test public void testParse13() {
+    test(DO+"sum:=0; i:=0; do {i++ < 100} {sum:=sum+i}; sum",TypeInt.INT64);
+
     test(DO+"i:=0; do {i++ < 2} {i== 9} ? ",Type.XNIL);    // Late exit, body never returns true.
     test(FORELSE+"i:=0; for {i++ < 100} {i== 5} ",TypeInt.BOOL); // Not sure of exit value, except bool
     test(FORELSE+"i:=0; for {i++ < 100} {i==50?i}",TypeInt.INT64); // Early exit on condition i==50

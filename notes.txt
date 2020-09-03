@@ -14,6 +14,7 @@ Thinking-
   ever-more-minor variants), where a Fun with multi-inputs can split?
 - Cleanup & keep merged live state.  Means I can reverse-flow some flags in the
   future.
+  
 - Clone always has a default input; limit to sig improvements, although even
   minor sig improvements might be good?
 - GCP/Opto.  Both defaults & clones get a chance to resolve.  Some/(many?) of
