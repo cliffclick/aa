@@ -5,7 +5,7 @@ import com.cliffc.aa.type.*;
 
 // Split control
 public class IfNode extends Node {
-  public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); _live = TypeMem.ALIVE; }
+  public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); }
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node ctl = in(0);
     Node tst = in(1);
@@ -72,6 +72,7 @@ public class IfNode extends Node {
 
     throw AA.unimpl(); // Dunno what test this is?
   }
+  @Override public TypeMem all_live() { return TypeMem.ALIVE; }
   @Override public Node is_copy(GVNGCM gvn, int idx) {
     if( !(_val instanceof TypeTuple) ) return null;
     TypeTuple tt = (TypeTuple)_val;

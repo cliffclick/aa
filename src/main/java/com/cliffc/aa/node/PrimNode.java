@@ -31,7 +31,7 @@ public abstract class PrimNode extends Node {
     if( PRIMS!=null ) return PRIMS;
     return PRIMS = new PrimNode[] {
       new RandI64(),
-      new Id(TypeMemPtr.OOP0), // Pre-split OOP from non-OOP
+      new Id(TypeMemPtr.ISUSED0), // Pre-split OOP from non-OOP
       new Id(TypeFunPtr.GENERIC_FUNPTR),
       new Id(Type.REAL),
 

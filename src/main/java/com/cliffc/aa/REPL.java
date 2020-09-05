@@ -10,31 +10,35 @@ import java.util.Scanner;
 
 public abstract class REPL {
   public static final String prompt="> ";
-  public static void go( Env env ) {
-    Scanner stdin = init(env);
+  public static String go( ) {
+    String prog = "";
+    Scanner stdin = init();
     while( stdin.hasNextLine() )
-      go_one(env,stdin);
+      prog = go_one(prog,stdin.nextLine());
+    return prog;
   }
 
-  static Scanner init( Env env) {
+  static Scanner init() {
     System.out.print(prompt);
     System.out.flush();
     return new Scanner(System.in);
   }
 
-  static void go_one( Env env, Scanner stdin ) {
-    String line = stdin.nextLine();
-    TypeEnv te = new Parse("stdin",env,line).go_partial();
+  static String go_one( String prog, String line ) {
+    String prog2 = prog+line+";"+System.lineSeparator();
+    TypeEnv te = Exec.go(Env.file_scope(Env.top_scope()),"stdin",prog2);
     if( te._errs == null ) {
       Type t = te._t;
       if( t instanceof TypeMemPtr )
         t = te._tmem.ld((TypeMemPtr)t); // Peek thru pointer
       SB sb = t.str(new SB(),null,te._tmem); // Print what we see, with memory
       System.out.println( sb.toString() );
+      prog = prog2;
     } else
       System.out.print( te._errs.get(0) );
     System.out.print(prompt);
     System.out.flush();
+    return prog;
   }
-  
+
 }

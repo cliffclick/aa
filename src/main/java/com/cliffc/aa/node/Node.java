@@ -175,7 +175,7 @@ public abstract class Node implements Cloneable {
     _uses = new Ary<>(new Node[1],0);
     for( Node def : defs ) if( def != null ) def._uses.add(this);
     _val = null;
-    _live = basic_liveness() ? TypeMem.LIVE_BOT : TypeMem.ALLMEM;
+    _live = all_live();
   }
 
   // Is 'touched' is just 'has a value', and also 'is in the GVN system'
@@ -383,9 +383,8 @@ public abstract class Node implements Cloneable {
       if( use._live != TypeMem.DEAD )
         live = (TypeMem)live.meet(use.live_use(opt_mode, this)); // Make alive used fields
     live = live.flatten_fields();
-    assert live==TypeMem.DEAD || live.basic_live()==basic_liveness();
+    assert live==TypeMem.DEAD || live.basic_live()==all_live().basic_live();
     assert live!=TypeMem.LIVE_BOT || (_val!=Type.CTRL && _val!=Type.XCTRL);
-    assert live!=TypeMem.LIVE_BOT || !(this instanceof IfNode);
     return live;
   }
   // Shortcut to update self-live
@@ -396,9 +395,9 @@ public abstract class Node implements Cloneable {
     return _keep>0 ? TypeMem.MEM : _live;
   }
 
-  // Compute basic liveness only: a flag of alive-or-dead represented
-  // as TypeMem.DEAD or TypeMem.ALIVE or TypeMem.ESCAPE;
-  public boolean basic_liveness() { return true; }
+  // Default lower-bound liveness.  For control, its always "ALIVE" and for
+  // memory opts (and tuples with memory) its "ALL_MEM".
+  public TypeMem all_live() { return TypeMem.LIVE_BOT; }  
   // We have a 'crossing optimization' point: changing the pointer input to a
   // Load or a Scope changes the memory demanded by the Load or Scope.  Same:
   // changing a def._type changes the use._live, requiring other defs to be

@@ -92,7 +92,6 @@ public class TypeNode extends Node {
     }
     return t1.oob(t0);
   }
-  @Override public boolean basic_liveness() { return true; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==arg() ) return _live;                   // Alive as I am
     // Alive (like normal liveness), plus the address, plus whatever can be

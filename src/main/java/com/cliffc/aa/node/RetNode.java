@@ -167,7 +167,7 @@ public final class RetNode extends Node {
   }
 
 
-  @Override public boolean basic_liveness() { return false; }
+  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
     // Pre-GCP, might be used anywhere (still finding CFG)
     return !opt_mode._CG ? TypeMem.ALLMEM : super.live(opt_mode);

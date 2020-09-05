@@ -19,15 +19,12 @@ public class GVNGCM {
   public int uid() { assert CNT < 100000 : "infinite node create loop"; _live.set(CNT);  return CNT++; }
 
   public enum Mode {
-    Parse   (false,false),      // Parsing
-    PesiNoCG(false,true ),      // Lifting, unknown Call Graph, no more code
-    Opto    (true ,true ),      // Falling, Call Graph discovery, no more code
-    PesiCG  (true ,true ),      // Lifting,   known Call Graph
-    PesiREPL(false,false),      // Lifting, unknown Call Graph, more code
-    OptoREPL(false,false);      // Falling, Call Graph discovery, more code
-    public final boolean _CG;   // True if full CG is known or being discovered.  Only for whole programs during or after Opto.
-    public final boolean _whole;// True if whole program has been seen.  False in the REPL.
-    Mode(boolean CG, boolean whole) { _CG=CG; _whole=whole; }
+    Parse   (false),          // Parsing
+    PesiNoCG(false),          // Lifting, unknown Call Graph
+    Opto    (true ),          // Falling, Call Graph discovery, no more code
+    PesiCG  (true );          // Lifting,   known Call Graph
+    public final boolean _CG; // True if full CG is known or being discovered.  Only for whole programs during or after Opto.
+    Mode(boolean CG) { _CG=CG; }
   }
   public Mode _opt_mode=Mode.Parse;
 

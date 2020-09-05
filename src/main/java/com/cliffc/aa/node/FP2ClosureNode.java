@@ -26,7 +26,7 @@ public final class FP2ClosureNode extends Node {
     Type tfp = t0 instanceof TypeTuple ? CallNode.ttfp(t0) : t0;
     return convert(tfp).simple_ptr();
   }
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def.basic_liveness() ? TypeMem.ALIVE: TypeMem.ANYMEM; }
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
   static public Type convert( Type t ) {
     if( !(t instanceof TypeFunPtr) )
       return t.above_center() ? TypeFunPtr.DISP.dual() : TypeFunPtr.DISP;

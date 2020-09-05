@@ -11,7 +11,7 @@ import java.util.function.Predicate;
 public final class TypeMemPtr extends Type<TypeMemPtr> {
   // List of known memory aliases.  Zero is nil.
   public BitsAlias _aliases;
-  
+
   // The _obj field is unused (trivially OBJ or XOBJ) for TMPs used as graph
   // node results, because memory contents are modified in TypeMems and
   // TypeObjs and NOT in pointers - hence this field "goes stale" rapidly as
@@ -85,9 +85,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   static {
     DISPLAY_PTR._hash = DISPLAY_PTR.compute_hash(); // Filled in during DISPLAY.install_cyclic
   }
+  public  static final TypeMemPtr ISUSED0= make(BitsAlias.NZERO   ,TypeObj.ISUSED); // Includes nil
+  public  static final TypeMemPtr ISUSED = make(BitsAlias.NZERO   ,TypeObj.ISUSED); // Excludes nil
   public  static final TypeMemPtr OOP0   = make(BitsAlias.FULL    ,TypeObj.OBJ); // Includes nil
   public  static final TypeMemPtr OOP    = make(BitsAlias.NZERO   ,TypeObj.OBJ); // Excludes nil
-  public  static final TypeMemPtr ISUSED = make(BitsAlias.NZERO   ,TypeObj.ISUSED); // Excludes nil
   public  static final TypeMemPtr ARYPTR = make(BitsAlias.ARYBITS ,TypeAry.ARY);
   public  static final TypeMemPtr STRPTR = make(BitsAlias.STRBITS ,TypeStr.STR);
   public  static final TypeMemPtr STR0   = make(BitsAlias.STRBITS0,TypeStr.STR);
@@ -157,13 +158,13 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return _aliases.above_center();
   }
   @Override public Type bound_impl(Type t) {
-    if( !(t instanceof TypeMemPtr) ) return oob();
+    if( !(t instanceof TypeMemPtr) ) return oob(t);
     TypeMemPtr tmp = (TypeMemPtr)t;
     // Deep bounds; keep the in-bounds _aliases but bound the _obj.
     if( tmp._aliases.dual().isa(_aliases) && _aliases.isa(tmp._aliases) )
-      return _obj.bound_impl(tmp._obj);
+      return make(_aliases,(TypeObj)_obj.bound_impl(tmp._obj));
     // Aliases OOB
-    return oob();
+    return oob(t);
   }
   // Aliases represent *classes* of pointers and are thus never constants.
   // nil is a constant.

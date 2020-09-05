@@ -124,7 +124,7 @@ public class MemJoinNode extends Node {
     }
     return TypeMem.make0(pubs);
   }
-  @Override public boolean basic_liveness() { return false; }
+  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 
   // Move the given SESE region just ahead of the split into the join/split
   // area.  The head node has the escape-set.

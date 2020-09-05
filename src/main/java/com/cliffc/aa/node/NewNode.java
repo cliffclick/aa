@@ -72,6 +72,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     return TypeTuple.make(is_unused() ? TypeObj.UNUSED : valueobj(),_tptr);   // Complex obj, simple ptr.
   }
   abstract TypeObj valueobj();
+  @Override public TypeMem all_live() { return TypeMem.ALIVE; } // Just normal alive; this is a TypeObj not a TypeMem
 
   @Override BitsAlias escapees() { return _tptr._aliases; }
   abstract T dead_type();

@@ -40,7 +40,7 @@ public class MemSplitNode extends Node {
     Arrays.fill(ts,t);
     return TypeTuple.make(ts);
   }
-  @Override public boolean basic_liveness() { return false; }
+  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 
   // Find the escape set this esc set belongs to, or make a new one.
   int add_alias( GVNGCM gvn, BitsAlias esc ) {

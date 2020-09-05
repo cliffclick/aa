@@ -10,7 +10,7 @@ public abstract class Exec {
   }
   // Caller must close TypeEnv
   static TypeEnv open( Env top, String src, String str ) { // Execute string
-    return (P=new Parse(src,top,str)).go_whole();
+    return (P=new Parse(src,top,str)).go();
   }
 
   public static String dump() { return Env.START.dumprpo(false,false); } // Debugging hook

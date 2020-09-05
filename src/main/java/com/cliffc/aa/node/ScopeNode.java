@@ -83,7 +83,6 @@ public class ScopeNode extends Node {
     Node rez = rez();
     Type trez = rez==null ? null : rez._val;
     if( gvn._opt_mode != GVNGCM.Mode.Parse &&   // Past parsing
-        gvn._opt_mode._whole &&                 // And whole program
         rez != null &&          // Have a return result
         // If type(rez) can never lift to any TMP, then we will not return a
         // pointer, and do not need the memory state on exit.
@@ -96,7 +95,7 @@ public class ScopeNode extends Node {
     return null;
   }
   @Override public Type value(GVNGCM.Mode opt_mode) { return Type.ALL; }
-  @Override public boolean basic_liveness() { return false; }
+  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 
   // From a memory and a possible pointer-to-memory, find all the reachable
   // aliases and fold them into 'live'.  This is unlike other live_use
@@ -115,11 +114,8 @@ public class ScopeNode extends Node {
     return tmem0.slice_reaching_aliases(aliases);
   }
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
-    // The top scope is always alive, and represents what all future unparsed
-    // code MIGHT do.
-    if( !opt_mode._whole && _uses._len==0 ) return TypeMem.ALLMEM; // In the REPL, future code can touch all memory
-    if( this==Env.SCP_0 )
-      return opt_mode._CG ? TypeMem.DEAD : TypeMem.ALLMEM;
+    // Prim scope is not used past Call-Graph discovery
+    if( this==Env.SCP_0 )  return opt_mode._CG ? TypeMem.DEAD : TypeMem.ALLMEM;
     assert _uses._len==0;
     // All fields in all reachable pointers from rez() will be marked live
     return compute_live_mem(mem(),rez()).flatten_fields();
@@ -128,12 +124,14 @@ public class ScopeNode extends Node {
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     // The top scope is always alive, and represents what all future unparsed
     // code MIGHT do.
-    if( this==Env.SCP_0 && opt_mode._CG && opt_mode._whole )
+    if( this==Env.SCP_0 && opt_mode._CG )
       return TypeMem.DEAD;
     // Basic liveness ("You are Alive!") for control and returned value
     if( def == ctrl() ) return TypeMem.ALIVE;
-    if( def == rez () ) return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM;
-    if( def == ptr () ) return opt_mode._whole ? TypeMem.DEAD : TypeMem.LIVE_BOT; // Returned display is dead, alive & escape in the REPL
+    if( def == rez () ) return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM;
+    // Returned display is dead in a whole program.
+    // In a partial-program, whats in the display is exported to the next step.
+    if( def == ptr () ) return opt_mode._CG ? TypeMem.DEAD : TypeMem.LIVE_BOT; // Returned display is dead after CG
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.
     assert def == mem();

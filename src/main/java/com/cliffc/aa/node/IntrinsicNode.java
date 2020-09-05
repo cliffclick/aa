@@ -101,7 +101,7 @@ public class IntrinsicNode extends Node {
     TypeObj rez = (TypeObj)obj.set_name(_tn._name);
     return tmem.set(alias,rez);
   }
-  @Override public boolean basic_liveness() { return false; }
+  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==mem() ) return _live;
     return TypeMem.ALIVE;

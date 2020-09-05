@@ -76,7 +76,6 @@ public final class FunPtrNode extends Node {
     return TypeFunPtr.make(ret._fidx,ret._nargs,(TypeMemPtr)tdisp);
   }
 
-  @Override public boolean basic_liveness() { return true; }
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
     // Pre-GCP, might be used anywhere (still finding the CFG)
     return !opt_mode._CG ? TypeMem.ESCAPE : super.live(opt_mode);

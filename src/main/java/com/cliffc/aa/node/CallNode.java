@@ -347,7 +347,7 @@ public class CallNode extends Node {
       return _val; // Display and FIDX mis-aligned; stall
     // Resolve; only keep choices with sane arguments during GCP
     // Unpacked: to be monotonic, skip resolve until unpacked.
-    BitsFun rfidxs = _unpacked ? resolve(fidxs,ts,tmem,opt_mode==GVNGCM.Mode.Opto || opt_mode==GVNGCM.Mode.OptoREPL) : fidxs;
+    BitsFun rfidxs = _unpacked ? resolve(fidxs,ts,tmem,opt_mode==GVNGCM.Mode.Opto) : fidxs;
     if( rfidxs==null ) return _val; // Dead function input, stall until this dies
     // nargs is min nargs across the resolved fidxs for below-center, max for above.
     boolean rup = rfidxs.above_center();
@@ -406,7 +406,7 @@ public class CallNode extends Node {
     // enough to declare this live, so it exists for errors.
     return super.live(opt_mode);
   }
-  @Override public boolean basic_liveness() { return false; }
+  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==fun() ) {                         // Function argument
       if( !opt_mode._CG ) return TypeMem.ESCAPE; // Prior to GCP, assume all fptrs are alive and display escapes
@@ -424,7 +424,7 @@ public class CallNode extends Node {
         if( proj == null || proj._live == TypeMem.DEAD )
           return TypeMem.DEAD; // Proj not used
       }
-      assert def.basic_liveness();
+      assert def.all_live().basic_live();
       return TypeMem.ESCAPE;    // Args always alive and escape
     }
 

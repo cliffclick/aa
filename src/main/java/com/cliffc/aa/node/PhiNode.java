@@ -16,7 +16,7 @@ public class PhiNode extends Node {
     else if( t instanceof TypeTuple ) _t = Type.SCALAR;
     else { assert t.isa(Type.SCALAR); _t = Type.SCALAR; }
     _badgc = badgc;
-    _live = basic_liveness() ? TypeMem.LIVE_BOT : TypeMem.ALLMEM;
+    _live = all_live();         // Recompute starting live after setting t
   }
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
   // For ParmNodes
@@ -65,10 +65,12 @@ public class PhiNode extends Node {
     return t;
   }
   @Override BitsAlias escapees() { return BitsAlias.FULL; }
-  @Override public boolean basic_liveness() { return _t==Type.SCALAR; }
+  @Override public TypeMem all_live() {
+    return _t==Type.SCALAR ? TypeMem.LIVE_BOT : TypeMem.ALLMEM;
+  }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==in(0) ) return TypeMem.ALIVE;
-    return basic_liveness() && !def.basic_liveness() ? TypeMem.ANYMEM : _live;
+    return all_live().basic_live() && !def.all_live().basic_live() ? TypeMem.ANYMEM : _live;
   }
 
   @Override public ErrMsg err( boolean fast ) {

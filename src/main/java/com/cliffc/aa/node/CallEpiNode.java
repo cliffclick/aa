@@ -223,7 +223,7 @@ public final class CallEpiNode extends Node {
         live = TypeMem.ESCAPE;
         break;
       }
-      actual = (gvn._opt_mode == GVNGCM.Mode.Opto || gvn._opt_mode == GVNGCM.Mode.OptoREPL) ? gvn.new_gcp(actual) : gvn.xform(actual);
+      actual = gvn._opt_mode == GVNGCM.Mode.Opto ? gvn.new_gcp(actual) : gvn.xform(actual);
       gvn.add_def(arg,actual);
       actual._live = (TypeMem)actual._live.meet(live);
       gvn.add_work(actual);
@@ -488,7 +488,7 @@ public final class CallEpiNode extends Node {
     assert sane_wiring();
   }
 
-  @Override public boolean basic_liveness() { return false; }
+  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // Compute local contribution of use liveness to this def.  If the call is
   // Unresolved, then none of CallEpi targets are (yet) alive.
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {

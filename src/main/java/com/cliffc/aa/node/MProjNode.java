@@ -20,7 +20,7 @@ public class MProjNode extends ProjNode {
     return null;
   }
   @Override BitsAlias escapees() { return in(0).escapees(); }
-  @Override public boolean basic_liveness() { return false; }
+  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // Only called here if alive, and input is more-than-basic-alive
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return _live; }
 }

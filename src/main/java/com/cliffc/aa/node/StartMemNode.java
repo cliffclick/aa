@@ -12,7 +12,7 @@ public class StartMemNode extends Node {
     // All things are '~use' (to-be-allocated)
     return TypeMem.ANYMEM;
   }
-  @Override public boolean basic_liveness() { return false; }
+  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // StartMemNodes are never equal
   @Override public int hashCode() { return 123456789+2; }
   @Override public boolean equals(Object o) { return this==o; }

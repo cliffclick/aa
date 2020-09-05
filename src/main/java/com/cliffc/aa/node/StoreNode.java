@@ -101,7 +101,7 @@ public class StoreNode extends Node {
     return ((TypeMemPtr)adr)._aliases;
   }
 
-  @Override public boolean basic_liveness() { return false; }
+  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // Compute the liveness local contribution to def's liveness.  Ignores the
   // incoming memory types, as this is a backwards propagation of demanded
   // memory.

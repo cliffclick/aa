@@ -7,7 +7,7 @@ import com.cliffc.aa.type.TypeMem;
 // Proj control
 public class CProjNode extends ProjNode {
   public CProjNode( Node ifn, int idx ) { this(OP_CPROJ,ifn,idx); }
-  public CProjNode( byte op, Node ifn, int idx ) { super(op,ifn,idx); _live = TypeMem.ALIVE; }
+  public CProjNode( byte op, Node ifn, int idx ) { super(op,ifn,idx); }
   @Override String xstr() {
     if( !is_dead() && in(0) instanceof IfNode )
       return _idx==0 ? "False" : "True";
@@ -19,7 +19,8 @@ public class CProjNode extends ProjNode {
     if( x==Type.ALL ) return Type. CTRL;
     return x;
   }
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
+  @Override public TypeMem all_live() { return TypeMem.ALIVE; }
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.
   @Override public byte op_prec() { return _defs.at(0).op_prec(); }

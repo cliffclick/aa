@@ -136,7 +136,7 @@ public abstract class MemPrimNode extends PrimNode {
       return new FunPtrNode(ret,gvn.con(TypeFunPtr.NO_DISP));
     }
 
-    @Override public boolean basic_liveness() { return false; }
+    @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
     // The only memory required here is what is needed to support the Load
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
       if( def==mem() ) return _live; // Pass full liveness along

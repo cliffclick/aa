@@ -29,6 +29,7 @@ public class UnresolvedNode extends Node {
       if( in(i) instanceof UnresolvedNode ) {
         progress = true;
         Node u = in(i);
+// TODO: folding a primitive Unresolved, instead probably need to make a new one...
         for( int j=0; j<u._defs._len; j++ )
           add_def(u.in(j));
         set_def(i,pop(),gvn);
@@ -80,12 +81,11 @@ public class UnresolvedNode extends Node {
   // Return a funptr for this fidx.
   FunPtrNode find_fidx( int fidx ) {
     for( Node n : _defs )
-      if( ((FunPtrNode)n).fun()._fidx==fidx )
+      if( ((FunPtrNode)n).ret()._fidx==fidx )
         return (FunPtrNode)n;
     return null;
   }
 
-  @Override public boolean basic_liveness() { return true; }
   // Compute local contribution of use liveness to this def.
   // If pre-GCP, same as value() above, use the conservative answer.
   // During GCP, this will resolve so use the optimistic answer.

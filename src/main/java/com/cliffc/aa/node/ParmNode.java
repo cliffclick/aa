@@ -90,9 +90,9 @@ public class ParmNode extends PhiNode {
     // All callers known; merge the wired & flowing ones
     Type t = Type.ANY;
     for( int i=1; i<_defs._len; i++ ) {
-      if( fun.val(i)!=Type.CTRL ) continue; // Only meet alive paths
+      if( fun.val(i)==Type.XCTRL || fun.val(i)==Type.ANY ) continue; // Only meet alive paths
       // Check arg type, after sharpening
-      Type ta = in(i).sharptr(mem.in(i));
+      Type ta = mem == null ? val(i) : in(i).sharptr(mem.in(i));
       t = t.meet(ta);
     }
 
@@ -101,10 +101,21 @@ public class ParmNode extends PhiNode {
     Type formal = fun.formal(_idx);
     // Good case: t.isa(formal).
     if( t.isa(formal) )  return t.simple_ptr();
+
+    // TODO: Incoming type is in-error.  Most Types I can 'bound' and that
+    // counts as 'poisoned' enough to prevent further optimization
+    // (e.g. constant folding), so the Parm does not later go unused.  Not so
+    // for pointers, where a Load might find constants in memory, even from a
+    // bounded pointer.  The issue is, I am not ALSO bounding memory.
+    if( formal instanceof TypeMemPtr ) {
+      BitsAlias aliases = ((TypeMemPtr)formal)._aliases;
+      if( aliases==BitsAlias.FULL || aliases==BitsAlias.NZERO ) return formal;
+      if( aliases.isa(BitsAlias.RECORD_BITS0) ) return TypeMemPtr.OOP0.simple_ptr();
+      if( aliases.isa(BitsAlias.    STRBITS0) ) return TypeMemPtr.STR0.simple_ptr();
+      return TypeMemPtr.ARYPTR.simple_ptr();
+    }
     return t.bound(formal);
   }
-  // TODO: for mem(), include ScopeNode.compute_live_mem forall args & mem.
-  // Needed to sharpen args for e.g. value OOB and errors
 
   @Override public ErrMsg err( boolean fast ) {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere

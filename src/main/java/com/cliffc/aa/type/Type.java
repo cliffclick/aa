@@ -586,7 +586,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     return bound_impl(t);
   }
   // Compute recursively deep bounds, knowing OOB already.
-  public Type bound_impl(Type t) { return oob(); }
+  public Type bound_impl(Type t) { return oob(t); }
   public Type       oob( ) { return oob(ALL); }
   public Type       oob(Type       e) { return above_center() ? e.dual() : e; }
   public TypeObj    oob(TypeObj    e) { return above_center() ? (TypeObj)e.dual() : e; }

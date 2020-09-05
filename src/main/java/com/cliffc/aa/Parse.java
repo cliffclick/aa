@@ -95,58 +95,10 @@ public class Parse implements Comparable<Parse> {
   String dumprpo() { return Env.START.dumprpo(false,false); }// debugging hook
 
   // Parse the string in the given lookup context, and return an executable
-  // program.  Called in a partial-program context; passed in an existing
-  // file-sized ScopeNode with existing variables which survive to the next call.
-  // Used by the REPL to do incremental typing.
-  TypeEnv go_partial( ) {
-    Node xnil = _gvn.con(Type.XNIL);
-    // Replicate the top-scope & display chain, and set it aside.
-    Node orig_ctrl = _e._scope.ctrl();
-    Ary<Node> orig_disp = _e._scope.stk()._defs.deepCopy();
-    for( Node def : orig_disp ) if( def != null ) def.keep();
-    TypeStruct orig_t = _e._scope.stk()._ts;
-
-    prog();        // Parse a program
-    _gvn.rereg(_e._scope,Type.ALL);
-    _e._scope.xliv(_gvn._opt_mode);
-    for( Node n : _gvn.valsKeySet() ) _gvn.add_work(n); // Adding top-level defs must flow everywhere
-    _gvn.iter(GVNGCM.Mode.PesiREPL); // Pessimistic optimizations; might improve error situation
-    _gvn.gcp (GVNGCM.Mode.OptoREPL,_e._scope); // Global Constant Propagation
-    _gvn.iter(GVNGCM.Mode.PesiREPL); // Re-check all ideal calls now that types have been maximally lifted
-    _gvn.gcp (GVNGCM.Mode.OptoREPL,_e._scope); // Global Constant Propagation
-    _gvn.iter(GVNGCM.Mode.PesiREPL); // Re-check all ideal calls now that types have been maximally lifted
-    TypeEnv te = gather_errors();
-    if( te._errs!=null )        // If errors, roll back - no effects from the bad code
-      reset_partial(orig_ctrl, orig_disp, orig_t);
-    for( Node def : orig_disp ) if( def != null ) def.unkeep(_gvn);
-    _gvn.unreg(_e._scope);
-    _e._scope.set_rez(xnil,_gvn);
-    return te;
-  }
-
-  private void reset_partial(Node orig_ctrl, Ary<Node> orig_disp, TypeStruct orig_t) {
-    _gvn.set_def_reg(_e._scope,0,orig_ctrl);
-    // Reset display chain back to the saved
-    NewObjNode nnn = _e._scope.stk();
-    _gvn.unreg(nnn);
-    while( !nnn._defs.isEmpty() ) nnn.pop(_gvn);
-    for( Node def : orig_disp )
-      nnn.add_def(def);
-    nnn.sets_out(orig_t);
-    _gvn.rereg(nnn,nnn.value(GVNGCM.Mode.PesiREPL));
-    _gvn.set_def_reg(_e._scope,1,nnn.mrg());
-    // Everybody has flowed the bad types; unwind them all
-    for( Node n : _gvn.valsKeySet() ) { n._val = Type.ALL; _gvn.add_work(n); }
-    for( Node n : _gvn.valsKeySet() )   n._val = n.value(GVNGCM.Mode.PesiREPL);
-    // Run the worklist dry
-    _gvn.iter(GVNGCM.Mode.PesiREPL);
-  }
-
-  // Parse the string in the given lookup context, and return an executable
   // program.  Called in a whole-program context; passed in an empty ScopeNode
   // and nothing survives since there is no next call.  Used by the Exec to do
   // whole-compilation-unit typing.
-  TypeEnv go_whole( ) {
+  TypeEnv go( ) {
     prog();                     // Parse a program
     // Delete names at the top scope before final optimization.
     _e.close_display(_gvn);
@@ -1377,7 +1329,7 @@ public class Parse implements Comparable<Parse> {
     // error message
     SB sb = new SB().p(_src).p(':').p(_line).p(':').p(s).nl();
     sb.p(new String(_buf,a,b-a)).nl();
-    int line_start = 0;
+    int line_start = a;
     for( int i=line_start; i<_x; i++ )
       sb.p(' ');
     return sb.p('^').nl().toString();
