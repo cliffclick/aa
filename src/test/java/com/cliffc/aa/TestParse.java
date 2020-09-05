@@ -506,7 +506,7 @@ public class TestParse {
          "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
-         "@{map=~Scalar;l=*[$]@{map=~Scalar;l=~nil;r=*[$]@{map=~Scalar;l=~nil;r=~nil;v=14};v=10};r=*[$]@{map=~Scalar;l=~nil;r=*[$]@{map=~Scalar;l=~nil;r=~nil;v=44};v=40};v=24}");
+         "@{map=~Scalar;l=*[$]@{map=~Scalar;l=*[$]$?;r=$;v=int64}?;r=$;v=int64}");
 
     // A linked-list mixing ints and strings, always in pairs
     String ll_cona = "a=0; ";
@@ -655,8 +655,6 @@ public class TestParse {
   private final String DO="do={pred->{body->!pred()?^;body(); do pred body}};";
 
   @Test public void testParse13() {
-    test(DO+"sum:=0; i:=0; do {i++ < 100} {sum:=sum+i}; sum",TypeInt.INT64);
-
     test(DO+"i:=0; do {i++ < 2} {i== 9} ? ",Type.XNIL);    // Late exit, body never returns true.
     test(FORELSE+"i:=0; for {i++ < 100} {i== 5} ",TypeInt.BOOL); // Not sure of exit value, except bool
     test(FORELSE+"i:=0; for {i++ < 100} {i==50?i}",TypeInt.INT64); // Early exit on condition i==50

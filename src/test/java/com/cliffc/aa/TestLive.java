@@ -25,7 +25,7 @@ public class TestLive {
 
     // Check liveness base case
     scope.xliv(gvn._opt_mode);
-    assertEquals(scope._live,TypeMem.ALLMEM);
+    assertEquals(scope._live,TypeMem.ANYMEM);
 
     // Check liveness recursive back one step
     rez.xliv(GVNGCM.Mode.PesiCG);

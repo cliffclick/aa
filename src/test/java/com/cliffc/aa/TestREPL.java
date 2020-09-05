@@ -46,6 +46,10 @@ public class TestREPL {
     test("x=4", "4");
     testerr("x+x", "x=4", "Cannot re-assign final val 'x'",6,0);
     test("3+2", "5");
+    test("sq={x->x*x}", "sq={x -> }");
+    test("sq 5","25");
+    testerr("sq \"abc\"", "sq={x->x*x}", "*[14]\"abc\" is none of (flt64,int64)", 10,7);
+    testerr("x", "x=4", "Cannot re-assign final val 'x'",6,0);
   }
 
   // Requires

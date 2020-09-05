@@ -210,13 +210,8 @@ public class FunNode extends RegionNode {
     // passed in.
     if( has_unknown_callers() ) {
       ParmNode mem = parm(-2);
-      if( mem!=null ) {
-        Type mt = Type.ANY;
-        for( int i=1; i<_defs._len; i++ )
-          mt = mt.meet(mem.val(i));
-        if( !mt.isa(Env.DEFMEM._val) )
-          return null;          // Do not inline a bad memory type
-      }
+      if( mem!=null && !mem._val.isa(Env.DEFMEM._val) )
+          return null; // Do not inline a bad memory type
     }
 
     // Look for appropriate type-specialize callers
@@ -342,33 +337,30 @@ public class FunNode extends RegionNode {
     // Look for splitting to help a pointer from an unspecialized type
     boolean progress = false;
     Type[] sig = new Type[parms.length];
-    TypeMem tmem = (TypeMem)parm(-2)._val;
-    for( int i=0; i<parms.length; i++ ) { // For all parms
-      Node parm = parms[i];
-      if( parm == null ) { sig[i]=Type.SCALAR; continue; } // (some can be dead)
-      sig[i] = parm._val;                                  // Current type
-      if( i==0 ) continue;                                 // No split on the display
-      // Best possible type
-      Type tp = Type.ALL;
-      for( Node def : parm._defs )
-        if( def != this )
-          tp = tp.join(def._val);
-      if( !(tp instanceof TypeMemPtr) ) continue; // Not a pointer
-      TypeObj to = (TypeObj)tmem.ld((TypeMemPtr)tp).widen(); //
-      // Are all the uses of parm compatible with this TMP?
-      // Also, flag all used fields.
-      if( bad_mem_use(parm, to) )
-        continue;               // So bad usage
+    Type tmem = parm(-2)._val;
+    if( tmem instanceof TypeMem ) {
+      for( int i=0; i<parms.length; i++ ) { // For all parms
+        Node parm = parms[i];
+        if( parm == null ) { sig[i]=Type.SCALAR; continue; } // (some can be dead)
+        sig[i] = parm._val;                                  // Current type
+        if( i==0 ) continue;                                 // No split on the display
+        // Best possible type
+        Type tp = Type.ALL;
+        for( Node def : parm._defs )
+          if( def != this )
+            tp = tp.join(def._val);
+        if( !(tp instanceof TypeMemPtr) ) continue; // Not a pointer
+        TypeObj to = (TypeObj)((TypeMem)tmem).ld((TypeMemPtr)tp).widen(); //
+        // Are all the uses of parm compatible with this TMP?
+        // Also, flag all used fields.
+        if( bad_mem_use(parm, to) )
+          continue;               // So bad usage
 
-      sig[i] = TypeMemPtr.make(BitsAlias.RECORD_BITS0,to); // Signature takes any alias but has sharper guts
-      progress = true;
+        sig[i] = TypeMemPtr.make(BitsAlias.RECORD_BITS0,to); // Signature takes any alias but has sharper guts
+        progress = true;
+      }
     }
     if( progress ) return sig;
-
-    // Look for splitting default input off, with multiple resolved calls.
-    // Specifically to help the REPL.
-    if( _defs._len > 3 )
-      return null; // Split here
 
     return null;
   }
@@ -404,6 +396,7 @@ public class FunNode extends RegionNode {
       case OP_NAME: break; // Pointer to a nameable struct
       case OP_PRIM:
         if( use instanceof PrimNode.EQ_OOP ) break;
+        if( use instanceof MemPrimNode.LValueLength ) break;
         if( use instanceof MemPrimNode.LValueRead )
           if( ((MemPrimNode)use).idx() == n ) return true; // Use as index is broken
           else break;   // Use for array base is fine

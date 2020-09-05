@@ -1381,46 +1381,20 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return false;
   }
 
-
-  // COOL HACK NOT GONNA WORK.  NEED TO BUILD A CYCLIC STRUCTURE PROPER
-
-  // Replace (in a large recursive structure), all display fields 'fld' with scalar.
-  public TypeStruct crush_fld(String fld) {
-    RECURSIVE_MEET++;
-    TypeStruct mt = crush_fld_impl(fld);// Clone, crushing this field
-    DUPS.clear();
-    mt = shrink(mt.reachable(),mt);     // No shrinking nor UF expected
-    Ary<Type> reaches = mt.reachable(); // Recompute reaches after shrink
-    assert check_uf(reaches);
-    UF.clear();
-    RECURSIVE_MEET--;
-    mt = mt.install_cyclic(reaches); // But yes cycles
-    return mt;
-  }
-  @Override TypeStruct crush_fld_impl(String fld) {
-    TypeStruct mt = DUPS.get(this);
-    if( mt != null )
-      return mt; // Been there, done that.
-    mt = _clone();
-    Arrays.fill(mt._ts,ANY);
-    mt._cyclic = _cyclic;
-    DUPS.put(this,mt);          // Flag the cycle closed
-    for( int i=0; i<_ts.length; i++ )
-      mt._ts[i] = Util.eq(_flds[i],fld) ? SCALAR : _ts[i].crush_fld_impl(fld);
-    return mt;
-  }
-
   // Widen (lose info), to make it suitable as the default function memory.
-  // Final fields can remain as-is; non-finals are all widened to ALL (assuming
-  // a future error Store); field flags set to bottom; the field names are kept.
+  // All fields are widened to ALL (assuming a future error Store); field flags
+  // set to bottom; only the field names are kept.
   @Override public TypeStruct crush() {
     if( _any ) return this;     // No crush on high structs
-    Type[] ts = Types.clone(_ts);
-    byte[] flags = _flags.clone();
-    for( int i=0; i<ts.length; i++ )
-      if( is_modifable(fmod(i)) ) { ts[i]=ALL; flags[i]=FBOT; }// Widen writables to ALL, as-if crushed by errors
-      else { ts[i]=ts[i].simple_ptr(); flags[i]=_flags[i]; }
-    // Keep the name and field names.
+    Type[] ts = Types.get(_ts.length);
+    Arrays.fill(ts,ALL); // Widen all fields, as-if crushed by errors, even finals.
+    byte[] flags = new byte[_ts.length];
+    Arrays.fill(flags,FBOT); // Widen all fields, as-if crushed by errors, even finals.
+    // Keep only the display pointer, as it cannot be stomped even with error code
+    if( _flds.length>0 && Util.eq(_flds[0],"^") ) {
+      ts[0] = _ts[0].simple_ptr();  flags[0]=_flags[0];
+    }
+    // Keep the name and field names untouched.
     // Low input so low output.
     return malloc(_name,false,_flds,ts,flags,_open).hashcons_free();
   }

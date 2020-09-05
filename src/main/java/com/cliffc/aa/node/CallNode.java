@@ -331,7 +331,7 @@ public class CallNode extends Node {
     // Also gather all aliases from all args
     BitsAlias as = BitsAlias.EMPTY;
     for( int i=0; i<nargs(); i++ )
-      as = as.meet(get_alias(opt_mode,ts[i+ARGIDX] = arg(i)._val));
+      as = as.meet(get_alias(opt_mode,ts[i+ARGIDX] = arg(i)._val,i));
     // Recursively search memory for aliases; compute escaping aliases
     BitsAlias as2 = tmem.all_reaching_aliases(as);
     ts[_defs._len] = TypeMemPtr.make(as2,TypeObj.UNUSED);
@@ -366,11 +366,14 @@ public class CallNode extends Node {
     return TypeTuple.make(ts);
   }
   // Get (shallow) aliases from the type
-  private BitsAlias get_alias(GVNGCM.Mode opt_mode, Type t) {
+  private BitsAlias get_alias(GVNGCM.Mode opt_mode, Type t, int aidx) {
     if( t instanceof TypeMemPtr ) return ((TypeMemPtr)t)._aliases;
     if( t instanceof TypeFunPtr ) {
-      if( opt_mode._CG && _uses.find(e->e instanceof FP2ClosureNode)==-1 )
-        return BitsAlias.EMPTY; // Fully wired call still not using display
+      if( opt_mode._CG && aidx==0 ) { // Only for the local display; other FPtrs can be passed-in, and escaped along
+        int idx = _uses.find(e->e instanceof FP2ClosureNode);
+        if( idx== -1 || _uses.at(idx)._live==TypeMem.DEAD )
+          return BitsAlias.EMPTY; // Fully wired call still not using display
+      }
       return ((TypeFunPtr)t)._disp._aliases;
     }
     if( TypeMemPtr.OOP.isa(t)   ) return BitsAlias.FULL;
@@ -660,8 +663,14 @@ public class CallNode extends Node {
 
     // Expect a function pointer
     TypeFunPtr tfp = ttfpx(_val);
-    if( tfp==null )
-      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"A function is being called, but "+((TypeTuple)_val).at(ARGIDX)+" is not a function type");
+    if( tfp==null ) {
+      Type t = _val;
+      if( t instanceof TypeTuple ) {
+        TypeTuple tt = (TypeTuple)t;
+        t = tt.at(ARGIDX);
+      }
+      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"A function is being called, but "+t+" is not a function type");
+    }
 
     // Indirectly, forward-ref for function type
     if( tfp.is_forward_ref() ) // Forward ref on incoming function

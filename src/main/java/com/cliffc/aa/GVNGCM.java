@@ -309,9 +309,10 @@ public class GVNGCM {
     if( nnn==null ) return;     // No progress
     assert (level&1)==0;        // No changes during asserts
     // Progress, so changes to the users which might change live-use-ness.
-    for( Node use : old._uses )
-      if( use.input_value_changes_live() )
-        add_work_defs(use);
+    if( !old.is_dead() )
+      for( Node use : old._uses )
+        if( use.input_value_changes_live() )
+          add_work_defs(use);
     // Progress, but not replacement
     if( nnn == old ) {
       // All users on worklist
@@ -331,6 +332,10 @@ public class GVNGCM {
               for( Node useuseuse : useuse._uses )
                 if( useuseuse instanceof LoadNode )
                   add_work(useuseuse); // Final load bypassing a Call
+        if( old instanceof CallNode && use instanceof CProjNode )
+          for( Node useuse : use._uses )
+            if( useuse instanceof FunNode )
+              add_work(useuse); // Call lifts TFP, some FunNodes no longer called, go dead
         if( use.is_multi_head() )
           for( Node useuse : use._uses ) {
             if( useuse instanceof ProjNode && use.is_copy(this, ((ProjNode) useuse)._idx) != null )

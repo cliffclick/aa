@@ -57,8 +57,8 @@ public class ParmNode extends PhiNode {
     Node mem = fun.parm(-2);
     for( int i=1; i<_defs._len; i++  ) { // For all arguments
       Node n = in(i);
-      if( fun.val(i)==Type.CTRL &&     // Dead path
-          valid_args(fun,i,mem) ) {    // And valid arguments
+      if( fun.val(i)==Type.CTRL ) {    // Dead path can ignore both valid and invalid args
+        if( !valid_args(fun,i,mem) ) return null; // No collapse invalid args; want them for errors
         if( n==this || n==live ) continue; // Ignore self or duplicates
         if( live==null ) live = n;         // Found unique live input
         else live=this;         // Found 2nd live input, no collapse

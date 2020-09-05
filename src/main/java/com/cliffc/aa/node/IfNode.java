@@ -35,8 +35,8 @@ public class IfNode extends Node {
     if( p0!=null && p0._idx==1 ) { ProjNode tmp=p0; p0=p1; p1=tmp; }
     Node x0 = gvn.xform(new CProjNode(that,0));
     Node x1 = gvn.xform(new CProjNode(that,1));
-    if( p0!=null ) gvn.replace(p0,x1);
-    if( p1!=null ) gvn.replace(p1,x0);
+    if( p0!=null ) gvn.subsume(p0,x1);
+    if( p1!=null ) gvn.subsume(p1,x0);
     x0._live = x1._live = that._live = this._live;
     return that;
   }
