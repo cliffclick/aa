@@ -595,19 +595,19 @@ public abstract class Node implements Cloneable {
     public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type expected, Level lvl ) {
       TypeMem tmem = t0mem instanceof TypeMem ? (TypeMem)t0mem : null;
       VBitSet vb = new VBitSet();
-      SB sb = actual.str(new SB(),vb, tmem).p(" is not a ");
+      SB sb = actual.str(new SB(),vb, tmem, false).p(" is not a ");
       vb.clear();
-      expected.str(sb,vb,null); // Expected is already a complex ptr, does not depend on memory
+      expected.str(sb,vb,null,false); // Expected is already a complex ptr, does not depend on memory
       if( actual==Type.ALL && lvl==Level.TypeErr ) lvl=Level.AllTypeErr; // ALLs have failed earlier, so this is a lower priority error report
       return new ErrMsg(loc,sb.toString(),lvl);
     }
     public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type[] expecteds ) {
       TypeMem tmem = t0mem instanceof TypeMem ? (TypeMem)t0mem : null;
       VBitSet vb = new VBitSet();
-      SB sb = actual.str(new SB(),vb, tmem);
+      SB sb = actual.str(new SB(),vb, tmem,false);
       sb.p( expecteds.length==1 ? " is not a " : " is none of (");
       vb.clear();
-      for( Type expect : expecteds ) expect.str(sb,vb,null).p(',');
+      for( Type expect : expecteds ) expect.str(sb,vb,null,false).p(',');
       sb.unchar().p(expecteds.length==1 ? "" : ")");
       return new ErrMsg(loc,sb.toString(),Level.TypeErr);
     }
@@ -617,7 +617,7 @@ public abstract class Node implements Cloneable {
     public static ErrMsg field(Parse loc, String msg, String fld, boolean closure, Type tadr) {
       SB sb = new SB().p(msg).p(closure ? " val '" : " field '.").p(fld).p("'");
       if( !(tadr instanceof TypeMemPtr && ((TypeMemPtr)tadr)._obj.getClass()==TypeObj.class) )
-        tadr.str(sb.p(" in address "),new VBitSet(),null);
+        tadr.str(sb.p(" in address "),new VBitSet(),null,false);
       return new ErrMsg(loc,sb.toString(),Level.Field);
     }
     public static ErrMsg niladr(Parse loc, String msg, String fld) {

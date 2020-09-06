@@ -17,10 +17,7 @@ public class TypeLive extends TypeObj<TypeLive> {
     return _flags==((TypeLive)o)._flags;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override public SB str( SB sb, VBitSet dups, TypeMem mem ) {
-    throw com.cliffc.aa.AA.unimpl(); // Undefined, because not sensible for the REPL?
-  }
-  @Override public SB dstr( SB sb, VBitSet dups, TypeMem mem ) {
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     if( _flags==  0 && !_any ) return sb.p( "LIVE");
     if( _flags== -1 &&  _any ) return sb.p("~LIVE");
     if( _any ) sb.p('~');

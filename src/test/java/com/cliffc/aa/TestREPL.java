@@ -60,7 +60,7 @@ public class TestREPL {
     test   ("hash := {@{ tab = [3]; get = { key -> idx = key.hash(); tab[idx] } } }","[hash=*{ -> }]");
     testerr("junk := hash:int","junk := hash:int","[hash=*{ -> }] is not a int64",2,12);
     testerr("hash.tab","hash.tab","Unknown field '.tab' in address [hash=*{ -> }]",2,5);
-    test   ("x := hash()","@{tab=any; get=[get=*{key -> }]}");
+    test   ("x := hash()","@{tab=*[3]0/obj; get=[get=*{key -> }]}");
     testerr("x.#tab","x.#tab","Unknown ref 'tab'",4,3);
     test   ("#x.tab","3");
   }

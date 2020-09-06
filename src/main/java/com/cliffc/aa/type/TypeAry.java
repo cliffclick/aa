@@ -24,7 +24,7 @@ public class TypeAry extends TypeObj<TypeAry> {
     return _size == ta._size && _elem == ta._elem && _stor == ta._stor;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override public SB str( SB sb, VBitSet dups, TypeMem mem ) {
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     if( _any ) sb.p('~');
     sb.p('[');
     if( _size != TypeInt.INT64 ) sb.p(_size);

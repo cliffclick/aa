@@ -33,18 +33,18 @@ public class TypeTuple extends Type<TypeTuple> {
   }
   // Never part of a cycle so the normal equals works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override public SB str( SB sb, VBitSet dups, TypeMem mem ) {
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     if( _any ) sb.p('~');
     sb.p('(');
     if( _ts.length>0 ) {        // No commas for zero-length
       int j = _ts.length-1;     // Find length of trailing equal parts
       Type last = _ts[j];       // Last type
       for( j--; j>0; j-- ) if( _ts[j] != last )  break;
-      _ts[0].str(sb,dups,mem);    // First type
+      _ts[0].str(sb,dups,mem,debug);    // First type
       for( int i=1; i<=j+1; i++ ) // All types up to trailing equal parts
-        _ts[i].str(sb.p(','),dups,mem);
+        _ts[i].str(sb.p(','),dups,mem,debug);
       if( j+2<_ts.length-1 )  sb.p("..."); // Abbreviate tail
-      if( _ts.length> j+2 ) last.str(sb.p(','),dups,mem);
+      if( _ts.length> j+2 ) last.str(sb.p(','),dups,mem,debug);
     }
     return sb.p(')');
   }

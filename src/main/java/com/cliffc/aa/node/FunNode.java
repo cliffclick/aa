@@ -98,7 +98,7 @@ public class FunNode extends RegionNode {
   // Short self name
   @Override String xstr() { return name(); }
   // Inline longer info
-  @Override public String str() { return is_forward_ref() ? xstr() : _sig.str(new SB(),null,null).toString(); }
+  @Override public String str() { return is_forward_ref() ? xstr() : _sig.str(new SB(),new VBitSet(),null,false).toString(); }
   // Name from fidx alone
   private static String name( int fidx, boolean debug) {
     FunNode fun = find_fidx(fidx);

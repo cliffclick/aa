@@ -44,6 +44,7 @@ public class MemSplitNode extends Node {
 
   // Find the escape set this esc set belongs to, or make a new one.
   int add_alias( GVNGCM gvn, BitsAlias esc ) {
+    assert !esc.is_empty();
     BitsAlias all = _escs.at(0);   // Summary of Right Hand Side(s) escapes
     if( all.join(esc) == BitsAlias.EMPTY ) { // No overlap
       _escs.set(0,all.meet(esc));  // Update summary
@@ -107,9 +108,8 @@ public class MemSplitNode extends Node {
   //      tail1->{SESE#1}->head1->tail2->{SESE#2}->head2
   // New/Mrg pairs are just the Mrg; the New is not part of the SESE region.
   // Call/CallEpi pairs are: MProj->{CallEpi}->Call.
-  static Node insert_split(GVNGCM gvn, Node tail1, Node head1, Node tail2, Node head2) {
+  static Node insert_split(GVNGCM gvn, Node tail1, BitsAlias head1_escs, Node head1, Node tail2, Node head2) {
     assert tail1.is_mem() && head1.is_mem() && tail2.is_mem() && head2.is_mem();
-    BitsAlias head1_escs = head1.escapees();
     BitsAlias head2_escs = head2.escapees();
     assert check_split(gvn,head1,head1_escs);
     // Insert empty split/join above head2

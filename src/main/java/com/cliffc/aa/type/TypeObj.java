@@ -25,7 +25,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     return _any ==to._any && _use ==to._use;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override public SB str( SB sb, VBitSet dups, TypeMem mem ) {
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     return sb.p(_name).p(_any?"~":"").p(_any==_use ? "obj" : "use");
   }
 

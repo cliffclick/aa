@@ -109,7 +109,7 @@ public class TypeMem extends Type<TypeMem> {
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   private static final char[] LIVEC = new char[]{' ','#','R','3'};
-  @Override public SB str( SB sb, VBitSet dups, TypeMem mem ) {
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     if( this==FULL ) return sb.p(" [ all ]");
     if( this==EMPTY) return sb.p(" [_____]");
     if( this== MEM ) return sb.p(" [ mem ]");
@@ -124,7 +124,7 @@ public class TypeMem extends Type<TypeMem> {
     sb.p('[');
     for( int i = 1; i< _pubs.length; i++ )
       if( _pubs[i] != null )
-        _pubs[i].dstr(sb.p(i).p(':'),dups,mem).p(",");
+        _pubs[i].str(sb.p(i).p(':'),dups,mem,debug).p(",");
     return sb.unchar().p(']');
   }
 

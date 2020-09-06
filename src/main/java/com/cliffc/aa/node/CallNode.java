@@ -287,9 +287,10 @@ public class CallNode extends Node {
         if( mem._val.isa(tmcepi) ) {
           // If call returns same as new (via recursion), cannot split, but CAN swap.
           BitsAlias esc_out = CallEpiNode.esc_out(tmcepi,cepid==null ? Type.XNIL : cepid._val);
+          BitsAlias escs = escapees().meet(esc_out);
           int alias = ((MrgProjNode)mem).nnn()._alias;
-          if( !esc_out.test_recur(alias) ) // No return conflict, so parallelize memory
-            return MemSplitNode.insert_split(gvn,cepim,this,mem,mem);
+          if( !escs.is_empty() && !esc_out.test_recur(alias) ) // No return conflict, so parallelize memory
+            return MemSplitNode.insert_split(gvn,cepim,escs,this,mem,mem);
           else                  // Else move New below Call.
             return swap_new(gvn,cepim,(MrgProjNode)mem);
         }
@@ -305,7 +306,7 @@ public class CallNode extends Node {
     gvn.replace(cepim,mrg);
     set_def(1,mrg.mem(),gvn);
     gvn.set_def_reg(mrg,1,cepim.unhook());
-    gvn.revalive(this,cepim,mrg);
+    gvn.revalive(this,cepim.in(0),cepim,mrg);
     return this;
   }
 

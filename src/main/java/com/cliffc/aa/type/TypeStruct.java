@@ -140,9 +140,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   private static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
   private boolean is_tup() { return _flds.length<=1 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[1].charAt(0)); }
-  @Override public SB  str( SB sb, VBitSet dups, TypeMem mem ) { return xstr(sb               ,dups,mem,false); }
-  @Override public SB dstr( SB sb, VBitSet dups, TypeMem mem ) { return xstr(sb.p('_').p(_uid),dups,mem,true ); }
-  private SB xstr( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
+    if( debug ) sb.p('_').p(_uid);
     if( dups.tset(_uid) ) return sb.p("$"); // Break recursive printing cycle
     if( _any ) sb.p('~');
     sb.p(_name);
@@ -151,8 +150,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Special shortcut for the all-prims display type
     if( find("!") != -1 && find("math_pi") != -1 ) {
       sb.p(_ts[1] instanceof TypeFunPtr
-           ? (((TypeFunPtr)_ts[1])._fidxs.above_center() ? "@{PRIMS}" : "@{LOW_PRIMS}")
-           : "@{PRIMS_"+_ts[1]+"}");
+           ? (((TypeFunPtr)_ts[1])._fidxs.above_center() ? "PRIMS" : "LOW_PRIMS")
+           : "PRIMS_"+_ts[1]);
     } else {
       boolean field_sep=false;
       for( int i=0; i<_flds.length; i++ ) {
@@ -162,15 +161,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         Type t = at(i);
         if( t==null ) sb.p("!");  // Graceful with broken types
         else if( t==SCALAR ) ;    // Default answer, do not print
-        else if( debug ) t.dstr(sb,dups,mem);  // Recursively print field type
-        else             t. str(sb,dups,mem);  // Recursively print field type
+        else t.str(sb,dups,mem,debug); // Recursively print field type
         sb.p("; ");               // Between fields
         field_sep=true;
       }
       if( _open ) sb.p("...");    // More fields allowed
       else if( field_sep ) sb.unchar().unchar();
-      sb.p(!is_tup ? "}" : ")");
     }
+    sb.p(!is_tup ? "}" : ")");
     return sb;
   }
 

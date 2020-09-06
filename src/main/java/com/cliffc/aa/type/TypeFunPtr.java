@@ -46,15 +46,14 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     return _disp==tf._disp || _disp.cycle_equals(tf._disp);
   }
   
-  @Override public SB  str( SB sb, VBitSet dups, TypeMem mem ) { return xstr(sb               ,dups,mem,false); }
-  @Override public SB dstr( SB sb, VBitSet dups, TypeMem mem ) { return xstr(sb.p('_').p(_uid),dups,mem,true ); }
-  private SB xstr( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
+    if( debug ) sb.p('_').p(_uid);
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
     // For all fidxs, if name & sig are unique, print them.
     // Print singleton as: name={x y -> z}.
     // Print collection as: [name=*{x y -> z}, name=*{},....]
     sb.p('[');                  // Collection (even of 1) start
-    if( debug ) _disp.dstr(sb,dups,mem).p(',');
+    if( debug ) _disp.str(sb,dups,mem,debug).p(',');
     BitsFun fidxs = BitsFun.EMPTY;
     for( int fidx : _fidxs ) {
       middle:
@@ -73,8 +72,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
           fidxs = fidxs.set(kid);
           sb.p(fun.name(false)).p("=*");
           if( fun.is_forward_ref() ) sb.p("$fref");
-          else if( debug ) fun._sig.dstr(sb,dups,mem);
-          else             fun._sig. str(sb,dups,mem);
+          else fun._sig.str(sb,dups,mem,debug);
           sb.p(',');
         }
       }

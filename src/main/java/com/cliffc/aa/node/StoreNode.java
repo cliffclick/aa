@@ -54,7 +54,7 @@ public class StoreNode extends Node {
       else head2 = null;
       // Check no extra readers/writers at the split point
       if( head2 != null && MemSplitNode.check_split(gvn,this,escapees()) )
-        return MemSplitNode.insert_split(gvn,this,this,mem,head2);
+        return MemSplitNode.insert_split(gvn,this,escapees(),this,mem,head2);
     }
 
     // If Store is of a MemJoin and it can enter the split region, do so.

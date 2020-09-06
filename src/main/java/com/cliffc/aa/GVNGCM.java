@@ -159,7 +159,7 @@ public class GVNGCM {
     add_work_uses(n);
   }
 
-  // Did a bulk not-monotonic update.  Forceably update the entire region at
+  // Did a bulk not-monotonic update.  Forcibly update the entire region at
   // once; restores monotonicity over the whole region when done.
   public void revalive(Node... ns) {
     for( Node n : ns ) {
@@ -471,6 +471,10 @@ public class GVNGCM {
           Node puse = ProjNode.proj(u, 0);
           if( puse != null ) add_work_uses(puse);
         }
+        if( u instanceof RegionNode )
+          for( Node useuse : u._uses )
+            if( useuse instanceof PhiNode )
+              add_work(useuse);
         if( nnn instanceof MProjNode && nnn.in(0) instanceof MemSplitNode )
           add_work_uses(u); // Trying to get Join/Merge/Split to fold up
         if( u instanceof StoreNode ) // Load/Store fold up

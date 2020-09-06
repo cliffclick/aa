@@ -22,9 +22,8 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
-  @Override public SB  str( SB sb, VBitSet dups, TypeMem mem ) { return xstr(sb               ,dups,mem,false); }
-  @Override public SB dstr( SB sb, VBitSet dups, TypeMem mem ) { return xstr(sb.p('_').p(_uid),dups,mem,true ); }
-  private SB xstr( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
+    if( debug ) sb.p('_').p(_uid);
     sb.p(_name);
     sb.p('{');
     boolean field_sep=false;
@@ -32,13 +31,12 @@ public final class TypeFunSig extends Type<TypeFunSig> {
       if( !debug && i==0 && Util.eq(fld(i),"^") ) continue; // Do not print the ever-present display
       sb.p(fld(i));
       if( arg(i) != Type.SCALAR )
-        if( debug ) arg(i).dstr(sb.p(':'),dups,mem);
-        else        arg(i). str(sb.p(':'),dups,mem);
+        arg(i).str(sb.p(':'),dups,mem,debug);
       sb.p(" ");  field_sep=true;
     }
     if( field_sep ) sb.unchar();
     sb.p(" -> ");
-    if( _ret != Type.SCALAR ) _ret.str(sb,dups,mem);
+    if( _ret != Type.SCALAR ) _ret.str(sb,dups,mem,debug);
     return sb.p('}');
   }
 

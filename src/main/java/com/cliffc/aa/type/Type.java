@@ -123,13 +123,11 @@ public class Type<T extends Type<T>> implements Cloneable {
   // the Type hierarchy.  Instead, subtypes override 'str(...)' where the extra
   // args stop cycles (VBitSet) or sharpen pointers (TypeMem), or optimize
   // printing strings (SB).
-  @Override public final String toString() { return dstr(new SB(),new VBitSet(),null).toString(); }
+  @Override public final String toString() { return str(new SB(),new VBitSet(),null,true).toString(); }
   // Nice, REPL-friendly and error-friendly dump.
-  // Does not dump, e.g. raw aliases or raw fidxs.
+  // Debug flag dumps, e.g. raw aliases and raw fidxs.
   // This is the 'base' printer, as changing this changes behavior.
-  public SB  str( SB sb, VBitSet dups, TypeMem mem ) { return sb.p(_name).p(STRS[_type]); }
-  // Debug print; contains more raw info dumped
-  public SB dstr( SB sb, VBitSet dups, TypeMem mem ) { return str(sb,dups,mem); }
+  public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) { return sb.p(_name).p(STRS[_type]); }
 
   // Shallow array compare, using '==' instead of 'equals'.  Since elements are
   // interned, this is the same as 'equals' except asympotically faster unless
@@ -266,7 +264,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   static final byte TNIL    =16; // The Nil-type
   static final byte TXNIL   =17; // NIL.dual
   static final byte TSIMPLE =18; // End of the Simple Types
-  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","nScalar","~nScalar","Number","~Number","nNumber","~nNumber","Real","~Real","nReal","~nReal","nil","~nil"};
+  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","nScalar","~nScalar","Number","~Number","nNumber","~nNumber","Real","~Real","nReal","~nReal","nil","0"};
   // Complex types - Implemented in subclasses
   static final byte TINT    =19; // All Integers, including signed/unsigned and various sizes; see TypeInt
   static final byte TFLT    =20; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt

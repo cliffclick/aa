@@ -23,7 +23,7 @@ public class TypeStr extends TypeObj<TypeStr> {
     return Util.eq(_con,((TypeStr)o)._con);
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override public SB str( SB sb, VBitSet dups, TypeMem mem ) {
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     if( _any ) sb.p('~');
     if( _con == null ) sb.p("str");
     else sb.p('"').p(_con).p('"');

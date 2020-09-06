@@ -31,7 +31,7 @@ public abstract class REPL {
       Type t = te._t;
       if( t instanceof TypeMemPtr )
         t = te._tmem.ld((TypeMemPtr)t); // Peek thru pointer
-      SB sb = t.str(new SB(),new VBitSet(),te._tmem); // Print what we see, with memory
+      SB sb = t.str(new SB(),new VBitSet(),te._tmem,false); // Print what we see, with memory
       System.out.println( sb.toString() );
       prog = prog2;
     } else
