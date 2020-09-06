@@ -80,7 +80,7 @@ $(test_classes): $(CLZDIR)/test/%class: $(TST)/%java $(main_classes)
 	@javac $(JAVAC_ARGS) -cp "$(CLZDIR)/test$(SEP)$(CLZDIR)/main$(SEP)$(jars)" -sourcepath $(TST) -d $(CLZDIR)/test $(test_javas)
 
 # Note the tabs - not spaces - in the grep and cut commands
-PROJECT_VERSION=99999
+PROJECT_VERSION=0.0.1
 BUILD_BRANCH=  git branch | grep '*' | sed 's/* //'
 BUILD_HASH=    git log -1 --format="%H"
 BUILD_DESCRIBE=git describe --always --dirty

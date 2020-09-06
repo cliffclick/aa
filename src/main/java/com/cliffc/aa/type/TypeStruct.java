@@ -140,87 +140,38 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   private static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
   private boolean is_tup() { return _flds.length<=1 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[1].charAt(0)); }
-  public String str( VBitSet dups) {
-    if( dups == null ) dups = new VBitSet();
-    if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
-    // Special shortcut for the all-prims display type
-    if( find("!") != -1 && find("math_pi") != -1 )
-      return (_any?"~":"") + (_ts[1] instanceof TypeFunPtr
-        ? (((TypeFunPtr)_ts[1])._fidxs.above_center() ? "{PRIMS}" : "{LOW_PRIMS}")
-                              : "{PRIMS_"+_ts[1]+"}");
-
-    SB sb = new SB();
+  @Override public SB  str( SB sb, VBitSet dups, TypeMem mem ) { return xstr(sb               ,dups,mem,false); }
+  @Override public SB dstr( SB sb, VBitSet dups, TypeMem mem ) { return xstr(sb.p('_').p(_uid),dups,mem,true ); }
+  private SB xstr( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
+    if( dups.tset(_uid) ) return sb.p("$"); // Break recursive printing cycle
     if( _any ) sb.p('~');
     sb.p(_name);
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
-    for( int i=0; i<_flds.length; i++ ) {
-      if( !is_tup )
-        sb.p(_flds[i]).p(fstr(_fmod(i))).p('='); // Field name, access mod
-      Type t = at(i);
-      if( t==null ) sb.p("!");  // Graceful with broken types
-      else if( t==SCALAR ) ;    // Default answer, do not print
-      else sb.p(t.str(dups));   // Recursively print field type
-      sb.p(';');
-    }
-    if( _open ) sb.p("...");    // More fields allowed
-    else if( _flds.length>0 ) sb.unchar();
-    sb.p(!is_tup ? "}" : ")");
-    return sb.toString();
-  }
-  @Override SB dstr( SB sb, VBitSet dups ) {
-    sb.p('_').p(_uid);
-    if( dups == null ) dups = new VBitSet();
-    if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
     // Special shortcut for the all-prims display type
-    if( find("!") != -1 && find("math_pi") != -1 && _ts[1] instanceof TypeFunPtr )
-      return sb.p(_any?"~":"").p(((TypeFunPtr)_ts[1])._fidxs.above_center()
-                                 ? "{PRIMS}" : "{LOW_PRIMS}");
-
-    if( _any ) sb.p('~');
-    sb.p(_name);
-    boolean is_tup = is_tup();
-    if( !is_tup ) sb.p('@');    // Not a tuple
-    sb.p(is_tup ? '(' : '{').nl().ii(1); // open struct, newline, increase_indent
-    for( int i=0; i<_flds.length; i++ ) {
-      sb.i();                   // indent, 1 field per line
-      Type t = at(i);
-      if( !is_tup )
-        sb.p(_flds[i]).p(fstr(_fmod(i))).p('='); // Field name, access mod
-      if( t==null ) sb.p("!");  // Graceful with broken types
-      else if( t==SCALAR ) ;    // Default answer, do not print
-      else t.dstr(sb,dups);     // Recursively print field type
-      sb.p(';').nl();           // One field per line
+    if( find("!") != -1 && find("math_pi") != -1 ) {
+      sb.p(_ts[1] instanceof TypeFunPtr
+           ? (((TypeFunPtr)_ts[1])._fidxs.above_center() ? "@{PRIMS}" : "@{LOW_PRIMS}")
+           : "@{PRIMS_"+_ts[1]+"}");
+    } else {
+      boolean field_sep=false;
+      for( int i=0; i<_flds.length; i++ ) {
+        if( !debug && i==0 && Util.eq(_flds[0],"^") ) continue; // Do not print the ever-present display
+        if( !is_tup )
+          sb.p(_flds[i]).p(fstr(_fmod(i))).p('='); // Field name, access mod
+        Type t = at(i);
+        if( t==null ) sb.p("!");  // Graceful with broken types
+        else if( t==SCALAR ) ;    // Default answer, do not print
+        else if( debug ) t.dstr(sb,dups,mem);  // Recursively print field type
+        else             t. str(sb,dups,mem);  // Recursively print field type
+        sb.p("; ");               // Between fields
+        field_sep=true;
+      }
+      if( _open ) sb.p("...");    // More fields allowed
+      else if( field_sep ) sb.unchar().unchar();
+      sb.p(!is_tup ? "}" : ")");
     }
-    if( _open ) sb.i().p("...").nl(); // More fields allowed
-    return sb.di(1).i().p(!is_tup ? '}' : ')');
-  }
-  // Print with memory instead of recursion
-  @Override public SB str(SB sb, VBitSet dups, TypeMem mem) {
-    if( dups == null ) dups = new VBitSet();
-    if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
-    // Special shortcut for the all-prims display type
-    if( find("!") != -1 && find("math_pi") != -1 && _ts[1] instanceof TypeFunPtr )
-      return sb.p(_any?"~":"").p(((TypeFunPtr)_ts[1])._disp.above_center()
-                  ? "{PRIMS}" : "{LOW_PRIMS}");
-    if( _any ) sb.p('~');
-    sb.p(_name);
-    boolean is_tup = is_tup();
-    if( !is_tup ) sb.p('@');    // Not a tuple
-    sb.p(is_tup ? '(' : '{');
-    for( int i=0; i<_flds.length; i++ ) {
-      if( Util.eq(_flds[i],"^") ) continue; // Do not print the ever-present display
-      Type t = at(i);
-      if( !is_tup )
-        sb.p(_flds[i]).p(fstr(_fmod(i))).p('='); // Field name, access mod
-      if( t==null ) sb.p("!");  // Graceful with broken types
-      else if( t==SCALAR ) ;    // Default answer, do not print
-      else t.str(sb,dups,mem);  // Recursively print field type
-      sb.p(';');
-    }
-    if( _open ) sb.p("...");     // More fields allowed
-    else if( _flds.length>0 ) sb.unchar();
-    return sb.p(!is_tup ? '}' : ')');
+    return sb;
   }
 
   // Unlike other types, TypeStruct never makes dups - instead it might make

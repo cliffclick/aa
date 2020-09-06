@@ -211,7 +211,8 @@ public class LoadNode extends Node {
     return null;
   }
   private ErrMsg bad( boolean fast ) {
-    return fast ? ErrMsg.FAST : ErrMsg.field(_bad,"Unknown",_fld,adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure);
+    boolean is_closure = adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure;
+    return fast ? ErrMsg.FAST : ErrMsg.field(_bad,"Unknown",_fld,is_closure,adr()._val);
   }
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }
   @Override public boolean equals(Object o) {

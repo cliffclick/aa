@@ -5,8 +5,6 @@ import org.junit.*;
 import org.junit.contrib.java.lang.system.SystemErrRule;
 import org.junit.contrib.java.lang.system.SystemOutRule;
 
-import java.util.Scanner;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -16,10 +14,9 @@ public class TestREPL {
   @Rule public final SystemOutRule sysOut = new SystemOutRule().enableLog().muteForSuccessfulTests();
   @Rule public final SystemErrRule sysErr = new SystemErrRule().enableLog().muteForSuccessfulTests();
 
-  private Scanner _stdin;
   private String _prog;
   @Before public void open_repl() {
-    _stdin = REPL.init();
+    REPL.init();
     _prog = "";
     // Drain the initial prompt string so tests do not expect one
     String actual = sysOut.getLog();
@@ -46,16 +43,26 @@ public class TestREPL {
     test("x=4", "4");
     testerr("x+x", "x=4", "Cannot re-assign final val 'x'",6,0);
     test("3+2", "5");
-    test("sq={x->x*x}", "sq={x -> }");
+    test("sq={x->x*x}", "[sq=*{x -> }]");
     test("sq 5","25");
-    testerr("sq \"abc\"", "sq={x->x*x}", "*[14]\"abc\" is none of (flt64,int64)", 10,7);
+    testerr("sq \"abc\"", "sq={x->x*x}", "*\"abc\" is none of (flt64,int64)", 10,7);
     testerr("x", "x=4", "Cannot re-assign final val 'x'",6,0);
   }
 
-  // Requires
+  // Requires multi-pass type inference.
   @Test public void testREPL02() {
-    test("do={pred->{body->pred()?body():^; do pred body}}","do={pred -> }");
+    test("do={pred->{body->pred()?body():^; do pred body}}","[do=*{pred -> }]");
     test("sum:=0; i:=0; do {i++ < 100} {sum:=sum+i}; sum","int64");
+  }
+
+  // Start of a HashTable class.
+  @Test public void testREPL03() {
+    test   ("hash := {@{ tab = [3]; get = { key -> idx = key.hash(); tab[idx] } } }","[hash=*{ -> }]");
+    testerr("junk := hash:int","junk := hash:int","[hash=*{ -> }] is not a int64",2,12);
+    testerr("hash.tab","hash.tab","Unknown field '.tab' in address [hash=*{ -> }]",2,5);
+    test   ("x := hash()","@{tab=any; get=[get=*{key -> }]}");
+    testerr("x.#tab","x.#tab","Unknown ref 'tab'",4,3);
+    test   ("#x.tab","3");
   }
 
   // Jam the code into STDIN, run the REPL one-step, read the STDOUT and compare.

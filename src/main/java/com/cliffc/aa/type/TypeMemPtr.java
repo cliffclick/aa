@@ -41,31 +41,20 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( _aliases != t2._aliases ) return false;
     return _obj == t2._obj || _obj.cycle_equals(t2._obj);
   }
-  @Override String str( VBitSet dups) {
-    if( dups == null ) dups = new VBitSet();
-    if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
-    if( _aliases==BitsAlias.NIL || _aliases==BitsAlias.NIL.dual() ) return "*0";
-    SB sb = new SB().p('*');
-    _aliases.toString(sb);
-    if( _aliases.test(0) ) sb.p('?');
-    return sb.toString();
-  }
-  @Override SB dstr( SB sb, VBitSet dups ) {
-    sb.p('_').p(_uid);
-    if( dups == null ) dups = new VBitSet();
+
+  @Override public SB  str( SB sb, VBitSet dups, TypeMem mem ) { return xstr(sb               ,dups,mem,false); }
+  @Override public SB dstr( SB sb, VBitSet dups, TypeMem mem ) { return xstr(sb.p('_').p(_uid),dups,mem,true ); }
+  private SB xstr( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
-    return _obj.dstr(_aliases.toString(sb.p('*')).p("->"),dups);
-  }
-  @Override public SB str(SB sb, VBitSet dups, TypeMem mem) {
-    if( dups == null ) dups = new VBitSet();
-    if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
-    if( _aliases==BitsAlias.NIL || _aliases==BitsAlias.NIL.dual() ) return sb.p("*0");
+    if( _aliases==BitsAlias.NIL || _aliases==BitsAlias.NIL.dual() ) return sb.p("0");
     TypeObj to = (mem == null || _aliases==BitsAlias.RECORD_BITS) ? _obj : mem.ld(this);
     if( to == TypeObj.XOBJ ) to = _obj;
-    to.str(_aliases.toString(sb.p('*')),dups,mem);
+    sb.p('*');
+    if( debug ) { _aliases.str(sb); to.dstr(sb,dups,mem); }
+    else to.str(sb,dups,mem);
     if( _aliases.test(0) ) sb.p('?');
     return sb;
-  }
+  }  
 
   private static TypeMemPtr FREE=null;
   @Override protected TypeMemPtr free( TypeMemPtr ret ) { FREE=this; return ret; }

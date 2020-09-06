@@ -23,12 +23,11 @@ public class TypeStr extends TypeObj<TypeStr> {
     return Util.eq(_con,((TypeStr)o)._con);
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override String str( VBitSet dups) {
-    SB sb = new SB();
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem ) {
     if( _any ) sb.p('~');
     if( _con == null ) sb.p("str");
     else sb.p('"').p(_con).p('"');
-    return sb.toString();
+    return sb;
   }
   private static TypeStr FREE=null;
   @Override protected TypeStr free( TypeStr ret ) { FREE=this; return ret; }

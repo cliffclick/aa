@@ -87,7 +87,7 @@ public abstract class MemPrimNode extends PrimNode {
       if( !(mem  instanceof TypeMem  ) ) return mem .oob();
       if( !(adr instanceof TypeMemPtr) ) return adr.oob();
       TypeMemPtr ptr = (TypeMemPtr)mem.sharptr(adr);
-      if( !(ptr._obj instanceof TypeAry) ) return adr.oob();
+      if( !(ptr._obj instanceof TypeAry) ) return adr.oob(TypeInt.INT64);
       TypeAry ary = (TypeAry)ptr._obj;
       return ary._size;
     }

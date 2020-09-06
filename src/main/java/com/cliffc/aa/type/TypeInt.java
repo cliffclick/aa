@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.HashMap;
@@ -20,10 +21,11 @@ public class TypeInt extends Type<TypeInt> {
     return super.equals(o) && _x==t2._x && _z==t2._z && _con==t2._con;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override String str( VBitSet dups) {
-    if( _con != 0 ) return _name+(_x<0 ? "&" : (_x>0 ? "+" : ""))+_con;
-    if( _x==0 ) return _name+_con;
-    return _name+(_x>0?"~":"")+(Math.abs(_x)==1?"n":"")+"int"+_z;
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem ) {
+    sb.p(_name);
+    if( _con != 0 ) return sb.p(_x<0 ? "&" : (_x>0 ? "+" : "")).p(_con);
+    if( _x==0 ) return sb.p(_con);
+    return sb.p(_x>0?"~":"").p(Math.abs(_x)==1?"n":"").p("int").p(_z);
   }
   private static TypeInt FREE=null;
   @Override protected TypeInt free( TypeInt ret ) { FREE=this; return ret; }

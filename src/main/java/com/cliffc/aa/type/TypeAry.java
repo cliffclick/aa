@@ -24,15 +24,14 @@ public class TypeAry extends TypeObj<TypeAry> {
     return _size == ta._size && _elem == ta._elem && _stor == ta._stor;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override String str( VBitSet dups) {
-    SB sb = new SB();
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem ) {
     if( _any ) sb.p('~');
     sb.p('[');
     if( _size != TypeInt.INT64 ) sb.p(_size);
     sb.p(']');
     sb.p(_elem);
     if( _elem != _stor ) sb.p('/').p(_stor);
-    return sb.toString();
+    return sb;
   }
   private static TypeAry FREE=null;
   @Override protected TypeAry free( TypeAry ret ) { FREE=this; return ret; }

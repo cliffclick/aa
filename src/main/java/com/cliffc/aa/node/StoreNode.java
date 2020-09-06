@@ -114,11 +114,11 @@ public class StoreNode extends Node {
 
   @Override public ErrMsg err( boolean fast ) {
     Type t = adr()._val;
-    if( t.must_nil() ) return ErrMsg.niladr(_bad,"Struct might be nil when writing",_fld);
+    if( t.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when writing",_fld);
     String msg = err0(t);
     if( msg == null ) return null;
     boolean closure = adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure;
-    return ErrMsg.field(_bad,msg,_fld,closure);
+    return fast ? ErrMsg.FAST : ErrMsg.field(_bad,msg,_fld,closure,adr()._val);
   }
   private String err0( Type t ) {
     if( t==Type.ANY ) return null;

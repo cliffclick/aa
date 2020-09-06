@@ -108,25 +108,24 @@ public class TypeMem extends Type<TypeMem> {
   }
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  private static char[] LIVEC = new char[]{' ','#','R','3'};
-  @Override String str( VBitSet dups ) {
-    if( this==FULL ) return " [ all ]";
-    if( this==EMPTY) return " [_____]";
-    if( this== MEM ) return " [ mem ]";
-    if( this==XMEM ) return " [~mem ]";
-    if( this==DEAD ) return "![dead ]";
-    if( this==ALIVE) return " [live ]";
-    if( this==ESCAPE)return "#[escap]";
-    if( this==LIVE_BOT) return "3[!repl]";
-    SB sb = new SB();
+  private static final char[] LIVEC = new char[]{' ','#','R','3'};
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem ) {
+    if( this==FULL ) return sb.p(" [ all ]");
+    if( this==EMPTY) return sb.p(" [_____]");
+    if( this== MEM ) return sb.p(" [ mem ]");
+    if( this==XMEM ) return sb.p(" [~mem ]");
+    if( this==DEAD ) return sb.p("![dead ]");
+    if( this==ALIVE) return sb.p(" [live ]");
+    if( this==ESCAPE)return sb.p("#[escap]");
+    if( this==LIVE_BOT) return sb.p("3[!repl]");
     if( _pubs[0]==TypeLive.DEAD ) sb.p('!');
     else sb.p(LIVEC[((TypeLive)_pubs[0])._flags]);
-    if( _pubs.length==1 ) return sb.p("[]").toString();
+    if( _pubs.length==1 ) return sb.p("[]");
     sb.p('[');
     for( int i = 1; i< _pubs.length; i++ )
       if( _pubs[i] != null )
-        sb.p(i).p(':').p(_pubs[i].toString()).p(",");
-    return sb.unchar().p(']').toString();
+        _pubs[i].dstr(sb.p(i).p(':'),dups,mem).p(",");
+    return sb.unchar().p(']');
   }
 
   // Alias-at.  Out of bounds or null uses the parent value.
@@ -219,7 +218,7 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   public static TypeMem make_live(TypeLive live) { return make0(new TypeObj[]{live}); }
-  
+
   public static final TypeMem FULL; // Every alias filled with something
   public static final TypeMem EMPTY;// Every alias filled with anything
   public static final TypeMem  MEM; // FULL, except lifts REC, arrays, STR

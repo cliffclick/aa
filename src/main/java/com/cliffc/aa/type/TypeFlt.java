@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.HashMap;
@@ -20,9 +21,10 @@ public class TypeFlt extends Type<TypeFlt> {
     return super.equals(o) && _x==t2._x && _z==t2._z && _con==t2._con;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override String str( VBitSet dups) {
-    if( _x==0 ) return _name+_con;
-    return _name+(_x>0?"~":"")+(Math.abs(_x)==1?"n":"")+"flt"+Integer.toString(_z);
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem ) {
+    sb.p(_name);
+    if( _x==0 ) return sb.p(_con);
+    return sb.p(_x>0?"~":"").p(Math.abs(_x)==1?"n":"").p("flt").p(_z);
   }
   private static TypeFlt FREE=null;
   @Override protected TypeFlt free( TypeFlt ret ) { FREE=this; return ret; }

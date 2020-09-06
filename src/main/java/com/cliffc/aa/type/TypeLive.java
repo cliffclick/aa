@@ -17,15 +17,17 @@ public class TypeLive extends TypeObj<TypeLive> {
     return _flags==((TypeLive)o)._flags;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override String str( VBitSet dups) {
-    if( _flags==  0 && !_any ) return "LIVE";
-    if( _flags== -1 &&  _any ) return "~LIVE";
-    SB sb = new SB();
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem ) {
+    throw com.cliffc.aa.AA.unimpl(); // Undefined, because not sensible for the REPL?
+  }
+  @Override public SB dstr( SB sb, VBitSet dups, TypeMem mem ) {
+    if( _flags==  0 && !_any ) return sb.p( "LIVE");
+    if( _flags== -1 &&  _any ) return sb.p("~LIVE");
     if( _any ) sb.p('~');
     if( (_flags&FLAG_ESCAPE)!=0 ) sb.p("ESCP");
-
-    return sb.toString();
+    return sb;
   }
+  
   private static TypeLive FREE=null;
   @Override protected TypeLive free( TypeLive ret ) { FREE=this; return ret; }
   private static TypeLive make( boolean any, int flags ) {

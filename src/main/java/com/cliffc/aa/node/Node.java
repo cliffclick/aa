@@ -594,32 +594,31 @@ public abstract class Node implements Cloneable {
     public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type expected ) { return typerr(loc,actual,t0mem,expected,Level.TypeErr); }
     public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type expected, Level lvl ) {
       TypeMem tmem = t0mem instanceof TypeMem ? (TypeMem)t0mem : null;
-      String s0 = typerr(actual  ,tmem);
-      String s1 = typerr(expected,null); // Expected is already a complex ptr, does not depend on memory
+      VBitSet vb = new VBitSet();
+      SB sb = actual.str(new SB(),vb, tmem).p(" is not a ");
+      vb.clear();
+      expected.str(sb,vb,null); // Expected is already a complex ptr, does not depend on memory
       if( actual==Type.ALL && lvl==Level.TypeErr ) lvl=Level.AllTypeErr; // ALLs have failed earlier, so this is a lower priority error report
-      return new ErrMsg(loc,s0+" is not a "+s1,lvl);
+      return new ErrMsg(loc,sb.toString(),lvl);
     }
     public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type[] expecteds ) {
       TypeMem tmem = t0mem instanceof TypeMem ? (TypeMem)t0mem : null;
-      SB sb = new SB().p(typerr(actual,tmem));
+      VBitSet vb = new VBitSet();
+      SB sb = actual.str(new SB(),vb, tmem);
       sb.p( expecteds.length==1 ? " is not a " : " is none of (");
-      for( Type expect : expecteds ) sb.p(typerr(expect,null)).p(',');
+      vb.clear();
+      for( Type expect : expecteds ) expect.str(sb,vb,null).p(',');
       sb.unchar().p(expecteds.length==1 ? "" : ")");
       return new ErrMsg(loc,sb.toString(),Level.TypeErr);
-    }
-    private static String typerr( Type t, TypeMem tmem ) {
-      return t.is_forward_ref()
-        ? ((TypeFunPtr)t).names(false)
-        : (t instanceof TypeMemPtr
-           ? t.str(new SB(), null, tmem).toString()
-           : t.toString());
     }
     public static ErrMsg asserterr( Parse loc, Type actual, Type t0mem, Type expected ) {
       return typerr(loc,actual,t0mem,expected,Level.Assert);
     }
-    public static ErrMsg field(Parse loc, String msg, String fld, boolean closure) {
-      String f = msg+(closure ? " val '" : " field '.")+fld+"'";
-      return new ErrMsg(loc,f,Level.Field);
+    public static ErrMsg field(Parse loc, String msg, String fld, boolean closure, Type tadr) {
+      SB sb = new SB().p(msg).p(closure ? " val '" : " field '.").p(fld).p("'");
+      if( !(tadr instanceof TypeMemPtr && ((TypeMemPtr)tadr)._obj.getClass()==TypeObj.class) )
+        tadr.str(sb.p(" in address "),new VBitSet(),null);
+      return new ErrMsg(loc,sb.toString(),Level.Field);
     }
     public static ErrMsg niladr(Parse loc, String msg, String fld) {
       String f = fld==null ? msg : msg+" field '."+fld+"'";

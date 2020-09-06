@@ -18,9 +18,8 @@ public class TypeRPC extends Type<TypeRPC> {
   }
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override String str( VBitSet dups) {
-    SB sb = new SB().p("#");
-    return _rpcs.toString(sb).toString();
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem ) {
+    return _rpcs.str(sb.p("#"));
   }
 
   private static TypeRPC FREE=null;

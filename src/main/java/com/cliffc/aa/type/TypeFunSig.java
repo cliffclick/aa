@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
 
 // Function signatures: formal arguments (and return) used to type-check.  This
@@ -21,26 +22,23 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
-  @Override public String str( VBitSet dups) { return xstr(new SB(),null).toString(); }
-  @Override   SB dstr( SB sb, VBitSet dups ) { return xstr(sb.p('_').p(_uid),dups); }
-  private SB xstr( SB sb, VBitSet dups ) {
+  @Override public SB  str( SB sb, VBitSet dups, TypeMem mem ) { return xstr(sb               ,dups,mem,false); }
+  @Override public SB dstr( SB sb, VBitSet dups, TypeMem mem ) { return xstr(sb.p('_').p(_uid),dups,mem,true ); }
+  private SB xstr( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
+    sb.p(_name);
     sb.p('{');
+    boolean field_sep=false;
     for( int i=0; i<nargs(); i++ ) {
-      if( !TypeStruct.fldBot(fld(i)) ) sb.p(fld(i)).p(':');
-      arg(i).dstr(sb,dups).p(",");
+      if( !debug && i==0 && Util.eq(fld(i),"^") ) continue; // Do not print the ever-present display
+      sb.p(fld(i));
+      if( arg(i) != Type.SCALAR )
+        if( debug ) arg(i).dstr(sb.p(':'),dups,mem);
+        else        arg(i). str(sb.p(':'),dups,mem);
+      sb.p(" ");  field_sep=true;
     }
-    return sb.unchar().p(" -> ").p(_ret).p('}');
-  }
-  // Fancier version for REPL printing
-  SB ystr( SB sb, VBitSet dups ) {
-    sb.p('{');
-    for( int i=1; i<nargs(); i++ ) { // Skip display?
-      if( !TypeStruct.fldBot(fld(i)) ) sb.p(fld(i));
-      if( arg(i) != Type.SCALAR ) arg(i).dstr(sb.p(':'),dups);
-      sb.p(",");
-    }
-    sb.unchar().p(" -> ");
-    if( _ret != Type.SCALAR ) sb.p(_ret);
+    if( field_sep ) sb.unchar();
+    sb.p(" -> ");
+    if( _ret != Type.SCALAR ) _ret.str(sb,dups,mem);
     return sb.p('}');
   }
 

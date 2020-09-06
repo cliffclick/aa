@@ -120,16 +120,16 @@ public class Type<T extends Type<T>> implements Cloneable {
   }
 
   // In order to handle recursive printing, this is the only toString call in
-  // the Type hierarchy.  Instead, subtypes override 'str(HashSet)' where the
-  // HashSet is only installed by the head of a type-cycle (always and only
-  // TypeName) and is used (again only by TypeName) to end cyclic printing.
-  // All other 'str()' callers just pass along.
-  @Override public final String toString() { return str(null); }
-  //@Override public final String toString() { return dstr(new SB(),null).toString(); }
-  public SB str( SB sb, VBitSet dups, TypeMem mem ) { return sb.p(str(dups)); }
-  String str( VBitSet dups ) { return _name+STRS[_type]; }
-  SB dstr( SB sb, VBitSet dups ) { return sb.p(str(dups)); }
-  String q() { return dstr(new SB(),null).toString(); }
+  // the Type hierarchy.  Instead, subtypes override 'str(...)' where the extra
+  // args stop cycles (VBitSet) or sharpen pointers (TypeMem), or optimize
+  // printing strings (SB).
+  @Override public final String toString() { return dstr(new SB(),new VBitSet(),null).toString(); }
+  // Nice, REPL-friendly and error-friendly dump.
+  // Does not dump, e.g. raw aliases or raw fidxs.
+  // This is the 'base' printer, as changing this changes behavior.
+  public SB  str( SB sb, VBitSet dups, TypeMem mem ) { return sb.p(_name).p(STRS[_type]); }
+  // Debug print; contains more raw info dumped
+  public SB dstr( SB sb, VBitSet dups, TypeMem mem ) { return str(sb,dups,mem); }
 
   // Shallow array compare, using '==' instead of 'equals'.  Since elements are
   // interned, this is the same as 'equals' except asympotically faster unless

@@ -110,8 +110,8 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       if( _bits[i]!=bs._bits[i] ) return false;
     return true;
   }
-  @Override public String toString() { return toString(new SB()).toString(); }
-  public SB toString(SB sb) {
+  @Override public String toString() { return str(new SB()).toString(); }
+  public SB str(SB sb) {
     if( _bits==null ) {
       if( _con==0 ) return sb.p("[]"); // EMPTY
       return sb.p('[').p(_con).p(']');

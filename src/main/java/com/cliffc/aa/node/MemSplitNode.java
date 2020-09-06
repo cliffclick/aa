@@ -28,7 +28,7 @@ public class MemSplitNode extends Node {
     SB sb = new SB();
     sb.p('(').p("base,");
     for( int i=1; i<_escs._len; i++ )
-      _escs.at(i).toString(sb).p(',');
+      _escs.at(i).str(sb).p(',');
     return sb.unchar().p(')').toString();
   }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }

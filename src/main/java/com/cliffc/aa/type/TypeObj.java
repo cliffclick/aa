@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 import java.util.function.Predicate;
 
@@ -24,9 +25,8 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     return _any ==to._any && _use ==to._use;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override String str( VBitSet dups ) {
-    String x = _any==_use ? "obj" : "use";
-    return _name+((_any?"~":"")+x);
+  @Override public SB str( SB sb, VBitSet dups, TypeMem mem ) {
+    return sb.p(_name).p(_any?"~":"").p(_any==_use ? "obj" : "use");
   }
 
   private static TypeObj FREE=null;
@@ -60,7 +60,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     if( !_use && t == ISUSED ) return ISUSED;
     return this;
   }
-      
+
   // Update (approximately) the current TypeObj.  Merges fields.
   public TypeObj update(byte fin, String fld, Type val) { return this; }
   // Approximate array update.
@@ -77,7 +77,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     return obj.crush();    // Both are low, so keep other fields but crush them
   }
   TypeObj flatten_fields() { return this; }
-  
+
   @Override public boolean above_center() { return _any; }
   @Override public boolean may_be_con() { return _any; }
   @Override public boolean is_con() { return false; }
