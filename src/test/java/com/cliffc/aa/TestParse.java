@@ -17,6 +17,32 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeStr.NO_DISP);
+    // fails another way also
+    test("key = \"Monday\"; val = 1;\n" +
+         "entry = 0;\n" +
+         "entry && key.eq(entry.key) ? (oldval=entry.val; entry.val:=val; ^oldval);\n" +
+         "0\n",
+         Type.XNIL);
+    test("put = { key val ->\n" +
+         "  entry = 0;\n" +
+         "  entry && key.eq(entry.key) ? (oldval=entry.val; entry.val:=val; ^oldval);\n" +
+         "  0\n" +
+         "};\n" +
+         "put(\"Monday\",1);\n",
+         Type.XNIL);
+    // fails, oldval not defined on false arm of trinary
+    test("_tab = [7];\n" +
+         "put = { key val ->\n" +
+         "  idx = key.hash() % #_tab;\n" +
+         "  entry = _tab[idx];\n" +
+         "  entry && key.eq(entry.key) ? (oldval=entry.val; entry.val:=val; ^oldval);\n" +
+         "  0\n" +
+         "};\n" +
+         "put(\"Monday\",1);\n",
+         Type.XNIL);
+
+
+    //test("x:=0; fun={p -> p ? (old=x; x:=1; ^old); x:=3}; fun(2)",TypeInt.con(2));
 
     // A collection of tests which like to fail easily
     test("-1",  TypeInt.con( -1));
@@ -670,7 +696,7 @@ public class TestParse {
     test    ("ary = [3]; ary[0]:=2", TypeInt.con(2));
     test_obj("ary = [3]; ary[0]:=0; ary[1]:=1; ary[2]:=2; (ary[0],ary[1],ary[2])", // array create, array storing
       TypeStruct.make_tuple(Type.XNIL,TypeInt.INT8,TypeInt.INT8,TypeInt.INT8));
-    testary("0[0]","0 is not a *[]Scalar/obj",2);
+    testary("0[0]","0 is not a *[]Scalar/obj",1);
     testary("[3] [4]","Index must be out of bounds",5);
     testary("[3] [-1]","Index must be out of bounds",5);
     test_obj("[3]:[int]", TypeAry.make(TypeInt.con(3),Type.XNIL,TypeObj.OBJ)); // Array of 3 XNILs in INTs.

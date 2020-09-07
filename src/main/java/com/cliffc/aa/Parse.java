@@ -276,6 +276,8 @@ public class Parse implements Comparable<Parse> {
     if( peek('^') ) {           // Early function exit
       Node ifex = ifex();
       if( ifex==null ) ifex=_gvn.con(Type.XNIL);
+      if( _e._par._par==null )
+        return err_ctrl1(Node.ErrMsg.syntax(this,"Function exit but outside any function"));
       return _e.early_exit(this,ifex);
     }
 
@@ -459,10 +461,11 @@ public class Parse implements Comparable<Parse> {
         if( bin==null ) break;    // Valid parse, but no more Kleene star
         Node binfun = _e.lookup_filter(bin.intern(),_gvn,2); // BinOp, or null
         if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
+        _x = oldx+filtered_name(binfun).length();
         skipWS();
         int oldx2 = _x;
         if( (term=term()) == null )
-          term = err_ctrl2("Missing term after '"+bin+"'");
+          term = err_ctrl2("Missing term after '"+filtered_name(binfun)+"'");
         funs.add(binfun.keep());
         args.add_def(term);
         bafs.add(errMsg(oldx ));
@@ -500,10 +503,19 @@ public class Parse implements Comparable<Parse> {
     return term;
   }
 
+  // Actual minimal length uniop might be smaller than the parsed token
+  // (greedy algo vs not-greed)
+  private static String filtered_name( Node fun ) {
+    FunPtrNode fptr = (FunPtrNode)(fun instanceof UnresolvedNode ? fun.in(0) : fun);
+    return fptr.fun()._name;
+  }
+
   /** Any number field-lookups or function applications, then an optional assigment
    *    term = id++ | id--
    *    term = uniop term
    *    term = tfact [tuple | .field | '['stmts']' ]* [.field[:]=stmt | '['stmts ']:=' stmt   | .field++ | .field-- | e]
+   *    term = tfact balop_open stmts balop_close      // if balop is ary,idx
+   *    term = tfact balop_open stmts balop_close stmt // if balop is ary,idx,val
    */
   private Node term() {
     int oldx = _x;
@@ -512,10 +524,7 @@ public class Parse implements Comparable<Parse> {
       Node unifun = _e.lookup_filter(uni.intern(),_gvn,1); // UniOp, or null
       if( unifun==null || unifun.op_prec() <= 0 ) _x=oldx; // Not a uniop
       else {
-        FunPtrNode fptr = (FunPtrNode)(unifun.keep() instanceof UnresolvedNode ? unifun.in(0) : unifun);
-        // Actual minimal length uniop might be smaller than the parsed token
-        // (greedy algo vs not-greed)
-        _x = oldx+fptr.fun()._name.length();
+        _x = oldx+filtered_name(unifun.keep()).length();
         Node term = term();
         unifun.unhook();
         if( term==null ) { _x = oldx; return null; }
@@ -610,14 +619,14 @@ public class Parse implements Comparable<Parse> {
           } else fptr = (FunPtrNode)bfun;
           require(fptr.fun()._bal_close,oldx);
           if( fptr.fun().nargs()==3 ) { // display, array, index
-            n = do_call(errMsgs(oldx,oldx2),args(fptr,n,idx));
+            n = do_call(errMsgs(0,oldx,oldx2),args(fptr,n,idx));
           } else {
             assert fptr.fun().nargs()==4; // display, array, index, value
             skipWS();
             int oldx3 = _x;
             Node val = stmt();
             if( val==null ) return err_ctrl2("Missing stmt after '"+fptr.fun()._bal_close+"'");
-            n = do_call(errMsgs(oldx,oldx2,oldx3),args(fptr,n,idx,val));
+            n = do_call(errMsgs(0,oldx,oldx2,oldx3),args(fptr,n,idx,val));
           }
         } else {
           break;                // Not a balanced op
@@ -724,7 +733,10 @@ public class Parse implements Comparable<Parse> {
       { _x = oldx; return null; } // Disallow '=' as a fact, too easy to make mistakes
     ScopeNode scope = lookup_scope(tok,false);
     if( scope == null ) { // Assume any unknown id is a forward-ref of a recursive function
-      if( isOp(tok) ) { _x = oldx; return null; } // Ops cannot be forward-refs
+      // Ops cannot be forward-refs, so are just 'not a fact'.  Cannot declare
+      // them as a undefined forward-ref right now, because the op might be the
+      // tail-half of a balanced-op, which is parsed by term() above.
+      if( isOp(tok) ) { _x = oldx; return null; }
       Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,errMsg(oldx)));
       // Place in nearest enclosing closure scope
       _e._scope.stk().create(tok.intern(),fref,TypeStruct.FFNL,_gvn);

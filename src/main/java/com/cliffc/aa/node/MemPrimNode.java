@@ -21,20 +21,20 @@ public abstract class MemPrimNode extends PrimNode {
     if( tmem==Type.ALL || tmem==Type.ANY ) return null; // An error, reported earlier
     if( tadr==Type.ALL || tadr==Type.ANY ) return null; // An error, reported earlier
     if( tidx==Type.ALL || tidx==Type.ANY ) return null; // An error, reported earlier
-    if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_badargs[0],"Array might be nil when reading",null);
+    if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_badargs[1],"Array might be nil when reading",null);
     if( !(tadr instanceof TypeMemPtr) )
       throw com.cliffc.aa.AA.unimpl();
     TypeMemPtr ptr = (TypeMemPtr)tadr;
     TypeObj objs = ((TypeMem)tmem).ld(ptr); // General load from memory
     if( !(objs instanceof TypeAry) )
-      return fast ? ErrMsg.FAST : ErrMsg.typerr(_badargs[0],ptr,tmem,TypeMemPtr.ARYPTR);
+      return fast ? ErrMsg.FAST : ErrMsg.typerr(_badargs[1],ptr,tmem,TypeMemPtr.ARYPTR);
     TypeAry ary = (TypeAry)objs;
     if( tidx instanceof TypeInt ) {
       TypeInt idx = (TypeInt)tidx;
       if( idx.is_con() ) {
         long i = idx.getl();
         long len = ary._size.is_con() ? ary._size.getl() : (1L<<ary._size._z);
-        if( i<0 || i>=len ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_badargs[1],"Index must be out of bounds",null);
+        if( i<0 || i>=len ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_badargs[2],"Index must be out of bounds",null);
       }
     }
 

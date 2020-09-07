@@ -582,8 +582,9 @@ public abstract class Node implements Cloneable {
     public static final ErrMsg FAST = new ErrMsg(null,"fast",Level.Syntax);
     public static final ErrMsg BADARGS = new ErrMsg(null,"bad arguments",Level.BadArgs);
     public ErrMsg(Parse loc, String msg, Level lvl) { _loc=loc; _msg=msg; _lvl=lvl; }
-    public static ErrMsg forward_ref(Parse loc, FunNode fun) {
-      return new ErrMsg(loc,"Unknown ref '"+fun._name+"'",Level.ForwardRef);
+    public static ErrMsg forward_ref(Parse loc, FunNode fun) { return forward_ref(loc,fun._name); }
+    public static ErrMsg forward_ref(Parse loc, String name) {
+      return new ErrMsg(loc,"Unknown ref '"+name+"'",Level.ForwardRef);
     }
     public static ErrMsg syntax(Parse loc, String msg) {
       return new ErrMsg(loc,msg,Level.Syntax);
@@ -616,7 +617,7 @@ public abstract class Node implements Cloneable {
     }
     public static ErrMsg field(Parse loc, String msg, String fld, boolean closure, Type tadr) {
       SB sb = new SB().p(msg).p(closure ? " val '" : " field '.").p(fld).p("'");
-      if( !(tadr instanceof TypeMemPtr && ((TypeMemPtr)tadr)._obj.getClass()==TypeObj.class) )
+      if( !(tadr instanceof TypeMemPtr && ((TypeMemPtr)tadr)._obj.getClass()==TypeObj.class) && tadr != Type.ANY )
         tadr.str(sb.p(" in address "),new VBitSet(),null,false);
       return new ErrMsg(loc,sb.toString(),Level.Field);
     }

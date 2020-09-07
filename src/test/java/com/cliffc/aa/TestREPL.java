@@ -72,6 +72,8 @@ public class TestREPL {
   @Test public void testREPL04() throws IOException {
     String hash_src = new String(Files.readAllBytes( Paths.get("test/java/com/cliffc/aa","HashTable.aa")));
     test(hash_src,"[HashTable=*{ -> }]");
+    test("htab = HashTable()","@{_tab=*[7]0/obj; get=[get=*{key -> }]; put=[put=*{key val -> }]}");
+    test("htab.put(\"Monday\",1)","0");
   }
 
   // Jam the code into STDIN, run the REPL one-step, read the STDOUT and compare.
