@@ -400,7 +400,7 @@ public class FunNode extends RegionNode {
         if( use instanceof MemPrimNode.LValueRead )
           if( ((MemPrimNode)use).idx() == n ) return true; // Use as index is broken
           else break;   // Use for array base is fine
-        if( use instanceof MemPrimNode.LValueWrite )
+        if( use instanceof MemPrimNode.LValueWrite || use instanceof MemPrimNode.LValueWriteFinal )
           if( ((MemPrimNode)use).idx() == n ) return true; // Use as index is broken
           else break;   // Use for array base or value is fine
         throw AA.unimpl();

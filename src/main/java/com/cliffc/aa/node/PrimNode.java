@@ -75,6 +75,7 @@ public abstract class PrimNode extends Node {
       new MemPrimNode.ReadPrimNode.LValueLength(), // Read  an L-Value: (ary) ==> size
       new MemPrimNode.ReadPrimNode.LValueRead  (), // Read  an L-Value: (ary,idx) ==> elem
       new MemPrimNode.ReadPrimNode.LValueWrite (), // Write an L-Value: (ary,idx,elem) ==> elem
+      new MemPrimNode.ReadPrimNode.LValueWriteFinal(), // Final Write an L-Value: (ary,idx,elem) ==> elem
     };
   }
 

@@ -71,7 +71,7 @@ public class TestREPL {
 
   @Test public void testREPL04() throws IOException {
     String hash_src = new String(Files.readAllBytes( Paths.get("test/java/com/cliffc/aa","HashTable.aa")));
-    test(hash_src,"[Hash=*{ -> }]");
+    test(hash_src,"[HashTable=*{ -> }]");
   }
 
   // Jam the code into STDIN, run the REPL one-step, read the STDOUT and compare.

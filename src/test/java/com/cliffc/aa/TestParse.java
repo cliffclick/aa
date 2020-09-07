@@ -11,7 +11,7 @@ import static org.junit.Assert.*;
 
 public class TestParse {
   private static final String[] FLDS = new String[]{"^","n","v"};
-  private static final BitsFun TEST_FUNBITS = BitsFun.make0(42);
+  private static final BitsFun TEST_FUNBITS = BitsFun.make0(43);
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {

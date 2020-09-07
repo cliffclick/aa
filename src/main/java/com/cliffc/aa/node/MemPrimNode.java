@@ -171,4 +171,33 @@ public abstract class MemPrimNode extends PrimNode {
     @Override public TypeInt apply( Type[] args ) { throw com.cliffc.aa.AA.unimpl(); }
   }
 
+  // Produces a triop LValue, where the leading TMP is a non-zero array
+  static class LValueWriteFinal extends WritePrimNode {
+    LValueWriteFinal() { super("[",TypeStruct.LVAL_WR,Type.SCALAR); }
+    @Override public String bal_close() { return "]="; } // Balanced op
+    @Override public byte op_prec() { return 0; }
+    @Override public Node ideal(GVNGCM gvn, int level) { return null; }
+    @Override public Type value(GVNGCM.Mode opt_mode) {
+      Type mem = val(1);
+      Type ary = val(2);
+      Type idx = val(3);
+      Type val = val(4);
+      if( !(mem instanceof TypeMem   ) ) return mem.oob();
+      if( !(ary instanceof TypeMemPtr) ) return ary.oob();
+      if( !(idx instanceof TypeInt) && idx!=Type.XNIL ) return idx.oob();
+      if( !val.isa(Type.SCALAR) ) return val.oob();
+      TypeMem    tmem = (TypeMem   )mem;
+      TypeMemPtr tary = (TypeMemPtr)ary;
+      TypeInt    tidx = idx==Type.XNIL ? TypeInt.ZERO : (TypeInt)idx;
+      TypeMem tmem2 = tmem.update(tary._aliases,tidx,val);
+      return tmem2;
+    }
+    @Override public TypeInt apply( Type[] args ) { throw com.cliffc.aa.AA.unimpl(); }
+    @Override public ErrMsg err(boolean fast) {
+      ErrMsg msg = super.err(fast);
+      if( msg != null ) return msg;
+      return Node.ErrMsg.syntax(_badargs[0],"Final array assignment not supported.");
+    }
+  }
+
 }
