@@ -45,6 +45,7 @@ public abstract class PrimNode extends Node {
       new AddF64(),
       new SubF64(),
       new MulF64(),
+      new DivF64(),
 
       new LT_F64(),
       new LE_F64(),
@@ -56,6 +57,8 @@ public abstract class PrimNode extends Node {
       new AddI64(),
       new SubI64(),
       new MulI64(),
+      new DivI64(),
+      new ModI64(),
 
       new AndI64(),
 
@@ -234,6 +237,12 @@ public abstract class PrimNode extends Node {
     @Override public byte op_prec() { return 6; }
   }
 
+  static class DivF64 extends Prim2OpF64 {
+    DivF64() { super("/"); }
+    @Override double op( double l, double r ) { return l/r; }
+    @Override public byte op_prec() { return 6; }
+  }
+
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpF64 extends PrimNode {
     Prim2RelOpF64( String name ) { super(name,TypeStruct.FLT64_FLT64,TypeInt.BOOL); }
@@ -272,6 +281,18 @@ public abstract class PrimNode extends Node {
   static class MulI64 extends Prim2OpI64 {
     MulI64() { super("*"); }
     @Override long op( long l, long r ) { return l*r; }
+    @Override public byte op_prec() { return 6; }
+  }
+
+  static class DivI64 extends Prim2OpI64 {
+    DivI64() { super("/"); }
+    @Override long op( long l, long r ) { return l/r; } // Long division
+    @Override public byte op_prec() { return 6; }
+  }
+
+  static class ModI64 extends Prim2OpI64 {
+    ModI64() { super("%"); }
+    @Override long op( long l, long r ) { return l%r; }
     @Override public byte op_prec() { return 6; }
   }
 

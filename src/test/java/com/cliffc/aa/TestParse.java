@@ -11,7 +11,7 @@ import static org.junit.Assert.*;
 
 public class TestParse {
   private static final String[] FLDS = new String[]{"^","n","v"};
-  private static final BitsFun TEST_FUNBITS = BitsFun.make0(39);
+  private static final BitsFun TEST_FUNBITS = BitsFun.make0(42);
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
@@ -820,7 +820,7 @@ HashTable = {@{
     TypeEnv te = Exec.go(Env.file_scope(Env.top_scope()),"args",program);
     assertTrue(te._errs != null && te._errs.size()>=1);
     String cursor = new String(new char[cur_off]).replace('\0', ' ');
-    String err2 = new SB().p("args:0:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
+    String err2 = new SB().p("args:1:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
     assertEquals(err2,strip_alias_numbers(te._errs.get(0).toString()));
   }
   private static String strip_alias_numbers( String err ) {
@@ -839,7 +839,7 @@ HashTable = {@{
     TypeEnv te = Exec.go(Env.file_scope(Env.top_scope()),"args",program);
     assertTrue(te._errs != null && te._errs.size()>=1);
     String cursor = new String(new char[cur_off]).replace('\0', ' ');
-    String err2 = new SB().p("args:0:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
+    String err2 = new SB().p("args:1:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
     assertEquals(err2,te._errs.get(0).toString());
   }
 

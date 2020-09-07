@@ -1,0 +1,27 @@
+// A very basic test hash-table.  No resize, reprobe, clear, etc.
+
+// HashTable is a function which returns a new hash table, very similar
+// to calling 'new HashTable()' in Java.
+HashTable = {@{     // No args, returns a hash table struct
+  _tab = [7];       // The table
+
+  // Takes a key, which has a field 'hash' which has a no-arg function
+  // and a field 'eq' which takes an arg.
+  get = { key ->
+    entry = _tab[key.hash() % #_tab];
+    entry && key.eq(entry.key) ? entry.val;
+  };
+  
+  // Takes a key, which has a field 'hash' which has a no-arg function
+  // and a field 'eq' which takes an arg.  Takes a 'val'.  Returns any
+  // oldval
+  put = { key val ->
+    idx = key.hash() % #_tab;     // Compute hash index
+    entry = _tab[idx];            // Get table entry
+    // On a hit, set val over the entry.val, and return the oldval.
+    entry && key.eq(entry.key) ? (oldval=entry.val; entry.val:=val; ^oldval);
+    // On a miss, linked-list insert key, val.
+    _tab[idx]= @{key=key; val=val; next=entry};
+    0  // Missed
+  }
+}}

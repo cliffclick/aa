@@ -2,10 +2,7 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.Util;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.text.NumberFormat;
@@ -69,7 +66,8 @@ public class Parse implements Comparable<Parse> {
   private Env _e;                       // Lookup context; pushed and popped as scopes come and go
   private final byte[] _buf;            // Bytes being parsed
   private int _x;                       // Parser index
-  private int _line;                    // Zero-based line number
+  private int _lastNWS;                 // Index of last non-white-space char
+  private AryInt _lines;                // char offset of each line
   public final GVNGCM _gvn;             // Pessimistic types
 
   // Fields strictly for Java number parsing
@@ -79,7 +77,6 @@ public class Parse implements Comparable<Parse> {
 
   Parse( String src, Env env, String str ) {
     _src = src;
-    _line= 0;
     _e   = env;
     _buf = str.getBytes();
     _x   = 0;
@@ -88,8 +85,10 @@ public class Parse implements Comparable<Parse> {
     _nf = NumberFormat.getInstance();
     _nf.setGroupingUsed(false);
     _pp = new ParsePosition(0);
-    _str = str;          // Keep a complete string copy for java number parsing
-    _gvn = Env.GVN;      // Pessimistic during parsing
+    _str = str;           // Keep a complete string copy for java number parsing
+    _lines = new AryInt();//
+    _lines.push(0);       // Line 0 at offset 0
+    _gvn = Env.GVN;       // Pessimistic during parsing
   }
   String dump() { return _e._scope.dump(99); }// debugging hook
   String dumprpo() { return Env.START.dumprpo(false,false); }// debugging hook
@@ -408,7 +407,8 @@ public class Parse implements Comparable<Parse> {
     return  gvn(new PhiNode(Type.SCALAR ,bad,r.unhook(),tex.unhook(),  fex.unhook())) ; // Ifex result
   }
 
-  /** Parse a lisp-like function application
+  /** Parse a lisp-like function application.  To avoid the common bug of
+   *  forgetting a ';', these must be on the same line.
       apply = expr
       apply = expr expr*
    */
@@ -418,8 +418,16 @@ public class Parse implements Comparable<Parse> {
     while( true ) {
       skipWS();
       int oldx = _x;
+      int old_last = _lastNWS;
       Node arg = expr();
       if( arg==null ) return expr;
+      // To avoid the common bug of forgetting a ';', these must be on the same line.
+      int line_last = _lines.binary_search(old_last);
+      int line_now  = _lines.binary_search(_x);
+      if( line_last != line_now ) {
+        _x = oldx;  _lastNWS = old_last;
+        return err_ctrl2("Lisp-like function application split between lines "+line_last+" and "+line_now+", but must be on the same line; possible missing semicolon?");
+      }
       expr = do_call(errMsgs(oldx,oldx),args(expr,arg)); // Pass the 1 arg
     }
   }
@@ -1208,12 +1216,16 @@ public class Parse implements Comparable<Parse> {
   /** Advance parse pointer to the first non-whitespace character, and return
    *  that character, -1 otherwise.  */
   private byte skipWS() {
+    int oldx = _x;
     while( _x < _buf.length ) {
       byte c = _buf[_x];
       if( c=='/' && _x+1 < _buf.length && _buf[_x+1]=='/' ) { skipEOL()  ; continue; }
       if( c=='/' && _x+1 < _buf.length && _buf[_x+1]=='*' ) { skipBlock(); continue; }
-      if( c=='\n' ) _line++;
-      if( !isWS(c) ) return c;
+      if( c=='\n' && _x+1 > _lines.last() ) _lines.push(_x+1);
+      if( !isWS(c) ) {
+        if( oldx-1 > _lastNWS && !isWS(_buf[oldx-1]) ) _lastNWS = oldx-1;
+        return c;
+      }
       _x++;
     }
     return -1;
@@ -1297,12 +1309,12 @@ public class Parse implements Comparable<Parse> {
 
   // Make a private clone just for delayed error messages
   private Parse( Parse P ) {
-    _src = P._src;
-    _buf = P._buf;
-    _x   = P._x;
-    _line= P._line;
-    _gvn = P._gvn;
-    _e   = null;  _nf  = null;  _pp  = null;  _str = null;
+    _src  = P._src;
+    _buf  = P._buf;
+    _x    = P._x;
+    _lines= P._lines;
+    _gvn  = P._gvn;
+    _e    = null;  _nf  = null;  _pp  = null;  _str = null;
   }
   // Delayed error message, just record line/char index and share code buffer
   Parse errMsg() { return errMsg(_x); }
@@ -1326,8 +1338,12 @@ public class Parse implements Comparable<Parse> {
     int b=_x;
     while( b < _buf.length && _buf[b] != '\n' ) b++;
     if( b < _buf.length ) b--; // do not include trailing \n or \n\r
-    // error message
-    SB sb = new SB().p(_src).p(':').p(_line).p(':').p(s).nl();
+    // Find line number.  Bin-search returns the insertion-point, which is the NEXT
+    // line unless _x is exactly a line start.
+    int line = _lines.binary_search(_x); // Find zero-based line insertion point
+    if( line == _lines._len ||  _lines.at(line)>_x ) line--;
+    // error message using 1-based line
+    SB sb = new SB().p(_src).p(':').p(line+1).p(':').p(s).nl();
     sb.p(new String(_buf,a,b-a)).nl();
     int line_start = a;
     for( int i=line_start; i<_x; i++ )

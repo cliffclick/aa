@@ -5,6 +5,10 @@ import org.junit.*;
 import org.junit.contrib.java.lang.system.SystemErrRule;
 import org.junit.contrib.java.lang.system.SystemOutRule;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -39,14 +43,14 @@ public class TestREPL {
     test("2+3", "5");
     test("x=3", "3");
     test("x*x", "9");
-    testerr("y*y", "y*y", "Unknown ref 'y'",6,0);
+    testerr("y*y", "y*y", "Unknown ref 'y'",4,0);
     test("x=4", "4");
-    testerr("x+x", "x=4", "Cannot re-assign final val 'x'",6,0);
+    testerr("x+x", "x=4", "Cannot re-assign final val 'x'",4,0);
     test("3+2", "5");
     test("sq={x->x*x}", "[sq=*{x -> }]");
     test("sq 5","25");
-    testerr("sq \"abc\"", "sq={x->x*x}", "*\"abc\" is none of (flt64,int64)", 10,7);
-    testerr("x", "x=4", "Cannot re-assign final val 'x'",6,0);
+    testerr("sq \"abc\"", "sq={x->x*x}", "*\"abc\" is none of (flt64,int64)", 6,7);
+    testerr("x", "x=4", "Cannot re-assign final val 'x'",4,0);
   }
 
   // Requires multi-pass type inference.
@@ -61,8 +65,13 @@ public class TestREPL {
     testerr("junk := hash:int","junk := hash:int","[hash=*{ -> }] is not a int64",2,12);
     testerr("hash.tab","hash.tab","Unknown field '.tab' in address [hash=*{ -> }]",2,5);
     test   ("x := hash()","@{tab=*[3]0/obj; get=[get=*{key -> }]}");
-    testerr("x.#tab","x.#tab","Unknown ref 'tab'",4,3);
+    testerr("x.#tab","x.#tab","Unknown ref 'tab'",3,3);
     test   ("#x.tab","3");
+  }
+
+  @Test public void testREPL04() throws IOException {
+    String hash_src = new String(Files.readAllBytes( Paths.get("test/java/com/cliffc/aa","HashTable.aa")));
+    test(hash_src,"[Hash=*{ -> }]");
   }
 
   // Jam the code into STDIN, run the REPL one-step, read the STDOUT and compare.
