@@ -200,4 +200,5 @@ public class TypeInt extends Type<TypeInt> {
   }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
   public TypeInt minsize(TypeInt ti) { return make(-2,Math.min(_z,ti._z),0);  }
+  public TypeInt maxsize(TypeInt ti) { return make(-2,Math.max(_z,ti._z),0);  }
 }

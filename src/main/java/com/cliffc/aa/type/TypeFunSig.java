@@ -11,7 +11,12 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   public Type _ret;
 
   private TypeFunSig(TypeStruct formals, Type ret ) { super(TFUNSIG); init(formals,ret); }
-  private void init (TypeStruct formals, Type ret ) { _formals=formals; _ret=ret; }
+  private void init (TypeStruct formals, Type ret ) {
+    for( Type t : formals._ts )
+      assert t.isa(Type.SCALAR);
+    _formals=formals;
+    _ret=ret;
+  }
   @Override int compute_hash() { assert _formals._hash != 0;  return TFUNSIG + _formals._hash + _ret._hash; }
 
   @Override public boolean equals( Object o ) {

@@ -38,8 +38,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   private void _init(int parent_alias, T ts) {
     _alias = BitsAlias.new_alias(parent_alias);
     _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeObj.ISUSED);
-    _ts = ts;
-    _crushed = ts.crush();
+    sets_out(ts);
   }
   String xstr() { return "New"+"*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
@@ -129,6 +128,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   @Override @NotNull public NewNode copy( boolean copy_edges, GVNGCM gvn) {
     // Split the original '_alias' class into 2 sub-aliases
     NewNode<T> nnn = (NewNode<T>)super.copy(copy_edges, gvn);
+    nnn._val = null;            // Not in GVN
     nnn._init(_alias,_ts);      // Children alias classes, split from parent
     // The original NewNode also splits from the parent alias
     assert touched();

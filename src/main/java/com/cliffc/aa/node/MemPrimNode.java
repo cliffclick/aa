@@ -79,7 +79,6 @@ public abstract class MemPrimNode extends PrimNode {
   static class LValueLength extends ReadPrimNode {
     LValueLength() { super("#",TypeStruct.LVAL_LEN,TypeInt.INT64); }
     @Override public String bal_close() { return null; } // Balanced op
-    @Override public byte op_prec() { return 9; } // Max precidence
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type mem = val(1);

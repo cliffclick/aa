@@ -681,11 +681,6 @@ public class CallNode extends Node {
     if( tfp._nargs != nargs() )
       return fast ? ErrMsg.FAST : ErrMsg.syntax(_badargs[0],"Passing "+(nargs()-1)+" arguments to "+tfp.names(false)+" which takes "+(tfp._nargs-1)+" arguments");
 
-    // Call did not resolve
-    BitsFun fidxs = tfp.fidxs();
-    if( fidxs.is_empty() || fidxs.above_center() ) // This is an unresolved call
-      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
-
     // If ANY args are ANY they will fail the arg check, BUT will be reported
     // first where they became an ANY.
     if( !fast )
@@ -700,6 +695,7 @@ public class CallNode extends Node {
       Type actual = arg(j).sharptr(mem());
       Ary<Type> ts=null;
       for( int fidx : tfp._fidxs ) {
+        if( fidx==0 ) continue;
         FunNode fun = FunNode.find_fidx(fidx);
         if( fun==null || fun.is_dead() ) return ErrMsg.FAST;
         TypeStruct formals = fun._sig._formals; // Type of each argument
@@ -714,6 +710,11 @@ public class CallNode extends Node {
       if( ts!=null )
         return ErrMsg.typerr(_badargs[j],actual,mem()._val,ts.asAry());
     }
+
+    // Call did not resolve
+    BitsFun fidxs = tfp.fidxs();
+    if( fidxs.is_empty() || fidxs.above_center() ) // This is an unresolved call
+      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
 
     return null;
   }

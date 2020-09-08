@@ -1,4 +1,31 @@
 =======================================
+Notes from 09/07/2020
+
+Short-circuit evals.
+
+Plan A: Thunk the RHS expr & pass the thunk to all binops.
+Prims like '*' unthunk it.
+Prims like '&&' do short-circuit eval & unthunk on demand.
+Allows user to define new short-circuit operators.
+Means expr() will thunk all term()s independently, except perhaps the first.
+Then precedence determines the order of eval.
+
+Example: a() && b() || c() && d()
+if( a() ) {
+  if( b() ) {
+    returns b
+  }
+}
+if( c() ) {
+  if( d() ) {
+    returns d()
+  }
+}
+returns 0
+
+
+
+=======================================
 Notes from 09/01/2020
 
 REPL- Lots of cleanup/improvements already.
@@ -21,10 +48,6 @@ Thinking-
   the clones will never get resolved-to; get cleaned up.
 - Each new-line, some new Calls appear, resolve to some Funs.  
 - Each new-line, visit all FunNodes, clone if sig varies when dropping default.
-
-
-
-
 
 =======================================
 Notes from 08/29/2020

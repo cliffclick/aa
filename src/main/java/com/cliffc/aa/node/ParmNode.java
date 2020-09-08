@@ -126,7 +126,7 @@ public class ParmNode extends PhiNode {
     Type formal = fun.formal(_idx);
     for( int i=1; i<_defs._len; i++ ) {
       if( fun.val(i)==Type.XCTRL ) continue;// Ignore dead paths
-      Type argt = in(i).sharptr(mem.in(i)); // Arg type for this incoming path
+      Type argt = mem == null ? in(i)._val : in(i).sharptr(mem.in(i)); // Arg type for this incoming path
       if( argt!=Type.ALL && !argt.isa(formal) ) { // Argument is legal?  ALL args are in-error elsewhere
         // The merge of all incoming calls for this argument is not legal.
         // Find the call bringing the broken args, and use it for error

@@ -161,7 +161,7 @@ public final class RetNode extends Node {
     Type ctl = ctl()._val;
     if( ctl != Type.CTRL ) return ctl.oob(TALL);
     Type mem = mem()._val;
-    if( !(mem instanceof TypeMem) ) return mem.oob(TALL);
+    if( !(mem instanceof TypeMem) ) mem = mem.oob(TypeMem.ALLMEM);
     Type val = val()._val;
     return TypeTuple.make(ctl,mem,val);
   }
@@ -170,7 +170,7 @@ public final class RetNode extends Node {
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
     // Pre-GCP, might be used anywhere (still finding CFG)
-    return !opt_mode._CG ? TypeMem.ALLMEM : super.live(opt_mode);
+    return in(4) instanceof FunNode && fun().has_unknown_callers() && !opt_mode._CG ? TypeMem.ALLMEM : super.live(opt_mode);
   }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==mem() ) return _live;

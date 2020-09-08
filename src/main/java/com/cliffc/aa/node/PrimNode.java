@@ -5,6 +5,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Ary;
 
 // Primitives can be used as an internal operator (their apply() call does the
 // primitive operation).  Primitives are wrapped as functions when returned
@@ -17,6 +18,7 @@ public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
   final TypeFunSig _sig;        // Argument types; 0 is display, 1 is 1st real arg
   Parse[] _badargs;             // Filled in when inlined in CallNode
+  byte _op_prec;                // Operator precedence, computed from table.  Generally 1-9.
   PrimNode( String name, TypeStruct formals, Type ret ) {
     super(OP_PRIM);
     _name=name;
@@ -24,12 +26,44 @@ public abstract class PrimNode extends Node {
     _sig=TypeFunSig.make(formals,ret);
     _badargs=null;
   }
+  @Override public byte op_prec() { return _op_prec; }
 
-  private static PrimNode[] PRIMS = null;
+  private static PrimNode[] PRIMS = null; // All primitives
+  static PrimNode[][] PRECEDENCE = null;  // Just the binary operators, grouped by precedence
   public static void reset() { PRIMS=null; }
+
   public static PrimNode[] PRIMS() {
     if( PRIMS!=null ) return PRIMS;
-    return PRIMS = new PrimNode[] {
+
+    // Binary-operator primitives, sorted by precedence
+    PRECEDENCE = new PrimNode[][]{
+
+      {new MemPrimNode.ReadPrimNode.LValueLength(), }, // The other array ops are "balanced ops" and use term() for precedence
+
+      {new MinusF64(), new MinusI64(), new Not(), },
+
+      {new MulF64(), new DivF64(), new MulI64(), new DivI64(), new ModI64(), },
+
+      {new AddF64(), new SubF64(), new AddI64(), new SubI64(), },
+
+      {new LT_F64(), new LE_F64(), new GT_F64(), new GE_F64(),
+       new LT_I64(), new LE_I64(), new GT_I64(), new GE_I64(),},
+
+      {new EQ_F64(), new NE_F64(), new EQ_I64(), new NE_I64(), new EQ_OOP(), new NE_OOP(), },
+
+      {new AndI64(), },
+
+      {new OrI64(), },
+
+      //{new AndThen(), },
+      //
+      //{new OrElse(), },
+
+    };
+
+    // Other primitives, not binary operators
+    PrimNode[] others = new PrimNode[] {
+      // These are called like a function
       new RandI64(),
       new Id(TypeMemPtr.ISUSED0), // Pre-split OOP from non-OOP
       new Id(TypeFunPtr.GENERIC_FUNPTR),
@@ -38,45 +72,25 @@ public abstract class PrimNode extends Node {
       new ConvertInt64F64(),
       new ConvertStrStr(),
 
-      new MinusF64(),
-      new MinusI64(),
-      new Not(),
-
-      new AddF64(),
-      new SubF64(),
-      new MulF64(),
-      new DivF64(),
-
-      new LT_F64(),
-      new LE_F64(),
-      new GT_F64(),
-      new GE_F64(),
-      new EQ_F64(),
-      new NE_F64(),
-
-      new AddI64(),
-      new SubI64(),
-      new MulI64(),
-      new DivI64(),
-      new ModI64(),
-
-      new AndI64(),
-
-      new LT_I64(),
-      new LE_I64(),
-      new GT_I64(),
-      new GE_I64(),
-      new EQ_I64(),
-      new NE_I64(),
-
-      new EQ_OOP(),
-      new NE_OOP(),
-
-      new MemPrimNode.ReadPrimNode.LValueLength(), // Read  an L-Value: (ary) ==> size
+      // These are balanced-ops, called by Parse.term()
       new MemPrimNode.ReadPrimNode.LValueRead  (), // Read  an L-Value: (ary,idx) ==> elem
       new MemPrimNode.ReadPrimNode.LValueWrite (), // Write an L-Value: (ary,idx,elem) ==> elem
       new MemPrimNode.ReadPrimNode.LValueWriteFinal(), // Final Write an L-Value: (ary,idx,elem) ==> elem
     };
+
+    Ary<PrimNode> allprims = new Ary<>(others);
+    for( PrimNode[] prims : PRECEDENCE )
+      for( PrimNode prim : prims )
+        allprims.push(prim);
+    PRIMS = allprims.asAry();
+
+    // Compute precedence from table
+    int max_prec = PRECEDENCE.length;
+    for( int p=0; p<PRECEDENCE.length; p++ )
+      for( PrimNode n : PRECEDENCE[p] )
+        n._op_prec = (byte)(max_prec-p);
+
+    return PRIMS;
   }
 
   public static PrimNode convertTypeName( Type from, Type to, Parse badargs ) {
@@ -197,7 +211,6 @@ public abstract class PrimNode extends Node {
   static class MinusF64 extends Prim1OpF64 {
     MinusF64() { super("-"); }
     @Override double op( double d ) { return -d; }
-    @Override public byte op_prec() { return 9; }
   }
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing
@@ -210,7 +223,6 @@ public abstract class PrimNode extends Node {
   static class MinusI64 extends Prim1OpI64 {
     MinusI64() { super("-"); }
     @Override long op( long x ) { return -x; }
-    @Override public byte op_prec() { return 9; }
   }
 
   // 2Ops have uniform input/output types, so take a shortcut on name printing
@@ -223,25 +235,21 @@ public abstract class PrimNode extends Node {
   static class AddF64 extends Prim2OpF64 {
     AddF64() { super("+"); }
     double op( double l, double r ) { return l+r; }
-    @Override public byte op_prec() { return 5; }
   }
 
   static class SubF64 extends Prim2OpF64 {
     SubF64() { super("-"); }
     double op( double l, double r ) { return l-r; }
-    @Override public byte op_prec() { return 5; }
   }
 
   static class MulF64 extends Prim2OpF64 {
     MulF64() { super("*"); }
     @Override double op( double l, double r ) { return l*r; }
-    @Override public byte op_prec() { return 6; }
   }
 
   static class DivF64 extends Prim2OpF64 {
     DivF64() { super("/"); }
     @Override double op( double l, double r ) { return l/r; }
-    @Override public byte op_prec() { return 6; }
   }
 
   // 2RelOps have uniform input types, and bool output
@@ -249,7 +257,6 @@ public abstract class PrimNode extends Node {
     Prim2RelOpF64( String name ) { super(name,TypeStruct.FLT64_FLT64,TypeInt.BOOL); }
     @Override public Type apply( Type[] args ) { return op(args[1].getd(),args[2].getd())?TypeInt.TRUE:TypeInt.FALSE; }
     abstract boolean op( double x, double y );
-    @Override public byte op_prec() { return 4; }
   }
 
   static class LT_F64 extends Prim2RelOpF64 { LT_F64() { super("<" ); } boolean op( double l, double r ) { return l< r; } }
@@ -270,31 +277,26 @@ public abstract class PrimNode extends Node {
   static class AddI64 extends Prim2OpI64 {
     AddI64() { super("+"); }
     @Override long op( long l, long r ) { return l+r; }
-    @Override public byte op_prec() { return 5; }
   }
 
   static class SubI64 extends Prim2OpI64 {
     SubI64() { super("-"); }
     @Override long op( long l, long r ) { return l-r; }
-    @Override public byte op_prec() { return 5; }
   }
 
   static class MulI64 extends Prim2OpI64 {
     MulI64() { super("*"); }
     @Override long op( long l, long r ) { return l*r; }
-    @Override public byte op_prec() { return 6; }
   }
 
   static class DivI64 extends Prim2OpI64 {
     DivI64() { super("/"); }
     @Override long op( long l, long r ) { return l/r; } // Long division
-    @Override public byte op_prec() { return 6; }
   }
 
   static class ModI64 extends Prim2OpI64 {
     ModI64() { super("%"); }
     @Override long op( long l, long r ) { return l%r; }
-    @Override public byte op_prec() { return 6; }
   }
 
   static class AndI64 extends Prim2OpI64 {
@@ -320,7 +322,31 @@ public abstract class PrimNode extends Node {
       return ((TypeInt)t1).minsize((TypeInt)t2);
     }
     @Override long op( long l, long r ) { return l&r; }
-    @Override public byte op_prec() { return 7; }
+  }
+
+  static class OrI64 extends Prim2OpI64 {
+    OrI64() { super("|"); }
+    // And can preserve bit-width
+    @Override public Type value(GVNGCM.Mode opt_mode) {
+      Type t1 = val(1), t2 = val(2);
+      // 0 OR anything is that thing
+      if( t1 == Type.NIL || t1 == Type.XNIL ) return t2;
+      if( t2 == Type.NIL || t2 == Type.XNIL ) return t1;
+      // If either is high - results might fall to something reasonable
+      if( t1.above_center() || t2.above_center() )
+        return TypeInt.INT64.dual();
+      // Both are low-or-constant, and one is not valid - return bottom result
+      if( !t1.isa(TypeInt.INT64) || !t2.isa(TypeInt.INT64) )
+        return TypeInt.INT64;
+      // If both are constant ints, return the constant math.
+      if( t1.is_con() && t2.is_con() )
+        return TypeInt.con(t1.getl() | t2.getl());
+      if( !(t1 instanceof TypeInt) || !(t2 instanceof TypeInt) )
+        return TypeInt.INT64;
+      // Preserve width
+      return ((TypeInt)t1).maxsize((TypeInt)t2);
+    }
+    @Override long op( long l, long r ) { return l&r; }
   }
 
   // 2RelOps have uniform input types, and bool output
@@ -328,7 +354,6 @@ public abstract class PrimNode extends Node {
     Prim2RelOpI64( String name ) { super(name,TypeStruct.INT64_INT64,TypeInt.BOOL); }
     @Override public Type apply( Type[] args ) { return op(args[1].getl(),args[2].getl())?TypeInt.TRUE:TypeInt.FALSE; }
     abstract boolean op( long x, long y );
-    @Override public byte op_prec() { return 4; }
   }
 
   static class LT_I64 extends Prim2RelOpI64 { LT_I64() { super("<" ); } boolean op( long l, long r ) { return l< r; } }
@@ -363,7 +388,6 @@ public abstract class PrimNode extends Node {
       return TypeInt.BOOL;
     }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
-    @Override public byte op_prec() { return 4; }
     static Type vs_nil( Type tx, Type t, Type f ) {
       if( tx==Type.NIL || tx==Type.XNIL ) return t;
       if( tx.above_center() ) return tx.isa(Type.NIL) ? TypeInt.BOOL.dual() : f;
@@ -395,7 +419,6 @@ public abstract class PrimNode extends Node {
       return TypeInt.BOOL;
     }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
-    @Override public byte op_prec() { return 4; }
   }
 
 
@@ -413,7 +436,6 @@ public abstract class PrimNode extends Node {
       return Type.XNIL;           // Cannot be a nil, so return a nil
     }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
-    @Override public byte op_prec() { return 9; }
   }
 
   static class RandI64 extends PrimNode {
@@ -428,6 +450,7 @@ public abstract class PrimNode extends Node {
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
     // Rands have hidden internal state; 2 Rands are never equal
     @Override public boolean equals(Object o) { return this==o; }
+    @Override public byte op_prec() { return -1; }
   }
 
   static class Id extends PrimNode {
@@ -435,5 +458,6 @@ public abstract class PrimNode extends Node {
     @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
     @Override public Type value(GVNGCM.Mode opt_mode) { return val(1); }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
+    @Override public byte op_prec() { return -1; }
   }
 }
