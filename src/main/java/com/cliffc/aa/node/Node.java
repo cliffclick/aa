@@ -216,8 +216,10 @@ public abstract class Node implements Cloneable {
     sb.p(" [[");
     for( Node n : _uses ) sb.p(String.format("%4d ",n._uid));
     sb.p("]]  ");
-    sb.p(str());
-    sb.s().p(_val==null ? "----" : _val.toString());
+    sb.p(str()).s();
+    if( _val==null ) sb.p("----");
+    else _val.str(sb,new VBitSet(),null,true);
+
     return sb;
   }
   // Dump one node IF not already dumped, no recursion
@@ -417,6 +419,7 @@ public abstract class Node implements Cloneable {
   // -2 : Forward ref.
   public byte  op_prec() { return -1; }
   public byte may_prec() { return -1; }
+  public boolean thunk_rhs() { return false; }
 
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)

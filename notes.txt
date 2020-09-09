@@ -10,7 +10,8 @@ Allows user to define new short-circuit operators.
 Means expr() will thunk all term()s independently, except perhaps the first.
 Then precedence determines the order of eval.
 
-Example: a() && b() || c() && d()
+Example: a && b || c && d
+Assume a,b,c,d have side effects.
 if( a() ) {
   if( b() ) {
     returns b
@@ -22,6 +23,14 @@ if( c() ) {
   }
 }
 returns 0
+
+During expr parsing, once a thunking operator is found, thunk all remaining terms.
+NEEDS: a way to 'thunk' a term(), where a thunk is a no-arg function with all callers known.
+When combining terms, if RHS is a thunk & operator is no-thunk, then "dethunk" it.
+NEEDS: a way to 'de-thunk' a thunk; simple inlining.
+Inside the thunking operator, expect an IF around a eval'd thunk.
+NEEDS: a way to 'de-thunk' in the graph, expected AFTER operator inlining.
+After an op return, needs a way to 'thunk' it.
 
 
 

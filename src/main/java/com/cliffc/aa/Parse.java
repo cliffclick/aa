@@ -434,6 +434,44 @@ public class Parse implements Comparable<Parse> {
     }
   }
 
+  // To help order by precedence.  Example: 1+2*3+4*5:
+  //  op  : _ + * + *
+  //  term: 1 2 3 4 5
+  // Picking ops by precedence:
+  //  op  : _   +   + *
+  //  term: 1 (2*3) 4 5
+  //  op  : _   +     +
+  //  term: 1 (2*3) (4*5)
+  //  op  : _         +
+  //  term: 1+(2*3) (4*5)
+  //  op  : _
+  //  term: 1+(2*3)+(4*5)
+  private static class Expr {
+    Node _op;                   // Either a FunPtr or an Unresolved
+    Node _term;                 // The term, possibly thunked
+    boolean _thunked;           // True if term is thunked
+    Parse _loc_op;              // Location of operand start
+    Parse _loc_term;            // Location of term start
+    FunPtrNode _ptr;            // Sample FunPtr; same name, op_prec, thunking for all
+    Node _prim;                 // Sample Prim
+    String _name;               // Sample name
+    int _prec;                  // Precedence
+    Expr(Node op, Node term, boolean thunked, Parse loc_op, Parse loc_term) {
+      _op=op;
+      _term=term;
+      _thunked=thunked;
+      _loc_op=loc_op;
+      _loc_term=loc_term;
+      if( op != null ) {
+        _ptr = (FunPtrNode)(op instanceof UnresolvedNode ? op.in(0) : op);
+        _name = _ptr.fun()._name;
+        _prim = PrimNode.prim(_ptr);
+        _thunked = thunked || _prim.thunk_rhs();
+        _prec = _prim.op_prec();
+      }
+    }
+  }
+
   /** Parse an expression, a list of terms and infix operators.  The whole list
    *  is broken up into a tree based on operator precedence.
    *  expr = term [binop term]*
@@ -443,71 +481,58 @@ public class Parse implements Comparable<Parse> {
     int oldx = _x;
     Node term = term();
     if( term == null ) return null; // Term is required, so missing term implies not any expr
-    // Collect 1st fcn/arg pair
-    Ary<Node > funs = new Ary<>(new Node [1],0);
-    Ary<Parse> bafs = new Ary<>(new Parse[1],0);
-    Ary<Parse> bats = new Ary<>(new Parse[1],0);
-    try( TmpNode args = new TmpNode() ) {
-      funs.add(null);
-      args.add_def(term);
-      bafs.add(null);
-      bats.add(errMsg(oldx));
 
-      // Now loop for binop/term pairs: parse Kleene star of [binop term]
-      while( true ) {
-        skipWS();
-        oldx = _x;
-        String bin = token();
-        if( bin==null ) break;    // Valid parse, but no more Kleene star
-        Node binfun = _e.lookup_filter(bin.intern(),_gvn,2); // BinOp, or null
-        if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
-        _x = oldx+filtered_name(binfun).length();
-        skipWS();
-        int oldx2 = _x;
-        if( (term=term()) == null )
-          term = err_ctrl2("Missing term after '"+filtered_name(binfun)+"'");
-        funs.add(binfun.keep());
-        args.add_def(term);
-        bafs.add(errMsg(oldx ));
-        bats.add(errMsg(oldx2));
-      }
+    // Collect all binops and terms in the expr, up front; then sort them by
+    // precedence and combine pairwise into a tree.  The short-circuit
+    // operators require 'thunking' the Right Hand Side, to delay execution.
+    // In general, user ops can thunk RHSs, so right here right now we thunk
+    // all terms past any RHS-thunk operator.  During pair-wise combining we
+    // thunk or de-thunk as needed.
 
-      // Have a list of interspersed operators and terms.
-      // Build a tree with precedence.
-      int max=-1;                 // First find max precedence.
-      for( Node n : funs ) if( n != null ) max = Math.max(max,n.op_prec());
-      // Now starting at max working down, group list by pairs into a tree
-      while( max >= 0 && args._defs._len > 0 ) {
-        for( int i=0; i<funs.len(); i++ ) { // For all ops of this precedence level, left-to-right
-          Node  fun = funs.at(i);
-          if( fun==null ) continue;
-          if( fun.op_prec() < max ) continue; // Not yet
-          Parse baf = bafs.at(i);
-          Parse bat = bats.at(i);
-          if( i==0 ) {
-            Node call = do_call(new Parse[]{baf,bat},args(fun.unhook(),args.in(0)));
-            args.set_def(0,call,_gvn);
-            funs.setX(0,null);
-          } else {
-            Parse bat1 = bats.at(i-1); // Prior term start
-            Node call = do_call(new Parse[]{baf,bat1,bat},args(fun.unhook(),args.in(i-1),args.in(i)));
-            args.set_def(i-1,call,_gvn);
-            funs.remove(i);  args.remove(i);  bafs.remove(i);  bats.remove(i);  i--;
-          }
-        }
-        max--;
-      }
-      if( funs.last() != null ) funs.pop().unhook();
-      term = args.del(0);       // Return the remaining expression
+    // Collect ops and terms.  First term, no binop yet.
+    Ary<Expr> exs = new Ary<>(new Expr[1],0);
+    exs.push(new Expr(null,term.keep(),false,null,errMsg(oldx)));
+
+    // Now loop for binop/term pairs: parse Kleene star of [binop term]
+    boolean thunking = false;
+    while( true ) {
+      skipWS();                 // Skip between end of last term and start of token
+      oldx = _x;
+      String bin = token();
+      if( bin==null ) break;    // Valid parse, but no more Kleene star
+      Node binfun = _e.lookup_filter(bin.intern(),_gvn,2); // BinOp, or null
+      if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
+      Expr ex = exs.push(new Expr(binfun.keep(),null,thunking,errMsg(oldx),null));
+      // Token might have been longer than the filtered name; happens if a
+      // bunch of operator characters are adjacent but we can make an operator
+      // out of the first few.
+      _x = oldx+ex._name.length();
+      // Started thunking?
+      thunking = ex._thunked;
+      skipWS();                 // Skip WS after token
+      ex._loc_term = errMsg(_x);// Location of term start
+      if( thunking )            // Start thunking
+        throw com.cliffc.aa.AA.unimpl();
+      if( (term=term()) == null )
+        term = err_ctrl2("Missing term after '"+ex._name+"'");
+      ex._term=term.keep();
     }
-    return term;
-  }
 
-  // Actual minimal length uniop might be smaller than the parsed token
-  // (greedy algo vs not-greed)
-  private static String filtered_name( Node fun ) {
-    FunPtrNode fptr = (FunPtrNode)(fun instanceof UnresolvedNode ? fun.in(0) : fun);
-    return fptr.fun()._name;
+    // Have a list of interspersed operators and terms.
+    // Build a tree with precedence.
+    while( exs._len > 1 ) {
+      // Find max precedence index
+      int idx=1;
+      for( int i=2; i<exs._len; i++ )
+        if( exs.at(i)._prec > exs.at(idx)._prec )
+          idx = i;
+      Expr lhs = exs.at(idx-1);
+      Expr rhs = exs.remove(idx);
+      Node call = do_call(new Parse[]{rhs._loc_op     ,lhs._loc_term     ,rhs._loc_term     },
+                          args       (rhs._op.unhook(),lhs._term.unhook(),rhs._term.unhook()));
+      lhs._term = call.keep();
+    }
+    return exs.pop()._term.unhook();
   }
 
   /** Any number field-lookups or function applications, then an optional assigment
@@ -524,7 +549,13 @@ public class Parse implements Comparable<Parse> {
       Node unifun = _e.lookup_filter(uni.intern(),_gvn,1); // UniOp, or null
       if( unifun==null || unifun.op_prec() <= 0 ) _x=oldx; // Not a uniop
       else {
-        _x = oldx+filtered_name(unifun.keep()).length();
+        FunPtrNode ptr = (FunPtrNode)(unifun instanceof UnresolvedNode ? unifun.in(0) : unifun);
+        // Token might have been longer than the filtered name; happens if a
+        // bunch of operator characters are adjacent but we can make an operator
+        // out of the first few.
+        String name = ptr.fun()._name;
+        _x = oldx+name.length();
+        unifun.keep();
         Node term = term();
         unifun.unhook();
         if( term==null ) { _x = oldx; return null; }
@@ -809,6 +840,19 @@ public class Parse implements Comparable<Parse> {
       _e = e._par;                         // Pop nested environment
     } // Pop lexical scope around struct
     return ptr.unhook();
+  }
+
+  // Delay execution of a term(), in case its passed to a short-circuit
+  // operator and has side-effects.  Basically, this is a no-arg function that
+  // does not make or need a private display, nor escapes.  It does not need a
+  // display parm, but DOES need a memory parm.
+  //
+
+  private Node open_thunk() {
+    return null;
+  }
+  private FunPtrNode close_thunk() {
+    return null;
   }
 
   /** Parse an anonymous function; the opening '{' already parsed.  After the

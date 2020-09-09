@@ -3,6 +3,7 @@ package com.cliffc.aa;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.function.Function;
@@ -11,18 +12,17 @@ import static org.junit.Assert.*;
 
 public class TestParse {
   private static final String[] FLDS = new String[]{"^","n","v"};
-  private static final BitsFun TEST_FUNBITS = BitsFun.make0(44);
+  private static final BitsFun TEST_FUNBITS = BitsFun.make0(45);
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeStr.NO_DISP);
 
-    //// fails another way also
+    // fails another way also
     //test("key = \"Monday\"; val = 1;\n" +
     //     "entry = 0;\n" +
-    //     "entry && key.eq(entry.key) ? (oldval=entry.val; entry.val:=val; ^oldval);\n" +
-    //     "0\n",
+    //     "entry && key.eq(entry.key) ? (oldval=entry.val; entry.val:=val; oldval);",
     //     Type.XNIL);
     //test("put = { key val ->\n" +
     //     "  entry = 0;\n" +
@@ -184,6 +184,17 @@ public class TestParse {
     test_ptr0("math_rand(1)?\"abc\"", (alias)->TypeMemPtr.make_nil(alias,TypeStr.ABC));
     test   ("x:=0;math_rand(1)?(x:=1);x",TypeInt.BOOL);
     testerr("a.b.c();","Unknown ref 'a'",0);
+  }
+
+  @Ignore
+  @Test public void testParse01a() {
+    test("0 && 0", TypeInt.con(0));
+    test("1 && 2", TypeInt.con(1));
+    test("0 && 2", TypeInt.con(2));
+    test("x:=y:=0; z=x++ && y++;(x,y,z)",
+         TypeStruct.make_tuple(Type.XNIL,TypeInt.con(1),TypeInt.con(1),TypeInt.con(0)));
+
+
   }
 
   @Test public void testParse02() {

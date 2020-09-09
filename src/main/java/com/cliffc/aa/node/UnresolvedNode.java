@@ -5,6 +5,7 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
 import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.util.Util;
 
 import java.util.Arrays;
 
@@ -63,6 +64,18 @@ public class UnresolvedNode extends Node {
     return t==initial ? Type.ANY : t; // If all inputs are ANY, then ANY result
   }
 
+  // Validate same name, operator-precedence and thunking
+  private void add_def_unresolved( FunPtrNode ptr ) {
+    FunPtrNode ptr0 = (FunPtrNode)in(0);
+    assert Util.eq(ptr0.fun()._name,ptr.fun()._name);
+    // Actually, equal op_prec & think only for binary ops
+    Node prim0 = PrimNode.prim(ptr0);
+    Node prim  = PrimNode.prim(ptr );
+    assert prim0.op_prec()  == prim.op_prec();
+    assert prim0.thunk_rhs()== prim.thunk_rhs();
+    add_def(ptr);
+  }
+
   // Filter out all the wrong-arg-count functions
   public Node filter( GVNGCM gvn, int nargs ) {
     Node x = null;
@@ -72,7 +85,7 @@ public class UnresolvedNode extends Node {
       // Fun-nargs include the display, hence the +1.
       if( fun.nargs() != nargs+1 ) continue;
       if( x == null ) x = epi;
-      else if( x instanceof UnresolvedNode ) x.add_def(epi);
+      else if( x instanceof UnresolvedNode ) ((UnresolvedNode)x).add_def_unresolved((FunPtrNode)epi);
       else x = new UnresolvedNode(_bad,x,epi);
     }
     return x instanceof UnresolvedNode ? gvn.xform(x) : x;

@@ -55,9 +55,9 @@ public class Ary<E> implements Iterable<E> {
   /** Add element in amortized constant time
    *  @param e Element to add at end of list
    **/
-  public void push( E e ) {
+  public E push( E e ) {
     if( _len >= _es.length ) _es = Arrays.copyOf(_es,Math.max(1,_es.length<<1));
-    _es[_len++] = e;
+    return (_es[_len++] = e);
   }
 
   /** Slow, linear-time, element insert.  Preserves order.

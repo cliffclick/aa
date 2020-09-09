@@ -79,7 +79,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
     }
     TypeTuple _value(TypeObj tobj) { return TypeTuple.make(tobj,_tptr); }
     @Override TypeObj valueobj() { throw com.cliffc.aa.AA.unimpl(); }
-    @Override public byte op_prec() { return 5; }
+    @Override public byte op_prec() { return 6; }
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
       if( def==in(3) || def==in(4) ) return TypeMem.ALIVE;
       assert def==in(1);

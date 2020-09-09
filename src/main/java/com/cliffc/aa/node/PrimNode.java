@@ -19,14 +19,17 @@ public abstract class PrimNode extends Node {
   final TypeFunSig _sig;        // Argument types; 0 is display, 1 is 1st real arg
   Parse[] _badargs;             // Filled in when inlined in CallNode
   byte _op_prec;                // Operator precedence, computed from table.  Generally 1-9.
+  public boolean _thunk_rhs;    // Thunk (delay) right-hand-argument.
   PrimNode( String name, TypeStruct formals, Type ret ) {
     super(OP_PRIM);
     _name=name;
     assert formals.at(0)==TypeFunPtr.NO_DISP; // Room for no closure
     _sig=TypeFunSig.make(formals,ret);
     _badargs=null;
+    _thunk_rhs=false;
   }
   @Override public byte op_prec() { return _op_prec; }
+  @Override public boolean thunk_rhs() { return _thunk_rhs; }
 
   private static PrimNode[] PRIMS = null; // All primitives
   static PrimNode[][] PRECEDENCE = null;  // Just the binary operators, grouped by precedence
@@ -44,7 +47,7 @@ public abstract class PrimNode extends Node {
 
       {new MulF64(), new DivF64(), new MulI64(), new DivI64(), new ModI64(), },
 
-      {new AddF64(), new SubF64(), new AddI64(), new SubI64(), },
+      {new AddF64(), new SubF64(), new AddI64(), new SubI64() },
 
       {new LT_F64(), new LE_F64(), new GT_F64(), new GE_F64(),
        new LT_I64(), new LE_I64(), new GT_I64(), new GE_I64(),},
@@ -55,7 +58,7 @@ public abstract class PrimNode extends Node {
 
       {new OrI64(), },
 
-      //{new AndThen(), },
+      {new AndThen(), },
       //
       //{new OrElse(), },
 
@@ -155,6 +158,12 @@ public abstract class PrimNode extends Node {
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,gvn.init(this),rpc,fun));
     // No closures are added to primitives
     return new FunPtrNode(ret,gvn.con(TypeFunPtr.NO_DISP));
+  }
+  // From a FunPtr to a PrimNode
+  public static Node prim(FunPtrNode ptr) {
+    Node n  = ptr.fun().parm(1)._uses.at(0);
+    assert n instanceof PrimNode || n instanceof NewNode.NewPrimNode;
+    return n;
   }
 
 
@@ -459,5 +468,28 @@ public abstract class PrimNode extends Node {
     @Override public Type value(GVNGCM.Mode opt_mode) { return val(1); }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
     @Override public byte op_prec() { return -1; }
+  }
+
+  static class AndThen extends PrimNode {
+    // Takes a value on the LHS, and a THUNK on the RHS.
+    AndThen() { super("&&",TypeStruct.ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
+    @Override public Type value(GVNGCM.Mode opt_mode) {
+      Type t = val(1);
+      if( t!= Type.XNIL &&
+          t!= Type. NIL &&
+          t!= TypeInt.ZERO )
+        return t;
+
+      // Look at RHS only if LHS is false
+      Type f = val(2);
+      if( !(f instanceof TypeFunPtr) ) return f.oob(Type.SCALAR);
+      TypeFunPtr fptr = (TypeFunPtr)f;
+      if( fptr._nargs != 1 ) return f.oob(Type.SCALAR);
+      int fidx = fptr.fidxs().abit();
+      if( fidx == -1 ) return f.oob(Type.SCALAR);
+      TypeFunSig sig = FunNode.find_fidx(fidx)._sig;
+      return sig._ret;
+    }
+    @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   }
 }
