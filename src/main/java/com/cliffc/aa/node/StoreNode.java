@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Util;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
 // testing; also checks final field updates.
@@ -138,8 +139,13 @@ public class StoreNode extends Node {
     return null;
   }
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode()+_fin; }
-  // Stores are never CSE/equal lest we force a partial execution to become a
-  // total execution (require a store on some path it didn't happen).  Stores
-  // that are common in local SESE regions can be optimized with local peepholes.
-  @Override public boolean equals(Object o) { return this==o; }
+  // Stores are can be CSE/equal, and we might force a partial execution to
+  // become a total execution (require a store on some path it didn't happen).
+  // This can be undone later with splitting.
+  @Override public boolean equals(Object o) {
+    if( this==o ) return true;
+    if( !(o instanceof StoreNode) || !super.equals(o) ) return false;
+    StoreNode st = (StoreNode)o;
+    return _fin==st._fin && Util.eq(_fld,st._fld);
+  }
 }

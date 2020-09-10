@@ -509,16 +509,10 @@ public class Parse implements Comparable<Parse> {
       thunking = ex._thunked;
       skipWS();                 // Skip WS after token
       ex._term_loc = errMsg(_x);// Location of term start
-      
+
       if( thunking ) {          // Start thunking
-        Node old_ctrl = ctrl().keep();
-        Node old_mem  = mem ().keep();
-        FunNode fun = open_thunk(); // Thunk function header
-        term = require_term(ex);
-        term = close_thunk(fun,term);
-        set_ctrl(old_ctrl.unhook()); // Back to the pre-thunk-def control
-        set_mem (old_mem .unhook()); // Back to the pre-thunk-def memory
-      } else      
+        throw com.cliffc.aa.AA.unimpl();
+      } else
         term = require_term(ex);
       ex._term=term.keep();
     }
@@ -547,7 +541,7 @@ public class Parse implements Comparable<Parse> {
     Node term = term();
     return term==null ? err_ctrl2("Missing term after '"+ex._name+"'") : term;
   }
-  
+
   /** Any number field-lookups or function applications, then an optional assignment
    *    term = id++ | id--
    *    term = uniop term
@@ -853,23 +847,6 @@ public class Parse implements Comparable<Parse> {
       _e = e._par;                         // Pop nested environment
     } // Pop lexical scope around struct
     return ptr.unhook();
-  }
-
-  // Delay execution of a term(), in case its passed to a short-circuit
-  // operator and has side-effects.  Basically, this is a no-arg function that
-  // does not make or need a private display, nor escapes.  It does not need a
-  // display parm, but DOES need a memory parm.
-  private FunNode open_thunk() {
-    // Build the FunNode header
-    FunNode fun = gvn(new FunNode(TypeStruct.NO_ARGS._flds,TypeStruct.NO_ARGS._ts).add_def(Env.ALL_CTRL)).keep();
-    set_mem(gvn(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null)));
-    return set_ctrl(fun);       // New control is function head
-  }
-  private FunPtrNode close_thunk(FunNode fun, Node term) {
-    Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null));
-    RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),term,rpc,fun.unhook()));
-    Node disp = _e._scope.ptr();                      // Local display for the thunk
-    return (FunPtrNode)gvn(new FunPtrNode(ret,disp)); // Return thunk pointer
   }
 
   /** Parse an anonymous function; the opening '{' already parsed.  After the
