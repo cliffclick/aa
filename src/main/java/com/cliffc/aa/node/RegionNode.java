@@ -47,8 +47,7 @@ public class RegionNode extends Node {
     // Check for empty diamond
     if( dlen==3 ) {             // Exactly 2 live paths
       Node nif = in(1).in(0);
-      if( in(1) instanceof CProjNode && nif==in(2).in(0) ) {
-        assert nif instanceof IfNode;
+      if( in(1) instanceof CProjNode && nif==in(2).in(0) && nif instanceof IfNode ) {
         // Must have no phi uses
         for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;
         return nif.in(0);

@@ -36,7 +36,7 @@ public class TypeNode extends Node {
     if( _t instanceof TypeFunSig ) {
       TypeFunSig sig = (TypeFunSig)_t;
       Node[] args = new Node[sig.nargs()-1/*not display*/+/*+ctrl+mem+tfp+all args*/3];
-      FunNode fun = gvn.init((FunNode)(new FunNode(null,sig,-1).add_def(Env.ALL_CTRL)));
+      FunNode fun = gvn.init((FunNode)(new FunNode(null,sig,-1,false).add_def(Env.ALL_CTRL)));
       fun._val = Type.CTRL;
       args[0] = fun;            // Call control
       args[1] = gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));

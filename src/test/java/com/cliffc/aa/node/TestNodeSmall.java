@@ -414,7 +414,7 @@ public class TestNodeSmall {
     TypeStruct formals = TypeStruct.make_args(Types.ts(dsp_file_ptr._val, // File-scope display as arg0
                                                          Type.SCALAR));          // Some scalar arg1
     TypeFunSig sig = TypeFunSig.make(formals,Type.SCALAR);
-    FunNode fun = new FunNode("fact",sig,-1);
+    FunNode fun = new FunNode("fact",sig,-1,false);
     gvn.init(fun.add_def(ctl).add_def(ctl));
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
@@ -580,7 +580,7 @@ public class TestNodeSmall {
     ConNode arg2= (ConNode)gvn.xform(new ConNode<>(targ2.simple_ptr()));
 
     // Make nodes
-    FunNode fun = new FunNode("fun",tsig,-1);
+    FunNode fun = new FunNode("fun",tsig,-1,false);
     gvn.xform(fun.add_def(cpj));
 
     ParmNode parmem= gvn.init(new ParmNode(-2,"mem" ,fun,mem ,null));

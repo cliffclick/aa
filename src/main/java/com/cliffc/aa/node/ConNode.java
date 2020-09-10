@@ -36,7 +36,5 @@ public class ConNode<T extends Type> extends Node {
     ConNode con = (ConNode)o;
     return _t==con._t;
   }
-  @Override public byte op_prec() { return _t.op_prec(); }
-
 }
 

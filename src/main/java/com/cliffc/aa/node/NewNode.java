@@ -159,13 +159,15 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     public final String _name;    // Unique library call name
     final TypeFunSig _sig;        // Arguments
     final boolean _reads;         // Reads old memory (all of these ops *make* new memory, none *write* old memory)
-    NewPrimNode(byte op, int parent_alias, T to, String name, boolean reads, Type... args) {
+    final int _op_prec;
+    NewPrimNode(byte op, int parent_alias, T to, String name, boolean reads, int op_prec, Type... args) {
       super(op,parent_alias,to);
       _name = name;
       _reads = reads;
       args[0] = TypeFunPtr.NO_DISP; // No display
       String[] flds = args.length==1 ? TypeStruct.ARGS_ :  (args.length==2 ? TypeStruct.ARGS_X : TypeStruct.ARGS_XY);
       _sig = TypeFunSig.make(TypeStruct.make_args(flds,args),Type.SCALAR);
+      _op_prec = op_prec;
     }
     String bal_close() { return null; }
 

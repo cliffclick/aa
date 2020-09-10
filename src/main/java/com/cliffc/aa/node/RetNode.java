@@ -180,14 +180,5 @@ public final class RetNode extends Node {
 
   @Override public Node is_copy(GVNGCM gvn, int idx) { throw com.cliffc.aa.AA.unimpl(); }
   boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }
-  // Return the op_prec of the returned value.  Not sensible except when called
-  // on primitives.
-  @Override public byte op_prec() {
-    if( !is_prim() ) return -1;
-    byte op = val().op_prec();
-    if( op != -1 ) return op;
-    return mem().op_prec();
-  }
-
   @Override public boolean is_forward_ref() { return fun().is_forward_ref(); }
 }

@@ -7,8 +7,8 @@ import com.cliffc.aa.util.Ary;
 // Allocates a TypeStr in memory.  Weirdly takes a string OBJECT (not pointer),
 // and produces the pointer.  Hence liveness is odd.
 public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
-  public NewStrNode( TypeStr to, String name, boolean reads, Type... args) {
-    super(OP_NEWSTR,BitsAlias.STR,to,name,reads,args);
+  public NewStrNode( TypeStr to, String name, boolean reads, int op_prec, Type... args) {
+    super(OP_NEWSTR,BitsAlias.STR,to,name,reads,op_prec,args);
   }
   @Override TypeStr dead_type() { return TypeStr.XSTR; }
   protected static void add_libs( Ary<NewPrimNode> INTRINSICS ) {
@@ -19,14 +19,14 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
 
   // --------------------------------------------------------------------------
   public static class ConStr extends NewStrNode {
-    public ConStr( String str ) { super(TypeStr.con(str),"con",false,(Type)null); }
+    public ConStr( String str ) { super(TypeStr.con(str),"con",false,-1,(Type)null); }
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override TypeStr valueobj() { return _ts; }
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { throw com.cliffc.aa.AA.unimpl(); } // No inputs
   }
 
   public static class ConvertI64Str extends NewStrNode {
-    public ConvertI64Str( ) { super(TypeStr.STR,"str",false,null,TypeInt.INT64); }
+    public ConvertI64Str( ) { super(TypeStr.STR,"str",false,-1,null,TypeInt.INT64); }
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override TypeObj valueobj() {
       Type t = val(3);
@@ -38,7 +38,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   }
 
   public static class ConvertF64Str extends NewStrNode {
-    public ConvertF64Str( ) { super(TypeStr.STR,"str",false,null,TypeFlt.FLT64); }
+    public ConvertF64Str( ) { super(TypeStr.STR,"str",false,-1,null,TypeFlt.FLT64); }
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override TypeObj valueobj() {
       Type t = val(3);
@@ -54,7 +54,8 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   // If one  argument  is  NIL, the other non-nil argument is returned.
   // If neither argument is NIL, the two strings are concatenated into a new third string.
   public static class AddStrStr extends NewStrNode {
-    public AddStrStr( ) { super(TypeStr.STR,"+",true,null,TypeMemPtr.STR0,TypeMemPtr.STR0); }
+    private static int OP_PREC=6;
+    public AddStrStr( ) { super(TypeStr.STR,"+",true,OP_PREC,null,TypeMemPtr.STR0,TypeMemPtr.STR0); }
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       if( is_unused() ) return Type.ANY;
@@ -79,7 +80,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
     }
     TypeTuple _value(TypeObj tobj) { return TypeTuple.make(tobj,_tptr); }
     @Override TypeObj valueobj() { throw com.cliffc.aa.AA.unimpl(); }
-    @Override public byte op_prec() { return 6; }
+    @Override public byte op_prec() { return (byte)OP_PREC; }
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
       if( def==in(3) || def==in(4) ) return TypeMem.ALIVE;
       assert def==in(1);

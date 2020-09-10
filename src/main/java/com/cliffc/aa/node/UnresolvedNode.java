@@ -69,10 +69,8 @@ public class UnresolvedNode extends Node {
     FunPtrNode ptr0 = (FunPtrNode)in(0);
     assert Util.eq(ptr0.fun()._name,ptr.fun()._name);
     // Actually, equal op_prec & think only for binary ops
-    Node prim0 = PrimNode.prim(ptr0);
-    Node prim  = PrimNode.prim(ptr );
-    assert prim0.op_prec()  == prim.op_prec();
-    assert prim0.thunk_rhs()== prim.thunk_rhs();
+    assert ptr0.fun()._op_prec  == ptr.fun()._op_prec;
+    assert ptr0.fun()._thunk_rhs== ptr.fun()._thunk_rhs;
     add_def(ptr);
   }
 
@@ -118,18 +116,7 @@ public class UnresolvedNode extends Node {
 
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.  Should be the same across all defs.
-  @Override public byte op_prec() {
-    byte prec = _defs.at(0).op_prec();
-    assert _defs._len < 2 || _defs.at(1).op_prec() == prec;
-    return prec;
-  }
-  // Return the op_prec of the returned value.  Not sensible except when called
-  // on primitives.  Should be the same across all defs.
-  @Override public byte may_prec() {
-    byte prec = -1;
-    for( Node f : _defs ) if( (prec=f.op_prec()) >= 0 ) return prec;
-    return prec;
-  }
+  @Override public byte op_prec() { return _defs.at(0).op_prec(); }
   @Override public int hashCode() { return super.hashCode()+(_bad==null ? 0 : _bad.hashCode()); }
   @Override public boolean equals(Object o) {
     if( !super.equals(o) ) return false;

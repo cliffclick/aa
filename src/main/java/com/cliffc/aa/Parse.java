@@ -450,24 +450,22 @@ public class Parse implements Comparable<Parse> {
     Node _op;                   // Either a FunPtr or an Unresolved
     Node _term;                 // The term, possibly thunked
     boolean _thunked;           // True if term is thunked
-    Parse _loc_op;              // Location of operand start
-    Parse _loc_term;            // Location of term start
+    Parse _op_loc;              // Location of operand start
+    Parse _term_loc;            // Location of term start
     FunPtrNode _ptr;            // Sample FunPtr; same name, op_prec, thunking for all
-    Node _prim;                 // Sample Prim
     String _name;               // Sample name
-    int _prec;                  // Precedence
-    Expr(Node op, Node term, boolean thunked, Parse loc_op, Parse loc_term) {
+    byte _op_prec;              // Precedence
+    Expr(Node op, Node term, boolean thunked, Parse op_loc, Parse term_loc) {
       _op=op;
       _term=term;
       _thunked=thunked;
-      _loc_op=loc_op;
-      _loc_term=loc_term;
+      _op_loc  =  op_loc;
+      _term_loc=term_loc;
       if( op != null ) {
         _ptr = (FunPtrNode)(op instanceof UnresolvedNode ? op.in(0) : op);
         _name = _ptr.fun()._name;
-        _prim = PrimNode.prim(_ptr);
-        _thunked = thunked || _prim.thunk_rhs();
-        _prec = _prim.op_prec();
+        _thunked = thunked || _ptr.fun()._thunk_rhs;
+        _op_prec = _ptr.fun()._op_prec;
       }
     }
   }
@@ -510,11 +508,18 @@ public class Parse implements Comparable<Parse> {
       // Started thunking?
       thunking = ex._thunked;
       skipWS();                 // Skip WS after token
-      ex._loc_term = errMsg(_x);// Location of term start
-      if( thunking )            // Start thunking
-        throw com.cliffc.aa.AA.unimpl();
-      if( (term=term()) == null )
-        term = err_ctrl2("Missing term after '"+ex._name+"'");
+      ex._term_loc = errMsg(_x);// Location of term start
+      
+      if( thunking ) {          // Start thunking
+        Node old_ctrl = ctrl().keep();
+        Node old_mem  = mem ().keep();
+        FunNode fun = open_thunk(); // Thunk function header
+        term = require_term(ex);
+        term = close_thunk(fun,term);
+        set_ctrl(old_ctrl.unhook()); // Back to the pre-thunk-def control
+        set_mem (old_mem .unhook()); // Back to the pre-thunk-def memory
+      } else      
+        term = require_term(ex);
       ex._term=term.keep();
     }
 
@@ -524,18 +529,26 @@ public class Parse implements Comparable<Parse> {
       // Find max precedence index
       int idx=1;
       for( int i=2; i<exs._len; i++ )
-        if( exs.at(i)._prec > exs.at(idx)._prec )
+        if( exs.at(i)._op_prec > exs.at(idx)._op_prec )
           idx = i;
       Expr lhs = exs.at(idx-1);
       Expr rhs = exs.remove(idx);
-      Node call = do_call(new Parse[]{rhs._loc_op     ,lhs._loc_term     ,rhs._loc_term     },
+      assert !rhs._thunked || rhs._term instanceof FunPtrNode;
+      Node call = do_call(new Parse[]{rhs._op_loc     ,lhs._term_loc     ,rhs._term_loc     },
                           args       (rhs._op.unhook(),lhs._term.unhook(),rhs._term.unhook()));
+      if( lhs._thunked )
+        throw com.cliffc.aa.AA.unimpl();
       lhs._term = call.keep();
     }
     return exs.pop()._term.unhook();
   }
 
-  /** Any number field-lookups or function applications, then an optional assigment
+  private Node require_term(Expr ex) {
+    Node term = term();
+    return term==null ? err_ctrl2("Missing term after '"+ex._name+"'") : term;
+  }
+  
+  /** Any number field-lookups or function applications, then an optional assignment
    *    term = id++ | id--
    *    term = uniop term
    *    term = tfact [tuple | .field | '['stmts']' ]* [.field[:]=stmt | '['stmts ']:=' stmt   | .field++ | .field-- | e]
@@ -547,9 +560,9 @@ public class Parse implements Comparable<Parse> {
     String uni = token();
     if( uni!=null ) {
       Node unifun = _e.lookup_filter(uni.intern(),_gvn,1); // UniOp, or null
-      if( unifun==null || unifun.op_prec() <= 0 ) _x=oldx; // Not a uniop
+      FunPtrNode ptr = (FunPtrNode)(unifun instanceof UnresolvedNode ? unifun.in(0) : unifun);
+      if( ptr==null || ptr.fun()._op_prec <= 0 ) _x=oldx; // Not a uniop
       else {
-        FunPtrNode ptr = (FunPtrNode)(unifun instanceof UnresolvedNode ? unifun.in(0) : unifun);
         // Token might have been longer than the filtered name; happens if a
         // bunch of operator characters are adjacent but we can make an operator
         // out of the first few.
@@ -609,7 +622,7 @@ public class Parse implements Comparable<Parse> {
           { _x = oldx; return n; }
         Type tn = n._val;
         boolean may_fun = tn.isa(TypeFunPtr.GENERIC_FUNPTR);
-        if( !may_fun && arg.may_prec() >= 0 ) { _x=oldx; return n; }
+        if( !may_fun && arg.op_prec() >= 0 ) { _x=oldx; return n; }
         if( !may_fun &&
             // Notice the backwards condition: n was already tested for !(tn instanceof TypeFun).
             // Now we test the other way: the generic function can never be an 'n'.
@@ -743,7 +756,7 @@ public class Parse implements Comparable<Parse> {
     // Anonymous function or operator
     if( peek1(c,'{') ) {
       String tok = token0();
-      Node op = tok == null ? null : _e.lookup(tok.intern()); // TODO: filter by >2 not ==3
+      Node op = tok == null ? null : _e.lookup(tok.intern());
       if( peek('}') && op != null && op.op_prec() > 0 ) {
         // If a primitive unresolved, clone to give a proper error message.
         if( op instanceof UnresolvedNode && op.is_prim() )
@@ -846,13 +859,17 @@ public class Parse implements Comparable<Parse> {
   // operator and has side-effects.  Basically, this is a no-arg function that
   // does not make or need a private display, nor escapes.  It does not need a
   // display parm, but DOES need a memory parm.
-  //
-
-  private Node open_thunk() {
-    return null;
+  private FunNode open_thunk() {
+    // Build the FunNode header
+    FunNode fun = gvn(new FunNode(TypeStruct.NO_ARGS._flds,TypeStruct.NO_ARGS._ts).add_def(Env.ALL_CTRL)).keep();
+    set_mem(gvn(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null)));
+    return set_ctrl(fun);       // New control is function head
   }
-  private FunPtrNode close_thunk() {
-    return null;
+  private FunPtrNode close_thunk(FunNode fun, Node term) {
+    Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null));
+    RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),term,rpc,fun.unhook()));
+    Node disp = _e._scope.ptr();                      // Local display for the thunk
+    return (FunPtrNode)gvn(new FunPtrNode(ret,disp)); // Return thunk pointer
   }
 
   /** Parse an anonymous function; the opening '{' already parsed.  After the

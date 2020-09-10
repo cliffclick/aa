@@ -6,7 +6,7 @@ import com.cliffc.aa.type.*;
 
 // Memory-based primitives
 public abstract class MemPrimNode extends PrimNode {
-  MemPrimNode( String name, TypeStruct formals, Type ret ) { super(name,formals,ret); }
+  MemPrimNode( String name, TypeStruct formals, Type ret ) { super(name,formals,ret); _op_prec = 0; }
   Node mem() { return in(1); }
   Node adr() { return in(2); }
   Node idx() { return in(3); }

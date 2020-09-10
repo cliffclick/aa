@@ -93,7 +93,7 @@ public final class FunPtrNode extends Node {
 
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
-  @Override public byte op_prec() { return ret().op_prec(); }
+  @Override public byte op_prec() { return fun()._op_prec; }
 
   // Instead of returning the pre-call memory on true, returns self.
   // Changes as the graph changes, because works purely off of graph shape.

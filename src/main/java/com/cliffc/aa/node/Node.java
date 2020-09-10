@@ -417,9 +417,7 @@ public abstract class Node implements Cloneable {
   // 0  : Balanced op; precedence is from Parse.term() and not expr().
   // -1 : Invalid
   // -2 : Forward ref.
-  public byte  op_prec() { return -1; }
-  public byte may_prec() { return -1; }
-  public boolean thunk_rhs() { return false; }
+  public byte op_prec() { return -1; }
 
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)

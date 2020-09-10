@@ -64,26 +64,28 @@ public class FunNode extends RegionNode {
   public final TypeFunSig _sig;
   // Operator precedence; only set on top-level primitive wrappers.
   // -1 for normal non-operator functions and -2 for forward_decls.
-  private final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
+  public final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
+  public final boolean _thunk_rhs;
   private byte _cnt_size_inlines; // Count of size-based inlines
 
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
-  public FunNode(           PrimNode prim) { this(prim._name,prim._sig,prim.op_prec()); }
-  public FunNode(NewNode.NewPrimNode prim) { this(prim._name,prim._sig,prim.op_prec()); }
+  public FunNode(           PrimNode prim) { this(prim._name,prim._sig,prim._op_prec,prim._thunk_rhs); }
+  public FunNode(NewNode.NewPrimNode prim) { this(prim._name,prim._sig,prim._op_prec,false); }
   // Used to start an anonymous function in the Parser
-  public FunNode(String[] flds, Type[] ts) { this(null,TypeFunSig.make(TypeStruct.make_args(flds,ts),Type.SCALAR),-1); }
+  public FunNode(String[] flds, Type[] ts) { this(null,TypeFunSig.make(TypeStruct.make_args(flds,ts),Type.SCALAR),-1,false); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.NO_ARGS,Type.SCALAR),-2); add_def(Env.ALL_CTRL); }
-  public FunNode(String name, TypeFunSig sig, int op_prec) { this(name,sig,op_prec,BitsFun.new_fidx()); }
+  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.NO_ARGS,Type.SCALAR),-2,false); add_def(Env.ALL_CTRL); }
+  public FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs ) { this(name,sig,op_prec,thunk_rhs,BitsFun.new_fidx()); }
   // Shared common constructor
-  private FunNode(String name, TypeFunSig sig, int op_prec, int fidx) {
+  private FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs, int fidx) {
     super(OP_FUN);
     _name = name;
     _fidx = fidx;
     _sig = sig;
     _op_prec = (byte)op_prec;
+    _thunk_rhs = thunk_rhs;
     FUNS.setX(fidx(),this); // Track FunNode by fidx; assert single-bit fidxs
   }
 
@@ -558,7 +560,7 @@ public class FunNode extends RegionNode {
   private FunNode make_new_fun(GVNGCM gvn, RetNode ret, TypeStruct new_formals) {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
-    FunNode fun = new FunNode(_name,TypeFunSig.make(new_formals,_sig._ret),_op_prec,BitsFun.new_fidx(oldfidx));
+    FunNode fun = new FunNode(_name,TypeFunSig.make(new_formals,_sig._ret),_op_prec,_thunk_rhs,BitsFun.new_fidx(oldfidx));
     fun.pop();                  // Remove null added by RegionNode, will be added later
     // Renumber the original as well; the original _fidx is now a *class* of 2
     // fidxs.  Each FunNode fidx is only ever a constant, so the original Fun
@@ -863,6 +865,4 @@ public class FunNode extends RegionNode {
   }
 
   @Override public boolean equals(Object o) { return this==o; } // Only one
-  @Override public byte op_prec() { return _op_prec; }
-
 }

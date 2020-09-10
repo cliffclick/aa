@@ -7,8 +7,8 @@ import com.cliffc.aa.util.Ary;
 // Allocates a TypeAry in memory.  Takes in the size and initial element value
 // produces the pointer.  Hence liveness is odd.
 abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
-  public NewAryNode( TypeAry tary, String name, TypeInt sz ) {
-    super(OP_NEWARY,BitsAlias.ARY,tary,name,false,null,sz);
+  public NewAryNode( TypeAry tary, String name, int op_prec,TypeInt sz ) {
+    super(OP_NEWARY,BitsAlias.ARY,tary,name,false,op_prec,null,sz);
   }
   @Override TypeAry dead_type() { return TypeAry.ARY.dual(); }
   // The one string field is memory-alive
@@ -22,7 +22,7 @@ abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
   // "[" defines a new array, and expects an integer size.  Produces
   // partial-alloc type which is consumed by "]" to produce the array.
   public static class NewAry extends NewAryNode {
-    public NewAry( TypeAry tary, TypeInt sz ) { super(tary,"[",sz); }
+    public NewAry( TypeAry tary, TypeInt sz ) { super(tary,"[",0,sz); }
     @Override public String bal_close() { return "]"; } // Balanced op
     @Override public byte op_prec() { return 0; } // Balanced op
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }

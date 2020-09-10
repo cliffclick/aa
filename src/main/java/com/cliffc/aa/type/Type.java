@@ -792,8 +792,6 @@ public class Type<T extends Type<T>> implements Cloneable {
     default: return this;
     }
   }
-  // Operator precedence
-  public byte op_prec() { return -1; } // Overridden in subclasses
 
   // True if type must include a nil (as opposed to may-nil, which means the
   // type can choose something other than nil).
