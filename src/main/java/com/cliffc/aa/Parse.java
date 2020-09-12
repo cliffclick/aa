@@ -453,27 +453,59 @@ public class Parse implements Comparable<Parse> {
   // Invariant: WS already skipped before & after each _expr depth
   private Node _expr(int prec) {
     int lhsx = _x;              // Invariant: WS already skipped
-    Node lhs = _expr_higher(prec);
+    Node lhs = _expr_higher(prec,null), rhs;
     if( lhs==null ) return null;
-    while( true ) {
+    while( true ) {             // Kleene star at this precedence
+      // Look for a binop at this precedence level
       int opx = _x;             // Invariant: WS already skipped
       String bintok = peek(PrimNode.PRIM_TOKS);
       if( !_good_prec_tok(prec,bintok) ) return lhs; // No token at this precedence
       _x += bintok.length();
+      skipWS();
+      int rhsx = _x;            // Invariant: WS already skipped
+      // Get the matching FunPtr (or Unresolved)
       Node op = _e.lookup_filter(bintok.intern(),_gvn,2); // BinOp, or null
       assert op!=null;          // Since found valid token, must find matching primnode
       FunNode sfun = ((FunPtrNode)(op instanceof UnresolvedNode ? op.in(0) : op)).fun();
       assert sfun._op_prec == prec;
-      if( sfun._thunk_rhs ) throw com.cliffc.aa.AA.unimpl();
-      skipWS();
-      int rhsx = _x;            // Invariant: WS already skipped
-      Node rhs = _expr_higher(prec);
-      if( rhs==null ) rhs = err_ctrl2("Missing term after '"+bintok+"'");
-      lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op,lhs,rhs));
+      // Check for Thunking the RHS
+      if( sfun._thunk_rhs ) {
+        // Unwind after parsing delayed execution
+        Node old_ctrl = ctrl().keep();
+        Node old_mem  = mem ().keep();
+        // Insert a thunk header to delay execution
+        ThunkNode thunk = (ThunkNode)gvn(new ThunkNode(mem()));
+        set_ctrl(gvn(new CProjNode(thunk,0)));
+        set_mem (gvn(new MProjNode(thunk,1)));
+        // Delay execution parse of RHS
+        rhs = _expr_higher_require(prec,bintok,lhs);
+        // Insert thunk tail, unwind memory state
+        ThretNode thet = (ThretNode)gvn(new ThretNode(ctrl(),mem(),rhs,thunk));
+        set_ctrl(old_ctrl.unhook());
+        set_mem (old_mem .unhook());
+        // Emit the call to both terms
+        lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op,lhs,thet));
+        // Forcibly assert that thunk was inlined & removed
+        assert thunk.is_dead() && thet.is_dead();
+      } else {                  // Not a thunk!  Eager evaluation of RHS
+        rhs = _expr_higher_require(prec,bintok,lhs);
+        // Emit the call to both terms
+        lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op,lhs,rhs));
+      }
     }
   }
 
-  private Node _expr_higher( int prec) { return prec+1==PrimNode.PREC_TOKS.length ? term() : _expr(prec+1); }
+  // Get an expr and the next higher precedence, or a term, or null
+  private Node _expr_higher( int prec, Node lhs ) {
+    if( lhs != null ) lhs.keep();
+    Node rhs = prec+1 == PrimNode.PREC_TOKS.length ? term() : _expr(prec+1);
+    if( lhs != null ) lhs.unhook();
+    return rhs;
+  }
+  private Node _expr_higher_require( int prec, String bintok, Node lhs ) {
+    Node rhs = _expr_higher(prec,lhs);
+    return rhs==null ? err_ctrl2("Missing term after '"+bintok+"'") : rhs;
+  }
   private boolean _good_prec_tok(int prec, String bintok) {
     if( bintok==null ) return false;
     for( String tok : PrimNode.PREC_TOKS[prec] ) if( Util.eq(bintok,tok) ) return true;
@@ -1296,10 +1328,11 @@ public class Parse implements Comparable<Parse> {
     CallNode call = (CallNode)gvn(call0);
     // Call Epilog takes in the call which it uses to track wireable functions.
     // CallEpi internally tracks all wired functions.
-    Node cepi = gvn(new CallEpiNode(call,Env.DEFMEM)).keep();
-    set_ctrl(   gvn(new CProjNode(cepi,0)));
-    set_mem (   gvn(new MProjNode(cepi,1))); // Return memory from all called functions
-    return gvn(new ProjNode(2, cepi.unhook()));
+    Node cepi = gvn(new CallEpiNode(call,Env.DEFMEM));
+    if( call.is_dead() ) return cepi; // Inlined in the parser
+    set_ctrl(gvn(new CProjNode(cepi, 0)));
+    set_mem(gvn(new MProjNode(cepi, 1))); // Return memory from all called functions
+    return gvn(new ProjNode(2, cepi));
   }
 
   // Whack current control with a syntax error

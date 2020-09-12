@@ -513,7 +513,7 @@ public class FunNode extends RegionNode {
       cnts[op]++;               // Histogram ops
     }
     assert cnts[OP_FUN]==1 && cnts[OP_RET]==1;
-    assert cnts[OP_SCOPE]==0 && cnts[OP_TMP]==0;
+    assert cnts[OP_SCOPE]==0;
     assert cnts[OP_REGION] <= cnts[OP_IF];
 
     // Pick which input to inline.  Only based on having some constant inputs

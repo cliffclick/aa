@@ -41,12 +41,13 @@ public abstract class Node implements Cloneable {
   static final byte OP_START  =27;
   static final byte OP_STMEM  =28;
   static final byte OP_STORE  =29;
-  static final byte OP_TMP    =30;
-  static final byte OP_TYPE   =31;
-  static final byte OP_UNR    =32;
-  static final byte OP_MAX    =33;
+  static final byte OP_THRET  =30;
+  static final byte OP_THUNK  =31;
+  static final byte OP_TYPE   =32;
+  static final byte OP_UNR    =33;
+  static final byte OP_MAX    =34;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "DefMem", "Err", "FP2Clo", "Fun", "FunPtr", "If", "Join", "Load", "Loop", "Name", "NewObj", "NewAry", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Tmp", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "DefMem", "Err", "FP2Clo", "Fun", "FunPtr", "If", "Join", "Load", "Loop", "Name", "NewObj", "NewAry", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Thret", "Thunk", "Type", "Unresolved" };
   static { assert STRS.length==OP_MAX; }
 
   public int _uid;      // Unique ID, will have gaps, used to give a dense numbering to nodes

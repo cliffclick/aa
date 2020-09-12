@@ -148,7 +148,7 @@ public final class CallEpiNode extends Node {
       Node irez = rrez.copy(false,gvn);// Copy the entire function body
       irez._val = null;
       ProjNode proj = ProjNode.proj(this,2);
-      irez._live = proj==null ? TypeMem.ALIVE : proj._live;
+      irez._live = proj==null ? TypeMem.ESCAPE : proj._live;
       for( Node parm : rrez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? call.argm(((ParmNode)parm)._idx,gvn) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
@@ -161,7 +161,6 @@ public final class CallEpiNode extends Node {
   // Used during GCP and Ideal calls to see if wiring is possible.
   // Return true if a new edge is wired
   public boolean check_and_wire( GVNGCM gvn ) {
-    if( gvn._opt_mode == GVNGCM.Mode.Parse ) return false; // Graph not formed yet
     if( !(_val instanceof TypeTuple) ) return false; // Collapsing
     CallNode call = call();
     Type tcall = call._val;
@@ -193,7 +192,8 @@ public final class CallEpiNode extends Node {
     wire0(gvn,call,fun);
     // Wire self to the return
     gvn.add_work(this);
-    gvn.add_def(this,ret);
+    if( gvn.check_out(this) ) add_def(      ret);
+    else                  gvn.add_def(this, ret);
     gvn.add_work(ret);
     gvn.add_work_defs(call);
   }
@@ -442,12 +442,13 @@ public final class CallEpiNode extends Node {
     CProjNode ccprj = (CProjNode)ProjNode.proj(call,0);
     if( ccprj != null ) gvn.subsume(ccprj,call.ctl());
     CProjNode ceprj = (CProjNode)ProjNode.proj(this,0);
-    gvn.subsume(ceprj,ctl);
+    if( ceprj != null ) gvn.subsume(ceprj,ctl);
+    else set_def(0,null,gvn);
 
     // Move over result
     if( !is_dead() ) {
       ProjNode reprj = ProjNode.proj(this,2);
-      gvn.subsume(reprj,rez);
+      if( reprj != null ) gvn.subsume(reprj,rez);
     }
 
     // Move over arguments
@@ -462,14 +463,16 @@ public final class CallEpiNode extends Node {
 
     // While not strictly necessary, immediately fold any dead paths to
     // functions to clean up the CFG.
+    rez.keep();
     while( !call.is_dead() ) {
       Node proj = call._uses.at(0);
       Node parm = proj._uses.at(0);
       gvn.xform_old(parm.in(0),0);
     }
+    rez.unhook();
 
-    assert Env.START.more_flow(gvn,new VBitSet(),true,0)==0; // Check for sanity
-    return this;
+    assert gvn._opt_mode== GVNGCM.Mode.Parse || Env.START.more_flow(gvn,new VBitSet(),true,0)==0; // Check for sanity
+    return rez;
   }
 
   void unwire(GVNGCM gvn, CallNode call, RetNode ret) {

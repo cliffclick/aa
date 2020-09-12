@@ -357,7 +357,7 @@ public class GVNGCM {
       add_work(old);
       return;
     }
-    if( check_new(nnn) ) {      // If new, replace back in GVN
+    if( !nnn.is_dead() && check_new(nnn) ) { // If new, replace back in GVN
       nnn._live = old._live;    // Replacement has same liveness as original
       rereg(nnn, nnn.value(_opt_mode));
     }
