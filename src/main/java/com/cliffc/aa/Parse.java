@@ -434,113 +434,52 @@ public class Parse implements Comparable<Parse> {
     }
   }
 
-  // To help order by precedence.  Example: 1+2*3+4*5:
-  //  op  : _ + * + *
-  //  term: 1 2 3 4 5
-  // Picking ops by precedence:
-  //  op  : _   +   + *
-  //  term: 1 (2*3) 4 5
-  //  op  : _   +     +
-  //  term: 1 (2*3) (4*5)
-  //  op  : _         +
-  //  term: 1+(2*3) (4*5)
-  //  op  : _
-  //  term: 1+(2*3)+(4*5)
-  private static class Expr {
-    Node _op;                   // Either a FunPtr or an Unresolved
-    Node _term;                 // The term, possibly thunked
-    boolean _thunked;           // True if term is thunked
-    Parse _op_loc;              // Location of operand start
-    Parse _term_loc;            // Location of term start
-    FunPtrNode _ptr;            // Sample FunPtr; same name, op_prec, thunking for all
-    String _name;               // Sample name
-    byte _op_prec;              // Precedence
-    Expr(Node op, Node term, boolean thunked, Parse op_loc, Parse term_loc) {
-      _op=op;
-      _term=term;
-      _thunked=thunked;
-      _op_loc  =  op_loc;
-      _term_loc=term_loc;
-      if( op != null ) {
-        _ptr = (FunPtrNode)(op instanceof UnresolvedNode ? op.in(0) : op);
-        _name = _ptr.fun()._name;
-        _thunked = thunked || _ptr.fun()._thunk_rhs;
-        _op_prec = _ptr.fun()._op_prec;
-      }
-    }
-  }
-
-  /** Parse an expression, a list of terms and infix operators.  The whole list
-   *  is broken up into a tree based on operator precedence.
-   *  expr = term [binop term]*
+  /** Parse an expression, a series of terms seperarated by binary operators.
+   *  Precedence is encoded in the PrimNode.PRECEDENCE table, and reflects
+   *  here by the expr# recursive calls.
+   *    expr = term [binop term]*
+   *  Calls out for the precedence, starting high and working down low.
+   *    expr  = expr9 [binop9 expr9]
+   *    expr9 = expr8 [binop8 expr8]
+   *    ...
+   *    expr2 = expr1 [binop2 expr1]
+   *    expr1 = term  [binop1 term ]
    */
   private Node expr() {
-    skipWS();
-    int oldx = _x;
-    Node term = term();
-    if( term == null ) return null; // Term is required, so missing term implies not any expr
+    skipWS();         // Invariant: WS already skipped before & after each expr depth
+    return _expr(1);
+  }
 
-    // Collect all binops and terms in the expr, up front; then sort them by
-    // precedence and combine pairwise into a tree.  The short-circuit
-    // operators require 'thunking' the Right Hand Side, to delay execution.
-    // In general, user ops can thunk RHSs, so right here right now we thunk
-    // all terms past any RHS-thunk operator.  During pair-wise combining we
-    // thunk or de-thunk as needed.
-
-    // Collect ops and terms.  First term, no binop yet.
-    Ary<Expr> exs = new Ary<>(new Expr[1],0);
-    exs.push(new Expr(null,term.keep(),false,null,errMsg(oldx)));
-
-    // Now loop for binop/term pairs: parse Kleene star of [binop term]
-    boolean thunking = false;
+  // Invariant: WS already skipped before & after each _expr depth
+  private Node _expr(int prec) {
+    int lhsx = _x;              // Invariant: WS already skipped
+    Node lhs = _expr_higher(prec);
+    if( lhs==null ) return null;
     while( true ) {
-      skipWS();                 // Skip between end of last term and start of token
-      oldx = _x;
-      String bin = token();
-      if( bin==null ) break;    // Valid parse, but no more Kleene star
-      Node binfun = _e.lookup_filter(bin.intern(),_gvn,2); // BinOp, or null
-      if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
-      Expr ex = exs.push(new Expr(binfun.keep(),null,thunking,errMsg(oldx),null));
-      // Token might have been longer than the filtered name; happens if a
-      // bunch of operator characters are adjacent but we can make an operator
-      // out of the first few.
-      _x = oldx+ex._name.length();
-      // Started thunking?
-      thunking = ex._thunked;
-      skipWS();                 // Skip WS after token
-      ex._term_loc = errMsg(_x);// Location of term start
-
-      if( thunking ) {          // Start thunking
-        throw com.cliffc.aa.AA.unimpl();
-      } else
-        term = require_term(ex);
-      ex._term=term.keep();
+      int opx = _x;             // Invariant: WS already skipped
+      String bintok = peek(PrimNode.PRIM_TOKS);
+      if( !_good_prec_tok(prec,bintok) ) return lhs; // No token at this precedence
+      _x += bintok.length();
+      Node op = _e.lookup_filter(bintok.intern(),_gvn,2); // BinOp, or null
+      assert op!=null;          // Since found valid token, must find matching primnode
+      FunNode sfun = ((FunPtrNode)(op instanceof UnresolvedNode ? op.in(0) : op)).fun();
+      assert sfun._op_prec == prec;
+      if( sfun._thunk_rhs ) throw com.cliffc.aa.AA.unimpl();
+      skipWS();
+      int rhsx = _x;            // Invariant: WS already skipped
+      Node rhs = _expr_higher(prec);
+      if( rhs==null ) rhs = err_ctrl2("Missing term after '"+bintok+"'");
+      lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op,lhs,rhs));
     }
-
-    // Have a list of interspersed operators and terms.
-    // Build a tree with precedence.
-    while( exs._len > 1 ) {
-      // Find max precedence index
-      int idx=1;
-      for( int i=2; i<exs._len; i++ )
-        if( exs.at(i)._op_prec > exs.at(idx)._op_prec )
-          idx = i;
-      Expr lhs = exs.at(idx-1);
-      Expr rhs = exs.remove(idx);
-      assert !rhs._thunked || rhs._term instanceof FunPtrNode;
-      Node call = do_call(new Parse[]{rhs._op_loc     ,lhs._term_loc     ,rhs._term_loc     },
-                          args       (rhs._op.unhook(),lhs._term.unhook(),rhs._term.unhook()));
-      if( lhs._thunked )
-        throw com.cliffc.aa.AA.unimpl();
-      lhs._term = call.keep();
-    }
-    return exs.pop()._term.unhook();
   }
 
-  private Node require_term(Expr ex) {
-    Node term = term();
-    return term==null ? err_ctrl2("Missing term after '"+ex._name+"'") : term;
+  private Node _expr_higher( int prec) { return prec+1==PrimNode.PREC_TOKS.length ? term() : _expr(prec+1); }
+  private boolean _good_prec_tok(int prec, String bintok) {
+    if( bintok==null ) return false;
+    for( String tok : PrimNode.PREC_TOKS[prec] ) if( Util.eq(bintok,tok) ) return true;
+    return false;
   }
+
 
   /** Any number field-lookups or function applications, then an optional assignment
    *    term = id++ | id--
@@ -549,6 +488,7 @@ public class Parse implements Comparable<Parse> {
    *    term = tfact balop_open stmts balop_close      // if balop is ary,idx
    *    term = tfact balop_open stmts balop_close stmt // if balop is ary,idx,val
    */
+  // Invariant: WS already skipped before & after term
   private Node term() {
     int oldx = _x;
     String uni = token();
@@ -560,8 +500,7 @@ public class Parse implements Comparable<Parse> {
         // Token might have been longer than the filtered name; happens if a
         // bunch of operator characters are adjacent but we can make an operator
         // out of the first few.
-        String name = ptr.fun()._name;
-        _x = oldx+name.length();
+        _x = oldx+ptr.fun()._name.length();
         unifun.keep();
         Node term = term();
         unifun.unhook();
@@ -602,6 +541,7 @@ public class Parse implements Comparable<Parse> {
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
           else set_mem( gvn(new StoreNode(mem(),castnn,n=stmt,fin,fld ,errMsg(fld_start))));
+          skipWS();
           return n;
         } else {
           n = gvn(new LoadNode(mem(),castnn,fld,errMsg(fld_start)));
@@ -676,7 +616,9 @@ public class Parse implements Comparable<Parse> {
 
   // Handle post-increment/post-decrement operator.
   // Does not define a field in structs: "@{ x++; y=2 }" - syntax error, no such field x
+  // Skips trailing WS
   private Node inc(String tok, int d) {
+    skipWS();
     ScopeNode scope = lookup_scope(tok=tok.intern(),false); // Find prior scope of token
     // Need a load/call/store sensible options
     Node n;
@@ -1251,9 +1193,8 @@ public class Parse implements Comparable<Parse> {
   }
   private boolean peek( String s ) {
     if( !peek(s.charAt(0)) ) return false;
-    if(  peek_noWS(s.charAt(1)) ) return true ;
-    _x--;
-    return false;
+    if( !peek_noWS(s.charAt(1)) ) {  _x--; return false; }
+    return true;
   }
   // Peek 'c' and NOT followed by 'no'
   private boolean peek_not( char c, char no ) {
@@ -1262,6 +1203,18 @@ public class Parse implements Comparable<Parse> {
     _x++;
     return true;
   }
+  // Match any of these, and return the match or null
+  private String peek(String[] toks) {
+    for( String tok : toks ) if( peek1(tok) ) return tok;
+    return null;
+  }
+  private boolean peek1(String tok) {
+    for( int i=0; i<tok.length(); i++ )
+      if( _x+i >= _buf.length || _buf[_x+i] != tok.charAt(i) )
+        return false;
+    return true;
+  }
+
 
   /** Advance parse pointer to the first non-whitespace character, and return
    *  that character, -1 otherwise.  */

@@ -1,11 +1,10 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
-import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
+
+import java.util.*;
 
 // Primitives can be used as an internal operator (their apply() call does the
 // primitive operation).  Primitives are wrapped as functions when returned
@@ -30,7 +29,9 @@ public abstract class PrimNode extends Node {
     _thunk_rhs=false;
   }
   private static PrimNode[] PRIMS = null; // All primitives
-  static PrimNode[][] PRECEDENCE = null;  // Just the binary operators, grouped by precedence
+  public static PrimNode[][] PRECEDENCE = null;  // Just the binary operators, grouped by precedence
+  public static String  [][] PREC_TOKS  = null;  // Just the binary op tokens, grouped by precedence
+  public static String  []   PRIM_TOKS  = null;  // Primitive tokens, longer first for greedy token search
   public static void reset() { PRIMS=null; }
 
   public static PrimNode[] PRIMS() {
@@ -38,10 +39,6 @@ public abstract class PrimNode extends Node {
 
     // Binary-operator primitives, sorted by precedence
     PRECEDENCE = new PrimNode[][]{
-
-      {new MemPrimNode.ReadPrimNode.LValueLength(), }, // The other array ops are "balanced ops" and use term() for precedence
-
-      {new MinusF64(), new MinusI64(), new Not(), },
 
       {new MulF64(), new DivF64(), new MulI64(), new DivI64(), new ModI64(), },
 
@@ -78,8 +75,17 @@ public abstract class PrimNode extends Node {
       new MemPrimNode.ReadPrimNode.LValueWrite (), // Write an L-Value: (ary,idx,elem) ==> elem
       new MemPrimNode.ReadPrimNode.LValueWriteFinal(), // Final Write an L-Value: (ary,idx,elem) ==> elem
     };
-
+    
+    // These are unary ops, precedence determined outside of 'Parse.expr'
+    PrimNode[] uniops = new PrimNode[] {
+      new MemPrimNode.ReadPrimNode.LValueLength(), // The other array ops are "balanced ops" and use term() for precedence
+      new MinusF64(),
+      new MinusI64(),
+      new Not(),
+    };
+    
     Ary<PrimNode> allprims = new Ary<>(others);
+    for( PrimNode prim : uniops ) allprims.push(prim);
     for( PrimNode[] prims : PRECEDENCE )
       for( PrimNode prim : prims )
         allprims.push(prim);
@@ -90,6 +96,27 @@ public abstract class PrimNode extends Node {
     for( int p=0; p<PRECEDENCE.length; p++ )
       for( PrimNode n : PRECEDENCE[p] )
         n._op_prec = (byte)(max_prec-p);
+    // Not used to determine precedence, just a uniop flag
+    for( PrimNode prim : uniops ) prim._op_prec = (byte)max_prec; 
+
+    // Compute greedy primitive names, without regard to precedence.
+    // Example from Java: >,>=,>>,>>=,>>>,>>>= are all valid tokens.
+    HashSet<String> hash = new HashSet<>(); // Remove dups
+    for( PrimNode[] prims : PRECEDENCE )
+      for( PrimNode prim : prims )
+        hash.add(prim._name);
+    ArrayList<String> list = new ArrayList<String>(hash); 
+    Collections.sort(list);     // Longer strings on the right
+    Collections.reverse(list);  // Longer strings on the left, match first.
+    PRIM_TOKS = list.toArray(new String[list.size()]);
+
+    // Compute precedence token groupings for parser
+    PREC_TOKS = new String[max_prec+1][];
+    for( int p=0; p<max_prec; p++ ) {
+      String[] toks = PREC_TOKS[p+1] = new String[PRECEDENCE[max_prec-1-p].length];
+      for( int i=0; i<toks.length; i++ )
+        toks[i] = PRECEDENCE[max_prec-1-p][i]._name;
+    }
 
     return PRIMS;
   }
