@@ -224,7 +224,7 @@ public class FunNode extends RegionNode {
       formals = _sig._formals;  // Use old args
       if( _cnt_size_inlines >= 10 && !is_prim() ) return null;
       // Large code-expansion allowed; can inline for other reasons
-      path = split_size(body,parms);
+      path = _thunk_rhs ? 2 : split_size(body,parms); // Forcible size-splitting first path
       if( path == -1 ) return null;
       if( noinline() ) return null;
       if( !is_prim() ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives

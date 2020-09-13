@@ -92,6 +92,9 @@ public class ScopeNode extends Node {
       // Wipe out return memory
       return set_mem(gvn.add_work(gvn.con(TypeMem.XMEM)), gvn);
 
+    Node ctrl = in(0).is_copy(gvn,0);
+    if( ctrl != null ) set_ctrl(ctrl,gvn);
+
     return null;
   }
   @Override public Type value(GVNGCM.Mode opt_mode) { return Type.ALL; }
@@ -116,6 +119,7 @@ public class ScopeNode extends Node {
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
     // Prim scope is not used past Call-Graph discovery
     if( this==Env.SCP_0 )  return opt_mode._CG ? TypeMem.DEAD : TypeMem.ALLMEM;
+    if( opt_mode == GVNGCM.Mode.Parse ) return TypeMem.MEM;
     assert _uses._len==0;
     // All fields in all reachable pointers from rez() will be marked live
     return compute_live_mem(mem(),rez()).flatten_fields();

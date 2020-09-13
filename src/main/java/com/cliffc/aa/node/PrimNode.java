@@ -500,8 +500,11 @@ public abstract class PrimNode extends Node {
   }
 
   static class AndThen extends PrimNode {
+    private static final TypeStruct ANDTHEN =
+      TypeStruct.make_args(new String[]{"^","p","thunk"},
+                           TypeStruct.ts(TypeStruct.NO_DISP,Type.SCALAR,TypeTuple.RET));
     // Takes a value on the LHS, and a THUNK on the RHS.
-    AndThen() { super("&&",TypeStruct.ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
+    AndThen() { super("&&",ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
     // Expect this to inline everytime
     @Override public Node ideal(GVNGCM gvn, int level) {
       if( _defs._len != 4 ) return null; // Already did this

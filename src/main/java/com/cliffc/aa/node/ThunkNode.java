@@ -22,16 +22,16 @@ public class ThunkNode extends Node {
     return TypeTuple.make(in(0)==null ? Type.CTRL : val(0),
                           ((TypeMem)val(1)).crush()); // Just keep enough for parsing
   }
-  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    return def==in(1) ? _live : TypeMem.ALIVE; // Basic aliveness, except for memory
+    return def==in(1) ? TypeMem.MEM : TypeMem.ALIVE; // Basic aliveness, except for memory
   }
-  public void inline(GVNGCM gvn, Node ctrl, Node mem) {
-    gvn.set_def_reg(this,0,ctrl);
-    gvn.set_def_reg(this,1,mem );
+  @Override public Node is_copy(GVNGCM gvn, int idx) {
+    if( _defs._len==2 ) return null;
+    if( idx==0 ) return in(2);
+    if( idx==-2) return in(1);
+    throw com.cliffc.aa.AA.unimpl();
   }
-  @Override public Node is_copy(GVNGCM gvn, int idx) { return in(0)==null ? null : in(idx); }
   @Override Node walk_dom_last(Predicate<Node> P) { return in(0)==null ? null : super.walk_dom_last(P); }
   // Never equal, since will be editted during parsing & then removed.
-  @Override public boolean equals(Object o) { return this==o; } // 
+  @Override public boolean equals(Object o) { return this==o; } //
 }

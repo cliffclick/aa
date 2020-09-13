@@ -12,8 +12,6 @@ public final class TypeFunSig extends Type<TypeFunSig> {
 
   private TypeFunSig(TypeStruct formals, Type ret ) { super(TFUNSIG); init(formals,ret); }
   private void init (TypeStruct formals, Type ret ) {
-    for( Type t : formals._ts )
-      assert t.isa(Type.SCALAR);
     _formals=formals;
     _ret=ret;
   }

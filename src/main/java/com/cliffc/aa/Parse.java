@@ -475,8 +475,8 @@ public class Parse implements Comparable<Parse> {
         Node old_mem  = mem ().keep();
         // Insert a thunk header to delay execution
         ThunkNode thunk = (ThunkNode)gvn(new ThunkNode(mem()));
-        set_ctrl(gvn(new CProjNode(thunk,0)));
-        set_mem (gvn(new MProjNode(thunk,1)));
+        set_ctrl(thunk);
+        set_mem (gvn(new ParmNode(-2,"mem",thunk,con(TypeMem.MEM),null)));
         // Delay execution parse of RHS
         rhs = _expr_higher_require(prec,bintok,lhs);
         // Insert thunk tail, unwind memory state
@@ -485,6 +485,18 @@ public class Parse implements Comparable<Parse> {
         set_mem (old_mem .unhook());
         // Emit the call to both terms
         lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op,lhs,thet));
+
+        // Force the call to inline, right-here-right-now
+        Node oldrez = _e._scope.rez();
+        _e._scope.set_rez(lhs,_gvn);
+        _e._scope._val = Type.ALL;
+        _gvn.add_work(_e._scope);
+        _gvn.iter(GVNGCM.Mode.Parse);
+        lhs = _e._scope.rez().keep();
+        _gvn.unreg(_e._scope);
+        _e._scope.set_rez(oldrez,_gvn);
+        lhs.unhook();
+
         // Forcibly assert that thunk was inlined & removed
         assert thunk.is_dead() && thet.is_dead();
       } else {                  // Not a thunk!  Eager evaluation of RHS

@@ -25,6 +25,6 @@ public class ThretNode extends Node {
   }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    return def==in(1) ? _live : TypeMem.ALIVE; // Basic aliveness, except for memory
+    return def==in(1) || def==in(3) ? _live : TypeMem.ALIVE; // Basic aliveness for ctrl,rez full live for memory & thunk
   }
 }

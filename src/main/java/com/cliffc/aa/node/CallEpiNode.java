@@ -80,6 +80,13 @@ public final class CallEpiNode extends Node {
       }
     }
 
+    // Parser thunks eagerly inline
+    if( call.fun() instanceof ThretNode ) {
+      ThretNode tret = (ThretNode)call.fun();
+      wire1(gvn,call,tret.thunk(),tret);
+      return inline(gvn,level, call, tret.ctrl(), tret.mem(), tret.rez(), null/*do not unwire, because using the entire function body inplace*/);
+    }
+
     // Only inline wired single-target function with valid args.  CallNode wires.
     if( nwired()!=1 ) return null; // More than 1 wired, inline only via FunNode
     int fidx = fidxs.abit();       // Could be 1 or multi
@@ -187,7 +194,7 @@ public final class CallEpiNode extends Node {
   // Wire the call args to a known function, letting the function have precise
   // knowledge of its callers and arguments.  This adds a edges in the graph
   // but NOT in the CG, until _cg_wired gets set.
-  void wire1( GVNGCM gvn, CallNode call, FunNode fun, RetNode ret ) {
+  void wire1( GVNGCM gvn, CallNode call, Node fun, Node ret ) {
     assert _defs.find(ret)==-1; // No double wiring
     wire0(gvn,call,fun);
     // Wire self to the return
@@ -199,7 +206,7 @@ public final class CallEpiNode extends Node {
   }
 
   // Wire without the redundancy check, or adding to the CallEpi
-  void wire0(GVNGCM gvn, CallNode call, FunNode fun) {
+  void wire0(GVNGCM gvn, CallNode call, Node fun) {
     // Wire.  During GCP, cannot call "xform" since e.g. types are not final
     // nor constant yet - and need to add all new nodes to the GCP worklist.
     // During iter(), must call xform() to register all new nodes.

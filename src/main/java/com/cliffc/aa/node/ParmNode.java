@@ -31,7 +31,8 @@ public class ParmNode extends PhiNode {
   }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
-    if( !(in(0) instanceof FunNode) ) return null; // Dying
+    if( !(in(0) instanceof FunNode) )
+      return in(0).is_copy(gvn,_idx); // Dying, or thunks
     FunNode fun = fun();
     if( fun._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
     assert fun._defs._len==_defs._len;

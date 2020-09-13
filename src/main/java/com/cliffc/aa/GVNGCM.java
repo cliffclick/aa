@@ -407,7 +407,7 @@ public class GVNGCM {
     }
 
     // [ts!] If completely dead, exit now.
-    if( !nliv.is_live() && !n.is_prim() && n.err(true)==null &&
+    if( !nliv.is_live() && !n.is_prim() && n.err(true)==null && n._keep==0 &&
         !(n instanceof CallNode) &&       // Keep for proper errors
         !(n instanceof UnresolvedNode) && // Keep for proper errors
         !(n instanceof RetNode) &&        // Keep for proper errors
