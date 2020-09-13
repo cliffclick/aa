@@ -188,14 +188,14 @@ public class TestParse {
 
   @Ignore
   @Test public void testParse01a() {
+
     test("0 && 0", Type.XNIL);
     test("1 && 2", TypeInt.con(2));
     test("0 && 2", Type.XNIL);
     test_obj("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
              TypeStruct.make_tuple(Type.XNIL,TypeInt.con(1),Type.XNIL,Type.XNIL));
-    test_obj("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,1)
-             TypeStruct.make_tuple(Type.XNIL,TypeInt.con(2),TypeInt.con(1),TypeInt.con(1)));
-
+    test_obj("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
+      TypeStruct.make_tuple(Type.XNIL,TypeInt.con(2),TypeInt.con(1),Type.XNIL));
   }
 
   @Test public void testParse02() {

@@ -174,6 +174,8 @@ public class CallNode extends Node {
   }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
+    Node cc = in(0).is_copy(gvn,0);
+    if( cc!=null ) return set_def(0,cc,gvn);
     Type tc = _val;
     if( !(tc instanceof TypeTuple) ) return null;
     TypeTuple tcall = (TypeTuple)tc;
