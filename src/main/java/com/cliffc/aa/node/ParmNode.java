@@ -32,7 +32,7 @@ public class ParmNode extends PhiNode {
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     if( !(in(0) instanceof FunNode) )
-      return in(0).is_copy(gvn,_idx); // Dying, or thunks
+      return in(0).is_copy(_idx); // Dying, or thunks
     FunNode fun = fun();
     if( fun._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
     assert fun._defs._len==_defs._len;
@@ -80,7 +80,8 @@ public class ParmNode extends PhiNode {
     Type ctl = val(0);
     if( ctl != Type.CTRL ) return ctl.oob();
     Node in0 = in(0);
-    if( !(in0 instanceof FunNode) )  return in0._val.oob();
+    if( in0 instanceof ThunkNode ) return val(1);
+    if( !(in0 instanceof FunNode) )  return ctl.oob();
     // If unknown callers, then always the default value because some unknown
     // caller can be that bad.  During & after GCP all unknown callers are
     // accounted for.

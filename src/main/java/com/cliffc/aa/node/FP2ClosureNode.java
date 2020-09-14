@@ -10,7 +10,7 @@ public final class FP2ClosureNode extends Node {
   }
   @Override public Node ideal(GVNGCM gvn, int level) {
     // If copy is dead, optimize for it.
-    Node c = in(0).is_copy(gvn,CallNode.ARGIDX);
+    Node c = in(0).is_copy(CallNode.ARGIDX);
     if( c != null )
       set_def(0,c,gvn);
     // If at a FunPtrNode, it is only making a TFP out of a code pointer and a

@@ -54,7 +54,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   // If one  argument  is  NIL, the other non-nil argument is returned.
   // If neither argument is NIL, the two strings are concatenated into a new third string.
   public static class AddStrStr extends NewStrNode {
-    private static int OP_PREC=6;
+    private static int OP_PREC=7;
     public AddStrStr( ) { super(TypeStr.STR,"+",true,OP_PREC,null,TypeMemPtr.STR0,TypeMemPtr.STR0); }
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override public Type value(GVNGCM.Mode opt_mode) {

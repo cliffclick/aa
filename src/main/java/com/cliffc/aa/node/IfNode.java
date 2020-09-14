@@ -24,7 +24,8 @@ public class IfNode extends Node {
       if( tst instanceof PrimNode.NE_OOP ) throw AA.unimpl();
     }
 
-    if( tst instanceof PrimNode.Not ) return flip(gvn, gvn.xform(new IfNode(ctl,tst.in(1))));
+    if( tst instanceof PrimNode.Not && tst._uses._len==1 )
+      return flip(gvn, gvn.xform(new IfNode(ctl,tst.in(1))));
 
     return null;
   }
@@ -73,10 +74,10 @@ public class IfNode extends Node {
     throw AA.unimpl(); // Dunno what test this is?
   }
   @Override public TypeMem all_live() { return TypeMem.ALIVE; }
-  @Override public Node is_copy(GVNGCM gvn, int idx) {
+  @Override public Node is_copy(int idx) {
     if( !(_val instanceof TypeTuple) ) return null;
     TypeTuple tt = (TypeTuple)_val;
-    if( tt==TypeTuple.IF_ANY ) return gvn.con(Type.XCTRL);
+    if( tt==TypeTuple.IF_ANY ) return Env.GVN.con(Type.XCTRL);
     if( tt==TypeTuple.IF_TRUE  && idx==1 ) return in(0);
     if( tt==TypeTuple.IF_FALSE && idx==0 ) return in(0);
     return null;

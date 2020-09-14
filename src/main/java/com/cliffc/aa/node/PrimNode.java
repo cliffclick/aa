@@ -54,8 +54,8 @@ public abstract class PrimNode extends Node {
       {new OrI64(), },
 
       {new AndThen(), },
-      //
-      //{new OrElse(), },
+
+      {new OrElse(), },
 
     };
 
@@ -499,6 +499,9 @@ public abstract class PrimNode extends Node {
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   }
 
+  // Classic '&&' short-circuit.  The RHS is a *Thunk* not a value.  Inlines
+  // immediate into the operators' wrapper function, which in turn aggressively
+  // inlines during parsing.
   static class AndThen extends PrimNode {
     private static final TypeStruct ANDTHEN =
       TypeStruct.make_args(new String[]{"^","p","thunk"},
@@ -516,7 +519,7 @@ public abstract class PrimNode extends Node {
       Node iff = gvn.xform(new IfNode(ctl,lhs));
       Node fal = gvn.xform(new CProjNode(iff,0));
       Node tru = gvn.xform(new CProjNode(iff,1));
-      // Call on false branch
+      // Call on true branch; if false do not call.
       Node cal = gvn.xform(new CallNode(true,_badargs,tru,mem,rhs));
       Node cep = gvn.xform(new CallEpiNode(cal,Env.DEFMEM));
       Node ccc = gvn.xform(new CProjNode(cep,0));
@@ -524,6 +527,56 @@ public abstract class PrimNode extends Node {
       Node rez = gvn.xform(new  ProjNode(2,cep));
       // Region merging results
       Node reg = gvn.init (new RegionNode(null,fal,ccc));
+      Node phi = gvn.xform(new PhiNode(Type.SCALAR,null,reg,gvn.con(Type.XNIL),rez ));
+      Node phim= gvn.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
+      // Plug into self & trigger is_copy
+      set_def(0,reg ,gvn);
+      set_def(1,phim,gvn);
+      set_def(2,phi ,gvn);
+      pop();                    // Remove arg2, trigger is_copy
+      return this;
+    }
+    @Override public Type value(GVNGCM.Mode opt_mode) {
+      return TypeTuple.RET;
+    }
+    @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+      return def==in(1) ? _live : TypeMem.ALIVE; // Basic aliveness, except for memory
+    }
+    @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
+    @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
+    @Override public Node is_copy(int idx) {
+      return _defs._len==4 ? null : in(idx);
+    }
+  }
+
+  // Classic '||' short-circuit.  The RHS is a *Thunk* not a value.  Inlines
+  // immediate into the operators' wrapper function, which in turn aggressively
+  // inlines during parsing.
+  static class OrElse extends PrimNode {
+    private static final TypeStruct ORELSE =
+      TypeStruct.make_args(new String[]{"^","p","thunk"},
+                           TypeStruct.ts(TypeStruct.NO_DISP,Type.SCALAR,TypeTuple.RET));
+    // Takes a value on the LHS, and a THUNK on the RHS.
+    OrElse() { super("||",ORELSE,Type.SCALAR); _thunk_rhs=true; }
+    // Expect this to inline everytime
+    @Override public Node ideal(GVNGCM gvn, int level) {
+      if( _defs._len != 4 ) return null; // Already did this
+      Node ctl = in(0);
+      Node mem = in(1);
+      Node lhs = in(2);
+      Node rhs = in(3);
+      // Expand to if/then/else
+      Node iff = gvn.xform(new IfNode(ctl,lhs));
+      Node fal = gvn.xform(new CProjNode(iff,0));
+      Node tru = gvn.xform(new CProjNode(iff,1));
+      // Call on false branch; if true do not call.
+      Node cal = gvn.xform(new CallNode(true,_badargs,fal,mem,rhs));
+      Node cep = gvn.xform(new CallEpiNode(cal,Env.DEFMEM));
+      Node ccc = gvn.xform(new CProjNode(cep,0));
+      Node memc= gvn.xform(new MProjNode(cep,1));
+      Node rez = gvn.xform(new  ProjNode(2,cep));
+      // Region merging results
+      Node reg = gvn.init (new RegionNode(null,tru,ccc));
       Node phi = gvn.xform(new PhiNode(Type.SCALAR,null,reg,lhs,rez ));
       Node phim= gvn.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
       // Plug into self & trigger is_copy
@@ -541,8 +594,9 @@ public abstract class PrimNode extends Node {
     }
     @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
-    @Override public Node is_copy(GVNGCM gvn, int idx) {
+    @Override public Node is_copy(int idx) {
       return _defs._len==4 ? null : in(idx);
     }
   }
+  
 }

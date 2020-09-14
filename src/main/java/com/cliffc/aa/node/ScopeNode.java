@@ -45,6 +45,7 @@ public class ScopeNode extends Node {
   public <N extends Node> N set_ctrl( N n, GVNGCM gvn) { set_def(0,n,gvn); return n; }
   public void set_ptr ( Node n, GVNGCM gvn) { set_def(2,n,gvn); }
   public void set_rez ( Node n, GVNGCM gvn) { set_def(3,n,gvn); }
+  public Node swap_rez( Node n, GVNGCM gvn) { return swap_def(3,n,gvn); }
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
   public Node set_mem( Node n, GVNGCM gvn) {
     assert n==null || (n.touched() && (n._val instanceof TypeMem || n._val==Type.ANY || n._val==Type.ALL));
@@ -92,7 +93,7 @@ public class ScopeNode extends Node {
       // Wipe out return memory
       return set_mem(gvn.add_work(gvn.con(TypeMem.XMEM)), gvn);
 
-    Node ctrl = in(0).is_copy(gvn,0);
+    Node ctrl = in(0).is_copy(0);
     if( ctrl != null ) set_ctrl(ctrl,gvn);
 
     return null;
@@ -132,14 +133,14 @@ public class ScopeNode extends Node {
       return TypeMem.DEAD;
     // Basic liveness ("You are Alive!") for control and returned value
     if( def == ctrl() ) return TypeMem.ALIVE;
-    if( def == rez () ) return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM;
+    if( def == rez () ) return def.all_live().basic_live() ? TypeMem.LIVE_BOT : TypeMem.ANYMEM;
     // Returned display is dead in a whole program.
     // In a partial-program, whats in the display is exported to the next step.
     if( def == ptr () ) return opt_mode._CG ? TypeMem.DEAD : TypeMem.LIVE_BOT; // Returned display is dead after CG
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.
     assert def == mem();
-    return _live;
+    return opt_mode==GVNGCM.Mode.Parse ? TypeMem.ALLMEM : _live;
   }
 
   @Override public int hashCode() { return 123456789; }

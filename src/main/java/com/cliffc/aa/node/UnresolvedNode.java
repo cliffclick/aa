@@ -68,7 +68,7 @@ public class UnresolvedNode extends Node {
   private void add_def_unresolved( FunPtrNode ptr ) {
     FunPtrNode ptr0 = (FunPtrNode)in(0);
     assert Util.eq(ptr0.fun()._name,ptr.fun()._name);
-    // Actually, equal op_prec & think only for binary ops
+    // Actually, equal op_prec & thunk only for binary ops
     assert ptr0.fun()._op_prec  == ptr.fun()._op_prec;
     assert ptr0.fun()._thunk_rhs== ptr.fun()._thunk_rhs;
     add_def(ptr);

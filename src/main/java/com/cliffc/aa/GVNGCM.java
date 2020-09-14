@@ -338,7 +338,7 @@ public class GVNGCM {
               add_work(useuse); // Call lifts TFP, some FunNodes no longer called, go dead
         if( use.is_multi_head() )
           for( Node useuse : use._uses ) {
-            if( useuse instanceof ProjNode && use.is_copy(this, ((ProjNode) useuse)._idx) != null )
+            if( useuse instanceof ProjNode && use.is_copy(((ProjNode) useuse)._idx) != null )
               add_work(useuse);
             if( useuse instanceof CallEpiNode )
               add_work(useuse);

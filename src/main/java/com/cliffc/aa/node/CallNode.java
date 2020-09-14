@@ -174,7 +174,7 @@ public class CallNode extends Node {
   }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
-    Node cc = in(0).is_copy(gvn,0);
+    Node cc = in(0).is_copy(0);
     if( cc!=null ) return set_def(0,cc,gvn);
     Type tc = _val;
     if( !(tc instanceof TypeTuple) ) return null;
@@ -415,7 +415,7 @@ public class CallNode extends Node {
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==fun() ) {                         // Function argument
-      if( def instanceof ThretNode ) return TypeMem.MEM; // Always inlines eagerly, so this is always temporary
+      if( def instanceof ThretNode ) return TypeMem.ALLMEM; // Always inlines eagerly, so this is always temporary
       if( !opt_mode._CG ) return TypeMem.ESCAPE; // Prior to GCP, assume all fptrs are alive and display escapes
       if( _not_resolved_by_gcp ) return TypeMem.ESCAPE;// GCP failed to resolve, this call is in-error
       // During GCP, unresolved calls might resolve & remove this use.  Keep dead till resolve fails.
@@ -431,7 +431,7 @@ public class CallNode extends Node {
         if( proj == null || proj._live == TypeMem.DEAD )
           return TypeMem.DEAD; // Proj not used
       }
-      if( def instanceof ThretNode ) return TypeMem.MEM;
+      if( def instanceof ThretNode ) return TypeMem.ALLMEM;
       assert def.all_live().basic_live();
       return TypeMem.ESCAPE;    // Args always alive and escape
     }

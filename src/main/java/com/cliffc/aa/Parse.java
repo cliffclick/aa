@@ -90,7 +90,7 @@ public class Parse implements Comparable<Parse> {
     _lines.push(0);       // Line 0 at offset 0
     _gvn = Env.GVN;       // Pessimistic during parsing
   }
-  String dump() { return _e._scope.dump(99); }// debugging hook
+  String dump() { return scope().dump(99); }// debugging hook
   String dumprpo() { return Env.START.dumprpo(false,false); }// debugging hook
 
   // Parse the string in the given lookup context, and return an executable
@@ -101,14 +101,15 @@ public class Parse implements Comparable<Parse> {
     prog();                     // Parse a program
     // Delete names at the top scope before final optimization.
     _e.close_display(_gvn);
-    _gvn.rereg(_e._scope,Type.ALL);
-    _e._scope.xliv(GVNGCM.Mode.PesiNoCG);
+    _gvn.rereg(scope(),Type.ALL);
+    scope().xliv(GVNGCM.Mode.PesiNoCG);
+    _gvn.add_work(scope().mem());
     _gvn.add_work_defs(Env.SCP_0);
     _gvn.iter(GVNGCM.Mode.PesiNoCG); // Pessimistic optimizations; might improve error situation
     remove_unknown_callers();
-    _gvn.gcp (GVNGCM.Mode.Opto,_e._scope); // Global Constant Propagation
+    _gvn.gcp (GVNGCM.Mode.Opto,scope()); // Global Constant Propagation
     _gvn.iter(GVNGCM.Mode.PesiCG); // Re-check all ideal calls now that types have been maximally lifted
-    _gvn.gcp (GVNGCM.Mode.Opto,_e._scope); // Global Constant Propagation
+    _gvn.gcp (GVNGCM.Mode.Opto,scope()); // Global Constant Propagation
     _gvn.iter(GVNGCM.Mode.PesiCG); // Re-check all ideal calls now that types have been maximally lifted
     return gather_errors();
   }
@@ -135,13 +136,13 @@ public class Parse implements Comparable<Parse> {
     assert _e._par._par==null; // Top-level only
     HashSet<Node.ErrMsg> errs = new HashSet<>();
     VBitSet bs = new VBitSet();
-    _e._scope.walkerr_def(errs,bs);
+    scope().walkerr_def(errs,bs);
     if( skipWS() != -1 ) errs.add(Node.ErrMsg.trailingjunk(this));
     ArrayList<Node.ErrMsg> errs0 = new ArrayList<>(errs);
     Collections.sort(errs0);
 
-    Type res = _e._scope.rez()._val; // New and improved result
-    Type mem = _e._scope.mem()._val;
+    Type res = scope().rez()._val; // New and improved result
+    Type mem = scope().mem()._val;
     return new TypeEnv(res, mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM),_e,errs0.isEmpty() ? null : errs0);
   }
 
@@ -151,7 +152,7 @@ public class Parse implements Comparable<Parse> {
     _gvn._opt_mode = GVNGCM.Mode.Parse;
     Node res = stmts();
     if( res == null ) res = con(Type.ANY);
-    _e._scope.set_rez(res,_gvn);  // Hook result
+    scope().set_rez(res,_gvn);  // Hook result
   }
 
   /** Parse a list of statements; final semi-colon is optional.
@@ -226,7 +227,7 @@ public class Parse implements Comparable<Parse> {
     // Add a constructor function.  If this is a primitive, build a constructor
     // taking the primitive.
     Parse bad = errMsg();
-    Node rez, stk = _e._scope.stk();
+    Node rez, stk = scope().stk();
     _gvn.unreg(stk); // add_fun expects the display is not in GVN
     if( !(t instanceof TypeObj) ) {
       PrimNode cvt = PrimNode.convertTypeName(t,tn,bad);
@@ -306,7 +307,7 @@ public class Parse implements Comparable<Parse> {
       Parse badt = errMsg();    // Capture location in case of type error
       if( peek(":=") ) _x=oldx2; // Avoid confusion with typed assignment test
       else if( peek(':') && (t=type())==null ) { // Check for typed assignment
-        if( _e._scope.test_if() ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
+        if( scope().test_if() ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
         else                      err_ctrl0("Missing type after ':'");
       }
       if( peek(":=") ) rs.set(toks._len);              // Re-assignment parse
@@ -348,13 +349,13 @@ public class Parse implements Comparable<Parse> {
         if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
           ((FunPtrNode)ifex).fun().bind(tok); // Debug only: give name to function
         create(tok,con(Type.XNIL),TypeStruct.FRW); // Create at top of scope as ~scalar.
-        scope = _e._scope;              // Scope is the current one
+        scope = scope();              // Scope is the current one
         scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
       }
       // Handle re-assignments and forward referenced function definitions.
       Node n = scope.stk().get(tok); // Get prior direct binding
       if( n.is_forward_ref() ) { // Prior is actually a forward-ref, so this is the def
-        assert !scope.stk().is_mutable(tok) && scope == _e._scope;
+        assert !scope.stk().is_mutable(tok) && scope == scope();
         if( ifex instanceof FunPtrNode )
           ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex,(TypeMemPtr)scope.ptr()._val);
         else ; // Can be here if already in-error
@@ -379,7 +380,7 @@ public class Parse implements Comparable<Parse> {
     if( expr == null ) return null; // Expr is required, so missing expr implies not any ifex
     if( !peek('?') ) return expr;   // No if-expression
 
-    _e._scope.push_if();            // Start if-expression tracking new defs
+    scope().push_if();            // Start if-expression tracking new defs
     Node ifex = init(new IfNode(ctrl(),expr)).keep();
     set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch
     Node old_mem = mem().keep();          // Keep until parse false-side
@@ -389,7 +390,7 @@ public class Parse implements Comparable<Parse> {
     Node t_ctrl= ctrl().keep();    // Keep until merge point
     Node t_mem = mem ().keep();    // Keep until merge point
 
-    _e._scope.flip_if();        // Flip side of tracking new defs
+    scope().flip_if();          // Flip side of tracking new defs
     set_ctrl(gvn(new CProjNode(ifex.unhook(),0))); // Control for false branch
     set_mem(old_mem);           // Reset memory to before the IF
     Node fex = peek(':') ? stmt() : con(Type.XNIL);
@@ -400,9 +401,9 @@ public class Parse implements Comparable<Parse> {
     old_mem.unkeep(_gvn);
 
     Parse bad = errMsg();
-    t_mem = _e._scope.check_if(true ,bad,_gvn,t_ctrl,t_mem); // Insert errors if created only 1 side
-    f_mem = _e._scope.check_if(false,bad,_gvn,f_ctrl,f_mem); // Insert errors if created only 1 side
-    _e._scope.pop_if();         // Pop the if-scope
+    t_mem = scope().check_if(true ,bad,_gvn,t_ctrl,t_mem); // Insert errors if created only 1 side
+    f_mem = scope().check_if(false,bad,_gvn,f_ctrl,f_mem); // Insert errors if created only 1 side
+    scope().pop_if();         // Pop the if-scope
     RegionNode r = set_ctrl(init(new RegionNode(null,t_ctrl.unhook(),f_ctrl.unhook())).keep());
     r._val = Type.CTRL;
     set_mem(gvn(new PhiNode(TypeMem.FULL,bad,r       ,t_mem.unhook(),f_mem.unhook())));
@@ -453,7 +454,7 @@ public class Parse implements Comparable<Parse> {
   // Invariant: WS already skipped before & after each _expr depth
   private Node _expr(int prec) {
     int lhsx = _x;              // Invariant: WS already skipped
-    Node lhs = _expr_higher(prec,null), rhs;
+    Node lhs = _expr_higher(prec,null);
     if( lhs==null ) return null;
     while( true ) {             // Kleene star at this precedence
       // Look for a binop at this precedence level
@@ -470,43 +471,18 @@ public class Parse implements Comparable<Parse> {
       assert sfun._op_prec == prec;
       // Check for Thunking the RHS
       if( sfun._thunk_rhs ) {
-        // Unwind after parsing delayed execution
-        Node old_ctrl = ctrl().keep();
-        Node old_mem  = mem ().keep();
-        // Insert a thunk header to delay execution
-        ThunkNode thunk = (ThunkNode)gvn(new ThunkNode(mem()));
-        set_ctrl(thunk);
-        set_mem (gvn(new ParmNode(-2,"mem",thunk,con(TypeMem.MEM),null)));
-        // Delay execution parse of RHS
-        rhs = _expr_higher_require(prec,bintok,lhs);
-        // Insert thunk tail, unwind memory state
-        ThretNode thet = (ThretNode)gvn(new ThretNode(ctrl(),mem(),rhs,thunk));
-        set_ctrl(old_ctrl.unhook());
-        set_mem (old_mem .unhook());
-        // Emit the call to both terms
-        lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op,lhs,thet));
-
-        // Force the call to inline, right-here-right-now
-        Node oldrez = _e._scope.rez();
-        _e._scope.set_rez(lhs,_gvn);
-        _e._scope._val = Type.ALL;
-        _gvn.add_work(_e._scope);
-        _gvn.iter(GVNGCM.Mode.Parse);
-        lhs = _e._scope.rez().keep();
-        _gvn.unreg(_e._scope);
-        _e._scope.set_rez(oldrez,_gvn);
-        lhs.unhook();
-
-        // Forcibly assert that thunk was inlined & removed
-        assert thunk.is_dead() && thet.is_dead();
+        lhs = _short_circuit_expr(lhs,prec,bintok,op,opx,lhsx,rhsx);
       } else {                  // Not a thunk!  Eager evaluation of RHS
-        rhs = _expr_higher_require(prec,bintok,lhs);
+        Node rhs = _expr_higher_require(prec,bintok,lhs);
         // Emit the call to both terms
+        // LHS in unhooked prior to optimizing/replacing.
         lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op,lhs,rhs));
       }
+      // Invariant: LHS is unhooked
     }
   }
 
+  // Get an expr at the next higher precedence, or a term, or null
   // Get an expr and the next higher precedence, or a term, or null
   private Node _expr_higher( int prec, Node lhs ) {
     if( lhs != null ) lhs.keep();
@@ -518,12 +494,72 @@ public class Parse implements Comparable<Parse> {
     Node rhs = _expr_higher(prec,lhs);
     return rhs==null ? err_ctrl2("Missing term after '"+bintok+"'") : rhs;
   }
+  // Check that this token is valid for this precedence level
   private boolean _good_prec_tok(int prec, String bintok) {
     if( bintok==null ) return false;
     for( String tok : PrimNode.PREC_TOKS[prec] ) if( Util.eq(bintok,tok) ) return true;
     return false;
   }
 
+  // Short-circuit 'thunks' the RHS operator and passes it to a thunk-aware
+  // primitive.  The primitive is required to fully inline & optimize out the
+  // Thunk before we exit here.  However, the primitive can do pretty much what
+  // it wants with the Thunk (currently nil-check LHS, then optionally Call the
+  // thunk).  
+  private Node _short_circuit_expr(Node lhs, int prec, String bintok, Node op, int opx, int lhsx, int rhsx) {
+    // Capture state so we can unwind after parsing delayed execution
+    NewObjNode stk = scope().stk(); // Display
+    Node old_ctrl = ctrl().keep();
+    Node old_mem  = mem ().keep();
+    TypeStruct old_ts = stk._ts;
+    Ary<Node> old_defs = stk._defs.deepCopy();
+
+    // Insert a thunk header to capture the delayed execution
+    ThunkNode thunk = (ThunkNode)gvn(new ThunkNode(mem()).keep());
+    set_ctrl(thunk);
+    set_mem (gvn(new ParmNode(-2,"mem",thunk,TypeMem.MEM,Env.DEFMEM,null)));
+
+    // Delayed execution parse of RHS
+    Node rhs = _expr_higher_require(prec,bintok,lhs);
+
+    // Insert thunk tail, unwind memory state
+    ThretNode thet = (ThretNode)gvn(new ThretNode(ctrl(),mem(),rhs,thunk.unhook()));
+    set_ctrl(old_ctrl.unhook());
+    set_mem (old_mem .unhook());
+    for( int i=0; i<old_defs._len; i++ )
+      assert old_defs.at(i)==stk._defs.at(i); // Nothing peeked thru the Thunk & updated outside
+
+    // Emit the call to both terms.
+    lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op,lhs,thet));
+
+    // Extra variables in the thunk not available after the thunk.
+    // Set them to Err.
+    if( stk._ts != old_ts ) {
+      for( int i=old_defs._len; i<stk._defs._len; i++ ) {
+        String fname = stk._ts._flds[i-1];
+        String msg = "'"+fname+"' not defined prior to the short-circuit";
+        Parse bad = errMsg(rhsx);
+        Node err = gvn(new ErrNode(ctrl(),bad,msg));
+        set_mem(gvn(new StoreNode(mem(),scope().ptr(),err,TypeStruct.FFNL,fname,bad)));
+      }
+    }
+
+    // Force the call to inline, right-here-right-now.  Done with a general
+    // GVNGCM.iter() call, which triggers all sorts of other optimizations.
+    // Requires 'hooking' anything needed alive after Iter.
+    Node oldrez = scope().rez();
+    scope().set_rez(lhs,_gvn);
+    scope()._val = Type.ALL;
+    _gvn.add_work(scope());
+    _gvn.add_work(thunk);
+    _gvn.iter(GVNGCM.Mode.Parse);
+    _gvn.unreg(scope());
+    lhs = scope().swap_rez(oldrez,_gvn);
+
+    // Forcibly assert that thunk was inlined & removed
+    assert thunk.is_dead() && thet.is_dead();
+    return lhs;
+  }
 
   /** Any number field-lookups or function applications, then an optional assignment
    *    term = id++ | id--
@@ -668,7 +704,7 @@ public class Parse implements Comparable<Parse> {
     Node n;
     if( scope==null ) {         // Token not already bound to a value
       create(tok,con(Type.XNIL),ts_mutable(true));
-      scope = _e._scope;
+      scope = scope();
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
         return err_ctrl2("Cannot re-assign final val '"+tok+"'");
@@ -763,7 +799,7 @@ public class Parse implements Comparable<Parse> {
       if( isOp(tok) ) { _x = oldx; return null; }
       Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,errMsg(oldx)));
       // Place in nearest enclosing closure scope
-      _e._scope.stk().create(tok.intern(),fref,TypeStruct.FFNL,_gvn);
+      scope().stk().create(tok.intern(),fref,TypeStruct.FFNL,_gvn);
       return fref;
     }
     Node def = scope.get(tok);    // Get top-level value; only sane if no stores allowed to modify it
@@ -849,7 +885,7 @@ public class Parse implements Comparable<Parse> {
 
     // Push an extra hidden display argument.  Similar to java inner-class ptr
     // or when inside of a struct definition: 'this'.
-    Node parent_display = _e._scope.ptr();
+    Node parent_display = scope().ptr();
     TypeMemPtr tpar_disp = (TypeMemPtr)parent_display._val; // Just a TMP of the right alias
     ids .push("^");
     ts  .push(tpar_disp);
@@ -931,7 +967,7 @@ public class Parse implements Comparable<Parse> {
 
   private Node merge_exits(Node rez) {
     rez.keep();
-    ScopeNode s = _e._scope;
+    ScopeNode s = scope();
     Node ctrl = s.early_ctrl();
     Node mem  = s.early_mem ();
     Node val  = s.early_val ();
@@ -1296,11 +1332,11 @@ public class Parse implements Comparable<Parse> {
   public Node gvn (Node n) { return n==null ? null : _gvn.xform(n); }
   private <N extends Node> N init( N n ) { return n==null ? null : _gvn.init(n); }
   private void kill( Node n ) { if( n._uses._len==0 ) _gvn.kill(n); }
-  public Node ctrl() { return _e._scope.ctrl(); }
+  public Node ctrl() { return scope().ctrl(); }
   // Set and return a new control
-  private <N extends Node> N set_ctrl(N n) { return _e._scope.set_ctrl(n,_gvn); }
-  private Node mem() { return _e._scope.mem(); }
-  private void set_mem( Node n) { _e._scope.set_mem(n, _gvn); }
+  private <N extends Node> N set_ctrl(N n) { return scope().set_ctrl(n,_gvn); }
+  private Node mem() { return scope().mem(); }
+  private void set_mem( Node n) { scope().set_mem(n, _gvn); }
 
   private @NotNull ConNode con( Type t ) { return _gvn.con(t); }
 
@@ -1308,7 +1344,7 @@ public class Parse implements Comparable<Parse> {
   public  Node lookup( String tok ) { return _e.lookup(tok); }
   private ScopeNode lookup_scope( String tok, boolean lookup_current_scope_only ) { return _e.lookup_scope(tok,lookup_current_scope_only); }
   public  ScopeNode scope( ) { return _e._scope; }
-  private void create( String tok, Node n, byte mutable ) { _e._scope.stk().create(tok,n,mutable,_gvn); }
+  private void create( String tok, Node n, byte mutable ) { scope().stk().create(tok,n,mutable,_gvn); }
   private static byte ts_mutable(boolean mutable) { return mutable ? TypeStruct.FRW : TypeStruct.FFNL; }
 
   // Get the display pointer.  The function call

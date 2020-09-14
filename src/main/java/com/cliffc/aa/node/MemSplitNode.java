@@ -146,7 +146,7 @@ public class MemSplitNode extends Node {
     nnn._escs = _escs.deepCopy();
     return nnn;
   }
-  @Override public Node is_copy(GVNGCM gvn, int idx) {
+  @Override public Node is_copy(int idx) {
     if( _uses._len==1 && _keep==0 ) return mem(); // Single user
     return null;
   }

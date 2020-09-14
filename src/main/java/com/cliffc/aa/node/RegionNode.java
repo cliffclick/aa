@@ -14,10 +14,14 @@ public class RegionNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     // TODO: The unzip xform, especially for funnodes doing type-specialization
     // TODO: treat _cidx like U/F and skip_dead it also
+    int dlen = _defs.len();
+    for( int i=1; i<dlen; i++ ) {
+      Node cc = in(i).is_copy(0);
+      if( cc!=null ) return set_def(i,cc,gvn);
+    }
 
     // Look for dead paths.  If found, cut dead path out of all Phis and this
     // Node, and return-for-progress.
-    int dlen = _defs.len();
     for( int i=1; i<dlen; i++ )
       if( val(i)==Type.XCTRL && !in(i).is_prim() ) { // Found dead path; cut out
         for( Node phi : _uses )
@@ -114,6 +118,7 @@ public class RegionNode extends Node {
     }
     return Type.XCTRL;
   }
+  @Override public TypeMem all_live() { return TypeMem.ALIVE; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ALIVE; }
 
   // Complex dominator tree.  Ok to subset, attempt the easy walk

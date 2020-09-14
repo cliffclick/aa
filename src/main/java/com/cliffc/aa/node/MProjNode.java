@@ -9,7 +9,7 @@ public class MProjNode extends ProjNode {
   @Override String xstr() { return "MProj"+_idx; }
   @Override public boolean is_mem() { return true; }
   @Override public Node ideal(GVNGCM gvn, int level) {
-    Node x = in(0).is_copy(gvn,_idx);
+    Node x = in(0).is_copy(_idx);
     if( x != null )
       return x == this ? gvn.con(TypeMem.ANYMEM) : x; // Happens in dead self-recursive functions
     if( in(0) instanceof CallEpiNode ) {

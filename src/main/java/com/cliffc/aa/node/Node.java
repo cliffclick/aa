@@ -70,6 +70,15 @@ public abstract class Node implements Cloneable {
     if( (_defs._es[idx] = n) != null ) n._uses.add(this);
     return unuse(old, gvn);
   }
+  public Node swap_def( int idx, Node n, GVNGCM gvn ) {
+    _chk();
+    Node old = _defs.at(idx);  // Get old value
+    // Add edge to new guy before deleting old, in case old goes dead and
+    // recursively makes new guy go dead also
+    if( (_defs._es[idx] = n) != null ) n._uses.add(this);
+    if( old != null ) old._uses.del(this);
+    return old;
+  }
 
   public Node insert (int idx, Node n) { _chk(); _defs.insert(idx,n); if( n!=null ) n._uses.add(this); return this; }
   // Return Node at idx, withOUT auto-deleting it, even if this is the last
@@ -380,6 +389,7 @@ public abstract class Node implements Cloneable {
   // It must be monotonic.
   // This is a reverse-flow transfer-function computation.
   public TypeMem live( GVNGCM.Mode opt_mode ) {
+    if( _keep>0 ) return all_live();
     // Compute meet/union of all use livenesses
     TypeMem live = TypeMem.DEAD; // Start at lattice top
     for( Node use : _uses )      // Computed across all uses
@@ -400,7 +410,7 @@ public abstract class Node implements Cloneable {
 
   // Default lower-bound liveness.  For control, its always "ALIVE" and for
   // memory opts (and tuples with memory) its "ALL_MEM".
-  public TypeMem all_live() { return TypeMem.LIVE_BOT; }  
+  public TypeMem all_live() { return TypeMem.LIVE_BOT; }
   // We have a 'crossing optimization' point: changing the pointer input to a
   // Load or a Scope changes the memory demanded by the Load or Scope.  Same:
   // changing a def._type changes the use._live, requiring other defs to be
@@ -479,7 +489,7 @@ public abstract class Node implements Cloneable {
       boolean ok = lifting
         ? nval.isa(oval) && nliv.isa(oliv)
         : oval.isa(nval) && oliv.isa(nliv);
-      if( !ok || !gvn.on_work(this) ) {     // Still-to-be-computed?
+      if( !ok || (!gvn.on_work(this) && _keep==0) ) { // Still-to-be-computed?
         bs.clear(_uid);                     // Pop-frame & re-run in debugger
         System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
         errs++;
@@ -518,7 +528,7 @@ public abstract class Node implements Cloneable {
   // are always followed by ProjNodes to break out the tuple slices.  If the
   // node optimizes, each ProjNode becomes a copy of some other value... based
   // on the ProjNode index
-  public Node is_copy(GVNGCM gvn, int idx) { return null; }
+  public Node is_copy(int idx) { return null; }
 
   // Only true for some RetNodes and FunNodes
   public boolean is_forward_ref() { return false; }

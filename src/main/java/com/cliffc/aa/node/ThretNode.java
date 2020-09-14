@@ -12,7 +12,7 @@ import com.cliffc.aa.type.TypeTuple;
 // Takes in Control & Memory & Value.
 // Produces Control & Memory & Value.
 public class ThretNode extends Node {
-  public ThretNode( Node ctrl, Node mem, Node val, ThunkNode thunk ) { super(OP_THRET,ctrl,mem,val,thunk); }
+  public ThretNode( Node ctrl, Node mem, Node val, ThunkNode thunk ) { super(OP_THRET,ctrl,mem,val,thunk); _live = TypeMem.ALLMEM; }
   public Node ctrl() { return in(0); }
   public Node mem () { return in(1); }
   public Node rez () { return in(2); }
@@ -25,6 +25,10 @@ public class ThretNode extends Node {
   }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    return def==in(1) || def==in(3) ? _live : TypeMem.ALIVE; // Basic aliveness for ctrl,rez full live for memory & thunk
+    if( def==ctrl() ) return TypeMem.ALIVE;
+    if( def==mem () ) return _live;
+    if( def==rez () ) return TypeMem.ESCAPE;
+    if( def==thunk()) return _live;
+    throw com.cliffc.aa.AA.unimpl();
   }
 }

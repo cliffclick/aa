@@ -14,7 +14,7 @@ public class ProjNode extends Node {
   @Override String xstr() { return "DProj"+_idx; }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
-    Node c = in(0).is_copy(gvn,_idx);
+    Node c = in(0).is_copy(_idx);
     if( c != null ) return c==this ? gvn.con(Type.ANY) : c; // Happens in dying loops
     return null;
   }

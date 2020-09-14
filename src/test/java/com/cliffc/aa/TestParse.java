@@ -3,7 +3,6 @@ package com.cliffc.aa;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.function.Function;
@@ -12,7 +11,7 @@ import static org.junit.Assert.*;
 
 public class TestParse {
   private static final String[] FLDS = new String[]{"^","n","v"};
-  private static final BitsFun TEST_FUNBITS = BitsFun.make0(45);
+  private static final BitsFun TEST_FUNBITS = BitsFun.make0(46);
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
@@ -186,16 +185,26 @@ public class TestParse {
     testerr("a.b.c();","Unknown ref 'a'",0);
   }
 
-  @Ignore
+  // Short-circuit tests  
   @Test public void testParse01a() {
 
     test("0 && 0", Type.XNIL);
     test("1 && 2", TypeInt.con(2));
     test("0 && 2", Type.XNIL);
+    test("0 || 0", Type.XNIL);
+    test("0 || 2", TypeInt.con(2));
+    test("1 || 2", TypeInt.con(1));
+    test("0 && 1 || 2 && 3", TypeInt.con(3));    // Precedence
+
     test_obj("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
              TypeStruct.make_tuple(Type.XNIL,TypeInt.con(1),Type.XNIL,Type.XNIL));
     test_obj("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
       TypeStruct.make_tuple(Type.XNIL,TypeInt.con(2),TypeInt.con(1),Type.XNIL));
+    test("(x=1) && x+2", TypeInt.con(3)); // Def x in 1st position
+
+    testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
+    testerr("0 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x definitely not alive
+    test("math_rand(1) && (x=2;x*x) || 3 && 4", TypeInt.INT8); // local use of x in short-circuit; requires unzip to find 4
   }
 
   @Test public void testParse02() {
