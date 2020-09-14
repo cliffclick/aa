@@ -179,6 +179,13 @@ Code            | Comment
 `x:=0; math_rand(1) ? (x:=4):3; x:=x+1` | `:int8`  x partially updated, remains mutable after
 `x:=0; 1 ? (x =4):; x` | `4:int8` x final on 1 arm, dead on other arm, so final after
 `x:=0; math_rand(1) ? (x =4):3; x` | `'x' not final on false arm of trinary` Must be fully final after trinary
+**Short circuit operators** | ---
+`0 && 2` | `0` Returns nil
+`1 && 2` | `2` Returns the non-nil result
+`0 && 1 || 2 && 3` | `3` `||` has lower precedence than `&&`
+`x:=y:=0; z=x++ && y++;(x,y,z)` | `(1,0,0)` increments x, but it starts zero, so y never increments
+`(x=1;x*x) && x+2` | `3` New variables defined in the first term available in both terms
+`1 && (x=2;0) || x+3 && x+4` | `'x' not defined prior to the short-circuit` New variables in the 2nd term are NOT available afterwards
 **Anonymous function definition** | ---
 `{x y -> x+y}`    | Types as a 2-arg function { int int -> int } or { flt flt -> flt }
 `{5}()`           | `5:int` No args nor `->` required; this is simply a no-arg function returning 5, being executed
@@ -303,7 +310,7 @@ Named type variables | Named types are simple subtypes
 **Arrays**          | ---
 `[3]`               | `[0]` Create an array of length 3, typed as being all nils
 `ary = [3]; ary[0]` | `0` Get the zeroeth element
-`[3][0]`            | `0` Get the zeroeth element
+`[3][0]`            | `0` Get the zeroeth element of a new array
 `ary = [3]; ary[0]:=2` | `2:int` Set an element
 `ary = [3]; ary[0]:=0; ary[1]:=1; ary[2]:=2; (ary[0],ary[1],ary[2])` | `(0,1,2)` 
 `[3]:[int]`         | `[0]` Create an array of length 3, typed as being all nils, and assert that `nil` isa `int`

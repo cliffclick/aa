@@ -47,7 +47,8 @@ public class StoreNode extends Node {
     }
 
     // If Store is of a memory-writer, and the aliases do not overlap, make parallel with a Join
-    if( tmp != null && mem.is_mem() && mem.check_solo_mem_writer(this) ) {
+    if( tmp != null && (tmp._aliases!=BitsAlias.NIL.dual()) &&
+        mem.is_mem() && mem.check_solo_mem_writer(this) ) {
       Node head2;
       if( mem instanceof StoreNode ) head2=mem;
       else if( mem instanceof MrgProjNode ) head2=mem;

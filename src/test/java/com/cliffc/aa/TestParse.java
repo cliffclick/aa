@@ -18,11 +18,6 @@ public class TestParse {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeStr.NO_DISP);
 
-    // fails another way also
-    //test("key = \"Monday\"; val = 1;\n" +
-    //     "entry = 0;\n" +
-    //     "entry && key.eq(entry.key) ? (oldval=entry.val; entry.val:=val; oldval);",
-    //     Type.XNIL);
     //test("put = { key val ->\n" +
     //     "  entry = 0;\n" +
     //     "  entry && key.eq(entry.key) ? (oldval=entry.val; entry.val:=val; ^oldval);\n" +
@@ -185,7 +180,7 @@ public class TestParse {
     testerr("a.b.c();","Unknown ref 'a'",0);
   }
 
-  // Short-circuit tests  
+  // Short-circuit tests
   @Test public void testParse01a() {
 
     test("0 && 0", Type.XNIL);
@@ -205,6 +200,7 @@ public class TestParse {
     testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
     testerr("0 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x definitely not alive
     test("math_rand(1) && (x=2;x*x) || 3 && 4", TypeInt.INT8); // local use of x in short-circuit; requires unzip to find 4
+
   }
 
   @Test public void testParse02() {
