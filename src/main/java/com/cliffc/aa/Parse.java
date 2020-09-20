@@ -505,7 +505,7 @@ public class Parse implements Comparable<Parse> {
   // primitive.  The primitive is required to fully inline & optimize out the
   // Thunk before we exit here.  However, the primitive can do pretty much what
   // it wants with the Thunk (currently nil-check LHS, then optionally Call the
-  // thunk).  
+  // thunk).
   private Node _short_circuit_expr(Node lhs, int prec, String bintok, Node op, int opx, int lhsx, int rhsx) {
     // Capture state so we can unwind after parsing delayed execution
     NewObjNode stk = scope().stk(); // Display
@@ -549,16 +549,15 @@ public class Parse implements Comparable<Parse> {
     // Requires 'hooking' anything needed alive after Iter.
     Node oldrez = scope().rez();
     scope().set_rez(lhs,_gvn);
-    scope()._val = Type.ALL;
-    _gvn.add_work(scope());
+    for( Env e = _e; e._par!=null; e = e._par ) _gvn.rereg(e._scope,Type.ALL);
     _gvn.add_work(thunk);
     _gvn.iter(GVNGCM.Mode.Parse);
-    _gvn.unreg(scope());
+    for( Env e = _e; e._par!=null; e = e._par )  _gvn.unreg(e._scope);
     lhs = scope().swap_rez(oldrez,_gvn);
 
     // Forcibly assert that thunk was inlined & removed
     assert thunk.is_dead() && thet.is_dead();
-    return lhs;
+    return _gvn.add_work(lhs);
   }
 
   /** Any number field-lookups or function applications, then an optional assignment
@@ -858,7 +857,7 @@ public class Parse implements Comparable<Parse> {
    */
   private Node struct() {
     int oldx = _x-1; Node ptr;  // Opening @{
-    try( Env e = new Env(_e,errMsg(oldx-1), false) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e,errMsg(oldx-1), false,ctrl(),mem()) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
@@ -921,18 +920,14 @@ public class Parse implements Comparable<Parse> {
     if( _x == oldx ) { ids.set_len(1); ts.set_len(1); bads.set_len(1);  }
 
     // Build the FunNode header
-    Node old_ctrl = ctrl().keep();
-    Node old_mem  = mem ().keep();
     FunNode fun = gvn(new FunNode(ids.asAry(),ts.asAry()).add_def(Env.ALL_CTRL)).keep();
     // Build Parms for system incoming values
     Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
     Node mem = gvn(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
     Node clo = gvn(new ParmNode( 0,"^"  ,fun,con(tpar_disp),null));
-    set_ctrl(fun);              // New control is function head
-    set_mem(mem);               // New memory  is function memory
 
     // Increase scope depth for function body.
-    try( Env e = new Env(_e,errMsg(oldx-1), true) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e,errMsg(oldx-1), true, fun, mem) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
@@ -957,10 +952,9 @@ public class Parse implements Comparable<Parse> {
       // to the function for faster access.
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,rpc.unhook(),fun.unhook()));
       // The FunPtr builds a real display; any up-scope references are passed in now.
+      _gvn.add_work(rpc);
       Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr()));
       _e = _e._par;                // Pop nested environment
-      set_ctrl(old_ctrl.unhook()); // Back to the pre-function-def control
-      set_mem (old_mem .unhook()); // Back to the pre-function-def memory
       return fptr;                 // Return function; close-out and DCE 'e'
     }
   }

@@ -18,13 +18,6 @@ public class TestParse {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeStr.NO_DISP);
 
-    //test("put = { key val ->\n" +
-    //     "  entry = 0;\n" +
-    //     "  entry && key.eq(entry.key) ? (oldval=entry.val; entry.val:=val; ^oldval);\n" +
-    //     "  0\n" +
-    //     "};\n" +
-    //     "put(\"Monday\",1);\n",
-    //     Type.XNIL);
     //// fails, oldval not defined on false arm of trinary
     //test("_tab = [7];\n" +
     //     "put = { key val ->\n" +

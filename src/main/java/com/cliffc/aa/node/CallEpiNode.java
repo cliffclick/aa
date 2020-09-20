@@ -230,6 +230,7 @@ public final class CallEpiNode extends Node {
         live = TypeMem.ESCAPE;
         break;
       }
+      if( gvn._opt_mode._CG ) actual._live = TypeMem.DEAD; // With Call Graph, be optimistic on liveness
       actual = gvn._opt_mode == GVNGCM.Mode.Opto ? gvn.new_gcp(actual) : gvn.xform(actual);
       gvn.add_def(arg,actual);
       actual._live = (TypeMem)actual._live.meet(live);

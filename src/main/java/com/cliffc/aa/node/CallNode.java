@@ -687,7 +687,8 @@ public class CallNode extends Node {
 
     // If ANY args are ANY they will fail the arg check, BUT will be reported
     // first where they became an ANY.
-    if( !fast )
+    // Always allow Thunks to inline
+    if( !fast || (nargs()==3 && arg(2) instanceof ThretNode) )
       for( int j=1; j<nargs(); j++ ) {
         Type ta = arg(j)._val;
         if( ta==Type.ANY || ta==Type.ALL )

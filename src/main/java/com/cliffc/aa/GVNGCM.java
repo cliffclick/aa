@@ -257,7 +257,7 @@ public class GVNGCM {
     }
     // Global Value Numbering; n is "in the system" now
     Node x = _vals.putIfAbsent(n,n);
-    if( x != null ) { n._val = null; kill_new(n); return x; }
+    if( x != null ) { n._val = null; x._live=(TypeMem)n._live.meet(x._live); kill_new(n); return x; }
     return add_work(n);
   }
 

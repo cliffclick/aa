@@ -69,6 +69,7 @@ public class ParmNode extends PhiNode {
   }
 
   private boolean valid_args( FunNode fun, int i, Node mem ) {
+    if( fun._thunk_rhs ) return true; // Always allow folding of Thunks
     // Check arg type, after sharpening
     Type actual = in(i).sharptr(mem.in(i));
     Type formal = fun.formal(_idx);

@@ -32,12 +32,12 @@ public class Env implements AutoCloseable {
   }
 
   // A file-level Env, or below.  Contains user written code.
-  Env( Env par, Parse P, boolean is_closure ) {
+  Env( Env par, Parse P, boolean is_closure, Node ctrl, Node mem ) {
     GVN._opt_mode=GVNGCM.Mode.Parse;
     _P = P;
     _par = par;
     ScopeNode s = par._scope;   // Parent scope
-    _scope = init(s.ctrl(),s.ptr(),s.mem(),s.stk()._tptr,P==null ? null : P.errMsg(),is_closure);
+    _scope = init(ctrl,s.ptr(),mem,s.stk()._tptr,P==null ? null : P.errMsg(),is_closure);
   }
   // Make the Scope object for an Env.
   private static ScopeNode init(Node ctl, Node clo, Node mem, Type back_ptr, Parse errmsg, boolean is_closure) {
@@ -107,7 +107,7 @@ public class Env implements AutoCloseable {
   // A new Env for the current Parse scope (generally a file-scope or a
   // test-scope), above this is the basic public Env with all the primitives
   public static Env file_scope(Env top_scope) {
-    return new Env(top_scope,null, true);
+    return new Env(top_scope,null, true, top_scope._scope.ctrl(), top_scope._scope.mem());
   }
 
   // Wire up an early function exit
