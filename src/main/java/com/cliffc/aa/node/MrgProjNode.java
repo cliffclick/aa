@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
@@ -11,23 +12,41 @@ public class MrgProjNode extends ProjNode {
   NewNode nnn() { return (NewNode)in(0); }
   Node    mem() { return          in(1); }
   @Override public Node ideal(GVNGCM gvn, int level) {
+    NewNode nnn = nnn();
+    Node mem = mem();
     boolean doe = false;        // Dead-On-Entry
-    Type t = mem()._val;
-    if( t instanceof TypeMem && ((TypeMem)t).at(nnn()._alias)==TypeObj.UNUSED )
-      doe = true;                  // Dead-On-Entry
+    Type t = mem._val;
+    if( t instanceof TypeMem && ((TypeMem)t).at(nnn._alias)==TypeObj.UNUSED )
+      doe = true;               // Dead-On-Entry
 
-    if( doe && nnn().is_unused() ) // New is dead for no pointers
-      return mem();
+    if( doe && nnn.is_unused() ) // New is dead for no pointers
+      return mem;
 
     // New is dead from below.
-    if( _live.at(nnn()._alias)==TypeObj.UNUSED && nnn()._keep==0 && !nnn().is_unused() ) {
-      gvn.unreg(nnn());         // Unregister before self-kill
-      nnn().kill(gvn);          // Killing a NewNode has to do more updates than normal
+    if( _live.at(nnn._alias)==TypeObj.UNUSED && nnn._keep==0 && !nnn.is_unused() ) {
+      gvn.unreg(nnn);   // Unregister before self-kill
+      nnn.kill(gvn);    // Killing a NewNode has to do more updates than normal
       return this;
     }
-    if( doe && nnn().is_unused() )
-      return mem();             // Kill MrgNode when it no longer lifts values
+    if( doe && nnn.is_unused() )
+      return mem;               // Kill MrgNode when it no longer lifts values
 
+    // Look for back-to-back unrelated aliases and Split/Join
+    Node head2 = MemJoinNode.find_sese_head(mem);
+    if( head2 != null && !head2.is_prim() ) {
+      BitsAlias escs1 = escapees();
+      if( MemSplitNode.check_split(this,escs1) )
+        return MemSplitNode.insert_split(gvn,this,escs1,this,head2,mem);
+    }
+
+    // If is of a MemJoin and it can enter the split region, do so.
+    if( _keep==0 && mem instanceof MemJoinNode && mem._uses._len==1 ) {
+      MrgProjNode mprj = new MrgProjNode(nnn,mem);
+      MemJoinNode mjn = ((MemJoinNode)mem).add_alias_below_new(gvn,mprj,this);
+      gvn.set_def_reg(Env.DEFMEM,nnn._alias,mprj);
+      return mjn;
+    }
+    
     return null;
   }
   @Override public Type value(GVNGCM.Mode opt_mode) {

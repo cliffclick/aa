@@ -54,6 +54,12 @@ public class IntrinsicNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node mem = mem();
     Node ptr = ptr();
+
+    // If is of a MemJoin and it can enter the split region, do so.
+    if( _keep==0 && ptr._val instanceof TypeMemPtr && mem instanceof MemJoinNode && mem._uses._len==1 &&
+        ptr instanceof ProjNode && ptr.in(0) instanceof NewNode )
+      return ((MemJoinNode)mem).add_alias_below_new(gvn,new IntrinsicNode(_tn,_badargs,null,mem,ptr),this);
+
     if( mem instanceof MrgProjNode &&
         mem.in(0)==ptr.in(0) && mem._uses._len==2 ) { // Only self and DefMem users
       TypeMemPtr tptr = (TypeMemPtr)ptr._val;
@@ -106,6 +112,7 @@ public class IntrinsicNode extends Node {
     if( def==mem() ) return _live;
     return TypeMem.ALIVE;
   }
+  @Override BitsAlias escapees() { return ptr().in(0).escapees(); }
   //
   @Override public ErrMsg err( boolean fast ) {
     Type ptr = ptr()._val;

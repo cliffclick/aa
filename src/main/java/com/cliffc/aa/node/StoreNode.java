@@ -55,7 +55,7 @@ public class StoreNode extends Node {
       else if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) head2 = mem.in(0).in(0);
       else head2 = null;
       // Check no extra readers/writers at the split point
-      if( head2 != null && MemSplitNode.check_split(gvn,this,escapees()) )
+      if( head2 != null && MemSplitNode.check_split(this,escapees()) )
         return MemSplitNode.insert_split(gvn,this,escapees(),this,mem,head2);
     }
 
@@ -66,16 +66,8 @@ public class StoreNode extends Node {
       Node memw = get_mem_writer();
       // Check the address does not have a memory dependence on the Join.
       // TODO: This is super conservative
-      if( memw != null && adr instanceof ProjNode && adr.in(0) instanceof NewNode ) {
-        MemJoinNode mjn = (MemJoinNode)mem;
-        StoreNode st = (StoreNode)gvn.xform(new StoreNode(keep(),mem,adr).keep());
-        mjn.add_alias_below(gvn,st,st.escapees(),st.unhook());
-        unhook();
-        st .xval(gvn._opt_mode);
-        mjn.xval(gvn._opt_mode);
-        gvn.add_work_defs(mjn);
-        return mjn;
-      }
+      if( memw != null && adr instanceof ProjNode && adr.in(0) instanceof NewNode )
+        return ((MemJoinNode)mem).add_alias_below_new(gvn,new StoreNode(this,mem,adr),this);
     }
 
     // Is this Store dead from below?

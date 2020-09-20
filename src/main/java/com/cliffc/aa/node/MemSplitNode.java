@@ -111,7 +111,7 @@ public class MemSplitNode extends Node {
   static Node insert_split(GVNGCM gvn, Node tail1, BitsAlias head1_escs, Node head1, Node tail2, Node head2) {
     assert tail1.is_mem() && head1.is_mem() && tail2.is_mem() && head2.is_mem();
     BitsAlias head2_escs = head2.escapees();
-    assert check_split(gvn,head1,head1_escs);
+    assert check_split(head1,head1_escs);
     // Insert empty split/join above head2
     MemSplitNode msp = gvn.xform(new MemSplitNode(head2.in(1))).keep();
     MProjNode mprj = (MProjNode)gvn.xform(new MProjNode(msp,0));
@@ -122,10 +122,11 @@ public class MemSplitNode extends Node {
     // Pull the SESE regions in parallel from below
     mjn.add_alias_below(gvn,head2,head2_escs,tail2);
     mjn.add_alias_below(gvn,head1,head1_escs,tail1);
-    gvn.revalive(msp,mprj,mjn);
+    if( mprj.is_dead() ) gvn.revalive(msp);
+    else gvn.revalive(msp,mprj,mjn);
     return head1;
   }
-  static boolean check_split(GVNGCM gvn, Node head1, BitsAlias head1_escs) {
+  static boolean check_split( Node head1, BitsAlias head1_escs ) {
     Node tail2 = head1.in(1);
     // Must have only 1 mem-writer (this can fail if used by different control paths)
     if( !tail2.check_solo_mem_writer(head1) ) return false;

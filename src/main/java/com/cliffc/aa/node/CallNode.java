@@ -283,7 +283,7 @@ public class CallNode extends Node {
       ProjNode cepim = ProjNode.proj(cepi,1); // Memory projection from CEPI
       ProjNode cepid = ProjNode.proj(cepi,2); // Return projection from CEPI
       // Verify no extra mem readers in-between, no alias overlaps on input
-      if( cepim != null && MemSplitNode.check_split(gvn,this,escapees()) ) {
+      if( cepim != null && MemSplitNode.check_split(this,escapees()) ) {
         TypeMem tmcepi = (TypeMem)cepim._val;
         // Verify call entry is not stale relative to call exit
         if( mem._val.isa(tmcepi) ) {

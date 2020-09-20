@@ -43,9 +43,10 @@ public class MemJoinNode extends Node {
     return null;
   }
 
-  private Node find_sese_head(Node mem) {
+  static Node find_sese_head(Node mem) {
     if( mem instanceof MemJoinNode ) return ((MemJoinNode)mem).msp(); // Merge Split with prior Join
     if( mem instanceof StoreNode ) return mem;   // Move Store into Split/Join
+    if( mem instanceof MemPrimNode.LValueWrite ) return mem; // Array store
     if( mem instanceof MProjNode ) {
       Node head = mem.in(0);
       if( head instanceof CallNode ) return null; // Do not swallow a Call/CallEpi into a Split/Join
@@ -56,6 +57,7 @@ public class MemJoinNode extends Node {
     if( mem instanceof MrgProjNode ) return mem;
     if( mem instanceof ParmNode ) return null;
     if( mem instanceof PhiNode ) return null;
+    if( mem instanceof StartMemNode ) return null;
     throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
   }
 
@@ -199,6 +201,19 @@ public class MemJoinNode extends Node {
     else gvn.revalive(mspj,head,base.in(0),base);
   }
 
+  MemJoinNode add_alias_below_new(GVNGCM gvn, Node nnn, Node old ) {
+    old.keep();                 // Called from inside old.ideal(), must keep alive until exit
+    Node nnn2 = gvn.xform(nnn.keep()).unhook();
+    add_alias_below(gvn,nnn2,nnn2.escapees(),nnn2);
+    old.unhook();               // Alive, but keep==0
+    nnn2.xval(gvn._opt_mode);
+         xval(gvn._opt_mode);
+    gvn.add_work_defs(this);
+    return this;
+  }
+
+  
+  
   // Find a compatible alias edge, including base memory if nothing overlaps.
   // Return null for any partial overlaps.
   Node can_bypass( BitsAlias esc ) {

@@ -144,6 +144,11 @@ public abstract class MemPrimNode extends PrimNode {
       if( def==val() ) return TypeMem.ESCAPE;// Value escapes
       throw com.cliffc.aa.AA.unimpl();       // Should not reach here
     }
+    @Override BitsAlias escapees() {
+      Type adr = adr()._val;
+      if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? BitsAlias.EMPTY : BitsAlias.FULL;
+      return ((TypeMemPtr)adr)._aliases;
+    }
   }
 
   // Produces a triop LValue, where the leading TMP is a non-zero array
