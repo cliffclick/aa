@@ -10,6 +10,7 @@ import static org.junit.Assert.assertTrue;
 public class TestLive {
   @Test public void testBasic() {
     GVNGCM gvn = new GVNGCM();
+    gvn._opt_mode = GVNGCM.Mode.PesiNoCG;
 
     // Liveness is a backwards flow.  Scope always demands all return results.
     ScopeNode scope = new ScopeNode(null,false);
@@ -25,11 +26,11 @@ public class TestLive {
 
     // Check liveness base case
     scope.xliv(gvn._opt_mode);
-    assertEquals(scope._live,TypeMem.ANYMEM);
+    assertEquals(TypeMem.ANYMEM,scope._live);
 
     // Check liveness recursive back one step
     rez.xliv(GVNGCM.Mode.PesiCG);
-    assertEquals(rez._live,TypeMem.ALIVE);
+    assertEquals(TypeMem.ESCAPE,rez._live);
   }
 
   @SuppressWarnings("unchecked")
@@ -88,7 +89,7 @@ public class TestLive {
 
     // Check liveness recursive back one step
     ptr.xliv(GVNGCM.Mode.PesiNoCG);
-    assertEquals(TypeMem.ALIVE,ptr._live); // Ptr is all_type, conservative so all memory alive
+    assertEquals(TypeMem.ESCAPE,ptr._live); // Ptr is all_type, conservative so all memory alive
     mem.xliv(GVNGCM.Mode.PesiNoCG);
     assertEquals(mem._live,expected_live); // Object demands of OProj, but OProj passes along request to NewObj
     nnn.xliv(GVNGCM.Mode.PesiNoCG);

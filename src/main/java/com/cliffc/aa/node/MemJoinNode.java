@@ -58,6 +58,7 @@ public class MemJoinNode extends Node {
     if( mem instanceof ParmNode ) return null;
     if( mem instanceof PhiNode ) return null;
     if( mem instanceof StartMemNode ) return null;
+    if( mem instanceof ConNode ) return null;
     throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
   }
 
@@ -212,8 +213,8 @@ public class MemJoinNode extends Node {
     return this;
   }
 
-  
-  
+
+
   // Find a compatible alias edge, including base memory if nothing overlaps.
   // Return null for any partial overlaps.
   Node can_bypass( BitsAlias esc ) {

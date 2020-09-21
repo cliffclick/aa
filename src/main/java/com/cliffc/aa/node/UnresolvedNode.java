@@ -45,7 +45,7 @@ public class UnresolvedNode extends Node {
     // If any arg is ALL - that wins; if ANY - ignored.
     // If any arg is not a TFP, then OOB.
     // If any arg is high, ignore - FunPtrs always fall.
-    // If opt_mode==2, then high else low
+    // If opt_mode==Opto, then high else low
     boolean lifting = opt_mode!=GVNGCM.Mode.Opto;
     Type initial = lifting ? Type.ANY : Type.ALL;
     Type t = initial;
@@ -58,7 +58,7 @@ public class UnresolvedNode extends Node {
       if( !(td instanceof TypeFunPtr) ) return td.oob();
       TypeFunPtr tfp = (TypeFunPtr)td;
       if( tfp.above_center() ) tfp = tfp.dual();
-      if( tfp._disp.above_center() ) throw com.cliffc.aa.AA.unimpl(); // mixed-mode
+      if( tfp._disp.above_center() ) return _val; // No change until sorted out
       t = lifting ? t.meet(tfp) : t.join(tfp.dual());
     }
     return t==initial ? Type.ANY : t; // If all inputs are ANY, then ANY result
