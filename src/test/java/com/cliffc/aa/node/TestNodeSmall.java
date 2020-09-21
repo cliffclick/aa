@@ -531,8 +531,8 @@ public class TestNodeSmall {
     };
 
     // One-off jig for testing single combo
-    Type[] rez1 = check(gvn,sigs[2],mems[1],args[0],args[7]);
-    Type[] rez2 = check(gvn,sigs[2],mems[3],args[0],args[7]);
+    Type[] rez1 = check(gvn,sigs[2],mems[1],args[0],args[6]);
+    Type[] rez2 = check(gvn,sigs[2],mems[1],args[0],args[7]);
     assertTrue(rez1[2].isa(rez2[2]));
 
 
@@ -621,7 +621,8 @@ public class TestNodeSmall {
     tos[BitsAlias.ALL] = TypeObj.OBJ;
     tos[BitsAlias.RECORD]=TypeStruct.ALLSTRUCT;
     tos[BitsAlias.ABC] = TypeStr.ABC; //
-    tos[BitsAlias.ARY] = TypeStr.STR; // TODO: Proxy for all-arrays
+    tos[BitsAlias.STR] = TypeStr.STR;
+    tos[BitsAlias.ARY] = TypeAry.ARY;
     if( as != null )
       for( int i=0; i<as.length; i++ )
         tos[as[i]] = ts[i];

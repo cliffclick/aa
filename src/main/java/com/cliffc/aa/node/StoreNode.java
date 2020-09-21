@@ -78,11 +78,13 @@ public class StoreNode extends Node {
   }
 
   // StoreNode needs to return a TypeObj for the Parser.
-  @Override public TypeMem value(GVNGCM.Mode opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
     Node mem = mem(), adr = adr(), val = val();
     Type tmem = mem._val;
     Type tadr = adr._val;
     Type tval = val._val;  // Value
+    if( tmem==Type.ALL || tadr==Type.ALL ) return Type.ALL;
+
     if( tadr == Type.ALL ) tadr = TypeMemPtr.ISUSED0;
     if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM);
     if( !(tadr instanceof TypeMemPtr) ) return tadr.oob(TypeMem.ALLMEM);
@@ -108,20 +110,21 @@ public class StoreNode extends Node {
   }
 
   @Override public ErrMsg err( boolean fast ) {
-    Type t = adr()._val;
-    if( t.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when writing",_fld);
-    String msg = err0(t);
+    Type adr = adr()._val;
+    Type mem = mem()._val;
+    if( mem == Type.ANY ) return null; // Might fall to good
+    if( mem == Type.ALL ) return null; // Error, but reported elsewhere
+    if( adr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when writing",_fld);
+    String msg = err0(adr,mem);
     if( msg == null ) return null;
     boolean closure = adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure;
-    return fast ? ErrMsg.FAST : ErrMsg.field(_bad,msg,_fld,closure,adr()._val);
+    return fast ? ErrMsg.FAST : ErrMsg.field(_bad,msg,_fld,closure,adr);
   }
-  private String err0( Type t ) {
-    if( t==Type.ANY ) return null;
-    if( !(t instanceof TypeMemPtr) ) return "Unknown"; // Too low, might not have any fields
-    Type mem = mem()._val;
-    if( mem == Type.ANY ) return null;
+  private String err0( Type adr, Type mem ) {
+    if( adr==Type.ANY ) return null;
+    if( !(adr instanceof TypeMemPtr) ) return "Unknown"; // Too low, might not have any fields
     if( mem instanceof TypeMem )
-      mem = ((TypeMem)mem).ld((TypeMemPtr)t);
+      mem = ((TypeMem)mem).ld((TypeMemPtr)adr);
     if( !(mem instanceof TypeStruct) ) return "No such";
     TypeStruct ts = (TypeStruct)mem;
     int idx = ts.find(_fld);

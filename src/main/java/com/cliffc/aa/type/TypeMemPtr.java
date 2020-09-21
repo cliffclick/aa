@@ -53,7 +53,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     to.str(sb,dups,mem,debug);
     if( _aliases.test(0) ) sb.p('?');
     return sb;
-  }  
+  }
 
   private static TypeMemPtr FREE=null;
   @Override protected TypeMemPtr free( TypeMemPtr ret ) { FREE=this; return ret; }
@@ -139,8 +139,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   // Widens, not lowers.
   @Override public Type simple_ptr() {
     if( _obj==TypeObj.ISUSED || _obj==TypeObj.UNUSED || _obj==TypeStr.NO_DISP ) return this;
-    if( _obj==TypeObj.OBJ || _obj==TypeObj.XOBJ ) return this;
-    return make(_aliases,oob(TypeObj.ISUSED));
+    return make(_aliases,_obj.oob(TypeObj.ISUSED));
   }
   @Override public boolean above_center() {
     return _aliases.above_center();

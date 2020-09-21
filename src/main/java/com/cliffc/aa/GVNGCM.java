@@ -643,35 +643,28 @@ public class GVNGCM {
         if( n instanceof CallNode && n._live != TypeMem.DEAD ) {
           CallNode call = (CallNode)n;
           if( call.ctl()._val == Type.CTRL && call._val instanceof TypeTuple ) { // Wait until the Call is reachable
+            // Track ambiguous calls: resolve after GCP gets stable, and if we
+            // can resolve we continue to let GCP fall.
             BitsFun fidxs = CallNode.ttfp(call._val).fidxs();
             if( fidxs.above_center() && fidxs.abit() == -1 && ambi_calls.find(call) == -1 )
-              ambi_calls.add(call); // Track ambiguous calls
+              ambi_calls.add(call);
+            // If the function input can never fall to any function type, abort
+            // the resolve now.  The program is in-error.
+            if( !call.fun()._val.isa(TypeFunPtr.GENERIC_FUNPTR) ) {
+              call._not_resolved_by_gcp = true;
+              add_work(call);
+            }
           }
         }
         // Very expensive assert
         //assert Env.START.more_flow(this,new VBitSet(),false,0)==0; // Initial conditions are correct
       }
 
-      // Remove CallNode ambiguity after worklist runs dry
-      while( !ambi_calls.isEmpty() ) {
-        CallNode call = ambi_calls.pop();
-        BitsFun fidxs = CallNode.ttfp(call._val).fidxs();
-        FunPtrNode fptr = resolve_ambi(call,fidxs);
-        if( fptr==null ) {      // Not resolving, will be an error later
-          call._not_resolved_by_gcp = true;
-          add_work(call.fun());
-          continue;
-        }
-        call.set_fun_reg(fptr,this);// Set resolved edge
-        add_work(call);
-        add_work(fptr);             // Unresolved is now resolved and live
-        add_work(fptr.fun());
-        // If this call is wired, a CallEpi will 'peek thru' an Unresolved to
-        // pass liveness to a Ret.  Since 1-step removed from neighbor, have to
-        // add_work 1-step further afield.
-        add_work(fptr.in(0));
-        assert Env.START.more_flow(this,new VBitSet(),false,0)==0; // Post conditions are correct
-      }
+      // Remove CallNode ambiguity after worklist runs dry.  This makes a
+      // 'least_cost' choice on unresolved Calls, and lowers them in the
+      // lattice... allowing more GCP progress.
+      while( !ambi_calls.isEmpty() )
+        remove_ambi(ambi_calls.pop());
     }
 
     // Revisit the entire reachable program, as ideal calls may do something
@@ -683,13 +676,34 @@ public class GVNGCM {
     walk_dead(Env.START);
   }
 
-  private FunPtrNode resolve_ambi(CallNode call, BitsFun fidxs) {
-    if( fidxs.abit() != -1    ) return null; // resolved to one
-    if( !fidxs.above_center() ) return null; // resolved to many
-    if( fidxs==BitsFun.ANY )    return null; // no choices, must be error
-    return call.least_cost(this,fidxs,call.fun());
+  private void remove_ambi( CallNode call ) {
+    TypeFunPtr tfp = CallNode.ttfpx(call._val);
+    FunPtrNode fptr = null;
+    if( tfp != null ) {     // Have a sane function ptr?
+      BitsFun fidxs = tfp.fidxs();
+      if( fidxs.abit()!= -1 ) return; // Resolved after all
+      if( fidxs.above_center() &&     // Resolved to many
+          fidxs!=BitsFun.ANY )        // And have choices
+        // Pick least-cost among choices
+        fptr = call.least_cost(this,fidxs,call.fun());
+    }
+    if( fptr==null ) {      // Not resolving, program is in-error
+      call._not_resolved_by_gcp = true;
+      add_work(call);
+      add_work(call.fun());
+      return;                   // Not resolving, but Call flagged as in-error
+    }
+    call.set_fun_reg(fptr,this);// Set resolved edge
+    add_work(call);
+    add_work(fptr);             // Unresolved is now resolved and live
+    add_work(fptr.fun());
+    // If this call is wired, a CallEpi will 'peek thru' an Unresolved to
+    // pass liveness to a Ret.  Since 1-step removed from neighbor, have to
+    // add_work 1-step further afield.
+    add_work(fptr.in(0));
+    assert Env.START.more_flow(this,new VBitSet(),false,0)==0; // Post conditions are correct
   }
-
+  
   private void check_and_wire( CallEpiNode cepi ) {
     if( !cepi.check_and_wire(this) ) return;
     add_work(cepi.call().fun());

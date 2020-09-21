@@ -18,7 +18,7 @@ public class TestParse {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeStr.NO_DISP);
 
-    //// fails, oldval not defined on false arm of trinary
+    // fails, oldval not defined on false arm of trinary
     //test("_tab = [7];\n" +
     //     "put = { key val ->\n" +
     //     "  idx = key.hash() % #_tab;\n" +
@@ -28,7 +28,6 @@ public class TestParse {
     //     "};\n" +
     //     "put(\"Monday\",1);\n",
     //     Type.XNIL);
-
 
     // A collection of tests which like to fail easily
     test("-1",  TypeInt.con( -1));

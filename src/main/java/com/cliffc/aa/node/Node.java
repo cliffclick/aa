@@ -591,7 +591,7 @@ public abstract class Node implements Cloneable {
 
   // Error messages
   public static class ErrMsg implements Comparable<ErrMsg> {
-    public final Parse _loc;    // Point in code to blame
+    public       Parse _loc;    // Point in code to blame
     public final String _msg;   // Printable error message, minus code context
     public final Level _lvl;    // Priority for printing
     public int _order;          // Message order as they are found.
@@ -663,7 +663,12 @@ public abstract class Node implements Cloneable {
       if( this==obj ) return true;
       if( !(obj instanceof ErrMsg) ) return false;
       ErrMsg err = (ErrMsg)obj;
-      return _lvl==err._lvl && _loc.equals(err._loc) && _msg.equals(err._msg);
+      if( _lvl!=err._lvl || !_msg.equals(err._msg) ) return false;
+      // Spread a missing loc; cheaty but only a little bit.
+      // TODO: track down missing loc in Parser
+      if( _loc==null && err._loc!=null ) _loc=err._loc;
+      if( _loc!=null && err._loc==null ) err._loc=_loc;
+      return _loc==err._loc || _loc.equals(err._loc);
     }
     @Override public int hashCode() {
       return (_loc==null ? 0 : _loc.hashCode())+_msg.hashCode()+_lvl.hashCode();

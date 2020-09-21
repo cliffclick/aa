@@ -23,7 +23,17 @@ public final class ErrNode extends Node {
     return t == Type.ANY || t == Type.XCTRL ? Type.ANY : Type.ALL; // For dead data errors return ANY (no error)
   }
   @Override public TypeMem live_use( GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ALIVE; }
-  @Override public ErrMsg err( boolean fast ) { return _err; }
+  @Override public ErrMsg err( boolean fast ) {
+    // While you might think we should ALWAYS report these, as their existence
+    // means the program is in-error - the program may have other earlier
+    // errors we want to report in preference to this one.  If any user
+    // has ANOTHER ALL/Err input, return null instead.
+    for( Node use : _uses )
+      for( Node def : use._defs )
+        if( def != null && def != this && def._val==Type.ALL )
+          return null;
+    return _err;
+  }
   @Override public int hashCode() { return super.hashCode()+_err.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

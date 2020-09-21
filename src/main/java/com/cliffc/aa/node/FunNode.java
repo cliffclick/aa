@@ -840,6 +840,8 @@ public class FunNode extends RegionNode {
       if( !(in(i) instanceof CProjNode) ) return Type.CTRL; // A constant control
       // Call might be alive and executing and calling many targets, just not this one.
       CallNode call = (CallNode)in(i).in(0);
+      if( call._val == Type.ALL )
+        return Type.CTRL;
       TypeFunPtr ttfp = CallNode.ttfpx(call._val);
       if( ttfp != null && !ttfp.above_center() && ttfp._fidxs.test_recur(_fidx) )
         return Type.CTRL;       // Call us

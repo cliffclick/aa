@@ -322,13 +322,17 @@ public class CallNode extends Node {
     Type ctl = ctl()._val;
     if( opt_mode!=GVNGCM.Mode.Parse && cepi()==null ) ctl = Type.XCTRL; // Dead from below
     if( ctl != Type.CTRL ) return ctl.oob();
-    final Type[] ts = Types.get(_defs._len+1);
-    ts[0] = Type.CTRL;
 
     // Not a memory to the call?
     Type mem = mem()._val;
     if( !(mem instanceof TypeMem) ) return mem.oob();
     TypeMem tmem = (TypeMem)mem;
+
+    // If GCP declares unresolved, fall to the NO-OP function & be an error.
+    if( _not_resolved_by_gcp ) return Type.ALL;
+    
+    final Type[] ts = Types.get(_defs._len+1);
+    ts[0] = Type.CTRL;
 
     // Copy args for called functions.  Arg0 is display, handled below.
     // Also gather all aliases from all args
@@ -343,7 +347,7 @@ public class CallNode extends Node {
     // Not a function to call?
     Type tfx = fun()._val;
     if( !(tfx instanceof TypeFunPtr) )
-      tfx = tfx.above_center() ? TypeFunPtr.GENERIC_FUNPTR.dual() : TypeFunPtr.GENERIC_FUNPTR;
+      tfx = tfx.oob(TypeFunPtr.GENERIC_FUNPTR);
     TypeFunPtr tfp = (TypeFunPtr)tfx;
     BitsFun fidxs = tfp.fidxs();
     if( !fidxs.is_empty() && fidxs.above_center()!=tfp._disp.above_center() )
@@ -417,7 +421,7 @@ public class CallNode extends Node {
     if( def==fun() ) {                         // Function argument
       if( def instanceof ThretNode ) return TypeMem.ALLMEM; // Always inlines eagerly, so this is always temporary
       if( !opt_mode._CG ) return TypeMem.ESCAPE; // Prior to GCP, assume all fptrs are alive and display escapes
-      if( _not_resolved_by_gcp ) return TypeMem.ESCAPE;// GCP failed to resolve, this call is in-error
+      if( _not_resolved_by_gcp ) return TypeMem.ALIVE;// GCP failed to resolve, this call is in-error
       // During GCP, unresolved calls might resolve & remove this use.  Keep dead till resolve fails.
       // If we have a fidx directly, use it more precisely.
       int dfidx = def instanceof FunPtrNode ? ((FunPtrNode)def).ret()._fidx : -1;
@@ -458,7 +462,8 @@ public class CallNode extends Node {
 
   TypeMem live_use_call( int dfidx ) {
     Type tcall = _val;
-    if( !(tcall instanceof TypeTuple) ) return tcall.above_center() ? TypeMem.DEAD : _live;
+    if( !(tcall instanceof TypeTuple) )
+      return tcall.above_center() ? TypeMem.DEAD : TypeMem.ESCAPE;
     TypeFunPtr tfp = ttfp(tcall);
     // If resolve has chosen this dfidx, then the FunPtr is alive.
     BitsFun fidxs = tfp.fidxs();
@@ -666,15 +671,20 @@ public class CallNode extends Node {
       if( arg(j).is_forward_ref() )
         return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[j], FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx));
 
+    if( mem()._val == Type.ALL ) return null; // Will be reported elsewhere
+    if( fun()._val == Type.ALL ) return null; // Will be reported elsewhere
+
     // Expect a function pointer
     TypeFunPtr tfp = ttfpx(_val);
     if( tfp==null ) {
+      if( fast ) return ErrMsg.FAST;
+      if( _not_resolved_by_gcp ) return ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
       Type t = _val;
       if( t instanceof TypeTuple ) {
         TypeTuple tt = (TypeTuple)t;
         t = tt.at(ARGIDX);
       }
-      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"A function is being called, but "+t+" is not a function type");
+      return ErrMsg.unresolved(_badargs[0],"A function is being called, but "+t+" is not a function type");
     }
 
     // Indirectly, forward-ref for function type
