@@ -18,9 +18,9 @@ public abstract class MemPrimNode extends PrimNode {
     Type tmem = mem()._val;
     Type tadr = adr()._val;
     Type tidx = _defs._len <= 3 ? Type.XNIL : idx()._val;
-    if( tmem==Type.ALL || tmem==Type.ANY ) return null; // An error, reported earlier
-    if( tadr==Type.ALL || tadr==Type.ANY ) return null; // An error, reported earlier
-    if( tidx==Type.ALL || tidx==Type.ANY ) return null; // An error, reported earlier
+    if( tmem==Type.ANY ) return null; // No error
+    if( tadr==Type.ANY ) return null; // No error
+    if( tidx==Type.ANY ) return null; // No error
     if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_badargs[1],"Array might be nil when reading",null);
     if( !(tadr instanceof TypeMemPtr) )
       throw com.cliffc.aa.AA.unimpl();

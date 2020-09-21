@@ -112,8 +112,6 @@ public class StoreNode extends Node {
   @Override public ErrMsg err( boolean fast ) {
     Type adr = adr()._val;
     Type mem = mem()._val;
-    if( mem == Type.ANY ) return null; // Might fall to good
-    if( mem == Type.ALL ) return null; // Error, but reported elsewhere
     if( adr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when writing",_fld);
     String msg = err0(adr,mem);
     if( msg == null ) return null;
@@ -121,7 +119,7 @@ public class StoreNode extends Node {
     return fast ? ErrMsg.FAST : ErrMsg.field(_bad,msg,_fld,closure,adr);
   }
   private String err0( Type adr, Type mem ) {
-    if( adr==Type.ANY ) return null;
+    if( adr==Type.ANY ) return null;                     // No error
     if( !(adr instanceof TypeMemPtr) ) return "Unknown"; // Too low, might not have any fields
     if( mem instanceof TypeMem )
       mem = ((TypeMem)mem).ld((TypeMemPtr)adr);

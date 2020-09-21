@@ -670,10 +670,6 @@ public class CallNode extends Node {
     for( int j=1; j<nargs(); j++ )
       if( arg(j).is_forward_ref() )
         return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[j], FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx));
-
-    if( mem()._val == Type.ALL ) return null; // Will be reported elsewhere
-    if( fun()._val == Type.ALL ) return null; // Will be reported elsewhere
-
     // Expect a function pointer
     TypeFunPtr tfp = ttfpx(_val);
     if( tfp==null ) {
@@ -694,16 +690,6 @@ public class CallNode extends Node {
     // bad-arg-count
     if( tfp._nargs != nargs() )
       return fast ? ErrMsg.FAST : ErrMsg.syntax(_badargs[0],"Passing "+(nargs()-1)+" arguments to "+tfp.names(false)+" which takes "+(tfp._nargs-1)+" arguments");
-
-    // If ANY args are ANY they will fail the arg check, BUT will be reported
-    // first where they became an ANY.
-    // Always allow Thunks to inline
-    if( !fast || (nargs()==3 && arg(2) instanceof ThretNode) )
-      for( int j=1; j<nargs(); j++ ) {
-        Type ta = arg(j)._val;
-        if( ta==Type.ANY || ta==Type.ALL )
-          return null;
-      }
 
     // Now do an arg-check.
     for( int j=1; j<nargs(); j++ ) {

@@ -195,14 +195,13 @@ public class LoadNode extends Node {
 
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;
-    if( tadr==Type.ALL ) return null; // Error already
     if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when reading",_fld);
     if( !(tadr instanceof TypeMemPtr) )
       return bad(fast); // Not a pointer nor memory, cannot load a field
     TypeMemPtr ptr = (TypeMemPtr)tadr;
     Type tmem = mem()._val;
-    if( tmem==Type.ALL ) return null; // An error, reported earlier
-    if( tmem==Type.ANY ) return null; // An error, reported earlier
+    if( tmem==Type.ALL ) return bad(fast);
+    if( tmem==Type.ANY ) return null; // No error
     TypeObj objs = tmem instanceof TypeMem
       ? ((TypeMem)tmem).ld(ptr) // General load from memory
       : ((TypeObj)tmem);
