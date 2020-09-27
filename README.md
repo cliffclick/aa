@@ -15,7 +15,7 @@ for speed.
 
 **Modern:** Statically typed.  Functional programming with full-strength type
 inference - types are everywhere optional.  Minimal syntax.  REPL
-(i.e. incremental static typing) and seperate compilation.  Typed C-style
+(i.e. incremental static typing) and separate compilation.  Typed C-style
 macros: most syntax errors in dead code are typed.
 
 My intent is a modern language that can be used where C or C++ is used: low-level
@@ -28,10 +28,10 @@ and all keywords removed.  The whole no-keywords thing is an experiment I may
 back away from; a primary goal is to be *readable* - sometimes keywords feel
 like clutter and sometimes they are an code-anchor for your scanning eye.
 
-I specifically intend to look at real-time constraints and the notion of Time
+I specifically intend to look at real-time constraints, and the notion of Time
 in a language.
 
-Part of modern coding is the use Garbage Collection and the structured use of
+Part of modern coding is the use of Garbage Collection, and the structured use of
 malloc/free - so I intend to add Rust-style memory management.
 
 Part of modern coding is the use of multiple cores, so I intend to explore a
@@ -182,10 +182,10 @@ Code            | Comment
 **Short circuit operators** | ---
 `0 && 2` | `0` Returns nil
 `1 && 2` | `2` Returns the non-nil result
-`0 && 1 || 2 && 3` | `3` `||` has lower precedence than `&&`
-`x:=y:=0; z=x++ && y++;(x,y,z)` | `(1,0,0)` increments x, but it starts zero, so y never increments
-`(x=1;x*x) && x+2` | `3` New variables defined in the first term available in both terms
-`1 && (x=2;0) || x+3 && x+4` | `'x' not defined prior to the short-circuit` New variables in the 2nd term are NOT available afterwards
+<code>0 && 1 &#124;&#124; 2 && 3</code> | `3` <code>&#124;&#124;</code> has lower precedence than `&&`
+`x:=y:=0; z=x++ && y++; (x,y,z)` | `(1,0,0)` increments x, but it starts zero, so y never increments
+`(x=1;x*x) && x+2` | `3` New variables defined in the first term available in both terms 
+<code>1 && (x=2;0) &#124;&#124; x+3 && x+4</code> | `'x' not defined prior to the short-circuit` New variables in the 2nd term are NOT available afterwards
 **Anonymous function definition** | ---
 `{x y -> x+y}`    | Types as a 2-arg function { int int -> int } or { flt flt -> flt }
 `{5}()`           | `5:int` No args nor `->` required; this is simply a no-arg function returning 5, being executed
@@ -387,23 +387,13 @@ incA();incB();incA(); getA()*10+getB()
 Returns: `2*10+1` or `21`.
 
 
-`for` is an ordinary variable
------------------------------
+`for` and `do` are ordinary variables
+-------------------------------------
 
-This version of `for` takes a `pred` predicate function and a `body` body
-function.  The predicate is executed and if it returns `nil` the for-loop
-returns `nil`.  Then the body is executed, and if it returns a truthy value,
-that is the for-loop's result, otherwise the loop repeats.  Early function exit
-works in the normal way for both `pred` and `body`.  To *continue*, do an early
-return from the body with nil: `^`.  To *break*, do an early return from the
-body with not-nil: `^1`.
+`do` takes a `pred` predicate function and a `body` function.  `pred` is tested
+on every iteration, and looping stops when false.  `body` is executed for
+side-effects.
 
-```C
-for={pred->{body->!pred()?^;(tmp=body())?^tmp; for pred body}};
-```
-
-Here is a version which ignores the `body` return and continues until the
-`pred` is false:
 ```C
 do={pred->{body->!pred()?^;body(); do pred body}};
 ```
@@ -418,6 +408,30 @@ do {i++ < #ary} {
 ary
 ```
 Returns `[int64]`, with the elements filled with the squares from 0 to 99.
+
+`for` also takes a `pred` a `body` function.  The predicate is executed and if
+it returns `nil` the for-loop returns `nil`.  Then the `body` is executed, and
+if it returns a truthy value, that is the for-loop's result, otherwise the loop
+repeats.  Early function exit works in the normal way for both `pred` and
+`body`.  To *continue*, do an early return from the body with nil: `^`.  To
+*break*, do an early return from the body with not-nil: `^1`.
+
+```C
+for={pred->{body->!pred()?^;(tmp=body())?^tmp; for pred body}};
+```
+
+Return the index of the element matching `e`, or -1 if not found:
+
+```C
+find = { ary e ->
+  i:=0;
+  idx = for { i++ < #ary }
+    {ary[i]==e ? i+1};  // if found, exit non-zero
+  idx-1                 // if nil exit, then not-found so -1. 
+}
+```
+
+
 
 
 
