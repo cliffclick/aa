@@ -115,7 +115,7 @@ public class ParmNode extends PhiNode {
     if( formal instanceof TypeMemPtr ) {
       BitsAlias aliases = ((TypeMemPtr)formal)._aliases;
       if( aliases==BitsAlias.FULL || aliases==BitsAlias.NZERO ) return formal;
-      if( aliases.isa(BitsAlias.RECORD_BITS0) ) return TypeMemPtr.OOP0.simple_ptr();
+      if( aliases.isa(BitsAlias.RECORD_BITS0) ) return TypeMemPtr.STRUCT.simple_ptr();
       if( aliases.isa(BitsAlias.    STRBITS0) ) return TypeMemPtr.STR0.simple_ptr();
       return TypeMemPtr.ARYPTR.simple_ptr();
     }

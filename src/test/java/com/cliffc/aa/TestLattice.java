@@ -1040,6 +1040,63 @@ public class TestLattice {
     test(o256);
   }
 
+  // Set {1} is the parent of {2,3}.
+  // Using just a {+1} means: pick any of 2 or 3.
+  // Using {2,3} means: pick any 2 AND pick any 3.
+  
+  // Cannot collapse {+1,+2,+3} into {+1}, because this does not return both a
+  // 2 and a 3.  Instead, since {+2,+3} "cover" {+1}, can remove the +1.
+  // Assume all tree-splits are complete, and only the primitives & Parse have
+  // more than 2 (otherwise fidx & alias splits are *splits* and make 2 from 1).
+  //
+  //          {+1}
+  //        {+2+3+4}
+  //  {+2+3} {+2+4}  {+3+4}    ### &2 meet {+3+4}
+  //  {+2}    {+3}     {+4}    ### &2&3 and &2&4
+  //  {&2}    {&3}     {&4}
+  //  {&2&3} {&2&4}  {&3&4}
+  //        {&2&3&4}
+  //          {&1}
+  @Test public void testLattice12a() {
+    N.reset();
+    N _1  = new N("{&1}");
+    N _234= new N("{&2&3&4}",_1);
+
+    N _23 = new N("{&2&3}",_234);
+    N _24 = new N("{&2&4}",_234);
+    N _34 = new N("{&3&4}",_234);
+
+    N _2   = new N("&2",_23,_24);
+    N _3   = new N("&3",_23,_34);
+    N _4   = new N("&4",_24,_34);
+
+    N x2   = new N("+2",_2);
+    N x3   = new N("+3",_3);
+    N x4   = new N("+4",_4);
+
+    N x23 = new N("{+2+3}",x2,x3);
+    N x24 = new N("{+2+4}",x2,x4);
+    N x34 = new N("{+3+4}",x3,x4);
+
+    N x234= new N("{+2+3+4}",x23,x24,x34);
+    
+    N x1  = new N("{+1}",x234);
+
+    // Mark the non-centerline duals
+    x234.set_dual(_234);
+    x23 .set_dual(_23 );
+    x24 .set_dual(_24 );
+    x34 .set_dual(_34 );
+
+    x2  .set_dual(_2  );
+    x3  .set_dual(_3  );
+    x4  .set_dual(_4  );
+
+    x1  .set_dual(_1  );
+
+    test(x1);
+  }
+
   // Same as testLattice12, except 6 is now nil... which is on the centerline.
   // Not a lattice, although testLattice12 IS.
   // This implies I need a sign-nil: unsigned nil sits on the centerline.
@@ -1439,5 +1496,4 @@ public class TestLattice {
   // Same question for 0:int.meet(0:int) and 0:flt.meet(0:int).  And then the
   // same question for: 0:int.meet([0]->obj)?
   //
-
 }

@@ -524,10 +524,10 @@ public class TestNodeSmall {
       TypeInt.INT64,
       TypeInt.INT64.dual(),
       TypeInt.NINT64,
-      TypeMemPtr.ABCPTR,
-      TypeMemPtr.ABCPTR.dual(),
-      TypeMemPtr.make(a1,TypeObj.OBJ),
-      TypeMemPtr.make(a1,TypeObj.OBJ).dual(),
+      TypeMemPtr.ABCPTR.simple_ptr(),
+      TypeMemPtr.ABCPTR.dual().simple_ptr(),
+      TypeMemPtr.make(a1,TypeObj.OBJ).simple_ptr(),
+      TypeMemPtr.make(a1,TypeObj.OBJ).dual().simple_ptr(),
     };
 
     // One-off jig for testing single combo
@@ -571,14 +571,15 @@ public class TestNodeSmall {
   // Check that the Parm.value calls for these incoming args are monotonic, and
   // within the sig bounds.
   private static Type[] check( GVNGCM gvn, TypeFunSig tsig, TypeMem tmem, Type targ1, Type targ2 ) {
-
+    assert targ1.simple_ptr()==targ1;
+    assert targ2.simple_ptr()==targ2;
     ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
     CallNode call = gvn.init(new CallNode(true, null, ctl, null, null, null, null));
     CallEpiNode cepi = gvn.init(new CallEpiNode(call, Env.DEFMEM)); // Unwired
     Node cpj = gvn.xform(new CProjNode(call,0));
     ConNode mem = (ConNode)gvn.xform(new ConNode<>(tmem ));
-    ConNode arg1= (ConNode)gvn.xform(new ConNode<>(targ1.simple_ptr()));
-    ConNode arg2= (ConNode)gvn.xform(new ConNode<>(targ2.simple_ptr()));
+    ConNode arg1= (ConNode)gvn.xform(new ConNode<>(targ1));
+    ConNode arg2= (ConNode)gvn.xform(new ConNode<>(targ2));
 
     // Make nodes
     FunNode fun = new FunNode("fun",tsig,-1,false);
