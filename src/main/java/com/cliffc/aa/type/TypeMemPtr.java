@@ -85,7 +85,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeMemPtr STRUCT = make(BitsAlias.RECORD_BITS ,TypeStruct.ALLSTRUCT);
   public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECORD_BITS0,TypeStruct.ALLSTRUCT);
   public  static final TypeMemPtr NILPTR = make(BitsAlias.NIL,TypeObj.ISUSED);
-  public  static final TypeMemPtr NO_DISP= make(BitsAlias.NIL,TypeStr.NO_DISP); // Above [0]->obj, below center
+  public  static final TypeMemPtr NO_DISP= NILPTR;
   public  static final TypeMemPtr EMTPTR = make(BitsAlias.EMPTY,TypeObj.UNUSED);
   public  static final TypeMemPtr DISP_SIMPLE= make(BitsAlias.RECORD_BITS0,TypeObj.ISUSED); // closed display
   public  static final TypeMemPtr USE0   = make(BitsAlias.FULL    ,TypeObj.ISUSED); // Includes nil
@@ -140,7 +140,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   }
   // Widens, not lowers.
   @Override public Type simple_ptr() {
-    if( _obj==TypeObj.ISUSED || _obj==TypeObj.UNUSED || _obj==TypeStr.NO_DISP ) return this;
+    if( _obj==TypeObj.ISUSED || _obj==TypeObj.UNUSED ) return this;
     return make(_aliases,_aliases.above_center() ? TypeObj.UNUSED : TypeObj.ISUSED);
   }
   @Override public boolean above_center() {

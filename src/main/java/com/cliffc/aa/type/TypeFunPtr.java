@@ -149,7 +149,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public boolean is_con()       { return false; }
   // Basically, a constant fidx that may be split.
   public boolean can_be_fpnode() {
-    return (_disp==TypeFunPtr.NO_DISP || _disp._obj==TypeStr.NO_DISP) && // No display
+    return _disp==TypeFunPtr.NO_DISP && // No display
       // Single function
       _fidxs.abit() > 1 && !BitsFun.is_parent(_fidxs.abit());
   }

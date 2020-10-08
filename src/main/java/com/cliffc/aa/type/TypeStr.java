@@ -33,6 +33,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   @Override protected TypeStr free( TypeStr ret ) { FREE=this; return ret; }
   public static TypeStr make( boolean any, String con ) { return make("",any,con); }
   public static TypeStr make( String name, boolean any, String con ) {
+    assert con==null || !any;
     TypeStr t1 = FREE;
     if( t1 == null ) t1 = new TypeStr(name,any,con);
     else {   FREE = null;     t1.init(name,any,con); }
@@ -46,14 +47,13 @@ public class TypeStr extends TypeObj<TypeStr> {
   public  static final TypeStr  STR = make(false,null);  // not null
   public  static final TypeStr XSTR = STR.dual();        // choice string
   public  static final TypeStr  ABC = make(false,"abc"); // a string constant
-  public  static final TypeStr NO_DISP=make(false,"no_disp"); // a string constant
   private static final TypeStr  DEF = con("def"); // a string constant
   static final TypeStr[] TYPES = new TypeStr[]{STR,XSTR,ABC,DEF};
   static void init1( HashMap<String,Type> types ) { types.put("str",STR); }
   // Return a String from a TypeStr constant; assert otherwise.
   @Override public String getstr() { assert _con!=null; return _con; }
 
-  @Override protected TypeStr xdual() { return new TypeStr(_name, !_any,_con); }
+  @Override protected TypeStr xdual() { return _con == null ? new TypeStr(_name, !_any,_con) : this; }
   @Override TypeStr rdual() {
     if( _dual != null ) return _dual;
     TypeStr dual = _dual = xdual();
