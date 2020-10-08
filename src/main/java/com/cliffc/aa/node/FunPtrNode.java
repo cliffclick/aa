@@ -42,7 +42,7 @@ public final class FunPtrNode extends Node {
     if( display().in(0) instanceof NewNode ) {
       NewNode nn = (NewNode)display().in(0);
       if( nn._ts==nn.dead_type() )
-        return set_def(1,gvn.con(TypeMemPtr.make(nn._tptr._aliases,TypeStr.NO_DISP)),gvn); // No display needed
+        return set_def(1,gvn.con(TypeMemPtr.make(nn._tptr._aliases,TypeObj.UNUSED)),gvn); // No display needed
     }
 
     // Remove unused displays.  Track uses; Calls with no FPClosure are OK.
@@ -60,7 +60,7 @@ public final class FunPtrNode extends Node {
       }
       if( safe ) {              // No unsafe users; nuke display
         TypeMemPtr tdisp = (TypeMemPtr)display()._val;
-        return set_def(1,gvn.con(tdisp.make_from(TypeStr.NO_DISP)),gvn); // No display needed
+        return set_def(1,gvn.con(tdisp.make_from(TypeObj.UNUSED)),gvn); // No display needed
       }
     }
 

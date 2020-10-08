@@ -331,7 +331,7 @@ public class FunNode extends RegionNode {
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
       Type[] sig = Types.get(parms.length);
       sig[0] = parms[0]==null
-        ? _sig.display().make_from(TypeStr.NO_DISP)
+        ? _sig.display().simple_ptr()
         : parms[0].val(idx);
       for( int i=1; i<parms.length; i++ ) // 0 for display
         sig[i] = parms[i]==null ? Type.SCALAR : parms[i].val(idx).widen();

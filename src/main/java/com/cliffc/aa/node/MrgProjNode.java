@@ -51,8 +51,8 @@ public class MrgProjNode extends ProjNode {
     NewNode nnn = nnn();
     Type tn = nnn._val;
     Type tm = mem()._val;
-    if( !(tn instanceof TypeTuple) ) return tn.oob();
     if( !(tm instanceof TypeMem  ) ) return tm.oob();
+    if( !(tn instanceof TypeTuple) ) return tn.oob();
     TypeObj to = (TypeObj)((TypeTuple)tn).at(0);
     TypeMem tmem = (TypeMem)tm;
     return nnn.is_unused()      // This is a cycle-breaking lifting value
