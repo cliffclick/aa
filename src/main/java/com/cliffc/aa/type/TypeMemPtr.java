@@ -84,10 +84,12 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeMemPtr ABC0   = make(ABCPTR._aliases.meet_nil(),TypeStr.ABC);
   public  static final TypeMemPtr STRUCT = make(BitsAlias.RECORD_BITS ,TypeStruct.ALLSTRUCT);
   public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECORD_BITS0,TypeStruct.ALLSTRUCT);
+  public  static final TypeMemPtr NILPTR = make(BitsAlias.NIL,TypeObj.ISUSED);
   public  static final TypeMemPtr NO_DISP= make(BitsAlias.NIL,TypeStr.NO_DISP); // Above [0]->obj, below center
+  public  static final TypeMemPtr EMTPTR = make(BitsAlias.EMPTY,TypeObj.UNUSED);
   public  static final TypeMemPtr DISP_SIMPLE= make(BitsAlias.RECORD_BITS0,TypeObj.ISUSED); // closed display
   public  static final TypeMemPtr USE0   = make(BitsAlias.FULL    ,TypeObj.ISUSED); // Includes nil
-  static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,NO_DISP};
+  static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,NO_DISP,EMTPTR};
 
   @Override public boolean is_display_ptr() {
     BitsAlias x = _aliases.strip_nil();
@@ -139,7 +141,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   // Widens, not lowers.
   @Override public Type simple_ptr() {
     if( _obj==TypeObj.ISUSED || _obj==TypeObj.UNUSED || _obj==TypeStr.NO_DISP ) return this;
-    return make(_aliases,_obj.oob(TypeObj.ISUSED));
+    return make(_aliases,_aliases.above_center() ? TypeObj.UNUSED : TypeObj.ISUSED);
   }
   @Override public boolean above_center() {
     return _aliases.above_center();
@@ -171,7 +173,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     //    [~0]->~obj ==>  XNIL  ==>  [0]->~obj
     //    [~0]-> obj ==>   NIL  ==>  [0]-> obj
 
-    if( _aliases.isa(BitsAlias.NIL.dual()) ) {
+    if( _aliases.isa(BitsAlias.XNIL) ) {
       if( _obj.above_center() && nil==XNIL )  return XNIL;
       if( nil==NIL ) return NIL;
     }

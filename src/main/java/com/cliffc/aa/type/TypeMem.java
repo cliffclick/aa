@@ -303,7 +303,7 @@ public class TypeMem extends Type<TypeMem> {
     if( this==EMPTY ) return TypeObj.XOBJ;
     return ld(_pubs,ptr._aliases);
   }
-  static TypeObj ld( TypeObj[] tos, BitsAlias aliases ) {
+  private static TypeObj ld( TypeObj[] tos, BitsAlias aliases ) {
     boolean any = aliases.above_center();
     // Any alias, plus all of its children, are meet/joined.  This does a
     // tree-based scan on the inner loop.
@@ -361,15 +361,12 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Slice memory by aliases; unnamed aliases are replaced with ~use.
-  public TypeMem slice_reaching_aliases(BitsAlias aliases) { return slice_reaching_aliases(aliases,at(1),TypeObj.UNUSED); }
-  public TypeMem slice_reaching_aliases(BitsAlias aliases, TypeObj base, TypeObj unuse) {
+  public TypeMem slice_reaching_aliases(BitsAlias aliases) {
     if( aliases==BitsAlias.FULL ) return this;
     TypeObj[] tos = new TypeObj[Math.max(_pubs.length,aliases.max()+1)];
-    tos[1]=base;
-    for( int i=2; i<tos.length; i++ ) {
-      TypeObj to = at(i);
-      tos[i] = aliases.test_recur(i) || to==TypeObj.UNUSED ? to : unuse;
-    }
+    tos[1] = at(1);
+    for( int i=2; i<tos.length; i++ )
+      tos[i] = aliases.test_recur(i) ? at(i) : TypeObj.UNUSED;
     return make0(tos);
   }
 

@@ -76,7 +76,7 @@ public final class CallEpiNode extends Node {
           !fun.noinline() ) {           // And not turned off
         assert fun.in(1).in(0)==call;   // Just called by us
         fun.set_is_copy(gvn);
-        return inline(gvn,level, call, ret.ctl(), ret.mem(), ret.val(), null/*do not unwire, because using the entire function body inplace*/);
+        return inline(gvn,level, call, ret.ctl(), ret.mem(), ret.val(), null/*do not unwire, because using the entire function body inplace*/,call._uid);
       }
     }
 
@@ -84,7 +84,7 @@ public final class CallEpiNode extends Node {
     if( call.fun() instanceof ThretNode ) {
       ThretNode tret = (ThretNode)call.fun();
       wire1(gvn,call,tret.thunk(),tret);
-      return inline(gvn,level, call, tret.ctrl(), tret.mem(), tret.rez(), null/*do not unwire, because using the entire function body inplace*/);
+      return inline(gvn,level, call, tret.ctrl(), tret.mem(), tret.rez(), null/*do not unwire, because using the entire function body inplace*/,call._uid);
     }
 
     // Only inline wired single-target function with valid args.  CallNode wires.
@@ -137,11 +137,11 @@ public final class CallEpiNode extends Node {
 
     // Check for zero-op body (id function)
     if( rrez instanceof ParmNode && rrez.in(0) == fun && cmem == rmem )
-      return inline(gvn,level,call, cctl,cmem,call.arg(((ParmNode)rrez)._idx), ret);
+      return inline(gvn,level,call, cctl,cmem,call.arg(((ParmNode)rrez)._idx), ret,call._uid);
     // Check for constant body
     Type trez = rrez._val;
     if( trez.is_con() && rctl==fun && cmem == rmem)
-      return inline(gvn,level,call, cctl,cmem,gvn.con(trez),ret);
+      return inline(gvn,level,call, cctl,cmem,gvn.con(trez),ret,call._uid);
 
     // Check for a 1-op body using only constants or parameters and no memory effects
     boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem;
@@ -159,7 +159,7 @@ public final class CallEpiNode extends Node {
       for( Node parm : rrez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? call.argm(((ParmNode)parm)._idx,gvn) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
-      return inline(gvn,level,call, cctl,cmem,gvn.add_work(gvn.xform(irez)),ret); // New exciting replacement for inlined call
+      return inline(gvn,level,call, cctl,cmem,gvn.add_work(gvn.xform(irez)),ret,call._uid); // New exciting replacement for inlined call
     }
 
     return null;
@@ -337,7 +337,7 @@ public final class CallEpiNode extends Node {
     // Build epilog memory.
 
     // Approximate "live out of call", includes things that are alive before
-    // the call but not flowing in.  Catchs all the "new in call" returns.
+    // the call but not flowing in.  Catches all the "new in call" returns.
     BitsAlias esc_out = esc_out(post_call,trez);
     TypeObj[] pubs = new TypeObj[defnode._defs._len];
     for( int i=1; i<pubs.length; i++ ) {
@@ -363,11 +363,11 @@ public final class CallEpiNode extends Node {
   private static TypeObj live_out_gcp(boolean esc_in, boolean esc_out, TypeObj pre, TypeObj post, GVNGCM.Mode opt_mode, Node dn ) {
     if( dn == null ) return null; // A never-made (on this pass) type
     Type tdn = dn._val;           // Get default type
-    if( tdn == TypeObj.UNUSED || tdn == TypeObj.ANY ) return TypeObj.UNUSED; // If dead, then dead
     // Decide to take the pre-call or post-call value.
     TypeObj to = esc_in || esc_out ? (TypeObj)post.meet(pre) : pre;
     // After/During GCP, this is the value
     if( opt_mode._CG ) return to;
+    if( tdn == TypeObj.UNUSED || tdn == TypeObj.ANY ) return TypeObj.UNUSED; // If dead, then dead
     // Before GCP, must use DefNode to keep types as strong as the Parser.
     if( !(dn instanceof MrgProjNode) ) // Some kind of constant.
       // TODO: Probably should just jam down mrgproj/new for these constants
@@ -397,9 +397,11 @@ public final class CallEpiNode extends Node {
   // nodes are replaced with the called function 'leafs'.  Memory must maintain
   // the knowledge of the escape/no-escape split, so the entire inlined body is
   // visited to "lower" the types.
-  private Node inline( GVNGCM gvn, int level, CallNode call, Node ctl, Node mem, Node rez, RetNode ret ) {
+  private Node inline( GVNGCM gvn, int level, CallNode call, Node ctl, Node mem, Node rez, RetNode ret, int cuid ) {
     assert (level&1)==0; // Do not actually inline, if just checking that all forward progress was found
     assert nwired()==0 || nwired()==1; // not wired to several choices
+    if( FunNode._must_inline == cuid ) // Assert an expected inlining happens
+      FunNode._must_inline = 0;
     // Unwire any wired called function
     if( ret != null && nwired() == 1 && !ret.is_copy() ) // Wired, and called function not already collapsing
       unwire(gvn,call,ret);
@@ -489,7 +491,7 @@ public final class CallEpiNode extends Node {
       FunNode fun = ret.fun();
       for( int i = 1; i < fun._defs._len; i++ ) // Unwire
         if( fun.in(i).in(0) == call ) {
-          gvn.set_def_reg(fun, i, gvn.con(Type.XCTRL));
+          gvn.set_def_reg(fun, i, Env.XCTRL);
           break;
         }
       gvn.add_work_uses(fun);

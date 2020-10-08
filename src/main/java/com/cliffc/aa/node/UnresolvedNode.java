@@ -10,7 +10,7 @@ import com.cliffc.aa.util.Util;
 import java.util.Arrays;
 
 public class UnresolvedNode extends Node {
-  private Parse _bad;
+  private final Parse _bad;
   UnresolvedNode( Parse bad, Node... funs ) { super(OP_UNR,funs); _bad = bad; }
   @Override String xstr() {
     if( is_dead() ) return "DEAD";

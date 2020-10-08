@@ -270,7 +270,7 @@ public class TestNodeSmall {
     TypeFunPtr tint1 = v(aint,gvn), tint1X = tint1.dual();
     TypeFunPtr tstr1 = v(astr,gvn), tstr1X = tstr1.dual();
 
-    TypeFunPtr tmul1E = TypeFunPtr.make(BitsFun.EMPTY,1,TypeFunPtr.NO_DISP); // All bad choices
+    TypeFunPtr tmul1E = TypeFunPtr.make(BitsFun.EMPTY,0,TypeFunPtr.NO_DISP); // All bad choices
 
     assert tadd1X.isa(tnum1X) && tnum1X.isa(tflt1X) && tflt1X.isa(tnum1) && tnum1.isa(tadd1);
 
@@ -533,7 +533,8 @@ public class TestNodeSmall {
     // One-off jig for testing single combo
     Type[] rez1 = check(gvn,sigs[2],mems[1],args[0],args[6]);
     Type[] rez2 = check(gvn,sigs[2],mems[1],args[0],args[7]);
-    assertTrue(rez1[2].isa(rez2[2]));
+    for( int k=0; k<rez1.length; k++ )
+      assertTrue(rez1[k].isa(rez2[k]));
 
 
     // Call for all combos.

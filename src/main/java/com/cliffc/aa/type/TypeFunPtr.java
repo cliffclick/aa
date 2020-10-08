@@ -45,7 +45,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     if( _fidxs!=tf._fidxs || _nargs != tf._nargs ) return false;
     return _disp==tf._disp || _disp.cycle_equals(tf._disp);
   }
-  
+
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     if( debug ) sb.p('_').p(_uid);
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
@@ -103,7 +103,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public static TypeMemPtr NO_DISP = TypeMemPtr.NO_DISP;
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,1,TypeMemPtr.DISP_SIMPLE);
-  public  static final TypeFunPtr EMPTY = make(BitsFun.EMPTY,1,NO_DISP);
+  public  static final TypeFunPtr EMPTY  = make(BitsFun.EMPTY,0,NO_DISP);
+  public  static final TypeFunPtr NILPTR = make(BitsFun.NIL  ,0,NO_DISP);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,EMPTY};
 
   @Override protected TypeFunPtr xdual() { return new TypeFunPtr(_fidxs.dual(),_nargs,_disp.dual()); }
@@ -133,9 +134,9 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     }
     TypeFunPtr tf = (TypeFunPtr)t;
     BitsFun fidxs = _fidxs.meet(tf._fidxs);
-    TypeFunPtr min_tf = _nargs < tf._nargs ? this : tf;
-    TypeFunPtr max_tf = _nargs < tf._nargs ? tf : this;
-    int nargs = (min_tf.above_center() || _fidxs==BitsFun.EMPTY) ? max_tf._nargs : min_tf._nargs;
+    TypeFunPtr min_nargs = _nargs < tf._nargs ? this : tf;
+    TypeFunPtr max_nargs = _nargs < tf._nargs ? tf : this;
+    int nargs = min_nargs.above_center() ? max_nargs._nargs : min_nargs._nargs;
     return make(fidxs,nargs,(TypeMemPtr)_disp.meet(tf._disp));
   }
 
@@ -150,7 +151,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public boolean can_be_fpnode() {
     return (_disp==TypeFunPtr.NO_DISP || _disp._obj==TypeStr.NO_DISP) && // No display
       // Single function
-      _fidxs.abit() > 1 && !BitsAlias.is_parent(_fidxs.abit());
+      _fidxs.abit() > 1 && !BitsFun.is_parent(_fidxs.abit());
   }
   @Override public boolean must_nil() { return _fidxs.test(0) && !_fidxs.above_center(); }
   @Override public boolean may_nil() { return _fidxs.may_nil(); }

@@ -125,7 +125,7 @@ public class Parse implements Comparable<Parse> {
       if( !use.is_prim() ) {
         assert use instanceof FunNode;
         assert use.in(1)==Env.ALL_CTRL;
-        _gvn.set_def_reg(use,1,con(Type.XCTRL));
+        _gvn.set_def_reg(use,1,Env.XCTRL);
         i--;
       }
     }
@@ -989,7 +989,7 @@ public class Parse implements Comparable<Parse> {
     ctrl.add_def(ctrl());
     mem .add_def(mem ());
     val .add_def(rez   );
-    set_ctrl(con(Type.XCTRL  ));
+    set_ctrl(Env.XCTRL);
     set_mem (con(TypeMem.XMEM));
     return   con(Type.XNIL   ) ;
   }

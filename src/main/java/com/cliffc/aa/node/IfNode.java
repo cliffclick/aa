@@ -77,7 +77,7 @@ public class IfNode extends Node {
   @Override public Node is_copy(int idx) {
     if( !(_val instanceof TypeTuple) ) return null;
     TypeTuple tt = (TypeTuple)_val;
-    if( tt==TypeTuple.IF_ANY ) return Env.GVN.con(Type.XCTRL);
+    if( tt==TypeTuple.IF_ANY ) return Env.XCTRL;
     if( tt==TypeTuple.IF_TRUE  && idx==1 ) return in(0);
     if( tt==TypeTuple.IF_FALSE && idx==0 ) return in(0);
     return null;

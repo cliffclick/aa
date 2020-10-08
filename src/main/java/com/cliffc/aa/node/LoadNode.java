@@ -95,7 +95,9 @@ public class LoadNode extends Node {
     if( !(tmem0 instanceof TypeMem) || aliases==null ) return null;
     TypeMem tmem = (TypeMem)tmem0;
     // Walk up the memory chain looking for an exact matching Store or New
+    int cnt=0;
     while(true) {
+      assert cnt++ < 100; // Infinite loop?
       if( mem instanceof StoreNode ) {
         StoreNode st = (StoreNode)mem;
         if( Util.eq(st._fld,fld) ) {

@@ -5,6 +5,8 @@ import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
 
+import java.util.function.Predicate;
+
 // Program execution start
 public class StartNode extends Node {
   public StartNode() { super(OP_START); }
@@ -17,4 +19,5 @@ public class StartNode extends Node {
   // a new constant.  A better answer is to make new constants appear with the
   // same liveness as their users.
   @Override public TypeMem live(GVNGCM.Mode opt_mode) { return TypeMem.ESCAPE; }
+  @Override Node walk_dom_last( Predicate<Node> P) { return null; }
 }

@@ -419,7 +419,7 @@ public class GVNGCM {
 
     // [ts!] Put updated types into table for use by ideal()
     if( nval!=oval ) {
-      assert nval.isa(oval);       // Monotonically improving
+      assert nval.isa(oval);    // Monotonically improving
       n._val = nval;
     }
     // [ts!] Replace with a constant, if possible.  This is also very cheap
@@ -703,7 +703,7 @@ public class GVNGCM {
     add_work(fptr.in(0));
     assert Env.START.more_flow(this,new VBitSet(),false,0)==0; // Post conditions are correct
   }
-  
+
   private void check_and_wire( CallEpiNode cepi ) {
     if( !cepi.check_and_wire(this) ) return;
     add_work(cepi.call().fun());

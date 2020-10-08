@@ -67,6 +67,7 @@ public class FunNode extends RegionNode {
   public final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
   public final boolean _thunk_rhs;
   private byte _cnt_size_inlines; // Count of size-based inlines
+  static int _must_inline;        // Used for asserts
 
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
@@ -248,6 +249,7 @@ public class FunNode extends RegionNode {
       return null;              // Done this before
 
     assert level==2; // Do not actually inline, if just checking that all forward progress was found
+    if( path > 0 ) _must_inline = in(path).in(0)._uid;
 
     // --------------
     // Split the callers according to the new 'fun'.
@@ -699,7 +701,7 @@ public class FunNode extends RegionNode {
             parm.set_def(1,parm._idx==-2 ? Env.DEFMEM : gvn.con(fun.formal(parm._idx)),gvn);
           }
       } else                     // Path Split
-        fun.set_def(1,gvn.con(Type.XCTRL),gvn);
+        fun.set_def(1,Env.XCTRL,gvn);
     }
 
     // Put all new nodes into the GVN tables and worklist
@@ -833,7 +835,7 @@ public class FunNode extends RegionNode {
     // EpilogNode gets visited during GCP
     if( is_forward_ref() ) return Type.CTRL;
     if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
-    if( in(0)==this ) return val(1); // is_copy
+    if( in(0)==this ) return _defs._len>=2 ? val(1) : Type.XCTRL; // is_copy
     for( int i=1; i<_defs._len; i++ ) {
       Type c = val(i);
       if( c != Type.CTRL && c != Type.ALL ) continue; // Not control

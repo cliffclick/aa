@@ -24,7 +24,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   @Override public Tree<BitsAlias> tree() { return TREE; }
   public static final int ALL, AARY, STR, RECORD, ABC, ARY;
   public static BitsAlias RECORD_BITS, STRBITS0;
-  public static BitsAlias FULL, NZERO, ANY, EMPTY, NIL, STRBITS, RECORD_BITS0, ARYBITS;
+  public static BitsAlias FULL, NZERO, ANY, EMPTY, NIL, XNIL, STRBITS, RECORD_BITS0, ARYBITS;
 
   static {
     // The All-Memory alias class
@@ -33,6 +33,7 @@ public class BitsAlias extends Bits<BitsAlias> {
     FULL = NZERO.meet_nil();    // All aliases, with a low nil
     ANY = FULL.dual();          // Precompute dual
     NIL = make0(0);             // Ugly but NIL has a dual, and this is "low" NIL
+    XNIL = NIL.dual();          // 
     EMPTY = NZERO.make();       // No bits; its its own dual
     // Split All-Memory into Records/Tuples/Structs and Arrays (including Strings).
     // Everything falls into one of these two camps.

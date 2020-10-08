@@ -60,7 +60,7 @@ public class PhiNode extends Node {
     assert r._defs._len==_defs._len;
     Type t = Type.ANY;
     for( int i=1; i<_defs._len; i++ )
-      if( r.val(i)!=Type.XCTRL ) // Only meet alive paths
+      if( r.val(i)!=Type.XCTRL && r.val(i)!=Type.ANY ) // Only meet alive paths
         t = t.meet(val(i));
     return t;
   }

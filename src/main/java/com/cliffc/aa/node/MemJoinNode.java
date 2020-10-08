@@ -115,7 +115,6 @@ public class MemJoinNode extends Node {
     // nothing overlaps this is unambiguous.
     Ary<BitsAlias> escs = msp()._escs;
     TypeObj[] pubs = new TypeObj[Env.DEFMEM._defs._len];
-    TypeObj[] prvs = new TypeObj[Env.DEFMEM._defs._len];
     for( int alias=1, i; alias<Env.DEFMEM._defs._len; alias++ ) {
       if( escs.at(0).test_recur(alias) ) { // In some RHS set
         for( i=1; i<_defs._len; i++ )

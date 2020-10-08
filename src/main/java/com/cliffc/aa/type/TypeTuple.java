@@ -51,7 +51,6 @@ public class TypeTuple extends Type<TypeTuple> {
 
   private static TypeTuple FREE=null;
   @Override protected TypeTuple free( TypeTuple ret ) { FREE=this; return ret; }
-  @SuppressWarnings("unchecked")
   public static TypeTuple make0( boolean any, Type[] ts ) {
     ts = Types.hash_cons(ts);
     TypeTuple t1 = FREE;
@@ -92,7 +91,6 @@ public class TypeTuple extends Type<TypeTuple> {
 
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.
-  @SuppressWarnings("unchecked")
   @Override protected TypeTuple xdual() {
     Type[] ts = Types.get(_ts.length);
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].dual();
@@ -116,8 +114,7 @@ public class TypeTuple extends Type<TypeTuple> {
     Type[] ts = Types.get(len);
     for( int i=0; i<_ts.length; i++ )  ts[i] = _ts[i].meet(tmax._ts[i]);
     // Elements only in the longer tuple.
-    for( int i=_ts.length; i<len; i++ )
-      ts[i] = tmax._ts[i];
+    if( len > _ts.length ) System.arraycopy(tmax._ts, _ts.length, ts, _ts.length, len - _ts.length);
     return make0(_any&tmax._any,ts);
   }
 
@@ -145,7 +142,7 @@ public class TypeTuple extends Type<TypeTuple> {
   @Override public boolean must_nil() { return false; }
   @Override Type not_nil() { return this; }
   @Override public Type meet_nil(Type t) { throw AA.unimpl(); }
-  
+
   public TypeTuple sharptr( TypeMem mem ) {
     Type[] ts = Types.clone(_ts);
     for( int i=0; i<ts.length; i++ )
@@ -157,19 +154,6 @@ public class TypeTuple extends Type<TypeTuple> {
     for( int i=0; i<ts.length; i++ )
       ts[i] = ts[i].simple_ptr();
     return make0(_any,ts);
-  }
-
-  // Return true if this is a function pointer (return type from EpilogNode)
-  // 0 - Control for the function
-  // 1 - Return memory type, as implemented
-  // 2 - Return type of the function as implemented
-  // 3 - RPC (set of callers)
-  final boolean is_fun() {
-    return _ts.length==4 &&
-     (_ts[0]==CTRL || _ts[0]==XCTRL) &&
-      _ts[1] instanceof TypeMem &&
-      _ts[2].isa(SCALAR) &&
-      _ts[3] instanceof TypeRPC;
   }
 
   // True if isBitShape on all bits

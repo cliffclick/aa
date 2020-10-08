@@ -1151,11 +1151,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( dull_cache.get(dull._aliases) != null ) return;
     if( dull==TypeMemPtr.NO_DISP || dull==TypeMemPtr.NO_DISP.dual() ) { mem.sharput(dull,dull); return; }
     // Walk and meet "dull" fields; all TMPs will point to ISUSED (hence are dull).
-    Type t = TypeObj.UNUSED;
+    boolean any = dull._aliases.above_center();
+    Type t = any ? TypeObj.ISUSED : TypeObj.UNUSED;
     for( int alias : dull._aliases )
       if( alias != 0 )
-        for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
-          t = t.meet(mem.at(kid));
+        for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) ) {
+          TypeObj x = mem.at(kid);
+          t = any ? t.join(x) : t.meet(x);
+        }
     TypeMemPtr dptr = dull.make_from((TypeObj)t);
     if( _is_sharp(t) ) {        // If sharp, install and return
       mem.sharput(dull,dptr);

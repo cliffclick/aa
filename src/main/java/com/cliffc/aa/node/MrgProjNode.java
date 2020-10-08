@@ -14,13 +14,12 @@ public class MrgProjNode extends ProjNode {
   @Override public Node ideal(GVNGCM gvn, int level) {
     NewNode nnn = nnn();
     Node mem = mem();
-    boolean doe = false;        // Dead-On-Entry
     Type t = mem._val;
-    if( t instanceof TypeMem && ((TypeMem)t).at(nnn._alias)==TypeObj.UNUSED )
-      doe = true;               // Dead-On-Entry
+    // Alias is dead-on-entry.  Then this MrgPrj no longer lifts
+    boolean doe = t instanceof TypeMem && ((TypeMem)t).at(nnn._alias)==TypeObj.UNUSED;
 
     if( doe && nnn.is_unused() ) // New is dead for no pointers
-      return mem;
+      return mem;                // Kill MrgNode when it no longer lifts values
 
     // New is dead from below.
     if( _live.at(nnn._alias)==TypeObj.UNUSED && nnn._keep==0 && !nnn.is_unused() ) {
@@ -28,8 +27,6 @@ public class MrgProjNode extends ProjNode {
       nnn.kill(gvn);    // Killing a NewNode has to do more updates than normal
       return this;
     }
-    if( doe && nnn.is_unused() )
-      return mem;               // Kill MrgNode when it no longer lifts values
 
     // Look for back-to-back unrelated aliases and Split/Join
     Node head2 = MemJoinNode.find_sese_head(mem);
@@ -46,7 +43,7 @@ public class MrgProjNode extends ProjNode {
       gvn.set_def_reg(Env.DEFMEM,nnn._alias,mprj);
       return mjn;
     }
-    
+
     return null;
   }
   @Override public Type value(GVNGCM.Mode opt_mode) {

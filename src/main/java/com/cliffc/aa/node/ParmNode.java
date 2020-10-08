@@ -42,7 +42,7 @@ public class ParmNode extends PhiNode {
     if( fun.noinline() ) return null; // Do not fold up, because asked not to.
 
     // TODO: Relax this
-    // Never collapse memory phi, used for error reporting by other parms
+    // Never collapse memory phi, used for error reporting by other parms.
     if( _idx== -2 )
       for( Node use : fun._uses )
         if( use instanceof ParmNode && use != this )
@@ -77,7 +77,7 @@ public class ParmNode extends PhiNode {
   }
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
-    // Not executing, go the
+    // Not executing?
     Type ctl = val(0);
     if( ctl != Type.CTRL ) return ctl.oob();
     Node in0 = in(0);
@@ -99,8 +99,10 @@ public class ParmNode extends PhiNode {
       t = t.meet(ta);
     }
 
-    // Check against formals; if OOB, always produce an error.
     if( _idx < 0 ) return t;
+    // High, but valid, values like choice-functions need to pass thru,
+    // so following Calls agree that SOME function will be called.
+    // Check against formals; if OOB, always produce an error.
     Type formal = fun.formal(_idx);
     // Good case: t.isa(formal).
     if( t.isa(formal) )  return t.simple_ptr();

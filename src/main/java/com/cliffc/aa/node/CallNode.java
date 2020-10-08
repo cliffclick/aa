@@ -190,7 +190,7 @@ public class CallNode extends Node {
       for( int i=3; i<_defs._len; i++ )
         set_def(i,gvn.con(Type.ANY),gvn);
       gvn.add_work_defs(this);
-      return set_def(0,gvn.add_work(gvn.con(Type.XCTRL)),gvn);
+      return set_def(0,Env.XCTRL,gvn);
     }
 
     // When do I do 'pattern matching'?  For the moment, right here: if not
@@ -350,7 +350,7 @@ public class CallNode extends Node {
       tfx = tfx.oob(TypeFunPtr.GENERIC_FUNPTR);
     TypeFunPtr tfp = (TypeFunPtr)tfx;
     BitsFun fidxs = tfp.fidxs();
-    if( !fidxs.is_empty() && fidxs.above_center()!=tfp._disp.above_center() )
+    if( !fidxs.is_empty() && fidxs.above_center()!=tfp._disp.above_center() && !tfp._disp.is_con() )
       return _val; // Display and FIDX mis-aligned; stall
     // Resolve; only keep choices with sane arguments during GCP
     // Unpacked: to be monotonic, skip resolve until unpacked.

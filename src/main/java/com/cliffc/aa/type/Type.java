@@ -46,6 +46,10 @@ import java.util.function.Predicate;
 // field name, or bottom.
 // Strings are OOPs which again can be top, a constant, or bottom.
 //
+// Because the meet is commutative, associative, distributive, the following holds:
+//
+//     (forall X, join X) === ~(forall X, meet ~X)
+//
 // ===========================================================================
 //
 // A Treatise on NIL
@@ -556,6 +560,9 @@ public class Type<T extends Type<T>> implements Cloneable {
     System.out.println("Meet not commutative: "+this+".meet("+t+")="+mt+",\n but "+t+".meet("+this+")="+nmt2);
     return false;
   }
+  // A & B = MT
+  // Expect: ~A & ~MT == ~A
+  // Expect: ~B & ~MT == ~B
   private boolean check_symmetric( Type t, Type mt ) {
     if( t==this ) return true;
     Type ta = mt._dual.meet(t._dual);

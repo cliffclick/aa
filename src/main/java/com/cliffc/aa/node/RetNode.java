@@ -1,7 +1,10 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeTuple;
 
 // See CallNode comments.  The RetNode gathers {control (function exits or
 // not), memory, value, rpc, fun}, and sits at the end of a function.  The RPC
@@ -49,7 +52,7 @@ public final class RetNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     // If control is dead, but the Ret is alive, we're probably only using the
     // FunPtr as a 'gensym'.  Nuke the function body.
-    if( !is_copy() && ctl()._val== Type.XCTRL && !is_prim())
+    if( !is_copy() && ctl()._val== Type.XCTRL && !is_prim() && fun()._val==Type.XCTRL )
       set_def(4,null,gvn);      // We're a copy now!
 
     // If no users inlining, wipe out all edges
@@ -132,7 +135,7 @@ public final class RetNode extends Node {
     for( int i=1; i<call.nargs(); i++ ) do_phi(gvn,fun,call,loop,i);
     do_phi(gvn,fun,call,loop,-2);   // Also memory Phi
     // Cut the Call control
-    gvn.set_def_reg(call,0,gvn.con(Type.XCTRL));
+    gvn.set_def_reg(call,0, Env.XCTRL);
 
     return this;
   }

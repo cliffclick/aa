@@ -117,6 +117,7 @@ public class ScopeNode extends Node {
     BitsAlias aliases = tmem0.all_reaching_aliases(((TypeMemPtr)trez)._aliases);
     return tmem0.slice_reaching_aliases(aliases);
   }
+
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
     // Prim scope is not used past Call-Graph discovery
     if( this==Env.SCP_0 )  return opt_mode._CG ? TypeMem.DEAD : TypeMem.ALLMEM;

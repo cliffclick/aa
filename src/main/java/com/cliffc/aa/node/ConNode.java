@@ -2,7 +2,11 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeLive;
+import com.cliffc.aa.type.TypeMem;
+
+import java.util.function.Predicate;
 
 public class ConNode<T extends Type> extends Node {
   T _t;                         // Not final for testing
@@ -36,5 +40,6 @@ public class ConNode<T extends Type> extends Node {
     ConNode con = (ConNode)o;
     return _t==con._t;
   }
+  @Override Node walk_dom_last( Predicate<Node> P) { return null; }
 }
 

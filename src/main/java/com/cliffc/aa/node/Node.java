@@ -569,7 +569,6 @@ public abstract class Node implements Cloneable {
   // Walk a subset of the dominator tree, looking for the last place (highest
   // in tree) this predicate passes, or null if it never does.
   Node walk_dom_last(Predicate<Node> P) {
-    if( this==Env.START ) return null; // Walked off the top
     assert in(0) != null;       // All default control nodes pass ctrl in slot 0
     Node n = in(0).walk_dom_last(P);
     if( n != null ) return n;   // Take last answer first

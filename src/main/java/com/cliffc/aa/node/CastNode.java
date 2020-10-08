@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeTuple;
 
 // Gain precision after an If-test.
 public class CastNode extends Node {
@@ -44,8 +45,11 @@ public class CastNode extends Node {
   }
 
   private static boolean checked( Node n, Node addr ) {
-    return n instanceof CProjNode && ((CProjNode)n)._idx==1 &&
-      n.in(0) instanceof IfNode &&
-      n.in(0).in(1) == addr;
+    if( !(n instanceof CProjNode && ((CProjNode)n)._idx==1) ) return false; // Not a Cast of a CProj-True
+    Node n0 = n.in(0);
+    if( n0 instanceof IfNode && n0.in(1) == addr ) return true; // Guarded by If-n-zero
+    if( n0 instanceof ConNode && ((TypeTuple)n0._val).at(1)==Type.XCTRL )
+      return true;
+    return false;
   }
 }
