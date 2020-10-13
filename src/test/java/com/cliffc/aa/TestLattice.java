@@ -1119,6 +1119,7 @@ public class TestLattice {
   //  &{ 2 3}  &{ 2 4}  &{ 3 4}
   //          &{ 2 3 4}
   //
+  @Ignore
   @Test public void testLattice12b() {
     N.reset();
     N and_234= new N("&{ 2 3 4}");
