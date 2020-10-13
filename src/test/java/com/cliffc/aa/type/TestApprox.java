@@ -19,7 +19,7 @@ public class TestApprox {
     Type.init0(new HashMap<>());
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
-    int alias0 = BitsAlias.new_alias(BitsAlias.RECORD);
+    int alias0 = BitsAlias.new_alias(BitsAlias.REC);
     String[] flds = new String[]{"a","b"};
     byte[] finals = new byte[]{1,1};
 
@@ -56,7 +56,7 @@ public class TestApprox {
   @Test public void testApprox1() {
     Type.init0(new HashMap<>());
     final int CUTOFF = 3;
-    int alias0 = BitsAlias.new_alias(BitsAlias.RECORD);
+    int alias0 = BitsAlias.new_alias(BitsAlias.REC);
     String[] flds = new String[]{"a","b"};
     byte[] finals = new byte[]{1,1};
 
@@ -128,7 +128,7 @@ public class TestApprox {
   @Test public void testApprox2() {
     Type.init0(new HashMap<>());
     final int CUTOFF = 3;
-    int alias0 = BitsAlias.new_alias(BitsAlias.RECORD);
+    int alias0 = BitsAlias.new_alias(BitsAlias.REC);
     BitsAlias alias = BitsAlias.make0(alias0);
     String[] flds = new String[]{"a","b"};
     byte[] finals = new byte[]{1,1};
@@ -237,8 +237,8 @@ public class TestApprox {
   // A0 -> (X0 <-> X1) -> A1 -> X2 -> A23-> (X35<-> X45) -> A23
   @Test public void testApprox3() {
     Type.init0(new HashMap<>());
-    int alias0 = BitsAlias.new_alias(BitsAlias.RECORD);
-    int alias1 = BitsAlias.new_alias(BitsAlias.RECORD);
+    int alias0 = BitsAlias.new_alias(BitsAlias.REC);
+    int alias1 = BitsAlias.new_alias(BitsAlias.REC);
     String[] flds2 = new String[]{"v","x"};
     String[] flds3 = new String[]{"v","x","a"};
     byte[] finals2 = new byte[]{1,1};
@@ -401,7 +401,7 @@ public class TestApprox {
   @Test public void testApprox4() {
     Type.init0(new HashMap<>());
     final int CUTOFF = 3;
-    int alias = BitsAlias.new_alias(BitsAlias.RECORD);
+    int alias = BitsAlias.new_alias(BitsAlias.REC);
     String[] flds = new String[]{"v","l","r"};
     byte[] finals = new byte[]{1,1,1};
     Type nil = Type.NIL;
@@ -507,7 +507,7 @@ public class TestApprox {
   @Test public void testApprox5() {
     Type.init0(new HashMap<>());
     final int CUTOFF = 2;
-    int alias = BitsAlias.new_alias(BitsAlias.RECORD);
+    int alias = BitsAlias.new_alias(BitsAlias.REC);
     String[] flds = new String[]{"l","r","v"};
     byte[] finals = new byte[]{1,1,1};
 
@@ -546,7 +546,7 @@ public class TestApprox {
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
     final int CUTOFF = 2;
-    int alias = BitsAlias.new_alias(BitsAlias.RECORD);
+    int alias = BitsAlias.new_alias(BitsAlias.REC);
     String[] flds = new String[]{"l","r","v"};
     byte[] finals = new byte[]{1,1,1};
 
@@ -604,7 +604,7 @@ public class TestApprox {
     int cnt=0;
     while( tmp0 != tmp1 && cnt < 100 ) {
       TypeStruct ts1 = TypeStruct.make(args1,TypeStruct.ts(tmp1=tmp0),fs1);
-      TypeStruct ts1x = ts1.approx(CUTOFF,BitsAlias.RECORD);
+      TypeStruct ts1x = ts1.approx(CUTOFF,BitsAlias.REC);
       // Extend with nil-or-not endlessly.
       tmp0 = TypeMemPtr.make(BitsAlias.RECORD_BITS0,ts1x);
       cnt++;
@@ -616,9 +616,9 @@ public class TestApprox {
 
 
     // Make some child aliases.
-    final int alias6 = BitsAlias.new_alias(BitsAlias.RECORD);
-    final int alias7 = BitsAlias.new_alias(BitsAlias.RECORD);
-    final int alias8 = BitsAlias.new_alias(BitsAlias.RECORD);
+    final int alias6 = BitsAlias.new_alias(BitsAlias.REC);
+    final int alias7 = BitsAlias.new_alias(BitsAlias.REC);
+    final int alias8 = BitsAlias.new_alias(BitsAlias.REC);
     final BitsAlias ba6 = BitsAlias.make0(alias6);
     final BitsAlias ba7 = BitsAlias.make0(alias7);
     final BitsAlias ba8 = BitsAlias.make0(alias8);
@@ -703,7 +703,7 @@ public class TestApprox {
     final byte[] xmods = TypeStruct.ffnls(3);
     final int fidx = BitsFun.new_fidx(1), fidx0 = BitsFun.new_fidx(fidx), fidx1 = BitsFun.new_fidx(fidx);
     final BitsFun fidxs = BitsFun.make0(fidx0,fidx1).dual();
-    final int alias = BitsAlias.new_alias(BitsAlias.RECORD);
+    final int alias = BitsAlias.new_alias(BitsAlias.REC);
     Env.ALL_DISPLAYS = Env.ALL_DISPLAYS.set(alias); // Declare a display
 
     // Args for the forward-ref fib(^ ->Scalar).  This has to start as hi-args

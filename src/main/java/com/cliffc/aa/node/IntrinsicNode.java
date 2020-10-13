@@ -117,7 +117,7 @@ public class IntrinsicNode extends Node {
   @Override public ErrMsg err( boolean fast ) {
     Type ptr = ptr()._val;
     Type mem = mem()._val;
-    return ErrMsg.typerr(_badargs,ptr,mem,TypeMemPtr.make(BitsAlias.RECORD,_tn)); // Did not remove the aliasing
+    return ErrMsg.typerr(_badargs,ptr,mem,TypeMemPtr.make(BitsAlias.REC,_tn)); // Did not remove the aliasing
   }
 
   // --------------------------------------------------------------------------

@@ -206,7 +206,7 @@ public class Parse implements Comparable<Parse> {
     if( ot == null ) {                      // Name does not pre-exist
       tn = t.set_name((tvar+":").intern()); // Add a name
       if( tn instanceof TypeStruct ) {      // TypeObj decl
-        alias = BitsAlias.type_alias(BitsAlias.RECORD); // Assign an alias
+        alias = BitsAlias.type_alias(BitsAlias.REC); // Assign an alias
         tn = ((TypeStruct)tn).close();
         tn_crush = ((TypeStruct)tn).crush();
       }
@@ -837,7 +837,7 @@ public class Parse implements Comparable<Parse> {
 
     // Build the tuple from gathered args
     TypeStruct mt_tuple = TypeStruct.make(false,new String[]{"^"},TypeStruct.ts(Type.XNIL),new byte[]{TypeStruct.FFNL},true);
-    NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,mt_tuple,con(Type.XNIL));
+    NewObjNode nn = new NewObjNode(false,BitsAlias.REC,mt_tuple,con(Type.XNIL));
     for( int i=0; i<args._len; i++ )
       nn.create_active((""+i).intern(),args.at(i),TypeStruct.FFNL);
     nn._fld_starts = bads.asAry();
@@ -1126,7 +1126,7 @@ public class Parse implements Comparable<Parse> {
     if( !(t instanceof TypeObj) ) return t; // Primitives are not wrapped
     // Automatically convert to reference for fields.
     // Make a reasonably precise alias.
-    int type_alias = t instanceof TypeStruct ? ((TypeStruct)t).fref_alias() : (t instanceof TypeStr ? BitsAlias.STR : BitsAlias.ARY);
+    int type_alias = t instanceof TypeStruct ? ((TypeStruct)t).fref_alias() : (t instanceof TypeStr ? BitsAlias.STR : BitsAlias.AARY);
     TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.make0(type_alias),(TypeObj)t);
     return typeq(tmp);          // And check for null-ness
   }

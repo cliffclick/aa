@@ -22,7 +22,7 @@ public class BitsAlias extends Bits<BitsAlias> {
 
   static final Bits.Tree<BitsAlias> TREE = new Bits.Tree<>();
   @Override public Tree<BitsAlias> tree() { return TREE; }
-  public static final int ALL, AARY, STR, RECORD, ABC, ARY;
+  public static final int ALL, ARY, STR, REC, ABC, AARY;
   public static BitsAlias RECORD_BITS, STRBITS0;
   public static BitsAlias FULL, NZERO, ANY, EMPTY, NIL, XNIL, STRBITS, RECORD_BITS0, ARYBITS;
 
@@ -33,22 +33,22 @@ public class BitsAlias extends Bits<BitsAlias> {
     FULL = NZERO.meet_nil();    // All aliases, with a low nil
     ANY = FULL.dual();          // Precompute dual
     NIL = make0(0);             // Ugly but NIL has a dual, and this is "low" NIL
-    XNIL = NIL.dual();          // 
+    XNIL = NIL.dual();          //
     EMPTY = NZERO.make();       // No bits; its its own dual
     // Split All-Memory into Records/Tuples/Structs and Arrays (including Strings).
     // Everything falls into one of these two camps.
-    RECORD_BITS = make0(RECORD = type_alias(ALL));
+    RECORD_BITS = make0(REC = type_alias(ALL));
     RECORD_BITS0 = RECORD_BITS.meet_nil();
 
     // Arrays
-    AARY = type_alias(ALL);
+    ARY = type_alias(ALL);
     // Split Arrays into Strings (vs other arrays)
-    STRBITS = make0(STR = type_alias(AARY));
+    STRBITS = make0(STR = type_alias(ARY));
     STRBITS0 = STRBITS.meet_nil();
     ABC = type_alias(STR);
 
-    ARY = type_alias(AARY);
-    ARYBITS = make0(ARY);
+    AARY = type_alias(ARY);
+    ARYBITS = make0(AARY);
   }
   // True if kid is a child or equal to parent
   public static boolean is_parent( int par, int kid ) { return TREE.is_parent(par,kid); }

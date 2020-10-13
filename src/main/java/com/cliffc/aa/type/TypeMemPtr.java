@@ -97,7 +97,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     int alias1 = x.abit();                 // Just a single alias
     // The GENERIC function allows the generic record, otherwise must be on the display list
     if( alias1 != -1 )
-      return Math.abs(alias1)==BitsAlias.RECORD || com.cliffc.aa.Env.ALL_DISPLAYS.test_recur(Math.abs(alias1));
+      return Math.abs(alias1)==BitsAlias.REC || com.cliffc.aa.Env.ALL_DISPLAYS.test_recur(Math.abs(alias1));
     // If closures are being used, can be multiple valid displays
     for( int alias : _aliases )
       if( alias != 0 && !com.cliffc.aa.Env.ALL_DISPLAYS.test_recur(alias) )
@@ -166,6 +166,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return bits==_aliases ? this : make(bits,_obj);
   }
   @Override public Type meet_nil(Type nil) {
+    assert nil==NIL || nil==XNIL;
     // See testLattice15.  The UNSIGNED NIL tests as a lattice:
     //    [~0]->~obj  ==>  NIL  ==>  [0]-> obj
     // But loses the pointed-at type down to OBJ.

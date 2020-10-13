@@ -20,7 +20,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
   public NewObjNode( boolean is_closure, TypeStruct disp, Node clo ) {
-    this(is_closure, BitsAlias.RECORD, disp, clo);
+    this(is_closure, BitsAlias.REC, disp, clo);
   }
   // Called by IntrinsicNode.convertTypeNameStruct
   public NewObjNode( boolean is_closure, int par_alias, TypeStruct ts, Node clo ) {

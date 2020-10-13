@@ -160,6 +160,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     return bits==_fidxs ? this : make(bits,_nargs,_disp);
   }
   @Override public Type meet_nil(Type nil) {
+    assert nil==NIL || nil==XNIL;
     // See testLattice15.  The UNSIGNED NIL tests as a lattice:
     //    [~0]->~obj  ==>  NIL  ==>  [0]-> obj
     // But loses the pointed-at type down to OBJ.

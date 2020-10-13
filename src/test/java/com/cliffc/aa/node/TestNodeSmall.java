@@ -493,9 +493,9 @@ public class TestNodeSmall {
     // including memory args.
 
     // Build a bunch of aliases.
-    int a1 = BitsAlias.new_alias(BitsAlias.RECORD);
-    int a2 = BitsAlias.new_alias(BitsAlias.RECORD);
-    int a3 = BitsAlias.new_alias(BitsAlias.RECORD);
+    int a1 = BitsAlias.new_alias(BitsAlias.REC);
+    int a2 = BitsAlias.new_alias(BitsAlias.REC);
+    int a3 = BitsAlias.new_alias(BitsAlias.REC);
     Type[] ts_int_flt = TypeStruct.ts(TypeMemPtr.NO_DISP,TypeInt.INT64,TypeFlt.FLT64);
     Type[] ts_int_abc = TypeStruct.ts(TypeMemPtr.NO_DISP,TypeInt.INT64,TypeMemPtr.ABCPTR);
     // @{ a:int; b:"abc" }
@@ -506,7 +506,7 @@ public class TestNodeSmall {
       TypeFunSig.make(Type.SCALAR,ts_int_flt), // {int flt   -> }
       TypeFunSig.make(Type.SCALAR,ts_int_abc), // {int "abc" -> }
       // { flt @{a:int; b:"abc"} -> }
-      TypeFunSig.make(Type.SCALAR,TypeStruct.ts(TypeMemPtr.NO_DISP,TypeFlt.FLT64,TypeMemPtr.make(BitsAlias.RECORD,a_int_b_abc))),
+      TypeFunSig.make(Type.SCALAR,TypeStruct.ts(TypeMemPtr.NO_DISP,TypeFlt.FLT64,TypeMemPtr.make(BitsAlias.REC,a_int_b_abc))),
     };
 
     // Build a bunch of memory parm types
@@ -617,14 +617,14 @@ public class TestNodeSmall {
 
   // Helper to make memory
   private static TypeMem tmem(int[] as, TypeObj... ts) {
-    int max = BitsAlias.ARY;
+    int max = BitsAlias.AARY;
     if( as !=null && as.length> 0 ) max = Math.max(max,as[as.length-1]);
     TypeObj[] tos = new TypeObj[max+1];
     tos[BitsAlias.ALL] = TypeObj.OBJ;
-    tos[BitsAlias.RECORD]=TypeStruct.ALLSTRUCT;
+    tos[BitsAlias.REC]=TypeStruct.ALLSTRUCT;
     tos[BitsAlias.ABC] = TypeStr.ABC; //
     tos[BitsAlias.STR] = TypeStr.STR;
-    tos[BitsAlias.ARY] = TypeAry.ARY;
+    tos[BitsAlias.AARY] = TypeAry.ARY;
     if( as != null )
       for( int i=0; i<as.length; i++ )
         tos[as[i]] = ts[i];

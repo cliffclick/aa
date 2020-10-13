@@ -198,7 +198,7 @@ public class TestType {
 
     Type pabc0= TypeMemPtr.ABC0;    // *["abc"]?
     TypeMemPtr pabc = TypeMemPtr.ABCPTR; // *["abc"]
-    TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.type_alias(BitsAlias.RECORD),TypeStruct.ALLSTRUCT);// *[(0)]
+    TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.type_alias(BitsAlias.REC),TypeStruct.ALLSTRUCT);// *[(0)]
     TypeMemPtr pzer0= TypeMemPtr.make(pzer._aliases.meet_nil(),TypeStruct.ALLSTRUCT);  // *[(0)]?
     Type nil  = Type.NIL, xnil=Type.XNIL;
 
@@ -275,9 +275,9 @@ public class TestType {
     byte[] finals = new byte[]{TypeStruct.FFNL};
 
     // meet @{c:0}? and @{c:@{x:1}?,}
-    int alias0 = BitsAlias.type_alias(BitsAlias.RECORD);
+    int alias0 = BitsAlias.type_alias(BitsAlias.REC);
     int alias1 = BitsAlias.type_alias(alias0);
-    int alias2 = BitsAlias.type_alias(BitsAlias.RECORD);
+    int alias2 = BitsAlias.type_alias(BitsAlias.REC);
     int alias3 = BitsAlias.type_alias(alias0);
     TypeObj a1 = TypeStruct.make(new String[]{"c"},TypeStruct.ts(Type.NIL                   ),finals); // @{c:nil}
     TypeObj a3 = TypeStruct.make(new String[]{"x"},TypeStruct.ts(TypeInt.TRUE               ),finals); // @{x: 1 }
@@ -343,7 +343,7 @@ public class TestType {
 
     // Recursive types no longer cyclic in the concrete definition?  Because
     // TypeObj can contain TypeMemPtrs but not another nested TypeObj...
-    final int alias1 = BitsAlias.new_alias(BitsAlias.RECORD);
+    final int alias1 = BitsAlias.new_alias(BitsAlias.REC);
     final TypeMemPtr ts0ptr = TypeMemPtr.make    (alias1,TypeStruct.ALLSTRUCT);
     final TypeMemPtr ts0ptr0= TypeMemPtr.make_nil(alias1,TypeStruct.ALLSTRUCT);
 
@@ -373,21 +373,21 @@ public class TestType {
     // Cyclic named struct: Memory#2 :A:@{n:*[0,2],v:int}
     // If we unrolled this (and used S for Struct and 0 for Nil) we'd get:
     // AS0AS0AS0AS0AS0AS0...
-    final int alias2 = BitsAlias.new_alias(BitsAlias.RECORD);
+    final int alias2 = BitsAlias.new_alias(BitsAlias.REC);
     TypeMemPtr tptr2= TypeMemPtr.make_nil(alias2,TypeObj.OBJ); // *[0,2]
     TypeStruct ts2 = TypeStruct.make(flds,TypeStruct.ts(tptr2,TypeInt.INT64)); // @{n:*[0,2],v:int}
     TypeStruct ta2 = ts2.set_name("A:");
 
     // Peel A once without the nil: Memory#3: A:@{n:*[2],v:int}
     // ASAS0AS0AS0AS0AS0AS0...
-    final int alias3 = BitsAlias.new_alias(BitsAlias.RECORD);
+    final int alias3 = BitsAlias.new_alias(BitsAlias.REC);
     TypeMemPtr tptr3= TypeMemPtr.make(alias3,TypeObj.OBJ); // *[3]
     TypeStruct ts3 = TypeStruct.make(flds,TypeStruct.ts(tptr2,TypeInt.INT64)); // @{n:*[2],v:int}
     TypeStruct ta3 = ts3.set_name("A:");
 
     // Peel A twice without the nil: Memory#4: A:@{n:*[3],v:int}
     // ASASAS0AS0AS0AS0AS0AS0...
-    final int alias4 = BitsAlias.new_alias(BitsAlias.RECORD);
+    final int alias4 = BitsAlias.new_alias(BitsAlias.REC);
     TypeStruct ts4 = TypeStruct.make(flds,TypeStruct.ts(tptr3,TypeInt.INT64)); // @{n:*[3],v:int}
     TypeStruct ta4 = ts4.set_name("A:");
 
@@ -414,7 +414,7 @@ public class TestType {
     assertEquals(xta,mta);
 
     // Mismatched Names in a cycle; force a new cyclic type to appear
-    final int alias5 = BitsAlias.new_alias(BitsAlias.RECORD);
+    final int alias5 = BitsAlias.new_alias(BitsAlias.REC);
     TypeStruct tsnb = TypeStruct.make(flds,TypeStruct.ts(TypeMemPtr.make_nil(alias5,TypeObj.OBJ),TypeFlt.FLT64));
     TypeStruct tfb = tsnb.set_name("B:");
     Type mtab = ta2.meet(tfb);
@@ -436,7 +436,7 @@ public class TestType {
     // Nest a linked-list style tuple 10 deep; verify actual depth is capped at
     // less than 5.  Any data loop must contain a Phi; if structures are
     // nesting infinitely deep, then it must contain a NewNode also.
-    int alias = BitsAlias.new_alias(BitsAlias.RECORD);
+    int alias = BitsAlias.new_alias(BitsAlias.REC);
     Type[] tts = Types.ts(Type.NIL,TypeInt.con(0));
     String[] flds2 = new String[]{".","."};
     TypeStruct ts = TypeStruct.make(flds2,tts,finals);
@@ -461,7 +461,7 @@ public class TestType {
     // Dual; then meet ~4_() and ~0_A
     String[] flds = new String[]{"n","v"};
     byte[] finals = TypeStruct.ffnls(2);
-    final int alias = BitsAlias.RECORD;
+    final int alias = BitsAlias.REC;
 
     Type.RECURSIVE_MEET++;
     TypeStruct as1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals,true).set_name("A:");

@@ -132,8 +132,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   private B make( boolean any, long[] bits ) {
     // If a 'parent' bit is set, then no need to have any child bits set.
     Tree<B> tree = tree();
-    // TODO: Run this loop backwards, avoids most tree-walks; lowers O(n log n)
-    // to O(n).
+    // TODO: Run this loop backwards, avoids most tree-walks; lowers O(n log n) to O(n).
     for( int i=0; i<bits.length; i++ ) { // For all words
       long l = bits[i];
       if( l!=0 ) {

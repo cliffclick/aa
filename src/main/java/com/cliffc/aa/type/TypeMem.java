@@ -238,12 +238,12 @@ public class TypeMem extends Type<TypeMem> {
     // All memory.  Includes breakouts for all structs and all strings.
     // Triggers BitsAlias.<clinit> which makes all the initial alias splits.
     // Not currently including closures
-    TypeObj[] tos = new TypeObj[Math.max(BitsAlias.RECORD,BitsAlias.ARY)+1];
+    TypeObj[] tos = new TypeObj[Math.max(BitsAlias.REC,BitsAlias.AARY)+1];
     tos[BitsAlias.ALL] = TypeObj.ISUSED;
-    tos[BitsAlias.RECORD]=TypeStruct.ALLSTRUCT;
+    tos[BitsAlias.REC]=TypeStruct.ALLSTRUCT;
     tos[BitsAlias.STR] = TypeStr.STR; //
     tos[BitsAlias.ABC] = TypeStr.ABC; //
-    tos[BitsAlias.ARY] = TypeAry.ARY; //
+    tos[BitsAlias.AARY] = TypeAry.ARY; //
     MEM  = make0(tos);
     XMEM = MEM.dual();
 

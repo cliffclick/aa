@@ -870,6 +870,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     }
   }
   public Type meet_nil(Type nil) {
+    assert nil==NIL || nil==XNIL;
     switch( _type ) {
     case TANY:
     case TXNUM:

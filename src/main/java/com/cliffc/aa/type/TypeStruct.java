@@ -424,12 +424,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // forward-reference, to be resolved before the end of parsing.
   public static TypeStruct make_forward_def_type(String tok) {
     // Make a new top-level alias
-    int alias = BitsAlias.type_alias(BitsAlias.RECORD);
+    int alias = BitsAlias.type_alias(BitsAlias.REC);
     return make((tok+":").intern(),flds("$fref"),ts(TypeInt.con(alias)),fbots(1),true);
   }
   // Return the alias for a forward-ref type, or 0 if not a forward-ref
   public int fref_alias() {
-    if( !has_name() || !Util.eq(_flds[0],"$fref") ) return BitsAlias.RECORD; // Not a forward ref
+    if( !has_name() || !Util.eq(_flds[0],"$fref") ) return BitsAlias.REC; // Not a forward ref
     return (int)_ts[0].getl();
   }
   // We have a cycle because we are unioning {t,this} and we have a graph from
@@ -438,7 +438,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // INTERN table, but if a prior cycle version exists, we need to remove the
   // new cycle and use the prior one.
   public TypeStruct merge_recursive_type( TypeStruct ts ) {
-    assert fref_alias()!=BitsAlias.RECORD;
+    assert fref_alias()!=BitsAlias.REC;
     // Remove from INTERN table, since hacking type will not match hash
     untern()._dual.untern();
     ts.untern().dual().untern();

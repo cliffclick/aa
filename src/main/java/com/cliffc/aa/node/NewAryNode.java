@@ -8,7 +8,7 @@ import com.cliffc.aa.util.Ary;
 // produces the pointer.  Hence liveness is odd.
 abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
   public NewAryNode( TypeAry tary, String name, int op_prec,TypeInt sz ) {
-    super(OP_NEWARY,BitsAlias.ARY,tary,name,false,op_prec,null,sz);
+    super(OP_NEWARY,BitsAlias.AARY,tary,name,false,op_prec,null,sz);
   }
   @Override TypeAry dead_type() { return TypeAry.ARY.dual(); }
   // The one string field is memory-alive
