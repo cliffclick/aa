@@ -1040,6 +1040,7 @@ public class TestLattice {
     test(o256);
   }
 
+  // Not a lattice; exactly Pic.8 from Lattice_(order) page.
   // Set {1} is the parent of {2,3}.
   // Using just a {+1} means: pick any of 2 or 3.
   // Using {2,3} means: pick any 2 AND pick any 3.
@@ -1057,6 +1058,7 @@ public class TestLattice {
   //  {&2&3} {&2&4}  {&3&4}
   //        {&2&3&4}
   //          {&1}
+  @Ignore
   @Test public void testLattice12a() {
     N.reset();
     N _1  = new N("{&1}");
@@ -1095,6 +1097,92 @@ public class TestLattice {
     x1  .set_dual(_1  );
 
     test(x1);
+  }
+
+
+  // Bits indicate in/out.  Another bit for up/down.  Another bit for bulk
+  // meet/join.  In the implementation, if a parent in is IN, then all children
+  // are IN, and forced zero.  Future/unnamed children are IN.  If a parent is
+  // OUT, then each child can be in or out.  Future/unnamed children are OUT.
+  //
+  //          +{~2~3~4}
+  //  +{~2~3}  +{~2~4}  +{~3~4}
+  //  +{~2}    +{~3}      +{~4}
+  //  &{~2}    &{~3}      &{~4}
+  //  &{~2~3}  &{~2~4}  &{~3~4}
+  //          &{~2~3~4}
+  //
+  //          +{ 2 3 4}
+  //  +{ 2 3}  +{ 2 4}  +{ 3 4}
+  //  +{ 2}    +{ 3}      +{ 4}
+  //  &{ 2}    &{ 3}      &{ 4}
+  //  &{ 2 3}  &{ 2 4}  &{ 3 4}
+  //          &{ 2 3 4}
+  //
+  @Test public void testLattice12b() {
+    N.reset();
+    N and_234= new N("&{ 2 3 4}");
+
+    N and_23 = new N("&{ 2 3}",and_234);
+    N and_24 = new N("&{ 2 4}",and_234);
+    N and_34 = new N("&{ 3 4}",and_234);
+
+    N and_2   = new N("&{ 2}",and_23,and_24);
+    N and_3   = new N("&{ 3}",and_23,and_34);
+    N and_4   = new N("&{ 4}",and_24,and_34);
+
+    N oor_2   = new N("+{ 2}",and_2);
+    N oor_3   = new N("+{ 3}",and_3);
+    N oor_4   = new N("+{ 4}",and_4);
+
+    N oor_23 = new N("+{ 2 3}",oor_2,oor_3);
+    N oor_24 = new N("+{ 2 4}",oor_2,oor_4);
+    N oor_34 = new N("+{ 3 4}",oor_3,oor_4);
+    
+    N oor_234= new N("+{ 2 3 4}",oor_23,oor_24,oor_34);
+
+    N andx234= new N("&{~2~3~4}",oor_234);
+
+    N andx23 = new N("&{~2~3}",andx234);
+    N andx24 = new N("&{~2~4}",andx234);
+    N andx34 = new N("&{~3~4}",andx234);
+
+    N andx2   = new N("&{~2}",andx23,andx24);
+    N andx3   = new N("&{~3}",andx23,andx34);
+    N andx4   = new N("&{~4}",andx24,andx34);
+
+    N oorx2   = new N("+{~2}",andx2);
+    N oorx3   = new N("+{~3}",andx3);
+    N oorx4   = new N("+{~4}",andx4);
+
+    N oorx23 = new N("+{~2~3}",oorx2,oorx3);
+    N oorx24 = new N("+{~2~4}",oorx2,oorx4);
+    N oorx34 = new N("+{~3~4}",oorx3,oorx4);
+    
+    N oorx234= new N("+{~2~3~4}",oorx23,oorx24,oorx34);
+    
+    // Mark the non-centerline duals
+    andx234.set_dual(oor_234);
+    
+    andx23 .set_dual(oor_23 );
+    andx24 .set_dual(oor_24 );
+    andx34 .set_dual(oor_34 );
+
+    andx2  .set_dual(oor_2  );
+    andx3  .set_dual(oor_3  );
+    andx4  .set_dual(oor_4  );
+
+    oorx2  .set_dual(and_2  );
+    oorx3  .set_dual(and_3  );
+    oorx4  .set_dual(and_4  );
+    
+    oorx23 .set_dual(and_23 );
+    oorx24 .set_dual(and_24 );
+    oorx34 .set_dual(and_34 );
+
+    oorx234.set_dual(and_234);
+    
+    test(oorx234);
   }
 
   // Same as testLattice12, except 6 is now nil... which is on the centerline.
