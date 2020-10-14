@@ -22,7 +22,7 @@ public class MrgProjNode extends ProjNode {
       return mem;                // Kill MrgNode when it no longer lifts values
 
     // New is dead from below.
-    if( _live.at(nnn._alias)==TypeObj.UNUSED && nnn._keep==0 && !nnn.is_unused() ) {
+    if( _live.at(nnn._alias)==TypeObj.UNUSED && nnn._keep==0 && !nnn.is_unused() && !is_prim() ) {
       gvn.unreg(nnn);   // Unregister before self-kill
       nnn.kill(gvn);    // Killing a NewNode has to do more updates than normal
       return this;

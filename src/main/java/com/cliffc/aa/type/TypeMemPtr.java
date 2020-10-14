@@ -73,7 +73,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   static {
     DISPLAY_PTR._hash = DISPLAY_PTR.compute_hash(); // Filled in during DISPLAY.install_cyclic
   }
-  public  static final TypeMemPtr ISUSED0= make(BitsAlias.NZERO   ,TypeObj.ISUSED); // Includes nil
+  public  static final TypeMemPtr ISUSED0= make(BitsAlias.FULL    ,TypeObj.ISUSED); // Includes nil
   public  static final TypeMemPtr ISUSED = make(BitsAlias.NZERO   ,TypeObj.ISUSED); // Excludes nil
   public  static final TypeMemPtr OOP0   = make(BitsAlias.FULL    ,TypeObj.OBJ); // Includes nil
   public  static final TypeMemPtr OOP    = make(BitsAlias.NZERO   ,TypeObj.OBJ); // Excludes nil
@@ -88,7 +88,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeMemPtr NO_DISP= NILPTR;
   public  static final TypeMemPtr EMTPTR = make(BitsAlias.EMPTY,TypeObj.UNUSED);
   public  static final TypeMemPtr DISP_SIMPLE= make(BitsAlias.RECORD_BITS0,TypeObj.ISUSED); // closed display
-  public  static final TypeMemPtr USE0   = make(BitsAlias.FULL    ,TypeObj.ISUSED); // Includes nil
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,NO_DISP,EMTPTR};
 
   @Override public boolean is_display_ptr() {
@@ -146,14 +145,14 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override public boolean above_center() {
     return _aliases.above_center();
   }
-  @Override public Type bound_impl(Type t) {
-    if( !(t instanceof TypeMemPtr) ) return oob(t);
+  @Override public Type oop_deep_impl(Type t) {
+    if( !(t instanceof TypeMemPtr) ) return oob();
     TypeMemPtr tmp = (TypeMemPtr)t;
     // Deep bounds; keep the in-bounds _aliases but bound the _obj.
     if( tmp._aliases.dual().isa(_aliases) && _aliases.isa(tmp._aliases) )
-      return make(_aliases,(TypeObj)_obj.bound_impl(tmp._obj));
+      return _obj.oop_deep_impl(tmp._obj);
     // Aliases OOB
-    return oob(t);
+    return oob();
   }
   // Aliases represent *classes* of pointers and are thus never constants.
   // nil is a constant.

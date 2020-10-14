@@ -75,7 +75,7 @@ public abstract class PrimNode extends Node {
       new MemPrimNode.ReadPrimNode.LValueWrite (), // Write an L-Value: (ary,idx,elem) ==> elem
       new MemPrimNode.ReadPrimNode.LValueWriteFinal(), // Final Write an L-Value: (ary,idx,elem) ==> elem
     };
-    
+
     // These are unary ops, precedence determined outside of 'Parse.expr'
     PrimNode[] uniops = new PrimNode[] {
       new MemPrimNode.ReadPrimNode.LValueLength(), // The other array ops are "balanced ops" and use term() for precedence
@@ -83,7 +83,7 @@ public abstract class PrimNode extends Node {
       new MinusI64(),
       new Not(),
     };
-    
+
     Ary<PrimNode> allprims = new Ary<>(others);
     for( PrimNode prim : uniops ) allprims.push(prim);
     for( PrimNode[] prims : PRECEDENCE )
@@ -97,7 +97,7 @@ public abstract class PrimNode extends Node {
       for( PrimNode n : PRECEDENCE[p] )
         n._op_prec = (byte)(max_prec-p);
     // Not used to determine precedence, just a uniop flag
-    for( PrimNode prim : uniops ) prim._op_prec = (byte)max_prec; 
+    for( PrimNode prim : uniops ) prim._op_prec = (byte)max_prec;
 
     // Compute greedy primitive names, without regard to precedence.
     // Example from Java: >,>=,>>,>>=,>>>,>>>= are all valid tokens.
@@ -105,7 +105,7 @@ public abstract class PrimNode extends Node {
     for( PrimNode[] prims : PRECEDENCE )
       for( PrimNode prim : prims )
         hash.add(prim._name);
-    ArrayList<String> list = new ArrayList<String>(hash); 
+    ArrayList<String> list = new ArrayList<String>(hash);
     Collections.sort(list);     // Longer strings on the right
     Collections.reverse(list);  // Longer strings on the left, match first.
     PRIM_TOKS = list.toArray(new String[list.size()]);
@@ -526,7 +526,7 @@ public abstract class PrimNode extends Node {
       Node memc= gvn.xform(new MProjNode(cep,1));
       Node rez = gvn.xform(new  ProjNode(2,cep));
       // Region merging results
-      Node reg = gvn.init (new RegionNode(null,fal,ccc));
+      Node reg = gvn.xform(new RegionNode(null,fal,ccc));
       Node phi = gvn.xform(new PhiNode(Type.SCALAR,null,reg,gvn.con(Type.XNIL),rez ));
       Node phim= gvn.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
       // Plug into self & trigger is_copy
@@ -576,7 +576,7 @@ public abstract class PrimNode extends Node {
       Node memc= gvn.xform(new MProjNode(cep,1));
       Node rez = gvn.xform(new  ProjNode(2,cep));
       // Region merging results
-      Node reg = gvn.init (new RegionNode(null,tru,ccc));
+      Node reg = gvn.xform(new RegionNode(null,tru,ccc));
       Node phi = gvn.xform(new PhiNode(Type.SCALAR,null,reg,lhs,rez ));
       Node phim= gvn.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
       // Plug into self & trigger is_copy
@@ -598,5 +598,5 @@ public abstract class PrimNode extends Node {
       return _defs._len==4 ? null : in(idx);
     }
   }
-  
+
 }

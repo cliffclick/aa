@@ -381,7 +381,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static final TypeStruct STRPTR     = make_args(ARGS_X ,ts(NO_DISP,TypeMemPtr.STRPTR));
   public  static final TypeStruct INT64_INT64= make_args(ARGS_XY,ts(NO_DISP,TypeInt.INT64,TypeInt.INT64)); // {int int->int }
   public  static final TypeStruct FLT64_FLT64= make_args(ARGS_XY,ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64)); // {flt flt->flt }
-  public  static final TypeStruct OOP_OOP    = make_args(ARGS_XY,ts(NO_DISP,TypeMemPtr.USE0,TypeMemPtr.USE0));
+  public  static final TypeStruct OOP_OOP    = make_args(ARGS_XY,ts(NO_DISP,TypeMemPtr.ISUSED0,TypeMemPtr.ISUSED0));
   public  static final TypeStruct SCALAR1    = make_args(ARGS_X ,ts(NO_DISP,SCALAR));
   public  static final TypeStruct LVAL_LEN   = make_args(ARGS_X ,ts(NO_DISP,TypeMemPtr.ARYPTR)); // Array
   public  static final TypeStruct LVAL_RD    = make_args(ARGS_XY,ts(NO_DISP,TypeMemPtr.ARYPTR,TypeInt.INT64)); // Array & index

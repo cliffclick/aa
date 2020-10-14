@@ -5,7 +5,8 @@ import com.cliffc.aa.type.*;
 
 // Proj memory
 public class MProjNode extends ProjNode {
-  public MProjNode( Node ifn, int idx ) { super(idx, ifn); }
+  public MProjNode( Node head, int idx ) { super(idx, head); }
+  public MProjNode( CallNode call, DefMemNode def, int idx ) { super(idx,call,def); }
   @Override String xstr() { return "MProj"+_idx; }
   @Override public boolean is_mem() { return true; }
   @Override public Node ideal(GVNGCM gvn, int level) {
@@ -19,6 +20,24 @@ public class MProjNode extends ProjNode {
     }
     return null;
   }
+
+  @Override public Type value(GVNGCM.Mode opt_mode) {
+    Type c = val(0);
+    if( c instanceof TypeTuple ) {
+      TypeTuple ct = (TypeTuple)c;
+      if( _idx < ct._ts.length ) {
+        Type t = ct.at(_idx);
+        // Break forward dead-alias cycles in recursive functions by inspecting
+        // dead-ness in DefMem.
+        if( in(0) instanceof CallNode )
+          t = t.join(in(1)._val);
+        return t;
+      }
+    }
+    return c.oob();
+  }
+
+
   @Override BitsAlias escapees() { return in(0).escapees(); }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // Only called here if alive, and input is more-than-basic-alive

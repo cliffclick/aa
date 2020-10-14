@@ -330,7 +330,7 @@ public class CallNode extends Node {
 
     // If GCP declares unresolved, fall to the NO-OP function & be an error.
     if( _not_resolved_by_gcp ) return Type.ALL;
-    
+
     final Type[] ts = Types.get(_defs._len+1);
     ts[0] = Type.CTRL;
 
@@ -538,7 +538,7 @@ public class CallNode extends Node {
       return choices;           // Report it low
     if( choices==BitsFun.EMPTY )// No good choices
       return sgn(fidxs,false);  // Report all the bad ones low
-    return sgn(choices,fidxs.above_center());
+    return sgn(choices,gcp && fidxs.above_center());
   }
 
   private static boolean x(int flags, int flag)  { return (flags&flag)==flag; }

@@ -531,8 +531,12 @@ public class TestNodeSmall {
     };
 
     // One-off jig for testing single combo
-    Type[] rez1 = check(gvn,sigs[2],mems[1],args[0],args[6]);
-    Type[] rez2 = check(gvn,sigs[2],mems[1],args[0],args[7]);
+    // Known easy fail: 0,0,0,[6,5]
+    // Known easy fail: 2,1,0,[6,7]
+    // Known easy fail: 1,0,0,[8,5]
+    // Known easy fail: 2,[1,0],0,7
+    Type[] rez1 = check(gvn,sigs[2],mems[1],args[0],args[8]);
+    Type[] rez2 = check(gvn,sigs[2],mems[0],args[0],args[8]);
     for( int k=0; k<rez1.length; k++ )
       assertTrue(rez1[k].isa(rez2[k]));
 

@@ -223,7 +223,7 @@ public final class CallEpiNode extends Node {
       switch( idx ) {
       case  0: actual = new FP2ClosureNode(call); break; // Filter Function Pointer to Closure
       case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); actual._live = live; break; // Always RPC is a constant
-      case -2: actual = new MProjNode(call,CallNode.MEMIDX); break;    // Memory into the callee
+      case -2: actual = new MProjNode(call,Env.DEFMEM,CallNode.MEMIDX); break;    // Memory into the callee
       default: actual = idx >= call.nargs()              // Check for args present
           ? new ConNode<>(Type.ALL) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
           : new ProjNode(idx+CallNode.ARGIDX, call); // Normal args
@@ -365,9 +365,9 @@ public final class CallEpiNode extends Node {
     Type tdn = dn._val;           // Get default type
     // Decide to take the pre-call or post-call value.
     TypeObj to = esc_in || esc_out ? (TypeObj)post.meet(pre) : pre;
+    if( tdn == TypeObj.UNUSED || tdn == TypeObj.ANY ) return TypeObj.UNUSED; // If dead, then dead
     // After/During GCP, this is the value
     if( opt_mode._CG ) return to;
-    if( tdn == TypeObj.UNUSED || tdn == TypeObj.ANY ) return TypeObj.UNUSED; // If dead, then dead
     // Before GCP, must use DefNode to keep types as strong as the Parser.
     if( !(dn instanceof MrgProjNode) ) // Some kind of constant.
       // TODO: Probably should just jam down mrgproj/new for these constants

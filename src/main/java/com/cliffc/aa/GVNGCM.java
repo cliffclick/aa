@@ -343,6 +343,10 @@ public class GVNGCM {
             if( useuse instanceof CallEpiNode )
               add_work(useuse);
           }
+        if( use instanceof NewStrNode.AddStrStr )
+          for( Node defuse : use._defs )
+            if( defuse != old )
+              add_work(defuse);
       }
       if( old instanceof FP2ClosureNode )
         add_work(old.in(0)); // Liveness update
@@ -529,7 +533,7 @@ public class GVNGCM {
       if( did_doms && _work._len != wlen-1 ) did_doms=false; // Did work, revisit doms
       // VERY EXPENSIVE ASSERT
       //assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
-      cnt++; assert cnt < 30000; // Catch infinite ideal-loops
+      cnt++; assert cnt < 35000; // Catch infinite ideal-loops
     }
     // No more ideal calls, small or large, to apply
     assert !Env.START.more_ideal(this,new VBitSet(),3);

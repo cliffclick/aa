@@ -104,22 +104,10 @@ public class ParmNode extends PhiNode {
     // so following Calls agree that SOME function will be called.
     // Check against formals; if OOB, always produce an error.
     Type formal = fun.formal(_idx);
-    // Good case: t.isa(formal).
-    if( t.isa(formal) )  return t.simple_ptr();
-
-    // TODO: Incoming type is in-error.  Most Types I can 'bound' and that
-    // counts as 'poisoned' enough to prevent further optimization
-    // (e.g. constant folding), so the Parm does not later go unused.  Not so
-    // for pointers, where a Load might find constants in memory, even from a
-    // bounded pointer.  The issue is, I am not ALSO bounding memory.
-    if( formal instanceof TypeMemPtr ) {
-      BitsAlias aliases = ((TypeMemPtr)formal)._aliases;
-      if( aliases==BitsAlias.FULL || aliases==BitsAlias.NZERO ) return formal;
-      if( aliases.isa(BitsAlias.RECORD_BITS0) ) return TypeMemPtr.OOP0.simple_ptr();
-      if( aliases.isa(BitsAlias.    STRBITS0) ) return TypeMemPtr.STR0.simple_ptr();
-      return TypeMemPtr.ARYPTR.simple_ptr();
-    }
-    return t.bound(formal);
+    // Good case:
+    if( t.isa(formal) ) return t.simple_ptr();
+    // Bad case: OOB, but up or down according to how close the formal is matched.
+    return t.oob_deep(formal);
   }
 
   @Override public ErrMsg err( boolean fast ) {

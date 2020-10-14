@@ -92,7 +92,7 @@ public class FunNode extends RegionNode {
 
   // Find FunNodes by fidx
   static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
-  public static void reset() { FUNS.clear(); }
+  public static void reset() { FUNS.clear(); _must_inline=0; }
   public static FunNode find_fidx( int fidx ) { return FUNS.atX(fidx); }
   int fidx() { return _fidx; }
 
@@ -249,6 +249,7 @@ public class FunNode extends RegionNode {
       return null;              // Done this before
 
     assert level==2; // Do not actually inline, if just checking that all forward progress was found
+    assert _must_inline==0; // Failed to inline a prior inline?
     if( path > 0 ) _must_inline = in(path).in(0)._uid;
 
     // --------------
