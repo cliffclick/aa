@@ -19,10 +19,10 @@ public class TestParse {
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
 
     // fails, oldval not defined on false arm of trinary
-    //test("_tab = [7];\n" +
+    //test("tab = [7];\n" +
     //     "put = { key val ->\n" +
-    //     "  idx = key.hash() % #_tab;\n" +
-    //     "  entry = _tab[idx];\n" +
+    //     "  idx = key.hash() % #tab;\n" +
+    //     "  entry = tab[idx];\n" +
     //     "  entry && key.eq(entry.key) ? (oldval=entry.val; entry.val:=val; ^oldval);\n" +
     //     "  0\n" +
     //     "};\n" +
@@ -42,8 +42,8 @@ public class TestParse {
     testerr("math_rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",3);
     test_isa("{x y -> x+y}", TypeFunPtr.make(TEST_FUNBITS,3,tdisp)); // {Scalar Scalar -> Scalar}
-    testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",19);
-    testerr("Point=:@{x;y}; Point((0,1))", "*(0; 1) is not a *Point:@{x:=; y:=}",21);
+    testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y' in @{x=1}",19);
+    testerr("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
     test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
     test("x=@{a:=1;noinline_b= {a=a+1;b=0}}; x.noinline_b(); x.a",TypeInt.NINT8);
 
@@ -296,8 +296,8 @@ public class TestParse {
     test_name("A= :(flt,int)", TypeFlt.FLT64,TypeInt.INT64);
     test_name("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
 
-    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*\"abc\"; 2)");
-    test_ptr("A= :(str?, int); A( (\"abc\",2) )","A:(*\"abc\"; 2)");
+    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*\"abc\", 2)");
+    test_ptr("A= :(str?, int); A( (\"abc\",2) )","A:(*\"abc\", 2)");
     testerr("A= :(str?, int)?","Named types are never nil",16);
   }
 
@@ -305,14 +305,14 @@ public class TestParse {
     TypeStruct dummy = TypeStruct.DISPLAY;
     // simple anon struct tests
     testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",14);
-    testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x'",8);
+    testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x' in @{x=1}",8);
     test   ("a=@{x=1.2;y;}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing semicolon optional
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3; v:=2}");
     testerr("(a=@{x=0;y=0}; a.)", "Missing field name after '.'",17);
-    testerr("a=@{x=0;y=0}; a.x=1; a","Cannot re-assign final field '.x'",16);
+    testerr("a=@{x=0;y=0}; a.x=1; a","Cannot re-assign final field '.x' in @{x=0; y=0}",16);
     test   ("a=@{x=0;y=1}; b=@{x=2}  ; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2; structs can be partially merged
-    testerr("a=@{x=0;y=1}; b=@{x=2}; c=math_rand(1)?a:b; c.y",  "Unknown field '.y'",46);
-    testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",19);
+    testerr("a=@{x=0;y=1}; b=@{x=2}; c=math_rand(1)?a:b; c.y",  "Unknown field '.y' in @{x=int8}",46);
+    testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y' in @{x=1}",19);
     test   ("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1;y=2})", TypeInt.con(5));     // passed in to func
     test   ("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1;y=2;z=3})", TypeInt.con(5)); // extra fields OK
     test   ("dist={p:@{x;y} -> p.x*p.x+p.y*p.y}; dist(@{x:=1;y:=2})", TypeInt.con(5)); // Typed func arg
@@ -346,7 +346,7 @@ public class TestParse {
     test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*@{x=1; y=2} is not a *Point:@{x:=; y:=}",55);
-    testerr ("Point=:@{x;y}; Point((0,1))", "*(0; 1) is not a *Point:@{x:=; y:=}",21);
+    testerr ("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
     test_obj_isa("x=@{n}",TypeStruct.make(new String[]{"^","n"},TypeStruct.ts(TypeMemPtr.OOP,Type.XNIL),new byte[]{TypeStruct.FFNL,TypeStruct.FRW}));
@@ -374,12 +374,12 @@ public class TestParse {
 
     // Building recursive types
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
-    test_ptr("A= :(str?, int); A(0,2)","A:(0; 2)");
+    test_ptr("A= :(str?, int); A(0,2)","A:(0, 2)");
     // Named recursive types
     test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(TypeStruct.ts(TypeMemPtr.NO_DISP,Type.XNIL,TypeInt.con(2))).set_name("A:")));
-    test_ptr("A= :(A?, int); A(0,2)","A:(0; 2)");
+    test_ptr("A= :(A?, int); A(0,2)","A:(0, 2)");
     test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*A:(0; 2); 3)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*A:(0, 2), 3)");
 
     // TODO: Needs a way to easily test simple recursive types
     TypeEnv te3 = Exec.go(Env.file_scope(Env.top_scope()),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
@@ -522,7 +522,7 @@ public class TestParse {
          "     ? @{ll=map(tree.l);vv=tree.v}"+
          "     : 0};"+
          "map(tmp)",
-            "Cannot re-assign final field '.l'",36);
+            "Cannot re-assign final field '.l' in @{l=*use; v:=0}",36);
 
     // Good tree-structure inference test
     test_ptr("tmp=@{"+
@@ -612,15 +612,15 @@ public class TestParse {
     // Test re-assignment in struct
     Type[] ts = TypeStruct.ts(TypeMemPtr.DISP_SIMPLE, TypeInt.con(1), TypeInt.con(2));
     test_obj_isa("x=@{n:=1;v:=2}", TypeStruct.make(FLDS, ts,new byte[]{TypeStruct.FFNL,TypeStruct.FRW,TypeStruct.FRW}));
-    testerr ("x=@{n =1;v:=2}; x.n  = 3; x.n", "Cannot re-assign final field '.n'",18);
+    testerr ("x=@{n =1;v:=2}; x.n  = 3; x.n", "Cannot re-assign final field '.n' in @{n=1; v:=2}",18);
     test    ("x=@{n:=1;v:=2}; x.n  = 3", TypeInt.con(3));
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3; v:=2}");
-    testerr ("x=@{n:=1;v:=2}; x.n  = 3; x.v = 1; x.n = 4; x.n", "Cannot re-assign final field '.n'",37);
+    testerr ("x=@{n:=1;v:=2}; x.n  = 3; x.v = 1; x.n = 4; x.n", "Cannot re-assign final field '.n' in @{n=3; v=1}",37);
     test    ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n", TypeInt.NINT8);
-    testerr ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5; tmp.n", "Cannot re-assign read-only field '.n'",63);
+    testerr ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5; tmp.n", "Cannot re-assign read-only field '.n' in @{n==nint8; v:=nint8}",63);
     test    ("x=@{n:=1;v:=2}; foo={q -> q.n=3}; foo(x); x.n",TypeInt.con(3)); // Side effects persist out of functions
     // Tuple assignment
-    testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0'",11);
+    testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0' in (1, 2)",11);
     // Final-only and read-only type syntax.
     testerr ("ptr2rw = @{f:=1}; ptr2final:@{f=} = ptr2rw; ptr2final", "*@{f:=1} is not a *@{f=; ...}",27); // Cannot cast-to-final
 
@@ -630,7 +630,7 @@ public class TestParse {
     test    ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; 2", TypeInt.con(2)); // Dead cast-away of final
     test    ("@{x:=1;y =2}:@{x;y=}.y", TypeInt.con(2)); // Allowed reading final field
     testerr ("f={ptr2final:@{x;y=} -> ptr2final.y  }; f(@{x:=1;y:=2})", "*@{x:=1; y:=2} is not a *@{x:=; y=; ...}",42); // Another version of casting-to-final
-    testerr ("f={ptr2final:@{x;y=} -> ptr2final.y=3; ptr2final}; f(@{x:=1;y =2})", "Cannot re-assign final field '.y'",34);
+    testerr ("f={ptr2final:@{x;y=} -> ptr2final.y=3; ptr2final}; f(@{x:=1;y =2})", "Cannot re-assign final field '.y' in @{x:=1; y=2}",34);
     test    ("f={ptr:@{x==;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).y", TypeInt.con(3)); // On field x, cast-away r/w for r/o
     test    ("f={ptr:@{x=;y:=} -> ptr.y=3; ptr}; f(@{x =1;y:=2}).y", TypeInt.con(3)); // On field x, cast-up r/o for final but did not read
     testerr ("f={ptr:@{x=;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).x", "*@{x:=1; y:=2} is not a *@{x=; y:=; ...}",37); // On field x, cast-up r/w for final and read

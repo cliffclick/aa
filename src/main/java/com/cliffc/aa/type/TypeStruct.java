@@ -162,7 +162,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         if( t==null ) sb.p("!");  // Graceful with broken types
         else if( t==SCALAR ) ;    // Default answer, do not print
         else t.str(sb,dups,mem,debug); // Recursively print field type
-        sb.p("; ");               // Between fields
+        sb.p(is_tup ? ", " : "; ");    // Between fields
         field_sep=true;
       }
       if( _open ) sb.p("...");    // More fields allowed

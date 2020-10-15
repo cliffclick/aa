@@ -634,10 +634,9 @@ public abstract class Node implements Cloneable {
     public static ErrMsg asserterr( Parse loc, Type actual, Type t0mem, Type expected ) {
       return typerr(loc,actual,t0mem,expected,Level.Assert);
     }
-    public static ErrMsg field(Parse loc, String msg, String fld, boolean closure, Type tadr) {
+    public static ErrMsg field(Parse loc, String msg, String fld, boolean closure, TypeObj to) {
       SB sb = new SB().p(msg).p(closure ? " val '" : " field '.").p(fld).p("'");
-      if( !(tadr instanceof TypeMemPtr && ((TypeMemPtr)tadr)._obj.getClass()==TypeObj.class) && tadr != Type.ANY )
-        tadr.str(sb.p(" in address "),new VBitSet(),null,false);
+      if( to != null && !closure ) to.str(sb.p(" in "),new VBitSet(),null,false);
       return new ErrMsg(loc,sb.toString(),Level.Field);
     }
     public static ErrMsg niladr(Parse loc, String msg, String fld) {

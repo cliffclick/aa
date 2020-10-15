@@ -4,9 +4,7 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.BitSet;
@@ -214,7 +212,7 @@ public class FunNode extends RegionNode {
     if( has_unknown_callers() ) {
       ParmNode mem = parm(-2);
       if( mem!=null && !mem._val.isa(Env.DEFMEM._val) )
-          return null; // Do not inline a bad memory type
+        return null; // Do not inline a bad memory type
     }
 
     // Look for appropriate type-specialize callers
@@ -245,7 +243,10 @@ public class FunNode extends RegionNode {
 
     // Check for dups (already done this but failed to resolve all calls, so trying again).
     TypeStruct fformals = formals;
-    if( path == -1 && FUNS.find(fun -> fun != null && !fun.is_dead() && fun._sig._formals==fformals && fun._sig._ret == _sig._ret && fun.in(1)==in(1) ) != -1 )
+    if( path == -1 && FUNS.find(fun -> fun != null && !fun.is_dead() &&
+                                fun._sig._formals==fformals && fun._sig._ret == _sig._ret &&
+                                fun.in(1)==in(1) &&
+                                Util.eq(_name,fun._name)) != -1 )
       return null;              // Done this before
 
     assert level==2; // Do not actually inline, if just checking that all forward progress was found
@@ -370,7 +371,8 @@ public class FunNode extends RegionNode {
     return null;
   }
 
-  // Check all uses are compatible with sharpening to a pointer
+  // Check all uses are compatible with sharpening to a pointer.
+  // TODO: Really should be a virtual call
   private static boolean bad_mem_use( Node n, TypeObj to) {
     for( Node use : n._uses ) {
       switch( use._op ) {
@@ -408,6 +410,9 @@ public class FunNode extends RegionNode {
         if( use instanceof MemPrimNode.LValueWrite || use instanceof MemPrimNode.LValueWriteFinal )
           if( ((MemPrimNode)use).idx() == n ) return true; // Use as index is broken
           else break;   // Use for array base or value is fine
+        if( use instanceof PrimNode.MulF64 ) return false;
+        if( use instanceof PrimNode.MulI64 ) return false;
+        if( use instanceof PrimNode.AndI64 ) return false;
         throw AA.unimpl();
       default: throw AA.unimpl();
       }

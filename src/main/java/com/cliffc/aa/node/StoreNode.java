@@ -108,30 +108,33 @@ public class StoreNode extends Node {
     if( def==val() ) return TypeMem.ESCAPE;// Value escapes
     throw com.cliffc.aa.AA.unimpl();       // Should not reach here
   }
-
+  
   @Override public ErrMsg err( boolean fast ) {
-    Type adr = adr()._val;
-    Type mem = mem()._val;
-    if( adr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when writing",_fld);
-    String msg = err0(adr,mem);
-    if( msg == null ) return null;
-    boolean closure = adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure;
-    return fast ? ErrMsg.FAST : ErrMsg.field(_bad,msg,_fld,closure,adr);
-  }
-  private String err0( Type adr, Type mem ) {
-    if( adr==Type.ANY ) return null;                     // No error
-    if( !(adr instanceof TypeMemPtr) ) return "Unknown"; // Too low, might not have any fields
-    if( mem instanceof TypeMem )
-      mem = ((TypeMem)mem).ld((TypeMemPtr)adr);
-    if( !(mem instanceof TypeStruct) ) return "No such";
-    TypeStruct ts = (TypeStruct)mem;
+    Type tadr = adr()._val;
+    if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when writing",_fld);
+    if( !(tadr instanceof TypeMemPtr) )
+      return bad("Unknown",fast,null); // Not a pointer nor memory, cannot store a field
+    TypeMemPtr ptr = (TypeMemPtr)tadr;
+    Type tmem = mem()._val;
+    if( tmem==Type.ALL ) return bad("Unknown",fast,null);
+    if( tmem==Type.ANY ) return null; // No error
+    TypeObj objs = tmem instanceof TypeMem
+      ? ((TypeMem)tmem).ld(ptr) // General load from memory
+      : ((TypeObj)tmem);
+    if( !(objs instanceof TypeStruct) ) return bad("No such",fast,objs);
+    TypeStruct ts = (TypeStruct)objs;
     int idx = ts.find(_fld);
-    if( idx == -1 )  return "No such";
+    if( idx==-1 ) return bad("No such",fast,objs);
     if( !ts.can_update(idx) ) {
       String fstr = TypeStruct.fstring(ts.fmod(idx));
-      return "Cannot re-assign "+fstr;
+      return bad("Cannot re-assign "+fstr,fast,ts);
     }
     return null;
+  }
+  private ErrMsg bad( String msg, boolean fast, TypeObj to ) {
+    if( fast ) return ErrMsg.FAST;
+    boolean is_closure = adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure;
+    return ErrMsg.field(_bad,msg,_fld,is_closure,to);
   }
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode()+_fin; }
   // Stores are can be CSE/equal, and we might force a partial execution to
