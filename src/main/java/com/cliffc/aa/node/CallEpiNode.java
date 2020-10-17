@@ -126,6 +126,7 @@ public final class CallEpiNode extends Node {
     Node rctl = ret.ctl();      // Control being returned
     Node rmem = ret.mem();      // Memory  being returned
     Node rrez = ret.val();      // Value   being returned
+    boolean inline = !fun.noinline();
     // If the function does nothing with memory, then use the call memory directly.
     if( (rmem instanceof ParmNode && rmem.in(0) == fun) || rmem._val==TypeMem.XMEM )
       rmem = cmem;
@@ -136,21 +137,20 @@ public final class CallEpiNode extends Node {
       return null;
 
     // Check for zero-op body (id function)
-    if( rrez instanceof ParmNode && rrez.in(0) == fun && cmem == rmem )
+    if( rrez instanceof ParmNode && rrez.in(0) == fun && cmem == rmem && inline )
       return inline(gvn,level,call, cctl,cmem,call.arg(((ParmNode)rrez)._idx), ret,call._uid);
     // Check for constant body
     Type trez = rrez._val;
-    if( trez.is_con() && rctl==fun && cmem == rmem)
+    if( trez.is_con() && rctl==fun && cmem == rmem && inline )
       return inline(gvn,level,call, cctl,cmem,gvn.con(trez),ret,call._uid);
 
     // Check for a 1-op body using only constants or parameters and no memory effects
-    boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem;
+    boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem && inline;
     for( Node parm : rrez._defs )
       if( parm != null && parm != fun &&
           !(parm instanceof ParmNode && parm.in(0) == fun) &&
           !(parm instanceof ConNode) )
         can_inline=false;       // Not trivial
-    if( fun.noinline() ) can_inline=false;
     if( can_inline ) {
       Node irez = rrez.copy(false,gvn);// Copy the entire function body
       irez._val = null;

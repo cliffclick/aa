@@ -18,6 +18,11 @@ public class TestParse {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
 
+    // parametric polymorphism
+    test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",TypeStruct.make_tuple(Type.XNIL,TypeInt.con(5),TypeInt.con(3)));
+
+
+
     // fails, oldval not defined on false arm of trinary
     //test("tab = [7];\n" +
     //     "put = { key val ->\n" +
