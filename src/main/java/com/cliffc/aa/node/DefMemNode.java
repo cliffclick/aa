@@ -17,6 +17,7 @@ public class DefMemNode extends Node {
         tos[i] = nnn != null ? nnn._crushed : TypeObj.UNUSED;
       } else {                  // Collapsed NewNode
         Type tn = n._val;
+        if( tn instanceof TypeMem ) tn = ((TypeMem)tn).at(i);
         tos[i] = tn instanceof TypeObj ? (TypeObj)tn : tn.oob(TypeObj.ISUSED);
       }
     }

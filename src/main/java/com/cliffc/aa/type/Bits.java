@@ -372,6 +372,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       bs.set(alias);
     return bs;
   }
+  public TypeObj oob(TypeObj t) { return above_center() ? (TypeObj)t.dual() : t; }
 
   // Bits are split in a tree like pattern, recorded here.  To avoid rehashing,
   // the exact same tree-split is handed out between tests.  Basically there is

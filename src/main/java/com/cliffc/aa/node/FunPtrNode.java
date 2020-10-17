@@ -41,8 +41,10 @@ public final class FunPtrNode extends Node {
     // Display is known dead?  Yank it.
     if( display().in(0) instanceof NewNode ) {
       NewNode nn = (NewNode)display().in(0);
-      if( nn._ts==nn.dead_type() )
-        return set_def(1,gvn.con(TypeMemPtr.make(nn._tptr._aliases,TypeObj.UNUSED)),gvn); // No display needed
+      if( nn._ts==nn.dead_type() ) {
+        BitsAlias aliases = nn._tptr._aliases;
+        return set_def(1,gvn.con(TypeMemPtr.make(aliases,aliases.oob(TypeObj.ISUSED))),gvn); // No display needed
+      }
     }
 
     // Remove unused displays.  Track uses; Calls with no FPClosure are OK.

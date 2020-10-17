@@ -28,7 +28,7 @@ public class ThretNode extends Node {
     if( def==ctrl() ) return TypeMem.ALIVE;
     if( def==mem () ) return _live;
     if( def==rez () ) return TypeMem.ESCAPE;
-    if( def==thunk()) return _live;
+    if( def==thunk()) return TypeMem.ALIVE;
     throw com.cliffc.aa.AA.unimpl();
   }
 }

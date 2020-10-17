@@ -270,8 +270,8 @@ public class CallNode extends Node {
       Node progress = null;
       for( int i=1; i<nargs(); i++ ) // Skip the FP/DISPLAY arg, as its useful for error messages
         if( ProjNode.proj(this,i+ARGIDX)==null &&
-            !(arg(i) instanceof ConNode && arg(i)._val==Type.ANY) ) // Not already folded
-          progress = set_arg(i,gvn.con(Type.ANY),gvn); // Kill dead arg
+            !(arg(i) instanceof ConNode) ) // Not already folded
+          progress = set_arg(i,gvn.con(targ(tcall,i)),gvn); // Kill dead arg
       if( progress != null ) return this;
     }
 
@@ -341,7 +341,7 @@ public class CallNode extends Node {
       as = as.meet(get_alias(opt_mode,ts[i+ARGIDX] = arg(i)._val,i));
     // Recursively search memory for aliases; compute escaping aliases
     BitsAlias as2 = tmem.all_reaching_aliases(as);
-    ts[_defs._len] = TypeMemPtr.make(as2,TypeObj.UNUSED);
+    ts[_defs._len] = TypeMemPtr.make(as2,TypeObj.ISUSED);
     ts[MEMIDX]=tmem;         // Memory into the callee, not caller
 
     // Not a function to call?
@@ -443,7 +443,8 @@ public class CallNode extends Node {
     // Needed to sharpen args for e.g. resolve and errors.
     Type tcall = _val;
     Type tcmem = mem()._val;
-    if( !(tcall instanceof TypeTuple) || !(tcmem instanceof TypeMem) ) return _live; // No type to sharpen
+    if( !(tcall instanceof TypeTuple) || !(tcmem instanceof TypeMem) ) // No type to sharpen
+      return tcall.oob(TypeMem.ALLMEM);
     TypeMem caller_mem = (TypeMem)tcmem;
     BitsAlias aliases = BitsAlias.EMPTY;
     for( int i=1; i<nargs(); i++ ) {
@@ -576,7 +577,6 @@ public class CallNode extends Node {
     int flags=0;
     for( int j=0; j<nargs(); j++ ) {
       Type formal = formals.at(j);
-      if( fun.parm(j)==null ) continue;     // Arg is ignored
       Type actual = targ(targs,j);          // Calls skip ctrl & mem
       if( j==0 && actual instanceof TypeFunPtr )
         actual = ((TypeFunPtr)actual)._disp; // Extract Display type from TFP

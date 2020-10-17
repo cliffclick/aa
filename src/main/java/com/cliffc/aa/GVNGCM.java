@@ -415,8 +415,10 @@ public class GVNGCM {
         !(n instanceof CallNode) &&       // Keep for proper errors
         !(n instanceof UnresolvedNode) && // Keep for proper errors
         !(n instanceof RetNode) &&        // Keep for proper errors
-        !(n instanceof ConNode) )         // Already a constant
-      { n._val = null; return con(Type.ANY); } // Replace non-constants with high (dead) constants
+        !(n instanceof ConNode) ) {       // Already a constant
+      n._val = null;        // Replace non-constants with high (dead) constants
+      return con(oval);
+    }
 
     // [ts!] Compute best type, and type is IN ts
     Type nval = n.value(_opt_mode); // Get best type
@@ -587,11 +589,11 @@ public class GVNGCM {
         if( n.is_dead() ) continue; // Can be dead functions after removing ambiguous calls
 
         // Forwards flow
-        Type ot = n._val;                              // Old type
-        Type nt = n.value(_opt_mode);                  // New type
-        if( ot != nt ) {                               // Progress
-          if( !check_monotonicity(n,ot,nt) ) continue; // Debugging hook
-          n._val = nt;           // Record progress
+        Type oval = n._val;                                // Old type
+        Type nval = n.value(_opt_mode);                    // New type
+        if( oval != nval ) {                               // Progress
+          if( !check_monotonicity(n,oval,nval) ) continue; // Debugging hook
+          n._val = nval;           // Record progress
           // Classic forwards flow on change:
           for( Node use : n._uses ) {
             if( use==n ) continue; // Stop self-cycle (not legit, but happens during debugging)
@@ -630,11 +632,11 @@ public class GVNGCM {
         }
 
         // Reverse flow
-        TypeMem old = n._live;
-        TypeMem nnn = n.live(_opt_mode);
-        if( old != nnn ) {      // Liveness progress
-          assert old.isa(nnn);  // Monotonically improving
-          n._live = nnn;
+        TypeMem oliv = n._live;
+        TypeMem nliv = n.live(_opt_mode);
+        if( oliv != nliv ) {      // Liveness progress
+          if( !check_monotonicity(n,oliv,nliv) ) continue; // Debugging hook
+          n._live = nliv;
           add_work_defs(n);    // Put defs on worklist... liveness flows uphill
           if( n.live_changes_value() )
             add_work(n);

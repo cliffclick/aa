@@ -178,7 +178,7 @@ public abstract class PrimNode extends Node {
     add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
     if( _thunk_rhs ) add_def(mem);      // Memory if thunking
     for( int i=1; i<_sig.nargs(); i++ ) // First is display
-      add_def(gvn.xform(new ParmNode(i,_sig.fld(i),fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
+      add_def(gvn.xform(new ParmNode(i,_sig.fld(i),fun, gvn.con(Type.ALL),null)));
     gvn.init(this);
     Node ctl,rez;
     if( _thunk_rhs ) {
