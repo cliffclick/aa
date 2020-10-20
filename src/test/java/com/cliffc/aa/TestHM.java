@@ -32,6 +32,23 @@ public class TestHM {
     assertEquals("{ v2 -> pair(3,v2) }",rez);
   }
 
+  @Test
+  public void test3() {
+    // let fact = {n -> (if/else (==0 n) 1 (* n (fact (dec n))))} in (fact 5);
+    Syntax syn =
+      new Let("fact",
+              new Lambda("n",
+                         new Apply(new Apply( new Apply(new Ident("if/else"),
+                                                        new Apply(new Ident("==0"),new Ident("n"))),
+                                              new Con(TypeInt.con(1))),
+                                   new Apply(new Apply(new Ident("*"), new Ident("n")),
+                                             new Apply(new Ident("fact"),
+                                                       new Apply(new Ident("dec"),new Ident("n")))))),
+              new Apply(new Ident("fact"), new Con(TypeInt.con(5))));
+    HMType t = HM.HM(syn);
+    String rez = t.str();
+    assertEquals("{ v2 -> pair(3,v2) }",rez);
+  }
 
 
 }

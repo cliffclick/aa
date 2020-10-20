@@ -2,6 +2,7 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeInt;
 import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
@@ -17,9 +18,21 @@ public class HM {
   public static HMType HM(Syntax prog) {
 
     HashMap<String,HMType> env = new HashMap<>();
+    // Simple types
+    HMBase bool  = new HMBase(TypeInt.BOOL);
+    HMBase int64 = new HMBase(TypeInt.INT64);
+    
+    // Primitives
     HMVar var1 = new HMVar();
     HMVar var2 = new HMVar();
     env.put("pair",new HMFun(var1, new HMFun(var2, new Oper("pair",var1,var2))));
+    
+    HMVar var3 = new HMVar();
+    env.put("if/else",new HMFun(bool,new HMFun(var3,new HMFun(var3,var3))));
+
+    env.put("dec",new HMFun(int64,int64));
+    env.put("*",new HMFun(int64,new HMFun(int64,int64)));
+    env.put("==0",new HMFun(int64,bool));
 
     return prog.hm(env, new HashSet<>());
   }
@@ -44,7 +57,8 @@ public class HM {
     @Override HMType hm(HashMap<String,HMType> env, HashSet<HMVar> nongen) {
       HMType t = env.get(_name);
       if( t==null ) throw new RuntimeException("Parse error, "+_name+" is undefined");
-      return t;
+      HMType f = t.fresh(nongen);
+      return f;
     }
   }
   public static class Lambda extends Syntax {
@@ -54,6 +68,23 @@ public class HM {
     @Override public String toString() { return "{ "+_arg0+" -> "+_body+" }"; }
     @Override HMType hm(HashMap<String,HMType> env, HashSet<HMVar> nongen) {
       throw com.cliffc.aa.AA.unimpl();
+    }
+  }
+  public static class Let extends Syntax {
+    final String _arg0;
+    final Syntax _def, _body;
+    Let(String arg0, Syntax def, Syntax body) { _arg0=arg0; _def=def; _body=body; }
+    @Override public String toString() { return "let "+_arg0+" = "+_def+" in "+_body+" }"; }
+    @Override HMType hm(HashMap<String,HMType> env, HashSet<HMVar> nongen) {
+      HMVar tndef = new HMVar();
+      HashMap<String,HMType> newenv = new HashMap<>(env);
+      newenv.put(_arg0,tndef);
+      HashSet<HMVar> newgen = new HashSet<>(nongen);
+      nongen.add(tndef);
+      HMType tdef = _def.hm(newenv,newgen);
+      tndef.union(tdef);
+      HMType trez = _body.hm(newenv,nongen);
+      return trez;
     }
   }
   public static class Apply extends Syntax {
@@ -78,6 +109,26 @@ public class HM {
     abstract HMType find();
     public String str() { return find()._str(); }
     abstract String _str();
+    
+    HMType fresh(HashSet<HMVar> nongen) {
+      HashMap<HMVar,HMVar> vars = new HashMap<>();
+      return _fresh(nongen,vars);
+    }
+    HMType _fresh(HashSet<HMVar> nongen, HashMap<HMVar,HMVar> vars) {
+      HMType t2 = find();
+      if( t2 instanceof HMVar ) {
+        HMVar v2 = (HMVar)t2;
+        return !occurs_in(v2,nongen)
+          ? vars.getOrElseUpdate(t2, new HMVar())
+          : t2;
+      } else {
+        Oper op = (Oper)t2;
+        HMType[] args = new HMType[op._args.length];
+        for( int i=0; i<args.length; i++ )
+          args[i] = op._args[i]._fresh(nongen,vars);
+        return new Oper(op._name,args);
+      }
+    }
   }
 
   private static class HMVar extends HMType {
