@@ -470,6 +470,8 @@ Ideas, Desirables
 * Parallel (and distributed) but also deterministic
 * "eval"
 * Monads?  i/o, side-effect monads.
+* "back tick" computing, meta-computing
+
 
 lifetime:
 
