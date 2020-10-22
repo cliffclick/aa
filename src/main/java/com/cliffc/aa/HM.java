@@ -120,16 +120,15 @@ public class HM {
     boolean is_top() { return _u==null; }
 
     HMType fresh(HashSet<HMVar> nongen) {
-      HashMap<HMVar,HMVar> vars = new HashMap<>();
+      HashMap<HMType,HMType> vars = new HashMap<>();
       return _fresh(nongen,vars);
     }
-    HMType _fresh(HashSet<HMVar> nongen, HashMap<HMVar,HMVar> vars) {
+    HMType _fresh(HashSet<HMVar> nongen, HashMap<HMType,HMType> vars) {
       HMType t2 = find();
       if( t2 instanceof HMVar ) {
-        HMVar v2 = (HMVar)t2;
-        return v2.occurs_in(nongen) //
-          ? v2                      // Keep same var
-          : vars.computeIfAbsent(v2, e -> new HMVar(v2._t));
+        return t2.occurs_in(nongen) //
+          ? t2                      // Keep same var
+          : vars.computeIfAbsent(t2, e -> new HMVar(((HMVar)t2)._t));
       } else {
         Oper op = (Oper)t2;
         HMType[] args = new HMType[op._args.length];
