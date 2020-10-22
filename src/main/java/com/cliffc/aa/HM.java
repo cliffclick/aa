@@ -68,11 +68,12 @@ public class HM {
     @Override public String toString() { return "{ "+_arg0+" -> "+_body+" }"; }
     @Override HMType hm(HashMap<String,HMType> env, HashSet<HMVar> nongen) {
       HMVar tnew = new HMVar();
-      HashMap<String,HMType> newenv = new HashMap<>(env);
-      newenv.put(_arg0,tnew);
-      HashSet<HMVar> newgen = new HashSet<>(nongen);
-      newgen.add(tnew);
-      HMType trez = _body.hm(newenv,newgen);
+      // Push _arg0->tnew into env & nongen, popping them off after doing body
+      env.put(_arg0,tnew);
+      nongen.add(tnew);
+      HMType trez = _body.hm(env,nongen);
+      nongen.remove(tnew);
+      env.remove(_arg0);
       return new HMFun(tnew,trez);
     }
   }
@@ -83,13 +84,14 @@ public class HM {
     @Override public String toString() { return "let "+_arg0+" = "+_def+" in "+_body+" }"; }
     @Override HMType hm(HashMap<String,HMType> env, HashSet<HMVar> nongen) {
       HMVar tndef = new HMVar();
-      HashMap<String,HMType> newenv = new HashMap<>(env);
-      newenv.put(_arg0,tndef);
-      HashSet<HMVar> newgen = new HashSet<>(nongen);
-      newgen.add(tndef);
-      HMType tdef = _def.hm(newenv,newgen);
+      // Push _arg0->tnew into env & nongen, popping them off after doing body
+      env.put(_arg0,tndef);
+      nongen.add(tndef);
+      HMType tdef = _def.hm(env,nongen);
+      nongen.remove(tndef);
       tndef.union(tdef);
-      HMType trez = _body.hm(newenv,nongen);
+      HMType trez = _body.hm(env,nongen);
+      env.remove(_arg0);
       return trez;
     }
   }

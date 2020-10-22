@@ -101,7 +101,7 @@ public class TestHM {
   public void test8() {
     // example that demonstrates generic and non-generic variables:
     // fn g => let f = fn x => g in pair (f 3, f true)
-    Syntax syn = 
+    Syntax syn =
       new Lambda("g",
                  new Let("f",
                          new Lambda("x", new Ident("g")),
@@ -119,7 +119,7 @@ public class TestHM {
   public void test9() {
     // Function composition
     // fn f (fn g (fn arg (f g arg)))
-    Syntax syn = 
+    Syntax syn =
       new Lambda("f", new Lambda("g", new Lambda("arg", new Apply(new Ident("g"), new Apply(new Ident("f"), new Ident("arg"))))));
 
     HMType t1 = HM.HM(syn);
