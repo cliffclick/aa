@@ -115,6 +115,7 @@ public class HM {
     abstract HMType find();
     public String str() { return find()._str(); }
     abstract String _str();
+    boolean is_top() { return _u==null; }
 
     HMType fresh(HashSet<HMVar> nongen) {
       HashMap<HMVar,HMVar> vars = new HashMap<>();
@@ -124,7 +125,7 @@ public class HM {
       HMType t2 = find();
       if( t2 instanceof HMVar ) {
         HMVar v2 = (HMVar)t2;
-        return occurs_in(v2,nongen) //
+        return v2.occurs_in(nongen) //
           ? v2                      // Keep same var
           : vars.computeIfAbsent(v2, e -> new HMVar(v2._t));
       } else {
@@ -138,20 +139,21 @@ public class HM {
       }
     }
 
-    static boolean occurs_in(HMVar v, HashSet<HMVar>nongen) {
-      for( HMVar x : nongen ) if( x.occurs_in_type(v) ) return true;
+    boolean occurs_in(HashSet<HMVar>nongen) {
+      for( HMVar x : nongen ) if( occurs_in_type(x) ) return true;
       return false;
     }
-    static boolean occurs_in(HMVar v, HMType[] args) {
-      for( HMType x : args ) if( x.occurs_in_type(v) ) return true;
+    boolean occurs_in(HMType[] args) {
+      for( HMType x : args ) if( occurs_in_type(x) ) return true;
       return false;
     }
-    boolean occurs_in_type(HMVar v) {
-      HMType y = find();
-      if( y==v )
+    boolean occurs_in_type(HMType v) {
+      assert is_top();
+      HMType y = v.find();
+      if( y==this )
         return true;
       if( y instanceof Oper )
-        return occurs_in(v,((Oper)y)._args);
+        return occurs_in(((Oper)y)._args);
       return false;
     }
   }
@@ -164,7 +166,6 @@ public class HM {
     HMVar(Type t) { _uid=CNT++; _t=t; }
     static void reset() { CNT=1; }
     public Type type() { assert is_top(); return _t; }
-    boolean is_top() { return _u==null; }
     @Override public String toString() {
       String s = _str();
       if( _u!=null ) s += ">>"+_u;
@@ -186,15 +187,19 @@ public class HM {
       while( x._u!=u ) { HMType tmp = x._u; x._u=u; x=tmp;}
       return u;
     }
-    @Override HMType union(HMType other) {
-      if( _u!=null ) return find().union(other);
-      if( other instanceof HMVar ) other = other.find();
-      if( this==other ) return this; // Do nothing
-      // TODO: Occurs+_in check
-      if( other instanceof HMVar )
-        ((HMVar)other)._t = _t.meet(((HMVar)other)._t);
+    @Override HMType union(HMType that) {
+      if( _u!=null ) return find().union(that);
+      if( that instanceof HMVar ) that = that.find();
+      if( this==that ) return this; // Do nothing
+      if( occurs_in_type(that) )
+        throw new RuntimeException("recursive unification");
+
+      if( that instanceof HMVar ) {
+        HMVar v2 = (HMVar)that;
+        v2._t = _t.meet(v2._t);
+      }
       else assert _t==Type.ANY; // Else this var is un-MEETd with any Con
-      return _u = other;        // Classic U-F union
+      return _u = that;         // Classic U-F union
     }
   }
 

@@ -59,7 +59,71 @@ public class TestHM {
                                      new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
                            new Apply(new Ident("x"), new Con(TypeStr.ABC))));
     HMType t1 = HM.HM(x);
-    assertEquals("{ {v9:all -> v7} -> pair(v7,v7) }",t1.str());
+    assertEquals("{ { v9:all -> v7 } -> pair(v7,v7) }",t1.str());
+  }
+
+  @Test
+  public void test5() {
+    // ({ x -> (pair (x 3) (x "abc")) } {x->x})
+    Syntax x =
+      new Apply(new Lambda("x",
+                           new Apply(new Apply(new Ident("pair"),
+                                               new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
+                                     new Apply(new Ident("x"), new Con(TypeStr.ABC)))),
+                new Lambda("x", new Ident("x")));
+
+    HMType t1 = HM.HM(x);
+    assertEquals("pair(v15:all,v15:all)",t1.str());
+  }
+
+
+  @Test(expected = RuntimeException.class)
+  public void test6() {
+    // recursive unification
+    // fn f => f f (fail)
+    Syntax x =
+      new Lambda("f", new Apply(new Ident("f"), new Ident("f")));
+    HM.HM(x);
+  }
+
+  @Test
+  public void test7() {
+    // let g = fn f => 5 in g g
+    Syntax x =
+      new Let("g",
+              new Lambda("f", new Con(TypeInt.con(5))),
+              new Apply(new Ident("g"), new Ident("g")));
+    HMType t1 = HM.HM(x);
+    assertEquals("v10:5",t1.str());
+  }
+
+  @Test
+  public void test8() {
+    // example that demonstrates generic and non-generic variables:
+    // fn g => let f = fn x => g in pair (f 3, f true)
+    Syntax syn = 
+      new Lambda("g",
+                 new Let("f",
+                         new Lambda("x", new Ident("g")),
+                         new Apply(
+                                   new Apply(new Ident("pair"),
+                                             new Apply(new Ident("f"), new Con(TypeInt.con(3)))
+                                             ),
+                                   new Apply(new Ident("f"), new Con(TypeInt.con(1))))));
+
+    HMType t1 = HM.HM(syn);
+    assertEquals("{ v9 -> pair(v9,v9) }",t1.str());
+  }
+
+  @Test
+  public void test9() {
+    // Function composition
+    // fn f (fn g (fn arg (f g arg)))
+    Syntax syn = 
+      new Lambda("f", new Lambda("g", new Lambda("arg", new Apply(new Ident("g"), new Apply(new Ident("f"), new Ident("arg"))))));
+
+    HMType t1 = HM.HM(syn);
+    assertEquals("{ { v8 -> v9 } -> { { v9 -> v10 } -> { v8 -> v10 } } }",t1.str());
   }
 
 }
