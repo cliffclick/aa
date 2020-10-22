@@ -1,8 +1,7 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.Node;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeInt;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
@@ -19,14 +18,14 @@ public class HM {
 
     HashMap<String,HMType> env = new HashMap<>();
     // Simple types
-    HMBase bool  = new HMBase(TypeInt.BOOL);
-    HMBase int64 = new HMBase(TypeInt.INT64);
-    
+    HMVar bool  = new HMVar(TypeInt.BOOL);
+    HMVar int64 = new HMVar(TypeInt.INT64);
+
     // Primitives
     HMVar var1 = new HMVar();
     HMVar var2 = new HMVar();
     env.put("pair",new HMFun(var1, new HMFun(var2, new Oper("pair",var1,var2))));
-    
+
     HMVar var3 = new HMVar();
     env.put("if/else",new HMFun(bool,new HMFun(var3,new HMFun(var3,var3))));
 
@@ -47,7 +46,7 @@ public class HM {
     Con(Type t) { _t=t; }
     @Override public String toString() { return _t.toString(); }
     @Override HMType hm(HashMap<String,HMType> env, HashSet<HMVar> nongen) {
-      return new HMBase(_t);
+      return new HMVar(_t);
     }
   }
   public static class Ident extends Syntax {
@@ -56,7 +55,8 @@ public class HM {
     @Override public String toString() { return _name; }
     @Override HMType hm(HashMap<String,HMType> env, HashSet<HMVar> nongen) {
       HMType t = env.get(_name);
-      if( t==null ) throw new RuntimeException("Parse error, "+_name+" is undefined");
+      if( t==null )
+        throw new RuntimeException("Parse error, "+_name+" is undefined");
       HMType f = t.fresh(nongen);
       return f;
     }
@@ -67,7 +67,13 @@ public class HM {
     Lambda(String arg0, Syntax body) { _arg0=arg0; _body=body; }
     @Override public String toString() { return "{ "+_arg0+" -> "+_body+" }"; }
     @Override HMType hm(HashMap<String,HMType> env, HashSet<HMVar> nongen) {
-      throw com.cliffc.aa.AA.unimpl();
+      HMVar tnew = new HMVar();
+      HashMap<String,HMType> newenv = new HashMap<>(env);
+      newenv.put(_arg0,tnew);
+      HashSet<HMVar> newgen = new HashSet<>(nongen);
+      newgen.add(tnew);
+      HMType trez = _body.hm(newenv,newgen);
+      return new HMFun(tnew,trez);
     }
   }
   public static class Let extends Syntax {
@@ -80,7 +86,7 @@ public class HM {
       HashMap<String,HMType> newenv = new HashMap<>(env);
       newenv.put(_arg0,tndef);
       HashSet<HMVar> newgen = new HashSet<>(nongen);
-      nongen.add(tndef);
+      newgen.add(tndef);
       HMType tdef = _def.hm(newenv,newgen);
       tndef.union(tdef);
       HMType trez = _body.hm(newenv,nongen);
@@ -109,7 +115,7 @@ public class HM {
     abstract HMType find();
     public String str() { return find()._str(); }
     abstract String _str();
-    
+
     HMType fresh(HashSet<HMVar> nongen) {
       HashMap<HMVar,HMVar> vars = new HashMap<>();
       return _fresh(nongen,vars);
@@ -118,38 +124,76 @@ public class HM {
       HMType t2 = find();
       if( t2 instanceof HMVar ) {
         HMVar v2 = (HMVar)t2;
-        return !occurs_in(v2,nongen)
-          ? vars.getOrElseUpdate(t2, new HMVar())
-          : t2;
+        return occurs_in(v2,nongen) //
+          ? v2                      // Keep same var
+          : vars.computeIfAbsent(v2, e -> new HMVar(v2._t));
       } else {
         Oper op = (Oper)t2;
         HMType[] args = new HMType[op._args.length];
         for( int i=0; i<args.length; i++ )
           args[i] = op._args[i]._fresh(nongen,vars);
+
+        if( op instanceof HMFun  ) return new HMFun (args[0],args[1]);
         return new Oper(op._name,args);
       }
     }
+
+    static boolean occurs_in(HMVar v, HashSet<HMVar>nongen) {
+      for( HMVar x : nongen ) if( x.occurs_in_type(v) ) return true;
+      return false;
+    }
+    static boolean occurs_in(HMVar v, HMType[] args) {
+      for( HMType x : args ) if( x.occurs_in_type(v) ) return true;
+      return false;
+    }
+    boolean occurs_in_type(HMVar v) {
+      HMType y = find();
+      if( y==v )
+        return true;
+      if( y instanceof Oper )
+        return occurs_in(v,((Oper)y)._args);
+      return false;
+    }
   }
 
-  private static class HMVar extends HMType {
+  static class HMVar extends HMType {
+    private Type _t;
     private final int _uid;
     private static int CNT;
-    HMVar() { _uid=CNT++; }
+    HMVar() { this(Type.ANY); }
+    HMVar(Type t) { _uid=CNT++; _t=t; }
     static void reset() { CNT=1; }
-    @Override public String toString() { return "v"+_uid+((_u==null)? "" : ">>"+_u); }
-    @Override public String _str() { return "v"+_uid; }
-    
+    public Type type() { assert is_top(); return _t; }
+    boolean is_top() { return _u==null; }
+    @Override public String toString() {
+      String s = _str();
+      if( _u!=null ) s += ">>"+_u;
+      return s;
+    }
+    @Override public String _str() {
+      String s = "v"+_uid;
+      if( _t!=Type.ANY ) s += ":"+_t;
+      return s;
+    }
+
     @Override HMType find() {
-      if( _u==null ) return this; // Top of union tree
-      if( _u._u==null ) return _u; // One-step from top
-      throw com.cliffc.aa.AA.unimpl();
+      HMType u = _u;
+      if( u==null ) return this; // Top of union tree
+      if( u._u==null ) return u; // One-step from top
+      // Classic U-F rollup
+      while( u._u!=null ) u = u._u; // Find the top
+      HMType x = this;              // Collapse all to top
+      while( x._u!=u ) { HMType tmp = x._u; x._u=u; x=tmp;}
+      return u;
     }
     @Override HMType union(HMType other) {
       if( _u!=null ) return find().union(other);
-      //if( other instanceof HMVar ) other = ((HMVar)other).find();
-      if( this==other )
-        throw com.cliffc.aa.AA.unimpl(); // Do nothing
+      if( other instanceof HMVar ) other = other.find();
+      if( this==other ) return this; // Do nothing
       // TODO: Occurs+_in check
+      if( other instanceof HMVar )
+        ((HMVar)other)._t = _t.meet(((HMVar)other)._t);
+      else assert _t==Type.ANY; // Else this var is un-MEETd with any Con
       return _u = other;        // Classic U-F union
     }
   }
@@ -165,7 +209,7 @@ public class HM {
         sb.p(t.str()).p(',');
       return sb.unchar().p(')').toString();
     }
-    
+
     @Override HMType find() { return this; }
     @Override HMType union(HMType that) {
       if( !(that instanceof Oper) ) return that.union(this);
@@ -186,12 +230,4 @@ public class HM {
     }
   }
 
-  public static class HMBase extends Oper {
-    private Type _t;
-    public HMBase(Type t) { super("con"); _t = t; }
-    Type type() { return _t; }
-    public void meet(Type t) { _t=_t.meet(t); }
-    @Override public String toString() { return _t.toString(); }
-    @Override public String _str() { return _t.toString(); }
-  }
 }
