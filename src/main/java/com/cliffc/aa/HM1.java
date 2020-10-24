@@ -1,21 +1,20 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeInt;
+import com.cliffc.aa.node.Node;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 
-// Hindley-Milner typing.  Complete stand-alone, for research.  MEETs base
-// types, instead of declaring type error.  Requires SSA renumbering; uses a
-// global Env instead locally tracking.
-public class HM {
-  static final HashMap<String,HMType> ENV = new HashMap<>();
-
+// Hindley-Milner typing.  Complete stand-alone, for research.
+// MEETs base types, instead of declaring type error.
+// Does standard lexical scoping, which is not needed for SSA form.
+public class HM1 {
   public static HMType HM(Syntax prog) {
 
+    HashMap<String,HMType> env = new HashMap<>();
     // Simple types
     HMVar bool  = new HMVar(TypeInt.BOOL);
     HMVar int64 = new HMVar(TypeInt.INT64);
@@ -23,90 +22,89 @@ public class HM {
     // Primitives
     HMVar var1 = new HMVar();
     HMVar var2 = new HMVar();
-    ENV.put("pair",Oper.fun(var1, Oper.fun(var2, new Oper("pair",var1,var2))));
+    env.put("pair",Oper.fun(var1, Oper.fun(var2, new Oper("pair",var1,var2))));
 
     HMVar var3 = new HMVar();
-    ENV.put("if/else",Oper.fun(bool,Oper.fun(var3,Oper.fun(var3,var3))));
+    env.put("if/else",Oper.fun(bool,Oper.fun(var3,Oper.fun(var3,var3))));
 
-    ENV.put("dec",Oper.fun(int64,int64));
-    ENV.put("*",Oper.fun(int64,Oper.fun(int64,int64)));
-    ENV.put("==0",Oper.fun(int64,bool));
+    env.put("dec",Oper.fun(int64,int64));
+    env.put("*",Oper.fun(int64,Oper.fun(int64,int64)));
+    env.put("==0",Oper.fun(int64,bool));
 
-    // Prep for SSA: pre-gather all the (unique) ids
-    prog.get_ids();
-
-    return prog.hm(new HashSet<>());
+    return prog.hm(env, new HashSet<>());
   }
   static void reset() { HMVar.reset(); }
 
 
   public static abstract class Syntax {
-    abstract HMType hm(HashSet<HMVar> nongen);
-    abstract void get_ids();
+    abstract HMType hm(HashMap<String,HMType> env, HashSet<HMVar> nongen);
   }
   public static class Con extends Syntax {
     final Type _t;
     Con(Type t) { _t=t; }
     @Override public String toString() { return _t.toString(); }
-    @Override HMType hm(HashSet<HMVar> nongen) { return new HMVar(_t); }
-    @Override void get_ids() {}
+    @Override HMType hm(HashMap<String,HMType> env, HashSet<HMVar> nongen) {
+      return new HMVar(_t);
+    }
   }
   public static class Ident extends Syntax {
     final String _name;
     Ident(String name) { _name=name; }
     @Override public String toString() { return _name; }
-    @Override HMType hm(HashSet<HMVar> nongen) {
-      HMType t = ENV.get(_name);
+    @Override HMType hm(HashMap<String,HMType> env, HashSet<HMVar> nongen) {
+      HMType t = env.get(_name);
       if( t==null )
         throw new RuntimeException("Parse error, "+_name+" is undefined");
       HMType f = t.fresh(nongen);
       return f;
     }
-    @Override void get_ids() {}
   }
   public static class Lambda extends Syntax {
     final String _arg0;
     final Syntax _body;
     Lambda(String arg0, Syntax body) { _arg0=arg0; _body=body; }
     @Override public String toString() { return "{ "+_arg0+" -> "+_body+" }"; }
-    @Override HMType hm(HashSet<HMVar> nongen) {
-      HMVar tnew = (HMVar) ENV.get(_arg0);
+    @Override HMType hm(HashMap<String,HMType> env, HashSet<HMVar> nongen) {
+      HMVar tnew = new HMVar();
+      // Push _arg0->tnew into env & nongen, popping them off after doing body
+      env.put(_arg0,tnew);
       nongen.add(tnew);
-      HMType trez = _body.hm(nongen);
+      HMType trez = _body.hm(env,nongen);
       nongen.remove(tnew);
+      env.remove(_arg0);
       return Oper.fun(tnew,trez);
     }
-    @Override void get_ids() { ENV.put(_arg0, new HMVar()); _body.get_ids(); }
   }
   public static class Let extends Syntax {
     final String _arg0;
     final Syntax _def, _body;
     Let(String arg0, Syntax def, Syntax body) { _arg0=arg0; _def=def; _body=body; }
     @Override public String toString() { return "let "+_arg0+" = "+_def+" in "+_body+" }"; }
-    @Override HMType hm(HashSet<HMVar> nongen) {
-      HMVar tnew = (HMVar) ENV.get(_arg0);
-      nongen.add(tnew);
-      HMType tdef = _def.hm(nongen);
-      nongen.remove(tnew);
-      tnew.union(tdef);
-      HMType trez = _body.hm(nongen);
+    @Override HMType hm(HashMap<String,HMType> env, HashSet<HMVar> nongen) {
+      HMVar tndef = new HMVar();
+      // Push _arg0->tnew into env & nongen, popping them off after doing body
+      env.put(_arg0,tndef);
+      nongen.add(tndef);
+      HMType tdef = _def.hm(env,nongen);
+      nongen.remove(tndef);
+      tndef.union(tdef);
+      HMType trez = _body.hm(env,nongen);
+      env.remove(_arg0);
       return trez;
     }
-    @Override void get_ids() { ENV.put(_arg0, new HMVar()); _body.get_ids(); _def.get_ids(); }
   }
   public static class Apply extends Syntax {
     final Syntax _fun, _arg;
     Apply(Syntax fun, Syntax arg) { _fun=fun; _arg=arg; }
     @Override public String toString() { return "("+_fun+" "+_arg+")"; }
-    @Override HMType hm(HashSet<HMVar> nongen) {
-      HMType tfun = _fun.hm(nongen);
-      HMType targ = _arg.hm(nongen);
+    @Override HMType hm(HashMap<String,HMType> env, HashSet<HMVar> nongen) {
+      HMType tfun = _fun.hm(env,nongen);
+      HMType targ = _arg.hm(env,nongen);
       HMType trez = new HMVar();
       HMType nfun = Oper.fun(targ,trez);
       nfun.union(tfun);
       return trez;
     }
-    @Override void get_ids() { _fun.get_ids(); _arg.get_ids(); }
   }
 
 
@@ -212,7 +210,7 @@ public class HM {
       return _name+" "+Arrays.toString(_args);
     }
     @Override public String _str() {
-      if( _name.equals("->") )
+      if( _name.equals("->") ) 
             return "{ "+_args[0].str()+" -> "+_args[1].str()+" }";
       SB sb = new SB().p(_name).p('(');
       for( HMType t : _args )

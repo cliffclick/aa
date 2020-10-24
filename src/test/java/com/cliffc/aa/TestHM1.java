@@ -5,30 +5,30 @@ import com.cliffc.aa.type.TypeStr;
 import org.junit.Before;
 import org.junit.Test;
 
-import static com.cliffc.aa.HM.*;
+import static com.cliffc.aa.HM1.*;
 import static org.junit.Assert.assertEquals;
 
-public class TestHM {
+public class TestHM1 {
 
-  @Before public void reset() { HM.reset(); }
+  @Before public void reset() { HM1.reset(); }
 
   @Test(expected = RuntimeException.class)
   public void test0() {
     Syntax syn = new Ident("fred");
-    HM.HM(syn);
+    HM1.HM(syn);
   }
 
   @Test
   public void test1() {
     Syntax syn = new Con(TypeInt.con(3));
-    HMVar t = (HMVar)HM.HM(syn);
+    HMVar t = (HMVar)HM1.HM(syn);
     assertEquals(TypeInt.con(3),t.type());
   }
 
   @Test
   public void test2() {
     Syntax syn = new Apply(new Ident("pair"),new Con(TypeInt.con(3)));
-    HMType t = HM.HM(syn);
+    HMType t = HM1.HM(syn);
     assertEquals("{ v7 -> pair(v6:3,v7) }",t.str());
   }
 
@@ -46,7 +46,7 @@ public class TestHM {
                                              new Apply(new Ident("fact"),
                                                        new Apply(new Ident("dec"),new Ident("n")))))),
               new Ident("fact"));
-    HMType t1 = HM.HM(fact);
+    HMType t1 = HM1.HM(fact);
     assertEquals("{ v23:int64 -> v23:int64 }",t1.str());
   }
 
@@ -58,7 +58,7 @@ public class TestHM {
                  new Apply(new Apply(new Ident("pair"),
                                      new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
                            new Apply(new Ident("x"), new Con(TypeStr.ABC))));
-    HMType t1 = HM.HM(x);
+    HMType t1 = HM1.HM(x);
     assertEquals("{ { v9:all -> v7 } -> pair(v7,v7) }",t1.str());
   }
 
@@ -70,10 +70,10 @@ public class TestHM {
                            new Apply(new Apply(new Ident("pair"),
                                                new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
                                      new Apply(new Ident("x"), new Con(TypeStr.ABC)))),
-                new Lambda("y", new Ident("y")));
+                new Lambda("x", new Ident("x")));
 
-    HMType t1 = HM.HM(x);
-    assertEquals("pair(v7:all,v7:all)",t1.str());
+    HMType t1 = HM1.HM(x);
+    assertEquals("pair(v15:all,v15:all)",t1.str());
   }
 
 
@@ -83,7 +83,7 @@ public class TestHM {
     // fn f => f f (fail)
     Syntax x =
       new Lambda("f", new Apply(new Ident("f"), new Ident("f")));
-    HM.HM(x);
+    HM1.HM(x);
   }
 
   @Test
@@ -93,7 +93,7 @@ public class TestHM {
       new Let("g",
               new Lambda("f", new Con(TypeInt.con(5))),
               new Apply(new Ident("g"), new Ident("g")));
-    HMType t1 = HM.HM(x);
+    HMType t1 = HM1.HM(x);
     assertEquals("v10:5",t1.str());
   }
 
@@ -111,7 +111,7 @@ public class TestHM {
                                              ),
                                    new Apply(new Ident("f"), new Con(TypeInt.con(1))))));
 
-    HMType t1 = HM.HM(syn);
+    HMType t1 = HM1.HM(syn);
     assertEquals("{ v9 -> pair(v9,v9) }",t1.str());
   }
 
@@ -122,7 +122,7 @@ public class TestHM {
     Syntax syn =
       new Lambda("f", new Lambda("g", new Lambda("arg", new Apply(new Ident("g"), new Apply(new Ident("f"), new Ident("arg"))))));
 
-    HMType t1 = HM.HM(syn);
+    HMType t1 = HM1.HM(syn);
     assertEquals("{ { v8 -> v9 } -> { { v9 -> v10 } -> { v8 -> v10 } } }",t1.str());
   }
 
