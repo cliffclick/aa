@@ -1,8 +1,8 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeInt;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -15,10 +15,13 @@ public class HM {
   static final HashMap<String,HMType> ENV = new HashMap<>();
 
   public static HMType HM(Syntax prog) {
+    Object dummy = TypeStruct.DISPLAY;
 
     // Simple types
     HMVar bool  = new HMVar(TypeInt.BOOL);
     HMVar int64 = new HMVar(TypeInt.INT64);
+    HMVar flt64 = new HMVar(TypeFlt.FLT64);
+    HMVar strp  = new HMVar(TypeMemPtr.STRPTR);
 
     // Primitives
     HMVar var1 = new HMVar();
@@ -32,6 +35,12 @@ public class HM {
     ENV.put("*",Oper.fun(int64,Oper.fun(int64,int64)));
     ENV.put("==0",Oper.fun(int64,bool));
 
+    // Print a string; int->str
+    ENV.put("str",Oper.fun(int64,strp));
+    // Factor
+    ENV.put("factor",Oper.fun(flt64,new Oper("pair",flt64,flt64)));
+    
+    
     // Prep for SSA: pre-gather all the (unique) ids
     prog.get_ids();
 
@@ -172,7 +181,7 @@ public class HM {
     }
     @Override public String _str() {
       String s = "v"+_uid;
-      if( _t!=Type.ANY ) s += ":"+_t;
+      if( _t!=Type.ANY ) s += ":"+_t.str(new SB(),new VBitSet(),null,false);
       return s;
     }
 
