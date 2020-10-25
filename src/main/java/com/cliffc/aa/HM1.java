@@ -8,9 +8,18 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 
-// Hindley-Milner typing.  Complete stand-alone, for research.
-// MEETs base types, instead of declaring type error.
-// Does standard lexical scoping, which is not needed for SSA form.
+/** Hindley-Milner typing.  A Java clone from:
+ * http://dysphoria.net/code/hindley-milner/HindleyMilner.scala
+ * Andrew Forrest
+ * Based heavily on Nikita Borisov's Perl implementation at
+ * http://web.archive.org/web/20050420002559/www.cs.berkeley.edu/~nikitab/courses/cs263/hm.html
+ * which in turn is based on the paper by Luca Cardelli at
+ * http://lucacardelli.name/Papers/BasicTypechecking.pdf
+
+ * Complete stand-alone, for my research.
+ * MEETs base types, instead of declaring type error.
+ * Does standard lexical scoping, which is not needed for SSA form.
+ */
 public class HM1 {
   public static HMType HM(Syntax prog) {
 

@@ -11,10 +11,63 @@ import java.util.HashSet;
 // Hindley-Milner typing.  Complete stand-alone, for research.  MEETs base
 // types, instead of declaring type error.  Requires SSA renumbering; uses a
 // global Env instead locally tracking.
+//
+// For Sea-of-Nodes, plus memory/side-effects:
+//   Buff for multi-args AND multi-return (return includes memory).
+// LAMBDA/FunNode:
+//   Parms: new TVar per Parm.
+//   Ret  : Gather multi-return TVars (ret&mem)
+//   TFP  : new TVar == { parms... -> ret mem }
+// APPLY/CallNode:
+//   Clone TFP fresh (clone-per-use), and the TFP has to be sorted out already.
+//   Build TVarFun { args... mem -> new rez, new mem }
+//   U-F with cloned TFP.  Cloned TFP has constraints like input-same-type-as-
+//   output, and U-F enforces this on Call args.
+// IDENT/Node:
+//   Clone per use typically, so put the onus on the user.
+//   Otherwise use TNode (which is base Type for this Node).
+
+// Thinking: every Node USE (occurrence of an Ident) gets a unique TVar - except
+// TFP's being used inside their own Fun (recursive).  This is a TVar-per-Edge
+// instead of per-Node.
+//
+// Also: Arrays need recursive-MEET same as Structs.  Much simpler, of course!
+// But ptrs-to-Arrays-to-ptrs of the same type should totally be typable.
+//
+// Also: TFPs need a TVar per arg & return; so do TypeStruct need a TVar per
+// field.  Correlation between NewStruct having an Edge-per-Field.
+//
+// Must run HM after first GCP (coarse Call Graph available).
+// But wondering if can run DURING GCP & get optimistic results.
+// HM is NOT the same as Thesis combo.
+
+// Starting with pessimistic: TVars allow JOIN on types in some places lifting
+// conservative answers.  They discover congruences (equivs) amongst Nodes,
+// and can be used to lift values amongst congruences; e.g., if A===B and
+// A:int:3 and B:BOTTOM, actually B:int:3.
+
+// TypeNode: has a Node & can UF with other TypeNodes.  Computes base type as a
+// JOIN across all UF Nodes' base types.  Nodes start with a TypeNode of
+// themselves. Identities can UF TypeNodes for their own TypeNode.  SESE
+// regions can lift TypeNodes around Phi/Parm.  NewObj has a TypeNode which is
+// a TypeStruct with TypeNode fields.  Fun has a TypeNode which is a TypeFunSig
+// which has args & ret as TypeNodes.  So TypeNodes have mirror structure to
+// Types???  So... maybe want Rule: Node has a Type (which includes a TypeNode),
+// but Nodes' TypeNode cannot (recursively) encode its own TypeNode.
+//
+// Ex: Con:int:5 - TypeInt:5.
+// Ex: (Add x y) - TypeInt:int64
+// Ex: (Copy a)  - TypeNode:a, where 'a' is not this Copy
+// Ex: Parm      - Type as a MEET of inputs, not a TypeNode, unless foldable (which Ideal will do).
+// Ex: Ret       - TypeTuple of {ret:TypeNode, mem:TypeNode}
+// Ex: CallEpi   - TypeTuple of MEET of {ret:TypeNode, mem:TypeNode}.
+// Ex: CallEpi   - Single ret; for all TypeNodes in {ret,mem} that are Parm, replace with Call edge.
+
+
 public class HM {
   static final HashMap<String,HMType> ENV = new HashMap<>();
 
-  public static HMType HM(Syntax prog) {
+  public static HMType hm( Syntax prog) {
     Object dummy = TypeStruct.DISPLAY;
 
     // Simple types
@@ -39,8 +92,8 @@ public class HM {
     ENV.put("str",Oper.fun(int64,strp));
     // Factor
     ENV.put("factor",Oper.fun(flt64,new Oper("pair",flt64,flt64)));
-    
-    
+
+
     // Prep for SSA: pre-gather all the (unique) ids
     prog.get_ids();
 
