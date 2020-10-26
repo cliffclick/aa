@@ -14,14 +14,22 @@ import org.jetbrains.annotations.NotNull;
 public class TypeVar {
   @NotNull private final TNode _tnode;   // Abstract view of a Node
 
-  // Either: HEAD of U-F; _u==null, _uf_child set
-  // OR:     TAIL of U-F; _u==HEAD, _uf_child null
+  // Either: HEAD of U-F; _u==null, _uf_kids set with list of children
+  // OR:     TAIL of U-F; _u==HEAD, _uf_kids null
   private TypeVar _u;           // Tarjan Union-Find; null==HEAD
-  private Ary<TypeVar> _uf_child;// List of union children.  Used for computing JOIN of children.
+  private Ary<TypeVar> _uf_kids;// List of union children.  Used for computing JOIN of children.
 
   private Type _type;           // Base/ground Type
 
+  // Basic H-M type variable supporting U-F and parametric types.
   public TypeVar( @NotNull TNode tn ) { _tnode=tn; _type=Type.ALL; }
+  // Basic H-M type operator; the name is a class of unifiable operators, such
+  // as "->N" for functions of N args, or "{N}" for structs of N fields, or
+  // "CMV" for {Control,Memory,Value} as the result of Rets and CallEpis.
+  public TypeVar( String _name, TypeVar... tvars ) {
+    
+  }
+  
   public int uid() { return _tnode.uid(); }
 
 
@@ -37,12 +45,12 @@ public class TypeVar {
   private Type _type() {
     assert _u==null;
     assert !_tnode.is_dead();
-    if( _uf_child==null || _uf_child._len==0 ) return _type;
+    if( _uf_kids==null || _uf_kids._len==0 ) return _type;
     Type t = _type;
-    for( int i=0; i<_uf_child._len; i++ ) {
-      TypeVar tv = _uf_child.at(i);
+    for( int i=0; i<_uf_kids._len; i++ ) {
+      TypeVar tv = _uf_kids.at(i);
       if( tv._tnode.is_dead() ) {
-        _uf_child.del(i--);
+        _uf_kids.del(i--);
         continue;
       }
       assert tv._u==this;
@@ -60,10 +68,10 @@ public class TypeVar {
     assert !_tnode.is_dead();
     assert tv._u==null;
     assert !tv._tnode.is_dead();
-    if( tv._uf_child != null && tv._uf_child._len>0 )  throw com.cliffc.aa.AA.unimpl(); // Copy children forward
-    if( _uf_child==null ) _uf_child = new Ary<TypeVar>(new TypeVar[1],0);
+    if( tv._uf_kids != null && tv._uf_kids._len>0 )  throw com.cliffc.aa.AA.unimpl(); // Copy children forward
+    if( _uf_kids==null ) _uf_kids = new Ary<TypeVar>(new TypeVar[1],0);
     tv._u=this;
-    _uf_child.push(tv);
+    _uf_kids.push(tv);
   }
 
   // U-F find algo
