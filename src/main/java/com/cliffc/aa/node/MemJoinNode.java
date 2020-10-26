@@ -17,7 +17,7 @@ public class MemJoinNode extends Node {
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     // If the split count is lower than 2, then the split serves no purpose
-    if( _defs._len == 2 && val(1).isa(_val) && _keep==0 )
+    if( _defs._len == 2 && val(1).isa(val()) && _keep==0 )
       return in(1);             // Just become the last split
 
     // If some Split/Join path clears out, remove the (useless) split.
@@ -94,7 +94,7 @@ public class MemJoinNode extends Node {
     Type tt = mjn.xval(gvn._opt_mode);
     msp.xval(gvn._opt_mode);
     for( Node use : msp._uses )
-      use._val = tt;
+      use.set_val(tt);
 
     return this;
   }
@@ -158,10 +158,10 @@ public class MemJoinNode extends Node {
     while( !work.isEmpty() ) {
       Node n = work.pop();
       assert n.is_mem();
-      Type t0 = n._val;
+      Type t0 = n.val();
       Type t1 = n.value(gvn._opt_mode);
       if( t0==t1 ) continue;
-      n._val = t1;
+      n.set_val(t1);
       if( n == this ) continue;
       for( Node use : n._uses ) if( use.is_mem() ) work.add(use);
     }

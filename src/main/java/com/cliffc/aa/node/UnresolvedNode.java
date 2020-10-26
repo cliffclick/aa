@@ -41,7 +41,7 @@ public class UnresolvedNode extends Node {
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
     // Freeze after GVN - only still around for errors
-    if( opt_mode == GVNGCM.Mode.PesiCG ) return _val;
+    if( opt_mode == GVNGCM.Mode.PesiCG ) return val();
     // If any arg is ALL - that wins; if ANY - ignored.
     // If any arg is not a TFP, then OOB.
     // If any arg is high, ignore - FunPtrs always fall.
@@ -50,7 +50,7 @@ public class UnresolvedNode extends Node {
     Type initial = lifting ? Type.ANY : Type.ALL;
     Type t = initial;
     for( Node def : _defs ) {
-      Type td = def._val;
+      Type td = def.val();
       if( td==Type.ANY )        // Some arg is at high?
         if( lifting ) continue; // Lifting: ignore it
         else return Type.ANY;   // Falling: wait till it falls.
@@ -58,7 +58,7 @@ public class UnresolvedNode extends Node {
       if( !(td instanceof TypeFunPtr) ) return td.oob();
       TypeFunPtr tfp = (TypeFunPtr)td;
       if( tfp.above_center() ) tfp = tfp.dual();
-      if( tfp._disp.above_center() ) return _val; // No change until sorted out
+      if( tfp._disp.above_center() ) return val(); // No change until sorted out
       t = lifting ? t.meet(tfp) : t.join(tfp.dual());
     }
     return t==initial ? Type.ANY : t; // If all inputs are ANY, then ANY result

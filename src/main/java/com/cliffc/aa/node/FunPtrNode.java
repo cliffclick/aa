@@ -61,7 +61,7 @@ public final class FunPtrNode extends Node {
         if( !safe ) break;
       }
       if( safe ) {              // No unsafe users; nuke display
-        TypeMemPtr tdisp = (TypeMemPtr)display()._val;
+        TypeMemPtr tdisp = (TypeMemPtr) display().val();
         return set_def(1,gvn.con(tdisp.make_from(TypeObj.UNUSED)),gvn); // No display needed
       }
     }
@@ -73,7 +73,7 @@ public final class FunPtrNode extends Node {
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
     Node disp = display();
-    Type tdisp = disp._val;
+    Type tdisp = disp.val();
     if( !(tdisp instanceof TypeMemPtr) )
       tdisp = tdisp.oob(TypeMemPtr.DISP_SIMPLE);
     return TypeFunPtr.make(ret._fidx,ret._nargs,(TypeMemPtr)tdisp);

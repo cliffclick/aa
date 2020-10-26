@@ -211,7 +211,7 @@ public class FunNode extends RegionNode {
     // passed in.
     if( has_unknown_callers() ) {
       ParmNode mem = parm(-2);
-      if( mem!=null && !mem._val.isa(Env.DEFMEM._val) )
+      if( mem!=null && !mem.val().isa(Env.DEFMEM.val()) )
         return null; // Do not inline a bad memory type
     }
 
@@ -306,7 +306,7 @@ public class FunNode extends RegionNode {
         for( Node use : parm._uses ) { // See if a parm-user needs a type-specialization split
           if( use instanceof CallNode ) {
             CallNode call = (CallNode)use;
-            if( (call.fun()==parm && !parm._val.isa(TypeFunPtr.GENERIC_FUNPTR) ) ||
+            if( (call.fun()==parm && !parm.val().isa(TypeFunPtr.GENERIC_FUNPTR) ) ||
                 call.fun() instanceof UnresolvedNode ) { // Call overload not resolved
               Type t0 = parm.val(1);                   // Generic type in slot#1
               for( int i=2; i<parm._defs._len; i++ ) { // For all other inputs
@@ -343,18 +343,18 @@ public class FunNode extends RegionNode {
     // Look for splitting to help a pointer from an unspecialized type
     boolean progress = false;
     Type[] sig = new Type[parms.length];
-    Type tmem = parm(-2)._val;
+    Type tmem = parm(-2).val();
     if( tmem instanceof TypeMem ) {
       for( int i=0; i<parms.length; i++ ) { // For all parms
         Node parm = parms[i];
         if( parm == null ) { sig[i]=Type.SCALAR; continue; } // (some can be dead)
-        sig[i] = parm._val;                                  // Current type
+        sig[i] = parm.val();                                  // Current type
         if( i==0 ) continue;                                 // No split on the display
         // Best possible type
         Type tp = Type.ALL;
         for( Node def : parm._defs )
           if( def != this )
-            tp = tp.join(def._val);
+            tp = tp.join(def.val());
         if( !(tp instanceof TypeMemPtr) ) continue; // Not a pointer
         TypeObj to = (TypeObj)((TypeMem)tmem).ld((TypeMemPtr)tp).widen(); //
         // Are all the uses of parm compatible with this TMP?
@@ -387,7 +387,7 @@ public class FunNode extends RegionNode {
           return true;          // Did not find field
         break;
       case OP_STORE:
-        if( ((StoreNode)use).val()==n) break; // Storing as value is ok
+        if( ((StoreNode)use).rez()==n) break; // Storing as value is ok
         if( !(to instanceof TypeStruct) ||    // Address needs to find field
             ((StoreNode)use).find((TypeStruct)to)== -1 )
           return true;          // Did not find field
@@ -511,7 +511,7 @@ public class FunNode extends RegionNode {
         Node n2 = n1 instanceof UnresolvedNode ? n1.in(0) : n1;
         if( n2 instanceof FunPtrNode ) {
           FunPtrNode fpn = (FunPtrNode)n2;
-          if( fpn.ret().val() instanceof PrimNode )
+          if( fpn.ret().rez() instanceof PrimNode )
             op = OP_PRIM;       // Treat as primitive for inlining purposes
           if( fpn.fun() == this )
             recursive.set(n.in(0)._uid);  // No self-recursive inlining till after parse
@@ -532,8 +532,8 @@ public class FunNode extends RegionNode {
       Node call = in(i).in(0);
       if( !(call instanceof CallNode) ) continue; // Not well formed
       if( ((CallNode)call).nargs() != nargs() ) continue; // Will not inline
-      if( call._val == Type.ALL ) continue;
-      TypeFunPtr tfp = CallNode.ttfp(call._val);
+      if( call.val() == Type.ALL ) continue;
+      TypeFunPtr tfp = CallNode.ttfp(call.val());
       int fidx = tfp.fidxs().abit();
       if( fidx < 0 || BitsFun.is_parent(fidx) ) continue;  // Call must only target one fcn
       int ncon=0;
@@ -634,7 +634,7 @@ public class FunNode extends RegionNode {
       if( n==this ) continue;   // Already cloned the FunNode
       int old_alias = n instanceof NewNode ? ((NewNode)n)._alias : -1;
       Node c = n.copy(false,gvn); // Make a blank copy with no edges
-      c._val = null;              // Flag as not-in system
+      c._in=false;                // Flag as not-in system
       map.put(n,c);               // Map from old to new
       if( old_alias != -1 )       // Was a NewNode?
         aliases.set(old_alias);   // Record old alias before copy/split
@@ -677,16 +677,16 @@ public class FunNode extends RegionNode {
           gvn.replace(old_funptr,new_unr);
           new_unr.add_def(old_funptr);
           gvn.rereg(new_unr,new_unr.value(gvn._opt_mode));
-          new_funptr._val = null; // Remove type, to preserve new invariant
+          new_funptr._in=false;        // Remove type, to preserve new invariant
         }
     } else {                           // Path split
       Node old_funptr = path_call.fun(); // Find the funptr for the path split
       Node new_funptr = map.get(old_funptr);
       gvn.replace(new_funptr,old_funptr);
-      TypeFunPtr ofptr = (TypeFunPtr)old_funptr._val;
+      TypeFunPtr ofptr = (TypeFunPtr) old_funptr.val();
       path_call.set_fun_reg(new_funptr, gvn); // Force new_funptr, will re-wire later
       TypeFunPtr nfptr = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,ofptr._disp);
-      path_call._val = CallNode.set_ttfp((TypeTuple)path_call._val,nfptr);
+      path_call.set_val(CallNode.set_ttfp((TypeTuple) path_call.val(),nfptr));
     } // Else other funptr/displays on unrelated path, dead, can be ignored
 
     // For all aliases split in this pass, update in-node both old and new.
@@ -704,7 +704,7 @@ public class FunNode extends RegionNode {
         for( Node p : fun._uses )
           if( p instanceof ParmNode ) {
             ParmNode parm = (ParmNode)p;
-            parm.set_def(1,parm._idx==-2 ? Env.DEFMEM : gvn.con(fun.formal(parm._idx)),gvn);
+            parm.set_def(1,parm._idx==-2 ? Env.DEFMEM : gvn.con(fun.formal(parm._idx).simple_ptr()),gvn);
           }
       } else                     // Path Split
         fun.set_def(1,Env.XCTRL,gvn);
@@ -714,7 +714,7 @@ public class FunNode extends RegionNode {
     for( Map.Entry<Node,Node> e : map.entrySet() ) {
       Node oo = e.getKey();     // Old node
       Node nn = e.getValue();   // New node
-      Type nt = oo._val;        // Generally just copy type from original nodes
+      Type nt = oo.val();        // Generally just copy type from original nodes
       if( nn instanceof MrgProjNode ) { // Cloned allocations registers with default memory
         Env.DEFMEM.make_mem(gvn,((NewNode)nn.in(0))._alias,(MrgProjNode)nn);
         Env.DEFMEM.make_mem(gvn,((NewNode)oo.in(0))._alias,(MrgProjNode)oo);
@@ -747,7 +747,7 @@ public class FunNode extends RegionNode {
       CallNode call = cepi.call();
       CallEpiNode cepi2 = (CallEpiNode)map.get(cepi);
       if( path < 0 ) {          // Type-split, wire both & resolve later
-        BitsFun call_fidxs = ((TypeFunPtr)call.fun()._val).fidxs();
+        BitsFun call_fidxs = ((TypeFunPtr) call.fun().val()).fidxs();
         assert call_fidxs.test_recur(    fidx());
         assert call_fidxs.test_recur(fun.fidx());
         cepi.wire1(gvn,call,this,oldret);
@@ -757,7 +757,7 @@ public class FunNode extends RegionNode {
           // self-call.  wire the clone, same as the original was wired, so the
           // clone keeps knowledge about its return type.
           CallNode call2 = cepi2.call();
-          BitsFun call_fidxs2 = ((TypeFunPtr)call2.fun()._val).fidxs();
+          BitsFun call_fidxs2 = ((TypeFunPtr) call2.fun().val()).fidxs();
           assert call_fidxs2.test_recur(    fidx());
           assert call_fidxs2.test_recur(fun.fidx());
           cepi2.wire1(gvn,call2,this,oldret);
@@ -814,7 +814,7 @@ public class FunNode extends RegionNode {
       Node wrk = work.pop();
       if( wrk.is_mem() ) {
         boolean un=false;
-        Type twrk = wrk._val;
+        Type twrk = wrk.val();
         TypeMem tmem = (TypeMem)(twrk instanceof TypeTuple ? ((TypeTuple)twrk).at(1) : twrk);
         for( int alias = aliases.nextSetBit(0); alias != -1; alias = aliases.nextSetBit(alias + 1))
           if( tmem.at(alias)!= TypeObj.UNUSED )
@@ -822,7 +822,7 @@ public class FunNode extends RegionNode {
         if( un ) {
           Type tval = wrk.value(opt_mode);
           if( twrk != tval ) {
-            wrk._val = tval;
+            wrk.set_val(tval);
             if( wrk instanceof MProjNode && wrk.in(0) instanceof CallNode ) {
               CallEpiNode cepi = ((CallNode)wrk.in(0)).cepi();
               if( cepi != null ) work.push(cepi);
@@ -848,9 +848,9 @@ public class FunNode extends RegionNode {
       if( !(in(i) instanceof CProjNode) ) return Type.CTRL; // A constant control
       // Call might be alive and executing and calling many targets, just not this one.
       CallNode call = (CallNode)in(i).in(0);
-      if( call._val == Type.ALL )
+      if( call.val() == Type.ALL )
         return Type.CTRL;
-      TypeFunPtr ttfp = CallNode.ttfpx(call._val);
+      TypeFunPtr ttfp = CallNode.ttfpx(call.val());
       if( ttfp != null && !ttfp.above_center() && ttfp._fidxs.test_recur(_fidx) )
         return Type.CTRL;       // Call us
     }

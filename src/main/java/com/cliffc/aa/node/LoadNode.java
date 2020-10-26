@@ -35,14 +35,14 @@ public class LoadNode extends Node {
     Node mem  = mem();
     Node adr = adr();
 
-    Type tadr = adr._val;
+    Type tadr = adr.val();
     BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
 
     // If we can find an exact previous store, fold immediately to the value.
     // Do not move Loads "up" past unrelated stores, lest we make memory alive twice.
     Node st = find_previous_store(gvn,mem(),adr(),aliases,_fld,true);
     if( st!=null ) {
-      if( st instanceof StoreNode ) return (( StoreNode)st).val();
+      if( st instanceof StoreNode ) return (( StoreNode)st).rez();
       else                          return ((NewObjNode)st).get(_fld);
     }
 
@@ -91,7 +91,7 @@ public class LoadNode extends Node {
   // Find a matching prior Store or NewObj - matching field name and address.
   // Returns null if highest available memory does not match name & address.
   static Node find_previous_store(GVNGCM gvn, Node mem, Node adr, BitsAlias aliases, String fld, boolean is_load ) {
-    Type tmem0 = mem._val;
+    Type tmem0 = mem.val();
     if( !(tmem0 instanceof TypeMem) || aliases==null ) return null;
     TypeMem tmem = (TypeMem)tmem0;
     // Walk up the memory chain looking for an exact matching Store or New
@@ -103,7 +103,7 @@ public class LoadNode extends Node {
         if( Util.eq(st._fld,fld) ) {
           if( st.adr()==adr ) return st.err(true)== null ? st : null; // Exact matching store
           // Matching field, wrong address.  Look for no-overlap in aliases
-          Type tst = st.adr()._val;
+          Type tst = st.adr().val();
           if( !(tst instanceof TypeMemPtr) ) return null; // Store has weird address
           BitsAlias st_alias = ((TypeMemPtr)tst)._aliases;
           if( aliases.join(st_alias) != BitsAlias.EMPTY )
@@ -155,7 +155,7 @@ public class LoadNode extends Node {
     CallNode call = cepi.call();
     if( tmem.fld_is_final(aliases,fld) )
       return call.mem(); // Loads from final memory can bypass calls.  Stores cannot, store-over-final is in error.
-    TypeMemPtr escs = call.tesc(call._val);
+    TypeMemPtr escs = call.tesc(call.val());
     if( escs._aliases.join(aliases)==BitsAlias.EMPTY )
       return call.mem(); // Load from call; if memory is made *in* the call this will fail later on an address mismatch.
     return null;         // Stuck behind call
@@ -164,13 +164,13 @@ public class LoadNode extends Node {
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Node adr = adr();
-    Type tadr = adr._val;
+    Type tadr = adr.val();
     if( !(tadr instanceof TypeMemPtr) ) return tadr.oob();
     TypeMemPtr tmp = (TypeMemPtr)tadr;
 
     // Loading from TypeMem - will get a TypeObj out.
     Node mem = mem();
-    Type tmem = mem._val; // Memory
+    Type tmem = mem.val(); // Memory
     if( !(tmem instanceof TypeMem) ) return tmem.oob(); // Nothing sane
     TypeObj tobj = ((TypeMem)tmem).ld(tmp);
 
@@ -187,8 +187,8 @@ public class LoadNode extends Node {
   // The only memory required here is what is needed to support the Load
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==adr() ) return TypeMem.ALIVE;
-    Type tmem = mem()._val;
-    Type tptr = adr()._val;
+    Type tmem = mem().val();
+    Type tptr = adr().val();
     if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
     if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
     if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
@@ -196,12 +196,12 @@ public class LoadNode extends Node {
   }
 
   @Override public ErrMsg err( boolean fast ) {
-    Type tadr = adr()._val;
+    Type tadr = adr().val();
     if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when reading",_fld);
     if( !(tadr instanceof TypeMemPtr) )
       return bad(fast,null); // Not a pointer nor memory, cannot load a field
     TypeMemPtr ptr = (TypeMemPtr)tadr;
-    Type tmem = mem()._val;
+    Type tmem = mem().val();
     if( tmem==Type.ALL ) return bad(fast,null);
     if( tmem==Type.ANY ) return null; // No error
     TypeObj objs = tmem instanceof TypeMem

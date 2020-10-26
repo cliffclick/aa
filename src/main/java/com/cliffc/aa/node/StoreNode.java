@@ -17,7 +17,7 @@ public class StoreNode extends Node {
     _fin = fin;
     _bad = bad;    // Tests can pass a null, but nobody else does
   }
-  private StoreNode( StoreNode st, Node mem, Node adr ) { this(mem,adr,st.val(),st._fin,st._fld,st._bad); }
+  private StoreNode( StoreNode st, Node mem, Node adr ) { this(mem,adr,st.rez(),st._fin,st._fld,st._bad); }
 
   String xstr() { return "."+_fld+"="; } // Self short name
   String  str() { return xstr(); }   // Inline short name
@@ -25,24 +25,24 @@ public class StoreNode extends Node {
 
   Node mem() { return in(1); }
   Node adr() { return in(2); }
-  Node val() { return in(3); }
+  Node rez() { return in(3); }
   public int find(TypeStruct ts) { return ts.find(_fld); }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node mem = mem();
     Node adr = adr();
-    Type ta = adr._val;
+    Type ta = adr.val();
     TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
 
     // If Store is by a New and no other Stores, fold into the New.
     NewObjNode nnn;  int idx;
     if( mem instanceof MrgProjNode &&
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
-        !val().is_forward_ref() &&
+        !rez().is_forward_ref() &&
         mem._uses._len==2 &&
         (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
       // Update the value, and perhaps the final field
-      nnn.update(idx,_fin,val(),gvn);
+      nnn.update(idx,_fin,rez(),gvn);
       return mem;               // Store is replaced by using the New directly.
     }
 
@@ -79,10 +79,10 @@ public class StoreNode extends Node {
 
   // StoreNode needs to return a TypeObj for the Parser.
   @Override public Type value(GVNGCM.Mode opt_mode) {
-    Node mem = mem(), adr = adr(), val = val();
-    Type tmem = mem._val;
-    Type tadr = adr._val;
-    Type tval = val._val;  // Value
+    Node mem = mem(), adr = adr(), rez = rez();
+    Type tmem = mem.val();
+    Type tadr = adr.val();
+    Type tval = rez.val();  // Value
     if( tmem==Type.ALL || tadr==Type.ALL ) return Type.ALL;
 
     if( tadr == Type.ALL ) tadr = TypeMemPtr.ISUSED0;
@@ -93,7 +93,7 @@ public class StoreNode extends Node {
     return tm.update(tmp._aliases,_fin,_fld,tval);
   }
   @Override BitsAlias escapees() {
-    Type adr = adr()._val;
+    Type adr = adr().val();
     if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? BitsAlias.EMPTY : BitsAlias.FULL;
     return ((TypeMemPtr)adr)._aliases;
   }
@@ -105,17 +105,17 @@ public class StoreNode extends Node {
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==mem() ) return _live; // Pass full liveness along
     if( def==adr() ) return TypeMem.ALIVE; // Basic aliveness
-    if( def==val() ) return TypeMem.ESCAPE;// Value escapes
+    if( def==rez() ) return TypeMem.ESCAPE;// Value escapes
     throw com.cliffc.aa.AA.unimpl();       // Should not reach here
   }
-  
+
   @Override public ErrMsg err( boolean fast ) {
-    Type tadr = adr()._val;
+    Type tadr = adr().val();
     if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when writing",_fld);
     if( !(tadr instanceof TypeMemPtr) )
       return bad("Unknown",fast,null); // Not a pointer nor memory, cannot store a field
     TypeMemPtr ptr = (TypeMemPtr)tadr;
-    Type tmem = mem()._val;
+    Type tmem = mem().val();
     if( tmem==Type.ALL ) return bad("Unknown",fast,null);
     if( tmem==Type.ANY ) return null; // No error
     TypeObj objs = tmem instanceof TypeMem

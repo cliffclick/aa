@@ -50,32 +50,32 @@ public class NewObjNode extends NewNode<TypeStruct> {
       use.xval(gvn._opt_mode);  // Record "downhill" type for OProj, DProj
       gvn.add_work_uses(use);   // Neighbors on worklist
     }
-    assert touched();
+    assert _in;
   }
 
   // Create a field from parser for an active this
   public void create_active( String name, Node val, byte mutable ) {
-    assert !touched();
+    assert !_in;
     assert def_idx(_ts._ts.length)== _defs._len;
     assert _ts.find(name) == -1; // No dups
     add_def(val);
-    sets_out(_ts.add_fld(name,mutable,mutable==TypeStruct.FFNL ? val._val : Type.SCALAR));
+    sets_out(_ts.add_fld(name,mutable,mutable==TypeStruct.FFNL ? val.val() : Type.SCALAR));
   }
   public void update( String tok, byte mutable, Node val, GVNGCM gvn  ) { update(_ts.find(tok),mutable,val,gvn); }
   // Update the field & mod
   public void update( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
     assert def_idx(_ts._ts.length)== _defs._len;
     gvn.set_def_reg(this,def_idx(fidx),val);
-    sets_in(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? val._val : Type.SCALAR,mutable));
+    sets_in(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? val.val() : Type.SCALAR,mutable));
   }
   // Update default value.  Used by StoreNode folding into a NewObj initial
   // state.  Used by the Parser when updating local variables... basically
   // another store.
   public void update_active( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
-    assert !touched();
+    assert !_in;
     assert def_idx(_ts._ts.length)== _defs._len;
     set_def(def_idx(fidx),val,gvn);
-    sets_out(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? val._val : Type.SCALAR,mutable));
+    sets_out(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? val.val() : Type.SCALAR,mutable));
   }
 
 
@@ -108,7 +108,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
         assert Env.LEX_DISPLAYS.test(_alias);
         TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS.clear(_alias),TypeObj.ISUSED);
         gvn.set_def_reg(n,1,gvn.con(tdisp));
-        n._val = n.value(GVNGCM.Mode.Parse);
+        n.set_val(n.value(GVNGCM.Mode.Parse));
         // Make field in the parent
         parent.create(ts._flds[i],n,ts.fmod(i),gvn);
         // Stomp field locally to XSCALAR
@@ -134,8 +134,8 @@ public class NewObjNode extends NewNode<TypeStruct> {
     if( progress ) return this;
 
     // If the value lifts a final field, so does the default lift.
-    if( _val instanceof TypeTuple ) {
-      TypeTuple ts1 = (TypeTuple)_val;
+    if( val() instanceof TypeTuple ) {
+      TypeTuple ts1 = (TypeTuple) val();
       TypeObj ts3 = (TypeObj)ts1.at(0);
       if( ts3 != TypeObj.UNUSED ) {
         TypeStruct ts4 = _ts.make_from(((TypeStruct)ts3)._ts);
@@ -154,7 +154,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     // Gather args and produce a TypeStruct
     Type[] ts = Types.get(_ts._ts.length);
     for( int i=0; i<ts.length; i++ )
-      ts[i] = fld(i)._val;
+      ts[i] = fld(i).val();
     return _ts.make_from(ts);  // Pick up field names and mods
   }
   @Override TypeStruct dead_type() { return TypeStruct.ANYSTRUCT; }

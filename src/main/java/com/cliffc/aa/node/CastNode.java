@@ -15,7 +15,7 @@ public class CastNode extends Node {
     if( cc!=null ) return set_def(0,cc,gvn);
     // Cast is useless?  Remove same as a TypeNode
     Node ctrl = in(0), addr = in(1);
-    Type c = ctrl._val, t = addr._val;
+    Type c = ctrl.val(), t = addr.val();
     if( c != Type.CTRL ) return null;
     if( t.isa(_t) ) return in(1);
 
@@ -48,7 +48,7 @@ public class CastNode extends Node {
     if( !(n instanceof CProjNode && ((CProjNode)n)._idx==1) ) return false; // Not a Cast of a CProj-True
     Node n0 = n.in(0);
     if( n0 instanceof IfNode && n0.in(1) == addr ) return true; // Guarded by If-n-zero
-    if( n0 instanceof ConNode && ((TypeTuple)n0._val).at(1)==Type.XCTRL )
+    if( n0 instanceof ConNode && ((TypeTuple) n0.val()).at(1)==Type.XCTRL )
       return true;
     return false;
   }

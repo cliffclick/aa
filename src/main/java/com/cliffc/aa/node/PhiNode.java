@@ -35,7 +35,7 @@ public class PhiNode extends Node {
     if( val(0) == Type.XCTRL ) return null;
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
-    if( r._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
+    if( r.val() == Type.XCTRL ) return null; // All dead, c-prop will fold up
     if( r._defs.len() > 1 &&  r.in(1) == Env.ALL_CTRL ) return null;
     if( r instanceof FunNode && ((FunNode)r).noinline() )
       return null; // Do not start peeling apart parameters to a no-inline function
@@ -75,9 +75,9 @@ public class PhiNode extends Node {
 
   @Override public ErrMsg err( boolean fast ) {
     if( !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar
-        (_val!=null &&
-         (_val.contains(Type.SCALAR) ||
-          _val.contains(Type.NSCALR))) ) // Cannot have code that deals with unknown-GC-state
+        (val() !=null &&
+         (val().contains(Type.SCALAR) ||
+          val().contains(Type.NSCALR))) ) // Cannot have code that deals with unknown-GC-state
       return ErrMsg.badGC(_badgc);
     return null;
   }

@@ -48,7 +48,7 @@ public class ScopeNode extends Node {
   public Node swap_rez( Node n, GVNGCM gvn) { return swap_def(3,n,gvn); }
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
   public Node set_mem( Node n, GVNGCM gvn) {
-    assert n==null || (n.touched() && (n._val instanceof TypeMem || n._val==Type.ANY || n._val==Type.ALL));
+    assert n==null || (n._in && (n.val() instanceof TypeMem || n.val() ==Type.ANY || n.val() ==Type.ALL));
     set_def(1,n,gvn);
     return this;
   }
@@ -82,14 +82,14 @@ public class ScopeNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node mem = mem();
     Node rez = rez();
-    Type trez = rez==null ? null : rez._val;
+    Type trez = rez==null ? null : rez.val();
     if( gvn._opt_mode != GVNGCM.Mode.Parse &&   // Past parsing
         rez != null &&          // Have a return result
         // If type(rez) can never lift to any TMP, then we will not return a
         // pointer, and do not need the memory state on exit.
         (!TypeMemPtr.OOP0.dual().isa(trez) || trez==Type.XNIL) &&
         // And not already wiped it out
-        !(mem instanceof ConNode && mem._val==TypeMem.XMEM) )
+        !(mem instanceof ConNode && mem.val() ==TypeMem.XMEM) )
       // Wipe out return memory
       return set_mem(gvn.add_work(gvn.con(TypeMem.XMEM)), gvn);
 
@@ -106,8 +106,8 @@ public class ScopeNode extends Node {
   // because this "turns around" the incoming live memory to also be the
   // demanded/used memory.
   static TypeMem compute_live_mem(Node mem, Node rez) {
-    Type tmem = mem._val;
-    Type trez = rez._val;
+    Type tmem = mem.val();
+    Type trez = rez.val();
     if( !(tmem instanceof TypeMem ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
     if( TypeMemPtr.OOP.isa(trez) ) return (TypeMem)tmem; // All possible pointers, so all memory is alive
     if( !(trez instanceof TypeMemPtr) ) return TypeMem.ANYMEM; // Not a pointer, basic live only

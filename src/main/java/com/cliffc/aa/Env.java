@@ -183,7 +183,7 @@ public class Env implements AutoCloseable {
   // Test support, return top-level name type
   Type lookup_valtype( String name ) {
     Node n = lookup(name);
-    if( !(n instanceof UnresolvedNode) ) return n._val;
+    if( !(n instanceof UnresolvedNode) ) return n.val();
     // For unresolved, use the ambiguous type
     return n.value(GVNGCM.Mode.Opto);
   }

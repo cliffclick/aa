@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 // Global Value Numbering, Global Code Motion
 public class GVNGCM {
   // Unique dense node-numbering
-  private int CNT;
+  private int CNT=1; // Do not hand out UID 0
   private final BitSet _live = new BitSet();  // Conservative approximation of live; due to loops some things may be marked live, but are dead
 
   public int uid() { assert CNT < 100000 : "infinite node create loop"; _live.set(CNT);  return CNT++; }
@@ -44,7 +44,7 @@ public class GVNGCM {
   public void add_work_uses( Node n ) {
     for( Node use : n._uses )  add_work(use);
     // Add self at the end, so the work loops pull it off again.
-    if( n.touched()  ) add_work(n); // Do not re-add if mid-ideal-call.
+    if( n._in ) add_work(n); // Do not re-add if mid-ideal-call.
   }
   // All defs on worklist - liveness flows uphill
   public void add_work_defs( Node n ) {
@@ -99,13 +99,14 @@ public class GVNGCM {
     // Check for a function constant, and return the globally shared common
     // FunPtrNode instead.  This only works for FunPtrs with no closures.
     assert !(t instanceof TypeFunPtr && t.is_con()); // Does not work for function constants
+    assert t==t.simple_ptr();
     ConNode con = new ConNode<>(t);
     Node con2 = _vals.get(con);
     if( con2 != null ) {        // Found a prior constant
       kill0(con);               // Kill the just-made one
       con = (ConNode)con2;
     } else {
-      con._val = t.simple_ptr(); // Constant is this value
+      con.set_val(t);           // In the GVN system
       _vals.put(con,con);
     }
     con._live = TypeMem.LIVE_BOT; // Alive, but demands no memory
@@ -117,7 +118,7 @@ public class GVNGCM {
   // mid-construction from the parser.  Any function call with yet-to-be-parsed
   // call sites, and any loop top with an unparsed backedge needs to use this.
   public <N extends Node> N init( N n ) {
-    n._val = Type.ALL;
+    n.set_val(Type.ALL);
     assert n._uses._len==0;
     return init0(n);
   }
@@ -145,8 +146,8 @@ public class GVNGCM {
   // Remove from GVN structures.  Used rarely for whole-merge changes
   public Type unreg( Node n ) { assert check_opt(n); return unreg0(n); }
   private Type unreg0( Node n ) {
-    Type t = n._val;            // Get old type
-    n._val = null;              // Remove from type system
+    Type t = n.val();           // Get old type
+    n._in = false;              // Remove from type system
     _vals.remove(n);            // Remove from GVN
     return t;
   }
@@ -154,7 +155,7 @@ public class GVNGCM {
   // Used rarely for whole-merge changes
   public void rereg( Node n, Type oldt ) {
     assert !check_opt(n);
-    n._val = oldt;
+    n.set_val(oldt);
     _vals.putIfAbsent(n,n);     // 'n' will not go back if it hits a prior
     add_work_uses(n);
   }
@@ -165,8 +166,8 @@ public class GVNGCM {
     for( Node n : ns ) {
       if( n == null ) continue;
       Type t = n.value(_opt_mode);
-      if( t != n._val ) {
-        n._val = t;
+      if( t != n.val() ) {
+        n.set_val(t);
         add_work_uses(n);
       }
     }
@@ -204,7 +205,7 @@ public class GVNGCM {
   }
   // Node is in the type table and GVN hash table
   private boolean check_opt(Node n) {
-    if( n.touched() ) {         // First & only test: in type table or not
+    if( n._in ) {               // First & only test: in type table or not
       assert (n instanceof ScopeNode) || _wrk_bits.get(n._uid)  || check_gvn(n,true); // Check also in GVN table
       return true;              // Yes in both type table and GVN table
     }
@@ -239,7 +240,7 @@ public class GVNGCM {
       // Replace with a constant, if possible
       if( replace_con(t,n) )
         { kill_new(n); return con(t); }
-      n._val = t;               // Set it in for ideal
+      n.set_val(t);               // Set it in for ideal
       Node x = n.ideal(this,0);
       if( x == null ) break;
       if( x != n ) {          // Different return, so delete original dead node
@@ -252,12 +253,12 @@ public class GVNGCM {
         if( !check_new(x) ) return x; // If the replacement is old, no need to re-ideal
         add_work_defs(n);       // Force live-ness rechecking
       }
-      n._val = null;            // Pull out for invariants on next iteration
+      n._in=false;              // Pull out for invariants on next iteration
       cnt++; assert cnt < 100;  // Catch infinite ideal-loops
     }
     // Global Value Numbering; n is "in the system" now
     Node x = _vals.putIfAbsent(n,n);
-    if( x != null ) { n._val = null; x._live=(TypeMem)n._live.meet(x._live); kill_new(n); return x; }
+    if( x != null ) { n._in=false; x._live=(TypeMem)n._live.meet(x._live); kill_new(n); return x; }
     return add_work(n);
   }
 
@@ -365,6 +366,8 @@ public class GVNGCM {
       nnn._live = old._live;    // Replacement has same liveness as original
       rereg(nnn, nnn.value(_opt_mode));
     }
+    if( !nnn.is_dead() && !old.is_dead() )
+      nnn.tvar().unify(old.tvar());
     if( !old.is_dead() ) { // if old is being replaced, it got removed from GVN table and types table.
       assert !check_opt(old);
       if( nnn._live != old._live ) {                    // New is as alive as the old
@@ -384,8 +387,8 @@ public class GVNGCM {
    *  @param n Node to be idealized; already in GVN
    *  @return null for no-change, or a better version of n, already in GVN */
   private Node xform_old0( Node n, int level ) {
-    assert n.touched(); // Node is in type tables, but might be already out of GVN
-    Type oval = n._val; // Get old type
+    assert n._in;    // Node is in type tables, but might be already out of GVN
+    Type oval = n.val(); // Get old type
 
     // Must exit either with {old node | null} and the old node in both types
     // and vals tables, OR exit with a new node and the old node in neither table.
@@ -416,7 +419,7 @@ public class GVNGCM {
         !(n instanceof UnresolvedNode) && // Keep for proper errors
         !(n instanceof RetNode) &&        // Keep for proper errors
         !(n instanceof ConNode) ) {       // Already a constant
-      n._val = null;        // Replace non-constants with high (dead) constants
+      n._in=false;          // Replace non-constants with high (dead) constants
       return con(oval);
     }
 
@@ -426,7 +429,7 @@ public class GVNGCM {
     // [ts!] Put updated types into table for use by ideal()
     if( nval!=oval ) {
       assert nval.isa(oval);    // Monotonically improving
-      n._val = nval;
+      n.set_val(nval);
     }
     // [ts!] Replace with a constant, if possible.  This is also very cheap
     // (once we expensively computed best value) and makes the best forward
@@ -436,8 +439,8 @@ public class GVNGCM {
     // [ts+] Try generic graph reshaping using updated types
     Node y = n.ideal(this,level);
     assert y==null || y==n || n._keep==0;// Ideal calls need to not replace 'keep'rs
-    if( y != null && y != n      ) { n._val = null; return  y  ; } // Progress with some new node
-    if( y != null && y.is_dead() ) { n._val = null; return null; }
+    if( y != null && y != n      ) { n._in=false; return  y  ; } // Progress with some new node
+    if( y != null && y.is_dead() ) { n._in=false; return null; }
 
     // [ts+,vals?] Reinsert in GVN
     Node z = _vals.putIfAbsent(n,n);
@@ -453,9 +456,9 @@ public class GVNGCM {
   // type table and not in the vals table.  NNN is in both.
   private Node merge( Node old, Node nnn ) {
     nnn._live = (TypeMem)nnn._live.meet(old._live);
-    Type told = old._val, tnnn = nnn._val;
-    if( told!=tnnn ) { nnn._val = told.join(tnnn); add_work_uses(nnn); }
-    old._val = null;            // Just toss old
+    Type told = old.val(), tnnn = nnn.val();
+    if( told!=tnnn ) { nnn.set_val(told.join(tnnn)); add_work_uses(nnn); }
+    old._in=false;              // Just toss old
     return nnn;                 // Keep nnn.
   }
 
@@ -463,7 +466,7 @@ public class GVNGCM {
   public void replace( Node old, Node nnn ) {
     while( old._uses._len > 0 ) {
       Node u = old._uses.del(0);  // Old use
-      boolean was = u.touched();
+      boolean was = u._in;
       _vals.remove(u);  // Use is about to change edges; remove from type table
       u._chk();
       u._defs.replace(old,nnn); // was old now nnn
@@ -589,11 +592,11 @@ public class GVNGCM {
         if( n.is_dead() ) continue; // Can be dead functions after removing ambiguous calls
 
         // Forwards flow
-        Type oval = n._val;                                // Old type
+        Type oval = n.val();                                // Old type
         Type nval = n.value(_opt_mode);                    // New type
         if( oval != nval ) {                               // Progress
           if( !check_monotonicity(n,oval,nval) ) continue; // Debugging hook
-          n._val = nval;           // Record progress
+          n.set_val(nval);           // Record progress
           // Classic forwards flow on change:
           for( Node use : n._uses ) {
             if( use==n ) continue; // Stop self-cycle (not legit, but happens during debugging)
@@ -648,15 +651,15 @@ public class GVNGCM {
         // See if we can resolve an unresolved
         if( n instanceof CallNode && n._live != TypeMem.DEAD ) {
           CallNode call = (CallNode)n;
-          if( call.ctl()._val == Type.CTRL && call._val instanceof TypeTuple ) { // Wait until the Call is reachable
+          if( call.ctl().val() == Type.CTRL && call.val() instanceof TypeTuple ) { // Wait until the Call is reachable
             // Track ambiguous calls: resolve after GCP gets stable, and if we
             // can resolve we continue to let GCP fall.
-            BitsFun fidxs = CallNode.ttfp(call._val).fidxs();
+            BitsFun fidxs = CallNode.ttfp(call.val()).fidxs();
             if( fidxs.above_center() && fidxs.abit() == -1 && ambi_calls.find(call) == -1 )
               ambi_calls.add(call);
             // If the function input can never fall to any function type, abort
             // the resolve now.  The program is in-error.
-            if( !call.fun()._val.isa(TypeFunPtr.GENERIC_FUNPTR) ) {
+            if( !call.fun().val().isa(TypeFunPtr.GENERIC_FUNPTR) ) {
               call._not_resolved_by_gcp = true;
               add_work(call);
             }
@@ -683,7 +686,7 @@ public class GVNGCM {
   }
 
   private void remove_ambi( CallNode call ) {
-    TypeFunPtr tfp = CallNode.ttfpx(call._val);
+    TypeFunPtr tfp = CallNode.ttfpx(call.val());
     FunPtrNode fptr = null;
     if( tfp != null ) {     // Have a sane function ptr?
       BitsFun fidxs = tfp.fidxs();
@@ -732,7 +735,7 @@ public class GVNGCM {
     Node x = _vals.get(n);
     if( x!=null ) { kill0(n); return x; }
     _vals.put(n,n);
-    n._val = n.value(_opt_mode);
+    n.set_val(n.value(_opt_mode));
     n._live = TypeMem.DEAD;
     add_work(n);
     return n;
@@ -746,7 +749,7 @@ public class GVNGCM {
     if( n==Env.START ) return;          // Top-level scope
 
     // Hit the fixed point, despite any immediate updates.
-    assert n.value(_opt_mode)==n._val;
+    assert n.value(_opt_mode)== n.val();
     assert n.live (_opt_mode)==n._live;
 
     // Walk reachable graph

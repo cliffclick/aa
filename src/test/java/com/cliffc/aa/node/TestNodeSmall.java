@@ -48,18 +48,18 @@ public class TestNodeSmall {
 
 
     // Compute Node.all_type() and all_type.startype()
-    Type uaddALL = uadd._val, uaddSTART = Type.ANY;
-    Type anumALL = anum._val, anumSTART = Type.ANY;
-    Type afltALL = aflt._val, afltSTART = Type.ANY;
-    Type aintALL = aint._val, aintSTART = Type.ANY;
-    Type astrALL = astr._val, astrSTART = Type.ANY;
+    Type uaddALL = uadd.val(), uaddSTART = Type.ANY;
+    Type anumALL = anum.val(), anumSTART = Type.ANY;
+    Type afltALL = aflt.val(), afltSTART = Type.ANY;
+    Type aintALL = aint.val(), aintSTART = Type.ANY;
+    Type astrALL = astr.val(), astrSTART = Type.ANY;
 
     // Compute Node.value() where initial GVN is startype()
-    uadd._val = uaddSTART;
-    anum._val = anumSTART;
-    aflt._val = afltSTART;
-    aint._val = aintSTART;
-    astr._val = astrSTART;
+    uadd.set_val(uaddSTART);
+    anum.set_val(anumSTART);
+    aflt.set_val(afltSTART);
+    aint.set_val(aintSTART);
+    astr.set_val(astrSTART);
     gvn._opt_mode=GVNGCM.Mode.PesiNoCG;
     Type uaddVAL1START = uadd.value(gvn._opt_mode);
     Type anumVAL1START = anum.value(gvn._opt_mode);
@@ -74,11 +74,11 @@ public class TestNodeSmall {
     Type astrVAL2START = astr.value(gvn._opt_mode);
 
     // Compute Node.value() where initial GVN is all_type.dual()
-    uadd._val = uaddALL.dual();
-    anum._val = anumALL.dual();
-    aflt._val = afltALL.dual();
-    aint._val = aintALL.dual();
-    astr._val = astrALL.dual();
+    uadd.set_val(uaddALL.dual());
+    anum.set_val(anumALL.dual());
+    aflt.set_val(afltALL.dual());
+    aint.set_val(aintALL.dual());
+    astr.set_val(astrALL.dual());
     gvn._opt_mode=GVNGCM.Mode.PesiNoCG;
     Type uaddVAL1XALL = uadd.value(gvn._opt_mode);
     Type anumVAL1XALL = anum.value(gvn._opt_mode);
@@ -93,11 +93,11 @@ public class TestNodeSmall {
     Type astrVAL2XALL = astr.value(gvn._opt_mode);
 
     // Compute Node.value() where initial GVN is all_type()
-    uadd._val = uaddALL;
-    anum._val = uaddALL;
-    aflt._val = afltALL;
-    aint._val = aintALL;
-    astr._val = astrALL;
+    uadd.set_val(uaddALL);
+    anum.set_val(uaddALL);
+    aflt.set_val(afltALL);
+    aint.set_val(aintALL);
+    astr.set_val(astrALL);
     gvn._opt_mode=GVNGCM.Mode.PesiNoCG;
     Type uaddVAL1ALL = uadd.value(gvn._opt_mode);
     Type anumVAL1ALL = anum.value(gvn._opt_mode);
@@ -175,7 +175,7 @@ public class TestNodeSmall {
     TypeTuple[] tns= new TypeTuple[argss.length];
     for( int i=0; i<argss.length; i++ ) {
       for( int j=0; j<ins.length; j++ )
-        ins[j]._val = argss[i].at(j);
+        ins[j].set_val(argss[i].at(j));
       tns[i] = (TypeTuple)n.value(gvn._opt_mode);
     }
     // Equals check after computing them all
@@ -400,7 +400,7 @@ public class TestNodeSmall {
     //   FunPtr - Ret
     gvn._opt_mode=GVNGCM.Mode.Parse;
     ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
-    ctl._val = Type.CTRL;
+    ctl.set_val(Type.CTRL);
     ConNode mem = (ConNode)gvn.xform(new ConNode<>(TypeMem.ANYMEM));
     ConNode rpc = (ConNode)gvn.xform(new ConNode<>(TypeRPC.ALL_CALL));
     ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISP_SIMPLE));
@@ -411,7 +411,7 @@ public class TestNodeSmall {
     ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(1, dsp_file));
     Env.ALL_DISPLAYS = Env.ALL_DISPLAYS.set(dsp_file._alias);
     // The Fun and Fun._tf:
-    TypeStruct formals = TypeStruct.make_args(Types.ts(dsp_file_ptr._val, // File-scope display as arg0
+    TypeStruct formals = TypeStruct.make_args(Types.ts(dsp_file_ptr.val(), // File-scope display as arg0
                                                          Type.SCALAR));          // Some scalar arg1
     TypeFunSig sig = TypeFunSig.make(formals,Type.SCALAR);
     FunNode fun = new FunNode("fact",sig,-1,false);
@@ -419,7 +419,7 @@ public class TestNodeSmall {
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
     ParmNode parm_mem = new ParmNode(-2,"mem",fun,mem,null);
-    ParmNode parm_dsp = new ParmNode( 0,"^"  ,fun,Type.SCALAR,gvn.con(dsp_file_ptr._val),null);
+    ParmNode parm_dsp = new ParmNode( 0,"^"  ,fun,Type.SCALAR,gvn.con(dsp_file_ptr.val()),null);
     gvn.init(parm_mem.add_def(dsp_file_obj));
     gvn.init(parm_dsp.add_def(dsp_file_ptr));
     // Close the function up
@@ -443,7 +443,7 @@ public class TestNodeSmall {
     // loose on it.  Just check the types flow correctly.
     gvn._opt_mode=GVNGCM.Mode.PesiNoCG;
     for( Node n : nodes ) {
-      Type old = n._val;
+      Type old = n.val();
       Type nnn = n.value(gvn._opt_mode);
       assert nnn.isa(old);
     }
@@ -452,12 +452,12 @@ public class TestNodeSmall {
     gvn.gcp(GVNGCM.Mode.Opto,env);
 
     // Validate cyclic display/function type
-    TypeFunPtr tfptr0 = (TypeFunPtr)fptr._val;
+    TypeFunPtr tfptr0 = (TypeFunPtr) fptr.val();
     Type tdptr0 = tfptr0._disp;
-    Type tret = ((TypeTuple)ret._val).at(2);
+    Type tret = ((TypeTuple) ret.val()).at(2);
     assertEquals(tdptr0,tret); // Returning the display
     // Display contains 'fact' pointing to self
-    TypeMem tmem = (TypeMem)dsp_file_obj._val;
+    TypeMem tmem = (TypeMem) dsp_file_obj.val();
     TypeStruct tdisp0 = (TypeStruct)tmem.ld((TypeMemPtr)tdptr0);
     assertEquals(tfptr0,tdisp0.at(tdisp0.find("fact")));
   }

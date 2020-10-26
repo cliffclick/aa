@@ -12,10 +12,10 @@ import java.util.Arrays;
 // constant but a TypeNode has to be proven useless and removed before the
 // program is type-correct.  A CastNode is always correct from local semantics,
 // and the join is non-trivial.
-public class TypeNode extends Node {
+public class AssertNode extends Node {
   private final Type _t;            // Asserted type
   private final Parse _error_parse; // Used for error messages
-  public TypeNode( Node mem, Node a, Type t, Parse P ) {
+  public AssertNode( Node mem, Node a, Type t, Parse P ) {
     super(OP_TYPE,null,mem,a);
     assert !(t instanceof TypeFunPtr);
     _t=t;
@@ -37,7 +37,7 @@ public class TypeNode extends Node {
       TypeFunSig sig = (TypeFunSig)_t;
       Node[] args = new Node[sig.nargs()-1/*not display*/+/*+ctrl+mem+tfp+all args*/3];
       FunNode fun = gvn.init((FunNode)(new FunNode(null,sig,-1,false).add_def(Env.ALL_CTRL)));
-      fun._val = Type.CTRL;
+      fun.set_val(Type.CTRL);
       args[0] = fun;            // Call control
       args[1] = gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
       args[2] = arg;            // The whole TFP to the call
@@ -53,7 +53,7 @@ public class TypeNode extends Node {
       Node postmem= gvn.xform(new MProjNode(cepi,1)).keep();
       Node val    = gvn.xform(new  ProjNode(2, cepi.unhook()));
       // Type-check the return also
-      Node chk    = gvn.xform(new  TypeNode(postmem,val,sig._ret,_error_parse));
+      Node chk    = gvn.xform(new AssertNode(postmem,val,sig._ret,_error_parse));
       RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));
       // Just the Closure when we make a new TFP
       Node clos = gvn.xform(new FP2ClosureNode(arg));
@@ -83,7 +83,7 @@ public class TypeNode extends Node {
   }
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Node arg = arg();
-    Type t1 = arg._val;
+    Type t1 = arg.val();
     Type t0 = _t.simple_ptr();
     if( t1.isa(t0) ) {
       Type actual = arg.sharptr(mem());
@@ -101,8 +101,8 @@ public class TypeNode extends Node {
 
   // Check TypeNode for being in-error
   @Override public ErrMsg err( boolean fast ) {
-    Type arg = arg()._val;
-    Type mem = mem()._val;
+    Type arg = arg().val();
+    Type mem = mem().val();
     return ErrMsg.asserterr(_error_parse,arg,mem,_t);
   }
 }

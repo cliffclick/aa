@@ -15,7 +15,7 @@ public class MProjNode extends ProjNode {
       return x == this ? gvn.con(TypeMem.ANYMEM) : x; // Happens in dead self-recursive functions
     if( in(0) instanceof CallEpiNode ) {
       Node precall = in(0).is_pure_call(); // See if memory can bypass pure calls (most primitives)
-      if( precall != null && _val==precall._val )
+      if( precall != null && val() == precall.val() )
         return precall;
     }
     return null;
@@ -30,7 +30,7 @@ public class MProjNode extends ProjNode {
         // Break forward dead-alias cycles in recursive functions by inspecting
         // dead-ness in DefMem.
         if( in(0) instanceof CallNode )
-          t = t.join(in(1)._val);
+          t = t.join(in(1).val());
         return t;
       }
     }

@@ -141,8 +141,8 @@ public class Parse implements Comparable<Parse> {
     ArrayList<Node.ErrMsg> errs0 = new ArrayList<>(errs);
     Collections.sort(errs0);
 
-    Type res = scope().rez()._val; // New and improved result
-    Type mem = scope().mem()._val;
+    Type res = scope().rez().val(); // New and improved result
+    Type mem = scope().mem().val();
     return new TypeEnv(res, mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM),_e,errs0.isEmpty() ? null : errs0);
   }
 
@@ -357,7 +357,7 @@ public class Parse implements Comparable<Parse> {
       if( n.is_forward_ref() ) { // Prior is actually a forward-ref, so this is the def
         assert !scope.stk().is_mutable(tok) && scope == scope();
         if( ifex instanceof FunPtrNode )
-          ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex,(TypeMemPtr)scope.ptr()._val);
+          ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex,(TypeMemPtr) scope.ptr().val());
         else ; // Can be here if already in-error
       } else { // Store into scope/NewObjNode/display
         // Assign into display
@@ -405,7 +405,7 @@ public class Parse implements Comparable<Parse> {
     f_mem = scope().check_if(false,bad,_gvn,f_ctrl,f_mem); // Insert errors if created only 1 side
     scope().pop_if();         // Pop the if-scope
     RegionNode r = set_ctrl(init(new RegionNode(null,t_ctrl.unhook(),f_ctrl.unhook())).keep());
-    r._val = Type.CTRL;
+    r.set_val(Type.CTRL);
     set_mem(gvn(new PhiNode(TypeMem.FULL,bad,r       ,t_mem.unhook(),f_mem.unhook())));
     return  gvn(new PhiNode(Type.SCALAR ,bad,r.unhook(),tex.unhook(),  fex.unhook())) ; // Ifex result
   }
@@ -633,7 +633,7 @@ public class Parse implements Comparable<Parse> {
         Node arg = tuple(oldx-1,stmts(),first_arg_start); // Parse argument list
         if( arg == null )       // tfact but no arg is just the tfact
           { _x = oldx; return n; }
-        Type tn = n._val;
+        Type tn = n.val();
         boolean may_fun = tn.isa(TypeFunPtr.GENERIC_FUNPTR);
         if( !may_fun && arg.op_prec() >= 0 ) { _x=oldx; return n; }
         if( !may_fun &&
@@ -885,7 +885,7 @@ public class Parse implements Comparable<Parse> {
     // Push an extra hidden display argument.  Similar to java inner-class ptr
     // or when inside of a struct definition: 'this'.
     Node parent_display = scope().ptr();
-    TypeMemPtr tpar_disp = (TypeMemPtr)parent_display._val; // Just a TMP of the right alias
+    TypeMemPtr tpar_disp = (TypeMemPtr) parent_display.val(); // Just a TMP of the right alias
     ids .push("^");
     ts  .push(tpar_disp);
     bads.push(null);
@@ -968,7 +968,7 @@ public class Parse implements Comparable<Parse> {
     s.early_kill();
     if( ctrl == null ) return rez.unhook(); // No other exits to merge into
     set_ctrl(ctrl=init(ctrl.add_def(ctrl())));
-    ctrl._val = Type.CTRL;
+    ctrl.set_val(Type.CTRL);
     mem.set_def(0,ctrl,null);
     val.set_def(0,ctrl,null);
     set_mem (gvn(mem.add_def(mem())));
@@ -1029,7 +1029,7 @@ public class Parse implements Comparable<Parse> {
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.
   private Node typechk(Node x, Type t, Node mem, Parse bad) {
-    return t == null || x._val.isa(t) ? x : gvn(new TypeNode(mem,x,t,bad));
+    return t == null || x.val().isa(t) ? x : gvn(new AssertNode(mem,x,t,bad));
   }
 
   private String token() { skipWS();  return token0(); }

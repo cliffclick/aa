@@ -19,7 +19,7 @@ public final class RetNode extends Node {
   public RetNode( Node ctrl, Node mem, Node val, Node rpc, FunNode fun ) { super(OP_RET,ctrl,mem,val,rpc,fun); _fidx = fun._fidx; _nargs=fun.nargs(); }
   public Node ctl() { return in(0); }
   public Node mem() { return in(1); }
-  public Node val() { return in(2); }
+  public Node rez() { return in(2); }
   public Node rpc() { return in(3); }
   public FunNode fun() { return (FunNode)in(4); }
   @Override public boolean is_mem() { return true; }
@@ -52,7 +52,7 @@ public final class RetNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     // If control is dead, but the Ret is alive, we're probably only using the
     // FunPtr as a 'gensym'.  Nuke the function body.
-    if( !is_copy() && ctl()._val== Type.XCTRL && !is_prim() && fun()._val==Type.XCTRL )
+    if( !is_copy() && ctl().val() == Type.XCTRL && !is_prim() && fun().val() ==Type.XCTRL )
       set_def(4,null,gvn);      // We're a copy now!
 
     // If no users inlining, wipe out all edges
@@ -71,8 +71,8 @@ public final class RetNode extends Node {
     if( is_copy() ) return null;
     // Collapsed to a constant?  Remove any control interior.
     Node ctl = ctl();
-    if( val()._val.is_con() && ctl!=fun() && // Profit: can change control and delete function interior
-        (mem()._val==TypeMem.EMPTY || (mem() instanceof ParmNode && mem().in(0)==fun())) ) // Memory has to be trivial also
+    if( rez().val().is_con() && ctl!=fun() && // Profit: can change control and delete function interior
+        (mem().val() ==TypeMem.EMPTY || (mem() instanceof ParmNode && mem().in(0)==fun())) ) // Memory has to be trivial also
       return set_def(0,fun(),gvn); // Gut function body
 
     // Look for a tail recursive call
@@ -101,7 +101,7 @@ public final class RetNode extends Node {
     if( idx == ctl._defs._len ) return null; // No call-epi found
     CallEpiNode cepi = (CallEpiNode)ctl.in(idx).in(0);
     CallNode call = cepi.call();
-    if( call.ctl()._val != Type.CTRL ) return null; // Dead call
+    if( call.ctl().val() != Type.CTRL ) return null; // Dead call
     // Every Phi on the region must come directly from the CallEpi.
     for( Node phi : ctl._uses )
       if( phi._op == OP_PHI && phi.in(idx).in(0)!=cepi )
@@ -143,8 +143,8 @@ public final class RetNode extends Node {
   private static boolean check_phi_type( GVNGCM gvn, FunNode fun, CallNode call, int argn ) {
     ParmNode parm = fun.parm(argn);
     if( parm==null ) return true; // arg/parm might be dead
-    Type tenter = parm._val;
-    Type tback  = call.argm(argn,gvn)._val;
+    Type tenter = parm.val();
+    Type tback  = call.argm(argn, gvn).val();
     return tback.isa(tenter);
   }
 
@@ -155,17 +155,16 @@ public final class RetNode extends Node {
     gvn.replace(parm,phi);
     phi.set_def(1,parm,null);
     phi._live = parm._live;
-    gvn.rereg(phi,parm._val);
+    gvn.rereg(phi, parm.val());
   }
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
-    if( ctl()==null ) return _val; // No change if a copy
-    TypeTuple TALL = TypeTuple.RET;
-    Type ctl = ctl()._val;
-    if( ctl != Type.CTRL ) return ctl.oob(TALL);
-    Type mem = mem()._val;
+    if( ctl()==null ) return val(); // No change if a copy
+    Type ctl = ctl().val();
+    if( ctl != Type.CTRL ) return ctl.oob(TypeTuple.RET);
+    Type mem = mem().val();
     if( !(mem instanceof TypeMem) ) mem = mem.oob(TypeMem.ALLMEM);
-    Type val = val()._val;
+    Type val = rez().val();
     return TypeTuple.make(ctl,mem,val);
   }
 
@@ -177,7 +176,7 @@ public final class RetNode extends Node {
   }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==mem() ) return _live;
-    if( def==val() ) return TypeMem.ESCAPE;
+    if( def==rez() ) return TypeMem.ESCAPE;
     return TypeMem.ALIVE;       // Basic aliveness
   }
 

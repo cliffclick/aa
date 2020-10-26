@@ -14,7 +14,7 @@ public class MrgProjNode extends ProjNode {
   @Override public Node ideal(GVNGCM gvn, int level) {
     NewNode nnn = nnn();
     Node mem = mem();
-    Type t = mem._val;
+    Type t = mem.val();
     // Alias is dead-on-entry.  Then this MrgPrj no longer lifts
     boolean doe = t instanceof TypeMem && ((TypeMem)t).at(nnn._alias)==TypeObj.UNUSED;
 
@@ -49,8 +49,8 @@ public class MrgProjNode extends ProjNode {
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( !(in(0) instanceof NewNode) ) return Type.ANY;
     NewNode nnn = nnn();
-    Type tn = nnn._val;
-    Type tm = mem()._val;
+    Type tn = nnn.val();
+    Type tm = mem().val();
     if( !(tm instanceof TypeMem  ) ) return tm.oob();
     if( !(tn instanceof TypeTuple) ) return tn.oob();
     TypeObj to = (TypeObj)((TypeTuple)tn).at(0);

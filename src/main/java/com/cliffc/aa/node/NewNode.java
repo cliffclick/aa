@@ -48,12 +48,12 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
   // Recompute default memory cache on a change
   public final void sets_out( T ts ) {
-    assert !touched();
+    assert !_in;
     _ts = ts;
     _crushed = ts.crush();
   }
   protected final void sets_in( T ts ) {
-    assert touched();
+    assert _in;
     _ts = ts;
     _crushed = ts.crush();
     Env.GVN.revalive(this,ProjNode.proj(this,0),Env.DEFMEM);
@@ -128,10 +128,10 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   @Override @NotNull public NewNode copy( boolean copy_edges, GVNGCM gvn) {
     // Split the original '_alias' class into 2 sub-aliases
     NewNode<T> nnn = (NewNode<T>)super.copy(copy_edges, gvn);
-    nnn._val = null;            // Not in GVN
+    nnn._in=false;              // Not in GVN
     nnn._init(_alias,_ts);      // Children alias classes, split from parent
     // The original NewNode also splits from the parent alias
-    assert touched();
+    assert _in;
     Type oldt = gvn.unreg(this);
     _init(_alias,_ts);
     gvn.rereg(this,oldt);

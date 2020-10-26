@@ -33,7 +33,7 @@ public class MemSplitNode extends Node {
   }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM.Mode opt_mode) {
-    Type t = mem()._val;
+    Type t = mem().val();
     if( !(t instanceof TypeMem) ) return t.oob();
     // Normal type is for an MProj of the input memory, one per alias class
     Type[] ts = Types.get(_escs._len);

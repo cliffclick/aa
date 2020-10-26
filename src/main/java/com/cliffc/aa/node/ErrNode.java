@@ -30,7 +30,7 @@ public final class ErrNode extends Node {
     // has ANOTHER ALL/Err input, return null instead.
     for( Node use : _uses )
       for( Node def : use._defs )
-        if( def != null && def != this && def._val==Type.ALL )
+        if( def != null && def != this && def.val() ==Type.ALL )
           return null;
     return _err;
   }

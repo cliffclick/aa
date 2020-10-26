@@ -200,15 +200,15 @@ public class TestNode {
     for( int i=1; i<_ins.length; i++ )
       _ins[i] = new ConNode<>(Type.SCALAR);
     Node mem = new ConNode<Type>(TypeMem.MEM);
-    mem._val = TypeMem.MEM;
+    mem.set_val(TypeMem.MEM);
     FunNode fun_forward_ref = new FunNode("anon");
-    Env.DEFMEM._val = TypeMem.MEM;
+    Env.DEFMEM.set_val(TypeMem.MEM);
 
     Node unr = top.lookup("+"); // All the "+" functions
     FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
     RetNode ret = fun_plus.ret();
     CallNode call = new CallNode(false,null,_ins[0],unr,mem);
-    call._val = TypeTuple.CALLE;
+    call.set_val(TypeTuple.CALLE);
     TypeStruct tname = TypeStruct.NAMEPT;
 
     // Testing 1 set of types into a value call.
@@ -259,9 +259,9 @@ public class TestNode {
     test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FRW ,"x",null));
     test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FFNL,"x",null));
     //                  ScopeNode has no inputs, and value() call is monotonic
-    test1monotonic(new   TypeNode(_ins[1],_ins[2],TypeInt.FALSE    ,null));
-    test1monotonic(new   TypeNode(_ins[1],_ins[2],TypeMemPtr.STRPTR,null));
-    test1monotonic(new   TypeNode(_ins[1],_ins[2],TypeFlt.FLT64    ,null));
+    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeInt.FALSE    ,null));
+    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeMemPtr.STRPTR,null));
+    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeFlt.FLT64    ,null));
     _gvn._opt_mode=GVNGCM.Mode.PesiNoCG;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=GVNGCM.Mode.Parse;
     _gvn._opt_mode=GVNGCM.Mode.PesiCG  ;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=GVNGCM.Mode.Parse;
 
@@ -271,10 +271,10 @@ public class TestNode {
   @SuppressWarnings("unchecked")
   private Type test1jig(final Node n, Type t0, Type t1, Type t2, Type t3) {
     // Prep graph edges
-    _ins[0]._val =                         t0;
-    _ins[1]._val = ((ConNode)_ins[1])._t = t1;
-    _ins[2]._val = ((ConNode)_ins[2])._t = t2;
-    _ins[3]._val = ((ConNode)_ins[3])._t = t3;
+    _ins[0].set_val(t0);
+    _ins[1].set_val(((ConNode)_ins[1])._t = t1);
+    _ins[2].set_val(((ConNode)_ins[2])._t = t2);
+    _ins[3].set_val(((ConNode)_ins[3])._t = t3);
     return n.value(_gvn._opt_mode);
   }
 
@@ -322,10 +322,10 @@ public class TestNode {
       Type vn = get_value_type(xx);
       int x0 = xx(xx,0), x1 = xx(xx,1), x2 = xx(xx,2), x3 = xx(xx,3);
       // Prep graph edges
-      _ins[0]._val=                        all[x0];
-      _ins[1]._val=((ConNode)_ins[1])._t = all[x1];
-      _ins[2]._val=((ConNode)_ins[2])._t = all[x2];
-      _ins[3]._val=((ConNode)_ins[3])._t = all[x3];
+      _ins[0].set_val(all[x0]);
+      _ins[1].set_val(((ConNode)_ins[1])._t = all[x1]);
+      _ins[2].set_val(((ConNode)_ins[2])._t = all[x2]);
+      _ins[3].set_val(((ConNode)_ins[3])._t = all[x3]);
 
       // Subtypes in 4 node input directions
       int[] stx0 = stx(n,xx,0);
@@ -395,7 +395,7 @@ public class TestNode {
   @SuppressWarnings("unchecked")
   private void set_type(int idx, Type tyx) {
     if( idx > 0 ) ((ConNode)_ins[idx])._t = tyx;
-    _ins[idx]._val = tyx;
+    _ins[idx].set_val(tyx);
   }
 
   private static final int[] stx_any = new int[]{};
