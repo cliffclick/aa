@@ -1,7 +1,7 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.Node;
-import com.cliffc.aa.type.TypeVar;
+import com.cliffc.aa.tvar.TypeVar;
 
 // Simple interface to limit TypeNode access to Node.
 public interface TNode {

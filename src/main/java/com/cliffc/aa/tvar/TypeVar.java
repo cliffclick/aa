@@ -1,6 +1,7 @@
-package com.cliffc.aa.type;
+package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.type.Type;
 import com.cliffc.aa.TNode;
 import org.jetbrains.annotations.NotNull;
 
@@ -27,7 +28,7 @@ public class TypeVar {
   // as "->N" for functions of N args, or "{N}" for structs of N fields, or
   // "CMV" for {Control,Memory,Value} as the result of Rets and CallEpis.
   public TypeVar( String _name, TypeVar... tvars ) {
-    
+    _tnode=null;
   }
   
   public int uid() { return _tnode.uid(); }
