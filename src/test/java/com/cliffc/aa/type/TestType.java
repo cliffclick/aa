@@ -6,6 +6,7 @@ import org.junit.Test;
 
 import java.util.HashMap;
 
+import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -309,7 +310,7 @@ public class TestType {
 
     // TypeTuple structure demands the shortest Tuple wins the "length
     // war" (determines the length of the result based on short's any/all flag).
-    TypeFunPtr f1i2i = TypeFunPtr.make_new_fidx(BitsFun.ALL,2,TypeFunPtr.NO_DISP);
+    TypeFunPtr f1i2i = TypeFunPtr.make_new_fidx(BitsFun.ALL,2,NO_DISP);
     // To be a GF result, GF has to be shorter and high; the isa does a meet of
     // TypeFunPtrs which does a *join* of args, which duals the GF args down
     // low.  GF is zero length and low, and wins the meet.
@@ -319,19 +320,19 @@ public class TestType {
     assertTrue(gf.dual().isa(f1i2i)); // To be short result, short must be low
 
     assertTrue(f1i2i.isa(gf));
-    TypeFunPtr f1f2f = TypeFunPtr.make_new_fidx(BitsFun.ALL,2,TypeFunPtr.NO_DISP);
+    TypeFunPtr f1f2f = TypeFunPtr.make_new_fidx(BitsFun.ALL,2,NO_DISP);
     assertTrue(f1f2f.isa(gf));
     TypeFunPtr mt = (TypeFunPtr)f1i2i.meet(f1f2f);
     int fidx0 = f1i2i.fidx();
     int fidx1 = f1f2f.fidx();
     BitsFun funs = BitsFun.make0(fidx0).meet(BitsFun.make0(fidx1));
-    TypeFunPtr f3i2r = TypeFunPtr.make(funs,2,TypeFunPtr.NO_DISP);
+    TypeFunPtr f3i2r = TypeFunPtr.make(funs,2,NO_DISP);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));
     assertTrue(f1f2f.isa(f3i2r));
 
-    TypeFunPtr f2 = TypeFunPtr.make(BitsFun.make0(fidx1),2,TypeFunPtr.NO_DISP); // Some generic function (happens to be #23, '&')
+    TypeFunPtr f2 = TypeFunPtr.make(BitsFun.make0(fidx1),2,NO_DISP); // Some generic function (happens to be #23, '&')
     assertTrue(f2.isa(gf));
   }
 

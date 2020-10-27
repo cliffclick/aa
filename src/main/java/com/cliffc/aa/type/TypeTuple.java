@@ -4,6 +4,8 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
+import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
+
 // Internal fixed-length non-recursive tuples.  Used for function arguments,
 // and multi-arg results like IfNode and CallNode.  This is not the same as a
 // no-named-field TypeStruct, and is not exposed at the language level.  With
@@ -61,21 +63,22 @@ public class TypeTuple extends Type<TypeTuple> {
     return t1==t2 ? t1 : t1.free(t2);
   }
   public static TypeTuple make( Type[] ts ) { return make0(false,ts); }
-  public static TypeTuple make( ) { Type[] ts = Types.get(0);  return make0(false,ts); }
-  public static TypeTuple make( Type t0 ) { Type[] ts = Types.get(1);  ts[0]=t0;  return make0(false,ts); }
-  public static TypeTuple make( Type t0, Type t1 ) { Type[] ts = Types.get(2);  ts[0]=t0; ts[1]=t1; return make0(false,ts); }
-  public static TypeTuple make( Type t0, Type t1, Type t2 ) { Type[] ts = Types.get(3); ts[0]=t0; ts[1]=t1; ts[2]=t2; return make0(false,ts); }
-  public static TypeTuple make( Type t0, Type t1, Type t2, Type t3 ) { Type[] ts = Types.get(4); ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; return make0(false,ts); }
-  public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4 ) {
-    Type[] ts = Types.get(5);
-    ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; ts[4]=t4;
-    return make0(false,ts);
-  }
-  public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4, Type t5 ) {
-    Type[] ts = Types.get(6);
-    ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; ts[4]=t4; ts[5]=t5;
-    return make0(false,ts);
-  }
+  public static TypeTuple make( ) { return make0(false,Types.get(0)); }
+  //public static TypeTuple make( Type t0 ) { Type[] ts = Types.get(1);  ts[0]=t0;  return make0(false,ts); }
+  public static TypeTuple make( Type t0, Type t1 ) { return make0(false,Types.ts(t0,t1)); }
+  public static TypeTuple make( Type t0, Type t1, Type t2 ) { return make0(false,Types.ts(t0,t1,t2)); }
+  public static TypeTuple make( Type t0, Type t1, Type t2, Type t3 ) { return make0(false,Types.ts(t0,t1,t2,t3)); }
+  //public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4 ) {
+  //  Type[] ts = Types.get(5);
+  //  ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; ts[4]=t4;
+  //  return make0(false,ts);
+  //}
+  public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4, Type t5 ) { return make0(false,Types.ts(t0,t1,t2,t3,t4,t5)); }
+
+  public static TypeTuple make_args(Type[] ts) { return make(ts); }
+  public static TypeTuple make(TypeStruct ts) { return make(ts._ts); }
+
+
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
   public  static final TypeTuple IF_ANY  = IF_ALL.dual();
   public  static final TypeTuple IF_TRUE = make(XCTRL,CTRL );
@@ -87,7 +90,24 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple CALLE= make(CTRL, TypeMem.ALLMEM, ALL); // Type of CallEpiNodes
   public  static final TypeTuple TEST0= make(CTRL, TypeMem.MEM  , TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
   public  static final TypeTuple TEST1= make(CTRL, TypeMem.EMPTY, TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
-  static final TypeTuple[] TYPES = new TypeTuple[]{CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE, TEST0, TEST1};
+  // Arguments
+  public  static final TypeTuple NO_ARGS    = make_args(Types.ts(NO_DISP));
+  public  static final TypeTuple INT64      = make_args(Types.ts(NO_DISP,TypeInt.INT64)); // {int->flt}
+  public  static final TypeTuple FLT64      = make_args(Types.ts(NO_DISP,TypeFlt.FLT64)); // {flt->flt}
+  public  static final TypeTuple STRPTR     = make_args(Types.ts(NO_DISP,TypeMemPtr.STRPTR));
+  public  static final TypeTuple INT64_INT64= make_args(Types.ts(NO_DISP,TypeInt.INT64,TypeInt.INT64)); // {int int->int }
+  public  static final TypeTuple FLT64_FLT64= make_args(Types.ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64)); // {flt flt->flt }
+  public  static final TypeTuple OOP_OOP    = make_args(Types.ts(NO_DISP,TypeMemPtr.ISUSED0,TypeMemPtr.ISUSED0));
+  public  static final TypeTuple SCALAR1    = make_args(Types.ts(NO_DISP,SCALAR));
+  public  static final TypeTuple LVAL_LEN   = make_args(Types.ts(NO_DISP,TypeMemPtr.ARYPTR)); // Array
+  public  static final TypeTuple LVAL_RD    = make_args(Types.ts(NO_DISP,TypeMemPtr.ARYPTR,TypeInt.INT64)); // Array & index
+  public  static final TypeTuple LVAL_WR    = make_args(Types.ts(NO_DISP,TypeMemPtr.ARYPTR,TypeInt.INT64,Type.SCALAR)); // Array & index & element
+
+  // 
+  static final TypeTuple[] TYPES = new TypeTuple[]{
+    CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE, TEST0, TEST1,
+    NO_ARGS, INT64, FLT64, STRPTR, INT64_INT64, FLT64_FLT64, OOP_OOP
+  };
 
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.
@@ -119,6 +139,7 @@ public class TypeTuple extends Type<TypeTuple> {
   }
 
   public Type at( int idx ) { return _ts[idx]; } // Must be in-size
+  public int len() { return _ts.length; }
 
   // Same as the original, with one field changed
   public TypeTuple set( int idx, Type t ) {

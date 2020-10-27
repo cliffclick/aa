@@ -6,6 +6,8 @@ import com.cliffc.aa.util.Ary;
 
 import java.util.*;
 
+import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
+
 // Primitives can be used as an internal operator (their apply() call does the
 // primitive operation).  Primitives are wrapped as functions when returned
 // from Env lookup, although the immediate lookup+apply is optimized to just
@@ -16,14 +18,17 @@ import java.util.*;
 public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
   final TypeFunSig _sig;        // Argument types; 0 is display, 1 is 1st real arg
+  final String[] _args;         // 
   Parse[] _badargs;             // Filled in when inlined in CallNode
   byte _op_prec;                // Operator precedence, computed from table.  Generally 1-9.
   public boolean _thunk_rhs;    // Thunk (delay) right-hand-argument.
-  PrimNode( String name, TypeStruct formals, Type ret ) {
+  PrimNode( String name, TypeTuple formals, Type ret ) {
     super(OP_PRIM);
     _name=name;
-    assert formals.at(0)==TypeFunPtr.NO_DISP; // Room for no closure
+    assert formals.at(0)==NO_DISP; // Room for no closure
     _sig=TypeFunSig.make(formals,ret);
+    _args=new String[_sig.nargs()];
+    for( int i=0; i<_args.length; i++ ) _args[i]=arg_name(i);
     _badargs=null;
     _op_prec = -1;              // Not set yet
     _thunk_rhs=false;
@@ -33,6 +38,7 @@ public abstract class PrimNode extends Node {
   public static String  [][] PREC_TOKS  = null;  // Just the binary op tokens, grouped by precedence
   public static String  []   PRIM_TOKS  = null;  // Primitive tokens, longer first for greedy token search
   public static void reset() { PRIMS=null; }
+  String arg_name(int i) { return TypeStruct.arg_name(i); }
 
   public static PrimNode[] PRIMS() {
     if( PRIMS!=null ) return PRIMS;
@@ -178,7 +184,7 @@ public abstract class PrimNode extends Node {
     add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
     if( _thunk_rhs ) add_def(mem);      // Memory if thunking
     for( int i=1; i<_sig.nargs(); i++ ) // First is display
-      add_def(gvn.xform(new ParmNode(i,_sig.fld(i),fun, gvn.con(Type.ALL),null)));
+      add_def(gvn.xform(new ParmNode(i,_args[i],fun, gvn.con(Type.ALL),null)));
     gvn.init(this);
     Node ctl,rez;
     if( _thunk_rhs ) {
@@ -194,7 +200,7 @@ public abstract class PrimNode extends Node {
     // memory).  Thunking (short circuit) prims return both memory and a value.
     RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,mem,rez,rpc,fun));
     // No closures are added to primitives
-    return new FunPtrNode(ret,gvn.con(TypeFunPtr.NO_DISP));
+    return new FunPtrNode(ret,gvn.con(NO_DISP));
   }
 
 
@@ -202,7 +208,7 @@ public abstract class PrimNode extends Node {
   // Default name constructor using a single tuple type
   static class ConvertTypeName extends PrimNode {
     ConvertTypeName(Type from, Type to, Parse badargs) {
-      super(to._name,TypeStruct.make_args(TypeStruct.ts(TypeStruct.NO_DISP,from)),to);
+      super(to._name,TypeTuple.make_args(Types.ts(TypeMemPtr.NO_DISP,from)),to);
       _badargs = new Parse[]{badargs};
     }
     @Override public Type value(GVNGCM.Mode opt_mode) {
@@ -229,13 +235,13 @@ public abstract class PrimNode extends Node {
   }
 
   static class ConvertInt64F64 extends PrimNode {
-    ConvertInt64F64() { super("flt64",TypeStruct.INT64,TypeFlt.FLT64); }
+    ConvertInt64F64() { super("flt64",TypeTuple.INT64,TypeFlt.FLT64); }
     @Override public Type apply( Type[] args ) { return TypeFlt.con((double)args[1].getl()); }
   }
 
   // TODO: Type-check strptr input args
   static class ConvertStrStr extends PrimNode {
-    ConvertStrStr() { super("str",TypeStruct.STRPTR,TypeMemPtr.OOP); }
+    ConvertStrStr() { super("str",TypeTuple.STRPTR,TypeMemPtr.OOP); }
     @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
     @Override public Type value(GVNGCM.Mode opt_mode) { return val(1); }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
@@ -243,7 +249,7 @@ public abstract class PrimNode extends Node {
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpF64 extends PrimNode {
-    Prim1OpF64( String name ) { super(name,TypeStruct.FLT64,TypeFlt.FLT64); }
+    Prim1OpF64( String name ) { super(name,TypeTuple.FLT64,TypeFlt.FLT64); }
     public Type apply( Type[] args ) { return TypeFlt.con(op(args[1].getd())); }
     abstract double op( double d );
   }
@@ -255,7 +261,7 @@ public abstract class PrimNode extends Node {
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpI64 extends PrimNode {
-    Prim1OpI64( String name ) { super(name,TypeStruct.INT64,TypeInt.INT64); }
+    Prim1OpI64( String name ) { super(name,TypeTuple.INT64,TypeInt.INT64); }
     @Override public Type apply( Type[] args ) { return TypeInt.con(op(args[1].getl())); }
     abstract long op( long d );
   }
@@ -267,7 +273,7 @@ public abstract class PrimNode extends Node {
 
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpF64 extends PrimNode {
-    Prim2OpF64( String name ) { super(name,TypeStruct.FLT64_FLT64,TypeFlt.FLT64); }
+    Prim2OpF64( String name ) { super(name,TypeTuple.FLT64_FLT64,TypeFlt.FLT64); }
     @Override public Type apply( Type[] args ) { return TypeFlt.con(op(args[1].getd(),args[2].getd())); }
     abstract double op( double x, double y );
   }
@@ -294,7 +300,7 @@ public abstract class PrimNode extends Node {
 
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpF64 extends PrimNode {
-    Prim2RelOpF64( String name ) { super(name,TypeStruct.FLT64_FLT64,TypeInt.BOOL); }
+    Prim2RelOpF64( String name ) { super(name,TypeTuple.FLT64_FLT64,TypeInt.BOOL); }
     @Override public Type apply( Type[] args ) { return op(args[1].getd(),args[2].getd())?TypeInt.TRUE:TypeInt.FALSE; }
     abstract boolean op( double x, double y );
   }
@@ -309,7 +315,7 @@ public abstract class PrimNode extends Node {
 
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpI64 extends PrimNode {
-    Prim2OpI64( String name ) { super(name,TypeStruct.INT64_INT64,TypeInt.INT64); }
+    Prim2OpI64( String name ) { super(name,TypeTuple.INT64_INT64,TypeInt.INT64); }
     @Override public Type apply( Type[] args ) { return TypeInt.con(op(args[1].getl(),args[2].getl())); }
     abstract long op( long x, long y );
   }
@@ -391,7 +397,7 @@ public abstract class PrimNode extends Node {
 
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpI64 extends PrimNode {
-    Prim2RelOpI64( String name ) { super(name,TypeStruct.INT64_INT64,TypeInt.BOOL); }
+    Prim2RelOpI64( String name ) { super(name,TypeTuple.INT64_INT64,TypeInt.BOOL); }
     @Override public Type apply( Type[] args ) { return op(args[1].getl(),args[2].getl())?TypeInt.TRUE:TypeInt.FALSE; }
     abstract boolean op( long x, long y );
   }
@@ -405,7 +411,7 @@ public abstract class PrimNode extends Node {
 
 
   static class EQ_OOP extends PrimNode {
-    EQ_OOP() { super("==",TypeStruct.OOP_OOP,TypeInt.BOOL); }
+    EQ_OOP() { super("==",TypeTuple.OOP_OOP,TypeInt.BOOL); }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
       // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
@@ -436,7 +442,7 @@ public abstract class PrimNode extends Node {
   }
 
   static class NE_OOP extends PrimNode {
-    NE_OOP() { super("!=",TypeStruct.OOP_OOP,TypeInt.BOOL); }
+    NE_OOP() { super("!=",TypeTuple.OOP_OOP,TypeInt.BOOL); }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
       // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
@@ -464,7 +470,7 @@ public abstract class PrimNode extends Node {
 
   static class Not extends PrimNode {
     // Rare function which takes a Scalar (works for both ints and ptrs)
-    Not() { super("!",TypeStruct.SCALAR1,TypeInt.BOOL); }
+    Not() { super("!",TypeTuple.SCALAR1,TypeInt.BOOL); }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type t = val(1);
       if( t== Type.XNIL ||
@@ -479,7 +485,7 @@ public abstract class PrimNode extends Node {
   }
 
   static class RandI64 extends PrimNode {
-    RandI64() { super("math_rand",TypeStruct.INT64,TypeInt.INT64); }
+    RandI64() { super("math_rand",TypeTuple.INT64,TypeInt.INT64); }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type t = val(1);
       if( t.above_center() ) return TypeInt.BOOL.dual();
@@ -493,7 +499,7 @@ public abstract class PrimNode extends Node {
   }
 
   static class Id extends PrimNode {
-    Id(Type arg) { super("id",TypeStruct.make_args(TypeStruct.ts(TypeStruct.NO_DISP,arg)),arg); }
+    Id(Type arg) { super("id",TypeTuple.make_args(Types.ts(TypeMemPtr.NO_DISP,arg)),arg); }
     @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
     @Override public Type value(GVNGCM.Mode opt_mode) { return val(1); }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
@@ -503,11 +509,18 @@ public abstract class PrimNode extends Node {
   // immediate into the operators' wrapper function, which in turn aggressively
   // inlines during parsing.
   static class AndThen extends PrimNode {
-    private static final TypeStruct ANDTHEN =
-      TypeStruct.make_args(new String[]{"^","p","thunk"},
-                           TypeStruct.ts(TypeStruct.NO_DISP,Type.SCALAR,TypeTuple.RET));
+    private static final TypeTuple ANDTHEN =
+      TypeTuple.make_args(Types.ts(TypeMemPtr.NO_DISP,Type.SCALAR,TypeTuple.RET));
     // Takes a value on the LHS, and a THUNK on the RHS.
     AndThen() { super("&&",ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
+    @Override String arg_name(int i) {
+      switch(i) {
+      case 0: return "^";
+      case 1: return "p";
+      case 2: return "thunk";
+      default: throw com.cliffc.aa.AA.unimpl();
+      }
+    }
     // Expect this to inline everytime
     @Override public Node ideal(GVNGCM gvn, int level) {
       if( _defs._len != 4 ) return null; // Already did this
@@ -553,11 +566,18 @@ public abstract class PrimNode extends Node {
   // immediate into the operators' wrapper function, which in turn aggressively
   // inlines during parsing.
   static class OrElse extends PrimNode {
-    private static final TypeStruct ORELSE =
-      TypeStruct.make_args(new String[]{"^","p","thunk"},
-                           TypeStruct.ts(TypeStruct.NO_DISP,Type.SCALAR,TypeTuple.RET));
+    private static final TypeTuple ORELSE =
+      TypeTuple.make_args(Types.ts(TypeMemPtr.NO_DISP,Type.SCALAR,TypeTuple.RET));
     // Takes a value on the LHS, and a THUNK on the RHS.
     OrElse() { super("||",ORELSE,Type.SCALAR); _thunk_rhs=true; }
+    @Override String arg_name(int i) {
+      switch(i) {
+      case 0: return "^";
+      case 1: return "p";
+      case 2: return "thunk";
+      default: throw com.cliffc.aa.AA.unimpl();
+      }
+    }
     // Expect this to inline everytime
     @Override public Node ideal(GVNGCM gvn, int level) {
       if( _defs._len != 4 ) return null; // Already did this

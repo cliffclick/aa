@@ -7,6 +7,8 @@ import com.cliffc.aa.util.VBitSet;
 
 import java.util.function.Predicate;
 
+import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
+
 // Function indices or function pointers; a single instance can include all
 // possible aliased function pointers.  Function pointers can be executed, are
 // not GC'd, and cannot be Loaded or Stored through (although they can be
@@ -100,7 +102,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public static TypeFunPtr make_new_fidx( int parent, int nargs, TypeMemPtr disp ) { return make(BitsFun.make_new_fidx(parent),nargs,disp); }
                 TypeFunPtr make_from( TypeMemPtr disp ) { return make(_fidxs,_nargs,disp); }
   public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR; // Open display, allows more fields
-  public static TypeMemPtr NO_DISP = TypeMemPtr.NO_DISP;
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,1,TypeMemPtr.DISP_SIMPLE);
   public  static final TypeFunPtr EMPTY  = make(BitsFun.EMPTY,0,NO_DISP);
@@ -149,7 +150,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public boolean is_con()       { return false; }
   // Basically, a constant fidx that may be split.
   public boolean can_be_fpnode() {
-    return _disp==TypeFunPtr.NO_DISP && // No display
+    return _disp==NO_DISP && // No display
       // Single function
       _fidxs.abit() > 1 && !BitsFun.is_parent(_fidxs.abit());
   }

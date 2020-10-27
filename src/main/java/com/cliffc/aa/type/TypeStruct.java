@@ -2,12 +2,15 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
 import com.cliffc.aa.util.*;
+
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.function.Predicate;
+
+import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 
 /** A memory-based collection of optionally named fields.  This is a recursive
  *  type, only produced by NewNode and structure or tuple constants.  Fields
@@ -283,11 +286,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static final String[] ARGS_X  = flds("^","x");     // Used for functions of 1 arg
   public  static final String[] ARGS_XY = flds("^","x","y"); // Used for functions of 2 args
   public  static final String[] ARGS_XYZ= flds("^","x","y","z"); // Used for functions of 3 args
+  public  static String arg_name(int i) {
+    return i==0 ? "^" : String.valueOf('x'+i-1).intern();
+  }
   public  static Type[] ts() { return Types.get(0); }
-  public  static Type[] ts(Type t0) { Type[] ts = Types.get(1); ts[0]=t0; return ts;}
-  public  static Type[] ts(Type t0, Type t1) { Type[] ts = Types.get(2); ts[0]=t0; ts[1]=t1; return ts;}
-  public  static Type[] ts(Type t0, Type t1, Type t2) { Type[] ts = Types.get(3); ts[0]=t0; ts[1]=t1; ts[2]=t2; return ts;}
-  public  static Type[] ts(Type t0, Type t1, Type t2, Type t3) { Type[] ts = Types.get(4); ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; return ts;}
+  public  static Type[] ts(Type t0) { return Types.ts(t0); }
+  public  static Type[] ts(Type t0, Type t1) { return Types.ts(t0,t1); }
+  public  static Type[] ts(Type t0, Type t1, Type t2) { return Types.ts(t0,t1,t2); }
+  public  static Type[] ts(Type t0, Type t1, Type t2, Type t3) { return Types.ts(t0,t1,t2,t3); }
   public  static Type[] ts(int n) { Type[] ts = Types.get(n); Arrays.fill(ts,SCALAR); return ts; } // All Scalar fields
 
   public  static TypeStruct make(Type[] ts) { return malloc(ts).hashcons_free(); }
@@ -353,8 +359,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   private static final HashMap<TPair,TypeStruct> MEETS0 = new HashMap<>();
 
-  public  static final TypeStruct ANYSTRUCT = malloc("",true ,new String[0], Types.get(0),fbots(0),false).hashcons_free();
-  public  static final TypeStruct ALLSTRUCT = malloc("",false,new String[0], Types.get(0),fbots(0),true ).hashcons_free();
+  public  static final TypeStruct ANYSTRUCT = malloc("",true ,new String[0], ts(),fbots(0),false).hashcons_free();
+  public  static final TypeStruct ALLSTRUCT = malloc("",false,new String[0], ts(),fbots(0),true ).hashcons_free();
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.
   // To break class-init cycle, this is partially made here, now.
   // Then we touch TypeMemPtr, which uses this field.
@@ -368,7 +374,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     DISPLAY.install_cyclic(new Ary<>(ts(DISPLAY ,TypeMemPtr.DISPLAY_PTR)));
     assert DISPLAY.is_display();
   }
-  public static TypeMemPtr NO_DISP = TypeMemPtr.NO_DISP;
   @Override boolean is_display() {
     return
       this==DISPLAY || this==DISPLAY._dual ||
@@ -376,16 +381,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   public  static final TypeStruct NO_ARGS    = make_args(TFLDS[1],ts(NO_DISP));
-  public  static final TypeStruct INT64      = make_args(ARGS_X ,ts(NO_DISP,TypeInt.INT64)); // {int->flt}
-  public  static final TypeStruct FLT64      = make_args(ARGS_X ,ts(NO_DISP,TypeFlt.FLT64)); // {flt->flt}
-  public  static final TypeStruct STRPTR     = make_args(ARGS_X ,ts(NO_DISP,TypeMemPtr.STRPTR));
-  public  static final TypeStruct INT64_INT64= make_args(ARGS_XY,ts(NO_DISP,TypeInt.INT64,TypeInt.INT64)); // {int int->int }
-  public  static final TypeStruct FLT64_FLT64= make_args(ARGS_XY,ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64)); // {flt flt->flt }
-  public  static final TypeStruct OOP_OOP    = make_args(ARGS_XY,ts(NO_DISP,TypeMemPtr.ISUSED0,TypeMemPtr.ISUSED0));
-  public  static final TypeStruct SCALAR1    = make_args(ARGS_X ,ts(NO_DISP,SCALAR));
-  public  static final TypeStruct LVAL_LEN   = make_args(ARGS_X ,ts(NO_DISP,TypeMemPtr.ARYPTR)); // Array
-  public  static final TypeStruct LVAL_RD    = make_args(ARGS_XY,ts(NO_DISP,TypeMemPtr.ARYPTR,TypeInt.INT64)); // Array & index
-  public  static final TypeStruct LVAL_WR    = make_args(ARGS_XYZ,ts(NO_DISP,TypeMemPtr.ARYPTR,TypeInt.INT64,Type.SCALAR)); // Array & index & element
 
   // A bunch of types for tests
   public  static final TypeStruct NAMEPT= make("Point:",flds("^","x","y"),ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64),ffnls(3));
@@ -395,8 +390,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final TypeStruct C0    = make(flds("^","c"),ts(NO_DISP,TypeInt.FALSE )); // @{c:0}
   private static final TypeStruct D1    = make(flds("^","d"),ts(NO_DISP,TypeInt.TRUE  )); // @{d:1}
           static final TypeStruct ARW   = make(flds("^","a"),ts(NO_DISP,TypeFlt.FLT64),new byte[]{FRW,FRW});
+  public  static final TypeStruct FLT64 = make_args(ARGS_X ,ts(NO_DISP,TypeFlt.FLT64)); // {flt->flt}
+  public  static final TypeStruct INT64_INT64= make_args(ARGS_XY,ts(NO_DISP,TypeInt.INT64,TypeInt.INT64)); // {int int->int }
 
-  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STRPTR,FLT64,POINT,NAMEPT,A,C0,D1,ARW,DISPLAY,INT64_INT64,ANYSTRUCT};
+  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,POINT,NAMEPT,A,C0,D1,ARW,DISPLAY,ANYSTRUCT};
 
   // Extend the current struct with a new named field
   public TypeStruct add_fld( String name, byte mutable ) { return add_fld(name,mutable,Type.SCALAR); }

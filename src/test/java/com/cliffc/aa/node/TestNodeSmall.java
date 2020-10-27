@@ -5,6 +5,7 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import org.junit.Test;
 
+import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -270,7 +271,7 @@ public class TestNodeSmall {
     TypeFunPtr tint1 = v(aint,gvn), tint1X = tint1.dual();
     TypeFunPtr tstr1 = v(astr,gvn), tstr1X = tstr1.dual();
 
-    TypeFunPtr tmul1E = TypeFunPtr.make(BitsFun.EMPTY,0,TypeFunPtr.NO_DISP); // All bad choices
+    TypeFunPtr tmul1E = TypeFunPtr.make(BitsFun.EMPTY,0,NO_DISP); // All bad choices
 
     assert tadd1X.isa(tnum1X) && tnum1X.isa(tflt1X) && tflt1X.isa(tnum1) && tnum1.isa(tadd1);
 
@@ -411,8 +412,8 @@ public class TestNodeSmall {
     ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(1, dsp_file));
     Env.ALL_DISPLAYS = Env.ALL_DISPLAYS.set(dsp_file._alias);
     // The Fun and Fun._tf:
-    TypeStruct formals = TypeStruct.make_args(Types.ts(dsp_file_ptr.val(), // File-scope display as arg0
-                                                         Type.SCALAR));          // Some scalar arg1
+    TypeTuple formals = TypeTuple.make_args(Types.ts(dsp_file_ptr.val(), // File-scope display as arg0
+                                                         Type.SCALAR));  // Some scalar arg1
     TypeFunSig sig = TypeFunSig.make(formals,Type.SCALAR);
     FunNode fun = new FunNode("fact",sig,-1,false);
     gvn.init(fun.add_def(ctl).add_def(ctl));

@@ -6,6 +6,8 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
+import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
+
 // Allocates a TypeObj and produces a Tuple with the TypeObj and a TypeMemPtr.
 //
 // NewNodes have a unique alias class - they do not alias with any other
@@ -156,9 +158,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       super(op,parent_alias,to);
       _name = name;
       _reads = reads;
-      args[0] = TypeFunPtr.NO_DISP; // No display
-      String[] flds = args.length==1 ? TypeStruct.ARGS_ :  (args.length==2 ? TypeStruct.ARGS_X : TypeStruct.ARGS_XY);
-      _sig = TypeFunSig.make(TypeStruct.make_args(flds,args),Type.SCALAR);
+      args[0] = NO_DISP; // No display
+      _sig = TypeFunSig.make(TypeTuple.make_args(args),Type.SCALAR);
       _op_prec = op_prec;
     }
     String bal_close() { return null; }
@@ -186,13 +187,13 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       add_def(_reads ? memp : null); // Memory  for the primitive in slot 1
       add_def(null);                 // Closure for the primitive in slot 2
       for( int i=1; i<_sig.nargs(); i++ ) // Args follow, closure in formal 0
-        add_def( gvn.xform(new ParmNode(i,_sig.fld(i),fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
+        add_def( gvn.xform(new ParmNode(i,TypeStruct.arg_name(i),fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
       NewNode nnn = (NewNode)gvn.xform(this);
       Node mem = Env.DEFMEM.make_mem_proj(gvn,nnn,memp);
       Node ptr = gvn.xform(new ProjNode(1, nnn));
       RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,ptr,rpc,fun));
       mem.xliv(gvn._opt_mode); // Refine initial memory
-      return new FunPtrNode(ret,gvn.con(TypeFunPtr.NO_DISP));
+      return new FunPtrNode(ret,gvn.con(NO_DISP));
     }
   }
 }

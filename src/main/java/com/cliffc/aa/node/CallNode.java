@@ -573,7 +573,7 @@ public class CallNode extends Node {
         if( i==cepi.nwired() ) return 0; // While a (stale) fidx might be available, this path is for another call.
       }
     }
-    TypeStruct formals = fun._sig._formals;  // Type of each argument
+    TypeTuple formals = fun._sig._formals;  // Type of each argument
     int flags=0;
     for( int j=0; j<nargs(); j++ ) {
       Type formal = formals.at(j);
@@ -605,7 +605,7 @@ public class CallNode extends Node {
     assert choices.above_center() == (gvn._opt_mode==GVNGCM.Mode.Opto);
     int best_cvts=99999;           // Too expensive
     FunPtrNode best_fptr=null;     //
-    TypeStruct best_formals=null;  //
+    TypeTuple best_formals=null;  //
     boolean tied=false;            // Ties not allowed
     for( int fidx : choices ) {
       // Parent/kids happen during inlining
@@ -615,7 +615,7 @@ public class CallNode extends Node {
 
         FunNode fun = FunNode.find_fidx(kidx);
         if( fun.nargs()!=nargs() || fun.ret() == null ) continue; // BAD/dead
-        TypeStruct formals = fun._sig._formals; // Type of each argument
+        TypeTuple formals = fun._sig._formals; // Type of each argument
         int cvts=0;                        // Arg conversion cost
         for( int j=1; j<nargs(); j++ ) {   // Skip arg#0, the display
           if( fun.parm(j)==null ) continue; // Formal is ignored
@@ -699,7 +699,7 @@ public class CallNode extends Node {
         if( fidx==0 ) continue;
         FunNode fun = FunNode.find_fidx(fidx);
         if( fun==null || fun.is_dead() ) return ErrMsg.FAST;
-        TypeStruct formals = fun._sig._formals; // Type of each argument
+        TypeTuple formals = fun._sig._formals; // Type of each argument
         if( fun.parm(j)==null ) continue;  // Formal is dead
         Type formal = formals.at(j);
         if( actual.isa(formal) ) continue; // Actual is a formal

@@ -1157,7 +1157,7 @@ public class Parse implements Comparable<Parse> {
         if( ts._len != 2 ) return null; // should return TypeErr missing -> in tfun
         ret = ts.pop();         // e.g. { int } Get single return type
       }
-      TypeStruct targs = TypeStruct.make_args(ts.asAry());
+      TypeTuple targs = TypeTuple.make_args(ts.asAry());
       if( !peek('}') ) return null;
       return typeq(TypeFunSig.make(targs,ret));
     }

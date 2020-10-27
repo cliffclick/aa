@@ -7,6 +7,7 @@ import org.junit.Test;
 
 import java.util.function.Function;
 
+import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 import static org.junit.Assert.*;
 
 public class TestParse {
@@ -342,7 +343,7 @@ public class TestParse {
     test_obj("(1,\"abc\").1", TypeStr.ABC);
 
     // Named type variables
-    test("gal=:flt; gal", TypeFunPtr.make(TEST_FUNBITS,2,TypeFunPtr.NO_DISP));
+    test("gal=:flt; gal", TypeFunPtr.make(TEST_FUNBITS,2,NO_DISP));
     test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
@@ -381,7 +382,7 @@ public class TestParse {
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
     test_ptr("A= :(str?, int); A(0,2)","A:(0, 2)");
     // Named recursive types
-    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(TypeStruct.ts(TypeMemPtr.NO_DISP,Type.XNIL,TypeInt.con(2))).set_name("A:")));
+    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(TypeStruct.ts(NO_DISP,Type.XNIL,TypeInt.con(2))).set_name("A:")));
     test_ptr("A= :(A?, int); A(0,2)","A:(0, 2)");
     test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
     test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*A:(0, 2), 3)");
@@ -788,7 +789,7 @@ HashTable = {@{
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeFunPtr);
       TypeFunPtr actual = (TypeFunPtr)te._t;
-      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),2,TypeFunPtr.NO_DISP);
+      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),2,NO_DISP);
       assertEquals(expected,actual);
     }
   }

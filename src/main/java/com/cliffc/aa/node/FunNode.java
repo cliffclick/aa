@@ -73,9 +73,9 @@ public class FunNode extends RegionNode {
   public FunNode(           PrimNode prim) { this(prim._name,prim._sig,prim._op_prec,prim._thunk_rhs); }
   public FunNode(NewNode.NewPrimNode prim) { this(prim._name,prim._sig,prim._op_prec,false); }
   // Used to start an anonymous function in the Parser
-  public FunNode(String[] flds, Type[] ts) { this(null,TypeFunSig.make(TypeStruct.make_args(flds,ts),Type.SCALAR),-1,false); }
+  public FunNode(String[] flds, Type[] ts) { this(null,TypeFunSig.make(flds,TypeTuple.make_args(ts),Type.SCALAR),-1,false); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.NO_ARGS,Type.SCALAR),-2,false); add_def(Env.ALL_CTRL); }
+  FunNode(String name) { this(name,TypeFunSig.make(TypeTuple.NO_ARGS,Type.SCALAR),-2,false); add_def(Env.ALL_CTRL); }
   public FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs ) { this(name,sig,op_prec,thunk_rhs,BitsFun.new_fidx()); }
   // Shared common constructor
   private FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs, int fidx) {
@@ -216,7 +216,7 @@ public class FunNode extends RegionNode {
     }
 
     // Look for appropriate type-specialize callers
-    TypeStruct formals = type_special(parms);
+    TypeTuple formals = type_special(parms);
     Ary<Node> body = find_body(ret);
     int path = -1;              // Paths will split according to type
     if( formals == null ) {     // No type-specialization to do
@@ -242,7 +242,7 @@ public class FunNode extends RegionNode {
     }
 
     // Check for dups (already done this but failed to resolve all calls, so trying again).
-    TypeStruct fformals = formals;
+    TypeTuple fformals = formals;
     if( path == -1 && FUNS.find(fun -> fun != null && !fun.is_dead() &&
                                 fun._sig._formals==fformals && fun._sig._ret == _sig._ret &&
                                 fun.in(1)==in(1) &&
@@ -428,12 +428,12 @@ public class FunNode extends RegionNode {
   // on arguments that help immediately.
   //
   // Same argument for field Loads from unspecialized values.
-  private TypeStruct type_special( ParmNode[] parms ) {
+  private TypeTuple type_special( ParmNode[] parms ) {
     if( !has_unknown_callers() ) return null; // Only overly-wide calls.
     Type[] sig = find_type_split(parms);
     if( sig == null ) return null; // No unresolved calls; no point in type-specialization
     // Make a new function header with new signature
-    TypeStruct formals = TypeStruct.make_args(_sig._formals._flds,sig);
+    TypeTuple formals = TypeTuple.make_args(sig);
     if( !formals.isa(_sig._formals) ) return null;    // Fails in error cases
     return formals == _sig._formals ? null : formals; // Must see improvement
   }
@@ -565,10 +565,10 @@ public class FunNode extends RegionNode {
     return m;                   // Return path to split on
   }
 
-  private FunNode make_new_fun(GVNGCM gvn, RetNode ret, TypeStruct new_formals) {
+  private FunNode make_new_fun(GVNGCM gvn, RetNode ret, TypeTuple new_formals) {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
-    FunNode fun = new FunNode(_name,TypeFunSig.make(new_formals,_sig._ret),_op_prec,_thunk_rhs,BitsFun.new_fidx(oldfidx));
+    FunNode fun = new FunNode(_name,TypeFunSig.make(_sig._args,new_formals,_sig._ret),_op_prec,_thunk_rhs,BitsFun.new_fidx(oldfidx));
     fun.pop();                  // Remove null added by RegionNode, will be added later
     // Renumber the original as well; the original _fidx is now a *class* of 2
     // fidxs.  Each FunNode fidx is only ever a constant, so the original Fun

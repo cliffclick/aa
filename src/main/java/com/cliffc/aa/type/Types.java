@@ -102,6 +102,36 @@ public class Types {
     ts[2] = t2;
     return ts;
   }
+  public static Type[] ts(Type t0, Type t1, Type t2, Type t3) {
+    Types t4 = tary(4).check();
+    Type[] ts = t4.get();
+    ts[0] = t0;
+    ts[1] = t1;
+    ts[2] = t2;
+    ts[3] = t3;
+    return ts;
+  }
+  public static Type[] ts(Type t0, Type t1, Type t2, Type t3, Type t4) {
+    Types t5 = tary(5).check();
+    Type[] ts = t5.get();
+    ts[0] = t0;
+    ts[1] = t1;
+    ts[2] = t2;
+    ts[3] = t3;
+    ts[4] = t4;
+    return ts;
+  }
+  public static Type[] ts(Type t0, Type t1, Type t2, Type t3, Type t4, Type t5) {
+    Types t6 = tary(6).check();
+    Type[] ts = t6.get();
+    ts[0] = t0;
+    ts[1] = t1;
+    ts[2] = t2;
+    ts[3] = t3;
+    ts[4] = t4;
+    ts[5] = t5;
+    return ts;
+  }
 
   // Result not interned; suitable for direct hacking.
   // Original assumed in-use, not freed.

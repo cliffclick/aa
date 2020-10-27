@@ -6,6 +6,8 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
+import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
+
 // Function to wrap another type in a Name, which typically involves setting a
 // vtable like field, i.e. memory updates.
 // Names an unaliased memory.  Needs to collapse away, or else an error.
@@ -38,7 +40,7 @@ public class IntrinsicNode extends Node {
 
     // This function call takes in and returns a plain ptr-to-object.
     // Only after folding together does the name become apparent.
-    TypeStruct formals = TypeStruct.make_args(TypeStruct.ts(TypeFunPtr.NO_DISP,TypeMemPtr.STRUCT));
+    TypeTuple formals = TypeTuple.make_args(Types.ts(NO_DISP,TypeMemPtr.STRUCT));
     TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(BitsAlias.RECORD_BITS,tn));
     FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,sig,-1,false).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
@@ -46,7 +48,7 @@ public class IntrinsicNode extends Node {
     Node ptr = gvn.xform(new ParmNode( 1,"ptr",fun,gvn.con(TypeMemPtr.ISUSED),badargs));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,cvt,ptr,rpc,fun));
-    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(TypeFunPtr.NO_DISP)));
+    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(NO_DISP)));
   }
 
   // If the input memory is unaliased, fold into the NewNode.
@@ -129,15 +131,15 @@ public class IntrinsicNode extends Node {
     assert Util.eq(to._flds[0],"^"); // Display already
     assert to.fmod(0)==TypeStruct.FFNL; // Display is final
     // Upgrade the type to one with no display for nnn.
-    to = to.set_fld(0,TypeMemPtr.NO_DISP,TypeStruct.FFNL);
+    to = to.set_fld(0,NO_DISP,TypeStruct.FFNL);
     // Formal is unnamed, and this function adds the name.
-    TypeStruct formals = to.remove_name();
+    TypeTuple formals = TypeTuple.make(to.remove_name());
     TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(BitsAlias.make0(alias),to));
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,sig,-1,false).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    Node memp= gvn.init(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+    Node memp= gvn.init (new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
     // Add input edges to the NewNode
-    ConNode nodisp = gvn.con(TypeMemPtr.NO_DISP);
+    ConNode nodisp = gvn.con(NO_DISP);
     NewObjNode nnn = new NewObjNode(false,alias,to,nodisp).keep();
     for( int i=1; i<to._ts.length; i++ ) { // Display in 0, fields in 1+
       String argx = to._flds[i];
