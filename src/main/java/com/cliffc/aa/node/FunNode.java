@@ -815,7 +815,9 @@ public class FunNode extends RegionNode {
       if( wrk.is_mem() ) {
         boolean un=false;
         Type twrk = wrk.val();
-        TypeMem tmem = (TypeMem)(twrk instanceof TypeTuple ? ((TypeTuple)twrk).at(1) : twrk);
+        Type tmem0 = twrk instanceof TypeTuple ? ((TypeTuple)twrk).at(1) : twrk;
+        if( !(tmem0 instanceof TypeMem) ) continue;
+        TypeMem tmem = (TypeMem)tmem0;
         for( int alias = aliases.nextSetBit(0); alias != -1; alias = aliases.nextSetBit(alias + 1))
           if( tmem.at(alias)!= TypeObj.UNUSED )
             { un=true; break; }

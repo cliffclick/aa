@@ -4,7 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.TNode;
-import com.cliffc.aa.tvar.TypeVar;
+import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
@@ -57,14 +57,16 @@ public abstract class Node implements Cloneable, TNode {
   public byte _keep;    // Keep-alive in parser, even as last use goes away
   public boolean _in;   // "in" or "out" of GVN...
   public TypeMem _live; // Liveness; assumed live in gvn.iter(), assumed dead in gvn.gcp().
-  @NotNull private TypeVar _tvar;// Value; starts at ALL and lifts towards ANY.
-  public Type val() { return _tvar.type(); }
+  @NotNull TVar _tvar;  // Type variable; has a Type which starts at ALL and lifts towards ANY, and may have constraints to be equal to other Types
+  public Type val() { return _tvar.type(); } // The unified Type
+  public Type oval() { return _tvar._type(false); } // The local, not-unified, Type
   public Type set_val( @NotNull Type val ) {
     _in = true;
     assert _tvar.uid()==_uid;
     return _tvar.setype(val);
   }
-  public TypeVar tvar() { return _tvar; }
+  public TVar tvar() { return _tvar; }
+  public TVar tvar(int x) { return in(x)._tvar; }
 
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
@@ -195,7 +197,7 @@ public abstract class Node implements Cloneable, TNode {
     _defs = new Ary<>(defs);
     _uses = new Ary<>(new Node[1],0);
     for( Node def : defs ) if( def != null ) def._uses.add(this);
-    _tvar = new TypeVar(this);
+    _tvar = new TVar(this);
     _live = all_live();
   }
 
@@ -210,7 +212,7 @@ public abstract class Node implements Cloneable, TNode {
       n._uid = Env.GVN.uid();             // A new UID
       n._defs = new Ary<>(new Node[1],0); // New empty defs
       n._uses = new Ary<>(new Node[1],0); // New empty uses
-      n._tvar = new TypeVar(n);
+      n._tvar = new TVar(n);
       if( copy_edges )
         for( Node def : _defs )
           n.add_def(def);
@@ -236,7 +238,7 @@ public abstract class Node implements Cloneable, TNode {
     for( Node n : _uses ) sb.p(String.format("%4d ",n._uid));
     sb.p("]]  ");
     sb.p(str()).s();
-    if( _tvar ==null ) sb.p("----");
+    if( !_in ) sb.p("----");
     else val().str(sb,new VBitSet(),null,true);
 
     return sb;
@@ -467,7 +469,7 @@ public abstract class Node implements Cloneable, TNode {
   // Forward reachable walk, setting types to all_type().dual() and making all dead.
   public final void walk_initype( GVNGCM gvn, VBitSet bs ) {
     if( bs.tset(_uid) ) return;    // Been there, done that
-    set_val(Type.ANY);               // Highest value
+    set_val(Type.ANY);             // Highest value
     _live = TypeMem.DEAD;          // Not alive
     // Walk reachable graph
     gvn.add_work(this);
@@ -483,7 +485,7 @@ public abstract class Node implements Cloneable, TNode {
       if( idl != null )
         return true;            // Found an ideal call
       Type t = value(gvn._opt_mode);
-      if( val() != t )
+      if( oval() != t )
         return true;            // Found a value improvement
       TypeMem live = live(gvn._opt_mode);
       if( _live != live )
@@ -497,8 +499,8 @@ public abstract class Node implements Cloneable, TNode {
   public final int more_flow(GVNGCM gvn, VBitSet bs, boolean lifting, int errs) {
     if( bs.tset(_uid) ) return errs; // Been there, done that
     // Check for only forwards flow, and if possible then also on worklist
-    Type    oval= val(), nval = value(gvn._opt_mode);
-    TypeMem oliv=_live , nliv = live (gvn._opt_mode);
+    Type    oval= oval(), nval = value(gvn._opt_mode);
+    TypeMem oliv=_live  , nliv = live (gvn._opt_mode);
     if( nval != oval || nliv != oliv ) {
       boolean ok = lifting
         ? nval.isa(oval) && nliv.isa(oliv)

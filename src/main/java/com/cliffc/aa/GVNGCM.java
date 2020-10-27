@@ -367,7 +367,7 @@ public class GVNGCM {
       rereg(nnn, nnn.value(_opt_mode));
     }
     if( !nnn.is_dead() && !old.is_dead() )
-      nnn.tvar().unify(old.tvar());
+      old.tvar().unify(nnn.tvar());
     if( !old.is_dead() ) { // if old is being replaced, it got removed from GVN table and types table.
       assert !check_opt(old);
       if( nnn._live != old._live ) {                    // New is as alive as the old
@@ -388,7 +388,7 @@ public class GVNGCM {
    *  @return null for no-change, or a better version of n, already in GVN */
   private Node xform_old0( Node n, int level ) {
     assert n._in;    // Node is in type tables, but might be already out of GVN
-    Type oval = n.val(); // Get old type
+    Type oval = n.oval(); // Get old type
 
     // Must exit either with {old node | null} and the old node in both types
     // and vals tables, OR exit with a new node and the old node in neither table.
@@ -592,7 +592,7 @@ public class GVNGCM {
         if( n.is_dead() ) continue; // Can be dead functions after removing ambiguous calls
 
         // Forwards flow
-        Type oval = n.val();                                // Old type
+        Type oval = n.oval();                              // Old local type
         Type nval = n.value(_opt_mode);                    // New type
         if( oval != nval ) {                               // Progress
           if( !check_monotonicity(n,oval,nval) ) continue; // Debugging hook
@@ -749,7 +749,7 @@ public class GVNGCM {
     if( n==Env.START ) return;          // Top-level scope
 
     // Hit the fixed point, despite any immediate updates.
-    assert n.value(_opt_mode)== n.val();
+    assert n.value(_opt_mode)== n.oval();
     assert n.live (_opt_mode)==n._live;
 
     // Walk reachable graph

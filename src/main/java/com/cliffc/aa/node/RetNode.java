@@ -2,6 +2,8 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TVar;
+import com.cliffc.aa.tvar.TTup3;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
@@ -16,7 +18,13 @@ import com.cliffc.aa.type.TypeTuple;
 public final class RetNode extends Node {
   int _fidx;                 // Shortcut to fidx when the FunNode has collapsed
   int _nargs;                // Replicated from FunNode
-  public RetNode( Node ctrl, Node mem, Node val, Node rpc, FunNode fun ) { super(OP_RET,ctrl,mem,val,rpc,fun); _fidx = fun._fidx; _nargs=fun.nargs(); }
+  public RetNode( Node ctrl, Node mem, Node val, Node rpc, FunNode fun ) {
+    super(OP_RET,ctrl,mem,val,rpc,fun);
+    _fidx = fun._fidx;
+    _nargs=fun.nargs();
+    // RetNodes are structural copies of their inputs, reflect this in their type variables
+    tvar().unify(new TTup3(this));
+  }
   public Node ctl() { return in(0); }
   public Node mem() { return in(1); }
   public Node rez() { return in(2); }
@@ -65,6 +73,7 @@ public final class RetNode extends Node {
         set_def(2,null,gvn);      // No val
         set_def(3,null,gvn);      // No rpc
         set_def(4,null,gvn);      // No fun
+        _tvar = new TVar(this);   // Not unified into anything
         return this;              // Progress
       }
     }
