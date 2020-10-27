@@ -48,16 +48,16 @@ public class TVar extends TypeVar {
     if( !(_u instanceof TVar) || ((TVar)_u)._u==null ) return _u;
     throw com.cliffc.aa.AA.unimpl();
   }
-  // Debug print
-  @Override public String toString() {
-    String s = _str();
-    if( _u!=null ) s += ">>"+_u;
-    return s;
-  }
+  
   // Pretty print
-  @Override public String _str() {
-    String s = "V"+uid();
-    if( _type!=Type.ANY && _u==null ) s += ":"+_type.str(new SB(),new VBitSet(),null,false);
-    return s;
+  @Override public SB _str(SB sb, boolean pretty) {
+    if( _u!=null ) {
+      if( !pretty ) sb.p("V").p(uid()).p(">>");
+      return _u._str(sb,pretty);
+    }
+    sb.p("V").p(uid());
+    if( _type!=Type.ANY )
+      _type.str(sb.p(":"),new VBitSet(),null,false);
+    return sb;
   }
 }

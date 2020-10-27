@@ -3,6 +3,7 @@ package com.cliffc.aa.tvar;
 import com.cliffc.aa.TNode;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
 // Type of a Hindley-Milner 3-tuple operator
@@ -34,14 +35,12 @@ public class TTup3 extends TypeVar {
 
   // U-F find algo.  Only TVars can be a child in U-F.
   @Override TypeVar find() { return this; }
-  // Debug print
-  @Override public String toString() { return _str(); }
   // Pretty print
-  @Override public String _str() {
-    TVar t0 = _tnode.tvar(0);
-    TVar t1 = _tnode.tvar(1);
-    TVar t2 = _tnode.tvar(2);
-    String s = "V"+uid()+"["+t0+","+t1+","+t2+"]";
-    return s;
+  @Override public SB _str(SB sb, boolean pretty) {
+    sb.p("V").p(uid()).p("[");
+    _tnode.tvar(0)._str(sb,pretty).p(",");
+    _tnode.tvar(1)._str(sb,pretty).p(",");
+    _tnode.tvar(2)._str(sb,pretty).p("]");
+    return sb;
   }
 }

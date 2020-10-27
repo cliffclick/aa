@@ -1,6 +1,7 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.TNode;
 import org.jetbrains.annotations.NotNull;
@@ -40,7 +41,7 @@ abstract public class TypeVar {
   abstract public Object unify(TypeVar tv);
   abstract TypeVar find();
 
-  // Pretty print
-  public String str() { return find()._str(); }
-  abstract String _str();
+  // Debug
+  public final String toString() { return _str(new SB(),false).toString(); }
+  abstract SB _str(SB sb, boolean pretty); 
 }

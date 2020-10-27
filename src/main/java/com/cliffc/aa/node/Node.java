@@ -239,7 +239,7 @@ public abstract class Node implements Cloneable, TNode {
     sb.p("]]  ");
     sb.p(str()).s();
     if( !_in ) sb.p("----");
-    else val().str(sb,new VBitSet(),null,true);
+    else _tvar._str(sb,true);
 
     return sb;
   }
