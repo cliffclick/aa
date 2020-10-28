@@ -35,15 +35,15 @@ public class AssertNode extends Node {
     // immediately in the Parser and is here to declutter the Parser.
     if( _t instanceof TypeFunSig ) {
       TypeFunSig sig = (TypeFunSig)_t;
-      Node[] args = new Node[sig.nargs()-1/*not display*/+/*+ctrl+mem+tfp+all args*/3];
+      Node[] args = new Node[sig.nargs()+1/*add Ctrl up front*/];
       FunNode fun = gvn.init((FunNode)(new FunNode(null,sig,-1,false).add_def(Env.ALL_CTRL)));
       fun.set_val(Type.CTRL);
       args[0] = fun;            // Call control
-      args[1] = gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+      args[1] = gvn.xform(new ParmNode(0,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
       args[2] = arg;            // The whole TFP to the call
-      for( int i=1; i<sig.nargs(); i++ )  // First is display
+      for( int i=2; i<sig.nargs(); i++ )  // Zero is memory, 1 is display.
         // All the parms; types in the function signature
-        args[i+2] = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),_error_parse));
+        args[i+1] = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),_error_parse));
       Parse[] badargs = new Parse[sig.nargs()];
       Arrays.fill(badargs,_error_parse);
       Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));

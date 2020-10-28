@@ -40,12 +40,12 @@ public class IntrinsicNode extends Node {
 
     // This function call takes in and returns a plain ptr-to-object.
     // Only after folding together does the name become apparent.
-    TypeTuple formals = TypeTuple.make_args(Types.ts(NO_DISP,TypeMemPtr.STRUCT));
+    TypeTuple formals = TypeTuple.make_args(TypeMemPtr.STRUCT);
     TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(BitsAlias.RECORD_BITS,tn));
     FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,sig,-1,false).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    Node mem = gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-    Node ptr = gvn.xform(new ParmNode( 1,"ptr",fun,gvn.con(TypeMemPtr.ISUSED),badargs));
+    Node mem = gvn.xform(new ParmNode( 0,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+    Node ptr = gvn.xform(new ParmNode( 2,"ptr",fun,gvn.con(TypeMemPtr.ISUSED),badargs));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,cvt,ptr,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(NO_DISP)));
@@ -117,6 +117,7 @@ public class IntrinsicNode extends Node {
   @Override BitsAlias escapees() { return ptr().in(0).escapees(); }
   //
   @Override public ErrMsg err( boolean fast ) {
+    if( fast ) return ErrMsg.FAST;
     Type ptr = ptr().val();
     Type mem = mem().val();
     return ErrMsg.typerr(_badargs,ptr,mem,TypeMemPtr.make(BitsAlias.REC,_tn)); // Did not remove the aliasing
@@ -137,14 +138,14 @@ public class IntrinsicNode extends Node {
     TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(BitsAlias.make0(alias),to));
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,sig,-1,false).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    Node memp= gvn.init (new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+    Node memp= gvn.init (new ParmNode( 0,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
     // Add input edges to the NewNode
     ConNode nodisp = gvn.con(NO_DISP);
     NewObjNode nnn = new NewObjNode(false,alias,to,nodisp).keep();
     for( int i=1; i<to._ts.length; i++ ) { // Display in 0, fields in 1+
       String argx = to._flds[i];
       if( TypeStruct.fldBot(argx) ) argx = null;
-      nnn.add_def(gvn.xform(new ParmNode(i,argx,fun, gvn.con(to._ts[i].simple_ptr()),bad)));
+      nnn.add_def(gvn.xform(new ParmNode(i+1,argx,fun, gvn.con(to._ts[i].simple_ptr()),bad)));
     }
     gvn.init(nnn);
     Node mmem = Env.DEFMEM.make_mem_proj(gvn,nnn.unhook(),memp);

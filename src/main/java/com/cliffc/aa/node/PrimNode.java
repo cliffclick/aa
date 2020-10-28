@@ -18,17 +18,15 @@ import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
   final TypeFunSig _sig;        // Argument types; 0 is display, 1 is 1st real arg
-  final String[] _args;         // 
   Parse[] _badargs;             // Filled in when inlined in CallNode
   byte _op_prec;                // Operator precedence, computed from table.  Generally 1-9.
   public boolean _thunk_rhs;    // Thunk (delay) right-hand-argument.
-  PrimNode( String name, TypeTuple formals, Type ret ) {
+  PrimNode( String name, TypeTuple formals, Type ret ) { this(name,null,formals,ret); }
+  PrimNode( String name, String[] args, TypeTuple formals, Type ret ) {
     super(OP_PRIM);
     _name=name;
-    assert formals.at(0)==NO_DISP; // Room for no closure
-    _sig=TypeFunSig.make(formals,ret);
-    _args=new String[_sig.nargs()];
-    for( int i=0; i<_args.length; i++ ) _args[i]=arg_name(i);
+    assert formals.at(0)==TypeMem.ALLMEM && formals.at(1)==NO_DISP; // Room for no closure; never memory
+    _sig=TypeFunSig.make(args==null ? TypeFunSig.arg_names(formals.len()) : args,formals,ret);
     _badargs=null;
     _op_prec = -1;              // Not set yet
     _thunk_rhs=false;
@@ -143,7 +141,7 @@ public abstract class PrimNode extends Node {
     boolean is_con = true, has_high = false;
     for( int i=1; i<_defs._len; i++ ) { // first is control
       Type tactual = val(i);
-      Type tformal = _sig.arg(i);
+      Type tformal = _sig.arg(i+1); // 0 is display, 1 is memory
       Type t = tformal.dual().meet(ts[i] = tactual);
       if( !t.is_con() ) {
         is_con = false;         // Some non-constant
@@ -155,7 +153,7 @@ public abstract class PrimNode extends Node {
   @Override public ErrMsg err( boolean fast ) {
     for( int i=1; i<_defs._len; i++ ) { // first is control
       Type tactual = val(i);
-      Type tformal = _sig.arg(i).simple_ptr();
+      Type tformal = _sig.arg(i+1).simple_ptr(); // 0 is display, 1 is memory, 2 is first real arg
       if( !tactual.isa(tformal) )
         return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[i],tactual,null,tformal);
     }
@@ -180,11 +178,11 @@ public abstract class PrimNode extends Node {
     _defs.clear();  _uses.clear();
     FunNode fun = (FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    Node mem = gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
     add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
+    Node mem = gvn.xform(new ParmNode(0,_sig._args[0],fun, gvn.con(TypeMem.ALLMEM),null));
     if( _thunk_rhs ) add_def(mem);      // Memory if thunking
-    for( int i=1; i<_sig.nargs(); i++ ) // First is display
-      add_def(gvn.xform(new ParmNode(i,_args[i],fun, gvn.con(Type.ALL),null)));
+    for( int i=2; i<_sig.nargs(); i++ ) // First is display, always ignored in primitives
+      add_def(gvn.xform(new ParmNode(i,_sig._args[i],fun, gvn.con(Type.ALL),null)));
     gvn.init(this);
     Node ctl,rez;
     if( _thunk_rhs ) {
@@ -208,7 +206,7 @@ public abstract class PrimNode extends Node {
   // Default name constructor using a single tuple type
   static class ConvertTypeName extends PrimNode {
     ConvertTypeName(Type from, Type to, Parse badargs) {
-      super(to._name,TypeTuple.make_args(Types.ts(TypeMemPtr.NO_DISP,from)),to);
+      super(to._name,TypeTuple.make_args(from),to);
       _badargs = new Parse[]{badargs};
     }
     @Override public Type value(GVNGCM.Mode opt_mode) {
@@ -499,7 +497,7 @@ public abstract class PrimNode extends Node {
   }
 
   static class Id extends PrimNode {
-    Id(Type arg) { super("id",TypeTuple.make_args(Types.ts(TypeMemPtr.NO_DISP,arg)),arg); }
+    Id(Type arg) { super("id",TypeTuple.make_args(arg),arg); }
     @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
     @Override public Type value(GVNGCM.Mode opt_mode) { return val(1); }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
@@ -510,17 +508,9 @@ public abstract class PrimNode extends Node {
   // inlines during parsing.
   static class AndThen extends PrimNode {
     private static final TypeTuple ANDTHEN =
-      TypeTuple.make_args(Types.ts(TypeMemPtr.NO_DISP,Type.SCALAR,TypeTuple.RET));
+      TypeTuple.make_args(Type.SCALAR,TypeTuple.RET);
     // Takes a value on the LHS, and a THUNK on the RHS.
-    AndThen() { super("&&",ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
-    @Override String arg_name(int i) {
-      switch(i) {
-      case 0: return "^";
-      case 1: return "p";
-      case 2: return "thunk";
-      default: throw com.cliffc.aa.AA.unimpl();
-      }
-    }
+    AndThen() { super("&&",new String[]{" mem","^","p","thunk"},ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
     // Expect this to inline everytime
     @Override public Node ideal(GVNGCM gvn, int level) {
       if( _defs._len != 4 ) return null; // Already did this
@@ -567,9 +557,9 @@ public abstract class PrimNode extends Node {
   // inlines during parsing.
   static class OrElse extends PrimNode {
     private static final TypeTuple ORELSE =
-      TypeTuple.make_args(Types.ts(TypeMemPtr.NO_DISP,Type.SCALAR,TypeTuple.RET));
+      TypeTuple.make_args(Type.SCALAR,TypeTuple.RET);
     // Takes a value on the LHS, and a THUNK on the RHS.
-    OrElse() { super("||",ORELSE,Type.SCALAR); _thunk_rhs=true; }
+    OrElse() { super("||",new String[]{" mem","^","p","thunk"},ORELSE,Type.SCALAR); _thunk_rhs=true; }
     @Override String arg_name(int i) {
       switch(i) {
       case 0: return "^";

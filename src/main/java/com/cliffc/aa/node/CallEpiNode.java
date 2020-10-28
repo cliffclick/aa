@@ -67,7 +67,7 @@ public final class CallEpiNode extends Node {
       TypeTuple tret = ret.val() instanceof TypeTuple ? (TypeTuple) ret.val() : (TypeTuple) ret.val().oob(TypeTuple.RET);
       Type tretmem = tret.at(1);
       if( fun != null && fun._defs._len==2 && // Function is only called by 1 (and not the unknown caller)
-          call.err(true)==null &&   // And args are ok
+          call.err(true)==null &&       // And args are ok
           CallNode.emem(tcall).isa(tdef) &&
           tretmem.isa(tdef) &&          // Call and return memory at least as good as default
           call.mem().in(0) != call &&   // Dead self-recursive
@@ -221,12 +221,12 @@ public final class CallEpiNode extends Node {
       int idx = ((ParmNode)arg)._idx;
       TypeMem live = arg._live;
       switch( idx ) {
-      case  0: actual = new FP2ClosureNode(call); break; // Filter Function Pointer to Closure
       case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); actual._live = live; break; // Always RPC is a constant
-      case -2: actual = new MProjNode(call,Env.DEFMEM,CallNode.MEMIDX); break;    // Memory into the callee
+      case  0: actual = new MProjNode(call,Env.DEFMEM,CallNode.MEMIDX); break;    // Memory into the callee
+      case  1: actual = new FP2ClosureNode(call); break; // Filter Function Pointer to Closure
       default: actual = idx >= call.nargs()              // Check for args present
           ? new ConNode<>(Type.ALL) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
-          : new ProjNode(idx+CallNode.ARGIDX, call); // Normal args
+          : new ProjNode(idx+CallNode.MEMIDX, call); // Normal args
         live = TypeMem.ESCAPE;
         break;
       }
@@ -465,7 +465,7 @@ public final class CallEpiNode extends Node {
     for( int i=0, idx; !call.is_dead() && i<call._uses._len; ) {
       Node use = call._uses.at(i);
       if( use instanceof ProjNode && (idx=((ProjNode)use)._idx) >= 2 ) {
-        Node arg = call.arg(idx - CallNode.ARGIDX);
+        Node arg = call.arg(idx - CallNode.MEMIDX);
         if( rez==use ) rez = arg;
         gvn.subsume(use, arg);
       }

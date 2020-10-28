@@ -64,19 +64,28 @@ public class TypeTuple extends Type<TypeTuple> {
   }
   public static TypeTuple make( Type[] ts ) { return make0(false,ts); }
   public static TypeTuple make( ) { return make0(false,Types.get(0)); }
-  //public static TypeTuple make( Type t0 ) { Type[] ts = Types.get(1);  ts[0]=t0;  return make0(false,ts); }
   public static TypeTuple make( Type t0, Type t1 ) { return make0(false,Types.ts(t0,t1)); }
   public static TypeTuple make( Type t0, Type t1, Type t2 ) { return make0(false,Types.ts(t0,t1,t2)); }
   public static TypeTuple make( Type t0, Type t1, Type t2, Type t3 ) { return make0(false,Types.ts(t0,t1,t2,t3)); }
-  //public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4 ) {
-  //  Type[] ts = Types.get(5);
-  //  ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; ts[4]=t4;
-  //  return make0(false,ts);
-  //}
+  public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4 ) { return make0(false,Types.ts(t0,t1,t2,t3,t4)); }
   public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4, Type t5 ) { return make0(false,Types.ts(t0,t1,t2,t3,t4,t5)); }
 
-  public static TypeTuple make_args(Type[] ts) { return make(ts); }
-  public static TypeTuple make(TypeStruct ts) { return make(ts._ts); }
+  // Make a Call args tuple from a Struct by adding Memory up front
+  public static TypeTuple make(TypeStruct ts) {
+    Type[] ts2 = Types.get(ts._ts.length+1);
+    ts2[0] = TypeMem.ALLMEM;
+    System.arraycopy(ts._ts,0,ts2,1,ts._ts.length);
+    return make(ts2);
+  }
+  public static TypeTuple make_args(Type[] ts) {
+    assert ts[0] instanceof TypeMem && ts[1].is_display_ptr();
+    return make(ts);
+  }
+
+  public static TypeTuple make_args(                       ) { return make(TypeMem.ALLMEM,NO_DISP ); }
+  public static TypeTuple make_args(Type t2                ) { return make(TypeMem.ALLMEM,NO_DISP,t2); }
+  public static TypeTuple make_args(Type t2,Type t3        ) { return make(TypeMem.ALLMEM,NO_DISP,t2,t3); }
+  public static TypeTuple make_args(Type t2,Type t3,Type t4) { return make(TypeMem.ALLMEM,NO_DISP,t2,t3,t4); }
 
 
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
@@ -91,17 +100,17 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple TEST0= make(CTRL, TypeMem.MEM  , TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
   public  static final TypeTuple TEST1= make(CTRL, TypeMem.EMPTY, TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
   // Arguments
-  public  static final TypeTuple NO_ARGS    = make_args(Types.ts(NO_DISP));
-  public  static final TypeTuple INT64      = make_args(Types.ts(NO_DISP,TypeInt.INT64)); // {int->flt}
-  public  static final TypeTuple FLT64      = make_args(Types.ts(NO_DISP,TypeFlt.FLT64)); // {flt->flt}
-  public  static final TypeTuple STRPTR     = make_args(Types.ts(NO_DISP,TypeMemPtr.STRPTR));
-  public  static final TypeTuple INT64_INT64= make_args(Types.ts(NO_DISP,TypeInt.INT64,TypeInt.INT64)); // {int int->int }
-  public  static final TypeTuple FLT64_FLT64= make_args(Types.ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64)); // {flt flt->flt }
-  public  static final TypeTuple OOP_OOP    = make_args(Types.ts(NO_DISP,TypeMemPtr.ISUSED0,TypeMemPtr.ISUSED0));
-  public  static final TypeTuple SCALAR1    = make_args(Types.ts(NO_DISP,SCALAR));
-  public  static final TypeTuple LVAL_LEN   = make_args(Types.ts(NO_DISP,TypeMemPtr.ARYPTR)); // Array
-  public  static final TypeTuple LVAL_RD    = make_args(Types.ts(NO_DISP,TypeMemPtr.ARYPTR,TypeInt.INT64)); // Array & index
-  public  static final TypeTuple LVAL_WR    = make_args(Types.ts(NO_DISP,TypeMemPtr.ARYPTR,TypeInt.INT64,Type.SCALAR)); // Array & index & element
+  public  static final TypeTuple NO_ARGS    = make_args();
+  public  static final TypeTuple INT64      = make_args(TypeInt.INT64); // {int->flt}
+  public  static final TypeTuple FLT64      = make_args(TypeFlt.FLT64); // {flt->flt}
+  public  static final TypeTuple STRPTR     = make_args(TypeMemPtr.STRPTR);
+  public  static final TypeTuple INT64_INT64= make_args(TypeInt.INT64,TypeInt.INT64); // {int int->int }
+  public  static final TypeTuple FLT64_FLT64= make_args(TypeFlt.FLT64,TypeFlt.FLT64); // {flt flt->flt }
+  public  static final TypeTuple OOP_OOP    = make_args(TypeMemPtr.ISUSED0,TypeMemPtr.ISUSED0);
+  public  static final TypeTuple SCALAR1    = make_args(SCALAR);
+  public  static final TypeTuple LVAL_LEN   = make_args(TypeMemPtr.ARYPTR); // Array
+  public  static final TypeTuple LVAL_RD    = make_args(TypeMemPtr.ARYPTR,TypeInt.INT64); // Array & index
+  public  static final TypeTuple LVAL_WR    = make_args(TypeMemPtr.ARYPTR,TypeInt.INT64,Type.SCALAR); // Array & index & element
 
   // 
   static final TypeTuple[] TYPES = new TypeTuple[]{

@@ -343,13 +343,13 @@ public class FunNode extends RegionNode {
     // Look for splitting to help a pointer from an unspecialized type
     boolean progress = false;
     Type[] sig = new Type[parms.length];
-    Type tmem = parm(-2).val();
+    Type tmem = parm(0).val();
+    sig[0] = tmem;
     if( tmem instanceof TypeMem ) {
-      for( int i=0; i<parms.length; i++ ) { // For all parms
+      for( int i=1; i<parms.length; i++ ) { // For all parms
         Node parm = parms[i];
         if( parm == null ) { sig[i]=Type.SCALAR; continue; } // (some can be dead)
-        sig[i] = parm.val();                                  // Current type
-        if( i==0 ) continue;                                 // No split on the display
+        sig[i] = parm.val();                                 // Current type
         // Best possible type
         Type tp = Type.ALL;
         for( Node def : parm._defs )
@@ -410,9 +410,9 @@ public class FunNode extends RegionNode {
         if( use instanceof MemPrimNode.LValueWrite || use instanceof MemPrimNode.LValueWriteFinal )
           if( ((MemPrimNode)use).idx() == n ) return true; // Use as index is broken
           else break;   // Use for array base or value is fine
-        if( use instanceof PrimNode.MulF64 ) return false;
-        if( use instanceof PrimNode.MulI64 ) return false;
-        if( use instanceof PrimNode.AndI64 ) return false;
+        if( use instanceof PrimNode.MulF64 ) return true;
+        if( use instanceof PrimNode.MulI64 ) return true;
+        if( use instanceof PrimNode.AndI64 ) return true;
         throw AA.unimpl();
       default: throw AA.unimpl();
       }
@@ -526,7 +526,6 @@ public class FunNode extends RegionNode {
 
     // Pick which input to inline.  Only based on having some constant inputs
     // right now.
-    Node mem = parm(-2);        // Memory, used to sharpen input ptrs
     int m=-1, mncons = -1;
     for( int i=has_unknown_callers() ? 2 : 1; i<_defs._len; i++ ) {
       Node call = in(i).in(0);
@@ -539,7 +538,7 @@ public class FunNode extends RegionNode {
       int ncon=0;
       for( ParmNode parm : parms )
         if( parm != null ) {    // Some can be dead
-          Type actual = parm.in(i).sharptr(mem.in(i));
+          Type actual = parm.val(i);
           Type formal = formal(parm._idx);
           if( !actual.isa(formal) ) // Path is in-error?
             { ncon = -2; break; }   // This path is in-error, cannot inline even if small & constants
@@ -793,8 +792,8 @@ public class FunNode extends RegionNode {
 
     // Retype memory, so we can everywhere lift the split-alias parents "up and
     // out".
-    retype_mem(gvn._opt_mode,aliases,this.parm(-2));
-    retype_mem(gvn._opt_mode,aliases,fun .parm(-2));
+    retype_mem(gvn._opt_mode,aliases,this.parm(0));
+    retype_mem(gvn._opt_mode,aliases,fun .parm(0));
 
     // Unhook the hooked FunPtrs
     for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) use.unhook();

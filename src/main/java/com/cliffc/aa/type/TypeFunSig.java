@@ -7,8 +7,9 @@ import com.cliffc.aa.util.VBitSet;
 // Function signatures: formal arguments (and return) used to type-check.  This
 // is NOT any "code pointer" or "function index" or "fidx"; see TypeFunPtr.
 public final class TypeFunSig extends Type<TypeFunSig> {
-  // Formal 0 is the display.
-  // Formals 1-N are the normal arguments.
+  // Formal 0 is the Display pointer.
+  // Formal 1 is the Memory type, using TypeObj.ISUSED for ignored memory state.
+  // Formals 2-N are the normal arguments.
   public String[] _args;
   public TypeTuple _formals;
   public Type _ret;
@@ -16,6 +17,8 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   private TypeFunSig(String[] args, TypeTuple formals, Type ret ) { super(TFUNSIG); init(args,formals,ret); }
   private void init (String[] args, TypeTuple formals, Type ret ) {
     assert args.length==formals.len();
+    assert Util.eq(args[0]," mem") && formals.at(0) instanceof TypeMem;
+    assert Util.eq(args[1],"^"   ) && formals.at(1).is_display_ptr();
     _args=args;
     _formals=formals;
     _ret=ret;
@@ -46,7 +49,8 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     sb.p('{');
     boolean field_sep=false;
     for( int i=0; i<nargs(); i++ ) {
-      if( !debug && i==0 && Util.eq(_args[i],"^") ) continue; // Do not print the ever-present display
+      if( !debug && i==0 && Util.eq(_args[i]," mem") ) continue; // Do not print the memory
+      if( !debug && i==1 && Util.eq(_args[i],"^"   ) ) continue; // Do not print the ever-present display
       sb.p(_args[i]);
       if( arg(i) != Type.SCALAR )
         arg(i).str(sb.p(':'),dups,mem,debug);
@@ -61,8 +65,10 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   private static TypeFunSig FREE=null;
   @Override protected TypeFunSig free( TypeFunSig ret ) { FREE=this; return ret; }
   public static TypeFunSig make( String[] args, TypeTuple formals, Type ret ) {
-    assert formals._ts[0].is_display_ptr() && (ret.isa(SCALAR) || ret instanceof TypeTuple);
-    assert Util.eq(args[0],"^") && args.length==formals.len();
+    assert args.length==formals.len();
+    assert Util.eq(args[0]," mem") && formals._ts[0] instanceof TypeMem;
+    assert Util.eq(args[1],"^"   ) && formals._ts[1].is_display_ptr();
+    assert ret.isa(SCALAR) || ret instanceof TypeTuple;
     TypeFunSig t1 = FREE;
     if( t1 == null ) t1 = new TypeFunSig(args,formals,ret);
     else {   FREE = null;        t1.init(args,formals,ret); }
@@ -75,12 +81,12 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   public static TypeFunSig make( TypeTuple formals, Type ret ) { return make(arg_names(formals.len()),formals,ret); }
 
   static String[] flds(String... fs) { return fs; }
-  static final String[] ARGS_   = flds("^");           // Used for functions of 0 args
-  static final String[] ARGS_X  = flds("^","x");     // Used for functions of 1 arg
-  static final String[] ARGS_XY = flds("^","x","y"); // Used for functions of 2 args
-  static final String[] ARGS_XYZ= flds("^","x","y","z"); // Used for functions of 3 args
-  static final String[][] ARGS = new String[][]{null,ARGS_,ARGS_X,ARGS_XY,ARGS_XYZ};
-  static String[] arg_names(int i) { return ARGS[i]; }
+  static final String[] ARGS_   = flds(" mem","^");            // Used for functions of 0 args
+  static final String[] ARGS_X  = flds(" mem","^","x");        // Used for functions of 1 arg
+  static final String[] ARGS_XY = flds(" mem","^","x","y");    // Used for functions of 2 args
+  static final String[] ARGS_XYZ= flds(" mem","^","x","y","z");// Used for functions of 3 args
+  static final String[][] ARGS = new String[][]{null,null,ARGS_,ARGS_X,ARGS_XY,ARGS_XYZ};
+  public static String[] arg_names(int i) { return ARGS[i]; }
 
   public static final TypeFunSig II_I = make(TypeTuple.INT64_INT64,TypeInt.INT64);
   static final TypeFunSig[] TYPES = new TypeFunSig[]{II_I};

@@ -6,16 +6,17 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
 // Function parameter node; almost just a Phi with a name.  There is a dense
-// numbering matching function arguments, with -1 reserved for the RPC and -2
+// numbering matching function arguments, with -1 reserved for the RPC and 0
 // for memory.
 public class ParmNode extends PhiNode {
-  public final int _idx; // Parameter index, zero-based; -1 reserved for RPC, -2 for mem
+  public final int _idx; // Parameter index, -1 RPC, 0 Mem, 1 Display, 2+ normal args
   final String _name;         // Parameter name
   public ParmNode( int idx, String name, Node fun, ConNode defalt, Parse badgc) {
     this(idx,name,fun,defalt._t,defalt,badgc);
   }
   public ParmNode( int idx, String name, Node fun, Type tdef, Node defalt, Parse badgc) {
     super(OP_PARM,fun,tdef,defalt,badgc);
+    assert idx>-2;
     _idx=idx;
     _name=name;
   }
@@ -43,7 +44,7 @@ public class ParmNode extends PhiNode {
 
     // TODO: Relax this
     // Never collapse memory phi, used for error reporting by other parms.
-    if( _idx== -2 )
+    if( _idx== 0 )
       for( Node use : fun._uses )
         if( use instanceof ParmNode && use != this )
           return null;
@@ -55,7 +56,7 @@ public class ParmNode extends PhiNode {
     //   - not flowing, - types not aligned, do not fold
     //   - flowing but bad args, do not fold
     Node live=null;
-    Node mem = fun.parm(-2);
+    Node mem = fun.parm(0);
     for( int i=1; i<_defs._len; i++  ) { // For all arguments
       Node n = in(i);
       if( fun.val(i)==Type.CTRL ) {    // Dead path can ignore both valid and invalid args
@@ -89,7 +90,7 @@ public class ParmNode extends PhiNode {
     FunNode fun = (FunNode)in0;
     if( !opt_mode._CG && fun.has_unknown_callers() )
       return val(1);
-    Node mem = fun.parm(-2);    // Memory for sharpening pointers
+    Node mem = fun.parm(0);
     // All callers known; merge the wired & flowing ones
     Type t = Type.ANY;
     for( int i=1; i<_defs._len; i++ ) {
@@ -115,7 +116,7 @@ public class ParmNode extends PhiNode {
     FunNode fun = fun();
     assert fun._defs._len==_defs._len;
     if( _idx < 0 ) return null;                    // No arg check on RPC or Mem
-    Node mem = fun.parm(-2);
+    Node mem = fun.parm(0);
     Type formal = fun.formal(_idx);
     for( int i=1; i<_defs._len; i++ ) {
       if( fun.val(i)==Type.XCTRL ) continue;// Ignore dead paths
@@ -131,7 +132,7 @@ public class ParmNode extends PhiNode {
               return null;      // #args errors reported before bad-args
             Type argc = call.arg(_idx).sharptr(call.mem()); // Call arg type
             if( argc!=Type.ALL && !argc.isa(formal) ) // Check this call
-              return ErrMsg.typerr(call._badargs[_idx],argc, call.mem().val(),formal);
+              return ErrMsg.typerr(call._badargs[_idx-1],argc, call.mem().val(),formal);
             // Must be a different call that is in-error
           }
         }

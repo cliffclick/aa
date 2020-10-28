@@ -158,7 +158,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       super(op,parent_alias,to);
       _name = name;
       _reads = reads;
-      args[0] = NO_DISP; // No display
+      assert (reads == (args[0]!=TypeMem.ALLMEM)); // If reading, then memory has some requirements
+      args[1] = NO_DISP; // No display
       _sig = TypeFunSig.make(TypeTuple.make_args(args),Type.SCALAR);
       _op_prec = op_prec;
     }
@@ -179,15 +180,14 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     public FunPtrNode as_fun( GVNGCM gvn ) {
       FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL));
       ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-      Node memp= gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-      gvn.add_work(memp);         // This may refine more later
+      Node memp= gvn.xform(new ParmNode(0,_sig._args[0],fun, gvn.con(_sig.arg(0).simple_ptr()),null));
       fun._bal_close = bal_close();
 
       // Add input edges to the intrinsic
       add_def(_reads ? memp : null); // Memory  for the primitive in slot 1
       add_def(null);                 // Closure for the primitive in slot 2
-      for( int i=1; i<_sig.nargs(); i++ ) // Args follow, closure in formal 0
-        add_def( gvn.xform(new ParmNode(i,TypeStruct.arg_name(i),fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
+      for( int i=2; i<_sig.nargs(); i++ ) // Args follow, closure in formal 1
+        add_def( gvn.xform(new ParmNode(i,_sig._args[i],fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
       NewNode nnn = (NewNode)gvn.xform(this);
       Node mem = Env.DEFMEM.make_mem_proj(gvn,nnn,memp);
       Node ptr = gvn.xform(new ProjNode(1, nnn));

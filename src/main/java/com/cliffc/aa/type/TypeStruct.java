@@ -287,7 +287,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static final String[] ARGS_XY = flds("^","x","y"); // Used for functions of 2 args
   public  static final String[] ARGS_XYZ= flds("^","x","y","z"); // Used for functions of 3 args
   public  static String arg_name(int i) {
-    return i==0 ? "^" : String.valueOf('x'+i-1).intern();
+    return i==0 ? "^" : String.valueOf((char)('x'+i-1)).intern();
   }
   public  static Type[] ts() { return Types.get(0); }
   public  static Type[] ts(Type t0) { return Types.ts(t0); }

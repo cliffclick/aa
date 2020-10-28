@@ -483,7 +483,6 @@ public class Parse implements Comparable<Parse> {
   }
 
   // Get an expr at the next higher precedence, or a term, or null
-  // Get an expr and the next higher precedence, or a term, or null
   private Node _expr_higher( int prec, Node lhs ) {
     if( lhs != null ) lhs.keep();
     Node rhs = prec+1 == PrimNode.PREC_TOKS.length ? term() : _expr(prec+1);
@@ -886,6 +885,9 @@ public class Parse implements Comparable<Parse> {
     // or when inside of a struct definition: 'this'.
     Node parent_display = scope().ptr();
     TypeMemPtr tpar_disp = (TypeMemPtr) parent_display.val(); // Just a TMP of the right alias
+    ids .push(" mem");
+    ts  .push(TypeMem.MEM);
+    bads.push(null);
     ids .push("^");
     ts  .push(tpar_disp);
     bads.push(null);
@@ -916,15 +918,15 @@ public class Parse implements Comparable<Parse> {
       bads.add(bad);
     }
     // If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
-    // args, and then reset.  Also reset to just the display arg.
-    if( _x == oldx ) { ids.set_len(1); ts.set_len(1); bads.set_len(1);  }
+    // args, and then reset.  Also reset to just the mem & display args.
+    if( _x == oldx ) { ids.set_len(2); ts.set_len(2); bads.set_len(2);  }
 
     // Build the FunNode header
     FunNode fun = gvn(new FunNode(ids.asAry(),ts.asAry()).add_def(Env.ALL_CTRL)).keep();
     // Build Parms for system incoming values
-    Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
-    Node mem = gvn(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-    Node clo = gvn(new ParmNode( 0,"^"  ,fun,con(tpar_disp),null));
+    Node rpc = gvn(new ParmNode(-1,"rpc" ,fun,con(TypeRPC.ALL_CALL),null)).keep();
+    Node mem = gvn(new ParmNode( 0," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+    Node clo = gvn(new ParmNode( 1,"^"   ,fun,con(tpar_disp),null));
 
     // Increase scope depth for function body.
     try( Env e = new Env(_e,errMsg(oldx-1), true, fun, mem) ) { // Nest an environment for the local vars
@@ -937,7 +939,7 @@ public class Parse implements Comparable<Parse> {
 
       // Parms for all arguments
       Parse errmsg = errMsg();  // Lazy error message
-      for( int i=1; i<ids._len; i++ ) { // User parms start at#1
+      for( int i=2; i<ids._len; i++ ) { // User parms start at#2
         Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(Type.SCALAR),errmsg));
         create(ids.at(i),parm, args_are_mutable);
       }
@@ -1146,7 +1148,7 @@ public class Parse implements Comparable<Parse> {
   // Type or null or Type.ANY for '->' token
   private Type type0(boolean type_var) {
     if( peek('{') ) {           // Function type
-      Ary<Type> ts = new Ary<>(new Type[]{TypeMemPtr.DISP_SIMPLE});  Type t;
+      Ary<Type> ts = new Ary<>(new Type[]{TypeMem.ALLMEM,TypeMemPtr.DISP_SIMPLE});  Type t;
       while( (t=typep(type_var)) != null && t != Type.ANY  )
         ts.add(t);              // Collect arg types
       Type ret;
