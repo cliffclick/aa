@@ -516,7 +516,7 @@ public class Parse implements Comparable<Parse> {
     // Insert a thunk header to capture the delayed execution
     ThunkNode thunk = (ThunkNode)gvn(new ThunkNode(mem()).keep());
     set_ctrl(thunk);
-    set_mem (gvn(new ParmNode(-2,"mem",thunk,TypeMem.MEM,Env.DEFMEM,null)));
+    set_mem (gvn(new ParmNode(0,"mem",thunk,TypeMem.MEM,Env.DEFMEM,null)));
 
     // Delayed execution parse of RHS
     Node rhs = _expr_higher_require(prec,bintok,lhs);

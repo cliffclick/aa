@@ -35,8 +35,8 @@ import java.util.Map;
 // to the generic unknown worse-case caller (a type-specific ConNode with
 // worse-case legit bottom type).  ParmNodes merge all input path types (since
 // they are a Phi), and the call "loses precision" for type inference there.
-// Parm#0 and up (NOT the zero-slot but the zero idx) are the classic function
-// arguments; Parm#-1 is for the RPC and Parm#-2 is for memory.
+// Parm#1 and up (NOT the zero-slot but the zero idx) are the classic function
+// arguments; Parm#-1 is for the RPC and Parm#0 is for memory.
 //
 // Ret points to the return control, memory, value and RPC, as well as the
 // original Fun.  A FunPtr points to a Ret, and a Call will use a FunPtr (or a
@@ -164,8 +164,7 @@ public class FunNode extends RegionNode {
   boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
   // Formal types.
   Type formal(int idx) {
-    return idx == -1 ? TypeRPC.ALL_CALL :
-      (idx == -2 ? TypeMem.MEM : _sig.arg(idx));
+    return idx == -1 ? TypeRPC.ALL_CALL : _sig.arg(idx);
   }
   public int nargs() { return _sig.nargs(); }
   void set_is_copy(GVNGCM gvn) { gvn.set_def_reg(this,0,this); }
@@ -210,7 +209,7 @@ public class FunNode extends RegionNode {
     // Memory is not 'lifted' by DefMem, a sign that a bad-memory-arg is being
     // passed in.
     if( has_unknown_callers() ) {
-      ParmNode mem = parm(-2);
+      ParmNode mem = parm(0);
       if( mem!=null && !mem.val().isa(Env.DEFMEM.val()) )
         return null; // Do not inline a bad memory type
     }
@@ -526,6 +525,7 @@ public class FunNode extends RegionNode {
 
     // Pick which input to inline.  Only based on having some constant inputs
     // right now.
+    Node mem = parm(0);        // Memory, used to sharpen input ptrs
     int m=-1, mncons = -1;
     for( int i=has_unknown_callers() ? 2 : 1; i<_defs._len; i++ ) {
       Node call = in(i).in(0);
@@ -538,7 +538,7 @@ public class FunNode extends RegionNode {
       int ncon=0;
       for( ParmNode parm : parms )
         if( parm != null ) {    // Some can be dead
-          Type actual = parm.val(i);
+          Type actual = parm.in(i).sharptr(mem.in(i));
           Type formal = formal(parm._idx);
           if( !actual.isa(formal) ) // Path is in-error?
             { ncon = -2; break; }   // This path is in-error, cannot inline even if small & constants
@@ -703,7 +703,7 @@ public class FunNode extends RegionNode {
         for( Node p : fun._uses )
           if( p instanceof ParmNode ) {
             ParmNode parm = (ParmNode)p;
-            parm.set_def(1,parm._idx==-2 ? Env.DEFMEM : gvn.con(fun.formal(parm._idx).simple_ptr()),gvn);
+            parm.set_def(1,parm._idx==0 ? Env.DEFMEM : gvn.con(fun.formal(parm._idx).simple_ptr()),gvn);
           }
       } else                     // Path Split
         fun.set_def(1,Env.XCTRL,gvn);

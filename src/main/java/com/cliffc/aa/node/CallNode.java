@@ -153,7 +153,7 @@ public class CallNode extends Node {
   }
   static TypeTuple set_ttfp( TypeTuple tcall, TypeFunPtr nfptr ) { return tcall.set(ARGIDX,nfptr); }
   static Type       targ( Type tcall, int x ) { return targ(((TypeTuple)tcall)._ts,x); }
-  static Type       targ( Type[] ts, int x ) { return ts[ARGIDX+x]; }
+  static Type       targ( Type[] ts, int x ) { return ts[MEMIDX+x]; }
 
   // Clones during inlining all become unique new call sites.  The original RPC
   // splits into 2, and the two new children RPCs replace it entirely.  The

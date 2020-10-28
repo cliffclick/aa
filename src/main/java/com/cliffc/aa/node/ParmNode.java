@@ -100,7 +100,7 @@ public class ParmNode extends PhiNode {
       t = t.meet(ta);
     }
 
-    if( _idx < 0 ) return t;
+    if( _idx <= 0 ) return t;
     // High, but valid, values like choice-functions need to pass thru,
     // so following Calls agree that SOME function will be called.
     // Check against formals; if OOB, always produce an error.

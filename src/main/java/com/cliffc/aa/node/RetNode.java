@@ -117,11 +117,9 @@ public final class RetNode extends Node {
           return null;
     FunNode fun = fun();
     // Every Phi must be type compatible
-    for( int i=1; i<call.nargs(); i++ )
+    for( int i=0; i<call.nargs(); i++ )
       if( !check_phi_type(gvn,fun,call, i) )
         return null;
-    if( !check_phi_type(gvn,fun,call, -2) )  // Also memory Phi
-      return null;
 
     // Behind the function entry, split out a LoopNode/Phi setup - one phi for
     // every argument.  The first input comes from the parms; the second input
@@ -141,8 +139,7 @@ public final class RetNode extends Node {
     loop = (LoopNode)gvn.xform(loop);
     gvn.set_def_reg(cuse,cidx,loop);
     // Insert loop phis in-the-middle
-    for( int i=1; i<call.nargs(); i++ ) do_phi(gvn,fun,call,loop,i);
-    do_phi(gvn,fun,call,loop,-2);   // Also memory Phi
+    for( int i=0; i<call.nargs(); i++ ) do_phi(gvn,fun,call,loop,i);
     // Cut the Call control
     gvn.set_def_reg(call,0, Env.XCTRL);
 

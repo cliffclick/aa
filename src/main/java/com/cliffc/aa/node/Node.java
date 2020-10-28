@@ -140,8 +140,8 @@ public abstract class Node implements Cloneable, TNode {
           if( ret != null && ret.funptr() != null ) gvn.add_work(ret.funptr());
         }
         // Parm memory may fold away, if no other parm needs it for sharpening
-        if( this instanceof ParmNode && ((ParmNode)this)._idx!=-2 && old instanceof FunNode ) {
-          ParmNode pmem = ((FunNode)old).parm(-2);
+        if( this instanceof ParmNode && ((ParmNode)this)._idx!=0 && old instanceof FunNode ) {
+          ParmNode pmem = ((FunNode)old).parm(0);
           if( pmem != null ) gvn.add_work(pmem);
         }
         if( this instanceof ProjNode ) { // A proj dying might let an is_copy input also die
