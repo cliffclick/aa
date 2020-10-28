@@ -218,14 +218,14 @@ public abstract class PrimNode extends Node {
     @Override public Type apply( Type[] args ) {
       Type actual = args[1];
       if( actual==Type.ANY || actual==Type.ALL ) return actual;
-      Type formal = _sig.arg(1);
+      Type formal = _sig.arg(2);
       // Wrapping function will not inline if args are in-error
       assert formal.dual().isa(actual) && actual.isa(formal);
       return actual.set_name(_sig._ret._name);
     }
     @Override public ErrMsg err( boolean fast ) {
       Type actual = val(1);
-      Type formal = _sig.arg(1);
+      Type formal = _sig.arg(2);
       if( !actual.isa(formal) ) // Actual is not a formal
         return ErrMsg.typerr(_badargs[0],actual,null,formal);
       return null;

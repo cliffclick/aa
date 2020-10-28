@@ -1156,7 +1156,7 @@ public class Parse implements Comparable<Parse> {
         ret = typep(type_var);
         if( ret == null ) return null; // should return TypeErr missing type after ->
       } else {                  // Allow no-args and simple return type
-        if( ts._len != 2 ) return null; // should return TypeErr missing -> in tfun
+        if( ts._len != 3 ) return null; // should return TypeErr missing -> in tfun
         ret = ts.pop();         // e.g. { int } Get single return type
       }
       TypeTuple targs = TypeTuple.make_args(ts.asAry());

@@ -575,10 +575,10 @@ public class CallNode extends Node {
     }
     TypeTuple formals = fun._sig._formals;  // Type of each argument
     int flags=0;
-    for( int j=0; j<nargs(); j++ ) {
+    for( int j=1; j<nargs(); j++ ) {
       Type formal = formals.at(j);
       Type actual = targ(targs,j);          // Calls skip ctrl & mem
-      if( j==0 && actual instanceof TypeFunPtr )
+      if( j==1 && actual instanceof TypeFunPtr )
         actual = ((TypeFunPtr)actual)._disp; // Extract Display type from TFP
       assert actual==actual.simple_ptr();    // Only simple ptrs from nodes
       actual = caller_mem.sharptr(actual);   // Sharpen actual pointers before checking vs formals
