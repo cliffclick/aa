@@ -376,7 +376,7 @@ public class CallNode extends Node {
   private BitsAlias get_alias(GVNGCM.Mode opt_mode, Type t, int aidx) {
     if( t instanceof TypeMemPtr ) return ((TypeMemPtr)t)._aliases;
     if( t instanceof TypeFunPtr ) {
-      if( opt_mode._CG && aidx==0 ) { // Only for the local display; other FPtrs can be passed-in, and escaped along
+      if( opt_mode._CG && aidx==1 ) { // Only for the local display; other FPtrs can be passed-in, and escaped along
         int idx = _uses.find(e->e instanceof FP2ClosureNode);
         if( idx== -1 || _uses.at(idx)._live==TypeMem.DEAD )
           return BitsAlias.EMPTY; // Fully wired call still not using display

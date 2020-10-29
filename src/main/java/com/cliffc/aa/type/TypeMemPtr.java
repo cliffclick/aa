@@ -49,7 +49,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     TypeObj to = (mem == null || _aliases==BitsAlias.RECORD_BITS) ? _obj : mem.ld(this);
     if( to == TypeObj.XOBJ ) to = _obj;
     sb.p('*');
-    _aliases.str(sb);
+    if( debug ) _aliases.str(sb);
     to.str(sb,dups,mem,debug);
     if( _aliases.test(0) ) sb.p('?');
     return sb;
