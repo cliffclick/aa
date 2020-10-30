@@ -349,6 +349,7 @@ public class FunNode extends RegionNode {
         Node parm = parms[i];
         if( parm == null ) { sig[i]=Type.SCALAR; continue; } // (some can be dead)
         sig[i] = parm.val();                                 // Current type
+        if( i==1 ) continue;                                 // No split on the display
         // Best possible type
         Type tp = Type.ALL;
         for( Node def : parm._defs )
