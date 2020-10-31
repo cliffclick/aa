@@ -30,8 +30,8 @@ public class ThunkNode extends Node {
   }
   @Override public Node is_copy(int idx) {
     if( _defs._len==2 ) return null;
-    if( idx==0 ) return in(2);
-    //if( idx==-2) return in(1);
+    if( idx==0 ) return in(2);  // Wired thunk added a def
+    if( idx==1 ) return in(1);
     throw com.cliffc.aa.AA.unimpl();
   }
   @Override Node walk_dom_last(Predicate<Node> P) { return in(0)==null ? null : super.walk_dom_last(P); }
