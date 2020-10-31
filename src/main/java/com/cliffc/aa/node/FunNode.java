@@ -343,7 +343,7 @@ public class FunNode extends RegionNode {
     boolean progress = false;
     Type[] sig = new Type[parms.length];
     Type tmem = parm(0).val();
-    sig[0] = tmem;
+    sig[0] = TypeMem.MEM;
     if( tmem instanceof TypeMem ) {
       for( int i=1; i<parms.length; i++ ) { // For all parms
         Node parm = parms[i];

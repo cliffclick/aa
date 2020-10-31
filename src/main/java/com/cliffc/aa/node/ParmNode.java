@@ -132,12 +132,12 @@ public class ParmNode extends PhiNode {
               return null;      // #args errors reported before bad-args
             Type argc = call.arg(_idx).sharptr(call.mem()); // Call arg type
             if( argc!=Type.ALL && !argc.isa(formal) ) // Check this call
-              return ErrMsg.typerr(call._badargs[_idx-1],argc, call.mem().val(),formal);
+              return fast ? ErrMsg.FAST : ErrMsg.typerr(call._badargs[_idx-1],argc, call.mem().val(),formal);
             // Must be a different call that is in-error
           }
         }
         // meet of args is not the formal, but no single arg is not the formal?
-        return ErrMsg.typerr(_badgc,argt,mem.val(i),formal); // Can be the default
+        return fast ? ErrMsg.FAST : ErrMsg.typerr(_badgc,argt,mem.val(i),formal); // Can be the default
       }
     }
     return null;
