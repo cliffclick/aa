@@ -28,6 +28,7 @@ public abstract class MemPrimNode extends PrimNode {
       throw com.cliffc.aa.AA.unimpl();
     TypeMemPtr ptr = (TypeMemPtr)tadr;
     TypeObj objs = ((TypeMem)tmem).ld(ptr); // General load from memory
+    if( objs==TypeObj.UNUSED || objs==TypeObj.XOBJ ) return null; // Can fall to valid array
     if( !(objs instanceof TypeAry) )
       return fast ? ErrMsg.FAST : ErrMsg.typerr(_badargs[1],ptr,tmem,TypeMemPtr.ARYPTR);
     TypeAry ary = (TypeAry)objs;
@@ -35,7 +36,7 @@ public abstract class MemPrimNode extends PrimNode {
       TypeInt idx = (TypeInt)tidx;
       if( idx.is_con() ) {
         long i = idx.getl();
-        long len = ary._size.is_con() ? ary._size.getl() : (1L<<ary._size._z);
+        long len = ary._size.is_con() ? ary._size.getl() : (ary._size._z>=63 ? Integer.MAX_VALUE : (1L<<ary._size._z));
         if( i<0 || i>=len ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_badargs[2],"Index must be out of bounds",null);
       }
     }
@@ -88,7 +89,7 @@ public abstract class MemPrimNode extends PrimNode {
       if( !(mem  instanceof TypeMem  ) ) return mem .oob();
       if( !(adr instanceof TypeMemPtr) ) return adr.oob();
       TypeMemPtr ptr = (TypeMemPtr)mem.sharptr(adr);
-      if( !(ptr._obj instanceof TypeAry) ) return adr.oob(TypeInt.INT64);
+      if( !(ptr._obj instanceof TypeAry) ) return ptr._obj.oob(TypeInt.INT64);
       TypeAry ary = (TypeAry)ptr._obj;
       return ary._size;
     }
@@ -111,7 +112,7 @@ public abstract class MemPrimNode extends PrimNode {
       if( err(true) != null ) return Type.SCALAR;
       TypeMemPtr ptr = (TypeMemPtr)mem.sharptr(adr);
       TypeInt idx2 = idx==Type.XNIL ? TypeInt.ZERO : (TypeInt)idx;
-      if( !(ptr._obj instanceof TypeAry) ) return adr.oob();
+      if( !(ptr._obj instanceof TypeAry) ) return ptr._obj.oob();
       TypeAry ary = (TypeAry)ptr._obj;
       return ary.ld(idx2);
     }

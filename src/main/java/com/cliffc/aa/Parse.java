@@ -674,10 +674,10 @@ public class Parse implements Comparable<Parse> {
             }
           } else fptr = (FunPtrNode)bfun;
           require(fptr.fun()._bal_close,oldx);
-          if( fptr.fun().nargs()==3 ) { // display, array, index
+          if( fptr.fun().nargs()==4 ) { // display, array, index
             n = do_call(errMsgs(0,oldx,oldx2),args(fptr,n,idx));
           } else {
-            assert fptr.fun().nargs()==4; // display, array, index, value
+            assert fptr.fun().nargs()==5; // display, array, index, value
             skipWS();
             int oldx3 = _x;
             Node val = stmt();

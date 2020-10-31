@@ -97,7 +97,7 @@ public class LoadNode extends Node {
     // Walk up the memory chain looking for an exact matching Store or New
     int cnt=0;
     while(true) {
-      assert cnt++ < 100; // Infinite loop?
+      cnt++; assert cnt < 100; // Infinite loop?
       if( mem instanceof StoreNode ) {
         StoreNode st = (StoreNode)mem;
         if( Util.eq(st._fld,fld) ) {
@@ -110,6 +110,10 @@ public class LoadNode extends Node {
             return null;        // Aliases not disjoint, might overlap but wrong address
         }               // Wrong field name, cannot match
         mem = st.mem(); // Advance past
+
+      } else if( mem instanceof MemPrimNode.LValueWrite ) {
+        // Array stores and field loads never alias
+        mem = ((MemPrimNode)mem).mem();
 
       } else if( mem instanceof MProjNode ) {
         Node mem0 = mem.in(0);
@@ -142,7 +146,7 @@ public class LoadNode extends Node {
                  mem instanceof ConNode) {
         return null;            // Would have to match on both sides, and Phi the results
       } else {
-        throw com.cliffc.aa.AA.unimpl(); // decide cannot be equal, and advance, or maybe-equal andreturn null
+        throw com.cliffc.aa.AA.unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
       }
     }
   }
