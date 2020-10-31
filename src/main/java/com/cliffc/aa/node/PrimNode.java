@@ -179,7 +179,7 @@ public abstract class PrimNode extends Node {
     FunNode fun = (FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
-    Node mem = gvn.xform(new ParmNode(0,_sig._args[0],fun, gvn.con(TypeMem.ALLMEM),null));
+    Node mem = gvn.xform(new ParmNode(0,_sig._args[0],fun,TypeMem.MEM,Env.DEFMEM,null));
     if( _thunk_rhs ) add_def(mem);      // Memory if thunking
     for( int i=2; i<_sig.nargs(); i++ ) // First is display, always ignored in primitives
       add_def(gvn.xform(new ParmNode(i,_sig._args[i],fun, gvn.con(Type.ALL),null)));

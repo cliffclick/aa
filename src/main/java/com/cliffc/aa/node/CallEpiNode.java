@@ -410,8 +410,8 @@ public final class CallEpiNode extends Node {
     // bypasses the body and now flow into it).
     Ary<Node> work = new Ary<>(new Node[1],0);
     MProjNode emprj = (MProjNode)ProjNode.proj(this,1);
-    if( mem != call.mem() ) {   // Most primitives do nothing with memory
-      MProjNode cmprj = (MProjNode)ProjNode.proj(call,1);
+    MProjNode cmprj = (MProjNode)ProjNode.proj(call,1);
+    if( mem != call.mem() && cmprj !=null ) { // Most primitives do nothing with memory
       work.addAll(cmprj._uses);
       gvn.subsume(cmprj,call.mem());
       if( mem == cmprj ) mem = call.mem();
