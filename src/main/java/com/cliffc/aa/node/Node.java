@@ -67,9 +67,7 @@ public abstract class Node implements Cloneable, TNode {
   }
   public TVar tvar() { return _tvar; }
   public TVar tvar(int x) { return in(x)._tvar; }
-  public TVar targ(int x) { throw com.cliffc.aa.AA.unimpl(); } // Only for FunPtr
-  public TVar tret(     ) { throw com.cliffc.aa.AA.unimpl(); } // Only for FunPtr
-
+  public TNode[] parms() { throw com.cliffc.aa.AA.unimpl(); } // Only for FunNodes
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
   public Ary<Node> _defs;

@@ -1,8 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
-import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
@@ -866,6 +864,13 @@ public class FunNode extends RegionNode {
       if( use instanceof ParmNode && ((ParmNode)use)._idx==idx )
         return (ParmNode)use;
     return null;
+  }
+  public TNode[] parms() {
+    TNode[] tns = new TNode[nargs()];
+    for( Node use : _uses )
+      if( use instanceof ParmNode && ((ParmNode)use)._idx!=-1 )
+        tns[((ParmNode)use)._idx] = use;
+    return tns;
   }
 
   public ParmNode rpc() { return parm(-1); }

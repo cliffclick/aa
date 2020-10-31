@@ -4,6 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.*;
 
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
 // TypeFunPtr with a constant fidx and variable displays.  Used to allow 1st
@@ -15,6 +16,10 @@ public final class FunPtrNode extends Node {
   private FunPtrNode( ErrMsg referr, RetNode ret, Node display ) {
     super(OP_FUNPTR,ret,display);
     _referr = referr;
+    TLambda tvargs = new TLambda(ret.fun());
+    TTupN tvret  = (TTupN)ret.tvar().find();         // [Control,Memory,Result]
+    TFun  tvfun  = new TFun(this,tvargs,tvret);
+    //tvar().unify(tvfun);
   }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }

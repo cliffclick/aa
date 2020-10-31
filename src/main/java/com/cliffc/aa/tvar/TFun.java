@@ -1,23 +1,26 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
-import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFunSig;
 import com.cliffc.aa.type.TypeTuple;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
 // Type of a Hindley-Milner function operator.
 // "->N" for n-argument functions.
-
 public class TFun extends TypeVar {
-  final int _nargs;
+  final TLambda _funargs;
+  final TTupN _rez;
 
   // Basic H-M type variable supporting U-F and parametric types.
-  public TFun( @NotNull TNode tn, int nargs ) { super(tn); _nargs=nargs; }
+  public TFun( @NotNull TNode tn, TLambda funargs, TTupN rez ) { super(tn); _funargs=funargs; _rez=rez; }
 
   // Type from parts.  Grab the nargs (and memory) and the return and build a
   // TypeFunSig.
-  @Override public Type _type(boolean head) {
+  @Override public TypeFunSig _type(boolean head) {
+    TypeTuple targs = _funargs._type(head);
+    TypeTuple rez   = _rez    ._type(head);
+    // TODO: Make a TypeFunSig
     throw com.cliffc.aa.AA.unimpl();
   }
 
@@ -31,15 +34,12 @@ public class TFun extends TypeVar {
     throw com.cliffc.aa.AA.unimpl();
   }
 
-  // U-F find algo.  Only TVars can be a child in U-F.
-  @Override TypeVar find() { return this; }
   // Pretty print
   @Override public SB _str(SB sb, boolean pretty) {
     sb.p("V").p(uid()).p("{ ");
-    for( int i=0; i<_nargs; i++ )
-      _tnode.targ(i)._str(sb,pretty).p(" ");
+    _funargs._str(sb,pretty);
     sb.p("-> ");
-    _tnode.tret()._str(sb,pretty);
+    _rez ._str(sb,pretty);
     return sb.p(" }");
   }
 }

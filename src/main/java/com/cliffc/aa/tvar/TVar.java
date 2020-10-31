@@ -43,7 +43,7 @@ public class TVar extends TypeVar {
   }
   
   // U-F find algo
-  @Override TypeVar find() {
+  @Override public TypeVar find() {
     if( _u==null ) return this;
     if( !(_u instanceof TVar) || ((TVar)_u)._u==null ) return _u;
     throw com.cliffc.aa.AA.unimpl();

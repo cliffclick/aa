@@ -39,7 +39,8 @@ abstract public class TypeVar {
   abstract public Type _type(boolean head); // Local type as UF root
   // Unify this into tv.
   abstract public Object unify(TypeVar tv);
-  abstract TypeVar find();
+  // U-F find algo.  Only TVars can be a child in U-F.
+  public TypeVar find() { return this; }
 
   // Debug
   public final String toString() { return _str(new SB(),false).toString(); }
