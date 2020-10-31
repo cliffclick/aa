@@ -412,15 +412,16 @@ public class TestNodeSmall {
     ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(1, dsp_file));
     Env.ALL_DISPLAYS = Env.ALL_DISPLAYS.set(dsp_file._alias);
     // The Fun and Fun._tf:
-    TypeTuple formals = TypeTuple.make_args(Types.ts(dsp_file_ptr.val(), // File-scope display as arg0
-                                                         Type.SCALAR));  // Some scalar arg1
+    TypeTuple formals = TypeTuple.make_args(Types.ts(TypeMem.MEM,
+                                                     dsp_file_ptr.val(), // File-scope display as arg0
+                                                     Type.SCALAR));  // Some scalar arg1
     TypeFunSig sig = TypeFunSig.make(formals,Type.SCALAR);
     FunNode fun = new FunNode("fact",sig,-1,false);
     gvn.init(fun.add_def(ctl).add_def(ctl));
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
-    ParmNode parm_mem = new ParmNode(-2,"mem",fun,mem,null);
-    ParmNode parm_dsp = new ParmNode( 0,"^"  ,fun,Type.SCALAR,gvn.con(dsp_file_ptr.val()),null);
+    ParmNode parm_mem = new ParmNode(0,"mem",fun,mem,null);
+    ParmNode parm_dsp = new ParmNode(1,"^"  ,fun,Type.SCALAR,gvn.con(dsp_file_ptr.val()),null);
     gvn.init(parm_mem.add_def(dsp_file_obj));
     gvn.init(parm_dsp.add_def(dsp_file_ptr));
     // Close the function up
@@ -497,17 +498,17 @@ public class TestNodeSmall {
     int a1 = BitsAlias.new_alias(BitsAlias.REC);
     int a2 = BitsAlias.new_alias(BitsAlias.REC);
     int a3 = BitsAlias.new_alias(BitsAlias.REC);
-    Type[] ts_int_flt = TypeStruct.ts(TypeMemPtr.NO_DISP,TypeInt.INT64,TypeFlt.FLT64);
-    Type[] ts_int_abc = TypeStruct.ts(TypeMemPtr.NO_DISP,TypeInt.INT64,TypeMemPtr.ABCPTR);
+    Type[] ts_int_flt = TypeStruct.ts(TypeMem.MEM,TypeMemPtr.NO_DISP,TypeInt.INT64,TypeFlt.FLT64);
+    Type[] ts_int_abc = TypeStruct.ts(TypeMem.MEM,TypeMemPtr.NO_DISP,TypeInt.INT64,TypeMemPtr.ABCPTR);
     // @{ a:int; b:"abc" }
-    TypeStruct a_int_b_abc = TypeStruct.make(new String[]{"^","a","b"},ts_int_abc);
+    TypeStruct a_int_b_abc = TypeStruct.make(new String[]{" mem","^","a","b"},ts_int_abc);
 
     // Build a bunch of function type signatures
     TypeFunSig[] sigs = new TypeFunSig[] {
       TypeFunSig.make(Type.SCALAR,ts_int_flt), // {int flt   -> }
       TypeFunSig.make(Type.SCALAR,ts_int_abc), // {int "abc" -> }
       // { flt @{a:int; b:"abc"} -> }
-      TypeFunSig.make(Type.SCALAR,TypeStruct.ts(TypeMemPtr.NO_DISP,TypeFlt.FLT64,TypeMemPtr.make(BitsAlias.REC,a_int_b_abc))),
+      TypeFunSig.make(Type.SCALAR,TypeStruct.ts(TypeMem.MEM,TypeMemPtr.NO_DISP,TypeFlt.FLT64,TypeMemPtr.make(BitsAlias.REC,a_int_b_abc))),
     };
 
     // Build a bunch of memory parm types
@@ -590,9 +591,9 @@ public class TestNodeSmall {
     FunNode fun = new FunNode("fun",tsig,-1,false);
     gvn.xform(fun.add_def(cpj));
 
-    ParmNode parmem= gvn.init(new ParmNode(-2,"mem" ,fun,mem ,null));
-    ParmNode parm1 = gvn.init(new ParmNode( 1,"arg1",fun,arg1,null));
-    ParmNode parm2 = gvn.init(new ParmNode( 2,"arg2",fun,arg2,null));
+    ParmNode parmem= gvn.init(new ParmNode( 0,"mem" ,fun,mem ,null));
+    ParmNode parm1 = gvn.init(new ParmNode( 2,"arg1",fun,arg1,null));
+    ParmNode parm2 = gvn.init(new ParmNode( 3,"arg2",fun,arg2,null));
 
     // Types for normal args before memory type
     Type tp1 = parm1 .xval (gvn._opt_mode);
@@ -601,11 +602,11 @@ public class TestNodeSmall {
 
     // Check the isa(sig) on complex pointer args
     Type actual1 = tpm.sharptr(tp1);
-    Type formal1 = fun.formal(1);
+    Type formal1 = fun.formal(2);
     if( !actual1.isa(formal1) && !formal1.isa(actual1) )
       perror("arg1-vs-formal1",actual1,formal1);
     Type actual2 = tpm.sharptr(tp2);
-    Type formal2 = fun.formal(2);
+    Type formal2 = fun.formal(3);
     if( !actual2.isa(formal2) && !formal2.isa(actual2) )
       perror("arg2-vs-formal2",actual2,formal2);
 
