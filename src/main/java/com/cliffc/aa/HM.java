@@ -142,19 +142,19 @@ public class HM {
   }
   public static class Let extends Syntax {
     final String _arg0;
-    final Syntax _def, _body;
-    Let(String arg0, Syntax def, Syntax body) { _arg0=arg0; _def=def; _body=body; }
-    @Override public String toString() { return "let "+_arg0+" = "+_def+" in "+_body+" }"; }
+    final Syntax _body, _use;
+    Let(String arg0, Syntax body, Syntax use) { _arg0=arg0; _body=body; _use=use; }
+    @Override public String toString() { return "let "+_arg0+" = "+_body+" in "+_use+" }"; }
     @Override HMType hm(HashSet<HMVar> nongen) {
       HMVar tnew = (HMVar) ENV.get(_arg0);
       nongen.add(tnew);
-      HMType tdef = _def.hm(nongen);
+      HMType tbody = _body.hm(nongen);
       nongen.remove(tnew);
-      tnew.union(tdef);
-      HMType trez = _body.hm(nongen);
+      tnew.union(tbody);
+      HMType trez = _use.hm(nongen);
       return trez;
     }
-    @Override void get_ids() { ENV.put(_arg0, new HMVar()); _body.get_ids(); _def.get_ids(); }
+    @Override void get_ids() { ENV.put(_arg0, new HMVar()); _use.get_ids(); _body.get_ids(); }
   }
   public static class Apply extends Syntax {
     final Syntax _fun, _arg;

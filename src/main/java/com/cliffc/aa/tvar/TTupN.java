@@ -2,33 +2,36 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.Types;
 import com.cliffc.aa.type.TypeTuple;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
-// Type of a Hindley-Milner 3-tuple operator
+// Type of a Hindley-Milner N-tuple operator
 // "CMV" for {Control,Memory,Value} as the result of Rets and CallEpis.
+// {Control,Memory,Display/Fun,Arg2,Arg3,...} for an N-arg Call.
 
-public class TTup3 extends TypeVar {
-
+public class TTupN extends TypeVar {
+  private final int _n;
+  
   // Basic H-M type variable supporting U-F and parametric types.
-  public TTup3( @NotNull TNode tn ) { super(tn); }
+  public TTupN( @NotNull TNode tn, int n ) { super(tn); _n=n; }
 
   // Type from parts
   @Override public Type _type(boolean head) {
-    // A 3-tuple from inputs
-    Type t0 = _tnode.tvar(0).type();
-    Type t1 = _tnode.tvar(1).type();
-    Type t2 = _tnode.tvar(2).type();
-    return TypeTuple.make(t0,t1,t2);
+    // A N-tuple from inputs
+    Type[] ts = Types.get(_n);
+    for( int i=0; i<_n; i++ )
+      ts[i] = _tnode.tvar(i).type();
+    return TypeTuple.make(ts);
   }
 
   // Unify this into tv.
   @Override public Object unify(TypeVar tv) {
     if( tv instanceof TVar ) return tv.unify(this);
-    if( !(tv instanceof TTup3) )
+    if( !(tv instanceof TTupN) )
       throw com.cliffc.aa.AA.unimpl(); // Fails unification
-    TTup3 t3 = (TTup3)tv;
+    TTupN tn = (TTupN)tv;
     // Structural unification
     throw com.cliffc.aa.AA.unimpl();
   }
@@ -38,9 +41,8 @@ public class TTup3 extends TypeVar {
   // Pretty print
   @Override public SB _str(SB sb, boolean pretty) {
     sb.p("V").p(uid()).p("[");
-    _tnode.tvar(0)._str(sb,pretty).p(",");
-    _tnode.tvar(1)._str(sb,pretty).p(",");
-    _tnode.tvar(2)._str(sb,pretty).p("]");
-    return sb;
+    for( int i=0; i<_n; i++ )
+      _tnode.tvar(i)._str(sb,pretty).p(",");
+    return sb.unchar().p("]");
   }
 }

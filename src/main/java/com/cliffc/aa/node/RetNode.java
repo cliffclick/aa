@@ -3,7 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TVar;
-import com.cliffc.aa.tvar.TTup3;
+import com.cliffc.aa.tvar.TTupN;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
@@ -23,7 +23,7 @@ public final class RetNode extends Node {
     _fidx = fun._fidx;
     _nargs=fun.nargs();
     // RetNodes are structural copies of their inputs, reflect this in their type variables
-    tvar().unify(new TTup3(this));
+    tvar().unify(new TTupN(this,3));
   }
   public Node ctl() { return in(0); }
   public Node mem() { return in(1); }
