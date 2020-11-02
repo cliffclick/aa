@@ -5,6 +5,7 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
+import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.MEM_IDX;
 
 // Function parameter node; almost just a Phi with a name.  There is a dense
@@ -134,7 +135,7 @@ public class ParmNode extends PhiNode {
               return null;      // #args errors reported before bad-args
             Type argc = call.arg(_idx).sharptr(call.mem()); // Call arg type
             if( argc!=Type.ALL && !argc.isa(formal) ) // Check this call
-              return fast ? ErrMsg.FAST : ErrMsg.typerr(call._badargs[_idx-1],argc, call.mem().val(),formal);
+              return fast ? ErrMsg.FAST : ErrMsg.typerr(call._badargs[_idx-ARG_IDX+1],argc, call.mem().val(),formal);
             // Must be a different call that is in-error
           }
         }

@@ -618,8 +618,7 @@ public class CallNode extends Node {
         if( fun.nargs()!=nargs() || fun.ret() == null ) continue; // BAD/dead
         TypeTuple formals = fun._sig._formals; // Type of each argument
         int cvts=0;                        // Arg conversion cost
-        for( int j=ARG_IDX; j<nargs(); j++ ) {   // Skip arg#1, the display
-          if( fun.parm(j)==null ) continue; // Formal is ignored
+        for( int j=ARG_IDX; j<nargs(); j++ ) {   // Skip the display
           Type actual = arg(j).val();
           Type formal = formals.at(j);
           if( actual==formal ) continue;

@@ -303,23 +303,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return malloc("",false,flds,ts,fbots(ts.length),false);
   }
 
-  //// Function formals, used by FunNode.
-  //// Generic function arguments.  Slot 0 is the display.
-  //public static TypeStruct make_args(Type[] ts) { return make_x_args(false,ts); }
-  //public static TypeStruct make_x_args(boolean any, Type[] ts) {
-  //  String[] args = new String[ts.length];
-  //  Arrays.fill(args,any ? fldTop() : fldBot());
-  //  args[0] = "^";
-  //  return make_args(any,args,ts);
-  //}
-  //public static TypeStruct make_args(String[] flds, Type[] ts) { return make_args(false,flds,ts); }
-  //// First field is the display
-  //public static TypeStruct make_args(boolean any, String[] flds, Type[] ts) {
-  //  assert Util.eq(flds[0],"^");
-  //  assert ts[0].is_display_ptr() && ts[0]==ts[0].simple_ptr(); // Simple display ptrs only
-  //  byte[] fs = fbots(ts.length);
-  //  return malloc("",any,flds,ts,fs,false).hashcons_free();
-  //}
   public  static TypeStruct make(String[] flds, Type[] ts) { return malloc("",false,flds,ts,fbots(ts.length),false).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] flags) { return malloc("",false,flds,ts,flags,false).hashcons_free(); }
   public  static TypeStruct make(String name, String[] flds, Type[] ts, byte[] flags) { return malloc(name,false,flds,ts,flags,false).hashcons_free(); }
