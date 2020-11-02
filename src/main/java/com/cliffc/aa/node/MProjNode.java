@@ -1,12 +1,14 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
 // Proj memory
 public class MProjNode extends ProjNode {
-  public MProjNode( Node head, int idx ) { super(idx, head); }
-  public MProjNode( CallNode call, DefMemNode def, int idx ) { super(idx,call,def); }
+  public MProjNode( CallNode call, DefMemNode def ) { super(AA.MEM_IDX,call,def); }
+  public MProjNode( Node head ) { super(head, AA.MEM_IDX); }
+  public MProjNode( Node head, int idx ) { super(head,idx); }
   @Override String xstr() { return "MProj"+_idx; }
   @Override public boolean is_mem() { return true; }
   @Override public Node ideal(GVNGCM gvn, int level) {

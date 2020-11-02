@@ -1,8 +1,8 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
+import static com.cliffc.aa.AA.*;
 
 import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 
@@ -72,20 +72,23 @@ public class TypeTuple extends Type<TypeTuple> {
 
   // Make a Call args tuple from a Struct by adding Memory up front
   public static TypeTuple make(TypeStruct ts) {
-    Type[] ts2 = Types.get(ts._ts.length+1);
-    ts2[0] = TypeMem.ALLMEM;
-    System.arraycopy(ts._ts,0,ts2,1,ts._ts.length);
+    // TypeStruct includes a display/FUN_IDX, but what comes before
+    Type[] ts2 = Types.get(ts._ts.length+FUN_IDX);
+    ts2[CTL_IDX] = Type.CTRL;
+    ts2[MEM_IDX] = TypeMem.ALLMEM;
+    System.arraycopy(ts._ts,0,ts2,FUN_IDX,ts._ts.length);
     return make(ts2);
   }
   public static TypeTuple make_args(Type[] ts) {
-    assert ts[0] instanceof TypeMem && ts[1].is_display_ptr();
+    assert ts[MEM_IDX] instanceof TypeMem && ts[FUN_IDX].is_display_ptr();
     return make(ts);
   }
 
-  public static TypeTuple make_args(                       ) { return make(TypeMem.ALLMEM,NO_DISP ); }
-  public static TypeTuple make_args(Type t2                ) { return make(TypeMem.ALLMEM,NO_DISP,t2); }
-  public static TypeTuple make_args(Type t2,Type t3        ) { return make(TypeMem.ALLMEM,NO_DISP,t2,t3); }
-  public static TypeTuple make_args(Type t2,Type t3,Type t4) { return make(TypeMem.ALLMEM,NO_DISP,t2,t3,t4); }
+  public static TypeTuple make_args(                       ) { return make(Type.CTRL,TypeMem.ALLMEM,NO_DISP ); }
+  public static TypeTuple make_args(Type t2                ) { return make(Type.CTRL,TypeMem.ALLMEM,NO_DISP,t2); }
+  public static TypeTuple make_args(Type t2,Type t3        ) { return make(Type.CTRL,TypeMem.ALLMEM,NO_DISP,t2,t3); }
+  public static TypeTuple make_args(Type t2,Type t3,Type t4) { return make(Type.CTRL,TypeMem.ALLMEM,NO_DISP,t2,t3,t4); }
+  public static TypeTuple make_ret(Type trez) { return make(Type.CTRL,TypeMem.ANYMEM,trez); }
 
 
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
@@ -112,7 +115,7 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple LVAL_RD    = make_args(TypeMemPtr.ARYPTR,TypeInt.INT64); // Array & index
   public  static final TypeTuple LVAL_WR    = make_args(TypeMemPtr.ARYPTR,TypeInt.INT64,Type.SCALAR); // Array & index & element
 
-  // 
+  //
   static final TypeTuple[] TYPES = new TypeTuple[]{
     CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE, TEST0, TEST1,
     NO_ARGS, INT64, FLT64, STRPTR, INT64_INT64, FLT64_FLT64, OOP_OOP
@@ -171,7 +174,7 @@ public class TypeTuple extends Type<TypeTuple> {
   }
   @Override public boolean must_nil() { return false; }
   @Override Type not_nil() { return this; }
-  @Override public Type meet_nil(Type t) { throw AA.unimpl(); }
+  @Override public Type meet_nil(Type t) { throw unimpl(); }
 
   public TypeTuple sharptr( TypeMem mem ) {
     Type[] ts = Types.clone(_ts);

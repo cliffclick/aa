@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
@@ -10,7 +11,7 @@ public final class FP2ClosureNode extends Node {
   }
   @Override public Node ideal(GVNGCM gvn, int level) {
     // If copy is dead, optimize for it.
-    Node c = in(0).is_copy(CallNode.ARGIDX);
+    Node c = in(0).is_copy(AA.FUN_IDX);
     if( c != null )
       set_def(0,c,gvn);
     // If at a FunPtrNode, it is only making a TFP out of a code pointer and a

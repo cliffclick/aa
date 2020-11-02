@@ -4,8 +4,11 @@ import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 
+import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 
 // Primitives can be used as an internal operator (their apply() call does the
@@ -25,8 +28,8 @@ public abstract class PrimNode extends Node {
   PrimNode( String name, String[] args, TypeTuple formals, Type ret ) {
     super(OP_PRIM);
     _name=name;
-    assert formals.at(0)==TypeMem.ALLMEM && formals.at(1)==NO_DISP; // Room for no closure; never memory
-    _sig=TypeFunSig.make(args==null ? TypeFunSig.arg_names(formals.len()) : args,formals,ret);
+    assert formals.at(MEM_IDX)==TypeMem.ALLMEM && formals.at(FUN_IDX)==NO_DISP; // Room for no closure; never memory
+    _sig=TypeFunSig.make(args==null ? TypeFunSig.arg_names(formals.len()) : args,formals,TypeTuple.make_ret(ret));
     _badargs=null;
     _op_prec = -1;              // Not set yet
     _thunk_rhs=false;
@@ -109,7 +112,7 @@ public abstract class PrimNode extends Node {
     for( PrimNode[] prims : PRECEDENCE )
       for( PrimNode prim : prims )
         hash.add(prim._name);
-    ArrayList<String> list = new ArrayList<String>(hash);
+    ArrayList<String> list = new ArrayList<>(hash);
     Collections.sort(list);     // Longer strings on the right
     Collections.reverse(list);  // Longer strings on the left, match first.
     PRIM_TOKS = list.toArray(new String[list.size()]);
@@ -141,19 +144,20 @@ public abstract class PrimNode extends Node {
     boolean is_con = true, has_high = false;
     for( int i=1; i<_defs._len; i++ ) { // first is control
       Type tactual = val(i);
-      Type tformal = _sig.arg(i+1); // 0 is display, 1 is memory
+      Type tformal = _sig.arg(i+ARG_IDX-1); // first is control
       Type t = tformal.dual().meet(ts[i] = tactual);
       if( !t.is_con() ) {
         is_con = false;         // Some non-constant
         if( t.above_center() ) has_high=true;
       }
     }
-    return is_con ? apply(ts) : (has_high ? _sig._ret.dual() : _sig._ret);
+    Type rez = _sig._ret.at(REZ_IDX); // Ignore control,memory from primitive
+    return is_con ? apply(ts) : (has_high ? rez.dual() : rez);
   }
   @Override public ErrMsg err( boolean fast ) {
     for( int i=1; i<_defs._len; i++ ) { // first is control
       Type tactual = val(i);
-      Type tformal = _sig.arg(i+1).simple_ptr(); // 0 is display, 1 is memory, 2 is first real arg
+      Type tformal = _sig.arg(i+ARG_IDX-1).simple_ptr(); // 0 is display, 1 is memory, 2 is first real arg
       if( !tactual.isa(tformal) )
         return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[i],tactual,null,tformal);
     }
@@ -179,16 +183,17 @@ public abstract class PrimNode extends Node {
     FunNode fun = (FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
-    Node mem = gvn.xform(new ParmNode(0,_sig._args[0],fun,TypeMem.MEM,Env.DEFMEM,null));
+    Node mem = gvn.xform(new ParmNode(MEM_IDX,_sig._args[MEM_IDX],fun,TypeMem.MEM,Env.DEFMEM,null));
     if( _thunk_rhs ) add_def(mem);      // Memory if thunking
-    for( int i=2; i<_sig.nargs(); i++ ) // First is display, always ignored in primitives
+    for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // First is display, always ignored in primitives
       add_def(gvn.xform(new ParmNode(i,_sig._args[i],fun, gvn.con(Type.ALL),null)));
     gvn.init(this);
+    xval(GVNGCM.Mode.Parse);
     Node ctl,rez;
     if( _thunk_rhs ) {
-      ctl = gvn.xform(new CProjNode(this,0));
-      mem = gvn.xform(new MProjNode(this,1));
-      rez = gvn.xform(new  ProjNode(2,this));
+      ctl = gvn.xform(new CProjNode(this));
+      mem = gvn.xform(new MProjNode(this));
+      rez = gvn.xform(new  ProjNode(this,AA.REZ_IDX));
     } else {
       ctl = fun;
       rez = this;
@@ -510,7 +515,7 @@ public abstract class PrimNode extends Node {
     private static final TypeTuple ANDTHEN =
       TypeTuple.make_args(Type.SCALAR,TypeTuple.RET);
     // Takes a value on the LHS, and a THUNK on the RHS.
-    AndThen() { super("&&",new String[]{" mem","^","p","thunk"},ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
+    AndThen() { super("&&",new String[]{" ctl"," mem","^","p","thunk"},ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
     // Expect this to inline everytime
     @Override public Node ideal(GVNGCM gvn, int level) {
       if( _defs._len != 4 ) return null; // Already did this
@@ -525,9 +530,9 @@ public abstract class PrimNode extends Node {
       // Call on true branch; if false do not call.
       Node cal = gvn.xform(new CallNode(true,_badargs,tru,mem,rhs));
       Node cep = gvn.xform(new CallEpiNode(cal,Env.DEFMEM));
-      Node ccc = gvn.xform(new CProjNode(cep,0));
-      Node memc= gvn.xform(new MProjNode(cep,1));
-      Node rez = gvn.xform(new  ProjNode(2,cep));
+      Node ccc = gvn.xform(new CProjNode(cep));
+      Node memc= gvn.xform(new MProjNode(cep));
+      Node rez = gvn.xform(new  ProjNode(cep,AA.REZ_IDX));
       // Region merging results
       Node reg = gvn.xform(new RegionNode(null,fal,ccc));
       Node phi = gvn.xform(new PhiNode(Type.SCALAR,null,reg,gvn.con(Type.XNIL),rez ));
@@ -559,7 +564,7 @@ public abstract class PrimNode extends Node {
     private static final TypeTuple ORELSE =
       TypeTuple.make_args(Type.SCALAR,TypeTuple.RET);
     // Takes a value on the LHS, and a THUNK on the RHS.
-    OrElse() { super("||",new String[]{" mem","^","p","thunk"},ORELSE,Type.SCALAR); _thunk_rhs=true; }
+    OrElse() { super("||",new String[]{" ctl"," mem","^","p","thunk"},ORELSE,Type.SCALAR); _thunk_rhs=true; }
     @Override String arg_name(int i) {
       switch(i) {
       case 0: return "^";
@@ -582,9 +587,9 @@ public abstract class PrimNode extends Node {
       // Call on false branch; if true do not call.
       Node cal = gvn.xform(new CallNode(true,_badargs,fal,mem,rhs));
       Node cep = gvn.xform(new CallEpiNode(cal,Env.DEFMEM));
-      Node ccc = gvn.xform(new CProjNode(cep,0));
-      Node memc= gvn.xform(new MProjNode(cep,1));
-      Node rez = gvn.xform(new  ProjNode(2,cep));
+      Node ccc = gvn.xform(new CProjNode(cep));
+      Node memc= gvn.xform(new MProjNode(cep));
+      Node rez = gvn.xform(new  ProjNode(cep,AA.REZ_IDX));
       // Region merging results
       Node reg = gvn.xform(new RegionNode(null,tru,ccc));
       Node phi = gvn.xform(new PhiNode(Type.SCALAR,null,reg,lhs,rez ));

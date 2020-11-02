@@ -6,6 +6,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
+import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 
 // Allocates a TypeObj and produces a Tuple with the TypeObj and a TypeMemPtr.
@@ -33,10 +34,10 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // Just TMP.make(_alias,OBJ)
   public TypeMemPtr _tptr;
 
-  // NewNodes do not really need a ctrl; useful to bind the upward motion of
+  // News do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
   public NewNode( byte type, int parent_alias, T to         ) { super(type,(Node)null); _init(parent_alias,to); }
-  public NewNode( byte type, int parent_alias, T to,Node fld) { super(type,  null,fld); _init(parent_alias,to); }
+  public NewNode( byte type, int parent_alias, T to,Node fld) { super(type, null, fld); _init(parent_alias,to); }
   private void _init(int parent_alias, T ts) {
     _alias = BitsAlias.new_alias(parent_alias);
     _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeObj.ISUSED);
@@ -70,7 +71,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   }
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
-    return TypeTuple.make(is_unused() ? TypeObj.UNUSED : valueobj(),_tptr);   // Complex obj, simple ptr.
+    return TypeTuple.make(Type.CTRL, is_unused() ? TypeObj.UNUSED : valueobj(),_tptr);   // Complex obj, simple ptr.
   }
   abstract TypeObj valueobj();
   @Override public TypeMem all_live() { return TypeMem.ALIVE; } // Just normal alive; this is a TypeObj not a TypeMem
@@ -158,9 +159,9 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       super(op,parent_alias,to);
       _name = name;
       _reads = reads;
-      assert (reads == (args[0]!=TypeMem.ALLMEM)); // If reading, then memory has some requirements
-      args[1] = NO_DISP; // No display
-      _sig = TypeFunSig.make(TypeTuple.make_args(args),Type.SCALAR);
+      assert (reads == (args[MEM_IDX]!=TypeMem.ALLMEM)); // If reading, then memory has some requirements
+      args[FUN_IDX] = NO_DISP; // No display
+      _sig = TypeFunSig.make(TypeTuple.RET,TypeTuple.make_args(args));
       _op_prec = op_prec;
     }
     String bal_close() { return null; }
@@ -180,17 +181,17 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     public FunPtrNode as_fun( GVNGCM gvn ) {
       FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL));
       ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-      Node memp= gvn.xform(new ParmNode(0,_sig._args[0],fun, gvn.con(_sig.arg(0).simple_ptr()),null));
+      Node memp= gvn.xform(new ParmNode(MEM_IDX,_sig._args[MEM_IDX],fun, gvn.con(_sig.arg(MEM_IDX).simple_ptr()),null));
       fun._bal_close = bal_close();
 
       // Add input edges to the intrinsic
-      add_def(_reads ? memp : null); // Memory  for the primitive in slot 1
-      add_def(null);                 // Closure for the primitive in slot 2
-      for( int i=2; i<_sig.nargs(); i++ ) // Args follow, closure in formal 1
+      add_def(_reads ? memp : null); // Memory  for the primitive in slot MEM_IDX
+      add_def(null);                 // Closure for the primitive in slot FUN_IDX
+      for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // Args follow
         add_def( gvn.xform(new ParmNode(i,_sig._args[i],fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
       NewNode nnn = (NewNode)gvn.xform(this);
       Node mem = Env.DEFMEM.make_mem_proj(gvn,nnn,memp);
-      Node ptr = gvn.xform(new ProjNode(1, nnn));
+      Node ptr = gvn.xform(new ProjNode(nnn,REZ_IDX));
       RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,ptr,rpc,fun));
       mem.xliv(gvn._opt_mode); // Refine initial memory
       return new FunPtrNode(ret,gvn.con(NO_DISP));

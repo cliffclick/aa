@@ -5,6 +5,7 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import org.junit.Test;
 
+import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -330,8 +331,6 @@ public class TestNodeSmall {
     TypeFunPtr tint2  = v(aint,gvn), tint2X= tint2 .dual();
     TypeFunPtr tstr2  = v(astr,gvn), tstr2X= tstr2 .dual();
 
-    TypeFunPtr tmul2E = tmul1E;
-
     assert tadd2X.isa(tnum2X) && tnum2X.isa(tflt2X) && tflt2X.isa(tnum2) && tnum2.isa(tadd2);
 
 
@@ -409,21 +408,22 @@ public class TestNodeSmall {
     // yet built.
     NewObjNode dsp_file = (NewObjNode)gvn.xform(new NewObjNode(true,TypeStruct.DISPLAY,dsp_prims));
     MrgProjNode dsp_file_obj = Env.DEFMEM.make_mem_proj(gvn,dsp_file,mem);
-    ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(1, dsp_file));
+    ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(FUN_IDX, dsp_file));
     Env.ALL_DISPLAYS = Env.ALL_DISPLAYS.set(dsp_file._alias);
     // The Fun and Fun._tf:
-    TypeTuple formals = TypeTuple.make_args(Types.ts(TypeMem.MEM,
+    TypeTuple formals = TypeTuple.make_args(Types.ts(Type.CTRL,
+                                                     TypeMem.MEM,
                                                      dsp_file_ptr.val(), // File-scope display as arg0
                                                      Type.SCALAR));  // Some scalar arg1
-    TypeFunSig sig = TypeFunSig.make(formals,Type.SCALAR);
+    TypeFunSig sig = TypeFunSig.make(TypeTuple.RET,formals);
     FunNode fun = new FunNode("fact",sig,-1,false);
-    gvn.init(fun.add_def(ctl).add_def(ctl));
+    gvn.xform(fun.add_def(ctl).add_def(ctl));
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
-    ParmNode parm_mem = new ParmNode(0,"mem",fun,mem,null);
-    ParmNode parm_dsp = new ParmNode(1,"^"  ,fun,Type.SCALAR,gvn.con(dsp_file_ptr.val()),null);
-    gvn.init(parm_mem.add_def(dsp_file_obj));
-    gvn.init(parm_dsp.add_def(dsp_file_ptr));
+    ParmNode parm_mem = new ParmNode(MEM_IDX," mem",fun,mem,null);
+    ParmNode parm_dsp = new ParmNode(FUN_IDX,"^"  ,fun,Type.SCALAR,gvn.con(dsp_file_ptr.val()),null);
+    gvn.xform(parm_mem.add_def(dsp_file_obj));
+    gvn.xform(parm_dsp.add_def(dsp_file_ptr));
     // Close the function up
     RetNode ret = gvn.init(new RetNode(fun,parm_mem,parm_dsp,rpc,fun));
     FunPtrNode fptr = gvn.init(new FunPtrNode(ret,dsp_file_ptr));
@@ -498,17 +498,17 @@ public class TestNodeSmall {
     int a1 = BitsAlias.new_alias(BitsAlias.REC);
     int a2 = BitsAlias.new_alias(BitsAlias.REC);
     int a3 = BitsAlias.new_alias(BitsAlias.REC);
-    Type[] ts_int_flt = TypeStruct.ts(TypeMem.MEM,TypeMemPtr.NO_DISP,TypeInt.INT64,TypeFlt.FLT64);
-    Type[] ts_int_abc = TypeStruct.ts(TypeMem.MEM,TypeMemPtr.NO_DISP,TypeInt.INT64,TypeMemPtr.ABCPTR);
+    TypeTuple ts_int_flt = TypeTuple.make_args(TypeInt.INT64,TypeFlt.FLT64);
+    TypeTuple ts_int_abc = TypeTuple.make_args(TypeInt.INT64,TypeMemPtr.ABCPTR);
     // @{ a:int; b:"abc" }
-    TypeStruct a_int_b_abc = TypeStruct.make(new String[]{" mem","^","a","b"},ts_int_abc);
+    TypeStruct a_int_b_abc = TypeStruct.make(new String[]{"^","a","b"},TypeStruct.ts(TypeMemPtr.NO_DISP,TypeInt.INT64,TypeMemPtr.ABCPTR));
 
     // Build a bunch of function type signatures
     TypeFunSig[] sigs = new TypeFunSig[] {
-      TypeFunSig.make(Type.SCALAR,ts_int_flt), // {int flt   -> }
-      TypeFunSig.make(Type.SCALAR,ts_int_abc), // {int "abc" -> }
+      TypeFunSig.make(TypeTuple.RET,ts_int_flt), // {int flt   -> }
+      TypeFunSig.make(TypeTuple.RET,ts_int_abc), // {int "abc" -> }
       // { flt @{a:int; b:"abc"} -> }
-      TypeFunSig.make(Type.SCALAR,TypeStruct.ts(TypeMem.MEM,TypeMemPtr.NO_DISP,TypeFlt.FLT64,TypeMemPtr.make(BitsAlias.REC,a_int_b_abc))),
+      TypeFunSig.make(TypeTuple.RET,TypeTuple.make_args(TypeFlt.FLT64,TypeMemPtr.make(BitsAlias.REC,a_int_b_abc))),
     };
 
     // Build a bunch of memory parm types

@@ -5,6 +5,7 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
+import static com.cliffc.aa.AA.*;
 
 // See CallNode.  Slot 0 is the Call.  The remaining slots are Returns which
 // are typed as standard function returns: {Ctrl,Mem,Val}.  These Returns
@@ -110,10 +111,10 @@ public final class CallEpiNode extends Node {
     for( Node parm : fun._uses ) {
       if( parm instanceof ParmNode && parm.in(0)==fun ) {
         int idx = ((ParmNode)parm)._idx;
-        if( idx < 0 ) continue; // RPC, Mem
+        if( idx < 0 ) continue; // RPC
         Type actual = CallNode.targ(tcall,idx);
         // Display arg comes from function pointer
-        if( idx==0 ) actual = (actual instanceof TypeFunPtr) ? ((TypeFunPtr)actual)._disp : Type.SCALAR;
+        if( idx==FUN_IDX ) actual = (actual instanceof TypeFunPtr) ? ((TypeFunPtr)actual)._disp : Type.SCALAR;
         if( actual.isBitShape(formals.at(idx)) == 99 ) // Requires user-specified conversion
           return null;
       }
@@ -128,16 +129,16 @@ public final class CallEpiNode extends Node {
     Node rrez = ret.rez();      // Result  being returned
     boolean inline = !fun.noinline();
     // If the function does nothing with memory, then use the call memory directly.
-    if( (rmem instanceof ParmNode && rmem.in(0) == fun) || rmem.val() ==TypeMem.XMEM )
+    if( (rmem instanceof ParmNode && rmem.in(CTL_IDX) == fun) || rmem.val() ==TypeMem.XMEM )
       rmem = cmem;
     // Check that function return memory and post-call memory are compatible
     if( !(val() instanceof TypeTuple) ) return null;
-    Type selfmem = ((TypeTuple) val()).at(1);
+    Type selfmem = ((TypeTuple) val()).at(MEM_IDX);
     if( !rmem.val().isa( selfmem ) && !(selfmem==TypeMem.ANYMEM && call.is_pure_call()!=null) )
       return null;
 
     // Check for zero-op body (id function)
-    if( rrez instanceof ParmNode && rrez.in(0) == fun && cmem == rmem && inline )
+    if( rrez instanceof ParmNode && rrez.in(CTL_IDX) == fun && cmem == rmem && inline )
       return inline(gvn,level,call, cctl,cmem,call.arg(((ParmNode)rrez)._idx), ret,call._uid);
     // Check for constant body
     Type trez = rrez.val();
@@ -154,10 +155,10 @@ public final class CallEpiNode extends Node {
     if( can_inline ) {
       Node irez = rrez.copy(false,gvn);// Copy the entire function body
       irez._in=false;
-      ProjNode proj = ProjNode.proj(this,2);
+      ProjNode proj = ProjNode.proj(this,REZ_IDX);
       irez._live = proj==null ? TypeMem.ESCAPE : proj._live;
       for( Node parm : rrez._defs )
-        irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? call.argm(((ParmNode)parm)._idx,gvn) : parm);
+        irez.add_def((parm instanceof ParmNode && parm.in(CTL_IDX) == fun) ? call.argm(((ParmNode)parm)._idx,gvn) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
       return inline(gvn,level,call, cctl,cmem,gvn.add_work(gvn.xform(irez)),ret,call._uid); // New exciting replacement for inlined call
     }
@@ -222,11 +223,11 @@ public final class CallEpiNode extends Node {
       TypeMem live = arg._live;
       switch( idx ) {
       case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); actual._live = live; break; // Always RPC is a constant
-      case  0: actual = new MProjNode(call,Env.DEFMEM,CallNode.MEMIDX); break;    // Memory into the callee
-      case  1: actual = new FP2ClosureNode(call); break; // Filter Function Pointer to Closure
+      case MEM_IDX: actual = new MProjNode(call,Env.DEFMEM); break;    // Memory into the callee
+      case FUN_IDX: actual = new FP2ClosureNode(call); break; // Filter Function Pointer to Closure
       default: actual = idx >= call.nargs()              // Check for args present
           ? new ConNode<>(Type.ALL) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
-          : new ProjNode(idx+CallNode.MEMIDX, call); // Normal args
+          : new ProjNode(call,idx); // Normal args
         live = TypeMem.ESCAPE;
         break;
       }
@@ -238,7 +239,7 @@ public final class CallEpiNode extends Node {
     }
 
     // Add matching control to function via a CallGraph edge.
-    Node callgrf = new CProjNode(call,0);
+    Node callgrf = new CProjNode(call);
     callgrf = gvn._opt_mode == GVNGCM.Mode.Opto ? gvn.new_gcp(callgrf) : gvn.xform(callgrf);
     gvn.add_def(fun,callgrf);
   }
@@ -252,7 +253,7 @@ public final class CallEpiNode extends Node {
     if( !(tin0 instanceof TypeTuple) )
       return tin0.oob();     // Weird stuff?
     TypeTuple tcall = (TypeTuple)tin0;
-    if( tcall._ts.length <= CallNode.ARGIDX ) return tcall.oob(); // Weird stuff
+    if( tcall._ts.length < ARG_IDX ) return tcall.oob(); // Weird stuff
     Type tcmem = call().mem().val();
     if( !(tcmem instanceof TypeMem) ) return tcmem.oob();
     TypeMem caller_mem = (TypeMem)tcmem;
@@ -448,28 +449,25 @@ public final class CallEpiNode extends Node {
       gvn.subsume(emprj,mem);
     }
 
-    // Move over Control
-    CProjNode ccprj = (CProjNode)ProjNode.proj(call,0);
-    if( ccprj != null ) gvn.subsume(ccprj,call.ctl());
+    // Move over CEPI Control
     CProjNode ceprj = (CProjNode)ProjNode.proj(this,0);
     if( ceprj != null ) gvn.subsume(ceprj,ctl);
     else set_def(0,null,gvn);
 
     // Move over result
     if( !is_dead() ) {
-      ProjNode reprj = ProjNode.proj(this,2);
+      ProjNode reprj = ProjNode.proj(this,REZ_IDX);
       if( reprj != null ) gvn.subsume(reprj,rez);
     }
 
-    // Move over arguments
-    for( int i=0, idx; !call.is_dead() && i<call._uses._len; ) {
+    // Move over Call inputs
+    for( int i=0; !call.is_dead() && i<call._uses._len; ) {
       Node use = call._uses.at(i);
-      if( use instanceof ProjNode && (idx=((ProjNode)use)._idx) >= 2 ) {
-        Node arg = call.arg(idx - CallNode.MEMIDX);
+      if( use instanceof ProjNode ) {
+        Node arg = call.arg(((ProjNode)use)._idx);
         if( rez==use ) rez = arg;
         gvn.subsume(use, arg);
-      }
-      else if( use instanceof FP2ClosureNode )
+      } else if( use instanceof FP2ClosureNode )
         gvn.set_def_reg(use,0,call.fun());
       else i++;
     }

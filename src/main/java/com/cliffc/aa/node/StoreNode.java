@@ -43,6 +43,7 @@ public class StoreNode extends Node {
         (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
       // Update the value, and perhaps the final field
       nnn.update(idx,_fin,rez(),gvn);
+      gvn.revalive(mem);
       return mem;               // Store is replaced by using the New directly.
     }
 

@@ -45,7 +45,7 @@ public class Env implements AutoCloseable {
     TypeStruct tdisp = TypeStruct.open(back_ptr);
     NewObjNode nnn = (NewObjNode)GVN.xform(new NewObjNode(is_closure,tdisp,clo));
     MrgProjNode  frm = DEFMEM.make_mem_proj(GVN,nnn,mem);
-    Node ptr = GVN.xform(new ProjNode(1, nnn));
+    Node ptr = GVN.xform(new ProjNode(nnn,AA.REZ_IDX));
     ALL_DISPLAYS = ALL_DISPLAYS.set(nnn._alias);   // Displays for all time
     LEX_DISPLAYS = LEX_DISPLAYS.set(nnn._alias);   // Lexically active displays
     ScopeNode scope = new ScopeNode(errmsg,is_closure);

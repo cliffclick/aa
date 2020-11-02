@@ -5,6 +5,8 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
+import static com.cliffc.aa.AA.MEM_IDX;
+
 // Function parameter node; almost just a Phi with a name.  There is a dense
 // numbering matching function arguments, with -1 reserved for the RPC and 0
 // for memory.
@@ -56,7 +58,7 @@ public class ParmNode extends PhiNode {
     //   - not flowing, - types not aligned, do not fold
     //   - flowing but bad args, do not fold
     Node live=null;
-    Node mem = fun.parm(0);
+    Node mem = fun.parm(MEM_IDX);
     for( int i=1; i<_defs._len; i++  ) { // For all arguments
       Node n = in(i);
       if( fun.val(i)==Type.CTRL ) {    // Dead path can ignore both valid and invalid args
@@ -72,7 +74,7 @@ public class ParmNode extends PhiNode {
   private boolean valid_args( FunNode fun, int i, Node mem ) {
     if( fun._thunk_rhs ) return true; // Always allow folding of Thunks
     // Check arg type, after sharpening
-    Type actual = in(i).sharptr(mem.in(i));
+    Type actual = mem==null ? val(i) : in(i).sharptr(mem.in(i));
     Type formal = fun.formal(_idx);
     return actual.isa(formal);
   }
@@ -90,7 +92,7 @@ public class ParmNode extends PhiNode {
     FunNode fun = (FunNode)in0;
     if( !opt_mode._CG && fun.has_unknown_callers() )
       return val(1);
-    Node mem = fun.parm(0);
+    Node mem = fun.parm(MEM_IDX);
     // All callers known; merge the wired & flowing ones
     Type t = Type.ANY;
     for( int i=1; i<_defs._len; i++ ) {
@@ -116,7 +118,7 @@ public class ParmNode extends PhiNode {
     FunNode fun = fun();
     assert fun._defs._len==_defs._len;
     if( _idx < 0 ) return null;                    // No arg check on RPC or Mem
-    Node mem = fun.parm(0);
+    Node mem = fun.parm(MEM_IDX);
     Type formal = fun.formal(_idx);
     for( int i=1; i<_defs._len; i++ ) {
       if( fun.val(i)==Type.XCTRL ) continue;// Ignore dead paths

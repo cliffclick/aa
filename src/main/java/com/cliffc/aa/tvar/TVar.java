@@ -37,18 +37,18 @@ public class TVar extends TypeVar {
   @Override public Object unify(TypeVar tv) {
     assert !_tnode.is_dead() && !tv._tnode.is_dead();
     _u = tv;
-    if( tv._uf_kids==null ) tv._uf_kids = new Ary<TVar>(new TVar[1],0);
+    if( tv._uf_kids==null ) tv._uf_kids = new Ary<>(new TVar[1],0);
     if( _uf_kids != null )  tv._uf_kids.addAll(_uf_kids);
     return tv._uf_kids.push(this);
   }
-  
+
   // U-F find algo
   @Override public TypeVar find() {
     if( _u==null ) return this;
     if( !(_u instanceof TVar) || ((TVar)_u)._u==null ) return _u;
     throw com.cliffc.aa.AA.unimpl();
   }
-  
+
   // Pretty print
   @Override public SB _str(SB sb, boolean pretty) {
     if( _u!=null ) {

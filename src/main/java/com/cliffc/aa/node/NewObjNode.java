@@ -6,6 +6,8 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
+import static com.cliffc.aa.AA.MEM_IDX;
+
 // Allocates a TypeStruct and produces a Tuple with the TypeStruct and a TypeMemPtr.
 //
 // During Parsing we construct closures whose field names are discovered as we
@@ -136,7 +138,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     // If the value lifts a final field, so does the default lift.
     if( val() instanceof TypeTuple ) {
       TypeTuple ts1 = (TypeTuple) val();
-      TypeObj ts3 = (TypeObj)ts1.at(0);
+      TypeObj ts3 = (TypeObj)ts1.at(MEM_IDX);
       if( ts3 != TypeObj.UNUSED ) {
         TypeStruct ts4 = _ts.make_from(((TypeStruct)ts3)._ts);
         TypeStruct ts5 = ts4.crush();

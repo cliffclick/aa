@@ -19,14 +19,14 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
 
   // --------------------------------------------------------------------------
   public static class ConStr extends NewStrNode {
-    public ConStr( String str ) { super(TypeStr.con(str),"con",false,-1,TypeMem.ALLMEM,null); }
+    public ConStr( String str ) { super(TypeStr.con(str),"con",false,-1,Type.CTRL,TypeMem.ALLMEM,null); }
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override TypeStr valueobj() { return _ts; }
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { throw com.cliffc.aa.AA.unimpl(); } // No inputs
   }
 
   public static class ConvertI64Str extends NewStrNode {
-    public ConvertI64Str( ) { super(TypeStr.STR,"str",false,-1,TypeMem.ALLMEM,null,TypeInt.INT64); }
+    public ConvertI64Str( ) { super(TypeStr.STR,"str",false,-1,Type.CTRL,TypeMem.ALLMEM,null,TypeInt.INT64); }
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override TypeObj valueobj() {
       Type t = val(3);
@@ -38,7 +38,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   }
 
   public static class ConvertF64Str extends NewStrNode {
-    public ConvertF64Str( ) { super(TypeStr.STR,"str",false,-1,TypeMem.ALLMEM,null,TypeFlt.FLT64); }
+    public ConvertF64Str( ) { super(TypeStr.STR,"str",false,-1,Type.CTRL,TypeMem.ALLMEM,null,TypeFlt.FLT64); }
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override TypeObj valueobj() {
       Type t = val(3);
@@ -55,7 +55,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   // If neither argument is NIL, the two strings are concatenated into a new third string.
   public static class AddStrStr extends NewStrNode {
     private static int OP_PREC=7;
-    public AddStrStr( ) { super(TypeStr.STR,"+",true,OP_PREC,TypeMem.MEM_STR,null,TypeMemPtr.STR0,TypeMemPtr.STR0); }
+    public AddStrStr( ) { super(TypeStr.STR,"+",true,OP_PREC,Type.CTRL,TypeMem.MEM_STR,null,TypeMemPtr.STR0,TypeMemPtr.STR0); }
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       if( is_unused() ) return Type.ANY;
@@ -78,7 +78,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       if( !str0.is_con() || !str1.is_con() ) return _value(TypeStr.STR);
       return _value(TypeStr.make(false,(str0.getstr()+str1.getstr()).intern()));
     }
-    TypeTuple _value(TypeObj tobj) { return TypeTuple.make(tobj,_tptr); }
+    TypeTuple _value(TypeObj tobj) { return TypeTuple.make(Type.CTRL,tobj,_tptr); }
     @Override TypeObj valueobj() { throw com.cliffc.aa.AA.unimpl(); }
     @Override public byte op_prec() { return (byte)OP_PREC; }
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {

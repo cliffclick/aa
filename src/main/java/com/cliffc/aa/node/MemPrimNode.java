@@ -4,6 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
+import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 
 // Memory-based primitives
@@ -25,7 +26,7 @@ public abstract class MemPrimNode extends PrimNode {
     if( tidx==Type.ANY ) return null; // No error
     if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_badargs[1],"Array might be nil when reading",null);
     if( !(tadr instanceof TypeMemPtr) )
-      throw com.cliffc.aa.AA.unimpl();
+      throw unimpl();
     TypeMemPtr ptr = (TypeMemPtr)tadr;
     TypeObj objs = ((TypeMem)tmem).ld(ptr); // General load from memory
     if( objs==TypeObj.UNUSED || objs==TypeObj.XOBJ ) return null; // Can fall to valid array
@@ -52,11 +53,11 @@ public abstract class MemPrimNode extends PrimNode {
       _defs.clear();  _uses.clear();
       FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
       ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-      ParmNode mem = (ParmNode) gvn.xform(new ParmNode(0," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+      ParmNode mem = (ParmNode) gvn.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
       fun._bal_close = bal_close();
       add_def(null);              // Control for the primitive in slot 0
       add_def(mem );              // Memory  for the primitive in slot 1
-      for( int i=2; i<_sig.nargs(); i++ ) // First is display, never used
+      for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // First is display, never used
         add_def(gvn.xform(new ParmNode(i,_sig._args[i],fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
       // Functions return the set of *modified* memory.  ReadPrimNodes do not modify
       // memory.
@@ -80,7 +81,7 @@ public abstract class MemPrimNode extends PrimNode {
 
   // Array length
   static class LValueLength extends ReadPrimNode {
-    LValueLength() { super("#",new String[]{" mem","^","ary"},TypeTuple.LVAL_LEN,TypeInt.INT64); }
+    LValueLength() { super("#",new String[]{" ctl"," mem","^","ary"},TypeTuple.LVAL_LEN,TypeInt.INT64); }
     @Override public String bal_close() { return null; } // Balanced op
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override public Type value(GVNGCM.Mode opt_mode) {
@@ -93,12 +94,12 @@ public abstract class MemPrimNode extends PrimNode {
       TypeAry ary = (TypeAry)ptr._obj;
       return ary._size;
     }
-    @Override public TypeInt apply( Type[] args ) { throw com.cliffc.aa.AA.unimpl(); }
+    @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
   }
 
   // Produces a binop LValue, where the leading TMP is a non-zero array
   static class LValueRead extends ReadPrimNode {
-    LValueRead() { super("[",new String[]{" mem","^","ary","idx"},TypeTuple.LVAL_RD,Type.SCALAR); }
+    LValueRead() { super("[",new String[]{" ctl"," mem","^","ary","idx"},TypeTuple.LVAL_RD,Type.SCALAR); }
     @Override public String bal_close() { return "]"; } // Balanced op
     @Override public byte op_prec() { return 0; } // Balanced op
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
@@ -116,7 +117,7 @@ public abstract class MemPrimNode extends PrimNode {
       TypeAry ary = (TypeAry)ptr._obj;
       return ary.ld(idx2);
     }
-    @Override public TypeInt apply( Type[] args ) { throw com.cliffc.aa.AA.unimpl(); }
+    @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
   }
 
   // ------------------------------------------------------------
@@ -126,11 +127,11 @@ public abstract class MemPrimNode extends PrimNode {
     @Override public FunPtrNode as_fun( GVNGCM gvn ) {
       FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
       ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-      ParmNode mem = (ParmNode) gvn.xform(new ParmNode(0," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+      ParmNode mem = (ParmNode) gvn.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
       fun._bal_close = bal_close();
       add_def(null);              // Control for the primitive in slot 0
       add_def(mem );              // Memory  for the primitive in slot 1
-      for( int i=2; i<_sig.nargs(); i++ ) // First is display, never used
+      for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // First is display, never used
         add_def(gvn.xform(new ParmNode(i,TypeStruct.arg_name(i),fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
       // Write prims return both a value and memory.
       MemPrimNode prim = (MemPrimNode)gvn.xform(this);
@@ -145,7 +146,7 @@ public abstract class MemPrimNode extends PrimNode {
       if( def==adr() ) return TypeMem.ALIVE; // Basic aliveness
       if( def==idx() ) return TypeMem.ALIVE ;// Basic aliveness
       if( def==rez() ) return TypeMem.ESCAPE;// Value escapes
-      throw com.cliffc.aa.AA.unimpl();       // Should not reach here
+      throw unimpl();                        // Should not reach here
     }
     @Override BitsAlias escapees() {
       Type adr = adr().val();
@@ -156,7 +157,7 @@ public abstract class MemPrimNode extends PrimNode {
 
   // Produces a triop LValue, where the leading TMP is a non-zero array
   static class LValueWrite extends WritePrimNode {
-    LValueWrite() { super("[",new String[]{" mem","^","ary","idx","val"},TypeTuple.LVAL_WR,Type.SCALAR); }
+    LValueWrite() { super("[",new String[]{" ctl"," mem","^","ary","idx","val"},TypeTuple.LVAL_WR,Type.SCALAR); }
     @Override public String bal_close() { return "]:="; } // Balanced op
     @Override public byte op_prec() { return 0; }
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
@@ -175,12 +176,12 @@ public abstract class MemPrimNode extends PrimNode {
       TypeMem tmem2 = tmem.update(tary._aliases,tidx,val);
       return tmem2;
     }
-    @Override public TypeInt apply( Type[] args ) { throw com.cliffc.aa.AA.unimpl(); }
+    @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
   }
 
   // Produces a triop LValue, where the leading TMP is a non-zero array
   static class LValueWriteFinal extends WritePrimNode {
-    LValueWriteFinal() { super("[",new String[]{" mem","^","ary","idx","val"},TypeTuple.LVAL_WR,Type.SCALAR); }
+    LValueWriteFinal() { super("[",new String[]{" ctl"," mem","^","ary","idx","val"},TypeTuple.LVAL_WR,Type.SCALAR); }
     @Override public String bal_close() { return "]="; } // Balanced op
     @Override public byte op_prec() { return 0; }
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
@@ -199,7 +200,7 @@ public abstract class MemPrimNode extends PrimNode {
       TypeMem tmem2 = tmem.update(tary._aliases,tidx,val);
       return tmem2;
     }
-    @Override public TypeInt apply( Type[] args ) { throw com.cliffc.aa.AA.unimpl(); }
+    @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
     @Override public ErrMsg err(boolean fast) {
       ErrMsg msg = super.err(fast);
       if( msg != null ) return msg;

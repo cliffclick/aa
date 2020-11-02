@@ -1,11 +1,14 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
 import java.util.Arrays;
+
+import static com.cliffc.aa.AA.*;
 
 // Assert the matching type.  Parse-time error if it does not remove.  Note the
 // difference with CastNode: both Nodes always join their input with their
@@ -35,25 +38,25 @@ public class AssertNode extends Node {
     // immediately in the Parser and is here to declutter the Parser.
     if( _t instanceof TypeFunSig ) {
       TypeFunSig sig = (TypeFunSig)_t;
-      Node[] args = new Node[sig.nargs()+1/*add Ctrl up front*/];
+      Node[] args = new Node[sig.nargs()];
       FunNode fun = gvn.init((FunNode)(new FunNode(null,sig,-1,false).add_def(Env.ALL_CTRL)));
       fun.set_val(Type.CTRL);
-      args[0] = fun;            // Call control
-      args[1] = gvn.xform(new ParmNode(0,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-      args[2] = arg;            // The whole TFP to the call
-      for( int i=2; i<sig.nargs(); i++ )  // Zero is memory, 1 is display.
+      args[CTL_IDX] = fun;            // Call control
+      args[MEM_IDX] = gvn.xform(new ParmNode(MEM_IDX,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+      args[FUN_IDX] = arg;            // The whole TFP to the call
+      for( int i=ARG_IDX; i<sig.nargs(); i++ )  // 1 is memory, 2 is display.
         // All the parms; types in the function signature
-        args[i+1] = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),_error_parse));
+        args[i] = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),_error_parse));
       Parse[] badargs = new Parse[sig.nargs()];
       Arrays.fill(badargs,_error_parse);
       Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
       CallNode call = (CallNode)gvn.xform(new CallNode(true,badargs,args));
       Node cepi   = gvn.xform(new CallEpiNode(call,Env.DEFMEM)).keep();
-      Node ctl    = gvn.xform(new CProjNode(cepi,0));
-      Node postmem= gvn.xform(new MProjNode(cepi,1)).keep();
-      Node val    = gvn.xform(new  ProjNode(2, cepi.unhook()));
+      Node ctl    = gvn.xform(new CProjNode(cepi));
+      Node postmem= gvn.xform(new MProjNode(cepi)).keep();
+      Node val    = gvn.xform(new  ProjNode(cepi.unhook(),AA.REZ_IDX));
       // Type-check the return also
-      Node chk    = gvn.xform(new AssertNode(postmem,val,sig._ret,_error_parse));
+      Node chk    = gvn.xform(new AssertNode(postmem,val,sig._ret.at(REZ_IDX),_error_parse));
       RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));
       // Just the Closure when we make a new TFP
       Node clos = gvn.xform(new FP2ClosureNode(arg));
@@ -76,7 +79,7 @@ public class AssertNode extends Node {
       //for( int i=1; i<arg._defs._len; i++ )
       //  gvn.set_def_reg(arg,i,gvn.xform(new TypeNode(_t,arg.in(i),_error_parse)));
       //return arg;               // Remove TypeNode, since completely replaced
-      throw com.cliffc.aa.AA.unimpl("untested");
+      throw AA.unimpl("untested");
     }
 
     return null;

@@ -247,7 +247,7 @@ public class TypeMem extends Type<TypeMem> {
     MEM  = make0(tos);
     XMEM = MEM.dual();
 
-    MEM_STR = make(BitsAlias.STR,TypeStr.STR);
+    MEM_STR = make(BitsAlias.STR,TypeStr.STR.dual()).dual(); // [1:use,4:str]
     MEM_ABC = make(BitsAlias.ABC,TypeStr.ABC.dual());
 
     // Sentinel for liveness flow; not part of lattice

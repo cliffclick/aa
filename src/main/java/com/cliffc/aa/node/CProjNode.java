@@ -1,13 +1,14 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 
 // Proj control
 public class CProjNode extends ProjNode {
-  public CProjNode( Node ifn, int idx ) { this(OP_CPROJ,ifn,idx); }
-  public CProjNode( byte op, Node ifn, int idx ) { super(op,ifn,idx); }
+  public CProjNode( Node ifn ) { this(ifn,AA.CTL_IDX); }
+  public CProjNode( Node ifn, int idx ) { super(OP_PROJ,ifn,idx); }
   @Override String xstr() {
     if( !is_dead() && in(0) instanceof IfNode )
       return _idx==0 ? "False" : "True";

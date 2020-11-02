@@ -4,9 +4,11 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
+import static com.cliffc.aa.AA.MEM_IDX;
+
 // Proj memory
 public class MrgProjNode extends ProjNode {
-  public MrgProjNode( NewNode nnn, Node mem ) { super(0,nnn,mem); }
+  public MrgProjNode( NewNode nnn, Node mem ) { super(MEM_IDX,nnn,mem); }
   @Override String xstr() { return "MrgProj"+_idx; }
   @Override public boolean is_mem() { return true; }
   NewNode nnn() { return (NewNode)in(0); }
@@ -53,7 +55,7 @@ public class MrgProjNode extends ProjNode {
     Type tm = mem().val();
     if( !(tm instanceof TypeMem  ) ) return tm.oob();
     if( !(tn instanceof TypeTuple) ) return tn.oob();
-    TypeObj to = (TypeObj)((TypeTuple)tn).at(0);
+    TypeObj to = (TypeObj)((TypeTuple)tn).at(MEM_IDX);
     TypeMem tmem = (TypeMem)tm;
     return nnn.is_unused()      // This is a cycle-breaking lifting value
       ? tmem.set   (nnn._alias,TypeObj.UNUSED)

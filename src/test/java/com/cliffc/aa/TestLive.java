@@ -4,6 +4,7 @@ import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import org.junit.Test;
 
+import static com.cliffc.aa.AA.REZ_IDX;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -62,7 +63,7 @@ public class TestLive {
     // Proj, OProj
     Node mem = new MrgProjNode(nnn,mmm);
     mem.xval(gvn._opt_mode);
-    Node ptr = new  ProjNode(1, nnn);
+    Node ptr = new  ProjNode(REZ_IDX, nnn);
     ptr.xval(gvn._opt_mode);
 
     // Use the object for scope exit

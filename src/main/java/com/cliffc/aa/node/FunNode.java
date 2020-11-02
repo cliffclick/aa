@@ -9,6 +9,8 @@ import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.cliffc.aa.AA.*;
+
 // FunNodes are lexically scoped.  During parsing/graph-gen a closure is
 // allocated for local variables as a standard NewObj.  Local escape analysis
 // is used to remove NewObjs that do not escape the local lifetime.  Scoped
@@ -71,9 +73,9 @@ public class FunNode extends RegionNode {
   public FunNode(           PrimNode prim) { this(prim._name,prim._sig,prim._op_prec,prim._thunk_rhs); }
   public FunNode(NewNode.NewPrimNode prim) { this(prim._name,prim._sig,prim._op_prec,false); }
   // Used to start an anonymous function in the Parser
-  public FunNode(String[] flds, Type[] ts) { this(null,TypeFunSig.make(flds,TypeTuple.make_args(ts),Type.SCALAR),-1,false); }
+  public FunNode(String[] flds, Type[] ts) { this(null,TypeFunSig.make(flds,TypeTuple.make_args(ts),TypeTuple.RET),-1,false); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(name,TypeFunSig.make(TypeTuple.NO_ARGS,Type.SCALAR),-2,false); add_def(Env.ALL_CTRL); }
+  FunNode(String name) { this(name,TypeFunSig.make(TypeTuple.RET,TypeTuple.NO_ARGS),-2,false); add_def(Env.ALL_CTRL); }
   public FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs ) { this(name,sig,op_prec,thunk_rhs,BitsFun.new_fidx()); }
   // Shared common constructor
   private FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs, int fidx) {
@@ -156,7 +158,7 @@ public class FunNode extends RegionNode {
   public boolean noinline() { return _name != null && _name.startsWith("noinline") && in(0)==null; }
 
   // Never inline with a nested function
-  @Override @NotNull public Node copy( boolean copy_edges, GVNGCM gvn) { throw AA.unimpl(); }
+  @Override @NotNull public Node copy( boolean copy_edges, GVNGCM gvn) { throw unimpl(); }
 
   // True if may have future unknown callers.
   boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
@@ -183,9 +185,7 @@ public class FunNode extends RegionNode {
     if( _defs._len <= 1 ) return null; // Not even the unknown caller
     ParmNode rpc_parm = rpc();
     if( rpc_parm == null ) return null; // Single caller const-folds the RPC, but also inlines in CallNode
-    ParmNode[] parms = new ParmNode[nargs()];
-    if( split_callers_gather(parms) == null ) return null;
-
+    if( !check_callers() ) return null;
     if( _defs._len <= 2 ) return null; // No need to split callers if only 1
 
     if( level <= 1 ) {          // Only doing small-work now
@@ -213,6 +213,7 @@ public class FunNode extends RegionNode {
     }
 
     // Look for appropriate type-specialize callers
+    ParmNode[] parms = parms();
     TypeTuple formals = type_special(parms);
     Ary<Node> body = find_body(ret);
     int path = -1;              // Paths will split according to type
@@ -275,23 +276,16 @@ public class FunNode extends RegionNode {
     if( _defs._len==3 && ret != null ) gvn.add_work_uses(ret);
   }
 
-  // Gather the ParmNodes into an array.  Return null if any input path is dead
-  // (would rather fold away dead paths before inlining).
-  private RetNode split_callers_gather( ParmNode[] parms ) {
-    for( int i=1; i<_defs._len; i++ ) if( val(i)==Type.XCTRL && !in(i).is_prim() ) return null;
-
+  // Return false if any input path is dead (would rather fold away dead paths
+  // before inlining), or if not exactly 1 return.
+  private boolean check_callers( ) {
+    // No dead input paths
+    for( int i=1; i<_defs._len; i++ ) if( val(i)==Type.XCTRL && !in(i).is_prim() ) return false;
     // Gather the ParmNodes and the RetNode.  Ignore other (control) uses
-    RetNode ret = null;
-    for( Node use : _uses )
-      if( use instanceof ParmNode ) {
-        ParmNode parm = (ParmNode)use;
-        if( parm._idx >= 0 ) // Skip memory, rpc
-          parms[parm._idx] = parm;
-      } else if( use instanceof RetNode ) {
-        if( ret != use && ret != null ) return null; // Too many returns
-        ret = (RetNode)use;
-      }
-    return ret;                 // return (or null if dead)
+    int retcnt=0;
+    for( Node use : _uses ) if( use instanceof RetNode ) retcnt++;
+    if( retcnt!=1 ) return false;
+    return true;
   }
 
   // Visit all ParmNodes, looking for unresolved call uses that can be improved
@@ -329,10 +323,12 @@ public class FunNode extends RegionNode {
     int idx = find_type_split_index(parms);
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
       Type[] sig = Types.get(parms.length);
-      sig[0] = parms[0]==null
+      sig[CTL_IDX] = Type.CTRL;
+      sig[MEM_IDX] = TypeMem.MEM;
+      sig[FUN_IDX] = parms[FUN_IDX]==null
         ? _sig.display().simple_ptr()
-        : parms[0].val(idx);
-      for( int i=1; i<parms.length; i++ ) // 0 for display
+        : parms[FUN_IDX].val(idx);
+      for( int i=ARG_IDX; i<parms.length; i++ )
         sig[i] = parms[i]==null ? Type.SCALAR : parms[i].val(idx).widen();
       return sig;
     }
@@ -340,14 +336,14 @@ public class FunNode extends RegionNode {
     // Look for splitting to help a pointer from an unspecialized type
     boolean progress = false;
     Type[] sig = new Type[parms.length];
-    Type tmem = parm(0).val();
-    sig[0] = TypeMem.MEM;
+    Type tmem = parm(MEM_IDX).val();
+    sig[MEM_IDX] = TypeMem.MEM;
     if( tmem instanceof TypeMem ) {
-      for( int i=1; i<parms.length; i++ ) { // For all parms
+      for( int i=FUN_IDX; i<parms.length; i++ ) { // For all parms
         Node parm = parms[i];
         if( parm == null ) { sig[i]=Type.SCALAR; continue; } // (some can be dead)
         sig[i] = parm.val();                                 // Current type
-        if( i==1 ) continue;                                 // No split on the display
+        if( i==FUN_IDX ) continue;                           // No split on the display
         // Best possible type
         Type tp = Type.ALL;
         for( Node def : parm._defs )
@@ -411,8 +407,8 @@ public class FunNode extends RegionNode {
         if( use instanceof PrimNode.MulF64 ) return true;
         if( use instanceof PrimNode.MulI64 ) return true;
         if( use instanceof PrimNode.AndI64 ) return true;
-        throw AA.unimpl();
-      default: throw AA.unimpl();
+        throw unimpl();
+      default: throw unimpl();
       }
     }
     return false;
@@ -524,7 +520,7 @@ public class FunNode extends RegionNode {
 
     // Pick which input to inline.  Only based on having some constant inputs
     // right now.
-    Node mem = parm(0);        // Memory, used to sharpen input ptrs
+    Node mem = parm(MEM_IDX);   // Memory, used to sharpen input ptrs
     int m=-1, mncons = -1;
     for( int i=has_unknown_callers() ? 2 : 1; i<_defs._len; i++ ) {
       Node call = in(i).in(0);
@@ -702,7 +698,7 @@ public class FunNode extends RegionNode {
         for( Node p : fun._uses )
           if( p instanceof ParmNode ) {
             ParmNode parm = (ParmNode)p;
-            parm.set_def(1,parm._idx==0 ? Env.DEFMEM : gvn.con(fun.formal(parm._idx).simple_ptr()),gvn);
+            parm.set_def(1,parm._idx==MEM_IDX ? Env.DEFMEM : gvn.con(fun.formal(parm._idx).simple_ptr()),gvn);
           }
       } else                     // Path Split
         fun.set_def(1,Env.XCTRL,gvn);
@@ -714,9 +710,11 @@ public class FunNode extends RegionNode {
       Node nn = e.getValue();   // New node
       Type nt = oo.val();        // Generally just copy type from original nodes
       if( nn instanceof MrgProjNode ) { // Cloned allocations registers with default memory
-        Env.DEFMEM.make_mem(gvn,((NewNode)nn.in(0))._alias,(MrgProjNode)nn);
-        Env.DEFMEM.make_mem(gvn,((NewNode)oo.in(0))._alias,(MrgProjNode)oo);
-        int oldalias = BitsAlias.parent(((NewNode)oo.in(0))._alias);
+        MrgProjNode nnrg = (MrgProjNode)nn;
+        MrgProjNode oorg = (MrgProjNode)oo;
+        Env.DEFMEM.make_mem(gvn,nnrg.nnn()._alias,nnrg);
+        Env.DEFMEM.make_mem(gvn,oorg.nnn()._alias,oorg);
+        int oldalias = BitsAlias.parent(oorg.nnn()._alias);
         gvn.set_def_reg(Env.DEFMEM,oldalias,gvn.add_work(gvn.con(TypeObj.UNUSED)));
       }
 
@@ -791,8 +789,8 @@ public class FunNode extends RegionNode {
 
     // Retype memory, so we can everywhere lift the split-alias parents "up and
     // out".
-    retype_mem(gvn._opt_mode,aliases,this.parm(0));
-    retype_mem(gvn._opt_mode,aliases,fun .parm(0));
+    retype_mem(gvn._opt_mode,aliases,this.parm(MEM_IDX));
+    retype_mem(gvn._opt_mode,aliases,fun .parm(MEM_IDX));
 
     // Unhook the hooked FunPtrs
     for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) use.unhook();
@@ -865,11 +863,29 @@ public class FunNode extends RegionNode {
         return (ParmNode)use;
     return null;
   }
-  public TNode[] parms() {
-    TNode[] tns = new TNode[nargs()];
+  // Matches CTL_IDX, MEM_IDX, FUN_IDX
+  @Override public ParmNode[] parms() {
+    ParmNode[] tns = new ParmNode[nargs()];
     for( Node use : _uses )
-      if( use instanceof ParmNode && ((ParmNode)use)._idx!=-1 )
-        tns[((ParmNode)use)._idx] = use;
+      if( use instanceof ParmNode ) {
+        ParmNode parm = (ParmNode)use;
+        if( parm._idx != -1 ) tns[parm._idx] = parm;
+      }
+    return tns;
+  }
+  @Override public @NotNull String @NotNull [] argnames() {
+    String[] tns = new String[nargs()];
+    for( Node use : _uses )
+      if( use instanceof ParmNode ) {
+        ParmNode parm = (ParmNode)use;
+        if( parm._idx != -1 ) tns[parm._idx] = parm._name;
+      }
+    if( tns[CTL_IDX]==null ) tns[CTL_IDX]=" ctl";
+    if( tns[MEM_IDX]==null ) tns[MEM_IDX]=" mem";
+    if( tns[FUN_IDX]==null ) tns[FUN_IDX]="^";
+    for( int i=ARG_IDX; i<nargs(); i++ )
+      if( tns[i]==null )
+        tns[i] = ("arg"+i).intern();
     return tns;
   }
 

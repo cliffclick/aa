@@ -9,6 +9,8 @@ import java.text.NumberFormat;
 import java.text.ParsePosition;
 import java.util.*;
 
+import static com.cliffc.aa.AA.*;
+
 /** an implementation of language AA
  *
  *  GRAMMAR:
@@ -234,7 +236,7 @@ public class Parse implements Comparable<Parse> {
       rez = _e.add_fun(bad,tvar,gvn(cvt.as_fun(_gvn))); // Return type-name constructor
     } else {
       // Get the prefix type name; it must exist (and has an alias# already).
-      if( t.has_name() ) throw AA.unimpl();
+      if( t.has_name() ) throw unimpl();
 
       // If this is a TypeObj, build a constructor taking a pointer-to-TypeObj
       // - and the associated memory state, i.e.  takes a ptr-to-@{x,y} and
@@ -846,7 +848,7 @@ public class Parse implements Comparable<Parse> {
 
     // NewNode returns a TypeMem and a TypeMemPtr (the reference).
     set_mem( Env.DEFMEM.make_mem_proj(_gvn,nn,mem()) );
-    return gvn(new ProjNode(1, nn));
+    return gvn(new ProjNode(nn,REZ_IDX));
   }
 
   /** Parse anonymous struct; the opening "@{" already parsed.  A lexical scope
@@ -885,6 +887,9 @@ public class Parse implements Comparable<Parse> {
     // or when inside of a struct definition: 'this'.
     Node parent_display = scope().ptr();
     TypeMemPtr tpar_disp = (TypeMemPtr) parent_display.val(); // Just a TMP of the right alias
+    ids .push(" ctl");
+    ts  .push(Type.CTRL);
+    bads.push(null);
     ids .push(" mem");
     ts  .push(TypeMem.MEM);
     bads.push(null);
@@ -919,14 +924,14 @@ public class Parse implements Comparable<Parse> {
     }
     // If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
     // args, and then reset.  Also reset to just the mem & display args.
-    if( _x == oldx ) { ids.set_len(2); ts.set_len(2); bads.set_len(2);  }
+    if( _x == oldx ) { ids.set_len(ARG_IDX); ts.set_len(ARG_IDX); bads.set_len(ARG_IDX);  }
 
     // Build the FunNode header
     FunNode fun = gvn(new FunNode(ids.asAry(),ts.asAry()).add_def(Env.ALL_CTRL)).keep();
     // Build Parms for system incoming values
     Node rpc = gvn(new ParmNode(-1,"rpc" ,fun,con(TypeRPC.ALL_CALL),null)).keep();
-    Node mem = gvn(new ParmNode( 0," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-    Node clo = gvn(new ParmNode( 1,"^"   ,fun,con(tpar_disp),null));
+    Node mem = gvn(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+    Node clo = gvn(new ParmNode(FUN_IDX,"^"   ,fun,con(tpar_disp),null));
 
     // Increase scope depth for function body.
     try( Env e = new Env(_e,errMsg(oldx-1), true, fun, mem) ) { // Nest an environment for the local vars
@@ -939,7 +944,7 @@ public class Parse implements Comparable<Parse> {
 
       // Parms for all arguments
       Parse errmsg = errMsg();  // Lazy error message
-      for( int i=2; i<ids._len; i++ ) { // User parms start at#2
+      for( int i=ARG_IDX; i<ids._len; i++ ) { // User parms start
         Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(Type.SCALAR),errmsg));
         create(ids.at(i),parm, args_are_mutable);
       }
@@ -1007,7 +1012,7 @@ public class Parse implements Comparable<Parse> {
     if( s==null ) { _x = oldx; return null; } // A bare "()" pair is not a statement
     if( peek(',') ) {
       _x --;                    // Reparse the ',' in tuple
-      throw com.cliffc.aa.AA.unimpl();
+      throw unimpl();
     }
     require(bal_fun(bfun)._bal_close,oldx);
     return do_call(errMsgs(oldx,oldx2),args(bfun,s));
@@ -1089,15 +1094,15 @@ public class Parse implements Comparable<Parse> {
     int oldx = ++_x;
     byte c;
     while( (c=_buf[_x++]) != '"' ) {
-      if( c=='%' ) throw AA.unimpl();
-      if( c=='\\' ) throw AA.unimpl();
+      if( c=='%' ) throw unimpl();
+      if( c=='\\' ) throw unimpl();
       if( _x == _buf.length ) return null;
     }
     String str = new String(_buf,oldx,_x-oldx-1).intern();
     // Convert to ptr-to-constant-memory-string
     NewNode nnn = (NewNode)gvn( new NewStrNode.ConStr(str) );
     set_mem(Env.DEFMEM.make_mem_proj(_gvn,nnn,mem()));
-    return gvn( new ProjNode(1, nnn));
+    return gvn( new ProjNode(nnn,REZ_IDX));
   }
 
   /** Parse a type or return null
@@ -1148,7 +1153,7 @@ public class Parse implements Comparable<Parse> {
   // Type or null or Type.ANY for '->' token
   private Type type0(boolean type_var) {
     if( peek('{') ) {           // Function type
-      Ary<Type> ts = new Ary<>(new Type[]{TypeMem.ALLMEM,TypeMemPtr.DISP_SIMPLE});  Type t;
+      Ary<Type> ts = new Ary<>(new Type[]{Type.CTRL,TypeMem.ALLMEM,TypeMemPtr.DISP_SIMPLE});  Type t;
       while( (t=typep(type_var)) != null && t != Type.ANY  )
         ts.add(t);              // Collect arg types
       Type ret;
@@ -1156,12 +1161,12 @@ public class Parse implements Comparable<Parse> {
         ret = typep(type_var);
         if( ret == null ) return null; // should return TypeErr missing type after ->
       } else {                  // Allow no-args and simple return type
-        if( ts._len != 3 ) return null; // should return TypeErr missing -> in tfun
+        if( ts._len != ARG_IDX ) return null; // should return TypeErr missing -> in tfun
         ret = ts.pop();         // e.g. { int } Get single return type
       }
       TypeTuple targs = TypeTuple.make_args(ts.asAry());
       if( !peek('}') ) return null;
-      return typeq(TypeFunSig.make(targs,ret));
+      return typeq(TypeFunSig.make(TypeTuple.make_ret(ret),targs));
     }
 
     if( peek("@{") ) {          // Struct type
@@ -1177,7 +1182,7 @@ public class Parse implements Comparable<Parse> {
             (t=typep(type_var)) == null) // Parse type, wrap ptrs
           t = Type.SCALAR;               // No type found, assume default
         tok = tok.intern();              // Only 1 copy
-        if( flds.find(tok) != -1 ) throw AA.unimpl(); // cannot use same field name twice
+        if( flds.find(tok) != -1 ) throw unimpl(); // cannot use same field name twice
         flds  .add(tok);                 // Gather for final type
         ts    .add(t);
         mods  .add(tmodf);
@@ -1310,7 +1315,7 @@ public class Parse implements Comparable<Parse> {
     return -1;
   }
   private void skipEOL  () { while( _x < _buf.length && _buf[_x] != '\n' ) _x++; }
-  private void skipBlock() { throw AA.unimpl(); }
+  private void skipBlock() { throw unimpl(); }
   // Advance parse pointer to next WS.  Used for parser syntax error recovery.
   private void skipNonWS() {
     while( _x < _buf.length && !isWS(_buf[_x]) ) _x++;
@@ -1374,9 +1379,9 @@ public class Parse implements Comparable<Parse> {
     // CallEpi internally tracks all wired functions.
     Node cepi = gvn(new CallEpiNode(call,Env.DEFMEM));
     if( call.is_dead() ) return cepi; // Inlined in the parser
-    set_ctrl(gvn(new CProjNode(cepi, 0)));
-    set_mem(gvn(new MProjNode(cepi, 1))); // Return memory from all called functions
-    return gvn(new ProjNode(2, cepi));
+    set_ctrl(gvn(new CProjNode(cepi)));
+    set_mem(gvn(new MProjNode(cepi))); // Return memory from all called functions
+    return gvn(new ProjNode(cepi,REZ_IDX));
   }
 
   // Whack current control with a syntax error

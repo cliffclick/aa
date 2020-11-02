@@ -6,6 +6,7 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
+import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 
 // Function to wrap another type in a Name, which typically involves setting a
@@ -41,11 +42,11 @@ public class IntrinsicNode extends Node {
     // This function call takes in and returns a plain ptr-to-object.
     // Only after folding together does the name become apparent.
     TypeTuple formals = TypeTuple.make_args(TypeMemPtr.STRUCT);
-    TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(BitsAlias.RECORD_BITS,tn));
+    TypeFunSig sig = TypeFunSig.make(TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.RECORD_BITS,tn)),formals);
     FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,sig,-1,false).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    Node mem = gvn.xform(new ParmNode( 0,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-    Node ptr = gvn.xform(new ParmNode( 2,"ptr",fun,gvn.con(TypeMemPtr.ISUSED),badargs));
+    Node mem = gvn.xform(new ParmNode(MEM_IDX,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+    Node ptr = gvn.xform(new ParmNode(ARG_IDX,"ptr",fun,gvn.con(TypeMemPtr.ISUSED),badargs));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,cvt,ptr,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(NO_DISP)));
@@ -71,7 +72,7 @@ public class IntrinsicNode extends Node {
         // NewObjNode is well-typed and producing a pointer to memory with the
         // correct type?  Fold into the NewObjNode and remove this Convert.
         TypeTuple tnnn = (TypeTuple) nnn.val();
-        Type actual = mem.val().sharptr(tnnn.at(1));
+        Type actual = mem.val().sharptr(tnnn.at(MEM_IDX));
         if( actual instanceof TypeMemPtr ) actual = ((TypeMemPtr)actual)._obj; // Get the struct
         Type formal = _tn.remove_name();
         if( actual.isa(formal) ) { // Actual struct isa formal struct?
@@ -135,21 +136,21 @@ public class IntrinsicNode extends Node {
     to = to.set_fld(0,NO_DISP,TypeStruct.FFNL);
     // Formal is unnamed, and this function adds the name.
     TypeTuple formals = TypeTuple.make(to.remove_name());
-    TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(BitsAlias.make0(alias),to));
+    TypeFunSig sig = TypeFunSig.make(TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.make0(alias),to)),formals);
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,sig,-1,false).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    Node memp= gvn.init (new ParmNode( 0,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+    Node memp= gvn.init (new ParmNode(MEM_IDX,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
     // Add input edges to the NewNode
     ConNode nodisp = gvn.con(NO_DISP);
     NewObjNode nnn = new NewObjNode(false,alias,to,nodisp).keep();
-    for( int i=1; i<to._ts.length; i++ ) { // Display in 0, fields in 1+
+    for( int i=1; i<to._ts.length; i++ ) {
       String argx = to._flds[i];
       if( TypeStruct.fldBot(argx) ) argx = null;
-      nnn.add_def(gvn.xform(new ParmNode(i+1,argx,fun, gvn.con(to._ts[i].simple_ptr()),bad)));
+      nnn.add_def(gvn.xform(new ParmNode(i+FUN_IDX,argx,fun, gvn.con(to._ts[i].simple_ptr()),bad)));
     }
     gvn.init(nnn);
     Node mmem = Env.DEFMEM.make_mem_proj(gvn,nnn.unhook(),memp);
-    Node ptr = gvn.xform(new  ProjNode(1, nnn));
+    Node ptr = gvn.xform(new ProjNode(REZ_IDX, nnn));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret,nodisp));
   }

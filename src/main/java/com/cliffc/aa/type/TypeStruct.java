@@ -303,23 +303,23 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return malloc("",false,flds,ts,fbots(ts.length),false);
   }
 
-  // Function formals, used by FunNode.
-  // Generic function arguments.  Slot 0 is the display.
-  public static TypeStruct make_args(Type[] ts) { return make_x_args(false,ts); }
-  public static TypeStruct make_x_args(boolean any, Type[] ts) {
-    String[] args = new String[ts.length];
-    Arrays.fill(args,any ? fldTop() : fldBot());
-    args[0] = "^";
-    return make_args(any,args,ts);
-  }
-  public static TypeStruct make_args(String[] flds, Type[] ts) { return make_args(false,flds,ts); }
-  // First field is the display
-  public static TypeStruct make_args(boolean any, String[] flds, Type[] ts) {
-    assert Util.eq(flds[0],"^");
-    assert ts[0].is_display_ptr() && ts[0]==ts[0].simple_ptr(); // Simple display ptrs only
-    byte[] fs = fbots(ts.length);
-    return malloc("",any,flds,ts,fs,false).hashcons_free();
-  }
+  //// Function formals, used by FunNode.
+  //// Generic function arguments.  Slot 0 is the display.
+  //public static TypeStruct make_args(Type[] ts) { return make_x_args(false,ts); }
+  //public static TypeStruct make_x_args(boolean any, Type[] ts) {
+  //  String[] args = new String[ts.length];
+  //  Arrays.fill(args,any ? fldTop() : fldBot());
+  //  args[0] = "^";
+  //  return make_args(any,args,ts);
+  //}
+  //public static TypeStruct make_args(String[] flds, Type[] ts) { return make_args(false,flds,ts); }
+  //// First field is the display
+  //public static TypeStruct make_args(boolean any, String[] flds, Type[] ts) {
+  //  assert Util.eq(flds[0],"^");
+  //  assert ts[0].is_display_ptr() && ts[0]==ts[0].simple_ptr(); // Simple display ptrs only
+  //  byte[] fs = fbots(ts.length);
+  //  return malloc("",any,flds,ts,fs,false).hashcons_free();
+  //}
   public  static TypeStruct make(String[] flds, Type[] ts) { return malloc("",false,flds,ts,fbots(ts.length),false).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] flags) { return malloc("",false,flds,ts,flags,false).hashcons_free(); }
   public  static TypeStruct make(String name, String[] flds, Type[] ts, byte[] flags) { return malloc(name,false,flds,ts,flags,false).hashcons_free(); }
@@ -380,8 +380,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       (_ts.length >= 1 && _ts[0].is_display_ptr() && Util.eq(_flds[0],"^"));
   }
 
-  public  static final TypeStruct NO_ARGS    = make_args(TFLDS[1],ts(NO_DISP));
-
   // A bunch of types for tests
   public  static final TypeStruct NAMEPT= make("Point:",flds("^","x","y"),ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64),ffnls(3));
   public  static final TypeStruct POINT = make(flds("^","x","y"),ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64));
@@ -390,8 +388,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final TypeStruct C0    = make(flds("^","c"),ts(NO_DISP,TypeInt.FALSE )); // @{c:0}
   private static final TypeStruct D1    = make(flds("^","d"),ts(NO_DISP,TypeInt.TRUE  )); // @{d:1}
           static final TypeStruct ARW   = make(flds("^","a"),ts(NO_DISP,TypeFlt.FLT64),new byte[]{FRW,FRW});
-  public  static final TypeStruct FLT64 = make_args(ARGS_X ,ts(NO_DISP,TypeFlt.FLT64)); // {flt->flt}
-  public  static final TypeStruct INT64_INT64= make_args(ARGS_XY,ts(NO_DISP,TypeInt.INT64,TypeInt.INT64)); // {int int->int }
+  public  static final TypeStruct FLT64 = make(ARGS_X,ts(NO_DISP,TypeFlt.FLT64)); // {flt->flt}
+  public  static final TypeStruct INT64_INT64= make(ARGS_XY,ts(NO_DISP,TypeInt.INT64,TypeInt.INT64)); // {int int->int }
 
   static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,POINT,NAMEPT,A,C0,D1,ARW,DISPLAY,ANYSTRUCT};
 

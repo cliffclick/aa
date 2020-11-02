@@ -95,8 +95,8 @@ public final class FunPtrNode extends Node {
   // Filter out all the wrong-arg-count functions
   public Node filter( GVNGCM gvn, int nargs ) {
     // User-nargs are user-visible #arguments.
-    // Fun-nargs include memory & the display, hence the +2.
-    return fun().nargs() == nargs+2 ? this : null;
+    // Fun-nargs include ctrl, memory & the display, hence the +3.
+    return fun().nargs() == nargs+3 ? this : null;
   }
 
   // Return the op_prec of the returned value.  Not sensible except when called
