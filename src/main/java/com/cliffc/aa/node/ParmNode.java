@@ -46,7 +46,7 @@ public class ParmNode extends PhiNode {
 
     // TODO: Relax this
     // Never collapse memory phi, used for error reporting by other parms.
-    if( _idx== 0 )
+    if( _idx== MEM_IDX )
       for( Node use : fun._uses )
         if( use instanceof ParmNode && use != this )
           return null;

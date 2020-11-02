@@ -100,7 +100,7 @@ public class CallNode extends Node {
   String  str() { return xstr(); }       // Inline short name
   @Override public boolean is_mem() {    // Some calls are known to not write memory
     CallEpiNode cepi = cepi();
-    return cepi!=null && ProjNode.proj(cepi,1)!=null;
+    return cepi!=null && ProjNode.proj(cepi,MEM_IDX)!=null;
   }
 
   // Call arguments:
@@ -281,8 +281,8 @@ public class CallNode extends Node {
     // arguments transitively, which is detected in the escape-in set.
     Node mem = mem();
     if( gvn._opt_mode != GVNGCM.Mode.Parse && mem instanceof MrgProjNode && cepi != null ) {
-      ProjNode cepim = ProjNode.proj(cepi,1); // Memory projection from CEPI
-      ProjNode cepid = ProjNode.proj(cepi,2); // Return projection from CEPI
+      ProjNode cepim = ProjNode.proj(cepi,MEM_IDX); // Memory projection from CEPI
+      ProjNode cepid = ProjNode.proj(cepi,REZ_IDX); // Return projection from CEPI
       // Verify no extra mem readers in-between, no alias overlaps on input
       if( cepim != null && MemSplitNode.check_split(this,escapees()) ) {
         TypeMem tmcepi = (TypeMem) cepim.val();
@@ -618,7 +618,7 @@ public class CallNode extends Node {
         if( fun.nargs()!=nargs() || fun.ret() == null ) continue; // BAD/dead
         TypeTuple formals = fun._sig._formals; // Type of each argument
         int cvts=0;                        // Arg conversion cost
-        for( int j=2; j<nargs(); j++ ) {   // Skip arg#1, the display
+        for( int j=ARG_IDX; j<nargs(); j++ ) {   // Skip arg#1, the display
           if( fun.parm(j)==null ) continue; // Formal is ignored
           Type actual = arg(j).val();
           Type formal = formals.at(j);

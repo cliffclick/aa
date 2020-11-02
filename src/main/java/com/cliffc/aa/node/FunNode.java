@@ -282,9 +282,12 @@ public class FunNode extends RegionNode {
     // No dead input paths
     for( int i=1; i<_defs._len; i++ ) if( val(i)==Type.XCTRL && !in(i).is_prim() ) return false;
     // Gather the ParmNodes and the RetNode.  Ignore other (control) uses
-    int retcnt=0;
-    for( Node use : _uses ) if( use instanceof RetNode ) retcnt++;
-    if( retcnt!=1 ) return false;
+    Node ret=null;
+    for( Node use : _uses )
+      if( use instanceof RetNode ) {
+        if( ret!=null && ret!=use ) return false;
+        ret = use;
+      }
     return true;
   }
 
@@ -337,6 +340,7 @@ public class FunNode extends RegionNode {
     boolean progress = false;
     Type[] sig = new Type[parms.length];
     Type tmem = parm(MEM_IDX).val();
+    sig[CTL_IDX] = Type.CTRL;
     sig[MEM_IDX] = TypeMem.MEM;
     if( tmem instanceof TypeMem ) {
       for( int i=FUN_IDX; i<parms.length; i++ ) { // For all parms

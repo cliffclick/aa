@@ -10,6 +10,8 @@ import java.util.BitSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static com.cliffc.aa.AA.MEM_IDX;
+
 // Global Value Numbering, Global Code Motion
 public class GVNGCM {
   // Unique dense node-numbering
@@ -614,7 +616,7 @@ public class GVNGCM {
             if( use instanceof RegionNode || use instanceof CallNode )
               add_work_uses(use);
             // If a Parm:Mem input is updated, all Parm:ptrs may update.
-            if( use instanceof ParmNode && ((ParmNode)use)._idx==0 )
+            if( use instanceof ParmNode && ((ParmNode)use)._idx==MEM_IDX )
               add_work_uses(use.in(0));
             if( n instanceof CallNode && use instanceof CProjNode )
               add_work_uses(use); // Call lowers fidxs, Funs might get turned on
@@ -625,7 +627,7 @@ public class GVNGCM {
             add_work_defs(n.in(2)); // Also Call.Unresolved: any resolved call makes that call alive
           }
           // Memory Parms enable sharpening all pointer-Parms.
-          if( n instanceof ParmNode && ((ParmNode)n)._idx==0 )
+          if( n instanceof ParmNode && ((ParmNode)n)._idx==MEM_IDX )
             add_work_uses(n.in(0));
           // Optimistic Call-Graph discovery.  If the funptr input lowers
           // to where a new FIDX might be possible, wire the CG edge.
