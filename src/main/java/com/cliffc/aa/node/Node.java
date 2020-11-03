@@ -67,7 +67,6 @@ public abstract class Node implements Cloneable, TNode {
   }
   public TVar tvar() { return _tvar; }
   public TVar tvar(int x) { return in(x)._tvar; }
-  public String argname() { throw com.cliffc.aa.AA.unimpl(); } // Only for ParmNodes
   public @NotNull TNode[] parms () { throw com.cliffc.aa.AA.unimpl(); } // Only for  FunNodes
   public @NotNull String @NotNull [] argnames() { throw com.cliffc.aa.AA.unimpl(); } // Only for FunNodes
 
@@ -132,7 +131,7 @@ public abstract class Node implements Cloneable, TNode {
             Node msp = nm == null ? null : nm.get_mem_writer();
             if( msp instanceof MemSplitNode )
               gvn.add_work(((MemSplitNode)msp).join());
-          } else if( nn instanceof MemJoinNode ) gvn.add_work(nn);
+          } else if( nn instanceof MemJoinNode || nn instanceof MrgProjNode ) gvn.add_work(nn);
         }
         // Displays for FunPtrs update
         if( this instanceof ParmNode && ((ParmNode)this)._idx==0 && old instanceof FunNode ) {
@@ -564,7 +563,7 @@ public abstract class Node implements Cloneable, TNode {
   public boolean is_mem() { return false; }
   // For most memory-producing Nodes, exactly 1 memory producer follows.
   public Node get_mem_writer() {
-    for( Node use : _uses ) if( use.is_mem() )return use;
+    for( Node use : _uses ) if( use.is_mem() ) return use;
     return null;
   }
   // Easy assertion check

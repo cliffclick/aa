@@ -237,6 +237,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   // +1 requires a bit-changing conversion (Int->Flt)
   // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
   @Override public byte isBitShape(Type t) {
+    if( t == Type.SCALAR ) return 0; // Scalar function arg; generally dead or just passed along blindly.
     return (byte)(t instanceof TypeMemPtr ? 0 : 99);  // Mixing TMP and a non-ptr
   }
   @SuppressWarnings("unchecked")

@@ -7,6 +7,7 @@ import org.junit.Test;
 
 import java.util.function.Function;
 
+import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 import static org.junit.Assert.*;
 
@@ -787,7 +788,7 @@ HashTable = {@{
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeFunPtr);
       TypeFunPtr actual = (TypeFunPtr)te._t;
-      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),3,NO_DISP);
+      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),ARG_IDX+1,NO_DISP);
       assertEquals(expected,actual);
     }
   }
