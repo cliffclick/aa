@@ -132,7 +132,7 @@ public abstract class MemPrimNode extends PrimNode {
       add_def(null);              // Control for the primitive in slot 0
       add_def(mem );              // Memory  for the primitive in slot 1
       for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // First is display, never used
-        add_def(gvn.xform(new ParmNode(i,TypeStruct.arg_name(i),fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
+        add_def(gvn.xform(new ParmNode(i,_sig._args[i],fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
       // Write prims return both a value and memory.
       MemPrimNode prim = (MemPrimNode)gvn.xform(this);
       RetNode ret = (RetNode)gvn.xform(new RetNode(fun,prim,prim.rez(),rpc,fun));

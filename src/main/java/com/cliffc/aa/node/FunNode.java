@@ -207,14 +207,14 @@ public class FunNode extends RegionNode {
     // Memory is not 'lifted' by DefMem, a sign that a bad-memory-arg is being
     // passed in.
     if( has_unknown_callers() ) {
-      ParmNode mem = parm(0);
+      ParmNode mem = parm(MEM_IDX);
       if( mem!=null && !mem.val().isa(Env.DEFMEM.val()) )
         return null; // Do not inline a bad memory type
     }
 
     // Look for appropriate type-specialize callers
     ParmNode[] parms = parms();
-    TypeTuple formals = type_special(parms);
+    TypeTuple formals = _thunk_rhs ? null : type_special(parms);
     Ary<Node> body = find_body(ret);
     int path = -1;              // Paths will split according to type
     if( formals == null ) {     // No type-specialization to do
@@ -223,20 +223,9 @@ public class FunNode extends RegionNode {
       // Large code-expansion allowed; can inline for other reasons
       path = _thunk_rhs ? 2 : split_size(body,parms); // Forcible size-splitting first path
       if( path == -1 ) return null;
+      assert CallNode.ttfp(in(path).in(0).val()).fidx()!=-1; // called by a single-target call
       if( noinline() ) return null;
       if( !is_prim() ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
-      // To do a size-split, we are splitting so this one path can inline.  The
-      // one path needs to directly reference the existing function with a
-      // FunPtr, so after the split the Call can be pointed directly to the new
-      // function.
-      CallNode call = (CallNode)in(path).in(0);
-      if( !(call.fun() instanceof FunPtrNode) ) {
-        // Make a local FunPtr with the current Display.
-        Node disp = gvn.xform(new FP2ClosureNode(call.fun()));
-        Node fptr = gvn.xform(new FunPtrNode(ret,disp));
-        body.add(fptr);
-        call.set_fun_reg(fptr,gvn);
-      }
     }
 
     // Check for dups (already done this but failed to resolve all calls, so trying again).
@@ -500,7 +489,7 @@ public class FunNode extends RegionNode {
     // Count function body size.  Requires walking the function body and
     // counting opcodes.  Some opcodes are ignored, because they manage
     // dependencies but make no code.
-    int call_indirect=0;        // Count of calls to e.g. loads/args/parms
+    int call_indirect=0, call_thunk=0; // Count of calls to e.g. loads/args/parms
     int[] cnts = new int[OP_MAX];
     for( Node n : body ) {
       int op = n._op;           // opcode
@@ -508,11 +497,13 @@ public class FunNode extends RegionNode {
         Node n1 = ((CallNode)n).fun();
         Node n2 = n1 instanceof UnresolvedNode ? n1.in(0) : n1;
         if( n2 instanceof FunPtrNode ) {
-          FunPtrNode fpn = (FunPtrNode)n2;
+          FunPtrNode fpn = (FunPtrNode) n2;
           if( fpn.ret().rez() instanceof PrimNode )
             op = OP_PRIM;       // Treat as primitive for inlining purposes
           if( fpn.fun() == this )
             recursive.set(n.in(0)._uid);  // No self-recursive inlining till after parse
+        } else if( n2.val()==TypeTuple.RET ) { // Thunks are encouraged to inline
+          call_thunk++;
         } else
           call_indirect++;
       }

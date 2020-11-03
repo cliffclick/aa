@@ -12,6 +12,8 @@ import org.jetbrains.annotations.NotNull;
 import java.util.HashSet;
 import java.util.function.Predicate;
 
+import static com.cliffc.aa.AA.MEM_IDX;
+
 // Sea-of-Nodes
 public abstract class Node implements Cloneable, TNode {
   static final byte OP_CALL   = 1;
@@ -139,8 +141,8 @@ public abstract class Node implements Cloneable, TNode {
           if( ret != null && ret.funptr() != null ) gvn.add_work(ret.funptr());
         }
         // Parm memory may fold away, if no other parm needs it for sharpening
-        if( this instanceof ParmNode && ((ParmNode)this)._idx!=0 && old instanceof FunNode ) {
-          ParmNode pmem = ((FunNode)old).parm(0);
+        if( this instanceof ParmNode && ((ParmNode)this)._idx!=MEM_IDX && old instanceof FunNode ) {
+          ParmNode pmem = ((FunNode)old).parm(MEM_IDX);
           if( pmem != null ) gvn.add_work(pmem);
         }
         if( this instanceof ProjNode ) { // A proj dying might let an is_copy input also die
