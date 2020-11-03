@@ -244,7 +244,7 @@ public class TestParse {
              TypeStruct.make_tuple(Type.XNIL,Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.BOOL );
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
 
     // This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
@@ -342,7 +342,7 @@ public class TestParse {
     test_obj("(1,\"abc\").1", TypeStr.ABC);
 
     // Named type variables
-    test("gal=:flt; gal", TypeFunPtr.make(TEST_FUNBITS,3,NO_DISP));
+    test("gal=:flt; gal", TypeFunPtr.make(TEST_FUNBITS,4,NO_DISP));
     test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?

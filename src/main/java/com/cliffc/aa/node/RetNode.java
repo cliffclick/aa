@@ -114,7 +114,7 @@ public final class RetNode extends Node {
     // Every Phi on the region must come directly from the CallEpi.
     for( Node phi : ctl._uses )
       if( phi._op == OP_PHI && phi.in(idx).in(0)!=cepi )
-          return null;
+        return null;
     FunNode fun = fun();
     // Every Phi must be type compatible
     for( int i=0; i<call.nargs(); i++ )

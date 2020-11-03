@@ -57,7 +57,7 @@ public class TVar extends TypeVar {
     }
     sb.p("V").p(uid());
     if( _type!=Type.ANY )
-      _type.str(sb.p(":"),new VBitSet(),null,false);
+      _type.str(sb.p(":"),new VBitSet(),null,true);
     return sb;
   }
 }

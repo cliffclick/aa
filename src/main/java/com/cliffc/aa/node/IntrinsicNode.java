@@ -72,7 +72,7 @@ public class IntrinsicNode extends Node {
         // NewObjNode is well-typed and producing a pointer to memory with the
         // correct type?  Fold into the NewObjNode and remove this Convert.
         TypeTuple tnnn = (TypeTuple) nnn.val();
-        Type actual = mem.val().sharptr(tnnn.at(MEM_IDX));
+        Type actual = mem.val().sharptr(tnnn.at(REZ_IDX));
         if( actual instanceof TypeMemPtr ) actual = ((TypeMemPtr)actual)._obj; // Get the struct
         Type formal = _tn.remove_name();
         if( actual.isa(formal) ) { // Actual struct isa formal struct?
@@ -101,12 +101,12 @@ public class IntrinsicNode extends Node {
     if( !(ptr instanceof TypeMemPtr) ) return ptr.oob(); // Inputs are confused
     TypeMem tmem = (TypeMem)mem;
     // Get the Obj from the pointer.
-    int alias = ((TypeMemPtr)ptr)._aliases.abit();
     TypeObj obj = tmem.ld((TypeMemPtr)ptr);
     TypeObj tn = (TypeObj)_tn.remove_name();
     if( !obj.isa(tn       ) ) return tmem; // Inputs not correct from, and node is in-error
     if(  obj.isa(tn.dual()) ) return tmem;
     // Wrap result in Name
+    int alias = ((TypeMemPtr)ptr)._aliases.abit();
     TypeObj rez = (TypeObj)obj.set_name(_tn._name);
     return tmem.set(alias,rez);
   }
