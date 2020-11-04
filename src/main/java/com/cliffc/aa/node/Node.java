@@ -57,16 +57,13 @@ public abstract class Node implements Cloneable, TNode {
   public int _uid;      // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;       // Opcode (besides the object class), used to avoid v-calls in some places
   public byte _keep;    // Keep-alive in parser, even as last use goes away
-  public boolean _in;   // "in" or "out" of GVN...
   public TypeMem _live; // Liveness; assumed live in gvn.iter(), assumed dead in gvn.gcp().
+  public boolean _in;   // "in" or "out" of GVN...
+  public Type _val;     // Value; starts at ALL and lifts towards ANY.
+  public Type val() { return _val; }
+  public Type set_val( @NotNull Type val ) { _in = true; return (_val=val); }
   @NotNull TVar _tvar;  // Type variable; has a Type which starts at ALL and lifts towards ANY, and may have constraints to be equal to other Types
-  public Type val() { return _tvar.type(); } // The unified Type
-  public Type oval() { return _tvar._type(false); } // The local, not-unified, Type
-  public Type set_val( @NotNull Type val ) {
-    _in = true;
-    assert _tvar.uid()==_uid;
-    return _tvar.setype(val);
-  }
+  // H-M Type-Variables
   public TVar tvar() { return _tvar; }
   public TVar tvar(int x) { return in(x)._tvar; }
   public @NotNull TNode[] parms () { throw com.cliffc.aa.AA.unimpl(); } // Only for  FunNodes
@@ -488,7 +485,7 @@ public abstract class Node implements Cloneable, TNode {
       if( idl != null )
         return true;            // Found an ideal call
       Type t = value(gvn._opt_mode);
-      if( oval() != t )
+      if( _val != t )
         return true;            // Found a value improvement
       TypeMem live = live(gvn._opt_mode);
       if( _live != live )
@@ -502,8 +499,8 @@ public abstract class Node implements Cloneable, TNode {
   public final int more_flow(GVNGCM gvn, VBitSet bs, boolean lifting, int errs) {
     if( bs.tset(_uid) ) return errs; // Been there, done that
     // Check for only forwards flow, and if possible then also on worklist
-    Type    oval= oval(), nval = value(gvn._opt_mode);
-    TypeMem oliv=_live  , nliv = live (gvn._opt_mode);
+    Type    oval= _val, nval = value(gvn._opt_mode);
+    TypeMem oliv=_live, nliv = live (gvn._opt_mode);
     if( nval != oval || nliv != oliv ) {
       boolean ok = lifting
         ? nval.isa(oval) && nliv.isa(oliv)

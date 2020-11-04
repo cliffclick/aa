@@ -16,9 +16,9 @@ public final class FunPtrNode extends Node {
   private FunPtrNode( ErrMsg referr, RetNode ret, Node display ) {
     super(OP_FUNPTR,ret,display);
     _referr = referr;
-    TLambda tvargs = new TLambda(ret.fun());
-    TTupN tvret  = (TTupN)ret.tvar().find();         // [Control,Memory,Result]
-    TFun  tvfun  = new TFun(this,tvargs,tvret);
+    //TLambda tvargs = new TLambda(ret.fun());
+    //TTupN tvret  = (TTupN)ret.tvar().find();         // [Control,Memory,Result]
+    //TFun  tvfun  = new TFun(this,tvargs,tvret);
     //tvar().unify(tvfun);
   }
   public RetNode ret() { return (RetNode)in(0); }
