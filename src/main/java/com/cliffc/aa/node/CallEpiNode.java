@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
 import static com.cliffc.aa.AA.*;
@@ -22,7 +23,16 @@ import static com.cliffc.aa.AA.*;
 // bit-vector.
 
 public final class CallEpiNode extends Node {
-  public CallEpiNode( Node... nodes ) { super(OP_CALLEPI,nodes);  assert nodes[1] instanceof DefMemNode; }
+  public CallEpiNode( Node... nodes ) {
+    super(OP_CALLEPI,nodes);
+    assert nodes[1] instanceof DefMemNode;
+
+    // Build a HM tvar (args->ret), same as HM.java Apply does.
+    TypeVar tfun0 = call().fun().tvar().find();
+    TypeVar tvargs = call().tvar().find();
+    TFun tvfun = new TFun(this,tvargs,_tvar); // New TFun { tvargs -> this }
+    tfun0.unify(tvfun);
+  }
   String xstr() { return (is_dead() ? "X" : "C")+"allEpi";  } // Self short name
   public CallNode call() { return (CallNode)in(0); }
   @Override public boolean is_mem() { return true; }

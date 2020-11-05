@@ -1,6 +1,8 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.Env;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TLambda;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
@@ -86,6 +88,8 @@ public class FunNode extends RegionNode {
     _op_prec = (byte)op_prec;
     _thunk_rhs = thunk_rhs;
     FUNS.setX(fidx(),this); // Track FunNode by fidx; assert single-bit fidxs
+    // FunNodes are just argument collections (no return)
+    tvar().unify(new TLambda(this,nargs()));
   }
 
   // Find FunNodes by fidx

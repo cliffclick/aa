@@ -23,7 +23,8 @@ public class TestParse {
     // parametric polymorphism
     //test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",TypeStruct.make_tuple(Type.XNIL,TypeInt.con(5),TypeInt.con(3)));
 
-    // fails, oldval not defined on false arm of trinary
+    // fails, str.hash, str.eq is missing.
+    // needs a class for primitives which includes things like hash & eq & toString.
     //test("tab = [7];\n" +
     //     "put = { key val ->\n" +
     //     "  idx = key.hash() % #tab;\n" +

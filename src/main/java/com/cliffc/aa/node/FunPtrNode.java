@@ -16,10 +16,12 @@ public final class FunPtrNode extends Node {
   private FunPtrNode( ErrMsg referr, RetNode ret, Node display ) {
     super(OP_FUNPTR,ret,display);
     _referr = referr;
-    //TLambda tvargs = new TLambda(ret.fun());
-    //TTupN tvret  = (TTupN)ret.tvar().find();         // [Control,Memory,Result]
-    //TFun  tvfun  = new TFun(this,tvargs,tvret);
-    //tvar().unify(tvfun);
+    // Build a HM tvar (args->ret), same as HM.java Lambda does.
+    FunNode fun = ret.fun();
+    TLambda tvargs = (TLambda)fun.tvar().find();
+    TTupN   tvret  = (TTupN  )ret.tvar().find(); // [Control,Memory,Result]
+    TFun tvfun = new TFun(this,tvargs,tvret);
+    _tvar.unify(tvfun);
   }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }

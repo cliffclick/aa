@@ -4,6 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TLambda;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
@@ -213,6 +214,8 @@ public class CallNode extends Node {
           add_def( nnn.fld(i));
         set_mem(((MrgProjNode)mem).mem(),gvn);
         _unpacked = true;     // Only do it once
+        // After unpacking, unify with proper arg counts
+        tvar().unify(new TLambda(this,nargs()));
         return this;
       }
     }
@@ -732,4 +735,9 @@ public class CallNode extends Node {
     return _rpc==call._rpc;
   }
   @Override Node is_pure_call() { return fun().is_pure_call()==null ? null : mem(); }
+  // Matches CTL_IDX, MEM_IDX, FUN_IDX
+  @Override public @NotNull Node[] parms() { return _defs.asAry(); }
+  @Override public @NotNull String @NotNull [] argnames() {
+    return TypeFunSig.arg_names(nargs());
+  }
 }

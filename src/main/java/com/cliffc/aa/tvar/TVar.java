@@ -1,11 +1,12 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.TNode;
+import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.TNode;
 import org.jetbrains.annotations.NotNull;
+
+import static com.cliffc.aa.AA.unimpl;
 
 // Type of a Var, for something like Hindley-Milner parametric polymorphism.  A
 // TypeVar holds the base type for its Node.  TypeVars can be unified (or in
@@ -19,34 +20,38 @@ public class TVar extends TypeVar {
   // OR:     TAIL of U-F; _u==HEAD, _uf_kids null
   private TypeVar _u;           // Tarjan Union-Find; null==HEAD
 
-  private Type _type;           // Base/ground Type
-
   // Basic H-M type variable supporting U-F and parametric types.
-  public TVar( @NotNull TNode tn ) { super(tn); _type=Type.ALL; }
+  public TVar( @NotNull TNode tn ) { super(tn); ; }
 
   // Base type from Node
   @Override public Type _type(boolean head) {
     assert !head || _u==null;
-    return _type;
+    return _tnode.val();
   }
 
-  //
-  public Type setype( Type t ) { return _type = t; }
-
+  // Test no fails during unification
+  @Override boolean _unify_test(TypeVar tv) {
+    return true;
+  }
   // Unify this into tv.
-  @Override public Object unify(TypeVar tv) {
-    assert !_tnode.is_dead() && !tv._tnode.is_dead();
+  @Override public void _unify(TypeVar tv) {
+    if( tv==this ) return;      // Already unioned
+    if( tv._tnode.is_dead() ) {
+      assert !_tnode.is_dead(); // top of union is alive
+      tv._unify(this);
+      return;
+    }
     _u = tv;
     if( tv._uf_kids==null ) tv._uf_kids = new Ary<>(new TVar[1],0);
     if( _uf_kids != null )  tv._uf_kids.addAll(_uf_kids);
-    return tv._uf_kids.push(this);
+    tv._uf_kids.push(this);
   }
 
   // U-F find algo
   @Override public TypeVar find() {
     if( _u==null ) return this;
     if( !(_u instanceof TVar) || ((TVar)_u)._u==null ) return _u;
-    throw com.cliffc.aa.AA.unimpl();
+    throw unimpl();
   }
 
   // Pretty print
@@ -56,8 +61,7 @@ public class TVar extends TypeVar {
       return _u._str(sb,pretty);
     }
     sb.p("V").p(uid());
-    if( _type!=Type.ANY )
-      _type.str(sb.p(":"),new VBitSet(),null,true);
+    //_tnode.val().str(sb.p(":"),new VBitSet(),null,true);
     return sb;
   }
 }

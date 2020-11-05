@@ -2,8 +2,8 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.Types;
 import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.type.Types;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
@@ -12,7 +12,7 @@ import org.jetbrains.annotations.NotNull;
 // {Control,Memory,Display/Fun,Arg2,Arg3,...} for an N-arg Call.
 public class TTupN extends TypeVar {
   private final int _n;
-  
+
   // Basic H-M type variable supporting U-F and parametric types.
   public TTupN( @NotNull TNode tn, int n ) { super(tn); _n=n; }
 
@@ -25,9 +25,18 @@ public class TTupN extends TypeVar {
     return TypeTuple.make(ts);
   }
 
+  // Test no fails during unification
+  @Override boolean _unify_test(TypeVar tv) {
+    if( tv instanceof TVar ) return tv._unify_test(this);
+    if( !(tv instanceof TTupN) ) return false; // Fails unification
+    TTupN tn = (TTupN)tv;
+    // Structural unification
+    throw com.cliffc.aa.AA.unimpl();
+  }
+
   // Unify this into tv.
-  @Override public Object unify(TypeVar tv) {
-    if( tv instanceof TVar ) return tv.unify(this);
+  @Override public void _unify(TypeVar tv) {
+    if( tv instanceof TVar ) { tv._unify(this); return; }
     if( !(tv instanceof TTupN) )
       throw com.cliffc.aa.AA.unimpl(); // Fails unification
     TTupN tn = (TTupN)tv;

@@ -368,6 +368,7 @@ public class GVNGCM {
       nnn._live = old._live;    // Replacement has same liveness as original
       rereg(nnn, nnn.value(_opt_mode));
     }
+    // When replacing one node with another, unify their type vars
     if( !nnn.is_dead() && !old.is_dead() )
       old.tvar().unify(nnn.tvar());
     if( !old.is_dead() ) { // if old is being replaced, it got removed from GVN table and types table.

@@ -275,7 +275,7 @@ public class HM {
     }
     @Override public String _str() {
       if( _name.equals("->") )
-            return "{ "+_args[0].str()+" -> "+_args[1].str()+" }";
+        return "{ "+_args[0].str()+" -> "+_args[1].str()+" }";
       SB sb = new SB().p(_name).p('(');
       for( HMType t : _args )
         sb.p(t.str()).p(',');

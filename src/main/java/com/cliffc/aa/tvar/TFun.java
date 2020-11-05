@@ -9,30 +9,37 @@ import org.jetbrains.annotations.NotNull;
 // Type of a Hindley-Milner function operator.
 // "->N" for n-argument functions.
 public class TFun extends TypeVar {
-  final TLambda _funargs; // Control0, Memory1, Fcn/Disp2, Arg3, Arg4, ...
-  final TTupN _rez;       // Control0, Memory1, Result2
+  final TypeVar _funargs; // Control0, Memory1, Fcn/Disp2, Arg3, Arg4, ...
+  public final TypeVar _rez;       // Control0, Memory1, Result2
 
   // Basic H-M type variable supporting U-F and parametric types.
-  public TFun( @NotNull TNode tn, TLambda funargs, TTupN rez ) { super(tn); _funargs=funargs; _rez=rez; }
+  public TFun( @NotNull TNode tn, TypeVar funargs, TypeVar rez ) { super(tn); _funargs=funargs; _rez=rez; }
 
   // Type from parts.  Grab the nargs (and memory) and the return and build a
   // TypeFunSig.
   @Override public TypeFunSig _type(boolean head) {
     @NotNull String @NotNull [] names  = _funargs._tnode.argnames();
-    TypeTuple targs = _funargs._type(head);
-    TypeTuple rez   = _rez    ._type(head);
+    TypeTuple targs = (TypeTuple)_funargs._type(head);
+    TypeTuple rez   = (TypeTuple)_rez    ._type(head);
     TypeFunSig fcn = TypeFunSig.make(names,targs,rez);
     return fcn;
   }
 
+  // Test no fails during unification
+  @Override boolean _unify_test(TypeVar tv) {
+    if( tv instanceof TVar ) return tv._unify_test(this);
+    if( !(tv instanceof TFun) ) return false;
+    TFun tf = (TFun)tv;
+    return _funargs._unify_test(tf._funargs) && _rez._unify_test(tf._rez);
+
+  }
   // Unify this into tv.
-  @Override public Object unify(TypeVar tv) {
-    if( tv instanceof TVar ) return tv.unify(this);
-    if( !(tv instanceof TFun) )
-      throw com.cliffc.aa.AA.unimpl(); // Fails unification
+  @Override void _unify(TypeVar tv) {
+    if( tv instanceof TVar ) { tv._unify(this); return; }
     TFun tf = (TFun)tv;
     // Structural unification
-    throw com.cliffc.aa.AA.unimpl();
+    _funargs._unify(tf._funargs);
+    _rez._unify(tf._rez);
   }
 
   // Pretty print
