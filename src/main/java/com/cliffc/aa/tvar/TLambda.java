@@ -61,10 +61,10 @@ public class TLambda extends TypeVar {
 
   // Pretty print
   @Override public SB _str(SB sb, boolean pretty) {
-    sb.p('V').p(uid()).p('[');
     @NotNull TNode           [] parms = _tnode.parms   ();
     @NotNull String @NotNull [] names = _tnode.argnames();
-    for( int i=MEM_IDX; i<parms.length; i++ ) {
+    sb.p('[');
+    for( int i=0; i<parms.length; i++ ) {
       TNode tn = parms[i];
       if( tn!=null ) tn.tvar()._str(sb.p(names[i]).p(':'),pretty);
       sb.p(',');

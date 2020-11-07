@@ -45,6 +45,7 @@ public class TVar extends TypeVar {
     if( tv._uf_kids==null ) tv._uf_kids = new Ary<>(new TVar[1],0);
     if( _uf_kids != null )  tv._uf_kids.addAll(_uf_kids);
     tv._uf_kids.push(this);
+    _uf_kids=null;
   }
 
   // U-F find algo

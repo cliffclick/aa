@@ -46,7 +46,7 @@ public class TTupN extends TypeVar {
 
   // Pretty print
   @Override public SB _str(SB sb, boolean pretty) {
-    sb.p("V").p(uid()).p("[");
+    sb.p("[");
     for( int i=0; i<_n; i++ )
       _tnode.tvar(i)._str(sb,pretty).p(",");
     return sb.unchar().p("]");

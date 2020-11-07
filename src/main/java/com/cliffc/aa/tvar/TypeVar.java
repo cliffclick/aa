@@ -14,7 +14,7 @@ import org.jetbrains.annotations.NotNull;
 // function: TypeFunSig(formals:TypeStruct(disp,TypeVar A),ret:TypeVar A).
 
 abstract public class TypeVar {
-  @NotNull final TNode _tnode; // Abstract view of a Node
+  TNode _tnode; // Abstract view of a Node
   Ary<TVar> _uf_kids; // List of union children.  Used for computing JOIN of children.
   public TypeVar( @NotNull TNode tn ) { _tnode=tn; }
   public int uid() { return _tnode.uid(); }
@@ -38,7 +38,12 @@ abstract public class TypeVar {
   }
   abstract public Type _type(boolean head); // Local type as UF root
   // Unify this into tv.
-  public final void unify(TypeVar tv) { if( _unify_test(tv) ) _unify(tv); }
+  public final void unify(TypeVar tv) {
+    if( _unify_test(tv) )
+      _unify(tv);
+    else
+      System.out.println("Unable to unify "+this+"with "+tv);
+  }
   abstract boolean _unify_test(TypeVar tv);
   abstract void _unify(TypeVar tv);
   // U-F find algo.  Only TVars can be a child in U-F.
