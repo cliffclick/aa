@@ -1,25 +1,70 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
-import org.jetbrains.annotations.NotNull;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 
 // Hindley-Milner typing.  Complete stand-alone, for research.  MEETs base
 // types, instead of declaring type error.  Requires SSA renumbering; uses a
 // global Env instead locally tracking.
 //
-// Testing in this version changing out the AST tree-walk for a worklist based
-// approach, where unification happens in any order.  In particular, it means
-// that (unlike a tree-walk), function types will get used before the function
-// is typed.  This means that a "fresh" copy of a function type to be used to
-// unify against will not have all the contraints at first unification.
+// For Sea-of-Nodes, plus memory/side-effects:
+//   Buff for multi-args AND multi-return (return includes memory).
+// LAMBDA/FunNode:
+//   Parms: new TVar per Parm.
+//   Ret  : Gather multi-return TVars (ret&mem)
+//   TFP  : new TVar == { parms... -> ret mem }
+// APPLY/CallNode:
+//   Clone TFP fresh (clone-per-use), and the TFP has to be sorted out already.
+//   Build TVarFun { args... mem -> new rez, new mem }
+//   U-F with cloned TFP.  Cloned TFP has constraints like input-same-type-as-
+//   output, and U-F enforces this on Call args.
+// IDENT/Node:
+//   Clone per use typically, so put the onus on the user.
+//   Otherwise use TNode (which is base Type for this Node).
+
+// Thinking: every Node USE (occurrence of an Ident) gets a unique TVar - except
+// TFP's being used inside their own Fun (recursive).  This is a TVar-per-Edge
+// instead of per-Node.
+//
+// Also: Arrays need recursive-MEET same as Structs.  Much simpler, of course!
+// But ptrs-to-Arrays-to-ptrs of the same type should totally be typable.
+//
+// Also: TFPs need a TVar per arg & return; so do TypeStruct need a TVar per
+// field.  Correlation between NewStruct having an Edge-per-Field.
+//
+// Must run HM after first GCP (coarse Call Graph available).
+// But wondering if can run DURING GCP & get optimistic results.
+// HM is NOT the same as Thesis combo.
+
+// Starting with pessimistic: TVars allow JOIN on types in some places lifting
+// conservative answers.  They discover congruences (equivs) amongst Nodes,
+// and can be used to lift values amongst congruences; e.g., if A===B and
+// A:int:3 and B:BOTTOM, actually B:int:3.
+
+// TypeNode: has a Node & can UF with other TypeNodes.  Computes base type as a
+// JOIN across all UF Nodes' base types.  Nodes start with a TypeNode of
+// themselves. Identities can UF TypeNodes for their own TypeNode.  SESE
+// regions can lift TypeNodes around Phi/Parm.  NewObj has a TypeNode which is
+// a TypeStruct with TypeNode fields.  Fun has a TypeNode which is a TypeFunSig
+// which has args & ret as TypeNodes.  So TypeNodes have mirror structure to
+// Types???  So... maybe want Rule: Node has a Type (which includes a TypeNode),
+// but Nodes' TypeNode cannot (recursively) encode its own TypeNode.
+//
+// Ex: Con:int:5 - TypeInt:5.
+// Ex: (Add x y) - TypeInt:int64
+// Ex: (Copy a)  - TypeNode:a, where 'a' is not this Copy
+// Ex: Parm      - Type as a MEET of inputs, not a TypeNode, unless foldable (which Ideal will do).
+// Ex: Ret       - TypeTuple of {ret:TypeNode, mem:TypeNode}
+// Ex: CallEpi   - TypeTuple of MEET of {ret:TypeNode, mem:TypeNode}.
+// Ex: CallEpi   - Single ret; for all TypeNodes in {ret,mem} that are Parm, replace with Call edge.
 
 
-public class HM {
+public class HM2 {
   static final HashMap<String,HMType> ENV = new HashMap<>();
 
   public static HMType hm( Syntax prog) {
@@ -49,133 +94,81 @@ public class HM {
     ENV.put("factor",Oper.fun(flt64,new Oper("pair",flt64,flt64)));
 
 
-    // Prep for SSA: pre-gather all the (unique) ids.  Store a linked-list of
-    // non-generative IDs (those mid-definition in Lambda & Let, or in the old
-    // "nongen" HashSet), for use by Ident.hm.
-    prog.get_ids(null);
+    // Prep for SSA: pre-gather all the (unique) ids
+    prog.get_ids();
 
-    // Worklist:
-    final Ary<Syntax> ary = new Ary<>(Syntax.class); // For picking random element
-    final HashSet<Syntax> work = new HashSet<>();    // For preventing dups
-    prog.add_work(ary,work);
-    while( ary.len()>0 ) {
-      Syntax s = ary.pop();
-      work.remove(s);
-      HMType old = s._hm;
-      HMType nnn = s.hm(); if( nnn!=null ) nnn = nnn.find();
-      if( nnn==null || !nnn.eq(old,new HashMap<>()) ) {
-        s._hm = nnn;
-        if( s._par!=null ) s._par.add_work(ary,work);
-        s.add_kids(ary,work);
-      } else if( nnn!=old )
-        old.find().union(nnn);
-    }
-    return prog._hm;
+    return prog.hm(new HashSet<>());
   }
-  static void reset() { ENV.clear(); HMVar.reset(); }
+  static void reset() { HMVar.reset(); }
 
-  static class VStack implements Iterable<HMVar> {
-    final VStack _par;
-    final HMVar _nongen;
-    VStack( VStack par, HMVar nongen ) { _par=par; _nongen=nongen; }
-    /** @return an iterator */
-    @NotNull
-    @Override public Iterator<HMVar> iterator() { return new Iter(); }
-    private class Iter implements Iterator<HMVar> {
-      private VStack _vstk;
-      Iter() { _vstk=VStack.this; }
-      @Override public boolean hasNext() { return _vstk!=null; }
-      @Override public HMVar next() { HMVar v = _vstk._nongen; _vstk = _vstk._par;  return v; }
-    }
-
-  }
 
   public static abstract class Syntax {
-    abstract HMType hm();
-    abstract void get_ids(VStack vstk);
-    Syntax _par;
-    HMType _hm;
-    final void add_work(Ary<Syntax> ary,HashSet<Syntax> work) {
-      if( !work.contains(this) )
-        work.add(ary.push(this));
-    }
-    void add_kids(Ary<Syntax> ary,HashSet<Syntax> work) {}
+    abstract HMType hm(HashSet<HMVar> nongen);
+    abstract void get_ids();
   }
   public static class Con extends Syntax {
     final Type _t;
     Con(Type t) { _t=t; }
     @Override public String toString() { return _t.toString(); }
-    @Override HMType hm() { return new HMVar(_t); }
-    @Override void get_ids(VStack vstk) {}
+    @Override HMType hm(HashSet<HMVar> nongen) { return new HMVar(_t); }
+    @Override void get_ids() {}
   }
   public static class Ident extends Syntax {
     final String _name;
-    VStack _vstk;
     Ident(String name) { _name=name; }
     @Override public String toString() { return _name; }
-    @Override HMType hm() {
+    @Override HMType hm(HashSet<HMVar> nongen) {
       HMType t = ENV.get(_name);
       if( t==null )
         throw new RuntimeException("Parse error, "+_name+" is undefined");
-      HMType f = t.fresh(_vstk);
+      HMType f = t.fresh(nongen);
       return f;
     }
-    @Override void get_ids(VStack vstk) { _vstk=vstk; }
+    @Override void get_ids() {}
   }
   public static class Lambda extends Syntax {
     final String _arg0;
     final Syntax _body;
-    Lambda(String arg0, Syntax body) { _arg0=arg0; _body=body; _body._par=this; }
+    Lambda(String arg0, Syntax body) { _arg0=arg0; _body=body; }
     @Override public String toString() { return "{ "+_arg0+" -> "+_body+" }"; }
-    @Override HMType hm() {
-      HMVar  tnew = (HMVar) ENV.get(_arg0);
-      HMType trez = _body._hm;
-      if( trez==null ) return null;
+    @Override HMType hm(HashSet<HMVar> nongen) {
+      HMVar tnew = (HMVar) ENV.get(_arg0);
+      nongen.add(tnew);
+      HMType trez = _body.hm(nongen);
+      nongen.remove(tnew);
       return Oper.fun(tnew,trez);
     }
-    @Override void get_ids(VStack vstk) {
-      HMVar var = new HMVar();
-      ENV.put(_arg0, var);
-      _body.get_ids(new VStack(vstk,var));
-    }
-    void add_kids(Ary<Syntax> ary,HashSet<Syntax> work) { _body.add_work(ary,work); }
+    @Override void get_ids() { ENV.put(_arg0, new HMVar()); _body.get_ids(); }
   }
   public static class Let extends Syntax {
     final String _arg0;
     final Syntax _body, _use;
-    Let(String arg0, Syntax body, Syntax use) { _arg0=arg0; _body=body; _use=use; _body._par=this; _use._par=this; }
+    Let(String arg0, Syntax body, Syntax use) { _arg0=arg0; _body=body; _use=use; }
     @Override public String toString() { return "let "+_arg0+" = "+_body+" in "+_use+" }"; }
-    @Override HMType hm() {
-      HMType tbody = _body._hm;
-      HMType trez  = _use ._hm;
-      if( tbody==null || trez==null ) return null;
+    @Override HMType hm(HashSet<HMVar> nongen) {
       HMVar tnew = (HMVar) ENV.get(_arg0);
-      tnew.union(tbody.find());
-      return trez.find();
+      nongen.add(tnew);
+      HMType tbody = _body.hm(nongen);
+      nongen.remove(tnew);
+      tnew.union(tbody);
+      HMType trez = _use.hm(nongen);
+      return trez;
     }
-    @Override void get_ids(VStack vstk) {
-      HMVar var = new HMVar();
-      ENV.put(_arg0, var);
-      _body.get_ids(new VStack(vstk,var));
-      _use .get_ids(vstk);
-    }
-    void add_kids(Ary<Syntax> ary,HashSet<Syntax> work) { _body.add_work(ary,work); _use.add_work(ary,work); }
+    @Override void get_ids() { ENV.put(_arg0, new HMVar()); _use.get_ids(); _body.get_ids(); }
   }
   public static class Apply extends Syntax {
     final Syntax _fun, _arg;
-    Apply(Syntax fun, Syntax arg) { _fun=fun; _arg=arg; _fun._par=this; _arg._par=this; }
+    Apply(Syntax fun, Syntax arg) { _fun=fun; _arg=arg; }
     @Override public String toString() { return "("+_fun+" "+_arg+")"; }
-    @Override HMType hm() {
-      HMType tfun = _fun._hm;
-      HMType targ = _arg._hm;
-      if( tfun==null || targ==null ) return null;
+    @Override HMType hm(HashSet<HMVar> nongen) {
+      HMType tfun = _fun.hm(nongen);
+      HMType targ = _arg.hm(nongen);
       HMType trez = new HMVar();
-      HMType nfun = Oper.fun(targ.find(),trez);
+      HMType nfun = Oper.fun(targ,trez);
       nfun.union(tfun);
       return trez;
     }
-    @Override void get_ids(VStack vstk) { _fun.get_ids(vstk); _arg.get_ids(vstk); }
-    void add_kids(Ary<Syntax> ary,HashSet<Syntax> work) { _fun.add_work(ary,work); _arg.add_work(ary,work); }
+    @Override void get_ids() { _fun.get_ids(); _arg.get_ids(); }
   }
 
 
@@ -187,30 +180,28 @@ public class HM {
     public String str() { return find()._str(); }
     abstract String _str();
     boolean is_top() { return _u==null; }
-    abstract boolean eq( HMType v, HashMap<HMVar,HMVar> map );
 
-    HMType fresh(VStack vstk) {
+    HMType fresh(HashSet<HMVar> nongen) {
       HashMap<HMType,HMType> vars = new HashMap<>();
-      return _fresh(vstk,vars);
+      return _fresh(nongen,vars);
     }
-    HMType _fresh(VStack vstk, HashMap<HMType,HMType> vars) {
+    HMType _fresh(HashSet<HMVar> nongen, HashMap<HMType,HMType> vars) {
       HMType t2 = find();
       if( t2 instanceof HMVar ) {
-        return t2.occurs_in(vstk)   //
+        return t2.occurs_in(nongen) //
           ? t2                      // Keep same var
           : vars.computeIfAbsent(t2, e -> new HMVar(((HMVar)t2)._t));
       } else {
         Oper op = (Oper)t2;
         HMType[] args = new HMType[op._args.length];
         for( int i=0; i<args.length; i++ )
-          args[i] = op._args[i]._fresh(vstk,vars);
+          args[i] = op._args[i]._fresh(nongen,vars);
         return new Oper(op._name,args);
       }
     }
 
-    boolean occurs_in(VStack vstk) {
-      if( vstk==null ) return false;
-      for( HMVar x : vstk ) if( occurs_in_type(x) ) return true;
+    boolean occurs_in(HashSet<HMVar>nongen) {
+      for( HMVar x : nongen ) if( occurs_in_type(x) ) return true;
       return false;
     }
     boolean occurs_in(HMType[] args) {
@@ -258,9 +249,9 @@ public class HM {
       return u;
     }
     @Override HMType union(HMType that) {
-      if( this==that ) return this; // Do nothing
       if( _u!=null ) return find().union(that);
       if( that instanceof HMVar ) that = that.find();
+      if( this==that ) return this; // Do nothing
       if( occurs_in_type(that) )
         throw new RuntimeException("recursive unification");
 
@@ -270,17 +261,6 @@ public class HM {
       }
       else assert _t==Type.ANY; // Else this var is un-MEETd with any Con
       return _u = that;         // Classic U-F union
-    }
-
-    @Override boolean eq( HMType v, HashMap<HMVar,HMVar> map ) {
-      if( this==v ) return true;
-      if( v==null ) return false;
-      HMType v2 = v.find();
-      if( !(v2 instanceof HMVar) ) return false;
-      assert _u==null && v2._u==null;
-      if( _t != ((HMVar)v2)._t) return false;
-      HMVar v3 = map.computeIfAbsent(this,k -> (HMVar)v2);
-      return v2 == v3;
     }
   }
 
@@ -304,7 +284,6 @@ public class HM {
 
     @Override HMType find() { return this; }
     @Override HMType union(HMType that) {
-      if( this==that ) return this;
       if( !(that instanceof Oper) ) return that.union(this);
       Oper op2 = (Oper)that;
       if( !_name.equals(op2._name) ||
@@ -313,17 +292,6 @@ public class HM {
       for( int i=0; i<_args.length; i++ )
         _args[i].union(op2._args[i]);
       return this;
-    }
-    @Override boolean eq( HMType v, HashMap<HMVar,HMVar> map ) {
-      if( this==v ) return true;
-      if( !(v instanceof Oper) ) return false;
-      Oper o = (Oper)v;
-      if( !_name.equals(o._name) ||
-          _args.length!=o._args.length ) return false;
-      for( int i=0; i<_args.length; i++ )
-        if( !_args[i].find().eq(o._args[i].find(),map) )
-          return false;
-      return true;
     }
   }
 }

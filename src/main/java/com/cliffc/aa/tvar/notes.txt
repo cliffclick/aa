@@ -79,8 +79,36 @@ So CEpi takes the Ret TTupN3, makes a TLamba from Call args (might as well have
 Call make a TLambda), CEpi makes a TFun from the TLambda+TTupN (same as FunPtr)
 and unifies with the Call incoming TFun.
 
+BUG: Call makes a TLambda from inputs directly, but the Display needs to split
+from the code-pointer.
+439: Call: [ctl:4, mem:434, fcnptr:433, "5"] <<-- but display is "420"!
+And need to "fresh" versions, but lazily.  H-M has ordering, gets the final
+"shape" of a Lambda done before ANY uses.
+
+Theory: instead of Unify an Apply/Call with the fresh version of a completed
+Lambda/FunPtr type, i can unify across a Call boundary lazily & on-demand.
+Can do this in H-M?
+  Make a pass, skipping fcn ID unification, then at Call, no unification
+  between return & arg BECAUSE fcn is NOT unified between return & arg.
+  Then do fcn ID.
+  
+  Then make a pass, at every Call walk the structure of function, force
+  unification of matching args.  Walk Function Return HMType - which is
+  structural on HMOper and leaves on HMVar (and Find at every step).  If see an
+  HMOper, expect same HMOper from Call Return, recursively.  At any Leaf,
+  Unify with same Leaf from Func Return.  Goal: prove it in HM first.
+  Goal: make a worklist version of HM with identical results (but perhaps
+  not provably identical!)
 
 
+
+
+
+AST:            Let "noinline_x"
+           Lambda "i"         Apply2
+          "i"        ("pair"  Apply2             Apply1)
+                        ("&"  Apply1  "7")    ("#" Apply1)
+                        ("noinline" "5")   ("noinline" "[3]")
 
 
  490: #[8]       3  [[ 423 ]]  #[8] #[8] -- V490
@@ -98,29 +126,38 @@ and unifies with the Call incoming TFun.
  420: DProj2   418  [[ 433 ]]  DProj2 _555*[12]use -- V420
  419: MrgProj  418    9  [[   5  439 ]]  MrgProj1  [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]}] -- V419
 
- 433: *noinli  432  420  [[ 418  439  473 ]]  {x -> (Ctrl, [1:use],all)} _582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}] -- V433{ V422[ mem:V424,,x:V431]-> V432[V422[ mem:V424,,x:V431],V424,V431] }
+ 433: *noinli  432  420  [[ 418  439  473 ]]  {x -> (Ctrl, [1:use],all)} _582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}] -- V433{ [ ctl:V4, mem:V419,,x:V435]-> [V4,V419,V435] }
+// Prior to removing dead display:
+  { [ ctl:V422, mem:V424,^:V426,x:V431]-> [V422,V428,V431] }
+// Prior to 1st Call unification  
+  { [ ctl:V422, mem:V424,^:V426,x:V431]-> [V422,V428,V431] }
+// After 1st Call unification
+  { [V422>>V4,V424,V426>>V2>>V433>>...recursive death,V431>>V435]] -> [V422>>V4, V428, V431>>V435] }
 
- 439: Call       4  419  433  435  [[ 440  442  445  444 ]]  Call (Ctrl, [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]}],_582$,5,_81*[]use) -- V439
+  { [ ctl:V4, mem:V419,,x:V435]-> [ctl:V4,mem:V419,V435] }
+
+// Need a "fresh" version of of V433.
+ 439: Call       4  419  433  435  [[ 440  442  445  444 ]]  Call (Ctrl, [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]}],_582$,5,_81*[]use) -- [ ctl:V4, mem:V419,^:V433{ [ ctl:V4, mem:V419,,x:V435]-> [V4,V419,V435] },x:V435]
  444: DProj3   439  [[ 431 ]]  DProj3 5 -- V444
  445: CProj0   439  [[ 422 ]]  CProj0 Ctrl -- V445
  442: MProj1   439    5  [[ 424 ]]  MProj1  [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]}] -- V442
 
- 440: CallEpi  439    5  432  [[ 446  447  448 ]]  CallEpi (Ctrl, [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]},17:[3]0/obj],nScalar) -- V440
+ 440: CallEpi  439    5  432  [[ 446  447  448 ]]  CallEpi (Ctrl, [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]},17:[3]0/obj],nScalar) -- [V4,V419,V435]
  448: DProj2   440  [[ 450 ]]  DProj2 nScalar -- V448
  447: MProj1   440  [[ 503  450 ]]  MProj1  [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]},17:[3]0/obj] -- V447
  446: CProj0   440  [[ 450 ]]  CProj0 Ctrl -- V446
 
- 450: Call     446  447  325  448  449  [[ 451  453  454  455  456 ]]  Call (Ctrl, [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]},17:[3]0/obj],_482[_78 0,{&}=*_191{ ctl:Ctrl  mem: [1:use] ^:_78$ x:int64 y:int64 -> (Ctrl, [1:~use],int64)}],nScalar,7,_28*[0,ALL]use?) -- V450
+ 450: Call     446  447  325  448  449  [[ 451  453  454  455  456 ]]  Call (Ctrl, [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]},17:[3]0/obj],_482[_78 0,{&}=*_191{ ctl:Ctrl  mem: [1:use] ^:_78$ x:int64 y:int64 -> (Ctrl, [1:~use],int64)}],nScalar,7,_28*[0,ALL]use?) -- [ ctl:V319, mem:V321,,x:V322,y:V323]
  456: CProj0   450  [[ 319 ]]  CProj0 Ctrl -- V456
  455: DProj4   450  [[ 323 ]]  DProj4 7 -- V455
  454: DProj3   450  [[ 322 ]]  DProj3 nScalar -- V454
  453: MProj1   450    5  [[ 321 ]]  MProj1  [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]},17:[3]0/obj] -- V453
 
- 451: CallEpi  450    5  324  [[ 457  458 ]]  CallEpi (Ctrl, [1:~use],int64) -- V451
+ 451: CallEpi  450    5  324  [[ 457  458 ]]  CallEpi (Ctrl, [1:~use],int64) -- [V319,V321,V41]
  458: DProj2   451  [[ 486 ]]  DProj2 int64 -- V458
  457: CProj0   451  [[ 473 ]]  CProj0 Ctrl -- V457
 
- 473: Call     457  503  433  501  [[ 474  491  492  493 ]]  Call (Ctrl, [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]},17:[3]0/obj],_582$,_1109*[17]use,_1109$) -- V473
+ 473: Call     457  503  433  501  [[ 474  491  492  493 ]]  Call (Ctrl, [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]},17:[3]0/obj],_582$,_1109*[17]use,_1109$) -- [ ctl:V457, mem:V503,^:V433{ [ ctl:V4, mem:V419,,x:V435]-> [V4,V419,V435] },x:V501]
  493: CProj0   473  [[ 422 ]]  CProj0 Ctrl -- V493
  492: DProj3   473  [[ 431 ]]  DProj3 _1109*[17]use -- V492
  491: MProj1   473    5  [[ 424 ]]  MProj1  [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]},17:[3]0/obj] -- V491
@@ -129,12 +166,12 @@ and unifies with the Call incoming TFun.
  477: DProj2   474  [[ 478 ]]  DProj2 nScalar -- V477
  475: CProj0   474  [[ 478 ]]  CProj0 Ctrl -- V475
 
- 478: Call     475  503  129  477  [[ 479  481  482  483 ]]  Call (Ctrl, [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]},17:[3]0/obj],_318[_78 0,{#}=*_242{ ctl:Ctrl  mem: [1:use] ^:_78$ ary:_60*[6][]Scalar/obj -> (Ctrl, [1:~use],int64)}],nScalar,_28*[0,ALL]use?) -- V478
+ 478: Call     475  503  129  477  [[ 479  481  482  483 ]]  Call (Ctrl, [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]},17:[3]0/obj],_318[_78 0,{#}=*_242{ ctl:Ctrl  mem: [1:use] ^:_78$ ary:_60*[6][]Scalar/obj -> (Ctrl, [1:~use],int64)}],nScalar,_28*[0,ALL]use?) -- [ ctl:V124, mem:V126,,ary:V127]
  483: CProj0   478  [[ 124 ]]  CProj0 Ctrl -- V483
  482: DProj3   478  [[ 127 ]]  DProj3 nScalar -- V482
  481: MProj1   478    5  [[ 126 ]]  MProj1  [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]},17:[3]0/obj] -- V481
 
- 479: CallEpi  478    5  128  [[ 484  485 ]]  CallEpi (Ctrl, [1:~use],all) -- V479
+ 479: CallEpi  478    5  128  [[ 484  485 ]]  CallEpi (Ctrl, [1:~use],all) -- [V124,V126,V54]
  485: DProj2   479  [[ 486 ]]  DProj2 all -- V485
  484: CProj0   479  [[ 421 ]]  CProj0 Ctrl -- V484
 
@@ -145,10 +182,10 @@ and unifies with the Call incoming TFun.
  421: Scope    484  487 ____  488 ____ ____ ____  [[]]  Scope all -- V421
 
 ============ noinline_id[46] ============
- 422: noinlin ____  445  493  [[ 423  424  432  432  431 ]]  {x -> (Ctrl, [1:use],all)} Ctrl -- V422[ mem:V424,,x:V431]
- 431: Parm:x   422  444  492  [[ 432 ]]  Parm:x nScalar -- V431
- 424: Parm: m  422  442  491  [[ 432 ]]  Parm: mem  [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]},17:[3]0/obj] -- V424
+ 422: noinlin ____  445  493  [[ 423  424  432  432  431 ]]  {x -> (Ctrl, [1:use],all)} Ctrl -- V4
+ 431: Parm:x   422  444  492  [[ 432 ]]  Parm:x nScalar -- V435
+ 424: Parm: m  422  442  491  [[ 432 ]]  Parm: mem  [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]},17:[3]0/obj] -- V419
  423: Parm:rp  422  441  490  [[ 432 ]]  Parm:rpc #[5,8] -- V423
 
- 432: Ret_noi  422  424  431  423  422  [[ 433  440  474 ]]  Ret_noinline_id[46] (Ctrl, [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]},17:[3]0/obj],nScalar) -- V432[V422[ mem:V424,,x:V431],V424,V431]
+ 432: Ret_noi  422  424  431  423  422  [[ 433  440  474 ]]  Ret_noinline_id[46] (Ctrl, [1:~use,7:_1051@{LOW_PRIMS},12:_798@{^=_181*[7]use; noinline_id=_582[_555*[12]use,noinline_id=*_613{ ctl:Ctrl  mem: [ mem ] ^:_555$ x -> (Ctrl, [1:use],all)}]},17:[3]0/obj],nScalar) -- [V4,V419,V435]
 ============ noinline_id[46] ============
