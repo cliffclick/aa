@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.TNode;
 import com.cliffc.aa.tvar.TLambda;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
@@ -89,7 +90,7 @@ public class FunNode extends RegionNode {
     _thunk_rhs = thunk_rhs;
     FUNS.setX(fidx(),this); // Track FunNode by fidx; assert single-bit fidxs
     // FunNodes are just argument collections (no return)
-    tvar().unify(new TLambda(this,nargs()));
+    //tvar().unify(new TLambda(this,nargs()));
   }
 
   // Find FunNodes by fidx
@@ -217,7 +218,7 @@ public class FunNode extends RegionNode {
     }
 
     // Look for appropriate type-specialize callers
-    ParmNode[] parms = parms();
+    Node[] parms = parms();
     TypeTuple formals = _thunk_rhs ? null : type_special(parms);
     Ary<Node> body = find_body(ret);
     int path = -1;              // Paths will split according to type
@@ -286,10 +287,10 @@ public class FunNode extends RegionNode {
 
   // Visit all ParmNodes, looking for unresolved call uses that can be improved
   // by type-splitting
-  private int find_type_split_index( ParmNode[] parms ) {
-    assert has_unknown_callers(); // Only overly-wide calls.
-    for( ParmNode parm : parms ) // For all parms
-      if( parm != null && parm._idx > 0 ) // (some can be dead) and skipping the display
+  private int find_type_split_index( Node[] parms ) {
+    assert has_unknown_callers();// Only overly-wide calls.
+    for( Node parm : parms )     // For all parms
+      if( parm != null )         // (some can be dead)
         for( Node use : parm._uses ) { // See if a parm-user needs a type-specialization split
           if( use instanceof CallNode ) {
             CallNode call = (CallNode)use;
@@ -312,7 +313,7 @@ public class FunNode extends RegionNode {
   }
 
   // Find types for which splitting appears to help.
-  private Type[] find_type_split( ParmNode[] parms ) {
+  private Type[] find_type_split( Node[] parms ) {
     assert has_unknown_callers(); // Only overly-wide calls.
 
     // Look for splitting to help an Unresolved Call.
@@ -419,7 +420,7 @@ public class FunNode extends RegionNode {
   // on arguments that help immediately.
   //
   // Same argument for field Loads from unspecialized values.
-  private TypeTuple type_special( ParmNode[] parms ) {
+  private TypeTuple type_special( Node[] parms ) {
     if( !has_unknown_callers() ) return null; // Only overly-wide calls.
     Type[] sig = find_type_split(parms);
     if( sig == null ) return null; // No unresolved calls; no point in type-specialization
@@ -486,7 +487,7 @@ public class FunNode extends RegionNode {
   // Split a single-use copy (e.g. fully inline) if the function is "small
   // enough".  Include anything with just a handful of primitives, or a single
   // call, possible with a single if.
-  private int split_size( Ary<Node> body, ParmNode[] parms ) {
+  private int split_size( Ary<Node> body, Node[] parms ) {
     if( _defs._len <= 1 ) return -1; // No need to split callers if only 2
     BitSet recursive = new BitSet();    // Heuristic to limit unrolling recursive methods
 
@@ -530,14 +531,16 @@ public class FunNode extends RegionNode {
       int fidx = tfp.fidxs().abit();
       if( fidx < 0 || BitsFun.is_parent(fidx) ) continue;  // Call must only target one fcn
       int ncon=0;
-      for( ParmNode parm : parms )
+      for( int j=MEM_IDX; j<parms.length; j++ ) {
+        Node parm = parms[j];
         if( parm != null ) {    // Some can be dead
           Type actual = parm.in(i).sharptr(mem.in(i));
-          Type formal = formal(parm._idx);
+          Type formal = formal(j);
           if( !actual.isa(formal) ) // Path is in-error?
             { ncon = -2; break; }   // This path is in-error, cannot inline even if small & constants
           if( actual.is_con() ) ncon++; // Count constants along each path
         }
+      }
       if( ncon > mncons && !recursive.get(in(i)._uid) )
         { mncons = ncon; m = i; } // Path with the most constants
     }
@@ -863,8 +866,9 @@ public class FunNode extends RegionNode {
     return null;
   }
   // Matches CTL_IDX, MEM_IDX, FUN_IDX
-  @Override public ParmNode[] parms() {
-    ParmNode[] tns = new ParmNode[nargs()];
+  @Override public Node[] parms() {
+    Node[] tns = new Node[nargs()];
+    tns[CTL_IDX]=this;
     for( Node use : _uses )
       if( use instanceof ParmNode ) {
         ParmNode parm = (ParmNode)use;

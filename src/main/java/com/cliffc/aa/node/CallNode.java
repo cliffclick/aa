@@ -736,7 +736,11 @@ public class CallNode extends Node {
   }
   @Override Node is_pure_call() { return fun().is_pure_call()==null ? null : mem(); }
   // Matches CTL_IDX, MEM_IDX, FUN_IDX
-  @Override public @NotNull Node[] parms() { return _defs.asAry(); }
+  @Override public @NotNull Node[] parms() {
+    Node[] parms = _defs.asAry();
+    
+    return parms;
+  }
   @Override public @NotNull String @NotNull [] argnames() {
     return TypeFunSig.arg_names(nargs());
   }

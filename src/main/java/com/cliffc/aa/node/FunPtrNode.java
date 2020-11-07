@@ -18,7 +18,7 @@ public final class FunPtrNode extends Node {
     _referr = referr;
     // Build a HM tvar (args->ret), same as HM.java Lambda does.
     FunNode fun = ret.fun();
-    TLambda tvargs = (TLambda)fun.tvar().find();
+    TLambda tvargs = new TLambda(fun,fun.nargs());
     TTupN   tvret  = (TTupN  )ret.tvar().find(); // [Control,Memory,Result]
     TFun tvfun = new TFun(this,tvargs,tvret);
     _tvar.unify(tvfun);
