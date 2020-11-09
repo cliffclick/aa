@@ -358,9 +358,9 @@ public class HM {
 
       if( that instanceof HMVar ) {
         HMVar v2 = (HMVar)that;
-        if( _uid < v2._uid )
+        if( _uid < v2._uid )    // Order, so keep smaller _uids by default
           return that.union(this,work);
-        v2._t = _t.meet(v2._t);
+        v2._t = _t.meet(v2._t); // Lattice MEET instead of unification failure
       }
       else assert _t==Type.ANY; // Else this var is un-MEETd with any Con
       if( _ids!=null ) {        // Move this ids into that ids
@@ -369,8 +369,8 @@ public class HM {
         _ids=null;              // No longer here
       }
       if( that._ids!=null ) {   // All that ids onto worklist
-        for( Ident id : that._ids ) id._hm=null;
-        work.addAll(that._ids);
+        for( Ident id : that._ids ) id._hm=null; // Flag as 1-shot re-freshen
+        work.addAll(that._ids); // On to worklist
       }
       return _u = that;         // Classic U-F union
     }
