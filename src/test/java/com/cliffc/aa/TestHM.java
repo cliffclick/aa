@@ -28,7 +28,7 @@ public class TestHM {
   public void test02() {
     Syntax syn = new Apply(new Ident("pair"),new Con(TypeInt.con(3)));
     HMType t = HM.hm(syn);
-    assertEquals("{ v15 -> pair(v14:3,v15) }",t.str());
+    assertEquals("{ v10 -> pair(v8:3,v10) }",t.str());
   }
 
   @Test
@@ -46,7 +46,7 @@ public class TestHM {
                                                        new Apply(new Ident("dec"),new Ident("n")))))),
               new Ident("fact"));
     HMType t1 = HM.hm(fact);
-    assertEquals("{ v47:int64 -> v47:int64 }",t1.str());
+    assertEquals("{ v14:int64 -> v14:int64 }",t1.str());
   }
 
   @Test
@@ -58,7 +58,7 @@ public class TestHM {
                                      new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
                            new Apply(new Ident("x"), new Con(TypeStr.ABC))));
     HMType t1 = HM.hm(x);
-    assertEquals("{ { v9:all -> v26 } -> pair(v26,v26) }",t1.str());
+    assertEquals("{ { v9:all -> v10 } -> pair(v10,v10) }",t1.str());
   }
 
   @Test
@@ -111,7 +111,7 @@ public class TestHM {
                                    new Apply(new Ident("f"), new Con(TypeInt.con(1))))));
 
     HMType t1 = HM.hm(syn);
-    assertEquals("{ v11 -> pair(v11,v11) }",t1.str());
+    assertEquals("{ v8 -> pair(v8,v8) }",t1.str());
   }
 
   @Test
@@ -144,7 +144,7 @@ public class TestHM {
                                             // "factor" a float returns a pair (mod,rem).
                                             new Ident("factor")), new Con(TypeFlt.con(2.3)))));
     HMType t1 = HM.hm(syn);
-    assertEquals("pair(v12:*str,pair(v26:flt64,v26:flt64))",t1.str());
+    assertEquals("pair(v18:*str,pair(v11:flt64,v11:flt64))",t1.str());
   }
 
 
