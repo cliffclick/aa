@@ -2,8 +2,8 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -129,8 +129,9 @@ public class HM1 {
     HMType _u;                  // U-F; always null for Oper
     abstract HMType union(HMType t);
     abstract HMType find();
-    public String str() { return find()._str(); }
-    abstract String _str();
+    @Override public final String toString() { return _str(new SB(),new VBitSet(),true).toString(); }
+    public String str() { return _str(new SB(),new VBitSet(),false).toString(); }
+    abstract SB _str(SB sb, VBitSet vbs, boolean debug);
     boolean is_top() { return _u==null; }
 
     HMType fresh(HashSet<HMVar> nongen) {
@@ -179,16 +180,14 @@ public class HM1 {
     HMVar(Type t) { _uid=CNT++; _t=t; }
     static void reset() { CNT=1; }
     public Type type() { assert is_top(); return _t; }
-    @Override public String toString() {
-      String s = _str();
-      if( _u!=null ) s += ">>"+_u;
-      return s;
-    }
-    @Override public String _str() {
-      String s = "v"+_uid;
-      if( _t!=Type.ANY ) s += ":"+_t;
-      return s;
-    }
+    @Override public SB _str(SB sb, VBitSet dups, boolean debug) {
+      if( _u!=null && !debug ) return _u._str(sb,dups,debug);
+      sb.p("v").p(_uid);
+      if( dups.tset(_uid) ) return sb.p("$");
+      if( _t!=Type.ANY ) _t.str(sb.p(":"),dups,null,false);
+      if( _u!=null ) _u._str(sb.p(">>"),dups,debug);
+      return sb;
+     }
 
     @Override HMType find() {
       HMType u = _u;
@@ -221,17 +220,18 @@ public class HM1 {
     final HMType[] _args;
     Oper(String name, HMType... args) { _name=name; _args=args; }
     static Oper fun(HMType... args) { return new Oper("->",args); }
-    @Override public String toString() {
-      if( _name.equals("->") ) return "{ "+_args[0]+" -> "+_args[1]+" }";
-      return _name+" "+Arrays.toString(_args);
-    }
-    @Override public String _str() {
-      if( _name.equals("->") )
-            return "{ "+_args[0].str()+" -> "+_args[1].str()+" }";
-      SB sb = new SB().p(_name).p('(');
+    @Override public SB _str(SB sb, VBitSet dups, boolean debug) {
+      if( _name.equals("->") ) {
+        sb.p("{ ");
+        _args[0]._str(sb,dups,debug);
+        sb.p(" -> ");
+        _args[1]._str(sb,dups,debug);
+        return sb.p(" }");
+      }
+      sb.p(_name).p('(');
       for( HMType t : _args )
-        sb.p(t.str()).p(',');
-      return sb.unchar().p(')').toString();
+        t._str(sb,dups,debug).p(',');
+      return sb.unchar().p(')');
     }
 
     @Override HMType find() { return this; }

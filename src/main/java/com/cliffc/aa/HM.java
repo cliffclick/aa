@@ -274,8 +274,9 @@ public class HM {
     Ary<Ident> _ids;            // Progress for IDs when types change
     abstract HMType union(HMType t, Worklist work);
     abstract HMType find();
-    public String str() { return find()._str(); }
-    abstract String _str();
+    @Override public final String toString() { return _str(new SB(),new VBitSet()).toString(); }
+    public String str() { return find().toString(); }
+    abstract SB _str(SB sb, VBitSet vbs);
     boolean is_top() { return _u==null; }
     static final HashMap<HMVar,HMVar> EQS = new HashMap<>();
     final boolean eq( HMType v ) { EQS.clear(); return find()._eq(v); }
@@ -328,15 +329,11 @@ public class HM {
     HMVar(Type t) { _uid=CNT++; _t=t; }
     static void reset() { CNT=1; }
     public Type type() { assert is_top(); return _t; }
-    @Override public String toString() {
-      String s = _str();
-      if( _u!=null ) s += ">>"+_u;
-      return s;
-    }
-    @Override public String _str() {
-      String s = "v"+_uid;
-      if( _t!=Type.ANY ) s += ":"+_t.str(new SB(),new VBitSet(),null,false);
-      return s;
+    @Override public SB _str(SB sb, VBitSet dups) {
+      sb.p("v").p(_uid);
+      if( dups.tset(_uid) ) return sb.p("$");
+      if( _t!=Type.ANY ) _t.str(sb.p(":"),dups,null,false);
+      return sb;
     }
 
     @Override HMType find() {
@@ -392,17 +389,13 @@ public class HM {
     final HMType[] _args;
     Oper(String name, HMType... args) { _name=name; _args=args; }
     static Oper fun(HMType... args) { return new Oper("->",args); }
-    @Override public String toString() {
-      if( _name.equals("->") ) return "{ "+_args[0]+" -> "+_args[1]+" }";
-      return _name+" "+Arrays.toString(_args);
-    }
-    @Override public String _str() {
+    @Override public SB _str(SB sb, VBitSet dups) {
       if( _name.equals("->") )
-        return "{ "+_args[0].str()+" -> "+_args[1].str()+" }";
-      SB sb = new SB().p(_name).p('(');
+        return sb.p("{ ").p(_args[0].str()).p(" -> ").p(_args[1].str()).p(" }");
+      sb.p(_name).p('(');
       for( HMType t : _args )
         sb.p(t.str()).p(',');
-      return sb.unchar().p(')').toString();
+      return sb.unchar().p(')');
     }
 
     @Override HMType find() { return this; }

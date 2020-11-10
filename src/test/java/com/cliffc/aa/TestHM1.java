@@ -28,7 +28,7 @@ public class TestHM1 {
   public void test2() {
     Syntax syn = new Apply(new Ident("pair"),new Con(TypeInt.con(3)));
     HMType t = HM1.HM(syn);
-    assertEquals("{ v9 -> pair(v8:3,v9) }",t.str());
+    assertEquals("{ v9 -> pair(v8:3,v9$) }",t.str());
   }
 
   @Test
@@ -46,7 +46,7 @@ public class TestHM1 {
                                                        new Apply(new Ident("dec"),new Ident("n")))))),
               new Ident("fact"));
     HMType t1 = HM1.HM(fact);
-    assertEquals("{ v25:int64 -> v25:int64 }",t1.str());
+    assertEquals("{ v25:int64 -> v25$ }",t1.str());
   }
 
   @Test
@@ -58,7 +58,7 @@ public class TestHM1 {
                                      new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
                            new Apply(new Ident("x"), new Con(TypeStr.ABC))));
     HMType t1 = HM1.HM(x);
-    assertEquals("{ { v11:all -> v9 } -> pair(v9,v9) }",t1.str());
+    assertEquals("{ { v11:all -> v9 } -> pair(v9$,v9$) }",t1.str());
   }
 
   @Test
@@ -72,7 +72,7 @@ public class TestHM1 {
                 new Lambda("x", new Ident("x")));
 
     HMType t1 = HM1.HM(x);
-    assertEquals("pair(v17:all,v17:all)",t1.str());
+    assertEquals("pair(v17:all,v17$)",t1.str());
   }
 
 
@@ -82,7 +82,8 @@ public class TestHM1 {
     // fn f => f f (fail)
     Syntax x =
       new Lambda("f", new Apply(new Ident("f"), new Ident("f")));
-    HM1.HM(x);
+    HMType t1 = HM1.HM(x);
+    assertEquals("TBD",t1.str());
   }
 
   @Test
@@ -111,7 +112,7 @@ public class TestHM1 {
                                    new Apply(new Ident("f"), new Con(TypeInt.con(1))))));
 
     HMType t1 = HM1.HM(syn);
-    assertEquals("{ v11 -> pair(v11,v11) }",t1.str());
+    assertEquals("{ v11 -> pair(v11$,v11$) }",t1.str());
   }
 
   @Test
@@ -122,7 +123,7 @@ public class TestHM1 {
       new Lambda("f", new Lambda("g", new Lambda("arg", new Apply(new Ident("g"), new Apply(new Ident("f"), new Ident("arg"))))));
 
     HMType t1 = HM1.HM(syn);
-    assertEquals("{ { v10 -> v11 } -> { { v11 -> v12 } -> { v10 -> v12 } } }",t1.str());
+    assertEquals("{ { v10 -> v11 } -> { { v11$ -> v12 } -> { v10$ -> v12$ } } }",t1.str());
   }
 
   @Test
@@ -143,7 +144,7 @@ public class TestHM1 {
                                             // "factor" a float returns a pair (mod,rem).
                                             new Ident("factor")), new Con(TypeFlt.con(2.3)))));
     HMType t1 = HM1.HM(syn);
-    assertEquals("pair(v12:_75*[4]str,pair(v26:flt64,v26:flt64))",t1.str());
+    assertEquals("pair(v12:*str,pair(v26:flt64,v26$))",t1.str());
   }
 
   @Test(expected = RuntimeException.class)
