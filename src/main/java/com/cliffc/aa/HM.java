@@ -274,9 +274,9 @@ public class HM {
     Ary<Ident> _ids;            // Progress for IDs when types change
     abstract HMType union(HMType t, Worklist work);
     abstract HMType find();
-    @Override public final String toString() { return _str(new SB(),new VBitSet()).toString(); }
-    public String str() { return find().toString(); }
-    abstract SB _str(SB sb, VBitSet vbs);
+    @Override public final String toString() { return _str(new SB(),new VBitSet(),true).toString(); }
+    public String str() { return _str(new SB(),new VBitSet(),false).toString(); }
+    abstract SB _str(SB sb, VBitSet vbs, boolean debug);
     boolean is_top() { return _u==null; }
     static final HashMap<HMVar,HMVar> EQS = new HashMap<>();
     final boolean eq( HMType v ) { EQS.clear(); return find()._eq(v); }
@@ -329,12 +329,14 @@ public class HM {
     HMVar(Type t) { _uid=CNT++; _t=t; }
     static void reset() { CNT=1; }
     public Type type() { assert is_top(); return _t; }
-    @Override public SB _str(SB sb, VBitSet dups) {
+    @Override public SB _str(SB sb, VBitSet dups, boolean debug) {
+      if( _u!=null && !debug ) return _u._str(sb,dups,debug);
       sb.p("v").p(_uid);
       if( dups.tset(_uid) ) return sb.p("$");
       if( _t!=Type.ANY ) _t.str(sb.p(":"),dups,null,false);
+      if( _u!=null ) _u._str(sb.p(">>"),dups,debug);
       return sb;
-    }
+     }
 
     @Override HMType find() {
       HMType u = _u;
@@ -352,6 +354,7 @@ public class HM {
       if( this==that ) return this; // Do nothing
       if( occurs_in_type(that) )
         throw new RuntimeException("recursive unification");
+        //System.out.println("recursive unification");
 
       if( that instanceof HMVar ) {
         HMVar v2 = (HMVar)that;
@@ -389,12 +392,17 @@ public class HM {
     final HMType[] _args;
     Oper(String name, HMType... args) { _name=name; _args=args; }
     static Oper fun(HMType... args) { return new Oper("->",args); }
-    @Override public SB _str(SB sb, VBitSet dups) {
-      if( _name.equals("->") )
-        return sb.p("{ ").p(_args[0].str()).p(" -> ").p(_args[1].str()).p(" }");
+    @Override public SB _str(SB sb, VBitSet dups, boolean debug) {
+      if( _name.equals("->") ) {
+        sb.p("{ ");
+        _args[0]._str(sb,dups,debug);
+        sb.p(" -> ");
+        _args[1]._str(sb,dups,debug);
+        return sb.p(" }");
+      }
       sb.p(_name).p('(');
       for( HMType t : _args )
-        sb.p(t.str()).p(',');
+        t._str(sb,dups,debug).p(',');
       return sb.unchar().p(')');
     }
 
