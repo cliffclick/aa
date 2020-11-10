@@ -80,7 +80,7 @@ public class HM {
     }
     return prog._hm;
   }
-  static void reset() { ENV.clear(); HMVar.reset(); }
+  static void reset() { ENV.clear(); HMType.reset(); }
 
   // Small classic tree of HMVars, immutable, with sharing at the root parts.
   static class VStack implements Iterable<HMVar> {
@@ -271,6 +271,10 @@ public class HM {
 
   public static abstract class HMType {
     HMType _u;                  // U-F; always null for Oper
+    final int _uid;
+    private static int CNT;
+    static void reset() { CNT=1; }
+    HMType() { _uid=CNT++; }
     Ary<Ident> _ids;            // Progress for IDs when types change
     abstract HMType union(HMType t, Worklist work);
     abstract HMType find();
@@ -289,7 +293,7 @@ public class HM {
     HMType _fresh(VStack vstk, HashMap<HMType,HMType> vars) {
       HMType t2 = find();
       if( t2 instanceof HMVar ) {
-        return t2.occurs_in(vstk)   //
+        return t2.occurs_in(vstk, new VBitSet())   //
           ? t2                      // Keep same var
           : vars.computeIfAbsent(t2, e -> new HMVar(((HMVar)t2)._t));
       } else {
@@ -301,38 +305,37 @@ public class HM {
       }
     }
 
-    boolean occurs_in(VStack vstk) {
+    boolean occurs_in(VStack vstk, VBitSet dups) {
       if( vstk==null ) return false;
-      for( HMVar x : vstk ) if( occurs_in_type(x) ) return true;
+      for( HMVar x : vstk ) if( occurs_in_type(x,dups) ) return true;
       return false;
     }
-    boolean occurs_in(HMType[] args) {
-      for( HMType x : args ) if( occurs_in_type(x) ) return true;
+    boolean occurs_in(HMType[] args, VBitSet dups) {
+      for( HMType x : args ) if( occurs_in_type(x,dups) ) return true;
       return false;
     }
-    boolean occurs_in_type(HMType v) {
+    boolean occurs_in_type(HMType v, VBitSet dups) {
       assert is_top();
-      HMType y = v.find();
-      if( y==this )
-        return true;
-      if( y instanceof Oper )
-        return occurs_in(((Oper)y)._args);
+      if( dups.tset(v._uid) )
+        return false;           // Been there, done that
+      HMType y = v.find();      // Find top
+      if( y==this )             // Occurs in type?
+        return true;            // Yup, occurs in type right here
+      if( y instanceof Oper )   // Structural recursive test
+        return occurs_in(((Oper)y)._args,dups);
       return false;
     }
   }
 
   static class HMVar extends HMType {
     private Type _t;
-    private final int _uid;
-    private static int CNT;
     HMVar() { this(Type.ANY); }
-    HMVar(Type t) { _uid=CNT++; _t=t; }
-    static void reset() { CNT=1; }
+    HMVar(Type t) { _t=t; }
     public Type type() { assert is_top(); return _t; }
     @Override public SB _str(SB sb, VBitSet dups, boolean debug) {
-      if( _u!=null && !debug ) return _u._str(sb,dups,debug);
+      if( _u!=null && !debug ) return _u._str(sb,dups,debug); // Clean print; skip to U-F root & print
       sb.p("v").p(_uid);
-      if( dups.tset(_uid) ) return sb.p("$");
+      if( dups.tset(_uid) ) return sb.p("$");  // Stop infinite print loops
       if( _t!=Type.ANY ) _t.str(sb.p(":"),dups,null,false);
       if( _u!=null ) _u._str(sb.p(">>"),dups,debug);
       return sb;
@@ -352,14 +355,14 @@ public class HM {
       if( _u!=null ) return find().union(that,work);
       if( that instanceof HMVar ) that = that.find();
       if( this==that ) return this; // Do nothing
-      if( occurs_in_type(that) )
+      if( occurs_in_type(that, new VBitSet()) )
         throw new RuntimeException("recursive unification");
-        //System.out.println("recursive unification");
+      //System.out.println("recursive unification");
 
       if( that instanceof HMVar ) {
         HMVar v2 = (HMVar)that;
-        if( _uid < v2._uid )    // Order, so keep smaller _uids by default
-          return that.union(this,work);
+        // Order, so keep smaller _uids by default
+        if( _uid < v2._uid ) return that.union(this,work);
         v2._t = _t.meet(v2._t); // Lattice MEET instead of unification failure
       }
       else assert _t==Type.ANY; // Else this var is un-MEETd with any Con
@@ -372,7 +375,7 @@ public class HM {
         for( Ident id : that._ids ) id._hm=null; // Flag as 1-shot re-freshen
         work.addAll(that._ids); // On to worklist
       }
-      return _u = that;         // Classic U-F union
+      return _u = that;         // Classic U-F union this into that.
     }
 
     @Override boolean _eq( HMType v ) {
@@ -393,14 +396,18 @@ public class HM {
     Oper(String name, HMType... args) { _name=name; _args=args; }
     static Oper fun(HMType... args) { return new Oper("->",args); }
     @Override public SB _str(SB sb, VBitSet dups, boolean debug) {
+      if( dups.tset(_uid) ) return sb.p(_name).p(_uid).p("$");  // Stop infinite print loops
       if( _name.equals("->") ) {
         sb.p("{ ");
         _args[0]._str(sb,dups,debug);
-        sb.p(" -> ");
+        if( debug ) sb.p(" ->").p(_uid).p(" ");
+        else sb.p(" -> ");
         _args[1]._str(sb,dups,debug);
         return sb.p(" }");
       }
-      sb.p(_name).p('(');
+      sb.p(_name);
+      if( debug ) sb.p(_uid);
+      sb.p('(');
       for( HMType t : _args )
         t._str(sb,dups,debug).p(',');
       return sb.unchar().p(')');
@@ -410,15 +417,16 @@ public class HM {
     @Override HMType union(HMType that, Worklist work) {
       if( this==that ) return this;
       if( !(that instanceof Oper) ) return that.union(this,work);
+      if( _uid < that._uid ) return that.union(this,work); // Minimize unique CNT values
       Oper op2 = (Oper)that;
       if( !_name.equals(op2._name) ||
           _args.length != op2._args.length )
         throw new RuntimeException("Cannot unify "+this+" and "+that);
       for( int i=0; i<_args.length; i++ )
-        _args[i].union(op2._args[i],work);
+        _args[i] = _args[i].union(op2._args[i],work); // Both union, and update U-F
       if(      _ids!=null ) { for( Ident id :      _ids ) id._hm=null;  work.addAll(     _ids); }
       if( that._ids!=null ) { for( Ident id : that._ids ) id._hm=null;  work.addAll(that._ids); }
-      return this;
+      return that;
     }
     @Override boolean _eq( HMType v ) {
       if( this==v ) return true;
@@ -426,9 +434,14 @@ public class HM {
       Oper o = (Oper)v;
       if( !_name.equals(o._name) ||
           _args.length!=o._args.length ) return false;
-      for( int i=0; i<_args.length; i++ )
-        if( !_args[i].find()._eq(o._args[i].find()) )
+      for( int i=0; i<_args.length; i++ ) {
+        HMType h0 =   _args[i];
+        HMType h1 = o._args[i];
+        if( !h0.is_top() )   _args[i] = h0 = h0.find();
+        if( !h1.is_top() ) o._args[i] = h1 = h1.find();
+        if( !h0._eq(h1) )
           return false;
+      }
       return true;
     }
   }
