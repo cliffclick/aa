@@ -1,7 +1,6 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.type.TypeInt;
-import com.cliffc.aa.type.TypeStr;
+import com.cliffc.aa.type.*;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -29,7 +28,7 @@ public class TestHM1 {
   public void test2() {
     Syntax syn = new Apply(new Ident("pair"),new Con(TypeInt.con(3)));
     HMType t = HM1.HM(syn);
-    assertEquals("{ v7 -> pair(v6:3,v7) }",t.str());
+    assertEquals("{ v9 -> pair(v8:3,v9) }",t.str());
   }
 
   @Test
@@ -47,7 +46,7 @@ public class TestHM1 {
                                                        new Apply(new Ident("dec"),new Ident("n")))))),
               new Ident("fact"));
     HMType t1 = HM1.HM(fact);
-    assertEquals("{ v23:int64 -> v23:int64 }",t1.str());
+    assertEquals("{ v25:int64 -> v25:int64 }",t1.str());
   }
 
   @Test
@@ -59,7 +58,7 @@ public class TestHM1 {
                                      new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
                            new Apply(new Ident("x"), new Con(TypeStr.ABC))));
     HMType t1 = HM1.HM(x);
-    assertEquals("{ { v9:all -> v7 } -> pair(v7,v7) }",t1.str());
+    assertEquals("{ { v11:all -> v9 } -> pair(v9,v9) }",t1.str());
   }
 
   @Test
@@ -73,7 +72,7 @@ public class TestHM1 {
                 new Lambda("x", new Ident("x")));
 
     HMType t1 = HM1.HM(x);
-    assertEquals("pair(v15:all,v15:all)",t1.str());
+    assertEquals("pair(v17:all,v17:all)",t1.str());
   }
 
 
@@ -94,7 +93,7 @@ public class TestHM1 {
               new Lambda("f", new Con(TypeInt.con(5))),
               new Apply(new Ident("g"), new Ident("g")));
     HMType t1 = HM1.HM(x);
-    assertEquals("v10:5",t1.str());
+    assertEquals("v12:5",t1.str());
   }
 
   @Test
@@ -112,7 +111,7 @@ public class TestHM1 {
                                    new Apply(new Ident("f"), new Con(TypeInt.con(1))))));
 
     HMType t1 = HM1.HM(syn);
-    assertEquals("{ v9 -> pair(v9,v9) }",t1.str());
+    assertEquals("{ v11 -> pair(v11,v11) }",t1.str());
   }
 
   @Test
@@ -123,7 +122,63 @@ public class TestHM1 {
       new Lambda("f", new Lambda("g", new Lambda("arg", new Apply(new Ident("g"), new Apply(new Ident("f"), new Ident("arg"))))));
 
     HMType t1 = HM1.HM(syn);
-    assertEquals("{ { v8 -> v9 } -> { { v9 -> v10 } -> { v8 -> v10 } } }",t1.str());
+    assertEquals("{ { v10 -> v11 } -> { { v11 -> v12 } -> { v10 -> v12 } } }",t1.str());
+  }
+
+  @Test
+  public void test10() {
+    // Looking at when tvars are duplicated ("fresh" copies made).
+    // This is the "map" problem with a scalar instead of a collection.
+    // Takes a '{a->b}' and a 'a' for a couple of different prims.
+    // let map = { fun -> {x -> (fun x) }} in ((pair ((map str) 5)) ((map factor) 2.3))
+    Syntax syn =
+      new Let("map",
+              new Lambda("fun",
+                         new Lambda("x",
+                                    new Apply(new Ident("fun"),new Ident("x")))),
+              new Apply(new Apply(new Ident("pair"),
+                                  new Apply(new Apply(new Ident("map"),
+                                                      new Ident("str")), new Con(TypeInt.con(5)))),
+                        new Apply(new Apply(new Ident("map"),
+                                            // "factor" a float returns a pair (mod,rem).
+                                            new Ident("factor")), new Con(TypeFlt.con(2.3)))));
+    HMType t1 = HM1.HM(syn);
+    assertEquals("pair(v12:_75*[4]str,pair(v26:flt64,v26:flt64))",t1.str());
+  }
+
+  @Test(expected = RuntimeException.class)
+  public void test11() {
+    // Checking behavior when using "if/else" to merge two functions with
+    // sufficiently different signatures, then attempting to pass them to a map
+    // & calling internally.
+    // fcn takes a predicate 'p' and returns one of two fcns.
+    //   let fcn = { p -> (((if/else p) {a -> pair[a,a]}) {b -> pair[b,pair[3,b]]}) } in
+    // map takes a function and an element (collection?) and applies it (applies to collection?)
+    //   let map = { fun -> {x -> (fun x) }} in
+    // Should return either { p -> p ? [5,5] : [5,[3,5]] }
+    //   { q -> ((map (fcn q)) 5) }
+    Syntax syn =
+      new Let("fcn",
+              new Lambda("p",
+                         new Apply(new Apply(new Apply(new Ident("if/else"),new Ident("p")), // p ?
+                                             new Lambda("a",
+                                                        new Apply(new Apply(new Ident("pair"),new Ident("a")),
+                                                                  new Ident("a")))),
+                                   new Lambda("b",
+                                              new Apply(new Apply(new Ident("pair"),new Ident("b")),
+                                                        new Apply(new Apply(new Ident("pair"),new Con(TypeInt.con(3))),
+                                                                  new Ident("b")))))),
+              new Let("map",
+                      new Lambda("fun",
+                                 new Lambda("x",
+                                            new Apply(new Ident("fun"),new Ident("x")))),
+                      new Lambda("q",
+                                 new Apply(new Apply(new Ident("map"),
+                                                     new Apply(new Ident("fcn"),new Ident("q"))),
+                                           new Con(TypeInt.con(5))))));
+    // Ultimately, unifies "a" with "pair[3,a]" which throws recursive unification.
+    HMType t1 = HM1.HM(syn);
+    assertEquals("TBD",t1.str());
   }
 
 }

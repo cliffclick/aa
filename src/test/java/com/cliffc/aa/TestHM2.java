@@ -9,7 +9,7 @@ import static org.junit.Assert.assertEquals;
 
 public class TestHM2 {
 
-  @Before public void reset() { HM.reset(); }
+  @Before public void reset() { HM2.reset(); }
 
   @Test(expected = RuntimeException.class)
   public void test00() {
@@ -147,5 +147,39 @@ public class TestHM2 {
     assertEquals("pair(v12:*str,pair(v26:flt64,v26:flt64))",t1.str());
   }
 
+  @Test(expected = RuntimeException.class)
+  public void test11() {
+    // Checking behavior when using "if/else" to merge two functions with
+    // sufficiently different signatures, then attempting to pass them to a map
+    // & calling internally.
+    // fcn takes a predicate 'p' and returns one of two fcns.
+    //   let fcn = { p -> (((if/else p) {a -> pair[a,a]}) {b -> pair[b,pair[3,b]]}) } in
+    // map takes a function and an element (collection?) and applies it (applies to collection?)
+    //   let map = { fun -> {x -> (fun x) }} in
+    // Should return either { p -> p ? [5,5] : [5,[3,5]] }
+    //   { q -> ((map (fcn q)) 5) }
+    Syntax syn =
+      new Let("fcn",
+              new Lambda("p",
+                         new Apply(new Apply(new Apply(new Ident("if/else"),new Ident("p")), // p ?
+                                             new Lambda("a",
+                                                        new Apply(new Apply(new Ident("pair"),new Ident("a")),
+                                                                  new Ident("a")))),
+                                   new Lambda("b",
+                                              new Apply(new Apply(new Ident("pair"),new Ident("b")),
+                                                        new Apply(new Apply(new Ident("pair"),new Con(TypeInt.con(3))),
+                                                                  new Ident("b")))))),
+              new Let("map",
+                      new Lambda("fun",
+                                 new Lambda("x",
+                                            new Apply(new Ident("fun"),new Ident("x")))),
+                      new Lambda("q",
+                                 new Apply(new Apply(new Ident("map"),
+                                                     new Apply(new Ident("fcn"),new Ident("q"))),
+                                           new Con(TypeInt.con(5))))));
+    // Ultimately, unifies "a" with "pair[3,a]" which throws recursive unification.
+    HMType t1 = HM2.hm(syn);
+    assertEquals("TBD",t1.str());
+  }
 
 }

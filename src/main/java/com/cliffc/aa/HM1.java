@@ -1,6 +1,5 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 
@@ -22,11 +21,14 @@ import java.util.HashSet;
  */
 public class HM1 {
   public static HMType HM(Syntax prog) {
+    Object dummy = TypeStruct.DISPLAY;
 
     HashMap<String,HMType> env = new HashMap<>();
     // Simple types
     HMVar bool  = new HMVar(TypeInt.BOOL);
     HMVar int64 = new HMVar(TypeInt.INT64);
+    HMVar flt64 = new HMVar(TypeFlt.FLT64);
+    HMVar strp  = new HMVar(TypeMemPtr.STRPTR);
 
     // Primitives
     HMVar var1 = new HMVar();
@@ -39,6 +41,11 @@ public class HM1 {
     env.put("dec",Oper.fun(int64,int64));
     env.put("*",Oper.fun(int64,Oper.fun(int64,int64)));
     env.put("==0",Oper.fun(int64,bool));
+
+    // Print a string; int->str
+    env.put("str",Oper.fun(int64,strp));
+    // Factor
+    env.put("factor",Oper.fun(flt64,new Oper("pair",flt64,flt64)));
 
     return prog.hm(env, new HashSet<>());
   }
@@ -219,7 +226,7 @@ public class HM1 {
       return _name+" "+Arrays.toString(_args);
     }
     @Override public String _str() {
-      if( _name.equals("->") ) 
+      if( _name.equals("->") )
             return "{ "+_args[0].str()+" -> "+_args[1].str()+" }";
       SB sb = new SB().p(_name).p('(');
       for( HMType t : _args )

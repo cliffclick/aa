@@ -365,7 +365,7 @@ public class HM {
       else assert _t==Type.ANY; // Else this var is un-MEETd with any Con
       if( _ids!=null ) {        // Move this ids into that ids
         if( that._ids==null ) that._ids = _ids;
-        else throw AA.unimpl();
+        else that._ids.addAll(_ids);
         _ids=null;              // No longer here
       }
       if( that._ids!=null ) {   // All that ids onto worklist

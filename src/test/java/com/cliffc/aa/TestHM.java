@@ -125,7 +125,6 @@ public class TestHM {
     assertEquals("{ { v10 -> v11 } -> { { v11 -> v12 } -> { v10 -> v12 } } }",t1.str());
   }
 
-
   @Test
   public void test10() {
     // Looking at when tvars are duplicated ("fresh" copies made).
@@ -147,5 +146,39 @@ public class TestHM {
     assertEquals("pair(v18:*str,pair(v11:flt64,v11:flt64))",t1.str());
   }
 
+  @Test
+  public void test11() {
+    // Checking behavior when using "if/else" to merge two functions with
+    // sufficiently different signatures, then attempting to pass them to a map
+    // & calling internally.
+    // fcn takes a predicate 'p' and returns one of two fcns.
+    //   let fcn = { p -> (((if/else p) {a -> pair[a,a]}) {b -> pair[b,pair[3,b]]}) } in
+    // map takes a function and an element (collection?) and applies it (applies to collection?)
+    //   let map = { fun -> {x -> (fun x) }} in
+    // Should return either { p -> p ? [5,5] : [5,[3,5]] }
+    //   { q -> ((map (fcn q)) 5) }
+
+    Syntax syn =
+      new Let("fcn",
+              new Lambda("p",
+                         new Apply(new Apply(new Apply(new Ident("if/else"),new Ident("p")), // p ?
+                                             new Lambda("a",
+                                                        new Apply(new Apply(new Ident("pair"),new Ident("a")),
+                                                                  new Ident("a")))),
+                                   new Lambda("b",
+                                              new Apply(new Apply(new Ident("pair"),new Ident("b")),
+                                                        new Apply(new Apply(new Ident("pair"),new Con(TypeInt.con(3))),
+                                                                  new Ident("b")))))),
+              new Let("map",
+                      new Lambda("fun",
+                                 new Lambda("x",
+                                            new Apply(new Ident("fun"),new Ident("x")))),
+                      new Lambda("q",
+                                 new Apply(new Apply(new Ident("map"),
+                                                     new Apply(new Ident("fcn"),new Ident("q"))),
+                                           new Con(TypeInt.con(5))))));
+    HMType t1 = HM.hm(syn);
+    assertEquals("TBD",t1.str());
+  }
 
 }
