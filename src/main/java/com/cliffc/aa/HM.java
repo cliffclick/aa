@@ -1,9 +1,7 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -283,27 +281,15 @@ public class HM {
     abstract SB _str(SB sb, VBitSet vbs, boolean debug);
     boolean is_top() { return _u==null; }
     static final HashMap<HMVar,HMVar> EQS = new HashMap<>();
-    final boolean eq( HMType v ) { EQS.clear(); return find()._eq(v); }
-    abstract boolean _eq( HMType v );
+    final boolean eq( HMType v ) { EQS.clear(); return find()._eq(v, new BitSetSparse()); }
+    abstract boolean _eq( HMType v, BitSetSparse dups );
 
     HMType fresh(VStack vstk) {
-      HashMap<HMType,HMType> vars = new HashMap<>();
-      return _fresh(vstk,vars);
+      HashMap<HMVar,HMVar> vars = new HashMap<>();
+      HashMap<Oper,Oper> opers = new HashMap<>();
+      return find()._fresh(vstk,vars,opers);
     }
-    HMType _fresh(VStack vstk, HashMap<HMType,HMType> vars) {
-      HMType t2 = find();
-      if( t2 instanceof HMVar ) {
-        return t2.occurs_in(vstk, new VBitSet())   //
-          ? t2                      // Keep same var
-          : vars.computeIfAbsent(t2, e -> new HMVar(((HMVar)t2)._t));
-      } else {
-        Oper op = (Oper)t2;
-        HMType[] args = new HMType[op._args.length];
-        for( int i=0; i<args.length; i++ )
-          args[i] = op._args[i]._fresh(vstk,vars);
-        return new Oper(op._name,args);
-      }
-    }
+    abstract HMType _fresh(VStack vstk, HashMap<HMVar,HMVar> vars, HashMap<Oper,Oper> opers);
 
     boolean occurs_in(VStack vstk, VBitSet dups) {
       if( vstk==null ) return false;
@@ -356,8 +342,8 @@ public class HM {
       if( that instanceof HMVar ) that = that.find();
       if( this==that ) return this; // Do nothing
       if( occurs_in_type(that, new VBitSet()) )
-        throw new RuntimeException("recursive unification");
-      //System.out.println("recursive unification");
+        //throw new RuntimeException("recursive unification");
+        System.out.println("recursive unification");
 
       if( that instanceof HMVar ) {
         HMVar v2 = (HMVar)that;
@@ -365,7 +351,8 @@ public class HM {
         if( _uid < v2._uid ) return that.union(this,work);
         v2._t = _t.meet(v2._t); // Lattice MEET instead of unification failure
       }
-      else assert _t==Type.ANY; // Else this var is un-MEETd with any Con
+      else if( _t!=Type.ANY )   // Else this var is un-MEETd with any Con
+        throw new RuntimeException("Cannot unify "+this+" and "+that);
       if( _ids!=null ) {        // Move this ids into that ids
         if( that._ids==null ) that._ids = _ids;
         else that._ids.addAll(_ids);
@@ -378,7 +365,7 @@ public class HM {
       return _u = that;         // Classic U-F union this into that.
     }
 
-    @Override boolean _eq( HMType v ) {
+    @Override boolean _eq( HMType v, BitSetSparse dups ) {
       if( this==v ) return true;
       if( v==null ) return false;
       HMType v2 = v.find();
@@ -388,6 +375,13 @@ public class HM {
       HMVar v3 = EQS.computeIfAbsent(this,k -> (HMVar)v2);
       return v2 == v3;
     }
+    
+    @Override HMType _fresh(VStack vstk, HashMap<HMVar,HMVar> vars, HashMap<Oper,Oper> opers) {
+      assert is_top();
+      return occurs_in(vstk, new VBitSet()) // If in the lexical Stack
+        ? this                      // Keep same var
+        : vars.computeIfAbsent(this, e -> new HMVar(_t));
+    }
   }
 
   static class Oper extends HMType {
@@ -396,12 +390,12 @@ public class HM {
     Oper(String name, HMType... args) { _name=name; _args=args; }
     static Oper fun(HMType... args) { return new Oper("->",args); }
     @Override public SB _str(SB sb, VBitSet dups, boolean debug) {
-      if( dups.tset(_uid) ) return sb.p(_name).p(_uid).p("$");  // Stop infinite print loops
+      if( dups.tset(_uid) ) return sb.p("v").p(_uid).p("$");  // Stop infinite print loops
       if( _name.equals("->") ) {
+        if( debug ) sb.p("v").p(_uid).p(":");
         sb.p("{ ");
         _args[0]._str(sb,dups,debug);
-        if( debug ) sb.p(" ->").p(_uid).p(" ");
-        else sb.p(" -> ");
+        sb.p(" -> ");
         _args[1]._str(sb,dups,debug);
         return sb.p(" }");
       }
@@ -428,9 +422,12 @@ public class HM {
       if( that._ids!=null ) { for( Ident id : that._ids ) id._hm=null;  work.addAll(that._ids); }
       return that;
     }
-    @Override boolean _eq( HMType v ) {
+    @Override boolean _eq( HMType v, BitSetSparse dups ) {
+      assert is_top() && v.is_top();
       if( this==v ) return true;
       if( !(v instanceof Oper) ) return false;
+      if( dups.tset(_uid,v._uid) )
+        return true; // Checked already, something else has to be equal/unequal
       Oper o = (Oper)v;
       if( !_name.equals(o._name) ||
           _args.length!=o._args.length ) return false;
@@ -439,10 +436,22 @@ public class HM {
         HMType h1 = o._args[i];
         if( !h0.is_top() )   _args[i] = h0 = h0.find();
         if( !h1.is_top() ) o._args[i] = h1 = h1.find();
-        if( !h0._eq(h1) )
+        if( !h0._eq(h1,dups) )
           return false;
       }
       return true;
     }
+    @Override HMType _fresh(VStack vstk, HashMap<HMVar,HMVar> vars, HashMap<Oper,Oper> opers) {
+      assert is_top();
+      Oper op = opers.get(this);
+      if( op!=null ) return op;
+      HMType[] args = new HMType[_args.length];
+      op = new Oper(_name,args);
+      opers.put(this,op);       // Stop cyclic structure endless looping
+      for( int i=0; i<_args.length; i++ )
+        args[i] = _args[i].find()._fresh(vstk,vars,opers);
+      return op;
+    }
+    
   }
 }

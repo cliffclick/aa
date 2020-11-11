@@ -28,7 +28,7 @@ public class TestHM {
   public void test02() {
     Syntax syn = new Apply(new Ident("pair"),new Con(TypeInt.con(3)));
     HMType t = HM.hm(syn);
-    assertEquals("{ v23 -> pair(v21:3,v23$) }",t.str());
+    assertEquals("{ v25 -> pair(v21:3,v25$) }",t.str());
   }
 
   @Test
@@ -46,7 +46,7 @@ public class TestHM {
                                                        new Apply(new Ident("dec"),new Ident("n")))))),
               new Ident("fact"));
     HMType t1 = HM.hm(fact);
-    assertEquals("{ v30:int64 -> v30$ }",t1.str());
+    assertEquals("{ v31:int64 -> v31$ }",t1.str());
   }
 
   @Test
@@ -76,13 +76,15 @@ public class TestHM {
   }
 
 
-  @Test(expected = RuntimeException.class)
+  @Test
   public void test06() {
     // recursive unification
     // fn f => f f (fail)
     Syntax x =
       new Lambda("f", new Apply(new Ident("f"), new Ident("f")));
-    HM.hm(x);
+    HMType t1 = HM.hm(x);
+    // Not minimal form, but not too bad
+    assertEquals("{ { v23$ -> v22 } -> v22$ }",t1.str());
   }
 
   @Test
@@ -143,7 +145,7 @@ public class TestHM {
                                             // "factor" a float returns a pair (mod,rem).
                                             new Ident("factor")), new Con(TypeFlt.con(2.3)))));
     HMType t1 = HM.hm(syn);
-    assertEquals("pair(v35:*str,pair(v24:flt64,v24$))",t1.str());
+    assertEquals("pair(v36:*str,pair(v24:flt64,v24$))",t1.str());
   }
 
   @Test(expected = RuntimeException.class)
@@ -178,6 +180,8 @@ public class TestHM {
                                                      new Apply(new Ident("fcn"),new Ident("q"))),
                                            new Con(TypeInt.con(5))))));
     HMType t1 = HM.hm(syn);
+    // Cannot unify v29:5 and pair96(v97:3,v96$)
+    // Cannot unify 5 and (3,$) - unifying a 5 with a pair.
     assertEquals("TBD",t1.str());
   }
 
