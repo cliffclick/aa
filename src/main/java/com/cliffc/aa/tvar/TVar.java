@@ -95,9 +95,9 @@ public class TVar implements Comparable<TVar> {
     }
     // Print all unioned nodes
     if( debug )
-      for( int i=1; i<_ns._len; i++ )
-        if( !_ns.at(i).is_dead() )
-          sb.p('N').p(_ns.at(i).uid()).p(':');
+      for( TNode tn : _ns )
+        if( !tn.is_dead() && (idx==-1 || _ns.at(idx)!=tn) )
+          sb.p('N').p(tn.uid()).p(':');
     return _str(sb,bs,debug);
   }
   // Type-variable structure print

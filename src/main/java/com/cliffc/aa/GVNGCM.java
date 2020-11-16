@@ -368,9 +368,6 @@ public class GVNGCM {
       nnn._live = old._live;    // Replacement has same liveness as original
       rereg(nnn, nnn.value(_opt_mode));
     }
-    // When replacing one node with another, unify their type vars
-    if( !nnn.is_dead() && !old.is_dead() )
-      old.tvar().unify(nnn.tvar());
     if( !old.is_dead() ) { // if old is being replaced, it got removed from GVN table and types table.
       assert !check_opt(old);
       if( nnn._live != old._live ) {                    // New is as alive as the old
@@ -467,6 +464,9 @@ public class GVNGCM {
 
   // Replace, but do not delete old.  Really used to insert a node in front of old.
   public void replace( Node old, Node nnn ) {
+    // When replacing one node with another, unify their type vars
+    if( !nnn.is_dead() && !old.is_dead() )
+      old.tvar().unify(nnn.tvar());
     while( old._uses._len > 0 ) {
       Node u = old._uses.del(0);  // Old use
       boolean was = u._in;
