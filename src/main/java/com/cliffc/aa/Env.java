@@ -199,7 +199,7 @@ public class Env implements AutoCloseable {
         if( nargs == 0 ) return n;
         return n instanceof UnresolvedNode
           ? ((UnresolvedNode)n).filter(gvn,nargs)
-          : ((    FunPtrNode)n).filter(gvn,nargs);
+          : ((    FunPtrNode)n).filter(nargs);
       }
     }
     return null;

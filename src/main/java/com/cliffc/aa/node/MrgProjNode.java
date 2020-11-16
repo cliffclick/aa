@@ -9,7 +9,7 @@ import static com.cliffc.aa.AA.MEM_IDX;
 // Proj memory
 public class MrgProjNode extends ProjNode {
   public MrgProjNode( NewNode nnn, Node mem ) { super(MEM_IDX,nnn,mem); }
-  @Override String xstr() { return "MrgProj"+_idx; }
+  @Override public String xstr() { return "MrgProj"+_idx; }
   @Override public boolean is_mem() { return true; }
   NewNode nnn() { return (NewNode)in(0); }
   Node    mem() { return          in(1); }

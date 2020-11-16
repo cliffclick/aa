@@ -2,11 +2,11 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.TVar;
-import com.cliffc.aa.tvar.TTupN;
+import com.cliffc.aa.TNode;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.tvar.TRet;
 
 // See CallNode comments.  The RetNode gathers {control (function exits or
 // not), memory, value, rpc, fun}, and sits at the end of a function.  The RPC
@@ -23,7 +23,7 @@ public final class RetNode extends Node {
     _fidx = fun._fidx;
     _nargs=fun.nargs();
     // RetNodes are structural copies of their inputs, reflect this in their type variables
-    tvar().unify(new TTupN(this,3));
+    tvar().unify(new TRet(this));
   }
   public Node ctl() { return in(0); }
   public Node mem() { return in(1); }
@@ -51,7 +51,7 @@ public final class RetNode extends Node {
   }
 
   // Short self name
-  @Override String xstr() {
+  @Override public String xstr() {
     if( is_dead() ) return "Ret";
     FunNode fun = FunNode.find_fidx(_fidx);
     return "Ret_"+(is_copy() ? "!copy!" : (fun==null ? ""+_fidx : fun.name()));
@@ -73,7 +73,6 @@ public final class RetNode extends Node {
         set_def(2,null,gvn);      // No val
         set_def(3,null,gvn);      // No rpc
         set_def(4,null,gvn);      // No fun
-        _tvar = new TVar(this);   // Not unified into anything
         return this;              // Progress
       }
     }
@@ -189,4 +188,5 @@ public final class RetNode extends Node {
   @Override public Node is_copy(int idx) { throw com.cliffc.aa.AA.unimpl(); }
   boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }
   @Override public boolean is_forward_ref() { return fun().is_forward_ref(); }
+  @Override public TNode[] parms() { return new Node[]{ctl(),mem(),rez()}; }
 }

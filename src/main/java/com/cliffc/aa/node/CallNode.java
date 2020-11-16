@@ -1,10 +1,8 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.TLambda;
+import com.cliffc.aa.tvar.TArgs;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
@@ -95,9 +93,11 @@ public class CallNode extends Node {
     _rpc = BitsRPC.new_rpc(BitsRPC.ALL); // Unique call-site index
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
     _badargs = badargs;
+    // Gather incoming args.  NOT an application point (yet), that is a CallEpi.
+    tvar().unify(new TArgs(this,true));
   }
 
-  String xstr() { return (is_dead() ? "X" : "C")+"all";  } // Self short name
+  @Override public String xstr() { return (is_dead() ? "X" : "C")+"all";  } // Self short name
   String  str() { return xstr(); }       // Inline short name
   @Override public boolean is_mem() {    // Some calls are known to not write memory
     CallEpiNode cepi = cepi();
@@ -134,7 +134,7 @@ public class CallNode extends Node {
   // takes a Type, upcasts to tuple, & slices by name.
   // ts[0] == in(0) == ctl() == Ctrl
   // ts[1] == in(1) == mem() == Mem into the callee = mem()
-  // ts[2] == in(2) == fun() == Function pointer (code ptr + display) == arg(1)
+  // ts[2] == in(2) == fun() == Function pointer (code ptr + display) == arg(2)
   // ts[3] == in(3) == arg(3)
   // ts[4] == in(4) == arg(4)
   // ....
@@ -215,7 +215,7 @@ public class CallNode extends Node {
         set_mem(((MrgProjNode)mem).mem(),gvn);
         _unpacked = true;     // Only do it once
         // After unpacking, unify with proper arg counts
-        tvar().unify(new TLambda(this,nargs()));
+        tvar().unify(new TArgs(this,true));
         return this;
       }
     }
@@ -735,13 +735,5 @@ public class CallNode extends Node {
     return _rpc==call._rpc;
   }
   @Override Node is_pure_call() { return fun().is_pure_call()==null ? null : mem(); }
-  // Matches CTL_IDX, MEM_IDX, FUN_IDX
-  @Override public @NotNull Node[] parms() {
-    Node[] parms = _defs.asAry();
-    
-    return parms;
-  }
-  @Override public @NotNull String @NotNull [] argnames() {
-    return TypeFunSig.arg_names(nargs());
-  }
+  @Override public TNode[] parms() { return _defs.asAry(); }
 }

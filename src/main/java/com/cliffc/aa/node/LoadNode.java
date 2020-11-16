@@ -24,7 +24,7 @@ public class LoadNode extends Node {
     // Just value: not allowed.
     assert (closure_adr || !closure_val); // Just value: not allowed
   }
-  String xstr() { return "."+_fld; }   // Self short name
+  @Override public String xstr() { return "."+_fld; }   // Self short name
   String  str() { return xstr(); } // Inline short name
   private Node mem() { return in(1); }
           Node adr() { return in(2); }

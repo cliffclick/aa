@@ -24,7 +24,7 @@ public class ParmNode extends PhiNode {
     _name=name;
   }
   FunNode fun() { return (FunNode) in(0); }
-  @Override String xstr() { return "Parm:"+_name; }
+  @Override public String xstr() { return "Parm:"+_name; }
   @Override public int hashCode() { return super.hashCode()+_idx; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

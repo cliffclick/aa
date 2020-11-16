@@ -43,7 +43,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeObj.ISUSED);
     sets_out(ts);
   }
-  String xstr() { return "New"+"*"+_alias; } // Self short name
+  @Override public String xstr() { return "New"+"*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
 
   static int def_idx(int fld) { return fld+1; } // Skip ctl in slot 0

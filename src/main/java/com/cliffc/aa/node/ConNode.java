@@ -13,7 +13,7 @@ public class ConNode<T extends Type> extends Node {
   public ConNode( T t ) { super(OP_CON,Env.START); _t=t; }
   // Used by FunPtrNode
   ConNode( byte type, T tfp, RetNode ret, Node closure ) { super(type,ret,closure); _t = tfp; }
-  @Override String xstr() { return Env.ALL_CTRL == this ? "ALL_CTL" : _t.toString(); }
+  @Override public String xstr() { return Env.ALL_CTRL == this ? "ALL_CTL" : _t.toString(); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM.Mode opt_mode) {
     // ALL_CTRL is used for unknown callers; during and after GCP there are no

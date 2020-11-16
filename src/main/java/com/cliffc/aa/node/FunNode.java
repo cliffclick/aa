@@ -2,15 +2,11 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.TNode;
-import com.cliffc.aa.tvar.TLambda;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.BitSet;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import static com.cliffc.aa.AA.*;
 
@@ -89,8 +85,6 @@ public class FunNode extends RegionNode {
     _op_prec = (byte)op_prec;
     _thunk_rhs = thunk_rhs;
     FUNS.setX(fidx(),this); // Track FunNode by fidx; assert single-bit fidxs
-    // FunNodes are just argument collections (no return)
-    //tvar().unify(new TLambda(this,nargs()));
   }
 
   // Find FunNodes by fidx
@@ -102,7 +96,7 @@ public class FunNode extends RegionNode {
   // Fast reset of parser state between calls to Exec
 
   // Short self name
-  @Override String xstr() { return name(); }
+  @Override public String xstr() { return name(); }
   // Inline longer info
   @Override public String str() { return is_forward_ref() ? xstr() : _sig.str(new SB(),new VBitSet(),null,false).toString(); }
   // Name from fidx alone
@@ -201,6 +195,7 @@ public class FunNode extends RegionNode {
     //----------------
     // level 2 (or 3) work: heuristics & inline
 
+
     // Every input path is wired to an output path
     for( int i=1+(has_unknown_callers() ? 1 : 0); i<_defs._len; i++ ) {
       Node c = in(i);
@@ -211,14 +206,14 @@ public class FunNode extends RegionNode {
     }
     // Memory is not 'lifted' by DefMem, a sign that a bad-memory-arg is being
     // passed in.
+    Node[] parms = parms();
     if( has_unknown_callers() ) {
-      ParmNode mem = parm(MEM_IDX);
+      Node mem = parms[MEM_IDX];
       if( mem!=null && !mem.val().isa(Env.DEFMEM.val()) )
         return null; // Do not inline a bad memory type
     }
 
     // Look for appropriate type-specialize callers
-    Node[] parms = parms();
     TypeTuple formals = _thunk_rhs ? null : type_special(parms);
     Ary<Node> body = find_body(ret);
     int path = -1;              // Paths will split according to type
@@ -333,7 +328,7 @@ public class FunNode extends RegionNode {
     // Look for splitting to help a pointer from an unspecialized type
     boolean progress = false;
     Type[] sig = new Type[parms.length];
-    Type tmem = parm(MEM_IDX).val();
+    Type tmem = parms[MEM_IDX].val();
     sig[CTL_IDX] = Type.CTRL;
     sig[MEM_IDX] = TypeMem.MEM;
     if( tmem instanceof TypeMem ) {
@@ -520,7 +515,7 @@ public class FunNode extends RegionNode {
 
     // Pick which input to inline.  Only based on having some constant inputs
     // right now.
-    Node mem = parm(MEM_IDX);   // Memory, used to sharpen input ptrs
+    Node mem = parms[MEM_IDX];  // Memory, used to sharpen input ptrs
     int m=-1, mncons = -1;
     for( int i=has_unknown_callers() ? 2 : 1; i<_defs._len; i++ ) {
       Node call = in(i).in(0);
@@ -865,33 +860,13 @@ public class FunNode extends RegionNode {
         return (ParmNode)use;
     return null;
   }
-  // Matches CTL_IDX, MEM_IDX, FUN_IDX
   @Override public Node[] parms() {
-    Node[] tns = new Node[nargs()];
-    tns[CTL_IDX]=this;
+    Node[] parms = new Node[nargs()];
     for( Node use : _uses )
-      if( use instanceof ParmNode ) {
-        ParmNode parm = (ParmNode)use;
-        if( parm._idx != -1 ) tns[parm._idx] = parm;
-      }
-    return tns;
+      if( use instanceof ParmNode && ((ParmNode)use)._idx != -1 )
+        parms[((ParmNode)use)._idx] = use;
+    return parms;
   }
-  @Override public @NotNull String @NotNull [] argnames() {
-    String[] tns = new String[nargs()];
-    for( Node use : _uses )
-      if( use instanceof ParmNode ) {
-        ParmNode parm = (ParmNode)use;
-        if( parm._idx != -1 ) tns[parm._idx] = parm._name;
-      }
-    if( tns[CTL_IDX]==null ) tns[CTL_IDX]=" ctl";
-    if( tns[MEM_IDX]==null ) tns[MEM_IDX]=" mem";
-    if( tns[FUN_IDX]==null ) tns[FUN_IDX]="^";
-    for( int i=ARG_IDX; i<nargs(); i++ )
-      if( tns[i]==null )
-        tns[i] = ("arg"+i).intern();
-    return tns;
-  }
-
   public ParmNode rpc() { return parm(-1); }
   public RetNode ret() {
     for( Node use : _uses )

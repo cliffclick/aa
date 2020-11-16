@@ -20,7 +20,7 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     _args=args;
     _formals=formals;
     _ret=ret;
-    assert args.length==formals.len();
+    assert args.length>=formals.len();
     assert (args[CTL_IDX]==null || Util.eq(args[CTL_IDX]," ctl")) && (formals.at(CTL_IDX)==Type.CTRL || formals.at(CTL_IDX)==Type.XCTRL);
     assert (args[MEM_IDX]==null || Util.eq(args[MEM_IDX]," mem")) &&  formals.at(MEM_IDX) instanceof TypeMem;
     assert (args[FUN_IDX]==null || Util.eq(args[FUN_IDX],"^"   )) &&  formals.at(FUN_IDX).is_display_ptr();
@@ -75,18 +75,14 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     TypeFunSig t2 = (TypeFunSig)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static TypeFunSig make( TypeTuple ret, Type[] ts ) { return make(arg_names(ts.length),TypeTuple.make_args(ts),ret); }
+  public static TypeFunSig make( TypeTuple ret, Type[] ts ) { return make(func_names,TypeTuple.make_args(ts),ret); }
   public static TypeFunSig make( TypeTuple ret, TypeMemPtr disp, Type arg1 ) { return make(ret,Types.ts(disp,arg1)); }
   public static TypeFunSig make( TypeTuple ret, TypeMemPtr disp, Type arg1, Type arg2 ) { return make(ret,Types.ts(disp,arg1,arg2)); }
-  public static TypeFunSig make( TypeTuple ret, TypeTuple formals ) { return make(arg_names(formals.len()),formals,ret); }
+  public static TypeFunSig make( TypeTuple ret, TypeTuple formals ) { return make(func_names,formals,ret); }
 
   static String[] flds(String... fs) { return fs; }
-  static final String[] ARGS_   = flds(" ctl"," mem","^");            // Used for functions of 0 args
-  static final String[] ARGS_X  = flds(" ctl"," mem","^","x");        // Used for functions of 1 arg
-  static final String[] ARGS_XY = flds(" ctl"," mem","^","x","y");    // Used for functions of 2 args
-  static final String[] ARGS_XYZ= flds(" ctl"," mem","^","x","y","z");// Used for functions of 3 args
-  static final String[][] ARGS = new String[][]{null,null,null,ARGS_,ARGS_X,ARGS_XY,ARGS_XYZ};
-  public static String[] arg_names(int i) { return ARGS[i]; }
+  public static final String[] aply_names = new String[]{" ctl", " mem", "->", "arg3", "arg4", "arg5" }; // TODO: Extend as needed
+  public static final String[] func_names = new String[]{" ctl", " mem", "^" , "arg3", "arg4", "arg5" }; // TODO: Extend as needed
 
   public static final TypeFunSig II_I = make(TypeTuple.make_ret(TypeInt.INT64),TypeTuple.INT64_INT64);
   static final TypeFunSig[] TYPES = new TypeFunSig[]{II_I};

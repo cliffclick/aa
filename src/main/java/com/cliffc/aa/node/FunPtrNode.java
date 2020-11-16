@@ -3,8 +3,10 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
+import com.cliffc.aa.tvar.TArgs;
+import com.cliffc.aa.tvar.TFun;
+import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.*;
 
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
 // TypeFunPtr with a constant fidx and variable displays.  Used to allow 1st
@@ -17,17 +19,20 @@ public final class FunPtrNode extends Node {
     super(OP_FUNPTR,ret,display);
     _referr = referr;
     // Build a HM tvar (args->ret), same as HM.java Lambda does.
+    // FunNodes are just argument collections (no return)
     FunNode fun = ret.fun();
-    TLambda tvargs = new TLambda(fun,fun.nargs());
-    TTupN   tvret  = (TTupN  )ret.tvar().find(); // [Control,Memory,Result]
-    TFun tvfun = new TFun(this,tvargs,tvret);
-    _tvar.unify(tvfun);
+    TVar targs = new TArgs(fun,is_forward_ref()); // [Control,Memory,Fcn,Args...]
+    fun.tvar().unify(targs);
+    TVar tret  = ret.tvar(); // [Control,Memory,Result]
+    TVar tfun = new TFun(this,targs,tret);
+    tvar().unify(tfun);
   }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }
   public FunNode fun() { return ret().fun(); }
+  public FunNode xfun() { RetNode ret = ret(); return ret.in(4) instanceof FunNode ? ret.fun() : null; }
   // Self short name
-  @Override String xstr() {
+  @Override public String xstr() {
     if( is_dead() ) return "*fun";
     int fidx = ret()._fidx;    // Reliably returns a fidx
     FunNode fun = FunNode.find_fidx(fidx);
@@ -95,7 +100,7 @@ public final class FunPtrNode extends Node {
   }
 
   // Filter out all the wrong-arg-count functions
-  public Node filter( GVNGCM gvn, int nargs ) {
+  public Node filter( int nargs ) {
     // User-nargs are user-visible #arguments.
     // Fun-nargs include ctrl, memory & the display, hence the +3.
     return fun().nargs() == nargs+3 ? this : null;

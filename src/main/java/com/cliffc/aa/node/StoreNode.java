@@ -19,7 +19,7 @@ public class StoreNode extends Node {
   }
   private StoreNode( StoreNode st, Node mem, Node adr ) { this(mem,adr,st.rez(),st._fin,st._fld,st._bad); }
 
-  String xstr() { return "."+_fld+"="; } // Self short name
+  @Override public String xstr() { return "."+_fld+"="; } // Self short name
   String  str() { return xstr(); }   // Inline short name
   @Override public boolean is_mem() { return true; }
 

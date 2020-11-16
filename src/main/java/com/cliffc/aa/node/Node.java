@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.function.Predicate;
 
 import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.AA.unimpl;
 
 // Sea-of-Nodes
 public abstract class Node implements Cloneable, TNode {
@@ -64,13 +65,18 @@ public abstract class Node implements Cloneable, TNode {
   public Type set_val( @NotNull Type val ) { _in = true; return (_val=val); }
   @NotNull TVar _tvar;  // Type variable; has a Type which starts at ALL and lifts towards ANY, and may have constraints to be equal to other Types
   // H-M Type-Variables
-  public TVar tvar() { return _tvar; }
-  public TVar tvar(int x) { return in(x)._tvar; }
-  public @NotNull TNode[] parms () { throw com.cliffc.aa.AA.unimpl(); } // Only for  FunNodes
-  public @NotNull String @NotNull [] argnames() { throw com.cliffc.aa.AA.unimpl(); } // Only for FunNodes
+  public TVar tvar() {
+    TVar tv = _tvar.find();     // Do U-F step
+    return tv == _tvar ? tv : (_tvar = tv);
+  }
+  public TVar _tvar() { return _tvar; } // For debug prints
+  public TVar tvar(int x) { return in(x).tvar(); }
+  public TNode[] parms() { throw unimpl(); }
+  public int compareTo(TNode tn) { return uid() - tn.uid(); }
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
   public Ary<Node> _defs;
+  public int len() { return _defs._len; }
   public void _chk() { assert Env.GVN.check_out(this); }
   // Add def/use edge
   public Node add_def(Node n) { _chk(); _defs.add(n); if( n!=null ) n._uses.add(this); return this; }
@@ -221,7 +227,7 @@ public abstract class Node implements Cloneable, TNode {
   }
 
   // Short string name
-  String xstr() { return STRS[_op]; } // Self   short  name
+  @Override public String xstr() { return STRS[_op]; } // Self short name
   String  str() { return xstr(); }    // Inline longer name
   @Override public String toString() { return dump(0,new SB(),false).toString(); }
   // Dump
@@ -240,7 +246,6 @@ public abstract class Node implements Cloneable, TNode {
     sb.p(str()).s();
     if( !_in ) sb.p("----");
     else _val.str(sb,new VBitSet(),null,true);
-    _tvar._str(sb.p(" -- "),true);
 
     return sb;
   }
@@ -581,7 +586,7 @@ public abstract class Node implements Cloneable, TNode {
 
   // Aliases that a MemJoin might choose between.  Not valid for nodes which do
   // not manipulate memory.
-  BitsAlias escapees() { throw com.cliffc.aa.AA.unimpl("graph error"); }
+  BitsAlias escapees() { throw unimpl("graph error"); }
 
   // Walk a subset of the dominator tree, looking for the last place (highest
   // in tree) this predicate passes, or null if it never does.

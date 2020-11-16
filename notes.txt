@@ -1,4 +1,56 @@
 =======================================
+Notes from 11/10/2020
+
+Branch HM has a Hindley-Milner-like thing, set for a Sea-of-Nodes (or at least
+SSA), a worklist-style algo with monotonicity properties (for including in the
+iter() pass), and recursive types (no occurs-check).  Missing minification of
+recursive types, like TypeStruct does.  Also, the TypeVar relation changes
+dynamically (at the moment), which precludes using the immutable persistent
+Types I do now.
+
+Concept: TVars map to a Node, and a collection of U-F'd TVars map to a
+collection of Nodes.  The collection, as a whole, is a MEET, but individual
+Nodes keep their Type (JOIN vs the whole).
+
+Concept: This is the SESE principle at work: args into a Call have a Type
+relationship amongst themselves (and the CEpi), but the CEpi result is lifted
+from the merged Ret value.  Types in a Fun/Ret are merged & approximated,
+but sharpened again at a CEpi.  The TVars map those relationships.
+
+Concept: TVars have structure like Types: TStructs, TArys, TFuns.  We can argue
+TMPs, TFPs, TMems as well.  The difference is that they all bottom out at
+TVars, which bottom out at a Node.
+
+
+Ponder: making TypeVars immutable, so can hash-cons.
+
+Ponder: Need syntax for TypeVars in the type sub-language.  Classically single capital letters.
+
+Ponder: Simplistic in execution, then optimize.  No hash-cons.  Entire cut-n-
+paste clone of type/Type*.java, including the cyclic stuff in TypeStruct.
+
+Ponder: Test code for TypeVar, including cyclic unification.
+
+Ponder:
+Every Node has a TVar, which can be "sharpened" via U-F.
+Every TVar also is a U-F, including "Shape" TVars.
+The "base" TVar is either tied to a Node (hence also Type).
+Shape TVars: TStruct, TAry, TFun.
+
+Shape TStruct - a map from field names & numbers to TVars.
+  Sometimes its just field name from a Load/Store, sometimes a number.
+  Sometimes we can union a field name and a number (e.g. a constructor with ordered field declarations).
+
+Shape TAry - just a TVar for the size & elements.  Size is optional.  Maybe use same impl as TStruct, with eg field names "#" and "[]".
+
+Shape TMemPtr: A ptr to TStruct/TAry (or both, as a TObj).  
+
+Shape TMem - A map from TMemPtr to TStruct/TAry/TObj.
+
+Shape TFun - Straight from H-M: a collection of args & and return.
+
+
+=======================================
 Notes from 09/07/2020
 
 Short-circuit evals.

@@ -15,7 +15,7 @@ public final class ErrNode extends Node {
     _err = err;
     _live= TypeMem.LIVE_BOT;
   }
-  @Override String xstr() { return _err._msg; }
+  @Override public String xstr() { return _err._msg; }
   @Override String str() { return "Err"; }
   @Override public Node ideal(GVNGCM gvn, int level) {  Node cc = in(0).is_copy(0);  return cc==null ? null :set_def(0,cc,gvn); }
   @Override public Type value(GVNGCM.Mode opt_mode) {

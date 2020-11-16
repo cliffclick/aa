@@ -9,7 +9,7 @@ public class MProjNode extends ProjNode {
   public MProjNode( CallNode call, DefMemNode def ) { super(AA.MEM_IDX,call,def); }
   public MProjNode( Node head ) { super(head, AA.MEM_IDX); }
   public MProjNode( Node head, int idx ) { super(head,idx); }
-  @Override String xstr() { return "MProj"+_idx; }
+  @Override public String xstr() { return "MProj"+_idx; }
   @Override public boolean is_mem() { return true; }
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node x = in(0).is_copy(_idx);

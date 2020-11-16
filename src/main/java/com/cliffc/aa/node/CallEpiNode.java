@@ -28,12 +28,13 @@ public final class CallEpiNode extends Node {
     assert nodes[1] instanceof DefMemNode;
 
     // Build a HM tvar (args->ret), same as HM.java Apply does.
-    TypeVar tfun0 = call().fun().tvar().find();
-    TypeVar tvargs = call().tvar().find();
-    TFun tvfun = new TFun(this,tvargs,_tvar); // New TFun { tvargs -> this }
-    tfun0.unify(tvfun);
+    TVar targs = call().tvar();
+    TVar tfun = new TFun(this,targs,tvar()); // New TFun { tvargs -> this }
+    // Function being called
+    TVar tfun0 = call().fun().tvar();
+    tfun0.unify(tfun);
   }
-  String xstr() { return (is_dead() ? "X" : "C")+"allEpi";  } // Self short name
+  @Override public String xstr() { return (is_dead() ? "X" : "C")+"allEpi";  } // Self short name
   public CallNode call() { return (CallNode)in(0); }
   @Override public boolean is_mem() { return true; }
   int nwired() { return _defs._len-2; }

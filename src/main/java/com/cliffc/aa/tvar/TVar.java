@@ -1,68 +1,117 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
-import org.jetbrains.annotations.NotNull;
+import com.cliffc.aa.util.*;
 
-import static com.cliffc.aa.AA.unimpl;
+// Type Variable.  TVars unify (ala Tarjan Union-Find), and can have structure
+// (such as "{ A -> B }").  TVars are tied to a TNode to enforce Type structure
+// on Types.  TVars with no structure either refer to a plain Node, or get
+// unioned into another TVar.  TVars with structure have to match structure to
+// be unified, but then can be recursively unified.
 
-// Type of a Var, for something like Hindley-Milner parametric polymorphism.  A
-// TypeVar holds the base type for its Node.  TypeVars can be unified (or in
-// the same congruence class); the base Type is then the JOIN (not MEET) of all
-// unified base types.  Other Types can have TypeVar parts, indicating which
-// sub-parts have to have the same Type.  Example for the classic Identity
-// function: TypeFunSig(formals:TypeStruct(disp,TypeVar A),ret:TypeVar A).
+public class TVar implements Comparable<TVar> {
+  // Tarjan U-F value.  null==HEAD.
+  TVar _u;                      // Tarjan Union-Find; null==HEAD
+  // Set of unioned Nodes.  The first element is the HEAD, the original TNode.
+  // Dead TNodes are removed as found.  Try for the assert that HEAD has least uid.
+  Ary<TNode> _ns;               // TNodes unioned together.
+  int _uid;                     // UID of HEAD TNode; only used for debug prints
 
-public class TVar extends TypeVar {
-  // Either: HEAD of U-F; _u==null, _uf_kids set with list of children
-  // OR:     TAIL of U-F; _u==HEAD, _uf_kids null
-  private TypeVar _u;           // Tarjan Union-Find; null==HEAD
+  public TVar( TNode tn ) { _ns = new Ary<>(new TNode[]{tn}); _uid = tn.uid(); }
 
-  // Basic H-M type variable supporting U-F and parametric types.
-  public TVar( @NotNull TNode tn ) { super(tn); ; }
-
-  // Base type from Node
-  @Override public Type _type(boolean head) {
-    assert !head || _u==null;
-    return _tnode.val();
+  // U-F Find
+  public TVar find() {
+    if( _u   == null ) return this;
+    if( _u._u== null ) return _u;
+    TVar u = _u;                // Find top of U-F
+    while( u._u != null ) u = u._u;
+    TVar v = this;              // Roll up to top of U-F
+    while( v != u ) { _u = u; v = v._u; }
+    return u;
   }
 
-  // Test no fails during unification
-  @Override boolean _unify_test(TypeVar tv) {
+  // Structural unification, "this into that".
+  public TVar unify(TVar tv) {
+    if( this==tv ) return this; // Done!
+    if( !_will_unify(tv,0, new NonBlockingHashMapLong<Integer>()) )    // Will fail to unify
+      //throw unimpl();
+      System.out.println("Failed to unify "+this+" and "+tv);
+    return _unify0(tv);
+  }
+
+  // TODO: Top unify: shortcut, then will_unify, which handles sorting internally.
+  // THEN: sort & unify parts - which recursively call the sort & unify parts.
+  // THEN: merge TNS & union.
+  TVar _unify0(TVar tv) {
+    if( this==tv ) return this; // Done!
+    if( compareTo(tv) > 0 )
+      return tv._unify0(this); // Canonicalize unification order
+    // Unify this into that
+    _u = tv;
+    // Kill tnodes and other bits of this, to signify unified.
+    tv._ns = Ary.merge_or(_ns,tv._ns);
+    for( int i=0; i<tv._ns._len; i++ )
+      if( tv._ns.at(i).is_dead() )
+        tv._ns.remove(i--);
+    assert tv.check_ns();
+    _ns = null;
+    // Unify parts
+    _unify(tv);
+    return tv;
+  }
+  // Unification requires equal structure.
+  // Plain TVars have no structure and unify with all others.
+  boolean _will_unify(TVar tv, int cnt, NonBlockingHashMapLong<Integer> cyc) { return true; }
+
+  // Unify parts
+  // Plain TVars have no structure and unify with all others.
+  void _unify(TVar tv) { }
+
+  // Sorted, no dups.  Poor-mans assert
+  private boolean check_ns() {
+    for( int i=0; i<_ns._len-1; i++ )
+      if( _ns.at(i).uid() >= _ns.at(i+1).uid() )
+        return false;
     return true;
   }
-  // Unify this into tv.
-  @Override public void _unify(TypeVar tv) {
-    if( tv==this ) return;      // Already unioned
-    if( tv._tnode.is_dead() ) {
-      assert !_tnode.is_dead(); // top of union is alive
-      tv._unify(this);
-      return;
-    }
-    _u = tv;
-    if( tv._uf_kids==null ) tv._uf_kids = new Ary<>(new TVar[1],0);
-    if( _uf_kids != null )  tv._uf_kids.addAll(_uf_kids);
-    tv._uf_kids.push(this);
-    _uf_kids=null;
-  }
 
-  // U-F find algo
-  @Override public TypeVar find() {
-    if( _u==null ) return this;
-    if( !(_u instanceof TVar) || ((TVar)_u)._u==null ) return _u;
-    throw unimpl();
-  }
+  @Override public final String toString() { return str(new SB(),new VBitSet(),true).toString();  }
 
   // Pretty print
-  @Override public SB _str(SB sb, boolean pretty) {
+  public final SB str(SB sb, VBitSet bs, boolean debug) {
+    // Explicit U-F chain
     if( _u!=null ) {
-      if( !pretty ) sb.p("V").p(uid()).p(">>");
-      return _u._str(sb,pretty);
+      if( debug ) sb.p("V").p(_uid).p(">>");
+      return _u.str(sb,bs,debug);
     }
-    sb.p("V").p(uid());
-    //_tnode.val().str(sb.p(":"),new VBitSet(),null,true);
-    return sb;
+    if( bs.tset(_uid) )
+      return sb.p("V").p(_uid).p("$");
+    // Find a sample node to print out
+    int idx = _ns.find(e -> e.uid()==_uid);
+    if( idx == -1 ) idx = _ns.find(e -> !e.is_dead());
+    if( idx != -1 ) {
+      TNode tn = _ns.at(idx);
+      sb.p('N').p(tn.uid()).p(':').p(tn.xstr()).p(':');
+    }
+    // Print all unioned nodes
+    if( debug )
+      for( int i=1; i<_ns._len; i++ )
+        if( !_ns.at(i).is_dead() )
+          sb.p('N').p(_ns.at(i).uid()).p(':');
+    return _str(sb,bs,debug);
   }
+  // Type-variable structure print
+  SB _str(SB sb, VBitSet bs, boolean debug) { return sb; } // No special fields
+
+  // Dead is always least; then plain TVars; then any other TVar type.
+  // Two equal classes order by uid.
+  @Override public int compareTo(TVar tv) {
+    if( this==tv ) return 0;
+    boolean istv0 =    getClass()==TVar.class;
+    boolean istv1 = tv.getClass()==TVar.class;
+    if( istv0 && !istv1 ) return -1;
+    if( !istv0 && istv1 ) return  1;
+    return _uid - tv._uid;
+  }
+
 }

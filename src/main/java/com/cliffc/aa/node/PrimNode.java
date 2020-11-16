@@ -29,7 +29,7 @@ public abstract class PrimNode extends Node {
     super(OP_PRIM);
     _name=name;
     assert formals.at(MEM_IDX)==TypeMem.ALLMEM && formals.at(FUN_IDX)==NO_DISP; // Room for no closure; never memory
-    _sig=TypeFunSig.make(args==null ? TypeFunSig.arg_names(formals.len()) : args,formals,TypeTuple.make_ret(ret));
+    _sig=TypeFunSig.make(args==null ? TypeFunSig.func_names : args,formals,TypeTuple.make_ret(ret));
     _badargs=null;
     _op_prec = -1;              // Not set yet
     _thunk_rhs=false;

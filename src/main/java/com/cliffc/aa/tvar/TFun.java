@@ -1,53 +1,39 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
-import com.cliffc.aa.type.TypeFunSig;
-import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.SB;
-import org.jetbrains.annotations.NotNull;
+import com.cliffc.aa.util.VBitSet;
 
-// Type of a Hindley-Milner function operator.
-// "->N" for n-argument functions.
-public class TFun extends TypeVar {
-  final TypeVar _funargs; // Control0, Memory1, Fcn/Disp2, Arg3, Arg4, ...
-  public final TypeVar _rez;       // Control0, Memory1, Result2
+// FunPtr TVar, a classic function tvar, mapping between a TArgs and a TRet.
+public class TFun extends TVar {
+  TVar _args, _ret;               // Either plain TVars, or a TArg, TRet.
 
-  // Basic H-M type variable supporting U-F and parametric types.
-  public TFun( @NotNull TNode tn, TypeVar funargs, TypeVar rez ) { super(tn); _funargs=funargs; _rez=rez; }
+  public TFun(TNode fptr, TVar args, TVar ret) { super(fptr); _args = args; _ret=ret;}
 
-  // Type from parts.  Grab the nargs (and memory) and the return and build a
-  // TypeFunSig.
-  @Override public TypeFunSig _type(boolean head) {
-    @NotNull String @NotNull [] names  = _funargs._tnode.argnames();
-    TypeTuple targs = (TypeTuple)_funargs._type(head);
-    TypeTuple rez   = (TypeTuple)_rez    ._type(head);
-    TypeFunSig fcn = TypeFunSig.make(names,targs,rez);
-    return fcn;
-  }
-
-  // Test no fails during unification
-  @Override boolean _unify_test(TypeVar tv) {
-    if( tv instanceof TVar ) return tv._unify_test(this);
+  @Override boolean _will_unify(TVar tv, int cnt, NonBlockingHashMapLong<Integer> cyc) {
+    if( this==tv ) return true;
+    if( tv.getClass()==TVar.class ) return true;
     if( !(tv instanceof TFun) ) return false;
-    TFun tf = (TFun)tv;
-    return _funargs._unify_test(tf._funargs) && _rez._unify_test(tf._rez);
-
+    TFun tfun = (TFun)tv;
+    if( cnt > 100 ) throw com.cliffc.aa.AA.unimpl();
+    if( !_args._will_unify(tfun._args,cnt,cyc) ) return false;
+    if( !_ret ._will_unify(tfun._ret ,cnt,cyc) ) return false;
+    return true;
   }
-  // Unify this into tv.
-  @Override void _unify(TypeVar tv) {
-    if( tv instanceof TVar ) { tv._unify(this); return; }
-    TFun tf = (TFun)tv;
-    // Structural unification
-    _funargs._unify(tf._funargs);
-    _rez._unify(tf._rez);
+
+  @Override void _unify( TVar tv ) {
+    if( tv.getClass()==TVar.class ) return;
+    TFun tfun = (TFun)tv;
+    _args.find()._unify0(tfun._args.find());
+    _ret .find()._unify0(tfun._ret .find());
   }
 
   // Pretty print
-  @Override public SB _str(SB sb, boolean pretty) {
-    sb.p("V").p(uid()).p("{ ");
-    _funargs._str(sb,pretty);
-    sb.p("-> ");
-    _rez._str(sb,pretty);
-    return sb.p(" }");
+  @Override SB _str(SB sb, VBitSet bs, boolean debug) {
+    sb.p("{ ");
+    _args.str(sb,bs,debug).p(" -> ");
+    _ret .str(sb,bs,debug).p(" }");
+    return sb;
   }
 }

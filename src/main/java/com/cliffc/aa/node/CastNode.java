@@ -9,7 +9,7 @@ import com.cliffc.aa.type.TypeTuple;
 public class CastNode extends Node {
   public final Type _t;                // TypeVar???
   public CastNode( Node ctrl, Node ret, Type t ) { super(OP_CAST,ctrl,ret); _t=t; }
-  @Override String xstr() { return "("+_t+")"; }
+  @Override public String xstr() { return "("+_t+")"; }
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node cc = in(0).is_copy(0);
     if( cc!=null ) return set_def(0,cc,gvn);
