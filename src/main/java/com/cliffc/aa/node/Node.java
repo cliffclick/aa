@@ -56,6 +56,7 @@ public abstract class Node implements Cloneable, TNode {
   static { assert STRS.length==OP_MAX; }
 
   public int _uid;      // Unique ID, will have gaps, used to give a dense numbering to nodes
+  @Override public int uid() { return _uid; }
   final byte _op;       // Opcode (besides the object class), used to avoid v-calls in some places
   public byte _keep;    // Keep-alive in parser, even as last use goes away
   public TypeMem _live; // Liveness; assumed live in gvn.iter(), assumed dead in gvn.gcp().
@@ -63,16 +64,20 @@ public abstract class Node implements Cloneable, TNode {
   public Type _val;     // Value; starts at ALL and lifts towards ANY.
   public Type val() { return _val; }
   public Type set_val( @NotNull Type val ) { _in = true; return (_val=val); }
-  @NotNull TVar _tvar;  // Type variable; has a Type which starts at ALL and lifts towards ANY, and may have constraints to be equal to other Types
+  // Hindley-Milner inspired typing, or CNC Thesis based congruence-class
+  // typing.  This is a Type Variable which can unify with other TVars forcing
+  // Type-equivalence (JOIN of unified Types), and includes gross structure
+  // (functions, structs, pointers, or simple Types).
+  @NotNull TVar _tvar;  
   // H-M Type-Variables
   public TVar tvar() {
     TVar tv = _tvar.find();     // Do U-F step
-    return tv == _tvar ? tv : (_tvar = tv);
+    return tv == _tvar ? tv : (_tvar = tv); // Update U-F style in-place.
   }
   public TVar _tvar() { return _tvar; } // For debug prints
   public TVar tvar(int x) { return in(x).tvar(); }
-  public TNode[] parms() { throw unimpl(); }
-  public int compareTo(TNode tn) { return uid() - tn.uid(); }
+  public TNode[] parms() { throw unimpl(); } // Used to build structural TVars
+  public int compareTo(TNode tn) { return _uid - tn.uid(); }
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
   public Ary<Node> _defs;
@@ -383,11 +388,15 @@ public abstract class Node implements Cloneable, TNode {
   }
 
   // Graph rewriting.  Can change defs, including making new nodes - but if it
-  // does so, all new nodes will first call gvn.xform().  If gvn._opt if false,
-  // not allowed to remove CFG edges (loop backedges and function-call entry
-  // points have not all appeared).  Returns null if no-progress, or a better
-  // version of 'this'.  The transformed graph must remain monotonic in both
-  // value() and live().
+  // does so, all new nodes will first call gvn.xform().  If gvn._opt_mode is
+  // before Mode.Opto not allowed to remove CFG edges (loop backedges and
+  // function-call entry points have not all appeared).
+  //   level==0 ==> Small work only, no inlining
+  //   level==1 ==> Assert no small work
+  //   level==2 ==> Inlining, hence code expansion
+  //   level==3 ==> Assert no inlining
+  // Returns null if no-progress or a better version of 'this'.  The
+  // transformed graph must remain monotonic in both value() and live().
   abstract public Node ideal(GVNGCM gvn, int level);
 
   // Compute the current best Type for this Node, based on the types of its
@@ -437,10 +446,10 @@ public abstract class Node implements Cloneable, TNode {
   public boolean value_changes_live() { return _op==OP_CALL; }
   public boolean live_changes_value() { return false; }
 
-
-  // Hindley-Milner inspired typing, or CNC Thesis based congruence-class
-  // typing.
-  @Override public int uid() { return _uid; }
+  // Unifies this Node with others; Call/CallEpi with Fun/Parm/Ret.  NewNodes &
+  // Load/Stores, etc.  Returns true if progress, and puts neighbors back on
+  // the worklist.
+  public boolean unify(GVNGCM gvn) { return false; }
 
   // Return any type error message, or null if no error
   public ErrMsg err( boolean fast ) { return null; }

@@ -2,6 +2,7 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
 import com.cliffc.aa.util.*;
+import java.util.HashMap;
 
 // Type Variable.  TVars unify (ala Tarjan Union-Find), and can have structure
 // (such as "{ A -> B }").  TVars are tied to a TNode to enforce Type structure
@@ -31,25 +32,24 @@ public class TVar implements Comparable<TVar> {
   }
 
   // Structural unification, "this into that".
-  public TVar unify(TVar tv) {
+  // Top-level entry point, not recursive.
+  public final TVar unify(TVar tv) {
     if( this==tv ) return this; // Done!
-    if( !_will_unify(tv,0, new NonBlockingHashMapLong<Integer>()) )    // Will fail to unify
+    if( !_will_unify(tv,0, new NonBlockingHashMapLong<>()) ) // Will fail to unify
       //throw unimpl();
       System.out.println("Failed to unify "+this+" and "+tv);
     return _unify0(tv);
   }
 
-  // TODO: Top unify: shortcut, then will_unify, which handles sorting internally.
-  // THEN: sort & unify parts - which recursively call the sort & unify parts.
-  // THEN: merge TNS & union.
-  TVar _unify0(TVar tv) {
+  // Recursive entry point for unification.
+  final TVar _unify0(TVar tv) {
     if( this==tv ) return this; // Done!
     if( compareTo(tv) > 0 )
       return tv._unify0(this); // Canonicalize unification order
     // Unify this into that
     _u = tv;
     // Kill tnodes and other bits of this, to signify unified.
-    tv._ns = Ary.merge_or(_ns,tv._ns);
+    if( _ns != null ) tv._ns = Ary.merge_or(_ns,tv._ns);
     for( int i=0; i<tv._ns._len; i++ )
       if( tv._ns.at(i).is_dead() )
         tv._ns.remove(i--);
@@ -59,11 +59,8 @@ public class TVar implements Comparable<TVar> {
     _unify(tv);
     return tv;
   }
-  // Unification requires equal structure.
-  // Plain TVars have no structure and unify with all others.
-  boolean _will_unify(TVar tv, int cnt, NonBlockingHashMapLong<Integer> cyc) { return true; }
 
-  // Unify parts
+  // Unify parts, varies by subclass.
   // Plain TVars have no structure and unify with all others.
   void _unify(TVar tv) { }
 
@@ -74,6 +71,24 @@ public class TVar implements Comparable<TVar> {
         return false;
     return true;
   }
+
+  // Unification requires equal structure; structure varies by subclass.
+  // Plain TVars have no structure and unify with all others.
+  boolean _will_unify(TVar tv, int cnt, NonBlockingHashMapLong<Integer> cyc) { return true; }
+
+  // True if two TVars are structurally equivalent
+  static final HashMap<TVar,TVar> EQS = new HashMap<>();
+  static final BitSetSparse DUPS = new BitSetSparse();
+  public final boolean eq( TVar tv ) {  EQS.clear();  DUPS.clear();  return _eq(tv);  }
+  boolean _eq(TVar tv) {
+    assert _u==null && tv._u==null;
+    if( this==tv ) return true;
+    if( tv.getClass() != TVar.class ) return false;
+    // TODO: Something to do with Types
+    TVar v2 = EQS.computeIfAbsent(this,k -> tv);
+    return tv==v2;              // Unequal TVars
+  }
+
 
   @Override public final String toString() { return str(new SB(),new VBitSet(),true).toString();  }
 

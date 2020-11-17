@@ -6,6 +6,7 @@ import com.cliffc.aa.TNode;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.tvar.TRet;
 
 // See CallNode comments.  The RetNode gathers {control (function exits or
@@ -22,8 +23,6 @@ public final class RetNode extends Node {
     super(OP_RET,ctrl,mem,val,rpc,fun);
     _fidx = fun._fidx;
     _nargs=fun.nargs();
-    // RetNodes are structural copies of their inputs, reflect this in their type variables
-    tvar().unify(new TRet(this));
   }
   public Node ctl() { return in(0); }
   public Node mem() { return in(1); }
@@ -183,6 +182,18 @@ public final class RetNode extends Node {
     if( def==mem() ) return _live;
     if( def==rez() ) return TypeMem.ESCAPE;
     return TypeMem.ALIVE;       // Basic aliveness
+  }
+
+  @Override public boolean unify( GVNGCM gvn ) {
+    // Already a TRet?
+    TVar tvar = tvar();
+    if( tvar instanceof TRet ) return false;
+    // RetNodes are structural copies of their inputs, reflect this in their
+    // type variables
+    tvar.unify(new TRet(this));
+    // Update FunPtrNodes
+    gvn.add_work_uses(this);
+    return true;
   }
 
   @Override public Node is_copy(int idx) { throw com.cliffc.aa.AA.unimpl(); }

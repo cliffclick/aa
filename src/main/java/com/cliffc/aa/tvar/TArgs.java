@@ -20,11 +20,12 @@ public class TArgs extends TVar {
       _parms[i] = parms[i]==null ? null : parms[i].tvar();
     _loose = loose;
   }
+  public final int nargs() { return _parms.length; }
 
   @Override boolean _will_unify(TVar tv, int cnt, NonBlockingHashMapLong<Integer> cyc) {
     if( this==tv ) return true;
     if( tv.getClass()==TVar.class ) return true;
-    if( !(tv instanceof TArgs) ) return false;
+    if( getClass()!=tv.getClass() ) return false; // Both TArgs or TRets
     TArgs targs = (TArgs)tv;
     if( _parms.length != targs._parms.length &&
         !(_loose && targs._loose) ) // Both args allow a loose-fit
@@ -54,9 +55,9 @@ public class TArgs extends TVar {
     TVar tv2 = tv.find();
     return tv2 == tv ? tv2 : (_parms[i] = tv2);
   }
-  
+
   @Override void _unify( TVar tv ) {
-    if( tv.getClass()==TVar.class ) return;
+    assert _u!=null;            // Flagged as being unified
     TArgs targs = (TArgs)tv;
     for( int i=0; i<_parms.length; i++ ) {
       TVar tn0 =       parm(i);
@@ -65,6 +66,23 @@ public class TArgs extends TVar {
         tn0._unify0(tn1);
     }
     _parms = null;              // No longer need parts from 'this'
+  }
+
+  @Override boolean _eq(TVar tv) {
+    assert _u==null && tv._u==null;
+    if( this==tv ) return true;
+    if( getClass()!=tv.getClass() ) return false; // Both TArgs or TRets
+    TArgs targs = (TArgs)tv;
+    if( nargs() != targs.nargs() ) return false;
+    if( DUPS.tset(_uid,targs._uid) )
+      return true;              // Cyclic check works, something else will decide eq/ne
+    for( int i=0; i<_parms.length; i++ ) {
+      TVar tv0 =       parm(i);
+      TVar tv1 = targs.parm(i);
+      if( tv0 != null && tv1 != null && !tv0._eq(tv1) )
+        return false;
+    }
+    return true;
   }
 
   // Pretty print

@@ -2,7 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.TArgs;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
@@ -93,8 +93,6 @@ public class CallNode extends Node {
     _rpc = BitsRPC.new_rpc(BitsRPC.ALL); // Unique call-site index
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
     _badargs = badargs;
-    // Gather incoming args.  NOT an application point (yet), that is a CallEpi.
-    tvar().unify(new TArgs(this,true));
   }
 
   @Override public String xstr() { return (is_dead() ? "X" : "C")+"all";  } // Self short name
@@ -214,8 +212,6 @@ public class CallNode extends Node {
           add_def( nnn.fld(i));
         set_mem(((MrgProjNode)mem).mem(),gvn);
         _unpacked = true;     // Only do it once
-        // After unpacking, unify with proper arg counts
-        tvar().unify(new TArgs(this,true));
         return this;
       }
     }
@@ -665,6 +661,17 @@ public class CallNode extends Node {
       if( ((FunPtrNode)def).ret()== ret )
         return (FunPtrNode)def;
     return null;
+  }
+
+  @Override public boolean unify( GVNGCM gvn ) {
+    // Gather incoming args.  NOT an application point (yet), that is a CallEpi.
+    TVar tvar = tvar();
+    if( tvar instanceof TArgs &&
+        ((TArgs)tvar).nargs() == nargs() ) // Unpack can change arg counts
+      return false;
+    tvar.unify(new TArgs(this,true));
+    gvn.add_work(cepi());
+    return true;
   }
 
 

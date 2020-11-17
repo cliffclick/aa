@@ -6,6 +6,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
+
 import static com.cliffc.aa.AA.*;
 
 // See CallNode.  Slot 0 is the Call.  The remaining slots are Returns which
@@ -26,13 +27,6 @@ public final class CallEpiNode extends Node {
   public CallEpiNode( Node... nodes ) {
     super(OP_CALLEPI,nodes);
     assert nodes[1] instanceof DefMemNode;
-
-    // Build a HM tvar (args->ret), same as HM.java Apply does.
-    TVar targs = call().tvar();
-    TVar tfun = new TFun(this,targs,tvar()); // New TFun { tvargs -> this }
-    // Function being called
-    TVar tfun0 = call().fun().tvar();
-    tfun0.unify(tfun);
   }
   @Override public String xstr() { return (is_dead() ? "X" : "C")+"allEpi";  } // Self short name
   public CallNode call() { return (CallNode)in(0); }
@@ -530,6 +524,18 @@ public final class CallEpiNode extends Node {
     if( fidxs.above_center() || !fidxs.test(fidx) )
       return TypeMem.DEAD;    // Call does not call this, so not alive.
     return _live;
+  }
+
+  @Override public boolean unify( GVNGCM gvn ) {
+    // Build a HM tvar (args->ret), same as HM.java Apply does.
+    TVar tfun  = call().fun().tvar();
+    TVar targs = call().tvar();
+    if( tfun instanceof TFun &&
+        ((TFun)tfun).args().eq(targs) &&
+        ((TFun)tfun).ret ().eq(tvar()) )
+      return false;
+    tfun.unify(new TFun(this,targs,tvar())); // New TFun { tvargs -> this }
+    return true;
   }
 
   @Override Node is_pure_call() { return in(0) instanceof CallNode ? call().is_pure_call() : null; }

@@ -7,9 +7,12 @@ import com.cliffc.aa.util.VBitSet;
 
 // FunPtr TVar, a classic function tvar, mapping between a TArgs and a TRet.
 public class TFun extends TVar {
-  TVar _args, _ret;               // Either plain TVars, or a TArg, TRet.
+  TVar _args, _ret;      // Either plain TVars, or a TArg, TRet.
 
   public TFun(TNode fptr, TVar args, TVar ret) { super(fptr); _args = args; _ret=ret;}
+
+  public TVar args() { TVar args = _args.find();  return args==_args ? args : (_args=args); }
+  public TVar ret () { TVar ret  = _ret .find();  return ret ==_ret  ? ret  : (_ret =ret ); }
 
   @Override boolean _will_unify(TVar tv, int cnt, NonBlockingHashMapLong<Integer> cyc) {
     if( this==tv ) return true;
@@ -17,16 +20,27 @@ public class TFun extends TVar {
     if( !(tv instanceof TFun) ) return false;
     TFun tfun = (TFun)tv;
     if( cnt > 100 ) throw com.cliffc.aa.AA.unimpl();
-    if( !_args._will_unify(tfun._args,cnt,cyc) ) return false;
-    if( !_ret ._will_unify(tfun._ret ,cnt,cyc) ) return false;
+    if( !args()._will_unify(tfun.args(),cnt,cyc) ) return false;
+    if( !ret ()._will_unify(tfun.ret (),cnt,cyc) ) return false;
     return true;
   }
 
   @Override void _unify( TVar tv ) {
-    if( tv.getClass()==TVar.class ) return;
+    assert _u!=null;            // Flagged as being unified
     TFun tfun = (TFun)tv;
-    _args.find()._unify0(tfun._args.find());
-    _ret .find()._unify0(tfun._ret .find());
+    TVar arg0 = args(), arg1 = tfun.args();
+    TVar ret0 = ret (), ret1 = tfun.ret ();
+    arg0._unify0(arg1);
+    ret0._unify0(ret1);
+    _args = _ret = null;        // Clear out, now that unified
+  }
+
+  @Override boolean _eq(TVar tv) {
+    assert _u==null && tv._u==null;
+    if( this==tv ) return true;
+    if( !(tv instanceof TFun) ) return false; // Both TFun
+    TFun tfun = (TFun)tv;
+    return args()._eq(tfun.args()) && ret()._eq(tfun.ret());
   }
 
   // Pretty print

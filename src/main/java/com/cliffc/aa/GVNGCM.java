@@ -403,6 +403,10 @@ public class GVNGCM {
     // [ts!,vals?] Remove before ideal or value-wiring hacks edges & changes hash
     _vals.remove(n);
 
+    // Perform unification
+    if( n.unify(this) )
+      ;//System.out.println("HM progress "+n.tvar());
+    
     // [ts!] Compute uses & live bits.  If progress, push the defs on the
     // worklist.  This is a reverse flow computation.
     TypeMem oliv = n._live;

@@ -1,5 +1,23 @@
 =======================================
-Notes from 11/10/2020
+Notes from 11/16/2020
+
+Got HM unification "working" on Sea of Nodes, meaning doing unification but not
+using the info to do any improvements.  Also, no distinction between Lambda and
+Let.  Actions:
+
+Make a "unify" call for GVM.  Set to NOP by default.
+Call it during iter().  Can do Ideal() for now.
+Run "standard" unification, like i do in the constructors now.
+Add a "progress" - which forces re-unification.
+If a Call directly uses a FunPtr, get a fresh copy for unification.
+Update the fresh copy if FunPtr makes "progress", which means it unifies with anything.
+
+Eventually, once the TVars are correct for toy example, use the TVars to
+improve CEpi return types after Call.
+
+
+
+======================================= Notes from 11/10/2020
 
 Branch HM has a Hindley-Milner-like thing, set for a Sea-of-Nodes (or at least
 SSA), a worklist-style algo with monotonicity properties (for including in the

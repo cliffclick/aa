@@ -3,10 +3,8 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TArgs;
-import com.cliffc.aa.tvar.TFun;
-import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.*;
 
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
 // TypeFunPtr with a constant fidx and variable displays.  Used to allow 1st
@@ -18,14 +16,6 @@ public final class FunPtrNode extends Node {
   private FunPtrNode( ErrMsg referr, RetNode ret, Node display ) {
     super(OP_FUNPTR,ret,display);
     _referr = referr;
-    // Build a HM tvar (args->ret), same as HM.java Lambda does.
-    // FunNodes are just argument collections (no return)
-    FunNode fun = ret.fun();
-    TVar targs = new TArgs(fun,is_forward_ref()); // [Control,Memory,Fcn,Args...]
-    fun.tvar().unify(targs);
-    TVar tret  = ret.tvar(); // [Control,Memory,Result]
-    TVar tfun = new TFun(this,targs,tret);
-    tvar().unify(tfun);
   }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }
@@ -97,6 +87,26 @@ public final class FunPtrNode extends Node {
   }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     return def==ret() ? TypeMem.ANYMEM : TypeMem.ESCAPE;
+  }
+
+  @Override public boolean unify( GVNGCM gvn ) {
+    // Build a HM tvar (args->ret), same as HM.java Lambda does.
+    // FunNodes are just argument collections (no return).
+    FunNode fun = xfun();
+    if( fun==null ) return false;
+    RetNode ret = ret();
+    TVar tvar = tvar();
+    TVar targs = fun.tvar();
+    TVar tret  = ret.tvar();
+    if( tvar instanceof TFun &&
+        ((TFun)tvar).args().eq(targs) &&
+        ((TFun)tvar).ret ().eq(tret ) )
+      return false;             // No progress
+    TVar tfun = new TFun(this,targs,tret);
+    tvar().unify(tfun);
+    // All users of FunPtr need to unify with the new, stronger, structure
+    gvn.add_work_uses(this);
+    return true;
   }
 
   // Filter out all the wrong-arg-count functions

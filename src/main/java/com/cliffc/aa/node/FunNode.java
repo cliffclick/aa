@@ -2,11 +2,16 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TArgs;
+import com.cliffc.aa.tvar.TFun;
+import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.*;
+import java.util.BitSet;
+import java.util.HashMap;
+import java.util.Map;
 
 import static com.cliffc.aa.AA.*;
 
@@ -850,6 +855,18 @@ public class FunNode extends RegionNode {
         return Type.CTRL;       // Call us
     }
     return Type.XCTRL;
+  }
+
+  @Override public boolean unify( GVNGCM gvn ) {
+    // Build a HM tvar (args->ret), same as HM.java Lambda does.
+    // FunNodes are just argument collections (no return).
+    TVar tvar = tvar();
+    if( tvar instanceof TFun ) return false;
+    tvar.unify(new TArgs(this,is_forward_ref())); // [Control,Memory,Fcn,Args...]
+    // Update FunPtrNodes
+    RetNode ret = ret();
+    if( ret != null ) gvn.add_work_uses(ret);
+    return true;
   }
 
   // True if this is a forward_ref

@@ -63,7 +63,7 @@ public class TestHM {
 
   @Test
   public void test05() {
-    // ({ x -> (pair (x 3) (x "abc")) } {x->x})
+    // ({ x -> (pair (x 3) (x "abc")) } {y->y})
     Syntax x =
       new Apply(new Lambda("x",
                            new Apply(new Apply(new Ident("pair"),
@@ -75,6 +75,20 @@ public class TestHM {
     assertEquals("pair(v22:all,v22$)",t1.str());
   }
 
+
+  @Test
+  public void test05a() {
+    // let x = {y->y} in (pair (x 3) (x "abc"))
+    Syntax x =
+      new Let("x",
+              new Lambda("y", new Ident("y")),
+              new Apply(new Apply(new Ident("pair"),
+                                  new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
+                        new Apply(new Ident("x"), new Con(TypeStr.ABC))));
+
+    HMType t1 = HM.hm(x);
+    assertEquals("pair(v27:3,v23:\"abc\")",t1.str());
+  }
 
   @Test
   public void test06() {
