@@ -3,6 +3,7 @@ package com.cliffc.aa.tvar;
 import com.cliffc.aa.TNode;
 import com.cliffc.aa.util.*;
 import java.util.HashMap;
+import java.util.HashSet;
 
 // Type Variable.  TVars unify (ala Tarjan Union-Find), and can have structure
 // (such as "{ A -> B }").  TVars are tied to a TNode to enforce Type structure
@@ -15,10 +16,13 @@ public class TVar implements Comparable<TVar> {
   TVar _u;                      // Tarjan Union-Find; null==HEAD
   // Set of unioned Nodes.  The first element is the HEAD, the original TNode.
   // Dead TNodes are removed as found.  Try for the assert that HEAD has least uid.
-  Ary<TNode> _ns;               // TNodes unioned together.
-  int _uid;                     // UID of HEAD TNode; only used for debug prints
+  Ary<TNode> _ns;              // TNodes unioned together.
+  static private int UID=1;
+  final int _uid;
 
-  public TVar( TNode tn ) { _ns = new Ary<>(new TNode[]{tn}); _uid = tn.uid(); }
+  public TVar( TNode tn ) { this(tn==null ? new TNode[0] : new TNode[]{tn}); }
+  public TVar(          ) { this(new TNode[0]); }
+  private TVar( TNode[] tns ) { _ns = new Ary<>(tns); _uid = UID++; }
 
   // U-F Find
   public TVar find() {
@@ -76,6 +80,29 @@ public class TVar implements Comparable<TVar> {
   // Plain TVars have no structure and unify with all others.
   boolean _will_unify(TVar tv, int cnt, NonBlockingHashMapLong<Integer> cyc) { return true; }
 
+  // Return a "fresh" copy, preserving structure
+  TVar _fresh(HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups) {
+    assert _u==null;               // At top
+    return occurs_in(nongen, null) // If 'this' is in the non-generative set, use 'this'
+      ? this                       // Use 'this'
+      : dups.computeIfAbsent(this, e-> new TVar()); // One-time, make a new structure-parallel var
+  }
+
+  // Does 'this' occur in the nongen set, recursively.
+  final boolean occurs_in(HashSet<TVar> nongen, VBitSet visit) {
+    assert _u==null;            // At top
+    if( nongen == null ) return false;
+    for( TVar tv : nongen )
+      if( tv.find()._occurs_in(this,visit) ) // Flip sense: nongen is now 'this'
+        return true;
+    return false;
+  }
+  // Flipped: does 'id' occur in 'this'
+  boolean _occurs_in(TVar id, VBitSet visit) {
+    assert _u==null && id._u==null; // At top
+    return this==id;
+  }
+  
   // True if two TVars are structurally equivalent
   static final HashMap<TVar,TVar> EQS = new HashMap<>();
   static final BitSetSparse DUPS = new BitSetSparse();
@@ -99,11 +126,10 @@ public class TVar implements Comparable<TVar> {
       if( debug ) sb.p("V").p(_uid).p(">>");
       return _u.str(sb,bs,debug);
     }
-    if( bs.tset(_uid) )
+    if( _uid != -1 && bs.tset(_uid) )
       return sb.p("V").p(_uid).p("$");
     // Find a sample node to print out
-    int idx = _ns.find(e -> e.uid()==_uid);
-    if( idx == -1 ) idx = _ns.find(e -> !e.is_dead());
+    int idx = _ns.find(e -> !e.is_dead());
     if( idx != -1 ) {
       TNode tn = _ns.at(idx);
       sb.p('N').p(tn.uid()).p(':').p(tn.xstr()).p(':');

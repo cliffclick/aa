@@ -528,13 +528,40 @@ public final class CallEpiNode extends Node {
 
   @Override public boolean unify( GVNGCM gvn ) {
     // Build a HM tvar (args->ret), same as HM.java Apply does.
+
+    // Need a "fresh" copy of FunPtr tvar here.  Then it sticks (no progress)
+    // until the FunPtr updates.  So here, i need a "history" that i got a
+    // fresh FunPtr, and no further "fresh" until the FunPtr updates.
+    // However, each *use* of the updated FunPtr needs a fresh "fresh" TVar clone.
+
+    // Alternatively, upon update of FunPtr, i need to unify the "shape" of
+    // FunPtr into "new TFun(---,targs,tvar()))".  Note that this unification
+    // does nothing if the FunPtr is not a TFun already (in the prior impl,
+    // would make a "fresh" copy of a simple TVar, which trivially unifies with
+    // no change to the shape).
+
+
     TVar tfun  = call().fun().tvar();
     TVar targs = call().tvar();
     if( tfun instanceof TFun &&
-        ((TFun)tfun).args().eq(targs) &&
+        ((TFun)tfun).args().eq(targs ) &&
         ((TFun)tfun).ret ().eq(tvar()) )
       return false;
-    tfun.unify(new TFun(this,targs,tvar())); // New TFun { tvargs -> this }
+    // Useless to make a "fresh" plain TVar & unify, so no progress here.
+    if( !(tfun instanceof TFun) )
+      return false;
+    // TODO: "fresh" clone of tfun, then unify.
+    // TODO: validate 'eq' === equal_shape
+    // TODO: Unify-as-if-from-fresh, without doing the whole "clone fresh & unify".
+
+    // TODO: Need a real progress indicator, so a FunPtrNode just worklists as
+    // normal, and we can get here & note no-progress.  Which drives the desire
+    // to have a cheaper unification than "clone fresh & unify".
+
+    // For debug sake, doing clone-fresh-and-unify first.
+
+    TFun tfun0 = new TFun(null,null,targs,tvar()); // New TFun { tvargs -> this }
+    ((TFun)tfun).fresh().unify(tfun0);
     return true;
   }
 

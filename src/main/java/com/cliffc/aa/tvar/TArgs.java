@@ -1,9 +1,9 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
-import com.cliffc.aa.util.NonBlockingHashMapLong;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
+
+import java.util.HashSet;
 
 // Fun TVar, NOT FunPtr!  Gathers incoming function arguments.  Only used AFTER
 // a Fun is completed, because Parms/Args are not available when a Fun first is
@@ -12,12 +12,18 @@ public class TArgs extends TVar {
   TVar[] _parms;
   final boolean _loose;   // Syntatic de-sugaring on a Call, allows arg-counts to mis-match.
 
-  public TArgs(TNode fun, boolean loose ) {
+  private static TVar[] init(TNode fun) {
+    TNode[] tns = fun.parms();
+    TVar[] parms = new TVar[tns.length];
+    for( int i=0; i<tns.length; i++ )
+      parms[i] = tns[i]==null ? null : tns[i].tvar();
+    return parms;
+  }
+  public  TArgs(TNode fun, boolean loose ) { this(fun,init(fun),loose); }
+  TArgs(TNode fun, TVar[] parms, boolean loose) {
     super(fun);
-    TNode[] parms = fun.parms();
-    _parms = new TVar[parms.length];
-    for( int i=0; i<parms.length; i++ )
-      _parms[i] = parms[i]==null ? null : parms[i].tvar();
+    assert !(parms[0] instanceof TArgs);
+    _parms = parms;
     _loose = loose;
   }
   public final int nargs() { return _parms.length; }
@@ -53,6 +59,7 @@ public class TArgs extends TVar {
     TVar tv = _parms[i];
     if( tv==null ) return null;
     TVar tv2 = tv.find();
+    assert !(i==0 && tv2 instanceof TArgs);
     return tv2 == tv ? tv2 : (_parms[i] = tv2);
   }
 
@@ -62,11 +69,41 @@ public class TArgs extends TVar {
     for( int i=0; i<_parms.length; i++ ) {
       TVar tn0 =       parm(i);
       TVar tn1 = targs.parm(i);
+      assert i!=0 || !(tn0 instanceof TArgs || tn1 instanceof TArgs);
       if( tn0!=null && tn1!=null ) // Dead always unfies
         tn0._unify0(tn1);
     }
     _parms = null;              // No longer need parts from 'this'
   }
+
+
+  // Return a "fresh" copy, preserving structure
+  @Override TArgs _fresh( HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups) {
+    TVar rez = dups.get(this);
+    if( rez != null ) return (TArgs)rez;
+    return _fresh2(nongen,dups,new TArgs(null,new TVar[_parms.length],_loose));
+  }
+  final <T extends TArgs> T _fresh2(HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, T targs) {
+    dups.put(this,targs);       // Stop recursive cycles
+    for( int i=0; i<_parms.length; i++ ) {
+      TVar parm = parm(i);
+      targs._parms[i] = parm==null ? null : parm._fresh(nongen,dups);
+    }
+    return targs;
+  }
+
+  // Flipped: does 'id' occur in 'this'
+  @Override boolean _occurs_in(TVar id, VBitSet visit) {
+    assert _u==null && id._u==null; // At top
+    if( this==id ) return true;     // Occurs right here
+    assert _uid>0;
+    if( visit.tset(_uid) ) return false;
+    for( TVar parm : _parms )
+      if( parm!=null && parm.find()._occurs_in(id,visit) )
+        return true;
+    return false;
+  }
+
 
   @Override boolean _eq(TVar tv) {
     assert _u==null && tv._u==null;

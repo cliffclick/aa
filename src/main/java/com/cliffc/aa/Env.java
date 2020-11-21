@@ -2,6 +2,8 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TVar;
+import java.util.HashSet;
 
 public class Env implements AutoCloseable {
   public final static GVNGCM GVN = new GVNGCM(); // Initial GVN
@@ -219,4 +221,17 @@ public class Env implements AutoCloseable {
   void add_type( String name, Type t ) { _scope.add_type(name,t); }
   void def_type( String name, Type t ) { _scope.def_type(name,t); }
 
+  // Collect TVars from all variables in-scope.  Used to build a
+  // "non-generative" set of TVars for Hindley-Milner typing.
+  public HashSet<TVar> collect_active_scope() {
+    HashSet<TVar> tvars = new HashSet<>();
+    Env e = this;
+    while( e!=null ) {
+      for( Node def : _scope.stk()._defs )
+        if( def != null ) tvars.add(def.tvar());
+      e = e._par;
+    }
+    return tvars;
+  }
+  
 }

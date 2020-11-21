@@ -42,9 +42,9 @@ public class HM1 {
     env.put("*",Oper.fun(int64,Oper.fun(int64,int64)));
     env.put("==0",Oper.fun(int64,bool));
 
-    // Print a string; int->str
+    // Convert integer to a string; int->str
     env.put("str",Oper.fun(int64,strp));
-    // Factor
+    // Floating point Factor; sorta like {div/mod}
     env.put("factor",Oper.fun(flt64,new Oper("pair",flt64,flt64)));
 
     return prog.hm(env, new HashSet<>());

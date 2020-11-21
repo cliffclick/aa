@@ -404,8 +404,9 @@ public class GVNGCM {
     _vals.remove(n);
 
     // Perform unification
-    if( n.unify(this) )
-      ;//System.out.println("HM progress "+n.tvar());
+    n.unify(this);
+    //if( n.unify(this) )
+    //  System.out.println("HM progress "+n.tvar());
     
     // [ts!] Compute uses & live bits.  If progress, push the defs on the
     // worklist.  This is a reverse flow computation.

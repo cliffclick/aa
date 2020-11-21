@@ -233,7 +233,7 @@ public class TestNode {
     test1monotonic(new  CProjNode(_ins[0],0));
     test1monotonic(new    ErrNode(_ins[0],null,"\nerr\n"));
     test1monotonic(new    FunNode(TypeStruct.ARGS_X,new Type[]{TypeMemPtr.DISP_SIMPLE,TypeInt.INT64}));
-    test1monotonic(new FunPtrNode(ret,_gvn.con(NO_DISP)));
+    test1monotonic(new FunPtrNode(ret,null));
     test1monotonic(new FP2ClosureNode(_ins[1])); // Only takes in a TFP
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     for( NewNode.NewPrimNode prim : NewNode.NewPrimNode.INTRINSICS() )
@@ -260,9 +260,9 @@ public class TestNode {
     test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FRW ,"x",null));
     test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FFNL,"x",null));
     //                  ScopeNode has no inputs, and value() call is monotonic
-    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeInt.FALSE    ,null));
-    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeMemPtr.STRPTR,null));
-    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeFlt.FLT64    ,null));
+    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeInt.FALSE    ,null, null));
+    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeMemPtr.STRPTR,null, null));
+    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeFlt.FLT64    ,null, null));
     _gvn._opt_mode=GVNGCM.Mode.PesiNoCG;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=GVNGCM.Mode.Parse;
     _gvn._opt_mode=GVNGCM.Mode.PesiCG  ;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=GVNGCM.Mode.Parse;
 

@@ -49,7 +49,7 @@ public class IntrinsicNode extends Node {
     Node ptr = gvn.xform(new ParmNode(ARG_IDX,"ptr",fun,gvn.con(TypeMemPtr.ISUSED),badargs));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,cvt,ptr,rpc,fun));
-    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(NO_DISP)));
+    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null));
   }
 
   // If the input memory is unaliased, fold into the NewNode.
@@ -152,7 +152,7 @@ public class IntrinsicNode extends Node {
     Node mmem = Env.DEFMEM.make_mem_proj(gvn,nnn.unhook(),memp);
     Node ptr = gvn.xform(new ProjNode(REZ_IDX, nnn));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
-    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,nodisp));
+    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null));
   }
 
 }

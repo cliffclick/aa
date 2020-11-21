@@ -5,17 +5,29 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.*;
+import org.jetbrains.annotations.NotNull;
 
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
 // TypeFunPtr with a constant fidx and variable displays.  Used to allow 1st
 // class functions to be passed about.
 public final class FunPtrNode extends Node {
   private final ErrMsg _referr;
-  public  FunPtrNode( RetNode ret, Node display ) { this(null,ret,display); }
+  // Every var use that results in a function, so actually only these FunPtrs,
+  // needs to make a "fresh" copy before unification.  "Fresh" makes a
+  // structural copy of the TVar, keeping TVars from Nodes currently in-scope
+  // as-is, and making structural copies of out-of-scope TVars.  The only
+  // interesting thing is when an out-of-scope TVar uses the same TVar
+  // internally in different parts - the copy replicates this structure.  When
+  // unified, it forces equivalence in the same places.
+  public  FunPtrNode( RetNode ret, Env e ) { this(null,e,ret,e==null ? Env.GVN.con(TypeMemPtr.NO_DISP) : e._scope.ptr()); }
+  public  FunPtrNode( RetNode ret, Env e, Node display ) { this(null,e,ret,display); }
   // For forward-refs only; super weak display & function.
-  private FunPtrNode( ErrMsg referr, RetNode ret, Node display ) {
+  private FunPtrNode( ErrMsg referr, Env e, RetNode ret, Node display ) {
     super(OP_FUNPTR,ret,display);
     _referr = referr;
+    // Add the "non-generative" set to the TFun structure, but no other
+    // structural is available (args and ret are new TVars).
+    tvar().unify(new TFun(this,e == null ? null : e.collect_active_scope(),new TVar(),new TVar()));
   }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }
@@ -95,14 +107,14 @@ public final class FunPtrNode extends Node {
     FunNode fun = xfun();
     if( fun==null ) return false;
     RetNode ret = ret();
-    TVar tvar = tvar();
-    TVar targs = fun.tvar();
+    TFun tvar = (TFun)tvar();   // Self is always a TFun
+    // Build function arguments; "fun" itself is just control.
+    TArgs targs = new TArgs(fun,false);
     TVar tret  = ret.tvar();
-    if( tvar instanceof TFun &&
-        ((TFun)tvar).args().eq(targs) &&
-        ((TFun)tvar).ret ().eq(tret ) )
+    if( tvar.args().eq(targs) &&
+        tvar.ret ().eq(tret ) )
       return false;             // No progress
-    TVar tfun = new TFun(this,targs,tret);
+    TVar tfun = new TFun(this,tvar._nongen,targs,tret);
     tvar().unify(tfun);
     // All users of FunPtr need to unify with the new, stronger, structure
     gvn.add_work_uses(this);
@@ -141,7 +153,7 @@ public final class FunPtrNode extends Node {
     RetNode ret = gvn.init(new RetNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun));
     // Display is limited to any one of the current lexical scopes.
     TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS,TypeObj.ISUSED);
-    return new FunPtrNode( ErrMsg.forward_ref(unkref,fun),ret,gvn.con(tdisp));
+    return new FunPtrNode( ErrMsg.forward_ref(unkref,fun),null,ret,gvn.con(tdisp));
   }
 
   // True if this is a forward_ref
@@ -176,4 +188,11 @@ public final class FunPtrNode extends Node {
   }
 
   @Override public ErrMsg err( boolean fast ) { return is_forward_ref() ? _referr : null; }
+  // clones during inlining all become unique new sites
+  @SuppressWarnings("unchecked")
+  @Override @NotNull public FunPtrNode copy( boolean copy_edges, GVNGCM gvn) {
+    FunPtrNode nnn = (FunPtrNode)super.copy(copy_edges, gvn);
+    nnn.tvar().unify(new TFun(nnn,((TFun)_tvar)._nongen,new TVar(),new TVar()));
+    return nnn;
+  }
 }

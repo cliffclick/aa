@@ -18,11 +18,13 @@ import static com.cliffc.aa.AA.*;
 public class AssertNode extends Node {
   private final Type _t;            // Asserted type
   private final Parse _error_parse; // Used for error messages
-  public AssertNode( Node mem, Node a, Type t, Parse P ) {
+  private final Env _env;           // Lexical scope
+  public AssertNode( Node mem, Node a, Type t, Parse P, Env e ) {
     super(OP_TYPE,null,mem,a);
     assert !(t instanceof TypeFunPtr);
     _t=t;
     _error_parse = P;
+    _env = e;
   }
   @Override public String xstr() { return "assert:"+_t; }
   Node mem() { return in(1); }
@@ -56,11 +58,11 @@ public class AssertNode extends Node {
       Node postmem= gvn.xform(new MProjNode(cepi)).keep();
       Node val    = gvn.xform(new  ProjNode(cepi.unhook(),AA.REZ_IDX));
       // Type-check the return also
-      Node chk    = gvn.xform(new AssertNode(postmem,val,sig._ret.at(REZ_IDX),_error_parse));
+      Node chk    = gvn.xform(new AssertNode(postmem,val,sig._ret.at(REZ_IDX),_error_parse,_env));
       RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));
-      // Just the Closure when we make a new TFP
+      // Just the same Closure when we make a new TFP
       Node clos = gvn.xform(new FP2ClosureNode(arg));
-      return gvn.xform(new FunPtrNode(ret,clos));
+      return gvn.xform(new FunPtrNode(ret,_env,clos));
     }
 
     // Push TypeNodes 'up' to widen the space they apply to, and hopefully push

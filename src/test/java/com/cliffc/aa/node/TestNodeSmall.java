@@ -426,7 +426,7 @@ public class TestNodeSmall {
     gvn.xform(parm_dsp.add_def(dsp_file_ptr));
     // Close the function up
     RetNode ret = gvn.init(new RetNode(fun,parm_mem,parm_dsp,rpc,fun));
-    FunPtrNode fptr = gvn.init(new FunPtrNode(ret,dsp_file_ptr));
+    FunPtrNode fptr = gvn.init(new FunPtrNode(ret,null,dsp_file_ptr));
     // Close the cycle
     dsp_file.create("fact",fptr,TypeStruct.FFNL,gvn);
     dsp_file.no_more_fields();

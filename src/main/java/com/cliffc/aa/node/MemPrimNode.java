@@ -63,7 +63,7 @@ public abstract class MemPrimNode extends PrimNode {
       // memory.
       RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem(),gvn.init(this),rpc,fun));
       // No closures are added to primitives
-      return new FunPtrNode(ret,gvn.con(NO_DISP));
+      return new FunPtrNode(ret,null);
     }
 
     // The only memory required here is what is needed to support the Load
@@ -136,7 +136,7 @@ public abstract class MemPrimNode extends PrimNode {
       // Write prims return both a value and memory.
       MemPrimNode prim = (MemPrimNode)gvn.xform(this);
       RetNode ret = (RetNode)gvn.xform(new RetNode(fun,prim,prim.rez(),rpc,fun));
-      return new FunPtrNode(ret,gvn.con(NO_DISP));
+      return new FunPtrNode(ret,null);
     }
 
     @Override public TypeMem all_live() { return TypeMem.ALLMEM; }

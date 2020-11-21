@@ -960,7 +960,7 @@ public class Parse implements Comparable<Parse> {
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,rpc.unhook(),fun.unhook()));
       // The FunPtr builds a real display; any up-scope references are passed in now.
       _gvn.add_work(rpc);
-      Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr()));
+      Node fptr = gvn(new FunPtrNode(ret,e._par));
       _e = _e._par;                // Pop nested environment
       return fptr;                 // Return function; close-out and DCE 'e'
     }
@@ -1036,7 +1036,7 @@ public class Parse implements Comparable<Parse> {
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.
   private Node typechk(Node x, Type t, Node mem, Parse bad) {
-    return t == null || x.val().isa(t) ? x : gvn(new AssertNode(mem,x,t,bad));
+    return t == null || x.val().isa(t) ? x : gvn(new AssertNode(mem,x,t,bad,_e));
   }
 
   private String token() { skipWS();  return token0(); }

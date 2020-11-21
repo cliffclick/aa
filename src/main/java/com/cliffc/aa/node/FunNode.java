@@ -857,17 +857,7 @@ public class FunNode extends RegionNode {
     return Type.XCTRL;
   }
 
-  @Override public boolean unify( GVNGCM gvn ) {
-    // Build a HM tvar (args->ret), same as HM.java Lambda does.
-    // FunNodes are just argument collections (no return).
-    TVar tvar = tvar();
-    if( tvar instanceof TFun ) return false;
-    tvar.unify(new TArgs(this,is_forward_ref())); // [Control,Memory,Fcn,Args...]
-    // Update FunPtrNodes
-    RetNode ret = ret();
-    if( ret != null ) gvn.add_work_uses(ret);
-    return true;
-  }
+  @Override public boolean unify( GVNGCM gvn ) { return true; }
 
   // True if this is a forward_ref
   @Override public boolean is_forward_ref() { return _op_prec==-2; }
@@ -882,6 +872,8 @@ public class FunNode extends RegionNode {
     for( Node use : _uses )
       if( use instanceof ParmNode && ((ParmNode)use)._idx != -1 )
         parms[((ParmNode)use)._idx] = use;
+    assert parms[0]==null;
+    parms[0] = this;
     return parms;
   }
   public ParmNode rpc() { return parm(-1); }

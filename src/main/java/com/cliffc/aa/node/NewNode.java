@@ -7,7 +7,6 @@ import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
 import static com.cliffc.aa.AA.*;
-import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 
 // Allocates a TypeObj and produces a Tuple with the TypeObj and a TypeMemPtr.
 //
@@ -160,7 +159,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       _name = name;
       _reads = reads;
       assert (reads == (args[MEM_IDX]!=TypeMem.ALLMEM)); // If reading, then memory has some requirements
-      args[FUN_IDX] = NO_DISP; // No display
+      args[FUN_IDX] = TypeMemPtr.NO_DISP; // No display
       _sig = TypeFunSig.make(TypeTuple.RET,TypeTuple.make_args(args));
       _op_prec = op_prec;
     }
@@ -194,7 +193,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       Node ptr = gvn.xform(new ProjNode(nnn,REZ_IDX));
       RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,ptr,rpc,fun));
       mem.xliv(gvn._opt_mode); // Refine initial memory
-      return new FunPtrNode(ret,gvn.con(NO_DISP));
+      return new FunPtrNode(ret,null);
     }
   }
 }
