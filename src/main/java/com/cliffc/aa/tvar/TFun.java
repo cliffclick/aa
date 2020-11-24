@@ -10,7 +10,7 @@ public class TFun extends TVar {
   public HashSet<TVar> _nongen; // "Non-generative" set of TVars; TVars from all variables visible in the defining scope
 
   public TFun(TNode fptr, HashSet<TVar> nongen, TVar args, TVar ret) { super(fptr); _args = args; _ret=ret; _nongen = nongen; }
-  public TFun() { }
+  private TFun() { _args = new TVar(); _ret = new TVar(); }
 
   public TVar args() { TVar args = _args.find();  return args==_args ? args : (_args=args); }
   public TVar ret () { TVar ret  = _ret .find();  return ret ==_ret  ? ret  : (_ret =ret ); }
@@ -36,20 +36,37 @@ public class TFun extends TVar {
     _args = _ret = null;        // Clear out, now that unified
   }
 
-  // Clone a "fresh" instance, preserving all shape.
-  // To be immediately unified.
-  public TFun fresh() {
+  // Unify 'this' into 'that', except make a 'fresh' clone of 'this' before
+  // unification, so 'this' is unchanged.  Instead 'that' picks up any
+  // structure from 'this'.  Returns true for progress.
+  public boolean fresh_unify(TVar args, TVar ret) {
     assert _u==null;            // Already top
-    return _fresh(_nongen,new NonBlockingHashMap<>());
+    NonBlockingHashMapLong<Integer> cyc = new NonBlockingHashMapLong<>();
+    if( !args()._will_unify(args,0, cyc ) )  return false;
+    if( !ret ()._will_unify(ret ,0, cyc ) )  return false;
+    NonBlockingHashMap<TVar,TVar> dups = new NonBlockingHashMap<>();
+    return
+      args()._fresh_unify(args,_nongen,dups) | // NO SHORT-CIRCUIT: NOTE: '|' NOT '||'
+      ret ()._fresh_unify(ret, _nongen,dups);  // Must do both halves always
   }
-  @Override TFun _fresh(HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups) {
-    TVar rez = dups.get(this);
-    if( rez != null ) return (TFun)rez;
-    TFun tfun = new TFun();
+  @Override boolean _fresh_unify(TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups) {
+    assert _u==null;            // At top
+    if( this==tv || dups.containsKey(this) )
+      return false;             // Stop recursive cycles
+    boolean progress = false;
+    if( !(tv instanceof TFun) ) {   // Make a TFun, unify to 'tv' and keep unifying.  And report progress.
+      assert tv.getClass() == TVar.class;
+      progress = true;          // Forcing tv into a TArgs/TRet shape
+      tv._u = new TFun();       // Fresh TArgs, with all empty parms
+      tv._u._ns = tv._ns;       // Copy any nodes to the fresh
+      tv._ns = null;
+      tv = tv._u;               // This is the new unified 'tv'
+    }
+    TFun tfun = (TFun)tv;
     dups.put(this,tfun);        // Stop recursive cycles
-    tfun._args = args()._fresh(nongen,dups);
-    tfun._ret  = ret ()._fresh(nongen,dups);
-    return tfun;
+    progress |= args()._fresh_unify(tfun.args(),_nongen,dups);
+    progress |= ret ()._fresh_unify(tfun.ret (),_nongen,dups);
+    return progress;
   }
 
   // Flipped: does 'id' occur in 'this'

@@ -199,4 +199,20 @@ public class TestHM {
     assertEquals("TBD",t1.str());
   }
 
+  @Test(expected = RuntimeException.class)
+  public void test12() {
+    // Want to constant-fold if/else, and drop the dead unification.
+    // So compute: (int->bool int) // ==0
+    //             (flt->pair 1.2) // factor
+    //             (P ? {==0} : {factor}) // Force unification {int/flt} -> {bool/pair}
+    // lambda P
+    //  (((==0 1),(factor 1.2)),  (((if/else P) ==0) factor))
+    Syntax syn =
+      new Lambda("p",
+                 new Apply(new Apply(new Apply(new Ident("if/else"),new Ident("p")), // (((if/else p) ==0) factor)
+                                     new Ident("==0")),
+                           new Ident("factor")));
+    HMType t1 = HM.hm(syn);
+    assertEquals("Cannot unify v27:int1 and pair24(v23:Real,v23$)",t1.str());
+  }
 }

@@ -109,13 +109,13 @@ public final class FunPtrNode extends Node {
     RetNode ret = ret();
     TFun tvar = (TFun)tvar();   // Self is always a TFun
     // Build function arguments; "fun" itself is just control.
-    TArgs targs = new TArgs(fun,false);
+    TArgs targs = new TArgs(fun,true);
     TVar tret  = ret.tvar();
     if( tvar.args().eq(targs) &&
         tvar.ret ().eq(tret ) )
       return false;             // No progress
     TVar tfun = new TFun(this,tvar._nongen,targs,tret);
-    tvar().unify(tfun);
+    tvar.unify(tfun);
     // All users of FunPtr need to unify with the new, stronger, structure
     gvn.add_work_uses(this);
     return true;

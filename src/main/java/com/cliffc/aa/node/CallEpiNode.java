@@ -2,8 +2,9 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.TNode;
 import com.cliffc.aa.tvar.*;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
 
@@ -336,6 +337,23 @@ public final class CallEpiNode extends Node {
     }
     TypeMem post_call = (TypeMem)tmem;
 
+    // Lift according to H-M typing
+    TVar tv = tvar();
+    if( tv instanceof TArgs ) {
+      TVar tvmem = ((TArgs)tv).parm(1);
+      TVar tvrez = ((TArgs)tv).parm(2);
+      if( tvrez._ns != null && tvrez._ns._len>0 ) {
+        Type trez2 = trez;
+        for( TNode tn : tvrez._ns ) {
+          if( tn.is_dead() )
+            System.out.println("join with the dead");
+          trez2 = trez2.join(tn.val());
+        }
+        if( trez2 != trez )
+          trez = trez2;
+      }
+    }
+
     // If no memory projection, then do not compute memory
     if( opt_mode!=GVNGCM.Mode.Parse && ProjNode.proj(this,1)==null )
       return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,trez);
@@ -504,6 +522,7 @@ public final class CallEpiNode extends Node {
     }
     gvn.add_work(ret);
     del(_defs.find(ret));
+    _tvar = TRet.fresh_new();   // Reset TVar; removed CG edge, so also remove H-M constraint
     assert sane_wiring();
   }
 
@@ -527,42 +546,16 @@ public final class CallEpiNode extends Node {
   }
 
   @Override public boolean unify( GVNGCM gvn ) {
-    // Build a HM tvar (args->ret), same as HM.java Apply does.
-
-    // Need a "fresh" copy of FunPtr tvar here.  Then it sticks (no progress)
-    // until the FunPtr updates.  So here, i need a "history" that i got a
-    // fresh FunPtr, and no further "fresh" until the FunPtr updates.
-    // However, each *use* of the updated FunPtr needs a fresh "fresh" TVar clone.
-
-    // Alternatively, upon update of FunPtr, i need to unify the "shape" of
-    // FunPtr into "new TFun(---,targs,tvar()))".  Note that this unification
-    // does nothing if the FunPtr is not a TFun already (in the prior impl,
-    // would make a "fresh" copy of a simple TVar, which trivially unifies with
-    // no change to the shape).
-
-
-    TVar tfun  = call().fun().tvar();
+    // Build a HM tvar (args->ret), same as HM.java Apply does.  Instead of
+    // grabbing a 'fresh' copy of 'Ident' (see HM.java) we grab it fresh at the
+    // use point below, by calling 'fresh_unify' which acts as-if a fresh copy
+    // is made, and then unifies it.
+    TVar tfunv = call().fun().tvar();
     TVar targs = call().tvar();
-    if( tfun instanceof TFun &&
-        ((TFun)tfun).args().eq(targs ) &&
-        ((TFun)tfun).ret ().eq(tvar()) )
-      return false;
     // Useless to make a "fresh" plain TVar & unify, so no progress here.
-    if( !(tfun instanceof TFun) )
-      return false;
-    // TODO: "fresh" clone of tfun, then unify.
-    // TODO: validate 'eq' === equal_shape
-    // TODO: Unify-as-if-from-fresh, without doing the whole "clone fresh & unify".
-
-    // TODO: Need a real progress indicator, so a FunPtrNode just worklists as
-    // normal, and we can get here & note no-progress.  Which drives the desire
-    // to have a cheaper unification than "clone fresh & unify".
-
-    // For debug sake, doing clone-fresh-and-unify first.
-
-    TFun tfun0 = new TFun(null,null,targs,tvar()); // New TFun { tvargs -> this }
-    ((TFun)tfun).fresh().unify(tfun0);
-    return true;
+    if( !(tfunv instanceof TFun) ) return false;
+    // Actual progress only if the structure changes.
+    return ((TFun)tfunv).fresh_unify(targs,tvar());
   }
 
   @Override Node is_pure_call() { return in(0) instanceof CallNode ? call().is_pure_call() : null; }

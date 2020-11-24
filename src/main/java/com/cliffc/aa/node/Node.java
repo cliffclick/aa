@@ -77,7 +77,6 @@ public abstract class Node implements Cloneable, TNode {
   public TVar _tvar() { return _tvar; } // For debug prints
   public TVar tvar(int x) { return in(x).tvar(); }
   public TNode[] parms() { throw unimpl(); } // Used to build structural TVars
-  public int compareTo(TNode tn) { return _uid - tn.uid(); }
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
   public Ary<Node> _defs;
@@ -499,6 +498,8 @@ public abstract class Node implements Cloneable, TNode {
       Node idl = ideal(gvn,level);
       if( idl != null )
         return true;            // Found an ideal call
+      if( unify(gvn) )
+        return true;            // Found more unification
       Type t = value(gvn._opt_mode);
       if( _val != t )
         return true;            // Found a value improvement

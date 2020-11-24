@@ -45,6 +45,7 @@ public class HM {
     HMVar var2 = new HMVar();
     ENV.put("pair",Oper.fun(var1, Oper.fun(var2, new Oper("pair",var1,var2))));
 
+    // { pred:bool lhs:var3 rhs:var3 -> var3 }
     HMVar var3 = new HMVar();
     ENV.put("if/else",Oper.fun(bool,Oper.fun(var3,Oper.fun(var3,var3))));
 

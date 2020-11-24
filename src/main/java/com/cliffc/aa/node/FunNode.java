@@ -2,9 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.TArgs;
-import com.cliffc.aa.tvar.TFun;
-import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
@@ -667,10 +664,10 @@ public class FunNode extends RegionNode {
           // pointer to a 'map()' call, or storing it to memory.
           Node old_funptr = use;
           Node new_funptr = map.get(old_funptr);
-          gvn.replace(new_funptr,old_funptr);
+          gvn.insert(new_funptr,old_funptr);
           new_funptr.xval(gvn._opt_mode); // Build type so Unresolved can compute type
           UnresolvedNode new_unr = new UnresolvedNode(null,new_funptr);
-          gvn.replace(old_funptr,new_unr);
+          gvn.insert(old_funptr,new_unr);
           new_unr.add_def(old_funptr);
           gvn.rereg(new_unr,new_unr.value(gvn._opt_mode));
           new_funptr._in=false;        // Remove type, to preserve new invariant
@@ -856,8 +853,6 @@ public class FunNode extends RegionNode {
     }
     return Type.XCTRL;
   }
-
-  @Override public boolean unify( GVNGCM gvn ) { return true; }
 
   // True if this is a forward_ref
   @Override public boolean is_forward_ref() { return _op_prec==-2; }

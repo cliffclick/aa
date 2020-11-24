@@ -212,6 +212,7 @@ public class CallNode extends Node {
           add_def( nnn.fld(i));
         set_mem(((MrgProjNode)mem).mem(),gvn);
         _unpacked = true;     // Only do it once
+        gvn.add_work(this);   // Revisit unification after unpacking
         return this;
       }
     }
@@ -667,9 +668,10 @@ public class CallNode extends Node {
     // Gather incoming args.  NOT an application point (yet), that is a CallEpi.
     TVar tvar = tvar();
     if( tvar instanceof TArgs &&
+        ((TArgs)tvar)._unpacked == _unpacked &&
         ((TArgs)tvar).nargs() == nargs() ) // Unpack can change arg counts
       return false;
-    tvar.unify(new TArgs(this,true));
+    tvar.unify(new TArgs(this,_unpacked));
     gvn.add_work(cepi());
     return true;
   }

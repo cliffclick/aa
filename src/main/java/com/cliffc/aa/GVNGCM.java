@@ -407,7 +407,7 @@ public class GVNGCM {
     n.unify(this);
     //if( n.unify(this) )
     //  System.out.println("HM progress "+n.tvar());
-    
+
     // [ts!] Compute uses & live bits.  If progress, push the defs on the
     // worklist.  This is a reverse flow computation.
     TypeMem oliv = n._live;
@@ -472,6 +472,10 @@ public class GVNGCM {
     // When replacing one node with another, unify their type vars
     if( !nnn.is_dead() && !old.is_dead() )
       old.tvar().unify(nnn.tvar());
+    insert(old,nnn);
+  }
+  // Replace, but do not delete old.  Really used to insert a node in front of old.
+  public void insert( Node old, Node nnn ) {
     while( old._uses._len > 0 ) {
       Node u = old._uses.del(0);  // Old use
       boolean was = u._in;

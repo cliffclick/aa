@@ -10,7 +10,7 @@ import java.util.HashSet;
 // created.
 public class TArgs extends TVar {
   TVar[] _parms;
-  final boolean _loose;   // Syntatic de-sugaring on a Call, allows arg-counts to mis-match.
+  public final boolean _unpacked;   // Syntactic de-sugaring on a Call, allows arg-counts to mis-match.
 
   private static TVar[] init(TNode fun) {
     TNode[] tns = fun.parms();
@@ -19,12 +19,13 @@ public class TArgs extends TVar {
       parms[i] = tns[i]==null ? null : tns[i].tvar();
     return parms;
   }
-  public  TArgs(TNode fun, boolean loose ) { this(fun,init(fun),loose); }
-  TArgs(TNode fun, TVar[] parms, boolean loose) {
+  public  TArgs(TNode fun, boolean unpacked ) { this(null,init(fun),unpacked); }
+  TArgs(TNode fun, TVar[] parms, boolean unpacked) {
     super(fun);
     assert !(parms[0] instanceof TArgs);
+    assert parms[0]==null || parms[0]._ns.atX(0) != _ns.atX(0) || _ns.atX(0)==null;
     _parms = parms;
-    _loose = loose;
+    _unpacked = unpacked;
   }
   public final int nargs() { return _parms.length; }
 
@@ -34,7 +35,7 @@ public class TArgs extends TVar {
     if( getClass()!=tv.getClass() ) return false; // Both TArgs or TRets
     TArgs targs = (TArgs)tv;
     if( _parms.length != targs._parms.length &&
-        !(_loose && targs._loose) ) // Both args allow a loose-fit
+        (_unpacked || targs._unpacked) ) // Both args must allow a loose-fit
       return false;
     if( cnt > 100 ) throw com.cliffc.aa.AA.unimpl();
     Integer ii = cyc.get(_uid);
@@ -54,7 +55,7 @@ public class TArgs extends TVar {
 
   // Get ith parm or null if OOB or null.
   // Do a find & update.
-  TVar parm(int i) {
+  public TVar parm(int i) {
     if( i >= _parms.length ) return null;
     TVar tv = _parms[i];
     if( tv==null ) return null;
@@ -78,18 +79,35 @@ public class TArgs extends TVar {
 
 
   // Return a "fresh" copy, preserving structure
-  @Override TArgs _fresh( HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups) {
-    TVar rez = dups.get(this);
-    if( rez != null ) return (TArgs)rez;
-    return _fresh2(nongen,dups,new TArgs(null,new TVar[_parms.length],_loose));
-  }
-  final <T extends TArgs> T _fresh2(HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, T targs) {
-    dups.put(this,targs);       // Stop recursive cycles
+  @Override boolean _fresh_unify( TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups) {
+    assert _u==null;            // At top
+    if( this==tv || dups.containsKey(this) )
+      return false;             // Stop recursive cycles
+    boolean progress = false;
+    if( getClass() != tv.getClass() ){// Make a TArgs, unify to 'tv' and keep unifying.  And report progress.
+      assert tv.getClass() == TVar.class;
+      progress = true;          // Forcing tv into a TArgs/TRet shape
+      tv._u = _fresh_new();     // Fresh TArgs, with all empty parms
+      tv._u._ns = tv._ns;       // Copy any nodes to the fresh
+      tv._ns = null;
+      tv = tv._u;               // This is the new unified 'tv'
+    }
+    TArgs targ = (TArgs)tv;     // Either a TArgs or a TRet
+    dups.put(this,targ);        // Stop recursive cycles
     for( int i=0; i<_parms.length; i++ ) {
       TVar parm = parm(i);
-      targs._parms[i] = parm==null ? null : parm._fresh(nongen,dups);
+      if( parm != null )        // No parm means no additional structure
+        progress |= parm._fresh_unify(targ.parm(i), nongen, dups);
     }
-    return targs;
+    return progress;
+  }
+
+  TArgs _fresh_new() { return new TArgs(null, tvars(_parms.length), _unpacked); }
+  static TVar[] tvars(int len) {
+    TVar[] tvs = new TVar[len];
+    for( int i=0; i<len; i++ )
+      tvs[i] = new TVar();
+    return tvs;
   }
 
   // Flipped: does 'id' occur in 'this'

@@ -1,4 +1,65 @@
 =======================================
+Notes from 11/23/2020
+
+Blending H-M & Flow/Lattice Theory.
+
+Adding H-M constraints "looks like" making two Nodes structurally-equal (both
+are primitives, or both function-pointers, or both structures with same fields,
+etc).  Thus when H-M U-Fs two TVars together, their matching Nodes should have
+structurally-equal types - which I can make by doing a JOIN.
+
+If, during Iter & types lift, I declare some code dead, it no longer U-Fs
+sensibly.  i.e., what does "structurally-equal to dead" mean.  Example: "P=0; P
+? A : B", might start with A & B unified, but then A goes dead and B keeps
+being unified with A... and A might have had structure, which then got forced
+onto B.  Dropping the U-F of A needs to drop the structural unification.  More
+Example: "A = (C0,C0); B = (D0,E0)".  Unifiying A & B forces equivalence
+between D0 & E0.  When A goes dead, what to allow D0 & E0 to once again be
+seperate.
+
+During GCP, is something is currently dead, it no longer JOINS, so CEPI types
+drop.  If something goes live, it does JOIN, so CEPI types lift.  Not monotonic.
+Cannot use JOIN.
+
+Conflict is: More H-M U-F "lifts" in that it forces equiv structural types,
+which maps naturally to my JOIN.  But dead-code breaks a Union effect (or else
+should allow Union to DEAD), which "lowers" resulting types.  This is UNSTABLE
+& OSCILLATES.  If U-F with DEAD keeps the JOIN to ANY, then always fail to type
+with simple DCE.
+
+This is because I dont have a theory on the "best solution" or "fixed-point"
+solution when H-M discovers structure-equivalence.  Current best theory is
+every time H-M unifies, I've discovered more struct-eqv, which can be used to
+lift types.  Lifting types can lift a {?:} op to one side, which then U-F with
+DEAD & removes the structural equivalence between sides.
+
+// still no fail here...
+b:int = 1
+c:flt = 2.3
+dup = {x->(x,x)}
+while(1) {
+  P ? (dup 2) : (b,c); // Unifies (2,b) and (2,c); forcing (_:nint,_:nScalar)
+}
+
+BECAUSE PHI DOES NOT IMPLY STRUCT-EQV ON ARGS, UNLIKE H-M {if/else} OPERATOR!
+Because H-M does not ask the forward-flow question, it only gathers contraints
+that have to hold to type.  When flow gives an Error, H-M might claim things
+have to be equal.  More like an Assert.
+
+Keep DEAD & JOIN anyways.  Good progress, back to the is_even/is_odd test.
+
+Now: Lacking a way to tell unify progress.
+Still want a unify-fresh variant for performance & progress.
+
+Now: After some progress work, figured out call fresh() in the wrong place.
+Each *use* of a FunPtr gets a new fresh(), which only updates if the
+FunPtr basic type changes shape.  This *should* be the same as calling
+fresh() at every use (only use in CallEpi), except progress is wrong.
+
+Ok, sorted out more progress.
+
+
+=======================================
 Notes from 11/16/2020
 
 Got HM unification "working" on Sea of Nodes, meaning doing unification but not
@@ -14,7 +75,6 @@ Update the fresh copy if FunPtr makes "progress", which means it unifies with an
 
 Eventually, once the TVars are correct for toy example, use the TVars to
 improve CEpi return types after Call.
-
 
 
 ======================================= Notes from 11/10/2020

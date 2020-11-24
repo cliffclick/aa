@@ -16,7 +16,7 @@ public class TVar implements Comparable<TVar> {
   TVar _u;                      // Tarjan Union-Find; null==HEAD
   // Set of unioned Nodes.  The first element is the HEAD, the original TNode.
   // Dead TNodes are removed as found.  Try for the assert that HEAD has least uid.
-  Ary<TNode> _ns;              // TNodes unioned together.
+  public Ary<TNode> _ns;        // TNodes unioned together.
   static private int UID=1;
   final int _uid;
 
@@ -54,9 +54,6 @@ public class TVar implements Comparable<TVar> {
     _u = tv;
     // Kill tnodes and other bits of this, to signify unified.
     if( _ns != null ) tv._ns = Ary.merge_or(_ns,tv._ns);
-    for( int i=0; i<tv._ns._len; i++ )
-      if( tv._ns.at(i).is_dead() )
-        tv._ns.remove(i--);
     assert tv.check_ns();
     _ns = null;
     // Unify parts
@@ -81,11 +78,22 @@ public class TVar implements Comparable<TVar> {
   boolean _will_unify(TVar tv, int cnt, NonBlockingHashMapLong<Integer> cyc) { return true; }
 
   // Return a "fresh" copy, preserving structure
-  TVar _fresh(HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups) {
-    assert _u==null;               // At top
-    return occurs_in(nongen, null) // If 'this' is in the non-generative set, use 'this'
-      ? this                       // Use 'this'
-      : dups.computeIfAbsent(this, e-> new TVar()); // One-time, make a new structure-parallel var
+  boolean _fresh_unify(TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups) {
+    assert _u==null;                // At top
+    if( this==tv ) return false;    // Short cut
+    if( occurs_in(nongen, null) )   // If 'this' is in the non-generative set, use 'this'
+      { _unify0(tv); return true; } // Unify with LHS always reports progress
+    // Use a 'fresh' TVar, but keep the structural properties: if it appears
+    // only once, unification with fresh is a no-op.  So instead record as-if
+    // unified with fresh.  Only progress if using for the 2nd time.
+    TVar prior = dups.get(this);    // Get a replacement, if any
+    if( prior==null ) {             // No prior mapping, so...
+      dups.put(this,tv);            // Record mapping
+      return false;                 // No progress
+    }
+    if( prior==tv ) return false;
+    prior._unify0(tv);          // Force structural equivalence
+    return true;                // Progress
   }
 
   // Does 'this' occur in the nongen set, recursively.
@@ -102,7 +110,7 @@ public class TVar implements Comparable<TVar> {
     assert _u==null && id._u==null; // At top
     return this==id;
   }
-  
+
   // True if two TVars are structurally equivalent
   static final HashMap<TVar,TVar> EQS = new HashMap<>();
   static final BitSetSparse DUPS = new BitSetSparse();
@@ -137,7 +145,7 @@ public class TVar implements Comparable<TVar> {
     // Print all unioned nodes
     if( debug )
       for( TNode tn : _ns )
-        if( !tn.is_dead() && (idx==-1 || _ns.at(idx)!=tn) )
+        if( (idx==-1 || _ns.at(idx)!=tn) )
           sb.p('N').p(tn.uid()).p(':');
     return _str(sb,bs,debug);
   }

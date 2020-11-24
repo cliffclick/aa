@@ -8,6 +8,7 @@ import org.jetbrains.annotations.NotNull;
 public interface TNode extends Comparable<TNode> {
   abstract String xstr();       // Pretty short string
   abstract int uid();           // Unique ID
+  default public int compareTo(TNode tn) { return uid() - tn.uid(); }
   
   abstract Type val();          // My lattice type
   abstract TVar tvar();         // My Type-Var, with Finding
