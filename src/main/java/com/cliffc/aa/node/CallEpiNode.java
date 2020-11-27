@@ -226,22 +226,19 @@ public final class CallEpiNode extends Node {
       // See CallNode output tuple type for what these horrible magic numbers are.
       Node actual;
       int idx = ((ParmNode)arg)._idx;
-      TypeMem live = arg._live;
       switch( idx ) {
-      case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); actual._live = live; break; // Always RPC is a constant
+      case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); break; // Always RPC is a constant
       case MEM_IDX: actual = new MProjNode(call,Env.DEFMEM); break;    // Memory into the callee
       case FUN_IDX: actual = new FP2ClosureNode(call); break; // Filter Function Pointer to Closure
       default: actual = idx >= call.nargs()              // Check for args present
           ? new ConNode<>(Type.ALL) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
           : new ProjNode(call,idx); // Normal args
-        live = TypeMem.ESCAPE;
         break;
       }
-      if( gvn._opt_mode._CG ) actual._live = TypeMem.DEAD; // With Call Graph, be optimistic on liveness
-      actual = gvn._opt_mode == GVNGCM.Mode.Opto ? gvn.new_gcp(actual) : gvn.xform(actual);
-      gvn.add_def(arg,actual);
-      actual._live = (TypeMem)actual._live.meet(live);
-      gvn.add_work(actual);
+      actual._live = arg._live; // Alive as the original
+      Node actual2 = gvn._opt_mode == GVNGCM.Mode.Opto ? gvn.new_gcp(actual) : gvn.xform(actual);
+      gvn.add_def(arg,actual2);
+      gvn.add_work(actual2);
     }
 
     // Add matching control to function via a CallGraph edge.
@@ -551,7 +548,7 @@ public final class CallEpiNode extends Node {
     // grabbing a 'fresh' copy of 'Ident' (see HM.java) we grab it fresh at the
     // use point below, by calling 'fresh_unify' which acts as-if a fresh copy
     // is made, and then unifies it.
-    
+
     TVar tfunv = call().fun().tvar();
     // Useless to make a "fresh" plain TVar & unify, so no progress here.
     if( !(tfunv instanceof TFun) ) return false;
