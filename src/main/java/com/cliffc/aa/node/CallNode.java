@@ -603,7 +603,7 @@ public class CallNode extends Node {
   public FunPtrNode least_cost(GVNGCM gvn, BitsFun choices, Node unk) {
     if( choices==BitsFun.EMPTY ) return null;
     assert choices.bitCount() > 0; // Must be some choices
-    assert choices.above_center() == (gvn._opt_mode==GVNGCM.Mode.Opto);
+    assert choices.abit()!= -1 || (choices.above_center() == (gvn._opt_mode==GVNGCM.Mode.Opto));
     int best_cvts=99999;           // Too expensive
     FunPtrNode best_fptr=null;     //
     TypeTuple best_formals=null;  //

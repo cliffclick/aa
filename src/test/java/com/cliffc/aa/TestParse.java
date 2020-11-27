@@ -3,6 +3,7 @@ package com.cliffc.aa;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.function.Function;
@@ -19,9 +20,6 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
-
-    // parametric polymorphism
-    test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",TypeStruct.make_tuple(Type.XNIL,TypeInt.con(5),TypeInt.con(3)));
 
     // fails, str.hash, str.eq is missing.
     // needs a class for primitives which includes things like hash & eq & toString.
@@ -60,6 +58,8 @@ public class TestParse {
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(1)",TypeInt.con(1));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
     test("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
+    // id accepts and returns both ints and reference types (arrays).
+    test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",TypeStruct.make_tuple(Type.XNIL,TypeInt.con(5),TypeInt.con(3)));
   }
 
   @Test public void testParse00() {
@@ -102,6 +102,8 @@ public class TestParse {
     test_obj("str(3.14)"       , TypeStr.con("3.14"));
     test_obj("str(3)"          , TypeStr.con("3"   ));
     test_obj("str(\"abc\")"    , TypeStr.ABC);
+    test("\"abc\"==\"abc\"",TypeInt.TRUE); // Constant strings intern
+
 
     // Variable lookup
     test("math_pi", TypeFlt.PI);
@@ -720,6 +722,43 @@ public class TestParse {
     test_ptr(DO+"ary=[99]; i:=0; do {i++ < #ary} {ary[i]:=i*i};ary", "[$]int64/obj"); // sequential iteration over array
     // ary.{e -> f(e)} // map over array elements
     // ary.{e -> f(e)}.{e0 e1 -> f(e0,e1) } // map/reduce over array elements
+  }
+
+  // Parametric polymorphism
+  @Ignore
+  @Test public void testParse15() {
+    TypeStruct dummy = TypeStruct.DISPLAY;
+    TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
+
+    // TODO: Tuple/struct/memory not polymorphic yet
+    test("noinline_map={tup fcn -> (0,fcn tup.1)};"+
+         //"lst_int=(0,2      );"+ //
+         "lst_str=(0,\"abc\");"+ //
+         //"lst_istr=noinline_map(lst_int,str);"+      // Map over ints with int->str conversion, returning a list of strings
+         "lst_bool=noinline_map(lst_str,{str-> str==\"abc\"});"+ // Map over strs with str->bool conversion, returns bools
+         "(lst_bool)",
+         Type.ANY);
+
+
+
+    // id accepts and returns both ints and reference types (arrays).
+    test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",TypeStruct.make_tuple(Type.XNIL,TypeInt.con(5),TypeInt.con(3)));
+    // recursive unification.  Trivially types as a dead fcn ptr.
+    test_isa("x={x -> x x}",TypeFunPtr.make(BitsFun.make0(46),3,tdisp));
+    // recursive unification.  Passing an ID to x then passes ID to ID, returning ID.
+    test_isa("x={x -> x x}; x({y->y})",TypeFunPtr.make(BitsFun.make0(49),4,tdisp));
+    // Looks like recursive unification, but x is a function of 0 arguments,
+    // being called with 1 argument.  Error to call it.
+    testerr("x={x x};x(1)","Passing 1 arguments to x which takes 0 arguments",9);
+    // map being called with 2 different functions & lists
+    test("noinline_map={lst fcn -> lst ? (noinline_map(lst.0,fcn),fcn lst.1)};"+
+         "lst_int=(((0,2),3),5);"+ // List of 3 ints
+         "lst_str= ((0,\"abc\"),\"def\");"+ // List of 2 strings
+         "lst_istr=noinline_map(lst_int,str);"+      // Map over ints with int->str conversion, returning a list of strings
+         "lst_bool=noinline_map(lst_str,{str:str ->str==\"abc\"});"+ // Map over strs with str->bool conversion, returns bools
+         "(lst_istr,lst_bool)",
+         Type.ANY);
+
   }
 
   /*

@@ -1101,7 +1101,8 @@ public class Parse implements Comparable<Parse> {
     String str = new String(_buf,oldx,_x-oldx-1).intern();
     // Convert to ptr-to-constant-memory-string
     NewNode nnn = (NewNode)gvn( new NewStrNode.ConStr(str) );
-    set_mem(Env.DEFMEM.make_mem_proj(_gvn,nnn,mem()));
+    if( Env.DEFMEM._defs.atX(nnn._alias)==null )
+      set_mem(Env.DEFMEM.make_mem_proj(_gvn,nnn,mem()));
     return gvn( new ProjNode(nnn,REZ_IDX));
   }
 

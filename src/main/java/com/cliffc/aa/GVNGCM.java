@@ -701,9 +701,9 @@ public class GVNGCM {
     FunPtrNode fptr = null;
     if( tfp != null ) {     // Have a sane function ptr?
       BitsFun fidxs = tfp.fidxs();
-      if( fidxs.abit()!= -1 ) return; // Resolved after all
-      if( fidxs.above_center() &&     // Resolved to many
-          fidxs!=BitsFun.ANY )        // And have choices
+      if( fidxs.abit()!= -1 ||      // Already resolved single-choice
+          ( fidxs.above_center() && // Resolved to many
+            fidxs!=BitsFun.ANY ) )  // And have choices
         // Pick least-cost among choices
         fptr = call.least_cost(this,fidxs,call.fun());
     }
@@ -716,7 +716,7 @@ public class GVNGCM {
     call.set_fun_reg(fptr,this);// Set resolved edge
     add_work(call);
     add_work(call.cepi());
-    add_work(fptr);             // Unresolved is now resolved and live
+    revalive(add_work(fptr)); // Unresolved is now resolved and live, and might lift from ESCAPE to LIVE
     add_work(fptr.fun());
     // If this call is wired, a CallEpi will 'peek thru' an Unresolved to
     // pass liveness to a Ret.  Since 1-step removed from neighbor, have to

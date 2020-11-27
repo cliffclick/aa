@@ -23,6 +23,9 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
     @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override TypeStr valueobj() { return _ts; }
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { throw com.cliffc.aa.AA.unimpl(); } // No inputs
+    // Constant Strings intern
+    @Override public int hashCode() { return _ts._hash; }
+    @Override public boolean equals(Object o) { return o instanceof ConStr && _ts==((ConStr)o)._ts; }
   }
 
   public static class ConvertI64Str extends NewStrNode {

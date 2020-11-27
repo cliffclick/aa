@@ -136,6 +136,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // Only ever equal to self, because of unique _alias.  We can collapse equal
   // NewNodes and join alias classes, but this is not the normal CSE and so is
   // not done by default.
+  // TODO: Allow CSE if all fields are final at construction.
   @Override public boolean equals(Object o) {  return this==o; }
   public MrgProjNode mrg() {
     Node ptr = _uses.at(0);

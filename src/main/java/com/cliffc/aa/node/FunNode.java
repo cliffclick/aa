@@ -402,6 +402,8 @@ public class FunNode extends RegionNode {
         if( use instanceof PrimNode.MulF64 ) return true;
         if( use instanceof PrimNode.MulI64 ) return true;
         if( use instanceof PrimNode.AndI64 ) return true;
+        if( use instanceof PrimNode.EQ_F64 ) return true;
+        if( use instanceof PrimNode.EQ_I64 ) return true;
         throw unimpl();
       default: throw unimpl();
       }
