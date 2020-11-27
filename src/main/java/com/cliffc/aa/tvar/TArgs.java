@@ -79,13 +79,14 @@ public class TArgs extends TVar {
 
 
   // Return a "fresh" copy, preserving structure
-  @Override boolean _fresh_unify( TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups) {
+  @Override boolean _fresh_unify( TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
     assert _u==null;            // At top
     if( this==tv || dups.containsKey(this) )
       return false;             // Stop recursive cycles
     boolean progress = false;
     if( getClass() != tv.getClass() ){// Make a TArgs, unify to 'tv' and keep unifying.  And report progress.
       assert tv.getClass() == TVar.class;
+      if( test ) return true;   // No unification during testing, but report progress
       progress = true;          // Forcing tv into a TArgs/TRet shape
       tv._u = _fresh_new();     // Fresh TArgs, with all empty parms
       tv._u._ns = tv._ns;       // Copy any nodes to the fresh
@@ -97,7 +98,7 @@ public class TArgs extends TVar {
     for( int i=0; i<_parms.length; i++ ) {
       TVar parm = parm(i);
       if( parm != null )        // No parm means no additional structure
-        progress |= parm._fresh_unify(targ.parm(i), nongen, dups);
+        progress |= parm._fresh_unify(targ.parm(i), nongen, dups, test);
     }
     return progress;
   }
@@ -147,5 +148,11 @@ public class TArgs extends TVar {
       if( tn==null ) sb.p("_ ");
       else tn.str(sb,bs,debug).p(' ');
     return sb.p("]");
+  }
+  
+  @Override void push_dep(TNode tn) {
+    assert _deps==null;
+    for( int i=0; i<_parms.length; i++ )
+      if( parm(i) != null ) parm(i).push_dep(tn);
   }
 }

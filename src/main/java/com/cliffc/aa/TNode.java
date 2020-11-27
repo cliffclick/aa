@@ -1,11 +1,12 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.tvar.TVar;
 import org.jetbrains.annotations.NotNull;
 
 // Simple interface to limit TypeNode access to Node.
-public interface TNode extends Comparable<TNode> {
+public interface TNode {
   abstract String xstr();       // Pretty short string
   abstract int uid();           // Unique ID
   default public int compareTo(TNode tn) { return uid() - tn.uid(); }
@@ -21,4 +22,5 @@ public interface TNode extends Comparable<TNode> {
   abstract boolean is_dead();   // Dead already
 
   abstract boolean is_forward_ref(); // In H-M, Lambda vs LetRec
+  static void add_work_all(Ary<TNode>deps) { Env.GVN.add_work_all(deps); }
 }

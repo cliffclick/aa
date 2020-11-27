@@ -664,16 +664,15 @@ public class CallNode extends Node {
     return null;
   }
 
-  @Override public boolean unify( GVNGCM gvn ) {
+  @Override public boolean unify( GVNGCM gvn, boolean test ) {
     // Gather incoming args.  NOT an application point (yet), that is a CallEpi.
     TVar tvar = tvar();
     if( tvar instanceof TArgs &&
         ((TArgs)tvar)._unpacked == _unpacked &&
         ((TArgs)tvar).nargs() == nargs() ) // Unpack can change arg counts
       return false;
-    tvar.unify(new TArgs(this,_unpacked));
-    gvn.add_work(cepi());
-    return true;
+    if( !test ) tvar.unify(new TArgs(this,_unpacked));
+    return true;                // Progress
   }
 
 

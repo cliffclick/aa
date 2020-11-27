@@ -101,7 +101,7 @@ public final class FunPtrNode extends Node {
     return def==ret() ? TypeMem.ANYMEM : TypeMem.ESCAPE;
   }
 
-  @Override public boolean unify( GVNGCM gvn ) {
+  @Override public boolean unify( GVNGCM gvn, boolean test ) {
     // Build a HM tvar (args->ret), same as HM.java Lambda does.
     // FunNodes are just argument collections (no return).
     FunNode fun = xfun();
@@ -114,10 +114,8 @@ public final class FunPtrNode extends Node {
     if( tvar.args().eq(targs) &&
         tvar.ret ().eq(tret ) )
       return false;             // No progress
-    TVar tfun = new TFun(this,tvar._nongen,targs,tret);
-    tvar.unify(tfun);
-    // All users of FunPtr need to unify with the new, stronger, structure
-    gvn.add_work_uses(this);
+    if( !test )
+      tvar.unify(new TFun(this,tvar._nongen,targs,tret));
     return true;
   }
 

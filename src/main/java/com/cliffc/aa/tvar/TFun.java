@@ -39,22 +39,25 @@ public class TFun extends TVar {
   // Unify 'this' into 'that', except make a 'fresh' clone of 'this' before
   // unification, so 'this' is unchanged.  Instead 'that' picks up any
   // structure from 'this'.  Returns true for progress.
-  public boolean fresh_unify(TVar args, TVar ret) {
+  public boolean fresh_unify(TVar args, TVar ret, boolean test, TNode dep) {
     assert _u==null;            // Already top
+    args().push_dep(dep);
+    ret ().push_dep(dep);
     NonBlockingHashMapLong<Integer> cyc = new NonBlockingHashMapLong<>();
     if( !args()._will_unify(args,0, cyc ) )  return false;
     if( !ret ()._will_unify(ret ,0, cyc ) )  return false;
     NonBlockingHashMap<TVar,TVar> dups = new NonBlockingHashMap<>();
     return
-      args()._fresh_unify(args,_nongen,dups) | // NO SHORT-CIRCUIT: NOTE: '|' NOT '||'
-      ret ()._fresh_unify(ret, _nongen,dups);  // Must do both halves always
+      args()._fresh_unify(args,_nongen,dups,test) | // NO SHORT-CIRCUIT: NOTE: '|' NOT '||'
+      ret ()._fresh_unify(ret ,_nongen,dups,test);  // Must do both halves always
   }
-  @Override boolean _fresh_unify(TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups) {
+  @Override boolean _fresh_unify(TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
     assert _u==null;            // At top
     if( this==tv || dups.containsKey(this) )
       return false;             // Stop recursive cycles
     boolean progress = false;
     if( !(tv instanceof TFun) ) {   // Make a TFun, unify to 'tv' and keep unifying.  And report progress.
+      if( test ) return true;       // No unification during testing, but report progress
       assert tv.getClass() == TVar.class;
       progress = true;          // Forcing tv into a TArgs/TRet shape
       tv._u = new TFun();       // Fresh TArgs, with all empty parms
@@ -64,8 +67,8 @@ public class TFun extends TVar {
     }
     TFun tfun = (TFun)tv;
     dups.put(this,tfun);        // Stop recursive cycles
-    progress |= args()._fresh_unify(tfun.args(),_nongen,dups);
-    progress |= ret ()._fresh_unify(tfun.ret (),_nongen,dups);
+    progress |= args()._fresh_unify(tfun.args(),_nongen,dups,test);
+    progress |= ret ()._fresh_unify(tfun.ret (),_nongen,dups,test);
     return progress;
   }
 
@@ -96,5 +99,11 @@ public class TFun extends TVar {
     _args.str(sb,bs,debug).p(" -> ");
     _ret .str(sb,bs,debug).p(" }");
     return sb;
+  }
+  
+  @Override void push_dep(TNode tn) {
+    assert _deps==null;
+    args().push_dep(tn);
+    ret ().push_dep(tn);
   }
 }

@@ -14,9 +14,12 @@ import java.util.HashSet;
 public class TVar implements Comparable<TVar> {
   // Tarjan U-F value.  null==HEAD.
   TVar _u;                      // Tarjan Union-Find; null==HEAD
-  // Set of unioned Nodes.  The first element is the HEAD, the original TNode.
-  // Dead TNodes are removed as found.  Try for the assert that HEAD has least uid.
+  // Set of unioned Nodes.  Try for the assert that HEAD has least uid.
   public Ary<TNode> _ns;        // TNodes unioned together.
+  // Set of dependent Nodes (to be re-worklisted if something changes)
+  public Ary<TNode> _deps;
+
+  
   static private int UID=1;
   final int _uid;
 
@@ -53,9 +56,15 @@ public class TVar implements Comparable<TVar> {
     // Unify this into that
     _u = tv;
     // Kill tnodes and other bits of this, to signify unified.
-    if( _ns != null ) tv._ns = Ary.merge_or(_ns,tv._ns);
+    if( _ns != null )
+      tv._ns  = tv._ns  ==null ? _ns  : Ary.merge_or(_ns  ,tv._ns  , TNode::compareTo);
+    if( _deps!=null ) {
+      for( TNode tn : _deps )
+        tv.push_dep(tn);
+      TNode.add_work_all(_deps);
+    }
     assert tv.check_ns();
-    _ns = null;
+    _deps = _ns = null;
     // Unify parts
     _unify(tv);
     return tv;
@@ -67,9 +76,14 @@ public class TVar implements Comparable<TVar> {
 
   // Sorted, no dups.  Poor-mans assert
   private boolean check_ns() {
-    for( int i=0; i<_ns._len-1; i++ )
-      if( _ns.at(i).uid() >= _ns.at(i+1).uid() )
-        return false;
+    if( _ns!=null )
+      for( int i=0; i<_ns._len-1; i++ )
+        if( _ns.at(i).uid() >= _ns.at(i+1).uid() )
+          return false;
+    if( _deps!=null )
+      for( int i=0; i<_deps._len-1; i++ )
+        if( _deps.at(i).uid() >= _deps.at(i+1).uid() )
+          return false;
     return true;
   }
 
@@ -78,11 +92,13 @@ public class TVar implements Comparable<TVar> {
   boolean _will_unify(TVar tv, int cnt, NonBlockingHashMapLong<Integer> cyc) { return true; }
 
   // Return a "fresh" copy, preserving structure
-  boolean _fresh_unify(TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups) {
+  boolean _fresh_unify(TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
     assert _u==null;                // At top
     if( this==tv ) return false;    // Short cut
-    if( occurs_in(nongen, null) )   // If 'this' is in the non-generative set, use 'this'
-      { _unify0(tv); return true; } // Unify with LHS always reports progress
+    if( occurs_in(nongen, null) ) { // If 'this' is in the non-generative set, use 'this'
+      if( !test ) _unify0(tv);      // Unify with LHS always reports progress
+      return true;
+    } 
     // Use a 'fresh' TVar, but keep the structural properties: if it appears
     // only once, unification with fresh is a no-op.  So instead record as-if
     // unified with fresh.  Only progress if using for the 2nd time.
@@ -92,7 +108,7 @@ public class TVar implements Comparable<TVar> {
       return false;                 // No progress
     }
     if( prior==tv ) return false;
-    prior._unify0(tv);          // Force structural equivalence
+    if( !test ) prior._unify0(tv); // Force structural equivalence
     return true;                // Progress
   }
 
@@ -124,7 +140,7 @@ public class TVar implements Comparable<TVar> {
     return tv==v2;              // Unequal TVars
   }
 
-
+  
   @Override public final String toString() { return str(new SB(),new VBitSet(),true).toString();  }
 
   // Pretty print
@@ -161,6 +177,15 @@ public class TVar implements Comparable<TVar> {
     if( istv0 && !istv1 ) return -1;
     if( !istv0 && istv1 ) return  1;
     return _uid - tv._uid;
+  }
+
+  // Push on deps list.  Returns true if already on the deps lift (no change).
+  void push_dep(TNode tn) {
+    if( _deps==null ) _deps = new Ary<>(TNode.class);
+    if( !tn.is_dead() && _deps.find(tn)==-1 ) {
+      _deps.push(tn);
+      _deps.sort_update(TNode::compareTo);
+    }
   }
 
 }

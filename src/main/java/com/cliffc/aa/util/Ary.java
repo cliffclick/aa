@@ -235,6 +235,25 @@ public class Ary<E> implements Iterable<E> {
     while( j<a1._len ) res.add(a1._es[j++]);
     return res;
   }
+  
+  public static <X> Ary<X> merge_or( Ary<X> a0, Ary<X> a1, Comparator<X> cmpr) {
+    int i=0, j=0;
+    Ary<X> res = new Ary<>(Arrays.copyOf(a0._es,a0._len+a1._len),0);
+
+    while( i<a0._len && j<a1._len ) {
+      X x = a0._es[i];
+      X y = a1._es[j];
+      int cmp = cmpr.compare(x,y);
+      if( cmp<0 )      { res.add(x); i++;      }
+      else if( cmp>0 ) { res.add(y);      j++; }
+      else             { res.add(x); i++; j++; }
+    }
+    while( i<a0._len ) res.add(a0._es[i++]);
+    while( j<a1._len ) res.add(a1._es[j++]);
+    return res;
+  }
+
+  
   /** Merge-And.  Merge 2 sorted Arys, keeping only duplicates.  Return a new
    *  sorted Ary with the merged list.  Undefined if the original arrays are
    *  not sorted.  Error if they are not of the same type.  Elements must

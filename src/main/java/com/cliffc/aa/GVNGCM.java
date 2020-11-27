@@ -54,6 +54,7 @@ public class GVNGCM {
       if( def != null && def != n )
         add_work(def);
   }
+  void add_work_all(Ary<TNode> deps) { for( TNode tn : deps ) add_work((Node)tn); }
 
   // A second worklist, for code-expanding and thus lower priority work.
   // Inlining happens off this worklist, once the main worklist runs dry.
@@ -404,9 +405,7 @@ public class GVNGCM {
     _vals.remove(n);
 
     // Perform unification
-    n.unify(this);
-    //if( n.unify(this) )
-    //  System.out.println("HM progress "+n.tvar());
+    boolean hm_progress = n.unify(this,false);
 
     // [ts!] Compute uses & live bits.  If progress, push the defs on the
     // worklist.  This is a reverse flow computation.
@@ -453,7 +452,7 @@ public class GVNGCM {
 
     // [ts+,vals!]
     assert check_opt(n);
-    return oval == nval && oliv == nliv && y==null ? null : n; // Progress if types improved
+    return oval == nval && oliv == nliv && y==null && !hm_progress ? null : n; // Progress if types improved
   }
 
   // Utility: Merge old and new, returning node with the merged liveness.
@@ -716,6 +715,7 @@ public class GVNGCM {
     }
     call.set_fun_reg(fptr,this);// Set resolved edge
     add_work(call);
+    add_work(call.cepi());
     add_work(fptr);             // Unresolved is now resolved and live
     add_work(fptr.fun());
     // If this call is wired, a CallEpi will 'peek thru' an Unresolved to

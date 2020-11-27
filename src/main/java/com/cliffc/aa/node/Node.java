@@ -68,7 +68,7 @@ public abstract class Node implements Cloneable, TNode {
   // typing.  This is a Type Variable which can unify with other TVars forcing
   // Type-equivalence (JOIN of unified Types), and includes gross structure
   // (functions, structs, pointers, or simple Types).
-  @NotNull TVar _tvar;  
+  @NotNull TVar _tvar;
   // H-M Type-Variables
   public TVar tvar() {
     TVar tv = _tvar.find();     // Do U-F step
@@ -447,8 +447,9 @@ public abstract class Node implements Cloneable, TNode {
 
   // Unifies this Node with others; Call/CallEpi with Fun/Parm/Ret.  NewNodes &
   // Load/Stores, etc.  Returns true if progress, and puts neighbors back on
-  // the worklist.
-  public boolean unify(GVNGCM gvn) { return false; }
+  // the worklist.  If 'test' then make no changes, but return if progress
+  // would be made.
+  public boolean unify(GVNGCM gvn, boolean test) { return false; }
 
   // Return any type error message, or null if no error
   public ErrMsg err( boolean fast ) { return null; }
@@ -498,7 +499,7 @@ public abstract class Node implements Cloneable, TNode {
       Node idl = ideal(gvn,level);
       if( idl != null )
         return true;            // Found an ideal call
-      if( unify(gvn) )
+      if( unify(gvn,true) )
         return true;            // Found more unification
       Type t = value(gvn._opt_mode);
       if( _val != t )
@@ -517,7 +518,8 @@ public abstract class Node implements Cloneable, TNode {
     // Check for only forwards flow, and if possible then also on worklist
     Type    oval= _val, nval = value(gvn._opt_mode);
     TypeMem oliv=_live, nliv = live (gvn._opt_mode);
-    if( nval != oval || nliv != oliv ) {
+    boolean hm = lifting && unify(gvn,true); // Progress-only check, and only during Pesi not Opto
+    if( nval != oval || nliv != oliv || hm ) {
       boolean ok = lifting
         ? nval.isa(oval) && nliv.isa(oliv)
         : oval.isa(nval) && oliv.isa(nliv);

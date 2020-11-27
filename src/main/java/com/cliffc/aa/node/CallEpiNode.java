@@ -339,7 +339,8 @@ public final class CallEpiNode extends Node {
 
     // Lift according to H-M typing
     TVar tv = tvar();
-    if( tv instanceof TArgs ) {
+    if( tv instanceof TArgs &&
+        trez != Type.ALL ) {    // If already an error term, poison, stay error.
       TVar tvmem = ((TArgs)tv).parm(1);
       TVar tvrez = ((TArgs)tv).parm(2);
       if( tvrez._ns != null && tvrez._ns._len>0 ) {
@@ -545,17 +546,17 @@ public final class CallEpiNode extends Node {
     return _live;
   }
 
-  @Override public boolean unify( GVNGCM gvn ) {
+  @Override public boolean unify( GVNGCM gvn, boolean test ) {
     // Build a HM tvar (args->ret), same as HM.java Apply does.  Instead of
     // grabbing a 'fresh' copy of 'Ident' (see HM.java) we grab it fresh at the
     // use point below, by calling 'fresh_unify' which acts as-if a fresh copy
     // is made, and then unifies it.
+    
     TVar tfunv = call().fun().tvar();
-    TVar targs = call().tvar();
     // Useless to make a "fresh" plain TVar & unify, so no progress here.
     if( !(tfunv instanceof TFun) ) return false;
     // Actual progress only if the structure changes.
-    return ((TFun)tfunv).fresh_unify(targs,tvar());
+    return ((TFun)tfunv).fresh_unify(call().tvar(),tvar(),test,this);
   }
 
   @Override Node is_pure_call() { return in(0) instanceof CallNode ? call().is_pure_call() : null; }
