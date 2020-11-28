@@ -571,7 +571,7 @@ public class CallNode extends Node {
           if( !ret.is_copy() && ret.fun()==fun )
             break;
         }
-        if( i==cepi.nwired() ) return 0; // While a (stale) fidx might be available, this path is for another call.
+        if( i==cepi.nwired() ) return BAD; // While a (stale) fidx might be available, this path is for another call.
       }
     }
     TypeTuple formals = fun._sig._formals;  // Type of each argument

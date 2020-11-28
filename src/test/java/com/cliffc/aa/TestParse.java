@@ -3,7 +3,6 @@ package com.cliffc.aa;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.function.Function;
@@ -725,21 +724,9 @@ public class TestParse {
   }
 
   // Parametric polymorphism
-  @Ignore
   @Test public void testParse15() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
-
-    // TODO: Tuple/struct/memory not polymorphic yet
-    test("noinline_map={tup fcn -> (0,fcn tup.1)};"+
-         //"lst_int=(0,2      );"+ //
-         "lst_str=(0,\"abc\");"+ //
-         //"lst_istr=noinline_map(lst_int,str);"+      // Map over ints with int->str conversion, returning a list of strings
-         "lst_bool=noinline_map(lst_str,{str-> str==\"abc\"});"+ // Map over strs with str->bool conversion, returns bools
-         "(lst_bool)",
-         Type.ANY);
-
-
 
     // id accepts and returns both ints and reference types (arrays).
     test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",TypeStruct.make_tuple(Type.XNIL,TypeInt.con(5),TypeInt.con(3)));
@@ -750,6 +737,14 @@ public class TestParse {
     // Looks like recursive unification, but x is a function of 0 arguments,
     // being called with 1 argument.  Error to call it.
     testerr("x={x x};x(1)","Passing 1 arguments to x which takes 0 arguments",9);
+    // Only odd thing here is losing not-nil-ness on list_int.
+    test_ptr("noinline_map={tup fcn -> (0,fcn tup.1)};"+
+        "lst_int=(0,2      );"+ //
+        "lst_str=(0,\"abc\");"+ //
+        "lst_istr=noinline_map(lst_int,str);"+      // Map over ints with int->str conversion, returning a list of strings
+        "lst_bool=noinline_map(lst_str,{str-> str==\"abc\"});"+ // Map over strs with str->bool conversion, returns bools
+        "(lst_istr,lst_bool)",
+      "(*(0, *\"2\")?, *(0, int1))");
     // map being called with 2 different functions & lists
     test("noinline_map={lst fcn -> lst ? (noinline_map(lst.0,fcn),fcn lst.1)};"+
          "lst_int=(((0,2),3),5);"+ // List of 3 ints
