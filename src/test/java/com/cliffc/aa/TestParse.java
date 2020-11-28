@@ -20,6 +20,11 @@ public class TestParse {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
 
+    // TODO:
+    // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
+    // The Meet loses precision to fast.  This is a typing bug.
+
+    
     // fails, str.hash, str.eq is missing.
     // needs a class for primitives which includes things like hash & eq & toString.
     //test("tab = [7];\n" +
@@ -727,7 +732,14 @@ public class TestParse {
   @Test public void testParse15() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
-
+    test("noinline_map={lst fcn -> lst ? (noinline_map(lst.0,fcn),fcn lst.1)};"+
+         "lst_int=(((0,2),3),5);"+          // List of 3 ints
+         "lst_str= ((0,\"abc\"),\"def\");"+ // List of 2 strings
+         "lst_istr=noinline_map(lst_int,str:{int->str});"+        // Map over ints with int->str  conversion, returning a list of strings
+         "lst_bool=noinline_map(lst_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
+         "(lst_istr,lst_bool)",
+         Type.ANY);
+    
     // id accepts and returns both ints and reference types (arrays).
     test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",TypeStruct.make_tuple(Type.XNIL,TypeInt.con(5),TypeInt.con(3)));
     // recursive unification.  Trivially types as a dead fcn ptr.

@@ -39,11 +39,20 @@ public class LoadNode extends Node {
     BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
 
     // If we can find an exact previous store, fold immediately to the value.
-    // Do not move Loads "up" past unrelated stores, lest we make memory alive twice.
     Node st = find_previous_store(gvn,mem(),adr(),aliases,_fld,true);
     if( st!=null ) {
       if( st instanceof StoreNode ) return (( StoreNode)st).rez();
       else                          return ((NewObjNode)st).get(_fld);
+    }
+    // Bypass unrelated Stores, but only if the Address predates the Store.  If
+    // the Load address depends on the Store memory, then the Load cannot
+    // bypass the Store.
+    if( mem() instanceof StoreNode ) {
+      StoreNode st2 = (StoreNode)mem();
+      if( st2.adr()==adr() && !Util.eq(st2._fld,_fld) ) { // Very weak "Address must predate" test
+        set_mem(st2.mem(),gvn);
+        return this;
+      }
     }
 
     // Load can move past a Join if all aliases align.

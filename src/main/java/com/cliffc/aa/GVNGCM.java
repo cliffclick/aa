@@ -701,13 +701,12 @@ public class GVNGCM {
     FunPtrNode fptr = null;
     if( tfp != null ) {     // Have a sane function ptr?
       BitsFun fidxs = tfp.fidxs();
-      if( fidxs.abit()!= -1 ||      // Already resolved single-choice
-          ( fidxs.above_center() && // Resolved to many
-            fidxs!=BitsFun.ANY ) )  // And have choices
+      if( !fidxs.above_center() ) return; // Resolved after all
+      if( fidxs!=BitsFun.ANY )            // And have choices
         // Pick least-cost among choices
         fptr = call.least_cost(this,fidxs,call.fun());
     }
-    if( fptr==null ) {      // Not resolving, program is in-error
+    if( fptr==null ) {          // Not resolving, program is in-error
       call._not_resolved_by_gcp = true;
       add_work(call);
       add_work(call.fun());
