@@ -214,13 +214,13 @@ public class TestNode {
 
     // Testing 1 set of types into a value call.
     // Comment out when not debugging.
-    CallEpiNode cepi = new CallEpiNode(call,Env.DEFMEM,_ins[2]);
+    CallEpiNode cepi = new CallEpiNode(null,call,Env.DEFMEM,_ins[2]);
     Type rez0 = test1jig(cepi, TypeTuple.TEST0,TypeTuple.RET, Type.ANY, Type.ANY);
 
     // All the Nodes, all Values, all Types
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
-    test1monotonic(new CallEpiNode(call,Env.DEFMEM,_ins[2])); // CallNode, then some count of RetNode, not flowing
+    test1monotonic(new CallEpiNode(null,call,Env.DEFMEM,_ins[2])); // CallNode, then some count of RetNode, not flowing
     test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
     test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));
     test1monotonic(new    ConNode<Type>(          TypeFlt.FLT64));

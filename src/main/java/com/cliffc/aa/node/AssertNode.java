@@ -53,7 +53,7 @@ public class AssertNode extends Node {
       Arrays.fill(badargs,_error_parse);
       Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
       CallNode call = (CallNode)gvn.xform(new CallNode(true,badargs,args));
-      Node cepi   = gvn.xform(new CallEpiNode(call,Env.DEFMEM)).keep();
+      Node cepi   = gvn.xform(new CallEpiNode(null/*TODO: Suspect need to carry a prior Env thru*/,call,Env.DEFMEM)).keep();
       Node ctl    = gvn.xform(new CProjNode(cepi));
       Node postmem= gvn.xform(new MProjNode(cepi)).keep();
       Node val    = gvn.xform(new  ProjNode(cepi.unhook(),AA.REZ_IDX));

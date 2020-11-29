@@ -529,7 +529,7 @@ public abstract class PrimNode extends Node {
       Node tru = gvn.xform(new CProjNode(iff,1));
       // Call on true branch; if false do not call.
       Node cal = gvn.xform(new CallNode(true,_badargs,tru,mem,rhs));
-      Node cep = gvn.xform(new CallEpiNode(cal,Env.DEFMEM));
+      Node cep = gvn.xform(new CallEpiNode(null,cal,Env.DEFMEM));
       Node ccc = gvn.xform(new CProjNode(cep));
       Node memc= gvn.xform(new MProjNode(cep));
       Node rez = gvn.xform(new  ProjNode(cep,AA.REZ_IDX));
@@ -586,7 +586,7 @@ public abstract class PrimNode extends Node {
       Node tru = gvn.xform(new CProjNode(iff,1));
       // Call on false branch; if true do not call.
       Node cal = gvn.xform(new CallNode(true,_badargs,fal,mem,rhs));
-      Node cep = gvn.xform(new CallEpiNode(cal,Env.DEFMEM));
+      Node cep = gvn.xform(new CallEpiNode(null,cal,Env.DEFMEM));
       Node ccc = gvn.xform(new CProjNode(cep));
       Node memc= gvn.xform(new MProjNode(cep));
       Node rez = gvn.xform(new  ProjNode(cep,AA.REZ_IDX));

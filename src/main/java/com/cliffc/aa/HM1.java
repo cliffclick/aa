@@ -39,7 +39,7 @@ public class HM1 {
     env.put("if/else",Oper.fun(bool,Oper.fun(var3,Oper.fun(var3,var3))));
 
     env.put("dec",Oper.fun(int64,int64));
-    env.put("*",Oper.fun(int64,Oper.fun(int64,int64)));
+    env.put("*"  ,Oper.fun(int64,Oper.fun(int64,int64)));
     env.put("==0",Oper.fun(int64,bool));
 
     // Convert integer to a string; int->str

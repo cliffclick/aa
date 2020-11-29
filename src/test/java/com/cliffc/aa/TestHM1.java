@@ -181,5 +181,4 @@ public class TestHM1 {
     HMType t1 = HM1.HM(syn);
     assertEquals("TBD",t1.str());
   }
-
 }

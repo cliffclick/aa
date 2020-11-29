@@ -1378,7 +1378,7 @@ public class Parse implements Comparable<Parse> {
     CallNode call = (CallNode)gvn(call0);
     // Call Epilog takes in the call which it uses to track wireable functions.
     // CallEpi internally tracks all wired functions.
-    Node cepi = gvn(new CallEpiNode(call,Env.DEFMEM));
+    Node cepi = gvn(new CallEpiNode(_e,call,Env.DEFMEM));
     if( call.is_dead() ) return cepi; // Inlined in the parser
     set_ctrl(gvn(new CProjNode(cepi)));
     set_mem(gvn(new MProjNode(cepi))); // Return memory from all called functions
