@@ -29,7 +29,7 @@ public class ConNode<T extends Type> extends Node {
     for( Node use : _uses )
       if( use._live != TypeMem.DEAD )
         live = live.lmeet(use.live_use(opt_mode,this).live());
-    if( live.above_center() ) live = TypeLive.LIVE;
+    //if( live.above_center() ) live = TypeLive.LIVE;
     return TypeMem.make_live(live);
   }
   @Override public String toString() { return str(); }

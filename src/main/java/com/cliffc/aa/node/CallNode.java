@@ -290,7 +290,7 @@ public class CallNode extends Node {
     // arg is still alive.
     if( gvn._opt_mode._CG && err(true)==null ) {
       Node progress = null;
-      for( int i=ARG_IDX; i<nargs(); i++ ) // Skip the FP/DISPLAY arg, as its useful for error messages
+      for( int i=FUN_IDX; i<nargs(); i++ )
         if( ProjNode.proj(this,i)==null &&
             !(arg(i) instanceof ConNode) ) // Not already folded
           progress = set_arg(i,gvn.con(targ(tcall,i)),gvn); // Kill dead arg
@@ -463,7 +463,7 @@ public class CallNode extends Node {
       return tcall.oob(TypeMem.ALLMEM);
     TypeMem caller_mem = (TypeMem)tcmem;
     BitsAlias aliases = BitsAlias.EMPTY;
-    for( int i=1; i<nargs(); i++ ) {
+    for( int i=FUN_PTR; i<nargs(); i++ ) {
       Type targ = targ(tcall,i);
       if( TypeMemPtr.OOP.isa(targ) )
         { aliases=BitsAlias.FULL; break; } // All possible pointers, so all memory is alive
