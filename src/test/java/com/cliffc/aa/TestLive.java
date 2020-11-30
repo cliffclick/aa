@@ -40,7 +40,7 @@ public class TestLive {
     GVNGCM gvn = Env.GVN;
     GVNGCM._INIT0_CNT = 1; // No prims
     // Always memory for the NewObj
-    Node mmm = new ConNode<>(TypeMem.ANYMEM);
+    Node mmm = new ConNode<>(TypeMem.ANYMEM).keep();
     mmm.set_val(TypeMem.ANYMEM);
 
     // Fields

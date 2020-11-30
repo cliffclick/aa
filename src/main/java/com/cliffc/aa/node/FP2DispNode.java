@@ -20,5 +20,4 @@ public final class FP2DispNode extends Node {
     Type t = val(0);
     return t instanceof TypeFunPtr ? ((TypeFunPtr)t)._disp.simple_ptr() : t.oob(TypeMemPtr.DISP_SIMPLE);
   }
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ANYMEM; }
 }

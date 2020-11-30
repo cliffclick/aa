@@ -679,7 +679,7 @@ public class FunNode extends RegionNode {
       gvn.replace(new_funptr,old_funptr);
       TypeFunPtr ofptr = (TypeFunPtr) old_funptr.val();
       path_call.set_fdx_reg(new_funptr, gvn); // Force new_funptr, will re-wire later
-      TypeFunPtr nfptr = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,ofptr._disp);
+      TypeFunPtr nfptr = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,TypeMemPtr.NO_DISP);
       path_call.set_val(CallNode.set_ttfp((TypeTuple) path_call.val(),nfptr));
     } // Else other funptr/displays on unrelated path, dead, can be ignored
 

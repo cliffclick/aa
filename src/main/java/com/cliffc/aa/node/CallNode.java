@@ -392,7 +392,7 @@ public class CallNode extends Node {
       }
     }
     // FIDX is the last _def, 2nd-to-last type in ts
-    ts[_defs._len-1] = TypeFunPtr.make(rfidxs,nargs,rfidxs.above_center() == fidxs.above_center() ? tfp._disp : tfp._disp.dual());
+    ts[_defs._len-1] = TypeFunPtr.make(rfidxs,nargs,TypeMemPtr.NO_DISP);
 
     return TypeTuple.make(ts);
   }
@@ -590,8 +590,6 @@ public class CallNode extends Node {
     for( int j=MEM_IDX; j<nargs(); j++ ) {
       Type formal = formals.at(j);
       Type actual = targ(targs,j);          // Calls skip ctrl & mem
-      if( j==FUN_IDX && actual instanceof TypeFunPtr )
-        actual = ((TypeFunPtr)actual)._disp; // Extract Display type from TFP
       assert actual==actual.simple_ptr();    // Only simple ptrs from nodes
       actual = caller_mem.sharptr(actual);   // Sharpen actual pointers before checking vs formals
 
