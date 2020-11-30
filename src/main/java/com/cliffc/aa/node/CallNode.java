@@ -124,8 +124,8 @@ public class CallNode extends Node {
   int nargs() { return _defs._len-1; }
   // Actual arguments.  Arg(1) is allowed and refers to memory; arg(2) to the Display/TFP.
   Node arg ( int x ) { assert x>=0; return _defs.at(x); }
-  // Set an argument.  Use 'set_fun' to set the Display/Code.
-  Node set_arg (int idx, Node arg, GVNGCM gvn) { assert idx>=ARG_IDX; return set_def(idx,arg,gvn); }
+  // Set an argument.  Use 'set_fun' to set the Code.
+  Node set_arg (int idx, Node arg, GVNGCM gvn) { assert idx>=FUN_IDX && idx <nargs(); return set_def(idx,arg,gvn); }
   public void set_mem( Node mem, GVNGCM gvn) { set_def(MEM_IDX, mem, gvn); }
          Node set_fdx    (Node fun, GVNGCM gvn) { return set_def(         _defs._len-1,fun,gvn); }
   public void set_fdx_reg(Node fun, GVNGCM gvn) {    gvn.set_def_reg(this,_defs._len-1,fun    ); }

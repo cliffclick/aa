@@ -66,7 +66,7 @@ public class FunNode extends RegionNode {
   public final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
   public final boolean _thunk_rhs;
   private byte _cnt_size_inlines; // Count of size-based inlines
-  static int _must_inline;        // Used for asserts
+  public static int _must_inline; // Used for asserts
 
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
@@ -809,11 +809,11 @@ public class FunNode extends RegionNode {
     while( !work.isEmpty() ) {
       Node wrk = work.pop();
       if( wrk.is_mem() ) {
-        boolean un=false;
         Type twrk = wrk.val();
         Type tmem0 = twrk instanceof TypeTuple ? ((TypeTuple)twrk).at(1) : twrk;
         if( !(tmem0 instanceof TypeMem) ) continue;
         TypeMem tmem = (TypeMem)tmem0;
+        boolean un=false;
         for( int alias = aliases.nextSetBit(0); alias != -1; alias = aliases.nextSetBit(alias + 1))
           if( tmem.at(alias)!= TypeObj.UNUSED )
             { un=true; break; }

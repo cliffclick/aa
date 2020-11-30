@@ -549,6 +549,7 @@ public class GVNGCM {
     // No more ideal calls, small or large, to apply
     assert !Env.START.more_ideal(this,new VBitSet(),3);
     assert _work3.isEmpty();
+    assert FunNode._must_inline==0;
   }
 
   private boolean can_dom(Node n) {
