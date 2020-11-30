@@ -463,7 +463,7 @@ public class CallNode extends Node {
       return tcall.oob(TypeMem.ALLMEM);
     TypeMem caller_mem = (TypeMem)tcmem;
     BitsAlias aliases = BitsAlias.EMPTY;
-    for( int i=FUN_PTR; i<nargs(); i++ ) {
+    for( int i=FUN_IDX; i<nargs(); i++ ) {
       Type targ = targ(tcall,i);
       if( TypeMemPtr.OOP.isa(targ) )
         { aliases=BitsAlias.FULL; break; } // All possible pointers, so all memory is alive
