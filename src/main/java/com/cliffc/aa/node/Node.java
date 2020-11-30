@@ -24,7 +24,7 @@ public abstract class Node implements Cloneable, TNode {
   static final byte OP_CPROJ  = 5;
   static final byte OP_DEFMEM = 6;
   static final byte OP_ERR    = 7;
-  static final byte OP_FP2CLO = 8;
+  static final byte OP_FP2DISP= 8;
   static final byte OP_FUN    = 9;
   static final byte OP_FUNPTR =10;
   static final byte OP_IF     =11;
@@ -52,7 +52,7 @@ public abstract class Node implements Cloneable, TNode {
   static final byte OP_UNR    =33;
   static final byte OP_MAX    =34;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "DefMem", "Err", "FP2Clo", "Fun", "FunPtr", "If", "Join", "Load", "Loop", "Name", "NewObj", "NewAry", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Thret", "Thunk", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "DefMem", "Err", "FP2Disp", "Fun", "FunPtr", "If", "Join", "Load", "Loop", "Name", "NewObj", "NewAry", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Thret", "Thunk", "Type", "Unresolved" };
   static { assert STRS.length==OP_MAX; }
 
   public int _uid;      // Unique ID, will have gaps, used to give a dense numbering to nodes
@@ -304,7 +304,7 @@ public abstract class Node implements Cloneable, TNode {
     }
   }
   public boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_LOOP || _op==OP_NEWOBJ || _op==OP_NEWSTR || _op==OP_REGION || _op==OP_SPLIT || _op==OP_START; }
-  private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ || _op==OP_CPROJ || _op==OP_FP2CLO; }
+  private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ || _op==OP_CPROJ; }
   boolean is_CFG() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_LOOP || _op==OP_REGION || _op==OP_START || _op==OP_CPROJ || _op==OP_SCOPE; }
 
   public String dumprpo( boolean prims, boolean plive ) {

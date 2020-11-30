@@ -19,7 +19,7 @@ public class TArgs extends TVar {
       parms[i] = tns[i]==null ? null : tns[i].tvar();
     return parms;
   }
-  public  TArgs(TNode fun, boolean unpacked ) { this(null,init(fun),unpacked); }
+  public TArgs(TNode fun, boolean unpacked ) { this(null,init(fun),unpacked); }
   TArgs(TNode fun, TVar[] parms, boolean unpacked) {
     super(fun);
     assert !(parms[0] instanceof TArgs);

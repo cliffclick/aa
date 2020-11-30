@@ -19,12 +19,13 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
+    test("noinline_x={@{a}}; x0=noinline_x(); x1=noinline_x(); x0.a:=2; x1.a",  TypeInt.INT8);
 
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
     // The Meet loses precision to fast.  This is a typing bug.
 
-    
+
     // fails, str.hash, str.eq is missing.
     // needs a class for primitives which includes things like hash & eq & toString.
     //test("tab = [7];\n" +
@@ -739,7 +740,7 @@ public class TestParse {
          "lst_bool=noinline_map(lst_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
          "(lst_istr,lst_bool)",
          Type.ANY);
-    
+
     // id accepts and returns both ints and reference types (arrays).
     test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",TypeStruct.make_tuple(Type.XNIL,TypeInt.con(5),TypeInt.con(3)));
     // recursive unification.  Trivially types as a dead fcn ptr.

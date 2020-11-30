@@ -40,15 +40,16 @@ public class AssertNode extends Node {
     // immediately in the Parser and is here to declutter the Parser.
     if( _t instanceof TypeFunSig ) {
       TypeFunSig sig = (TypeFunSig)_t;
-      Node[] args = new Node[sig.nargs()];
+      Node[] args = new Node[sig.nargs()+1];
       FunNode fun = gvn.init((FunNode)(new FunNode(null,sig,-1,false).add_def(Env.ALL_CTRL)));
       fun.set_val(Type.CTRL);
       args[CTL_IDX] = fun;            // Call control
-      args[MEM_IDX] = gvn.xform(new ParmNode(MEM_IDX,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-      args[FUN_IDX] = arg;            // The whole TFP to the call
+      args[MEM_IDX] = gvn.xform(new ParmNode(MEM_IDX,"mem" ,fun,TypeMem.MEM,Env.DEFMEM,null));
+      args[FUN_IDX] = gvn.xform(new ParmNode(FUN_IDX,"disp",fun,gvn.con(TypeMemPtr.DISP_SIMPLE),_error_parse));
       for( int i=ARG_IDX; i<sig.nargs(); i++ )  // 1 is memory, 2 is display.
         // All the parms; types in the function signature
         args[i] = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),_error_parse));
+      args[sig.nargs()] = arg;        // The whole TFP to the call
       Parse[] badargs = new Parse[sig.nargs()];
       Arrays.fill(badargs,_error_parse);
       Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
@@ -61,7 +62,7 @@ public class AssertNode extends Node {
       Node chk    = gvn.xform(new AssertNode(postmem,val,sig._ret.at(REZ_IDX),_error_parse,_env));
       RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));
       // Just the same Closure when we make a new TFP
-      Node clos = gvn.xform(new FP2ClosureNode(arg));
+      Node clos = gvn.xform(new FP2DispNode(arg));
       return gvn.xform(new FunPtrNode(ret,_env,clos));
     }
 

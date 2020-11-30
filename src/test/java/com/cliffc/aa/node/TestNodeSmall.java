@@ -244,7 +244,8 @@ public class TestNodeSmall {
     ConNode mem  = gvn.init(new ConNode<>(TypeMem.MEM));
     ConNode arg1 = gvn.init(new ConNode<>(Type.SCALAR));
     ConNode arg2 = gvn.init(new ConNode<>(Type.SCALAR));
-    CallNode call = (CallNode)gvn.xform(new CallNode(true, null, ctrl, mem, fp_mul, arg1, arg2));
+    Node dsp = gvn.xform(new ConNode<>(TypeMemPtr.NO_DISP));
+    CallNode call = (CallNode)gvn.xform(new CallNode(true, null, ctrl, mem, dsp, arg1, arg2, fp_mul));
     CallEpiNode cepi = (CallEpiNode)gvn.xform(new CallEpiNode(null,call, Env.DEFMEM)); // Unwired
 
     gvn.unreg(call);            // Will be hacking edges
@@ -278,7 +279,7 @@ public class TestNodeSmall {
 
 
     // Check the fptr {int,flt} meet
-    call.set_fun(ins[2]=fp_mul,gvn);
+    call.set_fdx(ins[2]=fp_mul,gvn);
     TypeTuple[] argss_mul1 = new TypeTuple[] {                 // arg1  arg2   resolve
       TypeTuple.make( tctl, tfull, tmul1, txscl, txscl, tmul1X), //  ~S    ~S   [+int+flt] ;          high
       TypeTuple.make( tctl, tfull, tmul1, t2   , txscl, tmul1X), //   2    ~S   [+int+flt] ;     good+high
@@ -299,7 +300,7 @@ public class TestNodeSmall {
     // - Mix High/Low & no Good , keep all & fidx?join:meet
     // - Some Good, no Low, no High, drop Bad & fidx?join:meet
     // - All Bad, like Low: keep all & meet
-    call.set_fun(ins[2]=fp_add,gvn);
+    call.set_fdx(ins[2]=fp_add,gvn);
     TypeTuple[] argss_add1 = new TypeTuple[] {
       TypeTuple.make( tctl, tfull, tadd1, txscl, txscl, tadd1X), //  ~S    ~S   [+int+flt+str] (__H,__H,__H) ; All  high, keep all, join
       TypeTuple.make( tctl, tfull, tadd1, txscl, tabc , tadd1X), //  ~S    str  [+int+flt+str] (B_H,B_H,_GH) ; Some high, keep all, join
@@ -335,7 +336,7 @@ public class TestNodeSmall {
 
 
     // Check the fptr {+int+flt} choices
-    call.set_fun(ins[2]=fp_mul,gvn);
+    call.set_fdx(ins[2]=fp_mul,gvn);
     TypeTuple[] argss_mul2 = new TypeTuple[] {                  // arg2  arg2   resolve
       TypeTuple.make( tctl, tfull, tmul2X, txscl, txscl, tmul2X), //  ~S    ~S   [+int+flt]
       TypeTuple.make( tctl, tfull, tmul2X, t2   , txscl, tmul2X), //   2    ~S   [+int+flt]
@@ -349,7 +350,7 @@ public class TestNodeSmall {
     _testMonotonicChain(ins,call,argss_mul2);
 
     // Check the {+int+flt+str} choices
-    call.set_fun(ins[2]=fp_add,gvn);
+    call.set_fdx(ins[2]=fp_add,gvn);
     TypeTuple[] argss_add2 = new TypeTuple[] {
       TypeTuple.make( tctl, tfull, tadd2X, txscl, txscl, tadd2X), //  ~S    ~S   [+int+flt+str] (__H,__H,__H) ; All  high, keep all, join
       TypeTuple.make( tctl, tfull, tadd2X, txscl, tabc , tadd2X), //  ~S    str  [+int+flt+str] (B_H,B_H,_GH) ; Some high, keep all, join
@@ -580,7 +581,7 @@ public class TestNodeSmall {
     assert targ1.simple_ptr()==targ1;
     assert targ2.simple_ptr()==targ2;
     ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
-    CallNode call = gvn.init(new CallNode(true, null, ctl, null, null, null, null));
+    CallNode call = gvn.init(new CallNode(true, null, ctl, null/*mem*/, null/*disp*/, null/*x*/, null/*y*/, null/*fidx*/));
     CallEpiNode cepi = gvn.init(new CallEpiNode(null, call, Env.DEFMEM)); // Unwired
     Node cpj = gvn.xform(new CProjNode(call,0));
     ConNode mem = (ConNode)gvn.xform(new ConNode<>(tmem ));

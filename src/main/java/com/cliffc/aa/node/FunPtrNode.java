@@ -61,27 +61,29 @@ public final class FunPtrNode extends Node {
       }
     }
 
-    // Remove unused displays.  Track uses; Calls with no FPClosure are OK.
-    // Uses storing the FPTR and passing it along are dangerous.
-    if( gvn._opt_mode._CG && !(display() instanceof ConNode) ) {
-      boolean safe=true;
-      for( Node use : _uses )  {
-        if( !(use instanceof CallNode) ) { safe=false; break; }
-        CallNode call = (CallNode)use;
-        for( int i=0; i<call.nargs(); i++ ) if( call.arg(i)==this ) { safe=false; break; }
-        for( Node cuse : call._uses )
-          if( cuse instanceof FP2ClosureNode )
-            { safe=false; break; }
-        if( !safe ) break;
-      }
-      if( safe ) {              // No unsafe users; nuke display
-        TypeMemPtr tdisp = (TypeMemPtr) display().val();
-        return set_def(1,gvn.con(tdisp.make_from(TypeObj.UNUSED)),gvn); // No display needed
-      }
+    // Remove unused displays.  Track uses; Calling with no display is OK.
+    // Uses storing the FPTR and passing it along still require a display.
+    if( gvn._opt_mode._CG && !(display() instanceof ConNode) && !display_used() ) {
+      TypeMemPtr tdisp = (TypeMemPtr) display().val();
+      return set_def(1,gvn.con(tdisp.make_from(TypeObj.UNUSED)),gvn); // No display needed
     }
-
     return null;
   }
+  
+  // Is the display used?
+  private boolean display_used() {
+    for( Node call : _uses ) {
+      if( call instanceof CallNode ) {
+        if( call._defs.find(e->e==this) < call._defs._len-1 )
+          return true;          // Call-use other than the last position is using the display
+      } else {
+        return true;            // Anything other than a Call is using the display
+      }
+    }
+    return false;
+  }
+
+  
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;

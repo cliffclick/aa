@@ -1368,10 +1368,11 @@ public class Parse implements Comparable<Parse> {
 
   // Insert a call, with memory splits.  Wiring happens later, and when a call
   // is wired it picks up projections to merge at the Fun & Parm nodes.
-  private Node[] args(Node a0                           ) { return new Node[]{ctrl(),mem(),a0}; }
-  private Node[] args(Node a0, Node a1                  ) { return new Node[]{ctrl(),mem(),a0,a1}; }
-  private Node[] args(Node a0, Node a1, Node a2         ) { return new Node[]{ctrl(),mem(),a0,a1,a2}; }
-  private Node[] args(Node a0, Node a1, Node a2, Node a3) { return new Node[]{ctrl(),mem(),a0,a1,a2,a3}; }
+  private Node dsp(Node a0) { Node n=gvn(new FP2DispNode(a0.keep())); a0.unhook(); return n; }
+  private Node[] args(Node a0                           ) { return new Node[]{ctrl(),mem(),dsp(a0),a0}; }
+  private Node[] args(Node a0, Node a1                  ) { return new Node[]{ctrl(),mem(),dsp(a0),a1,a0}; }
+  private Node[] args(Node a0, Node a1, Node a2         ) { return new Node[]{ctrl(),mem(),dsp(a0),a1,a2,a0}; }
+  private Node[] args(Node a0, Node a1, Node a2, Node a3) { return new Node[]{ctrl(),mem(),dsp(a0),a1,a2,a3,a0}; }
   private Node do_call( Parse[] bads, Node... args ) { return do_call0(true,bads,args); }
   private Node do_call0( boolean unpack, Parse[] bads, Node... args ) {
     CallNode call0 = new CallNode(unpack,bads,args);

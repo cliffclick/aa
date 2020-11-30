@@ -31,7 +31,7 @@ public final class CallEpiNode extends Node {
     // Add the "non-generative" set to the TFun structure, but no other
     // structural is available (args and ret are new TVars).
     CallNode call = call();
-    Node fun = call.fun();
+    Node fun = call.fdx();
     // TODO: Need to force call().fun() to be a TFun.  Might not be (yet) if
     // fun is indirectly coming from e.g. a Parm or a Load.
     //fun.tvar().unify(new TFun(fun,e == null ? null : e.collect_active_scope(),call.tvar(),tvar()));
@@ -95,8 +95,8 @@ public final class CallEpiNode extends Node {
     }
 
     // Parser thunks eagerly inline
-    if( call.fun() instanceof ThretNode ) {
-      ThretNode tret = (ThretNode)call.fun();
+    if( call.fdx() instanceof ThretNode ) {
+      ThretNode tret = (ThretNode)call.fdx();
       wire1(gvn,call,tret.thunk(),tret);
       return inline(gvn,level, call, tret.ctrl(), tret.mem(), tret.rez(), null/*do not unwire, because using the entire function body inplace*/,call._uid);
     }
@@ -126,8 +126,6 @@ public final class CallEpiNode extends Node {
         int idx = ((ParmNode)parm)._idx;
         if( idx < 0 ) continue; // RPC
         Type actual = CallNode.targ(tcall,idx);
-        // Display arg comes from function pointer
-        if( idx==FUN_IDX ) actual = (actual instanceof TypeFunPtr) ? ((TypeFunPtr)actual)._disp : Type.SCALAR;
         if( actual.isBitShape(formals.at(idx)) == 99 ) // Requires user-specified conversion
           return null;
       }
@@ -171,7 +169,7 @@ public final class CallEpiNode extends Node {
       ProjNode proj = ProjNode.proj(this,REZ_IDX);
       irez._live = proj==null ? TypeMem.ESCAPE : proj._live;
       for( Node parm : rrez._defs )
-        irez.add_def((parm instanceof ParmNode && parm.in(CTL_IDX) == fun) ? call.argm(((ParmNode)parm)._idx,gvn) : parm);
+        irez.add_def((parm instanceof ParmNode && parm.in(CTL_IDX) == fun) ? call.arg(((ParmNode)parm)._idx) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
       return inline(gvn,level,call, cctl,cmem,gvn.add_work(gvn.xform(irez)),ret,call._uid); // New exciting replacement for inlined call
     }
@@ -236,7 +234,6 @@ public final class CallEpiNode extends Node {
       switch( idx ) {
       case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); break; // Always RPC is a constant
       case MEM_IDX: actual = new MProjNode(call,Env.DEFMEM); break;    // Memory into the callee
-      case FUN_IDX: actual = new FP2ClosureNode(call); break; // Filter Function Pointer to Closure
       default: actual = idx >= call.nargs()              // Check for args present
           ? new ConNode<>(Type.ALL) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
           : new ProjNode(call,idx); // Normal args
@@ -495,8 +492,7 @@ public final class CallEpiNode extends Node {
         Node arg = call.arg(((ProjNode)use)._idx);
         if( rez==use ) rez = arg;
         gvn.subsume(use, arg);
-      } else if( use instanceof FP2ClosureNode )
-        gvn.set_def_reg(use,0,call.fun());
+      }
       else i++;
     }
 
@@ -555,7 +551,7 @@ public final class CallEpiNode extends Node {
     // grabbing a 'fresh' copy of 'Ident' (see HM.java) we grab it fresh at the
     // use point below, by calling 'fresh_unify' which acts as-if a fresh copy
     // is made, and then unifies it.
-    TVar tfunv = call().fun().tvar();
+    TVar tfunv = call().fdx().tvar();
     // Useless to make a "fresh" plain TVar & unify, so no progress here.
     // TODO: SEE COMMENT IN CONSTRUCTOR
     if( !(tfunv instanceof TFun) ) return false;

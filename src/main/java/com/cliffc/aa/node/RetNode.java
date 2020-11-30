@@ -102,7 +102,7 @@ public final class RetNode extends Node {
       if( c._op == OP_CPROJ && cepi._op == OP_CALLEPI &&
           ((CallEpiNode)cepi).nwired()==1 &&
           ((CallEpiNode)cepi).wired(0)== this && // TODO: if in tail position, can be a tail call not self-recursive
-          ((CallEpiNode)cepi).call().fun()._op == OP_FUNPTR ) // And a direct call
+          ((CallEpiNode)cepi).call().fdx()._op == OP_FUNPTR ) // And a direct call
         break;
     }
     if( idx == ctl._defs._len ) return null; // No call-epi found
@@ -116,7 +116,7 @@ public final class RetNode extends Node {
     FunNode fun = fun();
     // Every Phi must be type compatible
     for( int i=0; i<call.nargs(); i++ )
-      if( !check_phi_type(gvn,fun,call, i) )
+      if( !check_phi_type(fun,call, i) )
         return null;
 
     // Behind the function entry, split out a LoopNode/Phi setup - one phi for
@@ -144,18 +144,18 @@ public final class RetNode extends Node {
     return this;
   }
 
-  private static boolean check_phi_type( GVNGCM gvn, FunNode fun, CallNode call, int argn ) {
+  private static boolean check_phi_type( FunNode fun, CallNode call, int argn ) {
     ParmNode parm = fun.parm(argn);
     if( parm==null ) return true; // arg/parm might be dead
     Type tenter = parm.val();
-    Type tback  = call.argm(argn, gvn).val();
+    Type tback  = call.arg(argn).val();
     return tback.isa(tenter);
   }
 
   private static void do_phi(GVNGCM gvn, FunNode fun, CallNode call, LoopNode loop, int argn) {
     ParmNode parm = fun.parm(argn);
     if( parm==null ) return; // arg/parm might be dead
-    PhiNode phi = new PhiNode(parm._t,parm._badgc,loop,null,call.argm(argn,gvn));
+    PhiNode phi = new PhiNode(parm._t,parm._badgc,loop,null,call.arg(argn));
     gvn.replace(parm,phi);
     phi.set_def(1,parm,null);
     phi._live = parm._live;

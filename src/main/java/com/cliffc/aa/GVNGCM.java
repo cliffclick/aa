@@ -352,11 +352,6 @@ public class GVNGCM {
             if( defuse != old )
               add_work(defuse);
       }
-      if( old instanceof FP2ClosureNode )
-        add_work(old.in(0)); // Liveness update
-      Node fun;
-      if( old instanceof CallNode && (fun=((CallNode)old).fun()) instanceof FunPtrNode ) // Call value update changes liveness of FP2Closure
-        add_work(fun);
       if( old instanceof ProjNode && old.in(0) instanceof NewNode )
         add_work(Env.DEFMEM);
       if( old.value_changes_live() )
@@ -670,7 +665,7 @@ public class GVNGCM {
               ambi_calls.add(call);
             // If the function input can never fall to any function type, abort
             // the resolve now.  The program is in-error.
-            if( !call.fun().val().isa(TypeFunPtr.GENERIC_FUNPTR) ) {
+            if( !call.fdx().val().isa(TypeFunPtr.GENERIC_FUNPTR) ) {
               call._not_resolved_by_gcp = true;
               add_work(call);
             }
@@ -704,7 +699,7 @@ public class GVNGCM {
       if( !fidxs.above_center() ) return; // Resolved after all
       if( fidxs!=BitsFun.ANY )            // And have choices
         // Pick least-cost among choices
-        fptr = call.least_cost(this,fidxs,call.fun());
+        fptr = call.least_cost(this,fidxs,call.fdx());
     }
     if( fptr==null ) {          // Not resolving, program is in-error
       call._not_resolved_by_gcp = true;
@@ -712,7 +707,7 @@ public class GVNGCM {
       add_work(call.fun());
       return;                   // Not resolving, but Call flagged as in-error
     }
-    call.set_fun_reg(fptr,this);// Set resolved edge
+    call.set_fdx_reg(fptr,this);// Set resolved edge
     add_work(call);
     add_work(call.cepi());
     revalive(add_work(fptr)); // Unresolved is now resolved and live, and might lift from ESCAPE to LIVE
@@ -726,7 +721,7 @@ public class GVNGCM {
 
   private void check_and_wire( CallEpiNode cepi ) {
     if( !cepi.check_and_wire(this) ) return;
-    add_work(cepi.call().fun());
+    add_work(cepi.call().fdx());
     add_work(cepi.call());
     add_work(cepi);
     assert Env.START.more_flow(this,new VBitSet(),false,0)==0;

@@ -291,8 +291,8 @@ public class FunNode extends RegionNode {
         for( Node use : parm._uses ) { // See if a parm-user needs a type-specialization split
           if( use instanceof CallNode ) {
             CallNode call = (CallNode)use;
-            if( (call.fun()==parm && !parm.val().isa(TypeFunPtr.GENERIC_FUNPTR) ) ||
-                call.fun() instanceof UnresolvedNode ) { // Call overload not resolved
+            if( (call.fdx()==parm && !parm.val().isa(TypeFunPtr.GENERIC_FUNPTR) ) ||
+                call.fdx() instanceof UnresolvedNode ) { // Call overload not resolved
               Type t0 = parm.val(1);                   // Generic type in slot#1
               for( int i=2; i<parm._defs._len; i++ ) { // For all other inputs
                 Type tp = parm.val(i);
@@ -459,7 +459,6 @@ public class FunNode extends RegionNode {
       if( freached.tset(n._uid) ) continue; // Already visited?
       if( op == OP_RET ) continue;          // End of this function
       if( n instanceof ProjNode && n.in(0) instanceof CallNode ) continue; // Wired call; all projs lead to other functions
-      if( n instanceof FP2ClosureNode ) continue; // Wired call; all projs lead to other functions
       work.addAll(n._uses);   // Visit all uses
     }
 
@@ -498,7 +497,7 @@ public class FunNode extends RegionNode {
     for( Node n : body ) {
       int op = n._op;           // opcode
       if( op == OP_CALL ) {     // Call-of-primitive?
-        Node n1 = ((CallNode)n).fun();
+        Node n1 = ((CallNode)n).fdx();
         Node n2 = n1 instanceof UnresolvedNode ? n1.in(0) : n1;
         if( n2 instanceof FunPtrNode ) {
           FunPtrNode fpn = (FunPtrNode) n2;
@@ -675,11 +674,11 @@ public class FunNode extends RegionNode {
           new_funptr._in=false;        // Remove type, to preserve new invariant
         }
     } else {                           // Path split
-      Node old_funptr = path_call.fun(); // Find the funptr for the path split
+      Node old_funptr = path_call.fdx(); // Find the funptr for the path split
       Node new_funptr = map.get(old_funptr);
       gvn.replace(new_funptr,old_funptr);
       TypeFunPtr ofptr = (TypeFunPtr) old_funptr.val();
-      path_call.set_fun_reg(new_funptr, gvn); // Force new_funptr, will re-wire later
+      path_call.set_fdx_reg(new_funptr, gvn); // Force new_funptr, will re-wire later
       TypeFunPtr nfptr = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,ofptr._disp);
       path_call.set_val(CallNode.set_ttfp((TypeTuple) path_call.val(),nfptr));
     } // Else other funptr/displays on unrelated path, dead, can be ignored
@@ -744,7 +743,7 @@ public class FunNode extends RegionNode {
       CallNode call = cepi.call();
       CallEpiNode cepi2 = (CallEpiNode)map.get(cepi);
       if( path < 0 ) {          // Type-split, wire both & resolve later
-        BitsFun call_fidxs = ((TypeFunPtr) call.fun().val()).fidxs();
+        BitsFun call_fidxs = ((TypeFunPtr) call.fdx().val()).fidxs();
         assert call_fidxs.test_recur(    fidx());
         assert call_fidxs.test_recur(fun.fidx());
         cepi.wire1(gvn,call,this,oldret);
@@ -754,7 +753,7 @@ public class FunNode extends RegionNode {
           // self-call.  wire the clone, same as the original was wired, so the
           // clone keeps knowledge about its return type.
           CallNode call2 = cepi2.call();
-          BitsFun call_fidxs2 = ((TypeFunPtr) call2.fun().val()).fidxs();
+          BitsFun call_fidxs2 = ((TypeFunPtr) call2.fdx().val()).fidxs();
           assert call_fidxs2.test_recur(    fidx());
           assert call_fidxs2.test_recur(fun.fidx());
           cepi2.wire1(gvn,call2,this,oldret);

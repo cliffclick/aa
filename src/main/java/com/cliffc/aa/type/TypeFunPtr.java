@@ -100,7 +100,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   public static TypeFunPtr make( int fidx, int nargs, TypeMemPtr disp ) { return make(BitsFun.make0(fidx),nargs,disp); }
   public static TypeFunPtr make_new_fidx( int parent, int nargs, TypeMemPtr disp ) { return make(BitsFun.make_new_fidx(parent),nargs,disp); }
-                TypeFunPtr make_from( TypeMemPtr disp ) { return make(_fidxs,_nargs,disp); }
+  public        TypeFunPtr make_from( TypeMemPtr disp ) { return make(_fidxs,_nargs,disp); }
   public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR; // Open display, allows more fields
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,1,TypeMemPtr.DISP_SIMPLE);
