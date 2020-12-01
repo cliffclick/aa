@@ -484,10 +484,14 @@ public class FunNode extends RegionNode {
 
   // Split a single-use copy (e.g. fully inline) if the function is "small
   // enough".  Include anything with just a handful of primitives, or a single
-  // call, possible with a single if.
+  // call, possible with a single if.  Disallow functions returning a new
+  // allocation & making other (possibly recursive) calls: the recursive-loop
+  // prevents lifting the allocations from the default parent to either child
+  // without a full GCP pass - which means we split_size but then cannot inline
+  // in CEPI because the Ret memory type will never lift to the default memory.
   private int split_size( Ary<Node> body, Node[] parms ) {
     if( _defs._len <= 1 ) return -1; // No need to split callers if only 2
-    BitSet recursive = new BitSet();    // Heuristic to limit unrolling recursive methods
+    boolean self_recursive=false;
 
     // Count function body size.  Requires walking the function body and
     // counting opcodes.  Some opcodes are ignored, because they manage
@@ -503,8 +507,7 @@ public class FunNode extends RegionNode {
           FunPtrNode fpn = (FunPtrNode) n2;
           if( fpn.ret().rez() instanceof PrimNode )
             op = OP_PRIM;       // Treat as primitive for inlining purposes
-          if( fpn.fun() == this )
-            recursive.set(n.in(0)._uid);  // No self-recursive inlining till after parse
+          if( fpn.fun() == this ) self_recursive=true;
         } else if( n2.val()==TypeTuple.RET ) { // Thunks are encouraged to inline
           call_thunk++;
         } else
@@ -516,6 +519,18 @@ public class FunNode extends RegionNode {
     assert cnts[OP_SCOPE]==0;
     assert cnts[OP_REGION] <= cnts[OP_IF];
 
+    // Specifically ignoring constants, parms, phis, rpcs, types,
+    // unresolved, and casts.  These all track & control values, but actually
+    // do not generate any code.
+    if( cnts[OP_CALL] > 2 || // Careful inlining more calls; leads to exponential growth
+        cnts[OP_LOAD] > 4 ||
+        cnts[OP_STORE]> 2 ||
+        cnts[OP_PRIM] > 6 ||   // Allow small-ish primitive counts to inline
+        cnts[OP_NEWOBJ]>2 ||   // Display and return is OK
+        (cnts[OP_NEWOBJ]>1 && self_recursive) ||
+        call_indirect > 0 )
+      return -1;
+
     // Pick which input to inline.  Only based on having some constant inputs
     // right now.
     Node mem = parms[MEM_IDX];  // Memory, used to sharpen input ptrs
@@ -524,11 +539,12 @@ public class FunNode extends RegionNode {
       Node call = in(i).in(0);
       if( !(call instanceof CallNode) ) continue; // Not well formed
       if( ((CallNode)call).nargs() != nargs() ) continue; // Will not inline
-      if( call.val() == Type.ALL ) continue;
+      if( call.val() == Type.ALL ) continue; // Otherwise in-error
       TypeFunPtr tfp = CallNode.ttfp(call.val());
       int fidx = tfp.fidxs().abit();
       if( fidx < 0 || BitsFun.is_parent(fidx) ) continue;  // Call must only target one fcn
       int ncon=0;
+      // Count constant inputs on non-error paths
       for( int j=MEM_IDX; j<parms.length; j++ ) {
         Node parm = parms[j];
         if( parm != null ) {    // Some can be dead
@@ -539,21 +555,13 @@ public class FunNode extends RegionNode {
           if( actual.is_con() ) ncon++; // Count constants along each path
         }
       }
-      if( ncon > mncons && !recursive.get(in(i)._uid) )
+      if( ncon > mncons )
         { mncons = ncon; m = i; } // Path with the most constants
     }
     if( m == -1 )               // No paths are not in-error? (All paths have an error-parm)
       return -1;                // No inline
 
-    // Specifically ignoring constants, parms, phis, rpcs, types,
-    // unresolved, and casts.  These all track & control values, but actually
-    // do not generate any code.
-    if( cnts[OP_CALL] > 2 || // Careful inlining more calls; leads to exponential growth
-        cnts[OP_IF  ] > 1+mncons || // Allow some trivial filtering to inline
-        cnts[OP_LOAD] > 4 ||
-        cnts[OP_STORE]> 2 ||
-        cnts[OP_PRIM] > 6 ||   // Allow small-ish primitive counts to inline
-        call_indirect > 0 )
+    if( cnts[OP_IF] > 1+mncons) // Allow some trivial filtering to inline
       return -1;
 
     return m;                   // Return path to split on

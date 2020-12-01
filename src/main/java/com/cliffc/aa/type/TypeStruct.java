@@ -554,19 +554,23 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
     // If unequal length; then if short is low it "wins" (result is short) else
     // short is high and it "loses" (result is long).
-    return thsi._ts.length <= that._ts.length ? thsi.xmeet1(that) : that.xmeet1(thsi);
+    return thsi._ts.length <= that._ts.length ? thsi.xmeet1(that,false) : that.xmeet1(thsi,false);
   }
 
   // Meet 2 structs, shorter is 'this'.
-  private TypeStruct xmeet1( TypeStruct tmax ) {
+  private TypeStruct xmeet1( TypeStruct tmax, boolean is_loop ) {
     int len = _any ? tmax._ts.length : _ts.length;
     // Meet of common elements
     String[] as = new String[len];
     Type  [] ts = Types.get(len);
     byte  [] bs = new byte  [len];
     for( int i=0; i<_ts.length; i++ ) {
+      if( is_loop && fmod(i)==fnl_flag ) {
+        ts[i] = _ts[i];         // Ignore RHS on final fields around loops
+      } else {
+        ts[i] = _ts[i].meet(tmax._ts[i]); // Recursive not cyclic
+      }
       as[i] = smeet(_flds   [i],     tmax._flds  [i]);
-      ts[i] =       _ts     [i].meet(tmax._ts    [i]); // Recursive not cyclic
       flags(bs,i,fmeet(flags(i),     tmax.flags  (i)));
     }
     // Elements only in the longer tuple; the short struct must be high and so
@@ -1212,6 +1216,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return t;
   }
 
+  @Override public Type meet_loop(Type t2) {
+    if( this==t2 ) return this;
+    if( !(t2 instanceof TypeStruct) ) return meet(t2);
+    if( _ts.length != ((TypeStruct)t2)._ts.length ) return meet(t2);
+    return xmeet1((TypeStruct)t2,true);
+  }
 
   // ------ String field name lattice ------
   static private boolean fldTop( String s ) { return s.charAt(0)=='\\'; }

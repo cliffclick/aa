@@ -270,12 +270,12 @@ public class TypeMem extends Type<TypeMem> {
     if( t._type != TMEM ) return ALL;
     TypeMem tf = (TypeMem)t;
     // Meet of default values, meet of element-by-element.
-    TypeObj[] as = _meet(_pubs,tf._pubs);
+    TypeObj[] as = _meet(_pubs,tf._pubs,false);
     TypeObj[] tos = _make1(as);
     return tos==null ? DEAD : make(tos); // All things are dead, so dead
   }
 
-  private static TypeObj[] _meet(TypeObj[] as, TypeObj[] bs) {
+  private static TypeObj[] _meet(TypeObj[] as, TypeObj[] bs, boolean is_loop) {
     TypeObj mt_live = (TypeObj)as[0].meet(bs[0]);
     int  len = Math.max(as.length,bs.length);
     int mlen = Math.min(as.length,bs.length);
@@ -289,10 +289,23 @@ public class TypeMem extends Type<TypeMem> {
     objs[0] = mt_live;
     for( int i=1; i<len; i++ )
       objs[i] = i<mlen && as[i]==null && bs[i]==null // Shortcut null-vs-null
-        ? null : (TypeObj)at(as,i).meet(at(bs,i)); // meet element-by-element
+        ? null : _meet(at(as,i),at(bs,i),is_loop);   // meet element-by-element
     return objs;
   }
+  private static TypeObj _meet(TypeObj a, TypeObj b, boolean is_loop) {
+    return (TypeObj)(is_loop ? a.meet_loop(b) : a.meet(b));
+  }
 
+  // MEET at a Loop; optimize no-final-updates on backedges.
+  @Override public Type meet_loop(Type t2) {
+    if( t2._type != TMEM ) return ALL;
+    TypeMem tf = (TypeMem)t2;
+    // Meet of default values, meet of element-by-element.
+    TypeObj[] as = _meet(_pubs,tf._pubs,true);
+    TypeObj[] tos = _make1(as);
+    return tos==null ? DEAD : make(tos); // All things are dead, so dead
+  }
+  
   // Shallow meet of all possible loadable values.  Used in Node.value calls, so must be monotonic.
   public TypeObj ld( TypeMemPtr ptr ) {
     if( ptr._aliases == BitsAlias.NIL.dual() || ptr._aliases == BitsAlias.NIL )
