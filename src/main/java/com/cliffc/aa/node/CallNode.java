@@ -203,10 +203,10 @@ public class CallNode extends Node {
     if( tctl(tcall)!=Type.CTRL ) { // Dead control (NOT dead self-type, which happens if we do not resolve)
       if( (ctl() instanceof ConNode) ) return null;
       // Kill all inputs with type-safe dead constants
-      set_def(1,gvn.con(TypeMem.XMEM),gvn);
-      set_def(2,gvn.con(TypeFunPtr.GENERIC_FUNPTR.dual()),gvn);
+      set_def(MEM_IDX,gvn.con(TypeMem.XMEM),gvn);
+      set_def(FUN_IDX,gvn.con(TypeFunPtr.GENERIC_FUNPTR.dual()),gvn);
       if( is_dead() ) return this;
-      for( int i=3; i<_defs._len; i++ )
+      for( int i=ARG_IDX; i<_defs._len; i++ )
         set_def(i,gvn.con(Type.ANY),gvn);
       gvn.add_work_defs(this);
       return set_def(0,Env.XCTRL,gvn);
@@ -293,7 +293,7 @@ public class CallNode extends Node {
       for( int i=FUN_IDX; i<nargs(); i++ )
         if( ProjNode.proj(this,i)==null &&
             !(arg(i) instanceof ConNode) ) // Not already folded
-          progress = set_arg(i,gvn.con(targ(tcall,i)),gvn); // Kill dead arg
+          progress = set_arg(i,gvn.con(Type.ANY),gvn); // Kill dead arg
       if( progress != null ) return this;
     }
 
@@ -599,6 +599,8 @@ public class CallNode extends Node {
     for( int j=MEM_IDX; j<nargs(); j++ ) {
       Type formal = formals.at(j);
       Type actual = targ(targs,j);          // Calls skip ctrl & mem
+      if( actual==Type.ANY && arg(j) instanceof ConNode && ProjNode.proj(this, j)==null )
+          continue;             // Unused args can be error, are ignored
       assert actual==actual.simple_ptr();    // Only simple ptrs from nodes
       actual = caller_mem.sharptr(actual);   // Sharpen actual pointers before checking vs formals
 
