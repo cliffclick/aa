@@ -106,7 +106,6 @@ public class TypeStr extends TypeObj<TypeStr> {
     if( str._con==null ) return this;
     throw com.cliffc.aa.AA.unimpl(); // Unequal strings is a parse error
   }
-  @Override TypeObj flatten_fields() { return this; }
   // Widen (loss info), to make it suitable as the default function memory.
   @Override public TypeObj crush() { return this; }
 

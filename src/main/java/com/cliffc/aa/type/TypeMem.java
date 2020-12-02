@@ -461,14 +461,10 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Everything NOT in the 'escs' is flattened to UNUSED.
-  public TypeMem remove_no_escapes( BitsAlias escs ) {
-    int i; for( i=1; i<_pubs.length; i++ )
-      if( at(i) != TypeObj.UNUSED && !escs.test_recur(i) )
-        break;                         // Found a no-escape to remove
-    if( i==_pubs.length ) return this; // Already flattened
+  public TypeMem remove_no_escapes( BitsAlias escs, String fld ) {
     TypeObj[] tos = new TypeObj[Math.max(_pubs.length,escs.max()+1)];
-    for( i=1; i<tos.length; i++ )
-      tos[i] = escs.test_recur(i) ? at(i) : TypeObj.UNUSED;
+    for( int i=1; i<tos.length; i++ )
+      tos[i] = escs.test_recur(i) ? at(i).remove_other_flds(fld) : TypeObj.UNUSED;
     return make0(tos);
   }
 
@@ -524,7 +520,6 @@ public class TypeMem extends Type<TypeMem> {
         tos[i] = tos[i].flatten_fields();
     return make0(tos);
   }
-
 
   @Override public boolean above_center() {
     for( TypeObj alias : _pubs )

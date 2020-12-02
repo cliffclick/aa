@@ -456,7 +456,16 @@ public class CallNode extends Node {
       return TypeMem.ESCAPE;    // Args always alive and escape
     }
 
-    // Needed to sharpen args for e.g. resolve and errors.
+    // After we have the exact callers, use liveness directly.  True if we have
+    // the Call Graph, or the callers are known directly.  If the call is
+    // in-error, act as-if we do not known the Call Graph.
+    TypeFunPtr tfpx = CallNode.ttfpx(val());
+    if( (opt_mode._CG || fdx() instanceof FunPtrNode) &&
+        (tfpx ==null || tfpx.fidxs().above_center() || err(true)==null) )
+      return _live;
+
+    // Unknown future callees act as-if all available aliases are read from and
+    // thus live.
     Type tcall = val();
     Type tcmem = mem().val();
     if( !(tcall instanceof TypeTuple) || !(tcmem instanceof TypeMem) ) // No type to sharpen
@@ -709,21 +718,24 @@ public class CallNode extends Node {
       return fast ? ErrMsg.FAST : ErrMsg.syntax(_badargs[0],"Passing "+(nargs()-ARG_IDX)+" arguments to "+tfp.names(false)+" which takes "+(tfp._nargs-ARG_IDX)+" arguments");
 
     // Now do an arg-check.
+    BitsFun.Tree<BitsFun> tree = tfp._fidxs.tree();
     for( int j=ARG_IDX; j<nargs(); j++ ) {
       Type actual = arg(j).sharptr(mem());
       Ary<Type> ts=null;
       for( int fidx : tfp._fidxs ) {
         if( fidx==0 ) continue;
-        FunNode fun = FunNode.find_fidx(fidx);
-        if( fun==null || fun.is_dead() ) return ErrMsg.FAST;
-        TypeTuple formals = fun._sig._formals; // Type of each argument
-        if( fun.parm(j)==null ) continue;  // Formal is dead
-        Type formal = formals.at(j);
-        if( actual.isa(formal) ) continue; // Actual is a formal
-        if( fast ) return ErrMsg.FAST;     // Fail-fast
-        if( ts==null ) ts = new Ary<>(new Type[1],0);
-        if( ts.find(formal) == -1 ) // Dup filter
-          ts.push(formal);          // Add broken type
+        for( int kid=fidx; kid!=0; kid = tree.next_kid(fidx,kid) ) {
+          FunNode fun = FunNode.find_fidx(kid);
+          if( fun==null || fun.is_dead() ) continue;
+          TypeTuple formals = fun._sig._formals; // Type of each argument
+          if( fun.parm(j)==null ) continue;  // Formal is dead
+          Type formal = formals.at(j);
+          if( actual.isa(formal) ) continue; // Actual is a formal
+          if( fast ) return ErrMsg.FAST;     // Fail-fast
+          if( ts==null ) ts = new Ary<>(new Type[1],0);
+          if( ts.find(formal) == -1 ) // Dup filter
+            ts.push(formal);          // Add broken type
+        }
       }
       if( ts!=null )
         return ErrMsg.typerr(_badargs[j-ARG_IDX+1],actual, mem().val(),ts.asAry());

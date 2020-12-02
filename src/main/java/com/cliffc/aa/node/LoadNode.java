@@ -205,7 +205,8 @@ public class LoadNode extends Node {
     if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
     if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
     if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
-    return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases);
+    // Only named the named field from the named aliases is live.
+    return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld);
   }
 
   @Override public ErrMsg err( boolean fast ) {

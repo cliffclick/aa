@@ -1308,11 +1308,24 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   @Override TypeObj flatten_fields() {
-    Type[] ts = Types.get(_ts.length);
-    Arrays.fill(ts,SCALAR);
+    Type[] ts = Types.clone(_ts);
+    for( int i=0; i<ts.length; i++ )
+      if( ts[i]!=XSCALAR )
+        ts[i] = SCALAR;
     return make_from(_any,ts,fbots(_ts.length));
   }
 
+  // Used during liveness propagation from Loads.
+  // Fields not-loaded are not-live.
+  @Override TypeObj remove_other_flds(String fld) {
+    int idx = find(fld);
+    if( idx == -1 ) return UNUSED; // No such field, so all fields will be XSCALAR so UNUSED instead
+    Type[] ts = Types.get(_ts.length);
+    Arrays.fill(ts,XSCALAR);
+    ts[idx] = SCALAR;
+    return make_from(_any,ts,fbots(_ts.length));
+  }
+  
   boolean any_modifiable() {
     if( _open ) return true;
     for( byte b : _flags )

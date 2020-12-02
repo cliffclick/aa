@@ -326,8 +326,8 @@ public class GVNGCM {
           add_work_uses(use);
         if( use instanceof DefMemNode )
           add_work_uses(use); // Changing input to DefMem impacts all CallEpi
-        if( use instanceof ParmNode && ((ParmNode)use)._idx==0 )
-          add_work_uses(use.in(0));  // Recheck function inlining
+        if( use instanceof ParmNode && ((ParmNode)use)._idx==MEM_IDX )
+          add_work_uses(use.in(0));  // Recheck memory sharpening of adjacent Parms
         if( use instanceof MProjNode && ((MProjNode)use)._idx==0 && use._uses.at(0) instanceof MemJoinNode )
           add_work(use._uses.at(0));
         if( old instanceof CallNode && use instanceof CallEpiNode )
