@@ -2,9 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFunPtr;
-import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
 import java.util.Arrays;
@@ -39,29 +37,21 @@ public class UnresolvedNode extends Node {
     return progress ? this : null;
   }
 
+  // Required property for value():
+  // ANY >= value(ANY) >= value(other) >= value(ALL) >= ALL
   @Override public Type value(GVNGCM.Mode opt_mode) {
     // Freeze after GVN - only still around for errors
     if( opt_mode == GVNGCM.Mode.PesiCG ) return val();
-    // If any arg is ALL - that wins; if ANY - ignored.
-    // If any arg is not a TFP, then OOB.
-    // If any arg is high, ignore - FunPtrs always fall.
-    // If opt_mode==Opto, then high else low
     boolean lifting = opt_mode!=GVNGCM.Mode.Opto;
-    Type initial = lifting ? Type.ANY : Type.ALL;
-    Type t = initial;
+    Type t   = lifting ? Type.ANY : Type.ALL;
     for( Node def : _defs ) {
       Type td = def.val();
-      if( td==Type.ANY )        // Some arg is at high?
-        if( lifting ) continue; // Lifting: ignore it
-        else return Type.ANY;   // Falling: wait till it falls.
-      if( td==Type.ALL ) return Type.ALL;
       if( !(td instanceof TypeFunPtr) ) return td.oob();
       TypeFunPtr tfp = (TypeFunPtr)td;
-      if( tfp.above_center() ) tfp = tfp.dual();
-      if( tfp._disp.above_center() ) return val(); // No change until sorted out
-      t = lifting ? t.meet(tfp) : t.join(tfp.dual());
+      if( tfp.above_center() == lifting ) tfp = tfp.dual();
+      t = lifting ? t.meet(tfp) : t.join(tfp);
     }
-    return t==initial ? Type.ANY : t; // If all inputs are ANY, then ANY result
+    return t;
   }
 
   // Validate same name, operator-precedence and thunking

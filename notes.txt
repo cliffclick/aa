@@ -1,3 +1,18 @@
+BUGS:
+BUG: At last pass, alias [12] still live into noinline_map call, prevents lifting values across call.
+BUG: MEET of [7+43+44] and [48] loses all the aboves.  Needs structure as a product of sums.
+     Definitely Phi/Meet of a unresolved-choice and a solid actual fidx.  The Unresolved needs to
+     be kept directly, and resolved at the ultimate use.
+
+BUG: Parse08, 2nd test, size-splits for a private inline, then FAILS TO INLINE after split, because
+     aliases remain conservative, so fails CallEpi tretmem.isa(tdef).
+     BAD FIX: Lower inlining for recursive fcns with 2+ News.
+     
+     BETTER FIX: if a New is not live-in to recursive call but yes live-out,
+     then LIFT during split; each side gets the lifted variant according to
+     calling self or calling the other split.
+
+
 =======================================
 Notes from 11/23/2020
 

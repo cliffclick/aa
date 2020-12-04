@@ -708,6 +708,7 @@ public class GVNGCM {
       add_work(call.fun());
       return;                   // Not resolving, but Call flagged as in-error
     }
+    set_def_reg(call,AA.FUN_IDX,fptr.display());
     call.set_fdx_reg(fptr,this);// Set resolved edge
     add_work(call);
     add_work(call.cepi());

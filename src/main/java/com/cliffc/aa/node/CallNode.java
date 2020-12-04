@@ -261,7 +261,10 @@ public class CallNode extends Node {
           // See if FunPtr is available just above an Unresolved.
           if( unk instanceof UnresolvedNode ) {
             fptr = ((UnresolvedNode)unk).find_fidx(fidx);
-            if( fptr != null ) return set_fdx(fptr, gvn);
+            if( fptr != null ) {
+              set_arg(FUN_IDX,fptr.display(),gvn);
+              return set_fdx(fptr, gvn);
+            }
           }
         }
       }
@@ -274,7 +277,10 @@ public class CallNode extends Node {
       BitsFun rfidxs = resolve(fidxs,tcall._ts,(TypeMem) mem().val(),gvn._opt_mode==GVNGCM.Mode.Opto);
       if( rfidxs==null ) return null;            // Dead function, stall for time
       FunPtrNode fptr = least_cost(gvn, rfidxs, unk); // Check for least-cost target
-      if( fptr != null ) return set_fdx(fptr, gvn); // Resolve to 1 choice
+      if( fptr != null ) {
+        set_arg(FUN_IDX,fptr.display(),gvn);
+        return set_fdx(fptr, gvn); // Resolve to 1 choice
+      }
     }
 
     // Wire valid targets.

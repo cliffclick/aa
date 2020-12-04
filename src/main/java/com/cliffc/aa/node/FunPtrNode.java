@@ -90,8 +90,10 @@ public final class FunPtrNode extends Node {
     RetNode ret = ret();
     Node disp = display();
     Type tdisp = disp.val();
-    if( !(tdisp instanceof TypeMemPtr) )
-      tdisp = tdisp.oob(TypeMemPtr.DISP_SIMPLE);
+    if( tdisp!=TypeMemPtr.NO_DISP && !(tdisp instanceof TypeMemPtr) )
+      return tdisp.oob();
+    if( tdisp==TypeMemPtr.NO_DISP.dual() )
+      throw com.cliffc.aa.AA.unimpl();
     return TypeFunPtr.make(ret._fidx,ret._nargs,(TypeMemPtr)tdisp);
   }
 
