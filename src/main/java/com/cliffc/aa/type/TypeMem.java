@@ -305,7 +305,7 @@ public class TypeMem extends Type<TypeMem> {
     TypeObj[] tos = _make1(as);
     return tos==null ? DEAD : make(tos); // All things are dead, so dead
   }
-  
+
   // Shallow meet of all possible loadable values.  Used in Node.value calls, so must be monotonic.
   public TypeObj ld( TypeMemPtr ptr ) {
     if( ptr._aliases == BitsAlias.NIL.dual() || ptr._aliases == BitsAlias.NIL )
@@ -489,19 +489,19 @@ public class TypeMem extends Type<TypeMem> {
     return bs;
   }
 
-  // True if field is final across all aliases
-  public boolean fld_is_final(BitsAlias aliases, String fld) {
+  // True if field is modifiable across all aliases
+  public boolean fld_is_mod( BitsAlias aliases, String fld) {
     for( int alias : aliases ) {
       if( alias != 0 ) {
         TypeObj to = at(alias);
-        if( !(to instanceof TypeStruct) ) return false;
+        if( !(to instanceof TypeStruct) ) return true;
         TypeStruct ts = (TypeStruct)to;
         int idx = ts.find(fld);
         if( idx == -1 || ts.fmod(idx) != TypeStruct.FFNL )
-          return false;
+          return true;          // Cannot check for R/O here, because R/O can lift to R/W
       }
     }
-    return true;
+    return false;
   }
 
   public TypeMem flatten_fields() {

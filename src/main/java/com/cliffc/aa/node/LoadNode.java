@@ -102,7 +102,6 @@ public class LoadNode extends Node {
   static Node find_previous_store(GVNGCM gvn, Node mem, Node adr, BitsAlias aliases, String fld, boolean is_load ) {
     Type tmem0 = mem.val();
     if( !(tmem0 instanceof TypeMem) || aliases==null ) return null;
-    TypeMem tmem = (TypeMem)tmem0;
     // Walk up the memory chain looking for an exact matching Store or New
     int cnt=0;
     while(true) {
@@ -127,14 +126,16 @@ public class LoadNode extends Node {
       } else if( mem instanceof MProjNode ) {
         Node mem0 = mem.in(0);
         if( mem0 instanceof CallEpiNode ) { // Bypass an entire function call
-          mem = _find_previous_store_call(gvn,aliases,tmem,(CallEpiNode)mem0,fld,is_load);
+          tmem0 = ((CallEpiNode)mem0).call().mem().val();
+          if( !(tmem0 instanceof TypeMem) ) return null;
+          mem = _find_previous_store_call(aliases,(TypeMem)tmem0,(CallEpiNode)mem0,fld,is_load);
           if( mem==null ) return null;
         } else if( mem0 instanceof MemSplitNode ) { // Lifting out of a split/join region
           mem = ((MemSplitNode)mem0).mem();
         } else if( mem0 instanceof CallNode ) { // Lifting out of a Call
           mem = ((CallNode)mem0).mem();
         } else {
-          throw com.cliffc.aa.AA.unimpl(); // decide cannot be equal, and advance, or maybe-equal andreturn null
+          throw com.cliffc.aa.AA.unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
         }
       } else if( mem instanceof MrgProjNode ) {
         MrgProjNode mrg = (MrgProjNode)mem;
@@ -161,12 +162,12 @@ public class LoadNode extends Node {
   }
 
   // Can bypass call?  Return null if cannot or call.mem if can.
-  static private Node _find_previous_store_call(GVNGCM gvn, BitsAlias aliases, TypeMem tmem, CallEpiNode cepi, String fld, boolean is_load) {
+  static private Node _find_previous_store_call( BitsAlias aliases, TypeMem tmem, CallEpiNode cepi, String fld, boolean is_load ) {
     // TODO: Strengthen this.  Global no-esc can bypass, IF during inline/clone
     // each clone body updates both aliases everywhere.
     if( !is_load ) return null; // For now, Store types NEVER bypass a call.
     CallNode call = cepi.call();
-    if( tmem.fld_is_final(aliases,fld) )
+    if( !tmem.fld_is_mod(aliases,fld) )
       return call.mem(); // Loads from final memory can bypass calls.  Stores cannot, store-over-final is in error.
     TypeMemPtr escs = call.tesc(call.val());
     if( escs._aliases.join(aliases)==BitsAlias.EMPTY )

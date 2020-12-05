@@ -195,23 +195,6 @@ public class CallNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node cc = in(0).is_copy(0);
     if( cc!=null ) return set_def(0,cc,gvn);
-    Type tc = val();
-    if( !(tc instanceof TypeTuple) ) return null;
-    TypeTuple tcall = (TypeTuple)tc;
-
-    // Dead, do nothing
-    if( tctl(tcall)!=Type.CTRL ) { // Dead control (NOT dead self-type, which happens if we do not resolve)
-      if( (ctl() instanceof ConNode) ) return null;
-      // Kill all inputs with type-safe dead constants
-      set_def(MEM_IDX,gvn.con(TypeMem.XMEM),gvn);
-      set_def(FUN_IDX,gvn.con(TypeFunPtr.GENERIC_FUNPTR.dual()),gvn);
-      if( is_dead() ) return this;
-      for( int i=ARG_IDX; i<_defs._len; i++ )
-        set_def(i,gvn.con(Type.ANY),gvn);
-      gvn.add_work_defs(this);
-      return set_def(0,Env.XCTRL,gvn);
-    }
-
     // When do I do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked ) {          // Not yet unpacked a tuple
@@ -237,6 +220,24 @@ public class CallNode extends Node {
         return this;
       }
     }
+
+    Type tc = val();
+    if( !(tc instanceof TypeTuple) ) return null;
+    TypeTuple tcall = (TypeTuple)tc;
+
+    // Dead, do nothing
+    if( tctl(tcall)!=Type.CTRL ) { // Dead control (NOT dead self-type, which happens if we do not resolve)
+      if( (ctl() instanceof ConNode) ) return null;
+      // Kill all inputs with type-safe dead constants
+      set_def(MEM_IDX,gvn.con(TypeMem.XMEM),gvn);
+      set_def(FUN_IDX,gvn.con(TypeFunPtr.GENERIC_FUNPTR.dual()),gvn);
+      if( is_dead() ) return this;
+      for( int i=ARG_IDX; i<_defs._len; i++ )
+        set_def(i,gvn.con(Type.ANY),gvn);
+      gvn.add_work_defs(this);
+      return set_def(0,Env.XCTRL,gvn);
+    }
+    
     // Have some sane function choices?
     TypeFunPtr tfp  = ttfp(tcall);
     BitsFun fidxs = tfp.fidxs();
