@@ -141,6 +141,7 @@ public final class FunPtrNode extends Node {
     RetNode ret = ret();
     if( ret.is_copy() ) return null;
     FunNode fun = ret.fun();
+    if( fun.noinline() ) return null; // Disallow if no-inline
     Node mem = ret.mem();
     if( mem.in(0)==fun && mem instanceof ParmNode ) return this; // Parm:mem on fun, no mods to memory
     return null;

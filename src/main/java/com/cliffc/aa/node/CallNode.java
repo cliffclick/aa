@@ -237,7 +237,7 @@ public class CallNode extends Node {
       gvn.add_work_defs(this);
       return set_def(0,Env.XCTRL,gvn);
     }
-    
+
     // Have some sane function choices?
     TypeFunPtr tfp  = ttfp(tcall);
     BitsFun fidxs = tfp.fidxs();
@@ -262,8 +262,9 @@ public class CallNode extends Node {
           // See if FunPtr is available just above an Unresolved.
           if( unk instanceof UnresolvedNode ) {
             fptr = ((UnresolvedNode)unk).find_fidx(fidx);
-            if( fptr != null ) {
-              set_arg(FUN_IDX,fptr.display(),gvn);
+            if( fptr != null ) { // Gonna improve
+              if( dsp() instanceof FP2DispNode && dsp().in(0)==unk )
+                set_arg(FUN_IDX,fptr.display(),gvn);
               return set_fdx(fptr, gvn);
             }
           }
@@ -279,7 +280,8 @@ public class CallNode extends Node {
       if( rfidxs==null ) return null;            // Dead function, stall for time
       FunPtrNode fptr = least_cost(gvn, rfidxs, unk); // Check for least-cost target
       if( fptr != null ) {
-        set_arg(FUN_IDX,fptr.display(),gvn);
+        if( fptr.display().val().isa(dsp().val()) )
+          set_arg(FUN_IDX,fptr.display(),gvn);
         return set_fdx(fptr, gvn); // Resolve to 1 choice
       }
     }
@@ -370,7 +372,7 @@ public class CallNode extends Node {
     // Also gather all aliases from all args.
     BitsAlias as = BitsAlias.EMPTY;
     for( int i=FUN_IDX; i<nargs(); i++ )
-      as = as.meet(get_alias(opt_mode,ts[i] = arg(i).val(),i));
+      as = as.meet(get_alias(ts[i] = arg(i).val()));
     // Recursively search memory for aliases; compute escaping aliases
     BitsAlias as2 = tmem.all_reaching_aliases(as);
     ts[_defs._len] = TypeMemPtr.make(as2,TypeObj.ISUSED); // Set escapes as last type
@@ -404,7 +406,7 @@ public class CallNode extends Node {
     return TypeTuple.make(ts);
   }
   // Get (shallow) aliases from the type
-  private BitsAlias get_alias(GVNGCM.Mode opt_mode, Type t, int aidx) {
+  private BitsAlias get_alias( Type t ) {
     if( t instanceof TypeMemPtr ) return ((TypeMemPtr)t)._aliases;
     if( TypeMemPtr.OOP.isa(t)   ) return BitsAlias.FULL;
     return BitsAlias.EMPTY;
