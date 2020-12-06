@@ -40,13 +40,7 @@ public class TVar implements Comparable<TVar> {
 
   // Structural unification, "this into that".
   // Top-level entry point, not recursive.
-  public final TVar unify(TVar tv) {
-    if( this==tv ) return this; // Done!
-    if( !_will_unify(tv,0, new NonBlockingHashMapLong<>()) ) // Will fail to unify
-      //throw unimpl();
-      System.out.println("Failed to unify "+this+" and "+tv);
-    return _unify0(tv);
-  }
+  public final TVar unify(TVar tv) { return _unify0(tv); }
 
   // Recursive entry point for unification.
   final TVar _unify0(TVar tv) {
@@ -89,7 +83,9 @@ public class TVar implements Comparable<TVar> {
 
   // Unification requires equal structure; structure varies by subclass.
   // Plain TVars have no structure and unify with all others.
-  boolean _will_unify(TVar tv, int cnt, NonBlockingHashMapLong<Integer> cyc) { return true; }
+  static final NonBlockingHashMapLong<Integer> CYC = new NonBlockingHashMapLong<>();
+  static       boolean CYC_BUSY=false;
+  boolean _will_unify(TVar tv, int cnt) { return true; }
 
   // Return a "fresh" copy, preserving structure
   boolean _fresh_unify(TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {

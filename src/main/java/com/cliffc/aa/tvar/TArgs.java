@@ -29,7 +29,7 @@ public class TArgs extends TVar {
   }
   public final int nargs() { return _parms.length; }
 
-  @Override boolean _will_unify(TVar tv, int cnt, NonBlockingHashMapLong<Integer> cyc) {
+  @Override boolean _will_unify(TVar tv, int cnt) {
     if( this==tv ) return true;
     if( tv.getClass()==TVar.class ) return true;
     if( getClass()!=tv.getClass() ) return false; // Both TArgs or TRets
@@ -38,15 +38,15 @@ public class TArgs extends TVar {
         (_unpacked || targs._unpacked) ) // Both args must allow a loose-fit
       return false;
     if( cnt > 100 ) throw com.cliffc.aa.AA.unimpl(); // Infinite recursion check
-    Integer ii = cyc.get(_uid);
+    Integer ii = CYC.get(_uid);
     if( ii!=null && ii==targs._uid )
       return true;              // Assume cycle unifys; closes cyclic unification tests
-    cyc.put(_uid,targs._uid);   // Start cycle
+    CYC.put(_uid,targs._uid);   // Start cycle
     for( int i=0; i<_parms.length; i++ ) {
       TVar tn0 =       parm(i);
       TVar tn1 = targs.parm(i);
       // null always unifies
-      if( tn0!=null && tn1!=null && !tn0._will_unify(tn1,cnt+1,cyc) )
+      if( tn0!=null && tn1!=null && !tn0._will_unify(tn1,cnt+1) )
         return false;
     }
     return true;

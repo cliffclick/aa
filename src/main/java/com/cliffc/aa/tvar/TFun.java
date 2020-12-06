@@ -15,14 +15,14 @@ public class TFun extends TVar {
   public TVar args() { TVar args = _args.find();  return args==_args ? args : (_args=args); }
   public TVar ret () { TVar ret  = _ret .find();  return ret ==_ret  ? ret  : (_ret =ret ); }
 
-  @Override boolean _will_unify(TVar tv, int cnt, NonBlockingHashMapLong<Integer> cyc) {
+  @Override boolean _will_unify(TVar tv, int cnt) {
     if( this==tv ) return true;
     if( tv.getClass()==TVar.class ) return true;
     if( !(tv instanceof TFun) ) return false;
     TFun tfun = (TFun)tv;
     if( cnt > 100 ) throw com.cliffc.aa.AA.unimpl(); // assert no infinite recursion
-    if( !args()._will_unify(tfun.args(),cnt,cyc) ) return false;
-    if( !ret ()._will_unify(tfun.ret (),cnt,cyc) ) return false;
+    if( !args()._will_unify(tfun.args(),cnt) ) return false;
+    if( !ret ()._will_unify(tfun.ret (),cnt) ) return false;
     return true;
   }
 
@@ -43,9 +43,15 @@ public class TFun extends TVar {
     assert _u==null;            // Already top
     args().push_dep(dep);
     ret ().push_dep(dep);
-    NonBlockingHashMapLong<Integer> cyc = new NonBlockingHashMapLong<>();
-    if( !args()._will_unify(args,0, cyc ) )  return false;
-    if( !ret ()._will_unify(ret ,0, cyc ) )  return false;
+    assert !CYC_BUSY && CYC.isEmpty();
+    CYC_BUSY=true;
+    boolean will_unify =
+      args()._will_unify(args,0) &&
+      ret ()._will_unify(ret ,0);
+    CYC.clear();
+    CYC_BUSY=false;
+    if( !will_unify ) return false; // No change
+    
     NonBlockingHashMap<TVar,TVar> dups = new NonBlockingHashMap<>();
     return
       args()._fresh_unify(args,_nongen,dups,test) | // NO SHORT-CIRCUIT: NOTE: '|' NOT '||'
