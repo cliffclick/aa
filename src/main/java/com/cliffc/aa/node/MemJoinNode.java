@@ -181,14 +181,14 @@ public class MemJoinNode extends Node {
     int idx = msp.add_alias(gvn,head1_escs), bidx; // Add escape set, find index
     if( idx == _defs._len ) {         // Escape set added at the end
       gvn.add_def(this,gvn.xform(new MProjNode(msp,idx)));
-    } else {                    // Inserted into prior region
+    } else {             // Inserted into prior region
       assert idx!=0;     // No partial overlap; all escape sets are independent
     }
     // Reset edges to move SESE region inside
     Node mspj = in(idx);
     keep();
     gvn.set_def_reg(head,1,in(idx));
-    gvn.replace(base,this);
+    gvn.insert(base,this);
     gvn.set_def_reg(unhook(),idx,base);
     // Move any accidental refs to DefMem back to base
     int didx = Env.DEFMEM._defs.find(this);

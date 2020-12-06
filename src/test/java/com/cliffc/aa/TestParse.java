@@ -20,6 +20,15 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
+    // Should be typable with H-M
+    //test("noinline_map={lst fcn -> lst ? fcn lst.1};"+
+    //     "in_int=(0,2);"+        // List of ints
+    //     "in_str=(0,\"abc\");"+ // List of strings
+    //     "out_str =noinline_map(in_int,str:{int->str});"+        // Map over ints with int->str  conversion, returning a list of strings
+    //     "out_bool=noinline_map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
+    //     "(out_str,out_bool)",
+    //     Type.ANY);
+
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
     // The Meet loses precision to fast.  This is a typing bug.
@@ -601,6 +610,9 @@ public class TestParse {
     test   ("x:=0; 1 ? (x:=4):; x:=x+1", TypeInt.con(5)); // x mutable ahead; ok to mutate on 1 arm and later
     test   ("x:=0; 1 ? (x =4):; x", TypeInt.con(4)); // x final on 1 arm, dead on other arm
     testerr("x:=0; math_rand(1) ? (x =4):3; x=2; x", "Cannot re-assign read-only val 'x'",31);
+    // Final into the 2nd call, so final out of 1st so error.
+    // Requires inlining, which is expliciting denied.
+    testerr("noinline_x={@{a}}; noinline_x().a=2; noinline_x().a",  "Cannot re-assign read-only field '.a' in @{a==int8}", 32);
   }
 
   // Ffnls are declared with an assignment.  This is to avoid the C++/Java

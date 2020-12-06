@@ -705,7 +705,7 @@ public class GVNGCM {
     if( fptr==null ) {          // Not resolving, program is in-error
       call._not_resolved_by_gcp = true;
       add_work(call);
-      add_work(call.fun());
+      add_work(call.fdx());
       return;                   // Not resolving, but Call flagged as in-error
     }
     set_def_reg(call,AA.FUN_IDX,fptr.display());

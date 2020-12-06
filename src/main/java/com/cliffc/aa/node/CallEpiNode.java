@@ -338,23 +338,10 @@ public final class CallEpiNode extends Node {
     }
     TypeMem post_call = (TypeMem)tmem;
 
-    // Lift according to H-M typing
+    // Lift result according to H-M typing
     TVar tv = tvar();
-    if( tv instanceof TArgs &&
-        trez != Type.ALL ) {    // If already an error term, poison, stay error.
-      TVar tvmem = ((TArgs)tv).parm(1);
-      TVar tvrez = ((TArgs)tv).parm(2);
-      if( tvrez._ns != null && tvrez._ns._len>0 ) {
-        Type trez2 = trez;
-        for( TNode tn : tvrez._ns ) {
-          if( tn.is_dead() )
-            System.out.println("join with the dead");
-          trez2 = trez2.join(tn.val());
-        }
-        if( trez2 != trez )
-          trez = trez2;
-      }
-    }
+    if( tv instanceof TArgs && trez != Type.ALL ) // If already an error term, poison, stay error.
+      trez = unify_lift(trez,((TArgs)tv).parm(2));
 
     // If no memory projection, then do not compute memory
     if( opt_mode!=GVNGCM.Mode.Parse && ProjNode.proj(this,1)==null )
@@ -371,7 +358,12 @@ public final class CallEpiNode extends Node {
       boolean eout = esc_out       .test_recur(i);
       pubs[i] = live_out_gcp(ein,eout,caller_mem.at(i),post_call.at(i),opt_mode,defnode.in(i));
     }
-    TypeMem tmem3 = TypeMem.make0(pubs);
+    Type tmem3 = TypeMem.make0(pubs);
+
+
+    // Lift memory according to H-M typing
+    if( tv instanceof TArgs )
+      tmem3 = unify_lift(tmem3,((TArgs)tv).parm(1));
 
     return TypeTuple.make(Type.CTRL,tmem3,trez);
   }
@@ -524,6 +516,7 @@ public final class CallEpiNode extends Node {
     gvn.add_work(ret);
     del(_defs.find(ret));
     _tvar = TRet.fresh_new();   // Reset TVar; removed CG edge, so also remove H-M constraint
+    unify(gvn,false);           // Reunify to collect the other constraints
     assert sane_wiring();
   }
 
@@ -558,6 +551,22 @@ public final class CallEpiNode extends Node {
     // Actual progress only if the structure changes.
     return ((TFun)tfunv).fresh_unify(call().tvar(),tvar(),test,this);
   }
+
+  // H-M typing demands all unified Nodes have the same type... which is a
+  // ASSERT/JOIN.  Hence the incoming type can be lifted to the join.
+  private static Type unify_lift(Type t, TVar tv) {
+    if( tv._ns == null || tv._ns._len==0 ) return t;
+    Type t2 = t;
+    for( TNode tn : tv._ns ) {
+      // Most of the unified Nodes are dead, unified because ideal() replaced
+      // them with another.  However, their Types do not update after the merge
+      // and become stale.  So no unify with the dead.
+      if( !tn.is_dead() )       // TODO: Optimize this
+        t2 = t2.join(tn.val());
+    }
+    return t2;
+  }
+
 
   @Override Node is_pure_call() { return in(0) instanceof CallNode ? call().is_pure_call() : null; }
   // Return the set of updatable memory - including everything reachable from
