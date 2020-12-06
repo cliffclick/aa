@@ -20,14 +20,6 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
-    // Should be typable with H-M
-    //test("noinline_map={lst fcn -> lst ? fcn lst.1};"+
-    //     "in_int=(0,2);"+        // List of ints
-    //     "in_str=(0,\"abc\");"+ // List of strings
-    //     "out_str =noinline_map(in_int,str:{int->str});"+        // Map over ints with int->str  conversion, returning a list of strings
-    //     "out_bool=noinline_map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
-    //     "(out_str,out_bool)",
-    //     Type.ANY);
 
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
@@ -747,11 +739,11 @@ public class TestParse {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
     test("noinline_map={lst fcn -> lst ? (noinline_map(lst.0,fcn),fcn lst.1)};"+
-         "lst_int=(((0,2),3),5);"+          // List of 3 ints
-         "lst_str= ((0,\"abc\"),\"def\");"+ // List of 2 strings
-         "lst_istr=noinline_map(lst_int,str:{int->str});"+        // Map over ints with int->str  conversion, returning a list of strings
-         "lst_bool=noinline_map(lst_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
-         "(lst_istr,lst_bool)",
+         "in_int=(((0,2),3),5);"+          // List of 3 ints
+         "in_str= ((0,\"abc\"),\"def\");"+ // List of 2 strings
+         "out_str =noinline_map(in_int,str:{int->str});"+        // Map over ints with int->str  conversion, returning a list of strings
+         "out_bool=noinline_map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
+         "(out_str,out_bool)",
          Type.ANY);
 
     // id accepts and returns both ints and reference types (arrays).
@@ -763,6 +755,14 @@ public class TestParse {
     // Looks like recursive unification, but x is a function of 0 arguments,
     // being called with 1 argument.  Error to call it.
     testerr("x={x x};x(1)","Passing 1 arguments to x which takes 0 arguments",9);
+    // Should be typable with H-M
+    test_ptr("noinline_map={lst fcn -> lst ? fcn lst.1};"+
+             "in_int=(0,2);"+       // List of ints
+             "in_str=(0,\"abc\");"+ // List of strings
+             "out_str =noinline_map(in_int,str:{int->str});"+        // Map over ints with int->str  conversion, returning a list of strings
+             "out_bool=noinline_map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
+             "(out_str,out_bool)",
+             "(*\"2\",int1)");
     // Only odd thing here is losing not-nil-ness on list_int.
     test_ptr("noinline_map={tup fcn -> (0,fcn tup.1)};"+
         "lst_int=(0,2      );"+ //

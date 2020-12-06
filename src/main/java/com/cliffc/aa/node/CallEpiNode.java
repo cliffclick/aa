@@ -557,12 +557,13 @@ public final class CallEpiNode extends Node {
   private static Type unify_lift(Type t, TVar tv) {
     if( tv._ns == null || tv._ns._len==0 ) return t;
     Type t2 = t;
-    for( TNode tn : tv._ns ) {
+    for( int i=0; i<tv._ns._len; i++ ) {
+      TNode tn = tv._ns.at(i);
       // Most of the unified Nodes are dead, unified because ideal() replaced
       // them with another.  However, their Types do not update after the merge
       // and become stale.  So no unify with the dead.
-      if( !tn.is_dead() )       // TODO: Optimize this
-        t2 = t2.join(tn.val());
+      if( tn.is_dead() ) tv._ns.remove(i--);
+      else t2 = t2.join(tn.val());
     }
     return t2;
   }

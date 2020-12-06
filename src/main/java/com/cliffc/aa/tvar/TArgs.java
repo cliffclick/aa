@@ -37,16 +37,15 @@ public class TArgs extends TVar {
     if( _parms.length != targs._parms.length &&
         (_unpacked || targs._unpacked) ) // Both args must allow a loose-fit
       return false;
-    if( cnt > 100 ) throw com.cliffc.aa.AA.unimpl();
+    if( cnt > 100 ) throw com.cliffc.aa.AA.unimpl(); // Infinite recursion check
     Integer ii = cyc.get(_uid);
     if( ii!=null && ii==targs._uid )
       return true;              // Assume cycle unifys; closes cyclic unification tests
     cyc.put(_uid,targs._uid);   // Start cycle
     for( int i=0; i<_parms.length; i++ ) {
-      // Compress out dead nodes
       TVar tn0 =       parm(i);
       TVar tn1 = targs.parm(i);
-      // Dead always unifies
+      // null always unifies
       if( tn0!=null && tn1!=null && !tn0._will_unify(tn1,cnt+1,cyc) )
         return false;
     }
