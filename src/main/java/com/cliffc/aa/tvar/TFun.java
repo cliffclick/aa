@@ -5,26 +5,14 @@ import com.cliffc.aa.util.*;
 import java.util.HashSet;
 
 // FunPtr TVar, a classic function tvar, mapping between a TArgs and a TRet.
-public class TFun extends TVar {
-  TVar _args, _ret;             // Either plain TVars, or a TArg, TRet.
+public class TFun extends TMulti<TFun> {
   public HashSet<TVar> _nongen; // "Non-generative" set of TVars; TVars from all variables visible in the defining scope
 
-  public TFun(TNode fptr, HashSet<TVar> nongen, TVar args, TVar ret) { super(fptr); _args = args; _ret=ret; _nongen = nongen; }
-  private TFun() { _args = new TVar(); _ret = new TVar(); }
+  public TFun(TNode fptr, HashSet<TVar> nongen, TVar args, TVar ret) { super(fptr,new TVar[]{args,ret}); _nongen = nongen; }
+  private TFun() { this(null,null,new TVar(),new TVar()); }
 
-  public TVar args() { TVar args = _args.find();  return args==_args ? args : (_args=args); }
-  public TVar ret () { TVar ret  = _ret .find();  return ret ==_ret  ? ret  : (_ret =ret ); }
-
-  @Override boolean _will_unify(TVar tv, int cnt) {
-    if( this==tv ) return true;
-    if( tv.getClass()==TVar.class ) return true;
-    if( !(tv instanceof TFun) ) return false;
-    TFun tfun = (TFun)tv;
-    if( cnt > 100 ) throw com.cliffc.aa.AA.unimpl(); // assert no infinite recursion
-    if( !args()._will_unify(tfun.args(),cnt) ) return false;
-    if( !ret ()._will_unify(tfun.ret (),cnt) ) return false;
-    return true;
-  }
+  public TVar args() { return parm(0); }
+  public TVar ret () { return parm(1); }
 
   @Override void _unify( TVar tv ) {
     assert _u!=null;            // Flagged as being unified
@@ -33,7 +21,13 @@ public class TFun extends TVar {
     TVar ret0 = ret (), ret1 = tfun.ret ();
     arg0._unify0(arg1);
     ret0._unify0(ret1);
-    _args = _ret = null;        // Clear out, now that unified
+  }
+  
+  // Already checks same class, no cycles, not infinite recursion, non-zero parms will_unify.
+  @Override boolean _will_unify0(TFun tfun) { assert _parms.length==2 && tfun._parms.length==2; return true; }
+
+  @Override TArgs _fresh_new() {
+    throw com.cliffc.aa.AA.unimpl();
   }
 
   // Unify 'this' into 'that', except make a 'fresh' clone of 'this' before
@@ -57,6 +51,7 @@ public class TFun extends TVar {
       args()._fresh_unify(args,_nongen,dups,test) | // NO SHORT-CIRCUIT: NOTE: '|' NOT '||'
       ret ()._fresh_unify(ret ,_nongen,dups,test);  // Must do both halves always
   }
+  
   @Override boolean _fresh_unify(TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
     assert _u==null;            // At top
     if( this==tv || dups.containsKey(this) )
@@ -78,38 +73,11 @@ public class TFun extends TVar {
     return progress;
   }
 
-  // Flipped: does 'id' occur in 'this'
-  @Override boolean _occurs_in(TVar id, VBitSet visit) {
-    assert _u==null && id._u==null; // At top
-    if( this==id ) return true;     // Occurs right here
-    assert _uid>0;
-    if( visit == null ) visit = new VBitSet();
-    if( visit.tset(_uid) ) return false;
-    if( args()._occurs_in(id,visit) ||
-        ret ()._occurs_in(id,visit) )
-      return true;
-    return false;
-  }
-
-  @Override boolean _eq(TVar tv) {
-    assert _u==null && tv._u==null;
-    if( this==tv ) return true;
-    if( !(tv instanceof TFun) ) return false; // Both TFun
-    TFun tfun = (TFun)tv;
-    return args()._eq(tfun.args()) && ret()._eq(tfun.ret());
-  }
-
   // Pretty print
   @Override SB _str(SB sb, VBitSet bs, boolean debug) {
     sb.p("{ ");
-    _args.str(sb,bs,debug).p(" -> ");
-    _ret .str(sb,bs,debug).p(" }");
+    _parms[0].str(sb,bs,debug).p(" -> ");
+    _parms[1].str(sb,bs,debug).p(" }");
     return sb;
-  }
-  
-  @Override void push_dep(TNode tn) {
-    assert _deps==null;
-    args().push_dep(tn);
-    ret ().push_dep(tn);
   }
 }

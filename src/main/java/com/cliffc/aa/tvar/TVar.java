@@ -83,16 +83,14 @@ public class TVar implements Comparable<TVar> {
 
   // Unification requires equal structure; structure varies by subclass.
   // Plain TVars have no structure and unify with all others.
-  static final NonBlockingHashMapLong<Integer> CYC = new NonBlockingHashMapLong<>();
-  static       boolean CYC_BUSY=false;
   boolean _will_unify(TVar tv, int cnt) { return true; }
 
   // Return a "fresh" copy, preserving structure
   boolean _fresh_unify(TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
-    assert _u==null;                // At top
-    if( this==tv ) return false;    // Short cut
-    if( occurs_in(nongen, null) ) { // If 'this' is in the non-generative set, use 'this'
-      if( !test ) _unify0(tv);      // Unify with LHS always reports progress
+    assert _u==null;             // At top
+    if( this==tv ) return false; // Short cut
+    if( occurs_in(nongen) ) {    // If 'this' is in the non-generative set, use 'this'
+      if( !test ) _unify0(tv);   // Unify with LHS always reports progress
       return true;
     } 
     // Use a 'fresh' TVar, but keep the structural properties: if it appears
@@ -109,16 +107,23 @@ public class TVar implements Comparable<TVar> {
   }
 
   // Does 'this' occur in the nongen set, recursively.
-  final boolean occurs_in(HashSet<TVar> nongen, VBitSet visit) {
+  static final VBitSet VISIT = new VBitSet();
+  static       boolean VISIT_BUSY = false;
+  final boolean occurs_in(HashSet<TVar> nongen) {
     assert _u==null;            // At top
     if( nongen == null ) return false;
+    assert !VISIT_BUSY && VISIT.isEmpty();
+    VISIT_BUSY = true;
+    boolean occurs=false;
     for( TVar tv : nongen )
-      if( tv.find()._occurs_in(this,visit) ) // Flip sense: nongen is now 'this'
-        return true;
-    return false;
+      if( tv.find()._occurs_in(this) ) // Flip sense: nongen is now 'this'
+        { occurs = true; break; }
+    VISIT.clear();
+    VISIT_BUSY = false;
+    return occurs;
   }
   // Flipped: does 'id' occur in 'this'
-  boolean _occurs_in(TVar id, VBitSet visit) {
+  boolean _occurs_in(TVar id) {
     assert _u==null && id._u==null; // At top
     return this==id;
   }
