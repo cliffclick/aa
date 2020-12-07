@@ -108,6 +108,12 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
   }
 
   abstract T _fresh_new();
+  static TVar[] tvars(int len) {
+    TVar[] tvs = new TVar[len];
+    for( int i=0; i<len; i++ )
+      tvs[i] = new TVar();
+    return tvs;
+  }
 
   // Flipped: does 'id' occur in 'this'
   @Override boolean _occurs_in(TVar id) {

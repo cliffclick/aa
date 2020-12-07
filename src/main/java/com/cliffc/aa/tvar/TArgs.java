@@ -21,11 +21,5 @@ public class TArgs extends TMulti<TArgs> {
       (!_unpacked && !targs._unpacked);
   }
 
-  @Override TArgs _fresh_new() {
-    int len = _parms.length;
-    TVar[] tvs = new TVar[len];
-    for( int i=0; i<len; i++ )
-      tvs[i] = new TVar();
-    return new TArgs(null, tvs, _unpacked);
-  }
+  @Override TArgs _fresh_new() { return new TArgs(null, tvars(_parms.length), _unpacked); }
 }

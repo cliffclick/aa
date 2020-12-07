@@ -7,11 +7,6 @@ public class TRet extends TArgs {
 
   public TRet(TNode ret) { super(ret,false); assert _parms.length==3; }
   private TRet(TVar[] parms) { super(null,parms,false); }
-  static public TRet fresh_new() {
-    TVar[] tvs = new TVar[3];
-    for( int i=0; i<3; i++ )
-      tvs[i] = new TVar();
-    return new TRet(tvs);
-  }
+  static public TRet fresh_new() { return new TRet(tvars(3)); }
   @Override TRet _fresh_new() { return fresh_new(); }
 }
