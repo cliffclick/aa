@@ -8,14 +8,10 @@ import com.cliffc.aa.util.*;
 // unique TVars and always unify.
 public class TMem extends TMulti<TMem> {
 
-  public TMem(TNode mem) {
-    super(mem,init(mem));
-  }
+  public TMem(TNode mem) { super(mem,init(mem)); }
 
   // Already checks same class, no cycles, not infinite recursion, non-zero parms will_unify.
-  @Override boolean _will_unify0(TMem tv) {
-    throw com.cliffc.aa.AA.unimpl();
-  }
+  @Override boolean _will_unify0(TMem tv) { return true; }
 
   @Override TMem _fresh_new() {
     throw com.cliffc.aa.AA.unimpl();

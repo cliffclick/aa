@@ -23,7 +23,6 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
       parms[i] = tns[i]==null ? null : tns[i].tvar();
     return parms;
   }
-  public TMulti(TNode fun) { this(null,init(fun)); }
   TMulti(TNode fun, TVar[] parms) {
     super(fun);
     _parms = parms;
@@ -97,24 +96,18 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
       tv._ns = null;
       tv = tv._u;               // This is the new unified 'tv'
     }
-    // Same subclass
-    TMulti targ = (TMulti)tv;   // Either a TMulti or a TRet
-    dups.put(this,targ);        // Stop recursive cycles
+    // Same subclass 'this' and 'tv'
+    TMulti tmulti = (TMulti)tv;   //
+    dups.put(this,tmulti);        // Stop recursive cycles
     for( int i=0; i<_parms.length; i++ ) {
       TVar parm = parm(i);
       if( parm != null )        // No parm means no additional structure
-        progress |= parm._fresh_unify(targ.parm(i), nongen, dups, test);
+        progress |= parm._fresh_unify(tmulti.parm(i), nongen, dups, test);
     }
     return progress;
   }
 
-  abstract TMulti _fresh_new();
-  static TVar[] tvars(int len) {
-    TVar[] tvs = new TVar[len];
-    for( int i=0; i<len; i++ )
-      tvs[i] = new TVar();
-    return tvs;
-  }
+  abstract T _fresh_new();
 
   // Flipped: does 'id' occur in 'this'
   @Override boolean _occurs_in(TVar id) {
@@ -157,7 +150,9 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
 
   @Override void push_dep(TNode tn) {
     assert _deps==null;
-    for( int i=0; i<_parms.length; i++ )
-      if( parm(i) != null ) parm(i).push_dep(tn);
+    for( int i=0; i<_parms.length; i++ ) {
+      TVar parm = parm(i);
+      if( parm != null ) parm.push_dep(tn);
+    }
   }
 }
