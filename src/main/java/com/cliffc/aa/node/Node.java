@@ -475,7 +475,7 @@ public abstract class Node implements Cloneable, TNode {
     if( !(o instanceof Node) ) return false;
     Node n = (Node)o;
     if( _op != n._op ) return false;
-    if( _defs._len != n._defs._len ) return false;
+    if( n._defs==null || _defs._len != n._defs._len ) return false;
     // Note pointer-equality
     for( int i=0; i<_defs._len; i++ ) if( _defs._es[i] != n._defs._es[i] ) return false;
     return true;

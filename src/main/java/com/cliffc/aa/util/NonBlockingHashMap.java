@@ -1,5 +1,7 @@
 package com.cliffc.aa.util;
 
+import sun.misc.Unsafe;
+
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Field;
@@ -7,7 +9,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
-import sun.misc.Unsafe;
 
 /*
  * Written by Cliff Click and released to the public domain, as explained at
@@ -1050,7 +1051,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
       // then got stalled before promoting.
       copy_check_and_promote( topmap, oldkvs, 0 );// See if we can promote
     }
-    
+
     // --- copy_slot_and_check -----------------------------------------------
     // Copy slot 'idx' from the old table to the new table.  If this thread
     // confirmed the copy, update the counters and check for promotion.
@@ -1198,10 +1199,12 @@ public class NonBlockingHashMap<TypeK, TypeV>
     }
     int length() { return len(_sskvs); }
     Object key(int idx) { return NonBlockingHashMap.key(_sskvs,idx); }
+    Object val(int idx) { return NonBlockingHashMap.val(_sskvs,idx); }
     private int _idx;              // Varies from 0-keys.length
     private Object _nextK, _prevK; // Last 2 keys found
     private TypeV  _nextV, _prevV; // Last 2 values found
     public boolean hasNext() { return _nextV != null; }
+    @SuppressWarnings("unchecked")
     public TypeV next() {
       // 'next' actually knows what the next value will be - it had to
       // figure that out last go-around lest 'hasNext' report true and
@@ -1212,14 +1215,19 @@ public class NonBlockingHashMap<TypeK, TypeV>
       _prevK = _nextK;          // This will become the previous key
       _prevV = _nextV;          // This will become the previous value
       _nextV = null;            // We have no more next-key
+      Object nV;
       // Attempt to set <_nextK,_nextV> to the next K,V pair.
       // _nextV is the trigger: stop searching when it is != null
       while( _idx<length() ) {  // Scan array
-        _nextK = key(_idx++); // Get a key that definitely is in the set (for the moment!)
-        if( _nextK != null && // Found something?
-            _nextK != TOMBSTONE &&
-            (_nextV=get(_nextK)) != null )
-          break;                // Got it!  _nextK is a valid Key
+        _nextK = key(_idx++);   // Get a key that definitely is in the set (for the moment!)
+        if( _nextK != null &&   // Found something?
+            _nextK != TOMBSTONE &&       // Key is not TOMBSTONE
+            // Keys can be deleted and not TOMBSTONE, and after deletion had
+            // their innards gutted... so you cannot use them to compute their
+            // own hash or 'get' a Value.  So get the paired Value directly.
+            (nV=val(_idx-1)) != null &&  // Get value
+            nV != TOMBSTONE )            // Value is not TOMBSTONE
+          { _nextV = (TypeV)nV; break; } // Got it!  _nextK/_nextV is a valid Key/Value
       }                         // Else keep scanning
       return _prevV;            // Return current value.
     }
