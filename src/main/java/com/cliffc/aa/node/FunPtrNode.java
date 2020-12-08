@@ -35,7 +35,7 @@ public final class FunPtrNode extends Node {
   public FunNode xfun() { RetNode ret = ret(); return ret.in(4) instanceof FunNode ? ret.fun() : null; }
   // Self short name
   @Override public String xstr() {
-    if( is_dead() ) return "*fun";
+    if( is_dead() || _defs._len==0 ) return "*fun";
     int fidx = ret()._fidx;    // Reliably returns a fidx
     FunNode fun = FunNode.find_fidx(fidx);
     return "*"+(fun==null ? ""+fidx : fun.name());
@@ -43,6 +43,7 @@ public final class FunPtrNode extends Node {
   // Inline longer name
   @Override String str() {
     if( is_dead() ) return "DEAD";
+    if( _defs._len==0 ) return "MAKING";
     RetNode ret = ret();
     if( ret.is_copy() ) return "gensym:"+xstr();
     FunNode fun = ret.fun();
@@ -69,7 +70,7 @@ public final class FunPtrNode extends Node {
     }
     return null;
   }
-  
+
   // Is the display used?
   private boolean display_used() {
     for( Node call : _uses ) {
@@ -83,7 +84,7 @@ public final class FunPtrNode extends Node {
     return false;
   }
 
-  
+
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;

@@ -571,6 +571,7 @@ public class FunNode extends RegionNode {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
     FunNode fun = new FunNode(_name,TypeFunSig.make(_sig._args,new_formals,_sig._ret),_op_prec,_thunk_rhs,BitsFun.new_fidx(oldfidx));
+    fun._bal_close = _bal_close;
     fun.pop();                  // Remove null added by RegionNode, will be added later
     // Renumber the original as well; the original _fidx is now a *class* of 2
     // fidxs.  Each FunNode fidx is only ever a constant, so the original Fun
@@ -684,7 +685,7 @@ public class FunNode extends RegionNode {
     } else {                           // Path split
       Node old_funptr = path_call.fdx(); // Find the funptr for the path split
       Node new_funptr = map.get(old_funptr);
-      gvn.replace(new_funptr,old_funptr);
+      gvn.insert(new_funptr,old_funptr);
       TypeFunPtr ofptr = (TypeFunPtr) old_funptr.val();
       path_call.set_fdx_reg(new_funptr, gvn); // Force new_funptr, will re-wire later
       TypeFunPtr nfptr = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,TypeMemPtr.NO_DISP);

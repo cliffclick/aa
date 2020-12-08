@@ -49,15 +49,15 @@ public class TVar implements Comparable<TVar> {
       return tv._unify0(this); // Canonicalize unification order
     // Unify this into that
     _u = tv;
-    // Kill tnodes and other bits of this, to signify unified.
-    if( _ns != null )
+    if( _ns != null )           // Also merge TNodes
       tv._ns =  (tv._ns==null) ? _ns : Ary.merge_or(_ns,tv._ns, TNode::compareTo);
-    if( _deps!=null ) {
+    if( _deps!=null ) {         // Also merge deps
       for( TNode tn : _deps )
         tv.push_dep(tn);
-      TNode.add_work_all(_deps);
+      TNode.add_work_all(_deps); // And push deps on worklist
     }
     assert tv.check_ns();
+    // Kill tnodes and other bits of this, to signify unified.
     _deps = _ns = null;
     // Unify parts
     _unify(tv);
