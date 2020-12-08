@@ -3,6 +3,7 @@ package com.cliffc.aa.tvar;
 import com.cliffc.aa.TNode;
 import com.cliffc.aa.util.*;
 
+import java.util.Arrays;
 import java.util.HashSet;
 
 // A structured collection of TVars.  Child classes typically only unify with
@@ -99,12 +100,15 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     // Same subclass 'this' and 'tv'
     TMulti tmulti = (TMulti)tv;   //
     dups.put(this,tmulti);        // Stop recursive cycles
-    assert _parms.length <= tmulti._parms.length;
-    if( _parms.length > tmulti._parms.length ) throw com.cliffc.aa.AA.unimpl(); // RHS needs to grow
+    if( _parms.length > tmulti._parms.length )
+      tmulti.grow(_parms.length);
     for( int i=0; i<_parms.length; i++ ) {
       TVar parm = parm(i);
-      if( parm != null )        // No parm means no additional structure
-        progress |= parm._fresh_unify(tmulti.parm(i), nongen, dups, test);
+      if( parm != null ) {      // No parm means no additional structure
+        TVar tvparm = tmulti.parm(i);
+        if( tvparm==null ) tmulti._parms[i] = tvparm = new TVar();
+        progress |= parm._fresh_unify(tvparm, nongen, dups, test);
+      }
     }
     return progress;
   }
@@ -117,6 +121,12 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     return tvs;
   }
 
+  void grow( int nlen ) {
+    int len = _parms.length;
+    while( nlen >= len ) len<<=1;
+    if( len != _parms.length ) _parms = Arrays.copyOf(_parms,len);
+  }
+  
   // Flipped: does 'id' occur in 'this'
   @Override boolean _occurs_in(TVar id) {
     assert _u==null && id._u==null; // At top

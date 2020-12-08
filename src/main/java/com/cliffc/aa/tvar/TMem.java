@@ -15,7 +15,11 @@ public class TMem extends TMulti<TMem> {
 
   @Override TMem _fresh_new() { return new TMem(new TVar[_parms.length]); }
 
+  // Unify at a single alias
   public void unify_alias(int alias, TVar tv) {
-    //throw com.cliffc.aa.AA.unimpl();
+    grow(alias+1);
+    TVar tobj = parm(alias);
+    if( tobj==null ) _parms[alias] = tv;
+    else tobj.unify(tv);
   }
 }

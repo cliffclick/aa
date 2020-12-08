@@ -286,6 +286,20 @@ public class CallNode extends Node {
       }
     }
 
+    // See if the display is always dead; common for Unresolved of primitives.
+    if( unk instanceof UnresolvedNode &&
+        !(arg(FUN_IDX) instanceof ConNode && arg(FUN_IDX).val()==Type.ANY) ) {
+      boolean dsp_nil=true;
+      for( Node fptr : unk._defs )
+        if( !(fptr instanceof FunPtrNode) || ((FunPtrNode)fptr).display().val()!=TypeMemPtr.NO_DISP )
+          { dsp_nil=false; break; }
+      if( dsp_nil ) {           // Display is unused by any Unresolved
+        set_arg(FUN_IDX,gvn.con(Type.ANY),gvn);
+        return this;
+      }
+    }
+
+
     // Wire valid targets.
     CallEpiNode cepi = cepi();
     if( cepi!=null && cepi.check_and_wire(gvn) )
