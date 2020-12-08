@@ -2,6 +2,8 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TMem;
+import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.MEM_IDX;
@@ -66,4 +68,17 @@ public class MrgProjNode extends ProjNode {
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // Only called here if alive, and input is more-than-basic-alive
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def==in(0) ? TypeMem.ALIVE : _live; }
+
+  @Override public boolean unify( GVNGCM gvn, boolean test ) {
+    // Already a TMem?
+    TVar tvar = tvar();
+    if( tvar instanceof TMem ) return false;
+    // Always should be a TMem
+    if( !test ) {
+      TMem tmem = (TMem)tvar.unify(new TMem(this));
+      tmem.unify_alias(nnn()._alias,nnn().tvar());
+    }
+    return true;                // Progress
+  }
+
 }

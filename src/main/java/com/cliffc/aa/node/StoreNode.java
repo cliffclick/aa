@@ -2,6 +2,8 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
+import com.cliffc.aa.tvar.TMem;
+import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
@@ -147,4 +149,18 @@ public class StoreNode extends Node {
     StoreNode st = (StoreNode)o;
     return _fin==st._fin && Util.eq(_fld,st._fld);
   }
+
+  @Override public boolean unify( GVNGCM gvn, boolean test ) {
+    // Already a TMem?
+    TVar tvar = tvar();
+    if( tvar instanceof TMem ) return false;
+    // Always should be a TMem
+    if( !test ) {
+      TMem tmem = (TMem)tvar.unify(new TMem(this));
+      // Not sure which aliases should unify here, as the set of aliases may shrink over time
+      //tmem.unify_alias(nnn()._alias,nnn().tvar());
+    }
+    return true;                // Progress
+  }
+
 }
