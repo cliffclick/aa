@@ -6,6 +6,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.function.Predicate;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 /** an implementation of language AA
  */
 
@@ -17,7 +19,7 @@ import java.util.function.Predicate;
 
 // Complemented around the centerline of constants.  Fixed height, so a finite
 // count of Meet stabilizes; a unique All (Bottom; no known value) and due to
-// symmetry a unique Any (Top, all values simultaneously).  Support function
+// symmetry a unique Any (Top, all values simultaneously).  Supports function
 // types, various kinds of numeric ranges, nil, tuples and structs, and named
 // subtypes of the above.
 //
@@ -84,11 +86,11 @@ import java.util.function.Predicate;
 // int.join(*str) == nScalar     ; Nothing in common
 // *[0+4+]str?.isa(nScalar) == FALSE!!!!! ; Crossing-nil has failed again...
 
-// The current "solution" is that nil is in the Type system, but OUT of the
-// Lattice.  At any given use point the nil collapses exactly one of the more
-// refined nils (TypeInt.ZERO, TypeMemPtr.NIL, etc) but until then it is an
-// undistinguished nil.
+// Tried a nil is in the Type system, but OUT of the Lattice.  At any given use
+// point the nil collapses exactly one of the more refined nils (TypeInt.ZERO,
+// TypeMemPtr.NIL, etc) but until then it is an undistinguished nil.
 
+// Current solution is that nil is signed: XNIL and NIL.
 
 public class Type<T extends Type<T>> implements Cloneable {
   static private int CNT=1;
@@ -160,7 +162,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // Hash-Cons - all Types are interned in this hash table.  Thus an equality
   // check of a (possibly very large) Type is always a simple pointer-equality
   // check, except during construction and intern'ing.
-  private static final NonBlockingHashMap<Type,Type> INTERN = new NonBlockingHashMap<>();
+  private static final ConcurrentHashMap<Type,Type> INTERN = new ConcurrentHashMap<>();
   static int RECURSIVE_MEET;    // Count of recursive meet depth
   @SuppressWarnings("unchecked")
   final Type hashcons() {
@@ -583,7 +585,7 @@ public class Type<T extends Type<T>> implements Cloneable {
 
   // MEET at a Loop; optimize no-final-updates on backedges.
   public Type meet_loop(Type t2) { return meet(t2); }
-  
+
 
   // Report OOB based on shallowest OOB component.
   public Type oob_deep( Type t ) { return oop_deep_impl(t); }

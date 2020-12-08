@@ -28,13 +28,6 @@ public final class CallEpiNode extends Node {
   public CallEpiNode( Env e, Node... nodes ) {
     super(OP_CALLEPI,nodes);
     assert nodes[1] instanceof DefMemNode;
-    // Add the "non-generative" set to the TFun structure, but no other
-    // structural is available (args and ret are new TVars).
-    CallNode call = call();
-    Node fun = call.fdx();
-    // TODO: Need to force call().fun() to be a TFun.  Might not be (yet) if
-    // fun is indirectly coming from e.g. a Parm or a Load.
-    //fun.tvar().unify(new TFun(fun,e == null ? null : e.collect_active_scope(),call.tvar(),tvar()));
   }
   @Override public String xstr() { return (is_dead() ? "X" : "C")+"allEpi";  } // Self short name
   public CallNode call() { return (CallNode)in(0); }
@@ -546,7 +539,6 @@ public final class CallEpiNode extends Node {
     // is made, and then unifies it.
     TVar tfunv = call().fdx().tvar();
     // Useless to make a "fresh" plain TVar & unify, so no progress here.
-    // TODO: SEE COMMENT IN CONSTRUCTOR
     if( !(tfunv instanceof TFun) ) return false;
     // Actual progress only if the structure changes.
     return ((TFun)tfunv).fresh_unify(call().tvar(),tvar(),test,this);

@@ -3,12 +3,12 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.NonBlockingHashMap;
 import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.BitSet;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.cliffc.aa.AA.MEM_IDX;
 
@@ -76,7 +76,7 @@ public class GVNGCM {
   }
 
   // Global expressions, to remove redundant Nodes
-  private final NonBlockingHashMap<Node,Node> _vals = new NonBlockingHashMap<>();
+  private final ConcurrentHashMap<Node,Node> _vals = new ConcurrentHashMap<>();
   Set<Node> valsKeySet() { return _vals.keySet(); }
 
   // Initial state after loading e.g. primitives.

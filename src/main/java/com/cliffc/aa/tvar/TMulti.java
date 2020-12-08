@@ -99,6 +99,8 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     // Same subclass 'this' and 'tv'
     TMulti tmulti = (TMulti)tv;   //
     dups.put(this,tmulti);        // Stop recursive cycles
+    assert _parms.length <= tmulti._parms.length;
+    if( _parms.length > tmulti._parms.length ) throw com.cliffc.aa.AA.unimpl(); // RHS needs to grow
     for( int i=0; i<_parms.length; i++ ) {
       TVar parm = parm(i);
       if( parm != null )        // No parm means no additional structure
