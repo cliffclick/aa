@@ -537,9 +537,13 @@ public final class CallEpiNode extends Node {
     // grabbing a 'fresh' copy of 'Ident' (see HM.java) we grab it fresh at the
     // use point below, by calling 'fresh_unify' which acts as-if a fresh copy
     // is made, and then unifies it.
-    TVar tfunv = call().fdx().tvar();
-    // Useless to make a "fresh" plain TVar & unify, so no progress here.
-    if( !(tfunv instanceof TFun) ) return false;
+    Node fdx = call().fdx();
+    TVar tfunv = fdx.tvar();
+    if( tfunv instanceof TVDead ) return false; // Not gonna be a TFun
+    if( !(tfunv instanceof TFun) ) {
+      if( !test ) tfunv.unify(new TFun(fdx,null,new TVar(),new TVar()));
+      return true;
+    }
     // Actual progress only if the structure changes.
     return ((TFun)tfunv).fresh_unify(call().tvar(),tvar(),test,this);
   }

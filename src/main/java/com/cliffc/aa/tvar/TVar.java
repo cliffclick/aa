@@ -19,7 +19,7 @@ public class TVar implements Comparable<TVar> {
   // Set of dependent Nodes (to be re-worklisted if something changes)
   public Ary<TNode> _deps;
 
-  
+
   static private int UID=1;
   final int _uid;
 
@@ -43,20 +43,26 @@ public class TVar implements Comparable<TVar> {
   public final TVar unify(TVar tv) { return _unify0(tv); }
 
   // Recursive entry point for unification.
-  final TVar _unify0(TVar tv) {
+  TVar _unify0(TVar tv) {
     if( this==tv ) return this; // Done!
     if( compareTo(tv) > 0 )
       return tv._unify0(this); // Canonicalize unification order
     // Unify this into that
     _u = tv;
-    if( _ns != null )           // Also merge TNodes
-      tv._ns =  (tv._ns==null) ? _ns : Ary.merge_or(_ns,tv._ns, TNode::compareTo);
-    if( _deps!=null ) {         // Also merge deps
-      for( TNode tn : _deps )
-        tv.push_dep(tn);
-      TNode.add_work_all(_deps); // And push deps on worklist
+    if( _ns != null ) {         // Also merge TNodes
+      if( tv._ns==null ) tv._ns = _ns;
+      else {
+        tv._ns = Ary.merge_or(_ns,tv._ns, TNode::compareTo, e->!e.is_dead());
+        assert tv.check_ns();   // Check sorted, dead cleared
+      }
     }
-    assert tv.check_ns();
+    if( tv._ns!=null && tv._ns._len==0 ) tv._ns=null;
+    if( _deps!=null ) {                        // Also merge deps
+      TNode.add_work_all(tv.push_deps(_deps)); // And push deps on worklist
+      assert tv._deps==null || tv._deps.find(TNode::is_dead) == -1;
+    }
+    if( tv._deps!=null && tv._deps._len==0 )
+      tv._deps=null;            // Cleaned out
     // Kill tnodes and other bits of this, to signify unified.
     _deps = _ns = null;
     // Unify parts
@@ -70,14 +76,9 @@ public class TVar implements Comparable<TVar> {
 
   // Sorted, no dups.  Poor-mans assert
   private boolean check_ns() {
-    if( _ns!=null )
-      for( int i=0; i<_ns._len-1; i++ )
-        if( _ns.at(i).uid() >= _ns.at(i+1).uid() )
-          return false;
-    if( _deps!=null )
-      for( int i=0; i<_deps._len-1; i++ )
-        if( _deps.at(i).uid() >= _deps.at(i+1).uid() )
-          return false;
+    for( int i=0; i<_ns._len-1; i++ )
+      if( _ns.at(i).uid() >= _ns.at(i+1).uid() || _ns.at(i).is_dead() )
+        return false;
     return true;
   }
 
@@ -92,7 +93,7 @@ public class TVar implements Comparable<TVar> {
     if( occurs_in(nongen) ) {    // If 'this' is in the non-generative set, use 'this'
       if( !test ) _unify0(tv);   // Unify with LHS always reports progress
       return true;
-    } 
+    }
     // Use a 'fresh' TVar, but keep the structural properties: if it appears
     // only once, unification with fresh is a no-op.  So instead record as-if
     // unified with fresh.  Only progress if using for the 2nd time.
@@ -141,7 +142,7 @@ public class TVar implements Comparable<TVar> {
     return tv==v2;              // Unequal TVars
   }
 
-  
+
   @Override public final String toString() { return str(new SB(),new VBitSet(),true).toString();  }
 
   // Pretty print
@@ -154,13 +155,13 @@ public class TVar implements Comparable<TVar> {
     if( _uid != -1 && bs.tset(_uid) )
       return sb.p("V").p(_uid).p("$");
     // Find a sample node to print out
-    int idx = _ns.find(e -> !e.is_dead());
+    int idx = _ns==null ? -1 : _ns.find(e -> !e.is_dead());
     if( idx != -1 ) {
       TNode tn = _ns.at(idx);
       sb.p('N').p(tn.uid()).p(':').p(tn.xstr()).p(':');
     }
     // Print all unioned nodes
-    if( debug )
+    if( debug && _ns!=null )
       for( TNode tn : _ns )
         if( (idx==-1 || _ns.at(idx)!=tn) )
           sb.p('N').p(tn.uid()).p(':');
@@ -173,6 +174,8 @@ public class TVar implements Comparable<TVar> {
   // Two equal classes order by uid.
   @Override public int compareTo(TVar tv) {
     if( this==tv ) return 0;
+    if( this instanceof TVDead ) return -1;
+    if( tv   instanceof TVDead ) return  1;
     boolean istv0 =    getClass()==TVar.class;
     boolean istv1 = tv.getClass()==TVar.class;
     if( istv0 && !istv1 ) return -1;
@@ -182,11 +185,22 @@ public class TVar implements Comparable<TVar> {
 
   // Push on deps list.  Returns true if already on the deps lift (no change).
   void push_dep(TNode tn) {
+    if( tn.is_dead() ) return;
     if( _deps==null ) _deps = new Ary<>(TNode.class);
-    if( !tn.is_dead() && _deps.find(tn)==-1 ) {
+    if( _deps.find(tn)==-1 )
       _deps.push(tn);
-      _deps.sort_update(TNode::compareTo);
+  }
+  Ary<TNode> push_deps(Ary<TNode> deps) {
+    deps.filter_update(e->!e.is_dead());
+    if( _deps==null ) _deps = deps;
+    else {
+      _deps.filter_update(e->!e.is_dead());
+      for( TNode tn : deps )
+        if( _deps.find(tn)==-1 )
+          _deps.push(tn);
     }
+    if( _deps._len==0 ) _deps=null;
+    return deps;
   }
 
 }

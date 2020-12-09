@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TMem;
+import com.cliffc.aa.tvar.TVDead;
 import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
 
@@ -70,15 +71,27 @@ public class MrgProjNode extends ProjNode {
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def==in(0) ? TypeMem.ALIVE : _live; }
 
   @Override public boolean unify( GVNGCM gvn, boolean test ) {
-    // Already a TMem?
+    boolean progress=false;
+    // Self should always should be a TMem
     TVar tvar = tvar();
-    if( tvar instanceof TMem ) return false;
-    // Always should be a TMem
-    if( !test ) {
-      TMem tmem = (TMem)tvar.unify(new TMem(this));
-      tmem.unify_alias(nnn()._alias,nnn().tvar());
+    if( !(tvar instanceof TMem) ) {
+      if( tvar instanceof TVDead ) return false; // Not gonna be a TMem
+      progress=true;            // Would make progress
+      if( !test ) tvar = tvar.unify(new TMem(this));
     }
-    return true;                // Progress
+    // Input should be a TMem also
+    Node mem = mem();
+    TVar tmem = mem.tvar();
+    if( !(tmem instanceof TMem) ) {
+      if( tmem instanceof TVDead ) return false; // Not gonna be a TMem
+      progress=true;            // Would make progress
+      if( !test ) tmem = tmem.unify(new TMem(mem));
+    }
+    // If flipped one or the other to TMem, also one-time TMem unify interiors
+    if( !test && progress )
+      ((TMem)tvar).unify_alias((TMem)tmem,BitsAlias.make0(nnn()._alias),nnn().tvar());
+
+    return progress;
   }
 
 }

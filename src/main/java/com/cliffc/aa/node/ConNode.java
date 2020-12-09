@@ -5,12 +5,18 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeLive;
 import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.tvar.TVDead;
 
 import java.util.function.Predicate;
 
 public class ConNode<T extends Type> extends Node {
   T _t;                         // Not final for testing
-  public ConNode( T t ) { super(OP_CON,Env.START); _t=t; }
+  public ConNode( T t ) {
+    super(OP_CON,Env.START);
+    _t=t;
+    // Specifically, no unifcation with ANY/Dead
+    if( t==Type.ANY ) _tvar = new TVDead();
+  }
   // Used by FunPtrNode
   ConNode( byte type, T tfp, RetNode ret, Node closure ) { super(type,ret,closure); _t = tfp; }
   @Override public String xstr() { return Env.ALL_CTRL == this ? "ALL_CTL" : _t.toString(); }

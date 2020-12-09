@@ -39,6 +39,7 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     return tv2 == tv ? tv2 : (_parms[i] = tv2);
   }
 
+  // Unify parts after other work is done
   @Override void _unify( TVar tv ) {
     assert _u!=null;            // Flagged as being unified
     TMulti targs = (TMulti)tv;
@@ -172,5 +173,13 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
       TVar parm = parm(i);
       if( parm != null ) parm.push_dep(tn);
     }
+  }
+  @Override Ary<TNode> push_deps(Ary<TNode> deps) {
+    assert _deps==null;
+    for( int i=0; i<_parms.length; i++ ) {
+      TVar parm = parm(i);
+      if( parm != null ) parm.push_deps(deps);
+    }
+    return deps;
   }
 }
