@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Util;
 
 // Load a named field from a struct.  Does it's own nil-check testing.  Loaded
@@ -237,4 +238,27 @@ public class LoadNode extends Node {
     if( !super.equals(o) ) return false;
     return (o instanceof LoadNode) && Util.eq(_fld,((LoadNode)o)._fld);
   }
+  
+  @Override public boolean unify( GVNGCM gvn, boolean test ) {
+    boolean progress=false;
+    // Input should be a TMem
+    Node mem = mem();
+    TVar tmem = mem.tvar();
+    if( !(tmem instanceof TMem) ) {
+      if( tmem instanceof TVDead ) return false; // Not gonna be a TMem
+      progress=true;            // Would make progress
+      if( !test ) tmem = tmem.unify(new TMem(mem));
+    }
+    if( !test && progress ) {
+      // Address needs to name the aliases
+      Type tadr = adr().val();
+      if( !(tadr instanceof TypeMemPtr) )
+        tadr = tadr.oob(TypeMemPtr.ISUSED);
+      TypeMemPtr tmp = (TypeMemPtr)tadr;
+      // Unify the given alias & field name
+      
+    }
+    return progress;
+  }
+
 }

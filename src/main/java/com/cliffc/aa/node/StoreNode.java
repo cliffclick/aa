@@ -2,9 +2,8 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TMem;
-import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Util;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
@@ -151,16 +150,35 @@ public class StoreNode extends Node {
   }
 
   @Override public boolean unify( GVNGCM gvn, boolean test ) {
-    // Already a TMem?
+    boolean progress=false;
+    // Self should always should be a TMem
     TVar tvar = tvar();
-    if( tvar instanceof TMem ) return false;
-    // Always should be a TMem
-    if( !test ) {
-      TMem tmem = (TMem)tvar.unify(new TMem(this));
-      // Not sure which aliases should unify here, as the set of aliases may shrink over time
-      //tmem.unify_alias(nnn()._alias,nnn().tvar());
+    if( !(tvar instanceof TMem) ) {
+      if( tvar instanceof TVDead ) return false; // Not gonna be a TMem
+      progress=true;            // Would make progress
+      if( !test ) tvar = tvar.unify(new TMem(this));
     }
-    return true;                // Progress
+    // Input should be a TMem also
+    Node mem = mem();
+    TVar tmem = mem.tvar();
+    if( !(tmem instanceof TMem) ) {
+      if( tmem instanceof TVDead ) return false; // Not gonna be a TMem
+      progress=true;            // Would make progress
+      if( !test ) tmem = tmem.unify(new TMem(mem));
+    }
+    // Unify incoming & outgoing memory, modulo the stored value
+    if( !test && progress ) {
+      // Address needs to name the aliases
+      Type tadr = adr().val();
+      if( !(tadr instanceof TypeMemPtr) )
+        tadr = tadr.oob(TypeMemPtr.ISUSED);
+      TypeMemPtr tmp = (TypeMemPtr)tadr;
+      // Unify all memory
+      //tvar.unify(tmem);
+      // Also unify at the given alias & field name
+      //((TMem)tvar).unify_alias((TMem)tmem,(TypeMemPtr)tadr,val().tvar());
+    }
+    return progress;
   }
 
 }
