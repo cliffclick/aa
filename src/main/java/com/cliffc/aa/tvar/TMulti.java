@@ -167,18 +167,22 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     return sb.p("]");
   }
 
-  @Override void push_dep(TNode tn) {
+  @Override void push_dep(TNode tn, VBitSet visit) {
     assert _deps==null;
+    if( visit==null ) visit = new VBitSet();
+    if( visit.tset(_uid) ) return;
     for( int i=0; i<_parms.length; i++ ) {
       TVar parm = parm(i);
-      if( parm != null ) parm.push_dep(tn);
+      if( parm != null ) parm.push_dep(tn,visit);
     }
   }
-  @Override Ary<TNode> push_deps(Ary<TNode> deps) {
+  @Override Ary<TNode> push_deps(Ary<TNode> deps, VBitSet visit) {
     assert _deps==null;
+    if( visit==null ) visit = new VBitSet();
+    if( visit.tset(_uid) ) return deps;
     for( int i=0; i<_parms.length; i++ ) {
       TVar parm = parm(i);
-      if( parm != null ) parm.push_deps(deps);
+      if( parm != null ) parm.push_deps(deps,visit);
     }
     return deps;
   }

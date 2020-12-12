@@ -14,15 +14,6 @@ public class TFun extends TMulti<TFun> {
   public TVar args() { return parm(0); }
   public TVar ret () { return parm(1); }
 
-  @Override void _unify( TVar tv ) {
-    assert _u!=null;            // Flagged as being unified
-    TFun tfun = (TFun)tv;
-    TVar arg0 = args(), arg1 = tfun.args();
-    TVar ret0 = ret (), ret1 = tfun.ret ();
-    arg0._unify0(arg1);
-    ret0._unify0(ret1);
-  }
-  
   // Already checks same class, no cycles, not infinite recursion, non-zero parms will_unify.
   @Override boolean _will_unify0(TFun tfun) { assert _parms.length==2 && tfun._parms.length==2; return true; }
   @Override TFun _fresh_new() { return new TFun(); }
@@ -32,8 +23,6 @@ public class TFun extends TMulti<TFun> {
   // structure from 'this'.  Returns true for progress.
   public boolean fresh_unify(TVar args, TVar ret, boolean test, TNode dep) {
     assert _u==null;            // Already top
-    args().push_dep(dep);
-    ret ().push_dep(dep);
     assert !CYC_BUSY && CYC.isEmpty();
     CYC_BUSY=true;
     boolean will_unify =
@@ -42,9 +31,12 @@ public class TFun extends TMulti<TFun> {
     CYC.clear();
     CYC_BUSY=false;
     if( !will_unify ) return false; // No change
-    
+    if( !test ) {                   // No change if testing
+      args().push_dep(dep,null);
+      ret ().push_dep(dep,null);
+    }
     NonBlockingHashMap<TVar,TVar> dups = new NonBlockingHashMap<>();
-    return
+    return                                          // If testing, still must call both to check for progress
       args()._fresh_unify(args,_nongen,dups,test) | // NO SHORT-CIRCUIT: NOTE: '|' NOT '||'
       ret ()._fresh_unify(ret ,_nongen,dups,test);  // Must do both halves always
   }

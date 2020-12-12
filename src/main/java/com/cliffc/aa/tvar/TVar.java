@@ -2,6 +2,8 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
 import com.cliffc.aa.util.*;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -58,7 +60,7 @@ public class TVar implements Comparable<TVar> {
     }
     if( tv._ns!=null && tv._ns._len==0 ) tv._ns=null;
     if( _deps!=null ) {                        // Also merge deps
-      TNode.add_work_all(tv.push_deps(_deps)); // And push deps on worklist
+      TNode.add_work_all(tv.push_deps(_deps,null)); // And push deps on worklist
       assert tv._deps==null || tv._deps.find(TNode::is_dead) == -1;
     }
     if( tv._deps!=null && tv._deps._len==0 )
@@ -89,7 +91,7 @@ public class TVar implements Comparable<TVar> {
   // Return a "fresh" copy, preserving structure
   boolean _fresh_unify(TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
     assert _u==null;             // At top
-    if( this==tv ) return false; // Short cut
+    if( this==tv || tv instanceof TVDead ) return false; // Short cut
     if( occurs_in(nongen) ) {    // If 'this' is in the non-generative set, use 'this'
       if( !test ) _unify0(tv);   // Unify with LHS always reports progress
       return true;
@@ -154,25 +156,22 @@ public class TVar implements Comparable<TVar> {
     }
     if( _uid != -1 && bs.tset(_uid) )
       return sb.p("V").p(_uid).p("$");
-    // Find a sample node to print out
-    int idx = _ns==null ? -1 : _ns.find(e -> !e.is_dead());
-    if( idx != -1 ) {
-      TNode tn = _ns.at(idx);
-      sb.p('N').p(tn.uid()).p(':').p(tn.xstr()).p(':');
-    }
     // Print all unioned nodes
-    if( debug && _ns!=null )
-      for( TNode tn : _ns )
-        if( (idx==-1 || _ns.at(idx)!=tn) )
+    if( _ns!=null )             // Have any
+      for( TNode tn : _ns )     // For all unioned
+        if( !tn.is_dead() ) {   // Dead lazily cleared out, do not both  to print
           sb.p('N').p(tn.uid()).p(':');
-    return _str(sb,bs,debug);
+          if( !debug ) break;   // Debug, see them all; non-debug just the first
+        }
+    return _str(sb,bs,debug);   // Subclass specific prints
   }
+
   // Type-variable structure print
-  SB _str(SB sb, VBitSet bs, boolean debug) { return sb; } // No special fields
+  SB _str(SB sb, VBitSet bs, boolean debug) { return (_ns==null || _ns._len==0) ? sb.p("V").p(_uid) : sb; } // No special fields
 
   // Dead is always least; then plain TVars; then any other TVar type.
   // Two equal classes order by uid.
-  @Override public int compareTo(TVar tv) {
+  @Override public int compareTo(@NotNull TVar tv) {
     if( this==tv ) return 0;
     if( this instanceof TVDead ) return -1;
     if( tv   instanceof TVDead ) return  1;
@@ -184,13 +183,15 @@ public class TVar implements Comparable<TVar> {
   }
 
   // Push on deps list.  Returns true if already on the deps lift (no change).
-  void push_dep(TNode tn) {
+  void       push_dep (    TNode  tn  , VBitSet visit) {        merge_dep (tn  ); }
+  Ary<TNode> push_deps(Ary<TNode> deps, VBitSet visit) { return merge_deps(deps); }
+  final void merge_dep(TNode tn) {
     if( tn.is_dead() ) return;
     if( _deps==null ) _deps = new Ary<>(TNode.class);
     if( _deps.find(tn)==-1 )
       _deps.push(tn);
   }
-  Ary<TNode> push_deps(Ary<TNode> deps) {
+  final Ary<TNode> merge_deps(Ary<TNode> deps) {
     deps.filter_update(e->!e.is_dead());
     if( _deps==null ) _deps = deps;
     else {

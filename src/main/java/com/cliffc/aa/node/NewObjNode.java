@@ -1,10 +1,13 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
+import com.cliffc.aa.tvar.TObj;
+import com.cliffc.aa.tvar.TVDead;
+import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
+
+import java.util.Arrays;
 
 import static com.cliffc.aa.AA.MEM_IDX;
 
@@ -157,5 +160,18 @@ public class NewObjNode extends NewNode<TypeStruct> {
     if( _keep==1 && _uses._len==0 )
       return TypeMem.ALIVE;
     return super.live(opt_mode);
+  }
+
+  @Override public boolean unify( GVNGCM gvn, boolean test ) {
+    // Self should always should be a TObj
+    TVar tvar = tvar();
+    if( tvar instanceof TObj ||
+        tvar instanceof TVDead ) return false; // Not gonna be a TMem
+    if( !test ) tvar.unify(new TObj(this,_ts._flds));
+    return true;
+  }
+
+  @Override public TNode[] parms() {
+    return Arrays.copyOfRange(_defs._es,1,_defs._len); // All defs
   }
 }

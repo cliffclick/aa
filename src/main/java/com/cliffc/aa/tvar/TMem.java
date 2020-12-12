@@ -1,7 +1,10 @@
 package com.cliffc.aa.tvar;
 
-import com.cliffc.aa.type.BitsAlias;
 import com.cliffc.aa.TNode;
+import com.cliffc.aa.type.BitsAlias;
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 
 // TVars for aliased memory.  Very similar to a TArgs, except indexed by alias
 // number instead of by direct index.  Missing aliases are assumed to be new
@@ -26,8 +29,43 @@ public class TMem extends TMulti<TMem> {
       TVar rhs = tmem.parm(i);
       if( i<alen && aliases.test_recur(i) ) rhs = tv;
       if( lhs==null && rhs==null ) continue;
-      if( lhs==null ) _parms[i] = rhs;
+      if( lhs==null ) {         // No LHS, assume as-if a new TVar
+        _parms[i] = rhs;        // Set to RHS
+        if( _deps!=null )       // And add any deps
+          rhs.push_deps(_deps,null);
+      }
       else lhs.unify(rhs);
     }
+  }
+
+  // Pretty print
+  @Override SB _str(SB sb, VBitSet bs, boolean debug) {
+    sb.p("[ ");
+    for( int i=0; i<_parms.length; i++ )
+      if( _parms[i]!=null ) _parms[i].str(sb.p(i).p(':'),bs,debug).p(' ');
+    return sb.p("]");
+  }
+
+
+  @Override void push_dep(TNode tn, VBitSet visit) {
+    // Merge and keep all deps lists.  Since null aliases are a shortcut for "a
+    // new TVar appears here later" that TVar needs the deps list when it appears.
+    merge_dep(tn);        // Merge dependents lists
+    // Push to all non-null aliases
+    for( int i=0; i<_parms.length; i++ ) {
+      TVar parm = parm(i);
+      if( parm != null ) parm.push_dep(tn,visit);
+    }
+  }
+  @Override Ary<TNode> push_deps(Ary<TNode> deps, VBitSet visit) {
+    // Merge and keep all deps lists.  Since null aliases are a shortcut for "a
+    // new TVar appears here later" that TVar needs the deps list when it appears.
+    merge_deps(deps);     // Merge dependents lists
+    // Push to all non-null aliases
+    for( int i=0; i<_parms.length; i++ ) {
+      TVar parm = parm(i);
+      if( parm != null ) parm.push_deps(deps,visit);
+    }
+    return deps;
   }
 }
