@@ -2,8 +2,6 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
 import com.cliffc.aa.util.*;
-import org.jetbrains.annotations.NotNull;
-
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -171,7 +169,7 @@ public class TVar implements Comparable<TVar> {
 
   // Dead is always least; then plain TVars; then any other TVar type.
   // Two equal classes order by uid.
-  @Override public int compareTo(@NotNull TVar tv) {
+  @Override public int compareTo(TVar tv) {
     if( this==tv ) return 0;
     if( this instanceof TVDead ) return -1;
     if( tv   instanceof TVDead ) return  1;
@@ -192,6 +190,7 @@ public class TVar implements Comparable<TVar> {
       _deps.push(tn);
   }
   final Ary<TNode> merge_deps(Ary<TNode> deps) {
+    if( deps==null ) return deps;
     deps.filter_update(e->!e.is_dead());
     if( _deps==null ) _deps = deps;
     else {

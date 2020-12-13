@@ -787,8 +787,8 @@ public class Type<T extends Type<T>> implements Cloneable {
 
     throw typerr(t);  // Overridden in subtypes
   }
-  // "widen" a narrow type for primitive type-specialization.
-  // e.g. "3" becomes "int64".
+  // "widen" a narrow type for primitive type-specialization and H-M
+  // unification.  e.g. "3" becomes "int64".
   public Type widen() {
     switch( _type ) {
     case TNUM:

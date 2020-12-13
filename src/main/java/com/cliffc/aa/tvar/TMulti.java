@@ -85,9 +85,16 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
 
   // Return a "fresh" copy, preserving structure
   @Override boolean _fresh_unify( TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
-    assert _u==null;            // At top
-    if( this==tv || dups.containsKey(this) )
-      return false;             // Stop recursive cycles
+    assert _u==null;             // At top
+    if( this==tv ) return false; // Already unified
+    TVar prior = dups.get(this); // Get a replacement, if any
+    if( prior != null ) {
+      if( prior==tv ) return false;  // Already unified
+      if( !test ) prior._unify0(tv); // Force equivalence
+      return true;
+    }
+    dups.put(this,tv);          // Stop recursive cycles, record structure mapping
+    
     boolean progress = false;
     if( getClass() != tv.getClass() ){// Make a TMulti, unify to 'tv' and keep unifying.  And report progress.
       assert tv.getClass() == TVar.class;
@@ -98,11 +105,10 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
       tv._ns = null;
       tv = tv._u;               // This is the new unified 'tv'
     }
+
     // Same subclass 'this' and 'tv'
-    TMulti tmulti = (TMulti)tv;   //
-    dups.put(this,tmulti);        // Stop recursive cycles
-    if( _parms.length > tmulti._parms.length )
-      tmulti.grow(_parms.length);
+    TMulti tmulti = (TMulti)tv;
+    tmulti.grow(_parms.length);
     for( int i=0; i<_parms.length; i++ ) {
       TVar parm = parm(i);
       if( parm != null ) {      // No parm means no additional structure
@@ -124,10 +130,10 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
 
   void grow( int nlen ) {
     int len = _parms.length;
-    while( nlen >= len ) len<<=1;
+    while( nlen > len ) len<<=1;
     if( len != _parms.length ) _parms = Arrays.copyOf(_parms,len);
   }
-  
+
   // Flipped: does 'id' occur in 'this'
   @Override boolean _occurs_in(TVar id) {
     assert _u==null && id._u==null; // At top
@@ -177,6 +183,7 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     }
   }
   @Override Ary<TNode> push_deps(Ary<TNode> deps, VBitSet visit) {
+    if( deps==null ) return deps;
     assert _deps==null;
     if( visit==null ) visit = new VBitSet();
     if( visit.tset(_uid) ) return deps;

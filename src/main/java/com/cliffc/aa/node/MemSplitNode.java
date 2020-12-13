@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
@@ -124,6 +125,12 @@ public class MemSplitNode extends Node {
     mjn.add_alias_below(gvn,head1,head1_escs,tail1);
     if( mprj.is_dead() ) gvn.revalive(msp);
     else gvn.revalive(msp,mprj,mjn);
+    // Reset TVars on all memory users: H-M memory constraint to the Join not
+    // anything inside it
+    if( !mjn.is_dead() )
+      for( Node use : mjn._uses )
+        if( use.is_mem() )    // Reunify to collect the other constraints
+          { use._tvar = new TVar();  use.unify(gvn,false); }
     return head1;
   }
   static boolean check_split( Node head1, BitsAlias head1_escs ) {

@@ -19,20 +19,20 @@ public class TMem extends TMulti<TMem> {
 
   @Override TMem _fresh_new() { return new TMem(new TVar[_parms.length]); }
 
-  // Unify two TMems, except at the aliases, unify with the given TVar.
+  // Unify two TMems alias by alias, except at the given aliases unify this
+  // with the given TVar.  Do not merge their TNode sets, since this is not a
+  // unifying the two TMems directly.
   public void unify_alias(TMem tmem, BitsAlias aliases, TVar tv) {
     int alen = aliases.max()+1; // Length of aliases
-    grow(Math.max(alen,tmem._parms.length));
-    tmem.grow(_parms.length);
+    grow(alen);
     for( int i=0; i<_parms.length; i++ ) {
       TVar lhs =      parm(i);
       TVar rhs = tmem.parm(i);
       if( i<alen && aliases.test_recur(i) ) rhs = tv;
-      if( lhs==null && rhs==null ) continue;
+      if( rhs==null ) continue; // Nothing to unify
       if( lhs==null ) {         // No LHS, assume as-if a new TVar
         _parms[i] = rhs;        // Set to RHS
-        if( _deps!=null )       // And add any deps
-          rhs.push_deps(_deps,null);
+        rhs.push_deps(_deps,null);
       }
       else lhs.unify(rhs);
     }
@@ -58,6 +58,7 @@ public class TMem extends TMulti<TMem> {
     }
   }
   @Override Ary<TNode> push_deps(Ary<TNode> deps, VBitSet visit) {
+    if( deps==null ) return deps;
     // Merge and keep all deps lists.  Since null aliases are a shortcut for "a
     // new TVar appears here later" that TVar needs the deps list when it appears.
     merge_deps(deps);     // Merge dependents lists

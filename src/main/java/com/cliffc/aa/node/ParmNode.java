@@ -114,6 +114,11 @@ public class ParmNode extends PhiNode {
     return t.oob_deep(formal);
   }
 
+  // While Parms are mostly Phis (and yes for value flows), during unification
+  // Parms are already treated by the H-M algo, and (via fresh_unify) get
+  // "fresh" TVars for every input path.
+  @Override public boolean unify( GVNGCM gvn, boolean test ) { return false; }
+
   @Override public ErrMsg err( boolean fast ) {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere
     FunNode fun = fun();

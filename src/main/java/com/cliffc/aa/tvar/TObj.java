@@ -14,7 +14,7 @@ public class TObj extends TMulti<TObj> {
     _flds = flds;
     assert flds.length==_parms.length;
   }
-  public TObj(TObj tobj) { super(null,new TVar[tobj._parms.length]); _flds = tobj._flds; }
+  public TObj(TObj tobj) { super(null,tvars(tobj._parms.length)); _flds = tobj._flds; }
 
   // Already checks same class, no cycles, not infinite recursion, non-zero parms will_unify.
   @Override boolean _will_unify0(TObj tv) {

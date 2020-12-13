@@ -87,7 +87,6 @@ public class StoreNode extends Node {
     Type tval = rez.val();  // Value
     if( tmem==Type.ALL || tadr==Type.ALL ) return Type.ALL;
 
-    if( tadr == Type.ALL ) tadr = TypeMemPtr.ISUSED0;
     if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM);
     if( !(tadr instanceof TypeMemPtr) ) return tadr.oob(TypeMem.ALLMEM);
     TypeMem    tm  = (TypeMem   )tmem;

@@ -243,14 +243,15 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
   public int getbit() { return _aliases.getbit(); }
+
+  // Widen for primitive specialization and H-M unification.  H-M distinguishes
+  // ptr-to-array (and string) from ptr-to-record.
   @Override public TypeMemPtr widen() {
     // Flatten to either all-structs or all-strings, unless both.
-    boolean rec = _aliases.isa(BitsAlias.RECORD_BITS0);
-    boolean str = _aliases.isa(BitsAlias.STRBITS0);
-    BitsAlias bs = rec ? (str
-                          ? BitsAlias.FULL
-                          : BitsAlias.RECORD_BITS0)
-      : BitsAlias.STRBITS0;
+    BitsAlias bs = null;
+    if( _aliases.isa(BitsAlias.RECORD_BITS0) )  bs = BitsAlias.RECORD_BITS0;
+    if( _aliases.isa(BitsAlias.STRBITS0) ) bs = bs==null ? BitsAlias.STRBITS0 : BitsAlias.FULL;
+    if( _aliases.isa(BitsAlias.ARYBITS0) ) bs = bs==null ? BitsAlias.ARYBITS0 : BitsAlias.FULL;
     return make(bs,(TypeObj)_obj.widen());
   }
 }

@@ -559,7 +559,7 @@ public final class CallEpiNode extends Node {
       // them with another.  However, their Types do not update after the merge
       // and become stale.  So no unify with the dead.
       if( tn.is_dead() ) tv._ns.remove(i--);
-      else t2 = t2.join(tn.val());
+      else t2 = t2.join(tn.val().widen());
     }
     return t2;
   }
