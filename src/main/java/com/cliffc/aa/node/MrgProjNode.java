@@ -70,7 +70,7 @@ public class MrgProjNode extends ProjNode {
   // Only called here if alive, and input is more-than-basic-alive
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def==in(0) ? TypeMem.ALIVE : _live; }
 
-  @Override public boolean unify( GVNGCM gvn, boolean test ) {
+  @Override public boolean unify( boolean test ) {
     boolean progress=false;
     // Self should always should be a TMem
     TVar tvar = tvar();

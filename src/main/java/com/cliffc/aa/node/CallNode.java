@@ -707,7 +707,7 @@ public class CallNode extends Node {
     return null;
   }
 
-  @Override public boolean unify( GVNGCM gvn, boolean test ) {
+  @Override public boolean unify( boolean test ) {
     // Gather incoming args.  NOT an application point (yet), that is a CallEpi.
     TVar tvar = tvar();
     if( tvar instanceof TArgs &&

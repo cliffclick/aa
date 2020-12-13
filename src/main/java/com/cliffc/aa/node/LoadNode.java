@@ -239,7 +239,7 @@ public class LoadNode extends Node {
     return (o instanceof LoadNode) && Util.eq(_fld,((LoadNode)o)._fld);
   }
   
-  @Override public boolean unify( GVNGCM gvn, boolean test ) {
+  @Override public boolean unify( boolean test ) {
     boolean progress=false;
     // Input should be a TMem
     Node mem = mem();

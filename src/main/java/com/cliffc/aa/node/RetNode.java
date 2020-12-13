@@ -184,7 +184,7 @@ public final class RetNode extends Node {
     return TypeMem.ALIVE;       // Basic aliveness
   }
 
-  @Override public boolean unify( GVNGCM gvn, boolean test ) {
+  @Override public boolean unify( boolean test ) {
     // Already a TRet?
     TVar tvar = tvar();
     if( tvar instanceof TRet ) return false;

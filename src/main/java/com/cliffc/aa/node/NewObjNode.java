@@ -162,7 +162,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     return super.live(opt_mode);
   }
 
-  @Override public boolean unify( GVNGCM gvn, boolean test ) {
+  @Override public boolean unify( boolean test ) {
     // Self should always should be a TObj
     TVar tvar = tvar();
     if( tvar instanceof TObj ||

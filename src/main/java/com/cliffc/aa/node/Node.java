@@ -449,7 +449,7 @@ public abstract class Node implements Cloneable, TNode {
   // Load/Stores, etc.  Returns true if progress, and puts neighbors back on
   // the worklist.  If 'test' then make no changes, but return if progress
   // would be made.
-  public boolean unify(GVNGCM gvn, boolean test) { return false; }
+  public boolean unify(boolean test) { return false; }
 
   // Return any type error message, or null if no error
   public ErrMsg err( boolean fast ) { return null; }
@@ -499,7 +499,7 @@ public abstract class Node implements Cloneable, TNode {
       Node idl = ideal(gvn,level);
       if( idl != null )
         return true;            // Found an ideal call
-      if( unify(gvn,true) )
+      if( unify(true) )
         return true;            // Found more unification
       Type t = value(gvn._opt_mode);
       if( _val != t )
@@ -518,7 +518,7 @@ public abstract class Node implements Cloneable, TNode {
     // Check for only forwards flow, and if possible then also on worklist
     Type    oval= _val, nval = value(gvn._opt_mode);
     TypeMem oliv=_live, nliv = live (gvn._opt_mode);
-    boolean hm = lifting && unify(gvn,true); // Progress-only check, and only during Pesi not Opto
+    boolean hm = lifting && unify(true); // Progress-only check, and only during Pesi not Opto
     if( nval != oval || nliv != oliv || hm ) {
       boolean ok = lifting
         ? nval.isa(oval) && nliv.isa(oliv)

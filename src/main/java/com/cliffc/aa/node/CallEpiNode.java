@@ -509,7 +509,7 @@ public final class CallEpiNode extends Node {
     gvn.add_work(ret);
     del(_defs.find(ret));
     _tvar = TRet.fresh_new();   // Reset TVar; removed CG edge, so also remove H-M constraint
-    unify(gvn,false);           // Reunify to collect the other constraints
+    unify(false);               // Reunify to collect the other constraints
     assert sane_wiring();
   }
 
@@ -532,7 +532,7 @@ public final class CallEpiNode extends Node {
     return _live;
   }
 
-  @Override public boolean unify( GVNGCM gvn, boolean test ) {
+  @Override public boolean unify( boolean test ) {
     // Build a HM tvar (args->ret), same as HM.java Apply does.  Instead of
     // grabbing a 'fresh' copy of 'Ident' (see HM.java) we grab it fresh at the
     // use point below, by calling 'fresh_unify' which acts as-if a fresh copy

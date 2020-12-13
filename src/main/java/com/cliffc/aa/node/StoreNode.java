@@ -148,7 +148,7 @@ public class StoreNode extends Node {
     return _fin==st._fin && Util.eq(_fld,st._fld);
   }
 
-  @Override public boolean unify( GVNGCM gvn, boolean test ) {
+  @Override public boolean unify( boolean test ) {
     boolean progress=false;
     // Self should always should be a TMem
     TVar tvar = tvar();

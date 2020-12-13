@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -725,6 +726,7 @@ public class FunNode extends RegionNode {
         Env.DEFMEM.make_mem(gvn,oorg.nnn()._alias,oorg);
         int oldalias = BitsAlias.parent(oorg.nnn()._alias);
         gvn.set_def_reg(Env.DEFMEM,oldalias,gvn.add_work(gvn.con(TypeObj.UNUSED)));
+        oorg._tvar = new TVar(); // Force new H-M unification of memory
       }
 
       if( nn instanceof FunPtrNode ) { // FunPtrs pick up the new fidx
@@ -821,12 +823,8 @@ public class FunNode extends RegionNode {
         Type twrk = wrk.val();
         Type tmem0 = twrk instanceof TypeTuple ? ((TypeTuple)twrk).at(1) : twrk;
         if( !(tmem0 instanceof TypeMem) ) continue;
-        TypeMem tmem = (TypeMem)tmem0;
-        boolean un=false;
-        for( int alias = aliases.nextSetBit(0); alias != -1; alias = aliases.nextSetBit(alias + 1))
-          if( tmem.at(alias)!= TypeObj.UNUSED )
-            { un=true; break; }
-        if( un ) {
+        // Has any used values?
+        if( has_used((TypeMem)tmem0,aliases) ) {
           Type tval = wrk.value(opt_mode);
           if( twrk != tval ) {
             wrk.set_val(tval);
@@ -841,6 +839,12 @@ public class FunNode extends RegionNode {
     }
   }
 
+  private static boolean has_used(TypeMem tmem, BitSet aliases) {
+    for( int alias = aliases.nextSetBit(0); alias != -1; alias = aliases.nextSetBit(alias + 1))
+      if( tmem.at(alias)!= TypeObj.UNUSED )
+        return true;            // Has a not-unused (some used) type
+    return false;
+  }
 
   // Compute value from inputs.  Simple meet over inputs.
   @Override public Type value(GVNGCM.Mode opt_mode) {

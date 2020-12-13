@@ -130,7 +130,7 @@ public class MemSplitNode extends Node {
     if( !mjn.is_dead() )
       for( Node use : mjn._uses )
         if( use.is_mem() )    // Reunify to collect the other constraints
-          { use._tvar = new TVar();  use.unify(gvn,false); }
+          { use._tvar = new TVar();  use.unify(false); }
     return head1;
   }
   static boolean check_split( Node head1, BitsAlias head1_escs ) {
