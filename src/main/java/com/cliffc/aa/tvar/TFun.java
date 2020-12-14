@@ -1,8 +1,11 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
+import com.cliffc.aa.type.BitsAlias;
 import com.cliffc.aa.util.*;
 import java.util.HashSet;
+
+import static com.cliffc.aa.AA.MEM_IDX;
 
 // FunPtr TVar, a classic function tvar, mapping between a TArgs and a TRet.
 public class TFun extends TMulti<TFun> {
@@ -35,10 +38,20 @@ public class TFun extends TMulti<TFun> {
       args().push_dep(dep,null);
       ret ().push_dep(dep,null);
     }
+    TArgs argz; TRet retz;
+    BitsAlias news = BitsAlias.EMPTY; // New-in-function set; will not unify with pre-function memory
+    if( args() instanceof TArgs && (argz=(TArgs)args()).parm(MEM_IDX) instanceof TMem &&
+        ret () instanceof TRet  && (retz=(TRet )ret ()).parm(MEM_IDX) instanceof TMem ) {
+      TMem argmem = (TMem)argz.parm(MEM_IDX);
+      TMem retmem = (TMem)retz.parm(MEM_IDX);
+      for( int i=0; i<retmem._parms.length; i++ )
+        if( retmem._parms[i]!=null && (i>=argmem._parms.length || argmem._parms[i]==null) )
+          news = news.set(i);
+    }
     NonBlockingHashMap<TVar,TVar> dups = new NonBlockingHashMap<>();
     return                                          // If testing, still must call both to check for progress
-      args()._fresh_unify(args,_nongen,dups,test) | // NO SHORT-CIRCUIT: NOTE: '|' NOT '||'
-      ret ()._fresh_unify(ret ,_nongen,dups,test);  // Must do both halves always
+      args()._fresh_unify(args,news,_nongen,dups,test) | // NO SHORT-CIRCUIT: NOTE: '|' NOT '||'
+      ret ()._fresh_unify(ret ,news,_nongen,dups,test);  // Must do both halves always
   }
 
   // Pretty print

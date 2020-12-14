@@ -1,6 +1,7 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
+import com.cliffc.aa.type.BitsAlias;
 import com.cliffc.aa.util.*;
 
 import java.util.HashSet;
@@ -13,7 +14,7 @@ public class TVDead<T extends TVDead<T>> extends TVar {
   @Override final boolean _will_unify(TVar tv, int cnt) { return true; }
 
   // Return a "fresh" copy, preserving structure
-  @Override boolean _fresh_unify( TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
+  @Override boolean _fresh_unify( TVar tv, BitsAlias news, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
     throw com.cliffc.aa.AA.unimpl(); 
   }
 

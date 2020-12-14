@@ -1,6 +1,7 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
+import com.cliffc.aa.type.BitsAlias;
 import com.cliffc.aa.util.*;
 
 import java.util.Arrays;
@@ -84,7 +85,7 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
 
 
   // Return a "fresh" copy, preserving structure
-  @Override boolean _fresh_unify( TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
+    @Override boolean _fresh_unify( TVar tv, BitsAlias news, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
     assert _u==null;             // At top
     if( this==tv ) return false; // Already unified
     TVar prior = dups.get(this); // Get a replacement, if any
@@ -112,9 +113,11 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     for( int i=0; i<_parms.length; i++ ) {
       TVar parm = parm(i);
       if( parm != null ) {      // No parm means no additional structure
+        if( news.test_recur(i) )
+          continue;             // New-in-function, does not unify with pre-function
         TVar tvparm = tmulti.parm(i);
         if( tvparm==null ) tmulti._parms[i] = tvparm = new TVar();
-        progress |= parm._fresh_unify(tvparm, nongen, dups, test);
+        progress |= parm._fresh_unify(tvparm, news, nongen, dups, test);
       }
     }
     return progress;

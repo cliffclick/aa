@@ -1,6 +1,7 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
+import com.cliffc.aa.type.BitsAlias;
 import com.cliffc.aa.util.*;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -87,7 +88,7 @@ public class TVar implements Comparable<TVar> {
   boolean _will_unify(TVar tv, int cnt) { return true; }
 
   // Return a "fresh" copy, preserving structure
-  boolean _fresh_unify(TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
+  boolean _fresh_unify(TVar tv, BitsAlias news, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
     assert _u==null;             // At top
     if( this==tv || tv instanceof TVDead ) return false; // Short cut
     if( occurs_in(nongen) ) {    // If 'this' is in the non-generative set, use 'this'
