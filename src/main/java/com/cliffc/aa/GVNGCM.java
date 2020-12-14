@@ -419,7 +419,7 @@ public class GVNGCM {
         !(n instanceof RetNode) &&        // Keep for proper errors
         !(n instanceof ConNode) ) {       // Already a constant
       n._in=false;          // Replace non-constants with high (dead) constants
-      return con(oval);
+      return con(Type.ANY);
     }
 
     // [ts!] Compute best type, and type is IN ts

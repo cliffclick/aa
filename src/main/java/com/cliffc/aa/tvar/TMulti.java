@@ -88,10 +88,10 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     assert _u==null;             // At top
     if( this==tv ) return false; // Already unified
     TVar prior = dups.get(this); // Get a replacement, if any
-    if( prior != null ) {
+    if( prior != null ) {            // Found prior
       if( prior==tv ) return false;  // Already unified
-      if( !test ) prior._unify0(tv); // Force equivalence
-      return true;
+      if( !test ) prior._unify0(tv); // Force structural equivalence
+      return true;                   // Progress
     }
     dups.put(this,tv);          // Stop recursive cycles, record structure mapping
     

@@ -324,8 +324,8 @@ public final class CallEpiNode extends Node {
         if( fidxs.test_recur(ret._fidx) ) { // Can be wired, but later fidx is removed
           Type tret = ret.val();
           if( !(tret instanceof TypeTuple) ) tret = tret.oob(TypeTuple.RET);
-          tmem = tmem.meet(((TypeTuple)tret).at(1));
-          trez = trez.meet(((TypeTuple)tret).at(2));
+          tmem = tmem.meet(((TypeTuple)tret).at(MEM_IDX));
+          trez = trez.meet(((TypeTuple)tret).at(REZ_IDX));
         }
       }
     }
@@ -351,14 +351,12 @@ public final class CallEpiNode extends Node {
       boolean eout = esc_out       .test_recur(i);
       pubs[i] = live_out_gcp(ein,eout,caller_mem.at(i),post_call.at(i),opt_mode,defnode.in(i));
     }
-    Type tmem3 = TypeMem.make0(pubs);
-
+    TypeMem tmem3 = TypeMem.make0(pubs);
 
     // Lift memory according to H-M typing
-    if( tv instanceof TArgs )
-      tmem3 = unify_lift(tmem3,((TArgs)tv).parm(1));
+    Type tmem4 = tv instanceof TArgs ? unify_lift(tmem3,((TArgs)tv).parm(1)) : tmem3;
 
-    return TypeTuple.make(Type.CTRL,tmem3,trez);
+    return TypeTuple.make(Type.CTRL,tmem4,trez);
   }
 
   static BitsAlias esc_out( TypeMem tmem, Type trez ) {
