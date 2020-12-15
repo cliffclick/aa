@@ -5,6 +5,10 @@ public class Util {
     for( int i=0; i<es.length; i++ ) if( es[i]==e ) return i;
     return -1;
   }
+  public static <E> int find( E[] es, E e ) {
+    for( int i=0; i<es.length; i++ ) if( es[i]==e ) return i;
+    return -1;
+  }
 
   // String-equals, with expected interned strings
   public static boolean eq( String s0, String s1 ) {

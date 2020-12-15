@@ -33,6 +33,8 @@ public class TObj extends TMulti<TObj> {
     throw com.cliffc.aa.AA.unimpl();
   }
 
+  int find(String fld) { return Util.find(_flds,fld); }
+  
   // Pretty print
   @Override SB _str(SB sb, VBitSet bs, boolean debug) {
     sb.p("@{ ");
