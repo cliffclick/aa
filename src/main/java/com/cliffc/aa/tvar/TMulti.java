@@ -131,10 +131,11 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     return tvs;
   }
 
-  void grow( int nlen ) {
+  TVar[] grow( int nlen ) {
     int len = _parms.length;
     while( nlen > len ) len<<=1;
     if( len != _parms.length ) _parms = Arrays.copyOf(_parms,len);
+    return _parms;
   }
 
   // Flipped: does 'id' occur in 'this'
