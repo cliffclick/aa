@@ -439,10 +439,8 @@ public abstract class Node implements Cloneable, TNode {
   public TypeMem all_live() { return TypeMem.LIVE_BOT; }
   // We have a 'crossing optimization' point: changing the pointer input to a
   // Load or a Scope changes the memory demanded by the Load or Scope.  Same:
-  // changing a def._type changes the use._live, requiring other defs to be
-  // revisited.  For Calls, changing the input function type to something low
-  // means the call can resolve it - unresolved fptrs are not live.
-  public boolean input_value_changes_live() { return _op==OP_SCOPE || _op==OP_LOAD || _op==OP_CALLEPI || _op==OP_TYPE; }
+  // changing a def._type changes the use._live, requiring other defs to be revisited.
+  public boolean input_value_changes_live() { return false; }
   public boolean value_changes_live() { return _op==OP_CALL; }
   public boolean live_changes_value() { return false; }
 

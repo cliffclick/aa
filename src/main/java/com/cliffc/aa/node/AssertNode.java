@@ -104,6 +104,8 @@ public class AssertNode extends Node {
     // reached from the address.
     return ScopeNode.compute_live_mem(mem(),arg());
   }
+  // Changing rez to/from a pointer changes live.
+  @Override public boolean input_value_changes_live() { return true; }
 
   // Check TypeNode for being in-error
   @Override public ErrMsg err( boolean fast ) {

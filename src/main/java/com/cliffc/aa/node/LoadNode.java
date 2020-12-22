@@ -211,6 +211,8 @@ public class LoadNode extends Node {
     // Only named the named field from the named aliases is live.
     return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld);
   }
+  // Changing adr inputs from ANY to ALL flips the sense of LIVE.
+  @Override public boolean input_value_changes_live() { return true; }
 
   @Override public boolean unify( boolean test ) {
     // Input should be a TMem

@@ -143,6 +143,8 @@ public class ScopeNode extends Node {
     assert def == mem();
     return opt_mode==GVNGCM.Mode.Parse ? TypeMem.ALLMEM : _live;
   }
+  // Changing rez to/from a pointer changes live.
+  @Override public boolean input_value_changes_live() { return true; }
 
   @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal

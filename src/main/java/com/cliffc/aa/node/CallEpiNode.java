@@ -529,6 +529,9 @@ public final class CallEpiNode extends Node {
       return TypeMem.DEAD;    // Call does not call this, so not alive.
     return _live;
   }
+  // Changing the input function type to something low means the call can
+  // resolve it - unresolved fptrs are not live.
+  @Override public boolean input_value_changes_live() { return true; }
 
   @Override public boolean unify( boolean test ) {
     // Build a HM tvar (args->ret), same as HM.java Apply does.  Instead of
