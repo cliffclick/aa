@@ -28,6 +28,16 @@ public class TVar implements Comparable<TVar> {
   public TVar(          ) { this(new TNode[0]); }
   private TVar( TNode[] tns ) { _ns = new Ary<>(tns); _uid = UID++; }
 
+  // A TNode resets its TVar.  Remove all instances & start afresh.
+  public TVar reset_tnode(TNode tn) {
+    if( _ns!=null ) {
+      int idx = _ns.find(tn);
+      if( idx != -1 ) _ns.remove(idx);
+    }
+    return new TVar(tn);
+  }
+
+
   // U-F Find
   public TVar find() {
     if( _u   == null ) return this;
@@ -38,16 +48,27 @@ public class TVar implements Comparable<TVar> {
     while( v != u ) { _u = u; v = v._u; }
     return u;
   }
+  // Find without the Union bit
+  public TVar debug_find() {
+    if( _u   == null ) return this;
+    if( _u._u== null ) return _u;
+    TVar u = _u;                // Find top of U-F
+    while( u._u != null ) u = u._u;
+    return u;
+  }
 
   // Structural unification, "this into that".
+  // Returns true for progress.
   // Top-level entry point, not recursive.
-  public final TVar unify(TVar tv) { return _unify0(tv); }
+  public final boolean unify(TVar tv, boolean test) { return _unify0(tv, test); }
 
   // Recursive entry point for unification.
-  TVar _unify0(TVar tv) {
-    if( this==tv ) return this; // Done!
+  boolean _unify0(TVar tv, boolean test) {
+    assert _u==null && tv._u==null;
+    if( this==tv ) return false; // Done!
     if( compareTo(tv) > 0 )
-      return tv._unify0(this); // Canonicalize unification order
+      return tv._unify0(this,test); // Canonicalize unification order
+    if( test ) return true;
     // Unify this into that
     _u = tv;
     if( _ns != null ) {         // Also merge TNodes
@@ -68,7 +89,7 @@ public class TVar implements Comparable<TVar> {
     _deps = _ns = null;
     // Unify parts
     _unify(tv);
-    return tv;
+    return true;
   }
 
   // Unify parts, varies by subclass.
@@ -88,13 +109,12 @@ public class TVar implements Comparable<TVar> {
   boolean _will_unify(TVar tv, int cnt) { return true; }
 
   // Return a "fresh" copy, preserving structure
-  boolean _fresh_unify(TVar tv, BitsAlias news, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
+  boolean _fresh_unify(int cnt, TVar tv, BitsAlias news, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
     assert _u==null;             // At top
     if( this==tv || tv instanceof TVDead ) return false; // Short cut
-    if( occurs_in(nongen) ) {    // If 'this' is in the non-generative set, use 'this'
-      if( !test ) _unify0(tv);   // Unify with LHS always reports progress
-      return true;
-    }
+    if( occurs_in(nongen) )      // If 'this' is in the non-generative set, use 'this'
+      return _unify0(tv,test);   // Unify with LHS
+
     // Use a 'fresh' TVar, but keep the structural properties: if it appears
     // only once, unification with fresh is a no-op.  So instead record as-if
     // unified with fresh.  Only progress if using for the 2nd time.
@@ -103,9 +123,9 @@ public class TVar implements Comparable<TVar> {
       dups.put(this,tv);            // Record mapping
       return false;                 // No progress
     }
-    if( prior==tv ) return false;
-    if( !test ) prior._unify0(tv); // Force structural equivalence
-    return true;                // Progress
+    TVar prior2 = prior.find();
+    if( prior2==tv ) return false;
+    return prior2._unify0(tv,test); // Force structural equivalence
   }
 
   // Does 'this' occur in the nongen set, recursively.
@@ -168,30 +188,34 @@ public class TVar implements Comparable<TVar> {
   // Type-variable structure print
   SB _str(SB sb, VBitSet bs, boolean debug) { return (_ns==null || _ns._len==0) ? sb.p("V").p(_uid) : sb; } // No special fields
 
-  // Dead is always least; then plain TVars; then any other TVar type.
+  // Dead & Nil are always least; then plain TVars; then any other TVar type.
   // Two equal classes order by uid.
   @Override public int compareTo(TVar tv) {
     if( this==tv ) return 0;
-    if( this instanceof TVDead ) return -1;
+    if( this instanceof TVDead ) return -1; // TVDead always wins
     if( tv   instanceof TVDead ) return  1;
+    if( this instanceof TNil   ) return -1; // TNil always loses
+    if( tv   instanceof TNil   ) return  1;
     boolean istv0 =    getClass()==TVar.class;
     boolean istv1 = tv.getClass()==TVar.class;
-    if( istv0 && !istv1 ) return -1;
+    if( istv0 && !istv1 ) return -1; // Plain TVars ahead of others
     if( !istv0 && istv1 ) return  1;
-    return _uid - tv._uid;
+    return tv._uid - _uid;      // Two random subclasses sort by uid
   }
 
-  // Push on deps list.  Returns true if already on the deps lift (no change).
-  void       push_dep (    TNode  tn  , VBitSet visit) {        merge_dep (tn  ); }
+  // Push on deps list.  Returns the merged list.
+  TNode      push_dep (    TNode  tn  , VBitSet visit) { return merge_dep (tn  ); }
   Ary<TNode> push_deps(Ary<TNode> deps, VBitSet visit) { return merge_deps(deps); }
-  final void merge_dep(TNode tn) {
-    if( tn.is_dead() ) return;
+  final TNode merge_dep(TNode tn) {
+    if( tn.is_dead() ) return tn;
     if( _deps==null ) _deps = new Ary<>(TNode.class);
     if( _deps.find(tn)==-1 )
       _deps.push(tn);
+    return tn;
   }
+  // Push on deps list.  Returns the merged list.
   final Ary<TNode> merge_deps(Ary<TNode> deps) {
-    if( deps==null ) return deps;
+    if( deps==null ) return _deps;
     deps.filter_update(e->!e.is_dead());
     if( _deps==null ) _deps = deps;
     else {
@@ -201,7 +225,7 @@ public class TVar implements Comparable<TVar> {
           _deps.push(tn);
     }
     if( _deps._len==0 ) _deps=null;
-    return deps;
+    return _deps;
   }
 
 }

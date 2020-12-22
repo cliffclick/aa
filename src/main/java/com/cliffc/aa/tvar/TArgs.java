@@ -15,8 +15,8 @@ public class TArgs extends TMulti<TArgs> {
   }
   public final int nargs() { return _parms.length; }
 
-  // Already checks same class, no cycles, not infinite recursion, non-zero parms will_unify.
-  @Override boolean _will_unify0(TArgs targs) {
+  // Already checks same class, no cycles, not infinite recursion, non-null parms will_unify.
+  @Override boolean _will_unify0(TArgs targs, int cnt) {
     return _parms.length == targs._parms.length ||
       (!_unpacked && !targs._unpacked);
   }

@@ -4,7 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.TNode;
-import com.cliffc.aa.tvar.TVar;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
@@ -75,7 +75,8 @@ public abstract class Node implements Cloneable, TNode {
     return tv == _tvar ? tv : (_tvar = tv); // Update U-F style in-place.
   }
   public TVar _tvar() { return _tvar; } // For debug prints
-  public TVar tvar(int x) { return in(x).tvar(); }
+  public TVar tvar(int x) { return in(x).tvar(); } // nth TVar
+  public void reset_tvar() { _tvar = _tvar.reset_tnode(this); }
   public TNode[] parms() { throw unimpl(); } // Used to build structural TVars
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.

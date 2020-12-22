@@ -278,7 +278,7 @@ public class Parse implements Comparable<Parse> {
   private Node stmt(boolean lookup_current_scope_only) {
     if( peek('^') ) {           // Early function exit
       Node ifex = ifex();
-      if( ifex==null ) ifex=_gvn.con(Type.XNIL);
+      if( ifex==null ) ifex=Env.XNIL;
       if( _e._par._par==null )
         return err_ctrl1(Node.ErrMsg.syntax(this,"Function exit but outside any function"));
       return _e.early_exit(this,ifex);
@@ -331,7 +331,7 @@ public class Parse implements Comparable<Parse> {
     }
 
     // Normal statement value parse
-    Node ifex = default_nil ? con(Type.XNIL) : ifex(); // Parse an expression for the statement value
+    Node ifex = default_nil ? Env.XNIL : ifex(); // Parse an expression for the statement value
     if( ifex == null ) {        // No statement?
       if( toks._len == 0 ) return  null;
       ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
@@ -350,7 +350,7 @@ public class Parse implements Comparable<Parse> {
       if( scope==null ) {                    // Token not already bound at any scope
         if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
           ((FunPtrNode)ifex).fun().bind(tok); // Debug only: give name to function
-        create(tok,con(Type.XNIL),TypeStruct.FRW); // Create at top of scope as ~scalar.
+        create(tok,Env.XNIL,TypeStruct.FRW);  // Create at top of scope as ~scalar.
         scope = scope();              // Scope is the current one
         scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
       }
@@ -395,7 +395,7 @@ public class Parse implements Comparable<Parse> {
     scope().flip_if();          // Flip side of tracking new defs
     set_ctrl(gvn(new CProjNode(ifex.unhook(),0))); // Control for false branch
     set_mem(old_mem);           // Reset memory to before the IF
-    Node fex = peek(':') ? stmt() : con(Type.XNIL);
+    Node fex = peek(':') ? stmt() : Env.XNIL;
     if( fex == null ) fex = err_ctrl2("missing expr after ':'");
     fex.keep();                    // Keep until merge point
     Node f_ctrl= ctrl().keep();    // Keep until merge point
@@ -703,7 +703,7 @@ public class Parse implements Comparable<Parse> {
     // Need a load/call/store sensible options
     Node n;
     if( scope==null ) {         // Token not already bound to a value
-      create(tok,con(Type.XNIL),ts_mutable(true));
+      create(tok,Env.XNIL,ts_mutable(true));
       scope = scope();
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
@@ -838,7 +838,7 @@ public class Parse implements Comparable<Parse> {
 
     // Build the tuple from gathered args
     TypeStruct mt_tuple = TypeStruct.make(false,new String[]{"^"},TypeStruct.ts(Type.XNIL),new byte[]{TypeStruct.FFNL},true);
-    NewObjNode nn = new NewObjNode(false,BitsAlias.REC,mt_tuple,con(Type.XNIL));
+    NewObjNode nn = new NewObjNode(false,BitsAlias.REC,mt_tuple,Env.XNIL);
     for( int i=0; i<args._len; i++ )
       nn.create_active((""+i).intern(),args.at(i),TypeStruct.FFNL);
     nn._fld_starts = bads.asAry();
@@ -998,7 +998,7 @@ public class Parse implements Comparable<Parse> {
     val .add_def(rez   );
     set_ctrl(Env.XCTRL);
     set_mem (con(TypeMem.XMEM));
-    return   con(Type.XNIL   ) ;
+    return Env.XNIL;
   }
 
   /** A balanced operator as a fact().  Any balancing token can be used.

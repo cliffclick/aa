@@ -71,27 +71,21 @@ public class MrgProjNode extends ProjNode {
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def==in(0) ? TypeMem.ALIVE : _live; }
 
   @Override public boolean unify( boolean test ) {
-    boolean progress=false;
-    // Self should always should be a TMem
+    if( !(in(0) instanceof NewNode) ) return false;
+    // Self always should be a TMem
     TVar tvar = tvar();
-    if( !(tvar instanceof TMem) ) {
-      if( tvar instanceof TVDead ) return false; // Not gonna be a TMem
-      progress=true;            // Would make progress
-      if( !test ) tvar = tvar.unify(new TMem(this));
-    }
-    // Input should be a TMem also
-    Node mem = mem();
-    TVar tmem = mem.tvar();
-    if( !(tmem instanceof TMem) ) {
-      if( tmem instanceof TVDead ) return false; // Not gonna be a TMem
-      progress=true;            // Would make progress
-      if( !test ) tmem = tmem.unify(new TMem(mem));
-    }
-    // If flipped one or the other to TMem, also one-time TMem unify interiors
-    if( !test && progress )
-      ((TMem)tvar).unify_alias((TMem)tmem,BitsAlias.make0(nnn()._alias),nnn().tvar());
-
-    return progress;
+    if( tvar instanceof TVDead ) return false; // Not gonna be a TMem
+    if( !(tvar instanceof TMem) )
+      return test || tvar.unify(new TMem(this),false);
+    // Input memory always should be a TMem
+    TVar tmem = mem().tvar();
+    if( !(tmem instanceof TMem) )
+      return test || tmem.unify(new TMem(mem()),false);
+    // Unify with input memory, alias by alias
+    if( ((TMem)tvar).unify_mem(nnn().escapees(),mem().tvar(),mem(),test) )
+      return true;
+    // Unify TMem interiors with new TObj
+    return ((TMem)tvar).unify_alias(nnn()._alias,nnn().tvar(),test);
   }
 
 }

@@ -20,7 +20,6 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
-
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
     // The Meet loses precision to fast.  This is a typing bug.

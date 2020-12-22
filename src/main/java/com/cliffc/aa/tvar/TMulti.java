@@ -47,8 +47,10 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     for( int i=0; i<_parms.length; i++ ) {
       TVar tn0 =       parm(i);
       TVar tn1 = targs.parm(i);
-      if( tn0!=null && tn1!=null ) // Dead always unifies
-        tn0._unify0(tn1);
+      if( tn0!=null ) {        // Null (shortcut for plain TVar) always unifies
+        if( tn1==null ) targs.grow(i+1)[i] = tn0;
+        else tn0._unify0(tn1,false);
+      }
     }
     _parms = null;              // No longer need parts from 'this'
   }
@@ -57,7 +59,7 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
   static final NonBlockingHashMapLong<Integer> CYC = new NonBlockingHashMapLong<>();
   static       boolean CYC_BUSY=false;
   @SuppressWarnings("unchecked")
-  @Override final boolean _will_unify(TVar tv, int cnt) {
+  @Override boolean _will_unify(TVar tv, int cnt) {
     if( this==tv ) return true;
     if( tv.getClass()==TVar.class ) return true;
     if( getClass()!=tv.getClass() ) return false;    // Same subclasses
@@ -75,27 +77,27 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
       if( tn0!=null && tn1!=null && !tn0._will_unify(tn1,cnt+1) )
         return false;
     }
-    return _will_unify0(tmulti);
+    return _will_unify0(tmulti,cnt);
   }
   // Subclass specific tests:
   // - TArg: requires same length or both are "unpacked"
   // - TMem: "extra" values are kept on both sides and will unify
   // - TObj: all field names must match
-  abstract boolean _will_unify0(T tm);
+  abstract boolean _will_unify0(T tm, int cnt);
 
 
   // Return a "fresh" copy, preserving structure
-    @Override boolean _fresh_unify( TVar tv, BitsAlias news, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
+  @Override boolean _fresh_unify( int cnt, TVar tv, BitsAlias news, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
     assert _u==null;             // At top
     if( this==tv ) return false; // Already unified
+    cnt++;  assert cnt<100;      // Infinite recursion check
     TVar prior = dups.get(this); // Get a replacement, if any
-    if( prior != null ) {            // Found prior
+    if( prior != null ) {        // Found prior
       if( prior==tv ) return false;  // Already unified
-      if( !test ) prior._unify0(tv); // Force structural equivalence
-      return true;                   // Progress
+      return test || prior.find()._unify0(tv,false); // Force structural equivalence
     }
     dups.put(this,tv);          // Stop recursive cycles, record structure mapping
-    
+
     boolean progress = false;
     if( getClass() != tv.getClass() ){// Make a TMulti, unify to 'tv' and keep unifying.  And report progress.
       assert tv.getClass() == TVar.class;
@@ -103,21 +105,31 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
       progress = true;          // Forcing tv into a TMulti/TRet shape
       tv._u = _fresh_new();     // Fresh TMulti, with all empty parms
       tv._u._ns = tv._ns;       // Copy any nodes to the fresh
-      tv._ns = null;
+      tv._u.push_deps(tv._deps,null);// Copy any deps
       tv = tv._u;               // This is the new unified 'tv'
     }
-
     // Same subclass 'this' and 'tv'
-    TMulti tmulti = (TMulti)tv;
-    tmulti.grow(_parms.length);
+    return _fresh_unify_recursive(cnt, progress, (TMulti)tv, news, nongen, dups, test);
+  }
+  // Recursive call for all parms
+  boolean _fresh_unify_recursive(int cnt, boolean progress, TMulti tmulti, BitsAlias news, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
+    // Same subclass 'this' and 'tv'
+    if( test && tmulti._parms.length < _parms.length ) return true;
+    if( tmulti._parms.length < _parms.length ) {
+      TNode.add_work_all(tmulti._ns);
+      tmulti.grow(_parms.length);
+    }
     for( int i=0; i<_parms.length; i++ ) {
       TVar parm = parm(i);
       if( parm != null ) {      // No parm means no additional structure
-        if( news.test_recur(i) )
+        if( this instanceof TMem && news.test_recur(i) )
           continue;             // New-in-function, does not unify with pre-function
         TVar tvparm = tmulti.parm(i);
-        if( tvparm==null ) tmulti._parms[i] = tvparm = new TVar();
-        progress |= parm._fresh_unify(tvparm, news, nongen, dups, test);
+        if( tvparm==null ) {
+          tmulti._parms[i] = tvparm = new TVar();
+          tvparm.push_deps(tmulti._deps,null);
+        }
+        progress |= parm._fresh_unify(cnt,tvparm, news, nongen, dups, test);
       }
     }
     return progress;
@@ -177,20 +189,21 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     return sb.p("]");
   }
 
-  @Override void push_dep(TNode tn, VBitSet visit) {
+  @Override TNode push_dep(TNode tn, VBitSet visit) {
     assert _deps==null;
     if( visit==null ) visit = new VBitSet();
-    if( visit.tset(_uid) ) return;
+    if( visit.tset(_uid) ) return tn;
     for( int i=0; i<_parms.length; i++ ) {
       TVar parm = parm(i);
       if( parm != null ) parm.push_dep(tn,visit);
     }
+    return tn;
   }
   @Override Ary<TNode> push_deps(Ary<TNode> deps, VBitSet visit) {
-    if( deps==null ) return deps;
+    if( deps==null ) return null;
     assert _deps==null;
     if( visit==null ) visit = new VBitSet();
-    if( visit.tset(_uid) ) return deps;
+    if( visit.tset(_uid) ) return null;
     for( int i=0; i<_parms.length; i++ ) {
       TVar parm = parm(i);
       if( parm != null ) parm.push_deps(deps,visit);

@@ -12,42 +12,103 @@ import com.cliffc.aa.util.VBitSet;
 public class TMem extends TMulti<TMem> {
 
   public TMem(TNode mem) { super(mem,new TVar[1]); }
-  public TMem(TVar[] parms) { super(null,parms); }
 
   // Already checks same class, no cycles, not infinite recursion, non-zero parms will_unify.
-  @Override boolean _will_unify0(TMem tv) { return true; }
+  @Override boolean _will_unify0(TMem tv, int cnt) { return true; }
 
-  @Override TMem _fresh_new() { return new TMem(new TVar[_parms.length]); }
+  @Override TMem _fresh_new() { return new TMem(null); }
 
-  // Unify two TMems alias by alias, except at the given aliases unify this
-  // with the given TVar.  Do not merge their TNode sets, since this is not a
-  // unifying the two TMems directly.
-  public void unify_alias(TMem tmem, BitsAlias aliases, TVar tv) {
-    int alen = aliases.max()+1; // Length of aliases
-    grow(alen);
-    for( int i=0; i<_parms.length; i++ ) {
-      TVar lhs =      parm(i);
-      TVar rhs = tmem.parm(i);
-      if( i<alen && aliases.test_recur(i) ) rhs = tv;
-      if( rhs==null ) continue; // Nothing to unify
-      if( lhs==null ) {         // No LHS, assume as-if a new TVar
-        _parms[i] = rhs;        // Set to RHS
-        rhs.push_deps(_deps,null);
+  // Used by Loads.  Unify tv against all aliases at this field only.  Aliases
+  // are either produced by the Parser (so very generic) or from forwards-flow
+  // from News and very specific.  Ignore the generic ones until they refine.
+  // TODO: As aliases further refine, need to undo-redo prior unifies against
+  // larger/weaker aliases.
+  public boolean unify_alias_load(BitsAlias aliases, String fld, TVar tv, TNode dep, boolean test) {
+    boolean progress=false;
+    for( int alias : aliases ) {
+      if( alias <= BitsAlias.AARY ) return false; // No unify on parser-specific values
+      TVar parm = parm(alias);
+      if( parm instanceof TObj ) {
+        progress = ((TObj)parm).unify_fld(fld,tv,test);
+      } else {
+        TObj tvo = new TObj(null).add_fld(fld,tv);
+        if( parm==null ) {
+          if( test ) return true;    // Definitely will be progress
+          TNode.add_work(tvo.push_dep(dep,null)); // If a new alias, it gets the deps
+          TNode.add_work_all(_deps);
+          grow(alias+1)[alias] = tvo;
+          progress = true;
+        } else {
+          progress = parm.unify(tvo,test);
+        }
       }
-      else lhs.unify(rhs);
+      if( test && progress ) return progress; // Shortcut
     }
+    return progress;
+  }
+
+  // Used by MrgProj and MemJoin, unify alias by alias, but not the main TMem
+  public boolean unify_mem( BitsAlias aliases, TVar tv, TNode mem, boolean test ) {
+    if( !(tv instanceof TMem) ) return false; // No progress until its a TMem
+    boolean progress = false;
+    TMem tmem = (TMem)tv;
+    int len = Math.max(_parms.length,tmem._parms.length);
+    for( int i=1; i<len; i++ ) {
+      if( aliases.test(i) ) continue;  // Not the given aliases
+      TVar tv0 =      parm(i);
+      TVar tv1 = tmem.parm(i);
+      if( tv0!=null && tv1 != null ) progress = tv0.unify(tv1,test);
+      else {
+        if( test ) return true; // Always progress
+        TVar tx = tv0==null ? (tv1==null ? new TVar() : tv1) : tv0;
+        grow(i+1)[i] = tmem.grow(i+1)[i] = tx;
+        progress = true;
+      }
+    }
+    if( !test && progress ) TNode.add_work(push_dep(mem,null));
+    return progress;
+  }
+
+  // Used by MrgProj with only the alias.
+  public boolean unify_alias(int alias, TVar tv, boolean test) {
+    TVar lhs = parm(alias);
+    if( lhs==null ) {            // No LHS, assume as-if a new TVar
+      if( !test ) {              // If not testing
+        grow(alias+1)[alias] = tv; // Set to RHS
+        tv.push_deps(_deps,null);
+      }
+      return true;
+    }
+    return lhs.unify(tv,test);
+  }
+  // Used by MemJoin with the set of aliases
+  public boolean unify_alias(BitsAlias aliases, TMem tmem, boolean test) {
+    boolean progress = false;
+    for( int alias : aliases ) {
+      TVar parm = tmem.parm(alias);
+      if( parm != null )        // Might not be anything yet
+        progress |= unify_alias(alias,parm,test);
+    }
+    return progress;
   }
 
   // Pretty print
   @Override SB _str(SB sb, VBitSet bs, boolean debug) {
     sb.p("[ ");
-    for( int i=0; i<_parms.length; i++ )
-      if( _parms[i]!=null ) _parms[i].str(sb.p(i).p(':'),bs,debug).p(' ');
+    for( int i=0; i<_parms.length; i++ ) {
+      TVar p = _parms[i];
+      if( p!=null ) {
+        if( p.getClass()==TVar.class && p._u==null )
+          continue;             // Do not print plain TVars for all aliases
+        if( i==7 ) sb.p("7:PRIMS ");
+        else p.str(sb.p(i).p(':'),bs,debug).p(' ');
+      }
+    }
     return sb.p("]");
   }
 
 
-  @Override void push_dep(TNode tn, VBitSet visit) {
+  @Override TNode push_dep(TNode tn, VBitSet visit) {
     // Merge and keep all deps lists.  Since null aliases are a shortcut for "a
     // new TVar appears here later" that TVar needs the deps list when it appears.
     merge_dep(tn);        // Merge dependents lists
@@ -56,6 +117,7 @@ public class TMem extends TMulti<TMem> {
       TVar parm = parm(i);
       if( parm != null ) parm.push_dep(tn,visit);
     }
+    return tn;
   }
   @Override Ary<TNode> push_deps(Ary<TNode> deps, VBitSet visit) {
     if( deps==null ) return deps;

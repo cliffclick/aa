@@ -54,7 +54,8 @@ public class GVNGCM {
       if( def != null && def != n )
         add_work(def);
   }
-  void add_work_all(Ary<TNode> deps) { for( TNode tn : deps ) add_work((Node)tn); }
+  void add_work    (    TNode  dep ) {                                         add_work((Node)dep); }
+  void add_work_all(Ary<TNode> deps) { if( deps!=null ) for( TNode tn : deps ) add_work((Node)tn); }
 
   // A second worklist, for code-expanding and thus lower priority work.
   // Inlining happens off this worklist, once the main worklist runs dry.
@@ -370,10 +371,7 @@ public class GVNGCM {
         nnn._live = (TypeMem)nnn._live.meet(old._live); // Union of liveness
         add_work_defs(nnn);                             // Push liveness uphill
       }
-      replace(old,nnn);
-      nnn.keep();               // Keep-alive
-      kill0(old);               // Delete the old n, and anything it uses
-      add_work(nnn.unhook());   // Remove keep-alive and be sure to visit
+      add_work(subsume0(old,nnn)); // Subsume 'old' with 'nnn' and nuke 'old'.
     }
   }
 
@@ -461,14 +459,22 @@ public class GVNGCM {
     return nnn;                 // Keep nnn.
   }
 
-  // Replace, but do not delete old.  Really used to insert a node in front of old.
-  public void replace( Node old, Node nnn ) {
+  // Complete replacement; point uses to 'nnn' and removes 'old'.
+  public Node subsume( Node old, Node nnn ) { unreg0(old); return subsume0(old,nnn); }
+  public Node subsume0( Node old, Node nnn ) {
+    assert !nnn.is_dead();
     // When replacing one node with another, unify their type vars
-    if( !nnn.is_dead() && !old.is_dead() )
-      old.tvar().unify(nnn.tvar());
-    insert(old,nnn);
+    if( !old.is_dead() ) old.tvar().unify(nnn.tvar(), false);
+    insert(old,nnn);            // Change graph shape
+    nnn.keep();                 // Keep-alive
+    kill0(old);                 // Delete the old n, and anything it uses
+    return nnn.unhook();        // Remove keep-alive
   }
-  // Replace, but do not delete old.  Really used to insert a node in front of old.
+
+  // Replace, but do not delete old.  Really used to insert a node in front of
+  // old.  Does graph-structure changes, making pointers-to-old point to nnn.
+  // Changes neither 'old' nor 'nnn'.  Does not enforce any monotonicity nor
+  // unification.
   public void insert( Node old, Node nnn ) {
     while( old._uses._len > 0 ) {
       Node u = old._uses.del(0);  // Old use
@@ -480,35 +486,32 @@ public class GVNGCM {
       if( was ) {            // If was in GVN
         _vals.putIfAbsent(u,u);// Back in the table, since its still in the graph
         add_work(u);         // And put on worklist, to get re-visited
-        if( u instanceof RetNode )
-          add_work_uses(u); // really trying to get CallEpi to test trivial inline again
-        if( u instanceof MemSplitNode ) {
-          Node puse = ProjNode.proj(u, 0);
-          if( puse != null ) add_work_uses(puse);
-        }
-        if( u instanceof RegionNode )
-          for( Node useuse : u._uses )
-            if( useuse instanceof PhiNode )
-              add_work(useuse);
-        if( nnn instanceof MProjNode && nnn.in(0) instanceof MemSplitNode )
-          add_work_uses(u); // Trying to get Join/Merge/Split to fold up
-        if( u instanceof StoreNode ) // Load/Store fold up
-          for( Node n : u._uses ) if( n instanceof LoadNode ) add_work(n);
-        if( u instanceof CallNode )
-          for( Node n : u._uses ) if( n instanceof CallEpiNode ) add_work(n);
-        if( u instanceof DefMemNode )
-          add_work_uses(u); // Killing a New triggers value rollups on most CallEpis
-        if( nnn.in(0) != null ) add_work(nnn.in(0));
+        add_work_insert_use(nnn,u);
       }
     }
   }
 
-  // Complete replacement; point uses to 'nnn'.  The goal is to completely replace 'old'.
-  public Node subsume( Node old, Node nnn ) {
-    replace(old,nnn);
-    nnn.keep();                 // Keep-alive
-    kill(old);                  // Delete the old n, and anything it uses
-    return nnn.unhook();        // Remove keep-alive
+  // Add selected users of 'old' when replaced by 'nnn' to trigger more ideal() calls.
+  private void add_work_insert_use(Node nnn, Node u) {
+    if( u instanceof RetNode )
+      add_work_uses(u); // really trying to get CallEpi to test trivial inline again
+    if( u instanceof MemSplitNode ) {
+      Node puse = ProjNode.proj(u, 0);
+      if( puse != null ) add_work_uses(puse);
+    }
+    if( u instanceof RegionNode )
+      for( Node useuse : u._uses )
+        if( useuse instanceof PhiNode )
+          add_work(useuse);
+    if( nnn instanceof MProjNode && nnn.in(0) instanceof MemSplitNode )
+      add_work_uses(u); // Trying to get Join/Merge/Split to fold up
+    if( u instanceof StoreNode ) // Load/Store fold up
+      for( Node n : u._uses ) if( n instanceof LoadNode ) add_work(n);
+    if( u instanceof CallNode )
+      for( Node n : u._uses ) if( n instanceof CallEpiNode ) add_work(n);
+    if( u instanceof DefMemNode )
+      add_work_uses(u); // Killing a New triggers value rollups on most CallEpis
+    if( nnn.in(0) != null ) add_work(nnn.in(0));
   }
 
   // Once the program is complete, any time anything is on the worklist we can

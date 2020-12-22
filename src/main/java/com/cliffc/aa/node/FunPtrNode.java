@@ -27,7 +27,7 @@ public final class FunPtrNode extends Node {
     _referr = referr;
     // Add the "non-generative" set to the TFun structure, but no other
     // structural is available (args and ret are new TVars).
-    tvar().unify(new TFun(this,e == null ? null : e.collect_active_scope(),new TVar(),new TVar()));
+    tvar().unify(new TFun(this,e == null ? null : e.collect_active_scope(),new TVar(),new TVar()),false);
   }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }
@@ -117,11 +117,9 @@ public final class FunPtrNode extends Node {
     TArgs targs = new TArgs(fun,true);
     TVar tret  = ret.tvar();
     if( tvar.args().eq(targs) &&
-        tvar.ret ().eq(tret ) )
+        tvar.ret () == tret  )
       return false;             // No progress
-    if( !test )
-      tvar.unify(new TFun(this,tvar._nongen,targs,tret));
-    return true;
+    return test || tvar.unify(new TFun(this,tvar._nongen,targs,tret),false);
   }
 
   // Filter out all the wrong-arg-count functions
@@ -196,7 +194,7 @@ public final class FunPtrNode extends Node {
   @SuppressWarnings("unchecked")
   @Override @NotNull public FunPtrNode copy( boolean copy_edges, GVNGCM gvn) {
     FunPtrNode nnn = (FunPtrNode)super.copy(copy_edges, gvn);
-    nnn.tvar().unify(new TFun(nnn,((TFun)_tvar)._nongen,new TVar(),new TVar()));
+    nnn.tvar().unify(new TFun(nnn,((TFun)_tvar)._nongen,new TVar(),new TVar()),false);
     return nnn;
   }
 }

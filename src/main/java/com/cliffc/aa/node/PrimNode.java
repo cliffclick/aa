@@ -536,7 +536,7 @@ public abstract class PrimNode extends Node {
       Node rez = gvn.xform(new  ProjNode(cep,AA.REZ_IDX));
       // Region merging results
       Node reg = gvn.xform(new RegionNode(null,fal,ccc));
-      Node phi = gvn.xform(new PhiNode(Type.SCALAR,null,reg,gvn.con(Type.XNIL),rez ));
+      Node phi = gvn.xform(new PhiNode(Type.SCALAR,null,reg,Env.XNIL,rez ));
       Node phim= gvn.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
       // Plug into self & trigger is_copy
       set_def(0,reg ,gvn);

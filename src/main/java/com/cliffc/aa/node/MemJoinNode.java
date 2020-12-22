@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Ary;
 
 // Join a split set of aliases from a SESE region, split by an earlier MemSplit.
@@ -128,6 +129,37 @@ public class MemJoinNode extends Node {
   }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 
+  // Unify alias-by-alias, except on the alias sets
+  @Override public boolean unify( boolean test ) {
+    // Self has to be a TMem
+    TVar tvar = tvar();
+    if( tvar instanceof TVDead ) return false; // Not gonna be a TMem
+    if( !(tvar instanceof TMem) )
+      return test || tvar.unify(new TMem(this),test);
+    TMem tvarm = (TMem)tvar;
+
+    // Inputs should be TMems also
+    boolean progress = false;
+    for( Node def : _defs ) {
+      TVar dmem = def.tvar();
+      if( dmem instanceof TVDead ) return progress; // Not gonna be a TMem
+      if( !(dmem instanceof TMem) )
+        progress |= dmem.unify(new TMem(def),test);
+    }
+    if( test && progress ) return progress;
+
+    // Base has to be a TMem
+    TMem tbasem = (TMem)tvar(0);
+    // Unify aliases outside of the esc set from the base
+    Ary<BitsAlias> escs = msp()._escs;
+    progress |= tvarm.unify_mem(escs.at(0),tbasem,this,test);
+
+    // Unify inputs alias by alias
+    for( int i=1; i<_defs._len; i++ )
+      progress |= tvarm.unify_alias(escs.at(i),(TMem)tvar(i),test);
+    return progress;
+  }
+
   // Move the given SESE region just ahead of the split into the join/split
   // area.  The head node has the escape-set.
   MemJoinNode add_alias_above( GVNGCM gvn, Node head ) {
@@ -147,7 +179,7 @@ public class MemJoinNode extends Node {
     // Resort edges to move SESE region inside
     mprj.keep();  base.keep();
     gvn.set_def_reg(msp,1,head.in(1)); // Move Split->base edge to Split->head.in(1)
-    gvn.replace(mprj,base);            // Move split mprj users to base
+    gvn.insert(mprj,base);             // Move split mprj users to base
     gvn.set_def_reg(head,1,mprj);      // Move head->head.in(1) to head->MProj
     mprj.unhook();   base.unhook();
     // Moving things inside the Split/Join region might let types get
@@ -170,6 +202,7 @@ public class MemJoinNode extends Node {
     if( base != head ) head.xliv(gvn._opt_mode);
     mprj.xliv(gvn._opt_mode);
     msp .xliv(gvn._opt_mode);
+    // TODO: Re-establish H-M invariants
     return this;
   }
 

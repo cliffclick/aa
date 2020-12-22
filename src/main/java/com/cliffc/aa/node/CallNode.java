@@ -350,10 +350,11 @@ public class CallNode extends Node {
   // Swap a New and a Call, when we cannot use a Split/Join.
   private Node swap_new(GVNGCM gvn, Node cepim, MrgProjNode mrg ) {
     cepim.keep();
-    gvn.replace(cepim,mrg);
+    gvn.insert(cepim,mrg);
     set_def(1,mrg.mem(),gvn);
     gvn.set_def_reg(mrg,1,cepim.unhook());
     gvn.revalive(this,cepim.in(0),cepim,mrg);
+    // TODO: Re-establish H-M invariants
     return this;
   }
 
@@ -711,11 +712,10 @@ public class CallNode extends Node {
     // Gather incoming args.  NOT an application point (yet), that is a CallEpi.
     TVar tvar = tvar();
     if( tvar instanceof TArgs &&
-        ((TArgs)tvar)._unpacked == _unpacked &&
-        ((TArgs)tvar).nargs() == nargs() ) // Unpack can change arg counts
+        (((TArgs)tvar)._unpacked == _unpacked ||
+         ((TArgs)tvar).nargs() == nargs()) ) // Unpack can change arg counts
       return false;
-    if( !test ) tvar.unify(new TArgs(this,_unpacked));
-    return true;                // Progress
+    return test || tvar.unify(new TArgs(this,_unpacked),false); // Progress
   }
 
 

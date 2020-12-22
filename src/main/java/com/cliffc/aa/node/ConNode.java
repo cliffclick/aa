@@ -5,6 +5,7 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeLive;
 import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.tvar.TNil;
 import com.cliffc.aa.tvar.TVDead;
 
 import java.util.function.Predicate;
@@ -16,6 +17,7 @@ public class ConNode<T extends Type> extends Node {
     _t=t;
     // Specifically, no unifcation with ANY/Dead
     if( t==Type.ANY ) _tvar = new TVDead();
+    else if( t==Type.XNIL ) _tvar = new TNil();
   }
   // Used by FunPtrNode
   ConNode( byte type, T tfp, RetNode ret, Node closure ) { super(type,ret,closure); _t = tfp; }

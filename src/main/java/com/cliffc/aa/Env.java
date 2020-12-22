@@ -15,6 +15,7 @@ public class Env implements AutoCloseable {
   public static   DefMemNode DEFMEM;// Default memory (all structure types)
   public static      ConNode ALL_CTRL; // Default control
   public static      ConNode XCTRL; // Always dead control
+  public static      ConNode XNIL;  // Common XNIL
   // Set of all display aliases, used to track escaped displays at call sites for asserts.
   public static BitsAlias ALL_DISPLAYS = BitsAlias.EMPTY;
   // Set of lexically active display aliases, used for a conservative display
@@ -66,13 +67,14 @@ public class Env implements AutoCloseable {
 
     // Top-level default values; ALL_CTRL is used by declared functions to
     // indicate that future not-yet-parsed code may call the function.
-    ALL_CTRL = GVN.init(new ConNode<>(Type.CTRL));
-    XCTRL = GVN.init(new ConNode<>(Type.XCTRL)).keep();
+    ALL_CTRL= GVN.init(new ConNode<>(Type.CTRL ));
+    XCTRL   = GVN.init(new ConNode<>(Type.XCTRL)).keep();
+    XNIL    = GVN.init(new ConNode<>(Type.XNIL )).keep();
     // Initial control & memory
-    START  = (StartNode)GVN.xform(new StartNode(       ));
-    CTL_0  = (CProjNode)GVN.xform(new CProjNode(START,0));
-    DEFMEM = (DefMemNode)GVN.xform(new DefMemNode(CTL_0));
-    MEM_0  = (StartMemNode)GVN.xform(new StartMemNode(START));
+    START  = (   StartNode)GVN.xform(new    StartNode(       ));
+    CTL_0  = (   CProjNode)GVN.xform(new    CProjNode(START,0));
+    DEFMEM = (  DefMemNode)GVN.xform(new   DefMemNode(  CTL_0));
+    MEM_0  = (StartMemNode)GVN.xform(new StartMemNode(START  ));
     // Top-most (file-scope) lexical environment
     Env top = new Env();
     // Top-level display defining all primitives

@@ -52,8 +52,7 @@ public class MProjNode extends ProjNode {
     TVar tvar = tvar();
     if( tvar instanceof TMem ) return false;
     // Always should be a TMem
-    if( !test ) tvar.unify(new TMem(this));
-    return true;                // Progress
+    return test || tvar.unify(new TMem(this),false); // Progress
   }
 
 }

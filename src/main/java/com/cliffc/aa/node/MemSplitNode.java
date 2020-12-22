@@ -3,7 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.TVar;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
@@ -42,6 +42,20 @@ public class MemSplitNode extends Node {
     return TypeTuple.make(ts);
   }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
+
+  @Override public boolean unify( boolean test ) {
+    TVar tvar = tvar();
+    if( tvar instanceof TVDead ) return false; // Not gonna be a TMem
+    if( !(tvar instanceof TMem) )
+      return test || tvar.unify(new TMem(this),test);
+    // Input should be a TMem also
+    TVar dmem = mem().tvar();
+    if( dmem instanceof TVDead ) return false; // Not gonna be a TMem
+    if( !(dmem instanceof TMem) )
+      return test || dmem.unify(new TMem(this),test);
+    return tvar.unify(dmem,test);
+  }
+
 
   // Find the escape set this esc set belongs to, or make a new one.
   int add_alias( GVNGCM gvn, BitsAlias esc ) {
@@ -129,8 +143,8 @@ public class MemSplitNode extends Node {
     // anything inside it
     if( !mjn.is_dead() )
       for( Node use : mjn._uses )
-        if( use.is_mem() )    // Reunify to collect the other constraints
-          { use._tvar = new TVar();  use.unify(false); }
+        if( use.is_mem() ) // Reunify to collect the other constraints
+          { use.reset_tvar(); gvn.add_work_uses(use); }
     return head1;
   }
   static boolean check_split( Node head1, BitsAlias head1_escs ) {

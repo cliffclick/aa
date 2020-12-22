@@ -167,8 +167,12 @@ public class NewObjNode extends NewNode<TypeStruct> {
     TVar tvar = tvar();
     if( tvar instanceof TObj ||
         tvar instanceof TVDead ) return false; // Not gonna be a TMem
-    if( !test ) tvar.unify(new TObj(this,_ts._flds));
-    return true;
+    if( test ) return true;                    // Would make progress
+    // Make a TObj
+    TObj tvo = new TObj(this);
+    for( int i=0; i<_ts._flds.length; i++ )
+      tvo.add_fld(_ts._flds[i],tvar(def_idx(i)));
+    return tvar.unify(tvo,false);      // ...and unify with it
   }
 
   @Override public TNode[] parms() {

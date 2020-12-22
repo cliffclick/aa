@@ -726,7 +726,7 @@ public class FunNode extends RegionNode {
         Env.DEFMEM.make_mem(gvn,oorg.nnn()._alias,oorg);
         int oldalias = BitsAlias.parent(oorg.nnn()._alias);
         gvn.set_def_reg(Env.DEFMEM,oldalias,gvn.add_work(gvn.con(TypeObj.UNUSED)));
-        oorg._tvar = new TVar(); // Force new H-M unification of memory
+        oorg.reset_tvar();      // Force new H-M unification of memory
       }
 
       if( nn instanceof FunPtrNode ) { // FunPtrs pick up the new fidx
@@ -800,8 +800,8 @@ public class FunNode extends RegionNode {
 
     // Retype memory, so we can everywhere lift the split-alias parents "up and
     // out".
-    retype_mem(gvn._opt_mode,aliases,this.parm(MEM_IDX));
-    retype_mem(gvn._opt_mode,aliases,fun .parm(MEM_IDX));
+    retype_mem(gvn,aliases,this.parm(MEM_IDX));
+    retype_mem(gvn,aliases,fun .parm(MEM_IDX));
 
     // Unhook the hooked FunPtrs
     for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) use.unhook();
@@ -813,7 +813,7 @@ public class FunNode extends RegionNode {
   // 'iter').  Used when inlining, and the inlined body needs to acknowledge
   // bypasses aliases.  Used during code-clone, to lift the split alias parent
   // up & out.
-  private static void retype_mem(GVNGCM.Mode opt_mode, BitSet aliases, Node mem) {
+  private static void retype_mem(GVNGCM gvn, BitSet aliases, Node mem) {
     Ary<Node> work = new Ary<>(new Node[1],0);
     work.push(mem);
     // Update all memory ops
@@ -825,9 +825,10 @@ public class FunNode extends RegionNode {
         if( !(tmem0 instanceof TypeMem) ) continue;
         // Has any used values?
         if( has_used((TypeMem)tmem0,aliases) ) {
-          Type tval = wrk.value(opt_mode);
+          Type tval = wrk.value(gvn._opt_mode);
           if( twrk != tval ) {
             wrk.set_val(tval);
+            gvn.add_work_uses(wrk);
             if( wrk instanceof MProjNode && wrk.in(0) instanceof CallNode ) {
               CallEpiNode cepi = ((CallNode)wrk.in(0)).cepi();
               if( cepi != null ) work.push(cepi);

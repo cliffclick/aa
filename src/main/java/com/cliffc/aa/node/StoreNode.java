@@ -44,7 +44,11 @@ public class StoreNode extends Node {
         (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
       // Update the value, and perhaps the final field
       nnn.update(idx,_fin,rez(),gvn);
+      // Reset types & H-M; the old value in mem@fld is gone.
       gvn.revalive(mem);
+      nnn.reset_tvar();
+      mem.reset_tvar();
+      rez().reset_tvar();
       return mem;               // Store is replaced by using the New directly.
     }
 
@@ -149,35 +153,32 @@ public class StoreNode extends Node {
   }
 
   @Override public boolean unify( boolean test ) {
-    boolean progress=false;
     // Self should always should be a TMem
     TVar tvar = tvar();
-    if( !(tvar instanceof TMem) ) {
-      if( tvar instanceof TVDead ) return false; // Not gonna be a TMem
-      progress=true;            // Would make progress
-      if( !test ) tvar = tvar.unify(new TMem(this));
-    }
+    if( tvar instanceof TVDead ) return false; // Not gonna be a TMem
+    if( !(tvar instanceof TMem) )
+      return test || tvar.unify(new TMem(this),false);
     // Input should be a TMem also
     Node mem = mem();
     TVar tmem = mem.tvar();
-    if( !(tmem instanceof TMem) ) {
-      if( tmem instanceof TVDead ) return false; // Not gonna be a TMem
-      progress=true;            // Would make progress
-      if( !test ) tmem = tmem.unify(new TMem(mem));
-    }
-    // Unify incoming & outgoing memory, modulo the stored value
-    if( !test && progress ) {
-      // Address needs to name the aliases
-      Type tadr = adr().val();
-      if( !(tadr instanceof TypeMemPtr) )
-        tadr = tadr.oob(TypeMemPtr.ISUSED);
-      TypeMemPtr tmp = (TypeMemPtr)tadr;
-      // Unify all memory
-      //tvar.unify(tmem);
-      // Also unify at the given alias & field name
-      //((TMem)tvar).unify_alias((TMem)tmem,(TypeMemPtr)tadr,val().tvar());
-    }
-    return progress;
+    if( tmem instanceof TVDead ) return false; // Not gonna be a TMem
+    if( !(tmem instanceof TMem) )
+      return test || tmem.unify(new TMem(mem),false);
+    // Address needs to name the aliases
+    Type tadr = adr().val();
+    if( !(tadr instanceof TypeMemPtr) )
+      return false;
+    TypeMemPtr tmp = (TypeMemPtr)tadr;
+
+    // Unify all deep memory aliases, but not the top-level self-memory: We
+    // output a new memory value, and it is not the same as incoming memory.
+    // TODO: If we have a Precise replacement (single alias, no recursion) then
+    // do not unify with incoming memory at alias - this is a true replacement.
+    ((TMem)tvar).unify_mem(BitsAlias.EMPTY,tmem,mem(),test);
+
+    // Unify the given aliases and field against the stored type
+    return ((TMem)tvar).unify_alias_load(tmp._aliases,_fld,rez().tvar(),mem,test);
+
   }
 
 }

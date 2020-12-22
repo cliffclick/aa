@@ -13,12 +13,17 @@ public class TFun extends TMulti<TFun> {
 
   public TFun(TNode fptr, HashSet<TVar> nongen, TVar args, TVar ret) { super(fptr,new TVar[]{args,ret}); _nongen = nongen; }
   private TFun() { this(null,null,new TVar(),new TVar()); }
-
+  @Override public TVar reset_tnode(TNode tn) {
+    int idx = _ns.find(tn);
+    if( idx!=-1 ) _ns.remove(idx);
+    return new TFun(tn,_nongen,new TVar(),new TVar());
+  }
+  
   public TVar args() { return parm(0); }
   public TVar ret () { return parm(1); }
 
   // Already checks same class, no cycles, not infinite recursion, non-zero parms will_unify.
-  @Override boolean _will_unify0(TFun tfun) { assert _parms.length==2 && tfun._parms.length==2; return true; }
+  @Override boolean _will_unify0(TFun tfun, int cnt) { assert _parms.length==2 && tfun._parms.length==2; return true; }
   @Override TFun _fresh_new() { return new TFun(); }
 
   // Unify 'this' into 'that', except make a 'fresh' clone of 'this' before
@@ -50,8 +55,8 @@ public class TFun extends TMulti<TFun> {
     }
     NonBlockingHashMap<TVar,TVar> dups = new NonBlockingHashMap<>();
     return                                          // If testing, still must call both to check for progress
-      args()._fresh_unify(args,news,_nongen,dups,test) | // NO SHORT-CIRCUIT: NOTE: '|' NOT '||'
-      ret ()._fresh_unify(ret ,news,_nongen,dups,test);  // Must do both halves always
+      args()._fresh_unify(0,args,news,_nongen,dups,test) | // NO SHORT-CIRCUIT: NOTE: '|' NOT '||'
+      ret ()._fresh_unify(0,ret ,news,_nongen,dups,test);  // Must do both halves always
   }
 
   // Pretty print

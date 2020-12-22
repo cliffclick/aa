@@ -506,8 +506,8 @@ public final class CallEpiNode extends Node {
     }
     gvn.add_work(ret);
     del(_defs.find(ret));
-    _tvar = TRet.fresh_new();   // Reset TVar; removed CG edge, so also remove H-M constraint
-    unify(false);               // Reunify to collect the other constraints
+    reset_tvar();
+    unify(false);
     assert sane_wiring();
   }
 
@@ -538,10 +538,8 @@ public final class CallEpiNode extends Node {
     Node fdx = call().fdx();
     TVar tfunv = fdx.tvar();
     if( tfunv instanceof TVDead ) return false; // Not gonna be a TFun
-    if( !(tfunv instanceof TFun) ) {
-      if( !test ) tfunv.unify(new TFun(fdx,null,new TVar(),new TVar()));
-      return true;
-    }
+    if( !(tfunv instanceof TFun) )              // Progress
+      return test || tfunv.unify(new TFun(fdx,null,new TVar(),new TVar()),false);
     // Actual progress only if the structure changes.
     return ((TFun)tfunv).fresh_unify(call().tvar(),tvar(),test,this);
   }

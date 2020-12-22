@@ -156,7 +156,8 @@ public final class RetNode extends Node {
     ParmNode parm = fun.parm(argn);
     if( parm==null ) return; // arg/parm might be dead
     PhiNode phi = new PhiNode(parm._t,parm._badgc,loop,null,call.arg(argn));
-    gvn.replace(parm,phi);
+    phi._tvar = parm.tvar();    // H-M unify
+    gvn.insert(parm,phi);
     phi.set_def(1,parm,null);
     phi._live = parm._live;
     gvn.rereg(phi, parm.val());
@@ -190,8 +191,7 @@ public final class RetNode extends Node {
     if( tvar instanceof TRet ) return false;
     // RetNodes are structural copies of their inputs, reflect this in their
     // type variables
-    if( !test ) tvar.unify(new TRet(this));
-    return true;                // Progress
+    return test || tvar.unify(new TRet(this),false); // Progress
   }
 
   @Override public Node is_copy(int idx) { throw com.cliffc.aa.AA.unimpl(); }
