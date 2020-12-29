@@ -791,11 +791,15 @@ public class Type<T extends Type<T>> implements Cloneable {
   // unification.  e.g. "3" becomes "int64".
   public Type widen() {
     switch( _type ) {
-    case TNUM:
-    case TXNUM:
-    case TXREAL:
-    case TREAL: return SCALAR;
-    default: return this;
+    case TNUM:    case TXNUM:
+    case TREAL:   case TXREAL:
+    case TSCALAR: case TXSCALAR:
+      return SCALAR;
+    case TCTRL: case TXCTRL:
+    case TNIL : case TXNIL :
+    case TANY : case TALL  :
+      return this;
+    default: throw typerr(null); // Overridden in subclass
     }
   }
 

@@ -936,18 +936,19 @@ public class TestLattice {
   }
 
   // Same as Lattice10, except no centerline constants; everything is either up
-  // or down.  Still not a Lattice.
+  // or down.  Still not a Lattice.  The MEET of {+2+5} and &6 is either {2&6}
+  // or {5&6}, no GLB.
   // The following is NOT a lattice (matches pic#7).  Set elements are 2,5,6
   // and are all independent sets (siblings in the tree).
   //
   //         {+2+5+6}
   //        /    |   \
   //  {+2+5}  {+2+6}  {+5+6}
-  //    |  /  \    /   \   |
+  //    | /  \      /  \  |
   //   +2       +5       +6
   //    |        |        |
   //   &2       &5       &6
-  //    |  \  /    \   /   |
+  //    | \  /      \  /  |
   //  { 2&5}  { 2&6}  { 5&6}
   //        \    |   /
   //         { 2&5&6}
@@ -1184,6 +1185,61 @@ public class TestLattice {
     oorx234.set_dual(and_234);
     
     test(oorx234);
+  }
+
+
+  // Same as lattice 12, except using a high & low empty sets.
+  // Set elements are 2,5,6 and are all independent sets (siblings in the tree).
+  //
+  //         {+2+5+6}
+  //        /    |   \
+  //  {+2+5}  {+2+6}  {+5+6}
+  //    |  /  \    /   \   |
+  //   +2       +5       +6
+  //     \       |      /
+  //            [+]               -- high empty
+  //            [ ]               -- low  empty
+  //     /       |      \
+  //   &2       &5       &6
+  //    |  \  /    \   /   |
+  //  { 2&5}  { 2&6}  { 5&6}
+  //        \    |   /
+  //         { 2&5&6}
+  @Test public void testLattice12d() {
+    N.reset();
+    N x256 = new N("{ 2&5&6}");
+
+    N x25  = new N("{ 2&5}",x256);
+    N x26  = new N("{ 2&6}",x256);
+    N x56  = new N("{ 5&6}",x256);
+
+    N x2   = new N("&2",x25,x26);
+    N x5   = new N("&5",x25,x56);
+    N x6   = new N("&6",x26,x56);
+
+    N mt   = new N("[]",x2,x5,x6);
+
+    N o2   = new N("+2",mt);
+    N o5   = new N("+5",mt);
+    N o6   = new N("+6",mt);
+
+    N o25  = new N("{+2+5}",o2,o5);
+    N o26  = new N("{+2+6}",o2,o6);
+    N o56  = new N("{+5+6}",o5,o6);
+
+    N o256 = new N("{+2+5+6}",o25,o26,o56);
+
+    // Mark the non-centerline duals
+    x256.set_dual(o256);
+    x25 .set_dual(o25 );
+    x26 .set_dual(o26 );
+    x56 .set_dual(o56 );
+
+    x2  .set_dual(o2  );
+    x5  .set_dual(o5  );
+    x6  .set_dual(o6  );
+
+    test(o256);
   }
 
   // Same as testLattice12, except 6 is now nil... which is on the centerline.

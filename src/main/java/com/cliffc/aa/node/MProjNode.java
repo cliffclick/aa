@@ -2,8 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.TMem;
-import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
 
 // Proj memory
@@ -46,13 +44,4 @@ public class MProjNode extends ProjNode {
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // Only called here if alive, and input is more-than-basic-alive
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return _live; }
-
-  @Override public boolean unify( boolean test ) {
-    // Already a TMem?
-    TVar tvar = tvar();
-    if( tvar instanceof TMem ) return false;
-    // Always should be a TMem
-    return test || tvar.unify(new TMem(this),false); // Progress
-  }
-
 }

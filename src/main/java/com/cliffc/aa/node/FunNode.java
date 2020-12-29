@@ -346,7 +346,7 @@ public class FunNode extends RegionNode {
           if( def != this )
             tp = tp.join(def.val());
         if( !(tp instanceof TypeMemPtr) ) continue; // Not a pointer
-        TypeObj to = (TypeObj)((TypeMem)tmem).ld((TypeMemPtr)tp).widen(); //
+        TypeObj to = ((TypeMem)tmem).ld((TypeMemPtr)tp).widen(); //
         // Are all the uses of parm compatible with this TMP?
         // Also, flag all used fields.
         if( bad_mem_use(parm, to) )

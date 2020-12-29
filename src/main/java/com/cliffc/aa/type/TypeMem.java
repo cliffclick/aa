@@ -521,6 +521,15 @@ public class TypeMem extends Type<TypeMem> {
     return make0(tos);
   }
 
+  @Override public TypeMem widen() {
+    TypeObj[] tos = _pubs.clone();
+    tos[0] = null;
+    for( int i=1; i<tos.length; i++ )
+      if( tos[i]!=null )
+        tos[i] = tos[i].widen();
+    return make0(tos);
+  }
+
   @Override public boolean above_center() {
     for( TypeObj alias : _pubs )
       if( alias != null && !alias.above_center() && !alias.is_con() )

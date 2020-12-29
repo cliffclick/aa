@@ -1,20 +1,78 @@
-BUGS:
-BUG: At last pass, alias [12] still live into noinline_map call, prevents lifting values across call.
-BUG: MEET of [7+43+44] and [48] loses all the aboves.  Needs structure as a product of sums.
-     Definitely Phi/Meet of a unresolved-choice and a solid actual fidx.  The Unresolved needs to
-     be kept directly, and resolved at the ultimate use.
-
-BUG: Parse08, 2nd test, size-splits for a private inline, then FAILS TO INLINE after split, because
-     aliases remain conservative, so fails CallEpi tretmem.isa(tdef).
-     BAD FIX: Lower inlining for recursive fcns with 2+ News.
-     
-     BETTER FIX: if a New is not live-in to recursive call but yes live-out,
-     then LIFT during split; each side gets the lifted variant according to
-     calling self or calling the other split.
-
-
 =======================================
-Notes from 11/23/2020
+Notes from 12/28/2020
+
+Back around to basic theory.  Progress since last time: pushing H-M through
+most code, but then up against some basic stuff.
+
+MEMORY: Suppose I treat a H-M "pair" as memory, extending the 2 elements to N.
+As long as the index is a fixed constant (e.g. car,cdr on pairs), the H-M
+updates are fairly obvious: A "car!" or "cdr!" forces unification of the
+before-and-after.
+
+Example: pair (X,Y), "car! (X,Y) Z" results in (Z,Y) and unification of {X,Z}.
+If I extend car/cdr to a "store" with an unknown index, everything the index
+touches must unify.
+
+Example with a 4-wide "pair": (A,B,C,D), and a ptr with range 1-2, and then "st
+(A,B,C,D) ptr Q" --> (A,B&Q,C&Q,D) (maybe updates B or C) and forces
+unification of {B,Q,C}.  Later during "iter" ptr lifts from 1-2 to the constant
+1, and the store result lifts to (A,B&Q,C,D) and we should LOSE THE UNIFICATION
+of C and Q.  This is not monotonic!
+
+Same basic problem as dead-code on a test: (P ? A : B) unifies A and B, but if
+P becomes a constant this unification should be lost - and is not monotonic.
+
+This leads me back to Click thesis chpt3 - a need to express unification rules
+as equations, in order to get the basic theory right, and get back to some kind
+of monotonic solution.
+
+---Attempting to make a pair-of-nodes Unification Lattice:
+
+Using CCP from Click thesis directly, including jargon Lattice_c (for integer
+constants) and Lattice_u (for (un)reachable), shortcut: Lc and Lu.
+
+Lattice_unified (Lf): two Nodes are unified or not.  This is a 2-D bitwise
+relation.  We hope it becomes an equivalence class, with a distinguished
+Leader.  (As of 12/28/2020, seeing the need for a Leader & Followers).
+
+(X<=>Y) are unified if:
+      (X===Y)         +        // Reflexive
+      Y:=X            +        // Y is copied from X, includes Loads & Stores & Projections of Tuples.
+                               // And Y is marked as a Follower
+      (X_isa_Phi)&(X[1]<=>X[2]) & (X[1]<=>Y) + // IF Phi inputs are unified with each other, then also unified with Phi
+      VX=TOP          +        // Either is Value TOP
+      VY=TOP          +        // Either is Value TOP
+      VX=VY=c0        +        // All compute the same constant
+      ....
+
+Lattice_f does not hold onto the notion of Functions or Pairs or Oper.
+In H-M, Nodes have a constructed T expression which is shared with other Nodes:
+ - A unique numbered TVar; the same TVar can appear many times in a T expression
+ - A TMulti fixed-length tuple of TVars, indexed by constants
+ - A TArg, which is a TMulti of length 3+, [Ctrl TMem Arg1 Arg2...]
+ - A TRet, which is a TArg of length 3
+ - A TFun, which is a TMulti of a TArg and a TRet
+ - A TMem, which is a TMulti of length #aliases (program constant) of TObjs
+ - A TObj, which is a TMulti indexed by field name (one-to-one mapping from field name to field index), which hold TVars
+ - A TAry, which is a TMulti with a single element TVar (someday maybe the size).
+
+Typical equation-solving gives a unique TVar structure to *a Node*, but H-M
+solving gives a shared TVar structure, but this is for efficiency and not
+required.  
+
+Each H-M unification step either (1) succeeds and maybe grows the 'leaves' or
+(2) fails, and the program is in-error.  Success adds constraints to a T
+expression; if the sub-parts are shared then some other Nodes' T expression
+also changes.  If we do not share, then instead Lf is a per-Node T expression
+which monotonically grows.  This means we are computing a T expression
+per-Node.
+
+Given a T-expression & a Value type, we can force alignment by doing a JOIN.
+Which turns into, we can apply the H-M "fresh_unify" notion in the old Type
+system at Calls.
+
+
+======================================= Notes from 11/23/2020
 
 Blending H-M & Flow/Lattice Theory.
 

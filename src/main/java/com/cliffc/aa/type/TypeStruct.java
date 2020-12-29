@@ -1352,7 +1352,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return malloc(_name,false,_flds,ts,flags,_open).hashcons_free();
   }
   // Keep field names and orders.  Widen all field contents, including finals.
-  @Override public Type widen() {
+  @Override public TypeStruct widen() {
     Type[] ts = Types.clone(_ts);
     for( int i=0; i<ts.length; i++ )
       ts[i] = _ts[i].widen();

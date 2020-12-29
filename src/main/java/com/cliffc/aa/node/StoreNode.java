@@ -158,6 +158,7 @@ public class StoreNode extends Node {
     if( tvar instanceof TVDead ) return false; // Not gonna be a TMem
     if( !(tvar instanceof TMem) )
       return test || tvar.unify(new TMem(this),false);
+    TMem tvarm = (TMem)tvar;
     // Input should be a TMem also
     Node mem = mem();
     TVar tmem = mem.tvar();
@@ -174,10 +175,10 @@ public class StoreNode extends Node {
     // output a new memory value, and it is not the same as incoming memory.
     // TODO: If we have a Precise replacement (single alias, no recursion) then
     // do not unify with incoming memory at alias - this is a true replacement.
-    ((TMem)tvar).unify_mem(BitsAlias.EMPTY,tmem,mem(),test);
-
-    // Unify the given aliases and field against the stored type
-    return ((TMem)tvar).unify_alias_load(tmp._aliases,_fld,rez().tvar(),mem,test);
+    return
+      tvarm.unify_mem(BitsAlias.EMPTY,tmem,test) |
+      // Unify the given aliases and field against the stored type
+      tvarm.unify_alias_load(tmp._aliases,_fld,rez().tvar(),mem,test);
 
   }
 

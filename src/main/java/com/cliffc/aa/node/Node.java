@@ -498,8 +498,8 @@ public abstract class Node implements Cloneable, TNode {
       Node idl = ideal(gvn,level);
       if( idl != null )
         return true;            // Found an ideal call
-      if( unify(true) )
-        return true;            // Found more unification
+      //if( unify(true) )
+      //  return true;            // Found more unification
       Type t = value(gvn._opt_mode);
       if( _val != t )
         return true;            // Found a value improvement
@@ -518,7 +518,7 @@ public abstract class Node implements Cloneable, TNode {
     Type    oval= _val, nval = value(gvn._opt_mode);
     TypeMem oliv=_live, nliv = live (gvn._opt_mode);
     boolean hm = lifting && unify(true); // Progress-only check, and only during Pesi not Opto
-    if( nval != oval || nliv != oliv || hm ) {
+    if( nval != oval || nliv != oliv /*|| hm*/ ) {
       boolean ok = lifting
         ? nval.isa(oval) && nliv.isa(oliv)
         : oval.isa(nval) && oliv.isa(nliv);

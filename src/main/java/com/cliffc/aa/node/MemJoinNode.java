@@ -2,8 +2,11 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.TNode;
+import com.cliffc.aa.tvar.TMem;
+import com.cliffc.aa.tvar.TVDead;
+import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Ary;
 
 // Join a split set of aliases from a SESE region, split by an earlier MemSplit.
@@ -152,7 +155,11 @@ public class MemJoinNode extends Node {
     TMem tbasem = (TMem)tvar(0);
     // Unify aliases outside of the esc set from the base
     Ary<BitsAlias> escs = msp()._escs;
-    progress |= tvarm.unify_mem(escs.at(0),tbasem,this,test);
+    progress |= tvarm.unify_mem(escs.at(0),tbasem,test);
+    // If we widen the TMem here, all inputs will widen as well
+    if( !test && progress )
+      for( Node def : _defs )
+        TNode.add_work(def);
 
     // Unify inputs alias by alias
     for( int i=1; i<_defs._len; i++ )

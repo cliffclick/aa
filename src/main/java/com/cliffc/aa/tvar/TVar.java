@@ -3,6 +3,7 @@ package com.cliffc.aa.tvar;
 import com.cliffc.aa.TNode;
 import com.cliffc.aa.type.BitsAlias;
 import com.cliffc.aa.util.*;
+
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -22,7 +23,7 @@ public class TVar implements Comparable<TVar> {
 
 
   static private int UID=1;
-  final int _uid;
+  public final int _uid;
 
   public TVar( TNode tn ) { this(tn==null ? new TNode[0] : new TNode[]{tn}); }
   public TVar(          ) { this(new TNode[0]); }
@@ -96,11 +97,16 @@ public class TVar implements Comparable<TVar> {
   // Plain TVars have no structure and unify with all others.
   void _unify(TVar tv) { }
 
-  // Sorted, no dups.  Poor-mans assert
+  // Sorted, no dups.  JOIN of all Nodes is feasible.  Poor-mans assert.
   private boolean check_ns() {
-    for( int i=0; i<_ns._len-1; i++ )
+    //Type t = Type.ALL;
+    for( int i=0; i<_ns._len-1; i++ ) {
       if( _ns.at(i).uid() >= _ns.at(i+1).uid() || _ns.at(i).is_dead() )
         return false;
+      //t = t.join(_ns.at(i).val());
+      //if( t.above_center() )
+      //  return false;
+    }
     return true;
   }
 

@@ -82,7 +82,7 @@ public class MrgProjNode extends ProjNode {
     if( !(tmem instanceof TMem) )
       return test || tmem.unify(new TMem(mem()),false);
     // Unify with input memory, alias by alias
-    if( ((TMem)tvar).unify_mem(nnn().escapees(),mem().tvar(),mem(),test) )
+    if( ((TMem)tvar).unify_mem(nnn().escapees(),tmem.find(),test) )
       return true;
     // Unify TMem interiors with new TObj
     return ((TMem)tvar).unify_alias(nnn()._alias,nnn().tvar(),test);

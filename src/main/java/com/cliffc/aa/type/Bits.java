@@ -34,9 +34,29 @@ import java.util.Iterator;
 // function or a return-point, except for code-cloning (i.e. inlining).
 //
 // The tree-structure really defines a basic set-inclusion property which is
-// trivially a lattice; see https://en.wikipedia.org/wiki/Lattice_(order) pic#1.
-// However to get a lattice AND a dual we MUST have the empty element in the
-// middle.  The meet of +2 and +5 is... [], the empty set, and NOT [2&5].
+// trivially a lattice; see https://en.wikipedia.org/wiki/Lattice_(order)
+// pic#1.  However to get a lattice AND a dual we MUST have the empty element
+// in the middle.  The meet of -2 and -5 is... [], the empty set, and NOT
+// [2&5].  See TestLattice#10 for a failure test case.  Adding a dual lattice
+// without the empty-set also fails, see TestLattice#11.
+
+// TODO: Ponder a Plan B: No sets-of-siblings allowed.  Instead meet of
+// siblings goes straight to the tree LCA.  This means we only ever have 1 bit
+// set and Bits become a simple number (not an array of bits).  This means
+// the meet of two high siblings is the low parent, and not the empty set.
+
+// TODO: Ponder a Plan B: Meet of 2 unrelated FIDXS goes immediately to the
+// Most General FIDX, which defeats the Call-Graph discovery.  Related FIDXS
+// from e.g. FunNode split work great.  But a "map" style call taking any
+// generic function will immediately get several top-level FIDXS which will
+// immediately force the Most General FIDX for the map's function argument.
+//
+// TODO: FIDXS which can be Unresolved probably need to be under the same
+// parent (as opposed to the meet of 2 unrelated FIDXS going immediately to the
+// Most General FIDX).
+//
+// TODO: Ponder a Plan C: Bits are independent, always 'MEET', always all-up or
+// all-down.  Meet of [-2] and [-5] is [-2,-5]???
 
 public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Holds a set of bits meet'd together, or join'd together, along

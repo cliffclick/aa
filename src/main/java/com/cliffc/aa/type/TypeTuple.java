@@ -188,6 +188,13 @@ public class TypeTuple extends Type<TypeTuple> {
       ts[i] = ts[i].simple_ptr();
     return make0(_any,ts);
   }
+  
+  @Override public TypeTuple widen() {
+    Type[] ts = Types.get(_ts.length);
+    for( int i=0; i<ts.length; i++ )
+      ts[i] = _ts[i].widen();
+    return make(ts);
+  }
 
   // True if isBitShape on all bits
   @Override public byte isBitShape(Type t) {

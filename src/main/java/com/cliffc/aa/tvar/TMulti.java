@@ -32,7 +32,7 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
 
   // Get ith parm or null if OOB or null.
   // Do a find & update.
-  public final TVar parm(int i) {
+  public TVar parm(int i) {
     if( i >= _parms.length ) return null;
     TVar tv = _parms[i];
     if( tv==null ) return null;
@@ -44,6 +44,7 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
   @Override void _unify( TVar tv ) {
     assert _u!=null;            // Flagged as being unified
     TMulti targs = (TMulti)tv;
+    if( _parms.length != targs._parms.length ) TNode.add_work_all(targs._ns);
     for( int i=0; i<_parms.length; i++ ) {
       TVar tn0 =       parm(i);
       TVar tn1 = targs.parm(i);

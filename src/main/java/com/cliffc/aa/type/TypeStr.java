@@ -119,6 +119,6 @@ public class TypeStr extends TypeObj<TypeStr> {
     if( t._type==TNIL || t._type==Type.TSTR || t._type == TOBJ ) return 0;
     return 99;
   }
-  @Override public Type widen() { return STR; }
+  @Override public TypeStr widen() { return STR; }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
 }

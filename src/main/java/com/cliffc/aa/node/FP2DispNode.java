@@ -9,11 +9,12 @@ public final class FP2DispNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     // If at a FunPtrNode, it is only making a TFP out of a code pointer and a
     // display.  Become the display (dropping the code pointer).
-    Node disp = fptr2disp(in(0));
+    Node in0 = in(0);
+    Node disp = fptr2disp(in0);
     if( disp != null ) return disp;
     // If all inputs to an Unresolved are FunPtrs with the same Display, become that display.
-    if( in(0) instanceof UnresolvedNode ) {
-      for( Node in : in(0)._defs ) {
+    if( in0 instanceof UnresolvedNode ) {
+      for( Node in : in0._defs ) {
         Node disp2 = fptr2disp(in);
         if( disp==null ) disp = disp2;
         else if( disp!=disp2 )
@@ -21,6 +22,15 @@ public final class FP2DispNode extends Node {
       }
       return disp;
     }
+
+    // FP2Disp can move out of a Call, if the function has no Parm:mem - happens
+    // for single target calls that do not (have not yet) inlined.
+    if( in0 instanceof ProjNode && in0.in(0) instanceof CallNode ) {
+      int idx = ((ProjNode)in0)._idx;
+      Node fptr = in0.in(0).in(idx);
+      return set_def(0,fptr,gvn);
+    }
+
     return null;
   }
 

@@ -11,6 +11,8 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Arrays;
 import java.util.BitSet;
 
+// TODO: Parse12 gen test, seeing many back-to-back identical split/join.
+
 // Split a set of aliases into a SESE region, to be joined by a later MemJoin.
 // This allows more precision in the SESE that may otherwise merge many paths
 // in and out, and is especially targeting non-inlined calls.
@@ -19,6 +21,7 @@ public class MemSplitNode extends Node {
   public MemSplitNode( Node mem ) { super(OP_SPLIT,null,mem); }
   Node mem() { return in(1); }
   public MemJoinNode join() {
+    
     Node prj = ProjNode.proj(this,0);
     if( prj==null ) return null;
     return (MemJoinNode)prj._uses.at(0);

@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.TNode;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
@@ -416,10 +415,10 @@ public final class CallEpiNode extends Node {
       unwire(gvn,call,ret);
 
     // Update memory in the body with the not-escaped values (which had
-    // bypasses the body and now flow into it).
+    // bypassed the body and now flow into it).
     Ary<Node> work = new Ary<>(new Node[1],0);
-    MProjNode emprj = (MProjNode)ProjNode.proj(this,1);
-    MProjNode cmprj = (MProjNode)ProjNode.proj(call,1);
+    MProjNode emprj = (MProjNode)ProjNode.proj(this,MEM_IDX);
+    MProjNode cmprj = (MProjNode)ProjNode.proj(call,MEM_IDX);
     if( mem != call.mem() && cmprj !=null ) { // Most primitives do nothing with memory
       work.addAll(cmprj._uses);
       gvn.subsume(cmprj,call.mem());
@@ -544,23 +543,37 @@ public final class CallEpiNode extends Node {
     if( !(tfunv instanceof TFun) )              // Progress
       return test || tfunv.unify(new TFun(fdx,null,new TVar(),new TVar()),false);
     // Actual progress only if the structure changes.
-    return ((TFun)tfunv).fresh_unify(call().tvar(),tvar(),test,this);
+    //if( !((TFun)tfunv).fresh_unify(call().tvar(),tvar(),test,this) )
+    //  return false;
+    //if( !test )
+    //  for( Node cuse : call()._uses ) // If Call transitions from TVar to TArgs
+    //    TNode.add_work(cuse);         // Add proj users
+    //return true;
+    return false;
   }
 
   // H-M typing demands all unified Nodes have the same type... which is a
   // ASSERT/JOIN.  Hence the incoming type can be lifted to the join.
-  private static Type unify_lift(Type t, TVar tv) {
+  private Type unify_lift(Type t, TVar tv) {
     if( tv._ns == null || tv._ns._len==0 ) return t;
-    Type t2 = t;
-    for( int i=0; i<tv._ns._len; i++ ) {
-      TNode tn = tv._ns.at(i);
-      // Most of the unified Nodes are dead, unified because ideal() replaced
-      // them with another.  However, their Types do not update after the merge
-      // and become stale.  So no unify with the dead.
-      if( tn.is_dead() ) tv._ns.remove(i--);
-      else t2 = t2.join(tn.val().widen());
-    }
-    return t2;
+    // TODO: DISABLED FOR NOW, STILL SORTING OUT
+    //Type t2 = t;
+    //for( int i=0; i<tv._ns._len; i++ ) {
+    //  TNode tn = tv._ns.at(i);
+    //  // Most of the unified Nodes are dead, unified because ideal() replaced
+    //  // them with another.  However, their Types do not update after the merge
+    //  // and become stale.  So no unify with the dead.
+    //  if( tn.is_dead() ) tv._ns.remove(i--);
+    //  else if( tn instanceof ProjNode && ((ProjNode)tn).in(0)==this ) /*self projection: do nothing*/;
+    //  else {
+    //    Type t3 = tn.val();
+    //    Type t4 = tn instanceof MemSplitNode ? ((TypeTuple)t3).at(0) : t3;
+    //    Type t5 = t4.widen();
+    //    t2 = t2.join(t5);
+    //  }
+    //}
+    //return t2;
+    return t;
   }
 
 

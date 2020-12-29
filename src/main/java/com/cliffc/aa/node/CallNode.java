@@ -636,6 +636,37 @@ public class CallNode extends Node {
       else if( mt_hi==formal.dual() ) flags|=HIGH;
       else if( mt_lo==formal ) flags|=GOOD; // handles some display cases with prims hi/lo inverted
       else flags|=BAD;                      // Side-ways is bad
+
+      // TEST IS BROKEN FOR PTRS
+      /**
+Because a collection of bits forming a simple tree with simple set-inclusion
+will NOT form a lattice without the EMPTY set in the middle.  Thus the join of
+[26] and [30] (two unrelated sibling aliases) is [] and not [-26-30].
+
+Here we want to allow a "little sideways and low" type to lift to inbetween
+formal and ~formal.  Example: formal is int64, actual is nScalar.  This should
+be LOW and not BAD.  The actual is not directly below int64 (Scalar is), but
+can lift to nint64 which is allowed.
+
+However, a formal TypeMemPtr with alias [30] and unrelated actual [26] IS BAD,
+since [26] can never lift to a [30]-or-above.  
+
+The test is "actual can lift to between formal and ~formal", which can be
+restated as "~formal ISA (actual JOIN formal)" - which works for int64 and
+Scalar, but because Bits allows EMPTY, does not work for [26] and [30].
+
+       */
+      //else if( formal.dual().isa(actual.join(formal)) ) {
+      //  if( (actual instanceof TypeMemPtr && formal instanceof TypeMemPtr &&
+      //       ((TypeMemPtr)actual).aliases().join(((TypeMemPtr)formal).aliases()).is_empty()) )
+      //    flags |=BAD;       // Sideways
+      //  else if( (actual instanceof TypeFunPtr && formal instanceof TypeFunPtr &&
+      //            ((TypeFunPtr)actual)._fidxs.join(((TypeFunPtr)formal)._fidxs).is_empty()) )
+      //    flags |=BAD;       // Sideways
+      //  else 
+      //    flags|=LOW; // Low & sideways, but can lift to good.
+      //
+      //} else flags|=BAD;                      // Side-ways is bad
     }
     if( flags==0 ) flags=GOOD; // No args counts as all-good-args
     return flags;

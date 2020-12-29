@@ -9,6 +9,12 @@ import com.cliffc.aa.util.VBitSet;
 // TVars for aliased memory.  Very similar to a TArgs, except indexed by alias
 // number instead of by direct index.  Missing aliases are assumed to be new
 // unique TVars and always unify.
+
+// TODO: Commonly, this TMem is unified with a parent TMem except at specific
+// aliases.  We want to lazily manifest this: make a TMem in which all null
+// parms pull from the parent.  Not the same as a Unify!  Once every alias on
+// this TMem is not-null, we can drop the parent.
+
 public class TMem extends TMulti<TMem> {
 
   public TMem(TNode mem) { super(mem,new TVar[1]); }
@@ -47,8 +53,9 @@ public class TMem extends TMulti<TMem> {
     return progress;
   }
 
-  // Used by MrgProj and MemJoin, unify alias by alias, but not the main TMem
-  public boolean unify_mem( BitsAlias aliases, TVar tv, TNode mem, boolean test ) {
+  // Used by Store and MrgProj and MemJoin, unify alias by alias except the
+  // given ones and not the main TMem
+  public boolean unify_mem( BitsAlias aliases, TVar tv, boolean test ) {
     if( !(tv instanceof TMem) ) return false; // No progress until its a TMem
     boolean progress = false;
     TMem tmem = (TMem)tv;
@@ -57,7 +64,7 @@ public class TMem extends TMulti<TMem> {
       if( aliases.test(i) ) continue;  // Not the given aliases
       TVar tv0 =      parm(i);
       TVar tv1 = tmem.parm(i);
-      if( tv0!=null && tv1 != null ) progress = tv0.unify(tv1,test);
+      if( tv0!=null && tv1 != null ) progress |= tv0.unify(tv1,test);
       else {
         if( test ) return true; // Always progress
         TVar tx = tv0==null ? (tv1==null ? new TVar() : tv1) : tv0;
@@ -65,7 +72,7 @@ public class TMem extends TMulti<TMem> {
         progress = true;
       }
     }
-    if( !test && progress ) TNode.add_work(push_dep(mem,null));
+    if( !test && progress ) TNode.add_work_all(tv._ns);
     return progress;
   }
 

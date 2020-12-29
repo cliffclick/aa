@@ -1,6 +1,8 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TMulti;
+import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
@@ -30,6 +32,18 @@ public class ProjNode extends Node {
   }
   // Only called here if alive, and input is more-than-basic-alive
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
+
+  // Unify with the parent TVar sub-part
+  @Override public boolean unify( boolean test ) {
+    if( in(0) instanceof NewNode ) return false; // TODO: Not really a proper use of Proj
+    TVar tv = tvar(0);          // Input tvar
+    if( !(tv instanceof TMulti) ) return false;
+    if( in(0) instanceof MemSplitNode )
+      return tvar().unify(tv,test);  // MemSplit has same memory for ALL MProjs (but different alias focus)
+    TVar tprj = ((TMulti)tv).parm(_idx);
+    return tprj!=null && tvar().unify(tprj,test);
+  }
+
 
   public static ProjNode proj( Node head, int idx ) {
     for( Node use : head._uses )
