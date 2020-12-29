@@ -86,7 +86,7 @@ sensibly.  i.e., what does "structurally-equal to dead" mean.  Example: "P=0; P
 ? A : B", might start with A & B unified, but then A goes dead and B keeps
 being unified with A... and A might have had structure, which then got forced
 onto B.  Dropping the U-F of A needs to drop the structural unification.  More
-Example: "A = (C0,C0); B = (D0,E0)".  Unifiying A & B forces equivalence
+Example: "A = (C0,C0); B = (D0,E0)".  Unifying A & B forces equivalence
 between D0 & E0.  When A goes dead, what to allow D0 & E0 to once again be
 seperate.
 
