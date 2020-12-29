@@ -38,41 +38,41 @@ public class TestHM {
     Syntax fact =
       new Let("fact",
               new Lambda("n",
-                         new Apply(new Apply( new Apply(new Ident("if/else"),
-                                                        new Apply(new Ident("==0"),new Ident("n"))),
-                                              new Con(TypeInt.con(1))),
-                                   new Apply(new Apply(new Ident("*"), new Ident("n")),
+                         new Apply(new Ident("if/else3"),
+                                   new Apply(new Ident("==0"),new Ident("n")),         // Predicate
+                                   new Con(TypeInt.con(1)),                            // True arm
+                                   new Apply(new Apply(new Ident("*"), new Ident("n")),// False arm
                                              new Apply(new Ident("fact"),
                                                        new Apply(new Ident("dec"),new Ident("n")))))),
               new Ident("fact"));
     HMType t1 = HM.hm(fact);
-    assertEquals("{ v25:int64 -> v25:int64 }",t1.str());
+    assertEquals("{ v23:int64 -> v23:int64 }",t1.str());
   }
 
   @Test
   public void test04() {
-    // { x -> (pair (x 3) (x "abc")) }
+    // { x -> (pair2 (x 3) (x "abc")) }
     Syntax x =
       new Lambda("x",
-                 new Apply(new Apply(new Ident("pair"),
-                                     new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
+                 new Apply(new Ident("pair2"),
+                           new Apply(new Ident("x"), new Con(TypeInt.con(3))),
                            new Apply(new Ident("x"), new Con(TypeStr.ABC))));
     HMType t1 = HM.hm(x);
-    assertEquals("{ { v11:all -> v9 } -> pair(v9,v9) }",t1.str());
+    assertEquals("{ { v11:all -> v10 } -> pair2(v10,v10) }",t1.str());
   }
 
   @Test
   public void test05() {
-    // ({ x -> (pair (x 3) (x "abc")) } {x->x})
+    // ({ x -> (pair2 (x 3) (x "abc")) } {x->x})
     Syntax x =
       new Apply(new Lambda("x",
-                           new Apply(new Apply(new Ident("pair"),
-                                               new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
+                           new Apply(new Ident("pair2"),
+                                     new Apply(new Ident("x"), new Con(TypeInt.con(3))),
                                      new Apply(new Ident("x"), new Con(TypeStr.ABC)))),
                 new Lambda("y", new Ident("y")));
 
     HMType t1 = HM.hm(x);
-    assertEquals("pair(v9:all,v9:all)",t1.str());
+    assertEquals("pair2(v9:all,v9:all)",t1.str());
   }
 
 
@@ -99,19 +99,17 @@ public class TestHM {
   @Test
   public void test08() {
     // example that demonstrates generic and non-generic variables:
-    // fn g => let f = fn x => g in pair (f 3, f true)
+    // fn g => let f = fn x => g in pair2 (f 3, f true)
     Syntax syn =
       new Lambda("g",
                  new Let("f",
                          new Lambda("x", new Ident("g")),
-                         new Apply(
-                                   new Apply(new Ident("pair"),
-                                             new Apply(new Ident("f"), new Con(TypeInt.con(3)))
-                                             ),
+                         new Apply(new Ident("pair2"),
+                                   new Apply(new Ident("f"), new Con(TypeInt.con(3))),
                                    new Apply(new Ident("f"), new Con(TypeInt.con(1))))));
 
     HMType t1 = HM.hm(syn);
-    assertEquals("{ v11 -> pair(v11,v11) }",t1.str());
+    assertEquals("{ v12 -> pair2(v12,v12) }",t1.str());
   }
 
   @Test
@@ -137,14 +135,15 @@ public class TestHM {
               new Lambda("fun",
                          new Lambda("x",
                                     new Apply(new Ident("fun"),new Ident("x")))),
-              new Apply(new Apply(new Ident("pair"),
-                                  new Apply(new Apply(new Ident("map"),
-                                                      new Ident("str")), new Con(TypeInt.con(5)))),
+              new Apply(new Ident("pair2"),
+                        new Apply(new Apply(new Ident("map"),
+                                            new Ident("str")), new Con(TypeInt.con(5))),
                         new Apply(new Apply(new Ident("map"),
                                             // "factor" a float returns a pair (mod,rem).
-                                            new Ident("factor")), new Con(TypeFlt.con(2.3)))));
+                                            new Ident("factor")), new Con(TypeFlt.con(2.3))))
+              );
     HMType t1 = HM.hm(syn);
-    assertEquals("pair(v12:*str,pair(v26:flt64,v26:flt64))",t1.str());
+    assertEquals("pair2(v12:*str,pair2(v25:flt64,v25:flt64))",t1.str());
   }
 
   @Test(expected = RuntimeException.class)
@@ -161,13 +160,17 @@ public class TestHM {
     Syntax syn =
       new Let("fcn",
               new Lambda("p",
-                         new Apply(new Apply(new Apply(new Ident("if/else"),new Ident("p")), // p ?
-                                             new Lambda("a",
-                                                        new Apply(new Apply(new Ident("pair"),new Ident("a")),
-                                                                  new Ident("a")))),
+                         new Apply(new Ident("if/else3"),
+                                   new Ident("p"), // p ?
+                                   new Lambda("a",
+                                              new Apply(new Ident("pair2"),
+                                                        new Ident("a"),
+                                                        new Ident("a"))),
                                    new Lambda("b",
-                                              new Apply(new Apply(new Ident("pair"),new Ident("b")),
-                                                        new Apply(new Apply(new Ident("pair"),new Con(TypeInt.con(3))),
+                                              new Apply(new Ident("pair"),
+                                                        new Ident("b"),
+                                                        new Apply(new Ident("pair2"),
+                                                                  new Con(TypeInt.con(3)),
                                                                   new Ident("b")))))),
               new Let("map",
                       new Lambda("fun",

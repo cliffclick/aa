@@ -30,10 +30,12 @@ public class HM {
     // Primitives
     HMVar var1 = new HMVar();
     HMVar var2 = new HMVar();
-    ENV.put("pair",Oper.fun(var1, Oper.fun(var2, new Oper("pair",var1,var2))));
+    ENV.put("pair" ,Oper.fun(var1, Oper.fun(var2, new Oper("pair",var1,var2))));
+    ENV.put("pair2",Oper.fun(var1, var2, new Oper("pair2",var1,var2)));
 
     HMVar var3 = new HMVar();
-    ENV.put("if/else",Oper.fun(bool,Oper.fun(var3,Oper.fun(var3,var3))));
+    ENV.put("if/else" ,Oper.fun(bool,Oper.fun(var3,Oper.fun(var3,var3))));
+    ENV.put("if/else3",Oper.fun(bool,var3,var3,var3));
 
     ENV.put("dec",Oper.fun(int64,int64));
     ENV.put("*",Oper.fun(int64,Oper.fun(int64,int64)));
@@ -42,7 +44,7 @@ public class HM {
     // Print a string; int->str
     ENV.put("str",Oper.fun(int64,strp));
     // Factor
-    ENV.put("factor",Oper.fun(flt64,new Oper("pair",flt64,flt64)));
+    ENV.put("factor",Oper.fun(flt64,new Oper("pair2",flt64,flt64)));
 
 
     // Prep for SSA: pre-gather all the (unique) ids
@@ -108,18 +110,29 @@ public class HM {
     @Override void get_ids() { ENV.put(_arg0, new HMVar()); _use.get_ids(); _body.get_ids(); }
   }
   public static class Apply extends Syntax {
-    final Syntax _fun, _arg;
-    Apply(Syntax fun, Syntax arg) { _fun=fun; _arg=arg; }
-    @Override public String toString() { return "("+_fun+" "+_arg+")"; }
+    final Syntax _fun;
+    final Syntax[] _args;
+    Apply(Syntax fun, Syntax... args) { _fun = fun; _args = args; }
+    @Override public String toString() {
+      SB sb = new SB().p("(").p(_fun.toString()).p(" ");
+      for( Syntax arg : _args )
+        sb.p(arg.toString()).p(" ");
+      return sb.unchar().p(")").toString();
+    }
     @Override HMType hm(HashSet<HMVar> nongen) {
       HMType tfun = _fun.hm(nongen);
-      HMType targ = _arg.hm(nongen);
-      HMType trez = new HMVar();
-      HMType nfun = Oper.fun(targ,trez);
+      HMType[] targs = new HMType[_args.length+1];
+      for( int i=0; i<_args.length; i++ )
+        targs[i] = _args[i].hm(nongen);
+      HMType trez = targs[_args.length] = new HMVar();
+      HMType nfun = Oper.fun(targs);
       nfun.union(tfun);
       return trez;
     }
-    @Override void get_ids() { _fun.get_ids(); _arg.get_ids(); }
+    @Override void get_ids() {
+      _fun.get_ids();
+      for( Syntax arg : _args ) arg.get_ids();
+    }
   }
 
 
@@ -221,13 +234,23 @@ public class HM {
     Oper(String name, HMType... args) { _name=name; _args=args; }
     static Oper fun(HMType... args) { return new Oper("->",args); }
     @Override public String toString() {
-      if( _name.equals("->") ) return "{ "+_args[0]+" -> "+_args[1]+" }";
+      if( _name.equals("->") ) {
+        SB sb = new SB().p("{ ");
+        for( int i=0; i<_args.length-1; i++ )
+          sb.p(_args[i].toString()).p(' ');
+        return sb.p("-> ").p(_args[_args.length-1].toString()).p(" }").toString();
+      }
       return _name+" "+Arrays.toString(_args);
     }
     @Override public String _str() {
-      if( _name.equals("->") )
-        return "{ "+_args[0].str()+" -> "+_args[1].str()+" }";
-      SB sb = new SB().p(_name).p('(');
+      SB sb = new SB();
+      if( _name.equals("->") ) {
+        sb.p("{ ");
+        for( int i=0; i<_args.length-1; i++ )
+          sb.p(_args[i].str()).p(' ');
+        return sb.p("-> ").p(_args[_args.length-1].str()).p(" }").toString();
+      }
+      sb.p(_name).p('(');
       for( HMType t : _args )
         sb.p(t.str()).p(',');
       return sb.unchar().p(')').toString();
