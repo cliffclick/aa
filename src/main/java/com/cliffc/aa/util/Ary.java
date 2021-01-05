@@ -148,11 +148,11 @@ public class Ary<E> implements Iterable<E> {
   }
 
   /** @param c Collection to be added */
-  public Ary<E> addAll( Collection<? extends E> c ) { for( E e : c ) add(e); return this; }
+  public Ary<E> addAll( Collection<? extends E> c ) { if( c!=null ) for( E e : c ) add(e); return this; }
 
   /** @param es Array to be added */
   public <F extends E> Ary<E> addAll( F[] es ) {
-    if( es.length==0 ) return this;
+    if( es==null || es.length==0 ) return this;
     while( _len+es.length > _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);
     System.arraycopy(es,0,_es,_len,es.length);
     _len += es.length;
@@ -161,7 +161,7 @@ public class Ary<E> implements Iterable<E> {
 
   /** @param c Collection to be added */
   public Ary<E> addAll( Ary<? extends E> c ) {
-    if( c._len==0 ) return this;
+    if( c==null || c._len==0 ) return this;
     while( _len+c._len > _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);
     System.arraycopy(c._es,0,_es,_len,c._len);
     _len += c._len;
@@ -235,7 +235,7 @@ public class Ary<E> implements Iterable<E> {
     while( j<a1._len ) res.add(a1._es[j++]);
     return res;
   }
-  
+
   /** Merge-Or.  Merge two sorted Arys, tossing out duplicates and elements not
    *  passing the filter.  Return a new sorted Ary with the merged list.
    *  Undefined if the original arrays are not sorted.  Error if they are not
@@ -263,7 +263,7 @@ public class Ary<E> implements Iterable<E> {
     return res;
   }
 
-  
+
   /** Merge-And.  Merge 2 sorted Arys, keeping only duplicates.  Return a new
    *  sorted Ary with the merged list.  Undefined if the original arrays are
    *  not sorted.  Error if they are not of the same type.  Elements must

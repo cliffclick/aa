@@ -39,7 +39,7 @@ Leader.  (As of 12/28/2020, seeing the need for a Leader & Followers).
       (X===Y)         +        // Reflexive
       Y:=X            +        // Y is copied from X, includes Loads & Stores & Projections of Tuples.
                                // And Y is marked as a Follower
-      (X_isa_Phi)&(X[1]<=>X[2]) & (X[1]<=>Y) + // IF Phi inputs are unified with each other, then also unified with Phi
+      (X_isa_Phi)&(path#1 reachable)&(X[1]===Y) + // Phi and reachable path are unified
       VX=TOP          +        // Either is Value TOP
       VY=TOP          +        // Either is Value TOP
       VX=VY=c0        +        // All compute the same constant
@@ -71,6 +71,67 @@ Given a T-expression & a Value type, we can force alignment by doing a JOIN.
 Which turns into, we can apply the H-M "fresh_unify" notion in the old Type
 system at Calls.
 
+
+
+Need to make a Lattice_f: define a 'meet' and 'dual'?
+Assume all lattice elements are 'below center' for now.
+A 'TVar' is essentially a 'lattice bottom' and can lift to any more specific type.
+Phi xfer function = { ctrl_1:Type.CTRL val_1:Type hm_1:TVar
+                      ctrl_2:Type.CTRL val_2:Type hm_2:TVar ->
+
+                      if( ctrl_1==X && ctrl_2==X )
+                        return [Type.ANY, plain TVar];
+                      if( ctrl_1==CTRL && ctrl_2==X )
+                        return [val_1,hm_1] // same value type, same hm as LHS
+                      if( ctrl_1==ctrl_2==CTRL )
+                        return [val_1 MEET  val_2,
+                                hm_1  UNIFY hm_2 ];
+                    }
+
+
+Need to define unify:
+- Given 2 complex structs with equal name&arg.length
+  - its the structural recursive answer
+- Given a TVar & anything else, its the other thing
+- Can be a base type
+  - Given 2 base types, use TYPE system.
+- Otherwise its an TError
+This implies a lattice: plain TVar at TOP, complex in the middle, TError at bottom.
+Dual can be just replicated 'above' & ignored till GCP.
+
+Exploring this "lattice" with shared TVars -
+  { x -> x } MEET { 3 -> y } ==> { 3 -> 3 }
+
+  { a -> { b -> c } }  MEET { { d -> e } -> f }  ==> { {d -> e} -> {b -> c} }
+
+  { [a] {a->b} -> [b] } MEET { [int] {c->flt} -> d} ==> { [a:int] {a:c:int->b:flt} -> d:[b:flt]}
+
+  { bool a a a -> a } MEET { b b b b -> b } ==> all bools
+
+  { x -> x } { (a,b) -> (d,e) } ==> { (ad,be) -> (ad,be) }
+LOOKs like lattice to me!!!
+
+Ignoring shared TVars, this could be a refinement of Type system.  Assuming
+IMMUTABLE, with marked shared (un-interesting differences are always
+hash-consed, shared, immutable).  Shares are unique per expression, and must be
+top-level marked, or else cannot tell shares here from shares there, and we
+might get cross-TVar sharing (which is buggy).
+
+Summary: need a top-level THM which delimits TVar sharing.  Internally plain
+TVars are null; shared ones unique numbered from 1.  Still need to look at
+Apply / Call+CallEpi.
+
+Lambda/FunPtr xfer function = { arg:Type tvarg:TVar ret:Type tvret:TVar ->
+                                return [TypeFunPtr(arg,ret),
+                                        TFun(tvarg,tvret)];
+                              }
+
+Weirdness at Let,Apply, because of UNIFY.
+
+
+
+
+ALSO: could be a bug with nongen missing contents of memory
 
 ======================================= Notes from 11/23/2020
 

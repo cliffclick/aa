@@ -86,6 +86,12 @@ public class HM3 {
     final VStack _par;
     final HMVar _nongen;
     VStack( VStack par, HMVar nongen ) { _par=par; _nongen=nongen; }
+    @Override public String toString() { return str(new SB()).toString(); }
+    SB str(SB sb) {
+      _nongen._str(sb,new VBitSet(),false);
+      if( _par!=null ) _par.str(sb.p(" >> "));
+      return sb;
+    }
     @NotNull @Override public Iterator<HMVar> iterator() { return new Iter(); }
     private class Iter implements Iterator<HMVar> {
       private VStack _vstk;
@@ -180,6 +186,7 @@ public class HM3 {
       add_work(work);
     }
   }
+  
   public static class Lambda extends Syntax {
     final String _arg0;
     Lambda(String arg0, Syntax body) { _kids=new Syntax[]{body}; body._par=this; _arg0=arg0; }
@@ -376,7 +383,7 @@ public class HM3 {
       HMVar v3 = EQS.computeIfAbsent(this,k -> (HMVar)v2);
       return v2 == v3;
     }
-    
+
     @Override HMType _fresh(VStack vstk, HashMap<HMVar,HMVar> vars, HashMap<Oper,Oper> opers) {
       assert is_top();
       return occurs_in(vstk, new VBitSet()) // If in the lexical Stack
@@ -453,6 +460,6 @@ public class HM3 {
         args[i] = _args[i].find()._fresh(vstk,vars,opers);
       return op;
     }
-    
+
   }
 }

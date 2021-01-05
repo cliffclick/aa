@@ -1,271 +1,522 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
+import org.jetbrains.annotations.NotNull;
 
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 
 // Hindley-Milner typing.  Complete stand-alone, for research.  MEETs base
-// types, instead of declaring type error.  Requires SSA renumbering; uses a
-// global Env instead locally tracking.
+// types, instead of declaring type error.  Requires SSA renumbering; looks
+// 'up' the Syntax tree for variables instead of building a 'nongen' set.
 //
-// Exploring a non-U-F variant; each Syntax element gets its own immutable H-M
-// tvar.  Also allowing multi-arg functions.
+// T2 types form a Lattice, with 'unify' same as 'meet'.  T2's form a DAG
+// (cycles if i allow recursive unification) with sharing.  Each Syntax has a
+// T2, and the forest of T2s can share.  Leaves of a T2 can be either a simple
+// concrete base type, or a sharable leaf.  Unify is structural, and where not
+// unifyable the union is replaced with an Error.
 
 public class HM {
-  static final HashMap<String,HMType> ENV = new HashMap<>();
+  static final HashMap<String,T2> PRIMS = new HashMap<>();
 
-  public static HMType hm( Syntax prog) {
+  public static T2 hm( Syntax prog) {
     Object dummy = TypeStruct.DISPLAY;
 
+    Ary<Syntax> work = new Ary<>(Syntax.class);
+
     // Simple types
-    HMVar bool  = new HMVar(TypeInt.BOOL);
-    HMVar int64 = new HMVar(TypeInt.INT64);
-    HMVar flt64 = new HMVar(TypeFlt.FLT64);
-    HMVar strp  = new HMVar(TypeMemPtr.STRPTR);
+    T2 bool  = T2.base(TypeInt.BOOL);
+    T2 int64 = T2.base(TypeInt.INT64);
+    T2 flt64 = T2.base(TypeFlt.FLT64);
+    T2 strp  = T2.base(TypeMemPtr.STRPTR);
 
     // Primitives
-    HMVar var1 = new HMVar();
-    HMVar var2 = new HMVar();
-    ENV.put("pair" ,Oper.fun(var1, Oper.fun(var2, new Oper("pair",var1,var2))));
-    ENV.put("pair2",Oper.fun(var1, var2, new Oper("pair2",var1,var2)));
+    T2 var1 = T2.tnew();
+    T2 var2 = T2.tnew();
 
-    HMVar var3 = new HMVar();
-    ENV.put("if/else" ,Oper.fun(bool,Oper.fun(var3,Oper.fun(var3,var3))));
-    ENV.put("if/else3",Oper.fun(bool,var3,var3,var3));
+    PRIMS.put("pair" ,T2.fresh("TOP",T2.fun(var1, T2.fun(var2, T2.prim("pair" ,var1,var2)))));
+    PRIMS.put("pair2",T2.fresh("TOP",T2.fun(var1,        var2, T2.prim("pair2",var1,var2) )));
 
-    ENV.put("dec",Oper.fun(int64,int64));
-    ENV.put("*",Oper.fun(int64,Oper.fun(int64,int64)));
-    ENV.put("==0",Oper.fun(int64,bool));
+    //PRIMS.put("if/else" ,new HMT(T2.fun(bool,T2.fun(var1,T2.fun(var1,var1)))));
+    PRIMS.put("if/else3",T2.fresh("TOP",T2.fun(bool,var1,var1,var1)));
+
+    PRIMS.put("dec",T2.fresh("TOP",T2.fun(int64,int64)));
+    PRIMS.put("*"  ,T2.fresh("TOP",T2.fun(int64,T2.fun(int64,int64))));
+    PRIMS.put("*2" ,T2.fresh("TOP",T2.fun(int64,int64,int64)));
+    PRIMS.put("==0",T2.fresh("TOP",T2.fun(int64,bool)));
 
     // Print a string; int->str
-    ENV.put("str",Oper.fun(int64,strp));
-    // Factor
-    ENV.put("factor",Oper.fun(flt64,new Oper("pair2",flt64,flt64)));
+    PRIMS.put("str",T2.fresh("TOP",T2.fun(int64,strp)));
+    // Factor; FP div/mod-like operation
+    PRIMS.put("factor",T2.fresh("TOP",T2.fun(flt64,T2.prim("divmod",flt64,flt64))));
 
 
     // Prep for SSA: pre-gather all the (unique) ids
-    prog.get_ids();
+    prog.prep_tree(null,work);
 
-    return prog.hm(new HashSet<>());
+    int cnt=0;
+    while( !work.isEmpty() ) {  // While work
+      Syntax syn = work.pop();  // Get work
+      T2 t = syn.hm(work);      // Get work results
+      T2 tsyn = syn.find();
+      if( t!=tsyn ) {             // Progress?
+        assert !t.progress(tsyn); // monotonic: unifying with the result is no-progress
+        syn._t=t;                 // Progress!
+        if( syn._par !=null ) work.push(syn._par); // Parent updates
+      }
+      // VERY EXPENSIVE ASSERT: Every Syntax that makes progress is on the worklist
+      //assert prog.more_work(work);
+      cnt++;
+    }
+
+    return prog._t;
   }
-  static void reset() { HMVar.reset(); }
-
+  static void reset() { PRIMS.clear(); T2.reset(); }
 
   public static abstract class Syntax {
-    abstract HMType hm(HashSet<HMVar> nongen);
-    abstract void get_ids();
+    Syntax _par;
+    T2 _t;                      // Current HM type
+    T2 find() {                 // U-F find
+      T2 t = _t.find();
+      return t==_t ? t : (_t=t);
+    }
+
+    // Compute a new HM type, without modification of any existing T2 in any Syntax
+    abstract T2 hm(Ary<Syntax> work);
+
+    abstract void prep_tree(Syntax par,Ary<Syntax> work);
+    void prep_tree_impl( Syntax par, T2 t, Ary<Syntax> work ) { _par=par; _t=t; work.push(this); }
+    T2 prep_tree_lookup(String name, Syntax prior) { return null; }
+
+    // Giant Assert: True if OK; all Syntaxs off worklist do not make progress
+    abstract boolean more_work(Ary<Syntax> work);
+    final boolean more_work_impl(Ary<Syntax> work) {
+      if( work.find(this)!=-1 ) return true; // On worklist, so ok
+      // Check does not make progress
+      int old = T2.CNT;  int olen = work._len;
+      boolean more_work;
+      try {
+        T2 t = find();
+        T2 hm = hm(null);       // Run H-M, with null work, looking for progress
+        T2 un = find().unify(hm,null);
+        more_work = t!=un || work._len!=olen; // Something happened?
+      } catch( RuntimeException no_unify ) { more_work=true; } // Fail to unify assert is progress
+      if( !more_work ) T2.CNT=old;  // Reset if no error; prevents assert from endlessly raising CNT
+      return !more_work;
+    }
+    // Print for debugger
+    @Override final public String toString() { return str(new SB()).toString(); }
+    abstract SB str(SB sb);
+    // Line-by-line print with more detail
+    public String p() { return p0(new SB(), new VBitSet()).toString(); }
+    final SB p0(SB sb, VBitSet dups) {
+      _t.get_dups(dups);
+      _t.str(p1(sb.i()).p(" "), new VBitSet(),dups).nl();
+      return p2(sb.ii(1),dups).di(1);
+    }
+    abstract SB p1(SB sb);      // Self short print
+    abstract SB p2(SB sb, VBitSet dups); // Recursion print
   }
+  
   public static class Con extends Syntax {
-    final Type _t;
-    Con(Type t) { _t=t; }
-    @Override public String toString() { return _t.toString(); }
-    @Override HMType hm(HashSet<HMVar> nongen) { return new HMVar(_t); }
-    @Override void get_ids() {}
+    final Type _con;
+    Con(Type con) { super(); _con=con; }
+    @Override SB str(SB sb) { return p1(sb); }
+    @Override SB p1(SB sb) { return sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString()); }
+    @Override SB p2(SB sb, VBitSet dups) { return sb; }
+    @Override T2 hm(Ary<Syntax> work) { return find(); }
+    @Override void prep_tree( Syntax par, Ary<Syntax> work ) { prep_tree_impl(par, T2.base(_con), work); }
+    @Override boolean more_work(Ary<Syntax> work) { return more_work_impl(work); }
   }
+
   public static class Ident extends Syntax {
     final String _name;
     Ident(String name) { _name=name; }
-    @Override public String toString() { return _name; }
-    @Override HMType hm(HashSet<HMVar> nongen) {
-      HMType t = ENV.get(_name);
-      if( t==null )
-        throw new RuntimeException("Parse error, "+_name+" is undefined");
-      HMType f = t.fresh(nongen);
-      return f;
+    @Override SB str(SB sb) { return p1(sb); }
+    @Override SB p1(SB sb) { return sb.p(_name); }
+    @Override SB p2(SB sb, VBitSet dups) { return sb; }
+    @Override T2 hm(Ary<Syntax> work) { return find(); }
+    @Override void prep_tree( Syntax par, Ary<Syntax> work ) {
+      // Find Ident in some lexical scope.  Get a T2 for it.
+      T2 t=null;
+      for( Syntax syn = par, prior=this; syn!=null; prior=syn, syn=syn._par )
+        if( (t = syn.prep_tree_lookup(_name,prior)) !=null )
+          break;
+      if( t==null ) t = PRIMS.get(_name);  // Check prims; always FRESH
+      if( t==null ) throw new RuntimeException("Parse error, "+_name+" is undefined");
+      prep_tree_impl(par,t,work);
     }
-    @Override void get_ids() {}
+    @Override boolean more_work(Ary<Syntax> work) { return more_work_impl(work); }
   }
+
   public static class Lambda extends Syntax {
     final String _arg0;
     final Syntax _body;
-    Lambda(String arg0, Syntax body) { _arg0=arg0; _body=body; }
-    @Override public String toString() { return "{ "+_arg0+" -> "+_body+" }"; }
-    @Override HMType hm(HashSet<HMVar> nongen) {
-      HMVar tnew = (HMVar) ENV.get(_arg0);
-      nongen.add(tnew);
-      HMType trez = _body.hm(nongen);
-      nongen.remove(tnew);
-      return Oper.fun(tnew,trez);
+    T2 _targ;
+    Lambda(String arg0, Syntax body) { _arg0=arg0; _body=body; _targ = T2.tnew(); }
+    @Override SB str(SB sb) { return _body.str(sb.p("{ ").p(_arg0).p(" -> ")).p(" }"); }
+    @Override SB p1(SB sb) { return sb.p("{ ").p(_arg0).p(" -> ... } "); }
+    @Override SB p2(SB sb, VBitSet dups) { return _body.p0(sb,dups); }
+    T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
+    @Override T2 hm(Ary<Syntax> work) {
+      // The normal lambda work
+      T2 fun = T2.fun(targ(),_body.find());
+      // Force forwards progress; an Apply may already have lifted _t to
+      // something better than just a plain fun wrapper.
+      return find().unify(fun,work);
     }
-    @Override void get_ids() { ENV.put(_arg0, new HMVar()); _body.get_ids(); }
+    @Override void prep_tree( Syntax par, Ary<Syntax> work ) {
+      prep_tree_impl(par,T2.tnew(),work);
+      _body.prep_tree(this,work);
+    }
+    // If found name, inside a Lambda so NOT fresh
+    @Override T2 prep_tree_lookup(String name, Syntax prior) { return Util.eq(_arg0,name) ? _targ : null; } 
+    @Override boolean more_work(Ary<Syntax> work) {
+      if( !more_work_impl(work) ) return false;
+      return _body.more_work(work);
+    }
   }
+
   public static class Let extends Syntax {
     final String _arg0;
     final Syntax _body, _use;
-    Let(String arg0, Syntax body, Syntax use) { _arg0=arg0; _body=body; _use=use; }
-    @Override public String toString() { return "let "+_arg0+" = "+_body+" in "+_use+" }"; }
-    @Override HMType hm(HashSet<HMVar> nongen) {
-      HMVar tnew = (HMVar) ENV.get(_arg0);
-      nongen.add(tnew);
-      HMType tbody = _body.hm(nongen);
-      nongen.remove(tnew);
-      tnew.union(tbody);
-      HMType trez = _use.hm(nongen);
-      return trez;
+    T2 _targ;
+    Let(String arg0, Syntax body, Syntax use) { _arg0=arg0; _body=body; _use=use; _targ=T2.tnew(); }
+    @Override SB str(SB sb) { return _use.str(_body.str(sb.p("let ").p(_arg0).p(" = ")).p(" in ")); }
+    @Override SB p1(SB sb) { return sb.p("let ").p(_arg0).p(" = ... in ..."); }
+    @Override SB p2(SB sb, VBitSet dups) { _body.p0(sb,dups); return _use.p0(sb,dups); }
+    T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
+    @Override T2 hm(Ary<Syntax> work) {
+      targ().unify(_body.find(),work);
+      return _use.find();
     }
-    @Override void get_ids() { ENV.put(_arg0, new HMVar()); _use.get_ids(); _body.get_ids(); }
+    @Override void prep_tree( Syntax par, Ary<Syntax> work ) {
+      prep_tree_impl(par,T2.tnew(),work);
+      _body.prep_tree(this,work);
+      _use .prep_tree(this,work);
+    }
+    @Override T2 prep_tree_lookup(String name, Syntax prior) {
+      return Util.eq(_arg0,name)
+        // Let _body, NOT fresh; Let _use, YES fresh
+        ? (prior==_use ? T2.fresh(name,_targ) : _targ)
+        : null;                 // Missed on name
+    }
+    
+    @Override boolean more_work(Ary<Syntax> work) {
+      if( !more_work_impl(work) ) return false;
+      return _body.more_work(work) && _use.more_work(work);
+    }
   }
+
   public static class Apply extends Syntax {
     final Syntax _fun;
     final Syntax[] _args;
     Apply(Syntax fun, Syntax... args) { _fun = fun; _args = args; }
-    @Override public String toString() {
-      SB sb = new SB().p("(").p(_fun.toString()).p(" ");
+    @Override SB str(SB sb) {
+      _fun.str(sb.p("(")).p(" ");
       for( Syntax arg : _args )
-        sb.p(arg.toString()).p(" ");
-      return sb.unchar().p(")").toString();
+        arg.str(sb).p(" ");
+      return sb.unchar().p(")");
     }
-    @Override HMType hm(HashSet<HMVar> nongen) {
-      HMType tfun = _fun.hm(nongen);
-      HMType[] targs = new HMType[_args.length+1];
+    @Override SB p1(SB sb) { return sb.p("(...)"); }
+    @Override SB p2(SB sb, VBitSet dups) {
+      _fun.p0(sb,dups);
+      for( Syntax arg : _args ) arg.p0(sb,dups);
+      return sb;
+    }
+
+    @Override T2 hm(Ary<Syntax> work) {
+      T2 tfun = _fun.find();
+      if( tfun.is_fresh() )
+        tfun._args[0].push_update(this);
+      T2[] targs = new T2[_args.length+1];
       for( int i=0; i<_args.length; i++ )
-        targs[i] = _args[i].hm(nongen);
-      HMType trez = targs[_args.length] = new HMVar();
-      HMType nfun = Oper.fun(targs);
-      nfun.union(tfun);
-      return trez;
+        targs[i] = _args[i].find();
+      // if testing, allow progress on the last new result tvar....
+      targs[_args.length] = Util.eq(tfun._name,"->") && work==null ? tfun.find(tfun._args.length-1) : T2.tnew(); // Return is new unconstrained T2
+      T2 nfun = T2.fun(targs);
+      T2 ufun = tfun.unify(nfun,work);
+      if( _fun.find()!=tfun ) work.push(_fun);
+      // Return element
+      T2 trez = ufun.find(_args.length);
+      // Force forward progress
+      return trez.unify(find(),work);
     }
-    @Override void get_ids() {
-      _fun.get_ids();
-      for( Syntax arg : _args ) arg.get_ids();
+    @Override void prep_tree(Syntax par,Ary<Syntax> work) {
+      prep_tree_impl(par,T2.tnew(),work);
+      _fun.prep_tree(this,work);
+      for( Syntax arg : _args ) arg.prep_tree(this,work);
     }
-  }
-
-
-
-  public static abstract class HMType {
-    HMType _u;                  // U-F; always null for Oper
-    abstract HMType union(HMType t);
-    abstract HMType find();
-    public String str() { return find()._str(); }
-    abstract String _str();
-    boolean is_top() { return _u==null; }
-
-    HMType fresh(HashSet<HMVar> nongen) {
-      HashMap<HMType,HMType> vars = new HashMap<>();
-      return _fresh(nongen,vars);
-    }
-    HMType _fresh(HashSet<HMVar> nongen, HashMap<HMType,HMType> vars) {
-      HMType t2 = find();
-      if( t2 instanceof HMVar ) {
-        return t2.occurs_in(nongen) //
-          ? t2                      // Keep same var
-          : vars.computeIfAbsent(t2, e -> new HMVar(((HMVar)t2)._t));
-      } else {
-        Oper op = (Oper)t2;
-        HMType[] args = new HMType[op._args.length];
-        for( int i=0; i<args.length; i++ )
-          args[i] = op._args[i]._fresh(nongen,vars);
-        return new Oper(op._name,args);
-      }
-    }
-
-    boolean occurs_in(HashSet<HMVar>nongen) {
-      for( HMVar x : nongen ) if( occurs_in_type(x) ) return true;
-      return false;
-    }
-    boolean occurs_in(HMType[] args) {
-      for( HMType x : args ) if( occurs_in_type(x) ) return true;
-      return false;
-    }
-    boolean occurs_in_type(HMType v) {
-      assert is_top();
-      HMType y = v.find();
-      if( y==this )
-        return true;
-      if( y instanceof Oper )
-        return occurs_in(((Oper)y)._args);
-      return false;
+    @Override boolean more_work(Ary<Syntax> work) {
+      if( !more_work_impl(work) ) return false;
+      if( !_fun.more_work(work) ) return false;
+      for( Syntax arg : _args ) if( !arg.more_work(work) ) return false;
+      return true;
     }
   }
 
-  static class HMVar extends HMType {
-    private Type _t;
-    private final int _uid;
-    private static int CNT;
-    HMVar() { this(Type.ANY); }
-    HMVar(Type t) { _uid=CNT++; _t=t; }
-    static void reset() { CNT=1; }
-    public Type type() { assert is_top(); return _t; }
-    @Override public String toString() {
-      String s = _str();
-      if( _u!=null ) s += ">>"+_u;
-      return s;
-    }
-    @Override public String _str() {
-      String s = "v"+_uid;
-      if( _t!=Type.ANY ) s += ":"+_t.str(new SB(),new VBitSet(),null,false);
-      return s;
+  // ---------------------------------------------------------------------
+  // T2 types form a Lattice, with 'unify' same as 'meet'.  T2's form a DAG
+  // (cycles if i allow recursive unification) with sharing.  Each Syntax has a
+  // T2, and the forest of T2s can share.  Leaves of a T2 can be either a
+  // simple concrete base type, or a sharable leaf.  Unify is structural, and
+  // where not unifyable the union is replaced with an Error.
+  public static class T2 {
+    static void reset() { CNT=0; }
+    private static int CNT=0;
+
+    // Base constants are same as structural but using BASE.
+    // Other names are structural, eg "->" or "pair".
+    @NotNull final String _name; // name, eq "->" or "pair", or unique string for TVar leaves
+    @NotNull T2[] _args;
+    final int _uid;
+    // If set, this is a 'fresh' T2, which means it lazily clones during
+    // unification such that it imparts its structure on the RHS but does not
+    // itself change.  The args are length 1 with the U-F in slot0.
+    String _fresh;
+    // Base types carry a concrete Type
+    Type _con;
+    // Part of the incrementalization: if a fresh fcn type changes, any Applys
+    // using it might update.
+    Ary<Apply> _updates;
+
+    static T2 fun(T2... args) { return new T2("->",args); }
+    static T2 tnew() { return new T2("V"+CNT,new T2[1]); }
+    static T2 base(Type con) { T2 t = tnew(); t._con=con; return t; }
+    static T2 prim(String name, T2... args) { return new T2(name,args); }
+    static T2 fresh(String name, T2 t) {
+      assert !t.is_fresh();
+      T2 t2 = new T2(name,t); // Points to non-fresh
+      t2._fresh=name;
+      return t2;
     }
 
-    @Override HMType find() {
-      HMType u = _u;
-      if( u==null ) return this; // Top of union tree
-      if( u._u==null ) return u; // One-step from top
-      // Classic U-F rollup
-      while( u._u!=null ) u = u._u; // Find the top
-      HMType x = this;              // Collapse all to top
-      while( x._u!=u ) { HMType tmp = x._u; x._u=u; x=tmp;}
+    private T2(@NotNull String name, T2... args) { _name = name; _args= args; _uid=CNT++; }
+
+    // A fresh-able type var; a simple wrapper over another type var.
+    boolean is_fresh() { return _fresh!=null; }
+    // A type var, not a concrete leaf.  Might be U-Fd or not.
+    boolean is_leaf () { return _name.charAt(0)=='V' && !is_base(); }
+    // Concrete primitive base
+    boolean is_base () { return _con!=null; }
+
+    // U-F find
+    T2 find() {
+      if( !is_leaf() && !is_base() ) return this; // Shortcut
+      T2 u = _args[0];
+      if( u==null ) return this; // Shortcut
+      if( !u.is_leaf() || u._args[0]==null ) return u; // Shortcut
+      // U-F fixup
+      while( u.is_leaf() && u._args[0]!=null ) u = u._args[0];
+      T2 v = this, v2;
+      while( v.is_leaf() && (v2=v._args[0])!=u ) { v._args[0]=u; v = v2; }
       return u;
     }
-    @Override HMType union(HMType that) {
-      if( _u!=null ) return find().union(that);
-      if( that instanceof HMVar ) that = that.find();
-      if( this==that ) return this; // Do nothing
-      if( occurs_in_type(that) )
-        throw new RuntimeException("recursive unification");
-
-      if( that instanceof HMVar ) {
-        HMVar v2 = (HMVar)that;
-        v2._t = _t.meet(v2._t);
-      }
-      else assert _t==Type.ANY; // Else this var is un-MEETd with any Con
-      return _u = that;         // Classic U-F union
+    // U-F find on the args array
+    T2 find(int i) {
+      assert no_uf();
+      T2 u = _args[i];
+      T2 uu = u.find();
+      return u==uu ? uu : (_args[i]=uu);
     }
-  }
+    boolean no_uf() { return (!is_leaf() && !is_base()) || _args[0]==null; }
 
-  static class Oper extends HMType {
-    final String _name;
-    final HMType[] _args;
-    Oper(String name, HMType... args) { _name=name; _args=args; }
-    static Oper fun(HMType... args) { return new Oper("->",args); }
-    @Override public String toString() {
-      if( _name.equals("->") ) {
-        SB sb = new SB().p("{ ");
-        for( int i=0; i<_args.length-1; i++ )
-          sb.p(_args[i].toString()).p(' ');
-        return sb.p("-> ").p(_args[_args.length-1].toString()).p(" }").toString();
-      }
-      return _name+" "+Arrays.toString(_args);
+    // U-F union; this becomes that.  If 'this' was used in an Apply, re-check
+    // the Apply.
+    T2 union(T2 that, Ary<Syntax> work) {
+      assert _args[0]==null; // Cannot union twice
+      if( this==that ) return this;
+      if( work!=null ) work.addAll(_updates); // Re-Apply
+      return (_args[0] = that);
     }
-    @Override public String _str() {
-      SB sb = new SB();
+
+    // Structural unification.  Both 'this' and t' are the same afterwards and
+    // returns the unified bit.  If 'this' is 'fresh', it is cloned during
+    // unification and unchanged, only imparting its sharing structure on 't'.
+    T2 unify( T2 t, Ary<Syntax> work ) {
+      if( this==t ) return this;
+      assert no_uf() && t.no_uf();
+      assert !t.is_fresh();     // Only can lazy-clone LHS
+      if( is_fresh() )          // Peel off fresh lazy & do a fresh-unify
+        return _args[0].find()._fresh(new HashMap<>(),t,work);
+      // Normal unification, with side-effects
+      return _unify(t,work);
+    }
+
+    // Structural unification.  Both 'this' and t' are the same afterwards and
+    // returns the unified bit.
+    private T2 _unify(T2 t, Ary<Syntax> work) {
+      assert no_uf() && t.no_uf();
+      if( this==t ) return this;
+      if(   is_fresh() ) throw com.cliffc.aa.AA.unimpl(); // recursive fresh?
+      if( t.is_fresh() ) throw com.cliffc.aa.AA.unimpl(); // RHS is fresh?
+
+      if( is_base() && t.is_base() ) return unify_base(t,work);
+      // two leafs union in either order, so keep lower uid
+      if( is_leaf() && t.is_leaf() && _uid<t._uid ) return t.union(this,work);
+      if(   is_leaf() ) return   union(t   ,work);
+      if( t.is_leaf() ) return t.union(this,work);
+
+      if( !Util.eq(_name,t._name) )
+        throw new RuntimeException("Cannot unify "+this+" and "+t);
+      if( _args==t._args ) return this; // Names are equal, args are equal
+      if( _args.length != t._args.length )
+        throw new RuntimeException("Cannot unify "+this+" and "+t);
+      // Structural recursion unification
+      T2[] args = new T2[_args.length];
+      boolean progress0=false, progress1=false;
+      for( int i=0; i<_args.length; i++ ) {
+        args[i] = find(i)._unify(t.find(i),work);
+        progress0 |= args[i]!=  find(i);
+        progress1 |= args[i]!=t.find(i);
+      }
+      // If same-same, return same
+      if( !progress0 ) return this;
+      if( !progress1 ) return t;
+      // Return new unified T2
+      return new T2(_name,args);
+    }
+
+    private T2 fresh_base(T2 t) { t._con = _con.meet(t._con); return t; }
+    private T2 unify_base(T2 t, Ary<Syntax> work) { return union(fresh_base(t),work); }
+
+    // Apply 'this' structure on 't'; no modifications to 'this'.
+    // 'vars' maps from the cloned LHS to the RHS replacement.
+    private T2 _fresh( HashMap<T2, T2> vars, T2 t, Ary<Syntax> work ) {
+      assert no_uf() && t.no_uf();
+      T2 prior = vars.get(this);
+      if( prior!=null )         // Been there, done that?  Return prior mapping
+        return prior.find().unify(t,work);
+      assert !is_fresh();       // recursive fresh?
+
+      // RHS is also a lazy clone, which if cloned, will not be part of any
+      // other structure.  When unioned with the clone of the LHS, the result
+      // is not part of anything direct... but the structures still have to
+      // align.  Make a replica & unify (e.g. stop being lazy).
+      if( t.is_fresh() ) t = t._args[0].find().repl(vars, new HashMap<>());
+
+      if( is_base() && t.is_base() ) return fresh_base(t);
+      if(   is_leaf() ) { vars.put(this,t); return t; }  // Lazy map LHS tvar to RHS
+      if( t.is_leaf() ) return t.union(repl(vars, new HashMap<>()),work); // RHS is a tvar; union with a copy of LHS
+
+      if( !Util.eq(_name,t._name) )
+        throw com.cliffc.aa.AA.unimpl(); // unification error
+      if( _args.length != t._args.length )
+        throw new RuntimeException("Cannot unify "+this+" and "+t);
+      // Structural recursion unification, lazy on LHS
+      T2[] args = new T2[_args.length];
+      for( int i=0; i<_args.length; i++ )
+        args[i] = find(i)._fresh(vars,t.find(i),work);
+
+      return new T2(_name,args);
+    }
+
+    // Replicate LHS, replacing vars as they appear
+    T2 repl(HashMap<T2,T2> vars, HashMap<T2,T2> dups) {
+      T2 t = vars.get(this);
+      if( t!=null ) return t;   // Been there, done that, return prior answer
+      if( is_leaf() ) {         // LHS is a leaf, make a new one for RHS
+        vars.put(this,t = tnew());
+        return t;
+      }
+      // Must replicate base's, because they are not really immutable:
+      // mismatched Types meet instead of error.
+      if( is_base() ) return base(_con);
+      // Deep clone.  dups check for RHS cycles, and keep them
+      T2 rez = dups.get(this);
+      if( rez!=null ) return rez; // RHS has a cycle (as opposed to LHS, handled by vars check above)
+      T2[] args = new T2[_args.length];
+      dups.put(this,rez = new T2(_name,args)); // Insert in dups BEFORE structural recursion, to stop cycles
+      // Structural recursion replicate
+      for( int i=0; i<_args.length; i++ )
+        args[i] = find(i).repl(vars,dups);
+      return rez;
+    }
+
+    // Structural unification, except return true if ever LHS progress
+    boolean progress(T2 t) {
+      assert no_uf() && t.no_uf();
+      if( this==t ) return false;
+      if( t.is_leaf() ) return false; // will be equal after unify
+      if( is_base() && t.is_base() && _con==t._con ) return false;
+      if( is_fresh() ) return _args[0].progress(t);
+      if( !Util.eq(_name,t._name) || _args.length!=t._args.length )
+        return true;            // Blatently not-equal
+      for( int i=0; i<_args.length; i++ )
+        if( find(i).progress(t.find(i)) )
+          return true;          // Recursive progress
+      return false;
+    }
+
+    void push_update(Apply a) {
+      if( _updates==null ) _updates = new Ary<>(Apply.class);
+      if( _updates.find(a)==-1 ) _updates.push(a);
+    }
+
+    // -----------------
+    // Glorious Printing
+
+    // Look for dups, in a tree or even a forest (which Syntax.p() does)
+    VBitSet get_dups(VBitSet dups) { return _get_dups(new VBitSet(),dups); }
+    VBitSet _get_dups(VBitSet visit, VBitSet dups) {
+      if( visit.tset(_uid) ) dups.set(_uid);
+      else
+        for( T2 t : _args )
+          if( t!=null )
+            t._get_dups(visit,dups);
+      return dups;
+    }
+
+    // Fancy print for Debuggers - includes explicit U-F re-direction.
+    // Does NOT roll-up U-F, has no side-effects.
+    @Override public String toString() { return str(new SB(), new VBitSet(), get_dups(new VBitSet()) ).toString(); }
+    SB str(SB sb, VBitSet visit, VBitSet dups) {
+      if( is_fresh() ) return _args[0].str(sb.p('#'),visit,dups);
+      if( is_leaf() || is_base() ) {
+        if( is_base() ) sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString()); else sb.p(_name);
+        return _args[0]==null ? sb : _args[0].str(sb.p(">>"), visit, dups);
+      }
+      boolean dup = dups.get(_uid);
+      if( dup ) sb.p('$').p(_uid);
+      if( visit.tset(_uid) && dup ) return sb;
+      if( dup ) sb.p(':');
+
       if( _name.equals("->") ) {
         sb.p("{ ");
         for( int i=0; i<_args.length-1; i++ )
-          sb.p(_args[i].str()).p(' ');
-        return sb.p("-> ").p(_args[_args.length-1].str()).p(" }").toString();
+          str(sb,visit,_args[i],dups).p(" ");
+        return str(sb.p("-> "),visit,_args[_args.length-1],dups).p(" }");
       }
-      sb.p(_name).p('(');
-      for( HMType t : _args )
-        sb.p(t.str()).p(',');
-      return sb.unchar().p(')').toString();
+      // Generic structural T2
+      sb.p("(").p(_name).p(" ");
+      for( T2 t : _args ) str(sb,visit,t,dups).p(" ");
+      return sb.unchar().p(")");
     }
+    static private SB str(SB sb, VBitSet visit, T2 t, VBitSet dups) { return t==null ? sb.p("_") : t.str(sb,visit,dups); }
 
-    @Override HMType find() { return this; }
-    @Override HMType union(HMType that) {
-      if( !(that instanceof Oper) ) return that.union(this);
-      Oper op2 = (Oper)that;
-      if( !_name.equals(op2._name) ||
-          _args.length != op2._args.length )
-        throw new RuntimeException("Cannot unify "+this+" and "+that);
-      for( int i=0; i<_args.length; i++ )
-        _args[i].union(op2._args[i]);
-      return this;
+    // Same as toString but calls find().  Can thus side-effect & roll-up U-Fs, so not a toString
+    public String p() { return p(get_dups(new VBitSet())); }
+    String p(VBitSet dups) { return find()._p(new SB(), new VBitSet(), dups).toString(); }
+    private SB _p(SB sb, VBitSet visit, VBitSet dups) {
+      assert no_uf();
+      if( is_fresh() ) return _args[0].find()._p(sb.p('#'),visit,dups);
+      if( is_base() ) return sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString() );
+      if( is_leaf() ) return sb.p(_name);
+      boolean dup = dups.get(_uid);
+      if( dup ) sb.p('$').p(_uid);
+      if( visit.tset(_uid) && dup ) return sb;
+      if( dup ) sb.p(':');
+      if( _name.equals("->") ) {
+        sb.p("{ ");
+        for( int i=0; i<_args.length-1; i++ )
+          find(i)._p(sb,visit,dups).p(" ");
+        return find(_args.length-1)._p(sb.p("-> "),visit,dups).p(" }");
+      }
+      // Generic structural T2
+      sb.p("(").p(_name).p(" ");
+      for( int i=0; i<_args.length; i++ ) find(i)._p(sb,visit,dups).p(" ");
+      return sb.unchar().p(")");
     }
   }
+
 }
