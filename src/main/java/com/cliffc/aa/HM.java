@@ -56,7 +56,7 @@ public class HM {
 
     int cnt=0;
     while( !work.isEmpty() ) {  // While work
-      Syntax syn = work.pop();  // Get work
+      Syntax syn = work.del(cnt%work._len);  // Get work
       T2 t = syn.hm(work);      // Get work results
       T2 tsyn = syn.find();
       if( t!=tsyn ) {             // Progress?
@@ -64,7 +64,7 @@ public class HM {
         syn._t=t;                 // Progress!
         if( syn._par !=null ) work.push(syn._par); // Parent updates
       }
-      // VERY EXPENSIVE ASSERT: Every Syntax that makes progress is on the worklist
+      // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
       //assert prog.more_work(work);
       cnt++;
     }
@@ -117,7 +117,7 @@ public class HM {
     abstract SB p1(SB sb);      // Self short print
     abstract SB p2(SB sb, VBitSet dups); // Recursion print
   }
-  
+
   public static class Con extends Syntax {
     final Type _con;
     Con(Type con) { super(); _con=con; }
@@ -170,7 +170,7 @@ public class HM {
       _body.prep_tree(this,work);
     }
     // If found name, inside a Lambda so NOT fresh
-    @Override T2 prep_tree_lookup(String name, Syntax prior) { return Util.eq(_arg0,name) ? _targ : null; } 
+    @Override T2 prep_tree_lookup(String name, Syntax prior) { return Util.eq(_arg0,name) ? _targ : null; }
     @Override boolean more_work(Ary<Syntax> work) {
       if( !more_work_impl(work) ) return false;
       return _body.more_work(work);
@@ -201,7 +201,7 @@ public class HM {
         ? (prior==_use ? T2.fresh(name,_targ) : _targ)
         : null;                 // Missed on name
     }
-    
+
     @Override boolean more_work(Ary<Syntax> work) {
       if( !more_work_impl(work) ) return false;
       return _body.more_work(work) && _use.more_work(work);
@@ -299,17 +299,19 @@ public class HM {
     boolean is_leaf () { return _name.charAt(0)=='V' && !is_base(); }
     // Concrete primitive base
     boolean is_base () { return _con!=null; }
+    // Is a structural type variable, neither is_leaf nor is_base
+    boolean is_tvar() { return _name.charAt(0)!='V' && _con==null; }
 
     // U-F find
     T2 find() {
-      if( !is_leaf() && !is_base() ) return this; // Shortcut
+      if( is_tvar() ) return this; // Shortcut
       T2 u = _args[0];
       if( u==null ) return this; // Shortcut
-      if( !u.is_leaf() || u._args[0]==null ) return u; // Shortcut
+      if( u.is_tvar() || u._args[0]==null ) return u; // Shortcut
       // U-F fixup
-      while( u.is_leaf() && u._args[0]!=null ) u = u._args[0];
+      while( !u.is_tvar() && u._args[0]!=null ) u = u._args[0];
       T2 v = this, v2;
-      while( v.is_leaf() && (v2=v._args[0])!=u ) { v._args[0]=u; v = v2; }
+      while( !v.is_tvar() && (v2=v._args[0])!=u ) { v._args[0]=u; v = v2; }
       return u;
     }
     // U-F find on the args array
@@ -319,7 +321,7 @@ public class HM {
       T2 uu = u.find();
       return u==uu ? uu : (_args[i]=uu);
     }
-    boolean no_uf() { return (!is_leaf() && !is_base()) || _args[0]==null; }
+    boolean no_uf() { return is_tvar() || _args[0]==null; }
 
     // U-F union; this becomes that.  If 'this' was used in an Apply, re-check
     // the Apply.
@@ -340,11 +342,15 @@ public class HM {
       if( is_fresh() )          // Peel off fresh lazy & do a fresh-unify
         return _args[0].find()._fresh(new HashMap<>(),t,work);
       // Normal unification, with side-effects
-      return _unify(t,work);
+      assert DUPS.isEmpty();
+      T2 rez = _unify(t,work);
+      DUPS.clear();
+      return rez;
     }
 
     // Structural unification.  Both 'this' and t' are the same afterwards and
     // returns the unified bit.
+    static private final HashMap<Long,T2> DUPS = new HashMap<>();
     private T2 _unify(T2 t, Ary<Syntax> work) {
       assert no_uf() && t.no_uf();
       if( this==t ) return this;
@@ -362,19 +368,28 @@ public class HM {
       if( _args==t._args ) return this; // Names are equal, args are equal
       if( _args.length != t._args.length )
         throw new RuntimeException("Cannot unify "+this+" and "+t);
-      // Structural recursion unification
+
+      // Cycle check.
+      long luid = ((long)_uid<<32)|t._uid;
+      T2 rez = DUPS.get(luid), rez2;
+      if( rez!=null ) return rez; // Been there, done that
       T2[] args = new T2[_args.length];
-      boolean progress0=false, progress1=false;
-      for( int i=0; i<_args.length; i++ ) {
+      rez = rez2 = new T2(_name,args);
+      DUPS.put(luid,rez);       // Close cycles
+
+      // Structural recursion unification.
+      for( int i=0; i<_args.length; i++ )
         args[i] = find(i)._unify(t.find(i),work);
-        progress0 |= args[i]!=  find(i);
-        progress1 |= args[i]!=t.find(i);
-      }
-      // If same-same, return same
-      if( !progress0 ) return this;
-      if( !progress1 ) return t;
+
+      // Check for being equal, cyclic-ly, and return a prior if possible.
+      boolean eq0 = rez.cycle_equals(this);
+      boolean eq1 = rez.cycle_equals(t   );
+      if( eq0 ) rez2 = this;
+      if( eq1 ) rez2 = t   ;
+      if( eq0 && eq1 ) rez2 = _uid<t._uid ? this : t;
+      if( rez!=rez2 ) DUPS.put(luid,rez2);
       // Return new unified T2
-      return new T2(_name,args);
+      return rez2;
     }
 
     private T2 fresh_base(T2 t) { t._con = _con.meet(t._con); return t; }
@@ -448,6 +463,32 @@ public class HM {
       return false;
     }
 
+    static private final HashMap<T2,T2> CDUPS = new HashMap<>();
+    boolean cycle_equals(T2 t) {
+      assert CDUPS.isEmpty();
+      boolean rez = _cycle_equals(t);
+      CDUPS.clear();
+      return rez;
+    }
+    boolean _cycle_equals(T2 t) {
+      assert no_uf() && t.no_uf();
+      if( this==t ) return true;
+      if( !is_tvar() || !t.is_tvar() ||    // Base-cases have to be completely identical
+          !Util.eq(_name,t._name) ||       // Wrong type-var names
+          _args.length != t._args.length ) // Mismatched sizes
+        return false;
+      if( _args==t._args ) return true;
+      // Cycles stall the equal/unequal decision until we see a difference.
+      T2 tc = CDUPS.get(this);
+      if( tc!=null )
+        return tc==t; // Cycle check; true if both cycling the same
+      CDUPS.put(this,t);
+      for( int i=0; i<_args.length; i++ )
+        if( !find(i)._cycle_equals(t.find(i)) )
+          return false;
+      return true;
+    }
+
     void push_update(Apply a) {
       if( _updates==null ) _updates = new Ary<>(Apply.class);
       if( _updates.find(a)==-1 ) _updates.push(a);
@@ -459,7 +500,7 @@ public class HM {
     // Look for dups, in a tree or even a forest (which Syntax.p() does)
     VBitSet get_dups(VBitSet dups) { return _get_dups(new VBitSet(),dups); }
     VBitSet _get_dups(VBitSet visit, VBitSet dups) {
-      if( visit.tset(_uid) ) dups.set(_uid);
+      if( visit.tset(_uid) && no_uf() ) dups.set(_uid);
       else
         for( T2 t : _args )
           if( t!=null )

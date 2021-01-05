@@ -84,7 +84,7 @@ public class TestHM {
     Syntax x =
       new Lambda("f", new Apply(new Ident("f"), new Ident("f")));
     T2 t1 = HM.hm(x);
-    assertEquals("{ $33:{ $33 -> V31 } -> V31 }",t1.p());
+    assertEquals("{ $34:{ $34 -> V31 } -> V31 }",t1.p());
   }
 
   @Test
