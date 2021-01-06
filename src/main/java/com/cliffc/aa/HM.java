@@ -50,7 +50,6 @@ public class HM {
     // Factor; FP div/mod-like operation
     PRIMS.put("factor",T2.fresh("TOP",T2.fun(flt64,T2.prim("divmod",flt64,flt64))));
 
-
     // Prep for SSA: pre-gather all the (unique) ids
     prog.prep_tree(null,work);
 
@@ -72,6 +71,14 @@ public class HM {
     return prog._t;
   }
   static void reset() { PRIMS.clear(); T2.reset(); }
+
+  // Gather live T2._uid
+  static IBitSet live(Syntax prog) {
+    IBitSet visit = new IBitSet();
+    for( T2 t : PRIMS.values() ) t.live(visit);
+    prog.live(visit);
+    return visit;
+  }
 
   public static abstract class Syntax {
     Syntax _par;
@@ -116,6 +123,7 @@ public class HM {
     }
     abstract SB p1(SB sb);      // Self short print
     abstract SB p2(SB sb, VBitSet dups); // Recursion print
+    abstract void live(IBitSet visit);
   }
 
   public static class Con extends Syntax {
@@ -127,6 +135,7 @@ public class HM {
     @Override T2 hm(Ary<Syntax> work) { return find(); }
     @Override void prep_tree( Syntax par, Ary<Syntax> work ) { prep_tree_impl(par, T2.base(_con), work); }
     @Override boolean more_work(Ary<Syntax> work) { return more_work_impl(work); }
+    @Override void live(IBitSet visit) {if( _t!=null ) _t.live(visit);}
   }
 
   public static class Ident extends Syntax {
@@ -147,6 +156,7 @@ public class HM {
       prep_tree_impl(par,t,work);
     }
     @Override boolean more_work(Ary<Syntax> work) { return more_work_impl(work); }
+    @Override void live(IBitSet visit) {if( _t!=null ) _t.live(visit);}
   }
 
   public static class Lambda extends Syntax {
@@ -174,6 +184,11 @@ public class HM {
     @Override boolean more_work(Ary<Syntax> work) {
       if( !more_work_impl(work) ) return false;
       return _body.more_work(work);
+    }
+    @Override void live(IBitSet visit) {
+      if( _t!=null ) _t.live(visit);
+      _targ.live(visit);
+      _body.live(visit);
     }
   }
 
@@ -205,6 +220,12 @@ public class HM {
     @Override boolean more_work(Ary<Syntax> work) {
       if( !more_work_impl(work) ) return false;
       return _body.more_work(work) && _use.more_work(work);
+    }
+    @Override void live(IBitSet visit) {
+      if( _t!=null ) _t.live(visit);
+      _targ.live(visit);
+      _body.live(visit);
+      _use .live(visit);
     }
   }
 
@@ -252,6 +273,10 @@ public class HM {
       if( !_fun.more_work(work) ) return false;
       for( Syntax arg : _args ) if( !arg.more_work(work) ) return false;
       return true;
+    }
+    @Override void live(IBitSet visit) {
+      if( _t!=null ) _t.live(visit);
+      for( Syntax arg : _args ) arg.live(visit);
     }
   }
 
@@ -301,6 +326,11 @@ public class HM {
     boolean is_base () { return _con!=null; }
     // Is a structural type variable, neither is_leaf nor is_base
     boolean is_tvar() { return _name.charAt(0)!='V' && _con==null; }
+
+    void live(IBitSet visit) {
+      if( visit.set(_uid) ) return;
+      for( T2 t : _args ) if( t!=null ) t.live(visit);
+    }
 
     // U-F find
     T2 find() {
