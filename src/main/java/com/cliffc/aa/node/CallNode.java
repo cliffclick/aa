@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.BitSet;
 
 import static com.cliffc.aa.AA.*;
+import static com.cliffc.aa.Env.GVN;
 
 // Call/apply node.
 //
@@ -92,7 +93,7 @@ public class CallNode extends Node {
   Parse[] _badargs;         // Errors for e.g. wrong arg counts or incompatible args; one error point per arg.
   public CallNode( boolean unpacked, Parse[] badargs, Node... defs ) {
     super(OP_CALL,defs);
-    assert defs[FUN_IDX]==null || defs[FUN_IDX].val() instanceof TypeMemPtr; // Temp; not required
+    assert defs[FUN_IDX]==null || defs[FUN_IDX]._val instanceof TypeMemPtr; // Temp; not required
     assert defs.length > FUN_IDX+1;
     _rpc = BitsRPC.new_rpc(BitsRPC.ALL); // Unique call-site index
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
@@ -115,7 +116,6 @@ public class CallNode extends Node {
   //     The output type here is trimmed to what is "resolved"
   public  Node ctl() { return in(CTL_IDX); }
   public  Node mem() { return in(MEM_IDX); }
-  public  Node fun() { throw AA.unimpl(); } // transition
   public  Node dsp() { return in(FUN_IDX); } // Display
   public  Node fdx() { return _defs.last(); } // FIDX
 
@@ -125,20 +125,12 @@ public class CallNode extends Node {
   // Actual arguments.  Arg(1) is allowed and refers to memory; arg(2) to the Display/TFP.
   Node arg ( int x ) { assert x>=0; return _defs.at(x); }
   // Set an argument.  Use 'set_fun' to set the Code.
-  Node set_arg (int idx, Node arg, GVNGCM gvn) { assert idx>=FUN_IDX && idx <nargs(); return set_def(idx,arg,gvn); }
-  public void set_mem( Node mem, GVNGCM gvn) { set_def(MEM_IDX, mem, gvn); }
-         Node set_fdx    (Node fun, GVNGCM gvn) { return set_def(         _defs._len-1,fun,gvn); }
-  public void set_fdx_reg(Node fun, GVNGCM gvn) {    gvn.set_def_reg(this,_defs._len-1,fun    ); }
-  Node set_fun( Node fun, GVNGCM gvn) {
-    //return set_def(FUN_IDX,fun,gvn);
-    throw AA.unimpl();
-  }
-  public void set_fun_reg(Node fun, GVNGCM gvn) {
-    //gvn.set_def_reg(this,FUN_IDX,fun);
-    throw AA.unimpl();
-  }
+  Node set_arg (int idx, Node arg) { assert idx>=FUN_IDX && idx <nargs(); return set_def(idx,arg); }
+  public Node set_dsp( Node dsp) { return set_def(FUN_IDX, dsp); }
+  public void set_mem( Node mem) { set_def(MEM_IDX, mem); }
+  public Node set_fdx( Node fun) { return set_def(_defs._len-1,fun); }
   public BitsFun fidxs() {
-    Type tf = fdx().val();
+    Type tf = fdx()._val;
     return tf instanceof TypeFunPtr ? ((TypeFunPtr)tf).fidxs() : null;
   }
 
@@ -178,30 +170,28 @@ public class CallNode extends Node {
   // splits into 2, and the two new children RPCs replace it entirely.  The
   // original RPC may exist in the type system for a little while, until the
   // children propagate everywhere.
-  @Override @NotNull public CallNode copy( boolean copy_edges, GVNGCM gvn) {
-    CallNode call = (CallNode)super.copy(copy_edges,gvn);
-    ConNode old_rpc = gvn.con(TypeRPC.make(_rpc));
+  @Override @NotNull public CallNode copy( boolean copy_edges) {
+    CallNode call = (CallNode)super.copy(copy_edges);
+    ConNode old_rpc = Node.con(TypeRPC.make(_rpc));
     call._rpc = BitsRPC.new_rpc(_rpc); // Children RPC
-    Type oldt = gvn.unreg(this);       // Changes hash, so must remove from hash table
-    _rpc = BitsRPC.new_rpc(_rpc);      // New child RPC for 'this' as well.
-    gvn.rereg(this,oldt);              // Back on list
+    set_rpc(BitsRPC.new_rpc(_rpc)); // New child RPC for 'this' as well.
     // Swap out the existing old rpc users for the new.
     // Might be no users of either.
-    ConNode new_rpc = gvn.con(TypeRPC.make(_rpc));
-    gvn.add_work(gvn.subsume(old_rpc,new_rpc));
+    ConNode new_rpc = Node.con(TypeRPC.make(_rpc));
+    GVN.add_work(old_rpc.subsume(new_rpc));
     return call;
   }
 
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  @Override public Node ideal_reduce() {
     Node cc = in(0).is_copy(0);
-    if( cc!=null ) return set_def(0,cc,gvn);
+    if( cc!=null ) return set_def(0,cc);
     // When do I do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked ) {          // Not yet unpacked a tuple
       assert nargs()==ARG_IDX+1;// Memory, Display plus the arg tuple
       Node mem = mem();
       Node arg = arg(ARG_IDX);
-      Type tadr = arg.val();
+      Type tadr = arg._val;
       // Bypass a merge on the 2-arg input during unpacking
       if( mem instanceof MrgProjNode && tadr instanceof TypeMemPtr &&
           arg instanceof ProjNode && mem.in(0)==arg.in(0) ) {
@@ -209,19 +199,20 @@ public class CallNode extends Node {
         if( alias == -1 ) throw unimpl(); // Handle multiple aliases, handle all/empty
         NewNode nnn = (NewNode)arg.in(0);
         Node fdx = pop();
-        remove(_defs._len-1,gvn); // Pop off the NewNode tuple
+        remove(_defs._len-1); // Pop off the NewNode tuple
         int len = nnn._defs._len;
         for( int i=1; NewNode.def_idx(i)<len; i++ ) // Push the args; unpacks the tuple
           add_def( nnn.fld(i));
-        set_mem(((MrgProjNode)mem).mem(),gvn);
+        set_mem(((MrgProjNode)mem).mem());
         add_def(fdx);
-        _unpacked = true;     // Only do it once
-        gvn.add_work(this);   // Revisit unification after unpacking
+        _unpacked = true;      // Only do it once
+        xval();                // Recompute value, this is not monotonic since replacing tuple with args
+        GVN.add_work_all(this);// Revisit unification after unpacking
         return this;
       }
     }
 
-    Type tc = val();
+    Type tc = _val;
     if( !(tc instanceof TypeTuple) ) return null;
     TypeTuple tcall = (TypeTuple)tc;
 
@@ -229,13 +220,14 @@ public class CallNode extends Node {
     if( tctl(tcall)!=Type.CTRL ) { // Dead control (NOT dead self-type, which happens if we do not resolve)
       if( (ctl() instanceof ConNode) ) return null;
       // Kill all inputs with type-safe dead constants
-      set_def(MEM_IDX,gvn.con(TypeMem.XMEM),gvn);
-      set_def(FUN_IDX,gvn.con(TypeFunPtr.GENERIC_FUNPTR.dual()),gvn);
+      set_mem(Node.con(TypeMem.XMEM));
+      set_dsp(Node.con(TypeFunPtr.GENERIC_FUNPTR.dual()));
       if( is_dead() ) return this;
       for( int i=ARG_IDX; i<_defs._len; i++ )
-        set_def(i,gvn.con(Type.ANY),gvn);
-      gvn.add_work_defs(this);
-      return set_def(0,Env.XCTRL,gvn);
+        set_def(i,Env.ANY);
+      //gvn.add_work_defs(this);
+      //return set_def(0,Env.XCTRL,gvn);
+      throw unimpl();
     }
 
     // Have some sane function choices?
@@ -258,14 +250,14 @@ public class CallNode extends Node {
           // FunPtr.  Common for non-upwardsly exposed targets.
           FunPtrNode fptr = ret.funptr();
           if( fptr != null && !fptr.display()._live.live().is_escape() )
-            return set_fun(fptr, gvn);
+            return set_dsp(fptr);
           // See if FunPtr is available just above an Unresolved.
           if( unk instanceof UnresolvedNode ) {
             fptr = ((UnresolvedNode)unk).find_fidx(fidx);
             if( fptr != null ) { // Gonna improve
               if( dsp() instanceof FP2DispNode && dsp().in(0)==unk )
-                set_arg(FUN_IDX,fptr.display(),gvn);
-              return set_fdx(fptr, gvn);
+                set_dsp(fptr.display());
+              return set_fdx(fptr);
             }
           }
         }
@@ -276,25 +268,25 @@ public class CallNode extends Node {
     // Fidxs are typically low during iter, but can be high during
     // iter post-GCP on error calls where nothing resolves.
     if( fidx == -1 && !fidxs.above_center() && !fidxs.test(1)) {
-      BitsFun rfidxs = resolve(fidxs,tcall._ts,(TypeMem) mem().val(),gvn._opt_mode==GVNGCM.Mode.Opto);
+      BitsFun rfidxs = resolve(fidxs,tcall._ts,(TypeMem) mem()._val,GVN._opt_mode==GVNGCM.Mode.Opto);
       if( rfidxs==null ) return null;            // Dead function, stall for time
-      FunPtrNode fptr = least_cost(gvn, rfidxs, unk); // Check for least-cost target
+      FunPtrNode fptr = least_cost(rfidxs, unk); // Check for least-cost target
       if( fptr != null ) {
-        if( fptr.display().val().isa(dsp().val()) )
-          set_arg(FUN_IDX,fptr.display(),gvn);
-        return set_fdx(fptr, gvn); // Resolve to 1 choice
+        if( fptr.display()._val.isa(dsp()._val) )
+          set_dsp(fptr.display());
+        return set_fdx(fptr); // Resolve to 1 choice
       }
     }
 
     // See if the display is always dead; common for Unresolved of primitives.
     if( unk instanceof UnresolvedNode &&
-        !(arg(FUN_IDX) instanceof ConNode && arg(FUN_IDX).val()==Type.ANY) ) {
+        !(dsp() instanceof ConNode && dsp()._val==Type.ANY) ) {
       boolean dsp_nil=true;
       for( Node fptr : unk._defs )
-        if( !(fptr instanceof FunPtrNode) || ((FunPtrNode)fptr).display().val()!=TypeMemPtr.NO_DISP )
+        if( !(fptr instanceof FunPtrNode) || ((FunPtrNode)fptr).display()._val!=TypeMemPtr.NO_DISP )
           { dsp_nil=false; break; }
       if( dsp_nil ) {           // Display is unused by any Unresolved
-        set_arg(FUN_IDX,gvn.con(Type.ANY),gvn);
+        set_dsp(Env.ANY);
         return this;
       }
     }
@@ -302,7 +294,7 @@ public class CallNode extends Node {
 
     // Wire valid targets.
     CallEpiNode cepi = cepi();
-    if( cepi!=null && cepi.check_and_wire(gvn) )
+    if( cepi!=null && cepi.check_and_wire() )
       return this;              // Some wiring happened
 
     // Check for dead args and trim; must be after all wiring is done because
@@ -311,35 +303,44 @@ public class CallNode extends Node {
     // alive args still need to resolve.  Constants are an issue, because they
     // fold into the Parm and the Call can lose the matching DProj while the
     // arg is still alive.
-    if( gvn._opt_mode._CG && err(true)==null ) {
+    if( GVN._opt_mode._CG && err(true)==null ) {
       Node progress = null;
       for( int i=FUN_IDX; i<nargs(); i++ )
         if( ProjNode.proj(this,i)==null &&
             !(arg(i) instanceof ConNode) ) // Not already folded
-          progress = set_arg(i,gvn.con(Type.ANY),gvn); // Kill dead arg
+          progress = set_arg(i,Env.ANY);   // Kill dead arg
       if( progress != null ) return this;
     }
 
+    return null;
+  }
+
+  @Override public Node ideal_grow() {
     // Check for a prior New and move past the call (pushes a store-like
     // behavior down).  The New address must not be reachable from the Call
     // arguments transitively, which is detected in the escape-in set.
+
+    // Inserting a MemSplit is a ideal_grow, and swap_new could be an
+    // ideal_mono, but they both use the same large correctness tests, so both
+    // go under ideal_grow to avoid recomputing the test.
     Node mem = mem();
-    if( gvn._opt_mode != GVNGCM.Mode.Parse && mem instanceof MrgProjNode && cepi != null ) {
+    CallEpiNode cepi = cepi();
+    if( GVN._opt_mode != GVNGCM.Mode.Parse && mem instanceof MrgProjNode && cepi != null ) {
       ProjNode cepim = ProjNode.proj(cepi,MEM_IDX); // Memory projection from CEPI
       ProjNode cepid = ProjNode.proj(cepi,REZ_IDX); // Return projection from CEPI
       // Verify no extra mem readers in-between, no alias overlaps on input
       if( cepim != null && MemSplitNode.check_split(this,escapees()) ) {
-        TypeMem tmcepi = (TypeMem) cepim.val();
+        TypeMem tmcepi = (TypeMem) cepim._val;
         // Verify call entry is not stale relative to call exit
-        if( mem.val().isa(tmcepi) ) {
+        if( mem._val.isa(tmcepi) ) {
           // If call returns same as new (via recursion), cannot split, but CAN swap.
-          BitsAlias esc_out = CallEpiNode.esc_out(tmcepi,cepid==null ? Type.XNIL : cepid.val());
+          BitsAlias esc_out = CallEpiNode.esc_out(tmcepi,cepid==null ? Type.XNIL : cepid._val);
           BitsAlias escs = escapees().meet(esc_out);
           int alias = ((MrgProjNode)mem).nnn()._alias;
           if( !escs.is_empty() && !esc_out.test_recur(alias) ) // No return conflict, so parallelize memory
-            return MemSplitNode.insert_split(gvn,cepim,escs,this,mem,mem);
+            return MemSplitNode.insert_split(cepim,escs,this,mem,mem);
           else                  // Else move New below Call.
-            return swap_new(gvn,cepim,(MrgProjNode)mem);
+            return swap_new(cepim,(MrgProjNode)mem);
         }
       }
     }
@@ -347,15 +348,18 @@ public class CallNode extends Node {
     return null;
   }
 
+  @Override public Node ideal(GVNGCM gvn, int level) { throw unimpl(); }
+
   // Swap a New and a Call, when we cannot use a Split/Join.
-  private Node swap_new(GVNGCM gvn, Node cepim, MrgProjNode mrg ) {
+  private Node swap_new(Node cepim, MrgProjNode mrg ) {
     cepim.keep();
-    gvn.insert(cepim,mrg);
-    set_def(1,mrg.mem(),gvn);
-    gvn.set_def_reg(mrg,1,cepim.unhook());
-    gvn.revalive(this,cepim.in(0),cepim,mrg);
+    cepim.insert(mrg);
+    set_def(1,mrg.mem());
+    mrg.set_def(1,cepim.unkeep());
+    //gvn.revalive(this,cepim.in(0),cepim,mrg);
+    throw unimpl();
     // TODO: Re-establish H-M invariants
-    return this;
+    //return this;
   }
 
   // Pass thru all inputs directly - just a direct gather/scatter.  The gather
@@ -365,12 +369,12 @@ public class CallNode extends Node {
   // merge from that path.  Result tuple type:
   @Override public Type value(GVNGCM.Mode opt_mode) {
     // Pinch to XCTRL/CTRL
-    Type ctl = ctl().val();
+    Type ctl = ctl()._val;
     if( opt_mode!=GVNGCM.Mode.Parse && cepi()==null ) ctl = Type.XCTRL; // Dead from below
     if( ctl != Type.CTRL ) return ctl.oob();
 
     // Not a memory to the call?
-    Type mem = mem().val();
+    Type mem = mem()._val;
     if( !(mem instanceof TypeMem) ) return mem.oob();
     TypeMem tmem = (TypeMem)mem;
 
@@ -387,23 +391,23 @@ public class CallNode extends Node {
     // Also gather all aliases from all args.
     BitsAlias as = BitsAlias.EMPTY;
     for( int i=FUN_IDX; i<nargs(); i++ )
-      as = as.meet(get_alias(ts[i] = arg(i).val()));
+      as = as.meet(get_alias(ts[i] = arg(i)._val));
     // Recursively search memory for aliases; compute escaping aliases
     BitsAlias as2 = tmem.all_reaching_aliases(as);
     ts[_defs._len] = TypeMemPtr.make(as2,TypeObj.ISUSED); // Set escapes as last type
 
     // Not a function to call?
-    Type tfx = fdx().val();
+    Type tfx = fdx()._val;
     if( !(tfx instanceof TypeFunPtr) )
       tfx = tfx.oob(TypeFunPtr.GENERIC_FUNPTR);
     TypeFunPtr tfp = (TypeFunPtr)tfx;
     BitsFun fidxs = tfp.fidxs();
     if( !fidxs.is_empty() && fidxs.above_center()!=tfp._disp.above_center() && !tfp._disp.is_con() )
-      return val(); // Display and FIDX mis-aligned; stall
+      return _val; // Display and FIDX mis-aligned; stall
     // Resolve; only keep choices with sane arguments during GCP
     // Unpacked: to be monotonic, skip resolve until unpacked.
     BitsFun rfidxs = _unpacked ? resolve(fidxs,ts,tmem,opt_mode==GVNGCM.Mode.Opto) : fidxs;
-    if( rfidxs==null ) return val(); // Dead function input, stall until this dies
+    if( rfidxs==null ) return _val; // Dead function input, stall until this dies
     // nargs is min nargs across the resolved fidxs for below-center, max for above.
     boolean rup = rfidxs.above_center();
     int nargs = rup ? -1 : 9999;
@@ -426,12 +430,27 @@ public class CallNode extends Node {
     if( TypeMemPtr.OOP.isa(t)   ) return BitsAlias.FULL;
     return BitsAlias.EMPTY;
   }
+
+  @Override public void add_flow_extra() {
+    // Live-use depends on memory into a Call
+    for( Node def : _defs )
+      if( def.is_mem() )
+        Env.GVN.add_flow(def);
+    
+    // FunNode.value depends on changing CallNode.value.
+    for( Node use : _uses )
+      if( use instanceof CProjNode )
+        for( Node fun : use._uses )
+          if( fun instanceof FunNode )
+            Env.GVN.add_flow(fun);
+  }
+
   @Override BitsAlias escapees() {
-    BitsAlias esc_in  = tesc(val())._aliases;
+    BitsAlias esc_in  = tesc(_val)._aliases;
     CallEpiNode cepi = cepi();
-    TypeTuple tcepi = cepi.val() instanceof TypeTuple ? (TypeTuple) cepi.val() : (TypeTuple) cepi.val().oob(TypeTuple.CALLE);
+    TypeTuple tcepi = cepi._val instanceof TypeTuple ? (TypeTuple) cepi._val : (TypeTuple) cepi._val.oob(TypeTuple.CALLE);
     BitsAlias esc_out = CallEpiNode.esc_out((TypeMem)tcepi.at(1),tcepi.at(2));
-    TypeMem precall = (TypeMem) mem().val();
+    TypeMem precall = (TypeMem) mem()._val;
     BitsAlias esc_out2 = precall.and_unused(esc_out); // Filter by unused pre-call
     return esc_out2.meet(esc_in);
   }
@@ -445,7 +464,7 @@ public class CallNode extends Node {
       if( fidxs.above_center() ) return _live; // Got choices, dunno which one will stick
       CallEpiNode cepi = cepi();
       if( cepi==null ) return _live; // Collapsing
-      if( ctl().val() == Type.XCTRL ) return _live; // Unreachable
+      if( ctl()._val == Type.XCTRL ) return _live; // Unreachable
       // Expand (actually fail) if any parents
       BitSet bs = fidxs.tree().plus_kids(fidxs);
       if( bs.cardinality() > cepi.nwired() ) // More things to call
@@ -483,21 +502,18 @@ public class CallNode extends Node {
     // After we have the exact callers, use liveness directly.  True if we have
     // the Call Graph, or the callers are known directly.  If the call is
     // in-error, act as-if we do not known the Call Graph.
-    TypeFunPtr tfpx = CallNode.ttfpx(val());
+    TypeFunPtr tfpx = ttfpx(_val);
     if( (opt_mode._CG || fdx() instanceof FunPtrNode) &&
         (tfpx ==null || tfpx.fidxs().above_center() || err(true)==null) )
       return _live;
 
     // Unknown future callees act as-if all available aliases are read from and
     // thus live.
-    Type tcall = val();
-    Type tcmem = mem().val();
-    if( !(tcall instanceof TypeTuple) || !(tcmem instanceof TypeMem) ) // No type to sharpen
-      return tcall.oob(TypeMem.ALLMEM);
-    TypeMem caller_mem = (TypeMem)tcmem;
+    if( !(_val instanceof TypeTuple) ) // No type to sharpen
+      return _val.oob(TypeMem.ALLMEM);
     BitsAlias aliases = BitsAlias.EMPTY;
     for( int i=FUN_IDX; i<nargs(); i++ ) {
-      Type targ = targ(tcall,i);
+      Type targ = targ(_val,i);
       if( TypeMemPtr.OOP.isa(targ) )
         { aliases=BitsAlias.FULL; break; } // All possible pointers, so all memory is alive
       if( !(targ instanceof TypeMemPtr) ) continue; // Not a pointer, does not need memory to sharpen
@@ -506,12 +522,13 @@ public class CallNode extends Node {
     }
     // Conservative too strong; need only memories that go as deep as the
     // formal types.
+    TypeMem caller_mem = emem(_val);
     TypeMem tmem2 = caller_mem.slice_reaching_aliases(caller_mem.all_reaching_aliases(aliases));
     return (TypeMem)tmem2.meet(_live);
   }
 
   TypeMem live_use_call( int dfidx ) {
-    Type tcall = val();
+    Type tcall = _val;
     if( !(tcall instanceof TypeTuple) )
       return tcall.above_center() ? TypeMem.DEAD : TypeMem.ALIVE;
     TypeFunPtr tfp = ttfp(tcall);
@@ -649,7 +666,7 @@ be LOW and not BAD.  The actual is not directly below int64 (Scalar is), but
 can lift to nint64 which is allowed.
 
 However, a formal TypeMemPtr with alias [30] and unrelated actual [26] IS BAD,
-since [26] can never lift to a [30]-or-above.  
+since [26] can never lift to a [30]-or-above.
 
 The test is "actual can lift to between formal and ~formal", which can be
 restated as "~formal ISA (actual JOIN formal)" - which works for int64 and
@@ -663,7 +680,7 @@ Scalar, but because Bits allows EMPTY, does not work for [26] and [30].
       //  else if( (actual instanceof TypeFunPtr && formal instanceof TypeFunPtr &&
       //            ((TypeFunPtr)actual)._fidxs.join(((TypeFunPtr)formal)._fidxs).is_empty()) )
       //    flags |=BAD;       // Sideways
-      //  else 
+      //  else
       //    flags|=LOW; // Low & sideways, but can lift to good.
       //
       //} else flags|=BAD;                      // Side-ways is bad
@@ -675,10 +692,10 @@ Scalar, but because Bits allows EMPTY, does not work for [26] and [30].
 
   // Amongst these choices return the least-cost.  Some or all might be
   // invalid.
-  public FunPtrNode least_cost(GVNGCM gvn, BitsFun choices, Node unk) {
+  public FunPtrNode least_cost(BitsFun choices, Node unk) {
     if( choices==BitsFun.EMPTY ) return null;
     assert choices.bitCount() > 0; // Must be some choices
-    assert choices.abit()!= -1 || (choices.above_center() == (gvn._opt_mode==GVNGCM.Mode.Opto));
+    assert choices.abit()!= -1 || (choices.above_center() == (GVN._opt_mode==GVNGCM.Mode.Opto));
     int best_cvts=99999;           // Too expensive
     FunPtrNode best_fptr=null;     //
     TypeTuple best_formals=null;  //
@@ -694,7 +711,7 @@ Scalar, but because Bits allows EMPTY, does not work for [26] and [30].
         TypeTuple formals = fun._sig._formals; // Type of each argument
         int cvts=0;                        // Arg conversion cost
         for( int j=ARG_IDX; j<nargs(); j++ ) {   // Skip the display
-          Type actual = arg(j).val();
+          Type actual = arg(j)._val;
           Type formal = formals.at(j);
           if( actual==formal ) continue;
           byte cvt = actual.isBitShape(formal); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
@@ -756,11 +773,11 @@ Scalar, but because Bits allows EMPTY, does not work for [26] and [30].
       if( arg(j).is_forward_ref() )
         return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[j-ARG_IDX+1], FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx));
     // Expect a function pointer
-    TypeFunPtr tfp = ttfpx(val());
+    TypeFunPtr tfp = ttfpx(_val);
     if( tfp==null ) {
       if( fast ) return ErrMsg.FAST;
       if( _not_resolved_by_gcp ) return ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
-      Type t = val();
+      Type t = _val;
       if( t instanceof TypeTuple ) t = ((TypeTuple)t).at(FUN_IDX);
       return ErrMsg.unresolved(_badargs[0],"A function is being called, but "+t+" is not a function type");
     }
@@ -794,7 +811,7 @@ Scalar, but because Bits allows EMPTY, does not work for [26] and [30].
         }
       }
       if( ts!=null )
-        return ErrMsg.typerr(_badargs[j-ARG_IDX+1],actual, mem().val(),ts.asAry());
+        return ErrMsg.typerr(_badargs[j-ARG_IDX+1],actual, mem()._val,ts.asAry());
     }
 
     // Call did not resolve
@@ -811,6 +828,7 @@ Scalar, but because Bits allows EMPTY, does not work for [26] and [30].
         return (CallEpiNode)cepi;
     return null;
   }
+  void set_rpc(int rpc) { unelock(); _rpc=rpc; } // Unlock before changing hash
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

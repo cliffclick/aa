@@ -17,13 +17,13 @@ public class TestLive {
     ScopeNode scope = new ScopeNode(null,false);
 
     Node fullmem = new ConNode<>(TypeMem.FULL);
-    fullmem.set_val(TypeMem.FULL);
-    scope.set_mem(fullmem,gvn);
+    fullmem._val = TypeMem.FULL;
+    scope.set_mem(fullmem);
 
     // Return the number '5' - should be alive with no special memory.
     Node rez = new ConNode<>(TypeInt.con(5));
-    rez.set_val(TypeInt.con(5));
-    scope.set_rez(rez,gvn);
+    rez._val = TypeInt.con(5);
+    scope.set_rez(rez);
 
     // Check liveness base case
     scope.xliv(gvn._opt_mode);
@@ -38,39 +38,39 @@ public class TestLive {
   @Test public void testNewObj() {
     Env env = Env.top_scope();
     GVNGCM gvn = Env.GVN;
-    GVNGCM._INIT0_CNT = 1; // No prims
+    Node._INIT0_CNT = 1; // No prims
     // Always memory for the NewObj
     Node mmm = new ConNode<>(TypeMem.ANYMEM).keep();
-    mmm.set_val(TypeMem.ANYMEM);
+    mmm._val = TypeMem.ANYMEM;
 
     // Fields
     Type ti5 = TypeInt.con(5);
     ConNode fdx = new ConNode(ti5);
-    fdx.set_val(ti5);
+    fdx._val = ti5;
     Type ti9 = TypeInt.con(9);
     ConNode<Type> fdy = new ConNode<>(ti9);
-    fdy.set_val(ti9);
+    fdy._val = ti9;
 
     // New object, fields x,y holding ints
-    NewObjNode nnn = new NewObjNode(false,TypeStruct.DISPLAY,gvn.con(Type.NIL));
+    NewObjNode nnn = new NewObjNode(false,TypeStruct.DISPLAY,Node.con(Type.NIL));
     nnn.create_active("x",fdx,TypeStruct.FFNL);
     nnn.create_active("y",fdy,TypeStruct.FFNL);
-    nnn.set_val(Type.ANY);
+    nnn._val = Type.ANY;
     nnn.no_more_fields();
-    nnn.xval(gvn._opt_mode);
+    nnn.xval();
     nnn._live = TypeMem.LIVE_BOT;
 
     // Proj, OProj
     Node mem = new MrgProjNode(nnn,mmm);
-    mem.xval(gvn._opt_mode);
+    mem.xval();
     Node ptr = new  ProjNode(REZ_IDX, nnn);
-    ptr.xval(gvn._opt_mode);
+    ptr.xval();
 
     // Use the object for scope exit
     ScopeNode scope = new ScopeNode(null,false);
-    scope.set_mem(mem,gvn);
-    scope.set_rez(ptr,gvn);
-    scope.set_val(Type.ALL);
+    scope.set_mem(mem);
+    scope.set_rez(ptr);
+    scope._val = Type.ALL;
 
     // Check 'live' is stable on creation, except for mem & scope
     // which are 'turning around' liveness.

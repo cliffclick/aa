@@ -40,10 +40,11 @@ public class TMem extends TMulti<TMem> {
         TObj tvo = new TObj(null).add_fld(fld,tv);
         if( parm==null ) {
           if( test ) return true;    // Definitely will be progress
-          TNode.add_work(tvo.push_dep(dep,null)); // If a new alias, it gets the deps
-          TNode.add_work_all(_deps);
-          grow(alias+1)[alias] = tvo;
-          progress = true;
+          //TNode.add_work(tvo.push_dep(dep,null)); // If a new alias, it gets the deps
+          //TNode.add_work_all(_deps);
+          //grow(alias+1)[alias] = tvo;
+          //progress = true;
+          throw com.cliffc.aa.AA.unimpl();
         } else {
           progress = parm.unify(tvo,test);
         }
@@ -72,7 +73,9 @@ public class TMem extends TMulti<TMem> {
         progress = true;
       }
     }
-    if( !test && progress ) TNode.add_work_all(tv._ns);
+    if( !test && progress )
+      throw com.cliffc.aa.AA.unimpl();
+    //TNode.add_work_all(tv._ns);
     return progress;
   }
 

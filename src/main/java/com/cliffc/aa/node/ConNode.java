@@ -15,6 +15,7 @@ public class ConNode<T extends Type> extends Node {
   public ConNode( T t ) {
     super(OP_CON,Env.START);
     _t=t;
+    _live = all_live();
     // Specifically, no unifcation with ANY/Dead
     if( t==Type.ANY ) _tvar = new TVDead();
     else if( t==Type.XNIL ) _tvar = new TNil();
@@ -33,13 +34,14 @@ public class ConNode<T extends Type> extends Node {
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
     // If any use is alive, the Con is alive... but it never demands memory.
     // Indeed, it may supply memory.
+    if( _keep>0 ) return all_live();
     TypeLive live = TypeLive.DEAD; // Start at lattice top
     for( Node use : _uses )
       if( use._live != TypeMem.DEAD )
         live = live.lmeet(use.live_use(opt_mode,this).live());
-    if( _keep>0 && live.above_center() ) live = TypeLive.LIVE;
     return TypeMem.make_live(live);
   }
+  @Override public TypeMem all_live() { return _t==Type.CTRL ? TypeMem.ALIVE : TypeMem.LIVE_BOT; }
   @Override public String toString() { return str(); }
   @Override public int hashCode() { return _t.hashCode(); }// In theory also slot 0, but slot 0 is always Start
   @Override public boolean equals(Object o) {

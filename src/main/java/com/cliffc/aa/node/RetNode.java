@@ -43,6 +43,7 @@ public final class RetNode extends Node {
     return fpn;                 // Zero (null) or 1 display.
   }
   public int fidx() { return _fidx; }
+  void set_fidx(int fidx) { unelock(); _fidx = fidx; } // Unlock before changing hash
   @Override public int hashCode() { return super.hashCode()+_fidx; }
   @Override public boolean equals(Object o) {
     if( !super.equals(o) ) return false;
@@ -56,22 +57,22 @@ public final class RetNode extends Node {
     return "Ret_"+(is_copy() ? "!copy!" : (fun==null ? ""+_fidx : fun.name()));
   }
 
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  @Override public Node ideal_reduce() {
     // If control is dead, but the Ret is alive, we're probably only using the
     // FunPtr as a 'gensym'.  Nuke the function body.
     if( !is_copy() && ctl().val() == Type.XCTRL && !is_prim() && fun().val() ==Type.XCTRL )
-      set_def(4,null,gvn);      // We're a copy now!
+      set_def(4,null);          // We're a copy now!
 
     // If no users inlining, wipe out all edges
     if( is_copy() && in(0)!=null ) {
       boolean only_fptr = true;
       for( Node use : _uses )  if( !(use instanceof FunPtrNode) ) { only_fptr=false; break; }
       if( only_fptr ) {           // Only funptr uses, make them all gensyms
-        set_def(0,null,gvn);      // No ctrl
-        set_def(1,null,gvn); if( is_dead() ) return this; // No mem
-        set_def(2,null,gvn);      // No val
-        set_def(3,null,gvn);      // No rpc
-        set_def(4,null,gvn);      // No fun
+        set_def(0,null);          // No ctrl
+        set_def(1,null); if( is_dead() ) return this; // No mem
+        set_def(2,null);          // No val
+        set_def(3,null);          // No rpc
+        set_def(4,null);          // No fun
         return this;              // Progress
       }
     }
@@ -80,21 +81,21 @@ public final class RetNode extends Node {
     Node ctl = ctl();
     if( rez().val().is_con() && ctl!=fun() && // Profit: can change control and delete function interior
         (mem().val() ==TypeMem.EMPTY || (mem() instanceof ParmNode && mem().in(0)==fun())) ) // Memory has to be trivial also
-      return set_def(0,fun(),gvn); // Gut function body
-
-    // Look for a tail recursive call
-    Node tail = tail_recursive(gvn);
-    if( tail != null ) return tail;
-
+      return set_def(0,fun());  // Gut function body
     return null;
   }
+  
+  // Look for a tail recursive call
+  @Override public Node ideal_mono() { return tail_recursive(); }
+  
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   // Look for a tail-Call.  There should be 1 (collapsed) Region, and maybe a
   // tail Call.  Look no further than 1 Region, since collapsing will fold
   // nested regions up.  Since the RetNode is a single "pinch point" for
   // control flow in the entire function, if we see a tail-call here, it means
   // the function ends in an infinite loop, not currently optimized.
-  Node tail_recursive( GVNGCM gvn ) {
+  Node tail_recursive() {
     Node ctl = ctl();
     if( ctl._op!=OP_REGION ) return null;
     int idx; for( idx=1; idx<ctl._defs._len; idx++ ) {
@@ -134,13 +135,12 @@ public final class RetNode extends Node {
     LoopNode loop = new LoopNode();
     loop.add_def(fun);
     loop.add_def(call.ctl());
-    loop = (LoopNode)gvn.xform(loop);
-    gvn.set_def_reg(cuse,cidx,loop);
+    loop = (LoopNode)Env.GVN.xform(loop);
+    cuse.set_def(cidx,loop);
     // Insert loop phis in-the-middle
-    for( int i=0; i<call.nargs(); i++ ) do_phi(gvn,fun,call,loop,i);
+    for( int i=0; i<call.nargs(); i++ ) do_phi(fun,call,loop,i);
     // Cut the Call control
-    gvn.set_def_reg(call,0, Env.XCTRL);
-
+    call.set_def(0, Env.XCTRL);
     return this;
   }
 
@@ -152,15 +152,14 @@ public final class RetNode extends Node {
     return tback.isa(tenter);
   }
 
-  private static void do_phi(GVNGCM gvn, FunNode fun, CallNode call, LoopNode loop, int argn) {
+  private static void do_phi(FunNode fun, CallNode call, LoopNode loop, int argn) {
     ParmNode parm = fun.parm(argn);
     if( parm==null ) return; // arg/parm might be dead
     PhiNode phi = new PhiNode(parm._t,parm._badgc,loop,null,call.arg(argn));
     phi._tvar = parm.tvar();    // H-M unify
-    gvn.insert(parm,phi);
-    phi.set_def(1,parm,null);
+    parm.insert(phi);
+    phi.set_def(1,parm);
     phi._live = parm._live;
-    gvn.rereg(phi, parm.val());
   }
 
   @Override public Type value(GVNGCM.Mode opt_mode) {

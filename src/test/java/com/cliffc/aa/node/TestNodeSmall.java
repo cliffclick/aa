@@ -57,11 +57,11 @@ public class TestNodeSmall {
     Type astrALL = astr.val(), astrSTART = Type.ANY;
 
     // Compute Node.value() where initial GVN is startype()
-    uadd.set_val(uaddSTART);
-    anum.set_val(anumSTART);
-    aflt.set_val(afltSTART);
-    aint.set_val(aintSTART);
-    astr.set_val(astrSTART);
+    uadd._val = uaddSTART;
+    anum._val = anumSTART;
+    aflt._val = afltSTART;
+    aint._val = aintSTART;
+    astr._val = astrSTART;
     gvn._opt_mode=GVNGCM.Mode.PesiNoCG;
     Type uaddVAL1START = uadd.value(gvn._opt_mode);
     Type anumVAL1START = anum.value(gvn._opt_mode);
@@ -76,11 +76,11 @@ public class TestNodeSmall {
     Type astrVAL2START = astr.value(gvn._opt_mode);
 
     // Compute Node.value() where initial GVN is all_type.dual()
-    uadd.set_val(uaddALL.dual());
-    anum.set_val(anumALL.dual());
-    aflt.set_val(afltALL.dual());
-    aint.set_val(aintALL.dual());
-    astr.set_val(astrALL.dual());
+    uadd._val = uaddALL.dual();
+    anum._val = anumALL.dual();
+    aflt._val = afltALL.dual();
+    aint._val = aintALL.dual();
+    astr._val = astrALL.dual();
     gvn._opt_mode=GVNGCM.Mode.PesiNoCG;
     Type uaddVAL1XALL = uadd.value(gvn._opt_mode);
     Type anumVAL1XALL = anum.value(gvn._opt_mode);
@@ -95,11 +95,11 @@ public class TestNodeSmall {
     Type astrVAL2XALL = astr.value(gvn._opt_mode);
 
     // Compute Node.value() where initial GVN is all_type()
-    uadd.set_val(uaddALL);
-    anum.set_val(uaddALL);
-    aflt.set_val(afltALL);
-    aint.set_val(aintALL);
-    astr.set_val(astrALL);
+    uadd._val = uaddALL;
+    anum._val = uaddALL;
+    aflt._val = afltALL;
+    aint._val = aintALL;
+    astr._val = astrALL;
     gvn._opt_mode=GVNGCM.Mode.PesiNoCG;
     Type uaddVAL1ALL = uadd.value(gvn._opt_mode);
     Type anumVAL1ALL = anum.value(gvn._opt_mode);
@@ -177,7 +177,7 @@ public class TestNodeSmall {
     TypeTuple[] tns= new TypeTuple[argss.length];
     for( int i=0; i<argss.length; i++ ) {
       for( int j=0; j<ins.length; j++ )
-        ins[j].set_val(argss[i].at(j));
+        ins[j]._val = argss[i].at(j);
       tns[i] = (TypeTuple)n.value(gvn._opt_mode);
     }
     // Equals check after computing them all
@@ -248,7 +248,7 @@ public class TestNodeSmall {
     CallNode call = (CallNode)gvn.xform(new CallNode(true, null, ctrl, mem, dsp, arg1, arg2, fp_mul));
     CallEpiNode cepi = (CallEpiNode)gvn.xform(new CallEpiNode(null,call, Env.DEFMEM)); // Unwired
 
-    gvn.unreg(call);            // Will be hacking edges
+    call.unelock();             // Will be hacking edges
     Node[] ins = new Node[]{ctrl,mem,fp_mul,arg1,arg2};
 
     // Args to calls
@@ -279,7 +279,7 @@ public class TestNodeSmall {
 
 
     // Check the fptr {int,flt} meet
-    call.set_fdx(ins[2]=fp_mul,gvn);
+    call.set_fdx(ins[2]=fp_mul);
     TypeTuple[] argss_mul1 = new TypeTuple[] {                 // arg1  arg2   resolve
       TypeTuple.make( tctl, tfull, tmul1, txscl, txscl, tmul1X), //  ~S    ~S   [+int+flt] ;          high
       TypeTuple.make( tctl, tfull, tmul1, t2   , txscl, tmul1X), //   2    ~S   [+int+flt] ;     good+high
@@ -300,7 +300,7 @@ public class TestNodeSmall {
     // - Mix High/Low & no Good , keep all & fidx?join:meet
     // - Some Good, no Low, no High, drop Bad & fidx?join:meet
     // - All Bad, like Low: keep all & meet
-    call.set_fdx(ins[2]=fp_add,gvn);
+    call.set_fdx(ins[2]=fp_add);
     TypeTuple[] argss_add1 = new TypeTuple[] {
       TypeTuple.make( tctl, tfull, tadd1, txscl, txscl, tadd1X), //  ~S    ~S   [+int+flt+str] (__H,__H,__H) ; All  high, keep all, join
       TypeTuple.make( tctl, tfull, tadd1, txscl, tabc , tadd1X), //  ~S    str  [+int+flt+str] (B_H,B_H,_GH) ; Some high, keep all, join
@@ -336,7 +336,7 @@ public class TestNodeSmall {
 
 
     // Check the fptr {+int+flt} choices
-    call.set_fdx(ins[2]=fp_mul,gvn);
+    call.set_fdx(ins[2]=fp_mul);
     TypeTuple[] argss_mul2 = new TypeTuple[] {                  // arg2  arg2   resolve
       TypeTuple.make( tctl, tfull, tmul2X, txscl, txscl, tmul2X), //  ~S    ~S   [+int+flt]
       TypeTuple.make( tctl, tfull, tmul2X, t2   , txscl, tmul2X), //   2    ~S   [+int+flt]
@@ -350,7 +350,7 @@ public class TestNodeSmall {
     _testMonotonicChain(ins,call,argss_mul2);
 
     // Check the {+int+flt+str} choices
-    call.set_fdx(ins[2]=fp_add,gvn);
+    call.set_fdx(ins[2]=fp_add);
     TypeTuple[] argss_add2 = new TypeTuple[] {
       TypeTuple.make( tctl, tfull, tadd2X, txscl, txscl, tadd2X), //  ~S    ~S   [+int+flt+str] (__H,__H,__H) ; All  high, keep all, join
       TypeTuple.make( tctl, tfull, tadd2X, txscl, tabc , tadd2X), //  ~S    str  [+int+flt+str] (B_H,B_H,_GH) ; Some high, keep all, join
@@ -368,7 +368,8 @@ public class TestNodeSmall {
     };
     _testMonotonicChain(ins,call,argss_add2);
 
-    gvn.kill(cepi);
+    //gvn.kill(cepi);
+    throw com.cliffc.aa.AA.unimpl();
   }
 
 
@@ -401,14 +402,14 @@ public class TestNodeSmall {
     //   FunPtr - Ret
     gvn._opt_mode=GVNGCM.Mode.Parse;
     ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
-    ctl.set_val(Type.CTRL);
+    ctl._val = Type.CTRL;
     ConNode mem = (ConNode)gvn.xform(new ConNode<>(TypeMem.ANYMEM));
     ConNode rpc = (ConNode)gvn.xform(new ConNode<>(TypeRPC.ALL_CALL));
     ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISP_SIMPLE));
     // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
     // yet built.
     NewObjNode dsp_file = (NewObjNode)gvn.xform(new NewObjNode(true,TypeStruct.DISPLAY,dsp_prims));
-    MrgProjNode dsp_file_obj = Env.DEFMEM.make_mem_proj(gvn,dsp_file,mem);
+    MrgProjNode dsp_file_obj = Env.DEFMEM.make_mem_proj(dsp_file,mem);
     ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(FUN_IDX, dsp_file));
     Env.ALL_DISPLAYS = Env.ALL_DISPLAYS.set(dsp_file._alias);
     // The Fun and Fun._tf:
@@ -422,7 +423,7 @@ public class TestNodeSmall {
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
     ParmNode parm_mem = new ParmNode(MEM_IDX," mem",fun,mem,null);
-    ParmNode parm_dsp = new ParmNode(FUN_IDX,"^"  ,fun,Type.SCALAR,gvn.con(dsp_file_ptr.val()),null);
+    ParmNode parm_dsp = new ParmNode(FUN_IDX,"^"  ,fun,Type.SCALAR,Node.con(dsp_file_ptr.val()),null);
     gvn.xform(parm_mem.add_def(dsp_file_obj));
     gvn.xform(parm_dsp.add_def(dsp_file_ptr));
     // Close the function up
@@ -433,10 +434,10 @@ public class TestNodeSmall {
     dsp_file.no_more_fields();
     // Return the fptr to keep all alive
     ScopeNode env = new ScopeNode(null,true);
-    env.set_ctrl(ctl,gvn);
-    env.set_ptr (dsp_file_ptr,gvn);
-    env.set_mem (dsp_file_obj,gvn);
-    env.set_rez (fptr,gvn);
+    env.set_ctrl(ctl);
+    env.set_ptr (dsp_file_ptr);
+    env.set_mem (dsp_file_obj);
+    env.set_rez (fptr);
     gvn.init(env);
 
     Node[] nodes = new Node[]{ctl,mem,rpc,dsp_prims,dsp_file,dsp_file_obj,dsp_file_ptr,fun,parm_mem,parm_dsp,ret,fptr,env};
@@ -597,8 +598,8 @@ public class TestNodeSmall {
     ParmNode parm2 = gvn.init(new ParmNode( 3,"arg2",fun,arg2,null));
 
     // Types for normal args before memory type
-    Type tp1 = parm1 .xval (gvn._opt_mode);
-    Type tp2 = parm2 .xval (gvn._opt_mode);
+    Type tp1 = parm1 .xval ();
+    Type tp2 = parm2 .xval ();
     Type tpm = parmem.value(gvn._opt_mode);
 
     // Check the isa(sig) on complex pointer args

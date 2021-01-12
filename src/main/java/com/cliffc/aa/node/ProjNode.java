@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TMulti;
 import com.cliffc.aa.tvar.TVar;
@@ -15,12 +16,15 @@ public class ProjNode extends Node {
   ProjNode( byte op, Node ifn, int idx ) { super(op,ifn); _idx=idx; }
   @Override public String xstr() { return "DProj"+_idx; }
 
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  // Strictly reducing
+  @Override public Node ideal_reduce() {
     Node c = in(0).is_copy(_idx);
-    if( c != null ) return c==this ? gvn.con(Type.ANY) : c; // Happens in dying loops
+    if( c != null ) return c==this ? Env.ANY : c; // Happens in dying loops
     return null;
   }
 
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
+  
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Type c = val(0);
     if( c instanceof TypeTuple ) {
@@ -52,6 +56,7 @@ public class ProjNode extends Node {
     return null;
   }
 
+  void set_idx( int idx ) { unelock(); _idx=idx; } // Unlock before changing hash
   @Override public int hashCode() { return super.hashCode()+_idx; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

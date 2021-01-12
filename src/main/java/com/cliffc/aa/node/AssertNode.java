@@ -42,25 +42,25 @@ public class AssertNode extends Node {
       TypeFunSig sig = (TypeFunSig)_t;
       Node[] args = new Node[sig.nargs()+1];
       FunNode fun = gvn.init((FunNode)(new FunNode(null,sig,-1,false).add_def(Env.ALL_CTRL)));
-      fun.set_val(Type.CTRL);
+      fun._val = Type.CTRL;
       args[CTL_IDX] = fun;            // Call control
       args[MEM_IDX] = gvn.xform(new ParmNode(MEM_IDX,"mem" ,fun,TypeMem.MEM,Env.DEFMEM,null));
-      args[FUN_IDX] = gvn.xform(new ParmNode(FUN_IDX,"disp",fun,gvn.con(TypeMemPtr.DISP_SIMPLE),_error_parse));
+      args[FUN_IDX] = gvn.xform(new ParmNode(FUN_IDX,"disp",fun,Node.con(TypeMemPtr.DISP_SIMPLE),_error_parse));
       for( int i=ARG_IDX; i<sig.nargs(); i++ )  // 1 is memory, 2 is display.
         // All the parms; types in the function signature
-        args[i] = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),_error_parse));
+        args[i] = gvn.xform(new ParmNode(i,"arg"+i,fun,Node.con(Type.SCALAR),_error_parse));
       args[sig.nargs()] = arg;        // The whole TFP to the call
       Parse[] badargs = new Parse[sig.nargs()];
       Arrays.fill(badargs,_error_parse);
-      Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
+      Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
       CallNode call = (CallNode)gvn.xform(new CallNode(true,badargs,args));
       Node cepi   = gvn.xform(new CallEpiNode(null/*TODO: Suspect need to carry a prior Env thru*/,call,Env.DEFMEM)).keep();
       Node ctl    = gvn.xform(new CProjNode(cepi));
       Node postmem= gvn.xform(new MProjNode(cepi)).keep();
-      Node val    = gvn.xform(new  ProjNode(cepi.unhook(),AA.REZ_IDX));
+      Node val    = gvn.xform(new  ProjNode(cepi.unkeep(),AA.REZ_IDX));
       // Type-check the return also
       Node chk    = gvn.xform(new AssertNode(postmem,val,sig._ret.at(REZ_IDX),_error_parse,_env));
-      RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));
+      RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unkeep(),chk,rpc,fun));
       // Just the same Closure when we make a new TFP
       Node clos = gvn.xform(new FP2DispNode(arg));
       return gvn.xform(new FunPtrNode(ret,_env,clos));
@@ -104,8 +104,6 @@ public class AssertNode extends Node {
     // reached from the address.
     return ScopeNode.compute_live_mem(mem(),arg());
   }
-  // Changing rez to/from a pointer changes live.
-  @Override public boolean input_value_changes_live() { return true; }
 
   // Check TypeNode for being in-error
   @Override public ErrMsg err( boolean fast ) {

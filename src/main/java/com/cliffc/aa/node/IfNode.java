@@ -9,7 +9,7 @@ public class IfNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node ctl = in(0);
     Node tst = in(1);
-    if( ctl.val() == Type.XCTRL ) return gvn.con(TypeTuple.IF_ANY);
+    if( ctl.val() == Type.XCTRL ) return Node.con(TypeTuple.IF_ANY);
     // Binary test vs 0?
     if( tst._defs._len==3 &&
         (tst.val(1)==Type.XNIL || tst.val(2)==Type.XNIL) ) {
@@ -36,8 +36,8 @@ public class IfNode extends Node {
     if( p0!=null && p0._idx==1 ) { ProjNode tmp=p0; p0=p1; p1=tmp; }
     Node x0 = gvn.xform(new CProjNode(that,0));
     Node x1 = gvn.xform(new CProjNode(that,1));
-    if( p0!=null ) gvn.subsume(p0,x1);
-    if( p1!=null ) gvn.subsume(p1,x0);
+    if( p0!=null ) p0.subsume(x1);
+    if( p1!=null ) p1.subsume(x0);
     x0._live = x1._live = that._live = this._live;
     return that;
   }

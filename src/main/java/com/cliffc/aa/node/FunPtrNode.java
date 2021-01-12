@@ -7,6 +7,8 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.*;
 import org.jetbrains.annotations.NotNull;
 
+import static com.cliffc.aa.Env.GVN;
+
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
 // TypeFunPtr with a constant fidx and variable displays.  Used to allow 1st
 // class functions to be passed about.
@@ -19,7 +21,7 @@ public final class FunPtrNode extends Node {
   // interesting thing is when an out-of-scope TVar uses the same TVar
   // internally in different parts - the copy replicates this structure.  When
   // unified, it forces equivalence in the same places.
-  public  FunPtrNode( RetNode ret, Env e ) { this(null,e,ret,e==null ? Env.GVN.con(TypeMemPtr.NO_DISP) : e._scope.ptr()); }
+  public  FunPtrNode( RetNode ret, Env e ) { this(null,e,ret,e==null ? Node.con(TypeMemPtr.NO_DISP) : e._scope.ptr()); }
   public  FunPtrNode( RetNode ret, Env e, Node display ) { this(null,e,ret,display); }
   // For forward-refs only; super weak display & function.
   private FunPtrNode( ErrMsg referr, Env e, RetNode ret, Node display ) {
@@ -50,7 +52,7 @@ public final class FunPtrNode extends Node {
     return fun==null ? xstr() : fun.str();
   }
 
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  @Override public Node ideal_reduce() {
     if( is_forward_ref() ) return null;
 
     // Display is known dead?  Yank it.
@@ -58,18 +60,19 @@ public final class FunPtrNode extends Node {
       NewNode nn = (NewNode)display().in(0);
       if( nn._ts==nn.dead_type() ) {
         BitsAlias aliases = nn._tptr._aliases;
-        return set_def(1,gvn.con(TypeMemPtr.make(aliases,aliases.oob(TypeObj.ISUSED))),gvn); // No display needed
+        return set_def(1,Node.con(TypeMemPtr.make(aliases,aliases.oob(TypeObj.ISUSED)))); // No display needed
       }
     }
 
     // Remove unused displays.  Track uses; Calling with no display is OK.
     // Uses storing the FPTR and passing it along still require a display.
-    if( gvn._opt_mode._CG && !(display() instanceof ConNode) && !display_used() ) {
+    if( GVN._opt_mode._CG && !(display() instanceof ConNode) && !display_used() ) {
       TypeMemPtr tdisp = (TypeMemPtr) display().val();
-      return set_def(1,gvn.con(tdisp.make_from(TypeObj.UNUSED)),gvn); // No display needed
+      return set_def(1,Node.con(tdisp.make_from(TypeObj.UNUSED))); // No display needed
     }
     return null;
   }
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   // Is the display used?
   private boolean display_used() {
@@ -152,10 +155,10 @@ public final class FunPtrNode extends Node {
   // returns a scalar.
   public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(name));
-    RetNode ret = gvn.init(new RetNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun));
+    RetNode ret = gvn.init(new RetNode(fun,Node.con(TypeMem.MEM),Node.con(Type.SCALAR),Node.con(TypeRPC.ALL_CALL),fun));
     // Display is limited to any one of the current lexical scopes.
     TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS,TypeObj.ISUSED);
-    return new FunPtrNode( ErrMsg.forward_ref(unkref,fun),null,ret,gvn.con(tdisp));
+    return new FunPtrNode( ErrMsg.forward_ref(unkref,fun),null,ret,Node.con(tdisp));
   }
 
   // True if this is a forward_ref
@@ -174,27 +177,26 @@ public final class FunPtrNode extends Node {
     // Make a function pointer based on the original forward-ref fidx, but with
     // the known types.
     FunNode.FUNS.setX(dfun._fidx,null); // Untrack dfun by old fidx
-    gvn.unreg(dfun);  dfun._fidx = rfun._fidx;  gvn.rereg(dfun,Type.CTRL);
+    dfun._fidx = rfun._fidx;
     FunNode.FUNS.setX(dfun._fidx,dfun); // Track FunNode by fidx
 
     RetNode dret = def.ret();
-    Type tret = gvn.unreg(dret);
     dret._fidx  = rfun._fidx ;
-    gvn.rereg(dret,tret);
     FunPtrNode fptr = dret.funptr();
-    fptr.xval(gvn._opt_mode);
-
-    // Replace the forward_ref with the def.
-    gvn.subsume(this,def);
-    dfun.bind(tok);
+    //fptr.xval(gvn._opt_mode);
+    //
+    //// Replace the forward_ref with the def.
+    //gvn.subsume(this,def);
+    //dfun.bind(tok);
+    throw com.cliffc.aa.AA.unimpl();
   }
 
   @Override public ErrMsg err( boolean fast ) { return is_forward_ref() ? _referr : null; }
   // clones during inlining all become unique new sites
   @SuppressWarnings("unchecked")
-  @Override @NotNull public FunPtrNode copy( boolean copy_edges, GVNGCM gvn) {
-    FunPtrNode nnn = (FunPtrNode)super.copy(copy_edges, gvn);
-    nnn.tvar().unify(new TFun(nnn,((TFun)_tvar)._nongen,new TVar(),new TVar()),false);
+  @Override @NotNull public FunPtrNode copy( boolean copy_edges) {
+    FunPtrNode nnn = (FunPtrNode)super.copy(copy_edges);
+    nnn.tvar().unify(new TFun(nnn,((TFun)tvar())._nongen,new TVar(),new TVar()),false);
     return nnn;
   }
 }

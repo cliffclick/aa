@@ -5,9 +5,9 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.VBitSet;
 
 import static com.cliffc.aa.AA.*;
+import static com.cliffc.aa.Env.GVN;
 
 // See CallNode.  Slot 0 is the Call.  The remaining slots are Returns which
 // are typed as standard function returns: {Ctrl,Mem,Val}.  These Returns
@@ -34,7 +34,7 @@ public final class CallEpiNode extends Node {
   int nwired() { return _defs._len-2; }
   RetNode wired(int x) { return (RetNode)in(x+2); }
 
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  @Override public Node ideal_reduce() {
     CallNode call = call();
     Type tc = call.val();
     if( !(tc instanceof TypeTuple) ) return null;
@@ -54,15 +54,11 @@ public final class CallEpiNode extends Node {
           // of lifting types some of the manifested CG edges are killed.
           // Post-GCP all CG edges are manifest, but types can keep lifting
           // and so CG edges can still be killed.
-          unwire(gvn,call,ret);
+          unwire(call,ret);
           return this; // Return with progress
         }
       }
     }
-
-    // See if we can wire any new fidxs directly between Call/Fun and Ret/CallEpi
-    if( check_and_wire(gvn) )
-      return this;              // Return with progress
 
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.
@@ -81,16 +77,16 @@ public final class CallEpiNode extends Node {
           ret._live.isa(_live) &&       // Call and return liveness compatible
           !fun.noinline() ) {           // And not turned off
         assert fun.in(1).in(0)==call;   // Just called by us
-        fun.set_is_copy(gvn);
-        return inline(gvn,level, call, ret.ctl(), ret.mem(), ret.rez(), null/*do not unwire, because using the entire function body inplace*/,call._uid);
+        fun.set_is_copy();
+        return inline( call, ret.ctl(), ret.mem(), ret.rez(), null/*do not unwire, because using the entire function body inplace*/,call._uid);
       }
     }
 
     // Parser thunks eagerly inline
     if( call.fdx() instanceof ThretNode ) {
       ThretNode tret = (ThretNode)call.fdx();
-      wire1(gvn,call,tret.thunk(),tret);
-      return inline(gvn,level, call, tret.ctrl(), tret.mem(), tret.rez(), null/*do not unwire, because using the entire function body inplace*/,call._uid);
+      wire1(call,tret.thunk(),tret);
+      return inline( call, tret.ctrl(), tret.mem(), tret.rez(), null/*do not unwire, because using the entire function body inplace*/,call._uid);
     }
 
     // Only inline wired single-target function with valid args.  CallNode wires.
@@ -142,11 +138,11 @@ public final class CallEpiNode extends Node {
 
     // Check for zero-op body (id function)
     if( rrez instanceof ParmNode && rrez.in(CTL_IDX) == fun && cmem == rmem && inline )
-      return inline(gvn,level,call, cctl,cmem,call.arg(((ParmNode)rrez)._idx), ret,call._uid);
+      return inline(call, cctl,cmem,call.arg(((ParmNode)rrez)._idx), ret,call._uid);
     // Check for constant body
     Type trez = rrez.val();
     if( trez.is_con() && rctl==fun && cmem == rmem && inline )
-      return inline(gvn,level,call, cctl,cmem,gvn.con(trez),ret,call._uid);
+      return inline(call, cctl,cmem,Node.con(trez),ret,call._uid);
 
     // Check for a 1-op body using only constants or parameters and no memory effects
     boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem && inline;
@@ -156,22 +152,29 @@ public final class CallEpiNode extends Node {
           !(parm instanceof ConNode) )
         can_inline=false;       // Not trivial
     if( can_inline ) {
-      Node irez = rrez.copy(false,gvn);// Copy the entire function body
-      irez._in=false;
+      Node irez = rrez.copy(false); // Copy the entire function body
       ProjNode proj = ProjNode.proj(this,REZ_IDX);
       irez._live = proj==null ? TypeMem.ESCAPE : proj._live;
       for( Node parm : rrez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(CTL_IDX) == fun) ? call.arg(((ParmNode)parm)._idx) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
-      return inline(gvn,level,call, cctl,cmem,gvn.add_work(gvn.xform(irez)),ret,call._uid); // New exciting replacement for inlined call
+      keep();
+      irez = GVN.xform(irez);
+      unkeep();
+      return inline(call, cctl,cmem,irez,ret,call._uid); // New exciting replacement for inlined call
     }
 
     return null;
   }
 
+  // See if we can wire any new fidxs directly between Call/Fun and Ret/CallEpi
+  @Override public Node ideal_mono() { return check_and_wire() ? this : null; }
+
+  @Override public Node ideal(GVNGCM gvn, int level) { throw unimpl(); }
+
   // Used during GCP and Ideal calls to see if wiring is possible.
   // Return true if a new edge is wired
-  public boolean check_and_wire( GVNGCM gvn ) {
+  public boolean check_and_wire( ) {
     if( !(val() instanceof TypeTuple) ) return false; // Collapsing
     CallNode call = call();
     Type tcall = call.val();
@@ -190,7 +193,7 @@ public final class CallEpiNode extends Node {
       if( ret==null ) continue;               // Mid-death
       if( _defs.find(ret) != -1 ) continue;   // Wired already
       progress=true;
-      wire1(gvn,call,fun,ret); // Wire Call->Fun, Ret->CallEpi
+      wire1(call,fun,ret);      // Wire Call->Fun, Ret->CallEpi
     }
     return progress;
   }
@@ -198,22 +201,17 @@ public final class CallEpiNode extends Node {
   // Wire the call args to a known function, letting the function have precise
   // knowledge of its callers and arguments.  This adds a edges in the graph
   // but NOT in the CG, until _cg_wired gets set.
-  void wire1( GVNGCM gvn, CallNode call, Node fun, Node ret ) {
+  void wire1( CallNode call, Node fun, Node ret ) {
     assert _defs.find(ret)==-1; // No double wiring
-    wire0(gvn,call,fun);
+    wire0(call,fun);
     // Wire self to the return
-    gvn.add_work(this);
-    if( gvn.check_out(this) ) add_def(      ret);
-    else                  gvn.add_def(this, ret);
-    gvn.add_work(ret);
-    gvn.add_work_defs(call);
+    add_def(ret);
+    if( fun instanceof FunNode ) GVN.add_inline((FunNode)fun);
   }
 
   // Wire without the redundancy check, or adding to the CallEpi
-  void wire0(GVNGCM gvn, CallNode call, Node fun) {
-    // Wire.  During GCP, cannot call "xform" since e.g. types are not final
-    // nor constant yet - and need to add all new nodes to the GCP worklist.
-    // During iter(), must call xform() to register all new nodes.
+  void wire0(CallNode call, Node fun) {
+    // Wire.  Bulk parallel function argument path add
 
     // Add an input path to all incoming arg ParmNodes from the Call.  Cannot
     // assert finding all args, because dead args may already be removed - and
@@ -231,16 +229,12 @@ public final class CallEpiNode extends Node {
           : new ProjNode(call,idx); // Normal args
         break;
       }
-      actual._live = arg._live; // Alive as the original
-      Node actual2 = gvn._opt_mode == GVNGCM.Mode.Opto ? gvn.new_gcp(actual) : gvn.xform(actual);
-      gvn.add_def(arg,actual2);
-      gvn.add_work(actual2);
+      arg.add_def(actual.init1());
     }
 
     // Add matching control to function via a CallGraph edge.
-    Node callgrf = new CProjNode(call);
-    callgrf = gvn._opt_mode == GVNGCM.Mode.Opto ? gvn.new_gcp(callgrf) : gvn.xform(callgrf);
-    gvn.add_def(fun,callgrf);
+    fun.add_def(new CProjNode(call).init1());
+    GVN.add_flow(fun);
   }
 
   // Merge call-graph edges, but the call-graph is not discovered prior to GCP.
@@ -253,9 +247,6 @@ public final class CallEpiNode extends Node {
       return tin0.oob();     // Weird stuff?
     TypeTuple tcall = (TypeTuple)tin0;
     if( tcall._ts.length < ARG_IDX ) return tcall.oob(); // Weird stuff
-    Type tcmem = call().mem().val();
-    if( !(tcmem instanceof TypeMem) ) return tcmem.oob();
-    TypeMem caller_mem = (TypeMem)tcmem;
 
     // Get Call result.  If the Call args are in-error, then the Call is called
     // and we flow types to the post-call.... BUT the bad args are NOT passed
@@ -345,10 +336,15 @@ public final class CallEpiNode extends Node {
     // the call but not flowing in.  Catches all the "new in call" returns.
     BitsAlias esc_out = esc_out(post_call,trez);
     TypeObj[] pubs = new TypeObj[defnode._defs._len];
+    TypeMem caller_mem = CallNode.emem(tcall); // Call memory
     for( int i=1; i<pubs.length; i++ ) {
       boolean ein  = tescs._aliases.test_recur(i);
       boolean eout = esc_out       .test_recur(i);
-      pubs[i] = live_out_gcp(ein,eout,caller_mem.at(i),post_call.at(i),opt_mode,defnode.in(i));
+      TypeObj pre = caller_mem.at(i);
+      TypeObj obj = ein || eout ? (TypeObj)(pre.meet(post_call.at(i))) : pre;
+      if( !opt_mode._CG )       // Before GCP, must use DefMem to keeps types strong as the Parser
+        obj = (TypeObj)obj.join(((TypeMem)defmem).at(i));
+      pubs[i] = obj;
     }
     TypeMem tmem3 = TypeMem.make0(pubs);
 
@@ -365,26 +361,6 @@ public final class CallEpiNode extends Node {
       return tmem.all_reaching_aliases(((TypeMemPtr)trez)._aliases);
     return TypeMemPtr.OOP0.dual().isa(trez) ? BitsAlias.NZERO : BitsAlias.EMPTY;
   }
-
-  // If pre-GCP, must lift the types
-  // as strong as the Parser, which is a join with default memory.
-  private static TypeObj live_out_gcp(boolean esc_in, boolean esc_out, TypeObj pre, TypeObj post, GVNGCM.Mode opt_mode, Node dn ) {
-    if( dn == null ) return null; // A never-made (on this pass) type
-    Type tdn = dn.val();           // Get default type
-    // Decide to take the pre-call or post-call value.
-    TypeObj to = esc_in || esc_out ? (TypeObj)post.meet(pre) : pre;
-    if( tdn == TypeObj.UNUSED || tdn == TypeObj.ANY ) return TypeObj.UNUSED; // If dead, then dead
-    // After/During GCP, this is the value
-    if( opt_mode._CG ) return to;
-    // Before GCP, must use DefNode to keep types as strong as the Parser.
-    if( !(dn instanceof MrgProjNode) ) // Some kind of constant.
-      // TODO: Probably should just jam down mrgproj/new for these constants
-      return tdn instanceof TypeObj ? (TypeObj)tdn : tdn.oob(TypeObj.ISUSED);
-    // Else there is a New/MrgProj
-    TypeObj tdef2 = ((MrgProjNode)dn).nnn()._crushed;
-    return (TypeObj)to.join(tdef2); // Lift to the default worse-case the Parser assumed
-  }
-
 
   // Sanity check
   boolean sane_wiring() {
@@ -405,14 +381,13 @@ public final class CallEpiNode extends Node {
   // nodes are replaced with the called function 'leafs'.  Memory must maintain
   // the knowledge of the escape/no-escape split, so the entire inlined body is
   // visited to "lower" the types.
-  private Node inline( GVNGCM gvn, int level, CallNode call, Node ctl, Node mem, Node rez, RetNode ret, int cuid ) {
-    assert (level&1)==0; // Do not actually inline, if just checking that all forward progress was found
+  private Node inline( CallNode call, Node ctl, Node mem, Node rez, RetNode ret, int cuid ) {
     assert nwired()==0 || nwired()==1; // not wired to several choices
     if( FunNode._must_inline == cuid ) // Assert an expected inlining happens
       FunNode._must_inline = 0;
     // Unwire any wired called function
     if( ret != null && nwired() == 1 && !ret.is_copy() ) // Wired, and called function not already collapsing
-      unwire(gvn,call,ret);
+      unwire(call,ret);
 
     // Update memory in the body with the not-escaped values (which had
     // bypassed the body and now flow into it).
@@ -421,16 +396,16 @@ public final class CallEpiNode extends Node {
     MProjNode cmprj = (MProjNode)ProjNode.proj(call,MEM_IDX);
     if( mem != call.mem() && cmprj !=null ) { // Most primitives do nothing with memory
       work.addAll(cmprj._uses);
-      gvn.subsume(cmprj,call.mem());
+      cmprj.subsume(call.mem());
       if( mem == cmprj ) mem = call.mem();
       // Update all memory ops
       while( !work.isEmpty() ) {
         Node wrk = work.pop();
         if( wrk.is_mem() ) {
-          Type t2 = wrk.value(gvn._opt_mode); // Compute a new type
+          Type t2 = wrk.value(GVN._opt_mode); // Compute a new type
           if( !t2.isa(wrk.val()) ) { // Types out of alignment, need to forward progress here
             // Move types 'down' and add users to worklist.
-            wrk.set_val(t2); // Move 'down', wrong direction, and recognize the escaped type is alive here
+            wrk._val = t2; // Move 'down', wrong direction, and recognize the escaped type is alive here
             assert !(wrk instanceof MProjNode && wrk.in(0) instanceof CallNode); // Should not push work outside the function
             work.addAll(wrk._uses);
           }
@@ -449,22 +424,22 @@ public final class CallEpiNode extends Node {
       while( !work.isEmpty() ) {
         Node wrk = work.pop();
         if( wrk.is_mem() ) {
-          if( wrk instanceof LoadNode ) gvn.add_work(wrk);
-          if( wrk instanceof StoreNode ) { gvn.add_work(wrk); work.addAll(wrk._uses); }
+          if( wrk instanceof  LoadNode ) unimpl(); // gvn.add_work(wrk);
+          if( wrk instanceof StoreNode ) unimpl(); // { gvn.add_work(wrk); work.addAll(wrk._uses); }
         }
       }
-      gvn.subsume(emprj,mem);
+      emprj.subsume(mem);
     }
 
     // Move over CEPI Control
     CProjNode ceprj = (CProjNode)ProjNode.proj(this,0);
-    if( ceprj != null ) gvn.subsume(ceprj,ctl);
-    else set_def(0,null,gvn);
+    if( ceprj != null ) ceprj.subsume(ctl);
+    else set_def(0,null);
 
     // Move over result
     if( !is_dead() ) {
       ProjNode reprj = ProjNode.proj(this,REZ_IDX);
-      if( reprj != null ) gvn.subsume(reprj,rez);
+      if( reprj != null ) reprj.subsume(rez);
     }
 
     // Move over Call inputs
@@ -473,7 +448,7 @@ public final class CallEpiNode extends Node {
       if( use instanceof ProjNode ) {
         Node arg = call.arg(((ProjNode)use)._idx);
         if( rez==use ) rez = arg;
-        gvn.subsume(use, arg);
+        use.subsume(arg);
       }
       else i++;
     }
@@ -481,29 +456,24 @@ public final class CallEpiNode extends Node {
     // While not strictly necessary, immediately fold any dead paths to
     // functions to clean up the CFG.
     rez.keep();
-    while( !call.is_dead() ) {
-      Node proj = call._uses.at(0);
-      Node parm = proj._uses.at(0);
-      gvn.xform_old(parm.in(0),0);
-    }
-    rez.unhook();
+    GVN.do_dead();
+    assert call.is_dead();
+    rez.unkeep();
 
-    assert gvn._opt_mode== GVNGCM.Mode.Parse || Env.START.more_flow(gvn,new VBitSet(),true,0)==0; // Check for sanity
+    assert GVN._opt_mode== GVNGCM.Mode.Parse || Env.START.more_flow(true)==0; // Check for sanity
     return rez;
   }
 
-  void unwire(GVNGCM gvn, CallNode call, RetNode ret) {
+  void unwire(CallNode call, RetNode ret) {
     assert sane_wiring();
     if( !ret.is_copy() ) {
       FunNode fun = ret.fun();
       for( int i = 1; i < fun._defs._len; i++ ) // Unwire
         if( fun.in(i).in(0) == call ) {
-          gvn.set_def_reg(fun, i, Env.XCTRL);
+          fun.set_def(i, Env.XCTRL);
           break;
         }
-      gvn.add_work_uses(fun);
     }
-    gvn.add_work(ret);
     del(_defs.find(ret));
     reset_tvar();
     unify(false);
@@ -514,7 +484,7 @@ public final class CallEpiNode extends Node {
   // Compute local contribution of use liveness to this def.  If the call is
   // Unresolved, then none of CallEpi targets are (yet) alive.
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    assert _keep==0;
+    assert _keep==0 || _live==all_live();
     // Not a copy
     if( def==in(0) ) return _live; // The Call
     if( def==in(1) ) return _live; // The DefMem
@@ -528,9 +498,6 @@ public final class CallEpiNode extends Node {
       return TypeMem.DEAD;    // Call does not call this, so not alive.
     return _live;
   }
-  // Changing the input function type to something low means the call can
-  // resolve it - unresolved fptrs are not live.
-  @Override public boolean input_value_changes_live() { return true; }
 
   @Override public boolean unify( boolean test ) {
     // Build a HM tvar (args->ret), same as HM.java Apply does.  Instead of

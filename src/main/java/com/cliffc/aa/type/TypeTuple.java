@@ -4,8 +4,6 @@ import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 import static com.cliffc.aa.AA.*;
 
-import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
-
 // Internal fixed-length non-recursive tuples.  Used for function arguments,
 // and multi-arg results like IfNode and CallNode.  This is not the same as a
 // no-named-field TypeStruct, and is not exposed at the language level.  With
@@ -84,10 +82,10 @@ public class TypeTuple extends Type<TypeTuple> {
     return make(ts);
   }
 
-  public static TypeTuple make_args(                       ) { return make(Type.CTRL,TypeMem.ALLMEM,NO_DISP ); }
-  public static TypeTuple make_args(Type t2                ) { return make(Type.CTRL,TypeMem.ALLMEM,NO_DISP,t2); }
-  public static TypeTuple make_args(Type t2,Type t3        ) { return make(Type.CTRL,TypeMem.ALLMEM,NO_DISP,t2,t3); }
-  public static TypeTuple make_args(Type t2,Type t3,Type t4) { return make(Type.CTRL,TypeMem.ALLMEM,NO_DISP,t2,t3,t4); }
+  public static TypeTuple make_args(                       ) { return make(Type.CTRL,TypeMem.ALLMEM,TypeMemPtr.NO_DISP ); }
+  public static TypeTuple make_args(Type t2                ) { return make(Type.CTRL,TypeMem.ALLMEM,TypeMemPtr.NO_DISP,t2); }
+  public static TypeTuple make_args(Type t2,Type t3        ) { return make(Type.CTRL,TypeMem.ALLMEM,TypeMemPtr.NO_DISP,t2,t3); }
+  public static TypeTuple make_args(Type t2,Type t3,Type t4) { return make(Type.CTRL,TypeMem.ALLMEM,TypeMemPtr.NO_DISP,t2,t3,t4); }
   public static TypeTuple make_ret(Type trez) { return make(Type.CTRL,TypeMem.ANYMEM,trez); }
 
 

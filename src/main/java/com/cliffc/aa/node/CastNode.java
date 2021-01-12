@@ -12,7 +12,7 @@ public class CastNode extends Node {
   @Override public String xstr() { return "("+_t+")"; }
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node cc = in(0).is_copy(0);
-    if( cc!=null ) return set_def(0,cc,gvn);
+    if( cc!=null ) return set_def(0,cc);
     // Cast is useless?  Remove same as a TypeNode
     Node ctrl = in(0), addr = in(1);
     Type c = ctrl.val(), t = addr.val();
@@ -26,7 +26,7 @@ public class CastNode extends Node {
 
     Node tru = ctrl.walk_dom_last(n -> checked(n,fbaseaddr));
     if( tru==null || tru==ctrl ) return null;
-    set_def(0,tru,gvn);
+    set_def(0,tru);
     return this;
   }
   @Override public Type value(GVNGCM.Mode opt_mode) {

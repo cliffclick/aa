@@ -9,7 +9,6 @@ import java.util.Collections;
 import java.util.HashSet;
 
 import static com.cliffc.aa.AA.*;
-import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 
 // Primitives can be used as an internal operator (their apply() call does the
 // primitive operation).  Primitives are wrapped as functions when returned
@@ -28,7 +27,7 @@ public abstract class PrimNode extends Node {
   PrimNode( String name, String[] args, TypeTuple formals, Type ret ) {
     super(OP_PRIM);
     _name=name;
-    assert formals.at(MEM_IDX)==TypeMem.ALLMEM && formals.at(FUN_IDX)==NO_DISP; // Room for no closure; never memory
+    assert formals.at(MEM_IDX)==TypeMem.ALLMEM && formals.at(FUN_IDX)==TypeMemPtr.NO_DISP; // Room for no closure; never memory
     _sig=TypeFunSig.make(args==null ? TypeFunSig.func_names : args,formals,TypeTuple.make_ret(ret));
     _badargs=null;
     _op_prec = -1;              // Not set yet
@@ -179,31 +178,32 @@ public abstract class PrimNode extends Node {
   // wraps a PrimNode as a full 1st-class function to be passed about or
   // assigned to variables.
   public FunPtrNode as_fun( GVNGCM gvn ) {
-    _defs.clear();  _uses.clear();
-    FunNode fun = (FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
-    Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
-    Node mem = gvn.xform(new ParmNode(MEM_IDX,_sig._args[MEM_IDX],fun,TypeMem.MEM,Env.DEFMEM,null));
-    if( _thunk_rhs ) add_def(mem);      // Memory if thunking
-    for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // First is display, always ignored in primitives
-      add_def(gvn.xform(new ParmNode(i,_sig._args[i],fun, gvn.con(Type.ALL),null)));
-    gvn.init(this);
-    xval(GVNGCM.Mode.Parse);
-    Node ctl,rez;
-    if( _thunk_rhs ) {
-      ctl = gvn.xform(new CProjNode(this));
-      mem = gvn.xform(new MProjNode(this));
-      rez = gvn.xform(new  ProjNode(this,AA.REZ_IDX));
-    } else {
-      ctl = fun;
-      rez = this;
+    try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
+      assert _defs._len==0 && _uses._len==0;
+      FunNode fun = (FunNode) X.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
+      Node rpc = X.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
+      add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
+      Node mem = X.xform(new ParmNode(MEM_IDX,_sig._args[MEM_IDX],fun,TypeMem.MEM,Env.DEFMEM,null));
+      if( _thunk_rhs ) add_def(mem);      // Memory if thunking
+      for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // First is display, always ignored in primitives
+        add_def(X.xform(new ParmNode(i,_sig._args[i],fun, Env.ALL,null)));
+      Node that = X.xform(this);
+      Node ctl,rez;
+      if( _thunk_rhs ) {
+        ctl = X.xform(new CProjNode(that));
+        mem = X.xform(new MProjNode(that));
+        rez = X.xform(new  ProjNode(that,AA.REZ_IDX));
+      } else {
+        ctl = fun;
+        rez = that;
+      }
+      // Functions return the set of *modified* memory.  Most PrimNodes never
+      // *modify* memory (see Intrinsic*Node for some primitives that *modify*
+      // memory).  Thunking (short circuit) prims return both memory and a value.
+      RetNode ret = (RetNode)X.xform(new RetNode(ctl,mem,rez,rpc,fun));
+      // No closures are added to primitives
+      return (X._ret = new FunPtrNode(ret,null));
     }
-    // Functions return the set of *modified* memory.  Most PrimNodes never
-    // *modify* memory (see Intrinsic*Node for some primitives that *modify*
-    // memory).  Thunking (short circuit) prims return both memory and a value.
-    RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,mem,rez,rpc,fun));
-    // No closures are added to primitives
-    return new FunPtrNode(ret,null);
   }
 
 
@@ -245,7 +245,8 @@ public abstract class PrimNode extends Node {
   // TODO: Type-check strptr input args
   static class ConvertStrStr extends PrimNode {
     ConvertStrStr() { super("str",TypeTuple.STRPTR,TypeMemPtr.OOP); }
-    @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
+    @Override public Node ideal_reduce() { return in(1); }
+    @Override public Node ideal(GVNGCM gvn, int level) { throw AA.unimpl(); }
     @Override public Type value(GVNGCM.Mode opt_mode) { return val(1); }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   }
@@ -539,9 +540,9 @@ public abstract class PrimNode extends Node {
       Node phi = gvn.xform(new PhiNode(Type.SCALAR,null,reg,Env.XNIL,rez ));
       Node phim= gvn.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
       // Plug into self & trigger is_copy
-      set_def(0,reg ,gvn);
-      set_def(1,phim,gvn);
-      set_def(2,phi ,gvn);
+      set_def(0,reg );
+      set_def(1,phim);
+      set_def(2,phi );
       pop();                    // Remove arg2, trigger is_copy
       return this;
     }
@@ -597,9 +598,9 @@ public abstract class PrimNode extends Node {
       Node phi = gvn.xform(new PhiNode(Type.SCALAR,null,reg,lhs,rez ));
       Node phim= gvn.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
       // Plug into self & trigger is_copy
-      set_def(0,reg ,gvn);
-      set_def(1,phim,gvn);
-      set_def(2,phi ,gvn);
+      set_def(0,reg );
+      set_def(1,phim);
+      set_def(2,phi );
       pop();                    // Remove arg2, trigger is_copy
       return this;
     }

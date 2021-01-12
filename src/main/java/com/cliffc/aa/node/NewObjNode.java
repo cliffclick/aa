@@ -40,52 +40,48 @@ public class NewObjNode extends NewNode<TypeStruct> {
     return fmod == TypeStruct.FRW;
   }
   // Called when folding a Named Constructor into this allocation site
-  void set_name( TypeStruct name ) { assert !name.above_center();  sets_in(name); }
+  void set_name( TypeStruct name ) { assert !name.above_center();  sets(name); }
 
   // No more fields
-  public void no_more_fields() { sets_in(_ts.close()); }
+  public void no_more_fields() { sets(_ts.close()); }
 
   // Create a field from parser for an inactive this
   public void create( String name, Node val, byte mutable, GVNGCM gvn) {
     assert !Util.eq(name,"^"); // Closure field created on init
-    gvn.unreg(this);
     create_active(name,val,mutable);
-    gvn.rereg(this,value(gvn._opt_mode)); // Re-insert with field added
     for( Node use : _uses ) {
-      use.xval(gvn._opt_mode);  // Record "downhill" type for OProj, DProj
-      gvn.add_work_uses(use);   // Neighbors on worklist
+      //use.xval(gvn._opt_mode);  // Record "downhill" type for OProj, DProj
+      //gvn.add_work_uses(use);   // Neighbors on worklist
+      throw com.cliffc.aa.AA.unimpl();
     }
-    assert _in;
   }
 
   // Create a field from parser for an active this
   public void create_active( String name, Node val, byte mutable ) {
-    assert !_in;
     assert def_idx(_ts._ts.length)== _defs._len;
     assert _ts.find(name) == -1; // No dups
     add_def(val);
-    sets_out(_ts.add_fld(name,mutable,mutable==TypeStruct.FFNL ? val.val() : Type.SCALAR));
+    sets(_ts.add_fld(name,mutable,mutable==TypeStruct.FFNL ? val.val() : Type.SCALAR));
   }
   public void update( String tok, byte mutable, Node val, GVNGCM gvn  ) { update(_ts.find(tok),mutable,val,gvn); }
   // Update the field & mod
   public void update( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
     assert def_idx(_ts._ts.length)== _defs._len;
-    gvn.set_def_reg(this,def_idx(fidx),val);
-    sets_in(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? val.val() : Type.SCALAR,mutable));
+    set_def(def_idx(fidx),val);
+    sets(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? val.val() : Type.SCALAR,mutable));
   }
   // Update default value.  Used by StoreNode folding into a NewObj initial
   // state.  Used by the Parser when updating local variables... basically
   // another store.
-  public void update_active( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
-    assert !_in;
+  public void update_active( int fidx, byte mutable, Node val ) {
     assert def_idx(_ts._ts.length)== _defs._len;
-    set_def(def_idx(fidx),val,gvn);
-    sets_out(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? val.val() : Type.SCALAR,mutable));
+    set_def(def_idx(fidx),val);
+    sets(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? val.val() : Type.SCALAR,mutable));
   }
 
 
   // Add a named FunPtr to a New.  Auto-inflates to a Unresolved as needed.
-  public FunPtrNode add_fun( Parse bad, String name, FunPtrNode ptr, GVNGCM gvn ) {
+  public FunPtrNode add_fun( Parse bad, String name, FunPtrNode ptr ) {
     int fidx = _ts.find(name);
     if( fidx == -1 ) {
       create_active(name,ptr,TypeStruct.FFNL);
@@ -93,8 +89,8 @@ public class NewObjNode extends NewNode<TypeStruct> {
       Node n = _defs.at(def_idx(fidx));
       if( n instanceof UnresolvedNode ) n.add_def(ptr);
       else n = new UnresolvedNode(bad,n,ptr);
-      n.xval(gvn._opt_mode); // Update the input type, so the _ts field updates
-      update_active(fidx,TypeStruct.FFNL,n,gvn);
+      n.xval(); // Update the input type, so the _ts field updates
+      update_active(fidx,TypeStruct.FFNL,n);
     }
     return ptr;
   }
@@ -112,31 +108,28 @@ public class NewObjNode extends NewNode<TypeStruct> {
         // Remove current display from forward-refs display choices.
         assert Env.LEX_DISPLAYS.test(_alias);
         TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS.clear(_alias),TypeObj.ISUSED);
-        gvn.set_def_reg(n,1,gvn.con(tdisp));
-        n.set_val(n.value(GVNGCM.Mode.Parse));
+        n.set_def(1,Node.con(tdisp));
+        n._val = n.value(GVNGCM.Mode.Parse);
         // Make field in the parent
         parent.create(ts._flds[i],n,ts.fmod(i),gvn);
         // Stomp field locally to XSCALAR
-        gvn.set_def_reg(this,def_idx(i),gvn.con(Type.XSCALAR));
-        sets_in(_ts.set_fld(i,Type.XSCALAR,TypeStruct.FFNL));
+        set_def(def_idx(i),Node.con(Type.XSCALAR));
+        sets(_ts.set_fld(i,Type.XSCALAR,TypeStruct.FFNL));
       }
     }
   }
 
-  @Override public Node ideal(GVNGCM gvn, int level) {
-    Node n = super.ideal(gvn,level);
-    if( n != null ) return n;
-
+  @Override public Node ideal_mono() {
     // If the value lifts a final field, so does the default lift.
-    if( val() instanceof TypeTuple ) {
-      TypeTuple ts1 = (TypeTuple) val();
+    if( _val instanceof TypeTuple ) {
+      TypeTuple ts1 = (TypeTuple) _val;
       TypeObj ts3 = (TypeObj)ts1.at(MEM_IDX);
       if( ts3 != TypeObj.UNUSED ) {
         TypeStruct ts4 = _ts.make_from(((TypeStruct)ts3)._ts);
         TypeStruct ts5 = ts4.crush();
         assert ts4.isa(ts5);
         if( ts5 != _crushed && ts5.isa(_crushed) ) {
-          sets_in(ts4);
+          sets(ts4);
           return this;
         }
       }
@@ -148,7 +141,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     // Gather args and produce a TypeStruct
     Type[] ts = Types.get(_ts._ts.length);
     for( int i=0; i<ts.length; i++ )
-      ts[i] = fld(i).val();
+      ts[i] = (_ts._open && i>0) ? Type.SCALAR : fld(i)._val;
     return _ts.make_from(ts);  // Pick up field names and mods
   }
   @Override TypeStruct dead_type() { return TypeStruct.ANYSTRUCT; }

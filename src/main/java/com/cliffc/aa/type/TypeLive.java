@@ -43,7 +43,7 @@ public class TypeLive extends TypeObj<TypeLive> {
 
   public static final TypeLive LIVE   = make(false,0); // Basic alive
   static final TypeLive ESCAPE = make(false,FLAG_ESCAPE); // Used as a call argument
-  static final TypeLive LIVE_BOT=make(false,FLAG_ESCAPE);
+  public static final TypeLive LIVE_BOT=make(false,FLAG_ESCAPE);
   public static final TypeLive DEAD   = LIVE_BOT.dual();
   static final TypeLive[] TYPES = new TypeLive[]{LIVE,ESCAPE};
 

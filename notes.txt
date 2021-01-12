@@ -1,4 +1,38 @@
 =======================================
+1/11/2021
+
+Restructure of GVN in progress.
+
+=======================================
+1/6/2021
+
+Got incremental H-M working.
+Got decent evidence of 'monotonicity' of unify.
+For lattice, TOP=a shared TVar (all part of it), BOT=independent TVar.
+H-M starts @ BOT, and unifies towards One-Shared-TVar.
+
+
+Thinking of reworking GVN iter, to get me more structure & control over it.
+Seperate worklists for dead (instead of recursive kill0), for strict removal
+(eg, CSE, folding +0, st/ld), flowing {value,live,unify}, strict same edge/node
+counts but lowers something, increases edge/nodes (but maybe adds parallelism),
+larger simple xforms, inlining (maybe sorted by utility).
+
+Seperate ideal_xxx calls for each of these, along with seperate worklist_xxxs.
+
+A way to gather neighbors for each ideal_xxx or value/live?  For a
+value/live/unify, return the new value plus also a "neighbors used to make
+this".  Store with each Node the reverse-neighbor list?
+
+How about:
+  old.add_work_flow (nnn);  // called iff value/live changes, adds to value/live worklist
+  old.add_work_unify(nnn);  // called iff unify changes, adds to unify worklist
+  old.add_work_reduce();    // 
+
+
+
+
+=======================================
 Notes from 12/28/2020
 
 Back around to basic theory.  Progress since last time: pushing H-M through
@@ -67,7 +101,8 @@ also changes.  If we do not share, then instead Lf is a per-Node T expression
 which monotonically grows.  This means we are computing a T expression
 per-Node.
 
-Given a T-expression & a Value type, we can force alignment by doing a JOIN.
+Given a T-expression & a Value type, we can force alignment by doing a JOIN
+on Leader only (Followers get Values flowing from Leader).
 Which turns into, we can apply the H-M "fresh_unify" notion in the old Type
 system at Calls.
 
@@ -127,9 +162,6 @@ Lambda/FunPtr xfer function = { arg:Type tvarg:TVar ret:Type tvret:TVar ->
                               }
 
 Weirdness at Let,Apply, because of UNIFY.
-
-
-
 
 ALSO: could be a bug with nongen missing contents of memory
 

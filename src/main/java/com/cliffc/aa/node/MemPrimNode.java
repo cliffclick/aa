@@ -5,7 +5,6 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
-import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 
 // Memory-based primitives
 public abstract class MemPrimNode extends PrimNode {
@@ -50,20 +49,22 @@ public abstract class MemPrimNode extends PrimNode {
     ReadPrimNode( String name, String[] args, TypeTuple formals, Type ret ) { super(name,args,formals,ret); }
 
     @Override public FunPtrNode as_fun( GVNGCM gvn ) {
-      _defs.clear();  _uses.clear();
-      FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
-      ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-      ParmNode mem = (ParmNode) gvn.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-      fun._bal_close = bal_close();
-      add_def(null);              // Control for the primitive in slot 0
-      add_def(mem );              // Memory  for the primitive in slot 1
-      for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // First is display, never used
-        add_def(gvn.xform(new ParmNode(i,_sig._args[i],fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
-      // Functions return the set of *modified* memory.  ReadPrimNodes do not modify
-      // memory.
-      RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem(),gvn.init(this),rpc,fun));
-      // No closures are added to primitives
-      return new FunPtrNode(ret,null);
+      try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
+        assert _defs._len==0 && _uses._len==0;
+        FunNode  fun = ( FunNode) X.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
+        ParmNode rpc = (ParmNode) X.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
+        ParmNode mem = (ParmNode) X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+        fun._bal_close = bal_close();
+        add_def(null);              // Control for the primitive in slot 0
+        add_def(mem );              // Memory  for the primitive in slot 1
+        for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // First is display, never used
+          add_def(X.xform(new ParmNode(i,_sig._args[i],fun, Node.con(_sig.arg(i).simple_ptr()),null)));
+        // Functions return the set of *modified* memory.  ReadPrimNodes do not modify
+        // memory.
+        RetNode ret = (RetNode)X.xform(new RetNode(fun,mem(),gvn.init(this),rpc,fun));
+        // No closures are added to primitives
+        return (X._ret = new FunPtrNode(ret,null));
+      }
     }
 
     // The only memory required here is what is needed to support the Load
@@ -125,18 +126,21 @@ public abstract class MemPrimNode extends PrimNode {
     WritePrimNode( String name, String[] args, TypeTuple formals, Type ret ) { super(name,args,formals,ret); }
 
     @Override public FunPtrNode as_fun( GVNGCM gvn ) {
-      FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
-      ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-      ParmNode mem = (ParmNode) gvn.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-      fun._bal_close = bal_close();
-      add_def(null);              // Control for the primitive in slot 0
-      add_def(mem );              // Memory  for the primitive in slot 1
-      for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // First is display, never used
-        add_def(gvn.xform(new ParmNode(i,_sig._args[i],fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
-      // Write prims return both a value and memory.
-      MemPrimNode prim = (MemPrimNode)gvn.xform(this);
-      RetNode ret = (RetNode)gvn.xform(new RetNode(fun,prim,prim.rez(),rpc,fun));
-      return new FunPtrNode(ret,null);
+      try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
+        assert _defs._len==0 && _uses._len==0;
+        FunNode  fun = ( FunNode) X.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
+        ParmNode rpc = (ParmNode) X.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
+        ParmNode mem = (ParmNode) X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+        fun._bal_close = bal_close();
+        add_def(null);              // Control for the primitive in slot 0
+        add_def(mem );              // Memory  for the primitive in slot 1
+        for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // First is display, never used
+          add_def(X.xform(new ParmNode(i,_sig._args[i],fun, Node.con(_sig.arg(i).simple_ptr()),null)));
+        // Write prims return both a value and memory.
+        MemPrimNode prim = (MemPrimNode)X.xform(this);
+        RetNode ret = (RetNode)X.xform(new RetNode(fun,prim,prim.rez(),rpc,fun));
+        return (X._ret = new FunPtrNode(ret,null));
+      }
     }
 
     @Override public TypeMem all_live() { return TypeMem.ALLMEM; }

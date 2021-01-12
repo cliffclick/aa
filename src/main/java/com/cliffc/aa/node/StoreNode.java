@@ -62,7 +62,7 @@ public class StoreNode extends Node {
       else head2 = null;
       // Check no extra readers/writers at the split point
       if( head2 != null && MemSplitNode.check_split(this,escapees()) )
-        return MemSplitNode.insert_split(gvn,this,escapees(),this,mem,head2);
+        return MemSplitNode.insert_split(this,escapees(),this,mem,head2);
     }
 
     // If Store is of a MemJoin and it can enter the split region, do so.
@@ -73,7 +73,7 @@ public class StoreNode extends Node {
       // Check the address does not have a memory dependence on the Join.
       // TODO: This is super conservative
       if( memw != null && adr instanceof ProjNode && adr.in(0) instanceof NewNode )
-        return ((MemJoinNode)mem).add_alias_below_new(gvn,new StoreNode(this,mem,adr),this);
+        return ((MemJoinNode)mem).add_alias_below_new(new StoreNode(this,mem,adr),this);
     }
 
     // Is this Store dead from below?

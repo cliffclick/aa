@@ -98,7 +98,5 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       TypeMem esc1 = ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr1)._aliases,"");
       return (TypeMem)esc0.meet(esc1);
     }
-    // Changing arg inputs from ANY to ALL flips the sense of LIVE.
-    @Override public boolean input_value_changes_live() { return true; }
   }
 }

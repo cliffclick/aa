@@ -16,6 +16,8 @@ public class Env implements AutoCloseable {
   public static      ConNode ALL_CTRL; // Default control
   public static      ConNode XCTRL; // Always dead control
   public static      ConNode XNIL;  // Common XNIL
+  public static      ConNode ANY;   // Common ANY
+  public static      ConNode ALL;   // Common ALL
   // Set of all display aliases, used to track escaped displays at call sites for asserts.
   public static BitsAlias ALL_DISPLAYS = BitsAlias.EMPTY;
   // Set of lexically active display aliases, used for a conservative display
@@ -32,7 +34,7 @@ public class Env implements AutoCloseable {
   private Env(  ) {
     _par = null;
     _P = null;
-    _scope = init(CTL_0,GVN.con(Type.XNIL),MEM_0,Type.XNIL,null,true);
+    _scope = init(CTL_0,XNIL,MEM_0,Type.XNIL,null,true);
   }
 
   // A file-level Env, or below.  Contains user written code.
@@ -47,15 +49,15 @@ public class Env implements AutoCloseable {
   private static ScopeNode init(Node ctl, Node clo, Node mem, Type back_ptr, Parse errmsg, boolean is_closure) {
     TypeStruct tdisp = TypeStruct.open(back_ptr);
     NewObjNode nnn = (NewObjNode)GVN.xform(new NewObjNode(is_closure,tdisp,clo));
-    MrgProjNode  frm = DEFMEM.make_mem_proj(GVN,nnn,mem);
+    MrgProjNode  frm = DEFMEM.make_mem_proj(nnn,mem);
     Node ptr = GVN.xform(new ProjNode(nnn,AA.REZ_IDX));
     ALL_DISPLAYS = ALL_DISPLAYS.set(nnn._alias);   // Displays for all time
     LEX_DISPLAYS = LEX_DISPLAYS.set(nnn._alias);   // Lexically active displays
     ScopeNode scope = new ScopeNode(errmsg,is_closure);
-    scope.set_ctrl(ctl,GVN);
-    scope.set_ptr (ptr,GVN);  // Address for 'nnn', the local stack frame
-    scope.set_mem (frm,GVN);  // Memory includes local stack frame
-    scope.set_rez (GVN.con(Type.SCALAR),GVN);
+    scope.set_ctrl(ctl);
+    scope.set_ptr (ptr);  // Address for 'nnn', the local stack frame
+    scope.set_mem (frm);  // Memory includes local stack frame
+    scope.set_rez (Node.con(Type.SCALAR));
     return scope;
   }
 
@@ -67,42 +69,32 @@ public class Env implements AutoCloseable {
 
     // Top-level default values; ALL_CTRL is used by declared functions to
     // indicate that future not-yet-parsed code may call the function.
-    ALL_CTRL= GVN.init(new ConNode<>(Type.CTRL ));
-    XCTRL   = GVN.init(new ConNode<>(Type.XCTRL)).keep();
-    XNIL    = GVN.init(new ConNode<>(Type.XNIL )).keep();
+    START   = GVN.init (new StartNode());
+    ALL_CTRL= GVN.xform(new ConNode<>(Type.CTRL )).keep();
+    XCTRL   = GVN.xform(new ConNode<>(Type.XCTRL)).keep();
+    XNIL    = GVN.xform(new ConNode<>(Type.XNIL )).keep();
+    ANY     = GVN.xform(new ConNode<>(Type.ANY  )).keep();
+    ALL     = GVN.xform(new ConNode<>(Type.ALL  )).keep();
     // Initial control & memory
-    START  = (   StartNode)GVN.xform(new    StartNode(       ));
-    CTL_0  = (   CProjNode)GVN.xform(new    CProjNode(START,0));
-    DEFMEM = (  DefMemNode)GVN.xform(new   DefMemNode(  CTL_0));
-    MEM_0  = (StartMemNode)GVN.xform(new StartMemNode(START  ));
+    CTL_0  = GVN.init(new    CProjNode(START,0)).keep();
+    DEFMEM = GVN.init(new   DefMemNode(  CTL_0)).keep();
+    MEM_0  = GVN.init(new StartMemNode(START  )).keep();
     // Top-most (file-scope) lexical environment
     Env top = new Env();
     // Top-level display defining all primitives
     SCP_0 = top._scope;
-    SCP_0.init0();              // Add base types
-    STK_0  = SCP_0.stk();
+    SCP_0.init();               // Add base types
+    STK_0 = SCP_0.stk();
 
-    GVN.unreg(STK_0.keep());    // Make STK_0 active, to cheaply add primitives
-    for( Node use : STK_0._uses ) GVN.unreg(use); // Also the OProj,DProj will rapidly change types
+    STK_0.keep();               // Inputs & type will rapidly change
     for( PrimNode prim : PrimNode.PRIMS() )
-      STK_0.add_fun(null,prim._name,(FunPtrNode) GVN.xform(prim.as_fun(GVN)), GVN);
+      STK_0.add_fun(null,prim._name,(FunPtrNode) GVN.xform(prim.as_fun(GVN)));
     for( NewNode.NewPrimNode lib : NewNode.NewPrimNode.INTRINSICS() )
-      STK_0.add_fun(null,lib ._name,(FunPtrNode) GVN.xform(lib .as_fun(GVN)), GVN);
+      STK_0.add_fun(null,lib ._name,(FunPtrNode) GVN.xform(lib .as_fun(GVN)));
     // Top-level constants
-    STK_0.create_active("math_pi", GVN.con(TypeFlt.PI),TypeStruct.FFNL);
-    // Now that all the UnresolvedNodes have all possible hits for a name,
-    // register them with GVN.
-    for( Node val : STK_0._defs )  if( val instanceof UnresolvedNode ) GVN.init0(val);
-    GVN.rereg(STK_0,STK_0.value(GVN._opt_mode));
-    for( Node use : STK_0._uses ) GVN.rereg(use,use.value(GVN._opt_mode));
+    STK_0.create_active("math_pi", Node.con(TypeFlt.PI),TypeStruct.FFNL);
     STK_0.no_more_fields();
-    GVN.rereg(SCP_0,SCP_0.value(GVN._opt_mode));
-    // Uplift all types once, since early Parm:mem got early versions of prims,
-    // and later prims *added* choices which *lowered* types.
-    for( int i=0; i<3; i++ )
-      for( Node n : GVN.valsKeySet() )
-        n.xval(GVN._opt_mode);
-    GVN.add_work(MEM_0);
+    STK_0.unkeep();
     // Run the worklist dry
     GVN.iter(GVNGCM.Mode.Parse);
 
@@ -129,8 +121,9 @@ public class Env implements AutoCloseable {
     if( ptr == null ) return;   // Already done
     NewObjNode stk = _scope.stk();
     stk.no_more_fields();
-    gvn.add_work_uses(stk);     // Scope object going dead, trigger following projs to cleanup
-    _scope.set_ptr(null,gvn);   // Clear pointer to display
+    gvn.add_flow(stk);          // Scope object going dead, trigger following projs to cleanup
+    _scope.set_ptr(null);       // Clear pointer to display
+    gvn.add_work_all(_scope);
     LEX_DISPLAYS = LEX_DISPLAYS.clear(stk._alias);
   }
 
@@ -142,7 +135,8 @@ public class Env implements AutoCloseable {
     if( pscope != null && _par._par != null )
       _scope.stk().promote_forward(GVN,pscope.stk());
     close_display(GVN);
-    _scope.unkeep(GVN);
+    _scope.unhook();
+    GVN.iter(GVNGCM.Mode.PesiCG);
     assert _scope.is_dead();
   }
 
@@ -152,9 +146,7 @@ public class Env implements AutoCloseable {
     BitsFun  .init0();
     BitsRPC  .init0();
   }
-  private static void record_for_top_reset2() {
-    GVN.init0();
-  }
+  private static void record_for_top_reset2() { GVN.init0(); Node.init0(); }
 
   // Reset all global statics for the next parse.  Useful during testing when
   // many top-level parses happen in a row.
@@ -163,6 +155,7 @@ public class Env implements AutoCloseable {
     BitsFun   .reset_to_init0();
     BitsRPC   .reset_to_init0();
     GVN       .reset_to_init0();
+    Node      .reset_to_init0();
     FunNode   .reset();
     NewNode.NewPrimNode.reset();
     PrimNode  .reset();
@@ -210,7 +203,7 @@ public class Env implements AutoCloseable {
   }
 
   // Update function name token to Node mapping in the current scope
-  Node add_fun( Parse bad, String name, Node val ) { return _scope.stk().add_fun(bad,name,(FunPtrNode)val,GVN); }
+  Node add_fun( Parse bad, String name, Node val ) { return _scope.stk().add_fun(bad,name,(FunPtrNode)val); }
 
 
   // Type lookup in any scope
@@ -235,5 +228,5 @@ public class Env implements AutoCloseable {
     }
     return tvars;
   }
-  
+
 }

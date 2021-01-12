@@ -35,21 +35,21 @@ public class ScopeNode extends Node {
   }
 
   // Add base types on startup
-  public void init0() { Type.init0(_types); }
+  public void init() { Type.init0(_types); }
 
   public   Node  ctrl() { return in(0); }
   public   Node  mem () { return in(1); }
   public   Node  ptr () { return in(2); }
   public   Node  rez () { return in(3); }
   public NewObjNode stk () { return (NewObjNode)ptr().in(0); }
-  public <N extends Node> N set_ctrl( N n, GVNGCM gvn) { set_def(0,n,gvn); return n; }
-  public void set_ptr ( Node n, GVNGCM gvn) { set_def(2,n,gvn); }
-  public void set_rez ( Node n, GVNGCM gvn) { set_def(3,n,gvn); }
-  public Node swap_rez( Node n, GVNGCM gvn) { return swap_def(3,n,gvn); }
+  public <N extends Node> N set_ctrl( N n ) { set_def(0,n); return n; }
+  public void set_ptr ( Node n) { set_def(2,n); }
+  public void set_rez ( Node n) { set_def(3,n); }
+  public Node swap_rez( Node n) { return swap_def(3,n); }
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
-  public Node set_mem( Node n, GVNGCM gvn) {
-    assert n==null || (n._in && (n.val() instanceof TypeMem || n.val() ==Type.ANY || n.val() ==Type.ALL));
-    set_def(1,n,gvn);
+  public Node set_mem( Node n) {
+    assert n==null || (n._elock && (n._val instanceof TypeMem || n._val ==Type.ANY || n._val ==Type.ALL));
+    set_def(1,n);
     return this;
   }
   @Override public boolean is_mem() { return true; }
@@ -79,11 +79,11 @@ public class ScopeNode extends Node {
 
   public boolean is_closure() { assert _defs._len==4 || _defs._len==7; return _defs._len==7; }
 
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  @Override public Node ideal_reduce() {
     Node mem = mem();
     Node rez = rez();
     Type trez = rez==null ? null : rez.val();
-    if( gvn._opt_mode != GVNGCM.Mode.Parse &&   // Past parsing
+    if( Env.GVN._opt_mode != GVNGCM.Mode.Parse &&   // Past parsing
         rez != null &&          // Have a return result
         // If type(rez) can never lift to any TMP, then we will not return a
         // pointer, and do not need the memory state on exit.
@@ -91,13 +91,14 @@ public class ScopeNode extends Node {
         // And not already wiped it out
         !(mem instanceof ConNode && mem.val() ==TypeMem.XMEM) )
       // Wipe out return memory
-      return set_mem(gvn.add_work(gvn.con(TypeMem.XMEM)), gvn);
+      return set_mem(Node.con(TypeMem.XMEM));
 
     Node ctrl = in(0).is_copy(0);
-    if( ctrl != null ) set_ctrl(ctrl,gvn);
+    if( ctrl != null ) set_ctrl(ctrl);
 
     return null;
   }
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
   @Override public Type value(GVNGCM.Mode opt_mode) { return Type.ALL; }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 
@@ -143,8 +144,6 @@ public class ScopeNode extends Node {
     assert def == mem();
     return opt_mode==GVNGCM.Mode.Parse ? TypeMem.ALLMEM : _live;
   }
-  // Changing rez to/from a pointer changes live.
-  @Override public boolean input_value_changes_live() { return true; }
 
   @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal
@@ -204,7 +203,7 @@ public class ScopeNode extends Node {
       // Everything in this set is a partially-created variable error
       HashMap<String,Byte> vars = arm ? _fvars : _tvars;
       if( vars.isEmpty() ) return mem;
-      mem.unhook();             // Passed-in 'hooked' memory
+      mem.unkeep();             // Passed-in 'hooked' memory
       for( String name : vars.keySet() ) {
         String msg = "'"+name+"' not defined on "+arm+" arm of trinary";
         Node err = gvn.xform(new ErrNode(ctrl,bad,msg));

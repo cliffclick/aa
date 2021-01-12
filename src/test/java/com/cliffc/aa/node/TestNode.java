@@ -200,15 +200,15 @@ public class TestNode {
     for( int i=1; i<_ins.length; i++ )
       _ins[i] = new ConNode<>(Type.SCALAR);
     Node mem = new ConNode<Type>(TypeMem.MEM);
-    mem.set_val(TypeMem.MEM);
+    mem._val = TypeMem.MEM;
     FunNode fun_forward_ref = new FunNode("anon");
-    Env.DEFMEM.set_val(TypeMem.MEM);
+    Env.DEFMEM._val = TypeMem.MEM;
 
     Node unr = top.lookup("+"); // All the "+" functions
     FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
     RetNode ret = fun_plus.ret();
     CallNode call = new CallNode(false,null,_ins[0],unr,mem);
-    call.set_val(TypeTuple.CALLE);
+    call._val = TypeTuple.CALLE;
     TypeStruct tname = TypeStruct.NAMEPT;
 
     // Testing 1 set of types into a value call.
@@ -239,14 +239,14 @@ public class TestNode {
       test1monotonic_intrinsic(prim);
     test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
-    NewObjNode nnn1 = new NewObjNode(false,TypeStruct.DISPLAY,_gvn.con(Type.NIL));
+    NewObjNode nnn1 = new NewObjNode(false,TypeStruct.DISPLAY,Node.con(Type.NIL));
     set_type(1,Type.SCALAR);  nnn1.create_active("x",_ins[1],TypeStruct.FFNL);
     set_type(2,Type.SCALAR);  nnn1.create_active("y",_ins[2],TypeStruct.FFNL);
     test1monotonic(nnn1);
-    NewObjNode nnn2 = new NewObjNode(false,TypeStruct.DISPLAY,_gvn.con(Type.NIL));
+    NewObjNode nnn2 = new NewObjNode(false,TypeStruct.DISPLAY,Node.con(Type.NIL));
     set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[1],TypeStruct.FFNL);
     set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[2],TypeStruct.FFNL);
-    nnn2.sets_out(tname);
+    nnn2.sets(tname);
     test1monotonic(nnn2);
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],null).add_def(_ins[2]));
@@ -271,10 +271,10 @@ public class TestNode {
   @SuppressWarnings("unchecked")
   private Type test1jig(final Node n, Type t0, Type t1, Type t2, Type t3) {
     // Prep graph edges
-    _ins[0].set_val(t0);
-    _ins[1].set_val(((ConNode)_ins[1])._t = t1);
-    _ins[2].set_val(((ConNode)_ins[2])._t = t2);
-    _ins[3].set_val(((ConNode)_ins[3])._t = t3);
+    _ins[0]._val = t0;
+    _ins[1]._val = ((ConNode)_ins[1])._t = t1;
+    _ins[2]._val = ((ConNode)_ins[2])._t = t2;
+    _ins[3]._val = ((ConNode)_ins[3])._t = t3;
     return n.value(_gvn._opt_mode);
   }
 
@@ -285,7 +285,7 @@ public class TestNode {
 
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_prim(PrimNode prim, Node mem) {
-    PrimNode n = (PrimNode)prim.copy(false,_gvn);
+    PrimNode n = (PrimNode)prim.copy(false);
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[n._defs._len]);
@@ -296,7 +296,7 @@ public class TestNode {
   }
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_intrinsic(NewNode.NewPrimNode prim) {
-    NewNode.NewPrimNode n = (NewNode.NewPrimNode)prim.copy(false,_gvn);
+    NewNode.NewPrimNode n = (NewNode.NewPrimNode)prim.copy(false);
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);         // memory
@@ -322,10 +322,10 @@ public class TestNode {
       Type vn = get_value_type(xx);
       int x0 = xx(xx,0), x1 = xx(xx,1), x2 = xx(xx,2), x3 = xx(xx,3);
       // Prep graph edges
-      _ins[0].set_val(all[x0]);
-      _ins[1].set_val(((ConNode)_ins[1])._t = all[x1]);
-      _ins[2].set_val(((ConNode)_ins[2])._t = all[x2]);
-      _ins[3].set_val(((ConNode)_ins[3])._t = all[x3]);
+      _ins[0]._val = all[x0];
+      _ins[1]._val = ((ConNode)_ins[1])._t = all[x1];
+      _ins[2]._val = ((ConNode)_ins[2])._t = all[x2];
+      _ins[3]._val = ((ConNode)_ins[3])._t = all[x3];
 
       // Subtypes in 4 node input directions
       int[] stx0 = stx(n,xx,0);
@@ -395,7 +395,7 @@ public class TestNode {
   @SuppressWarnings("unchecked")
   private void set_type(int idx, Type tyx) {
     if( idx > 0 ) ((ConNode)_ins[idx])._t = tyx;
-    _ins[idx].set_val(tyx);
+    _ins[idx]._val = tyx;
   }
 
   private static final int[] stx_any = new int[]{};

@@ -13,7 +13,7 @@ public class OProjNode extends ProjNode {
     // pointer-use remains.
     if( _uses._len==1 ) {
       assert _uses.at(0)==Env.DEFMEM;
-      return gvn.con(TypeObj.UNUSED);
+      return Node.con(TypeObj.UNUSED);
     }
     return null;
   }

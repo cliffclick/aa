@@ -1131,7 +1131,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Check caches and return
     if( mem.sharp_get(dull) != null ) return;
     if( dull_cache.get(dull._aliases) != null ) return;
-    if( dull==TypeMemPtr.NO_DISP || dull==TypeMemPtr.NO_DISP.dual() ) { mem.sharput(dull,dull); return; }
+    if( dull==NO_DISP || dull==NO_DISP.dual() ) { mem.sharput(dull,dull); return; }
     // Walk and meet "dull" fields; all TMPs will point to ISUSED (hence are dull).
     boolean any = dull._aliases.above_center();
     Type t = any ? TypeObj.ISUSED : TypeObj.UNUSED;

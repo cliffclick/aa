@@ -19,7 +19,7 @@ public class UnresolvedNode extends Node {
     }
     return "Unr???";
   }
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  @Override public Node ideal_reduce() {
     if( _defs._len < 2 )               // One function, consumer should treat as a copy
       throw com.cliffc.aa.AA.unimpl(); // Should collapse
     // Back-to-back Unresolved collapse (happens due to inlining)
@@ -31,11 +31,12 @@ public class UnresolvedNode extends Node {
 // TODO: folding a primitive Unresolved, instead probably need to make a new one...
         for( int j=0; j<u._defs._len; j++ )
           add_def(u.in(j));
-        set_def(i,pop(),gvn);
+        set_def(i,pop());
       }
     }
     return progress ? this : null;
   }
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   // Required property for value():
   // ANY >= value(ANY) >= value(other) >= value(ALL) >= ALL

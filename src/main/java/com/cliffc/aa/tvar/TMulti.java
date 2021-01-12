@@ -44,7 +44,9 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
   @Override void _unify( TVar tv ) {
     assert _u!=null;            // Flagged as being unified
     TMulti targs = (TMulti)tv;
-    if( _parms.length != targs._parms.length ) TNode.add_work_all(targs._ns);
+    if( _parms.length != targs._parms.length )
+      throw com.cliffc.aa.AA.unimpl();
+      //TNode.add_work_all(targs._ns);
     for( int i=0; i<_parms.length; i++ ) {
       TVar tn0 =       parm(i);
       TVar tn1 = targs.parm(i);
@@ -117,8 +119,9 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     // Same subclass 'this' and 'tv'
     if( test && tmulti._parms.length < _parms.length ) return true;
     if( tmulti._parms.length < _parms.length ) {
-      TNode.add_work_all(tmulti._ns);
-      tmulti.grow(_parms.length);
+      //TNode.add_work_all(tmulti._ns);
+      //tmulti.grow(_parms.length);
+      throw com.cliffc.aa.AA.unimpl();
     }
     for( int i=0; i<_parms.length; i++ ) {
       TVar parm = parm(i);

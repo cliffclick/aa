@@ -7,7 +7,6 @@ import com.cliffc.aa.util.VBitSet;
 
 import java.util.function.Predicate;
 
-import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 
 // Function indices or function pointers; a single instance can include all
 // possible aliased function pointers.  Function pointers can be executed, are
@@ -104,8 +103,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR; // Open display, allows more fields
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,1,TypeMemPtr.DISP_SIMPLE);
-  public  static final TypeFunPtr EMPTY  = make(BitsFun.EMPTY,0,NO_DISP);
-  public  static final TypeFunPtr NILPTR = make(BitsFun.NIL  ,0,NO_DISP);
+  public  static final TypeFunPtr EMPTY  = make(BitsFun.EMPTY,0,TypeMemPtr.NO_DISP);
+  public  static final TypeFunPtr NILPTR = make(BitsFun.NIL  ,0,TypeMemPtr.NO_DISP);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,EMPTY};
 
   @Override protected TypeFunPtr xdual() { return new TypeFunPtr(_fidxs.dual(),_nargs,_disp.dual()); }
@@ -150,7 +149,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public boolean is_con()       { return false; }
   // Basically, a constant fidx that may be split.
   public boolean can_be_fpnode() {
-    return _disp==NO_DISP && // No display
+    return _disp==TypeMemPtr.NO_DISP && // No display
       // Single function
       _fidxs.abit() > 1 && !BitsFun.is_parent(_fidxs.abit());
   }

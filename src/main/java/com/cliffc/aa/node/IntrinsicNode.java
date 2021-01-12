@@ -7,7 +7,6 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
-import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 
 // Function to wrap another type in a Name, which typically involves setting a
 // vtable like field, i.e. memory updates.
@@ -44,9 +43,9 @@ public class IntrinsicNode extends Node {
     TypeTuple formals = TypeTuple.make_args(TypeMemPtr.STRUCT);
     TypeFunSig sig = TypeFunSig.make(TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.RECORD_BITS,tn)),formals);
     FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,sig,-1,false).add_def(Env.ALL_CTRL));
-    Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
+    Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
     Node mem = gvn.xform(new ParmNode(MEM_IDX,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-    Node ptr = gvn.xform(new ParmNode(ARG_IDX,"ptr",fun,gvn.con(TypeMemPtr.ISUSED),badargs));
+    Node ptr = gvn.xform(new ParmNode(ARG_IDX,"ptr",fun,Node.con(TypeMemPtr.ISUSED),badargs));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,cvt,ptr,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null));
@@ -61,7 +60,7 @@ public class IntrinsicNode extends Node {
     // If is of a MemJoin and it can enter the split region, do so.
     if( _keep==0 && ptr.val() instanceof TypeMemPtr && mem instanceof MemJoinNode && mem._uses._len==1 &&
         ptr instanceof ProjNode && ptr.in(0) instanceof NewNode )
-      return ((MemJoinNode)mem).add_alias_below_new(gvn,new IntrinsicNode(_tn,_badargs,null,mem,ptr),this);
+      return ((MemJoinNode)mem).add_alias_below_new(new IntrinsicNode(_tn,_badargs,null,mem,ptr),this);
 
     if( mem instanceof MrgProjNode &&
         mem.in(0)==ptr.in(0) && mem._uses._len==2 ) { // Only self and DefMem users
@@ -78,8 +77,8 @@ public class IntrinsicNode extends Node {
         if( actual.isa(formal) ) { // Actual struct isa formal struct?
           TypeStruct tn = nnn._ts.make_from(_tn._name);
           nnn.set_name(tn);
-          nnn.xval(gvn._opt_mode); // Update immediately to preserve monotonicity
-          mem.xval(gvn._opt_mode);
+          nnn.xval(); // Update immediately to preserve monotonicity
+          mem.xval();
           return mem;
         }
       }
@@ -133,23 +132,23 @@ public class IntrinsicNode extends Node {
     assert Util.eq(to._flds[0],"^"); // Display already
     assert to.fmod(0)==TypeStruct.FFNL; // Display is final
     // Upgrade the type to one with no display for nnn.
-    to = to.set_fld(0,NO_DISP,TypeStruct.FFNL);
+    to = to.set_fld(0,TypeMemPtr.NO_DISP,TypeStruct.FFNL);
     // Formal is unnamed, and this function adds the name.
     TypeTuple formals = TypeTuple.make(to.remove_name());
     TypeFunSig sig = TypeFunSig.make(TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.make0(alias),to)),formals);
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,sig,-1,false).add_def(Env.ALL_CTRL));
-    Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
+    Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
     Node memp= gvn.init (new ParmNode(MEM_IDX,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
     // Add input edges to the NewNode
-    ConNode nodisp = gvn.con(NO_DISP);
+    ConNode nodisp = Node.con(TypeMemPtr.NO_DISP);
     NewObjNode nnn = new NewObjNode(false,alias,to,nodisp).keep();
     for( int i=1; i<to._ts.length; i++ ) {
       String argx = to._flds[i];
       if( TypeStruct.fldBot(argx) ) argx = null;
-      nnn.add_def(gvn.xform(new ParmNode(i+FUN_IDX,argx,fun, gvn.con(to._ts[i].simple_ptr()),bad)));
+      nnn.add_def(Env.GVN.xform(new ParmNode(i+FUN_IDX,argx,fun, Node.con(to._ts[i].simple_ptr()),bad)));
     }
     gvn.init(nnn);
-    Node mmem = Env.DEFMEM.make_mem_proj(gvn,nnn.unhook(),memp);
+    Node mmem = Env.DEFMEM.make_mem_proj(nnn.unkeep(),memp);
     Node ptr = gvn.xform(new ProjNode(REZ_IDX, nnn));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null));

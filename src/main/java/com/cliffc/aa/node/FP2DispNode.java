@@ -6,7 +6,8 @@ import com.cliffc.aa.type.*;
 // Extract a Display pointer (a TypeMemPtr) from a TypeFunPtr.
 public final class FP2DispNode extends Node {
   public FP2DispNode( Node funptr ) { super(OP_FP2DISP,funptr); }
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  
+  @Override public Node ideal_reduce() {
     // If at a FunPtrNode, it is only making a TFP out of a code pointer and a
     // display.  Become the display (dropping the code pointer).
     Node in0 = in(0);
@@ -28,11 +29,12 @@ public final class FP2DispNode extends Node {
     if( in0 instanceof ProjNode && in0.in(0) instanceof CallNode ) {
       int idx = ((ProjNode)in0)._idx;
       Node fptr = in0.in(0).in(idx);
-      return set_def(0,fptr,gvn);
+      return set_def(0,fptr);
     }
 
     return null;
   }
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   Node fptr2disp( Node in ) {
     if( in instanceof FunPtrNode ) {

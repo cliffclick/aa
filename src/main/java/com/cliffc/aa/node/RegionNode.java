@@ -11,13 +11,14 @@ import java.util.function.Predicate;
 public class RegionNode extends Node {
   public RegionNode( Node... ctrls) { super(OP_REGION,ctrls); }
   RegionNode( byte op ) { super(op,(Node)null); } // For FunNodes
-  @Override public Node ideal(GVNGCM gvn, int level) {
+
+  @Override public Node ideal_reduce() {
     // TODO: The unzip xform, especially for funnodes doing type-specialization
     // TODO: treat _cidx like U/F and skip_dead it also
     int dlen = _defs.len();
     for( int i=1; i<dlen; i++ ) {
       Node cc = in(i).is_copy(0);
-      if( cc!=null ) return set_def(i,cc,gvn);
+      if( cc!=null ) return set_def(i,cc);
     }
 
     // Look for dead paths.  If found, cut dead path out of all Phis and this
@@ -25,13 +26,10 @@ public class RegionNode extends Node {
     for( int i=1; i<dlen; i++ )
       if( val(i)==Type.XCTRL && !(i==1 && is_prim()) ) { // Found dead path; cut out
         for( Node phi : _uses )
-          if( phi instanceof PhiNode ) {
-            assert !phi.is_dead();
-            Type oldt = gvn.unreg(phi);
-            phi.remove(i,gvn);
-            if( !phi.is_dead() ) gvn.rereg(phi,oldt);
-          }
-        if( !is_dead() ) { unwire(gvn,i);  if( !is_dead() ) remove(i,gvn); }
+          if( phi instanceof PhiNode )
+            phi.remove(i);
+        unwire(i);
+        remove(i);
         return this; // Progress
       }
 
@@ -59,14 +57,16 @@ public class RegionNode extends Node {
     }
 
     // Check for stacked Region (not Fun) and collapse.
-    Node stack = stacked_region(gvn);
+    Node stack = stacked_region();
     if( stack != null ) return stack;
 
     return null;
   }
+  
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   // Collapse stacked regions.
-  Node stacked_region( GVNGCM gvn ) {
+  Node stacked_region() {
     if( _op != OP_REGION ) return null; // Does not apply to e.g. functions & loops
     int idx = _defs.find( e -> e !=null && e._op==OP_REGION );
     if( idx== -1 ) return null; // No stacked region
@@ -89,25 +89,23 @@ public class RegionNode extends Node {
     // Collapse stacked Phis
     for( Node phi : _uses )
       if( phi._op == OP_PHI ) {
-        Type oldt = gvn.unreg(phi);
         Node rphi = phi.in(idx);
         boolean stacked_phi = rphi._op == OP_PHI && rphi.in(0)==r;
         for( int i = 1; i<r._defs._len; i++ )
           phi.add_def(stacked_phi ? rphi.in(i) : rphi);
-        phi.remove(idx,gvn);
+        phi.remove(idx);
         assert !stacked_phi || rphi.is_dead();
-        gvn.rereg(phi,oldt);
       }
 
     // Collapse stacked Region
     for( int i = 1; i<r._defs._len; i++ )
       add_def(r.in(i));
-    remove(idx,gvn);
+    remove(idx);
     assert r.is_dead();
     return this;
   }
 
-  void unwire(GVNGCM gvn, int idx) { }
+  void unwire(int idx) { }
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop

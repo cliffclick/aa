@@ -8,6 +8,8 @@ import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
+import static com.cliffc.aa.Env.GVN;
+
 import java.util.Arrays;
 import java.util.BitSet;
 
@@ -61,13 +63,13 @@ public class MemSplitNode extends Node {
 
 
   // Find the escape set this esc set belongs to, or make a new one.
-  int add_alias( GVNGCM gvn, BitsAlias esc ) {
+  int add_alias( BitsAlias esc ) {
     assert !esc.is_empty();
     BitsAlias all = _escs.at(0);   // Summary of Right Hand Side(s) escapes
     if( all.join(esc) == BitsAlias.EMPTY ) { // No overlap
       _escs.set(0,all.meet(esc));  // Update summary
       _escs.add(esc);              // Add escape set
-      xval(gvn._opt_mode);         // Expand tuple result
+      xval();                      // Expand tuple result
       return _escs._len-1;
     }
     for( int i=1; i<_escs._len; i++ )
@@ -75,19 +77,16 @@ public class MemSplitNode extends Node {
         return i;               // Found exact alias slice
     return 0;                   // No match, partial overlap
   }
-  void remove_alias( GVNGCM gvn, int idx ) {
+  void remove_alias( int idx ) {
     // Remove (non-overlapping) bits from the rollup
     _escs.set(0,(BitsAlias)_escs.at(0).subtract(_escs.at(idx)));
     _escs.remove(idx);          // Remove the escape set
-    Type tt = xval(gvn._opt_mode); // Reduce tuple result
+    Type tt = xval();           // Reduce tuple result
     // Renumber all trailing projections to match
     for( Node use : _uses ) {
       MProjNode mprj = (MProjNode)use;
-      if( mprj._idx > idx ) {
-        Type old = gvn.unreg(mprj);
-        mprj._idx--;
-        gvn.rereg(mprj,tt instanceof TypeTuple ? ((TypeTuple)tt).at(mprj._idx) : tt);
-      }
+      if( mprj._idx > idx )
+        mprj.set_idx(mprj._idx-1);
     }
   }
 
@@ -126,28 +125,31 @@ public class MemSplitNode extends Node {
   //      tail1->{SESE#1}->head1->tail2->{SESE#2}->head2
   // New/Mrg pairs are just the Mrg; the New is not part of the SESE region.
   // Call/CallEpi pairs are: MProj->{CallEpi}->Call.
-  static Node insert_split(GVNGCM gvn, Node tail1, BitsAlias head1_escs, Node head1, Node tail2, Node head2) {
+  static Node insert_split(Node tail1, BitsAlias head1_escs, Node head1, Node tail2, Node head2) {
     assert tail1.is_mem() && head1.is_mem() && tail2.is_mem() && head2.is_mem();
     BitsAlias head2_escs = head2.escapees();
     assert check_split(head1,head1_escs);
     // Insert empty split/join above head2
-    MemSplitNode msp = gvn.xform(new MemSplitNode(head2.in(1))).keep();
-    MProjNode mprj = (MProjNode)gvn.xform(new MProjNode(msp,0));
-    MemJoinNode mjn = (MemJoinNode)gvn.xform(new MemJoinNode(mprj));
-    gvn.set_def_reg(head2,1,mjn);
-    msp.unhook();
+    MemSplitNode msp = GVN.xform(new MemSplitNode(head2.in(1))).keep();
+    MProjNode mprj = (MProjNode)GVN.xform(new MProjNode(msp,0));
+    MemJoinNode mjn = (MemJoinNode)GVN.xform(new MemJoinNode(mprj));
+    head2.set_def(1,mjn);
+    msp.unkeep();
     mjn._live = tail1._live;
     // Pull the SESE regions in parallel from below
-    mjn.add_alias_below(gvn,head2,head2_escs,tail2);
-    mjn.add_alias_below(gvn,head1,head1_escs,tail1);
-    if( mprj.is_dead() ) gvn.revalive(msp);
-    else gvn.revalive(msp,mprj,mjn);
+    mjn.add_alias_below(head2,head2_escs,tail2);
+    mjn.add_alias_below(head1,head1_escs,tail1);
+    if( mprj.is_dead() ) GVN.revalive(msp);
+    else GVN.revalive(msp,mprj,mjn);
     // Reset TVars on all memory users: H-M memory constraint to the Join not
     // anything inside it
     if( !mjn.is_dead() )
       for( Node use : mjn._uses )
         if( use.is_mem() ) // Reunify to collect the other constraints
-          { use.reset_tvar(); gvn.add_work_uses(use); }
+          { use.reset_tvar();
+            //gvn.add_work_uses(use);
+            throw com.cliffc.aa.AA.unimpl();
+          }
     return head1;
   }
   static boolean check_split( Node head1, BitsAlias head1_escs ) {
@@ -166,8 +168,8 @@ public class MemSplitNode extends Node {
 
 
   //@SuppressWarnings("unchecked")
-  @Override @NotNull public MemSplitNode copy( boolean copy_edges, GVNGCM gvn) {
-    MemSplitNode nnn = (MemSplitNode)super.copy(copy_edges, gvn);
+  @Override @NotNull public MemSplitNode copy( boolean copy_edges) {
+    MemSplitNode nnn = (MemSplitNode)super.copy(copy_edges);
     nnn._escs = _escs.deepCopy();
     return nnn;
   }

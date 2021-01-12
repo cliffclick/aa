@@ -29,69 +29,84 @@ public class LoadNode extends Node {
   String  str() { return xstr(); } // Inline short name
   private Node mem() { return in(1); }
           Node adr() { return in(2); }
-  private Node set_mem(Node a, GVNGCM gvn) { return set_def(1,a,gvn); }
+  private Node set_mem(Node a) { return set_def(1,a); }
   public int find(TypeStruct ts) { return ts.find(_fld); }
 
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
+
+  // Strictly reducing optimizations
+  @Override public Node ideal_reduce() {
     Node mem  = mem();
     Node adr = adr();
-
     Type tadr = adr.val();
     BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
 
     // If we can find an exact previous store, fold immediately to the value.
-    Node st = find_previous_store(gvn,mem(),adr(),aliases,_fld,true);
+    Node st = find_previous_store(mem(),adr(),aliases,_fld,true);
     if( st!=null ) {
       if( st instanceof StoreNode ) return (( StoreNode)st).rez();
       else                          return ((NewObjNode)st).get(_fld);
     }
+    return null;
+  }
+  
+  // Changing edges to bypass, but typically not removing nodes nor edges
+  @Override public Node ideal_mono() {
+    Node mem = mem();
     // Bypass unrelated Stores, but only if the Address predates the Store.  If
     // the Load address depends on the Store memory, then the Load cannot
     // bypass the Store.
-    if( mem() instanceof StoreNode ) {
-      StoreNode st2 = (StoreNode)mem();
-      if( st2.adr()==adr() && !Util.eq(st2._fld,_fld) ) { // Very weak "Address must predate" test
-        set_mem(st2.mem(),gvn);
-        return this;
-      }
+    if( mem instanceof StoreNode ) {
+      StoreNode st2 = (StoreNode)mem;
+      if( st2.adr()==adr() && !Util.eq(st2._fld,_fld) ) // Very weak "Address must predate" test
+        return set_mem(st2.mem());
     }
 
+    Node adr = adr();
+    Type tadr = adr.val();
+    BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
+    
     // Load can move past a Join if all aliases align.
     if( mem instanceof MemJoinNode && aliases != null ) {
       Node jmem = ((MemJoinNode)mem).can_bypass(aliases);
       if( jmem != null ) {
-        jmem.xval(gvn._opt_mode);
-        set_mem(jmem,gvn);
-        return this;
+        jmem.xval();
+        return set_mem(jmem);
       }
     }
 
     // Load can move out of a Call, if the function has no Parm:mem - happens
     // for single target calls that do not (have not yet) inlined.
     if( mem instanceof MProjNode && mem.in(0) instanceof CallNode )
-      return set_mem(((CallNode)mem.in(0)).mem(),gvn);
+      return set_mem(((CallNode)mem.in(0)).mem());
 
     // Load can bypass a New or Store if the address does not depend on the New/St.
     if( aliases != null && mem instanceof MrgProjNode ) {
       NewNode nnn = ((MrgProjNode)mem).nnn();
       // Bypass if aliases do not overlap
       if( !aliases.test_recur(nnn._alias) )
-        return set_mem(mem.in(1),gvn);
+        return set_mem(mem.in(1));
       // Also bypass if address predates the allocation.  Here we just see that
       // the address comes from the function Parm, and the New is made in the
       // function.
       Node adr2 = adr instanceof CastNode ? adr.in(1) : adr;
       if( adr2 instanceof ParmNode )
-        return set_mem(mem.in(1),gvn);
+        return set_mem(mem.in(1));
     }
-
+    
+    return null;
+  }
+  
+  @Override public Node ideal_grow() {
+    Node mem = mem();
+    Node adr = adr();
     // Load from a memory Phi; split through in an effort to sharpen the memory.
     // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
     // TODO: Hoist out of loops.
     if( mem._op == OP_PHI && mem.in(0)._op != OP_LOOP && adr.in(0) instanceof NewNode ) {
       Node lphi = new PhiNode(Type.SCALAR,((PhiNode)mem)._badgc,mem.in(0));
       for( int i=1; i<mem._defs._len; i++ )
-        lphi.add_def(gvn.xform(new LoadNode(mem.in(i),adr,_fld,_bad)));
+        lphi.add_def(Env.GVN.xform(new LoadNode(mem.in(i),adr,_fld,_bad)));
       return lphi;
     }
 
@@ -100,7 +115,7 @@ public class LoadNode extends Node {
 
   // Find a matching prior Store or NewObj - matching field name and address.
   // Returns null if highest available memory does not match name & address.
-  static Node find_previous_store(GVNGCM gvn, Node mem, Node adr, BitsAlias aliases, String fld, boolean is_load ) {
+  static Node find_previous_store(Node mem, Node adr, BitsAlias aliases, String fld, boolean is_load ) {
     Type tmem = mem.val();
     if( !(tmem instanceof TypeMem) || aliases==null ) return null;
     // Walk up the memory chain looking for an exact matching Store or New
@@ -211,8 +226,6 @@ public class LoadNode extends Node {
     // Only named the named field from the named aliases is live.
     return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld);
   }
-  // Changing adr inputs from ANY to ALL flips the sense of LIVE.
-  @Override public boolean input_value_changes_live() { return true; }
 
   @Override public boolean unify( boolean test ) {
     // Input should be a TMem

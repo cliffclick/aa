@@ -38,9 +38,10 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   public NewNode( byte type, int parent_alias, T to         ) { super(type,(Node)null); _init(parent_alias,to); }
   public NewNode( byte type, int parent_alias, T to,Node fld) { super(type, null, fld); _init(parent_alias,to); }
   private void _init(int parent_alias, T ts) {
+    if( _elock ) unelock();    // Unlock before changing hash
     _alias = BitsAlias.new_alias(parent_alias);
     _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeObj.ISUSED);
-    sets_out(ts);
+    sets(ts);
   }
   @Override public String xstr() { return "New"+"*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
@@ -49,25 +50,20 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   Node fld(int fld) { return in(def_idx(fld)); } // Node for field#
 
   // Recompute default memory cache on a change
-  public final void sets_out( T ts ) {
-    assert !_in;
+  public final void sets( T ts ) {
     _ts = ts;
     _crushed = ts.crush();
-  }
-  protected final void sets_in( T ts ) {
-    assert _in;
-    _ts = ts;
-    _crushed = ts.crush();
-    Env.GVN.revalive(this,ProjNode.proj(this,0),Env.DEFMEM);
   }
 
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  @Override public Node ideal_reduce() {
     // If either the address or memory is not looked at then the memory
     // contents are dead.  The object might remain as a 'gensym' or 'sentinel'
     // for identity tests.
-    if( _defs._len > 1 && captured(gvn) ) return kill(gvn);
+    if( _defs._len > 1 && captured() ) { kill2(); return this; }
     return null;
   }
+
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
     return TypeTuple.make(Type.CTRL, is_unused() ? TypeObj.UNUSED : valueobj(),_tptr);   // Complex obj, simple ptr.
@@ -79,21 +75,21 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   abstract T dead_type();
   boolean is_unused() { return _ts==dead_type(); }
   // Kill all inputs, inform all users
-  NewNode kill(GVNGCM gvn) {
+  NewNode kill2() {
     while( !is_dead() && _defs._len > 1 )
-      pop(gvn);               // Kill all fields except memory
+      pop();                    // Kill all fields except memory
     if( is_dead() ) return this;
     _crushed = _ts = dead_type();
+    Env.DEFMEM.set_def(_alias,Node.con(TypeObj.UNUSED));
     Env.GVN.revalive(this,ProjNode.proj(this,0),Env.DEFMEM);
-    gvn.set_def_reg(Env.DEFMEM,_alias,gvn.add_work(gvn.con(TypeObj.UNUSED)));
     if( is_dead() ) return this;
     for( Node use : _uses )
-      gvn.add_work_uses(use); // Get FPtrs from MrgProj, and dead Ptrs into New
+      Env.GVN.add_flow_uses(use); // Get FPtrs from MrgProj, and dead Ptrs into New
     return this;
   }
 
   // Basic escape analysis.  If no escapes and no loads this object is dead.
-  private boolean captured( GVNGCM gvn ) {
+  private boolean captured( ) {
     if( _keep > 0 ) return false;
     if( _uses._len==0 ) return false; // Dead or being created
     Node mem = _uses.at(0);
@@ -119,16 +115,12 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
   // clones during inlining all become unique new sites
   @SuppressWarnings("unchecked")
-  @Override @NotNull public NewNode copy( boolean copy_edges, GVNGCM gvn) {
+  @Override @NotNull public NewNode copy( boolean copy_edges) {
     // Split the original '_alias' class into 2 sub-aliases
-    NewNode<T> nnn = (NewNode<T>)super.copy(copy_edges, gvn);
-    nnn._in=false;              // Not in GVN
+    NewNode<T> nnn = (NewNode<T>)super.copy(copy_edges);
     nnn._init(_alias,_ts);      // Children alias classes, split from parent
-    // The original NewNode also splits from the parent alias
-    assert _in;
-    Type oldt = gvn.unreg(this);
-    _init(_alias,_ts);
-    gvn.rereg(this,oldt);
+    _init(_alias,_ts); // The original NewNode also splits from the parent alias
+    Env.GVN.add_flow(this);     // Alias changes flow
     return nnn;
   }
 
@@ -179,22 +171,24 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
     // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
     public FunPtrNode as_fun( GVNGCM gvn ) {
-      FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL));
-      ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-      Node memp= gvn.xform(new ParmNode(MEM_IDX,_sig._args[MEM_IDX],fun, gvn.con(_sig.arg(MEM_IDX).simple_ptr()),null));
-      fun._bal_close = bal_close();
+      try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
+        assert in(0)==null && _uses._len==0;
+        FunNode  fun = ( FunNode) X.xform(new  FunNode(this).add_def(Env.ALL_CTRL));
+        ParmNode rpc = (ParmNode) X.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
+        Node memp= X.xform(new ParmNode(MEM_IDX,_sig._args[MEM_IDX],fun, TypeMem.MEM, Env.DEFMEM,null));
+        fun._bal_close = bal_close();
 
-      // Add input edges to the intrinsic
-      add_def(_reads ? memp : null); // Memory  for the primitive in slot MEM_IDX
-      add_def(null);                 // Closure for the primitive in slot FUN_IDX
-      for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // Args follow
-        add_def( gvn.xform(new ParmNode(i,_sig._args[i],fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
-      NewNode nnn = (NewNode)gvn.xform(this);
-      Node mem = Env.DEFMEM.make_mem_proj(gvn,nnn,memp);
-      Node ptr = gvn.xform(new ProjNode(nnn,REZ_IDX));
-      RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,ptr,rpc,fun));
-      mem.xliv(gvn._opt_mode); // Refine initial memory
-      return new FunPtrNode(ret,null);
+        // Add input edges to the intrinsic
+        add_def(_reads ? memp : null); // Memory  for the primitive in slot MEM_IDX
+        add_def(null);                 // Closure for the primitive in slot FUN_IDX
+        for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // Args follow
+          add_def( X.xform(new ParmNode(i,_sig._args[i],fun, Node.con(_sig.arg(i).simple_ptr()),null)));
+        NewNode nnn = (NewNode)X.xform(this);
+        Node mem = Env.DEFMEM.make_mem_proj(nnn,memp);
+        Node ptr = X.xform(new ProjNode(nnn,REZ_IDX));
+        RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,ptr,rpc,fun));
+        return (X._ret = new FunPtrNode(ret,null));
+      }
     }
   }
 }

@@ -31,7 +31,7 @@ public class PhiNode extends Node {
     return _t==phi._t;
   }
 
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  @Override public Node ideal_reduce() {
     if( val(0) == Type.XCTRL ) return null;
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
@@ -51,6 +51,9 @@ public class PhiNode extends Node {
     if( live != this ) return live; // Single unique input
 
     return null;
+  }
+  @Override public Node ideal(GVNGCM gvn, int level) {
+    throw com.cliffc.aa.AA.unimpl();
   }
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
