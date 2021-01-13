@@ -135,4 +135,5 @@ public class RegionNode extends Node {
     }
     return P.test(this) ? this : null;
   }
+  @Override public Node is_copy(int idx) { return _defs._len==2 ? in(1) : null; }
 }

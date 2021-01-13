@@ -479,11 +479,15 @@ public abstract class Node implements Cloneable, TNode {
     case OP_CON:
     case OP_CPROJ:
     case OP_DEFMEM:
+    case OP_ERR:
+    case OP_FP2DISP:
     case OP_FUN:
     case OP_FUNPTR:
+    case OP_IF:
     case OP_NEWSTR:
     case OP_PARM:
     case OP_PHI:
+    case OP_PRIM:
     case OP_PROJ:
     case OP_REGION:
     case OP_SCOPE:
@@ -499,17 +503,26 @@ public abstract class Node implements Cloneable, TNode {
   // parallelism).  Returns null for no-progress.
   public Node ideal_grow() {
     switch( _op ) {             // Giant assert that these nodes are checked for do-nothing
+    case OP_CALLEPI:
+    case OP_CAST:
     case OP_CON:
     case OP_CPROJ:
     case OP_DEFMEM:
+    case OP_ERR:
+    case OP_FP2DISP:
     case OP_FUN:
     case OP_FUNPTR:
+    case OP_IF:
     case OP_NEWOBJ:
     case OP_NEWSTR:
     case OP_PARM:
+    case OP_PHI:
+    case OP_PRIM:
     case OP_PROJ:
     case OP_REGION:
+    case OP_RET:
     case OP_SCOPE:
+    case OP_UNR:
       break;
     default: throw com.cliffc.aa.AA.unimpl(); // Node not confirmed do-nothing
     }
@@ -559,7 +572,7 @@ public abstract class Node implements Cloneable, TNode {
   // Compute local contribution of use liveness to this def.
   // Overridden in subclasses that do per-def liveness.
   public TypeMem live_use( GVNGCM.Mode opt_mode, Node def ) {
-    return _keep>0 ? TypeMem.MEM : _live;
+    return _keep>0 ? TypeMem.LIVE_BOT : _live;
   }
 
   // Default lower-bound liveness.  For control, its always "ALIVE" and for
@@ -593,21 +606,25 @@ public abstract class Node implements Cloneable, TNode {
 
   // Reducing xforms, strictly fewer Nodes or Edges.  n may be either in or out
   // of VALS.  If a replacement is found, replace.  In any case, put in the
-  // VALS table.
-  public @NotNull Node do_reduce() {
-    if( is_dead() || _keep>0 ) return this;
+  // VALS table.  Return null if no progress, or this or the replacement.
+  public Node do_reduce() {
+    if( is_dead() || _keep>0 ) return null;
     assert check_vals();
     Node nnn = _do_reduce();
-    if( !is_dead() && nnn != this )  {
+    if( nnn!=null ) {
       if( nnn==Env.ANY ) Env.GVN.add_flow_uses(this); // Input is dying
-      subsume(nnn);
+      if( nnn != this && !is_dead() )  subsume(nnn);  // Replace
+      Env.GVN.add_reduce(nnn);                        // Rerun the replacement
+      return nnn._elock();                            // After putting in VALS
     }
-    return nnn._elock();        // Not in vals, then lock and put in vals
+    // No progress; put in VALS and return
+    _elock();
+    return null;
   }
 
   // Check for being not-live, being a constant, CSE in VALS table, and then
   // call out to ideal_reduce.  Returns an equivalent replacement (or self).
-  private @NotNull Node _do_reduce() {
+  private Node _do_reduce() {
     // Dead from below
     if( !_live.is_live() && !is_prim() && err(true)==null && _keep==0 &&
         !(this instanceof CallNode) &&       // Keep for proper errors
@@ -631,9 +648,9 @@ public abstract class Node implements Cloneable, TNode {
 
     // Try general ideal call
     Node x = ideal_reduce();    // Try the general reduction
-    if( x != null ) return x;
+    if( x != null ) { Env.GVN.add_flow(x); return x; }
 
-    return this;                // No change
+    return null;                // No change
   }
 
 
@@ -670,6 +687,13 @@ public abstract class Node implements Cloneable, TNode {
       add_flow_extra();
     }
     return progress;
+  }
+
+  public Node do_mono() { Node x= ideal_mono(); assert x==null || x==this; return x; }
+
+  public Node do_grow() {
+    Node nnn = ideal_grow();
+    return nnn==null || nnn==this ? nnn : subsume(nnn);
   }
 
   // Replace with a ConNode iff

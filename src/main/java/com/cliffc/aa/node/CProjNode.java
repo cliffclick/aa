@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
@@ -22,6 +23,14 @@ public class CProjNode extends ProjNode {
   }
   @Override public TypeMem all_live() { return TypeMem.ALIVE; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
+  // Control into a Region allows Phis to make progress
+  @Override public void add_flow_extra() {
+    for( Node use : _uses )
+      if( use instanceof RegionNode )
+        for( Node phi : use._uses )
+          if( phi instanceof PhiNode )
+            Env.GVN.add_flow(phi);
+  }
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.
   @Override public byte op_prec() { return _defs.at(0).op_prec(); }

@@ -244,7 +244,7 @@ public class Parse implements Comparable<Parse> {
       if( tn instanceof TypeStruct ) {     // Add struct types with expanded arg lists
         FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)tn, alias, _gvn, errMsg());
         Node rez2 = _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
-        _gvn.init0(rez2._uses.at(0));      // Force init of Unresolved
+        _gvn.init(rez2._uses.at(0));       // Force init of Unresolved
       }
     }
     _gvn.revalive(Env.DEFMEM);       // Update DEFMEM for both functions added
@@ -376,7 +376,7 @@ public class Parse implements Comparable<Parse> {
     if( !peek('?') ) return expr;   // No if-expression
 
     scope().push_if();            // Start if-expression tracking new defs
-    Node ifex = init(new IfNode(ctrl(),expr)).keep();
+    Node ifex = init(new IfNode(ctrl(),expr));
     set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch
     Node old_mem = mem().keep();          // Keep until parse false-side
     Node tex = stmt();                    // Parse true expression
@@ -386,7 +386,8 @@ public class Parse implements Comparable<Parse> {
     Node t_mem = mem ().keep();    // Keep until merge point
 
     scope().flip_if();          // Flip side of tracking new defs
-    set_ctrl(gvn(new CProjNode(ifex.unkeep(),0))); // Control for false branch
+    Env.GVN.add_work_all(ifex.unkeep());
+    set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch
     set_mem(old_mem);           // Reset memory to before the IF
     Node fex = peek(':') ? stmt() : Env.XNIL;
     if( fex == null ) fex = err_ctrl2("missing expr after ':'");
@@ -399,7 +400,7 @@ public class Parse implements Comparable<Parse> {
     t_mem = scope().check_if(true ,bad,_gvn,t_ctrl,t_mem); // Insert errors if created only 1 side
     f_mem = scope().check_if(false,bad,_gvn,f_ctrl,f_mem); // Insert errors if created only 1 side
     scope().pop_if();         // Pop the if-scope
-    RegionNode r = set_ctrl(init(new RegionNode(null,t_ctrl.unkeep(),f_ctrl.unkeep())).keep());
+    RegionNode r = set_ctrl(init(new RegionNode(null,t_ctrl.unkeep(),f_ctrl.unkeep())));
     r._val = Type.CTRL;
     set_mem(gvn(new PhiNode(TypeMem.FULL,bad,r       ,t_mem.unkeep(),f_mem.unkeep())));
     return  gvn(new PhiNode(Type.SCALAR ,bad,r.unkeep(),tex.unkeep(),  fex.unkeep())) ; // Ifex result
@@ -799,7 +800,7 @@ public class Parse implements Comparable<Parse> {
       if( isOp(tok) ) { _x = oldx; return null; }
       Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,errMsg(oldx)));
       // Place in nearest enclosing closure scope
-      scope().stk().create(tok.intern(),fref,TypeStruct.FFNL,_gvn);
+      scope().stk().create(tok.intern(),fref,TypeStruct.FFNL);
       return fref;
     }
     Node def = scope.get(tok);    // Get top-level value; only sane if no stores allowed to modify it
@@ -940,7 +941,7 @@ public class Parse implements Comparable<Parse> {
       // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
       NewObjNode stk = e._scope.stk();
-      stk.update(0,ts_mutable(false),clo,_gvn);
+      stk.update(0,ts_mutable(false),clo);
 
       // Parms for all arguments
       Parse errmsg = errMsg();  // Lazy error message
@@ -1348,7 +1349,7 @@ public class Parse implements Comparable<Parse> {
   public  Node lookup( String tok ) { return _e.lookup(tok); }
   private ScopeNode lookup_scope( String tok, boolean lookup_current_scope_only ) { return _e.lookup_scope(tok,lookup_current_scope_only); }
   public  ScopeNode scope( ) { return _e._scope; }
-  private void create( String tok, Node n, byte mutable ) { scope().stk().create(tok,n,mutable,_gvn); }
+  private void create( String tok, Node n, byte mutable ) { scope().stk().create(tok,n,mutable); }
   private static byte ts_mutable(boolean mutable) { return mutable ? TypeStruct.FRW : TypeStruct.FFNL; }
 
   // Get the display pointer.  The function call

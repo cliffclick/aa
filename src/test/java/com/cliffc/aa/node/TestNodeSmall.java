@@ -430,7 +430,7 @@ public class TestNodeSmall {
     RetNode ret = gvn.init(new RetNode(fun,parm_mem,parm_dsp,rpc,fun));
     FunPtrNode fptr = gvn.init(new FunPtrNode(ret,null,dsp_file_ptr));
     // Close the cycle
-    dsp_file.create("fact",fptr,TypeStruct.FFNL,gvn);
+    dsp_file.create("fact",fptr,TypeStruct.FFNL);
     dsp_file.no_more_fields();
     // Return the fptr to keep all alive
     ScopeNode env = new ScopeNode(null,true);

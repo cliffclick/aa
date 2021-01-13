@@ -94,7 +94,7 @@ public class ScopeNode extends Node {
       return set_mem(Node.con(TypeMem.XMEM));
 
     Node ctrl = in(0).is_copy(0);
-    if( ctrl != null ) set_ctrl(ctrl);
+    if( ctrl != null ) { set_ctrl(ctrl); return this; }
 
     return null;
   }

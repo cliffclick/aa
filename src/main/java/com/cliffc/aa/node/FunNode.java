@@ -604,6 +604,7 @@ public class FunNode extends RegionNode {
       CallEpiNode cepi = call.cepi();
       cepi.del(cepi._defs.find(oldret));
       unwireds.add(cepi);
+      Env.GVN.add_reduce(cepi); // Visit for inlining later
       // And remove path from all Parms
       for( Node parm : _uses )
         if( parm instanceof ParmNode )

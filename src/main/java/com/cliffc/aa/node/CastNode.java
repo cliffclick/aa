@@ -10,7 +10,8 @@ public class CastNode extends Node {
   public final Type _t;                // TypeVar???
   public CastNode( Node ctrl, Node ret, Type t ) { super(OP_CAST,ctrl,ret); _t=t; }
   @Override public String xstr() { return "("+_t+")"; }
-  @Override public Node ideal(GVNGCM gvn, int level) {
+
+  @Override public Node ideal_reduce() {
     Node cc = in(0).is_copy(0);
     if( cc!=null ) return set_def(0,cc);
     // Cast is useless?  Remove same as a TypeNode
@@ -18,9 +19,13 @@ public class CastNode extends Node {
     Type c = ctrl.val(), t = addr.val();
     if( c != Type.CTRL ) return null;
     if( t.isa(_t) ) return in(1);
-
+    return null;
+  }
+  
+  @Override public Node ideal_mono() {
     // Can we hoist control to a higher test?
-    Node baseaddr = addr;
+    Node ctrl = in(0);
+    Node baseaddr = in(1);
     while( baseaddr instanceof CastNode ) baseaddr = baseaddr.in(1);
     final Node fbaseaddr = baseaddr;
 
@@ -29,6 +34,8 @@ public class CastNode extends Node {
     set_def(0,tru);
     return this;
   }
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
+  
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Type c = val(0);
     if( c != Type.CTRL ) return c.oob();

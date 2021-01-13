@@ -123,7 +123,8 @@ public class Env implements AutoCloseable {
     stk.no_more_fields();
     gvn.add_flow(stk);          // Scope object going dead, trigger following projs to cleanup
     _scope.set_ptr(null);       // Clear pointer to display
-    gvn.add_work_all(_scope);
+    gvn.add_flow(ptr);          // Clearing pointer changes liveness
+    gvn.add_work_all(_scope.unkeep());
     LEX_DISPLAYS = LEX_DISPLAYS.clear(stk._alias);
   }
 
@@ -133,9 +134,9 @@ public class Env implements AutoCloseable {
     ScopeNode pscope = _par._scope;
     // Promote forward refs to the next outer scope
     if( pscope != null && _par._par != null )
-      _scope.stk().promote_forward(GVN,pscope.stk());
+      _scope.stk().promote_forward(pscope.stk());
     close_display(GVN);
-    _scope.unhook();
+    GVN.add_dead(_scope);
     GVN.iter(GVNGCM.Mode.PesiCG);
     assert _scope.is_dead();
   }

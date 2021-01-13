@@ -6,7 +6,8 @@ import com.cliffc.aa.type.*;
 // Split control
 public class IfNode extends Node {
   public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); }
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  
+  @Override public Node ideal_reduce() {
     Node ctl = in(0);
     Node tst = in(1);
     if( ctl.val() == Type.XCTRL ) return Node.con(TypeTuple.IF_ANY);
@@ -25,17 +26,18 @@ public class IfNode extends Node {
     }
 
     if( tst instanceof PrimNode.Not && tst._uses._len==1 )
-      return flip(gvn, gvn.xform(new IfNode(ctl,tst.in(1))));
+      return flip(Env.GVN.xform(new IfNode(ctl,tst.in(1))));
 
     return null;
   }
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
-  Node flip(GVNGCM gvn, Node that) {
+  Node flip(Node that) {
     ProjNode p0 = (ProjNode)_uses.atX(0);
     ProjNode p1 = (ProjNode)_uses.atX(1);
     if( p0!=null && p0._idx==1 ) { ProjNode tmp=p0; p0=p1; p1=tmp; }
-    Node x0 = gvn.xform(new CProjNode(that,0));
-    Node x1 = gvn.xform(new CProjNode(that,1));
+    Node x0 = Env.GVN.xform(new CProjNode(that,0));
+    Node x1 = Env.GVN.xform(new CProjNode(that,1));
     if( p0!=null ) p0.subsume(x1);
     if( p1!=null ) p1.subsume(x0);
     x0._live = x1._live = that._live = this._live;

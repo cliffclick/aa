@@ -20,12 +20,12 @@ public class GVNGCM {
   public Mode _opt_mode=Mode.Parse;
 
   // Iterative worklists.
-  private final Work _work_dead   = new Work() { @Override public void apply(Node n) { if( n._uses._len == 0 ) n.kill(); } };
-  private final Work _work_reduce = new Work() { @Override public void apply(Node n) { n.do_reduce (); } };
-  private final Work _work_flow   = new Work() { @Override public void apply(Node n) { n.do_flow   (); } };
-  private final Work _work_mono   = new Work() { @Override public void apply(Node n) { n.ideal_mono(); } };
-  private final Work _work_grow   = new Work() { @Override public void apply(Node n) { n.ideal_grow(); } };
-  private final Work _work_inline = new Work() { @Override public void apply(Node n) { ((FunNode)n).ideal_inline(); } };
+  private final Work _work_dead   = new Work() { @Override public void accept(Node n) { if( n._uses._len == 0 ) n.kill(); } };
+  private final Work _work_reduce = new Work() { @Override public void accept(Node n) { n.do_reduce(); } };
+  private final Work _work_flow   = new Work() { @Override public void accept(Node n) { n.do_flow  (); } };
+  private final Work _work_mono   = new Work() { @Override public void accept(Node n) { n.do_mono  (); } };
+  private final Work _work_grow   = new Work() { @Override public void accept(Node n) { n.do_grow  (); } };
+  private final Work _work_inline = new Work() { @Override public void accept(Node n) { ((FunNode)n).ideal_inline(); } };
   @SuppressWarnings("unchecked")
   private final Work[] _new_works = new Work[]{           _work_reduce,_work_flow,_work_mono,_work_grow             };
   @SuppressWarnings("unchecked")
@@ -41,6 +41,7 @@ public class GVNGCM {
   public void add_dead  ( Node n ) { add_work(_work_dead  ,n); }
   public void add_reduce( Node n ) { add_work(_work_reduce,n); }
   public void add_flow  ( Node n ) { add_work(_work_flow  ,n); }
+  public void add_grow  ( Node n ) { add_work(_work_grow  ,n); }
   public void add_inline( FunNode n ) { add_work(_work_inline,n); }
   public void add_flow_defs( Node n ) { add_work_defs(_work_flow  ,n); }
   public void add_flow_uses( Node n ) { add_work_uses(_work_flow  ,n); }
@@ -88,10 +89,6 @@ public class GVNGCM {
   // mid-construction from the parser.  Any function call with yet-to-be-parsed
   // call sites, and any loop top with an unparsed backedge needs to use this.
   public <N extends Node> N init( N n ) { add_reduce(n); return n.keep(); }
-  <N extends Node> N init0( N n ) {
-    // TODO: Replace with keep()/unkeep()
-    throw com.cliffc.aa.AA.unimpl();
-  }
 
   // Did a bulk not-monotonic update.  Forcibly update the entire region at
   // once; restores monotonicity over the whole region when done.
@@ -110,8 +107,7 @@ public class GVNGCM {
       TypeMem t = n.live(_opt_mode);
       if( t != n._live ) {
         n._live=t;
-        //add_work_defs(n);
-        throw com.cliffc.aa.AA.unimpl();
+        add_flow_defs(n);
       }
     }
   }
@@ -120,21 +116,21 @@ public class GVNGCM {
   // for the parser).  Return a node registered with GVN that is possibly "more
   // ideal" than what was before.
   public Node xform( Node n ) {
-    assert n._uses._len==0;      // New to GVN
+    assert n._uses._len==0;     // New to GVN
     assert n._keep==0;
     n.keep();
     boolean progress = true;
     while( progress ) {
       progress = n.do_flow();
       n.unkeep();
-      Node x = n.do_reduce();
-      if( x!=n ) { n=x; progress=true; }
+      Node x;
+      if( (x=n.do_reduce()) != null ) { n=x; progress=true; }
+      if( (x=n.do_mono  ()) != null ) { n=x; progress=true; }
+      if( (x=n.do_grow  ()) != null ) { n=x; progress=true; }
       n.keep();
-      n.ideal_mono();
-
-      if( !HAS_WORK ) break;
       iter(_opt_mode);
     }
+    if( n instanceof FunNode ) add_inline((FunNode)n);
     n.unkeep();
     add_flow(n); // if keep falls back to zero; next time can compute proper liveness
     return n;
@@ -295,17 +291,21 @@ public class GVNGCM {
     Ary<Node> _tmps = new Ary<>(new Node[1],0);
     public N _ret;
     public Node xform( Node n ) {
-      n = n.do_reduce();        // Attempt to reduce
-      if( _tmps.find(n)!=-1 ) return n; // Already reduced & flowed & keeped
+      Node x = n.do_reduce();   // Attempt to reduce
+      return init(x==null ? n : x);
+    }
+    public Node init( Node n ) {
+      if( _tmps.find(n)!=-1 ) return n; // Already flowed & keeped
       n.keep().do_flow(); // Update types, and future Parser uses, so always alive
       return _tmps.push(n);
     }
+    @SuppressWarnings("unchecked")
+    public <M extends Node> M init2( M n ) { return (M)init(n); }
     @Override public void close() {
       _ret.keep();              // Thing being returned at close-point is always alive
       for( Node tmp : _tmps ) {
         tmp.unkeep();
-        if( tmp._keep>0 ) throw com.cliffc.aa.AA.unimpl(); // Untested
-        if( tmp._uses._len==0 ) add_dead(tmp);
+        if( tmp._keep==0 && tmp._uses._len==0 ) add_dead(tmp);
         else add_flow(tmp);     // Almost surely needs a proper live calc
       }
       iter(Mode.Parse);         // Empty list

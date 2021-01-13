@@ -52,9 +52,7 @@ public class PhiNode extends Node {
 
     return null;
   }
-  @Override public Node ideal(GVNGCM gvn, int level) {
-    throw com.cliffc.aa.AA.unimpl();
-  }
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Type ctl = val(0);

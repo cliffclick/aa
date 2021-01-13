@@ -1,11 +1,11 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
+import java.util.function.Consumer;
 
-public abstract class Work {
+public abstract class Work implements Consumer<Node> {
   final Ary<Node> _work = new Ary<>(new Node[1],0);
   final VBitSet _on = new VBitSet();
   public Node add(Node n) {
@@ -17,10 +17,10 @@ public abstract class Work {
     while(true) {
       Node n=pop();
       if( n==null ) return false;
-      if( !n.is_dead() ) { apply(n); return true; }
+      if( !n.is_dead() ) { accept(n); return true; }
     }
   }
-  public abstract void apply(Node n);
+  public abstract void accept(Node n);
 
   public Node pop() {
     if( _work._len==0 ) return null;
@@ -28,7 +28,7 @@ public abstract class Work {
     _on.clear(n._uid);
     return n;
   }
-  
+
   public boolean isEmpty() { return _work._len==0; }
   public boolean on(Node n) { return _on.test(n._uid); }
   public void clear() { _work.clear(); _on.clear(); }

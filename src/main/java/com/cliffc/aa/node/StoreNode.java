@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -29,11 +30,15 @@ public class StoreNode extends Node {
   Node rez() { return in(3); }
   public int find(TypeStruct ts) { return ts.find(_fld); }
 
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  @Override public Node ideal_reduce() {
     Node mem = mem();
     Node adr = adr();
     Type ta = adr.val();
     TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
+
+    // Is this Store dead from below?
+    if( tmp!=null && _live.ld(tmp)==TypeObj.UNUSED )
+      return mem;
 
     // If Store is by a New and no other Stores, fold into the New.
     NewObjNode nnn;  int idx;
@@ -43,14 +48,37 @@ public class StoreNode extends Node {
         mem._uses._len==2 &&
         (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
       // Update the value, and perhaps the final field
-      nnn.update(idx,_fin,rez(),gvn);
-      // Reset types & H-M; the old value in mem@fld is gone.
-      gvn.revalive(mem);
-      nnn.reset_tvar();
-      mem.reset_tvar();
-      rez().reset_tvar();
+      nnn.update(idx,_fin,rez());
+      mem.xval();
+      Env.GVN.add_flow_uses(this);
       return mem;               // Store is replaced by using the New directly.
     }
+
+    return null;
+  }
+  @Override public Node ideal_mono() {
+    Node mem = mem();
+    Node adr = adr();
+    Type ta = adr.val();
+    TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
+
+    // If Store is of a MemJoin and it can enter the split region, do so.
+    // Requires no other memory *reader* (or writer), as the reader will
+    // now see the Store effects as part of the Join.
+    if( _keep==0 && tmp != null && mem instanceof MemJoinNode && mem._uses._len==1 ) {
+      Node memw = get_mem_writer();
+      // Check the address does not have a memory dependence on the Join.
+      // TODO: This is super conservative
+      if( memw != null && adr instanceof ProjNode && adr.in(0) instanceof NewNode )
+        return ((MemJoinNode)mem).add_alias_below_new(new StoreNode(this,mem,adr),this);
+    }
+    return null;
+  }
+  @Override public Node ideal_grow() {
+    Node mem = mem();
+    Node adr = adr();
+    Type ta = adr.val();
+    TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
 
     // If Store is of a memory-writer, and the aliases do not overlap, make parallel with a Join
     if( tmp != null && (tmp._aliases!=BitsAlias.NIL.dual()) &&
@@ -64,24 +92,9 @@ public class StoreNode extends Node {
       if( head2 != null && MemSplitNode.check_split(this,escapees()) )
         return MemSplitNode.insert_split(this,escapees(),this,mem,head2);
     }
-
-    // If Store is of a MemJoin and it can enter the split region, do so.
-    // Requires no other memory *reader* (or writer), as the reader will
-    // now see the Store effects as part of the Join.
-    if( _keep==0 && tmp != null && mem instanceof MemJoinNode && mem._uses._len==1 ) {
-      Node memw = get_mem_writer();
-      // Check the address does not have a memory dependence on the Join.
-      // TODO: This is super conservative
-      if( memw != null && adr instanceof ProjNode && adr.in(0) instanceof NewNode )
-        return ((MemJoinNode)mem).add_alias_below_new(new StoreNode(this,mem,adr),this);
-    }
-
-    // Is this Store dead from below?
-    if( tmp!=null && _live.ld(tmp)==TypeObj.UNUSED )
-      return mem;
-
     return null;
   }
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   // StoreNode needs to return a TypeObj for the Parser.
   @Override public Type value(GVNGCM.Mode opt_mode) {

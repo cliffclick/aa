@@ -49,11 +49,14 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   static int def_idx(int fld) { return fld+1; } // Skip ctl in slot 0
   Node fld(int fld) { return in(def_idx(fld)); } // Node for field#
 
-  // Recompute default memory cache on a change
+  // Recompute default memory cache on a change.  Might not be monotonic,
+  // e.g. during Node create, or folding a Store.
   public final void sets( T ts ) {
     _ts = ts;
     _crushed = ts.crush();
   }
+  // Recompute default memory, expecting it to monotonically lift.
+  public final void setsm( T ts ) { assert ts.isa(_ts); sets(ts); }
 
   @Override public Node ideal_reduce() {
     // If either the address or memory is not looked at then the memory
