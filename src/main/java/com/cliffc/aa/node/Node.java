@@ -463,8 +463,11 @@ public abstract class Node implements Cloneable, TNode {
     case OP_CON:
     case OP_DEFMEM:
     case OP_PRIM:
+    case OP_SPLIT:
     case OP_START:
     case OP_STMEM:
+    case OP_THRET:
+    case OP_THUNK:
       break;
     default: throw com.cliffc.aa.AA.unimpl(); // Node not confirmed do-nothing
     }
@@ -484,6 +487,7 @@ public abstract class Node implements Cloneable, TNode {
     case OP_FUN:
     case OP_FUNPTR:
     case OP_IF:
+    case OP_JOIN:
     case OP_NEWSTR:
     case OP_PARM:
     case OP_PHI:
@@ -491,6 +495,9 @@ public abstract class Node implements Cloneable, TNode {
     case OP_PROJ:
     case OP_REGION:
     case OP_SCOPE:
+    case OP_SPLIT:
+    case OP_THRET:
+    case OP_THUNK:
     case OP_UNR:
       break;
     default: throw com.cliffc.aa.AA.unimpl(); // Node not confirmed do-nothing
@@ -513,6 +520,7 @@ public abstract class Node implements Cloneable, TNode {
     case OP_FUN:
     case OP_FUNPTR:
     case OP_IF:
+    case OP_JOIN:
     case OP_NEWOBJ:
     case OP_NEWSTR:
     case OP_PARM:
@@ -522,6 +530,9 @@ public abstract class Node implements Cloneable, TNode {
     case OP_REGION:
     case OP_RET:
     case OP_SCOPE:
+    case OP_SPLIT:
+    case OP_THRET:
+    case OP_THUNK:
     case OP_UNR:
       break;
     default: throw com.cliffc.aa.AA.unimpl(); // Node not confirmed do-nothing
@@ -564,7 +575,7 @@ public abstract class Node implements Cloneable, TNode {
         live = (TypeMem)live.meet(use.live_use(opt_mode, this)); // Make alive used fields
     live = live.flatten_fields();
     assert live==TypeMem.DEAD || live.basic_live()==all_live().basic_live();
-    assert live!=TypeMem.LIVE_BOT || (val() !=Type.CTRL && val() !=Type.XCTRL);
+    assert live!=TypeMem.LIVE_BOT || (_val !=Type.CTRL && _val !=Type.XCTRL);
     return live;
   }
   // Shortcut to update self-live
@@ -572,16 +583,18 @@ public abstract class Node implements Cloneable, TNode {
   // Compute local contribution of use liveness to this def.
   // Overridden in subclasses that do per-def liveness.
   public TypeMem live_use( GVNGCM.Mode opt_mode, Node def ) {
-    return _keep>0 ? TypeMem.LIVE_BOT : _live;
+    return _keep>0 ? all_live() : _live;
   }
 
   // Default lower-bound liveness.  For control, its always "ALIVE" and for
-  // memory opts (and tuples with memory) its "ALL_MEM".
+  // memory opts (and tuples with memory) its "ALLMEM".
   public TypeMem all_live() { return TypeMem.LIVE_BOT; }
 
-  // The _val changed here, and more than the immediately _neighbors might
-  // change value/live/unify.
+  // The _val changed here, and more than the immediate _neighbors might change
+  // value/live/unify.
   public void add_flow_extra() { }
+  // Inputs changed here, and more than the immediate _neighbors might reduce
+  public void add_reduce_extra() { }
 
   // Unifies this Node with others; Call/CallEpi with Fun/Parm/Ret.  NewNodes &
   // Load/Stores, etc.  Returns true if progress, and puts neighbors back on
@@ -611,11 +624,15 @@ public abstract class Node implements Cloneable, TNode {
     if( is_dead() || _keep>0 ) return null;
     assert check_vals();
     Node nnn = _do_reduce();
-    if( nnn!=null ) {
-      if( nnn==Env.ANY ) Env.GVN.add_flow_uses(this); // Input is dying
-      if( nnn != this && !is_dead() )  subsume(nnn);  // Replace
-      Env.GVN.add_reduce(nnn);                        // Rerun the replacement
-      return nnn._elock();                            // After putting in VALS
+    if( nnn!=null ) {                   // Something happened
+      if( nnn != this && !is_dead() ) { // Being replaced
+        Env.GVN.add_flow_uses(this);    // Visit users
+        subsume(nnn);                   // Replace
+        for( Node use : nnn._uses )
+          use.add_reduce_extra();
+      }
+      Env.GVN.add_reduce(nnn);  // Rerun the replacement
+      return nnn._elock();      // After putting in VALS
     }
     // No progress; put in VALS and return
     _elock();
@@ -807,7 +824,7 @@ public abstract class Node implements Cloneable, TNode {
     if( bs.tset(_uid) ) return; // Been there, done that
     for( int i=0; i<_defs._len; i++ ) {
       Node def = _defs.at(i);   // Walk data defs for more errors
-      if( def == null || def.val() == Type.XCTRL ) continue;
+      if( def == null || def._val == Type.XCTRL ) continue;
       // Walk function bodies that are wired, but not bare FunPtrs.
       if( def instanceof FunPtrNode && !def.is_forward_ref() )
         continue;
@@ -816,7 +833,7 @@ public abstract class Node implements Cloneable, TNode {
     if( is_prim() ) return;
     // Skip reporting if any input is 'all', as the input should report instead.
     for( Node def : _defs )
-      if( def !=null && def.val() ==Type.ALL )
+      if( def !=null && def._val ==Type.ALL )
         return;                 // Skip reporting.
     adderr(errs);
   }
@@ -862,7 +879,7 @@ public abstract class Node implements Cloneable, TNode {
   }
 
   // Shortcut
-  public Type sharptr( Node mem ) { return mem.val().sharptr(val()); }
+  public Type sharptr( Node mem ) { return mem._val.sharptr(_val); }
 
   // Aliases that a MemJoin might choose between.  Not valid for nodes which do
   // not manipulate memory.

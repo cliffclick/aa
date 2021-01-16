@@ -193,6 +193,7 @@ public abstract class PrimNode extends Node {
         ctl = X.xform(new CProjNode(that));
         mem = X.xform(new MProjNode(that));
         rez = X.xform(new  ProjNode(that,AA.REZ_IDX));
+        Env.GVN.add_grow(that);
       } else {
         ctl = fun;
         rez = that;
@@ -518,39 +519,44 @@ public abstract class PrimNode extends Node {
     // Takes a value on the LHS, and a THUNK on the RHS.
     AndThen() { super("&&",new String[]{" ctl"," mem","^","p","thunk"},ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
     // Expect this to inline everytime
-    @Override public Node ideal(GVNGCM gvn, int level) {
+    @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
+    @Override public Node ideal_grow() {
       if( _defs._len != 4 ) return null; // Already did this
-      Node ctl = in(0);
-      Node mem = in(1);
-      Node lhs = in(2);
-      Node rhs = in(3);
-      // Expand to if/then/else
-      Node iff = gvn.xform(new IfNode(ctl,lhs));
-      Node fal = gvn.xform(new CProjNode(iff,0));
-      Node tru = gvn.xform(new CProjNode(iff,1));
-      // Call on true branch; if false do not call.
-      Node dsp = gvn.xform(new FP2DispNode(rhs));
-      Node cal = gvn.xform(new CallNode(true,_badargs,tru,mem,dsp,rhs));
-      Node cep = gvn.xform(new CallEpiNode(null,cal,Env.DEFMEM));
-      Node ccc = gvn.xform(new CProjNode(cep));
-      Node memc= gvn.xform(new MProjNode(cep));
-      Node rez = gvn.xform(new  ProjNode(cep,AA.REZ_IDX));
-      // Region merging results
-      Node reg = gvn.xform(new RegionNode(null,fal,ccc));
-      Node phi = gvn.xform(new PhiNode(Type.SCALAR,null,reg,Env.XNIL,rez ));
-      Node phim= gvn.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
-      // Plug into self & trigger is_copy
-      set_def(0,reg );
-      set_def(1,phim);
-      set_def(2,phi );
-      pop();                    // Remove arg2, trigger is_copy
-      return this;
+      try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
+        Node ctl = in(0);
+        Node mem = in(1);
+        Node lhs = in(2);
+        Node rhs = in(3);
+        // Expand to if/then/else
+        Node iff = X.xform(new IfNode(ctl,lhs));
+        Node fal = X.xform(new CProjNode(iff,0));
+        Node tru = X.xform(new CProjNode(iff,1));
+        // Call on true branch; if false do not call.
+        Node dsp = X.xform(new FP2DispNode(rhs));
+        Node cal = X.xform(new CallNode(true,_badargs,tru,mem,dsp,rhs));
+        Node cep = X.xform(new CallEpiNode(null,cal,Env.DEFMEM));
+        Node ccc = X.xform(new CProjNode(cep));
+        Node memc= X.xform(new MProjNode(cep));
+        Node rez = X.xform(new  ProjNode(cep,AA.REZ_IDX));
+        // Region merging results
+        Node reg = X.xform(new RegionNode(null,fal,ccc));
+        Node phi = X.xform(new PhiNode(Type.SCALAR,null,reg,Env.XNIL,rez ));
+        Node phim= X.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
+        // Plug into self & trigger is_copy
+        set_def(0,reg );
+        set_def(1,phim);
+        set_def(2,phi );
+        pop();                    // Remove arg2, trigger is_copy
+        return (X._ret=this);
+      }
     }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       return TypeTuple.RET;
     }
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-      return def==in(1) ? _live : TypeMem.ALIVE; // Basic aliveness, except for memory
+      if( def==in(0) ) return TypeMem.ALIVE; // Control
+      if( def==in(1) ) return TypeMem.ALLMEM; // Force maximal liveness, since will inline
+      return TypeMem.LIVE_BOT; // Force maximal liveness, since will inline
     }
     @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
@@ -576,39 +582,44 @@ public abstract class PrimNode extends Node {
       }
     }
     // Expect this to inline everytime
-    @Override public Node ideal(GVNGCM gvn, int level) {
+    @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
+    @Override public Node ideal_grow() {
       if( _defs._len != 4 ) return null; // Already did this
-      Node ctl = in(0);
-      Node mem = in(1);
-      Node lhs = in(2);
-      Node rhs = in(3);
-      // Expand to if/then/else
-      Node iff = gvn.xform(new IfNode(ctl,lhs));
-      Node fal = gvn.xform(new CProjNode(iff,0));
-      Node tru = gvn.xform(new CProjNode(iff,1));
-      // Call on false branch; if true do not call.
-      Node dsp = gvn.xform(new FP2DispNode(rhs));
-      Node cal = gvn.xform(new CallNode(true,_badargs,fal,mem,dsp,rhs));
-      Node cep = gvn.xform(new CallEpiNode(null,cal,Env.DEFMEM));
-      Node ccc = gvn.xform(new CProjNode(cep));
-      Node memc= gvn.xform(new MProjNode(cep));
-      Node rez = gvn.xform(new  ProjNode(cep,AA.REZ_IDX));
-      // Region merging results
-      Node reg = gvn.xform(new RegionNode(null,tru,ccc));
-      Node phi = gvn.xform(new PhiNode(Type.SCALAR,null,reg,lhs,rez ));
-      Node phim= gvn.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
-      // Plug into self & trigger is_copy
-      set_def(0,reg );
-      set_def(1,phim);
-      set_def(2,phi );
-      pop();                    // Remove arg2, trigger is_copy
-      return this;
+      try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
+        Node ctl = in(0);
+        Node mem = in(1);
+        Node lhs = in(2);
+        Node rhs = in(3);
+        // Expand to if/then/else
+        Node iff = X.xform(new IfNode(ctl,lhs));
+        Node fal = X.xform(new CProjNode(iff,0));
+        Node tru = X.xform(new CProjNode(iff,1));
+        // Call on false branch; if true do not call.
+        Node dsp = X.xform(new FP2DispNode(rhs));
+        Node cal = X.xform(new CallNode(true,_badargs,fal,mem,dsp,rhs));
+        Node cep = X.xform(new CallEpiNode(null,cal,Env.DEFMEM));
+        Node ccc = X.xform(new CProjNode(cep));
+        Node memc= X.xform(new MProjNode(cep));
+        Node rez = X.xform(new  ProjNode(cep,AA.REZ_IDX));
+        // Region merging results
+        Node reg = X.xform(new RegionNode(null,tru,ccc));
+        Node phi = X.xform(new PhiNode(Type.SCALAR,null,reg,lhs,rez ));
+        Node phim= X.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
+        // Plug into self & trigger is_copy
+        set_def(0,reg );
+        set_def(1,phim);
+        set_def(2,phi );
+        pop();                    // Remove arg2, trigger is_copy
+        return (X._ret=this);
+      }
     }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       return TypeTuple.RET;
     }
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-      return def==in(1) ? _live : TypeMem.ALIVE; // Basic aliveness, except for memory
+      if( def==in(0) ) return TypeMem.ALIVE; // Control
+      if( def==in(1) ) return TypeMem.ALLMEM; // Force maximal liveness, since will inline
+      return TypeMem.LIVE_BOT; // Force maximal liveness, since will inline
     }
     @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }

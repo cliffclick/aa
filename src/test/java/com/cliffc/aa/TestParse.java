@@ -144,6 +144,7 @@ public class TestParse {
   }
 
   @Test public void testParse01() {
+    test   ("math_rand(1)?x=4:x=3;x", TypeInt.NINT8); // x defined on both arms, so available after
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
@@ -186,7 +187,6 @@ public class TestParse {
 
   // Short-circuit tests
   @Test public void testParse01a() {
-
     test("0 && 0", Type.XNIL);
     test("1 && 2", TypeInt.con(2));
     test("0 && 2", Type.XNIL);
@@ -204,7 +204,6 @@ public class TestParse {
     testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
     testerr("0 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x definitely not alive
     test("math_rand(1) && (x=2;x*x) || 3 && 4", TypeInt.INT8); // local use of x in short-circuit; requires unzip to find 4
-
   }
 
   @Test public void testParse02() {

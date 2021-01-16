@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.TNode;
 import com.cliffc.aa.tvar.TMem;
 import com.cliffc.aa.tvar.TVDead;
 import com.cliffc.aa.tvar.TVar;
@@ -21,7 +20,8 @@ public class MemJoinNode extends Node {
   MemSplitNode msp() { return (MemSplitNode)in(0).in(0); }  // The MemSplit
   @Override public boolean is_mem() { return true; }
 
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
+  @Override public Node ideal_reduce() {
     // If the split count is lower than 2, then the split serves no purpose
     if( _defs._len == 2 && val(1).isa(val()) && _keep==0 )
       return in(1);             // Just become the last split
@@ -218,39 +218,33 @@ public class MemJoinNode extends Node {
 
   // Move the given SESE region just behind of the join into the join/split
   // area.  The head node has the escape-set.
-  void add_alias_below( Node head, BitsAlias head1_escs, Node base ) {
+  void add_alias_below( GVNGCM.Build X, Node head, BitsAlias head1_escs, Node base ) {
     assert head.is_mem() && base.is_mem();
+    X.add(this);
     MemSplitNode msp = msp();
-    int idx = msp.add_alias(head1_escs), bidx; // Add escape set, find index
+    int idx = msp.add_alias(head1_escs); // Add escape set, find index
     if( idx == _defs._len ) {         // Escape set added at the end
-      add_def(Env.GVN.xform(new MProjNode(msp,idx)));
+      add_def(X.xform(new MProjNode(msp,idx)));
     } else {             // Inserted into prior region
       assert idx!=0;     // No partial overlap; all escape sets are independent
     }
     // Reset edges to move SESE region inside
     Node mspj = in(idx);
-    keep();
     head.set_def(1,in(idx));
     base.insert(this);
-    unkeep().set_def(idx,base);
+    set_def(idx,base);
     // Move any accidental refs to DefMem back to base
     int didx = Env.DEFMEM._defs.find(this);
     if( didx != -1 ) Env.DEFMEM.set_def(didx,base);
-    // We just lost the off-alias updates.
-    // Forward-flow new values.
-    // Reverse-flow new lives.
-    if( base==head ) Env.GVN.revalive(mspj,head);
-    else if( base.in(0)==head ) throw com.cliffc.aa.AA.unimpl(); //gvn.revalive(head,base);
-    else Env.GVN.revalive(mspj,head,base.in(0),base);
   }
 
   MemJoinNode add_alias_below_new(Node nnn, Node old ) {
-    old.keep();                 // Called from inside old.ideal(), must keep alive until exit
-    Node nnn2 = GVN.xform(nnn.keep()).unkeep();
-    add_alias_below(nnn2,nnn2.escapees(),nnn2);
-    old.unkeep();               // Alive, but keep==0
-    nnn2.xval();
-    xval();
+    //old.keep();                 // Called from inside old.ideal(), must keep alive until exit
+    //Node nnn2 = GVN.xform(nnn.keep()).unkeep();
+    //add_alias_below(nnn2,nnn2.escapees(),nnn2);
+    //old.unkeep();               // Alive, but keep==0
+    //nnn2.xval();
+    //xval();
     //gvn.add_work_defs(this);
     //return this;
     throw com.cliffc.aa.AA.unimpl();

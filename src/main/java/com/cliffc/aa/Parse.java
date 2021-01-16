@@ -511,28 +511,32 @@ public class Parse implements Comparable<Parse> {
     Node old_mem  = mem ().keep();
     TypeStruct old_ts = stk._ts;
     Ary<Node> old_defs = stk._defs.deepCopy();
+    lhs.keep();
 
     // Insert a thunk header to capture the delayed execution
-    ThunkNode thunk = (ThunkNode)gvn(new ThunkNode(mem()).keep());
+    ThunkNode thunk = (ThunkNode)gvn(new ThunkNode(mem()));
     set_ctrl(thunk);
-    set_mem (gvn(new ParmNode(MEM_IDX,"mem",thunk,TypeMem.MEM,Env.DEFMEM,null)));
+    set_mem (gvn(new ParmNode(MEM_IDX,"mem",thunk.keep(),TypeMem.MEM,Env.DEFMEM,null)));
 
     // Delayed execution parse of RHS
     Node rhs = _expr_higher_require(prec,bintok,lhs);
 
     // Insert thunk tail, unwind memory state
-    ThretNode thet = (ThretNode)gvn(new ThretNode(ctrl(),mem(),rhs,thunk.unkeep()));
+    ThretNode thet = (ThretNode)gvn(new ThretNode(ctrl(),mem(),rhs,Env.GVN.add_flow(thunk.unkeep())));
     set_ctrl(old_ctrl.unkeep());
     set_mem (old_mem .unkeep());
     for( int i=0; i<old_defs._len; i++ )
       assert old_defs.at(i)==stk._defs.at(i); // Nothing peeked thru the Thunk & updated outside
 
-    // Emit the call to both terms.
-    lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op,lhs,thet));
+    // Emit the call to both terms.  Both the emitted call and the thunk MUST
+    // inline right now.
+    lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op,lhs.unkeep(),thet));
+    assert thunk.is_dead() && thet.is_dead(); // Thunk, in fact, inlined
 
     // Extra variables in the thunk not available after the thunk.
     // Set them to Err.
     if( stk._ts != old_ts ) {
+      lhs.keep();
       for( int i=old_defs._len; i<stk._defs._len; i++ ) {
         String fname = stk._ts._flds[i-1];
         String msg = "'"+fname+"' not defined prior to the short-circuit";
@@ -540,23 +544,9 @@ public class Parse implements Comparable<Parse> {
         Node err = gvn(new ErrNode(ctrl(),bad,msg));
         set_mem(gvn(new StoreNode(mem(),scope().ptr(),err,TypeStruct.FFNL,fname,bad)));
       }
+      lhs.unkeep();
     }
-
-    // Force the call to inline, right-here-right-now.  Done with a general
-    // GVNGCM.iter() call, which triggers all sorts of other optimizations.
-    // Requires 'hooking' anything needed alive after Iter.
-    Node oldrez = scope().rez();
-    scope().set_rez(lhs);
-    //for( Env e = _e; e._par!=null; e = e._par ) _gvn.rereg(e._scope);
-    //_gvn.add_work(thunk);
-    //_gvn.iter(GVNGCM.Mode.Parse);
-    //for( Env e = _e; e._par!=null; e = e._par )  _gvn.unreg(e._scope);
-    //lhs = scope().swap_rez(oldrez,_gvn);
-    //
-    //// Forcibly assert that thunk was inlined & removed
-    //assert thunk.is_dead() && thet.is_dead();
-    //return _gvn.add_work(lhs);
-    throw com.cliffc.aa.AA.unimpl();
+    return lhs;
   }
 
   /** Any number field-lookups or function applications, then an optional assignment
@@ -719,8 +709,9 @@ public class Parse implements Comparable<Parse> {
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl1(Node.ErrMsg.forward_ref(this,((FunPtrNode)n).fun()));
     // Do a full lookup on "+", and execute the function
+    n.keep();
     Node plus = _e.lookup_filter("+",_gvn,2);
-    Node sum = do_call(errMsgs(0,_x,_x),args(plus,n.keep(),con(TypeInt.con(d))));
+    Node sum = do_call(errMsgs(0,_x,_x),args(plus,n,con(TypeInt.con(d))));
     // Active memory for the chosen scope, after the call to plus
     set_mem(gvn(new StoreNode(mem(),ptr,sum,TypeStruct.FRW,tok,errMsg())));
     return n.unkeep();          // Return pre-increment value
@@ -1391,9 +1382,13 @@ public class Parse implements Comparable<Parse> {
     // Call Epilog takes in the call which it uses to track wireable functions.
     // CallEpi internally tracks all wired functions.
     Node cepi = gvn(new CallEpiNode(_e,call,Env.DEFMEM));
-    if( call.is_dead() ) return cepi; // Inlined in the parser
-    set_ctrl(gvn(new CProjNode(cepi.keep())));
+    assert cepi instanceof CallEpiNode;
+    Node ctrl = gvn(new CProjNode(cepi.keep()));
+    if( ctrl.is_copy(0)!=null ) ctrl = ctrl.is_copy(0); // More aggressively fold, so Thunks can more aggressively assert
+    set_ctrl(ctrl);
     set_mem(gvn(new MProjNode(cepi))); // Return memory from all called functions
+    Env.GVN.add_flow(cepi);
+    Env.GVN.add_reduce(cepi);
     return gvn(new ProjNode(cepi.unkeep(),REZ_IDX));
   }
 
@@ -1412,6 +1407,7 @@ public class Parse implements Comparable<Parse> {
     _x    = P._x;
     _lines= P._lines;
     _gvn  = P._gvn;
+    _lastNWS = P._lastNWS;
     _e    = null;  _nf  = null;  _pp  = null;  _str = null;
   }
   // Delayed error message, just record line/char index and share code buffer

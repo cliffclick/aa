@@ -11,10 +11,11 @@ public class MProjNode extends ProjNode {
   public MProjNode( Node head, int idx ) { super(head,idx); }
   @Override public String xstr() { return "MProj"+_idx; }
   @Override public boolean is_mem() { return true; }
-  @Override public Node ideal(GVNGCM gvn, int level) {
-    Node x = in(0).is_copy(_idx);
-    if( x != null )
-      return x == this ? Node.con(TypeMem.ANYMEM) : x; // Happens in dead self-recursive functions
+  
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
+  @Override public Node ideal_reduce() {
+    Node x = super.ideal_reduce();
+    if( x!=null ) return x;
     if( in(0) instanceof CallEpiNode ) {
       Node precall = in(0).is_pure_call(); // See if memory can bypass pure calls (most primitives)
       if( precall != null && val() == precall.val() )

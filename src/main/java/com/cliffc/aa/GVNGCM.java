@@ -34,17 +34,18 @@ public class GVNGCM {
   public boolean on_flow  ( Node n ) { return _work_flow  .on(n); }
   public boolean on_reduce( Node n ) { return _work_reduce.on(n); }
 
-  static public Node add_work( Work work, Node n ) {
+  static public <N extends Node> N add_work( Work work, N n ) {
     if( !HAS_WORK ) HAS_WORK = true; // Filtered set
     return work.add(n);
   }
   public void add_dead  ( Node n ) { add_work(_work_dead  ,n); }
-  public void add_reduce( Node n ) { add_work(_work_reduce,n); }
-  public void add_flow  ( Node n ) { add_work(_work_flow  ,n); }
+  public Node add_reduce( Node n ) { return add_work(_work_reduce,n); }
+  public <N extends Node> N add_flow ( N n ) { return add_work(_work_flow  ,n); }
   public void add_grow  ( Node n ) { add_work(_work_grow  ,n); }
-  public void add_inline( FunNode n ) { add_work(_work_inline,n); }
-  public void add_flow_defs( Node n ) { add_work_defs(_work_flow  ,n); }
-  public void add_flow_uses( Node n ) { add_work_uses(_work_flow  ,n); }
+  public Node add_inline( FunNode n ) { return add_work(_work_inline,n); }
+  public void add_flow_defs  ( Node n ) { add_work_defs(_work_flow  ,n); }
+  public void add_flow_uses  ( Node n ) { add_work_uses(_work_flow  ,n); }
+  public void add_reduce_uses( Node n ) { add_work_uses(_work_reduce,n); }
   // n goes unused
   public void add_unuse ( Node n ) {
     if( n._uses._len==0 && n._keep==0 ) add_dead(n); // might be dead
@@ -150,10 +151,9 @@ public class GVNGCM {
       //assert Env.START.more_flow(true)==0; // Initial conditions are correct
       if( _work_flow  .do1() ) continue;   // Per-node flow: value, live, unify
       if( _work_reduce.do1() ) continue;   // Strictly reducing transforms (fewer nodes or edges)
-      if( _work_mono  .do1() ) continue;   // Monotonic nodes or edges (but generally more freeddom)
+      if( _work_mono  .do1() ) continue;   // Monotonic nodes or edges (but generally more freedom)
       if( _work_grow  .do1() ) continue;   // Growing (but generally more precision)
-      if( opt_mode!=Mode.Parse &&
-          _work_inline.do1() ) continue;   // Inlining (like growing, but more growth)
+      if( _work_inline.do1() ) continue;   // Inlining (like growing, but more growth)
       break;
     }
     HAS_WORK = false;
@@ -295,8 +295,14 @@ public class GVNGCM {
       return init(x==null ? n : x);
     }
     public Node init( Node n ) {
+      assert _tmps._len<16;             // Time for a BitSet
       if( _tmps.find(n)!=-1 ) return n; // Already flowed & keeped
       n.keep().do_flow(); // Update types, and future Parser uses, so always alive
+      return _tmps.push(n);
+    }
+    public Node add( Node n ) {
+      assert _tmps._len<16;             // Time for a BitSet
+      if( _tmps.find(n)!=-1 ) return n; // Already flowed & keeped
       return _tmps.push(n);
     }
     @SuppressWarnings("unchecked")

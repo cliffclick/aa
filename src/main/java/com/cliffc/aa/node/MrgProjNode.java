@@ -33,7 +33,7 @@ public class MrgProjNode extends ProjNode {
     }
     return null;
   }
-  
+
   @Override public Node ideal_mono() {
     NewNode nnn = nnn();
     Node mem = mem();
@@ -44,10 +44,10 @@ public class MrgProjNode extends ProjNode {
       Env.DEFMEM.set_def(nnn._alias,mprj);
       return this;
     }
-    
+
     return null;
   }
-  
+
   @Override public Node ideal_grow() {
     Node mem = mem();
     // Look for back-to-back unrelated aliases and Split/Join
@@ -59,7 +59,7 @@ public class MrgProjNode extends ProjNode {
     }
     return null;
   }
-  
+
   @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( !(in(0) instanceof NewNode) ) return Type.ANY;
@@ -78,7 +78,7 @@ public class MrgProjNode extends ProjNode {
   @Override BitsAlias escapees() { return in(0).escapees(); }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // Only called here if alive, and input is more-than-basic-alive
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def==in(0) ? TypeMem.ALIVE : _live; }
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def==nnn() ? TypeMem.ALIVE : _live; }
 
   @Override public boolean unify( boolean test ) {
     if( !(in(0) instanceof NewNode) ) return false;

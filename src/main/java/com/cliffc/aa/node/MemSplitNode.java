@@ -2,13 +2,13 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TMem;
+import com.cliffc.aa.tvar.TVDead;
+import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
-
-import static com.cliffc.aa.Env.GVN;
 
 import java.util.Arrays;
 import java.util.BitSet;
@@ -23,7 +23,7 @@ public class MemSplitNode extends Node {
   public MemSplitNode( Node mem ) { super(OP_SPLIT,null,mem); }
   Node mem() { return in(1); }
   public MemJoinNode join() {
-    
+
     Node prj = ProjNode.proj(this,0);
     if( prj==null ) return null;
     return (MemJoinNode)prj._uses.at(0);
@@ -37,7 +37,7 @@ public class MemSplitNode extends Node {
       _escs.at(i).str(sb).p(',');
     return sb.unchar().p(')').toString();
   }
-  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Type t = mem().val();
     if( !(t instanceof TypeMem) ) return t.oob();
@@ -127,31 +127,23 @@ public class MemSplitNode extends Node {
   // Call/CallEpi pairs are: MProj->{CallEpi}->Call.
   static Node insert_split(Node tail1, BitsAlias head1_escs, Node head1, Node tail2, Node head2) {
     assert tail1.is_mem() && head1.is_mem() && tail2.is_mem() && head2.is_mem();
-    BitsAlias head2_escs = head2.escapees();
-    assert check_split(head1,head1_escs);
-    // Insert empty split/join above head2
-    MemSplitNode msp = GVN.xform(new MemSplitNode(head2.in(1))).keep();
-    MProjNode mprj = (MProjNode)GVN.xform(new MProjNode(msp,0));
-    MemJoinNode mjn = (MemJoinNode)GVN.xform(new MemJoinNode(mprj));
-    head2.set_def(1,mjn);
-    msp.unkeep();
-    mjn._live = tail1._live;
-    // Pull the SESE regions in parallel from below
-    mjn.add_alias_below(head2,head2_escs,tail2);
-    mjn.add_alias_below(head1,head1_escs,tail1);
-    if( mprj.is_dead() ) GVN.revalive(msp);
-    else GVN.revalive(msp,mprj,mjn);
-    // Reset TVars on all memory users: H-M memory constraint to the Join not
-    // anything inside it
-    if( !mjn.is_dead() )
-      for( Node use : mjn._uses )
-        if( use.is_mem() ) // Reunify to collect the other constraints
-          { use.reset_tvar();
-            //gvn.add_work_uses(use);
-            throw com.cliffc.aa.AA.unimpl();
-          }
-    return head1;
+    try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
+      BitsAlias head2_escs = head2.escapees();
+      assert check_split(head1,head1_escs);
+      // Insert empty split/join above head2
+      MemSplitNode msp = (MemSplitNode)X.xform(new MemSplitNode(head2.in(1)));
+      MProjNode    mprj= (MProjNode)   X.xform(new MProjNode(msp,0));
+      MemJoinNode  mjn = (MemJoinNode) X.xform(new MemJoinNode(mprj));
+      head2.set_def(1,mjn);
+      // Pull the SESE regions in parallel from below
+      mjn.add_alias_below(X,head2,head2_escs,tail2);
+      mjn.add_alias_below(X,head1,head1_escs,tail1);
+      if( mprj.is_dead() ) Env.GVN.revalive(msp);
+      else Env.GVN.revalive(msp,mprj,mjn);
+      return (X._ret=head1);
+    }
   }
+
   static boolean check_split( Node head1, BitsAlias head1_escs ) {
     Node tail2 = head1.in(1);
     // Must have only 1 mem-writer (this can fail if used by different control paths)

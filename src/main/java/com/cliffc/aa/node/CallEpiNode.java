@@ -4,7 +4,6 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.Env.GVN;
@@ -24,17 +23,23 @@ import static com.cliffc.aa.Env.GVN;
 // bit-vector.
 
 public final class CallEpiNode extends Node {
+  boolean _is_copy;
   public CallEpiNode( Env e, Node... nodes ) {
     super(OP_CALLEPI,nodes);
     assert nodes[1] instanceof DefMemNode;
   }
-  @Override public String xstr() { return (is_dead() ? "X" : "C")+"allEpi";  } // Self short name
+  @Override public String xstr() {// Self short name
+    if( _is_copy ) return "CopyEpi";
+    if( is_dead() ) return "XallEpi";
+    return "CallEpi";
+  }
   public CallNode call() { return (CallNode)in(0); }
   @Override public boolean is_mem() { return true; }
   int nwired() { return _defs._len-2; }
   RetNode wired(int x) { return (RetNode)in(x+2); }
 
   @Override public Node ideal_reduce() {
+    if( _is_copy ) return null;
     CallNode call = call();
     Type tc = call.val();
     if( !(tc instanceof TypeTuple) ) return null;
@@ -77,8 +82,8 @@ public final class CallEpiNode extends Node {
           ret._live.isa(_live) &&       // Call and return liveness compatible
           !fun.noinline() ) {           // And not turned off
         assert fun.in(1).in(0)==call;   // Just called by us
-        fun.set_is_copy();
-        return inline( call, ret.ctl(), ret.mem(), ret.rez(), null/*do not unwire, because using the entire function body inplace*/,call._uid);
+        fun.set_is_copy();              // Collapse the FunNode into the Call
+        return set_is_copy(ret.ctl(), ret.mem(), ret.rez()); // Collapse the CallEpi into the Ret
       }
     }
 
@@ -86,7 +91,7 @@ public final class CallEpiNode extends Node {
     if( call.fdx() instanceof ThretNode ) {
       ThretNode tret = (ThretNode)call.fdx();
       wire1(call,tret.thunk(),tret);
-      return inline( call, tret.ctrl(), tret.mem(), tret.rez(), null/*do not unwire, because using the entire function body inplace*/,call._uid);
+      return set_is_copy(tret.ctrl(), tret.mem(), tret.rez());     // Collapse the CallEpi into the Thret
     }
 
     // Only inline wired single-target function with valid args.  CallNode wires.
@@ -138,11 +143,12 @@ public final class CallEpiNode extends Node {
 
     // Check for zero-op body (id function)
     if( rrez instanceof ParmNode && rrez.in(CTL_IDX) == fun && cmem == rmem && inline )
-      return inline(call, cctl,cmem,call.arg(((ParmNode)rrez)._idx), ret,call._uid);
+      return unwire(call,ret).set_is_copy(cctl,cmem,call.arg(((ParmNode)rrez)._idx)); // Collapse the CallEpi
+
     // Check for constant body
     Type trez = rrez.val();
     if( trez.is_con() && rctl==fun && cmem == rmem && inline )
-      return inline(call, cctl,cmem,Node.con(trez),ret,call._uid);
+      return unwire(call,ret).set_is_copy(cctl,cmem,Node.con(trez));
 
     // Check for a 1-op body using only constants or parameters and no memory effects
     boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem && inline;
@@ -158,17 +164,18 @@ public final class CallEpiNode extends Node {
       for( Node parm : rrez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(CTL_IDX) == fun) ? call.arg(((ParmNode)parm)._idx) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
-      keep();
-      irez = GVN.xform(irez);
-      unkeep();
-      return inline(call, cctl,cmem,irez,ret,call._uid); // New exciting replacement for inlined call
+      GVN.add_work_all(irez);
+      return unwire(call,ret).set_is_copy(cctl,cmem,irez);
     }
 
     return null;
   }
 
   // See if we can wire any new fidxs directly between Call/Fun and Ret/CallEpi
-  @Override public Node ideal_mono() { return check_and_wire() ? this : null; }
+  @Override public Node ideal_mono() {
+    if( _is_copy ) return null; // A copy
+    return check_and_wire() ? this : null;
+  }
 
   @Override public Node ideal(GVNGCM gvn, int level) { throw unimpl(); }
 
@@ -235,6 +242,7 @@ public final class CallEpiNode extends Node {
     // Add matching control to function via a CallGraph edge.
     fun.add_def(new CProjNode(call).init1());
     GVN.add_flow(fun);
+    if( fun instanceof ThunkNode ) GVN.add_reduce_uses(fun);
   }
 
   // Merge call-graph edges, but the call-graph is not discovered prior to GCP.
@@ -242,6 +250,7 @@ public final class CallEpiNode extends Node {
   // unwired Returns may yet appear, and be conservative.  Otherwise it can
   // just meet the set of known functions.
   @Override public Type value(GVNGCM.Mode opt_mode) {
+    if( _is_copy ) return _val; // A copy
     Type tin0 = val(0);
     if( !(tin0 instanceof TypeTuple) )
       return tin0.oob();     // Weird stuff?
@@ -327,7 +336,7 @@ public final class CallEpiNode extends Node {
       trez = unify_lift(trez,((TArgs)tv).parm(2));
 
     // If no memory projection, then do not compute memory
-    if( opt_mode!=GVNGCM.Mode.Parse && ProjNode.proj(this,1)==null )
+    if( _keep==0 && ProjNode.proj(this,1)==null )
       return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,trez);
 
     // Build epilog memory.
@@ -377,94 +386,22 @@ public final class CallEpiNode extends Node {
     return true;
   }
 
-  // Inline the CallNode.  All inputs and outputs to/from the Call and CallEpi
-  // nodes are replaced with the called function 'leafs'.  Memory must maintain
-  // the knowledge of the escape/no-escape split, so the entire inlined body is
-  // visited to "lower" the types.
-  private Node inline( CallNode call, Node ctl, Node mem, Node rez, RetNode ret, int cuid ) {
-    assert nwired()==0 || nwired()==1; // not wired to several choices
-    if( FunNode._must_inline == cuid ) // Assert an expected inlining happens
+  @Override public Node is_copy(int idx) { return _is_copy ? in(idx) : null; }
+
+  private CallEpiNode set_is_copy( Node ctl, Node mem, Node rez ) {
+    if( FunNode._must_inline == call()._uid ) // Assert an expected inlining happens
       FunNode._must_inline = 0;
-    // Unwire any wired called function
-    if( ret != null && nwired() == 1 && !ret.is_copy() ) // Wired, and called function not already collapsing
-      unwire(call,ret);
-
-    // Update memory in the body with the not-escaped values (which had
-    // bypassed the body and now flow into it).
-    Ary<Node> work = new Ary<>(new Node[1],0);
-    MProjNode emprj = (MProjNode)ProjNode.proj(this,MEM_IDX);
-    MProjNode cmprj = (MProjNode)ProjNode.proj(call,MEM_IDX);
-    if( mem != call.mem() && cmprj !=null ) { // Most primitives do nothing with memory
-      work.addAll(cmprj._uses);
-      cmprj.subsume(call.mem());
-      if( mem == cmprj ) mem = call.mem();
-      // Update all memory ops
-      while( !work.isEmpty() ) {
-        Node wrk = work.pop();
-        if( wrk.is_mem() ) {
-          Type t2 = wrk.value(GVN._opt_mode); // Compute a new type
-          if( !t2.isa(wrk.val()) ) { // Types out of alignment, need to forward progress here
-            // Move types 'down' and add users to worklist.
-            wrk._val = t2; // Move 'down', wrong direction, and recognize the escaped type is alive here
-            assert !(wrk instanceof MProjNode && wrk.in(0) instanceof CallNode); // Should not push work outside the function
-            work.addAll(wrk._uses);
-          }
-        }
-        if( wrk instanceof CallNode ) { // Unless a Call which escape-filters; then need to check CallEpi as well
-          CallEpiNode cepi = ((CallNode)wrk).cepi();
-          if( cepi != null ) work.push(cepi);
-        }
-      }
-    }
-
-    // Sigh, ugly hack because Load/Stores are so strong.  All load/store
-    // children of the inlined call need to hit the worklist.
-    if( emprj != null ) {
-      work.addAll(emprj._uses);
-      while( !work.isEmpty() ) {
-        Node wrk = work.pop();
-        if( wrk.is_mem() ) {
-          if( wrk instanceof  LoadNode ) unimpl(); // gvn.add_work(wrk);
-          if( wrk instanceof StoreNode ) unimpl(); // { gvn.add_work(wrk); work.addAll(wrk._uses); }
-        }
-      }
-      emprj.subsume(mem);
-    }
-
-    // Move over CEPI Control
-    CProjNode ceprj = (CProjNode)ProjNode.proj(this,0);
-    if( ceprj != null ) ceprj.subsume(ctl);
-    else set_def(0,null);
-
-    // Move over result
-    if( !is_dead() ) {
-      ProjNode reprj = ProjNode.proj(this,REZ_IDX);
-      if( reprj != null ) reprj.subsume(rez);
-    }
-
-    // Move over Call inputs
-    for( int i=0; !call.is_dead() && i<call._uses._len; ) {
-      Node use = call._uses.at(i);
-      if( use instanceof ProjNode ) {
-        Node arg = call.arg(((ProjNode)use)._idx);
-        if( rez==use ) rez = arg;
-        use.subsume(arg);
-      }
-      else i++;
-    }
-
-    // While not strictly necessary, immediately fold any dead paths to
-    // functions to clean up the CFG.
-    rez.keep();
-    GVN.do_dead();
-    assert call.is_dead();
-    rez.unkeep();
-
-    assert GVN._opt_mode== GVNGCM.Mode.Parse || Env.START.more_flow(true)==0; // Check for sanity
-    return rez;
+    call()._is_copy=_is_copy=true;
+    Env.GVN.add_reduce_uses(call());
+    Env.GVN.add_reduce_uses(this);
+    while( _defs._len>0 ) pop();
+    add_def(ctl);
+    add_def(mem);
+    add_def(rez);
+    return this;
   }
 
-  void unwire(CallNode call, RetNode ret) {
+  CallEpiNode unwire(CallNode call, RetNode ret) {
     assert sane_wiring();
     if( !ret.is_copy() ) {
       FunNode fun = ret.fun();
@@ -478,6 +415,7 @@ public final class CallEpiNode extends Node {
     reset_tvar();
     unify(false);
     assert sane_wiring();
+    return this;
   }
 
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
@@ -485,6 +423,7 @@ public final class CallEpiNode extends Node {
   // Unresolved, then none of CallEpi targets are (yet) alive.
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     assert _keep==0 || _live==all_live();
+    if( _is_copy ) return def._live; // A copy
     // Not a copy
     if( def==in(0) ) return _live; // The Call
     if( def==in(1) ) return _live; // The DefMem
@@ -500,6 +439,7 @@ public final class CallEpiNode extends Node {
   }
 
   @Override public boolean unify( boolean test ) {
+    if( _is_copy ) return false; // A copy
     // Build a HM tvar (args->ret), same as HM.java Apply does.  Instead of
     // grabbing a 'fresh' copy of 'Ident' (see HM.java) we grab it fresh at the
     // use point below, by calling 'fresh_unify' which acts as-if a fresh copy

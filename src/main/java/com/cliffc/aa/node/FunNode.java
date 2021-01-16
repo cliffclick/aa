@@ -528,6 +528,7 @@ public class FunNode extends RegionNode {
       if( !(call instanceof CallNode) ) continue; // Not well formed
       if( ((CallNode)call).nargs() != nargs() ) continue; // Will not inline
       if( call.val() == Type.ALL ) continue; // Otherwise in-error
+      if( ((CallNode)call).cepi()._keep>0 ) continue; // Call/CallEpi still being parsed
       TypeFunPtr tfp = CallNode.ttfp(call.val());
       int fidx = tfp.fidxs().abit();
       if( fidx < 0 || BitsFun.is_parent(fidx) ) continue;  // Call must only target one fcn
@@ -874,4 +875,5 @@ public class FunNode extends RegionNode {
   }
 
   @Override public boolean equals(Object o) { return this==o; } // Only one
+  @Override public Node is_copy(int idx) { return null; }       // Never a copy, since inline rules are complex
 }

@@ -49,7 +49,7 @@ public class LoadNode extends Node {
     }
     return null;
   }
-  
+
   // Changing edges to bypass, but typically not removing nodes nor edges
   @Override public Node ideal_mono() {
     Node mem = mem();
@@ -65,7 +65,7 @@ public class LoadNode extends Node {
     Node adr = adr();
     Type tadr = adr.val();
     BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
-    
+
     // Load can move past a Join if all aliases align.
     if( mem instanceof MemJoinNode && aliases != null ) {
       Node jmem = ((MemJoinNode)mem).can_bypass(aliases);
@@ -93,10 +93,10 @@ public class LoadNode extends Node {
       if( adr2 instanceof ParmNode )
         return set_mem(mem.in(1));
     }
-    
+
     return null;
   }
-  
+
   @Override public Node ideal_grow() {
     Node mem = mem();
     Node adr = adr();
@@ -142,6 +142,7 @@ public class LoadNode extends Node {
       } else if( mem instanceof MProjNode ) {
         Node mem0 = mem.in(0);
         if( mem0 instanceof CallEpiNode ) { // Bypass an entire function call
+          if( ((CallEpiNode)mem0)._is_copy ) return null;
           Type tmem0 = mem.val();
           Type tmem1 = ((CallEpiNode)mem0).call().mem().val();
           if( !(tmem0 instanceof TypeMem) || !(tmem1 instanceof TypeMem) ) return null;

@@ -8,7 +8,7 @@ import java.util.function.Consumer;
 public abstract class Work implements Consumer<Node> {
   final Ary<Node> _work = new Ary<>(new Node[1],0);
   final VBitSet _on = new VBitSet();
-  public Node add(Node n) {
+  public <N extends Node> N add(N n) {
     if( !_on.tset(n._uid) ) _work.push(n);
     return n;
   }

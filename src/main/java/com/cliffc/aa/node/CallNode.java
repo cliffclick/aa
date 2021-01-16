@@ -86,6 +86,7 @@ import static com.cliffc.aa.Env.GVN;
 public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
   boolean _unpacked;        // One-shot flag; call site allows unpacking a tuple
+  boolean _is_copy;         // One-shot flag; Call will collapse
   public boolean _not_resolved_by_gcp; // One-shot flag set when GCP cannot resolve; this Call is definitely in-error
   // Example: call(arg1,arg2)
   // _badargs[0] points to the opening paren.
@@ -178,7 +179,7 @@ public class CallNode extends Node {
     // Swap out the existing old rpc users for the new.
     // Might be no users of either.
     ConNode new_rpc = Node.con(TypeRPC.make(_rpc));
-    GVN.add_work(old_rpc.subsume(new_rpc));
+    old_rpc.subsume(new_rpc);
     return call;
   }
 
@@ -436,7 +437,7 @@ public class CallNode extends Node {
     for( Node def : _defs )
       if( def.is_mem() )
         Env.GVN.add_flow(def);
-    
+
     // FunNode.value depends on changing CallNode.value.
     for( Node use : _uses )
       if( use instanceof CProjNode )
@@ -827,6 +828,12 @@ Scalar, but because Bits allows EMPTY, does not work for [26] and [30].
       if( cepi instanceof CallEpiNode )
         return (CallEpiNode)cepi;
     return null;
+  }
+  @Override public Node is_copy(int idx) { return _is_copy ? in(idx) : null; }
+  @Override public void add_reduce_extra() {
+    Node cepi = cepi();
+    if( !_is_copy && cepi!=null )
+      Env.GVN.add_reduce(cepi);
   }
   void set_rpc(int rpc) { unelock(); _rpc=rpc; } // Unlock before changing hash
   @Override public int hashCode() { return super.hashCode()+_rpc; }

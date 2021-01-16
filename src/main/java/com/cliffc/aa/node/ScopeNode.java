@@ -80,6 +80,9 @@ public class ScopeNode extends Node {
   public boolean is_closure() { assert _defs._len==4 || _defs._len==7; return _defs._len==7; }
 
   @Override public Node ideal_reduce() {
+    Node ctrl = in(0).is_copy(0);
+    if( ctrl != null ) { set_ctrl(ctrl); return this; }
+
     Node mem = mem();
     Node rez = rez();
     Type trez = rez==null ? null : rez.val();
@@ -92,9 +95,6 @@ public class ScopeNode extends Node {
         !(mem instanceof ConNode && mem.val() ==TypeMem.XMEM) )
       // Wipe out return memory
       return set_mem(Node.con(TypeMem.XMEM));
-
-    Node ctrl = in(0).is_copy(0);
-    if( ctrl != null ) { set_ctrl(ctrl); return this; }
 
     return null;
   }

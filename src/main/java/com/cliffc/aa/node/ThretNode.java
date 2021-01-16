@@ -6,7 +6,7 @@ import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
 
 // Thret: a limited function return
-// See Thunk (Fun), Thrall (Call).
+// See Thunk (Fun)
 
 // Expected 1 callepi only, determined after Parse.expr().
 // Takes in Control & Memory & Value.
@@ -17,9 +17,7 @@ public class ThretNode extends Node {
   public Node mem () { return in(1); }
   public Node rez () { return in(2); }
   public ThunkNode thunk() { return (ThunkNode)in(3); }
-  @Override public Node ideal(GVNGCM gvn, int level) {
-    return null;
-  }
+  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM.Mode opt_mode) {
     return TypeTuple.RET;
   }

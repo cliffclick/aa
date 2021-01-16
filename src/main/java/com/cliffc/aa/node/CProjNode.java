@@ -26,10 +26,12 @@ public class CProjNode extends ProjNode {
   // Control into a Region allows Phis to make progress
   @Override public void add_flow_extra() {
     for( Node use : _uses )
-      if( use instanceof RegionNode )
+      if( use instanceof RegionNode ) {
+        Env.GVN.add_reduce(use);
         for( Node phi : use._uses )
           if( phi instanceof PhiNode )
             Env.GVN.add_flow(phi);
+      }
   }
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.

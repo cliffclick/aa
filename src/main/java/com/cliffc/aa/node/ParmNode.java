@@ -34,7 +34,7 @@ public class ParmNode extends PhiNode {
     return _idx==parm._idx;
   }
 
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  @Override public Node ideal_reduce() {
     if( !(in(0) instanceof FunNode) )
       return in(0).is_copy(_idx); // Dying, or thunks
     FunNode fun = fun();
@@ -71,6 +71,7 @@ public class ParmNode extends PhiNode {
     }
     return live == this ? null : live; // Return single unique live input
   }
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   private boolean valid_args( FunNode fun, int i, Node mem ) {
     if( fun._thunk_rhs ) return true; // Always allow folding of Thunks
