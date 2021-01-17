@@ -31,6 +31,7 @@ public class GVNGCM {
   @SuppressWarnings("unchecked")
   private final Work[] _all_works = new Work[]{_work_dead,_work_reduce,_work_flow,_work_mono,_work_grow,_work_inline};
   static private boolean HAS_WORK;
+  public boolean on_dead  ( Node n ) { return _work_dead  .on(n); }
   public boolean on_flow  ( Node n ) { return _work_flow  .on(n); }
   public boolean on_reduce( Node n ) { return _work_reduce.on(n); }
 
@@ -38,18 +39,19 @@ public class GVNGCM {
     if( !HAS_WORK ) HAS_WORK = true; // Filtered set
     return work.add(n);
   }
-  public void add_dead  ( Node n ) { add_work(_work_dead  ,n); }
-  public Node add_reduce( Node n ) { return add_work(_work_reduce,n); }
-  public <N extends Node> N add_flow ( N n ) { return add_work(_work_flow  ,n); }
+  public <N extends Node> N add_dead  ( N n ) { return add_work(_work_dead  ,n); }
+  public <N extends Node> N add_reduce( N n ) { return add_work(_work_reduce,n); }
+  public <N extends Node> N add_flow  ( N n ) { return add_work(_work_flow  ,n); }
   public void add_grow  ( Node n ) { add_work(_work_grow  ,n); }
   public Node add_inline( FunNode n ) { return add_work(_work_inline,n); }
   public void add_flow_defs  ( Node n ) { add_work_defs(_work_flow  ,n); }
   public void add_flow_uses  ( Node n ) { add_work_uses(_work_flow  ,n); }
   public void add_reduce_uses( Node n ) { add_work_uses(_work_reduce,n); }
   // n goes unused
-  public void add_unuse ( Node n ) {
-    if( n._uses._len==0 && n._keep==0 ) add_dead(n); // might be dead
-    else { add_reduce(n); add_flow(n); }             // might flow liveness, or collapse further
+  public <N extends Node> N add_unuse ( N n ) {
+    if( n._uses._len==0 && n._keep==0 ) return add_dead(n); // might be dead
+    n.add_flow_extra();
+    return add_reduce(add_flow(n)); // might flow liveness, or collapse further
   }
   static public void add_work_defs( Work work, Node n ) {
     for( Node def : n._defs )
@@ -89,7 +91,7 @@ public class GVNGCM {
   // Record a Node, but do not optimize it for value and ideal calls, as it is
   // mid-construction from the parser.  Any function call with yet-to-be-parsed
   // call sites, and any loop top with an unparsed backedge needs to use this.
-  public <N extends Node> N init( N n ) { add_reduce(n); return n.keep(); }
+  public <N extends Node> N init( N n ) { return add_reduce(n.keep()); }
 
   // Did a bulk not-monotonic update.  Forcibly update the entire region at
   // once; restores monotonicity over the whole region when done.
@@ -159,8 +161,6 @@ public class GVNGCM {
     HAS_WORK = false;
   }
 
-  public void do_dead() { while( _work_dead.do1() ) ; }
-
   // Global Optimistic Constant Propagation.  Passed in the final program state
   // (including any return result, i/o & memory state).  Returns the most-precise
   // types possible, and replaces constants types with constants.
@@ -183,7 +183,8 @@ public class GVNGCM {
   public void gcp(Mode mode, ScopeNode rez ) {
     _opt_mode = mode;
     // Set all values to ALL and lives to DEAD, their most optimistic types.
-    Env.START.walk_initype(this,new VBitSet());
+    VBitSet visit = new VBitSet();
+    Env.START.walk_initype(this,visit);
     assert Env.START.more_flow(false)==0; // Initial conditions are correct
     // Collect unresolved calls, and verify they get resolved.
     Ary<CallNode> ambi_calls = new Ary<>(new CallNode[1],0);
@@ -249,6 +250,8 @@ public class GVNGCM {
     }
 
     assert Env.START.more_flow(false)==0; // Final conditions are correct
+    visit.clear();
+    rez.walk_opt(visit);
   }
 
   private void remove_ambi( CallNode call ) {
@@ -303,19 +306,16 @@ public class GVNGCM {
     public Node add( Node n ) {
       assert _tmps._len<16;             // Time for a BitSet
       if( _tmps.find(n)!=-1 ) return n; // Already flowed & keeped
-      return _tmps.push(n);
+      return _tmps.push(n.keep());
     }
     @SuppressWarnings("unchecked")
     public <M extends Node> M init2( M n ) { return (M)init(n); }
     @Override public void close() {
-      _ret.keep();              // Thing being returned at close-point is always alive
-      for( Node tmp : _tmps ) {
-        tmp.unkeep();
-        if( tmp._keep==0 && tmp._uses._len==0 ) add_dead(tmp);
-        else add_flow(tmp);     // Almost surely needs a proper live calc
-      }
-      iter(Mode.Parse);         // Empty list
-      _ret.unkeep();
+      if( _ret!=null ) _ret.keep(); // Thing being returned at close-point is always alive
+      for( Node tmp : _tmps )
+        add_unuse(tmp.unkeep()); // Needs proper liveness at least
+      iter(_opt_mode);          // Cleanup
+      if( _ret!=null ) _ret.unkeep();
     }
   }
 }

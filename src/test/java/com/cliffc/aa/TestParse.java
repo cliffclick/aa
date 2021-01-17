@@ -207,6 +207,7 @@ public class TestParse {
   }
 
   @Test public void testParse02() {
+    test("mul3={x -> y=3; x*y}; mul3(2)", TypeInt.con(6)); // multiple statements in func body
     TypeStruct dummy = TypeStruct.DISPLAY;
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
     // Since call not-taken, post GCP Parms not loaded from _tf, limited to ~Scalar.  The

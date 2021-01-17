@@ -79,6 +79,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   boolean is_unused() { return _ts==dead_type(); }
   // Kill all inputs, inform all users
   NewNode kill2() {
+    unelock();
     while( !is_dead() && _defs._len > 1 )
       pop();                    // Kill all fields except memory
     if( is_dead() ) return this;

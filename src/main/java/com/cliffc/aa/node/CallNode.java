@@ -357,10 +357,7 @@ public class CallNode extends Node {
     cepim.insert(mrg);
     set_def(1,mrg.mem());
     mrg.set_def(1,cepim.unkeep());
-    //gvn.revalive(this,cepim.in(0),cepim,mrg);
-    throw unimpl();
-    // TODO: Re-establish H-M invariants
-    //return this;
+    return this;
   }
 
   // Pass thru all inputs directly - just a direct gather/scatter.  The gather
@@ -369,6 +366,7 @@ public class CallNode extends Node {
   // the full arg set but if the call is not reachable the FunNode will not
   // merge from that path.  Result tuple type:
   @Override public Type value(GVNGCM.Mode opt_mode) {
+    if( _is_copy ) return _val; // No change till folds away
     // Pinch to XCTRL/CTRL
     Type ctl = ctl()._val;
     if( opt_mode!=GVNGCM.Mode.Parse && cepi()==null ) ctl = Type.XCTRL; // Dead from below
@@ -433,10 +431,9 @@ public class CallNode extends Node {
   }
 
   @Override public void add_flow_extra() {
-    // Live-use depends on memory into a Call
+    // Live-use depends on memory into a Call & projections live after a call
     for( Node def : _defs )
-      if( def.is_mem() )
-        Env.GVN.add_flow(def);
+      Env.GVN.add_flow(def);
 
     // FunNode.value depends on changing CallNode.value.
     for( Node use : _uses )
@@ -829,7 +826,7 @@ Scalar, but because Bits allows EMPTY, does not work for [26] and [30].
         return (CallEpiNode)cepi;
     return null;
   }
-  @Override public Node is_copy(int idx) { return _is_copy ? in(idx) : null; }
+  @Override public Node is_copy(int idx) { return _is_copy ? (_val==Type.ANY ? Env.ANY : in(idx)) : null; }
   @Override public void add_reduce_extra() {
     Node cepi = cepi();
     if( !_is_copy && cepi!=null )

@@ -102,6 +102,7 @@ public class Parse implements Comparable<Parse> {
   TypeEnv go( ) {
     prog();                     // Parse a program
     // Delete names at the top scope before starting optimization.
+    _e._scope.keep();
     _e.close_display(_gvn);
     _gvn.iter(GVNGCM.Mode.PesiNoCG); // Pessimistic optimizations; might improve error situation
     remove_unknown_callers();
@@ -109,6 +110,7 @@ public class Parse implements Comparable<Parse> {
     _gvn.iter(GVNGCM.Mode.PesiCG); // Re-check all ideal calls now that types have been maximally lifted
     _gvn.gcp (GVNGCM.Mode.Opto,scope()); // Global Constant Propagation
     _gvn.iter(GVNGCM.Mode.PesiCG); // Re-check all ideal calls now that types have been maximally lifted
+    _e._scope.unkeep();
     return gather_errors();
   }
 
@@ -243,8 +245,7 @@ public class Parse implements Comparable<Parse> {
       // For Structs, add a second constructor taking an expanded arg list
       if( tn instanceof TypeStruct ) {     // Add struct types with expanded arg lists
         FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)tn, alias, _gvn, errMsg());
-        Node rez2 = _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
-        _gvn.init(rez2._uses.at(0));       // Force init of Unresolved
+        _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
       }
     }
     _gvn.revalive(Env.DEFMEM);       // Update DEFMEM for both functions added
@@ -353,7 +354,7 @@ public class Parse implements Comparable<Parse> {
       if( n.is_forward_ref() ) { // Prior is actually a forward-ref, so this is the def
         assert !scope.stk().is_mutable(tok) && scope == scope();
         if( ifex instanceof FunPtrNode )
-          ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex,(TypeMemPtr) scope.ptr().val());
+          ((FunPtrNode)n).merge_ref_def(tok,(FunPtrNode)ifex);
         else ; // Can be here if already in-error
       } else { // Store into scope/NewObjNode/display
         // Assign into display
@@ -834,13 +835,13 @@ public class Parse implements Comparable<Parse> {
     for( int i=0; i<args._len; i++ )
       nn.create_active((""+i).intern(),args.at(i).unkeep(),TypeStruct.FFNL);
     nn._fld_starts = bads.asAry();
-    NewObjNode nnn = (NewObjNode)gvn(nn);
-    nnn.no_more_fields();
-    nnn._live = TypeMem.LIVE_BOT;
+    nn.no_more_fields();
+    init(nn);
+    _gvn.add_flow(nn);
 
     // NewNode returns a TypeMem and a TypeMemPtr (the reference).
     set_mem( Env.DEFMEM.make_mem_proj(nn,mem()) );
-    return gvn(new ProjNode(nn,REZ_IDX));
+    return gvn(new ProjNode(nn.unkeep(),REZ_IDX));
   }
 
   /** Parse anonymous struct; the opening "@{" already parsed.  A lexical scope
@@ -918,43 +919,44 @@ public class Parse implements Comparable<Parse> {
     // args, and then reset.  Also reset to just the mem & display args.
     if( _x == oldx ) { ids.set_len(ARG_IDX); ts.set_len(ARG_IDX); bads.set_len(ARG_IDX);  }
 
-    // Build the FunNode header
-    FunNode fun = gvn(new FunNode(ids.asAry(),ts.asAry()).add_def(Env.ALL_CTRL)).keep();
-    // Build Parms for system incoming values
-    Node rpc = gvn(new ParmNode(-1,"rpc" ,fun,con(TypeRPC.ALL_CALL),null)).keep();
-    Node mem = gvn(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-    Node clo = gvn(new ParmNode(FUN_IDX,"^"   ,fun,con(tpar_disp),null));
+    try( GVNGCM.Build<Node> X = _gvn.new Build<>()) { // Nest an environment for the local vars
+      // Build the FunNode header
+      FunNode fun = (FunNode)X.xform(new FunNode(ids.asAry(),ts.asAry()).add_def(Env.ALL_CTRL));
+      // Build Parms for system incoming values
+      Node rpc = X.xform(new ParmNode(-1,"rpc" ,fun,con(TypeRPC.ALL_CALL),null));
+      Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+      Node clo = X.xform(new ParmNode(FUN_IDX,"^"   ,fun,con(tpar_disp),null));
 
-    // Increase scope depth for function body.
-    try( Env e = new Env(_e,errMsg(oldx-1), true, fun, mem) ) { // Nest an environment for the local vars
-      _e = e;                   // Push nested environment
-      // Display is special: the default is simply the outer lexical scope.
-      // But here, in a function, the display is actually passed in as a hidden
-      // extra argument and replaces the default.
-      NewObjNode stk = e._scope.stk();
-      stk.update(0,ts_mutable(false),clo);
+      // Increase scope depth for function body.
+      try( Env e = new Env(_e,errMsg(oldx-1), true, fun, mem) ) { // Nest an environment for the local vars
+        _e = e;                   // Push nested environment
+        // Display is special: the default is simply the outer lexical scope.
+        // But here, in a function, the display is actually passed in as a hidden
+        // extra argument and replaces the default.
+        NewObjNode stk = e._scope.stk();
+        stk.update(0,ts_mutable(false),clo);
 
-      // Parms for all arguments
-      Parse errmsg = errMsg();  // Lazy error message
-      for( int i=ARG_IDX; i<ids._len; i++ ) { // User parms start
-        Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(Type.SCALAR),errmsg));
-        create(ids.at(i),parm, args_are_mutable);
+        // Parms for all arguments
+        Parse errmsg = errMsg();  // Lazy error message
+        for( int i=ARG_IDX; i<ids._len; i++ ) { // User parms start
+          Node parm = X.xform(new ParmNode(i,ids.at(i),fun,con(Type.SCALAR),errmsg));
+          create(ids.at(i),parm, args_are_mutable);
+        }
+
+        // Parse function body
+        Node rez = stmts();       // Parse function body
+        if( rez == null ) rez = err_ctrl2("Missing function body");
+        require('}',oldx-1);      // Matched with opening {}
+        // Merge normal exit into all early-exit paths
+        if( e._scope.is_closure() ) rez = merge_exits(rez);
+        // Standard return; function control, memory, result, RPC.  Plus a hook
+        // to the function for faster access.
+        RetNode ret = (RetNode)X.xform(new RetNode(ctrl(),mem(),rez,rpc,fun));
+        // The FunPtr builds a real display; any up-scope references are passed in now.
+        Node fptr = X.xform(new FunPtrNode(ret,e._par));
+        _e = _e._par;                // Pop nested environment
+        return (X._ret=fptr);        // Return function; close-out and DCE 'e'
       }
-
-      // Parse function body
-      Node rez = stmts();       // Parse function body
-      if( rez == null ) rez = err_ctrl2("Missing function body");
-      require('}',oldx-1);      // Matched with opening {}
-      // Merge normal exit into all early-exit paths
-      if( e._scope.is_closure() ) rez = merge_exits(rez);
-      // Standard return; function control, memory, result, RPC.  Plus a hook
-      // to the function for faster access.
-      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,rpc.unkeep(),fun.unkeep()));
-      // The FunPtr builds a real display; any up-scope references are passed in now.
-      _gvn.add_work(rpc);
-      Node fptr = gvn(new FunPtrNode(ret,e._par));
-      _e = _e._par;                // Pop nested environment
-      return fptr;                 // Return function; close-out and DCE 'e'
     }
   }
 

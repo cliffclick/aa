@@ -59,9 +59,10 @@ public abstract class MemPrimNode extends PrimNode {
         add_def(mem );              // Memory  for the primitive in slot 1
         for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // First is display, never used
           add_def(X.xform(new ParmNode(i,_sig._args[i],fun, Node.con(_sig.arg(i).simple_ptr()),null)));
+        X.xform(this);
         // Functions return the set of *modified* memory.  ReadPrimNodes do not modify
         // memory.
-        RetNode ret = (RetNode)X.xform(new RetNode(fun,mem(),gvn.init(this),rpc,fun));
+        RetNode ret = (RetNode)X.xform(new RetNode(fun,mem(),this,rpc,fun));
         // No closures are added to primitives
         return (X._ret = new FunPtrNode(ret,null));
       }

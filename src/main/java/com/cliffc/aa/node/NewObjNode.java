@@ -103,12 +103,13 @@ public class NewObjNode extends NewNode<TypeStruct> {
         assert Env.LEX_DISPLAYS.test(_alias);
         TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS.clear(_alias),TypeObj.ISUSED);
         n.set_def(1,Node.con(tdisp));
-        n._val = n.value(GVNGCM.Mode.Parse);
+        n.xval();
         // Make field in the parent
         parent.create(ts._flds[i],n,ts.fmod(i));
         // Stomp field locally to XSCALAR
         set_def(def_idx(i),Node.con(Type.XSCALAR));
         setsm(_ts.set_fld(i,Type.XSCALAR,TypeStruct.FFNL));
+        Env.GVN.add_flow_uses(n);
       }
     }
   }

@@ -148,7 +148,7 @@ public class IntrinsicNode extends Node {
       nnn.add_def(Env.GVN.xform(new ParmNode(i+FUN_IDX,argx,fun, Node.con(to._ts[i].simple_ptr()),bad)));
     }
     gvn.init(nnn);
-    Node mmem = Env.DEFMEM.make_mem_proj(nnn.unkeep(),memp);
+    Node mmem = Env.DEFMEM.make_mem_proj(nnn.unkeep(),memp.unkeep());
     Node ptr = gvn.xform(new ProjNode(REZ_IDX, nnn));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null));

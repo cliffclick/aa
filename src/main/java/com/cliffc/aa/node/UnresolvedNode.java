@@ -42,7 +42,7 @@ public class UnresolvedNode extends Node {
   // ANY >= value(ANY) >= value(other) >= value(ALL) >= ALL
   @Override public Type value(GVNGCM.Mode opt_mode) {
     // Freeze after GVN - only still around for errors
-    if( opt_mode == GVNGCM.Mode.PesiCG ) return val();
+    if( opt_mode == GVNGCM.Mode.PesiCG || opt_mode == GVNGCM.Mode.Pause ) return _val;
     boolean lifting = opt_mode!=GVNGCM.Mode.Opto;
     Type t   = lifting ? Type.ANY : Type.ALL;
     for( Node def : _defs ) {

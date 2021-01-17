@@ -531,7 +531,8 @@ public class FunNode extends RegionNode {
       if( ((CallNode)call).cepi()._keep>0 ) continue; // Call/CallEpi still being parsed
       TypeFunPtr tfp = CallNode.ttfp(call.val());
       int fidx = tfp.fidxs().abit();
-      if( fidx < 0 || BitsFun.is_parent(fidx) ) continue;  // Call must only target one fcn
+      if( fidx < 0 || BitsFun.is_parent(fidx) ) continue;    // Call must only target one fcn
+      if( self_recursive && body.find(call)!=-1 ) continue; // Self-recursive; amounts to unrolling
       int ncon=0;
       // Count constant inputs on non-error paths
       for( int j=MEM_IDX; j<parms.length; j++ ) {
@@ -577,6 +578,9 @@ public class FunNode extends RegionNode {
     for( Node old_fptr : ret._uses )
       if( old_fptr instanceof FunPtrNode ) // Can be many old funptrs with different displays
         old_fptr.xval();                   // Upgrade FIDX
+    Env.GVN.add_flow(ret);
+    Env.GVN.add_flow(this);
+    Env.GVN.add_flow_uses(this);
     return fun;
   }
 
@@ -659,11 +663,11 @@ public class FunNode extends RegionNode {
           Node old_funptr = use;
           Node new_funptr = map.get(old_funptr);
           new_funptr.insert(old_funptr);
-          //new_funptr.xval(gvn._opt_mode); // Build type so Unresolved can compute type
-          //UnresolvedNode new_unr = new UnresolvedNode(null,new_funptr);
-          //gvn.insert(old_funptr,new_unr);
-          //new_unr.add_def(old_funptr);
-          throw com.cliffc.aa.AA.unimpl();
+          new_funptr.xval(); // Build type so Unresolved can compute type
+          UnresolvedNode new_unr = new UnresolvedNode(null,new_funptr);
+          old_funptr.insert(new_unr);
+          new_unr.add_def(old_funptr);
+          new_unr._val = new_unr.value(GVNGCM.Mode.PesiNoCG);
         }
     } else {                           // Path split
       Node old_funptr = path_call.fdx(); // Find the funptr for the path split
@@ -716,7 +720,8 @@ public class FunNode extends RegionNode {
         if( ofptr.fidx()==oldret._fidx )
           nt = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,ofptr._disp);
       }
-      nn._val = nt;
+      nn._val = nt;             // Values
+      nn._elock();              // In GVN table
     }
     Env.DEFMEM.xval();
 
@@ -726,7 +731,7 @@ public class FunNode extends RegionNode {
       if( fptr instanceof FunPtrNode )
         for( Node unr : fptr._uses )
           if( unr instanceof UnresolvedNode )
-            unr.xval();
+            unr._val = unr.value(GVNGCM.Mode.PesiCG);
 
     // Rewire all unwired calls.
     for( CallEpiNode cepi : unwireds ) {
@@ -758,9 +763,10 @@ public class FunNode extends RegionNode {
           // self-call.  wire the clone, same as the original was wired, so the
           // clone keeps knowledge about its return type.
           cepi2.wire1(call2,this,oldret);
-          //call2.xval(gvn._opt_mode);
-          throw com.cliffc.aa.AA.unimpl();
+          call2.xval();
+          Env.GVN.add_flow_uses(this); // This gets wired, that gets wired, revisit all
         }
+        Env.GVN.add_unuse(cepi);
       }
     }
 

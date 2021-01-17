@@ -202,9 +202,9 @@ public abstract class Node implements Cloneable, TNode {
   // Changes neither 'this' nor 'nnn'.  Does not enforce any monotonicity nor
   // unification.
   public void insert( Node nnn ) {
+    if( _uses._len>0 ) unelock(); // Hacking edges
     while( _uses._len > 0 ) {
       Node u = _uses.del(0);  // Old use
-      unelock();              // Hacking edges
       u.replace(this,nnn);    // was this now nnn
       nnn._uses.add(u);
     }
@@ -488,6 +488,8 @@ public abstract class Node implements Cloneable, TNode {
     case OP_FUNPTR:
     case OP_IF:
     case OP_JOIN:
+    case OP_LOOP:
+    case OP_NEWARY:
     case OP_NEWSTR:
     case OP_PARM:
     case OP_PHI:
@@ -496,6 +498,8 @@ public abstract class Node implements Cloneable, TNode {
     case OP_REGION:
     case OP_SCOPE:
     case OP_SPLIT:
+    case OP_START:
+    case OP_STMEM:
     case OP_THRET:
     case OP_THUNK:
     case OP_UNR:
@@ -521,6 +525,8 @@ public abstract class Node implements Cloneable, TNode {
     case OP_FUNPTR:
     case OP_IF:
     case OP_JOIN:
+    case OP_LOOP:
+    case OP_NEWARY:
     case OP_NEWOBJ:
     case OP_NEWSTR:
     case OP_PARM:
@@ -531,6 +537,8 @@ public abstract class Node implements Cloneable, TNode {
     case OP_RET:
     case OP_SCOPE:
     case OP_SPLIT:
+    case OP_START:
+    case OP_STMEM:
     case OP_THRET:
     case OP_THUNK:
     case OP_UNR:
@@ -680,7 +688,7 @@ public abstract class Node implements Cloneable, TNode {
 
     // Compute live bits.  If progress, push the defs on the flow worklist.
     // This is a reverse flow computation.  Always assumed live if keep.
-    assert _keep==0 || _live == all_live();
+    assert _keep==0 || _live == all_live() || this instanceof ScopeNode;
     if( _keep==0 ) {
       TypeMem oliv = _live;
       TypeMem nliv = live(Env.GVN._opt_mode);
@@ -722,7 +730,7 @@ public abstract class Node implements Cloneable, TNode {
       return false; // Already a constant, or never touch an ErrNode
     // Constant argument to call: keep for call resolution.
     // Call can always inline to fold constant.
-    if( this instanceof ProjNode && in(0) instanceof CallNode )
+    if( this instanceof ProjNode && in(0) instanceof CallNode && ((ProjNode)this)._idx>0 )
       return false;
     // Is in-error; do not remove the error.
     if( err(true) != null )
@@ -808,7 +816,7 @@ public abstract class Node implements Cloneable, TNode {
       boolean ok = lifting
         ? nval.isa(oval) && nliv.isa(oliv)
         : oval.isa(nval) && oliv.isa(nliv);
-      if( !ok || (!Env.GVN.on_flow(this) && _keep==0) ) { // Still-to-be-computed?
+      if( !ok || (!Env.GVN.on_flow(this) && !Env.GVN.on_dead(this) && _keep==0) ) { // Still-to-be-computed?
         FLOW_VISIT.clear(_uid); // Pop-frame & re-run in debugger
         System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
         errs++;
@@ -844,6 +852,21 @@ public abstract class Node implements Cloneable, TNode {
     msg._order = errs.size();
     errs.add(msg);
   }
+
+  // GCP optimizations on the live subgraph
+  public void walk_opt( VBitSet visit ) {
+    assert !is_dead();
+    if( visit.tset(_uid) ) return; // Been there, done that
+
+    // Hit the fixed point, despite any immediate updates.
+    assert value(GVNGCM.Mode.Opto)==_val ;
+    assert live (GVNGCM.Mode.Opto)==_live;
+
+    // Walk reachable graph
+    Env.GVN.add_work_all(this);
+    for( Node def : _defs )  if( def != null )  def.walk_opt(visit);
+  }
+
   @Override public boolean is_dead() { return _uses == null; }
   public void set_dead( ) { _defs = _uses = null; }   // TODO: Poor-mans indication of a dead node, probably needs to recycle these...
 

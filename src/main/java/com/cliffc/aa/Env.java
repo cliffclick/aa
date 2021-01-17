@@ -76,9 +76,9 @@ public class Env implements AutoCloseable {
     ANY     = GVN.xform(new ConNode<>(Type.ANY  )).keep();
     ALL     = GVN.xform(new ConNode<>(Type.ALL  )).keep();
     // Initial control & memory
-    CTL_0  = GVN.init(new    CProjNode(START,0)).keep();
-    DEFMEM = GVN.init(new   DefMemNode(  CTL_0)).keep();
-    MEM_0  = GVN.init(new StartMemNode(START  )).keep();
+    CTL_0  = GVN.init(new    CProjNode(START,0));
+    DEFMEM = GVN.init(new   DefMemNode(  CTL_0));
+    MEM_0  = GVN.init(new StartMemNode(START  ));
     // Top-most (file-scope) lexical environment
     Env top = new Env();
     // Top-level display defining all primitives
@@ -137,7 +137,7 @@ public class Env implements AutoCloseable {
       _scope.stk().promote_forward(pscope.stk());
     close_display(GVN);
     GVN.add_dead(_scope);
-    GVN.iter(GVNGCM.Mode.PesiCG);
+    GVN.iter(GVN._opt_mode);
     assert _scope.is_dead();
   }
 

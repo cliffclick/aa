@@ -213,6 +213,7 @@ public final class CallEpiNode extends Node {
     wire0(call,fun);
     // Wire self to the return
     add_def(ret);
+    GVN.add_flow(this);
     if( fun instanceof FunNode ) GVN.add_inline((FunNode)fun);
   }
 
@@ -242,6 +243,7 @@ public final class CallEpiNode extends Node {
     // Add matching control to function via a CallGraph edge.
     fun.add_def(new CProjNode(call).init1());
     GVN.add_flow(fun);
+    GVN.add_flow_uses(fun);
     if( fun instanceof ThunkNode ) GVN.add_reduce_uses(fun);
   }
 
@@ -408,6 +410,8 @@ public final class CallEpiNode extends Node {
       for( int i = 1; i < fun._defs._len; i++ ) // Unwire
         if( fun.in(i).in(0) == call ) {
           fun.set_def(i, Env.XCTRL);
+          Env.GVN.add_flow(fun);
+          Env.GVN.add_flow_uses(fun); // Dead path, all Phis can lift
           break;
         }
     }
@@ -433,7 +437,7 @@ public final class CallEpiNode extends Node {
     if( !(tcall instanceof TypeTuple) ) return tcall.above_center() ? TypeMem.DEAD : _live;
     BitsFun fidxs = CallNode.ttfp(tcall).fidxs();
     int fidx = ((RetNode)def).fidx();
-    if( fidxs.above_center() || !fidxs.test(fidx) )
+    if( fidxs.above_center() || !fidxs.test_recur(fidx) )
       return TypeMem.DEAD;    // Call does not call this, so not alive.
     return _live;
   }

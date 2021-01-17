@@ -3,8 +3,10 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
+import com.cliffc.aa.tvar.TArgs;
+import com.cliffc.aa.tvar.TFun;
+import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.*;
 import org.jetbrains.annotations.NotNull;
 
 import static com.cliffc.aa.Env.GVN;
@@ -154,8 +156,10 @@ public final class FunPtrNode extends Node {
   // body (yet).  Make a function pointer that takes/ignores all args, and
   // returns a scalar.
   public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
-    FunNode fun = gvn.init(new FunNode(name));
-    RetNode ret = gvn.init(new RetNode(fun,Node.con(TypeMem.MEM),Node.con(Type.SCALAR),Node.con(TypeRPC.ALL_CALL),fun));
+    FunNode fun = gvn.init(new FunNode(name)).unkeep();
+    RetNode ret = gvn.init(new RetNode(fun,Node.con(TypeMem.MEM),Node.con(Type.SCALAR),Node.con(TypeRPC.ALL_CALL),fun)).unkeep();
+    gvn.add_flow(fun);
+    gvn.add_flow(ret);
     // Display is limited to any one of the current lexical scopes.
     TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS,TypeObj.ISUSED);
     return new FunPtrNode( ErrMsg.forward_ref(unkref,fun),null,ret,Node.con(tdisp));
@@ -167,7 +171,7 @@ public final class FunPtrNode extends Node {
   // 'this' is a forward reference, probably with multiple uses (and no inlined
   // callers).  Passed in the matching function definition, which is brand new
   // and has no uses.  Merge the two.
-  public void merge_ref_def( GVNGCM gvn, String tok, FunPtrNode def, TypeMemPtr disp_ptr ) {
+  public void merge_ref_def( String tok, FunPtrNode def ) {
     FunNode rfun = fun();
     FunNode dfun = def.fun();
     assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.ALL_CTRL; // Forward ref has no callers
@@ -178,17 +182,18 @@ public final class FunPtrNode extends Node {
     // the known types.
     FunNode.FUNS.setX(dfun._fidx,null); // Untrack dfun by old fidx
     dfun._fidx = rfun._fidx;
-    FunNode.FUNS.setX(dfun._fidx,dfun); // Track FunNode by fidx
+    FunNode.FUNS.setX(dfun._fidx,dfun); // Track FunNode by new fidx
 
     RetNode dret = def.ret();
-    dret._fidx  = rfun._fidx ;
+    dret.set_fidx(rfun._fidx);
     FunPtrNode fptr = dret.funptr();
-    //fptr.xval(gvn._opt_mode);
-    //
-    //// Replace the forward_ref with the def.
-    //gvn.subsume(this,def);
-    //dfun.bind(tok);
-    throw com.cliffc.aa.AA.unimpl();
+    fptr.xval();
+    Env.GVN.add_flow_uses(this);
+
+    // Replace the forward_ref with the def.
+    subsume(def);
+    dfun.bind(tok); // Debug only, associate variable name with function
+    Env.GVN.iter(GVNGCM.Mode.Parse);
   }
 
   @Override public ErrMsg err( boolean fast ) { return is_forward_ref() ? _referr : null; }

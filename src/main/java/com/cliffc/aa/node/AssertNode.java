@@ -60,7 +60,7 @@ public class AssertNode extends Node {
       Node val    = gvn.xform(new  ProjNode(cepi.unkeep(),AA.REZ_IDX));
       // Type-check the return also
       Node chk    = gvn.xform(new AssertNode(postmem,val,sig._ret.at(REZ_IDX),_error_parse,_env));
-      RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unkeep(),chk,rpc,fun));
+      RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unkeep(),chk,rpc,fun.unkeep()));
       // Just the same Closure when we make a new TFP
       Node clos = gvn.xform(new FP2DispNode(arg));
       return gvn.xform(new FunPtrNode(ret,_env,clos));

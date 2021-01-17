@@ -40,36 +40,12 @@ public class ParmNode extends PhiNode {
     FunNode fun = fun();
     if( fun.val() == Type.XCTRL ) return null; // All dead, c-prop will fold up
     assert fun._defs._len==_defs._len;
-
-    // Has unknown caller input
-    if( fun._defs.len() > 1 && fun.in(1) == Env.ALL_CTRL ) return null;
-    if( fun.noinline() ) return null; // Do not fold up, because asked not to.
-
-    // TODO: Relax this
-    // Never collapse memory phi, used for error reporting by other parms.
-    if( _idx== MEM_IDX )
-      for( Node use : fun._uses )
-        if( use instanceof ParmNode && use != this )
-          return null;
-    // If only 1 unique live input, return that
-    // Arg-check before folding up.
-    // - Dead path & self-cycle, always fold
-    // - Live-path but
-    //   - no Call, Cepi - confused, do not fold
-    //   - not flowing, - types not aligned, do not fold
-    //   - flowing but bad args, do not fold
-    Node live=null;
-    Node mem = fun.parm(MEM_IDX);
-    for( int i=1; i<_defs._len; i++  ) { // For all arguments
-      Node n = in(i);
-      if( fun.val(i)==Type.CTRL ) {    // Dead path can ignore both valid and invalid args
-        if( !valid_args(fun,i,mem) ) return null; // No collapse invalid args; want them for errors
-        if( n==this || n==live ) continue; // Ignore self or duplicates
-        if( live==null ) live = n;         // Found unique live input
-        else live=this;         // Found 2nd live input, no collapse
-      }
-    }
-    return live == this ? null : live; // Return single unique live input
+    if( fun.in(0)!=null && in(1) != this) // FunNode is a Copy
+      return in(1);             // So return the copy
+    // Do not otherwise fold away, as this lets Nodes in *this* function depend
+    // on values in some other function... which, if code-split, gets confused
+    // (would have to re-insert the Parm).
+    return null;
   }
   @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
@@ -150,5 +126,19 @@ public class ParmNode extends PhiNode {
       }
     }
     return null;
+  }
+
+  // If an input to a Mem Parm changes, the flow results of other Parms can change
+  static void add_flow_extra_mem_parm(Node mem) {
+    assert mem.is_mem();
+    for( Node use : mem._uses ) {
+      if( use instanceof ParmNode && use.is_mem() ) {
+        Node fun = use.in(0);
+        for( Node parm : fun._uses ) {
+          if( parm instanceof ParmNode && parm != use )
+            Env.GVN.add_flow(parm);
+        }
+      }
+    }
   }
 }

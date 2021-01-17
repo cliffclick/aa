@@ -84,10 +84,10 @@ public final class RetNode extends Node {
       return set_def(0,fun());  // Gut function body
     return null;
   }
-  
+
   // Look for a tail recursive call
-  @Override public Node ideal_mono() { return tail_recursive(); }
-  
+  @Override public Node ideal_mono() { return is_copy() ? null : tail_recursive(); }
+
   @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   // Look for a tail-Call.  There should be 1 (collapsed) Region, and maybe a
@@ -132,16 +132,29 @@ public final class RetNode extends Node {
         { assert cuse==null; cuse = use; }
     int cidx = cuse._defs.find(fun);
     // Insert loop in-the-middle
-    LoopNode loop = new LoopNode();
-    loop.add_def(fun);
-    loop.add_def(call.ctl());
-    loop = (LoopNode)Env.GVN.xform(loop);
-    cuse.set_def(cidx,loop);
-    // Insert loop phis in-the-middle
-    for( int i=0; i<call.nargs(); i++ ) do_phi(fun,call,loop,i);
-    // Cut the Call control
-    call.set_def(0, Env.XCTRL);
-    return this;
+    try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
+      LoopNode loop = new LoopNode();
+      loop.add_def(fun);
+      loop.add_def(call.ctl());
+      X.xform(loop);
+      cuse.set_def(cidx,loop);
+      // Insert loop phis in-the-middle
+      for( int argn=0; argn<call.nargs(); argn++ ) {
+        ParmNode parm = fun.parm(argn);
+        if( parm==null ) continue; // arg/parm might be dead
+        Node phi = new PhiNode(parm._t,parm._badgc,loop,null,call.arg(argn));
+        phi._val  = parm._val ; // Inserting inside a loop, take optimistic values
+        phi._live = parm._live; // Inserting inside a loop, take optimistic lives
+        parm.insert(phi);
+        phi.set_def(1,parm);
+        phi.xval();
+        X.add(phi);
+      }
+      // Cut the Call control
+      call.set_def(0, Env.XCTRL);
+      Env.GVN.add_unuse(call);
+      return this;
+    }
   }
 
   private static boolean check_phi_type( FunNode fun, CallNode call, int argn ) {
@@ -152,15 +165,6 @@ public final class RetNode extends Node {
     return tback.isa(tenter);
   }
 
-  private static void do_phi(FunNode fun, CallNode call, LoopNode loop, int argn) {
-    ParmNode parm = fun.parm(argn);
-    if( parm==null ) return; // arg/parm might be dead
-    PhiNode phi = new PhiNode(parm._t,parm._badgc,loop,null,call.arg(argn));
-    phi._tvar = parm.tvar();    // H-M unify
-    parm.insert(phi);
-    phi.set_def(1,parm);
-    phi._live = parm._live;
-  }
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( ctl()==null ) return val(); // No change if a copy

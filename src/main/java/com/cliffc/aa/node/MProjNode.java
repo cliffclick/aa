@@ -45,4 +45,5 @@ public class MProjNode extends ProjNode {
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // Only called here if alive, and input is more-than-basic-alive
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return _live; }
+  @Override public void add_flow_extra() { ParmNode.add_flow_extra_mem_parm(this); }
 }

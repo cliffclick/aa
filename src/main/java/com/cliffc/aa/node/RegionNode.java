@@ -62,7 +62,7 @@ public class RegionNode extends Node {
 
     return null;
   }
-  
+
   @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   // Collapse stacked regions.
@@ -94,13 +94,14 @@ public class RegionNode extends Node {
         for( int i = 1; i<r._defs._len; i++ )
           phi.add_def(stacked_phi ? rphi.in(i) : rphi);
         phi.remove(idx);
-        assert !stacked_phi || rphi.is_dead();
+        assert !stacked_phi || rphi._uses._len==0;
       }
 
     // Collapse stacked Region
     for( int i = 1; i<r._defs._len; i++ )
       add_def(r.in(i));
     remove(idx);
+    Env.GVN.iter(Env.GVN._opt_mode);
     assert r.is_dead();
     return this;
   }

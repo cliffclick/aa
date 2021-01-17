@@ -12,14 +12,13 @@ public abstract class Work implements Consumer<Node> {
     if( !_on.tset(n._uid) ) _work.push(n);
     return n;
   }
-  // True if apply() called, false if worklist is empty
+  // True if accept() called, false if worklist is empty
   public boolean do1() {
-    while(true) {
-      Node n=pop();
-      if( n==null ) return false;
-      if( !n.is_dead() ) { accept(n); return true; }
-    }
+    Node n=pop();
+    while( n!=null && n.is_dead() ) n=pop();
+    return n!=null && accept0(n);
   }
+  private boolean accept0(Node n) { accept(n); return true; }
   public abstract void accept(Node n);
 
   public Node pop() {
