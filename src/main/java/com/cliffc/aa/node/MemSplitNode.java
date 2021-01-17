@@ -127,21 +127,21 @@ public class MemSplitNode extends Node {
   // Call/CallEpi pairs are: MProj->{CallEpi}->Call.
   static Node insert_split(Node tail1, BitsAlias head1_escs, Node head1, Node tail2, Node head2) {
     assert tail1.is_mem() && head1.is_mem() && tail2.is_mem() && head2.is_mem();
-    try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
-      BitsAlias head2_escs = head2.escapees();
-      assert check_split(head1,head1_escs);
-      // Insert empty split/join above head2
-      MemSplitNode msp = (MemSplitNode)X.xform(new MemSplitNode(head2.in(1)));
-      MProjNode    mprj= (MProjNode)   X.xform(new MProjNode(msp,0));
-      MemJoinNode  mjn = (MemJoinNode) X.xform(new MemJoinNode(mprj));
-      head2.set_def(1,mjn);
-      // Pull the SESE regions in parallel from below
-      mjn.add_alias_below(X,head2,head2_escs,tail2);
-      mjn.add_alias_below(X,head1,head1_escs,tail1);
-      if( mprj.is_dead() ) Env.GVN.revalive(msp);
-      else Env.GVN.revalive(msp,mprj,mjn);
-      return (X._ret=head1);
-    }
+    BitsAlias head2_escs = head2.escapees();
+    assert check_split(head1,head1_escs);
+    // Insert empty split/join above head2
+    MemSplitNode msp = (MemSplitNode)Env.GVN.init(new MemSplitNode(head2.in(1))).unkeep();
+    MProjNode    mprj= (MProjNode)   Env.GVN.init(new MProjNode   (msp,0      )).unkeep();
+    MemJoinNode  mjn = (MemJoinNode) Env.GVN.init(new MemJoinNode (mprj       )).unkeep();
+    head2.set_def(1,mjn);
+    mjn._live = tail1._live;
+    // Pull the SESE regions in parallel from below
+    mjn.add_alias_below(head2,head2_escs,tail2);
+    mjn.add_alias_below(head1,head1_escs,tail1);
+    if( mprj.is_dead() ) Env.GVN.revalive(msp);
+    else Env.GVN.revalive(msp,mprj,mjn);
+    assert Env.START.more_flow(true)==0;
+    return head1;
   }
 
   static boolean check_split( Node head1, BitsAlias head1_escs ) {

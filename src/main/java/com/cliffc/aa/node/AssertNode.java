@@ -30,40 +30,43 @@ public class AssertNode extends Node {
   Node mem() { return in(1); }
   Node arg() { return in(2); }
 
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  @Override public Node ideal_reduce() {
+    Type actual = arg().sharptr(mem());
+    return actual.isa(_t) ? arg() : null;
+  }
+  @Override public Node ideal_grow() {
     Node arg= arg(), mem = mem();
-    Type actual = arg.sharptr(mem);
-    if( actual.isa(_t) )
-      return arg;
     // If TypeNode check is for a function, it will wrap any incoming function
     // with a new function which does the right arg-checks.  This happens
     // immediately in the Parser and is here to declutter the Parser.
     if( _t instanceof TypeFunSig ) {
       TypeFunSig sig = (TypeFunSig)_t;
-      Node[] args = new Node[sig.nargs()+1];
-      FunNode fun = gvn.init((FunNode)(new FunNode(null,sig,-1,false).add_def(Env.ALL_CTRL)));
-      fun._val = Type.CTRL;
-      args[CTL_IDX] = fun;            // Call control
-      args[MEM_IDX] = gvn.xform(new ParmNode(MEM_IDX,"mem" ,fun,TypeMem.MEM,Env.DEFMEM,null));
-      args[FUN_IDX] = gvn.xform(new ParmNode(FUN_IDX,"disp",fun,Node.con(TypeMemPtr.DISP_SIMPLE),_error_parse));
-      for( int i=ARG_IDX; i<sig.nargs(); i++ )  // 1 is memory, 2 is display.
-        // All the parms; types in the function signature
-        args[i] = gvn.xform(new ParmNode(i,"arg"+i,fun,Node.con(Type.SCALAR),_error_parse));
-      args[sig.nargs()] = arg;        // The whole TFP to the call
-      Parse[] badargs = new Parse[sig.nargs()];
-      Arrays.fill(badargs,_error_parse);
-      Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
-      CallNode call = (CallNode)gvn.xform(new CallNode(true,badargs,args));
-      Node cepi   = gvn.xform(new CallEpiNode(null/*TODO: Suspect need to carry a prior Env thru*/,call,Env.DEFMEM)).keep();
-      Node ctl    = gvn.xform(new CProjNode(cepi));
-      Node postmem= gvn.xform(new MProjNode(cepi)).keep();
-      Node val    = gvn.xform(new  ProjNode(cepi.unkeep(),AA.REZ_IDX));
-      // Type-check the return also
-      Node chk    = gvn.xform(new AssertNode(postmem,val,sig._ret.at(REZ_IDX),_error_parse,_env));
-      RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unkeep(),chk,rpc,fun.unkeep()));
-      // Just the same Closure when we make a new TFP
-      Node clos = gvn.xform(new FP2DispNode(arg));
-      return gvn.xform(new FunPtrNode(ret,_env,clos));
+      try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
+        Node[] args = new Node[sig.nargs()+1];
+        FunNode fun = (FunNode)X.init(new FunNode(null,sig,-1,false).add_def(Env.ALL_CTRL));
+        fun._val = Type.CTRL;
+        args[CTL_IDX] = fun;            // Call control
+        args[MEM_IDX] = X.xform(new ParmNode(MEM_IDX,"mem" ,fun,TypeMem.MEM,Env.DEFMEM,null));
+        args[FUN_IDX] = X.xform(new ParmNode(FUN_IDX,"disp",fun,Node.con(TypeMemPtr.DISP_SIMPLE),_error_parse));
+        for( int i=ARG_IDX; i<sig.nargs(); i++ )  // 1 is memory, 2 is display.
+          // All the parms; types in the function signature
+          args[i] = X.xform(new ParmNode(i,"arg"+i,fun,Node.con(Type.SCALAR),_error_parse));
+        args[sig.nargs()] = arg;        // The whole TFP to the call
+        Parse[] badargs = new Parse[sig.nargs()];
+        Arrays.fill(badargs,_error_parse);
+        Node rpc= X.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
+        CallNode call = (CallNode)X.xform(new CallNode(true,badargs,args));
+        Node cepi   = X.xform(new CallEpiNode(null/*TODO: Suspect need to carry a prior Env thru*/,call,Env.DEFMEM));
+        Node ctl    = X.xform(new CProjNode(cepi));
+        Node postmem= X.xform(new MProjNode(cepi));
+        Node val    = X.xform(new  ProjNode(cepi,AA.REZ_IDX));
+        // Type-check the return also
+        Node chk    = X.xform(new AssertNode(postmem,val,sig._ret.at(REZ_IDX),_error_parse,_env));
+        RetNode ret = (RetNode)X.xform(new RetNode(ctl,postmem,chk,rpc,fun));
+        // Just the same Closure when we make a new TFP
+        Node clos = X.xform(new FP2DispNode(arg));
+        return (X._ret=X.xform(new FunPtrNode(ret,_env,clos)));
+      }
     }
 
     // Push TypeNodes 'up' to widen the space they apply to, and hopefully push
@@ -87,6 +90,9 @@ public class AssertNode extends Node {
 
     return null;
   }
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
+
+    
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Node arg = arg();
     Type t1 = arg.val();

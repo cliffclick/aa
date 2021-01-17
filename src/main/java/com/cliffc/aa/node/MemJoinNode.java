@@ -8,6 +8,7 @@ import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
+import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.Env.GVN;
 
 // Join a split set of aliases from a SESE region, split by an earlier MemSplit.
@@ -89,7 +90,7 @@ public class MemJoinNode extends Node {
     int idx = head.add_alias(esc);
     assert idx!=0; // No partial overlaps; actually we could just legit bail here, no assert
     if( idx == mjn._defs._len ) // Add edge Join->Split as needed
-      mjn.add_def(Env.GVN.xform(new MProjNode(head,idx))); // Add a new MProj from MemSplit
+      mjn.add_def(GVN.xform(new MProjNode(head,idx))); // Add a new MProj from MemSplit
     // Move SESE region from lower Split/Join to upper Split/Join
     ProjNode prj = ProjNode.proj(msp,msp._escs._len);
     prj.subsume(mjn.in(idx));
@@ -218,39 +219,38 @@ public class MemJoinNode extends Node {
 
   // Move the given SESE region just behind of the join into the join/split
   // area.  The head node has the escape-set.
-  void add_alias_below( GVNGCM.Build X, Node head, BitsAlias head1_escs, Node base ) {
+  void add_alias_below( Node head, BitsAlias head1_escs, Node base ) {
     assert head.is_mem() && base.is_mem();
-    X.add(this);
+    GVN.add_unuse(this);
     MemSplitNode msp = msp();
     int idx = msp.add_alias(head1_escs); // Add escape set, find index
     if( idx == _defs._len ) {         // Escape set added at the end
-      add_def(X.xform(new MProjNode(msp,idx)));
+      add_def(GVN.init(new MProjNode(msp,idx)).unkeep());
     } else {             // Inserted into prior region
       assert idx!=0;     // No partial overlap; all escape sets are independent
     }
     // Reset edges to move SESE region inside
     Node mspj = in(idx);
-    head.set_def(1,in(idx));
+    head.set_def(MEM_IDX,in(idx));
     base.insert(this);
     set_def(idx,base);
     // Move any accidental refs to DefMem back to base
     int didx = Env.DEFMEM._defs.find(this);
     if( didx != -1 ) Env.DEFMEM.set_def(didx,base);
+    GVN.revalive(mspj,head,base);
   }
 
   MemJoinNode add_alias_below_new(Node nnn, Node old ) {
-    //old.keep();                 // Called from inside old.ideal(), must keep alive until exit
-    //Node nnn2 = GVN.xform(nnn.keep()).unkeep();
-    //add_alias_below(nnn2,nnn2.escapees(),nnn2);
-    //old.unkeep();               // Alive, but keep==0
-    //nnn2.xval();
-    //xval();
-    //gvn.add_work_defs(this);
-    //return this;
-    throw com.cliffc.aa.AA.unimpl();
+    old.keep();                 // Called from inside old.ideal(), must keep alive until exit
+    Node nnn2 = GVN.init(nnn).unkeep();
+    add_alias_below(nnn2,nnn2.escapees(),nnn2);
+    old.unkeep();               // Alive, but keep==0
+    nnn2.xval();
+    xval();
+    GVN.add_flow_defs(this);
+    assert Env.START.more_flow(true)==0;
+    return this;
   }
-
-
 
   // Find a compatible alias edge, including base memory if nothing overlaps.
   // Return null for any partial overlaps.

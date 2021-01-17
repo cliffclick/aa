@@ -40,28 +40,24 @@ public class IntrinsicNode extends Node {
 
     // This function call takes in and returns a plain ptr-to-object.
     // Only after folding together does the name become apparent.
-    TypeTuple formals = TypeTuple.make_args(TypeMemPtr.STRUCT);
-    TypeFunSig sig = TypeFunSig.make(TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.RECORD_BITS,tn)),formals);
-    FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,sig,-1,false).add_def(Env.ALL_CTRL));
-    Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
-    Node mem = gvn.xform(new ParmNode(MEM_IDX,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-    Node ptr = gvn.xform(new ParmNode(ARG_IDX,"ptr",fun,Node.con(TypeMemPtr.ISUSED),badargs));
-    Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
-    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,cvt,ptr,rpc,fun));
-    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null));
+    try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
+      TypeTuple formals = TypeTuple.make_args(TypeMemPtr.STRUCT);
+      TypeFunSig sig = TypeFunSig.make(TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.RECORD_BITS,tn)),formals);
+      FunNode fun = X.init2((FunNode)new FunNode(tn._name,sig,-1,false).add_def(Env.ALL_CTRL));
+      Node rpc = X.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
+      Node mem = X.xform(new ParmNode(MEM_IDX,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+      Node ptr = X.xform(new ParmNode(ARG_IDX,"ptr",fun,Node.con(TypeMemPtr.ISUSED),badargs));
+      Node cvt = X.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
+      RetNode ret = (RetNode)X.xform(new RetNode(fun,cvt,ptr,rpc,fun));
+      return (X._ret = X.init2(new FunPtrNode(ret,null)));
+    }
   }
 
   // If the input memory is unaliased, fold into the NewNode.
   // If this node does not fold away, the program is in error.
-  @Override public Node ideal(GVNGCM gvn, int level) {
+  @Override public Node ideal_reduce() {
     Node mem = mem();
     Node ptr = ptr();
-
-    // If is of a MemJoin and it can enter the split region, do so.
-    if( _keep==0 && ptr.val() instanceof TypeMemPtr && mem instanceof MemJoinNode && mem._uses._len==1 &&
-        ptr instanceof ProjNode && ptr.in(0) instanceof NewNode )
-      return ((MemJoinNode)mem).add_alias_below_new(new IntrinsicNode(_tn,_badargs,null,mem,ptr),this);
-
     if( mem instanceof MrgProjNode &&
         mem.in(0)==ptr.in(0) && mem._uses._len==2 ) { // Only self and DefMem users
       TypeMemPtr tptr = (TypeMemPtr) ptr.val();
@@ -83,8 +79,16 @@ public class IntrinsicNode extends Node {
         }
       }
     }
+
+    // If is of a MemJoin and it can enter the split region, do so.
+    if( _keep==0 && ptr.val() instanceof TypeMemPtr && mem instanceof MemJoinNode && mem._uses._len==1 &&
+        ptr instanceof ProjNode && ptr.in(0) instanceof NewNode )
+      return ((MemJoinNode)mem).add_alias_below_new(new IntrinsicNode(_tn,_badargs,null,mem,ptr),this);
+
     return null;
   }
+
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   // Semantics are to extract a TypeObj from mem and ptr, and if there is no
   // aliasing, sharpen the TypeObj to a Type with a name.  We can be correct and
@@ -136,22 +140,24 @@ public class IntrinsicNode extends Node {
     // Formal is unnamed, and this function adds the name.
     TypeTuple formals = TypeTuple.make(to.remove_name());
     TypeFunSig sig = TypeFunSig.make(TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.make0(alias),to)),formals);
-    FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,sig,-1,false).add_def(Env.ALL_CTRL));
-    Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
-    Node memp= gvn.init (new ParmNode(MEM_IDX,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-    // Add input edges to the NewNode
-    ConNode nodisp = Node.con(TypeMemPtr.NO_DISP);
-    NewObjNode nnn = new NewObjNode(false,alias,to,nodisp).keep();
-    for( int i=1; i<to._ts.length; i++ ) {
-      String argx = to._flds[i];
-      if( TypeStruct.fldBot(argx) ) argx = null;
-      nnn.add_def(Env.GVN.xform(new ParmNode(i+FUN_IDX,argx,fun, Node.con(to._ts[i].simple_ptr()),bad)));
+
+    try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
+      FunNode fun = (FunNode) X.xform(new FunNode(to._name,sig,-1,false).add_def(Env.ALL_CTRL));
+      Node rpc = X.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
+      Node memp= X.xform(new ParmNode(MEM_IDX,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+      // Add input edges to the NewNode
+      ConNode nodisp = Node.con(TypeMemPtr.NO_DISP);
+      NewObjNode nnn = (NewObjNode)X.add(new NewObjNode(false,alias,to,nodisp));
+      for( int i=1; i<to._ts.length; i++ ) {
+        String argx = to._flds[i];
+        if( TypeStruct.fldBot(argx) ) argx = null;
+        nnn.add_def(X.xform(new ParmNode(i+FUN_IDX,argx,fun, Node.con(to._ts[i].simple_ptr()),bad)));
+      }
+      Node mmem = Env.DEFMEM.make_mem_proj(nnn,memp);
+      Node ptr = X.xform(new ProjNode(REZ_IDX, nnn));
+      RetNode ret = (RetNode)X.xform(new RetNode(fun,mmem,ptr,rpc,fun));
+      return (X._ret=X.init2(new FunPtrNode(ret,null)));
     }
-    gvn.init(nnn);
-    Node mmem = Env.DEFMEM.make_mem_proj(nnn.unkeep(),memp.unkeep());
-    Node ptr = gvn.xform(new ProjNode(REZ_IDX, nnn));
-    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
-    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null));
   }
 
 }

@@ -489,6 +489,7 @@ public abstract class Node implements Cloneable, TNode {
     case OP_IF:
     case OP_JOIN:
     case OP_LOOP:
+    case OP_NAME:
     case OP_NEWARY:
     case OP_NEWSTR:
     case OP_PARM:
@@ -502,6 +503,7 @@ public abstract class Node implements Cloneable, TNode {
     case OP_STMEM:
     case OP_THRET:
     case OP_THUNK:
+    case OP_TYPE:
     case OP_UNR:
       break;
     default: throw com.cliffc.aa.AA.unimpl(); // Node not confirmed do-nothing
@@ -526,6 +528,7 @@ public abstract class Node implements Cloneable, TNode {
     case OP_IF:
     case OP_JOIN:
     case OP_LOOP:
+    case OP_NAME:
     case OP_NEWARY:
     case OP_NEWOBJ:
     case OP_NEWSTR:
