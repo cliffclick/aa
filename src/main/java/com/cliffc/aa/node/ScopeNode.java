@@ -7,6 +7,8 @@ import com.cliffc.aa.util.Ary;
 import java.util.HashMap;
 import java.util.function.Predicate;
 
+import static com.cliffc.aa.AA.MEM_IDX;
+
 // Lexical-Scope Node.  Tracks control & phat memory, plus a stack frame (which
 // is just a NewNode).  The stack frame maps local variable names to Nodes and
 // is modeled as a true memory indirection - for true closures.  Unless there
@@ -38,7 +40,7 @@ public class ScopeNode extends Node {
   public void init() { Type.init0(_types); }
 
   public   Node  ctrl() { return in(0); }
-  public   Node  mem () { return in(1); }
+  public   Node  mem () { return in(MEM_IDX); }
   public   Node  ptr () { return in(2); }
   public   Node  rez () { return in(3); }
   public NewObjNode stk () { return (NewObjNode)ptr().in(0); }
@@ -49,7 +51,12 @@ public class ScopeNode extends Node {
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
   public Node set_mem( Node n) {
     assert n==null || (n._elock && (n._val instanceof TypeMem || n._val ==Type.ANY || n._val ==Type.ALL));
-    set_def(1,n);
+    Node old = mem();
+    set_def(MEM_IDX,n);
+    if( old!=null ) {
+      Env.GVN.add_work_all(old);
+      Env.GVN.iter(Env.GVN._opt_mode);
+    }
     return this;
   }
   @Override public boolean is_mem() { return true; }

@@ -61,7 +61,15 @@ public class MemSplitNode extends Node {
     return tvar.unify(dmem,test);
   }
 
-
+  // Find index for alias
+  int find_alias_index( int alias ) {
+    if( !_escs.at(0).test(alias) ) return 0; // Not in any set, so base
+    for( int i=1; i<_escs._len; i++ )
+      if( _escs.at(i).test(alias) )
+        return i;
+    throw com.cliffc.aa.AA.unimpl(); // Should be found
+  }
+  
   // Find the escape set this esc set belongs to, or make a new one.
   int add_alias( BitsAlias esc ) {
     assert !esc.is_empty();

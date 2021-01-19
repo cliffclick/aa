@@ -54,14 +54,6 @@ public class StoreNode extends Node {
       return mem;               // Store is replaced by using the New directly.
     }
 
-    return null;
-  }
-  @Override public Node ideal_mono() {
-    Node mem = mem();
-    Node adr = adr();
-    Type ta = adr.val();
-    TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
-
     // If Store is of a MemJoin and it can enter the split region, do so.
     // Requires no other memory *reader* (or writer), as the reader will
     // now see the Store effects as part of the Join.
@@ -72,8 +64,10 @@ public class StoreNode extends Node {
       if( memw != null && adr instanceof ProjNode && adr.in(0) instanceof NewNode )
         return ((MemJoinNode)mem).add_alias_below_new(new StoreNode(this,mem,adr),this);
     }
+    
     return null;
   }
+  @Override public Node ideal_mono() { return null; }
   @Override public Node ideal_grow() {
     Node mem = mem();
     Node adr = adr();

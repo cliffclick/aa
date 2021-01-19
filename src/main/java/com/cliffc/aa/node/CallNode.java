@@ -190,26 +190,31 @@ public class CallNode extends Node {
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked ) {          // Not yet unpacked a tuple
       assert nargs()==ARG_IDX+1;// Memory, Display plus the arg tuple
-      Node mem = mem();
       Node arg = arg(ARG_IDX);
       Type tadr = arg._val;
-      // Bypass a merge on the 2-arg input during unpacking
-      if( mem instanceof MrgProjNode && tadr instanceof TypeMemPtr &&
-          arg instanceof ProjNode && mem.in(0)==arg.in(0) ) {
+      if( tadr instanceof TypeMemPtr && arg instanceof ProjNode ) {
         int alias = ((TypeMemPtr)tadr)._aliases.abit();
         if( alias == -1 ) throw unimpl(); // Handle multiple aliases, handle all/empty
-        NewNode nnn = (NewNode)arg.in(0);
-        Node fdx = pop();
-        remove(_defs._len-1); // Pop off the NewNode tuple
-        int len = nnn._defs._len;
-        for( int i=1; NewNode.def_idx(i)<len; i++ ) // Push the args; unpacks the tuple
-          add_def( nnn.fld(i));
-        set_mem(((MrgProjNode)mem).mem());
-        add_def(fdx);
-        _unpacked = true;      // Only do it once
-        xval();                // Recompute value, this is not monotonic since replacing tuple with args
-        GVN.add_work_all(this);// Revisit unification after unpacking
-        return this;
+        Node mem = mem();
+        // Bypass a MemJoin
+        if( mem instanceof MemJoinNode ) {
+          int jdx = ((MemJoinNode)mem).msp().find_alias_index(alias);
+          if( jdx!=0 ) mem = mem.in(jdx);
+        }
+        // Find a tuple being passed in directly; unpack
+        if( mem instanceof MrgProjNode && mem.in(0)==arg.in(0) ) {
+          NewNode nnn = (NewNode)arg.in(0);
+          Node fdx = pop();
+          remove(_defs._len-1); // Pop off the NewNode tuple
+          int len = nnn._defs._len;
+          for( int i=1; NewNode.def_idx(i)<len; i++ ) // Push the args; unpacks the tuple
+            add_def( nnn.fld(i));
+          add_def(fdx);
+          _unpacked = true;      // Only do it once
+          xval();                // Recompute value, this is not monotonic since replacing tuple with args
+          GVN.add_work_all(this);// Revisit unification after unpacking
+          return this;
+        }
       }
     }
 

@@ -523,7 +523,7 @@ public class Parse implements Comparable<Parse> {
     Node rhs = _expr_higher_require(prec,bintok,lhs);
 
     // Insert thunk tail, unwind memory state
-    ThretNode thet = (ThretNode)gvn(new ThretNode(ctrl(),mem(),rhs,Env.GVN.add_flow(thunk.unkeep())));
+    ThretNode thet = (ThretNode)gvn(new ThretNode(ctrl(),mem(),rhs,Env.GVN.add_flow(thunk.unkeep()))).keep();
     set_ctrl(old_ctrl.unkeep());
     set_mem (old_mem .unkeep());
     for( int i=0; i<old_defs._len; i++ )
@@ -531,7 +531,7 @@ public class Parse implements Comparable<Parse> {
 
     // Emit the call to both terms.  Both the emitted call and the thunk MUST
     // inline right now.
-    lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op,lhs.unkeep(),thet));
+    lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op,lhs.unkeep(),thet.unkeep()));
     assert thunk.is_dead() && thet.is_dead(); // Thunk, in fact, inlined
 
     // Extra variables in the thunk not available after the thunk.

@@ -5,6 +5,8 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Util;
 
+import static com.cliffc.aa.AA.MEM_IDX;
+
 // Load a named field from a struct.  Does it's own nil-check testing.  Loaded
 // value depends on the struct typing.
 public class LoadNode extends Node {
@@ -27,8 +29,8 @@ public class LoadNode extends Node {
   }
   @Override public String xstr() { return "."+_fld; }   // Self short name
   String  str() { return xstr(); } // Inline short name
-  private Node mem() { return in(1); }
-          Node adr() { return in(2); }
+  Node mem() { return in(MEM_IDX); }
+  Node adr() { return in(2); }
   private Node set_mem(Node a) { return set_def(1,a); }
   public int find(TypeStruct ts) { return ts.find(_fld); }
 

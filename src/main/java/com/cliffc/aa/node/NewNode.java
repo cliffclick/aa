@@ -78,18 +78,17 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   abstract T dead_type();
   boolean is_unused() { return _ts==dead_type(); }
   // Kill all inputs, inform all users
-  NewNode kill2() {
+  void kill2() {
     unelock();
     while( !is_dead() && _defs._len > 1 )
       pop();                    // Kill all fields except memory
-    if( is_dead() ) return this;
+    if( is_dead() ) return;
     _crushed = _ts = dead_type();
     Env.DEFMEM.set_def(_alias,Node.con(TypeObj.UNUSED));
     Env.GVN.revalive(this,ProjNode.proj(this,0),Env.DEFMEM);
-    if( is_dead() ) return this;
+    if( is_dead() ) return;
     for( Node use : _uses )
       Env.GVN.add_flow_uses(use); // Get FPtrs from MrgProj, and dead Ptrs into New
-    return this;
   }
 
   // Basic escape analysis.  If no escapes and no loads this object is dead.
@@ -106,6 +105,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     }
     Node ptr = _uses.at(1);
     if( ptr instanceof MrgProjNode ) ptr = _uses.at(0); // Get ptr not mem
+    if( ptr._keep>0 ) return false;
 
     // Scan for memory contents being unreachable.
     // Really stupid!

@@ -31,22 +31,19 @@ public class MrgProjNode extends ProjNode {
       nnn.kill2();      // Killing a NewNode has to do more updates than normal
       return this;
     }
-    return null;
-  }
 
-  @Override public Node ideal_mono() {
-    NewNode nnn = nnn();
-    Node mem = mem();
     // If is of a MemJoin and it can enter the split region, do so.
     if( _keep==0 && mem instanceof MemJoinNode && mem._uses._len==1 ) {
       MrgProjNode mprj = new MrgProjNode(nnn,mem);
       MemJoinNode mjn = ((MemJoinNode)mem).add_alias_below_new(mprj,this);
       Env.DEFMEM.set_def(nnn._alias,mprj);
-      return this;
+      return mjn;
     }
 
     return null;
   }
+
+  @Override public Node ideal_mono() { return null; }
 
   @Override public Node ideal_grow() {
     Node mem = mem();
