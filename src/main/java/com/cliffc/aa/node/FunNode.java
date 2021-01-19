@@ -236,7 +236,7 @@ public class FunNode extends RegionNode {
     GVNGCM.Mode old_mode = Env.GVN._opt_mode;
     Env.GVN._opt_mode = GVNGCM.Mode.Pause;
     FunNode fun = make_new_fun(ret, formals);
-    split_callers(Env.GVN,ret,fun,body,path);
+    split_callers(ret,fun,body,path);
     Env.GVN._opt_mode = old_mode;
     assert Env.START.more_flow(true)==0; // Initial conditions are correct
     return this;
@@ -380,6 +380,7 @@ public class FunNode extends RegionNode {
       case OP_NAME: break; // Pointer to a nameable struct
       case OP_PRIM:
         if( use instanceof PrimNode.EQ_OOP ) break;
+        if( use instanceof PrimNode.NE_OOP ) break;
         if( use instanceof MemPrimNode.LValueLength ) break;
         if( use instanceof MemPrimNode.LValueRead )
           if( ((MemPrimNode)use).idx() == n ) return true; // Use as index is broken
@@ -598,7 +599,7 @@ public class FunNode extends RegionNode {
   // Clone the function; wire calls *from* the clone same as the original.
   // Then rewire all calls that were unwired; for a type-split wire both targets
   // with an Unresolved.  For a path-split rewire left-or-right by path.
-  private void split_callers( GVNGCM gvn, RetNode oldret, FunNode fun, Ary<Node> body, int path ) {
+  private void split_callers( RetNode oldret, FunNode fun, Ary<Node> body, int path ) {
     // Unwire this function and collect unwired calls.  Leave the
     // unknown-caller, if any.
     CallNode path_call = path < 0 ? null : (CallNode)in(path).in(0);
@@ -683,7 +684,7 @@ public class FunNode extends RegionNode {
     // This changes their hash, and afterwards the keys cannot be looked up.
     for( Map.Entry<Node,Node> e : map.entrySet() )
       if( e.getKey() instanceof MemSplitNode )
-        ((MemSplitNode)e.getKey()).split_alias(e.getValue(),aliases,gvn);
+        ((MemSplitNode)e.getKey()).split_alias(e.getValue(),aliases);
 
     // Wired Call Handling:
     if( has_unknown_callers() ) { // Not called by any unknown caller
@@ -786,20 +787,19 @@ public class FunNode extends RegionNode {
 
     // Retype memory, so we can everywhere lift the split-alias parents "up and
     // out".
-    retype_mem(gvn,aliases,this.parm(MEM_IDX));
-    retype_mem(gvn,aliases,fun .parm(MEM_IDX));
+    retype_mem(aliases,this.parm(MEM_IDX));
+    retype_mem(aliases,fun .parm(MEM_IDX));
 
     // Unhook the hooked FunPtrs
     for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) use.unkeep();
   }
 
 
-
   // Walk all memory edges, and 'retype' them, probably DOWN (counter to
   // 'iter').  Used when inlining, and the inlined body needs to acknowledge
   // bypasses aliases.  Used during code-clone, to lift the split alias parent
   // up & out.
-  private static void retype_mem(GVNGCM gvn, BitSet aliases, Node mem) {
+  private static void retype_mem(BitSet aliases, Node mem) {
     Ary<Node> work = new Ary<>(new Node[1],0);
     work.push(mem);
     // Update all memory ops
@@ -811,7 +811,7 @@ public class FunNode extends RegionNode {
         if( !(tmem0 instanceof TypeMem) ) continue;
         // Has any used values?
         if( has_used((TypeMem)tmem0,aliases) ) {
-          Type tval = wrk.value(gvn._opt_mode);
+          Type tval = wrk.value(Env.GVN._opt_mode);
           if( twrk != tval ) {
             wrk._val= tval;
             Env.GVN.add_flow_uses(wrk);

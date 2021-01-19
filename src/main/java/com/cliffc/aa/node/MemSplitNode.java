@@ -69,7 +69,7 @@ public class MemSplitNode extends Node {
         return i;
     throw com.cliffc.aa.AA.unimpl(); // Should be found
   }
-  
+
   // Find the escape set this esc set belongs to, or make a new one.
   int add_alias( BitsAlias esc ) {
     assert !esc.is_empty();
@@ -89,7 +89,7 @@ public class MemSplitNode extends Node {
     // Remove (non-overlapping) bits from the rollup
     _escs.set(0,(BitsAlias)_escs.at(0).subtract(_escs.at(idx)));
     _escs.remove(idx);          // Remove the escape set
-    Type tt = xval();           // Reduce tuple result
+    xval();                     // Reduce tuple result
     // Renumber all trailing projections to match
     for( Node use : _uses ) {
       MProjNode mprj = (MProjNode)use;
@@ -100,17 +100,18 @@ public class MemSplitNode extends Node {
 
   // A function body was cloned and all aliases split.  The 'this' Split takes
   // the first child and the clone takes the 2nd child.
-  void split_alias( Node copy, BitSet aliases, GVNGCM gvn ) {
-    gvn.add_work(this);
-    MemSplitNode cmsp = (MemSplitNode)copy;
-    for( int alias = aliases.nextSetBit(0); alias != -1; alias = aliases.nextSetBit(alias + 1)) {
-      int[] kid0_aliases = BitsAlias.get_kids(alias);
-      int newalias1 = kid0_aliases[1];
-      int newalias2 = kid0_aliases[2];
-      cmsp._update(alias,newalias1);
-      this._update(alias,newalias2);
-      gvn.add_work(join());
-    }
+  void split_alias( Node copy, BitSet aliases ) {
+    //gvn.add_work(this);
+    //MemSplitNode cmsp = (MemSplitNode)copy;
+    //for( int alias = aliases.nextSetBit(0); alias != -1; alias = aliases.nextSetBit(alias + 1)) {
+    //  int[] kid0_aliases = BitsAlias.get_kids(alias);
+    //  int newalias1 = kid0_aliases[1];
+    //  int newalias2 = kid0_aliases[2];
+    //  cmsp._update(alias,newalias1);
+    //  this._update(alias,newalias2);
+    //  gvn.add_work(join());
+    //}
+    throw com.cliffc.aa.AA.unimpl();
   }
   // Replace the old alias with the new child alias
   private void _update(int oldalias, int newalias) {
@@ -138,9 +139,9 @@ public class MemSplitNode extends Node {
     BitsAlias head2_escs = head2.escapees();
     assert check_split(head1,head1_escs);
     // Insert empty split/join above head2
-    MemSplitNode msp = (MemSplitNode)Env.GVN.init(new MemSplitNode(head2.in(1))).unkeep();
-    MProjNode    mprj= (MProjNode)   Env.GVN.init(new MProjNode   (msp,0      )).unkeep();
-    MemJoinNode  mjn = (MemJoinNode) Env.GVN.init(new MemJoinNode (mprj       )).unkeep();
+    MemSplitNode msp = Env.GVN.init(new MemSplitNode(head2.in(1))).unkeep();
+    MProjNode    mprj= Env.GVN.init(new MProjNode   (msp,0      )).unkeep();
+    MemJoinNode  mjn = Env.GVN.init(new MemJoinNode (mprj       )).unkeep();
     head2.set_def(1,mjn);
     mjn._live = tail1._live;
     // Pull the SESE regions in parallel from below

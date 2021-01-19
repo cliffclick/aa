@@ -24,7 +24,7 @@ import static com.cliffc.aa.Env.GVN;
 
 public final class CallEpiNode extends Node {
   boolean _is_copy;
-  public CallEpiNode( Env e, Node... nodes ) {
+  public CallEpiNode( Node... nodes ) {
     super(OP_CALLEPI,nodes);
     assert nodes[1] instanceof DefMemNode;
   }
@@ -391,10 +391,13 @@ public final class CallEpiNode extends Node {
   @Override public Node is_copy(int idx) { return _is_copy ? in(idx) : null; }
 
   private CallEpiNode set_is_copy( Node ctl, Node mem, Node rez ) {
-    if( FunNode._must_inline == call()._uid ) // Assert an expected inlining happens
+    CallNode call = call();
+    if( FunNode._must_inline == call._uid ) // Assert an expected inlining happens
       FunNode._must_inline = 0;
-    call()._is_copy=_is_copy=true;
-    Env.GVN.add_reduce_uses(call());
+    if( mem instanceof IntrinsicNode ) // Better error message for Instrinsic if Call args are bad
+      ((IntrinsicNode)mem)._badargs = call._badargs[1];
+    call._is_copy=_is_copy=true;
+    Env.GVN.add_reduce_uses(call);
     Env.GVN.add_reduce_uses(this);
     while( _defs._len>0 ) pop();
     add_def(ctl);
@@ -440,6 +443,15 @@ public final class CallEpiNode extends Node {
     if( fidxs.above_center() || !fidxs.test_recur(fidx) )
       return TypeMem.DEAD;    // Call does not call this, so not alive.
     return _live;
+  }
+
+  @Override public void add_flow_use_extra(Node chg) {
+    if( chg instanceof CallNode ) { // If the Call changes value
+      Env.GVN.add_flow(chg.in(MEM_IDX));       // The called memory   changes liveness
+      Env.GVN.add_flow(((CallNode)chg).fdx()); // The called function changes liveness
+      for( int i=0; i<nwired(); i++ )          // Called returns change liveness
+        Env.GVN.add_flow(wired(i));
+    }
   }
 
   @Override public boolean unify( boolean test ) {

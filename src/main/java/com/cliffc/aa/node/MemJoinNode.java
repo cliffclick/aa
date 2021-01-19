@@ -33,6 +33,7 @@ public class MemJoinNode extends Node {
       if( in(i) instanceof MProjNode && in(i).in(0)==msp && in(i)._uses._len==1 ) {
         in(0).xval();        // Update the default type
         msp.remove_alias(i);
+        Env.GVN.add_dead(in(i));
         return remove(i);
       }
 
@@ -178,43 +179,24 @@ public class MemJoinNode extends Node {
     Node base = msp.mem();                  // Base of SESE region
     assert base.check_solo_mem_writer(msp); // msp is only memory writer after base
     assert head.in(1).check_solo_mem_writer(head);   // head is the 1 memory writer after head.in
-    int idx = msp.add_alias(head.escapees()); // Add escape set, find index
-    Node mprj;
-    if( idx == _defs._len ) {         // Escape set added at the end
-      add_def(mprj = GVN.xform(new MProjNode(msp,idx))); // Add a new MProj from MemSplit
-      mprj._live=_live;
-    } else {
-      assert idx!=0;     // No partial overlap; all escape sets are independent
-      mprj = ProjNode.proj(msp,idx); // Find match MProj
+    try( GVNGCM.Build<MemJoinNode> X = Env.GVN.new Build<>() ) {
+      int idx = msp.add_alias(head.escapees()); // Add escape set, find index
+      Node mprj;
+      if( idx == _defs._len ) {         // Escape set added at the end
+        add_def(mprj = X.xform(new MProjNode(msp,idx))); // Add a new MProj from MemSplit
+      } else {
+        assert idx!=0;     // No partial overlap; all escape sets are independent
+        mprj = ProjNode.proj(msp,idx); // Find match MProj
+      }
+      // Resort edges to move SESE region inside
+      msp.set_def(1,head.in(1)); // Move Split->base edge to Split->head.in(1)
+      mprj.insert(base);         // Move split mprj users to base
+      head.set_def(1,mprj);      // Move head->head.in(1) to head->MProj
+      X.add(msp);
+      X.add(base);
+      X.add(head);
+      return (X._ret=this);
     }
-    // Resort edges to move SESE region inside
-    mprj.keep();  base.keep();
-    msp.set_def(1,head.in(1)); // Move Split->base edge to Split->head.in(1)
-    mprj.insert(base);         // Move split mprj users to base
-    head.set_def(1,mprj);      // Move head->head.in(1) to head->MProj
-    mprj.unkeep();   base.unkeep();
-    // Moving things inside the Split/Join region might let types get
-    // out-of-order; the Split might be able to lift and be stale, while the
-    // moved body is on the 'wrong side' of the stale Split.  Update the Split
-    // and following MProjNodes immediately.
-    Ary<Node> work = new Ary<>(new Node[]{msp});
-    while( !work.isEmpty() ) {
-      Node n = work.pop();
-      assert n.is_mem();
-      Type t0 = n.val();
-      Type t1 = n.value(GVN._opt_mode);
-      if( t0==t1 ) continue;
-      n._val = t1;
-      if( n == this ) continue;
-      for( Node use : n._uses ) if( use.is_mem() ) work.add(use);
-    }
-    // Update live same way
-    base.xliv(GVN._opt_mode);
-    if( base != head ) head.xliv(GVN._opt_mode);
-    mprj.xliv(GVN._opt_mode);
-    msp .xliv(GVN._opt_mode);
-    // TODO: Re-establish H-M invariants
-    return this;
   }
 
   // Move the given SESE region just behind of the join into the join/split

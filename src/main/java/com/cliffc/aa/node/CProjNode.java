@@ -23,16 +23,17 @@ public class CProjNode extends ProjNode {
   }
   @Override public TypeMem all_live() { return TypeMem.ALIVE; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
-  // Control into a Region allows Phis to make progress
-  @Override public void add_flow_extra() {
-    for( Node use : _uses )
-      if( use instanceof RegionNode ) {
-        Env.GVN.add_reduce(use);
-        for( Node phi : use._uses )
-          if( phi instanceof PhiNode )
-            Env.GVN.add_flow(phi);
-      }
+
+  @Override public void add_flow_use_extra(Node chg) {
+    // Control from Calls
+    if( chg instanceof CallNode ) {
+      // if the Call changes val the function might be callable
+      for( Node fun : _uses )
+        if( fun instanceof FunNode )
+          Env.GVN.add_flow(fun);
+    }
   }
+
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.
   @Override public byte op_prec() { return _defs.at(0).op_prec(); }

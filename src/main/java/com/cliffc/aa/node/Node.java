@@ -9,9 +9,8 @@ import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
-import java.util.function.Predicate;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.Set;
+import java.util.function.Predicate;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -138,19 +137,13 @@ public abstract class Node implements Cloneable, TNode {
     if( !_elock ) { _elock = true; VALS.put(this,this); }
     return this;
   }
-  // Check that n._elock and VALS agree.
-  public boolean check_gvn( ) {
-    if( !_elock && !Env.GVN.on_reduce(this) ) // If not edge-locked, should be on reduce worklist...
-      return false;         // ...so it eventually gets edge-locked & in VALS.
-    return check_vals();
-  }
+
   private boolean check_vals( ) {
     Node x = VALS.get(this), old=null;
     if( x == this ) old=this;   // Found in table quickly
     // Hunt the hard way
     else for( Node o : VALS.keySet() ) if( o._uid == _uid ) { old=o; break; }
-    boolean rez = (old!=null) == _elock;
-    return rez;
+    return (old!=null) == _elock;
   }
 
   // Add def/use edge
@@ -179,11 +172,10 @@ public abstract class Node implements Cloneable, TNode {
   // Return Node at idx, withOUT auto-deleting it, even if this is the last
   // use.  Used by the parser to retrieve final Nodes from tmp holders.  Does
   // NOT preserve order.
-  public Node del( int idx ) {
+  public void del( int idx ) {
     unelock();
     Node n = _defs.del(idx);
     if( n != null ) n._uses.del(this);
-    return n;
   }
   public Node pop( ) { unelock(); Node n = _defs.pop(); unuse(n); return n; }
   // Remove Node at idx, auto-delete and preserve order.
@@ -222,9 +214,9 @@ public abstract class Node implements Cloneable, TNode {
   }
 
   // Kill a node; all inputs are null'd out; this may put more dead Nodes on
-  // the dead worklist.
-  public void kill( ) {
-    if( is_dead() ) return;
+  // the dead worklist.  Return this for progress, null for no-progress.
+  public Node kill( ) {
+    if( is_dead() ) return null;
     assert _uses._len==0 && _keep==0;
     // Similar to unelock(), except do not put on any worklist
     if( _elock ) { _elock = false; Node x = VALS.remove(this); assert x == this; }
@@ -233,6 +225,7 @@ public abstract class Node implements Cloneable, TNode {
     LIVE.clear(_uid);
     if( _uid==CNT-1 )           // Roll back unused node indices
       while( !LIVE.get(CNT-1) ) CNT--;
+    return this;
   }
 
   // "keep" a Node during all optimizations because it is somehow unfinished.
@@ -603,7 +596,8 @@ public abstract class Node implements Cloneable, TNode {
 
   // The _val changed here, and more than the immediate _neighbors might change
   // value/live/unify.
-  public void add_flow_extra() { }
+  public void add_flow_use_extra(Node chg) { }
+  public void add_flow_def_extra(Node chg) { }
   // Inputs changed here, and more than the immediate _neighbors might reduce
   public void add_reduce_extra() { }
 
@@ -626,13 +620,12 @@ public abstract class Node implements Cloneable, TNode {
 
   // Global expressions, to remove redundant Nodes
   public static final ConcurrentHashMap<Node,Node> VALS = new ConcurrentHashMap<>();
-  Set<Node> valsKeySet() { return VALS.keySet(); }
 
   // Reducing xforms, strictly fewer Nodes or Edges.  n may be either in or out
   // of VALS.  If a replacement is found, replace.  In any case, put in the
   // VALS table.  Return null if no progress, or this or the replacement.
   public Node do_reduce() {
-    if( is_dead() || _keep>0 ) return null;
+    if( _keep>0 ) return null;
     assert check_vals();
     Node nnn = _do_reduce();
     if( nnn!=null ) {                   // Something happened
@@ -683,9 +676,8 @@ public abstract class Node implements Cloneable, TNode {
 
 
   // Change values at this Node directly.
-  public boolean do_flow() {
-    boolean progress = false;
-    if( is_dead() ) return progress;
+  public Node do_flow() {
+    Node progress=null;
     // Perform unification
     //boolean hm_progress = n.unify(false);
 
@@ -696,10 +688,11 @@ public abstract class Node implements Cloneable, TNode {
       TypeMem oliv = _live;
       TypeMem nliv = live(Env.GVN._opt_mode);
       if( oliv != nliv ) {        // Progress?
-        progress = true;          // Progress!
+        progress = this;          // Progress!
         assert nliv.isa(oliv);    // Monotonically improving
         _live = nliv;             // Record progress
-        Env.GVN.add_flow_defs(this); // Put defs on worklist... liveness flows uphill
+        for( Node def : _defs )   // Put defs on worklist... liveness flows uphill
+          if( def != null ) Env.GVN.add_flow(def).add_flow_def_extra(this);
       }
     }
 
@@ -708,11 +701,11 @@ public abstract class Node implements Cloneable, TNode {
     Type oval = _val; // Get old type
     Type nval = value(Env.GVN._opt_mode);// Get best type
     if( nval!=oval ) {
-      progress = true;          // Progress!
+      progress = this;          // Progress!
       assert nval.isa(oval);    // Monotonically improving
       _val = nval;
-      Env.GVN.add_flow_uses(this); // Put uses on worklist... values flows downhill
-      add_flow_extra();
+      for( Node use : _uses )  // Put uses on worklist... values flows downhill
+        Env.GVN.add_flow(use).add_flow_use_extra(this);
     }
     return progress;
   }
@@ -811,6 +804,7 @@ public abstract class Node implements Cloneable, TNode {
   public  final int more_flow(boolean lifting) { FLOW_VISIT.clear();  return more_flow(lifting,0);  }
   private int more_flow( boolean lifting, int errs) {
     if( FLOW_VISIT.tset(_uid) ) return errs; // Been there, done that
+    if( Env.GVN.on_dead(this) ) return errs; // Do not check dying nodes
     // Check for only forwards flow, and if possible then also on worklist
     Type    oval= _val, nval = value(Env.GVN._opt_mode);
     TypeMem oliv=_live, nliv = live (Env.GVN._opt_mode);
@@ -819,7 +813,7 @@ public abstract class Node implements Cloneable, TNode {
       boolean ok = lifting
         ? nval.isa(oval) && nliv.isa(oliv)
         : oval.isa(nval) && oliv.isa(nliv);
-      if( !ok || (!Env.GVN.on_flow(this) && !Env.GVN.on_dead(this) && _keep==0) ) { // Still-to-be-computed?
+      if( !ok || (!Env.GVN.on_flow(this) && _keep==0) ) { // Still-to-be-computed?
         FLOW_VISIT.clear(_uid); // Pop-frame & re-run in debugger
         System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
         errs++;

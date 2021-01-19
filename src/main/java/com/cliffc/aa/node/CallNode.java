@@ -435,19 +435,6 @@ public class CallNode extends Node {
     return BitsAlias.EMPTY;
   }
 
-  @Override public void add_flow_extra() {
-    // Live-use depends on memory into a Call & projections live after a call
-    for( Node def : _defs )
-      Env.GVN.add_flow(def);
-
-    // FunNode.value depends on changing CallNode.value.
-    for( Node use : _uses )
-      if( use instanceof CProjNode )
-        for( Node fun : use._uses )
-          if( fun instanceof FunNode )
-            Env.GVN.add_flow(fun);
-  }
-
   @Override BitsAlias escapees() {
     BitsAlias esc_in  = tesc(_val)._aliases;
     CallEpiNode cepi = cepi();
@@ -541,6 +528,12 @@ public class CallNode extends Node {
     if( dfidx != -1 && !fidxs.test_recur(dfidx) ) return TypeMem.DEAD; // Not in the fidx set.
     // Otherwise the FIDX is alive
     return TypeMem.ALIVE;
+  }
+
+  @Override public void add_flow_def_extra(Node chg) {
+    // Projections live after a call alter liveness of incoming args
+    if( chg instanceof ProjNode )
+      Env.GVN.add_flow(in(((ProjNode)chg)._idx));
   }
 
   // Resolve an Unresolved.  Called in value() and so must be monotonic.
@@ -643,7 +636,7 @@ public class CallNode extends Node {
     for( int j=MEM_IDX; j<nargs(); j++ ) {
       Type formal = formals.at(j);
       Type actual = targ(targs,j);          // Calls skip ctrl & mem
-      if( actual==Type.ANY && arg(j) instanceof ConNode && ProjNode.proj(this, j)==null )
+      if( actual==Type.ANY && ProjNode.proj(this, j)==null )
           continue;             // Unused args can be error, are ignored
       assert actual==actual.simple_ptr();    // Only simple ptrs from nodes
       actual = caller_mem.sharptr(actual);   // Sharpen actual pointers before checking vs formals
@@ -832,6 +825,7 @@ Scalar, but because Bits allows EMPTY, does not work for [26] and [30].
     return null;
   }
   @Override public Node is_copy(int idx) { return _is_copy ? (_val==Type.ANY ? Env.ANY : in(idx)) : null; }
+  // Call reduces, then check the CEPI for reducing
   @Override public void add_reduce_extra() {
     Node cepi = cepi();
     if( !_is_copy && cepi!=null )

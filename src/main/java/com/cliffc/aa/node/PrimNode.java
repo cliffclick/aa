@@ -38,7 +38,6 @@ public abstract class PrimNode extends Node {
   public static String  [][] PREC_TOKS  = null;  // Just the binary op tokens, grouped by precedence
   public static String  []   PRIM_TOKS  = null;  // Primitive tokens, longer first for greedy token search
   public static void reset() { PRIMS=null; }
-  String arg_name(int i) { return TypeStruct.arg_name(i); }
 
   public static PrimNode[] PRIMS() {
     if( PRIMS!=null ) return PRIMS;
@@ -114,7 +113,7 @@ public abstract class PrimNode extends Node {
     ArrayList<String> list = new ArrayList<>(hash);
     Collections.sort(list);     // Longer strings on the right
     Collections.reverse(list);  // Longer strings on the left, match first.
-    PRIM_TOKS = list.toArray(new String[list.size()]);
+    PRIM_TOKS = list.toArray(new String[0]);
 
     // Compute precedence token groupings for parser
     PREC_TOKS = new String[max_prec+1][];
@@ -534,7 +533,7 @@ public abstract class PrimNode extends Node {
         // Call on true branch; if false do not call.
         Node dsp = X.xform(new FP2DispNode(rhs));
         Node cal = X.xform(new CallNode(true,_badargs,tru,mem,dsp,rhs));
-        Node cep = X.xform(new CallEpiNode(null,cal,Env.DEFMEM));
+        Node cep = X.xform(new CallEpiNode(cal,Env.DEFMEM));
         Node ccc = X.xform(new CProjNode(cep));
         Node memc= X.xform(new MProjNode(cep));
         Node rez = X.xform(new  ProjNode(cep,AA.REZ_IDX));
@@ -573,14 +572,6 @@ public abstract class PrimNode extends Node {
       TypeTuple.make_args(Type.SCALAR,TypeTuple.RET);
     // Takes a value on the LHS, and a THUNK on the RHS.
     OrElse() { super("||",new String[]{" ctl"," mem","^","p","thunk"},ORELSE,Type.SCALAR); _thunk_rhs=true; }
-    @Override String arg_name(int i) {
-      switch(i) {
-      case 0: return "^";
-      case 1: return "p";
-      case 2: return "thunk";
-      default: throw com.cliffc.aa.AA.unimpl();
-      }
-    }
     // Expect this to inline everytime
     @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
     @Override public Node ideal_grow() {
@@ -597,7 +588,7 @@ public abstract class PrimNode extends Node {
         // Call on false branch; if true do not call.
         Node dsp = X.xform(new FP2DispNode(rhs));
         Node cal = X.xform(new CallNode(true,_badargs,fal,mem,dsp,rhs));
-        Node cep = X.xform(new CallEpiNode(null,cal,Env.DEFMEM));
+        Node cep = X.xform(new CallEpiNode(cal,Env.DEFMEM));
         Node ccc = X.xform(new CProjNode(cep));
         Node memc= X.xform(new MProjNode(cep));
         Node rez = X.xform(new  ProjNode(cep,AA.REZ_IDX));

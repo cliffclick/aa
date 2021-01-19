@@ -1383,7 +1383,7 @@ public class Parse implements Comparable<Parse> {
     CallNode call = (CallNode)gvn(call0);
     // Call Epilog takes in the call which it uses to track wireable functions.
     // CallEpi internally tracks all wired functions.
-    Node cepi = gvn(new CallEpiNode(_e,call,Env.DEFMEM));
+    Node cepi = gvn(new CallEpiNode(call,Env.DEFMEM));
     assert cepi instanceof CallEpiNode;
     Node ctrl = gvn(new CProjNode(cepi.keep()));
     if( ctrl.is_copy(0)!=null ) ctrl = ctrl.is_copy(0); // More aggressively fold, so Thunks can more aggressively assert

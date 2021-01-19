@@ -20,16 +20,16 @@ public class GVNGCM {
   public Mode _opt_mode=Mode.Parse;
 
   // Iterative worklists.
-  private final Work _work_dead   = new Work() { @Override public void accept(Node n) { if( n._uses._len == 0 ) n.kill(); } };
-  private final Work _work_reduce = new Work() { @Override public void accept(Node n) { n.do_reduce(); } };
-  private final Work _work_flow   = new Work() { @Override public void accept(Node n) { n.do_flow  (); } };
-  private final Work _work_mono   = new Work() { @Override public void accept(Node n) { n.do_mono  (); } };
-  private final Work _work_grow   = new Work() { @Override public void accept(Node n) { n.do_grow  (); } };
-  private final Work _work_inline = new Work() { @Override public void accept(Node n) { ((FunNode)n).ideal_inline(); } };
+  private final Work _work_dead   = new Work("dead"  ) { @Override public Node apply(Node n) { return n._uses._len == 0 ? n.kill() : null; } };
+  private final Work _work_reduce = new Work("reduce") { @Override public Node apply(Node n) { return n.do_reduce(); } };
+  private final Work _work_flow   = new Work("flow"  ) { @Override public Node apply(Node n) { return n.do_flow  (); } };
+  private final Work _work_mono   = new Work("mono"  ) { @Override public Node apply(Node n) { return n.do_mono  (); } };
+  private final Work _work_grow   = new Work("grow"  ) { @Override public Node apply(Node n) { return n.do_grow  (); } };
+  private final Work _work_inline = new Work("inline") { @Override public Node apply(Node n) { return ((FunNode)n).ideal_inline(); } };
   @SuppressWarnings("unchecked")
-  private final Work[] _new_works = new Work[]{           _work_reduce,_work_flow,_work_mono,_work_grow             };
+  private final Work[] _new_works = new Work[]{           _work_flow,_work_reduce,_work_mono,_work_grow             };
   @SuppressWarnings("unchecked")
-  private final Work[] _all_works = new Work[]{_work_dead,_work_reduce,_work_flow,_work_mono,_work_grow,_work_inline};
+  private final Work[] _all_works = new Work[]{_work_dead,_work_flow,_work_reduce,_work_mono,_work_grow,_work_inline};
   static private boolean HAS_WORK;
   public boolean on_dead  ( Node n ) { return _work_dead  .on(n); }
   public boolean on_flow  ( Node n ) { return _work_flow  .on(n); }
@@ -39,19 +39,18 @@ public class GVNGCM {
     if( !HAS_WORK ) HAS_WORK = true; // Filtered set
     return work.add(n);
   }
-  public <N extends Node> N add_dead  ( N n ) { return add_work(_work_dead  ,n); }
+  public void add_dead  ( Node n ) { add_work(_work_dead, n); }
   public <N extends Node> N add_reduce( N n ) { return add_work(_work_reduce,n); }
   public <N extends Node> N add_flow  ( N n ) { return add_work(_work_flow  ,n); }
   public void add_grow  ( Node n ) { add_work(_work_grow  ,n); }
-  public Node add_inline( FunNode n ) { return add_work(_work_inline,n); }
+  public void add_inline( FunNode n ) { add_work(_work_inline, n); }
   public void add_flow_defs  ( Node n ) { add_work_defs(_work_flow  ,n); }
   public void add_flow_uses  ( Node n ) { add_work_uses(_work_flow  ,n); }
   public void add_reduce_uses( Node n ) { add_work_uses(_work_reduce,n); }
   // n goes unused
-  public <N extends Node> N add_unuse ( N n ) {
-    if( n._uses._len==0 && n._keep==0 ) return add_dead(n); // might be dead
-    n.add_flow_extra();
-    return add_reduce(add_flow(n)); // might flow liveness, or collapse further
+  public void add_unuse( Node n ) {
+    if( n._uses._len==0 && n._keep==0 ) { add_dead(n); return; } // might be dead
+    add_reduce(add_flow(n));
   }
   static public void add_work_defs( Work work, Node n ) {
     for( Node def : n._defs )
@@ -69,10 +68,6 @@ public class GVNGCM {
     if( n instanceof FunNode )
         add_work(_work_inline,(FunNode)n);
     return n;
-  }
-
-  public Node add_work( Node n ) {
-    throw com.cliffc.aa.AA.unimpl();
   }
 
   // Initial state after loading e.g. primitives.
@@ -122,14 +117,14 @@ public class GVNGCM {
     assert n._uses._len==0;     // New to GVN
     assert n._keep==0;
     n.keep();
-    boolean progress = true;
-    while( progress ) {
+    Node progress = n;
+    while( progress!=null ) {
       progress = n.do_flow();
       n.unkeep();
       Node x;
-      if( (x=n.do_reduce()) != null ) { n=x; progress=true; }
-      if( (x=n.do_mono  ()) != null ) { n=x; progress=true; }
-      if( (x=n.do_grow  ()) != null ) { n=x; progress=true; }
+      if( (x=n.do_reduce()) != null ) { n=x; progress=n; }
+      if( (x=n.do_mono  ()) != null ) { n=x; progress=n; }
+      if( (x=n.do_grow  ()) != null ) { n=x; progress=n; }
       n.keep();
       iter(_opt_mode);
     }
@@ -142,24 +137,30 @@ public class GVNGCM {
   // Once the program is complete, any time anything is on the worklist we can
   // always conservatively iterate on it.
   static int ITER_CNT;
+  static int ITER_CNT_NOOP;
   public void iter(Mode opt_mode) {
-    if( opt_mode== Mode.Pause ) return;
     _opt_mode = opt_mode;
-
-    while( true ) {
-      ITER_CNT++; assert ITER_CNT < 35000; // Catch infinite ideal-loops
-      if( _work_dead.do1() ) continue;     // Remove dead nodes
-      // VERY EXPENSIVE ASSERT
-      //assert Env.START.more_flow(true)==0; // Initial conditions are correct
-      if( _work_flow  .do1() ) continue;   // Per-node flow: value, live, unify
-      if( _work_reduce.do1() ) continue;   // Strictly reducing transforms (fewer nodes or edges)
-      if( _work_mono  .do1() ) continue;   // Monotonic nodes or edges (but generally more freedom)
-      if( _work_grow  .do1() ) continue;   // Growing (but generally more precision)
-      if( _work_inline.do1() ) continue;   // Inlining (like growing, but more growth)
-      break;
-    }
-    HAS_WORK = false;
+    if( opt_mode== Mode.Pause ) return;
+    if( !HAS_WORK ) return;
+    while( true ) if( !has_work() ) break;
+    HAS_WORK=false;
   }
+  private boolean has_work() {
+    for( Work W : _all_works ) {
+      Node n = W.pop();
+      if( n==null ) continue;
+      if( !n.is_dead() && W.apply(n) !=null ) {
+        // VERY EXPENSIVE ASSERT
+        //assert W==_work_dead || Env.START.more_flow(true)==0; // Initial conditions are correct
+        ITER_CNT++; assert ITER_CNT < 35000; // Catch infinite ideal-loops
+      } else {
+      ITER_CNT_NOOP++;
+      }
+      return true;
+    }
+    return false;
+  }
+
 
   // Global Optimistic Constant Propagation.  Passed in the final program state
   // (including any return result, i/o & memory state).  Returns the most-precise
@@ -202,10 +203,10 @@ public class GVNGCM {
         Type oval = n._val;                                // Old local type
         Type nval = n.value(_opt_mode);                    // New type
         if( oval != nval ) {                               // Progress
-          if( !check_monotonicity(n,oval,nval) ) continue; // Debugging hook
-          n._val = nval;           // Record progress
-          add_flow_uses(n);        // Classic forwards flow on change
-          n.add_flow_extra();      // Extra changes
+          if( check_not_monotonic(n, oval, nval) ) continue; // Debugging hook
+          n._val = nval;            // Record progress
+          for( Node use : n._uses ) // Classic forwards flow on change
+            add_flow(use).add_flow_use_extra(n);
           if( n instanceof CallEpiNode ) check_and_wire((CallEpiNode)n);
           for( Node use : n._uses )
             if( use instanceof CallEpiNode ) check_and_wire((CallEpiNode)use);
@@ -215,11 +216,10 @@ public class GVNGCM {
         TypeMem oliv = n._live;
         TypeMem nliv = n.live(_opt_mode);
         if( oliv != nliv ) {      // Liveness progress
-          if( !check_monotonicity(n,oliv,nliv) ) continue; // Debugging hook
-          n._live = nliv;
-          add_flow_defs(n);    // Put defs on worklist... liveness flows uphill
-          if( n instanceof ProjNode && n.in(0) instanceof CallNode )
-            add_flow_defs(n.in(0)); // Args are alive, if Call Projs are alive
+          if( check_not_monotonic(n, oliv, nliv) ) continue; // Debugging hook
+          n._live = nliv;           // Record progress
+          for( Node def : n._defs ) // Classic reverse flow on change
+            if( def!=null ) add_flow(def).add_flow_def_extra(n);
         }
         // See if we can resolve an unresolved
         if( n instanceof CallNode && n._live != TypeMem.DEAD ) {
@@ -266,9 +266,10 @@ public class GVNGCM {
     }
     if( fptr==null ) {          // Not resolving, program is in-error
       call._not_resolved_by_gcp = true;
-      add_work(call);
-      add_work(call.fdx());
-      return;                   // Not resolving, but Call flagged as in-error
+      //add_work(call);
+      //add_work(call.fdx());
+      //return;                   // Not resolving, but Call flagged as in-error
+      throw com.cliffc.aa.AA.unimpl();
     }
     call.set_def(AA.FUN_IDX,fptr.display());
     call.set_fdx(fptr);         // Set resolved edge
@@ -282,12 +283,12 @@ public class GVNGCM {
   }
 
   // Debugging hook
-  private boolean check_monotonicity(Node n, Type ot, Type nt) {
+  private boolean check_not_monotonic( Node n, Type ot, Type nt) {
     assert nt==nt.simple_ptr();   // Only simple pointers in node types
-    if( ot.isa(nt) ) return true; // No bug
+    if( ot.isa(nt) ) return false; // No bug
     add_flow(n);                  // Setup for a re-run
     System.out.println("Not monotonic");
-    return false;    // Just single-step forward in debugging to re-run n.value
+    return true;    // Just single-step forward in debugging to re-run n.value
   }
 
   public class Build<N extends Node> implements AutoCloseable {

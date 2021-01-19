@@ -11,7 +11,7 @@ public class MProjNode extends ProjNode {
   public MProjNode( Node head, int idx ) { super(head,idx); }
   @Override public String xstr() { return "MProj"+_idx; }
   @Override public boolean is_mem() { return true; }
-  
+
   @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
   @Override public Node ideal_reduce() {
     Node x = super.ideal_reduce();
@@ -40,10 +40,8 @@ public class MProjNode extends ProjNode {
     return c.oob();
   }
 
-
   @Override BitsAlias escapees() { return in(0).escapees(); }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // Only called here if alive, and input is more-than-basic-alive
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return _live; }
-  @Override public void add_flow_extra() { ParmNode.add_flow_extra_mem_parm(this); }
 }

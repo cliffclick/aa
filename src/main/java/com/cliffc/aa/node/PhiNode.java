@@ -77,13 +77,6 @@ public class PhiNode extends Node {
     if( def==in(0) ) return TypeMem.ALIVE;
     return all_live().basic_live() && !def.all_live().basic_live() ? TypeMem.ANYMEM : _live;
   }
-  // Address into a Load changes, the Memory can be more alive.
-  @Override public void add_flow_extra() {
-    if( _val instanceof TypeMemPtr )
-      for( Node use : _uses )
-        if( use instanceof LoadNode )
-          Env.GVN.add_flow(((LoadNode)use).mem());
-  }
 
   @Override public ErrMsg err( boolean fast ) {
     if( !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar

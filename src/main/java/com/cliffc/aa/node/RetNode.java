@@ -130,6 +130,7 @@ public final class RetNode extends Node {
     for( Node use : fun._uses )
       if( use != this && use.is_CFG() )
         { assert cuse==null; cuse = use; }
+    assert cuse!=null;
     int cidx = cuse._defs.find(fun);
     // Insert loop in-the-middle
     try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {

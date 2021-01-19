@@ -119,6 +119,13 @@ public class RegionNode extends Node {
   }
   @Override public TypeMem all_live() { return TypeMem.ALIVE; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ALIVE; }
+  // Control into a Region allows Phis to make progress
+  @Override public void add_flow_use_extra(Node chg) {
+    Env.GVN.add_reduce(this);
+    for( Node phi : _uses )
+      if( phi instanceof PhiNode )
+        Env.GVN.add_flow(phi);
+  }
 
   // Complex dominator tree.  Ok to subset, attempt the easy walk
   @Override Node walk_dom_last(Predicate<Node> P) {

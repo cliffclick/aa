@@ -129,16 +129,10 @@ public class ParmNode extends PhiNode {
   }
 
   // If an input to a Mem Parm changes, the flow results of other Parms can change
-  static void add_flow_extra_mem_parm(Node mem) {
-    assert mem.is_mem();
-    for( Node use : mem._uses ) {
-      if( use instanceof ParmNode && use.is_mem() ) {
-        Node fun = use.in(0);
-        for( Node parm : fun._uses ) {
-          if( parm instanceof ParmNode && parm != use )
-            Env.GVN.add_flow(parm);
-        }
-      }
-    }
+  @Override public void add_flow_use_extra(Node chg) {
+    if( is_mem() )
+      for( Node parm : in(0)._uses )
+        if( parm instanceof ParmNode && parm != this )
+          Env.GVN.add_flow(parm);
   }
 }

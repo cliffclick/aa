@@ -38,7 +38,6 @@ public class LoadNode extends Node {
 
   // Strictly reducing optimizations
   @Override public Node ideal_reduce() {
-    Node mem  = mem();
     Node adr = adr();
     Type tadr = adr.val();
     BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
@@ -228,6 +227,11 @@ public class LoadNode extends Node {
     if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
     // Only named the named field from the named aliases is live.
     return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld);
+  }
+  // Address into a Load changes, the Memory can be more alive.
+  @Override public void add_flow_use_extra(Node chg) {
+    if( chg==adr() )
+      Env.GVN.add_flow(mem());
   }
 
   @Override public boolean unify( boolean test ) {

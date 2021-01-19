@@ -246,7 +246,7 @@ public class TestNodeSmall {
     ConNode arg2 = gvn.init(new ConNode<>(Type.SCALAR));
     Node dsp = gvn.xform(new ConNode<>(TypeMemPtr.NO_DISP));
     CallNode call = (CallNode)gvn.xform(new CallNode(true, null, ctrl, mem, dsp, arg1, arg2, fp_mul));
-    CallEpiNode cepi = (CallEpiNode)gvn.xform(new CallEpiNode(null,call, Env.DEFMEM)); // Unwired
+    CallEpiNode cepi = (CallEpiNode)gvn.xform(new CallEpiNode(call, Env.DEFMEM)); // Unwired
 
     call.unelock();             // Will be hacking edges
     Node[] ins = new Node[]{ctrl,mem,fp_mul,arg1,arg2};
@@ -583,7 +583,7 @@ public class TestNodeSmall {
     assert targ2.simple_ptr()==targ2;
     ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
     CallNode call = gvn.init(new CallNode(true, null, ctl, null/*mem*/, null/*disp*/, null/*x*/, null/*y*/, null/*fidx*/));
-    CallEpiNode cepi = gvn.init(new CallEpiNode(null, call, Env.DEFMEM)); // Unwired
+    CallEpiNode cepi = gvn.init(new CallEpiNode(call, Env.DEFMEM)); // Unwired
     Node cpj = gvn.xform(new CProjNode(call,0));
     ConNode mem = (ConNode)gvn.xform(new ConNode<>(tmem ));
     ConNode arg1= (ConNode)gvn.xform(new ConNode<>(targ1));

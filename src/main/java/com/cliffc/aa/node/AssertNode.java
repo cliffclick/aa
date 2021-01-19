@@ -56,7 +56,7 @@ public class AssertNode extends Node {
         Arrays.fill(badargs,_error_parse);
         Node rpc= X.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
         CallNode call = (CallNode)X.xform(new CallNode(true,badargs,args));
-        Node cepi   = X.xform(new CallEpiNode(null/*TODO: Suspect need to carry a prior Env thru*/,call,Env.DEFMEM));
+        Node cepi   = X.xform(new CallEpiNode(/*TODO: Suspect need to carry a prior Env thru*/call,Env.DEFMEM));
         Node ctl    = X.xform(new CProjNode(cepi));
         Node postmem= X.xform(new MProjNode(cepi));
         Node val    = X.xform(new  ProjNode(cepi,AA.REZ_IDX));
@@ -92,7 +92,7 @@ public class AssertNode extends Node {
   }
   @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
-    
+
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Node arg = arg();
     Type t1 = arg.val();
