@@ -23,7 +23,7 @@ import static com.cliffc.aa.Env.GVN;
 // bit-vector.
 
 public final class CallEpiNode extends Node {
-  boolean _is_copy;
+  public boolean _is_copy;
   public CallEpiNode( Node... nodes ) {
     super(OP_CALLEPI,nodes);
     assert nodes[1] instanceof DefMemNode;
@@ -35,8 +35,8 @@ public final class CallEpiNode extends Node {
   }
   public CallNode call() { return (CallNode)in(0); }
   @Override public boolean is_mem() { return true; }
-  int nwired() { return _defs._len-2; }
-  RetNode wired(int x) { return (RetNode)in(x+2); }
+  public int nwired() { return _defs._len-2; }
+  public RetNode wired(int x) { return (RetNode)in(x+2); }
 
   @Override public Node ideal_reduce() {
     if( _is_copy ) return null;
@@ -214,7 +214,6 @@ public final class CallEpiNode extends Node {
     // Wire self to the return
     add_def(ret);
     GVN.add_flow(this);
-    if( fun instanceof FunNode ) GVN.add_inline((FunNode)fun);
   }
 
   // Wire without the redundancy check, or adding to the CallEpi
@@ -245,6 +244,7 @@ public final class CallEpiNode extends Node {
     GVN.add_flow(fun);
     GVN.add_flow_uses(fun);
     if( fun instanceof ThunkNode ) GVN.add_reduce_uses(fun);
+    if( fun instanceof FunNode ) GVN.add_inline((FunNode)fun);
   }
 
   // Merge call-graph edges, but the call-graph is not discovered prior to GCP.
@@ -373,6 +373,15 @@ public final class CallEpiNode extends Node {
     return TypeMemPtr.OOP0.dual().isa(trez) ? BitsAlias.NZERO : BitsAlias.EMPTY;
   }
 
+  @Override public void add_flow_use_extra(Node chg) {
+    if( chg instanceof CallNode ) { // If the Call changes value
+      Env.GVN.add_flow(chg.in(MEM_IDX));       // The called memory   changes liveness
+      Env.GVN.add_flow(((CallNode)chg).fdx()); // The called function changes liveness
+      for( int i=0; i<nwired(); i++ )          // Called returns change liveness
+        Env.GVN.add_flow(wired(i));
+    }
+  }
+
   // Sanity check
   boolean sane_wiring() {
     CallNode call = call();
@@ -443,15 +452,6 @@ public final class CallEpiNode extends Node {
     if( fidxs.above_center() || !fidxs.test_recur(fidx) )
       return TypeMem.DEAD;    // Call does not call this, so not alive.
     return _live;
-  }
-
-  @Override public void add_flow_use_extra(Node chg) {
-    if( chg instanceof CallNode ) { // If the Call changes value
-      Env.GVN.add_flow(chg.in(MEM_IDX));       // The called memory   changes liveness
-      Env.GVN.add_flow(((CallNode)chg).fdx()); // The called function changes liveness
-      for( int i=0; i<nwired(); i++ )          // Called returns change liveness
-        Env.GVN.add_flow(wired(i));
-    }
   }
 
   @Override public boolean unify( boolean test ) {

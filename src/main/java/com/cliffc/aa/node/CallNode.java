@@ -273,11 +273,13 @@ public class CallNode extends Node {
     // If the function is unresolved, see if we can resolve it now.
     // Fidxs are typically low during iter, but can be high during
     // iter post-GCP on error calls where nothing resolves.
+    CallEpiNode cepi = cepi();
     if( fidx == -1 && !fidxs.above_center() && !fidxs.test(1)) {
       BitsFun rfidxs = resolve(fidxs,tcall._ts,(TypeMem) mem()._val,GVN._opt_mode==GVNGCM.Mode.Opto);
       if( rfidxs==null ) return null;            // Dead function, stall for time
       FunPtrNode fptr = least_cost(rfidxs, unk); // Check for least-cost target
       if( fptr != null ) {
+        if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
         if( fptr.display()._val.isa(dsp()._val) )
           set_dsp(fptr.display());
         return set_fdx(fptr); // Resolve to 1 choice
@@ -299,7 +301,6 @@ public class CallNode extends Node {
 
 
     // Wire valid targets.
-    CallEpiNode cepi = cepi();
     if( cepi!=null && cepi.check_and_wire() )
       return this;              // Some wiring happened
 
@@ -319,6 +320,12 @@ public class CallNode extends Node {
     }
 
     return null;
+  }
+  // Call reduces, then check the CEPI for reducing
+  @Override public void add_reduce_extra() {
+    Node cepi = cepi();
+    if( !_is_copy && cepi!=null )
+      Env.GVN.add_reduce(cepi);
   }
 
   @Override public Node ideal_grow() {
@@ -444,6 +451,11 @@ public class CallNode extends Node {
     BitsAlias esc_out2 = precall.and_unused(esc_out); // Filter by unused pre-call
     return esc_out2.meet(esc_in);
   }
+  @Override public void add_flow_def_extra(Node chg) {
+    // Projections live after a call alter liveness of incoming args
+    if( chg instanceof ProjNode )
+      Env.GVN.add_flow(in(((ProjNode)chg)._idx));
+  }
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
   // have not seen all possible function-body uses.  Check for #FIDXs == nwired().
@@ -477,8 +489,8 @@ public class CallNode extends Node {
       return live_use_call(dfidx);
     }
     if( def==ctl() ) return TypeMem.ALIVE;
-    if( def!=mem() ) {          // Some argument
-      if( opt_mode._CG && !(def instanceof ConNode && (((ConNode)def)._t == Type.ANY)) ) { // If all are wired, we can check projs for uses
+    if( def!=mem() ) {         // Some argument
+      if( opt_mode._CG ) {     // If all are wired, we can check projs for uses
         int argn = _defs.find(def);
         ProjNode proj = ProjNode.proj(this, argn);
         if( proj == null || proj._live == TypeMem.DEAD )
@@ -528,12 +540,6 @@ public class CallNode extends Node {
     if( dfidx != -1 && !fidxs.test_recur(dfidx) ) return TypeMem.DEAD; // Not in the fidx set.
     // Otherwise the FIDX is alive
     return TypeMem.ALIVE;
-  }
-
-  @Override public void add_flow_def_extra(Node chg) {
-    // Projections live after a call alter liveness of incoming args
-    if( chg instanceof ProjNode )
-      Env.GVN.add_flow(in(((ProjNode)chg)._idx));
   }
 
   // Resolve an Unresolved.  Called in value() and so must be monotonic.
@@ -825,12 +831,6 @@ Scalar, but because Bits allows EMPTY, does not work for [26] and [30].
     return null;
   }
   @Override public Node is_copy(int idx) { return _is_copy ? (_val==Type.ANY ? Env.ANY : in(idx)) : null; }
-  // Call reduces, then check the CEPI for reducing
-  @Override public void add_reduce_extra() {
-    Node cepi = cepi();
-    if( !_is_copy && cepi!=null )
-      Env.GVN.add_reduce(cepi);
-  }
   void set_rpc(int rpc) { unelock(); _rpc=rpc; } // Unlock before changing hash
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {

@@ -84,6 +84,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       pop();                    // Kill all fields except memory
     if( is_dead() ) return;
     _crushed = _ts = dead_type();
+    _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeObj.UNUSED);
     Env.DEFMEM.set_def(_alias,Node.con(TypeObj.UNUSED));
     Env.GVN.revalive(this,ProjNode.proj(this,0),Env.DEFMEM);
     if( is_dead() ) return;

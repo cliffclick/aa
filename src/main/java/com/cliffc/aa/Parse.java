@@ -389,13 +389,12 @@ public class Parse implements Comparable<Parse> {
     scope().flip_if();          // Flip side of tracking new defs
     Env.GVN.add_work_all(ifex.unkeep());
     set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch
-    set_mem(old_mem);           // Reset memory to before the IF
+    set_mem(old_mem.unkeep());     // Reset memory to before the IF
     Node fex = peek(':') ? stmt() : Env.XNIL;
     if( fex == null ) fex = err_ctrl2("missing expr after ':'");
     fex.keep();                    // Keep until merge point
     Node f_ctrl= ctrl().keep();    // Keep until merge point
     Node f_mem = mem ().keep();    // Keep until merge point
-    old_mem.unhook();
 
     Parse bad = errMsg();
     t_mem = scope().check_if(true ,bad,_gvn,t_ctrl,t_mem); // Insert errors if created only 1 side
@@ -403,8 +402,12 @@ public class Parse implements Comparable<Parse> {
     scope().pop_if();         // Pop the if-scope
     RegionNode r = set_ctrl(init(new RegionNode(null,t_ctrl.unkeep(),f_ctrl.unkeep())));
     r._val = Type.CTRL;
-    set_mem(gvn(new PhiNode(TypeMem.FULL,bad,r       ,t_mem.unkeep(),f_mem.unkeep())));
-    return  gvn(new PhiNode(Type.SCALAR ,bad,r.unkeep(),tex.unkeep(),  fex.unkeep())) ; // Ifex result
+    _gvn.add_reduce(t_ctrl);
+    _gvn.add_reduce(f_ctrl);
+    set_mem(   gvn(new PhiNode(TypeMem.FULL,bad,r       ,t_mem.unkeep(),f_mem.unkeep())));
+    Node rez = gvn(new PhiNode(Type.SCALAR ,bad,r.unkeep(),tex.unkeep(),  fex.unkeep())) ; // Ifex result
+    _gvn.add_work_all(r);
+    return rez;
   }
 
   /** Parse a lisp-like function application.  To avoid the common bug of
@@ -523,7 +526,7 @@ public class Parse implements Comparable<Parse> {
     Node rhs = _expr_higher_require(prec,bintok,lhs);
 
     // Insert thunk tail, unwind memory state
-    ThretNode thet = (ThretNode)gvn(new ThretNode(ctrl(),mem(),rhs,Env.GVN.add_flow(thunk.unkeep()))).keep();
+    ThretNode thet = gvn(new ThretNode(ctrl(),mem(),rhs,Env.GVN.add_flow(thunk.unkeep()))).keep();
     set_ctrl(old_ctrl.unkeep());
     set_mem (old_mem .unkeep());
     for( int i=0; i<old_defs._len; i++ )
@@ -1383,14 +1386,18 @@ public class Parse implements Comparable<Parse> {
     CallNode call = (CallNode)gvn(call0);
     // Call Epilog takes in the call which it uses to track wireable functions.
     // CallEpi internally tracks all wired functions.
-    Node cepi = gvn(new CallEpiNode(call,Env.DEFMEM));
-    assert cepi instanceof CallEpiNode;
+    CallEpiNode cepi = (CallEpiNode)gvn(new CallEpiNode(call,Env.DEFMEM));
     Node ctrl = gvn(new CProjNode(cepi.keep()));
     if( ctrl.is_copy(0)!=null ) ctrl = ctrl.is_copy(0); // More aggressively fold, so Thunks can more aggressively assert
     set_ctrl(ctrl);
     set_mem(gvn(new MProjNode(cepi))); // Return memory from all called functions
-    Env.GVN.add_flow(cepi);
-    Env.GVN.add_reduce(cepi);
+    // As soon as CEPI is unkeep, a whole lotta things are allowed, including
+    // e.g. inlining
+    if( !cepi._is_copy ) {
+      Env.GVN.add_work_all(cepi);
+      for( int i = 0; i < cepi.nwired(); i++ )
+        Env.GVN.add_inline(cepi.wired(i).fun());
+    }
     return gvn(new ProjNode(cepi.unkeep(),REZ_IDX));
   }
 

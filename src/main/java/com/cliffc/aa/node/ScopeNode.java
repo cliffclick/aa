@@ -47,14 +47,15 @@ public class ScopeNode extends Node {
   public <N extends Node> N set_ctrl( N n ) { set_def(0,n); return n; }
   public void set_ptr ( Node n) { set_def(2,n); }
   public void set_rez ( Node n) { set_def(3,n); }
-  public Node swap_rez( Node n) { return swap_def(3,n); }
+
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
   public Node set_mem( Node n) {
-    assert n==null || (n._elock && (n._val instanceof TypeMem || n._val ==Type.ANY || n._val ==Type.ALL));
+    assert n==null || (n._val instanceof TypeMem || n._val ==Type.ANY || n._val ==Type.ALL);
     Node old = mem();
     set_def(MEM_IDX,n);
     if( old!=null ) {
       Env.GVN.add_work_all(old);
+      Env.GVN.add_work_all(n);
       Env.GVN.iter(Env.GVN._opt_mode);
     }
     return this;

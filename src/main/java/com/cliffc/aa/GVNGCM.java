@@ -25,7 +25,7 @@ public class GVNGCM {
   private final Work _work_flow   = new Work("flow"  ) { @Override public Node apply(Node n) { return n.do_flow  (); } };
   private final Work _work_mono   = new Work("mono"  ) { @Override public Node apply(Node n) { return n.do_mono  (); } };
   private final Work _work_grow   = new Work("grow"  ) { @Override public Node apply(Node n) { return n.do_grow  (); } };
-  private final Work _work_inline = new Work("inline") { @Override public Node apply(Node n) { return ((FunNode)n).ideal_inline(); } };
+  private final Work _work_inline = new Work("inline") { @Override public Node apply(Node n) { return ((FunNode)n).ideal_inline(false); } };
   @SuppressWarnings("unchecked")
   private final Work[] _new_works = new Work[]{           _work_flow,_work_reduce,_work_mono,_work_grow             };
   @SuppressWarnings("unchecked")
@@ -80,7 +80,7 @@ public class GVNGCM {
   void reset_to_init0() {
     for( Work work : _all_works ) work.clear();
     _opt_mode = Mode.Parse;
-    ITER_CNT = 0;
+    ITER_CNT = ITER_CNT_NOOP = 0;
   }
 
   // Record a Node, but do not optimize it for value and ideal calls, as it is
@@ -126,7 +126,7 @@ public class GVNGCM {
       if( (x=n.do_mono  ()) != null ) { n=x; progress=n; }
       if( (x=n.do_grow  ()) != null ) { n=x; progress=n; }
       n.keep();
-      iter(_opt_mode);
+      if( iter() ) progress=n;
     }
     if( n instanceof FunNode ) add_inline((FunNode)n);
     n.unkeep();
@@ -134,33 +134,42 @@ public class GVNGCM {
     return n;
   }
 
+  private static final VBitSet IDEAL_VISIT = new VBitSet();
+  public boolean iter(Mode opt_mode) {
+    _opt_mode = opt_mode;
+    boolean progress = iter();
+    IDEAL_VISIT.clear();
+    assert !Env.START.more_ideal(IDEAL_VISIT);
+    return progress;
+  }
+
   // Once the program is complete, any time anything is on the worklist we can
   // always conservatively iterate on it.
   static int ITER_CNT;
   static int ITER_CNT_NOOP;
-  public void iter(Mode opt_mode) {
-    _opt_mode = opt_mode;
-    if( opt_mode== Mode.Pause ) return;
-    if( !HAS_WORK ) return;
-    while( true ) if( !has_work() ) break;
-    HAS_WORK=false;
-  }
-  private boolean has_work() {
-    for( Work W : _all_works ) {
-      Node n = W.pop();
-      if( n==null ) continue;
-      if( !n.is_dead() && W.apply(n) !=null ) {
-        // VERY EXPENSIVE ASSERT
-        //assert W==_work_dead || Env.START.more_flow(true)==0; // Initial conditions are correct
-        ITER_CNT++; assert ITER_CNT < 35000; // Catch infinite ideal-loops
-      } else {
-      ITER_CNT_NOOP++;
+  public boolean iter() {
+    if( _opt_mode== Mode.Pause ) return false;
+    if( !HAS_WORK ) return false;
+    boolean progress = false;
+    outer:
+    while( true ) {
+      for( Work W : _all_works ) {
+        Node n = W.pop();
+        if( n==null ) continue;
+        if( !n.is_dead() && W.apply(n) !=null ) {
+          // VERY EXPENSIVE ASSERT
+          //assert W==_work_dead || Env.START.more_flow(true)==0; // Initial conditions are correct
+          ITER_CNT++; assert ITER_CNT < 35000; // Catch infinite ideal-loops
+          progress = true;
+        } else {
+          ITER_CNT_NOOP++;      // No progress
+        }
+        continue outer;
       }
-      return true;
+      HAS_WORK=false;
+      return progress;
     }
-    return false;
   }
-
 
   // Global Optimistic Constant Propagation.  Passed in the final program state
   // (including any return result, i/o & memory state).  Returns the most-precise
@@ -315,7 +324,7 @@ public class GVNGCM {
       if( _ret!=null ) _ret.keep(); // Thing being returned at close-point is always alive
       for( Node tmp : _tmps )
         add_unuse(tmp.unkeep()); // Needs proper liveness at least
-      iter(_opt_mode);          // Cleanup
+      iter();                    // Cleanup
       if( _ret!=null ) _ret.unkeep();
     }
   }

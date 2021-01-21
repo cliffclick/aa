@@ -96,6 +96,7 @@ public class UnresolvedNode extends Node {
     if( !(def instanceof FunPtrNode) ) return _live;
     // If any Call has resolved to this def, its alive.
     // If not a Call, must assume it props to some unknown Call and is alive.
+    if( _uses._len==0 ) return _live; // No change if dead anyways
     int dfidx = ((FunPtrNode)def).ret()._fidx;
     for( Node call : _uses )
       if( !(call instanceof CallNode) ||

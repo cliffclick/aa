@@ -24,8 +24,10 @@ public class MemJoinNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
   @Override public Node ideal_reduce() {
     // If the split count is lower than 2, then the split serves no purpose
-    if( _defs._len == 2 && val(1).isa(val()) && _keep==0 )
+    if( _defs._len == 2 && val(1).isa(val()) && _keep==0 ) {
+      for( Node use : msp()._uses ) Env.GVN.add_reduce(use);
       return in(1);             // Just become the last split
+    }
 
     // If some Split/Join path clears out, remove the (useless) split.
     MemSplitNode msp = msp();

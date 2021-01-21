@@ -186,6 +186,7 @@ public abstract class Node implements Cloneable, TNode {
     old._uses.del(this);
     // Either last use of old & goes dead, or at least 1 fewer uses & changes liveness
     Env.GVN.add_unuse(old);
+    if( old._uses._len!=0 && old._keep ==0 ) old.add_flow_def_extra(this);
     return this;
   }
 
@@ -706,6 +707,7 @@ public abstract class Node implements Cloneable, TNode {
       _val = nval;
       for( Node use : _uses )  // Put uses on worklist... values flows downhill
         Env.GVN.add_flow(use).add_flow_use_extra(this);
+      if( is_CFG() ) for( Node use : _uses ) if( use.is_CFG() ) Env.GVN.add_reduce(use);
     }
     return progress;
   }
@@ -714,7 +716,7 @@ public abstract class Node implements Cloneable, TNode {
 
   public Node do_grow() {
     Node nnn = ideal_grow();
-    return nnn==null || nnn==this ? nnn : subsume(nnn);
+    return nnn==null || nnn==this || is_dead() ? nnn : subsume(nnn);
   }
 
   // Replace with a ConNode iff
@@ -779,23 +781,28 @@ public abstract class Node implements Cloneable, TNode {
   }
 
   // Assert all ideal, value and liveness calls are done
-  public final boolean more_ideal(GVNGCM gvn, VBitSet bs, int level) {
+  public final boolean more_ideal(VBitSet bs) {
     if( bs.tset(_uid) ) return false; // Been there, done that
     if( _keep == 0 && _live.is_live() ) { // Only non-keeps, which is just top-level scope and prims
-      Node idl = ideal(gvn,level);
-      if( idl != null )
-        return true;            // Found an ideal call
       //if( unify(true) )
       //  return true;            // Found more unification
-      Type t = value(gvn._opt_mode);
+      Type t = value(Env.GVN._opt_mode);
       if( _val != t )
         return true;            // Found a value improvement
-      TypeMem live = live(gvn._opt_mode);
+      TypeMem live = live(Env.GVN._opt_mode);
       if( _live != live )
         return true;            // Found a liveness improvement
+      Node x;
+      x = do_reduce(); if( x != null )
+                         return true; // Found an ideal call
+      x = do_mono(); if( x != null )
+                       return true; // Found an ideal call
+      x = do_grow(); if( x != null )
+                       return true; // Found an ideal call
+      if( this instanceof FunNode ) ((FunNode)this).ideal_inline(true);
     }
-    for( Node def : _defs ) if( def != null && def.more_ideal(gvn,bs,level) ) return true;
-    for( Node use : _uses ) if( use != null && use.more_ideal(gvn,bs,level) ) return true;
+    for( Node def : _defs ) if( def != null && def.more_ideal(bs) ) return true;
+    for( Node use : _uses ) if( use != null && use.more_ideal(bs) ) return true;
     return false;
   }
 

@@ -381,7 +381,6 @@ public class TestParse {
 
   @Test public void testParse06() {
     Object dummy = Env.GVN; // Force class loading cycle
-
     // Building recursive types
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
     test_ptr("A= :(str?, int); A(0,2)","A:(0, 2)");

@@ -91,6 +91,14 @@ public class ParmNode extends PhiNode {
     return t.oob_deep(formal);
   }
 
+  // If an input to a Mem Parm changes, the flow results of other Parms can change
+  @Override public void add_flow_use_extra(Node chg) {
+    if( is_mem() )
+      for( Node parm : in(0)._uses )
+        if( parm instanceof ParmNode && parm != this )
+          Env.GVN.add_flow(parm);
+  }
+  
   // While Parms are mostly Phis (and yes for value flows), during unification
   // Parms are already treated by the H-M algo, and (via fresh_unify) get
   // "fresh" TVars for every input path.
@@ -126,13 +134,5 @@ public class ParmNode extends PhiNode {
       }
     }
     return null;
-  }
-
-  // If an input to a Mem Parm changes, the flow results of other Parms can change
-  @Override public void add_flow_use_extra(Node chg) {
-    if( is_mem() )
-      for( Node parm : in(0)._uses )
-        if( parm instanceof ParmNode && parm != this )
-          Env.GVN.add_flow(parm);
   }
 }

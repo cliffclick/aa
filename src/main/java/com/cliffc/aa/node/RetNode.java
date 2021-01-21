@@ -23,6 +23,7 @@ public final class RetNode extends Node {
     super(OP_RET,ctrl,mem,val,rpc,fun);
     _fidx = fun._fidx;
     _nargs=fun.nargs();
+    fun.unkeep();         // Unkeep the extra, now that a Ret completes the Fun
   }
   public Node ctl() { return in(0); }
   public Node mem() { return in(1); }

@@ -35,13 +35,14 @@ public class AssertNode extends Node {
     return actual.isa(_t) ? arg() : null;
   }
   @Override public Node ideal_grow() {
-    Node arg= arg(), mem = mem();
+    Node arg= arg();
     // If TypeNode check is for a function, it will wrap any incoming function
     // with a new function which does the right arg-checks.  This happens
     // immediately in the Parser and is here to declutter the Parser.
     if( _t instanceof TypeFunSig ) {
       TypeFunSig sig = (TypeFunSig)_t;
       try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
+        X.add(this);
         Node[] args = new Node[sig.nargs()+1];
         FunNode fun = (FunNode)X.init(new FunNode(null,sig,-1,false).add_def(Env.ALL_CTRL));
         fun._val = Type.CTRL;

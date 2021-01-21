@@ -30,6 +30,10 @@ public class RegionNode extends Node {
             phi.remove(i);
         unwire(i);
         remove(i);
+        if( this instanceof FunNode && _defs._len==2 && in(1).in(0) instanceof CallNode ) {
+          Node cepi = ((CallNode)in(1).in(0)).cepi();
+          if( cepi!=null ) Env.GVN.add_reduce(cepi);
+        }
         return this; // Progress
       }
 
@@ -61,6 +65,15 @@ public class RegionNode extends Node {
     if( stack != null ) return stack;
 
     return null;
+  }
+  @Override public void add_flow_def_extra(Node chg) {
+    if( chg.is_CFG() ) {           // If losing an extra CFG user
+      for( Node use : _uses )
+        if( use._op == OP_REGION ) // Then stacked regions can fold
+          Env.GVN.add_reduce(use); // Put lower region of stack on worklist
+      if( this instanceof FunNode && ((FunNode)this).ret()==null )
+        Env.GVN.add_reduce(this);
+    }
   }
 
   @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
@@ -117,8 +130,6 @@ public class RegionNode extends Node {
     }
     return Type.XCTRL;
   }
-  @Override public TypeMem all_live() { return TypeMem.ALIVE; }
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ALIVE; }
   // Control into a Region allows Phis to make progress
   @Override public void add_flow_use_extra(Node chg) {
     Env.GVN.add_reduce(this);
@@ -126,6 +137,9 @@ public class RegionNode extends Node {
       if( phi instanceof PhiNode )
         Env.GVN.add_flow(phi);
   }
+  
+  @Override public TypeMem all_live() { return TypeMem.ALIVE; }
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ALIVE; }
 
   // Complex dominator tree.  Ok to subset, attempt the easy walk
   @Override Node walk_dom_last(Predicate<Node> P) {

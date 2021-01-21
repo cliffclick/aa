@@ -42,7 +42,7 @@ public class StoreNode extends Node {
 
     // If Store is by a New and no other Stores, fold into the New.
     NewObjNode nnn;  int idx;
-    if( mem instanceof MrgProjNode &&
+    if( mem instanceof MrgProjNode && mem._keep==0 &&
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
         !rez().is_forward_ref() &&
         mem._uses._len==2 &&
@@ -64,7 +64,7 @@ public class StoreNode extends Node {
       if( memw != null && adr instanceof ProjNode && adr.in(0) instanceof NewNode )
         return ((MemJoinNode)mem).add_alias_below_new(new StoreNode(this,mem,adr),this);
     }
-    
+
     return null;
   }
   @Override public Node ideal_mono() { return null; }
@@ -88,6 +88,15 @@ public class StoreNode extends Node {
     }
     return null;
   }
+  // If changing an input or value allows the store to no longer be in-error,
+  // following Loads can collapse
+  @Override public void add_reduce_extra() {
+    if( err(true)==null )
+      for( Node use : _uses )
+        if( use instanceof LoadNode )
+          Env.GVN.add_reduce(use);
+  }
+  
   @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   // StoreNode needs to return a TypeObj for the Parser.

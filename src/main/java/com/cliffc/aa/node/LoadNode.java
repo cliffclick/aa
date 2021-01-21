@@ -216,6 +216,10 @@ public class LoadNode extends Node {
     }
     return tobj.oob();          // No loading from e.g. Strings
   }
+  @Override public void add_flow_use_extra(Node chg) {
+    if( chg==adr() ) Env.GVN.add_flow(mem());  // Address into a Load changes, the Memory can be more alive.
+    if( chg==mem() ) Env.GVN.add_flow(mem());  // Memory value lifts to ANY, memory live lifts also.
+  }
 
   // The only memory required here is what is needed to support the Load
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
@@ -227,11 +231,6 @@ public class LoadNode extends Node {
     if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
     // Only named the named field from the named aliases is live.
     return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld);
-  }
-  // Address into a Load changes, the Memory can be more alive.
-  @Override public void add_flow_use_extra(Node chg) {
-    if( chg==adr() )
-      Env.GVN.add_flow(mem());
   }
 
   @Override public boolean unify( boolean test ) {

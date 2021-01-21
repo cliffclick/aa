@@ -101,17 +101,14 @@ public class MemSplitNode extends Node {
   // A function body was cloned and all aliases split.  The 'this' Split takes
   // the first child and the clone takes the 2nd child.
   void split_alias( Node copy, BitSet aliases ) {
-    //gvn.add_work(this);
-    //MemSplitNode cmsp = (MemSplitNode)copy;
-    //for( int alias = aliases.nextSetBit(0); alias != -1; alias = aliases.nextSetBit(alias + 1)) {
-    //  int[] kid0_aliases = BitsAlias.get_kids(alias);
-    //  int newalias1 = kid0_aliases[1];
-    //  int newalias2 = kid0_aliases[2];
-    //  cmsp._update(alias,newalias1);
-    //  this._update(alias,newalias2);
-    //  gvn.add_work(join());
-    //}
-    throw com.cliffc.aa.AA.unimpl();
+    MemSplitNode cmsp = (MemSplitNode)copy;
+    for( int alias = aliases.nextSetBit(0); alias != -1; alias = aliases.nextSetBit(alias + 1)) {
+      int[] kid0_aliases = BitsAlias.get_kids(alias);
+      int newalias1 = kid0_aliases[1];
+      int newalias2 = kid0_aliases[2];
+      cmsp._update(alias,newalias1);
+      this._update(alias,newalias2);
+    }
   }
   // Replace the old alias with the new child alias
   private void _update(int oldalias, int newalias) {

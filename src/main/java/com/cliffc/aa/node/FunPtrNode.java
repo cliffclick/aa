@@ -58,22 +58,26 @@ public final class FunPtrNode extends Node {
     if( is_forward_ref() ) return null;
 
     // Display is known dead?  Yank it.
-    if( display().in(0) instanceof NewNode ) {
-      NewNode nn = (NewNode)display().in(0);
-      if( nn._ts==nn.dead_type() ) {
-        BitsAlias aliases = nn._tptr._aliases;
-        return set_def(1,Node.con(TypeMemPtr.make(aliases,aliases.oob(TypeObj.ISUSED)))); // No display needed
-      }
-    }
+    Node dsp = display();
+    Type tdsp = dsp._val;
+    if( tdsp instanceof TypeMemPtr && ((TypeMemPtr)tdsp)._obj==TypeObj.UNUSED && !(dsp instanceof ConNode) )
+      return set_def(1,Node.con(tdsp)); // No display needed
 
     // Remove unused displays.  Track uses; Calling with no display is OK.
     // Uses storing the FPTR and passing it along still require a display.
-    if( GVN._opt_mode._CG && !(display() instanceof ConNode) && !display_used() ) {
+    if( GVN._opt_mode._CG && !(dsp instanceof ConNode) && !display_used() ) {
       TypeMemPtr tdisp = (TypeMemPtr) display().val();
       return set_def(1,Node.con(tdisp.make_from(TypeObj.UNUSED))); // No display needed
     }
     return null;
   }
+  // Called if Display goes unused
+  @Override public void add_flow_use_extra(Node chg) {
+    Type tdsp = display()._val;
+    if( tdsp instanceof TypeMemPtr && ((TypeMemPtr)tdsp)._obj==TypeObj.UNUSED )
+      Env.GVN.add_reduce(this);
+  }
+
   @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   // Is the display used?

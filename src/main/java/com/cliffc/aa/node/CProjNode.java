@@ -21,9 +21,6 @@ public class CProjNode extends ProjNode {
     if( x==Type.ALL ) return Type. CTRL;
     return x;
   }
-  @Override public TypeMem all_live() { return TypeMem.ALIVE; }
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
-
   @Override public void add_flow_use_extra(Node chg) {
     // Control from Calls
     if( chg instanceof CallNode ) {
@@ -33,6 +30,9 @@ public class CProjNode extends ProjNode {
           Env.GVN.add_flow(fun);
     }
   }
+
+  @Override public TypeMem all_live() { return TypeMem.ALIVE; }
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
 
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.

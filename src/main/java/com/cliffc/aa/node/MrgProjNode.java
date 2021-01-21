@@ -56,7 +56,11 @@ public class MrgProjNode extends ProjNode {
     }
     return null;
   }
-
+  @Override public void add_flow_def_extra(Node chg) {
+    for( Node use : _uses )     // Lost a use; look for back-to-back MrgProj
+      if( use instanceof MrgProjNode )
+        Env.GVN.add_grow(use);
+  }
   @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( !(in(0) instanceof NewNode) ) return Type.ANY;

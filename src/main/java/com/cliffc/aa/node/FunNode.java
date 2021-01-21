@@ -87,6 +87,7 @@ public class FunNode extends RegionNode {
     _op_prec = (byte)op_prec;
     _thunk_rhs = thunk_rhs;
     FUNS.setX(fidx(),this); // Track FunNode by fidx; assert single-bit fidxs
+    keep();                 // Always keep, until RetNode is constructed
   }
 
   // Find FunNodes by fidx
@@ -173,8 +174,20 @@ public class FunNode extends RegionNode {
   // ----
   // Graph rewriting via general inlining.  All other graph optimizations are
   // already done.
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
-  public Node ideal_inline() {
+  @Override public Node ideal_reduce() {
+    Node rez = super.ideal_reduce();
+    if( rez != null ) return rez;
+    // Check for FunPtr/Ret dead/gone, and the function is no longer callable
+    // from anybody.
+    RetNode ret = ret();
+    if( has_unknown_callers() && ret==null && _keep==0 ) {
+      assert !is_prim();
+      assert in(1)==Env.ALL_CTRL;
+      return set_def(1,Env.XCTRL);
+    }
+    return null;
+  }
+  public Node ideal_inline(boolean check_progress) {
     // If no trailing RetNode and hence no FunPtr... function is uncallable
     // from the unknown caller.
     RetNode ret = ret();
@@ -182,11 +195,11 @@ public class FunNode extends RegionNode {
       return null;
 
     if( is_forward_ref() ) return null; // No mods on a forward ref
-    if( _defs._len <= 1 ) return null; // Not even the unknown caller
+    if( _defs._len <= 1  ) return null; // Not even the unknown caller
     ParmNode rpc_parm = rpc();
     if( rpc_parm == null ) return null; // Single caller const-folds the RPC, but also inlines in CallNode
     if( !check_callers() ) return null;
-    if( _defs._len <= 2 ) return null; // No need to split callers if only 1
+    if( _defs._len <= 2  ) return null; // No need to split callers if only 1
 
     // Every input path is wired to an output path
     for( int i=1+(has_unknown_callers() ? 1 : 0); i<_defs._len; i++ ) {
@@ -230,6 +243,7 @@ public class FunNode extends RegionNode {
 
     assert _must_inline==0; // Failed to inline a prior inline?
     if( path > 0 ) _must_inline = in(path).in(0)._uid;
+    assert !check_progress;     // Not expecting progress
 
     // --------------
     // Split the callers according to the new 'fun'.
@@ -241,6 +255,7 @@ public class FunNode extends RegionNode {
     assert Env.START.more_flow(true)==0; // Initial conditions are correct
     return this;
   }
+  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   @Override void unwire(int idx) {
     Node ctl = in(idx);
@@ -564,6 +579,7 @@ public class FunNode extends RegionNode {
     FunNode fun = new FunNode(_name,TypeFunSig.make(_sig._args,new_formals,_sig._ret),_op_prec,_thunk_rhs,BitsFun.new_fidx(oldfidx));
     fun._bal_close = _bal_close;
     fun.pop();                  // Remove null added by RegionNode, will be added later
+    fun.unkeep();               // Ret will clone and not construct
     // Renumber the original as well; the original _fidx is now a *class* of 2
     // fidxs.  Each FunNode fidx is only ever a constant, so the original Fun
     // becomes the other child fidx.
@@ -875,7 +891,7 @@ public class FunNode extends RegionNode {
   public ParmNode rpc() { return parm(-1); }
   public RetNode ret() {
     for( Node use : _uses )
-      if( use instanceof RetNode && !((RetNode)use).is_copy() && ((RetNode)use).fun()==this )
+      if( use instanceof RetNode && use._defs._len==5 && !((RetNode)use).is_copy() && ((RetNode)use).fun()==this )
         return (RetNode)use;
     return null;
   }
