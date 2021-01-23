@@ -20,12 +20,12 @@ public class GVNGCM {
   public Mode _opt_mode=Mode.Parse;
 
   // Iterative worklists.
-  private final Work _work_dead   = new Work("dead"  ) { @Override public Node apply(Node n) { return n._uses._len == 0 ? n.kill() : null; } };
-  private final Work _work_reduce = new Work("reduce") { @Override public Node apply(Node n) { return n.do_reduce(); } };
-  private final Work _work_flow   = new Work("flow"  ) { @Override public Node apply(Node n) { return n.do_flow  (); } };
-  private final Work _work_mono   = new Work("mono"  ) { @Override public Node apply(Node n) { return n.do_mono  (); } };
-  private final Work _work_grow   = new Work("grow"  ) { @Override public Node apply(Node n) { return n.do_grow  (); } };
-  private final Work _work_inline = new Work("inline") { @Override public Node apply(Node n) { return ((FunNode)n).ideal_inline(false); } };
+  private final Work _work_dead   = new Work("dead"  , false) { @Override public Node apply(Node n) { return n._uses._len == 0 ? n.kill() : null; } };
+  private final Work _work_reduce = new Work("reduce", true ) { @Override public Node apply(Node n) { return n.do_reduce(); } };
+  private final Work _work_flow   = new Work("flow"  , false) { @Override public Node apply(Node n) { return n.do_flow  (); } };
+  private final Work _work_mono   = new Work("mono"  , true ) { @Override public Node apply(Node n) { return n.do_mono  (); } };
+  private final Work _work_grow   = new Work("grow"  , true ) { @Override public Node apply(Node n) { return n.do_grow  (); } };
+  private final Work _work_inline = new Work("inline", false) { @Override public Node apply(Node n) { return ((FunNode)n).ideal_inline(false); } };
   @SuppressWarnings("unchecked")
   private final Work[] _new_works = new Work[]{           _work_flow,_work_reduce,_work_mono,_work_grow             };
   @SuppressWarnings("unchecked")
@@ -48,9 +48,9 @@ public class GVNGCM {
   public void add_flow_uses  ( Node n ) { add_work_uses(_work_flow  ,n); }
   public void add_reduce_uses( Node n ) { add_work_uses(_work_reduce,n); }
   // n goes unused
-  public void add_unuse( Node n ) {
-    if( n._uses._len==0 && n._keep==0 ) { add_dead(n); return; } // might be dead
-    add_reduce(add_flow(n));
+  public Node add_unuse( Node n ) {
+    if( n._uses._len==0 && n._keep==0 ) { add_dead(n); return n; } // might be dead
+    return add_reduce(add_flow(n));
   }
   static public void add_work_defs( Work work, Node n ) {
     for( Node def : n._defs )
@@ -114,60 +114,55 @@ public class GVNGCM {
   // for the parser).  Return a node registered with GVN that is possibly "more
   // ideal" than what was before.
   public Node xform( Node n ) {
-    assert n._uses._len==0;     // New to GVN
-    assert n._keep==0;
-    n.keep();
-    Node progress = n;
-    while( progress!=null ) {
-      progress = n.do_flow();
-      n.unkeep();
-      Node x;
-      if( (x=n.do_reduce()) != null ) { n=x; progress=n; }
-      if( (x=n.do_mono  ()) != null ) { n=x; progress=n; }
-      if( (x=n.do_grow  ()) != null ) { n=x; progress=n; }
-      n.keep();
-      if( iter() ) progress=n;
-    }
-    if( n instanceof FunNode ) add_inline((FunNode)n);
-    n.unkeep();
-    add_flow(n); // if keep falls back to zero; next time can compute proper liveness
-    return n;
+    assert n._uses._len==0 && n._keep==0; // New to GVN
+    Node x = iter(add_work_all(n));
+    if( x==null ) x=n;          // Ignore lack-of-progress
+    return add_flow(x);         // No liveness (yet), since uses not known
   }
 
+  // Top-level iter cleanout.  Changes GVN modes & empties all queues &
+  // aggressively checks no-more-progress.
   private static final VBitSet IDEAL_VISIT = new VBitSet();
-  public boolean iter(Mode opt_mode) {
+  public void iter(Mode opt_mode) {
     _opt_mode = opt_mode;
-    boolean progress = iter();
+    iter((Node)null);
     IDEAL_VISIT.clear();
     assert !Env.START.more_ideal(IDEAL_VISIT);
-    return progress;
   }
 
-  // Once the program is complete, any time anything is on the worklist we can
-  // always conservatively iterate on it.
+  // Any time anything is on any worklist we can always conservatively iterate on it.
+  // Return null if no progress.  Otherwise return 'n' or a replacement for 'n'.
   static int ITER_CNT;
   static int ITER_CNT_NOOP;
-  public boolean iter() {
-    if( _opt_mode== Mode.Pause ) return false;
-    if( !HAS_WORK ) return false;
-    boolean progress = false;
+  public Node iter(Node x) {
+    if( _opt_mode== Mode.Pause ) return x;
+    if( !HAS_WORK ) return x;
+    if( x!=null ) x.keep(); // Always keep this guy, unless reducing it directly
+    boolean progress=false;
     outer:
     while( true ) {
       for( Work W : _all_works ) {
         Node n = W.pop();
-        if( n==null ) continue;
-        if( !n.is_dead() && W.apply(n) !=null ) {
+        if( n==null ) continue; // Worklist is empty
+        if( n.is_dead() ) { ITER_CNT_NOOP++; continue outer; }
+        boolean keep = x==n && W._replacing; // Allow X to be replaced
+        if( keep ) x.unkeep();
+        Node m = W.apply(n);
+        if( m == null ) {       // not-null is progress
+          ITER_CNT_NOOP++;      // No progress
+        } else {
           // VERY EXPENSIVE ASSERT
           //assert W==_work_dead || Env.START.more_flow(true)==0; // Initial conditions are correct
           ITER_CNT++; assert ITER_CNT < 35000; // Catch infinite ideal-loops
-          progress = true;
-        } else {
-          ITER_CNT_NOOP++;      // No progress
+          if( x==n ) x=m;       // Keep track of the replacement for x, if any
+          progress = true;      // flag progress
         }
+        if( keep ) x.keep();
         continue outer;
       }
       HAS_WORK=false;
-      return progress;
+      if( x!=null ) x.unkeep();
+      return progress ? x : null;
     }
   }
 
@@ -324,7 +319,7 @@ public class GVNGCM {
       if( _ret!=null ) _ret.keep(); // Thing being returned at close-point is always alive
       for( Node tmp : _tmps )
         add_unuse(tmp.unkeep()); // Needs proper liveness at least
-      iter();                    // Cleanup
+      iter((Node)null);          // Cleanup
       if( _ret!=null ) _ret.unkeep();
     }
   }

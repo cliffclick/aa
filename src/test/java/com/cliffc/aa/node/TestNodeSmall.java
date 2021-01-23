@@ -368,8 +368,7 @@ public class TestNodeSmall {
     };
     _testMonotonicChain(ins,call,argss_add2);
 
-    //gvn.kill(cepi);
-    throw com.cliffc.aa.AA.unimpl();
+    cepi.kill();
   }
 
 
@@ -418,7 +417,7 @@ public class TestNodeSmall {
                                                      dsp_file_ptr.val(), // File-scope display as arg0
                                                      Type.SCALAR));  // Some scalar arg1
     TypeFunSig sig = TypeFunSig.make(TypeTuple.RET,formals);
-    FunNode fun = new FunNode("fact",sig,-1,false);
+    FunNode fun = new FunNode("fact",sig,-1,false).unkeep();
     gvn.xform(fun.add_def(ctl).add_def(ctl));
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".

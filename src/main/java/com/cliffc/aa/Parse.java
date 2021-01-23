@@ -1397,7 +1397,7 @@ public class Parse implements Comparable<Parse> {
       Env.GVN.add_work_all(cepi);
       for( int i = 0; i < cepi.nwired(); i++ )
         Env.GVN.add_inline(cepi.wired(i).fun());
-    }
+    } else Env.GVN.add_flow(cepi);
     return gvn(new ProjNode(cepi.unkeep(),REZ_IDX));
   }
 

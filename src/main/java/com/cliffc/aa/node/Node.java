@@ -712,11 +712,16 @@ public abstract class Node implements Cloneable, TNode {
     return progress;
   }
 
-  public Node do_mono() { Node x= ideal_mono(); assert x==null || x==this; return x; }
+  public Node do_mono() {
+    Node x= ideal_mono();
+    if( x==null ) return null;
+    assert x==this;
+    return Env.GVN.add_flow(Env.GVN.add_reduce(x));
+  }
 
   public Node do_grow() {
     Node nnn = ideal_grow();
-    return nnn==null || nnn==this || is_dead() ? nnn : subsume(nnn);
+    return nnn==null || nnn==this || is_dead() ? nnn : subsume(Env.GVN.add_flow(Env.GVN.add_reduce(nnn)));
   }
 
   // Replace with a ConNode iff

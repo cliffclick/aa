@@ -642,10 +642,9 @@ public class CallNode extends Node {
     for( int j=MEM_IDX; j<nargs(); j++ ) {
       Type formal = formals.at(j);
       Type actual = targ(targs,j);          // Calls skip ctrl & mem
-      if( actual==Type.ANY && ProjNode.proj(this, j)==null )
-          continue;             // Unused args can be error, are ignored
-      assert actual==actual.simple_ptr();    // Only simple ptrs from nodes
-      actual = caller_mem.sharptr(actual);   // Sharpen actual pointers before checking vs formals
+      if( actual==Type.ANY ) continue;      // Unused args can be error, are ignored
+      assert actual==actual.simple_ptr();   // Only simple ptrs from nodes
+      actual = caller_mem.sharptr(actual);  // Sharpen actual pointers before checking vs formals
 
       if( actual==formal ) { flags|=GOOD; continue; } // Arg is fine.  Covers NO_DISP which can be a high formal.
       Type mt_lo = actual.meet(formal       );

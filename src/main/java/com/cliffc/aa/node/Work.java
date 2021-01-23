@@ -8,8 +8,9 @@ import java.util.function.Function;
 public abstract class Work implements Function<Node,Node> {
   final Ary<Node> _work = new Ary<>(new Node[1],0);
   final VBitSet _on = new VBitSet();
-  final String _name;
-  public Work(String name) { _name=name; }
+  public final String _name;
+  public final boolean _replacing;
+  public Work(String name, boolean replacing) { _name=name; _replacing = replacing; }
   public <N extends Node> N add(N n) {
     if( !_on.tset(n._uid) ) _work.push(n);
     return n;
