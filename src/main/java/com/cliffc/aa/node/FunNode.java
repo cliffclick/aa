@@ -730,6 +730,7 @@ public class FunNode extends RegionNode {
         int oldalias = BitsAlias.parent(oorg.nnn()._alias);
         Env.DEFMEM.set_def(oldalias,Node.con(TypeObj.UNUSED));
         oorg.reset_tvar();      // Force new H-M unification of memory
+        Env.GVN.add_mono(oorg.nnn());
       }
 
       if( nn instanceof FunPtrNode ) { // FunPtrs pick up the new fidx

@@ -67,6 +67,10 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   }
 
   @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
+  @Override public void add_flow_def_extra(Node chg) {
+    if( chg instanceof MrgProjNode && chg._live.at(_alias)==TypeObj.UNUSED )
+      Env.GVN.add_reduce(chg);
+  }
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
     return TypeTuple.make(Type.CTRL, is_unused() ? TypeObj.UNUSED : valueobj(),_tptr);   // Complex obj, simple ptr.

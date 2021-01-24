@@ -42,6 +42,7 @@ public class GVNGCM {
   public void add_dead  ( Node n ) { add_work(_work_dead, n); }
   public <N extends Node> N add_reduce( N n ) { return add_work(_work_reduce,n); }
   public <N extends Node> N add_flow  ( N n ) { return add_work(_work_flow  ,n); }
+  public <N extends Node> N add_mono  ( N n ) { return add_work(_work_mono  ,n); }
   public void add_grow  ( Node n ) { add_work(_work_grow  ,n); }
   public void add_inline( FunNode n ) { add_work(_work_inline, n); }
   public void add_flow_defs  ( Node n ) { add_work_defs(_work_flow  ,n); }
@@ -259,7 +260,7 @@ public class GVNGCM {
   }
 
   private void remove_ambi( CallNode call ) {
-    TypeFunPtr tfp = CallNode.ttfpx(call.val());
+    TypeFunPtr tfp = CallNode.ttfpx(call._val);
     FunPtrNode fptr = null;
     if( tfp != null ) {     // Have a sane function ptr?
       BitsFun fidxs = tfp.fidxs();

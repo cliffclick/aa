@@ -70,8 +70,8 @@ public final class CallEpiNode extends Node {
     if( nwired()==1 && fidxs.abit() != -1 ) { // Wired to 1 target
       RetNode ret = wired(0);                 // One wired return
       FunNode fun = ret.fun();
-      Type tdef = Env.DEFMEM.val();
-      TypeTuple tret = ret.val() instanceof TypeTuple ? (TypeTuple) ret.val() : (TypeTuple) ret.val().oob(TypeTuple.RET);
+      Type tdef = Env.DEFMEM._val;
+      TypeTuple tret = ret._val instanceof TypeTuple ? (TypeTuple) ret._val : (TypeTuple)ret._val.oob(TypeTuple.RET);
       Type tretmem = tret.at(1);
       if( fun != null && fun._defs._len==2 && // Function is only called by 1 (and not the unknown caller)
           call.err(true)==null &&       // And args are ok
@@ -348,11 +348,14 @@ public final class CallEpiNode extends Node {
     BitsAlias esc_out = esc_out(post_call,trez);
     TypeObj[] pubs = new TypeObj[defnode._defs._len];
     TypeMem caller_mem = CallNode.emem(tcall); // Call memory
+    TypeMem tdefmem = (TypeMem)defmem;
     for( int i=1; i<pubs.length; i++ ) {
       boolean ein  = tescs._aliases.test_recur(i);
       boolean eout = esc_out       .test_recur(i);
       TypeObj pre = caller_mem.at(i);
       TypeObj obj = ein || eout ? (TypeObj)(pre.meet(post_call.at(i))) : pre;
+      if( tdefmem.at(i) == TypeObj.UNUSED || tdefmem.at(i) == TypeObj.ANY )
+        obj = TypeObj.UNUSED; // If dead, then dead
       if( !opt_mode._CG )       // Before GCP, must use DefMem to keeps types strong as the Parser
         obj = (TypeObj)obj.join(((TypeMem)defmem).at(i));
       pubs[i] = obj;

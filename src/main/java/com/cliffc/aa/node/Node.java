@@ -716,7 +716,7 @@ public abstract class Node implements Cloneable, TNode {
     Node x= ideal_mono();
     if( x==null ) return null;
     assert x==this;
-    return Env.GVN.add_flow(Env.GVN.add_reduce(x));
+    return Env.GVN.add_mono(Env.GVN.add_flow(Env.GVN.add_reduce(x)));
   }
 
   public Node do_grow() {

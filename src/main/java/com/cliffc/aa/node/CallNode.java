@@ -383,6 +383,7 @@ public class CallNode extends Node {
     Type ctl = ctl()._val;
     if( opt_mode!=GVNGCM.Mode.Parse && cepi()==null ) ctl = Type.XCTRL; // Dead from below
     if( ctl != Type.CTRL ) return ctl.oob();
+    if( mem()==null ) return Type.ALL;
 
     // Not a memory to the call?
     Type mem = mem()._val;
@@ -619,7 +620,7 @@ public class CallNode extends Node {
       return 0; // Parent is never a real choice.  See these during inlining.
 
     FunNode fun = FunNode.find_fidx(fidx);
-    if( fun==null || fun.is_dead() ) return DEAD; // Stale fidx leading to dead fun
+    if( fun==null || fun.is_dead() ) return BAD; // Stale fidx leading to dead fun
     // Forward refs are only during parsing; assume they fit the bill
     if( fun.is_forward_ref() ) return LOW;   // Assume they work
     if( fun.nargs() != nargs() ) return BAD; // Wrong arg count, toss out

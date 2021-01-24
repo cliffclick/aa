@@ -219,6 +219,8 @@ public class LoadNode extends Node {
   @Override public void add_flow_use_extra(Node chg) {
     if( chg==adr() ) Env.GVN.add_flow(mem());  // Address into a Load changes, the Memory can be more alive.
     if( chg==mem() ) Env.GVN.add_flow(mem());  // Memory value lifts to ANY, memory live lifts also.
+    // Memory improves, perhaps Load can bypass Call
+    if( chg==mem() && mem().in(0) instanceof CallEpiNode ) Env.GVN.add_reduce(this);
   }
 
   // The only memory required here is what is needed to support the Load

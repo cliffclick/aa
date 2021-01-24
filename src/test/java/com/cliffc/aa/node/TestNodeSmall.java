@@ -402,7 +402,7 @@ public class TestNodeSmall {
     gvn._opt_mode=GVNGCM.Mode.Parse;
     ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
     ctl._val = Type.CTRL;
-    ConNode mem = (ConNode)gvn.xform(new ConNode<>(TypeMem.ANYMEM));
+    ConNode mem = (ConNode)gvn.xform(new ConNode<>(TypeMem.ANYMEM)).keep();
     ConNode rpc = (ConNode)gvn.xform(new ConNode<>(TypeRPC.ALL_CALL));
     ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISP_SIMPLE));
     // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
@@ -417,8 +417,8 @@ public class TestNodeSmall {
                                                      dsp_file_ptr.val(), // File-scope display as arg0
                                                      Type.SCALAR));  // Some scalar arg1
     TypeFunSig sig = TypeFunSig.make(TypeTuple.RET,formals);
-    FunNode fun = new FunNode("fact",sig,-1,false).unkeep();
-    gvn.xform(fun.add_def(ctl).add_def(ctl));
+    FunNode fun = new FunNode("fact",sig,-1,false);
+    gvn.init(fun.add_def(ctl).add_def(ctl)).unkeep();
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
     ParmNode parm_mem = new ParmNode(MEM_IDX," mem",fun,mem,null);
@@ -589,7 +589,7 @@ public class TestNodeSmall {
     ConNode arg2= (ConNode)gvn.xform(new ConNode<>(targ2));
 
     // Make nodes
-    FunNode fun = new FunNode("fun",tsig,-1,false);
+    FunNode fun = new FunNode("fun",tsig,-1,false).unkeep();
     gvn.xform(fun.add_def(cpj));
 
     ParmNode parmem= gvn.init(new ParmNode( 0,"mem" ,fun,mem ,null));

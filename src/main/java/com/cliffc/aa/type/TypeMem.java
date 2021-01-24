@@ -489,7 +489,7 @@ public class TypeMem extends Type<TypeMem> {
     return bs;
   }
 
-  // True if field is modifiable across all aliases
+  // True if field is modifiable across any alias
   public boolean fld_is_mod( BitsAlias aliases, String fld) {
     for( int alias : aliases ) {
       if( alias != 0 ) {

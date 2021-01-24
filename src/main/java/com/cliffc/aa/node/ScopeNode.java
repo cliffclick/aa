@@ -55,6 +55,7 @@ public class ScopeNode extends Node {
     set_def(MEM_IDX,n);
     if( old!=null ) {
       Env.GVN.add_work_all(old);
+      old.add_flow_def_extra(n); // old loses a use, triggers extra
       Env.GVN.add_work_all(n);
       Env.GVN.iter(Env.GVN._opt_mode);
     }
