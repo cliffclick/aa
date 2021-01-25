@@ -26,6 +26,7 @@ public class GVNGCM {
   private final Work _work_mono   = new Work("mono"  , true ) { @Override public Node apply(Node n) { return n.do_mono  (); } };
   private final Work _work_grow   = new Work("grow"  , true ) { @Override public Node apply(Node n) { return n.do_grow  (); } };
   private final Work _work_inline = new Work("inline", false) { @Override public Node apply(Node n) { return ((FunNode)n).ideal_inline(false); } };
+  public  final Work _work_dom    = new Work("dom"   , false) { @Override public Node apply(Node n) { return n.do_mono  (); } };
   @SuppressWarnings("unchecked")
   private final Work[] _new_works = new Work[]{           _work_flow,_work_reduce,_work_mono,_work_grow             };
   @SuppressWarnings("unchecked")
@@ -126,7 +127,19 @@ public class GVNGCM {
   private static final VBitSet IDEAL_VISIT = new VBitSet();
   public void iter(Mode opt_mode) {
     _opt_mode = opt_mode;
-    iter((Node)null);
+    boolean progress=true;
+    while( progress ) {
+      progress = false;
+      iter((Node)null);
+      // Only a very nodes can make progress via dominance relations, and these
+      // can make progress "very far" in the graph.  So instead of using a
+      // neighbors list, we bulk revisit them here.
+      for( int i=0; i<_work_dom.len(); i++ ) {
+        Node dom = _work_dom.at(i);
+        if( dom.is_dead() ) _work_dom.del(i--);
+        else progress |= _work_dom.apply(dom)!=null;
+      }
+    }
     IDEAL_VISIT.clear();
     assert !Env.START.more_ideal(IDEAL_VISIT);
   }
@@ -135,10 +148,13 @@ public class GVNGCM {
   // Return null if no progress.  Otherwise return 'n' or a replacement for 'n'.
   static int ITER_CNT;
   static int ITER_CNT_NOOP;
+  static int ITER_NEST=0;
   public Node iter(Node x) {
     if( _opt_mode== Mode.Pause ) return x;
     if( !HAS_WORK ) return x;
     if( x!=null ) x.keep(); // Always keep this guy, unless reducing it directly
+    ITER_NEST++;
+    Work outer = null;
     boolean progress=false;
     outer:
     while( true ) {
@@ -147,7 +163,11 @@ public class GVNGCM {
         if( n==null ) continue; // Worklist is empty
         if( n.is_dead() ) { ITER_CNT_NOOP++; continue outer; }
         boolean keep = x==n && W._replacing; // Allow X to be replaced
-        if( keep ) x.unkeep();
+        if( keep ) x.unkeep();               // Need to upgrade X in-place
+        if( n._keep>0 && W._replacing && ITER_NEST > 1 ) { // Will not upgrade in this iter, but may be in a recursive iter
+          if( outer==null ) outer = new Work("outer",true) { @Override public Node apply(Node n) { throw com.cliffc.aa.AA.unimpl(); } };
+          outer.add(n);         // Save for a recursive iter
+        }
         Node m = W.apply(n);
         if( m == null ) {       // not-null is progress
           ITER_CNT_NOOP++;      // No progress
@@ -163,6 +183,9 @@ public class GVNGCM {
       }
       HAS_WORK=false;
       if( x!=null ) x.unkeep();
+      if( outer!=null && progress )
+        for( Node n : outer._work ) add_reduce(n);
+      ITER_NEST--;
       return progress ? x : null;
     }
   }

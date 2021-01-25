@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
@@ -8,7 +9,10 @@ import com.cliffc.aa.type.TypeTuple;
 // Gain precision after an If-test.
 public class CastNode extends Node {
   public final Type _t;                // TypeVar???
-  public CastNode( Node ctrl, Node ret, Type t ) { super(OP_CAST,ctrl,ret); _t=t; }
+  public CastNode( Node ctrl, Node ret, Type t ) {
+    super(OP_CAST,ctrl,ret); _t=t;
+    Env.GVN._work_dom.add(this);
+  }
   @Override public String xstr() { return "("+_t+")"; }
 
   @Override public Node ideal_reduce() {
@@ -50,7 +54,11 @@ public class CastNode extends Node {
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     return def==in(0) ? TypeMem.ALIVE : _live;
   }
-
+  @Override public CastNode copy( boolean copy_edges) {
+    CastNode nnn = (CastNode)super.copy(copy_edges);
+    return Env.GVN._work_dom.add(nnn);    
+  }
+  
   private static boolean checked( Node n, Node addr ) {
     if( !(n instanceof CProjNode && ((CProjNode)n)._idx==1) ) return false; // Not a Cast of a CProj-True
     Node n0 = n.in(0);

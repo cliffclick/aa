@@ -51,6 +51,7 @@ public class StoreNode extends Node {
       nnn.update(idx,_fin,rez());
       mem.xval();
       Env.GVN.add_flow_uses(this);
+      add_reduce_extra();       // Folding in allows store followers to fold in
       return mem;               // Store is replaced by using the New directly.
     }
 
@@ -91,12 +92,11 @@ public class StoreNode extends Node {
   // If changing an input or value allows the store to no longer be in-error,
   // following Loads can collapse
   @Override public void add_reduce_extra() {
-    if( err(true)==null )
-      for( Node use : _uses )
-        if( use instanceof LoadNode )
-          Env.GVN.add_reduce(use);
+    for( Node use : _uses )
+      if( use instanceof LoadNode )
+        Env.GVN.add_mono(Env.GVN.add_reduce(use));
   }
-  
+
   @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   // StoreNode needs to return a TypeObj for the Parser.

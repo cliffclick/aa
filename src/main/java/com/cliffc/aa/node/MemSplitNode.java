@@ -150,8 +150,8 @@ public class MemSplitNode extends Node {
     return head1;
   }
 
-  static boolean check_split( Node head1, BitsAlias head1_escs ) {
-    Node tail2 = head1.in(1);
+  static boolean check_split( Node head1, BitsAlias head1_escs ) { return check_split(head1,head1_escs,head1.in(1)); }
+  static boolean check_split( Node head1, BitsAlias head1_escs, Node tail2 ) {
     // Must have only 1 mem-writer (this can fail if used by different control paths)
     if( !tail2.check_solo_mem_writer(head1) ) return false;
     // No alias overlaps

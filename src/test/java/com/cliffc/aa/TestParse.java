@@ -412,6 +412,7 @@ public class TestParse {
 
   private static final String[] FLDS2= new String[]{"^","map","nn","vv"};
   @Test public void testParse07() {
+    TypeStruct dummy = TypeStruct.DISPLAY;
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", Type.XNIL);
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
@@ -462,7 +463,7 @@ public class TestParse {
 
     // Test inferring a recursive struct type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
-    Type[] ts1 = TypeStruct.ts(Type.XNIL, Type.XSCALAR, TypeMemPtr.make_nil(20,TypeObj.ISUSED),TypeFlt.con(1.2*1.2));
+    Type[] ts1 = TypeStruct.ts(Type.XNIL, Type.XSCALAR, TypeMemPtr.make_nil(37,TypeObj.ISUSED),TypeFlt.con(1.2*1.2));
     test_struct("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
                 TypeStruct.make(FLDS2,ts1,TypeStruct.ffnls(4)));
 

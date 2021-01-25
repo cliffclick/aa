@@ -6,11 +6,12 @@ import com.cliffc.aa.util.VBitSet;
 import java.util.function.Function;
 
 public abstract class Work implements Function<Node,Node> {
-  final Ary<Node> _work = new Ary<>(new Node[1],0);
+  public final Ary<Node> _work = new Ary<>(new Node[1],0);
   final VBitSet _on = new VBitSet();
   public final String _name;
   public final boolean _replacing;
   public Work(String name, boolean replacing) { _name=name; _replacing = replacing; }
+  public int len() { return _work._len; }
   public <N extends Node> N add(N n) {
     if( !_on.tset(n._uid) ) _work.push(n);
     return n;
@@ -23,6 +24,8 @@ public abstract class Work implements Function<Node,Node> {
     _on.clear(n._uid);
     return n;
   }
+  public Node at(int i) { return _work.at(i); }
+  public void del(int i) { _on.clear(at(i)._uid); _work.del(i); }
 
   public boolean isEmpty() { return _work._len==0; }
   public boolean on(Node n) { return _on.test(n._uid); }

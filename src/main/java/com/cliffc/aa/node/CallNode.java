@@ -338,27 +338,57 @@ public class CallNode extends Node {
     // go under ideal_grow to avoid recomputing the test.
     Node mem = mem();
     CallEpiNode cepi = cepi();
-    if( GVN._opt_mode != GVNGCM.Mode.Parse && mem instanceof MrgProjNode && cepi != null ) {
-      ProjNode cepim = ProjNode.proj(cepi,MEM_IDX); // Memory projection from CEPI
-      ProjNode cepid = ProjNode.proj(cepi,REZ_IDX); // Return projection from CEPI
-      // Verify no extra mem readers in-between, no alias overlaps on input
-      if( cepim != null && MemSplitNode.check_split(this,escapees()) ) {
-        TypeMem tmcepi = (TypeMem) cepim._val;
-        // Verify call entry is not stale relative to call exit
-        if( mem._val.isa(tmcepi) ) {
-          // If call returns same as new (via recursion), cannot split, but CAN swap.
-          BitsAlias esc_out = CallEpiNode.esc_out(tmcepi,cepid==null ? Type.XNIL : cepid._val);
-          BitsAlias escs = escapees().meet(esc_out);
-          int alias = ((MrgProjNode)mem).nnn()._alias;
-          if( !escs.is_empty() && !esc_out.test_recur(alias) ) // No return conflict, so parallelize memory
-            return MemSplitNode.insert_split(cepim,escs,this,mem,mem);
-          else                  // Else move New below Call.
-            return swap_new(cepim,(MrgProjNode)mem);
+    if( GVN._opt_mode == GVNGCM.Mode.Parse || cepi==null ) return null;
+    ProjNode cepim = ProjNode.proj(cepi,MEM_IDX); // Memory projection from CEPI
+    ProjNode cepid = ProjNode.proj(cepi,REZ_IDX); // Return projection from CEPI
+    if( cepim == null ) return null;
+    if( !(cepim._val instanceof TypeMem) ) return null;
+    TypeMem tmcepi = (TypeMem) cepim._val;
+    if( !mem._val.isa(tmcepi) ) return null; // Call entry stale relative to exit
+    BitsAlias escs = escapees();
+    // Check for prior      MrgProj/New
+    if( mem instanceof MrgProjNode )
+      return _ideal_grow((MrgProjNode)mem,cepim,cepid,escs,-1);
+    // Check for prior Join/MrgProj/New
+    if( mem instanceof MemJoinNode ) {
+      for( int i=1; i<mem._defs._len; i++ )
+        if( mem.in(i) instanceof MrgProjNode ) {
+          Node x = _ideal_grow((MrgProjNode)mem.in(i),cepim,cepid,escs,i);
+          if( x!=null ) return x;
         }
-      }
     }
-
     return null;
+  }
+
+  // Check for a Call/New that can either bypass or be placed in parallel
+  private Node _ideal_grow(MrgProjNode mem, ProjNode cepim, ProjNode cepid, BitsAlias escs, int i) {
+    // No alias overlaps
+    int alias = mem.nnn()._alias;
+    if( escs.test_recur(alias) ) return null;
+    // No other readers or writers.  Expect the Call (or Join) and optionally DEFMEM
+    if( mem._uses._len>2 ) return null;
+    if( mem._uses._len==2 && mem._uses.find(Env.DEFMEM)==-1 ) return null; // Something other than DEFMEM
+
+    // If call returns same as new (via recursion), cannot split, but CAN swap.
+    TypeMem tmcepi = (TypeMem) cepim._val;
+    BitsAlias esc_out = CallEpiNode.esc_out(tmcepi,cepid==null ? Type.XNIL : cepid._val);
+    BitsAlias escs2 = escs.meet(esc_out);
+    Node jn = mem();
+    if( !escs2.is_empty() && !esc_out.test_recur(alias) ) { // No return conflict, so parallelize memory
+      if( jn==mem )             // Bare Call/New; add a Split/Join.
+        return MemSplitNode.insert_split(cepim,escs2,this,mem,mem);
+      return null; // TODO: allow Call to move into existing JOIN
+    } else {                    // Else move New below Call.
+      if( jn!=mem ) {           // Move New below Join
+        Node pre = mem.mem();
+        jn.set_def(i,pre);
+        mem.set_def(MEM_IDX,jn);
+        set_mem(mem);
+        Env.GVN.add_unuse(jn);
+        Env.GVN.add_unuse(mem);
+      }
+      return swap_new(cepim,mem); // Move New below Call
+    }
   }
 
   @Override public Node ideal(GVNGCM gvn, int level) { throw unimpl(); }
@@ -369,6 +399,8 @@ public class CallNode extends Node {
     cepim.insert(mrg);
     set_def(1,mrg.mem());
     mrg.set_def(1,cepim.unkeep());
+    Env.GVN.revalive(mrg);
+    Env.GVN.add_flow_uses(mrg);
     return this;
   }
 
