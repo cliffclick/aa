@@ -223,11 +223,11 @@ public abstract class Node implements Cloneable, TNode {
     if( _elock ) { _elock = false; Node x = VALS.remove(this); assert x == this; }
     while( _defs._len > 0 ) unuse(_defs.pop());
     set_dead();                 // officially dead now
-    LIVE.clear(_uid);
-    if( _uid==CNT-1 )           // Roll back unused node indices
-      while( !LIVE.get(CNT-1) ) CNT--;
+    LIVE.clear(_uid);           // Off the LIVE set.  CNT cannot roll back unless the GVN worklists are also clear
     return this;
   }
+  // Called when GVN worklists are empty
+  public static void roll_back_CNT() { while( !LIVE.get(CNT-1) ) CNT--; }
 
   // "keep" a Node during all optimizations because it is somehow unfinished.
   // Typically used when needing to build several Nodes before building the

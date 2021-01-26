@@ -52,7 +52,11 @@ public class MemJoinNode extends Node {
 
     return null;
   }
-
+  @Override public void add_flow_def_extra(Node chg) {
+    if( _uses._len==1 && _uses.at(0) instanceof StoreNode )
+      Env.GVN.add_reduce(_uses.at(0));
+  }
+    
   static Node find_sese_head(Node mem) {
     if( mem instanceof MemJoinNode ) return ((MemJoinNode)mem).msp(); // Merge Split with prior Join
     if( mem instanceof StoreNode ) return mem;   // Move Store into Split/Join

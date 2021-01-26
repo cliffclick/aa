@@ -37,6 +37,7 @@ public class GVNGCM {
   public boolean on_reduce( Node n ) { return _work_reduce.on(n); }
 
   static public <N extends Node> N add_work( Work work, N n ) {
+    if( n.is_dead() ) return n;
     if( !HAS_WORK ) HAS_WORK = true; // Filtered set
     return work.add(n);
   }
@@ -65,6 +66,7 @@ public class GVNGCM {
         add_work(work,use);
   }
   public Node add_work_all( Node n ) {
+    if( n.is_dead() ) return n;
     if( !HAS_WORK ) HAS_WORK = true; // Filtered set
     for( Work work : _new_works ) work.add(n);
     if( n instanceof FunNode )
@@ -182,6 +184,7 @@ public class GVNGCM {
         continue outer;
       }
       HAS_WORK=false;
+      Node.roll_back_CNT();     // Can reclaim node numbers
       if( x!=null ) x.unkeep();
       if( outer!=null && progress )
         for( Node n : outer._work ) add_reduce(n);
