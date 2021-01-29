@@ -276,6 +276,7 @@ public final class CallEpiNode extends Node {
     BitsFun fidxs = tfptr==null || tfptr.is_forward_ref() ? BitsFun.FULL : tfptr.fidxs();
     // NO fidxs, means we're not calling anything.
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
+    if( fidxs.above_center() ) return TypeTuple.CALLE.dual(); // Not resolved yet
 
     // Default memory: global worse-case scenario
     Node defnode = in(1);

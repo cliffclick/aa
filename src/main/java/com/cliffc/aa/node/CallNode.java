@@ -418,7 +418,7 @@ public class CallNode extends Node {
     if( _is_copy ) return _val; // No change till folds away
     // Pinch to XCTRL/CTRL
     Type ctl = ctl()._val;
-    if( cepi()==null ) ctl = Type.XCTRL; // Dead from below
+    if( opt_mode!=GVNGCM.Mode.Parse && cepi()==null ) ctl = Type.XCTRL; // Dead from below
     if( _keep==0 && ctl != Type.CTRL ) return ctl.oob();
     if( mem()==null ) return Type.ALL;
 
@@ -644,7 +644,7 @@ public class CallNode extends Node {
       return choices;           // Report it low
     if( choices==BitsFun.EMPTY )// No good choices
       return sgn(fidxs,false);  // Report all the bad ones low
-    return sgn(choices,true);   // All good choices, report high
+    return sgn(choices,gcp && fidxs.above_center());
   }
 
   private static boolean x(int flags, int flag)  { return (flags&flag)==flag; }
