@@ -107,7 +107,7 @@ public class LoadNode extends Node {
     if( mem._op == OP_PHI && mem.in(0)._op != OP_LOOP && adr.in(0) instanceof NewNode ) {
       Node lphi = new PhiNode(Type.SCALAR,((PhiNode)mem)._badgc,mem.in(0));
       for( int i=1; i<mem._defs._len; i++ )
-        lphi.add_def(Env.GVN.xform(new LoadNode(mem.in(i),adr,_fld,_bad)));
+        lphi.add_def(Env.GVN.add_work_all(new LoadNode(mem.in(i),adr,_fld,_bad)));
       return lphi;
     }
 

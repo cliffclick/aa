@@ -22,7 +22,7 @@ public class TypeTuple extends Type<TypeTuple> {
   // If visit is not null, children need to be recursively visited.
   @Override public int compute_hash( ) {
     int hash = TTUPLE+(_any?0:1);
-    for( Type t : _ts ) hash += t._hash;
+    for( Type t : _ts ) hash = (hash>>>17) | ((hash<<5) * t._hash);
     return hash|1;
   }
   @Override public boolean equals( Object o ) {

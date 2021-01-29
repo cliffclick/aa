@@ -211,8 +211,8 @@ public class CallNode extends Node {
             add_def( nnn.fld(i));
           add_def(fdx);
           _unpacked = true;      // Only do it once
-          xval();                // Recompute value, this is not monotonic since replacing tuple with args
-          GVN.add_work_all(this);// Revisit unification after unpacking
+          keep().xval();         // Recompute value, this is not monotonic since replacing tuple with args
+          GVN.add_work_all(unkeep());// Revisit unification after unpacking
           return this;
         }
       }
@@ -282,7 +282,9 @@ public class CallNode extends Node {
         if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
         if( fptr.display()._val.isa(dsp()._val) )
           set_dsp(fptr.display());
-        return set_fdx(fptr); // Resolve to 1 choice
+        set_fdx(fptr);          // Resolve to 1 choice
+        xval();                 // Force value update; least-cost LOWERS types (by removing a choice)
+        return this;
       }
     }
 
@@ -326,6 +328,8 @@ public class CallNode extends Node {
     Node cepi = cepi();
     if( !_is_copy && cepi!=null )
       Env.GVN.add_reduce(cepi);
+    if( mem() instanceof MrgProjNode )
+      Env.GVN.add_reduce(this);
   }
 
   @Override public Node ideal_grow() {
@@ -338,7 +342,7 @@ public class CallNode extends Node {
     // go under ideal_grow to avoid recomputing the test.
     Node mem = mem();
     CallEpiNode cepi = cepi();
-    if( GVN._opt_mode == GVNGCM.Mode.Parse || cepi==null ) return null;
+    if( _keep>0 || cepi==null ) return null;
     ProjNode cepim = ProjNode.proj(cepi,MEM_IDX); // Memory projection from CEPI
     ProjNode cepid = ProjNode.proj(cepi,REZ_IDX); // Return projection from CEPI
     if( cepim == null ) return null;
@@ -401,6 +405,7 @@ public class CallNode extends Node {
     mrg.set_def(1,cepim.unkeep());
     Env.GVN.revalive(mrg);
     Env.GVN.add_flow_uses(mrg);
+    Env.GVN.add_flow(this);
     return this;
   }
 
@@ -413,8 +418,8 @@ public class CallNode extends Node {
     if( _is_copy ) return _val; // No change till folds away
     // Pinch to XCTRL/CTRL
     Type ctl = ctl()._val;
-    if( opt_mode!=GVNGCM.Mode.Parse && cepi()==null ) ctl = Type.XCTRL; // Dead from below
-    if( ctl != Type.CTRL ) return ctl.oob();
+    if( cepi()==null ) ctl = Type.XCTRL; // Dead from below
+    if( _keep==0 && ctl != Type.CTRL ) return ctl.oob();
     if( mem()==null ) return Type.ALL;
 
     // Not a memory to the call?
@@ -581,14 +586,17 @@ public class CallNode extends Node {
   // and resolve() cannot move off the extreme until ALL args move.
   // See TestNodeSmall.java for the large mapping table test.
   //
+  // resolve breaks down all args to all potential functions into GOOD, BAD,
+  // HIGH and LOW.  LOW and HIGH bracket BAD & GOOD, which are parallel.
+  //
   // Rules "cookbook" to help map the table:
   // - Some args High & no Low, keep all & join (ignore Good,Bad)
   // - Some args Low & no High, keep all & meet (ignore Good,Bad)
   // - Mix High/Low & no Good , keep all
   // - Some Good, no Low, no High, drop Bad & fidx?join:meet
   // - All Bad, like Low: keep all & meet
-  // At any time during iter (not GCP), an arg can go dead and
-  // be removed - so losing an arg can only lift.
+  // At any time during iter (not GCP), an arg can go dead (ANY) and be removed
+  // (lift to HIGH) - so losing an arg can only lift.
   private static final int BAD=1, GOOD=2, LOW=4, HIGH=8, DEAD=16;
 
   BitsFun resolve( BitsFun fidxs, Type[] targs, TypeMem caller_mem, boolean gcp ) {
@@ -636,7 +644,7 @@ public class CallNode extends Node {
       return choices;           // Report it low
     if( choices==BitsFun.EMPTY )// No good choices
       return sgn(fidxs,false);  // Report all the bad ones low
-    return sgn(choices,gcp && fidxs.above_center());
+    return sgn(choices,true);   // All good choices, report high
   }
 
   private static boolean x(int flags, int flag)  { return (flags&flag)==flag; }

@@ -1,4 +1,45 @@
 =======================================
+1/28/2021
+
+Maybe a breakthru on Unresolved....
+
+Have a way to specify that "this collection of fcns are ambiguous", maybe
+always true based on name alone (e.g. {+}).  Then any BitsFun is a collection
+of bits (as normal), but some of them may be ambiguous with some others (but
+not all).  They can be both high and low BitsFuns, as normal (and mixed with
+other bits).  Normal forward flow rules, except at a Call.  Call filters out
+BAD arg choices as normal.
+
+LEAST_COST, during Iter same as Opto: can only be used once no more other
+lifting can happen.  Standard problem: BAD args can go dead and lift to ANY,
+so cannot prematurely remove a FDX with BAD args.
+
+Need to expand on the TestMonotonicCall.  Add ANY args.
+Can I ever filter out FDXs?
+
+When an arg dies, a FunSig LOWERS to ALL (allowing even an Err argument).
+Previously illegal args can become legal.
+Iter: Args keep lifting.
+Unresolved makes a low set of FunPtrs.
+LEAST_COST tosses out the higher cost, once its clear there is a lower cost legal FDX.
+Can be run at any time.
+
+i.e. Call.value: Keeps all FDXs until there is a lower cost one; keeps BAD ones
+(in case ARG goes dead), keeps LOW (in case lifts).  Keeps HIGH (might as well)
+
+Parm filters by valid args, keeps at ALL until valid (can keep at ALL until all
+Parms are valid; dead args same as ALL, always valid).
+
+Opto: Args keep falling.
+Unresolved starts with a high set?
+
+Illegal FDX
+
+A FunSig starts high (all args dead, all calls allowed? not monotonic?) - Seperate question.
+
+
+
+=======================================
 1/11/2021
 
 Restructure of GVN in progress.

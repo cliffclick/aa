@@ -207,6 +207,7 @@ public class FunNode extends RegionNode {
       if( !(c.in(0) instanceof CallNode) ) return null; // If this is not a CallNode, just bail
       CallNode call = (CallNode)c.in(0);
       CallEpiNode cepi = call.cepi();
+      if( cepi==null ) return null;
       assert cepi._defs.find(ret)!= -1;  // If this is not wired, just bail
     }
     // Memory is not 'lifted' by DefMem, a sign that a bad-memory-arg is being
@@ -544,7 +545,6 @@ public class FunNode extends RegionNode {
       if( !(call instanceof CallNode) ) continue; // Not well formed
       if( ((CallNode)call).nargs() != nargs() ) continue; // Will not inline
       if( call.val() == Type.ALL ) continue; // Otherwise in-error
-      if( ((CallNode)call).cepi()._keep>0 ) continue; // Call/CallEpi still being parsed
       TypeFunPtr tfp = CallNode.ttfp(call.val());
       int fidx = tfp.fidxs().abit();
       if( fidx < 0 || BitsFun.is_parent(fidx) ) continue;    // Call must only target one fcn
@@ -862,9 +862,9 @@ public class FunNode extends RegionNode {
       if( c != Type.CTRL && c != Type.ALL ) continue; // Not control
       if( !(in(i) instanceof CProjNode) ) return Type.CTRL; // A constant control
       // Call might be alive and executing and calling many targets, just not this one.
-      CallNode call = (CallNode)in(i).in(0);
-      if( call._val == Type.ALL )
-        return Type.CTRL;
+      Node call = in(i).in(0);
+      if( !(call instanceof CallNode) ) continue; // Mid collapse
+      if( call._val == Type.ALL ) return Type.CTRL;
       TypeFunPtr ttfp = CallNode.ttfpx(call._val);
       if( ttfp != null && !ttfp.above_center() && ttfp._fidxs.test_recur(_fidx) )
         return Type.CTRL;       // Call us

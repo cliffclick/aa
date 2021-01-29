@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
@@ -97,6 +98,9 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       TypeMem esc0 = ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr0)._aliases,"");
       TypeMem esc1 = ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr1)._aliases,"");
       return (TypeMem)esc0.meet(esc1);
+    }
+    @Override public void add_flow_use_extra(Node chg) {
+      if( chg==in(3) || chg==in(4) ) Env.GVN.add_flow(in(1));  // Address into a Load changes, the Memory can be more alive.
     }
   }
 }

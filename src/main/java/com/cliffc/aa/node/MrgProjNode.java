@@ -66,6 +66,8 @@ public class MrgProjNode extends ProjNode {
         MemJoinNode jn = ((MemSplitNode)use).join();
         if( jn!=null ) Env.GVN.add_reduce(jn);
       }
+      if( use instanceof CallNode )
+        Env.GVN.add_grow(use); // Swap Call & New
     }
   }
   @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }

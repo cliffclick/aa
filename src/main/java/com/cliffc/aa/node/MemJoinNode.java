@@ -53,8 +53,12 @@ public class MemJoinNode extends Node {
     return null;
   }
   @Override public void add_flow_def_extra(Node chg) {
-    if( _uses._len==1 && _uses.at(0) instanceof StoreNode )
-      Env.GVN.add_reduce(_uses.at(0));
+    if( _uses._len==1 ) {
+      Node u = _uses.at(0);
+      if( u instanceof StoreNode ||
+          u instanceof MrgProjNode )
+        Env.GVN.add_reduce(u);
+    }
   }
     
   static Node find_sese_head(Node mem) {

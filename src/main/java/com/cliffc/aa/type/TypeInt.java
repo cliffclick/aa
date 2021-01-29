@@ -40,7 +40,7 @@ public class TypeInt extends Type<TypeInt> {
   public static TypeInt con(long con) { return make(0,log(con),con); }
 
   static public  final TypeInt  INT64 = make(-2,64,0);
-  static         final TypeInt  INT32 = make(-2,32,0);
+  static public  final TypeInt  INT32 = make(-2,32,0);
   static         final TypeInt  INT16 = make(-2,16,0);
   static public  final TypeInt  INT8  = make(-2, 8,0);
   static public  final TypeInt  BOOL  = make(-2, 1,0);

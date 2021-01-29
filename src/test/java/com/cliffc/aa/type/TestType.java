@@ -18,14 +18,13 @@ public class TestType {
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
 
-    TypeStruct ts0 = TypeStruct.open(TypeMemPtr.DISPLAY_PTR); // infinite extent of any-field, top mod, Scalar
-    TypeStruct ts1 = ts0.add_fld("a",TypeStruct.FFNL); // adding a field lifts
-    TypeStruct ts2 = ts1.add_fld("b",TypeStruct.FFNL); // adding a field lifts
-    Type mt = ts1.meet(ts2);
-    assertEquals(ts1,mt);
-
-    TypeStruct ts3 = ts2.close();
-    assertTrue(ts3.isa(ts2));
+    int fdx0 = BitsFun.new_fidx(1);
+    int fdx1 = BitsFun.new_fidx(fdx0);
+    int fdx2 = BitsFun.new_fidx(fdx0);
+    BitsFun bf0  = BitsFun.make0(-fdx0);
+    BitsFun bf12 = BitsFun.make0(-fdx1,-fdx2);
+    assertTrue(bf12.isa(bf0));
+    assertTrue(bf0.dual().isa(bf12.dual()));
   }
 
   @Test public void testBits0() {

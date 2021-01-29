@@ -41,7 +41,7 @@ public final class CallEpiNode extends Node {
   @Override public Node ideal_reduce() {
     if( _is_copy ) return null;
     CallNode call = call();
-    Type tc = call.val();
+    Type tc = call._val;
     if( !(tc instanceof TypeTuple) ) return null;
     TypeTuple tcall = (TypeTuple)tc;
     if( CallNode.tctl(tcall) != Type.CTRL ) return null; // Call not executable
@@ -107,7 +107,7 @@ public final class CallEpiNode extends Node {
     int cnargs = call.nargs();
     FunNode fun = FunNode.find_fidx(fidx);
     assert !fun.is_forward_ref() && !fun.is_dead()
-      && fun.val() == Type.CTRL
+      && fun._val == Type.CTRL
       && fun.nargs() == cnargs; // All checked by call.err
     RetNode ret = fun.ret();    // Return from function
     if( ret==null ) return null;
@@ -133,12 +133,12 @@ public final class CallEpiNode extends Node {
     Node rrez = ret.rez();      // Result  being returned
     boolean inline = !fun.noinline();
     // If the function does nothing with memory, then use the call memory directly.
-    if( (rmem instanceof ParmNode && rmem.in(CTL_IDX) == fun) || rmem.val() ==TypeMem.XMEM )
+    if( (rmem instanceof ParmNode && rmem.in(CTL_IDX) == fun) || rmem._val ==TypeMem.XMEM )
       rmem = cmem;
     // Check that function return memory and post-call memory are compatible
-    if( !(val() instanceof TypeTuple) ) return null;
-    Type selfmem = ((TypeTuple) val()).at(MEM_IDX);
-    if( !rmem.val().isa( selfmem ) && !(selfmem==TypeMem.ANYMEM && call.is_pure_call()!=null) )
+    if( !(_val instanceof TypeTuple) ) return null;
+    Type selfmem = ((TypeTuple) _val).at(MEM_IDX);
+    if( !rmem._val.isa( selfmem ) && !(selfmem==TypeMem.ANYMEM && call.is_pure_call()!=null) )
       return null;
 
     // Check for zero-op body (id function)
@@ -146,7 +146,7 @@ public final class CallEpiNode extends Node {
       return unwire(call,ret).set_is_copy(cctl,cmem,call.arg(((ParmNode)rrez)._idx)); // Collapse the CallEpi
 
     // Check for constant body
-    Type trez = rrez.val();
+    Type trez = rrez._val;
     if( trez.is_con() && rctl==fun && cmem == rmem && inline )
       return unwire(call,ret).set_is_copy(cctl,cmem,Node.con(trez));
 
@@ -182,9 +182,9 @@ public final class CallEpiNode extends Node {
   // Used during GCP and Ideal calls to see if wiring is possible.
   // Return true if a new edge is wired
   public boolean check_and_wire( ) {
-    if( !(val() instanceof TypeTuple) ) return false; // Collapsing
+    if( !(_val instanceof TypeTuple) ) return false; // Collapsing
     CallNode call = call();
-    Type tcall = call.val();
+    Type tcall = call._val;
     if( !(tcall instanceof TypeTuple) ) return false;
     BitsFun fidxs = CallNode.ttfp(tcall)._fidxs;
     if( fidxs.above_center() )  return false; // Still choices to be made during GCP.
@@ -276,11 +276,10 @@ public final class CallEpiNode extends Node {
     BitsFun fidxs = tfptr==null || tfptr.is_forward_ref() ? BitsFun.FULL : tfptr.fidxs();
     // NO fidxs, means we're not calling anything.
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
-    if( fidxs.above_center() ) return TypeTuple.CALLE.dual(); // Not resolved yet
 
     // Default memory: global worse-case scenario
     Node defnode = in(1);
-    Type defmem = defnode.val();
+    Type defmem = defnode._val;
     if( !(defmem instanceof TypeMem) ) defmem = defmem.oob(TypeMem.ALLMEM);
 
     // Any not-wired unknown call targets?
@@ -305,7 +304,7 @@ public final class CallEpiNode extends Node {
         }
         if( BitsFun.is_parent(fidx) ) { // Child of a split parent, need both kids wired
           if( kids==2 ) continue;       // Both kids wired, this is ok
-          return val();                  // "Freeze in place"
+          return _val;                  // "Freeze in place"
         }
         if( !opt_mode._CG )  // Before GCP?  Fidx is an unwired unknown call target
           { fidxs = BitsFun.FULL; break; }
@@ -314,7 +313,7 @@ public final class CallEpiNode extends Node {
     }
 
     // Compute call-return value from all callee returns
-    Type trez = Type.ANY;
+    Type trez = Type   .ANY   ;
     Type tmem = TypeMem.ANYMEM;
     if( fidxs == BitsFun.FULL ) { // Called something unknown
       trez = Type.ALL;            // Unknown target does worst thing
@@ -323,7 +322,7 @@ public final class CallEpiNode extends Node {
       for( int i=0; i<nwired(); i++ ) {
         RetNode ret = wired(i);
         if( fidxs.test_recur(ret._fidx) ) { // Can be wired, but later fidx is removed
-          Type tret = ret.val();
+          Type tret = ret._val;
           if( !(tret instanceof TypeTuple) ) tret = tret.oob(TypeTuple.RET);
           tmem = tmem.meet(((TypeTuple)tret).at(MEM_IDX));
           trez = trez.meet(((TypeTuple)tret).at(REZ_IDX));
@@ -448,7 +447,7 @@ public final class CallEpiNode extends Node {
     if( def==in(1) ) return _live; // The DefMem
     // Wired return.
     // The given function is alive, only if the Call will Call it.
-    Type tcall = call().val();
+    Type tcall = call()._val;
     if( !(tcall instanceof TypeTuple) ) return tcall.above_center() ? TypeMem.DEAD : _live;
     BitsFun fidxs = CallNode.ttfp(tcall).fidxs();
     int fidx = ((RetNode)def).fidx();
@@ -492,7 +491,7 @@ public final class CallEpiNode extends Node {
     //  if( tn.is_dead() ) tv._ns.remove(i--);
     //  else if( tn instanceof ProjNode && ((ProjNode)tn).in(0)==this ) /*self projection: do nothing*/;
     //  else {
-    //    Type t3 = tn.val();
+    //    Type t3 = tn._val;
     //    Type t4 = tn instanceof MemSplitNode ? ((TypeTuple)t3).at(0) : t3;
     //    Type t5 = t4.widen();
     //    t2 = t2.join(t5);

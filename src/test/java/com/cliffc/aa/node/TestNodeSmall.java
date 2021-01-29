@@ -5,6 +5,8 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import org.junit.Test;
 
+import java.util.*;
+
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 import static org.junit.Assert.assertEquals;
@@ -155,25 +157,36 @@ public class TestNodeSmall {
     GVNGCM gvn = Env.GVN;
 
     // First validate the test itself.  If two tuples are 'isa' then the result
-    // is also 'isa'.
+    // is also 'isa'.  To allow the tests in any order, we check a slightly
+    // strong condition: if all tuples are isa IN SOME ORDER, then the result
+    // is also 'isa' IN THAT ORDER.
     int len = argss.length;
     int num = argss[0]._ts.length;
     for( int i=0; i<len; i++ ) {
       TypeTuple tti = argss[i];
+      int order=0;              // no order picked
       midloop:
       for( int j=i+1; j<len; j++ ) { // Triangulate
         TypeTuple ttj = argss[j];
-        for( int k=0; k<num-1; k++ )
-          if( !tti.at(k).isa(ttj.at(k)) ) // All elements except last are 'isa'
-            continue midloop;
-        Type ttiN = tti.at(num-1); // Then check last element is 'isa'
+        for( int k=0; k<num-1; k++ ) { // Check all parts are 'isa', except the answer
+          Type ttik = tti.at(k);
+          Type ttjk = ttj.at(k);
+          if( ttik==ttjk ) continue;      // Does not affect outcome
+          if(      ttik.isa(ttjk) ) order |= 1;// i isa j
+          else if( ttjk.isa(ttik) ) order |= 2;// j isa i
+          else order |= 3; // Unordered
+          if( order==3 )  continue midloop; // Mixed/unordered
+        }
+        assert order==1 || order==2;
+        Type ttiN = tti.at(num-1); // Then check last answer element is 'isa'
         Type ttjN = ttj.at(num-1);
-        assertTrue("Test is broken: "+tti+" isa "+ttj+", but "+ttiN+" !isa "+ttjN,ttiN.isa(ttjN));
+        if( order==1 ) assertTrue("Test is broken: "+tti+" isa "+ttj+", but "+ttiN+" !isa "+ttjN,ttiN.isa(ttjN));
+        else           assertTrue("Test is broken: "+ttj+" isa "+tti+", but "+ttjN+" !isa "+ttiN,ttjN.isa(ttiN));
       }
     }
 
 
-    // Now call Node.value() call, and compare to expected
+    // Now call Node.value()
     TypeTuple[] tns= new TypeTuple[argss.length];
     for( int i=0; i<argss.length; i++ ) {
       for( int j=0; j<ins.length; j++ )
@@ -184,7 +197,8 @@ public class TestNodeSmall {
     for( int i=0; i<argss.length; i++ ) {
       TypeFunPtr expect = (TypeFunPtr)argss[i].at(ins.length);
       TypeFunPtr actual = CallNode.ttfp(tns[i]); // Looking at the TFP from the Call, ignore ctrl,memory,args
-      assertEquals(expect.fidxs(),actual.fidxs());
+      assertEquals("Expect "+expect+", but actual is "+actual+", for ("+argss[i].at(3)+", "+argss[i].at(4)+")",
+                   expect.fidxs(),actual.fidxs());
     }
     return tns;
   }
@@ -201,7 +215,9 @@ public class TestNodeSmall {
    *  arg1  arg2    fptr*      resolve
    *   ~S    ~S   [~int+flt]  [~int+flt]   Choices all around
    *    2    ~S   [~int+flt]  [~int+flt]   Choices all around; arg2 can fall to e.g. 3 or 3.14
-   *    2     3   [~int+flt]  [~int+XXX]   Valid to cutout flt or allow (least_cost will resolve)
+   *    2     3   [~int+flt]  [~int+flt]   Valid to cutout flt or allow (least_cost will resolve)
+   *    2     I   [~int+flt]  [ int    ]   Only int
+   *    2     F   [~int+flt]  [     flt]   Only flt
    *    2     S   [~int+flt]  [ int,flt]   Error state, but arg2 may lift
    *    S     S   [~int+flt]  [ int,flt]   Error state, but args may lift
    *   ~S     S   [~int+flt]  [ int,flt]   Error state in GCP, args may lift in ITER
@@ -235,12 +251,13 @@ public class TestNodeSmall {
     gvn._opt_mode=GVNGCM.Mode.Parse;
     ConNode ctrl = (ConNode) gvn.xform(new ConNode<>(Type.CTRL));
     UnresolvedNode fp_mul = (UnresolvedNode)top.lookup("*"); // {int int -> int} and {flt flt -> flt}
+    FunPtrNode mflt = (FunPtrNode)fp_mul.in(0);
+    FunPtrNode mint = (FunPtrNode)fp_mul.in(1);
     UnresolvedNode fp_add = (UnresolvedNode)top.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
     FunPtrNode aflt = (FunPtrNode)fp_add.in(0);
     FunPtrNode aint = (FunPtrNode)fp_add.in(1);
     FunPtrNode astr = (FunPtrNode)fp_add.in(2);
     // Make a flt/int combo, drops off string.
-    UnresolvedNode anum = new UnresolvedNode(null,aflt,aint);
     ConNode mem  = gvn.init(new ConNode<>(TypeMem.MEM));
     ConNode arg1 = gvn.init(new ConNode<>(Type.SCALAR));
     ConNode arg2 = gvn.init(new ConNode<>(Type.SCALAR));
@@ -256,8 +273,10 @@ public class TestNodeSmall {
     Type tscl = Type.SCALAR, txscl = Type.XSCALAR;
     Type tnil = Type.XNIL;
     TypeMem tfull = TypeMem.MEM;
-    Type t2 = TypeInt.con(2);
+    Type t2 = TypeInt.con(2);   // Small ints are ambiguously either ints or floats
     Type t3 = TypeInt.con(3);
+    Type tint=TypeInt.INT64;
+    Type tflt=TypeFlt.FLT64;
     Type tabc=TypeMemPtr.ABCPTR.simple_ptr();
 
     // iter(), not gcp().  Types always rise.  Very low types might lift to be
@@ -268,28 +287,32 @@ public class TestNodeSmall {
     TypeFunPtr tmul1 = v(fp_mul,gvn), tmul1X = tmul1.dual();
     TypeFunPtr tadd1 = v(fp_add,gvn), tadd1X = tadd1.dual();
 
+    UnresolvedNode anum = gvn.init(new UnresolvedNode(null,aflt,aint));
     TypeFunPtr tnum1 = v(anum,gvn), tnum1X = tnum1.dual();
     TypeFunPtr tflt1 = v(aflt,gvn), tflt1X = tflt1.dual();
     TypeFunPtr tint1 = v(aint,gvn), tint1X = tint1.dual();
     TypeFunPtr tstr1 = v(astr,gvn), tstr1X = tstr1.dual();
+    TypeFunPtr tmint = v(mint,gvn), tmintX = tmint.dual();
+    TypeFunPtr tmflt = v(mflt,gvn), tmfltX = tmflt.dual();
 
     TypeFunPtr tmul1E = TypeFunPtr.make(BitsFun.EMPTY,0,NO_DISP); // All bad choices
 
     assert tadd1X.isa(tnum1X) && tnum1X.isa(tflt1X) && tflt1X.isa(tnum1) && tnum1.isa(tadd1);
 
-
     // Check the fptr {int,flt} meet
     call.set_fdx(ins[2]=fp_mul);
-    TypeTuple[] argss_mul1 = new TypeTuple[] {                 // arg1  arg2   resolve
+    TypeTuple[] argss_mul1 = new TypeTuple[] {                   // arg1  arg2   resolve
       TypeTuple.make( tctl, tfull, tmul1, txscl, txscl, tmul1X), //  ~S    ~S   [+int+flt] ;          high
       TypeTuple.make( tctl, tfull, tmul1, t2   , txscl, tmul1X), //   2    ~S   [+int+flt] ;     good+high
-      TypeTuple.make( tctl, tfull, tmul1, t2   , t3   , tmul1 ), //   2     3   [ int,flt] ;     good
+      TypeTuple.make( tctl, tfull, tmul1, t2   , t3   , tmul1X), //   2     3   [+int+flt] ;     good, requires 'least cost' to resolve
+      TypeTuple.make( tctl, tfull, tmul1, t2   , tint , tmintX), //   2     I   [+int    ] ;     good
+      TypeTuple.make( tctl, tfull, tmul1, t2   , tflt , tmfltX), //   2     F   [    +flt] ;     good
       TypeTuple.make( tctl, tfull, tmul1, t2   , tscl , tmul1 ), //   2     S   [ int,flt] ; low+good
       TypeTuple.make( tctl, tfull, tmul1, tscl , tscl , tmul1 ), //   S     S   [ int,flt] ; low
       TypeTuple.make( tctl, tfull, tmul1, txscl, tscl , tmul1 ), //  ~S     S   [ int,flt] ; low     +high
-      TypeTuple.make( tctl, tfull, tmul1, txscl, tabc , tmul1X), //  ~S    str  [ int,flt] ; bad      high
+      TypeTuple.make( tctl, tfull, tmul1, txscl, tabc , tmul1X), //  ~S    str  [+int+flt] ; bad      high
       TypeTuple.make( tctl, tfull, tmul1, tabc , tabc , tmul1 ), //  str   str  [        ] ; bad
-      TypeTuple.make( tctl, tfull, tmul1, t2   , tabc , tmul1 ), //   2    str  [ int,flt] ; bad+good
+      TypeTuple.make( tctl, tfull, tmul1, t2   , tabc , tmul1 ), //   2    str  [+int+flt] ; bad+good
     };
     _testMonotonicChain(ins,call,argss_mul1);
 
@@ -306,14 +329,15 @@ public class TestNodeSmall {
       TypeTuple.make( tctl, tfull, tadd1, txscl, tabc , tadd1X), //  ~S    str  [+int+flt+str] (B_H,B_H,_GH) ; Some high, keep all, join
       TypeTuple.make( tctl, tfull, tadd1, txscl, tscl , tadd1 ), //  ~S     S   [ int,flt,str] (L_H,L_H,L_H) ; Mix H/L no Good, fidx/meet
       TypeTuple.make( tctl, tfull, tadd1, tnil , txscl, tadd1X), //   0    ~S   [+int+flt+str] (_GH,_GH,_GH) ; Some high, keep all, join
-      TypeTuple.make( tctl, tfull, tadd1, tnil , t3   , tnum1 ), //   0     3   [ int,flt    ] (_G_,_G_,BG_) ; Some good, drop bad, fidx/meet
-      TypeTuple.make( tctl, tfull, tadd1, tnil , tabc , tstr1 ), //   0    str  [         str] (BG_,BG_,_G_) ; Some good, drop bad, fidx/meet
+      TypeTuple.make( tctl, tfull, tadd1, tnil , t3   , tnum1X), //   0     3   [+int+flt    ] (_G_,_G_,BG_) ; Some good, drop bad, fidx/meet
+      TypeTuple.make( tctl, tfull, tadd1, tnil , tabc , tstr1X), //   0    str  [        +str] (BG_,BG_,_G_) ; Some good, drop bad, fidx/meet
+      TypeTuple.make( tctl, tfull, tadd1, tnil , tint , tint1X), //   0     3   [+int        ] (_G_,_G_,_G_) ; All good
       TypeTuple.make( tctl, tfull, tadd1, tnil , tscl , tadd1 ), //   0     S   [ int,flt,str] (LG_,LG_,LG_) ; Some low , keep all, meet
       TypeTuple.make( tctl, tfull, tadd1, t2   , txscl, tadd1X), //   2    ~S   [+int+flt+str] (_GH,_GH,B_H) ; Some high, keep all, join
-      TypeTuple.make( tctl, tfull, tadd1, t2   , t3   , tnum1 ), //   2     3   [ int,flt    ] (_G_,_G_,B__) ; Some good, drop bad, fidx/meet
+      TypeTuple.make( tctl, tfull, tadd1, t2   , t3   , tnum1X), //   2     3   [+int+flt    ] (_G_,_G_,B__) ; Some good, drop bad, fidx/meet
       TypeTuple.make( tctl, tfull, tadd1, t2   , tabc , tadd1 ), //   2    str  [ int,flt,str] (BG_,BG_,BG_) ; All  bad , keep all, meet
       TypeTuple.make( tctl, tfull, tadd1, t2   , tscl , tadd1 ), //   2     S   [ int,flt,str] (LG_,LG_,B__) ; Some low , keep all, meet
-      TypeTuple.make( tctl, tfull, tadd1, tabc , tabc , tstr1 ), //  str   str  [         str] (B__,B__,_G_) ; Some good, drop bad, fidx/meet
+      TypeTuple.make( tctl, tfull, tadd1, tabc , tabc , tstr1X), //  str   str  [        +str] (B__,B__,_G_) ; Some good, drop bad, fidx/meet
       TypeTuple.make( tctl, tfull, tadd1, tscl , tscl , tadd1 ), //   S     S   [ int,flt,str] (L__,L__,L__) ; All  low , keep all, meet
     };
     _testMonotonicChain(ins,call,argss_add1);
@@ -357,13 +381,13 @@ public class TestNodeSmall {
       TypeTuple.make( tctl, tfull, tadd2X, txscl, tscl , tadd2X), //  ~S     S   [+int+flt+str] (L_H,L_H,L_H) ; Mix H/L, no good, keep all, fidx/join
       TypeTuple.make( tctl, tfull, tadd2X, tnil , txscl, tadd2X), //   0    ~S   [+int+flt+str] (_GH,_GH,_GH) ; Some high, keep all, join
       TypeTuple.make( tctl, tfull, tadd2X, tnil , t3   , tnum2X), //   0     3   [+int+flt    ] (_G_,_G_,BG_) ; Some good, drop bad, fidx/join
-      TypeTuple.make( tctl, tfull, tadd2X, tnil , tabc , tstr2 ), //   0    str  [        ~str] (BG_,BG_,_G_) ; Some good, drop bad, fidx/join
+      TypeTuple.make( tctl, tfull, tadd2X, tnil , tabc , tstr2X), //   0    str  [        +str] (BG_,BG_,_G_) ; Some good, drop bad, fidx/join
       TypeTuple.make( tctl, tfull, tadd2X, tnil , tscl , tadd2 ), //   0     S   [ int,flt,str] (LG_,LG_,LG_) ; Some low , keep all, meet
       TypeTuple.make( tctl, tfull, tadd2X, t2   , txscl, tadd2X), //   2    ~S   [+int+flt+str] (_GH,_GH,B_H) ; Some high, keep all, join
       TypeTuple.make( tctl, tfull, tadd2X, t2   , t3   , tnum2X), //   2     3   [+int+flt    ] (_G_,_G_,B__) ; Some good, drop bad, fidx/join
       TypeTuple.make( tctl, tfull, tadd2X, t2   , tabc , tadd2 ), //   2    str  [ int,flt,str] (BG_,BG_,BG_) ; All  bad , keep all, meet
       TypeTuple.make( tctl, tfull, tadd2X, t2   , tscl , tadd2 ), //   2     S   [ int,flt,str] (LG_,LG_,B__) ; Some low , keep all, meet
-      TypeTuple.make( tctl, tfull, tadd2X, tabc , tabc , tstr2 ), //  str   str  [        ~str] (B__,B__,_G_) ; Some good, drop bad, fidx/join
+      TypeTuple.make( tctl, tfull, tadd2X, tabc , tabc , tstr2X), //  str   str  [        +str] (B__,B__,_G_) ; Some good, drop bad, fidx/join
       TypeTuple.make( tctl, tfull, tadd2X, tscl , tscl , tadd2 ), //   S     S   [ int,flt,str] (L__,L__,L__) ; All  low , keep all, meet
     };
     _testMonotonicChain(ins,call,argss_add2);
@@ -371,7 +395,79 @@ public class TestNodeSmall {
     cepi.kill();
   }
 
+  @Test public void testCallNodeResolve2() {
+    Env top = Env.top_scope();
+    GVNGCM gvn = Env.GVN;
+    gvn._opt_mode=GVNGCM.Mode.Parse;
 
+    UnresolvedNode fp_add = (UnresolvedNode)top.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
+    FunPtrNode aflt = (FunPtrNode)fp_add.in(0);
+    FunPtrNode aint = (FunPtrNode)fp_add.in(1);
+    FunPtrNode astr = (FunPtrNode)fp_add.in(2);
+
+    // Make a Unknown/CallNode/CallEpi combo.  Unwired.
+    ConNode ctrl = (ConNode)gvn.xform(new ConNode<>(Type.CTRL));
+    ConNode mem  = (ConNode)gvn.xform(new ConNode<>(TypeMem.MEM));
+    ConNode dsp  = (ConNode)gvn.xform(new ConNode<>(TypeMemPtr.NO_DISP));
+    ConNode arg3 = gvn.init(new ConNode<>(Type.SCALAR));
+    ConNode arg4 = gvn.init(new ConNode<>(Type.SCALAR));
+    ConNode fdx  = gvn.init(new ConNode<>(fp_add._val));
+    CallNode call = gvn.init(new CallNode(true, null, ctrl, mem, dsp, arg3, arg4, fdx));
+    CallEpiNode cepi = gvn.init(new CallEpiNode(call, Env.DEFMEM)); // Unwired
+
+    // Types we see on inputs, choosen to walk across the sample space
+    Type i32 = TypeInt.INT32;   // Subsets both int64 and flt64
+    Type i64 = TypeInt.INT64;
+    Type f64 = TypeFlt.FLT64;
+    Type scl = Type.SCALAR;
+    Type abc = TypeMemPtr.ABCPTR.simple_ptr(); // Constant string
+    Type tup = TypeMemPtr.STRUCT.simple_ptr(); // Tuple pointer (always wrong
+    // All args, including duals
+    Type[] targs = new Type[]{i64,i64.dual(),
+                              f64,f64.dual(),
+                              scl,scl.dual(),
+                              //abc,abc.dual(),
+                              //i32,i32.dual(),
+                              //tup,tup.dual(),
+    };
+    // Functions we see, in all combos
+    Type fint = aint._val;
+    Type fflt = aflt._val;
+    Type fstr = astr._val;
+    Type fif_ = fint.meet(fflt);
+    Type f_fs = fstr.meet(fflt);
+    Type fi_s = fstr.meet(fint);
+    Type fifs = fint.meet(fflt).meet(fstr);
+    // All FDXS, including duals
+    Type[] tfdxs = new Type[]{fint,fint.dual(),fflt,fflt.dual(),fstr,fstr.dual(),
+                              fif_,fif_.dual(),f_fs,f_fs.dual(),
+                              fi_s,fi_s.dual(),fifs,fifs.dual(),};
+
+    // Pre-compute them all
+    HashMap<TypeTuple,Type> cvals = new HashMap<>();
+    for( Type targ3 : targs ) {
+      arg3._val = targ3;
+      for( Type targ4 : targs ) {
+        arg4._val = targ4;
+        for( Type tfdx : tfdxs ) {
+          fdx._val = tfdx;
+          Type tcall = call.value(GVNGCM.Mode.Parse);
+          TypeTuple args = TypeTuple.make(targ3,targ4,tfdx);
+          cvals.put(args,tcall);
+        }
+      }
+    }
+
+    // Verify ISA relation
+    Set<TypeTuple> keys = cvals.keySet();
+    for( TypeTuple key0 : keys )
+      for( TypeTuple key1 : keys )
+        if( key0.isa(key1) )
+          assertTrue(cvals.get(key0).isa(cvals.get(key1)));
+
+
+    
+  }
 
   // When making a recursive function, we get a pointer cycle with the display
   // and function arguments.  Validate that we can re-discover this closed

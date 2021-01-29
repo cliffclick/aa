@@ -133,7 +133,7 @@ public class GVNGCM {
     while( progress ) {
       progress = false;
       iter((Node)null);
-      // Only a very nodes can make progress via dominance relations, and these
+      // Only a very few nodes can make progress via dominance relations, and these
       // can make progress "very far" in the graph.  So instead of using a
       // neighbors list, we bulk revisit them here.
       for( int i=0; i<_work_dom.len(); i++ ) {
@@ -143,6 +143,7 @@ public class GVNGCM {
       }
     }
     IDEAL_VISIT.clear();
+    // Expensive assert
     assert !Env.START.more_ideal(IDEAL_VISIT);
   }
 
@@ -302,7 +303,7 @@ public class GVNGCM {
       //return;                   // Not resolving, but Call flagged as in-error
       throw com.cliffc.aa.AA.unimpl();
     }
-    call.set_def(AA.FUN_IDX,fptr.display());
+    call.set_dsp(fptr.display());
     call.set_fdx(fptr);         // Set resolved edge
     add_flow(call);
     assert Env.START.more_flow(false)==0; // Post conditions are correct
