@@ -229,13 +229,14 @@ public final class CallEpiNode extends Node {
       Node actual;
       int idx = ((ParmNode)arg)._idx;
       switch( idx ) {
-      case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); break; // Always RPC is a constant
+      case 0: actual = new ConNode<>(TypeRPC.make(call._rpc)); break; // Always RPC is a constant
       case MEM_IDX: actual = new MProjNode(call,Env.DEFMEM); break;    // Memory into the callee
       default: actual = idx >= call.nargs()              // Check for args present
           ? new ConNode<>(Type.ALL) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
           : new ProjNode(call,idx); // Normal args
         break;
       }
+      actual._live = arg._live;
       arg.add_def(actual.init1());
     }
 
@@ -406,7 +407,7 @@ public final class CallEpiNode extends Node {
     CallNode call = call();
     if( FunNode._must_inline == call._uid ) // Assert an expected inlining happens
       FunNode._must_inline = 0;
-    if( mem instanceof IntrinsicNode ) // Better error message for Instrinsic if Call args are bad
+    if( mem instanceof IntrinsicNode ) // Better error message for Intrinsic if Call args are bad
       ((IntrinsicNode)mem)._badargs = call._badargs[1];
     call._is_copy=_is_copy=true;
     Env.GVN.add_reduce_uses(call);

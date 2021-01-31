@@ -60,7 +60,7 @@ public class FunNode extends RegionNode {
   public String _name; // Optional for anon functions; can be set later via bind()
   public String _bal_close; // null for everything except "balanced functions", e.g. "[]"
   public int _fidx;
-  public final TypeFunSig _sig;
+  public TypeFunSig _sig;
   // Operator precedence; only set on top-level primitive wrappers.
   // -1 for normal non-operator functions and -2 for forward_decls.
   public final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
@@ -185,8 +185,20 @@ public class FunNode extends RegionNode {
       assert in(1)==Env.ALL_CTRL;
       return set_def(1,Env.XCTRL);
     }
+
+    // Update _sig if parms are unused.  SIG falls during Iter and lifts during
+    // GCP.  If parm is missing or not-live, then the corresponding SIG
+    // argument can be ALL (all args allowed, including errors).
+    if( !is_forward_ref() && !is_prim() ) {
+      ParmNode[] parms = parms();
+      for( int i=1; i<parms.length; i++ )
+        if( (parms[i]==null || parms[i]._live==TypeMem.DEAD) && _sig._formals.at(i)!=Type.ALL )
+          { _sig = _sig.make_from_arg(i,Type.ALL); return this; }
+    }
+
     return null;
   }
+
   public Node ideal_inline(boolean check_progress) {
     // If no trailing RetNode and hence no FunPtr... function is uncallable
     // from the unknown caller.
@@ -195,8 +207,8 @@ public class FunNode extends RegionNode {
       return null;
 
     if( is_forward_ref() ) return null; // No mods on a forward ref
-    if( _defs._len <= 1  ) return null; // Not even the unknown caller
-    ParmNode rpc_parm = rpc();
+    ParmNode[] parms = parms();
+    ParmNode rpc_parm = parms[0];
     if( rpc_parm == null ) return null; // Single caller const-folds the RPC, but also inlines in CallNode
     if( !check_callers() ) return null;
     if( _defs._len <= 2  ) return null; // No need to split callers if only 1
@@ -212,7 +224,6 @@ public class FunNode extends RegionNode {
     }
     // Memory is not 'lifted' by DefMem, a sign that a bad-memory-arg is being
     // passed in.
-    Node[] parms = parms();
     if( has_unknown_callers() ) {
       Node mem = parms[MEM_IDX];
       if( mem!=null && !mem._val.isa(Env.DEFMEM._val) )
@@ -323,9 +334,9 @@ public class FunNode extends RegionNode {
       Type[] sig = Types.get(parms.length);
       sig[CTL_IDX] = Type.CTRL;
       sig[MEM_IDX] = TypeMem.MEM;
-      sig[FUN_IDX] = parms[FUN_IDX]==null
+      sig[DSP_IDX] = parms[DSP_IDX]==null
         ? _sig.display().simple_ptr()
-        : parms[FUN_IDX].val(idx);
+        : parms[DSP_IDX].val(idx);
       for( int i=ARG_IDX; i<parms.length; i++ )
         sig[i] = parms[i]==null ? Type.SCALAR : parms[i].val(idx).widen();
       return sig;
@@ -338,11 +349,11 @@ public class FunNode extends RegionNode {
     sig[CTL_IDX] = Type.CTRL;
     sig[MEM_IDX] = TypeMem.MEM;
     if( tmem instanceof TypeMem ) {
-      for( int i=FUN_IDX; i<parms.length; i++ ) { // For all parms
+      for( int i=DSP_IDX; i<parms.length; i++ ) { // For all parms
         Node parm = parms[i];
-        if( parm == null ) { sig[i]=Type.SCALAR; continue; } // (some can be dead)
-        sig[i] = parm.val();                                 // Current type
-        if( i==FUN_IDX ) continue;                           // No split on the display
+        if( parm == null ) { sig[i]=Type.ALL; continue; } // (some can be dead)
+        sig[i] = parm.val();                              // Current type
+        if( i==DSP_IDX ) continue; // No split on the display
         // Best possible type
         Type tp = Type.ALL;
         for( Node def : parm._defs )
@@ -355,7 +366,7 @@ public class FunNode extends RegionNode {
         if( bad_mem_use(parm, to) )
           continue;               // So bad usage
 
-        sig[i] = TypeMemPtr.make(BitsAlias.RECORD_BITS0,to); // Signature takes any alias but has sharper guts
+        sig[i] = TypeMemPtr.make(BitsAlias.ALL,to); // Signature takes any alias but has sharper guts
         progress = true;
       }
     }
@@ -690,10 +701,10 @@ public class FunNode extends RegionNode {
       Node old_funptr = path_call.fdx(); // Find the funptr for the path split
       Node new_funptr = map.get(old_funptr);
       new_funptr.insert(old_funptr);
-      TypeFunPtr ofptr = (TypeFunPtr) old_funptr.val();
+      TypeFunPtr ofptr = (TypeFunPtr) old_funptr._val;
       path_call.set_fdx(new_funptr); // Force new_funptr, will re-wire later
-      TypeFunPtr nfptr = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,TypeMemPtr.NO_DISP);
-      path_call._val = CallNode.set_ttfp((TypeTuple) path_call.val(),nfptr);
+      TypeFunPtr nfptr = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,ofptr._disp);
+      path_call._val = CallNode.set_ttfp((TypeTuple) path_call._val,nfptr);
     } // Else other funptr/displays on unrelated path, dead, can be ignored
 
     // For all aliases split in this pass, update in-node both old and new.
@@ -711,7 +722,7 @@ public class FunNode extends RegionNode {
         for( Node p : fun._uses )
           if( p instanceof ParmNode ) {
             ParmNode parm = (ParmNode)p;
-            parm.set_def(1,parm._idx==MEM_IDX ? Env.DEFMEM : Node.con(fun.formal(parm._idx).simple_ptr()));
+            parm.set_def(1,parm._idx==0 ? Node.con(TypeRPC.ALL_CALL) : (parm._idx==MEM_IDX ? Env.DEFMEM : Node.con(fun.formal(parm._idx).simple_ptr())));
           }
       } else                     // Path Split
         fun.set_def(1,Env.XCTRL);
@@ -867,7 +878,7 @@ public class FunNode extends RegionNode {
       if( call._val == Type.ALL ) return Type.CTRL;
       TypeFunPtr ttfp = CallNode.ttfpx(call._val);
       if( ttfp != null && !ttfp.above_center() && ttfp._fidxs.test_recur(_fidx) )
-        return Type.CTRL;       // Call us
+        return Type.CTRL;       // Calls us
     }
     return Type.XCTRL;
   }
@@ -880,16 +891,14 @@ public class FunNode extends RegionNode {
         return (ParmNode)use;
     return null;
   }
-  @Override public Node[] parms() {
-    Node[] parms = new Node[nargs()];
+  @Override public ParmNode[] parms() {
+    ParmNode[] parms = new ParmNode[nargs()];
     for( Node use : _uses )
-      if( use instanceof ParmNode && ((ParmNode)use)._idx != -1 )
-        parms[((ParmNode)use)._idx] = use;
-    assert parms[0]==null;
-    parms[0] = this;
+      if( use instanceof ParmNode )
+        parms[((ParmNode)use)._idx] = (ParmNode)use;
     return parms;
   }
-  public ParmNode rpc() { return parm(-1); }
+  public ParmNode rpc() { return parm(0); }
   public RetNode ret() {
     for( Node use : _uses )
       if( use instanceof RetNode && use._defs._len==5 && !((RetNode)use).is_copy() && ((RetNode)use).fun()==this )

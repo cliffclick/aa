@@ -43,14 +43,12 @@ public class UnresolvedNode extends Node {
   @Override public Type value(GVNGCM.Mode opt_mode) {
     // Freeze after GVN - only still around for errors
     if( opt_mode == GVNGCM.Mode.PesiCG || opt_mode == GVNGCM.Mode.Pause ) return _val;
-    boolean lifting = opt_mode!=GVNGCM.Mode.Opto;
-    Type t   = lifting ? Type.ANY : Type.ALL;
+    boolean lifting = true;
+    Type t = Type.ANY;
     for( Node def : _defs ) {
       Type td = def.val();
       if( !(td instanceof TypeFunPtr) ) return td.oob();
-      TypeFunPtr tfp = (TypeFunPtr)td;
-      if( tfp.above_center() == lifting ) tfp = tfp.dual();
-      t = lifting ? t.meet(tfp) : t.join(tfp);
+      t = t.meet(td);
     }
     return t;
   }
@@ -86,24 +84,6 @@ public class UnresolvedNode extends Node {
       if( ((FunPtrNode)n).ret()._fidx==fidx )
         return (FunPtrNode)n;
     return null;
-  }
-
-  // Compute local contribution of use liveness to this def.
-  // If pre-GCP, same as value() above, use the conservative answer.
-  // During GCP, this will resolve so use the optimistic answer.
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    if( !opt_mode._CG ) return super.live_use(opt_mode,def);
-    if( !(def instanceof FunPtrNode) ) return _live;
-    // If any Call has resolved to this def, its alive.
-    // If not a Call, must assume it props to some unknown Call and is alive.
-    if( _uses._len==0 ) return _live; // No change if dead anyways
-    int dfidx = ((FunPtrNode)def).ret()._fidx;
-    for( Node call : _uses )
-      if( !(call instanceof CallNode) ||
-          ((CallNode)call).live_use_call(dfidx) != TypeMem.DEAD )
-        return _live;
-    // Only call users, and no call wants this def.
-    return TypeMem.DEAD;
   }
 
   // Return the op_prec of the returned value.  Not sensible except when called

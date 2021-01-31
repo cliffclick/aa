@@ -161,7 +161,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       _name = name;
       _reads = reads;
       assert (reads == (args[MEM_IDX]!=TypeMem.ALLMEM)); // If reading, then memory has some requirements
-      args[FUN_IDX] = TypeMemPtr.NO_DISP; // No display
+      args[DSP_IDX] = Type.ALL; // No display
       _sig = TypeFunSig.make(TypeTuple.RET,TypeTuple.make_args(args));
       _op_prec = op_prec;
     }
@@ -183,13 +183,13 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
         assert in(0)==null && _uses._len==0;
         FunNode  fun = ( FunNode) X.xform(new  FunNode(this).add_def(Env.ALL_CTRL));
-        ParmNode rpc = (ParmNode) X.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
+        ParmNode rpc = (ParmNode) X.xform(new ParmNode(0,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
         Node memp= X.xform(new ParmNode(MEM_IDX,_sig._args[MEM_IDX],fun, TypeMem.MEM, Env.DEFMEM,null));
         fun._bal_close = bal_close();
 
         // Add input edges to the intrinsic
         add_def(_reads ? memp : null); // Memory  for the primitive in slot MEM_IDX
-        add_def(null);                 // Closure for the primitive in slot FUN_IDX
+        add_def(null);                 // Closure for the primitive in slot DSP_IDX
         for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // Args follow
           add_def( X.xform(new ParmNode(i,_sig._args[i],fun, Node.con(_sig.arg(i).simple_ptr()),null)));
         NewNode nnn = (NewNode)X.xform(this);

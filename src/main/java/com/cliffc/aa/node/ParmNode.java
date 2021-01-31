@@ -12,14 +12,14 @@ import static com.cliffc.aa.AA.MEM_IDX;
 // numbering matching function arguments, with -1 reserved for the RPC and 0
 // for memory.
 public class ParmNode extends PhiNode {
-  public final int _idx; // Parameter index, -1 RPC, 0 Mem, 1 Display, 2+ normal args
-  final String _name;         // Parameter name
+  public final int _idx; // Parameter index, MEM_IDX, FUN_IDX is display, ARGIDX+ normal args
+  final String _name;    // Parameter name
   public ParmNode( int idx, String name, Node fun, ConNode defalt, Parse badgc) {
     this(idx,name,fun,defalt._t,defalt,badgc);
   }
   public ParmNode( int idx, String name, Node fun, Type tdef, Node defalt, Parse badgc) {
     super(OP_PARM,fun,tdef,defalt,badgc);
-    assert idx>-2;
+    assert idx>=0;
     _idx=idx;
     _name=name;
   }
@@ -87,8 +87,7 @@ public class ParmNode extends PhiNode {
     Type formal = fun.formal(_idx);
     // Good case:
     if( t.isa(formal) ) return t.simple_ptr();
-    // Bad case: OOB, but up or down according to how close the formal is matched.
-    return t.oob_deep(formal);
+    return Type.ALL;
   }
 
   // If an input to a Mem Parm changes, the flow results of other Parms can change
@@ -108,7 +107,7 @@ public class ParmNode extends PhiNode {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere
     FunNode fun = fun();
     assert fun._defs._len==_defs._len;
-    if( _idx < 0 ) return null;                    // No arg check on RPC or Mem
+    if( _idx <= MEM_IDX ) return null; // No arg check on RPC or memory
     Node mem = fun.parm(MEM_IDX);
     Type formal = fun.formal(_idx);
     for( int i=1; i<_defs._len; i++ ) {

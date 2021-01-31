@@ -779,10 +779,14 @@ public abstract class Node implements Cloneable, TNode {
   // Node n is new, but cannot call GVN.iter() so cannot call the general xform.
   public Node init1( ) {
     Node x = VALS.get(this);
-    if( x!=null ) { kill(); return x; }
+    if( Env.GVN._opt_mode == GVNGCM.Mode.Opto ) _live = TypeMem.DEAD;
+    if( x!=null ) {             // Hit in GVN table
+      x._live = (TypeMem)x._live.meet(_live); // Merge liveness
+      kill();                                 // Kill just-init'd
+      return Env.GVN.add_flow(x);             // Return old
+    }
     _elock();
     _val = value(Env.GVN._opt_mode);
-    if( Env.GVN._opt_mode == GVNGCM.Mode.Opto ) _live = TypeMem.DEAD;
     return Env.GVN.add_work_all(this);
   }
 

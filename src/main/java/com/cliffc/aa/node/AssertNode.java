@@ -48,14 +48,14 @@ public class AssertNode extends Node {
         fun._val = Type.CTRL;
         args[CTL_IDX] = fun;            // Call control
         args[MEM_IDX] = X.xform(new ParmNode(MEM_IDX,"mem" ,fun,TypeMem.MEM,Env.DEFMEM,null));
-        args[FUN_IDX] = X.xform(new ParmNode(FUN_IDX,"disp",fun,Node.con(TypeMemPtr.DISP_SIMPLE),_error_parse));
+        args[DSP_IDX] = X.xform(new ParmNode(DSP_IDX,"disp",fun,Node.con(TypeMemPtr.DISP_SIMPLE),_error_parse));
         for( int i=ARG_IDX; i<sig.nargs(); i++ )  // 1 is memory, 2 is display.
           // All the parms; types in the function signature
           args[i] = X.xform(new ParmNode(i,"arg"+i,fun,Node.con(Type.SCALAR),_error_parse));
         args[sig.nargs()] = arg;        // The whole TFP to the call
         Parse[] badargs = new Parse[sig.nargs()];
         Arrays.fill(badargs,_error_parse);
-        Node rpc= X.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
+        Node rpc= X.xform(new ParmNode(0,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
         CallNode call = (CallNode)X.xform(new CallNode(true,badargs,args));
         Node cepi   = X.xform(new CallEpiNode(/*TODO: Suspect need to carry a prior Env thru*/call,Env.DEFMEM));
         Node ctl    = X.xform(new CProjNode(cepi));

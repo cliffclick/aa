@@ -52,7 +52,7 @@ public abstract class MemPrimNode extends PrimNode {
       try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
         assert _defs._len==0 && _uses._len==0;
         FunNode  fun = ( FunNode) X.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
-        ParmNode rpc = (ParmNode) X.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
+        ParmNode rpc = (ParmNode) X.xform(new ParmNode( 0     ,"rpc" ,fun,Node.con(TypeRPC.ALL_CALL),null));
         ParmNode mem = (ParmNode) X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
         fun._bal_close = bal_close();
         add_def(null);              // Control for the primitive in slot 0
@@ -130,7 +130,7 @@ public abstract class MemPrimNode extends PrimNode {
       try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
         assert _defs._len==0 && _uses._len==0;
         FunNode  fun = ( FunNode) X.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
-        ParmNode rpc = (ParmNode) X.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
+        ParmNode rpc = (ParmNode) X.xform(new ParmNode( 0     ,"rpc" ,fun,Node.con(TypeRPC.ALL_CALL),null));
         ParmNode mem = (ParmNode) X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
         fun._bal_close = bal_close();
         add_def(null);              // Control for the primitive in slot 0

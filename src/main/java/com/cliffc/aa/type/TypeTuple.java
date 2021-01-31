@@ -70,22 +70,27 @@ public class TypeTuple extends Type<TypeTuple> {
 
   // Make a Call args tuple from a Struct by adding Memory up front
   public static TypeTuple make(TypeStruct ts) {
-    // TypeStruct includes a display/FUN_IDX, but what comes before
-    Type[] ts2 = Types.get(ts._ts.length+FUN_IDX);
+    // TypeStruct includes a display/DSP_IDX, but what comes before
+    Type[] ts2 = Types.get(ts._ts.length+DSP_IDX);
     ts2[CTL_IDX] = Type.CTRL;
     ts2[MEM_IDX] = TypeMem.ALLMEM;
-    System.arraycopy(ts._ts,0,ts2,FUN_IDX,ts._ts.length);
+    System.arraycopy(ts._ts,0,ts2,DSP_IDX,ts._ts.length);
     return make(ts2);
   }
   public static TypeTuple make_args(Type[] ts) {
-    assert ts[MEM_IDX] instanceof TypeMem && ts[FUN_IDX].is_display_ptr();
+    assert ts[MEM_IDX] instanceof TypeMem && ts[DSP_IDX].is_display_ptr();
     return make(ts);
   }
+  public TypeTuple make_from_arg(int idx, Type arg ) {
+    Type[] ts = Types.clone(_ts);
+    ts[idx]=arg;
+    return make0(_any,ts);
+  }
 
-  public static TypeTuple make_args(                       ) { return make(Type.CTRL,TypeMem.ALLMEM,TypeMemPtr.NO_DISP ); }
-  public static TypeTuple make_args(Type t2                ) { return make(Type.CTRL,TypeMem.ALLMEM,TypeMemPtr.NO_DISP,t2); }
-  public static TypeTuple make_args(Type t2,Type t3        ) { return make(Type.CTRL,TypeMem.ALLMEM,TypeMemPtr.NO_DISP,t2,t3); }
-  public static TypeTuple make_args(Type t2,Type t3,Type t4) { return make(Type.CTRL,TypeMem.ALLMEM,TypeMemPtr.NO_DISP,t2,t3,t4); }
+  public static TypeTuple make_args(                       ) { return make(Type.CTRL,TypeMem.ALLMEM,Type.ALL ); }
+  public static TypeTuple make_args(Type t2                ) { return make(Type.CTRL,TypeMem.ALLMEM,Type.ALL,t2); }
+  public static TypeTuple make_args(Type t2,Type t3        ) { return make(Type.CTRL,TypeMem.ALLMEM,Type.ALL,t2,t3); }
+  public static TypeTuple make_args(Type t2,Type t3,Type t4) { return make(Type.CTRL,TypeMem.ALLMEM,Type.ALL,t2,t3,t4); }
   public static TypeTuple make_ret(Type trez) { return make(Type.CTRL,TypeMem.ANYMEM,trez); }
 
 

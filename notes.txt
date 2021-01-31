@@ -1,4 +1,37 @@
 =======================================
+1/31/2021
+
+Maybe a breakthru on Call+resolve+Unresolved.
+
+FunNode has a TypeFunSig.  This can FALL during ITER (lift during GCP?) as arg
+uses die (during GCP all args start not-live so all TFS can be super-low).
+
+A FunNode validates each path independently, and sets a bit-per-path.  (Part of
+FunNode value?  Add a CProj on every wired Call path?).  Valid means that all
+args are "isa" the TFS.  Invalid paths mean the call+fun is in-error, normal
+during Iter.  They still push results thru (despite being invalid), since the
+TFS might FALL to drop the incoming arg requirement; dead args can be Err.
+
+Parms merge all paths, including in-error paths & overload paths.  If the arg
+fails to be "isa" the formal, Parm drops to ALL.  "The poison spreads".  This
+is monotonic; if an error arg dies the path remains valid & the merge is
+correct (and the FunNode no longer is in-error).
+
+Calls just pass along the FDXs, no resolution filtering.
+CallEpis wire all FDXs unconditionally.
+
+Overloads then might wire to all options.  Most options would be in-error.  As
+args lift during Iter, we can unwire overloads.  We ask the FunNode if this
+overload path is valid.  Also, if FDXs lift to fewer, we can unwire.
+
+Ambiguous error if more than 1 overload remains.
+
+We keep all paths during Iter even with BAD args (because TFS might lift).  We
+also keep HIGH args, but these do not pass along much info.  Post GCP#1 we have
+all wired+extras (might require GCP#1 to resolve totally unknown FPTRs, so no
+guarentees out of Iter#1)
+
+=======================================
 1/28/2021
 
 Maybe a breakthru on Unresolved....

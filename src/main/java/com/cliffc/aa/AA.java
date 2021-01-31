@@ -12,8 +12,8 @@ public abstract class AA {
   // Indices common between Nodes & Types & TVars.
   public static final int CTL_IDX=0; // Often 0 is just used directly
   public static final int MEM_IDX=1; // Memory index
-  public static final int FUN_IDX=2; // Function/Display index to Calls
-  public static final int REZ_IDX=2; // Result from returns, same as FUN_IDX
+  public static final int DSP_IDX=2; // Display index to calls
+  public static final int REZ_IDX=2; // Result from returns, same as DSP_IDX
   public static final int ARG_IDX=3; // Start of user-visible args
 
   private static final AbstractBuildVersion ABV;

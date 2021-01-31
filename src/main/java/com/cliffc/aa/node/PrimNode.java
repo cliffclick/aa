@@ -27,7 +27,7 @@ public abstract class PrimNode extends Node {
   PrimNode( String name, String[] args, TypeTuple formals, Type ret ) {
     super(OP_PRIM);
     _name=name;
-    assert formals.at(MEM_IDX)==TypeMem.ALLMEM && formals.at(FUN_IDX)==TypeMemPtr.NO_DISP; // Room for no closure; never memory
+    assert formals.at(MEM_IDX)==TypeMem.ALLMEM && formals.at(DSP_IDX)==Type.ALL; // Room for no closure; never memory
     _sig=TypeFunSig.make(args==null ? TypeFunSig.func_names : args,formals,TypeTuple.make_ret(ret));
     _badargs=null;
     _op_prec = -1;              // Not set yet
@@ -180,7 +180,7 @@ public abstract class PrimNode extends Node {
     try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
       assert _defs._len==0 && _uses._len==0;
       FunNode fun = (FunNode) X.xform(new FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
-      Node rpc = X.xform(new ParmNode(-1,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
+      Node rpc = X.xform(new ParmNode(0,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
       add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
       Node mem = X.xform(new ParmNode(MEM_IDX,_sig._args[MEM_IDX],fun,TypeMem.MEM,Env.DEFMEM,null));
       if( _thunk_rhs ) add_def(mem);      // Memory if thunking
@@ -513,8 +513,7 @@ public abstract class PrimNode extends Node {
   // immediate into the operators' wrapper function, which in turn aggressively
   // inlines during parsing.
   static class AndThen extends PrimNode {
-    private static final TypeTuple ANDTHEN =
-      TypeTuple.make_args(Type.SCALAR,TypeTuple.RET);
+    private static final TypeTuple ANDTHEN = TypeTuple.make_args(Type.SCALAR,TypeTuple.RET);
     // Takes a value on the LHS, and a THUNK on the RHS.
     AndThen() { super("&&",new String[]{" ctl"," mem","^","p","thunk"},ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
     // Expect this to inline everytime

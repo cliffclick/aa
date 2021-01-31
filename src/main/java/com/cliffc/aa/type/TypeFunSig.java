@@ -22,8 +22,8 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     _ret=ret;
     assert args.length>=formals.len();
     assert (args[CTL_IDX]==null || Util.eq(args[CTL_IDX]," ctl")) && (formals.at(CTL_IDX)==Type.CTRL || formals.at(CTL_IDX)==Type.XCTRL);
-    assert (args[MEM_IDX]==null || Util.eq(args[MEM_IDX]," mem")) &&  formals.at(MEM_IDX) instanceof TypeMem;
-    assert (args[FUN_IDX]==null || Util.eq(args[FUN_IDX],"^"   )) &&  formals.at(FUN_IDX).is_display_ptr();
+    assert (args[MEM_IDX]==null || Util.eq(args[MEM_IDX]," mem")) && (formals.at(MEM_IDX) instanceof TypeMem || formals.at(MEM_IDX)==Type.ALL || formals.at(MEM_IDX)==Type.ANY);
+    assert (args[DSP_IDX]==null || Util.eq(args[DSP_IDX],"^"   )) &&  formals.at(DSP_IDX).is_display_ptr();
     assert ret.len()==3 && ret.at(MEM_IDX) instanceof TypeMem;
   }
   @Override int compute_hash() {
@@ -54,7 +54,7 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     for( int i=0; i<nargs(); i++ ) {
       if( !debug && i==CTL_IDX && Util.eq(_args[CTL_IDX]," ctl") ) continue; // Do not print the Control
       if( !debug && i==MEM_IDX && Util.eq(_args[MEM_IDX]," mem") ) continue; // Do not print the memory
-      if( !debug && i==FUN_IDX && Util.eq(_args[FUN_IDX],"^"   ) ) continue; // Do not print the ever-present display
+      if( !debug && i==DSP_IDX && Util.eq(_args[DSP_IDX],"^"   ) ) continue; // Do not print the ever-present display
       sb.p(_args[i]);
       if( arg(i) != Type.SCALAR )
         arg(i).str(sb.p(':'),dups,mem,debug);
@@ -79,9 +79,8 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   public static TypeFunSig make( TypeTuple ret, TypeMemPtr disp, Type arg1 ) { return make(ret,Types.ts(disp,arg1)); }
   public static TypeFunSig make( TypeTuple ret, TypeMemPtr disp, Type arg1, Type arg2 ) { return make(ret,Types.ts(disp,arg1,arg2)); }
   public static TypeFunSig make( TypeTuple ret, TypeTuple formals ) { return make(func_names,formals,ret); }
+  public TypeFunSig make_from_arg( int idx, Type arg ) { return make(_args,_formals.make_from_arg(idx,arg),_ret); }
 
-  static String[] flds(String... fs) { return fs; }
-  public static final String[] aply_names = new String[]{" ctl", " mem", "->", "arg3", "arg4", "arg5" }; // TODO: Extend as needed
   public static final String[] func_names = new String[]{" ctl", " mem", "^" , "arg3", "arg4", "arg5" }; // TODO: Extend as needed
 
   public static final TypeFunSig II_I = make(TypeTuple.make_ret(TypeInt.INT64),TypeTuple.INT64_INT64);
@@ -89,7 +88,7 @@ public final class TypeFunSig extends Type<TypeFunSig> {
 
   public int nargs() { return _formals._ts.length; }
   public Type arg(int idx) { return _formals._ts[idx]; }
-  public TypeMemPtr display() { return (TypeMemPtr)arg(FUN_IDX); }
+  public Type display() { return arg(DSP_IDX); }
 
   @Override protected TypeFunSig xdual() { return new TypeFunSig(_args,_formals.dual(),_ret.dual()); }
   @Override protected Type xmeet( Type t ) {

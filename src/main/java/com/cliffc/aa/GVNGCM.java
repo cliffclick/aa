@@ -262,12 +262,6 @@ public class GVNGCM {
             BitsFun fidxs = CallNode.ttfp(call.val()).fidxs();
             if( fidxs.above_center() && fidxs.abit() == -1 && ambi_calls.find(call) == -1 )
               ambi_calls.add(call);
-            // If the function input can never fall to any function type, abort
-            // the resolve now.  The program is in-error.
-            if( !call.fdx().val().isa(TypeFunPtr.GENERIC_FUNPTR) ) {
-              call._not_resolved_by_gcp = true;
-              add_work(_work_flow,call);
-            }
           }
         }
         // Very expensive assert
@@ -289,19 +283,12 @@ public class GVNGCM {
   private void remove_ambi( CallNode call ) {
     TypeFunPtr tfp = CallNode.ttfpx(call._val);
     FunPtrNode fptr = null;
-    if( tfp != null ) {     // Have a sane function ptr?
-      BitsFun fidxs = tfp.fidxs();
-      if( !fidxs.above_center() ) return; // Resolved after all
-      if( fidxs!=BitsFun.ANY )            // And have choices
-        // Pick least-cost among choices
-        fptr = call.least_cost(fidxs,call.fdx());
-    }
-    if( fptr==null ) {          // Not resolving, program is in-error
-      call._not_resolved_by_gcp = true;
-      //add_work(call);
-      //add_work(call.fdx());
-      //return;                   // Not resolving, but Call flagged as in-error
-      throw com.cliffc.aa.AA.unimpl();
+    BitsFun fidxs = tfp.fidxs();
+    if( !fidxs.above_center() ) return; // Resolved after all
+    if( fidxs!=BitsFun.ANY ) {          // And have choices
+      // Pick least-cost among choices
+      fptr = call.least_cost(fidxs,call.fdx());
+      if( fptr==null ) return;  // Not resolving, program is in-error
     }
     call.set_dsp(fptr.display());
     call.set_fdx(fptr);         // Set resolved edge

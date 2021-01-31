@@ -87,15 +87,14 @@ public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
   boolean _unpacked;        // One-shot flag; call site allows unpacking a tuple
   boolean _is_copy;         // One-shot flag; Call will collapse
-  public boolean _not_resolved_by_gcp; // One-shot flag set when GCP cannot resolve; this Call is definitely in-error
   // Example: call(arg1,arg2)
   // _badargs[0] points to the opening paren.
   // _badargs[1] points to the start of arg1, same for arg2, etc.
   Parse[] _badargs;         // Errors for e.g. wrong arg counts or incompatible args; one error point per arg.
   public CallNode( boolean unpacked, Parse[] badargs, Node... defs ) {
     super(OP_CALL,defs);
-    assert defs[FUN_IDX]==null || defs[FUN_IDX]._val instanceof TypeMemPtr; // Temp; not required
-    assert defs.length > FUN_IDX+1;
+    assert defs[DSP_IDX]==null || defs[DSP_IDX]._val instanceof TypeMemPtr; // Temp; not required
+    assert defs.length > DSP_IDX+1;
     _rpc = BitsRPC.new_rpc(BitsRPC.ALL); // Unique call-site index
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
     _badargs = badargs;
@@ -117,17 +116,17 @@ public class CallNode extends Node {
   //     The output type here is trimmed to what is "resolved"
   public  Node ctl() { return in(CTL_IDX); }
   public  Node mem() { return in(MEM_IDX); }
-  public  Node dsp() { return in(FUN_IDX); } // Display
+  public  Node dsp() { return in(DSP_IDX); } // Display
   public  Node fdx() { return _defs.last(); } // FIDX
 
-  // Number of actual arguments, including closure/display at FUN_IDX, and not
+  // Number of actual arguments, including closure/display at DSP_IDX, and not
   // counting the FIDX in the last position.
   int nargs() { return _defs._len-1; }
   // Actual arguments.  Arg(1) is allowed and refers to memory; arg(2) to the Display/TFP.
   Node arg ( int x ) { assert x>=0; return _defs.at(x); }
   // Set an argument.  Use 'set_fun' to set the Code.
-  Node set_arg (int idx, Node arg) { assert idx>=FUN_IDX && idx <nargs(); return set_def(idx,arg); }
-  public Node set_dsp( Node dsp) { return set_def(FUN_IDX, dsp); }
+  Node set_arg (int idx, Node arg) { assert idx>=DSP_IDX && idx <nargs(); return set_def(idx,arg); }
+  public Node set_dsp( Node dsp) { return set_def(DSP_IDX, dsp); }
   public void set_mem( Node mem) { set_def(MEM_IDX, mem); }
   public Node set_fdx( Node fun) { return set_def(_defs._len-1,fun); }
   public BitsFun fidxs() {
@@ -275,9 +274,7 @@ public class CallNode extends Node {
     // iter post-GCP on error calls where nothing resolves.
     CallEpiNode cepi = cepi();
     if( fidx == -1 && !fidxs.above_center() && !fidxs.test(1)) {
-      BitsFun rfidxs = resolve(fidxs,tcall._ts,(TypeMem) mem()._val,GVN._opt_mode==GVNGCM.Mode.Opto);
-      if( rfidxs==null ) return null;            // Dead function, stall for time
-      FunPtrNode fptr = least_cost(rfidxs, unk); // Check for least-cost target
+      FunPtrNode fptr = least_cost(fidxs, unk); // Check for least-cost target
       if( fptr != null ) {
         if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
         if( fptr.display()._val.isa(dsp()._val) )
@@ -314,7 +311,7 @@ public class CallNode extends Node {
     // arg is still alive.
     if( GVN._opt_mode._CG && err(true)==null ) {
       Node progress = null;
-      for( int i=FUN_IDX; i<nargs(); i++ )
+      for( int i=DSP_IDX; i<nargs(); i++ )
         if( ProjNode.proj(this,i)==null &&
             !(arg(i) instanceof ConNode) ) // Not already folded
           progress = set_arg(i,Env.ANY);   // Kill dead arg
@@ -418,17 +415,11 @@ public class CallNode extends Node {
     if( _is_copy ) return _val; // No change till folds away
     // Pinch to XCTRL/CTRL
     Type ctl = ctl()._val;
-    if( opt_mode!=GVNGCM.Mode.Parse && cepi()==null ) ctl = Type.XCTRL; // Dead from below
-    if( _keep==0 && ctl != Type.CTRL ) return ctl.oob();
-    if( mem()==null ) return Type.ALL;
+    if( ctl != Type.CTRL ) return ctl.oob();
 
     // Not a memory to the call?
     Type mem = mem()._val;
-    if( !(mem instanceof TypeMem) ) return mem.oob();
-    TypeMem tmem = (TypeMem)mem;
-
-    // If GCP declares unresolved, fall to the NO-OP function & be an error.
-    if( _not_resolved_by_gcp ) return Type.ALL;
+    TypeMem tmem = mem instanceof TypeMem ? (TypeMem)mem : TypeMem.ANYMEM;
 
     // Result type includes a type-per-input and an extra roll-up type of all
     // escaping aliases.
@@ -439,7 +430,7 @@ public class CallNode extends Node {
     // Copy args for called functions.  FIDX is refined below.
     // Also gather all aliases from all args.
     BitsAlias as = BitsAlias.EMPTY;
-    for( int i=FUN_IDX; i<nargs(); i++ )
+    for( int i=DSP_IDX; i<nargs(); i++ )
       as = as.meet(get_alias(ts[i] = arg(i)._val));
     // Recursively search memory for aliases; compute escaping aliases
     BitsAlias as2 = tmem.all_reaching_aliases(as);
@@ -451,25 +442,8 @@ public class CallNode extends Node {
       tfx = tfx.oob(TypeFunPtr.GENERIC_FUNPTR);
     TypeFunPtr tfp = (TypeFunPtr)tfx;
     BitsFun fidxs = tfp.fidxs();
-    if( !fidxs.is_empty() && fidxs.above_center()!=tfp._disp.above_center() && !tfp._disp.is_con() )
-      return _val; // Display and FIDX mis-aligned; stall
-    // Resolve; only keep choices with sane arguments during GCP
-    // Unpacked: to be monotonic, skip resolve until unpacked.
-    BitsFun rfidxs = _unpacked ? resolve(fidxs,ts,tmem,opt_mode==GVNGCM.Mode.Opto) : fidxs;
-    if( rfidxs==null ) return _val; // Dead function input, stall until this dies
-    // nargs is min nargs across the resolved fidxs for below-center, max for above.
-    boolean rup = rfidxs.above_center();
-    int nargs = rup ? -1 : 9999;
-    if( rfidxs == BitsFun.FULL || rfidxs == BitsFun.EMPTY ) nargs = tfp._nargs;
-    else {
-      for( int fidx : rfidxs ) {
-        FunNode fun = FunNode.find_fidx(fidx);
-        int fnargs = fun==null ? tfp._nargs : fun._sig.nargs();
-        nargs = rup ? Math.max(nargs,fnargs) : Math.min(nargs,fnargs);
-      }
-    }
-    // FIDX is the last _def, 2nd-to-last type in ts
-    ts[_defs._len-1] = TypeFunPtr.make(rfidxs,nargs,TypeMemPtr.NO_DISP);
+    assert fidxs.is_empty() || fidxs.above_center()==tfp._disp.above_center() || tfp._disp.is_con();
+    ts[_defs._len-1] = tfp;    // FIDX is the last _def, 2nd-to-last type in ts
 
     return TypeTuple.make(ts);
   }
@@ -520,7 +494,6 @@ public class CallNode extends Node {
     if( def==fdx() ) {                         // Function argument
       if( def instanceof ThretNode ) return TypeMem.ALLMEM; // Always inlines eagerly, so this is always temporary
       if( !opt_mode._CG ) return TypeMem.ESCAPE; // Prior to GCP, assume all fptrs are alive and display escapes
-      if( _not_resolved_by_gcp ) return TypeMem.ALIVE;// GCP failed to resolve, this call is in-error
       // During GCP, unresolved calls might resolve & remove this use.  Keep dead till resolve fails.
       // If we have a fidx directly, use it more precisely.
       int dfidx = def instanceof FunPtrNode ? ((FunPtrNode)def).ret()._fidx : -1;
@@ -552,7 +525,7 @@ public class CallNode extends Node {
     if( !(_val instanceof TypeTuple) ) // No type to sharpen
       return _val.oob(TypeMem.ALLMEM);
     BitsAlias aliases = BitsAlias.EMPTY;
-    for( int i=FUN_IDX; i<nargs(); i++ ) {
+    for( int i=DSP_IDX; i<nargs(); i++ ) {
       Type targ = targ(_val,i);
       if( TypeMemPtr.OOP.isa(targ) )
         { aliases=BitsAlias.FULL; break; } // All possible pointers, so all memory is alive
@@ -580,160 +553,7 @@ public class CallNode extends Node {
     return TypeMem.ALIVE;
   }
 
-  // Resolve an Unresolved.  Called in value() and so must be monotonic.
-  // Strictly looks at arguments and the list of function choices.  Mostly all
-  // arguments start in GCP & Iter at the extremes and move towards the center
-  // and resolve() cannot move off the extreme until ALL args move.
-  // See TestNodeSmall.java for the large mapping table test.
-  //
-  // resolve breaks down all args to all potential functions into GOOD, BAD,
-  // HIGH and LOW.  LOW and HIGH bracket BAD & GOOD, which are parallel.
-  //
-  // Rules "cookbook" to help map the table:
-  // - Some args High & no Low, keep all & join (ignore Good,Bad)
-  // - Some args Low & no High, keep all & meet (ignore Good,Bad)
-  // - Mix High/Low & no Good , keep all
-  // - Some Good, no Low, no High, drop Bad & fidx?join:meet
-  // - All Bad, like Low: keep all & meet
-  // At any time during iter (not GCP), an arg can go dead (ANY) and be removed
-  // (lift to HIGH) - so losing an arg can only lift.
-  private static final int BAD=1, GOOD=2, LOW=4, HIGH=8, DEAD=16;
-
-  BitsFun resolve( BitsFun fidxs, Type[] targs, TypeMem caller_mem, boolean gcp ) {
-    if( fidxs==BitsFun.EMPTY) return fidxs; // Nothing to resolve
-    if( fidxs==BitsFun.ANY  ) return fidxs; // No point in attempting to resolve all things
-    if( fidxs==BitsFun.FULL ) return fidxs; // No point in attempting to resolve all things
-
-    int flags = 0;
-    for( int fidx : fidxs )
-      // Parent/kids happen during inlining
-      for( int kidx=fidx; kidx!=0; kidx=BitsFun.next_kid(fidx,kidx) )
-        flags |= resolve(kidx,targs,caller_mem,gcp);
-    if( x(flags,DEAD) ) return null; // Caller should stall for time, till dead folds up
-    // - Some args High & no Low, keep all & join (ignore Good,Bad)
-    if(  x(flags,HIGH) && !x(flags,LOW) ) return sgn(fidxs,true);
-    // - Some args Low & no High, keep all & meet (ignore Good,Bad)
-    if( !x(flags,HIGH) &&  x(flags,LOW) ) return sgn(fidxs,false);
-    // - Mix High/Low, keep all & fidx (ignore Good,Bad)
-    if(  x(flags,HIGH) &&  x(flags,LOW) ) return fidxs;
-    // - All Bad, like Low: keep all & meet.  Bad args can go dead, effectively lifting.
-    if( !x(flags,HIGH) && !x(flags,LOW) && !x(flags,GOOD) && flags!=0 )
-      return sgn(fidxs,false);
-    // No args is at least as high as anything with args
-    if( flags==0 )
-      return sgn(fidxs,true);
-
-    // Only had a single target coming in.
-    if( fidxs.abit() != -1 ) // Single target
-      // If BAD args can die (false in primitives, and false in UnresolvedNodes
-      // where the BAD arg is required to make the signature unambiguous) then
-      // return all the fidxs, and wait for some arg to die (or else the
-      // program is in-error).
-      return fidxs;
-
-    // All that is left is the no-args case (all formals ignoring), no high/low
-    // and some good and maybe bad.  Toss out the bad & return the remaining
-    // fidxs with the same sign.
-    BitsFun choices = BitsFun.EMPTY;
-    for( int fidx : fidxs )
-      // Parent/kids happen during inlining
-      for( int kidx=fidx; kidx!=0; kidx=BitsFun.next_kid(fidx,kidx) )
-        if( !BitsFun.is_parent(kidx) && !x(resolve(kidx,targs,caller_mem,gcp),BAD) )
-          choices = choices.set(kidx);
-    if( choices.abit() != -1 )  // Single choice with all good, no high, no low, no bad
-      return choices;           // Report it low
-    if( choices==BitsFun.EMPTY )// No good choices
-      return sgn(fidxs,false);  // Report all the bad ones low
-    return sgn(choices,gcp && fidxs.above_center());
-  }
-
-  private static boolean x(int flags, int flag)  { return (flags&flag)==flag; }
-  private static BitsFun sgn(BitsFun fidxs, boolean hi) {
-    return fidxs.above_center()==hi ? fidxs : fidxs.dual();
-  }
-
-  // Return 4 bools as 4 bits based on whether or not the actual args meets the
-  // formals: [High,Low,Good,Bad].  High > formal.dual >= Good >= formal > Low.
-  // Bad is none of the prior (actual is neither above nor below the formal).
-  int resolve( int fidx, Type[] targs, TypeMem caller_mem, boolean gcp ) {
-    if( BitsFun.is_parent(fidx) )
-      return 0; // Parent is never a real choice.  See these during inlining.
-
-    FunNode fun = FunNode.find_fidx(fidx);
-    if( fun==null || fun.is_dead() ) return BAD; // Stale fidx leading to dead fun
-    // Forward refs are only during parsing; assume they fit the bill
-    if( fun.is_forward_ref() ) return LOW;   // Assume they work
-    if( fun.nargs() != nargs() ) return BAD; // Wrong arg count, toss out
-    // Toss out single-path (inlines specific to a single call-site) FunNodes
-    // to the wrong call.  Happens because the parent fidx splits, and both
-    // children appear at all call sites - for a little while.
-    if( !fun.has_unknown_callers() && !gcp ) {
-      CallEpiNode cepi = cepi();
-      if( cepi != null ) {
-        int i; for( i=0; i<cepi.nwired(); i++ ) {
-          RetNode ret = cepi.wired(i);
-          if( !ret.is_copy() && ret.fun()==fun )
-            break;
-        }
-        if( i==cepi.nwired() ) return BAD; // While a (stale) fidx might be available, this path is for another call.
-      }
-    }
-    TypeTuple formals = fun._sig._formals;  // Type of each argument
-    int flags=0;
-    for( int j=MEM_IDX; j<nargs(); j++ ) {
-      Type formal = formals.at(j);
-      Type actual = targ(targs,j);          // Calls skip ctrl & mem
-      if( actual==Type.ANY ) continue;      // Unused args can be error, are ignored
-      assert actual==actual.simple_ptr();   // Only simple ptrs from nodes
-      actual = caller_mem.sharptr(actual);  // Sharpen actual pointers before checking vs formals
-
-      if( actual==formal ) { flags|=GOOD; continue; } // Arg is fine.  Covers NO_DISP which can be a high formal.
-      Type mt_lo = actual.meet(formal       );
-      Type mt_hi = actual.meet(formal.dual());
-      if( mt_lo==actual ) flags|=LOW;       // Low
-      else if( mt_hi==actual && mt_lo==formal ) flags|=GOOD; // Good
-      else if( mt_hi==formal.dual() ) flags|=HIGH;
-      else if( mt_lo==formal ) flags|=GOOD; // handles some display cases with prims hi/lo inverted
-      else flags|=BAD;                      // Side-ways is bad
-
-      // TEST IS BROKEN FOR PTRS
-      /**
-Because a collection of bits forming a simple tree with simple set-inclusion
-will NOT form a lattice without the EMPTY set in the middle.  Thus the join of
-[26] and [30] (two unrelated sibling aliases) is [] and not [-26-30].
-
-Here we want to allow a "little sideways and low" type to lift to inbetween
-formal and ~formal.  Example: formal is int64, actual is nScalar.  This should
-be LOW and not BAD.  The actual is not directly below int64 (Scalar is), but
-can lift to nint64 which is allowed.
-
-However, a formal TypeMemPtr with alias [30] and unrelated actual [26] IS BAD,
-since [26] can never lift to a [30]-or-above.
-
-The test is "actual can lift to between formal and ~formal", which can be
-restated as "~formal ISA (actual JOIN formal)" - which works for int64 and
-Scalar, but because Bits allows EMPTY, does not work for [26] and [30].
-
-       */
-      //else if( formal.dual().isa(actual.join(formal)) ) {
-      //  if( (actual instanceof TypeMemPtr && formal instanceof TypeMemPtr &&
-      //       ((TypeMemPtr)actual).aliases().join(((TypeMemPtr)formal).aliases()).is_empty()) )
-      //    flags |=BAD;       // Sideways
-      //  else if( (actual instanceof TypeFunPtr && formal instanceof TypeFunPtr &&
-      //            ((TypeFunPtr)actual)._fidxs.join(((TypeFunPtr)formal)._fidxs).is_empty()) )
-      //    flags |=BAD;       // Sideways
-      //  else
-      //    flags|=LOW; // Low & sideways, but can lift to good.
-      //
-      //} else flags|=BAD;                      // Side-ways is bad
-    }
-    if( flags==0 ) flags=GOOD; // No args counts as all-good-args
-    return flags;
-  }
-
-
-  // Amongst these choices return the least-cost.  Some or all might be
-  // invalid.
+  // Amongst these choices return the least-cost.  Some or all might be invalid.
   public FunPtrNode least_cost(BitsFun choices, Node unk) {
     if( choices==BitsFun.EMPTY ) return null;
     assert choices.bitCount() > 0; // Must be some choices
@@ -749,13 +569,14 @@ Scalar, but because Bits allows EMPTY, does not work for [26] and [30].
           continue;
 
         FunNode fun = FunNode.find_fidx(kidx);
-        if( fun.nargs()!=nargs() || fun.ret() == null ) continue; // BAD/dead
+        if( fun.nargs()!=nargs() || fun.in(0)==fun ) continue; // BAD/dead
         TypeTuple formals = fun._sig._formals; // Type of each argument
         int cvts=0;                        // Arg conversion cost
-        for( int j=ARG_IDX; j<nargs(); j++ ) {   // Skip the display
+        for( int j=DSP_IDX; j<nargs(); j++ ) {
           Type actual = arg(j)._val;
           Type formal = formals.at(j);
           if( actual==formal ) continue;
+          if( Type.ALL==formal ) continue; // Allows even error arguments
           byte cvt = actual.isBitShape(formal); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
           if( cvt == -1 ) return null; // Might be the best choice, or only choice, dunno
           cvts += cvt;
@@ -818,9 +639,8 @@ Scalar, but because Bits allows EMPTY, does not work for [26] and [30].
     TypeFunPtr tfp = ttfpx(_val);
     if( tfp==null ) {
       if( fast ) return ErrMsg.FAST;
-      if( _not_resolved_by_gcp ) return ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
       Type t = _val;
-      if( t instanceof TypeTuple ) t = ((TypeTuple)t).at(FUN_IDX);
+      if( t instanceof TypeTuple ) t = ((TypeTuple)t).at(DSP_IDX);
       return ErrMsg.unresolved(_badargs[0],"A function is being called, but "+t+" is not a function type");
     }
 
@@ -832,12 +652,36 @@ Scalar, but because Bits allows EMPTY, does not work for [26] and [30].
     if( tfp._nargs != nargs() )
       return fast ? ErrMsg.FAST : ErrMsg.syntax(_badargs[0],"Passing "+(nargs()-ARG_IDX)+" arguments to "+tfp.names(false)+" which takes "+(tfp._nargs-ARG_IDX)+" arguments");
 
-    // Now do an arg-check.
-    BitsFun.Tree<BitsFun> tree = tfp._fidxs.tree();
+    // Call did not resolve.
+    BitsFun fidxs = tfp.fidxs();
+    if( fidxs.is_empty() ) // This is an unresolved call
+      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
+
+    // Also happens if more than one FIDX shares the same Unresolved.
+    // Basically means we did not clone enough to remove a choice amongst primitives.
+    // Bail out here if we see more than one Unresolved.
+    Node munr = null;
+    for( int fidx : fidxs ) {                                 // All fidxs to Call
+      FunNode fun = FunNode.find_fidx(fidx);
+      if( fun==null ) continue;                // No such function (probably dead and mid-cleanup)
+      outer:
+      for( Node fptrs : fun.ret()._uses )      // FunPtrs for each fidx (typically 1)
+        for( Node unr : fptrs._uses )          // Unresolved behind each FunPtr (typically 1)
+          if( unr instanceof UnresolvedNode && // Unresolved includes fdxs in this Call FDX set?
+              ((TypeFunPtr)(tfp.join(unr._val)))._fidxs.abit() == -1 ) {
+            if( fast ) return ErrMsg.FAST;
+            if( munr == null || munr==unr ) { munr = unr; continue outer; }
+            return ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
+          }
+    }
+
+    // Now do an arg-check.  No more than 1 unresolved, so the error message is
+    // more sensible.
+    BitsFun.Tree<BitsFun> tree = fidxs.tree();
     for( int j=ARG_IDX; j<nargs(); j++ ) {
       Type actual = arg(j).sharptr(mem());
       Ary<Type> ts=null;
-      for( int fidx : tfp._fidxs ) {
+      for( int fidx : fidxs ) {
         if( fidx==0 ) continue;
         for( int kid=fidx; kid!=0; kid = tree.next_kid(fidx,kid) ) {
           FunNode fun = FunNode.find_fidx(kid);
@@ -855,11 +699,6 @@ Scalar, but because Bits allows EMPTY, does not work for [26] and [30].
       if( ts!=null )
         return ErrMsg.typerr(_badargs[j-ARG_IDX+1],actual, mem()._val,ts.asAry());
     }
-
-    // Call did not resolve
-    BitsFun fidxs = tfp.fidxs();
-    if( fidxs.is_empty() || fidxs.above_center() ) // This is an unresolved call
-      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
 
     return null;
   }

@@ -912,7 +912,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return null; }
 
   // Display might be Scalar or ~Scalar at GVN start
-  public boolean is_display_ptr() { return _type==TSCALAR || _type==TXSCALAR || _type==TNIL || _type==TXNIL || _type==TANY; }
+  public boolean is_display_ptr() { return _type==TSCALAR || _type==TXSCALAR || _type==TNIL || _type==TXNIL || _type==TANY || _type==TALL; }
   boolean is_display() { return false; }
 
   RuntimeException typerr(Type t) {

@@ -926,9 +926,9 @@ public class Parse implements Comparable<Parse> {
       // Build the FunNode header
       FunNode fun = (FunNode)X.xform(new FunNode(ids.asAry(),ts.asAry()).add_def(Env.ALL_CTRL));
       // Build Parms for system incoming values
-      Node rpc = X.xform(new ParmNode(-1,"rpc" ,fun,con(TypeRPC.ALL_CALL),null));
+      Node rpc = X.xform(new ParmNode(0      ,"rpc" ,fun,con(TypeRPC.ALL_CALL),null));
       Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-      Node clo = X.xform(new ParmNode(FUN_IDX,"^"   ,fun,con(tpar_disp),null));
+      Node clo = X.xform(new ParmNode(DSP_IDX,"^"   ,fun,con(tpar_disp),null));
 
       // Increase scope depth for function body.
       try( Env e = new Env(_e,errMsg(oldx-1), true, fun, mem) ) { // Nest an environment for the local vars
@@ -1373,7 +1373,7 @@ public class Parse implements Comparable<Parse> {
     args[CTL_IDX] = ctrl();     // Always control
     args[MEM_IDX] = mem();      // Always memory
     for( int i=ARG_IDX; i<args.length; i++ ) args[i].keep(); // Hook all args before reducing display
-    args[FUN_IDX]= gvn(new FP2DispNode(args[FUN_IDX]));      // Reduce display
+    args[DSP_IDX]= gvn(new FP2DispNode(args[DSP_IDX]));      // Reduce display
     for( int i=ARG_IDX; i<args.length; i++ ) args[i].unkeep();
     return args;
   }

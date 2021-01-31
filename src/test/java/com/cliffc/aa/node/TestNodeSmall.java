@@ -505,7 +505,7 @@ public class TestNodeSmall {
     // yet built.
     NewObjNode dsp_file = (NewObjNode)gvn.xform(new NewObjNode(true,TypeStruct.DISPLAY,dsp_prims));
     MrgProjNode dsp_file_obj = Env.DEFMEM.make_mem_proj(dsp_file,mem);
-    ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(FUN_IDX, dsp_file));
+    ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(DSP_IDX, dsp_file));
     Env.ALL_DISPLAYS = Env.ALL_DISPLAYS.set(dsp_file._alias);
     // The Fun and Fun._tf:
     TypeTuple formals = TypeTuple.make_args(Types.ts(Type.CTRL,
@@ -518,7 +518,7 @@ public class TestNodeSmall {
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
     ParmNode parm_mem = new ParmNode(MEM_IDX," mem",fun,mem,null);
-    ParmNode parm_dsp = new ParmNode(FUN_IDX,"^"  ,fun,Type.SCALAR,Node.con(dsp_file_ptr.val()),null);
+    ParmNode parm_dsp = new ParmNode(DSP_IDX,"^"  ,fun,Type.SCALAR,Node.con(dsp_file_ptr.val()),null);
     gvn.xform(parm_mem.add_def(dsp_file_obj));
     gvn.xform(parm_dsp.add_def(dsp_file_ptr));
     // Close the function up
