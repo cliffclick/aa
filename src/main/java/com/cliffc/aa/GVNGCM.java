@@ -288,7 +288,11 @@ public class GVNGCM {
     if( fidxs!=BitsFun.ANY ) {          // And have choices
       // Pick least-cost among choices
       fptr = call.least_cost(fidxs,call.fdx());
-      if( fptr==null ) return;  // Not resolving, program is in-error
+      if( fptr==null ) { // Not resolving, program is in-error
+        call._not_resolved_by_gcp = true; // will drop fdx in lattice
+        add_flow(call);
+        return;
+      }
     }
     call.set_dsp(fptr.display());
     call.set_fdx(fptr);         // Set resolved edge

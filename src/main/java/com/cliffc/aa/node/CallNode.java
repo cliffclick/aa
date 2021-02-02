@@ -87,6 +87,7 @@ public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
   boolean _unpacked;        // One-shot flag; call site allows unpacking a tuple
   boolean _is_copy;         // One-shot flag; Call will collapse
+  public boolean _not_resolved_by_gcp; // One-shot flag set when GCP cannot resolve; this Call is definitely in-error
   // Example: call(arg1,arg2)
   // _badargs[0] points to the opening paren.
   // _badargs[1] points to the start of arg1, same for arg2, etc.
@@ -444,6 +445,10 @@ public class CallNode extends Node {
     TypeFunPtr tfp = (TypeFunPtr)tfx;
     BitsFun fidxs = tfp.fidxs();
     assert fidxs.is_empty() || fidxs.above_center()==tfp._disp.above_center() || tfp._disp.is_con();
+    if( _not_resolved_by_gcp ) { // If overloads not resolvable, then take them all and we are in-error
+      if( fidxs.above_center() ) tfp = tfp.dual();
+    }
+    
     ts[_defs._len-1] = tfp;    // FIDX is the last _def, 2nd-to-last type in ts
 
     return TypeTuple.make(ts);
@@ -506,19 +511,24 @@ public class CallNode extends Node {
     }
     if( def==ctl() ) return TypeMem.ALIVE;
     if( def!=mem() ) {         // Some argument
-      if( opt_mode._CG ) {     // If all are wired, we can check projs for uses
-        // Check that all fidxs are wired; an unwired fidx might be in-error
-        // and we want the argument alive for errors.  This is a value turn-
-        // around point (high fidxs need to fall)
-        BitsFun fidxs = fidxs();
-        if( fidxs==null ) return TypeMem.DEAD; // No fidxs yet
-        CallEpiNode cepi = cepi();
-        if( cepi!=null && fidxs.bitCount() == cepi.nwired() ) {
-          int argn = _defs.find(def);
-          ProjNode proj = ProjNode.proj(this, argn);
-          if( proj == null || proj._live == TypeMem.DEAD )
-            return TypeMem.DEAD; // Proj not used
-        }
+      // Check that all fidxs are wired; an unwired fidx might be in-error
+      // and we want the argument alive for errors.  This is a value turn-
+      // around point (high fidxs need to fall)
+
+      // Pre GCP, might not wire (yet), assume fully used by unwired valid fcn
+      // target, so ESCAPE.
+
+      // 1st GCP, wiring appears over time, if not wired assume it will be and
+      // do the optimistic proj test.
+
+      // Post GCP, if not wired, then Call is in error, so ESCAPE.
+      if( opt_mode._CG &&       // Either mid-GCP or post-GCP
+          err(true)==null &&    // Not in-error
+          (opt_mode==GVNGCM.Mode.Opto || all_fcns_wired()) ) {
+        int argn = _defs.find(def);
+        ProjNode proj = ProjNode.proj(this, argn);
+        if( proj == null || proj._live == TypeMem.DEAD )
+          return TypeMem.DEAD; // Proj not used
       }
       if( def instanceof ThretNode ) return TypeMem.ALLMEM;
       assert def.all_live().basic_live();
@@ -528,15 +538,17 @@ public class CallNode extends Node {
     // After we have the exact callers, use liveness directly.  True if we have
     // the Call Graph, or the callers are known directly.  If the call is
     // in-error, act as-if we do not known the Call Graph.
+    if( !(_val instanceof TypeTuple) ) // No type to sharpen
+      return _val.oob(TypeMem.ALLMEM);
     TypeFunPtr tfpx = ttfpx(_val);
-    if( (opt_mode._CG || fdx() instanceof FunPtrNode) &&
-        (tfpx ==null || tfpx.fidxs().above_center() || err(true)==null) )
-      return _live;
+    if( opt_mode._CG || fdx() instanceof FunPtrNode ) {
+      if( err(true)!=null ) return TypeMem.ALLMEM;
+      if( tfpx ==null || tfpx.fidxs().above_center() )
+        return _live;
+    }
 
     // Unknown future callees act as-if all available aliases are read from and
     // thus live.
-    if( !(_val instanceof TypeTuple) ) // No type to sharpen
-      return _val.oob(TypeMem.ALLMEM);
     BitsAlias aliases = BitsAlias.EMPTY;
     for( int i=DSP_IDX; i<nargs(); i++ ) {
       Type targ = targ(_val,i);
@@ -551,6 +563,13 @@ public class CallNode extends Node {
     TypeMem caller_mem = emem(_val);
     TypeMem tmem2 = caller_mem.slice_reaching_aliases(caller_mem.all_reaching_aliases(aliases));
     return (TypeMem)tmem2.meet(_live);
+  }
+
+  private boolean all_fcns_wired() {
+    BitsFun fidxs = fidxs();
+    if( _is_copy || fidxs==null ) return true;
+    CallEpiNode cepi = cepi();
+    return cepi != null && fidxs.bitCount() == cepi.nwired();
   }
 
   TypeMem live_use_call( int dfidx ) {
@@ -674,9 +693,9 @@ public class CallNode extends Node {
     // Basically means we did not clone enough to remove a choice amongst primitives.
     // Bail out here if we see more than one Unresolved.
     Node munr = null;
-    for( int fidx : fidxs ) {                                 // All fidxs to Call
+    for( int fidx : fidxs ) {                    // All fidxs to Call
       FunNode fun = FunNode.find_fidx(fidx);
-      if( fun==null ) continue;                // No such function (probably dead and mid-cleanup)
+      if( fun==null || fun.is_dead() || fun.ret()==null ) continue; // No such function (probably dead and mid-cleanup)
       outer:
       for( Node fptrs : fun.ret()._uses )      // FunPtrs for each fidx (typically 1)
         for( Node unr : fptrs._uses )          // Unresolved behind each FunPtr (typically 1)

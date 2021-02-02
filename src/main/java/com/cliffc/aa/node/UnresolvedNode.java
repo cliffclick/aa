@@ -43,12 +43,14 @@ public class UnresolvedNode extends Node {
   @Override public Type value(GVNGCM.Mode opt_mode) {
     // Freeze after GVN - only still around for errors
     if( opt_mode == GVNGCM.Mode.PesiCG || opt_mode == GVNGCM.Mode.Pause ) return _val;
-    boolean lifting = true;
-    Type t = Type.ANY;
+    boolean lifting = opt_mode!=GVNGCM.Mode.Opto;
+    Type t   = lifting ? Type.ANY : Type.ALL;
     for( Node def : _defs ) {
       Type td = def.val();
       if( !(td instanceof TypeFunPtr) ) return td.oob();
-      t = t.meet(td);
+      TypeFunPtr tfp = (TypeFunPtr)td;
+      if( tfp.above_center() == lifting ) tfp = tfp.dual();
+      t = lifting ? t.meet(tfp) : t.join(tfp);
     }
     return t;
   }

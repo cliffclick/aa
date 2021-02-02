@@ -6,30 +6,36 @@ import com.cliffc.aa.type.*;
 
 // Proj control
 public class CEProjNode extends CProjNode {
+  final TypeFunSig _sig;
   public CEProjNode( CallNode call, TypeFunSig sig ) { super(call); _sig = sig; }
-  TypeFunSig _sig;
   @Override public String xstr() { return "CEProj"; }
-  @Override public Type value(GVNGCM.Mode opt_mode) { return good_call(val(0),_sig,_sig==null) ? Type.CTRL : Type.XCTRL; }
-  // Will typically have the same Call input,
-  @Override public int hashCode() { return super.hashCode()+(_sig==null ? 0 : _sig._hash); }
-  @Override public boolean equals(Object o) {
-    if( this==o ) return true;
-    if( !super.equals(o) ) return false;
-    if( !(o instanceof CEProjNode) ) return false;
-    CEProjNode proj = (CEProjNode)o;
-    return _sig==proj._sig;
+  @Override public Type value(GVNGCM.Mode opt_mode) {
+    if( _uses._len<1 ) return Type.CTRL;
+    return good_call(val(0),_uses.at(0)) ? Type.CTRL : Type.XCTRL;
   }
+  // Never equal to another CEProj, since Call-Graph *edges* are unique
+  @Override public int hashCode() { return super.hashCode()+(_sig==null ? 0 : _sig._hash); }
+  @Override public boolean equals(Object o) { return this==o; }
 
-  static boolean good_call(Type tcall, TypeFunSig sig, boolean thunk_rhs) {
+  static boolean good_call(Type tcall, Node ftun ) {
     if( !(tcall instanceof TypeTuple) ) return !tcall.above_center();
     TypeTuple ctup = (TypeTuple)tcall; // Call type tuple
-    if( sig==null || thunk_rhs ) return true; // Thunk call is OK by design
+    if( ctup.at(0)!=Type.CTRL ) return false; // Call not executing
+    if( ftun instanceof ThunkNode ) return true; // Thunk call is OK by design
+    FunNode fun = (FunNode)ftun;
+    if( fun._thunk_rhs ) return true; // Thunk call is OK by design
+    TypeFunPtr tfp = CallNode.ttfp(ctup);
+    if( tfp.fidxs().above_center() ) return false; // Call not executing yet
+    if( !tfp.fidxs().test_recur(fun._fidx) )
+      return false;             // Call not executing this wired path
+
     // Argument count mismatch
-    if( ctup.len()-2 != sig._formals.len() ) return false;
+    TypeTuple formals = fun._sig._formals;
+    if( ctup.len()-2 != formals.len() ) return false;
     // Check good args
     TypeMem tmem = (TypeMem)ctup.at(AA.MEM_IDX);
-    for( int i=AA.MEM_IDX; i<sig._formals.len(); i++ ) {
-      Type formal = sig._formals.at(i);
+    for( int i=AA.MEM_IDX; i<formals.len(); i++ ) {
+      Type formal = formals.at(i);
       Type actual0= ctup.at(i);
       if( actual0==Type.ANY && formal==Type.ALL ) continue; // Allow ignored error args
       // If any argument (or display, fidx, memory) is high, do not enable the

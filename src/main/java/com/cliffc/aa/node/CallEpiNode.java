@@ -199,7 +199,7 @@ public final class CallEpiNode extends Node {
       RetNode ret = fun.ret();
       if( ret==null ) continue;               // Mid-death
       if( _defs.find(ret) != -1 ) continue;   // Wired already
-      if( !CEProjNode.good_call(tcall,fun._sig,fun._thunk_rhs) ) continue; // Invalid arguments
+      if( !CEProjNode.good_call(tcall,fun) ) continue; // Invalid arguments
       progress=true;
       wire1(call,fun,ret);      // Wire Call->Fun, Ret->CallEpi
     }
@@ -215,6 +215,7 @@ public final class CallEpiNode extends Node {
     // Wire self to the return
     add_def(ret);
     GVN.add_flow(this);
+    GVN.add_flow(call);
   }
 
   // Wire without the redundancy check, or adding to the CallEpi
@@ -236,7 +237,7 @@ public final class CallEpiNode extends Node {
           : new ProjNode(call,idx); // Normal args
         break;
       }
-      actual._live = arg._live;
+      actual._live = arg._live; // Set it before CSE during init1
       arg.add_def(actual.init1());
     }
 
@@ -309,7 +310,7 @@ public final class CallEpiNode extends Node {
           return _val;                  // "Freeze in place"
         }
         FunNode fun = FunNode.find_fidx(fidx);
-        if( !opt_mode._CG && CEProjNode.good_call(tcall,fun._sig,fun._thunk_rhs) )  // Before GCP?  Fidx is an unwired unknown call target
+        if( !opt_mode._CG && CEProjNode.good_call(tcall,fun) ) // Before GCP?  Fidx is an unwired unknown call target
           { fidxs = BitsFun.FULL; break; }
       }
     }

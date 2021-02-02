@@ -870,15 +870,7 @@ public class FunNode extends RegionNode {
     if( in(0)==this ) return _defs._len>=2 ? val(1) : Type.XCTRL; // is_copy
     for( int i=1; i<_defs._len; i++ ) {
       Type c = val(i);
-      if( c != Type.CTRL && c != Type.ALL ) continue; // Not control
-      if( !(in(i) instanceof CProjNode) ) return Type.CTRL; // A constant control
-      // Call might be alive and executing and calling many targets, just not this one.
-      Node call = in(i).in(0);
-      if( !(call instanceof CallNode) ) continue; // Mid collapse
-      if( call._val == Type.ALL ) return Type.CTRL;
-      TypeFunPtr ttfp = CallNode.ttfpx(call._val);
-      if( ttfp != null && !ttfp.above_center() && ttfp._fidxs.test_recur(_fidx) )
-        return Type.CTRL;       // Calls us
+      if( c == Type.CTRL || c == Type.ALL ) return Type.CTRL; // Valid path
     }
     return Type.XCTRL;
   }

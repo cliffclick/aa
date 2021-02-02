@@ -1,4 +1,48 @@
 =======================================
+2/2/2021
+
+'remove_ambi' situation: no high fdxs, so no *optimistic selection* fdxs.  so
+double-loop in GCP not needed; no remove-ambi.
+
+But concept of needing remove-ambi still valid: optimistic selection of choice
+overloads.
+
+2 kinds of overloads: (1) from type-specialization, with a clear monontonically
+improving choice, and (2) unrelated primitives (+:int vs +:str) with conflicts
+and (2a) unrelated primitives with cost (+:int vs +:flt).
+
+Current issue: during GCP, Call.live_use is declaring unwired fdxs as "will be
+wired", so Args "might-be-live on the to-be-wired fdx".  Never wired, because
+call is in-error.  "good_call" does not distinguish between "some args high, so
+waiting for them to fall" from "bad nargs or bad args".  During GCP want to
+distinguish between "CG still building" from "CG is built, but errors so no
+longer want to wait for CG"
+
+Call old resolve code helped here.
+GCP args falling from high.
+FDXs have some overloads; Scalar->Int type-specialization, or
+same-name overloads +:Int-vs-Flt or +:Int-vs-Str.
+Ex ARG lattice: TOP->Int/Other->Scalar.
+Ex FDX lattice: TOP->50/54->[50,54], where [50] allows Scalar and [54] allows Int.
+Want CEProj to never hit CTRL on paths that will never take.
+[Arg:Top,FDX:Top  ] -> 50:X,54:X
+[Arg:Int,FDX:54   ] -> 50:X,54:Ctrl
+[Arg:Int,FDX:50,54] -> 50:X,54:Ctrl
+[Arg:Str,FDX:50,54] -> 50:Ctrl,54:X
+[Arg:Int,FDX:50   ] -> 50:X,54:X // ODDLY, staying HIGH waiting for 54 to appear.  If it does NOT appear, needs to fall.
+
+This is the remove_ambi situation: call stays high (disallows all FDXs) until
+no-more-progress.  Then GCP calls remove-ambi, which starts allowing FDXs that
+are available, but can be filtered.  Which means no FDXs until either
+remove-ambi, or i can tell this FDX will never be overloaded.  Or Unresolved
+puts out high FDXs (which fail at Phis, but can all fall down) (high FDXs is
+what i was doing).  Call resolve allows no high FDXs until resolve-ambi, then
+the call is flagged to 'fall this way', or can prove exactly 1 high FDX will
+ever pass.
+
+
+
+=======================================
 1/31/2021
 
 Maybe a breakthru on Call+resolve+Unresolved.
