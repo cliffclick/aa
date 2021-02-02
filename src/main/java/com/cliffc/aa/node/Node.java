@@ -830,7 +830,7 @@ public abstract class Node implements Cloneable, TNode {
       boolean ok = lifting
         ? nval.isa(oval) && nliv.isa(oliv)
         : oval.isa(nval) && oliv.isa(nliv);
-      if( !ok || (!Env.GVN.on_flow(this) && _keep==0) ) { // Still-to-be-computed?
+      if( !ok || (!Env.GVN.on_flow(this) && !Env.GVN.on_dead(this) && _keep==0) ) { // Still-to-be-computed?
         FLOW_VISIT.clear(_uid); // Pop-frame & re-run in debugger
         System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
         errs++;

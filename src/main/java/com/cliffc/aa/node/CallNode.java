@@ -327,6 +327,7 @@ public class CallNode extends Node {
       Env.GVN.add_reduce(cepi);
     if( mem() instanceof MrgProjNode )
       Env.GVN.add_reduce(this);
+    Env.GVN.add_flow(mem()); // Dead pointer args reduced to ANY, so mem() liveness lifts
   }
 
   @Override public Node ideal_grow() {
@@ -468,6 +469,10 @@ public class CallNode extends Node {
     if( chg instanceof ProjNode )
       Env.GVN.add_flow(in(((ProjNode)chg)._idx));
   }
+  @Override public void add_flow_use_extra(Node chg) {
+    if( chg == fdx() )          // FIDX falls to sane from too-high
+      Env.GVN.add_flow_defs(this); // All args become alive
+  }
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
   // have not seen all possible function-body uses.  Check for #FIDXs == nwired().
@@ -502,10 +507,18 @@ public class CallNode extends Node {
     if( def==ctl() ) return TypeMem.ALIVE;
     if( def!=mem() ) {         // Some argument
       if( opt_mode._CG ) {     // If all are wired, we can check projs for uses
-        int argn = _defs.find(def);
-        ProjNode proj = ProjNode.proj(this, argn);
-        if( proj == null || proj._live == TypeMem.DEAD )
-          return TypeMem.DEAD; // Proj not used
+        // Check that all fidxs are wired; an unwired fidx might be in-error
+        // and we want the argument alive for errors.  This is a value turn-
+        // around point (high fidxs need to fall)
+        BitsFun fidxs = fidxs();
+        if( fidxs==null ) return TypeMem.DEAD; // No fidxs yet
+        CallEpiNode cepi = cepi();
+        if( cepi!=null && fidxs.bitCount() == cepi.nwired() ) {
+          int argn = _defs.find(def);
+          ProjNode proj = ProjNode.proj(this, argn);
+          if( proj == null || proj._live == TypeMem.DEAD )
+            return TypeMem.DEAD; // Proj not used
+        }
       }
       if( def instanceof ThretNode ) return TypeMem.ALLMEM;
       assert def.all_live().basic_live();

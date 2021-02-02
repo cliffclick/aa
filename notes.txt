@@ -31,6 +31,21 @@ also keep HIGH args, but these do not pass along much info.  Post GCP#1 we have
 all wired+extras (might require GCP#1 to resolve totally unknown FPTRs, so no
 guarentees out of Iter#1)
 
+THIS IS WORKING OUT.
+
+Think I need a Call Graph edge; a CEProj between Fun and Call, so individual
+edges can be turned on and off.  GCP needs optimistic edge discovery to resolve
+cyclic overload fidxs.  Theory is i've wired a call to {+} to all 3 {+}s;
+during GCP i discover that (a) all start high, so ok, (b) one arg falls to 1,
+which flows to {+}:int, which around again.  Need to not allow {+}:str to fire
+until all args are not-above-center() and also isa_formals.
+
+CEProj.value: XCTRL while Call is ANY/XCTRL; FIDXS are high; ARGS are high;
+Then and only then, look at the exactly trailing FUN, get _sig, and check args
+being 'isa'; allow CTRL is all are OK.
+Parm.value: ignore _sig isa; just use the CEProj state.
+
+
 =======================================
 1/28/2021
 

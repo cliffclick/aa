@@ -74,7 +74,7 @@ public final class CallEpiNode extends Node {
       TypeTuple tret = ret._val instanceof TypeTuple ? (TypeTuple) ret._val : (TypeTuple)ret._val.oob(TypeTuple.RET);
       Type tretmem = tret.at(1);
       if( fun != null && fun._defs._len==2 && // Function is only called by 1 (and not the unknown caller)
-          call.err(true)==null &&       // And args are ok
+          (call.err(true)==null || fun._thunk_rhs) &&       // And args are ok
           CallNode.emem(tcall).isa(tdef) &&
           tretmem.isa(tdef) &&          // Call and return memory at least as good as default
           call.mem().in(0) != call &&   // Dead self-recursive
@@ -199,6 +199,7 @@ public final class CallEpiNode extends Node {
       RetNode ret = fun.ret();
       if( ret==null ) continue;               // Mid-death
       if( _defs.find(ret) != -1 ) continue;   // Wired already
+      if( !CEProjNode.good_call(tcall,fun._sig,fun._thunk_rhs) ) continue; // Invalid arguments
       progress=true;
       wire1(call,fun,ret);      // Wire Call->Fun, Ret->CallEpi
     }
@@ -225,7 +226,6 @@ public final class CallEpiNode extends Node {
     // so there's no Parm/Phi to attach the incoming arg to.
     for( Node arg : fun._uses ) {
       if( arg.in(0) != fun || !(arg instanceof ParmNode) ) continue;
-      // See CallNode output tuple type for what these horrible magic numbers are.
       Node actual;
       int idx = ((ParmNode)arg)._idx;
       switch( idx ) {
@@ -241,7 +241,7 @@ public final class CallEpiNode extends Node {
     }
 
     // Add matching control to function via a CallGraph edge.
-    fun.add_def(new CProjNode(call).init1());
+    fun.add_def(new CEProjNode(call,fun instanceof FunNode && !((FunNode) fun)._thunk_rhs ? ((FunNode)fun)._sig : null).init1());
     GVN.add_flow(fun);
     GVN.add_flow_uses(fun);
     if( fun instanceof ThunkNode ) GVN.add_reduce_uses(fun);
@@ -308,9 +308,9 @@ public final class CallEpiNode extends Node {
           if( kids==2 ) continue;       // Both kids wired, this is ok
           return _val;                  // "Freeze in place"
         }
-        if( !opt_mode._CG )  // Before GCP?  Fidx is an unwired unknown call target
+        FunNode fun = FunNode.find_fidx(fidx);
+        if( !opt_mode._CG && CEProjNode.good_call(tcall,fun._sig,fun._thunk_rhs) )  // Before GCP?  Fidx is an unwired unknown call target
           { fidxs = BitsFun.FULL; break; }
-        assert opt_mode==GVNGCM.Mode.Opto; // During GCP, still wiring, post GCP all are wired
       }
     }
 
@@ -320,7 +320,7 @@ public final class CallEpiNode extends Node {
     if( fidxs == BitsFun.FULL ) { // Called something unknown
       trez = Type.ALL;            // Unknown target does worst thing
       tmem = defmem;
-    } else {                    // All targets are known & wired
+    } else {                      // All targets are known & wired
       for( int i=0; i<nwired(); i++ ) {
         RetNode ret = wired(i);
         if( fidxs.test_recur(ret._fidx) ) { // Can be wired, but later fidx is removed
@@ -389,14 +389,15 @@ public final class CallEpiNode extends Node {
   // Sanity check
   boolean sane_wiring() {
     CallNode call = call();
-    ProjNode cprj = ProjNode.proj(call,0); // Control proj
-    if( cprj==null ) return true; // Abort check, call is dead
     for( int i=0; i<nwired(); i++ ) {
       RetNode ret = wired(i);
       if( ret.is_copy() ) return true; // Abort check, will be misaligned until dead path removed
       FunNode fun = ret.fun();
-      if( cprj._uses.find(fun) == -1 )
-        return false;           // ith usage is ith wire
+      boolean found=false;
+      for( Node def : fun._defs )
+        if( def instanceof CEProjNode && def.in(0)==call )
+          { found=true; break; }
+      if( !found ) return false;
     }
     return true;
   }

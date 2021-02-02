@@ -21,6 +21,7 @@ public class ThretNode extends Node {
   @Override public Type value(GVNGCM.Mode opt_mode) {
     return TypeTuple.RET;
   }
+  @Override public TypeMem live(GVNGCM.Mode opt_mode ) { return TypeMem.ALLMEM; }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==ctrl() ) return TypeMem.ALIVE;

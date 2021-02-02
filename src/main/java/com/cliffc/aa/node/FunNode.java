@@ -169,7 +169,7 @@ public class FunNode extends RegionNode {
     return idx == -1 ? TypeRPC.ALL_CALL : _sig.arg(idx);
   }
   public int nargs() { return _sig.nargs(); }
-  void set_is_copy() { set_def(0,this); }
+  void set_is_copy() { set_def(0,this); Env.GVN.add_reduce_uses(this); }
 
   // ----
   // Graph rewriting via general inlining.  All other graph optimizations are
@@ -277,7 +277,7 @@ public class FunNode extends RegionNode {
       CallEpiNode cepi = call.cepi();
       if( cepi != null ) {
         int ridx = cepi._defs.find(ret());
-        if( ridx != -1 ) cepi.remove(ridx);
+        if( ridx != -1 ) Env.GVN.add_flow(cepi).remove(ridx);
       }
     }
   }
