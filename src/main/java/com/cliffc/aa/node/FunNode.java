@@ -352,7 +352,8 @@ public class FunNode extends RegionNode {
       for( int i=DSP_IDX; i<parms.length; i++ ) { // For all parms
         Node parm = parms[i];
         if( parm == null ) { sig[i]=Type.ALL; continue; } // (some can be dead)
-        sig[i] = parm.val();                              // Current type
+        if( parm._val==Type.ALL ) return null;            // No split with error args
+        sig[i] = parm._val;                               // Current type
         if( i==DSP_IDX ) continue; // No split on the display
         // Best possible type
         Type tp = Type.ALL;

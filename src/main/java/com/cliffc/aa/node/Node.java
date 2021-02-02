@@ -597,6 +597,7 @@ public abstract class Node implements Cloneable, TNode {
 
   // The _val changed here, and more than the immediate _neighbors might change
   // value/live/unify.
+  public void add_flow_extra(Type old) { }
   public void add_flow_use_extra(Node chg) { }
   public void add_flow_def_extra(Node chg) { }
   // Inputs changed here, and more than the immediate _neighbors might reduce

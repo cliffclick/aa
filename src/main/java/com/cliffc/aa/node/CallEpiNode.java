@@ -199,7 +199,6 @@ public final class CallEpiNode extends Node {
       RetNode ret = fun.ret();
       if( ret==null ) continue;               // Mid-death
       if( _defs.find(ret) != -1 ) continue;   // Wired already
-      if( !CEProjNode.good_call(tcall,fun) ) continue; // Invalid arguments
       progress=true;
       wire1(call,fun,ret);      // Wire Call->Fun, Ret->CallEpi
     }
@@ -310,7 +309,7 @@ public final class CallEpiNode extends Node {
           return _val;                  // "Freeze in place"
         }
         FunNode fun = FunNode.find_fidx(fidx);
-        if( !opt_mode._CG && CEProjNode.good_call(tcall,fun) ) // Before GCP?  Fidx is an unwired unknown call target
+        if( !opt_mode._CG ) // Before GCP?  Fidx is an unwired unknown call target
           { fidxs = BitsFun.FULL; break; }
       }
     }

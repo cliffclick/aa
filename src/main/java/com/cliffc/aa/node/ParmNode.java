@@ -97,7 +97,7 @@ public class ParmNode extends PhiNode {
         if( parm instanceof ParmNode && parm != this )
           Env.GVN.add_flow(parm);
   }
-  
+
   // While Parms are mostly Phis (and yes for value flows), during unification
   // Parms are already treated by the H-M algo, and (via fresh_unify) get
   // "fresh" TVars for every input path.
@@ -106,6 +106,7 @@ public class ParmNode extends PhiNode {
   @Override public ErrMsg err( boolean fast ) {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere
     FunNode fun = fun();
+    if( fun.in(0)== fun ) return null; // Dead, being inlined
     assert fun._defs._len==_defs._len;
     if( _idx <= MEM_IDX ) return null; // No arg check on RPC or memory
     Node mem = fun.parm(MEM_IDX);

@@ -242,6 +242,7 @@ public class GVNGCM {
           if( n instanceof CallEpiNode ) check_and_wire((CallEpiNode)n);
           for( Node use : n._uses )
             if( use instanceof CallEpiNode ) check_and_wire((CallEpiNode)use);
+          n.add_flow_extra(oval);
         }
 
         // Reverse flow

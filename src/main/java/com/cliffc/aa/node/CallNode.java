@@ -446,9 +446,9 @@ public class CallNode extends Node {
     BitsFun fidxs = tfp.fidxs();
     assert fidxs.is_empty() || fidxs.above_center()==tfp._disp.above_center() || tfp._disp.is_con();
     if( _not_resolved_by_gcp ) { // If overloads not resolvable, then take them all and we are in-error
-      if( fidxs.above_center() ) tfp = tfp.dual();
+      if( fidxs.above_center() && tfp!=TypeFunPtr.GENERIC_FUNPTR.dual() ) tfp = tfp.dual();
     }
-    
+
     ts[_defs._len-1] = tfp;    // FIDX is the last _def, 2nd-to-last type in ts
 
     return TypeTuple.make(ts);
@@ -468,6 +468,10 @@ public class CallNode extends Node {
     TypeMem precall = (TypeMem) mem()._val;
     BitsAlias esc_out2 = precall.and_unused(esc_out); // Filter by unused pre-call
     return esc_out2.meet(esc_in);
+  }
+  @Override public void add_flow_extra(Type old) {
+    if( old==Type.ANY )
+      Env.GVN.add_flow_defs(this); // Args can be more-alive
   }
   @Override public void add_flow_def_extra(Node chg) {
     // Projections live after a call alter liveness of incoming args
@@ -523,7 +527,7 @@ public class CallNode extends Node {
 
       // Post GCP, if not wired, then Call is in error, so ESCAPE.
       if( opt_mode._CG &&       // Either mid-GCP or post-GCP
-          err(true)==null &&    // Not in-error
+          (_val==Type.ANY || err(true)==null) &&  // Not in-error
           (opt_mode==GVNGCM.Mode.Opto || all_fcns_wired()) ) {
         int argn = _defs.find(def);
         ProjNode proj = ProjNode.proj(this, argn);
@@ -698,13 +702,15 @@ public class CallNode extends Node {
       if( fun==null || fun.is_dead() || fun.ret()==null ) continue; // No such function (probably dead and mid-cleanup)
       outer:
       for( Node fptrs : fun.ret()._uses )      // FunPtrs for each fidx (typically 1)
-        for( Node unr : fptrs._uses )          // Unresolved behind each FunPtr (typically 1)
-          if( unr instanceof UnresolvedNode && // Unresolved includes fdxs in this Call FDX set?
-              ((TypeFunPtr)(tfp.join(unr._val)))._fidxs.abit() == -1 ) {
-            if( fast ) return ErrMsg.FAST;
-            if( munr == null || munr==unr ) { munr = unr; continue outer; }
-            return ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
-          }
+        if( fptrs instanceof FunPtrNode )
+          for( Node unr : fptrs._uses )          // Unresolved behind each FunPtr (typically 1)
+            if( unr instanceof UnresolvedNode && // Unresolved includes fdxs in this Call FDX set?
+                unr._val instanceof TypeFunPtr &&
+                ((TypeFunPtr)(tfp.join(unr._val)))._fidxs.abit() == -1 ) {
+              if( fast ) return ErrMsg.FAST;
+              if( munr == null || munr==unr ) { munr = unr; continue outer; }
+              return ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
+            }
     }
 
     // Now do an arg-check.  No more than 1 unresolved, so the error message is
