@@ -48,7 +48,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   }
 
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
-    if( debug ) sb.p('_').p(_uid);
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
     if( _fidxs.above_center() ) sb.p('~');
     if( _fidxs.is_empty() ) return sb.p("[]");

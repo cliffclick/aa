@@ -167,9 +167,10 @@ public class Parse implements Comparable<Parse> {
       last = stmt.keep();
       stmt = tstmt();
       if( stmt == null ) stmt = stmt(lookup_current_scope_only);
+      last.unkeep();
       if( stmt == null ) {
-        if( peek(';') ) { _x--; stmt=last.unkeep(); }   // Ignore empty statement
-      } else if( !last.unkeep().is_dead() && stmt != last) kill(last); // prior expression result no longer alive in parser
+        if( peek(';') ) { _x--; stmt=last; }   // Ignore empty statement
+      } else if( !last.is_dead() && stmt != last) kill(last); // prior expression result no longer alive in parser
     }
     return last;
   }
