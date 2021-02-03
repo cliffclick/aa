@@ -880,6 +880,7 @@ public abstract class Node implements Cloneable, TNode {
     // Walk reachable graph
     Env.GVN.add_work_all(this);
     for( Node def : _defs )  if( def != null )  def.walk_opt(visit);
+    for( Node use : _uses )                     use.walk_opt(visit);
   }
 
   @Override public boolean is_dead() { return _uses == null; }

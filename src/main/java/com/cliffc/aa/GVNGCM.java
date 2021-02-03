@@ -278,7 +278,7 @@ public class GVNGCM {
 
     assert Env.START.more_flow(false)==0; // Final conditions are correct
     visit.clear();
-    rez.walk_opt(visit);
+    Env.START.walk_opt(visit);
   }
 
   private void remove_ambi( CallNode call ) {

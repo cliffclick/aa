@@ -61,7 +61,7 @@ public final class RetNode extends Node {
   @Override public Node ideal_reduce() {
     // If control is dead, but the Ret is alive, we're probably only using the
     // FunPtr as a 'gensym'.  Nuke the function body.
-    if( !is_copy() && ctl().val() == Type.XCTRL && !is_prim() && fun().val() ==Type.XCTRL )
+    if( !is_copy() && ctl()._val == Type.XCTRL && !is_prim() && fun()._val ==Type.XCTRL )
       set_def(4,null);          // We're a copy now!
 
     // If no users inlining, wipe out all edges
@@ -80,8 +80,8 @@ public final class RetNode extends Node {
     if( is_copy() ) return null;
     // Collapsed to a constant?  Remove any control interior.
     Node ctl = ctl();
-    if( rez().val().is_con() && ctl!=fun() && // Profit: can change control and delete function interior
-        (mem().val() ==TypeMem.EMPTY || (mem() instanceof ParmNode && mem().in(0)==fun())) ) // Memory has to be trivial also
+    if( rez()._val.is_con() && ctl!=fun() && // Profit: can change control and delete function interior
+        (mem()._val ==TypeMem.EMPTY || (mem() instanceof ParmNode && mem().in(0)==fun())) ) // Memory has to be trivial also
       return set_def(0,fun());  // Gut function body
     return null;
   }
@@ -110,7 +110,7 @@ public final class RetNode extends Node {
     if( idx == ctl._defs._len ) return null; // No call-epi found
     CallEpiNode cepi = (CallEpiNode)ctl.in(idx).in(0);
     CallNode call = cepi.call();
-    if( call.ctl().val() != Type.CTRL ) return null; // Dead call
+    if( call.ctl()._val != Type.CTRL ) return null; // Dead call
     // Every Phi on the region must come directly from the CallEpi.
     for( Node phi : ctl._uses )
       if( phi._op == OP_PHI && phi.in(idx).in(0)!=cepi )
@@ -162,19 +162,19 @@ public final class RetNode extends Node {
   private static boolean check_phi_type( FunNode fun, CallNode call, int argn ) {
     ParmNode parm = fun.parm(argn);
     if( parm==null ) return true; // arg/parm might be dead
-    Type tenter = parm.val();
-    Type tback  = call.arg(argn).val();
+    Type tenter = parm._val;
+    Type tback  = call.arg(argn)._val;
     return tback.isa(tenter);
   }
 
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
-    if( ctl()==null ) return val(); // No change if a copy
-    Type ctl = ctl().val();
+    if( ctl()==null ) return _val; // No change if a copy
+    Type ctl = ctl()._val;
     if( ctl != Type.CTRL ) return ctl.oob(TypeTuple.RET);
-    Type mem = mem().val();
+    Type mem = mem()._val;
     if( !(mem instanceof TypeMem) ) mem = mem.oob(TypeMem.ALLMEM);
-    Type val = rez().val();
+    Type val = rez()._val;
     return TypeTuple.make(ctl,mem,val);
   }
 

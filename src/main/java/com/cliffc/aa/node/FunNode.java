@@ -367,7 +367,7 @@ public class FunNode extends RegionNode {
         if( bad_mem_use(parm, to) )
           continue;               // So bad usage
 
-        sig[i] = TypeMemPtr.make(BitsAlias.ALL,to); // Signature takes any alias but has sharper guts
+        sig[i] = TypeMemPtr.make(BitsAlias.FULL,to); // Signature takes any alias but has sharper guts
         progress = true;
       }
     }
