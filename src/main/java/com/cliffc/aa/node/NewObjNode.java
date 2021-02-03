@@ -130,6 +130,9 @@ public class NewObjNode extends NewNode<TypeStruct> {
     }
     return null;
   }
+  @Override public void add_flow_extra(Type old) {
+    Env.GVN.add_mono(this); // Can update crushed
+  }
 
   @Override TypeObj valueobj() {
     // Gather args and produce a TypeStruct

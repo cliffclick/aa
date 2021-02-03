@@ -710,6 +710,7 @@ public abstract class Node implements Cloneable, TNode {
       for( Node use : _uses )  // Put uses on worklist... values flows downhill
         Env.GVN.add_flow(use).add_flow_use_extra(this);
       if( is_CFG() ) for( Node use : _uses ) if( use.is_CFG() ) Env.GVN.add_reduce(use);
+      add_flow_extra(oval);
     }
     return progress;
   }

@@ -546,11 +546,8 @@ public class CallNode extends Node {
     if( !(_val instanceof TypeTuple) ) // No type to sharpen
       return _val.oob(TypeMem.ALLMEM);
     TypeFunPtr tfpx = ttfpx(_val);
-    if( opt_mode._CG || fdx() instanceof FunPtrNode ) {
-      if( err(true)!=null ) return TypeMem.ALLMEM;
-      if( tfpx ==null || tfpx.fidxs().above_center() )
-        return _live;
-    }
+    if( opt_mode._CG || fdx() instanceof FunPtrNode ) // All callers known
+      return err(true)==null ? _live : TypeMem.ALLMEM; // Use live directly (unless in error)
 
     // Unknown future callees act as-if all available aliases are read from and
     // thus live.
