@@ -470,7 +470,8 @@ public class CallNode extends Node {
     return esc_out2.meet(esc_in);
   }
   @Override public void add_flow_extra(Type old) {
-    if( old==Type.ANY )
+    if( old==Type.ANY ||
+        (old instanceof TypeTuple && ttfp(old).above_center()) )
       Env.GVN.add_flow_defs(this); // Args can be more-alive
   }
   @Override public void add_flow_def_extra(Node chg) {
@@ -684,12 +685,13 @@ public class CallNode extends Node {
     if( tfp.is_forward_ref() ) // Forward ref on incoming function
       return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[0], FunNode.find_fidx(tfp.fidx()));
 
+    BitsFun fidxs = tfp.fidxs();
+    if( fidxs.above_center() ) return null; // Not resolved (yet)
     // bad-arg-count
     if( tfp._nargs != nargs() )
       return fast ? ErrMsg.FAST : ErrMsg.syntax(_badargs[0],"Passing "+(nargs()-ARG_IDX)+" arguments to "+tfp.names(false)+" which takes "+(tfp._nargs-ARG_IDX)+" arguments");
 
     // Call did not resolve.
-    BitsFun fidxs = tfp.fidxs();
     if( fidxs.is_empty() ) // This is an unresolved call
       return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
 
@@ -707,9 +709,8 @@ public class CallNode extends Node {
             if( unr instanceof UnresolvedNode && // Unresolved includes fdxs in this Call FDX set?
                 unr._val instanceof TypeFunPtr &&
                 ((TypeFunPtr)(tfp.join(unr._val)))._fidxs.abit() == -1 ) {
-              if( fast ) return ErrMsg.FAST;
               if( munr == null || munr==unr ) { munr = unr; continue outer; }
-              return ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
+              return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
             }
     }
 

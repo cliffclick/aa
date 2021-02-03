@@ -215,6 +215,7 @@ public final class CallEpiNode extends Node {
     add_def(ret);
     GVN.add_flow(this);
     GVN.add_flow(call);
+    GVN.add_flow_defs(call);
   }
 
   // Wire without the redundancy check, or adding to the CallEpi

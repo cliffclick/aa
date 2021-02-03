@@ -146,6 +146,12 @@ public class MemJoinNode extends Node {
   }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 
+  @Override public TypeMem live_use( GVNGCM.Mode opt_mode, Node def ) { return _live; }
+  @Override public TypeMem live( GVNGCM.Mode opt_mode ) {
+    if( _keep>0 ) return _live;
+    return super.live(opt_mode);
+  }
+  
   // Unify alias-by-alias, except on the alias sets
   @Override public boolean unify( boolean test ) {
     // Self has to be a TMem

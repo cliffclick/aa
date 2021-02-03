@@ -89,6 +89,10 @@ public class StoreNode extends Node {
     }
     return null;
   }
+  // Liveness changes, check if reduce
+  @Override public void add_flow_extra(Type old) {
+    Env.GVN.add_reduce(this); // Args can be more-alive
+  }
   // If changing an input or value allows the store to no longer be in-error,
   // following Loads can collapse
   @Override public void add_reduce_extra() {

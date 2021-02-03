@@ -134,7 +134,7 @@ public abstract class Node implements Cloneable, TNode {
   }
   Node _elock() {               // No assert version, used for new nodes
     assert check_vals();        // elock & VALs match
-    if( !_elock ) { _elock = true; VALS.put(this,this); }
+    if( !_elock && VALS.get(this)==null ) { _elock = true; VALS.put(this,this); }
     return this;
   }
 
@@ -685,7 +685,6 @@ public abstract class Node implements Cloneable, TNode {
 
     // Compute live bits.  If progress, push the defs on the flow worklist.
     // This is a reverse flow computation.  Always assumed live if keep.
-    assert _keep==0 || _live == all_live() || this instanceof ScopeNode;
     if( _keep==0 ) {
       TypeMem oliv = _live;
       TypeMem nliv = live(Env.GVN._opt_mode);
@@ -695,6 +694,7 @@ public abstract class Node implements Cloneable, TNode {
         _live = nliv;             // Record progress
         for( Node def : _defs )   // Put defs on worklist... liveness flows uphill
           if( def != null ) Env.GVN.add_flow(def).add_flow_def_extra(this);
+        add_flow_extra(oliv);
       }
     }
 
