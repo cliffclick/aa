@@ -201,7 +201,7 @@ public class TestNode {
       _ins[i] = new ConNode<>(Type.SCALAR);
     Node mem = new ConNode<Type>(TypeMem.MEM);
     mem._val = TypeMem.MEM;
-    FunNode fun_forward_ref = new FunNode("anon");
+    FunNode fun_forward_ref = new FunNode(1.2f);
     Env.DEFMEM._val = TypeMem.MEM;
 
     Node unr = top.lookup("+"); // All the "+" functions
@@ -232,7 +232,7 @@ public class TestNode {
     test1monotonic(new  CProjNode(_ins[0],0));
     test1monotonic(new    ErrNode(_ins[0],null,"\nerr\n"));
     test1monotonic(new    FunNode(TypeStruct.ARGS_X,new Type[]{TypeMemPtr.DISP_SIMPLE,TypeInt.INT64}));
-    test1monotonic(new FunPtrNode(ret,null));
+    test1monotonic(new FunPtrNode("anon",ret,null));
     test1monotonic(new FP2DispNode(_ins[1])); // Only takes in a TFP
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     for( NewNode.NewPrimNode prim : NewNode.NewPrimNode.INTRINSICS() )

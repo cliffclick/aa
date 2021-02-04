@@ -668,7 +668,7 @@ public class CallNode extends Node {
     // Fail for passed-in unknown references directly.
     for( int j=ARG_IDX; j<nargs(); j++ )
       if( arg(j).is_forward_ref() )
-        return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[j-ARG_IDX+1], FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx));
+        return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[j-ARG_IDX+1], FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx).fptr());
     // Expect a function pointer
     TypeFunPtr tfp = ttfpx(_val);
     if( tfp==null ) {
@@ -680,7 +680,7 @@ public class CallNode extends Node {
 
     // Indirectly, forward-ref for function type
     if( tfp.is_forward_ref() ) // Forward ref on incoming function
-      return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[0], FunNode.find_fidx(tfp.fidx()));
+      return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[0], FunNode.find_fidx(tfp.fidx()).fptr());
 
     BitsFun fidxs = tfp.fidxs();
     if( fidxs.above_center() ) return null; // Not resolved (yet)

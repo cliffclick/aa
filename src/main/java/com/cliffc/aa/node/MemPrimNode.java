@@ -64,7 +64,7 @@ public abstract class MemPrimNode extends PrimNode {
         // memory.
         RetNode ret = (RetNode)X.xform(new RetNode(fun,mem(),this,rpc,fun));
         // No closures are added to primitives
-        return (X._ret = new FunPtrNode(ret,null));
+        return (X._ret = new FunPtrNode(_name,ret,null));
       }
     }
 
@@ -140,7 +140,7 @@ public abstract class MemPrimNode extends PrimNode {
         // Write prims return both a value and memory.
         MemPrimNode prim = (MemPrimNode)X.xform(this);
         RetNode ret = (RetNode)X.xform(new RetNode(fun,prim,prim.rez(),rpc,fun));
-        return (X._ret = new FunPtrNode(ret,null));
+        return (X._ret = new FunPtrNode(_name,ret,null));
       }
     }
 

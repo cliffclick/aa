@@ -202,7 +202,7 @@ public abstract class PrimNode extends Node {
       // memory).  Thunking (short circuit) prims return both memory and a value.
       RetNode ret = (RetNode)X.xform(new RetNode(ctl,mem,rez,rpc,fun));
       // No closures are added to primitives
-      return (X._ret = new FunPtrNode(ret,null));
+      return (X._ret = new FunPtrNode(_name,ret,null));
     }
   }
 

@@ -150,8 +150,10 @@ public class ScopeNode extends Node {
     if( def == ptr () ) return opt_mode._CG ? TypeMem.DEAD : TypeMem.LIVE_BOT; // Returned display is dead after CG
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.
-    assert def == mem();
-    return opt_mode==GVNGCM.Mode.Parse ? TypeMem.ALLMEM : _live;
+    if( def == mem() )
+      return opt_mode==GVNGCM.Mode.Parse ? TypeMem.ALLMEM : _live;
+    // Merging exit path
+    return def._live;
   }
 
   @Override public int hashCode() { return 123456789; }

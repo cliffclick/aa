@@ -345,9 +345,9 @@ public class Parse implements Comparable<Parse> {
       ScopeNode scope = lookup_scope(tok,lookup_current_scope_only);
       if( scope==null ) {                    // Token not already bound at any scope
         if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
-          ((FunPtrNode)ifex).fun().bind(tok); // Debug only: give name to function
+          ((FunPtrNode)ifex).bind(tok); // Debug only: give name to function
         create(tok,Env.XNIL,TypeStruct.FRW);  // Create at top of scope as ~scalar.
-        scope = scope();              // Scope is the current one
+        scope = scope();                // Scope is the current one
         scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
       }
       // Handle re-assignments and forward referenced function definitions.
@@ -390,6 +390,7 @@ public class Parse implements Comparable<Parse> {
     scope().flip_if();          // Flip side of tracking new defs
     Env.GVN.add_work_all(ifex.unkeep());
     set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch
+    Env.GVN.add_reduce(ifex);
     set_mem(old_mem.unkeep());     // Reset memory to before the IF
     Node fex = peek(':') ? stmt() : Env.XNIL;
     if( fex == null ) fex = err_ctrl2("missing expr after ':'");
@@ -573,7 +574,7 @@ public class Parse implements Comparable<Parse> {
         // Token might have been longer than the filtered name; happens if a
         // bunch of operator characters are adjacent but we can make an operator
         // out of the first few.
-        _x = oldx+ptr.fun()._name.length();
+        _x = oldx+ptr.fun().fptr()._name.length();
         unifun.keep();
         Node term = term();
         if( term==null ) { unifun.unhook(); _x = oldx; return null; }
@@ -712,7 +713,7 @@ public class Parse implements Comparable<Parse> {
     Node ptr = get_display_ptr(scope);
     n = gvn(new LoadNode(mem(),ptr,tok,null));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
-      return err_ctrl1(Node.ErrMsg.forward_ref(this,((FunPtrNode)n).fun()));
+      return err_ctrl1(Node.ErrMsg.forward_ref(this,((FunPtrNode)n)));
     // Do a full lookup on "+", and execute the function
     n.keep();
     Node plus = _e.lookup_filter("+",_gvn,2);
@@ -957,7 +958,7 @@ public class Parse implements Comparable<Parse> {
         // to the function for faster access.
         RetNode ret = (RetNode)X.xform(new RetNode(ctrl(),mem(),rez,rpc,fun));
         // The FunPtr builds a real display; any up-scope references are passed in now.
-        Node fptr = X.xform(new FunPtrNode(ret,e._par));
+        Node fptr = X.xform(new FunPtrNode(null,ret,e._par));
         _e = _e._par;                // Pop nested environment
         return (X._ret=fptr);        // Return function; close-out and DCE 'e'
       }
@@ -972,12 +973,18 @@ public class Parse implements Comparable<Parse> {
     Node val  = s.early_val ();
     s.early_kill();
     if( ctrl == null ) return rez.unkeep(); // No other exits to merge into
-    set_ctrl(ctrl=init(ctrl.add_def(ctrl())));
-    ctrl._val = Type.CTRL;
-    mem.set_def(0,ctrl);
-    val.set_def(0,ctrl);
-    set_mem (gvn(mem.add_def(mem())));
-    return   gvn(val.add_def(rez.unkeep())) ;
+    try(GVNGCM.Build<Node> X = _gvn.new Build<>()) {
+      ctrl = ctrl.add_def(ctrl()).unkeep();
+      ctrl._val = Type.CTRL;
+      set_ctrl(ctrl=X.init(ctrl));
+      //ctrl._val = Type.CTRL;
+      mem.unkeep().set_def(0,ctrl);
+      val.unkeep().set_def(0,ctrl);
+      Node mem2 = X.xform(mem.add_def(mem()));
+      Node val2 = X.xform(val.add_def(rez));
+      set_mem(mem2);
+      return (X._ret=val2);
+    }
   }
 
   // Merge this early exit path into all early exit paths being recorded in the
@@ -987,9 +994,9 @@ public class Parse implements Comparable<Parse> {
     Node mem  = s.early_mem ();
     Node val  = s.early_val ();
     if( ctrl == null ) {
-      s.set_def(4,ctrl=new RegionNode((Node)null));
-      s.set_def(5,mem =new PhiNode(TypeMem.MEM, null,(Node)null));
-      s.set_def(6,val =new PhiNode(Type.SCALAR, null,(Node)null));
+      s.set_def(4,ctrl=new RegionNode((Node)null).keep()); ctrl._val=Type.CTRL;
+      s.set_def(5,mem =new PhiNode(TypeMem.MEM, null,(Node)null).keep());
+      s.set_def(6,val =new PhiNode(Type.SCALAR, null,(Node)null).keep());
     }
     ctrl.add_def(ctrl());
     mem .add_def(mem ());
@@ -1028,7 +1035,7 @@ public class Parse implements Comparable<Parse> {
     if( bfun==null || bfun.op_prec() != 0 ) { _x=oldx; return null; }
     // Actual minimal length uniop might be smaller than the parsed token
     // (greedy algo vs not-greed)
-    _x = oldx+bal_fun(bfun)._name.length();
+    _x = oldx+bal_fun(bfun).fptr()._name.length();
     return bfun;
   }
 

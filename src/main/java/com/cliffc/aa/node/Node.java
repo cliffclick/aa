@@ -960,7 +960,7 @@ public abstract class Node implements Cloneable, TNode {
     public static final ErrMsg FAST = new ErrMsg(null,"fast",Level.Syntax);
     public static final ErrMsg BADARGS = new ErrMsg(null,"bad arguments",Level.BadArgs);
     public ErrMsg(Parse loc, String msg, Level lvl) { _loc=loc; _msg=msg; _lvl=lvl; }
-    public static ErrMsg forward_ref(Parse loc, FunNode fun) { return forward_ref(loc,fun._name); }
+    public static ErrMsg forward_ref(Parse loc, FunPtrNode fun) { return forward_ref(loc,fun._name); }
     public static ErrMsg forward_ref(Parse loc, String name) {
       return new ErrMsg(loc,"Unknown ref '"+name+"'",Level.ForwardRef);
     }

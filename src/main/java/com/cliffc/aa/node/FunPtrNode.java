@@ -15,6 +15,7 @@ import static com.cliffc.aa.Env.GVN;
 // TypeFunPtr with a constant fidx and variable displays.  Used to allow 1st
 // class functions to be passed about.
 public final class FunPtrNode extends Node {
+  public String _name;          // Optional for debug only
   private final ErrMsg _referr;
   // Every var use that results in a function, so actually only these FunPtrs,
   // needs to make a "fresh" copy before unification.  "Fresh" makes a
@@ -23,11 +24,12 @@ public final class FunPtrNode extends Node {
   // interesting thing is when an out-of-scope TVar uses the same TVar
   // internally in different parts - the copy replicates this structure.  When
   // unified, it forces equivalence in the same places.
-  public  FunPtrNode( RetNode ret, Env e ) { this(null,e,ret,e==null ? Node.con(TypeMemPtr.NO_DISP) : e._scope.ptr()); }
-  public  FunPtrNode( RetNode ret, Env e, Node display ) { this(null,e,ret,display); }
+  public  FunPtrNode( String name, RetNode ret, Env e ) { this(name,null,e,ret,e==null ? Node.con(TypeMemPtr.NO_DISP) : e._scope.ptr()); }
+  public  FunPtrNode( RetNode ret, Env e, Node display ) { this(null,null,e,ret,display); }
   // For forward-refs only; super weak display & function.
-  private FunPtrNode( ErrMsg referr, Env e, RetNode ret, Node display ) {
+  private FunPtrNode( String name, ErrMsg referr, Env e, RetNode ret, Node display ) {
     super(OP_FUNPTR,ret,display);
+    _name = name;
     _referr = referr;
     // Add the "non-generative" set to the TFun structure, but no other
     // structural is available (args and ret are new TVars).
@@ -52,6 +54,12 @@ public final class FunPtrNode extends Node {
     if( ret.is_copy() ) return "gensym:"+xstr();
     FunNode fun = ret.fun();
     return fun==null ? xstr() : fun.str();
+  }
+  
+  // Debug only: make an attempt to bind name to a function
+  public void bind( String tok ) {
+    assert _name==null || _name.equals(tok); // Attempt to double-bind
+    _name = tok;
   }
 
   @Override public Node ideal_reduce() {
@@ -160,13 +168,13 @@ public final class FunPtrNode extends Node {
   // body (yet).  Make a function pointer that takes/ignores all args, and
   // returns a scalar.
   public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
-    FunNode fun = gvn.init(new FunNode(name)).unkeep();
+    FunNode fun = gvn.init(new FunNode(1.2f)).unkeep();
     RetNode ret = gvn.init(new RetNode(fun,Node.con(TypeMem.MEM),Node.con(Type.SCALAR),Node.con(TypeRPC.ALL_CALL),fun)).unkeep();
     gvn.add_flow(fun);
     gvn.add_flow(ret);
     // Display is limited to any one of the current lexical scopes.
     TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS,TypeObj.ISUSED);
-    return new FunPtrNode( ErrMsg.forward_ref(unkref,fun),null,ret,Node.con(tdisp));
+    return new FunPtrNode( name, ErrMsg.forward_ref(unkref,name),null,ret,Node.con(tdisp));
   }
 
   // True if this is a forward_ref
@@ -196,7 +204,7 @@ public final class FunPtrNode extends Node {
 
     // Replace the forward_ref with the def.
     subsume(def);
-    dfun.bind(tok); // Debug only, associate variable name with function
+    fptr.bind(tok); // Debug only, associate variable name with function
     Env.GVN.iter(GVNGCM.Mode.Parse);
   }
 

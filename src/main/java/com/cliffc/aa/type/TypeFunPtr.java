@@ -2,7 +2,6 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.function.Predicate;
@@ -68,7 +67,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
           if( fidxs!=BitsFun.EMPTY )
             for( int fidx2 : fidxs ) {
               FunNode fun2 = FunNode.find_fidx(fidx2);
-              if( Util.eq(fun2._name,fun._name) && fun2._sig==fun._sig )
+              if( fun2.name(false).equals(fun.name(false)) && fun2._sig==fun._sig )
                 continue middle;
             }
           // Unique; add to unique set & print

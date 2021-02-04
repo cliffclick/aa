@@ -57,7 +57,6 @@ import static com.cliffc.aa.AA.*;
 
 
 public class FunNode extends RegionNode {
-  public String _name; // Optional for anon functions; can be set later via bind()
   public String _bal_close; // null for everything except "balanced functions", e.g. "[]"
   public int _fidx;
   public TypeFunSig _sig;
@@ -71,17 +70,16 @@ public class FunNode extends RegionNode {
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
-  public FunNode(           PrimNode prim) { this(prim._name,prim._sig,prim._op_prec,prim._thunk_rhs); }
-  public FunNode(NewNode.NewPrimNode prim) { this(prim._name,prim._sig,prim._op_prec,false); }
+  public FunNode(           PrimNode prim) { this(prim._sig,prim._op_prec,prim._thunk_rhs); }
+  public FunNode(NewNode.NewPrimNode prim) { this(prim._sig,prim._op_prec,false); }
   // Used to start an anonymous function in the Parser
-  public FunNode(String[] flds, Type[] ts) { this(null,TypeFunSig.make(flds,TypeTuple.make_args(ts),TypeTuple.RET),-1,false); }
+  public FunNode(String[] flds, Type[] ts) { this(TypeFunSig.make(flds,TypeTuple.make_args(ts),TypeTuple.RET),-1,false); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(name,TypeFunSig.make(TypeTuple.RET,TypeTuple.NO_ARGS),-2,false); add_def(Env.ALL_CTRL); }
-  public FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs ) { this(name,sig,op_prec,thunk_rhs,BitsFun.new_fidx()); }
+  FunNode(float dummy) { this(TypeFunSig.make(TypeTuple.RET,TypeTuple.NO_ARGS),-2,false); add_def(Env.ALL_CTRL); }
+  public FunNode(TypeFunSig sig, int op_prec, boolean thunk_rhs ) { this(sig,op_prec,thunk_rhs,BitsFun.new_fidx()); }
   // Shared common constructor
-  private FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs, int fidx) {
+  private FunNode(TypeFunSig sig, int op_prec, boolean thunk_rhs, int fidx) {
     super(OP_FUN);
-    _name = name;
     _fidx = fidx;
     _sig = sig;
     _op_prec = (byte)op_prec;
@@ -108,8 +106,12 @@ public class FunNode extends RegionNode {
     return fun==null ? name(null,null,fidx,-1,false,debug) : fun.name(debug);
   }
   // Name from FunNode
-  public String name(boolean debug) { return name(_name,_bal_close,fidx(),_op_prec,is_forward_ref(),debug); }
   String name() { return name(true); }
+  public String name(boolean debug) {
+    FunPtrNode fptr = fptr();
+    String name=fptr==null ? null : fptr._name;
+    return name(name,_bal_close,fidx(),_op_prec,is_forward_ref(),debug);
+  }
   static String name(String name, String bal, int fidx, int op_prec, boolean fref, boolean debug) {
     if( op_prec >= 0 && name != null ) name = '{'+name+(bal==null?"":bal)+'}'; // Primitives wrap
     if( name==null ) name="";
@@ -127,11 +129,17 @@ public class FunNode extends RegionNode {
     boolean prim=false;
     for( Integer ii : fidxs ) {
       FunNode fun = find_fidx(ii);
-      if( fun==null || fun._name==null ) { s=null; break; } // Unnamed fidx
-      prim |= fun._op_prec >= 0;
-      if( s==null ) s = fun._name;
-      else if( !s.equals(fun._name) )
-        { s=null; break; }
+      if( fun!=null ) {
+        prim |= fun._op_prec >= 0;
+        for( Node fptr : fun.ret()._uses ) // For all displays for this fun
+          if( fptr instanceof FunPtrNode ) {
+            String name = ((FunPtrNode)fptr)._name; // Get debug name
+            if( s==null ) s=name;                   // Capture debug name
+            else if( !s.equals(name) )              // Same name is OK
+              { s=null; break; } // Too many different names
+          }
+        if( s==null ) break; // Unnamed fidx
+      }
     }
     if( s!=null )
       if( prim ) sb.p('{').p(s).p('}'); else sb.p(s);
@@ -150,14 +158,8 @@ public class FunNode extends RegionNode {
     return sb;
   }
 
-  // Debug only: make an attempt to bind name to a function
-  public void bind( String tok ) {
-    assert _name==null || _name.equals(tok); // Attempt to double-bind
-    _name = tok;
-  }
-
   // This function has disabled inlining
-  public boolean noinline() { return _name != null && _name.startsWith("noinline") && in(0)==null; }
+  public boolean noinline() { return in(0)==null && name(false).startsWith("noinline"); }
 
   // Never inline with a nested function
   @Override @NotNull public Node copy( boolean copy_edges) { throw unimpl(); }
@@ -249,8 +251,7 @@ public class FunNode extends RegionNode {
     TypeTuple fformals = formals;
     if( path == -1 && FUNS.find(fun -> fun != null && !fun.is_dead() &&
                                 fun._sig._formals==fformals && fun._sig._ret == _sig._ret &&
-                                fun.in(1)==in(1) &&
-                                Util.eq(_name,fun._name)) != -1 )
+                                fun.in(1)==in(1)) != -1 )
       return null;              // Done this before
 
     assert _must_inline==0; // Failed to inline a prior inline?
@@ -588,7 +589,7 @@ public class FunNode extends RegionNode {
   private FunNode make_new_fun(RetNode ret, TypeTuple new_formals) {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
-    FunNode fun = new FunNode(_name,TypeFunSig.make(_sig._args,new_formals,_sig._ret),_op_prec,_thunk_rhs,BitsFun.new_fidx(oldfidx));
+    FunNode fun = new FunNode(TypeFunSig.make(_sig._args,new_formals,_sig._ret),_op_prec,_thunk_rhs,BitsFun.new_fidx(oldfidx));
     fun._bal_close = _bal_close;
     fun.pop();                  // Remove null added by RegionNode, will be added later
     fun.unkeep();               // Ret will clone and not construct
@@ -893,9 +894,19 @@ public class FunNode extends RegionNode {
   }
   public ParmNode rpc() { return parm(0); }
   public RetNode ret() {
+    if( is_dead() ) return null;
     for( Node use : _uses )
       if( use instanceof RetNode && use._defs._len==5 && !((RetNode)use).is_copy() && ((RetNode)use).fun()==this )
         return (RetNode)use;
+    return null;
+  }
+  // Returns first - not ALL - FunPtrs
+  public FunPtrNode fptr() {
+    RetNode ret = ret();
+    if( ret==null ) return null;
+    for( Node fptr : ret._uses )
+      if( fptr instanceof FunPtrNode )
+        return (FunPtrNode)fptr;
     return null;
   }
 

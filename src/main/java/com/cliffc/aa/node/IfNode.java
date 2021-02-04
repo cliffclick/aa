@@ -6,7 +6,7 @@ import com.cliffc.aa.type.*;
 // Split control
 public class IfNode extends Node {
   public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); }
-  
+
   @Override public Node ideal_reduce() {
     Node ctl = in(0);
     Node tst = in(1);
@@ -35,11 +35,12 @@ public class IfNode extends Node {
   Node flip(Node that) {
     ProjNode p0 = (ProjNode)_uses.atX(0);
     ProjNode p1 = (ProjNode)_uses.atX(1);
-    if( p0!=null && p0._idx==1 ) { ProjNode tmp=p0; p0=p1; p1=tmp; }
+    if( p0==null || p0._keep>0 || p1==null || p1._keep>0 ) return null; // Not well formed
+    if( p0._idx==1 ) { ProjNode tmp=p0; p0=p1; p1=tmp; }
     Node x0 = Env.GVN.xform(new CProjNode(that,0));
     Node x1 = Env.GVN.xform(new CProjNode(that,1));
-    if( p0!=null ) p0.subsume(x1);
-    if( p1!=null ) p1.subsume(x0);
+    p0.subsume(x1);
+    p1.subsume(x0);
     x0._live = x1._live = that._live = this._live;
     return that;
   }

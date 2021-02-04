@@ -32,6 +32,7 @@ public class PhiNode extends Node {
   }
 
   @Override public Node ideal_reduce() {
+    if( in(0)==null ) return null; // Mid-construction
     if( val(0) == Type.XCTRL ) return null;
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
@@ -55,6 +56,7 @@ public class PhiNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
+    if( in(0)==null ) return Type.ALL; // Conservative, mid-construction
     Type ctl = val(0);
     if( ctl != Type.CTRL ) return ctl.oob();
     RegionNode r = (RegionNode) in(0);
@@ -79,7 +81,7 @@ public class PhiNode extends Node {
   }
 
   @Override public ErrMsg err( boolean fast ) {
-    if( !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar
+    if( !(in(0) instanceof FunNode && ((FunNode)in(0)).name(false).equals("!") ) && // Specifically "!" takes a Scalar
         (_val !=null &&
          (_val.contains(Type.SCALAR) ||
           _val.contains(Type.NSCALR))) ) // Cannot have code that deals with unknown-GC-state
