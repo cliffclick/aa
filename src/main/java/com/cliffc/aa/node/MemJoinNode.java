@@ -60,7 +60,7 @@ public class MemJoinNode extends Node {
         Env.GVN.add_reduce(u);
     }
   }
-    
+
   static Node find_sese_head(Node mem) {
     if( mem instanceof MemJoinNode ) return ((MemJoinNode)mem).msp(); // Merge Split with prior Join
     if( mem instanceof StoreNode ) return mem;   // Move Store into Split/Join
@@ -151,7 +151,7 @@ public class MemJoinNode extends Node {
     if( _keep>0 ) return _live;
     return super.live(opt_mode);
   }
-  
+
   // Unify alias-by-alias, except on the alias sets
   @Override public boolean unify( boolean test ) {
     // Self has to be a TMem
@@ -240,11 +240,9 @@ public class MemJoinNode extends Node {
 
   MemJoinNode add_alias_below_new(Node nnn, Node old ) {
     old.keep();                 // Called from inside old.ideal(), must keep alive until exit
-    Node nnn2 = GVN.init(nnn).unkeep();
-    add_alias_below(nnn2,nnn2.escapees(),nnn2);
+    add_alias_below(GVN.add_work_all(nnn),nnn.escapees(),nnn);
     old.unkeep();               // Alive, but keep==0
-    nnn2.xval();
-    xval();
+    nnn.xval();  xval();        // Force update, since not locally monotonic
     GVN.add_flow_defs(this);
     assert Env.START.more_flow(true)==0;
     return this;
