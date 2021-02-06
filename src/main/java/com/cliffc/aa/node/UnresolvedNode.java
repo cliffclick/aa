@@ -42,17 +42,31 @@ public class UnresolvedNode extends Node {
   // ANY >= value(ANY) >= value(other) >= value(ALL) >= ALL
   @Override public Type value(GVNGCM.Mode opt_mode) {
     // Freeze after GVN - only still around for errors
-    if( opt_mode == GVNGCM.Mode.PesiCG || opt_mode == GVNGCM.Mode.Pause ) return _val;
-    boolean lifting = opt_mode!=GVNGCM.Mode.Opto;
-    Type t   = lifting ? Type.ANY : Type.ALL;
-    for( Node def : _defs ) {
-      Type td = def.val();
-      if( !(td instanceof TypeFunPtr) ) return td.oob();
-      TypeFunPtr tfp = (TypeFunPtr)td;
-      if( tfp.above_center() == lifting ) tfp = tfp.dual();
-      t = lifting ? t.meet(tfp) : t.join(tfp);
+    switch( opt_mode ) {
+    case PesiCG:
+    case Pause:
+      return _val;
+    case Parse:
+    case PesiNoCG:
+      Type t = Type.ANY;
+      for( Node def : _defs ) {
+        Type td = def._val;
+        if( !(td instanceof TypeFunPtr) ) return td.oob();
+        t = t.meet(td);
+      }
+      return t;
+    case Opto:
+      Type tx = Type.ANY;
+      for( Node fptr : _defs ) {
+        Type td = fptr._val;
+        if( td==Type.ANY && fptr instanceof FunPtrNode )
+          td = TypeFunPtr.make(((FunPtrNode)fptr).ret()._fidx,((FunPtrNode)fptr).ret()._nargs,Type.ANY);
+        tx = tx.meet(td);
+      }
+      if( !(tx instanceof TypeFunPtr) ) return tx.oob();
+      return ((TypeFunPtr)tx).make_from(((TypeFunPtr)tx)._fidxs.dual());
+    default: throw com.cliffc.aa.AA.unimpl();
     }
-    return t;
   }
 
   // Validate same name, operator-precedence and thunking

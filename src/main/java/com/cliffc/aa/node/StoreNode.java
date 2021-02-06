@@ -37,8 +37,8 @@ public class StoreNode extends Node {
     TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
 
     // Is this Store dead from below?
-    if( tmp!=null && _live.ld(tmp)==TypeObj.UNUSED )
-      return mem;
+    if( ta.above_center() ) return mem;
+    if( tmp!=null && _live.ld(tmp)==TypeObj.UNUSED )  return mem;
 
     // If Store is by a New and no other Stores, fold into the New.
     NewObjNode nnn;  int idx;
@@ -112,7 +112,7 @@ public class StoreNode extends Node {
     if( tmem==Type.ALL || tadr==Type.ALL ) return Type.ALL;
 
     if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM);
-    if( !(tadr instanceof TypeMemPtr) ) return tadr.oob(TypeMem.ALLMEM);
+    if( !(tadr instanceof TypeMemPtr) ) return tadr.above_center() ? tmem : TypeMem.ALLMEM;
     TypeMem    tm  = (TypeMem   )tmem;
     TypeMemPtr tmp = (TypeMemPtr)tadr;
     return tm.update(tmp._aliases,_fin,_fld,tval);

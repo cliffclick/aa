@@ -707,6 +707,8 @@ public class FunNode extends RegionNode {
       path_call.set_fdx(new_funptr); // Force new_funptr, will re-wire later
       TypeFunPtr nfptr = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,ofptr._disp);
       path_call._val = CallNode.set_ttfp((TypeTuple) path_call._val,nfptr);
+      for( Node use : oldret._uses ) // Check extra FunPtrs are dead
+        if( use instanceof FunPtrNode ) Env.GVN.add_dead(map.get(use));
     } // Else other funptr/displays on unrelated path, dead, can be ignored
 
     // For all aliases split in this pass, update in-node both old and new.

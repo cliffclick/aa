@@ -38,7 +38,7 @@ public class ParmNode extends PhiNode {
     if( !(in(0) instanceof FunNode) )
       return in(0).is_copy(_idx); // Dying, or thunks
     FunNode fun = fun();
-    if( fun.val() == Type.XCTRL ) return null; // All dead, c-prop will fold up
+    if( fun._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
     assert fun._defs._len==_defs._len;
     if( fun.in(0)!=null && in(1) != this) // FunNode is a Copy
       return in(1);             // So return the copy
@@ -81,6 +81,7 @@ public class ParmNode extends PhiNode {
     }
 
     if( _idx <= 0 ) return t;
+    if( fun.in(0)==fun ) return t.simple_ptr(); // Function is collapsing, memory not available to check formals
     // High, but valid, values like choice-functions need to pass thru,
     // so following Calls agree that SOME function will be called.
     // Check against formals; if OOB, always produce an error.
@@ -113,7 +114,7 @@ public class ParmNode extends PhiNode {
     Type formal = fun.formal(_idx);
     for( int i=1; i<_defs._len; i++ ) {
       if( fun.val(i)==Type.XCTRL ) continue;// Ignore dead paths
-      Type argt = mem == null ? in(i).val() : in(i).sharptr(mem.in(i)); // Arg type for this incoming path
+      Type argt = mem == null ? in(i)._val : in(i).sharptr(mem.in(i)); // Arg type for this incoming path
       if( argt!=Type.ALL && !argt.isa(formal) ) { // Argument is legal?  ALL args are in-error elsewhere
         // The merge of all incoming calls for this argument is not legal.
         // Find the call bringing the broken args, and use it for error
@@ -125,7 +126,7 @@ public class ParmNode extends PhiNode {
               return null;      // #args errors reported before bad-args
             Type argc = call.arg(_idx).sharptr(call.mem()); // Call arg type
             if( argc!=Type.ALL && !argc.isa(formal) ) // Check this call
-              return fast ? ErrMsg.FAST : ErrMsg.typerr(call._badargs[_idx-ARG_IDX+1],argc, call.mem().val(),formal);
+              return fast ? ErrMsg.FAST : ErrMsg.typerr(call._badargs[_idx-ARG_IDX+1],argc, call.mem()._val,formal);
             // Must be a different call that is in-error
           }
         }

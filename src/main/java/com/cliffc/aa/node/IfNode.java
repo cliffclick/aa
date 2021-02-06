@@ -26,7 +26,7 @@ public class IfNode extends Node {
     }
 
     if( tst instanceof PrimNode.Not && tst._uses._len==1 )
-      return flip(Env.GVN.xform(new IfNode(ctl,tst.in(1))));
+      return flip(Env.GVN.xreduce(new IfNode(ctl,tst.in(1))));
 
     return null;
   }
@@ -37,8 +37,8 @@ public class IfNode extends Node {
     ProjNode p1 = (ProjNode)_uses.atX(1);
     if( p0==null || p0._keep>0 || p1==null || p1._keep>0 ) return null; // Not well formed
     if( p0._idx==1 ) { ProjNode tmp=p0; p0=p1; p1=tmp; }
-    Node x0 = Env.GVN.xform(new CProjNode(that,0));
-    Node x1 = Env.GVN.xform(new CProjNode(that,1));
+    Node x0 = Env.GVN.xreduce(new CProjNode(that,0));
+    Node x1 = Env.GVN.xreduce(new CProjNode(that,1));
     p0.subsume(x1);
     p1.subsume(x0);
     x0._live = x1._live = that._live = this._live;

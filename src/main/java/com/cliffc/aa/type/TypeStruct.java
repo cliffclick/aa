@@ -809,11 +809,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // folding up.  Otherwise unrelated types might expand endlessly.
     TypeFunPtr nt = OLD2APX.get(old);
     if( nt != null ) return ufind(nt);
+    if( old._disp==Type.ANY )
+      // return old; // no ufind because its old
+      throw com.cliffc.aa.AA.unimpl();
 
     // Walk internal structure, meeting into the approximation
     TypeFunPtr nmp = (TypeFunPtr)old.clone();
     OLD2APX.put(old,nmp);
-    nmp._disp = ax_impl_ptr(alias,cutoff,cutoffs,d,dold,old._disp);
+    nmp._disp = ax_impl_ptr(alias,cutoff,cutoffs,d,dold,(TypeMemPtr)old._disp);
     OLD2APX.put(old,null);      // Do not keep sharing the "tails"
     return nmp;
   }
@@ -941,8 +944,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
           break;
         case TFUNPTR:           // Update TypeFunPtr internal field
           TypeFunPtr tfptr = (TypeFunPtr)t0;
-          TypeMemPtr t6 = tfptr._disp;
-          TypeMemPtr t7 = ufind(t6);
+          Type t6 = tfptr._disp;
+          Type t7 = ufind(t6);
           if( t6 != t7 ) {
             tfptr._disp = t7;
             progress |= post_mod(tfptr);
@@ -1195,7 +1198,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         dts2._ts[i] = _sharp(mem,((TypeMemPtr)t),dull_cache);
       if( t instanceof TypeFunPtr ) {
         TypeFunPtr tf = (TypeFunPtr)t;
-        TypeMemPtr dptr3 = _sharp(mem,tf._disp,dull_cache);
+        if( tf._disp == Type.ANY )
+          continue;  // No pointer to sharpen
+        TypeMemPtr dptr3 = _sharp(mem,(TypeMemPtr)tf._disp,dull_cache);
         dts2._ts[i] = dptr3.interned() // Sharp return?
           ? tf.make_from(dptr3)        // Make sharp TFP field
           : tf._sharpen_clone(dptr3);  // Make dull  TFP field
@@ -1325,7 +1330,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     ts[idx] = SCALAR;
     return make_from(_any,ts,fbots(_ts.length));
   }
-  
+
   boolean any_modifiable() {
     if( _open ) return true;
     for( byte b : _flags )

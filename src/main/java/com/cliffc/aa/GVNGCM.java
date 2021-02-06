@@ -28,9 +28,11 @@ public class GVNGCM {
   private final Work _work_inline = new Work("inline", false) { @Override public Node apply(Node n) { return ((FunNode)n).ideal_inline(false); } };
   public  final Work _work_dom    = new Work("dom"   , false) { @Override public Node apply(Node n) { return n.do_mono  (); } };
   @SuppressWarnings("unchecked")
-  private final Work[] _new_works = new Work[]{           _work_flow,_work_reduce,_work_mono,_work_grow             };
+  private final Work[]    _new_works = new Work[]{           _work_flow,_work_reduce,_work_mono,_work_grow             };
   @SuppressWarnings("unchecked")
-  private final Work[] _all_works = new Work[]{_work_dead,_work_flow,_work_reduce,_work_mono,_work_grow,_work_inline};
+  public  final Work[] _reduce_works = new Work[]{_work_dead,_work_flow,_work_reduce                                    };
+  @SuppressWarnings("unchecked")
+  private final Work[]    _all_works = new Work[]{_work_dead,_work_flow,_work_reduce,_work_mono,_work_grow,_work_inline};
   static private boolean HAS_WORK;
   public boolean on_dead  ( Node n ) { return _work_dead  .on(n); }
   public boolean on_flow  ( Node n ) { return _work_flow  .on(n); }
@@ -119,10 +121,20 @@ public class GVNGCM {
   // ideal" than what was before.
   public Node xform( Node n ) {
     assert n._uses._len==0 && n._keep==0; // New to GVN
-    Node x = iter(add_work_all(n));
+    Node x = iter(add_work_all(n),_all_works);
     if( x==null ) x=n;          // Ignore lack-of-progress
     return add_flow(x);         // No liveness (yet), since uses not known
   }
+
+  // Apply graph-rewrite rules, up to the ideal_reduce calls.  Return a node
+  // that is possibly "more ideal" than what was before.
+  public Node xreduce( Node n ) {
+    assert n._uses._len==0 && n._keep==0; // New to GVN
+    Node x = iter(add_work_all(n), _reduce_works);
+    if( x==null ) x=n;          // Ignore lack-of-progress
+    return add_flow(x);         // No liveness (yet), since uses not known
+  }
+
 
   // Top-level iter cleanout.  Changes GVN modes & empties all queues &
   // aggressively checks no-more-progress.
@@ -132,10 +144,10 @@ public class GVNGCM {
     boolean progress=true;
     while( progress ) {
       progress = false;
-      iter((Node)null);
-      // Only a very few nodes can make progress via dominance relations, and these
-      // can make progress "very far" in the graph.  So instead of using a
-      // neighbors list, we bulk revisit them here.
+      iter(null,_all_works);
+      // Only a very few nodes can make progress via dominance relations, and
+      // these can make progress "very far" in the graph.  So instead of using
+      // a neighbors list, we bulk revisit them here.
       for( int i=0; i<_work_dom.len(); i++ ) {
         Node dom = _work_dom.at(i);
         if( dom.is_dead() ) _work_dom.del(i--);
@@ -152,7 +164,7 @@ public class GVNGCM {
   static int ITER_CNT;
   static int ITER_CNT_NOOP;
   static int ITER_NEST=0;
-  public Node iter(Node x) {
+  public Node iter(Node x, Work[] works) {
     if( _opt_mode== Mode.Pause ) return x;
     if( !HAS_WORK ) return x;
     if( x!=null ) x.keep(); // Always keep this guy, unless reducing it directly
@@ -161,7 +173,7 @@ public class GVNGCM {
     boolean progress=false;
     outer:
     while( true ) {
-      for( Work W : _all_works ) {
+      for( Work W : works ) {
         Node n = W.pop();
         if( n==null ) continue; // Worklist is empty
         if( n.is_dead() ) { ITER_CNT_NOOP++; continue outer; }
@@ -339,7 +351,7 @@ public class GVNGCM {
       if( _ret!=null ) _ret.keep(); // Thing being returned at close-point is always alive
       for( Node tmp : _tmps )
         add_unuse(tmp.unkeep()); // Needs proper liveness at least
-      iter((Node)null);          // Cleanup
+      iter((Node)null,_reduce_works); // Cleanup
       if( _ret!=null ) _ret.unkeep();
     }
   }

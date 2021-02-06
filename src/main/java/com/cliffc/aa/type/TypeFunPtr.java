@@ -24,10 +24,10 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   // A single bit is a classic code pointer.
   public BitsFun _fidxs;        // Known function bits
   public int _nargs;            // Number of formals, including the display
-  public TypeMemPtr _disp;      // Display; is_display_ptr
+  public Type _disp;            // Display; is_display_ptr
 
-  private TypeFunPtr(BitsFun fidxs, int nargs, TypeMemPtr disp ) { super(TFUNPTR); init(fidxs,nargs,disp); }
-  private void init (BitsFun fidxs, int nargs, TypeMemPtr disp ) { _fidxs = fidxs; _nargs=nargs; _disp=disp; }
+  private TypeFunPtr(BitsFun fidxs, int nargs, Type disp ) { super(TFUNPTR); init(fidxs,nargs,disp); }
+  private void init (BitsFun fidxs, int nargs, Type disp ) { _fidxs = fidxs; _nargs=nargs; _disp=disp; }
   @Override int compute_hash() { assert _disp._hash != 0;  return (TFUNPTR + _fidxs._hash + _nargs + _disp._hash)|256; }
 
   @Override public boolean equals( Object o ) {
@@ -86,7 +86,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
-  public static TypeFunPtr make( BitsFun fidxs, int nargs, TypeMemPtr disp ) {
+  public static TypeFunPtr make( BitsFun fidxs, int nargs, Type disp ) {
     assert disp.is_display_ptr(); // Simple display ptr.  Just the alias.
     TypeFunPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeFunPtr(fidxs,nargs,disp);
@@ -95,12 +95,13 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     return t1==t2 ? t1 : t1.free(t2);
   }
 
-  public static TypeFunPtr make( int fidx, int nargs, TypeMemPtr disp ) { return make(BitsFun.make0(fidx),nargs,disp); }
-  public static TypeFunPtr make_new_fidx( int parent, int nargs, TypeMemPtr disp ) { return make(BitsFun.make_new_fidx(parent),nargs,disp); }
+  public static TypeFunPtr make( int fidx, int nargs, Type disp ) { return make(BitsFun.make0(fidx),nargs,disp); }
+  public static TypeFunPtr make_new_fidx( int parent, int nargs, Type disp ) { return make(BitsFun.make_new_fidx(parent),nargs,disp); }
   public        TypeFunPtr make_from( TypeMemPtr disp ) { return make(_fidxs,_nargs,disp); }
+  public        TypeFunPtr make_from( BitsFun fidxs ) { return make(fidxs,_nargs,_disp); }
   public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR; // Open display, allows more fields
 
-  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,1,TypeMemPtr.DISP_SIMPLE);
+  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,1,Type.ALL);
   public  static final TypeFunPtr EMPTY  = make(BitsFun.EMPTY,0,TypeMemPtr.NO_DISP);
   public  static final TypeFunPtr NILPTR = make(BitsFun.NIL  ,0,TypeMemPtr.NO_DISP);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,EMPTY};
@@ -135,7 +136,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     TypeFunPtr min_nargs = _nargs < tf._nargs ? this : tf;
     TypeFunPtr max_nargs = _nargs < tf._nargs ? tf : this;
     int nargs = min_nargs.above_center() ? max_nargs._nargs : min_nargs._nargs;
-    return make(fidxs,nargs,(TypeMemPtr)_disp.meet(tf._disp));
+    return make(fidxs,nargs,_disp.meet(tf._disp));
   }
 
   public BitsFun fidxs() { return _fidxs; }

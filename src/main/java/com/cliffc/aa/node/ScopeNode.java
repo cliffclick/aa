@@ -101,7 +101,7 @@ public class ScopeNode extends Node {
         // pointer, and do not need the memory state on exit.
         (!TypeMemPtr.OOP0.dual().isa(trez) || trez==Type.XNIL) &&
         // And not already wiped it out
-        !(mem instanceof ConNode && mem.val() ==TypeMem.XMEM) )
+        !(mem instanceof ConNode && mem._val ==TypeMem.XMEM) )
       // Wipe out return memory
       return set_mem(Node.con(TypeMem.XMEM));
 

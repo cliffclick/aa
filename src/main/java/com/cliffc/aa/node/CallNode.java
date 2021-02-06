@@ -94,7 +94,7 @@ public class CallNode extends Node {
   Parse[] _badargs;         // Errors for e.g. wrong arg counts or incompatible args; one error point per arg.
   public CallNode( boolean unpacked, Parse[] badargs, Node... defs ) {
     super(OP_CALL,defs);
-    assert defs[DSP_IDX]==null || defs[DSP_IDX]._val instanceof TypeMemPtr; // Temp; not required
+    assert defs[DSP_IDX]._val==Type.ANY || defs[DSP_IDX]._val instanceof TypeMemPtr; // Temp; not required
     assert defs.length > DSP_IDX+1;
     _rpc = BitsRPC.new_rpc(BitsRPC.ALL); // Unique call-site index
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
@@ -444,10 +444,9 @@ public class CallNode extends Node {
       tfx = tfx.oob(TypeFunPtr.GENERIC_FUNPTR);
     TypeFunPtr tfp = (TypeFunPtr)tfx;
     BitsFun fidxs = tfp.fidxs();
-    assert fidxs.is_empty() || fidxs.above_center()==tfp._disp.above_center() || tfp._disp.is_con();
-    if( _not_resolved_by_gcp ) { // If overloads not resolvable, then take them all and we are in-error
-      if( fidxs.above_center() && tfp!=TypeFunPtr.GENERIC_FUNPTR.dual() ) tfp = tfp.dual();
-    }
+    if( _not_resolved_by_gcp && // If overloads not resolvable, then take them all and we are in-error
+        fidxs.above_center() && tfp!=TypeFunPtr.GENERIC_FUNPTR.dual() )
+      tfp = tfp.make_from(fidxs.dual()); // Force FIDXS low (take all), and we are in-error
 
     ts[_defs._len-1] = tfp;    // FIDX is the last _def, 2nd-to-last type in ts
 
@@ -480,8 +479,11 @@ public class CallNode extends Node {
       Env.GVN.add_flow(in(((ProjNode)chg)._idx));
   }
   @Override public void add_flow_use_extra(Node chg) {
-    if( chg == fdx() )          // FIDX falls to sane from too-high
+    if( chg == fdx() ) {           // FIDX falls to sane from too-high
       Env.GVN.add_flow_defs(this); // All args become alive
+      CallEpiNode cepi = cepi();
+      if( cepi!=null ) Env.GVN.add_mono(cepi);    // FDX gets stable, might wire
+    }
   }
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
@@ -527,6 +529,7 @@ public class CallNode extends Node {
       // do the optimistic proj test.
 
       // Post GCP, if not wired, then Call is in error, so ESCAPE.
+      if( opt_mode._CG && _val==Type.ANY ) return TypeMem.DEAD;
       if( opt_mode._CG &&       // Either mid-GCP or post-GCP
           (_val==Type.ANY || err(true)==null) &&  // Not in-error
           (opt_mode==GVNGCM.Mode.Opto || all_fcns_wired()) ) {

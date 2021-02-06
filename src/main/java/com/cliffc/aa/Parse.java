@@ -1411,7 +1411,7 @@ public class Parse implements Comparable<Parse> {
 
   // Whack current control with a syntax error
   private ErrNode err_ctrl1( Node.ErrMsg msg ) { return init(new ErrNode(Env.START,msg)); }
-  private ErrNode err_ctrl2( String msg ) { return init(new ErrNode(ctrl(),errMsg(),msg)); }
+  private ErrNode err_ctrl2( String msg ) { return init(new ErrNode(ctrl(),errMsg(),msg)).unkeep(); }
   private void err_ctrl0(String s) { err_ctrl3(s,errMsg()); }
   private void err_ctrl3(String s, Parse open) {
     set_ctrl(gvn(new ErrNode(ctrl(),open,s)));

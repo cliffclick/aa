@@ -55,7 +55,7 @@ public final class FunPtrNode extends Node {
     FunNode fun = ret.fun();
     return fun==null ? xstr() : fun.str();
   }
-  
+
   // Debug only: make an attempt to bind name to a function
   public void bind( String tok ) {
     assert _name==null || _name.equals(tok); // Attempt to double-bind
@@ -69,14 +69,12 @@ public final class FunPtrNode extends Node {
     Node dsp = display();
     Type tdsp = dsp._val;
     if( tdsp instanceof TypeMemPtr && ((TypeMemPtr)tdsp)._obj==TypeObj.UNUSED && !(dsp instanceof ConNode) )
-      return set_def(1,Node.con(tdsp)); // No display needed
+      return set_def(1,Env.ANY); // No display needed
 
     // Remove unused displays.  Track uses; Calling with no display is OK.
     // Uses storing the FPTR and passing it along still require a display.
-    if( GVN._opt_mode._CG && !(dsp instanceof ConNode) && !display_used() ) {
-      TypeMemPtr tdisp = (TypeMemPtr) display().val();
-      return set_def(1,Node.con(tdisp.make_from(TypeObj.UNUSED))); // No display needed
-    }
+    if( GVN._opt_mode._CG && !(dsp instanceof ConNode) && !display_used() )
+      return set_def(1,Env.ANY); // No display needed
     return null;
   }
   // Called if Display goes unused
@@ -105,14 +103,7 @@ public final class FunPtrNode extends Node {
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
-    RetNode ret = ret();
-    Node disp = display();
-    Type tdisp = disp.val();
-    if( tdisp!=TypeMemPtr.NO_DISP && !(tdisp instanceof TypeMemPtr) )
-      return tdisp.oob();
-    if( tdisp==TypeMemPtr.NO_DISP.dual() )
-      throw com.cliffc.aa.AA.unimpl();
-    return TypeFunPtr.make(ret._fidx,ret._nargs,(TypeMemPtr)tdisp);
+    return TypeFunPtr.make(ret()._fidx,ret()._nargs,display()._val);
   }
 
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {

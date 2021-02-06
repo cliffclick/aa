@@ -58,7 +58,13 @@ public abstract class Node implements Cloneable, TNode {
   public  static int _INIT0_CNT;
   private static int CNT=1; // Do not hand out UID 0
   private static final VBitSet LIVE = new VBitSet();  // Conservative approximation of live; due to loops some things may be marked live, but are dead
-  int newuid() { assert CNT < 100000 : "infinite node create loop"; LIVE.set(CNT);  return CNT++; }
+  int newuid() {
+    assert CNT < 100000 : "infinite node create loop";
+    if( CNT==AA.UID )
+      System.out.print("");
+    LIVE.set(CNT);
+    return CNT++;
+  }
 
   // Initial state after loading e.g. primitives.
   public static void init0() {
@@ -627,7 +633,7 @@ public abstract class Node implements Cloneable, TNode {
   // of VALS.  If a replacement is found, replace.  In any case, put in the
   // VALS table.  Return null if no progress, or this or the replacement.
   public Node do_reduce() {
-    if( _keep>0 ) return null;
+    if( _keep>0 && !(this instanceof ScopeNode) ) return null;
     assert check_vals();
     Node nnn = _do_reduce();
     if( nnn!=null ) {                   // Something happened

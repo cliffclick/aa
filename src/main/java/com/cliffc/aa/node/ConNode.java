@@ -41,7 +41,7 @@ public class ConNode<T extends Type> extends Node {
         live = live.lmeet(use.live_use(opt_mode,this).live());
     return TypeMem.make_live(live);
   }
-  @Override public TypeMem all_live() { return _t==Type.CTRL ? TypeMem.ALIVE : TypeMem.LIVE_BOT; }
+  @Override public TypeMem all_live() { return _t==Type.CTRL ? TypeMem.ALIVE : (_t instanceof TypeMem ? TypeMem.ALIVE : TypeMem.LIVE_BOT); }
   @Override public String toString() { return str(); }
   @Override public int hashCode() { return _t.hashCode(); }// In theory also slot 0, but slot 0 is always Start
   @Override public boolean equals(Object o) {
