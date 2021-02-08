@@ -743,7 +743,9 @@ public class Parse implements Comparable<Parse> {
    *  fact = (stmts)   // General statements parsed recursively
    *  fact = (tuple,*) // tuple; first comma required, trailing comma not required
    *  fact = balop+ stmts balop-           // Constructor with initial size
+   *    Ex:    [      7      ]             // Array constructor
    *  fact = balop+ stmts[, stmts]* balop- // Constructor with initial elements
+   *    Ex:    [      1   ,  2        ]    // Array constructor with initial elements
    *  fact = {binop}   // Special syntactic form of binop; no spaces allowed; returns function constant
    *  fact = {uniop}   // Special syntactic form of uniop; no spaces allowed; returns function constant
    *  fact = {func}    // Anonymous function declaration
@@ -807,7 +809,7 @@ public class Parse implements Comparable<Parse> {
     // Forward refs always directly assigned into scope and never updated.
     if( def.is_forward_ref() ) return def;
     // Balanced ops are similar to "{}", "()" or "@{}".
-    if( def.op_prec()==0 )
+    if( def.op_prec()==0 && def._val instanceof TypeFunPtr )
       return bfact(oldx,def);
 
     // Else must load against most recent display update.  Get the display to

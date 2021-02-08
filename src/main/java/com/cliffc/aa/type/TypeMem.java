@@ -3,6 +3,7 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.*;
 
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.HashMap;
 
 /**
@@ -306,6 +307,15 @@ public class TypeMem extends Type<TypeMem> {
     return tos==null ? DEAD : make(tos); // All things are dead, so dead
   }
 
+  // Any alias is not UNUSED?
+  public boolean has_used(BitSet aliases) {
+    for( int alias = aliases.nextSetBit(0); alias != -1; alias = aliases.nextSetBit(alias + 1))
+      if( at(alias)!= TypeObj.UNUSED )
+        return true;            // Has a not-unused (some used) type
+    return false;
+  }
+
+  
   // Shallow meet of all possible loadable values.  Used in Node.value calls, so must be monotonic.
   public TypeObj ld( TypeMemPtr ptr ) {
     if( ptr._aliases == BitsAlias.NIL.dual() || ptr._aliases == BitsAlias.NIL )

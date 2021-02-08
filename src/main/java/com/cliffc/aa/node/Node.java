@@ -640,8 +640,10 @@ public abstract class Node implements Cloneable, TNode {
       if( nnn != this && !is_dead() ) { // Being replaced
         Env.GVN.add_flow_uses(this);    // Visit users
         subsume(nnn);                   // Replace
-        for( Node use : nnn._uses )
+        for( Node use : nnn._uses ) {
           use.add_reduce_extra();
+          use.add_flow_use_extra(nnn);
+        }
       }
       Env.GVN.add_reduce(nnn);  // Rerun the replacement
       return nnn._elock();      // After putting in VALS

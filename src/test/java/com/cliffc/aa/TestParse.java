@@ -599,9 +599,9 @@ public class TestParse {
     test   ("x:=0; 1 ? (x:=4):; x:=x+1", TypeInt.con(5)); // x mutable ahead; ok to mutate on 1 arm and later
     test   ("x:=0; 1 ? (x =4):; x", TypeInt.con(4)); // x final on 1 arm, dead on other arm
     testerr("x:=0; math_rand(1) ? (x =4):3; x=2; x", "Cannot re-assign read-only val 'x'",31);
-    // Final into the 2nd call, so final out of 1st so error.
-    // Requires inlining, which is expliciting denied.
-    testerr("noinline_x={@{a}}; noinline_x().a=2; noinline_x().a",  "Cannot re-assign read-only field '.a' in @{a==int8}", 32);
+    // A final store, but defs of @{a} do not escape into nonline_x, hence do
+    // not merge and escape out.
+    test("noinline_x={@{a}}; noinline_x().a=2; noinline_x().a",  TypeInt.INT8);
   }
 
   // Ffnls are declared with an assignment.  This is to avoid the C++/Java

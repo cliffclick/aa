@@ -817,52 +817,12 @@ public class FunNode extends RegionNode {
       }
     }
 
-    // Retype memory, so we can everywhere lift the split-alias parents "up and
-    // out".
-    retype_mem(aliases,this.parm(MEM_IDX));
-    retype_mem(aliases,fun .parm(MEM_IDX));
+    // Retype memory, so we can everywhere lift the split-alias parents "up and out".
+    GVNGCM.retype_mem(aliases,this.parm(MEM_IDX), oldret, true);
+    GVNGCM.retype_mem(aliases,fun .parm(MEM_IDX), newret, true);
 
     // Unhook the hooked FunPtrs
     for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) use.unkeep();
-  }
-
-
-  // Walk all memory edges, and 'retype' them, probably DOWN (counter to
-  // 'iter').  Used when inlining, and the inlined body needs to acknowledge
-  // bypasses aliases.  Used during code-clone, to lift the split alias parent
-  // up & out.
-  private static void retype_mem(BitSet aliases, Node mem) {
-    Ary<Node> work = new Ary<>(new Node[1],0);
-    work.push(mem);
-    // Update all memory ops
-    while( !work.isEmpty() ) {
-      Node wrk = work.pop();
-      if( wrk.is_mem() ) {
-        Type twrk = wrk.val();
-        Type tmem0 = twrk instanceof TypeTuple ? ((TypeTuple)twrk).at(1) : twrk;
-        if( !(tmem0 instanceof TypeMem) ) continue;
-        // Has any used values?
-        if( has_used((TypeMem)tmem0,aliases) ) {
-          Type tval = wrk.value(Env.GVN._opt_mode);
-          if( twrk != tval ) {
-            wrk._val= tval;
-            Env.GVN.add_flow_uses(wrk);
-            if( wrk instanceof MProjNode && wrk.in(0) instanceof CallNode ) {
-              CallEpiNode cepi = ((CallNode)wrk.in(0)).cepi();
-              if( cepi != null ) work.push(cepi);
-            } else if( !(wrk instanceof RetNode) )
-              work.addAll(wrk._uses);
-          }
-        }
-      }
-    }
-  }
-
-  private static boolean has_used(TypeMem tmem, BitSet aliases) {
-    for( int alias = aliases.nextSetBit(0); alias != -1; alias = aliases.nextSetBit(alias + 1))
-      if( tmem.at(alias)!= TypeObj.UNUSED )
-        return true;            // Has a not-unused (some used) type
-    return false;
   }
 
   // Compute value from inputs.  Simple meet over inputs.

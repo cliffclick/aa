@@ -188,7 +188,7 @@ public class LoadNode extends Node {
     CallNode call = cepi.call();
     if( !tmem0.fld_is_mod(aliases,fld) && !tmem1.fld_is_mod(aliases,fld) )
       return call.mem(); // Loads from final memory can bypass calls.  Stores cannot, store-over-final is in error.
-    TypeMemPtr escs = call.tesc(call.val());
+    TypeMemPtr escs = CallNode.tesc(call.val());
     if( escs._aliases.join(aliases)==BitsAlias.EMPTY )
       return call.mem(); // Load from call; if memory is made *in* the call this will fail later on an address mismatch.
     return null;         // Stuck behind call

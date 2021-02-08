@@ -91,7 +91,7 @@ public final class CallEpiNode extends Node {
     if( call.fdx() instanceof ThretNode ) {
       ThretNode tret = (ThretNode)call.fdx();
       wire1(call,tret.thunk(),tret);
-      return set_is_copy(tret.ctrl(), tret.mem(), tret.rez());     // Collapse the CallEpi into the Thret
+      return set_is_copy(tret.ctrl(), tret.mem(), tret.rez()); // Collapse the CallEpi into the Thret
     }
 
     // Only inline wired single-target function with valid args.  CallNode wires.
@@ -272,7 +272,7 @@ public final class CallEpiNode extends Node {
     if( ctl != Type.CTRL && ctl != Type.ALL )
       return TypeTuple.CALLE.dual();
     TypeFunPtr tfptr= CallNode.ttfpx(tcall); // Peel apart Call tuple
-    TypeMemPtr tescs= call().tesc(tcall);    // Peel apart Call tuple
+    TypeMemPtr tescs= CallNode.tesc(tcall);  // Peel apart Call tuple
 
     // Fidxes; if still in the parser, assuming calling everything
     BitsFun fidxs = tfptr==null || tfptr.is_forward_ref() ? BitsFun.FULL : tfptr.fidxs();
@@ -349,7 +349,8 @@ public final class CallEpiNode extends Node {
     // the call but not flowing in.  Catches all the "new in call" returns.
     BitsAlias esc_out = esc_out(post_call,trez);
     TypeObj[] pubs = new TypeObj[defnode._defs._len];
-    TypeMem caller_mem = CallNode.emem(tcall); // Call memory
+    Type premem = call().mem()._val;
+    TypeMem caller_mem = premem instanceof TypeMem ? (TypeMem)premem : premem.oob(TypeMem.ALLMEM);
     TypeMem tdefmem = (TypeMem)defmem;
     for( int i=1; i<pubs.length; i++ ) {
       boolean ein  = tescs._aliases.test_recur(i);
@@ -412,6 +413,10 @@ public final class CallEpiNode extends Node {
     if( mem instanceof IntrinsicNode ) // Better error message for Intrinsic if Call args are bad
       ((IntrinsicNode)mem)._badargs = call._badargs[1];
     call._is_copy=_is_copy=true;
+    // Memory was split at the Call, according to the escapes aliases, and
+    // rejoined at the CallEpi.  We need to make that explicit here.
+    GVNGCM.retype_mem(null,call,this,false);
+
     Env.GVN.add_reduce_uses(call);
     Env.GVN.add_reduce_uses(this);
     while( _defs._len>0 ) pop();

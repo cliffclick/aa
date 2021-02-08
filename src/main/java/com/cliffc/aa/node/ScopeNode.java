@@ -50,7 +50,7 @@ public class ScopeNode extends Node {
 
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
   public Node set_mem( Node n) {
-    assert n==null || (n._val instanceof TypeMem || n._val ==Type.ANY || n._val ==Type.ALL);
+    assert n._val instanceof TypeMem || n._val ==Type.ANY || n._val ==Type.ALL;
     Node old = mem();
     set_def(MEM_IDX,n);
     if( old!=null ) {

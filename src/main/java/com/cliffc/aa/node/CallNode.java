@@ -148,8 +148,10 @@ public class CallNode extends Node {
   static        Type       tctl( Type tcall ) { return             ((TypeTuple)tcall).at(CTL_IDX); }
   static        TypeMem    emem( Type tcall ) { return emem(       ((TypeTuple)tcall)._ts ); }
   static        TypeMem    emem( Type[] ts  ) { return (TypeMem   ) ts[MEM_IDX]; } // callee memory passed into function
-  TypeMemPtr tesc( Type tcall ) {
-    return tcall instanceof TypeTuple ? (TypeMemPtr)((TypeTuple)tcall).at(_defs._len) : tcall.oob(TypeMemPtr.OOP);
+  static        TypeMemPtr tesc( Type tcall ) {
+    if( !(tcall instanceof TypeTuple) ) return tcall.oob(TypeMemPtr.OOP);
+    TypeTuple tt = (TypeTuple)tcall;
+    return (TypeMemPtr)tt.at(tt.len()-1);
   }
   // No-check must-be-correct get TFP
   static public TypeFunPtr ttfp( Type tcall ) {
@@ -414,7 +416,6 @@ public class CallNode extends Node {
   // the full arg set but if the call is not reachable the FunNode will not
   // merge from that path.  Result tuple type:
   @Override public Type value(GVNGCM.Mode opt_mode) {
-    if( _is_copy ) return _val; // No change till folds away
     // Pinch to XCTRL/CTRL
     Type ctl = ctl()._val;
     if( ctl != Type.CTRL ) return ctl.oob();
@@ -437,6 +438,12 @@ public class CallNode extends Node {
     // Recursively search memory for aliases; compute escaping aliases
     BitsAlias as2 = tmem.all_reaching_aliases(as);
     ts[_defs._len] = TypeMemPtr.make(as2,TypeObj.ISUSED); // Set escapes as last type
+    // Only pass along escaping aliases; others are not available to the call
+    // body.  In the case of recursive calls, aliases made new in the body may
+    // not be passed into the recursive calls, and thus not into the call head
+    // and thus avoids self-merging.  Once we decide to inline, keep the entire
+    // alias set since this filtering by the CallNode goes away as we inline.
+    if( !_is_copy ) ts[MEM_IDX] = tmem.slice_reaching_aliases(as2);
 
     // Not a function to call?
     Type tfx = fdx()._val;
@@ -469,9 +476,9 @@ public class CallNode extends Node {
     return esc_out2.meet(esc_in);
   }
   @Override public void add_flow_extra(Type old) {
-    if( old==Type.ANY ||
+    if( old==Type.ANY || _val==Type.ANY || 
         (old instanceof TypeTuple && ttfp(old).above_center()) )
-      Env.GVN.add_flow_defs(this); // Args can be more-alive
+      Env.GVN.add_flow_defs(this); // Args can be more-alive or more-dead
   }
   @Override public void add_flow_def_extra(Node chg) {
     // Projections live after a call alter liveness of incoming args
@@ -479,11 +486,12 @@ public class CallNode extends Node {
       Env.GVN.add_flow(in(((ProjNode)chg)._idx));
   }
   @Override public void add_flow_use_extra(Node chg) {
+    CallEpiNode cepi = cepi();
     if( chg == fdx() ) {           // FIDX falls to sane from too-high
       Env.GVN.add_flow_defs(this); // All args become alive
-      CallEpiNode cepi = cepi();
       if( cepi!=null ) Env.GVN.add_mono(cepi);    // FDX gets stable, might wire
     }
+    if( chg == mem() && cepi != null ) Env.GVN.add_flow(cepi);
   }
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus

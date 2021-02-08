@@ -5,6 +5,8 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
 
+import java.util.BitSet;
+
 // Global Value Numbering, Global Code Motion
 public class GVNGCM {
 
@@ -325,6 +327,36 @@ public class GVNGCM {
     add_flow(n);                  // Setup for a re-run
     System.out.println("Not monotonic");
     return true;    // Just single-step forward in debugging to re-run n.value
+  }
+
+  // Walk all memory edges, and 'retype' them, probably DOWN (counter to
+  // 'iter').  Used when inlining, and the inlined body needs to acknowledge
+  // bypasses aliases.  Used during code-clone, to lift the split alias parent
+  // up & out.
+  public static void retype_mem( BitSet aliases, Node mem, Node exit, boolean skip_calls ) {
+    Ary<Node> work = new Ary<>(new Node[1],0);
+    work.push(mem);
+    // Update all memory ops
+    while( !work.isEmpty() ) {
+      Node wrk = work.pop();
+      if( !wrk.is_mem() && wrk!=mem ) continue; // Not a memory Node?
+      Type twrk = wrk._val;
+      Type tmem0 = twrk instanceof TypeTuple ? ((TypeTuple)twrk).at(1) : twrk;
+      if( !(tmem0 instanceof TypeMem) ) continue; // Node does have have a memory type?
+      if( aliases!=null && !((TypeMem)tmem0).has_used(aliases) ) continue; // Not does not use the listed memory?
+      if( wrk instanceof CallNode ) { // Do the CEPI for a Call, skipping in-between
+        CallEpiNode cepi = ((CallNode)wrk).cepi();
+        if( cepi != null ) work.push(cepi);
+      }
+      Type tval = wrk.value(Env.GVN._opt_mode); // Recompute memory value
+      if( twrk == tval ) continue;              // No change
+      wrk._val = tval;                          // Progress!!!
+      Env.GVN.add_flow_uses(wrk);               // Forwards flow the update
+      if( wrk==exit ) continue;                 // Stop at end
+      if( skip_calls && wrk instanceof MProjNode && wrk.in(0) instanceof CallNode )
+        continue;               // Skip the inside of calls
+      work.addAll(wrk._uses);
+    }
   }
 
   public class Build<N extends Node> implements AutoCloseable {

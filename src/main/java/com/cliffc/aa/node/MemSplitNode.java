@@ -20,10 +20,10 @@ import java.util.BitSet;
 // in and out, and is especially targeting non-inlined calls.
 public class MemSplitNode extends Node {
   Ary<BitsAlias> _escs = new Ary<>(new BitsAlias[]{new BitsAlias()});
+  boolean _is_copy;             // Set by MemJoin as last split goes away
   public MemSplitNode( Node mem ) { super(OP_SPLIT,null,mem); }
   Node mem() { return in(1); }
   public MemJoinNode join() {
-
     Node prj = ProjNode.proj(this,0);
     if( prj==null ) return null;
     return (MemJoinNode)prj._uses.at(0);
@@ -39,11 +39,17 @@ public class MemSplitNode extends Node {
   }
   @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
   @Override public Type value(GVNGCM.Mode opt_mode) {
-    Type t = mem().val();
+    Type t = mem()._val;
     if( !(t instanceof TypeMem) ) return t.oob();
+    TypeMem tmem = (TypeMem)t;
     // Normal type is for an MProj of the input memory, one per alias class
     Type[] ts = Types.get(_escs._len);
-    Arrays.fill(ts,t);
+    if( _is_copy ) Arrays.fill(ts,t);
+    else {
+      ts[0] = t;
+      for( int i=1; i<_escs._len; i++ )
+        ts[i] = tmem.slice_reaching_aliases(_escs.at(i));
+    }
     return TypeTuple.make(ts);
   }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
@@ -146,6 +152,7 @@ public class MemSplitNode extends Node {
     mjn.add_alias_below(head1,head1_escs,tail1);
     if( mprj.is_dead() ) Env.GVN.revalive(msp);
     else Env.GVN.revalive(msp,mprj,mjn);
+    if( tail1 instanceof ProjNode ) Env.GVN.add_flow(tail1.in(0));
     assert Env.START.more_flow(true)==0;
     for( Node use : mjn._uses )
       Env.GVN.add_work_all(use); // See if other uses can move into the Join
@@ -174,7 +181,8 @@ public class MemSplitNode extends Node {
     return nnn;
   }
   @Override public Node is_copy(int idx) {
-    if( _uses._len==1 && _keep==0 ) return mem(); // Single user
+    if( _is_copy ) return mem();
+    //if( _uses._len==1 && _keep==0 ) return mem(); // Single user
     return null;
   }
     // Modifies all of memory - just does it in parts
