@@ -101,7 +101,7 @@ public class CallNode extends Node {
     _badargs = badargs;
   }
 
-  @Override public String xstr() { return (is_dead() ? "X" : "C")+"all";  } // Self short name
+  @Override public String xstr() { return  _is_copy ? "CopyCall" : (is_dead() ? "Xall" : "Call"); } // Self short name
   String  str() { return xstr(); }       // Inline short name
   @Override public boolean is_mem() {    // Some calls are known to not write memory
     CallEpiNode cepi = cepi();
@@ -476,9 +476,13 @@ public class CallNode extends Node {
     return esc_out2.meet(esc_in);
   }
   @Override public void add_flow_extra(Type old) {
-    if( old==Type.ANY || _val==Type.ANY || 
+    if( old==Type.ANY || _val==Type.ANY ||
         (old instanceof TypeTuple && ttfp(old).above_center()) )
       Env.GVN.add_flow_defs(this); // Args can be more-alive or more-dead
+    // If Call flips to being in-error, all incoming args forced live/escape
+    for( Node def : _defs )
+      if( def._live!=TypeMem.ESCAPE && err(true)!=null )
+        Env.GVN.add_flow(def);
   }
   @Override public void add_flow_def_extra(Node chg) {
     // Projections live after a call alter liveness of incoming args
@@ -539,12 +543,14 @@ public class CallNode extends Node {
       // Post GCP, if not wired, then Call is in error, so ESCAPE.
       if( opt_mode._CG && _val==Type.ANY ) return TypeMem.DEAD;
       if( opt_mode._CG &&       // Either mid-GCP or post-GCP
-          (_val==Type.ANY || err(true)==null) &&  // Not in-error
-          (opt_mode==GVNGCM.Mode.Opto || all_fcns_wired()) ) {
+          (def==dsp() ||        // Display is not a user-visible arg, so if unused can go away
+           (err(true)==null &&  // Not in-error
+            // And fully wired (no new users will wire)
+            (opt_mode==GVNGCM.Mode.Opto || all_fcns_wired()) )) ) {
         int argn = _defs.find(def);
         ProjNode proj = ProjNode.proj(this, argn);
         if( proj == null || proj._live == TypeMem.DEAD )
-          return TypeMem.DEAD; // Proj not used
+          return TypeMem.DEAD; // Arg not used
       }
       if( def instanceof ThretNode ) return TypeMem.ALLMEM;
       assert def.all_live().basic_live();

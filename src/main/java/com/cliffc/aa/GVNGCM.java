@@ -253,10 +253,10 @@ public class GVNGCM {
           n._val = nval;            // Record progress
           for( Node use : n._uses ) // Classic forwards flow on change
             add_flow(use).add_flow_use_extra(n);
+          n.add_flow_extra(oval);
           if( n instanceof CallEpiNode ) check_and_wire((CallEpiNode)n);
           for( Node use : n._uses )
             if( use instanceof CallEpiNode ) check_and_wire((CallEpiNode)use);
-          n.add_flow_extra(oval);
         }
 
         // Reverse flow

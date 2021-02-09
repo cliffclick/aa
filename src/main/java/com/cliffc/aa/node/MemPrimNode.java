@@ -125,6 +125,7 @@ public abstract class MemPrimNode extends PrimNode {
   // ------------------------------------------------------------
   public abstract static class WritePrimNode extends MemPrimNode {
     WritePrimNode( String name, String[] args, TypeTuple formals, Type ret ) { super(name,args,formals,ret); }
+    @Override public boolean is_mem() { return true; }
 
     @Override public FunPtrNode as_fun( GVNGCM gvn ) {
       try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
