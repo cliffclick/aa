@@ -24,12 +24,12 @@ public class TMem extends TMulti<TMem> {
 
   @Override TMem _fresh_new() { return new TMem(null); }
 
-  // Used by Loads.  Unify tv against all aliases at this field only.  Aliases
-  // are either produced by the Parser (so very generic) or from forwards-flow
-  // from News and very specific.  Ignore the generic ones until they refine.
-  // TODO: As aliases further refine, need to undo-redo prior unifies against
-  // larger/weaker aliases.
-  public boolean unify_alias_load(BitsAlias aliases, String fld, TVar tv, TNode dep, boolean test) {
+  // Used by Loads and Stores.  Unify tv against all aliases at this field
+  // only.  Aliases are either produced by the Parser (so very generic) or from
+  // forwards-flow from News and very specific.  Ignore the generic ones until
+  // they refine.  TODO: As aliases further refine, need to undo-redo prior
+  // unifies against larger/weaker aliases.
+  public boolean unify_alias_fld(BitsAlias aliases, String fld, TVar tv, TNode dep, boolean test) {
     boolean progress=false;
     for( int alias : aliases ) {
       if( alias <= BitsAlias.AARY ) return false; // No unify on parser-specific values
@@ -37,17 +37,17 @@ public class TMem extends TMulti<TMem> {
       if( parm instanceof TObj ) {
         progress = ((TObj)parm).unify_fld(fld,tv,test);
       } else {
-        TObj tvo = new TObj(null).add_fld(fld,tv);
-        if( parm==null ) {
-          if( test ) return true;    // Definitely will be progress
-          //TNode.add_work(tvo.push_dep(dep,null)); // If a new alias, it gets the deps
-          //TNode.add_work_all(_deps);
-          //grow(alias+1)[alias] = tvo;
-          //progress = true;
-          throw com.cliffc.aa.AA.unimpl();
-        } else {
-          progress = parm.unify(tvo,test);
-        }
+        //TObj tvo = new TObj(null).add_fld(fld,tv);
+        //if( parm==null ) {
+        //  if( test ) return true;    // Definitely will be progress
+        //  TNode.add_work(tvo.push_dep(dep,null)); // If a new alias, it gets the deps
+        //  TNode.add_work_all(_deps);
+        //  grow(alias+1)[alias] = tvo;
+        //  progress = true;
+        //} else {
+        //  progress = parm.unify(tvo,test);
+        //}
+        throw com.cliffc.aa.AA.unimpl();
       }
       if( test && progress ) return progress; // Shortcut
     }

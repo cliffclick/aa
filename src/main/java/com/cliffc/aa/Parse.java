@@ -24,6 +24,8 @@ import static com.cliffc.aa.AA.*;
  *  expr = term [binop term]*      // gather all the binops and sort by precedence
  *  term = uniop term              // Any number of prefix uniops
  *  term = id++ | id--             //   then postfix update ops
+ *  term = tfact balop_open stmts balop_close      // if balop is ary,idx
+ *  term = tfact balop_open stmts balop_close stmt // if balop is ary,idx,val
  *  term = tfact post              //   A term is a tfact and some more stuff...
  *  post = empty                   // A term can be just a plain 'tfact'
  *  post = (tuple) post            // Application argument list

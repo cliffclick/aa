@@ -173,33 +173,21 @@ public class StoreNode extends Node {
   }
 
   @Override public boolean unify( boolean test ) {
-    // Self should always should be a TMem
-    TVar tvar = tvar();
-    if( tvar instanceof TVDead ) return false; // Not gonna be a TMem
-    if( !(tvar instanceof TMem) )
-      return test || tvar.unify(new TMem(this),false);
-    TMem tvarm = (TMem)tvar;
-    // Input should be a TMem also
+    // Input should be a TMem 
     Node mem = mem();
     TVar tmem = mem.tvar();
     if( tmem instanceof TVDead ) return false; // Not gonna be a TMem
-    if( !(tmem instanceof TMem) )
-      return test || tmem.unify(new TMem(mem),false);
+    boolean progress = tvar().unify(tmem,test);
+    if( !(tmem instanceof TMem) ) return progress;
     // Address needs to name the aliases
     Type tadr = adr().val();
-    if( !(tadr instanceof TypeMemPtr) )
-      return false;
+    if( !(tadr instanceof TypeMemPtr) ) return progress;
     TypeMemPtr tmp = (TypeMemPtr)tadr;
 
-    // Unify all deep memory aliases, but not the top-level self-memory: We
-    // output a new memory value, and it is not the same as incoming memory.
+    // Unify the given aliases and field against the stored type
     // TODO: If we have a Precise replacement (single alias, no recursion) then
     // do not unify with incoming memory at alias - this is a true replacement.
-    return
-      tvarm.unify_mem(BitsAlias.EMPTY,tmem,test) |
-      // Unify the given aliases and field against the stored type
-      tvarm.unify_alias_load(tmp._aliases,_fld,rez().tvar(),mem,test);
-
+    return ((TMem)tmem).unify_alias_fld(tmp._aliases,_fld,rez().tvar(),mem,test) | progress;
   }
 
 }

@@ -80,10 +80,9 @@ public class TVar implements Comparable<TVar> {
       }
     }
     if( tv._ns!=null && tv._ns._len==0 ) tv._ns=null;
-    if( _deps!=null ) {                        // Also merge deps
-      //TNode.add_work_all(tv.push_deps(_deps,null)); // And push deps on worklist
-      //assert tv._deps==null || tv._deps.find(TNode::is_dead) == -1;
-      throw com.cliffc.aa.AA.unimpl();
+    if( _deps!=null ) {                         // Also merge deps
+      TNode.add_flow(tv.push_deps(_deps,null)); // And push deps on worklist
+      assert tv._deps==null || tv._deps.find(TNode::is_dead) == -1;
     }
     if( tv._deps!=null && tv._deps._len==0 )
       tv._deps=null;            // Cleaned out

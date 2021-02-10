@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TMem;
-import com.cliffc.aa.tvar.TVDead;
 import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
 
@@ -21,7 +20,7 @@ public class MrgProjNode extends ProjNode {
   @Override public Node ideal_reduce() {
     NewNode nnn = nnn();
     Node mem = mem();
-    Type t = mem.val();
+    Type t = mem._val;
     // Alias is dead-on-entry.  Then this MrgPrj no longer lifts
     if( t instanceof TypeMem && ((TypeMem)t).at(nnn._alias)==TypeObj.UNUSED && nnn.is_unused() ) // New is dead for no pointers
       return mem;                // Kill MrgNode when it no longer lifts values
@@ -74,8 +73,8 @@ public class MrgProjNode extends ProjNode {
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( !(in(0) instanceof NewNode) ) return Type.ANY;
     NewNode nnn = nnn();
-    Type tn = nnn.val();
-    Type tm = mem().val();
+    Type tn = nnn._val;
+    Type tm = mem()._val;
     if( !(tm instanceof TypeMem  ) ) return tm.oob();
     if( !(tn instanceof TypeTuple) ) return tn.oob();
     TypeObj to = (TypeObj)((TypeTuple)tn).at(MEM_IDX);
@@ -92,20 +91,12 @@ public class MrgProjNode extends ProjNode {
 
   @Override public boolean unify( boolean test ) {
     if( !(in(0) instanceof NewNode) ) return false;
-    // Self always should be a TMem
-    TVar tvar = tvar();
-    if( tvar instanceof TVDead ) return false; // Not gonna be a TMem
-    if( !(tvar instanceof TMem) )
-      return test || tvar.unify(new TMem(this),false);
-    // Input memory always should be a TMem
+    NewNode nnn = nnn();
     TVar tmem = mem().tvar();
-    if( !(tmem instanceof TMem) )
-      return test || tmem.unify(new TMem(mem()),false);
-    // Unify with input memory, alias by alias
-    if( ((TMem)tvar).unify_mem(nnn().escapees(),tmem.find(),test) )
-      return true;
-    // Unify TMem interiors with new TObj
-    return ((TMem)tvar).unify_alias(nnn()._alias,nnn().tvar(),test);
+    boolean progress = tvar().unify(tmem,test); // Progress if we unify       with incoming
+    if( tmem instanceof TMem )                  // Progress if we unify alias with incoming
+      progress |= ((TMem)tmem).unify_alias(nnn._alias,nnn.tvar(),test);
+    return progress;
   }
 
 }

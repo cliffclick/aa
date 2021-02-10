@@ -2,10 +2,8 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.TMem;
-import com.cliffc.aa.tvar.TVDead;
-import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.MEM_IDX;
@@ -157,37 +155,15 @@ public class MemJoinNode extends Node {
   // Unify alias-by-alias, except on the alias sets
   @Override public boolean unify( boolean test ) {
     // Self has to be a TMem
-    TVar tvar = tvar();
-    if( tvar instanceof TVDead ) return false; // Not gonna be a TMem
-    if( !(tvar instanceof TMem) )
-      return test || tvar.unify(new TMem(this),test);
-    TMem tvarm = (TMem)tvar;
-
-    // Inputs should be TMems also
-    boolean progress = false;
-    for( Node def : _defs ) {
-      TVar dmem = def.tvar();
-      if( dmem instanceof TVDead ) return progress; // Not gonna be a TMem
-      if( !(dmem instanceof TMem) )
-        progress |= dmem.unify(new TMem(def),test);
-    }
-    if( test && progress ) return progress;
-
-    // Base has to be a TMem
-    TMem tbasem = (TMem)tvar(0);
-    // Unify aliases outside of the esc set from the base
+    if( tvar() instanceof TVDead ) return false;     // Not gonna be a TMem
+    boolean progress = tvar().unify(tvar(0),test);   // Unify against base
+    if( !(tvar() instanceof TMem) ) return progress; // Wait till gets stronger
     Ary<BitsAlias> escs = msp()._escs;
-    progress |= tvarm.unify_mem(escs.at(0),tbasem,test);
-    // If we widen the TMem here, all inputs will widen as well
-    //if( !test && progress )
-    //  for( Node def : _defs )
-    //    TNode.add_work(def);
-
-    //// Unify inputs alias by alias
-    //for( int i=1; i<_defs._len; i++ )
-    //  progress |= tvarm.unify_alias(escs.at(i),(TMem)tvar(i),test);
-    //return progress;
-    throw com.cliffc.aa.AA.unimpl();
+    for( int i=1; i<_defs._len; i++ )
+      if( tvar(i) instanceof TMem && ((TMem)tvar()).unify_alias(escs.at(i),(TMem)tvar(i),test) )
+        if( test ) return true;
+        else progress = true;
+    return progress;
   }
 
   // Move the given SESE region just ahead of the split into the join/split

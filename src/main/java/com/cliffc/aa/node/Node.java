@@ -689,7 +689,8 @@ public abstract class Node implements Cloneable, TNode {
   public Node do_flow() {
     Node progress=null;
     // Perform unification
-    //boolean hm_progress = n.unify(false);
+    if( unify(false) )
+      progress = this;          // Progress
 
     // Compute live bits.  If progress, push the defs on the flow worklist.
     // This is a reverse flow computation.  Always assumed live if keep.
@@ -718,6 +719,7 @@ public abstract class Node implements Cloneable, TNode {
       for( Node use : _uses )  // Put uses on worklist... values flows downhill
         Env.GVN.add_flow(use).add_flow_use_extra(this);
       if( is_CFG() ) for( Node use : _uses ) if( use.is_CFG() ) Env.GVN.add_reduce(use);
+      if( tvar()._deps!=null ) Env.GVN.add_flow(tvar()._deps);
       add_flow_extra(oval);
     }
     return progress;
@@ -804,8 +806,8 @@ public abstract class Node implements Cloneable, TNode {
   public final boolean more_ideal(VBitSet bs) {
     if( bs.tset(_uid) ) return false; // Been there, done that
     if( _keep == 0 && _live.is_live() ) { // Only non-keeps, which is just top-level scope and prims
-      //if( unify(true) )
-      //  return true;            // Found more unification
+      if( unify(true) )
+        return true;            // Found more unification
       Type t = value(Env.GVN._opt_mode);
       if( _val != t )
         return true;            // Found a value improvement
@@ -836,7 +838,7 @@ public abstract class Node implements Cloneable, TNode {
     Type    oval= _val, nval = value(Env.GVN._opt_mode);
     TypeMem oliv=_live, nliv = live (Env.GVN._opt_mode);
     boolean hm = lifting && unify(true); // Progress-only check, and only during Pesi not Opto
-    if( nval != oval || nliv != oliv /*|| hm*/ ) {
+    if( nval != oval || nliv != oliv || hm ) {
       boolean ok = lifting
         ? nval.isa(oval) && nliv.isa(oliv)
         : oval.isa(nval) && oliv.isa(nliv);

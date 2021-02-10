@@ -49,11 +49,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public void create( String name, Node val, byte mutable ) {
     assert !Util.eq(name,"^"); // Closure field created on init
     create_active(name,val,mutable);
-    //for( Node use : _uses ) {
-      //use.xval(gvn._opt_mode);  // Record "downhill" type for OProj, DProj
-      //gvn.add_work_uses(use);   // Neighbors on worklist
-    //  throw com.cliffc.aa.AA.unimpl();
-    //}
   }
 
   // Create a field from parser for an active this
@@ -155,14 +150,21 @@ public class NewObjNode extends NewNode<TypeStruct> {
   @Override public boolean unify( boolean test ) {
     // Self should always should be a TObj
     TVar tvar = tvar();
-    if( tvar instanceof TObj ||
-        tvar instanceof TVDead ) return false; // Not gonna be a TMem
-    if( test ) return true;                    // Would make progress
-    // Make a TObj
-    TObj tvo = new TObj(this);
-    for( int i=0; i<_ts._flds.length; i++ )
-      tvo.add_fld(_ts._flds[i],tvar(def_idx(i)));
-    return tvar.unify(tvo,false);      // ...and unify with it
+    if( tvar instanceof TVDead ) return false; // Not gonna be a TMem
+    // Get/Make a TObj
+    boolean progress = false;
+    TObj tvo;
+    if( !(tvar instanceof TObj) ) {
+      if( test ) return true;   // Progress to make a TObj
+      tvar.unify(tvo=new TObj(this),test);
+      progress = true;
+    } else tvo = (TObj)tvar;
+    // Structural unification on all fields
+    for( int i=0; i<_ts._flds.length; i++ ) 
+      if( tvo.add_fld(_ts._flds[i],tvar(def_idx(i)),test) )
+        if( test ) return true;
+        else progress = true;
+    return progress;
   }
 
   @Override public TNode[] parms() {

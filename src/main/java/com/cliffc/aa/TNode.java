@@ -21,6 +21,6 @@ public interface TNode {
   abstract boolean is_dead();   // Dead already
 
   abstract boolean is_forward_ref(); // In H-M, Lambda vs LetRec
-  //static void add_work    (    TNode dep ) { Env.GVN.add_work    (dep); }
-  //static void add_work_all(Ary<TNode>deps) { Env.GVN.add_work_all(deps); }
+  //static void add_flow( TNode dep ) { Env.GVN.add_flow(dep); }
+  static void add_flow(Ary<TNode>deps) { Env.GVN.add_flow(deps); }
 }

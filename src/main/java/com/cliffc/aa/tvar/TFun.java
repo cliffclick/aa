@@ -18,7 +18,7 @@ public class TFun extends TMulti<TFun> {
     if( idx!=-1 ) _ns.remove(idx);
     return new TFun(tn,_nongen,new TVar(),new TVar());
   }
-  
+
   public TVar args() { return parm(0); }
   public TVar ret () { return parm(1); }
 
@@ -40,8 +40,8 @@ public class TFun extends TMulti<TFun> {
     CYC_BUSY=false;
     if( !will_unify ) return false; // No change
     if( !test ) {                   // No change if testing
-      args().push_dep(dep,null);
-      ret ().push_dep(dep,null);
+      args.push_dep(dep,null);
+      ret .push_dep(dep,null);
     }
     TArgs argz; TRet retz;
     BitsAlias news = BitsAlias.EMPTY; // New-in-function set; will not unify with pre-function memory

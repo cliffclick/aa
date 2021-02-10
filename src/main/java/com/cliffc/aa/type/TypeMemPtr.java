@@ -252,6 +252,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( _aliases.isa(BitsAlias.RECORD_BITS0) )  bs = BitsAlias.RECORD_BITS0;
     if( _aliases.isa(BitsAlias.STRBITS0) ) bs = bs==null ? BitsAlias.STRBITS0 : BitsAlias.FULL;
     if( _aliases.isa(BitsAlias.ARYBITS0) ) bs = bs==null ? BitsAlias.ARYBITS0 : BitsAlias.FULL;
+    if( !_aliases.test(0) ) bs = bs.strip_nil();
     return make(bs,_obj.widen());
   }
 }

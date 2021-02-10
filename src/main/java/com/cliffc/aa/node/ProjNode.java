@@ -41,8 +41,6 @@ public class ProjNode extends Node {
     if( in(0) instanceof NewNode ) return false; // TODO: Not really a proper use of Proj
     TVar tv = tvar(0);          // Input tvar
     if( !(tv instanceof TMulti) ) return false;
-    if( in(0) instanceof MemSplitNode )
-      return tvar().unify(tv,test);  // MemSplit has same memory for ALL MProjs (but different alias focus)
     TVar tprj = ((TMulti)tv).parm(_idx);
     return tprj!=null && tvar().unify(tprj,test);
   }

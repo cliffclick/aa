@@ -2,9 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.TMem;
-import com.cliffc.aa.tvar.TVDead;
-import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
@@ -54,18 +51,7 @@ public class MemSplitNode extends Node {
   }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 
-  @Override public boolean unify( boolean test ) {
-    TVar tvar = tvar();
-    if( tvar instanceof TVDead ) return false; // Not gonna be a TMem
-    if( !(tvar instanceof TMem) )
-      return test || tvar.unify(new TMem(this),test);
-    // Input should be a TMem also
-    TVar dmem = mem().tvar();
-    if( dmem instanceof TVDead ) return false; // Not gonna be a TMem
-    if( !(dmem instanceof TMem) )
-      return test || dmem.unify(new TMem(this),test);
-    return tvar.unify(dmem,test);
-  }
+  @Override public boolean unify( boolean test ) { return tvar().unify(mem().tvar(),test); }
 
   // Find index for alias
   int find_alias_index( int alias ) {

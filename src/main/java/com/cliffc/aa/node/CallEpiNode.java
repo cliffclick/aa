@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.TNode;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 
@@ -309,7 +310,6 @@ public final class CallEpiNode extends Node {
           if( kids==2 ) continue;       // Both kids wired, this is ok
           return _val;                  // "Freeze in place"
         }
-        FunNode fun = FunNode.find_fidx(fidx);
         if( !opt_mode._CG ) // Before GCP?  Fidx is an unwired unknown call target
           { fidxs = BitsFun.FULL; break; }
       }
@@ -337,10 +337,10 @@ public final class CallEpiNode extends Node {
     // Lift result according to H-M typing
     TVar tv = tvar();
     if( tv instanceof TArgs && trez != Type.ALL ) // If already an error term, poison, stay error.
-      trez = unify_lift(trez,((TArgs)tv).parm(2));
+      trez = unify_lift(trez,((TArgs)tv).parm(REZ_IDX));
 
     // If no memory projection, then do not compute memory
-    if( _keep==0 && ProjNode.proj(this,1)==null )
+    if( _keep==0 && ProjNode.proj(this,MEM_IDX)==null )
       return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,trez);
 
     // Build epilog memory.
@@ -366,7 +366,7 @@ public final class CallEpiNode extends Node {
     TypeMem tmem3 = TypeMem.make0(pubs);
 
     // Lift memory according to H-M typing
-    Type tmem4 = tv instanceof TArgs ? unify_lift(tmem3,((TArgs)tv).parm(1)) : tmem3;
+    Type tmem4 = tv instanceof TArgs ? unify_lift(tmem3,((TArgs)tv).parm(MEM_IDX)) : tmem3;
 
     return TypeTuple.make(Type.CTRL,tmem4,trez);
   }
@@ -476,38 +476,35 @@ public final class CallEpiNode extends Node {
     if( tfunv instanceof TVDead ) return false; // Not gonna be a TFun
     if( !(tfunv instanceof TFun) )              // Progress
       return test || tfunv.unify(new TFun(fdx,null,new TVar(),new TVar()),false);
+    // Call transitions from TVar to TArgs.
     // Actual progress only if the structure changes.
-    //if( !((TFun)tfunv).fresh_unify(call().tvar(),tvar(),test,this) )
-    //  return false;
-    //if( !test )
-    //  for( Node cuse : call()._uses ) // If Call transitions from TVar to TArgs
-    //    TNode.add_work(cuse);         // Add proj users
-    //return true;
-    return false;
+    if( !((TFun)tfunv).fresh_unify(call().tvar(),tvar(),test,this) )
+      return false;             // No progress anyways
+    if( !test )                 // Progress, neighbors on list
+      Env.GVN.add_flow_uses(call());
+    return true;
   }
 
   // H-M typing demands all unified Nodes have the same type... which is a
   // ASSERT/JOIN.  Hence the incoming type can be lifted to the join.
   private Type unify_lift(Type t, TVar tv) {
     if( tv._ns == null || tv._ns._len==0 ) return t;
-    // TODO: DISABLED FOR NOW, STILL SORTING OUT
-    //Type t2 = t;
-    //for( int i=0; i<tv._ns._len; i++ ) {
-    //  TNode tn = tv._ns.at(i);
-    //  // Most of the unified Nodes are dead, unified because ideal() replaced
-    //  // them with another.  However, their Types do not update after the merge
-    //  // and become stale.  So no unify with the dead.
-    //  if( tn.is_dead() ) tv._ns.remove(i--);
-    //  else if( tn instanceof ProjNode && ((ProjNode)tn).in(0)==this ) /*self projection: do nothing*/;
-    //  else {
-    //    Type t3 = tn._val;
-    //    Type t4 = tn instanceof MemSplitNode ? ((TypeTuple)t3).at(0) : t3;
-    //    Type t5 = t4.widen();
-    //    t2 = t2.join(t5);
-    //  }
-    //}
-    //return t2;
-    return t;
+    Type t2 = t;
+    for( int i=0; i<tv._ns._len; i++ ) {
+      TNode tn = tv._ns.at(i);
+      // Most of the unified Nodes are dead, unified because ideal() replaced
+      // them with another.  However, their Types do not update after the merge
+      // and become stale.  So no unify with the dead.
+      if( tn.is_dead() ) tv._ns.remove(i--);
+      else if( tn instanceof ProjNode && ((ProjNode)tn).in(0)==this ) /*self projection: do nothing*/;
+      else {
+        Type t3 = tn.val();
+        Type t4 = tn instanceof MemSplitNode ? ((TypeTuple)t3).at(0) : t3;
+        Type t5 = t4.widen();
+        t2 = t2.join(t5);       // Lift according to H-M
+      }
+    }
+    return t2;
   }
 
 

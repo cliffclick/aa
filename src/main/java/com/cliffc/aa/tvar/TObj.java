@@ -19,10 +19,13 @@ public class TObj extends TMulti<TObj> {
   public TObj(TNode mem ) { super(mem,TVS0); _flds = new HashMap<>(); }
   private void put( String fld, TVar tv) { _flds.put(fld,tv); }
   // Lazily add fields
-  public TObj add_fld(String fld, TVar tv) {
-    assert !_flds.containsKey(fld);
-    put(fld,tv);
-    return this;
+  public boolean add_fld(String fld, TVar tv, boolean test) {
+    TVar tvo = _flds.get(fld);
+    if( tvo==null ) {           // Does not already exist, so progress
+      if( !test ) put(fld,tv);  // Put directly
+      return true;              // Declare progress
+    }
+    return tvo.unify(tv,test);  // Progress recursively
   }
   // Union matching field
   boolean unify_fld(String fld, TVar tv0, boolean test) {
