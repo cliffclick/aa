@@ -52,21 +52,22 @@ BNF                           | Comment
 `prog = stmts END`            |
 `stmts= [tstmt or stmt][; stmts]*[;]?` | multiple statments; final ';' is optional
 `tstmt= tvar = :type`         | type variable assignment
-`stmt = [id[:type] [:]=]* ifex` | ids are (re-)assigned, and are available in later statements.  
+`stmt = [id[:type] [:]=]* ifex` | ids are (re-)assigned, and are available in later statements.
 `stmt = ^ifex`                | Early function exit
 `ifex = apply [? stmt [: stmt]]` | trinary logic; the else-clause will default to 0
-`apply= expr  | expr expr*`   | Lisp-like application-as-adjacent
+`apply = expr+`               | Lisp-like application-as-adjacent
 `expr = term [binop term]*`   | gather all the binops and sort by prec
 `term = uniop term`           | Any number of uniops
-`term = id++ | id--`          |   post-inc/dec operators
+`term = id++`                 |   post-inc/dec operators
+`term = id--`                 |   post-inc/dec operators
+`term = tfact bopen stmts bclose`      | If bopen/bclose is arity 2, e.g. `arg[idx]`
+`term = tfact bopen stmts bclose stmt` | If bopen/bclose is arity 3, e.g. `arg[idx]=val`
 `term = tfact post`           |   A term is a tfact and some more stuff...
 `post = empty`                | A term can be just a plain 'tfact'
 `post = (tuple) post`         | Application argument list
 `post = .field post`          | Field and tuple lookup
 `post = .field [:]= stmt`     | Field (re)assignment.  Plain '=' is a final assignment
 `post = .field++ OR .field--` | Field reassignment.
-`post = [stmts] post`         | Array lookup
-`post = [stmts]:= stmt`       | Array assignment
 `tfact= fact[:type]`          | Optionally typed fact
 `fact = id`                   | variable lookup
 `fact = num`                  | number
@@ -89,9 +90,11 @@ BNF                           | Comment
 `tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]` | Primitive types
 `tfun = {[[type]* ->]? type }` | Function types mirror func decls
 `ttuple = ([[type],]* )`      | Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length.  Tuples are always final.
-`tmod = := | = | ==`          | ':=' or '' is r/w, '=' is final, '==' is r/w
+`tmod = := ! = ! ==`          | ':=' or (missing) is r/w, '=' is final, '==' is r/w
 `tstruct = @{ [id [tmod [type?]],]*}` | Struct types are field names with optional access and optional types.  Spaces not allowed
-`tvar = id`                   | Type variable lookup 
+`tvar = id`                   | Type variable lookup
+`bopen = [`                   | Split/Balanced-operator open
+`bclose = ] ]= ]:= `          | Split/Balanced-operator close
 
 SIMPLE EXAMPLES
 ---------------
@@ -226,8 +229,8 @@ Code            | Comment
 `is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)` | `1:int`
 `is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)` | `0:int`
 **Simple anonymous tuples** | ---
-`(1,\"abc\").0` | `1:int`  .n loads from the nth field; only parse-time constants are supported
-`(1,\"abc\").1` | `"abc"`
+`(1,"abc").0` | `1:int`  .n loads from the nth field; only parse-time constants are supported
+`(1,"abc").1` | `"abc"`
 **Simple anonymous structures** | ---
 `  @{x;y}`        | `@{x,y}` Simple anon struct decl
 `a=@{x=1.2;y}; x` | `Unknown ref 'x'` Field name does not escape structure
@@ -245,7 +248,7 @@ Code            | Comment
 `a=@{x=(b=1.2)*b;y=x}; a.y` | `1.44:flt` Ok to use early fields in later defs
 `a=@{x=(b=1.2)*b;y=b}; b` | `Unknown ref 'b'`  Structure def has a lexical scope
 `dist={p->p//qqq`<br>`.//qqq`<br>`x*p.x+p.y*p.y}; dist(//qqq`<br>`@{x//qqq`<br>`=1;y=2})` | `5:int`  Some rather horrible comments
-Named type variables | Named types are simple subtypes
+**Named type variables** | Named types are simple subtypes
 `gal=:flt`        | `gal{flt -> gal:flt}` Returns a simple type constructor function
 `gal=:flt; {gal}` | `gal{flt -> gal:flt}` Operator syntax for the function
 `gal=:flt; 3==gal(2)+1` | `1:int` Auto-cast-away `gal` to get a `flt`

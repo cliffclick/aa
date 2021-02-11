@@ -24,14 +24,12 @@ import static com.cliffc.aa.AA.*;
  *  expr = term [binop term]*      // gather all the binops and sort by precedence
  *  term = uniop term              // Any number of prefix uniops
  *  term = id++ | id--             //   then postfix update ops
- *  term = tfact balop_open stmts balop_close      // if balop is ary,idx
- *  term = tfact balop_open stmts balop_close stmt // if balop is ary,idx,val
+ *  term = tfact bopen stmts bclose      // if bopen/bclose is arity-2 e.g. ary[idx]
+ *  term = tfact bopen stmts bclose stmt // if bopen/bclose is arity-3 e.g. ary[idx]=val
  *  term = tfact post              //   A term is a tfact and some more stuff...
  *  post = empty                   // A term can be just a plain 'tfact'
  *  post = (tuple) post            // Application argument list
  *  post = .field post             // Field and tuple lookup
- *  post = [stmts] post            // Array lookup
- *  post = [stmts]:= stmt          // Array assignment
  *  post = .field [:]= stmt        // Field (re)assignment.  Plain '=' is a final assignment
  *  post = .field++ | .field--     // Allowed anytime a := is allowed
  *  post = :type post              // TODO: Add this, remove 'tfact'
@@ -560,9 +558,9 @@ public class Parse implements Comparable<Parse> {
   /** Any number field-lookups or function applications, then an optional assignment
    *    term = id++ | id--
    *    term = uniop term
-   *    term = tfact [tuple | .field | '['stmts']' ]* [.field[:]=stmt | '['stmts ']:=' stmt   | .field++ | .field-- | e]
-   *    term = tfact balop_open stmts balop_close      // if balop is ary,idx
-   *    term = tfact balop_open stmts balop_close stmt // if balop is ary,idx,val
+   *    term = tfact [tuple | .field | [.field[:]=stmt | .field++ | .field-- | e]
+   *    term = tfact bopen stmts bclose      // if bopen/bclose is arity-2 e.g. ary[idx]
+   *    term = tfact bopen stmts bclose stmt // if bopen/bclose is arity-3 e.g. ary[idx]=val
    */
   // Invariant: WS already skipped before & after term
   private Node term() {
