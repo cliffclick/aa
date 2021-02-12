@@ -17,7 +17,6 @@ public class ThretNode extends Node {
   public Node mem () { return in(1); }
   public Node rez () { return in(2); }
   public ThunkNode thunk() { return (ThunkNode)in(3); }
-  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM.Mode opt_mode) {
     return TypeTuple.RET;
   }

@@ -134,7 +134,6 @@ public abstract class PrimNode extends Node {
   // zero-based (not same as the _formals and _args fields).
   public abstract Type apply( Type[] args ); // Execute primitive
   @Override public String xstr() { return _name+":"+_sig._formals.at(1); }
-  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Type[] ts = new Type[_defs._len]; // 1-based
     // If all inputs are constants we constant fold.  If any input is high, we
@@ -246,7 +245,6 @@ public abstract class PrimNode extends Node {
   static class ConvertStrStr extends PrimNode {
     ConvertStrStr() { super("str",TypeTuple.STRPTR,TypeMemPtr.OOP); }
     @Override public Node ideal_reduce() { return in(1); }
-    @Override public Node ideal(GVNGCM gvn, int level) { throw AA.unimpl(); }
     @Override public Type value(GVNGCM.Mode opt_mode) { return val(1); }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   }
@@ -504,7 +502,6 @@ public abstract class PrimNode extends Node {
 
   static class Id extends PrimNode {
     Id(Type arg) { super("id",TypeTuple.make_args(arg),arg); }
-    @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
     @Override public Type value(GVNGCM.Mode opt_mode) { return val(1); }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   }
@@ -517,7 +514,6 @@ public abstract class PrimNode extends Node {
     // Takes a value on the LHS, and a THUNK on the RHS.
     AndThen() { super("&&",new String[]{" ctl"," mem","^","p","thunk"},ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
     // Expect this to inline everytime
-    @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
     @Override public Node ideal_grow() {
       if( _defs._len != 4 ) return null; // Already did this
       try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
@@ -574,7 +570,6 @@ public abstract class PrimNode extends Node {
     // Takes a value on the LHS, and a THUNK on the RHS.
     OrElse() { super("||",new String[]{" ctl"," mem","^","p","thunk"},ORELSE,Type.SCALAR); _thunk_rhs=true; }
     // Expect this to inline everytime
-    @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
     @Override public Node ideal_grow() {
       if( _defs._len != 4 ) return null; // Already did this
       try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {

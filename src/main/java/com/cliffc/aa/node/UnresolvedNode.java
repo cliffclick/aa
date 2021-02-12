@@ -36,7 +36,6 @@ public class UnresolvedNode extends Node {
     }
     return progress ? this : null;
   }
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   // Required property for value():
   // ANY >= value(ANY) >= value(other) >= value(ALL) >= ALL

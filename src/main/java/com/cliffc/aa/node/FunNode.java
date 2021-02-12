@@ -268,7 +268,6 @@ public class FunNode extends RegionNode {
     assert Env.START.more_flow(true)==0; // Initial conditions are correct
     return this;
   }
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   @Override void unwire(int idx) {
     Node ctl = in(idx);

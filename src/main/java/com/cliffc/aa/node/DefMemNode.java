@@ -6,7 +6,6 @@ import static com.cliffc.aa.Env.GVN;
 
 public class DefMemNode extends Node {
   public DefMemNode( Node ctrl) { super(OP_DEFMEM,ctrl); }
-  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public TypeMem value(GVNGCM.Mode opt_mode) {
     if( _defs._len <= 1 ) return TypeMem.ALLMEM;
     TypeObj[] tos = new TypeObj[_defs._len];

@@ -85,7 +85,6 @@ public abstract class MemPrimNode extends PrimNode {
   static class LValueLength extends ReadPrimNode {
     LValueLength() { super("#",new String[]{" ctl"," mem","^","ary"},TypeTuple.LVAL_LEN,TypeInt.INT64); }
     @Override public String bal_close() { return null; } // Balanced op
-    @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type mem = val(1);
       Type adr = val(2);
@@ -104,7 +103,6 @@ public abstract class MemPrimNode extends PrimNode {
     LValueRead() { super("[",new String[]{" ctl"," mem","^","ary","idx"},TypeTuple.LVAL_RD,Type.SCALAR); }
     @Override public String bal_close() { return "]"; } // Balanced op
     @Override public byte op_prec() { return 0; } // Balanced op
-    @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type mem = val(1);
       Type adr = val(2);
@@ -166,7 +164,6 @@ public abstract class MemPrimNode extends PrimNode {
     LValueWrite() { super("[",new String[]{" ctl"," mem","^","ary","idx","val"},TypeTuple.LVAL_WR,Type.SCALAR); }
     @Override public String bal_close() { return "]:="; } // Balanced op
     @Override public byte op_prec() { return 0; }
-    @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type mem = val(1);
       Type ary = val(2);
@@ -190,7 +187,6 @@ public abstract class MemPrimNode extends PrimNode {
     LValueWriteFinal() { super("[",new String[]{" ctl"," mem","^","ary","idx","val"},TypeTuple.LVAL_WR,Type.SCALAR); }
     @Override public String bal_close() { return "]="; } // Balanced op
     @Override public byte op_prec() { return 0; }
-    @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type mem = val(1);
       Type ary = val(2);

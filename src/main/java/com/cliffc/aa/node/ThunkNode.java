@@ -15,7 +15,6 @@ import java.util.function.Predicate;
 // Produces a Control & Memory.
 public class ThunkNode extends Node {
   public ThunkNode( Node mem ) { super(OP_THUNK,null,mem); }
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
   @Override public Node ideal_reduce() { return null; }
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( _keep==0 &&         // If keep, then during construction and no Thret built yet (but coming)

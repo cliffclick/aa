@@ -84,8 +84,6 @@ public final class FunPtrNode extends Node {
       Env.GVN.add_reduce(this);
   }
 
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
-
   // Is the display used?
   private boolean display_used() {
     for( Node call : _uses ) {

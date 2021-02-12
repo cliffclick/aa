@@ -38,7 +38,6 @@ public class CastNode extends Node {
     set_def(0,tru);
     return this;
   }
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
   
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Type c = val(0);

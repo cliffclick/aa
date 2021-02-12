@@ -10,7 +10,6 @@ import java.util.function.Predicate;
 // Program execution start
 public class StartNode extends Node {
   public StartNode() { super(OP_START); }
-  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM.Mode opt_mode) { return TypeTuple.START_STATE; }
   // StartNodes are never equal
   @Override public int hashCode() { return 123456789+1; }

@@ -21,7 +21,6 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   // --------------------------------------------------------------------------
   public static class ConStr extends NewStrNode {
     public ConStr( String str ) { super(TypeStr.con(str),"con",false,-1,Type.CTRL,TypeMem.ALLMEM,null); }
-    @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override TypeStr valueobj() { return _ts; }
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { throw com.cliffc.aa.AA.unimpl(); } // No inputs
     // Constant Strings intern
@@ -31,7 +30,6 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
 
   public static class ConvertI64Str extends NewStrNode {
     public ConvertI64Str( ) { super(TypeStr.STR,"str",false,-1,Type.CTRL,TypeMem.ALLMEM,null,TypeInt.INT64); }
-    @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override TypeObj valueobj() {
       Type t = val(3);
       if( t.above_center() || !(t instanceof TypeInt) ) return t.oob(TypeStr.STR);
@@ -43,7 +41,6 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
 
   public static class ConvertF64Str extends NewStrNode {
     public ConvertF64Str( ) { super(TypeStr.STR,"str",false,-1,Type.CTRL,TypeMem.ALLMEM,null,TypeFlt.FLT64); }
-    @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override TypeObj valueobj() {
       Type t = val(3);
       if( t.above_center() || !(t instanceof TypeFlt) ) return t.oob(TypeStr.STR);
@@ -60,7 +57,6 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   public static class AddStrStr extends NewStrNode {
     private static int OP_PREC=7;
     public AddStrStr( ) { super(TypeStr.STR,"+",true,OP_PREC,Type.CTRL,TypeMem.MEM_STR,null,TypeMemPtr.STR0,TypeMemPtr.STR0); }
-    @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       if( is_unused() ) return Type.ANY;
       Type m   = val(1);

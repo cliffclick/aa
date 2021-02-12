@@ -396,8 +396,6 @@ public class CallNode extends Node {
     }
   }
 
-  @Override public Node ideal(GVNGCM gvn, int level) { throw unimpl(); }
-
   // Swap a New and a Call, when we cannot use a Split/Join.
   private Node swap_new(Node cepim, MrgProjNode mrg ) {
     cepim.keep();

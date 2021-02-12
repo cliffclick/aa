@@ -107,7 +107,6 @@ public class ScopeNode extends Node {
 
     return null;
   }
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
   @Override public Type value(GVNGCM.Mode opt_mode) { return Type.ALL; }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 

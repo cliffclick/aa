@@ -9,7 +9,6 @@ import com.cliffc.aa.type.*;
 public class StartMemNode extends Node {
   public StartMemNode(StartNode st) { super(OP_STMEM,st); }
   @Override public boolean is_mem() { return true; }
-  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM.Mode opt_mode) {
     // All things are '~use' (to-be-allocated)
     return TypeMem.ANYMEM;

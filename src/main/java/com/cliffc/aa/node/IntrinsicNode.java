@@ -88,8 +88,6 @@ public class IntrinsicNode extends Node {
     return null;
   }
 
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
-
   // Semantics are to extract a TypeObj from mem and ptr, and if there is no
   // aliasing, sharpen the TypeObj to a Type with a name.  We can be correct and
   // conservative by doing nothing.

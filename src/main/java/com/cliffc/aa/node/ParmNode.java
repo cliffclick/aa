@@ -47,7 +47,6 @@ public class ParmNode extends PhiNode {
     // (would have to re-insert the Parm).
     return null;
   }
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   private boolean valid_args( FunNode fun, int i, Node mem ) {
     if( fun._thunk_rhs ) return true; // Always allow folding of Thunks

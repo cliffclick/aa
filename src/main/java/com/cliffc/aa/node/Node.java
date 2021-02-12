@@ -443,21 +443,10 @@ public abstract class Node implements Cloneable, TNode {
     return null;
   }
 
-  // Graph rewriting.  Can change defs, including making new nodes - but if it
-  // does so, all new nodes will first call gvn.xform().  If gvn._opt_mode is
-  // before Mode.Opto not allowed to remove CFG edges (loop backedges and
-  // function-call entry points have not all appeared).
-  //   level==0 ==> Small work only, no inlining
-  //   level==1 ==> Assert no small work
-  //   level==2 ==> Inlining, hence code expansion
-  //   level==3 ==> Assert no inlining
-  // Returns null if no-progress or a better version of 'this'.  The
-  // transformed graph must remain monotonic in both value() and live().
-  abstract public Node ideal(GVNGCM gvn, int level);
-
-
   // Graph rewriting.  Strictly reducing Nodes or Edges.  Cannot make a new
   // Node, save that for the expanding ideal calls.
+  // Returns null if no-progress or a better version of 'this'.  The
+  // transformed graph must remain monotonic in both value() and live().
   public Node ideal_reduce() {
     switch( _op ) {             // Giant assert that these nodes are checked for do-nothing
     case OP_CON:

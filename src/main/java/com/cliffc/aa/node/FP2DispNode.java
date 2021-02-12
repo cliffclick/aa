@@ -34,7 +34,6 @@ public final class FP2DispNode extends Node {
 
     return null;
   }
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
 
   Node fptr2disp( Node in ) {
     if( in instanceof FunPtrNode ) {

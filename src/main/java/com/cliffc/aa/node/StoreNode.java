@@ -101,8 +101,6 @@ public class StoreNode extends Node {
         Env.GVN.add_mono(Env.GVN.add_reduce(use));
   }
 
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
-
   // StoreNode needs to return a TypeObj for the Parser.
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Node mem = mem(), adr = adr(), rez = rez();

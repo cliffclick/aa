@@ -53,8 +53,6 @@ public class PhiNode extends Node {
 
     return null;
   }
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
-
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( in(0)==null ) return Type.ALL; // Conservative, mid-construction
     Type ctl = val(0);

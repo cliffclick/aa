@@ -76,8 +76,6 @@ public class RegionNode extends Node {
     }
   }
 
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
-
   // Collapse stacked regions.
   Node stacked_region() {
     if( _op != OP_REGION ) return null; // Does not apply to e.g. functions & loops

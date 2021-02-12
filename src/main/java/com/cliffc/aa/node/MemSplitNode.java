@@ -34,7 +34,7 @@ public class MemSplitNode extends Node {
       _escs.at(i).str(sb).p(',');
     return sb.unchar().p(')').toString();
   }
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
+  
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Type t = mem()._val;
     if( !(t instanceof TypeMem) ) return t.oob();

@@ -89,8 +89,6 @@ public final class RetNode extends Node {
   // Look for a tail recursive call
   @Override public Node ideal_mono() { return is_copy() ? null : tail_recursive(); }
 
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
-
   // Look for a tail-Call.  There should be 1 (collapsed) Region, and maybe a
   // tail Call.  Look no further than 1 Region, since collapsing will fold
   // nested regions up.  Since the RetNode is a single "pinch point" for

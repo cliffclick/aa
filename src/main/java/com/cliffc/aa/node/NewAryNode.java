@@ -25,7 +25,6 @@ abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
     public NewAry( TypeAry tary, TypeInt sz ) { super(tary,"[",0,sz); }
     @Override public String bal_close() { return "]"; } // Balanced op
     @Override public byte op_prec() { return 0; } // Balanced op
-    @Override public Node ideal(GVNGCM gvn, int level) { return null; }
     @Override TypeObj valueobj() {
       Type sz = val(3);
       if( !(sz instanceof TypeInt) ) return sz.oob(TypeObj.ISUSED);

@@ -178,8 +178,6 @@ public final class CallEpiNode extends Node {
     return check_and_wire() ? this : null;
   }
 
-  @Override public Node ideal(GVNGCM gvn, int level) { throw unimpl(); }
-
   // Used during GCP and Ideal calls to see if wiring is possible.
   // Return true if a new edge is wired
   public boolean check_and_wire( ) {
@@ -502,9 +500,18 @@ public final class CallEpiNode extends Node {
         Type t4 = tn instanceof MemSplitNode ? ((TypeTuple)t3).at(0) : t3;
         Type t5 = t4.widen();
         t2 = t2.join(t5);       // Lift according to H-M
+        //throw com.cliffc.aa.AA.unimpl();
       }
     }
     return t2;
+
+    // currently: unify/join with all unified nodes.
+    // thinking:  unify/join with nodes that are *inputs* (not stable but monotonic)?
+    // memory is always an input, and should aways join (except if you allocate?)
+    //   - not sure if memory is always on the _ns list
+    // what about args?
+    // really want: forward-flow reaching list of nodes.  might have to track this seperately?  classic Reaches bitvector?
+    
   }
 
 

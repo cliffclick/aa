@@ -34,8 +34,6 @@ public class LoadNode extends Node {
   private Node set_mem(Node a) { return set_def(1,a); }
   public int find(TypeStruct ts) { return ts.find(_fld); }
 
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
-
   // Strictly reducing optimizations
   @Override public Node ideal_reduce() {
     Node adr = adr();

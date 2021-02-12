@@ -91,8 +91,6 @@ public class AssertNode extends Node {
 
     return null;
   }
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
-
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Node arg = arg();

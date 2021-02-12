@@ -19,7 +19,6 @@ public class MemJoinNode extends Node {
   MemSplitNode msp() { return (MemSplitNode)in(0).in(0); }  // The MemSplit
   @Override public boolean is_mem() { return true; }
 
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
   @Override public Node ideal_reduce() {
     MemSplitNode msp = msp();
     // If the split count is lower than 2, then the split serves no purpose

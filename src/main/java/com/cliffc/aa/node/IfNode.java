@@ -30,8 +30,6 @@ public class IfNode extends Node {
 
     return null;
   }
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
-
   Node flip(Node that) {
     ProjNode p0 = (ProjNode)_uses.atX(0);
     ProjNode p1 = (ProjNode)_uses.atX(1);

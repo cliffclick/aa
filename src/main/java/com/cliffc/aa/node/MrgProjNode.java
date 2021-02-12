@@ -69,7 +69,6 @@ public class MrgProjNode extends ProjNode {
         Env.GVN.add_grow(use); // Swap Call & New
     }
   }
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( !(in(0) instanceof NewNode) ) return Type.ANY;
     NewNode nnn = nnn();

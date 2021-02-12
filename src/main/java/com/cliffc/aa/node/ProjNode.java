@@ -22,8 +22,6 @@ public class ProjNode extends Node {
     if( c != null ) return c==this ? Env.ANY : c; // Happens in dying loops
     return null;
   }
-  @Override public Node ideal(GVNGCM gvn, int level) { throw com.cliffc.aa.AA.unimpl(); }
-  
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Type c = val(0);
     if( c instanceof TypeTuple ) {
