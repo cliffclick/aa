@@ -1,7 +1,7 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
-import com.cliffc.aa.type.BitsAlias;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 
 import java.util.Arrays;
@@ -39,10 +39,12 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     TVar tv2 = tv.find();
     return tv2 == tv ? tv2 : (_parms[i] = tv2);
   }
+  public int len() { return _parms.length; }
 
   // Unify parts after other work is done
   @Override void _unify( TVar tv ) {
     assert _u!=null;            // Flagged as being unified
+    if( tv instanceof TVDead ) return; // Dead, no parts unify
     TMulti targs = (TMulti)tv;
     if( _parms.length != targs._parms.length )
       throw com.cliffc.aa.AA.unimpl();
@@ -166,7 +168,21 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     return false;
   }
 
+  // Find instances of 'tv' inside of 'this' via structural recursion.  Walk
+  // the matching Type at the same time.  Report the first one found, and
+  // assert all the others have the same Type.
+  @Override Type _find_tvar(Type t, TVar tv, Type t2) {
+    if( DUPS.tset(_uid) ) return t2; // Stop cycles
+    t2 = _find_tvar_self(t,tv,t2);   // Look for direct hit
+    if( tv==this ) return t2;        // Direct hit is the answer
+    // Search recursively
+    TypeTuple tt = (TypeTuple)t;
+    for( int i=0; i<_parms.length; i++ )
+      t2 = parm(i)._find_tvar(tt.at(i),tv,t2);
+    return t2;
+  }
 
+  // Test all parm-based TVars for equivalence
   @Override boolean _eq(TVar tv) {
     assert _u==null && tv._u==null;
     if( this==tv ) return true;

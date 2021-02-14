@@ -2,6 +2,8 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
 import com.cliffc.aa.type.BitsAlias;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -100,6 +102,24 @@ public class TMem extends TMulti<TMem> {
         progress |= unify_alias(alias,parm,test);
     }
     return progress;
+  }
+
+
+  // Find instances of 'tv' inside of 'this' via structural recursion.  Walk
+  // the matching Type at the same time.  Report the first one found, and
+  // assert all the others have the same Type.
+  @Override Type _find_tvar(Type t, TVar tv, Type t2) {
+    if( DUPS.tset(_uid) ) return t2; // Stop cycles
+    t2 = _find_tvar_self(t,tv,t2);   // Look for direct hit
+    if( tv==this ) return t2;        // Direct hit is the answer
+    // Search recursively
+    TypeMem tt = (TypeMem)t;
+    for( int i=1; i<_parms.length; i++ ) {
+      TVar tva = parm(i);
+      if( tva!=null )
+        t2 = tva._find_tvar(tt.at(i),tv,t2);
+    }
+    return t2;
   }
 
   // Pretty print

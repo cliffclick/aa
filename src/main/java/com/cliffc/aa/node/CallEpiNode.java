@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.TNode;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 
@@ -437,8 +436,6 @@ public final class CallEpiNode extends Node {
         }
     }
     del(_defs.find(ret));
-    reset_tvar();
-    unify(false);
     assert sane_wiring();
     return this;
   }
@@ -486,32 +483,25 @@ public final class CallEpiNode extends Node {
   // H-M typing demands all unified Nodes have the same type... which is a
   // ASSERT/JOIN.  Hence the incoming type can be lifted to the join.
   private Type unify_lift(Type t, TVar tv) {
-    if( tv._ns == null || tv._ns._len==0 ) return t;
-    Type t2 = t;
-    for( int i=0; i<tv._ns._len; i++ ) {
-      TNode tn = tv._ns.at(i);
-      // Most of the unified Nodes are dead, unified because ideal() replaced
-      // them with another.  However, their Types do not update after the merge
-      // and become stale.  So no unify with the dead.
-      if( tn.is_dead() ) tv._ns.remove(i--);
-      else if( tn instanceof ProjNode && ((ProjNode)tn).in(0)==this ) /*self projection: do nothing*/;
-      else {
-        Type t3 = tn.val();
-        Type t4 = tn instanceof MemSplitNode ? ((TypeTuple)t3).at(0) : t3;
-        Type t5 = t4.widen();
-        t2 = t2.join(t5);       // Lift according to H-M
-        //throw com.cliffc.aa.AA.unimpl();
-      }
+    TVar tvar  = call().tvar();
+    Type tcall = call()._val;
+    // Since tcall memory is pre-filtered for the call, and we want the memory
+    // *into* the call (not the filtered memory into the Fun), peel the
+    // top-layer of tvars/types and handle the pre-call memory special.
+    if( !(tvar instanceof TMulti && tcall instanceof TypeTuple) ) return t;
+    TypeTuple ttcall = (TypeTuple)tcall;
+    TMulti tmvar = (TMulti)tvar;
+    Type tcmem = call().mem()._val;
+    Type t2 = tmvar.parm(MEM_IDX).find_tvar(tcmem,tv);
+    // Found in input memory; JOIN with the call return type.
+    if( t2 != null ) return t2.join(t);
+    // Check the other inputs.
+    for( int i=MEM_IDX+1;i<tmvar.len(); i++ ) {
+      Type t3 = tmvar.parm(i).find_tvar(ttcall.at(i),tv);
+      // Found in input args; JOIN with the call return type.
+      if( t3 != null ) return t3.join(t);
     }
-    return t2;
-
-    // currently: unify/join with all unified nodes.
-    // thinking:  unify/join with nodes that are *inputs* (not stable but monotonic)?
-    // memory is always an input, and should aways join (except if you allocate?)
-    //   - not sure if memory is always on the _ns list
-    // what about args?
-    // really want: forward-flow reaching list of nodes.  might have to track this seperately?  classic Reaches bitvector?
-    
+    return t;                   // no change
   }
 
 

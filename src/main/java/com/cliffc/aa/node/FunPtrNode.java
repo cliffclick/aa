@@ -3,9 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TArgs;
-import com.cliffc.aa.tvar.TFun;
-import com.cliffc.aa.tvar.TVar;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -117,8 +115,9 @@ public final class FunPtrNode extends Node {
     // FunNodes are just argument collections (no return).
     FunNode fun = xfun();
     if( fun==null ) return false;
-    RetNode ret = ret();
+    if( tvar() instanceof TVDead ) return false;
     TFun tvar = (TFun)tvar();   // Self is always a TFun
+    RetNode ret = ret();
     // Build function arguments; "fun" itself is just control.
     TArgs targs = new TArgs(fun,true);
     TVar tret  = ret.tvar();

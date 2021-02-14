@@ -672,10 +672,9 @@ public class CallNode extends Node {
     // Gather incoming args.  NOT an application point (yet), that is a CallEpi.
     TVar tvar = tvar();
     if( tvar instanceof TArgs &&
-        (((TArgs)tvar)._unpacked == _unpacked ||
-         ((TArgs)tvar).nargs() == nargs()) ) // Unpack can change arg counts
+        ((TArgs)tvar)._unpacked == _unpacked )
       return false;
-    return test || tvar.unify(new TArgs(this,_unpacked),false); // Progress
+    return reset_tvar().unify(new TArgs(this,_unpacked),false); // Progress
   }
 
 

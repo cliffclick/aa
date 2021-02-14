@@ -61,6 +61,8 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     return this;
   }
 
+  public Type fld(String fld) { return oob(); } // No such field, returns ANY or ALL
+  
   // Update (approximately) the current TypeObj.  Merges fields.
   public TypeObj update(byte fin, String fld, Type val) { return this; }
   // Approximate array update.

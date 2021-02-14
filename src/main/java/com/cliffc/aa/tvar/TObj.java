@@ -1,7 +1,7 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
-import com.cliffc.aa.type.BitsAlias;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
@@ -25,7 +25,7 @@ public class TObj extends TMulti<TObj> {
       if( !test ) put(fld,tv);  // Put directly
       return true;              // Declare progress
     }
-    return tvo.unify(tv,test);  // Progress recursively
+    return tvo.find().unify(tv,test);  // Progress recursively
   }
   // Union matching field
   boolean unify_fld(String fld, TVar tv0, boolean test) {
@@ -38,6 +38,7 @@ public class TObj extends TMulti<TObj> {
   }
 
   @Override void _unify( TVar tv ) {
+    if( tv instanceof TVDead ) return;
     TObj tvo = (TObj)tv;
     assert _flds!=tvo._flds; // do not expect the shortcut to work
     for( Map.Entry<String,TVar> e : _flds.entrySet() ) {
@@ -90,6 +91,35 @@ public class TObj extends TMulti<TObj> {
   }
 
   @Override TObj _fresh_new() { return new TObj(null); }
+
+  // Find instances of 'tv' inside of 'this' via structural recursion.  Walk
+  // the matching Type at the same time.  Report the first one found, and
+  // assert all the others have the same Type.
+  @Override Type _find_tvar(Type t, TVar tv, Type t2) {
+    if( DUPS.tset(_uid) ) return t2; // Stop cycles
+    t2 = _find_tvar_self(t,tv,t2);   // Look for direct hit
+    if( tv==this ) return t2;        // Direct hit is the answer
+    if( t==TypeObj.UNUSED ) return t2; // Undefined is not an answer
+    // Search recursively
+    TypeObj to = (TypeObj)t;
+    for( String pfld : _flds.keySet() )
+      t2 = _flds.get(pfld)._find_tvar(to.fld(pfld),tv,t2);
+    return t2;
+  }
+
+
+  // Test TVars for equivalence
+  @Override boolean _eq(TVar tv) {
+    assert _u==null && tv._u==null;
+    if( this==tv ) return true;
+    if( getClass()!=tv.getClass() ) return false; // Subclasses are equal
+    TObj tobj = (TObj)tv;
+    if( _flds.size() != tobj._flds.size() ) return false;
+    if( DUPS.tset(_uid,tobj._uid) )
+      return true;              // Cyclic check works, something else will decide eq/ne
+    // Check hash sets for equality
+    throw com.cliffc.aa.AA.unimpl();
+  }
 
   // Pretty print
   @Override SB _str(SB sb, VBitSet bs, boolean debug) {

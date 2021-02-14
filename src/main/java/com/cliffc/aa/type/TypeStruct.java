@@ -1090,6 +1090,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private int len( TypeStruct tt ) { return _ts.length <= tt._ts.length ? len0(tt) : tt.len0(this); }
   private int len0( TypeStruct tmax ) { return _any ? tmax._ts.length : _ts.length; }
 
+  // Return type at field name
+  @Override public Type fld(String fld) {
+    int idx = find(fld);
+    return _ts[idx==-1 ? 1 : idx];
+  }
+
+
   // Buid a (recursively) sharpened pointer from memory.  Alias sets can be
   // looked-up directly in a map from BitsAlias to TypeObjs.  This is useful
   // for resolving all the deep pointer structures at a point in the program

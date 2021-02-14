@@ -8,14 +8,12 @@ import java.util.HashSet;
 
 public class TVDead<T extends TVDead<T>> extends TVar {
 
-  // TVDead always "unifies" by doing nothing & winning unification.
-  @Override boolean _unify0( TVar tv, boolean test ) { return false; }
-
   @Override final boolean _will_unify(TVar tv, int cnt) { return true; }
 
   // Return a "fresh" copy, preserving structure
   @Override boolean _fresh_unify( int cnt, TVar tv, BitsAlias news, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
-    throw com.cliffc.aa.AA.unimpl(); 
+    if( tv instanceof TVDead ) return false;
+    return test || unify(tv,test);
   }
 
   // Pretty print

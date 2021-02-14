@@ -53,7 +53,7 @@ public class GVNGCM {
   public void add_inline( FunNode n ) { add_work(_work_inline, n); }
   public void add_flow_defs  ( Node n ) { add_work_defs(_work_flow  ,n); }
   public void add_flow_uses  ( Node n ) { add_work_uses(_work_flow  ,n); }
-  public void add_flow  ( Ary<TNode> deps ) { for( TNode dep : deps )  add_flow((Node)dep); }
+  public void add_flow  ( Ary<TNode> deps ) { if( deps != null ) for( TNode dep : deps )  add_flow((Node)dep); }
   public void add_reduce_uses( Node n ) { add_work_uses(_work_reduce,n); }
   // n goes unused
   public Node add_unuse( Node n ) {
@@ -101,6 +101,10 @@ public class GVNGCM {
   // once; restores monotonicity over the whole region when done.
   public void revalive(Node... ns) {
     for( Node n : ns )  if( n != null )  n.reset_tvar();
+    revalive2(ns);
+  }
+  // Bulk not-monotonic update, without reseting tvars
+  public void revalive2(Node... ns) {
     for( Node n : ns ) {
       if( n == null ) continue;
       Type t = n.value(_opt_mode);

@@ -2,6 +2,7 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
 import com.cliffc.aa.type.BitsAlias;
+import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
@@ -156,9 +157,22 @@ public class TVar implements Comparable<TVar> {
     return this==id;
   }
 
+  // Find instances of 'tv' inside of 'this' via structural recursion.  Walk
+  // the matching Type at the same time.  Report the first one found, and
+  // assert all the others have the same Type.
+  static final BitSetSparse DUPS = new BitSetSparse();
+  public Type find_tvar(Type t, TVar tv) { DUPS.clear(); return _find_tvar(t,tv,null); }
+  Type _find_tvar(Type t, TVar tv, Type t2) { return _find_tvar_self(t,tv,t2); }
+  final Type _find_tvar_self(Type t, TVar tv, Type t2) {
+    if( tv!=this || t==Type.ANY ) return t2;
+    if( t2==null ) return t;
+    assert t2==t : "Found multiple refs to tvar with diff types, "+ t +","+ t2;
+    //t2 = t2.meet(t);
+    return t2;
+  }
+
   // True if two TVars are structurally equivalent
   static final HashMap<TVar,TVar> EQS = new HashMap<>();
-  static final BitSetSparse DUPS = new BitSetSparse();
   public final boolean eq( TVar tv ) {  EQS.clear();  DUPS.clear();  return _eq(tv);  }
   boolean _eq(TVar tv) {
     assert _u==null && tv._u==null;
@@ -198,9 +212,9 @@ public class TVar implements Comparable<TVar> {
   // Two equal classes order by uid.
   @Override public int compareTo(TVar tv) {
     if( this==tv ) return 0;
-    if( this instanceof TVDead ) return -1; // TVDead always wins
-    if( tv   instanceof TVDead ) return  1;
-    if( this instanceof TNil   ) return -1; // TNil always loses
+    if( this instanceof TVDead && !( tv  instanceof TVDead) ) return  1; // TVDead always loses
+    if( tv   instanceof TVDead && !(this instanceof TVDead) ) return -1;
+    if( this instanceof TNil   ) return -1; // TNil loses second
     if( tv   instanceof TNil   ) return  1;
     boolean istv0 =    getClass()==TVar.class;
     boolean istv1 = tv.getClass()==TVar.class;
@@ -233,5 +247,4 @@ public class TVar implements Comparable<TVar> {
     if( _deps._len==0 ) _deps=null;
     return _deps;
   }
-
 }

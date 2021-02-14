@@ -20,6 +20,12 @@ public class ConNode<T extends Type> extends Node {
     if( t==Type.ANY ) _tvar = new TVDead();
     else if( t==Type.XNIL ) _tvar = new TNil();
   }
+  // Allows ANY type with a normal unification, used for uninitialized variables
+  // (as opposed to dead ones).
+  public ConNode( T t, double dummy ) {
+    super(OP_CON,Env.START);
+    _t=t;
+  }
   // Used by FunPtrNode
   ConNode( byte type, T tfp, RetNode ret, Node closure ) { super(type,ret,closure); _t = tfp; }
   @Override public String xstr() { return Env.ALL_CTRL == this ? "ALL_CTL" : _t.toString(); }
@@ -47,7 +53,7 @@ public class ConNode<T extends Type> extends Node {
     if( this==o ) return true;
     if( !(o instanceof ConNode) ) return false;
     ConNode con = (ConNode)o;
-    return _t==con._t;
+    return _t==con._t && (tvar() instanceof TVDead == con.tvar() instanceof TVDead);
   }
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }
 }

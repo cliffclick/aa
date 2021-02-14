@@ -1,7 +1,7 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
-import com.cliffc.aa.type.BitsAlias;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import java.util.HashSet;
 
@@ -59,6 +59,23 @@ public class TFun extends TMulti<TFun> {
       ret ()._fresh_unify(0,ret ,news,_nongen,dups,test);  // Must do both halves always
   }
 
+  // Find instances of 'tv' inside of 'this' via structural recursion.  Walk
+  // the matching Type at the same time.  Report the first one found, and
+  // assert all the others have the same Type.
+  @Override Type _find_tvar(Type t, TVar tv, Type t2) {
+    if( DUPS.tset(_uid) ) return t2; // Stop cycles
+    t2 = _find_tvar_self(t,tv,t2);   // Look for direct hit
+    if( tv==this ) return t2;        // Direct hit is the answer
+    // Search recursively
+    assert t==Type.ALL || t==Type.ANY || t instanceof TypeFunPtr;
+    // TODO: There are no *local* Types in a TypeFunPtr.  We can get the FIDXS
+    // & thence the FunNodes & TypeFunSigs, but these are not local.  I assume
+    // I am not interested in such remote types (no type benefit accrues here)
+    // but not really sure, hence the TODO.
+    return t2;
+  }
+  
+  
   // Pretty print
   @Override SB _str(SB sb, VBitSet bs, boolean debug) {
     sb.p("{ ");

@@ -100,7 +100,7 @@ public abstract class Node implements Cloneable, TNode {
   }
   public TVar _tvar() { return _tvar; } // For debug prints
   public TVar tvar(int x) { return in(x).tvar(); } // nth TVar
-  public void reset_tvar() { _tvar = _tvar.reset_tnode(this); }
+  public TVar reset_tvar() { return (_tvar = _tvar.reset_tnode(this)); }
   public TNode[] parms() { throw unimpl(); } // Used to build structural TVars
   public Type val() { return _val; }
 
@@ -555,6 +555,7 @@ public abstract class Node implements Cloneable, TNode {
       _val = nval;
       Env.GVN.add_flow_uses(this); // Put uses on worklist... values flows downhill
     }
+    unify(false); // Re-unify with re-flow
     return nval;
   }
 
@@ -678,8 +679,12 @@ public abstract class Node implements Cloneable, TNode {
   public Node do_flow() {
     Node progress=null;
     // Perform unification
-    if( unify(false) )
+    TVar tv = tvar();
+    if( unify(false) ) {
       progress = this;          // Progress
+      if( tv.getClass() == TVar.class && tvar().getClass() != TVar.class )
+        Env.GVN.add_flow_uses(this); // Unification gained structure; neighbors can unify
+    }
 
     // Compute live bits.  If progress, push the defs on the flow worklist.
     // This is a reverse flow computation.  Always assumed live if keep.
