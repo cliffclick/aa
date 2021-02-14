@@ -65,7 +65,9 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert def_idx(_ts._ts.length)== _defs._len;
     set_def(def_idx(fidx),val);
     sets(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? val.val() : Type.SCALAR,mutable));
+    reset_tvar(); // Because direct set of field
     xval();
+    Env.GVN.add_flow_uses(this);
   }
 
 
@@ -160,7 +162,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
       progress = true;
     } else tvo = (TObj)tvar;
     // Structural unification on all fields
-    for( int i=0; i<_ts._flds.length; i++ ) 
+    for( int i=0; i<_ts._flds.length; i++ )
       if( tvo.add_fld(_ts._flds[i],tvar(def_idx(i)),test) )
         if( test ) return true;
         else progress = true;

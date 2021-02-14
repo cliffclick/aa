@@ -79,6 +79,7 @@ public class TVar implements Comparable<TVar> {
         tv._ns = Ary.merge_or(_ns,tv._ns, TNode::compareTo, e->!e.is_dead());
         assert tv.check_ns();   // Check sorted, dead cleared
       }
+      TNode.add_flow_uses(_ns); // this is picking up structure, children might need to recheck
     }
     if( tv._ns!=null && tv._ns._len==0 ) tv._ns=null;
     if( _deps!=null ) {                         // Also merge deps

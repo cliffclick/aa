@@ -211,10 +211,11 @@ public class CallNode extends Node {
           int len = nnn._defs._len;
           for( int i=1; NewNode.def_idx(i)<len; i++ ) // Push the args; unpacks the tuple
             add_def( nnn.fld(i));
-          add_def(fdx);
+          add_def(fdx);          // FIDX is last
           _unpacked = true;      // Only do it once
+          reset_tvar();          // Arg layout changes
           keep().xval();         // Recompute value, this is not monotonic since replacing tuple with args
-          GVN.add_work_all(unkeep());// Revisit unification after unpacking
+          GVN.add_work_all(unkeep());// Revisit after unpacking
           return this;
         }
       }
@@ -671,10 +672,11 @@ public class CallNode extends Node {
   @Override public boolean unify( boolean test ) {
     // Gather incoming args.  NOT an application point (yet), that is a CallEpi.
     TVar tvar = tvar();
-    if( tvar instanceof TArgs &&
-        ((TArgs)tvar)._unpacked == _unpacked )
+    if( tvar instanceof TArgs ) {
+      assert ((TArgs)tvar)._unpacked == _unpacked; // Unpack logic sets this correct
       return false;
-    return reset_tvar().unify(new TArgs(this,_unpacked),false); // Progress
+    }
+    return tvar.unify(new TArgs(this,_unpacked),test); // Progress
   }
 
 

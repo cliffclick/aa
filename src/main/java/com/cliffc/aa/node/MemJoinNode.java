@@ -38,17 +38,6 @@ public class MemJoinNode extends Node {
         return remove(i);
       }
 
-    // If the Split memory has an obvious SESE region, move it into the Split
-    Node mem = msp.mem();
-    if( !mem.is_prim() && mem.check_solo_mem_writer(msp) ) { // Split is only memory writer after mem
-      Node head = find_sese_head(mem);                       // Find head of SESE region
-      if( head instanceof MemSplitNode )                     // Back to back split/join combo
-        return combine_splits((MemSplitNode)head);
-      if( head != null && head.in(1).check_solo_mem_writer(head) ) // Head is the only writer after the above-head
-        // Move from Split.mem() to head inside the split/join area
-        return add_alias_above(head);
-    }
-
     return null;
   }
   @Override public void add_flow_def_extra(Node chg) {
@@ -59,6 +48,22 @@ public class MemJoinNode extends Node {
         Env.GVN.add_reduce(u);
     }
   }
+
+  @Override public Node ideal_mono() {
+    // If the Split memory has an obvious SESE region, move it into the Split
+    MemSplitNode msp = msp();
+    Node mem = msp.mem();
+    if( !mem.is_prim() && mem.check_solo_mem_writer(msp) ) { // Split is only memory writer after mem
+      Node head = find_sese_head(mem);                       // Find head of SESE region
+      if( head instanceof MemSplitNode )                     // Back to back split/join combo
+        return combine_splits((MemSplitNode)head);
+      if( head != null && head.in(1).check_solo_mem_writer(head) ) // Head is the only writer after the above-head
+        // Move from Split.mem() to head inside the split/join area
+        return add_alias_above(head);
+    }
+    return null;
+  }
+
 
   static Node find_sese_head(Node mem) {
     if( mem instanceof MemJoinNode ) return ((MemJoinNode)mem).msp(); // Merge Split with prior Join

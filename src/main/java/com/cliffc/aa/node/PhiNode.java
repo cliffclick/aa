@@ -69,6 +69,12 @@ public class PhiNode extends Node {
         t = t.meet(val(i));
     return t;
   }
+  // All inputs unify
+  @Override public boolean unify( boolean test ) {
+    //throw com.cliffc.aa.AA.unimpl();
+    return false;
+  }
+
   @Override BitsAlias escapees() { return BitsAlias.FULL; }
   @Override public TypeMem all_live() {
     return _t==Type.SCALAR ? TypeMem.LIVE_BOT : TypeMem.ALLMEM;

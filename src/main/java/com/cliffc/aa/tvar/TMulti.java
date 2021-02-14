@@ -46,9 +46,15 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     assert _u!=null;            // Flagged as being unified
     if( tv instanceof TVDead ) return; // Dead, no parts unify
     TMulti targs = (TMulti)tv;
-    if( _parms.length != targs._parms.length )
-      throw com.cliffc.aa.AA.unimpl();
+    if( _parms.length != targs._parms.length ) {
+      // If the LHS is all empty, assume its a forward-ref args, and there is nothing to unify with
+      boolean zero=true;
+      for( TVar parm : targs._parms ) if( parm != null ) { zero = false; break; }
+      if( zero ) { targs._parms = _parms; return; }
+      // Some broken state?
       //TNode.add_work_all(targs._ns);
+      throw com.cliffc.aa.AA.unimpl();
+    }
     for( int i=0; i<_parms.length; i++ ) {
       TVar tn0 =       parm(i);
       TVar tn1 = targs.parm(i);
