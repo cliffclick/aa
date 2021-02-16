@@ -335,7 +335,7 @@ public final class CallEpiNode extends Node {
     Type premem = call().mem()._val;
     if( _keep==0 && ProjNode.proj(this,MEM_IDX)==null ) {
       TVar tv = tvar();
-      if( tv instanceof TArgs && trez != Type.ALL ) // If already an error term, poison, stay error.
+      if( tv instanceof TArgs && trez != Type.ALL && premem instanceof TypeMem ) // If already an error term, poison, stay error.
         trez = unify_lift(trez,((TArgs)tv).parm(REZ_IDX), (TypeMem)premem);
       return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,trez);
     }
