@@ -9,7 +9,7 @@ public class TArgs extends TMulti<TArgs> {
   public final boolean _unpacked;   // Syntactic de-sugaring on a Call, allows arg-counts to mis-match.
 
   public TArgs(TNode fun, boolean unpacked ) { this(null,init(fun),unpacked); }
-  TArgs(TNode fun, TVar[] parms, boolean unpacked) {
+  public TArgs(TNode fun, TVar[] parms, boolean unpacked) {
     super(fun,parms);
     _unpacked = unpacked;
   }

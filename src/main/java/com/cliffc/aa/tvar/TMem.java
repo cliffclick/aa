@@ -39,6 +39,7 @@ public class TMem extends TMulti<TMem> {
       if( parm instanceof TObj ) {
         progress = ((TObj)parm).unify_fld(fld,tv,test);
       } else {
+        if( parm==null && test ) return true;    // Definitely will be progress
         //TObj tvo = new TObj(null).add_fld(fld,tv);
         //if( parm==null ) {
         //  if( test ) return true;    // Definitely will be progress

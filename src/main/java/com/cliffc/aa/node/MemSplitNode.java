@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
@@ -51,7 +52,15 @@ public class MemSplitNode extends Node {
   }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 
-  @Override public boolean unify( boolean test ) { return tvar().unify(mem().tvar(),test); }
+  @Override public boolean unify( boolean test ) {
+    TVar tvar = tvar();
+    if( tvar instanceof TMulti ) return false;
+    if( test ) return true;
+    TVar tmvar = mem().tvar();
+    TVar[] parms = new TVar[_escs._len];
+    Arrays.fill(parms,tmvar);
+    return tvar().unify(new TArgs(this,parms,true),test);
+  }
 
   // Find index for alias
   int find_alias_index( int alias ) {

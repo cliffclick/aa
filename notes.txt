@@ -1,4 +1,80 @@
 =======================================
+2/16/2021
+
+Mid-integration with H-M.  New situation with Memory.
+
+H-M assumes all args are immutable, visible, and the return type is a function
+of args (and the fdx).
+
+Flow-types assume values are immutable but memory is incrementally updated
+(mutable), with new aliases in-function and also field updates.
+
+Integration pretends memory is both an arg-in and a return-out.  It is split by
+escaping aliases; non-escapes are NOT arg-ins; escapes ARE arg-ins.  The
+return-out memory is a function of the arg-ins, including escape-in memory.
+
+Precision on the flow side is at the alias level, but needs to be at the FIELD
+level.  Precision on the H-M side is at the field level.
+
+Bug#1 is: MemSplit & MProj did not unify.
+Bug#2 is: body of fcn never lifts Parm:mem/Split/Join/MrgProj to TMem... so MrgProj never reports new-in-fcn TObj.
+----
+
+Want a TLazyMem: has a prior TVar, a BitsAlias and a TObj.  Unifies the TObj at
+all BitsAlias in the prior TVar - once it becomes a TMem.  Can just stay apart
+if prior is a TLazyMem, buggy if anything else (e.g. TFun).  Two TLazyMems can
+unify TObjs if both BitsAliases are the same.  A TLazyMem and a TMem can make a
+new TMem by copying the old TMem except at aliases.
+
+Want all Nodes to produce an initial Txxx that is sharper, and not require
+'unify' except once (per original H-M, but more times with partial-eval
+modifying program shape).
+
+Want a TLazyObj: has a prior TVar, a field & a TVar.  Merges fields.  But
+fields do not flow forever, nor get huge in number.  So just make TObj allow
+for lazy new field to appear?  eg. a Load/StoreNode has incoming memory
+as a plain TVar (not TMem), or incoming obj as a plain TVar (not TObj).
+Will force output as a TLazyMem with a TLazyObj (plus named field).
+
+For a FCN, the input mem parm will be a TLazyMem w/no aliases except what
+appears inside the FCN.  Fresh-unify will unify with the TLazyMems, and require
+the not-mentioned aliases be the same before & after the FCN.  E.g. a
+TFun = { [CTL:TVar MEM:TLazyMem[exceptions] ARG3:TVar  ARG4:TVar] -> 
+         [CTL:TVar MEM:TLazyMem[exceptions] REZ :TVar] }
+Forces the not-exception memory aliases to be the same.
+
+
+----
+
+H-M alternative: split memory by aliases (and by field within alias), as
+explicit top-level TVar args into a Call, or top-level TVar returns.  New-in-
+call is treated as a top-level input (of UNUSED) and a top-level return.  All
+side-effects are modeled as part of the memory-return.
+
+Aliases that are neither esc-in nor esc-out are not incoming args nor can force
+fresh-unify anything.
+
+CallEpi are the Apply return-points, and unify "as expected": defaults to a
+TRet which has a TLazyMem to-be-unified with the return ala fresh-unify.
+
+Why a TLazyMem instead of eagerly chasing all TObj/aliases down and flattening
+into a TMem?  Because we *never* answer the question of unrelated aliases in an
+unrelated function.  It's the variable never asked for.
+
+Which brings me to: Tmem becomes lazy by-default always.
+
+TLazyMem: has a default, has a "you asked for it once before, so i got the
+short-cut answer right now", has a "exceptions, not the default".  The
+effect is: "whatever the default is, unless looking at exceptions".
+When fresh-unify, the default can bottom out at "no default given" which
+might be a plain-tvar.  The Parm:mem & Ret:mem can have the same default,
+which fresh-unify uses to force before-mem and after-mem to be the same.
+
+
+
+
+
+=======================================
 2/2/2021
 
 'remove_ambi' situation: no high fdxs, so no *optimistic selection* fdxs.  so
@@ -39,7 +115,6 @@ puts out high FDXs (which fail at Phis, but can all fall down) (high FDXs is
 what i was doing).  Call resolve allows no high FDXs until resolve-ambi, then
 the call is flagged to 'fall this way', or can prove exactly 1 high FDX will
 ever pass.
-
 
 
 =======================================
