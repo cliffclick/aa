@@ -52,7 +52,7 @@ public class TestParse {
     test_isa("{x y -> x+y}", TypeFunPtr.make(TEST_FUNBITS,3,tdisp)); // {Scalar Scalar -> Scalar}
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y' in @{x=1}",19);
     testerr("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
-    test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
+    test("x=@{a:=1;         b= {a=a+1;b=0}}; x.         b(); x.a",TypeInt.con(2));
     test("x=@{a:=1;noinline_b= {a=a+1;b=0}}; x.noinline_b(); x.a",TypeInt.NINT8);
 
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", Type.XNIL);

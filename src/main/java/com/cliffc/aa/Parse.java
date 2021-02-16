@@ -844,7 +844,7 @@ public class Parse implements Comparable<Parse> {
     nn._fld_starts = bads.asAry();
     nn.no_more_fields();
     init(nn);
-    _gvn.add_flow(nn);
+    nn.xval();
 
     // NewNode returns a TypeMem and a TypeMemPtr (the reference).
     set_mem( Env.DEFMEM.make_mem_proj(nn,mem()) );
@@ -1396,6 +1396,7 @@ public class Parse implements Comparable<Parse> {
     CallNode call = (CallNode)gvn(call0);
     // Call Epilog takes in the call which it uses to track wireable functions.
     // CallEpi internally tracks all wired functions.
+
     CallEpiNode cepi = (CallEpiNode)gvn(new CallEpiNode(call,Env.DEFMEM));
     Node ctrl = gvn(new CProjNode(cepi.keep()));
     if( ctrl.is_copy(0)!=null ) ctrl = ctrl.is_copy(0); // More aggressively fold, so Thunks can more aggressively assert

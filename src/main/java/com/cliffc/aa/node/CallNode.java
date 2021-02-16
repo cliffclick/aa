@@ -406,6 +406,7 @@ public class CallNode extends Node {
     Env.GVN.revalive(mrg);
     Env.GVN.add_flow_uses(mrg);
     Env.GVN.add_flow(this);
+    Env.GVN.add_flow(cepim.in(0));
     return this;
   }
 
@@ -492,7 +493,7 @@ public class CallNode extends Node {
     CallEpiNode cepi = cepi();
     if( chg == fdx() ) {           // FIDX falls to sane from too-high
       Env.GVN.add_flow_defs(this); // All args become alive
-      if( cepi!=null ) Env.GVN.add_mono(cepi);    // FDX gets stable, might wire
+      if( cepi!=null ) Env.GVN.add_work_all(cepi); // FDX gets stable, might wire, might unify_lift
     }
     if( chg == mem() && cepi != null ) Env.GVN.add_flow(cepi);
   }

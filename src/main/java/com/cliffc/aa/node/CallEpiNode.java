@@ -367,7 +367,7 @@ public final class CallEpiNode extends Node {
       trez =         unify_lift(trez ,((TArgs)tv).parm(REZ_IDX), tmem3);
       tmem3=(TypeMem)unify_lift(tmem3,((TArgs)tv).parm(MEM_IDX), tmem3);
     }
-    
+
     return TypeTuple.make(Type.CTRL,tmem3,trez);
   }
 
@@ -496,7 +496,7 @@ public final class CallEpiNode extends Node {
     TMulti tmvar = (TMulti)tvar;
     Type t2 = tmvar.parm(MEM_IDX).find_tvar(tcmem,tv);
     // Found in input memory; JOIN with the call return type.
-    if( t2 != null ) return t2.join(t);
+    if( t2 != null ) t = t2.join(t);
     // Check the other inputs.
     for( int i=MEM_IDX+1;i<tmvar.len(); i++ ) {
       Type t3 = tmvar.parm(i).find_tvar(ttcall.at(i),tv);

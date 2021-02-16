@@ -1093,7 +1093,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Return type at field name
   @Override public Type fld(String fld) {
     int idx = find(fld);
-    return _ts[idx==-1 ? 1 : idx];
+    return idx==-1 ? Type.ANY : _ts[idx];
   }
 
 

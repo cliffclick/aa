@@ -58,7 +58,8 @@ public class GVNGCM {
     if( deps != null )
       for( TNode dep : deps )
         if( !dep.is_dead() )
-          add_flow_uses((Node)dep);
+          for( Node use : ((Node)dep)._uses )
+            add_flow(use).add_flow_use_extra((Node)dep);
   }
   public void add_reduce_uses( Node n ) { add_work_uses(_work_reduce,n); }
   // n goes unused
@@ -107,6 +108,7 @@ public class GVNGCM {
   // once; restores monotonicity over the whole region when done.
   public void revalive(Node... ns) {
     for( Node n : ns )  if( n != null )  n.reset_tvar();
+    for( Node n : ns )  if( n != null )  n.unify(false);
     revalive2(ns);
   }
   // Bulk not-monotonic update, without reseting tvars

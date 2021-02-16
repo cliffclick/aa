@@ -15,5 +15,5 @@ public class TNil<T extends TNil<T>> extends TVar {
 
   // Pretty print
   @Override SB _str(SB sb, VBitSet bs, boolean debug) { return sb.p("TNil"); }
-  @Override TNode push_dep(TNode tn, VBitSet visit) { return tn; }
+  @Override public TNode push_dep(TNode tn, VBitSet visit) { return tn; }
 }

@@ -18,5 +18,5 @@ public class TVDead<T extends TVDead<T>> extends TVar {
 
   // Pretty print
   @Override SB _str(SB sb, VBitSet bs, boolean debug) { return sb.p("TVDead"); }
-  @Override TNode push_dep(TNode tn, VBitSet visit) { return tn; }
+  @Override public TNode push_dep(TNode tn, VBitSet visit) { return tn; }
 }

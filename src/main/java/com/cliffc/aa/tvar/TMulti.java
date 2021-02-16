@@ -215,7 +215,7 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     return sb.p("]");
   }
 
-  @Override TNode push_dep(TNode tn, VBitSet visit) {
+  @Override public TNode push_dep(TNode tn, VBitSet visit) {
     assert _deps==null;
     if( visit==null ) visit = new VBitSet();
     if( visit.tset(_uid) ) return tn;

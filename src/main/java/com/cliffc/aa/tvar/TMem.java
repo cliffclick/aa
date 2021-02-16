@@ -138,7 +138,7 @@ public class TMem extends TMulti<TMem> {
   }
 
 
-  @Override TNode push_dep(TNode tn, VBitSet visit) {
+  @Override public TNode push_dep(TNode tn, VBitSet visit) {
     // Merge and keep all deps lists.  Since null aliases are a shortcut for "a
     // new TVar appears here later" that TVar needs the deps list when it appears.
     merge_dep(tn);        // Merge dependents lists

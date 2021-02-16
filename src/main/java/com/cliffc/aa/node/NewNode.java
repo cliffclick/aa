@@ -90,7 +90,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeObj.UNUSED);
     Env.DEFMEM.set_def(_alias,Node.con(TypeObj.UNUSED));
     Env.GVN.revalive(this,ProjNode.proj(this,0),Env.DEFMEM);
-    _tvar.unify(new TVDead(),false);  // Kill all unification
+    tvar().unify(new TVDead(),false);  // Kill all unification
     if( is_dead() ) return;
     for( Node use : _uses )
       Env.GVN.add_flow_uses(use); // Get FPtrs from MrgProj, and dead Ptrs into New

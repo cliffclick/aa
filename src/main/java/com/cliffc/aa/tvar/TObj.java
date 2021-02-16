@@ -103,7 +103,7 @@ public class TObj extends TMulti<TObj> {
     // Search recursively
     TypeObj to = (TypeObj)t;
     for( String pfld : _flds.keySet() )
-      t2 = _flds.get(pfld)._find_tvar(to.fld(pfld),tv,t2);
+      t2 = _flds.get(pfld)._find_tvar(to.fld(pfld), tv, t2);
     return t2;
   }
 
@@ -132,7 +132,7 @@ public class TObj extends TMulti<TObj> {
     return sb.p("}");
   }
 
-  @Override TNode push_dep(TNode tn, VBitSet visit) {
+  @Override public TNode push_dep(TNode tn, VBitSet visit) {
     // Merge and keep all deps lists.  Since null aliases are a shortcut for "a
     // new TVar appears here later" that TVar needs the deps list when it appears.
     merge_dep(tn);        // Merge dependents lists

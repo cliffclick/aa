@@ -708,6 +708,11 @@ public class FunNode extends RegionNode {
       path_call._val = CallNode.set_ttfp((TypeTuple) path_call._val,nfptr);
       for( Node use : oldret._uses ) // Check extra FunPtrs are dead
         if( use instanceof FunPtrNode ) Env.GVN.add_dead(map.get(use));
+      // New H-M dependencies
+      for( Node use : new_funptr._uses )
+        if( use instanceof CallNode && ((CallNode)use).fdx()==new_funptr )
+          new_funptr.tvar().push_dep(((CallNode)use).cepi(),null);
+
     } // Else other funptr/displays on unrelated path, dead, can be ignored
 
     // For all aliases split in this pass, update in-node both old and new.

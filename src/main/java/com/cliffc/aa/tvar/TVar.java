@@ -79,7 +79,7 @@ public class TVar implements Comparable<TVar> {
         tv._ns = Ary.merge_or(_ns,tv._ns, TNode::compareTo, e->!e.is_dead());
         assert tv.check_ns();   // Check sorted, dead cleared
       }
-      TNode.add_flow_uses(_ns); // this is picking up structure, children might need to recheck
+      TNode.add_flow_uses(tv._ns); // this is picking up structure, children might need to recheck
     }
     if( tv._ns!=null && tv._ns._len==0 ) tv._ns=null;
     if( _deps!=null ) {                         // Also merge deps
@@ -225,8 +225,8 @@ public class TVar implements Comparable<TVar> {
   }
 
   // Push on deps list.  Returns the merged list.
-  TNode      push_dep (    TNode  tn  , VBitSet visit) { return merge_dep (tn  ); }
-  Ary<TNode> push_deps(Ary<TNode> deps, VBitSet visit) { return merge_deps(deps); }
+  public TNode      push_dep (    TNode  tn  , VBitSet visit) { return merge_dep (tn  ); }
+         Ary<TNode> push_deps(Ary<TNode> deps, VBitSet visit) { return merge_deps(deps); }
   final TNode merge_dep(TNode tn) {
     if( tn.is_dead() ) return tn;
     if( _deps==null ) _deps = new Ary<>(TNode.class);
