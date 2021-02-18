@@ -335,8 +335,8 @@ public final class CallEpiNode extends Node {
     Type premem = call().mem()._val;
     if( _keep==0 && ProjNode.proj(this,MEM_IDX)==null ) {
       TVar tv = tvar();
-      if( tv instanceof TArgs && trez != Type.ALL && premem instanceof TypeMem ) // If already an error term, poison, stay error.
-        trez = unify_lift(trez,((TArgs)tv).parm(REZ_IDX), (TypeMem)premem);
+      if( tv instanceof TArgs && trez != Type.ALL ) // If already an error term, poison, stay error.
+        trez = unify_lift(trez,((TArgs)tv).parm(REZ_IDX), premem);
       return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,trez);
     }
 
@@ -489,7 +489,7 @@ public final class CallEpiNode extends Node {
 
   // H-M typing demands all unified Nodes have the same type... which is a
   // ASSERT/JOIN.  Hence the incoming type can be lifted to the join.
-  private Type unify_lift(Type t, TVar tv, TypeMem tcmem) {
+  private Type unify_lift(Type t, TVar tv, Type tcmem) {
     TVar tvar  = call().tvar();
     Type tcall = call()._val;
     // Since tcall memory is pre-filtered for the call, and we want the memory
