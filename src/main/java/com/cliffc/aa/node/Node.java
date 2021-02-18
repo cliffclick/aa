@@ -100,11 +100,12 @@ public abstract class Node implements Cloneable, TNode {
   }
   public TVar _tvar() { return _tvar; } // For debug prints
   public TVar tvar(int x) { return in(x).tvar(); } // nth TVar
-  public TVar reset_tvar() { return (_tvar = _tvar.reset_tnode(this)); }
+  public final void reset_tvar() { _tvar = _tvar.reset_tnode(this, new_tvar()); }
+  public TVar new_tvar() { return new TVar(this); }
   public TNode[] parms() { throw unimpl(); } // Used to build structural TVars
   public Type val() { return _val; }
 
-    // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
+  // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)
   @Override public int hashCode() {
     int sum = _op;
@@ -263,7 +264,7 @@ public abstract class Node implements Cloneable, TNode {
     for( Node def : defs ) if( def != null ) def._uses.add(this);
     _val  = Type.ALL;
     _live = all_live();
-    _tvar = new TVar(this);
+    _tvar = new_tvar();
   }
 
   // Is a primitive
@@ -277,7 +278,7 @@ public abstract class Node implements Cloneable, TNode {
       n._uid = newuid();                  // A new UID
       n._defs = new Ary<>(new Node[1],0); // New empty defs
       n._uses = new Ary<>(new Node[1],0); // New empty uses
-      n._tvar = new TVar(n);
+      n._tvar = n.new_tvar();
       n._elock=false;           // Not in GVN
       if( copy_edges )
         for( Node def : _defs )

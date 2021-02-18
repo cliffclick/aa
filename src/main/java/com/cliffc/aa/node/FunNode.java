@@ -3,7 +3,9 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.BitSet;
@@ -750,6 +752,7 @@ public class FunNode extends RegionNode {
         Env.DEFMEM.set_def(oldalias,Node.con(TypeObj.UNUSED));
         oorg.reset_tvar();      // Force new H-M unification of memory
         Env.GVN.add_mono(oorg.nnn());
+        Env.GVN.add_flow_uses(oorg);
       }
 
       if( nn instanceof FunPtrNode ) { // FunPtrs pick up the new fidx
@@ -819,7 +822,17 @@ public class FunNode extends RegionNode {
           }
         }
       }
+      // Get a good H-M after edges for Calls and CallEpis; needed for
+      // unify_lift typing.
+      if( nn instanceof CallNode ) {
+        nn.unify(false);        
+        ((CallNode)nn).cepi().unify(false);
+      }
     }
+
+    // Force-unify the new function nodes, so they can unify_lift
+    for( Node nn : map.values() )
+      nn.unify(false);
 
     // Retype memory, so we can everywhere lift the split-alias parents "up and out".
     GVNGCM.retype_mem(aliases,this.parm(MEM_IDX), oldret, true);

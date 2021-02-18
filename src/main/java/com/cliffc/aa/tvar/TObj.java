@@ -75,7 +75,7 @@ public class TObj extends TMulti<TObj> {
 
   // Recursive call for all parms.  Sincee TObj parms are kept in the HashMap
   // instead of _parms, have to override TMulti here.
-  @Override boolean _fresh_unify_recursive(int cnt, boolean progress, TMulti tmulti, BitsAlias news, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
+  @Override boolean _fresh_unify_recursive(int cnt, boolean progress, TMulti tmulti, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
     // Same subclass 'this' and 'tv'
     TObj tobj = (TObj)tmulti;
     for( String pfld : _flds.keySet() ) {
@@ -85,7 +85,7 @@ public class TObj extends TMulti<TObj> {
         tobj.put(pfld,mtv=new TVar()); // Update for new
         mtv.push_deps(_deps,null);     // Copy any deps
       }
-      progress |= ptv._fresh_unify(cnt,mtv, news, nongen, dups, test);
+      progress |= ptv._fresh_unify(cnt,mtv, nongen, dups, test);
     };
     return progress;
   }

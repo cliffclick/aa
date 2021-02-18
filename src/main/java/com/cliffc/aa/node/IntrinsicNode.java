@@ -4,6 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TMem;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
@@ -20,8 +21,8 @@ public class IntrinsicNode extends Node {
     _badargs=badargs;
   }
 
-  @Override
-  public boolean is_mem() { return true; }
+  @Override public boolean is_mem() { return true; }
+  @Override public TMem new_tvar() { return new TMem(this); }
   @Override public String xstr() { return _tn._name; }
   Node mem() { return in(1); }
   Node ptr() { return in(2); }

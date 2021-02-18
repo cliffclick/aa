@@ -35,7 +35,7 @@ public class MemSplitNode extends Node {
       _escs.at(i).str(sb).p(',');
     return sb.unchar().p(')').toString();
   }
-  
+
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Type t = mem()._val;
     if( !(t instanceof TypeMem) ) return t.oob();
@@ -54,7 +54,10 @@ public class MemSplitNode extends Node {
 
   @Override public boolean unify( boolean test ) {
     TVar tvar = tvar();
-    if( tvar instanceof TMulti ) return false;
+    if( tvar instanceof TMulti ) {
+      assert ((TMulti)tvar).len()==_escs._len; // If changing the split-arity, need to reset_tvar
+      return false;
+    }
     if( test ) return true;
     TVar tmvar = mem().tvar();
     TVar[] parms = new TVar[_escs._len];
@@ -78,7 +81,8 @@ public class MemSplitNode extends Node {
     if( all.join(esc) == BitsAlias.EMPTY ) { // No overlap
       _escs.set(0,all.meet(esc));  // Update summary
       _escs.add(esc);              // Add escape set
-      xval();                      // Expand tuple result
+      reset_tvar();                // Expand H-M tuple result
+      xval();                      // Expand val tuple result
       return _escs._len-1;
     }
     for( int i=1; i<_escs._len; i++ )
@@ -137,9 +141,9 @@ public class MemSplitNode extends Node {
     BitsAlias head2_escs = head2.escapees();
     assert check_split(head1,head1_escs);
     // Insert empty split/join above head2
-    MemSplitNode msp = Env.GVN.init(new MemSplitNode(head2.in(1))).unkeep();
-    MProjNode    mprj= Env.GVN.init(new MProjNode   (msp,0      )).unkeep();
-    MemJoinNode  mjn = Env.GVN.init(new MemJoinNode (mprj       )).unkeep();
+    MemSplitNode msp = (MemSplitNode)Env.GVN.xreduce(new MemSplitNode(head2.in(1)));
+    MProjNode    mprj= (MProjNode   )Env.GVN.xreduce(new MProjNode   (msp,0      ));
+    MemJoinNode  mjn = (MemJoinNode )Env.GVN.xreduce(new MemJoinNode (mprj       )).keep();
     head2.set_def(1,mjn);
     mjn._live = tail1._live;
     // Pull the SESE regions in parallel from below
@@ -149,7 +153,7 @@ public class MemSplitNode extends Node {
     else Env.GVN.revalive(msp,mprj,mjn);
     if( tail1 instanceof ProjNode ) Env.GVN.add_flow(tail1.in(0));
     assert Env.START.more_flow(true)==0;
-    for( Node use : mjn._uses )
+    for( Node use : mjn.unkeep()._uses )
       Env.GVN.add_work_all(use); // See if other uses can move into the Join
     return head1;
   }

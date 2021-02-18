@@ -185,7 +185,7 @@ public class StoreNode extends Node {
     // Unify the given aliases and field against the stored type
     // TODO: If we have a Precise replacement (single alias, no recursion) then
     // do not unify with incoming memory at alias - this is a true replacement.
-    return ((TMem)tmem).unify_alias_fld(tmp._aliases,_fld,rez().tvar(),mem,test) | progress;
+    return ((TMem)tmem).unify_alias_fld(this,tmp._aliases,_fld,rez().tvar(),mem,test) | progress;
   }
 
 }

@@ -238,14 +238,13 @@ public class LoadNode extends Node {
     Node mem = mem();
     TVar tvmem = mem.tvar();
     if( tvmem instanceof TVDead ) return false; // Not gonna be a TMem
-    if( !(tvmem instanceof TMem) ) return false;
     // Address needs to name the aliases
     Type tadr = adr().val();
     if( !(tadr instanceof TypeMemPtr) )
       return false;             // Wait until types are sharper
     TypeMemPtr tmp = (TypeMemPtr)tadr;
     // Unify the given aliases and field against the loaded type
-    return ((TMem)tvmem).unify_alias_fld(tmp._aliases,_fld,tvar(),mem,test);
+    return ((TMem)tvmem).unify_alias_fld(this,tmp._aliases,_fld,tvar(),mem,test);
   }
 
   @Override public ErrMsg err( boolean fast ) {

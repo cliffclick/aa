@@ -14,7 +14,7 @@ import static com.cliffc.aa.Env.GVN;
 // in and out, and is especially targeting non-inlined calls.
 public class MemJoinNode extends Node {
 
-  public MemJoinNode( MProjNode mprj ) { super(OP_JOIN,mprj); assert mprj.in(0) instanceof MemSplitNode; }
+  public MemJoinNode( MProjNode mprj ) { super(OP_JOIN,mprj);  assert mprj.in(0) instanceof MemSplitNode;  }
 
   MemSplitNode msp() { return (MemSplitNode)in(0).in(0); }  // The MemSplit
   @Override public boolean is_mem() { return true; }
@@ -32,6 +32,7 @@ public class MemJoinNode extends Node {
     // If some Split/Join path clears out, remove the (useless) split.
     for( int i=1; i<_defs._len; i++ )
       if( in(i) instanceof MProjNode && in(i).in(0)==msp && in(i)._uses._len==1 ) {
+        msp.reset_tvar();    // Changing split arity, reset tvar
         in(0).xval();        // Update the default type
         msp.remove_alias(i);
         Env.GVN.add_dead(in(i));
@@ -158,15 +159,15 @@ public class MemJoinNode extends Node {
 
   // Unify alias-by-alias, except on the alias sets
   @Override public boolean unify( boolean test ) {
-    // Self has to be a TMem
     if( tvar() instanceof TVDead ) return false;     // Not gonna be a TMem
-    boolean progress = tvar().unify(tvar(0),test);   // Unify against base
-    if( !(tvar() instanceof TMem) ) return progress; // Wait till gets stronger
+    TMem tmem = (TMem)tvar(0);
+    boolean progress = tvar().unify(tmem,test);
+    if( progress && test ) return true;
     Ary<BitsAlias> escs = msp()._escs;
-    for( int i=1; i<_defs._len; i++ )
-      if( tvar(i) instanceof TMem && ((TMem)tvar()).unify_alias(escs.at(i),(TMem)tvar(i),test) )
-        if( test ) return true;
-        else progress = true;
+    for( int i=1; i<_defs._len; i++ ) {
+      progress |= tvar(i) instanceof TMem && tmem.unify_alias(escs.at(i),(TMem)tvar(i),test);
+      if( progress && test ) return true;
+    }
     return progress;
   }
 
@@ -204,13 +205,15 @@ public class MemJoinNode extends Node {
     GVN.add_unuse(this);
     MemSplitNode msp = msp();
     int idx = msp.add_alias(head1_escs); // Add escape set, find index
+    Node mspj;
     if( idx == _defs._len ) {         // Escape set added at the end
-      add_def(GVN.init(new MProjNode(msp,idx)).unkeep());
+      add_def(mspj = GVN.init(new MProjNode(msp,idx)).unkeep());
+      mspj._tvar = msp.mem().tvar(); // Need to upgrade tvar to a TMem
     } else {             // Inserted into prior region
+      mspj = in(idx);
       assert idx!=0;     // No partial overlap; all escape sets are independent
     }
     // Reset edges to move SESE region inside
-    Node mspj = in(idx);
     head.set_def(MEM_IDX,in(idx));
     base.insert(this);
     set_def(idx,base);

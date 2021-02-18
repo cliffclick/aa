@@ -670,14 +670,13 @@ public class CallNode extends Node {
     return null;
   }
 
+  // Gather incoming args.  NOT an application point (yet), that is a CallEpi.
+  @Override public TVar new_tvar() { return _defs._len > DSP_IDX ? new TArgs(this,_unpacked) : new TVar(this); }
+  
   @Override public boolean unify( boolean test ) {
-    // Gather incoming args.  NOT an application point (yet), that is a CallEpi.
-    TVar tvar = tvar();
-    if( tvar instanceof TArgs ) {
-      assert ((TArgs)tvar)._unpacked == _unpacked; // Unpack logic sets this correct
-      return false;
-    }
-    return tvar.unify(new TArgs(this,_unpacked),test); // Progress
+    if( tvar() instanceof TArgs ) return false;
+    if(_defs._len <= DSP_IDX ) return false;
+    return test || tvar().unify(new TArgs(this,_unpacked),test);
   }
 
 

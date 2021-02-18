@@ -98,7 +98,7 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
 
 
   // Return a "fresh" copy, preserving structure
-  @Override boolean _fresh_unify( int cnt, TVar tv, BitsAlias news, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
+  @Override boolean _fresh_unify( int cnt, TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
     assert _u==null;             // At top
     if( this==tv ) return false; // Already unified
     cnt++;  assert cnt<100;      // Infinite recursion check
@@ -120,10 +120,10 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
       tv = tv._u;               // This is the new unified 'tv'
     }
     // Same subclass 'this' and 'tv'
-    return _fresh_unify_recursive(cnt, progress, (TMulti)tv, news, nongen, dups, test);
+    return _fresh_unify_recursive(cnt, progress, (TMulti)tv, nongen, dups, test);
   }
   // Recursive call for all parms
-  boolean _fresh_unify_recursive(int cnt, boolean progress, TMulti tmulti, BitsAlias news, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
+  boolean _fresh_unify_recursive(int cnt, boolean progress, TMulti tmulti, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
     // Same subclass 'this' and 'tv'
     if( test && tmulti._parms.length < _parms.length ) return true;
     if( tmulti._parms.length < _parms.length ) {
@@ -134,14 +134,12 @@ public abstract class TMulti<T extends TMulti<T>> extends TVar {
     for( int i=0; i<_parms.length; i++ ) {
       TVar parm = parm(i);
       if( parm != null ) {      // No parm means no additional structure
-        if( this instanceof TMem && news.test_recur(i) )
-          continue;             // New-in-function, does not unify with pre-function
         TVar tvparm = tmulti.parm(i);
         if( tvparm==null ) {
           tmulti._parms[i] = tvparm = new TVar();
           tvparm.push_deps(tmulti._deps,null);
         }
-        progress |= parm._fresh_unify(cnt,tvparm, news, nongen, dups, test);
+        progress |= parm._fresh_unify(cnt,tvparm, nongen, dups, test);
       }
     }
     return progress;

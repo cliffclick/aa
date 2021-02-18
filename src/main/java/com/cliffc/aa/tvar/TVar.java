@@ -1,7 +1,6 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
-import com.cliffc.aa.type.BitsAlias;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.*;
 
@@ -31,12 +30,13 @@ public class TVar implements Comparable<TVar> {
   private TVar( TNode[] tns ) { _ns = new Ary<>(tns); _uid = UID++; }
 
   // A TNode resets its TVar.  Remove all instances & start afresh.
-  public TVar reset_tnode(TNode tn) {
+  public TVar reset_tnode(TNode tn) { return reset_tnode(tn, new TVar(tn)); }
+  public TVar reset_tnode(TNode tn, TVar tv) {
     if( _ns!=null ) {
       int idx = _ns.find(tn);
       if( idx != -1 ) _ns.remove(idx);
     }
-    return new TVar(tn);
+    return tv;
   }
 
 
@@ -117,7 +117,7 @@ public class TVar implements Comparable<TVar> {
   boolean _will_unify(TVar tv, int cnt) { return true; }
 
   // Return a "fresh" copy, preserving structure
-  boolean _fresh_unify(int cnt, TVar tv, BitsAlias news, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
+  boolean _fresh_unify(int cnt, TVar tv, HashSet<TVar> nongen, NonBlockingHashMap<TVar,TVar> dups, boolean test) {
     assert _u==null;             // At top
     if( this==tv || tv instanceof TVDead ) return false; // Short cut
     if( occurs_in(nongen) )      // If 'this' is in the non-generative set, use 'this'
@@ -213,8 +213,10 @@ public class TVar implements Comparable<TVar> {
   // Two equal classes order by uid.
   @Override public int compareTo(TVar tv) {
     if( this==tv ) return 0;
-    if( this instanceof TVDead && !( tv  instanceof TVDead) ) return  1; // TVDead always loses
-    if( tv   instanceof TVDead && !(this instanceof TVDead) ) return -1;
+    if( this instanceof TVDead   && !( tv  instanceof TVDead  ) ) return  1; // TVDead   always loses
+    if( tv   instanceof TVDead   && !(this instanceof TVDead  ) ) return -1;
+    if( this instanceof TVUnused && !( tv  instanceof TVUnused) ) return -1; // TVUnused always wins
+    if( tv   instanceof TVUnused && !(this instanceof TVUnused) ) return  1;
     if( this instanceof TNil   ) return -1; // TNil loses second
     if( tv   instanceof TNil   ) return  1;
     boolean istv0 =    getClass()==TVar.class;

@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TMem;
+import com.cliffc.aa.tvar.TVDead;
 import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
 
@@ -90,12 +91,11 @@ public class MrgProjNode extends ProjNode {
 
   @Override public boolean unify( boolean test ) {
     if( !(in(0) instanceof NewNode) ) return false;
-    NewNode nnn = nnn();
-    TVar tmem = mem().tvar();
-    boolean progress = tvar().unify(tmem,test); // Progress if we unify       with incoming
-    if( tmem instanceof TMem )                  // Progress if we unify alias with incoming
-      progress |= ((TMem)tmem).unify_alias(nnn._alias,nnn.tvar(),test);
-    return progress;
+    if( tvar() instanceof TVDead ) return false;
+    TMem tmem = (TMem)mem().tvar();
+    TVar tself = tvar();
+    boolean progress = !(tself instanceof TMem) && tself.unify(tmem, test);
+    return tmem.unify_alias(nnn()._alias,nnn().tvar(),test) | progress; // Unify at the alias
   }
 
 }

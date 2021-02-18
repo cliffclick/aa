@@ -3,6 +3,8 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TMem;
+import com.cliffc.aa.tvar.TVar;
 
 import static com.cliffc.aa.AA.MEM_IDX;
 
@@ -40,6 +42,8 @@ public class MProjNode extends ProjNode {
     }
     return c.oob();
   }
+  
+  @Override public TVar new_tvar() { return new TMem(this); }
 
   @Override public void add_flow_use_extra(Node chg) {
     if( chg instanceof CallNode ) { // If the Call changes value

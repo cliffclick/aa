@@ -346,7 +346,7 @@ public class Parse implements Comparable<Parse> {
       if( scope==null ) {                    // Token not already bound at any scope
         if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
           ((FunPtrNode)ifex).bind(tok); // Debug only: give name to function
-        create(tok,gvn(new ConNode<>(Type.ANY,1.2)),TypeStruct.FRW);  // Create at top of scope as  (undefined)
+        create(tok,Env.XNIL,TypeStruct.FRW);  // Create at top of scope as undefined
         scope = scope();                // Scope is the current one
         scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
       }

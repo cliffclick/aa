@@ -1,11 +1,13 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
-import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.*;
-import java.util.HashSet;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFunPtr;
+import com.cliffc.aa.util.NonBlockingHashMap;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 
-import static com.cliffc.aa.AA.MEM_IDX;
+import java.util.HashSet;
 
 // FunPtr TVar, a classic function tvar, mapping between a TArgs and a TRet.
 public class TFun extends TMulti<TFun> {
@@ -43,20 +45,10 @@ public class TFun extends TMulti<TFun> {
       args.push_dep(dep,null);
       ret .push_dep(dep,null);
     }
-    TArgs argz; TRet retz;
-    BitsAlias news = BitsAlias.EMPTY; // New-in-function set; will not unify with pre-function memory
-    if( args() instanceof TArgs && (argz=(TArgs)args()).parm(MEM_IDX) instanceof TMem &&
-        ret () instanceof TRet  && (retz=(TRet )ret ()).parm(MEM_IDX) instanceof TMem ) {
-      TMem argmem = (TMem)argz.parm(MEM_IDX);
-      TMem retmem = (TMem)retz.parm(MEM_IDX);
-      for( int i=0; i<retmem._parms.length; i++ )
-        if( retmem._parms[i]!=null && (i>=argmem._parms.length || argmem._parms[i]==null) )
-          news = news.set(i);
-    }
     NonBlockingHashMap<TVar,TVar> dups = new NonBlockingHashMap<>();
-    return                                          // If testing, still must call both to check for progress
-      args()._fresh_unify(0,args,news,_nongen,dups,test) | // NO SHORT-CIRCUIT: NOTE: '|' NOT '||'
-      ret ()._fresh_unify(0,ret ,news,_nongen,dups,test);  // Must do both halves always
+    return                                            // If testing, still must call both to check for progress
+      args()._fresh_unify(0,args,_nongen,dups,test) | // NO SHORT-CIRCUIT: NOTE: '|' NOT '||'
+      ret ()._fresh_unify(0,ret ,_nongen,dups,test);  // Must do both halves always
   }
 
   // Find instances of 'tv' inside of 'this' via structural recursion.  Walk
@@ -74,8 +66,8 @@ public class TFun extends TMulti<TFun> {
     // but not really sure, hence the TODO.
     return t2;
   }
-  
-  
+
+
   // Pretty print
   @Override SB _str(SB sb, VBitSet bs, boolean debug) {
     sb.p("{ ");

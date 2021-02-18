@@ -4,6 +4,8 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TMem;
+import com.cliffc.aa.tvar.TVar;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
@@ -14,7 +16,7 @@ public class PhiNode extends Node {
     if( t instanceof TypeMem ) _t = TypeMem.ALLMEM;
     else if( t instanceof TypeObj ) _t = TypeObj.OBJ; // Need to check liveness
     else if( t instanceof TypeTuple ) _t = Type.SCALAR;
-    else { _t = Type.SCALAR; }
+    else _t = Type.SCALAR;
     _badgc = badgc;
     _live = all_live();         // Recompute starting live after setting t
   }
@@ -69,10 +71,17 @@ public class PhiNode extends Node {
         t = t.meet(val(i));
     return t;
   }
+
+  @Override public TVar new_tvar() { return _t==TypeMem.ALLMEM ? new TMem(this) : new TVar(this); }
+  
   // All inputs unify
   @Override public boolean unify( boolean test ) {
-    //throw com.cliffc.aa.AA.unimpl();
-    return false;
+    boolean progress = false;
+    for( int i=1; i<_defs._len; i++ ) {
+      progress |= tvar().unify(tvar(i),test);
+      if( progress && test ) return true;
+    }
+    return progress;
   }
 
   @Override BitsAlias escapees() { return BitsAlias.FULL; }

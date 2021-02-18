@@ -158,14 +158,13 @@ public class NewObjNode extends NewNode<TypeStruct> {
     TObj tvo;
     if( !(tvar instanceof TObj) ) {
       if( test ) return true;   // Progress to make a TObj
-      tvar.unify(tvo=new TObj(this),test);
-      progress = true;
+      progress = tvar.unify(tvo=new TObj(this),test);
     } else tvo = (TObj)tvar;
     // Structural unification on all fields
-    for( int i=0; i<_ts._flds.length; i++ )
-      if( tvo.add_fld(_ts._flds[i],tvar(def_idx(i)),test) )
-        if( test ) return true;
-        else progress = true;
+    for( int i=0; i<_ts._flds.length; i++ ) {
+      progress |= tvo.add_fld(_ts._flds[i],tvar(def_idx(i)),test);
+      if( progress && test ) return true;
+    }
     return progress;
   }
 

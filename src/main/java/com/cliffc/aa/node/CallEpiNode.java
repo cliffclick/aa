@@ -472,12 +472,16 @@ public final class CallEpiNode extends Node {
     Node fdx = call().fdx();
     TVar tfunv = fdx.tvar();
     if( tfunv instanceof TVDead ) return false; // Not gonna be a TFun
-    if( !(tfunv instanceof TFun) )              // Progress
-      return test || tfunv.unify(new TFun(fdx,null,new TVar(),new TVar()),false);
+    boolean progress = false;
+    if( !(tfunv instanceof TFun) ) { // Progress
+      if( test ) return true;        // Testing
+      progress = tfunv.unify(new TFun(fdx,null,new TVar(),new TVar()),test);
+      tfunv = fdx.tvar();
+    }
     // Call transitions from TVar to TArgs.
     // Actual progress only if the structure changes.
     if( !((TFun)tfunv).fresh_unify(call().tvar(),tvar(),test,this) )
-      return false;             // No progress anyways
+      return progress;          // No progress anyways
     if( !test )                 // Progress, neighbors on list
       Env.GVN.add_flow_uses(call());
     return true;
@@ -496,12 +500,12 @@ public final class CallEpiNode extends Node {
     TMulti tmvar = (TMulti)tvar;
     Type t2 = tmvar.parm(MEM_IDX).find_tvar(tcmem,tv);
     // Found in input memory; JOIN with the call return type.
-    if( t2 != null ) t = t2.join(t);
+    if( t2 != null ) t = t2.widen().join(t);
     // Check the other inputs.
     for( int i=MEM_IDX+1;i<tmvar.len(); i++ ) {
       Type t3 = tmvar.parm(i).find_tvar(ttcall.at(i),tv);
       // Found in input args; JOIN with the call return type.
-      if( t3 != null ) return t3.join(t);
+      if( t3 != null ) return t3.widen().join(t);
     }
     return t;                   // no change
   }

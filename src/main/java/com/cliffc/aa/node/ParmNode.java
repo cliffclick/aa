@@ -3,7 +3,9 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TMem;
+import com.cliffc.aa.tvar.TVar;
+import com.cliffc.aa.type.Type;
 
 import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.MEM_IDX;
@@ -22,6 +24,7 @@ public class ParmNode extends PhiNode {
     assert idx>=0;
     _idx=idx;
     _name=name;
+    if( idx==MEM_IDX ) _tvar = new TMem(this);
   }
   FunNode fun() { return (FunNode) in(0); }
   @Override public String xstr() { return "Parm:"+_name; }
@@ -97,6 +100,8 @@ public class ParmNode extends PhiNode {
         if( parm instanceof ParmNode && parm != this )
           Env.GVN.add_flow(parm);
   }
+
+  @Override public TVar new_tvar() { return _idx==MEM_IDX ? new TMem(this) : new TVar(this); }
 
   // While Parms are mostly Phis (and yes for value flows), during unification
   // Parms are already treated by the H-M algo, and (via fresh_unify) get

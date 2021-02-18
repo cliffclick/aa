@@ -16,8 +16,8 @@ public class Env implements AutoCloseable {
   public static      ConNode ALL_CTRL; // Default control
   public static      ConNode XCTRL; // Always dead control
   public static      ConNode XNIL;  // Common XNIL
-  public static      ConNode ANY;   // Common ANY
-  public static      ConNode ALL;   // Common ALL
+  public static      ConNode ANY;   // Common ANY / used for dead
+  public static      ConNode ALL;   // Common ALL / used for errors
   // Set of all display aliases, used to track escaped displays at call sites for asserts.
   public static BitsAlias ALL_DISPLAYS = BitsAlias.EMPTY;
   // Set of lexically active display aliases, used for a conservative display

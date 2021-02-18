@@ -5,7 +5,8 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
-import org.jetbrains.annotations.NotNull;
+
+import java.util.HashSet;
 
 import static com.cliffc.aa.Env.GVN;
 
@@ -15,6 +16,8 @@ import static com.cliffc.aa.Env.GVN;
 public final class FunPtrNode extends Node {
   public String _name;          // Optional for debug only
   private final ErrMsg _referr;
+  private final HashSet<TVar> _active_scope;
+
   // Every var use that results in a function, so actually only these FunPtrs,
   // needs to make a "fresh" copy before unification.  "Fresh" makes a
   // structural copy of the TVar, keeping TVars from Nodes currently in-scope
@@ -29,9 +32,7 @@ public final class FunPtrNode extends Node {
     super(OP_FUNPTR,ret,display);
     _name = name;
     _referr = referr;
-    // Add the "non-generative" set to the TFun structure, but no other
-    // structural is available (args and ret are new TVars).
-    tvar().unify(new TFun(this,e == null ? null : e.collect_active_scope(),new TVar(),new TVar()),false);
+    _active_scope = e == null ? null : e.collect_active_scope();
   }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }
@@ -108,6 +109,12 @@ public final class FunPtrNode extends Node {
   }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     return def==ret() ? TypeMem.ANYMEM : TypeMem.ESCAPE;
+  }
+
+  @Override public TVar new_tvar() {
+    // Add the "non-generative" set to the TFun structure, but no other
+    // structural is available (args and ret are new TVars).
+    return new TFun(this,_active_scope,new TVar(),new TVar());
   }
 
   @Override public boolean unify( boolean test ) {
@@ -197,11 +204,4 @@ public final class FunPtrNode extends Node {
   }
 
   @Override public ErrMsg err( boolean fast ) { return is_forward_ref() ? _referr : null; }
-  // clones during inlining all become unique new sites
-  @SuppressWarnings("unchecked")
-  @Override @NotNull public FunPtrNode copy( boolean copy_edges) {
-    FunPtrNode nnn = (FunPtrNode)super.copy(copy_edges);
-    nnn.tvar().unify(new TFun(nnn,((TFun)tvar())._nongen,new TVar(),new TVar()),false);
-    return nnn;
-  }
 }
