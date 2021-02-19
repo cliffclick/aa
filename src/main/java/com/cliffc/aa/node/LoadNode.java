@@ -237,7 +237,8 @@ public class LoadNode extends Node {
     // Input should be a TMem
     Node mem = mem();
     TVar tvmem = mem.tvar();
-    if( tvmem instanceof TVDead ) return false; // Not gonna be a TMem
+    if(   tvmem instanceof TVDead ) return false; // Not gonna be a TMem
+    if( !(tvmem instanceof TMem ) ) return false;
     // Address needs to name the aliases
     Type tadr = adr().val();
     if( !(tadr instanceof TypeMemPtr) )

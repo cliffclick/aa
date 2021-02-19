@@ -82,7 +82,7 @@ public class GVNGCM {
     if( !HAS_WORK ) HAS_WORK = true; // Filtered set
     for( Work work : _new_works ) work.add(n);
     if( n instanceof FunNode )
-        add_work(_work_inline,(FunNode)n);
+      add_work(_work_inline,(FunNode)n);
     return n;
   }
 
