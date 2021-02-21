@@ -3,9 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.BitSet;
@@ -59,12 +57,15 @@ import static com.cliffc.aa.AA.*;
 
 
 public class FunNode extends RegionNode {
+  public String _name;          // Debug-only name
   public String _bal_close; // null for everything except "balanced functions", e.g. "[]"
   public int _fidx;
   public TypeFunSig _sig;
   // Operator precedence; only set on top-level primitive wrappers.
   // -1 for normal non-operator functions and -2 for forward_decls.
   public final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
+  // Function is parsed infix, with the RHS argument thunked.  Flag is used by
+  // the Parser only for short-circuit operations like '||' and '&&'.
   public final boolean _thunk_rhs;
   private byte _cnt_size_inlines; // Count of size-based inlines
   public static int _must_inline; // Used for asserts
@@ -72,16 +73,18 @@ public class FunNode extends RegionNode {
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
-  public FunNode(           PrimNode prim) { this(prim._sig,prim._op_prec,prim._thunk_rhs); }
-  public FunNode(NewNode.NewPrimNode prim) { this(prim._sig,prim._op_prec,false); }
+  public FunNode(           PrimNode prim) { this(prim._name,prim._sig,prim._op_prec,prim._thunk_rhs); }
+  public FunNode(NewNode.NewPrimNode prim) { this(prim._name,prim._sig,prim._op_prec,false); }
   // Used to start an anonymous function in the Parser
-  public FunNode(String[] flds, Type[] ts) { this(TypeFunSig.make(flds,TypeTuple.make_args(ts),TypeTuple.RET),-1,false); }
+  public FunNode(String[] flds, Type[] ts) { this(null,TypeFunSig.make(flds,TypeTuple.make_args(ts),TypeTuple.RET),-1,false); }
   // Used to forward-decl anon functions
-  FunNode(float dummy) { this(TypeFunSig.make(TypeTuple.RET,TypeTuple.NO_ARGS),-2,false); add_def(Env.ALL_CTRL); }
-  public FunNode(TypeFunSig sig, int op_prec, boolean thunk_rhs ) { this(sig,op_prec,thunk_rhs,BitsFun.new_fidx()); }
+  FunNode(String name) { this(name,TypeFunSig.make(TypeTuple.RET,TypeTuple.NO_ARGS),-2,false); add_def(Env.ALL_CTRL); }
   // Shared common constructor
-  private FunNode(TypeFunSig sig, int op_prec, boolean thunk_rhs, int fidx) {
+  FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs ) { this(name,sig,op_prec,thunk_rhs,BitsFun.new_fidx()); }
+  // Shared common constructor
+  private FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs, int fidx) {
     super(OP_FUN);
+    _name = name;
     _fidx = fidx;
     _sig = sig;
     _op_prec = (byte)op_prec;
@@ -110,8 +113,11 @@ public class FunNode extends RegionNode {
   // Name from FunNode
   String name() { return name(true); }
   public String name(boolean debug) {
-    FunPtrNode fptr = fptr();
-    String name=fptr==null ? null : fptr._name;
+    String name = _name;
+    if( name==null ) {
+      FunPtrNode fptr = fptr();
+      name=fptr==null ? null : fptr._name;
+    }
     return name(name,_bal_close,fidx(),_op_prec,is_forward_ref(),debug);
   }
   static String name(String name, String bal, int fidx, int op_prec, boolean fref, boolean debug) {
@@ -133,13 +139,15 @@ public class FunNode extends RegionNode {
       FunNode fun = find_fidx(ii);
       if( fun!=null ) {
         prim |= fun._op_prec >= 0;
-        for( Node fptr : fun.ret()._uses ) // For all displays for this fun
-          if( fptr instanceof FunPtrNode ) {
-            String name = ((FunPtrNode)fptr)._name; // Get debug name
-            if( s==null ) s=name;                   // Capture debug name
-            else if( !s.equals(name) )              // Same name is OK
-              { s=null; break; } // Too many different names
-          }
+        if( fun._name != null ) s = fun._name;
+        else if( !fun.is_dead() )
+          for( Node fptr : fun.ret()._uses ) // For all displays for this fun
+            if( fptr instanceof FunPtrNode ) {
+              String name = ((FunPtrNode)fptr)._name; // Get debug name
+              if( s==null ) s=name;                   // Capture debug name
+              else if( !Util.eq(s,name) )             // Same name is OK
+                { s=null; break; } // Too many different names
+            }
         if( s==null ) break; // Unnamed fidx
       }
     }
@@ -158,6 +166,12 @@ public class FunNode extends RegionNode {
       sb.p(']');
     }
     return sb;
+  }
+
+  // Debug only: make an attempt to bind name to a function
+  public void bind( String tok ) {
+    assert _name==null || _name.equals(tok); // Attempt to double-bind
+    _name = tok;
   }
 
   // This function has disabled inlining
@@ -590,7 +604,7 @@ public class FunNode extends RegionNode {
   private FunNode make_new_fun(RetNode ret, TypeTuple new_formals) {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
-    FunNode fun = new FunNode(TypeFunSig.make(_sig._args,new_formals,_sig._ret),_op_prec,_thunk_rhs,BitsFun.new_fidx(oldfidx));
+    FunNode fun = new FunNode(_name,TypeFunSig.make(_sig._args,new_formals,_sig._ret),_op_prec,_thunk_rhs,BitsFun.new_fidx(oldfidx));
     fun._bal_close = _bal_close;
     fun.pop();                  // Remove null added by RegionNode, will be added later
     fun.unkeep();               // Ret will clone and not construct
@@ -825,7 +839,7 @@ public class FunNode extends RegionNode {
       // Get a good H-M after edges for Calls and CallEpis; needed for
       // unify_lift typing.
       if( nn instanceof CallNode ) {
-        nn.unify(false);        
+        nn.unify(false);
         ((CallNode)nn).cepi().unify(false);
       }
     }

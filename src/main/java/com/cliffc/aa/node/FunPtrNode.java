@@ -59,6 +59,7 @@ public final class FunPtrNode extends Node {
   public void bind( String tok ) {
     assert _name==null || _name.equals(tok); // Attempt to double-bind
     _name = tok;
+    fun().bind(tok);
   }
 
   @Override public Node ideal_reduce() {
@@ -163,7 +164,7 @@ public final class FunPtrNode extends Node {
   // body (yet).  Make a function pointer that takes/ignores all args, and
   // returns a scalar.
   public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
-    FunNode fun = gvn.init(new FunNode(1.2f)).unkeep();
+    FunNode fun = gvn.init(new FunNode(name)).unkeep();
     RetNode ret = gvn.init(new RetNode(fun,Node.con(TypeMem.MEM),Node.con(Type.SCALAR),Node.con(TypeRPC.ALL_CALL),fun)).unkeep();
     gvn.add_flow(fun);
     gvn.add_flow(ret);

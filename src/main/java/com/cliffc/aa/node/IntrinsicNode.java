@@ -44,7 +44,7 @@ public class IntrinsicNode extends Node {
     try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
       TypeTuple formals = TypeTuple.make_args(TypeMemPtr.STRUCT);
       TypeFunSig sig = TypeFunSig.make(TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.RECORD_BITS,tn)),formals);
-      FunNode fun = X.init2((FunNode)new FunNode(sig,-1,false).add_def(Env.ALL_CTRL));
+      FunNode fun = X.init2((FunNode)new FunNode(tn._name,sig,-1,false).add_def(Env.ALL_CTRL));
       Node rpc = X.xform(new ParmNode( 0     ,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
       Node mem = X.xform(new ParmNode(MEM_IDX,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
       Node ptr = X.xform(new ParmNode(ARG_IDX,"ptr",fun,Node.con(TypeMemPtr.ISUSED),badargs));
@@ -141,7 +141,7 @@ public class IntrinsicNode extends Node {
     TypeFunSig sig = TypeFunSig.make(TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.make0(alias),to)),formals);
 
     try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
-      FunNode fun = (FunNode) X.xform(new FunNode(sig,-1,false).add_def(Env.ALL_CTRL));
+      FunNode fun = (FunNode) X.xform(new FunNode(to._name,sig,-1,false).add_def(Env.ALL_CTRL));
       Node rpc = X.xform(new ParmNode(  0    ,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
       Node memp= X.xform(new ParmNode(MEM_IDX,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
       // Add input edges to the NewNode

@@ -19,35 +19,42 @@ public class CEProjNode extends CProjNode {
 
   static boolean good_call(Type tcall, Node ftun ) {
     if( !(tcall instanceof TypeTuple) ) return !tcall.above_center();
-    TypeTuple ctup = (TypeTuple)tcall; // Call type tuple
-    if( ctup.at(0)!=Type.CTRL ) return false; // Call not executing
+    TypeTuple ttcall = (TypeTuple)tcall; // Call type tuple
+    if( ttcall.at(0)!=Type.CTRL ) return false; // Call not executing
     if( ftun instanceof ThunkNode ) return true; // Thunk call is OK by design
     FunNode fun = (FunNode)ftun;
     if( fun._thunk_rhs ) return true; // Thunk call is OK by design
-    TypeFunPtr tfp = CallNode.ttfp(ctup);
+    TypeFunPtr tfp = CallNode.ttfp(ttcall);
     if( tfp.fidxs().above_center() ) return false; // Call not executing yet
     if( !tfp.fidxs().test_recur(fun._fidx) )
       return false;             // Call not executing this wired path
 
-    //// Argument count mismatch
-    //TypeTuple formals = fun._sig._formals;
-    //if( ctup.len()-2 != formals.len() ) return false;
+    // Argument count mismatch
+    TypeTuple formals = fun._sig._formals;
+    if( ttcall.len()-2/*minus fun, minus esc*/ != formals.len() ) return false;
+    
+    // Cannot use the obvious argument check "actual.isa(formal)"!!!!!
+
+    // If the actual is higher than formal (not even above_center), but then
+    // falls during Opto, this type would LIFT from Ctrl to XCTRL.  Can only
+    // test for static properties (e.g. argument count, or constant ALL
+    // arguments).
+
+    
     //// Check good args
-    //TypeMem tmem = (TypeMem)ctup.at(AA.MEM_IDX);
+    //TypeMem tmem = (TypeMem)ttcall.at(AA.MEM_IDX);
     //for( int i=AA.MEM_IDX; i<formals.len(); i++ ) {
     //  Type formal = formals.at(i);
-    //  Type actual0= ctup.at(i);
-    //  if( actual0==Type.ANY && formal==Type.ALL ) continue; // Allow ignored error args
-    //  // If any argument (or display, fidx, memory) is high, do not enable the
-    //  // CFG edge.  Wait until all args are sane (allowing XNIL as sane).
-    //  if( actual0.above_center() && actual0!=Type.XNIL ) return false;
+    //  Type actual0= ttcall.at(i);
+    //  if( actual0==Type.ANY ) continue; // Allow ignored args
     //  Type actual = tmem.sharptr(actual0);
-    //  // See if all args might lift to some valid formal.  Must be monotonic,
-    //  // and any high args is already False.  So all args are at/below center.
-    //  // "(actual.JOIN.formal is below_center)" may be agood arg.
-    //  Type join   = actual.join(formal);
-    //  if( join.above_center() && join!=Type.XNIL )
-    //    return false;
+    //  if( formal.isa(actual) ) continue; // Low but sane
+    //  if( actual.isa(formal) &&
+    //      (!actual.above_center() ||
+    //       actual==Type.XNIL ||
+    //       formal.dual().isa(actual))  )
+    //    continue;
+    //  return false;
     //}
     return true;
   }

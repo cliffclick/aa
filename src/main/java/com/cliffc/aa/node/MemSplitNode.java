@@ -143,7 +143,7 @@ public class MemSplitNode extends Node {
     // Insert empty split/join above head2
     MemSplitNode msp = (MemSplitNode)Env.GVN.init(new MemSplitNode(head2.in(1))).unkeep();
     MProjNode    mprj= (MProjNode   )Env.GVN.init(new MProjNode   (msp,0      )).unkeep();
-    MemJoinNode  mjn = (MemJoinNode )Env.GVN.init(new MemJoinNode (mprj       ));
+    MemJoinNode  mjn =               Env.GVN.init(new MemJoinNode (mprj       ));
     head2.set_def(1,mjn);
     mjn._live = tail1._live;
     // Pull the SESE regions in parallel from below

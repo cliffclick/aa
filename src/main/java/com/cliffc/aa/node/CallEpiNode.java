@@ -107,8 +107,8 @@ public final class CallEpiNode extends Node {
     int cnargs = call.nargs();
     FunNode fun = FunNode.find_fidx(fidx);
     assert !fun.is_forward_ref() && !fun.is_dead()
-      && fun._val == Type.CTRL
       && fun.nargs() == cnargs; // All checked by call.err
+    if( fun._val != Type.CTRL ) return null;
     RetNode ret = fun.ret();    // Return from function
     if( ret==null ) return null;
 
@@ -197,6 +197,7 @@ public final class CallEpiNode extends Node {
       RetNode ret = fun.ret();
       if( ret==null ) continue;               // Mid-death
       if( _defs.find(ret) != -1 ) continue;   // Wired already
+      if( !CEProjNode.good_call(tcall,fun) ) continue; // Args fail basic sanity
       progress=true;
       wire1(call,fun,ret);      // Wire Call->Fun, Ret->CallEpi
     }

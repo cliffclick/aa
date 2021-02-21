@@ -201,7 +201,7 @@ public class TestNode {
       _ins[i] = new ConNode<>(Type.SCALAR);
     Node mem = new ConNode<Type>(TypeMem.MEM);
     mem._val = TypeMem.MEM;
-    FunNode fun_forward_ref = new FunNode(1.2f);
+    FunNode fun_forward_ref = new FunNode("some_fcn");
     Env.DEFMEM._val = TypeMem.MEM;
 
     Node unr = top.lookup("+"); // All the "+" functions

@@ -983,7 +983,7 @@ public class Parse implements Comparable<Parse> {
       mem.unkeep().set_def(0,ctrl);
       val.unkeep().set_def(0,ctrl);
       Node mem2 = X.xform(mem.add_def(mem()));
-      Node val2 = X.xform(val.add_def(rez));
+      Node val2 = X.xform(val.add_def(rez.unkeep()));
       set_mem(mem2);
       return (X._ret=val2);
     }

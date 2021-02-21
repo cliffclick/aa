@@ -245,14 +245,15 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public int getbit() { return _aliases.getbit(); }
 
   // Widen for primitive specialization and H-M unification.  H-M distinguishes
-  // ptr-to-array (and string) from ptr-to-record.
+  // ptr-to-array (and string) from ptr-to-record.  Must keep types at the same
+  // resolution as H-M, so pointers all permit nil (unless I track a H-M type
+  // which disallows nil).
   @Override public TypeMemPtr widen() {
     // Flatten to either all-structs or all-strings, unless both.
     BitsAlias bs = null;
     if( _aliases.isa(BitsAlias.RECORD_BITS0) )  bs = BitsAlias.RECORD_BITS0;
     if( _aliases.isa(BitsAlias.STRBITS0) ) bs = bs==null ? BitsAlias.STRBITS0 : BitsAlias.FULL;
     if( _aliases.isa(BitsAlias.ARYBITS0) ) bs = bs==null ? BitsAlias.ARYBITS0 : BitsAlias.FULL;
-    if( !_aliases.test(0) ) bs = bs.strip_nil();
     if( bs==null ) return this; // Already plenty wide
     return make(bs,_obj.widen());
   }
