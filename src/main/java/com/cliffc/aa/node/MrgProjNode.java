@@ -91,9 +91,11 @@ public class MrgProjNode extends ProjNode {
 
   @Override public boolean unify( boolean test ) {
     if( !(in(0) instanceof NewNode) ) return false;
-    if( tvar() instanceof TVDead ) return false;
-    TMem tmem = (TMem)mem().tvar();
     TVar tself = tvar();
+    if( tself instanceof TVDead ) return false;
+    TVar tmem0 = mem().tvar();
+    if( !(tmem0 instanceof TMem) ) return false;
+    TMem tmem = (TMem)tmem0;
     boolean progress = !(tself instanceof TMem) && tself.unify(tmem, test);
     return tmem.unify_alias(nnn()._alias,nnn().tvar(),test) | progress; // Unify at the alias
   }

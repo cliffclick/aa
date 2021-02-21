@@ -170,8 +170,9 @@ public class FunNode extends RegionNode {
 
   // Debug only: make an attempt to bind name to a function
   public void bind( String tok ) {
-    assert _name==null || _name.equals(tok); // Attempt to double-bind
-    _name = tok;
+    if( _name==null ) _name = tok;
+    if( !_name.equals(tok) ) // Attempt to double-bind
+      _name = _name+":"+tok;
   }
 
   // This function has disabled inlining
