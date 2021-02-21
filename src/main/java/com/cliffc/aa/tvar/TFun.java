@@ -2,7 +2,6 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.TNode;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFunPtr;
 import com.cliffc.aa.util.NonBlockingHashMap;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -59,7 +58,6 @@ public class TFun extends TMulti<TFun> {
     t2 = _find_tvar_self(t,tv,t2);   // Look for direct hit
     if( tv==this ) return t2;        // Direct hit is the answer
     // Search recursively
-    assert t==Type.ALL || t==Type.ANY || t== Type.SCALAR || t instanceof TypeFunPtr;
     // TODO: There are no *local* Types in a TypeFunPtr.  We can get the FIDXS
     // & thence the FunNodes & TypeFunSigs, but these are not local.  I assume
     // I am not interested in such remote types (no type benefit accrues here)
