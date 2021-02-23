@@ -440,6 +440,7 @@ public final class CallEpiNode extends Node {
         }
     }
     del(_defs.find(ret));
+    Env.GVN.add_reduce(ret);
     assert sane_wiring();
     return this;
   }
@@ -474,6 +475,7 @@ public final class CallEpiNode extends Node {
     TVar tfunv = fdx.tvar();
     if( tfunv instanceof TVDead ) return false; // Not gonna be a TFun
     boolean progress = false;
+    // Force function to be a TFun
     if( !(tfunv instanceof TFun) ) { // Progress
       if( test ) return true;        // Testing
       progress = tfunv.unify(new TFun(fdx,null,new TVar(),new TVar()),test);
@@ -491,6 +493,7 @@ public final class CallEpiNode extends Node {
   // H-M typing demands all unified Nodes have the same type... which is a
   // ASSERT/JOIN.  Hence the incoming type can be lifted to the join.
   private Type unify_lift(Type t, TVar tv, Type tcmem) {
+    if( tv instanceof TVDead ) return t; // No update from dead
     TVar tvar  = call().tvar();
     Type tcall = call()._val;
     // Since tcall memory is pre-filtered for the call, and we want the memory

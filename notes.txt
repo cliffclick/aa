@@ -1,4 +1,41 @@
 =======================================
+2/23/2021
+
+Back to HM algo.  Missed the 'fresh' notion in main code: let Name = Body in Use;
+If   Name is in Use  then use a Fresh let result;
+else Name is in Body and  use the     let result.
+
+In main code; Names are use-def edges (SSA).
+Typically want FunPtrNodes to deliver Fresh,
+except when recursively self-defining.
+
+So when looking at a FunPtrNode, tvar behaves "as if" wrapped in a Fresh.
+Here's maybe the bug: At a normal Call/Cepi with a FunPtr, I do the
+fresh-unify.  But if the FunPtr is passed along (and merged with others), I
+lose the Fresh notion.  All unification points (args to functions, Phi nodes),
+need to honor the Fresh notion.
+
+Also, lots of replicated code because TMulti does not support sparse edges (ala
+TMem aliases), nor named fields (TObj).  Replace TMulti with a sparse array
+indexed by Object (either String or Alias index/Integer).  Drop TFun, TMem,
+TArg, TRet.  Add a String for a structural-type, for asserts.  Add a Fresh wrapper.
+Normal unify splits into fresh/not-fresh as HM does.
+Drop unify_lift & debug until i can run all tests except HM15.
+
+Can i get rid of TNil & TVDead?
+Fold TMulti and TVar?
+In HM, using _updates; in TVar its called _deps, and should only take CallEpiNodes.
+Still keep _ns for debugging; but only for debugging.
+
+Keep new TVar counts under control? not getting big in HM.  Obvious: add a
+string per alloc side, & histogram allocs.  Keep with TVar, and on unification
+also histogram its death (no GC, so cannot recycle, without refcnt).
+
+
+Make a TVar2/TV2; and clone HM.java behavior as much as possible.
+
+
+=======================================
 2/16/2021
 
 Mid-integration with H-M.  New situation with Memory.
@@ -69,9 +106,6 @@ effect is: "whatever the default is, unless looking at exceptions".
 When fresh-unify, the default can bottom out at "no default given" which
 might be a plain-tvar.  The Parm:mem & Ret:mem can have the same default,
 which fresh-unify uses to force before-mem and after-mem to be the same.
-
-
-
 
 
 =======================================

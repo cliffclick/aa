@@ -285,6 +285,8 @@ public class CallNode extends Node {
           set_dsp(fptr.display());
         set_fdx(fptr);          // Resolve to 1 choice
         xval();                 // Force value update; least-cost LOWERS types (by removing a choice)
+        add_flow_use_extra(fptr);
+        if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
         return this;
       }
     }
@@ -493,7 +495,10 @@ public class CallNode extends Node {
     CallEpiNode cepi = cepi();
     if( chg == fdx() ) {           // FIDX falls to sane from too-high
       Env.GVN.add_flow_defs(this); // All args become alive
-      if( cepi!=null ) Env.GVN.add_work_all(cepi); // FDX gets stable, might wire, might unify_lift
+      if( cepi!=null ) {
+        Env.GVN.add_work_all(cepi);  // FDX gets stable, might wire, might unify_lift
+        Env.GVN.add_flow_defs(cepi); // Wired Rets might no longer be alive (might unwire)
+      }
     }
     if( chg == mem() && cepi != null ) Env.GVN.add_flow(cepi);
   }
