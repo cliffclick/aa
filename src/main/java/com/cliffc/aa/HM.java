@@ -44,6 +44,7 @@ public class HM {
     PRIMS.put("*"  ,T2.fresh("TOP",T2.fun(int64,T2.fun(int64,int64))));
     PRIMS.put("*2" ,T2.fresh("TOP",T2.fun(int64,int64,int64)));
     PRIMS.put("==0",T2.fresh("TOP",T2.fun(int64,bool)));
+    PRIMS.put("isempty",T2.fresh("TOP",T2.fun(strp,bool)));
 
     // Print a string; int->str
     PRIMS.put("str",T2.fresh("TOP",T2.fun(int64,strp)));
@@ -192,6 +193,46 @@ public class HM {
     }
   }
 
+  public static class Lambda2 extends Syntax {
+    final String _arg0, _arg1;
+    final Syntax _body;
+    T2 _targ0;
+    T2 _targ1;
+    Lambda2(String arg0, String arg1, Syntax body) { _arg0=arg0; _arg1 = arg1; _body=body; _targ0 = T2.tnew(); _targ1 = T2.tnew(); }
+    @Override SB str(SB sb) { return _body.str(sb.p("{ ").p(_arg0).p(" ").p(_arg1).p(" -> ")).p(" }"); }
+    @Override SB p1(SB sb) { return sb.p("{ ").p(_arg0).p(" ").p(_arg1).p(" -> ... } "); }
+    @Override SB p2(SB sb, VBitSet dups) { return _body.p0(sb,dups); }
+    T2 targ0() { T2 targ = _targ0.find(); return targ==_targ0 ? targ : (_targ0=targ); }
+    T2 targ1() { T2 targ = _targ1.find(); return targ==_targ1 ? targ : (_targ1=targ); }
+    @Override T2 hm(Ary<Syntax> work) {
+      // The normal lambda work
+      T2 fun = T2.fun(targ0(),targ1(),_body.find());
+      // Force forwards progress; an Apply may already have lifted _t to
+      // something better than just a plain fun wrapper.
+      return find().unify(fun,work);
+    }
+    @Override void prep_tree( Syntax par, Ary<Syntax> work ) {
+      prep_tree_impl(par,T2.tnew(),work);
+      _body.prep_tree(this,work);
+    }
+    // If found name, inside a Lambda so NOT fresh
+    @Override T2 prep_tree_lookup(String name, Syntax prior) {
+      if( Util.eq(_arg0,name) ) return _targ0;
+      if( Util.eq(_arg1,name) ) return _targ1;
+      return null;
+    }
+    @Override boolean more_work(Ary<Syntax> work) {
+      if( !more_work_impl(work) ) return false;
+      return _body.more_work(work);
+    }
+    @Override void live(IBitSet visit) {
+      if( _t!=null ) _t.live(visit);
+      _targ0.live(visit);
+      _targ1.live(visit);
+      _body .live(visit);
+    }
+  }
+
   public static class Let extends Syntax {
     final String _arg0;
     final Syntax _body, _use;
@@ -249,7 +290,7 @@ public class HM {
     @Override T2 hm(Ary<Syntax> work) {
       T2 tfun = _fun.find();
       if( tfun.is_fresh() )
-        tfun._args[0].push_update(this);
+        tfun.get_fresh().push_update(this);
       T2[] targs = new T2[_args.length+1];
       for( int i=0; i<_args.length; i++ )
         targs[i] = _args[i].find();
@@ -257,7 +298,7 @@ public class HM {
       targs[_args.length] = Util.eq(tfun._name,"->") && work==null ? tfun.find(tfun._args.length-1) : T2.tnew(); // Return is new unconstrained T2
       T2 nfun = T2.fun(targs);
       T2 ufun = tfun.unify(nfun,work);
-      if( _fun.find()!=tfun ) work.push(_fun);
+      if( _fun.find()!=tfun && work!=null ) work.push(_fun);
       // Return element
       T2 trez = ufun.find(_args.length);
       // Force forward progress
@@ -319,13 +360,19 @@ public class HM {
     private T2(@NotNull String name, T2... args) { _name = name; _args= args; _uid=CNT++; }
 
     // A fresh-able type var; a simple wrapper over another type var.
-    boolean is_fresh() { return _fresh!=null; }
+    boolean is_fresh() { assert _fresh==null || (_args.length==1 && _args[0]!=null); return _fresh!=null; }
     // A type var, not a concrete leaf.  Might be U-Fd or not.
     boolean is_leaf () { return _name.charAt(0)=='V' && !is_base(); }
     // Concrete primitive base
     boolean is_base () { return _con!=null; }
     // Is a structural type variable, neither is_leaf nor is_base
     boolean is_tvar() { return _name.charAt(0)!='V' && _con==null; }
+    T2 get_fresh() {
+      assert is_fresh();
+      T2 fun = find(0);
+      assert Util.eq(fun._name,"->");
+      return fun;
+    }
 
     void live(IBitSet visit) {
       if( visit.set(_uid) ) return;
@@ -337,7 +384,7 @@ public class HM {
       if( is_tvar() ) return this; // Shortcut
       T2 u = _args[0];
       if( u==null ) return this; // Shortcut
-      if( u.is_tvar() || u._args[0]==null ) return u; // Shortcut
+      if( u.no_uf() ) return u;  // Shortcut
       // U-F fixup
       while( !u.is_tvar() && u._args[0]!=null ) u = u._args[0];
       T2 v = this, v2;
@@ -346,7 +393,6 @@ public class HM {
     }
     // U-F find on the args array
     T2 find(int i) {
-      assert no_uf();
       T2 u = _args[i];
       T2 uu = u.find();
       return u==uu ? uu : (_args[i]=uu);
@@ -356,9 +402,15 @@ public class HM {
     // U-F union; this becomes that.  If 'this' was used in an Apply, re-check
     // the Apply.
     T2 union(T2 that, Ary<Syntax> work) {
-      assert _args[0]==null; // Cannot union twice
+      assert _args[0]==null;    // Cannot union twice
       if( this==that ) return this;
+      // Worklist: put updates on the worklist for revisiting
       if( work!=null ) work.addAll(_updates); // Re-Apply
+      // Merge update lists, for future unions
+      if( _updates != null ) {
+        if( that._updates==null ) that._updates = _updates;
+        else throw com.cliffc.aa.AA.unimpl();
+      }
       return (_args[0] = that);
     }
 
@@ -370,7 +422,7 @@ public class HM {
       assert no_uf() && t.no_uf();
       assert !t.is_fresh();     // Only can lazy-clone LHS
       if( is_fresh() )          // Peel off fresh lazy & do a fresh-unify
-        return _args[0].find()._fresh(new HashMap<>(),t,work);
+        return get_fresh()._fresh(new HashMap<>(),t,work);
       // Normal unification, with side-effects
       assert DUPS.isEmpty();
       T2 rez = _unify(t,work);
@@ -438,7 +490,7 @@ public class HM {
       // other structure.  When unioned with the clone of the LHS, the result
       // is not part of anything direct... but the structures still have to
       // align.  Make a replica & unify (e.g. stop being lazy).
-      if( t.is_fresh() ) t = t._args[0].find().repl(vars, new HashMap<>());
+      if( t.is_fresh() ) t = t.get_fresh().repl(vars, new HashMap<>());
 
       if( is_base() && t.is_base() ) return fresh_base(t);
       if(   is_leaf() ) { vars.put(this,t); return t; }  // Lazy map LHS tvar to RHS
@@ -484,7 +536,7 @@ public class HM {
       if( this==t ) return false;
       if( t.is_leaf() ) return false; // will be equal after unify
       if( is_base() && t.is_base() && _con==t._con ) return false;
-      if( is_fresh() ) return _args[0].progress(t);
+      if( is_fresh() ) return get_fresh().progress(t);
       if( !Util.eq(_name,t._name) || _args.length!=t._args.length )
         return true;            // Blatently not-equal
       for( int i=0; i<_args.length; i++ )
@@ -519,9 +571,22 @@ public class HM {
       return true;
     }
 
-    void push_update(Apply a) {
-      if( _updates==null ) _updates = new Ary<>(Apply.class);
-      if( _updates.find(a)==-1 ) _updates.push(a);
+    // This is a T2 function that is the target of 'fresh', i.e., this function
+    // might be fresh-unified with some other function.  Push the application
+    // down the function parts; if any changes the fresh-application may make
+    // progress.
+    static final VBitSet UPDATE_VISIT  = new VBitSet();
+    void push_update(Apply a) { UPDATE_VISIT.clear(); push_update_impl(a); }
+    private void push_update_impl(Apply a) {
+      assert no_uf();
+      if( is_leaf() ) {
+        if( _updates==null ) _updates = new Ary<>(Apply.class);
+        if( _updates.find(a)==-1 ) _updates.push(a);
+      } else if( is_tvar() ) {
+        if( UPDATE_VISIT.tset(_uid) ) return;
+        for( int i=0; i<_args.length; i++ )
+          find(i).push_update_impl(a);
+      } else assert is_base();
     }
 
     // -----------------
@@ -570,7 +635,7 @@ public class HM {
     String p(VBitSet dups) { return find()._p(new SB(), new VBitSet(), dups).toString(); }
     private SB _p(SB sb, VBitSet visit, VBitSet dups) {
       assert no_uf();
-      if( is_fresh() ) return _args[0].find()._p(sb.p('#'),visit,dups);
+      if( is_fresh() ) return get_fresh()._p(sb.p('#'),visit,dups);
       if( is_base() ) return sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString() );
       if( is_leaf() ) return sb.p(_name);
       boolean dup = dups.get(_uid);
