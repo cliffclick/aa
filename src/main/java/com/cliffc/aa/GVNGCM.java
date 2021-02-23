@@ -20,7 +20,6 @@ public class GVNGCM {
     Mode(boolean CG) { _CG=CG; }
   }
   public Mode _opt_mode=Mode.Parse;
-  //public boolean _past_init;    // True if after prims are initialized
 
   // Iterative worklists.
   private final Work _work_dead   = new Work("dead"  , false) { @Override public Node apply(Node n) { return n._uses._len == 0 ? n.kill() : null; } };
@@ -90,7 +89,6 @@ public class GVNGCM {
   // Initial state after loading e.g. primitives.
   void init0() {
     for( Work work : _all_works ) assert work.isEmpty();
-    //_past_init=true;
   }
   // Reset is called after a top-level exec exits (e.g. junits) with no parse
   // state left alive.  NOT called after a line in the REPL or a user-call to
@@ -296,7 +294,7 @@ public class GVNGCM {
           }
         }
         // Very expensive assert
-        assert Env.START.more_flow(false)==0; // Initial conditions are correct
+        //assert Env.START.more_flow(false)==0; // Initial conditions are correct
       }
 
       // Remove CallNode ambiguity after worklist runs dry.  This makes a

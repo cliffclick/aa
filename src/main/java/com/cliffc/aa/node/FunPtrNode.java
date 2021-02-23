@@ -116,7 +116,6 @@ public final class FunPtrNode extends Node {
     // Add the "non-generative" set to the TFun structure, but no other
     // structural is available (args and ret are new TVars).
     return new TFun(this,_active_scope,new TVar(),new TVar());
-    //return Env.GVN._past_init ? new TFun(this,_active_scope,new TVar(),new TVar()) : new TVar();
   }
 
   @Override public boolean unify( boolean test ) {
@@ -125,12 +124,6 @@ public final class FunPtrNode extends Node {
     FunNode fun = xfun();
     if( fun==null ) return false;
     if( tvar() instanceof TVDead ) return false;
-    //if( !Env.GVN._past_init ) return false; // Wait till all Unresolveds are inserted ahead of all FunPtrs
-    //boolean progress = false;
-    //if( !(tvar() instanceof TFun) ) {
-    //  if( test ) return true;
-    //  progress = tvar().unify(new_tvar(), test);
-    //}
     TFun tvar = (TFun)tvar();   // Self is always a TFun
     RetNode ret = ret();
     // Build function arguments; "fun" itself is just control.
@@ -138,7 +131,6 @@ public final class FunPtrNode extends Node {
     TVar tret  = ret.tvar();
     if( tvar.args().eq(targs) &&
         tvar.ret () == tret  )
-      //return progress;             // No progress
       return false;             // No progress
     return test || tvar.unify(new TFun(this,tvar._nongen,targs,tret),false);
   }

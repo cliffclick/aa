@@ -90,8 +90,7 @@ public class ParmNode extends PhiNode {
     Type formal = fun.formal(_idx);
     // Good case:
     if( t.isa(formal) ) return t.simple_ptr();
-    //return Type.ALL;
-    return t.simple_ptr();
+    return Type.ALL;
   }
 
   // If an input to a Mem Parm changes, the flow results of other Parms can change

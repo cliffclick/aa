@@ -101,7 +101,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public        TypeFunPtr make_from( BitsFun fidxs ) { return make(fidxs,_nargs,_disp); }
   public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR; // Open display, allows more fields
 
-  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,1,DISP.simple_ptr());
+  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,1,Type.ALL);
   public  static final TypeFunPtr EMPTY  = make(BitsFun.EMPTY,0,TypeMemPtr.NO_DISP);
   public  static final TypeFunPtr NILPTR = make(BitsFun.NIL  ,0,TypeMemPtr.NO_DISP);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,EMPTY};
@@ -206,5 +206,5 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     tf._hash = tf.compute_hash();
     return tf;
   }
-  @Override public TypeFunPtr widen() { return GENERIC_FUNPTR; }
+  @Override public TypeFunPtr widen() { return this; }
 }

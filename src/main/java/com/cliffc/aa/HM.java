@@ -354,7 +354,6 @@ public class HM {
       assert !t.is_fresh();
       T2 t2 = new T2(name,t); // Points to non-fresh
       t2._fresh=name;
-      assert t2.is_fresh();
       return t2;
     }
 
@@ -423,7 +422,7 @@ public class HM {
       assert no_uf() && t.no_uf();
       assert !t.is_fresh();     // Only can lazy-clone LHS
       if( is_fresh() )          // Peel off fresh lazy & do a fresh-unify
-        return get_fresh()._fresh_unify(new HashMap<>(),t,work);
+        return get_fresh()._fresh(new HashMap<>(),t,work);
       // Normal unification, with side-effects
       assert DUPS.isEmpty();
       T2 rez = _unify(t,work);
@@ -469,7 +468,7 @@ public class HM {
       boolean eq1 = rez.cycle_equals(t   );
       if( eq0 ) rez2 = this;
       if( eq1 ) rez2 = t   ;
-      if( eq0 && eq1 ) rez2 = _uid < t._uid ? this : t;
+      if( eq0 && eq1 ) rez2 = _uid<t._uid ? this : t;
       if( rez!=rez2 ) DUPS.put(luid,rez2);
       // Return new unified T2
       return rez2;
@@ -480,7 +479,7 @@ public class HM {
 
     // Apply 'this' structure on 't'; no modifications to 'this'.
     // 'vars' maps from the cloned LHS to the RHS replacement.
-    private T2 _fresh_unify( HashMap<T2, T2> vars, T2 t, Ary<Syntax> work ) {
+    private T2 _fresh( HashMap<T2, T2> vars, T2 t, Ary<Syntax> work ) {
       assert no_uf() && t.no_uf();
       T2 prior = vars.get(this);
       if( prior!=null )         // Been there, done that?  Return prior mapping
@@ -490,7 +489,7 @@ public class HM {
       // RHS is also a lazy clone, which if cloned, will not be part of any
       // other structure.  When unioned with the clone of the LHS, the result
       // is not part of anything direct... but the structures still have to
-      // align for the returned T2.  Make a replica & unify (e.g. stop being lazy).
+      // align.  Make a replica & unify (e.g. stop being lazy).
       if( t.is_fresh() ) t = t.get_fresh().repl(vars, new HashMap<>());
 
       if( is_base() && t.is_base() ) return fresh_base(t);
@@ -504,7 +503,7 @@ public class HM {
       // Structural recursion unification, lazy on LHS
       T2[] args = new T2[_args.length];
       for( int i=0; i<_args.length; i++ )
-        args[i] = find(i)._fresh_unify(vars,t.find(i),work);
+        args[i] = find(i)._fresh(vars,t.find(i),work);
 
       return new T2(_name,args);
     }

@@ -4,6 +4,7 @@ import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TArgs;
 import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
@@ -279,12 +280,11 @@ public class CallNode extends Node {
     if( fidx == -1 && !fidxs.above_center() && !fidxs.test(1)) {
       FunPtrNode fptr = least_cost(fidxs, unk); // Check for least-cost target
       if( fptr != null ) {
+        if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
         if( fptr.display()._val.isa(dsp()._val) )
           set_dsp(fptr.display());
         set_fdx(fptr);          // Resolve to 1 choice
         xval();                 // Force value update; least-cost LOWERS types (by removing a choice)
-        add_flow_use_extra(fptr);
-        if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
         return this;
       }
     }
@@ -493,10 +493,7 @@ public class CallNode extends Node {
     CallEpiNode cepi = cepi();
     if( chg == fdx() ) {           // FIDX falls to sane from too-high
       Env.GVN.add_flow_defs(this); // All args become alive
-      if( cepi!=null ) {
-        Env.GVN.add_work_all(cepi);  // FDX gets stable, might wire, might unify_lift
-        Env.GVN.add_flow_defs(cepi); // Wired Rets might no longer be alive (might unwire)
-      }
+      if( cepi!=null ) Env.GVN.add_work_all(cepi); // FDX gets stable, might wire, might unify_lift
     }
     if( chg == mem() && cepi != null ) Env.GVN.add_flow(cepi);
   }
@@ -675,7 +672,7 @@ public class CallNode extends Node {
 
   // Gather incoming args.  NOT an application point (yet), that is a CallEpi.
   @Override public TVar new_tvar() { return _defs._len > DSP_IDX ? new TArgs(this,_unpacked) : new TVar(this); }
-
+  
   @Override public boolean unify( boolean test ) {
     if( tvar() instanceof TArgs ) return false;
     if(_defs._len <= DSP_IDX ) return false;
@@ -730,30 +727,30 @@ public class CallNode extends Node {
             }
     }
 
-    //// Now do an arg-check.  No more than 1 unresolved, so the error message is
-    //// more sensible.
-    //BitsFun.Tree<BitsFun> tree = fidxs.tree();
-    //for( int j=ARG_IDX; j<nargs(); j++ ) {
-    //  Type actual = arg(j).sharptr(mem());
-    //  Ary<Type> ts=null;
-    //  for( int fidx : fidxs ) {
-    //    if( fidx==0 ) continue;
-    //    for( int kid=fidx; kid!=0; kid = tree.next_kid(fidx,kid) ) {
-    //      FunNode fun = FunNode.find_fidx(kid);
-    //      if( fun==null || fun.is_dead() ) continue;
-    //      TypeTuple formals = fun._sig._formals; // Type of each argument
-    //      if( fun.parm(j)==null ) continue;  // Formal is dead
-    //      Type formal = formals.at(j);
-    //      if( actual.isa(formal) ) continue; // Actual is a formal
-    //      if( fast ) return ErrMsg.FAST;     // Fail-fast
-    //      if( ts==null ) ts = new Ary<>(new Type[1],0);
-    //      if( ts.find(formal) == -1 ) // Dup filter
-    //        ts.push(formal);          // Add broken type
-    //    }
-    //  }
-    //  if( ts!=null )
-    //    return ErrMsg.typerr(_badargs[j-ARG_IDX+1],actual, mem()._val,ts.asAry());
-    //}
+    // Now do an arg-check.  No more than 1 unresolved, so the error message is
+    // more sensible.
+    BitsFun.Tree<BitsFun> tree = fidxs.tree();
+    for( int j=ARG_IDX; j<nargs(); j++ ) {
+      Type actual = arg(j).sharptr(mem());
+      Ary<Type> ts=null;
+      for( int fidx : fidxs ) {
+        if( fidx==0 ) continue;
+        for( int kid=fidx; kid!=0; kid = tree.next_kid(fidx,kid) ) {
+          FunNode fun = FunNode.find_fidx(kid);
+          if( fun==null || fun.is_dead() ) continue;
+          TypeTuple formals = fun._sig._formals; // Type of each argument
+          if( fun.parm(j)==null ) continue;  // Formal is dead
+          Type formal = formals.at(j);
+          if( actual.isa(formal) ) continue; // Actual is a formal
+          if( fast ) return ErrMsg.FAST;     // Fail-fast
+          if( ts==null ) ts = new Ary<>(new Type[1],0);
+          if( ts.find(formal) == -1 ) // Dup filter
+            ts.push(formal);          // Add broken type
+        }
+      }
+      if( ts!=null )
+        return ErrMsg.typerr(_badargs[j-ARG_IDX+1],actual, mem()._val,ts.asAry());
+    }
 
     return null;
   }

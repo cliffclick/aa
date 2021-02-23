@@ -86,7 +86,6 @@ public class Env implements AutoCloseable {
     SCP_0.init();               // Add base types
     STK_0 = SCP_0.stk();
 
-    GVN._opt_mode=GVNGCM.Mode.Pause;
     STK_0.keep();               // Inputs & type will rapidly change
     for( PrimNode prim : PrimNode.PRIMS() )
       STK_0.add_fun(null,prim._name,(FunPtrNode) GVN.xform(prim.as_fun(GVN)));
