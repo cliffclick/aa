@@ -735,23 +735,26 @@ public class TestParse {
   @Test public void testParse15() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
-    test("noinline_map={lst fcn -> lst ? (noinline_map(lst.0,fcn),fcn lst.1)};"+
-         "in_int=(((0,2),3),5);"+          // List of 3 ints
-         "in_str= ((0,\"abc\"),\"def\");"+ // List of 2 strings
-         "out_str =noinline_map(in_int,str:{int->str});"+        // Map over ints with int->str  conversion, returning a list of strings
-         "out_bool=noinline_map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
-         "(out_str,out_bool)",
-         Type.ANY);
+    test_ptr("noinline_map={lst fcn -> lst ? fcn lst.1};"+
+        "in_int=(0,2);"+       // List of ints
+        "in_str=(0,\"abc\");"+ // List of strings
+        "out_str =noinline_map(in_int,str:{int->str});"+        // Map over ints with int->str  conversion, returning a list of strings
+        "out_bool=noinline_map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
+        "(out_str,out_bool)",
+      "(*\"2\",int1)");
 
-    // id accepts and returns both ints and reference types (arrays).
-    test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",TypeStruct.make_tuple(Type.XNIL,TypeInt.con(5),TypeInt.con(3)));
+
+
+
     // recursive unification.  Trivially types as a dead fcn ptr.
     test_isa("x={x -> x x}",TypeFunPtr.make(BitsFun.make0(46),3,tdisp));
     // recursive unification.  Passing an ID to x then passes ID to ID, returning ID.
-    test_isa("x={x -> x x}; x({y->y})",TypeFunPtr.make(BitsFun.make0(49),4,tdisp));
+    test_isa("x={x -> x x}; x({y->y})",TypeFunPtr.make(BitsFun.make0(47),4,tdisp));
     // Looks like recursive unification, but x is a function of 0 arguments,
     // being called with 1 argument.  Error to call it.
     testerr("x={x x};x(1)","Passing 1 arguments to x which takes 0 arguments",9);
+    // id accepts and returns both ints and reference types (arrays).
+    test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",TypeStruct.make_tuple(Type.XNIL,TypeInt.INT8,TypeInt.con(3)));
     // Should be typable with H-M
     test_ptr("noinline_map={lst fcn -> lst ? fcn lst.1};"+
              "in_int=(0,2);"+       // List of ints
@@ -770,12 +773,12 @@ public class TestParse {
       "(*(0, *\"2\")?, *(0, int1))");
     // map being called with 2 different functions & lists
     test("noinline_map={lst fcn -> lst ? (noinline_map(lst.0,fcn),fcn lst.1)};"+
-         "lst_int=(((0,2),3),5);"+ // List of 3 ints
-         "lst_str= ((0,\"abc\"),\"def\");"+ // List of 2 strings
-         "lst_istr=noinline_map(lst_int,str);"+      // Map over ints with int->str conversion, returning a list of strings
-         "lst_bool=noinline_map(lst_str,{str:str ->str==\"abc\"});"+ // Map over strs with str->bool conversion, returns bools
-         "(lst_istr,lst_bool)",
-         Type.ANY);
+        "in_int=(((0,2),3),5);"+          // List of 3 ints
+        "in_str= ((0,\"abc\"),\"def\");"+ // List of 2 strings
+        "out_str =noinline_map(in_int,str:{int->str});"+        // Map over ints with int->str  conversion, returning a list of strings
+        "out_bool=noinline_map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
+        "(out_str,out_bool)",
+      Type.ANY);
 
   }
 

@@ -210,9 +210,18 @@ public class FunNode extends RegionNode {
     // argument can be ALL (all args allowed, including errors).
     if( !is_forward_ref() && !is_prim() ) {
       ParmNode[] parms = parms();
+      TypeFunSig progress = _sig;
       for( int i=1; i<parms.length; i++ )
         if( (parms[i]==null || parms[i]._live==TypeMem.DEAD) && _sig._formals.at(i)!=Type.ALL )
-          { _sig = _sig.make_from_arg(i,Type.ALL); return this; }
+          _sig = _sig.make_from_arg(i,Type.ALL);
+      // Can resolve some least_cost choices
+      if( progress != _sig ) {
+        FunPtrNode fptr = fptr();
+        if( fptr != null )
+          for( Node use : fptr()._uses )
+            if( use instanceof UnresolvedNode )
+              Env.GVN.add_reduce_uses(use);
+      }
     }
 
     return null;

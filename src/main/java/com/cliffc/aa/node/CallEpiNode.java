@@ -440,6 +440,7 @@ public final class CallEpiNode extends Node {
         }
     }
     del(_defs.find(ret));
+    Env.GVN.add_reduce(ret);
     assert sane_wiring();
     return this;
   }
@@ -474,12 +475,16 @@ public final class CallEpiNode extends Node {
     TVar tfunv = fdx.tvar();
     if( tfunv instanceof TVDead ) return false; // Not gonna be a TFun
     boolean progress = false;
+    // Force function to be a TFun
     if( !(tfunv instanceof TFun) ) { // Progress
       if( test ) return true;        // Testing
       progress = tfunv.unify(new TFun(fdx,null,new TVar(),new TVar()),test);
       tfunv = fdx.tvar();
     }
-    // Call transitions from TVar to TArgs.
+    // Force this to be a TRet
+    
+
+    
     // Actual progress only if the structure changes.
     if( !((TFun)tfunv).fresh_unify(call().tvar(),tvar(),test,this) )
       return progress;          // No progress anyways
@@ -506,7 +511,7 @@ public final class CallEpiNode extends Node {
     for( int i=MEM_IDX+1;i<tmvar.len(); i++ ) {
       Type t3 = tmvar.parm(i).find_tvar(ttcall.at(i),tv);
       // Found in input args; JOIN with the call return type.
-      if( t3 != null ) return t3.widen().join(t);
+    if( t3 != null ) return t3.widen().join(t);
     }
     return t;                   // no change
   }
