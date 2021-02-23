@@ -215,8 +215,6 @@ public class TVar implements Comparable<TVar> {
     if( this==tv ) return 0;
     if( this instanceof TVDead   && !( tv  instanceof TVDead  ) ) return  1; // TVDead   always loses
     if( tv   instanceof TVDead   && !(this instanceof TVDead  ) ) return -1;
-    if( this instanceof TVUnused && !( tv  instanceof TVUnused) ) return -1; // TVUnused always wins
-    if( tv   instanceof TVUnused && !(this instanceof TVUnused) ) return  1;
     if( this instanceof TNil   ) return -1; // TNil loses second
     if( tv   instanceof TNil   ) return  1;
     boolean istv0 =    getClass()==TVar.class;
