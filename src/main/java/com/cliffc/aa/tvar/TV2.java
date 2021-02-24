@@ -45,11 +45,11 @@ public class TV2 {
   public String _alloc_site;    // Creation site; used to track excessive creation.
 
   // Common constructor
-  private TV2(@NotNull String name, HashMap<Object,TV2> args, Type base, HashSet<Node> ns, @NotNull String alloc_site) {
+  private TV2(@NotNull String name, HashMap<Object,TV2> args, Type type, HashSet<Node> ns, @NotNull String alloc_site) {
     _uid = UID++;
     _name = name;
     _args = args;
-    _base = base;
+    _type = type;
     _deps = null;               // Lazy added
     _ns = ns;
     _alloc_site = alloc_site;
@@ -69,15 +69,15 @@ public class TV2 {
   // Make a new TV2 attached to a Node.
   TV2 make_new(@NotNull String name, Node n, @NotNull String alloc_site) {
     HashSet<Node> ns = new HashSet<>();  ns.add(n);
-    TV2 tv2 = new TV2(name,null,ns,alloc_site);
-    assert tv2.is_leaf() && _args==null && _base==null && !tv2.is_fresh() && !tv2.is_base();
+    TV2 tv2 = new TV2(name,null,null,ns,alloc_site);
+    assert tv2.is_leaf() && _args==null && _type==null && !tv2.is_fresh() && !tv2.is_base();
     return tv2;
   }
   // Make a new Fresh TV2 attached to a prior TV2
   TV2 make_fresh(TV2 tv, @NotNull String alloc_site) {
     HashMap<Object,TV2> args = new HashMap<>();
     args.put("Fresh",tv);
-    TV2 fresh = new TV2("Fresh",args,tv._ns,alloc_site);
+    TV2 fresh = new TV2("Fresh",args,null,tv._ns,alloc_site);
     assert fresh.is_fresh() && _args.size()==1;
     return fresh;
   }
@@ -88,14 +88,14 @@ public class TV2 {
     return tv2;
   }
   // Structural constructor
-  TV2 make_tv(@NotNull String name, Node n, @NotNull String alloc_site, TV2... args) {
-    ... need inidices for args...
+  TV2 make_tv(@NotNull String name, Node n, @NotNull String alloc_site, HashMap<Object,TV2> args) {
     HashSet<Node> ns = new HashSet<>();  ns.add(n);
     TV2 tv2 = new TV2(name,args,null,ns,alloc_site);
     assert !is_base() && !is_leaf() && !is_fresh();
     return tv2;
   }
 
+  // --------------------------------------------
   // Classic Tarjan U-F with rollup
   public TV2 find() {
     if( !is_unified() ) return this;
@@ -106,12 +106,74 @@ public class TV2 {
     while( v != u ) { v._args.put("Unified",u); v = v.get_unified(); }
     return u;
   }
+  
+  // U-F union; this becomes that.  If 'this' was used in an CallEpi/Apply,
+  // re-check the CallEpi.
+  TV2 union(TV2 that, Ary<Node> work) {
+    assert is_leaf() && !is_unified(); // Only leafs union; more complex things unify
+    if( this==that ) return that;
+    _args.clear();
+    _args.put("Unified",that);
+    assert is_unified() && !is_leaf();
+    // Worklist: put updates on the worklist for revisiting
+    if( work!=null ) work.addAll(_deps); // Re-CallEpi
+    // Merge update lists, for future unions
+    if( _deps != null ) {
+      if( that._deps==null ) that._deps = _deps;
+      else that._deps.addAll(this._deps);
+      _deps=null;
+    }
+    // Merge Node list, for easier debugging
+    if( _ns != null ) {
+      if( that._ns==null ) that._ns = _ns;
+      else that._ns.addAll(this._ns);
+      this._ns=null;
+    }
+    ALLOCS.get(_alloc_site)._free++;
+    return that;
+  }
 
-  // Unification.  Returns True if progress.
-  boolean unify(TV2 tv, boolean test) {
+
+  // --------------------------------------------
+  // Used in the recursive unification process.  During fresh_unify tracks the
+  // mapping from LHS TV2s to RHS TVs.
+  static private HashMap<TV2,TV2> VARS = new HashMap<>();
+  // Used in the recursive unification process.  During unify detects cycles,
+  // to allow cyclic unification.
+  static private NonBlockingHashMapLong<TV2> DUPS = new NonBlockingHashMapLong<>();
+  
+  // Structural unification.  Both 'this' and that' are the same afterwards and
+  // returns the unified bit.  Returns True if progress.
+  boolean unify(TV2 that, Ary<Node> work, boolean test) {
+    assert !this.is_unified() && !that.is_unified();
+    if( this==that ) return false;
+    assert !that.is_fresh();    // Only can lazy-clone LHS
+    // Fresh_unify does not modify the LHS 'this', but forces the RHS 'that' to
+    // match structurally.
+    boolean progress;
+    if( this.is_fresh() ) {     // Peel off fresh lazy & do a fresh-unify
+      assert VARS.isEmpty();
+      progress = get_fresh()._fresh_unify(that,work,test);
+      VARS.clear();
+    } else {
+      // Normal unification, with side-effects allows both LHS and RHS
+      assert DUPS.isEmpty();
+      progress = _unify(that,work,test);
+      DUPS.clear();
+    }
+    return progress;
+  }
+
+  private boolean _unify(TV2 that, Ary<Node> work, boolean test) {
     throw com.cliffc.aa.AA.unimpl();
   }
+
+  private boolean _fresh_unify(TV2 that, Ary<Node> work, boolean test) {
+    throw com.cliffc.aa.AA.unimpl();
+  }
+
   
+  // --------------------------------------------
   // Track allocation statistics
   static private class ACnts { int _malloc, _free; }
   static private HashMap<String,ACnts> ALLOCS = new HashMap<>(); // Counts at alloc sites
@@ -133,10 +195,10 @@ public class TV2 {
       return sb.p("V").p(_uid).p("$");
     // Print all unioned nodes
     if( _ns!=null && _ns.size() != 0 ) { // Have any
-      for( Node tn : _ns.iterator() ) // For all unioned
-        if( !tn.is_dead() ) {   // Dead lazily cleared out, do not both  to print
+      for( Node tn : _ns )               // For all unioned
+        if( !tn.is_dead() ) { // Dead lazily cleared out, do not both  to print
           sb.p('N').p(tn.uid()).p(':');
-          if( !debug ) break;   // Debug, see them all; non-debug just the first
+          if( !debug ) break; // Debug, see them all; non-debug just the first
         }
       sb.unchar();
     } else                      // No unioned nodes
