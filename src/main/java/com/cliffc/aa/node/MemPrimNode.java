@@ -17,9 +17,9 @@ public abstract class MemPrimNode extends PrimNode {
   @Override public String xstr() { return _name+(bal_close()==null?"":bal_close()); }
 
   @Override public ErrMsg err(boolean fast) {
-    Type tmem = mem().val();
-    Type tadr = adr().val();
-    Type tidx = _defs._len <= 3 ? Type.XNIL : idx().val();
+    Type tmem = mem()._val;
+    Type tadr = adr()._val;
+    Type tidx = _defs._len <= 3 ? Type.XNIL : idx()._val;
     if( tmem==Type.ANY ) return null; // No error
     if( tadr==Type.ANY ) return null; // No error
     if( tidx==Type.ANY ) return null; // No error
@@ -72,8 +72,8 @@ public abstract class MemPrimNode extends PrimNode {
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
       if( def==adr() ) return TypeMem.ALIVE;
       if( _defs._len>3 && def==idx() ) return TypeMem.ALIVE;
-      Type tmem = mem().val();
-      Type tptr = adr().val();
+      Type tmem = mem()._val;
+      Type tptr = adr()._val;
       if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
       if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
       return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,"");
@@ -153,7 +153,7 @@ public abstract class MemPrimNode extends PrimNode {
       throw unimpl();                        // Should not reach here
     }
     @Override BitsAlias escapees() {
-      Type adr = adr().val();
+      Type adr = adr()._val;
       if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? BitsAlias.EMPTY : BitsAlias.FULL;
       return ((TypeMemPtr)adr)._aliases;
     }

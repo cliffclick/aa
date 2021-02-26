@@ -3,10 +3,10 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.*;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
-import java.util.HashSet;
+import java.util.HashMap;
 
 import static com.cliffc.aa.Env.GVN;
 
@@ -16,7 +16,6 @@ import static com.cliffc.aa.Env.GVN;
 public final class FunPtrNode extends Node {
   public String _name;          // Optional for debug only
   private final ErrMsg _referr;
-  private final HashSet<TVar> _active_scope;
 
   // Every var use that results in a function, so actually only these FunPtrs,
   // needs to make a "fresh" copy before unification.  "Fresh" makes a
@@ -25,14 +24,13 @@ public final class FunPtrNode extends Node {
   // interesting thing is when an out-of-scope TVar uses the same TVar
   // internally in different parts - the copy replicates this structure.  When
   // unified, it forces equivalence in the same places.
-  public  FunPtrNode( String name, RetNode ret, Env e ) { this(name,null,e,ret,e==null ? Node.con(TypeMemPtr.NO_DISP) : e._scope.ptr()); }
-  public  FunPtrNode( RetNode ret, Env e, Node display ) { this(null,null,e,ret,display); }
+  public  FunPtrNode( String name, RetNode ret, Env e ) { this(name,null,ret,e==null ? Node.con(TypeMemPtr.NO_DISP) : e._scope.ptr()); }
+  public  FunPtrNode( RetNode ret, Node display ) { this(null,null,ret,display); }
   // For forward-refs only; super weak display & function.
-  private FunPtrNode( String name, ErrMsg referr, Env e, RetNode ret, Node display ) {
+  private FunPtrNode( String name, ErrMsg referr, RetNode ret, Node display ) {
     super(OP_FUNPTR,ret,display);
     _name = name;
     _referr = referr;
-    _active_scope = e == null ? null : e.collect_active_scope();
   }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }
@@ -112,27 +110,32 @@ public final class FunPtrNode extends Node {
     return def==ret() ? TypeMem.ANYMEM : TypeMem.ESCAPE;
   }
 
-  @Override public TVar new_tvar() {
-    // Add the "non-generative" set to the TFun structure, but no other
-    // structural is available (args and ret are new TVars).
-    return new TFun(this,_active_scope,new TVar(),new TVar());
+  @Override public TV2 new_tvar(String alloc_site) {
+    return TV2.make_fresh(TV2.make("Fun",this,alloc_site),alloc_site);
   }
 
   @Override public boolean unify( boolean test ) {
     // Build a HM tvar (args->ret), same as HM.java Lambda does.
     // FunNodes are just argument collections (no return).
+    RetNode ret = ret();
     FunNode fun = xfun();
     if( fun==null ) return false;
-    if( tvar() instanceof TVDead ) return false;
-    TFun tvar = (TFun)tvar();   // Self is always a TFun
-    RetNode ret = ret();
+    TV2 tvar = tvar().get_fresh();  assert tvar.isa("Fun"); // Self is always a Fresh-Fun
+    TV2 tret = ret.tvar();  assert tret.isa("Ret"); // Ret  is always a Ret
+
+    // Check for progress before allocation
+    Node[] parms = fun.parms();
+    TV2 tvar_args = tvar.get("Args");
+    TV2 tvar_ret  = tvar.get("Ret" );
+    if( tvar_args!=null && tvar_args.eq(parms) && tvar_ret==tret ) return false; // Equal parts
+    if( test ) return true;     // Will make progress
     // Build function arguments; "fun" itself is just control.
-    TArgs targs = new TArgs(fun,true);
-    TVar tret  = ret.tvar();
-    if( tvar.args().eq(targs) &&
-        tvar.ret () == tret  )
-      return false;             // No progress
-    return test || tvar.unify(new TFun(this,tvar._nongen,targs,tret),false);
+    TV2 targ = TV2.make("Args",fun,"FunPtr_unify_Args",parms);
+    HashMap<Object,TV2> args = new HashMap<Object,TV2>(){{ put("Args",targ);  put("Ret",tret); }};
+    TV2 tfun = TV2.make("Fun",this,"FunPtr_unify_Fun",args);
+    boolean progress = tvar.unify(tfun,test);
+    assert progress;            // Will make progress
+    return progress;
   }
 
   // Filter out all the wrong-arg-count functions
@@ -170,7 +173,7 @@ public final class FunPtrNode extends Node {
     gvn.add_flow(ret);
     // Display is limited to any one of the current lexical scopes.
     TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS,TypeObj.ISUSED);
-    return new FunPtrNode( name, ErrMsg.forward_ref(unkref,name),null,ret,Node.con(tdisp));
+    return new FunPtrNode( name, ErrMsg.forward_ref(unkref,name),ret,Node.con(tdisp));
   }
 
   // True if this is a forward_ref

@@ -1,11 +1,9 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
-import com.cliffc.aa.tvar.TVar;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
@@ -15,7 +13,7 @@ import java.util.function.Predicate;
 import static com.cliffc.aa.AA.unimpl;
 
 // Sea-of-Nodes
-public abstract class Node implements Cloneable, TNode {
+public abstract class Node implements Cloneable {
   static final byte OP_CALL   = 1;
   static final byte OP_CALLEPI= 2;
   static final byte OP_CAST   = 3;
@@ -82,28 +80,24 @@ public abstract class Node implements Cloneable, TNode {
 
 
   public int _uid;      // Unique ID, will have gaps, used to give a dense numbering to nodes
-  @Override public int uid() { return _uid; }
   final byte _op;       // Opcode (besides the object class), used to avoid v-calls in some places
   public byte _keep;    // Keep-alive in parser, even as last use goes away
   public boolean _elock;// Edge-lock: cannot modify edges because messes up hashCode & GVN
   public Type _val;     // Value; starts at ALL and lifts towards ANY.
   public TypeMem _live; // Liveness; assumed live in gvn.iter(), assumed dead in gvn.gcp().
   // Hindley-Milner inspired typing, or CNC Thesis based congruence-class
-  // typing.  This is a Type Variable which can unify with other TVars forcing
+  // typing.  This is a Type Variable which can unify with other TV2s forcing
   // Type-equivalence (JOIN of unified Types), and includes gross structure
   // (functions, structs, pointers, or simple Types).
-  @NotNull TVar _tvar;
+  @NotNull TV2 _tvar;
   // H-M Type-Variables
-  public TVar tvar() {
-    TVar tv = _tvar.find();     // Do U-F step
+  public TV2 tvar() {
+    TV2 tv = _tvar.find();     // Do U-F step
     return tv == _tvar ? tv : (_tvar = tv); // Update U-F style in-place.
   }
-  public TVar _tvar() { return _tvar; } // For debug prints
-  public TVar tvar(int x) { return in(x).tvar(); } // nth TVar
-  public final void reset_tvar() { _tvar = _tvar.reset_tnode(this, new_tvar()); }
-  public TVar new_tvar() { return new TVar(this); }
-  public TNode[] parms() { throw unimpl(); } // Used to build structural TVars
-  public Type val() { return _val; }
+  public TV2 tvar(int x) { return in(x).tvar(); } // nth TV2
+  public final void reset_tvar(String alloc_site) { _tvar.reset(this); _tvar = new_tvar(alloc_site); }
+  public TV2 new_tvar(String alloc_site) { return TV2.make_leaf(this,alloc_site); }
 
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)
@@ -214,7 +208,7 @@ public abstract class Node implements Cloneable, TNode {
   public Node subsume( Node nnn ) {
     assert !nnn.is_dead();
     // When replacing one node with another, unify their type vars
-    if( !is_dead() ) tvar().unify(nnn.tvar(), false);
+    if( !is_dead() ) tvar().unify(nnn.tvar(),false);
     insert(nnn);                // Change graph shape
     nnn.keep();                 // Keep-alive
     kill();                     // Delete the old, and anything it uses
@@ -264,7 +258,7 @@ public abstract class Node implements Cloneable, TNode {
     for( Node def : defs ) if( def != null ) def._uses.add(this);
     _val  = Type.ALL;
     _live = all_live();
-    _tvar = new_tvar();
+    _tvar = new_tvar("constructor");
   }
 
   // Is a primitive
@@ -278,7 +272,7 @@ public abstract class Node implements Cloneable, TNode {
       n._uid = newuid();                  // A new UID
       n._defs = new Ary<>(new Node[1],0); // New empty defs
       n._uses = new Ary<>(new Node[1],0); // New empty uses
-      n._tvar = n.new_tvar();
+      n._tvar = n.new_tvar("copy_constructor");
       n._elock=false;           // Not in GVN
       if( copy_edges )
         for( Node def : _defs )
@@ -289,7 +283,7 @@ public abstract class Node implements Cloneable, TNode {
   }
 
   // Short string name
-  @Override public String xstr() { return STRS[_op]; } // Self short name
+  public String xstr() { return STRS[_op]; } // Self short name
   String  str() { return xstr(); }    // Inline longer name
   @Override public String toString() { return dump(0,new SB(),false).toString(); }
   // Dump
@@ -680,10 +674,10 @@ public abstract class Node implements Cloneable, TNode {
   public Node do_flow() {
     Node progress=null;
     // Perform unification
-    TVar tv = tvar();
+    TV2 tv = tvar();
     if( unify(false) ) {
       progress = this;          // Progress
-      if( tv.getClass() == TVar.class && tvar().getClass() != TVar.class )
+      if( !Util.eq(tv.name(),tvar().name()) )
         Env.GVN.add_flow_uses(this); // Unification gained structure; neighbors can unify
     }
 
@@ -889,7 +883,7 @@ public abstract class Node implements Cloneable, TNode {
     for( Node use : _uses )                     use.walk_opt(visit);
   }
 
-  @Override public boolean is_dead() { return _uses == null; }
+  public boolean is_dead() { return _uses == null; }
   public void set_dead( ) { _defs = _uses = null; }   // TODO: Poor-mans indication of a dead node, probably needs to recycle these...
 
   // Overridden in subclasses that return TypeTuple value types.  Such nodes

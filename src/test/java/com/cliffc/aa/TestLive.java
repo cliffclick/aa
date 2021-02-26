@@ -78,14 +78,14 @@ public class TestLive {
     for( Node n : new Node[]{mmm,fdx,fdy,nnn,mem,ptr,scope} ) {
       if( n != mem && n != scope )
         assertTrue(n.live(gvn._opt_mode).isa(n._live));
-      assertEquals(n.val(),n.value(gvn._opt_mode));
+      assertEquals(n._val,n.value(gvn._opt_mode));
     }
 
     // Check liveness base case
     scope.xliv(GVNGCM.Mode.PesiNoCG);
     // Since simple forwards-flow, the default memory is known UNUSED.
     // However, we got provided at least one object.
-    TypeMem expected_live = ((TypeMem) mem.val()).flatten_fields();
+    TypeMem expected_live = ((TypeMem) mem._val).flatten_fields();
     assertEquals(scope._live,expected_live);
 
     // Check liveness recursive back one step

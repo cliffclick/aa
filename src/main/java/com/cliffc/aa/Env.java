@@ -2,7 +2,7 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.TVar;
+import com.cliffc.aa.tvar.TV2;
 import java.util.HashSet;
 
 public class Env implements AutoCloseable {
@@ -182,7 +182,7 @@ public class Env implements AutoCloseable {
   // Test support, return top-level name type
   Type lookup_valtype( String name ) {
     Node n = lookup(name);
-    if( !(n instanceof UnresolvedNode) ) return n.val();
+    if( !(n instanceof UnresolvedNode) ) return n._val;
     // For unresolved, use the ambiguous type
     return n.value(GVNGCM.Mode.Opto);
   }
@@ -220,8 +220,8 @@ public class Env implements AutoCloseable {
 
   // Collect TVars from all variables in-scope.  Used to build a
   // "non-generative" set of TVars for Hindley-Milner typing.
-  public HashSet<TVar> collect_active_scope() {
-    HashSet<TVar> tvars = new HashSet<>();
+  public HashSet<TV2> collect_active_scope() {
+    HashSet<TV2> tvars = new HashSet<>();
     Env e = this;
     while( e!=null ) {
       for( Node def : _scope.stk()._defs )

@@ -1,8 +1,9 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
-import com.cliffc.aa.tvar.TArgs;
-import com.cliffc.aa.tvar.TVar;
+import com.cliffc.aa.Env;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Parse;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
@@ -213,7 +214,7 @@ public class CallNode extends Node {
             add_def( nnn.fld(i));
           add_def(fdx);          // FIDX is last
           _unpacked = true;      // Only do it once
-          reset_tvar();          // Arg layout changes
+          reset_tvar("call_unpack"); // Arg layout changes
           keep().xval();         // Recompute value, this is not monotonic since replacing tuple with args
           GVN.add_work_all(unkeep());// Revisit after unpacking
           return this;
@@ -676,14 +677,9 @@ public class CallNode extends Node {
   }
 
   // Gather incoming args.  NOT an application point (yet), that is a CallEpi.
-  @Override public TVar new_tvar() { return _defs._len > DSP_IDX ? new TArgs(this,_unpacked) : new TVar(this); }
-  
-  @Override public boolean unify( boolean test ) {
-    if( tvar() instanceof TArgs ) return false;
-    if(_defs._len <= DSP_IDX ) return false;
-    return test || tvar().unify(new TArgs(this,_unpacked),test);
-  }
+  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Args",this,alloc_site,parms());  }
 
+  @Override public boolean unify( boolean test ) { assert tvar().isa("Args"); return false; }
 
   @Override public ErrMsg err( boolean fast ) {
     // Fail for passed-in unknown references directly.
@@ -777,7 +773,7 @@ public class CallNode extends Node {
     return _rpc==call._rpc;
   }
   @Override Node is_pure_call() { return fdx().is_pure_call()==null ? null : mem(); }
-  @Override public TNode[] parms() {
+  public Node[] parms() {
     return Arrays.copyOf(_defs._es,_defs._len-1); // All defs, except the FIDX.
   }
 }

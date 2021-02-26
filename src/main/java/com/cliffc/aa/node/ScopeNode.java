@@ -98,7 +98,7 @@ public class ScopeNode extends Node {
 
     Node mem = mem();
     Node rez = rez();
-    Type trez = rez==null ? null : rez.val();
+    Type trez = rez==null ? null : rez._val;
     if( Env.GVN._opt_mode != GVNGCM.Mode.Parse &&   // Past parsing
         rez != null &&          // Have a return result
         // If type(rez) can never lift to any TMP, then we will not return a
@@ -119,8 +119,8 @@ public class ScopeNode extends Node {
   // because this "turns around" the incoming live memory to also be the
   // demanded/used memory.
   static TypeMem compute_live_mem(Node mem, Node rez) {
-    Type tmem = mem.val();
-    Type trez = rez.val();
+    Type tmem = mem._val;
+    Type trez = rez._val;
     if( !(tmem instanceof TypeMem ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
     if( TypeMemPtr.OOP.isa(trez) ) return (TypeMem)tmem; // All possible pointers, so all memory is alive
     if( !(trez instanceof TypeMemPtr) ) return TypeMem.ANYMEM; // Not a pointer, basic live only

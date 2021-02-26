@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
@@ -28,5 +29,8 @@ public class ThretNode extends Node {
     if( def==rez () ) return TypeMem.ESCAPE;
     if( def==thunk()) return TypeMem.ALIVE;
     throw com.cliffc.aa.AA.unimpl();
+  }
+  @Override public TV2 new_tvar(String alloc_site) {
+    return TV2.make("Ret",this,alloc_site,in(0),in(1),in(2));
   }
 }

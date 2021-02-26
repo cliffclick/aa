@@ -141,8 +141,8 @@ public class Parse implements Comparable<Parse> {
     ArrayList<Node.ErrMsg> errs0 = new ArrayList<>(errs);
     Collections.sort(errs0);
 
-    Type res = scope().rez().val(); // New and improved result
-    Type mem = scope().mem().val();
+    Type res = scope().rez()._val; // New and improved result
+    Type mem = scope().mem()._val;
     return new TypeEnv(res, mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM),_e,errs0.isEmpty() ? null : errs0);
   }
 
@@ -886,7 +886,7 @@ public class Parse implements Comparable<Parse> {
     // Push an extra hidden display argument.  Similar to java inner-class ptr
     // or when inside of a struct definition: 'this'.
     Node parent_display = scope().ptr();
-    TypeMemPtr tpar_disp = (TypeMemPtr) parent_display.val(); // Just a TMP of the right alias
+    TypeMemPtr tpar_disp = (TypeMemPtr) parent_display._val; // Just a TMP of the right alias
     ids .push(" ctl");
     ts  .push(Type.CTRL);
     bads.push(null);
@@ -1043,7 +1043,7 @@ public class Parse implements Comparable<Parse> {
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.
   private Node typechk(Node x, Type t, Node mem, Parse bad) {
-    return t == null || x.val().isa(t) ? x : gvn(new AssertNode(mem,x,t,bad,_e));
+    return t == null || x._val.isa(t) ? x : gvn(new AssertNode(mem,x,t,bad,_e));
   }
 
   private String token() { skipWS();  return token0(); }

@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 
@@ -27,6 +28,11 @@ public class ThunkNode extends Node {
     return def==in(1) ? TypeMem.ALLMEM : TypeMem.ALIVE; // Basic aliveness, except for memory
   }
   @Override public TypeMem all_live() { return TypeMem.ALIVE; }
+
+  @Override public TV2 new_tvar(String alloc_site) {
+    return TV2.make_fresh(TV2.make("Fun",this,alloc_site),alloc_site);
+  }
+
   @Override public Node is_copy(int idx) {
     if( _defs._len==2 ) return null;
     if( idx==0 ) return in(2);  // Wired thunk added a def

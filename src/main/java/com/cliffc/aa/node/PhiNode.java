@@ -4,8 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.TMem;
-import com.cliffc.aa.tvar.TVar;
+import com.cliffc.aa.tvar.TV2;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
@@ -19,6 +18,8 @@ public class PhiNode extends Node {
     else _t = Type.SCALAR;
     _badgc = badgc;
     _live = all_live();         // Recompute starting live after setting t
+    assert _tvar==null;
+    _tvar = new_tvar("constructor");
   }
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
   // For ParmNodes
@@ -72,7 +73,11 @@ public class PhiNode extends Node {
     return t;
   }
 
-  @Override public TVar new_tvar() { return _t==TypeMem.ALLMEM ? new TMem(this) : new TVar(this); }
+
+  @Override public TV2 new_tvar(String alloc_site) {
+    if( _t==null ) return null;
+    return _t==TypeMem.ALLMEM ? TV2.make_mem(this,alloc_site) : TV2.make_leaf(this,alloc_site);
+  }
   
   // All inputs unify
   @Override public boolean unify( boolean test ) {

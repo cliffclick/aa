@@ -66,7 +66,7 @@ public class AssertNode extends Node {
         RetNode ret = (RetNode)X.xform(new RetNode(ctl,postmem,chk,rpc,fun));
         // Just the same Closure when we make a new TFP
         Node clos = X.xform(new FP2DispNode(arg));
-        return (X._ret=X.xform(new FunPtrNode(ret,_env,clos)));
+        return (X._ret=X.xform(new FunPtrNode(ret,clos)));
       }
     }
 
@@ -94,7 +94,7 @@ public class AssertNode extends Node {
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Node arg = arg();
-    Type t1 = arg.val();
+    Type t1 = arg._val;
     Type t0 = _t.simple_ptr();
     if( t1.isa(t0) ) {
       Type actual = arg.sharptr(mem());
@@ -112,8 +112,8 @@ public class AssertNode extends Node {
 
   // Check TypeNode for being in-error
   @Override public ErrMsg err( boolean fast ) {
-    Type arg = arg().val();
-    Type mem = mem().val();
+    Type arg = arg()._val;
+    Type mem = mem()._val;
     return ErrMsg.asserterr(_error_parse,arg,mem,_t);
   }
 }

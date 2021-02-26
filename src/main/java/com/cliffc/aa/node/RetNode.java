@@ -2,12 +2,10 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.TNode;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
-import com.cliffc.aa.tvar.TVar;
-import com.cliffc.aa.tvar.TRet;
+import com.cliffc.aa.tvar.TV2;
 
 // See CallNode comments.  The RetNode gathers {control (function exits or
 // not), memory, value, rpc, fun}, and sits at the end of a function.  The RPC
@@ -188,17 +186,13 @@ public final class RetNode extends Node {
     return TypeMem.ALIVE;       // Basic aliveness
   }
 
-  @Override public boolean unify( boolean test ) {
-    // Already a TRet?
-    TVar tvar = tvar();
-    if( tvar instanceof TRet ) return false;
-    // RetNodes are structural copies of their inputs, reflect this in their
-    // type variables
-    return test || tvar.unify(new TRet(this),false); // Progress
+  @Override public TV2 new_tvar(String alloc_site) {
+    return TV2.make("Ret",this,alloc_site);
   }
+
+  @Override public boolean unify( boolean test ) { assert tvar().isa("Ret"); return false; }
 
   @Override public Node is_copy(int idx) { throw com.cliffc.aa.AA.unimpl(); }
   boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }
   @Override public boolean is_forward_ref() { return fun().is_forward_ref(); }
-  @Override public TNode[] parms() { return new TNode[]{ctl(),mem(),rez()}; }
 }

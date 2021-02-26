@@ -2,11 +2,10 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.TMulti;
-import com.cliffc.aa.tvar.TVar;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.tvar.TV2;
 
 // Proj data
 public class ProjNode extends Node {
@@ -37,9 +36,8 @@ public class ProjNode extends Node {
   // Unify with the parent TVar sub-part
   @Override public boolean unify( boolean test ) {
     if( in(0) instanceof NewNode ) return false; // TODO: Not really a proper use of Proj
-    TVar tv = tvar(0);          // Input tvar
-    if( !(tv instanceof TMulti) ) return false;
-    TVar tprj = ((TMulti)tv).parm(_idx);
+    TV2 tv = tvar(0);          // Input tvar
+    TV2 tprj = tv.get(_idx);
     return tprj!=null && tvar().unify(tprj,test);
   }
 

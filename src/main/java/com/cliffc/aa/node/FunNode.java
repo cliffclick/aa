@@ -268,7 +268,7 @@ public class FunNode extends RegionNode {
       // Large code-expansion allowed; can inline for other reasons
       path = _thunk_rhs ? 2 : split_size(body,parms); // Forcible size-splitting first path
       if( path == -1 ) return null;
-      assert CallNode.ttfp(in(path).in(0).val()).fidx()!=-1; // called by a single-target call
+      assert CallNode.ttfp(in(path).val(0)).fidx()!=-1; // called by a single-target call
       if( noinline() ) return null;
       if( !is_prim() ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
     }
@@ -332,7 +332,7 @@ public class FunNode extends RegionNode {
         for( Node use : parm._uses ) { // See if a parm-user needs a type-specialization split
           if( use instanceof CallNode ) {
             CallNode call = (CallNode)use;
-            if( (call.fdx()==parm && !parm.val().isa(TypeFunPtr.GENERIC_FUNPTR) ) ||
+            if( (call.fdx()==parm && !parm._val.isa(TypeFunPtr.GENERIC_FUNPTR) ) ||
                 call.fdx() instanceof UnresolvedNode ) { // Call overload not resolved
               Type t0 = parm.val(1);                   // Generic type in slot#1
               for( int i=2; i<parm._defs._len; i++ ) { // For all other inputs
@@ -371,7 +371,7 @@ public class FunNode extends RegionNode {
     // Look for splitting to help a pointer from an unspecialized type
     boolean progress = false;
     Type[] sig = new Type[parms.length];
-    Type tmem = parms[MEM_IDX].val();
+    Type tmem = parms[MEM_IDX]._val;
     sig[CTL_IDX] = Type.CTRL;
     sig[MEM_IDX] = TypeMem.MEM;
     if( tmem instanceof TypeMem ) {
@@ -385,7 +385,7 @@ public class FunNode extends RegionNode {
         Type tp = Type.ALL;
         for( Node def : parm._defs )
           if( def != this )
-            tp = tp.join(def.val());
+            tp = tp.join(def._val);
         if( !(tp instanceof TypeMemPtr) ) continue; // Not a pointer
         TypeObj to = ((TypeMem)tmem).ld((TypeMemPtr)tp).widen(); //
         // Are all the uses of parm compatible with this TMP?
@@ -551,7 +551,7 @@ public class FunNode extends RegionNode {
           if( fpn.ret().rez() instanceof PrimNode )
             op = OP_PRIM;       // Treat as primitive for inlining purposes
           if( fpn.fun() == this ) self_recursive=true;
-        } else if( n2.val()==TypeTuple.RET ) { // Thunks are encouraged to inline
+        } else if( n2._val==TypeTuple.RET ) { // Thunks are encouraged to inline
           call_thunk++;
         } else
           call_indirect++;
@@ -582,8 +582,8 @@ public class FunNode extends RegionNode {
       Node call = in(i).in(0);
       if( !(call instanceof CallNode) ) continue; // Not well formed
       if( ((CallNode)call).nargs() != nargs() ) continue; // Will not inline
-      if( call.val() == Type.ALL ) continue; // Otherwise in-error
-      TypeFunPtr tfp = CallNode.ttfp(call.val());
+      if( call._val == Type.ALL ) continue; // Otherwise in-error
+      TypeFunPtr tfp = CallNode.ttfp(call._val);
       int fidx = tfp.fidxs().abit();
       if( fidx < 0 || BitsFun.is_parent(fidx) ) continue;    // Call must only target one fcn
       if( self_recursive && body.find(call)!=-1 ) continue; // Self-recursive; amounts to unrolling
@@ -737,7 +737,7 @@ public class FunNode extends RegionNode {
       // New H-M dependencies
       for( Node use : new_funptr._uses )
         if( use instanceof CallNode && ((CallNode)use).fdx()==new_funptr )
-          new_funptr.tvar().push_dep(((CallNode)use).cepi(),null);
+          new_funptr.tvar().push_dep(((CallNode)use).cepi());
 
     } // Else other funptr/displays on unrelated path, dead, can be ignored
 
@@ -766,7 +766,7 @@ public class FunNode extends RegionNode {
     for( Map.Entry<Node,Node> e : map.entrySet() ) {
       Node oo = e.getKey();     // Old node
       Node nn = e.getValue();   // New node
-      Type nt = oo.val();        // Generally just copy type from original nodes
+      Type nt = oo._val;        // Generally just copy type from original nodes
       if( nn instanceof MrgProjNode ) { // Cloned allocations registers with default memory
         MrgProjNode nnrg = (MrgProjNode)nn;
         MrgProjNode oorg = (MrgProjNode)oo;
@@ -774,7 +774,7 @@ public class FunNode extends RegionNode {
         Env.DEFMEM.make_mem(oorg.nnn()._alias,oorg);
         int oldalias = BitsAlias.parent(oorg.nnn()._alias);
         Env.DEFMEM.set_def(oldalias,Node.con(TypeObj.UNUSED));
-        oorg.reset_tvar();      // Force new H-M unification of memory
+        oorg.reset_tvar("fun_inline_alias");      // Force new H-M unification of memory
         Env.GVN.add_mono(oorg.nnn());
         Env.GVN.add_flow_uses(oorg);
       }
@@ -802,7 +802,7 @@ public class FunNode extends RegionNode {
       CallNode call = cepi.call();
       CallEpiNode cepi2 = (CallEpiNode)map.get(cepi);
       if( path < 0 ) {          // Type-split, wire both & resolve later
-        BitsFun call_fidxs = ((TypeFunPtr) call.fdx().val()).fidxs();
+        BitsFun call_fidxs = ((TypeFunPtr) call.fdx()._val).fidxs();
         assert call_fidxs.test_recur(    fidx());
         assert call_fidxs.test_recur(fun.fidx());
         cepi.wire1(call,this,oldret);
@@ -812,7 +812,7 @@ public class FunNode extends RegionNode {
           // self-call.  wire the clone, same as the original was wired, so the
           // clone keeps knowledge about its return type.
           CallNode call2 = cepi2.call();
-          BitsFun call_fidxs2 = ((TypeFunPtr) call2.fdx().val()).fidxs();
+          BitsFun call_fidxs2 = ((TypeFunPtr) call2.fdx()._val).fidxs();
           assert call_fidxs2.test_recur(    fidx());
           assert call_fidxs2.test_recur(fun.fidx());
           cepi2.wire1(call2,this,oldret);
@@ -888,7 +888,7 @@ public class FunNode extends RegionNode {
         return (ParmNode)use;
     return null;
   }
-  @Override public ParmNode[] parms() {
+  public ParmNode[] parms() {
     ParmNode[] parms = new ParmNode[nargs()];
     for( Node use : _uses )
       if( use instanceof ParmNode )

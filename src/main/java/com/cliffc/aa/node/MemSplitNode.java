@@ -53,16 +53,15 @@ public class MemSplitNode extends Node {
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 
   @Override public boolean unify( boolean test ) {
-    TVar tvar = tvar();
-    if( tvar instanceof TMulti ) {
-      assert ((TMulti)tvar).len()==_escs._len; // If changing the split-arity, need to reset_tvar
+    TV2 tself = tvar();
+    if( tself.isa("Mem") ) {
+      assert tself._args.size()==_escs._len; // If changing the split-arity, need to reset_tvar
       return false;
     }
     if( test ) return true;
-    TVar tmvar = mem().tvar();
-    TVar[] parms = new TVar[_escs._len];
-    Arrays.fill(parms,tmvar);
-    return tvar().unify(new TArgs(this,parms,true),test);
+    Node[] parms = new Node[_escs._len];
+    Arrays.fill(parms,mem());
+    return tvar().unify(TV2.make("Mem",this,"unify",parms),test);
   }
 
   // Find index for alias
@@ -81,7 +80,7 @@ public class MemSplitNode extends Node {
     if( all.join(esc) == BitsAlias.EMPTY ) { // No overlap
       _escs.set(0,all.meet(esc));  // Update summary
       _escs.add(esc);              // Add escape set
-      reset_tvar();                // Expand H-M tuple result
+      reset_tvar("reset_add_split");// Expand H-M tuple result
       xval();                      // Expand val tuple result
       return _escs._len-1;
     }

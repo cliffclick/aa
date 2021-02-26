@@ -5,6 +5,8 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 
+import java.util.HashMap;
+
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.Env.GVN;
 
@@ -335,9 +337,9 @@ public final class CallEpiNode extends Node {
     // If no memory projection, then do not compute memory
     Type premem = call().mem()._val;
     if( _keep==0 && ProjNode.proj(this,MEM_IDX)==null ) {
-      TVar tv = tvar();
-      if( tv instanceof TArgs && trez != Type.ALL ) // If already an error term, poison, stay error.
-        trez = unify_lift(trez,((TArgs)tv).parm(REZ_IDX), premem);
+      TV2 tv = tvar();
+      if( tv.isa("Args") && trez != Type.ALL ) // If already an error term, poison, stay error.
+        trez = unify_lift(trez,tv.get(REZ_IDX), premem);
       return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,trez);
     }
 
@@ -363,10 +365,10 @@ public final class CallEpiNode extends Node {
     TypeMem tmem3 = TypeMem.make0(pubs);
 
     // Lift result according to H-M typing
-    TVar tv = tvar();
-    if( tv instanceof TArgs && trez != Type.ALL ) {// If already an error term, poison, stay error.
-      trez =         unify_lift(trez ,((TArgs)tv).parm(REZ_IDX), tmem3);
-      tmem3=(TypeMem)unify_lift(tmem3,((TArgs)tv).parm(MEM_IDX), tmem3);
+    TV2 tv = tvar();
+    if( trez != Type.ALL ) {   // !If already an error term, poison, stay error.
+      trez =         unify_lift(trez ,tv.get(REZ_IDX), tmem3);
+      tmem3=(TypeMem)unify_lift(tmem3,tv.get(MEM_IDX), tmem3);
     }
 
     return TypeTuple.make(Type.CTRL,tmem3,trez);
@@ -465,6 +467,8 @@ public final class CallEpiNode extends Node {
     return _live;
   }
 
+  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Ret",this,alloc_site); }
+
   @Override public boolean unify( boolean test ) {
     if( _is_copy ) return false; // A copy
     // Build a HM tvar (args->ret), same as HM.java Apply does.  Instead of
@@ -472,45 +476,48 @@ public final class CallEpiNode extends Node {
     // use point below, by calling 'fresh_unify' which acts as-if a fresh copy
     // is made, and then unifies it.
     Node fdx = call().fdx();
-    TVar tfunv = fdx.tvar();
-    if( tfunv instanceof TVDead ) return false; // Not gonna be a TFun
-    boolean progress = false;
-    // Force function to be a TFun
-    if( !(tfunv instanceof TFun) ) { // Progress
-      if( test ) return true;        // Testing
-      progress = tfunv.unify(new TFun(fdx,null,new TVar(),new TVar()),test);
-      tfunv = fdx.tvar();
-    }
-    // Call transitions from TVar to TArgs.
-    // Actual progress only if the structure changes.
-    if( !((TFun)tfunv).fresh_unify(call().tvar(),tvar(),test,this) )
-      return progress;          // No progress anyways
-    if( !test )                 // Progress, neighbors on list
-      Env.GVN.add_flow_uses(call());
-    return true;
+    TV2 tfdx = fdx.tvar();
+    if( tfdx.is_fresh() )
+      tfdx.push_dep(this);
+    // In an effort to detect possible progress without constructing endless
+    // new TV2s, we look for a common no-progress situation by inspecting the
+    // first layer in.
+    TV2 tfdx2 = tfdx.is_fresh() ? tfdx.get_fresh() : tfdx;
+    TV2 tcargs = call().tvar();
+    TV2 tcret  = tvar();  assert tcret.isa("Ret");
+    TV2 tfargs = tfdx2.get("Args");
+    TV2 tfret  = tfdx2.get("Ret" );
+    if( tfdx2.isa("Fun") && tcargs.eq(tfargs) && tcret.eq(tfret) ) return false; // Equal parts, no progress
+    // Will make progress aligning the shapes
+    HashMap<Object,TV2> args = new HashMap<Object,TV2>(){{ put("Args",tcargs);  put("Ret",tcret); }};
+    TV2 tfun = TV2.make("Fun",this,"CallEpi_unify_Fun",args);
+    boolean progress = tfdx.unify(tfun,test);
+    if( progress && !test )
+      Env.GVN.add_flow_uses(call()); // Progress, neighbors on list
+    return progress;
   }
 
   // H-M typing demands all unified Nodes have the same type... which is a
   // ASSERT/JOIN.  Hence the incoming type can be lifted to the join.
-  private Type unify_lift(Type t, TVar tv, Type tcmem) {
-    if( tv instanceof TVDead ) return t; // No update from dead
-    TVar tvar  = call().tvar();
+  private Type unify_lift(Type t, TV2 tv, Type tcmem) {
+    TV2 tvar  = call().tvar();
     Type tcall = call()._val;
     // Since tcall memory is pre-filtered for the call, and we want the memory
     // *into* the call (not the filtered memory into the Fun), peel the
     // top-layer of tvars/types and handle the pre-call memory special.
-    if( !(tvar instanceof TMulti && tcall instanceof TypeTuple) ) return t;
+    if( !(tvar.is_tvar() && tcall instanceof TypeTuple) ) return t;
     TypeTuple ttcall = (TypeTuple)tcall;
-    TMulti tmvar = (TMulti)tvar;
-    Type t2 = tmvar.parm(MEM_IDX).find_tvar(tcmem,tv);
-    // Found in input memory; JOIN with the call return type.
-    if( t2 != null ) t = t2.widen().join(t);
-    // Check the other inputs.
-    for( int i=MEM_IDX+1;i<tmvar.len(); i++ ) {
-      Type t3 = tmvar.parm(i).find_tvar(ttcall.at(i),tv);
-      // Found in input args; JOIN with the call return type.
-      if( t3 != null ) return t3.widen().join(t);
-    }
+    // TODO: TURN THIS ON
+    //TMulti tmvar = (TMulti)tvar;
+    //Type t2 = tmvar.parm(MEM_IDX).find_tvar(tcmem,tv);
+    //// Found in input memory; JOIN with the call return type.
+    //if( t2 != null ) t = t2.widen().join(t);
+    //// Check the other inputs.
+    //for( int i=MEM_IDX+1;i<tmvar.len(); i++ ) {
+    //  Type t3 = tmvar.parm(i).find_tvar(ttcall.at(i),tv);
+    //  // Found in input args; JOIN with the call return type.
+    //  if( t3 != null ) return t3.widen().join(t);
+    //}
     return t;                   // no change
   }
 

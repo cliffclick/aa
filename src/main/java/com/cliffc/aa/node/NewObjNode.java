@@ -1,13 +1,11 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
-import com.cliffc.aa.tvar.TObj;
-import com.cliffc.aa.tvar.TVDead;
-import com.cliffc.aa.tvar.TVar;
+import com.cliffc.aa.Env;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Parse;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
-
-import java.util.Arrays;
 
 import static com.cliffc.aa.AA.MEM_IDX;
 
@@ -56,7 +54,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert def_idx(_ts._ts.length)== _defs._len;
     assert _ts.find(name) == -1; // No dups
     add_def(val);
-    setsm(_ts.add_fld(name,mutable,mutable==TypeStruct.FFNL ? val.val() : Type.SCALAR));
+    setsm(_ts.add_fld(name,mutable,mutable==TypeStruct.FFNL ? val._val : Type.SCALAR));
     Env.GVN.add_flow(this);
   }
   public void update( String tok, byte mutable, Node val ) { update(_ts.find(tok),mutable,val); }
@@ -64,8 +62,8 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public void update( int fidx, byte mutable, Node val ) {
     assert def_idx(_ts._ts.length)== _defs._len;
     set_def(def_idx(fidx),val);
-    sets(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? val.val() : Type.SCALAR,mutable));
-    reset_tvar(); // Because direct set of field
+    sets(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? val._val : Type.SCALAR,mutable));
+    tvar().reset_at(_ts._flds[fidx]);
     xval();
     Env.GVN.add_flow_uses(this);
   }
@@ -149,26 +147,23 @@ public class NewObjNode extends NewNode<TypeStruct> {
     return super.live(opt_mode);
   }
 
+  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Obj",this,alloc_site); }
+
   @Override public boolean unify( boolean test ) {
     // Self should always should be a TObj
-    TVar tvar = tvar();
-    if( tvar instanceof TVDead ) return false; // Not gonna be a TMem
-    // Get/Make a TObj
-    boolean progress = false;
-    TObj tvo;
-    if( !(tvar instanceof TObj) ) {
-      if( test ) return true;   // Progress to make a TObj
-      progress = tvar.unify(tvo=new TObj(this),test);
-    } else tvo = (TObj)tvar;
+    TV2 tvar = tvar();
+    assert tvar.isa("Obj");
     // Structural unification on all fields
+    boolean progress=false;
     for( int i=0; i<_ts._flds.length; i++ ) {
-      progress |= tvo.add_fld(_ts._flds[i],tvar(def_idx(i)),test);
+      progress |= tvar.unify_at(_ts._flds[i],tvar(def_idx(i)),test);
       if( progress && test ) return true;
     }
     return progress;
   }
 
-  @Override public TNode[] parms() {
-    return Arrays.copyOfRange(_defs._es,1,_defs._len); // All defs
+  public Node[] parms() {
+    throw com.cliffc.aa.AA.unimpl(); // TODO: yank this
+    //return Arrays.copyOfRange(_defs._es,1,_defs._len); // All defs
   }
 }

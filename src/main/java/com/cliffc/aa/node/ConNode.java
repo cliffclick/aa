@@ -2,11 +2,10 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeLive;
 import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.tvar.TNil;
-import com.cliffc.aa.tvar.TVDead;
 
 import java.util.function.Predicate;
 
@@ -16,9 +15,7 @@ public class ConNode<T extends Type> extends Node {
     super(OP_CON,Env.START);
     _t=t;
     _live = all_live();
-    // Specifically, no unifcation with ANY/Dead
-    if( t==Type.ANY ) _tvar = new TVDead();
-    else if( t==Type.XNIL ) _tvar = new TNil();
+    if( t==Type.ANY ) { _tvar.free(); _tvar = TV2.DEAD; }
   }
   // Allows ANY type with a normal unification, used for uninitialized variables
   // (as opposed to dead ones).
@@ -53,7 +50,7 @@ public class ConNode<T extends Type> extends Node {
     if( this==o ) return true;
     if( !(o instanceof ConNode) ) return false;
     ConNode con = (ConNode)o;
-    return _t==con._t && (tvar() instanceof TVDead == con.tvar() instanceof TVDead);
+    return _t==con._t;
   }
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }
 }

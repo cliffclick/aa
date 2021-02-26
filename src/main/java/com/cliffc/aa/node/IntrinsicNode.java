@@ -4,7 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.TMem;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
@@ -22,7 +22,10 @@ public class IntrinsicNode extends Node {
   }
 
   @Override public boolean is_mem() { return true; }
-  @Override public TMem new_tvar() { return new TMem(this); }
+  @Override public TV2 new_tvar(String alloc_site) {
+    //return new TMem(this);
+    throw com.cliffc.aa.AA.unimpl(); // return false;
+  }
   @Override public String xstr() { return _tn._name; }
   Node mem() { return in(1); }
   Node ptr() { return in(2); }
@@ -61,14 +64,14 @@ public class IntrinsicNode extends Node {
     Node ptr = ptr();
     if( mem instanceof MrgProjNode &&
         mem.in(0)==ptr.in(0) && mem._uses._len==2 ) { // Only self and DefMem users
-      TypeMemPtr tptr = (TypeMemPtr) ptr.val();
+      TypeMemPtr tptr = (TypeMemPtr) ptr._val;
       int alias = tptr._aliases.abit();
       if( alias > 0 ) {         // Not a mixed set of aliases
         NewObjNode nnn = (NewObjNode)mem.in(0);
         // NewObjNode is well-typed and producing a pointer to memory with the
         // correct type?  Fold into the NewObjNode and remove this Convert.
-        TypeTuple tnnn = (TypeTuple) nnn.val();
-        Type actual = mem.val().sharptr(tnnn.at(REZ_IDX));
+        TypeTuple tnnn = (TypeTuple) nnn._val;
+        Type actual = mem._val.sharptr(tnnn.at(REZ_IDX));
         if( actual instanceof TypeMemPtr ) actual = ((TypeMemPtr)actual)._obj; // Get the struct
         Type formal = _tn.remove_name();
         if( actual.isa(formal) ) { // Actual struct isa formal struct?
@@ -82,7 +85,7 @@ public class IntrinsicNode extends Node {
     }
 
     // If is of a MemJoin and it can enter the split region, do so.
-    if( _keep==0 && ptr.val() instanceof TypeMemPtr && mem instanceof MemJoinNode && mem._uses._len==1 &&
+    if( _keep==0 && ptr._val instanceof TypeMemPtr && mem instanceof MemJoinNode && mem._uses._len==1 &&
         ptr instanceof ProjNode && ptr.in(0) instanceof NewNode )
       return ((MemJoinNode)mem).add_alias_below_new(new IntrinsicNode(_tn,_badargs,null,mem,ptr),this);
 
@@ -97,8 +100,8 @@ public class IntrinsicNode extends Node {
   // ptr is of the "from" type, we cast a Name to it and produce a pointer to
   // the "to" type, otherwise we get the most conservative "to" type.
   @Override public Type value(GVNGCM.Mode opt_mode) {
-    Type mem = mem().val();
-    Type ptr = ptr().val();
+    Type mem = mem()._val;
+    Type ptr = ptr()._val;
     if( !(mem instanceof TypeMem   ) ) return mem.oob(); // Inputs are confused
     if( !(ptr instanceof TypeMemPtr) ) return ptr.oob(); // Inputs are confused
     TypeMem tmem = (TypeMem)mem;
@@ -121,8 +124,8 @@ public class IntrinsicNode extends Node {
   //
   @Override public ErrMsg err( boolean fast ) {
     if( fast ) return ErrMsg.FAST;
-    Type ptr = ptr().val();
-    Type mem = mem().val();
+    Type ptr = ptr()._val;
+    Type mem = mem()._val;
     return ErrMsg.typerr(_badargs,ptr,mem,TypeMemPtr.make(BitsAlias.REC,_tn)); // Did not remove the aliasing
   }
 

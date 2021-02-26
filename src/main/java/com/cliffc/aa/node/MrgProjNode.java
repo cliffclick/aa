@@ -2,10 +2,10 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.TMem;
-import com.cliffc.aa.tvar.TVDead;
-import com.cliffc.aa.tvar.TVar;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
+
+import java.util.HashMap;
 
 import static com.cliffc.aa.AA.MEM_IDX;
 
@@ -89,15 +89,15 @@ public class MrgProjNode extends ProjNode {
   // Only called here if alive, and input is more-than-basic-alive
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def==nnn() ? TypeMem.ALIVE : _live; }
 
+  @Override public TV2 new_tvar( String alloc_site) { return TV2.make_mem(this,alloc_site); }
+
   @Override public boolean unify( boolean test ) {
     if( !(in(0) instanceof NewNode) ) return false;
-    TVar tself = tvar();
-    if( tself instanceof TVDead ) return false;
-    TVar tmem0 = mem().tvar();
-    if( !(tmem0 instanceof TMem) ) return false;
-    TMem tmem = (TMem)tmem0;
-    boolean progress = !(tself instanceof TMem) && tself.unify(tmem, test);
-    return tmem.unify_alias(nnn()._alias,nnn().tvar(),test) | progress; // Unify at the alias
+    TV2 tmem = mem().tvar();
+    if( !tmem.isa("Mem") ) return false;
+    TV2 tself = tvar();
+    return tself.unify(tmem,test) |                     // Unify bulk memory
+      tmem.unify_at(nnn()._alias,nnn().tvar(),test); // Unify at the alias
   }
 
 }

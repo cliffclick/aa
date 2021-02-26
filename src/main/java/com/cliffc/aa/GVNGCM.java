@@ -6,6 +6,7 @@ import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.BitSet;
+import java.util.HashSet;
 
 // Global Value Numbering, Global Code Motion
 public class GVNGCM {
@@ -53,6 +54,7 @@ public class GVNGCM {
   public void add_inline( FunNode n ) { add_work(_work_inline, n); }
   public void add_flow_defs  ( Node n ) { add_work_defs(_work_flow  ,n); }
   public void add_flow_uses  ( Node n ) { add_work_uses(_work_flow  ,n); }
+  public void add_flow( HashSet<CallEpiNode> deps ) { if( deps != null ) for( Node dep : deps ) add_flow(dep); }
   public void add_flow  ( Ary<TNode> deps ) { if( deps != null ) for( TNode dep : deps )  add_flow((Node)dep); }
   public void add_flow_uses( Ary<TNode> deps ) {
     if( deps != null )
@@ -107,7 +109,7 @@ public class GVNGCM {
   // Did a bulk not-monotonic update.  Forcibly update the entire region at
   // once; restores monotonicity over the whole region when done.
   public void revalive(Node... ns) {
-    for( Node n : ns )  if( n != null )  n.reset_tvar();
+    for( Node n : ns )  if( n != null )  n.reset_tvar("gvn_revalive");
     for( Node n : ns )  if( n != null )  n.unify(false);
     revalive2(ns);
   }
@@ -285,10 +287,10 @@ public class GVNGCM {
         // See if we can resolve an unresolved
         if( n instanceof CallNode && n._live != TypeMem.DEAD ) {
           CallNode call = (CallNode)n;
-          if( call.ctl().val() == Type.CTRL && call.val() instanceof TypeTuple ) { // Wait until the Call is reachable
+          if( call.ctl()._val == Type.CTRL && call._val instanceof TypeTuple ) { // Wait until the Call is reachable
             // Track ambiguous calls: resolve after GCP gets stable, and if we
             // can resolve we continue to let GCP fall.
-            BitsFun fidxs = CallNode.ttfp(call.val()).fidxs();
+            BitsFun fidxs = CallNode.ttfp(call._val).fidxs();
             if( fidxs.above_center() && fidxs.abit() == -1 && ambi_calls.find(call) == -1 )
               ambi_calls.add(call);
           }

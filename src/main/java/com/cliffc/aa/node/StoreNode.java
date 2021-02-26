@@ -33,7 +33,7 @@ public class StoreNode extends Node {
   @Override public Node ideal_reduce() {
     Node mem = mem();
     Node adr = adr();
-    Type ta = adr.val();
+    Type ta = adr._val;
     TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
 
     // Is this Store dead from below?
@@ -72,7 +72,7 @@ public class StoreNode extends Node {
   @Override public Node ideal_grow() {
     Node mem = mem();
     Node adr = adr();
-    Type ta = adr.val();
+    Type ta = adr._val;
     TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
 
     // If Store is of a memory-writer, and the aliases do not overlap, make parallel with a Join
@@ -104,9 +104,9 @@ public class StoreNode extends Node {
   // StoreNode needs to return a TypeObj for the Parser.
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Node mem = mem(), adr = adr(), rez = rez();
-    Type tmem = mem.val();
-    Type tadr = adr.val();
-    Type tval = rez.val();  // Value
+    Type tmem = mem._val;
+    Type tadr = adr._val;
+    Type tval = rez._val;  // Value
     if( tmem==Type.ALL || tadr==Type.ALL ) return Type.ALL;
 
     if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM);
@@ -116,7 +116,7 @@ public class StoreNode extends Node {
     return tm.update(tmp._aliases,_fin,_fld,tval);
   }
   @Override BitsAlias escapees() {
-    Type adr = adr().val();
+    Type adr = adr()._val;
     if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? BitsAlias.EMPTY : BitsAlias.FULL;
     return ((TypeMemPtr)adr)._aliases;
   }
@@ -133,12 +133,12 @@ public class StoreNode extends Node {
   }
 
   @Override public ErrMsg err( boolean fast ) {
-    Type tadr = adr().val();
+    Type tadr = adr()._val;
     if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when writing",_fld);
     if( !(tadr instanceof TypeMemPtr) )
       return bad("Unknown",fast,null); // Not a pointer nor memory, cannot store a field
     TypeMemPtr ptr = (TypeMemPtr)tadr;
-    Type tmem = mem().val();
+    Type tmem = mem()._val;
     if( tmem==Type.ALL ) return bad("Unknown",fast,null);
     if( tmem==Type.ANY ) return null; // No error
     TypeObj objs = tmem instanceof TypeMem
@@ -172,20 +172,19 @@ public class StoreNode extends Node {
 
   @Override public boolean unify( boolean test ) {
     // Input should be a TMem 
-    Node mem = mem();
-    TVar tmem = mem.tvar();
-    if( tmem instanceof TVDead ) return false; // Not gonna be a TMem
+    TV2 tmem = mem().tvar();
     boolean progress = tvar().unify(tmem,test);
-    if( !(tmem instanceof TMem) ) return progress;
+    if( progress && test ) return progress;
+    if( !tmem.isa("Mem") ) return progress;
     // Address needs to name the aliases
-    Type tadr = adr().val();
+    Type tadr = adr()._val;
     if( !(tadr instanceof TypeMemPtr) ) return progress;
     TypeMemPtr tmp = (TypeMemPtr)tadr;
 
     // Unify the given aliases and field against the stored type
     // TODO: If we have a Precise replacement (single alias, no recursion) then
     // do not unify with incoming memory at alias - this is a true replacement.
-    return ((TMem)tmem).unify_alias_fld(this,tmp._aliases,_fld,rez().tvar(),mem,test) | progress;
+    return tmem.unify_alias_fld(this,tmp._aliases,_fld,rez().tvar(),test,"Store_unify") | progress;
   }
 
 }

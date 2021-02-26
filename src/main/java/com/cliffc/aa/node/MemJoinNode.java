@@ -3,7 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.*;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.MEM_IDX;
@@ -22,20 +22,20 @@ public class MemJoinNode extends Node {
   @Override public Node ideal_reduce() {
     MemSplitNode msp = msp();
     // If the split count is lower than 2, then the split serves no purpose
-    if( _defs._len == 2 && val(1).isa(val()) && _keep==0 ) {
+    if( _defs._len == 2 && val(1).isa(_val) && _keep==0 ) {
       msp()._is_copy=true;
       GVNGCM.retype_mem(null,msp(),in(1), false);
-      for( Node use : msp()._uses ) Env.GVN.add_reduce(use);
+      for( Node use : msp()._uses ) GVN.add_reduce(use);
       return in(1);             // Just become the last split
     }
 
     // If some Split/Join path clears out, remove the (useless) split.
     for( int i=1; i<_defs._len; i++ )
       if( in(i) instanceof MProjNode && in(i).in(0)==msp && in(i)._uses._len==1 ) {
-        msp.reset_tvar();    // Changing split arity, reset tvar
+        msp.reset_tvar("join_dead_split");    // Changing split arity, reset tvar
         in(0).xval();        // Update the default type
         msp.remove_alias(i);
-        Env.GVN.add_dead(in(i));
+        GVN.add_dead(in(i));
         return remove(i);
       }
 
@@ -46,7 +46,7 @@ public class MemJoinNode extends Node {
       Node u = _uses.at(0);
       if( u instanceof StoreNode ||
           u instanceof MrgProjNode )
-        Env.GVN.add_reduce(u);
+        GVN.add_reduce(u);
     }
   }
 
@@ -159,13 +159,12 @@ public class MemJoinNode extends Node {
 
   // Unify alias-by-alias, except on the alias sets
   @Override public boolean unify( boolean test ) {
-    if( tvar() instanceof TVDead ) return false;     // Not gonna be a TMem
-    TMem tmem = (TMem)tvar(0);
+    TV2 tmem = tvar(0);
     boolean progress = tvar().unify(tmem,test);
     if( progress && test ) return true;
     Ary<BitsAlias> escs = msp()._escs;
     for( int i=1; i<_defs._len; i++ ) {
-      progress |= tvar(i) instanceof TMem && tmem.unify_alias(escs.at(i),(TMem)tvar(i),test);
+      progress |= tmem.unify_alias(escs.at(i),tvar(i),test);
       if( progress && test ) return true;
     }
     return progress;
@@ -178,7 +177,7 @@ public class MemJoinNode extends Node {
     Node base = msp.mem();                  // Base of SESE region
     assert base.check_solo_mem_writer(msp); // msp is only memory writer after base
     assert head.in(1).check_solo_mem_writer(head);   // head is the 1 memory writer after head.in
-    try( GVNGCM.Build<MemJoinNode> X = Env.GVN.new Build<>() ) {
+    try( GVNGCM.Build<MemJoinNode> X = GVN.new Build<>() ) {
       int idx = msp.add_alias(head.escapees()); // Add escape set, find index
       Node mprj;
       if( idx == _defs._len ) {         // Escape set added at the end

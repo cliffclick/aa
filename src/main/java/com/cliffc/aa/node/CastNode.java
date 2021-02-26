@@ -5,6 +5,7 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
+import org.jetbrains.annotations.NotNull;
 
 // Gain precision after an If-test.
 public class CastNode extends Node {
@@ -20,12 +21,12 @@ public class CastNode extends Node {
     if( cc!=null ) return set_def(0,cc);
     // Cast is useless?  Remove same as a TypeNode
     Node ctrl = in(0), addr = in(1);
-    Type c = ctrl.val(), t = addr.val();
+    Type c = ctrl._val, t = addr._val;
     if( c != Type.CTRL ) return null;
     if( t.isa(_t) ) return in(1);
     return null;
   }
-  
+
   @Override public Node ideal_mono() {
     // Can we hoist control to a higher test?
     Node ctrl = in(0);
@@ -38,7 +39,7 @@ public class CastNode extends Node {
     set_def(0,tru);
     return this;
   }
-  
+
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Type c = val(0);
     if( c != Type.CTRL ) return c.oob();
@@ -53,16 +54,16 @@ public class CastNode extends Node {
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     return def==in(0) ? TypeMem.ALIVE : _live;
   }
-  @Override public CastNode copy( boolean copy_edges) {
+  @Override public @NotNull CastNode copy( boolean copy_edges) {
     CastNode nnn = (CastNode)super.copy(copy_edges);
-    return Env.GVN._work_dom.add(nnn);    
+    return Env.GVN._work_dom.add(nnn);
   }
-  
+
   private static boolean checked( Node n, Node addr ) {
     if( !(n instanceof CProjNode && ((CProjNode)n)._idx==1) ) return false; // Not a Cast of a CProj-True
     Node n0 = n.in(0);
     if( n0 instanceof IfNode && n0.in(1) == addr ) return true; // Guarded by If-n-zero
-    if( n0 instanceof ConNode && ((TypeTuple) n0.val()).at(1)==Type.XCTRL )
+    if( n0 instanceof ConNode && ((TypeTuple) n0._val).at(1)==Type.XCTRL )
       return true;
     return false;
   }

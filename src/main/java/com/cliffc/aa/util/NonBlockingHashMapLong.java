@@ -74,7 +74,7 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 public class NonBlockingHashMapLong<TypeV>
   extends AbstractMap<Long,TypeV>
-  implements ConcurrentMap<Long,TypeV>, Serializable {
+  implements ConcurrentMap<Long,TypeV>, Cloneable, Serializable {
 
   private static final long serialVersionUID = 1234123412341234124L;
 
@@ -1217,5 +1217,36 @@ public class NonBlockingHashMapLong<TypeV>
       put(K,V);               // Insert with an offical put
     }
   }
+
+    /**
+   * Creates a shallow copy of this hashtable. All the structure of the
+   * hashtable itself is copied, but the keys and values are not cloned.
+   * This is a relatively expensive operation.
+   *
+   * @return  a clone of the hashtable.
+   */
+  @SuppressWarnings("unchecked")
+  @Override
+  public NonBlockingHashMapLong<TypeV> clone() {
+    try {
+      // Must clone, to get the class right; NBHML might have been
+      // extended so it would be wrong to just make a new NBHML.
+      NonBlockingHashMapLong<TypeV> t = (NonBlockingHashMapLong<TypeV>) super.clone();
+      // But I don't have an atomic clone operation - the underlying _kvs
+      // structure is undergoing rapid change.  If I just clone the _kvs
+      // field, the CHM in _kvs[0] won't be in sync.
+      //
+      // Wipe out the cloned array (it was shallow anyways).
+      t.clear();
+      // Now copy sanely
+      for( long K : keySetLong() )
+        t.put(K,get(K));
+      return t;
+    } catch (CloneNotSupportedException e) {
+      // this shouldn't happen, since we are Cloneable
+      throw new InternalError();
+    }
+  }
+
 
 }  // End NonBlockingHashMapLong class

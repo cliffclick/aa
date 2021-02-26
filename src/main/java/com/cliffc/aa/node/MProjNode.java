@@ -3,8 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.TMem;
-import com.cliffc.aa.tvar.TVar;
+import com.cliffc.aa.tvar.TV2;
 
 import static com.cliffc.aa.AA.MEM_IDX;
 
@@ -21,7 +20,7 @@ public class MProjNode extends ProjNode {
     if( x!=null ) return x;
     if( in(0) instanceof CallEpiNode ) {
       Node precall = in(0).is_pure_call(); // See if memory can bypass pure calls (most primitives)
-      if( precall != null && val() == precall.val() )
+      if( precall != null && _val == precall._val )
         return precall;
     }
     return null;
@@ -36,14 +35,14 @@ public class MProjNode extends ProjNode {
         // Break forward dead-alias cycles in recursive functions by inspecting
         // dead-ness in DefMem.
         if( in(0) instanceof CallNode )
-          t = t.join(in(1).val());
+          t = t.join(in(1)._val);
         return t;
       }
     }
     return c.oob();
   }
   
-  @Override public TVar new_tvar() { return new TMem(this); }
+  @Override public TV2 new_tvar( String alloc_site) { return TV2.make_mem(this,alloc_site); }
 
   @Override public void add_flow_use_extra(Node chg) {
     if( chg instanceof CallNode ) { // If the Call changes value

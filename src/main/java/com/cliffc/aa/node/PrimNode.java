@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
@@ -216,7 +217,7 @@ public abstract class PrimNode extends Node {
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type[] ts = new Type[_defs._len];
       for( int i=1; i<_defs._len; i++ )
-        ts[i] = _defs.at(i).val();
+        ts[i] = _defs.at(i)._val;
       return apply(ts);     // Apply (convert) even if some args are not constant
     }
     @Override public Type apply( Type[] args ) {
@@ -555,6 +556,7 @@ public abstract class PrimNode extends Node {
       return TypeMem.LIVE_BOT; // Force maximal liveness, since will inline
     }
     @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
+    @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Thunk",this,alloc_site); }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
     @Override public Node is_copy(int idx) {
       return _defs._len==4 ? null : in(idx);
@@ -611,6 +613,7 @@ public abstract class PrimNode extends Node {
       return TypeMem.LIVE_BOT; // Force maximal liveness, since will inline
     }
     @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
+    @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Thunk",this,alloc_site); }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
     @Override public Node is_copy(int idx) {
       return _defs._len==4 ? null : in(idx);
