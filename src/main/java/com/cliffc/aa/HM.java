@@ -73,14 +73,6 @@ public class HM {
   }
   static void reset() { PRIMS.clear(); T2.reset(); }
 
-  // Gather live T2._uid
-  static IBitSet live(Syntax prog) {
-    IBitSet visit = new IBitSet();
-    for( T2 t : PRIMS.values() ) t.live(visit);
-    prog.live(visit);
-    return visit;
-  }
-
   public static abstract class Syntax {
     Syntax _par;
     T2 _t;                      // Current HM type
@@ -299,7 +291,7 @@ public class HM {
       T2 nfun = T2.fun(targs);
       T2 ufun = tfun.unify(nfun,work);
       if( _fun.find()!=tfun && work!=null ) work.push(_fun);
-      // Return element
+      // Return last element
       T2 trez = ufun.find(_args.length);
       // Force forward progress
       return trez.unify(find(),work);
@@ -334,7 +326,7 @@ public class HM {
     // Base constants are same as structural but using BASE.
     // Other names are structural, eg "->" or "pair".
     @NotNull final String _name; // name, eq "->" or "pair", or unique string for TVar leaves
-    @NotNull T2[] _args;
+    T2 @NotNull [] _args;
     final int _uid;
     // If set, this is a 'fresh' T2, which means it lazily clones during
     // unification such that it imparts its structure on the RHS but does not
@@ -358,7 +350,7 @@ public class HM {
       return t2;
     }
 
-    private T2(@NotNull String name, T2... args) { _name = name; _args= args; _uid=CNT++; }
+    private T2(@NotNull String name, T2 @NotNull ... args) { _name = name; _args= args; _uid=CNT++; }
 
     // A fresh-able type var; a simple wrapper over another type var.
     boolean is_fresh() { assert _fresh==null || (_args.length==1 && _args[0]!=null); return _fresh!=null; }
@@ -482,11 +474,17 @@ public class HM {
     // 'vars' maps from the cloned LHS to the RHS replacement.
     private T2 _fresh_unify( HashMap<T2, T2> vars, T2 t, Ary<Syntax> work ) {
       assert no_uf() && t.no_uf();
+      assert this!=t;           // No overlap between LHS and RHS.
       T2 prior = vars.get(this);
       if( prior!=null )         // Been there, done that?  Return prior mapping
         return prior.find().unify(t,work);
       assert !is_fresh();       // recursive fresh?
+      T2 rez = _fresh_unify_impl( vars, t, work );
+      vars.put(this,rez);
+      return rez;
+    }
 
+    private T2 _fresh_unify_impl( HashMap<T2, T2> vars, T2 t, Ary<Syntax> work ) {
       // RHS is also a lazy clone, which if cloned, will not be part of any
       // other structure.  When unioned with the clone of the LHS, the result
       // is not part of anything direct... but the structures still have to
@@ -494,7 +492,7 @@ public class HM {
       if( t.is_fresh() ) t = t.get_fresh().repl(vars, new HashMap<>());
 
       if( is_base() && t.is_base() ) return fresh_base(t);
-      if(   is_leaf() ) { vars.put(this,t); return t; }  // Lazy map LHS tvar to RHS
+      if(   is_leaf() ) return t;   // Lazy map LHS tvar to RHS
       if( t.is_leaf() ) return t.union(repl(vars, new HashMap<>()),work); // RHS is a tvar; union with a copy of LHS
 
       if( !Util.eq(_name,t._name) )
@@ -511,20 +509,22 @@ public class HM {
 
     // Replicate LHS, replacing vars as they appear
     T2 repl(HashMap<T2,T2> vars, HashMap<T2,T2> dups) {
+      assert no_uf() && !is_fresh();
       T2 t = vars.get(this);
       if( t!=null ) return t;   // Been there, done that, return prior answer
-      if( is_leaf() ) {         // LHS is a leaf, make a new one for RHS
-        vars.put(this,t = tnew());
-        return t;
-      }
+      T2 rez = _repl(vars,dups);
+      vars.put(this,rez);
+      return rez;
+    }
+    T2 _repl(HashMap<T2,T2> vars, HashMap<T2,T2> dups) {
+      if( is_leaf() ) return tnew(); // LHS is a leaf, make a new one for RHS
+
       // Must replicate base's, because they are not really immutable:
       // mismatched Types meet instead of error.
       if( is_base() ) return base(_con);
-      // Deep clone.  dups check for RHS cycles, and keep them
-      T2 rez = dups.get(this);
-      if( rez!=null ) return rez; // RHS has a cycle (as opposed to LHS, handled by vars check above)
       T2[] args = new T2[_args.length];
-      dups.put(this,rez = new T2(_name,args)); // Insert in dups BEFORE structural recursion, to stop cycles
+      T2 rez = new T2(_name,args);
+      vars.put(this,rez); // Insert in dups BEFORE structural recursion, to stop cycles
       // Structural recursion replicate
       for( int i=0; i<_args.length; i++ )
         args[i] = find(i).repl(vars,dups);
@@ -539,7 +539,7 @@ public class HM {
       if( is_base() && t.is_base() && _con==t._con ) return false;
       if( is_fresh() ) return get_fresh().progress(t);
       if( !Util.eq(_name,t._name) || _args.length!=t._args.length )
-        return true;            // Blatently not-equal
+        return true;            // Blatantly not-equal
       for( int i=0; i<_args.length; i++ )
         if( find(i).progress(t.find(i)) )
           return true;          // Recursive progress

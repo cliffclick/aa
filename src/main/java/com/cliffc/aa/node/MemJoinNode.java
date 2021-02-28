@@ -164,6 +164,7 @@ public class MemJoinNode extends Node {
     if( progress && test ) return true;
     Ary<BitsAlias> escs = msp()._escs;
     for( int i=1; i<_defs._len; i++ ) {
+      if( !tvar(i).isa("Mem") ) continue; // TODO: Unify anyways, forces faster progress
       progress |= tmem.unify_alias(escs.at(i),tvar(i),test);
       if( progress && test ) return true;
     }

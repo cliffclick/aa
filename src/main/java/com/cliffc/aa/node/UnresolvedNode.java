@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.util.Util;
 
 import java.util.Arrays;
@@ -66,6 +67,10 @@ public class UnresolvedNode extends Node {
       return ((TypeFunPtr)tx).make_from(((TypeFunPtr)tx)._fidxs.dual());
     default: throw com.cliffc.aa.AA.unimpl();
     }
+  }
+
+  @Override public TV2 new_tvar(String alloc_site) {
+    return TV2.make_fresh(TV2.make("Fun",this,alloc_site),alloc_site);
   }
 
   // Validate same name, operator-precedence and thunking

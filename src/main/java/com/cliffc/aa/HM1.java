@@ -4,6 +4,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -36,10 +37,12 @@ public class HM1 {
     env.put("pair",Oper.fun(var1, Oper.fun(var2, new Oper("pair",var1,var2))));
 
     HMVar var3 = new HMVar();
-    env.put("if/else",Oper.fun(bool,Oper.fun(var3,Oper.fun(var3,var3))));
+    env.put("if/else" ,Oper.fun(bool,Oper.fun(var3,Oper.fun(var3,var3))));
+    env.put("if/else3",Oper.fun(bool,         var3,         var3,var3  ));
 
     env.put("dec",Oper.fun(int64,int64));
     env.put("*"  ,Oper.fun(int64,Oper.fun(int64,int64)));
+    env.put("*2" ,Oper.fun(int64,         int64,int64 ));
     env.put("==0",Oper.fun(int64,bool));
 
     // Convert integer to a string; int->str
@@ -75,6 +78,7 @@ public class HM1 {
       return f;
     }
   }
+  
   public static class Lambda extends Syntax {
     final String _arg0;
     final Syntax _body;
@@ -91,6 +95,29 @@ public class HM1 {
       return Oper.fun(tnew,trez);
     }
   }
+
+  public static class Lambda2 extends Syntax {
+    final String _arg0, _arg1;
+    final Syntax _body;
+    Lambda2(String arg0, String arg1, Syntax body) { _arg0=arg0; _arg1=arg1; _body=body; }
+    @Override public String toString() { return "{ "+_arg0+" "+_arg1+" -> "+_body+" }"; }
+    @Override HMType hm(HashMap<String,HMType> env, HashSet<HMVar> nongen) {
+      HMVar tnew0 = new HMVar();
+      HMVar tnew1 = new HMVar();
+      // Push _arg0->tnew0 into env & nongen, popping them off after doing body
+      env.put(_arg0,tnew0);
+      env.put(_arg1,tnew1);
+      nongen.add(tnew0);
+      nongen.add(tnew1);
+      HMType trez = _body.hm(env,nongen);
+      nongen.remove(tnew0);
+      nongen.remove(tnew1);
+      env.remove(_arg0);
+      env.remove(_arg1);
+      return Oper.fun(tnew0,tnew1,trez);
+    }
+  }
+
   public static class Let extends Syntax {
     final String _arg0;
     final Syntax _def, _body;
@@ -109,15 +136,20 @@ public class HM1 {
       return trez;
     }
   }
+  
   public static class Apply extends Syntax {
-    final Syntax _fun, _arg;
-    Apply(Syntax fun, Syntax arg) { _fun=fun; _arg=arg; }
-    @Override public String toString() { return "("+_fun+" "+_arg+")"; }
+    final Syntax _fun;
+    final Syntax[] _args;
+    Apply(Syntax fun, Syntax... args) { _fun=fun; _args=args; }
+    @Override public String toString() { return "("+_fun+" "+Arrays.deepToString(_args)+")"; }
     @Override HMType hm(HashMap<String,HMType> env, HashSet<HMVar> nongen) {
       HMType tfun = _fun.hm(env,nongen);
-      HMType targ = _arg.hm(env,nongen);
-      HMType trez = new HMVar();
-      HMType nfun = Oper.fun(targ,trez);
+
+      HMType[] targs = new HMType[_args.length+1];
+      for( int i=0; i<_args.length; i++ )
+        targs[i] = _args[i].hm(env,nongen);
+      HMType trez = targs[_args.length] = new HMVar();
+      HMType nfun = Oper.fun(targs);
       nfun.union(tfun);
       return trez;
     }
@@ -223,9 +255,10 @@ public class HM1 {
     @Override public SB _str(SB sb, VBitSet dups, boolean debug) {
       if( _name.equals("->") ) {
         sb.p("{ ");
-        _args[0]._str(sb,dups,debug);
-        sb.p(" -> ");
-        _args[1]._str(sb,dups,debug);
+        for( int i=0; i<_args.length-1; i++ )
+          _args[i]._str(sb,dups,debug).p(" ");
+        sb.p("-> ");
+        _args[_args.length-1]._str(sb,dups,debug);
         return sb.p(" }");
       }
       sb.p(_name).p('(');

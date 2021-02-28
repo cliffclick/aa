@@ -477,17 +477,19 @@ public final class CallEpiNode extends Node {
     // is made, and then unifies it.
     Node fdx = call().fdx();
     TV2 tfdx = fdx.tvar();
+    if( tfdx.is_leaf() )
+      return false;             // Wait?  probably need for force fresh-fun
     if( tfdx.is_fresh() )
       tfdx.push_dep(this);
     // In an effort to detect possible progress without constructing endless
     // new TV2s, we look for a common no-progress situation by inspecting the
     // first layer in.
-    TV2 tfdx2 = tfdx.is_fresh() ? tfdx.get_fresh() : tfdx;
     TV2 tcargs = call().tvar();
     TV2 tcret  = tvar();  assert tcret.isa("Ret");
+    TV2 tfdx2 = tfdx.is_fresh() ? tfdx.get_fresh() : tfdx;
     TV2 tfargs = tfdx2.get("Args");
     TV2 tfret  = tfdx2.get("Ret" );
-    if( tfdx2.isa("Fun") && tcargs.eq(tfargs) && tcret.eq(tfret) ) return false; // Equal parts, no progress
+    if( tfdx2.isa("Fun") && tcargs==tfargs && tcret==tfret ) return false; // Equal parts, no progress
     // Will make progress aligning the shapes
     HashMap<Object,TV2> args = new HashMap<Object,TV2>(){{ put("Args",tcargs);  put("Ret",tcret); }};
     TV2 tfun = TV2.make("Fun",this,"CallEpi_unify_Fun",args);

@@ -190,7 +190,7 @@ public final class RetNode extends Node {
     return TV2.make("Ret",this,alloc_site);
   }
 
-  @Override public boolean unify( boolean test ) { assert tvar().isa("Ret"); return false; }
+  @Override public boolean unify( boolean test ) { assert tvar().isa("Ret") || tvar().is_dead(); return false; }
 
   @Override public Node is_copy(int idx) { throw com.cliffc.aa.AA.unimpl(); }
   boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }

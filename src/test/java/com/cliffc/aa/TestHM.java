@@ -326,4 +326,47 @@ public class TestHM {
     assertEquals("(pair2 str int1)",t1.p());
   }
 
+  // Obscure factorial-like
+  @Test
+  public void test18() {
+    // let f0 = fn f x => (if/else3 (==0 x) 1 (f (f0 f (dec x)) 2) ) in f0 *2 99
+    Syntax x =
+      new Let("f0", new Lambda2("f","x",
+                                new Apply(new Ident("if/else3"),
+                                          new Apply(new Ident("==0"), new Ident("x")),
+                                          new Con(TypeInt.con(1)),
+                                          new Apply(new Ident("f"),
+                                                    new Apply(new Ident("f0"),
+                                                              new Ident("f"),
+                                                              new Apply(new Ident("dec"), new Ident("x"))),
+                                                    new Con(TypeInt.con(2)))
+                                          )
+                                ),
+              new Apply(new Ident("f0"), new Ident("*2"), new Con(TypeInt.con(99))));
+    T2 t1 = HM.hm(x);
+    assertEquals("int64",t1.p());
+  }
+
+
+  // Obscure factorial-like
+  @Test
+  public void test19() {
+    // let f0 = fn f x => (if/else3 (==0 x) 1 (*2 (f0 f (dec x)) 2) ) in f0 f0 99
+    // let f0 = fn f x => (if/else3 (==0 x) 1 (f  (f0 f (dec x)) 2) ) in f0 *2 99
+    Syntax x =
+      new Let("f0", new Lambda2("f","x",
+                                new Apply(new Ident("if/else3"),
+                                          new Apply(new Ident("==0"), new Ident("x")),
+                                          new Con(TypeInt.con(1)),
+                                          new Apply(new Ident("*2"),
+                                                    new Apply(new Ident("f0"),
+                                                              new Ident("f"),
+                                                              new Apply(new Ident("dec"), new Ident("x"))),
+                                                    new Con(TypeInt.con(2)))
+                                          )
+                                ),
+              new Apply(new Ident("f0"), new Ident("f0"), new Con(TypeInt.con(99))));
+    T2 t1 = HM.hm(x);
+    assertEquals("int64",t1.p());
+  }
 }

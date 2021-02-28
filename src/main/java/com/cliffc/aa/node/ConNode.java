@@ -15,7 +15,12 @@ public class ConNode<T extends Type> extends Node {
     super(OP_CON,Env.START);
     _t=t;
     _live = all_live();
-    if( t==Type.ANY ) { _tvar.free(); _tvar = TV2.DEAD; }
+  }
+  public ConNode( T t, TV2 tvar ) {
+    super(OP_CON,Env.START);
+    _t=t;
+    _live = all_live();
+    _tvar.free(); _tvar = tvar;
   }
   // Allows ANY type with a normal unification, used for uninitialized variables
   // (as opposed to dead ones).

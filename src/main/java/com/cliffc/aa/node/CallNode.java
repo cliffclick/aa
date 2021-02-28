@@ -677,7 +677,7 @@ public class CallNode extends Node {
   }
 
   // Gather incoming args.  NOT an application point (yet), that is a CallEpi.
-  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Args",this,alloc_site,parms());  }
+  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Args",this,alloc_site,parms()); }
 
   @Override public boolean unify( boolean test ) { assert tvar().isa("Args"); return false; }
 
@@ -774,6 +774,6 @@ public class CallNode extends Node {
   }
   @Override Node is_pure_call() { return fdx().is_pure_call()==null ? null : mem(); }
   public Node[] parms() {
-    return Arrays.copyOf(_defs._es,_defs._len-1); // All defs, except the FIDX.
+    return _defs._len>= DSP_IDX ? Arrays.copyOf(_defs._es,_defs._len-1) : new Node[0]; // All defs, except the FIDX.
   }
 }

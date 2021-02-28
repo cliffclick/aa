@@ -16,6 +16,7 @@ import static com.cliffc.aa.Env.GVN;
 public final class FunPtrNode extends Node {
   public String _name;          // Optional for debug only
   private final ErrMsg _referr;
+  boolean _mid_def; // H-M mid-definition of a recursive fcn
 
   // Every var use that results in a function, so actually only these FunPtrs,
   // needs to make a "fresh" copy before unification.  "Fresh" makes a
@@ -24,13 +25,15 @@ public final class FunPtrNode extends Node {
   // interesting thing is when an out-of-scope TVar uses the same TVar
   // internally in different parts - the copy replicates this structure.  When
   // unified, it forces equivalence in the same places.
-  public  FunPtrNode( String name, RetNode ret, Env e ) { this(name,null,ret,e==null ? Node.con(TypeMemPtr.NO_DISP) : e._scope.ptr()); }
-  public  FunPtrNode( RetNode ret, Node display ) { this(null,null,ret,display); }
+  public  FunPtrNode( String name, RetNode ret, Env e ) { this(name,null,ret,e==null ? Node.con(TypeMemPtr.NO_DISP) : e._scope.ptr(),false); }
+  public  FunPtrNode( RetNode ret, Node display ) { this(null,null,ret,display,true); }
   // For forward-refs only; super weak display & function.
-  private FunPtrNode( String name, ErrMsg referr, RetNode ret, Node display ) {
+  private FunPtrNode( String name, ErrMsg referr, RetNode ret, Node display, boolean mid_def ) {
     super(OP_FUNPTR,ret,display);
     _name = name;
     _referr = referr;
+    _mid_def = mid_def;
+    if( _mid_def ) { TV2 tv = _tvar.get_fresh();  _tvar.reset(this); _tvar = tv; }
   }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }
@@ -111,7 +114,9 @@ public final class FunPtrNode extends Node {
   }
 
   @Override public TV2 new_tvar(String alloc_site) {
-    return TV2.make_fresh(TV2.make("Fun",this,alloc_site),alloc_site);
+    TV2 tv = TV2.make("Fun",this,alloc_site);
+    if( _mid_def ) return tv;
+    return TV2.make_fresh(tv,alloc_site);
   }
 
   @Override public boolean unify( boolean test ) {
@@ -120,22 +125,20 @@ public final class FunPtrNode extends Node {
     RetNode ret = ret();
     FunNode fun = xfun();
     if( fun==null ) return false;
-    TV2 tvar = tvar().get_fresh();  assert tvar.isa("Fun"); // Self is always a Fresh-Fun
+    TV2 tvar = tvar();  assert tvar.is_fresh() || tvar.isa("Fun"); // Self is always a Fresh or Fun
     TV2 tret = ret.tvar();  assert tret.isa("Ret"); // Ret  is always a Ret
 
     // Check for progress before allocation
     Node[] parms = fun.parms();
-    TV2 tvar_args = tvar.get("Args");
-    TV2 tvar_ret  = tvar.get("Ret" );
+    TV2 tvx = tvar.is_fresh() ? tvar.get_fresh() : tvar;
+    TV2 tvar_args = tvx.get("Args");
+    TV2 tvar_ret  = tvx.get("Ret" );
     if( tvar_args!=null && tvar_args.eq(parms) && tvar_ret==tret ) return false; // Equal parts
-    if( test ) return true;     // Will make progress
     // Build function arguments; "fun" itself is just control.
     TV2 targ = TV2.make("Args",fun,"FunPtr_unify_Args",parms);
     HashMap<Object,TV2> args = new HashMap<Object,TV2>(){{ put("Args",targ);  put("Ret",tret); }};
     TV2 tfun = TV2.make("Fun",this,"FunPtr_unify_Fun",args);
-    boolean progress = tvar.unify(tfun,test);
-    assert progress;            // Will make progress
-    return progress;
+    return tvar.unify(tfun,test);
   }
 
   // Filter out all the wrong-arg-count functions
@@ -173,7 +176,7 @@ public final class FunPtrNode extends Node {
     gvn.add_flow(ret);
     // Display is limited to any one of the current lexical scopes.
     TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS,TypeObj.ISUSED);
-    return new FunPtrNode( name, ErrMsg.forward_ref(unkref,name),ret,Node.con(tdisp));
+    return new FunPtrNode( name, ErrMsg.forward_ref(unkref,name),ret,Node.con(tdisp),true);
   }
 
   // True if this is a forward_ref
@@ -188,6 +191,7 @@ public final class FunPtrNode extends Node {
     assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.ALL_CTRL; // Forward ref has no callers
     assert dfun._defs._len==2 && dfun.in(0)==null;
     assert def ._uses._len==0;  // Def is brand new, no uses
+    assert _mid_def && !def._mid_def;
 
     // Make a function pointer based on the original forward-ref fidx, but with
     // the known types.
@@ -202,6 +206,7 @@ public final class FunPtrNode extends Node {
     Env.GVN.add_flow_uses(this);
 
     // Replace the forward_ref with the def.
+    def._tvar.free();  def._tvar = _tvar;
     subsume(def);
     fptr.bind(tok); // Debug only, associate variable name with function
     Env.GVN.iter(GVNGCM.Mode.Parse);

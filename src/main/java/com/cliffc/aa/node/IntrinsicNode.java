@@ -22,10 +22,7 @@ public class IntrinsicNode extends Node {
   }
 
   @Override public boolean is_mem() { return true; }
-  @Override public TV2 new_tvar(String alloc_site) {
-    //return new TMem(this);
-    throw com.cliffc.aa.AA.unimpl(); // return false;
-  }
+  @Override public TV2 new_tvar(String alloc_site) { return TV2.make_mem(this,alloc_site); }
   @Override public String xstr() { return _tn._name; }
   Node mem() { return in(1); }
   Node ptr() { return in(2); }

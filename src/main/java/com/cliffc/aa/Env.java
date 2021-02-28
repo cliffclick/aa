@@ -72,8 +72,8 @@ public class Env implements AutoCloseable {
     START   = GVN.init (new StartNode());
     ALL_CTRL= GVN.xform(new ConNode<>(Type.CTRL )).keep();
     XCTRL   = GVN.xform(new ConNode<>(Type.XCTRL)).keep();
-    XNIL    = GVN.xform(new ConNode<>(Type.XNIL )).keep();
-    ANY     = GVN.xform(new ConNode<>(Type.ANY  )).keep();
+    XNIL    = GVN.xform(new ConNode<>(Type.XNIL , TV2.NIL )).keep();
+    ANY     = GVN.xform(new ConNode<>(Type.ANY  , TV2.DEAD)).keep();
     ALL     = GVN.xform(new ConNode<>(Type.ALL  )).keep();
     // Initial control & memory
     CTL_0  = GVN.init(new    CProjNode(START,0));
