@@ -3,8 +3,7 @@ package com.cliffc.aa.tvar;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.CallEpiNode;
 import com.cliffc.aa.node.Node;
-import com.cliffc.aa.type.BitsAlias;
-import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -125,7 +124,7 @@ public class TV2 {
     return fresh;
   }
   // Make a new primitive base TV2
-  static TV2 make_base(Type type, @NotNull String alloc_site) {
+  public static TV2 make_base(Type type, @NotNull String alloc_site) {
     TV2 tv2 = new TV2("Base",null,type,null,alloc_site);
     assert tv2.is_base() && !tv2.is_leaf() && !tv2.is_fresh();
     return tv2;
@@ -216,31 +215,35 @@ public class TV2 {
   // Classic Tarjan U-F with rollup
   public TV2 find() {
     if( !is_unified() ) return this;
-    TV2 u = get_unified();
-    if( !u.is_unified() ) return u;
-    while( u.is_unified() ) u = u.get_unified();
-    TV2 v = this;
-    while( v != u ) { v._args.put("Unified",u); v = v.get_unified(); }
-    return u;
+    TV2 top = get_unified();
+    if( !top.is_unified() ) return top;
+    // Find U-F top
+    while( top.is_unified() ) top = top.get_unified();
+    TV2 v = this;               // Rerun, rolling up to top
+    while( v != top ) v = v._union(top);
+    return top;
   }
 
   // U-F union; 'this' becomes 'that'.  If 'this' was used in an CallEpi/Apply,
   // re-check the CallEpi.  Always returns true.
   public boolean union(TV2 that) {
-    assert !is_unified() && !is_dead();
     if( this==that ) return true;
-    if( _args==null ) _args = new HashMap<>();
-    else _args.clear();
-    _args.put(_name="Unified",that);
-    assert is_unified();
+    assert !is_unified() && !is_dead();
     // Worklist: put updates on the worklist for revisiting
     Env.GVN.add_flow(_deps); // Re-CallEpi
-    // Merge update lists, for future unions
-    merge_deps(that);
-    // Merge Node list, for easier debugging
-    merge_ns(that);
+    if( _args==null ) _args = new HashMap<>();
+    else _args.clear();
+    _union(that);
     ALLOCS.get(_alloc_site)._free++;
     return true;
+  }
+  private TV2 _union(TV2 that) {
+    TV2 old = _args.get("Unified");
+    _args.put(_name="Unified",that);
+    assert is_unified();
+    merge_deps(that);           // Merge update lists, for future unions
+    merge_ns  (that);           // Merge Node list, for easier debugging
+    return old;
   }
 
   // --------------------------------------------
@@ -316,25 +319,28 @@ public class TV2 {
     that._type = _type.meet(that._type);
     return union(that);
   }
-  private boolean fresh_base(TV2 that) {
-    Type old = that._type;
-    that._type = _type.meet(that._type);
-    return old!=that._type;
+  private boolean fresh_base(TV2 that, boolean test) {
+    Type mt = _type.meet(that._type);
+    if( mt==that._type ) return false; // No progress
+    if( test ) return true;            // Progress
+    that._type = mt;
+    return true;
   }
 
   // Apply 'this' structure on 'that'; no modifications to 'this'.  VARS maps
   // from the cloned LHS to the RHS replacement.
   private boolean _fresh_unify(TV2 that, boolean test) {
     assert !is_unified() && !that.is_unified();
-    assert !is_dead();
-    assert this!=that;          // No overlap between LHS and RHS.
+
+    if( this==that ) return false;
     if( that.is_dead() ) return false;
+    assert !is_dead();
     if( this.is_nil() && that.is_nil() ) return false;
+
     TV2 prior = VARS.get(this);
     if( prior!=null )           // Been there, done that?  Return prior mapping
       return prior.find()._unify(that, test);
     VARS.put(this,that);        // Save it for next time; repeats unify the same way
-    assert !is_fresh();         // recursive fresh?
 
     return _fresh_unify_impl( that, test );
   }
@@ -344,10 +350,13 @@ public class TV2 {
     // other structure.  When unioned with the clone of the LHS, the result
     // is not part of anything direct... but the structures still have to
     // align for the returned T2.  Make a replica & unify (e.g. stop being lazy).
-    if( that.is_fresh() ) that = that.get_fresh().repl();
+    if( that.is_fresh() ) {
+      if( !this.is_fresh() )
+        that = that.get_fresh(); //.repl();  // TODO: no repl?
+    }
 
     if( is_base() && that.is_base() ) // Will definitely make progress
-      return test || fresh_base(that);
+      return fresh_base(that,test);
     if( is_leaf() ) return false;     // Lazy map LHS tvar to RHS
     if( that.is_leaf() || that.is_nil() )  // RHS is a leaf tvar; union with a copy of LHS
       return that.union(repl());
@@ -371,30 +380,38 @@ public class TV2 {
   }
 
   // Replicate LHS, including structure and cycles, replacing leafs as they appear
+  private static final HashMap<TV2,TV2> REPL = new HashMap<>();
   TV2 repl() {
-    if( is_dead() ) return this; // Dead always unifies and wins
-    assert !is_unified();
-    TV2 t = VARS.get(this);
-    if( t!=null ) return t;   // Been there, done that, return prior answer
-    TV2 rez = _repl();
-    VARS.put(this,rez);
+    assert REPL.isEmpty();
+    TV2 rez = _repl0();
+    REPL.clear();
     return rez;
   }
-  TV2 _repl() {
+
+  TV2 _repl0() {
+    if( is_dead() ) return this; // Dead always unifies and wins
+    assert !is_unified();
+    TV2 t = REPL.get(this);
+    if( t!=null ) return t;   // Been there, done that, return prior answer
+    TV2 rez = _repl1();
+    REPL.put(this,rez);
+    return rez;
+  }
+  TV2 _repl1() {
     if( is_leaf() )             // LHS is a leaf, make a new one for RHS
-      return make_leaf(_ns.clone(),"TV2_repl_leaf");
+      return make_leaf((NonBlockingHashMapLong<Node>)null,"TV2_repl_leaf");
     // Must replicate base's, because they are not really immutable:
     // mismatched Types meet instead of error.
     if( is_base() ) return make_base(_type,"TV2_repl_base");
 
-    if( _args==null ) return new TV2(_name,null,null,_ns==null ? null : _ns.clone(),"TV2_repl_shallow");
+    if( _args==null ) return new TV2(_name,null,null,null,"TV2_repl_shallow");
 
-    TV2 rez = new TV2(_name, new HashMap<>(),null,_ns==null ? null : _ns.clone(),"TV2_repl_deep");
-    VARS.put(this,rez); // Insert in dups BEFORE structural recursion, to stop cycles
+    TV2 rez = new TV2(_name, new HashMap<>(),null,null,"TV2_repl_deep");
+    REPL.put(this,rez); // Insert in dups BEFORE structural recursion, to stop cycles
     // Structural recursion replicate
     if( _args!=null )
       for( Object key : _args.keySet() )
-        rez._args.put(key,get(key).repl());
+        rez._args.put(key,get(key)._repl0());
     return rez;
   }
 
@@ -444,6 +461,56 @@ public class TV2 {
   }
 
   // --------------------------------------------
+  // Find instances of 'tv' inside of 'this' via structural recursion.  Walk
+  // the matching Type at the same time.  Report the first one found, and
+  // assert all the others have the same Type.
+  public Type find_tvar(Type t, TV2 tv) {
+    assert DUPS.isEmpty();
+    Type rez = _find_tvar(t,tv,null);
+    DUPS.clear();
+    return rez;
+  }
+  private Type _find_tvar(Type t, TV2 tv, Type rez) {
+    if( tv.isa("Dead") ) return rez;
+    if( tv==this ) {
+      assert rez==null || rez==t : "Found multiple refs to tvar with diff types, "+ t +","+ rez;
+      return t;
+    }
+    switch(_name) {
+    case "Mem":
+      TypeMem tmem = (TypeMem)t;
+      for( Object key : _args.keySet() ) {
+        TypeObj to = tmem.at((Integer) key);
+        rez = get(key)._find_tvar(to,tv,rez);
+      }
+      return rez;
+    case "Obj":
+      if( t==TypeObj.UNUSED )
+        return rez; // No substructure in type
+      TypeStruct ts = (TypeStruct)t; //
+      for( Object key : _args.keySet() ) {
+        Type tfld = ts.fld((String)key);
+        rez = get(key)._find_tvar(tfld,tv,rez);
+      }
+      return rez;
+    case "Fresh":
+      if( t ==Type.ALL ) return rez; // No substructure in type
+      //return get_fresh()._find_tvar(t,tv,rez);
+      return rez;               // TODO: Not sure if should inside Fresh
+    case "Fun":
+      if( t ==Type.ALL ) return rez; // No substructure in type
+      throw com.cliffc.aa.AA.unimpl();
+    case "Base":
+    case "Dead":
+    case "Leaf":
+    case "Nil":
+      return rez; // No substructure in TV2 and not equal already
+
+    default: throw com.cliffc.aa.AA.unimpl();
+    }
+  }
+
+  // --------------------------------------------
   // This is a TV2 function that is the target of 'fresh', i.e., this function
   // might be fresh-unified with some other function.  Push the application
   // down the function parts; if any changes the fresh-application may make
@@ -481,7 +548,7 @@ public class TV2 {
       else for( Node n : _ns.values() )
              if( !n.is_dead() )    // Must filter before merge
                that._ns.put(n._uid,n);
-     _ns=null;
+      _ns=null;
     }
   }
 

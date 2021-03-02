@@ -3,9 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeLive;
-import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.*;
 
 import java.util.function.Predicate;
 
@@ -13,9 +11,15 @@ public class ConNode<T extends Type> extends Node {
   T _t;                         // Not final for testing
   public ConNode( T t ) {
     super(OP_CON,Env.START);
+    assert !(t instanceof TypeFunPtr);
     _t=t;
     _live = all_live();
+    _tvar.free();
+    _tvar = t==TypeMem.MEM
+      ? TV2.make_mem(this,"Con_mem_constructor")
+      : TV2.make_base(t,"Con_constructor");
   }
+  // Used by e.g. Env.XNIL to use dedicated TV2.NIL
   public ConNode( T t, TV2 tvar ) {
     super(OP_CON,Env.START);
     _t=t;

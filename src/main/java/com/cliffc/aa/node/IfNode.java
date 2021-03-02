@@ -13,7 +13,8 @@ public class IfNode extends Node {
   @Override public Node ideal_reduce() {
     Node ctl = in(0);
     Node tst = in(1);
-    if( ctl._val == Type.XCTRL ) return Node.con(TypeTuple.IF_ANY);
+    if( ctl._val == Type.XCTRL && in(1)!=Env.ANY )
+      return set_def(1,Env.ANY); // Kill test; control projections fold up other ways
     // Binary test vs 0?
     if( tst._defs._len==3 &&
         (tst.val(1)==Type.XNIL || tst.val(2)==Type.XNIL) ) {

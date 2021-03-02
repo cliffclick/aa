@@ -101,9 +101,9 @@ public class NewObjNode extends NewNode<TypeStruct> {
         n.xval();
         // Make field in the parent
         parent.create(ts._flds[i],n,ts.fmod(i));
-        // Stomp field locally to XSCALAR
-        set_def(def_idx(i),Node.con(Type.XSCALAR));
-        setsm(_ts.set_fld(i,Type.XSCALAR,TypeStruct.FFNL));
+        // Stomp field locally to ANY
+        set_def(def_idx(i),Env.ANY);
+        setsm(_ts.set_fld(i,Type.ANY,TypeStruct.FFNL));
         Env.GVN.add_flow_uses(n);
       }
     }

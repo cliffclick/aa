@@ -7,6 +7,8 @@ import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
 import com.cliffc.aa.tvar.TV2;
 
+import static com.cliffc.aa.AA.REZ_IDX;
+
 // See CallNode comments.  The RetNode gathers {control (function exits or
 // not), memory, value, rpc, fun}, and sits at the end of a function.  The RPC
 // dictates which calls can be reached from here.  The Fun is used to rapidly
@@ -190,7 +192,16 @@ public final class RetNode extends Node {
     return TV2.make("Ret",this,alloc_site);
   }
 
-  @Override public boolean unify( boolean test ) { assert tvar().isa("Ret") || tvar().is_dead(); return false; }
+  @Override public boolean unify( boolean test ) {
+    if( is_copy() ) return false; // Disappearing
+    TV2 tvar = tvar();
+    if( tvar.is_dead() ) return false;
+    assert tvar.isa("Ret");
+    boolean progress = false;
+    for( int i=0; i<=REZ_IDX; i++ )
+      progress |= tvar.unify_at(i,tvar(i),test);
+    return progress;
+  }
 
   @Override public Node is_copy(int idx) { throw com.cliffc.aa.AA.unimpl(); }
   boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }

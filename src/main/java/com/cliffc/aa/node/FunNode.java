@@ -756,7 +756,15 @@ public class FunNode extends RegionNode {
         for( Node p : fun._uses )
           if( p instanceof ParmNode ) {
             ParmNode parm = (ParmNode)p;
-            parm.set_def(1,parm._idx==0 ? Node.con(TypeRPC.ALL_CALL) : (parm._idx==MEM_IDX ? Env.DEFMEM : Node.con(fun.formal(parm._idx).simple_ptr())));
+            Node defx;
+            if( parm._idx==0 ) defx = Node.con(TypeRPC.ALL_CALL);
+            else if( parm._idx==MEM_IDX ) defx = Env.DEFMEM;
+            else {
+              Type tx = fun.formal(parm._idx).simple_ptr();
+              if( tx instanceof TypeFunPtr ) defx = find_fidx(((TypeFunPtr)tx).fidx()).fptr();
+              else defx = Node.con(tx);
+            }
+            parm.set_def(1,defx);
           }
       } else                     // Path Split
         fun.set_def(1,Env.XCTRL);

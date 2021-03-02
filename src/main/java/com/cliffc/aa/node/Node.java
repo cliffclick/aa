@@ -652,6 +652,11 @@ public abstract class Node implements Cloneable {
     // Replace with a constant, if possible
     if( should_con(_val) ) return con(_val);
 
+    // Replace with a FunPtr directly
+    // Might be a FP constant
+    if( _val instanceof TypeFunPtr && !(this instanceof FunPtrNode) && ((TypeFunPtr)_val).can_be_fpnode() )
+      return FunNode.find_fidx(((TypeFunPtr)_val).fidx()).fptr();
+    
     // Try CSE
     if( !_elock ) {             // Not in VALS
       Node x = VALS.get(this);  // Try VALS
@@ -674,11 +679,15 @@ public abstract class Node implements Cloneable {
   public Node do_flow() {
     Node progress=null;
     // Perform unification
-    TV2 tv = tvar();
+    TV2 tv1 = tvar();
+    int sz1 = tv1._args==null ? 0 : tv1._args.size();
     if( unify(false) ) {
       progress = this;          // Progress
-      if( !Util.eq(tv.name(),tvar().name()) )
-        Env.GVN.add_flow_uses(this); // Unification gained structure; neighbors can unify
+      TV2 tv2 = tvar();
+      int sz2 = tv2._args==null ? 0 : tv2._args.size();
+      if( !Util.eq(tv1.name(),tv2.name()) || sz1!=sz2 )
+        for( Node use : _uses )   // Unification gained structure; neighbors can unify
+          Env.GVN.add_flow(use).add_flow_use_extra(this);
     }
 
     // Compute live bits.  If progress, push the defs on the flow worklist.
@@ -742,8 +751,7 @@ public abstract class Node implements Cloneable {
       return false;
     // Is a constant (or could be)
     if( t.is_con() ) return true; // Replace with a ConNode
-    // Might be a FP constant
-    return t instanceof TypeFunPtr && !(this instanceof FunPtrNode) && ((TypeFunPtr)t).can_be_fpnode();
+    return false;
   }
 
   // Make globally shared common ConNode for this type.

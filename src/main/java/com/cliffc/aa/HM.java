@@ -162,6 +162,7 @@ public class HM {
     @Override SB p2(SB sb, VBitSet dups) { return _body.p0(sb,dups); }
     T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
     @Override T2 hm(Ary<Syntax> work) {
+      assert !targ().is_fresh();
       // The normal lambda work
       T2 fun = T2.fun(targ(),_body.find());
       // Force forwards progress; an Apply may already have lifted _t to

@@ -125,20 +125,22 @@ public final class FunPtrNode extends Node {
     RetNode ret = ret();
     FunNode fun = xfun();
     if( fun==null ) return false;
-    TV2 tvar = tvar();  assert tvar.is_fresh() || tvar.isa("Fun"); // Self is always a Fresh or Fun
     TV2 tret = ret.tvar();  assert tret.isa("Ret"); // Ret  is always a Ret
 
     // Check for progress before allocation
-    Node[] parms = fun.parms();
+    TV2 tvar = tvar();
+    if( tvar.is_dead() ) return false;
+    assert tvar.is_fresh() || tvar.isa("Fun"); // Self is always a Fresh or Fun
     TV2 tvx = tvar.is_fresh() ? tvar.get_fresh() : tvar;
     TV2 tvar_args = tvx.get("Args");
     TV2 tvar_ret  = tvx.get("Ret" );
+    Node[] parms = fun.parms();
     if( tvar_args!=null && tvar_args.eq(parms) && tvar_ret==tret ) return false; // Equal parts
     // Build function arguments; "fun" itself is just control.
     TV2 targ = TV2.make("Args",fun,"FunPtr_unify_Args",parms);
     HashMap<Object,TV2> args = new HashMap<Object,TV2>(){{ put("Args",targ);  put("Ret",tret); }};
     TV2 tfun = TV2.make("Fun",this,"FunPtr_unify_Fun",args);
-    return tvar.unify(tfun,test);
+    return tvx.unify(tfun,test);
   }
 
   // Filter out all the wrong-arg-count functions

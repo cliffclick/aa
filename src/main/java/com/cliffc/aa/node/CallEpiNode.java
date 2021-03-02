@@ -338,7 +338,7 @@ public final class CallEpiNode extends Node {
     Type premem = call().mem()._val;
     if( _keep==0 && ProjNode.proj(this,MEM_IDX)==null ) {
       TV2 tv = tvar();
-      if( tv.isa("Args") && trez != Type.ALL ) // If already an error term, poison, stay error.
+      if( tv.isa("Ret") && trez != Type.ALL ) // If already an error term, poison, stay error.
         trez = unify_lift(trez,tv.get(REZ_IDX), premem);
       return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,trez);
     }
@@ -477,19 +477,21 @@ public final class CallEpiNode extends Node {
     // is made, and then unifies it.
     Node fdx = call().fdx();
     TV2 tfdx = fdx.tvar();
-    if( tfdx.is_leaf() )
-      return false;             // Wait?  probably need for force fresh-fun
+    if( tfdx.is_leaf() ) return false; // Wait?  probably need for force fresh-fun
+    if( tfdx.is_dead() ) return false;
     if( tfdx.is_fresh() )
       tfdx.push_dep(this);
     // In an effort to detect possible progress without constructing endless
     // new TV2s, we look for a common no-progress situation by inspecting the
     // first layer in.
     TV2 tcargs = call().tvar();
-    TV2 tcret  = tvar();  assert tcret.isa("Ret");
+    TV2 tcret  = tvar();
+    if( tcret.is_dead() ) return false;
     TV2 tfdx2 = tfdx.is_fresh() ? tfdx.get_fresh() : tfdx;
     TV2 tfargs = tfdx2.get("Args");
     TV2 tfret  = tfdx2.get("Ret" );
     if( tfdx2.isa("Fun") && tcargs==tfargs && tcret==tfret ) return false; // Equal parts, no progress
+
     // Will make progress aligning the shapes
     HashMap<Object,TV2> args = new HashMap<Object,TV2>(){{ put("Args",tcargs);  put("Ret",tcret); }};
     TV2 tfun = TV2.make("Fun",this,"CallEpi_unify_Fun",args);
@@ -502,6 +504,7 @@ public final class CallEpiNode extends Node {
   // H-M typing demands all unified Nodes have the same type... which is a
   // ASSERT/JOIN.  Hence the incoming type can be lifted to the join.
   private Type unify_lift(Type t, TV2 tv, Type tcmem) {
+    if( tv==null ) return t; // No structure, no change
     TV2 tvar  = call().tvar();
     Type tcall = call()._val;
     // Since tcall memory is pre-filtered for the call, and we want the memory
@@ -509,17 +512,21 @@ public final class CallEpiNode extends Node {
     // top-layer of tvars/types and handle the pre-call memory special.
     if( !(tvar.is_tvar() && tcall instanceof TypeTuple) ) return t;
     TypeTuple ttcall = (TypeTuple)tcall;
-    // TODO: TURN THIS ON
-    //TMulti tmvar = (TMulti)tvar;
-    //Type t2 = tmvar.parm(MEM_IDX).find_tvar(tcmem,tv);
-    //// Found in input memory; JOIN with the call return type.
-    //if( t2 != null ) t = t2.widen().join(t);
-    //// Check the other inputs.
-    //for( int i=MEM_IDX+1;i<tmvar.len(); i++ ) {
-    //  Type t3 = tmvar.parm(i).find_tvar(ttcall.at(i),tv);
-    //  // Found in input args; JOIN with the call return type.
-    //  if( t3 != null ) return t3.widen().join(t);
-    //}
+    assert tvar.isa("Args");
+    Type t2 = tvar.get(MEM_IDX).find_tvar(tcmem,tv);
+    // Found in input memory; JOIN with the call return type.
+    if( t2 != null && t2!=t )
+      t = t2.widen().join(t);
+    // Check the other inputs.
+    for( int i=MEM_IDX+1;i<call()._defs._len-1; i++ ) {
+      TV2 tvi = tvar.get(i);
+      if( tvi != null ) {
+        Type t3 = tvi.find_tvar(ttcall.at(i),tv);
+        // Found in input args; JOIN with the call return type.
+        if( t3 != null && t3!=t )
+          t = t3.widen().join(t);
+      }
+    }
     return t;                   // no change
   }
 
