@@ -391,7 +391,6 @@ public class TV2 {
     REPL.clear();
     return repl;
   }
-
   private TV2 _repl0() {
     if( is_dead() ) return this; // Dead always unifies and wins
     assert !is_unified();        // Already chased these down
@@ -438,7 +437,7 @@ public class TV2 {
         tvo._args.put(fld,tv);
       } else if( !tobj.isa("Dead") ) {
         assert tobj.isa("Obj");
-        progress = tobj.unify_at(fld,tv,test);
+        progress = tobj.unify_at(fld,tv.find(),test);
       } // else dead, no progress
       if( progress && test ) return progress; // Shortcut
     }
@@ -480,6 +479,7 @@ public class TV2 {
     }
     switch(_name) {
     case "Mem":
+      if( t ==Type.ANY ) return rez; // No substructure in type
       TypeMem tmem = (TypeMem)t;
       for( Object key : _args.keySet() ) {
         TypeObj to = tmem.at((Integer) key);
