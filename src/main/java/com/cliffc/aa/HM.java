@@ -68,7 +68,7 @@ public class HM {
       //assert prog.more_work(work);
       cnt++;
     }
-
+    assert prog.more_work(work);
     return prog._t;
   }
   static void reset() { PRIMS.clear(); T2.reset(); }
@@ -97,9 +97,11 @@ public class HM {
       boolean more_work;
       try {
         T2 t = find();
+        Type con = t._con;
         T2 hm = hm(null);       // Run H-M, with null work, looking for progress
         T2 un = find().unify(hm,null);
-        more_work = t!=un || work._len!=olen; // Something happened?
+        more_work = t!=un || con!=un._con || work._len!=olen; // Something happened?
+        assert !more_work;
       } catch( RuntimeException no_unify ) { more_work=true; } // Fail to unify assert is progress
       if( !more_work ) T2.CNT=old;  // Reset if no error; prevents assert from endlessly raising CNT
       return !more_work;
@@ -236,6 +238,7 @@ public class HM {
     @Override SB p2(SB sb, VBitSet dups) { _body.p0(sb,dups); return _use.p0(sb,dups); }
     T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
     @Override T2 hm(Ary<Syntax> work) {
+      _use.find().push_update(this);
       targ().unify(_body.find(),work);
       return _use.find();
     }
@@ -337,7 +340,7 @@ public class HM {
     Type _con;
     // Part of the incrementalization: if a fresh fcn type changes, any Applys
     // using it might update.
-    Ary<Apply> _updates;
+    Ary<Syntax> _updates;
 
     static T2 fun(T2... args) { return new T2("->",args); }
     static T2 tnew() { return new T2("V"+CNT,new T2[1]); }
@@ -475,7 +478,7 @@ public class HM {
     // 'vars' maps from the cloned LHS to the RHS replacement.
     private T2 _fresh_unify( HashMap<T2, T2> vars, T2 t, Ary<Syntax> work ) {
       assert no_uf() && t.no_uf();
-      assert this!=t;           // No overlap between LHS and RHS.
+      assert this!=t || is_base(); // No overlap between LHS and RHS.
       T2 prior = vars.get(this);
       if( prior!=null )         // Been there, done that?  Return prior mapping
         return prior.find().unify(t,work);
@@ -578,11 +581,11 @@ public class HM {
     // down the function parts; if any changes the fresh-application may make
     // progress.
     static final VBitSet UPDATE_VISIT  = new VBitSet();
-    void push_update(Apply a) { UPDATE_VISIT.clear(); push_update_impl(a); }
-    private void push_update_impl(Apply a) {
+    void push_update(Syntax a) { UPDATE_VISIT.clear(); push_update_impl(a); }
+    private void push_update_impl(Syntax a) {
       assert no_uf();
       if( is_leaf() ) {
-        if( _updates==null ) _updates = new Ary<>(Apply.class);
+        if( _updates==null ) _updates = new Ary<>(Syntax.class);
         if( _updates.find(a)==-1 ) _updates.push(a);
       } else if( is_tvar() ) {
         if( UPDATE_VISIT.tset(_uid) ) return;

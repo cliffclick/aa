@@ -355,7 +355,7 @@ public class Parse implements Comparable<Parse> {
       if( n.is_forward_ref() ) { // Prior is actually a forward-ref, so this is the def
         assert !scope.stk().is_mutable(tok) && scope == scope();
         if( ifex instanceof FunPtrNode )
-          ((FunPtrNode)n).merge_ref_def(tok,(FunPtrNode)ifex);
+          ((FunPtrNode)n).merge_ref_def(tok,(FunPtrNode)ifex,scope.stk());
         else ; // Can be here if already in-error
       } else { // Store into scope/NewObjNode/display
         // Assign into display

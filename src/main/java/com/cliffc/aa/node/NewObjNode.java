@@ -97,13 +97,15 @@ public class NewObjNode extends NewNode<TypeStruct> {
         // Remove current display from forward-refs display choices.
         assert Env.LEX_DISPLAYS.test(_alias);
         TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS.clear(_alias),TypeObj.ISUSED);
-        n.set_def(1,Node.con(tdisp));
+        n.set_def(1,Node.con(tdisp)); // TODO: BUGGY?  NEEDS TO CRAWL THE DISPLAY 1 LEVEL?
         n.xval();
         // Make field in the parent
-        parent.create(ts._flds[i],n,ts.fmod(i));
+        String fld = ts._flds[i];
+        parent.create(fld,n,ts.fmod(i));
         // Stomp field locally to ANY
         set_def(def_idx(i),Env.ANY);
         setsm(_ts.set_fld(i,Type.ANY,TypeStruct.FFNL));
+        tvar().reset_at(fld);
         Env.GVN.add_flow_uses(n);
       }
     }
@@ -152,6 +154,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   @Override public boolean unify( boolean test ) {
     // Self should always should be a TObj
     TV2 tvar = tvar();
+    if( tvar.is_dead() ) return false;
     assert tvar.isa("Obj");
     // Structural unification on all fields
     boolean progress=false;

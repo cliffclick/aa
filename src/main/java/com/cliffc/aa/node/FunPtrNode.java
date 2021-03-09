@@ -5,9 +5,9 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.NonBlockingHashMap;
 
-import java.util.HashMap;
-
+import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.Env.GVN;
 
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
@@ -15,8 +15,8 @@ import static com.cliffc.aa.Env.GVN;
 // class functions to be passed about.
 public final class FunPtrNode extends Node {
   public String _name;          // Optional for debug only
-  private final ErrMsg _referr;
-  boolean _mid_def; // H-M mid-definition of a recursive fcn
+  private ErrMsg _referr;       // Forward-ref error, cleared after defining
+  final boolean _mid_def; // H-M mid-definition of a recursive fcn; true means not "Fresh";
 
   // Every var use that results in a function, so actually only these FunPtrs,
   // needs to make a "fresh" copy before unification.  "Fresh" makes a
@@ -35,6 +35,13 @@ public final class FunPtrNode extends Node {
     _mid_def = mid_def;
     if( _mid_def ) { TV2 tv = _tvar.get_fresh();  _tvar.reset(this); _tvar = tv; }
   }
+  public FunPtrNode make_fresh() {
+    assert !tvar().is_fresh();
+    FunPtrNode fptr = new FunPtrNode(_name,_referr,ret(),display(),false);
+    fptr._tvar.reset(fptr);
+    fptr._tvar = TV2.make_fresh(tvar(),"FunPtr_make_fresh");
+    return fptr;
+  }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }
   public FunNode fun() { return ret().fun(); }
@@ -44,7 +51,7 @@ public final class FunPtrNode extends Node {
     if( is_dead() || _defs._len==0 ) return "*fun";
     int fidx = ret()._fidx;    // Reliably returns a fidx
     FunNode fun = FunNode.find_fidx(fidx);
-    return "*"+(fun==null ? ""+fidx : fun.name());
+    return (_mid_def ? "@" : "*")+(fun==null ? ""+fidx : fun.name());
   }
   // Inline longer name
   @Override String str() {
@@ -125,7 +132,9 @@ public final class FunPtrNode extends Node {
     RetNode ret = ret();
     FunNode fun = xfun();
     if( fun==null ) return false;
-    TV2 tret = ret.tvar();  assert tret.isa("Ret"); // Ret  is always a Ret
+    TV2 tret = ret.tvar();
+    if( tret.is_dead() ) return false;
+    assert tret.isa("Ret"); // Ret  is always a Ret
 
     // Check for progress before allocation
     TV2 tvar = tvar();
@@ -135,10 +144,11 @@ public final class FunPtrNode extends Node {
     TV2 tvar_args = tvx.get("Args");
     TV2 tvar_ret  = tvx.get("Ret" );
     Node[] parms = fun.parms();
+    parms[0] = fun;
     if( tvar_args!=null && tvar_args.eq(parms) && tvar_ret==tret ) return false; // Equal parts
     // Build function arguments; "fun" itself is just control.
     TV2 targ = TV2.make("Args",fun,"FunPtr_unify_Args",parms);
-    HashMap<Object,TV2> args = new HashMap<Object,TV2>(){{ put("Args",targ);  put("Ret",tret); }};
+    NonBlockingHashMap<Object,TV2> args = new NonBlockingHashMap<Object,TV2>(){{ put("Args",targ);  put("Ret",tret); }};
     TV2 tfun = TV2.make("Fun",this,"FunPtr_unify_Fun",args);
     return tvx.unify(tfun,test);
   }
@@ -187,13 +197,14 @@ public final class FunPtrNode extends Node {
   // 'this' is a forward reference, probably with multiple uses (and no inlined
   // callers).  Passed in the matching function definition, which is brand new
   // and has no uses.  Merge the two.
-  public void merge_ref_def( String tok, FunPtrNode def ) {
+  public void merge_ref_def( String tok, FunPtrNode def, NewObjNode dsp ) {
     FunNode rfun = fun();
     FunNode dfun = def.fun();
     assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.ALL_CTRL; // Forward ref has no callers
     assert dfun._defs._len==2 && dfun.in(0)==null;
     assert def ._uses._len==0;  // Def is brand new, no uses
     assert _mid_def && !def._mid_def;
+    ProjNode mrg = ProjNode.proj(dsp,MEM_IDX);
 
     // Make a function pointer based on the original forward-ref fidx, but with
     // the known types.
@@ -201,17 +212,37 @@ public final class FunPtrNode extends Node {
     dfun._fidx = rfun._fidx;
     FunNode.FUNS.setX(dfun._fidx,dfun); // Track FunNode by new fidx
 
+    // Update the fidx
     RetNode dret = def.ret();
     dret.set_fidx(rfun._fidx);
     FunPtrNode fptr = dret.funptr();
     fptr.xval();
     Env.GVN.add_flow_uses(this);
 
-    // Replace the forward_ref with the def.
-    def._tvar.free();  def._tvar = _tvar;
-    subsume(def);
+    // The existing forward-ref becomes a normal (not f-ref) but internal
+    // FunPtr; the H-M type is NOT Fresh, and forces alignment amongst the
+    // recursive uses.  Make a new FunPtr which IS Fresh for future external
+    // uses.
+    _referr = null;             // No longer a forward ref
+    set_def(0,def.in(0));       // Same inputs
+    set_def(1,def.in(1));
+    dsp.set_def(NewObjNode.def_idx(dsp._ts.find(tok)),def);
+    dsp.tvar().reset_at(tok);
+    dsp.xval();
+
     fptr.bind(tok); // Debug only, associate variable name with function
+    Env.GVN.add_reduce_uses(this);
+    assert Env.START.more_flow(true)==0;
     Env.GVN.iter(GVNGCM.Mode.Parse);
+  }
+
+  @Override public int hashCode() { return super.hashCode()+(_mid_def?0:1); }
+  @Override public boolean equals(Object o) {
+    if( this==o ) return true;
+    if( !super.equals(o) ) return false;
+    if( !(o instanceof FunPtrNode) ) return false;
+    FunPtrNode fptr = (FunPtrNode)o;
+    return _mid_def==fptr._mid_def;
   }
 
   @Override public ErrMsg err( boolean fast ) { return is_forward_ref() ? _referr : null; }

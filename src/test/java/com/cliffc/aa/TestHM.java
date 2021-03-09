@@ -369,4 +369,33 @@ public class TestHM {
     T2 t1 = HM.hm(x);
     assertEquals("int64",t1.p());
   }
+
+  // Mututal recursion
+  @Test
+  public void test20() {
+    /* let is_even =
+           (let is_odd = fn x => (if/else3 (==0 x) false (is_even (dec x)))
+                      in fn x => (if/else3 (==0 x) true  (is_odd  (dec x))))
+                   in (is_even 3)
+    */
+    Syntax x = new Let("is_even",
+                       new Let("is_odd",
+                               new Lambda("n",
+                                          new Apply(new Ident("if/else3"),
+                                                    new Apply(new Ident("==0"), new Ident("n")),
+                                                    new Con(TypeInt.con(0)),
+                                                    new Apply(new Ident("is_even"),
+                                                              new Apply(new Ident("dec"), new Ident("n"))))),
+                               new Lambda("n",
+                                          new Apply(new Ident("if/else3"),
+                                                    new Apply(new Ident("==0"), new Ident("n")),
+                                                    new Con(TypeInt.con(1)),
+                                                    new Apply(new Ident("is_odd" ),
+                                                              new Apply(new Ident("dec"), new Ident("n")))))
+                               ),
+                       new Apply(new Ident("is_even"), new Con(TypeInt.con(3))));
+    T2 t1 = HM.hm(x);
+    assertEquals("int1",t1.p());
+  }
+
 }

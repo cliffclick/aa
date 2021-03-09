@@ -4,8 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
-
-import java.util.HashMap;
+import com.cliffc.aa.util.NonBlockingHashMap;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.Env.GVN;
@@ -338,7 +337,7 @@ public final class CallEpiNode extends Node {
     Type premem = call().mem()._val;
     if( _keep==0 && ProjNode.proj(this,MEM_IDX)==null ) {
       TV2 tv = tvar();
-      if( tv.isa("Ret") && trez != Type.ALL ) // If already an error term, poison, stay error.
+      if( tv.isa("Ret") )
         trez = unify_lift(trez,tv.get(REZ_IDX), premem);
       return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,trez);
     }
@@ -366,10 +365,8 @@ public final class CallEpiNode extends Node {
 
     // Lift result according to H-M typing
     TV2 tv = tvar();
-    if( trez != Type.ALL ) {   // !If already an error term, poison, stay error.
-      trez =         unify_lift(trez ,tv.get(REZ_IDX), tmem3);
-      tmem3=(TypeMem)unify_lift(tmem3,tv.get(MEM_IDX), tmem3);
-    }
+    trez =         unify_lift(trez ,tv.get(REZ_IDX), tmem3);
+    tmem3=(TypeMem)unify_lift(tmem3,tv.get(MEM_IDX), tmem3);
 
     return TypeTuple.make(Type.CTRL,tmem3,trez);
   }
@@ -416,6 +413,8 @@ public final class CallEpiNode extends Node {
     if( mem instanceof IntrinsicNode ) // Better error message for Intrinsic if Call args are bad
       ((IntrinsicNode)mem)._badargs = call._badargs[1];
     call._is_copy=_is_copy=true;
+    call.reset_tvar("CEPI_set_is_copy");
+    this.reset_tvar("CEPI_set_is_copy");
     // Memory was split at the Call, according to the escapes aliases, and
     // rejoined at the CallEpi.  We need to make that explicit here.
     GVNGCM.retype_mem(null,call,this,false);
@@ -467,7 +466,11 @@ public final class CallEpiNode extends Node {
     return _live;
   }
 
-  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Ret",this,alloc_site); }
+  @Override public TV2 new_tvar(String alloc_site) {
+    return _is_copy
+      ? TV2.make_leaf(this,alloc_site)
+      : TV2.make("Ret",this,alloc_site).init_dep(this);
+  }
 
   @Override public boolean unify( boolean test ) {
     if( _is_copy ) return false; // A copy
@@ -479,7 +482,7 @@ public final class CallEpiNode extends Node {
     TV2 tfdx = fdx.tvar();
     if( tfdx.is_leaf() ) return false; // Wait?  probably need for force fresh-fun
     if( tfdx.is_dead() ) return false;
-    if( tfdx.is_fresh() )
+    if( tfdx.is_fresh() && test )
       tfdx.push_dep(this);
     // In an effort to detect possible progress without constructing endless
     // new TV2s, we look for a common no-progress situation by inspecting the
@@ -493,7 +496,7 @@ public final class CallEpiNode extends Node {
     if( tfdx2.isa("Fun") && tcargs==tfargs && tcret==tfret ) return false; // Equal parts, no progress
 
     // Will make progress aligning the shapes
-    HashMap<Object,TV2> args = new HashMap<Object,TV2>(){{ put("Args",tcargs);  put("Ret",tcret); }};
+    NonBlockingHashMap<Object,TV2> args = new NonBlockingHashMap<Object,TV2>(){{ put("Args",tcargs);  put("Ret",tcret); }};
     TV2 tfun = TV2.make("Fun",this,"CallEpi_unify_Fun",args);
     boolean progress = tfdx.unify(tfun,test);
     if( progress && !test )
@@ -503,8 +506,9 @@ public final class CallEpiNode extends Node {
 
   // H-M typing demands all unified Nodes have the same type... which is a
   // ASSERT/JOIN.  Hence the incoming type can be lifted to the join.
-  private Type unify_lift(Type t, TV2 tv, Type tcmem) {
+  private Type unify_lift( Type t, TV2 tv, Type tcmem ) {
     if( tv==null ) return t; // No structure, no change
+    if( tv.is_base() ) t = t.join(tv._type);
     TV2 tvar  = call().tvar();
     Type tcall = call()._val;
     // Since tcall memory is pre-filtered for the call, and we want the memory
@@ -515,7 +519,7 @@ public final class CallEpiNode extends Node {
     assert tvar.isa("Args");
     Type t2 = tvar.get(MEM_IDX).find_tvar(tcmem,tv);
     // Found in input memory; JOIN with the call return type.
-    if( t2 != null && t2!=t )
+    if( t2 != null && t2!=t && !t2.above_center() )
       t = t2.widen().join(t);
     // Check the other inputs.
     for( int i=MEM_IDX+1;i<call()._defs._len-1; i++ ) {
@@ -523,11 +527,11 @@ public final class CallEpiNode extends Node {
       if( tvi != null ) {
         Type t3 = tvi.find_tvar(ttcall.at(i),tv);
         // Found in input args; JOIN with the call return type.
-        if( t3 != null && t3!=t )
+        if( t3 != null && t3!=t && !t3.above_center() )
           t = t3.widen().join(t);
       }
     }
-    return t;                   // no change
+    return t;
   }
 
 

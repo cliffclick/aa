@@ -194,6 +194,8 @@ public final class RetNode extends Node {
 
   @Override public boolean unify( boolean test ) {
     if( is_copy() ) return false; // Disappearing
+    FunPtrNode fptr = funptr();
+    if( fptr != null && fptr.is_forward_ref() ) return false;
     TV2 tvar = tvar();
     if( tvar.is_dead() ) return false;
     assert tvar.isa("Ret");

@@ -70,7 +70,23 @@ public class UnresolvedNode extends Node {
   }
 
   @Override public TV2 new_tvar(String alloc_site) {
-    return TV2.make_fresh(TV2.make("Fun",this,alloc_site),alloc_site);
+    TV2 tv = TV2.make("Fun",this,alloc_site);
+    if( tvar(0).is_fresh() ) tv = TV2.make_fresh(tv,alloc_site);
+    return tv;
+  }
+
+  @Override public boolean unify( boolean test ) {
+    // Giant assert that all inputs are either all Fresh or all Fun, ignoring dead.
+    int is_fresh = 0;
+    for( Node n : _defs )
+      if( n.tvar().isa("Fun") ) {
+        assert is_fresh==0 || is_fresh== -1;
+        is_fresh = -1;
+      } else if( n.tvar().is_fresh() ) {
+        assert is_fresh==0 || is_fresh==  1;
+        is_fresh =  1;
+      }
+    return false;
   }
 
   // Validate same name, operator-precedence and thunking

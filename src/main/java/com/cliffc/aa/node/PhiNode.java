@@ -78,13 +78,17 @@ public class PhiNode extends Node {
     if( _t==null ) return null;
     return _t==TypeMem.ALLMEM ? TV2.make_mem(this,alloc_site) : TV2.make_leaf(this,alloc_site);
   }
-  
+
   // All inputs unify
   @Override public boolean unify( boolean test ) {
+    if( !(in(0) instanceof RegionNode) ) return false;
+    RegionNode r = (RegionNode) in(0);
     boolean progress = false;
     for( int i=1; i<_defs._len; i++ ) {
-      progress |= tvar().unify(tvar(i),test);
-      if( progress && test ) return true;
+      if( r.val(i)!=Type.XCTRL && r.val(i)!=Type.ANY ) { // Only unify alive paths
+        progress |= tvar().unify(tvar(i), test);
+        if( progress && test ) return true;
+      }
     }
     return progress;
   }

@@ -273,6 +273,7 @@ public abstract class Node implements Cloneable {
       n._defs = new Ary<>(new Node[1],0); // New empty defs
       n._uses = new Ary<>(new Node[1],0); // New empty uses
       n._tvar = n.new_tvar("copy_constructor");
+      n._keep = 0;              // Not keeping, even if cloning a mid-keeper operation
       n._elock=false;           // Not in GVN
       if( copy_edges )
         for( Node def : _defs )
@@ -656,7 +657,7 @@ public abstract class Node implements Cloneable {
     // Might be a FP constant
     if( _val instanceof TypeFunPtr && !(this instanceof FunPtrNode) && ((TypeFunPtr)_val).can_be_fpnode() )
       return FunNode.find_fidx(((TypeFunPtr)_val).fidx()).fptr();
-    
+
     // Try CSE
     if( !_elock ) {             // Not in VALS
       Node x = VALS.get(this);  // Try VALS

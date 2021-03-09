@@ -78,6 +78,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeMemPtr OOP0   = make(BitsAlias.FULL    ,TypeObj.OBJ); // Includes nil
   public  static final TypeMemPtr OOP    = make(BitsAlias.NZERO   ,TypeObj.OBJ); // Excludes nil
   public  static final TypeMemPtr ARYPTR = make(BitsAlias.ARYBITS ,TypeAry.ARY);
+  public  static final TypeMemPtr ARY0   = make(BitsAlias.ARYBITS0,TypeAry.ARY);
   public  static final TypeMemPtr STRPTR = make(BitsAlias.STRBITS ,TypeStr.STR);
   public  static final TypeMemPtr STR0   = make(BitsAlias.STRBITS0,TypeStr.STR);
   public  static final TypeMemPtr ABCPTR = make(BitsAlias.ABC     ,TypeStr.ABC);

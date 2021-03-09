@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
@@ -13,6 +12,7 @@ public class CEProjNode extends CProjNode {
     if( _uses._len<1 ) return Type.CTRL;
     return good_call(val(0),_uses.at(0)) ? Type.CTRL : Type.XCTRL;
   }
+
   // Never equal to another CEProj, since Call-Graph *edges* are unique
   @Override public int hashCode() { return super.hashCode()+(_sig==null ? 0 : _sig._hash); }
   @Override public boolean equals(Object o) { return this==o; }
@@ -32,7 +32,7 @@ public class CEProjNode extends CProjNode {
     // Argument count mismatch
     TypeTuple formals = fun._sig._formals;
     if( ttcall.len()-2/*minus fun, minus esc*/ != formals.len() ) return false;
-    
+
     // Cannot use the obvious argument check "actual.isa(formal)"!!!!!
 
     // If the actual is higher than formal (not even above_center), but then
@@ -40,7 +40,7 @@ public class CEProjNode extends CProjNode {
     // test for static properties (e.g. argument count, or constant ALL
     // arguments).
 
-    
+
     //// Check good args
     //TypeMem tmem = (TypeMem)ttcall.at(AA.MEM_IDX);
     //for( int i=AA.MEM_IDX; i<formals.len(); i++ ) {

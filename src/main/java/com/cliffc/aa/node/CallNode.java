@@ -500,8 +500,12 @@ public class CallNode extends Node {
         Env.GVN.add_work_all(cepi);  // FDX gets stable, might wire, might unify_lift
         Env.GVN.add_flow_defs(cepi); // Wired Rets might no longer be alive (might unwire)
       }
+    } else if( chg == mem() ) {
+      if( cepi != null ) Env.GVN.add_flow(cepi);
+    } else {                    // Args lifted, may resolve
+      if( fdx() instanceof UnresolvedNode )
+        Env.GVN.add_reduce(this);
     }
-    if( chg == mem() && cepi != null ) Env.GVN.add_flow(cepi);
   }
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
@@ -568,7 +572,6 @@ public class CallNode extends Node {
     // in-error, act as-if we do not known the Call Graph.
     if( !(_val instanceof TypeTuple) ) // No type to sharpen
       return _val.oob(TypeMem.ALLMEM);
-    TypeFunPtr tfpx = ttfpx(_val);
     if( opt_mode._CG || fdx() instanceof FunPtrNode ) // All callers known
       return err(true)==null ? _live : TypeMem.ALLMEM; // Use live directly (unless in error)
 
@@ -723,7 +726,7 @@ public class CallNode extends Node {
             if( unr instanceof UnresolvedNode && // Unresolved includes fdxs in this Call FDX set?
                 unr._val instanceof TypeFunPtr &&
                 ((TypeFunPtr)(tfp.join(unr._val)))._fidxs.abit() == -1 ) {
-              if( munr == null || munr==unr ) { munr = unr; continue outer; }
+              if( munr == null || munr._val==unr._val ) { munr = unr; continue outer; }
               return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
             }
     }

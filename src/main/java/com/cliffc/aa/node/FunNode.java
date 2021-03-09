@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
@@ -209,7 +210,7 @@ public class FunNode extends RegionNode {
     // GCP.  If parm is missing or not-live, then the corresponding SIG
     // argument can be ALL (all args allowed, including errors).
     if( !is_forward_ref() && !is_prim() ) {
-      ParmNode[] parms = parms();
+      Node[] parms = parms();
       TypeFunSig progress = _sig;
       for( int i=1; i<parms.length; i++ )
         if( (parms[i]==null || parms[i]._live==TypeMem.DEAD) && _sig._formals.at(i)!=Type.ALL )
@@ -235,8 +236,8 @@ public class FunNode extends RegionNode {
       return null;
 
     if( is_forward_ref() ) return null; // No mods on a forward ref
-    ParmNode[] parms = parms();
-    ParmNode rpc_parm = parms[0];
+    Node[] parms = parms();
+    Node rpc_parm = parms[0];
     if( rpc_parm == null ) return null; // Single caller const-folds the RPC, but also inlines in CallNode
     if( !check_callers() ) return null;
     if( _defs._len <= 2  ) return null; // No need to split callers if only 1
@@ -364,7 +365,7 @@ public class FunNode extends RegionNode {
         ? _sig.display().simple_ptr()
         : parms[DSP_IDX].val(idx);
       for( int i=ARG_IDX; i<parms.length; i++ )
-        sig[i] = parms[i]==null ? Type.SCALAR : parms[i].val(idx).widen();
+        sig[i] = parms[i]==null ? Type.ALL : parms[i].val(idx).widen();
       return sig;
     }
 
@@ -545,12 +546,14 @@ public class FunNode extends RegionNode {
       int op = n._op;           // opcode
       if( op == OP_CALL ) {     // Call-of-primitive?
         Node n1 = ((CallNode)n).fdx();
+        if( !(n1._val instanceof TypeFunPtr) ) return -1; // Calling an unknown function, await GCP
+        TypeFunPtr tfp = (TypeFunPtr)n1._val;
+        if( tfp._fidxs.test(_fidx) ) self_recursive = true; // May be self-recursive
         Node n2 = n1 instanceof UnresolvedNode ? n1.in(0) : n1;
         if( n2 instanceof FunPtrNode ) {
           FunPtrNode fpn = (FunPtrNode) n2;
           if( fpn.ret().rez() instanceof PrimNode )
             op = OP_PRIM;       // Treat as primitive for inlining purposes
-          if( fpn.fun() == this ) self_recursive=true;
         } else if( n2._val==TypeTuple.RET ) { // Thunks are encouraged to inline
           call_thunk++;
         } else
@@ -573,6 +576,8 @@ public class FunNode extends RegionNode {
         (cnts[OP_NEWOBJ]>1 && self_recursive) ||
         call_indirect > 0 )
       return -1;
+
+    if( !Env.GVN._opt_mode._CG && self_recursive ) return -1; // Await GCP & call-graph discovery before inlining self-recursive functions
 
     // Pick which input to inline.  Only based on having some constant inputs
     // right now.
@@ -660,7 +665,9 @@ public class FunNode extends RegionNode {
     Ary<CallEpiNode> unwireds = new Ary<>(new CallEpiNode[1],0);
     final int zlen = has_unknown_callers() ? 2 : 1;
     while( _defs._len > zlen ) {             // For all paths (except unknown-caller)
-      CallNode call = (CallNode)pop().in(0); // Unhook without removal
+      Node ceproj = pop();
+      ceproj.reset_tvar("Fun_inline");
+      CallNode call = (CallNode)ceproj.in(0); // Unhook without removal
       CallEpiNode cepi = call.cepi();
       cepi.del(cepi._defs.find(oldret));
       unwireds.add(cepi);
@@ -711,10 +718,10 @@ public class FunNode extends RegionNode {
     newret._fidx = fun.fidx();
     if( path < 0 ) {            // Type split
       for( Node use : oldret._uses )
-        if( use instanceof FunPtrNode ) {
+        if( use instanceof FunPtrNode ) { // Old-return FunPtrs; varies by Display & by internal/external
           // Make an Unresolved choice of the old and new functions, to be used
-          // by non-application uses.  E.g., passing a unresolved function
-          // pointer to a 'map()' call, or storing it to memory.
+          // by everything except mutually recursive calls; including
+          // external/top-level calls, storing to memory, external merges, etc.
           Node old_funptr = use;
           Node new_funptr = map.get(old_funptr);
           new_funptr.insert(old_funptr);
@@ -723,6 +730,13 @@ public class FunNode extends RegionNode {
           old_funptr.insert(new_unr);
           new_unr.add_def(old_funptr);
           new_unr._val = new_unr.value(GVNGCM.Mode.PesiNoCG);
+          if( ((FunPtrNode)use)._mid_def ) {
+            // Internal uses; need to use an internal unresolved...
+            // TODO: NEED FOR BOTH MID_DEF & NOT...
+            TV2 tv = new_unr.tvar();
+            old_funptr.tvar().unify(tv,false);
+            new_funptr.tvar().unify(tv,false);
+          }
         }
     } else {                           // Path split
       Node old_funptr = path_call.fdx(); // Find the funptr for the path split
@@ -811,20 +825,16 @@ public class FunNode extends RegionNode {
       CallEpiNode cepi2 = (CallEpiNode)map.get(cepi);
       if( path < 0 ) {          // Type-split, wire both & resolve later
         BitsFun call_fidxs = ((TypeFunPtr) call.fdx()._val).fidxs();
-        assert call_fidxs.test_recur(    fidx());
-        assert call_fidxs.test_recur(fun.fidx());
-        cepi.wire1(call,this,oldret);
-        cepi.wire1(call, fun,newret);
+        assert call_fidxs.test_recur(    fidx()) ;  cepi.wire1(call,this,oldret);
+        if(    call_fidxs.test_recur(fun.fidx()) )  cepi.wire1(call, fun,newret);
         if( cepi2!=null ) {
-          // Found an unwired call in original: musta been a recursive
-          // self-call.  wire the clone, same as the original was wired, so the
+          // Found an unwired call in original: musta been a recursive self-
+          // call.  wire the clone, same as the original was wired, so the
           // clone keeps knowledge about its return type.
           CallNode call2 = cepi2.call();
           BitsFun call_fidxs2 = ((TypeFunPtr) call2.fdx()._val).fidxs();
-          assert call_fidxs2.test_recur(    fidx());
-          assert call_fidxs2.test_recur(fun.fidx());
-          cepi2.wire1(call2,this,oldret);
-          cepi2.wire1(call2, fun,newret);
+          if(    call_fidxs2.test_recur(    fidx()) )  cepi2.wire1(call2,this,oldret);
+          assert call_fidxs2.test_recur(fun.fidx()) ;  cepi2.wire1(call2, fun,newret);
         }
       } else {                  // Non-type split, wire left or right
         if( call==path_call ) cepi.wire1(call, fun,newret);
@@ -834,6 +844,7 @@ public class FunNode extends RegionNode {
           // Found an unwired call in original: musta been a recursive
           // self-call.  wire the clone, same as the original was wired, so the
           // clone keeps knowledge about its return type.
+          call2.set_fdx(call.fdx());
           cepi2.wire1(call2,this,oldret);
           call2.xval();
           Env.GVN.add_flow_uses(this); // This gets wired, that gets wired, revisit all
@@ -854,17 +865,23 @@ public class FunNode extends RegionNode {
           }
         }
       }
-      // Get a good H-M after edges for Calls and CallEpis; needed for
-      // unify_lift typing.
+    }
+
+    // Get a good H-M after edges for Calls and CallEpis; needed for unify_lift
+    // typing.
+    for( Node nn : map.values() ) {
       if( nn instanceof CallNode ) {
-        nn.unify(false);
+        nn.reset_tvar("Fun_inline");
+        for( Node use : nn._uses )
+          if( use instanceof CEProjNode && use._uses._len==0 )
+            use.kill();
         ((CallNode)nn).cepi().unify(false);
       }
     }
 
     // Force-unify the new function nodes, so they can unify_lift
     for( Node nn : map.values() )
-      nn.unify(false);
+      if( !nn.is_dead() ) nn.unify(false);
 
     // Retype memory, so we can everywhere lift the split-alias parents "up and out".
     GVNGCM.retype_mem(aliases,this.parm(MEM_IDX), oldret, true);
@@ -888,6 +905,9 @@ public class FunNode extends RegionNode {
     return Type.XCTRL;
   }
 
+  // Funs get special treatment by the H-M algo.
+  @Override public boolean unify( boolean test ) { return false; }
+
   // True if this is a forward_ref
   @Override public boolean is_forward_ref() { return _op_prec==-2; }
   public ParmNode parm( int idx ) {
@@ -896,14 +916,13 @@ public class FunNode extends RegionNode {
         return (ParmNode)use;
     return null;
   }
-  public ParmNode[] parms() {
-    ParmNode[] parms = new ParmNode[nargs()];
+  public Node[] parms() {
+    Node[] parms = new Node[nargs()];
     for( Node use : _uses )
       if( use instanceof ParmNode )
-        parms[((ParmNode)use)._idx] = (ParmNode)use;
+        parms[((ParmNode)use)._idx] = use;
     return parms;
   }
-  public ParmNode rpc() { return parm(0); }
   public RetNode ret() {
     if( is_dead() ) return null;
     for( Node use : _uses )

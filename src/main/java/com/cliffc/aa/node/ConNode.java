@@ -17,7 +17,7 @@ public class ConNode<T extends Type> extends Node {
     _tvar.free();
     _tvar = t==TypeMem.MEM
       ? TV2.make_mem(this,"Con_mem_constructor")
-      : TV2.make_base(t,"Con_constructor");
+      : TV2.make_base(this,t,"Con_base_constructor");
   }
   // Used by e.g. Env.XNIL to use dedicated TV2.NIL
   public ConNode( T t, TV2 tvar ) {

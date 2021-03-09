@@ -20,7 +20,6 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
-    test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",TypeStruct.make_tuple(Type.XNIL,TypeInt.INT8,TypeInt.con(3)));
 
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.

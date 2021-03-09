@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
@@ -89,7 +90,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeObj.UNUSED);
     Env.DEFMEM.set_def(_alias,Node.con(TypeObj.UNUSED));
     Env.GVN.revalive(this,ProjNode.proj(this,0),Env.DEFMEM);
-    //TODO: tvar().unify(new TVDead(),false);  // Kill all unification
+    tvar().unify(TV2.DEAD,false);
     if( is_dead() ) return;
     for( Node use : _uses )
       Env.GVN.add_flow_uses(use); // Get FPtrs from MrgProj, and dead Ptrs into New
