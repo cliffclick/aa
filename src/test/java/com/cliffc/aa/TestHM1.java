@@ -33,6 +33,18 @@ public class TestHM1 {
 
   @Test
   public void test3() {
+    // { x -> (pair (x 3) (x "abc")) }
+    Syntax x =
+      new Lambda("x",
+                 new Apply(new Apply(new Ident("pair"),
+                                     new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
+                           new Apply(new Ident("x"), new Con(TypeStr.ABC))));
+    HMType t1 = HM1.HM(x);
+    assertEquals("{ { v11:all -> v9 } -> pair(v9$,v9$) }",t1.str());
+  }
+
+  @Test
+  public void test4() {
     // let fact = {n -> (  if/else (==0 n)  1  ( * n  (fact (dec n))))} in fact;
     // let fact = {n -> (((if/else (==0 n)) 1) ((* n) (fact (dec n))))} in fact;
     Syntax fact =
@@ -50,31 +62,18 @@ public class TestHM1 {
   }
 
   @Test
-  public void test4() {
-    // { x -> (pair (x 3) (x "abc")) }
-    Syntax x =
-      new Lambda("x",
-                 new Apply(new Apply(new Ident("pair"),
-                                     new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
-                           new Apply(new Ident("x"), new Con(TypeStr.ABC))));
-    HMType t1 = HM1.HM(x);
-    assertEquals("{ { v11:all -> v9 } -> pair(v9$,v9$) }",t1.str());
-  }
-
-  @Test
   public void test5() {
-    // ({ x -> (pair (x 3) (x "abc")) } {x->x})
+    // ({ x -> (pair (x 3) (x "abc")) } {y->y})
     Syntax x =
       new Apply(new Lambda("x",
                            new Apply(new Apply(new Ident("pair"),
                                                new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
                                      new Apply(new Ident("x"), new Con(TypeStr.ABC)))),
-                new Lambda("x", new Ident("x")));
+                new Lambda("y", new Ident("y")));
 
     HMType t1 = HM1.HM(x);
     assertEquals("pair(v17:all,v17$)",t1.str());
   }
-
 
   @Test(expected = RuntimeException.class)
   public void test6() {
@@ -110,13 +109,12 @@ public class TestHM1 {
                                              new Apply(new Ident("f"), new Con(TypeInt.con(3)))
                                              ),
                                    new Apply(new Ident("f"), new Con(TypeInt.con(1))))));
-
     HMType t1 = HM1.HM(syn);
     assertEquals("{ v11 -> pair(v11$,v11$) }",t1.str());
   }
 
   @Test
-  public void test9() {
+  public void test10() {
     // Function composition
     // fn f (fn g (fn arg (f g arg)))
     Syntax syn =
@@ -127,7 +125,7 @@ public class TestHM1 {
   }
 
   @Test
-  public void test10() {
+  public void test13() {
     // Looking at when tvars are duplicated ("fresh" copies made).
     // This is the "map" problem with a scalar instead of a collection.
     // Takes a '{a->b}' and a 'a' for a couple of different prims.
@@ -148,7 +146,7 @@ public class TestHM1 {
   }
 
   @Test(expected = RuntimeException.class)
-  public void test11() {
+  public void test17() {
     // Checking behavior when using "if/else" to merge two functions with
     // sufficiently different signatures, then attempting to pass them to a map
     // & calling internally.
@@ -156,8 +154,8 @@ public class TestHM1 {
     //   let fcn = { p -> (((if/else p) {a -> pair[a,a]}) {b -> pair[b,pair[3,b]]}) } in
     // map takes a function and an element (collection?) and applies it (applies to collection?)
     //   let map = { fun -> {x -> (fun x) }} in
-    // Should return either { p -> p ? [5,5] : [5,[3,5]] }
     //   { q -> ((map (fcn q)) 5) }
+    // Should return either { p -> p ? [5,5] : [5,[3,5]] }
     Syntax syn =
       new Let("fcn",
               new Lambda("p",
@@ -184,6 +182,22 @@ public class TestHM1 {
 
   @Test
   public void test18() {
+    // Hand-rolled cons/cdr
+    // let cons = { x y -> { cadr -> (cadr x y) } }
+    // in         let cdr = { mycons -> (mycons { p q -> q}) }
+    //            in (cdr (cons 2 3))
+    Syntax syn =
+      new Let("cons", new Lambda2("x","y",
+                                  new Lambda("cadr",new Apply(new Ident("cadr"),new Ident("x"),new Ident("y")))),
+              new Let("cdr", new Lambda("mycons", new Apply(new Ident("mycons"), new Lambda2("p","q", new Ident("q")))),
+                      new Apply(new Ident("cdr"),
+                                new Apply(new Ident("cons"), new Con(TypeInt.con(2)), new Con(TypeInt.con(3))))));
+    HMType t1 = HM1.HM(syn);
+    assertEquals("v20:3",t1.str());
+  }
+
+  @Test
+  public void test20() {
     // let f0 = fn f x => (if/else3 (==0 x) 1 (f (f0 f (dec x)) 2) ) in f0 *2 99
     Syntax syn =
       new Let("f0", new Lambda2("f","x",

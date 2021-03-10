@@ -77,7 +77,6 @@ public class TestHM {
     assertEquals("(pair2 all all)",t1.p());
   }
 
-
   @Test//(expected = RuntimeException.class)  No longer throws, but returns a recursive type
   public void test06() {
     // recursive unification
@@ -112,7 +111,6 @@ public class TestHM {
                          new Apply(new Ident("pair2"),
                                    new Apply(new Ident("f"), new Con(TypeInt.con(3))),
                                    new Apply(new Ident("f"), new Con(TypeInt.con(1))))));
-
     T2 t1 = HM.hm(syn);
     assertEquals("{ V2 -> (pair2 V2 V2) }",t1.p());
   }
@@ -122,7 +120,6 @@ public class TestHM {
     // fn f g => (f g)
     Syntax syn =
       new Lambda2("f", "g", new Apply(new Ident("f"), new Ident("g")));
-
     T2 t1 = HM.hm(syn);
     assertEquals("{ { V1 -> V34 } V1 -> V34 }",t1.p());
   }
@@ -133,7 +130,6 @@ public class TestHM {
     // fn f g => (fn arg => g (f arg))
     Syntax syn =
       new Lambda2("f", "g", new Lambda("arg", new Apply(new Ident("g"), new Apply(new Ident("f"), new Ident("arg")))));
-
     T2 t1 = HM.hm(syn);
     assertEquals("{ { V0 -> V37 } { V37 -> V36 } -> { V0 -> V36 } }",t1.p());
   }
@@ -254,7 +250,6 @@ public class TestHM {
     assertEquals("{ V4 -> (pair2 5 5) }",t1.p());
   }
 
-
   @Test(expected = RuntimeException.class)
   public void test17() {
     // Checking behavior when using "if/else" to merge two functions with
@@ -292,7 +287,6 @@ public class TestHM {
     T2 t1 = HM.hm(syn);
     assertEquals("TBD",t1.p());
   }
-
 
   @Test
   public void test18() {
@@ -409,4 +403,6 @@ public class TestHM {
     assertEquals("int1",t1.p());
   }
 
+  // Toss a function into a pair & pull it back out
+  
 }
