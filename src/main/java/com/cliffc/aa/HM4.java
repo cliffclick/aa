@@ -16,7 +16,7 @@ import java.util.HashMap;
 // concrete base type, or a sharable leaf.  Unify is structural, and where not
 // unifyable the union is replaced with an Error.
 
-public class HM {
+public class HM4 {
   static final HashMap<String,T2> PRIMS = new HashMap<>();
 
   public static T2 hm( Syntax prog) {

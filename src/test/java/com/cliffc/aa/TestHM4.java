@@ -4,30 +4,30 @@ import com.cliffc.aa.type.*;
 import org.junit.Before;
 import org.junit.Test;
 
-import static com.cliffc.aa.HM.*;
+import static com.cliffc.aa.HM4.*;
 import static org.junit.Assert.assertEquals;
 
-public class TestHM {
+public class TestHM4 {
 
-  @Before public void reset() { HM.reset(); }
+  @Before public void reset() { HM4.reset(); }
 
   @Test(expected = RuntimeException.class)
   public void test00() {
     Syntax syn = new Ident("fred");
-    HM.hm(syn);
+    HM4.hm(syn);
   }
 
   @Test
   public void test01() {
     Syntax syn = new Con(TypeInt.con(3));
-    T2 t = HM.hm(syn);
+    T2 t = HM4.hm(syn);
     assertEquals("3",t.p());
   }
 
   @Test
   public void test02() {
     Syntax syn = new Apply(new Ident("pair"),new Con(TypeInt.con(3)));
-    T2 t = HM.hm(syn);
+    T2 t = HM4.hm(syn);
     assertEquals("{ V36 -> (pair 3 V36) }",t.p());
   }
 
@@ -39,7 +39,7 @@ public class TestHM {
                  new Apply(new Ident("pair2"),
                            new Apply(new Ident("z"), new Con(TypeInt.con(3))),
                            new Apply(new Ident("z"), new Con(TypeStr.ABC))));
-    T2 t = HM.hm(x);
+    T2 t = HM4.hm(x);
     assertEquals("{ { all -> V34 } -> (pair2 V34 V34) }",t.p());
   }
 
@@ -57,7 +57,7 @@ public class TestHM {
                                              new Apply(new Ident("fact"),
                                                        new Apply(new Ident("dec"),new Ident("n")))))),
               new Ident("fact"));
-    T2 t = HM.hm(fact);
+    T2 t = HM4.hm(fact);
     assertEquals("#{ int64 -> int64 }",t.p());
   }
 
@@ -73,7 +73,7 @@ public class TestHM {
                                      new Apply(new Ident("x"), new Con(TypeStr.ABC)))),
                 new Lambda("y", new Ident("y")));
 
-    T2 t1 = HM.hm(x);
+    T2 t1 = HM4.hm(x);
     assertEquals("(pair2 all all)",t1.p());
   }
 
@@ -83,7 +83,7 @@ public class TestHM {
     // fn f => f f (fail)
     Syntax x =
       new Lambda("f", new Apply(new Ident("f"), new Ident("f")));
-    T2 t1 = HM.hm(x);
+    T2 t1 = HM4.hm(x);
     assertEquals("{ $36:{ $36 -> V33 } -> V33 }",t1.p());
     // We can argue the pretty-print should print:
     // "$36:{ $36 -> V33 }"
@@ -96,7 +96,7 @@ public class TestHM {
       new Let("g",
               new Lambda("f", new Con(TypeInt.con(5))),
               new Apply(new Ident("g"), new Ident("g")));
-    T2 t1 = HM.hm(x);
+    T2 t1 = HM4.hm(x);
     assertEquals("5",t1.p());
   }
 
@@ -111,7 +111,7 @@ public class TestHM {
                          new Apply(new Ident("pair2"),
                                    new Apply(new Ident("f"), new Con(TypeInt.con(3))),
                                    new Apply(new Ident("f"), new Con(TypeInt.con(1))))));
-    T2 t1 = HM.hm(syn);
+    T2 t1 = HM4.hm(syn);
     assertEquals("{ V2 -> (pair2 V2 V2) }",t1.p());
   }
 
@@ -120,7 +120,7 @@ public class TestHM {
     // fn f g => (f g)
     Syntax syn =
       new Lambda2("f", "g", new Apply(new Ident("f"), new Ident("g")));
-    T2 t1 = HM.hm(syn);
+    T2 t1 = HM4.hm(syn);
     assertEquals("{ { V1 -> V34 } V1 -> V34 }",t1.p());
   }
 
@@ -130,7 +130,7 @@ public class TestHM {
     // fn f g => (fn arg => g (f arg))
     Syntax syn =
       new Lambda2("f", "g", new Lambda("arg", new Apply(new Ident("g"), new Apply(new Ident("f"), new Ident("arg")))));
-    T2 t1 = HM.hm(syn);
+    T2 t1 = HM4.hm(syn);
     assertEquals("{ { V0 -> V37 } { V37 -> V36 } -> { V0 -> V36 } }",t1.p());
   }
 
@@ -147,7 +147,7 @@ public class TestHM {
               new Apply(new Apply(new Ident("map"),
                                   new Con(TypeInt.con(3))),
                         new Con(TypeInt.con(5))));
-    T2 t1 = HM.hm(syn);
+    T2 t1 = HM4.hm(syn);
     assertEquals("2",t1.p());
   }
 
@@ -163,7 +163,7 @@ public class TestHM {
                                     new Apply(new Ident("fun"),new Ident("x")))),
               new Lambda("p",
                          new Con(TypeInt.con(5))));
-    T2 t1 = HM.hm(syn);
+    T2 t1 = HM4.hm(syn);
     assertEquals("{ V2 -> 5 }",t1.p());
   }
 
@@ -185,7 +185,7 @@ public class TestHM {
                         new Apply(new Apply(new Ident("map"), new Ident("factor")),
                                   new Con(TypeFlt.con(2.3))))
               );
-    T2 t1 = HM.hm(syn);
+    T2 t1 = HM4.hm(syn);
     assertEquals("(pair2 str (divmod flt64 flt64))",t1.p());
   }
 
@@ -202,7 +202,7 @@ public class TestHM {
               new Apply(new Apply(new Ident("map"),
                                   new Lambda("a",new Con(TypeInt.con(3)))),
                         new Con(TypeInt.con(5))));
-    T2 t1 = HM.hm(syn);
+    T2 t1 = HM4.hm(syn);
     assertEquals("3",t1.p());
   }
 
@@ -222,7 +222,7 @@ public class TestHM {
                                                        new Ident("a"),
                                                        new Ident("a")))),
                         new Con(TypeInt.con(5))));
-    T2 t1 = HM.hm(syn);
+    T2 t1 = HM4.hm(syn);
     assertEquals("(pair2 5 5)",t1.p());
   }
 
@@ -246,7 +246,7 @@ public class TestHM {
                                  new Apply(new Ident("map"),
                                            new Apply(new Ident("fcn"),new Ident("q")),
                                            new Con(TypeInt.con(5))))));
-    T2 t1 = HM.hm(syn);
+    T2 t1 = HM4.hm(syn);
     assertEquals("{ V4 -> (pair2 5 5) }",t1.p());
   }
 
@@ -284,7 +284,7 @@ public class TestHM {
                                            new Apply(new Ident("fcn"),new Ident("q")),
                                            new Con(TypeInt.con(5))))));
     // Ultimately, unifies "a" with "pair[3,a]" which throws recursive unification.
-    T2 t1 = HM.hm(syn);
+    T2 t1 = HM4.hm(syn);
     assertEquals("TBD",t1.p());
   }
 
@@ -300,7 +300,7 @@ public class TestHM {
               new Let("cdr", new Lambda("mycons", new Apply(new Ident("mycons"), new Lambda2("p","q", new Ident("q")))),
                       new Apply(new Ident("cdr"),
                                 new Apply(new Ident("cons"), new Con(TypeInt.con(2)), new Con(TypeInt.con(3))))));
-    T2 t1 = HM.hm(syn);
+    T2 t1 = HM4.hm(syn);
     assertEquals("3",t1.p());
   }
 
@@ -327,7 +327,7 @@ public class TestHM {
                                         new Apply(new Ident("map"), new Ident("str"    ), (new Apply(new Ident("cons"),new Con(TypeInt.BOOL),new Con(TypeInt.con(5))))),
                                         new Apply(new Ident("map"), new Ident("isempty"), (new Apply(new Ident("cons"),new Con(TypeInt.BOOL),new Con(TypeStr.ABC   ))))
                                         ))));
-    T2 t1 = HM.hm(syn);
+    T2 t1 = HM4.hm(syn);
     assertEquals("(pair2 str int1)",t1.p());
   }
 
@@ -348,7 +348,7 @@ public class TestHM {
                                           )
                                 ),
               new Apply(new Ident("f0"), new Ident("*2"), new Con(TypeInt.con(99))));
-    T2 t1 = HM.hm(x);
+    T2 t1 = HM4.hm(x);
     assertEquals("int64",t1.p());
   }
 
@@ -371,7 +371,7 @@ public class TestHM {
                                           )
                                 ),
               new Apply(new Ident("f0"), new Ident("f0"), new Con(TypeInt.con(99))));
-    T2 t1 = HM.hm(x);
+    T2 t1 = HM4.hm(x);
     assertEquals("int64",t1.p());
   }
 
@@ -399,7 +399,7 @@ public class TestHM {
                                                               new Apply(new Ident("dec"), new Ident("n")))))
                                ),
                        new Apply(new Ident("is_even"), new Con(TypeInt.con(3))));
-    T2 t1 = HM.hm(x);
+    T2 t1 = HM4.hm(x);
     assertEquals("int1",t1.p());
   }
 
@@ -428,7 +428,7 @@ public class TestHM {
                          new Apply(new Ident("pair2"),
                                    new Apply(new Ident("fgz"),new Con(TypeInt.con(3))),
                                    new Apply(new Ident("fgz"),new Con(TypeInt.con(5))))));
-    T2 t1 = HM.hm(syn);
+    T2 t1 = HM4.hm(syn);
     assertEquals("{ { nint8 -> V31 } -> (pair2 V31 V31) }",t1.p());
   }
   
