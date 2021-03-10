@@ -215,4 +215,34 @@ public class TestHM1 {
     HMType t1 = HM1.HM(syn);
     assertEquals("v24:int64",t1.str());
   }
+
+  // Toss a function into a pair & pull it back out
+  @Test
+  public void test23() {
+    // { g ->
+    //   let fgz =
+    //     // Hand-rolled cons/cdr
+    //     let cons = { x y -> { cadr -> (cadr x y) } }
+    //     in         let cdr = { mycons -> (mycons { p q -> q}) }
+    //                in (cdr (cons 2 {z -> g z}))
+    //   in ((pair (fgz 3)) (fgz 5))
+    // }
+    Syntax syn =
+      new Lambda("g",
+                 new Let("fgz",
+                         new Let("cons",
+                                 new Lambda2("x","y", new Lambda("cadr",new Apply(new Ident("cadr"),new Ident("x"),new Ident("y")))),
+                                 new Let("cdr",
+                                         new Lambda("mycons", new Apply(new Ident("mycons"), new Lambda2("p","q", new Ident("q")))),
+                                         new Apply(new Ident("cdr"),
+                                                   new Apply(new Ident("cons"),
+                                                             new Con(TypeInt.con(2)),
+                                                             new Lambda("z",new Apply(new Ident("g"),new Ident("z"))))))),
+                         new Apply(new Apply(new Ident("pair"),
+                                             new Apply(new Ident("fgz"),new Con(TypeInt.con(3)))),
+                                   new Apply(new Ident("fgz"),new Con(TypeInt.con(5))))));
+    HMType t1 = HM1.HM(syn);
+    assertEquals("{ { v27:nint8 -> v31 } -> pair(v31$,v31$) }",t1.str());
+  }
+
 }
