@@ -45,8 +45,7 @@ public class TestHM {
 
   @Test
   public void test04() {
-    // let fact = {n -> (  if/else (==0 n)  1  ( * n  (fact (dec n))))} in fact;
-    // let fact = {n -> (((if/else (==0 n)) 1) ((* n) (fact (dec n))))} in fact;
+    // let fact = {n -> (if/else3 (==0 n)  1  (*2 n (fact (dec n))))} in fact;
     Syntax fact =
       new Let("fact",
               new Lambda("n",
@@ -64,7 +63,9 @@ public class TestHM {
 
   @Test
   public void test05() {
-    // ({ x -> (pair2 (x 3) (x "abc")) } {x->x})
+    // ({ x -> (pair2 (x 3) (x "abc")) } {y->y})
+    // Because {y->y} is passed in, all 'y' types must agree.
+    // This unifies 3 and "abc" which results in 'all'
     Syntax x =
       new Apply(new Lambda("x",
                            new Apply(new Ident("pair2"),
@@ -85,6 +86,8 @@ public class TestHM {
       new Lambda("f", new Apply(new Ident("f"), new Ident("f")));
     T2 t1 = HM.hm(x);
     assertEquals("{ $36:{ $36 -> V33 } -> V33 }",t1.p());
+    // We can argue the pretty-print should print:
+    // "$36:{ $36 -> V33 }"
   }
 
   @Test
@@ -101,7 +104,7 @@ public class TestHM {
   @Test
   public void test08() {
     // example that demonstrates generic and non-generic variables:
-    // fn g => let f = fn x => g in pair2 (f 3, f true)
+    // fn g => let f = (fn x => g) in pair2 (f 3, f true)
     Syntax syn =
       new Lambda("g",
                  new Let("f",
@@ -111,12 +114,12 @@ public class TestHM {
                                    new Apply(new Ident("f"), new Con(TypeInt.con(1))))));
 
     T2 t1 = HM.hm(syn);
-    assertEquals("{ V2 -> (pair2 V38 V41) }",t1.p());
+    assertEquals("{ V2 -> (pair2 V2 V2) }",t1.p());
   }
 
   @Test
-  public void test09a() {
-    // fn f => (fn g => (f g))
+  public void test09() {
+    // fn f g => (f g)
     Syntax syn =
       new Lambda2("f", "g", new Apply(new Ident("f"), new Ident("g")));
 
@@ -125,9 +128,9 @@ public class TestHM {
   }
 
   @Test
-  public void test09b() {
+  public void test10() {
     // Function composition
-    // fn f => (fn g => (fn arg => g (f arg)))
+    // fn f g => (fn arg => g (f arg))
     Syntax syn =
       new Lambda2("f", "g", new Lambda("arg", new Apply(new Ident("g"), new Apply(new Ident("f"), new Ident("arg")))));
 
@@ -135,13 +138,46 @@ public class TestHM {
     assertEquals("{ { V0 -> V37 } { V37 -> V36 } -> { V0 -> V36 } }",t1.p());
   }
 
+  @Test
+  public void test11() {
+    // Stacked functions ignoring all function arguments
+    // let map = (fn fun => (fn x => 2))
+    //        in ((map 3) 5)
+    Syntax syn =
+      new Let("map",
+              new Lambda("fun",
+                         new Lambda("x",
+                                    new Con(TypeInt.con(2)))),
+              new Apply(new Apply(new Ident("map"),
+                                  new Con(TypeInt.con(3))),
+                        new Con(TypeInt.con(5))));
+    T2 t1 = HM.hm(syn);
+    assertEquals("2",t1.p());
+  }
 
   @Test
-  public void test10() {
+  public void test12() {
+    // map takes a function and an element (collection?) and applies it (applies to collection?)
+    //   let map = { fun -> {x -> (fun x) }}
+    //          in { p -> 5 }
+    Syntax syn =
+      new Let("map",
+              new Lambda("fun",
+                         new Lambda("x",
+                                    new Apply(new Ident("fun"),new Ident("x")))),
+              new Lambda("p",
+                         new Con(TypeInt.con(5))));
+    T2 t1 = HM.hm(syn);
+    assertEquals("{ V2 -> 5 }",t1.p());
+  }
+
+  @Test
+  public void test13() {
     // Looking at when tvars are duplicated ("fresh" copies made).
     // This is the "map" problem with a scalar instead of a collection.
     // Takes a '{a->b}' and a 'a' for a couple of different prims.
-    // let map = { fun -> {x -> (fun x) }} in (pair2 ((map str) 5) ((map factor) 2.3))
+    // let map = { fun -> {x -> (fun x) }}
+    //        in (pair2 ((map str) 5) ((map factor) 2.3))
     Syntax syn =
       new Let("map",
               new Lambda("fun",
@@ -158,41 +194,10 @@ public class TestHM {
   }
 
   @Test
-  public void test11() {
+  public void test14() {
     // map takes a function and an element (collection?) and applies it (applies to collection?)
-    //   let map = { fun -> {x -> (fun x) }} in
-    //   { p -> 5 }
-    Syntax syn =
-      new Let("map",
-              new Lambda("fun",
-                         new Lambda("x",
-                                    new Apply(new Ident("fun"),new Ident("x")))),
-              new Lambda("p",
-                         new Con(TypeInt.con(5))));
-    T2 t1 = HM.hm(syn);
-    assertEquals("{ V2 -> 5 }",t1.p());
-  }
-
-  @Test
-  public void test12() {
-    Syntax syn =
-      new Let("map",
-              new Lambda("fun",
-                         new Lambda("x",
-                                    new Con(TypeInt.con(2)))),
-              new Apply(new Apply(new Ident("map"),
-                                  new Con(TypeInt.con(3))),
-                        new Con(TypeInt.con(5))));
-    T2 t1 = HM.hm(syn);
-    assertEquals("2",t1.p());
-  }
-
-  @Test
-  public void test13() {
-    // map takes a function and an element (collection?) and applies it (applies to collection?)
-    //   let map = { fun -> {x -> (fun x) }} in
-    //      (map {a -> 3} 5)
-    // Should return  { p -> [5,5] }
+    //   let map = { fun -> {x -> (fun x) }}
+    //          in (map {a -> 3} 5)
     Syntax syn =
       new Let("map",
               new Lambda("fun",
@@ -206,10 +211,10 @@ public class TestHM {
   }
 
   @Test
-  public void test14() {
+  public void test15() {
     // map takes a function and an element (collection?) and applies it (applies to collection?)
-    //   let map = { fun -> {x -> (fun x) }} in
-    //      (map {a -> [a,a]} 5)
+    //   let map = { fun -> {x -> (fun x) }}
+    //          in (map {a -> [a,a]} 5)
     Syntax syn =
       new Let("map",
               new Lambda("fun",
@@ -226,10 +231,11 @@ public class TestHM {
   }
 
   @Test
-  public void test15() {
+  public void test16() {
     //   let fcn = { p a -> pair[a,a] } in
     // map takes a function and an element (collection?) and applies it (applies to collection?)
     //   let map = { fun x -> (fun x) } in
+    //          in { q -> (map (fcn q) 5) }
     // Should return  { p -> [5,5] }
     Syntax syn =
       new Let("fcn",
@@ -250,16 +256,17 @@ public class TestHM {
 
 
   @Test(expected = RuntimeException.class)
-  public void test16() {
+  public void test17() {
     // Checking behavior when using "if/else" to merge two functions with
     // sufficiently different signatures, then attempting to pass them to a map
     // & calling internally.
     // fcn takes a predicate 'p' and returns one of two fcns.
-    //   let fcn = { p -> (if/else3 p {a -> pair[a,a]} {b -> pair[b,pair[3,b]]}) } in
+    //   let fcn = { p -> (if/else3 p {a -> pair[a,a        ]}
+    //                                {b -> pair[b,pair[3,b]]}) } in
     // map takes a function and an element (collection?) and applies it (applies to collection?)
-    //   let map = { fun -> {x -> (fun x) }} in
-    // Should return either { p -> p ? [5,5] : [5,[3,5]] }
-    //   { q -> ((map (fcn q)) 5) }
+    //   let map = { fun x -> (fun x) }
+    //          in { q -> ((map (fcn q)) 5) }
+    // Should return { q -> q ? [5,5] : [5,[3,5]] }
     Syntax syn =
       new Let("fcn",
               new Lambda("p",
@@ -288,7 +295,11 @@ public class TestHM {
 
 
   @Test
-  public void test17a() {
+  public void test18() {
+    // Hand-rolled cons/cdr
+    // let cons = { x y -> { cadr -> (cadr x y) } }
+    // in         let cdr = { mycons -> (mycons { p q -> q}) }
+    //            in (cdr (cons 2 3))
     Syntax syn =
       new Let("cons", new Lambda2("x","y",
                                   new Lambda("cadr",new Apply(new Ident("cadr"),new Ident("x"),new Ident("y")))),
@@ -307,7 +318,7 @@ public class TestHM {
   // in pair(map(str,intz),map(isempty,strz))
   // Expects: ("2",false)
   @Test
-  public void test17b() {
+  public void test19() {
     Syntax syn =
       new Let("cons", new Lambda2("x","y",
                                   new Lambda("cadr",new Apply(new Ident("cadr"),new Ident("x"),new Ident("y")))),
@@ -328,7 +339,7 @@ public class TestHM {
 
   // Obscure factorial-like
   @Test
-  public void test18() {
+  public void test20() {
     // let f0 = fn f x => (if/else3 (==0 x) 1 (f (f0 f (dec x)) 2) ) in f0 *2 99
     Syntax x =
       new Let("f0", new Lambda2("f","x",
@@ -350,7 +361,7 @@ public class TestHM {
 
   // Obscure factorial-like
   @Test
-  public void test19() {
+  public void test21() {
     // let f0 = fn f x => (if/else3 (==0 x) 1 (*2 (f0 f (dec x)) 2) ) in f0 f0 99
     // let f0 = fn f x => (if/else3 (==0 x) 1 (f  (f0 f (dec x)) 2) ) in f0 *2 99
     Syntax x =
@@ -372,7 +383,7 @@ public class TestHM {
 
   // Mututal recursion
   @Test
-  public void test20() {
+  public void test22() {
     /* let is_even =
            (let is_odd = fn x => (if/else3 (==0 x) false (is_even (dec x)))
                       in fn x => (if/else3 (==0 x) true  (is_odd  (dec x))))

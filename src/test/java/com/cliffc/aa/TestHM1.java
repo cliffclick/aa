@@ -100,7 +100,7 @@ public class TestHM1 {
   @Test
   public void test8() {
     // example that demonstrates generic and non-generic variables:
-    // fn g => let f = fn x => g in pair (f 3, f true)
+    // fn g => let f = (fn x => g) in pair (f 3, f true)
     Syntax syn =
       new Lambda("g",
                  new Let("f",
