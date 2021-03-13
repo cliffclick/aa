@@ -163,6 +163,7 @@ public class HM3 {
     @Override boolean progress() { return false; }
     @Override void get_ids(VStack vstk,Worklist work) { add_work(work); }
   }
+
   public static class Ident extends Syntax {
     final String _name;
     VStack _vstk;
