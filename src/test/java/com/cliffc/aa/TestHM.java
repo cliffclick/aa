@@ -230,9 +230,9 @@ public class TestHM {
   public void test16() {
     //   let fcn = { p a -> pair[a,a] } in
     // map takes a function and an element (collection?) and applies it (applies to collection?)
-    //   let map = { fun x -> (fun x) } in
+    //   let map = { fun x -> (fun x) }
     //          in { q -> (map (fcn q) 5) }
-    // Should return  { p -> [5,5] }
+    // Should return  { q -> [5,5] }
     Syntax syn =
       new Let("fcn",
               new Lambda("p",

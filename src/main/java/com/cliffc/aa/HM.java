@@ -68,6 +68,7 @@ public class HM {
         assert !t.progress(old.find());// monotonic: unifying with the result is no-progress
         syn._t=t;               // Progress!
         syn.add_kids(work);     // Push children on worklist
+        syn.add_occurs(work);   // Push occurs-check ids on worklist
         if( syn._par !=null ) work.push(syn._par); // Parent updates
       } else {
         assert !DEBUG_LEAKS || oldcnt==T2.CNT;  // No-progress consumes no-new-T2s
@@ -90,7 +91,7 @@ public class HM {
     //public Syntax pop() { Syntax s = _ary.pop();_cnt++;            _work.remove(s); return s; }
     public Syntax pop() { Syntax s = _ary.del(  _cnt++%_ary._len); _work.remove(s); return s; }
     public boolean has(Syntax s) { return _work.contains(s); }
-    public void addAll(Ary<? extends Syntax> ss) { for( Syntax s : ss ) push(s); }
+    public void addAll(Ary<? extends Syntax> ss) { if( ss != null ) for( Syntax s : ss ) push(s); }
     @Override public String toString() { return _ary.toString(); }
   }
 
@@ -116,6 +117,7 @@ public class HM {
     abstract T2 lookup(String name); // Lookup name in scope & return type; TODO: pre-cache this.
 
     abstract void add_kids(Worklist work); // Add children to worklist
+    void add_occurs(Worklist work){}
 
     // Giant Assert: True if OK; all Syntaxs off worklist do not make progress
     abstract boolean more_work(Worklist work);
@@ -195,12 +197,15 @@ public class HM {
       return _par==null ? null : _par.lookup(name);
     }
     @Override void add_kids(Worklist work) { work.push(_body); }
+    @Override void add_occurs(Worklist work) {
+      if( targ().occurs_in_type(_t) ) work.addAll(_targ._deps);
+    }
     @Override void prep_tree( Syntax par, Worklist work ) {
       prep_tree_impl(par,T2.make_leaf(),work);
       _body.prep_tree(this,work);
     }
     @Override boolean prep_lookup_deps(Ident id) {
-      return Util.eq(id._name,_arg0) && _targ.push_update(id) && _t.find().push_update(id);
+      return Util.eq(id._name,_arg0) && _targ.push_update(id);
     }
     @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
@@ -230,13 +235,17 @@ public class HM {
       return _par==null ? null : _par.lookup(name);
     }
     @Override void add_kids(Worklist work) { work.push(_body); }
+    @Override void add_occurs(Worklist work) {
+      if( targ0().occurs_in_type(_t) ) work.addAll(_targ0._deps);
+      if( targ1().occurs_in_type(_t) ) work.addAll(_targ1._deps);
+    }
     @Override void prep_tree( Syntax par, Worklist work ) {
       prep_tree_impl(par,T2.make_leaf(),work);
       _body.prep_tree(this,work);
     }
     @Override boolean prep_lookup_deps(Ident id) {
-      return (Util.eq(id._name,_arg0) && _targ0.push_update(id) && _t.find().push_update(id))
-        ||   (Util.eq(id._name,_arg1) && _targ1.push_update(id) && _t.find().push_update(id));
+      return (Util.eq(id._name,_arg0) && _targ0.push_update(id))
+        ||   (Util.eq(id._name,_arg1) && _targ1.push_update(id));
     }
     @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
@@ -262,13 +271,17 @@ public class HM {
       return _par==null ? null : _par.lookup(name);
     }
     @Override void add_kids(Worklist work) { work.push(_body); work.push(_def); }
+    @Override void add_occurs(Worklist work) {
+      if( targ().occurs_in_type(_t) ) work.addAll(_targ._deps);
+    }
     @Override void prep_tree( Syntax par, Worklist work ) {
-      _body.prep_tree(this,work);
       prep_tree_impl(par,_body._t,work);
+      _body.prep_tree(this,work);
       _def .prep_tree(this,work);
+      _t = _body._t;
     }
     @Override boolean prep_lookup_deps(Ident id) {
-      return Util.eq(id._name,_arg0) && _targ.push_update(id) && _body._t.find().push_update(id);
+      return Util.eq(id._name,_arg0) && _targ.push_update(id);
     }
     @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
@@ -359,7 +372,6 @@ public class HM {
   // where not unifyable the union is replaced with an Error.
   public static class T2 {
     private static int CNT=0;
-    static void reset() { CNT=0; }
     final int _uid;
 
     // A plain type variable starts with a 'V', and can unify directly.
@@ -550,9 +562,8 @@ public class HM {
       // Bases MEET cons in RHS
       if( is_base() && t.is_base() ) return fresh_base(t,work);
 
-      if( !Util.eq(_name,t._name) )
-        throw unimpl();         // unification error
-      if( _args.length != t._args.length )
+      if( !Util.eq(_name,t._name) ||
+          _args.length != t._args.length )
         throw new RuntimeException("Cannot unify "+this+" and "+t);
 
       // Structural recursion unification, lazy on LHS
@@ -604,19 +615,24 @@ public class HM {
       ODUPS.clear();
       return found;
     }
+    boolean occurs_in_type(T2 x) {
+      assert ODUPS.isEmpty();
+      boolean found = _occurs_in_type(x);
+      ODUPS.clear();
+      return found;
+    }
     boolean _occurs_in(Syntax syn) {
-      if( occurs_in_type(syn.find()) ) return true;
-      if( syn._par==null ) return false;
-      return _occurs_in(syn._par);
+      if( _occurs_in_type(syn.find()) ) return true;
+      return syn._par != null && _occurs_in(syn._par);
     }
 
-    boolean occurs_in_type(T2 x) {
+    boolean _occurs_in_type(T2 x) {
       assert no_uf() && x.no_uf();
       if( x==this ) return true;
-      if( ODUPS.test(x._uid) ) return false; // Been there, done that
+      if( ODUPS.tset(x._uid) ) return false; // Been there, done that
       if( !x.is_leaf() )
         for( int i=0; i<x._args.length; i++ )
-          if( occurs_in_type(x.args(i)) )
+          if( _occurs_in_type(x.args(i)) )
             return true;
       return false;
     }
@@ -729,6 +745,8 @@ public class HM {
       for( int i=0; i<_args.length; i++ ) args(i)._p(sb,visit,dups).p(" ");
       return sb.unchar().p(")");
     }
+
+    static void reset() { CNT=0; PROGRESS=0; DUPS.clear(); VARS.clear(); ODUPS.clear(); CDUPS.clear(); UPDATE_VISIT.clear(); }
   }
 
 }
