@@ -67,6 +67,7 @@ public class HM {
       if( t!=null ) {           // Progress?
         assert !t.progress(old.find());// monotonic: unifying with the result is no-progress
         syn._t=t;               // Progress!
+        syn.add_kids(work);     // Push children on worklist
         if( syn._par !=null ) work.push(syn._par); // Parent updates
       } else {
         assert !DEBUG_LEAKS || oldcnt==T2.CNT;  // No-progress consumes no-new-T2s
@@ -86,8 +87,8 @@ public class HM {
     private final HashSet<Syntax> _work = new HashSet<>();    // For preventing dups
     public int len() { return _ary.len(); }
     public void push(Syntax s) { if( !_work.contains(s) ) _work.add(_ary.push(s)); }
-    //public Syntax pop() { Syntax s = _ary.pop(             ); _work.remove(s); return s; }
-    public Syntax pop() { Syntax s = _ary.del(_cnt++%_ary._len); _work.remove(s); return s; }
+    public Syntax pop() { Syntax s = _ary.pop();_cnt++;            _work.remove(s); return s; }
+    //public Syntax pop() { Syntax s = _ary.del(  _cnt++%_ary._len); _work.remove(s); return s; }
     public boolean has(Syntax s) { return _work.contains(s); }
     public void addAll(Ary<? extends Syntax> ss) { for( Syntax s : ss ) push(s); }
     @Override public String toString() { return _ary.toString(); }
@@ -112,6 +113,8 @@ public class HM {
     final void prep_tree_impl( Syntax par, T2 t, Worklist work ) { _par=par; _t=t; work.push(this); }
 
     abstract T2 lookup(String name);
+
+    abstract void add_kids(Worklist work);
 
     // Giant Assert: True if OK; all Syntaxs off worklist do not make progress
     abstract boolean more_work(Worklist work);
@@ -139,8 +142,9 @@ public class HM {
     @Override SB str(SB sb) { return p1(sb); }
     @Override SB p1(SB sb) { return sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString()); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
-    @Override T2 hm(Worklist work) { assert _t.isa("Base"); return null; }
+    @Override T2 hm(Worklist work) { assert find().isa("Base"); return null; }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
+    @Override void add_kids(Worklist work) { }
     @Override void prep_tree( Syntax par, Worklist work ) { prep_tree_impl(par, T2.make_base(_con), work); }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
   }
@@ -159,8 +163,13 @@ public class HM {
       return t.fresh_unify(find(),_par,work);
     }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
+    @Override void add_kids(Worklist work) { }
     @Override void prep_tree( Syntax par, Worklist work ) {
       prep_tree_impl(par,T2.make_leaf(),work);
+      if( _par!=null ) {
+        T2 t = _par.lookup(_name);
+        if( t!=null ) t.push_update(this);
+      }
     }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
   }
@@ -183,6 +192,7 @@ public class HM {
       if( Util.eq(_arg0,name) ) return targ();
       return _par==null ? null : _par.lookup(name);
     }
+    @Override void add_kids(Worklist work) { work.push(_body); }
     @Override void prep_tree( Syntax par, Worklist work ) {
       prep_tree_impl(par,T2.make_leaf(),work);
       _body.prep_tree(this,work);
@@ -205,14 +215,16 @@ public class HM {
     T2 targ0() { T2 targ = _targ0.find(); return targ==_targ0 ? targ : (_targ0=targ); }
     T2 targ1() { T2 targ = _targ1.find(); return targ==_targ1 ? targ : (_targ1=targ); }
     @Override T2 hm(Worklist work) {
-      //// The normal lambda work
-      //T2 fun = T2.make_fun(targ0(),targ1(),_body.find());
-      //// Force forwards progress; an Apply may already have lifted _t to
-      //// something better than just a plain fun wrapper.
-      //return find().unify(fun,work);
-      throw unimpl();
+      // The normal lambda work
+      T2 fun = T2.make_fun(targ0(),targ1(),_body.find());
+      return find().unify(fun,work);
     }
-    @Override T2 lookup(String name) { throw unimpl(); }
+    @Override T2 lookup(String name) {
+      if( Util.eq(_arg0,name) ) return targ0();
+      if( Util.eq(_arg1,name) ) return targ1();
+      return _par==null ? null : _par.lookup(name);
+    }
+    @Override void add_kids(Worklist work) { work.push(_body); }
     @Override void prep_tree( Syntax par, Worklist work ) {
       prep_tree_impl(par,T2.make_leaf(),work);
       _body.prep_tree(this,work);
@@ -225,39 +237,37 @@ public class HM {
 
   public static class Let extends Syntax {
     final String _arg0;
-    final Syntax _body, _use;
+    final Syntax _def, _body;
     T2 _targ;
-    Let(String arg0, Syntax body, Syntax use) { _arg0=arg0; _body=body; _use=use; _targ=T2.make_leaf(); }
-    @Override SB str(SB sb) { return _use.str(_body.str(sb.p("let ").p(_arg0).p(" = ")).p(" in ")); }
+    Let(String arg0, Syntax def, Syntax body) { _arg0=arg0; _body=body; _def=def; _targ=T2.make_leaf(); }
+    @Override SB str(SB sb) { return _def.str(_body.str(sb.p("let ").p(_arg0).p(" = ")).p(" in ")); }
     @Override SB p1(SB sb) { return sb.p("let ").p(_arg0).p(" = ... in ..."); }
-    @Override SB p2(SB sb, VBitSet dups) { _body.p0(sb,dups); return _use.p0(sb,dups); }
+    @Override SB p2(SB sb, VBitSet dups) { _body.p0(sb,dups); return _def.p0(sb,dups); }
     T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
     @Override T2 hm(Worklist work) {
-      //_use.find().push_update(this);
-      boolean progress = targ().unify(_body.find(),work) != null;
-      if( progress && work != null )
-        work.push(_use);        // Revisit use if body changed
-      return progress ? find() : null;
+      boolean progress = targ().unify(_def.find(),work) != null;
+      return progress ? _body.find() : null;
     }
     @Override T2 lookup(String name) {
       if( Util.eq(_arg0,name) ) return targ();
       return _par==null ? null : _par.lookup(name);
     }
+    @Override void add_kids(Worklist work) { work.push(_body); work.push(_def); }
     @Override void prep_tree( Syntax par, Worklist work ) {
-      _use .prep_tree(this,work);
-      prep_tree_impl(par,_use._t,work);
       _body.prep_tree(this,work);
+      prep_tree_impl(par,_body._t,work);
+      _def .prep_tree(this,work);
     }
     //@Override T2 prep_tree_lookup(String name, Syntax prior) {
     //  return Util.eq(_arg0,name)
-    //    // Let _body, NOT fresh; Let _use, YES fresh
-    //    ? (prior==_use ? T2.fresh(name,_targ) : _targ)
+    //    // Let _body, NOT fresh; Let _def, YES fresh
+    //    ? (prior==_def ? T2.fresh(name,_targ) : _targ)
     //    : null;                 // Missed on name
     //}
 
     @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
-      return _body.more_work(work) && _use.more_work(work);
+      return _body.more_work(work) && _def.more_work(work);
     }
   }
 
@@ -321,6 +331,7 @@ public class HM {
       return arg==null ? find() : arg;
     }
     @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
+    @Override void add_kids(Worklist work) { for( Syntax arg : _args ) work.push(arg); }
     @Override void prep_tree(Syntax par,Worklist work) {
       prep_tree_impl(par,T2.make_leaf(),work);
       _fun.prep_tree(this,work);
@@ -404,15 +415,17 @@ public class HM {
     @NotNull T2 union(T2 that, Worklist work) {
       assert is_leaf() && no_uf(); // Cannot union twice
       if( this==that ) return that;
+      if( work==null ) return that.progress();
       // Worklist: put updates on the worklist for revisiting
-      if( work!=null && _deps!=null ) work.addAll(_deps); // Re-Apply
-      // Merge update lists, for future unions
       if( _deps != null ) {
-        if( that._deps==null ) that._deps = _deps;
-        else throw unimpl();    // merge lists
+        work.addAll(_deps); // Re-Apply
+        // Merge update lists, for future unions
+        if( that._deps==null && that.is_leaf() ) that._deps = _deps;
+        else
+          for( Syntax dep : _deps ) that.push_update(dep);
         _deps = null;
       }
-      if( work!=null ) _args[0] = that; // If no work, no change
+      _args[0] = that;         // U-F update
       return that.progress();
     }
 
@@ -490,8 +503,8 @@ public class HM {
     // the same as calling 'fresh' then 'unify', as a 'fresh' always makes new
     // T2s which always look like progress during the unify step.  The Syntax
     // is used when making the 'fresh' copy for the occurs_check.  If work is
-    // null, we are testing only and make no changes.  We return the unified
-    // value, and set a PROGRESS flag if changes.
+    // null, we are testing only, make no changes, and always return 't' if
+    // PROGRESS.  If PROGRESS and not testing we return the unified value.
     static private final HashMap<T2,T2> VARS = new HashMap<>();
     T2 fresh_unify(T2 t, Syntax syn, Worklist work) {
       assert VARS.isEmpty() && DUPS.isEmpty() && PROGRESS==0;
@@ -523,7 +536,11 @@ public class HM {
     @NotNull T2 _fresh_unify_impl(T2 t, Syntax syn, Worklist work) {
       if( occurs_in(syn) ) return _unify(t,work); // Famous 'occurs-check', switch to normal unify
       if(   is_leaf() ) return t;  // Lazy map LHS tvar to RHS
-      if( t.is_leaf() ) return t.union(_fresh(syn),work); // RHS is a tvar; union with a deep copy of LHS
+      if( t.is_leaf() ) {
+        T2 rez = t.union(_fresh(syn),work);
+        if( work==null && PROGRESS>0 ) return t; // If progress and testing, always return 't'
+        return rez; // RHS is a tvar; union with a deep copy of LHS
+      }
       // Bases MEET cons in RHS
       if( is_base() && t.is_base() ) return fresh_base(t,work);
 

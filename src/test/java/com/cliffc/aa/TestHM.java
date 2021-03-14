@@ -63,18 +63,18 @@ public class TestHM {
 
   @Test
   public void test05() {
-    // ({ x -> (pair2 (x 3) (x "abc")) } {y->y})
+    // ({ x -> (pair (x 3) (x "abc")) } {y->y})
     // Because {y->y} is passed in, all 'y' types must agree.
     // This unifies 3 and "abc" which results in 'all'
     Syntax x =
       new Apply(new Lambda("x",
-                           new Apply(new Ident("pair2"),
+                           new Apply(new Ident("pair"),
                                      new Apply(new Ident("x"), new Con(TypeInt.con(3))),
                                      new Apply(new Ident("x"), new Con(TypeStr.ABC)))),
                 new Lambda("y", new Ident("y")));
 
     T2 t1 = HM.hm(x);
-    assertEquals("(pair2 all all)",t1.p());
+    assertEquals("(pair all all)",t1.p());
   }
 
   @Test//(expected = RuntimeException.class)  No longer throws, but returns a recursive type
@@ -91,7 +91,7 @@ public class TestHM {
 
   @Test
   public void test07() {
-    // let g = fn f => 5 in g g
+    // let g = (fn f => 5) in (g g)
     Syntax x =
       new Let("g",
               new Lambda("f", new Con(TypeInt.con(5))),
@@ -103,16 +103,16 @@ public class TestHM {
   @Test
   public void test08() {
     // example that demonstrates generic and non-generic variables:
-    // fn g => let f = (fn x => g) in pair2 (f 3, f true)
+    // fn g => let f = (fn x => g) in pair (f 3, f true)
     Syntax syn =
       new Lambda("g",
                  new Let("f",
                          new Lambda("x", new Ident("g")),
-                         new Apply(new Ident("pair2"),
+                         new Apply(new Ident("pair"),
                                    new Apply(new Ident("f"), new Con(TypeInt.con(3))),
                                    new Apply(new Ident("f"), new Con(TypeInt.con(1))))));
     T2 t1 = HM.hm(syn);
-    assertEquals("{ V2 -> (pair2 V2 V2) }",t1.p());
+    assertEquals("{ V2 -> (pair V2 V2) }",t1.p());
   }
 
   @Test
@@ -121,7 +121,7 @@ public class TestHM {
     Syntax syn =
       new Lambda2("f", "g", new Apply(new Ident("f"), new Ident("g")));
     T2 t1 = HM.hm(syn);
-    assertEquals("{ { V1 -> V34 } V1 -> V34 }",t1.p());
+    assertEquals("{ { V1 -> V22 } V1 -> V22 }",t1.p());
   }
 
   @Test
@@ -131,7 +131,7 @@ public class TestHM {
     Syntax syn =
       new Lambda2("f", "g", new Lambda("arg", new Apply(new Ident("g"), new Apply(new Ident("f"), new Ident("arg")))));
     T2 t1 = HM.hm(syn);
-    assertEquals("{ { V0 -> V37 } { V37 -> V36 } -> { V0 -> V36 } }",t1.p());
+    assertEquals("{ { V0 -> V26 } { V26 -> V24 } -> { V0 -> V24 } }",t1.p());
   }
 
   @Test
@@ -173,20 +173,20 @@ public class TestHM {
     // This is the "map" problem with a scalar instead of a collection.
     // Takes a '{a->b}' and a 'a' for a couple of different prims.
     // let map = { fun -> {x -> (fun x) }}
-    //        in (pair2 ((map str) 5) ((map factor) 2.3))
+    //        in (pair ((map str) 5) ((map factor) 2.3))
     Syntax syn =
       new Let("map",
               new Lambda("fun",
                          new Lambda("x",
                                     new Apply(new Ident("fun"),new Ident("x")))),
-              new Apply(new Ident("pair2"),
+              new Apply(new Ident("pair"),
                         new Apply(new Apply(new Ident("map"), new Ident("str")),
                                   new Con(TypeInt.con(5))),
                         new Apply(new Apply(new Ident("map"), new Ident("factor")),
                                   new Con(TypeFlt.con(2.3))))
               );
     T2 t1 = HM.hm(syn);
-    assertEquals("(pair2 str (divmod flt64 flt64))",t1.p());
+    assertEquals("(pair str (divmod flt64 flt64))",t1.p());
   }
 
   @Test
@@ -218,12 +218,12 @@ public class TestHM {
                                     new Apply(new Ident("fun"),new Ident("x")))),
               new Apply(new Apply(new Ident("map"),
                                   new Lambda("a",
-                                             new Apply(new Ident("pair2"),
+                                             new Apply(new Ident("pair"),
                                                        new Ident("a"),
                                                        new Ident("a")))),
                         new Con(TypeInt.con(5))));
     T2 t1 = HM.hm(syn);
-    assertEquals("(pair2 5 5)",t1.p());
+    assertEquals("(pair 5 5)",t1.p());
   }
 
   @Test
@@ -237,7 +237,7 @@ public class TestHM {
       new Let("fcn",
               new Lambda("p",
                          new Lambda("a",
-                                    new Apply(new Ident("pair2"),
+                                    new Apply(new Ident("pair"),
                                               new Ident("a"),
                                               new Ident("a")))),
               new Let("map",
@@ -247,7 +247,7 @@ public class TestHM {
                                            new Apply(new Ident("fcn"),new Ident("q")),
                                            new Con(TypeInt.con(5))))));
     T2 t1 = HM.hm(syn);
-    assertEquals("{ V4 -> (pair2 5 5) }",t1.p());
+    assertEquals("{ V4 -> (pair 5 5) }",t1.p());
   }
 
   @Test(expected = RuntimeException.class)
@@ -268,13 +268,13 @@ public class TestHM {
                          new Apply(new Ident("if/else"),
                                    new Ident("p"), // p ?
                                    new Lambda("a",
-                                              new Apply(new Ident("pair2"),
+                                              new Apply(new Ident("pair"),
                                                         new Ident("a"),
                                                         new Ident("a"))),
                                    new Lambda("b",
-                                              new Apply(new Ident("pair2"),
+                                              new Apply(new Ident("pair"),
                                                         new Ident("b"),
-                                                        new Apply(new Ident("pair2"),
+                                                        new Apply(new Ident("pair"),
                                                                   new Con(TypeInt.con(3)),
                                                                   new Ident("b")))))),
               new Let("map",
@@ -323,12 +323,12 @@ public class TestHM {
                                                     new Apply(new Ident("cdr"),new Ident("parg"))
                                                     )),
                               // in pair(map(),map())
-                              new Apply(new Ident("pair2"),
+                              new Apply(new Ident("pair"),
                                         new Apply(new Ident("map"), new Ident("str"    ), (new Apply(new Ident("cons"),new Con(TypeInt.BOOL),new Con(TypeInt.con(5))))),
                                         new Apply(new Ident("map"), new Ident("isempty"), (new Apply(new Ident("cons"),new Con(TypeInt.BOOL),new Con(TypeStr.ABC   ))))
                                         ))));
     T2 t1 = HM.hm(syn);
-    assertEquals("(pair2 str int1)",t1.p());
+    assertEquals("(pair str int1)",t1.p());
   }
 
   // Obscure factorial-like
@@ -412,7 +412,7 @@ public class TestHM {
     //     let cons = { x y -> { cadr -> (cadr x y) } }
     //     in         let cdr = { mycons -> (mycons { p q -> q}) }
     //                in (cdr (cons 2 {z -> g z}))
-    //   in (pair2 (fgz 3) (fgz 5))
+    //   in (pair (fgz 3) (fgz 5))
     // }
     Syntax syn =
       new Lambda("g",
@@ -425,11 +425,11 @@ public class TestHM {
                                                    new Apply(new Ident("cons"),
                                                              new Con(TypeInt.con(2)),
                                                              new Lambda("z",new Apply(new Ident("g"),new Ident("z"))))))),
-                         new Apply(new Ident("pair2"),
+                         new Apply(new Ident("pair"),
                                    new Apply(new Ident("fgz"),new Con(TypeInt.con(3))),
                                    new Apply(new Ident("fgz"),new Con(TypeInt.con(5))))));
     T2 t1 = HM.hm(syn);
-    assertEquals("{ { nint8 -> V31 } -> (pair2 V31 V31) }",t1.p());
+    assertEquals("{ { nint8 -> V31 } -> (pair V31 V31) }",t1.p());
   }
 
 }
