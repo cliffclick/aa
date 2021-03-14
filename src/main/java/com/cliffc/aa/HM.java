@@ -87,8 +87,8 @@ public class HM {
     private final HashSet<Syntax> _work = new HashSet<>();    // For preventing dups
     public int len() { return _ary.len(); }
     public void push(Syntax s) { if( !_work.contains(s) ) _work.add(_ary.push(s)); }
-    public Syntax pop() { Syntax s = _ary.pop();_cnt++;            _work.remove(s); return s; }
-    //public Syntax pop() { Syntax s = _ary.del(  _cnt++%_ary._len); _work.remove(s); return s; }
+    //public Syntax pop() { Syntax s = _ary.pop();_cnt++;            _work.remove(s); return s; }
+    public Syntax pop() { Syntax s = _ary.del(  _cnt++%_ary._len); _work.remove(s); return s; }
     public boolean has(Syntax s) { return _work.contains(s); }
     public void addAll(Ary<? extends Syntax> ss) { for( Syntax s : ss ) push(s); }
     @Override public String toString() { return _ary.toString(); }
@@ -111,10 +111,11 @@ public class HM {
 
     abstract void prep_tree(Syntax par, Worklist work);
     final void prep_tree_impl( Syntax par, T2 t, Worklist work ) { _par=par; _t=t; work.push(this); }
+    abstract boolean prep_lookup_deps(Ident id);
 
-    abstract T2 lookup(String name);
+    abstract T2 lookup(String name); // Lookup name in scope & return type; TODO: pre-cache this.
 
-    abstract void add_kids(Worklist work);
+    abstract void add_kids(Worklist work); // Add children to worklist
 
     // Giant Assert: True if OK; all Syntaxs off worklist do not make progress
     abstract boolean more_work(Worklist work);
@@ -146,6 +147,7 @@ public class HM {
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
     @Override void add_kids(Worklist work) { }
     @Override void prep_tree( Syntax par, Worklist work ) { prep_tree_impl(par, T2.make_base(_con), work); }
+    @Override boolean prep_lookup_deps(Ident id) { throw unimpl("should not reach here"); }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
   }
 
@@ -166,11 +168,11 @@ public class HM {
     @Override void add_kids(Worklist work) { }
     @Override void prep_tree( Syntax par, Worklist work ) {
       prep_tree_impl(par,T2.make_leaf(),work);
-      if( _par!=null ) {
-        T2 t = _par.lookup(_name);
-        if( t!=null ) t.push_update(this);
-      }
+      Syntax syn = _par;
+      while( syn!=null && !syn.prep_lookup_deps(this) )
+        syn = syn._par;
     }
+    @Override boolean prep_lookup_deps(Ident id) { throw unimpl("should not reach here"); }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
   }
 
@@ -196,6 +198,9 @@ public class HM {
     @Override void prep_tree( Syntax par, Worklist work ) {
       prep_tree_impl(par,T2.make_leaf(),work);
       _body.prep_tree(this,work);
+    }
+    @Override boolean prep_lookup_deps(Ident id) {
+      return Util.eq(id._name,_arg0) && _targ.push_update(id) && _t.find().push_update(id);
     }
     @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
@@ -229,6 +234,10 @@ public class HM {
       prep_tree_impl(par,T2.make_leaf(),work);
       _body.prep_tree(this,work);
     }
+    @Override boolean prep_lookup_deps(Ident id) {
+      return (Util.eq(id._name,_arg0) && _targ0.push_update(id) && _t.find().push_update(id))
+        ||   (Util.eq(id._name,_arg1) && _targ1.push_update(id) && _t.find().push_update(id));
+    }
     @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
       return _body.more_work(work);
@@ -258,13 +267,9 @@ public class HM {
       prep_tree_impl(par,_body._t,work);
       _def .prep_tree(this,work);
     }
-    //@Override T2 prep_tree_lookup(String name, Syntax prior) {
-    //  return Util.eq(_arg0,name)
-    //    // Let _body, NOT fresh; Let _def, YES fresh
-    //    ? (prior==_def ? T2.fresh(name,_targ) : _targ)
-    //    : null;                 // Missed on name
-    //}
-
+    @Override boolean prep_lookup_deps(Ident id) {
+      return Util.eq(id._name,_arg0) && _targ.push_update(id) && _body._t.find().push_update(id);
+    }
     @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
       return _body.more_work(work) && _def.more_work(work);
@@ -337,6 +342,7 @@ public class HM {
       _fun.prep_tree(this,work);
       for( Syntax arg : _args ) arg.prep_tree(this,work);
     }
+    @Override boolean prep_lookup_deps(Ident id) { return false; }
     @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
       if( !_fun.more_work(work) ) return false;
@@ -648,7 +654,7 @@ public class HM {
     // down the function parts; if any changes the fresh-application may make
     // progress.
     static final VBitSet UPDATE_VISIT  = new VBitSet();
-    void push_update(Syntax a) { UPDATE_VISIT.clear(); push_update_impl(a); }
+    boolean push_update(Syntax a) { UPDATE_VISIT.clear(); push_update_impl(a); return true; }
     private void push_update_impl(Syntax a) {
       assert no_uf();
       if( is_leaf() ) {
