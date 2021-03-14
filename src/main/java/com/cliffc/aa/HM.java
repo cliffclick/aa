@@ -233,8 +233,10 @@ public class HM {
     @Override SB p2(SB sb, VBitSet dups) { _body.p0(sb,dups); return _use.p0(sb,dups); }
     T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
     @Override T2 hm(Worklist work) {
-      _use.find().push_update(this);
+      //_use.find().push_update(this);
       boolean progress = targ().unify(_body.find(),work) != null;
+      if( progress && work != null )
+        work.push(_use);        // Revisit use if body changed
       return progress ? find() : null;
     }
     @Override T2 lookup(String name) {
@@ -357,7 +359,7 @@ public class HM {
     // Dependent (non-local) tvars to revisit
     Ary<Syntax> _deps;
 
-    
+
     static T2 make_fun(T2... args) { return new T2("->",null,args); }
     static T2 make_leaf() { return new T2("V"+CNT,null,new T2[1]); }
     static T2 make_base(Type con) { return new T2("Base",con); }
@@ -402,6 +404,14 @@ public class HM {
     @NotNull T2 union(T2 that, Worklist work) {
       assert is_leaf() && no_uf(); // Cannot union twice
       if( this==that ) return that;
+      // Worklist: put updates on the worklist for revisiting
+      if( work!=null && _deps!=null ) work.addAll(_deps); // Re-Apply
+      // Merge update lists, for future unions
+      if( _deps != null ) {
+        if( that._deps==null ) that._deps = _deps;
+        else throw unimpl();    // merge lists
+        _deps = null;
+      }
       if( work!=null ) _args[0] = that; // If no work, no change
       return that.progress();
     }

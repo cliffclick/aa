@@ -45,20 +45,20 @@ public class TestHM {
 
   @Test
   public void test04() {
-    // let fact = {n -> (if/else3 (==0 n)  1  (*2 n (fact (dec n))))} in fact;
+    // let fact = {n -> (if/else (==0 n)  1  (* n (fact (dec n))))} in fact;
     Syntax fact =
       new Let("fact",
               new Lambda("n",
-                         new Apply(new Ident("if/else3"),
+                         new Apply(new Ident("if/else"),
                                    new Apply(new Ident("==0"),new Ident("n")), // Predicate
                                    new Con(TypeInt.con(1)),                    // True arm
-                                   new Apply(new Ident("*2"),                  // False arm
+                                   new Apply(new Ident("*"),                  // False arm
                                              new Ident("n"),
                                              new Apply(new Ident("fact"),
                                                        new Apply(new Ident("dec"),new Ident("n")))))),
               new Ident("fact"));
     T2 t = HM.hm(fact);
-    assertEquals("#{ int64 -> int64 }",t.p());
+    assertEquals("{ int64 -> int64 }",t.p());
   }
 
   @Test
@@ -84,9 +84,9 @@ public class TestHM {
     Syntax x =
       new Lambda("f", new Apply(new Ident("f"), new Ident("f")));
     T2 t1 = HM.hm(x);
-    assertEquals("{ $36:{ $36 -> V33 } -> V33 }",t1.p());
+    assertEquals("{ $26:{ $26 -> V21 } -> V21 }",t1.p());
     // We can argue the pretty-print should print:
-    // "$36:{ $36 -> V33 }"
+    // "$26:{ $26 -> V21 }"
   }
 
   @Test
@@ -256,7 +256,7 @@ public class TestHM {
     // sufficiently different signatures, then attempting to pass them to a map
     // & calling internally.
     // fcn takes a predicate 'p' and returns one of two fcns.
-    //   let fcn = { p -> (if/else3 p {a -> pair[a,a        ]}
+    //   let fcn = { p -> (if/else p {a -> pair[a,a        ]}
     //                                {b -> pair[b,pair[3,b]]}) } in
     // map takes a function and an element (collection?) and applies it (applies to collection?)
     //   let map = { fun x -> (fun x) }
@@ -265,7 +265,7 @@ public class TestHM {
     Syntax syn =
       new Let("fcn",
               new Lambda("p",
-                         new Apply(new Ident("if/else3"),
+                         new Apply(new Ident("if/else"),
                                    new Ident("p"), // p ?
                                    new Lambda("a",
                                               new Apply(new Ident("pair2"),
@@ -334,10 +334,10 @@ public class TestHM {
   // Obscure factorial-like
   @Test
   public void test20() {
-    // let f0 = fn f x => (if/else3 (==0 x) 1 (f (f0 f (dec x)) 2) ) in f0 *2 99
+    // let f0 = fn f x => (if/else (==0 x) 1 (f (f0 f (dec x)) 2) ) in f0 * 99
     Syntax x =
       new Let("f0", new Lambda2("f","x",
-                                new Apply(new Ident("if/else3"),
+                                new Apply(new Ident("if/else"),
                                           new Apply(new Ident("==0"), new Ident("x")),
                                           new Con(TypeInt.con(1)),
                                           new Apply(new Ident("f"),
@@ -347,7 +347,7 @@ public class TestHM {
                                                     new Con(TypeInt.con(2)))
                                           )
                                 ),
-              new Apply(new Ident("f0"), new Ident("*2"), new Con(TypeInt.con(99))));
+              new Apply(new Ident("f0"), new Ident("*"), new Con(TypeInt.con(99))));
     T2 t1 = HM.hm(x);
     assertEquals("int64",t1.p());
   }
@@ -356,14 +356,14 @@ public class TestHM {
   // Obscure factorial-like
   @Test
   public void test21() {
-    // let f0 = fn f x => (if/else3 (==0 x) 1 (*2 (f0 f (dec x)) 2) ) in f0 f0 99
-    // let f0 = fn f x => (if/else3 (==0 x) 1 (f  (f0 f (dec x)) 2) ) in f0 *2 99
+    // let f0 = fn f x => (if/else (==0 x) 1 (* (f0 f (dec x)) 2) ) in f0 f0 99
+    // let f0 = fn f x => (if/else (==0 x) 1 (f  (f0 f (dec x)) 2) ) in f0 * 99
     Syntax x =
       new Let("f0", new Lambda2("f","x",
-                                new Apply(new Ident("if/else3"),
+                                new Apply(new Ident("if/else"),
                                           new Apply(new Ident("==0"), new Ident("x")),
                                           new Con(TypeInt.con(1)),
-                                          new Apply(new Ident("*2"),
+                                          new Apply(new Ident("*"),
                                                     new Apply(new Ident("f0"),
                                                               new Ident("f"),
                                                               new Apply(new Ident("dec"), new Ident("x"))),
@@ -379,20 +379,20 @@ public class TestHM {
   @Test
   public void test22() {
     /* let is_even =
-           (let is_odd = fn x => (if/else3 (==0 x) false (is_even (dec x)))
-                      in fn x => (if/else3 (==0 x) true  (is_odd  (dec x))))
+           (let is_odd = fn x => (if/else (==0 x) false (is_even (dec x)))
+                      in fn x => (if/else (==0 x) true  (is_odd  (dec x))))
                    in (is_even 3)
     */
     Syntax x = new Let("is_even",
                        new Let("is_odd",
                                new Lambda("n",
-                                          new Apply(new Ident("if/else3"),
+                                          new Apply(new Ident("if/else"),
                                                     new Apply(new Ident("==0"), new Ident("n")),
                                                     new Con(TypeInt.con(0)),
                                                     new Apply(new Ident("is_even"),
                                                               new Apply(new Ident("dec"), new Ident("n"))))),
                                new Lambda("n",
-                                          new Apply(new Ident("if/else3"),
+                                          new Apply(new Ident("if/else"),
                                                     new Apply(new Ident("==0"), new Ident("n")),
                                                     new Con(TypeInt.con(1)),
                                                     new Apply(new Ident("is_odd" ),
