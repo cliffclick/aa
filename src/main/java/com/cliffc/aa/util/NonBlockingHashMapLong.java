@@ -189,6 +189,16 @@ public class NonBlockingHashMapLong<TypeV>
       print_impl(i,K,V);
   }
 
+  // Count of reprobes
+  private transient ConcurrentAutoTable _reprobes = new ConcurrentAutoTable();
+  /** Get and clear the current count of reprobes.  Reprobes happen on key
+   *  collisions, and a high reprobe rate may indicate a poor hash function or
+   *  weaknesses in the table resizing function.
+   *  @return the count of reprobes since the last call to {@link #reprobes}
+   *  or since the table was created.   */
+  public long reprobes() { long r = _reprobes.get(); _reprobes = new ConcurrentAutoTable(); return r; }
+
+
   // --- reprobe_limit -----------------------------------------------------
   // Heuristic to decide if we have reprobed toooo many times.  Running over
   // the reprobe limit on a 'get' call acts as a 'miss'; on a 'put' call it
@@ -398,6 +408,16 @@ public class NonBlockingHashMapLong<TypeV>
     topchm.help_copy_impl(false);
   }
 
+  // --- hash ----------------------------------------------------------------
+  // Helper function to spread lousy hashCodes Throws NPE for null Key, on
+  // purpose - as the first place to conveniently toss the required NPE for a
+  // null Key.
+  private static final int hash(long h) {
+    h ^= (h>>>20) ^ (h>>>12);
+    h ^= (h>>> 7) ^ (h>>> 4);
+    h += h<<7; // smear low bits up high, for hashcodes that only differ by 1
+    return (int)h;
+  }
 
   // --- CHM -----------------------------------------------------------------
   // The control structure for the NonBlockingHashMapLong
@@ -511,8 +531,9 @@ public class NonBlockingHashMapLong<TypeV>
     // --- get_impl ----------------------------------------------------------
     // Never returns a Prime nor a Tombstone.
     private Object get_impl ( final long key ) {
+      final int hash = hash(key);
       final int len     = _keys.length;
-      int idx = (int)(key & (len-1)); // First key hash
+      int idx = (int)(hash & (len-1)); // First key hash
 
       // Main spin/reprobe loop, looking for a Key hit
       int reprobe_cnt=0;
@@ -555,11 +576,12 @@ public class NonBlockingHashMapLong<TypeV>
     // Only the path through copy_slot passes in an expected value of null,
     // and putIfMatch only returns a null if passed in an expected null.
     private Object putIfMatch( final long key, final Object putval, final Object expVal ) {
+      final int hash = hash(key);
       assert putval != null;
       assert !(putval instanceof Prime);
       assert !(expVal instanceof Prime);
       final int len      = _keys.length;
-      int idx = (int)(key & (len-1)); // The first key
+      int idx = (int)(hash & (len-1)); // The first key
 
       // ---
       // Key-Claim stanza: spin till we can claim a Key (or force a resizing).
@@ -687,7 +709,7 @@ public class NonBlockingHashMapLong<TypeV>
         reprobe_cnt >= REPROBE_LIMIT &&
         (reprobe_cnt >= reprobe_limit(len) ||
          // More expensive check: see if the table is > 1/2 full.
-         _slots.estimate_get() >= (len>>1));
+         _slots.estimate_get() >= (reprobe_limit(len)>>1));
     }
 
     // --- resize ------------------------------------------------------------
@@ -838,7 +860,8 @@ public class NonBlockingHashMapLong<TypeV>
         // thread counts trying to copy the table often 'panic'.
         if( panic_start == -1 ) { // No panic?
           copyidx = (int)_copyIdx;
-          while( !_copyIdxUpdater.compareAndSet(this,copyidx,copyidx+MIN_COPY_WORK) )
+          while( copyidx < (oldlen<<1) && // 'panic' check
+                 !_copyIdxUpdater.compareAndSet(this,copyidx,copyidx+MIN_COPY_WORK) )
             copyidx = (int)_copyIdx;     // Re-read
           if( !(copyidx < (oldlen<<1)) ) // Panic!
             panic_start = copyidx;       // Record where we started to panic-copy
@@ -890,7 +913,7 @@ public class NonBlockingHashMapLong<TypeV>
     }
 
     // --- copy_check_and_promote --------------------------------------------
-     private final void copy_check_and_promote( int workdone ) {
+    private final void copy_check_and_promote( int workdone ) {
       int oldlen = _keys.length;
       // We made a slot unusable and so did some of the needed copy work
       long copyDone = _copyDone;
@@ -963,7 +986,7 @@ public class NonBlockingHashMapLong<TypeV>
       // appears in the old table.
       Object old_unboxed = ((Prime)oldval)._V;
       assert old_unboxed != TOMBSTONE;
-      _newchm.putIfMatch(key, old_unboxed, null);
+      boolean copied_into_new = (_newchm.putIfMatch(key, old_unboxed, null) == null);
 
       // ---
       // Finally, now that any old value is exposed in the new table, we can
@@ -973,7 +996,7 @@ public class NonBlockingHashMapLong<TypeV>
       while( oldval != TOMBPRIME && !CAS_val(idx,oldval,TOMBPRIME) )
         oldval = _vals[idx];
 
-      return oldval != TOMBPRIME; // True if we slammed the TOMBPRIME down
+      return copied_into_new;
     } // end copy_slot
   } // End of CHM
 
@@ -1218,7 +1241,7 @@ public class NonBlockingHashMapLong<TypeV>
     }
   }
 
-    /**
+  /**
    * Creates a shallow copy of this hashtable. All the structure of the
    * hashtable itself is copied, but the keys and values are not cloned.
    * This is a relatively expensive operation.
