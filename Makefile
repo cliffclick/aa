@@ -48,7 +48,6 @@ test_javas   := $(wildcard $(TST)/$(AA)/*java $(TST)/$(AA)/*/*java)
 main_classes := $(patsubst $(SRC)/%java,$(CLZDIR)/main/%class,$(main_javas))
 test_classes := $(patsubst $(TST)/%java,$(CLZDIR)/test/%class,$(test_javas))
 classes = $(main_classes) $(test_classes)
-javas = $(main_javas)
 # All the libraries: see lib/README.md for more info
 libs = $(wildcard lib/*jar)
 jars = $(subst $(space),$(SEP),$(libs))
@@ -72,7 +71,7 @@ test:	$(test_classes)
 $(main_classes): build/classes/main/%class: $(SRC)/%java
 	@echo "compiling " $@ " because " $?
 	@[ -d $(CLZDIR)/main ] || mkdir -p $(CLZDIR)/main
-	@javac $(JAVAC_ARGS) -cp "$(CLZDIR)/main$(SEP)$(jars)" -sourcepath $(SRC) -d $(CLZDIR)/main $(javas)
+	@javac $(JAVAC_ARGS) -cp "$(CLZDIR)/main$(SEP)$(jars)" -sourcepath $(SRC) -d $(CLZDIR)/main $(main_javas)
 
 $(test_classes): $(CLZDIR)/test/%class: $(TST)/%java $(main_classes)
 	@echo "compiling " $@ " because " $?
