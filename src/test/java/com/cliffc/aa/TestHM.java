@@ -375,7 +375,7 @@ public class TestHM {
     assertEquals("int64",t1.p());
   }
 
-  // Mututal recursion
+  // Mutual recursion
   @Test
   public void test22() {
     /* let is_even =
@@ -429,7 +429,7 @@ public class TestHM {
                                    new Apply(new Ident("fgz"),new Con(TypeInt.con(3))),
                                    new Apply(new Ident("fgz"),new Con(TypeInt.con(5))))));
     T2 t1 = HM.hm(syn);
-    assertEquals("{ { nint8 -> V31 } -> (pair V31 V31) }",t1.p());
+    assertEquals("{ { nint8 -> V33 } -> (pair V33 V33) }",t1.p());
   }
 
 }

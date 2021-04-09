@@ -88,8 +88,8 @@ public class HM {
     private final HashSet<Syntax> _work = new HashSet<>();    // For preventing dups
     public int len() { return _ary.len(); }
     public void push(Syntax s) { if( !_work.contains(s) ) _work.add(_ary.push(s)); }
-    //public Syntax pop() { Syntax s = _ary.pop();_cnt++;            _work.remove(s); return s; }
-    public Syntax pop() { Syntax s = _ary.del(  _cnt++%_ary._len); _work.remove(s); return s; }
+    public Syntax pop() { Syntax s = _ary.pop();_cnt++;            _work.remove(s); return s; }
+    //public Syntax pop() { Syntax s = _ary.del(  _cnt++%_ary._len); _work.remove(s); return s; }
     public boolean has(Syntax s) { return _work.contains(s); }
     public void addAll(Ary<? extends Syntax> ss) { if( ss != null ) for( Syntax s : ss ) push(s); }
     @Override public String toString() { return _ary.toString(); }
@@ -168,7 +168,13 @@ public class HM {
     }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
     @Override void add_kids(Worklist work) { }
-    @Override void prep_tree( Syntax par, Worklist work ) {
+    @Override void add_occurs(Worklist work) {
+      T2 t = _par==null ? null : _par.lookup(_name); // Lookup in current env
+      if( t==null ) t = PRIMS.get(_name);            // Lookup in prims
+      if( t.occurs_in(_par) )                        // Got captured in some parent?
+        t.add_deps_work(work);                       // Need to revisit dependent ids
+    }
+    @override void prep_tree( Syntax par, Worklist work ) {
       prep_tree_impl(par,T2.make_leaf(),work);
       Syntax syn = _par;
       while( syn!=null && !syn.prep_lookup_deps(this) )
@@ -258,7 +264,7 @@ public class HM {
     final Syntax _def, _body;
     T2 _targ;
     Let(String arg0, Syntax def, Syntax body) { _arg0=arg0; _body=body; _def=def; _targ=T2.make_leaf(); }
-    @Override SB str(SB sb) { return _def.str(_body.str(sb.p("let ").p(_arg0).p(" = ")).p(" in ")); }
+    @Override SB str(SB sb) { return _body.str(_def.str(sb.p("let ").p(_arg0).p(" = ")).p(" in ")); }
     @Override SB p1(SB sb) { return sb.p("let ").p(_arg0).p(" = ... in ..."); }
     @Override SB p2(SB sb, VBitSet dups) { _body.p0(sb,dups); return _def.p0(sb,dups); }
     T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
@@ -670,16 +676,27 @@ public class HM {
     // down the function parts; if any changes the fresh-application may make
     // progress.
     static final VBitSet UPDATE_VISIT  = new VBitSet();
-    boolean push_update(Syntax a) { UPDATE_VISIT.clear(); push_update_impl(a); return true; }
+    boolean push_update(Syntax a) { assert UPDATE_VISIT.isEmpty(); push_update_impl(a); UPDATE_VISIT.clear(); return true; }
     private void push_update_impl(Syntax a) {
       assert no_uf();
-      if( is_leaf() ) {
+      if( is_leaf() || _args.length==0 ) {
         if( _deps==null ) _deps = new Ary<>(Syntax.class);
         if( _deps.find(a)==-1 ) _deps.push(a);
       } else {
         if( UPDATE_VISIT.tset(_uid) ) return;
         for( int i=0; i<_args.length; i++ )
           args(i).push_update_impl(a);
+      }
+    }
+
+    void add_deps_work( Worklist work ) { assert UPDATE_VISIT.isEmpty(); add_deps_work_impl(work); UPDATE_VISIT.clear(); }
+    private void add_deps_work_impl( Worklist work ) {
+      if( is_leaf() || _args.length==0 ) {
+        work.addAll(_deps);
+      } else {
+        if( UPDATE_VISIT.tset(_uid) ) return;
+        for( int i=0; i<_args.length; i++ )
+          args(i).add_deps_work_impl(work);
       }
     }
 
