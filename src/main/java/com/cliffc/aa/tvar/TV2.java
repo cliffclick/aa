@@ -93,7 +93,7 @@ public class TV2 {
   public boolean unify_at(Object key, TV2 tv2, boolean test ) {
     assert is_tvar() && _args!=null;
     TV2 old = get(key);
-    if( old!=null ) return tv2.unify(old,test);
+    if( old!=null ) return old.unify(tv2,test);
     if( test ) return true;
     _args.put(key,tv2);
     merge_deps(tv2);            // Send deps about also
@@ -294,6 +294,8 @@ public class TV2 {
     if( this.is_leaf() && that.is_leaf() && _uid < that._uid ) return that.union(this);
     if( this.is_leaf() ) return this.union(that);
     if( that.is_leaf() ) return that.union(this);
+    // Normal unification of 2 Funs
+    if( that.is_fresh() && this.isa("Fun") ) that = that.get_fresh();
 
     assert Util.eq(_name,that._name); // Construction error?  Might be a runtime error.
     assert _args!=that._args; // Efficiency hack elsewhere if this is true here
@@ -338,7 +340,7 @@ public class TV2 {
     if( this==that ) return false;
     if( that.is_dead() ) return false;
     if( this.is_dead() ) return that.union(this); // Kill 'that', same as LHS
-    if( this.is_nil() && that.is_nil() ) return false;
+    if( this.is_nil() || that.is_nil() ) return false;
 
     TV2 prior = VARS.get(this);
     if( prior!=null )           // Been there, done that?  Return prior mapping
@@ -351,9 +353,9 @@ public class TV2 {
 
     if( is_base() && that.is_base() ) // Will definitely make progress
       return fresh_base(that,test);
-    if( is_leaf() ) return false;     // Lazy map LHS tvar to RHS
-    if( that.is_leaf() || that.is_nil() )  // RHS is a leaf tvar; union with a copy of LHS
-      return that.union(repl());
+    if( is_leaf() ) return false; // Lazy map LHS tvar to RHS
+    if( that.is_leaf() )          // RHS is a leaf tvar; union with a copy of LHS
+      return test || that.union(repl());
 
     // RHS is also a lazy clone, which if cloned, will not be part of any
     // other structure.  When unioned with the clone of the LHS, the result
