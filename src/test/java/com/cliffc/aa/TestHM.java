@@ -84,7 +84,7 @@ public class TestHM {
     Syntax x =
       new Lambda("f", new Apply(new Ident("f"), new Ident("f")));
     T2 t1 = HM.hm(x);
-    assertEquals("{ $26:{ $26 -> V21 } -> V21 }",t1.p());
+    assertEquals("{ $25:{ $25 -> V21 } -> V21 }",t1.p());
     // We can argue the pretty-print should print:
     // "$26:{ $26 -> V21 }"
   }

@@ -21,7 +21,6 @@ import static com.cliffc.aa.AA.unimpl;
 
 // Lazily computes 'Fresh' copies instead of eagerly.
 
-
 public class HM {
   static final HashMap<String,T2> PRIMS = new HashMap<>();
   static boolean DEBUG_LEAKS=false;
@@ -57,12 +56,16 @@ public class HM {
     PRIMS.put("factor",T2.make_fun(flt64,T2.prim("divmod",flt64,flt64)));
 
     // Prep for SSA: pre-gather all the (unique) ids
-    prog.prep_tree(null,work);
+    int cnt_syns = prog.prep_tree(null,work);
+    int init_T2s = T2.CNT;
 
+    int cnt=0, DEBUG_CNT=-1;
     while( work.len()>0 ) {     // While work
       int oldcnt = T2.CNT;      // Used for cost-check when no-progress
       Syntax syn = work.pop();  // Get work
       T2 old = syn._t;          // Old value for progress assert
+      if( cnt==DEBUG_CNT )
+        System.out.println("break here");
       T2 t = syn.hm(work);      // Get work results
       if( t!=null ) {           // Progress?
         assert !t.progress(old.find());// monotonic: unifying with the result is no-progress
@@ -75,8 +78,11 @@ public class HM {
       }
       // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
       assert prog.more_work(work);
+      cnt++;
     }
     assert prog.more_work(work);
+
+    //System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+cnt+", T2s: "+T2.CNT+", FREE T2s: "+T2.FREE);
     return prog._t;
   }
   static void reset() { PRIMS.clear(); T2.reset(); }
@@ -88,8 +94,8 @@ public class HM {
     private final HashSet<Syntax> _work = new HashSet<>();    // For preventing dups
     public int len() { return _ary.len(); }
     public void push(Syntax s) { if( !_work.contains(s) ) _work.add(_ary.push(s)); }
-    public Syntax pop() { Syntax s = _ary.pop();_cnt++;            _work.remove(s); return s; }
-    //public Syntax pop() { Syntax s = _ary.del(  _cnt++%_ary._len); _work.remove(s); return s; }
+    //public Syntax pop() { Syntax s = _ary.pop();_cnt++;            _work.remove(s); return s; }
+    public Syntax pop() { Syntax s = _ary.del(  _cnt++%_ary._len); _work.remove(s); return s; }
     public boolean has(Syntax s) { return _work.contains(s); }
     public void addAll(Ary<? extends Syntax> ss) { if( ss != null ) for( Syntax s : ss ) push(s); }
     @Override public String toString() { return _ary.toString(); }
@@ -110,7 +116,7 @@ public class HM {
     // equal to '_t') and update the worklist.
     abstract T2 hm(Worklist work);
 
-    abstract void prep_tree(Syntax par, Worklist work);
+    abstract int prep_tree(Syntax par, Worklist work);
     final void prep_tree_impl( Syntax par, T2 t, Worklist work ) { _par=par; _t=t; work.push(this); }
     abstract boolean prep_lookup_deps(Ident id);
 
@@ -148,7 +154,7 @@ public class HM {
     @Override T2 hm(Worklist work) { assert find().isa("Base"); return null; }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
     @Override void add_kids(Worklist work) { }
-    @Override void prep_tree( Syntax par, Worklist work ) { prep_tree_impl(par, T2.make_base(_con), work); }
+    @Override int prep_tree( Syntax par, Worklist work ) { prep_tree_impl(par, T2.make_base(_con), work); return 1; }
     @Override boolean prep_lookup_deps(Ident id) { throw unimpl("should not reach here"); }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
   }
@@ -174,11 +180,12 @@ public class HM {
       if( t.occurs_in(_par) )                        // Got captured in some parent?
         t.add_deps_work(work);                       // Need to revisit dependent ids
     }
-    @Override void prep_tree( Syntax par, Worklist work ) {
+    @Override int prep_tree( Syntax par, Worklist work ) {
       prep_tree_impl(par,T2.make_leaf(),work);
       Syntax syn = _par;
       while( syn!=null && !syn.prep_lookup_deps(this) )
         syn = syn._par;
+      return 1;
     }
     @Override boolean prep_lookup_deps(Ident id) { throw unimpl("should not reach here"); }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
@@ -195,8 +202,14 @@ public class HM {
     T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
     @Override T2 hm(Worklist work) {
       // The normal lambda work
+      T2 old = find();
+      if( old.is_fun() &&       // Already a function?  Compare-by-parts
+          old.args(0).unify(targ()      ,work)==null &&
+          old.args(1).unify(_body.find(),work)==null )
+        return null;
+      // Make a new T2 for progress
       T2 fun = T2.make_fun(targ(),_body.find());
-      return find().unify(fun,work);
+      return old.unify(fun,work);
     }
     @Override T2 lookup(String name) {
       if( Util.eq(_arg0,name) ) return targ();
@@ -206,9 +219,9 @@ public class HM {
     @Override void add_occurs(Worklist work) {
       if( targ().occurs_in_type(_t) ) work.addAll(_targ._deps);
     }
-    @Override void prep_tree( Syntax par, Worklist work ) {
+    @Override int prep_tree( Syntax par, Worklist work ) {
       prep_tree_impl(par,T2.make_leaf(),work);
-      _body.prep_tree(this,work);
+      return _body.prep_tree(this,work) + 1;
     }
     @Override boolean prep_lookup_deps(Ident id) {
       return Util.eq(id._name,_arg0) && _targ.push_update(id);
@@ -232,8 +245,15 @@ public class HM {
     T2 targ1() { T2 targ = _targ1.find(); return targ==_targ1 ? targ : (_targ1=targ); }
     @Override T2 hm(Worklist work) {
       // The normal lambda work
+      T2 old = find();
+      if( old.is_fun() &&       // Already a function?  Compare-by-parts
+          old.args(0).unify(targ0()     ,work)==null &&
+          old.args(1).unify(targ1()     ,work)==null &&
+          old.args(2).unify(_body.find(),work)==null )
+        return null;
+      // Make a new T2 for progress
       T2 fun = T2.make_fun(targ0(),targ1(),_body.find());
-      return find().unify(fun,work);
+      return old.unify(fun,work);
     }
     @Override T2 lookup(String name) {
       if( Util.eq(_arg0,name) ) return targ0();
@@ -245,9 +265,9 @@ public class HM {
       if( targ0().occurs_in_type(_t) ) work.addAll(_targ0._deps);
       if( targ1().occurs_in_type(_t) ) work.addAll(_targ1._deps);
     }
-    @Override void prep_tree( Syntax par, Worklist work ) {
+    @Override int prep_tree( Syntax par, Worklist work ) {
       prep_tree_impl(par,T2.make_leaf(),work);
-      _body.prep_tree(this,work);
+      return _body.prep_tree(this,work) + 1;
     }
     @Override boolean prep_lookup_deps(Ident id) {
       return (Util.eq(id._name,_arg0) && _targ0.push_update(id))
@@ -280,11 +300,12 @@ public class HM {
     @Override void add_occurs(Worklist work) {
       if( targ().occurs_in_type(_t) ) work.addAll(_targ._deps);
     }
-    @Override void prep_tree( Syntax par, Worklist work ) {
+    @Override int prep_tree( Syntax par, Worklist work ) {
       prep_tree_impl(par,_body._t,work);
-      _body.prep_tree(this,work);
-      _def .prep_tree(this,work);
+      int cnt = _body.prep_tree(this,work);
+      cnt +=    _def .prep_tree(this,work);
       _t = _body._t;
+      return cnt;
     }
     @Override boolean prep_lookup_deps(Ident id) {
       return Util.eq(id._name,_arg0) && _targ.push_update(id);
@@ -356,10 +377,11 @@ public class HM {
     }
     @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
     @Override void add_kids(Worklist work) { for( Syntax arg : _args ) work.push(arg); }
-    @Override void prep_tree(Syntax par,Worklist work) {
+    @Override int prep_tree(Syntax par,Worklist work) {
       prep_tree_impl(par,T2.make_leaf(),work);
-      _fun.prep_tree(this,work);
-      for( Syntax arg : _args ) arg.prep_tree(this,work);
+      int cnt = _fun.prep_tree(this,work);
+      for( Syntax arg : _args ) cnt += arg.prep_tree(this,work);
+      return cnt;
     }
     @Override boolean prep_lookup_deps(Ident id) { return false; }
     @Override boolean more_work(Worklist work) {
@@ -377,7 +399,7 @@ public class HM {
   // simple concrete base type, or a sharable leaf.  Unify is structural, and
   // where not unifyable the union is replaced with an Error.
   public static class T2 {
-    private static int CNT=0;
+    private static int CNT=0, FREE=0;
     final int _uid;
 
     // A plain type variable starts with a 'V', and can unify directly.
@@ -400,6 +422,10 @@ public class HM {
     static T2 make_base(Type con) { return new T2("Base",con); }
     static T2 prim(String name, T2... args) { return new T2(name,null,args); }
     T2 copy() { return new T2(_name,_con,new T2[_args.length]); }
+    void free() {
+      FREE++;
+      // should recover _deps, _args, this
+    }
 
     private T2(@NotNull String name, Type con, T2 @NotNull ... args) {
       _uid = CNT++;
@@ -579,15 +605,7 @@ public class HM {
       return t;
     }
 
-    // Make a "fresh" copy: preserves all sharing structure (including cycles);
-    // preserves pre-existing type-vars (in the "par" Syntax scope), but otherwise
-    // uses new type-vars at the leaves.
-    T2 fresh(Syntax par) {
-      assert VARS.isEmpty();
-      T2 rez = _fresh(par);
-      VARS.clear();
-      return rez;
-    }
+    // Return a fresh copy of 'this'
     T2 _fresh(Syntax par) {
       assert no_uf();
       T2 rez = VARS.get(this);
@@ -603,12 +621,9 @@ public class HM {
         VARS.put(this,t);       // Stop cyclic structure looping
         boolean change=false;
         for( int i=0; i<_args.length; i++ ) {
-          T2 arg = args(i)._fresh(par);
-          if( arg!=_args[i] )
-            { t._args[i] = arg; change=true; }
+          T2 arg = t._args[i] = args(i)._fresh(par);
+          change |= arg!=_args[i];
         }
-        if( DEBUG_LEAKS && !change )
-          throw unimpl("can share here");
         return t;
       }
     }
