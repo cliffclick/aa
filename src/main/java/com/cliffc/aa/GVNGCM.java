@@ -399,6 +399,7 @@ public class GVNGCM {
       if( _ret!=null ) _ret.keep(); // Thing being returned at close-point is always alive
       for( Node tmp : _tmps )
         add_unuse(tmp.unkeep()); // Needs proper liveness at least
+      assert Env.START.more_flow(true)==0; // Initial conditions are correct
       iter((Node)null,_reduce_works); // Cleanup
       if( _ret!=null ) _ret.unkeep();
     }

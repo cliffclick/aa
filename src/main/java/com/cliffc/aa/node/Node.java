@@ -130,7 +130,7 @@ public abstract class Node implements Cloneable {
       _elock=false;
       Node x = VALS.remove(this);
       assert x==this;
-      Env.GVN.add_reduce(this);
+      Env.GVN.add_reduce(Env.GVN.add_flow(this));
     }
   }
   Node _elock() {               // No assert version, used for new nodes

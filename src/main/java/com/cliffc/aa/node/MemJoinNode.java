@@ -194,6 +194,7 @@ public class MemJoinNode extends Node {
       X.add(msp);
       X.add(base);
       X.add(head);
+      GVN.revalive(base);
       return (X._ret=this);
     }
   }

@@ -174,7 +174,7 @@ public class HM {
       if( t.occurs_in(_par) )                        // Got captured in some parent?
         t.add_deps_work(work);                       // Need to revisit dependent ids
     }
-    @override void prep_tree( Syntax par, Worklist work ) {
+    @Override void prep_tree( Syntax par, Worklist work ) {
       prep_tree_impl(par,T2.make_leaf(),work);
       Syntax syn = _par;
       while( syn!=null && !syn.prep_lookup_deps(this) )

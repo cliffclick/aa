@@ -505,6 +505,8 @@ public class CallNode extends Node {
     } else {                    // Args lifted, may resolve
       if( fdx() instanceof UnresolvedNode )
         Env.GVN.add_reduce(this);
+      if( Env.GVN._opt_mode._CG && err(true)==null )
+        Env.GVN.add_flow(mem()); // Call not-in-error, memory may lift
     }
   }
 
