@@ -216,7 +216,7 @@ public class HM {
     }
     @Override void add_kids(Worklist work) { work.push(_body); }
     @Override void add_occurs(Worklist work) {
-      if( targ().occurs_in_type(_t) ) work.addAll(_targ._deps);
+      if( targ().occurs_in_type(find()) ) work.addAll(_targ._deps);
     }
     @Override int prep_tree( Syntax par, Worklist work ) {
       prep_tree_impl(par,T2.make_leaf(),work);
@@ -261,8 +261,8 @@ public class HM {
     }
     @Override void add_kids(Worklist work) { work.push(_body); }
     @Override void add_occurs(Worklist work) {
-      if( targ0().occurs_in_type(_t) ) work.addAll(_targ0._deps);
-      if( targ1().occurs_in_type(_t) ) work.addAll(_targ1._deps);
+      if( targ0().occurs_in_type(find()) ) work.addAll(_targ0._deps);
+      if( targ1().occurs_in_type(find()) ) work.addAll(_targ1._deps);
     }
     @Override int prep_tree( Syntax par, Worklist work ) {
       prep_tree_impl(par,T2.make_leaf(),work);
@@ -296,7 +296,7 @@ public class HM {
     }
     @Override void add_kids(Worklist work) { work.push(_body); work.push(_def); }
     @Override void add_occurs(Worklist work) {
-      if( targ().occurs_in_type(_t) ) work.addAll(_targ._deps);
+      if( targ().occurs_in_type(find()) ) work.addAll(_targ._deps);
     }
     @Override int prep_tree( Syntax par, Worklist work ) {
       prep_tree_impl(par,_body._t,work);
