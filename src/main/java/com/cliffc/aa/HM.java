@@ -67,7 +67,7 @@ public class HM {
       if( cnt==DEBUG_CNT )
         System.out.println("break here");
       if( syn.hm(work) ) {      // Compute a new HM type and check for progress
-        assert !syn.find().progress(old.find());// monotonic: unifying with the result is no-progress
+        assert !syn.debug_find().unify(old.find(),null);// monotonic: unifying with the result is no-progress
         syn.add_kids(work);     // Push children on worklist
         syn.add_occurs(work);   // Push occurs-check ids on worklist
         if( syn._par !=null ) work.push(syn._par); // Parent updates
@@ -107,6 +107,7 @@ public class HM {
       T2 t = _t.find();
       return t==_t ? t : (_t=t);
     }
+    T2 debug_find() { return _t.find(); } // Find, without the roll-up
 
     // Compute and set a new HM type.
     // If no change, return false.
@@ -168,7 +169,7 @@ public class HM {
       if( t==null ) t = PRIMS.get(_name);            // Lookup in prims
       if( t==null )
         throw new RuntimeException("Parse error, "+_name+" is undefined");
-      return t.fresh_unify(find(),_par,work)!=null;
+      return t.fresh_unify(find(),_par,work);
     }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
     @Override void add_kids(Worklist work) { }
@@ -449,10 +450,10 @@ public class HM {
 
     // U-F union; this becomes that; returns 'that'.
     // No change if only testing, and reports progress.
-    @NotNull T2 union(T2 that, Worklist work) {
+    boolean union(T2 that, Worklist work) {
       assert is_leaf() && no_uf(); // Cannot union twice
-      if( this==that ) return that;
-      if( work==null ) return that.progress();
+      if( this==that ) return false;
+      if( work==null ) return true; // Report progress without changing
       // Worklist: put updates on the worklist for revisiting
       if( _deps != null ) {
         work.addAll(_deps); // Re-Apply
@@ -463,49 +464,39 @@ public class HM {
         _deps = null;
       }
       _args[0] = that;         // U-F update
-      return that.progress();
+      return true;
     }
-
-    // Structural unification progress test
-    boolean progress(T2 t) { return unify(t,null); }
-    // Short-cut to set progress
-    @NotNull T2 progress() { PROGRESS=1; return this; }
 
     // Structural unification.
     // Returns false if no-change, true for change.
     // If work is null, does not actually change anything, just reports progress.
     // If work and change, unifies 'this' into 'that' (changing both), and
     // updates the worklist.
-    static private int PROGRESS;
     static private final HashMap<Long,T2> DUPS = new HashMap<>();
     boolean unify( T2 that, Worklist work ) {
       if( this==that ) return false;
-      assert DUPS.isEmpty() && PROGRESS==0;
-      PROGRESS = -1;            // No progress yet
-      T2 rez = _unify(that,work);
+      assert DUPS.isEmpty();
+      boolean progress = _unify(that,work);
       DUPS.clear();
-      if( PROGRESS<0 ) rez = null; // Return null if no-progress
-      PROGRESS=0;               // Reset
-      return rez!=null;
+      return progress;
     }
 
     // Structural unification, 'this' into 'that'.  No change if just testing
     // (work is null) and returns 'that' if progress.  If updating, both 'this'
     // and 'that' are the same afterwards.  Sets PROGRESS.
-    private @NotNull T2 _unify(T2 that, Worklist work) {
+    private boolean _unify(T2 that, Worklist work) {
       assert no_uf() && that.no_uf();
-      if( this==that ) return this;
-      if( PROGRESS>0 && work==null ) return that; // Progress early-exit
+      if( this==that ) return false;
 
       // two leafs union in either order, so keep lower uid
       if( is_leaf() && that.is_leaf() && _uid<that._uid ) return that.union(this,work);
-      if(   is_leaf() ) return   union(that   ,work);
+      if(      is_leaf() ) return      union(that,work);
       if( that.is_leaf() ) return that.union(this,work);
       if( is_base() && that.is_base() ) return unify_base(that,work);
 
       if( !Util.eq(_name,that._name) )
         throw new RuntimeException("Cannot unify "+this+" and "+that);
-      if( _args==that._args ) return this; // Names are equal, args are equal
+      assert _args!=that._args; // Not expecting to share _args and not 'this'
       if( _args.length != that._args.length )
         throw new RuntimeException("Cannot unify "+this+" and "+that);
 
@@ -513,88 +504,82 @@ public class HM {
       long luid = dbl_uid(that);
       T2 rez = DUPS.get(luid);
       assert rez==null || rez==that;
-      if( rez!=null ) return rez; // Been there, done that
-      DUPS.put(luid,that);           // Close cycles
+      if( rez!=null ) return false; // Been there, done that
+      DUPS.put(luid,that);          // Close cycles
 
       // Structural recursion unification.
-      for( int i=0; i<_args.length; i++ )
-        that._args[i] = args(i)._unify(that.args(i),work);
-      return that;
+      boolean progress=false;
+      for( int i=0; i<_args.length; i++ ) {
+        progress |= args(i)._unify(that.args(i),work);
+        if( progress && work!=null ) return true;
+      }
+      return progress;
     }
 
-    long dbl_uid(T2 t) { return ((long)_uid<<32)|t._uid; }
+    private long dbl_uid(T2 t) { return ((long)_uid<<32)|t._uid; }
 
-    private T2 unify_base(T2 t, Worklist work) {
-      fresh_base(t,work);
+    private boolean unify_base(T2 that, Worklist work) {
+      fresh_base(that,work);
+      if( work==null ) return true;
       _args = new T2[1];        // Room for a forwarding pointer
       _con=null;                // Flip from 'Base' to 'Leaf'
-      return union(t,work);
+      return union(that,work);
     }
-    private @NotNull T2 fresh_base(T2 t, Worklist work) {
-      Type con = _con.meet(t._con);
-      if( con==t._con ) return t;    // No progress
-      if( work!=null ) t._con = con; // Yes progress, but no update if null work
-      return t.progress();
+    private boolean fresh_base(T2 that, Worklist work) {
+      Type con = _con.meet(that._con);
+      if( con==that._con ) return false; // No progress
+      if( work!=null ) that._con = con;  // Yes progress, but no update if null work
+      return true;
     }
 
-    // Make a (lazy) fresh copy of 'this', and unify it with 't'.  This is NOT
-    // the same as calling 'fresh' then 'unify', as a 'fresh' always makes new
-    // T2s which always look like progress during the unify step.  The Syntax
-    // is used when making the 'fresh' copy for the occurs_check.  If work is
-    // null, we are testing only, make no changes, and always return 't' if
-    // PROGRESS.  If PROGRESS and not testing we return the unified value.
+    // Make a (lazy) fresh copy of 'this' and unify it with 'that'.  This is
+    // the same as calling 'fresh' then 'unify', without the clone of 'this'.
+    // The Syntax is used when making the 'fresh' copy for the occurs_check.
+    // Returns progress.
+    // If work is null, we are testing only and make no changes.
     static private final HashMap<T2,T2> VARS = new HashMap<>();
-    T2 fresh_unify(T2 t, Syntax syn, Worklist work) {
-      assert VARS.isEmpty() && DUPS.isEmpty() && PROGRESS==0;
-      PROGRESS = -1;
+    boolean fresh_unify(T2 that, Syntax syn, Worklist work) {
+      assert VARS.isEmpty() && DUPS.isEmpty();
       int old = CNT;
-      T2 rez = _fresh_unify(t,syn,work);
+      boolean progress = _fresh_unify(that,syn,work);
       VARS.clear();  DUPS.clear();
       if( work==null && old!=CNT && DEBUG_LEAKS )
         throw unimpl("busted, made T2s but just testing");
-      if( PROGRESS==-1 ) rez = null;
-      PROGRESS=0;               // Reset
-      return rez;
+      return progress;
     }
 
     // Outer recursive version, wraps a VARS check around other work
-    @NotNull T2 _fresh_unify(T2 t, Syntax syn, Worklist work) {
-      assert no_uf() && t.no_uf();
-      if( PROGRESS>0 && work==null ) return t; // Progress early-exit
+    private boolean _fresh_unify(T2 that, Syntax syn, Worklist work) {
+      assert no_uf() && that.no_uf();
       T2 prior = VARS.get(this);
       if( prior!=null )         // Been there, done that
-        return prior.find()._unify(t,work);  // Also 'prior' needs unification with 't'
-      if( cycle_equals(t) ) return t;
-      T2 rez = _fresh_unify_impl(t,syn,work);
-      VARS.put(this,rez);
-      return rez;
-    }
+        return prior.find()._unify(that,work);  // Also 'prior' needs unification with 'that'
+      if( cycle_equals(that) ) return vput(that,false);
 
-    // Recursive version; VARS check already done
-    @NotNull T2 _fresh_unify_impl(T2 t, Syntax syn, Worklist work) {
-      if( occurs_in(syn) ) return _unify(t,work); // Famous 'occurs-check', switch to normal unify
-      if(   is_leaf() ) return t;  // Lazy map LHS tvar to RHS
-      if( t.is_leaf() ) {
-        T2 rez = t.union(_fresh(syn),work);
-        if( work==null && PROGRESS>0 ) return t; // If progress and testing, always return 't'
-        return rez; // RHS is a tvar; union with a deep copy of LHS
-      }
+      if( occurs_in(syn) ) return vput(that,_unify(that,work)); // Famous 'occurs-check', switch to normal unify
+      if(   is_leaf() ) return vput(that,false); // Lazy map LHS tvar to RHS
+      if( that.is_leaf() )             // RHS is a tvar; union with a deep copy of LHS
+        return work==null || vput(that,that.union(_fresh(syn),work));
       // Bases MEET cons in RHS
-      if( is_base() && t.is_base() ) return fresh_base(t,work);
+      if( is_base() && that.is_base() ) return vput(that,fresh_base(that,work));
 
-      if( !Util.eq(_name,t._name) ||
-          _args.length != t._args.length )
-        throw new RuntimeException("Cannot unify "+this+" and "+t);
+      if( !Util.eq(_name,that._name) ||
+          _args.length != that._args.length )
+        throw new RuntimeException("Cannot unify "+this+" and "+that);
 
       // Structural recursion unification, lazy on LHS
-      VARS.put(this,t);         // Close cycles
-      for( int i=0; i<_args.length; i++ )
-        t._args[i] = args(i)._fresh_unify(t.args(i),syn,work);
-      return t;
+      boolean progress = vput(that,false); // Early set, to stop cycles
+      for( int i=0; i<_args.length; i++ ) {
+        progress |= args(i)._fresh_unify(that.args(i),syn,work);
+        if( progress && work==null ) return true;
+      }
+      return progress;
     }
 
+    private boolean vput(T2 that, boolean progress) { VARS.put(this,that); return progress; }
+
     // Return a fresh copy of 'this'
-    T2 _fresh(Syntax par) {
+    private T2 _fresh(Syntax par) {
       assert no_uf();
       T2 rez = VARS.get(this);
       if( rez!=null ) return rez; // Been there, done that
@@ -607,11 +592,8 @@ public class HM {
       } else {                  // Structure is deep-replicated
         T2 t = copy();
         VARS.put(this,t);       // Stop cyclic structure looping
-        boolean change=false;
-        for( int i=0; i<_args.length; i++ ) {
-          T2 arg = t._args[i] = args(i)._fresh(par);
-          change |= arg!=_args[i];
-        }
+        for( int i=0; i<_args.length; i++ )
+          t._args[i] = args(i)._fresh(par);
         return t;
       }
     }
@@ -766,7 +748,7 @@ public class HM {
       return sb.unchar().p(")");
     }
 
-    static void reset() { CNT=0; PROGRESS=0; DUPS.clear(); VARS.clear(); ODUPS.clear(); CDUPS.clear(); UPDATE_VISIT.clear(); }
+    static void reset() { CNT=0; DUPS.clear(); VARS.clear(); ODUPS.clear(); CDUPS.clear(); UPDATE_VISIT.clear(); }
   }
 
 }
