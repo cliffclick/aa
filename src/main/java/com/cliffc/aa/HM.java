@@ -66,10 +66,8 @@ public class HM {
       T2 old = syn._t;          // Old value for progress assert
       if( cnt==DEBUG_CNT )
         System.out.println("break here");
-      T2 t = syn.hm(work);      // Get work results
-      if( t!=null ) {           // Progress?
-        assert !t.progress(old.find());// monotonic: unifying with the result is no-progress
-        syn._t=t;               // Progress!
+      if( syn.hm(work) ) {      // Compute a new HM type and check for progress
+        assert !syn.find().progress(old.find());// monotonic: unifying with the result is no-progress
         syn.add_kids(work);     // Push children on worklist
         syn.add_occurs(work);   // Push occurs-check ids on worklist
         if( syn._par !=null ) work.push(syn._par); // Parent updates
@@ -110,11 +108,12 @@ public class HM {
       return t==_t ? t : (_t=t);
     }
 
-    // Compute a new HM type.  If no modifications are needed, return null.  If
-    // 'work' is null, then instead return '_t' without making modifications to
-    // anything.  If 'work' is available, return a modified result (might not be
-    // equal to '_t') and update the worklist.
-    abstract T2 hm(Worklist work);
+    // Compute and set a new HM type.
+    // If no change, return false.
+    // If a change, return always true, however:
+    // - If 'work' is null do not change/set anything.
+    // - If 'work' is available, set a new HM in '_t' and update the worklist.
+    abstract boolean hm(Worklist work);
 
     abstract int prep_tree(Syntax par, Worklist work);
     final void prep_tree_impl( Syntax par, T2 t, Worklist work ) { _par=par; _t=t; work.push(this); }
@@ -128,8 +127,7 @@ public class HM {
     // Giant Assert: True if OK; all Syntaxs off worklist do not make progress
     abstract boolean more_work(Worklist work);
     final boolean more_work_impl(Worklist work) {
-      boolean foo = work.has(this) || hm(null)==null;
-      return foo;
+      return work.has(this) || !hm(null); // Either on worklist, or no-progress
     }
     // Print for debugger
     @Override final public String toString() { return str(new SB()).toString(); }
@@ -151,7 +149,7 @@ public class HM {
     @Override SB str(SB sb) { return p1(sb); }
     @Override SB p1(SB sb) { return sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString()); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
-    @Override T2 hm(Worklist work) { assert find().isa("Base"); return null; }
+    @Override boolean hm(Worklist work) { assert find().isa("Base"); return false; }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
     @Override void add_kids(Worklist work) { }
     @Override int prep_tree( Syntax par, Worklist work ) { prep_tree_impl(par, T2.make_base(_con), work); return 1; }
@@ -165,12 +163,12 @@ public class HM {
     @Override SB str(SB sb) { return p1(sb); }
     @Override SB p1(SB sb) { return sb.p(_name); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
-    @Override T2 hm(Worklist work) {
+    @Override boolean hm(Worklist work) {
       T2 t = _par==null ? null : _par.lookup(_name); // Lookup in current env
       if( t==null ) t = PRIMS.get(_name);            // Lookup in prims
       if( t==null )
         throw new RuntimeException("Parse error, "+_name+" is undefined");
-      return t.fresh_unify(find(),_par,work);
+      return t.fresh_unify(find(),_par,work)!=null;
     }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
     @Override void add_kids(Worklist work) { }
@@ -200,13 +198,13 @@ public class HM {
     @Override SB p1(SB sb) { return sb.p("{ ").p(_arg0).p(" -> ... } "); }
     @Override SB p2(SB sb, VBitSet dups) { return _body.p0(sb,dups); }
     T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
-    @Override T2 hm(Worklist work) {
+    @Override boolean hm(Worklist work) {
       // The normal lambda work
       T2 old = find();
       if( old.is_fun() &&       // Already a function?  Compare-by-parts
-          old.args(0).unify(targ()      ,work)==null &&
-          old.args(1).unify(_body.find(),work)==null )
-        return null;
+          !old.args(0).unify(targ()      ,work) &&
+          !old.args(1).unify(_body.find(),work) )
+        return false;
       // Make a new T2 for progress
       T2 fun = T2.make_fun(targ(),_body.find());
       return old.unify(fun,work);
@@ -243,14 +241,14 @@ public class HM {
     @Override SB p2(SB sb, VBitSet dups) { return _body.p0(sb,dups); }
     T2 targ0() { T2 targ = _targ0.find(); return targ==_targ0 ? targ : (_targ0=targ); }
     T2 targ1() { T2 targ = _targ1.find(); return targ==_targ1 ? targ : (_targ1=targ); }
-    @Override T2 hm(Worklist work) {
+    @Override boolean hm(Worklist work) {
       // The normal lambda work
       T2 old = find();
-      if( old.is_fun() &&       // Already a function?  Compare-by-parts
-          old.args(0).unify(targ0()     ,work)==null &&
-          old.args(1).unify(targ1()     ,work)==null &&
-          old.args(2).unify(_body.find(),work)==null )
-        return null;
+      if(  old.is_fun() &&      // Already a function?  Compare-by-parts
+          !old.args(0).unify(targ0()     ,work) &&
+          !old.args(1).unify(targ1()     ,work) &&
+          !old.args(2).unify(_body.find(),work) )
+        return false;
       // Make a new T2 for progress
       T2 fun = T2.make_fun(targ0(),targ1(),_body.find());
       return old.unify(fun,work);
@@ -288,9 +286,8 @@ public class HM {
     @Override SB p1(SB sb) { return sb.p("let ").p(_arg0).p(" = ... in ..."); }
     @Override SB p2(SB sb, VBitSet dups) { _body.p0(sb,dups); return _def.p0(sb,dups); }
     T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
-    @Override T2 hm(Worklist work) {
-      boolean progress = targ().unify(_def.find(),work) != null;
-      return progress ? _body.find() : null;
+    @Override boolean hm(Worklist work) {
+      return targ().unify(_def.find(),work);
     }
     @Override T2 lookup(String name) {
       if( Util.eq(_arg0,name) ) return targ();
@@ -333,7 +330,7 @@ public class HM {
       return sb;
     }
 
-    @Override T2 hm(Worklist work) {
+    @Override boolean hm(Worklist work) {
       // Unifiying these: make_fun(this.arg0 this.arg1 -> new     )
       //                      _fun{_fun.arg0 _fun.arg1 -> _fun.rez}
       // Progress if:
@@ -343,17 +340,14 @@ public class HM {
 
       T2 tfun = _fun.find();
       if( !tfun.is_fun() ) {
-        if( work==null )
-          //return this; // Will-progress & testing
-          throw unimpl("untested");
+        if( work==null ) return true; // Will-progress & just-testing
         T2[] targs = new T2[_args.length+1];
         for( int i=0; i<_args.length; i++ )
           targs[i] = _args[i].find();
         targs[_args.length] = find(); // Return
         T2 nfun = T2.make_fun(targs);
-        T2 ufun = tfun.unify(nfun,work);
-        // Return is last element
-        return ufun.args(_args.length);
+        tfun.unify(nfun,work);
+        return true;        // Always progress (since forcing tfun to be a fun)
       }
 
       if( tfun._args.length != _args.length+1 )
@@ -361,19 +355,12 @@ public class HM {
       // Check for progress amongst arg pairs
       boolean progress = false;
       for( int i=0; i<_args.length; i++ ) {
-        T2 arg = tfun.args(i).unify(_args[i].find(),work);
-        if( arg!=null ) progress = true;
+        progress |= tfun.args(i).unify(_args[i].find(),work);
         if( progress && work==null )
-          //return this;          // Will-progress & testing
-          throw unimpl("untested");
+          return true;          // Will-progress & just-testing early exit
       }
-      T2 arg = tfun.args(_args.length).unify(find(),work);
-      if( arg!=null ) progress = true;
-      if( progress && work==null )
-        //return this;          // Will-progress & testing
-        throw unimpl("untested");
-      if( !progress ) return null;
-      return arg==null ? find() : arg;
+      progress |= tfun.args(_args.length).unify(find(),work);
+      return progress;
     }
     @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
     @Override void add_kids(Worklist work) { for( Syntax arg : _args ) work.push(arg); }
@@ -405,7 +392,7 @@ public class HM {
     // A plain type variable starts with a 'V', and can unify directly.
     // Everything else is structural - during unification they must match names
     // and arguments and Type constants.
-    @NotNull String _name; // name, e.g. "->" or "pair" or "V123" or "base"
+    final @NotNull String _name; // name, e.g. "->" or "pair" or "V123" or "base"
 
     // Structural parts to unify with, or slot 0 is used during normal U-F
     T2 @NotNull [] _args;
@@ -435,10 +422,10 @@ public class HM {
     }
 
     // A type var, not a concrete leaf.  Might be U-Fd or not.
-    boolean is_leaf() { return _name.charAt(0)=='V'; }
+    boolean is_leaf() { return _name.charAt(0)=='V' || (isa("Base") && _con==null); }
     boolean no_uf() { return !is_leaf() || _args[0]==null; }
     boolean isa(String name) { return Util.eq(_name,name); }
-    boolean is_base() { return isa("Base"); }
+    boolean is_base() { return isa("Base") && _con!=null; }
     boolean is_fun () { return isa("->"); }
 
     // U-F find
@@ -480,66 +467,67 @@ public class HM {
     }
 
     // Structural unification progress test
-    boolean progress(T2 t) { return unify(t,null)!=null; }
+    boolean progress(T2 t) { return unify(t,null); }
     // Short-cut to set progress
     @NotNull T2 progress() { PROGRESS=1; return this; }
 
-    // Structural unification.  Returns null if no-change.  If work is null,
-    // makes no change but returns 'this' instead of a change.  If change and
-    // work, returns a new T2 which may (or may not) be equal to either side.
+    // Structural unification.
+    // Returns false if no-change, true for change.
+    // If work is null, does not actually change anything, just reports progress.
+    // If work and change, unifies 'this' into 'that' (changing both), and
+    // updates the worklist.
     static private int PROGRESS;
     static private final HashMap<Long,T2> DUPS = new HashMap<>();
-    T2 unify( T2 t, Worklist work ) {
-      if( this==t ) return null;
+    boolean unify( T2 that, Worklist work ) {
+      if( this==that ) return false;
       assert DUPS.isEmpty() && PROGRESS==0;
-      PROGRESS = -1;
-      T2 rez = _unify(t,work);
+      PROGRESS = -1;            // No progress yet
+      T2 rez = _unify(that,work);
       DUPS.clear();
       if( PROGRESS<0 ) rez = null; // Return null if no-progress
       PROGRESS=0;               // Reset
-      return rez;
+      return rez!=null;
     }
 
-    // Structural unification, 'this' into 't'.  No change if just testing
-    // (work is null) and returns 't' if progress.  If updating, both 'this'
-    // and 't' are the same afterwards.  Sets PROGRESS.
-    private @NotNull T2 _unify(T2 t, Worklist work) {
-      assert no_uf() && t.no_uf();
-      if( this==t ) return this;
-      if( PROGRESS>0 && work==null ) return t; // Progress early-exit
+    // Structural unification, 'this' into 'that'.  No change if just testing
+    // (work is null) and returns 'that' if progress.  If updating, both 'this'
+    // and 'that' are the same afterwards.  Sets PROGRESS.
+    private @NotNull T2 _unify(T2 that, Worklist work) {
+      assert no_uf() && that.no_uf();
+      if( this==that ) return this;
+      if( PROGRESS>0 && work==null ) return that; // Progress early-exit
 
       // two leafs union in either order, so keep lower uid
-      if( is_leaf() && t.is_leaf() && _uid<t._uid ) return t.union(this,work);
-      if(   is_leaf() ) return   union(t   ,work);
-      if( t.is_leaf() ) return t.union(this,work);
-      if( is_base() && t.is_base() ) return unify_base(t,work);
+      if( is_leaf() && that.is_leaf() && _uid<that._uid ) return that.union(this,work);
+      if(   is_leaf() ) return   union(that   ,work);
+      if( that.is_leaf() ) return that.union(this,work);
+      if( is_base() && that.is_base() ) return unify_base(that,work);
 
-      if( !Util.eq(_name,t._name) )
-        throw new RuntimeException("Cannot unify "+this+" and "+t);
-      if( _args==t._args ) return this; // Names are equal, args are equal
-      if( _args.length != t._args.length )
-        throw new RuntimeException("Cannot unify "+this+" and "+t);
+      if( !Util.eq(_name,that._name) )
+        throw new RuntimeException("Cannot unify "+this+" and "+that);
+      if( _args==that._args ) return this; // Names are equal, args are equal
+      if( _args.length != that._args.length )
+        throw new RuntimeException("Cannot unify "+this+" and "+that);
 
       // Cycle check
-      long luid = dbl_uid(t);
+      long luid = dbl_uid(that);
       T2 rez = DUPS.get(luid);
-      assert rez==null || rez==t;
+      assert rez==null || rez==that;
       if( rez!=null ) return rez; // Been there, done that
-      DUPS.put(luid,t);           // Close cycles
+      DUPS.put(luid,that);           // Close cycles
 
       // Structural recursion unification.
       for( int i=0; i<_args.length; i++ )
-        t._args[i] = args(i)._unify(t.args(i),work);
-      return t;
+        that._args[i] = args(i)._unify(that.args(i),work);
+      return that;
     }
 
     long dbl_uid(T2 t) { return ((long)_uid<<32)|t._uid; }
 
     private T2 unify_base(T2 t, Worklist work) {
       fresh_base(t,work);
-      _name = "V"+_uid;         // Flip from 'Base' to 'Leaf'
       _args = new T2[1];        // Room for a forwarding pointer
-      _con=null;
+      _con=null;                // Flip from 'Base' to 'Leaf'
       return union(t,work);
     }
     private @NotNull T2 fresh_base(T2 t, Worklist work) {
