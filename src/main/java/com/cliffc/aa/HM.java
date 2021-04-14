@@ -165,6 +165,11 @@ public class HM {
     @Override SB p1(SB sb) { return sb.p(_name); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
     @Override boolean hm(Worklist work) {
+      // A boolean if name is from a Let._body (or PRIM) vs Let._def (or
+      // Lambda).  Not helpful, as its only useful at the top-layer.
+      // Structural unification requires the 'occurs check' at each internal
+      // layer, which can differ from the top-layer.      
+      //boolean occurs_fresh = _par==null /*from prims*/ || _par.is_fresh(_name,this);
       T2 t = _par==null ? null : _par.lookup(_name); // Lookup in current env
       if( t==null ) t = PRIMS.get(_name);            // Lookup in prims
       if( t==null )
@@ -302,7 +307,7 @@ public class HM {
       prep_tree_impl(par,_body._t,work);
       int cnt = _body.prep_tree(this,work);
       cnt +=    _def .prep_tree(this,work);
-      _t = _body._t;
+      _t = _body._t;            // Unify 'Let._t' with the '_body'
       return cnt;
     }
     @Override boolean prep_lookup_deps(Ident id) {
@@ -534,7 +539,8 @@ public class HM {
 
     // Make a (lazy) fresh copy of 'this' and unify it with 'that'.  This is
     // the same as calling 'fresh' then 'unify', without the clone of 'this'.
-    // The Syntax is used when making the 'fresh' copy for the occurs_check.
+    // The Syntax is used when making the 'fresh' copy for the occurs_check;
+    // it is another version of the 'nongen' set.
     // Returns progress.
     // If work is null, we are testing only and make no changes.
     static private final HashMap<T2,T2> VARS = new HashMap<>();
@@ -556,8 +562,12 @@ public class HM {
         return prior.find()._unify(that,work);  // Also 'prior' needs unification with 'that'
       if( cycle_equals(that) ) return vput(that,false);
 
+      // Attempting to pre-compute occurs_in, by computing 'is_fresh' in the
+      // Ident.hm() call does NOT work.  The 'is_fresh' is for the top-layer
+      // only, not the internal layers.  As soon as we structural recurse down
+      // a layer, 'is_fresh' does not correlate with an occurs_in check.      
       if( occurs_in(syn) ) return vput(that,_unify(that,work)); // Famous 'occurs-check', switch to normal unify
-      if(   is_leaf() ) return vput(that,false); // Lazy map LHS tvar to RHS
+      if( this.is_leaf() ) return vput(that,false); // Lazy map LHS tvar to RHS
       if( that.is_leaf() )             // RHS is a tvar; union with a deep copy of LHS
         return work==null || vput(that,that.union(_fresh(syn),work));
       // Bases MEET cons in RHS
@@ -613,8 +623,10 @@ public class HM {
       return found;
     }
     boolean _occurs_in(Syntax syn) {
-      if( _occurs_in_type(syn.find()) ) return true;
-      return syn._par != null && _occurs_in(syn._par);
+      for( ; syn!=null; syn=syn._par )
+        if( _occurs_in_type(syn.find()) )
+          return true;
+      return false;
     }
 
     boolean _occurs_in_type(T2 x) {
