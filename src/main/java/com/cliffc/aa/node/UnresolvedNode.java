@@ -1,14 +1,18 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFunPtr;
 import com.cliffc.aa.util.Util;
 
 import java.util.Arrays;
 
-public class UnresolvedNode extends Node {
+import static com.cliffc.aa.AA.ARG_IDX;
+
+public class UnresolvedNode extends UnOrFunPtrNode {
   private final Parse _bad;
   UnresolvedNode( Parse bad, Node... funs ) { super(OP_UNR,funs); _bad = bad; }
   @Override public String xstr() {
@@ -60,7 +64,7 @@ public class UnresolvedNode extends Node {
       for( Node fptr : _defs ) {
         Type td = fptr._val;
         if( td==Type.ANY && fptr instanceof FunPtrNode )
-          td = TypeFunPtr.make(((FunPtrNode)fptr).ret()._fidx,((FunPtrNode)fptr).ret()._nargs,Type.ANY);
+          td = TypeFunPtr.make(((FunPtrNode)fptr).ret()._fidx,((FunPtrNode)fptr).nargs(),Type.ANY);
         tx = tx.meet(td);
       }
       if( !(tx instanceof TypeFunPtr) ) return tx.oob();
@@ -70,48 +74,53 @@ public class UnresolvedNode extends Node {
   }
 
   @Override public TV2 new_tvar(String alloc_site) {
-    TV2 tv = TV2.make("Fun",this,alloc_site);
-    if( tvar(0).is_fresh() ) tv = TV2.make_fresh(tv,alloc_site);
-    return tv;
+    return TV2.make("Fun",this,alloc_site);
   }
 
   @Override public boolean unify( boolean test ) {
-    // Giant assert that all inputs are either all Fresh or all Fun, ignoring dead.
-    int is_fresh = 0;
+    // Giant assert that all inputs are all Fun, ignoring dead.
     for( Node n : _defs )
-      if( n.tvar().isa("Fun") ) {
-        assert is_fresh==0 || is_fresh== -1;
-        is_fresh = -1;
-      } else if( n.tvar().is_fresh() ) {
-        assert is_fresh==0 || is_fresh==  1;
-        is_fresh =  1;
-      }
+      assert n.tvar().is_dead() || n.tvar().isa("Fun");
     return false;
   }
 
   // Validate same name, operator-precedence and thunking
   private void add_def_unresolved( FunPtrNode ptr ) {
-    FunPtrNode ptr0 = (FunPtrNode)in(0);
-    assert Util.eq(ptr0._name,ptr._name);
-    // Actually, equal op_prec & thunk only for binary ops
-    assert ptr0.fun()._op_prec  == ptr.fun()._op_prec;
-    assert ptr0.fun()._thunk_rhs== ptr.fun()._thunk_rhs;
+    if( _defs._len>0 ) {
+      FunPtrNode ptr0 = (FunPtrNode) in(0);
+      assert Util.eq(ptr0._name, ptr._name);
+      // Actually, equal op_prec & thunk only for binary ops
+      assert ptr0.fun()._op_prec == ptr.fun()._op_prec;
+      assert ptr0.fun()._thunk_rhs == ptr.fun()._thunk_rhs;
+    }
     add_def(ptr);
   }
 
-  // Filter out all the wrong-arg-count functions
-  public Node filter( GVNGCM gvn, int nargs ) {
-    Node x = null;
+  // Filter out all the wrong-arg-count functions from Parser.
+  // Always return a FRESH copy, as-if HM.Ident primitive lookup.
+  @Override public UnOrFunPtrNode filter_fresh( Env env, int nargs ) {
+    UnOrFunPtrNode x = null;
     for( Node epi : _defs ) {
-      FunNode fun =  ((FunPtrNode)epi).fun();
+      FunPtrNode fptr = (FunPtrNode)epi;
       // User-nargs are user-visible #arguments.
       // Fun-nargs include the ctrl, display & memory, hence the +2.
-      if( fun.nargs() != nargs+3 ) continue;
-      if( x == null ) x = epi;
-      else if( x instanceof UnresolvedNode ) ((UnresolvedNode)x).add_def_unresolved((FunPtrNode)epi);
-      else x = new UnresolvedNode(_bad,x,epi);
+      if( fptr.nargs() != ARG_IDX+nargs ) continue;
+      FunPtrNode ffptr = fptr.fresh(env); // Make a FRESH copy
+      if( x == null ) x = ffptr.keep();
+      else if( x instanceof UnresolvedNode ) ((UnresolvedNode)x).add_def_unresolved(ffptr);
+      else x = new UnresolvedNode(_bad,x.unkeep(),ffptr).keep();
     }
-    return x instanceof UnresolvedNode ? gvn.xform(x) : x;
+    x.unkeep().xval();
+    return x;
+  }
+
+  // Make a FRESH copy
+  @Override public UnresolvedNode fresh(Env env) {
+    UnresolvedNode unr = new UnresolvedNode(_bad).keep();
+    for( Node fptr : _defs )
+      unr.add_def_unresolved(((FunPtrNode)fptr).fresh(env));
+    unr._val = unr.unkeep().value(GVNGCM.Mode.PesiNoCG);
+    return unr;
   }
 
   // Return a funptr for this fidx.
@@ -121,6 +130,11 @@ public class UnresolvedNode extends Node {
         return (FunPtrNode)n;
     return null;
   }
+
+  // Same NARGS across all defs
+  @Override public int nargs() { return funptr().nargs(); }
+  @Override public FunPtrNode funptr() { return (FunPtrNode)_defs.at(0); }
+  @Override public boolean is_fresh() { return funptr().is_fresh(); }
 
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.  Should be the same across all defs.

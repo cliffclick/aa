@@ -34,7 +34,7 @@ public class ConNode<T extends Type> extends Node {
   }
   // Used by FunPtrNode
   ConNode( byte type, T tfp, RetNode ret, Node closure ) { super(type,ret,closure); _t = tfp; }
-  @Override public String xstr() { return Env.ALL_CTRL == this ? "ALL_CTL" : _t.toString(); }
+  @Override public String xstr() { return Env.ALL_CTRL == this ? "ALL_CTL" : (_t==null?"(null)":_t.toString()); }
   @Override public Type value(GVNGCM.Mode opt_mode) {
     // ALL_CTRL is used for unknown callers; during and after GCP there are no
     // unknown callers.  However, we keep the ALL_CTRL for primitives so we can

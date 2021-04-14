@@ -257,7 +257,7 @@ public class TestHM {
     // & calling internally.
     // fcn takes a predicate 'p' and returns one of two fcns.
     //   let fcn = { p -> (if/else p {a -> pair[a,a        ]}
-    //                                {b -> pair[b,pair[3,b]]}) } in
+    //                               {b -> pair[b,pair[3,b]]}) } in
     // map takes a function and an element (collection?) and applies it (applies to collection?)
     //   let map = { fun x -> (fun x) }
     //          in { q -> ((map (fcn q)) 5) }

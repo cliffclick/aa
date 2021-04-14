@@ -12,20 +12,15 @@ import static com.cliffc.aa.AA.MEM_IDX;
 public class LoadNode extends Node {
   private final String _fld;
   private final Parse _bad;
+  // If not-null, this Load does a HM lookup and produces a 'fresh' tvar every time.
+  private final Env _env;
 
-  public LoadNode( Node mem, Node adr, String fld, Parse bad ) { this(mem,adr,fld,bad,false,false); }
-  public LoadNode( Node mem, Node adr, String fld, Parse bad, boolean closure_adr, boolean closure_val ) {
+  public LoadNode( Node mem, Node adr, String fld, Parse bad ) { this(mem,adr,fld,bad,null); }
+  public LoadNode( Node mem, Node adr, String fld, Parse bad, Env env) {
     super(OP_LOAD,null,mem,adr);
     _fld = fld;
     _bad = bad;
-    // TRUE if either the address or value must be a TFP.
-    // Address: means loading from a closure.
-    // Value  : means loading      a closure.
-    // Both: this is a linked-list display walk, finding the closure at the proper lexical depth.
-    // Just address: this is loading a local variable at this closure.
-    // Neither: this is a normal field load from a non-closure structure.
-    // Just value: not allowed.
-    assert (closure_adr || !closure_val); // Just value: not allowed
+    _env = env;
   }
   @Override public String xstr() { return "."+_fld; }   // Self short name
   String  str() { return xstr(); } // Inline short name
@@ -242,7 +237,7 @@ public class LoadNode extends Node {
     if( !(tadr instanceof TypeMemPtr) ) return false; // Wait until types are sharper
     TypeMemPtr tmp = (TypeMemPtr)tadr;
     // Unify the given aliases and field against the loaded type
-    return tmem.unify_alias_fld(this,tmp._aliases,_fld,tvar(),test,"Load_unify");
+    return tmem.unify_alias_fld(this,tmp._aliases,_fld,tvar(),test,_env,"Load_unify");
   }
 
   @Override public ErrMsg err( boolean fast ) {

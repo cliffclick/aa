@@ -1,9 +1,9 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
+import com.cliffc.aa.tvar.UQNodes;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.BitSet;
@@ -54,7 +54,7 @@ public class GVNGCM {
   public void add_inline( FunNode n ) { add_work(_work_inline, n); }
   public void add_flow_defs  ( Node n ) { add_work_defs(_work_flow  ,n); }
   public void add_flow_uses  ( Node n ) { add_work_uses(_work_flow  ,n); }
-  public void add_flow( NonBlockingHashMapLong<CallEpiNode> deps ) { if( deps != null ) for( Node dep : deps.values() ) add_flow(dep); }
+  public void add_flow( UQNodes deps ) { if( deps != null ) for( Node dep : deps.values() ) add_flow(dep); }
   public void add_flow  ( Ary<TNode> deps ) { if( deps != null ) for( TNode dep : deps )  add_flow((Node)dep); }
   public void add_flow_uses( Ary<TNode> deps ) {
     if( deps != null )

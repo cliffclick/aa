@@ -69,7 +69,7 @@ public class Parse implements Comparable<Parse> {
   private final byte[] _buf;            // Bytes being parsed
   private int _x;                       // Parser index
   private int _lastNWS;                 // Index of last non-white-space char
-  private AryInt _lines;                // char offset of each line
+  private final AryInt _lines;          // char offset of each line
   public final GVNGCM _gvn;             // Pessimistic types
 
   // Fields strictly for Java number parsing
@@ -228,7 +228,7 @@ public class Parse implements Comparable<Parse> {
     // Add a constructor function.  If this is a primitive, build a constructor
     // taking the primitive.
     Parse bad = errMsg();
-    Node rez, stk = scope().stk();
+    Node rez;
     if( !(t instanceof TypeObj) ) {
       PrimNode cvt = PrimNode.convertTypeName(t,tn,bad);
       rez = _e.add_fun(bad,tvar,gvn(cvt.as_fun(_gvn))); // Return type-name constructor
@@ -467,11 +467,12 @@ public class Parse implements Comparable<Parse> {
       _x += bintok.length();
       skipWS();
       int rhsx = _x;            // Invariant: WS already skipped
-      // Get the matching FunPtr (or Unresolved)
       lhs.keep();
-      Node op = _e.lookup_filter(bintok.intern(),_gvn,2); // BinOp, or null
+      // Get the matching FunPtr (or Unresolved).
+      // This is a primitive lookup and always returns a FRESH copy (see HM.Ident).
+      UnOrFunPtrNode op = _e.lookup_filter_fresh(bintok.intern(),2); // BinOp, or null
       assert op!=null;          // Since found valid token, must find matching primnode
-      FunNode sfun = ((FunPtrNode)(op instanceof UnresolvedNode ? op.in(0) : op)).fun();
+      FunNode sfun = op.funptr().fun();
       assert sfun._op_prec == prec;
       // Check for Thunking the RHS
       if( sfun._thunk_rhs ) {
@@ -567,8 +568,9 @@ public class Parse implements Comparable<Parse> {
     int oldx = _x;
     String uni = token();
     if( uni!=null ) {
-      Node unifun = _e.lookup_filter(uni.intern(),_gvn,1); // UniOp, or null
-      FunPtrNode ptr = (FunPtrNode)(unifun instanceof UnresolvedNode ? unifun.in(0) : unifun);
+      // This is a primitive lookup and always returns a FRESH copy (see HM.Ident).
+      UnOrFunPtrNode unifun = _e.lookup_filter_fresh(uni.intern(),1); // UniOp, or null
+      FunPtrNode ptr = unifun==null ? null : unifun.funptr();
       if( ptr==null || ptr.fun()._op_prec <= 0 ) _x=oldx; // Not a uniop
       else {
         // Token might have been longer than the filtered name; happens if a
@@ -709,14 +711,16 @@ public class Parse implements Comparable<Parse> {
 
     // Scope is discovered by walking lexical display stack.
     // Pointer to the proper display is found via ptr-walking live display stack.
-    // Now properly load from the display
+    // Now properly load from the display.
+    // This does a HM.Ident lookup, producing a FRESH tvar every time.
     Node ptr = get_display_ptr(scope);
-    n = gvn(new LoadNode(mem(),ptr,tok,null));
+    n = gvn(new LoadNode(mem(),ptr,tok,null,_e));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl1(Node.ErrMsg.forward_ref(this,((FunPtrNode)n)));
     // Do a full lookup on "+", and execute the function
     n.keep();
-    Node plus = _e.lookup_filter("+",_gvn,2);
+    // This is a primitive lookup and always returns a FRESH copy (see HM.Ident).
+    Node plus = _e.lookup_filter_fresh("+",2);
     Node sum = do_call(errMsgs(0,_x,_x),args(plus,n,con(TypeInt.con(d))));
     // Active memory for the chosen scope, after the call to plus
     set_mem(gvn(new StoreNode(mem(),ptr,sum,TypeStruct.FRW,tok,errMsg())));
@@ -773,12 +777,10 @@ public class Parse implements Comparable<Parse> {
     if( peek1(c,'{') ) {
       String tok = token0();
       Node op = tok == null ? null : _e.lookup(tok.intern());
-      if( peek('}') && op != null && op.op_prec() > 0 ) {
-        // If a primitive unresolved, clone to give a proper error message.
-        if( op instanceof UnresolvedNode && op.is_prim() )
-          op = gvn(((UnresolvedNode)op).copy(errMsg()));
-        return op;              // Return operator as a function constant
-      }
+      if( peek('}') && op != null && op.op_prec() > 0 )
+        // This is a primitive operator lookup as a function constant, and
+        // makes a FRESH copy like HM.Ident.
+        return ((UnOrFunPtrNode)op).fresh(_e);
       _x = oldx+1;              // Back to the opening paren
       return func();            // Anonymous function
     }
@@ -797,7 +799,7 @@ public class Parse implements Comparable<Parse> {
       // them as a undefined forward-ref right now, because the op might be the
       // tail-half of a balanced-op, which is parsed by term() above.
       if( isOp(tok) ) { _x = oldx; return null; }
-      Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,errMsg(oldx)));
+      Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,errMsg(oldx),_e));
       // Place in nearest enclosing closure scope
       scope().stk().create(tok.intern(),fref,TypeStruct.FFNL);
       return fref;
@@ -810,13 +812,14 @@ public class Parse implements Comparable<Parse> {
     if( def.is_forward_ref() ) return def;
     // Balanced ops are similar to "{}", "()" or "@{}".
     if( def.op_prec()==0 && def._val instanceof TypeFunPtr )
-      return bfact(oldx,def);
+      return bfact(oldx,(UnOrFunPtrNode)def);
 
     // Else must load against most recent display update.  Get the display to
     // load against.  If the scope is local, we load against it directly,
     // otherwise the display is passed in as a hidden argument.
+    // This does a HM.Ident lookup, producing a FRESH tvar every time.
     Node ptr = get_display_ptr(scope);
-    return gvn(new LoadNode(mem(),ptr,tok.intern(),null));
+    return gvn(new LoadNode(mem(),ptr,tok.intern(),null,_e));
   }
 
   /** Parse a tuple; first stmt but not the ',' parsed.
@@ -1012,7 +1015,7 @@ public class Parse implements Comparable<Parse> {
    *  bterm = [ stmts ]              // size  constructor
    *  bterm = [ stmts, [stmts,]* ]   // tuple constructor
    */
-  Node bfact(int oldx, Node bfun) {
+  Node bfact(int oldx, UnOrFunPtrNode bfun) {
     skipWS();
     int oldx2 = _x;             // Start of stmts
     Node s = stmts();
@@ -1021,11 +1024,8 @@ public class Parse implements Comparable<Parse> {
       _x --;                    // Reparse the ',' in tuple
       throw unimpl();
     }
-    require(bal_fun(bfun)._bal_close,oldx);
+    require(bfun.funptr().fun()._bal_close,oldx);
     return do_call(errMsgs(oldx,oldx2),args(bfun,s));
-  }
-  private FunNode bal_fun(Node bfun) {
-    return ((FunPtrNode)(bfun instanceof UnresolvedNode ? bfun.in(0) : bfun)).fun();
   }
 
   // Lookup a balanced open function of 2 or 3 arguments.
@@ -1033,11 +1033,12 @@ public class Parse implements Comparable<Parse> {
     int oldx = _x;
     String bal = token();
     if( bal==null ) return null;
-    Node bfun = _e.lookup_filter(bal.intern(),_gvn,0); // No nargs filtering
+    // This is a primitive lookup and always returns a FRESH copy (see HM.Ident).
+    UnOrFunPtrNode bfun = _e.lookup_filter_fresh(bal.intern(),0); // No nargs filtering
     if( bfun==null || bfun.op_prec() != 0 ) { _x=oldx; return null; }
     // Actual minimal length uniop might be smaller than the parsed token
     // (greedy algo vs not-greed)
-    _x = oldx+bal_fun(bfun).fptr()._name.length();
+    _x = oldx+bfun.funptr()._name.length();
     return bfun;
   }
 

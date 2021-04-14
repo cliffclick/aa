@@ -469,31 +469,25 @@ public final class CallEpiNode extends Node {
   @Override public TV2 new_tvar(String alloc_site) {
     return _is_copy
       ? TV2.make_leaf(this,alloc_site)
-      : TV2.make("Ret",this,alloc_site).init_dep(this);
+      : TV2.make("Ret",this,alloc_site).push_dep(this);
   }
 
   @Override public boolean unify( boolean test ) {
     if( _is_copy ) return false; // A copy
-    // Build a HM tvar (args->ret), same as HM.java Apply does.  Instead of
-    // grabbing a 'fresh' copy of 'Ident' (see HM.java) we grab it fresh at the
-    // use point below, by calling 'fresh_unify' which acts as-if a fresh copy
-    // is made, and then unifies it.
+    // Build a HM tvar (args->ret), same as HM.java Apply does.
     Node fdx = call().fdx();
     TV2 tfdx = fdx.tvar();
     if( tfdx.is_leaf() ) return false; // Wait?  probably need for force fresh-fun
     if( tfdx.is_dead() ) return false;
-    if( tfdx.is_fresh() && test )
-      tfdx.push_dep(this);
     // In an effort to detect possible progress without constructing endless
     // new TV2s, we look for a common no-progress situation by inspecting the
     // first layer in.
     TV2 tcargs = call().tvar();
     TV2 tcret  = tvar();
     if( tcret.is_dead() ) return false;
-    TV2 tfdx2 = tfdx.is_fresh() ? tfdx.get_fresh() : tfdx;
-    TV2 tfargs = tfdx2.get("Args");
-    TV2 tfret  = tfdx2.get("Ret" );
-    if( tfdx2.isa("Fun") && tcargs==tfargs && tcret==tfret ) return false; // Equal parts, no progress
+    TV2 tfargs = tfdx.get("Args");
+    TV2 tfret  = tfdx.get("Ret" );
+    if( tfdx.isa("Fun") && tcargs==tfargs && tcret==tfret ) return false; // Equal parts, no progress
 
     // Will make progress aligning the shapes
     NonBlockingHashMap<Object,TV2> args = new NonBlockingHashMap<Object,TV2>(){{ put("Args",tcargs);  put("Ret",tcret); }};

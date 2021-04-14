@@ -7,16 +7,17 @@ import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMap;
 
+import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.Env.GVN;
 
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
 // TypeFunPtr with a constant fidx and variable displays.  Used to allow 1st
 // class functions to be passed about.
-public final class FunPtrNode extends Node {
+public final class FunPtrNode extends UnOrFunPtrNode {
   public String _name;          // Optional for debug only
   private ErrMsg _referr;       // Forward-ref error, cleared after defining
-  final boolean _mid_def; // H-M mid-definition of a recursive fcn; true means not "Fresh";
+  final Env _env;               // Not-null means "fresh"
 
   // Every var use that results in a function, so actually only these FunPtrs,
   // needs to make a "fresh" copy before unification.  "Fresh" makes a
@@ -25,33 +26,28 @@ public final class FunPtrNode extends Node {
   // interesting thing is when an out-of-scope TVar uses the same TVar
   // internally in different parts - the copy replicates this structure.  When
   // unified, it forces equivalence in the same places.
-  public  FunPtrNode( String name, RetNode ret, Env e ) { this(name,null,ret,e==null ? Node.con(TypeMemPtr.NO_DISP) : e._scope.ptr(),false); }
-  public  FunPtrNode( RetNode ret, Node display ) { this(null,null,ret,display,true); }
+  public  FunPtrNode( String name, RetNode ret, Env env ) { this(name,null,ret,env==null ? Node.con(TypeMemPtr.NO_DISP) : env._scope.ptr(),env); }
+  public  FunPtrNode( RetNode ret, Node display ) { this(null,null,ret,display,null); }
   // For forward-refs only; super weak display & function.
-  private FunPtrNode( String name, ErrMsg referr, RetNode ret, Node display, boolean mid_def ) {
+  private FunPtrNode( String name, ErrMsg referr, RetNode ret, Node display, Env env ) {
     super(OP_FUNPTR,ret,display);
     _name = name;
     _referr = referr;
-    _mid_def = mid_def;
-    if( _mid_def ) { TV2 tv = _tvar.get_fresh();  _tvar.reset(this); _tvar = tv; }
-  }
-  public FunPtrNode make_fresh() {
-    assert !tvar().is_fresh();
-    FunPtrNode fptr = new FunPtrNode(_name,_referr,ret(),display(),false);
-    fptr._tvar.reset(fptr);
-    fptr._tvar = TV2.make_fresh(tvar(),"FunPtr_make_fresh");
-    return fptr;
+    _env = env;
   }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }
   public FunNode fun() { return ret().fun(); }
   public FunNode xfun() { RetNode ret = ret(); return ret.in(4) instanceof FunNode ? ret.fun() : null; }
+  @Override public int nargs() { return ret()._nargs; }
+  @Override public FunPtrNode funptr() { return this; }
+  @Override public boolean is_fresh() { return _env!=null; }
   // Self short name
   @Override public String xstr() {
     if( is_dead() || _defs._len==0 ) return "*fun";
     int fidx = ret()._fidx;    // Reliably returns a fidx
     FunNode fun = FunNode.find_fidx(fidx);
-    return (_mid_def ? "@" : "*")+(fun==null ? ""+fidx : fun.name());
+    return (_env!=null ? "@" : "*")+(fun==null ? ""+fidx : fun.name());
   }
   // Inline longer name
   @Override String str() {
@@ -109,7 +105,7 @@ public final class FunPtrNode extends Node {
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
-    return TypeFunPtr.make(ret()._fidx,ret()._nargs,display()._val);
+    return TypeFunPtr.make(ret()._fidx,nargs(),display()._val);
   }
 
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
@@ -121,9 +117,7 @@ public final class FunPtrNode extends Node {
   }
 
   @Override public TV2 new_tvar(String alloc_site) {
-    TV2 tv = TV2.make("Fun",this,alloc_site);
-    if( _mid_def ) return tv;
-    return TV2.make_fresh(tv,alloc_site);
+    return TV2.make("Fun",this,alloc_site);
   }
 
   @Override public boolean unify( boolean test ) {
@@ -134,15 +128,14 @@ public final class FunPtrNode extends Node {
     if( fun==null ) return false;
     TV2 tret = ret.tvar();
     if( tret.is_dead() ) return false;
-    assert tret.isa("Ret"); // Ret  is always a Ret
+    assert tret.isa("Ret"); // Ret is always a Ret
 
     // Check for progress before allocation
     TV2 tvar = tvar();
     if( tvar.is_dead() ) return false;
-    assert tvar.is_fresh() || tvar.isa("Fun"); // Self is always a Fresh or Fun
-    TV2 tvx = tvar.is_fresh() ? tvar.get_fresh() : tvar;
-    TV2 tvar_args = tvx.get("Args");
-    TV2 tvar_ret  = tvx.get("Ret" );
+    assert tvar.isa("Fun"); // Self is always a Fun
+    TV2 tvar_args = tvar.get("Args");
+    TV2 tvar_ret  = tvar.get("Ret" );
     Node[] parms = fun.parms();
     parms[0] = fun;
     if( tvar_args!=null && tvar_args.eq(parms) && tvar_ret==tret ) return false; // Equal parts
@@ -150,14 +143,23 @@ public final class FunPtrNode extends Node {
     TV2 targ = TV2.make("Args",fun,"FunPtr_unify_Args",parms);
     NonBlockingHashMap<Object,TV2> args = new NonBlockingHashMap<Object,TV2>(){{ put("Args",targ);  put("Ret",tret); }};
     TV2 tfun = TV2.make("Fun",this,"FunPtr_unify_Fun",args);
-    return tvx.unify(tfun,test);
+    return tvar.unify(tfun,test);
   }
 
-  // Filter out all the wrong-arg-count functions
-  public Node filter( int nargs ) {
+  // Filter out all the wrong-arg-count functions from Parser.
+  // Always return a FRESH copy, as-if HM.Ident primitive lookup.
+  @Override public FunPtrNode filter_fresh( Env env, int nargs ) {
     // User-nargs are user-visible #arguments.
     // Fun-nargs include ctrl, memory & the display, hence the +3.
-    return fun().nargs() == nargs+3 ? this : null;
+    return nargs() == ARG_IDX+nargs ? fresh(env) : null;
+  }
+
+  // Always return a FRESH copy, as-if HM.Ident primitive lookup.
+  @Override public FunPtrNode fresh(Env env ) {
+    FunPtrNode fptr = new FunPtrNode(_name,_referr,ret(),display(),env);
+    tvar().fresh_unify(fptr.tvar(),env,false); // Make a fresh copy of the type var
+    fptr.xval();
+    return fptr;
   }
 
   // Return the op_prec of the returned value.  Not sensible except when called
@@ -181,14 +183,14 @@ public final class FunPtrNode extends Node {
   // declared.  Hence we want a callable function pointer, but have no defined
   // body (yet).  Make a function pointer that takes/ignores all args, and
   // returns a scalar.
-  public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
+  public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref, Env e ) {
     FunNode fun = gvn.init(new FunNode(name)).unkeep();
     RetNode ret = gvn.init(new RetNode(fun,Node.con(TypeMem.MEM),Node.con(Type.SCALAR),Node.con(TypeRPC.ALL_CALL),fun)).unkeep();
     gvn.add_flow(fun);
     gvn.add_flow(ret);
     // Display is limited to any one of the current lexical scopes.
     TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS,TypeObj.ISUSED);
-    return new FunPtrNode( name, ErrMsg.forward_ref(unkref,name),ret,Node.con(tdisp),true);
+    return new FunPtrNode( name, ErrMsg.forward_ref(unkref,name),ret,Node.con(tdisp),null);
   }
 
   // True if this is a forward_ref
@@ -203,7 +205,7 @@ public final class FunPtrNode extends Node {
     assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.ALL_CTRL; // Forward ref has no callers
     assert dfun._defs._len==2 && dfun.in(0)==null;
     assert def ._uses._len==0;  // Def is brand new, no uses
-    assert _mid_def && !def._mid_def;
+    assert _env!=null && def._env==null;
     ProjNode mrg = ProjNode.proj(dsp,MEM_IDX);
 
     // Make a function pointer based on the original forward-ref fidx, but with
@@ -236,13 +238,13 @@ public final class FunPtrNode extends Node {
     Env.GVN.iter(GVNGCM.Mode.Parse);
   }
 
-  @Override public int hashCode() { return super.hashCode()+(_mid_def?0:1); }
+  @Override public int hashCode() { return super.hashCode()+(_env==null ? 0 : _env._scope.hashCode()); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
     if( !(o instanceof FunPtrNode) ) return false;
     FunPtrNode fptr = (FunPtrNode)o;
-    return _mid_def==fptr._mid_def;
+    return _env==null && fptr._env==null; // Unequal if either is FRESH, need to keep the TVARs from unifying
   }
 
   @Override public ErrMsg err( boolean fast ) { return is_forward_ref() ? _referr : null; }

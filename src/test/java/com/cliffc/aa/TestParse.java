@@ -20,6 +20,10 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
+    test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
+    
+    // Straight from TestHM.test08; types as {A -> (A,A)}
+    test("{ g -> f={x -> g}; (f 3,f 1)}", TypeFunPtr.make(TEST_FUNBITS,3,tdisp));
 
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.

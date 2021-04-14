@@ -37,7 +37,7 @@ public class ProjNode extends Node {
   @Override public boolean unify( boolean test ) {
     if( in(0) instanceof NewNode ) return false; // TODO: Not really a proper use of Proj
     TV2 tv0 = tvar(0);
-    return tv0._args!=null && tv0.unify_at(_idx,tvar(),test);
+    return tv0._args!=null && tv0.unify_at(_idx,tvar(),test,null);
   }
 
   public static ProjNode proj( Node head, int idx ) {

@@ -96,8 +96,8 @@ public class MrgProjNode extends ProjNode {
     TV2 tmem = mem().tvar();
     if( !tmem.isa("Mem") ) return false;
     TV2 tself = tvar();
-    return tself.unify(tmem,test) |                     // Unify bulk memory
-      tmem.unify_at(nnn()._alias,nnn().tvar(),test); // Unify at the alias
+    return tself.unify(tmem,test) |                       // Unify bulk memory
+      tmem.unify_at(nnn()._alias,nnn().tvar(),test,null); // Unify at the alias
   }
 
 }

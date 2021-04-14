@@ -829,7 +829,7 @@ public abstract class Node implements Cloneable {
   // Assert all value and liveness calls only go forwards.  Returns >0 for failures.
   private static final VBitSet FLOW_VISIT = new VBitSet();
   public  final int more_flow(boolean lifting) { FLOW_VISIT.clear();  return more_flow(lifting,0);  }
-  private int more_flow( boolean lifting, int errs) {
+  private int more_flow( boolean lifting, int errs ) {
     if( FLOW_VISIT.tset(_uid) ) return errs; // Been there, done that
     if( Env.GVN.on_dead(this) ) return errs; // Do not check dying nodes
     // Check for only forwards flow, and if possible then also on worklist

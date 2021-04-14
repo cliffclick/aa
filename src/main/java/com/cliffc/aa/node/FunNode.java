@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
@@ -705,6 +704,10 @@ public class FunNode extends RegionNode {
       assert c._defs._len==0;
       for( Node def : n._defs ) {
         Node newdef = map.get(def);// Map old to new
+        if( newdef==null && def instanceof UnOrFunPtrNode ) {
+          UnOrFunPtrNode uorf = (UnOrFunPtrNode)def;
+          def = uorf.fresh(uorf.funptr()._env);
+        }
         c.add_def(newdef==null ? def : newdef);
       }
     }
@@ -730,13 +733,14 @@ public class FunNode extends RegionNode {
           old_funptr.insert(new_unr);
           new_unr.add_def(old_funptr);
           new_unr._val = new_unr.value(GVNGCM.Mode.PesiNoCG);
-          if( ((FunPtrNode)use)._mid_def ) {
-            // Internal uses; need to use an internal unresolved...
-            // TODO: NEED FOR BOTH MID_DEF & NOT...
-            TV2 tv = new_unr.tvar();
-            old_funptr.tvar().unify(tv,false);
-            new_funptr.tvar().unify(tv,false);
-          }
+          //if( ((FunPtrNode)use)._env != null ) {
+          //  // Internal uses; need to use an internal unresolved...
+          //  // TODO: NEED FOR BOTH MID_DEF & NOT...
+          //  TV2 tv = new_unr.tvar();
+          //  old_funptr.tvar().unify(tv,false);
+          //  new_funptr.tvar().unify(tv,false);
+          //}
+          throw com.cliffc.aa.AA.unimpl("cloning a 'fresh' or 'notfresh'?  does it make a difference?");
         }
     } else {                           // Path split
       Node old_funptr = path_call.fdx(); // Find the funptr for the path split

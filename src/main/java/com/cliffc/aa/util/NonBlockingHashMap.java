@@ -98,7 +98,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
     catch( java.lang.NoSuchFieldException e ) { throw new RuntimeException(e); }
     _kvs_offset = _unsafe.objectFieldOffset(f);
   }
-  private final boolean CAS_kvs( final Object[] oldkvs, final Object[] newkvs ) {
+  private boolean CAS_kvs( final Object[] oldkvs, final Object[] newkvs ) {
     return _unsafe.compareAndSwapObject(this, _kvs_offset, oldkvs, newkvs );
   }
 
@@ -111,7 +111,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
 
   // --- hash ----------------------------------------------------------------
   // Helper function to spread lousy hashCodes
-  private static final int hash(final Object key) {
+  private static int hash( final Object key) {
     int h = key.hashCode();     // The real hashCode call
     h ^= (h>>>20) ^ (h>>>12);
     h ^= (h>>> 7) ^ (h>>> 4);
@@ -528,7 +528,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
     return (TypeV)V;
   }
 
-  private static final Object get_impl( final NonBlockingHashMap topmap, final Object[] kvs, final Object key ) {
+  private static Object get_impl( final NonBlockingHashMap topmap, final Object[] kvs, final Object key ) {
     final int fullhash= hash (key); // throws NullPointerException if key is null
     final int len     = len  (kvs); // Count of key/value pairs, reads kvs.length
     final CHM chm     = chm  (kvs); // The CHM, for a volatile read below; reads slot 0 of kvs
