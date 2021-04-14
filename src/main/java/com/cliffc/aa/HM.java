@@ -4,8 +4,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.*;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -56,7 +55,7 @@ public class HM {
     PRIMS.put("factor",T2.make_fun(flt64,T2.prim("divmod",flt64,flt64)));
 
     // Prep for SSA: pre-gather all the (unique) ids
-    int cnt_syns = prog.prep_tree(null,work);
+    int cnt_syns = prog.prep_tree(null,null,work);
     int init_T2s = T2.CNT;
 
     int cnt=0, DEBUG_CNT=-1;
@@ -80,7 +79,7 @@ public class HM {
     }
     assert prog.more_work(work);
 
-    //System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+cnt+", T2s: "+T2.CNT+", FREE T2s: "+T2.FREE);
+    //System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+cnt+", T2s: "+T2.CNT);
     return prog._t;
   }
   static void reset() { PRIMS.clear(); T2.reset(); }
@@ -99,9 +98,29 @@ public class HM {
     @Override public String toString() { return _ary.toString(); }
   }
 
+  // Small classic tree of T2s, immutable, with sharing at the root parts.
+  static class VStack implements Iterable<T2> {
+    final VStack _par;
+    final T2 _nongen;
+    VStack( VStack par, T2 nongen ) { _par=par; _nongen=nongen; }
+    @Override public String toString() { return str(new SB()).toString(); }
+    SB str(SB sb) {
+      _nongen.str(sb,new VBitSet(),new VBitSet());
+      if( _par!=null ) _par.str(sb.p(" >> "));
+      return sb;
+    }
+    @NotNull @Override public Iterator<T2> iterator() { return new Iter(); }
+    private class Iter implements Iterator<T2> {
+      private VStack _vstk;
+      Iter() { _vstk=VStack.this; }
+      @Override public boolean hasNext() { return _vstk!=null; }
+      @Override public T2 next() { T2 v = _vstk._nongen; _vstk = _vstk._par;  return v; }
+    }
+  }
 
   public static abstract class Syntax {
     Syntax _par;
+    VStack _nongen;             //
     T2 _t;                      // Current HM type
     T2 find() {                 // U-F find
       T2 t = _t.find();
@@ -116,9 +135,9 @@ public class HM {
     // - If 'work' is available, set a new HM in '_t' and update the worklist.
     abstract boolean hm(Worklist work);
 
-    abstract int prep_tree(Syntax par, Worklist work);
-    final void prep_tree_impl( Syntax par, T2 t, Worklist work ) { _par=par; _t=t; work.push(this); }
-    abstract boolean prep_lookup_deps(Ident id);
+    abstract int prep_tree(Syntax par, VStack nongen, Worklist work);
+    final void prep_tree_impl( Syntax par, VStack nongen, Worklist work, T2 t ) { _par=par; _t=t; _nongen = nongen; work.push(this); }
+    abstract void prep_lookup_deps(Ident id);
 
     abstract T2 lookup(String name); // Lookup name in scope & return type; TODO: pre-cache this.
 
@@ -153,8 +172,8 @@ public class HM {
     @Override boolean hm(Worklist work) { assert find().isa("Base"); return false; }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
     @Override void add_kids(Worklist work) { }
-    @Override int prep_tree( Syntax par, Worklist work ) { prep_tree_impl(par, T2.make_base(_con), work); return 1; }
-    @Override boolean prep_lookup_deps(Ident id) { throw unimpl("should not reach here"); }
+    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) { prep_tree_impl(par, nongen, work, T2.make_base(_con)); return 1; }
+    @Override void prep_lookup_deps(Ident id) { throw unimpl("should not reach here"); }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
   }
 
@@ -168,13 +187,13 @@ public class HM {
       // A boolean if name is from a Let._body (or PRIM) vs Let._def (or
       // Lambda).  Not helpful, as its only useful at the top-layer.
       // Structural unification requires the 'occurs check' at each internal
-      // layer, which can differ from the top-layer.      
+      // layer, which can differ from the top-layer.
       //boolean occurs_fresh = _par==null /*from prims*/ || _par.is_fresh(_name,this);
       T2 t = _par==null ? null : _par.lookup(_name); // Lookup in current env
       if( t==null ) t = PRIMS.get(_name);            // Lookup in prims
       if( t==null )
         throw new RuntimeException("Parse error, "+_name+" is undefined");
-      return t.fresh_unify(find(),_par,work);
+      return t.fresh_unify(find(),_nongen,work);
     }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
     @Override void add_kids(Worklist work) { }
@@ -184,14 +203,13 @@ public class HM {
       if( t.occurs_in(_par) )                        // Got captured in some parent?
         t.add_deps_work(work);                       // Need to revisit dependent ids
     }
-    @Override int prep_tree( Syntax par, Worklist work ) {
-      prep_tree_impl(par,T2.make_leaf(),work);
-      Syntax syn = _par;
-      while( syn!=null && !syn.prep_lookup_deps(this) )
-        syn = syn._par;
+    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
+      prep_tree_impl(par,nongen,work,T2.make_leaf());
+      for( Syntax syn = _par; syn!=null; syn = syn._par )
+        syn.prep_lookup_deps(this);
       return 1;
     }
-    @Override boolean prep_lookup_deps(Ident id) { throw unimpl("should not reach here"); }
+    @Override void prep_lookup_deps(Ident id) { throw unimpl("should not reach here"); }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
   }
 
@@ -223,12 +241,12 @@ public class HM {
     @Override void add_occurs(Worklist work) {
       if( targ().occurs_in_type(find()) ) work.addAll(_targ._deps);
     }
-    @Override int prep_tree( Syntax par, Worklist work ) {
-      prep_tree_impl(par,T2.make_leaf(),work);
-      return _body.prep_tree(this,work) + 1;
+    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
+      prep_tree_impl(par,nongen,work,T2.make_leaf());
+      return _body.prep_tree(this,new VStack(nongen,_targ),work) + 1;
     }
-    @Override boolean prep_lookup_deps(Ident id) {
-      return Util.eq(id._name,_arg0) && _targ.push_update(id);
+    @Override void prep_lookup_deps(Ident id) {
+      if( Util.eq(id._name,_arg0) ) _targ.push_update(id);
     }
     @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
@@ -269,13 +287,15 @@ public class HM {
       if( targ0().occurs_in_type(find()) ) work.addAll(_targ0._deps);
       if( targ1().occurs_in_type(find()) ) work.addAll(_targ1._deps);
     }
-    @Override int prep_tree( Syntax par, Worklist work ) {
-      prep_tree_impl(par,T2.make_leaf(),work);
-      return _body.prep_tree(this,work) + 1;
+    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
+      prep_tree_impl(par,nongen,work,T2.make_leaf());
+      VStack vs0 = new VStack(nongen,_targ0);
+      VStack vs1 = new VStack(vs0   ,_targ1);
+      return _body.prep_tree(this,vs1,work) + 1;
     }
-    @Override boolean prep_lookup_deps(Ident id) {
-      return (Util.eq(id._name,_arg0) && _targ0.push_update(id))
-        ||   (Util.eq(id._name,_arg1) && _targ1.push_update(id));
+    @Override void prep_lookup_deps(Ident id) {
+      if( Util.eq(id._name,_arg0) ) _targ0.push_update(id);
+      if( Util.eq(id._name,_arg1) ) _targ1.push_update(id);
     }
     @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
@@ -303,15 +323,15 @@ public class HM {
     @Override void add_occurs(Worklist work) {
       if( targ().occurs_in_type(find()) ) work.addAll(_targ._deps);
     }
-    @Override int prep_tree( Syntax par, Worklist work ) {
-      prep_tree_impl(par,_body._t,work);
-      int cnt = _body.prep_tree(this,work);
-      cnt +=    _def .prep_tree(this,work);
+    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
+      prep_tree_impl(par,nongen,work,_body._t);
+      int cnt = _body.prep_tree(this,           nongen       ,work) +
+                _def .prep_tree(this,new VStack(nongen,_targ),work);
       _t = _body._t;            // Unify 'Let._t' with the '_body'
       return cnt;
     }
-    @Override boolean prep_lookup_deps(Ident id) {
-      return Util.eq(id._name,_arg0) && _targ.push_update(id);
+    @Override void prep_lookup_deps(Ident id) {
+      if( Util.eq(id._name,_arg0) ) _targ.push_update(id);
     }
     @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
@@ -370,13 +390,13 @@ public class HM {
     }
     @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
     @Override void add_kids(Worklist work) { for( Syntax arg : _args ) work.push(arg); }
-    @Override int prep_tree(Syntax par,Worklist work) {
-      prep_tree_impl(par,T2.make_leaf(),work);
-      int cnt = _fun.prep_tree(this,work);
-      for( Syntax arg : _args ) cnt += arg.prep_tree(this,work);
+    @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
+      prep_tree_impl(par,nongen,work,T2.make_leaf());
+      int cnt = _fun.prep_tree(this,nongen,work);
+      for( Syntax arg : _args ) cnt += arg.prep_tree(this,nongen,work);
       return cnt;
     }
-    @Override boolean prep_lookup_deps(Ident id) { return false; }
+    @Override void prep_lookup_deps(Ident id) { }
     @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
       if( !_fun.more_work(work) ) return false;
@@ -392,7 +412,7 @@ public class HM {
   // simple concrete base type, or a sharable leaf.  Unify is structural, and
   // where not unifyable the union is replaced with an Error.
   public static class T2 {
-    private static int CNT=0, FREE=0;
+    private static int CNT=0;
     final int _uid;
 
     // A plain type variable starts with a 'V', and can unify directly.
@@ -407,7 +427,7 @@ public class HM {
     Type _con;
 
     // Dependent (non-local) tvars to revisit
-    Ary<Syntax> _deps;
+    Ary<Ident> _deps;
 
 
     static T2 make_fun(T2... args) { return new T2("->",null,args); }
@@ -415,10 +435,6 @@ public class HM {
     static T2 make_base(Type con) { return new T2("Base",con); }
     static T2 prim(String name, T2... args) { return new T2(name,null,args); }
     T2 copy() { return new T2(_name,_con,new T2[_args.length]); }
-    void free() {
-      FREE++;
-      // should recover _deps, _args, this
-    }
 
     private T2(@NotNull String name, Type con, T2 @NotNull ... args) {
       _uid = CNT++;
@@ -465,7 +481,7 @@ public class HM {
         // Merge update lists, for future unions
         if( that._deps==null && that.is_leaf() ) that._deps = _deps;
         else
-          for( Syntax dep : _deps ) that.push_update(dep);
+          for( Ident dep : _deps ) that.push_update(dep);
         _deps = null;
       }
       _args[0] = that;         // U-F update
@@ -544,10 +560,10 @@ public class HM {
     // Returns progress.
     // If work is null, we are testing only and make no changes.
     static private final HashMap<T2,T2> VARS = new HashMap<>();
-    boolean fresh_unify(T2 that, Syntax syn, Worklist work) {
+    boolean fresh_unify(T2 that, VStack nongen, Worklist work) {
       assert VARS.isEmpty() && DUPS.isEmpty();
       int old = CNT;
-      boolean progress = _fresh_unify(that,syn,work);
+      boolean progress = _fresh_unify(that,nongen,work);
       VARS.clear();  DUPS.clear();
       if( work==null && old!=CNT && DEBUG_LEAKS )
         throw unimpl("busted, made T2s but just testing");
@@ -555,7 +571,7 @@ public class HM {
     }
 
     // Outer recursive version, wraps a VARS check around other work
-    private boolean _fresh_unify(T2 that, Syntax syn, Worklist work) {
+    private boolean _fresh_unify(T2 that, VStack nongen, Worklist work) {
       assert no_uf() && that.no_uf();
       T2 prior = VARS.get(this);
       if( prior!=null )         // Been there, done that
@@ -565,11 +581,11 @@ public class HM {
       // Attempting to pre-compute occurs_in, by computing 'is_fresh' in the
       // Ident.hm() call does NOT work.  The 'is_fresh' is for the top-layer
       // only, not the internal layers.  As soon as we structural recurse down
-      // a layer, 'is_fresh' does not correlate with an occurs_in check.      
-      if( occurs_in(syn) ) return vput(that,_unify(that,work)); // Famous 'occurs-check', switch to normal unify
+      // a layer, 'is_fresh' does not correlate with an occurs_in check.
+      if( nongen_in(nongen) ) return vput(that,_unify(that,work)); // Famous 'occurs-check', switch to normal unify
       if( this.is_leaf() ) return vput(that,false); // Lazy map LHS tvar to RHS
       if( that.is_leaf() )             // RHS is a tvar; union with a deep copy of LHS
-        return work==null || vput(that,that.union(_fresh(syn),work));
+        return work==null || vput(that,that.union(_fresh(nongen),work));
       // Bases MEET cons in RHS
       if( is_base() && that.is_base() ) return vput(that,fresh_base(that,work));
 
@@ -580,7 +596,7 @@ public class HM {
       // Structural recursion unification, lazy on LHS
       boolean progress = vput(that,false); // Early set, to stop cycles
       for( int i=0; i<_args.length; i++ ) {
-        progress |= args(i)._fresh_unify(that.args(i),syn,work);
+        progress |= args(i)._fresh_unify(that.args(i),nongen,work);
         if( progress && work==null ) return true;
       }
       return progress;
@@ -589,21 +605,21 @@ public class HM {
     private boolean vput(T2 that, boolean progress) { VARS.put(this,that); return progress; }
 
     // Return a fresh copy of 'this'
-    private T2 _fresh(Syntax par) {
+    private T2 _fresh(VStack nongen) {
       assert no_uf();
       T2 rez = VARS.get(this);
       if( rez!=null ) return rez; // Been there, done that
 
       if( is_leaf() ) {
         // If occurs_in lexical scope, keep same variable, else make a new leaf
-        T2 t = occurs_in(par) ? this : T2.make_leaf();
+        T2 t = nongen_in(nongen) ? this : T2.make_leaf();
         VARS.put(this,t);
         return t;
       } else {                  // Structure is deep-replicated
         T2 t = copy();
         VARS.put(this,t);       // Stop cyclic structure looping
         for( int i=0; i<_args.length; i++ )
-          t._args[i] = args(i)._fresh(par);
+          t._args[i] = args(i)._fresh(nongen);
         return t;
       }
     }
@@ -640,6 +656,20 @@ public class HM {
       return false;
     }
 
+    boolean nongen_in(VStack syn) {
+      if( syn==null ) return false;
+      assert ODUPS.isEmpty();
+      boolean found = _nongen_in(syn);
+      ODUPS.clear();
+      return found;
+    }
+    boolean _nongen_in(VStack nongen) {
+      for( T2 t2 : nongen )
+        if( _occurs_in_type(t2.find()) )
+          return true;
+      return false;
+    }
+
     // Test for structural equivalence, including cycles
     static private final HashMap<T2,T2> CDUPS = new HashMap<>();
     boolean cycle_equals(T2 t) {
@@ -673,11 +703,11 @@ public class HM {
     // down the function parts; if any changes the fresh-application may make
     // progress.
     static final VBitSet UPDATE_VISIT  = new VBitSet();
-    boolean push_update(Syntax a) { assert UPDATE_VISIT.isEmpty(); push_update_impl(a); UPDATE_VISIT.clear(); return true; }
-    private void push_update_impl(Syntax a) {
+    boolean push_update(Ident a) { assert UPDATE_VISIT.isEmpty(); push_update_impl(a); UPDATE_VISIT.clear(); return true; }
+    private void push_update_impl(Ident a) {
       assert no_uf();
       if( is_leaf() || _args.length==0 ) {
-        if( _deps==null ) _deps = new Ary<>(Syntax.class);
+        if( _deps==null ) _deps = new Ary<>(Ident.class);
         if( _deps.find(a)==-1 ) _deps.push(a);
       } else {
         if( UPDATE_VISIT.tset(_uid) ) return;
