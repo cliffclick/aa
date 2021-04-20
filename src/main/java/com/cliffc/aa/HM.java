@@ -18,7 +18,7 @@ import static com.cliffc.aa.AA.unimpl;
 // concrete base type, or a sharable leaf.  Unify is structural, and where not
 // unifyable the union is replaced with an Error.
 
-// This version has a nice language parser.
+// Extend to records.
 
 public class HM {
   static final HashMap<String,T2> PRIMS = new HashMap<>();
@@ -77,7 +77,7 @@ public class HM {
         assert !DEBUG_LEAKS || oldcnt==T2.CNT;  // No-progress consumes no-new-T2s
       }
       // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
-      //assert prog.more_work(work);
+      assert prog.more_work(work);
       cnt++;
     }
     assert prog.more_work(work);
@@ -131,14 +131,39 @@ public class HM {
       return new Let(id,def,term());
     }
 
-    throw AA.unimpl();
+    // Structure
+    if( BUF[X]=='@' ) {
+      X++;
+      require('{',null);
+      Ary<String>  ids = new Ary<>(String.class);
+      Ary<Syntax> flds = new Ary<>(Syntax.class);
+      while( skipWS()!='}' && X < BUF.length ) {
+        String id = require('=',id());
+        Syntax fld = term();
+        if( fld==null ) throw AA.unimpl("Missing term for field "+id);
+        ids .push( id);
+        flds.push(fld);
+        if( skipWS()==',' ) X++;
+      }
+      return require('}',new Struct(ids.asAry(),flds.asAry()));
+    }
+
+    // Field lookup is prefix or backwards: ".x term"
+    if( BUF[X]=='.' ) {
+      X++;
+      return new Field(id(),term());
+    }
+
+    throw AA.unimpl("Unknown syntax");
   }
   private static final SB ID = new SB();
   private static String id() {
     ID.clear();
     while( X<BUF.length && isAlpha1(BUF[X]) )
       ID.p((char)BUF[X++]);
-    return ID.toString().intern();
+    String s = ID.toString().intern();
+    if( s.length()==0 ) throw AA.unimpl("Missing id");
+    return s;
   }
   private static Syntax number() {
     int sum=0;
@@ -419,7 +444,7 @@ public class HM {
       int cnt = _body.prep_tree(this,           nongen       ,work) +
                 _def .prep_tree(this,new VStack(nongen,_targ),work);
       _t = _body._t;            // Unify 'Let._t' with the '_body'
-      return cnt;
+      return cnt+1;
     }
     @Override void prep_lookup_deps(Ident id) {
       if( Util.eq(id._name,_arg0) ) _targ.push_update(id);
@@ -454,7 +479,6 @@ public class HM {
       //   _fun is not a function
       //   any arg-pair-unifies make progress
       //   this-unify-_fun.return makes progress
-
       T2 tfun = _fun.find();
       if( !tfun.is_fun() ) {
         if( work==null ) return true; // Will-progress & just-testing
@@ -483,7 +507,7 @@ public class HM {
     @Override void add_kids(Worklist work) { for( Syntax arg : _args ) work.push(arg); }
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
-      int cnt = _fun.prep_tree(this,nongen,work);
+      int cnt = 1+_fun.prep_tree(this,nongen,work);
       for( Syntax arg : _args ) cnt += arg.prep_tree(this,nongen,work);
       return cnt;
     }
@@ -493,6 +517,88 @@ public class HM {
       if( !_fun.more_work(work) ) return false;
       for( Syntax arg : _args ) if( !arg.more_work(work) ) return false;
       return true;
+    }
+  }
+
+  // Structure or Records.
+  static class Struct extends Syntax {
+    final String[]  _ids;
+    final Syntax[] _flds;
+    Struct( String[] ids, Syntax[] flds ) { _ids=ids; _flds=flds; }
+    @Override SB str(SB sb) {
+      sb.p("@{");
+      for( int i=0; i<_ids.length; i++ ) {
+        sb.p(' ').p(_ids[i]).p(" = ");
+        _flds[i].str(sb);
+        if( i < _ids.length-1 ) sb.p(',');
+      }
+      return sb.p("}");
+    }
+    @Override SB p1(SB sb) { return sb.p("@{ ... } "); }
+    @Override SB p2(SB sb, VBitSet dups) {
+      for( int i=0; i<_ids.length; i++ )
+        _flds[i].p0(sb.p(_ids[i]).p(" = "),dups);
+      return sb;
+    }
+    @Override boolean hm(Worklist work) {
+      // TODO: Check for progress before making new
+
+      // Make a new T2 for progress
+      T2[] t2s = new T2[_ids.length];
+      for( int i=0; i<_ids.length; i++ )
+        t2s[i] = _flds[i].find();
+      T2 tstruct = T2.make_struct(_ids,t2s);
+      return find().unify(tstruct,work);
+    }
+    @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
+    @Override void add_kids(Worklist work) { for( Syntax fld : _flds ) work.push(fld); }
+    @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
+      T2[] t2s = new T2[_ids.length];
+      prep_tree_impl(par, nongen, work, T2.make_struct(_ids,t2s));
+      int cnt = 1;              // One for self
+      for( int i=0; i<_flds.length; i++ ) { // Prep all sub-fields
+        cnt += _flds[i].prep_tree(this,nongen,work);
+        t2s[i] = _flds[i].find();
+      }
+      return cnt;
+    }
+    @Override void prep_lookup_deps(Ident id) { }
+    @Override boolean more_work(Worklist work) {
+      if( !more_work_impl(work) ) return false;
+      for( Syntax fld : _flds )
+        if( !fld.more_work(work) )
+          return false;
+      return true;
+    }
+  }
+
+  // Field lookup in a Struct
+  static class Field extends Syntax {
+    final String _id;
+    final Syntax _str;
+    Field( String id, Syntax str ) { _id=id; _str=str; }
+    @Override SB str(SB sb) { return _str.str(sb.p(".").p(_id).p(' ')); }
+    @Override SB p1 (SB sb) { return sb.p(".").p(_id); }
+    @Override SB p2(SB sb, VBitSet dups) { return _str.p0(sb,dups); }
+    @Override boolean hm(Worklist work) {
+      T2 str = _str.find();
+      int idx = str._ids==null ? -1 : Util.find(str._ids,_id);
+      if( idx==-1 )             // Not a struct or no field, force it to be one
+        return work == null || T2.make_struct(new String[]{_id}, new T2[]{_str.find()}).unify(str, work);
+
+      // Unify the field
+      return str.args(idx).unify(find(),work);
+    }
+    @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
+    @Override void add_kids(Worklist work) { work.push(_str); }
+    @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
+      prep_tree_impl(par, nongen, work, T2.make_leaf());
+      return _str.prep_tree(this,nongen,work)+1;
+    }
+    @Override void prep_lookup_deps(Ident id) { }
+    @Override boolean more_work(Worklist work) {
+      if( !more_work_impl(work) ) return false;
+      return _str.more_work(work);
     }
   }
 
@@ -517,20 +623,25 @@ public class HM {
     // Base types carry a concrete Type
     Type _con;
 
+    // Structs have field names
+    final String[] _ids;
+
     // Dependent (non-local) tvars to revisit
     Ary<Ident> _deps;
 
 
-    static T2 make_fun(T2... args) { return new T2("->",null,args); }
-    static T2 make_leaf() { return new T2("V"+CNT,null,new T2[1]); }
-    static T2 make_base(Type con) { return new T2("Base",con); }
-    static T2 prim(String name, T2... args) { return new T2(name,null,args); }
-    T2 copy() { return new T2(_name,_con,new T2[_args.length]); }
+    static T2 make_fun(T2... args) { return new T2("->",null,null,args); }
+    static T2 make_leaf() { return new T2("V"+CNT,null,null,new T2[1]); }
+    static T2 make_base(Type con) { return new T2("Base",con,null); }
+    static T2 make_struct(String[] ids, T2[] flds) { return new T2("@{}",null,ids,flds); }
+    static T2 prim(String name, T2... args) { return new T2(name,null,null,args); }
+    T2 copy() { return new T2(_name,_con,_ids,new T2[_args.length]); }
 
-    private T2(@NotNull String name, Type con, T2 @NotNull ... args) {
+    private T2(@NotNull String name, Type con, String[] ids, T2 @NotNull ... args) {
       _uid = CNT++;
       _name= name;
       _con = con;
+      _ids = ids;
       _args= args;
     }
 
@@ -540,6 +651,7 @@ public class HM {
     boolean isa(String name) { return Util.eq(_name,name); }
     boolean is_base() { return isa("Base") && _con!=null; }
     boolean is_fun () { return isa("->"); }
+    boolean is_struct() { return isa("@{}"); }
 
     // U-F find
     T2 find() {
@@ -609,7 +721,7 @@ public class HM {
       if( !Util.eq(_name,that._name) )
         throw new RuntimeException("Cannot unify "+this+" and "+that);
       assert _args!=that._args; // Not expecting to share _args and not 'this'
-      if( _args.length != that._args.length )
+      if( !is_struct() && _args.length != that._args.length )
         throw new RuntimeException("Cannot unify "+this+" and "+that);
 
       // Cycle check
@@ -620,10 +732,28 @@ public class HM {
       DUPS.put(luid,that);          // Close cycles
 
       // Structural recursion unification.
+      // Structs unify only on matching fields, and add missing fields.
       boolean progress=false;
-      for( int i=0; i<_args.length; i++ ) {
-        progress |= args(i)._unify(that.args(i),work);
-        if( progress && work!=null ) return true;
+      if( is_struct() ) {
+        // For all fields in LHS
+        for( int i=0; i<_ids.length; i++ ) {
+          int idx = Util.find(that._ids,_ids[i]);
+          if( idx==-1 ) throw AA.unimpl();
+          else progress |= args(i)._unify(that.args(idx),work);
+          if( progress && work!=null ) return true;
+        }
+        // For all fields in RHS not in LHS
+        for( int i=0; i<that._ids.length; i++ ) {
+          int idx = Util.find(_ids,that._ids[i]);
+          if( idx== -1 ) throw AA.unimpl();
+          if( progress && work!=null ) return true;
+        }
+        
+      } else {
+        for( int i=0; i<_args.length; i++ ) {
+          progress |= args(i)._unify(that.args(i),work);
+          if( progress && work!=null ) return true;
+        }
       }
       return progress;
     }
@@ -681,8 +811,9 @@ public class HM {
       if( is_base() && that.is_base() ) return vput(that,fresh_base(that,work));
 
       if( !Util.eq(_name,that._name) ||
-          _args.length != that._args.length )
+          (!is_struct() && _args.length != that._args.length) )
         throw new RuntimeException("Cannot unify "+this+" and "+that);
+      if( is_struct() ) throw AA.unimpl();
 
       // Structural recursion unification, lazy on LHS
       boolean progress = vput(that,false); // Early set, to stop cycles
@@ -845,12 +976,22 @@ public class HM {
       if( visit.tset(_uid) && dup ) return sb;
       if( dup ) sb.p(':');
 
+      // Special printing for functions
       if( is_fun() ) {
         sb.p("{ ");
         for( int i=0; i<_args.length-1; i++ )
           str(sb,visit,_args[i],dups).p(" ");
         return str(sb.p("-> "),visit,_args[_args.length-1],dups).p(" }");
       }
+
+      // Special printing for structures
+      if( is_struct() ) {
+        sb.p("@{");
+        for( int i=0; i<_ids.length; i++ )
+          str(sb.p(' ').p(_ids[i]).p(" = "),visit,_args[i],dups).p(',');
+        return sb.unchar().p("}");
+      }
+
       // Generic structural T2
       sb.p("(").p(_name).p(" ");
       for( T2 t : _args ) str(sb,visit,t,dups).p(" ");
@@ -869,12 +1010,23 @@ public class HM {
       if( dup ) sb.p('$').p(_uid);
       if( visit.tset(_uid) && dup ) return sb;
       if( dup ) sb.p(':');
+
+      // Special printing for functions
       if( is_fun() ) {
         sb.p("{ ");
         for( int i=0; i<_args.length-1; i++ )
           args(i)._p(sb,visit,dups).p(" ");
         return args(_args.length-1)._p(sb.p("-> "),visit,dups).p(" }");
       }
+
+      // Special printing for structures
+      if( is_struct() ) {
+        sb.p("@{");
+        for( int i=0; i<_ids.length; i++ )
+          str(sb.p(' ').p(_ids[i]).p(" = "),visit,args(i),dups).p(',');
+        return sb.unchar().p("}");
+      }
+
       // Generic structural T2
       sb.p("(").p(_name).p(" ");
       for( int i=0; i<_args.length; i++ ) args(i)._p(sb,visit,dups).p(" ");

@@ -1,15 +1,21 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.type.*;
 import org.junit.Before;
 import org.junit.Test;
 
-import static com.cliffc.aa.HM.*;
+import static com.cliffc.aa.HM.T2;
 import static org.junit.Assert.assertEquals;
 
 public class TestHM {
 
   @Before public void reset() { HM.reset(); }
+
+  @Test
+  public void test27() {
+    T2 t = HM.hm("{ g -> @{x =g, y =g}}");
+    assertEquals("{ V19 -> @{ x = V19, y = V19} }",t.p());
+  }
+
 
   @Test(expected = RuntimeException.class)
   public void test00() {
@@ -18,7 +24,6 @@ public class TestHM {
 
   @Test
   public void test01() {
-    Syntax syn = new Con(TypeInt.con(3));
     T2 t = HM.hm("3");
     assertEquals("3",t.p());
   }
@@ -211,7 +216,27 @@ public class TestHM {
                   "      (pair (fgz 3) (fgz 5))"+
                   "}"
                   );
-    assertEquals("{ { nint8 -> V44 } -> (pair V44 V44) }",t1.p());
+    assertEquals("{ { nint8 -> V33 } -> (pair V33 V33) }",t1.p());
+  }
+
+  // Basic structure test
+  @Test
+  public void test24() {
+    T2 t = HM.hm("@{x =2, y =3}");
+    assertEquals("@{ x = 2, y = 3}",t.p());
+  }
+
+  // Basic field test
+  @Test
+  public void test25() {
+    T2 t = HM.hm(".x @{x =2, y =3}");
+    assertEquals("2",t.p());
+  }
+
+  @Test
+  public void test26() {
+    T2 t = HM.hm("{ g -> @{x =g, y =g}}");
+    assertEquals("{ V19 -> @{ x = V19, y = V19} }",t.p());
   }
 
 }
