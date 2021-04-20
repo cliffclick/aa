@@ -66,6 +66,10 @@ public final class CallEpiNode extends Node {
       }
     }
 
+    // See if we can wire any new fidxs directly between Call/Fun and Ret/CallEpi.
+    // This *adds* edges, but enables a lot of shrinking via inlining.
+    if( check_and_wire() ) return this;
+    
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.
     if( nwired()==1 && fidxs.abit() != -1 ) { // Wired to 1 target
@@ -170,12 +174,6 @@ public final class CallEpiNode extends Node {
     }
 
     return null;
-  }
-
-  // See if we can wire any new fidxs directly between Call/Fun and Ret/CallEpi
-  @Override public Node ideal_mono() {
-    if( _is_copy ) return null; // A copy
-    return check_and_wire() ? this : null;
   }
 
   // Used during GCP and Ideal calls to see if wiring is possible.

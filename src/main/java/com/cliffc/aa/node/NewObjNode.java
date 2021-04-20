@@ -33,10 +33,9 @@ public class NewObjNode extends NewNode<TypeStruct> {
   }
   public Node get(String name) { int idx = _ts.find(name);  assert idx >= 0; return fld(idx); }
   public boolean exists(String name) { return _ts.find(name)!=-1; }
-  public boolean is_mutable(String name) {
-    byte fmod = _ts.fmod(_ts.find(name));
-    return fmod == TypeStruct.FRW;
-  }
+  public boolean is_mutable(String name) { return mutable(name)==TypeStruct.FRW; }
+  public byte mutable(String name) { return _ts.fmod(_ts.find(name)); }
+  
   // Called when folding a Named Constructor into this allocation site
   void set_name( TypeStruct name ) { assert !name.above_center();  setsm(name); }
 

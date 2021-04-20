@@ -55,7 +55,8 @@ public final class SB {
   //     sb.p(foo).p(',');
   //   sb.unchar().p(']');  // remove extra trailing comma
   //
-  public SB unchar() { _sb.setLength(_sb.length()-1); return this; }
+  public SB unchar() { return unchar(1); }
+  public SB unchar(int x) { _sb.setLength(_sb.length()-x); return this; }
   
   @Override public String toString() { return _sb.toString(); }
 }

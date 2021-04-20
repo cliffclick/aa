@@ -3,6 +3,8 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.util.*;
+
 import java.util.HashSet;
 
 public class Env implements AutoCloseable {
@@ -25,23 +27,23 @@ public class Env implements AutoCloseable {
   public static BitsAlias LEX_DISPLAYS = BitsAlias.EMPTY;
 
 
-  final public Env _par;        // Parent environment
+  final public Env _par;         // Parent environment
   public final ScopeNode _scope; // Lexical anchor; "end of display"; goes when this environment leaves scope
-  Parse _P;                      // Used to get debug info
+  public VStack _nongen;         // Hindley-Milner "non-generative" variable set; current/pending defs
 
   // Top-level Env.  Contains, e.g. the primitives.
   // Above any file-scope level Env.
   private Env(  ) {
     _par = null;
-    _P = null;
+    _nongen = null;
     _scope = init(CTL_0,XNIL,MEM_0,Type.XNIL,null,true);
   }
 
   // A file-level Env, or below.  Contains user written code.
   Env( Env par, Parse P, boolean is_closure, Node ctrl, Node mem ) {
     GVN._opt_mode=GVNGCM.Mode.Parse;
-    _P = P;
     _par = par;
+    _nongen = new VStack(par._nongen);
     ScopeNode s = par._scope;   // Parent scope
     _scope = init(ctrl,s.ptr(),mem,s.stk()._tptr,P==null ? null : P.errMsg(),is_closure);
   }
@@ -131,7 +133,6 @@ public class Env implements AutoCloseable {
 
   // Close the current Env and lexical scope.
   @Override public void close() {
-    if( _P != null ) { _scope._debug_close = _P.errMsg(); _P = null; }
     ScopeNode pscope = _par._scope;
     // Promote forward refs to the next outer scope
     if( pscope != null && _par._par != null )
@@ -198,7 +199,7 @@ public class Env implements AutoCloseable {
       UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(name.substring(0,i).intern());
       if( n != null ) {         // First name found will return
         if( nargs == 0 )        // Require a balanced-op
-          return n.op_prec()==0 ? n.fresh(this) : null;
+          return n.op_prec()==0 ? n.fresh(_nongen) : null;
         return n.filter_fresh(this,nargs);
       }
     }
@@ -230,6 +231,52 @@ public class Env implements AutoCloseable {
       e = e._par;
     }
     return tvars;
+  }
+
+  // Small classic tree of TV2s, immutable, with sharing at the root parts.
+  // Used to track the lexical scopes of vars, to allow for the H-M 'occurs_in'
+  // check.  This stack sub-sequences the main Env._scope stack, having splits
+  // for every unrelated set of mutually-self-recursive definitions.  This is
+  // typically just a single variable, currently being defined.
+  public static class VStack {
+    public final VStack _par;          // Parent
+    public final Ary<String> _flds;    // Field names, unique per-Scope
+    public final Ary<TV2> _tvars;      // Type variable, set at first reference (forward-ref or not)
+    VStack( VStack par ) { _par=par; _flds = new Ary<>(new String[1],0); _tvars = new Ary<>(new TV2[1],0); }
+    void push(String fld, TV2 tv) { _flds.push(fld); _tvars.push(tv); }
+    //void pop( String fld ) {
+    //  int i = _flds.find(fld);
+    //  _flds.del(i);
+    //  _tvars.del(i);
+    //}
+
+    boolean has_refs() { return _flds._len!=0; }
+
+    @Override public String toString() {
+      // These types get large & complex; find all the dups up-front to allow
+      // for prettier printing.  Uses '$A' style for repeats.
+      NonBlockingHashMapLong<String> dups = new NonBlockingHashMapLong<>();
+      VBitSet bs = new VBitSet();
+      for( VStack vs = this; vs!=null ; vs=vs._par )
+        for( TV2 tv2 : vs._tvars )
+          if( tv2 != null ) tv2.find_dups(bs,dups,0);
+
+      // Print stack of types, grouped by depth
+      bs.clr();
+      SB sb = new SB().p("[");
+      for( VStack vs = this; vs!=null ; vs=vs._par ) {
+        for( int i=0; i<vs._tvars._len; i++ ) {
+          sb.p(vs._flds.at(i)).p('=');
+          TV2 tv2 = vs._tvars.at(i);
+          if( tv2 !=null ) tv2.str(sb,bs,dups,false);
+          sb.p(", ");
+        }
+        if( vs._tvars._len>0 ) sb.unchar(2);
+        sb.p(" >> ");
+      }
+      if( _par!=null ) sb.unchar(4);
+      return sb.p("]").toString();
+    }
   }
 
 }

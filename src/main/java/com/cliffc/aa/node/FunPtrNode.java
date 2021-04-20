@@ -8,7 +8,6 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMap;
 
 import static com.cliffc.aa.AA.ARG_IDX;
-import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.Env.GVN;
 
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
@@ -17,7 +16,7 @@ import static com.cliffc.aa.Env.GVN;
 public final class FunPtrNode extends UnOrFunPtrNode {
   public String _name;          // Optional for debug only
   private ErrMsg _referr;       // Forward-ref error, cleared after defining
-  final Env _env;               // Not-null means "fresh"
+  final Env.VStack _vs;         // Not-null means "fresh"
 
   // Every var use that results in a function, so actually only these FunPtrs,
   // needs to make a "fresh" copy before unification.  "Fresh" makes a
@@ -26,14 +25,18 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   // interesting thing is when an out-of-scope TVar uses the same TVar
   // internally in different parts - the copy replicates this structure.  When
   // unified, it forces equivalence in the same places.
-  public  FunPtrNode( String name, RetNode ret, Env env ) { this(name,null,ret,env==null ? Node.con(TypeMemPtr.NO_DISP) : env._scope.ptr(),env); }
+  public  FunPtrNode( String name, RetNode ret, Env env ) {
+    this(name,null,ret,
+         env==null ? Node.con(TypeMemPtr.NO_DISP) : env._scope.ptr(),
+         env==null ? null : env._nongen);
+  }
   public  FunPtrNode( RetNode ret, Node display ) { this(null,null,ret,display,null); }
   // For forward-refs only; super weak display & function.
-  private FunPtrNode( String name, ErrMsg referr, RetNode ret, Node display, Env env ) {
+  private FunPtrNode( String name, ErrMsg referr, RetNode ret, Node display, Env.VStack vs ) {
     super(OP_FUNPTR,ret,display);
     _name = name;
     _referr = referr;
-    _env = env;
+    _vs = vs;
   }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }
@@ -41,13 +44,13 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   public FunNode xfun() { RetNode ret = ret(); return ret.in(4) instanceof FunNode ? ret.fun() : null; }
   @Override public int nargs() { return ret()._nargs; }
   @Override public FunPtrNode funptr() { return this; }
-  @Override public boolean is_fresh() { return _env!=null; }
+  @Override public boolean is_fresh() { return _vs!=null; }
   // Self short name
   @Override public String xstr() {
     if( is_dead() || _defs._len==0 ) return "*fun";
     int fidx = ret()._fidx;    // Reliably returns a fidx
     FunNode fun = FunNode.find_fidx(fidx);
-    return (_env!=null ? "@" : "*")+(fun==null ? ""+fidx : fun.name());
+    return (_vs!=null ? "@" : "*")+(fun==null ? ""+fidx : fun.name());
   }
   // Inline longer name
   @Override String str() {
@@ -151,13 +154,13 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   @Override public FunPtrNode filter_fresh( Env env, int nargs ) {
     // User-nargs are user-visible #arguments.
     // Fun-nargs include ctrl, memory & the display, hence the +3.
-    return nargs() == ARG_IDX+nargs ? fresh(env) : null;
+    return nargs() == ARG_IDX+nargs ? fresh(env._nongen) : null;
   }
 
   // Always return a FRESH copy, as-if HM.Ident primitive lookup.
-  @Override public FunPtrNode fresh(Env env ) {
-    FunPtrNode fptr = new FunPtrNode(_name,_referr,ret(),display(),env);
-    tvar().fresh_unify(fptr.tvar(),env,false); // Make a fresh copy of the type var
+  @Override public FunPtrNode fresh( Env.VStack vs ) {
+    FunPtrNode fptr = new FunPtrNode(_name,_referr,ret(),display(),vs);
+    tvar().fresh_unify(fptr.tvar(),vs,false); // Make a fresh copy of the type var
     fptr.xval();
     return fptr;
   }
@@ -190,7 +193,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     gvn.add_flow(ret);
     // Display is limited to any one of the current lexical scopes.
     TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS,TypeObj.ISUSED);
-    return new FunPtrNode( name, ErrMsg.forward_ref(unkref,name),ret,Node.con(tdisp),null);
+    return new FunPtrNode( name, ErrMsg.forward_ref(unkref,name),ret,Node.con(tdisp),e._nongen);
   }
 
   // True if this is a forward_ref
@@ -205,8 +208,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.ALL_CTRL; // Forward ref has no callers
     assert dfun._defs._len==2 && dfun.in(0)==null;
     assert def ._uses._len==0;  // Def is brand new, no uses
-    assert _env!=null && def._env==null;
-    ProjNode mrg = ProjNode.proj(dsp,MEM_IDX);
+    assert _vs!=null && def._vs==null;
 
     // Make a function pointer based on the original forward-ref fidx, but with
     // the known types.
@@ -238,13 +240,13 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     Env.GVN.iter(GVNGCM.Mode.Parse);
   }
 
-  @Override public int hashCode() { return super.hashCode()+(_env==null ? 0 : _env._scope.hashCode()); }
+  @Override public int hashCode() { return super.hashCode()+(_vs==null ? 0 : 1); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
     if( !(o instanceof FunPtrNode) ) return false;
     FunPtrNode fptr = (FunPtrNode)o;
-    return _env==null && fptr._env==null; // Unequal if either is FRESH, need to keep the TVARs from unifying
+    return _vs==null && fptr._vs==null; // Unequal if either is FRESH, need to keep the TVARs from unifying
   }
 
   @Override public ErrMsg err( boolean fast ) { return is_forward_ref() ? _referr : null; }

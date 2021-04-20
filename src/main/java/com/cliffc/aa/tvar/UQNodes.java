@@ -49,7 +49,7 @@ public class UQNodes extends NonBlockingHashMapLong<Node> {
     // See if all of smaller is in larger
     boolean progress=false;
     for( Node n : uq0.values() )
-      if( !n.is_dead() && !uq1.containsKey(n._uid) )
+      if( !n.is_dead() && uq1.get(n._uid)!=n )
         { progress = true; break; }
     if( !progress ) return uq1;
 
@@ -62,8 +62,8 @@ public class UQNodes extends NonBlockingHashMapLong<Node> {
 
   private void setHash() {
     long hash=0;
-    for( long key : keySetLong() )
-      hash = hash^key;
+    for( Node n : values() )
+      hash = hash^System.identityHashCode(n);
     if( hash==0 ) hash=1;
     _hash = (int)hash;
   }
@@ -74,8 +74,8 @@ public class UQNodes extends NonBlockingHashMapLong<Node> {
     assert _hash!=0 && uq._hash!=0;
     if( _hash!=uq._hash ) return false;
     if( size() != uq.size() ) return false;
-    for( long key : keySetLong() )
-      if( !uq.containsKey(key) )
+    for( Node n : values() )
+      if( n!=uq.get(n._uid) )
         return false;
     return true;
   }

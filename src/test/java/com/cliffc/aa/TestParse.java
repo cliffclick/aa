@@ -14,16 +14,17 @@ import static org.junit.Assert.*;
 
 public class TestParse {
   private static final String[] FLDS = new String[]{"^","n","v"};
-  private static final BitsFun TEST_FUNBITS = BitsFun.make0(46);
+  private static final BitsFun TEST_FUNBITS = BitsFun.make0(44);
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
-    test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
-    
+
     // Straight from TestHM.test08; types as {A -> (A,A)}
-    test("{ g -> f={x -> g}; (f 3,f 1)}", TypeFunPtr.make(TEST_FUNBITS,3,tdisp));
+  test("fun={ g -> f={x -> g}; (f 3,f 1)}; (99,fun \"abc\",fun 3.14)", TypeFunPtr.make(TEST_FUNBITS,3,tdisp));
+
+    test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
 
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
@@ -220,14 +221,6 @@ public class TestParse {
 
     // Anonymous function definition
     test_isa("{x y -> x+y}", TypeFunPtr.make(TEST_FUNBITS,3,tdisp)); // {Scalar Scalar -> Scalar}
-
-    // ID in different contexts; in general requires a new TypeVar per use; for
-    // such a small function it is always inlined completely, has the same effect.
-    test_prim("id", "id");
-    test("id(1)",TypeInt.con(1));
-    test("id(3.14)",TypeFlt.con(3.14));
-    test_prim("id({+})","+");
-    test("id({+})(id(1),id(math_pi))",TypeFlt.make(0,64,Math.PI+1));
 
     // Function execution and result typing
     test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2)); // trivially inlined; capture external variable
@@ -485,11 +478,6 @@ public class TestParse {
     test_obj_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
                  "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
                  TypeStruct.make(TypeStruct.ts(Type.XNIL,TypeMemPtr.STRUCT0,TypeFlt.FLT64/*TypeFlt.con(20.25)*/)));
-
-    // TODO: Need real TypeVars for these
-    //test("id:{A->A}"    , Env.lookup_valtype("id"));
-    //test("id:{A:int->A}", Env.lookup_valtype("id"));
-    //test("id:{int->int}", Env.lookup_valtype("id"));
   }
 
 
@@ -734,20 +722,27 @@ public class TestParse {
     // ary.{e -> f(e)}.{e0 e1 -> f(e0,e1) } // map/reduce over array elements
   }
 
+
   // Parametric polymorphism
   @Ignore
   @Test public void testParse15() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
-    test_ptr("noinline_map={lst fcn -> lst ? fcn lst.1};"+
-             "in_int=(0,2);"+       // List of ints
-             "in_str=(0,\"abc\");"+ // List of strings
-             "out_str =noinline_map(in_int,str:{int->str});"+        // Map over ints with int->str  conversion, returning a list of strings
-             "out_bool=noinline_map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
-             "(out_str,out_bool)",
-             "(*\"2\",int1)");
+
+    // Straight from TestHM.test08; types as {A -> (A,A)}.
+    // Function is never called, so returns the uncalled-function type.
+    test("{ g -> f={x -> g}; (f 3,f 1)}", TypeFunPtr.make(TEST_FUNBITS,ARG_IDX+1,Type.ANY));
+    test("fun={ g -> f={x -> g}; (f 3,f 1)}", TypeFunPtr.make(TEST_FUNBITS,3,tdisp));
+    // Called with different typevars A
+    test("fun={ g -> f={x -> g}; (f 3,f 1)}; (fun \"abc\",fun 3.14)", TypeFunPtr.make(TEST_FUNBITS,3,tdisp));
 
 
+    // ID in different contexts; in general requires a new TypeVar per use; for
+    // such a small function it is always inlined completely, has the same effect.
+    test("id={x->x};id(1)",TypeInt.con(1));
+    test("{x->x}(3.14)",TypeFlt.con(3.14));
+    test_prim("{x->x}({+})","+");
+    test("id={x->x};id({+})(id(1),id(math_pi))",TypeFlt.make(0,64,Math.PI+1));
 
     // recursive unification.  Trivially types as a dead fcn ptr.
     test_isa("x={x -> x x}",TypeFunPtr.make(BitsFun.make0(46),3,tdisp));

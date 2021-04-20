@@ -105,7 +105,7 @@ public class UnresolvedNode extends UnOrFunPtrNode {
       // User-nargs are user-visible #arguments.
       // Fun-nargs include the ctrl, display & memory, hence the +2.
       if( fptr.nargs() != ARG_IDX+nargs ) continue;
-      FunPtrNode ffptr = fptr.fresh(env); // Make a FRESH copy
+      FunPtrNode ffptr = fptr.fresh(env._nongen); // Make a FRESH copy
       if( x == null ) x = ffptr.keep();
       else if( x instanceof UnresolvedNode ) ((UnresolvedNode)x).add_def_unresolved(ffptr);
       else x = new UnresolvedNode(_bad,x.unkeep(),ffptr).keep();
@@ -115,10 +115,10 @@ public class UnresolvedNode extends UnOrFunPtrNode {
   }
 
   // Make a FRESH copy
-  @Override public UnresolvedNode fresh(Env env) {
+  @Override public UnresolvedNode fresh(Env.VStack vs) {
     UnresolvedNode unr = new UnresolvedNode(_bad).keep();
     for( Node fptr : _defs )
-      unr.add_def_unresolved(((FunPtrNode)fptr).fresh(env));
+      unr.add_def_unresolved(((FunPtrNode)fptr).fresh(vs));
     unr._val = unr.unkeep().value(GVNGCM.Mode.PesiNoCG);
     return unr;
   }

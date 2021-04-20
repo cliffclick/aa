@@ -255,9 +255,9 @@ public class Parse implements Comparable<Parse> {
   }
 
   /** A statement is a list of variables to final-assign or re-assign, and an
-   *  ifex for the value.  The variables must not be forward refs and are
-   *  available in all later statements.  Final-assigned variables can never be
-   *  assigned again.
+   *  ifex for the value.  The variables are available in all later statements.
+   *  Final-assigned variables can never be assigned again.  Forward references
+   *  must be defined in the same scope (or deeper) as the outermost pending def.
    *
    *  stmt = [id[:type] [:]=]* ifex
    *  stmt = id     // Implicit variable creation with nil
@@ -270,7 +270,6 @@ public class Parse implements Comparable<Parse> {
    *
    *  The ':=' is the re-assignment token, no spaces allowed.
    */
-  private Node stmt() { return stmt(false); }
   private Node stmt(boolean lookup_current_scope_only) {
     if( peek('^') ) {           // Early function exit
       Node ifex = ifex();
@@ -287,6 +286,7 @@ public class Parse implements Comparable<Parse> {
     Ary<Parse > badts= new Ary<>(new Parse [1],0);
     BitSet rs = new BitSet();
     boolean default_nil = false;
+    _e._nongen = new Env.VStack(_e._nongen); // Push a H-M let-style micro-scope
     while( true ) {
       skipWS();
       int oldx = _x;            // Unwind token parse point
@@ -306,7 +306,7 @@ public class Parse implements Comparable<Parse> {
       if( peek(":=") ) _x=oldx2; // Avoid confusion with typed assignment test
       else if( peek(':') && (t=type())==null ) { // Check for typed assignment
         if( scope().test_if() ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
-        else                      err_ctrl0("Missing type after ':'");
+        else err_ctrl0("Missing type after ':'");
       }
       if( peek(":=") ) rs.set(toks._len);              // Re-assignment parse
       else if( !peek_not('=','=') ) {                  // Not any assignment
@@ -320,7 +320,17 @@ public class Parse implements Comparable<Parse> {
           break;     // Done parsing assignment tokens
         }
       }
-      toks .add(tok.intern());
+
+      // If newly defining the value in *this* scope, insert a
+      // forward-reference to cover the case of (mutual) recursion.
+      ScopeNode scope = lookup_scope(tok=tok.intern(),lookup_current_scope_only);
+      if( scope==null ) {       // Token not already bound at any scope
+        Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,this,_e));
+        _e._scope.stk().create(tok,fref,TypeStruct.FBOT);
+        _e._nongen.push(tok,fref.tvar());
+      }
+
+      toks .add(tok);
       ts   .add(t  );
       badfs.add(badf);
       badts.add(badt);
@@ -329,13 +339,15 @@ public class Parse implements Comparable<Parse> {
     // Normal statement value parse
     Node ifex = default_nil ? Env.XNIL : ifex(); // Parse an expression for the statement value
     if( ifex == null ) {        // No statement?
-      if( toks._len == 0 ) return  null;
+      if( toks._len == 0 )
+        { _e._nongen = _e._nongen._par; return null; }
       ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
     }
     // Honor all type requests, all at once, by inserting type checks on the ifex.
     for( int i=0; i<ts._len; i++ )
       ifex = typechk(ifex,ts.at(i),mem(),badts.at(i));
     ifex.keep();
+
     // Assign tokens to value
     for( int i=0; i<toks._len; i++ ) {
       String tok = toks.at(i);               // Token being assigned
@@ -343,27 +355,32 @@ public class Parse implements Comparable<Parse> {
       // Find scope for token.  If not defining struct fields, look for any
       // prior def.  If defining a struct, tokens define a new field in this scope.
       ScopeNode scope = lookup_scope(tok,lookup_current_scope_only);
-      if( scope==null ) {                    // Token not already bound at any scope
-        if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
-          ((FunPtrNode)ifex).bind(tok); // Debug only: give name to function
-        create(tok,Env.XNIL,TypeStruct.FRW);  // Create at top of scope as undefined
-        scope = scope();                // Scope is the current one
-        scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
-      }
+
       // Handle re-assignments and forward referenced function definitions.
+      // All local-defs start as mutable forward-refs, and get flipped to
+      // immutable if actually used as a forward-ref.
       Node n = scope.stk().get(tok); // Get prior direct binding
-      if( n.is_forward_ref() ) { // Prior is actually a forward-ref, so this is the def
-        assert !scope.stk().is_mutable(tok) && scope == scope();
-        if( ifex instanceof FunPtrNode )
-          ((FunPtrNode)n).merge_ref_def(tok,(FunPtrNode)ifex,scope.stk());
-        else ; // Can be here if already in-error
+      if( n.is_forward_ref() ) {     // Prior is a f-ref
+        if( scope.stk().mutable(tok) == TypeStruct.FBOT ) { // Mutable f-ref is just a 1st-time def
+          scope.stk().update(tok,mutable,ifex);
+        } else {         // Prior is actually a forward-ref, so this is the def
+          assert mutable==TypeStruct.FFNL && scope == scope();
+          if( ifex instanceof FunPtrNode )
+            ((FunPtrNode)n).merge_ref_def(tok,(FunPtrNode)ifex,scope.stk());
+          else ; // Can be here if already in-error
+          throw com.cliffc.aa.AA.unimpl("unwind non-gen set");
+        }
+
       } else { // Store into scope/NewObjNode/display
-        // Assign into display
+
+        // Assign into display, changing an existing def
         Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
         set_mem(gvn(new StoreNode(mem(),ptr,ifex,mutable,tok,badfs.at(i))));
         scope.def_if(tok,mutable,false); // Note 1-side-of-if update
       }
     }
+
+    _e._nongen = _e._nongen._par; // Pop a H-M let-style microscope
     return ifex.unkeep();
   }
 
@@ -381,7 +398,7 @@ public class Parse implements Comparable<Parse> {
     Node ifex = init(new IfNode(ctrl(),expr));
     set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch
     Node old_mem = mem().keep();          // Keep until parse false-side
-    Node tex = stmt();                    // Parse true expression
+    Node tex = stmt(false);               // Parse true expression
     if( tex == null ) tex = err_ctrl2("missing expr after '?'");
     tex.keep();                    // Keep until merge point
     Node t_ctrl= ctrl().keep();    // Keep until merge point
@@ -392,7 +409,7 @@ public class Parse implements Comparable<Parse> {
     set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch
     Env.GVN.add_reduce(ifex);
     set_mem(old_mem.unkeep());     // Reset memory to before the IF
-    Node fex = peek(':') ? stmt() : Env.XNIL;
+    Node fex = peek(':') ? stmt(false) : Env.XNIL;
     if( fex == null ) fex = err_ctrl2("missing expr after ':'");
     fex.keep();                    // Keep until merge point
     Node f_ctrl= ctrl().keep();    // Keep until merge point
@@ -614,7 +631,7 @@ public class Parse implements Comparable<Parse> {
         // Store or load against memory
         if( peek(":=") || peek_not('=','=')) {
           byte fin = _buf[_x-2]==':' ? TypeStruct.FRW : TypeStruct.FFNL;
-          Node stmt = stmt();
+          Node stmt = stmt(false);
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
           else set_mem( gvn(new StoreNode(mem(),castnn,n=stmt.keep(),fin,fld ,errMsg(fld_start))));
           skipWS();
@@ -681,7 +698,7 @@ public class Parse implements Comparable<Parse> {
             assert fptr.fun().nargs()==ARG_IDX+3; // array, index, value
             skipWS();
             int oldx3 = _x;
-            Node val = stmt();
+            Node val = stmt(false);
             if( val==null ) { n.unhook(); return err_ctrl2("Missing stmt after '"+fptr.fun()._bal_close+"'"); }
             n = do_call(errMsgs(0,oldx,oldx2,oldx3),args(fptr,n.unkeep(),idx,val));
           }
@@ -714,7 +731,7 @@ public class Parse implements Comparable<Parse> {
     // Now properly load from the display.
     // This does a HM.Ident lookup, producing a FRESH tvar every time.
     Node ptr = get_display_ptr(scope);
-    n = gvn(new LoadNode(mem(),ptr,tok,null,_e));
+    n = gvn(new LoadNode(mem(),ptr,tok,null,_e._nongen));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl1(Node.ErrMsg.forward_ref(this,((FunPtrNode)n)));
     // Do a full lookup on "+", and execute the function
@@ -780,7 +797,7 @@ public class Parse implements Comparable<Parse> {
       if( peek('}') && op != null && op.op_prec() > 0 )
         // This is a primitive operator lookup as a function constant, and
         // makes a FRESH copy like HM.Ident.
-        return ((UnOrFunPtrNode)op).fresh(_e);
+        return ((UnOrFunPtrNode)op).fresh(_e._nongen);
       _x = oldx+1;              // Back to the opening paren
       return func();            // Anonymous function
     }
@@ -809,7 +826,7 @@ public class Parse implements Comparable<Parse> {
     // to use an operator as a factor, such as "plus = {+}" or "f(1,{+},2)".
     if( def.op_prec() > 0 ) { _x = oldx; return null; }
     // Forward refs always directly assigned into scope and never updated.
-    if( def.is_forward_ref() ) return def;
+    //if( def.is_forward_ref() ) return def;
     // Balanced ops are similar to "{}", "()" or "@{}".
     if( def.op_prec()==0 && def._val instanceof TypeFunPtr )
       return bfact(oldx,(UnOrFunPtrNode)def);
@@ -819,7 +836,7 @@ public class Parse implements Comparable<Parse> {
     // otherwise the display is passed in as a hidden argument.
     // This does a HM.Ident lookup, producing a FRESH tvar every time.
     Node ptr = get_display_ptr(scope);
-    return gvn(new LoadNode(mem(),ptr,tok.intern(),null,_e));
+    return gvn(new LoadNode(mem(),ptr,tok.intern(),null,_e._nongen));
   }
 
   /** Parse a tuple; first stmt but not the ',' parsed.
@@ -936,6 +953,7 @@ public class Parse implements Comparable<Parse> {
       Node rpc = X.xform(new ParmNode(0      ,"rpc" ,fun,con(TypeRPC.ALL_CALL),null));
       Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
       Node clo = X.xform(new ParmNode(DSP_IDX,"^"   ,fun,con(tpar_disp),null));
+      clo.tvar().unify(parent_display.tvar(),false); // Same H-M type
 
       // Increase scope depth for function body.
       try( Env e = new Env(_e,errMsg(oldx-1), true, fun, mem) ) { // Nest an environment for the local vars
@@ -950,6 +968,7 @@ public class Parse implements Comparable<Parse> {
         Parse errmsg = errMsg();  // Lazy error message
         for( int i=ARG_IDX; i<ids._len; i++ ) { // User parms start
           Node parm = X.xform(new ParmNode(i,ids.at(i),fun,con(Type.SCALAR),errmsg));
+          _e._nongen.push(ids.at(i),parm.tvar());
           create(ids.at(i),parm, args_are_mutable);
         }
 
@@ -957,6 +976,7 @@ public class Parse implements Comparable<Parse> {
         Node rez = stmts();       // Parse function body
         if( rez == null ) rez = err_ctrl2("Missing function body");
         require('}',oldx-1);      // Matched with opening {}
+
         // Merge normal exit into all early-exit paths
         if( e._scope.is_closure() ) rez = merge_exits(rez);
         // Standard return; function control, memory, result, RPC.  Plus a hook
@@ -964,6 +984,8 @@ public class Parse implements Comparable<Parse> {
         RetNode ret = (RetNode)X.xform(new RetNode(ctrl(),mem(),rez,rpc,fun));
         // The FunPtr builds a real display; any up-scope references are passed in now.
         Node fptr = X.xform(new FunPtrNode(null,ret,e._par));
+
+        _e._nongen = _e._nongen._par; // Pop H-M Lambda-style micro-scope
         _e = _e._par;                // Pop nested environment
         return (X._ret=fptr);        // Return function; close-out and DCE 'e'
       }
@@ -982,7 +1004,6 @@ public class Parse implements Comparable<Parse> {
       ctrl = ctrl.add_def(ctrl()).unkeep();
       ctrl._val = Type.CTRL;
       set_ctrl(ctrl=X.init(ctrl));
-      //ctrl._val = Type.CTRL;
       mem.unkeep().set_def(0,ctrl);
       val.unkeep().set_def(0,ctrl);
       Node mem2 = X.xform(mem.add_def(mem()));

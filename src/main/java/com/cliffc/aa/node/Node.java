@@ -21,35 +21,36 @@ public abstract class Node implements Cloneable {
   static final byte OP_CPROJ  = 5;
   static final byte OP_DEFMEM = 6;
   static final byte OP_ERR    = 7;
-  static final byte OP_FP2DISP= 8;
-  static final byte OP_FUN    = 9;
-  static final byte OP_FUNPTR =10;
-  static final byte OP_IF     =11;
-  static final byte OP_JOIN   =12;
-  static final byte OP_LOAD   =13;
-  static final byte OP_LOOP   =14;
-  static final byte OP_NAME   =15; // Cast a prior NewObj to have a runtime Name
-  static final byte OP_NEWOBJ =16; // Allocate a new struct
-  static final byte OP_NEWARY =17; // Allocate a new array
-  static final byte OP_NEWSTR =18; // Allocate a new string
-  static final byte OP_PARM   =19;
-  static final byte OP_PHI    =20;
-  static final byte OP_PRIM   =21;
-  static final byte OP_PROJ   =22;
-  static final byte OP_REGION =23;
-  static final byte OP_RET    =24;
-  static final byte OP_SCOPE  =25;
-  static final byte OP_SPLIT  =26;
-  static final byte OP_START  =27;
-  static final byte OP_STMEM  =28;
-  static final byte OP_STORE  =29;
-  static final byte OP_THRET  =30;
-  static final byte OP_THUNK  =31;
-  static final byte OP_TYPE   =32;
-  static final byte OP_UNR    =33;
-  static final byte OP_MAX    =34;
+  static final byte OP_FRESH  = 8;
+  static final byte OP_FP2DISP= 9;
+  static final byte OP_FUN    =10;
+  static final byte OP_FUNPTR =11;
+  static final byte OP_IF     =12;
+  static final byte OP_JOIN   =13;
+  static final byte OP_LOAD   =14;
+  static final byte OP_LOOP   =15;
+  static final byte OP_NAME   =16; // Cast a prior NewObj to have a runtime Name
+  static final byte OP_NEWOBJ =17; // Allocate a new struct
+  static final byte OP_NEWARY =18; // Allocate a new array
+  static final byte OP_NEWSTR =19; // Allocate a new string
+  static final byte OP_PARM   =20;
+  static final byte OP_PHI    =21;
+  static final byte OP_PRIM   =22;
+  static final byte OP_PROJ   =23;
+  static final byte OP_REGION =24;
+  static final byte OP_RET    =25;
+  static final byte OP_SCOPE  =26;
+  static final byte OP_SPLIT  =27;
+  static final byte OP_START  =28;
+  static final byte OP_STMEM  =29;
+  static final byte OP_STORE  =30;
+  static final byte OP_THRET  =31;
+  static final byte OP_THUNK  =32;
+  static final byte OP_TYPE   =33;
+  static final byte OP_UNR    =34;
+  static final byte OP_MAX    =35;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "DefMem", "Err", "FP2Disp", "Fun", "FunPtr", "If", "Join", "Load", "Loop", "Name", "NewObj", "NewAry", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Thret", "Thunk", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "DefMem", "Err", "Fresh", "FP2Disp", "Fun", "FunPtr", "If", "Join", "Load", "Loop", "Name", "NewObj", "NewAry", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Thret", "Thunk", "Type", "Unresolved" };
   static { assert STRS.length==OP_MAX; }
 
   // Unique dense node-numbering
@@ -467,6 +468,7 @@ public abstract class Node implements Cloneable {
     case OP_CON:
     case OP_CPROJ:
     case OP_DEFMEM:
+    case OP_FRESH:
     case OP_ERR:
     case OP_FP2DISP:
     case OP_FUN:
@@ -506,6 +508,7 @@ public abstract class Node implements Cloneable {
     case OP_CON:
     case OP_CPROJ:
     case OP_DEFMEM:
+    case OP_FRESH:
     case OP_ERR:
     case OP_FP2DISP:
     case OP_FUN:
@@ -815,11 +818,14 @@ public abstract class Node implements Cloneable {
       Node x;
       x = do_reduce(); if( x != null )
                          return true; // Found an ideal call
-      x = do_mono(); if( x != null )
-                       return true; // Found an ideal call
-      x = do_grow(); if( x != null )
-                       return true; // Found an ideal call
-      if( this instanceof FunNode ) ((FunNode)this).ideal_inline(true);
+      // TODO: TURNED OFF ALL AGGRESSIVE OPTS
+      //x = do_mono(); if( x != null )
+      //                 return true; // Found an ideal call
+      // TODO: TURNED OFF ALL AGGRESSIVE OPTS
+      //x = do_grow(); if( x != null )
+      //                 return true; // Found an ideal call
+      // TODO: TURNED OFF ALL AGGRESSIVE OPTS
+      //if( this instanceof FunNode ) ((FunNode)this).ideal_inline(true);
     }
     for( Node def : _defs ) if( def != null && def.more_ideal(bs) ) return true;
     for( Node use : _uses ) if( use != null && use.more_ideal(bs) ) return true;

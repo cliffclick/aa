@@ -706,7 +706,7 @@ public class FunNode extends RegionNode {
         Node newdef = map.get(def);// Map old to new
         if( newdef==null && def instanceof UnOrFunPtrNode ) {
           UnOrFunPtrNode uorf = (UnOrFunPtrNode)def;
-          def = uorf.fresh(uorf.funptr()._env);
+          def = uorf.fresh(uorf.funptr()._vs);
         }
         c.add_def(newdef==null ? def : newdef);
       }

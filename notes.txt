@@ -1,4 +1,35 @@
 =======================================
+4/14/2021
+
+Back to HM algo.  Missed 'fresh' a bunch; 'occurs_in' was not right.
+
+Thinking:
+- Cut Parse back to the nubbins; no 'xform' and no 'inline'.
+- Confirm get HM answer correct from HM test cases.
+- Supporting mutual-letrec.
+- Loads from Display just like HM.Ident; and needs 'nongen' set.
+- Stores to Display, very similar to '?:' just use same tvars.
+- Load/Store from Object/Array use memory/pair-like defs.  No recursive defs?
+
+- Need to build a nongen set during Parse.  This is almost exactly the
+  env._scope.stk() display, except during mid-def of recursive and mutually
+  recursive functions.
+- - WithOUT recursion, current Display is like a nested set of 'let x= ... in ...'.
+
+- May have to look at Unresolved as a case of Haskell Type-classes.
+- - {+} {int,int->int} {dbl,dbl->dbl} {flt,flt->flt}?  {str,str->str}
+- - {==} {int,int->bool} {dbl,dbl->bool}, etc....
+- - Haskell TypeClasses are declared interfaces, not duck-typing.
+
+- Once TV2 produces correct answers, start turning on XFORMS.
+
+- Besides turning OFF XFORMS, what else can i keep?
+- Can i keep NewObj for Displays & add-in the needed let-rec support?
+- - Add in support for ordered sets of tvars, used in the nongen tests?
+
+
+
+=======================================
 2/23/2021
 
 Back to HM algo.  Missed the 'fresh' notion in main code: let Name = Body in Use;

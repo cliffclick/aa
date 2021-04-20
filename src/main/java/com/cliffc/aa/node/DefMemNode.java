@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
 import static com.cliffc.aa.Env.GVN;
 
 public class DefMemNode extends Node {
@@ -29,6 +30,24 @@ public class DefMemNode extends Node {
     if( def==in(0) ) return TypeMem.ALIVE;  // Control
     return _live;
   }
+
+  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Mem",this,alloc_site); }
+
+  @Override public boolean unify( boolean test ) {
+    // Self should always should be a TMem
+    TV2 tvar = tvar();
+    assert tvar.isa("Mem");
+    // Structural unification on all objects
+    boolean progress=false;
+    for( int i=1; i<_defs._len; i++ ) {
+      TV2 tv = (in(i) instanceof MrgProjNode && !tvar(i).is_dead() ? ((MrgProjNode)in(i)).nnn() : in(i)).tvar();
+      progress |= tvar.unify_at(i,tv,test,null);
+      if( progress && test ) return true;
+    }
+    return progress;
+  }
+
+
   @Override public boolean equals(Object o) { return this==o; } // Only one
 
   // Make an MProj for a New, and 'hook' it into the default memory
