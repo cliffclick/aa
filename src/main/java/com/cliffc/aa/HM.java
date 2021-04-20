@@ -18,7 +18,7 @@ import static com.cliffc.aa.AA.unimpl;
 // concrete base type, or a sharable leaf.  Unify is structural, and where not
 // unifyable the union is replaced with an Error.
 
-// Lazily computes 'Fresh' copies instead of eagerly.
+// This version has a nice language parser.
 
 public class HM {
   static final HashMap<String,T2> PRIMS = new HashMap<>();
