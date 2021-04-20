@@ -24,7 +24,7 @@ public class HM {
   static final HashMap<String,T2> PRIMS = new HashMap<>();
   static boolean DEBUG_LEAKS=false;
 
-  public static T2 hm( Syntax prog) {
+  public static T2 hm( String sprog ) {
     Object dummy = TypeStruct.DISPLAY;
 
     Worklist work = new Worklist();
@@ -53,6 +53,9 @@ public class HM {
     PRIMS.put("str",T2.make_fun(int64,strp));
     // Factor; FP div/mod-like operation
     PRIMS.put("factor",T2.make_fun(flt64,T2.prim("divmod",flt64,flt64)));
+
+    // Parse
+    Syntax prog = parse( sprog );
 
     // Prep for SSA: pre-gather all the (unique) ids
     int cnt_syns = prog.prep_tree(null,null,work);
@@ -84,6 +87,92 @@ public class HM {
   }
   static void reset() { PRIMS.clear(); T2.reset(); }
 
+  // ---------------------------------------------------------------------
+  // Program text for parsing
+  private static int X;
+  private static byte[] BUF;
+  @Override public String toString() { return new String(BUF,X,BUF.length-X); }
+  static Syntax parse( String s ) {
+    X = 0;
+    BUF = s.getBytes();
+    Syntax prog = term();
+    if( skipWS() != -1 ) throw AA.unimpl("Junk at end of program: "+new String(BUF,X,BUF.length-X));
+    return prog;
+  }
+  static Syntax term() {
+    if( skipWS()==-1 ) return null;
+    if( isDigit(BUF[X]) ) return number();
+    if( BUF[X]=='"' ) return string();
+    if( BUF[X]=='(' ) {         // Parse an Apply
+      X++;                      // Skip paren
+      Syntax fun = term();
+      Ary<Syntax> ARGS = new Ary<>(new Syntax[1],0);
+      while( skipWS()!= ')' && X<BUF.length ) ARGS.push(term());
+      return new Apply(fun,require(')',ARGS.asAry()));
+    }
+    if( BUF[X]=='{' ) {         // Lambda of 1 or 2 args
+      X++;                      // Skip paren
+      skipWS();
+      String arg0 = id(), arg1=null;
+      if( skipWS()!='-' ) arg1 = id();
+      require("->");
+      Syntax body = require('}',term());
+      return arg1==null
+        ? new Lambda (arg0,     body)
+        : new Lambda2(arg0,arg1,body);
+    }
+    // Let or Id
+    if( isAlpha0(BUF[X]) ) {
+      String id = id();
+      if( skipWS()!='=' )  return new Ident(id);
+      // Let expression; "id = term(); term..."
+      X++;                      // Skip '='
+      Syntax def = require(';',term());
+      return new Let(id,def,term());
+    }
+
+    throw AA.unimpl();
+  }
+  private static final SB ID = new SB();
+  private static String id() {
+    ID.clear();
+    while( X<BUF.length && isAlpha1(BUF[X]) )
+      ID.p((char)BUF[X++]);
+    return ID.toString().intern();
+  }
+  private static Syntax number() {
+    int sum=0;
+    while( X<BUF.length && isDigit(BUF[X]) )
+      sum = sum*10+BUF[X++]-'0';
+    if( X>= BUF.length || BUF[X]!='.' ) return new Con(TypeInt.con(sum));
+    X++;
+    float f = (float)sum;
+    f = f + (BUF[X++]-'0')/10.0f;
+    return new Con(TypeFlt.con(f));
+  }
+  private static Syntax string() {
+    int start = ++X;
+    while( X<BUF.length && BUF[X]!='"' ) X++;
+    return require('"', new Con(TypeStr.con(new String(BUF,start,X-start).intern())));
+  }
+  private static byte skipWS() {
+    while( X<BUF.length && isWS(BUF[X]) ) X++;
+    return X==BUF.length ? -1 : BUF[X];
+  }
+  private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
+  private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
+  private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_') || (c=='*') || (c=='='); }
+  private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9') || (c=='/'); }
+  private static <T> T require(char c, T t) { if( skipWS()!=c ) throw AA.unimpl("Missing '"+c+"'"); X++; return t; }
+  private static void require(String s) {
+    skipWS();
+    for( int i=0; i<s.length(); i++ )
+      if( X+i >= BUF.length || BUF[X+i]!=s.charAt(i) )
+        throw AA.unimpl("Missing '"+s+"'");
+    X+=s.length();
+  }
+
+  // ---------------------------------------------------------------------
   // Worklist of Syntax nodes
   private static class Worklist {
     public int _cnt;
@@ -98,6 +187,7 @@ public class HM {
     @Override public String toString() { return _ary.toString(); }
   }
 
+  // ---------------------------------------------------------------------
   // Small classic tree of T2s, immutable, with sharing at the root parts.
   static class VStack implements Iterable<T2> {
     final VStack _par;
@@ -118,7 +208,8 @@ public class HM {
     }
   }
 
-  public static abstract class Syntax {
+  // ---------------------------------------------------------------------
+  static abstract class Syntax {
     Syntax _par;
     VStack _nongen;             //
     T2 _t;                      // Current HM type
@@ -163,7 +254,7 @@ public class HM {
     abstract SB p2(SB sb, VBitSet dups); // Recursion print
   }
 
-  public static class Con extends Syntax {
+  static class Con extends Syntax {
     final Type _con;
     Con(Type con) { super(); _con=con; }
     @Override SB str(SB sb) { return p1(sb); }
@@ -177,7 +268,7 @@ public class HM {
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
   }
 
-  public static class Ident extends Syntax {
+  static class Ident extends Syntax {
     final String _name;
     Ident(String name) { _name=name; }
     @Override SB str(SB sb) { return p1(sb); }
@@ -213,7 +304,7 @@ public class HM {
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
   }
 
-  public static class Lambda extends Syntax {
+  static class Lambda extends Syntax {
     final String _arg0;
     final Syntax _body;
     T2 _targ;
@@ -254,7 +345,7 @@ public class HM {
     }
   }
 
-  public static class Lambda2 extends Syntax {
+  static class Lambda2 extends Syntax {
     final String _arg0, _arg1;
     final Syntax _body;
     T2 _targ0;
@@ -303,7 +394,7 @@ public class HM {
     }
   }
 
-  public static class Let extends Syntax {
+  static class Let extends Syntax {
     final String _arg0;
     final Syntax _def, _body;
     T2 _targ;
@@ -339,7 +430,7 @@ public class HM {
     }
   }
 
-  public static class Apply extends Syntax {
+  static class Apply extends Syntax {
     final Syntax _fun;
     final Syntax[] _args;
     Apply(Syntax fun, Syntax... args) { _fun = fun; _args = args; }
@@ -411,7 +502,7 @@ public class HM {
   // T2, and the forest of T2s can share.  Leaves of a T2 can be either a
   // simple concrete base type, or a sharable leaf.  Unify is structural, and
   // where not unifyable the union is replaced with an Error.
-  public static class T2 {
+  static class T2 {
     private static int CNT=0;
     final int _uid;
 
