@@ -20,7 +20,7 @@ import static com.cliffc.aa.AA.unimpl;
 
 // Lazily computes 'Fresh' copies instead of eagerly.
 
-public class HM {
+public class HM5 {
   static final HashMap<String,T2> PRIMS = new HashMap<>();
   static boolean DEBUG_LEAKS=false;
 
