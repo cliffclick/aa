@@ -82,7 +82,7 @@ public class HM {
     }
     assert prog.more_work(work);
 
-    System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+cnt+", T2s: "+T2.CNT);
+    //System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+cnt+", T2s: "+T2.CNT);
     return prog._t;
   }
   static void reset() { PRIMS.clear(); T2.reset(); }
@@ -1022,7 +1022,7 @@ public class HM {
         return _args.length==0 || _args[0]==null ? sb : _args[0].str(sb.p(">>"), visit, dups);
       }
       boolean dup = dups.get(_uid);
-      if( dup ) sb.p('$').p(_uid);
+      if( dup ) sb.p("$V").p(_uid);
       if( visit.tset(_uid) && dup ) return sb;
       if( dup ) sb.p(':');
 
@@ -1056,12 +1056,14 @@ public class HM {
       assert no_uf();
       if( is_base() ) return sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString() );
       if( is_leaf() ) return sb.p(_name);
-      boolean dup = dups.get(_uid);
-      if( dup ) sb.p('$').p(_uid);
-      if( visit.tset(_uid) && dup ) return sb;
-      if( dup ) sb.p(':');
+      if( dups.get(_uid) ) {    // Duplicates?  Take some effort to pretty-print cycles
+        // 2nd and later visits use the short form
+        if( visit.tset(_uid) ) return sb.p("$V").p(_uid);
+        // First visit prints the V._uid and the type
+        sb.p('V').p(_uid).p(':');
+      }
 
-      // Special printing for functions
+      // Special printing for functions: { arg -> body }
       if( is_fun() ) {
         sb.p("{ ");
         for( int i=0; i<_args.length-1; i++ )
@@ -1069,7 +1071,7 @@ public class HM {
         return args(_args.length-1)._p(sb.p("-> "),visit,dups).p(" }");
       }
 
-      // Special printing for structures
+      // Special printing for structures: @{ fld0 = body, fld1 = body, ... }
       if( is_struct() ) {
         sb.p("@{");
         for( int i=0; i<_ids.length; i++ )
@@ -1077,7 +1079,7 @@ public class HM {
         return sb.unchar().p("}");
       }
 
-      // Generic structural T2
+      // Generic structural T2: (fun arg0 arg1...)
       sb.p("(").p(_name).p(" ");
       for( int i=0; i<_args.length; i++ ) args(i)._p(sb,visit,dups).p(" ");
       return sb.unchar().p(")");

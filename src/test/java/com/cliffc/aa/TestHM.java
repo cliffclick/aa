@@ -51,9 +51,9 @@ public class TestHM {
   public void test06() {
     // recursive unification
     T2 t1 = HM.hm("{ f -> (f f) }");
-    assertEquals("{ $25:{ $25 -> V21 } -> V21 }",t1.p());
+    assertEquals("{ V25:{ $V25 -> V21 } -> V21 }",t1.p());
     // We can argue the pretty-print should print:
-    // "$26:{ $26 -> V21 }"
+    // "V25:{ V25 -> V21 }"
   }
 
   @Test
@@ -250,7 +250,7 @@ public class TestHM {
   public void test29() {
     // Recursive linked-list discovery, with no end clause
     T2 t = HM.hm("map = { fcn lst -> @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } }; map");
-    assertEquals("{ { V40 -> V41 } $42:@{ n0 = $42, v0 = V40} -> $43:@{ n1 = $43, v1 = V41} }",t.p());
+    assertEquals("{ { V40 -> V41 } V42:@{ n0 = $V42, v0 = V40} -> V43:@{ n1 = $V43, v1 = V41} }",t.p());
   }
-  
+
 }
