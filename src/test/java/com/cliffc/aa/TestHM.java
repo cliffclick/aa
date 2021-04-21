@@ -10,13 +10,6 @@ public class TestHM {
 
   @Before public void reset() { HM.reset(); }
 
-  @Test
-  public void test27() {
-    T2 t = HM.hm("{ g -> @{x =g, y =g}}");
-    assertEquals("{ V19 -> @{ x = V19, y = V19} }",t.p());
-  }
-
-
   @Test(expected = RuntimeException.class)
   public void test00() {
     HM.hm("fred");
@@ -237,6 +230,13 @@ public class TestHM {
   public void test26() {
     T2 t = HM.hm("{ g -> @{x =g, y =g}}");
     assertEquals("{ V19 -> @{ x = V19, y = V19} }",t.p());
+  }
+
+  @Test
+  public void test27() {
+    // Load common field 'x', ignoring mismatched fields y and z
+    T2 t = HM.hm("{ pred -> .x (if/else pred @{x =2,y =3} @{x =3,z =\"abc\"}) }");
+    assertEquals("{ int1 -> nint8 }",t.p());
   }
 
 }
