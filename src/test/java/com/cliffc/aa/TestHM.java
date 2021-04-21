@@ -246,4 +246,11 @@ public class TestHM {
     assertEquals("{ @{ y = int64, x = int64} -> int64 }",t.p());
   }
 
+  @Test
+  public void test29() {
+    // Recursive linked-list discovery, with no end clause
+    T2 t = HM.hm("map = { fcn lst -> @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } }; map");
+    assertEquals("{ { V40 -> V41 } $42:@{ n0 = $42, v0 = V40} -> $43:@{ n1 = $43, v1 = V41} }",t.p());
+  }
+  
 }

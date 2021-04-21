@@ -82,7 +82,7 @@ public class HM {
     }
     assert prog.more_work(work);
 
-    //System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+cnt+", T2s: "+T2.CNT);
+    System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+cnt+", T2s: "+T2.CNT);
     return prog._t;
   }
   static void reset() { PRIMS.clear(); T2.reset(); }
@@ -218,10 +218,17 @@ public class HM {
     final VStack _par;
     final T2 _nongen;
     VStack( VStack par, T2 nongen ) { _par=par; _nongen=nongen; }
-    @Override public String toString() { return str(new SB()).toString(); }
-    SB str(SB sb) {
-      _nongen.str(sb,new VBitSet(),new VBitSet());
-      if( _par!=null ) _par.str(sb.p(" >> "));
+    @Override public String toString() {
+      // Collect dups across the forest of types
+      VBitSet dups = new VBitSet();
+      for( VStack vs = _par; vs!=null; vs = vs._par )
+        vs._nongen.get_dups(dups);
+      // Now recursively print
+      return str(new SB(),dups).toString();
+    }
+    SB str(SB sb, VBitSet dups) {
+      _nongen.str(sb,new VBitSet(),dups);
+      if( _par!=null ) _par.str(sb.p(" >> "),dups);
       return sb;
     }
     @NotNull @Override public Iterator<T2> iterator() { return new Iter(); }
@@ -592,7 +599,7 @@ public class HM {
       T2 str = _str.find();
       int idx = str._ids==null ? -1 : Util.find(str._ids,_id);
       if( idx==-1 )             // Not a struct or no field, force it to be one
-        return work==null || str.unify(T2.make_struct(new String[]{_id}, new T2[]{find()}), work);
+        return work==null || T2.make_struct(new String[]{_id}, new T2[]{find()}).unify(str, work);
 
       // Unify the field
       return str.args(idx).unify(find(),work);
@@ -750,7 +757,7 @@ public class HM {
         // field names and not by position.
         for( int i=0; i<_ids.length; i++ ) { // For all fields in LHS
           int idx = Util.find(that._ids,_ids[i]);
-          if( idx==-1 ) that.add_fld(_ids[i],args(i)); // Extend 'that' with matching field from 'this'
+          if( idx==-1 ) that.add_fld(_ids[i],args(i), work); // Extend 'that' with matching field from 'this'
           else args(i)._unify(that.args(idx),work);    // Unify matching field
         }
       } else {
@@ -760,13 +767,14 @@ public class HM {
       return union(that,work);
     }
 
-    private void add_fld(String id, T2 fld) {
+    private void add_fld(String id, T2 fld, Worklist work) {
       assert is_struct();
       int len = _ids.length;
       _ids  = Arrays.copyOf( _ids,len+1);
       _args = Arrays.copyOf(_args,len+1);
       _ids [len] = id ;
       _args[len] = fld;
+      work.addAll(_deps); //
     }
 
     private long dbl_uid(T2 t) { return ((long)_uid<<32)|t._uid; }
@@ -824,12 +832,33 @@ public class HM {
       if( !Util.eq(_name,that._name) ||
           (!is_struct() && _args.length != that._args.length) )
         throw new RuntimeException("Cannot unify "+this+" and "+that);
-      if( is_struct() ) throw AA.unimpl();
 
       // Structural recursion unification, lazy on LHS
-      boolean progress = vput(that,false); // Early set, to stop cycles
+      vput(that,false); // Early set, to stop cycles
+      boolean progress = false;
+      if( is_struct() )
+        progress = _fresh_unify_struct(that,nongen,work);
+      else {
+        for( int i=0; i<_args.length; i++ ) {
+          progress |= args(i)._fresh_unify(that.args(i),nongen,work);
+          if( progress && work==null ) return true;
+        }
+      }
+      return progress;
+    }
+
+    // Unification with structs must honor field names.
+    private boolean _fresh_unify_struct(T2 that, VStack nongen, Worklist work) {
+      assert is_struct() && that.is_struct();
+      boolean progress = false;
       for( int i=0; i<_args.length; i++ ) {
-        progress |= args(i)._fresh_unify(that.args(i),nongen,work);
+        int idx = Util.find(that._ids,_ids[i]);
+        if( idx == -1 ) {       // Missing field on RHS
+          if( work==null ) return true; // Will definitely make progress
+          progress = true;
+          that.add_fld(_ids[i],args(i)._fresh(nongen), work);
+        } else
+          progress |= args(i)._fresh_unify(that.args(idx),nongen,work);
         if( progress && work==null ) return true;
       }
       return progress;
@@ -948,17 +977,15 @@ public class HM {
     // down the function parts; if any changes the fresh-application may make
     // progress.
     static final VBitSet UPDATE_VISIT  = new VBitSet();
-    boolean push_update(Ident a) { assert UPDATE_VISIT.isEmpty(); push_update_impl(a); UPDATE_VISIT.clear(); return true; }
+    void push_update( Ident a) { assert UPDATE_VISIT.isEmpty(); push_update_impl(a); UPDATE_VISIT.clear(); }
     private void push_update_impl(Ident a) {
       assert no_uf();
-      if( is_leaf() || _args.length==0 ) {
-        if( _deps==null ) _deps = new Ary<>(Ident.class);
-        if( _deps.find(a)==-1 ) _deps.push(a);
-      } else {
-        if( UPDATE_VISIT.tset(_uid) ) return;
-        for( int i=0; i<_args.length; i++ )
+      if( UPDATE_VISIT.tset(_uid) ) return;
+      if( _deps==null ) _deps = new Ary<>(Ident.class);
+      if( _deps.find(a)==-1 ) _deps.push(a);
+      for( int i=0; i<_args.length; i++ )
+        if( _args[i]!=null )
           args(i).push_update_impl(a);
-      }
     }
 
     void add_deps_work( Worklist work ) { assert UPDATE_VISIT.isEmpty(); add_deps_work_impl(work); UPDATE_VISIT.clear(); }
