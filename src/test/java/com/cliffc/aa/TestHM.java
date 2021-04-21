@@ -239,4 +239,11 @@ public class TestHM {
     assertEquals("{ int1 -> nint8 }",t.p());
   }
 
+  @Test
+  public void test28() {
+    // Load some fields from an unknown struct: area of a square
+    T2 t = HM.hm("{ sq -> (* .x sq .y sq) }");
+    assertEquals("{ @{ y = int64, x = int64} -> int64 }",t.p());
+  }
+
 }

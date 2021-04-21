@@ -488,8 +488,7 @@ public class HM {
           targs[i] = _args[i].find();
         targs[_args.length] = find(); // Return
         T2 nfun = T2.make_fun(targs);
-        tfun.unify(nfun,work);
-        return true;        // Always progress (since forcing tfun to be a fun)
+        return tfun.unify(nfun,work);
       }
 
       if( tfun._args.length != _args.length+1 )
@@ -542,7 +541,15 @@ public class HM {
       return sb;
     }
     @Override boolean hm(Worklist work) {
-      // TODO: Check for progress before making new
+      // Check for progress before making new
+      T2 old = find();
+      if( old.is_struct() ) {  // Already a struct?  Compare-by-parts
+        for( int i=0; i<_ids.length; i++ ) {
+          int idx = Util.find(old._ids,_ids[i]);
+          if( idx== -1 || old.args(idx).unify(_flds[i].find(),work) ) { old=null; break; }
+        }
+        if( old!=null ) return false; // Shortcut: no progress, no allocation
+      }
 
       // Make a new T2 for progress
       T2[] t2s = new T2[_ids.length];
@@ -584,10 +591,8 @@ public class HM {
     @Override boolean hm(Worklist work) {
       T2 str = _str.find();
       int idx = str._ids==null ? -1 : Util.find(str._ids,_id);
-      if( idx==-1 ) {           // Not a struct or no field, force it to be one
-        if( work == null ) return true; // Will progress and just testing
-        return T2.make_struct(new String[]{_id}, new T2[]{find()}).unify(str, work);
-      }
+      if( idx==-1 )             // Not a struct or no field, force it to be one
+        return work==null || str.unify(T2.make_struct(new String[]{_id}, new T2[]{find()}), work);
 
       // Unify the field
       return str.args(idx).unify(find(),work);
@@ -618,7 +623,7 @@ public class HM {
     // A plain type variable starts with a 'V', and can unify directly.
     // Everything else is structural - during unification they must match names
     // and arguments and Type constants.
-    final @NotNull String _name; // name, e.g. "->" or "pair" or "V123" or "base"
+    @NotNull String _name; // name, e.g. "->" or "pair" or "V123" or "base"
 
     // Structural parts to unify with, or slot 0 is used during normal U-F
     T2 @NotNull [] _args;
@@ -627,7 +632,7 @@ public class HM {
     Type _con;
 
     // Structs have field names
-    String @NotNull [] _ids;
+    @NotNull String[] _ids;
 
     // Dependent (non-local) tvars to revisit
     Ary<Ident> _deps;
@@ -678,7 +683,7 @@ public class HM {
     // U-F union; this becomes that; returns 'that'.
     // No change if only testing, and reports progress.
     boolean union(T2 that, Worklist work) {
-      assert is_leaf() && no_uf(); // Cannot union twice
+      assert no_uf(); // Cannot union twice
       if( this==that ) return false;
       if( work==null ) return true; // Report progress without changing
       // Worklist: put updates on the worklist for revisiting
@@ -691,6 +696,8 @@ public class HM {
         _deps = null;
       }
       _args[0] = that;         // U-F update
+      _name = "VX";
+      assert !no_uf();
       return true;
     }
 
@@ -734,42 +741,23 @@ public class HM {
       if( rez!=null ) return false; // Been there, done that
       DUPS.put(luid,that);          // Close cycles
 
+      if( work==null ) return true; // Here we definitely make progress; bail out early if just testing
+
       // Structural recursion unification.
       // Structs unify only on matching fields, and add missing fields.
-      boolean progress=false;
       if( is_struct() ) {
         // Unification for structs is more complicated; args are aligned via
         // field names and not by position.
-        progress = _unify_struct(that,work);
+        for( int i=0; i<_ids.length; i++ ) { // For all fields in LHS
+          int idx = Util.find(that._ids,_ids[i]);
+          if( idx==-1 ) that.add_fld(_ids[i],args(i)); // Extend 'that' with matching field from 'this'
+          else args(i)._unify(that.args(idx),work);    // Unify matching field
+        }
       } else {
-        for( int i=0; i<_args.length; i++ ) {
-          progress |= args(i)._unify(that.args(i),work);
-          if( progress && work!=null ) return true;
-        }
+        for( int i=0; i<_args.length; i++ ) // For all fields in LHS
+          args(i)._unify(that.args(i),work);
       }
-      return progress;
-    }
-
-    // Unification between two structs, 'this' into 'that'.  Extends 'that'
-    // with missing fields from 'this', but does not extend 'this'.
-    private boolean _unify_struct(T2 that, Worklist work) {
-      assert is_struct() && that.is_struct();
-      boolean progress = false;
-      // For all fields in LHS
-      for( int i=0; i<_ids.length; i++ ) {
-        int idx = Util.find(that._ids,_ids[i]);
-        if( idx==-1 ) {
-          if( work==null ) return true; // Will progress
-          progress = true;
-          that.add_fld(_ids[i],args(i)); // Extend 'that' with matching field from 'this'
-        } else {
-          // Unify matching field
-          progress |= args(i)._unify(that.args(idx),work);
-        }
-        if( progress && work==null ) return true;
-      }
-      // For all fields in RHS not in LHS... do nothing.
-      return progress;
+      return union(that,work);
     }
 
     private void add_fld(String id, T2 fld) {
@@ -937,9 +925,21 @@ public class HM {
       if( tc!=null )
         return tc==t; // Cycle check; true if both cycling the same
       CDUPS.put(this,t);
+      if( is_struct() )         // Struct equality honors field names without regard to order
+        return _cycle_equals_struct(t);
       for( int i=0; i<_args.length; i++ )
         if( !args(i)._cycle_equals(t.args(i)) )
           return false;
+      return true;
+    }
+
+    private boolean _cycle_equals_struct(T2 t) {
+      assert is_struct() && t.is_struct();
+      for( int i=0; i<_args.length; i++ ) {
+        int idx = Util.find(t._ids,_ids[i]);
+        if( idx==-1 || !args(i)._cycle_equals(t.args(idx)) )
+          return false;
+      }
       return true;
     }
 
