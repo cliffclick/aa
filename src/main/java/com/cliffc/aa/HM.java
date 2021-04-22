@@ -115,14 +115,11 @@ public class HM {
     }
     if( BUF[X]=='{' ) {         // Lambda of 1 or 2 args
       X++;                      // Skip paren
-      skipWS();
-      String arg0 = id(), arg1=null;
-      if( skipWS()!='-' ) arg1 = id();
+      Ary<String> args = new Ary<>(new String[1],0);
+      while( skipWS()!='-' ) args.push(id());
       require("->");
       Syntax body = require('}',term());
-      return arg1==null
-        ? new Lambda (arg0,     body)
-        : new Lambda2(arg0,arg1,body);
+      return new Lambda(body,args.asAry());
     }
     // Let or Id
     if( isAlpha0(BUF[X]) ) {
@@ -342,88 +339,64 @@ public class HM {
   }
 
   static class Lambda extends Syntax {
-    final String _arg0;
+    final String[] _args;
     final Syntax _body;
-    T2 _targ;
-    Lambda(String arg0, Syntax body) { _arg0=arg0; _body=body; _targ = T2.make_leaf(); }
-    @Override SB str(SB sb) { return _body.str(sb.p("{ ").p(_arg0).p(" -> ")).p(" }"); }
-    @Override SB p1(SB sb) { return sb.p("{ ").p(_arg0).p(" -> ... } "); }
+    T2[] _targs;
+    Lambda(Syntax body, String... args) {
+      _args=args;
+      _body=body;
+      _targs = new T2[args.length];
+      for( int i=0; i<args.length; i++ ) _targs[i] = T2.make_leaf();
+    }
+    @Override SB str(SB sb) {
+      sb.p("{ ");
+      for( String arg : _args ) sb.p(arg).p(' ');
+      return _body.str(sb.p("-> ")).p(" }");
+    }
+    @Override SB p1(SB sb) {
+      sb.p("{ ");
+      for( String arg : _args ) sb.p(arg).p(' ');
+      return sb.p(" -> ... } ");
+    }
     @Override SB p2(SB sb, VBitSet dups) { return _body.p0(sb,dups); }
-    T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
+    T2 targ(int i) { T2 targ = _targs[i].find(); return targ==_targs[i] ? targ : (_targs[i]=targ); }
     @Override boolean hm(Worklist work) {
       // The normal lambda work
+      boolean progress = false;
       T2 old = find();
-      if( old.is_fun() &&       // Already a function?  Compare-by-parts
-          !old.args(0).unify(targ()      ,work) &&
-          !old.args(1).unify(_body.find(),work) )
-        return false;           // Shortcut: no progress, no allocation
+      if( old.is_fun() ) {      // Already a function?  Compare-by-parts
+        for( int i=0; i<_targs.length; i++ )
+          if( old.args(i).unify(targ(i),work) )
+            { progress=true; break; }
+        if( !progress && !old.args(_targs.length).unify(_body.find(),work) )
+          return false;           // Shortcut: no progress, no allocation
+      }
       // Make a new T2 for progress
-      T2 fun = T2.make_fun(targ(),_body.find());
+      T2[] targs = Arrays.copyOf(_targs,_targs.length+1);
+      targs[_targs.length] = _body.find();
+      T2 fun = T2.make_fun(targs);
       return old.unify(fun,work);
     }
     @Override T2 lookup(String name) {
-      if( Util.eq(_arg0,name) ) return targ();
+      for( int i=0; i<_args.length; i++ )
+        if( Util.eq(_args[i],name) ) return targ(i);
       return _par==null ? null : _par.lookup(name);
     }
     @Override void add_kids(Worklist work) { work.push(_body); }
     @Override void add_occurs(Worklist work) {
-      if( targ().occurs_in_type(find()) ) work.addAll(_targ._deps);
+      for( int i=0; i<_targs.length; i++ )
+        if( targ(i).occurs_in_type(find()) ) work.addAll(_targs[i]._deps);
     }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
-      return _body.prep_tree(this,new VStack(nongen,_targ),work) + 1;
+      VStack vs = nongen;
+      for( int i=0; i<_targs.length; i++ )
+        vs = new VStack(vs,_targs[i]);
+      return _body.prep_tree(this,vs,work) + 1;
     }
     @Override void prep_lookup_deps(Ident id) {
-      if( Util.eq(id._name,_arg0) ) _targ.push_update(id);
-    }
-    @Override boolean more_work(Worklist work) {
-      if( !more_work_impl(work) ) return false;
-      return _body.more_work(work);
-    }
-  }
-
-  static class Lambda2 extends Syntax {
-    final String _arg0, _arg1;
-    final Syntax _body;
-    T2 _targ0;
-    T2 _targ1;
-    Lambda2(String arg0, String arg1, Syntax body) { _arg0=arg0; _arg1 = arg1; _body=body; _targ0 = T2.make_leaf(); _targ1 = T2.make_leaf(); }
-    @Override SB str(SB sb) { return _body.str(sb.p("{ ").p(_arg0).p(" ").p(_arg1).p(" -> ")).p(" }"); }
-    @Override SB p1(SB sb) { return sb.p("{ ").p(_arg0).p(" ").p(_arg1).p(" -> ... } "); }
-    @Override SB p2(SB sb, VBitSet dups) { return _body.p0(sb,dups); }
-    T2 targ0() { T2 targ = _targ0.find(); return targ==_targ0 ? targ : (_targ0=targ); }
-    T2 targ1() { T2 targ = _targ1.find(); return targ==_targ1 ? targ : (_targ1=targ); }
-    @Override boolean hm(Worklist work) {
-      // The normal lambda work
-      T2 old = find();
-      if(  old.is_fun() &&      // Already a function?  Compare-by-parts
-          !old.args(0).unify(targ0()     ,work) &&
-          !old.args(1).unify(targ1()     ,work) &&
-          !old.args(2).unify(_body.find(),work) )
-        return false;           // Shortcut: no progress, no allocation
-      // Make a new T2 for progress
-      T2 fun = T2.make_fun(targ0(),targ1(),_body.find());
-      return old.unify(fun,work);
-    }
-    @Override T2 lookup(String name) {
-      if( Util.eq(_arg0,name) ) return targ0();
-      if( Util.eq(_arg1,name) ) return targ1();
-      return _par==null ? null : _par.lookup(name);
-    }
-    @Override void add_kids(Worklist work) { work.push(_body); }
-    @Override void add_occurs(Worklist work) {
-      if( targ0().occurs_in_type(find()) ) work.addAll(_targ0._deps);
-      if( targ1().occurs_in_type(find()) ) work.addAll(_targ1._deps);
-    }
-    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
-      prep_tree_impl(par,nongen,work,T2.make_leaf());
-      VStack vs0 = new VStack(nongen,_targ0);
-      VStack vs1 = new VStack(vs0   ,_targ1);
-      return _body.prep_tree(this,vs1,work) + 1;
-    }
-    @Override void prep_lookup_deps(Ident id) {
-      if( Util.eq(id._name,_arg0) ) _targ0.push_update(id);
-      if( Util.eq(id._name,_arg1) ) _targ1.push_update(id);
+      for( int i=0; i<_args.length; i++ )
+        if( Util.eq(_args[i],id._name) ) _targs[i].push_update(id);
     }
     @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
@@ -1103,12 +1076,14 @@ public class HM {
       if( is_leaf() || dups.get(_uid) ) { // Leafs or Duplicates?  Take some effort to pretty-print cycles
         Integer ii = VNAMES.get(this);
         if( ii==null )  VNAMES.put(this,ii=VCNT++);
-        char c = (char)('A'+ii);
-        if( is_leaf() ) return sb.p(c);
         // 2nd and later visits use the short form
-        if( visit.tset(_uid) ) return sb.p('$').p(c);
+        boolean later = !is_leaf() && visit.tset(_uid);
+        if( later ) sb.p('$');
+        char c = (char)('A'+ii);
+        if( c<'V' ) sb.p(c); else sb.p("V"+ii);
+        if( is_leaf() || later ) return sb;
         // First visit prints the V._uid and the type
-        sb.p(c).p(':');
+        sb.p(':');
       }
 
       // Special printing for functions: { arg -> body }
