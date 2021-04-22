@@ -36,13 +36,15 @@ public class HM {
     T2 strp  = T2.make_base(TypeMemPtr.STRPTR);
 
     // Primitives
+    PRIMS.put("nil",T2.make_nil());
+
     T2 var1 = T2.make_leaf();
     T2 var2 = T2.make_leaf();
 
     PRIMS.put("pair1",T2.make_fun(var1, T2.make_fun(var2, T2.prim("pair",var1,var2) ))); // curried
     PRIMS.put("pair",T2.make_fun(var1, var2, T2.prim("pair",var1,var2) ));
 
-    PRIMS.put("if",T2.make_fun(bool,var1,var1,var1));
+    PRIMS.put("if",T2.make_fun(var2,var1,var1,var1));
 
     PRIMS.put("dec",T2.make_fun(int64,int64));
     PRIMS.put("*"  ,T2.make_fun(int64,int64,int64));
@@ -100,7 +102,6 @@ public class HM {
   }
   static Syntax term() {
     if( skipWS()==-1 ) return null;
-    if( BUF[X]=='0' ) { X++; return new Con(Type.NIL); } // The magic nil
     if( isDigit(BUF[X]) ) return number();
     if( BUF[X]=='"' ) return string();
     if( BUF[X]=='(' ) {         // Parse an Apply
@@ -317,13 +318,14 @@ public class HM {
       if( t==null ) t = PRIMS.get(_name);            // Lookup in prims
       if( t==null )
         throw new RuntimeException("Parse error, "+_name+" is undefined");
-      return t.fresh_unify(find(),_nongen,work);
+      return t.find().fresh_unify(find(),_nongen,work);
     }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
     @Override void add_kids(Worklist work) { }
     @Override void add_occurs(Worklist work) {
       T2 t = _par==null ? null : _par.lookup(_name); // Lookup in current env
       if( t==null ) t = PRIMS.get(_name);            // Lookup in prims
+      t = t.find();
       if( t.occurs_in(_par) )                        // Got captured in some parent?
         t.add_deps_work(work);                       // Need to revisit dependent ids
     }
@@ -483,6 +485,20 @@ public class HM {
     @Override boolean hm(Worklist work) {
       // Unifiying these: make_fun(this.arg0 this.arg1 -> new     )
       //                      _fun{_fun.arg0 _fun.arg1 -> _fun.rez}
+
+      // Discover not-nil in the trivial case of directly using the 'if'
+      // primitive against a T2.is_struct().  Will not work if 'if' is some
+      // more hidden or complex function (e.q. '&&' or '||') or the predicate
+      // implies not-null on some other struct.
+      boolean progress = false;
+      T2 str;
+      if( _fun instanceof Ident && Util.eq(((Ident)_fun)._name,"if") &&
+          _args[0] instanceof Ident && (str=_args[0].find()).is_struct() && str._con==null ) {
+        if( work==null ) return true;
+        progress = true;
+        str._con = Type.NIL;    // Add nil to a struct
+      }
+
       // Progress if:
       //   _fun is not a function
       //   any arg-pair-unifies make progress
@@ -501,7 +517,6 @@ public class HM {
       if( tfun._args.length != _args.length+1 )
         throw new RuntimeException("Mismatched argument lengths");
       // Check for progress amongst arg pairs
-      boolean progress = false;
       for( int i=0; i<_args.length; i++ ) {
         progress |= tfun.args(i).unify(_args[i].find(),work);
         if( progress && work==null )
@@ -649,7 +664,7 @@ public class HM {
     static T2 make_leaf() { return new T2("V"+CNT,null,null,new T2[1]); }
     static T2 make_base(Type con) { return new T2("Base",con,null); }
     static T2 make_nil() { return new T2("Nil",null,null); }
-    static T2 make_struct(String[] ids, T2[] flds) { return new T2("@{}",null,ids,flds); }
+    static T2 make_struct( String[] ids, T2[] flds ) { return new T2("@{}", null,ids,flds); }
     static T2 prim(String name, T2... args) { return new T2(name,null,null,args); }
     T2 copy() { return new T2(_name,_con,_ids,new T2[_args.length]); }
 
@@ -845,6 +860,8 @@ public class HM {
         return work==null || vput(that,that.union(_fresh(nongen),work));
       // Bases MEET cons in RHS
       if( is_base() && that.is_base() ) return vput(that,fresh_base(that,work));
+      // Unify struct with nil
+      if( is_nil() && that.is_struct() ) return or0(that,work);
 
       if( !Util.eq(_name,that._name) ||
           (!is_struct() && _args.length != that._args.length) )
@@ -1100,7 +1117,9 @@ public class HM {
         sb.p("@{");
         for( int i=0; i<_ids.length; i++ )
           str(sb.p(' ').p(_ids[i]).p(" = "),visit,args(i),dups).p(',');
-        return sb.unchar().p("}");
+        sb.unchar().p("}");
+        if( _con==Type.NIL ) sb.p('?');
+        return sb;
       }
 
       // Generic structural T2: (fun arg0 arg1...)

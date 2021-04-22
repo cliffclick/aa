@@ -24,13 +24,13 @@ public class TestHM {
   @Test
   public void test02() {
     T2 t = HM.hm("(pair1 3)");
-    assertEquals("{ V25 -> (pair 3 V25) }",t.p());
+    assertEquals("{ V26 -> (pair 3 V26) }",t.p());
   }
 
   @Test
   public void test03() {
     T2 t = HM.hm("{ z -> (pair (z 3) (z \"abc\")) }");
-    assertEquals("{ { all -> V24 } -> (pair V24 V24) }",t.p());
+    assertEquals("{ { all -> V25 } -> (pair V25 V25) }",t.p());
   }
 
   @Test
@@ -51,9 +51,9 @@ public class TestHM {
   public void test06() {
     // recursive unification
     T2 t1 = HM.hm("{ f -> (f f) }");
-    assertEquals("{ V26:{ $V26 -> V22 } -> V22 }",t1.p());
+    assertEquals("{ V27:{ $V27 -> V23 } -> V23 }",t1.p());
     // We can argue the pretty-print should print:
-    // "V25:{ V25 -> V21 }"
+    // "V27:{ V27 -> V23 }"
   }
 
   @Test
@@ -66,20 +66,20 @@ public class TestHM {
   public void test08() {
     // example that demonstrates generic and non-generic variables:
     T2 t1 = HM.hm("{ g -> f = { x -> g }; (pair (f 3) (f \"abc\"))}");
-    assertEquals("{ V22 -> (pair V22 V22) }",t1.p());
+    assertEquals("{ V23 -> (pair V23 V23) }",t1.p());
   }
 
   @Test
   public void test09() {
     T2 t1 = HM.hm("{ f g -> (f g)}");
-    assertEquals("{ { V21 -> V23 } V21 -> V23 }",t1.p());
+    assertEquals("{ { V22 -> V24 } V22 -> V24 }",t1.p());
   }
 
   @Test
   public void test10() {
     // Function composition
     T2 t1 = HM.hm("{ f g -> { arg -> (g (f arg))} }");
-    assertEquals("{ { V20 -> V27 } { V27 -> V25 } -> { V20 -> V25 } }",t1.p());
+    assertEquals("{ { V21 -> V28 } { V28 -> V26 } -> { V21 -> V26 } }",t1.p());
   }
 
   @Test
@@ -93,7 +93,7 @@ public class TestHM {
   public void test12() {
     // map takes a function and an element (collection?) and applies it (applies to collection?)
     T2 t1 = HM.hm("map = { fun -> { x -> (fun x)}}; { p -> 5 }");
-    assertEquals("{ V22 -> 5 }",t1.p());
+    assertEquals("{ V23 -> 5 }",t1.p());
   }
 
   @Test
@@ -125,7 +125,7 @@ public class TestHM {
     T2 t1 = HM.hm("fcn = { p -> { a -> (pair a a) }};"+
                   "map = { fun x -> (fun x)};"+
                   "{ q -> (map (fcn q) 5)}");
-    assertEquals("{ V24 -> (pair 5 5) }",t1.p());
+    assertEquals("{ V25 -> (pair 5 5) }",t1.p());
   }
 
   @Test(expected = RuntimeException.class)
@@ -209,7 +209,7 @@ public class TestHM {
                   "      (pair (fgz 3) (fgz 5))"+
                   "}"
                   );
-    assertEquals("{ { nint8 -> V34 } -> (pair V34 V34) }",t1.p());
+    assertEquals("{ { nint8 -> V35 } -> (pair V35 V35) }",t1.p());
   }
 
   // Basic structure test
@@ -229,14 +229,14 @@ public class TestHM {
   @Test
   public void test26() {
     T2 t = HM.hm("{ g -> @{x=g, y=g}}");
-    assertEquals("{ V20 -> @{ x = V20, y = V20} }",t.p());
+    assertEquals("{ V21 -> @{ x = V21, y = V21} }",t.p());
   }
 
   @Test
   public void test27() {
     // Load common field 'x', ignoring mismatched fields y and z
     T2 t = HM.hm("{ pred -> .x (if pred @{x=2,y=3} @{x=3,z= \"abc\"}) }");
-    assertEquals("{ int1 -> nint8 }",t.p());
+    assertEquals("{ V21 -> nint8 }",t.p());
   }
 
   @Test
@@ -250,15 +250,15 @@ public class TestHM {
   public void test29() {
     // Recursive linked-list discovery, with no end clause
     T2 t = HM.hm("map = { fcn lst -> @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } }; map");
-    assertEquals("{ { V41 -> V42 } V43:@{ n0 = $V43, v0 = V41} -> V44:@{ n1 = $V44, v1 = V42} }",t.p());
+    assertEquals("{ { V42 -> V43 } V44:@{ n0 = $V44, v0 = V42} -> V45:@{ n1 = $V45, v1 = V43} }",t.p());
   }
 
 
   @Test
   public void test30() {
     // Recursive linked-list discovery, with nil
-    T2 t = HM.hm("map = { fcn lst -> (if (?0 lst) 0 @{ n1=(map fcn .n0 lst), v1=(fcn .v0 lst) }) }; map");
-    assertEquals("{ { V41 -> V42 } V43:@{ n0 = $V43, v0 = V41}? -> V44:@{ n1 = $V44, v1 = V42}? }",t.p());
+    T2 t = HM.hm("map = { fcn lst -> (if lst nil @{ n1=(map fcn .n0 lst), v1=(fcn .v0 lst) }) }; map");
+    assertEquals("{ { V48 -> V49 } V50:@{ v0 = V48, n0 = $V50}? -> V51:@{ n1 = $V51, v1 = V49}? }",t.p());
   }
 
   // need to see if a map call, inlined a few times, 'rolls up'
