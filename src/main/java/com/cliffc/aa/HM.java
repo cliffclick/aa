@@ -40,9 +40,11 @@ public class HM {
 
     T2 var1 = T2.make_leaf();
     T2 var2 = T2.make_leaf();
+    T2 var3 = T2.make_leaf();
 
     PRIMS.put("pair1",T2.make_fun(var1, T2.make_fun(var2, T2.prim("pair",var1,var2) ))); // curried
     PRIMS.put("pair",T2.make_fun(var1, var2, T2.prim("pair",var1,var2) ));
+    PRIMS.put("triple",T2.make_fun(var1, var2, var3, T2.prim("triple",var1,var2,var3) ));
 
     PRIMS.put("if",T2.make_fun(var2,var1,var1,var1));
 
@@ -1092,16 +1094,21 @@ public class HM {
 
     // Same as toString but calls find().  Can thus side-effect & roll-up U-Fs, so not a toString
     public String p() { return p(get_dups(new VBitSet())); }
-    String p(VBitSet dups) { return find()._p(new SB(), new VBitSet(), dups).toString(); }
+    private static int VCNT;
+    private static final HashMap<T2,Integer> VNAMES = new HashMap<>();
+    String p(VBitSet dups) { VCNT=0; VNAMES.clear(); return find()._p(new SB(), new VBitSet(), dups).toString(); }
     private SB _p(SB sb, VBitSet visit, VBitSet dups) {
       assert no_uf();
       if( is_base() ) return sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString() );
-      if( is_leaf() ) return sb.p(_name);
-      if( dups.get(_uid) ) {    // Duplicates?  Take some effort to pretty-print cycles
+      if( is_leaf() || dups.get(_uid) ) { // Leafs or Duplicates?  Take some effort to pretty-print cycles
+        Integer ii = VNAMES.get(this);
+        if( ii==null )  VNAMES.put(this,ii=VCNT++);
+        char c = (char)('A'+ii);
+        if( is_leaf() ) return sb.p(c);
         // 2nd and later visits use the short form
-        if( visit.tset(_uid) ) return sb.p("$V").p(_uid);
+        if( visit.tset(_uid) ) return sb.p('$').p(c);
         // First visit prints the V._uid and the type
-        sb.p('V').p(_uid).p(':');
+        sb.p(c).p(':');
       }
 
       // Special printing for functions: { arg -> body }
@@ -1116,7 +1123,7 @@ public class HM {
       if( is_struct() ) {
         sb.p("@{");
         for( int i=0; i<_ids.length; i++ )
-          str(sb.p(' ').p(_ids[i]).p(" = "),visit,args(i),dups).p(',');
+          args(i)._p(sb.p(' ').p(_ids[i]).p(" = "),visit,dups).p(',');
         sb.unchar().p("}");
         if( _con==Type.NIL ) sb.p('?');
         return sb;
