@@ -39,14 +39,14 @@ public class HM {
     T2 var1 = T2.make_leaf();
     T2 var2 = T2.make_leaf();
 
-    PRIMS.put("pair1",T2.make_fun(var1, T2.make_fun(var2, T2.prim("pair",var1,var2) )));
+    PRIMS.put("pair1",T2.make_fun(var1, T2.make_fun(var2, T2.prim("pair",var1,var2) ))); // curried
     PRIMS.put("pair",T2.make_fun(var1, var2, T2.prim("pair",var1,var2) ));
 
-    PRIMS.put("if/else",T2.make_fun(bool,var1,var1,var1));
+    PRIMS.put("if",T2.make_fun(bool,var1,var1,var1));
 
     PRIMS.put("dec",T2.make_fun(int64,int64));
     PRIMS.put("*"  ,T2.make_fun(int64,int64,int64));
-    PRIMS.put("==0",T2.make_fun(int64,bool));
+    PRIMS.put("?0",T2.make_fun(T2.make_leaf(),bool));
     PRIMS.put("isempty",T2.make_fun(strp,bool));
 
     // Print a string; int->str
@@ -61,12 +61,12 @@ public class HM {
     int cnt_syns = prog.prep_tree(null,null,work);
     int init_T2s = T2.CNT;
 
-    int cnt=0, DEBUG_CNT=-1;
+    int DEBUG_CNT=-1;
     while( work.len()>0 ) {     // While work
       int oldcnt = T2.CNT;      // Used for cost-check when no-progress
       Syntax syn = work.pop();  // Get work
       T2 old = syn._t;          // Old value for progress assert
-      if( cnt==DEBUG_CNT )
+      if( work._cnt==DEBUG_CNT )
         System.out.println("break here");
       if( syn.hm(work) ) {      // Compute a new HM type and check for progress
         assert !syn.debug_find().unify(old.find(),null);// monotonic: unifying with the result is no-progress
@@ -78,7 +78,6 @@ public class HM {
       }
       // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
       assert prog.more_work(work);
-      cnt++;
     }
     assert prog.more_work(work);
 
@@ -101,6 +100,7 @@ public class HM {
   }
   static Syntax term() {
     if( skipWS()==-1 ) return null;
+    if( BUF[X]=='0' ) { X++; return new Con(Type.NIL); } // The magic nil
     if( isDigit(BUF[X]) ) return number();
     if( BUF[X]=='"' ) return string();
     if( BUF[X]=='(' ) {         // Parse an Apply
@@ -186,7 +186,7 @@ public class HM {
   }
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
   private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
-  private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_') || (c=='*') || (c=='='); }
+  private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_') || (c=='*') || (c=='?'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9') || (c=='/'); }
   private static <T> T require(char c, T t) { if( skipWS()!=c ) throw AA.unimpl("Missing '"+c+"'"); X++; return t; }
   private static void require(String s) {
@@ -780,8 +780,10 @@ public class HM {
     private long dbl_uid(T2 t) { return ((long)_uid<<32)|t._uid; }
 
     private boolean unify_base(T2 that, Worklist work) {
-      fresh_base(that,work);
+      Type con = _con.meet(that._con);
+      if( con==that._con ) return false; // No progress
       if( work==null ) return true;
+      that._con = con;          // Yes progress, but no update if null work
       _args = new T2[1];        // Room for a forwarding pointer
       _con=null;                // Flip from 'Base' to 'Leaf'
       return union(that,work);
@@ -789,7 +791,8 @@ public class HM {
     private boolean fresh_base(T2 that, Worklist work) {
       Type con = _con.meet(that._con);
       if( con==that._con ) return false; // No progress
-      if( work!=null ) that._con = con;  // Yes progress, but no update if null work
+      if( work==null ) return true;
+      that._con = con;          // Yes progress, but no update if null work
       return true;
     }
 
@@ -889,6 +892,7 @@ public class HM {
     private static final VBitSet ODUPS = new VBitSet();
     boolean occurs_in(Syntax syn) {
       if( syn==null ) return false;
+      if( is_base() ) return false;
       assert ODUPS.isEmpty();
       boolean found = _occurs_in(syn);
       ODUPS.clear();
