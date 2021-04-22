@@ -221,14 +221,14 @@ public class HM {
     @Override public String toString() {
       // Collect dups across the forest of types
       VBitSet dups = new VBitSet();
-      for( VStack vs = _par; vs!=null; vs = vs._par )
+      for( VStack vs = this; vs!=null; vs = vs._par )
         vs._nongen.get_dups(dups);
       // Now recursively print
       return str(new SB(),dups).toString();
     }
     SB str(SB sb, VBitSet dups) {
       _nongen.str(sb,new VBitSet(),dups);
-      if( _par!=null ) _par.str(sb.p(" >> "),dups);
+      if( _par!=null ) _par.str(sb.p(" , "),dups);
       return sb;
     }
     @NotNull @Override public Iterator<T2> iterator() { return new Iter(); }
@@ -293,10 +293,10 @@ public class HM {
     @Override SB str(SB sb) { return p1(sb); }
     @Override SB p1(SB sb) { return sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString()); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
-    @Override boolean hm(Worklist work) { assert find().isa("Base"); return false; }
+    @Override boolean hm(Worklist work) { return false; }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
     @Override void add_kids(Worklist work) { }
-    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) { prep_tree_impl(par, nongen, work, T2.make_base(_con)); return 1; }
+    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) { prep_tree_impl(par, nongen, work, _con==Type.NIL ? T2.make_nil() : T2.make_base(_con)); return 1; }
     @Override void prep_lookup_deps(Ident id) { throw unimpl("should not reach here"); }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
   }
@@ -432,8 +432,8 @@ public class HM {
     final Syntax _def, _body;
     T2 _targ;
     Let(String arg0, Syntax def, Syntax body) { _arg0=arg0; _body=body; _def=def; _targ=T2.make_leaf(); }
-    @Override SB str(SB sb) { return _body.str(_def.str(sb.p("let ").p(_arg0).p(" = ")).p(" in ")); }
-    @Override SB p1(SB sb) { return sb.p("let ").p(_arg0).p(" = ... in ..."); }
+    @Override SB str(SB sb) { return _body.str(_def.str(sb.p(_arg0).p(" = ")).p("; ")); }
+    @Override SB p1(SB sb) { return sb.p(_arg0).p(" = ... ; ..."); }
     @Override SB p2(SB sb, VBitSet dups) { _body.p0(sb,dups); return _def.p0(sb,dups); }
     T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
     @Override boolean hm(Worklist work) {
@@ -648,6 +648,7 @@ public class HM {
     static T2 make_fun(T2... args) { return new T2("->",null,null,args); }
     static T2 make_leaf() { return new T2("V"+CNT,null,null,new T2[1]); }
     static T2 make_base(Type con) { return new T2("Base",con,null); }
+    static T2 make_nil() { return new T2("Nil",null,null); }
     static T2 make_struct(String[] ids, T2[] flds) { return new T2("@{}",null,ids,flds); }
     static T2 prim(String name, T2... args) { return new T2(name,null,null,args); }
     T2 copy() { return new T2(_name,_con,_ids,new T2[_args.length]); }
@@ -665,6 +666,7 @@ public class HM {
     boolean no_uf() { return !is_leaf() || _args[0]==null; }
     boolean isa(String name) { return Util.eq(_name,name); }
     boolean is_base() { return isa("Base") && _con!=null; }
+    boolean is_nil()  { return isa("Nil"); }
     boolean is_fun () { return isa("->"); }
     boolean is_struct() { return isa("@{}"); }
 
@@ -703,9 +705,18 @@ public class HM {
         _deps = null;
       }
       _args[0] = that;         // U-F update
-      _name = "VX";
+      if( _name.charAt(0)!='V' ) _name = "V"+_uid; // Flag as a leaf & unified
       assert !no_uf();
       return true;
+    }
+
+    // Unify a struct with nil
+    boolean or0(T2 that, Worklist work) {
+      assert is_nil() && that.is_struct();
+      if( work==null ) return that._con==null; // Progress if moving from not-nil to nillable
+      _args = new T2[1];                       // Room for U-F
+      that._con=Type.NIL;
+      return union(that,work);
     }
 
     // Structural unification.
@@ -734,6 +745,8 @@ public class HM {
       if(      is_leaf() ) return      union(that,work);
       if( that.is_leaf() ) return that.union(this,work);
       if( is_base() && that.is_base() ) return unify_base(that,work);
+      // Unify struct with nil
+      if( is_nil() && that.is_struct() ) return or0(that,work);
 
       if( !Util.eq(_name,that._name) )
         throw new RuntimeException("Cannot unify "+this+" and "+that);
@@ -760,6 +773,7 @@ public class HM {
           if( idx==-1 ) that.add_fld(_ids[i],args(i), work); // Extend 'that' with matching field from 'this'
           else args(i)._unify(that.args(idx),work);    // Unify matching field
         }
+        if( _con!=null && that._con==null ) that._con=Type.NIL;
       } else {
         for( int i=0; i<_args.length; i++ ) // For all fields in LHS
           args(i)._unify(that.args(i),work);
@@ -853,6 +867,10 @@ public class HM {
     // Unification with structs must honor field names.
     private boolean _fresh_unify_struct(T2 that, VStack nongen, Worklist work) {
       assert is_struct() && that.is_struct();
+      if( _con!=null && that._con==null ) {
+        if( work==null ) return true; // Will progress
+        that._con = Type.NIL;         // Allow nil
+      }
       boolean progress = false;
       for( int i=0; i<_args.length; i++ ) {
         int idx = Util.find(that._ids,_ids[i]);
@@ -1043,7 +1061,9 @@ public class HM {
         sb.p("@{");
         for( int i=0; i<_ids.length; i++ )
           str(sb.p(' ').p(_ids[i]).p(" = "),visit,_args[i],dups).p(',');
-        return sb.unchar().p("}");
+        sb.unchar().p("}");
+        if( _con==Type.NIL ) sb.p('?');
+        return sb;
       }
 
       // Generic structural T2
