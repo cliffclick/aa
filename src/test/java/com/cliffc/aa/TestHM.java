@@ -241,7 +241,8 @@ public class TestHM {
 
   @Test
   public void test28() {
-    // Load some fields from an unknown struct: area of a square
+    // Load some fields from an unknown struct: area of a square.
+    // Since no nil-check, correct types as needing a not-nill input.
     T2 t = HM.hm("{ sq -> (* .x sq .y sq) }");
     assertEquals("{ @{ y = int64, x = int64} -> int64 }",t.p());
   }
@@ -253,12 +254,11 @@ public class TestHM {
     assertEquals("{ { A -> B } C:@{ n0 = $C, v0 = A} -> D:@{ n1 = $D, v1 = B} }",t.p());
   }
 
-
   @Test
   public void test30() {
     // Recursive linked-list discovery, with nil
-    T2 t = HM.hm("map = { fcn lst -> (if lst nil @{ n1=(map fcn .n0 lst), v1=(fcn .v0 lst) }) }; map");
-    assertEquals("{ { A -> B } C:@{ v0 = A, n0 = $C}? -> D:@{ n1 = $D, v1 = B}? }",t.p());
+    T2 t = HM.hm("map = { fcn lst -> (if lst @{ n1=(map fcn .n0 lst), v1=(fcn .v0 lst) } nil) }; map");
+    assertEquals("{ { A -> B } C:@{ n0 = $C, v0 = A}? -> D:@{ n1 = $D, v1 = B}? }",t.p());
   }
 
   // try the worse-case expo blow-up test case from SO
@@ -273,6 +273,13 @@ public class TestHM {
     assertEquals("(triple (triple (triple { A B C -> (triple A B C) } { D E F -> (triple D E F) } { G H I -> (triple G H I) }) (triple { J K L -> (triple J K L) } { M N O -> (triple M N O) } { P Q R -> (triple P Q R) }) (triple { S T U -> (triple S T U) } { V21 V22 V23 -> (triple V21 V22 V23) } { V24 V25 V26 -> (triple V24 V25 V26) })) (triple (triple { V27 V28 V29 -> (triple V27 V28 V29) } { V30 V31 V32 -> (triple V30 V31 V32) } { V33 V34 V35 -> (triple V33 V34 V35) }) (triple { V36 V37 V38 -> (triple V36 V37 V38) } { V39 V40 V41 -> (triple V39 V40 V41) } { V42 V43 V44 -> (triple V42 V43 V44) }) (triple { V45 V46 V47 -> (triple V45 V46 V47) } { V48 V49 V50 -> (triple V48 V49 V50) } { V51 V52 V53 -> (triple V51 V52 V53) })) (triple (triple { V54 V55 V56 -> (triple V54 V55 V56) } { V57 V58 V59 -> (triple V57 V58 V59) } { V60 V61 V62 -> (triple V60 V61 V62) }) (triple { V63 V64 V65 -> (triple V63 V64 V65) } { V66 V67 V68 -> (triple V66 V67 V68) } { V69 V70 V71 -> (triple V69 V70 V71) }) (triple { V72 V73 V74 -> (triple V72 V73 V74) } { V75 V76 V77 -> (triple V75 V76 V77) } { V78 V79 V80 -> (triple V78 V79 V80) })))",t.p());
   }
 
-  // need to see if a map call, inlined a few times, 'rolls up'
-
+  // need to see if a map call, inlined a few times, 'rolls up'.  Rolls up the
+  // result, not the input: never unifies the inlined version with the initial
+  // version.
+  @Test
+  public void test32() {
+    // Recursive linked-list discovery, with nil.  Unrolled once.
+    T2 t = HM.hm("map = { lst -> (if lst @{ n1= arg= .n0 lst; (if arg @{ n1=(map .n0 arg), v1=(str .v0 arg)} nil), v1=(str .v0 lst) } nil) }; map");
+    assertEquals("{ A:@{ v0 = int64, n0 = @{ n0 = $A, v0 = int64}?}? -> B:@{ n1 = $B, v1 = str}? }",t.p());
+  }
 }

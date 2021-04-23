@@ -62,10 +62,10 @@ public class HM {
     Syntax prog = parse( sprog );
 
     // Prep for SSA: pre-gather all the (unique) ids
+    int DEBUG_CNT=-1;
     int cnt_syns = prog.prep_tree(null,null,work);
     int init_T2s = T2.CNT;
 
-    int DEBUG_CNT=-1;
     while( work.len()>0 ) {     // While work
       int oldcnt = T2.CNT;      // Used for cost-check when no-progress
       Syntax syn = work.pop();  // Get work
@@ -81,11 +81,11 @@ public class HM {
         assert !DEBUG_LEAKS || oldcnt==T2.CNT;  // No-progress consumes no-new-T2s
       }
       // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
-      assert prog.more_work(work);
+      //assert prog.more_work(work);
     }
     assert prog.more_work(work);
 
-    //System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+cnt+", T2s: "+T2.CNT);
+    //System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+work._cnt+", T2s: "+T2.CNT);
     return prog._t;
   }
   static void reset() { PRIMS.clear(); T2.reset(); }
@@ -422,7 +422,7 @@ public class HM {
     }
     @Override void add_kids(Worklist work) { work.push(_body); work.push(_def); }
     @Override void add_occurs(Worklist work) {
-      if( targ().occurs_in_type(find()) ) work.addAll(_targ._deps);
+      if( targ().occurs_in_type(_def.find()) ) work.addAll(_targ._deps);
     }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par,nongen,work,_body._t);
@@ -472,6 +472,7 @@ public class HM {
         if( work==null ) return true;
         progress = true;
         str._con = Type.NIL;    // Add nil to a struct
+        work.addAll(str._deps);
       }
 
       // Progress if:
@@ -589,13 +590,14 @@ public class HM {
       T2 str = _str.find();
       int idx = str._ids==null ? -1 : Util.find(str._ids,_id);
       if( idx==-1 )             // Not a struct or no field, force it to be one
-        return work==null || T2.make_struct(new String[]{_id}, new T2[]{find()}).unify(str, work);
+        return work==null || T2.make_struct(new String[]{_id}, new T2[]{find().push_update(str._deps)}).unify(str, work);
 
       // Unify the field
       return str.args(idx).unify(find(),work);
     }
     @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
     @Override void add_kids(Worklist work) { work.push(_str); }
+    @Override void add_occurs(Worklist work) { _str.add_occurs(work); }
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par, nongen, work, T2.make_leaf());
       return _str.prep_tree(this,nongen,work)+1;
@@ -703,7 +705,8 @@ public class HM {
     // Unify a struct with nil
     boolean or0(T2 that, Worklist work) {
       assert is_nil() && that.is_struct();
-      if( work==null ) return that._con==null; // Progress if moving from not-nil to nillable
+      if( work==null ) return that._con==null; // Progress if moving from not-nil to nilable
+      if( that._con == Type.NIL ) return false;// Already nilable
       _args = new T2[1];                       // Room for U-F
       that._con=Type.NIL;
       return union(that,work);
@@ -737,6 +740,7 @@ public class HM {
       if( is_base() && that.is_base() ) return unify_base(that,work);
       // Unify struct with nil
       if( is_nil() && that.is_struct() ) return or0(that,work);
+      if( that.is_nil() && is_struct() ) return that.or0(this,work);
 
       if( !Util.eq(_name,that._name) )
         throw new RuntimeException("Cannot unify "+this+" and "+that);
@@ -762,8 +766,10 @@ public class HM {
           int idx = Util.find(that._ids,_ids[i]);
           if( idx==-1 ) that.add_fld(_ids[i],args(i), work); // Extend 'that' with matching field from 'this'
           else args(i)._unify(that.args(idx),work);    // Unify matching field
+          that = that.find();                          // Recursively, might have already rolled this up
         }
         if( _con!=null && that._con==null ) that._con=Type.NIL;
+        if( this==that ) return true; // Might have unioned this-into-that recursively, exit now with progress
       } else {
         for( int i=0; i<_args.length; i++ ) // For all fields in LHS
           args(i)._unify(that.args(i),work);
@@ -836,7 +842,9 @@ public class HM {
       // Bases MEET cons in RHS
       if( is_base() && that.is_base() ) return vput(that,fresh_base(that,work));
       // Unify struct with nil
-      if( is_nil() && that.is_struct() ) return or0(that,work);
+      if( is_nil() && that.is_struct() ) return vput(that,or0(that,work));
+      if( that.is_nil() && is_struct() )
+        return work==null || vput(that,that.or0(_fresh(nongen),work));
 
       if( !Util.eq(_name,that._name) ||
           (!is_struct() && _args.length != that._args.length) )
@@ -978,6 +986,7 @@ public class HM {
 
     private boolean _cycle_equals_struct(T2 t) {
       assert is_struct() && t.is_struct();
+      if( _con != t._con ) return false;
       for( int i=0; i<_args.length; i++ ) {
         int idx = Util.find(t._ids,_ids[i]);
         if( idx==-1 || !args(i)._cycle_equals(t.args(idx)) )
@@ -991,6 +1000,7 @@ public class HM {
     // down the function parts; if any changes the fresh-application may make
     // progress.
     static final VBitSet UPDATE_VISIT  = new VBitSet();
+    T2 push_update( Ary<Ident> as ) { if( as != null ) for( Ident a : as ) push_update(a);  return this;   }
     void push_update( Ident a) { assert UPDATE_VISIT.isEmpty(); push_update_impl(a); UPDATE_VISIT.clear(); }
     private void push_update_impl(Ident a) {
       assert no_uf();
