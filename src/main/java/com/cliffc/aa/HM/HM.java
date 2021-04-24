@@ -1,4 +1,4 @@
-package com.cliffc.aa;
+package com.cliffc.aa.HM;
 
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
@@ -18,9 +18,9 @@ import static com.cliffc.aa.AA.unimpl;
 // concrete base type, or a sharable leaf.  Unify is structural, and where not
 // unifyable the union is replaced with an Error.
 
-// This version has a nice language parser.
+// Extend to records.
 
-public class HM6 {
+public class HM {
   static final HashMap<String,T2> PRIMS = new HashMap<>();
   static boolean DEBUG_LEAKS=false;
 
@@ -36,17 +36,21 @@ public class HM6 {
     T2 strp  = T2.make_base(TypeMemPtr.STRPTR);
 
     // Primitives
+    PRIMS.put("nil",T2.make_nil());
+
     T2 var1 = T2.make_leaf();
     T2 var2 = T2.make_leaf();
+    T2 var3 = T2.make_leaf();
 
-    PRIMS.put("pair1",T2.make_fun(var1, T2.make_fun(var2, T2.prim("pair",var1,var2) )));
+    PRIMS.put("pair1",T2.make_fun(var1, T2.make_fun(var2, T2.prim("pair",var1,var2) ))); // curried
     PRIMS.put("pair",T2.make_fun(var1, var2, T2.prim("pair",var1,var2) ));
+    PRIMS.put("triple",T2.make_fun(var1, var2, var3, T2.prim("triple",var1,var2,var3) ));
 
-    PRIMS.put("if/else",T2.make_fun(bool,var1,var1,var1));
+    PRIMS.put("if",T2.make_fun(var2,var1,var1,var1));
 
     PRIMS.put("dec",T2.make_fun(int64,int64));
     PRIMS.put("*"  ,T2.make_fun(int64,int64,int64));
-    PRIMS.put("==0",T2.make_fun(int64,bool));
+    PRIMS.put("?0",T2.make_fun(T2.make_leaf(),bool));
     PRIMS.put("isempty",T2.make_fun(strp,bool));
 
     // Print a string; int->str
@@ -58,15 +62,15 @@ public class HM6 {
     Syntax prog = parse( sprog );
 
     // Prep for SSA: pre-gather all the (unique) ids
+    int DEBUG_CNT=-1;
     int cnt_syns = prog.prep_tree(null,null,work);
     int init_T2s = T2.CNT;
 
-    int cnt=0, DEBUG_CNT=-1;
     while( work.len()>0 ) {     // While work
       int oldcnt = T2.CNT;      // Used for cost-check when no-progress
       Syntax syn = work.pop();  // Get work
       T2 old = syn._t;          // Old value for progress assert
-      if( cnt==DEBUG_CNT )
+      if( work._cnt==DEBUG_CNT )
         System.out.println("break here");
       if( syn.hm(work) ) {      // Compute a new HM type and check for progress
         assert !syn.debug_find().unify(old.find(),null);// monotonic: unifying with the result is no-progress
@@ -78,11 +82,10 @@ public class HM6 {
       }
       // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
       //assert prog.more_work(work);
-      cnt++;
     }
     assert prog.more_work(work);
 
-    //System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+cnt+", T2s: "+T2.CNT);
+    //System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+work._cnt+", T2s: "+T2.CNT);
     return prog._t;
   }
   static void reset() { PRIMS.clear(); T2.reset(); }
@@ -96,7 +99,7 @@ public class HM6 {
     X = 0;
     BUF = s.getBytes();
     Syntax prog = term();
-    if( skipWS() != -1 ) throw AA.unimpl("Junk at end of program: "+new String(BUF,X,BUF.length-X));
+    if( skipWS() != -1 ) throw unimpl("Junk at end of program: "+new String(BUF,X,BUF.length-X));
     return prog;
   }
   static Syntax term() {
@@ -112,14 +115,11 @@ public class HM6 {
     }
     if( BUF[X]=='{' ) {         // Lambda of 1 or 2 args
       X++;                      // Skip paren
-      skipWS();
-      String arg0 = id(), arg1=null;
-      if( skipWS()!='-' ) arg1 = id();
+      Ary<String> args = new Ary<>(new String[1],0);
+      while( skipWS()!='-' ) args.push(id());
       require("->");
       Syntax body = require('}',term());
-      return arg1==null
-        ? new Lambda (arg0,     body)
-        : new Lambda2(arg0,arg1,body);
+      return new Lambda(body,args.asAry());
     }
     // Let or Id
     if( isAlpha0(BUF[X]) ) {
@@ -131,14 +131,39 @@ public class HM6 {
       return new Let(id,def,term());
     }
 
-    throw AA.unimpl();
+    // Structure
+    if( BUF[X]=='@' ) {
+      X++;
+      require('{',null);
+      Ary<String>  ids = new Ary<>(String.class);
+      Ary<Syntax> flds = new Ary<>(Syntax.class);
+      while( skipWS()!='}' && X < BUF.length ) {
+        String id = require('=',id());
+        Syntax fld = term();
+        if( fld==null ) throw unimpl("Missing term for field "+id);
+        ids .push( id);
+        flds.push(fld);
+        if( skipWS()==',' ) X++;
+      }
+      return require('}',new Struct(ids.asAry(),flds.asAry()));
+    }
+
+    // Field lookup is prefix or backwards: ".x term"
+    if( BUF[X]=='.' ) {
+      X++;
+      return new Field(id(),term());
+    }
+
+    throw unimpl("Unknown syntax");
   }
   private static final SB ID = new SB();
   private static String id() {
     ID.clear();
     while( X<BUF.length && isAlpha1(BUF[X]) )
       ID.p((char)BUF[X++]);
-    return ID.toString().intern();
+    String s = ID.toString().intern();
+    if( s.length()==0 ) throw unimpl("Missing id");
+    return s;
   }
   private static Syntax number() {
     int sum=0;
@@ -161,14 +186,14 @@ public class HM6 {
   }
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
   private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
-  private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_') || (c=='*') || (c=='='); }
+  private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_') || (c=='*') || (c=='?'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9') || (c=='/'); }
-  private static <T> T require(char c, T t) { if( skipWS()!=c ) throw AA.unimpl("Missing '"+c+"'"); X++; return t; }
+  private static <T> T require(char c, T t) { if( skipWS()!=c ) throw unimpl("Missing '"+c+"'"); X++; return t; }
   private static void require(String s) {
     skipWS();
     for( int i=0; i<s.length(); i++ )
       if( X+i >= BUF.length || BUF[X+i]!=s.charAt(i) )
-        throw AA.unimpl("Missing '"+s+"'");
+        throw unimpl("Missing '"+s+"'");
     X+=s.length();
   }
 
@@ -180,8 +205,8 @@ public class HM6 {
     private final HashSet<Syntax> _work = new HashSet<>();    // For preventing dups
     public int len() { return _ary.len(); }
     public void push(Syntax s) { if( !_work.contains(s) ) _work.add(_ary.push(s)); }
-    //public Syntax pop() { Syntax s = _ary.pop();_cnt++;            _work.remove(s); return s; }
-    public Syntax pop() { Syntax s = _ary.del(  _cnt++%_ary._len); _work.remove(s); return s; }
+    public Syntax pop() { Syntax s = _ary.pop();_cnt++;            _work.remove(s); return s; }
+    //public Syntax pop() { Syntax s = _ary.del(  _cnt++%_ary._len); _work.remove(s); return s; }
     public boolean has(Syntax s) { return _work.contains(s); }
     public void addAll(Ary<? extends Syntax> ss) { if( ss != null ) for( Syntax s : ss ) push(s); }
     @Override public String toString() { return _ary.toString(); }
@@ -193,10 +218,17 @@ public class HM6 {
     final VStack _par;
     final T2 _nongen;
     VStack( VStack par, T2 nongen ) { _par=par; _nongen=nongen; }
-    @Override public String toString() { return str(new SB()).toString(); }
-    SB str(SB sb) {
-      _nongen.str(sb,new VBitSet(),new VBitSet());
-      if( _par!=null ) _par.str(sb.p(" >> "));
+    @Override public String toString() {
+      // Collect dups across the forest of types
+      VBitSet dups = new VBitSet();
+      for( VStack vs = this; vs!=null; vs = vs._par )
+        vs._nongen.get_dups(dups);
+      // Now recursively print
+      return str(new SB(),dups).toString();
+    }
+    SB str(SB sb, VBitSet dups) {
+      _nongen.str(sb,new VBitSet(),dups);
+      if( _par!=null ) _par.str(sb.p(" , "),dups);
       return sb;
     }
     @NotNull @Override public Iterator<T2> iterator() { return new Iter(); }
@@ -238,7 +270,8 @@ public class HM6 {
     // Giant Assert: True if OK; all Syntaxs off worklist do not make progress
     abstract boolean more_work(Worklist work);
     final boolean more_work_impl(Worklist work) {
-      return work.has(this) || !hm(null); // Either on worklist, or no-progress
+      boolean no_more_work = work.has(this) || !hm(null); // Either on worklist, or no-progress
+      return no_more_work;
     }
     // Print for debugger
     @Override final public String toString() { return str(new SB()).toString(); }
@@ -260,10 +293,10 @@ public class HM6 {
     @Override SB str(SB sb) { return p1(sb); }
     @Override SB p1(SB sb) { return sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString()); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
-    @Override boolean hm(Worklist work) { assert find().isa("Base"); return false; }
+    @Override boolean hm(Worklist work) { return false; }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
     @Override void add_kids(Worklist work) { }
-    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) { prep_tree_impl(par, nongen, work, T2.make_base(_con)); return 1; }
+    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) { prep_tree_impl(par, nongen, work, _con==Type.NIL ? T2.make_nil() : T2.make_base(_con)); return 1; }
     @Override void prep_lookup_deps(Ident id) { throw unimpl("should not reach here"); }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
   }
@@ -284,13 +317,14 @@ public class HM6 {
       if( t==null ) t = PRIMS.get(_name);            // Lookup in prims
       if( t==null )
         throw new RuntimeException("Parse error, "+_name+" is undefined");
-      return t.fresh_unify(find(),_nongen,work);
+      return t.find().fresh_unify(find(),_nongen,work);
     }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
     @Override void add_kids(Worklist work) { }
     @Override void add_occurs(Worklist work) {
       T2 t = _par==null ? null : _par.lookup(_name); // Lookup in current env
       if( t==null ) t = PRIMS.get(_name);            // Lookup in prims
+      t = t.find();
       if( t.occurs_in(_par) )                        // Got captured in some parent?
         t.add_deps_work(work);                       // Need to revisit dependent ids
     }
@@ -305,88 +339,64 @@ public class HM6 {
   }
 
   static class Lambda extends Syntax {
-    final String _arg0;
+    final String[] _args;
     final Syntax _body;
-    T2 _targ;
-    Lambda(String arg0, Syntax body) { _arg0=arg0; _body=body; _targ = T2.make_leaf(); }
-    @Override SB str(SB sb) { return _body.str(sb.p("{ ").p(_arg0).p(" -> ")).p(" }"); }
-    @Override SB p1(SB sb) { return sb.p("{ ").p(_arg0).p(" -> ... } "); }
+    T2[] _targs;
+    Lambda(Syntax body, String... args) {
+      _args=args;
+      _body=body;
+      _targs = new T2[args.length];
+      for( int i=0; i<args.length; i++ ) _targs[i] = T2.make_leaf();
+    }
+    @Override SB str(SB sb) {
+      sb.p("{ ");
+      for( String arg : _args ) sb.p(arg).p(' ');
+      return _body.str(sb.p("-> ")).p(" }");
+    }
+    @Override SB p1(SB sb) {
+      sb.p("{ ");
+      for( String arg : _args ) sb.p(arg).p(' ');
+      return sb.p(" -> ... } ");
+    }
     @Override SB p2(SB sb, VBitSet dups) { return _body.p0(sb,dups); }
-    T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
+    T2 targ(int i) { T2 targ = _targs[i].find(); return targ==_targs[i] ? targ : (_targs[i]=targ); }
     @Override boolean hm(Worklist work) {
       // The normal lambda work
+      boolean progress = false;
       T2 old = find();
-      if( old.is_fun() &&       // Already a function?  Compare-by-parts
-          !old.args(0).unify(targ()      ,work) &&
-          !old.args(1).unify(_body.find(),work) )
-        return false;
+      if( old.is_fun() ) {      // Already a function?  Compare-by-parts
+        for( int i=0; i<_targs.length; i++ )
+          if( old.args(i).unify(targ(i),work) )
+            { progress=true; break; }
+        if( !progress && !old.args(_targs.length).unify(_body.find(),work) )
+          return false;           // Shortcut: no progress, no allocation
+      }
       // Make a new T2 for progress
-      T2 fun = T2.make_fun(targ(),_body.find());
+      T2[] targs = Arrays.copyOf(_targs,_targs.length+1);
+      targs[_targs.length] = _body.find();
+      T2 fun = T2.make_fun(targs);
       return old.unify(fun,work);
     }
     @Override T2 lookup(String name) {
-      if( Util.eq(_arg0,name) ) return targ();
+      for( int i=0; i<_args.length; i++ )
+        if( Util.eq(_args[i],name) ) return targ(i);
       return _par==null ? null : _par.lookup(name);
     }
     @Override void add_kids(Worklist work) { work.push(_body); }
     @Override void add_occurs(Worklist work) {
-      if( targ().occurs_in_type(find()) ) work.addAll(_targ._deps);
+      for( int i=0; i<_targs.length; i++ )
+        if( targ(i).occurs_in_type(find()) ) work.addAll(_targs[i]._deps);
     }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
-      return _body.prep_tree(this,new VStack(nongen,_targ),work) + 1;
+      VStack vs = nongen;
+      for( int i=0; i<_targs.length; i++ )
+        vs = new VStack(vs,_targs[i]);
+      return _body.prep_tree(this,vs,work) + 1;
     }
     @Override void prep_lookup_deps(Ident id) {
-      if( Util.eq(id._name,_arg0) ) _targ.push_update(id);
-    }
-    @Override boolean more_work(Worklist work) {
-      if( !more_work_impl(work) ) return false;
-      return _body.more_work(work);
-    }
-  }
-
-  static class Lambda2 extends Syntax {
-    final String _arg0, _arg1;
-    final Syntax _body;
-    T2 _targ0;
-    T2 _targ1;
-    Lambda2(String arg0, String arg1, Syntax body) { _arg0=arg0; _arg1 = arg1; _body=body; _targ0 = T2.make_leaf(); _targ1 = T2.make_leaf(); }
-    @Override SB str(SB sb) { return _body.str(sb.p("{ ").p(_arg0).p(" ").p(_arg1).p(" -> ")).p(" }"); }
-    @Override SB p1(SB sb) { return sb.p("{ ").p(_arg0).p(" ").p(_arg1).p(" -> ... } "); }
-    @Override SB p2(SB sb, VBitSet dups) { return _body.p0(sb,dups); }
-    T2 targ0() { T2 targ = _targ0.find(); return targ==_targ0 ? targ : (_targ0=targ); }
-    T2 targ1() { T2 targ = _targ1.find(); return targ==_targ1 ? targ : (_targ1=targ); }
-    @Override boolean hm(Worklist work) {
-      // The normal lambda work
-      T2 old = find();
-      if(  old.is_fun() &&      // Already a function?  Compare-by-parts
-          !old.args(0).unify(targ0()     ,work) &&
-          !old.args(1).unify(targ1()     ,work) &&
-          !old.args(2).unify(_body.find(),work) )
-        return false;
-      // Make a new T2 for progress
-      T2 fun = T2.make_fun(targ0(),targ1(),_body.find());
-      return old.unify(fun,work);
-    }
-    @Override T2 lookup(String name) {
-      if( Util.eq(_arg0,name) ) return targ0();
-      if( Util.eq(_arg1,name) ) return targ1();
-      return _par==null ? null : _par.lookup(name);
-    }
-    @Override void add_kids(Worklist work) { work.push(_body); }
-    @Override void add_occurs(Worklist work) {
-      if( targ0().occurs_in_type(find()) ) work.addAll(_targ0._deps);
-      if( targ1().occurs_in_type(find()) ) work.addAll(_targ1._deps);
-    }
-    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
-      prep_tree_impl(par,nongen,work,T2.make_leaf());
-      VStack vs0 = new VStack(nongen,_targ0);
-      VStack vs1 = new VStack(vs0   ,_targ1);
-      return _body.prep_tree(this,vs1,work) + 1;
-    }
-    @Override void prep_lookup_deps(Ident id) {
-      if( Util.eq(id._name,_arg0) ) _targ0.push_update(id);
-      if( Util.eq(id._name,_arg1) ) _targ1.push_update(id);
+      for( int i=0; i<_args.length; i++ )
+        if( Util.eq(_args[i],id._name) ) _targs[i].push_update(id);
     }
     @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
@@ -399,8 +409,8 @@ public class HM6 {
     final Syntax _def, _body;
     T2 _targ;
     Let(String arg0, Syntax def, Syntax body) { _arg0=arg0; _body=body; _def=def; _targ=T2.make_leaf(); }
-    @Override SB str(SB sb) { return _body.str(_def.str(sb.p("let ").p(_arg0).p(" = ")).p(" in ")); }
-    @Override SB p1(SB sb) { return sb.p("let ").p(_arg0).p(" = ... in ..."); }
+    @Override SB str(SB sb) { return _body.str(_def.str(sb.p(_arg0).p(" = ")).p("; ")); }
+    @Override SB p1(SB sb) { return sb.p(_arg0).p(" = ... ; ..."); }
     @Override SB p2(SB sb, VBitSet dups) { _body.p0(sb,dups); return _def.p0(sb,dups); }
     T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
     @Override boolean hm(Worklist work) {
@@ -412,14 +422,14 @@ public class HM6 {
     }
     @Override void add_kids(Worklist work) { work.push(_body); work.push(_def); }
     @Override void add_occurs(Worklist work) {
-      if( targ().occurs_in_type(find()) ) work.addAll(_targ._deps);
+      if( targ().occurs_in_type(_def.find()) ) work.addAll(_targ._deps);
     }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par,nongen,work,_body._t);
       int cnt = _body.prep_tree(this,           nongen       ,work) +
                 _def .prep_tree(this,new VStack(nongen,_targ),work);
       _t = _body._t;            // Unify 'Let._t' with the '_body'
-      return cnt;
+      return cnt+1;
     }
     @Override void prep_lookup_deps(Ident id) {
       if( Util.eq(id._name,_arg0) ) _targ.push_update(id);
@@ -450,11 +460,24 @@ public class HM6 {
     @Override boolean hm(Worklist work) {
       // Unifiying these: make_fun(this.arg0 this.arg1 -> new     )
       //                      _fun{_fun.arg0 _fun.arg1 -> _fun.rez}
+
+      // Discover not-nil in the trivial case of directly using the 'if'
+      // primitive against a T2.is_struct().  Will not work if 'if' is some
+      // more hidden or complex function (e.q. '&&' or '||') or the predicate
+      // implies not-null on some other struct.
+      boolean progress = false;
+      T2 str = is_if_nil();
+      if( str!=null && str.is_struct() && str._con==null ) {
+        if( work==null ) return true;
+        progress = true;
+        str._con = Type.NIL;    // Add nil to a struct
+        work.addAll(str._deps);
+      }
+
       // Progress if:
       //   _fun is not a function
       //   any arg-pair-unifies make progress
       //   this-unify-_fun.return makes progress
-
       T2 tfun = _fun.find();
       if( !tfun.is_fun() ) {
         if( work==null ) return true; // Will-progress & just-testing
@@ -463,14 +486,12 @@ public class HM6 {
           targs[i] = _args[i].find();
         targs[_args.length] = find(); // Return
         T2 nfun = T2.make_fun(targs);
-        tfun.unify(nfun,work);
-        return true;        // Always progress (since forcing tfun to be a fun)
+        return tfun.unify(nfun,work);
       }
 
       if( tfun._args.length != _args.length+1 )
         throw new RuntimeException("Mismatched argument lengths");
       // Check for progress amongst arg pairs
-      boolean progress = false;
       for( int i=0; i<_args.length; i++ ) {
         progress |= tfun.args(i).unify(_args[i].find(),work);
         if( progress && work==null )
@@ -483,8 +504,10 @@ public class HM6 {
     @Override void add_kids(Worklist work) { for( Syntax arg : _args ) work.push(arg); }
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
-      int cnt = _fun.prep_tree(this,nongen,work);
+      int cnt = 1+_fun.prep_tree(this,nongen,work);
       for( Syntax arg : _args ) cnt += arg.prep_tree(this,nongen,work);
+      T2 str = is_if_nil();
+      if( str!=null ) str.push_update(this);
       return cnt;
     }
     @Override void prep_lookup_deps(Ident id) { }
@@ -493,6 +516,101 @@ public class HM6 {
       if( !_fun.more_work(work) ) return false;
       for( Syntax arg : _args ) if( !arg.more_work(work) ) return false;
       return true;
+    }
+    // True if we can refine an if-not-nil
+    private T2 is_if_nil() {
+      return _fun instanceof Ident && Util.eq(((Ident)_fun)._name,"if") && _args[0] instanceof Ident ? _args[0].find() : null;
+    }
+  }
+
+  // Structure or Records.
+  static class Struct extends Syntax {
+    final String[]  _ids;
+    final Syntax[] _flds;
+    Struct( String[] ids, Syntax[] flds ) { _ids=ids; _flds=flds; }
+    @Override SB str(SB sb) {
+      sb.p("@{");
+      for( int i=0; i<_ids.length; i++ ) {
+        sb.p(' ').p(_ids[i]).p(" = ");
+        _flds[i].str(sb);
+        if( i < _ids.length-1 ) sb.p(',');
+      }
+      return sb.p("}");
+    }
+    @Override SB p1(SB sb) { return sb.p("@{ ... } "); }
+    @Override SB p2(SB sb, VBitSet dups) {
+      for( int i=0; i<_ids.length; i++ )
+        _flds[i].p0(sb.p(_ids[i]).p(" = "),dups);
+      return sb;
+    }
+    @Override boolean hm(Worklist work) {
+      // Check for progress before making new
+      T2 old = find();
+      if( old.is_struct() ) {  // Already a struct?  Compare-by-parts
+        for( int i=0; i<_ids.length; i++ ) {
+          int idx = Util.find(old._ids,_ids[i]);
+          if( idx== -1 || old.args(idx).unify(_flds[i].find(),work) ) { old=null; break; }
+        }
+        if( old!=null ) return false; // Shortcut: no progress, no allocation
+      }
+
+      // Make a new T2 for progress
+      T2[] t2s = new T2[_ids.length];
+      for( int i=0; i<_ids.length; i++ )
+        t2s[i] = _flds[i].find();
+      T2 tstruct = T2.make_struct(_ids,t2s);
+      return tstruct.unify(find(),work);
+    }
+    @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
+    @Override void add_kids(Worklist work) { for( Syntax fld : _flds ) work.push(fld); }
+    @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
+      T2[] t2s = new T2[_ids.length];
+      prep_tree_impl(par, nongen, work, T2.make_struct(_ids,t2s));
+      int cnt = 1;              // One for self
+      for( int i=0; i<_flds.length; i++ ) { // Prep all sub-fields
+        cnt += _flds[i].prep_tree(this,nongen,work);
+        t2s[i] = _flds[i].find();
+      }
+      return cnt;
+    }
+    @Override void prep_lookup_deps(Ident id) { }
+    @Override boolean more_work(Worklist work) {
+      if( !more_work_impl(work) ) return false;
+      for( Syntax fld : _flds )
+        if( !fld.more_work(work) )
+          return false;
+      return true;
+    }
+  }
+
+  // Field lookup in a Struct
+  static class Field extends Syntax {
+    final String _id;
+    final Syntax _str;
+    Field( String id, Syntax str ) { _id=id; _str=str; }
+    @Override SB str(SB sb) { return _str.str(sb.p(".").p(_id).p(' ')); }
+    @Override SB p1 (SB sb) { return sb.p(".").p(_id); }
+    @Override SB p2(SB sb, VBitSet dups) { return _str.p0(sb,dups); }
+    @Override boolean hm(Worklist work) {
+      T2 str = _str.find();
+      int idx = str._ids==null ? -1 : Util.find(str._ids,_id);
+      if( idx==-1 )             // Not a struct or no field, force it to be one
+        return work==null || T2.make_struct(new String[]{_id}, new T2[]{find().push_update(str._deps)}).unify(str, work);
+
+      // Unify the field
+      return str.args(idx).unify(find(),work);
+    }
+    @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
+    @Override void add_kids(Worklist work) { work.push(_str); }
+    @Override void add_occurs(Worklist work) { _str.add_occurs(work); }
+    @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
+      prep_tree_impl(par, nongen, work, T2.make_leaf());
+      return _str.prep_tree(this,nongen,work)+1;
+    }
+    @Override void prep_lookup_deps(Ident id) { }
+    @Override boolean more_work(Worklist work) {
+      if( !more_work_impl(work) ) return false;
+      return _str.more_work(work);
     }
   }
 
@@ -509,7 +627,7 @@ public class HM6 {
     // A plain type variable starts with a 'V', and can unify directly.
     // Everything else is structural - during unification they must match names
     // and arguments and Type constants.
-    final @NotNull String _name; // name, e.g. "->" or "pair" or "V123" or "base"
+    @NotNull String _name; // name, e.g. "->" or "pair" or "V123" or "base"
 
     // Structural parts to unify with, or slot 0 is used during normal U-F
     T2 @NotNull [] _args;
@@ -517,20 +635,26 @@ public class HM6 {
     // Base types carry a concrete Type
     Type _con;
 
+    // Structs have field names
+    @NotNull String[] _ids;
+
     // Dependent (non-local) tvars to revisit
-    Ary<Ident> _deps;
+    Ary<Syntax> _deps;
 
 
-    static T2 make_fun(T2... args) { return new T2("->",null,args); }
-    static T2 make_leaf() { return new T2("V"+CNT,null,new T2[1]); }
-    static T2 make_base(Type con) { return new T2("Base",con); }
-    static T2 prim(String name, T2... args) { return new T2(name,null,args); }
-    T2 copy() { return new T2(_name,_con,new T2[_args.length]); }
+    static T2 make_fun(T2... args) { return new T2("->",null,null,args); }
+    static T2 make_leaf() { return new T2("V"+CNT,null,null,new T2[1]); }
+    static T2 make_base(Type con) { return new T2("Base",con,null); }
+    static T2 make_nil() { return new T2("Nil",null,null); }
+    static T2 make_struct( String[] ids, T2[] flds ) { return new T2("@{}", null,ids,flds); }
+    static T2 prim(String name, T2... args) { return new T2(name,null,null,args); }
+    T2 copy() { return new T2(_name,_con,_ids,new T2[_args.length]); }
 
-    private T2(@NotNull String name, Type con, T2 @NotNull ... args) {
+    private T2(@NotNull String name, Type con, String[] ids, T2 @NotNull ... args) {
       _uid = CNT++;
       _name= name;
       _con = con;
+      _ids = ids;
       _args= args;
     }
 
@@ -539,7 +663,9 @@ public class HM6 {
     boolean no_uf() { return !is_leaf() || _args[0]==null; }
     boolean isa(String name) { return Util.eq(_name,name); }
     boolean is_base() { return isa("Base") && _con!=null; }
+    boolean is_nil()  { return isa("Nil"); }
     boolean is_fun () { return isa("->"); }
+    boolean is_struct() { return isa("@{}"); }
 
     // U-F find
     T2 find() {
@@ -563,7 +689,7 @@ public class HM6 {
     // U-F union; this becomes that; returns 'that'.
     // No change if only testing, and reports progress.
     boolean union(T2 that, Worklist work) {
-      assert is_leaf() && no_uf(); // Cannot union twice
+      assert no_uf(); // Cannot union twice
       if( this==that ) return false;
       if( work==null ) return true; // Report progress without changing
       // Worklist: put updates on the worklist for revisiting
@@ -572,11 +698,23 @@ public class HM6 {
         // Merge update lists, for future unions
         if( that._deps==null && that.is_leaf() ) that._deps = _deps;
         else
-          for( Ident dep : _deps ) that.push_update(dep);
+          for( Syntax dep : _deps ) that.push_update(dep);
         _deps = null;
       }
       _args[0] = that;         // U-F update
+      if( _name.charAt(0)!='V' ) _name = "V"+_uid; // Flag as a leaf & unified
+      assert !no_uf();
       return true;
+    }
+
+    // Unify a struct with nil
+    boolean or0(T2 that, Worklist work) {
+      assert is_nil() && that.is_struct();
+      if( work==null ) return that._con==null; // Progress if moving from not-nil to nilable
+      if( that._con == Type.NIL ) return false;// Already nilable
+      _args = new T2[1];                       // Room for U-F
+      that._con=Type.NIL;
+      return union(that,work);
     }
 
     // Structural unification.
@@ -595,7 +733,7 @@ public class HM6 {
 
     // Structural unification, 'this' into 'that'.  No change if just testing
     // (work is null) and returns 'that' if progress.  If updating, both 'this'
-    // and 'that' are the same afterwards.  Sets PROGRESS.
+    // and 'that' are the same afterwards.
     private boolean _unify(T2 that, Worklist work) {
       assert no_uf() && that.no_uf();
       if( this==that ) return false;
@@ -605,11 +743,14 @@ public class HM6 {
       if(      is_leaf() ) return      union(that,work);
       if( that.is_leaf() ) return that.union(this,work);
       if( is_base() && that.is_base() ) return unify_base(that,work);
+      // Unify struct with nil
+      if( is_nil() && that.is_struct() ) return or0(that,work);
+      if( that.is_nil() && is_struct() ) return that.or0(this,work);
 
       if( !Util.eq(_name,that._name) )
         throw new RuntimeException("Cannot unify "+this+" and "+that);
       assert _args!=that._args; // Not expecting to share _args and not 'this'
-      if( _args.length != that._args.length )
+      if( !is_struct() && _args.length != that._args.length )
         throw new RuntimeException("Cannot unify "+this+" and "+that);
 
       // Cycle check
@@ -619,20 +760,45 @@ public class HM6 {
       if( rez!=null ) return false; // Been there, done that
       DUPS.put(luid,that);          // Close cycles
 
+      if( work==null ) return true; // Here we definitely make progress; bail out early if just testing
+
       // Structural recursion unification.
-      boolean progress=false;
-      for( int i=0; i<_args.length; i++ ) {
-        progress |= args(i)._unify(that.args(i),work);
-        if( progress && work!=null ) return true;
+      // Structs unify only on matching fields, and add missing fields.
+      if( is_struct() ) {
+        // Unification for structs is more complicated; args are aligned via
+        // field names and not by position.
+        for( int i=0; i<_ids.length; i++ ) { // For all fields in LHS
+          int idx = Util.find(that._ids,_ids[i]);
+          if( idx==-1 ) that.add_fld(_ids[i],args(i), work); // Extend 'that' with matching field from 'this'
+          else args(i)._unify(that.args(idx),work);    // Unify matching field
+          that = that.find();                          // Recursively, might have already rolled this up
+        }
+        if( _con!=null && that._con==null ) that._con=Type.NIL;
+        if( this==that ) return true; // Might have unioned this-into-that recursively, exit now with progress
+      } else {
+        for( int i=0; i<_args.length; i++ ) // For all fields in LHS
+          args(i)._unify(that.args(i),work);
       }
-      return progress;
+      return union(that,work);
+    }
+
+    private void add_fld(String id, T2 fld, Worklist work) {
+      assert is_struct();
+      int len = _ids.length;
+      _ids  = Arrays.copyOf( _ids,len+1);
+      _args = Arrays.copyOf(_args,len+1);
+      _ids [len] = id ;
+      _args[len] = fld;
+      work.addAll(_deps); //
     }
 
     private long dbl_uid(T2 t) { return ((long)_uid<<32)|t._uid; }
 
     private boolean unify_base(T2 that, Worklist work) {
-      fresh_base(that,work);
+      Type con = _con.meet(that._con);
+      if( con==that._con ) return false; // No progress
       if( work==null ) return true;
+      that._con = con;          // Yes progress, but no update if null work
       _args = new T2[1];        // Room for a forwarding pointer
       _con=null;                // Flip from 'Base' to 'Leaf'
       return union(that,work);
@@ -640,7 +806,8 @@ public class HM6 {
     private boolean fresh_base(T2 that, Worklist work) {
       Type con = _con.meet(that._con);
       if( con==that._con ) return false; // No progress
-      if( work!=null ) that._con = con;  // Yes progress, but no update if null work
+      if( work==null ) return true;
+      that._con = con;          // Yes progress, but no update if null work
       return true;
     }
 
@@ -679,15 +846,45 @@ public class HM6 {
         return work==null || vput(that,that.union(_fresh(nongen),work));
       // Bases MEET cons in RHS
       if( is_base() && that.is_base() ) return vput(that,fresh_base(that,work));
+      // Unify struct with nil
+      if( is_nil() && that.is_struct() ) return vput(that,or0(that,work));
+      if( that.is_nil() && is_struct() )
+        return work==null || vput(that,that.or0(_fresh(nongen),work));
 
       if( !Util.eq(_name,that._name) ||
-          _args.length != that._args.length )
+          (!is_struct() && _args.length != that._args.length) )
         throw new RuntimeException("Cannot unify "+this+" and "+that);
 
       // Structural recursion unification, lazy on LHS
-      boolean progress = vput(that,false); // Early set, to stop cycles
+      vput(that,false); // Early set, to stop cycles
+      boolean progress = false;
+      if( is_struct() )
+        progress = _fresh_unify_struct(that,nongen,work);
+      else {
+        for( int i=0; i<_args.length; i++ ) {
+          progress |= args(i)._fresh_unify(that.args(i),nongen,work);
+          if( progress && work==null ) return true;
+        }
+      }
+      return progress;
+    }
+
+    // Unification with structs must honor field names.
+    private boolean _fresh_unify_struct(T2 that, VStack nongen, Worklist work) {
+      assert is_struct() && that.is_struct();
+      if( _con!=null && that._con==null ) {
+        if( work==null ) return true; // Will progress
+        that._con = Type.NIL;         // Allow nil
+      }
+      boolean progress = false;
       for( int i=0; i<_args.length; i++ ) {
-        progress |= args(i)._fresh_unify(that.args(i),nongen,work);
+        int idx = Util.find(that._ids,_ids[i]);
+        if( idx == -1 ) {       // Missing field on RHS
+          if( work==null ) return true; // Will definitely make progress
+          progress = true;
+          that.add_fld(_ids[i],args(i)._fresh(nongen), work);
+        } else
+          progress |= args(i)._fresh_unify(that.args(idx),nongen,work);
         if( progress && work==null ) return true;
       }
       return progress;
@@ -718,6 +915,7 @@ public class HM6 {
     private static final VBitSet ODUPS = new VBitSet();
     boolean occurs_in(Syntax syn) {
       if( syn==null ) return false;
+      if( is_base() ) return false;
       assert ODUPS.isEmpty();
       boolean found = _occurs_in(syn);
       ODUPS.clear();
@@ -783,9 +981,22 @@ public class HM6 {
       if( tc!=null )
         return tc==t; // Cycle check; true if both cycling the same
       CDUPS.put(this,t);
+      if( is_struct() )         // Struct equality honors field names without regard to order
+        return _cycle_equals_struct(t);
       for( int i=0; i<_args.length; i++ )
         if( !args(i)._cycle_equals(t.args(i)) )
           return false;
+      return true;
+    }
+
+    private boolean _cycle_equals_struct(T2 t) {
+      assert is_struct() && t.is_struct();
+      if( _con != t._con ) return false;
+      for( int i=0; i<_args.length; i++ ) {
+        int idx = Util.find(t._ids,_ids[i]);
+        if( idx==-1 || !args(i)._cycle_equals(t.args(idx)) )
+          return false;
+      }
       return true;
     }
 
@@ -794,17 +1005,16 @@ public class HM6 {
     // down the function parts; if any changes the fresh-application may make
     // progress.
     static final VBitSet UPDATE_VISIT  = new VBitSet();
-    boolean push_update(Ident a) { assert UPDATE_VISIT.isEmpty(); push_update_impl(a); UPDATE_VISIT.clear(); return true; }
-    private void push_update_impl(Ident a) {
+    T2 push_update( Ary<Syntax> as ) { if( as != null ) for( Syntax a : as ) push_update(a);  return this;   }
+    void push_update( Syntax a) { assert UPDATE_VISIT.isEmpty(); push_update_impl(a); UPDATE_VISIT.clear(); }
+    private void push_update_impl(Syntax a) {
       assert no_uf();
-      if( is_leaf() || _args.length==0 ) {
-        if( _deps==null ) _deps = new Ary<>(Ident.class);
-        if( _deps.find(a)==-1 ) _deps.push(a);
-      } else {
-        if( UPDATE_VISIT.tset(_uid) ) return;
-        for( int i=0; i<_args.length; i++ )
+      if( UPDATE_VISIT.tset(_uid) ) return;
+      if( _deps==null ) _deps = new Ary<>(Syntax.class);
+      if( _deps.find(a)==-1 ) _deps.push(a);
+      for( int i=0; i<_args.length; i++ )
+        if( _args[i]!=null )
           args(i).push_update_impl(a);
-      }
     }
 
     void add_deps_work( Worklist work ) { assert UPDATE_VISIT.isEmpty(); add_deps_work_impl(work); UPDATE_VISIT.clear(); }
@@ -841,16 +1051,28 @@ public class HM6 {
         return _args.length==0 || _args[0]==null ? sb : _args[0].str(sb.p(">>"), visit, dups);
       }
       boolean dup = dups.get(_uid);
-      if( dup ) sb.p('$').p(_uid);
+      if( dup ) sb.p("$V").p(_uid);
       if( visit.tset(_uid) && dup ) return sb;
       if( dup ) sb.p(':');
 
+      // Special printing for functions
       if( is_fun() ) {
         sb.p("{ ");
         for( int i=0; i<_args.length-1; i++ )
           str(sb,visit,_args[i],dups).p(" ");
         return str(sb.p("-> "),visit,_args[_args.length-1],dups).p(" }");
       }
+
+      // Special printing for structures
+      if( is_struct() ) {
+        sb.p("@{");
+        for( int i=0; i<_ids.length; i++ )
+          str(sb.p(' ').p(_ids[i]).p(" = "),visit,_args[i],dups).p(',');
+        sb.unchar().p("}");
+        if( _con==Type.NIL ) sb.p('?');
+        return sb;
+      }
+
       // Generic structural T2
       sb.p("(").p(_name).p(" ");
       for( T2 t : _args ) str(sb,visit,t,dups).p(" ");
@@ -860,22 +1082,44 @@ public class HM6 {
 
     // Same as toString but calls find().  Can thus side-effect & roll-up U-Fs, so not a toString
     public String p() { return p(get_dups(new VBitSet())); }
-    String p(VBitSet dups) { return find()._p(new SB(), new VBitSet(), dups).toString(); }
+    private static int VCNT;
+    private static final HashMap<T2,Integer> VNAMES = new HashMap<>();
+    String p(VBitSet dups) { VCNT=0; VNAMES.clear(); return find()._p(new SB(), new VBitSet(), dups).toString(); }
     private SB _p(SB sb, VBitSet visit, VBitSet dups) {
       assert no_uf();
       if( is_base() ) return sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString() );
-      if( is_leaf() ) return sb.p(_name);
-      boolean dup = dups.get(_uid);
-      if( dup ) sb.p('$').p(_uid);
-      if( visit.tset(_uid) && dup ) return sb;
-      if( dup ) sb.p(':');
+      if( is_leaf() || dups.get(_uid) ) { // Leafs or Duplicates?  Take some effort to pretty-print cycles
+        Integer ii = VNAMES.get(this);
+        if( ii==null )  VNAMES.put(this,ii=VCNT++);
+        // 2nd and later visits use the short form
+        boolean later = !is_leaf() && visit.tset(_uid);
+        if( later ) sb.p('$');
+        char c = (char)('A'+ii);
+        if( c<'V' ) sb.p(c); else sb.p("V"+ii);
+        if( is_leaf() || later ) return sb;
+        // First visit prints the V._uid and the type
+        sb.p(':');
+      }
+
+      // Special printing for functions: { arg -> body }
       if( is_fun() ) {
         sb.p("{ ");
         for( int i=0; i<_args.length-1; i++ )
           args(i)._p(sb,visit,dups).p(" ");
         return args(_args.length-1)._p(sb.p("-> "),visit,dups).p(" }");
       }
-      // Generic structural T2
+
+      // Special printing for structures: @{ fld0 = body, fld1 = body, ... }
+      if( is_struct() ) {
+        sb.p("@{");
+        for( int i=0; i<_ids.length; i++ )
+          args(i)._p(sb.p(' ').p(_ids[i]).p(" = "),visit,dups).p(',');
+        sb.unchar().p("}");
+        if( _con==Type.NIL ) sb.p('?');
+        return sb;
+      }
+
+      // Generic structural T2: (fun arg0 arg1...)
       sb.p("(").p(_name).p(" ");
       for( int i=0; i<_args.length; i++ ) args(i)._p(sb,visit,dups).p(" ");
       return sb.unchar().p(")");

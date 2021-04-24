@@ -1,10 +1,10 @@
-package com.cliffc.aa;
+package com.cliffc.aa.HM;
 
 import com.cliffc.aa.type.*;
 import org.junit.Before;
 import org.junit.Test;
 
-import static com.cliffc.aa.HM3.*;
+import static com.cliffc.aa.HM.HM3.*;
 import static org.junit.Assert.assertEquals;
 
 public class TestHM3 {
