@@ -18,7 +18,7 @@ import static com.cliffc.aa.AA.unimpl;
 // concrete base type, or a sharable leaf.  Unify is structural, and where not
 // unifyable the union is replaced with an Error.
 
-// Extend to records.
+// Extend to records with nil.
 
 public class HM {
   static final HashMap<String,T2> PRIMS = new HashMap<>();
@@ -74,14 +74,12 @@ public class HM {
         System.out.println("break here");
       if( syn.hm(work) ) {      // Compute a new HM type and check for progress
         assert !syn.debug_find().unify(old.find(),null);// monotonic: unifying with the result is no-progress
-        syn.add_kids(work);     // Push children on worklist
-        syn.add_occurs(work);   // Push occurs-check ids on worklist
-        if( syn._par !=null ) work.push(syn._par); // Parent updates
+        syn.add_work(work);     // Push affected neighors on worklist
       } else {
         assert !DEBUG_LEAKS || oldcnt==T2.CNT;  // No-progress consumes no-new-T2s
       }
       // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
-      //assert prog.more_work(work);
+      assert prog.more_work(work);
     }
     assert prog.more_work(work);
 
@@ -204,7 +202,7 @@ public class HM {
     private final Ary<Syntax> _ary = new Ary<>(Syntax.class); // For picking random element
     private final HashSet<Syntax> _work = new HashSet<>();    // For preventing dups
     public int len() { return _ary.len(); }
-    public void push(Syntax s) { if( !_work.contains(s) ) _work.add(_ary.push(s)); }
+    public void push(Syntax s) { if( s!=null && !_work.contains(s) ) _work.add(_ary.push(s)); }
     public Syntax pop() { Syntax s = _ary.pop();_cnt++;            _work.remove(s); return s; }
     //public Syntax pop() { Syntax s = _ary.del(  _cnt++%_ary._len); _work.remove(s); return s; }
     public boolean has(Syntax s) { return _work.contains(s); }
@@ -264,8 +262,7 @@ public class HM {
 
     abstract T2 lookup(String name); // Lookup name in scope & return type; TODO: pre-cache this.
 
-    abstract void add_kids(Worklist work); // Add children to worklist
-    void add_occurs(Worklist work){}
+    abstract void add_work(Worklist work); // Add affected neighbors to worklist
 
     // Giant Assert: True if OK; all Syntaxs off worklist do not make progress
     abstract boolean more_work(Worklist work);
@@ -295,7 +292,7 @@ public class HM {
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
     @Override boolean hm(Worklist work) { return false; }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
-    @Override void add_kids(Worklist work) { }
+    @Override void add_work(Worklist work) { work.push(_par); }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) { prep_tree_impl(par, nongen, work, _con==Type.NIL ? T2.make_nil() : T2.make_base(_con)); return 1; }
     @Override void prep_lookup_deps(Ident id) { throw unimpl("should not reach here"); }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
@@ -320,8 +317,8 @@ public class HM {
       return t.find().fresh_unify(find(),_nongen,work);
     }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
-    @Override void add_kids(Worklist work) { }
-    @Override void add_occurs(Worklist work) {
+    @Override void add_work(Worklist work) {
+      work.push(_par);
       T2 t = _par==null ? null : _par.lookup(_name); // Lookup in current env
       if( t==null ) t = PRIMS.get(_name);            // Lookup in prims
       t = t.find();
@@ -382,8 +379,9 @@ public class HM {
         if( Util.eq(_args[i],name) ) return targ(i);
       return _par==null ? null : _par.lookup(name);
     }
-    @Override void add_kids(Worklist work) { work.push(_body); }
-    @Override void add_occurs(Worklist work) {
+    @Override void add_work(Worklist work) {
+      work.push(_par );
+      work.push(_body);
       for( int i=0; i<_targs.length; i++ )
         if( targ(i).occurs_in_type(find()) ) work.addAll(_targs[i]._deps);
     }
@@ -420,8 +418,10 @@ public class HM {
       if( Util.eq(_arg0,name) ) return targ();
       return _par==null ? null : _par.lookup(name);
     }
-    @Override void add_kids(Worklist work) { work.push(_body); work.push(_def); }
-    @Override void add_occurs(Worklist work) {
+    @Override void add_work(Worklist work) {
+      work.push(_par);
+      work.push(_body);
+      work.push(_def);
       if( targ().occurs_in_type(_def.find()) ) work.addAll(_targ._deps);
     }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
@@ -501,7 +501,10 @@ public class HM {
       return progress;
     }
     @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
-    @Override void add_kids(Worklist work) { for( Syntax arg : _args ) work.push(arg); }
+    @Override void add_work(Worklist work) {
+      work.push(_par);
+      for( Syntax arg : _args ) work.push(arg);
+    }
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
       int cnt = 1+_fun.prep_tree(this,nongen,work);
@@ -562,7 +565,10 @@ public class HM {
       return tstruct.unify(find(),work);
     }
     @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
-    @Override void add_kids(Worklist work) { for( Syntax fld : _flds ) work.push(fld); }
+    @Override void add_work(Worklist work) {
+      work.push(_par);
+      for( Syntax fld : _flds ) work.push(fld);
+    }
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       T2[] t2s = new T2[_ids.length];
       prep_tree_impl(par, nongen, work, T2.make_struct(_ids,t2s));
@@ -601,8 +607,11 @@ public class HM {
       return str.args(idx).unify(find(),work);
     }
     @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
-    @Override void add_kids(Worklist work) { work.push(_str); }
-    @Override void add_occurs(Worklist work) { _str.add_occurs(work); }
+    @Override void add_work(Worklist work) {
+      work.push(_par);
+      work.push(_str);
+      _str.add_work(work);
+    }
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par, nongen, work, T2.make_leaf());
       return _str.prep_tree(this,nongen,work)+1;
