@@ -149,6 +149,9 @@ check:	sandbox/timing.txt sandbox/out.0
 	@tail -n 4 sandbox/out.0
 	@[ `cat sandbox/status.0` -eq 0 ]
 
+hm_tests:	$(test_classes) build/aa.jar
+	$(JVM) org.junit.runner.JUnitCore com.cliffc.aa.TestHM
+
 .PHONY: clean
 clean:
 	rm -rf build

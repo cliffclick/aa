@@ -251,14 +251,14 @@ public class TestHM {
   public void test29() {
     // Recursive linked-list discovery, with no end clause
     T2 t = HM.hm("map = { fcn lst -> @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } }; map");
-    assertEquals("{ { A -> B } C:@{ n0 = $C, v0 = A} -> D:@{ n1 = $D, v1 = B} }",t.p());
+    assertEquals("{ { A -> B } C:@{ v0 = A, n0 = $C} -> D:@{ n1 = $D, v1 = B} }",t.p());
   }
 
   @Test
   public void test30() {
     // Recursive linked-list discovery, with nil
     T2 t = HM.hm("map = { fcn lst -> (if lst @{ n1=(map fcn .n0 lst), v1=(fcn .v0 lst) } nil) }; map");
-    assertEquals("{ { A -> B } C:@{ n0 = $C, v0 = A}? -> D:@{ n1 = $D, v1 = B}? }",t.p());
+    assertEquals("{ { A -> B } C:@{ v0 = A, n0 = $C}? -> D:@{ n1 = $D, v1 = B}? }",t.p());
   }
 
   // try the worse-case expo blow-up test case from SO
@@ -280,6 +280,6 @@ public class TestHM {
   public void test32() {
     // Recursive linked-list discovery, with nil.  Unrolled once.
     T2 t = HM.hm("map = { lst -> (if lst @{ n1= arg= .n0 lst; (if arg @{ n1=(map .n0 arg), v1=(str .v0 arg)} nil), v1=(str .v0 lst) } nil) }; map");
-    assertEquals("{ A:@{ v0 = int64, n0 = @{ n0 = $A, v0 = int64}?}? -> B:@{ n1 = $B, v1 = str}? }",t.p());
+    assertEquals("{ A:@{ v0 = int64, n0 = @{ n0 = $A, v0 = int64}?}? -> B:@{ n1 = @{ n1 = $B, v1 = str}?, v1 = str}? }",t.p());
   }
 }

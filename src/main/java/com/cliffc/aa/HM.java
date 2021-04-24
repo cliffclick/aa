@@ -205,8 +205,8 @@ public class HM {
     private final HashSet<Syntax> _work = new HashSet<>();    // For preventing dups
     public int len() { return _ary.len(); }
     public void push(Syntax s) { if( !_work.contains(s) ) _work.add(_ary.push(s)); }
-    //public Syntax pop() { Syntax s = _ary.pop();_cnt++;            _work.remove(s); return s; }
-    public Syntax pop() { Syntax s = _ary.del(  _cnt++%_ary._len); _work.remove(s); return s; }
+    public Syntax pop() { Syntax s = _ary.pop();_cnt++;            _work.remove(s); return s; }
+    //public Syntax pop() { Syntax s = _ary.del(  _cnt++%_ary._len); _work.remove(s); return s; }
     public boolean has(Syntax s) { return _work.contains(s); }
     public void addAll(Ary<? extends Syntax> ss) { if( ss != null ) for( Syntax s : ss ) push(s); }
     @Override public String toString() { return _ary.toString(); }
@@ -466,9 +466,8 @@ public class HM {
       // more hidden or complex function (e.q. '&&' or '||') or the predicate
       // implies not-null on some other struct.
       boolean progress = false;
-      T2 str;
-      if( _fun instanceof Ident && Util.eq(((Ident)_fun)._name,"if") &&
-          _args[0] instanceof Ident && (str=_args[0].find()).is_struct() && str._con==null ) {
+      T2 str = is_if_nil();
+      if( str!=null && str.is_struct() && str._con==null ) {
         if( work==null ) return true;
         progress = true;
         str._con = Type.NIL;    // Add nil to a struct
@@ -507,6 +506,8 @@ public class HM {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
       int cnt = 1+_fun.prep_tree(this,nongen,work);
       for( Syntax arg : _args ) cnt += arg.prep_tree(this,nongen,work);
+      T2 str = is_if_nil();
+      if( str!=null ) str.push_update(this);
       return cnt;
     }
     @Override void prep_lookup_deps(Ident id) { }
@@ -515,6 +516,10 @@ public class HM {
       if( !_fun.more_work(work) ) return false;
       for( Syntax arg : _args ) if( !arg.more_work(work) ) return false;
       return true;
+    }
+    // True if we can refine an if-not-nil
+    private T2 is_if_nil() {
+      return _fun instanceof Ident && Util.eq(((Ident)_fun)._name,"if") && _args[0] instanceof Ident ? _args[0].find() : null;
     }
   }
 
@@ -634,7 +639,7 @@ public class HM {
     @NotNull String[] _ids;
 
     // Dependent (non-local) tvars to revisit
-    Ary<Ident> _deps;
+    Ary<Syntax> _deps;
 
 
     static T2 make_fun(T2... args) { return new T2("->",null,null,args); }
@@ -693,7 +698,7 @@ public class HM {
         // Merge update lists, for future unions
         if( that._deps==null && that.is_leaf() ) that._deps = _deps;
         else
-          for( Ident dep : _deps ) that.push_update(dep);
+          for( Syntax dep : _deps ) that.push_update(dep);
         _deps = null;
       }
       _args[0] = that;         // U-F update
@@ -1000,12 +1005,12 @@ public class HM {
     // down the function parts; if any changes the fresh-application may make
     // progress.
     static final VBitSet UPDATE_VISIT  = new VBitSet();
-    T2 push_update( Ary<Ident> as ) { if( as != null ) for( Ident a : as ) push_update(a);  return this;   }
-    void push_update( Ident a) { assert UPDATE_VISIT.isEmpty(); push_update_impl(a); UPDATE_VISIT.clear(); }
-    private void push_update_impl(Ident a) {
+    T2 push_update( Ary<Syntax> as ) { if( as != null ) for( Syntax a : as ) push_update(a);  return this;   }
+    void push_update( Syntax a) { assert UPDATE_VISIT.isEmpty(); push_update_impl(a); UPDATE_VISIT.clear(); }
+    private void push_update_impl(Syntax a) {
       assert no_uf();
       if( UPDATE_VISIT.tset(_uid) ) return;
-      if( _deps==null ) _deps = new Ary<>(Ident.class);
+      if( _deps==null ) _deps = new Ary<>(Syntax.class);
       if( _deps.find(a)==-1 ) _deps.push(a);
       for( int i=0; i<_args.length; i++ )
         if( _args[i]!=null )
