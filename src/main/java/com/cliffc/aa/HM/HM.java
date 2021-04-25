@@ -23,8 +23,9 @@ import static com.cliffc.aa.AA.unimpl;
 public class HM {
   static final HashMap<String,T2> PRIMS = new HashMap<>();
   static boolean DEBUG_LEAKS=false;
+  static { BitsAlias.init0(); }
 
-  public static T2 hm( String sprog ) {
+  public static Syntax hm( String sprog ) {
     Object dummy = TypeStruct.DISPLAY;
 
     Worklist work = new Worklist();
@@ -62,7 +63,6 @@ public class HM {
     Syntax prog = parse( sprog );
 
     // Prep for SSA: pre-gather all the (unique) ids
-    int DEBUG_CNT=-1;
     int cnt_syns = prog.prep_tree(null,null,work);
     int init_T2s = T2.CNT;
 
@@ -70,8 +70,6 @@ public class HM {
       int oldcnt = T2.CNT;      // Used for cost-check when no-progress
       Syntax syn = work.pop();  // Get work
       T2 old = syn._t;          // Old value for progress assert
-      if( work._cnt==DEBUG_CNT )
-        System.out.println("break here");
       if( syn.hm(work) ) {      // Compute a new HM type and check for progress
         assert !syn.debug_find().unify(old.find(),null);// monotonic: unifying with the result is no-progress
         syn.add_work(work);     // Push affected neighors on worklist
@@ -84,9 +82,9 @@ public class HM {
     assert prog.more_work(work);
 
     //System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+work._cnt+", T2s: "+T2.CNT);
-    return prog._t;
+    return prog;
   }
-  static void reset() { PRIMS.clear(); T2.reset(); }
+  static void reset() { PRIMS.clear(); T2.reset(); BitsAlias.reset_to_init0(); }
 
   // ---------------------------------------------------------------------
   // Program text for parsing
@@ -242,12 +240,22 @@ public class HM {
   static abstract class Syntax {
     Syntax _par;
     VStack _nongen;             //
+    T2 _pre;                    // Pre-memory
     T2 _t;                      // Current HM type
+    T2 _post;                   // Post-memory
     T2 find() {                 // U-F find
       T2 t = _t.find();
       return t==_t ? t : (_t=t);
     }
     T2 debug_find() { return _t.find(); } // Find, without the roll-up
+    T2 pre() {
+      T2 t = _pre.find();
+      return t==_pre ? t : (_pre=t);
+    }
+    T2 post() {
+      T2 t = _post.find();
+      return t==_post ? t : (_post=t);
+    }
 
     // Compute and set a new HM type.
     // If no change, return false.
@@ -257,7 +265,14 @@ public class HM {
     abstract boolean hm(Worklist work);
 
     abstract int prep_tree(Syntax par, VStack nongen, Worklist work);
-    final void prep_tree_impl( Syntax par, VStack nongen, Worklist work, T2 t ) { _par=par; _t=t; _nongen = nongen; work.push(this); }
+    final void prep_tree_impl( Syntax par, VStack nongen, Worklist work, T2 t ) {
+      _par=par;
+      _pre = T2.make_mem();
+      _t=t;
+      _post = T2.make_mem();
+      _nongen = nongen;
+      work.push(this);
+    }
     abstract void prep_lookup_deps(Ident id);
 
     abstract T2 lookup(String name); // Lookup name in scope & return type; TODO: pre-cache this.
@@ -293,7 +308,11 @@ public class HM {
     @Override boolean hm(Worklist work) { return false; }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
     @Override void add_work(Worklist work) { work.push(_par); }
-    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) { prep_tree_impl(par, nongen, work, _con==Type.NIL ? T2.make_nil() : T2.make_base(_con)); return 1; }
+    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
+      prep_tree_impl(par, nongen, work, _con==Type.NIL ? T2.make_nil() : T2.make_base(_con));
+      _pre=_post;               // Unify at prep-time
+      return 1;
+    }
     @Override void prep_lookup_deps(Ident id) { throw unimpl("should not reach here"); }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
   }
@@ -327,6 +346,7 @@ public class HM {
     }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
+      _pre=_post;               // Unify at prep-time
       for( Syntax syn = _par; syn!=null; syn = syn._par )
         syn.prep_lookup_deps(this);
       return 1;
@@ -358,8 +378,13 @@ public class HM {
     @Override SB p2(SB sb, VBitSet dups) { return _body.p0(sb,dups); }
     T2 targ(int i) { T2 targ = _targs[i].find(); return targ==_targs[i] ? targ : (_targs[i]=targ); }
     @Override boolean hm(Worklist work) {
-      // The normal lambda work
       boolean progress = false;
+      // Lambda memory: pre-memory unifies with body-pre, post-memory unifies with post-body.
+      progress |= pre ().unify(_body.pre (),work);
+      progress |= post().unify(_body.post(),work);
+      if( work==null && progress ) return true;
+
+      // The normal lambda work
       T2 old = find();
       if( old.is_fun() ) {      // Already a function?  Compare-by-parts
         for( int i=0; i<_targs.length; i++ )
@@ -412,6 +437,13 @@ public class HM {
     @Override SB p2(SB sb, VBitSet dups) { _body.p0(sb,dups); return _def.p0(sb,dups); }
     T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
     @Override boolean hm(Worklist work) {
+      boolean progress = false;
+      // Let memory: pre-memory unifies with body-pre, post-memory unifies with post-body.
+      progress |=       pre ().unify(_def .pre (),work);
+      progress |= _def .post().unify(_body.pre (),work);
+      progress |= _body.post().unify(      post(),work);
+      if( work==null && progress ) return true;
+      
       return targ().unify(_def.find(),work);
     }
     @Override T2 lookup(String name) {
@@ -457,15 +489,26 @@ public class HM {
       return sb;
     }
 
+    // Unifiying these: make_fun(this.arg0 this.arg1 -> new     )
+    //                      _fun{_fun.arg0 _fun.arg1 -> _fun.rez}
     @Override boolean hm(Worklist work) {
-      // Unifiying these: make_fun(this.arg0 this.arg1 -> new     )
-      //                      _fun{_fun.arg0 _fun.arg1 -> _fun.rez}
+      // U/F link pre/post memory with argument memories
+      boolean progress = false;
+      progress |= pre().unify(_fun.pre(),work);
+      if( work==null && progress ) return true;
+      progress |= _fun.post().unify(_args[0].pre(),work);
+      if( work==null && progress ) return true;
+      for( int i=1; i<_args.length; i++ ) {
+        progress |= _args[i-1].post().unify(_args[i].pre(),work);
+        if( work==null && progress ) return true;
+      }
+      progress |= _args[_args.length-1].post().unify(post(),work);
+      if( work==null && progress ) return true;
 
       // Discover not-nil in the trivial case of directly using the 'if'
       // primitive against a T2.is_struct().  Will not work if 'if' is some
       // more hidden or complex function (e.q. '&&' or '||') or the predicate
       // implies not-null on some other struct.
-      boolean progress = false;
       T2 str = is_if_nil();
       if( str!=null && str.is_struct() && str._con==null ) {
         if( work==null ) return true;
@@ -528,11 +571,12 @@ public class HM {
 
   // Structure or Records.
   static class Struct extends Syntax {
+    final BitsAlias _alias;
     final String[]  _ids;
     final Syntax[] _flds;
-    Struct( String[] ids, Syntax[] flds ) { _ids=ids; _flds=flds; }
+    Struct( String[] ids, Syntax[] flds ) { _ids=ids; _flds=flds; _alias = BitsAlias.make0(BitsAlias.new_alias(BitsAlias.REC)); }
     @Override SB str(SB sb) {
-      sb.p("@{");
+      _alias.str(sb.p('#')).p("@{");
       for( int i=0; i<_ids.length; i++ ) {
         sb.p(' ').p(_ids[i]).p(" = ");
         _flds[i].str(sb);
@@ -540,29 +584,50 @@ public class HM {
       }
       return sb.p("}");
     }
-    @Override SB p1(SB sb) { return sb.p("@{ ... } "); }
+    @Override SB p1(SB sb) { return _alias.str(sb.p('#')).p("@{ ... } "); }
     @Override SB p2(SB sb, VBitSet dups) {
       for( int i=0; i<_ids.length; i++ )
         _flds[i].p0(sb.p(_ids[i]).p(" = "),dups);
       return sb;
     }
     @Override boolean hm(Worklist work) {
-      // Check for progress before making new
+      // U/F link pre/post memory with fields' memories
+      boolean progress = false, must_alloc=false;
+      progress |= pre().unify(_flds[0].pre(),work);
+      if( work==null && progress ) return true;
+      for( int i=1; i<_flds.length; i++ ) {
+        progress |= _flds[i-1].post().unify(_flds[i].pre(),work);
+        if( work==null && progress ) return true;
+      }
+      progress |= _flds[_flds.length-1].post().unify(post(),work);
+      if( work==null && progress ) return true;
+
+      // Force result to be a struct with at least these fields.
+      // Do not allocate a T2 unless we need to pick up fields.
       T2 old = find();
-      if( old.is_struct() ) {  // Already a struct?  Compare-by-parts
-        for( int i=0; i<_ids.length; i++ ) {
-          int idx = Util.find(old._ids,_ids[i]);
-          if( idx== -1 || old.args(idx).unify(_flds[i].find(),work) ) { old=null; break; }
-        }
-        if( old!=null ) return false; // Shortcut: no progress, no allocation
+      for( String id : _ids )
+        if( Util.find(old._ids, id) == -1 )
+          { must_alloc = true; break; }
+      if( must_alloc ) {              // Must allocate.
+        if( work==null ) return true; // Will progress
+        T2[] t2s = new T2[_ids.length];
+        for( int i=0; i<_ids.length; i++ )
+          t2s[i] = _flds[i].find();
+        T2.make_struct(_ids,t2s).unify(old,work);
+        old=find();
+        progress = true;
       }
 
-      // Make a new T2 for progress
-      T2[] t2s = new T2[_ids.length];
-      for( int i=0; i<_ids.length; i++ )
-        t2s[i] = _flds[i].find();
-      T2 tstruct = T2.make_struct(_ids,t2s);
-      return tstruct.unify(find(),work);
+      // Unify field-by-field
+      for( int i=0; i<_ids.length; i++ ) {
+        int idx = Util.find(old._ids,_ids[i]);
+        progress |= old.args(idx).unify(_flds[i].find(),work);
+        if( work==null && progress ) return true;
+      }
+
+      // Unify struct at alias into post-memory
+      progress |= _post.unify_rec(_alias.getbit(),old,work);
+      return progress;
     }
     @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
     @Override void add_work(Worklist work) {
@@ -598,13 +663,21 @@ public class HM {
     @Override SB p1 (SB sb) { return sb.p(".").p(_id); }
     @Override SB p2(SB sb, VBitSet dups) { return _str.p0(sb,dups); }
     @Override boolean hm(Worklist work) {
+      boolean progress = false;
+      progress |= pre ().unify(_str.pre (),work); // Pre -memory unifies with child pre
+      progress |= post().unify(_str.post(),work); // Post-memory unifies with child post
+      if( work==null && progress ) return true;
+
       T2 str = _str.find();
       int idx = str._ids==null ? -1 : Util.find(str._ids,_id);
-      if( idx==-1 )             // Not a struct or no field, force it to be one
-        return work==null || T2.make_struct(new String[]{_id}, new T2[]{find().push_update(str._deps)}).unify(str, work);
-
-      // Unify the field
-      return str.args(idx).unify(find(),work);
+      if( idx==-1 ) {           // Not a struct or no field, force it to be one
+        if( work==null ) return true;
+        progress |= T2.make_struct(new String[]{_id}, new T2[]{find().push_update(str._deps)}).unify(str, work);
+      } else {
+        // Unify the field
+        progress |= str.args(idx).unify(find(), work);
+      }
+      return progress;
     }
     @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
     @Override void add_work(Worklist work) {
@@ -656,6 +729,7 @@ public class HM {
     static T2 make_base(Type con) { return new T2("Base",con,null); }
     static T2 make_nil() { return new T2("Nil",null,null); }
     static T2 make_struct( String[] ids, T2[] flds ) { return new T2("@{}", null,ids,flds); }
+    static T2 make_mem() { return new T2("[]" ,null,null,new T2[1]); }
     static T2 prim(String name, T2... args) { return new T2(name,null,null,args); }
     T2 copy() { return new T2(_name,_con,_ids,new T2[_args.length]); }
 
@@ -675,6 +749,7 @@ public class HM {
     boolean is_nil()  { return isa("Nil"); }
     boolean is_fun () { return isa("->"); }
     boolean is_struct() { return isa("@{}"); }
+    boolean is_mem()  { return isa("[]"); }
 
     // U-F find
     T2 find() {
@@ -726,6 +801,7 @@ public class HM {
       return union(that,work);
     }
 
+    // -----------------
     // Structural unification.
     // Returns false if no-change, true for change.
     // If work is null, does not actually change anything, just reports progress.
@@ -759,7 +835,7 @@ public class HM {
       if( !Util.eq(_name,that._name) )
         throw new RuntimeException("Cannot unify "+this+" and "+that);
       assert _args!=that._args; // Not expecting to share _args and not 'this'
-      if( !is_struct() && _args.length != that._args.length )
+      if( !is_struct() && !is_mem() && _args.length != that._args.length )
         throw new RuntimeException("Cannot unify "+this+" and "+that);
 
       // Cycle check
@@ -772,6 +848,7 @@ public class HM {
       if( work==null ) return true; // Here we definitely make progress; bail out early if just testing
 
       // Structural recursion unification.
+
       // Structs unify only on matching fields, and add missing fields.
       if( is_struct() ) {
         // Unification for structs is more complicated; args are aligned via
@@ -784,6 +861,14 @@ public class HM {
         }
         if( _con!=null && that._con==null ) that._con=Type.NIL;
         if( this==that ) return true; // Might have unioned this-into-that recursively, exit now with progress
+
+        // Memory add missing fields
+      } else if( is_mem() ) {
+        for( int i=0; i<_args.length; i++ ) // For all fields in LHS
+          if( _args[i]!=null )
+            that.unify_rec(i,args(i),work);
+
+        // Normal structural unification
       } else {
         for( int i=0; i<_args.length; i++ ) // For all fields in LHS
           args(i)._unify(that.args(i),work);
@@ -820,6 +905,7 @@ public class HM {
       return true;
     }
 
+    // -----------------
     // Make a (lazy) fresh copy of 'this' and unify it with 'that'.  This is
     // the same as calling 'fresh' then 'unify', without the clone of 'this'.
     // The Syntax is used when making the 'fresh' copy for the occurs_check;
@@ -921,6 +1007,7 @@ public class HM {
       }
     }
 
+    // -----------------
     private static final VBitSet ODUPS = new VBitSet();
     boolean occurs_in(Syntax syn) {
       if( syn==null ) return false;
@@ -968,6 +1055,7 @@ public class HM {
       return false;
     }
 
+    // -----------------
     // Test for structural equivalence, including cycles
     static private final HashMap<T2,T2> CDUPS = new HashMap<>();
     boolean cycle_equals(T2 t) {
@@ -1009,6 +1097,26 @@ public class HM {
       return true;
     }
 
+    // -----------------
+    T2 getrec(int alias) {
+      assert is_mem();
+      if( alias >= _args.length ) return null;
+      T2 str = args(alias);
+      assert str==null || str.is_struct();
+      return str;
+    }
+
+    // Unify 'str' at alias 'alias' in 'this' memory.
+    boolean unify_rec(int alias, T2 str, Worklist work) {
+      assert is_mem() && str.is_struct();
+      while( alias >= _args.length )
+        _args = Arrays.copyOf(_args,_args.length<<1);
+      if( _args[alias] != null ) return args(alias).unify(str,work);
+      if( work!=null ) _args[alias] = str;
+      return true;
+    }
+
+    // -----------------
     // This is a T2 function that is the target of 'fresh', i.e., this function
     // might be fresh-unified with some other function.  Push the application
     // down the function parts; if any changes the fresh-application may make
@@ -1082,6 +1190,15 @@ public class HM {
         return sb;
       }
 
+      // Special printing for memory
+      if( is_mem() ) {
+        sb.p("[  ");
+        for( int i=0; i<_args.length; i++ )
+          if( _args[i] != null )
+            _args[i].str(sb.p(i).p(':'),visit,dups).p(", ");
+        return sb.unchar(2).p("]");
+      }
+
       // Generic structural T2
       sb.p("(").p(_name).p(" ");
       for( T2 t : _args ) str(sb,visit,t,dups).p(" ");
@@ -1126,6 +1243,15 @@ public class HM {
         sb.unchar().p("}");
         if( _con==Type.NIL ) sb.p('?');
         return sb;
+      }
+
+      // Special printing for memory
+      if( is_mem() ) {
+        sb.p("[  ");
+        for( int i=0; i<_args.length; i++ )
+          if( _args[i] != null )
+            args(i)._p(sb.p(i).p(':'),visit,dups).p(", ");
+        return sb.unchar(2).p("]");
       }
 
       // Generic structural T2: (fun arg0 arg1...)
