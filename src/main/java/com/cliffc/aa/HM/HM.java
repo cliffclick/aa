@@ -19,6 +19,7 @@ import static com.cliffc.aa.AA.unimpl;
 // unifyable the union is replaced with an Error.
 
 // Extend to records with nil.
+// Extend to aliases.
 
 public class HM {
   static final HashMap<String,T2> PRIMS = new HashMap<>();
@@ -247,7 +248,7 @@ public class HM {
       T2 t = _t.find();
       return t==_t ? t : (_t=t);
     }
-    T2 debug_find() { return _t.find(); } // Find, without the roll-up
+    T2 debug_find() { return _t.debug_find(); } // Find, without the roll-up
     T2 pre() {
       T2 t = _pre.find();
       return t==_pre ? t : (_pre=t);
@@ -443,7 +444,7 @@ public class HM {
       progress |= _def .post().unify(_body.pre (),work);
       progress |= _body.post().unify(      post(),work);
       if( work==null && progress ) return true;
-      
+
       return targ().unify(_def.find(),work);
     }
     @Override T2 lookup(String name) {
@@ -576,7 +577,7 @@ public class HM {
     final Syntax[] _flds;
     Struct( String[] ids, Syntax[] flds ) { _ids=ids; _flds=flds; _alias = BitsAlias.make0(BitsAlias.new_alias(BitsAlias.REC)); }
     @Override SB str(SB sb) {
-      _alias.str(sb.p('#')).p("@{");
+      _alias.str(sb.p('*')).p("@{");
       for( int i=0; i<_ids.length; i++ ) {
         sb.p(' ').p(_ids[i]).p(" = ");
         _flds[i].str(sb);
@@ -584,7 +585,7 @@ public class HM {
       }
       return sb.p("}");
     }
-    @Override SB p1(SB sb) { return _alias.str(sb.p('#')).p("@{ ... } "); }
+    @Override SB p1(SB sb) { return _alias.str(sb.p('*')).p("@{ ... } "); }
     @Override SB p2(SB sb, VBitSet dups) {
       for( int i=0; i<_ids.length; i++ )
         _flds[i].p0(sb.p(_ids[i]).p(" = "),dups);
@@ -604,29 +605,29 @@ public class HM {
 
       // Force result to be a struct with at least these fields.
       // Do not allocate a T2 unless we need to pick up fields.
-      T2 old = find();
+      T2 rec = find();
       for( String id : _ids )
-        if( Util.find(old._ids, id) == -1 )
+        if( Util.find(rec._ids, id) == -1 )
           { must_alloc = true; break; }
       if( must_alloc ) {              // Must allocate.
         if( work==null ) return true; // Will progress
         T2[] t2s = new T2[_ids.length];
         for( int i=0; i<_ids.length; i++ )
           t2s[i] = _flds[i].find();
-        T2.make_struct(_ids,t2s).unify(old,work);
-        old=find();
+        T2.make_struct(_ids,_alias,t2s).unify(rec,work);
+        rec=find();
         progress = true;
       }
 
       // Unify field-by-field
       for( int i=0; i<_ids.length; i++ ) {
-        int idx = Util.find(old._ids,_ids[i]);
-        progress |= old.args(idx).unify(_flds[i].find(),work);
+        int idx = Util.find(rec._ids,_ids[i]);
+        progress |= rec.args(idx).unify(_flds[i].find(),work);
         if( work==null && progress ) return true;
       }
 
       // Unify struct at alias into post-memory
-      progress |= _post.unify_rec(_alias.getbit(),old,work);
+      progress |= _post.unify_rec(_alias.getbit(),rec,work);
       return progress;
     }
     @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
@@ -636,7 +637,7 @@ public class HM {
     }
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       T2[] t2s = new T2[_ids.length];
-      prep_tree_impl(par, nongen, work, T2.make_struct(_ids,t2s));
+      prep_tree_impl(par, nongen, work, T2.make_struct(_ids,_alias,t2s));
       int cnt = 1;              // One for self
       for( int i=0; i<_flds.length; i++ ) { // Prep all sub-fields
         cnt += _flds[i].prep_tree(this,nongen,work);
@@ -657,22 +658,22 @@ public class HM {
   // Field lookup in a Struct
   static class Field extends Syntax {
     final String _id;
-    final Syntax _str;
-    Field( String id, Syntax str ) { _id=id; _str=str; }
-    @Override SB str(SB sb) { return _str.str(sb.p(".").p(_id).p(' ')); }
+    final Syntax _rec;
+    Field( String id, Syntax str ) { _id=id; _rec =str; }
+    @Override SB str(SB sb) { return _rec.str(sb.p(".").p(_id).p(' ')); }
     @Override SB p1 (SB sb) { return sb.p(".").p(_id); }
-    @Override SB p2(SB sb, VBitSet dups) { return _str.p0(sb,dups); }
+    @Override SB p2(SB sb, VBitSet dups) { return _rec.p0(sb,dups); }
     @Override boolean hm(Worklist work) {
       boolean progress = false;
-      progress |= pre ().unify(_str.pre (),work); // Pre -memory unifies with child pre
-      progress |= post().unify(_str.post(),work); // Post-memory unifies with child post
+      progress |= pre ().unify(_rec.pre (),work); // Pre -memory unifies with child pre
+      progress |= post().unify(_rec.post(),work); // Post-memory unifies with child post
       if( work==null && progress ) return true;
 
-      T2 str = _str.find();
+      T2 str = _rec.find();
       int idx = str._ids==null ? -1 : Util.find(str._ids,_id);
       if( idx==-1 ) {           // Not a struct or no field, force it to be one
         if( work==null ) return true;
-        progress |= T2.make_struct(new String[]{_id}, new T2[]{find().push_update(str._deps)}).unify(str, work);
+        progress |= T2.make_struct(new String[]{_id}, BitsAlias.RECORD_BITS.dual(),new T2[]{find().push_update(str._deps)}).unify(str, work);
       } else {
         // Unify the field
         progress |= str.args(idx).unify(find(), work);
@@ -682,17 +683,17 @@ public class HM {
     @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
     @Override void add_work(Worklist work) {
       work.push(_par);
-      work.push(_str);
-      _str.add_work(work);
+      work.push(_rec);
+      _rec.add_work(work);
     }
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par, nongen, work, T2.make_leaf());
-      return _str.prep_tree(this,nongen,work)+1;
+      return _rec.prep_tree(this,nongen,work)+1;
     }
     @Override void prep_lookup_deps(Ident id) { }
     @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
-      return _str.more_work(work);
+      return _rec.more_work(work);
     }
   }
 
@@ -720,24 +721,28 @@ public class HM {
     // Structs have field names
     @NotNull String[] _ids;
 
+    // Alias bits, for pointers and structs only.
+    BitsAlias _aliases;
+
     // Dependent (non-local) tvars to revisit
     Ary<Syntax> _deps;
 
+    // Constructor factories.
+    static T2 make_fun(T2... args) { return new T2("->",null,null,null,args); }
+    static T2 make_leaf() { return new T2("V"+CNT,null,null,null,new T2[1]); }
+    static T2 make_base(Type con) { return new T2("Base",con,null,null); }
+    static T2 make_nil() { return new T2("Nil",null,null,null); }
+    static T2 make_struct( String[] ids, BitsAlias aliases, T2[] flds ) { return new T2("@{}", null,ids,aliases,flds); }
+    static T2 make_mem() { return new T2("[]" ,null,null,null,new T2[1]); }
+    static T2 prim(String name, T2... args) { return new T2(name,null,null,null,args); }
+    T2 copy() { return new T2(_name,_con,_ids,_aliases,new T2[_args.length]); }
 
-    static T2 make_fun(T2... args) { return new T2("->",null,null,args); }
-    static T2 make_leaf() { return new T2("V"+CNT,null,null,new T2[1]); }
-    static T2 make_base(Type con) { return new T2("Base",con,null); }
-    static T2 make_nil() { return new T2("Nil",null,null); }
-    static T2 make_struct( String[] ids, T2[] flds ) { return new T2("@{}", null,ids,flds); }
-    static T2 make_mem() { return new T2("[]" ,null,null,new T2[1]); }
-    static T2 prim(String name, T2... args) { return new T2(name,null,null,args); }
-    T2 copy() { return new T2(_name,_con,_ids,new T2[_args.length]); }
-
-    private T2(@NotNull String name, Type con, String[] ids, T2 @NotNull ... args) {
+    private T2(@NotNull String name, Type con, String[] ids, BitsAlias aliases, T2 @NotNull ... args) {
       _uid = CNT++;
       _name= name;
       _con = con;
       _ids = ids;
+      _aliases = aliases;
       _args= args;
     }
 
@@ -746,19 +751,25 @@ public class HM {
     boolean no_uf() { return !is_leaf() || _args[0]==null; }
     boolean isa(String name) { return Util.eq(_name,name); }
     boolean is_base() { return isa("Base") && _con!=null; }
-    boolean is_nil()  { return isa("Nil"); }
+    boolean is_nil () { return isa("Nil"); }
     boolean is_fun () { return isa("->"); }
     boolean is_struct() { return isa("@{}"); }
     boolean is_mem()  { return isa("[]"); }
 
-    // U-F find
-    T2 find() {
+    T2 debug_find() {// Find, without the roll-up
       if( !is_leaf() ) return this; // Shortcut
       T2 u = _args[0];
       if( u==null ) return this; // Shortcut
       if( u.no_uf() ) return u;  // Shortcut
       // U-F fixup
       while( u.is_leaf() && u._args[0]!=null ) u = u._args[0];
+      return u;
+    }
+
+    // U-F find
+    T2 find() {
+      T2 u = debug_find();
+      if( u==this || u==_args[0] ) return u;
       T2 v = this, v2;
       while( !v.is_leaf() && (v2=v._args[0])!=u ) { v._args[0]=u; v = v2; }
       return u;
@@ -860,6 +871,7 @@ public class HM {
           that = that.find();                          // Recursively, might have already rolled this up
         }
         if( _con!=null && that._con==null ) that._con=Type.NIL;
+        that._aliases = that._aliases.meet(this._aliases);
         if( this==that ) return true; // Might have unioned this-into-that recursively, exit now with progress
 
         // Memory add missing fields
@@ -1182,7 +1194,7 @@ public class HM {
 
       // Special printing for structures
       if( is_struct() ) {
-        sb.p("@{");
+        _aliases.str(sb.p('*')).p("@{");
         for( int i=0; i<_ids.length; i++ )
           str(sb.p(' ').p(_ids[i]).p(" = "),visit,_args[i],dups).p(',');
         sb.unchar().p("}");
@@ -1237,7 +1249,7 @@ public class HM {
 
       // Special printing for structures: @{ fld0 = body, fld1 = body, ... }
       if( is_struct() ) {
-        sb.p("@{");
+        _aliases.str(sb.p('*')).p("@{");
         for( int i=0; i<_ids.length; i++ )
           args(i)._p(sb.p(' ').p(_ids[i]).p(" = "),visit,dups).p(',');
         sb.unchar().p("}");

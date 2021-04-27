@@ -239,8 +239,8 @@ public class TestHM {
   @Test
   public void test24() {
     Syntax syn = HM.hm("@{x=2, y=3}");
-    assertEquals("@{ x = 2, y = 3}",syn._t.p());
-    assertEquals("[  7:@{ x = 2, y = 3}]",syn._post.p());
+    assertEquals("*[7]@{ x = 2, y = 3}",syn._t.p());
+    assertEquals("[  7:*[7]@{ x = 2, y = 3}]",syn._post.p());
   }
 
   // Basic field test
@@ -248,22 +248,22 @@ public class TestHM {
   public void test25() {
     Syntax syn = HM.hm(".x @{x =2, y =3}");
     assertEquals("2",syn._t.p());
-    assertEquals("[  7:@{ x = 2, y = 3}]",syn._post.p());
+    assertEquals("[  7:*[7]@{ x = 2, y = 3}]",syn._post.p());
   }
 
   @Test
   public void test26() {
     Syntax syn = HM.hm("{ g -> @{x=g, y=g}}");
-    assertEquals("{ A -> @{ x = A, y = A} }",syn._t.p());
-    assertEquals("[  7:@{ x = A, y = A}]",syn._post.p());
+    assertEquals("{ A -> *[7]@{ x = A, y = A} }",syn._t.p());
+    assertEquals("[  7:*[7]@{ x = A, y = A}]",syn._post.p());
   }
 
   @Test
   public void test27() {
     // Load common field 'x', ignoring mismatched fields y and z
-    Syntax syn = HM.hm("{ pred -> .x (if pred @{x=2,y=3} @{x=3,z= \"abc\"}) }");
-    assertEquals("{ A -> nint8 }",syn._t.p());
-    assertEquals("[  7:A:@{ x = nint8, z = \"abc\", y = 3}, 8:$A]",syn._post.p());
+    Syntax syn = HM.hm("{ pred -> (if pred @{x=2,y=3} @{x=3,z= \"abc\"}) }");
+    assertEquals("{ A -> *[7,8]@{ x = nint8, z = \"abc\", y = 3} }",syn._t.p());
+    assertEquals("[  7:A:*[7,8]@{ x = nint8, z = \"abc\", y = 3}, 8:$A]",syn._post.p());
   }
 
   @Test
@@ -271,7 +271,7 @@ public class TestHM {
     // Load some fields from an unknown struct: area of a square.
     // Since no nil-check, correct types as needing a not-nil input.
     Syntax syn = HM.hm("{ sq -> (* .x sq .y sq) }");
-    assertEquals("{ @{ y = int64, x = int64} -> int64 }",syn._t.p());
+    assertEquals("{ *[-2]@{ y = int64, x = int64} -> int64 }",syn._t.p());
     assertEquals("[]",syn._post.p());
   }
 
@@ -279,16 +279,18 @@ public class TestHM {
   public void test29() {
     // Recursive linked-list discovery, with no end clause
     Syntax syn = HM.hm("map = { fcn lst -> @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } }; map");
-    assertEquals("{ { A -> B } C:@{ v0 = A, n0 = $C} -> D:@{ n1 = $D, v1 = B} }",syn._t.p());
-    assertEquals("[  7:A:@{ n1 = $A, v1 = B}]",syn._post.p());
+    assertEquals("{ { A -> B } C:*[-2]@{ v0 = A, n0 = $C} -> D:*[7]@{ n1 = $D, v1 = B} }",syn._t.p());
+    assertEquals("[  7:A:*[7]@{ n1 = $A, v1 = B}]",syn._post.p());
   }
 
   @Test
   public void test30() {
-    // Recursive linked-list discovery, with nil
+    // Recursive linked-list discovery, with nil.  Note that the output memory
+    // has the output memory alias, but not the input memory alias (which must
+    // be made before calling 'map').
     Syntax syn = HM.hm("map = { fcn lst -> (if lst @{ n1=(map fcn .n0 lst), v1=(fcn .v0 lst) } nil) }; map");
-    assertEquals("{ { A -> B } C:@{ v0 = A, n0 = $C}? -> D:@{ n1 = $D, v1 = B}? }",syn._t.p());
-    assertEquals("[  7:A:@{ n1 = $A, v1 = B}?]",syn._post.p());
+    assertEquals("{ { A -> B } C:*[-2]@{ v0 = A, n0 = $C}? -> D:*[7]@{ n1 = $D, v1 = B}? }",syn._t.p());
+    assertEquals("[  7:A:*[7]@{ n1 = $A, v1 = B}?]",syn._post.p());
   }
 
   // try the worse-case expo blow-up test case from SO
@@ -310,8 +312,8 @@ public class TestHM {
   public void test32() {
     // Recursive linked-list discovery, with nil.  Unrolled once.
     Syntax syn = HM.hm("map = { lst -> (if lst @{ n1= arg= .n0 lst; (if arg @{ n1=(map .n0 arg), v1=(str .v0 arg)} nil), v1=(str .v0 lst) } nil) }; map");
-    assertEquals("{ A:@{ v0 = int64, n0 = @{ n0 = $A, v0 = int64}?}? -> B:@{ n1 = @{ n1 = $B, v1 = str}?, v1 = str}? }",syn._t.p());
-    assertEquals("[  7:A:@{ n1 = B:@{ n1 = $A, v1 = str}?, v1 = str}?, 8:$B]",syn._post.p());
+    assertEquals("{ A:*[-2]@{ v0 = int64, n0 = *[-2]@{ n0 = $A, v0 = int64}?}? -> B:*[8]@{ n1 = *[7]@{ n1 = $B, v1 = str}?, v1 = str}? }",syn._t.p());
+    assertEquals("[  7:A:*[7]@{ n1 = B:*[8]@{ n1 = $A, v1 = str}?, v1 = str}?, 8:$B]",syn._post.p());
   }
 
 }
