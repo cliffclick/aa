@@ -261,8 +261,8 @@ public class TestHM {
   @Test
   public void test27() {
     // Load common field 'x', ignoring mismatched fields y and z
-    Syntax syn = HM.hm("{ pred -> (if pred @{x=2,y=3} @{x=3,z= \"abc\"}) }");
-    assertEquals("{ A -> *[7,8]@{ x = nint8, z = \"abc\", y = 3} }",syn._t.p());
+    Syntax syn = HM.hm("{ pred -> .x (if pred @{x=2,y=3} @{x=3,z= \"abc\"}) }");
+    assertEquals("{ A -> nint8 }",syn._t.p());
     assertEquals("[  7:A:*[7,8]@{ x = nint8, z = \"abc\", y = 3}, 8:$A]",syn._post.p());
   }
 
@@ -291,6 +291,14 @@ public class TestHM {
     Syntax syn = HM.hm("map = { fcn lst -> (if lst @{ n1=(map fcn .n0 lst), v1=(fcn .v0 lst) } nil) }; map");
     assertEquals("{ { A -> B } C:*[-2]@{ v0 = A, n0 = $C}? -> D:*[7]@{ n1 = $D, v1 = B}? }",syn._t.p());
     assertEquals("[  7:A:*[7]@{ n1 = $A, v1 = B}?]",syn._post.p());
+  }
+
+  @Test
+  public void test30a() {
+    // Recursive linked-list discovery, with no end clause
+    Syntax syn = HM.hm("map = { fcn lst -> (if lst @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } nil) }; (map dec @{n0 = nil, v0 = 5})");
+    assertEquals("A:*[7]@{ n1 = $A, v1 = int64}?",syn._t.p());
+    assertEquals("[  7:A:*[7]@{ n1 = $A, v1 = B}]",syn._post.p());
   }
 
   // try the worse-case expo blow-up test case from SO
