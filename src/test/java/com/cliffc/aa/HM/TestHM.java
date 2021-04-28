@@ -251,6 +251,22 @@ public class TestHM {
     assertEquals("[  7:*[7]@{ x = 2, y = 3}]",syn._post.p());
   }
 
+  // Basic field test
+  @Test(expected = RuntimeException.class)
+  public void test25a() {
+    Syntax syn = HM.hm(".x 5");
+    assertEquals("TBD",syn._t.p()); // Cannot unify 5 and @{x=A}
+  }
+
+  // Basic field test.  Do not like this answer, but requires a post-pass to
+  // discover no "x" field in *[7].  Instead, one is injected by the field load.
+  @Test
+  public void test25b() {
+    Syntax syn = HM.hm(".x @{ y =3}");
+    assertEquals("A",syn._t.p());
+    assertEquals("[  7:*[7]@{ x = A, y = 3}]",syn._post.p());
+  }
+
   @Test
   public void test26() {
     Syntax syn = HM.hm("{ g -> @{x=g, y=g}}");
@@ -269,8 +285,8 @@ public class TestHM {
   @Test
   public void test28() {
     // Load some fields from an unknown struct: area of a square.
-    // Since no nil-check, correct types as needing a not-nil input.
-    Syntax syn = HM.hm("{ sq -> (* .x sq .y sq) }");
+    // Since no nil-check, correctly types as needing a not-nil input.
+    Syntax syn = HM.hm("{ sq -> (* .x sq .y sq) }"); // { sq -> sq.x * sq.y }
     assertEquals("{ *[-2]@{ y = int64, x = int64} -> int64 }",syn._t.p());
     assertEquals("[]",syn._post.p());
   }
@@ -298,7 +314,7 @@ public class TestHM {
     // Recursive linked-list discovery, with no end clause
     Syntax syn = HM.hm("map = { fcn lst -> (if lst @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } nil) }; (map dec @{n0 = nil, v0 = 5})");
     assertEquals("A:*[7]@{ n1 = $A, v1 = int64}?",syn._t.p());
-    assertEquals("[  7:A:*[7]@{ n1 = $A, v1 = B}]",syn._post.p());
+    assertEquals("[  7:A:*[7]@{ n1 = $A, v1 = B}?, 8:*[8]@{ n0 = (Nil), v0 = int64}?]",syn._post.p());
   }
 
   // try the worse-case expo blow-up test case from SO
