@@ -619,10 +619,18 @@ public class HM {
         progress = true;
       }
 
-      // Unify field-by-field
+      // Extra fields are unified with ALL since they are not created here.
+      for( int i=0; i<rec._ids.length; i++ ) {
+        if( Util.find(_ids,rec._ids[i])== -1 && rec.args(i)._con!=Type.ALL ) {
+          if( work==null ) return true;
+          progress |= T2.make_base(Type.ALL).unify(rec.args(i),work);
+        }
+      }
+
+      // Unify existing fields.  Ignore extras on either side.
       for( int i=0; i<_ids.length; i++ ) {
         int idx = Util.find(rec._ids,_ids[i]);
-        progress |= rec.args(idx).unify(_flds[i].find(),work);
+        if( idx!= -1 ) progress |= rec.args(idx).unify(_flds[i].find(),work);
         if( work==null && progress ) return true;
       }
 
@@ -638,6 +646,7 @@ public class HM {
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       T2[] t2s = new T2[_ids.length];
       prep_tree_impl(par, nongen, work, T2.make_struct(_ids,_alias,t2s));
+      prep_tree_impl(par, nongen, work, T2.make_struct(new String[0],_alias,new T2[0]));
       int cnt = 1;              // One for self
       for( int i=0; i<_flds.length; i++ ) { // Prep all sub-fields
         cnt += _flds[i].prep_tree(this,nongen,work);
@@ -669,14 +678,16 @@ public class HM {
       progress |= post().unify(_rec.post(),work); // Post-memory unifies with child post
       if( work==null && progress ) return true;
 
-      T2 str = _rec.find();
-      int idx = str._ids==null ? -1 : Util.find(str._ids,_id);
+      T2 rec = _rec.find();
+      int idx = rec._ids==null ? -1 : Util.find(rec._ids,_id);
       if( idx==-1 ) {           // Not a struct or no field, force it to be one
         if( work==null ) return true;
-        progress |= T2.make_struct(new String[]{_id}, BitsAlias.RECORD_BITS.dual(),new T2[]{find().push_update(str._deps)}).unify(str, work);
+        progress |= T2.make_struct(new String[]{_id}, BitsAlias.RECORD_BITS.dual(),new T2[]{find().push_update(rec._deps)}).unify(rec, work);
       } else {
         // Unify the field
-        progress |= str.args(idx).unify(find(), work);
+        progress |= rec.args(idx).unify(find(), work);
+        if( find()._con==Type.ALL )
+          throw new RuntimeException("Missing field "+_id+" in "+rec.find());
       }
       return progress;
     }
@@ -796,6 +807,7 @@ public class HM {
           for( Syntax dep : _deps ) that.push_update(dep);
         _deps = null;
       }
+      if( _args.length==0 ) _args = new T2[1];
       _args[0] = that;         // U-F update
       if( _name.charAt(0)!='V' ) _name = "V"+_uid; // Flag as a leaf & unified
       assert !no_uf();

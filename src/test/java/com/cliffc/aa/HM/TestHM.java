@@ -258,9 +258,8 @@ public class TestHM {
     assertEquals("TBD",syn._t.p()); // Cannot unify 5 and @{x=A}
   }
 
-  // Basic field test.  Do not like this answer, but requires a post-pass to
-  // discover no "x" field in *[7].  Instead, one is injected by the field load.
-  @Test
+  // Basic field test.
+  @Test(expected = RuntimeException.class)
   public void test25b() {
     Syntax syn = HM.hm(".x @{ y =3}");
     assertEquals("A",syn._t.p());
@@ -279,7 +278,7 @@ public class TestHM {
     // Load common field 'x', ignoring mismatched fields y and z
     Syntax syn = HM.hm("{ pred -> .x (if pred @{x=2,y=3} @{x=3,z= \"abc\"}) }");
     assertEquals("{ A -> nint8 }",syn._t.p());
-    assertEquals("[  7:A:*[7,8]@{ x = nint8, z = \"abc\", y = 3}, 8:$A]",syn._post.p());
+    assertEquals("[  7:A:*[7,8]@{ x = nint8, z = all, y = all}, 8:$A]",syn._post.p());
   }
 
   @Test
