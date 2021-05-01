@@ -339,4 +339,51 @@ public class TestHM {
     assertEquals("[  7:A:*[7]@{ n1 = B:*[8]@{ n1 = $A, v1 = str}?, v1 = str}?, 8:$B]",syn._post.p());
   }
 
+  @Test
+  public void test33() {
+    Syntax syn = HM.hm("r = { a -> r }; join = { x y -> (if nil x y) }; s = (join r r); s");
+    assertEquals("A:{ B -> $A }",syn._t.p());
+    assertEquals("[]",syn._post.p());
+  }
+
+  @Test
+  public void test34() {
+    Syntax syn = HM.hm("f = { x y -> (* (f .tail x y) (f x y)) }; f");
+    assertEquals("{ A:*[-2]@{ tail = $A} B -> int64 }",syn._t.p());
+    assertEquals("[]",syn._post.p());
+  }
+
+  @Test
+  public void test35() {
+    Syntax syn = HM.hm("f = { x y -> (* (f .tail x y) (f .tail y x)) }; f");
+    assertEquals("{ A:*[-2]@{ tail = $A} $A -> int64 }",syn._t.p());
+    // The code I got this from: https://github.com/LPTK/simple-sub/blob/master/shared/src/test/scala/simplesub/ProgramTests.scala
+    // claims this answer:
+    //  assertEquals("{ A:*[-2]@{ tail = $A} B:*[-2]@{ tail = $B } -> int64 }",syn._t.p());
+    // But this does not seem correct to me; x & y are clearly passed in swapped about and will unify.
+    assertEquals("[]",syn._post.p());
+  }
+
+  @Test
+  public void test36() {
+    Syntax syn = HM.hm("{ x -> @{l = (x x), r = x } }");
+    assertEquals("{ A:{ $A -> B } -> *[7]@{ l = B, r = $A} }",syn._t.p());
+    assertEquals("[  7:*[7]@{ l = A, r = B:{ $B -> A }}]",syn._post.p());
+  }
+
+  @Test
+  public void test37() {
+    Syntax syn = HM.hm("recursive_monster = { x -> @{ thing = x, self = (recursive_monster x) }}; recursive_monster");
+    assertEquals("{ A -> B:*[7]@{ thing = A, self = $B} }",syn._t.p());
+    assertEquals("[  7:A:*[7]@{ thing = B, self = $A}]",syn._post.p());
+  }
+
+  // Attempts to unify a function and a struct, and blows out.
+  @Test(expected = RuntimeException.class)
+  public void test38() {
+    Syntax syn = HM.hm("x = y = (x x); { z -> z}; (x { y -> .u y})");
+    assertEquals("",syn._t.p());
+    assertEquals("",syn._post.p());
+  }
+
 }
