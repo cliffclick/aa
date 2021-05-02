@@ -28,6 +28,12 @@ public class TypeInt extends Type<TypeInt> {
     if( this==INT64.dual() ) return sb.p("~int64");
     if( this==INT32 )        return sb.p( "int32");
     if( this==INT32.dual() ) return sb.p("~int32");
+    if( this==INT16 )        return sb.p( "int16");
+    if( this==INT16.dual() ) return sb.p("~int16");
+    if( this==INT8  )        return sb.p( "int8" );
+    if( this==INT8 .dual() ) return sb.p("~int8" );
+    if( this==INT1  )        return sb.p( "bool" );
+    if( this==INT1 .dual() ) return sb.p("~bool" );
     if( _lo < _hi ) return sb.p('[').p(_lo).p('-').p(_hi).p(']');
     return sb.p("[-inf-").p(_hi).p(',').p(_lo).p("-+inf]");
   }
@@ -43,17 +49,17 @@ public class TypeInt extends Type<TypeInt> {
   public static TypeInt con(long con) { return make(con,con); }
 
 
-  static public  final TypeInt  INT64 = make(Long   .MIN_VALUE,Long   .MAX_VALUE);
-  static public  final TypeInt  INT32 = make(Integer.MIN_VALUE,Integer.MAX_VALUE);
-  static public  final TypeInt  INT16 = make(-32768,32767);
-  static public  final TypeInt  INT8  = make(0,255);
-  static public  final TypeInt  BOOL  = make(0,1);
-  static public  final TypeInt ZERO   = make(0,0);
-  static public  final TypeInt TRUE   = make(1,1);
-  static public  final Type    FALSE  = ZERO;
-  static public  final TypeInt XINT1  = BOOL.dual();
-  static public  final TypeInt NINT8  = make(1,255);
-  static public  final TypeInt NINT64 = INT64; // TODO
+  static public  final TypeInt INT64 = make(Long   .MIN_VALUE,Long   .MAX_VALUE);
+  static public  final TypeInt INT32 = make(Integer.MIN_VALUE,Integer.MAX_VALUE);
+  static public  final TypeInt INT16 = make(-32768,32767);
+  static public  final TypeInt INT8  = make(0,255);
+  static public  final TypeInt INT1  = make(0,1);
+  static public  final TypeInt ZERO  = make(0,0);
+  static public  final TypeInt BOOL  = INT1;
+  static public  final TypeInt TRUE  = make(1,1);
+  static public  final Type    FALSE = ZERO;
+  static public  final TypeInt NINT8 = make(1,255);
+  static public  final TypeInt NINT64= INT64; // TODO
   static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,INT8,BOOL,TRUE,con(3),con(1L<<54),NINT8};
   static void init1( HashMap<String,Type> types ) {
     types.put("bool" ,BOOL);
@@ -74,7 +80,7 @@ public class TypeInt extends Type<TypeInt> {
     assert t != this;
     switch( t._type ) {
     case TINT:   break;
-    case TFLT:   throw unimpl();
+    case TFLT:   return xmeetf((TypeFlt)t);
     case TFUNPTR:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
@@ -93,6 +99,26 @@ public class TypeInt extends Type<TypeInt> {
     return make(Math.min(_lo,tf._lo),Math.max(_hi,tf._hi));
   }
 
+  // int meet float
+  Type xmeetf( TypeFlt tf ) {
+    // TODO: allow small integers & precise floats overlaps
+    
+    //if( above_center() ) {      // High int
+    //  if( tf.above_center() ) { // High float; choices abound
+    //    return make((long)Math.min(_lo,tf._lo),(long)Math.max(_hi,tf._hi));
+    //  } else {                  // High int meet low float.  See if any ints overlap
+    //    return _lo < tf._lo ||  _hi > tf._hi || !tf.includes_int()? Type.SCALAR : tf;
+    //  }
+    //} else {                    // Low int
+    //  if( tf.above_center() ) { // Low float; restrictions abount
+    //    return tf._hi < _lo ||  tf._lo > _hi || !tf.includes_int() ? Type.SCALAR : this;
+    //  } else {                  // High int meet low float.  See if any ints overlap
+    //    return TypeFlt.make(Math.min(_lo,tf._lo),Math.max(_hi,tf._hi));
+    //  }
+    //}
+    return Type.SCALAR;
+  }
+  
   @Override public boolean above_center() { return _hi < _lo; }
   @Override public boolean may_be_con() { return _hi <= _lo; }
   @Override public boolean must_nil() { return _lo <= 0 && 0 <= _hi; }
