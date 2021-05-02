@@ -18,13 +18,17 @@ public class TestType {
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
 
-    Type a = TypeInt.BOOL.dual();
-    Type bc= TypeInt.NINT8.dual();
+    TypeFlt.FLT32.join(TypeFlt.PI);
 
-    Type x = a.meet(bc);
-    //Type y = (a.meet(b)).join(a.meet(c));
+    // TypeFlt fails, so why not TypeInt?  Suspect i need a >32bit constant
+    Type a = TypeInt.INT32.dual();
+    Type b = TypeInt.INT32;
+    Type c = TypeInt.con(1L<<54);
 
-    assertEquals(TypeInt.TRUE,x);
+    Type x = a.meet(b.join(c));
+    Type y = (a.meet(b)).join(a.meet(c));
+
+    assertEquals(x,y);
   }
 
   @Test public void testBits0() {
