@@ -6,8 +6,6 @@ import com.cliffc.aa.util.VBitSet;
 import java.util.HashMap;
 import java.util.function.Predicate;
 
-import static com.cliffc.aa.AA.unimpl;
-
 public class TypeFlt extends Type<TypeFlt> {
   double _lo, _hi;              // float or double con according
   private TypeFlt ( double lo, double hi ) { super(TFLT); init(lo,hi); }
@@ -23,7 +21,7 @@ public class TypeFlt extends Type<TypeFlt> {
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     sb.p(_name);
-    if( _lo==_hi ) return sb.p(_lo);
+    if( is_con() ) return above_center() ? sb.p("~").p(_hi) : sb.p(_lo);
     if( this==FLT64 )        return sb.p( "flt64");
     if( this==FLT64.dual() ) return sb.p("~flt64");
     if( this==FLT32 )        return sb.p( "flt32");
@@ -40,12 +38,13 @@ public class TypeFlt extends Type<TypeFlt> {
     TypeFlt t2 = (TypeFlt)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static Type con(double con) { return make(con,con); }
+  public static Type con(double con) { return make(con,con+Math.ulp(con)); }
 
   public static final TypeFlt FLT64 = (TypeFlt)make(Double.NEGATIVE_INFINITY,Double.POSITIVE_INFINITY);
   public static final TypeFlt FLT32 = (TypeFlt)make(Float .NEGATIVE_INFINITY,Float .POSITIVE_INFINITY);
   public static final TypeFlt PI    = (TypeFlt)con(Math.PI);
   public static final TypeFlt HALF  = (TypeFlt)con(0.5);
+  public static final TypeFlt ZERO  = (TypeFlt)con(0.0);
   public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,FLT32,PI,HALF};
   static void init1( HashMap<String,Type> types ) {
     types.put("flt32",FLT32);
@@ -53,16 +52,17 @@ public class TypeFlt extends Type<TypeFlt> {
     types.put("flt"  ,FLT64);
   }
   // Return a double from a TypeFlt constant; assert otherwise.
-  @Override public boolean is_con() { return _lo==_hi; }
+  @Override public boolean is_con() { return _lo+Math.ulp(_lo)==_hi || _hi+Math.ulp(_hi)==_lo; }
   @Override public double getd() { assert is_con(); return _lo; }
   @Override public long   getl() { assert is_con() && ((long)_lo)==_lo; return (long)_lo; }
 
-  @Override protected TypeFlt xdual() { return is_con() ? this : new TypeFlt(_hi,_lo); }
+  @Override protected TypeFlt xdual() { return new TypeFlt(_hi,_lo); }
   @Override protected Type xmeet( Type t ) {
     assert t != this;
     switch( t._type ) {
     case TFLT:   break;
     case TINT:   return ((TypeInt)t).xmeetf(this);
+    case TDIST:  return t.xmeet(this);
     case TFUNPTR:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
@@ -85,12 +85,13 @@ public class TypeFlt extends Type<TypeFlt> {
   @Override public boolean may_be_con() { return _hi <= _lo; }
   @Override public boolean must_nil() { return _lo <= 0 && 0 <= _hi; }
   @Override public boolean  may_nil() { return _hi <= 0 && 0 <= _lo; }
-  @Override Type not_nil() { return this; }
+  @Override Type not_nil() {
+    if( !may_nil() ) return this;
+    return meet(ZERO.dual());
+  }
   @Override public Type meet_nil(Type nil) {
-    //if( _x==2 ) return nil;
-    //if( _x==0 && _con==0 ) return nil==Type.XNIL ? this : Type.NIL;
-    //return TypeFlt.make(-2,_z,0);
-    throw unimpl();
+    if( must_nil() ) return this;
+    return meet(ZERO);
   }
 
   // Lattice of conversions:
