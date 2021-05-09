@@ -142,7 +142,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public BitsFun fidxs() { return _fidxs; }
   public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
 
-  @Override public boolean above_center() { return _fidxs.above_center() || (_fidxs.is_con() && _fidxs!=BitsFun.EMPTY && _disp.above_center()); }
+  @Override public boolean above_center() { return _fidxs.above_center() || (_fidxs.is_con() && _disp.above_center()); }
   @Override public boolean may_be_con()   { return above_center(); }
   // Since fidxs may split, never a constant.
   @Override public boolean is_con()       { return false; }

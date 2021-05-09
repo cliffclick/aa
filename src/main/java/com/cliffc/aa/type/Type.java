@@ -297,7 +297,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   private static final Type XNREAL = make(TXNREAL );
 
   // Collection of sample types for checking type lattice properties.
-  static final Type[] TYPES = new Type[]{ALL,CTRL,SCALAR,NSCALR,REAL,NREAL};
+  private static final Type[] TYPES = new Type[]{ALL,ANY,CTRL,XCTRL,SCALAR,XSCALAR,NSCALR,XNSCALR,REAL,XREAL,NREAL,XNREAL};
 
   // The complete list of primitive types that are disjoint and also is-a
   // SCALAR; nothing else is a SCALAR except what is on this list (or
@@ -350,7 +350,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     if( t == this ) return this;
     // Short-cut for seeing this meet before
     Type mt = Key.get(this,t);
-    //if( mt != null ) return mt;
+    if( mt != null ) return mt;
 
     // "Triangulate" the matrix and cut in half the number of cases.
     // Reverse; xmeet 2nd arg is never "is_simple" and never equal to "this".
@@ -400,60 +400,87 @@ public class Type<T extends Type<T>> implements Cloneable {
     if( _type==TALL || t._type==TANY ) return this;
     if( _type==TANY || t._type==TALL ) return    t;
 
-    // Ctrl can only meet Ctrl, XCtrl or Top
-    byte type = (byte)(_type|t._type); // the OR is low if both are low
-    if(  type <= TXCTRL ) return _type==TXCTRL && t._type==TXCTRL ? XCTRL : CTRL;
-    if( _type <= TXCTRL || t._type <= TXCTRL ) return ALL;
-
-    // Meeting scalar and non-scalar falls to ALL.  Includes most Memory shapes.
-    if( isa_scalar() ^ t.isa_scalar() ) return ALL;
-
-    // Memory does something complex with memory
-    if( t._type==TMEM ) return t.xmeet(this);
-
-    // Scalar is close to bottom: nearly everything falls to SCALAR, except
-    // Bottom (already handled) and Control (error; already handled).
-    if( _type == TSCALAR || t._type == TSCALAR ) return SCALAR;
-
-    // ~Scalar is close to Top: it falls to nearly anything.
-    if(   _type == TXSCALAR ) return t   ;
-    if( t._type == TXSCALAR ) return this;
-
-    // Not-nil variants
-    if(   _type == TNSCALR ) return t.must_nil() ? SCALAR : NSCALR;
-    if( t._type == TNSCALR ) return   must_nil() ? SCALAR : NSCALR;
-    if(   _type == TXNSCALR) return t.not_nil();
-    if( t._type == TXNSCALR) return   not_nil();
-
-    if( _type == TNIL || _type == TXNIL ) return t.meet_nil(this);
-
-    // Scalar values break out into: nums(reals (int,flt)), GC-ptrs (structs(tuples), arrays(strings)), fun-ptrs, RPC
-    if( t._type == TFUNPTR ||
-        t._type == TMEMPTR ||
-        t._type == TRPC   )
-      return cross_nil(t);
-
-    boolean that_oop = t.is_ptr();
-    boolean that_num = t.is_num();
-    assert !(that_oop&&that_num);
-
-    // Down to just nums and GC-ptrs
-    if( is_num() ) {
-      // May be OOP0 or STR or STRUCT or TUPLE
-      if( that_oop ) return (must_nil() || t.must_nil()) ? SCALAR : NSCALR;
-      if( that_num || t==NIL || t==XNIL ) {
-        // Real; same pattern as ANY/ALL, or SCALAR/XSCALAR
-        if( _type == TREAL || t._type == TREAL ) return REAL;
-        if(   _type == TXREAL ) return t   ;
-        if( t._type == TXREAL ) return this;
-
-        // Not-nil variants
-        if(   _type == TNREAL ) return t.must_nil() ? REAL : NREAL;
-        if( t._type == TNREAL ) return   must_nil() ? REAL : NREAL;
-        if(   _type == TXNREAL) return t.not_nil();
-        if( t._type == TXNREAL) return   not_nil();
-      }
-    }
+    //Type lo = t.simple_bot();
+    //
+    //TypeDist.xmeet(this,lo,t);
+    //
+    //if( !t.is_simple() ) ...
+    //  treal is perhaps OK;
+    //... ask for outer_lattice_layer (enclosing simple type)
+    //
+    //                                  forward to TDIST;
+    //if outer_lattices are compatible and high, we can fall to the inner value;
+    //otherwise we are looking at meets of simple; if either is low, then low;
+    //if both are high we can use a TDIST mix.
+    //
+    //          ...
+    //
+    //
+    //          // Ctrl can only meet Ctrl, XCtrl or Top
+    //          byte type = (byte)(_type|t._type); // the OR is low if both are low
+    //if(  type <= TXCTRL ) return _type==TXCTRL && t._type==TXCTRL ? XCTRL : CTRL;
+    //if( _type <= TXCTRL || t._type <= TXCTRL ) return ALL;
+    //
+    //// Meeting scalar and non-scalar falls to ALL.  Includes most Memory shapes.
+    //if( isa_scalar() ^ t.isa_scalar() ) return ALL;
+    //
+    //// Memory does something complex with memory
+    //if( t._type==TMEM ) return t.xmeet(this);
+    //
+    //// Scalar is close to bottom: nearly everything falls to SCALAR, except
+    //// Bottom (already handled) and Control (error; already handled).
+    //if( _type == TSCALAR || t._type == TSCALAR ) return SCALAR;
+    //
+    //// ~Scalar is close to Top: it falls to nearly anything.
+    //if(   _type == TXSCALAR ) return t   ;
+    //if( t._type == TXSCALAR ) return this;
+    //
+    //// Not-nil variants
+    //if(   _type == TNSCALR ) return t.must_nil() ? SCALAR : NSCALR;
+    //if( t._type == TNSCALR ) return   must_nil() ? SCALAR : NSCALR;
+    //if(   _type == TXNSCALR) return t.not_nil();
+    //if( t._type == TXNSCALR) return   not_nil();
+    //
+    //if( _type == TNIL || _type == TXNIL ) return t.meet_nil(this);
+    //
+    //// Scalar values break out into: nums(reals (int,flt)), GC-ptrs (structs(tuples), arrays(strings)), fun-ptrs, RPC
+    //if( t._type == TFUNPTR ||
+    //    t._type == TMEMPTR ||
+    //    t._type == TRPC   )
+    //  return cross_nil(t);
+    //
+    //boolean that_oop = t.is_ptr();
+    //boolean that_num = t.is_num();
+    //assert !(that_oop&&that_num);
+    //
+    //// Down to just nums and GC-ptrs
+    //if( is_num() ) {
+    //  // May be OOP0 or STR or STRUCT or TUPLE
+    //  if( that_oop ) return (must_nil() || t.must_nil()) ? SCALAR : NSCALR;
+    //  if( that_num || t==NIL || t==XNIL ) {
+    //    // Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
+    //    if( _type == TNUM || t._type == TNUM ) return NUM;
+    //    if(   _type == TXNUM ) return t   ;
+    //    if( t._type == TXNUM ) return this;
+    //
+    //    // Not-nil variants
+    //    if(   _type == TNNUM ) return t.must_nil() ? NUM : NNUM;
+    //    if( t._type == TNNUM ) return   must_nil() ? NUM : NNUM;
+    //    if(   _type == TXNNUM) return t.not_nil();
+    //    if( t._type == TXNNUM) return   not_nil();
+    //
+    //    // Real; same pattern as ANY/ALL, or SCALAR/XSCALAR
+    //    if( _type == TREAL || t._type == TREAL ) return REAL;
+    //    if(   _type == TXREAL ) return t   ;
+    //    if( t._type == TXREAL ) return this;
+    //
+    //    // Not-nil variants
+    //    if(   _type == TNREAL ) return t.must_nil() ? REAL : NREAL;
+    //    if( t._type == TNREAL ) return   must_nil() ? REAL : NREAL;
+    //    if(   _type == TXNREAL) return t.not_nil();
+    //    if( t._type == TXNREAL) return   not_nil();
+    //  }
+    //}
     throw typerr(t);
   }
 
@@ -590,9 +617,6 @@ public class Type<T extends Type<T>> implements Cloneable {
   public static Ary<Type> ALL_TYPES() {
     if( ALL_TYPES != null ) return ALL_TYPES;
     Ary<Type> ts = new Ary<>(new Type[1],0);
-    concat(ts,Type      .TYPES);
-    concat(ts,TypeAry   .TYPES);
-    concat(ts,TypeCombo .TYPES);
     concat(ts,TypeFlt   .TYPES);
     concat(ts,TypeFunPtr.TYPES);
     concat(ts,TypeFunSig.TYPES);
@@ -605,6 +629,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     concat(ts,TypeStr   .TYPES);
     concat(ts,TypeStruct.TYPES);
     concat(ts,TypeTuple .TYPES);
+    concat(ts,TypeAry   .TYPES);
     // Partial order Sort, makes for easier tests later.  Arrays.sort requires
     // a total order (i.e., the obvious Comparator breaks the sort contract),
     // so we hand-roll a simple bubble sort.

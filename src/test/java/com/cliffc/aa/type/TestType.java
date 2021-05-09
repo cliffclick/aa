@@ -589,63 +589,26 @@ public class TestType {
 
 
   @Test public void testDistributive() {
-    Object dummy0 = TypeStruct.TYPES;
-    Object dummy1 = TypeMemPtr.TYPES;
     // A.meet(B.join(C)) == A.meet(B).join(A.meet(C))
     // A.join(B.meet(C)) == A.join(B).meet(A.join(C))
     Ary<Type> ts = new Ary<>(new Type[1],0);
-    Type.concat(ts,Type      .TYPES);
-    //Type.concat(ts,TypeAry   .TYPES);
-    Type.concat(ts,TypeFlt   .TYPES);
-    //Type.concat(ts,TypeFunPtr.TYPES);
-    //Type.concat(ts,TypeFunSig.TYPES);
-    Type.concat(ts,TypeInt   .TYPES);
-    //Type.concat(ts,TypeLive  .TYPES);
-    //Type.concat(ts,TypeMem   .TYPES);
-    //Type.concat(ts,TypeMemPtr.TYPES);
-    //Type.concat(ts,TypeObj   .TYPES);
-    //Type.concat(ts,TypeRPC   .TYPES);
-    //Type.concat(ts,TypeStr   .TYPES);
-    //Type.concat(ts,TypeStruct.TYPES);
-    //Type.concat(ts,TypeTuple .TYPES);
-    // Partial order Sort, makes for easier tests later.  Arrays.sort requires
-    // a total order (i.e., the obvious Comparator breaks the sort contract),
-    // so we hand-roll a simple bubble sort.
-    for( int i=0; i<ts._len; i++ )
-      for( int j=i+1; j<ts._len; j++ )
-        if( ts._es[j].isa(ts._es[i]) ) { Type tmp = ts._es[i]; ts._es[i] = ts._es[j]; ts._es[j] = tmp; }
+    Type.concat(ts,TypeInt.TYPES);
+    Type.concat(ts,TypeFlt.TYPES);
+    //ts.push(Type.SCALAR);
 
     int errs=0;
-    //for( Type a : ts )
-    //  for( Type b : ts ) {
-    //    for( Type c : ts ) {
-    //      Type x = a.meet(b .join(       c));
-    //      Type y = a.meet(b).join(a.meet(c));
-    //      if( x!=y && errs++ < 10 ) {
-    //        System.err.println("a="+a+", b="+b+", c="+c);
-    //        System.err.println("b_join_c="+(b.join(c))+", a_meet="+x);
-    //        System.err.println("a_meet_b="+(a.meet(b))+", a_meet_c="+(a.meet(c))+", join_of_meets="+y);
-    //      }
-    //    }
-    //  }
-
-    // If A isa B, then A.join(C) isa B.join(C)
     for( Type a : ts )
       for( Type b : ts ) {
-        if( a.isa(b) ) {
-          for( Type c : ts ) {
-            Type tac = a.join(c);
-            Type tbc = b.join(c);
-            Type mt  = tac.meet(tbc);
-            if( mt != tbc && errs++ < 10 ) {
-              System.err.println("("+a+" ^ "+c+") = "+tac+"; "+
-                                 "("+b+" ^ "+c+") = "+tbc+"; "+
-                                 "their meet = "+mt+" which is not "+tbc);
-            }
+        for( Type c : ts ) {
+          Type x = a.meet(b .join(       c));
+          Type y = a.meet(b).join(a.meet(c));
+          if( x!=y && errs++ < 10 ) {
+            System.err.println("a="+a+", b="+b+", c="+c);
+            System.err.println("b_join_c="+(b.join(c))+", a_meet="+x);
+            System.err.println("a_meet_b="+(a.meet(b))+", a_meet_c="+(a.meet(c))+", join_of_meets="+y);
           }
         }
       }
-
     assert errs==0 : "Found "+errs+" non-join-type errors";
     assertEquals(0,errs);
   }

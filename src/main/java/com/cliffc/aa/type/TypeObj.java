@@ -43,7 +43,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   public static final TypeObj ISUSED= make("",false,true ); // Possibly allocated, the worst possible result
   public static final TypeObj UNUSED= (TypeObj)ISUSED.dual();    // Never allocated
   public static final TypeObj XOBJ  = (TypeObj)OBJ   .dual();    // alloc, but object type is unknown (either struct or array)
-  static final TypeObj[] TYPES = new TypeObj[]{OBJ,ISUSED};
+  static final TypeObj[] TYPES = new TypeObj[]{OBJ,ISUSED,UNUSED,XOBJ};
 
   @Override boolean is_display() { return false; }
   @SuppressWarnings("unchecked")

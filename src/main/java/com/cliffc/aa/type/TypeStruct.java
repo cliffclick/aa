@@ -374,7 +374,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static final TypeStruct FLT64 = make(ARGS_X,ts(NO_DISP,TypeFlt.FLT64)); // {flt->flt}
   public  static final TypeStruct INT64_INT64= make(ARGS_XY,ts(NO_DISP,TypeInt.INT64,TypeInt.INT64)); // {int int->int }
 
-  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,POINT,NAMEPT,A,C0,D1,ARW,DISPLAY};
+  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,POINT,NAMEPT,A,C0,D1,ARW,DISPLAY,ANYSTRUCT};
 
   // Extend the current struct with a new named field
   public TypeStruct add_fld( String name, byte mutable ) { return add_fld(name,mutable,Type.SCALAR); }

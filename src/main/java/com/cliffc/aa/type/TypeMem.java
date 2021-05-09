@@ -257,7 +257,7 @@ public class TypeMem extends Type<TypeMem> {
     ESCAPE = make_live(TypeLive.ESCAPE  ); // Alive, plus escapes some call/memory
     LIVE_BOT=make_live(TypeLive.LIVE_BOT);
   }
-  static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC.dual(),ALLMEM,ESCAPE};
+  static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC,ANYMEM,ESCAPE};
 
   // All mapped memories remain, but each memory flips internally.
   @Override protected TypeMem xdual() {
