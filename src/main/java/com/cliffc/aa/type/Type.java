@@ -2,9 +2,11 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.*;
 
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
+
+import java.util.concurrent.ConcurrentHashMap;
 
 /** an implementation of language AA
  */
@@ -256,30 +258,33 @@ public class Type<T extends Type<T>> implements Cloneable {
   // TypeNil.make(SCALAR) below SCALAR in the lattice, which gets ugly.
   static final byte TNSCALR = 6; // Scalars-not-nil
   static final byte TXNSCALR= 7; // Invert Scalars-not-nil
-  static final byte TREAL   = 8; // All Real Numbers
-  static final byte TXREAL  = 9; // Any Real Numbers; dual of REAL
-  static final byte TNREAL  =10; // Numbers-not-nil
-  static final byte TXNREAL =11; // Invert Numbers-not-nil
-  static final byte TNIL    =12; // The Nil-type
-  static final byte TXNIL   =13; // NIL.dual
-  static final byte TSIMPLE =14; // End of the Simple Types
-  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","nScalar","~nScalar","Real","~Real","nReal","~nReal","nil","0"};
+  static final byte TNUM    = 8; // Number and all derivatives (Complex, Rational, Int, Float, etc)
+  static final byte TXNUM   = 9; // Any Numbers; dual of NUM
+  static final byte TNNUM   =10; // Numbers-not-nil
+  static final byte TXNNUM  =11; // Invert Numbers-not-nil
+  static final byte TREAL   =12; // All Real Numbers
+  static final byte TXREAL  =13; // Any Real Numbers; dual of REAL
+  static final byte TNREAL  =14; // Numbers-not-nil
+  static final byte TXNREAL =15; // Invert Numbers-not-nil
+  static final byte TNIL    =16; // The Nil-type
+  static final byte TXNIL   =17; // NIL.dual
+  static final byte TSIMPLE =18; // End of the Simple Types
+  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","nScalar","~nScalar","Number","~Number","nNumber","~nNumber","Real","~Real","nReal","~nReal","nil","0"};
   // Complex types - Implemented in subclasses
-  static final byte TINT    =15; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TFLT    =16; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TRPC    =17; // Return PCs; Continuations; call-site return points; see TypeRPC
-  static final byte TTUPLE  =18; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TOBJ    =19; // Memory objects; arrays and structs and strings
-  static final byte TSTRUCT =20; // Memory Structs; tuples with named fields
-  static final byte TARY    =21; // Memory String type; an array of chars
-  static final byte TSTR    =22; // Memory String type; an array of chars
-  static final byte TMEM    =23; // Memory type; a map of Alias#s to TOBJs
-  static final byte TMEMPTR =24; // Memory pointer type; a collection of Alias#s
-  static final byte TFUNPTR =25; // Function pointer, refers to a collection of concrete functions
-  static final byte TFUNSIG =26; // Function signature; formals & ret.  Not any concrete function.
-  static final byte TLIVE   =27; // Liveness; backwards flow of TypeObj
-  static final byte TDIST   =28; // Combinations of simple types, requires to preserve distributivity
-  static final byte TLAST   =29; // Type check
+  static final byte TINT    =19; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TFLT    =20; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TRPC    =21; // Return PCs; Continuations; call-site return points; see TypeRPC
+  static final byte TTUPLE  =22; // Tuples; finite collections of unrelated Types, kept in parallel
+  static final byte TOBJ    =23; // Memory objects; arrays and structs and strings
+  static final byte TSTRUCT =24; // Memory Structs; tuples with named fields
+  static final byte TARY    =25; // Memory String type; an array of chars
+  static final byte TSTR    =26; // Memory String type; an array of chars
+  static final byte TMEM    =27; // Memory type; a map of Alias#s to TOBJs
+  static final byte TMEMPTR =28; // Memory pointer type; a collection of Alias#s
+  static final byte TFUNPTR =29; // Function pointer, refers to a collection of concrete functions
+  static final byte TFUNSIG =30; // Function signature; formals & ret.  Not any concrete function.
+  static final byte TLIVE   =31; // Liveness; backwards flow of TypeObj
+  static final byte TLAST   =32; // Type check
 
   public  static final Type ALL    = make( TALL   ); // Bottom
   public  static final Type ANY    = make( TANY   ); // Top
@@ -291,13 +296,17 @@ public class Type<T extends Type<T>> implements Cloneable {
   public  static final Type XNSCALR= make(TXNSCALR); // Scalars-not-nil
   public  static final Type   NIL  = make( TNIL   ); // The Nil.
   public  static final Type  XNIL  = make(TXNIL   ); // The ~Nil.
+  public  static final Type   NUM  = make( TNUM   );
+  public  static final Type  XNUM  = make(TXNUM   );
+  public  static final Type  NNUM  = make( TNNUM  );
+  private static final Type XNNUM  = make(TXNNUM  );
   public  static final Type   REAL = make( TREAL  );
   private static final Type  XREAL = make(TXREAL  );
           static final Type  NREAL = make( TNREAL );
   private static final Type XNREAL = make(TXNREAL );
 
   // Collection of sample types for checking type lattice properties.
-  private static final Type[] TYPES = new Type[]{ALL,ANY,CTRL,XCTRL,SCALAR,XSCALAR,NSCALR,XNSCALR,REAL,XREAL,NREAL,XNREAL};
+  private static final Type[] TYPES = new Type[]{ALL,ANY,CTRL,XCTRL,SCALAR,XSCALAR,NSCALR,XNSCALR,NUM,XNUM,NNUM,XNNUM,REAL,XREAL,NREAL,XNREAL};
 
   // The complete list of primitive types that are disjoint and also is-a
   // SCALAR; nothing else is a SCALAR except what is on this list (or
@@ -310,9 +319,9 @@ public class Type<T extends Type<T>> implements Cloneable {
 
   private boolean is_simple() { return _type < TSIMPLE; }
   private boolean is_ptr() { byte t = _type;  return t == TFUNPTR || t == TMEMPTR; }
-  private boolean is_num() { byte t = _type;  return t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
+  private boolean is_num() { byte t = _type;  return t == TNUM || t == TXNUM || t == TNNUM || t == TXNNUM || t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TNREAL-10*/1,1,1,1,/*TSIMPLE-14*/0, 1,1,1,0,0,0,0,0,0,1,1,/*TFUNSIG-26*/0,/*TLIVE-27*/0,/*TDIST=28*/0}/*TLAST=29*/;
+  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TNNUM-10*/1,1,1,1,1,1,1,1,/*TSIMPLE-18*/0, 1,1,1,0,0,0,0,0,0,1,1,/*TFUNSIG-30*/0,/*TLIVE-31*/0}/*TLAST=32*/;
   public final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
   // Simplify pointers (lose what they point at).
   public Type simple_ptr() { return this; }
@@ -400,87 +409,71 @@ public class Type<T extends Type<T>> implements Cloneable {
     if( _type==TALL || t._type==TANY ) return this;
     if( _type==TANY || t._type==TALL ) return    t;
 
-    //Type lo = t.simple_bot();
-    //
-    //TypeDist.xmeet(this,lo,t);
-    //
-    //if( !t.is_simple() ) ...
-    //  treal is perhaps OK;
-    //... ask for outer_lattice_layer (enclosing simple type)
-    //
-    //                                  forward to TDIST;
-    //if outer_lattices are compatible and high, we can fall to the inner value;
-    //otherwise we are looking at meets of simple; if either is low, then low;
-    //if both are high we can use a TDIST mix.
-    //
-    //          ...
-    //
-    //
-    //          // Ctrl can only meet Ctrl, XCtrl or Top
-    //          byte type = (byte)(_type|t._type); // the OR is low if both are low
-    //if(  type <= TXCTRL ) return _type==TXCTRL && t._type==TXCTRL ? XCTRL : CTRL;
-    //if( _type <= TXCTRL || t._type <= TXCTRL ) return ALL;
-    //
-    //// Meeting scalar and non-scalar falls to ALL.  Includes most Memory shapes.
-    //if( isa_scalar() ^ t.isa_scalar() ) return ALL;
-    //
-    //// Memory does something complex with memory
-    //if( t._type==TMEM ) return t.xmeet(this);
-    //
-    //// Scalar is close to bottom: nearly everything falls to SCALAR, except
-    //// Bottom (already handled) and Control (error; already handled).
-    //if( _type == TSCALAR || t._type == TSCALAR ) return SCALAR;
-    //
-    //// ~Scalar is close to Top: it falls to nearly anything.
-    //if(   _type == TXSCALAR ) return t   ;
-    //if( t._type == TXSCALAR ) return this;
-    //
-    //// Not-nil variants
-    //if(   _type == TNSCALR ) return t.must_nil() ? SCALAR : NSCALR;
-    //if( t._type == TNSCALR ) return   must_nil() ? SCALAR : NSCALR;
-    //if(   _type == TXNSCALR) return t.not_nil();
-    //if( t._type == TXNSCALR) return   not_nil();
-    //
-    //if( _type == TNIL || _type == TXNIL ) return t.meet_nil(this);
-    //
-    //// Scalar values break out into: nums(reals (int,flt)), GC-ptrs (structs(tuples), arrays(strings)), fun-ptrs, RPC
-    //if( t._type == TFUNPTR ||
-    //    t._type == TMEMPTR ||
-    //    t._type == TRPC   )
-    //  return cross_nil(t);
-    //
-    //boolean that_oop = t.is_ptr();
-    //boolean that_num = t.is_num();
-    //assert !(that_oop&&that_num);
-    //
-    //// Down to just nums and GC-ptrs
-    //if( is_num() ) {
-    //  // May be OOP0 or STR or STRUCT or TUPLE
-    //  if( that_oop ) return (must_nil() || t.must_nil()) ? SCALAR : NSCALR;
-    //  if( that_num || t==NIL || t==XNIL ) {
-    //    // Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
-    //    if( _type == TNUM || t._type == TNUM ) return NUM;
-    //    if(   _type == TXNUM ) return t   ;
-    //    if( t._type == TXNUM ) return this;
-    //
-    //    // Not-nil variants
-    //    if(   _type == TNNUM ) return t.must_nil() ? NUM : NNUM;
-    //    if( t._type == TNNUM ) return   must_nil() ? NUM : NNUM;
-    //    if(   _type == TXNNUM) return t.not_nil();
-    //    if( t._type == TXNNUM) return   not_nil();
-    //
-    //    // Real; same pattern as ANY/ALL, or SCALAR/XSCALAR
-    //    if( _type == TREAL || t._type == TREAL ) return REAL;
-    //    if(   _type == TXREAL ) return t   ;
-    //    if( t._type == TXREAL ) return this;
-    //
-    //    // Not-nil variants
-    //    if(   _type == TNREAL ) return t.must_nil() ? REAL : NREAL;
-    //    if( t._type == TNREAL ) return   must_nil() ? REAL : NREAL;
-    //    if(   _type == TXNREAL) return t.not_nil();
-    //    if( t._type == TXNREAL) return   not_nil();
-    //  }
-    //}
+    // Ctrl can only meet Ctrl, XCtrl or Top
+    byte type = (byte)(_type|t._type); // the OR is low if both are low
+    if(  type <= TXCTRL ) return _type==TXCTRL && t._type==TXCTRL ? XCTRL : CTRL;
+    if( _type <= TXCTRL || t._type <= TXCTRL ) return ALL;
+
+    // Meeting scalar and non-scalar falls to ALL.  Includes most Memory shapes.
+    if( isa_scalar() ^ t.isa_scalar() ) return ALL;
+
+    // Memory does something complex with memory
+    if( t._type==TMEM ) return t.xmeet(this);
+
+    // Scalar is close to bottom: nearly everything falls to SCALAR, except
+    // Bottom (already handled) and Control (error; already handled).
+    if( _type == TSCALAR || t._type == TSCALAR ) return SCALAR;
+
+    // ~Scalar is close to Top: it falls to nearly anything.
+    if(   _type == TXSCALAR ) return t   ;
+    if( t._type == TXSCALAR ) return this;
+
+    // Not-nil variants
+    if(   _type == TNSCALR ) return t.must_nil() ? SCALAR : NSCALR;
+    if( t._type == TNSCALR ) return   must_nil() ? SCALAR : NSCALR;
+    if(   _type == TXNSCALR) return t.not_nil();
+    if( t._type == TXNSCALR) return   not_nil();
+
+    if( _type == TNIL || _type == TXNIL ) return t.meet_nil(this);
+
+    // Scalar values break out into: nums(reals (int,flt)), GC-ptrs (structs(tuples), arrays(strings)), fun-ptrs, RPC
+    if( t._type == TFUNPTR ||
+        t._type == TMEMPTR ||
+        t._type == TRPC   )
+      return cross_nil(t);
+
+    boolean that_oop = t.is_ptr();
+    boolean that_num = t.is_num();
+    assert !(that_oop&&that_num);
+
+    // Down to just nums and GC-ptrs
+    if( is_num() ) {
+      // May be OOP0 or STR or STRUCT or TUPLE
+      if( that_oop ) return (must_nil() || t.must_nil()) ? SCALAR : NSCALR;
+      if( that_num || t==NIL || t==XNIL ) {
+        // Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
+        if( _type == TNUM || t._type == TNUM ) return NUM;
+        if(   _type == TXNUM ) return t   ;
+        if( t._type == TXNUM ) return this;
+
+        // Not-nil variants
+        if(   _type == TNNUM ) return t.must_nil() ? NUM : NNUM;
+        if( t._type == TNNUM ) return   must_nil() ? NUM : NNUM;
+        if(   _type == TXNNUM) return t.not_nil();
+        if( t._type == TXNNUM) return   not_nil();
+
+        // Real; same pattern as ANY/ALL, or SCALAR/XSCALAR
+        if( _type == TREAL || t._type == TREAL ) return REAL;
+        if(   _type == TXREAL ) return t   ;
+        if( t._type == TXREAL ) return this;
+
+        // Not-nil variants
+        if(   _type == TNREAL ) return t.must_nil() ? REAL : NREAL;
+        if( t._type == TNREAL ) return   must_nil() ? REAL : NREAL;
+        if(   _type == TXNREAL) return t.not_nil();
+        if( t._type == TXNREAL) return   not_nil();
+      }
+    }
     throw typerr(t);
   }
 
@@ -613,41 +606,34 @@ public class Type<T extends Type<T>> implements Cloneable {
     TypeStr.init1(types);
   }
 
-  private static Ary<Type> ALL_TYPES; // Used for tests
-  public static Ary<Type> ALL_TYPES() {
+  private static Type[] ALL_TYPES; // Used for tests
+  public static Type[] ALL_TYPES() {
     if( ALL_TYPES != null ) return ALL_TYPES;
-    Ary<Type> ts = new Ary<>(new Type[1],0);
-    concat(ts,TypeFlt   .TYPES);
-    concat(ts,TypeFunPtr.TYPES);
-    concat(ts,TypeFunSig.TYPES);
-    concat(ts,TypeInt   .TYPES);
-    concat(ts,TypeLive  .TYPES);
-    concat(ts,TypeMem   .TYPES);
-    concat(ts,TypeMemPtr.TYPES);
-    concat(ts,TypeObj   .TYPES);
-    concat(ts,TypeRPC   .TYPES);
-    concat(ts,TypeStr   .TYPES);
-    concat(ts,TypeStruct.TYPES);
-    concat(ts,TypeTuple .TYPES);
-    concat(ts,TypeAry   .TYPES);
+    Type[] ts =    Type      .TYPES ;
+    ts = concat(ts,TypeFlt   .TYPES);
+    ts = concat(ts,TypeFunPtr.TYPES);
+    ts = concat(ts,TypeFunSig.TYPES);
+    ts = concat(ts,TypeInt   .TYPES);
+    ts = concat(ts,TypeLive  .TYPES);
+    ts = concat(ts,TypeMem   .TYPES);
+    ts = concat(ts,TypeMemPtr.TYPES);
+    ts = concat(ts,TypeObj   .TYPES);
+    ts = concat(ts,TypeRPC   .TYPES);
+    ts = concat(ts,TypeStr   .TYPES);
+    ts = concat(ts,TypeStruct.TYPES);
+    ts = concat(ts,TypeTuple .TYPES);
+    ts = concat(ts,TypeAry   .TYPES);
     // Partial order Sort, makes for easier tests later.  Arrays.sort requires
     // a total order (i.e., the obvious Comparator breaks the sort contract),
     // so we hand-roll a simple bubble sort.
-    for( int i=0; i<ts._len; i++ )
-      for( int j=i+1; j<ts._len; j++ )
-        if( ts._es[j].isa(ts._es[i]) ) { Type tmp = ts._es[i]; ts._es[i] = ts._es[j]; ts._es[j] = tmp; }
+    for( int i=0; i<ts.length; i++ )
+      for( int j=i+1; j<ts.length; j++ )
+        if( ts[j].isa(ts[i]) ) { Type tmp = ts[i]; ts[i] = ts[j]; ts[j] = tmp; }
     return (ALL_TYPES = ts); // Preserve for tests
-  }
-  static void concat( Ary<Type> ts, Type[] ts1 ) {
-    for( Type t1 : ts1 ) {
-      assert !t1.above_center(); // Always below-center or equal, because we'll dual anyways
-      ts.push(t1);
-      if( t1!=t1.dual() ) ts.push(t1.dual());
-    }
   }
 
   static boolean check_startup() {
-    Type[] ts = ALL_TYPES().asAry();
+    Type[] ts = ALL_TYPES();
 
     // Confirm commutative & complete
     for( Type t0 : ts )
@@ -692,22 +678,6 @@ public class Type<T extends Type<T>> implements Cloneable {
       }
     assert errs==0 : "Found "+errs+" non-join-type errors";
 
-    // A.meet(B.join(C)) == A.meet(B).join(A.meet(C))
-    // A.join(B.meet(C)) == A.join(B).meet(A.join(C))
-    for( Type a : ts )
-      for( Type b : ts ) {
-        for( Type c : ts ) {
-          Type x = a.meet(b .join(       c));
-          Type y = a.meet(b).join(a.meet(c));
-          if( x!=y && errs++ < 10 ) {
-            System.err.println("a="+a+", b="+b+", c="+c);
-            System.err.println("b_join_c="+(b.join(c))+", a_meet="+x);
-            System.err.println("a_meet_b="+(a.meet(b))+", a_meet_c="+(a.meet(c))+", join_of_meets="+y);
-          }
-        }
-      }
-    assert errs==0 : "Found "+errs+" non-join-type errors";
-
     // Check scalar primitives; all are SCALARS and none sub-type each other.
     SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, TypeMemPtr.OOP0, TypeFunPtr.GENERIC_FUNPTR, TypeRPC.ALL_CALL };
     for( Type t : SCALAR_PRIMS ) assert t.isa(SCALAR);
@@ -717,18 +687,25 @@ public class Type<T extends Type<T>> implements Cloneable {
 
     return true;
   }
+  private static Type[] concat( Type[] ts0, Type[] ts1 ) {
+    Type[] ts = Arrays.copyOf(ts0,ts0.length+ts1.length);
+    System.arraycopy(ts1,0,ts,ts0.length,ts1.length);
+    return ts;
+  }
 
   // True if value is above the centerline (no definite value, ambiguous)
   public boolean above_center() {
     switch( _type ) {
     case TALL:
     case TCTRL:
+    case TNUM:    case TNNUM:
     case TREAL:   case TNREAL:
     case TSCALAR: case TNSCALR:
     case TNIL:
       return false;             // These are all below center
     case TANY:
     case TXCTRL:
+    case TXNUM:    case TXNNUM:
     case TXREAL:   case TXNREAL:
     case TXSCALAR: case TXNSCALR:
     case TXNIL:
@@ -741,11 +718,13 @@ public class Type<T extends Type<T>> implements Cloneable {
     switch( _type ) {
     case TALL:
     case TSCALAR:  case TNSCALR:
+    case TNUM:     case TNNUM:
     case TREAL:    case TNREAL:
     case TCTRL:
       return false;             // These all include not-constant things
     case TANY:
     case TXREAL:   case TXNREAL:
+    case TXNUM:    case TXNNUM:
     case TXSCALAR: case TXNSCALR:
     case TXCTRL:
     case TNIL:     case TXNIL:
@@ -758,12 +737,16 @@ public class Type<T extends Type<T>> implements Cloneable {
     switch( _type ) {
     case TALL:
     case TCTRL:
+    case TNNUM:
+    case TNUM:
     case TNREAL:
     case TREAL:
     case TNSCALR:
     case TSCALAR:
     case TANY:
     case TXCTRL:
+    case TXNNUM:
+    case TXNUM:
     case TXNREAL:
     case TXREAL:
     case TXNSCALR:
@@ -808,6 +791,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // unification.  e.g. "3" becomes "int64".
   public Type widen() {
     switch( _type ) {
+    case TNUM:    case TXNUM:
     case TREAL:   case TXREAL:
     case TSCALAR: case TXSCALAR:
     case TNSCALR: case TXNSCALR:
@@ -826,6 +810,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   public boolean must_nil() {
     switch( _type ) {
     case TALL:
+    case TNUM:
     case TREAL:
     case TSCALAR:
     case TNIL: case TXNIL:
@@ -834,29 +819,34 @@ public class Type<T extends Type<T>> implements Cloneable {
     case TMEM:   // Nonsense, only for IfNode.value test
       return true;              // These all must include a nil
     case TANY:                  // All above-center types are not required to include a nil
+    case TXNUM:
     case TXREAL:
     case TXSCALAR:
     case TXNSCALR: case TNSCALR:
+    case TXNNUM:   case TNNUM:
     case TXNREAL:  case TNREAL:
       return false;             // These all may be non-nil
     default: throw typerr(null); // Overridden in subclass
     }
   }
   // Mismatched scalar types that can only cross-nils
-  final Type cross_nil(Type t) { return must_nil() || t.must_nil() ? SCALAR : NSCALR; }
+  Type cross_nil(Type t) { return must_nil() || t.must_nil() ? SCALAR : NSCALR; }
 
   // True if type may include a nil (as opposed to must-nil).
   // True for many above-center or zero values.
   public boolean may_nil() {
     switch(_type) {
     case TALL:
+    case TNUM:
     case TREAL:
     case TSCALAR:
     case TXNSCALR: case TNSCALR:
+    case TXNNUM:   case TNNUM:
     case TXNREAL:  case TNREAL:
     case TTUPLE:
       return false;
     case TANY:
+    case TXNUM:
     case TXREAL:
     case TXSCALAR:
     case TCTRL:  // Nonsense, only for IfNode.value test
@@ -874,8 +864,10 @@ public class Type<T extends Type<T>> implements Cloneable {
   Type not_nil() {
     switch( _type ) {
     case TXSCALAR:  return XNSCALR;
+    case TXNUM   :  return XNNUM  ;
     case TXREAL  :  return XNREAL ;
     case TSCALAR:   case TNSCALR:   case TXNSCALR:
+    case TNUM:      case TNNUM:     case TXNNUM:
     case TREAL:     case TNREAL:    case TXNREAL:
     case TNIL:      case TXNIL:
       return this;
@@ -886,12 +878,15 @@ public class Type<T extends Type<T>> implements Cloneable {
     assert nil==NIL || nil==XNIL;
     switch( _type ) {
     case TANY:
+    case TXNUM:
     case TXREAL:
     case TXSCALAR:
     case TXNIL:   return nil; // Preserve high/low flavor
     case TNIL:    return NIL;
+    case TXNNUM:
     case TXNREAL:
     case TXNSCALR:  return TypeInt.BOOL;
+    case TNUM:    case TNNUM:     return NUM;
     case TREAL:   case TNREAL:    return REAL;
     case TSCALAR: case TNSCALR:   return SCALAR;
     case TCTRL:   case TXCTRL:

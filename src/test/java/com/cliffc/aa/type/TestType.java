@@ -18,13 +18,13 @@ public class TestType {
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
 
-    Type a = TypeInt.BOOL.dual();
-    Type bc= TypeInt.NINT8.dual();
-
-    Type x = a.meet(bc);
-    //Type y = (a.meet(b)).join(a.meet(c));
-
-    assertEquals(TypeInt.TRUE,x);
+    int fdx0 = BitsFun.new_fidx(1);
+    int fdx1 = BitsFun.new_fidx(fdx0);
+    int fdx2 = BitsFun.new_fidx(fdx0);
+    BitsFun bf0  = BitsFun.make0(-fdx0);
+    BitsFun bf12 = BitsFun.make0(-fdx1,-fdx2);
+    assertTrue(bf12.isa(bf0));
+    assertTrue(bf0.dual().isa(bf12.dual()));
   }
 
   @Test public void testBits0() {
@@ -582,29 +582,4 @@ public class TestType {
     assertTrue(Type.check_startup());
   }
 
-
-
-  @Test public void testDistributive() {
-    // A.meet(B.join(C)) == A.meet(B).join(A.meet(C))
-    // A.join(B.meet(C)) == A.join(B).meet(A.join(C))
-    Ary<Type> ts = new Ary<>(new Type[1],0);
-    Type.concat(ts,TypeInt.TYPES);
-    //ts.push(Type.SCALAR);
-
-    int errs=0;
-    for( Type a : ts )
-      for( Type b : ts ) {
-        for( Type c : ts ) {
-          Type x = a.meet(b .join(       c));
-          Type y = a.meet(b).join(a.meet(c));
-          if( x!=y && errs++ < 10 ) {
-            System.err.println("a="+a+", b="+b+", c="+c);
-            System.err.println("b_join_c="+(b.join(c))+", a_meet="+x);
-            System.err.println("a_meet_b="+(a.meet(b))+", a_meet_c="+(a.meet(c))+", join_of_meets="+y);
-          }
-        }
-      }
-    assert errs==0 : "Found "+errs+" non-join-type errors";
-    assertEquals(0,errs);
-  }
 }

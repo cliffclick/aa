@@ -163,7 +163,7 @@ public class TestNode {
     assert _errs == 0;          // Start with no errors
 
     // Types we are testing
-    _alltypes = Type.ALL_TYPES().asAry();
+    _alltypes = Type.ALL_TYPES();
     // A subset used to help diagnose this algorithm.
     //Type[] ts = new Type[] {
     //  Type.ALL,Type.ANY,Type.CTRL,Type.XCTRL, Type.SCALAR, Type.XSCALAR, Type.NSCALR, Type.XNSCALR,

@@ -30,7 +30,7 @@ public class TypeInt extends Type<TypeInt> {
   private static TypeInt FREE=null;
   @Override protected TypeInt free( TypeInt ret ) { FREE=this; return ret; }
   public static TypeInt make( int x, int z, long con ) {
-    if( Math.abs(x)==1 && z==1 && con==0) { x=0; con=1; } // not-null-bool is just a 1
+    if( Math.abs(x)==1 && z==1 && con==0) con=1; // not-null-bool is just a 1
     TypeInt t1 = FREE;
     if( t1 == null ) t1 = new TypeInt(x,z,con);
     else {  FREE = null;      t1.init(x,z,con); }
@@ -50,7 +50,7 @@ public class TypeInt extends Type<TypeInt> {
   static public  final TypeInt NINT8  = make(-1, 8,0);
   static public  final TypeInt NINT64 = make(-1,64,0);
   static public  final TypeInt ZERO   = (TypeInt)new TypeInt(0,1,0).hashcons();
-  static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,INT8,BOOL,TRUE,con(3),NINT64,NINT8};
+  static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,XINT1,NINT64};
   static void init1( HashMap<String,Type> types ) {
     types.put("bool" ,BOOL);
     types.put("int1" ,BOOL);
