@@ -36,7 +36,7 @@ public abstract class MemPrimNode extends PrimNode {
       TypeInt idx = (TypeInt)tidx;
       if( idx.is_con() ) {
         long i = idx.getl();
-        long len = ary._size.is_con() ? ary._size.getl() : (ary._size._hi>=63 ? Integer.MAX_VALUE : (1L<<ary._size._hi));
+        long len = ary._size.is_con() ? ary._size.getl() : (ary._size._z>=63 ? Integer.MAX_VALUE : (1L<<ary._size._z));
         if( i<0 || i>=len ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_badargs[2],"Index must be out of bounds",null);
       }
     }

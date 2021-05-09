@@ -102,9 +102,9 @@ public class TestParse {
     test("1&3|1&2", TypeInt.con(1));
 
     // Float
-    test("1.2+3.4", TypeFlt.con(4.6));
+    test("1.2+3.4", TypeFlt.make(0,64,4.6));
     // Mixed int/float with conversion
-    test("1+2.3",   TypeFlt.con(3.3));
+    test("1+2.3",   TypeFlt.make(0,64,3.3));
 
     // Simple strings
     test_obj("\"Hello, world\"", TypeStr.con("Hello, world"));
@@ -256,7 +256,7 @@ public class TestParse {
   @Test public void testParse03() {
     // Type annotations
     test("-1:int", TypeInt.con( -1));
-    test("(1+2.3):flt", TypeFlt.con(3.3));
+    test("(1+2.3):flt", TypeFlt.make(0,64,3.3));
     test("x:int = 1", TypeInt.TRUE);
     test("x:flt = 1", TypeInt.TRUE); // casts for free to a float
     testerr("x:flt32 = 123456789", "123456789 is not a flt32",1);
@@ -326,7 +326,7 @@ public class TestParse {
     test   ("a=@{x=(b=1.2)*b;y=b}; a.y", TypeFlt.con(1.2 )); // ok to use temp defs
     test   ("a=@{x=(b=1.2)*b;y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
     testerr("a=@{x=(b=1.2)*b;y=b}; b", "Unknown ref 'b'",22);
-    test   ("t=@{n=0;val=1.2}; u=math_rand(1) ? t : @{n=t;val=2.3}; u.val", TypeFlt.FLT64); // structs merge field-by-field
+    test   ("t=@{n=0;val=1.2}; u=math_rand(1) ? t : @{n=t;val=2.3}; u.val", TypeFlt.NFLT64); // structs merge field-by-field
     // Comments in the middle of a struct decl
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1;y=2})", TypeInt.con(5));
 
@@ -742,7 +742,7 @@ public class TestParse {
     test("id={x->x};id(1)",TypeInt.con(1));
     test("{x->x}(3.14)",TypeFlt.con(3.14));
     test_prim("{x->x}({+})","+");
-    test("id={x->x};id({+})(id(1),id(math_pi))",TypeFlt.con(Math.PI+1));
+    test("id={x->x};id({+})(id(1),id(math_pi))",TypeFlt.make(0,64,Math.PI+1));
 
     // recursive unification.  Trivially types as a dead fcn ptr.
     test_isa("x={x -> x x}",TypeFunPtr.make(BitsFun.make0(46),3,tdisp));
