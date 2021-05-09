@@ -593,7 +593,6 @@ public class TestType {
     // A.join(B.meet(C)) == A.join(B).meet(A.join(C))
     Ary<Type> ts = new Ary<>(new Type[1],0);
     Type.concat(ts,TypeInt.TYPES);
-    Type.concat(ts,TypeFlt.TYPES);
     //ts.push(Type.SCALAR);
 
     int errs=0;

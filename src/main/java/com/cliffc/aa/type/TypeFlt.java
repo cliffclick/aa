@@ -62,7 +62,7 @@ public class TypeFlt extends Type<TypeFlt> {
     assert t != this;
     switch( t._type ) {
     case TFLT:   break;
-    case TINT:   return ((TypeInt)t).xmeetf(this);
+    case TINT:   throw unimpl();
     case TFUNPTR:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
@@ -111,9 +111,4 @@ public class TypeFlt extends Type<TypeFlt> {
   }
   @Override public Type widen() { return FLT64; }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
-  boolean includes_int() {
-    long rlo = Math.round(_lo);
-    long rhi = Math.round(_hi);
-    return rlo!=rhi || _lo==rlo || _hi==rhi;
-  }
 }

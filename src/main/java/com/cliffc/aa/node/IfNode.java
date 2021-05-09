@@ -60,7 +60,7 @@ public class IfNode extends Node {
     Type pred = val(1);
     if( pred instanceof TypeTuple)return TypeTuple.IF_ANY;// Nonsense, so test is dead
     if( pred instanceof TypeObj ) return TypeTuple.IF_ANY;// Nonsense, so test is dead
-    if( pred.isa(TypeInt.INT1.dual()) ) return TypeTuple.IF_ANY; // Choice of {0,1}
+    if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY; // Choice of {0,1}
     if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL; // Can be either
     if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
       return TypeTuple.IF_FALSE;   // False only
