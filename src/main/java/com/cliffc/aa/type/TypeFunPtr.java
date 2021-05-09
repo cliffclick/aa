@@ -103,8 +103,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,1,Type.ALL);
   public  static final TypeFunPtr EMPTY  = make(BitsFun.EMPTY,0,TypeMemPtr.NO_DISP);
-  public  static final TypeFunPtr NILPTR = make(BitsFun.NIL  ,0,TypeMemPtr.NO_DISP);
-  static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,EMPTY};
+  static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,EMPTY.dual()};
 
   @Override protected TypeFunPtr xdual() { return new TypeFunPtr(_fidxs.dual(),_nargs,_disp.dual()); }
   @Override protected TypeFunPtr rdual() {

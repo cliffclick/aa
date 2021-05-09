@@ -50,7 +50,7 @@ public class TypeInt extends Type<TypeInt> {
   static public  final TypeInt NINT8  = make(-1, 8,0);
   static public  final TypeInt NINT64 = make(-1,64,0);
   static public  final TypeInt ZERO   = (TypeInt)new TypeInt(0,1,0).hashcons();
-  static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,XINT1,NINT64};
+  static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,NINT64};
   static void init1( HashMap<String,Type> types ) {
     types.put("bool" ,BOOL);
     types.put("int1" ,BOOL);

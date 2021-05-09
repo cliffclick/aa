@@ -257,7 +257,7 @@ public class TypeMem extends Type<TypeMem> {
     ESCAPE = make_live(TypeLive.ESCAPE  ); // Alive, plus escapes some call/memory
     LIVE_BOT=make_live(TypeLive.LIVE_BOT);
   }
-  static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC,ANYMEM,ESCAPE};
+  static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC.dual(),ALLMEM,ESCAPE};
 
   // All mapped memories remain, but each memory flips internally.
   @Override protected TypeMem xdual() {
@@ -315,7 +315,7 @@ public class TypeMem extends Type<TypeMem> {
     return false;
   }
 
-  
+
   // Shallow meet of all possible loadable values.  Used in Node.value calls, so must be monotonic.
   public TypeObj ld( TypeMemPtr ptr ) {
     if( ptr._aliases == BitsAlias.NIL.dual() || ptr._aliases == BitsAlias.NIL )
