@@ -339,4 +339,42 @@ public class TestHM {
     assertEquals("[  7:A:*[7]@{ n1 = B:*[8]@{ n1 = $A, v1 = str}?, v1 = str}?, 8:$B]",syn._post.p());
   }
 
+  @Test
+  public void test33() {
+    Syntax syn = HM.hm("x = { y -> (x (y y))}; x");
+    assertEquals("{ A:{ $A -> $A } -> B }",syn._t.p());
+    assertEquals("[]",syn._post.p());
+  }
+
+  @Test
+  public void test34() {
+    try {
+      // Example from SimpleSub requiring 'x' to be both a struct with field
+      // 'v', and also a function type - specifically disallowed in 'aa'.
+      HM.hm("{ x -> y = ( x .v x ); 0}");
+    } catch( RuntimeException e ) {
+      assertEquals("Cannot unify *[-2]@{ v = V40} and { V40 -> V34 }",e.getMessage());
+    }
+  }
+  
+  @Test
+  public void test35() {
+    Syntax syn = HM.hm("x = { z -> z}; (x { y -> .u y})");
+    assertEquals("{ *[-2]@{ u = A} -> A }",syn._t.p());
+    assertEquals("[]",syn._post.p());
+  }
+
+  @Test
+  public void test36() {
+    try {
+      // Example from SimpleSub requiring 'x' to be both:
+      // - a recursive self-call function from "w = (x x)": $V66:{ $V66 -> V67 } AND
+      // - a function which takes a struct with field 'u'
+      // The first arg to x is two different kinds of functions, so fails unification.
+      HM.hm("x = w = (x x); { z -> z}; (x { y -> .u y})");
+    } catch( RuntimeException e ) {
+      assertEquals("Cannot unify $V66:{ $V66 -> V67 } and *[-2]@{ u = V39}",e.getMessage());
+    }
+  }
+
 }

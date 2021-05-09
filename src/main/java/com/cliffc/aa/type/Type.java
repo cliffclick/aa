@@ -77,7 +77,7 @@ import java.util.function.Predicate;
 // nil.join(*str).  The problem is, the nil can drop to an int before the Cast
 // goes dead.  Thus the Cast computes int.join(*str).  Since nil.isa(int) the
 // Cast inputs drop monotonically... so the output should also.  Thus
-// nil.join(*str).isa(int.join(*str)).  This is a standard distributivity
+// nil.join(*str).isa(int.join(*str)).  This is a standard symmetry
 // property and is one of the major Type system asserts... and it doesn't hold.
 
 // nil.isa(int) == TRUE          ; the nil is treated as a TypeInt.ZERO
