@@ -40,7 +40,9 @@ public class DefMemNode extends Node {
     // Structural unification on all objects
     boolean progress=false;
     for( int i=1; i<_defs._len; i++ ) {
-      TV2 tv = (in(i) instanceof MrgProjNode && !tvar(i).is_dead() ? ((MrgProjNode)in(i)).nnn() : in(i)).tvar();
+      Node n = in(i);
+      if( n==null ) continue;
+      TV2 tv = (n instanceof MrgProjNode && !tvar(i).is_dead() ? n.in(0) : n).tvar();
       progress |= tvar.unify_at(i,tv,test,null);
       if( progress && test ) return true;
     }

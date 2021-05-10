@@ -1,8 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
@@ -90,7 +88,7 @@ public class UnresolvedNode extends UnOrFunPtrNode {
       FunPtrNode ptr0 = (FunPtrNode) in(0);
       assert Util.eq(ptr0._name, ptr._name);
       // Actually, equal op_prec & thunk only for binary ops
-      assert ptr0.fun()._op_prec == ptr.fun()._op_prec;
+      assert ptr0.fun()._op_prec == ptr.fun()._op_prec || ptr0.nargs()== AA.ARG_IDX+1; // Either a uniop, or same precedence
       assert ptr0.fun()._thunk_rhs == ptr.fun()._thunk_rhs;
     }
     add_def(ptr);
@@ -110,7 +108,7 @@ public class UnresolvedNode extends UnOrFunPtrNode {
       else if( x instanceof UnresolvedNode ) ((UnresolvedNode)x).add_def_unresolved(ffptr);
       else x = new UnresolvedNode(_bad,x.unkeep(),ffptr).keep();
     }
-    x.unkeep().xval();
+    if( x!=null ) x.unkeep().xval();
     return x;
   }
 

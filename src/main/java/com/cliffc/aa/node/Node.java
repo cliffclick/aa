@@ -465,6 +465,7 @@ public abstract class Node implements Cloneable {
   public Node ideal_mono() {
     switch( _op ) {             // Giant assert that these nodes are checked for do-nothing
     case OP_CALL:
+    case OP_CALLEPI:
     case OP_CON:
     case OP_CPROJ:
     case OP_DEFMEM:
