@@ -387,6 +387,7 @@ public class HM {
 
       // The normal lambda work
       T2 old = find();
+      if( old.is_err() ) return false;          
       if( old.is_fun() ) {      // Already a function?  Compare-by-parts
         for( int i=0; i<_targs.length; i++ )
           if( old.args(i).unify(targ(i),work) )
@@ -524,17 +525,19 @@ public class HM {
       //   this-unify-_fun.return makes progress
       T2 tfun = _fun.find();
       if( !tfun.is_fun() ) {
+        if( tfun.is_err() ) return find().unify(tfun,work);
         if( work==null ) return true; // Will-progress & just-testing
         T2[] targs = new T2[_args.length+1];
         for( int i=0; i<_args.length; i++ )
           targs[i] = _args[i].find();
         targs[_args.length] = find(); // Return
         T2 nfun = T2.make_fun(targs);
-        return tfun.unify(nfun,work);
+        progress = tfun.unify(nfun,work);
+        return tfun.find().is_err() ? find().unify(tfun.find(),work) : progress;
       }
 
       if( tfun._args.length != _args.length+1 )
-        throw new RuntimeException("Mismatched argument lengths");
+        progress |= T2.make_err("Mismatched argument lengths").unify(find(),work);
       // Check for progress amongst arg pairs
       for( int i=0; i<_args.length; i++ ) {
         progress |= tfun.args(i).unify(_args[i].find(),work);
@@ -542,6 +545,7 @@ public class HM {
           return true;          // Will-progress & just-testing early exit
       }
       progress |= tfun.args(_args.length).unify(find(),work);
+      if( tfun.find().is_err() ) return find().unify(tfun.find(),work);
       return progress;
     }
     @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
@@ -621,7 +625,7 @@ public class HM {
 
       // Extra fields are unified with ALL since they are not created here.
       for( int i=0; i<rec._ids.length; i++ ) {
-        if( Util.find(_ids,rec._ids[i])== -1 && rec.args(i)._con!=Type.ALL ) {
+        if( Util.find(_ids,rec._ids[i])== -1 && rec.args(i)._con!=Type.ALL && !rec.args(i).is_err() ) {
           if( work==null ) return true;
           progress |= T2.make_base(Type.ALL).unify(rec.args(i),work);
         }
@@ -681,13 +685,15 @@ public class HM {
       T2 rec = _rec.find();
       int idx = rec._ids==null ? -1 : Util.find(rec._ids,_id);
       if( idx==-1 ) {           // Not a struct or no field, force it to be one
+        if( find().is_err() ) return false;
         if( work==null ) return true;
+        if( rec.is_err() ) return find().unify(rec,work);
         progress |= T2.make_struct(new String[]{_id}, BitsAlias.RECORD_BITS.dual(),new T2[]{find().push_update(rec._deps)}).unify(rec, work);
       } else {
         // Unify the field
         progress |= rec.args(idx).unify(find(), work);
         if( find()._con==Type.ALL )
-          throw new RuntimeException("Missing field "+_id+" in "+rec.find());
+          progress |= T2.make_err("Missing field "+_id+" in "+rec.find()).unify(find(),work);
       }
       return progress;
     }
@@ -745,6 +751,7 @@ public class HM {
     static T2 make_nil() { return new T2("Nil",null,null,null); }
     static T2 make_struct( String[] ids, BitsAlias aliases, T2[] flds ) { return new T2("@{}", null,ids,aliases,flds); }
     static T2 make_mem() { return new T2("[]" ,null,null,null,new T2[1]); }
+    static T2 make_err(String s) { return new T2("Err",TypeStr.con(s.intern()),null,null); }
     static T2 prim(String name, T2... args) { return new T2(name,null,null,null,args); }
     T2 copy() { return new T2(_name,_con,_ids,_aliases,new T2[_args.length]); }
 
@@ -755,6 +762,7 @@ public class HM {
       _ids = ids;
       _aliases = aliases;
       _args= args;
+      _deps = null;
     }
 
     // A type var, not a concrete leaf.  Might be U-Fd or not.
@@ -766,6 +774,7 @@ public class HM {
     boolean is_fun () { return isa("->"); }
     boolean is_struct() { return isa("@{}"); }
     boolean is_mem()  { return isa("[]"); }
+    boolean is_err()  { return isa("Err"); }
 
     T2 debug_find() {// Find, without the roll-up
       if( !is_leaf() ) return this; // Shortcut
@@ -782,7 +791,7 @@ public class HM {
       T2 u = debug_find();
       if( u==this || u==_args[0] ) return u;
       T2 v = this, v2;
-      while( !v.is_leaf() && (v2=v._args[0])!=u ) { v._args[0]=u; v = v2; }
+      while( v.is_leaf() && (v2=v._args[0])!=u ) { v._args[0]=u; v = v2; }
       return u;
     }
     // U-F find on the args array
@@ -846,6 +855,11 @@ public class HM {
       assert no_uf() && that.no_uf();
       if( this==that ) return false;
 
+      // two errs union in either order, so keep lower uid (actually should merge error strings)
+      if( is_err() && that.is_err() && _uid<that._uid ) return that.union(this,work);
+      if(      is_err() ) return that.union(this,work);
+      if( that.is_err() ) return      union(that,work);
+
       // two leafs union in either order, so keep lower uid
       if( is_leaf() && that.is_leaf() && _uid<that._uid ) return that.union(this,work);
       if(      is_leaf() ) return      union(that,work);
@@ -855,12 +869,6 @@ public class HM {
       if( is_nil() && that.is_struct() ) return or0(that,work);
       if( that.is_nil() && is_struct() ) return that.or0(this,work);
 
-      if( !Util.eq(_name,that._name) )
-        throw new RuntimeException("Cannot unify "+this+" and "+that);
-      assert _args!=that._args; // Not expecting to share _args and not 'this'
-      if( !is_struct() && !is_mem() && _args.length != that._args.length )
-        throw new RuntimeException("Cannot unify "+this+" and "+that);
-
       // Cycle check
       long luid = dbl_uid(that);
       T2 rez = DUPS.get(luid);
@@ -869,6 +877,12 @@ public class HM {
       DUPS.put(luid,that);          // Close cycles
 
       if( work==null ) return true; // Here we definitely make progress; bail out early if just testing
+
+      if( !Util.eq(_name,that._name) )
+        return union_err(that,work,"Cannot unify "+this+" and "+that);
+      assert _args!=that._args; // Not expecting to share _args and not 'this'
+      if( !is_struct() && !is_mem() && _args.length != that._args.length )
+        return union_err(that,work,"Cannot unify "+this+" and "+that);
 
       // Structural recursion unification.
 
@@ -897,7 +911,8 @@ public class HM {
         for( int i=0; i<_args.length; i++ ) // For all fields in LHS
           args(i)._unify(that.args(i),work);
       }
-      return union(that,work);
+      if( find().is_err() && !that.find().is_err() ) return that.find().union(find(),work); // Preserve errors
+      return find().union(that,work);
     }
 
     private void add_fld(String id, T2 fld, Worklist work) {
@@ -928,6 +943,10 @@ public class HM {
       that._con = con;          // Yes progress, but no update if null work
       return true;
     }
+    private boolean union_err(T2 that, Worklist work, String msg) {
+      union(that,work);
+      return that.union(make_err(msg),work);
+    }
 
     // -----------------
     // Make a (lazy) fresh copy of 'this' and unify it with 'that'.  This is
@@ -955,6 +974,9 @@ public class HM {
         return prior.find()._unify(that,work);  // Also 'prior' needs unification with 'that'
       if( cycle_equals(that) ) return vput(that,false);
 
+      if( that.is_err() ) return vput(that,false); // That is an error, ignore 'this' and no progress
+      if( this.is_err() ) return vput(that,_unify(that,work));
+
       // Attempting to pre-compute occurs_in, by computing 'is_fresh' in the
       // Ident.hm() call does NOT work.  The 'is_fresh' is for the top-layer
       // only, not the internal layers.  As soon as we structural recurse down
@@ -972,7 +994,7 @@ public class HM {
 
       if( !Util.eq(_name,that._name) ||
           (!is_struct() && _args.length != that._args.length) )
-        throw new RuntimeException("Cannot unify "+this+" and "+that);
+        return work == null || vput(that,that._unify(make_err("Cannot unify "+this+" and "+that),work));
 
       // Structural recursion unification, lazy on LHS
       vput(that,false); // Early set, to stop cycles
@@ -1187,6 +1209,7 @@ public class HM {
     // Does NOT roll-up U-F, has no side-effects.
     @Override public String toString() { return str(new SB(), new VBitSet(), get_dups(new VBitSet()) ).toString(); }
     SB str(SB sb, VBitSet visit, VBitSet dups) {
+      if( is_err() ) return sb.p(_con.getstr());
       if( is_leaf() || is_base() ) {
         if( is_base() ) sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString()); else sb.p(_name);
         return _args.length==0 || _args[0]==null ? sb : _args[0].str(sb.p(">>"), visit, dups);
@@ -1237,6 +1260,7 @@ public class HM {
     String p(VBitSet dups) { VCNT=0; VNAMES.clear(); return find()._p(new SB(), new VBitSet(), dups).toString(); }
     private SB _p(SB sb, VBitSet visit, VBitSet dups) {
       assert no_uf();
+      if( is_err () ) return sb.p( _con.getstr() );
       if( is_base() ) return sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString() );
       if( is_leaf() || dups.get(_uid) ) { // Leafs or Duplicates?  Take some effort to pretty-print cycles
         Integer ii = VNAMES.get(this);

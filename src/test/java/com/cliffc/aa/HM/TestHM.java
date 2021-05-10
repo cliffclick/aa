@@ -144,7 +144,7 @@ public class TestHM {
     assertEquals("[]",syn._post.p());
   }
 
-  @Test(expected = RuntimeException.class)
+  @Test
   public void test17() {
     // Checking behavior when using "if" to merge two functions with
     // sufficiently different signatures, then attempting to pass them to a map
@@ -160,7 +160,7 @@ public class TestHM {
     Syntax syn = HM.hm("fcn = {p -> (if p {a -> (pair a a)} {b -> (pair b (pair 3 b))})};"+
                   "map = { fun x -> (fun x)};"+
                   "{ q -> (map (fcn q) 5)}");
-    assertEquals("TBD",syn._t.p());
+    assertEquals("{ A -> (pair Cannot unify $V123:(pair 3 $V123) and 5 Cannot unify $V123:(pair 3 $V123) and 5) }",syn._t.p());
     assertEquals("[]",syn._post.p());
   }
 
@@ -252,18 +252,19 @@ public class TestHM {
   }
 
   // Basic field test
-  @Test(expected = RuntimeException.class)
+  @Test
   public void test25a() {
     Syntax syn = HM.hm(".x 5");
-    assertEquals("TBD",syn._t.p()); // Cannot unify 5 and @{x=A}
+    assertEquals("Cannot unify *[-2]@{ x = V24} and 5",syn._t.p());
+    assertEquals("[]",syn._post.p());
   }
 
   // Basic field test.
-  @Test(expected = RuntimeException.class)
+  @Test
   public void test25b() {
     Syntax syn = HM.hm(".x @{ y =3}");
-    assertEquals("A",syn._t.p());
-    assertEquals("[  7:*[7]@{ x = A, y = 3}]",syn._post.p());
+    assertEquals("Missing field x in *[7]@{ y = 3, x = all}",syn._t.p());
+    assertEquals("[  7:*[7]@{ y = 3, x = Missing field x in *[7]@{ y = 3, x = all}}]",syn._post.p());
   }
 
   @Test
@@ -348,15 +349,13 @@ public class TestHM {
 
   @Test
   public void test34() {
-    try {
-      // Example from SimpleSub requiring 'x' to be both a struct with field
-      // 'v', and also a function type - specifically disallowed in 'aa'.
-      HM.hm("{ x -> y = ( x .v x ); 0}");
-    } catch( RuntimeException e ) {
-      assertEquals("Cannot unify *[-2]@{ v = V40} and { V40 -> V34 }",e.getMessage());
-    }
+    // Example from SimpleSub requiring 'x' to be both a struct with field
+    // 'v', and also a function type - specifically disallowed in 'aa'.
+    Syntax syn = HM.hm("{ x -> y = ( x .v x ); 0}");
+    assertEquals("{ Cannot unify *[-2]@{ v = V40} and { V40 -> V34 } -> 0 }",syn._t.p());
+    assertEquals("[]",syn._post.p());
   }
-  
+
   @Test
   public void test35() {
     Syntax syn = HM.hm("x = { z -> z}; (x { y -> .u y})");
@@ -366,15 +365,13 @@ public class TestHM {
 
   @Test
   public void test36() {
-    try {
-      // Example from SimpleSub requiring 'x' to be both:
-      // - a recursive self-call function from "w = (x x)": $V66:{ $V66 -> V67 } AND
-      // - a function which takes a struct with field 'u'
-      // The first arg to x is two different kinds of functions, so fails unification.
-      HM.hm("x = w = (x x); { z -> z}; (x { y -> .u y})");
-    } catch( RuntimeException e ) {
-      assertEquals("Cannot unify $V66:{ $V66 -> V67 } and *[-2]@{ u = V39}",e.getMessage());
-    }
+    // Example from SimpleSub requiring 'x' to be both:
+    // - a recursive self-call function from "w = (x x)": $V66:{ $V66 -> V67 } AND
+    // - a function which takes a struct with field 'u'
+    // The first arg to x is two different kinds of functions, so fails unification.
+    Syntax syn = HM.hm("x = w = (x x); { z -> z}; (x { y -> .u y})");
+    assertEquals("Cannot unify $V66:{ $V66 -> V67 } and *[-2]@{ u = V39}",syn._t.p());
+    assertEquals("[]",syn._post.p());
   }
 
 }
