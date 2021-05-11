@@ -321,16 +321,7 @@ public class Parse implements Comparable<Parse> {
         }
       }
 
-      // If newly defining the value in *this* scope, insert a
-      // forward-reference to cover the case of (mutual) recursion.
-      ScopeNode scope = lookup_scope(tok=tok.intern(),lookup_current_scope_only);
-      if( scope==null ) {       // Token not already bound at any scope
-        Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,this,_e));
-        _e._scope.stk().create(tok,fref,TypeStruct.FBOT);
-        _e._nongen.push(tok,fref.tvar());
-      }
-
-      toks .add(tok);
+      toks .add(tok.intern());
       ts   .add(t  );
       badfs.add(badf);
       badts.add(badt);
@@ -355,22 +346,21 @@ public class Parse implements Comparable<Parse> {
       // Find scope for token.  If not defining struct fields, look for any
       // prior def.  If defining a struct, tokens define a new field in this scope.
       ScopeNode scope = lookup_scope(tok,lookup_current_scope_only);
-
+      if( scope==null ) {                    // Token not already bound at any scope
+        if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
+          ((FunPtrNode)ifex).bind(tok); // Debug only: give name to function
+        create(tok,Env.XNIL,TypeStruct.FRW);  // Create at top of scope as undefined
+        scope = scope();                // Scope is the current one
+        scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
+      }
       // Handle re-assignments and forward referenced function definitions.
-      // All local-defs start as mutable forward-refs, and get flipped to
-      // immutable if actually used as a forward-ref.
       Node n = scope.stk().get(tok); // Get prior direct binding
       if( n.is_forward_ref() ) {     // Prior is a f-ref
-        if( scope.stk().mutable(tok) == TypeStruct.FBOT ) { // Mutable f-ref is just a 1st-time def
-          scope.stk().update(tok,mutable,ifex);
-        } else {         // Prior is actually a forward-ref, so this is the def
-          assert mutable==TypeStruct.FFNL && scope == scope();
-          if( ifex instanceof FunPtrNode )
-            ((FunPtrNode)n).merge_ref_def(tok,(FunPtrNode)ifex,scope.stk());
-          else ; // Can be here if already in-error
-          throw com.cliffc.aa.AA.unimpl("unwind non-gen set");
-        }
-
+        assert !scope.stk().is_mutable(tok) && scope == scope();
+        if( ifex instanceof FunPtrNode )
+          ((FunPtrNode)n).merge_ref_def(tok,(FunPtrNode)ifex,scope.stk());
+        else ; // Can be here if already in-error
+        
       } else { // Store into scope/NewObjNode/display
 
         // Assign into display, changing an existing def

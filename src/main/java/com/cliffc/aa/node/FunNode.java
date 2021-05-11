@@ -410,6 +410,7 @@ public class FunNode extends RegionNode {
       case OP_NEWOBJ: break; // Field use is like store.value use
       case OP_IF: break;     // Zero check is ok
       case OP_CAST:          // Cast propagates check
+      case OP_FRESH:         // No value change
         if( bad_mem_use(use, to) ) return true;
         break;
       case OP_LOAD:
@@ -669,6 +670,7 @@ public class FunNode extends RegionNode {
       CallNode call = (CallNode)ceproj.in(0); // Unhook without removal
       CallEpiNode cepi = call.cepi();
       cepi.del(cepi._defs.find(oldret));
+      cepi.reset_tvar("Fun_split_callers");
       unwireds.add(cepi);
       Env.GVN.add_reduce(cepi); // Visit for inlining later
       // And remove path from all Parms

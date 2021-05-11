@@ -808,8 +808,9 @@ public abstract class Node implements Cloneable {
   public final boolean more_ideal(VBitSet bs) {
     if( bs.tset(_uid) ) return false; // Been there, done that
     if( _keep == 0 && _live.is_live() ) { // Only non-keeps, which is just top-level scope and prims
-      if( unify(true) )
-        return true;            // Found more unification
+      // TODO Turn on unification progress
+      //if( unify(true) )
+      //  return true;            // Found more unification
       Type t = value(Env.GVN._opt_mode);
       if( _val != t )
         return true;            // Found a value improvement
@@ -819,14 +820,11 @@ public abstract class Node implements Cloneable {
       Node x;
       x = do_reduce(); if( x != null )
                          return true; // Found an ideal call
-      // TODO: TURNED OFF ALL AGGRESSIVE OPTS
-      //x = do_mono(); if( x != null )
-      //                 return true; // Found an ideal call
-      // TODO: TURNED OFF ALL AGGRESSIVE OPTS
-      //x = do_grow(); if( x != null )
-      //                 return true; // Found an ideal call
-      // TODO: TURNED OFF ALL AGGRESSIVE OPTS
-      //if( this instanceof FunNode ) ((FunNode)this).ideal_inline(true);
+      x = do_mono(); if( x != null )
+                       return true; // Found an ideal call
+      x = do_grow(); if( x != null )
+                       return true; // Found an ideal call
+      if( this instanceof FunNode ) ((FunNode)this).ideal_inline(true);
     }
     for( Node def : _defs ) if( def != null && def.more_ideal(bs) ) return true;
     for( Node use : _uses ) if( use != null && use.more_ideal(bs) ) return true;
@@ -842,7 +840,9 @@ public abstract class Node implements Cloneable {
     // Check for only forwards flow, and if possible then also on worklist
     Type    oval= _val, nval = value(Env.GVN._opt_mode);
     TypeMem oliv=_live, nliv = live (Env.GVN._opt_mode);
-    boolean hm = lifting && unify(true); // Progress-only check, and only during Pesi not Opto
+    // TODO: Turn on HM checking
+    //boolean hm = lifting && unify(true); // Progress-only check, and only during Pesi not Opto
+    boolean hm = false;
     if( nval != oval || nliv != oliv || hm ) {
       boolean ok = lifting
         ? nval.isa(oval) && nliv.isa(oliv)

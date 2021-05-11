@@ -14,7 +14,7 @@ import static org.junit.Assert.*;
 
 public class TestParse {
   private static final String[] FLDS = new String[]{"^","n","v"};
-  private static final BitsFun TEST_FUNBITS = BitsFun.make0(44);
+  private static final BitsFun TEST_FUNBITS = BitsFun.make0(46);
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
@@ -22,7 +22,7 @@ public class TestParse {
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
 
     // Straight from TestHM.test08; types as {A -> (A,A)}
-  test("fun={ g -> f={x -> g}; (f 3,f 1)}; (99,fun \"abc\",fun 3.14)", TypeFunPtr.make(TEST_FUNBITS,3,tdisp));
+    test("fun={ g -> f={x -> g}; (f 3,f 1)}; (99,fun \"abc\",fun 3.14)", TypeFunPtr.make(TEST_FUNBITS,3,tdisp));
 
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
 

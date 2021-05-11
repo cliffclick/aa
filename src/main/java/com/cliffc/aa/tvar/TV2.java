@@ -477,7 +477,7 @@ public class TV2 {
       }
       return rez;
     case "Obj":
-      if( t==TypeObj.UNUSED )
+      if( t==TypeObj.UNUSED || t==TypeObj.ISUSED )
         return rez; // No substructure in type
       TypeStruct ts = (TypeStruct)t; //
       for( Object key : _args.keySet() ) {
@@ -493,11 +493,11 @@ public class TV2 {
       // TypeFunPtrs carry only a set of FIDXS & a DISPLAY.
       // Hence no other Type is available here for lifting.
       return rez;
-    //case "Ret":
-    //  TypeTuple tt = (TypeTuple)t;
-    //  for( int i=0; i<tt.len(); i++ )
-    //    rez = get(i)._find_tvar(tt.at(i),tv,rez);
-    //  return rez;
+    case "Ret":
+      TypeTuple tt = (TypeTuple)t;
+      for( int i=0; i<tt.len(); i++ )
+        rez = get(i)._find_tvar(tt.at(i),tv,rez);
+      return rez;
     case "Base":
     case "Dead":
     case "Leaf":
@@ -531,7 +531,7 @@ public class TV2 {
   boolean _occurs_in(Env.VStack vs) {
     for( ; vs!=null; vs=vs._par )
       for( TV2 tv : vs._tvars )
-        if( _occurs_in_type(tv) )
+        if( _occurs_in_type(tv.find()) )
           return true;
     return false;
   }
