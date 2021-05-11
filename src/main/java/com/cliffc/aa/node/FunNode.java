@@ -735,17 +735,9 @@ public class FunNode extends RegionNode {
           old_funptr.insert(new_unr);
           new_unr.add_def(old_funptr);
           new_unr._val = new_unr.value(GVNGCM.Mode.PesiNoCG);
-          //if( ((FunPtrNode)use)._env != null ) {
-          //  // Internal uses; need to use an internal unresolved...
-          //  // TODO: NEED FOR BOTH MID_DEF & NOT...
-          //  TV2 tv = new_unr.tvar();
-          //  old_funptr.tvar().unify(tv,false);
-          //  new_funptr.tvar().unify(tv,false);
-          //}
-          throw com.cliffc.aa.AA.unimpl("cloning a 'fresh' or 'notfresh'?  does it make a difference?");
         }
     } else {                           // Path split
-      Node old_funptr = path_call.fdx(); // Find the funptr for the path split
+      Node old_funptr = fptr(); // Find the funptr for the path split
       Node new_funptr = map.get(old_funptr);
       new_funptr.insert(old_funptr);
       TypeFunPtr ofptr = (TypeFunPtr) old_funptr._val;
