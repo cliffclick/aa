@@ -240,17 +240,20 @@ public class Env implements AutoCloseable {
   // typically just a single variable, currently being defined.
   public static class VStack {
     public final VStack _par;          // Parent
-    public final Ary<String> _flds;    // Field names, unique per-Scope
-    public final Ary<TV2> _tvars;      // Type variable, set at first reference (forward-ref or not)
-    VStack( VStack par ) { _par=par; _flds = new Ary<>(new String[1],0); _tvars = new Ary<>(new TV2[1],0); }
-    void push(String fld, TV2 tv) { _flds.push(fld); _tvars.push(tv); }
-    //void pop( String fld ) {
-    //  int i = _flds.find(fld);
-    //  _flds.del(i);
-    //  _tvars.del(i);
-    //}
-
-    boolean has_refs() { return _flds._len!=0; }
+    public Ary<String> _flds;          // Field names, unique per-Scope
+    public Ary<TV2> _tvars; // Type variable, set at first reference (forward-ref or not)
+    private VStack( VStack par ) { _par=par; }
+    VStack push() { return new VStack(this); }
+    VStack pop() { return _par; }
+    void add_var(String fld, TV2 tv) {
+      if( _flds==null ) { _flds = new Ary<>(new String[1],0); _tvars = new Ary<>(new TV2[1],0); }
+      _flds.push(fld); _tvars.push(tv);
+    }
+    public boolean contains( VStack vs ) {
+      if( vs==this ) return true;
+      if( _par==null ) return false;
+      return _par.contains(vs);
+    }
 
     @Override public String toString() {
       // These types get large & complex; find all the dups up-front to allow
@@ -258,20 +261,23 @@ public class Env implements AutoCloseable {
       NonBlockingHashMapLong<String> dups = new NonBlockingHashMapLong<>();
       VBitSet bs = new VBitSet();
       for( VStack vs = this; vs!=null ; vs=vs._par )
-        for( TV2 tv2 : vs._tvars )
-          if( tv2 != null ) tv2.find_dups(bs,dups,0);
+        if( vs._tvars != null )
+          for( TV2 tv2 : vs._tvars )
+            if( tv2 != null ) tv2.find_dups(bs,dups,0);
 
       // Print stack of types, grouped by depth
       bs.clr();
       SB sb = new SB().p("[");
       for( VStack vs = this; vs!=null ; vs=vs._par ) {
-        for( int i=0; i<vs._tvars._len; i++ ) {
-          sb.p(vs._flds.at(i)).p('=');
-          TV2 tv2 = vs._tvars.at(i);
-          if( tv2 !=null ) tv2.str(sb,bs,dups,false);
-          sb.p(", ");
+        if( vs._tvars != null ) {
+          for( int i=0; i<vs._tvars._len; i++ ) {
+            sb.p(vs._flds.at(i)).p('=');
+            TV2 tv2 = vs._tvars.at(i);
+            if( tv2 !=null ) tv2.str(sb,bs,dups,false);
+            sb.p(", ");
+          }
+          if( vs._tvars._len>0 ) sb.unchar(2);
         }
-        if( vs._tvars._len>0 ) sb.unchar(2);
         sb.p(" >> ");
       }
       if( _par!=null ) sb.unchar(4);

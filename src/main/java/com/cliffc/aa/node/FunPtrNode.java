@@ -208,7 +208,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.ALL_CTRL; // Forward ref has no callers
     assert dfun._defs._len==2 && dfun.in(0)==null;
     assert def ._uses._len==0;  // Def is brand new, no uses
-    assert _vs!=null && def._vs==null;
+    assert _vs.contains(def._vs); // Def nested instead of ref
 
     // Make a function pointer based on the original forward-ref fidx, but with
     // the known types.

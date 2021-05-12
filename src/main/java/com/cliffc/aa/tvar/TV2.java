@@ -530,9 +530,10 @@ public class TV2 {
   // and needs to keep the self-type instead of making fresh.
   boolean _occurs_in(Env.VStack vs) {
     for( ; vs!=null; vs=vs._par )
-      for( TV2 tv : vs._tvars )
-        if( _occurs_in_type(tv.find()) )
-          return true;
+      if( vs._tvars != null )
+        for( TV2 tv : vs._tvars )
+          if( _occurs_in_type(tv.find()) )
+            return true;
     return false;
   }
 
@@ -541,8 +542,8 @@ public class TV2 {
     if( x==this ) return true;
     if( ODUPS.tset(x._uid) ) return false; // Been there, done that
     if( !x.is_leaf() && x._args!=null )
-      for( TV2 xarg : x._args.values() )
-        if( _occurs_in_type(xarg) )
+      for( Object key : x._args.keySet() )
+        if( _occurs_in_type(x.get(key)) )
           return true;
     return false;
   }

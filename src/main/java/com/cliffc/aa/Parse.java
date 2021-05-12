@@ -286,7 +286,7 @@ public class Parse implements Comparable<Parse> {
     Ary<Parse > badts= new Ary<>(new Parse [1],0);
     BitSet rs = new BitSet();
     boolean default_nil = false;
-    _e._nongen = new Env.VStack(_e._nongen); // Push a H-M let-style micro-scope
+    _e._nongen = _e._nongen.push(); // Push a H-M let-style micro-scope
     while( true ) {
       skipWS();
       int oldx = _x;            // Unwind token parse point
@@ -331,7 +331,7 @@ public class Parse implements Comparable<Parse> {
     Node ifex = default_nil ? Env.XNIL : ifex(); // Parse an expression for the statement value
     if( ifex == null ) {        // No statement?
       if( toks._len == 0 )
-        { _e._nongen = _e._nongen._par; return null; }
+        { _e._nongen = _e._nongen.pop(); return null; }
       ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
     }
     // Honor all type requests, all at once, by inserting type checks on the ifex.
@@ -370,7 +370,7 @@ public class Parse implements Comparable<Parse> {
       }
     }
 
-    _e._nongen = _e._nongen._par; // Pop a H-M let-style microscope
+    _e._nongen = _e._nongen.pop(); // Pop a H-M let-style microscope
     return ifex.unkeep();
   }
 
@@ -809,14 +809,13 @@ public class Parse implements Comparable<Parse> {
       Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,errMsg(oldx),_e));
       // Place in nearest enclosing closure scope
       scope().stk().create(tok.intern(),fref,TypeStruct.FFNL);
+      _e._nongen.add_var(tok,fref.tvar());
       return fref;
     }
     Node def = scope.get(tok);    // Get top-level value; only sane if no stores allowed to modify it
     // Disallow uniop and binop functions as factors.  Only possible if trying
     // to use an operator as a factor, such as "plus = {+}" or "f(1,{+},2)".
     if( def.op_prec() > 0 ) { _x = oldx; return null; }
-    // Forward refs always directly assigned into scope and never updated.
-    //if( def.is_forward_ref() ) return def;
     // Balanced ops are similar to "{}", "()" or "@{}".
     if( def.op_prec()==0 && def._val instanceof TypeFunPtr )
       return bfact(oldx,(UnOrFunPtrNode)def);
@@ -958,7 +957,7 @@ public class Parse implements Comparable<Parse> {
         Parse errmsg = errMsg();  // Lazy error message
         for( int i=ARG_IDX; i<ids._len; i++ ) { // User parms start
           Node parm = X.xform(new ParmNode(i,ids.at(i),fun,con(Type.SCALAR),errmsg));
-          _e._nongen.push(ids.at(i),parm.tvar());
+          _e._nongen.add_var(ids.at(i),parm.tvar());
           create(ids.at(i),parm, args_are_mutable);
         }
 
@@ -975,8 +974,7 @@ public class Parse implements Comparable<Parse> {
         // The FunPtr builds a real display; any up-scope references are passed in now.
         Node fptr = X.xform(new FunPtrNode(null,ret,e._par));
 
-        _e._nongen = _e._nongen._par; // Pop H-M Lambda-style micro-scope
-        _e = _e._par;                // Pop nested environment
+        _e = _e._par;                // Pop nested environment; pops nongen also
         return (X._ret=fptr);        // Return function; close-out and DCE 'e'
       }
     }
