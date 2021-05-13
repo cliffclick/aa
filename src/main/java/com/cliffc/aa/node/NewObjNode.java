@@ -158,7 +158,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     // Structural unification on all fields
     boolean progress=false;
     for( int i=0; i<_ts._flds.length; i++ ) {
-      progress |= tvar.unify_at(_ts._flds[i],tvar(def_idx(i)),test,null);
+      progress |= tvar.unify_at(_ts._flds[i],tvar(def_idx(i)),test);
       if( progress && test ) return true;
     }
     return progress;

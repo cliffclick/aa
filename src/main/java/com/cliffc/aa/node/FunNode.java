@@ -706,10 +706,6 @@ public class FunNode extends RegionNode {
       assert c._defs._len==0;
       for( Node def : n._defs ) {
         Node newdef = map.get(def);// Map old to new
-        if( newdef==null && def instanceof UnOrFunPtrNode ) {
-          UnOrFunPtrNode uorf = (UnOrFunPtrNode)def;
-          def = uorf.fresh(uorf.funptr()._vs);
-        }
         c.add_def(newdef==null ? def : newdef);
       }
     }

@@ -1,4 +1,32 @@
 =======================================
+5/12/2021
+
+Fun:   gather of control
+Parms: Lambda args def-spot.  Feeds into New directly, and uses inside the Lambda are never fresh.
+- The Env pushes a VStack of the parms.  These are all the not-fresh vars.
+Load: Drop the 'make fresh on removal'.  Do nothing 'Fresh'.
+- In parser, when doing name lookup, insert a Fresh after Load.
+FunPtr: is the value of a Lambda, not the variable being defined.  No fresh issues, but behaves like a Lambda.
+Stmt:  Behaves like a Let; use push nongen inside the statement def; pop nongen afterwards.
+- If after ifex() not a fref, no push/pop nongen.
+- If after ifex() was a fref, pop nongen
+Fact: If fref, push nongen (once; if not already pushed).
+Func:  Behaves like a Lambda; push nongen scope; add vars for each parm; all are 'popped' when Env is popped
+
+
+Fun                            
+  Parm
+  ...
+  Ret
+FunPtr                    Lambda: make a Fun of Parms->Ret
+
+Call (FunPtr Args...)     Gather Args
+CallEpi                   Apply: Fun+Args unify to FunPtr
+
+
+
+
+=======================================
 4/14/2021
 
 Back to HM algo.  Missed 'fresh' a bunch; 'occurs_in' was not right.

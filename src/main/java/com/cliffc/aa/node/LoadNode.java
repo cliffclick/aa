@@ -12,15 +12,11 @@ import static com.cliffc.aa.AA.MEM_IDX;
 public class LoadNode extends Node {
   private final String _fld;
   private final Parse _bad;
-  // If not-null, this Load does a HM lookup and produces a 'fresh' tvar every time.
-  private final Env.VStack _vs;
 
-  public LoadNode( Node mem, Node adr, String fld, Parse bad ) { this(mem,adr,fld,bad,null); }
-  public LoadNode( Node mem, Node adr, String fld, Parse bad, Env.VStack vs) {
+  public LoadNode( Node mem, Node adr, String fld, Parse bad ) {
     super(OP_LOAD,null,mem,adr);
     _fld = fld;
     _bad = bad;
-    _vs  = vs ;
   }
   @Override public String xstr() { return "."+_fld; }   // Self short name
   String  str() { return xstr(); } // Inline short name
@@ -39,10 +35,7 @@ public class LoadNode extends Node {
     Node st = find_previous_store(mem(),adr(),aliases,_fld,true);
     if( st!=null ) {
       if( st instanceof StoreNode ) return (( StoreNode)st).rez();
-      else {
-        Node rez = ((NewObjNode)st).get(_fld);
-        return _vs==null ? rez : new FreshNode(_vs,rez);
-      }
+      else                          return ((NewObjNode)st).get(_fld);
     }
     return null;
   }
@@ -240,7 +233,7 @@ public class LoadNode extends Node {
     if( !(tadr instanceof TypeMemPtr) ) return false; // Wait until types are sharper
     TypeMemPtr tmp = (TypeMemPtr)tadr;
     // Unify the given aliases and field against the loaded type
-    return tmem.unify_alias_fld(this,tmp._aliases,_fld,tvar(),test,_vs,"Load_unify");
+    return tmem.unify_alias_fld(this,tmp._aliases,_fld,tvar(),test,"Load_unify");
   }
 
   @Override public ErrMsg err( boolean fast ) {

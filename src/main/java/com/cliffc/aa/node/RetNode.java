@@ -201,7 +201,7 @@ public final class RetNode extends Node {
     assert tvar.isa("Ret");
     boolean progress = false;
     for( int i=0; i<=REZ_IDX; i++ )
-      progress |= tvar.unify_at(i,tvar(i),test,null);
+      progress |= tvar.unify_at(i,tvar(i),test);
     return progress;
   }
 

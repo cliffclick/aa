@@ -95,30 +95,18 @@ public class UnresolvedNode extends UnOrFunPtrNode {
   }
 
   // Filter out all the wrong-arg-count functions from Parser.
-  // Always return a FRESH copy, as-if HM.Ident primitive lookup.
-  @Override public UnOrFunPtrNode filter_fresh( Env env, int nargs ) {
+  @Override public UnOrFunPtrNode filter( int nargs ) {
     UnOrFunPtrNode x = null;
     for( Node epi : _defs ) {
       FunPtrNode fptr = (FunPtrNode)epi;
       // User-nargs are user-visible #arguments.
-      // Fun-nargs include the ctrl, display & memory, hence the +2.
+      // Fun-nargs include the ctrl, display & memory, hence the +ARG_IDX.
       if( fptr.nargs() != ARG_IDX+nargs ) continue;
-      FunPtrNode ffptr = fptr.fresh(env._nongen); // Make a FRESH copy
-      if( x == null ) x = ffptr.keep();
-      else if( x instanceof UnresolvedNode ) ((UnresolvedNode)x).add_def_unresolved(ffptr);
-      else x = new UnresolvedNode(_bad,x.unkeep(),ffptr).keep();
+      if( x == null ) x = fptr.keep();
+      else if( x instanceof UnresolvedNode ) ((UnresolvedNode)x).add_def_unresolved(fptr);
+      else x = new UnresolvedNode(_bad,x.unkeep(),fptr).keep();
     }
-    if( x!=null ) x.unkeep().xval();
-    return x;
-  }
-
-  // Make a FRESH copy
-  @Override public UnresolvedNode fresh(Env.VStack vs) {
-    UnresolvedNode unr = new UnresolvedNode(_bad).keep();
-    for( Node fptr : _defs )
-      unr.add_def_unresolved(((FunPtrNode)fptr).fresh(vs));
-    unr._val = unr.unkeep().value(GVNGCM.Mode.PesiNoCG);
-    return unr;
+    return x==null ? null : (UnOrFunPtrNode)Env.GVN.xform(x.unkeep());
   }
 
   // Return a funptr for this fidx.
@@ -132,7 +120,6 @@ public class UnresolvedNode extends UnOrFunPtrNode {
   // Same NARGS across all defs
   @Override public int nargs() { return funptr().nargs(); }
   @Override public FunPtrNode funptr() { return (FunPtrNode)_defs.at(0); }
-  @Override public boolean is_fresh() { return funptr().is_fresh(); }
 
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.  Should be the same across all defs.

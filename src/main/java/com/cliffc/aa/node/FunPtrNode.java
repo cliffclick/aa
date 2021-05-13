@@ -16,7 +16,6 @@ import static com.cliffc.aa.Env.GVN;
 public final class FunPtrNode extends UnOrFunPtrNode {
   public String _name;          // Optional for debug only
   private ErrMsg _referr;       // Forward-ref error, cleared after defining
-  final Env.VStack _vs;         // Not-null means "fresh"
 
   // Every var use that results in a function, so actually only these FunPtrs,
   // needs to make a "fresh" copy before unification.  "Fresh" makes a
@@ -36,7 +35,6 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     super(OP_FUNPTR,ret,display);
     _name = name;
     _referr = referr;
-    _vs = vs;
   }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }
@@ -44,13 +42,12 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   public FunNode xfun() { RetNode ret = ret(); return ret.in(4) instanceof FunNode ? ret.fun() : null; }
   @Override public int nargs() { return ret()._nargs; }
   @Override public FunPtrNode funptr() { return this; }
-  @Override public boolean is_fresh() { return _vs!=null; }
   // Self short name
   @Override public String xstr() {
     if( is_dead() || _defs._len==0 ) return "*fun";
     int fidx = ret()._fidx;    // Reliably returns a fidx
     FunNode fun = FunNode.find_fidx(fidx);
-    return (_vs!=null ? "@" : "*")+(fun==null ? ""+fidx : fun.name());
+    return "*"+(fun==null ? ""+fidx : fun.name());
   }
   // Inline longer name
   @Override String str() {
@@ -150,19 +147,10 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   }
 
   // Filter out all the wrong-arg-count functions from Parser.
-  // Always return a FRESH copy, as-if HM.Ident primitive lookup.
-  @Override public FunPtrNode filter_fresh( Env env, int nargs ) {
+  @Override public FunPtrNode filter( int nargs ) {
     // User-nargs are user-visible #arguments.
-    // Fun-nargs include ctrl, memory & the display, hence the +3.
-    return nargs() == ARG_IDX+nargs ? fresh(env._nongen) : null;
-  }
-
-  // Always return a FRESH copy, as-if HM.Ident primitive lookup.
-  @Override public FunPtrNode fresh( Env.VStack vs ) {
-    FunPtrNode fptr = new FunPtrNode(_name,_referr,ret(),display(),vs);
-    tvar().fresh_unify(fptr.tvar(),vs,false); // Make a fresh copy of the type var
-    fptr.xval();
-    return fptr;
+    // Fun-nargs include ctrl, memory & the display, hence the +ARG_IDX.
+    return nargs() == ARG_IDX+nargs ? this : null;
   }
 
   // Return the op_prec of the returned value.  Not sensible except when called
@@ -208,7 +196,6 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.ALL_CTRL; // Forward ref has no callers
     assert dfun._defs._len==2 && dfun.in(0)==null;
     assert def ._uses._len==0;  // Def is brand new, no uses
-    assert _vs.contains(def._vs); // Def nested instead of ref
 
     // Make a function pointer based on the original forward-ref fidx, but with
     // the known types.
@@ -238,15 +225,6 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     Env.GVN.add_reduce_uses(this);
     assert Env.START.more_flow(true)==0;
     Env.GVN.iter(GVNGCM.Mode.Parse);
-  }
-
-  @Override public int hashCode() { return super.hashCode()+(_vs==null ? 0 : 1); }
-  @Override public boolean equals(Object o) {
-    if( this==o ) return true;
-    if( !super.equals(o) ) return false;
-    if( !(o instanceof FunPtrNode) ) return false;
-    FunPtrNode fptr = (FunPtrNode)o;
-    return _vs==null && fptr._vs==null; // Unequal if either is FRESH, need to keep the TVARs from unifying
   }
 
   @Override public ErrMsg err( boolean fast ) { return is_forward_ref() ? _referr : null; }

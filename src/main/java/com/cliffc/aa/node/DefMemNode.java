@@ -43,7 +43,7 @@ public class DefMemNode extends Node {
       Node n = in(i);
       if( n==null ) continue;
       TV2 tv = (n instanceof MrgProjNode && !tvar(i).is_dead() ? n.in(0) : n).tvar();
-      progress |= tvar.unify_at(i,tv,test,null);
+      progress |= tvar.unify_at(i,tv,test);
       if( progress && test ) return true;
     }
     return progress;

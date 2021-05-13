@@ -3,6 +3,7 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.UQNodes;
 import com.cliffc.aa.util.*;
 
 import java.util.HashSet;
@@ -43,7 +44,7 @@ public class Env implements AutoCloseable {
   Env( Env par, Parse P, boolean is_closure, Node ctrl, Node mem ) {
     GVN._opt_mode=GVNGCM.Mode.Parse;
     _par = par;
-    _nongen = new VStack(par._nongen);
+    nongen_push();
     ScopeNode s = par._scope;   // Parent scope
     _scope = init(ctrl,s.ptr(),mem,s.stk()._tptr,P==null ? null : P.errMsg(),is_closure);
   }
@@ -192,15 +193,16 @@ public class Env implements AutoCloseable {
   // strings of operator characters are naturally broken by (greedy) strings.
   // If nargs is positive, filter by nargs.
   // If nargs is zero, this is a balanced-op lookup, filter by op_prec==0
-  // Always clones a 'fresh' result, as-if HM.Ident primitive lookup.
+  // Always makes a 'fresh' result, as-if HM.Ident primitive lookup.
   UnOrFunPtrNode lookup_filter_fresh( String name, int nargs ) {
     if( !Parse.isOp(name) ) return null; // Limit to operators
     for( int i=name.length(); i>0; i-- ) {
       UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(name.substring(0,i).intern());
       if( n != null ) {         // First name found will return
-        if( nargs == 0 )        // Require a balanced-op
-          return n.op_prec()==0 ? n.fresh(_nongen) : null;
-        return n.filter_fresh(this,nargs);
+        UnOrFunPtrNode u = nargs == 0 // Require a balanced-op
+          ? (n.op_prec()==0 ? n : null)
+          : n.filter(nargs);
+        return u==null ? null : (UnOrFunPtrNode)Env.GVN.xform(new FreshNode(_nongen,u));
       }
     }
     return null;
@@ -238,21 +240,22 @@ public class Env implements AutoCloseable {
   // check.  This stack sub-sequences the main Env._scope stack, having splits
   // for every unrelated set of mutually-self-recursive definitions.  This is
   // typically just a single variable, currently being defined.
+  Node nongen_pop(Node ret) { _nongen = _nongen._par; return ret;}
+  void nongen_push() { _nongen = new VStack(_nongen); }
+  String add_var(String fld) { return _nongen.add_var(fld,TV2.make_leaf_ns(UQNodes.EMPTY,"Env.add_var")); }
   public static class VStack {
     public final VStack _par;          // Parent
     public Ary<String> _flds;          // Field names, unique per-Scope
     public Ary<TV2> _tvars; // Type variable, set at first reference (forward-ref or not)
-    private VStack( VStack par ) { _par=par; }
-    VStack push() { return new VStack(this); }
-    VStack pop() { return _par; }
-    void add_var(String fld, TV2 tv) {
-      if( _flds==null ) { _flds = new Ary<>(new String[1],0); _tvars = new Ary<>(new TV2[1],0); }
-      _flds.push(fld); _tvars.push(tv);
-    }
-    public boolean contains( VStack vs ) {
-      if( vs==this ) return true;
-      if( _par==null ) return false;
-      return _par.contains(vs);
+    private VStack( VStack par ) { _par=par; _flds = new Ary<>(new String[1],0); _tvars = new Ary<>(new TV2[1],0); }
+    String add_var(String fld, TV2 tv) { _flds.push(fld);  _tvars.push(tv); return fld; }
+    //public boolean contains( VStack vs ) {
+    //  if( vs==this ) return true;
+    //  if( _par==null ) return false;
+    //  return _par.contains(vs);
+    //}
+    public boolean isEmpty() {
+      return _flds.isEmpty() && (_par == null || _par.isEmpty());
     }
 
     @Override public String toString() {

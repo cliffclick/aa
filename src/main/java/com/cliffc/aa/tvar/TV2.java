@@ -92,13 +92,13 @@ public class TV2 {
   }
 
   // Unify-at a selected key
-  public boolean unify_at(Object key, TV2 tv2, boolean test, Env.VStack vs ) {
+  public boolean unify_at(Object key, TV2 tv2, boolean test ) {
     assert is_tvar() && _args!=null;
     TV2 old = get(key);
     if( key.equals("g") && tv2.is_base() )
       System.out.println();
     if( old!=null )
-      return vs!=null ? old.fresh_unify(tv2,vs,test) : old.unify(tv2,test);
+      return old.unify(tv2,test);
     if( test ) return true;
     _args.put(key,tv2);
     merge_deps(tv2);            // Send deps about also
@@ -411,7 +411,7 @@ public class TV2 {
   // forwards-flow from News and very specific.  Ignore the generic ones until
   // they refine.  TODO: As aliases further refine, need to undo-redo prior
   // unifies against larger/weaker aliases.
-  public boolean unify_alias_fld(Node ldst, BitsAlias aliases, String fld, TV2 tv, boolean test, Env.VStack vs, String alloc_site) {
+  public boolean unify_alias_fld(Node ldst, BitsAlias aliases, String fld, TV2 tv, boolean test, String alloc_site) {
     assert isa("Mem");
     boolean progress=false;
     for( int alias : aliases ) {
@@ -425,7 +425,7 @@ public class TV2 {
         tvo._args.put(fld,tv);
       } else if( !tobj.isa("Dead") ) {
         assert tobj.isa("Obj");
-        progress = tobj.unify_at(fld,tv.find(),test,vs);
+        progress = tobj.unify_at(fld,tv.find(),test);
       } // else dead, no progress
       if( progress && test ) return progress; // Shortcut
     }
@@ -443,7 +443,7 @@ public class TV2 {
       if( tv==null ) continue;  // No idea (yet) from prior mem, nothing to unify
       if( tobj==null ) tobj=tv; // All objects in this set of aliases are already unified
       else assert tobj==tv;
-      progress |= unify_at(alias,tv,test,null); // Overwrite the default for alias
+      progress |= unify_at(alias,tv,test); // Overwrite the default for alias
       if( progress && test ) return true;
     }
     return progress;

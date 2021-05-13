@@ -257,7 +257,8 @@ public class Parse implements Comparable<Parse> {
   /** A statement is a list of variables to final-assign or re-assign, and an
    *  ifex for the value.  The variables are available in all later statements.
    *  Final-assigned variables can never be assigned again.  Forward references
-   *  must be defined in the same scope (or deeper) as the outermost pending def.
+   *  must be defined in the same scope (or higher) as the outermost pending def.
+   *  This is the same as a lambda calc LetRec expression: "let id = def in ..."
    *
    *  stmt = [id[:type] [:]=]* ifex
    *  stmt = id     // Implicit variable creation with nil
@@ -286,7 +287,7 @@ public class Parse implements Comparable<Parse> {
     Ary<Parse > badts= new Ary<>(new Parse [1],0);
     BitSet rs = new BitSet();
     boolean default_nil = false;
-    _e._nongen = _e._nongen.push(); // Push a H-M let-style micro-scope
+    _e.nongen_push();
     while( true ) {
       skipWS();
       int oldx = _x;            // Unwind token parse point
@@ -321,7 +322,7 @@ public class Parse implements Comparable<Parse> {
         }
       }
 
-      toks .add(tok.intern());
+      toks .add(_e.add_var(tok.intern()));
       ts   .add(t  );
       badfs.add(badf);
       badts.add(badt);
@@ -329,9 +330,9 @@ public class Parse implements Comparable<Parse> {
 
     // Normal statement value parse
     Node ifex = default_nil ? Env.XNIL : ifex(); // Parse an expression for the statement value
+    // Check for no-statement after start of assignment, e.g. "x = ;"
     if( ifex == null ) {        // No statement?
-      if( toks._len == 0 )
-        { _e._nongen = _e._nongen.pop(); return null; }
+      if( toks._len == 0 ) return _e.nongen_pop(null);
       ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
     }
     // Honor all type requests, all at once, by inserting type checks on the ifex.
@@ -360,7 +361,7 @@ public class Parse implements Comparable<Parse> {
         if( ifex instanceof FunPtrNode )
           ((FunPtrNode)n).merge_ref_def(tok,(FunPtrNode)ifex,scope.stk());
         else ; // Can be here if already in-error
-        
+
       } else { // Store into scope/NewObjNode/display
 
         // Assign into display, changing an existing def
@@ -370,8 +371,7 @@ public class Parse implements Comparable<Parse> {
       }
     }
 
-    _e._nongen = _e._nongen.pop(); // Pop a H-M let-style microscope
-    return ifex.unkeep();
+    return _e.nongen_pop(ifex.unkeep());
   }
 
   /** Parse an if-expression, with lazy eval on the branches.  Assignments to
@@ -721,7 +721,7 @@ public class Parse implements Comparable<Parse> {
     // Now properly load from the display.
     // This does a HM.Ident lookup, producing a FRESH tvar every time.
     Node ptr = get_display_ptr(scope);
-    n = gvn(new LoadNode(mem(),ptr,tok,null,_e._nongen));
+    n = gvn(new LoadNode(mem(),ptr,tok,null));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl1(Node.ErrMsg.forward_ref(this,((FunPtrNode)n)));
     // Do a full lookup on "+", and execute the function
@@ -787,7 +787,7 @@ public class Parse implements Comparable<Parse> {
       if( peek('}') && op != null && op.op_prec() > 0 )
         // This is a primitive operator lookup as a function constant, and
         // makes a FRESH copy like HM.Ident.
-        return ((UnOrFunPtrNode)op).fresh(_e._nongen);
+        return gvn(new FreshNode(_e._nongen,op));
       _x = oldx+1;              // Back to the opening paren
       return func();            // Anonymous function
     }
@@ -825,7 +825,7 @@ public class Parse implements Comparable<Parse> {
     // otherwise the display is passed in as a hidden argument.
     // This does a HM.Ident lookup, producing a FRESH tvar every time.
     Node ptr = get_display_ptr(scope);
-    return gvn(new LoadNode(mem(),ptr,tok.intern(),null,_e._nongen));
+    return gvn(new LoadNode(mem(),ptr,tok.intern(),null));
   }
 
   /** Parse a tuple; first stmt but not the ',' parsed.
