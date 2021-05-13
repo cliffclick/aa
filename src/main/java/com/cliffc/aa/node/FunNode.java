@@ -549,12 +549,12 @@ public class FunNode extends RegionNode {
         if( !(n1._val instanceof TypeFunPtr) ) return -1; // Calling an unknown function, await GCP
         TypeFunPtr tfp = (TypeFunPtr)n1._val;
         if( tfp._fidxs.test(_fidx) ) self_recursive = true; // May be self-recursive
-        Node n2 = n1 instanceof UnresolvedNode ? n1.in(0) : n1;
+        Node n2 = n1 instanceof UnOrFunPtrNode ? ((UnOrFunPtrNode)n1).funptr() : n1;
         if( n2 instanceof FunPtrNode ) {
           FunPtrNode fpn = (FunPtrNode) n2;
           if( fpn.ret().rez() instanceof PrimNode )
             op = OP_PRIM;       // Treat as primitive for inlining purposes
-        } else if( n2._val==TypeTuple.RET ) { // Thunks are encouraged to inline
+        } else if( n2!=null && n2._val==TypeTuple.RET ) { // Thunks are encouraged to inline
           call_thunk++;
         } else
           call_indirect++;

@@ -11,4 +11,5 @@ public abstract class UnOrFunPtrNode extends Node {
   // arguments, same operator precedence (same uni/bin-op) and the same name.
   // Balanced ops have the same closing name.
   public abstract FunPtrNode funptr(); // Sample FunPtr from Unresolved.
+  public abstract UnresolvedNode unk();
 }

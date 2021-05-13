@@ -247,9 +247,9 @@ public class CallNode extends Node {
       return null;             // Zero choices
 
     // If we have a single function allowed, force the function constant.
-    Node unk = fdx();           // Function epilog/function pointer
+    Node fdx = fdx();           // Function epilog/function pointer
     int fidx = fidxs.abit();    // Check for single target
-    if( fidx != -1 && !(unk instanceof FunPtrNode) ) {
+    if( fidx != -1 && !(fdx instanceof FunPtrNode) ) {
       // Check that the single target is well-formed
       FunNode fun = FunNode.find_fidx(Math.abs(fidx));
       if( fun != null && !fun.is_dead() ) {
@@ -262,10 +262,10 @@ public class CallNode extends Node {
           if( fptr != null && !fptr.display()._live.live().is_escape() )
             return set_dsp(fptr);
           // See if FunPtr is available just above an Unresolved.
-          if( unk instanceof UnresolvedNode ) {
-            fptr = ((UnresolvedNode)unk).find_fidx(fidx);
+          if( fdx instanceof UnresolvedNode ) {
+            fptr = ((UnresolvedNode)fdx).find_fidx(fidx);
             if( fptr != null ) { // Gonna improve
-              if( dsp() instanceof FP2DispNode && dsp().in(0)==unk )
+              if( dsp() instanceof FP2DispNode && dsp().in(0)==fdx )
                 set_dsp(fptr.display());
               return set_fdx(fptr);
             }
@@ -279,7 +279,7 @@ public class CallNode extends Node {
     // iter post-GCP on error calls where nothing resolves.
     CallEpiNode cepi = cepi();
     if( fidx == -1 && !fidxs.above_center() && !fidxs.test(1)) {
-      FunPtrNode fptr = least_cost(fidxs, unk); // Check for least-cost target
+      FunPtrNode fptr = least_cost(fidxs, fdx); // Check for least-cost target
       if( fptr != null ) {
         if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
         if( fptr.display()._val.isa(dsp()._val) )
@@ -293,7 +293,8 @@ public class CallNode extends Node {
     }
 
     // See if the display is always dead; common for Unresolved of primitives.
-    if( unk instanceof UnresolvedNode &&
+    UnresolvedNode unk;
+    if( fdx instanceof UnOrFunPtrNode && (unk=((UnOrFunPtrNode)fdx).unk())!=null &&
         !(dsp() instanceof ConNode && dsp()._val==Type.ANY) ) {
       boolean dsp_nil=true;
       for( Node fptr : unk._defs )

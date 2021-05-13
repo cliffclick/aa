@@ -26,12 +26,11 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   // unified, it forces equivalence in the same places.
   public  FunPtrNode( String name, RetNode ret, Env env ) {
     this(name,null,ret,
-         env==null ? Node.con(TypeMemPtr.NO_DISP) : env._scope.ptr(),
-         env==null ? null : env._nongen);
+         env==null ? Node.con(TypeMemPtr.NO_DISP) : env._scope.ptr() );
   }
-  public  FunPtrNode( RetNode ret, Node display ) { this(null,null,ret,display,null); }
+  public  FunPtrNode( RetNode ret, Node display ) { this(null,null,ret,display); }
   // For forward-refs only; super weak display & function.
-  private FunPtrNode( String name, ErrMsg referr, RetNode ret, Node display, Env.VStack vs ) {
+  private FunPtrNode( String name, ErrMsg referr, RetNode ret, Node display ) {
     super(OP_FUNPTR,ret,display);
     _name = name;
     _referr = referr;
@@ -42,6 +41,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   public FunNode xfun() { RetNode ret = ret(); return ret.in(4) instanceof FunNode ? ret.fun() : null; }
   @Override public int nargs() { return ret()._nargs; }
   @Override public FunPtrNode funptr() { return this; }
+  @Override public UnresolvedNode unk() { return null; }
   // Self short name
   @Override public String xstr() {
     if( is_dead() || _defs._len==0 ) return "*fun";
@@ -181,7 +181,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     gvn.add_flow(ret);
     // Display is limited to any one of the current lexical scopes.
     TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS,TypeObj.ISUSED);
-    return new FunPtrNode( name, ErrMsg.forward_ref(unkref,name),ret,Node.con(tdisp),e._nongen);
+    return new FunPtrNode( name, ErrMsg.forward_ref(unkref,name),ret,Node.con(tdisp));
   }
 
   // True if this is a forward_ref

@@ -287,7 +287,7 @@ public class Parse implements Comparable<Parse> {
     Ary<Parse > badts= new Ary<>(new Parse [1],0);
     BitSet rs = new BitSet();
     boolean default_nil = false;
-    _e.nongen_push();
+    _e.nongen_push(_e);
     while( true ) {
       skipWS();
       int oldx = _x;            // Unwind token parse point
@@ -721,7 +721,7 @@ public class Parse implements Comparable<Parse> {
     // Now properly load from the display.
     // This does a HM.Ident lookup, producing a FRESH tvar every time.
     Node ptr = get_display_ptr(scope);
-    n = gvn(new LoadNode(mem(),ptr,tok,null));
+    n = gvn(new FreshNode(_e._nongen,gvn(new LoadNode(mem(),ptr,tok,null))));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl1(Node.ErrMsg.forward_ref(this,((FunPtrNode)n)));
     // Do a full lookup on "+", and execute the function
@@ -806,10 +806,12 @@ public class Parse implements Comparable<Parse> {
       // them as a undefined forward-ref right now, because the op might be the
       // tail-half of a balanced-op, which is parsed by term() above.
       if( isOp(tok) ) { _x = oldx; return null; }
-      Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,errMsg(oldx),_e));
-      // Place in nearest enclosing closure scope
-      scope().stk().create(tok.intern(),fref,TypeStruct.FFNL);
-      _e._nongen.add_var(tok,fref.tvar());
+      // Must be a forward reference
+      Env fref_env = _e.lookup_fref(tok=tok.intern());
+      if( fref_env==null ) fref_env = _e;
+      Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,errMsg(oldx),fref_env));
+      // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
+      fref_env._scope.stk().create(tok,fref,TypeStruct.FFNL);
       return fref;
     }
     Node def = scope.get(tok);    // Get top-level value; only sane if no stores allowed to modify it
@@ -825,7 +827,7 @@ public class Parse implements Comparable<Parse> {
     // otherwise the display is passed in as a hidden argument.
     // This does a HM.Ident lookup, producing a FRESH tvar every time.
     Node ptr = get_display_ptr(scope);
-    return gvn(new LoadNode(mem(),ptr,tok.intern(),null));
+    return gvn(new FreshNode(_e._nongen,gvn(new LoadNode(mem(),ptr,tok.intern(),null))));
   }
 
   /** Parse a tuple; first stmt but not the ',' parsed.

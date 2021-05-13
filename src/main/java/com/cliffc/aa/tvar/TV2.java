@@ -77,6 +77,7 @@ public class TV2 {
   public boolean is_nil    () { return !is_unified() && isa("Nil"    ); }
   public boolean is_dead   () { return !is_unified() && isa("Dead"   ); }
   public boolean is_free   () { return !is_unified() && isa("Free"   ); }
+  public boolean is_err    () { return !is_unified() && isa("Err"    ); }
   public boolean is_tvar   () { return !is_unified() && _args!=null; } // Excludes unified,base,dead,nil,free
   public TV2    get_unified() { assert is_unified(); return _unified; }
   public String name() { return _name; }
@@ -125,6 +126,13 @@ public class TV2 {
     UQNodes ns = n==null ? null : UQNodes.make(n);
     TV2 tv2 = new TV2("Base",null,type.widen(),ns,alloc_site);
     assert tv2.is_base() && !tv2.is_leaf();
+    return tv2;
+  }
+  // Make a new primitive base TV2
+  public static TV2 make_err(Node n, String msg, @NotNull String alloc_site) {
+    UQNodes ns = n==null ? null : UQNodes.make(n);
+    TV2 tv2 = new TV2("Err",null,TypeStr.con(msg),ns,alloc_site);
+    assert tv2.is_err() && !tv2.is_leaf() && !tv2.is_base();
     return tv2;
   }
   // Structural constructor, empty
@@ -263,6 +271,11 @@ public class TV2 {
     assert !is_unified() && !that.is_unified();
     if( this==that ) return false;
 
+    // two errs union in either order, so keep lower uid (actually should merge error strings)
+    if( is_err() && that.is_err() && _uid<that._uid ) return that.union(this);
+    if(      is_err() ) return that.union(this);
+    if( that.is_err() ) return      union(that);
+    
     // Check for simple, non-recursive, unification.
     // NIL always loses and makes no progress (no structure implications)
     if( this.is_nil () ) return false;
@@ -279,16 +292,18 @@ public class TV2 {
     // Bases unify constants also
     if( this.is_base() && that.is_base() ) return unify_base(that);
 
-    // Recursive & cyclic unification
-    assert Util.eq(_name,that._name); // Construction error?  Might be a runtime error.
-    assert _args!=that._args; // Efficiency hack elsewhere if this is true here
-
     // Cycle check.
     long luid = ((long)_uid<<32)|that._uid; // Make a unique id for the pair
     TV2 rez = DUPS.get(luid);
-    if( rez!=null ) return true; // Been there, done that
-    DUPS.put(luid,that);         // Close cycles
+    if( rez!=null ) return false; // Been there, done that
+    DUPS.put(luid,that);          // Close cycles
 
+    // Errors
+    if( !Util.eq(_name,that._name) )
+      return union_err(that,"Cannot unify "+this+" and "+that);
+    assert _args!=that._args; // Efficiency hack elsewhere if this is true here
+
+    
     // Structural recursion unification, this into that.
     for( Object key : _args.keySet() ) {
       TV2 vthis =       get(key);  assert vthis!=null;
@@ -299,6 +314,10 @@ public class TV2 {
 
     // TODO: Check for being equal, cyclic-ly, and return a prior if possible.
     return find().union(that);
+  }
+  private boolean union_err(TV2 that, String msg) {
+    union(that);
+    return that.union(make_err(null,msg,"TV2.unify_err"));
   }
 
   private boolean unify_base(TV2 that) {
@@ -322,7 +341,7 @@ public class TV2 {
 
   // Returns progress.
   // If test, we are testing only and make no changes.
-  public boolean fresh_unify(TV2 that, Env.VStack vs, boolean test) {
+  public boolean fresh_unify(TV2 that, TV2[] vs, boolean test) {
     assert VARS.isEmpty() && DUPS.isEmpty();
     boolean progress = _fresh_unify(that,vs,test);
     VARS.clear();  DUPS.clear();
@@ -331,7 +350,7 @@ public class TV2 {
 
   // Apply 'this' structure on 'that'; no modifications to 'this'.  VARS maps
   // from the cloned LHS to the RHS replacement.
-  private boolean _fresh_unify(TV2 that, Env.VStack vs, boolean test) {
+  private boolean _fresh_unify(TV2 that, TV2[] vs, boolean test) {
     assert !is_unified() && !that.is_unified();
 
     // Several trivial cases that do not really do any work
@@ -344,7 +363,11 @@ public class TV2 {
     TV2 prior = VARS.get(this);
     if( prior!=null )           // Been there, done that?  Return prior mapping
       return prior.find()._unify(that, test);
+    if( cycle_equals(that) ) return vput(that,false);
 
+    if( that.is_err() ) return vput(that,false); // That is an error, ignore 'this' and no progress
+    if( this.is_err() ) return vput(that,_unify(that,test));
+    
     // Famous 'occurs-check', switch to normal unify
     if( occurs_in( vs ) ) return vput(that,_unify(that,test));
     // Either side is a Leaf, unify to the other (perhaps with a fresh copy)
@@ -357,7 +380,6 @@ public class TV2 {
     // Should be structurally equal now
     if( !Util.eq(_name,that._name) )
       throw com.cliffc.aa.AA.unimpl(); // unification error
-    if( cycle_equals(that) ) return vput(that,false);
 
     // Structural recursion unification, lazy on LHS
     boolean progress = vput(that,false); // Early set, to stop cycles
@@ -382,7 +404,7 @@ public class TV2 {
   private TV2 vput(TV2 that) { VARS.put(this,that); return that; }
 
   // Replicate LHS, including structure and cycles, replacing leafs as they appear
-  TV2 repl(Env.VStack vs) {
+  TV2 repl(TV2[] vs) {
     assert !is_unified();        // Already chased these down
     if( is_dead() ) return this; // Dead always unifies and wins
     TV2 t = VARS.get(this);      // Prior answer?
@@ -510,7 +532,7 @@ public class TV2 {
 
   // --------------------------------------------
   private static final VBitSet ODUPS = new VBitSet();
-  boolean occurs_in(Env.VStack vs) {
+  boolean occurs_in(TV2[] vs) {
     if( vs==null ) return false;
     assert ODUPS.isEmpty();
     boolean found = _occurs_in(vs);
@@ -528,12 +550,10 @@ public class TV2 {
   // If not, then return false (and typically make a fresh copy).
   // If it does, then 'this' reference is a recursive self-reference
   // and needs to keep the self-type instead of making fresh.
-  boolean _occurs_in(Env.VStack vs) {
-    for( ; vs!=null; vs=vs._par )
-      if( vs._tvars != null )
-        for( TV2 tv : vs._tvars )
-          if( _occurs_in_type(tv.find()) )
-            return true;
+  boolean _occurs_in(TV2[] vs) {
+    for( TV2 tv : vs )
+      if( _occurs_in_type(tv.find()) )
+        return true;
     return false;
   }
 
@@ -637,6 +657,7 @@ public class TV2 {
   // Pretty print
   public final SB str(SB sb, VBitSet bs, NonBlockingHashMapLong<String> dups, boolean debug) {
     if( is_dead() ) return sb.p("Dead"); // Do not print NS
+    if( is_err() ) return sb.p(_type.getstr());
 
     String stv = dups.get(_uid);
     if( stv!=null ) {

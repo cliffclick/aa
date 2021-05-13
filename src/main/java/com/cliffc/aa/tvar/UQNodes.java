@@ -7,7 +7,6 @@ import com.cliffc.aa.util.*;
 public class UQNodes extends NonBlockingHashMapLong<Node> {
   private static final NonBlockingHashMap<UQNodes,UQNodes> UQSETS = new NonBlockingHashMap<>();
   private static UQNodes KEY = new UQNodes();
-  public  static final UQNodes EMPTY = intern();
   private int _hash;
 
 

@@ -120,6 +120,7 @@ public class UnresolvedNode extends UnOrFunPtrNode {
   // Same NARGS across all defs
   @Override public int nargs() { return funptr().nargs(); }
   @Override public FunPtrNode funptr() { return (FunPtrNode)_defs.at(0); }
+  @Override public UnresolvedNode unk() { return this; }
 
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.  Should be the same across all defs.

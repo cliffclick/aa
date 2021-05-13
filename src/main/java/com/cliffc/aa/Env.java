@@ -1,9 +1,8 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
-import com.cliffc.aa.tvar.UQNodes;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 
 import java.util.HashSet;
@@ -44,7 +43,7 @@ public class Env implements AutoCloseable {
   Env( Env par, Parse P, boolean is_closure, Node ctrl, Node mem ) {
     GVN._opt_mode=GVNGCM.Mode.Parse;
     _par = par;
-    nongen_push();
+    nongen_push(par);
     ScopeNode s = par._scope;   // Parent scope
     _scope = init(ctrl,s.ptr(),mem,s.stk()._tptr,P==null ? null : P.errMsg(),is_closure);
   }
@@ -137,7 +136,8 @@ public class Env implements AutoCloseable {
     ScopeNode pscope = _par._scope;
     // Promote forward refs to the next outer scope
     if( pscope != null && _par._par != null )
-      _scope.stk().promote_forward(pscope.stk());
+      for( Node nnn : _scope.stk() )
+        assert nnn==null || !nnn.is_forward_ref();
     close_display(GVN);
     GVN.add_dead(_scope);
     GVN.iter(GVN._opt_mode);
@@ -241,22 +241,32 @@ public class Env implements AutoCloseable {
   // for every unrelated set of mutually-self-recursive definitions.  This is
   // typically just a single variable, currently being defined.
   Node nongen_pop(Node ret) { _nongen = _nongen._par; return ret;}
-  void nongen_push() { _nongen = new VStack(_nongen); }
-  String add_var(String fld) { return _nongen.add_var(fld,TV2.make_leaf_ns(UQNodes.EMPTY,"Env.add_var")); }
+  void nongen_push(Env par) { _nongen = new VStack(par._nongen); }
+  String add_var(String fld) { return _nongen.add_var(fld,TV2.make_leaf_ns(null,"Env.add_var")); }
   public static class VStack {
     public final VStack _par;          // Parent
     public Ary<String> _flds;          // Field names, unique per-Scope
     public Ary<TV2> _tvars; // Type variable, set at first reference (forward-ref or not)
     private VStack( VStack par ) { _par=par; _flds = new Ary<>(new String[1],0); _tvars = new Ary<>(new TV2[1],0); }
     String add_var(String fld, TV2 tv) { _flds.push(fld);  _tvars.push(tv); return fld; }
-    //public boolean contains( VStack vs ) {
-    //  if( vs==this ) return true;
-    //  if( _par==null ) return false;
-    //  return _par.contains(vs);
-    //}
     public boolean isEmpty() {
       return _flds.isEmpty() && (_par == null || _par.isEmpty());
     }
+
+    // Return a compact list of active tvars
+    public TV2[] compact() {
+      int cnt=0;
+      for( VStack vs = this; vs!=null; vs=vs._par )
+        cnt += vs._tvars._len;
+      TV2[] tv2s = new TV2[cnt];
+      cnt=0;
+      for( VStack vs = this; vs!=null; vs=vs._par ) {
+        System.arraycopy(vs._tvars._es,0,tv2s,cnt,vs._tvars._len);
+        cnt += vs._tvars._len;
+      }
+      return tv2s;
+    }
+
 
     @Override public String toString() {
       // These types get large & complex; find all the dups up-front to allow
@@ -288,4 +298,8 @@ public class Env implements AutoCloseable {
     }
   }
 
+  Env lookup_fref(String tok) {
+    if( _nongen!=null && _nongen._flds.find(tok)!= -1 ) return this;
+    return _par==null ? null : _par.lookup_fref(tok);
+  }
 }

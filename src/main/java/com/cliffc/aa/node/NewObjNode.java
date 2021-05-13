@@ -83,33 +83,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
     return ptr;
   }
 
-  // The current local scope ends, no more names will appear.  Forward refs
-  // first found in this scope are assumed to be defined in some outer scope
-  // and get promoted.  Other locals are no longer kept alive, but live or die
-  // according to use.
-  public void promote_forward( NewObjNode parent ) {
-    assert parent != null;
-    TypeStruct ts = _ts;
-    for( int i=0; i<ts._ts.length; i++ ) {
-      Node n = fld(i);
-      if( n != null && n.is_forward_ref() ) {
-        // Remove current display from forward-refs display choices.
-        assert Env.LEX_DISPLAYS.test(_alias);
-        TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS.clear(_alias),TypeObj.ISUSED);
-        n.set_def(1,Node.con(tdisp)); // TODO: BUGGY?  NEEDS TO CRAWL THE DISPLAY 1 LEVEL?
-        n.xval();
-        // Make field in the parent
-        String fld = ts._flds[i];
-        parent.create(fld,n,ts.fmod(i));
-        // Stomp field locally to ANY
-        set_def(def_idx(i),Env.ANY);
-        setsm(_ts.set_fld(i,Type.ANY,TypeStruct.FFNL));
-        tvar().reset_at(fld);
-        Env.GVN.add_flow_uses(n);
-      }
-    }
-  }
-
   @Override public Node ideal_mono() {
     // If the value lifts a final field, so does the default lift.
     if( _val instanceof TypeTuple ) {
