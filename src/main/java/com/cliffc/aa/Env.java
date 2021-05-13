@@ -133,10 +133,9 @@ public class Env implements AutoCloseable {
 
   // Close the current Env and lexical scope.
   @Override public void close() {
-    ScopeNode pscope = _par._scope;
     // Promote forward refs to the next outer scope
-    if( pscope != null && _par._par != null )
-      for( Node nnn : _scope.stk() )
+    if( _par._scope != null && _par._par != null )
+      for( Node nnn : _scope.stk()._defs )
         assert nnn==null || !nnn.is_forward_ref();
     close_display(GVN);
     GVN.add_dead(_scope);
