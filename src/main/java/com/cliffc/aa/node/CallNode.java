@@ -600,20 +600,20 @@ public class CallNode extends Node {
     BitsFun fidxs = fidxs();
     if( _is_copy || fidxs==null ) return true;
     CallEpiNode cepi = cepi();
-    return cepi != null && fidxs.bitCount() == cepi.nwired();
+    return cepi != null && fidxs.bitCount() <= cepi.nwired();
   }
 
   TypeMem live_use_call( int dfidx ) {
     Type tcall = _val;
     if( !(tcall instanceof TypeTuple) )
-      return tcall.above_center() ? TypeMem.DEAD : TypeMem.ALIVE;
+      return tcall.above_center() ? TypeMem.DEAD : TypeMem.NO_DISP;
     TypeFunPtr tfp = ttfp(tcall);
     // If resolve has chosen this dfidx, then the FunPtr is alive.
     BitsFun fidxs = tfp.fidxs();
     if( fidxs.above_center() ) return TypeMem.DEAD; // Nothing above-center is chosen
     if( dfidx != -1 && !fidxs.test_recur(dfidx) ) return TypeMem.DEAD; // Not in the fidx set.
     // Otherwise the FIDX is alive
-    return TypeMem.ALIVE;
+    return TypeMem.NO_DISP;
   }
 
   // Amongst these choices return the least-cost.  Some or all might be invalid.

@@ -129,6 +129,8 @@ public class Parse implements Comparable<Parse> {
         i--;
       }
     }
+    // No longer force all memory alive
+    Env.DEFMEM.unkeep();
   }
 
   private TypeEnv gather_errors() {

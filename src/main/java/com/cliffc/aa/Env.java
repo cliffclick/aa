@@ -50,9 +50,9 @@ public class Env implements AutoCloseable {
   // Make the Scope object for an Env.
   private static ScopeNode init(Node ctl, Node clo, Node mem, Type back_ptr, Parse errmsg, boolean is_closure) {
     TypeStruct tdisp = TypeStruct.open(back_ptr);
-    NewObjNode nnn = (NewObjNode)GVN.xform(new NewObjNode(is_closure,tdisp,clo));
+    NewObjNode nnn = (NewObjNode)GVN.xform(new NewObjNode(is_closure,tdisp,clo)).keep();
     MrgProjNode  frm = DEFMEM.make_mem_proj(nnn,mem);
-    Node ptr = GVN.xform(new ProjNode(nnn,AA.REZ_IDX));
+    Node ptr = GVN.xform(new ProjNode(nnn.unkeep(),AA.REZ_IDX));
     ALL_DISPLAYS = ALL_DISPLAYS.set(nnn._alias);   // Displays for all time
     LEX_DISPLAYS = LEX_DISPLAYS.set(nnn._alias);   // Lexically active displays
     ScopeNode scope = new ScopeNode(errmsg,is_closure);
@@ -134,9 +134,9 @@ public class Env implements AutoCloseable {
   // Close the current Env and lexical scope.
   @Override public void close() {
     // Promote forward refs to the next outer scope
-    if( _par._scope != null && _par._par != null )
-      for( Node nnn : _scope.stk()._defs )
-        assert nnn==null || !nnn.is_forward_ref();
+    ScopeNode pscope = _par._scope;
+    if( pscope != null && _par._par != null )
+      _scope.stk().promote_forward(pscope.stk());
     close_display(GVN);
     GVN.add_dead(_scope);
     GVN.iter(GVN._opt_mode);

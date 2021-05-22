@@ -18,11 +18,9 @@ public class TypeLive extends TypeObj<TypeLive> {
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
-    if( _flags==  0 && !_any ) return sb.p( "LIVE");
-    if( _flags== -1 &&  _any ) return sb.p("~LIVE");
+    if( this==DEAD ) return sb.p("DEAD");
     if( _any ) sb.p('~');
-    if( (_flags&FLAG_ESCAPE)!=0 ) sb.p("ESCP");
-    return sb;
+    return sb.p(STRS[_flags]);
   }
   
   private static TypeLive FREE=null;
@@ -37,15 +35,20 @@ public class TypeLive extends TypeObj<TypeLive> {
   }
 
   // Value is used as a call-argument, value-stored (address use is ok),
-  // returned merged at a phi, folded into a funptr, etc.
+  // returned, merged at a phi, folded into a funptr, etc.
   private static final int FLAG_ESCAPE=1;
   public boolean is_escape() { return (_flags&FLAG_ESCAPE)!=0; }
-
-  public static final TypeLive LIVE   = make(false,0); // Basic alive
-  static final TypeLive ESCAPE = make(false,FLAG_ESCAPE); // Used as a call argument
-  public static final TypeLive LIVE_BOT=make(false,FLAG_ESCAPE);
+  // Keeps all values alive
+  private static final int FLAG_WITH_DISP=2;
+  public boolean is_ret() { return (_flags&FLAG_WITH_DISP)!=0; }
+  
+  static final TypeLive NO_DISP= make(false,0 ); // no escape, no disp
+  static final TypeLive ESC_DISP= make(false,FLAG_ESCAPE); // escape, no disp
+  static final TypeLive LIVE   = make(false,FLAG_WITH_DISP); // Basic alive
+  static final TypeLive ESCAPE = make(false,FLAG_ESCAPE+FLAG_WITH_DISP); // Used as a call argument
+  
+  public static final TypeLive LIVE_BOT=make(false,FLAG_ESCAPE+FLAG_WITH_DISP);
   public static final TypeLive DEAD   = LIVE_BOT.dual();
-  static final TypeLive[] TYPES = new TypeLive[]{LIVE,ESCAPE};
 
   @Override protected TypeLive xdual() { return new TypeLive(!_any,_flags); }
   @Override protected Type xmeet( Type t ) {
@@ -72,7 +75,8 @@ public class TypeLive extends TypeObj<TypeLive> {
     int flags = any ? (_flags&ts._flags) : (f0|f1);
     return make(any,flags);
   }
-  private static final TypeLive[] LIVES = new TypeLive[]{LIVE,ESCAPE};
+  private static final TypeLive[] LIVES = new TypeLive[]{NO_DISP,ESC_DISP,LIVE,ESCAPE};
+  private static final String[] STRS = new String[]{"!dsp","esc!dsp","live","escp"};
   public TypeLive lmeet( TypeLive lv ) {
     if( this.above_center() ) return lv.above_center() ? (TypeLive)xmeet(lv) : lv;
     if( lv  .above_center() ) return this;

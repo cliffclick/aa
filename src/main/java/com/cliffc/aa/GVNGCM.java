@@ -265,6 +265,11 @@ public class GVNGCM {
           if( n instanceof CallEpiNode ) check_and_wire((CallEpiNode)n);
           for( Node use : n._uses )
             if( use instanceof CallEpiNode ) check_and_wire((CallEpiNode)use);
+          // All liveness is skipped if may_be_con, since the possible constant
+          // has no inputs.
+          assert oval.may_be_con() || !nval.may_be_con(); // May_be_con is monotonic
+          if( oval.may_be_con() && !nval.may_be_con() )
+            add_flow_defs(n);   // Now check liveness
         }
 
         // Reverse flow
@@ -273,6 +278,7 @@ public class GVNGCM {
         if( oliv != nliv ) {      // Liveness progress
           if( check_not_monotonic(n, oliv, nliv) ) continue; // Debugging hook
           n._live = nliv;           // Record progress
+          n.add_flow_extra(nliv);
           for( Node def : n._defs ) // Classic reverse flow on change
             if( def!=null ) add_flow(def).add_flow_def_extra(n);
         }

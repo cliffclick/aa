@@ -572,15 +572,21 @@ public abstract class Node implements Cloneable {
     // Compute meet/union of all use livenesses
     TypeMem live = TypeMem.DEAD; // Start at lattice top
     for( Node use : _uses )      // Computed across all uses
-      if( use._live != TypeMem.DEAD )
+      if( use.live_uses() )
         live = (TypeMem)live.meet(use.live_use(opt_mode, this)); // Make alive used fields
     live = live.flatten_fields();
     assert live==TypeMem.DEAD || live.basic_live()==all_live().basic_live();
     assert live!=TypeMem.LIVE_BOT || (_val !=Type.CTRL && _val !=Type.XCTRL);
     return live;
   }
+  public boolean live_uses() {
+    return _live != TypeMem.DEAD &&    // Only live uses make more live
+      // And no chance use turns into a constant (which then does not use anything)
+      !(_live.basic_live() && _val.may_be_con() && !is_prim());
+  }
+
   // Shortcut to update self-live
-  public void xliv( GVNGCM.Mode opt_mode ) { _live = live(opt_mode); }
+  public Node xliv( GVNGCM.Mode opt_mode ) { _live = live(opt_mode); return this; }
   // Compute local contribution of use liveness to this def.
   // Overridden in subclasses that do per-def liveness.
   public TypeMem live_use( GVNGCM.Mode opt_mode, Node def ) {
@@ -651,6 +657,7 @@ public abstract class Node implements Cloneable {
         !(this instanceof CallNode) &&       // Keep for proper errors
         !(this instanceof UnresolvedNode) && // Keep for proper errors
         !(this instanceof RetNode) &&        // Keep for proper errors
+        !(this instanceof CEProjNode) &&     // Have to unwire properly
         !(this instanceof ConNode) )         // Already a constant
       return Env.ANY;
 
@@ -718,7 +725,7 @@ public abstract class Node implements Cloneable {
       progress = this;          // Progress!
       assert nval.isa(oval);    // Monotonically improving
       _val = nval;
-      if( should_con(nval) ) Env.GVN.add_reduce(this);
+      if( should_con(nval) ) return do_reduce(); // Immediately replace with a constant
       for( Node use : _uses )  // Put uses on worklist... values flows downhill
         Env.GVN.add_flow(use).add_flow_use_extra(this);
       if( is_CFG() ) for( Node use : _uses ) if( use.is_CFG() ) Env.GVN.add_reduce(use);
@@ -747,6 +754,7 @@ public abstract class Node implements Cloneable {
   public boolean should_con(Type t) {
     if( _keep >0 || this instanceof ConNode || this instanceof ErrNode || is_prim() )
       return false; // Already a constant, or never touch an ErrNode
+    if( this instanceof CEProjNode ) return false;
     // Constant argument to call: keep for call resolution.
     // Call can always inline to fold constant.
     if( this instanceof ProjNode && in(0) instanceof CallNode && ((ProjNode)this)._idx>0 )
@@ -893,7 +901,20 @@ public abstract class Node implements Cloneable {
     assert value(GVNGCM.Mode.Opto)==_val ;
     assert live (GVNGCM.Mode.Opto)==_live;
 
+    // Replace any constants.  Since the node computes a constant, its inputs
+    // were never marked live, and so go dead and so go to ANY and so are not
+    // available to recompute the constant here.
+    if( should_con(_val) )
+      subsume(con(_val)).xliv(GVNGCM.Mode.Opto);
+    if( (!(this instanceof FunPtrNode) &&
+         _val instanceof TypeFunPtr &&
+         ((TypeFunPtr)_val).can_be_fpnode()) ) {
+      subsume(FunNode.find_fidx(((TypeFunPtr)_val).fidx()).fptr()).xliv(GVNGCM.Mode.Opto);
+      return;
+    }
+
     // Walk reachable graph
+    if( is_dead() ) return;
     Env.GVN.add_work_all(this);
     for( Node def : _defs )  if( def != null )  def.walk_opt(visit);
     for( Node use : _uses )                     use.walk_opt(visit);

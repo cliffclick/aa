@@ -11,8 +11,6 @@ abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
     super(OP_NEWARY,BitsAlias.AARY,tary,name,false,op_prec,Type.CTRL,TypeMem.ALLMEM,null,sz);
   }
   @Override TypeAry dead_type() { return TypeAry.ARY.dual(); }
-  // The one string field is memory-alive
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ANYMEM; }
 
   protected static void add_libs( Ary<NewPrimNode> INTRINSICS ) {
     INTRINSICS.push(new NewAry(TypeAry.ARY0,TypeInt.INT64));
@@ -31,7 +29,6 @@ abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
       // Storage class can be found by looking at _live, needs the reverse-flow of use sizes.
       return TypeAry.make((TypeInt)sz,Type.XNIL,TypeObj.OBJ);
     }
-    @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return _live; }
   }
 
 }

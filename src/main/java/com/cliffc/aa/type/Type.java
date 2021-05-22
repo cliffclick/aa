@@ -699,12 +699,12 @@ public class Type<T extends Type<T>> implements Cloneable {
     case TALL:
     case TSCALAR:  case TNSCALR:
     case TREAL:    case TNREAL:
+    case TXCTRL:
     case TCTRL:
       return false;             // These all include not-constant things
     case TANY:
     case TXREAL:   case TXNREAL:
     case TXSCALAR: case TXNSCALR:
-    case TXCTRL:
     case TNIL:     case TXNIL:
       return true;              // These all include some constants
     default: throw typerr(null);

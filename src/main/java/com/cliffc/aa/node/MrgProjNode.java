@@ -87,7 +87,11 @@ public class MrgProjNode extends ProjNode {
   @Override BitsAlias escapees() { return in(0).escapees(); }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // Only called here if alive, and input is more-than-basic-alive
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def==nnn() ? TypeMem.ALIVE : _live; }
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+    if( def==nnn() )
+      return _live.at(nnn()._alias).above_center() ? TypeMem.DEAD : TypeMem.ALIVE;
+    return _live;
+  }
 
   @Override public TV2 new_tvar( String alloc_site) { return TV2.make_mem(this,alloc_site); }
 

@@ -131,7 +131,7 @@ public class TV2 {
   // Make a new primitive base TV2
   public static TV2 make_err(Node n, String msg, @NotNull String alloc_site) {
     UQNodes ns = n==null ? null : UQNodes.make(n);
-    TV2 tv2 = new TV2("Err",null,TypeStr.con(msg),ns,alloc_site);
+    TV2 tv2 = new TV2("Err",null,TypeStr.con(msg.intern()),ns,alloc_site);
     assert tv2.is_err() && !tv2.is_leaf() && !tv2.is_base();
     return tv2;
   }
@@ -275,7 +275,7 @@ public class TV2 {
     if( is_err() && that.is_err() && _uid<that._uid ) return that.union(this);
     if(      is_err() ) return that.union(this);
     if( that.is_err() ) return      union(that);
-    
+
     // Check for simple, non-recursive, unification.
     // NIL always loses and makes no progress (no structure implications)
     if( this.is_nil () ) return false;
@@ -303,7 +303,7 @@ public class TV2 {
       return union_err(that,"Cannot unify "+this+" and "+that);
     assert _args!=that._args; // Efficiency hack elsewhere if this is true here
 
-    
+
     // Structural recursion unification, this into that.
     for( Object key : _args.keySet() ) {
       TV2 vthis =       get(key);  assert vthis!=null;
@@ -367,7 +367,7 @@ public class TV2 {
 
     if( that.is_err() ) return vput(that,false); // That is an error, ignore 'this' and no progress
     if( this.is_err() ) return vput(that,_unify(that,test));
-    
+
     // Famous 'occurs-check', switch to normal unify
     if( occurs_in( vs ) ) return vput(that,_unify(that,test));
     // Either side is a Leaf, unify to the other (perhaps with a fresh copy)

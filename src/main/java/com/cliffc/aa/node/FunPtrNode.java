@@ -105,7 +105,14 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
-    return TypeFunPtr.make(ret()._fidx,nargs(),display()._val);
+    // This is the only place where live() impacts value().  Usually being dead
+    // just sets the node to ANY (and rapidly kills it).
+    Type tdisp = _live.isa(TypeMem.NO_DISP) ? Type.ANY : display()._val;
+    return TypeFunPtr.make(ret()._fidx,nargs(),tdisp);
+  }
+  @Override public void add_flow_extra(Type old) {
+    if( old==_live )            // live impacts value
+      Env.GVN.add_flow(this);
   }
 
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
@@ -113,7 +120,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     return !opt_mode._CG ? TypeMem.ESCAPE : super.live(opt_mode);
   }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    return def==ret() ? TypeMem.ANYMEM : TypeMem.ESCAPE;
+    return def==ret() ? TypeMem.ANYMEM : (_live==TypeMem.NO_DISP ? TypeMem.DEAD : TypeMem.ESCAPE);
   }
 
   @Override public TV2 new_tvar(String alloc_site) {

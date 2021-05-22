@@ -49,10 +49,10 @@ import java.util.HashMap;
    being All vs some Constants).
 */
 public class TypeMem extends Type<TypeMem> {
-  // Mapping from alias#s to the current known alias state.  Slot 0 is
-  // reserved; TypeMem is never a nil.  Slot#1 is the Parent-Of-All aliases and
-  // is the default value.  Default values are replaced with null during
-  // canonicalization.
+  // Mapping from alias#s to the current known alias state.  Slot#0 is reserved
+  // for memory liveness; TypeMem is never a nil.  Slot#1 is the Parent-Of-All
+  // aliases and is the default value.  Default values are replaced with null
+  // during canonicalization.
   private TypeObj[] _pubs;
 
   // A cache of sharpened pointers.  Pointers get sharpened by looking up their
@@ -111,17 +111,17 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   private static final char[] LIVEC = new char[]{' ','#','R','3'};
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
-    if( this==FULL ) return sb.p(" [ all ]");
-    if( this==EMPTY) return sb.p(" [_____]");
-    if( this== MEM ) return sb.p(" [ mem ]");
-    if( this==XMEM ) return sb.p(" [~mem ]");
-    if( this==DEAD ) return sb.p("![dead ]");
-    if( this==ALIVE) return sb.p(" [live ]");
-    if( this==ESCAPE)return sb.p("#[escap]");
-    if( this==LIVE_BOT) return sb.p("3[!repl]");
+    if( this==FULL ) return sb.p("[ all ]");
+    if( this==EMPTY) return sb.p("[_____]");
+    if( this== MEM ) return sb.p("[ mem ]");
+    if( this==XMEM ) return sb.p("[~mem ]");
+
+    if( _pubs.length==1 )
+      return _pubs[0].str(sb.p('['),dups,mem,debug).p(']');
+
     if( _pubs[0]==TypeLive.DEAD ) sb.p('!');
-    else sb.p(LIVEC[((TypeLive)_pubs[0])._flags]);
-    if( _pubs.length==1 ) return sb.p("[]");
+    else _pubs[0].str(sb,dups,mem,debug);
+
     sb.p('[');
     for( int i = 1; i< _pubs.length; i++ )
       if( _pubs[i] != null )
@@ -224,7 +224,7 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem EMPTY;// Every alias filled with anything
   public static final TypeMem  MEM; // FULL, except lifts REC, arrays, STR
   public static final TypeMem XMEM; //
-  public static final TypeMem DEAD, ALIVE, LIVE_BOT; // Sentinel for liveness flow; not part of lattice
+  public static final TypeMem DEAD, ALIVE, NO_DISP, LIVE_BOT; // Sentinel for liveness flow; not part of lattice
   public static final TypeMem ESCAPE; // Sentinel for liveness, where the value "escapes" the local scope
   public static final TypeMem ANYMEM,ALLMEM; // Every alias is unused (so above XOBJ or below OBJ)
   public static final TypeMem MEM_ABC, MEM_STR;
@@ -254,6 +254,7 @@ public class TypeMem extends Type<TypeMem> {
     // Sentinel for liveness flow; not part of lattice
     DEAD   = make_live(TypeLive.DEAD    );
     ALIVE  = make_live(TypeLive.LIVE    ); // Basic alive for all time
+    NO_DISP= make_live(TypeLive.NO_DISP);  // !Basic alive, no display pointers
     ESCAPE = make_live(TypeLive.ESCAPE  ); // Alive, plus escapes some call/memory
     LIVE_BOT=make_live(TypeLive.LIVE_BOT);
   }

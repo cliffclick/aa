@@ -188,41 +188,58 @@ public class LoadNode extends Node {
     Node adr = adr();
     Type tadr = adr._val;
     if( !(tadr instanceof TypeMemPtr) ) return tadr.oob();
-    TypeMemPtr tmp = (TypeMemPtr)tadr;
 
     // Loading from TypeMem - will get a TypeObj out.
     Node mem = mem();
-    Type tmem = mem._val; // Memory
+    Type tmem = mem._val, tfld; // Memory
     if( !(tmem instanceof TypeMem) ) return tmem.oob(); // Nothing sane
-    TypeObj tobj = ((TypeMem)tmem).ld(tmp);
-
-    // Loading from TypeObj - hoping to get a field out.
-    if( tobj instanceof TypeStruct ) { // Struct; check for field
-      TypeStruct ts = (TypeStruct)tobj;
-      int idx = ts.find(_fld);  // Find the named field
-      if( idx != -1 ) return ts.at(idx);  // Field type
-      // No such field
-    }
+    TypeObj tobj = ((TypeMem)tmem).ld((TypeMemPtr)tadr);
+    if( tobj instanceof TypeStruct && (tfld = get_fld(tobj)) != null ) return tfld;
     return tobj.oob();          // No loading from e.g. Strings
   }
+
   @Override public void add_flow_use_extra(Node chg) {
     if( chg==adr() ) Env.GVN.add_flow(mem());  // Address into a Load changes, the Memory can be more alive.
     if( chg==mem() ) Env.GVN.add_flow(mem());  // Memory value lifts to ANY, memory live lifts also.
+    if( chg==mem() ) Env.GVN.add_flow(adr());  // Memory value lifts to an alias, address is more alive
     // Memory improves, perhaps Load can bypass Call
     if( chg==mem() && mem().in(0) instanceof CallEpiNode ) Env.GVN.add_reduce(this);
   }
 
   // The only memory required here is what is needed to support the Load
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    if( def==adr() ) return TypeMem.ALIVE;
+    TypeMem err = check_valid_mem(def);
+    if( def==adr() )            // Live_use of the address
+      return err.above_center() ? TypeMem.DEAD : TypeMem.ALIVE;
+    return err;
+  }
+  private TypeMem check_valid_mem(Node def) {
     Type tmem = mem()._val;
     Type tptr = adr()._val;
     if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
     if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
     if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
+
+    // If the load is of a constant, no memory is needed
+    Type tfld = get_fld((TypeMem)tmem,(TypeMemPtr)tptr);
+    if( tfld != null && (tfld.is_con() || (tfld instanceof TypeFunPtr && ((TypeFunPtr)tfld).can_be_fpnode())) )
+      return TypeMem.DEAD;
+    if( def==adr() ) return tfld==null ? TypeMem.DEAD : TypeMem.ALIVE; // Memory is sane, so address is alive
     // Only named the named field from the named aliases is live.
     return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld);
   }
+
+  // Load the value
+  private Type get_fld(TypeMem tmem, TypeMemPtr tadr) { return get_fld(tmem.ld(tadr)); }
+  private Type get_fld(TypeObj tobj) {
+    if( !(tobj instanceof TypeStruct) ) return null;
+    // Struct; check for field
+    TypeStruct ts = (TypeStruct)tobj;
+    int idx = ts.find(_fld);  // Find the named field
+    if( idx == -1 ) return null;
+    return ts.at(idx);          // Field type
+  }
+
 
   @Override public boolean unify( boolean test ) {
     // Input should be a TMem

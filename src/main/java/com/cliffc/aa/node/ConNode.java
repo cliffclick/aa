@@ -48,7 +48,7 @@ public class ConNode<T extends Type> extends Node {
     if( _keep>0 ) return all_live();
     TypeLive live = TypeLive.DEAD; // Start at lattice top
     for( Node use : _uses )
-      if( use._live != TypeMem.DEAD )
+      if( use.live_uses() )
         live = live.lmeet(use.live_use(opt_mode,this).live());
     return TypeMem.make_live(live);
   }
