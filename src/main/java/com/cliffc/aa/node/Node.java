@@ -582,7 +582,7 @@ public abstract class Node implements Cloneable {
   public boolean live_uses() {
     return _live != TypeMem.DEAD &&    // Only live uses make more live
       // And no chance use turns into a constant (which then does not use anything)
-      !(_live.basic_live() && _val.may_be_con() && !is_prim());
+      !(_live.basic_live() && _val.may_be_con() && !is_prim() && err(true)==null);
   }
 
   // Shortcut to update self-live

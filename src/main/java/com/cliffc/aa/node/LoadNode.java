@@ -222,7 +222,8 @@ public class LoadNode extends Node {
 
     // If the load is of a constant, no memory is needed
     Type tfld = get_fld((TypeMem)tmem,(TypeMemPtr)tptr);
-    if( tfld != null && (tfld.is_con() || (tfld instanceof TypeFunPtr && ((TypeFunPtr)tfld).can_be_fpnode())) )
+    if( tfld != null && (tfld.is_con() || (tfld instanceof TypeFunPtr && ((TypeFunPtr)tfld).can_be_fpnode())) &&
+        err(true)==null )
       return TypeMem.DEAD;
     if( def==adr() ) return tfld==null ? TypeMem.DEAD : TypeMem.ALIVE; // Memory is sane, so address is alive
     // Only named the named field from the named aliases is live.
@@ -256,6 +257,7 @@ public class LoadNode extends Node {
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;
     if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when reading",_fld);
+    if( tadr==Type.ANY ) return null; // No error, since might fall to any valid thing
     if( !(tadr instanceof TypeMemPtr) )
       return bad(fast,null); // Not a pointer nor memory, cannot load a field
     TypeMemPtr ptr = (TypeMemPtr)tadr;
@@ -265,6 +267,7 @@ public class LoadNode extends Node {
     TypeObj objs = tmem instanceof TypeMem
       ? ((TypeMem)tmem).ld(ptr) // General load from memory
       : ((TypeObj)tmem);
+    if( objs==TypeObj.UNUSED ) return null; // No error, since might fall to anything
     if( !(objs instanceof TypeStruct) || find((TypeStruct)objs) == -1 )
       return bad(fast,objs);
     return null;

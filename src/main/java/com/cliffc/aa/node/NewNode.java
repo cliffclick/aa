@@ -84,19 +84,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 
-  @Override public TypeMem live(GVNGCM.Mode opt_mode) {
-    // Keep the MrgProj memory, filtered by alias and the pointer being alive.
-    if( _keep>0 ) return TypeMem.make(_alias,_crushed);
-
-    // If the MrgProj does not have this object alive, then we are not alive -
-    // even if the pointer is alive.
-    if( _uses._len<2 ) return _live;    // Dead, collapsing
-    Node mem = _uses.at(0);
-    if( !(mem instanceof MrgProjNode) ) mem = _uses.at(1);
-    assert mem instanceof MrgProjNode;
-    return mem._live;
-  }
-
   // Only alive fields in the MrgProj escape
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     TypeObj to = _live.at(_alias);

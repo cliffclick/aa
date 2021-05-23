@@ -121,6 +121,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
         assert ts4.isa(ts5);
         if( ts5 != _crushed && ts5.isa(_crushed) ) {
           setsm(ts4);
+          Env.GVN.add_flow(Env.DEFMEM);
           return this;
         }
       }

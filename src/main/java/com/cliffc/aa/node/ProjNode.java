@@ -31,7 +31,9 @@ public class ProjNode extends Node {
     return c.oob();
   }
   // Only called here if alive, and input is more-than-basic-alive
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+    return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM;
+  }
 
   // Unify with the parent TVar sub-part
   @Override public boolean unify( boolean test ) {
