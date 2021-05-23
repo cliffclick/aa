@@ -779,6 +779,7 @@ public class FunNode extends RegionNode {
     }
 
     // Put all new nodes into the GVN tables and worklist
+    boolean split_alias=false;
     for( Map.Entry<Node,Node> e : map.entrySet() ) {
       Node oo = e.getKey();     // Old node
       Node nn = e.getValue();   // New node
@@ -793,6 +794,7 @@ public class FunNode extends RegionNode {
         oorg.reset_tvar("fun_inline_alias");      // Force new H-M unification of memory
         Env.GVN.add_mono(oorg.nnn());
         Env.GVN.add_flow_uses(oorg);
+        split_alias=true;
       }
 
       if( nn instanceof FunPtrNode ) { // FunPtrs pick up the new fidx
@@ -803,7 +805,10 @@ public class FunNode extends RegionNode {
       nn._val = nt;             // Values
       nn._elock();              // In GVN table
     }
-    Env.DEFMEM.xval();
+    if( split_alias ) {
+      Env.DEFMEM.reset_tvar("fun_inline_alias");
+      Env.DEFMEM.xval();
+    }
 
     // Eagerly lift any Unresolved types, so they quit propagating the parent
     // (and both children) to all targets.

@@ -635,6 +635,7 @@ public abstract class Node implements Cloneable {
     if( nnn!=null ) {                   // Something happened
       if( nnn != this && !is_dead() ) { // Being replaced
         Env.GVN.add_flow_uses(this);    // Visit users
+        add_reduce_extra();
         subsume(nnn);                   // Replace
         for( Node use : nnn._uses ) {
           use.add_reduce_extra();

@@ -72,6 +72,10 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     if( chg instanceof MrgProjNode && chg._live.at(_alias)==TypeObj.UNUSED )
       Env.GVN.add_reduce(chg);
   }
+  // Reducing a NewNode to 'any' changes DEFMEM
+  @Override public void add_reduce_extra() {
+    Env.GVN.add_flow(Env.DEFMEM);
+  }
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
     return TypeTuple.make(Type.CTRL, is_unused() ? TypeObj.UNUSED : valueobj(),_tptr);   // Complex obj, simple ptr.

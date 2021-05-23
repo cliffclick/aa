@@ -128,6 +128,8 @@ public class MemJoinNode extends Node {
     TypeMem[] mems = new TypeMem[_defs._len];
     for( int i=0; i<_defs._len; i++ ) {
       Type t = val(i);
+      if( t == Type.ANY ) t = TypeMem.ANYMEM;
+      if( t == Type.ALL ) t = TypeMem.ALLMEM;
       if( !(t instanceof TypeMem) ) return t.oob(TypeMem.ALLMEM);
       mems[i] = (TypeMem)t;
       if( i>0 && !diff ) diff = mems[i]!=mems[0];

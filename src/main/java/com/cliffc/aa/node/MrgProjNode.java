@@ -19,6 +19,8 @@ public class MrgProjNode extends ProjNode {
 
 
   @Override public Node ideal_reduce() {
+    if( val(0).above_center() )
+      return mem();
     NewNode nnn = nnn();
     Node mem = mem();
     Type t = mem._val;
@@ -88,7 +90,7 @@ public class MrgProjNode extends ProjNode {
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // Only called here if alive, and input is more-than-basic-alive
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    if( def==nnn() )
+    if( in(0) instanceof NewNode && def==nnn() )
       return _live.at(nnn()._alias).above_center() ? TypeMem.DEAD : TypeMem.ALIVE;
     return _live;
   }
