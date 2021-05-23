@@ -236,7 +236,7 @@ public class LoadNode extends Node {
     // Struct; check for field
     TypeStruct ts = (TypeStruct)tobj;
     int idx = ts.find(_fld);  // Find the named field
-    if( idx == -1 ) return null;
+    if( idx == -1 ) return Type.ALL;
     return ts.at(idx);          // Field type
   }
 
