@@ -133,8 +133,10 @@ public class RegionNode extends Node {
   @Override public void add_flow_use_extra(Node chg) {
     Env.GVN.add_reduce(this);
     for( Node phi : _uses )
-      if( phi instanceof PhiNode )
+      if( phi instanceof PhiNode ) {
         Env.GVN.add_flow(phi);
+        Env.GVN.add_flow_defs(phi); // Inputs to Phi change liveness
+      }
   }
   
   @Override public TypeMem all_live() { return TypeMem.ALIVE; }

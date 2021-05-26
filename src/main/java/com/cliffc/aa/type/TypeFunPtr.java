@@ -142,14 +142,14 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
 
   @Override public boolean above_center() { return _fidxs.above_center() || (_fidxs.is_con() && _disp.above_center()); }
-  @Override public boolean may_be_con()   { return above_center(); }
-  // Since fidxs may split, never a constant.
-  @Override public boolean is_con()       { return false; }
-  // Basically, a constant fidx that may be split.
-  public boolean can_be_fpnode() {
-    return _disp==TypeMemPtr.NO_DISP && // No display
-      // Single function
-      _fidxs.abit() > 1 && !BitsFun.is_parent(_fidxs.abit());
+  @Override public boolean may_be_con()   { return above_center() || is_con(); }
+  @Override public boolean is_con()       {
+    return _disp==TypeMemPtr.NO_DISP && // No display (could be constant display?)
+      // Single bit covers all functions (no new children added, but new splits
+      // can appear).  Currently not tracking this at the top-level, so instead
+      // just triggering off of a simple heuristic: a single bit above BitsFun.FULL.
+      _fidxs.abit() > 1 &&
+      !is_forward_ref();
   }
   @Override public boolean must_nil() { return _fidxs.test(0) && !_fidxs.above_center(); }
   @Override public boolean may_nil() { return _fidxs.may_nil(); }
@@ -194,8 +194,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   // Generic functions
   public boolean is_forward_ref() {
-    if( _fidxs.abit() == -1 ) return false; // Multiple fidxs
-    if( _fidxs.getbit() == 1 ) return false; // Thats the generic function ptr
+    if( _fidxs.abit() <= 1 ) return false; // Multiple fidxs, or generic fcn ptr
     FunNode fun = FunNode.find_fidx(Math.abs(fidx()));
     return fun != null && fun.is_forward_ref();
   }

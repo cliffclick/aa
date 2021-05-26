@@ -9,7 +9,8 @@ import static com.cliffc.aa.AA.MEM_IDX;
 
 // Proj memory
 public class MProjNode extends ProjNode {
-  public MProjNode( CallNode call, DefMemNode def ) { super(MEM_IDX,call,def); }
+
+  public MProjNode( CallNode call, Node def ) { super(MEM_IDX,call,def); }
   public MProjNode( Node head ) { super(head, MEM_IDX); }
   public MProjNode( Node head, int idx ) { super(head,idx); }
   @Override public String xstr() { return "MProj"+_idx; }
@@ -34,14 +35,14 @@ public class MProjNode extends ProjNode {
         Type t = ct.at(_idx);
         // Break forward dead-alias cycles in recursive functions by inspecting
         // dead-ness in DefMem.
-        if( in(0) instanceof CallNode )
+        if( in(0) instanceof CallNode && !opt_mode._CG)
           t = t.join(in(1)._val);
         return t;
       }
     }
     return c.oob();
   }
-  
+
   @Override public TV2 new_tvar( String alloc_site) { return TV2.make_mem(this,alloc_site); }
 
   @Override public void add_flow_use_extra(Node chg) {
@@ -54,5 +55,7 @@ public class MProjNode extends ProjNode {
   @Override BitsAlias escapees() { return in(0).escapees(); }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // Only called here if alive, and input is more-than-basic-alive
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return _live; }
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+    return opt_mode._CG && def==Env.DEFMEM ? TypeMem.DEAD : _live;
+  }
 }

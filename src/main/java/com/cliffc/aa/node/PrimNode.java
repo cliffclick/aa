@@ -180,7 +180,7 @@ public abstract class PrimNode extends Node {
     try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
       assert _defs._len==0 && _uses._len==0;
       FunNode fun = (FunNode) X.xform(new FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
-      Node rpc = X.xform(new ParmNode(0,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
+      Node rpc = X.xform(new ParmNode(0,"rpc",fun,Env.ALL_CALL,null));
       add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
       Node mem = X.xform(new ParmNode(MEM_IDX,_sig._args[MEM_IDX],fun,TypeMem.MEM,Env.DEFMEM,null));
       if( _thunk_rhs ) add_def(mem);      // Memory if thunking

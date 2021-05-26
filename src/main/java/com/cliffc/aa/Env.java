@@ -20,6 +20,7 @@ public class Env implements AutoCloseable {
   public static      ConNode XNIL;  // Common XNIL
   public static      ConNode ANY;   // Common ANY / used for dead
   public static      ConNode ALL;   // Common ALL / used for errors
+  public static      ConNode ALL_CALL; // Common during function call construction
   // Set of all display aliases, used to track escaped displays at call sites for asserts.
   public static BitsAlias ALL_DISPLAYS = BitsAlias.EMPTY;
   // Set of lexically active display aliases, used for a conservative display
@@ -77,6 +78,7 @@ public class Env implements AutoCloseable {
     XNIL    = GVN.xform(new ConNode<>(Type.XNIL , TV2.NIL )).keep();
     ANY     = GVN.xform(new ConNode<>(Type.ANY  , TV2.DEAD)).keep();
     ALL     = GVN.xform(new ConNode<>(Type.ALL  )).keep();
+    ALL_CALL= GVN.xform(new ConNode<>(TypeRPC.ALL_CALL)).keep();
     // Initial control & memory
     CTL_0  = GVN.init(new    CProjNode(START,0));
     DEFMEM = GVN.init(new   DefMemNode(  CTL_0));

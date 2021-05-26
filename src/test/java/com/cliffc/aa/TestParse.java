@@ -14,9 +14,10 @@ import static org.junit.Assert.*;
 
 public class TestParse {
   private static final String[] FLDS = new String[]{"^","n","v"};
-  private static final BitsFun TEST_FUNBITS = BitsFun.make0(46);
+  private static final BitsFun TEST_FUNBITS = BitsFun.make0(50);
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
+  @Ignore
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
@@ -72,6 +73,7 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
+    TypeStruct dummy = TypeStruct.DISPLAY;
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator

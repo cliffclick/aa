@@ -176,12 +176,12 @@ public class CallNode extends Node {
   // children propagate everywhere.
   @Override @NotNull public CallNode copy( boolean copy_edges) {
     CallNode call = (CallNode)super.copy(copy_edges);
-    ConNode old_rpc = Node.con(TypeRPC.make(_rpc));
+    Node old_rpc = Node.con(TypeRPC.make(_rpc));
     call._rpc = BitsRPC.new_rpc(_rpc); // Children RPC
     set_rpc(BitsRPC.new_rpc(_rpc)); // New child RPC for 'this' as well.
     // Swap out the existing old rpc users for the new.
     // Might be no users of either.
-    ConNode new_rpc = Node.con(TypeRPC.make(_rpc));
+    Node new_rpc = Node.con(TypeRPC.make(_rpc));
     old_rpc.subsume(new_rpc);
     return call;
   }
@@ -612,6 +612,8 @@ public class CallNode extends Node {
     BitsFun fidxs = tfp.fidxs();
     if( fidxs.above_center() ) return TypeMem.DEAD; // Nothing above-center is chosen
     if( dfidx != -1 && !fidxs.test_recur(dfidx) ) return TypeMem.DEAD; // Not in the fidx set.
+    if( tfp.is_con() && !(fdx() instanceof FunPtrNode) )
+      return TypeMem.DEAD; // Will be replaced by a constant
     // Otherwise the FIDX is alive
     return TypeMem.NO_DISP;
   }

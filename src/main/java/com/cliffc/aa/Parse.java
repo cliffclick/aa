@@ -131,6 +131,7 @@ public class Parse implements Comparable<Parse> {
     }
     // No longer force all memory alive
     Env.DEFMEM.unkeep();
+    Env.DEFMEM.insert(Env.ANY);
   }
 
   private TypeEnv gather_errors() {
@@ -1363,7 +1364,7 @@ public class Parse implements Comparable<Parse> {
   private Node mem() { return scope().mem(); }
   private void set_mem( Node n) { scope().set_mem(n); }
 
-  private @NotNull ConNode con( Type t ) { return Node.con(t); }
+  private @NotNull ConNode con( Type t ) { return (ConNode)Node.con(t); }
 
   // Lookup & extend scopes
   public  Node lookup( String tok ) { return _e.lookup(tok); }

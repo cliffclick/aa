@@ -127,10 +127,10 @@ public abstract class Node implements Cloneable {
   // Edge lock check, or anything that changes the hash
   public void unelock() {
     assert check_vals();        // elock & VALs match
-    if( _elock ) {
-      _elock=false;
+    if( _elock ) {              // Edge-locked
+      _elock=false;             // Unlock
       Node x = VALS.remove(this);
-      assert x==this;
+      assert x==this;           // Got the right node out
       Env.GVN.add_reduce(Env.GVN.add_flow(this));
     }
   }
@@ -582,7 +582,9 @@ public abstract class Node implements Cloneable {
   public boolean live_uses() {
     return _live != TypeMem.DEAD &&    // Only live uses make more live
       // And no chance use turns into a constant (which then does not use anything)
-      !(_live.basic_live() && _val.may_be_con() && !is_prim() && err(true)==null);
+      !(_live.basic_live() && _val.may_be_con() && !is_prim() && err(true)==null &&
+        // FunPtrs still use their Rets, even if constant
+        !(this instanceof FunPtrNode));
   }
 
   // Shortcut to update self-live
@@ -664,11 +666,6 @@ public abstract class Node implements Cloneable {
 
     // Replace with a constant, if possible
     if( should_con(_val) ) return con(_val);
-
-    // Replace with a FunPtr directly
-    // Might be a FP constant
-    if( _val instanceof TypeFunPtr && !(this instanceof FunPtrNode) && ((TypeFunPtr)_val).can_be_fpnode() )
-      return FunNode.find_fidx(((TypeFunPtr)_val).fidx()).fptr();
 
     // Try CSE
     if( !_elock ) {             // Not in VALS
@@ -753,9 +750,12 @@ public abstract class Node implements Cloneable {
   // - Not an ErrNode AND
   // - Type.is_con()
   public boolean should_con(Type t) {
-    if( _keep >0 || this instanceof ConNode || this instanceof ErrNode || is_prim() )
+    if( _keep >0 ||
+        this instanceof ConNode || // Already a constant 
+        (this instanceof FunPtrNode && _val.is_con()) || // Already a constant
+        this instanceof ErrNode || // Never touch an ErrNode
+        is_prim() )                // Never touch a Primitive
       return false; // Already a constant, or never touch an ErrNode
-    if( this instanceof CEProjNode ) return false;
     // Constant argument to call: keep for call resolution.
     // Call can always inline to fold constant.
     if( this instanceof ProjNode && in(0) instanceof CallNode && ((ProjNode)this)._idx>0 )
@@ -764,21 +764,21 @@ public abstract class Node implements Cloneable {
     if( err(true) != null )
       return false;
     // Is a constant (or could be)
-    if( t.is_con() ) return true; // Replace with a ConNode
-    return false;
+    return t.is_con();
   }
 
   // Make globally shared common ConNode for this type.
-  public static @NotNull ConNode con( Type t ) {
-    // Check for a function constant, and return the globally shared common
-    // FunPtrNode instead.  This only works for FunPtrs with no closures.
-    assert !(t instanceof TypeFunPtr && t.is_con()); // Does not work for function constants
+  public static @NotNull Node con( Type t ) {
     assert t==t.simple_ptr();
-    ConNode con = new ConNode<>(t);
+    Node con;
+    if( t instanceof TypeFunPtr )
+      con = new FunPtrNode(FunNode.find_fidx(((TypeFunPtr)t).fidx()).ret(),Env.ANY);
+    else
+      con = new ConNode<>(t);
     Node con2 = VALS.get(con);
     if( con2 != null ) {        // Found a prior constant
       con.kill();               // Kill the just-made one
-      con = (ConNode)con2;
+      con = con2;
       con._live = TypeMem.LIVE_BOT; // Adding more liveness
     } else {                        // New constant
       con._val = t;                 // Typed
@@ -907,12 +907,6 @@ public abstract class Node implements Cloneable {
     // available to recompute the constant here.
     if( should_con(_val) )
       subsume(con(_val)).xliv(GVNGCM.Mode.Opto);
-    if( (!(this instanceof FunPtrNode) &&
-         _val instanceof TypeFunPtr &&
-         ((TypeFunPtr)_val).can_be_fpnode()) ) {
-      subsume(FunNode.find_fidx(((TypeFunPtr)_val).fidx()).fptr()).xliv(GVNGCM.Mode.Opto);
-      return;
-    }
 
     // Walk reachable graph
     if( is_dead() ) return;

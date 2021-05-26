@@ -96,8 +96,6 @@ public class TV2 {
   public boolean unify_at(Object key, TV2 tv2, boolean test ) {
     assert is_tvar() && _args!=null;
     TV2 old = get(key);
-    if( key.equals("g") && tv2.is_base() )
-      System.out.println();
     if( old!=null )
       return old.unify(tv2,test);
     if( test ) return true;
@@ -271,11 +269,6 @@ public class TV2 {
     assert !is_unified() && !that.is_unified();
     if( this==that ) return false;
 
-    // two errs union in either order, so keep lower uid (actually should merge error strings)
-    if( is_err() && that.is_err() && _uid<that._uid ) return that.union(this);
-    if(      is_err() ) return that.union(this);
-    if( that.is_err() ) return      union(that);
-
     // Check for simple, non-recursive, unification.
     // NIL always loses and makes no progress (no structure implications)
     if( this.is_nil () ) return false;
@@ -285,6 +278,10 @@ public class TV2 {
     // Dead wins all
     if( this.is_dead() ) return that.union(this);
     if( that.is_dead() ) return this.union(that);
+    // two errs union in either order, so keep lower uid (actually should merge error strings)
+    if( is_err() && that.is_err() && _uid<that._uid ) return that.union(this);
+    if(      is_err() ) return that.union(this);
+    if( that.is_err() ) return      union(that);
     // Two leafs union in either order, so keep lower uid
     if( this.is_leaf() && that.is_leaf() && _uid < that._uid ) return that.union(this);
     if( this.is_leaf() ) return this.union(that);
@@ -457,7 +454,7 @@ public class TV2 {
   // Unify the two memories only at the given aliases
   public boolean unify_alias(BitsAlias aliases, TV2 mem, boolean test) {
     if( this==mem ) return false; // Already unified, no progress
-    assert isa("Mem") && mem.isa("Mem");
+    assert (isa("Mem") || isa("Dead")) && mem.isa("Mem");
     boolean progress = false;
     TV2 tobj=null;              // For asserts
     for( int alias : aliases ) {

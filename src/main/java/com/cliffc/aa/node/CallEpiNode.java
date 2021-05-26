@@ -69,7 +69,7 @@ public final class CallEpiNode extends Node {
     // See if we can wire any new fidxs directly between Call/Fun and Ret/CallEpi.
     // This *adds* edges, but enables a lot of shrinking via inlining.
     if( check_and_wire() ) return this;
-    
+
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.
     if( nwired()==1 && fidxs.abit() != -1 ) { // Wired to 1 target
@@ -229,7 +229,7 @@ public final class CallEpiNode extends Node {
       int idx = ((ParmNode)arg)._idx;
       switch( idx ) {
       case 0: actual = new ConNode<>(TypeRPC.make(call._rpc)); break; // Always RPC is a constant
-      case MEM_IDX: actual = new MProjNode(call,Env.DEFMEM); break;    // Memory into the callee
+      case MEM_IDX: actual = new MProjNode(call,(Env.DEFMEM._uses._len==0) ? Env.ANY : Env.DEFMEM); break;    // Memory into the callee
       default: actual = idx >= call.nargs()              // Check for args present
           ? new ConNode<>(Type.ALL) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
           : new ProjNode(call,idx); // Normal args
@@ -279,9 +279,9 @@ public final class CallEpiNode extends Node {
     if( fidxs.above_center() ) return TypeTuple.CALLE.dual(); // Not resolved yet
 
     // Default memory: global worse-case scenario
-    Node defnode = in(1);
-    Type defmem = defnode._val;
-    if( !(defmem instanceof TypeMem) ) defmem = defmem.oob(TypeMem.ALLMEM);
+    TypeMem defmem = Env.DEFMEM._val instanceof TypeMem
+      ? (TypeMem)Env.DEFMEM._val
+      : Env.DEFMEM._val.oob(TypeMem.ALLMEM);
 
     // Any not-wired unknown call targets?
     if( fidxs!=BitsFun.FULL ) {
@@ -345,18 +345,16 @@ public final class CallEpiNode extends Node {
     // Approximate "live out of call", includes things that are alive before
     // the call but not flowing in.  Catches all the "new in call" returns.
     BitsAlias esc_out = esc_out(post_call,trez);
-    TypeObj[] pubs = new TypeObj[defnode._defs._len];
     TypeMem caller_mem = premem instanceof TypeMem ? (TypeMem)premem : premem.oob(TypeMem.ALLMEM);
-    TypeMem tdefmem = (TypeMem)defmem;
+    int len = opt_mode._CG ? Math.max(caller_mem.len(),post_call.len()) : defmem.len();
+    TypeObj[] pubs = new TypeObj[len];
     for( int i=1; i<pubs.length; i++ ) {
       boolean ein  = tescs._aliases.test_recur(i);
       boolean eout = esc_out       .test_recur(i);
       TypeObj pre = caller_mem.at(i);
       TypeObj obj = ein || eout ? (TypeObj)(pre.meet(post_call.at(i))) : pre;
-      if( tdefmem.at(i) == TypeObj.UNUSED || tdefmem.at(i) == TypeObj.ANY )
-        obj = TypeObj.UNUSED; // If dead, then dead
       if( !opt_mode._CG )       // Before GCP, must use DefMem to keeps types strong as the Parser
-        obj = (TypeObj)obj.join(((TypeMem)defmem).at(i));
+        obj = (TypeObj)obj.join(defmem.at(i));
       pubs[i] = obj;
     }
     TypeMem tmem3 = TypeMem.make0(pubs);
@@ -434,7 +432,10 @@ public final class CallEpiNode extends Node {
         if( fun.in(i).in(0) == call ) {
           fun.set_def(i, Env.XCTRL);
           Env.GVN.add_flow(fun);
-          Env.GVN.add_flow_uses(fun); // Dead path, all Phis can lift
+          for( Node use : fun._uses ) {
+            Env.GVN.add_flow(use); // Dead path, all Phis can lift
+            Env.GVN.add_flow_defs(use); // All Phi uses lose a use
+          }
           break;
         }
     }
@@ -452,7 +453,7 @@ public final class CallEpiNode extends Node {
     if( _is_copy ) return def._live; // A copy
     // Not a copy
     if( def==in(0) ) return _live; // The Call
-    if( def==in(1) ) return _live; // The DefMem
+    if( def==in(1) ) return opt_mode._CG ? TypeMem.DEAD : _live; // The DefMem
     // Wired return.
     // The given function is alive, only if the Call will Call it.
     Type tcall = call()._val;
@@ -480,7 +481,7 @@ public final class CallEpiNode extends Node {
     TV2 tcargs = call().tvar();
     TV2 tcret  = tvar();
     if( tcret.is_dead() ) return false;
-    
+
     // Thunks are a little odd, because they cheat on graph structure.
     if( tfdx.isa("Ret") ) {
       if( tcret == tfdx ) return false;
@@ -496,7 +497,7 @@ public final class CallEpiNode extends Node {
     TV2 tfargs = tfdx.get("Args");
     TV2 tfret  = tfdx.get("Ret" );
     if( tfdx.isa("Fun") && tcargs==tfargs && tcret==tfret ) return false; // Equal parts, no progress
-    
+
     // Will make progress aligning the shapes
     NonBlockingHashMap<Object,TV2> args = new NonBlockingHashMap<Object,TV2>(){{ put("Args",tcargs);  put("Ret",tcret); }};
     TV2 tfun = TV2.make("Fun",this,"CallEpi_unify_Fun",args);

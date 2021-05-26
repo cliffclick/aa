@@ -195,7 +195,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
         assert in(0)==null && _uses._len==0;
         FunNode  fun = ( FunNode) X.xform(new  FunNode(this).add_def(Env.ALL_CTRL));
-        ParmNode rpc = (ParmNode) X.xform(new ParmNode(0,"rpc",fun,Node.con(TypeRPC.ALL_CALL),null));
+        ParmNode rpc = (ParmNode) X.xform(new ParmNode(0,"rpc",fun,Env.ALL_CALL,null));
         Node memp= X.xform(new ParmNode(MEM_IDX,_sig._args[MEM_IDX],fun, TypeMem.MEM, Env.DEFMEM,null));
         fun._bal_close = bal_close();
 
@@ -203,7 +203,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
         add_def(_reads ? memp : null); // Memory  for the primitive in slot MEM_IDX
         add_def(null);                 // Closure for the primitive in slot DSP_IDX
         for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // Args follow
-          add_def( X.xform(new ParmNode(i,_sig._args[i],fun, Node.con(_sig.arg(i).simple_ptr()),null)));
+          add_def( X.xform(new ParmNode(i,_sig._args[i],fun, (ConNode)Node.con(_sig.arg(i).simple_ptr()),null)));
         NewNode nnn = (NewNode)X.xform(this);
         Node mem = Env.DEFMEM.make_mem_proj(nnn,memp);
         Node ptr = X.xform(new ProjNode(nnn,REZ_IDX));

@@ -73,7 +73,7 @@ public class MrgProjNode extends ProjNode {
     }
   }
   @Override public Type value(GVNGCM.Mode opt_mode) {
-    if( !(in(0) instanceof NewNode) ) return Type.ANY;
+    if( !(in(0) instanceof NewNode) ) return mem()._val;
     NewNode nnn = nnn();
     Type tn = nnn._val;
     Type tm = mem()._val;

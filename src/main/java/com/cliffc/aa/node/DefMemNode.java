@@ -8,6 +8,7 @@ import static com.cliffc.aa.Env.GVN;
 public class DefMemNode extends Node {
   public DefMemNode( Node ctrl) { super(OP_DEFMEM,ctrl); }
   @Override public TypeMem value(GVNGCM.Mode opt_mode) {
+    if( opt_mode._CG ) return TypeMem.ANYMEM;
     if( _defs._len <= 1 ) return TypeMem.ALLMEM;
     TypeObj[] tos = new TypeObj[_defs._len];
     for( int i=1; i<_defs._len; i++ ) {
@@ -15,7 +16,7 @@ public class DefMemNode extends Node {
       if( n==null ) continue;
       if( n instanceof MrgProjNode ) { // NewNode still alive
         NewNode nnn = n.in(0) instanceof NewNode ? (NewNode)n.in(0) : null;
-        tos[i] = nnn != null ? nnn._crushed : TypeObj.UNUSED;
+        tos[i] = (nnn != null && nnn._val!=Type.ANY && nnn._live !=TypeMem.DEAD ) ? nnn._crushed : TypeObj.UNUSED;
       } else {                  // Collapsed NewNode
         Type tn = n._val;
         if( tn instanceof TypeMem ) tn = ((TypeMem)tn).at(i);

@@ -222,8 +222,7 @@ public class LoadNode extends Node {
 
     // If the load is of a constant, no memory is needed
     Type tfld = get_fld((TypeMem)tmem,(TypeMemPtr)tptr);
-    if( tfld != null && (tfld.is_con() || (tfld instanceof TypeFunPtr && ((TypeFunPtr)tfld).can_be_fpnode())) &&
-        err(true)==null )
+    if( tfld != null && tfld.is_con() && err(true)==null )
       return TypeMem.DEAD;
     if( def==adr() ) return tfld==null ? TypeMem.DEAD : TypeMem.ALIVE; // Memory is sane, so address is alive
     // Only named the named field from the named aliases is live.
