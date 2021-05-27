@@ -280,17 +280,15 @@ public class FunNode extends RegionNode {
                                 fun.in(1)==in(1)) != -1 )
       return null;              // Done this before
 
+
     assert _must_inline==0; // Failed to inline a prior inline?
     if( path > 0 ) _must_inline = in(path).in(0)._uid;
     assert !check_progress;     // Not expecting progress
 
     // --------------
     // Split the callers according to the new 'fun'.
-    GVNGCM.Mode old_mode = Env.GVN._opt_mode;
-    Env.GVN._opt_mode = GVNGCM.Mode.Pause;
     FunNode fun = make_new_fun(ret, formals);
     split_callers(ret,fun,body,path);
-    Env.GVN._opt_mode = old_mode;
     assert Env.START.more_flow(true)==0; // Initial conditions are correct
     return this;
   }

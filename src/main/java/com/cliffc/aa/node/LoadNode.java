@@ -4,6 +4,7 @@ import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Util;
+import org.jetbrains.annotations.NotNull;
 
 import static com.cliffc.aa.AA.MEM_IDX;
 
@@ -220,19 +221,20 @@ public class LoadNode extends Node {
     if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
     if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
 
-    // If the load is of a constant, no memory is needed
+    // If the load is of a constant, no memory nor address is needed
     Type tfld = get_fld((TypeMem)tmem,(TypeMemPtr)tptr);
-    if( tfld != null && tfld.is_con() && err(true)==null )
+    if( tfld.is_con() && err(true)==null )
       return TypeMem.DEAD;
-    if( def==adr() ) return tfld==null ? TypeMem.DEAD : TypeMem.ALIVE; // Memory is sane, so address is alive
+    if( def==adr() ) return tfld.above_center() ? TypeMem.DEAD : TypeMem.ALIVE; // Memory is sane, so address is alive
     // Only named the named field from the named aliases is live.
     return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld);
   }
 
   // Load the value
-  private Type get_fld(TypeMem tmem, TypeMemPtr tadr) { return get_fld(tmem.ld(tadr)); }
-  private Type get_fld(TypeObj tobj) {
-    if( !(tobj instanceof TypeStruct) ) return null;
+  private @NotNull Type get_fld(TypeMem tmem, TypeMemPtr tadr) { return get_fld(tmem.ld(tadr)); }
+  private @NotNull Type get_fld( TypeObj tobj) {
+    if( !(tobj instanceof TypeStruct) )
+      return tobj.oob(Type.ALL);
     // Struct; check for field
     TypeStruct ts = (TypeStruct)tobj;
     int idx = ts.find(_fld);  // Find the named field

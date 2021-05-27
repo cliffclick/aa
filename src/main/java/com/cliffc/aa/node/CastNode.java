@@ -32,6 +32,7 @@ public class CastNode extends Node {
     Node ctrl = in(0);
     Node baseaddr = in(1);
     while( baseaddr instanceof CastNode ) baseaddr = baseaddr.in(1);
+    while( baseaddr instanceof FreshNode ) baseaddr = baseaddr.in(0);
     final Node fbaseaddr = baseaddr;
 
     Node tru = ctrl.walk_dom_last(n -> checked(n,fbaseaddr));
@@ -47,9 +48,16 @@ public class CastNode extends Node {
     if( t.is_forward_ref() ) return Type.SCALAR;
 
     // If the cast is in-error, we cannot lift.
-    if( !checked(in(0),in(1)) ) return t;
+    Node n1 = in(1);
+    if( n1 instanceof FreshNode ) n1 = n1.in(0);
+    if( !checked(in(0),n1) ) return t;
     // Lift result.
     return _t.join(t);
+  }
+  @Override public void add_flow_extra(Type old) {
+    // If address sharpens, Cast can go dead because all Load uses make constants.
+    if( _val!=old )
+      Env.GVN.add_flow(this);
   }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     return def==in(0) ? TypeMem.ALIVE : _live;
@@ -62,7 +70,11 @@ public class CastNode extends Node {
   private static boolean checked( Node n, Node addr ) {
     if( !(n instanceof CProjNode && ((CProjNode)n)._idx==1) ) return false; // Not a Cast of a CProj-True
     Node n0 = n.in(0);
-    if( n0 instanceof IfNode && n0.in(1) == addr ) return true; // Guarded by If-n-zero
+    if( n0 instanceof IfNode ) {
+      Node na = n0.in(1);
+      if( na instanceof FreshNode ) na = na.in(0);
+      if( na == addr ) return true; // Guarded by If-n-zero
+    }
     if( n0 instanceof ConNode && ((TypeTuple) n0._val).at(1)==Type.XCTRL )
       return true;
     return false;

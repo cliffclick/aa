@@ -16,7 +16,10 @@ public class MemJoinNode extends Node {
 
   public MemJoinNode( MProjNode mprj ) { super(OP_JOIN,mprj);  assert mprj.in(0) instanceof MemSplitNode;  }
 
-  MemSplitNode msp() { return (MemSplitNode)in(0).in(0); }  // The MemSplit
+  MemSplitNode msp() {  // The MemSplit
+    Node n = in(0).in(0);
+    return n instanceof MemSplitNode ? (MemSplitNode)n : null;
+  }
   @Override public boolean is_mem() { return true; }
 
   @Override public Node ideal_reduce() {
@@ -123,6 +126,9 @@ public class MemJoinNode extends Node {
   }
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
+    MemSplitNode msp = msp();
+    if( msp==null ) return TypeMem.ANYMEM;
+
     // Gather all memories
     boolean diff=false;
     TypeMem[] mems = new TypeMem[_defs._len];
@@ -161,6 +167,8 @@ public class MemJoinNode extends Node {
 
   // Unify alias-by-alias, except on the alias sets
   @Override public boolean unify( boolean test ) {
+    MemSplitNode msp = msp();
+    if( msp==null ) return false;
     TV2 tmem = tvar(0);
     boolean progress = tvar().unify(tmem,test);
     if( progress && test ) return true;

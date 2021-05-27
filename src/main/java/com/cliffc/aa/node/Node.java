@@ -670,16 +670,14 @@ public abstract class Node implements Cloneable {
     // Try CSE
     if( !_elock ) {             // Not in VALS
       Node x = VALS.get(this);  // Try VALS
-      if( x != null ) {         // Hit
-        x._live = (TypeMem)x._live.meet(_live);
-        Env.GVN.add_flow(x); // In theory, just as cheap to add & check there as to check before add
-        return x;    // Graph replace with x
-      }
+      if( x != null )           // Hit
+        return merge(x);        // Graph replace with x
     }
 
     // Try general ideal call
     Node x = ideal_reduce();    // Try the general reduction
-    if( x != null ) { Env.GVN.add_flow(x); return x; }
+    if( x != null )
+      return merge(x);          // Graph replace with x
 
     return null;                // No change
   }
@@ -723,10 +721,22 @@ public abstract class Node implements Cloneable {
       progress = this;          // Progress!
       assert nval.isa(oval);    // Monotonically improving
       _val = nval;
-      if( should_con(nval) ) return do_reduce(); // Immediately replace with a constant
-      for( Node use : _uses )  // Put uses on worklist... values flows downhill
+      // Once a Node is valued as a is_con, its uses go unused - and perhaps
+      // dead, and are not available for recomputing the constant.  Replace
+      // immediately with a constant.
+      if( should_con(nval) ) {
+        progress = con(nval);            // Constant to replace with
+        if( _keep>0 ) { _keep--; progress._keep++; } // Move the keep-bits over.
+        subsume(progress);               // Immediately replace with a constant
+        Env.GVN.add_flow_uses(progress); // Visit users
+        return progress;
+      }
+      // Put uses on worklist... values flows downhill
+      for( Node use : _uses )  
         Env.GVN.add_flow(use).add_flow_use_extra(this);
+      // Progressing on CFG can mean CFG paths go dead
       if( is_CFG() ) for( Node use : _uses ) if( use.is_CFG() ) Env.GVN.add_reduce(use);
+      // Need to recompute dependent TVars
       if( tvar()._deps!=null ) Env.GVN.add_flow(tvar()._deps);
       add_flow_extra(oval);
     }
@@ -750,8 +760,7 @@ public abstract class Node implements Cloneable {
   // - Not an ErrNode AND
   // - Type.is_con()
   public boolean should_con(Type t) {
-    if( _keep >0 ||
-        this instanceof ConNode || // Already a constant 
+    if( this instanceof ConNode || // Already a constant
         (this instanceof FunPtrNode && _val.is_con()) || // Already a constant
         this instanceof ErrNode || // Never touch an ErrNode
         is_prim() )                // Never touch a Primitive
@@ -799,14 +808,20 @@ public abstract class Node implements Cloneable {
     for( Node def : _defs ) if( def != null ) def.walk_initype(gvn,bs);
   }
 
+  // At least as alive
+  private Node merge(Node x) {
+    x._live = (TypeMem)x._live.meet(_live);
+    return Env.GVN.add_flow(x);
+  }
+  
   // Node n is new, but cannot call GVN.iter() so cannot call the general xform.
   public Node init1( ) {
     Node x = VALS.get(this);
     if( Env.GVN._opt_mode == GVNGCM.Mode.Opto ) _live = TypeMem.DEAD;
     if( x!=null ) {             // Hit in GVN table
-      x._live = (TypeMem)x._live.meet(_live); // Merge liveness
+      merge(x);
       kill();                                 // Kill just-init'd
-      return Env.GVN.add_flow(x);             // Return old
+      return x;                               // Return old
     }
     _elock();
     _val = value(Env.GVN._opt_mode);

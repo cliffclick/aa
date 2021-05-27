@@ -342,7 +342,7 @@ public class TV2 {
 
   // Make a (lazy) fresh copy of 'this' and unify it with 'that'.  This is
   // the same as calling 'fresh' then 'unify', without the clone of 'this'.
-  // The Syntax is used when making the 'fresh' copy for the occurs_check.
+  // The TV2[] is used when making the 'fresh' copy for the occurs_check.
 
   // Returns progress.
   // If test, we are testing only and make no changes.
@@ -453,7 +453,7 @@ public class TV2 {
         tvo._args.put(fld,tv);
       } else if( tobj.isa("Obj") ) {
         progress = tobj.unify_at(fld,tv.find(),test);
-      } else if( tobj.isa("Dead") || tobj.isa("Err") ) {
+      } else if( tobj.is_dead() || tobj.isa("Err") ) {
         tobj.unify(tv.find(),test);
       } else
         throw com.cliffc.aa.AA.unimpl();
@@ -465,7 +465,7 @@ public class TV2 {
   // Unify the two memories only at the given aliases
   public boolean unify_alias(BitsAlias aliases, TV2 mem, boolean test) {
     if( this==mem ) return false; // Already unified, no progress
-    assert (isa("Mem") || isa("Dead")) && mem.isa("Mem");
+    assert (isa("Mem") || is_dead()) && mem.isa("Mem");
     boolean progress = false;
     TV2 tobj=null;              // For asserts
     for( int alias : aliases ) {
@@ -490,7 +490,7 @@ public class TV2 {
     return rez;
   }
   private Type _find_tvar(Type t, TV2 tv, Type rez) {
-    if( tv.isa("Dead") ) return rez;
+    if( tv.is_dead() ) return rez;
     if( tv==this ) {
       assert rez==null || rez==t || rez.widen()==t.widen(): "Found multiple refs to tvar with diff types, "+ t +","+ rez;
       return t;
@@ -559,8 +559,9 @@ public class TV2 {
   // If it does, then 'this' reference is a recursive self-reference
   // and needs to keep the self-type instead of making fresh.
   boolean _occurs_in(TV2[] vs) {
-    for( TV2 tv : vs )
-      if( _occurs_in_type(tv.find()) )
+    for( int i=0; i<vs.length; i++ )
+      // Can NOT modify 'vs' for U-F, because blows FreshNode hash.
+      if( _occurs_in_type(vs[i].find()) )
         return true;
     return false;
   }
@@ -575,6 +576,13 @@ public class TV2 {
           return true;
     return false;
   }
+
+  // Get TV2 from array, with U-F rollup
+  public static TV2 get(TV2[] vs, int i) {
+    TV2 tv = vs[i].find();
+    return vs[i]==tv ? tv : (vs[i]=tv); // U-F rollup
+  }
+
 
   // --------------------------------------------
   // Test for structural equivalence, including cycles
@@ -622,6 +630,7 @@ public class TV2 {
     assert !is_unified();
     if( DEPS_VISIT.tset(_uid) ) return;
     if( _deps!=null && _deps.get(dep)!=null ) return; // Already here and in all children
+    assert !isa("Dead");
     _deps = _deps==null ? UQNodes.make(dep) : _deps.add(dep);
     if( _args!=null )
       for( Object key : _args.keySet() ) // Structural recursion on a complex TV2
@@ -630,10 +639,10 @@ public class TV2 {
 
   // Merge Dependent CallEpiNode lists, 'this' into 'that'.  Required to
   // trigger CEPI.unify_lift when types change structurally.
-  private void merge_deps( TV2 that ) { that._deps = that._deps==null ? _deps : that._deps.addAll(_deps); _deps=null; }
+  private void merge_deps( TV2 that ) { if( !that.isa("Dead") ) that._deps = that._deps==null ? _deps : that._deps.addAll(_deps); _deps=null; }
   // Merge Node lists, 'this' into 'that', for easier debugging.
   // Lazily remove dead nodes on the fly.
-  private void merge_ns  ( TV2 that ) { that._ns   = that._ns  ==null ? _ns   : that._ns  .addAll(_ns  ); _ns  =null; }
+  private void merge_ns  ( TV2 that ) { if( !that.isa("Dead") ) that._ns   = that._ns  ==null ? _ns   : that._ns  .addAll(_ns  ); _ns  =null; }
 
 
   // --------------------------------------------

@@ -15,8 +15,7 @@ public class GVNGCM {
     Parse   (false),          // Parsing
     PesiNoCG(false),          // Lifting, unknown Call Graph
     Opto    (true ),          // Falling, Call Graph discovery, no more code
-    PesiCG  (true ),          // Lifting,   known Call Graph
-    Pause   (false);          // Do not iter()
+    PesiCG  (true );          // Lifting,   known Call Graph
     public final boolean _CG; // True if full CG is known or being discovered.  Only for whole programs during or after Opto.
     Mode(boolean CG) { _CG=CG; }
   }
@@ -89,6 +88,7 @@ public class GVNGCM {
   // "eval" as user state carries on.
   void reset_to_init0() {
     for( Work work : _all_works ) work.clear();
+    _work_dom.clear();
     _opt_mode = Mode.Parse;
     ITER_CNT = ITER_CNT_NOOP = 0;
   }
@@ -175,7 +175,6 @@ public class GVNGCM {
   static int ITER_CNT_NOOP;
   static int ITER_NEST=0;
   public Node iter(Node x, Work[] works) {
-    if( _opt_mode== Mode.Pause ) return x;
     if( !HAS_WORK ) return x;
     if( x!=null ) x.keep(); // Always keep this guy, unless reducing it directly
     ITER_NEST++;

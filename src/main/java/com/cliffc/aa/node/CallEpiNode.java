@@ -75,13 +75,13 @@ public final class CallEpiNode extends Node {
     if( nwired()==1 && fidxs.abit() != -1 ) { // Wired to 1 target
       RetNode ret = wired(0);                 // One wired return
       FunNode fun = ret.fun();
-      Type tdef = Env.DEFMEM._val;
+      Type tdef = Env.DEFMEM._uses._len==0 ? null : Env.DEFMEM._val;
       TypeTuple tret = ret._val instanceof TypeTuple ? (TypeTuple) ret._val : (TypeTuple)ret._val.oob(TypeTuple.RET);
       Type tretmem = tret.at(1);
       if( fun != null && fun._defs._len==2 && // Function is only called by 1 (and not the unknown caller)
           (call.err(true)==null || fun._thunk_rhs) &&       // And args are ok
-          CallNode.emem(tcall).isa(tdef) &&
-          tretmem.isa(tdef) &&          // Call and return memory at least as good as default
+          (tdef==null || CallNode.emem(tcall).isa(tdef)) && // Pre-GCP, call memory has to be as good as the default
+          (tdef==null || tretmem.isa(tdef)) &&  // Call and return memory at least as good as default
           call.mem().in(0) != call &&   // Dead self-recursive
           fun.in(1)._uses._len==1 &&    // And only calling fun
           ret._live.isa(_live) &&       // Call and return liveness compatible

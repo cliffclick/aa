@@ -46,7 +46,6 @@ public class UnresolvedNode extends UnOrFunPtrNode {
     // Freeze after GVN - only still around for errors
     switch( opt_mode ) {
     case PesiCG:
-    case Pause:
       return _val;
     case Parse:
     case PesiNoCG:

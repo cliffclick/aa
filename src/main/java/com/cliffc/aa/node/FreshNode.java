@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.type.Type;
@@ -8,12 +9,27 @@ import java.util.Arrays;
 
 // "fresh" the incoming TVar: make a fresh instance.
 public class FreshNode extends UnOrFunPtrNode {
-  final TV2[] _tv2s;
+  TV2[] _tv2s;
   public FreshNode( Env.VStack vs, Node ld ) { super(OP_FRESH, ld); _tv2s = vs.compact(); }
 
   @Override public Node ideal_reduce() {
-    if( _tv2s==null || _tv2s.length==0 ) return in(0);
-    return null;
+    boolean progress = false;
+    // TODO: Turn on, and also remove dups.
+    // Possibly go to Ary<>, for easier removal.
+    // Possibly keep sorted, for easier dup removal.
+    // Removing or U-F rollup changes hash.
+    //// Remove any dead TVars, as they never modify the occurs_in check.
+    //int j=_tv2s.length;
+    //for( int i=0; i<_tv2s.length; i++ )
+    //  if( TV2.get(_tv2s,i).is_dead() )
+    //    _tv2s[i] = _tv2s[--j];
+    //progress = j != _tv2s.length;
+    //if( progress ) _tv2s = Arrays.copyOf(_tv2s,j);
+    
+    // If nothing left, the Fresh never hits the occurs_in check.
+    if( _tv2s.length==0 ) return in(0);
+
+    return progress ? this : null;
   }
 
   @Override public Type value(GVNGCM.Mode opt_mode) { return val(0); }

@@ -409,7 +409,7 @@ public class TestParse {
     test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
   }
 
-  private static final String[] FLDS2= new String[]{"^","map","nn","vv"};
+  private static final String[] FLDS2= new String[]{"^","nn","vv"};
   @Test public void testParse07() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     // Passing a function recursively
@@ -426,7 +426,7 @@ public class TestParse {
     // interspersed with recursive computation calls.
     test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v&x.v} : 0};"+
                  "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
-                 TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.XSCALAR,TypeMemPtr.STRUCT0,TypeInt.INT8))); //con(20.25)
+                 TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,TypeMemPtr.STRUCT0,TypeInt.INT8))); //con(20.25)
     // Test does loads after recursive call, which should be allowed to bypass.
     test("sum={x -> x ? sum(x.n) + x.v : 0};"+
          "sum(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
@@ -456,21 +456,21 @@ public class TestParse {
     assertEquals("val" ,tt4._flds[2]);
 
     // Test inferring a recursive struct type, with a little help
-    Type[] ts0 = TypeStruct.ts(Type.XNIL, Type.XSCALAR, TypeMemPtr.make_nil(14,TypeObj.ISUSED),TypeFlt.con(1.2*1.2));
+    Type[] ts0 = TypeStruct.ts(Type.XNIL, TypeMemPtr.make_nil(20,TypeObj.ISUSED),TypeFlt.con(1.2*1.2));
     test_struct("map={x:@{n=;v=flt}? -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-                TypeStruct.make(FLDS2,ts0,TypeStruct.ffnls(4)));
+                TypeStruct.make(FLDS2,ts0,TypeStruct.ffnls(3)));
 
     // Test inferring a recursive struct type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
-    Type[] ts1 = TypeStruct.ts(Type.XNIL, Type.XSCALAR, TypeMemPtr.make_nil(20,TypeObj.ISUSED),TypeFlt.con(1.2*1.2));
+    Type[] ts1 = TypeStruct.ts(Type.XNIL, TypeMemPtr.make_nil(29,TypeObj.ISUSED),TypeFlt.con(1.2*1.2));
     test_struct("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-                TypeStruct.make(FLDS2,ts1,TypeStruct.ffnls(4)));
+                TypeStruct.make(FLDS2,ts1,TypeStruct.ffnls(3)));
 
     // Test inferring a recursive struct type, with less help. Too complex to
     // inline, so actual inference happens
     test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0};"+
                  "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1.2};v=2.3};v=3.4};v=4.5})",
-                 TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.STRUCT0,Type.XSCALAR,TypeMemPtr.STRUCT0,TypeFlt.FLT64))); //con(20.25)
+                 TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.STRUCT0,TypeMemPtr.STRUCT0,TypeFlt.FLT64))); //con(20.25)
 
     // Test inferring a recursive tuple type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
@@ -489,7 +489,7 @@ public class TestParse {
     // Main issue with the map() test is final assignments crossing recursive
     // not-inlined calls.  Smaller test case:
     test_ptr("tmp=@{val=2;nxt=@{val=1;nxt=0}}; noinline_map={tree -> tree ? @{vv=tree.val&tree.val;nn=noinline_map(tree.nxt)} : 0}; noinline_map(tmp)",
-             "@{vv=int8; noinline_map=~Scalar; nn=*$?}");
+             "@{vv=int8; nn=*$?}");
 
     // Too big to inline, multi-recursive
     test_ptr("tmp=@{"+
@@ -509,7 +509,7 @@ public class TestParse {
                     "     ? @{ll=map(tree.l);rr=map(tree.r);vv=tree.v&tree.v}"+
                     "     : 0};"+
                     "map(tmp)",
-             "@{map=~Scalar; ll=*$?; rr=$; vv=int8}");
+             "@{ll=*$?; rr=$; vv=int8}");
 
 
     // Failed attempt at a Tree-structure inference test.  Triggered all sorts
@@ -546,7 +546,7 @@ public class TestParse {
          "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
-         "@{map=~Scalar; l=*$?; r=$; v=int64}");
+         "@{l=*$?; r=$; v=int64}");
 
     // A linked-list mixing ints and strings, always in pairs
     String ll_cona = "a=0; ";
