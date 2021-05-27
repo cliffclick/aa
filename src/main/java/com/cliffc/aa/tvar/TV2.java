@@ -94,7 +94,8 @@ public class TV2 {
 
   // Unify-at a selected key
   public boolean unify_at(Object key, TV2 tv2, boolean test ) {
-    assert is_tvar() && _args!=null;
+    if( is_dead() ) return unify(tv2,test);
+    assert is_tvar() && _args!=null && !tv2.is_unified();
     TV2 old = get(key);
     if( old!=null )
       return old.unify(tv2,test);
@@ -106,7 +107,10 @@ public class TV2 {
   }
 
   // Reset-at a selected key, when a non-HM-structure change happens
-  public void reset_at(Object o ) { _args.remove(o); }
+  public void reset_at(Object o ) {
+    if( !is_dead() )
+      _args.remove(o);
+  }
 
   // --------------------------------------------
   // Public factories
@@ -121,8 +125,12 @@ public class TV2 {
   }
   // Make a new primitive base TV2
   public static TV2 make_base(Node n, Type type, @NotNull String alloc_site) {
+    if( type instanceof TypeObj ) { // Constant object?
+      return make("Obj",n,alloc_site); // Empty object constant
+    }
     UQNodes ns = n==null ? null : UQNodes.make(n);
-    TV2 tv2 = new TV2("Base",null,type.widen(),ns,alloc_site);
+    type = type.widen();
+    TV2 tv2 = new TV2("Base",null,type,ns,alloc_site);
     assert tv2.is_base() && !tv2.is_leaf();
     return tv2;
   }
@@ -432,6 +440,7 @@ public class TV2 {
   // unifies against larger/weaker aliases.
   public boolean unify_alias_fld(Node ldst, BitsAlias aliases, String fld, TV2 tv, boolean test, String alloc_site) {
     assert isa("Mem");
+    assert !tv.is_unified();
     boolean progress=false;
     for( int alias : aliases ) {
       if( alias <= BitsAlias.AARY ) return false; // No unify on parser-specific values
@@ -442,10 +451,12 @@ public class TV2 {
         TV2 tvo = make("Obj",ldst,alloc_site);
         _args.put(alias,tvo);
         tvo._args.put(fld,tv);
-      } else if( !tobj.isa("Dead") ) {
-        assert tobj.isa("Obj");
+      } else if( tobj.isa("Obj") ) {
         progress = tobj.unify_at(fld,tv.find(),test);
-      } // else dead, no progress
+      } else if( tobj.isa("Dead") || tobj.isa("Err") ) {
+        tobj.unify(tv.find(),test);
+      } else
+        throw com.cliffc.aa.AA.unimpl();
       if( progress && test ) return progress; // Shortcut
     }
     return progress;
