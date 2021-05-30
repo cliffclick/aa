@@ -870,7 +870,7 @@ public class HM {
       if( that.is_nil() && is_struct() ) return that.or0(this,work);
 
       // Cycle check
-      long luid = dbl_uid(that);
+      long luid = dbl_uid(that);    // long-unique-id formed from this and that
       T2 rez = DUPS.get(luid);
       assert rez==null || rez==that;
       if( rez!=null ) return false; // Been there, done that

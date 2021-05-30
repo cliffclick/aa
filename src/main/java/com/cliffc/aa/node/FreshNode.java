@@ -5,6 +5,10 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.TypeFlt;
+import com.cliffc.aa.type.TypeInt;
+import com.cliffc.aa.type.TypeMemPtr;
+
 import java.util.Arrays;
 
 // "fresh" the incoming TVar: make a fresh instance.
@@ -25,9 +29,13 @@ public class FreshNode extends UnOrFunPtrNode {
     //    _tv2s[i] = _tv2s[--j];
     //progress = j != _tv2s.length;
     //if( progress ) _tv2s = Arrays.copyOf(_tv2s,j);
-    
+
+    // Remove Fresh of base type values: things that can never have structure.
+    if( _val.isa(TypeInt.INT64) || _val.isa(TypeFlt.FLT64) || _val.isa(TypeMemPtr.ISUSED0) )
+      return in(0);
+
     // If nothing left, the Fresh never hits the occurs_in check.
-    if( _tv2s.length==0 ) return in(0);
+    if( _tv2s==null || _tv2s.length==0 ) return in(0);
 
     return progress ? this : null;
   }

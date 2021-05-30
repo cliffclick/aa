@@ -178,7 +178,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
       if( _obj.above_center() && nil==XNIL )  return XNIL;
       if( nil==NIL ) return NIL;
     }
-    return make(_aliases.meet(BitsAlias.NIL),nil==NIL ? TypeObj.OBJ : _obj);
+    return make(_aliases.meet(BitsAlias.NIL),nil==NIL ? TypeObj.ISUSED : _obj);
   }
   // Used during approximations, with a not-interned 'this'.
   // Updates-in-place.

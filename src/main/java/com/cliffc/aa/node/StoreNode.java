@@ -62,8 +62,9 @@ public class StoreNode extends Node {
       Node memw = get_mem_writer();
       // Check the address does not have a memory dependence on the Join.
       // TODO: This is super conservative
+      if( adr instanceof FreshNode ) adr = adr.in(0);
       if( memw != null && adr instanceof ProjNode && adr.in(0) instanceof NewNode )
-        return ((MemJoinNode)mem).add_alias_below_new(new StoreNode(this,mem,adr),this);
+        return ((MemJoinNode)mem).add_alias_below_new(new StoreNode(this,mem,adr()),this);
     }
 
     return null;
