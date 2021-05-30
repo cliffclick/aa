@@ -416,6 +416,8 @@ public class Parse implements Comparable<Parse> {
     r._val = Type.CTRL;
     _gvn.add_reduce(t_ctrl);
     _gvn.add_reduce(f_ctrl);
+    if( t_ctrl._val==Type.XCTRL ) _gvn.add_flow(t_mem);
+    if( f_ctrl._val==Type.XCTRL ) _gvn.add_flow(f_mem);
     set_mem(   gvn(new PhiNode(TypeMem.FULL,bad,r       ,t_mem.unkeep(),f_mem.unkeep())));
     Node rez = gvn(new PhiNode(Type.SCALAR ,bad,r.unkeep(),tex.unkeep(),  fex.unkeep())) ; // Ifex result
     _gvn.add_work_all(r);

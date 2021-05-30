@@ -98,8 +98,9 @@ public class PhiNode extends Node {
     return _t==Type.SCALAR ? TypeMem.LIVE_BOT : TypeMem.ALLMEM;
   }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    if( def==in(0) ) return TypeMem.ALIVE;
-    if( in(0).val(_defs.find(def)).above_center() ) return TypeMem.DEAD; // Path not executable
+    Node r = in(0);
+    if( r==def ) return TypeMem.ALIVE;
+    if( r!=null && r.val(_defs.find(def)).above_center() ) return TypeMem.DEAD; // Path not executable
     return all_live().basic_live() && !def.all_live().basic_live() ? TypeMem.ANYMEM : _live;
   }
 
