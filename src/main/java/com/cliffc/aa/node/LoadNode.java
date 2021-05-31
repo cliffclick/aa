@@ -211,7 +211,7 @@ public class LoadNode extends Node {
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     TypeMem err = check_valid_mem(def);
     if( def==adr() )            // Live_use of the address
-      return err.above_center() ? TypeMem.DEAD : TypeMem.ALIVE;
+      return err.above_center() ? TypeMem.DEAD : _live;
     return err;
   }
   private TypeMem check_valid_mem(Node def) {
@@ -226,8 +226,10 @@ public class LoadNode extends Node {
     if( tfld.is_con() && err(true)==null )
       return TypeMem.DEAD;
     if( def==adr() ) return tfld.above_center() ? TypeMem.DEAD : TypeMem.ALIVE; // Memory is sane, so address is alive
+
     // Only named the named field from the named aliases is live.
-    return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld);
+    Type ldef = (_live==TypeMem.ALIVE||_live==TypeMem.ESCAPE) ? Type.SCALAR : Type.NSCALR;
+    return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld, ldef);
   }
 
   // Load the value

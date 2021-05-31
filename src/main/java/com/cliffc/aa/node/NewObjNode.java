@@ -110,7 +110,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
       }
     }
   }
-  
+
   @Override public Node ideal_mono() {
     // If the value lifts a final field, so does the default lift.
     if( _val instanceof TypeTuple ) {
@@ -147,7 +147,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     if( !(to instanceof TypeStruct) ) return to.above_center() ? TypeMem.DEAD : TypeMem.ESCAPE;
     int idx = _defs.find(def)-1;
     Type t = ((TypeStruct)to).at(idx);
-    return t.above_center() ? TypeMem.DEAD : TypeMem.ESCAPE;
+    return t.above_center() ? TypeMem.DEAD : (t==Type.NSCALR ? TypeMem.ESC_NO_DISP : TypeMem.ESCAPE);
   }
 
   @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Obj",this,alloc_site); }

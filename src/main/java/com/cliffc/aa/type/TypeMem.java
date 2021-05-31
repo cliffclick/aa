@@ -224,7 +224,7 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem EMPTY;// Every alias filled with anything
   public static final TypeMem  MEM; // FULL, except lifts REC, arrays, STR
   public static final TypeMem XMEM; //
-  public static final TypeMem DEAD, ALIVE, NO_DISP, LIVE_BOT; // Sentinel for liveness flow; not part of lattice
+  public static final TypeMem DEAD, ALIVE, NO_DISP, ESC_NO_DISP, LIVE_BOT; // Sentinel for liveness flow; not part of lattice
   public static final TypeMem ESCAPE; // Sentinel for liveness, where the value "escapes" the local scope
   public static final TypeMem ANYMEM,ALLMEM; // Every alias is unused (so above XOBJ or below OBJ)
   public static final TypeMem MEM_ABC, MEM_STR;
@@ -254,7 +254,8 @@ public class TypeMem extends Type<TypeMem> {
     // Sentinel for liveness flow; not part of lattice
     DEAD   = make_live(TypeLive.DEAD    );
     ALIVE  = make_live(TypeLive.LIVE    ); // Basic alive for all time
-    NO_DISP= make_live(TypeLive.NO_DISP);  // !Basic alive, no display pointers
+    NO_DISP= make_live(TypeLive.NO_DISP);  // Basic alive, no display pointers
+    ESC_NO_DISP= make_live(TypeLive.ESC_DISP);  // Basic alive, no display pointers, and escapes.
     ESCAPE = make_live(TypeLive.ESCAPE  ); // Alive, plus escapes some call/memory
     LIVE_BOT=make_live(TypeLive.LIVE_BOT);
   }
@@ -472,10 +473,10 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Everything NOT in the 'escs' is flattened to UNUSED.
-  public TypeMem remove_no_escapes( BitsAlias escs, String fld ) {
+  public TypeMem remove_no_escapes( BitsAlias escs, String fld, Type live ) {
     TypeObj[] tos = new TypeObj[Math.max(_pubs.length,escs.max()+1)];
     for( int i=1; i<tos.length; i++ )
-      tos[i] = escs.test_recur(i) ? at(i).remove_other_flds(fld) : TypeObj.UNUSED;
+      tos[i] = escs.test_recur(i) ? at(i).remove_other_flds(fld,live) : TypeObj.UNUSED;
     return make0(tos);
   }
 

@@ -76,7 +76,7 @@ public abstract class MemPrimNode extends PrimNode {
       Type tptr = adr()._val;
       if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
       if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
-      return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,"");
+      return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,"", Type.SCALAR);
     }
 
   }

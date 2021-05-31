@@ -6,6 +6,16 @@ import com.cliffc.aa.util.VBitSet;
 import java.util.function.Predicate;
 
 // Backwards liveness, used to gather forward use types in a reverse flow.
+
+// Liveness is passed in TypeMems, because we support precise memory liveness.
+// - TypeMem.DEAD   - Value is dead
+// - TypeMem.ALIVE  - Value is simple, and fully alive
+// - TypeMem.ESCAPE - Value is simple, and fully alive, and "escapes" into memory or a call argument
+// - TypeMem[#alias]- Value is complex memory, and partially alive based on alias# and fields.
+// - TypeMem[#alias]._fld = Type.XSCALAR - This field is dead
+// - TypeMem[#alias]._fld = Type. SCALAR - This field is fully alive
+// - TypeMem[#alias]._fld = Type.NSCALR  - This field is partially alive: any display is dead, but all else is alive
+
 public class TypeLive extends TypeObj<TypeLive> {
   int _flags;
   private TypeLive (boolean any, int flags ) { super     (TLIVE,"",any); init(any,flags); }

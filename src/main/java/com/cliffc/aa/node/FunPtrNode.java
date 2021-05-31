@@ -38,7 +38,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }
   public FunNode fun() { return ret().fun(); }
-  public FunNode xfun() { RetNode ret = ret(); return ret.in(4) instanceof FunNode ? ret.fun() : null; }
+  public FunNode xfun() { RetNode ret = ret(); return ret !=null && ret.in(4) instanceof FunNode ? ret.fun() : null; }
   @Override public int nargs() { return ret()._nargs; }
   @Override public FunPtrNode funptr() { return this; }
   @Override public UnresolvedNode unk() { return null; }

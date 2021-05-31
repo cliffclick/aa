@@ -699,7 +699,7 @@ public class TestParse {
   private final String DO="do={pred->{body->!pred()?^;body(); do pred body}};";
 
   @Test public void testParse13() {
-    test(DO+"i:=0; do {i++ < 2} {i== 9} ? ",Type.XNIL);    // Late exit, body never returns true.
+    test(DO+"i:=0; do {i++ < 2} {i== 9} ",Type.XNIL);    // Late exit, body never returns true.
     test(FORELSE+"i:=0; for {i++ < 100} {i== 5} ",TypeInt.BOOL); // Not sure of exit value, except bool
     test(FORELSE+"i:=0; for {i++ < 100} {i==50?i}",TypeInt.INT64); // Early exit on condition i==50
     test(DO+"sum:=0; i:=0; do {i++ < 100} {sum:=sum+i}; sum",TypeInt.INT64);

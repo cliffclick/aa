@@ -91,8 +91,8 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       if( !(tmem  instanceof TypeMem   ) ) return tmem .oob(TypeMem.ALLMEM); // Not a memory?
       if( !(tptr0 instanceof TypeMemPtr) ) return tptr0.oob(TypeMem.ALLMEM); // Not a pointer?
       if( !(tptr1 instanceof TypeMemPtr) ) return tptr1.oob(TypeMem.ALLMEM); // Not a pointer?
-      TypeMem esc0 = ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr0)._aliases,"");
-      TypeMem esc1 = ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr1)._aliases,"");
+      TypeMem esc0 = ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr0)._aliases,"",Type.SCALAR);
+      TypeMem esc1 = ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr1)._aliases,"",Type.SCALAR);
       return (TypeMem)esc0.meet(esc1);
     }
     @Override public void add_flow_use_extra(Node chg) {
