@@ -19,7 +19,7 @@ public class RegionNode extends Node {
     int dlen = _defs.len();
     for( int i=1; i<dlen; i++ ) {
       Node cc = in(i).is_copy(0);
-      if( cc!=null ) return set_def(i,cc);
+      if( cc!=null && cc != this ) return set_def(i,cc);
     }
 
     // Look for dead paths.  If found, cut dead path out of all Phis and this
@@ -138,7 +138,7 @@ public class RegionNode extends Node {
         Env.GVN.add_flow_defs(phi); // Inputs to Phi change liveness
       }
   }
-  
+
   @Override public TypeMem all_live() { return TypeMem.ALIVE; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ALIVE; }
 

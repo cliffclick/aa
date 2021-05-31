@@ -37,6 +37,7 @@ public class StoreNode extends Node {
     TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
 
     // Is this Store dead from below?
+    if( mem==this ) return null;
     if( ta.above_center() ) return mem;
     if( tmp!=null && _live.ld(tmp)==TypeObj.UNUSED )  return mem;
 

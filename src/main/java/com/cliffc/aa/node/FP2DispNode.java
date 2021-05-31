@@ -6,7 +6,7 @@ import com.cliffc.aa.type.*;
 // Extract a Display pointer (a TypeMemPtr) from a TypeFunPtr.
 public final class FP2DispNode extends Node {
   public FP2DispNode( Node funptr ) { super(OP_FP2DISP,funptr); }
-  
+
   @Override public Node ideal_reduce() {
     // If at a FunPtrNode, it is only making a TFP out of a code pointer and a
     // display.  Become the display (dropping the code pointer).
@@ -33,9 +33,9 @@ public final class FP2DispNode extends Node {
     }
 
     // Move past a 'fresh', just getting the display not a 'fresh' copy of the function TVar.
-    if( in(0) instanceof FreshNode )
+    if( in(0) instanceof FreshNode && in(0).in(0) != in(0) )
       return set_def(0,in(0).in(0));
-    
+
     return null;
   }
 
@@ -47,7 +47,7 @@ public final class FP2DispNode extends Node {
     }
     return null;
   }
-  
+
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Type t = val(0);
     return t instanceof TypeFunPtr ? ((TypeFunPtr)t)._disp.simple_ptr() : (t.above_center() ? Type.ANY : TypeMemPtr.DISP_SIMPLE);

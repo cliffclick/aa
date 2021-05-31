@@ -105,9 +105,10 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
-    // This is the only place where live() impacts value().  Usually being dead
-    // just sets the node to ANY (and rapidly kills it).
-    Type tdisp = _live.isa(TypeMem.NO_DISP) ? Type.ANY : display()._val;
+    // While tempting, I cannot have value() depend on live() - or else GCP
+    // figures out something is not live, so it computes ANY so its not live -
+    // even as its used.
+    Type tdisp = display()._val;
     return TypeFunPtr.make(ret()._fidx,nargs(),tdisp);
   }
   @Override public void add_flow_extra(Type old) {
