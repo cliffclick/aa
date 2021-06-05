@@ -74,6 +74,7 @@ public class TestParse {
 
   @Test public void testParse00() {
     TypeStruct dummy = TypeStruct.DISPLAY;
+    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -699,7 +700,7 @@ public class TestParse {
   private final String DO="do={pred->{body->!pred()?^;body(); do pred body}};";
 
   @Test public void testParse13() {
-    test(DO+"i:=0; do {i++ < 2} {i== 9} ",Type.XNIL);    // Late exit, body never returns true.
+    test(DO+"i:=0; do {i++ < 2} {i== 9}; i",TypeInt.con(3));    // Late exit, body never returns true.
     test(FORELSE+"i:=0; for {i++ < 100} {i== 5} ",TypeInt.BOOL); // Not sure of exit value, except bool
     test(FORELSE+"i:=0; for {i++ < 100} {i==50?i}",TypeInt.INT64); // Early exit on condition i==50
     test(DO+"sum:=0; i:=0; do {i++ < 100} {sum:=sum+i}; sum",TypeInt.INT64);
@@ -719,7 +720,7 @@ public class TestParse {
     test_obj("[3]:[int]", TypeAry.make(TypeInt.con(3),Type.XNIL,TypeObj.OBJ)); // Array of 3 XNILs in INTs.
     //test("[1,2,3]", TypeAry.make(TypeInt.con(1),TypeInt.con(3),TypeInt.INT8)); // Array of 3 elements
     test("ary=[3];#ary",TypeInt.con(3)); // Array length
-    test_ptr(DO+"ary=[99]; i:=0; do {i++ < #ary} {ary[i]:=i*i};ary", "[$]int64/obj"); // sequential iteration over array
+  test_ptr(DO+"ary=[99]; i:=0; do {i++ < #ary} {ary[i]:=i*i};ary", "[$]int64/obj"); // sequential iteration over array
     // ary.{e -> f(e)} // map over array elements
     // ary.{e -> f(e)}.{e0 e1 -> f(e0,e1) } // map/reduce over array elements
   }

@@ -56,30 +56,32 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     // Print collection as: [name=*{x y -> z}, name=*{},....]
     sb.p('[');                  // Collection (even of 1) start
     if( debug ) _disp.str(sb,dups,mem,debug).p(',');
-    BitsFun fidxs = BitsFun.EMPTY;
-    for( int fidx : _fidxs ) {
-      middle:
-      for( int kid=fidx; kid != 0; kid=BitsFun.next_kid(fidx,kid) ) {
-        FunNode fun = FunNode.find_fidx(kid);
-        if( fun==null ) sb.p('[').p(kid).p(']');
-        else {
-          // Check for dups.
-          if( fidxs!=BitsFun.EMPTY )
-            for( int fidx2 : fidxs ) {
-              FunNode fun2 = FunNode.find_fidx(fidx2);
-              if( fun2.name(false).equals(fun.name(false)) && fun2._sig==fun._sig )
-                continue middle;
-            }
-          // Unique; add to unique set & print
-          fidxs = fidxs.set(kid);
-          sb.p(fun.name(false)).p("=*");
-          if( fun.is_forward_ref() ) sb.p("$fref");
-          else fun._sig.str(sb,dups,mem,debug);
-          sb.p(',');
-        }
-      }
-    }
-    return sb.unchar().p(']');
+    _fidxs.str(sb);
+    return sb.p(']');
+    //BitsFun fidxs = BitsFun.EMPTY;
+    //for( int fidx : _fidxs ) {
+    //  middle:
+    //  for( int kid=fidx; kid != 0; kid=BitsFun.next_kid(fidx,kid) ) {
+    //    FunNode fun = FunNode.find_fidx(kid);
+    //    if( fun==null ) sb.p('[').p(kid).p(']');
+    //    else {
+    //      // Check for dups.
+    //      if( fidxs!=BitsFun.EMPTY )
+    //        for( int fidx2 : fidxs ) {
+    //          FunNode fun2 = FunNode.find_fidx(fidx2);
+    //          if( fun2.name(false).equals(fun.name(false)) && fun2._sig==fun._sig )
+    //            continue middle;
+    //        }
+    //      // Unique; add to unique set & print
+    //      fidxs = fidxs.set(kid);
+    //      sb.p(fun.name(false)).p("=*");
+    //      if( fun.is_forward_ref() ) sb.p("$fref");
+    //      else fun._sig.str(sb,dups,mem,debug);
+    //      sb.p(',');
+    //    }
+    //  }
+    //}
+    //return sb.unchar().p(']');
   }
 
   public String names(boolean debug) { return FunNode.names(_fidxs,new SB(),debug).toString(); }

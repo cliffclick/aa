@@ -655,6 +655,10 @@ public abstract class Node implements Cloneable {
   // Check for being not-live, being a constant, CSE in VALS table, and then
   // call out to ideal_reduce.  Returns an equivalent replacement (or self).
   private Node _do_reduce() {
+    // Replace with a constant, if possible
+    if( should_con(_val) )
+      return con(_val);
+
     // Dead from below
     if( !_live.is_live() && !is_prim() && err(true)==null && _keep==0 &&
         !(this instanceof CallNode) &&       // Keep for proper errors
@@ -663,9 +667,6 @@ public abstract class Node implements Cloneable {
         !(this instanceof CEProjNode) &&     // Have to unwire properly
         !(this instanceof ConNode) )         // Already a constant
       return Env.ANY;
-
-    // Replace with a constant, if possible
-    if( should_con(_val) ) return con(_val);
 
     // Try CSE
     if( !_elock ) {             // Not in VALS
@@ -732,7 +733,7 @@ public abstract class Node implements Cloneable {
         return progress;
       }
       // Put uses on worklist... values flows downhill
-      for( Node use : _uses )  
+      for( Node use : _uses )
         Env.GVN.add_flow(use).add_flow_use_extra(this);
       // Progressing on CFG can mean CFG paths go dead
       if( is_CFG() ) for( Node use : _uses ) if( use.is_CFG() ) Env.GVN.add_reduce(use);
@@ -813,7 +814,7 @@ public abstract class Node implements Cloneable {
     x._live = (TypeMem)x._live.meet(_live);
     return Env.GVN.add_flow(x);
   }
-  
+
   // Node n is new, but cannot call GVN.iter() so cannot call the general xform.
   public Node init1( ) {
     Node x = VALS.get(this);
@@ -919,9 +920,16 @@ public abstract class Node implements Cloneable {
 
     // Replace any constants.  Since the node computes a constant, its inputs
     // were never marked live, and so go dead and so go to ANY and so are not
-    // available to recompute the constant here.
-    if( should_con(_val) )
-      subsume(con(_val)).xliv(GVNGCM.Mode.Opto);
+    // available to recompute the constant later.
+    Type val = _val;
+    TypeFunPtr tfp;
+    // TODO STILL NOT SURE...
+    if( val instanceof TypeFunPtr &&
+        _live.live_no_disp() &&
+        (tfp=(TypeFunPtr)val)._disp!=TypeMemPtr.NO_DISP )
+      val = tfp.make_no_disp();
+    if( should_con(val) )
+      subsume(con(val)).xliv(GVNGCM.Mode.Opto);
 
     // Walk reachable graph
     if( is_dead() ) return;

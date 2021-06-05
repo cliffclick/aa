@@ -317,7 +317,11 @@ public class TypeMem extends Type<TypeMem> {
     return false;
   }
 
-
+  // True if this is a liveness value that is NO_DISP, ESC_NO_DISP or DEAD
+  public boolean live_no_disp() {
+    return this==TypeMem.NO_DISP || this==TypeMem.ESC_NO_DISP || this==TypeMem.DEAD;
+  }
+  
   // Shallow meet of all possible loadable values.  Used in Node.value calls, so must be monotonic.
   public TypeObj ld( TypeMemPtr ptr ) {
     if( ptr._aliases == BitsAlias.NIL.dual() || ptr._aliases == BitsAlias.NIL )

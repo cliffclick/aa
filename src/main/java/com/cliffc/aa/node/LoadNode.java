@@ -195,7 +195,9 @@ public class LoadNode extends Node {
     Type tmem = mem._val, tfld; // Memory
     if( !(tmem instanceof TypeMem) ) return tmem.oob(); // Nothing sane
     TypeObj tobj = ((TypeMem)tmem).ld((TypeMemPtr)tadr);
-    if( tobj instanceof TypeStruct && (tfld = get_fld(tobj)) != null ) return tfld;
+    if( tobj instanceof TypeStruct )
+      // TODO: NOT DOING THIS IN VALUE, BECAUSE NEED TO FLOW AVAIL VALUES FORWARDS ALWAYS
+      return get_fld2(tobj);
     return tobj.oob();          // No loading from e.g. Strings
   }
 
@@ -209,12 +211,12 @@ public class LoadNode extends Node {
 
   // The only memory required here is what is needed to support the Load
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    TypeMem err = check_valid_mem(def);
-    if( def==adr() )            // Live_use of the address
-      return err.above_center() ? TypeMem.DEAD : _live;
-    return err;
+    TypeMem live = _live_use(opt_mode,def);
+    return def==adr()
+      ? (live.above_center() ? TypeMem.DEAD : _live)
+      : live;
   }
-  private TypeMem check_valid_mem(Node def) {
+  public TypeMem _live_use(GVNGCM.Mode opt_mode, Node def ) {
     Type tmem = mem()._val;
     Type tptr = adr()._val;
     if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
@@ -222,19 +224,20 @@ public class LoadNode extends Node {
     if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
 
     // If the load is of a constant, no memory nor address is needed
-    Type tfld = get_fld((TypeMem)tmem,(TypeMemPtr)tptr);
+    Type tfld = get_fld2(((TypeMem)tmem).ld((TypeMemPtr)tptr));
     if( tfld.is_con() && err(true)==null )
       return TypeMem.DEAD;
-    if( def==adr() ) return tfld.above_center() ? TypeMem.DEAD : TypeMem.ALIVE; // Memory is sane, so address is alive
+    
+    if( def==adr() )            // Load is sane, so address is alive
+      return tfld.above_center() ? TypeMem.DEAD : TypeMem.ALIVE; 
 
     // Only named the named field from the named aliases is live.
-    Type ldef = (_live==TypeMem.ALIVE||_live==TypeMem.ESCAPE) ? Type.SCALAR : Type.NSCALR;
+    Type ldef = _live.live_no_disp() ? Type.NSCALR : Type.SCALAR;
     return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld, ldef);
   }
 
   // Load the value
-  private @NotNull Type get_fld(TypeMem tmem, TypeMemPtr tadr) { return get_fld(tmem.ld(tadr)); }
-  private @NotNull Type get_fld( TypeObj tobj) {
+  private @NotNull Type get_fld( TypeObj tobj ) {
     if( !(tobj instanceof TypeStruct) )
       return tobj.oob(Type.ALL);
     // Struct; check for field
@@ -242,6 +245,20 @@ public class LoadNode extends Node {
     int idx = ts.find(_fld);  // Find the named field
     if( idx == -1 ) return Type.ALL;
     return ts.at(idx);          // Field type
+    Type tfld = ts.at(idx);     // Field type
+
+    return tfld;
+  }
+  // Upgrade, if !dsp and a function pointer
+  private @NotNull Type get_fld2( TypeObj tobj ) {
+    Type tfld = get_fld(tobj);
+    TypeFunPtr tfp;
+    if( tfld instanceof TypeFunPtr &&
+        (tfp=(TypeFunPtr)tfld)._disp!=TypeMemPtr.NO_DISP && // Display not alive
+        err(true)==null && 
+        _live.live_no_disp() )
+      tfld = tfp.make_no_disp();
+    return tfld;
   }
 
 
