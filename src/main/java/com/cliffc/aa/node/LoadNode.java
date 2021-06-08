@@ -197,7 +197,7 @@ public class LoadNode extends Node {
     TypeObj tobj = ((TypeMem)tmem).ld((TypeMemPtr)tadr);
     if( tobj instanceof TypeStruct )
       // TODO: NOT DOING THIS IN VALUE, BECAUSE NEED TO FLOW AVAIL VALUES FORWARDS ALWAYS
-      return get_fld2(tobj);
+      return get_fld(tobj);
     return tobj.oob();          // No loading from e.g. Strings
   }
 
@@ -245,9 +245,6 @@ public class LoadNode extends Node {
     int idx = ts.find(_fld);  // Find the named field
     if( idx == -1 ) return Type.ALL;
     return ts.at(idx);          // Field type
-    Type tfld = ts.at(idx);     // Field type
-
-    return tfld;
   }
   // Upgrade, if !dsp and a function pointer
   private @NotNull Type get_fld2( TypeObj tobj ) {

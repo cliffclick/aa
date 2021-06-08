@@ -101,6 +101,7 @@ public class UnresolvedNode extends UnOrFunPtrNode {
       // User-nargs are user-visible #arguments.
       // Fun-nargs include the ctrl, display & memory, hence the +ARG_IDX.
       if( fptr.nargs() != ARG_IDX+nargs ) continue;
+      if( fptr.op_prec()==0 ) continue; // Balanced op
       if( x == null ) x = fptr.keep();
       else if( x instanceof UnresolvedNode ) ((UnresolvedNode)x).add_def_unresolved(fptr);
       else x = new UnresolvedNode(_bad,x.unkeep(),fptr).keep();

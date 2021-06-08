@@ -7,6 +7,7 @@ import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
 import com.cliffc.aa.tvar.TV2;
 
+import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.AA.REZ_IDX;
 
 // See CallNode comments.  The RetNode gathers {control (function exits or
@@ -115,9 +116,14 @@ public final class RetNode extends Node {
         return null;
     FunNode fun = fun();
     // Every Phi must be type compatible
-    for( int i=0; i<call.nargs(); i++ )
+    for( int i=MEM_IDX; i<call.nargs(); i++ )
       if( !check_phi_type(fun,call, i) )
         return null;
+
+    // TODO: Turn this back on.
+    // Currently does not unroll, which is the moral equivalent of repeated inlining...
+    // so fails the Church-Rosser 1-step property.
+    if( true ) return null;
 
     // Behind the function entry, split out a LoopNode/Phi setup - one phi for
     // every argument.  The first input comes from the parms; the second input
@@ -139,7 +145,7 @@ public final class RetNode extends Node {
       X.xform(loop);
       cuse.set_def(cidx,loop);
       // Insert loop phis in-the-middle
-      for( int argn=0; argn<call.nargs(); argn++ ) {
+      for( int argn=MEM_IDX; argn<call.nargs(); argn++ ) {
         ParmNode parm = fun.parm(argn);
         if( parm==null ) continue; // arg/parm might be dead
         Node phi = new PhiNode(parm._t,parm._badgc,loop,null,call.arg(argn));
@@ -147,7 +153,6 @@ public final class RetNode extends Node {
         phi._live = parm._live; // Inserting inside a loop, take optimistic lives
         parm.insert(phi);
         phi.set_def(1,parm);
-        phi.xval();
         X.add(phi);
       }
       // Cut the Call control

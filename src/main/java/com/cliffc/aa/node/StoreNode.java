@@ -59,7 +59,7 @@ public class StoreNode extends Node {
     // If Store is of a MemJoin and it can enter the split region, do so.
     // Requires no other memory *reader* (or writer), as the reader will
     // now see the Store effects as part of the Join.
-    if( _keep==0 && tmp != null && mem instanceof MemJoinNode && mem._uses._len==1 ) {
+    if( _keep==0 && tmp != null && mem._keep==0 && mem instanceof MemJoinNode && mem._uses._len==1 ) {
       Node memw = get_mem_writer();
       // Check the address does not have a memory dependence on the Join.
       // TODO: This is super conservative
@@ -173,7 +173,7 @@ public class StoreNode extends Node {
   }
 
   @Override public boolean unify( boolean test ) {
-    // Input should be a TMem 
+    // Input should be a TMem
     TV2 tmem = mem().tvar();
     boolean progress = tvar().unify(tmem,test);
     if( progress && test ) return progress;

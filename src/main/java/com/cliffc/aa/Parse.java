@@ -666,39 +666,44 @@ public class Parse implements Comparable<Parse> {
 
       } else {
         // Check for balanced op
-        Node bfun = bal_open();   // Balanced op read
-        if( bfun!=null ) {
-          oldx = _x-1;            // Token start
-          skipWS();
-          n.keep();               // Keep alive across arg parse
-          int oldx2 = _x;
-          Node idx = stmts();     // Index expression
-          tok = token();
-          if( idx==null || tok==null ) { n.unhook(); return err_ctrl2("Missing stmts after '"+tok+"'"); }
-          _x -= tok.length(); // Unwind, since token length depends on match
-          // Need to find which balanced op close.  Find the longest matching name
-          FunPtrNode fptr=null;
-          if( bfun instanceof UnresolvedNode ) {
-            for( Node def : bfun._defs ) {
-              FunPtrNode def0 = (FunPtrNode)def;
-              if( tok.startsWith(def0.fun()._bal_close) &&
-                  (fptr==null || fptr.fun()._bal_close.length() < def0.fun()._bal_close.length()) )
-                fptr = def0;
-            }
-          } else fptr = (FunPtrNode)bfun;
-          require(fptr.fun()._bal_close,oldx);
-          if( fptr.fun().nargs()==ARG_IDX+2 ) { // array, index
-            n = do_call(errMsgs(0,oldx,oldx2),args(fptr,n.unkeep(),idx));
-          } else {
-            assert fptr.fun().nargs()==ARG_IDX+3; // array, index, value
-            skipWS();
-            int oldx3 = _x;
-            Node val = stmt(false);
-            if( val==null ) { n.unhook(); return err_ctrl2("Missing stmt after '"+fptr.fun()._bal_close+"'"); }
-            n = do_call(errMsgs(0,oldx,oldx2,oldx3),args(fptr,n.unkeep(),idx,val));
+        n.keep();
+        UnOrFunPtrNode bfun = bal_open();   // Balanced op read
+        if( bfun==null ) { n.unkeep(); break; } // Not a balanced op
+
+        oldx = _x-1;            // Token start
+        skipWS();
+        bfun.keep();            // Keep alive across arg parse
+        int oldx2 = _x;
+        Node idx = stmts();     // Index expression
+        tok = token();
+        if( idx==null || tok==null ) { n.unhook(); bfun.unkeep(); return err_ctrl2("Missing stmts after '"+tok+"'"); }
+        _x -= tok.length(); // Unwind, since token length depends on match
+
+        // Need to find which balanced op close.  Find the longest matching name
+        FunPtrNode fptr=null;
+        UnresolvedNode unr = ((UnOrFunPtrNode)bfun.unkeep()).unk();
+        if( unr!=null ) {       // Unresolved of balanced ops?
+          for( Node def : unr._defs ) {
+            FunPtrNode def0 = (FunPtrNode)def;
+            if( tok.startsWith(def0.fun()._bal_close) &&
+                (fptr==null || fptr.fun()._bal_close.length() < def0.fun()._bal_close.length()) )
+              fptr = def0;      // Found best match
           }
+          Env.GVN.add_reduce(bfun); // Dropping any new FreshNode, and replacing with this one
+          idx.keep();
+          bfun = (UnOrFunPtrNode)gvn(new FreshNode(_e._nongen,fptr));
+        } else fptr = bfun.funptr(); // Just the one balanced op
+        FunNode fun = fptr.fun();
+        require(fun._bal_close,oldx);
+        if( fun.nargs()==ARG_IDX+2 ) { // array, index
+          n = do_call(errMsgs(0,oldx,oldx2),args(bfun,n.unkeep(),idx.unkeep()));
         } else {
-          break;                // Not a balanced op
+          assert fun.nargs()==ARG_IDX+3; // array, index, value
+          skipWS();
+          int oldx3 = _x;
+          Node val = stmt(false);
+          if( val==null ) { n.unhook(); return err_ctrl2("Missing stmt after '"+fun._bal_close+"'"); }
+          n = do_call(errMsgs(0,oldx,oldx2,oldx3),args(bfun,n.unkeep(),idx.unkeep(),val));
         }
       }
     }
@@ -1045,7 +1050,7 @@ public class Parse implements Comparable<Parse> {
   }
 
   // Lookup a balanced open function of 2 or 3 arguments.
-  Node bal_open() {
+  UnOrFunPtrNode bal_open() {
     int oldx = _x;
     String bal = token();
     if( bal==null ) return null;
@@ -1401,7 +1406,11 @@ public class Parse implements Comparable<Parse> {
     args[MEM_IDX] = mem();      // Always memory
     for( int i=ARG_IDX; i<args.length; i++ ) args[i].keep(); // Hook all args before reducing display
     args[DSP_IDX]= gvn(new FP2DispNode(args[DSP_IDX]));      // Reduce display
-    for( int i=ARG_IDX; i<args.length; i++ ) args[i].unkeep();
+    for( int i=ARG_IDX; i<args.length; i++ ) {
+      args[i].unkeep();
+      // Generally might want this in unkeep(), except for cost
+      if( args[i]._val.is_con() ) Env.GVN.add_reduce(args[i]);
+    }
     return args;
   }
 

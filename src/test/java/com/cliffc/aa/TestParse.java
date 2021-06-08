@@ -74,7 +74,6 @@ public class TestParse {
 
   @Test public void testParse00() {
     TypeStruct dummy = TypeStruct.DISPLAY;
-    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -666,7 +665,7 @@ public class TestParse {
     test("x:=0; {^1 ?  x=1 ; x=3}(); x",TypeInt.con(1));  // Return of an ifex
     test("f={0 ? ^0; 7}; f()", TypeInt.con(7));
     // Find: returns 0 if not found, or first element which passes predicate.
-    test("find={list pred -> !list ? ^0; pred(list.1) ? ^list.1; find(list.0,pred)}; find(((0,3),2),{e -> e&1})", TypeInt.INT8);
+    test("find={list pred -> !list ? ^0; pred(list.1) ? ^list.1; find(list.0,pred)}; find(((0,3),2),{e -> e&1})", TypeInt.con(3));
     test("x:=0; {1 ? ^2; x=3}(); x",Type.XNIL);  // Following statement is ignored
     // Curried functions
     test("for={A->    A+3 }; for 2  ", TypeInt.con(5));

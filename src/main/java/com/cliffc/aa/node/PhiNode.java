@@ -100,7 +100,14 @@ public class PhiNode extends Node {
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     Node r = in(0);
     if( r==def ) return TypeMem.ALIVE;
-    if( r!=null && r.val(_defs.find(def)).above_center() ) return TypeMem.DEAD; // Path not executable
+    if( r!=null ) {
+      // The same def can appear on several inputs; check them all.
+      int i; for( i=1; i<_defs._len; i++ )
+        if( in(i)==def && !r.val(i).above_center() )
+          break;                               // This input is live
+      if( i==_defs._len ) return TypeMem.DEAD; // All matching defs are not live on any path
+    }
+    // Def is alive (on some path)
     return all_live().basic_live() && !def.all_live().basic_live() ? TypeMem.ANYMEM : _live;
   }
 

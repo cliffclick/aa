@@ -147,9 +147,9 @@ public abstract class MemPrimNode extends PrimNode {
     // The only memory required here is what is needed to support the Load
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
       if( def==mem() ) return _live; // Pass full liveness along
+      if( def==rez() ) return TypeMem.ESCAPE;// Value escapes
       if( def==adr() ) return TypeMem.ALIVE; // Basic aliveness
       if( def==idx() ) return TypeMem.ALIVE ;// Basic aliveness
-      if( def==rez() ) return TypeMem.ESCAPE;// Value escapes
       throw unimpl();                        // Should not reach here
     }
     @Override BitsAlias escapees() {

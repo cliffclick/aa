@@ -199,9 +199,9 @@ public class Env implements AutoCloseable {
     for( int i=name.length(); i>0; i-- ) {
       UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(name.substring(0,i).intern());
       if( n != null ) {         // First name found will return
-        UnOrFunPtrNode u = nargs == 0 // Require a balanced-op
-          ? (n.op_prec()==0 ? n : null)
-          : n.filter(nargs);
+        UnOrFunPtrNode u = nargs == 0 // Requiring a balanced-op?
+          ? (n.op_prec()==0 ? n : null) // Return a balanced-op or error
+          : n.filter(nargs);    // Non-balanced ops also check arg count; distinguish e.g. -x from x-y.
         return u==null ? null : (UnOrFunPtrNode)Env.GVN.xform(new FreshNode(_nongen,u));
       }
     }

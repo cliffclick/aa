@@ -558,7 +558,7 @@ public class TypeMem extends Type<TypeMem> {
   @Override Type not_nil() { return this; }
 
   public TypeLive live() { return (TypeLive)_pubs[0]; }
-  public boolean is_live() { return live()!=TypeLive.DEAD; }
+  public boolean is_live() { return _pubs.length>1 || (live()!=TypeLive.DEAD && live()!=TypeLive.LIVE.dual()); }
   public boolean basic_live() { return _pubs.length==1; }
 
 }

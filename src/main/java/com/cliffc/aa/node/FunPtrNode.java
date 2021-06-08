@@ -105,24 +105,11 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
-
-    // TODO: THIS IS BUSTED.  DURING GCP, LACK OF LIVE LEADS TO LACK OF VALUE LEADS TO LACK OF LIVE.
-    
-    // This is the only place where live() impacts value().  Usually being dead
-    // just sets the node to ANY (and rapidly kills it).
-    Type tdisp = _live.live_no_disp() ? Type.ANY : display()._val;
-
-
-    // While tempting, I cannot have value() depend on live() - or else GCP
-    // figures out something is not live, so it computes ANY so its not live -
-    // even as its used.
-
-    // currently thinking is broken, should be OK.  Appears i have some
-    // non-monotonic live/value bug.
-
-    // Without this fib={x -> x <= 2 ? x : fib(x-1)+fib(x-2) } fails.
-    
-    //Type tdisp = display()._val;
+    // Do not allow live() to impact value()!  Leads to a busted optimistic
+    // value+live result in GCP.
+    // If display is not live, do not compute it in the value.
+    //Type tdisp = _live.live_no_disp() ? Type.ANY : display()._val;
+    Type tdisp = display()._val;
     return TypeFunPtr.make(ret()._fidx,nargs(),tdisp);
   }
   @Override public void add_flow_extra(Type old) {

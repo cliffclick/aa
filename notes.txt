@@ -1,3 +1,22 @@
+
+=======================================
+6/6/2021
+
+Optimistically combining values & liveness failed.
+Example straight-live graph during GCP:
+
+ true     any      any     any
+Start  -> ID1  ->  ID2  -> Stop
+ dead     dead     live    live
+
+Since ID2 is passed and computes ANY, which may_be_constant, ID1 is not alive.
+Since ID1 is DEAD, ANY is passed to ID2.
+The answer is stable, but wrong: the 'true' should pass from Start to Stop thru the IDs unchanged.
+
+I allow value to impact live: constant values need no inputs, so their inputs are dead.
+But never can live impact value, or I get versions of the above example.
+
+
 =======================================
 5/12/2021
 

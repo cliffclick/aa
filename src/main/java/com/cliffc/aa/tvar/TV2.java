@@ -229,7 +229,9 @@ public class TV2 {
     TV2 top = get_unified();
     if( !top.is_unified() ) return top;
     // Find U-F top
-    while( top.is_unified() ) top = top.get_unified();
+    int cnt=0;
+    while( top.is_unified() && cnt++<100 ) top = top.get_unified();
+    assert cnt<100;             // Infinite roll-up loop
     TV2 v = this;               // Rerun, rolling up to top
     while( v != top ) v = v._union(top);
     return top;
@@ -314,7 +316,8 @@ public class TV2 {
       TV2 vthis =       get(key);  assert vthis!=null;
       TV2 vthat =  that.get(key);
       if( vthat==null ) that._args.put(key,vthis);
-      else              vthis._unify(vthat,test);
+      else              { vthis._unify(vthat,test); that = that.find(); }
+      assert !that.is_unified();
     }
 
     // TODO: Check for being equal, cyclic-ly, and return a prior if possible.

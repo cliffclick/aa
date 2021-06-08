@@ -659,15 +659,6 @@ public abstract class Node implements Cloneable {
     if( should_con(_val) )
       return con(_val);
 
-    // Dead from below
-    if( !_live.is_live() && !is_prim() && err(true)==null && _keep==0 &&
-        !(this instanceof CallNode) &&       // Keep for proper errors
-        !(this instanceof UnresolvedNode) && // Keep for proper errors
-        !(this instanceof RetNode) &&        // Keep for proper errors
-        !(this instanceof CEProjNode) &&     // Have to unwire properly
-        !(this instanceof ConNode) )         // Already a constant
-      return Env.ANY;
-
     // Try CSE
     if( !_elock ) {             // Not in VALS
       Node x = VALS.get(this);  // Try VALS
@@ -722,15 +713,10 @@ public abstract class Node implements Cloneable {
       progress = this;          // Progress!
       assert nval.isa(oval);    // Monotonically improving
       _val = nval;
-      // Once a Node is valued as a is_con, its uses go unused - and perhaps
-      // dead, and are not available for recomputing the constant.  Replace
-      // immediately with a constant.
-      if( should_con(nval) ) {
-        progress = con(nval);            // Constant to replace with
-        if( _keep>0 ) { _keep--; progress._keep++; } // Move the keep-bits over.
-        subsume(progress);               // Immediately replace with a constant
-        Env.GVN.add_flow_uses(progress); // Visit users
-        return progress;
+      // If becoming a constant, check for replacing with a ConNode
+      if( nval.is_con() ) {
+        Env.GVN.add_reduce(this);
+        Env.GVN.add_flow_defs(this); // Since a constant, inputs are no longer live
       }
       // Put uses on worklist... values flows downhill
       for( Node use : _uses )
@@ -773,7 +759,7 @@ public abstract class Node implements Cloneable {
     // Is in-error; do not remove the error.
     if( err(true) != null )
       return false;
-    // Is a constant (or could be)
+    // Is a constant
     return t.is_con();
   }
 
@@ -914,16 +900,11 @@ public abstract class Node implements Cloneable {
     assert !is_dead();
     if( visit.tset(_uid) ) return; // Been there, done that
 
-    // Hit the fixed point, despite any immediate updates.
-    assert value(GVNGCM.Mode.Opto)==_val ;
-    assert live (GVNGCM.Mode.Opto)==_live;
-
     // Replace any constants.  Since the node computes a constant, its inputs
     // were never marked live, and so go dead and so go to ANY and so are not
     // available to recompute the constant later.
     Type val = _val;
     TypeFunPtr tfp;
-    // TODO STILL NOT SURE...
     if( val instanceof TypeFunPtr &&
         _live.live_no_disp() &&
         (tfp=(TypeFunPtr)val)._disp!=TypeMemPtr.NO_DISP )

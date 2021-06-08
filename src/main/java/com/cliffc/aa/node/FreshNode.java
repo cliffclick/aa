@@ -1,13 +1,9 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Env;
-import com.cliffc.aa.type.Type;
+import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
-import com.cliffc.aa.type.TypeFlt;
-import com.cliffc.aa.type.TypeInt;
-import com.cliffc.aa.type.TypeMemPtr;
+import com.cliffc.aa.type.*;
 
 import java.util.Arrays;
 
@@ -17,6 +13,7 @@ public class FreshNode extends UnOrFunPtrNode {
   public FreshNode( Env.VStack vs, Node ld ) { super(OP_FRESH, ld); _tv2s = vs.compact(); }
 
   @Override public Node ideal_reduce() {
+    if( in(0)==this ) return null; // Dead self-cycle
     boolean progress = false;
     // TODO: Turn on, and also remove dups.
     // Possibly go to Ary<>, for easier removal.
@@ -43,6 +40,8 @@ public class FreshNode extends UnOrFunPtrNode {
   @Override public Type value(GVNGCM.Mode opt_mode) { return val(0); }
 
   @Override public boolean unify( boolean test ) {  return tvar(0).fresh_unify(tvar(),_tv2s,test); }
+  
+  @Override public byte op_prec() { return in(0).op_prec(); }
 
   @Override public UnresolvedNode unk() { return in(0) instanceof UnresolvedNode ? (UnresolvedNode)in(0) : null; }
   @Override int nargs() { return ((UnOrFunPtrNode)in(0)).nargs(); }
