@@ -602,7 +602,8 @@ public class TV2 {
     if( is_base() && that.is_base() )
       return _type==that._type; // Base-cases have to be completely identical
     if( !Util.eq(_name,that._name) ) return false; // Wrong type-var names
-    if( _args==that._args ) return true;           // Both null is OK
+    if( is_leaf() || that.is_leaf() ) return false;       // Unequal leaves are unequal
+    if( _args==that._args && !is_leaf() ) return true;    // Both null is OK
     if( _args.size() != that._args.size() ) return false; // Mismatched sizes
     // Cycles stall the equal/unequal decision until we see a difference.
     TV2 tc = CDUPS.get(this);

@@ -14,7 +14,6 @@ public class FreshNode extends UnOrFunPtrNode {
 
   @Override public Node ideal_reduce() {
     if( in(0)==this ) return null; // Dead self-cycle
-    boolean progress = false;
     // TODO: Turn on, and also remove dups.
     // Possibly go to Ary<>, for easier removal.
     // Possibly keep sorted, for easier dup removal.
@@ -28,16 +27,26 @@ public class FreshNode extends UnOrFunPtrNode {
     //if( progress ) _tv2s = Arrays.copyOf(_tv2s,j);
 
     // Remove Fresh of base type values: things that can never have structure.
-    if( _val.isa(TypeInt.INT64) || _val.isa(TypeFlt.FLT64) || _val.isa(TypeMemPtr.ISUSED0) )
+    if( no_tvar_structure(_val) )
       return in(0);
 
-    // If nothing left, the Fresh never hits the occurs_in check.
-    if( _tv2s==null || _tv2s.length==0 ) return in(0);
+    // If nothing left, the Fresh never hits the occurs_in check, and always
+    // requires a fresh unify.
+    //if( _tv2s==null || _tv2s.length==0 ) return in(0);
 
-    return progress ? this : null;
+    return null;
   }
 
   @Override public Type value(GVNGCM.Mode opt_mode) { return val(0); }
+  @Override public void add_flow_extra(Type old) {
+    // Types changed, now might collapse
+    if( !no_tvar_structure(old) && no_tvar_structure(_val) )
+      Env.GVN.add_reduce(this);
+  }
+  // Things that can never have type-variable internal structure.
+  private static boolean no_tvar_structure(Type t) {
+    return t.isa(TypeInt.INT64) || t.isa(TypeFlt.FLT64) || t.isa(TypeMemPtr.ISUSED0);
+  }
 
   @Override public boolean unify( boolean test ) {  return tvar(0).fresh_unify(tvar(),_tv2s,test); }
   

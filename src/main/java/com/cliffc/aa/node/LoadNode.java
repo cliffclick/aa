@@ -239,7 +239,7 @@ public class LoadNode extends Node {
   // Load the value
   private @NotNull Type get_fld( TypeObj tobj ) {
     if( !(tobj instanceof TypeStruct) )
-      return tobj.oob(Type.ALL);
+      return tobj.oob();
     // Struct; check for field
     TypeStruct ts = (TypeStruct)tobj;
     int idx = ts.find(_fld);  // Find the named field

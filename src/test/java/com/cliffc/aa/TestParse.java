@@ -9,7 +9,6 @@ import org.junit.Test;
 import java.util.function.Function;
 
 import static com.cliffc.aa.AA.ARG_IDX;
-import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 import static org.junit.Assert.*;
 
 public class TestParse {
@@ -20,12 +19,9 @@ public class TestParse {
   @Ignore
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
-    TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
 
     // Straight from TestHM.test08; types as {A -> (A,A)}
-    test("fun={ g -> f={x -> g}; (f 3,f 1)}; (99,fun \"abc\",fun 3.14)", TypeFunPtr.make(TEST_FUNBITS,3,tdisp));
-
-    test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
+    //test("fun={ g -> f={x -> g}; (f 3,f 1)}; (99,fun \"abc\",fun 3.14)", TypeFunPtr.make(TEST_FUNBITS,3,tdisp));
 
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
@@ -55,7 +51,7 @@ public class TestParse {
     test("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
     testerr("math_rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",3);
-    test_isa("{x y -> x+y}", TypeFunPtr.make(TEST_FUNBITS,3,tdisp)); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(46),3, TypeMemPtr.NO_DISP)); // {Scalar Scalar -> Scalar}
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y' in @{x=1}",19);
     testerr("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
     test("x=@{a:=1;         b= {a=a+1;b=0}}; x.         b(); x.a",TypeInt.con(2));
@@ -346,7 +342,7 @@ public class TestParse {
     test_obj("(1,\"abc\").1", TypeStr.ABC);
 
     // Named type variables
-    test("gal=:flt; gal", TypeFunPtr.make(TEST_FUNBITS,4,NO_DISP));
+    test("gal=:flt; gal", TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP));
     test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
@@ -384,7 +380,7 @@ public class TestParse {
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
     test_ptr("A= :(str?, int); A(0,2)","A:(0, 2)");
     // Named recursive types
-    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(TypeStruct.ts(NO_DISP,Type.XNIL,TypeInt.con(2))).set_name("A:")));
+    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(TypeStruct.ts(TypeMemPtr.NO_DISP,Type.XNIL,TypeInt.con(2))).set_name("A:")));
     test_ptr("A= :(A?, int); A(0,2)","A:(0, 2)");
     test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
     test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*A:(0, 2), 3)");
@@ -707,6 +703,7 @@ public class TestParse {
 
   // Array syntax examples
   @Test public void testParse14() {
+    testary("[3] [-1]","Index must be out of bounds",5);
     test_ptr("[3]", "[$]0/obj");
     test    ("ary = [3]; ary[0]", Type.XNIL);
     test    ("[3][0]", Type.XNIL);
@@ -849,7 +846,7 @@ HashTable = {@{
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeFunPtr);
       TypeFunPtr actual = (TypeFunPtr)te._t;
-      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),ARG_IDX+1,NO_DISP);
+      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),ARG_IDX+1, TypeMemPtr.NO_DISP);
       assertEquals(expected,actual);
     }
   }

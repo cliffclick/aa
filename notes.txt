@@ -1,13 +1,123 @@
 
 =======================================
-6/6/2021
+6/8/2021
+
+Still combining value & live.
+
+Value lattice: Top/Any, con(1,2,3), Bot/All
+Live  lattice: Dead, Live
+
+xfer-function for primitives:
+  // Issue is: for most primitives, it makes no difference
+  // Prop live first, then values
+  if all uses dead :  (top    ,dead)
+  else:
+    if any defs Top:  (top    ,dead)
+    if any defs bot:  (bot    ,live)
+    if all defs cons: (op(con),dead)
+  if Stop : always live
+  if Start: always true
+
+  // Prop values first then live
+  if all uses dead or con-not-Stop:
+    if any defs Top: (top     ,dead)
+    if any defs Bot: ( ?      ,dead)
+    if all defs cons (op(cons),dead)
+  else some uses alive:
+    if any defs Top: (top     ,live)
+    if any defs Bot: (bot     ,live)
+    if all defs cons (op(cons),live)
+  
+ true     true     true     top
+Start  -> ID1  ->  ID2  -> Stop
+ dead     live     live    live
+
+
+Example where value<->live impact each other around Loads of fcn ptrs.
+Issue is a fat-pointer (so requires a fat-live) with a #fidx constant
+and a display ptr.  Basically, a dead linked-list load.
+
+  (mem0,x0) = New*12(fld)      // New object, returns memory & pointer
+  fib0 = fptr(x0,#47)          // Construct TypeFunPtr from a display pointer and code constant
+  mem1 = st.fld(mem0,x0,fib0)  // Store into display
+  call(*47)(mem1,x0)           // Top-level fib call
+
+  fib() {                      // Function entry
+    mem2= parm(mem1,mem2)      // Memory  Parm from entry and loop-back
+    x1  = parm(x0  , x2 )      // Display Parm from entry and loop-back
+    
+    fib1 = x1.fib;             // Load TypeFunptr
+    x2 = fp2disp(fib1)         // Extract display pointer
+    fib = fp2fun(fib1)         // Extract code ptr
+    call(*fib)(mem2,x2)        // Recursive (looping) call
+    cepi  ...    
+  }
+
+// Start GCP
+  (mem0,x0) = New*12(fld)      // mem0: (fld=T )/(fld=X)  x0: *12/X -- Starting, so computes value despite dead
+  fib0 = fptr(x0,#47)          // T / X
+  mem1 = st.fld(mem0,x0,fib0)  // T / X
+  call(*47)(mem1,x0)           // 
+
+  fib() {                      // 
+    mem2= parm(mem1,mem2)      // T / X
+    x1  = parm(x0  , x2 )      // T / X
+    
+    fib1 = ld.fld(mem2,x1)     // T / X
+    fib = fp2fdx(fib1)         // T / X
+    x2 = fp2disp(fib1)         // T / X
+    call(*fib)(mem2,x2)        // T / X
+    cepi  ...                  // T / L -- Stopping, so computes live despite Top inputs
+  }
+
+// Some GCP progress on live, some backwards flow
+  (mem0,x0) = New*12(fld)      // mem0: (fld=T )/(fld=X)  x0: *12/X -- Starting, so computes value despite dead
+  fib0 = fptr(x0,#47)          // T / X
+  mem1 = st.fld(mem0,x0,fib0)  // T / X
+  call(*47)(mem1,x0)           // 
+
+  fib() {                      // 
+    mem2= parm(mem1,mem2)      // T / X
+    x1  = parm(x0  , x2 )      // T / X
+    
+    fib1 = ld.fld(mem2,x1);    // T / X         // Still dead; both users may-be-constant
+    fdx = fp2fdx(fib1)         // T / L         // Backwards from call; may-be-constant, so inputs are unused
+    x2 = fp2disp(fib1)         // T / X         // Backwards from call
+    call(*fdx)(mem2,x2)        // (T/L,T/X,T/X) // Call special: live-use requires code-ptr, but not memory nor display
+    cepi  ...                  // T / L
+  }
+
+// Some GCP progress on value, some forwards flow
+  (mem0,x0) = New*12(fld)      // mem0: (fld=T/X)  x0: *12/X -- Starting, so computes value despite dead
+  fib0 = fptr(x0,#47)          // 12:(fdx=#47/X,dsp=*12/X)
+  mem1 = st.fld(mem0,x0,fib0)  // 12:(fld=(fdx=#47/X,dsp=*12/X)/X)
+  call(*47)(mem1,x0)           // 
+
+  fib() {                      // 
+    mem2= parm(mem1,mem2)      // 12:(fld=(fdx=#47/X,dsp=*12/X)/X)
+    x1  = parm(x0  , x2 )      // *12/X
+    
+    fib1 = ld.fld(mem2,x1);    // (fdx=#47/L,dsp=*12/X)
+    fdx = fp2fdx(fib1)         // #47 / L       // 
+    x2 = fp2disp(fib1)         // *12 / X       // 
+    call(*fdx)(mem2,x2)        // (#47/ L, (fld=(fdx=#47/X,dsp=*12/X)/X), *12/X) // Call special: live-use requires code-ptr, but not memory nor display
+    cepi  ...                  // T / L
+  }
+
+// Turns out, this is the standard forwards-flow of values with constants
+// stopping liveness... but liveness not impacting values.  Simple ordering
+// of 2 unrelated global opts.
+
+
+
+======================================= 6/6/2021
 
 Optimistically combining values & liveness failed.
 Example straight-live graph during GCP:
 
- true     any      any     any
+ true     top      top     top
 Start  -> ID1  ->  ID2  -> Stop
- dead     dead     live    live
+ dead     dead     dead    live
 
 Since ID2 is passed and computes ANY, which may_be_constant, ID1 is not alive.
 Since ID1 is DEAD, ANY is passed to ID2.

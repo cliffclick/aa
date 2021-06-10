@@ -44,6 +44,13 @@ public class TestHM {
   }
 
   @Test
+  public void test05a() {
+    Syntax syn = HM.hm("id={x->x}; (pair (id 3) (id \"abc\"))");
+    assertEquals("(pair 3 \"abc\")",syn._t.p());
+    assertEquals("[]",syn._post.p());
+  }
+
+  @Test
   public void test05() {
     // Because {y->y} is passed in, all 'y' types must agree.
     // This unifies 3 and "abc" which results in 'all'

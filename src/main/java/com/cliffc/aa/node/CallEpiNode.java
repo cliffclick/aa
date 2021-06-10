@@ -511,7 +511,6 @@ public final class CallEpiNode extends Node {
   // ASSERT/JOIN.  Hence the incoming type can be lifted to the join.
   private Type unify_lift( Type t, TV2 tv, Type tcmem ) {
     // TODO: Turn this back on
-    return t;
     //if( tv==null ) return t; // No structure, no change
     //if( tv.is_base() ) t = t.join(tv._type);
     //TV2 tvar  = call().tvar();
@@ -536,7 +535,7 @@ public final class CallEpiNode extends Node {
     //      t = t3.widen().join(t);
     //  }
     //}
-    //return t;
+    return t;
   }
 
 

@@ -25,7 +25,7 @@ public abstract class MemPrimNode extends PrimNode {
     if( tidx==Type.ANY ) return null; // No error
     if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_badargs[1],"Array might be nil when reading",null);
     if( !(tadr instanceof TypeMemPtr) )
-      throw unimpl();
+      return fast ? ErrMsg.FAST : ErrMsg.typerr(_badargs[1],tadr,tmem,TypeMemPtr.ISUSED);
     TypeMemPtr ptr = (TypeMemPtr)tadr;
     TypeObj objs = ((TypeMem)tmem).ld(ptr); // General load from memory
     if( objs==TypeObj.UNUSED || objs==TypeObj.XOBJ ) return null; // Can fall to valid array
@@ -95,6 +95,30 @@ public abstract class MemPrimNode extends PrimNode {
       TypeAry ary = (TypeAry)ptr._obj;
       return ary._size;
     }
+    // Similar to LoadNode, of a field named '#'
+    @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+      TypeMem live = _live_use(opt_mode,def);
+      return def==adr()
+        ? (live.above_center() ? TypeMem.DEAD : _live)
+        : live;
+    }
+    public TypeMem _live_use(GVNGCM.Mode opt_mode, Node def ) {
+      Type tmem = mem()._val;
+      Type tptr = adr()._val;
+      if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
+      if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
+      if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
+
+      Type tobj = ((TypeMem)tmem).ld((TypeMemPtr)tptr);
+      if( !(tobj instanceof TypeAry) )
+        return tobj.oob(TypeMem.ALLMEM);
+      Type tlen = ((TypeAry)tobj)._size;
+      if( tlen.is_con() ) return TypeMem.DEAD;
+      if( def==adr() )          // Load is sane, so address is alive
+        return tlen.above_center() ? TypeMem.DEAD : TypeMem.ALIVE;
+      return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,"#", Type.SCALAR);
+    }
+
     @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
   }
 

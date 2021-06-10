@@ -101,4 +101,9 @@ public class TypeAry extends TypeObj<TypeAry> {
     TypeInt size = _size; // TypeInt size = (TypeInt)_size.meet(idx); // CNC - Not inferring array size yet
     return make(size,elem,TypeObj.OBJ);
   }
+  // Used during liveness propagation from Loads.
+  // Fields not-loaded are not-live.
+  @Override TypeAry remove_other_flds(String fld, Type live) {
+    return ARY;
+  }
 }

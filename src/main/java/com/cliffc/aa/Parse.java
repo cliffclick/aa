@@ -689,7 +689,7 @@ public class Parse implements Comparable<Parse> {
                 (fptr==null || fptr.fun()._bal_close.length() < def0.fun()._bal_close.length()) )
               fptr = def0;      // Found best match
           }
-          Env.GVN.add_reduce(bfun); // Dropping any new FreshNode, and replacing with this one
+          Env.GVN.add_dead(Env.GVN.add_reduce(bfun)); // Dropping any new FreshNode, and replacing with this one
           idx.keep();
           bfun = (UnOrFunPtrNode)gvn(new FreshNode(_e._nongen,fptr));
         } else fptr = bfun.funptr(); // Just the one balanced op
