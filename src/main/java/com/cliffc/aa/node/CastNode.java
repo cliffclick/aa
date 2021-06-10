@@ -32,7 +32,7 @@ public class CastNode extends Node {
     Node ctrl = in(0);
     Node baseaddr = in(1);
     while( baseaddr instanceof CastNode ) baseaddr = baseaddr.in(1);
-    while( baseaddr instanceof FreshNode ) baseaddr = baseaddr.in(0);
+    while( baseaddr instanceof FreshNode ) baseaddr = ((FreshNode)baseaddr).id();
     final Node fbaseaddr = baseaddr;
 
     Node tru = ctrl.walk_dom_last(n -> checked(n,fbaseaddr));
@@ -49,7 +49,7 @@ public class CastNode extends Node {
 
     // If the cast is in-error, we cannot lift.
     Node n1 = in(1);
-    if( n1 instanceof FreshNode ) n1 = n1.in(0);
+    if( n1 instanceof FreshNode ) n1 = ((FreshNode)n1).id();
     if( !checked(in(0),n1) ) return t;
     // Lift result.
     return _t.join(t);
@@ -72,7 +72,7 @@ public class CastNode extends Node {
     Node n0 = n.in(0);
     if( n0 instanceof IfNode ) {
       Node na = n0.in(1);
-      if( na instanceof FreshNode ) na = na.in(0);
+      if( na instanceof FreshNode ) na = ((FreshNode)na).id();
       if( na == addr ) return true; // Guarded by If-n-zero
     }
     if( n0 instanceof ConNode && ((TypeTuple) n0._val).at(1)==Type.XCTRL )

@@ -482,7 +482,7 @@ public class Parse implements Comparable<Parse> {
       lhs.keep();
       // Get the matching FunPtr (or Unresolved).
       // This is a primitive lookup and always returns a FRESH copy (see HM.Ident).
-      UnOrFunPtrNode op = _e.lookup_filter_fresh(bintok.intern(),2); // BinOp, or null
+      UnOrFunPtrNode op = _e.lookup_filter_fresh(bintok.intern(),2,ctrl()); // BinOp, or null
       assert op!=null;          // Since found valid token, must find matching primnode
       FunNode sfun = op.funptr().fun();
       assert sfun._op_prec == prec;
@@ -581,7 +581,7 @@ public class Parse implements Comparable<Parse> {
     String uni = token();
     if( uni!=null ) {
       // This is a primitive lookup and always returns a FRESH copy (see HM.Ident).
-      UnOrFunPtrNode unifun = _e.lookup_filter_fresh(uni.intern(),1); // UniOp, or null
+      UnOrFunPtrNode unifun = _e.lookup_filter_fresh(uni.intern(),1,ctrl()); // UniOp, or null
       FunPtrNode ptr = unifun==null ? null : unifun.funptr();
       if( ptr==null || ptr.fun()._op_prec <= 0 ) _x=oldx; // Not a uniop
       else {
@@ -691,7 +691,7 @@ public class Parse implements Comparable<Parse> {
           }
           Env.GVN.add_dead(Env.GVN.add_reduce(bfun)); // Dropping any new FreshNode, and replacing with this one
           idx.keep();
-          bfun = (UnOrFunPtrNode)gvn(new FreshNode(_e._nongen,fptr));
+          bfun = (UnOrFunPtrNode)gvn(new FreshNode(_e._nongen,ctrl(),fptr));
         } else fptr = bfun.funptr(); // Just the one balanced op
         FunNode fun = fptr.fun();
         require(fun._bal_close,oldx);
@@ -731,13 +731,13 @@ public class Parse implements Comparable<Parse> {
     // Now properly load from the display.
     // This does a HM.Ident lookup, producing a FRESH tvar every time.
     Node ptr = get_display_ptr(scope);
-    n = gvn(new FreshNode(_e._nongen,gvn(new LoadNode(mem(),ptr,tok,null))));
+    n = gvn(new FreshNode(_e._nongen,ctrl(),gvn(new LoadNode(mem(),ptr,tok,null))));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl1(Node.ErrMsg.forward_ref(this,((FunPtrNode)n)));
     // Do a full lookup on "+", and execute the function
     n.keep();
     // This is a primitive lookup and always returns a FRESH copy (see HM.Ident).
-    Node plus = _e.lookup_filter_fresh("+",2);
+    Node plus = _e.lookup_filter_fresh("+",2,ctrl());
     Node sum = do_call(errMsgs(0,_x,_x),args(plus,n,con(TypeInt.con(d))));
     // Active memory for the chosen scope, after the call to plus
     set_mem(gvn(new StoreNode(mem(),ptr,sum,TypeStruct.FRW,tok,errMsg())));
@@ -797,7 +797,7 @@ public class Parse implements Comparable<Parse> {
       if( peek('}') && op != null && op.op_prec() > 0 )
         // This is a primitive operator lookup as a function constant, and
         // makes a FRESH copy like HM.Ident.
-        return gvn(new FreshNode(_e._nongen,op));
+        return gvn(new FreshNode(_e._nongen,ctrl(),op));
       _x = oldx+1;              // Back to the opening paren
       return func();            // Anonymous function
     }
@@ -837,7 +837,7 @@ public class Parse implements Comparable<Parse> {
     // otherwise the display is passed in as a hidden argument.
     // This does a HM.Ident lookup, producing a FRESH tvar every time.
     Node ptr = get_display_ptr(scope);
-    return gvn(new FreshNode(_e._nongen,gvn(new LoadNode(mem(),ptr,tok.intern(),null))));
+    return gvn(new FreshNode(_e._nongen,ctrl(),gvn(new LoadNode(mem(),ptr,tok.intern(),null))));
   }
 
   /** Parse a tuple; first stmt but not the ',' parsed.
@@ -1055,7 +1055,7 @@ public class Parse implements Comparable<Parse> {
     String bal = token();
     if( bal==null ) return null;
     // This is a primitive lookup and always returns a FRESH copy (see HM.Ident).
-    UnOrFunPtrNode bfun = _e.lookup_filter_fresh(bal.intern(),0); // No nargs filtering
+    UnOrFunPtrNode bfun = _e.lookup_filter_fresh(bal.intern(),0,ctrl()); // No nargs filtering
     if( bfun==null || bfun.op_prec() != 0 ) { _x=oldx; return null; }
     // Actual minimal length uniop might be smaller than the parsed token
     // (greedy algo vs not-greed)

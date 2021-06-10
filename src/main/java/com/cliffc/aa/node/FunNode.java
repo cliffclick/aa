@@ -688,13 +688,6 @@ public class FunNode extends RegionNode {
       int old_alias = n instanceof NewNode ? ((NewNode)n)._alias : -1;
       Node c = n.copy(false);     // Make a blank copy with no edges
       map.put(n,c);               // Map from old to new
-      // Fresh nodes can be removed during inlining - the act of cloning makes the fresh TVar.
-      if( path > 0 && n instanceof FreshNode ) {
-        // Expect Fresh input to be inside fcn, else
-        // Fresh should not be in body.
-        if( n.in(0) instanceof ParmNode && n.in(0).in(0)==this )    ((FreshNode)c)._tv2s = null;
-        else   assert n.in(0) instanceof LoadNode; // unknown: Fresh buried in the middle
-      }
       if( old_alias != -1 )       // Was a NewNode?
         aliases.set(old_alias);   // Record old alias before copy/split
       // Slightly better error message when cloning constructors
@@ -871,17 +864,10 @@ public class FunNode extends RegionNode {
       }
     }
 
-    // Get a good H-M after edges for Calls and CallEpis; needed for unify_lift
-    // typing.
-    for( Node nn : map.values() ) {
-      if( nn instanceof CallNode ) {
-        nn.reset_tvar("Fun_inline");
-        for( Node use : nn._uses )
-          if( use instanceof CEProjNode && use._uses._len==0 )
-            use.kill();
+    // Get a good H-M after edges for Calls and CallEpis; needed for unify_lift typing.
+    for( Node nn : map.values() )
+      if( nn instanceof CallNode )
         ((CallNode)nn).cepi().unify(false);
-      }
-    }
 
     // Force-unify the new function nodes, so they can unify_lift
     for( Node nn : map.values() )

@@ -194,7 +194,7 @@ public class Env implements AutoCloseable {
   // If nargs is positive, filter by nargs.
   // If nargs is zero, this is a balanced-op lookup, filter by op_prec==0
   // Always makes a 'fresh' result, as-if HM.Ident primitive lookup.
-  UnOrFunPtrNode lookup_filter_fresh( String name, int nargs ) {
+  UnOrFunPtrNode lookup_filter_fresh( String name, int nargs, Node ctrl ) {
     if( !Parse.isOp(name) ) return null; // Limit to operators
     for( int i=name.length(); i>0; i-- ) {
       UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(name.substring(0,i).intern());
@@ -202,7 +202,7 @@ public class Env implements AutoCloseable {
         UnOrFunPtrNode u = nargs == 0 // Requiring a balanced-op?
           ? (n.op_prec()==0 ? n : null) // Return a balanced-op or error
           : n.filter(nargs);    // Non-balanced ops also check arg count; distinguish e.g. -x from x-y.
-        return u==null ? null : (UnOrFunPtrNode)Env.GVN.xform(new FreshNode(_nongen,u));
+        return u==null ? null : (UnOrFunPtrNode)Env.GVN.xform(new FreshNode(_nongen,ctrl,u));
       }
     }
     return null;

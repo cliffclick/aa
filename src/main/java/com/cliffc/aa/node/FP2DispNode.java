@@ -33,8 +33,8 @@ public final class FP2DispNode extends Node {
     }
 
     // Move past a 'fresh', just getting the display not a 'fresh' copy of the function TVar.
-    if( in(0) instanceof FreshNode && in(0).in(0) != in(0) )
-      return set_def(0,in(0).in(0));
+    if( in(0) instanceof FreshNode && ((FreshNode)in(0)).id() != in(0) )
+      return set_def(0,((FreshNode)in(0)).id());
 
     return null;
   }
