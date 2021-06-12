@@ -714,7 +714,7 @@ public abstract class Node implements Cloneable {
       assert nval.isa(oval);    // Monotonically improving
       _val = nval;
       // If becoming a constant, check for replacing with a ConNode
-      if( nval.is_con() ) {
+      if( !oval.may_be_con() && nval.may_be_con() ) {
         Env.GVN.add_reduce(this);
         Env.GVN.add_flow_defs(this); // Since a constant, inputs are no longer live
       }

@@ -33,8 +33,13 @@ public class UQNodes extends NonBlockingHashMapLong<Node> {
 
   // Add a node to a unique-set: copy, insert key, re-hash/intern.
   public UQNodes add( Node tn ) {
+    assert KEY.isEmpty();
     assert !tn.is_dead();
-    throw com.cliffc.aa.AA.unimpl();
+    if( get(tn._uid)!=null ) return this; // Already in there
+    // Fold them together
+    for( Node n : values() ) if( !n.is_dead() ) KEY.put(n._uid,n);
+    KEY.put(tn._uid,tn);
+    return intern();
   }
 
   // Combine two unique-sets & return the result.  Lazy remove dead nodes.

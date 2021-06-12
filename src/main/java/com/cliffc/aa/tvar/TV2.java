@@ -254,6 +254,8 @@ public class TV2 {
     assert is_unified();
     merge_deps(that);           // Merge update lists, for future unions
     merge_ns  (that);           // Merge Node list, for easier debugging
+    _deps = null;
+    _ns   = null;
     return old;
   }
 
@@ -520,7 +522,7 @@ public class TV2 {
       }
       return rez;
     case "Fun":
-      if( t ==Type.ALL ) return rez; // No substructure in type
+      if( t == Type.ALL || t == Type.ANY ) return rez; // No substructure in type
       if( t.is_forward_ref() ) return rez;
       assert t instanceof TypeFunPtr;
       // TypeFunPtrs carry only a set of FIDXS & a DISPLAY.
@@ -550,21 +552,15 @@ public class TV2 {
     ODUPS.clear();
     return found;
   }
-  boolean occurs_in_type(TV2 x) {
-    assert ODUPS.isEmpty();
-    boolean found = _occurs_in_type(x);
-    ODUPS.clear();
-    return found;
-  }
 
   // Does 'this' type occur in any scope, mid-definition (as a forward-ref).
   // If not, then return false (and typically make a fresh copy).
   // If it does, then 'this' reference is a recursive self-reference
   // and needs to keep the self-type instead of making fresh.
   boolean _occurs_in(TV2[] vs) {
-    for( int i=0; i<vs.length; i++ )
-      // Can NOT modify 'vs' for U-F, because blows FreshNode hash.
-      if( _occurs_in_type(vs[i].find()) )
+    // Can NOT modify 'vs' for U-F, because blows FreshNode hash.
+    for( TV2 v : vs )
+      if( _occurs_in_type(v.find()) )
         return true;
     return false;
   }
@@ -633,8 +629,8 @@ public class TV2 {
   private void _push_update(CallEpiNode dep) {
     assert !is_unified();
     if( DEPS_VISIT.tset(_uid) ) return;
-    if( _deps!=null && _deps.get(dep)!=null ) return; // Already here and in all children
-    assert !isa("Dead");
+    if( _deps!=null && _deps.get(dep._uid)!=null ) return; // Already here and in all children
+    if( isa("Dead") ) return;
     _deps = _deps==null ? UQNodes.make(dep) : _deps.add(dep);
     if( _args!=null )
       for( Object key : _args.keySet() ) // Structural recursion on a complex TV2
@@ -643,10 +639,10 @@ public class TV2 {
 
   // Merge Dependent CallEpiNode lists, 'this' into 'that'.  Required to
   // trigger CEPI.unify_lift when types change structurally.
-  private void merge_deps( TV2 that ) { if( !that.isa("Dead") ) that._deps = that._deps==null ? _deps : that._deps.addAll(_deps); _deps=null; }
+  private void merge_deps( TV2 that ) { if( !that.isa("Dead") ) that._deps = that._deps==null ? _deps : that._deps.addAll(_deps); }
   // Merge Node lists, 'this' into 'that', for easier debugging.
   // Lazily remove dead nodes on the fly.
-  private void merge_ns  ( TV2 that ) { if( !that.isa("Dead") ) that._ns   = that._ns  ==null ? _ns   : that._ns  .addAll(_ns  ); _ns  =null; }
+  private void merge_ns  ( TV2 that ) { if( !that.isa("Dead") ) that._ns   = that._ns  ==null ? _ns   : that._ns  .addAll(_ns  ); }
 
 
   // --------------------------------------------

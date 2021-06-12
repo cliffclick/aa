@@ -47,7 +47,7 @@ public class IntrinsicNode extends Node {
       FunNode fun = X.init2((FunNode)new FunNode(tn._name,sig,-1,false).add_def(Env.ALL_CTRL));
       Node rpc = X.xform(new ParmNode( 0     ,"rpc",fun,Env.ALL_CALL,null));
       Node mem = X.xform(new ParmNode(MEM_IDX,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-      Node ptr = X.xform(new ParmNode(ARG_IDX,"ptr",fun,(ConNode)Node.con(TypeMemPtr.ISUSED),badargs));
+      Node ptr = X.xform(new ParmNode(ARG_IDX,"ptr",fun,(ConNode)Node.con(TypeMemPtr.make(BitsAlias.RECORD_BITS,TypeObj.ISUSED)),badargs));
       Node cvt = X.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
       RetNode ret = (RetNode)X.xform(new RetNode(fun,cvt,ptr,rpc,fun));
       return (X._ret = X.init2(new FunPtrNode(tn._name,ret,null)));

@@ -502,8 +502,10 @@ public final class CallEpiNode extends Node {
     NonBlockingHashMap<Object,TV2> args = new NonBlockingHashMap<Object,TV2>(){{ put("Args",tcargs);  put("Ret",tcret); }};
     TV2 tfun = TV2.make("Fun",this,"CallEpi_unify_Fun",args);
     boolean progress = tfdx.unify(tfun,test);
-    if( progress && !test )
+    if( progress && !test ) {
       Env.GVN.add_flow_uses(call()); // Progress, neighbors on list
+      tcret.push_dep(this);
+    }
     return progress;
   }
 
