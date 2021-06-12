@@ -159,15 +159,7 @@ public abstract class Node implements Cloneable {
     if( (_defs._es[idx] = n) != null ) n._uses.add(this);
     return unuse(old);
   }
-  public Node swap_def( int idx, Node n ) {
-    unelock();
-    Node old = _defs.at(idx);  // Get old value
-    // Add edge to new guy before deleting old, in case old goes dead and
-    // recursively makes new guy go dead also
-    if( (_defs._es[idx] = n) != null ) n._uses.add(this);
-    if( old != null ) old._uses.del(this);
-    return old;
-  }
+
   public void replace(Node old, Node nnn) { unelock(); _defs.replace(old,nnn); }
 
   public Node insert (int idx, Node n) { unelock(); _defs.insert(idx,n); if( n!=null ) n._uses.add(this); return this; }
@@ -572,9 +564,11 @@ public abstract class Node implements Cloneable {
     // Compute meet/union of all use livenesses
     TypeMem live = TypeMem.DEAD; // Start at lattice top
     for( Node use : _uses )      // Computed across all uses
-      if( use.live_uses() )
-        live = (TypeMem)live.meet(use.live_use(opt_mode, this)); // Make alive used fields
-    live = live.flatten_fields();
+      if( use.live_uses() ) {
+        TypeMem ulive = use.live_use(opt_mode, this);
+        assert ulive.is_flattened();
+        live = (TypeMem)live.meet(ulive); // Make alive used fields
+      }
     assert live==TypeMem.DEAD || live.basic_live()==all_live().basic_live();
     assert live!=TypeMem.LIVE_BOT || (_val !=Type.CTRL && _val !=Type.XCTRL);
     return live;

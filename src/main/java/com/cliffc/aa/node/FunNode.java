@@ -3,6 +3,8 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.tvar.UQNodes;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -58,16 +60,19 @@ import static com.cliffc.aa.AA.*;
 
 public class FunNode extends RegionNode {
   public String _name;          // Debug-only name
-  public String _bal_close; // null for everything except "balanced functions", e.g. "[]"
-  public int _fidx;
-  public TypeFunSig _sig;
+  public String _bal_close; // null for everything except "balanced oper functions", e.g. "[]"
+  public int _fidx;         // Unique number for this piece of code
+  public TypeFunSig _sig;   // Apparent signature; clones typically sharpen
   // Operator precedence; only set on top-level primitive wrappers.
   // -1 for normal non-operator functions and -2 for forward_decls.
   public final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
   // Function is parsed infix, with the RHS argument thunked.  Flag is used by
   // the Parser only for short-circuit operations like '||' and '&&'.
   public final boolean _thunk_rhs;
-  private byte _cnt_size_inlines; // Count of size-based inlines
+  // Hindly-Milner non-generative set, used during cloning
+  private TV2[] _nongens;
+
+  private byte _cnt_size_inlines; // Count of size-based inlines; prevents infinite unrolling via inlining
   public static int _must_inline; // Used for asserts
 
   // Used to make the primitives at boot time.  Note the empty displays: in
@@ -98,8 +103,6 @@ public class FunNode extends RegionNode {
   public static void reset() { FUNS.clear(); _must_inline=0; }
   public static FunNode find_fidx( int fidx ) { return FUNS.atX(fidx); }
   int fidx() { return _fidx; }
-
-  // Fast reset of parser state between calls to Exec
 
   // Short self name
   @Override public String xstr() { return name(); }
@@ -189,6 +192,8 @@ public class FunNode extends RegionNode {
   }
   public int nargs() { return _sig.nargs(); }
   void set_is_copy() { set_def(0,this); Env.GVN.add_reduce_uses(this); }
+
+  public void set_nongens(TV2[] nongens) { _nongens = nongens; }
 
   // ----
   // Graph rewriting via general inlining.  All other graph optimizations are
@@ -681,8 +686,11 @@ public class FunNode extends RegionNode {
     HashMap<Node,Node> map = new HashMap<>();
     // Collect aliases that are cloning.
     BitSet aliases = new BitSet();
+    // Build a clonable set of TVars
+    TV2 tvs = TV2.make("inline_bulk", (UQNodes)null, "inline_bulk");
     // Clone the function body
     map.put(this,fun);
+    tvs.unify_at(_uid,tvar(),false);
     for( Node n : body ) {
       if( n==this ) continue;   // Already cloned the FunNode
       int old_alias = n instanceof NewNode ? ((NewNode)n)._alias : -1;
@@ -690,12 +698,15 @@ public class FunNode extends RegionNode {
       map.put(n,c);               // Map from old to new
       if( old_alias != -1 )       // Was a NewNode?
         aliases.set(old_alias);   // Record old alias before copy/split
+      tvs.unify_at(n._uid,n.tvar(),false); // Gather all TVars
       // Slightly better error message when cloning constructors
       if( path > 0 ) {
         if( n instanceof IntrinsicNode ) ((IntrinsicNode)c)._badargs = path_call._badargs[1];
         if( n instanceof   MemPrimNode ) ((  MemPrimNode)c)._badargs = path_call._badargs;
       }
     }
+    // Clone the TVars.  Rename the tvar._ns sets as well.
+    TV2 tvs_copy = tvs.repl_rename(_nongens,map);
 
     // Fill in edges.  New Nodes point to New instead of Old; everybody
     // shares old nodes not in the function (and not cloned).
@@ -706,6 +717,9 @@ public class FunNode extends RegionNode {
         Node newdef = map.get(def);// Map old to new
         c.add_def(newdef==null ? def : newdef);
       }
+      // Switch out the TVars
+      c._tvar.free();
+      c._tvar = tvs_copy.get(n._uid);
     }
 
     // Keep around the old body, even as the FunPtrs get shuffled from Call to Call
@@ -865,14 +879,9 @@ public class FunNode extends RegionNode {
     }
 
     // Get a good H-M after edges for Calls and CallEpis; needed for unify_lift typing.
-    for( Node nn : map.values() )
-      if( nn instanceof CallNode )
-        ((CallNode)nn).cepi().unify(false);
-
-    // Force-unify the new function nodes, so they can unify_lift
-    for( Node nn : map.values() )
-      if( !nn.is_dead() ) nn.unify(false);
-
+    for( CallEpiNode cepi : unwireds )
+      cepi.unify(false);
+    
     // Retype memory, so we can everywhere lift the split-alias parents "up and out".
     GVNGCM.retype_mem(aliases,this.parm(MEM_IDX), oldret, true);
     GVNGCM.retype_mem(aliases,fun .parm(MEM_IDX), newret, true);

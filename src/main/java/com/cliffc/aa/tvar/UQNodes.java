@@ -2,6 +2,7 @@ package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.util.*;
+import java.util.HashMap;
 
 // Unique immutable lazy-defined sets of Nodes.
 public class UQNodes extends NonBlockingHashMapLong<Node> {
@@ -62,6 +63,18 @@ public class UQNodes extends NonBlockingHashMapLong<Node> {
     for( Node n : uq0.values() ) if( !n.is_dead() ) KEY.put(n._uid,n);
     for( Node n : uq1.values() ) if( !n.is_dead() ) KEY.put(n._uid,n);
 
+    return intern();
+  }
+
+  // Replace via the map
+  public UQNodes rename(HashMap<Node,Node> map) {
+    assert KEY.isEmpty();
+    for( Node n : values() )
+      if( !n.is_dead() ) {
+        Node c = map.get(n);
+        if( c==null ) c = n;
+        KEY.put(c._uid,c);
+      }
     return intern();
   }
 

@@ -513,30 +513,32 @@ public final class CallEpiNode extends Node {
   // ASSERT/JOIN.  Hence the incoming type can be lifted to the join.
   private Type unify_lift( Type t, TV2 tv, Type tcmem ) {
     // TODO: Turn this back on
-    //if( tv==null ) return t; // No structure, no change
-    //if( tv.is_base() ) t = t.join(tv._type);
-    //TV2 tvar  = call().tvar();
-    //Type tcall = call()._val;
-    //// Since tcall memory is pre-filtered for the call, and we want the memory
-    //// *into* the call (not the filtered memory into the Fun), peel the
-    //// top-layer of tvars/types and handle the pre-call memory special.
-    //if( !(tvar.is_tvar() && tcall instanceof TypeTuple) ) return t;
-    //TypeTuple ttcall = (TypeTuple)tcall;
-    //assert tvar.isa("Args");
-    //Type t2 = tvar.get(MEM_IDX).find_tvar(tcmem,tv);
-    //// Found in input memory; JOIN with the call return type.
-    //if( t2 != null && t2!=t && !t2.above_center() )
-    //  t = t2.widen().join(t);
-    //// Check the other inputs.
-    //for( int i=MEM_IDX+1;i<call()._defs._len-1; i++ ) {
-    //  TV2 tvi = tvar.get(i);
-    //  if( tvi != null ) {
-    //    Type t3 = tvi.find_tvar(ttcall.at(i),tv);
-    //    // Found in input args; JOIN with the call return type.
-    //    if( t3 != null && t3!=t && !t3.above_center() )
-    //      t = t3.widen().join(t);
-    //  }
-    //}
+    if( tv==null ) return t; // No structure, no change
+    if( tv.is_base() ) t = t.join(tv._type);
+    TV2 tvar  = call().tvar();
+    Type tcall = call()._val;
+    // Since tcall memory is pre-filtered for the call, and we want the memory
+    // *into* the call (not the filtered memory into the Fun), peel the
+    // top-layer of tvars/types and handle the pre-call memory special.
+    if( !(tvar.is_tvar() && tcall instanceof TypeTuple) ) return t;
+    TypeTuple ttcall = (TypeTuple)tcall;
+    assert tvar.isa("Args");
+    TV2 tv2 = tvar.get(MEM_IDX);
+    if( tv2==null ) return t;
+    Type t2 = tv2.find_tvar(tcmem,tv);
+    // Found in input memory; JOIN with the call return type.
+    if( t2!=t && !t2.above_center() )
+      t = t2.widen().join(t);
+    // Check the other inputs.
+    for( int i=MEM_IDX+1;i<call()._defs._len-1; i++ ) {
+      TV2 tvi = tvar.get(i);
+      if( tvi != null ) {
+        Type t3 = tvi.find_tvar(ttcall.at(i),tv);
+        // Found in input args; JOIN with the call return type.
+        if( t3!=t && !t3.above_center() )
+          t = t3.widen().join(t);
+      }
+    }
     return t;
   }
 

@@ -26,6 +26,11 @@ public abstract class Work implements Function<Node,Node> {
   }
   public Node at(int i) { return _work.at(i); }
   public void del(int i) { _on.clear(at(i)._uid); _work.del(i); }
+  public void del(Node n) {
+    if( !_on.get(n._uid) ) return;
+    _on.clear(n._uid);
+    _work.del(n);
+  }
 
   public boolean isEmpty() { return _work._len==0; }
   public boolean on(Node n) { return _on.test(n._uid); }

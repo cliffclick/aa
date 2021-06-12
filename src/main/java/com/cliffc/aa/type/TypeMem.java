@@ -321,7 +321,7 @@ public class TypeMem extends Type<TypeMem> {
   public boolean live_no_disp() {
     return this==TypeMem.NO_DISP || this==TypeMem.ESC_NO_DISP || this==TypeMem.DEAD;
   }
-  
+
   // Shallow meet of all possible loadable values.  Used in Node.value calls, so must be monotonic.
   public TypeObj ld( TypeMemPtr ptr ) {
     if( ptr._aliases == BitsAlias.NIL.dual() || ptr._aliases == BitsAlias.NIL )
@@ -535,6 +535,12 @@ public class TypeMem extends Type<TypeMem> {
       if( tos[i] != null )
         tos[i] = tos[i].flatten_fields();
     return make0(tos);
+  }
+  public boolean is_flattened() {
+    for( int i=1; i< _pubs.length; i++ )
+      if( _pubs[i]!=null && !_pubs[i].is_flattened() )
+        return false;
+    return true;
   }
 
   @Override public TypeMem widen() {

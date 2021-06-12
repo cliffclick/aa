@@ -158,6 +158,7 @@ public class Env implements AutoCloseable {
     BitsAlias .reset_to_init0();
     BitsFun   .reset_to_init0();
     BitsRPC   .reset_to_init0();
+    TV2       .reset_to_init0();
     GVN       .reset_to_init0();
     Node      .reset_to_init0();
     FunNode   .reset();

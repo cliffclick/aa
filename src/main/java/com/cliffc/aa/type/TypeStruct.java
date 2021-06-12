@@ -1319,10 +1319,17 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return malloc(trhs._name,false,trhs._flds,ts,flags,trhs._open&_open).hashcons_free();
   }
 
+  @Override boolean is_flattened() {
+    for( int i=0; i<_ts.length; i++ )
+      if( _ts[i] != Type.XSCALAR &&
+          _ts[i] != Type.SCALAR  &&
+          _ts[i] != Type.NSCALR )
+        return false;
+    return true;
+  }
   @Override TypeObj flatten_fields() {
     Type[] ts = Types.clone(_ts);
-    for( int i=0; i<ts.length; i++ )
-      ts[i] = ts[i].meet(Type.NSCALR);
+    Arrays.fill(ts, Type.SCALAR);
     return make_from(_any,ts,fbots(_ts.length));
   }
 

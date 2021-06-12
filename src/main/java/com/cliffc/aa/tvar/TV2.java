@@ -171,6 +171,10 @@ public class TV2 {
   public static TV2 DEAD = new TV2("Dead",null,null,null,"static");
   public static TV2 NIL  = new TV2("Nil" ,null,null,null,"static");
 
+  public static void reset_to_init0() {
+    NIL._deps = DEAD._deps = null;
+    NIL._ns   = DEAD._ns   = null;
+  }
   public void reset(Node n) { if( _ns!=null ) _ns.remove(n._uid); }
 
   public void free() {
@@ -414,7 +418,7 @@ public class TV2 {
   private TV2 vput(TV2 that) { VARS.put(this,that); return that; }
 
   // Replicate LHS, including structure and cycles, replacing leafs as they appear
-  TV2 repl(TV2[] vs) {
+  private TV2 repl(TV2[] vs) {
     assert !is_unified();        // Already chased these down
     if( is_dead() ) return this; // Dead always unifies and wins
     TV2 t = VARS.get(this);      // Prior answer?
@@ -435,6 +439,26 @@ public class TV2 {
       rez._args.put(key,get(key).repl(vs));
     return rez;
   }
+
+  // Do a repl, then rename all _ns lists.
+  public TV2 repl_rename(TV2[]vs, HashMap<Node,Node> map) {
+    assert VARS.isEmpty() && DUPS.isEmpty();
+    TV2 tv = repl(vs);
+    _rename(tv,map);
+    VARS.clear();  DUPS.clear();
+    return tv;
+  }
+  private void _rename(TV2 tv, HashMap<Node,Node> map) {
+    if( DUPS.get(_uid) != null ) return; // Been there, remapped this
+    DUPS.put(_uid,this);                 // Only remap once
+    if( this==tv ) return;               // Using the same TVar
+    assert tv._ns==null;
+    tv._ns = _ns==null ? null : _ns.rename(map);
+    if( _args != null )
+      for( Object key : _args.keySet() )
+        _args.get(key)._rename(tv.get(key),map);
+  }
+
 
   // --------------------------------------------
 
@@ -490,14 +514,15 @@ public class TV2 {
   // assert all the others have the same Type.
   public Type find_tvar(Type t, TV2 tv) {
     assert DUPS.isEmpty();
-    Type rez = _find_tvar(t,tv,null);
+    Type rez = _find_tvar(t,tv,Type.ALL);
     DUPS.clear();
     return rez;
   }
   private Type _find_tvar(Type t, TV2 tv, Type rez) {
     if( tv.is_dead() ) return rez;
+    if( t==Type.ALL ) return rez; // Join against 'ALL' never changes anything
     if( tv==this ) {
-      assert rez==null || rez==t || rez.widen()==t.widen(): "Found multiple refs to tvar with diff types, "+ t +","+ rez;
+      rez = rez.join(t);
       return t;
     }
     switch(_name) {
@@ -522,9 +547,8 @@ public class TV2 {
       }
       return rez;
     case "Fun":
-      if( t == Type.ALL || t == Type.ANY ) return rez; // No substructure in type
       if( t.is_forward_ref() ) return rez;
-      assert t instanceof TypeFunPtr;
+      if( !(t instanceof TypeFunPtr) ) return rez;
       // TypeFunPtrs carry only a set of FIDXS & a DISPLAY.
       // Hence no other Type is available here for lifting.
       return rez;

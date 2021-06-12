@@ -118,13 +118,13 @@ public class ScopeNode extends Node {
     Type tmem = mem._val;
     Type trez = rez._val;
     if( !(tmem instanceof TypeMem ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
-    if( TypeMemPtr.OOP.isa(trez) ) return (TypeMem)tmem; // All possible pointers, so all memory is alive
+    if( TypeMemPtr.OOP.isa(trez) ) return ((TypeMem)tmem).flatten_fields(); // All possible pointers, so all memory is alive
     if( !(trez instanceof TypeMemPtr) ) return TypeMem.ANYMEM; // Not a pointer, basic live only
     if( trez.above_center() ) return TypeMem.ANYMEM; // Have infinite choices still, report basic live only
     // Find everything reachable from the pointer and memory, and report it all
     TypeMem tmem0 = (TypeMem)tmem;
     BitsAlias aliases = tmem0.all_reaching_aliases(((TypeMemPtr)trez)._aliases);
-    return tmem0.slice_reaching_aliases(aliases);
+    return tmem0.slice_reaching_aliases(aliases).flatten_fields();
   }
 
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
@@ -150,7 +150,7 @@ public class ScopeNode extends Node {
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.
     if( def == mem() )
-      return opt_mode==GVNGCM.Mode.Parse ? TypeMem.ALLMEM : _live;
+      return opt_mode==GVNGCM.Mode.Parse ? TypeMem.ALLMEM : _live.flatten_fields();
     // Merging exit path
     return def._live;
   }

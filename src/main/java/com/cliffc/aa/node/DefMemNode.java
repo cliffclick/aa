@@ -1,8 +1,11 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeObj;
+
 import static com.cliffc.aa.Env.GVN;
 
 public class DefMemNode extends Node {
@@ -69,4 +72,3 @@ public class DefMemNode extends Node {
     return obj;
   }
 }
-

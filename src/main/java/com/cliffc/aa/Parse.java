@@ -950,6 +950,8 @@ public class Parse implements Comparable<Parse> {
     try( GVNGCM.Build<Node> X = _gvn.new Build<>()) { // Nest an environment for the local vars
       // Build the FunNode header
       FunNode fun = (FunNode)X.xform(new FunNode(ids.asAry(),ts.asAry()).add_def(Env.ALL_CTRL));
+      // Record H-M VStack in case we clone
+      fun.set_nongens(_e._nongen.compact());
       // Build Parms for system incoming values
       Node rpc = X.xform(new ParmNode(0      ,"rpc" ,fun,con(TypeRPC.ALL_CALL),null));
       Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));

@@ -333,7 +333,12 @@ public class TestParse {
     // Lexical scoping.  Before a new field is created, the external variable is used.
     // After the new field, the new field is used.
     test("x=@{a:=1;b=@{a=a+1;c=a}}; x.a*10+x.b.c",TypeInt.con(1*10+2));
-    // Functions only make new fields if no prior one exists.
+    // Similar to Python; if the first ref to a variable finds it in some
+    // (possibly external) scope, futher refs all refer to the same variable.
+    // Here 'a:=a+1' or 'a++' in the scope of 'b' increment the external variable.
+    // If the first ref to a variable is a set/store, then the variable
+    // is defined locally.  Hence 'b=0' shadows the external x.b, and x.b
+    // is NOT set to 0.
     test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
 
     // Tuple
