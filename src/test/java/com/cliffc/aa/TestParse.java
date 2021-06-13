@@ -13,16 +13,11 @@ import static org.junit.Assert.*;
 
 public class TestParse {
   private static final String[] FLDS = new String[]{"^","n","v"};
-  private static final BitsFun TEST_FUNBITS = BitsFun.make0(50);
+  private static final BitsFun TEST_FUNBITS = BitsFun.make0(46);
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
-  @Ignore
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
-
-    // Straight from TestHM.test08; types as {A -> (A,A)}
-    //test("fun={ g -> f={x -> g}; (f 3,f 1)}; (99,fun \"abc\",fun 3.14)", TypeFunPtr.make(TEST_FUNBITS,3,tdisp));
-
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
     // The Meet loses precision to fast.  This is a typing bug.
@@ -457,13 +452,13 @@ public class TestParse {
     assertEquals("val" ,tt4._flds[2]);
 
     // Test inferring a recursive struct type, with a little help
-    Type[] ts0 = TypeStruct.ts(Type.XNIL, TypeMemPtr.make_nil(20,TypeObj.ISUSED),TypeFlt.con(1.2*1.2));
+    Type[] ts0 = TypeStruct.ts(Type.XNIL, TypeMemPtr.make_nil(14,TypeObj.ISUSED),TypeFlt.con(1.2*1.2));
     test_struct("map={x:@{n=;v=flt}? -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
                 TypeStruct.make(FLDS2,ts0,TypeStruct.ffnls(3)));
 
     // Test inferring a recursive struct type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
-    Type[] ts1 = TypeStruct.ts(Type.XNIL, TypeMemPtr.make_nil(29,TypeObj.ISUSED),TypeFlt.con(1.2*1.2));
+    Type[] ts1 = TypeStruct.ts(Type.XNIL, TypeMemPtr.make_nil(23,TypeObj.ISUSED),TypeFlt.con(1.2*1.2));
     test_struct("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
                 TypeStruct.make(FLDS2,ts1,TypeStruct.ffnls(3)));
 
@@ -733,20 +728,19 @@ public class TestParse {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
 
-    // Straight from TestHM.test08; types as {A -> (A,A)}.
-    // Function is never called, so returns the uncalled-function type.
-    test("{ g -> f={x -> g}; (f 3,f 1)}", TypeFunPtr.make(TEST_FUNBITS,ARG_IDX+1,Type.ANY));
-    test("fun={ g -> f={x -> g}; (f 3,f 1)}", TypeFunPtr.make(TEST_FUNBITS,3,tdisp));
-    // Called with different typevars A
-    test("fun={ g -> f={x -> g}; (f 3,f 1)}; (fun \"abc\",fun 3.14)", TypeFunPtr.make(TEST_FUNBITS,3,tdisp));
-
-
     // ID in different contexts; in general requires a new TypeVar per use; for
     // such a small function it is always inlined completely, has the same effect.
     test("id={x->x};id(1)",TypeInt.con(1));
     test("{x->x}(3.14)",TypeFlt.con(3.14));
     test_prim("{x->x}({+})","+");
     test("id={x->x};id({+})(id(1),id(math_pi))",TypeFlt.make(0,64,Math.PI+1));
+
+    // Straight from TestHM.test08; types as {A -> (A,A)}.
+    // Function is never called, so returns the uncalled-function type.
+    test("fun={ g -> f={x -> g}; (f 3,f 1)}", TypeFunPtr.make(BitsFun.make0(46),ARG_IDX+1,Type.ANY));
+    // Called with different typevars A
+    test_ptr("fun={ g -> f={x -> g}; (f 3,f 1)}; (fun \"abc\",fun 3.14)",
+      "(*(*\"abc\", $), *(3.14, 3.14))");
 
     // recursive unification.  Trivially types as a dead fcn ptr.
     test_isa("x={x -> x x}",TypeFunPtr.make(BitsFun.make0(46),3,tdisp));

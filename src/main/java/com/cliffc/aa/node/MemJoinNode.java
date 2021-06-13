@@ -202,9 +202,12 @@ public class MemJoinNode extends Node {
       mprj.insert(base);         // Move split mprj users to base
       head.set_def(1,mprj);      // Move head->head.in(1) to head->MProj
       X.add(msp);
+      X.add(mprj);
       X.add(base);
       X.add(head);
-      GVN.revalive(base);
+      base.unkeep();  mprj.unkeep();
+      GVN.revalive(mprj,base);
+      base.keep();  mprj.keep();
       return (X._ret=this);
     }
   }
