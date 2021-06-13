@@ -37,7 +37,12 @@ public class ProjNode extends Node {
 
   // Unify with the parent TVar sub-part
   @Override public boolean unify( boolean test ) {
-    if( in(0) instanceof NewNode ) return false; // TODO: Not really a proper use of Proj
+    if( in(0) instanceof NewNode ) { // TODO: Not really a proper use of Proj
+      NewNode nnn = (NewNode)in(0);
+      TV2 tv = tvar();
+      if( tv.is_base() && tv._type==nnn._tptr ) return false; // No progress
+      return tv.unify(TV2.make_base(this,nnn._tptr,"DProj_NewNode"),test);
+    }
     TV2 tv0 = tvar(0);
     return tv0._args!=null && tv0.unify_at(_idx,tvar(),test);
   }

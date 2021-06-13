@@ -2,6 +2,7 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -325,7 +326,7 @@ public class Parse implements Comparable<Parse> {
         }
       }
 
-      toks .add(_e.add_var(tok.intern()));
+      toks .add(_e._nongen.add_var(tok.intern(),TV2.make_leaf_ns(null,"Env.add_var")));
       ts   .add(t  );
       badfs.add(badf);
       badts.add(badt);
@@ -966,6 +967,8 @@ public class Parse implements Comparable<Parse> {
         // extra argument and replaces the default.
         NewObjNode stk = e._scope.stk();
         stk.update(0,ts_mutable(false),clo);
+        // Add a nongen memory arg
+        _e._nongen.add_var(" mem",mem.tvar());
 
         // Parms for all arguments
         Parse errmsg = errMsg();  // Lazy error message

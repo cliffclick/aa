@@ -88,8 +88,14 @@ public class TV2 {
     TV2 tv = _args.get(key);
     if( tv==null ) return null;
     TV2 tv2 = tv.find();
-    if( tv!=tv2 ) _args.put(key,tv2);
+    if( tv!=tv2 ) args_put(key,tv2);
     return tv2;
+  }
+
+  // When inserting a new key, propagate deps
+  void args_put(Object key, TV2 tv) {
+    _args.put(key,tv);          // Pick up a key->tv mapping
+    merge_deps(tv);             // tv gets all deps that 'this' has
   }
 
   // Unify-at a selected key
@@ -100,8 +106,7 @@ public class TV2 {
     if( old!=null )
       return old.unify(tv2,test);
     if( test ) return true;
-    _args.put(key,tv2);
-    merge_deps(tv2);            // Send deps about also
+    args_put(key,tv2);
     Env.GVN.add_flow(_deps);    // Re-CallEpi
     return true;
   }
@@ -321,7 +326,7 @@ public class TV2 {
     for( Object key : _args.keySet() ) {
       TV2 vthis =       get(key);  assert vthis!=null;
       TV2 vthat =  that.get(key);
-      if( vthat==null ) that._args.put(key,vthis);
+      if( vthat==null ) that.args_put(key,vthis);
       else              { vthis._unify(vthat,test); that = that.find(); }
       assert !that.is_unified();
     }
@@ -402,7 +407,7 @@ public class TV2 {
       TV2 rhs = that.get(key);
       if( rhs==null ) {         // No RHS to unify against
         if( !test ) {           // RHS is a fresh copy of the LHS
-          that._args.put(key,lhs.repl(vs));
+          that.args_put(key,lhs.repl(vs));
           Env.GVN.add_flow(that._deps); // Re-CallEpi
         }
         progress = true;
@@ -436,7 +441,7 @@ public class TV2 {
     TV2 rez = new TV2(_name, new NonBlockingHashMap<>(),null,null,"TV2_repl_deep");
     VARS.put(this,rez); // Insert in dups BEFORE structural recursion, to stop cycles
     for( Object key : _args.keySet() )
-      rez._args.put(key,get(key).repl(vs));
+      rez.args_put(key,get(key).repl(vs));
     return rez;
   }
 
@@ -452,8 +457,9 @@ public class TV2 {
     if( DUPS.get(_uid) != null ) return; // Been there, remapped this
     DUPS.put(_uid,this);                 // Only remap once
     if( this==tv ) return;               // Using the same TVar
-    assert tv._ns==null;
-    tv._ns = _ns==null ? null : _ns.rename(map);
+    assert tv._ns==null && tv._deps==null;
+    tv._deps= _deps==null ? null : _deps.rename(map);
+    tv._ns  = _ns  ==null ? null : _ns  .rename(map);
     if( _args != null )
       for( Object key : _args.keySet() )
         _args.get(key)._rename(tv.get(key),map);
@@ -478,8 +484,8 @@ public class TV2 {
         if( test ) return true; // Definitely will be progress
         progress = true;
         TV2 tvo = make("Obj",ldst,alloc_site);
-        _args.put(alias,tvo);
-        tvo._args.put(fld,tv);
+        args_put(alias,tvo);
+        tvo.args_put(fld,tv);
       } else if( tobj.isa("Obj") ) {
         progress = tobj.unify_at(fld,tv.find(),test);
       } else if( tobj.is_dead() || tobj.isa("Err") ) {
@@ -559,6 +565,7 @@ public class TV2 {
       return rez;
     case "Base":
     case "Dead":
+    case "Err":
     case "Leaf":
     case "Nil":
       return rez; // No substructure in TV2 and not equal already

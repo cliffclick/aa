@@ -243,7 +243,6 @@ public class Env implements AutoCloseable {
   // typically just a single variable, currently being defined.
   Node nongen_pop(Node ret) { _nongen = _nongen._par; return ret;}
   void nongen_push(Env par) { _nongen = new VStack(par._nongen); }
-  String add_var(String fld) { return _nongen.add_var(fld,TV2.make_leaf_ns(null,"Env.add_var")); }
   public static class VStack {
     public final VStack _par;          // Parent
     public Ary<String> _flds;          // Field names, unique per-Scope

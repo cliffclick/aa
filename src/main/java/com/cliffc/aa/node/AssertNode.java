@@ -101,8 +101,14 @@ public class AssertNode extends Node {
       if( actual.isa(_t) )
         return t1;
     }
+    // Value is capped to the assert value.
     return t1.oob(t0);
   }
+  @Override public void add_flow_use_extra(Node chg) {
+    if( ideal_reduce()!=null )
+      Env.GVN.add_reduce(this);
+  }
+
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==arg() ) return _live;                   // Alive as I am
     // Alive (like normal liveness), plus the address, plus whatever can be
