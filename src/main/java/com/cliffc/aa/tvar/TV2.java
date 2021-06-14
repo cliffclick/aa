@@ -545,6 +545,8 @@ public class TV2 {
     case "Obj":
       if( t==TypeObj.UNUSED || t==TypeObj.ISUSED )
         return rez; // No substructure in type
+      if( t instanceof TypeStr || t instanceof TypeAry )
+        return rez; // TODO: Handle These
       TypeStruct ts = (TypeStruct)t; //
       for( Object key : _args.keySet() ) {
         int idx = ts.find((String)key);
@@ -563,6 +565,9 @@ public class TV2 {
       for( int i=0; i<tt.len(); i++ )
         rez = get(i)._find_tvar(tt.at(i),tv,rez);
       return rez;
+    case "Ptr":
+      if( !(t instanceof TypeMemPtr) ) return rez;
+      return get(0)._find_tvar(((TypeMemPtr)t)._obj,tv,rez);
     case "Base":
     case "Dead":
     case "Err":

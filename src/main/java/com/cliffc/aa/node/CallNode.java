@@ -487,6 +487,9 @@ public class CallNode extends Node {
     for( Node def : _defs )
       if( def._live!=TypeMem.ESCAPE && err(true)!=null )
         Env.GVN.add_flow(def);
+    // If not resolved, might now resolve
+    if( _val instanceof TypeTuple && ttfp(_val)._fidxs.abit()==-1 )
+      Env.GVN.add_reduce(this);
   }
   @Override public void add_flow_def_extra(Node chg) {
     // Projections live after a call alter liveness of incoming args

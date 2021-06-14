@@ -90,6 +90,10 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     return to.above_center() ? TypeMem.DEAD : TypeMem.ESCAPE;
   }
 
+  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Obj",this,alloc_site); }
+  
+  abstract public boolean unify( boolean test );
+
   @Override BitsAlias escapees() { return _tptr._aliases; }
   abstract T dead_type();
   boolean is_unused() { return _ts==dead_type(); }

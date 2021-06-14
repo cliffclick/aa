@@ -15,9 +15,11 @@ public class ConNode<T extends Type> extends Node {
     _t=t;
     _live = all_live();
     _tvar.free();
-    _tvar = t==TypeMem.MEM
-      ? TV2.make_mem(this,"Con_mem_constructor")
-      : TV2.make_base(this,t,"Con_base_constructor");
+    TV2 tv = null;
+    if( t        ==TypeMem.MEM ) tv = TV2.make_mem (this,"Con_mem_constructor");
+    if( t.widen()==Type.SCALAR ) tv = TV2.make_leaf(this,"Con_leaf_constructor");
+    if( tv==null )               tv = TV2.make_base(this,t,"Con_base_constructor");
+    _tvar = tv;
   }
   // Used by e.g. Env.XNIL to use dedicated TV2.NIL
   public ConNode( T t, TV2 tvar ) {

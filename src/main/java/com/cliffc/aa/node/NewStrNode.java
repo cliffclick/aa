@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
@@ -11,6 +12,15 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   public NewStrNode( TypeStr to, String name, boolean reads, int op_prec, Type... args) {
     super(OP_NEWSTR,BitsAlias.STR,to,name,reads,op_prec,args);
   }
+  @Override public boolean unify( boolean test ) {
+    // Self should always should be a TObj
+    TV2 tvar = tvar();
+    if( tvar.is_dead() ) return false;
+    assert tvar.isa("Obj");
+    // TODO: Structural unification on all fields
+    return false;
+  }
+
   @Override TypeStr dead_type() { return TypeStr.XSTR; }
   protected static void add_libs( Ary<NewPrimNode> INTRINSICS ) {
     INTRINSICS.push(new ConvertI64Str());

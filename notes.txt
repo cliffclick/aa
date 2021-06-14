@@ -1,3 +1,40 @@
+=======================================
+6/14/2021
+
+Up to dealing with memory and arrays in the Type vars.
+Missing a grammer to type the state of memory.
+
+Grammar:
+ *  type = tcon | tvar | tfun[?] | tstruct[?] | ttuple[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nilable'
+ *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
+ *  tfun = {[[type]* ->]? type }   // Function types mirror func declarations
+ *  ttuple = ( [[type],]* )        // Tuple types are just a list of optional types;
+                                   // the count of commas dictates the length, zero commas is zero length.
+                                   // Tuples are always final.
+ *  tmod = := | = | ==             // Field assignment modifier; ':=' or '' is r/w, '=' is final, '==' is r/o
+ *  tstruct = @{ [id [tmod [type?]],]*}  // Struct types are field names with optional types.  Spaces not allowed
+ *  tvar = id                      // Type variable lookup
+// Nested type var, for repeats in the same type expression.
+// If 'id' is used and not an external tvar, then its treated as a free TVar.
+// If 'id' is assigned, then it shadows as a free TVar.
+// If 'id' is not top-level, then it never escapes the local type expression.
+ *  tvar= id=type
+// Arrays, no length.  Layout is taken from elem.
+ *  tary = []elem
+// Memory types can be followed with a tmod; this covers the entire object.
+ *  tary = []=elem
+ *  tstruct = @{ [id [tmod [type?]],]*}=
+ *  ttuple = ( [[type],]* )=
+
+// Some common primitives typed
+Array-load :  {[]} : { []==elem int      -> elem } = ...  // array is read/only
+Array-store:  {[]=}: { []  elem int elem -> elem } = ...  // array is read/write
+int-add    :  {+}  : { int int -> int } = ... // no memory effects
+flt-add    :  {+}  : { flt flt -> flt } = ... // no memory effects
+            sys.cp : { []==elem int []elem int int -> 0 } = ... // src array is read/only, dst array is read/write; nil return
+
+
+
 
 =======================================
 6/8/2021

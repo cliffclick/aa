@@ -1,6 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
@@ -11,6 +11,16 @@ abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
     super(OP_NEWARY,BitsAlias.AARY,tary,name,false,op_prec,Type.CTRL,TypeMem.ALLMEM,null,sz);
   }
   @Override TypeAry dead_type() { return TypeAry.ARY.dual(); }
+
+  @Override public boolean unify( boolean test ) {
+    // Self should always should be a TObj
+    TV2 tvar = tvar();
+    if( tvar.is_dead() ) return false;
+    assert tvar.isa("Obj");
+    // TODO: Structural unification on all fields
+    return false;
+  }
+
 
   protected static void add_libs( Ary<NewPrimNode> INTRINSICS ) {
     INTRINSICS.push(new NewAry(TypeAry.ARY0,TypeInt.INT64));

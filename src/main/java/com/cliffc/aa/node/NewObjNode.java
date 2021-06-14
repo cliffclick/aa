@@ -150,8 +150,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
     return t.above_center() ? TypeMem.DEAD : (t==Type.NSCALR ? TypeMem.ESC_NO_DISP : TypeMem.ESCAPE);
   }
 
-  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Obj",this,alloc_site); }
-
   @Override public boolean unify( boolean test ) {
     // Self should always should be a TObj
     TV2 tvar = tvar();
