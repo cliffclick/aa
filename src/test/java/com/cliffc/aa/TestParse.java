@@ -703,7 +703,6 @@ public class TestParse {
 
   // Array syntax examples
   @Test public void testParse14() {
-    testary("[3] [-1]","Index must be out of bounds",5);
     test_ptr("[3]", "[$]0/obj");
     test    ("ary = [3]; ary[0]", Type.XNIL);
     test    ("[3][0]", Type.XNIL);
@@ -716,7 +715,7 @@ public class TestParse {
     test_obj("[3]:[int]", TypeAry.make(TypeInt.con(3),Type.XNIL,TypeObj.OBJ)); // Array of 3 XNILs in INTs.
     //test("[1,2,3]", TypeAry.make(TypeInt.con(1),TypeInt.con(3),TypeInt.INT8)); // Array of 3 elements
     test("ary=[3];#ary",TypeInt.con(3)); // Array length
-  test_ptr(DO+"ary=[99]; i:=0; do {i++ < #ary} {ary[i]:=i*i};ary", "[$]int64/obj"); // sequential iteration over array
+    test_ptr(DO+"ary=[99]; i:=0; do {i++ < #ary} {ary[i]:=i*i};ary", "[$]int64/obj"); // sequential iteration over array
     // ary.{e -> f(e)} // map over array elements
     // ary.{e -> f(e)}.{e0 e1 -> f(e0,e1) } // map/reduce over array elements
   }

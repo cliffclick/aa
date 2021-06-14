@@ -260,17 +260,21 @@ public class LoadNode extends Node {
 
 
   @Override public boolean unify( boolean test ) {
+    return unify(this,_fld,test,"Load_unify");
+  }
+
+  public static boolean unify( Node n, String fld, boolean test, String alloc_site) {
     // Input should be a TMem
-    TV2 tmem = mem().tvar();
+    TV2 tmem = n.tvar(1);
     if( !tmem.isa("Mem") ) return false;
     // Address needs to name the aliases
-    Type tadr = adr()._val;
+    Type tadr = n.val(2);
     if( !(tadr instanceof TypeMemPtr) ) return false; // Wait until types are sharper
     TypeMemPtr tmp = (TypeMemPtr)tadr;
     // Unify the given aliases and field against the loaded type
-    return tmem.unify_alias_fld(this,tmp._aliases,_fld,tvar(),test,"Load_unify");
+    return tmem.unify_alias_fld(n,tmp._aliases,fld,n.tvar(),test,alloc_site);
   }
-
+  
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;
     if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when reading",_fld);

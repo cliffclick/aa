@@ -173,20 +173,23 @@ public class StoreNode extends Node {
   }
 
   @Override public boolean unify( boolean test ) {
+    return unify(this,rez(),_fld,test,"Store_unify");
+  }
+  
+  public static boolean unify( Node n, Node rez, String fld, boolean test, String alloc_site) {
     // Input should be a TMem
-    TV2 tmem = mem().tvar();
-    boolean progress = tvar().unify(tmem,test);
-    if( progress && test ) return progress;
-    if( !tmem.isa("Mem") ) return progress;
+    TV2 tmem = n.tvar(1);
+    if( !tmem.isa("Mem") ) return false;
     // Address needs to name the aliases
-    Type tadr = adr()._val;
-    if( !(tadr instanceof TypeMemPtr) ) return progress;
+    Type tadr = n.val(2);
+    if( !(tadr instanceof TypeMemPtr) ) return false; // Wait until types are sharper
     TypeMemPtr tmp = (TypeMemPtr)tadr;
-
+    // This produces same memory
+    boolean progress = n.tvar().unify(tmem,test);
+    if( progress && test ) return progress;
+    
     // Unify the given aliases and field against the stored type
-    // TODO: If we have a Precise replacement (single alias, no recursion) then
-    // do not unify with incoming memory at alias - this is a true replacement.
-    return tmem.unify_alias_fld(this,tmp._aliases,_fld,rez().tvar(),test,"Store_unify") | progress;
+    return tmem.unify_alias_fld(n,tmp._aliases,fld,rez.tvar(),test,alloc_site);
   }
 
 }

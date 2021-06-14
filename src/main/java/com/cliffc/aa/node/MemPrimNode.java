@@ -119,6 +119,10 @@ public abstract class MemPrimNode extends PrimNode {
       return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,"#", Type.SCALAR);
     }
 
+    @Override public boolean unify( boolean test ) {
+      return LoadNode.unify(this," len",test,"[]_unify");
+    }
+
     @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
   }
 
@@ -141,6 +145,11 @@ public abstract class MemPrimNode extends PrimNode {
       TypeAry ary = (TypeAry)ptr._obj;
       return ary.ld(idx2);
     }
+
+    @Override public boolean unify( boolean test ) {
+      return LoadNode.unify(this," elem",test,"[]_unify");
+    }
+
     @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
   }
 
@@ -181,6 +190,10 @@ public abstract class MemPrimNode extends PrimNode {
       if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? BitsAlias.EMPTY : BitsAlias.FULL;
       return ((TypeMemPtr)adr)._aliases;
     }
+
+    @Override public boolean unify(boolean test) {
+      throw unimpl();
+    }
   }
 
   // Produces a triop LValue, where the leading TMP is a non-zero array
@@ -202,6 +215,9 @@ public abstract class MemPrimNode extends PrimNode {
       TypeInt    tidx = idx==Type.XNIL ? TypeInt.ZERO : (TypeInt)idx;
       TypeMem tmem2 = tmem.update(tary._aliases,tidx,val);
       return tmem2;
+    }
+    @Override public boolean unify(boolean test) {
+      return StoreNode.unify(this,rez()," elem",test,"[]:=_unify");
     }
     @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
   }
@@ -225,6 +241,9 @@ public abstract class MemPrimNode extends PrimNode {
       TypeInt    tidx = idx==Type.XNIL ? TypeInt.ZERO : (TypeInt)idx;
       TypeMem tmem2 = tmem.update(tary._aliases,tidx,val);
       return tmem2;
+    }
+    @Override public boolean unify(boolean test) {
+      return StoreNode.unify(this,rez()," elem",test,"[]=_unify");
     }
     @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
     @Override public ErrMsg err(boolean fast) {

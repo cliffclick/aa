@@ -34,6 +34,32 @@ flt-add    :  {+}  : { flt flt -> flt } = ... // no memory effects
             sys.cp : { []==elem int []elem int int -> 0 } = ... // src array is read/only, dst array is read/write; nil return
 
 
+// Some more syntax, for actually doing the arg lineup & typing in 'aa'
+{+} : { int int -> int } = { x y -> $Prim.AddI64.make(x,y) } // no memory effect on type
+
+// Ponder oper fcn name using '_' as placeholders for args.
+// Also doing the special FFI syntax to talk to java.
+{_[_]} : { elem[]== int -> elem } = { ary idx -> $LValueRead.make($ctrl,$mem,ary,idx) } // read-only memory effect on type
+{[_]} : { int -> [] } = { ary idx -> $NewAry.make($ctrl,$mem,ary,idx) } // write-only memory effect on return type
+{_[_]=_} : { elem[] int elem -> elem } = { ary idx elem -> $LValueWrite.make($ctrl,$mem,ary,idx,elem) } // since no '==', updates memory
+
+  // Variations on typing arrays in aa code
+  [n] -- untyped array of size 'n'
+  [n]:flt[] -- flt array; "new float[n]".  Preferred; asserts result is typed as flt[]
+  [n]:flt -- special case syntax, ":flt" binds to "[]", and implies "flt[]".  Ambiguous with the below.
+  ary[n]:flt -- does an array lookup, and types the result as 'flt'.  Ambiguous with the above.
+  [n]:[flt] -- NO: another syntax choice, can be confused as claiming the indices have to be of type flt.
+  [:flt n] -- NO: a little odd; unambiguous grammar
+  ary[:flt n] -- NO: unambiguous, loading from an array of float.
+  flt[n] -- NO: injects a type without a ':'
+
+Now need type var syntax for exposed free tvars.
+Have not decided between these two syntaxes:
+  Tree A = : @{ left : Tree A ? , value : A, right : Tree A ? }
+  Tree<A>= : @{ left : Tree<A>? , value : A, right : Tree<A>? }
+
+
+
 
 
 =======================================

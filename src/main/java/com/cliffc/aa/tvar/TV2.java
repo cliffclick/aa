@@ -121,7 +121,8 @@ public class TV2 {
   // Public factories
   // Make a new TV2 attached to a Node.
   public static TV2 make_leaf(Node n, @NotNull String alloc_site) {
-    return make_leaf_ns(UQNodes.make(n),alloc_site);
+    UQNodes ns = n==null ? null : UQNodes.make(n);
+    return make_leaf_ns(ns,alloc_site);
   }
   public static TV2 make_leaf_ns(UQNodes ns, @NotNull String alloc_site) {
     TV2 tv2 = new TV2("Leaf",null,null,ns,alloc_site);
@@ -478,7 +479,6 @@ public class TV2 {
     assert !tv.is_unified();
     boolean progress=false;
     for( int alias : aliases ) {
-      if( alias <= BitsAlias.AARY ) return false; // No unify on parser-specific values
       TV2 tobj = get(alias);
       if( tobj == null ) {      // Missing, act as a fresh TV2 and lazily manifest
         if( test ) return true; // Definitely will be progress
