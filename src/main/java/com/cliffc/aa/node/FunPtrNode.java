@@ -150,7 +150,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     if( tvar_args!=null && tvar_args.eq(parms) && tvar_ret==tret ) return false; // Equal parts
     // Build function arguments; "fun" itself is just control.
     TV2 targ = TV2.make("Args",fun,"FunPtr_unify_Args",parms);
-    NonBlockingHashMap<Object,TV2> args = new NonBlockingHashMap<Object,TV2>(){{ put("Args",targ);  put("Ret",tret); }};
+    NonBlockingHashMap<Comparable,TV2> args = new NonBlockingHashMap<Comparable,TV2>(){{ put("Args",targ);  put("Ret",tret); }};
     TV2 tfun = TV2.make("Fun",this,"FunPtr_unify_Fun",args);
     return tvar.unify(tfun,test);
   }

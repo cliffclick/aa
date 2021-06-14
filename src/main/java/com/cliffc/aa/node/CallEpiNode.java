@@ -499,7 +499,7 @@ public final class CallEpiNode extends Node {
     if( tfdx.isa("Fun") && tcargs==tfargs && tcret==tfret ) return false; // Equal parts, no progress
 
     // Will make progress aligning the shapes
-    NonBlockingHashMap<Object,TV2> args = new NonBlockingHashMap<Object,TV2>(){{ put("Args",tcargs);  put("Ret",tcret); }};
+    NonBlockingHashMap<Comparable,TV2> args = new NonBlockingHashMap<Comparable,TV2>(){{ put("Args",tcargs);  put("Ret",tcret); }};
     TV2 tfun = TV2.make("Fun",this,"CallEpi_unify_Fun",args);
     boolean progress = tfdx.unify(tfun,test);
     if( progress && !test ) {

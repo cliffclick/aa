@@ -274,7 +274,6 @@ public class FunNode extends RegionNode {
       path = _thunk_rhs ? 2 : split_size(body,parms); // Forcible size-splitting first path
       if( path == -1 ) return null;
       assert CallNode.ttfp(in(path).val(0)).fidx()!=-1; // called by a single-target call
-      if( noinline() ) return null;
       if( !is_prim() ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
     }
 
@@ -284,7 +283,7 @@ public class FunNode extends RegionNode {
                                 fun._sig._formals==fformals && fun._sig._ret == _sig._ret &&
                                 fun.in(1)==in(1)) != -1 )
       return null;              // Done this before
-
+    if( noinline() ) return null;
 
     assert _must_inline==0; // Failed to inline a prior inline?
     if( path > 0 ) _must_inline = in(path).in(0)._uid;
@@ -720,6 +719,11 @@ public class FunNode extends RegionNode {
       // Switch out the TVars
       c._tvar.free();
       c._tvar = tvs_copy.get(n._uid);
+      if( c instanceof FreshNode ) {
+        FreshNode fsh = (FreshNode)c;
+        for( int i=0; i<fsh._tv2s.length; i++ )
+          fsh._tv2s[i] = fsh._tv2s[i].repl_rename(null,map);
+      }
     }
 
     // Keep around the old body, even as the FunPtrs get shuffled from Call to Call
@@ -881,7 +885,7 @@ public class FunNode extends RegionNode {
     // Get a good H-M after edges for Calls and CallEpis; needed for unify_lift typing.
     for( CallEpiNode cepi : unwireds )
       cepi.unify(false);
-    
+
     // Retype memory, so we can everywhere lift the split-alias parents "up and out".
     GVNGCM.retype_mem(aliases,this.parm(MEM_IDX), oldret, true);
     GVNGCM.retype_mem(aliases,fun .parm(MEM_IDX), newret, true);

@@ -286,7 +286,7 @@ public class Env implements AutoCloseable {
           for( int i=0; i<vs._tvars._len; i++ ) {
             sb.p(vs._flds.at(i)).p('=');
             TV2 tv2 = vs._tvars.at(i);
-            if( tv2 !=null ) tv2.str(sb,bs,dups,false);
+            if( tv2 !=null ) tv2.str(sb,bs,dups,false,0,0);
             sb.p(", ");
           }
           if( vs._tvars._len>0 ) sb.unchar(2);

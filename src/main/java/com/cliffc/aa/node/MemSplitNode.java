@@ -58,14 +58,14 @@ public class MemSplitNode extends Node {
 
   @Override public boolean unify( boolean test ) {
     TV2 tself = tvar();
-    if( tself.isa("Mem") ) {
+    if( tself.isa("SplitMem") ) {
       assert tself._args.size()==_escs._len; // If changing the split-arity, need to reset_tvar
       return false;
     }
     if( test ) return true;
     Node[] parms = new Node[_escs._len];
     Arrays.fill(parms,mem());
-    return tvar().unify(TV2.make("Mem",this,"unify",parms),test);
+    return tvar().unify(TV2.make("SplitMem",this,"unify",parms),test);
   }
 
   // Find index for alias

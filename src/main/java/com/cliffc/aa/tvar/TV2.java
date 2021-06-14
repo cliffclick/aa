@@ -7,7 +7,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashMap;
+import java.util.*;
 
 // Type Variable.  TVars unify (ala Tarjan Union-Find), and can have structure
 // (such as "{ A -> B }").  TVars are tied to a TNode to enforce Type structure
@@ -36,7 +36,7 @@ public class TV2 {
   // Set of structural H-M parts.  Indexed by dense integer for fixed-size (ala
   // Args,Ret,Fun), indexed by sparse integer alias for TMem, indexed by String
   // for Obj field names.  Can be null if empty.
-  public NonBlockingHashMap<Object,TV2> _args;
+  public NonBlockingHashMap<Comparable,TV2> _args;
 
   // U-F algo.  Only set when unified, monotonic null->unification_target.
   // Can change again to shorten unification changes.
@@ -57,7 +57,7 @@ public class TV2 {
   static private final HashMap<String,ACnts> ALLOCS = new HashMap<>(); // Counts at alloc sites
 
   // Common constructor
-  private TV2(@NotNull String name, NonBlockingHashMap<Object,TV2> args, Type type, UQNodes ns, @NotNull String alloc_site) {
+  private TV2(@NotNull String name, NonBlockingHashMap<Comparable,TV2> args, Type type, UQNodes ns, @NotNull String alloc_site) {
     _uid = UID++;
     _name = name;
     _args = args;
@@ -83,7 +83,7 @@ public class TV2 {
   public String name() { return _name; }
 
   // Get at a key, with U-F rollup
-  public TV2 get( Object key ) {
+  public TV2 get( Comparable key ) {
     if( _args==null ) return null;
     TV2 tv = _args.get(key);
     if( tv==null ) return null;
@@ -93,13 +93,13 @@ public class TV2 {
   }
 
   // When inserting a new key, propagate deps
-  void args_put(Object key, TV2 tv) {
+  void args_put(Comparable key, TV2 tv) {
     _args.put(key,tv);          // Pick up a key->tv mapping
     merge_deps(tv);             // tv gets all deps that 'this' has
   }
 
   // Unify-at a selected key
-  public boolean unify_at(Object key, TV2 tv2, boolean test ) {
+  public boolean unify_at(Comparable key, TV2 tv2, boolean test ) {
     if( is_dead() ) return unify(tv2,test);
     assert is_tvar() && _args!=null && !tv2.is_unified();
     TV2 old = get(key);
@@ -150,7 +150,7 @@ public class TV2 {
   // Structural constructor, empty
   public static TV2 make(@NotNull String name, Node n, @NotNull String alloc_site ) { return make(name,n,alloc_site,new NonBlockingHashMap<>()); }
   // Structural constructor
-  public static TV2 make(@NotNull String name, Node n, @NotNull String alloc_site, NonBlockingHashMap<Object,TV2> args) {
+  public static TV2 make(@NotNull String name, Node n, @NotNull String alloc_site, NonBlockingHashMap<Comparable,TV2> args) {
     assert args!=null;          // Must have some structure
     TV2 tv2 = new TV2(name,args,null,UQNodes.make(n),alloc_site);
     assert !tv2.is_base() && !tv2.is_leaf();
@@ -159,7 +159,7 @@ public class TV2 {
   // Structural constructor from array of TVs
   public static TV2 make(@NotNull String name, Node n, @NotNull String alloc_site, Node... ntvs) {
     assert ntvs!=null;          // Must have some structure
-    NonBlockingHashMap<Object,TV2> args = new NonBlockingHashMap<>();
+    NonBlockingHashMap<Comparable,TV2> args = new NonBlockingHashMap<>();
     for( int i=0; i<ntvs.length; i++ )
       if( ntvs[i]!=null )
         args.put(i,ntvs[i].tvar());
@@ -218,7 +218,7 @@ public class TV2 {
     DUPS.put(luid,this);                    // Mark for cycle
 
     // Structural recursion
-    for( Object key : _args.keySet() )
+    for( Comparable key : _args.keySet() )
       if( !get(key)._eq(that.get(key)) )
         return false;
     return true;
@@ -324,7 +324,7 @@ public class TV2 {
 
 
     // Structural recursion unification, this into that.
-    for( Object key : _args.keySet() ) {
+    for( Comparable key : _args.keySet() ) {
       TV2 vthis =       get(key);  assert vthis!=null;
       TV2 vthat =  that.get(key);
       if( vthat==null ) that.args_put(key,vthis);
@@ -403,7 +403,7 @@ public class TV2 {
 
     // Structural recursion unification, lazy on LHS
     boolean progress = vput(that,false); // Early set, to stop cycles
-    for( Object key : _args.keySet() ) {
+    for( Comparable key : _args.keySet() ) {
       TV2 lhs =      get(key);  assert lhs!=null;
       TV2 rhs = that.get(key);
       if( rhs==null ) {         // No RHS to unify against
@@ -441,7 +441,7 @@ public class TV2 {
     // Structural recursion replicate
     TV2 rez = new TV2(_name, new NonBlockingHashMap<>(),null,null,"TV2_repl_deep");
     VARS.put(this,rez); // Insert in dups BEFORE structural recursion, to stop cycles
-    for( Object key : _args.keySet() )
+    for( Comparable key : _args.keySet() )
       rez.args_put(key,get(key).repl(vs));
     return rez;
   }
@@ -462,7 +462,7 @@ public class TV2 {
     tv._deps= _deps==null ? null : _deps.rename(map);
     tv._ns  = _ns  ==null ? null : _ns  .rename(map);
     if( _args != null )
-      for( Object key : _args.keySet() )
+      for( Comparable key : _args.keySet() )
         _args.get(key)._rename(tv.get(key),map);
   }
 
@@ -479,6 +479,9 @@ public class TV2 {
     assert !tv.is_unified();
     boolean progress=false;
     for( int alias : aliases ) {
+      // TODO: Probably wrong, as no reason to believe that as soon as alias
+      // sharpens above AARY that it has hit its best sane value.
+      if( alias <= BitsAlias.AARY ) return false; // No unify on parser-specific values
       TV2 tobj = get(alias);
       if( tobj == null ) {      // Missing, act as a fresh TV2 and lazily manifest
         if( test ) return true; // Definitely will be progress
@@ -529,13 +532,13 @@ public class TV2 {
     if( t==Type.ALL ) return rez; // Join against 'ALL' never changes anything
     if( tv==this ) {
       rez = rez.join(t);
-      return t;
+      return rez;
     }
     switch(_name) {
     case "Mem":
       if( t ==Type.ANY ) return rez; // No substructure in type
       TypeMem tmem = (TypeMem)t;
-      for( Object key : _args.keySet() ) {
+      for( Comparable key : _args.keySet() ) {
         TypeObj to = tmem.at((Integer) key);
         TV2 obj = get(key);
         if( obj!=null )
@@ -548,7 +551,7 @@ public class TV2 {
       if( t instanceof TypeStr || t instanceof TypeAry )
         return rez; // TODO: Handle These
       TypeStruct ts = (TypeStruct)t; //
-      for( Object key : _args.keySet() ) {
+      for( Comparable key : _args.keySet() ) {
         int idx = ts.find((String)key);
         if( idx!= -1 )          // If field exists
           rez = get(key)._find_tvar(ts.at(idx),tv,rez);
@@ -606,7 +609,7 @@ public class TV2 {
     if( x==this ) return true;
     if( ODUPS.tset(x._uid) ) return false; // Been there, done that
     if( !x.is_leaf() && x._args!=null )
-      for( Object key : x._args.keySet() )
+      for( Comparable key : x._args.keySet() )
         if( _occurs_in_type(x.get(key)) )
           return true;
     return false;
@@ -642,7 +645,7 @@ public class TV2 {
     if( tc!=null )
       return tc==that; // Cycle check; true if both cycling the same
     CDUPS.put(this,that);
-    for( Object key : _args.keySet() ) {
+    for( Comparable key : _args.keySet() ) {
       TV2 lhs =      get(key);  assert lhs!=null;
       TV2 rhs = that.get(key);
       if( rhs==null || !lhs._cycle_equals(rhs) ) return false;
@@ -669,7 +672,7 @@ public class TV2 {
     if( isa("Dead") ) return;
     _deps = _deps==null ? UQNodes.make(dep) : _deps.add(dep);
     if( _args!=null )
-      for( Object key : _args.keySet() ) // Structural recursion on a complex TV2
+      for( Comparable key : _args.keySet() ) // Structural recursion on a complex TV2
         get(key)._push_update(dep);
   }
 
@@ -687,14 +690,21 @@ public class TV2 {
     NonBlockingHashMapLong<String> dups = new NonBlockingHashMapLong<>();
     VBitSet bs = new VBitSet();
     find_dups(bs,dups,0);
-    return str(new SB(),bs.clr(),dups,true).toString();
+    return str(new SB(),bs.clr(),dups,true,0,0).toString();
+  }
+  public final String str(int d) {
+    NonBlockingHashMapLong<String> dups = new NonBlockingHashMapLong<>();
+    VBitSet bs = new VBitSet();
+    find_dups(bs,dups,0);
+    return str(new SB(),bs.clr(),dups,true,0,d).toString();
   }
 
   // These TV2 types get large, with complex sharing patterns.
   // Need to find the sharing to pretty-print the shared parts.
   public final int find_dups(VBitSet bs, NonBlockingHashMapLong<String> dups, int scnt) {
     if( bs.tset(_uid) ) {
-      if( is_base() || is_dead() ) return scnt;
+      if( is_dead() ) return scnt;
+      if( dups.containsKey(_uid) ) return scnt; // Already has a dup name
       dups.put(_uid,new String(new char[]{(char)('A'+scnt)}));
       return scnt+1;
     }
@@ -702,13 +712,14 @@ public class TV2 {
       return get_unified().find_dups(bs,dups,scnt);
     if( _args!=null )
       for( TV2 tv : _args.values() )
-        if( !(isa("Mem") && _args.get(7) == tv) )
+        if( !(isa("Mem") && _args.get(7) == tv) && // Avoid the Prims
+            !(isa("Ptr") && _ns!=null && _ns.containsKey(19) ) )
           scnt = tv.find_dups(bs,dups,scnt);
     return scnt;
   }
 
   // Pretty print
-  public final SB str(SB sb, VBitSet bs, NonBlockingHashMapLong<String> dups, boolean debug) {
+  public final SB str(SB sb, VBitSet bs, NonBlockingHashMapLong<String> dups, boolean debug, int d, int max) {
     if( is_dead() ) return sb.p("Dead"); // Do not print NS
     if( is_err() ) return sb.p(_type.getstr());
 
@@ -721,7 +732,7 @@ public class TV2 {
     // Explicit U-F chain
     if( is_unified() ) {
       if( debug ) sb.p("V").p(_uid).p(">>");
-      return _unified.str(sb,bs,dups,debug);
+      return _unified.str(sb,bs,dups,debug,d,max);
     }
 
     (is_base() ? sb.p(_type) : sb.p(_name)).p(':');
@@ -736,21 +747,38 @@ public class TV2 {
       sb.p("V").p(_uid);        // So just the _uid
     // Structural contents
     if( _args != null ) {
+      final int min = Math.min(d+1,max);
       switch(_name) {
       case "Fun":
         sb.p(":{ ");
+        if( d < max ) sb.nl().i(min);
         TV2 args = _args.get("Args");
-        if( args==null ) sb.p("Args"); else args.str(sb,bs,dups,debug);
+        if( args==null ) sb.p("Args");
+        else args.str(sb,bs,dups,debug,d+1,max);
+        if( d < max ) sb.nl().i(min);
         sb.p(" -> ");
+        if( d < max ) sb.nl().i(min);
         TV2 ret = _args.get("Ret");
-        if( ret ==null ) sb.p("Ret" ); else ret .str(sb,bs,dups,debug);
+        if( ret ==null ) sb.p("Ret" );
+        else ret .str(sb,bs,dups,debug,d+1,max);
+        if( d < max ) sb.nl().i(d);
         sb.p(" }");
         break;
       default:
         sb.p(":[ ");
-        for( Object key : _args.keySet() )
+        List<? extends Comparable> keys = new ArrayList<>(_args.keySet());
+        Collections.sort(keys);
+        for( Comparable key : keys ) {
+          if( d < max ) sb.nl().i(min);
           if( isa("Mem") && key instanceof Integer && ((Integer)key)==7 ) sb.p("7:PRIMS ");
-          else _args.get(key).str(sb.p(key.toString()).p(':'),bs,dups,debug).p(' ');
+          else if( isa("Ptr") && _ns!=null && _ns.containsKey(19) ) sb.p("PRIMS");
+          else {
+            sb.p(key.toString()).p(':');
+            _args.get(key).str(sb,bs,dups,debug,d+1,max);
+            sb.p(' ');
+          }
+        }
+        if( d < max ) sb.nl().i(d);
         sb.p("]");
       }
     }

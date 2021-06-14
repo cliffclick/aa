@@ -34,7 +34,7 @@ abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
 
   @Override public TV2 new_tvar(String alloc_site) {
     final Node n = this;
-    NonBlockingHashMap<Object,TV2> args = new NonBlockingHashMap<Object,TV2>(){{
+    NonBlockingHashMap<Comparable,TV2> args = new NonBlockingHashMap<Comparable,TV2>(){{
         put(" len" ,TV2.make_base(null,TypeInt.INT64,alloc_site));
         put(" elem",TV2.make_leaf(null,alloc_site));
       }};
