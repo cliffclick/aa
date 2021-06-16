@@ -241,22 +241,12 @@ public class HM {
   static abstract class Syntax {
     Syntax _par;
     VStack _nongen;             //
-    T2 _pre;                    // Pre-memory
     T2 _t;                      // Current HM type
-    T2 _post;                   // Post-memory
     T2 find() {                 // U-F find
       T2 t = _t.find();
       return t==_t ? t : (_t=t);
     }
     T2 debug_find() { return _t.debug_find(); } // Find, without the roll-up
-    T2 pre() {
-      T2 t = _pre.find();
-      return t==_pre ? t : (_pre=t);
-    }
-    T2 post() {
-      T2 t = _post.find();
-      return t==_post ? t : (_post=t);
-    }
 
     // Compute and set a new HM type.
     // If no change, return false.
@@ -268,9 +258,7 @@ public class HM {
     abstract int prep_tree(Syntax par, VStack nongen, Worklist work);
     final void prep_tree_impl( Syntax par, VStack nongen, Worklist work, T2 t ) {
       _par=par;
-      _pre = T2.make_mem();
       _t=t;
-      _post = T2.make_mem();
       _nongen = nongen;
       work.push(this);
     }
@@ -311,7 +299,6 @@ public class HM {
     @Override void add_work(Worklist work) { work.push(_par); }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par, nongen, work, _con==Type.NIL ? T2.make_nil() : T2.make_base(_con));
-      _pre=_post;               // Unify at prep-time
       return 1;
     }
     @Override void prep_lookup_deps(Ident id) { throw unimpl("should not reach here"); }
@@ -347,7 +334,6 @@ public class HM {
     }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
-      _pre=_post;               // Unify at prep-time
       for( Syntax syn = _par; syn!=null; syn = syn._par )
         syn.prep_lookup_deps(this);
       return 1;
@@ -380,14 +366,9 @@ public class HM {
     T2 targ(int i) { T2 targ = _targs[i].find(); return targ==_targs[i] ? targ : (_targs[i]=targ); }
     @Override boolean hm(Worklist work) {
       boolean progress = false;
-      // Lambda memory: pre-memory unifies with body-pre, post-memory unifies with post-body.
-      progress |= pre ().unify(_body.pre (),work);
-      progress |= post().unify(_body.post(),work);
-      if( work==null && progress ) return true;
-
       // The normal lambda work
       T2 old = find();
-      if( old.is_err() ) return false;          
+      if( old.is_err() ) return false;
       if( old.is_fun() ) {      // Already a function?  Compare-by-parts
         for( int i=0; i<_targs.length; i++ )
           if( old.args(i).unify(targ(i),work) )
@@ -415,8 +396,7 @@ public class HM {
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
       VStack vs = nongen;
-      for( int i=0; i<_targs.length; i++ )
-        vs = new VStack(vs,_targs[i]);
+      for( T2 targ : _targs ) vs = new VStack(vs, targ);
       return _body.prep_tree(this,vs,work) + 1;
     }
     @Override void prep_lookup_deps(Ident id) {
@@ -440,12 +420,6 @@ public class HM {
     T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
     @Override boolean hm(Worklist work) {
       boolean progress = false;
-      // Let memory: pre-memory unifies with body-pre, post-memory unifies with post-body.
-      progress |=       pre ().unify(_def .pre (),work);
-      progress |= _def .post().unify(_body.pre (),work);
-      progress |= _body.post().unify(      post(),work);
-      if( work==null && progress ) return true;
-
       return targ().unify(_def.find(),work);
     }
     @Override T2 lookup(String name) {
@@ -494,18 +468,7 @@ public class HM {
     // Unifiying these: make_fun(this.arg0 this.arg1 -> new     )
     //                      _fun{_fun.arg0 _fun.arg1 -> _fun.rez}
     @Override boolean hm(Worklist work) {
-      // U/F link pre/post memory with argument memories
       boolean progress = false;
-      progress |= pre().unify(_fun.pre(),work);
-      if( work==null && progress ) return true;
-      progress |= _fun.post().unify(_args[0].pre(),work);
-      if( work==null && progress ) return true;
-      for( int i=1; i<_args.length; i++ ) {
-        progress |= _args[i-1].post().unify(_args[i].pre(),work);
-        if( work==null && progress ) return true;
-      }
-      progress |= _args[_args.length-1].post().unify(post(),work);
-      if( work==null && progress ) return true;
 
       // Discover not-nil in the trivial case of directly using the 'if'
       // primitive against a T2.is_struct().  Will not work if 'if' is some
@@ -596,16 +559,7 @@ public class HM {
       return sb;
     }
     @Override boolean hm(Worklist work) {
-      // U/F link pre/post memory with fields' memories
       boolean progress = false, must_alloc=false;
-      progress |= pre().unify(_flds[0].pre(),work);
-      if( work==null && progress ) return true;
-      for( int i=1; i<_flds.length; i++ ) {
-        progress |= _flds[i-1].post().unify(_flds[i].pre(),work);
-        if( work==null && progress ) return true;
-      }
-      progress |= _flds[_flds.length-1].post().unify(post(),work);
-      if( work==null && progress ) return true;
 
       // Force result to be a struct with at least these fields.
       // Do not allocate a T2 unless we need to pick up fields.
@@ -638,8 +592,6 @@ public class HM {
         if( work==null && progress ) return true;
       }
 
-      // Unify struct at alias into post-memory
-      progress |= _post.unify_rec(_alias.getbit(),rec,work);
       return progress;
     }
     @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
@@ -678,9 +630,6 @@ public class HM {
     @Override SB p2(SB sb, VBitSet dups) { return _rec.p0(sb,dups); }
     @Override boolean hm(Worklist work) {
       boolean progress = false;
-      progress |= pre ().unify(_rec.pre (),work); // Pre -memory unifies with child pre
-      progress |= post().unify(_rec.post(),work); // Post-memory unifies with child post
-      if( work==null && progress ) return true;
 
       T2 rec = _rec.find();
       int idx = rec._ids==null ? -1 : Util.find(rec._ids,_id);
@@ -688,10 +637,10 @@ public class HM {
         if( find().is_err() ) return false;
         if( work==null ) return true;
         if( rec.is_err() ) return find().unify(rec,work);
-        progress |= T2.make_struct(new String[]{_id}, BitsAlias.RECORD_BITS.dual(),new T2[]{find().push_update(rec._deps)}).unify(rec, work);
+        progress = T2.make_struct(new String[]{_id}, BitsAlias.RECORD_BITS.dual(), new T2[]{find().push_update(rec._deps)}).unify(rec, work);
       } else {
         // Unify the field
-        progress |= rec.args(idx).unify(find(), work);
+        progress = rec.args(idx).unify(find(), work);
         if( find()._con==Type.ALL )
           progress |= T2.make_err("Missing field "+_id+" in "+rec.find()).unify(find(),work);
       }
@@ -750,7 +699,6 @@ public class HM {
     static T2 make_base(Type con) { return new T2("Base",con,null,null); }
     static T2 make_nil() { return new T2("Nil",null,null,null); }
     static T2 make_struct( String[] ids, BitsAlias aliases, T2[] flds ) { return new T2("@{}", null,ids,aliases,flds); }
-    static T2 make_mem() { return new T2("[]" ,null,null,null,new T2[1]); }
     static T2 make_err(String s) { return new T2("Err",TypeStr.con(s.intern()),null,null); }
     static T2 prim(String name, T2... args) { return new T2(name,null,null,null,args); }
     T2 copy() { return new T2(_name,_con,_ids,_aliases,new T2[_args.length]); }
@@ -1153,13 +1101,15 @@ public class HM {
     }
 
     // Unify 'str' at alias 'alias' in 'this' memory.
-    boolean unify_rec(int alias, T2 str, Worklist work) {
+    void unify_rec( int alias, T2 str, Worklist work) {
       assert is_mem() && str.is_struct();
       while( alias >= _args.length )
         _args = Arrays.copyOf(_args,_args.length<<1);
-      if( _args[alias] != null ) return args(alias).unify(str,work);
+      if( _args[alias] != null ) {
+        args(alias).unify(str, work);
+        return;
+      }
       if( work!=null ) _args[alias] = str;
-      return true;
     }
 
     // -----------------
