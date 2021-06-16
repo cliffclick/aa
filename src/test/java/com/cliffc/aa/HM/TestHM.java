@@ -351,7 +351,7 @@ public class TestHM {
     //   out_bool= map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
     //   (out_str,out_bool)",
 
-    Syntax syn = HM.hm("map={lst fcn -> (fcn (.y lst)) }; "+
+    Syntax syn = HM.hm("map={lst fcn -> (fcn .y lst) }; "+
                        "in_int=@{ x=0 y=2}; " +
                        "in_str=@{ x=0 y=\"abc\"}; " +
                        "out_str = (map in_int str); " +
