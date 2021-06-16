@@ -341,4 +341,24 @@ public class TestHM {
     assertEquals("Cannot unify $V42:{ $V42 -> V43 } and *[-2]@{ u = V31}",syn._t.p());
   }
 
+  @Test
+  public void test37() {
+    // Example from test15:
+    //   map={lst fcn -> lst ? fcn lst.1};
+    //   in_int=(0,2);"+       // List of ints
+    //   in_str=(0,"abc");" +  // List of strings
+    //   out_str = map(in_int,str:{int->str});"+        // Map over ints with int->str  conversion, returning a list of strings
+    //   out_bool= map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
+    //   (out_str,out_bool)",
+
+    Syntax syn = HM.hm("map={lst fcn -> (fcn (.y lst)) }; "+
+                       "in_int=@{ x=0 y=2}; " +
+                       "in_str=@{ x=0 y=\"abc\"}; " +
+                       "out_str = (map in_int str); " +
+                       "out_bool= (map in_str { xstr -> (eq xstr \"def\")}); "+
+                       "(pair out_str out_bool)"  );
+    assertEquals("(pair str int1)",syn._t.p());
+  }
+
+
 }

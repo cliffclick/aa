@@ -53,6 +53,7 @@ public class HM {
     PRIMS.put("dec",T2.make_fun(int64,int64));
     PRIMS.put("*"  ,T2.make_fun(int64,int64,int64));
     PRIMS.put("?0",T2.make_fun(T2.make_leaf(),bool));
+    PRIMS.put("eq",T2.make_fun(var1,var1,bool));
     PRIMS.put("isempty",T2.make_fun(strp,bool));
 
     // Print a string; int->str
