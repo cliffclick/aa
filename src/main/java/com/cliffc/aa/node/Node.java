@@ -682,6 +682,8 @@ public abstract class Node implements Cloneable {
       if( !Util.eq(tv1.name(),tv2.name()) || sz1!=sz2 )
         for( Node use : _uses )   // Unification gained structure; neighbors can unify
           Env.GVN.add_flow(use).add_flow_use_extra(this);
+      if( this instanceof FreshNode )
+        Env.GVN.add_reduce(this);
     }
 
     // Compute live bits.  If progress, push the defs on the flow worklist.
@@ -744,6 +746,7 @@ public abstract class Node implements Cloneable {
     if( this instanceof ConNode || // Already a constant
         (this instanceof FunPtrNode && _val.is_con()) || // Already a constant
         this instanceof ErrNode || // Never touch an ErrNode
+        this instanceof FreshNode ||// These modify the TVars but not the constant flows
         is_prim() )                // Never touch a Primitive
       return false; // Already a constant, or never touch an ErrNode
     // Constant argument to call: keep for call resolution.
@@ -761,7 +764,7 @@ public abstract class Node implements Cloneable {
   public static @NotNull Node con( Type t ) {
     assert t==t.simple_ptr();
     Node con;
-    if( t instanceof TypeFunPtr )
+    if( t instanceof TypeFunPtr && ((TypeFunPtr)t)._fidxs.abit()!=-1 )
       con = new FunPtrNode(FunNode.find_fidx(((TypeFunPtr)t).fidx()).ret(),Env.ANY);
     else
       con = new ConNode<>(t);

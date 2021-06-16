@@ -3,6 +3,7 @@ package com.cliffc.aa.tvar;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.node.CallEpiNode;
 import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.FreshNode;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
@@ -93,7 +94,7 @@ public class TV2 {
   }
 
   // When inserting a new key, propagate deps
-  void args_put(Comparable key, TV2 tv) {
+  public void args_put(Comparable key, TV2 tv) {
     _args.put(key,tv);          // Pick up a key->tv mapping
     merge_deps(tv);             // tv gets all deps that 'this' has
   }
@@ -254,6 +255,12 @@ public class TV2 {
     assert !is_unified() && !is_dead();
     // Worklist: put updates on the worklist for revisiting
     Env.GVN.add_flow(_deps); // Re-CallEpi
+    // TODO: REMOVE THIS BACKDOORS HACK
+    if( _ns!=null && that._ns!=null && _ns.size()==1 ) {
+      Node val=null; for( Node xval : _ns.values() ) { val=xval; break; }
+      if( val instanceof FreshNode && that._ns.containsKey(((FreshNode)val).in(1)._uid) )
+        Env.GVN.add_reduce(val);
+    }
     _union(that);
     ALLOCS.get(_alloc_site)._free++;
     return true;
@@ -699,11 +706,15 @@ public class TV2 {
     return str(new SB(),bs.clr(),dups,true,0,d).toString();
   }
 
+  boolean is_prim() {
+    return isa("Obj") && _args!=null && _args.containsKey("!");
+  }
+
   // These TV2 types get large, with complex sharing patterns.
   // Need to find the sharing to pretty-print the shared parts.
   public final int find_dups(VBitSet bs, NonBlockingHashMapLong<String> dups, int scnt) {
     if( bs.tset(_uid) ) {
-      if( is_dead() ) return scnt;
+      if( is_dead() || is_nil() ) return scnt;
       if( dups.containsKey(_uid) ) return scnt; // Already has a dup name
       dups.put(_uid,new String(new char[]{(char)('A'+scnt)}));
       return scnt+1;
@@ -712,16 +723,17 @@ public class TV2 {
       return get_unified().find_dups(bs,dups,scnt);
     if( _args!=null )
       for( TV2 tv : _args.values() )
-        if( !(isa("Mem") && _args.get(7) == tv) && // Avoid the Prims
-            !(isa("Ptr") && _ns!=null && _ns.containsKey(19) ) )
+        if( !is_prim() )
           scnt = tv.find_dups(bs,dups,scnt);
     return scnt;
   }
 
   // Pretty print
+  @SuppressWarnings("unchecked")
   public final SB str(SB sb, VBitSet bs, NonBlockingHashMapLong<String> dups, boolean debug, int d, int max) {
     if( is_dead() ) return sb.p("Dead"); // Do not print NS
-    if( is_err() ) return sb.p(_type.getstr());
+    if( is_nil()  ) return sb.p("Nil" ); // Do not print NS
+    if( is_err()  ) return sb.p(_type.getstr());
 
     String stv = dups.get(_uid);
     if( stv!=null ) {
@@ -745,6 +757,8 @@ public class TV2 {
         }
     } else                      // No unioned nodes
       sb.p("V").p(_uid);        // So just the _uid
+    if( is_prim() ) return sb.p(":PRIMS");
+
     // Structural contents
     if( _args != null ) {
       final int min = Math.min(d+1,max);
@@ -766,17 +780,18 @@ public class TV2 {
         break;
       default:
         sb.p(":[ ");
-        List<? extends Comparable> keys = new ArrayList<>(_args.keySet());
-        Collections.sort(keys);
+        Ary<Comparable> keys = new Ary<>(_args.keySet().toArray(new Comparable[_args.size()]));
+          keys.sort_update((x,y)-> {
+            if( x==y ) return 0;
+            if( x=="^" ) return -1;
+            if( y=="^" ) return -1;
+            return x.compareTo(y);
+          });
         for( Comparable key : keys ) {
           if( d < max ) sb.nl().i(min);
-          if( isa("Mem") && key instanceof Integer && ((Integer)key)==7 ) sb.p("7:PRIMS ");
-          else if( isa("Ptr") && _ns!=null && _ns.containsKey(19) ) sb.p("PRIMS");
-          else {
-            sb.p(key.toString()).p(':');
-            _args.get(key).str(sb,bs,dups,debug,d+1,max);
-            sb.p(' ');
-          }
+          sb.p(key.toString()).p(':');
+          _args.get(key).str(sb,bs,dups,debug,d+1,max);
+          sb.p(' ');
         }
         if( d < max ) sb.nl().i(d);
         sb.p("]");

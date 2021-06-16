@@ -2,15 +2,13 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.tvar.UQNodes;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.BitSet;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import static com.cliffc.aa.AA.*;
 
@@ -334,8 +332,10 @@ public class FunNode extends RegionNode {
         for( Node use : parm._uses ) { // See if a parm-user needs a type-specialization split
           if( use instanceof CallNode ) {
             CallNode call = (CallNode)use;
-            if( (call.fdx()==parm && !parm._val.isa(TypeFunPtr.GENERIC_FUNPTR) ) ||
-                call.fdx() instanceof UnresolvedNode ) { // Call overload not resolved
+            Node fdx = call.fdx();
+            if( fdx instanceof FreshNode ) fdx = ((FreshNode)fdx).id();
+            if( (fdx==parm && !parm._val.isa(TypeFunPtr.GENERIC_FUNPTR) ) ||
+                fdx instanceof UnresolvedNode ) { // Call overload not resolved
               Type t0 = parm.val(1);                   // Generic type in slot#1
               for( int i=2; i<parm._defs._len; i++ ) { // For all other inputs
                 Type tp = parm.val(i);
@@ -721,8 +721,10 @@ public class FunNode extends RegionNode {
       c._tvar = tvs_copy.get(n._uid);
       if( c instanceof FreshNode ) {
         FreshNode fsh = (FreshNode)c;
+        fsh.unelock();          // Changing hash
+        fsh._tv2s = ((FreshNode)n)._tv2s.clone();
         for( int i=0; i<fsh._tv2s.length; i++ )
-          fsh._tv2s[i] = fsh._tv2s[i].repl_rename(null,map);
+          fsh._tv2s[i] = fsh._tv2s[i].find().repl_rename(null,map);
       }
     }
 
@@ -785,8 +787,7 @@ public class FunNode extends RegionNode {
             else if( parm._idx==MEM_IDX ) defx = Env.DEFMEM;
             else {
               Type tx = fun.formal(parm._idx).simple_ptr();
-              if( tx instanceof TypeFunPtr ) defx = find_fidx(((TypeFunPtr)tx).fidx()).fptr();
-              else defx = Node.con(tx);
+              defx = Node.con(tx);
             }
             parm.set_def(1,defx);
           }

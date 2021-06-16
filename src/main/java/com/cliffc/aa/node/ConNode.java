@@ -11,7 +11,7 @@ public class ConNode<T extends Type> extends Node {
   T _t;                         // Not final for testing
   public ConNode( T t ) {
     super(OP_CON,Env.START);
-    assert !(t instanceof TypeFunPtr);
+    //assert !(t instanceof TypeFunPtr);
     _t=t;
     _live = all_live();
     _tvar.free();

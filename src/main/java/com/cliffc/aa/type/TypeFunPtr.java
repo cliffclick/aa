@@ -207,5 +207,5 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     tf._hash = tf.compute_hash();
     return tf;
   }
-  @Override public TypeFunPtr widen() { return this; }
+  @Override public TypeFunPtr widen() { return GENERIC_FUNPTR; }
 }

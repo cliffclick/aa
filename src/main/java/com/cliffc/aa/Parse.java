@@ -529,6 +529,7 @@ public class Parse implements Comparable<Parse> {
     NewObjNode stk = scope().stk(); // Display
     Node old_ctrl = ctrl().keep();
     Node old_mem  = mem ().keep();
+    op.keep();
     TypeStruct old_ts = stk._ts;
     Ary<Node> old_defs = stk._defs.deepCopy();
     lhs.keep();
@@ -550,7 +551,7 @@ public class Parse implements Comparable<Parse> {
 
     // Emit the call to both terms.  Both the emitted call and the thunk MUST
     // inline right now.
-    lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op,lhs.unkeep(),thet.unkeep()));
+    lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op.unkeep(),lhs.unkeep(),thet.unkeep()));
     assert thunk.is_dead() && thet.is_dead(); // Thunk, in fact, inlined
 
     // Extra variables in the thunk not available after the thunk.
@@ -702,9 +703,10 @@ public class Parse implements Comparable<Parse> {
           assert fun.nargs()==ARG_IDX+3; // array, index, value
           skipWS();
           int oldx3 = _x;
+          bfun.keep();
           Node val = stmt(false);
           if( val==null ) { n.unhook(); return err_ctrl2("Missing stmt after '"+fun._bal_close+"'"); }
-          n = do_call(errMsgs(0,oldx,oldx2,oldx3),args(bfun,n.unkeep(),idx.unkeep(),val));
+          n = do_call(errMsgs(0,oldx,oldx2,oldx3),args(bfun.unkeep(),n.unkeep(),idx.unkeep(),val));
         }
       }
     }
@@ -909,6 +911,8 @@ public class Parse implements Comparable<Parse> {
     // or when inside of a struct definition: 'this'.
     Node parent_display = scope().ptr();
     TypeMemPtr tpar_disp = (TypeMemPtr) parent_display._val; // Just a TMP of the right alias
+    Node fresh_disp = gvn(new FreshNode(_e._nongen,ctrl(),parent_display)).keep();
+
     ids .push(" ctl");
     ts  .push(Type.CTRL);
     bads.push(null);
@@ -957,7 +961,6 @@ public class Parse implements Comparable<Parse> {
       Node rpc = X.xform(new ParmNode(0      ,"rpc" ,fun,con(TypeRPC.ALL_CALL),null));
       Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
       Node clo = X.xform(new ParmNode(DSP_IDX,"^"   ,fun,con(tpar_disp),null));
-      clo.tvar().unify(parent_display.tvar(),false); // Same H-M type
 
       // Increase scope depth for function body.
       try( Env e = new Env(_e,errMsg(oldx-1), true, fun, mem) ) { // Nest an environment for the local vars
@@ -989,7 +992,7 @@ public class Parse implements Comparable<Parse> {
         // to the function for faster access.
         RetNode ret = (RetNode)X.xform(new RetNode(ctrl(),mem(),rez,rpc,fun));
         // The FunPtr builds a real display; any up-scope references are passed in now.
-        Node fptr = X.xform(new FunPtrNode(null,ret,e._par));
+        Node fptr = X.xform(new FunPtrNode(null,ret,fresh_disp.unkeep()));
 
         _e = _e._par;                // Pop nested environment; pops nongen also
         return (X._ret=fptr);        // Return function; close-out and DCE 'e'
@@ -1409,8 +1412,9 @@ public class Parse implements Comparable<Parse> {
   private Node[] _args(Node[] args) {
     args[CTL_IDX] = ctrl();     // Always control
     args[MEM_IDX] = mem();      // Always memory
+    //args[MEM_IDX] = gvn(new FreshNode(_e._nongen,ctrl(),mem())).keep(); // Always memory
     for( int i=ARG_IDX; i<args.length; i++ ) args[i].keep(); // Hook all args before reducing display
-    args[DSP_IDX]= gvn(new FP2DispNode(args[DSP_IDX]));      // Reduce display
+    args[DSP_IDX] = gvn(new FreshNode(_e._nongen,ctrl(),gvn(new FP2DispNode(args[DSP_IDX])))); // Reduce display
     for( int i=ARG_IDX; i<args.length; i++ ) {
       args[i].unkeep();
       // Generally might want this in unkeep(), except for cost

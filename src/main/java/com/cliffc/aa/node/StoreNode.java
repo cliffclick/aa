@@ -82,7 +82,7 @@ public class StoreNode extends Node {
         mem.is_mem() && mem.check_solo_mem_writer(this) ) {
       Node head2;
       if( mem instanceof StoreNode ) head2=mem;
-      else if( mem instanceof MrgProjNode ) head2=mem;
+      else if( mem instanceof MrgProjNode && ((MrgProjNode)mem).mem()!=this ) head2=mem;
       else if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) head2 = mem.in(0).in(0);
       else head2 = null;
       // Check no extra readers/writers at the split point
@@ -175,7 +175,7 @@ public class StoreNode extends Node {
   @Override public boolean unify( boolean test ) {
     return unify(this,rez(),_fld,test,"Store_unify");
   }
-  
+
   public static boolean unify( Node n, Node rez, String fld, boolean test, String alloc_site) {
     // Input should be a TMem
     TV2 tmem = n.tvar(1);
@@ -187,7 +187,7 @@ public class StoreNode extends Node {
     // This produces same memory
     boolean progress = n.tvar().unify(tmem,test);
     if( progress && test ) return progress;
-    
+
     // Unify the given aliases and field against the stored type
     return tmem.unify_alias_fld(n,tmp._aliases,fld,rez.tvar(),test,alloc_site);
   }

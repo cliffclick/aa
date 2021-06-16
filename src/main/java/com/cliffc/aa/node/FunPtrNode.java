@@ -24,10 +24,10 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   // interesting thing is when an out-of-scope TVar uses the same TVar
   // internally in different parts - the copy replicates this structure.  When
   // unified, it forces equivalence in the same places.
-  public  FunPtrNode( String name, RetNode ret, Env env ) {
-    this(name,null,ret,
-         env==null ? Node.con(TypeMemPtr.NO_DISP) : env._scope.ptr() );
-  }
+  public  FunPtrNode( String name, RetNode ret, Node display ) { this(name,null,ret,display ); }
+  // Explicitly, no display
+  public  FunPtrNode( String name, RetNode ret ) { this(name,null,ret, Env.ANY ); }
+  // Display (already fresh-loaded) but no name.
   public  FunPtrNode( RetNode ret, Node display ) { this(null,null,ret,display); }
   // For forward-refs only; super weak display & function.
   private FunPtrNode( String name, ErrMsg referr, RetNode ret, Node display ) {

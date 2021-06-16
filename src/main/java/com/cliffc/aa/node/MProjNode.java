@@ -19,11 +19,12 @@ public class MProjNode extends ProjNode {
   @Override public Node ideal_reduce() {
     Node x = super.ideal_reduce();
     if( x!=null ) return x;
-    if( in(0) instanceof CallEpiNode ) {
-      Node precall = in(0).is_pure_call(); // See if memory can bypass pure calls (most primitives)
-      if( precall != null && _val == precall._val )
-        return precall;
-    }
+    // TODO: Turn back on, as a local flow property
+    //if( in(0) instanceof CallEpiNode ) {
+    //  Node precall = in(0).is_pure_call(); // See if memory can bypass pure calls (most primitives)
+    //  if( precall != null && _val == precall._val )
+    //    return precall;
+    //}
     return null;
   }
 

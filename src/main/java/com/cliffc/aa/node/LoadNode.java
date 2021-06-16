@@ -35,8 +35,10 @@ public class LoadNode extends Node {
     // If we can find an exact previous store, fold immediately to the value.
     Node st = find_previous_store(mem(),adr(),aliases,_fld,true);
     if( st!=null ) {
-      if( st instanceof StoreNode ) return (( StoreNode)st).rez();
-      else                          return ((NewObjNode)st).get(_fld);
+      Node rez = st instanceof StoreNode
+        ? (( StoreNode)st).rez()
+        : ((NewObjNode)st).get(_fld);
+      return rez==this ? null : rez;
     }
     return null;
   }
@@ -124,6 +126,7 @@ public class LoadNode extends Node {
           if( aliases.join(st_alias) != BitsAlias.EMPTY )
             return null;        // Aliases not disjoint, might overlap but wrong address
         }               // Wrong field name, cannot match
+        if( mem == st.mem() ) return null;
         mem = st.mem(); // Advance past
 
       } else if( mem instanceof MemPrimNode.LValueWrite ) {
@@ -227,9 +230,9 @@ public class LoadNode extends Node {
     Type tfld = get_fld2(((TypeMem)tmem).ld((TypeMemPtr)tptr));
     if( tfld.is_con() && err(true)==null )
       return TypeMem.DEAD;
-    
+
     if( def==adr() )            // Load is sane, so address is alive
-      return tfld.above_center() ? TypeMem.DEAD : TypeMem.ALIVE; 
+      return tfld.above_center() ? TypeMem.DEAD : TypeMem.ALIVE;
 
     // Only named the named field from the named aliases is live.
     Type ldef = _live.live_no_disp() ? Type.NSCALR : Type.SCALAR;
@@ -252,7 +255,7 @@ public class LoadNode extends Node {
     TypeFunPtr tfp;
     if( tfld instanceof TypeFunPtr &&
         (tfp=(TypeFunPtr)tfld)._disp!=TypeMemPtr.NO_DISP && // Display not alive
-        err(true)==null && 
+        err(true)==null &&
         _live.live_no_disp() )
       tfld = tfp.make_no_disp();
     return tfld;
@@ -260,7 +263,37 @@ public class LoadNode extends Node {
 
 
   @Override public boolean unify( boolean test ) {
-    return unify(this,_fld,test,"Load_unify");
+    // Input should be a TMem
+    TV2 tmem = tvar(1);
+    if( !tmem.isa("Mem") ) return false;
+    // Address needs to name the aliases
+    Type tadr = val(2);
+    if( !(tadr instanceof TypeMemPtr) ) return false; // Wait until types are sharper
+    TypeMemPtr tmp = (TypeMemPtr)tadr;
+
+    // Make a Obj["fld":self] type.
+    // Make a Ptr:[0:Obj] and unify with the address.
+    // Make a Mem:[alias:Obj] and unify with all aliases.
+
+    // Make a Obj["fld":self] type.
+    TV2 tobj = TV2.make("Obj",(UQNodes) null,"Load_unify");
+    tobj.args_put(_fld,tvar());
+
+    // Make a Ptr:[0:Obj] and unify with the address.
+    TV2 tptr = TV2.make("Ptr",adr(),"Load_unify");
+    tptr.args_put(0,tobj);
+    boolean progress = adr().tvar().unify(tptr,test);
+    if( test && progress ) return progress;
+
+    // Make a Mem:[alias:Obj] and unify with all aliases.
+    for( int alias : tmp._aliases ) {
+      // TODO: Probably wrong, as no reason to believe that as soon as alias
+      // sharpens above AARY that it has hit its best sane value.
+      if( alias <= BitsAlias.AARY ) continue; // No unify on parser-specific values
+      progress |= tmem.unify_at(alias,tobj.find(),test);
+      if( test && progress ) return progress;
+    }
+    return progress;
   }
 
   public static boolean unify( Node n, String fld, boolean test, String alloc_site) {
@@ -271,10 +304,11 @@ public class LoadNode extends Node {
     Type tadr = n.val(2);
     if( !(tadr instanceof TypeMemPtr) ) return false; // Wait until types are sharper
     TypeMemPtr tmp = (TypeMemPtr)tadr;
+
     // Unify the given aliases and field against the loaded type
     return tmem.unify_alias_fld(n,tmp._aliases,fld,n.tvar(),test,alloc_site);
   }
-  
+
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;
     if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when reading",_fld);

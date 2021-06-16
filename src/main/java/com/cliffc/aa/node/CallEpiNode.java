@@ -483,7 +483,7 @@ public final class CallEpiNode extends Node {
     if( tcret.is_dead() ) return false;
 
     // Thunks are a little odd, because they cheat on graph structure.
-    if( tfdx.isa("Ret") ) {
+    if( tfdx.isa("Ret") ) {     // The fdx._tvar is a Ret not a Fun
       if( tcret == tfdx ) return false;
       boolean progress = tfdx.unify(tcret,test);
       if( progress && !test )
@@ -500,11 +500,13 @@ public final class CallEpiNode extends Node {
 
     // Will make progress aligning the shapes
     NonBlockingHashMap<Comparable,TV2> args = new NonBlockingHashMap<Comparable,TV2>(){{ put("Args",tcargs);  put("Ret",tcret); }};
-    TV2 tfun = TV2.make("Fun",this,"CallEpi_unify_Fun",args);
+    TV2 tfun = TV2.make("Fun",fdx,"CallEpi_unify_Fun",args);
     boolean progress = tfdx.unify(tfun,test);
     if( progress && !test ) {
       Env.GVN.add_flow_uses(call()); // Progress, neighbors on list
-      tcret.push_dep(this);
+      tcret.find().push_dep(this);
+      if( fdx instanceof FreshNode )
+        Env.GVN.add_reduce(fdx);
     }
     return progress;
   }
@@ -514,31 +516,31 @@ public final class CallEpiNode extends Node {
   private Type unify_lift( Type t, TV2 tv, Type tcmem ) {
     // TODO: Turn this back on
     if( tv==null ) return t; // No structure, no change
-    if( tv.is_base() ) t = t.join(tv._type);
-    TV2 tvar  = call().tvar();
-    Type tcall = call()._val;
-    // Since tcall memory is pre-filtered for the call, and we want the memory
-    // *into* the call (not the filtered memory into the Fun), peel the
-    // top-layer of tvars/types and handle the pre-call memory special.
-    if( !(tvar.is_tvar() && tcall instanceof TypeTuple) ) return t;
-    TypeTuple ttcall = (TypeTuple)tcall;
-    assert tvar.isa("Args");
-    TV2 tv2 = tvar.get(MEM_IDX);
-    if( tv2==null ) return t;
-    Type t2 = tv2.find_tvar(tcmem,tv);
-    // Found in input memory; JOIN with the call return type.
-    if( t2!=t && !t2.above_center() )
-      t = t2.widen().join(t);
-    // Check the other inputs.
-    for( int i=MEM_IDX+1;i<call()._defs._len-1; i++ ) {
-      TV2 tvi = tvar.get(i);
-      if( tvi != null ) {
-        Type t3 = tvi.find_tvar(ttcall.at(i),tv);
-        // Found in input args; JOIN with the call return type.
-        if( t3!=t && !t3.above_center() )
-          t = t3.widen().join(t);
-      }
-    }
+    //if( tv.is_base() ) t = t.join(tv._type);
+    //TV2 tvar  = call().tvar();
+    //Type tcall = call()._val;
+    //// Since tcall memory is pre-filtered for the call, and we want the memory
+    //// *into* the call (not the filtered memory into the Fun), peel the
+    //// top-layer of tvars/types and handle the pre-call memory special.
+    //if( !(tvar.is_tvar() && tcall instanceof TypeTuple) ) return t;
+    //TypeTuple ttcall = (TypeTuple)tcall;
+    //assert tvar.isa("Args");
+    //TV2 tv2 = tvar.get(MEM_IDX);
+    //if( tv2==null ) return t;
+    //Type t2 = tv2.find_tvar(tcmem,tv);
+    //// Found in input memory; JOIN with the call return type.
+    //if( t2!=t && !t2.above_center() )
+    //  t = t2.widen().join(t);
+    //// Check the other inputs.
+    //for( int i=MEM_IDX+1;i<call()._defs._len-1; i++ ) {
+    //  TV2 tvi = tvar.get(i);
+    //  if( tvi != null ) {
+    //    Type t3 = tvi.find_tvar(ttcall.at(i),tv);
+    //    // Found in input args; JOIN with the call return type.
+    //    if( t3!=t && !t3.above_center() )
+    //      t = t3.widen().join(t);
+    //  }
+    //}
     return t;
   }
 
