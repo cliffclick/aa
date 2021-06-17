@@ -109,14 +109,16 @@ public class HM {
       Syntax fun = term();
       Ary<Syntax> ARGS = new Ary<>(new Syntax[1],0);
       while( skipWS()!= ')' && X<BUF.length ) ARGS.push(term());
-      return new Apply(fun,require(')',ARGS.asAry()));
+      require(')');
+      return new Apply(fun,ARGS.asAry());
     }
     if( BUF[X]=='{' ) {         // Lambda of 1 or 2 args
       X++;                      // Skip paren
       Ary<String> args = new Ary<>(new String[1],0);
       while( skipWS()!='-' ) args.push(id());
       require("->");
-      Syntax body = require('}',term());
+      Syntax body = term();
+      require('}');
       return new Lambda(body,args.asAry());
     }
     // Let or Id
@@ -125,14 +127,15 @@ public class HM {
       if( skipWS()!='=' )  return new Ident(id);
       // Let expression; "id = term(); term..."
       X++;                      // Skip '='
-      Syntax def = require(';',term());
+      Syntax def = term();
+      require(';');
       return new Let(id,def,term());
     }
 
     // Structure
     if( BUF[X]=='@' ) {
       X++;
-      require('{',null);
+      require('{');
       Ary<String>  ids = new Ary<>(String.class);
       Ary<Syntax> flds = new Ary<>(Syntax.class);
       while( skipWS()!='}' && X < BUF.length ) {
@@ -143,7 +146,8 @@ public class HM {
         flds.push(fld);
         if( skipWS()==',' ) X++;
       }
-      return require('}',new Struct(ids.asAry(),flds.asAry()));
+      require('}');
+      return new Struct(ids.asAry(),flds.asAry());
     }
 
     // Field lookup is prefix or backwards: ".x term"
@@ -186,7 +190,8 @@ public class HM {
   private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
   private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_') || (c=='*') || (c=='?'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9') || (c=='/'); }
-  private static <T> T require(char c, T t) { if( skipWS()!=c ) throw unimpl("Missing '"+c+"'"); X++; return t; }
+  private static void require(char c) { if( skipWS()!=c ) throw unimpl("Missing '"+c+"'"); X++; }
+  private static <T> T require(char c, T t) { require(c); return t; }
   private static void require(String s) {
     skipWS();
     for( int i=0; i<s.length(); i++ )
@@ -420,7 +425,6 @@ public class HM {
     @Override SB p2(SB sb, VBitSet dups) { _body.p0(sb,dups); return _def.p0(sb,dups); }
     T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
     @Override boolean hm(Worklist work) {
-      boolean progress = false;
       return targ().unify(_def.find(),work);
     }
     @Override T2 lookup(String name) {
@@ -630,8 +634,7 @@ public class HM {
     @Override SB p1 (SB sb) { return sb.p(".").p(_id); }
     @Override SB p2(SB sb, VBitSet dups) { return _rec.p0(sb,dups); }
     @Override boolean hm(Worklist work) {
-      boolean progress = false;
-
+      boolean progress;
       T2 rec = _rec.find();
       int idx = rec._ids==null ? -1 : Util.find(rec._ids,_id);
       if( idx==-1 ) {           // Not a struct or no field, force it to be one
@@ -1090,15 +1093,6 @@ public class HM {
           return false;
       }
       return true;
-    }
-
-    // -----------------
-    T2 getrec(int alias) {
-      assert is_mem();
-      if( alias >= _args.length ) return null;
-      T2 str = args(alias);
-      assert str==null || str.is_struct();
-      return str;
     }
 
     // Unify 'str' at alias 'alias' in 'this' memory.

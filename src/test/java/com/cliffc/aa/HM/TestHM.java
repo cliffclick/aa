@@ -150,7 +150,7 @@ public class TestHM {
     Syntax syn = HM.hm("fcn = {p -> (if p {a -> (pair a a)} {b -> (pair b (pair 3 b))})};"+
                   "map = { fun x -> (fun x)};"+
                   "{ q -> (map (fcn q) 5)}");
-    assertEquals("{ A -> (pair Cannot unify $V63:(pair 3 $V63) and 5 Cannot unify $V63:(pair 3 $V63) and 5) }",syn._t.p());
+    assertEquals("{ A -> (pair Cannot unify $V64:(pair 3 $V64) and 5 Cannot unify $V64:(pair 3 $V64) and 5) }",syn._t.p());
   }
 
   @Test
@@ -236,7 +236,7 @@ public class TestHM {
   @Test
   public void test25a() {
     Syntax syn = HM.hm(".x 5");
-    assertEquals("Cannot unify *[-2]@{ x = V24} and 5",syn._t.p());
+    assertEquals("Cannot unify *[-2]@{ x = V25} and 5",syn._t.p());
   }
 
   // Basic field test.
@@ -322,7 +322,7 @@ public class TestHM {
     // Example from SimpleSub requiring 'x' to be both a struct with field
     // 'v', and also a function type - specifically disallowed in 'aa'.
     Syntax syn = HM.hm("{ x -> y = ( x .v x ); 0}");
-    assertEquals("{ Cannot unify *[-2]@{ v = V30} and { V30 -> V28 } -> 0 }",syn._t.p());
+    assertEquals("{ Cannot unify *[-2]@{ v = V31} and { V31 -> V29 } -> 0 }",syn._t.p());
   }
 
   @Test
@@ -338,7 +338,7 @@ public class TestHM {
     // - a function which takes a struct with field 'u'
     // The first arg to x is two different kinds of functions, so fails unification.
     Syntax syn = HM.hm("x = w = (x x); { z -> z}; (x { y -> .u y})");
-    assertEquals("Cannot unify $V42:{ $V42 -> V43 } and *[-2]@{ u = V31}",syn._t.p());
+    assertEquals("Cannot unify $V43:{ $V43 -> V44 } and *[-2]@{ u = V32}",syn._t.p());
   }
 
   @Test
@@ -362,3 +362,104 @@ public class TestHM {
 
 
 }
+
+/**
+
+noinline_map: { lst:@{y=A} fcn:{A->B} -> B }
+in_int : @{ x=Nil, y=int}
+out_str: @{ x=Nil, y=str}
+pi     : @{ pi=flt }
+out_bol: int1/bool
+(pair str bool)
+
+Unify_Lift:
+  - assigns a type to a tvar, based on tvar?  Structure-for-structure, plus meet of Bases.
+  - applies the join to flow types in everywhere tvar appears
+  - follow top-level types/tvars
+  - No-esc-out uses pre-call memory
+  -- Concept: lift flow memory from non-memory TVars.
+  -- STUCK HERE...
+
+
+
+
+Example w/Store
+
+mem[#1s:@{y=Nil}]
+  Store.y mem #1s 5.2     adr<->@{y=Flt}  val=Flt
+mem[#1s:@{y=flt }]
+
+Now unify-lift: mem[#1s].y join with Flt.
+
+
+Example w/Call
+
+fcn = { mem adr val -> mem[adr].y = val }
+fcn: { @{y=A} A -> A }   // H-M tvar type
+
+mem[#1s:@{y=Nil}]   // Leaf:Nil can unify with anything
+  Call mem #1s  5.2  fcn
+    - val: flow makes it a Scalar
+    - lst: flow makes it a TMP[14,16,...]
+    - mem: flow makes it mem[14,16,...].y = Scalar
+    - fresh { @{y=A} A -> A } with { lst 5.2 -> rez }
+    - lst becomes @{y=A}
+    - A becomes 5.2
+    - unify Nil and 5.2 --> Flt
+
+
+
+Conflict on fcns:
+- Flow tracks set of valid call fidxs... until i start calling on things that
+  have merged, required H-M, and the merge loses the fidxs.
+
+- H-M can play top-down w/Opto/GCP; get H-M types.  So can track fcns thru args
+  and calls.  Unify_lift can recover some flow-fcn-fidxs, which can limit flow
+  targets.
+- Limit flow targets can limit H-M unification requirements:
+  fcn = pred ? {A->B} : {C->D}
+  (fcn foo)   // Implies foo:A:C all unified
+  // Suppose pred=TRUE, so {C->D} never happens, so foo[{A->B}] only
+  // Then foo:A
+
+
+
+
+Add combo GCP & HM ?
+
+-- really fighting memory state here
+-- did want mem to be indexed by alias#s... but this is variant over GCP time.
+-- Similar to the unify of pred case:
+
+-- unify (if pred x y):
+  -- pred==0 : y
+  -- pred==1 : x
+  -- pred==TOP : neither, skip
+  -- pred==BOT : x.unify(y)
+
+-- unify of memory loads:  (load.fld mem adr)
+  -- adr is an ever-widening set of alais#s
+  -- mem[forAll aliases].fld unify Load
+  -- New alias in flow types: unify it also
+
+-- Similar to unify of Stores
+
+-- Still need a way to lift flows from unify;
+  -- Apply result type can be lifted to join of matching TVar inputs?...
+     (fcn arg1 arg2):rez
+     fcn is flow-typed as (TFP int:A scalar:B -> scalar:B)
+     arg1 is :>int, or else flow error
+     arg2 is e.g. str
+     rez is scalar, but join with arg2:str.
+  -- (fcn arg1 arg2):rez
+  -- fcn:{ int:A {xxx -> yyy}:{B -> C} -> C}
+     arg1 is int
+     -- arg2 is scalar - no lift
+     -- arg2 is {bbb -> ccc} - rez.join(ccc)
+
+
+So... no unify during iter/lift.  Start all unifies at leafs at GCP.
+Unify "like normal"
+
+
+ */
