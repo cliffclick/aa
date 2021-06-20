@@ -47,13 +47,11 @@ public class HM {
     T2 var3 = T2.make_leaf();
 
     //
-    TypeStruct tpair = TypeStruct.make(new String[]{"^","0","1"},new Type[]{TypeMemPtr.NO_DISP,Type.ANY,Type.ANY});
-    TypeMemPtr tptr_pair = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.REC),tpair);
+    TypeMemPtr tptr_pair = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.REC),TypeStruct.ANYSTRUCT);
     PRIMS.put("pair1",T2.make_fun(var1, T2.make_fun(var2, T2.make_struct(tptr_pair,new String[]{"0","1"},new T2[]{var1,var2}) ))); // curried
     PRIMS.put("pair",T2.make_fun(var1, var2, T2.make_struct(tptr_pair,new String[]{"0","1"},new T2[]{var1,var2}) )); // not-curried
-    TypeStruct ttriple = TypeStruct.make(new String[]{"^","0","1","2"},new Type[]{TypeMemPtr.NO_DISP,Type.ANY,Type.ANY,Type.ANY});
-    TypeMemPtr tptr_triple = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.REC),ttriple);
-    PRIMS.put("triple",T2.make_fun(var1, var2, var3, T2.make_struct(tptr_pair,new String[]{"0","1","2"},new T2[]{var1,var2,var3}) ));
+    TypeMemPtr tptr_triple = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.REC),TypeStruct.ANYSTRUCT);
+    PRIMS.put("triple",T2.make_fun(var1, var2, var3, T2.make_struct(tptr_triple,new String[]{"0","1","2"},new T2[]{var1,var2,var3}) ));
 
     PRIMS.put("if",T2.make_fun(var2,var1,var1,var1));
 
@@ -86,7 +84,7 @@ public class HM {
         assert !DEBUG_LEAKS || oldcnt==T2.CNT;  // No-progress consumes no-new-T2s
       }
       // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
-      assert prog.more_work(work);
+      //assert prog.more_work(work);
     }
     assert prog.more_work(work);
 
@@ -572,16 +570,7 @@ public class HM {
       _flds=flds;
       // Make a TMP
       int alias = BitsAlias.new_alias(BitsAlias.REC);
-      // Space for an initial display, not part of the HM test but the
-      // TypeStruct pretty-printer expects it.
-      String[] ids1 = new String[_ids.length+1];
-      System.arraycopy(_ids,0,ids1,1,_ids.length);
-      ids1[0]="^";
-      Type[] tflds = new Type[_ids.length+1];
-      Arrays.fill(tflds,Type.ANY);
-      tflds[0] = TypeMemPtr.NO_DISP;
-      TypeStruct ts = TypeStruct.make(ids1,tflds);
-      _tmp = TypeMemPtr.make(alias,ts);
+      _tmp = TypeMemPtr.make(alias,TypeStruct.ANYSTRUCT);
     }
     @Override SB str(SB sb) {
       sb.p("@{");
@@ -678,7 +667,7 @@ public class HM {
         if( work==null ) return true;
         if( rec.is_err() ) return find().unify(rec,work);
         // We need to make a TypeMemPtr to a Struct, but do not have the alias (yet).
-        TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.EMPTY,TypeStruct.make(new String[]{"^",_id},new Type[]{TypeMemPtr.NO_DISP,Type.ANY}));
+        TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.EMPTY,TypeStruct.ANYSTRUCT);
         // The actual Struct is just a 1-field struct, and since structs ignore
         // field order it does not matter in which order fields get unified.
         progress = T2.make_struct(tmp,new String[]{_id}, new T2[]{find().push_update(rec._deps)}).unify(rec, work);
@@ -727,7 +716,9 @@ public class HM {
     // Structural parts to unify with, or slot 0 is used during normal U-F
     T2 @NotNull [] _args;
 
-    // A dataflow type
+    // A dataflow type.  Either ANY for a bare leaf, or a TypeMemPtr with
+    // aliases (including nil or not), to a bare structure, some scalar (for
+    // H-M base types).
     @NotNull Type _t;
 
     // Structs have field names
@@ -804,99 +795,14 @@ public class HM {
         _deps = null;
       }
       if( _args.length==0 ) _args = new T2[1];
+      // Unify the two base types, preserving errors
+      if( !that.is_err() )
+        that._t = _t.meet(that._t);
       _args[0] = that;         // U-F update
       if( _name.charAt(0)!='V' ) _name = "V"+_uid; // Flag as a leaf & unified
-      // Unify the two flow types.
-      Type t = meet_ignoring_field_order(_t,that._t);
-      that.unify_flow(t,_t,work);
       assert !no_uf();
       return true;
     }
-
-    // Unify the dataflow type with the H-M type.
-    // Just pushes the DF type down into the H-M type, or reports an error.
-    private void unify_flow(Type t, Type old, Worklist work) {
-      if( t==Type.ANY ) return; // Both are ANY, always compatible.
-      if( t==_t ) return;       // Already compatible
-      if( is_err() ) return;    // Preserve error
-      if( is_leaf() ) { _t=t; return; } // Leaves just do a meet
-      
-      if( is_struct() ) {
-        if( t instanceof TypeMemPtr ) { // Structural recursion breakdown
-          TypeObj tobj = ((TypeMemPtr)t)._obj;
-          if( tobj instanceof TypeStruct ) {
-            TypeStruct ts = (TypeStruct)tobj;
-            if( _args.length+1 != ts._ts.length )
-              throw unimpl();   // Mismatched field lengths
-            for( int i=0; i<_args.length; i++ ) {
-              int idx = Util.find(ts._flds,_ids[i]);
-              if( idx==-1 ) throw unimpl();
-              _args[i].unify_flow(ts._ts[idx],old,work);
-            }
-          }
-          _t = t;
-          return;
-        }
-        if( t==Type.SCALAR || t==Type.NSCALR ) {
-          union(make_err("Cannot unify "+old+" and "+this.p()),work);
-          return;
-        }
-        // some other kind of breakdown?
-        throw unimpl();
-      }
-
-      // Function breakdown.
-      if( is_fun() ) {
-        
-        throw unimpl();
-      }
-      
-      throw unimpl();
-    }
-
-    // TODO: Push this into the normal TypeStruct path
-    private Type meet_ignoring_field_order(Type t0, Type t1) {
-      if( t0==t1 ) return t0;
-      // Structural recursion on TMPs, looking for TypeStructs
-      if( t0 instanceof TypeMemPtr && t1 instanceof TypeMemPtr ) {
-        TypeMemPtr tmp0 = (TypeMemPtr)t0;
-        TypeMemPtr tmp1 = (TypeMemPtr)t1;
-        TypeObj rez = (TypeObj)meet_ignoring_field_order(tmp0._obj,tmp1._obj);
-        return TypeMemPtr.make(tmp0._aliases.meet(tmp1._aliases),rez);
-      }
-      // TypeStructs are special
-      if( t0 instanceof TypeStruct && t1 instanceof TypeStruct ) {
-        TypeStruct ts0 = (TypeStruct)t0;
-        TypeStruct ts1 = (TypeStruct)t1;
-        // If all field names are the same, in the same order, just do normal meet
-        if( ts0._ts.length==ts1._ts.length ) {
-          boolean eq=true;
-          for( int i=0; i<ts0._ts.length; i++ )
-            if( !Util.eq(ts0._flds[i],ts1._flds[i]) )
-              { eq=false; break; }
-          if( eq ) return t0.meet(t1);
-        }
-
-        // Mismatched fields.  Gather and sort (no reason, just easier to read).
-        // Extend each struct with the missing field(s).  Then do normal meet.
-        Ary<String> flds = new Ary<>(ts0._flds.clone());
-        for( String fld : ts1._flds )
-          if( Util.find(ts0._flds,fld)== -1 )
-            flds.push(fld);
-        // Extend both with fields from both
-        TypeStruct ts0x = TypeStruct.ALLSTRUCT;
-        TypeStruct ts1x = TypeStruct.ALLSTRUCT;
-        for( String fld : flds ) {
-          int idx0 = Util.find(ts0._flds,fld);  ts0x=ts0x.add_fld(fld,TypeStruct.FFNL, idx0==-1 ? Type.ANY : ts0._ts[idx0]);
-          int idx1 = Util.find(ts1._flds,fld);  ts1x=ts1x.add_fld(fld,TypeStruct.FFNL, idx1==-1 ? Type.ANY : ts1._ts[idx1]);
-        }
-        t0 = ts0x.close();
-        t1 = ts1x.close();
-      }
-
-      return t0.meet(t1);
-    }
-
 
     // -----------------
     // Structural unification.
@@ -927,8 +833,9 @@ public class HM {
 
       // two leafs union in either order, so keep lower uid
       if( is_leaf() && that.is_leaf() && _uid<that._uid ) return that.union(this,work);
-      if(      is_leaf() ) return      union(that,work);
-      if( that.is_leaf() ) return that.union(this,work);
+      if(      is_leaf() &&      _t==Type.ANY ) return      union(that,work);
+      if( that.is_leaf() && that._t==Type.ANY ) return that.union(this,work);
+      if( is_leaf() && that.is_leaf() ) return union(that,work);
 
       // Cycle check
       long luid = dbl_uid(that);    // long-unique-id formed from this and that
@@ -940,10 +847,8 @@ public class HM {
       if( work==null ) return true; // Here we definitely make progress; bail out early if just testing
 
       if( !Util.eq(_name,that._name) )
-        return union_err(that,work,"Cannot unify "+this+" and "+that);
+        return union_err(that,work,"Cannot unify "+this.p()+" and "+that.p());
       assert _args!=that._args; // Not expecting to share _args and not 'this'
-      //if( !is_struct() && !is_mem() && _args.length != that._args.length )
-      //  return union_err(that,work,"Cannot unify "+this+" and "+that);
 
       // Structural recursion unification.
 
@@ -958,7 +863,6 @@ public class HM {
           that = that.find();                          // Recursively, might have already rolled this up
         }
         // Fields in RHS and not the LHS do not need to be added to the RHS.
-        //if( _con!=null && that._con==null ) that._con=Type.NIL;
 
         // Memory add missing fields
       } else if( is_mem() ) {
@@ -973,9 +877,8 @@ public class HM {
           args(i)._unify(that.args(i),work);
       }
       if( find().is_err() && !that.find().is_err() )
-        //return that.find().union(find(),work); // Preserve errors
+        return that.find().union(find(),work); // Preserve errors
         // TODO: Find a more elegant way to preserve errors
-        throw unimpl();
       return find().union(that,work);
     }
 
@@ -1005,6 +908,7 @@ public class HM {
       if( t==that._t ) return false; // No progress
       if( work==null ) return true;
       that._t = t;          // Yes progress, but no update if null work
+      that.add_deps_work(work);
       return true;
     }
     private boolean union_err(T2 that, Worklist work, String msg) {
@@ -1047,12 +951,12 @@ public class HM {
       // a layer, 'is_fresh' does not correlate with an occurs_in check.
       if( nongen_in(nongen) ) return vput(that,_unify(that,work)); // Famous 'occurs-check', switch to normal unify
       if( this.is_leaf() ) return vput(that,fresh_base(that,work));
-      if( that.is_leaf() )             // RHS is a tvar; union with a deep copy of LHS
+      if( that.is_leaf() && that._t==Type.ANY )  // RHS is a tvar; union with a deep copy of LHS
         return work==null || vput(that,that.union(_fresh(nongen),work));
 
       if( !Util.eq(_name,that._name) ||
           (!is_struct() && _args.length != that._args.length) )
-        return work == null || vput(that,that._unify(make_err("Cannot unify "+this+" and "+that),work));
+        return work == null || vput(that,that._unify(make_err("Cannot unify "+this.p()+" and "+that.p()),work));
 
       // Structural recursion unification, lazy on LHS
       vput(that,false); // Early set, to stop cycles
@@ -1075,18 +979,17 @@ public class HM {
       for( int i=0; i<_args.length; i++ ) {
         int idx = Util.find(that._ids,_ids[i]);
         if( idx == -1 ) {       // Missing field on RHS
-      //    if( work==null ) return true; // Will definitely make progress
-      //    progress = true;
-      //    that.add_fld(_ids[i],args(i)._fresh(nongen), work);
-          throw unimpl();
+          if( work==null ) return true; // Will definitely make progress
+          progress = true;
+          that.add_fld(_ids[i],args(i)._fresh(nongen), work);
         } else
           progress |= args(i)._fresh_unify(that.args(idx),nongen,work);
         if( progress && work==null ) return true;
       }
       // Fields in RHS and not the LHS do not need to be added to the RHS.
-
-      Type t = meet_ignoring_field_order(_t,that._t);
-      that.unify_flow(t,_t,work);
+      Type t = _t.meet(that._t);
+      if( that._t != t ) progress = true; // Base types differ
+      that._t = t;
       return progress;
     }
 
@@ -1192,6 +1095,7 @@ public class HM {
 
     private boolean _cycle_equals_struct(T2 t) {
       assert is_struct() && t.is_struct();
+      if( _t!=t._t ) return false; // Aliases have to be equal
       for( int i=0; i<_args.length; i++ ) {
         int idx = Util.find(t._ids,_ids[i]);
         if( idx==-1 || !args(i)._cycle_equals(t.args(idx)) )
@@ -1282,14 +1186,12 @@ public class HM {
 
       // Special printing for structures
       if( is_struct() ) {
-        if( _t==NILPTR ) return sb.p("nil");
         sb.p("@{");
         for( int i=0; i<_ids.length; i++ )
           str(sb.p(' ').p(_ids[i]).p(" = "),visit,_args[i],dups).p(',');
         sb.unchar().p("}");
         sb.p(':').p(_t);
-        //if( _con==Type.NIL ) sb.p('?');
-        return sb;
+        return sb.p(((TypeMemPtr)_t)._aliases.toString());
       }
 
       // Special printing for memory
@@ -1316,20 +1218,19 @@ public class HM {
     private SB _p(SB sb, VBitSet visit, VBitSet dups) {
       assert no_uf();
       if( is_leaf() || dups.get(_uid) ) { // Leafs or Duplicates?  Take some effort to pretty-print cycles
-        if( !dups.get(_uid) ) return sb.p(_t); // One-shot leaves just do type
+        if( is_leaf() && _t!=Type.ANY ) return sb.p(_t); // One-shot bases just do type
         Integer ii = VNAMES.get(this);
-        if( ii==null )  VNAMES.put(this,ii=VCNT++);
+        if( ii==null )  VNAMES.put(this,ii=VCNT++); // Type-var name
         // 2nd and later visits use the short form
         boolean later = visit.tset(_uid);
         if( later ) sb.p('$');
         char c = (char)('A'+ii);
         if( c<'V' ) sb.p(c); else sb.p("V"+ii);
         if( later ) return sb;
-        sb.p(':').p(_t);
-        if( is_leaf() || is_err() ) return sb;
+        if( is_leaf() ) return sb;
         sb.p(':'); // Dups now print their structure
-      } else
-        if( is_err () ) return sb.p(_t);
+      }
+      if( is_err () ) return sb.p(_t);
 
       // Special printing for functions: { arg -> body }
       if( is_fun() ) {
@@ -1341,11 +1242,10 @@ public class HM {
 
       // Special printing for structures: @{ fld0 = body, fld1 = body, ... }
       if( is_struct() ) {
-        if( _t==NILPTR ) return sb.p("nil");
         boolean is_tuple=true;
-        for( int i=0; i<_ids.length; i++ )
-          if( !isDigit((byte)_ids[i].charAt(0)) )
-            { is_tuple=false; break; }
+        for( String id : _ids )
+          if( !isDigit((byte) id.charAt(0)) )
+            { is_tuple = false; break; }
         if( is_tuple ) {
           sb.p('(');
           for( int i=0; i<_ids.length; i++ ) {
@@ -1359,9 +1259,8 @@ public class HM {
           for( int i=0; i<_ids.length; i++ )
             args(i)._p(sb.p(' ').p(_ids[i]).p(" = "),visit,dups).p(',');
           sb.unchar().p("}");
-          //if( _con==Type.NIL ) sb.p('?');
         }
-        return sb;
+        return sb.p(((TypeMemPtr)_t)._aliases.toString());
       }
 
       // Special printing for memory

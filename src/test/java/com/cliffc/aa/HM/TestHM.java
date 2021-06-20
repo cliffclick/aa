@@ -24,19 +24,19 @@ public class TestHM {
   @Test
   public void test02() {
     Syntax syn = HM.hm("(pair1 3)");
-    assertEquals("{ A:any -> ( 3, $A) }",syn._t.p());
+    assertEquals("{ A -> ( 3, $A)[7] }",syn._t.p());
   }
 
   @Test
   public void test03() {
     Syntax syn = HM.hm("{ z -> (pair (z 3) (z \"abc\")) }");
-    assertEquals("{ { all -> A:any } -> ( $A, $A) }",syn._t.p());
+    assertEquals("{ { all -> A } -> ( $A, $A)[7] }",syn._t.p());
   }
 
   @Test
   public void test04() {
     Syntax syn = HM.hm("fact = { n -> (if (?0 n) 1 (* n (fact (dec n))))}; fact");
-    assertEquals("{ A:int64 -> $A }",syn._t.p());
+    assertEquals("{ int64 -> int64 }",syn._t.p());
   }
 
   @Test
@@ -44,20 +44,20 @@ public class TestHM {
     // Because {y->y} is passed in, all 'y' types must agree.
     // This unifies 3 and "abc" which results in 'all'
     Syntax syn = HM.hm("({ x -> (pair (x 3) (x \"abc\")) } {y->y})");
-    assertEquals("( A:all, $A)",syn._t.p());
+    assertEquals("( all, all)[7]",syn._t.p());
   }
 
   @Test
   public void test06() {
     Syntax syn = HM.hm("id={x->x}; (pair (id 3) (id \"abc\"))");
-    assertEquals("( 3, \"abc\")",syn._t.p());
+    assertEquals("( 3, \"abc\")[7]",syn._t.p());
   }
 
   @Test//(expected = RuntimeException.class)  No longer throws, but returns a recursive type
   public void test07() {
     // recursive unification
     Syntax syn = HM.hm("{ f -> (f f) }");
-    assertEquals("{ A:any:{ $A -> B:any } -> $B }",syn._t.p());
+    assertEquals("{ A:{ $A -> B } -> $B }",syn._t.p());
     // We can argue the pretty-print should print:
     // "A:{ $A -> B }"
   }
@@ -72,20 +72,20 @@ public class TestHM {
   public void test09() {
     // example that demonstrates generic and non-generic variables:
     Syntax syn = HM.hm("{ g -> f = { x -> g }; (pair (f 3) (f \"abc\"))}");
-    assertEquals("{ A:any -> ( $A, $A) }",syn._t.p());
+    assertEquals("{ A -> ( $A, $A)[7] }",syn._t.p());
   }
 
   @Test
   public void test10() {
     Syntax syn = HM.hm("{ f g -> (f g)}");
-    assertEquals("{ { A:any -> B:any } $A -> $B }",syn._t.p());
+    assertEquals("{ { A -> B } $A -> $B }",syn._t.p());
   }
 
   @Test
   public void test11() {
     // Function composition
     Syntax syn = HM.hm("{ f g -> { arg -> (g (f arg))} }");
-    assertEquals("{ { A:any -> B:any } { $B -> C:any } -> { $A -> $C } }",syn._t.p());
+    assertEquals("{ { A -> B } { $B -> C } -> { $A -> $C } }",syn._t.p());
   }
 
   @Test
@@ -99,7 +99,7 @@ public class TestHM {
   public void test13() {
     // map takes a function and an element (collection?) and applies it (applies to collection?)
     Syntax syn = HM.hm("map = { fun -> { x -> (fun x)}}; { p -> 5 }");
-    assertEquals("{ any -> 5 }",syn._t.p());
+    assertEquals("{ A -> 5 }",syn._t.p());
   }
 
   @Test
@@ -109,7 +109,7 @@ public class TestHM {
     // Takes a '{a->b}' and a 'a' for a couple of different prims.
     Syntax syn = HM.hm("map = { fun -> { x -> (fun x)}};"+
                   "(pair ((map str) 5) ((map factor) 2.3))");
-    assertEquals("( *[4]str, (divmod A:flt64 $A))",syn._t.p());
+    assertEquals("( *[4]str, (divmod flt64 flt64))[7]",syn._t.p());
   }
 
   @Test
@@ -123,7 +123,7 @@ public class TestHM {
   public void test16() {
     // map takes a function and an element (collection?) and applies it (applies to collection?)
     Syntax syn = HM.hm("map = { fun x -> (fun x)}; (map { a-> (pair a a)} 5)");
-    assertEquals("( A:5, $A)",syn._t.p());
+    assertEquals("( 5, 5)[7]",syn._t.p());
   }
 
   @Test
@@ -131,7 +131,7 @@ public class TestHM {
     Syntax syn = HM.hm("fcn = { p -> { a -> (pair a a) }};"+
                   "map = { fun x -> (fun x)};"+
                   "{ q -> (map (fcn q) 5)}");
-    assertEquals("{ any -> ( A:5, $A) }",syn._t.p());
+    assertEquals("{ A -> ( 5, 5)[7] }",syn._t.p());
   }
 
   @Test
@@ -150,7 +150,7 @@ public class TestHM {
     Syntax syn = HM.hm("fcn = {p -> (if p {a -> (pair a a)} {b -> (pair b (pair 3 b))})};"+
                   "map = { fun x -> (fun x)};"+
                   "{ q -> (map (fcn q) 5)}");
-    assertEquals("{ any -> ( A:\"Cannot unify 5 and A:*[7](any, any, any):( 3, $A)\", $A) }",syn._t.p());
+    assertEquals("{ A -> ( B:\"Cannot unify A:( 3, $A)[7] and 5\", $B)[7] }",syn._t.p());
   }
 
   @Test
@@ -175,7 +175,7 @@ public class TestHM {
                   "map ={fun parg -> (fun (cdr parg))};"+
                   "(pair (map str (cons 0 5)) (map isempty (cons 0 \"abc\")))"
                   );
-    assertEquals("( *[4]str, int1)",syn._t.p());
+    assertEquals("( *[4]str, int1)[7]",syn._t.p());
   }
 
   // Obscure factorial-like
@@ -215,14 +215,14 @@ public class TestHM {
                   "      (pair (fgz 3) (fgz 5))"+
                   "}"
                   );
-    assertEquals("{ { nint8 -> A:any } -> ( $A, $A) }",syn._t.p());
+    assertEquals("{ { nint8 -> A } -> ( $A, $A)[7] }",syn._t.p());
   }
 
   // Basic structure test
   @Test
   public void test25() {
     Syntax syn = HM.hm("@{x=2, y=3}");
-    assertEquals("@{ x = 2, y = 3}",syn._t.p());
+    assertEquals("@{ x = 2, y = 3}[9]",syn._t.p());
   }
 
   // Basic field test
@@ -236,7 +236,7 @@ public class TestHM {
   @Test
   public void test27() {
     Syntax syn = HM.hm(".x 5");
-    assertEquals("\"Cannot unify 5 and @{ x = any}\"",syn._t.p());
+    assertEquals("\"Cannot unify @{ x = A}[] and 5\"",syn._t.p());
   }
 
   // Basic field test.
@@ -249,14 +249,14 @@ public class TestHM {
   @Test
   public void test29() {
     Syntax syn = HM.hm("{ g -> @{x=g, y=g}}");
-    assertEquals("{ A:any -> @{ x = $A, y = $A} }",syn._t.p());
+    assertEquals("{ A -> @{ x = $A, y = $A}[9] }",syn._t.p());
   }
 
   @Test
   public void test30() {
     // Load common field 'x', ignoring mismatched fields y and z
     Syntax syn = HM.hm("{ pred -> .x (if pred @{x=2,y=3} @{x=3,z= \"abc\"}) }");
-    assertEquals("{ any -> nint8 }",syn._t.p());
+    assertEquals("{ A -> nint8 }",syn._t.p());
   }
 
   @Test
@@ -264,14 +264,14 @@ public class TestHM {
     // Load some fields from an unknown struct: area of a square.
     // Since no nil-check, correctly types as needing a not-nil input.
     Syntax syn = HM.hm("{ sq -> (* .x sq .y sq) }"); // { sq -> sq.x * sq.y }
-    assertEquals("{ @{ y = A:int64, x = $A} -> $A }",syn._t.p());
+    assertEquals("{ @{ y = int64, x = int64}[] -> int64 }",syn._t.p());
   }
 
   @Test
   public void test32() {
     // Recursive linked-list discovery, with no end clause
     Syntax syn = HM.hm("map = { fcn lst -> @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } }; map");
-    assertEquals("{ { A:any -> B:any } C:*[]@{^=any; n0=any; v0=any}:@{ v0 = $A, n0 = $C} -> D:*[9]@{^==any; n1==any; v1==any}:@{ n1 = $D, v1 = $B} }",syn._t.p());
+    assertEquals("{ { A -> B } C:@{ v0 = $A, n0 = $C}[] -> D:@{ n1 = $D, v1 = $B}[9] }",syn._t.p());
   }
 
   @Test
@@ -280,14 +280,14 @@ public class TestHM {
     // has the output memory alias, but not the input memory alias (which must
     // be made before calling 'map').
     Syntax syn = HM.hm("map = { fcn lst -> (if lst @{ n1=(map fcn .n0 lst), v1=(fcn .v0 lst) } nil) }; map");
-    assertEquals("{ { A:any -> B:any } C: 0:@{ v0 = $A, n0 = $C} -> D:*[0,9]@{^=any; n1=any; v1=any}?:@{ n1 = $D, v1 = $B} }",syn._t.p());
+    assertEquals("{ { A -> B } C:@{ v0 = $A, n0 = $C}[0] -> D:@{ n1 = $D, v1 = $B}[0,9] }",syn._t.p());
   }
 
   @Test
   public void test34() {
     // Recursive linked-list discovery, with no end clause
     Syntax syn = HM.hm("map = { fcn lst -> (if lst @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } nil) }; (map dec @{n0 = nil, v0 = 5})");
-    assertEquals("A:*[0,9]@{^=any; n1=any; v1=any}?:@{ n1 = $A, v1 = int64}",syn._t.p());
+    assertEquals("A:@{ n1 = $A, v1 = int64}[0,9]",syn._t.p());
   }
 
   // try the worse-case expo blow-up test case from SO
@@ -299,7 +299,7 @@ public class TestHM {
                  "p2 = (triple p1 p1 p1);"+
                  "p3 = (triple p2 p2 p2);"+
                  "p3");
-    assertEquals("( ( ( { A:any B:any C:any -> ( $A, $B, $C) }, { D:any E:any F:any -> ( $D, $E, $F) }, { G:any H:any I:any -> ( $G, $H, $I) }), ( { J:any K:any L:any -> ( $J, $K, $L) }, { M:any N:any O:any -> ( $M, $N, $O) }, { P:any Q:any R:any -> ( $P, $Q, $R) }), ( { S:any T:any U:any -> ( $S, $T, $U) }, { V21:any V22:any V23:any -> ( $V21, $V22, $V23) }, { V24:any V25:any V26:any -> ( $V24, $V25, $V26) })), ( ( { V27:any V28:any V29:any -> ( $V27, $V28, $V29) }, { V30:any V31:any V32:any -> ( $V30, $V31, $V32) }, { V33:any V34:any V35:any -> ( $V33, $V34, $V35) }), ( { V36:any V37:any V38:any -> ( $V36, $V37, $V38) }, { V39:any V40:any V41:any -> ( $V39, $V40, $V41) }, { V42:any V43:any V44:any -> ( $V42, $V43, $V44) }), ( { V45:any V46:any V47:any -> ( $V45, $V46, $V47) }, { V48:any V49:any V50:any -> ( $V48, $V49, $V50) }, { V51:any V52:any V53:any -> ( $V51, $V52, $V53) })), ( ( { V54:any V55:any V56:any -> ( $V54, $V55, $V56) }, { V57:any V58:any V59:any -> ( $V57, $V58, $V59) }, { V60:any V61:any V62:any -> ( $V60, $V61, $V62) }), ( { V63:any V64:any V65:any -> ( $V63, $V64, $V65) }, { V66:any V67:any V68:any -> ( $V66, $V67, $V68) }, { V69:any V70:any V71:any -> ( $V69, $V70, $V71) }), ( { V72:any V73:any V74:any -> ( $V72, $V73, $V74) }, { V75:any V76:any V77:any -> ( $V75, $V76, $V77) }, { V78:any V79:any V80:any -> ( $V78, $V79, $V80) })))",syn._t.p());
+    assertEquals("( ( ( { A B C -> ( $A, $B, $C)[8] }, { D E F -> ( $D, $E, $F)[8] }, { G H I -> ( $G, $H, $I)[8] })[8], ( { J K L -> ( $J, $K, $L)[8] }, { M N O -> ( $M, $N, $O)[8] }, { P Q R -> ( $P, $Q, $R)[8] })[8], ( { S T U -> ( $S, $T, $U)[8] }, { V21 V22 V23 -> ( $V21, $V22, $V23)[8] }, { V24 V25 V26 -> ( $V24, $V25, $V26)[8] })[8])[8], ( ( { V27 V28 V29 -> ( $V27, $V28, $V29)[8] }, { V30 V31 V32 -> ( $V30, $V31, $V32)[8] }, { V33 V34 V35 -> ( $V33, $V34, $V35)[8] })[8], ( { V36 V37 V38 -> ( $V36, $V37, $V38)[8] }, { V39 V40 V41 -> ( $V39, $V40, $V41)[8] }, { V42 V43 V44 -> ( $V42, $V43, $V44)[8] })[8], ( { V45 V46 V47 -> ( $V45, $V46, $V47)[8] }, { V48 V49 V50 -> ( $V48, $V49, $V50)[8] }, { V51 V52 V53 -> ( $V51, $V52, $V53)[8] })[8])[8], ( ( { V54 V55 V56 -> ( $V54, $V55, $V56)[8] }, { V57 V58 V59 -> ( $V57, $V58, $V59)[8] }, { V60 V61 V62 -> ( $V60, $V61, $V62)[8] })[8], ( { V63 V64 V65 -> ( $V63, $V64, $V65)[8] }, { V66 V67 V68 -> ( $V66, $V67, $V68)[8] }, { V69 V70 V71 -> ( $V69, $V70, $V71)[8] })[8], ( { V72 V73 V74 -> ( $V72, $V73, $V74)[8] }, { V75 V76 V77 -> ( $V75, $V76, $V77)[8] }, { V78 V79 V80 -> ( $V78, $V79, $V80)[8] })[8])[8])[8]",syn._t.p());
   }
 
   // Need to see if a map call, inlined a few times, 'rolls up'.  Sometimes
@@ -308,13 +308,13 @@ public class TestHM {
   public void test36() {
     // Recursive linked-list discovery, with nil.  Unrolled once.
     Syntax syn = HM.hm("map = { lst -> (if lst @{ n1= arg= .n0 lst; (if arg @{ n1=(map .n0 arg), v1=(str .v0 arg)} nil), v1=(str .v0 lst) } nil) }; map");
-    assertEquals("{ A: 0:@{ v0 = int64, n0 = @{ n0 = $A, v0 = int64}} -> B:*[0,10]@{^=any; n1=any; v1=any}?:@{ n1 = @{ n1 = $B, v1 = *[4]str}, v1 = *[4]str} }",syn._t.p());
+    assertEquals("{ A:@{ v0 = int64, n0 = @{ n0 = $A, v0 = int64}[0]}[0] -> B:@{ n1 = @{ n1 = $B, v1 = *[4]str}[0,9], v1 = *[4]str}[0,10] }",syn._t.p());
   }
 
   @Test
   public void test37() {
     Syntax syn = HM.hm("x = { y -> (x (y y))}; x");
-    assertEquals("{ A:any:{ $A -> $A } -> any }",syn._t.p());
+    assertEquals("{ A:{ $A -> $A } -> B }",syn._t.p());
   }
 
   @Test
@@ -322,13 +322,13 @@ public class TestHM {
     // Example from SimpleSub requiring 'x' to be both a struct with field
     // 'v', and also a function type - specifically disallowed in 'aa'.
     Syntax syn = HM.hm("{ x -> y = ( x .v x ); 0}");
-    assertEquals("{ Cannot unify *[-2]@{ v = V31} and { V31 -> V29 } -> 0 }",syn._t.p());
+    assertEquals("{ \"Cannot unify @{ v = A}[] and { A -> B }\" -> 0 }",syn._t.p());
   }
 
   @Test
   public void test39() {
     Syntax syn = HM.hm("x = { z -> z}; (x { y -> .u y})");
-    assertEquals("{ *[-2]@{ u = A} -> A }",syn._t.p());
+    assertEquals("{ @{ u = A}[] -> $A }",syn._t.p());
   }
 
   @Test
@@ -338,7 +338,7 @@ public class TestHM {
     // - a function which takes a struct with field 'u'
     // The first arg to x is two different kinds of functions, so fails unification.
     Syntax syn = HM.hm("x = w = (x x); { z -> z}; (x { y -> .u y})");
-    assertEquals("Cannot unify $V43:{ $V43 -> V44 } and *[-2]@{ u = V32}",syn._t.p());
+    assertEquals("\"Cannot unify A:{ $A -> B } and @{ u = A}[]\"",syn._t.p());
   }
 
   @Test
@@ -357,7 +357,7 @@ public class TestHM {
                        "out_str = (map in_int str); " +
                        "out_bool= (map in_str { xstr -> (eq xstr \"def\")}); "+
                        "(pair out_str out_bool)"  );
-    assertEquals("(pair str int1)",syn._t.p());
+    assertEquals("( *[4]str, int1)[7]",syn._t.p());
   }
 
 
