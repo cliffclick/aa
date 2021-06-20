@@ -1,6 +1,7 @@
 package com.cliffc.aa.HM;
 
 import com.cliffc.aa.HM.HM.*;
+import com.cliffc.aa.type.*;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -10,18 +11,22 @@ public class TestHM {
 
   @Before public void reset() { HM.reset(); }
 
-  private void run( String prog, String rez_hm ) {
+  private void run( String prog, String rez_hm ) { run(prog,rez_hm,null); }
+  private void run( String prog, String rez_hm, Type rez_gcp ) {
     Syntax syn = HM.hm(prog);
-    assertEquals(rez_hm,syn._t.p());
+    if( HM.DO_HM )
+      assertEquals(rez_hm,syn._t.p());
+    if( HM.DO_GCP )
+      assertEquals(rez_gcp,syn._type);
   }
 
 
   
   @Test(expected = RuntimeException.class)
-  public void test00() { run( "fred",null); }
+  public void test00() { run( "fred",null,null); }
 
   @Test public void test01() { run( "3" ,
-                                    "3");  }
+                                    "3", TypeInt.con(3));  }
   
   @Test public void test02() { run( "(pair1 3)" ,
                                     "{ A -> ( 3, $A)[7] }"); }

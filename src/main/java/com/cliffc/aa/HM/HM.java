@@ -80,23 +80,28 @@ public class HM {
       int oldcnt = T2.CNT;      // Used for cost-check when no-progress
       Syntax syn = work.pop();  // Get work
       T2 old = syn._t;          // Old value for progress assert
-      boolean progress;
       if( DO_HM && !DO_GCP ) {
-        progress = syn.hm(work);
-        assert !syn.debug_find().unify(old.find(),null);// monotonic: unifying with the result is no-progress
+        if( syn.hm(work) ) {
+          assert !syn.debug_find().unify(old.find(),null);// monotonic: unifying with the result is no-progress
+          syn.add_hm_work(work);     // Push affected neighbors on worklist
+        } else {
+          assert !DEBUG_LEAKS || oldcnt==T2.CNT;  // No-progress consumes no-new-T2s
+        }
       }
-      
-      if( progress ) {          // Compute a new HM type and check for progress
-        syn.add_work(work);     // Push affected neighors on worklist
-      } else {
-        assert !DEBUG_LEAKS || oldcnt==T2.CNT;  // No-progress consumes no-new-T2s
+      if( DO_GCP && !DO_HM ) {
+        Type t = syn.val();
+        if( t!=syn._type ) {       // Progress
+          assert t.isa(syn._type); // Monotonic falling
+          syn._type = t;           //
+          throw unimpl();
+        }
       }
-     
+
       // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
-      //assert prog.more_work(work);
+      assert prog.more_work(work);
     }
     assert prog.more_work(work);
-    
+
     System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+work._cnt+", T2s: "+T2.CNT);
     return prog;
   }
@@ -270,7 +275,7 @@ public class HM {
 
     // Dataflow type.  Varies during a run of CCP.
     Type _type;
-    
+
 
     // Compute and set a new HM type.
     // If no change, return false.
@@ -278,6 +283,13 @@ public class HM {
     // - If 'work' is null do not change/set anything.
     // - If 'work' is available, set a new HM in '_t' and update the worklist.
     abstract boolean hm(Worklist work);
+
+    T2 lookup_tvar(String name) { return null; } // Lookup name in scope & return type
+
+    abstract void add_hm_work(Worklist work); // Add affected neighbors to worklist
+
+    // Compute and return (and do not set) a new dataflow type
+    abstract Type val();
 
     abstract int prep_tree(Syntax par, VStack nongen, Worklist work);
     final void prep_tree_impl( Syntax par, VStack nongen, Worklist work, T2 t ) {
@@ -289,15 +301,15 @@ public class HM {
     }
     abstract void prep_lookup_deps(Ident id);
 
-    abstract T2 lookup(String name); // Lookup name in scope & return type
-
-    abstract void add_work(Worklist work); // Add affected neighbors to worklist
-
     // Giant Assert: True if OK; all Syntaxs off worklist do not make progress
     abstract boolean more_work(Worklist work);
     final boolean more_work_impl(Worklist work) {
-      boolean no_more_work = work.has(this) || !hm(null); // Either on worklist, or no-progress
-      return no_more_work;
+      if( work.has(this) ) return true;
+      if( DO_HM && hm(null) )   // Any more HM work?
+        return false;            // Found HM work not on worklist
+      if( DO_GCP && val()!=_type )
+        return false;            // Found GCP work not on worklist
+      return true;
     }
     // Print for debugger
     @Override final public String toString() { return str(new SB()).toString(); }
@@ -323,10 +335,9 @@ public class HM {
     @Override SB p1(SB sb) { return sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString()); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
     @Override boolean hm(Worklist work) { return false; }
-    @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
-    @Override void add_work(Worklist work) { work.push(_par); }
+    @Override Type val() { return _con; }
+    @Override void add_hm_work(Worklist work) { work.push(_par); }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
-      assert _con!=Type.NIL;
       prep_tree_impl(par, nongen, work, T2.make_leaf(_con));
       return 1;
     }
@@ -336,35 +347,38 @@ public class HM {
 
   static class Ident extends Syntax {
     final String _name;
+    T2 _idt;                    // Type var for the name in scope
     Ident(String name) { _name=name; }
     @Override SB str(SB sb) { return p1(sb); }
     @Override SB p1(SB sb) { return sb.p(_name); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
     @Override boolean hm(Worklist work) {
-      // A boolean if name is from a Let._body (or PRIM) vs Let._def (or
-      // Lambda).  Not helpful, as its only useful at the top-layer.
-      // Structural unification requires the 'occurs check' at each internal
-      // layer, which can differ from the top-layer.
-      //boolean occurs_fresh = _par==null /*from prims*/ || _par.is_fresh(_name,this);
-      T2 t = _par==null ? null : _par.lookup(_name); // Lookup in current env
-      if( t==null ) t = PRIMS.get(_name);            // Lookup in prims
-      if( t==null )
-        throw new RuntimeException("Parse error, "+_name+" is undefined");
-      return t.find().fresh_unify(find(),_nongen,work);
+      return _idt.find().fresh_unify(find(),_nongen,work);
     }
-    @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
-    @Override void add_work(Worklist work) {
+    @Override void add_hm_work(Worklist work) {
       work.push(_par);
-      T2 t = _par==null ? null : _par.lookup(_name); // Lookup in current env
-      if( t==null ) t = PRIMS.get(_name);            // Lookup in prims
-      t = t.find();
+      T2 t = _idt.find();
       if( t.occurs_in(_par) )                        // Got captured in some parent?
         t.add_deps_work(work);                       // Need to revisit dependent ids
+    }
+    @Override Type val() {
+      throw unimpl();
     }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
       for( Syntax syn = _par; syn!=null; syn = syn._par )
         syn.prep_lookup_deps(this);
+
+      // Lookup, and get the T2 type var
+      T2 t = null;
+      for( Syntax syn = _par; syn!=null; syn = syn._par )
+        if( (t=syn.lookup_tvar(_name)) != null )
+          break;                          // Found in scope
+      if( t==null ) t = PRIMS.get(_name); // Lookup in prims
+      if( t==null )                       // Still not found
+        throw new RuntimeException("Parse error, "+_name+" is undefined");
+      _idt = t;
+
       return 1;
     }
     @Override void prep_lookup_deps(Ident id) { throw unimpl("should not reach here"); }
@@ -411,17 +425,18 @@ public class HM {
       T2 fun = T2.make_fun(targs);
       return old.unify(fun,work);
     }
-    @Override T2 lookup(String name) {
+    @Override T2 lookup_tvar(String name) {
       for( int i=0; i<_args.length; i++ )
         if( Util.eq(_args[i],name) ) return targ(i);
-      return _par==null ? null : _par.lookup(name);
+      return null;
     }
-    @Override void add_work(Worklist work) {
+    @Override void add_hm_work(Worklist work) {
       work.push(_par );
       work.push(_body);
       for( int i=0; i<_targs.length; i++ )
         if( targ(i).occurs_in_type(find()) ) work.addAll(_targs[i]._deps);
     }
+    @Override Type val() { throw unimpl(); }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
       VStack vs = nongen;
@@ -450,16 +465,14 @@ public class HM {
     @Override boolean hm(Worklist work) {
       return targ().unify(_def.find(),work);
     }
-    @Override T2 lookup(String name) {
-      if( Util.eq(_arg0,name) ) return targ();
-      return _par==null ? null : _par.lookup(name);
-    }
-    @Override void add_work(Worklist work) {
+    @Override T2 lookup_tvar(String name) { return Util.eq(_arg0,name) ? targ() : null; }
+    @Override void add_hm_work(Worklist work) {
       work.push(_par);
       work.push(_body);
       work.push(_def);
       if( targ().occurs_in_type(_def.find()) ) work.addAll(_targ._deps);
     }
+    @Override Type val() { throw unimpl(); }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par,nongen,work,_body._t);
       int cnt = _body.prep_tree(this,           nongen       ,work) +
@@ -551,11 +564,11 @@ public class HM {
 
       return progress;
     }
-    @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
-    @Override void add_work(Worklist work) {
+    @Override void add_hm_work(Worklist work) {
       work.push(_par);
       for( Syntax arg : _args ) work.push(arg);
     }
+    @Override Type val() { throw unimpl(); }
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
       int cnt = 1+_fun.prep_tree(this,nongen,work);
@@ -641,11 +654,11 @@ public class HM {
 
       return progress;
     }
-    @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
-    @Override void add_work(Worklist work) {
+    @Override void add_hm_work(Worklist work) {
       work.push(_par);
       for( Syntax fld : _flds ) work.push(fld);
     }
+    @Override Type val() { throw unimpl(); }
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       T2[] t2s = new T2[_ids.length];
       prep_tree_impl(par, nongen, work, T2.make_struct(_tmp,_ids,t2s));
@@ -698,12 +711,12 @@ public class HM {
       }
       return progress;
     }
-    @Override T2 lookup(String name) { return _par==null ? null : _par.lookup(name); }
-    @Override void add_work(Worklist work) {
+    @Override void add_hm_work(Worklist work) {
       work.push(_par);
       work.push(_rec);
-      _rec.add_work(work);
+      _rec.add_hm_work(work);
     }
+    @Override Type val() { throw unimpl(); }
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par, nongen, work, T2.make_leaf());
       return _rec.prep_tree(this,nongen,work)+1;
