@@ -23,8 +23,11 @@ import static com.cliffc.aa.AA.unimpl;
 
 public class HM {
   static final HashMap<String,T2> PRIMS = new HashMap<>();
-  static boolean DEBUG_LEAKS=false;
+  static final boolean DEBUG_LEAKS=false;
   static { BitsAlias.init0(); }
+
+  static final boolean DO_HM  = true;
+  static final boolean DO_GCP = false;
 
   public static final TypeMemPtr NILPTR = TypeMemPtr.make(BitsAlias.NIL,TypeStruct.ANYSTRUCT);
 
@@ -77,18 +80,24 @@ public class HM {
       int oldcnt = T2.CNT;      // Used for cost-check when no-progress
       Syntax syn = work.pop();  // Get work
       T2 old = syn._t;          // Old value for progress assert
-      if( syn.hm(work) ) {      // Compute a new HM type and check for progress
+      boolean progress;
+      if( DO_HM && !DO_GCP ) {
+        progress = syn.hm(work);
         assert !syn.debug_find().unify(old.find(),null);// monotonic: unifying with the result is no-progress
+      }
+      
+      if( progress ) {          // Compute a new HM type and check for progress
         syn.add_work(work);     // Push affected neighors on worklist
       } else {
         assert !DEBUG_LEAKS || oldcnt==T2.CNT;  // No-progress consumes no-new-T2s
       }
+     
       // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
       //assert prog.more_work(work);
     }
     assert prog.more_work(work);
-
-    //System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+work._cnt+", T2s: "+T2.CNT);
+    
+    System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+work._cnt+", T2s: "+T2.CNT);
     return prog;
   }
   static void reset() { PRIMS.clear(); T2.reset(); BitsAlias.reset_to_init0(); }
@@ -250,14 +259,18 @@ public class HM {
 
   // ---------------------------------------------------------------------
   static abstract class Syntax {
-    Syntax _par;
-    VStack _nongen;             //
+    Syntax _par;                // Parent in the AST
+    VStack _nongen;             // Non-generative type variables
     T2 _t;                      // Current HM type
     T2 find() {                 // U-F find
       T2 t = _t.find();
       return t==_t ? t : (_t=t);
     }
     T2 debug_find() { return _t.debug_find(); } // Find, without the roll-up
+
+    // Dataflow type.  Varies during a run of CCP.
+    Type _type;
+    
 
     // Compute and set a new HM type.
     // If no change, return false.
@@ -272,10 +285,11 @@ public class HM {
       _t=t;
       _nongen = nongen;
       work.push(this);
+      _type = Type.ANY;         // Prepare for GCP
     }
     abstract void prep_lookup_deps(Ident id);
 
-    abstract T2 lookup(String name); // Lookup name in scope & return type; TODO: pre-cache this.
+    abstract T2 lookup(String name); // Lookup name in scope & return type
 
     abstract void add_work(Worklist work); // Add affected neighbors to worklist
 
@@ -291,8 +305,11 @@ public class HM {
     // Line-by-line print with more detail
     public String p() { return p0(new SB(), new VBitSet()).toString(); }
     final SB p0(SB sb, VBitSet dups) {
+      p1(sb.i()).p(" ");
       _t.get_dups(dups);
-      _t.str(p1(sb.i()).p(" "), new VBitSet(),dups).nl();
+      _t.str(sb, new VBitSet(),dups).p(" ");
+      _type.str(sb,null,null,false);
+      sb.nl();
       return p2(sb.ii(1),dups).di(1);
     }
     abstract SB p1(SB sb);      // Self short print
