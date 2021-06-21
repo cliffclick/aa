@@ -71,15 +71,15 @@ public class TestHM {
 
   // Function composition
   @Test public void test11() { run( "{ f g -> { arg -> (g (f arg))} }",
-                                    "{ { A -> B } { $B -> C } -> { $A -> $C } }"); }
+                                    "{ { A -> B } { $B -> C } -> { $A -> $C } }", tfs(tfs(Type.ALL))); }
 
   // Stacked functions ignoring all function arguments
   @Test public void test12() { run( "map = { fun -> { x -> 2 } }; ((map 3) 5)",
-                                    "2"); }
+                                    "2", TypeInt.con(2)); }
 
   // map takes a function and an element (collection?) and applies it (applies to collection?)
   @Test public void test13() { run( "map = { fun -> { x -> (fun x)}}; { p -> 5 }",
-                                    "{ A -> 5 }"); }
+                                    "{ A -> 5 }", tfs(TypeInt.con(5))); }
 
   // Looking at when tvars are duplicated ("fresh" copies made).
   // This is the "map" problem with a scalar instead of a collection.

@@ -763,26 +763,31 @@ public class HM {
     @Override SB str(SB sb) { return _fun.str(sb); }
     @Override boolean hm(Worklist work) { return find().unify(_fun.find(),work); }
     @Override void add_hm_work(Worklist work) { }
+
+    private static Type xval(TypeFunPtr fun) {
+      Type rez = Type.ANY;
+      for( int fidx : fun._fidxs )
+        rez = rez.meet(XFERS.get(fidx).apply(null));
+      return rez;
+    }
     @Override Type val() {
-      Type t = _fun._type;
-      if( !(t instanceof TypeFunPtr) ) return t;
-      for( int fidx : ((TypeFunPtr)t)._fidxs )
-        XFERS.get(fidx).apply(null);
+      Type rez = _fun._type;
+      while( rez instanceof TypeFunPtr )
+        rez = xval((TypeFunPtr)rez); // Propagate arg types
       return _fun._type;
     }
-    // Expand functions to full signatures
-    Type flow_type() {
-      Type t = _fun._type;
-      if( !(t instanceof TypeFunPtr) ) return t;
-      Type rez = Type.ANY;
-      for( int fidx : ((TypeFunPtr)t)._fidxs ) {
-        rez = rez.meet(XFERS.get(fidx).apply(null));
+    // Expand functions to full signatures, recursively
+    Type flow_type() { return add_sig(_fun._type); }
+
+    private static Type add_sig(Type t) {
+      if( t instanceof TypeFunPtr ) {
+        Type rez = add_sig(xval((TypeFunPtr)t));
+        return TypeFunSig.make(TypeTuple.make_ret(rez),TypeTuple.make_args());
+      } else {
+        return t;
       }
-      //
-      return TypeFunSig.make(TypeTuple.make_ret(rez),TypeTuple.make_args());
     }
   }
-
 
 
   // Structure or Records.
