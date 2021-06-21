@@ -13,13 +13,21 @@ public class TestHM {
 
   private void run( String prog, String rez_hm ) { run(prog,rez_hm,null); }
   private void run( String prog, String rez_hm, Type rez_gcp ) {
-    Syntax syn = HM.hm(prog);
+    Root syn = HM.hm(prog);
     if( HM.DO_HM )
       assertEquals(rez_hm,syn._t.p());
-    if( HM.DO_GCP )
-      assertEquals(rez_gcp,syn._type);
+    if( HM.DO_GCP ) {
+      assertEquals(rez_gcp,syn.flow_type());
+
+    }
+  }
+  // Simple no-arg signature returning the type
+  private static TypeFunSig tfs(Type ret) {
+    return TypeFunSig.make(TypeTuple.make_ret(ret),TypeTuple.make_args());
   }
 
+  private static TypeMemPtr tuple2 = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,Type.ALL,Type.ALL));
+  private static TypeFunSig ret_tuple2 = tfs(tuple2);
 
   
   @Test(expected = RuntimeException.class)
@@ -27,39 +35,39 @@ public class TestHM {
 
   @Test public void test01() { run( "3" ,
                                     "3", TypeInt.con(3));  }
-  
+
   @Test public void test02() { run( "(pair1 3)" ,
-                                    "{ A -> ( 3, $A)[7] }"); }
+                                    "{ A -> ( 3, $A)[7] }", tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(TypeInt.con(3),Type.ANY)))); }
 
   @Test public void test03() { run( "{ z -> (pair (z 3) (z \"abc\")) }" ,
-                                    "{ { all -> A } -> ( $A, $A)[7] }"); }
+                                    "{ { all -> A } -> ( $A, $A)[7] }", ret_tuple2); }
 
   @Test public void test04() { run( "fact = { n -> (if (?0 n) 1 (* n (fact (dec n))))}; fact",
-                                    "{ int64 -> int64 }" ); }
+                                    "{ int64 -> int64 }", tfs(TypeInt.INT64) ); }
 
   // Because {y->y} is passed in, all 'y' types must agree.
   // This unifies 3 and "abc" which results in 'all'
   @Test public void test05() { run( "({ x -> (pair (x 3) (x \"abc\")) } {y->y})",
-                                    "( all, all)[7]" ); }
+                                    "( all, all)[7]", tuple2 ); }
 
   @Test public void test06() { run( "id={x->x}; (pair (id 3) (id \"abc\"))",
-                                    "( 3, \"abc\")[7]" ); }
+                                    "( 3, \"abc\")[7]", tuple2  ); }
 
   // recursive unification; normal H-M fails here.
   @Test public void test07() { run( "{ f -> (f f) }",
     // We can argue the pretty-print should print:
     //                              "  A:{ $A -> B }"
-                                    "{ A:{ $A -> B } -> $B }" ); }
+                                    "{ A:{ $A -> B } -> $B }", tfs(Type.ALL) ); }
 
   @Test public void test08() { run( "g = {f -> 5}; (g g)",
-                                    "5"); }
+                                    "5", TypeInt.con(5)); }
 
   // example that demonstrates generic and non-generic variables:
   @Test public void test09() { run( "{ g -> f = { x -> g }; (pair (f 3) (f \"abc\"))}",
-                                    "{ A -> ( $A, $A)[7] }"); }
+                                    "{ A -> ( $A, $A)[7] }", ret_tuple2); }
 
   @Test public void test10() { run( "{ f g -> (f g)}",
-                                    "{ { A -> B } $A -> $B }"); }
+                                    "{ { A -> B } $A -> $B }", tfs(Type.ALL) ); }
 
   // Function composition
   @Test public void test11() { run( "{ f g -> { arg -> (g (f arg))} }",
@@ -77,20 +85,20 @@ public class TestHM {
   // This is the "map" problem with a scalar instead of a collection.
   // Takes a '{a->b}' and a 'a' for a couple of different prims.
   @Test public void test14() { run("map = { fun -> { x -> (fun x)}};"+
-                                   "(pair ((map str) 5) ((map factor) 2.3))", 
+                                   "(pair ((map str) 5) ((map factor) 2.3))",
                                    "( *[4]str, (divmod flt64 flt64))[7]"); }
 
   // map takes a function and an element (collection?) and applies it (applies to collection?)
-  @Test public void test15() { run("map = { fun x -> (fun x)}; (map {a->3} 5)", 
+  @Test public void test15() { run("map = { fun x -> (fun x)}; (map {a->3} 5)",
                                    "3"); }
 
   // map takes a function and an element (collection?) and applies it (applies to collection?)
-  @Test public void test16() { run("map = { fun x -> (fun x)}; (map { a-> (pair a a)} 5)", 
+  @Test public void test16() { run("map = { fun x -> (fun x)}; (map { a-> (pair a a)} 5)",
                                    "( 5, 5)[7]"); }
 
   @Test public void test17() { run("fcn = { p -> { a -> (pair a a) }};"+
                                    "map = { fun x -> (fun x)};"+
-                                   "{ q -> (map (fcn q) 5)}", 
+                                   "{ q -> (map (fcn q) 5)}",
                                    "{ A -> ( 5, 5)[7] }"); }
 
   // Checking behavior when using "if" to merge two functions with sufficiently
@@ -105,7 +113,7 @@ public class TestHM {
   // Ultimately, unifies "a" with "pair[3,a]" which throws recursive unification.
   @Test public void test18() { run("fcn = {p -> (if p {a -> (pair a a)} {b -> (pair b (pair 3 b))})};"+
                                    "map = { fun x -> (fun x)};"+
-                                   "{ q -> (map (fcn q) 5)}", 
+                                   "{ q -> (map (fcn q) 5)}",
                                    "{ A -> ( B:\"Cannot unify A:( 3, $A)[7] and 5\", $B)[7] }"); }
 
   @Test public void test19() { run("cons ={x y-> {cadr -> (cadr x y)}};"+
