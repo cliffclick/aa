@@ -146,12 +146,35 @@ public class HM {
       });
 
     PRIMS.put("eq",T2.make_fun(var1,var1,bool));
+    
     PRIMS.put("isempty",T2.make_fun(strp,bool));
+    VALS .put("isempty" ,tfp=TypeFunPtr.make_new_fidx(BitsFun.ALL,1,TypeMemPtr.NO_DISP));
+    XFERS.put(tfp.fidx(), args -> {
+        Type pred = args[0]._type;
+        if( pred.above_center() ) return TypeInt.BOOL.dual();
+        if( pred instanceof TypeStr && pred.is_con() )
+          return TypeInt.con(pred.getstr().isEmpty() ? 1 : 0);
+        return TypeInt.BOOL;
+      });
 
     // Print a string; int->str
     PRIMS.put("str",T2.make_fun(int64,strp));
+    VALS .put("str" ,tfp=TypeFunPtr.make_new_fidx(BitsFun.ALL,1,TypeMemPtr.NO_DISP));
+    XFERS.put(tfp.fidx(), args -> {
+        Type i = args[0]._type;
+        if( i.above_center() ) return TypeStr.STR.dual();
+        if( i instanceof TypeInt && i.is_con() )
+          return TypeStr.con(String.valueOf(i.getl()).intern());
+        return TypeStr.STR;
+      });
     // Factor; FP div/mod-like operation
     PRIMS.put("factor",T2.make_fun(flt64,T2.prim("divmod",flt64,flt64)));
+    VALS .put("factor" ,tfp=TypeFunPtr.make_new_fidx(BitsFun.ALL,1,TypeMemPtr.NO_DISP));
+    XFERS.put(tfp.fidx(), args -> {
+        Type flt = args[0]._type;
+        if( flt.above_center() ) return TypeTuple.make(TypeFlt.FLT64.dual(),TypeFlt.FLT64.dual());
+        return TypeTuple.make(TypeFlt.FLT64,TypeFlt.FLT64);
+      });
 
     // Parse
     Root prog = parse( sprog );

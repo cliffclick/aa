@@ -26,8 +26,9 @@ public class TestHM {
     return TypeFunSig.make(TypeTuple.make_ret(ret),TypeTuple.make_args());
   }
 
-  private static TypeMemPtr tuple2 = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,Type.ALL,Type.ALL));
-  private static TypeFunSig ret_tuple2 = tfs(tuple2);
+  private static final TypeMemPtr tuple2  = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,Type.ALL,      Type.ALL      ));
+  private static final TypeMemPtr tuple55 = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(5),TypeInt.con(5)));
+  private static final TypeFunSig ret_tuple2 = tfs(tuple2);
 
   
   @Test(expected = RuntimeException.class)
@@ -86,20 +87,20 @@ public class TestHM {
   // Takes a '{a->b}' and a 'a' for a couple of different prims.
   @Test public void test14() { run("map = { fun -> { x -> (fun x)}};"+
                                    "(pair ((map str) 5) ((map factor) 2.3))",
-                                   "( *[4]str, (divmod flt64 flt64))[7]"); }
+                                   "( *[4]str, (divmod flt64 flt64))[7]", tuple2); }
 
   // map takes a function and an element (collection?) and applies it (applies to collection?)
   @Test public void test15() { run("map = { fun x -> (fun x)}; (map {a->3} 5)",
-                                   "3"); }
+                                   "3", TypeInt.con(3)); }
 
   // map takes a function and an element (collection?) and applies it (applies to collection?)
   @Test public void test16() { run("map = { fun x -> (fun x)}; (map { a-> (pair a a)} 5)",
-                                   "( 5, 5)[7]"); }
+                                   "( 5, 5)[7]", tuple55); }
 
   @Test public void test17() { run("fcn = { p -> { a -> (pair a a) }};"+
                                    "map = { fun x -> (fun x)};"+
                                    "{ q -> (map (fcn q) 5)}",
-                                   "{ A -> ( 5, 5)[7] }"); }
+                                   "{ A -> ( 5, 5)[7] }", tfs(tuple55)); }
 
   // Checking behavior when using "if" to merge two functions with sufficiently
   // different signatures, then attempting to pass them to a map & calling internally.
@@ -114,12 +115,14 @@ public class TestHM {
   @Test public void test18() { run("fcn = {p -> (if p {a -> (pair a a)} {b -> (pair b (pair 3 b))})};"+
                                    "map = { fun x -> (fun x)};"+
                                    "{ q -> (map (fcn q) 5)}",
-                                   "{ A -> ( B:\"Cannot unify A:( 3, $A)[7] and 5\", $B)[7] }"); }
+                                   "{ A -> ( B:\"Cannot unify A:( 3, $A)[7] and 5\", $B)[7] }",
+                                   tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(5),Type.NSCALR)))
+                                   ); }
 
   @Test public void test19() { run("cons ={x y-> {cadr -> (cadr x y)}};"+
                                    "cdr ={mycons -> (mycons { p q -> q})};"+
                                    "(cdr (cons 2 3))",
-                                   "3"); }
+                                   "3", TypeInt.con(3)); }
 
   // Take 2nd element of pair, and applies a function.
   //    let map = fn parg fun => (fun (cdr parg))
@@ -132,24 +135,24 @@ public class TestHM {
                                    "cdr ={mycons -> (mycons { p q -> q})};"+
                                    "map ={fun parg -> (fun (cdr parg))};"+
                                    "(pair (map str (cons 0 5)) (map isempty (cons 0 \"abc\")))",
-                                   "( *[4]str, int1)[7]"); }
+                                   "( *[4]str, int1)[7]", tuple2); }
 
   // Obscure factorial-like
   @Test public void test21() { run("f0 = { f x -> (if (?0 x) 1 (f (f0 f (dec x)) 2))}; (f0 * 99)",
-                                   "int64"); }
+                                   "int64", TypeInt.INT64); }
 
   // Obscure factorial-like
   // let f0 = fn f x => (if (?0 x) 1 (* (f0 f (dec x)) 2) ) in f0 f0 99
   // let f0 = fn f x => (if (?0 x) 1 (f (f0 f (dec x)) 2) ) in f0 *  99
   @Test public void test22() { run("f0 = { f x -> (if (?0 x) 1 (* (f0 f (dec x)) 2))}; (f0 f0 99)",
-                                   "int64"); }
+                                   "int64", TypeInt.INT64); }
 
   // Mutual recursion
   @Test public void test23() { run("is_even = "+
                                    "  is_odd = { n -> (if (?0 n) 0 (is_even (dec n)))}; "+
                                    "     { n -> (if (?0 n) 1 (is_odd (dec n)))};"+
                                    "(is_even 3)" ,
-                                   "int1"); }
+                                   "int1", TypeInt.BOOL); }
 
   // Toss a function into a pair & pull it back out
   @Test public void test24() { run("{ g -> fgz = "+
@@ -159,7 +162,7 @@ public class TestHM {
                                    "      (pair (fgz 3) (fgz 5))"+
                                    "}"
                                    ,
-                                   "{ { nint8 -> A } -> ( $A, $A)[7] }"); }
+                                   "{ { nint8 -> A } -> ( $A, $A)[7] }", ret_tuple2); }
 
   // Basic structure test
   @Test public void test25() { run("@{x=2, y=3}",
