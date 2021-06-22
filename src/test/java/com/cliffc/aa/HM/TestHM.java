@@ -211,8 +211,8 @@ public class TestHM {
     TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn._ts[0];
     return cycle_ptrn;
   }
-  
-  
+
+
   // Recursive linked-list discovery, with no end clause.  Since this code has
   // no exit (its an infinite loop, endlessly reading from an infinite input
   // and writing an infinite output), gcp gets a cyclic approximation.
@@ -248,11 +248,11 @@ public class TestHM {
 
   // try the worse-case expo blow-up test case from SO
   @Test public void test35() {
-    TypeFunPtr tfp = TypeFunPtr.make(12,3,Type.ANY);
+    TypeFunPtr tfp = TypeFunPtr.make(13,3,Type.ANY);
     TypeMemPtr tmp0 = TypeMemPtr.make(8,TypeStruct.make_tuple(Type.ANY,tfp ,tfp ,tfp ));
     TypeMemPtr tmp1 = TypeMemPtr.make(8,TypeStruct.make_tuple(Type.ANY,tmp0,tmp0,tmp0));
     TypeMemPtr tmp2 = TypeMemPtr.make(8,TypeStruct.make_tuple(Type.ANY,tmp1,tmp1,tmp1));
-    
+
     run("p0 = { x y z -> (triple x y z) };"+
         "p1 = (triple p0 p0 p0);"+
         "p2 = (triple p1 p1 p1);"+
@@ -290,15 +290,17 @@ public class TestHM {
   @Test public void test38() { run("{ x -> y = ( x .v x ); 0}",
                                    "{ \"Cannot unify @{ v = A}[] and { A -> B }\" -> 0 }", tfs(Type.XNIL)); }
 
+  // Really bad flow-type: function can be called from the REPL with any
+  // argument type - and the worse case will be an error.
   @Test public void test39() { run("x = { z -> z}; (x { y -> .u y})",
-                                   "{ @{ u = A}[] -> $A }",null); }
+                                   "{ @{ u = A}[] -> $A }",tfs(TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con("No field u in Scalar")))); }
 
   // Example from SimpleSub requiring 'x' to be both:
   // - a recursive self-call function from "w = (x x)": $V66:{ $V66 -> V67 } AND
   // - a function which takes a struct with field 'u'
   // The first arg to x is two different kinds of functions, so fails unification.
   @Test public void test40() { run("x = w = (x x); { z -> z}; (x { y -> .u y})",
-                                   "\"Cannot unify A:{ $A -> B } and @{ u = A}[]\""); }
+                                   "\"Cannot unify A:{ $A -> B } and @{ u = A}[]\"", Type.SCALAR); }
 
   // Example from test15:
   //   map={lst fcn -> lst ? fcn lst.1};
@@ -313,7 +315,7 @@ public class TestHM {
                                    "out_str = (map in_int str); " +
                                    "out_bool= (map in_str { xstr -> (eq xstr \"def\")}); "+
                                    "(pair out_str out_bool)"  ,
-                                   "( *[4]str, int1)[7]"); }
+                                   "( *[4]str, int1)[7]", tuple2); }
 
 
 }

@@ -149,6 +149,16 @@ public class HM {
       });
 
     PRIMS.put("eq",T2.make_fun(var1,var1,bool));
+    VALS .put("eq" ,tfp=TypeFunPtr.make_new_fidx(BitsFun.ALL,1,TypeMemPtr.NO_DISP));
+    XFERS.put(tfp.fidx(), args -> {
+        Type x0 = args[0]._type;
+        Type x1 = args[1]._type;
+        if( x0.above_center() || x1.above_center() ) return TypeInt.BOOL.dual();
+        if( x0.is_con() && x1.is_con() && x0==x1 )
+          return TypeInt.TRUE;
+        // TODO: Can also know about nil/not-nil
+        return TypeInt.BOOL;
+      });
 
     PRIMS.put("isempty",T2.make_fun(strp,bool));
     VALS .put("isempty" ,tfp=TypeFunPtr.make_new_fidx(BitsFun.ALL,1,TypeMemPtr.NO_DISP));
