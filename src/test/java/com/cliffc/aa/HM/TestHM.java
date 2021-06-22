@@ -198,6 +198,21 @@ public class TestHM {
   @Test public void test31() { run("{ sq -> (* .x sq .y sq) }", // { sq -> sq.x * sq.y }
                                    "{ @{ y = int64, x = int64}[] -> int64 }", tfs(TypeInt.INT64)); }
 
+  private static TypeMemPtr build_cycle( int alias, boolean nil, Type fld ) {
+    // Build a cycle of length 2.
+    String[] N1V1 = new String[]{"n1","v1"};
+    BitsAlias aliases = BitsAlias.make0(alias);
+    if( nil ) aliases = aliases.meet_nil();
+    TypeMemPtr cycle_ptr0 = TypeMemPtr.make(aliases,TypeObj.XOBJ);
+    TypeStruct cycle_str1 = TypeStruct.make(N1V1,Types.ts(cycle_ptr0,fld));
+    TypeMemPtr cycle_ptr1 = TypeMemPtr.make(aliases,cycle_str1);
+    TypeStruct cycle_str2 = TypeStruct.make(N1V1,Types.ts(cycle_ptr1,fld));
+    TypeStruct cycle_strn = cycle_str2.approx(1,alias);
+    TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn._ts[0];
+    return cycle_ptrn;
+  }
+  
+  
   // Recursive linked-list discovery, with no end clause.  Since this code has
   // no exit (its an infinite loop, endlessly reading from an infinite input
   // and writing an infinite output), gcp gets a cyclic approximation.
@@ -205,53 +220,78 @@ public class TestHM {
     Root syn = HM.hm("map = { fcn lst -> @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } }; map");
     if( HM.DO_HM )
       assertEquals("{ { A -> B } C:@{ v0 = $A, n0 = $C}[] -> D:@{ n1 = $D, v1 = $B}[9] }",syn._t.p());
-    if( HM.DO_GCP ) {
-      // Build a cycle of length 2.
-      String[] N1V1 = new String[]{"n1","v1"};
-      final int alias = 9;
-      TypeMemPtr cycle_ptr0 = TypeMemPtr.make(alias,TypeObj.XOBJ);
-      TypeStruct cycle_str1 = TypeStruct.make(N1V1,Types.ts(cycle_ptr0,Type.SCALAR));
-      TypeMemPtr cycle_ptr1 = TypeMemPtr.make(alias,cycle_str1);
-      TypeStruct cycle_str2 = TypeStruct.make(N1V1,Types.ts(cycle_ptr1,Type.SCALAR));
-      TypeStruct cycle_strn = cycle_str2.approx(1,alias);
-      TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn._ts[0];
-      assertEquals(tfs(cycle_ptrn),syn.flow_type());
-    }
+    if( HM.DO_GCP )
+      // Build a cycle of length 2, without nil.
+      assertEquals(tfs(build_cycle(9,false,Type.SCALAR)),syn.flow_type());
   }
 
   // Recursive linked-list discovery, with nil.  Note that the output memory
   // has the output memory alias, but not the input memory alias (which must be
   // made before calling 'map').
-  @Test public void test33() { run("map = { fcn lst -> (if lst @{ n1=(map fcn .n0 lst), v1=(fcn .v0 lst) } nil) }; map",
-                                   "{ { A -> B } C:@{ v0 = $A, n0 = $C}[0] -> D:@{ n1 = $D, v1 = $B}[0,9] }"); }
+  @Test public void test33() {
+    Root syn = HM.hm("map = { fcn lst -> (if lst @{ n1=(map fcn .n0 lst), v1=(fcn .v0 lst) } 0) }; map");
+    if( HM.DO_HM )
+      assertEquals("{ { A -> B } C:@{ v0 = $A, n0 = $C}[0] -> D:@{ n1 = $D, v1 = $B}[0,9] }",syn._t.p());
+    if( HM.DO_GCP )
+      // Build a cycle of length 2, with nil.
+      assertEquals(tfs(build_cycle(9,true,Type.SCALAR)),syn.flow_type());
+  }
 
   // Recursive linked-list discovery, with no end clause
-  @Test public void test34() { run("map = { fcn lst -> (if lst @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } nil) }; (map dec @{n0 = nil, v0 = 5})",
-                                   "A:@{ n1 = $A, v1 = int64}[0,9]"); }
+  @Test public void test34() {
+    Root syn = HM.hm("map = { fcn lst -> (if lst @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } 0) }; (map dec @{n0 = 0, v0 = 5})");
+    if( HM.DO_HM )
+      assertEquals("A:@{ n1 = $A, v1 = int64}[0,9]",syn._t.p());
+    if( HM.DO_GCP )
+      assertEquals(build_cycle(9,true,TypeInt.con(4)),syn.flow_type());
+  }
 
   // try the worse-case expo blow-up test case from SO
-  @Test public void test35() { run("p0 = { x y z -> (triple x y z) };"+
-                                   "p1 = (triple p0 p0 p0);"+
-                                   "p2 = (triple p1 p1 p1);"+
-                                   "p3 = (triple p2 p2 p2);"+
-                                   "p3",
-                                   "( ( ( { A B C -> ( $A, $B, $C)[8] }, { D E F -> ( $D, $E, $F)[8] }, { G H I -> ( $G, $H, $I)[8] })[8], ( { J K L -> ( $J, $K, $L)[8] }, { M N O -> ( $M, $N, $O)[8] }, { P Q R -> ( $P, $Q, $R)[8] })[8], ( { S T U -> ( $S, $T, $U)[8] }, { V21 V22 V23 -> ( $V21, $V22, $V23)[8] }, { V24 V25 V26 -> ( $V24, $V25, $V26)[8] })[8])[8], ( ( { V27 V28 V29 -> ( $V27, $V28, $V29)[8] }, { V30 V31 V32 -> ( $V30, $V31, $V32)[8] }, { V33 V34 V35 -> ( $V33, $V34, $V35)[8] })[8], ( { V36 V37 V38 -> ( $V36, $V37, $V38)[8] }, { V39 V40 V41 -> ( $V39, $V40, $V41)[8] }, { V42 V43 V44 -> ( $V42, $V43, $V44)[8] })[8], ( { V45 V46 V47 -> ( $V45, $V46, $V47)[8] }, { V48 V49 V50 -> ( $V48, $V49, $V50)[8] }, { V51 V52 V53 -> ( $V51, $V52, $V53)[8] })[8])[8], ( ( { V54 V55 V56 -> ( $V54, $V55, $V56)[8] }, { V57 V58 V59 -> ( $V57, $V58, $V59)[8] }, { V60 V61 V62 -> ( $V60, $V61, $V62)[8] })[8], ( { V63 V64 V65 -> ( $V63, $V64, $V65)[8] }, { V66 V67 V68 -> ( $V66, $V67, $V68)[8] }, { V69 V70 V71 -> ( $V69, $V70, $V71)[8] })[8], ( { V72 V73 V74 -> ( $V72, $V73, $V74)[8] }, { V75 V76 V77 -> ( $V75, $V76, $V77)[8] }, { V78 V79 V80 -> ( $V78, $V79, $V80)[8] })[8])[8])[8]"); }
+  @Test public void test35() {
+    TypeFunPtr tfp = TypeFunPtr.make(12,3,Type.ANY);
+    TypeMemPtr tmp0 = TypeMemPtr.make(8,TypeStruct.make_tuple(Type.ANY,tfp ,tfp ,tfp ));
+    TypeMemPtr tmp1 = TypeMemPtr.make(8,TypeStruct.make_tuple(Type.ANY,tmp0,tmp0,tmp0));
+    TypeMemPtr tmp2 = TypeMemPtr.make(8,TypeStruct.make_tuple(Type.ANY,tmp1,tmp1,tmp1));
+    
+    run("p0 = { x y z -> (triple x y z) };"+
+        "p1 = (triple p0 p0 p0);"+
+        "p2 = (triple p1 p1 p1);"+
+        "p3 = (triple p2 p2 p2);"+
+        "p3",
+        "( ( ( { A B C -> ( $A, $B, $C)[8] }, { D E F -> ( $D, $E, $F)[8] }, { G H I -> ( $G, $H, $I)[8] })[8], ( { J K L -> ( $J, $K, $L)[8] }, { M N O -> ( $M, $N, $O)[8] }, { P Q R -> ( $P, $Q, $R)[8] })[8], ( { S T U -> ( $S, $T, $U)[8] }, { V21 V22 V23 -> ( $V21, $V22, $V23)[8] }, { V24 V25 V26 -> ( $V24, $V25, $V26)[8] })[8])[8], ( ( { V27 V28 V29 -> ( $V27, $V28, $V29)[8] }, { V30 V31 V32 -> ( $V30, $V31, $V32)[8] }, { V33 V34 V35 -> ( $V33, $V34, $V35)[8] })[8], ( { V36 V37 V38 -> ( $V36, $V37, $V38)[8] }, { V39 V40 V41 -> ( $V39, $V40, $V41)[8] }, { V42 V43 V44 -> ( $V42, $V43, $V44)[8] })[8], ( { V45 V46 V47 -> ( $V45, $V46, $V47)[8] }, { V48 V49 V50 -> ( $V48, $V49, $V50)[8] }, { V51 V52 V53 -> ( $V51, $V52, $V53)[8] })[8])[8], ( ( { V54 V55 V56 -> ( $V54, $V55, $V56)[8] }, { V57 V58 V59 -> ( $V57, $V58, $V59)[8] }, { V60 V61 V62 -> ( $V60, $V61, $V62)[8] })[8], ( { V63 V64 V65 -> ( $V63, $V64, $V65)[8] }, { V66 V67 V68 -> ( $V66, $V67, $V68)[8] }, { V69 V70 V71 -> ( $V69, $V70, $V71)[8] })[8], ( { V72 V73 V74 -> ( $V72, $V73, $V74)[8] }, { V75 V76 V77 -> ( $V75, $V76, $V77)[8] }, { V78 V79 V80 -> ( $V78, $V79, $V80)[8] })[8])[8])[8]",
+        tmp2  );
+  }
 
   // Need to see if a map call, inlined a few times, 'rolls up'.  Sometimes
   // rolls up, sometimes not; depends on worklist visitation order.
-  @Test public void test36() { run("map = { lst -> (if lst @{ n1= arg= .n0 lst; (if arg @{ n1=(map .n0 arg), v1=(str .v0 arg)} nil), v1=(str .v0 lst) } nil) }; map",
-                                   "{ A:@{ v0 = int64, n0 = @{ n0 = $A, v0 = int64}[0]}[0] -> B:@{ n1 = @{ n1 = $B, v1 = *[4]str}[0,9], v1 = *[4]str}[0,10] }"); }
+  @Test public void test36() {
+    Root syn = HM.hm("map = { lst -> (if lst @{ n1= arg= .n0 lst; (if arg @{ n1=(map .n0 arg), v1=(str .v0 arg)} 0), v1=(str .v0 lst) } 0) }; map");
+    if( HM.DO_HM )
+      assertEquals("{ A:@{ v0 = int64, n0 = @{ n0 = $A, v0 = int64}[0]}[0] -> B:@{ n1 = @{ n1 = $B, v1 = *[4]str}[0,9], v1 = *[4]str}[0,10] }",syn._t.p());
+    if( HM.DO_GCP ) {
+      String[] N1V1 = new String[]{"n1","v1"};
+      TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.FULL.make(0,10),TypeObj.XOBJ);
+      TypeStruct cycle_str1 = TypeStruct.make(N1V1,Types.ts(cycle_ptr0,TypeMemPtr.STRPTR));
+      TypeMemPtr cycle_ptr1 = TypeMemPtr.make(BitsAlias.FULL.make(0, 9),cycle_str1);
+      TypeStruct cycle_str2 = TypeStruct.make(N1V1,Types.ts(cycle_ptr1,TypeMemPtr.STRPTR));
+      TypeMemPtr cycle_ptr2 = TypeMemPtr.make(BitsAlias.FULL.make(0,10),cycle_str2);
+      TypeStruct cycle_str3 = TypeStruct.make(N1V1,Types.ts(cycle_ptr2,TypeMemPtr.STRPTR));
+      TypeStruct cycle_strn = cycle_str3.approx(1,9);
+      TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn._ts[0];
+      assertEquals(tfs(cycle_ptrn),syn.flow_type());
+    }
+  }
 
   @Test public void test37() { run("x = { y -> (x (y y))}; x",
-                                   "{ A:{ $A -> $A } -> B }"); }
+                                   "{ A:{ $A -> $A } -> B }", tfs(Type.XSCALAR)); }
 
   // Example from SimpleSub requiring 'x' to be both a struct with field
   // 'v', and also a function type - specifically disallowed in 'aa'.
   @Test public void test38() { run("{ x -> y = ( x .v x ); 0}",
-                                   "{ \"Cannot unify @{ v = A}[] and { A -> B }\" -> 0 }"); }
+                                   "{ \"Cannot unify @{ v = A}[] and { A -> B }\" -> 0 }", tfs(Type.XNIL)); }
 
   @Test public void test39() { run("x = { z -> z}; (x { y -> .u y})",
-                                   "{ @{ u = A}[] -> $A }"); }
+                                   "{ @{ u = A}[] -> $A }",null); }
 
   // Example from SimpleSub requiring 'x' to be both:
   // - a recursive self-call function from "w = (x x)": $V66:{ $V66 -> V67 } AND
@@ -268,7 +308,7 @@ public class TestHM {
   //   out_bool= map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
   //   (out_str,out_bool)",
   @Test public void test41() { run("map={lst fcn -> (fcn .y lst) }; "+
-                       "in_int=@{ x=0 y=2}; " +
+                                   "in_int=@{ x=0 y=2}; " +
                                    "in_str=@{ x=0 y=\"abc\"}; " +
                                    "out_str = (map in_int str); " +
                                    "out_bool= (map in_str { xstr -> (eq xstr \"def\")}); "+

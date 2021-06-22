@@ -40,8 +40,6 @@ public class HM {
   static final boolean DO_HM  = false;
   static final boolean DO_GCP = true;
 
-  public static final TypeMemPtr NILPTR = TypeMemPtr.make(BitsAlias.NIL,TypeStruct.ANYSTRUCT);
-
   public static Root hm( String sprog ) {
     Object dummy = TypeStruct.DISPLAY;
 
@@ -54,8 +52,6 @@ public class HM {
     T2 strp  = T2.make_leaf(TypeMemPtr.STRPTR);
 
     // Primitives
-    PRIMS.put("nil",T2.make_struct(NILPTR,new String[0],new T2[0]));
-
     T2 var1 = T2.make_leaf();
     T2 var2 = T2.make_leaf();
     T2 var3 = T2.make_leaf();
@@ -90,6 +86,13 @@ public class HM {
 
     TypeMemPtr tptr_triple = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.REC),TypeStruct.ANYSTRUCT);
     PRIMS.put("triple",T2.make_fun(var1, var2, var3, T2.make_struct(tptr_triple,new String[]{"0","1","2"},new T2[]{var1,var2,var3}) ));
+    VALS .put("triple",tfp=TypeFunPtr.make_new_fidx(BitsFun.ALL,1,TypeMemPtr.NO_DISP));
+    XFERS.put(tfp.fidx(), args -> {
+        Type[] ts = TypeStruct.ts(args.length+1);
+        ts[0] = Type.ANY;       // Display
+        for( int i=0; i<args.length; i++ ) ts[i+1] = args[i]._type;
+        return tptr_triple.make_from(TypeStruct.make_tuple(ts));
+      });
 
     PRIMS.put("if",T2.make_fun(var2,var1,var1,var1));
     VALS .put("if",tfp=TypeFunPtr.make_new_fidx(BitsFun.ALL,1,TypeMemPtr.NO_DISP));
@@ -98,7 +101,7 @@ public class HM {
         Type t1  = args[1]._type;
         Type t2  = args[2]._type;
         if( pred.above_center() )
-          return t1.join(t2);
+          return Type.XSCALAR; // t1.join(t2);
         if( pred==TypeInt.TRUE )
           return t1;
         if( pred==TypeInt.FALSE )
@@ -307,10 +310,12 @@ public class HM {
     return s;
   }
   private static Syntax number() {
+    if( BUF[X]=='0' ) { X++; return new Con(Type.XNIL); }
     int sum=0;
     while( X<BUF.length && isDigit(BUF[X]) )
       sum = sum*10+BUF[X++]-'0';
-    if( X>= BUF.length || BUF[X]!='.' ) return new Con(TypeInt.con(sum));
+    if( X>= BUF.length || BUF[X]!='.' )
+      return new Con(TypeInt.con(sum));
     X++;
     float f = (float)sum;
     f = f + (BUF[X++]-'0')/10.0f;
@@ -886,9 +891,7 @@ public class HM {
       for( int i=0; i<_flds.length; i++ )
         ts[i] = _flds[i]._type;
       TypeStruct tstr = TypeStruct.make(_ids,ts);
-      TypeStruct t2 = tstr.approx(2,_tmp.getbit());
-      if( t2 != tstr )
-        System.out.println(t2);
+      TypeStruct t2 = tstr.approx(1,_tmp.getbit());
       return _tmp.make_from(t2);
     }
 
@@ -955,8 +958,6 @@ public class HM {
       if( trec.above_center() ) return Type.XSCALAR;
       if( trec instanceof TypeMemPtr ) {
         TypeMemPtr tmp = (TypeMemPtr)trec;
-        if( tmp._aliases.test(0) )
-          throw unimpl();       // Might be null
         if( tmp._obj instanceof TypeStruct ) {
           TypeStruct tstr = (TypeStruct)tmp._obj;
           int idx = tstr.find(_id);

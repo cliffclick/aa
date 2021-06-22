@@ -207,7 +207,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   boolean may_nil() { return _con==-1 && _bits != null && ((_bits[0]&1) == 1); }
   // Add a low nil.
   @SuppressWarnings("unchecked")
-  B meet_nil() {
+  public B meet_nil() {
     if( above_center() ) return make(0); // Crossing centerline, drop all above bits, just [0]
     if( test(0) ) return (B)this;// Already has nil
     long[] bs = _bits;
