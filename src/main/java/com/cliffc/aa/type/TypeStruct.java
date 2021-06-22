@@ -142,7 +142,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   private static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
-  private boolean is_tup() { return _flds.length<=1 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[1].charAt(0)); }
+  private boolean is_tup() {
+    if( _flds.length==0 ) return true;
+    if( _flds.length==1 ) return _flds[0]=="^";
+    return fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[1].charAt(0));
+  }
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     //if( debug ) sb.p('_').p(_uid);
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle

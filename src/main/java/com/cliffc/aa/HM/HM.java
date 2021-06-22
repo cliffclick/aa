@@ -146,7 +146,7 @@ public class HM {
       });
 
     PRIMS.put("eq",T2.make_fun(var1,var1,bool));
-    
+
     PRIMS.put("isempty",T2.make_fun(strp,bool));
     VALS .put("isempty" ,tfp=TypeFunPtr.make_new_fidx(BitsFun.ALL,1,TypeMemPtr.NO_DISP));
     XFERS.put(tfp.fidx(), args -> {
@@ -162,18 +162,18 @@ public class HM {
     VALS .put("str" ,tfp=TypeFunPtr.make_new_fidx(BitsFun.ALL,1,TypeMemPtr.NO_DISP));
     XFERS.put(tfp.fidx(), args -> {
         Type i = args[0]._type;
-        if( i.above_center() ) return TypeStr.STR.dual();
+        if( i.above_center() ) return TypeMemPtr.STRPTR.dual();
         if( i instanceof TypeInt && i.is_con() )
-          return TypeStr.con(String.valueOf(i.getl()).intern());
-        return TypeStr.STR;
+          return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(String.valueOf(i.getl()).intern()));
+        return TypeMemPtr.STRPTR;
       });
     // Factor; FP div/mod-like operation
     PRIMS.put("factor",T2.make_fun(flt64,T2.prim("divmod",flt64,flt64)));
     VALS .put("factor" ,tfp=TypeFunPtr.make_new_fidx(BitsFun.ALL,1,TypeMemPtr.NO_DISP));
     XFERS.put(tfp.fidx(), args -> {
         Type flt = args[0]._type;
-        if( flt.above_center() ) return TypeTuple.make(TypeFlt.FLT64.dual(),TypeFlt.FLT64.dual());
-        return TypeTuple.make(TypeFlt.FLT64,TypeFlt.FLT64);
+        if( flt.above_center() ) return TypeFlt.FLT64.dual();
+        return TypeFlt.FLT64;
       });
 
     // Parse
@@ -186,8 +186,8 @@ public class HM {
     while( work.len()>0 ) {     // While work
       int oldcnt = T2.CNT;      // Used for cost-check when no-progress
       Syntax syn = work.pop();  // Get work
-      T2 old = syn._t;          // Old value for progress assert
       if( DO_HM && !DO_GCP ) {
+        T2 old = syn._t;        // Old value for progress assert
         if( syn.hm(work) ) {
           assert !syn.debug_find().unify(old.find(),null);// monotonic: unifying with the result is no-progress
           syn.add_hm_work(work);     // Push affected neighbors on worklist
@@ -319,7 +319,7 @@ public class HM {
   private static Syntax string() {
     int start = ++X;
     while( X<BUF.length && BUF[X]!='"' ) X++;
-    return require('"', new Con(TypeStr.con(new String(BUF,start,X-start).intern())));
+    return require('"', new Con(TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(new String(BUF,start,X-start).intern()))));
   }
   private static byte skipWS() {
     while( X<BUF.length && isWS(BUF[X]) ) X++;
@@ -532,7 +532,7 @@ public class HM {
       for( int i=0; i<args.length; i++ ) _targs[i] = T2.make_leaf();
       // Flow types for all arguments
       _types = new Type[args.length];
-      for( int i=0; i<args.length; i++ ) _types[i] = Type.ANY;
+      for( int i=0; i<args.length; i++ ) _types[i] = Type.XSCALAR;
       // A unique FIDX for this Lambda
       _tfp = TypeFunPtr.make_new_fidx(BitsFun.ALL,_args.length,Type.ANY);
       FUNS.put(_tfp.fidx(),this);
@@ -727,8 +727,8 @@ public class HM {
       for( Syntax arg : _args ) work.push(arg);
     }
     @Override Type val() {
-      if( _fun._type.above_center() ) return Type.ANY;
-      if( !(_fun._type instanceof TypeFunPtr) ) return Type.ALL;
+      if( _fun._type.above_center() ) return Type.XSCALAR;
+      if( !(_fun._type instanceof TypeFunPtr) ) return Type.SCALAR;
       TypeFunPtr tfp = (TypeFunPtr)_fun._type;
       // Have some functions, meet over their returns.
       Type rez = Type.ANY;
@@ -749,7 +749,7 @@ public class HM {
           fun._t.push_update(this); // Discovered as call-site; if the Lambda changes the Apply needs to be revisited.
           for( int i=0; i<fun._types.length; i++ ) {
             Type formal = fun._types[i];
-            Type actual = this instanceof Root ? Type.ALL : _args[i]._type;
+            Type actual = this instanceof Root ? Type.SCALAR : _args[i]._type;
             if( formal != actual ) {
               fun._types[i] = formal.meet(actual);
               work.addAll(fun._targs[i]._deps);
@@ -834,10 +834,10 @@ public class HM {
       }
       return sb.p("}:").p(_tmp._aliases.toString());
     }
-    @Override SB p1(SB sb) { return _tmp.str(sb.p('*'),null,null,false).p("@{ ... } "); }
+    @Override SB p1(SB sb) { return _tmp.str(sb,new VBitSet(),null,true).p("@{ ... } "); }
     @Override SB p2(SB sb, VBitSet dups) {
       for( int i=0; i<_ids.length; i++ )
-        _flds[i].p0(sb.p(_ids[i]).p(" = "),dups);
+        _flds[i].p0(sb.i().p(_ids[i]).p(" = ").nl(),dups);
       return sb;
     }
     @Override boolean hm(Worklist work) {
@@ -864,7 +864,7 @@ public class HM {
       for( int i=0; i<rec._ids.length; i++ ) {
         if( Util.find(_ids,rec._ids[i])== -1 && !rec.args(i).is_err() ) {
           if( work==null ) return true;
-          progress |= T2.make_err("Missing field definition "+rec._ids[i]+" in "+this).unify(rec.args(i),work);
+          progress |= T2.make_err("Missing field "+rec._ids[i]+" in "+this).unify(rec.args(i),work);
         }
       }
 
@@ -881,7 +881,19 @@ public class HM {
       work.push(_par);
       for( Syntax fld : _flds ) work.push(fld);
     }
-    @Override Type val() { throw unimpl(); }
+    @Override Type val() {
+      Type[] ts = Types.get(_flds.length);
+      for( int i=0; i<_flds.length; i++ )
+        ts[i] = _flds[i]._type;
+      TypeStruct tstr = TypeStruct.make(_ids,ts);
+      TypeStruct t2 = tstr.approx(2,_tmp.getbit());
+      if( t2 != tstr )
+        System.out.println(t2);
+      return _tmp.make_from(t2);
+    }
+
+    @Override Type lookup_val(String name) { return null; } // Lookup name in scope & return type
+
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       T2[] t2s = new T2[_ids.length];
       prep_tree_impl(par, nongen, work, T2.make_struct(_tmp,_ids,t2s));
@@ -938,7 +950,24 @@ public class HM {
       work.push(_rec);
       _rec.add_hm_work(work);
     }
-    @Override Type val() { throw unimpl(); }
+    @Override Type val() {
+      Type trec = _rec._type;
+      if( trec.above_center() ) return Type.XSCALAR;
+      if( trec instanceof TypeMemPtr ) {
+        TypeMemPtr tmp = (TypeMemPtr)trec;
+        if( tmp._aliases.test(0) )
+          throw unimpl();       // Might be null
+        if( tmp._obj instanceof TypeStruct ) {
+          TypeStruct tstr = (TypeStruct)tmp._obj;
+          int idx = tstr.find(_id);
+          if( idx!=-1 )
+            return tstr._ts[idx]; // Field type
+        }
+        return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(("Missing field "+_id+" in "+tmp._obj).intern())); // Any or All?      }
+      }
+      return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(("No field "+_id+" in "+trec).intern()));
+    }
+    @Override Type lookup_val(String name) { return null; } // Lookup name in scope & return type
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par, nongen, work, T2.make_leaf());
       return _rec.prep_tree(this,nongen,work)+1;

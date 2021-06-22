@@ -26,11 +26,14 @@ public class TestHM {
     return TypeFunSig.make(TypeTuple.make_ret(ret),TypeTuple.make_args());
   }
 
-  private static final TypeMemPtr tuple2  = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,Type.ALL,      Type.ALL      ));
+  private static final TypeMemPtr tuple2  = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,Type.SCALAR,   Type.SCALAR   ));
+  private static final TypeMemPtr tuplen2 = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,Type.NSCALR,   Type.NSCALR   ));
   private static final TypeMemPtr tuple55 = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(5),TypeInt.con(5)));
   private static final TypeFunSig ret_tuple2 = tfs(tuple2);
+  private static final String[] XY = new String[]{"x","y"};
+  private static final TypeMemPtr tuple9  = TypeMemPtr.make(9,TypeStruct.make(XY,Types.ts(Type.SCALAR,Type.SCALAR)));
 
-  
+
   @Test(expected = RuntimeException.class)
   public void test00() { run( "fred",null,null); }
 
@@ -49,16 +52,16 @@ public class TestHM {
   // Because {y->y} is passed in, all 'y' types must agree.
   // This unifies 3 and "abc" which results in 'all'
   @Test public void test05() { run( "({ x -> (pair (x 3) (x \"abc\")) } {y->y})",
-                                    "( all, all)[7]", tuple2 ); }
+                                    "( all, all)[7]", tuplen2 ); }
 
   @Test public void test06() { run( "id={x->x}; (pair (id 3) (id \"abc\"))",
-                                    "( 3, \"abc\")[7]", tuple2  ); }
+                                    "( 3, \"abc\")[7]", tuplen2  ); }
 
   // recursive unification; normal H-M fails here.
   @Test public void test07() { run( "{ f -> (f f) }",
     // We can argue the pretty-print should print:
     //                              "  A:{ $A -> B }"
-                                    "{ A:{ $A -> B } -> $B }", tfs(Type.ALL) ); }
+                                    "{ A:{ $A -> B } -> $B }", tfs(Type.SCALAR) ); }
 
   @Test public void test08() { run( "g = {f -> 5}; (g g)",
                                     "5", TypeInt.con(5)); }
@@ -68,11 +71,11 @@ public class TestHM {
                                     "{ A -> ( $A, $A)[7] }", ret_tuple2); }
 
   @Test public void test10() { run( "{ f g -> (f g)}",
-                                    "{ { A -> B } $A -> $B }", tfs(Type.ALL) ); }
+                                    "{ { A -> B } $A -> $B }", tfs(Type.SCALAR) ); }
 
   // Function composition
   @Test public void test11() { run( "{ f g -> { arg -> (g (f arg))} }",
-                                    "{ { A -> B } { $B -> C } -> { $A -> $C } }", tfs(tfs(Type.ALL))); }
+                                    "{ { A -> B } { $B -> C } -> { $A -> $C } }", tfs(tfs(Type.SCALAR))); }
 
   // Stacked functions ignoring all function arguments
   @Test public void test12() { run( "map = { fun -> { x -> 2 } }; ((map 3) 5)",
@@ -166,35 +169,55 @@ public class TestHM {
 
   // Basic structure test
   @Test public void test25() { run("@{x=2, y=3}",
-                                   "@{ x = 2, y = 3}[9]"); }
+                                   "@{ x = 2, y = 3}[9]",
+                                   TypeMemPtr.make(9,TypeStruct.make(XY,Types.ts(TypeInt.con(2),TypeInt.con(3))))
+                                   ); }
 
   // Basic field test
   @Test public void test26() { run(".x @{x =2, y =3}",
-                                   "2"); }
+                                   "2", TypeInt.con(2)); }
 
   // Basic field test
   @Test public void test27() { run(".x 5",
-                                   "\"Cannot unify @{ x = A}[] and 5\""); }
+                                   "\"Cannot unify @{ x = A}[] and 5\"", TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con("No field x in 5"))); }
 
   // Basic field test.
   @Test public void test28() { run(".x @{ y =3}",
-                                   "\"Missing field definition x in @{ y = 3}:[9]\""); }
+                                   "\"Missing field x in @{ y = 3}:[9]\"",
+                                   TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con("Missing field x in @{y==3}"))); }
 
   @Test public void test29() { run("{ g -> @{x=g, y=g}}",
-                                   "{ A -> @{ x = $A, y = $A}[9] }"); }
+                                   "{ A -> @{ x = $A, y = $A}[9] }", tfs(tuple9)); }
 
   // Load common field 'x', ignoring mismatched fields y and z
   @Test public void test30() { run("{ pred -> .x (if pred @{x=2,y=3} @{x=3,z= \"abc\"}) }",
-                                   "{ A -> nint8 }"); }
+                                   "{ A -> nint8 }", tfs(TypeInt.NINT8)); }
 
   // Load some fields from an unknown struct: area of a square.
   // Since no nil-check, correctly types as needing a not-nil input.
   @Test public void test31() { run("{ sq -> (* .x sq .y sq) }", // { sq -> sq.x * sq.y }
-                                   "{ @{ y = int64, x = int64}[] -> int64 }"); }
+                                   "{ @{ y = int64, x = int64}[] -> int64 }", tfs(TypeInt.INT64)); }
 
-  // Recursive linked-list discovery, with no end clause
-  @Test public void test32() { run("map = { fcn lst -> @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } }; map",
-                                   "{ { A -> B } C:@{ v0 = $A, n0 = $C}[] -> D:@{ n1 = $D, v1 = $B}[9] }"); }
+  // Recursive linked-list discovery, with no end clause.  Since this code has
+  // no exit (its an infinite loop, endlessly reading from an infinite input
+  // and writing an infinite output), gcp gets a cyclic approximation.
+  @Test public void test32() {
+    Root syn = HM.hm("map = { fcn lst -> @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } }; map");
+    if( HM.DO_HM )
+      assertEquals("{ { A -> B } C:@{ v0 = $A, n0 = $C}[] -> D:@{ n1 = $D, v1 = $B}[9] }",syn._t.p());
+    if( HM.DO_GCP ) {
+      // Build a cycle of length 2.
+      String[] N1V1 = new String[]{"n1","v1"};
+      final int alias = 9;
+      TypeMemPtr cycle_ptr0 = TypeMemPtr.make(alias,TypeObj.XOBJ);
+      TypeStruct cycle_str1 = TypeStruct.make(N1V1,Types.ts(cycle_ptr0,Type.SCALAR));
+      TypeMemPtr cycle_ptr1 = TypeMemPtr.make(alias,cycle_str1);
+      TypeStruct cycle_str2 = TypeStruct.make(N1V1,Types.ts(cycle_ptr1,Type.SCALAR));
+      TypeStruct cycle_strn = cycle_str2.approx(1,alias);
+      TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn._ts[0];
+      assertEquals(tfs(cycle_ptrn),syn.flow_type());
+    }
+  }
 
   // Recursive linked-list discovery, with nil.  Note that the output memory
   // has the output memory alias, but not the input memory alias (which must be
