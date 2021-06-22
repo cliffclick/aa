@@ -37,8 +37,8 @@ public class HM {
   static final boolean DEBUG_LEAKS=false;
   static { BitsAlias.init0(); BitsFun.init0(); }
 
-  static final boolean DO_HM  = false;
-  static final boolean DO_GCP = true;
+  static final boolean DO_HM  = true;
+  static final boolean DO_GCP = false;
 
   public static Root hm( String sprog ) {
     Object dummy = TypeStruct.DISPLAY;
@@ -861,6 +861,7 @@ public class HM {
       // Force result to be a struct with at least these fields.
       // Do not allocate a T2 unless we need to pick up fields.
       T2 rec = find();
+      if( rec.is_err() ) return false;
       for( String id : _ids )
         if( Util.find(rec._ids, id) == -1 )
           { must_alloc = true; break; }
@@ -1124,8 +1125,8 @@ public class HM {
 
       // two leafs union in either order, so keep lower uid
       if( is_leaf() && that.is_leaf() && _uid<that._uid ) return that.union(this,work);
-      if(      is_leaf() &&      _t==Type.ANY ) return      union(that,work);
-      if( that.is_leaf() && that._t==Type.ANY ) return that.union(this,work);
+      if(      is_leaf() && (     _t==Type.ANY ||      _t==Type.XNIL)) return      union(that,work);
+      if( that.is_leaf() && (that._t==Type.ANY || that._t==Type.XNIL)) return that.union(this,work);
       if( is_leaf() && that.is_leaf() ) return union(that,work);
 
       // Cycle check

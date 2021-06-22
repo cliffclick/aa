@@ -44,7 +44,7 @@ public class TestHM {
                                     "{ A -> ( 3, $A)[7] }", tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(TypeInt.con(3),Type.ANY)))); }
 
   @Test public void test03() { run( "{ z -> (pair (z 3) (z \"abc\")) }" ,
-                                    "{ { all -> A } -> ( $A, $A)[7] }", ret_tuple2); }
+                                    "{ { nScalar -> A } -> ( $A, $A)[7] }", ret_tuple2); }
 
   @Test public void test04() { run( "fact = { n -> (if (?0 n) 1 (* n (fact (dec n))))}; fact",
                                     "{ int64 -> int64 }", tfs(TypeInt.INT64) ); }
@@ -52,10 +52,10 @@ public class TestHM {
   // Because {y->y} is passed in, all 'y' types must agree.
   // This unifies 3 and "abc" which results in 'all'
   @Test public void test05() { run( "({ x -> (pair (x 3) (x \"abc\")) } {y->y})",
-                                    "( all, all)[7]", tuplen2 ); }
+                                    "( nScalar, nScalar)[7]", tuplen2 ); }
 
   @Test public void test06() { run( "id={x->x}; (pair (id 3) (id \"abc\"))",
-                                    "( 3, \"abc\")[7]", tuplen2  ); }
+                                    "( 3, *[4]\"abc\")[7]", tuplen2  ); }
 
   // recursive unification; normal H-M fails here.
   @Test public void test07() { run( "{ f -> (f f) }",
