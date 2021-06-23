@@ -38,7 +38,7 @@ public class HM {
   static { BitsAlias.init0(); BitsFun.init0(); }
 
   static final boolean DO_HM  = true;
-  static final boolean DO_GCP = false;
+  static final boolean DO_GCP = true;
 
   public static Root hm( String sprog ) {
     Object dummy = TypeStruct.DISPLAY;
@@ -199,7 +199,7 @@ public class HM {
     while( work.len()>0 ) {     // While work
       int oldcnt = T2.CNT;      // Used for cost-check when no-progress
       Syntax syn = work.pop();  // Get work
-      if( DO_HM && !DO_GCP ) {
+      if( DO_HM ) {
         T2 old = syn._t;        // Old value for progress assert
         if( syn.hm(work) ) {
           assert !syn.debug_find().unify(old.find(),null);// monotonic: unifying with the result is no-progress
@@ -208,7 +208,7 @@ public class HM {
           assert !DEBUG_LEAKS || oldcnt==T2.CNT;  // No-progress consumes no-new-T2s
         }
       }
-      if( DO_GCP && !DO_HM ) {
+      if( DO_GCP ) {
         Type t = syn.val();
         if( t!=syn._type ) {       // Progress
           assert syn._type.isa(t); // Monotonic falling
@@ -644,13 +644,13 @@ public class HM {
       work.push(_par);
       work.push(_body);
       work.push(_def);
-      if( targ().occurs_in_type(_def.find()) ) work.addAll(_targ._deps);
+      if( targ().occurs_in_type(_def.find()) ) work.addAll(targ()._deps);
     }
     @Override Type val() { return _body._type; }
     @Override Type lookup_val(String name) { return Util.eq(_arg0,name) ? _def._type : null; }
     @Override void add_val_work(Syntax child, Worklist work) {
       if( child==_def )
-        work.addAll(_targ._deps);
+        work.addAll(targ()._deps);
     }
 
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
@@ -767,7 +767,7 @@ public class HM {
             Type actual = this instanceof Root ? Type.SCALAR : _args[i]._type;
             if( formal != actual ) {
               fun._types[i] = formal.meet(actual);
-              work.addAll(fun._targs[i]._deps);
+              work.addAll(fun.targ(i)._deps);
             }
           }
         }
@@ -1445,7 +1445,7 @@ public class HM {
     VBitSet get_dups(VBitSet dups) { return _get_dups(new VBitSet(),dups); }
     VBitSet _get_dups(VBitSet visit, VBitSet dups) {
       if( visit.tset(_uid) ) {
-        if( no_uf() ) dups.set(_uid);
+        dups.set(debug_find()._uid);
       } else
         for( T2 t : _args )
           if( t!=null )
