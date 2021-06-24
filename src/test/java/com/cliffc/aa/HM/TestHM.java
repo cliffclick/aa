@@ -31,6 +31,7 @@ public class TestHM {
   private static final TypeMemPtr tuple55 = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(5),TypeInt.con(5)));
   private static final TypeFunSig ret_tuple2 = tfs(tuple2);
   private static final String[] XY = new String[]{"x","y"};
+  private static final String[] N1V1 = new String[]{"n1","v1"};
   private static final TypeMemPtr tuple9  = TypeMemPtr.make(9,TypeStruct.make(XY,Types.ts(Type.SCALAR,Type.SCALAR)));
 
 
@@ -200,7 +201,6 @@ public class TestHM {
 
   private static TypeMemPtr build_cycle( int alias, boolean nil, Type fld ) {
     // Build a cycle of length 2.
-    String[] N1V1 = new String[]{"n1","v1"};
     BitsAlias aliases = BitsAlias.make0(alias);
     if( nil ) aliases = aliases.meet_nil();
     TypeMemPtr cycle_ptr0 = TypeMemPtr.make(aliases,TypeObj.XOBJ);
@@ -248,7 +248,7 @@ public class TestHM {
 
   // try the worse-case expo blow-up test case from SO
   @Test public void test35() {
-    TypeFunPtr tfp = TypeFunPtr.make(13,3,Type.ANY);
+    TypeFunPtr tfp = TypeFunPtr.make(12,3,Type.ANY);
     TypeMemPtr tmp0 = TypeMemPtr.make(8,TypeStruct.make_tuple(Type.ANY,tfp ,tfp ,tfp ));
     TypeMemPtr tmp1 = TypeMemPtr.make(8,TypeStruct.make_tuple(Type.ANY,tmp0,tmp0,tmp0));
     TypeMemPtr tmp2 = TypeMemPtr.make(8,TypeStruct.make_tuple(Type.ANY,tmp1,tmp1,tmp1));
@@ -269,14 +269,26 @@ public class TestHM {
     if( HM.DO_HM )
       assertEquals("{ A:@{ v0 = int64, n0 = @{ n0 = $A, v0 = int64}[0]}[0] -> B:@{ n1 = @{ n1 = $B, v1 = *[4]str}[0,9], v1 = *[4]str}[0,10] }",syn._t.p());
     if( HM.DO_GCP ) {
-      String[] N1V1 = new String[]{"n1","v1"};
-      TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.FULL.make(0,10),TypeObj.XOBJ);
-      TypeStruct cycle_str1 = TypeStruct.make(N1V1,Types.ts(cycle_ptr0,TypeMemPtr.STRPTR));
-      TypeMemPtr cycle_ptr1 = TypeMemPtr.make(BitsAlias.FULL.make(0, 9),cycle_str1);
-      TypeStruct cycle_str2 = TypeStruct.make(N1V1,Types.ts(cycle_ptr1,TypeMemPtr.STRPTR));
-      TypeMemPtr cycle_ptr2 = TypeMemPtr.make(BitsAlias.FULL.make(0,10),cycle_str2);
-      TypeStruct cycle_str3 = TypeStruct.make(N1V1,Types.ts(cycle_ptr2,TypeMemPtr.STRPTR));
-      TypeStruct cycle_strn = cycle_str3.approx(1,9);
+      TypeStruct cycle_strX;
+      if( false ) {
+        // Unrolled, known to only produce results where either other nested
+        // struct is from a different allocation site.
+        TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.FULL.make(0,10),TypeObj.XOBJ);
+        TypeStruct cycle_str1 = TypeStruct.make(N1V1,Types.ts(cycle_ptr0,TypeMemPtr.STRPTR));
+        TypeMemPtr cycle_ptr1 = TypeMemPtr.make(BitsAlias.FULL.make(0, 9),cycle_str1);
+        TypeStruct cycle_str2 = TypeStruct.make(N1V1,Types.ts(cycle_ptr1,TypeMemPtr.STRPTR));
+        TypeMemPtr cycle_ptr2 = TypeMemPtr.make(BitsAlias.FULL.make(0,10),cycle_str2);
+        TypeStruct cycle_str3 = TypeStruct.make(N1V1,Types.ts(cycle_ptr2,TypeMemPtr.STRPTR));
+        cycle_strX = cycle_str3;
+      } else {
+        // Not unrolled, both structs are folded
+        TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.FULL.make(0,9,10),TypeObj.XOBJ);
+        TypeStruct cycle_str1 = TypeStruct.make(N1V1,Types.ts(cycle_ptr0,TypeMemPtr.STRPTR));
+        TypeMemPtr cycle_ptr1 = TypeMemPtr.make(BitsAlias.FULL.make(0,9,10),cycle_str1);
+        TypeStruct cycle_str2 = TypeStruct.make(N1V1,Types.ts(cycle_ptr1,TypeMemPtr.STRPTR));
+        cycle_strX = cycle_str2;
+      }
+      TypeStruct cycle_strn = cycle_strX.approx(1,9);
       TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn._ts[0];
       assertEquals(tfs(cycle_ptrn),syn.flow_type());
     }

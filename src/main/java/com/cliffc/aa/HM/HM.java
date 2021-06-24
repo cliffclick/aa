@@ -94,21 +94,6 @@ public class HM {
         return tptr_triple.make_from(TypeStruct.make_tuple(ts));
       });
 
-    PRIMS.put("if",T2.make_fun(var2,var1,var1,var1));
-    VALS .put("if",tfp=TypeFunPtr.make_new_fidx(BitsFun.ALL,1,TypeMemPtr.NO_DISP));
-    XFERS.put(tfp.fidx(), args -> {
-        Type pred= args[0]._type;
-        Type t1  = args[1]._type;
-        Type t2  = args[2]._type;
-        if( pred.above_center() )
-          return Type.XSCALAR; // t1.join(t2);
-        if( pred==TypeInt.TRUE )
-          return t1;
-        if( pred==TypeInt.FALSE )
-          return t2;
-        return t1.meet(t2);
-      });
-
     PRIMS.put("dec",T2.make_fun(int64,int64));
     VALS .put("dec",tfp=TypeFunPtr.make_new_fidx(BitsFun.ALL,1,TypeMemPtr.NO_DISP));
     XFERS.put(tfp.fidx(), args -> {
@@ -250,20 +235,23 @@ public class HM {
     BUF = s.getBytes();
     Syntax prog = term();
     if( skipWS() != -1 ) throw unimpl("Junk at end of program: "+new String(BUF,X,BUF.length-X));
-    return new Root(prog);
+    // Inject IF at root
+    return new Root(new Let("if",new Lambda(new If(),"pred","true","false"),prog));
   }
   static Syntax term() {
     if( skipWS()==-1 ) return null;
     if( isDigit(BUF[X]) ) return number();
     if( BUF[X]=='"' ) return string();
+
     if( BUF[X]=='(' ) {         // Parse an Apply
       X++;                      // Skip paren
       Syntax fun = term();
-      Ary<Syntax> ARGS = new Ary<>(new Syntax[1],0);
-      while( skipWS()!= ')' && X<BUF.length ) ARGS.push(term());
+      Ary<Syntax> args = new Ary<>(new Syntax[1],0);
+      while( skipWS()!= ')' && X<BUF.length ) args.push(term());
       require(')');
-      return new Apply(fun,ARGS.asAry());
+      return new Apply(fun,args.asAry());
     }
+
     if( BUF[X]=='{' ) {         // Lambda of 1 or 2 args
       X++;                      // Skip paren
       Ary<String> args = new Ary<>(new String[1],0);
@@ -426,7 +414,7 @@ public class HM {
     // Compute and return (and do not set) a new dataflow type
     abstract Type val();
 
-    Type lookup_val(String name) { throw unimpl(); } // Lookup name in scope & return type
+    Type lookup_val(String name) { return null; } // Lookup name in scope & return type
 
     void add_val_work(Syntax child, Worklist work) {} // Add affected neighbors to worklist
 
@@ -596,14 +584,14 @@ public class HM {
       work.push(_par );
       work.push(_body);
       for( int i=0; i<_targs.length; i++ )
-        if( targ(i).occurs_in_type(find()) ) work.addAll(_targs[i]._deps);
+        if( targ(i).occurs_in_type(find()) ) work.addAll(targ(i)._deps);
     }
     @Override Type val() {
       return _tfp;
     }
     @Override void add_val_work(Syntax child, Worklist work) {
       // Body changed, all Apply sites need to recompute
-      work.addAll(_t._deps);
+      work.addAll(find()._deps);
     }
     @Override Type lookup_val(String name) {
       for( int i=0; i<_args.length; i++ )
@@ -768,13 +756,13 @@ public class HM {
             if( formal != actual ) {
               fun._types[i] = formal.meet(actual);
               work.addAll(fun.targ(i)._deps);
+              work.push(fun._body);
             }
           }
         }
       }
     }
 
-    @Override Type lookup_val(String name) { return null; } // Lookup name in scope & return type
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
       int cnt = 1+_fun.prep_tree(this,nongen,work);
@@ -890,6 +878,7 @@ public class HM {
         if( idx!= -1 ) progress |= rec.args(idx).unify(_flds[i].find(),work);
         if( work==null && progress ) return true;
       }
+      rec.push_update(this);
 
       return progress;
     }
@@ -905,8 +894,6 @@ public class HM {
       TypeStruct t2 = tstr.approx(1,_tmp.getbit());
       return _tmp.make_from(t2);
     }
-
-    @Override Type lookup_val(String name) { return null; } // Lookup name in scope & return type
 
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       T2[] t2s = new T2[_ids.length];
@@ -979,7 +966,6 @@ public class HM {
       }
       return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(("No field "+_id+" in "+trec).intern()));
     }
-    @Override Type lookup_val(String name) { return null; } // Lookup name in scope & return type
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par, nongen, work, T2.make_leaf());
       return _rec.prep_tree(this,nongen,work)+1;
@@ -989,6 +975,45 @@ public class HM {
       return _rec.more_work(work);
     }
   }
+
+
+  // Special form of a Lambda body for IF which changes the H-M rules.
+  // None-executing paths do not unify args.
+  static class If extends Syntax {
+    @Override boolean hm(Worklist work) {
+      Lambda lambda = (Lambda)_par;
+      return
+        find().unify(lambda.targ(1),work) |
+        find().unify(lambda.targ(2),work);
+    }
+    @Override void add_hm_work(Worklist work){ }
+    @Override Type val(){
+      Lambda lambda = (Lambda)_par;
+      Type pred= lambda._types[0];
+      Type t1  = lambda._types[1];
+      Type t2  = lambda._types[2];
+      if( pred.above_center() )
+        return Type.XSCALAR; // t1.join(t2);
+      if( pred==TypeInt.TRUE )
+        return t1;
+      if( pred==TypeInt.FALSE )
+        return t2;
+      return t1.meet(t2);
+    }
+    @Override void add_val_work(Syntax child, Worklist work) {
+      throw unimpl();
+    }
+
+    @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
+      prep_tree_impl(par,nongen,work,T2.make_leaf());
+      return 1;
+    }
+    @Override boolean more_work(Worklist work) { return more_work_impl(work); }
+    @Override SB str(SB sb){ return sb.p("IF"); }
+    @Override SB p1(SB sb) { return sb.p("IF"); }
+    @Override SB p2(SB sb, VBitSet dups){ return sb; }
+  }
+
 
   // ---------------------------------------------------------------------
   // T2 types form a Lattice, with 'unify' same as 'meet'.  T2's form a DAG
@@ -1077,19 +1102,20 @@ public class HM {
       assert no_uf(); // Cannot union twice
       if( this==that ) return false;
       if( work==null ) return true; // Report progress without changing
+      // If that changes base types, revisit that._deps
+      Type t = _t.meet(that._t);
+      if( t!=that._t ) work.addAll(that._deps);
       // Worklist: put updates on the worklist for revisiting
       if( _deps != null ) {
         work.addAll(_deps); // Re-Apply
         // Merge update lists, for future unions
         if( that._deps==null && that.is_leaf() ) that._deps = _deps;
-        else
-          for( Syntax dep : _deps ) that.push_update(dep);
+        else for( Syntax dep : _deps ) that.push_update(dep);
         _deps = null;
       }
       if( _args.length==0 ) _args = new T2[1];
       // Unify the two base types, preserving errors
-      if( !that.is_err() )
-        that._t = _t.meet(that._t);
+      if( !that.is_err() ) that._t = t;
       _args[0] = that;         // U-F update
       if( _name.charAt(0)!='V' ) _name = "V"+_uid; // Flag as a leaf & unified
       assert !no_uf();
@@ -1124,10 +1150,13 @@ public class HM {
       if( that.is_err() ) return      union(that,work);
 
       // two leafs union in either order, so keep lower uid
-      if( is_leaf() && that.is_leaf() && _uid<that._uid ) return that.union(this,work);
+      if( is_leaf() && that.is_leaf() ) {
+        if( _uid<that._uid ) return that.union(this,work);
+        else                 return this.union(that,work);
+      }
+      // Either is base-leaf (i.e. no constant), unify the leaf away
       if(      is_leaf() && (     _t==Type.ANY ||      _t==Type.XNIL)) return      union(that,work);
       if( that.is_leaf() && (that._t==Type.ANY || that._t==Type.XNIL)) return that.union(this,work);
-      if( is_leaf() && that.is_leaf() ) return union(that,work);
 
       // Cycle check
       long luid = dbl_uid(that);    // long-unique-id formed from this and that
