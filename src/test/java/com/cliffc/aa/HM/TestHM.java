@@ -194,7 +194,7 @@ public class TestHM {
   @Test public void test30() { run("{ pred -> .x (if pred @{x=2,y=3} @{x=3,z= \"abc\"}) }",
                                    "{ A -> nint8 }", tfs(TypeInt.NINT8)); }
 
-  // Load some fields from an unknown struct: area of a square.
+  // Load some fields from an unknown struct: area of a rectangle.
   // Since no nil-check, correctly types as needing a not-nil input.
   @Test public void test31() { run("{ sq -> (* .x sq .y sq) }", // { sq -> sq.x * sq.y }
                                    "{ @{ y = int64, x = int64}[] -> int64 }", tfs(TypeInt.INT64)); }
@@ -267,7 +267,7 @@ public class TestHM {
   @Test public void test36() {
     Root syn = HM.hm("map = { lst -> (if lst @{ n1= arg= .n0 lst; (if arg @{ n1=(map .n0 arg), v1=(str .v0 arg)} 0), v1=(str .v0 lst) } 0) }; map");
     if( HM.DO_HM )
-      assertEquals("{ A:@{ v0 = int64, n0 = @{ n0 = $A, v0 = int64}[0]}[0] -> B:@{ n1 = @{ n1 = $B, v1 = *[4]str}[0,9], v1 = *[4]str}[0,10] }",syn._t.p());
+      assertEquals("{ A:@{ v0 = int64, n0 = @{ v0 = int64, n0 = $A}[0]}[0] -> B:@{ n1 = @{ n1 = $B, v1 = *[4]str}[0,9], v1 = *[4]str}[0,10] }",syn._t.p());
     if( HM.DO_GCP ) {
       TypeStruct cycle_strX;
       if( false ) {
@@ -312,7 +312,7 @@ public class TestHM {
   // - a function which takes a struct with field 'u'
   // The first arg to x is two different kinds of functions, so fails unification.
   @Test public void test40() { run("x = w = (x x); { z -> z}; (x { y -> .u y})",
-                                   "\"Cannot unify A:{ $A -> B } and @{ u = A}[]\"", Type.SCALAR); }
+                                   "\"Cannot unify A:{ $A -> $A } and @{ u = A}[]\"", Type.SCALAR); }
 
   // Example from test15:
   //   map={lst fcn -> lst ? fcn lst.1};
@@ -329,6 +329,33 @@ public class TestHM {
                                    "(pair out_str out_bool)"  ,
                                    "( *[4]str, int1)[7]", tuple2); }
 
+
+  // CCP Can help HM
+  @Test public void test42() {
+    Root syn = HM.hm("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4 }; .y (if pred s1 s2)");
+    if( HM.DO_HM ) {
+      if( HM.DO_GCP )
+        assertEquals("3.4000000953674316",syn._t.p());
+      else
+        assertEquals("\"Missing field y in @{ x = *[4]\"abc\"}[9]\"",syn._t.p());
+    }
+    if( HM.DO_GCP ) {
+      if( HM.DO_HM ) {
+        assertEquals(TypeFlt.con(3.4000000953674316), syn.flow_type());
+      } else {
+        assertEquals(TypeFlt.con(3.4000000953674316), syn.flow_type());
+      }
+    }
+  }
+
+  // The z-merge is ignored; the last s2 is a fresh (unmerged) copy.
+  @Test public void test43() {
+    Root syn = HM.hm("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4 }; z = (if pred s1 s2); .y s2");
+    if( HM.DO_HM )
+      assertEquals("3.4000000953674316",syn._t.p());
+    if( HM.DO_GCP )
+      assertEquals(TypeFlt.con(3.4000000953674316), syn.flow_type());
+  }
 
 }
 

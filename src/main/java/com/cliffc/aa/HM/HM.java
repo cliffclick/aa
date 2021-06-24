@@ -623,22 +623,19 @@ public class HM {
     @Override SB str(SB sb) { return _body.str(_def.str(sb.p(_arg0).p(" = ")).p("; ")); }
     @Override SB p1(SB sb) { return sb.p(_arg0).p(" = ... ; ..."); }
     @Override SB p2(SB sb, VBitSet dups) { _def.p0(sb,dups); return _body.p0(sb,dups); }
-    T2 targ() { T2 targ = _targ.find(); return targ==_targ ? targ : (_targ=targ); }
-    @Override boolean hm(Worklist work) {
-      return targ().unify(_def.find(),work);
-    }
-    @Override T2 lookup_tvar(String name) { return Util.eq(_arg0,name) ? targ() : null; }
+    @Override boolean hm(Worklist work) { return false;  }
+    @Override T2 lookup_tvar(String name) { return Util.eq(_arg0,name) ? _targ : null; }
     @Override void add_hm_work(Worklist work) {
       work.push(_par);
       work.push(_body);
       work.push(_def);
-      if( targ().occurs_in_type(_def.find()) ) work.addAll(targ()._deps);
+      work.addAll(_def.find()._deps);
     }
     @Override Type val() { return _body._type; }
     @Override Type lookup_val(String name) { return Util.eq(_arg0,name) ? _def._type : null; }
     @Override void add_val_work(Syntax child, Worklist work) {
       if( child==_def )
-        work.addAll(targ()._deps);
+        work.addAll(_def.find()._deps);
     }
 
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
@@ -646,6 +643,7 @@ public class HM {
       int cnt = _body.prep_tree(this,           nongen       ,work) +
                 _def .prep_tree(this,new VStack(nongen,_targ),work);
       _t = _body._t;            // Unify 'Let._t' with the '_body'
+      _targ.unify(_def.find(),work);
       return cnt+1;
     }
     @Override void prep_lookup_deps(Ident id) {
@@ -935,7 +933,13 @@ public class HM {
         TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.EMPTY,TypeStruct.ANYSTRUCT);
         // The actual Struct is just a 1-field struct, and since structs ignore
         // field order it does not matter in which order fields get unified.
-        progress = T2.make_struct(tmp,new String[]{_id}, new T2[]{find().push_update(rec._deps)}).unify(rec, work);
+        if( rec.is_struct() ) {
+          // Effectively unify with an extended struct.
+          rec.add_fld(_id,find(),work);
+          progress = true;
+        } else {
+          progress = T2.make_struct(tmp,new String[]{_id}, new T2[]{find().push_update(rec._deps)}).unify(rec, work);
+        }
       } else {
         // Unify the field
         progress = rec.args(idx).unify(find(), work);
@@ -982,6 +986,16 @@ public class HM {
   static class If extends Syntax {
     @Override boolean hm(Worklist work) {
       Lambda lambda = (Lambda)_par;
+      if( DO_GCP ) {            // Doing GCP during HM
+        Type pred = lambda._types[0];
+        if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
+          return find().unify(lambda.targ(2),work); // Unify only the false side
+        if( pred.above_center() ) // Neither side executes
+          return false;           // Unify neither side
+        if( !pred.must_nil() )    // Unify only the true side
+          return find().unify(lambda.targ(1),work);
+      }
+      // Unify both sides with the result
       return
         find().unify(lambda.targ(1),work) |
         find().unify(lambda.targ(2),work);
@@ -992,12 +1006,19 @@ public class HM {
       Type pred= lambda._types[0];
       Type t1  = lambda._types[1];
       Type t2  = lambda._types[2];
-      if( pred.above_center() )
-        return Type.XSCALAR; // t1.join(t2);
-      if( pred==TypeInt.TRUE )
-        return t1;
-      if( pred==TypeInt.FALSE )
-        return t2;
+      // Conditional Constant Propagation: only prop types from executable sides
+      if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
+        return t2;              // False only
+      if( pred.above_center() ) // Delay any values
+        return Type.XSCALAR;    // t1.join(t2);     // Join of either
+      assert !pred.may_nil();   // Already covered
+      // If meeting a nil changes things, then the original excluded nil and so
+      // was always true.
+      if( !pred.must_nil() ) {
+        assert pred.meet_nil(Type.XNIL) != pred; // Adding nil changes things, so original pred does not have a nil
+        return t1;              // True only
+      }
+      // Could be either, so meet
       return t1.meet(t2);
     }
     @Override void add_val_work(Syntax child, Worklist work) {
@@ -1179,11 +1200,16 @@ public class HM {
         // field names and not by position.
         for( int i=0; i<_ids.length; i++ ) { // For all fields in LHS
           int idx = Util.find(that._ids,_ids[i]);
-          if( idx==-1 ) that.add_fld(_ids[i],args(i), work); // Extend 'that' with matching field from 'this'
+          //if( idx==-1 ) that.add_fld(_ids[i],args(i), work); // Extend 'that' with matching field from 'this'
+          if( idx==-1 ) that.add_fld(_ids[i],make_err("Missing field "+_ids[i]+" in "+that.p()), work); // Extend 'that' with matching field from 'this'
           else args(i)._unify(that.args(idx),work);    // Unify matching field
           that = that.find();                          // Recursively, might have already rolled this up
         }
-        // Fields in RHS and not the LHS do not need to be added to the RHS.
+        //// Fields in RHS and not the LHS do not need to be added to the RHS.
+        // Fields in RHS and not the LHS are also errors.
+        for( int i=0; i<that._ids.length; i++ )  // For all fields in RHS
+          if( Util.find(_ids,that._ids[i])==-1 ) // Missing in LHS
+            that.args(i)._unify(make_err("Missing field "+that._ids[i]+" in "+this.p()),work);
 
         // Memory add missing fields
       } else if( is_mem() ) {

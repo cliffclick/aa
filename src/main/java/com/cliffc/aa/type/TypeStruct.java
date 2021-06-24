@@ -867,7 +867,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
     case TSTRUCT:
       if( old == TypeObj.OBJ ) { nt = TypeObj.OBJ; break; }
-      if( old == TypeObj.XOBJ ) break; // No changes, take nt as it is
+      if( old == TypeObj.XOBJ  ) break; // No changes, take nt as it is
+      if( old == TypeObj.UNUSED) break;
       if( !(old instanceof TypeStruct) ) throw AA.unimpl();
       TypeStruct ots = (TypeStruct)old, nts = (TypeStruct)nt;
       // Compute a new target length.  Generally size is unchanged, but will
