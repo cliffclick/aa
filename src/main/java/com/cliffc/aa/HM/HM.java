@@ -70,7 +70,7 @@ public class HM {
         if( tfp0!=null ) return tfp0;
         tfp0 = TypeFunPtr.make_new_fidx(BitsFun.ALL,1,TypeMemPtr.NO_DISP);
         PAIR1_ARGS.put(fld0,tfp0);
-        XFERS.put(tfp0.fidx(), args0 -> tptr_pair.make_from(TypeStruct.make_tuple(fld0,args0==null?Type.ANY:args0[0]._type)));
+        XFERS.put(tfp0.fidx(), args0 -> tptr_pair.make_from(TypeStruct.make_tuple(Type.ANY,fld0,args0==null?Type.XSCALAR:args0[0]._type)));
         return tfp0;
       });
 
@@ -166,7 +166,7 @@ public class HM {
         return TypeMemPtr.STRPTR;
       });
     // Factor; FP div/mod-like operation
-    PRIMS.put("factor",T2.make_fun(flt64,T2.prim("divmod",flt64,flt64)));
+    PRIMS.put("factor",T2.make_fun(flt64,T2.prim("factor",flt64,flt64)));
     VALS .put("factor" ,tfp=TypeFunPtr.make_new_fidx(BitsFun.ALL,1,TypeMemPtr.NO_DISP));
     XFERS.put(tfp.fidx(), args -> {
         Type flt = args[0]._type;
@@ -194,7 +194,7 @@ public class HM {
         }
       }
       if( DO_GCP ) {
-        Type t = syn.val();
+        Type t = syn.val(work);
         if( t!=syn._type ) {       // Progress
           assert syn._type.isa(t); // Monotonic falling
           syn._type = t;           // Update type
@@ -220,6 +220,8 @@ public class HM {
     XFERS.clear();
     PAIR1_ARGS.clear();
     Lambda.FUNS.clear();
+    Apply.T2FLOW_POSMAP.clear();
+    Apply.T2FLOW_NEGMAP.clear();
     T2.reset();
     BitsAlias.reset_to_init0();
     BitsFun.reset_to_init0();
@@ -412,7 +414,7 @@ public class HM {
     abstract void add_hm_work(Worklist work); // Add affected neighbors to worklist
 
     // Compute and return (and do not set) a new dataflow type
-    abstract Type val();
+    abstract Type val(Worklist work);
 
     Type lookup_val(String name) { return null; } // Lookup name in scope & return type
 
@@ -424,7 +426,7 @@ public class HM {
       _t=t;
       _nongen = nongen;
       work.push(this);
-      _type = Type.ANY;         // Prepare for GCP
+      _type = Type.XSCALAR;         // Prepare for GCP
     }
     void prep_lookup_deps(Ident id) {}
 
@@ -434,7 +436,7 @@ public class HM {
       if( work.has(this) ) return true;
       if( DO_HM && hm(null) )   // Any more HM work?
         return false;            // Found HM work not on worklist
-      if( DO_GCP && val()!=_type )
+      if( DO_GCP && val(null)!=_type )
         return false;            // Found GCP work not on worklist
       return true;
     }
@@ -462,7 +464,7 @@ public class HM {
     @Override SB p1(SB sb) { return sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString()); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
     @Override boolean hm(Worklist work) { return false; }
-    @Override Type val() { return _con; }
+    @Override Type val(Worklist work) { return _con; }
     @Override void add_hm_work(Worklist work) { work.push(_par); }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par, nongen, work, T2.make_leaf(_con));
@@ -488,7 +490,7 @@ public class HM {
       if( t.occurs_in(_par) )                        // Got captured in some parent?
         t.add_deps_work(work);                       // Need to revisit dependent ids
     }
-    @Override Type val() {
+    @Override Type val(Worklist work) {
       Type t = null;
       for( Syntax syn = _par; syn!=null; syn = syn._par )
         if( (t=syn.lookup_val(_name)) != null )
@@ -586,7 +588,7 @@ public class HM {
       for( int i=0; i<_targs.length; i++ )
         if( targ(i).occurs_in_type(find()) ) work.addAll(targ(i)._deps);
     }
-    @Override Type val() {
+    @Override Type val(Worklist work) {
       return _tfp;
     }
     @Override void add_val_work(Syntax child, Worklist work) {
@@ -631,7 +633,7 @@ public class HM {
       work.push(_def);
       work.addAll(_def.find()._deps);
     }
-    @Override Type val() { return _body._type; }
+    @Override Type val(Worklist work) { return _body._type; }
     @Override Type lookup_val(String name) { return Util.eq(_arg0,name) ? _def._type : null; }
     @Override void add_val_work(Syntax child, Worklist work) {
       if( child==_def )
@@ -656,6 +658,8 @@ public class HM {
   }
 
   static class Apply extends Syntax {
+    private static final HashMap<T2,Type> T2FLOW_POSMAP = new HashMap<>();
+    private static final HashMap<T2,Type> T2FLOW_NEGMAP = new HashMap<>();
     final Syntax _fun;
     final Syntax[] _args;
     Apply(Syntax fun, Syntax... args) { _fun = fun; _args = args; }
@@ -727,14 +731,40 @@ public class HM {
       work.push(_par);
       for( Syntax arg : _args ) work.push(arg);
     }
-    @Override Type val() {
+    @Override Type val(Worklist work) {
       if( _fun._type.above_center() ) return Type.XSCALAR;
       if( !(_fun._type instanceof TypeFunPtr) ) return Type.SCALAR;
       TypeFunPtr tfp = (TypeFunPtr)_fun._type;
       // Have some functions, meet over their returns.
-      Type rez = Type.ANY;
+      Type rez = Type.XSCALAR;
       for( int fidx : tfp._fidxs )
         rez = rez.meet(XFERS.get(fidx).apply(_args));
+
+      // HM helps GCP: lift types post-Apply to match known pre-Apply types.
+      if( false && DO_HM ) {
+
+        // Idea: take the Apply HM type-vars, and at where their occur in the
+        // inputs.  Structurally walk the input and output type-vars, and the
+        // matching flow type.  Wherever a type-var is seen in the output, can
+        // JOIN it with all instances seen in the input types.
+
+        // Walk the input type-vars and flow-types in parallel (stopping if
+        // either side loses structure) and build a map from type-var to
+        // flow-type.  JOIN redundant type-var flow-types.
+        assert T2FLOW_POSMAP.isEmpty() && T2FLOW_NEGMAP.isEmpty();
+        _fun.find().walk_t2flow_in(_fun._type,true);
+        for( Syntax arg : _args ) arg.find().walk_t2flow_in(arg._type,true);
+
+        // Walk the input type-vars and flow-types in parallel (stopping if
+        // either side loses structure) and rebuild the output flow-type with
+        // the JOINs from any matching type-vars.
+        Type rez2 = find().walk_t2flow_out(rez, work);
+        if( rez2 != rez ) {
+          assert rez2.isa(rez);
+          rez = rez.join(rez2);
+        }
+        T2FLOW_POSMAP.clear();  T2FLOW_NEGMAP.clear();
+      }
       return rez;
     }
     @Override void add_val_work(Syntax child, Worklist work) {
@@ -747,7 +777,7 @@ public class HM {
       for( int fidx : ((TypeFunPtr)_fun._type)._fidxs ) {
         Lambda fun = Lambda.FUNS.get(fidx);
         if( fun!=null ) {
-          fun._t.push_update(this); // Discovered as call-site; if the Lambda changes the Apply needs to be revisited.
+          fun.find().push_update(this); // Discovered as call-site; if the Lambda changes the Apply needs to be revisited.
           for( int i=0; i<fun._types.length; i++ ) {
             Type formal = fun._types[i];
             Type actual = this instanceof Root ? Type.SCALAR : _args[i]._type;
@@ -789,12 +819,12 @@ public class HM {
     @Override void add_hm_work(Worklist work) { }
 
     private static Type xval(TypeFunPtr fun) {
-      Type rez = Type.ANY;
+      Type rez = Type.XSCALAR;
       for( int fidx : fun._fidxs )
         rez = rez.meet(XFERS.get(fidx).apply(null));
       return rez;
     }
-    @Override Type val() {
+    @Override Type val(Worklist work) {
       Type rez = _fun._type;
       while( rez instanceof TypeFunPtr )
         rez = xval((TypeFunPtr)rez); // Propagate arg types
@@ -884,7 +914,7 @@ public class HM {
       work.push(_par);
       for( Syntax fld : _flds ) work.push(fld);
     }
-    @Override Type val() {
+    @Override Type val(Worklist work) {
       Type[] ts = Types.get(_flds.length);
       for( int i=0; i<_flds.length; i++ )
         ts[i] = _flds[i]._type;
@@ -955,7 +985,7 @@ public class HM {
       work.push(_rec);
       _rec.add_hm_work(work);
     }
-    @Override Type val() {
+    @Override Type val(Worklist work) {
       Type trec = _rec._type;
       if( trec.above_center() ) return Type.XSCALAR;
       if( trec instanceof TypeMemPtr ) {
@@ -986,6 +1016,7 @@ public class HM {
   static class If extends Syntax {
     @Override boolean hm(Worklist work) {
       Lambda lambda = (Lambda)_par;
+      // GCP helps HM: do not unify dead control paths
       if( DO_GCP ) {            // Doing GCP during HM
         Type pred = lambda._types[0];
         if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
@@ -1001,7 +1032,7 @@ public class HM {
         find().unify(lambda.targ(2),work);
     }
     @Override void add_hm_work(Worklist work){ }
-    @Override Type val(){
+    @Override Type val(Worklist work){
       Lambda lambda = (Lambda)_par;
       Type pred= lambda._types[0];
       Type t1  = lambda._types[1];
@@ -1066,12 +1097,12 @@ public class HM {
     Ary<Syntax> _deps;
 
     // Constructor factories.
-    static T2 make_fun(T2... args) { return new T2("->"   ,Type.ANY ,null,args); }
-    static T2 make_leaf()          { return new T2("V"+CNT,Type.ANY ,null,new T2[1]); }
+    static T2 make_fun(T2... args) { return new T2("->"   ,Type.XSCALAR ,null,args); }
+    static T2 make_leaf()          { return new T2("V"+CNT,Type.XSCALAR ,null,new T2[1]); }
     static T2 make_leaf(Type t)    { return new T2("V"+CNT,t        ,null,new T2[1]); }
     static T2 make_struct( TypeMemPtr tmp, String[] ids, T2[] flds ) { return new T2("@{}", tmp,ids,flds); }
     static T2 make_err(String s)   { return new T2("Err"  ,TypeStr.con(s.intern()),null); }
-    static T2 prim(String name, T2... args) { return new T2(name,Type.ANY,null,args); }
+    static T2 prim(String name, T2... args) { return new T2(name,Type.XSCALAR,null,args); }
     T2 copy() { return new T2(_name,_t,_ids,new T2[_args.length]); }
 
     private T2(@NotNull String name, @NotNull Type t, String[] ids, T2 @NotNull ... args) {
@@ -1176,8 +1207,9 @@ public class HM {
         else                 return this.union(that,work);
       }
       // Either is base-leaf (i.e. no constant), unify the leaf away
-      if(      is_leaf() && (     _t==Type.ANY ||      _t==Type.XNIL)) return      union(that,work);
-      if( that.is_leaf() && (that._t==Type.ANY || that._t==Type.XNIL)) return that.union(this,work);
+      assert _t!=Type.ANY && that._t!=Type.ANY;
+      if(      is_leaf() && (     _t==Type.XSCALAR ||      _t==Type.XNIL)) return      union(that,work);
+      if( that.is_leaf() && (that._t==Type.XSCALAR || that._t==Type.XNIL)) return that.union(this,work);
 
       // Cycle check
       long luid = dbl_uid(that);    // long-unique-id formed from this and that
@@ -1298,7 +1330,7 @@ public class HM {
       // a layer, 'is_fresh' does not correlate with an occurs_in check.
       if( nongen_in(nongen) ) return vput(that,_unify(that,work)); // Famous 'occurs-check', switch to normal unify
       if( this.is_leaf() ) return vput(that,fresh_base(that,work));
-      if( that.is_leaf() && that._t==Type.ANY )  // RHS is a tvar; union with a deep copy of LHS
+      if( that.is_leaf() && that._t==Type.XSCALAR )  // RHS is a tvar; union with a deep copy of LHS
         return work==null || vput(that,that.union(_fresh(nongen),work));
 
       if( !Util.eq(_name,that._name) ||
@@ -1421,7 +1453,7 @@ public class HM {
     boolean _cycle_equals(T2 t) {
       assert no_uf() && t.no_uf();
       if( this==t ) return true;
-      if( is_leaf() && t.is_leaf() && _t!=Type.ANY )
+      if( is_leaf() && t.is_leaf() && _t!=Type.XSCALAR )
         return _t==t._t;        // Base-cases have to be completely identical
       if( !Util.eq(_name,t._name) ||       // Wrong type-var names
           _args.length != t._args.length ) // Mismatched sizes
@@ -1494,6 +1526,105 @@ public class HM {
     }
 
     // -----------------
+    // Walk a T2 and a matching flow-type, and build a map from T2 to flow-types.
+    // Stop if either side loses structure.
+    Type walk_t2flow_in(Type t, boolean pos) {
+      assert no_uf();
+      if( !pos ) {
+        if( t==Type.XSCALAR ) return fput(t,pos); // Will be xscalar for all the breakdown types
+        if( is_err() ) throw unimpl();
+        if( is_leaf() )
+          return fput(t,pos);
+        throw unimpl();
+      }
+
+      if( t==Type.SCALAR ) return fput(t,pos); // Will be scalar for all the breakdown types
+      if( is_err() ) throw unimpl();
+      if( is_leaf() )
+        return fput(t,pos);
+      if( is_fun() ) {
+        if( !(t instanceof TypeFunPtr) ) throw unimpl();
+        int fidx = ((TypeFunPtr)t).fidx(); // TODO: Extend for multiple functions
+        Lambda lambda = Lambda.FUNS.get(fidx);
+        if( lambda == null )    // Null only for primitives
+          return t;
+        for( int i=0; i<_args.length-1; i++ )
+          args(i).walk_t2flow_in(lambda._types[i],pos);
+        return args(_args.length-1).walk_t2flow_in(lambda._body._type,!pos);
+      }
+
+
+      if( Util.eq(_name,"factor") )
+        return fput(t.join(TypeFlt.FLT64), true);
+
+      throw unimpl();
+    }
+    private Type fput(final Type t, boolean pos) {
+      if( pos ) {
+        //if( Apply.T2FLOW_POSMAP.get(this)!=null && Apply.T2FLOW_POSMAP.get(this)!=t ) throw unimpl(); // join or meet
+        Apply.T2FLOW_POSMAP.merge(this, t, (k,v) -> t.join(v));
+      } else {
+        if( Apply.T2FLOW_NEGMAP.get(this)!=null && Apply.T2FLOW_NEGMAP.get(this)!=t ) throw unimpl(); // join or meet
+        Apply.T2FLOW_NEGMAP.put(this,t);
+      }
+      return t;
+    }
+
+    Type walk_t2flow_out(Type t, Worklist work) {
+      assert no_uf();
+      if( t == Type.XSCALAR ) return t;  // No lift possible
+      Type tmap = Apply.T2FLOW_POSMAP.get(this);
+      if( tmap != null && t!=tmap ) {
+        Type tj = t.join(tmap);
+        return tj;
+      }
+      Type tnmap = Apply.T2FLOW_NEGMAP.get(this);
+      if( tnmap != null && t!=tnmap ) {
+        throw unimpl();
+      }
+
+      if( is_err() ) throw unimpl();
+      if( is_leaf() ) {
+        // If we have a HM leaf which is XSCALAR, it might expand later and
+        // lift further GCP terms... so we have to assume it will do the best
+        // possible lift.
+        if( _t==Type.XSCALAR ) {
+          if( !t.isa(Type.SCALAR) )
+            return Type.XSCALAR; // Free var, max lift
+          // Unify this with base?
+          T2.make_leaf(t).unify(this,work);
+          return t;
+        }
+        if( _t==Type.ALL ) throw unimpl(); // Really, the correct type for a free var
+        if( t==_t ) return t;              // No change
+        return t.join(_t);                 // Base type
+      }
+      if( is_fun() ) {
+        if( !(t instanceof TypeFunPtr) ) throw unimpl();
+        return t;               // No change, already known as a function (and no TFS in the flow types)
+      }
+      if( is_struct() ) {
+        if( !(t instanceof TypeMemPtr) ) throw unimpl();
+        TypeMemPtr tmp = (TypeMemPtr)t;
+        if( !(tmp._obj instanceof TypeStruct) ) throw unimpl();
+        TypeStruct ts = (TypeStruct)tmp._obj;
+        Type[] newts = null;
+        for( int i=0; i<_args.length; i++ ) {
+          Type targ = ts._ts[i+1];
+          Type rez = args(i).walk_t2flow_out(targ,work);
+          if( targ != rez ) {
+            if( newts==null ) newts = Types.clone(ts._ts);
+            newts[i+1] = rez;
+          }
+        }
+        if( newts != null )
+          t = tmp.make_from(ts.make_from(newts));
+        return t;
+      }
+      throw unimpl();
+    }
+
+    // -----------------
     // Glorious Printing
 
     // Look for dups, in a tree or even a forest (which Syntax.p() does)
@@ -1515,7 +1646,7 @@ public class HM {
       if( is_err() ) return sb.p(_t.getstr());
       boolean dup = dups.get(_uid);
       if( is_leaf() ) {
-        if( !dup ) sb.p(_name).p(':');
+        sb.p(_name).p(':');
         sb.p(_t);
         return _args.length==0 || _args[0]==null ? sb : _args[0].str(sb.p(">>"), visit, dups);
       }
@@ -1565,7 +1696,7 @@ public class HM {
     private SB _p(SB sb, VBitSet visit, VBitSet dups) {
       assert no_uf();
       if( is_leaf() || dups.get(_uid) ) { // Leafs or Duplicates?  Take some effort to pretty-print cycles
-        if( is_leaf() && _t!=Type.ANY ) return sb.p(_t); // One-shot bases just do type
+        if( is_leaf() && _t!=Type.XSCALAR ) return sb.p(_t); // One-shot bases just do type
         Integer ii = VNAMES.get(this);
         if( ii==null )  VNAMES.put(this,ii=VCNT++); // Type-var name
         // 2nd and later visits use the short form

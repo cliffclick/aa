@@ -16,10 +16,8 @@ public class TestHM {
     Root syn = HM.hm(prog);
     if( HM.DO_HM )
       assertEquals(rez_hm,syn._t.p());
-    if( HM.DO_GCP ) {
+    if( HM.DO_GCP )
       assertEquals(rez_gcp,syn.flow_type());
-
-    }
   }
   // Simple no-arg signature returning the type
   private static TypeFunSig tfs(Type ret) {
@@ -33,7 +31,8 @@ public class TestHM {
   private static final String[] XY = new String[]{"x","y"};
   private static final String[] N1V1 = new String[]{"n1","v1"};
   private static final TypeMemPtr tuple9  = TypeMemPtr.make(9,TypeStruct.make(XY,Types.ts(Type.SCALAR,Type.SCALAR)));
-
+  private static final TypeMemPtr ptrabc  = TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con("abc"));
+  private static final TypeMemPtr ptrtup3abc = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(3),ptrabc));
 
   @Test(expected = RuntimeException.class)
   public void test00() { run( "fred",null,null); }
@@ -42,7 +41,7 @@ public class TestHM {
                                     "3", TypeInt.con(3));  }
 
   @Test public void test02() { run( "(pair1 3)" ,
-                                    "{ A -> ( 3, $A)[7] }", tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(TypeInt.con(3),Type.ANY)))); }
+                                    "{ A -> ( 3, $A)[7] }", tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(3),Type.XSCALAR)))); }
 
   @Test public void test03() { run( "{ z -> (pair (z 3) (z \"abc\")) }" ,
                                     "{ { nScalar -> A } -> ( $A, $A)[7] }", ret_tuple2); }
@@ -52,11 +51,27 @@ public class TestHM {
 
   // Because {y->y} is passed in, all 'y' types must agree.
   // This unifies 3 and "abc" which results in 'all'
-  @Test public void test05() { run( "({ x -> (pair (x 3) (x \"abc\")) } {y->y})",
-                                    "( nScalar, nScalar)[7]", tuplen2 ); }
+  @Test public void test05() {
+    Root syn = HM.hm("({ x -> (pair (x 3) (x \"abc\")) } {y->y})");
+    if( HM.DO_HM )
+      assertEquals("( nScalar, nScalar)[7]",syn._t.p());
+    if( HM.DO_GCP )
+      if( HM.DO_HM )
+        assertEquals(ptrtup3abc,syn.flow_type());
+      else
+        assertEquals(tuplen2,syn.flow_type());
+  }
 
-  @Test public void test06() { run( "id={x->x}; (pair (id 3) (id \"abc\"))",
-                                    "( 3, *[4]\"abc\")[7]", tuplen2  ); }
+  @Test public void test06() {
+    Root syn = HM.hm("id={x->x}; (pair (id 3) (id \"abc\"))");
+    if( HM.DO_HM ) // HM is sharper here than in test05, because id is generalized per each use site
+      assertEquals("( 3, *[4]\"abc\")[7]",syn._t.p());
+    if( HM.DO_GCP )
+      if( HM.DO_HM )
+        assertEquals(ptrtup3abc,syn.flow_type());
+      else
+        assertEquals(tuplen2,syn.flow_type());
+  }
 
   // recursive unification; normal H-M fails here.
   @Test public void test07() { run( "{ f -> (f f) }",
@@ -91,7 +106,7 @@ public class TestHM {
   // Takes a '{a->b}' and a 'a' for a couple of different prims.
   @Test public void test14() { run("map = { fun -> { x -> (fun x)}};"+
                                    "(pair ((map str) 5) ((map factor) 2.3))",
-                                   "( *[4]str, (divmod flt64 flt64))[7]", tuple2); }
+                                   "( *[4]str, (factor flt64 flt64))[7]", tuple2); }
 
   // map takes a function and an element (collection?) and applies it (applies to collection?)
   @Test public void test15() { run("map = { fun x -> (fun x)}; (map {a->3} 5)",
