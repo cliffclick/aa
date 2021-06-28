@@ -62,12 +62,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return hash == 0 ? hash1 : hash;
   }
 
-  private static final Ary<TypeStruct> CYCLES = new Ary<>(new TypeStruct[0]);
-  private TypeStruct find_other() {
-    int idx = CYCLES.find(this);
-    return idx != -1 ? CYCLES.at(idx^1) : null;
-  }
-
   // Returns 1 for definitely equals, 0 for definitely unequals, and -1 if
   // needing the cyclic test.
   private int cmp( TypeStruct t ) {
@@ -97,6 +91,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // types have to be built all-at-once, and thus hash-cons and equality-
     // tested with a cyclic-aware equals check.
     return cycle_equals(t);
+  }
+  
+  private static final Ary<TypeStruct> CYCLES = new Ary<>(new TypeStruct[0]);
+  private TypeStruct find_other() {
+    int idx = CYCLES.find(this);
+    return idx != -1 ? CYCLES.at(idx^1) : null;
   }
   @Override public boolean cycle_equals( Type o ) {
     if( this==o ) return true;
@@ -293,6 +293,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static String arg_name(int i) {
     return i==0 ? "^" : String.valueOf((char)('x'+i-1)).intern();
   }
+  // TODO: Why is this API not auto-interning, and using Types directly
   public  static Type[] ts() { return Types.get(0); }
   public  static Type[] ts(Type t0) { return Types.ts(t0); }
   public  static Type[] ts(Type t0, Type t1) { return Types.ts(t0,t1); }
