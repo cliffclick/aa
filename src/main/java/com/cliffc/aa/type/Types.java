@@ -25,6 +25,8 @@ public class Types {
     @Override public boolean equals(Object o) {
       if( !(o instanceof Key) ) return false;
       Type[] ts = ((Key)o)._ts;
+      // This series of tests is NOT the same as Arrays.equals(), since it
+      // bottoms out in a pointer-equality test instead of 'equals'.
       if( _ts==ts ) return true;
       if( _ts.length != ts.length ) return false;
       for( int i=0; i<ts.length; i++ )
@@ -81,6 +83,7 @@ public class Types {
   public static Type[] get(int len) { return tary(len).check().get(); }
   public static void free(Type[] ts) { tary(ts.length)._free.push(ts); }
   public static Type[] hash_cons(Type[] ts) { return tary(ts.length).check().hash_cons_(ts); }
+  // TODO: Why is this API not auto-interning?
   public static Type[] ts(Type t0) {
     Types t1 = tary(1).check();
     Type[] ts = t1.get();
