@@ -237,7 +237,7 @@ public class HM {
     Syntax prog = term();
     if( skipWS() != -1 ) throw unimpl("Junk at end of program: "+new String(BUF,X,BUF.length-X));
     // Inject IF at root
-    return new Root(new Let("if",new Lambda(new If(),"pred","true","false"),prog));
+    return new Root(prog);
   }
   static Syntax term() {
     if( skipWS()==-1 ) return null;
@@ -265,7 +265,10 @@ public class HM {
     // Let or Id
     if( isAlpha0(BUF[X]) ) {
       String id = id();
-      if( skipWS()!='=' )  return new Ident(id);
+      if( skipWS()!='=' ) {
+        if( id.equals("if") ) return new If();
+        return new Ident(id);
+      }
       // Let expression; "id = term(); term..."
       X++;                      // Skip '='
       Syntax def = term();
@@ -804,7 +807,7 @@ public class HM {
     }
     // True if we can refine an if-not-nil
     private T2 is_if_nil() {
-      return _fun instanceof Ident && Util.eq(((Ident)_fun)._name,"if") && _args[0] instanceof Ident ? _args[0].find() : null;
+      return _fun instanceof If && _args[0] instanceof Ident ? _args[0].find() : null;
     }
   }
 
@@ -997,9 +1000,9 @@ public class HM {
           if( idx!=-1 )
             return tstr._ts[idx]; // Field type
         }
-        return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(("Missing field "+_id+" in "+tmp._obj).intern())); // Any or All?      }
+        return TypeMemPtr.make(BitsAlias.STRBITS0,TypeStr.con(("Missing field "+_id+" in "+tmp._obj).intern())); // Any or All?      }
       }
-      return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(("No field "+_id+" in "+trec).intern()));
+      return TypeMemPtr.make(BitsAlias.STRBITS0,TypeStr.con(("No field "+_id+" in "+trec).intern()));
     }
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par, nongen, work, T2.make_leaf());
@@ -1014,51 +1017,54 @@ public class HM {
 
   // Special form of a Lambda body for IF which changes the H-M rules.
   // None-executing paths do not unify args.
-  static class If extends Syntax {
+  static class If extends Lambda {
+    If() {
+      super(null,"pred","true","false");
+      XFERS.put(_tfp.fidx(), args0 -> {
+          Type pred= args0[0]._type;
+          Type t1  = args0[1]._type;
+          Type t2  = args0[2]._type;
+          // Conditional Constant Propagation: only prop types from executable sides
+          if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
+            return t2;              // False only
+          if( pred.above_center() ) // Delay any values
+            return Type.XSCALAR;    // t1.join(t2);     // Join of either
+          assert !pred.may_nil();   // Already covered
+          // If meeting a nil changes things, then the original excluded nil and so
+          // was always true.
+          if( !pred.must_nil() ) {
+            assert pred.meet_nil(Type.XNIL) != pred; // Adding nil changes things, so original pred does not have a nil
+            return t1;              // True only
+          }
+          // Could be either, so meet
+          return t1.meet(t2);
+        });
+    }
     @Override boolean hm(Worklist work) {
-      Lambda lambda = (Lambda)_par;
+      T2 rez = find().args(3);
       // GCP helps HM: do not unify dead control paths
       if( DO_GCP ) {            // Doing GCP during HM
-        Type pred = lambda._types[0];
+        Type pred = _types[0];
         if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
-          return find().unify(lambda.targ(2),work); // Unify only the false side
+          return rez.unify(targ(2),work); // Unify only the false side
         if( pred.above_center() ) // Neither side executes
           return false;           // Unify neither side
         if( !pred.must_nil() )    // Unify only the true side
-          return find().unify(lambda.targ(1),work);
+          return rez.unify(targ(1),work);
       }
       // Unify both sides with the result
       return
-        find().unify(lambda.targ(1),work) |
-        find().unify(lambda.targ(2),work);
+        rez.unify(targ(1),work) |
+        rez.find().unify(targ(2),work);
     }
     @Override void add_hm_work(Worklist work){ }
-    @Override Type val(Worklist work){
-      Lambda lambda = (Lambda)_par;
-      Type pred= lambda._types[0];
-      Type t1  = lambda._types[1];
-      Type t2  = lambda._types[2];
-      // Conditional Constant Propagation: only prop types from executable sides
-      if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
-        return t2;              // False only
-      if( pred.above_center() ) // Delay any values
-        return Type.XSCALAR;    // t1.join(t2);     // Join of either
-      assert !pred.may_nil();   // Already covered
-      // If meeting a nil changes things, then the original excluded nil and so
-      // was always true.
-      if( !pred.must_nil() ) {
-        assert pred.meet_nil(Type.XNIL) != pred; // Adding nil changes things, so original pred does not have a nil
-        return t1;              // True only
-      }
-      // Could be either, so meet
-      return t1.meet(t2);
-    }
     @Override void add_val_work(Syntax child, Worklist work) {
       throw unimpl();
     }
 
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
-      prep_tree_impl(par,nongen,work,T2.make_leaf());
+      prep_tree_impl(par,nongen,work,T2.make_fun(targ(0),targ(1),targ(2),T2.make_leaf()));
+      targ(0).push_update(this); // As predicate changes, unification may increase
       return 1;
     }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }

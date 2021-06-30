@@ -195,12 +195,12 @@ public class TestHM {
 
   // Basic field test
   @Test public void test27() { run(".x 5",
-                                   "\"Cannot unify @{ x = A}[] and 5\"", TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con("No field x in 5"))); }
+                                   "\"Cannot unify @{ x = A}[] and 5\"", TypeMemPtr.make(BitsAlias.STRBITS0,TypeStr.con("No field x in 5"))); }
 
   // Basic field test.
   @Test public void test28() { run(".x @{ y =3}",
                                    "\"Missing field x in @{ y = 3}:[9]\"",
-                                   TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con("Missing field x in @{^==any; y==3}"))); }
+                                   TypeMemPtr.make(BitsAlias.STRBITS0,TypeStr.con("Missing field x in @{^==any; y==3}"))); }
 
   @Test public void test29() { run("{ g -> @{x=g, y=g}}",
                                    "{ A -> @{ x = $A, y = $A}[9] }", tfs(tuple9)); }
@@ -285,7 +285,7 @@ public class TestHM {
       assertEquals("{ A:@{ v0 = int64, n0 = @{ v0 = int64, n0 = $A}[0]}[0] -> B:@{ n1 = @{ n1 = $B, v1 = *[4]str}[0,9], v1 = *[4]str}[0,10] }",syn._t.p());
     if( HM.DO_GCP ) {
       TypeStruct cycle_strX;
-      if( false ) {
+      if( true ) {
         // Unrolled, known to only produce results where either other nested
         // struct is from a different allocation site.
         TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.FULL.make(0,10),TypeObj.XOBJ);
@@ -320,7 +320,7 @@ public class TestHM {
   // Really bad flow-type: function can be called from the REPL with any
   // argument type - and the worse case will be an error.
   @Test public void test39() { run("x = { z -> z}; (x { y -> .u y})",
-                                   "{ @{ u = A}[] -> $A }",tfs(TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con("No field u in Scalar")))); }
+                                   "{ @{ u = A}[] -> $A }",tfs(TypeMemPtr.make(BitsAlias.STRBITS0,TypeStr.con("No field u in Scalar")))); }
 
   // Example from SimpleSub requiring 'x' to be both:
   // - a recursive self-call function from "w = (x x)": $V66:{ $V66 -> V67 } AND
