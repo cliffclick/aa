@@ -220,8 +220,7 @@ public class HM {
     XFERS.clear();
     PAIR1_ARGS.clear();
     Lambda.FUNS.clear();
-    Apply.T2FLOW_POSMAP.clear();
-    Apply.T2FLOW_NEGMAP.clear();
+    Apply.T2FLOW_MAP.clear();
     T2.reset();
     BitsAlias.reset_to_init0();
     BitsFun.reset_to_init0();
@@ -658,8 +657,7 @@ public class HM {
   }
 
   static class Apply extends Syntax {
-    private static final HashMap<T2,Type> T2FLOW_POSMAP = new HashMap<>();
-    private static final HashMap<T2,Type> T2FLOW_NEGMAP = new HashMap<>();
+    private static final HashMap<T2,Type> T2FLOW_MAP = new HashMap<>();
     final Syntax _fun;
     final Syntax[] _args;
     Apply(Syntax fun, Syntax... args) { _fun = fun; _args = args; }
@@ -751,9 +749,8 @@ public class HM {
         // Walk the input type-vars and flow-types in parallel (stopping if
         // either side loses structure) and build a map from type-var to
         // flow-type.  JOIN redundant type-var flow-types.
-        assert T2FLOW_POSMAP.isEmpty() && T2FLOW_NEGMAP.isEmpty();
-        _fun.find().walk_t2flow_in(_fun._type,true);
-        for( Syntax arg : _args ) arg.find().walk_t2flow_in(arg._type,true);
+        assert T2FLOW_MAP.isEmpty();
+        for( Syntax arg : _args ) arg.find().walk_t2flow_in(arg._type);
 
         // Walk the input type-vars and flow-types in parallel (stopping if
         // either side loses structure) and rebuild the output flow-type with
@@ -761,9 +758,9 @@ public class HM {
         Type rez2 = find().walk_t2flow_out(rez, work);
         if( rez2 != rez ) {
           assert rez2.isa(rez);
-          rez = rez.join(rez2);
+          rez = rez2;
         }
-        T2FLOW_POSMAP.clear();  T2FLOW_NEGMAP.clear();
+        T2FLOW_MAP.clear();
       }
       return rez;
     }
@@ -915,10 +912,14 @@ public class HM {
       for( Syntax fld : _flds ) work.push(fld);
     }
     @Override Type val(Worklist work) {
-      Type[] ts = Types.get(_flds.length);
+      Type[] ts = Types.get(_flds.length+1);
+      ts[0] = Type.ANY;
       for( int i=0; i<_flds.length; i++ )
-        ts[i] = _flds[i]._type;
-      TypeStruct tstr = TypeStruct.make(_ids,ts);
+        ts[i+1] = _flds[i]._type;
+      String[] ids = new String[_ids.length+1];
+      ids[0] = "^";
+      System.arraycopy(_ids,0,ids,1,_ids.length);
+      TypeStruct tstr = TypeStruct.make(ids,ts);
       TypeStruct t2 = tstr.approx(1,_tmp.getbit());
       return _tmp.make_from(t2);
     }
@@ -1528,59 +1529,50 @@ public class HM {
     // -----------------
     // Walk a T2 and a matching flow-type, and build a map from T2 to flow-types.
     // Stop if either side loses structure.
-    Type walk_t2flow_in(Type t, boolean pos) {
+    Type walk_t2flow_in(Type t) {
       assert no_uf();
-      if( !pos ) {
-        if( t==Type.XSCALAR ) return fput(t,pos); // Will be xscalar for all the breakdown types
-        if( is_err() ) throw unimpl();
-        if( is_leaf() )
-          return fput(t,pos);
-        throw unimpl();
-      }
-
-      if( t==Type.SCALAR ) return fput(t,pos); // Will be scalar for all the breakdown types
+      if( t==Type.SCALAR ) return fput(t); // Will be scalar for all the breakdown types
       if( is_err() ) throw unimpl();
       if( is_leaf() )
-        return fput(t,pos);
+        return fput(t);
       if( is_fun() ) {
-        if( !(t instanceof TypeFunPtr) ) throw unimpl();
+        if( !(t instanceof TypeFunPtr) )
+          { assert t==Type.XSCALAR; return fput(t); }
         int fidx = ((TypeFunPtr)t).fidx(); // TODO: Extend for multiple functions
         Lambda lambda = Lambda.FUNS.get(fidx);
         if( lambda == null )    // Null only for primitives
           return t;
-        for( int i=0; i<_args.length-1; i++ )
-          args(i).walk_t2flow_in(lambda._types[i],pos);
-        return args(_args.length-1).walk_t2flow_in(lambda._body._type,!pos);
+        //for( int i=0; i<_args.length-1; i++ )
+        //  args(i).walk_t2flow_in(lambda._types[i]);
+        //throw unimpl(); // highly suspicious that here i need to use TFPs
+        return args(_args.length-1).walk_t2flow_in(lambda._body._type);
       }
 
-
-      if( Util.eq(_name,"factor") )
-        return fput(t.join(TypeFlt.FLT64), true);
+      if( is_struct() ) {
+        if( !(t instanceof TypeMemPtr) )
+          { assert t==Type.XSCALAR; return fput(t); }
+        TypeMemPtr tmp = (TypeMemPtr)t;
+        if( !(tmp._obj instanceof TypeStruct) ) throw unimpl();
+        TypeStruct ts = (TypeStruct)tmp._obj;
+        for( int i=0; i<_args.length; i++ )
+          args(i).walk_t2flow_in(ts._ts[i+1]);
+        return ts;
+      }
 
       throw unimpl();
     }
-    private Type fput(final Type t, boolean pos) {
-      if( pos ) {
-        //if( Apply.T2FLOW_POSMAP.get(this)!=null && Apply.T2FLOW_POSMAP.get(this)!=t ) throw unimpl(); // join or meet
-        Apply.T2FLOW_POSMAP.merge(this, t, (k,v) -> t.join(v));
-      } else {
-        if( Apply.T2FLOW_NEGMAP.get(this)!=null && Apply.T2FLOW_NEGMAP.get(this)!=t ) throw unimpl(); // join or meet
-        Apply.T2FLOW_NEGMAP.put(this,t);
-      }
+    private Type fput(final Type t) {
+      Apply.T2FLOW_MAP.merge(this, t, Type::meet);
       return t;
     }
 
     Type walk_t2flow_out(Type t, Worklist work) {
       assert no_uf();
       if( t == Type.XSCALAR ) return t;  // No lift possible
-      Type tmap = Apply.T2FLOW_POSMAP.get(this);
-      if( tmap != null && t!=tmap ) {
+      Type tmap = Apply.T2FLOW_MAP.get(this);
+      if( tmap != null ) {
         Type tj = t.join(tmap);
         return tj;
-      }
-      Type tnmap = Apply.T2FLOW_NEGMAP.get(this);
-      if( tnmap != null && t!=tnmap ) {
-        throw unimpl();
       }
 
       if( is_err() ) throw unimpl();
@@ -1588,20 +1580,22 @@ public class HM {
         // If we have a HM leaf which is XSCALAR, it might expand later and
         // lift further GCP terms... so we have to assume it will do the best
         // possible lift.
-        if( _t==Type.XSCALAR ) {
-          if( !t.isa(Type.SCALAR) )
-            return Type.XSCALAR; // Free var, max lift
-          // Unify this with base?
-          T2.make_leaf(t).unify(this,work);
-          return t;
+        if( _t==Type.XSCALAR ) { // Free var?
+          // test05; v34 is XSCALAR at first, falls to a Base.
+          // Need the lift from the Base.
+          //return t; // test15, v38 is a free leaf, does not lift result
+          return Type.XSCALAR;  // Leaf might expand in the future to any of the input args types or subtypes
         }
         if( _t==Type.ALL ) throw unimpl(); // Really, the correct type for a free var
         if( t==_t ) return t;              // No change
-        return t.join(_t);                 // Base type
+        //return t.join(_t);                 // Base type lifts
+        //return _t.widen().join(t); // test05 base on LHS probably widens & then joins.
+        throw unimpl(); // need to use flow-types here
       }
       if( is_fun() ) {
         if( !(t instanceof TypeFunPtr) ) throw unimpl();
         return t;               // No change, already known as a function (and no TFS in the flow types)
+        //throw unimpl(); // need to use flow-types here
       }
       if( is_struct() ) {
         if( !(t instanceof TypeMemPtr) ) throw unimpl();

@@ -28,9 +28,9 @@ public class TestHM {
   private static final TypeMemPtr tuplen2 = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,Type.NSCALR,   Type.NSCALR   ));
   private static final TypeMemPtr tuple55 = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(5),TypeInt.con(5)));
   private static final TypeFunSig ret_tuple2 = tfs(tuple2);
-  private static final String[] XY = new String[]{"x","y"};
-  private static final String[] N1V1 = new String[]{"n1","v1"};
-  private static final TypeMemPtr tuple9  = TypeMemPtr.make(9,TypeStruct.make(XY,Types.ts(Type.SCALAR,Type.SCALAR)));
+  private static final String[] XY = new String[]{"^","x","y"};
+  private static final String[] N1V1 = new String[]{"^","n1","v1"};
+  private static final TypeMemPtr tuple9  = TypeMemPtr.make(9,TypeStruct.make(XY,Types.ts(Type.ANY,Type.SCALAR,Type.SCALAR)));
   private static final TypeMemPtr ptrabc  = TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con("abc"));
   private static final TypeMemPtr ptrtup3abc = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(3),ptrabc));
 
@@ -57,7 +57,7 @@ public class TestHM {
       assertEquals("( nScalar, nScalar)[7]",syn._t.p());
     if( HM.DO_GCP )
       if( HM.DO_HM )
-        assertEquals(ptrtup3abc,syn.flow_type());
+        assertEquals(tuplen2/*ptrtup3abc*/,syn.flow_type());
       else
         assertEquals(tuplen2,syn.flow_type());
   }
@@ -68,7 +68,7 @@ public class TestHM {
       assertEquals("( 3, *[4]\"abc\")[7]",syn._t.p());
     if( HM.DO_GCP )
       if( HM.DO_HM )
-        assertEquals(ptrtup3abc,syn.flow_type());
+        assertEquals(tuplen2/*ptrtup3abc*/,syn.flow_type());
       else
         assertEquals(tuplen2,syn.flow_type());
   }
@@ -186,7 +186,7 @@ public class TestHM {
   // Basic structure test
   @Test public void test25() { run("@{x=2, y=3}",
                                    "@{ x = 2, y = 3}[9]",
-                                   TypeMemPtr.make(9,TypeStruct.make(XY,Types.ts(TypeInt.con(2),TypeInt.con(3))))
+                                   TypeMemPtr.make(9,TypeStruct.make(XY,Types.ts(Type.ANY,TypeInt.con(2),TypeInt.con(3))))
                                    ); }
 
   // Basic field test
@@ -200,7 +200,7 @@ public class TestHM {
   // Basic field test.
   @Test public void test28() { run(".x @{ y =3}",
                                    "\"Missing field x in @{ y = 3}:[9]\"",
-                                   TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con("Missing field x in @{y==3}"))); }
+                                   TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con("Missing field x in @{^==any; y==3}"))); }
 
   @Test public void test29() { run("{ g -> @{x=g, y=g}}",
                                    "{ A -> @{ x = $A, y = $A}[9] }", tfs(tuple9)); }
@@ -219,11 +219,11 @@ public class TestHM {
     BitsAlias aliases = BitsAlias.make0(alias);
     if( nil ) aliases = aliases.meet_nil();
     TypeMemPtr cycle_ptr0 = TypeMemPtr.make(aliases,TypeObj.XOBJ);
-    TypeStruct cycle_str1 = TypeStruct.make(N1V1,Types.ts(cycle_ptr0,fld));
+    TypeStruct cycle_str1 = TypeStruct.make(N1V1,Types.ts(Type.ANY,cycle_ptr0,fld));
     TypeMemPtr cycle_ptr1 = TypeMemPtr.make(aliases,cycle_str1);
-    TypeStruct cycle_str2 = TypeStruct.make(N1V1,Types.ts(cycle_ptr1,fld));
+    TypeStruct cycle_str2 = TypeStruct.make(N1V1,Types.ts(Type.ANY,cycle_ptr1,fld));
     TypeStruct cycle_strn = cycle_str2.approx(1,alias);
-    TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn._ts[0];
+    TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn._ts[1];
     return cycle_ptrn;
   }
 
@@ -289,22 +289,22 @@ public class TestHM {
         // Unrolled, known to only produce results where either other nested
         // struct is from a different allocation site.
         TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.FULL.make(0,10),TypeObj.XOBJ);
-        TypeStruct cycle_str1 = TypeStruct.make(N1V1,Types.ts(cycle_ptr0,TypeMemPtr.STRPTR));
+        TypeStruct cycle_str1 = TypeStruct.make(N1V1,Types.ts(Type.ANY,cycle_ptr0,TypeMemPtr.STRPTR));
         TypeMemPtr cycle_ptr1 = TypeMemPtr.make(BitsAlias.FULL.make(0, 9),cycle_str1);
-        TypeStruct cycle_str2 = TypeStruct.make(N1V1,Types.ts(cycle_ptr1,TypeMemPtr.STRPTR));
+        TypeStruct cycle_str2 = TypeStruct.make(N1V1,Types.ts(Type.ANY,cycle_ptr1,TypeMemPtr.STRPTR));
         TypeMemPtr cycle_ptr2 = TypeMemPtr.make(BitsAlias.FULL.make(0,10),cycle_str2);
-        TypeStruct cycle_str3 = TypeStruct.make(N1V1,Types.ts(cycle_ptr2,TypeMemPtr.STRPTR));
+        TypeStruct cycle_str3 = TypeStruct.make(N1V1,Types.ts(Type.ANY,cycle_ptr2,TypeMemPtr.STRPTR));
         cycle_strX = cycle_str3;
       } else {
         // Not unrolled, both structs are folded
         TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.FULL.make(0,9,10),TypeObj.XOBJ);
-        TypeStruct cycle_str1 = TypeStruct.make(N1V1,Types.ts(cycle_ptr0,TypeMemPtr.STRPTR));
+        TypeStruct cycle_str1 = TypeStruct.make(N1V1,Types.ts(Type.ANY,cycle_ptr0,TypeMemPtr.STRPTR));
         TypeMemPtr cycle_ptr1 = TypeMemPtr.make(BitsAlias.FULL.make(0,9,10),cycle_str1);
-        TypeStruct cycle_str2 = TypeStruct.make(N1V1,Types.ts(cycle_ptr1,TypeMemPtr.STRPTR));
+        TypeStruct cycle_str2 = TypeStruct.make(N1V1,Types.ts(Type.ANY,cycle_ptr1,TypeMemPtr.STRPTR));
         cycle_strX = cycle_str2;
       }
       TypeStruct cycle_strn = cycle_strX.approx(1,9);
-      TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn._ts[0];
+      TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn._ts[1];
       assertEquals(tfs(cycle_ptrn),syn.flow_type());
     }
   }
