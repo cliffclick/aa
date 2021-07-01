@@ -150,8 +150,9 @@ public class HM {
     XFERS.put(tfp.fidx(), args -> {
         Type pred = args[0]._type;
         if( pred.above_center() ) return TypeInt.BOOL.dual();
-        if( pred instanceof TypeStr && pred.is_con() )
-          return TypeInt.con(pred.getstr().isEmpty() ? 1 : 0);
+        TypeObj to;
+        if( pred instanceof TypeMemPtr && (to=((TypeMemPtr)pred)._obj) instanceof TypeStr && to.is_con() )
+          return TypeInt.con(to.getstr().isEmpty() ? 1 : 0);
         return TypeInt.BOOL;
       });
 

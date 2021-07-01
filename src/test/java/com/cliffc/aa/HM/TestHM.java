@@ -369,7 +369,25 @@ public class TestHM {
     if( HM.DO_HM )
       assertEquals("3.4000000953674316",syn._t.p());
     if( HM.DO_GCP )
-      assertEquals(TypeFlt.con(3.4000000953674316), syn.flow_type());
+      assertEquals(TypeFlt.con(3.4f), syn.flow_type());
+  }
+
+
+  @Test public void test44() {
+    Root syn = HM.hm("fun = (if (isempty \"abc\") {x->x} {x->1.2}); (fun @{})");
+    if( HM.DO_HM ) {
+      if( HM.DO_GCP )
+        assertEquals("1.2000000476837158",syn._t.p());
+      else
+        assertEquals("\"Cannot unify 1.2000000476837158 and )[9]\"",syn._t.p());
+    }
+    if( HM.DO_GCP ) {
+      if( HM.DO_HM ) {
+        assertEquals(TypeFlt.con(1.2f), syn.flow_type());
+      } else {
+        assertEquals(TypeFlt.con(1.2f), syn.flow_type());
+      }
+    }
   }
 
 }
