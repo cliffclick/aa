@@ -30,7 +30,7 @@ public class TestHM {
   private static final TypeFunSig ret_tuple2 = tfs(tuple2);
   private static final String[] XY = new String[]{"^","x","y"};
   private static final String[] N1V1 = new String[]{"^","n1","v1"};
-  private static final TypeMemPtr tuple9  = TypeMemPtr.make(9,TypeStruct.make(XY,Types.ts(Type.ANY,Type.SCALAR,Type.SCALAR)));
+  private static final TypeMemPtr tuple9  = TypeMemPtr.make(7,TypeStruct.make(XY,Types.ts(Type.ANY,Type.SCALAR,Type.SCALAR)));
   private static final TypeMemPtr ptrabc  = TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con("abc"));
   private static final TypeMemPtr ptrtup3abc = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(3),ptrabc));
 
@@ -185,8 +185,8 @@ public class TestHM {
 
   // Basic structure test
   @Test public void test25() { run("@{x=2, y=3}",
-                                   "@{ x = 2, y = 3}[9]",
-                                   TypeMemPtr.make(9,TypeStruct.make(XY,Types.ts(Type.ANY,TypeInt.con(2),TypeInt.con(3))))
+                                   "@{ x = 2, y = 3}[7]",
+                                   TypeMemPtr.make(7,TypeStruct.make(XY,Types.ts(Type.ANY,TypeInt.con(2),TypeInt.con(3))))
                                    ); }
 
   // Basic field test
@@ -199,11 +199,11 @@ public class TestHM {
 
   // Basic field test.
   @Test public void test28() { run(".x @{ y =3}",
-                                   "\"Missing field x in @{ y = 3}:[9]\"",
+                                   "\"Missing field x in @{ y = 3}:[7]\"",
                                    TypeMemPtr.make(BitsAlias.STRBITS0,TypeStr.con("Missing field x in @{^==any; y==3}"))); }
 
   @Test public void test29() { run("{ g -> @{x=g, y=g}}",
-                                   "{ A -> @{ x = $A, y = $A}[9] }", tfs(tuple9)); }
+                                   "{ A -> @{ x = $A, y = $A}[7] }", tfs(tuple9)); }
 
   // Load common field 'x', ignoring mismatched fields y and z
   @Test public void test30() { run("{ pred -> .x (if pred @{x=2,y=3} @{x=3,z= \"abc\"}) }",
@@ -234,10 +234,10 @@ public class TestHM {
   @Test public void test32() {
     Root syn = HM.hm("map = { fcn lst -> @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } }; map");
     if( HM.DO_HM )
-      assertEquals("{ { A -> B } C:@{ v0 = $A, n0 = $C}[] -> D:@{ n1 = $D, v1 = $B}[9] }",syn._t.p());
+      assertEquals("{ { A -> B } C:@{ v0 = $A, n0 = $C}[] -> D:@{ n1 = $D, v1 = $B}[7] }",syn._t.p());
     if( HM.DO_GCP )
       // Build a cycle of length 2, without nil.
-      assertEquals(tfs(build_cycle(9,false,Type.SCALAR)),syn.flow_type());
+      assertEquals(tfs(build_cycle(7,false,Type.SCALAR)),syn.flow_type());
   }
 
   // Recursive linked-list discovery, with nil.  Note that the output memory
@@ -246,34 +246,34 @@ public class TestHM {
   @Test public void test33() {
     Root syn = HM.hm("map = { fcn lst -> (if lst @{ n1=(map fcn .n0 lst), v1=(fcn .v0 lst) } 0) }; map");
     if( HM.DO_HM )
-      assertEquals("{ { A -> B } C:@{ v0 = $A, n0 = $C}[0] -> D:@{ n1 = $D, v1 = $B}[0,9] }",syn._t.p());
+      assertEquals("{ { A -> B } C:@{ v0 = $A, n0 = $C}[0] -> D:@{ n1 = $D, v1 = $B}[0,7] }",syn._t.p());
     if( HM.DO_GCP )
       // Build a cycle of length 2, with nil.
-      assertEquals(tfs(build_cycle(9,true,Type.SCALAR)),syn.flow_type());
+      assertEquals(tfs(build_cycle(7,true,Type.SCALAR)),syn.flow_type());
   }
 
   // Recursive linked-list discovery, with no end clause
   @Test public void test34() {
     Root syn = HM.hm("map = { fcn lst -> (if lst @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } 0) }; (map dec @{n0 = 0, v0 = 5})");
     if( HM.DO_HM )
-      assertEquals("A:@{ n1 = $A, v1 = int64}[0,9]",syn._t.p());
+      assertEquals("A:@{ n1 = $A, v1 = int64}[0,7]",syn._t.p());
     if( HM.DO_GCP )
-      assertEquals(build_cycle(9,true,TypeInt.con(4)),syn.flow_type());
+      assertEquals(build_cycle(7,true,TypeInt.con(4)),syn.flow_type());
   }
 
   // try the worse-case expo blow-up test case from SO
   @Test public void test35() {
-    TypeFunPtr tfp = TypeFunPtr.make(12,3,Type.ANY);
-    TypeMemPtr tmp0 = TypeMemPtr.make(8,TypeStruct.make_tuple(Type.ANY,tfp ,tfp ,tfp ));
-    TypeMemPtr tmp1 = TypeMemPtr.make(8,TypeStruct.make_tuple(Type.ANY,tmp0,tmp0,tmp0));
-    TypeMemPtr tmp2 = TypeMemPtr.make(8,TypeStruct.make_tuple(Type.ANY,tmp1,tmp1,tmp1));
+    TypeFunPtr tfp = TypeFunPtr.make(3,3,Type.ANY);
+    TypeMemPtr tmp0 = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,tfp ,tfp ,tfp ));
+    TypeMemPtr tmp1 = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,tmp0,tmp0,tmp0));
+    TypeMemPtr tmp2 = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,tmp1,tmp1,tmp1));
 
     run("p0 = { x y z -> (triple x y z) };"+
         "p1 = (triple p0 p0 p0);"+
         "p2 = (triple p1 p1 p1);"+
         "p3 = (triple p2 p2 p2);"+
         "p3",
-        "( ( ( { A B C -> ( $A, $B, $C)[8] }, { D E F -> ( $D, $E, $F)[8] }, { G H I -> ( $G, $H, $I)[8] })[8], ( { J K L -> ( $J, $K, $L)[8] }, { M N O -> ( $M, $N, $O)[8] }, { P Q R -> ( $P, $Q, $R)[8] })[8], ( { S T U -> ( $S, $T, $U)[8] }, { V21 V22 V23 -> ( $V21, $V22, $V23)[8] }, { V24 V25 V26 -> ( $V24, $V25, $V26)[8] })[8])[8], ( ( { V27 V28 V29 -> ( $V27, $V28, $V29)[8] }, { V30 V31 V32 -> ( $V30, $V31, $V32)[8] }, { V33 V34 V35 -> ( $V33, $V34, $V35)[8] })[8], ( { V36 V37 V38 -> ( $V36, $V37, $V38)[8] }, { V39 V40 V41 -> ( $V39, $V40, $V41)[8] }, { V42 V43 V44 -> ( $V42, $V43, $V44)[8] })[8], ( { V45 V46 V47 -> ( $V45, $V46, $V47)[8] }, { V48 V49 V50 -> ( $V48, $V49, $V50)[8] }, { V51 V52 V53 -> ( $V51, $V52, $V53)[8] })[8])[8], ( ( { V54 V55 V56 -> ( $V54, $V55, $V56)[8] }, { V57 V58 V59 -> ( $V57, $V58, $V59)[8] }, { V60 V61 V62 -> ( $V60, $V61, $V62)[8] })[8], ( { V63 V64 V65 -> ( $V63, $V64, $V65)[8] }, { V66 V67 V68 -> ( $V66, $V67, $V68)[8] }, { V69 V70 V71 -> ( $V69, $V70, $V71)[8] })[8], ( { V72 V73 V74 -> ( $V72, $V73, $V74)[8] }, { V75 V76 V77 -> ( $V75, $V76, $V77)[8] }, { V78 V79 V80 -> ( $V78, $V79, $V80)[8] })[8])[8])[8]",
+        "( ( ( { A B C -> ( $A, $B, $C)[7] }, { D E F -> ( $D, $E, $F)[7] }, { G H I -> ( $G, $H, $I)[7] })[7], ( { J K L -> ( $J, $K, $L)[7] }, { M N O -> ( $M, $N, $O)[7] }, { P Q R -> ( $P, $Q, $R)[7] })[7], ( { S T U -> ( $S, $T, $U)[7] }, { V21 V22 V23 -> ( $V21, $V22, $V23)[7] }, { V24 V25 V26 -> ( $V24, $V25, $V26)[7] })[7])[7], ( ( { V27 V28 V29 -> ( $V27, $V28, $V29)[7] }, { V30 V31 V32 -> ( $V30, $V31, $V32)[7] }, { V33 V34 V35 -> ( $V33, $V34, $V35)[7] })[7], ( { V36 V37 V38 -> ( $V36, $V37, $V38)[7] }, { V39 V40 V41 -> ( $V39, $V40, $V41)[7] }, { V42 V43 V44 -> ( $V42, $V43, $V44)[7] })[7], ( { V45 V46 V47 -> ( $V45, $V46, $V47)[7] }, { V48 V49 V50 -> ( $V48, $V49, $V50)[7] }, { V51 V52 V53 -> ( $V51, $V52, $V53)[7] })[7])[7], ( ( { V54 V55 V56 -> ( $V54, $V55, $V56)[7] }, { V57 V58 V59 -> ( $V57, $V58, $V59)[7] }, { V60 V61 V62 -> ( $V60, $V61, $V62)[7] })[7], ( { V63 V64 V65 -> ( $V63, $V64, $V65)[7] }, { V66 V67 V68 -> ( $V66, $V67, $V68)[7] }, { V69 V70 V71 -> ( $V69, $V70, $V71)[7] })[7], ( { V72 V73 V74 -> ( $V72, $V73, $V74)[7] }, { V75 V76 V77 -> ( $V75, $V76, $V77)[7] }, { V78 V79 V80 -> ( $V78, $V79, $V80)[7] })[7])[7])[7]",
         tmp2  );
   }
 
@@ -282,28 +282,28 @@ public class TestHM {
   @Test public void test36() {
     Root syn = HM.hm("map = { lst -> (if lst @{ n1= arg= .n0 lst; (if arg @{ n1=(map .n0 arg), v1=(str .v0 arg)} 0), v1=(str .v0 lst) } 0) }; map");
     if( HM.DO_HM )
-      assertEquals("{ A:@{ v0 = int64, n0 = @{ v0 = int64, n0 = $A}[0]}[0] -> B:@{ n1 = @{ n1 = $B, v1 = *[4]str}[0,9], v1 = *[4]str}[0,10] }",syn._t.p());
+      assertEquals("{ A:@{ v0 = int64, n0 = @{ v0 = int64, n0 = $A}[0]}[0] -> B:@{ n1 = @{ n1 = $B, v1 = *[4]str}[0,7], v1 = *[4]str}[0,8] }",syn._t.p());
     if( HM.DO_GCP ) {
       TypeStruct cycle_strX;
       if( true ) {
         // Unrolled, known to only produce results where either other nested
         // struct is from a different allocation site.
-        TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.FULL.make(0,10),TypeObj.XOBJ);
+        TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.FULL.make(0, 8),TypeObj.XOBJ);
         TypeStruct cycle_str1 = TypeStruct.make(N1V1,Types.ts(Type.ANY,cycle_ptr0,TypeMemPtr.STRPTR));
-        TypeMemPtr cycle_ptr1 = TypeMemPtr.make(BitsAlias.FULL.make(0, 9),cycle_str1);
+        TypeMemPtr cycle_ptr1 = TypeMemPtr.make(BitsAlias.FULL.make(0, 7),cycle_str1);
         TypeStruct cycle_str2 = TypeStruct.make(N1V1,Types.ts(Type.ANY,cycle_ptr1,TypeMemPtr.STRPTR));
-        TypeMemPtr cycle_ptr2 = TypeMemPtr.make(BitsAlias.FULL.make(0,10),cycle_str2);
+        TypeMemPtr cycle_ptr2 = TypeMemPtr.make(BitsAlias.FULL.make(0, 8),cycle_str2);
         TypeStruct cycle_str3 = TypeStruct.make(N1V1,Types.ts(Type.ANY,cycle_ptr2,TypeMemPtr.STRPTR));
         cycle_strX = cycle_str3;
       } else {
         // Not unrolled, both structs are folded
-        TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.FULL.make(0,9,10),TypeObj.XOBJ);
+        TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.FULL.make(0,7, 8),TypeObj.XOBJ);
         TypeStruct cycle_str1 = TypeStruct.make(N1V1,Types.ts(Type.ANY,cycle_ptr0,TypeMemPtr.STRPTR));
-        TypeMemPtr cycle_ptr1 = TypeMemPtr.make(BitsAlias.FULL.make(0,9,10),cycle_str1);
+        TypeMemPtr cycle_ptr1 = TypeMemPtr.make(BitsAlias.FULL.make(0,7, 8),cycle_str1);
         TypeStruct cycle_str2 = TypeStruct.make(N1V1,Types.ts(Type.ANY,cycle_ptr1,TypeMemPtr.STRPTR));
         cycle_strX = cycle_str2;
       }
-      TypeStruct cycle_strn = cycle_strX.approx(1,9);
+      TypeStruct cycle_strn = cycle_strX.approx(1,7);
       TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn._ts[1];
       assertEquals(tfs(cycle_ptrn),syn.flow_type());
     }
@@ -352,7 +352,7 @@ public class TestHM {
       if( HM.DO_GCP )
         assertEquals("3.4000000953674316",syn._t.p());
       else
-        assertEquals("\"Missing field y in @{ x = *[4]\"abc\"}[9]\"",syn._t.p());
+        assertEquals("\"Missing field y in @{ x = *[4]\"abc\"}[7]\"",syn._t.p());
     }
     if( HM.DO_GCP ) {
       if( HM.DO_HM ) {
@@ -379,7 +379,7 @@ public class TestHM {
       if( HM.DO_GCP )
         assertEquals("1.2000000476837158",syn._t.p());
       else
-        assertEquals("\"Cannot unify 1.2000000476837158 and )[9]\"",syn._t.p());
+        assertEquals("\"Cannot unify 1.2000000476837158 and )[7]\"",syn._t.p());
     }
     if( HM.DO_GCP ) {
       if( HM.DO_HM ) {
