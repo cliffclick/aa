@@ -75,16 +75,14 @@ public class HM {
         }
       }
       if( DO_GCP ) {
-        for( T2 grp : syn._ccps.keySet() ) {
-          Type old = syn.ccp(grp);
-          Type t = syn.val(grp,work);
-          if( t!=old ) {           // Progress
-            assert old.isa(t);     // Monotonic falling
-            syn.set_ccp(grp,t);    // Update type
-            if( syn._par!=null ) { // Generally, parent needs revisit
-              work.push(syn._par); // Assume parent needs revisit
-              syn._par.add_val_work(syn,grp,work); // Push affected neighbors on worklist
-            }
+        Type old = syn._flow;
+        Type t = syn.val(work);
+        if( t!=old ) {           // Progress
+          assert old.isa(t);     // Monotonic falling
+          syn._flow = t;         // Update type
+          if( syn._par!=null ) { // Generally, parent needs revisit
+            work.push(syn._par); // Assume parent needs revisit
+            syn._par.add_val_work(syn,work); // Push affected neighbors on worklist
           }
         }
       }
@@ -255,8 +253,13 @@ public class HM {
   // Small classic tree of T2s, immutable, with sharing at the root parts.
   static class VStack implements Iterable<T2> {
     final VStack _par;
-    final T2 _nongen;
-    VStack( VStack par, T2 nongen ) { _par=par; _nongen=nongen; }
+    private T2 _nongen;
+    final int _d;
+    VStack( VStack par, T2 nongen ) { _par=par; _nongen=nongen; _d = par==null ? 0 : par._d+1; }
+    T2 nongen() {
+      T2 n = _nongen.find();
+      return n==_nongen ? n : (_nongen=n);
+    }
     @Override public String toString() {
       // Collect dups across the forest of types
       VBitSet dups = new VBitSet();
@@ -275,7 +278,7 @@ public class HM {
       private VStack _vstk;
       Iter() { _vstk=VStack.this; }
       @Override public boolean hasNext() { return _vstk!=null; }
-      @Override public T2 next() { T2 v = _vstk._nongen; _vstk = _vstk._par;  return v; }
+      @Override public T2 next() { T2 v = _vstk.nongen(); _vstk = _vstk._par;  return v; }
     }
   }
 
@@ -292,9 +295,7 @@ public class HM {
 
     // Dataflow types.  Varies during a run of CCP.
     // Mapped by the unique HM types available.
-    private HashMap<T2,Type> _ccps = new HashMap<T2,Type>() {{ put(T2.make_grp(), Type.XSCALAR); }};
-    Type ccp(T2 grp) { Type ccp = _ccps.get(grp); return ccp==null ? Type.XSCALAR : ccp; }
-    Type set_ccp(T2 grp, Type ccp) { _ccps.put(grp,ccp); return ccp; }
+    Type _flow;
 
     // Compute and set a new HM type.
     // If no change, return false.
@@ -306,14 +307,15 @@ public class HM {
     abstract void add_hm_work(Worklist work); // Add affected neighbors to worklist
 
     // Compute and return (and do not set) a new dataflow type for this T2 grp.
-    abstract Type val(T2 grp, Worklist work);
+    abstract Type val(Worklist work);
 
-    void add_val_work(Syntax child, T2 grp, Worklist work) {} // Add affected neighbors to worklist
+    void add_val_work(Syntax child, Worklist work) {} // Add affected neighbors to worklist
 
     abstract int prep_tree(Syntax par, VStack nongen, Worklist work);
     final void prep_tree_impl( Syntax par, VStack nongen, Worklist work, T2 t ) {
       _par=par;
       _t=t;
+      _flow = Type.XSCALAR;
       _nongen = nongen;
       work.push(this);
     }
@@ -324,11 +326,9 @@ public class HM {
     final boolean more_work_impl(Worklist work) {
       if( work.has(this) ) return true;
       if( DO_HM && hm(null) )   // Any more HM work?
-        return false;            // Found HM work not on worklist
-      if( DO_GCP )
-        for( T2 grp : _ccps.keySet() )
-          if( val(grp,null)!=ccp(grp) )
-            return false;       // Found GCP work not on worklist
+        return false;           // Found HM work not on worklist
+      if( DO_GCP && val(null)!=_flow )
+        return false;           // Found GCP work not on worklist
       return true;
     }
     // Print for debugger
@@ -341,14 +341,7 @@ public class HM {
       p1(sb.i()).p(" ");
       _t.get_dups(dups);
       if( DO_HM  ) _t.str(sb, visit,dups).p(" ");
-      if( DO_GCP ) {
-        sb.p("[");
-        for( T2 grp : _ccps.keySet() ) {
-          grp.str(sb.p(" "),visit.clr(),dups).p(" =>> ");
-          ccp(grp).str(sb,visit.clr(),null,false).p(',');
-        }
-        sb.unchar().p(" ]");
-      }
+      if( DO_GCP ) _flow.str(sb,visit.clr(),null,false);
       sb.nl();
       return p2(sb.ii(1),dups).di(1);
     }
@@ -363,7 +356,7 @@ public class HM {
     @Override SB p1(SB sb) { return sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString()); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
     @Override boolean hm(Worklist work) { return false; }
-    @Override Type val(T2 grp, Worklist work) { return _con; }
+    @Override Type val(Worklist work) { return _con; }
     @Override void add_hm_work(Worklist work) { work.push(_par); }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par, nongen, work, T2.make_leaf(_con));
@@ -391,8 +384,8 @@ public class HM {
       if( t.occurs_in(_par) )                        // Got captured in some parent?
         t.add_deps_work(work);                       // Need to revisit dependent ids
     }
-    @Override Type val(T2 grp, Worklist work) {
-      Type t = _def instanceof Let ? ((Let)_def)._def.ccp(grp) : ((Lambda)_def)._types[_idx];
+    @Override Type val(Worklist work) {
+      Type t = _def instanceof Let ? ((Let)_def)._def._flow : ((Lambda)_def)._types[_idx];
       return t;
     }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
@@ -486,14 +479,10 @@ public class HM {
       for( int i=0; i<_targs.length; i++ )
         if( targ(i).occurs_in_type(find()) ) work.addAll(targ(i)._deps);
     }
-    @Override Type val(T2 grp, Worklist work) {
-      return _tfp;
-    }
-    Type apply(T2 grp, Syntax[] args) {
-      // Ignore arguments, and return body type.  Very conservative.
-      return _body.ccp(grp);
-    }
-    @Override void add_val_work(Syntax child, T2 grp, Worklist work) {
+    @Override Type val(Worklist work) { return _tfp; }
+    // Ignore arguments, and return body type.  Very conservative.
+    Type apply(Syntax[] args) { return _body._flow; }
+    @Override void add_val_work(Syntax child, Worklist work) {
       // Body changed, all Apply sites need to recompute
       work.addAll(find()._deps);
     }
@@ -528,10 +517,8 @@ public class HM {
       work.push(_def);
       work.addAll(_def.find()._deps);
     }
-    @Override Type val(T2 grp, Worklist work) {
-      return _body.ccp(grp);
-    }
-    @Override void add_val_work(Syntax child, T2 grp, Worklist work) {
+    @Override Type val(Worklist work) { return _body._flow; }
+    @Override void add_val_work(Syntax child, Worklist work) {
       if( child==_def )
         work.addAll(_def.find()._deps);
     }
@@ -625,22 +612,22 @@ public class HM {
       work.push(_par);
       for( Syntax arg : _args ) work.push(arg);
     }
-    @Override Type val(T2 grp, Worklist work) {
-      Type flow = _fun.ccp(grp);
+    @Override Type val(Worklist work) {
+      Type flow = _fun._flow;
       if( flow.above_center() ) return Type.XSCALAR;
       if( !(flow instanceof TypeFunPtr) ) return Type.SCALAR;
       TypeFunPtr tfp = (TypeFunPtr)flow;
       // Have some functions, meet over their returns.
       Type rez = Type.XSCALAR;
       for( int fidx : tfp._fidxs )
-        rez = rez.meet(Lambda.FUNS.get(fidx).apply(grp,_args));
+        rez = rez.meet(Lambda.FUNS.get(fidx).apply(_args));
       return rez;
     }
-    @Override void add_val_work(Syntax child, T2 grp, Worklist work) {
+    @Override void add_val_work(Syntax child, Worklist work) {
       // If function changes type, recompute self
       if( child==_fun ) work.push(this);
       // If an argument changes type, adjust the lambda arg types
-      Type flow = _fun.ccp(grp);
+      Type flow = _fun._flow;
       if( flow.above_center() ) return;
       if( !(flow instanceof TypeFunPtr) ) return;
       // Meet the actuals over the formals.
@@ -650,7 +637,7 @@ public class HM {
           fun.find().push_update(this); // Discovered as call-site; if the Lambda changes the Apply needs to be revisited.
           for( int i=0; i<fun._types.length; i++ ) {
             Type formal = fun._types[i];
-            Type actual = this instanceof Root ? Type.SCALAR : _args[i].ccp(grp);
+            Type actual = this instanceof Root ? Type.SCALAR : _args[i]._flow;
             if( formal != actual ) {
               fun._types[i] = formal.meet(actual);
               work.addAll(fun.targ(i)._deps);
@@ -692,19 +679,17 @@ public class HM {
     private static Type xval(TypeFunPtr fun) {
       Type rez = Type.XSCALAR;
       for( int fidx : fun._fidxs )
-        rez = rez.meet(Lambda.FUNS.get(fidx).apply(T2.make_grp(),null));
+        rez = rez.meet(Lambda.FUNS.get(fidx).apply(null));
       return rez;
     }
-    @Override Type val(T2 grp, Worklist work) {
-      Type rez = _fun.ccp(grp);
+    @Override Type val(Worklist work) {
+      Type rez = _fun._flow;
       while( rez instanceof TypeFunPtr )
         rez = xval((TypeFunPtr)rez); // Propagate arg types
-      return _fun.ccp(grp);
+      return _fun._flow;
     }
     // Expand functions to full signatures, recursively
-    Type flow_type() {
-      return add_sig(ccp(T2.make_grp()));
-    }
+    Type flow_type() { return add_sig(_flow); }
 
     private static Type add_sig(Type t) {
       if( t instanceof TypeFunPtr ) {
@@ -787,11 +772,11 @@ public class HM {
       work.push(_par);
       for( Syntax fld : _flds ) work.push(fld);
     }
-    @Override Type val(T2 grp, Worklist work) {
+    @Override Type val(Worklist work) {
       Type[] ts = Types.get(_flds.length+1);
       ts[0] = Type.ANY;
       for( int i=0; i<_flds.length; i++ )
-        ts[i+1] = _flds[i].ccp(grp);
+        ts[i+1] = _flds[i]._flow;
       String[] ids = new String[_ids.length+1];
       ids[0] = "^";
       System.arraycopy(_ids,0,ids,1,_ids.length);
@@ -862,8 +847,8 @@ public class HM {
       work.push(_rec);
       _rec.add_hm_work(work);
     }
-    @Override Type val(T2 grp, Worklist work) {
-      Type trec = _rec.ccp(grp);
+    @Override Type val(Worklist work) {
+      Type trec = _rec._flow;
       if( trec.above_center() ) return Type.XSCALAR;
       if( trec instanceof TypeMemPtr ) {
         TypeMemPtr tmp = (TypeMemPtr)trec;
@@ -916,7 +901,7 @@ public class HM {
       return 1;
     }
     @Override void add_hm_work(Worklist work){ }
-    @Override void add_val_work(Syntax child, T2 grp, Worklist work) { throw unimpl(); }
+    @Override void add_val_work(Syntax child, Worklist work) { throw unimpl(); }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
     @Override SB str(SB sb){ return sb.p(_name); }
     @Override SB p1(SB sb) { return sb.p(_name); }
@@ -940,8 +925,8 @@ public class HM {
       assert pair.is_struct() && pair.args(0)==_t.args(0) && pair.args(1)==fun1.args(0);
       return false;
     }
-    @Override Type apply(T2 grp, Syntax[] args) {
-      Type t = args[0].ccp(grp);
+    @Override Type apply(Syntax[] args) {
+      Type t = args[0]._flow;
       Pair1X p1x = PAIR1S.get(t);
       if( p1x == null )
         PAIR1S.put(t,p1x = new Pair1X(t));
@@ -955,9 +940,9 @@ public class HM {
       @Override boolean hm(Worklist work) {
         throw unimpl();
       }
-      @Override Type apply(T2 grp, Syntax[] args) {
+      @Override Type apply(Syntax[] args) {
         Type con = find().args(1).args(0)._t;
-        return TPTR_PAIR.make_from(TypeStruct.make_tuple(Type.ANY,con,args==null ? Type.XSCALAR : args[0].ccp(grp)));
+        return TPTR_PAIR.make_from(TypeStruct.make_tuple(Type.ANY,con,args==null ? Type.XSCALAR : args[0]._flow));
       }
     }
   }
@@ -967,10 +952,10 @@ public class HM {
     static final String NAME = "pair";
     static private T2 var1,var2;
     public Pair() { super(NAME,var1=T2.make_leaf(),var2=T2.make_leaf(),T2.make_struct(TPTR_PAIR,new String[]{"0","1"},new T2[]{var1,var2})); }
-    @Override Type apply(T2 grp, Syntax[] args) {
+    @Override Type apply(Syntax[] args) {
       Type[] ts = TypeStruct.ts(args.length+1);
       ts[0] = Type.ANY;       // Display
-      for( int i=0; i<args.length; i++ ) ts[i+1] = args[i].ccp(grp);
+      for( int i=0; i<args.length; i++ ) ts[i+1] = args[i]._flow;
       return TPTR_PAIR.make_from(TypeStruct.make_tuple(ts));
     }
     @Override boolean hm(Worklist work) {
@@ -987,10 +972,10 @@ public class HM {
     static private T2 var1,var2,var3;
     static private final TypeMemPtr TPTR_TRIPLE = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.REC),TypeStruct.ANYSTRUCT);
     public Triple() { super(NAME,var1=T2.make_leaf(),var2=T2.make_leaf(),var3=T2.make_leaf(),T2.make_struct(TPTR_TRIPLE,new String[]{"0","1","2"},new T2[]{var1,var2,var3})); }
-    @Override Type apply(T2 grp, Syntax[] args) {
+    @Override Type apply(Syntax[] args) {
       Type[] ts = TypeStruct.ts(args.length+1);
       ts[0] = Type.ANY;       // Display
-      for( int i=0; i<args.length; i++ ) ts[i+1] = args[i].ccp(grp);
+      for( int i=0; i<args.length; i++ ) ts[i+1] = args[i]._flow;
       return TPTR_TRIPLE.make_from(TypeStruct.make_tuple(ts));
     }
     @Override boolean hm(Worklist work) {
@@ -1005,10 +990,10 @@ public class HM {
   static class If extends PrimSyn {
     static final String NAME = "if";
     public If() { super(NAME,T2.make_leaf(),T2.make_leaf(),T2.make_leaf(),T2.make_leaf()); }
-    @Override Type apply(T2 grp, Syntax[] args) {
-      Type pred= args[0].ccp(grp);
-      Type t1  = args[1].ccp(grp);
-      Type t2  = args[2].ccp(grp);
+    @Override Type apply( Syntax[] args) {
+      Type pred= args[0]._flow;
+      Type t1  = args[1]._flow;
+      Type t2  = args[2]._flow;
       // Conditional Constant Propagation: only prop types from executable sides
       if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
         return t2;              // False only
@@ -1048,9 +1033,9 @@ public class HM {
     static final String NAME = "eq";
     static private T2 var1;
     public EQ() { super(NAME,var1=T2.make_leaf(),var1,BOOL); }
-    @Override Type apply(T2 grp, Syntax[] args) {
-      Type x0 = args[0].ccp(grp);
-      Type x1 = args[1].ccp(grp);
+    @Override Type apply( Syntax[] args) {
+      Type x0 = args[0]._flow;
+      Type x1 = args[1]._flow;
       if( x0.above_center() || x1.above_center() ) return TypeInt.BOOL.dual();
       if( x0.is_con() && x1.is_con() && x0==x1 )
         return TypeInt.TRUE;
@@ -1067,8 +1052,8 @@ public class HM {
   static class EQ0 extends PrimSyn {
     static final String NAME = "?0";
     public EQ0() { super(NAME,INT64,BOOL); }
-    @Override Type apply(T2 grp, Syntax[] args) {
-      Type pred = args[0].ccp(grp);
+    @Override Type apply( Syntax[] args) {
+      Type pred = args[0]._flow;
       if( pred.above_center() ) return TypeInt.BOOL.dual();
       if( pred==Type.ALL ) return TypeInt.BOOL;
       if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
@@ -1086,8 +1071,8 @@ public class HM {
   static class IsEmpty extends PrimSyn {
     static final String NAME = "isempty";
     public IsEmpty() { super(NAME,STRP,BOOL); }
-    @Override Type apply(T2 grp, Syntax[] args) {
-      Type pred = args[0].ccp(grp);
+    @Override Type apply( Syntax[] args) {
+      Type pred = args[0]._flow;
       if( pred.above_center() ) return TypeInt.BOOL.dual();
       TypeObj to;
       if( pred instanceof TypeMemPtr && (to=((TypeMemPtr)pred)._obj) instanceof TypeStr && to.is_con() )
@@ -1104,9 +1089,9 @@ public class HM {
   static class Mul extends PrimSyn {
     static final String NAME = "*";
     public Mul() { super(NAME,INT64,INT64,INT64); }
-    @Override Type apply(T2 grp, Syntax[] args) {
-      Type t0 = args[0].ccp(grp);
-      Type t1 = args[1].ccp(grp);
+    @Override Type apply( Syntax[] args) {
+      Type t0 = args[0]._flow;
+      Type t1 = args[1]._flow;
       if( t0.above_center() || t1.above_center() )
         return TypeInt.INT64.dual();
       if( t0 instanceof TypeInt && t1 instanceof TypeInt ) {
@@ -1127,8 +1112,8 @@ public class HM {
   static class Dec extends PrimSyn {
     static final String NAME = "dec";
     public Dec() { super(NAME,INT64,INT64); }
-    @Override Type apply(T2 grp, Syntax[] args) {
-      Type t0 = args[0].ccp(grp);
+    @Override Type apply( Syntax[] args) {
+      Type t0 = args[0]._flow;
       if( t0.above_center() ) return TypeInt.INT64.dual();
       if( t0 instanceof TypeInt && t0.is_con() )
         return TypeInt.con(t0.getl()-1);
@@ -1144,8 +1129,8 @@ public class HM {
   static class Str extends PrimSyn {
     static final String NAME = "str";
     public Str() { super(NAME,INT64,STRP); }
-    @Override Type apply(T2 grp, Syntax[] args) {
-      Type i = args[0].ccp(grp);
+    @Override Type apply( Syntax[] args) {
+      Type i = args[0]._flow;
       if( i.above_center() ) return TypeMemPtr.STRPTR.dual();
       if( i instanceof TypeInt && i.is_con() )
         return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(String.valueOf(i.getl()).intern()));
@@ -1162,8 +1147,8 @@ public class HM {
   static class Factor extends PrimSyn {
     static final String NAME = "factor";
     public Factor() { super(NAME,FLT64,T2.prim("factor",FLT64,FLT64)); }
-    @Override Type apply(T2 grp, Syntax[] args) {
-      Type flt = args[0].ccp(grp);
+    @Override Type apply( Syntax[] args) {
+      Type flt = args[0]._flow;
       if( flt.above_center() ) return TypeFlt.FLT64.dual();
       return TypeFlt.FLT64;
     }
@@ -1209,12 +1194,6 @@ public class HM {
     static T2 make_leaf(Type t)    { return new T2("V"+CNT,t           ,null,new T2[1]); }
     static T2 make_struct( TypeMemPtr tmp, String[] ids, T2[] flds ) { return new T2("@{}", tmp,ids,flds); }
     static T2 make_err(String s)   { return new T2("Err"  ,TypeStr.con(s.intern()),null); }
-    static T2 make_grp()           { return new T2("[]"   ,Type.XSCALAR,null);}
-    T2 add_grp(T2... args) {
-      T2[] xargs = Arrays.copyOf(_args,_args.length+args.length);
-      System.arraycopy(args,0,xargs,_args.length,args.length);
-      return new T2("<>",Type.XSCALAR,null,xargs);
-    }
     static T2 prim(String name, T2... args) { return new T2(name,Type.XSCALAR,null,args); }
     T2 copy() { return new T2(_name,_t,_ids,new T2[_args.length]); }
 
@@ -1234,7 +1213,6 @@ public class HM {
     boolean is_fun () { return isa("->"); }
     boolean is_struct() { return isa("@{}"); }
     boolean is_err()  { return isa("Err"); }
-    boolean is_grp()  { return isa("[]"); }
 
     T2 debug_find() {// Find, without the roll-up
       if( !is_leaf() ) return this; // Shortcut
@@ -1691,14 +1669,6 @@ public class HM {
         return sb.p(((TypeMemPtr)_t)._aliases.toString());
       }
 
-      // Special printing for groups
-      if( is_grp() ) {
-        sb.p("[ ");
-        for( T2 t2 : _args )
-          t2.str(sb.p(' '),visit,dups).p(',');
-        return sb.unchar().p("]");
-      }
-
       // Generic structural T2
       sb.p("(").p(_name).p(" ");
       for( T2 t : _args ) str(sb,visit,t,dups).p(" ");
@@ -1757,11 +1727,6 @@ public class HM {
           sb.unchar().p("}");
         }
         return sb.p(((TypeMemPtr)_t)._aliases.toString());
-      }
-
-      // Special printing for groups
-      if( is_grp() ) {
-        throw unimpl();
       }
 
       // Generic structural T2: (fun arg0 arg1...)
