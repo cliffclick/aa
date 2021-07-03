@@ -5,11 +5,20 @@
 HashTable = {@{     // No args, returns a hash table struct
   tab = [7];        // The table
 
+  // Search the linked list for a key
+  // takes a linked list (list) and a key (key) 
+  // returns the value or a nil to indicate not found
+  search = { list key ->
+    list ? (
+      list.key.eq(key) ? list.val : search(list.next,  key)
+    )
+  };
+
   // Takes a key, which has a field 'hash' which has a no-arg function
   // and a field 'eq' which takes an arg.
   get = { key ->
     entry = tab[key.hash() % #tab];
-    entry && key.eq(entry.key) ? entry.val;
+    search(entry, key)
   };
   
   // Takes a key, which has a field 'hash' which has a no-arg function
