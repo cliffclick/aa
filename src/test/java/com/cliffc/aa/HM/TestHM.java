@@ -15,7 +15,7 @@ public class TestHM {
   private void run( String prog, String rez_hm, Type rez_gcp ) {
     Root syn = HM.hm(prog);
     if( HM.DO_HM )
-      assertEquals(rez_hm,syn._t.p());
+      assertEquals(rez_hm,syn._hmt.p());
     if( HM.DO_GCP )
       assertEquals(rez_gcp,syn.flow_type());
   }
@@ -54,7 +54,7 @@ public class TestHM {
   @Test public void test05() {
     Root syn = HM.hm("({ x -> (pair (x 3) (x \"abc\")) } {y->y})");
     if( HM.DO_HM )
-      assertEquals("( nScalar, nScalar)[7]",syn._t.p());
+      assertEquals("( nScalar, nScalar)[7]",syn._hmt.p());
     if( HM.DO_GCP )
       if( HM.DO_HM )
         assertEquals(tuplen2/*ptrtup3abc*/,syn.flow_type());
@@ -65,7 +65,7 @@ public class TestHM {
   @Test public void test06() {
     Root syn = HM.hm("id={x->x}; (pair (id 3) (id \"abc\"))");
     if( HM.DO_HM ) // HM is sharper here than in test05, because id is generalized per each use site
-      assertEquals("( 3, *[4]\"abc\")[7]",syn._t.p());
+      assertEquals("( 3, *[4]\"abc\")[7]",syn._hmt.p());
     if( HM.DO_GCP )
       if( HM.DO_HM )
         assertEquals(tuplen2/*ptrtup3abc*/,syn.flow_type());
@@ -234,7 +234,7 @@ public class TestHM {
   @Test public void test32() {
     Root syn = HM.hm("map = { fcn lst -> @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } }; map");
     if( HM.DO_HM )
-      assertEquals("{ { A -> B } C:@{ v0 = $A, n0 = $C}[] -> D:@{ n1 = $D, v1 = $B}[7] }",syn._t.p());
+      assertEquals("{ { A -> B } C:@{ v0 = $A, n0 = $C}[] -> D:@{ n1 = $D, v1 = $B}[7] }",syn._hmt.p());
     if( HM.DO_GCP )
       // Build a cycle of length 2, without nil.
       assertEquals(tfs(build_cycle(7,false,Type.SCALAR)),syn.flow_type());
@@ -246,7 +246,7 @@ public class TestHM {
   @Test public void test33() {
     Root syn = HM.hm("map = { fcn lst -> (if lst @{ n1=(map fcn .n0 lst), v1=(fcn .v0 lst) } 0) }; map");
     if( HM.DO_HM )
-      assertEquals("{ { A -> B } C:@{ v0 = $A, n0 = $C}[0] -> D:@{ n1 = $D, v1 = $B}[0,7] }",syn._t.p());
+      assertEquals("{ { A -> B } C:@{ v0 = $A, n0 = $C}[0] -> D:@{ n1 = $D, v1 = $B}[0,7] }",syn._hmt.p());
     if( HM.DO_GCP )
       // Build a cycle of length 2, with nil.
       assertEquals(tfs(build_cycle(7,true,Type.SCALAR)),syn.flow_type());
@@ -256,7 +256,7 @@ public class TestHM {
   @Test public void test34() {
     Root syn = HM.hm("map = { fcn lst -> (if lst @{ n1 = (map fcn .n0 lst), v1 = (fcn .v0 lst) } 0) }; (map dec @{n0 = 0, v0 = 5})");
     if( HM.DO_HM )
-      assertEquals("A:@{ n1 = $A, v1 = int64}[0,7]",syn._t.p());
+      assertEquals("A:@{ n1 = $A, v1 = int64}[0,7]",syn._hmt.p());
     if( HM.DO_GCP )
       assertEquals(build_cycle(7,true,TypeInt.con(4)),syn.flow_type());
   }
@@ -282,7 +282,7 @@ public class TestHM {
   @Test public void test36() {
     Root syn = HM.hm("map = { lst -> (if lst @{ n1= arg= .n0 lst; (if arg @{ n1=(map .n0 arg), v1=(str .v0 arg)} 0), v1=(str .v0 lst) } 0) }; map");
     if( HM.DO_HM )
-      assertEquals("{ A:@{ v0 = int64, n0 = @{ v0 = int64, n0 = $A}[0]}[0] -> B:@{ n1 = @{ n1 = $B, v1 = *[4]str}[0,7], v1 = *[4]str}[0,8] }",syn._t.p());
+      assertEquals("{ A:@{ v0 = int64, n0 = @{ v0 = int64, n0 = $A}[0]}[0] -> B:@{ n1 = @{ n1 = $B, v1 = *[4]str}[0,7], v1 = *[4]str}[0,8] }",syn._hmt.p());
     if( HM.DO_GCP ) {
       TypeStruct cycle_strX;
       if( true ) {
@@ -350,9 +350,9 @@ public class TestHM {
     Root syn = HM.hm("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4 }; .y (if pred s1 s2)");
     if( HM.DO_HM ) {
       if( HM.DO_GCP )
-        assertEquals("3.4000000953674316",syn._t.p());
+        assertEquals("3.4000000953674316",syn._hmt.p());
       else
-        assertEquals("\"Missing field y in @{ x = *[4]\"abc\"}[7]\"",syn._t.p());
+        assertEquals("\"Missing field y in @{ x = *[4]\"abc\"}[7]\"",syn._hmt.p());
     }
     if( HM.DO_GCP ) {
       if( HM.DO_HM ) {
@@ -367,7 +367,7 @@ public class TestHM {
   @Test public void test43() {
     Root syn = HM.hm("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4 }; z = (if pred s1 s2); .y s2");
     if( HM.DO_HM )
-      assertEquals("3.4000000953674316",syn._t.p());
+      assertEquals("3.4000000953674316",syn._hmt.p());
     if( HM.DO_GCP )
       assertEquals(TypeFlt.con(3.4f), syn.flow_type());
   }
@@ -377,9 +377,9 @@ public class TestHM {
     Root syn = HM.hm("fun = (if (isempty \"abc\") {x->x} {x->1.2}); (fun @{})");
     if( HM.DO_HM ) {
       if( HM.DO_GCP )
-        assertEquals("1.2000000476837158",syn._t.p());
+        assertEquals("1.2000000476837158",syn._hmt.p());
       else
-        assertEquals("\"Cannot unify 1.2000000476837158 and )[7]\"",syn._t.p());
+        assertEquals("\"Cannot unify 1.2000000476837158 and )[7]\"",syn._hmt.p());
     }
     if( HM.DO_GCP ) {
       if( HM.DO_HM ) {

@@ -66,7 +66,7 @@ public class HM {
       int oldcnt = T2.CNT;      // Used for cost-check when no-progress
       Syntax syn = work.pop();  // Get work
       if( DO_HM ) {
-        T2 old = syn._t;        // Old value for progress assert
+        T2 old = syn._hmt;        // Old value for progress assert
         if( syn.hm(work) ) {
           assert !syn.debug_find().unify(old.find(),null);// monotonic: unifying with the result is no-progress
           syn.add_hm_work(work);     // Push affected neighbors on worklist
@@ -286,12 +286,12 @@ public class HM {
   static abstract class Syntax {
     Syntax _par;                // Parent in the AST
     VStack _nongen;             // Non-generative type variables
-    T2 _t;                      // Current HM type
+    T2 _hmt;                    // Current HM type
     T2 find() {                 // U-F find
-      T2 t = _t.find();
-      return t==_t ? t : (_t=t);
+      T2 t = _hmt.find();
+      return t== _hmt ? t : (_hmt =t);
     }
-    T2 debug_find() { return _t.debug_find(); } // Find, without the roll-up
+    T2 debug_find() { return _hmt.debug_find(); } // Find, without the roll-up
 
     // Dataflow types.  Varies during a run of CCP.
     // Mapped by the unique HM types available.
@@ -314,7 +314,7 @@ public class HM {
     abstract int prep_tree(Syntax par, VStack nongen, Worklist work);
     final void prep_tree_impl( Syntax par, VStack nongen, Worklist work, T2 t ) {
       _par=par;
-      _t=t;
+      _hmt =t;
       _flow = Type.XSCALAR;
       _nongen = nongen;
       work.push(this);
@@ -339,8 +339,8 @@ public class HM {
     final SB p0(SB sb, VBitSet dups) {
       VBitSet visit = new VBitSet();
       p1(sb.i()).p(" ");
-      _t.get_dups(dups);
-      if( DO_HM  ) _t.str(sb, visit,dups).p(" ");
+      _hmt.get_dups(dups);
+      if( DO_HM  ) _hmt.str(sb, visit,dups).p(" ");
       if( DO_GCP ) _flow.str(sb,visit.clr(),null,false);
       sb.nl();
       return p2(sb.ii(1),dups).di(1);
@@ -385,36 +385,28 @@ public class HM {
         t.add_deps_work(work);                       // Need to revisit dependent ids
     }
     @Override Type val(Worklist work) {
-      Type t = _def instanceof Let ? ((Let)_def)._def._flow : ((Lambda)_def)._types[_idx];
-      return t;
+      return _def instanceof Let ? ((Let)_def)._def._flow : ((Lambda)_def)._types[_idx];
     }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
       for( Syntax syn = _par; syn!=null; syn = syn._par )
         syn.prep_lookup_deps(this);
 
-      // Lookup, and get the T2 type var
+      // Lookup, and get the T2 type var and a pointer to the flow type.
       for( Syntax syn = _par; syn!=null; syn = syn._par ) {
         if( syn instanceof Lambda ) {
-          Lambda l = (Lambda)syn;
-          int idx = Util.find(l._args,_name);
-          if( idx != -1 ) {
-            _idt = l.targ(idx);   // Cached
-            _def = l;
-            _idx = idx;
-            return 1;
-          }
+          Lambda lam = (Lambda)syn;
+          if( (_idx = Util.find(lam._args,_name)) != -1 )
+            return _init(lam,lam.targ(_idx));
         } else if( syn instanceof Let ) {
-          Let l = (Let)syn;
-          if( Util.eq(l._arg0,_name) ) {
-            _idt = l._targ;     // Cached
-            _def = l;
-            return 1;
-          }
+          Let let = (Let)syn;
+          if( Util.eq(let._arg0,_name) )
+            return _init(let,let._targ);
         }
       }
       throw new RuntimeException("Parse error, "+_name+" is undefined");
     }
+    private int _init(Syntax def,T2 idt) { _def = def; _idt = idt; return 1; }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
   }
 
@@ -524,10 +516,10 @@ public class HM {
     }
 
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
-      prep_tree_impl(par,nongen,work,_body._t);
+      prep_tree_impl(par,nongen,work,_body._hmt);
       int cnt = _body.prep_tree(this,           nongen       ,work) +
                 _def .prep_tree(this,new VStack(nongen,_targ),work);
-      _t = _body._t;            // Unify 'Let._t' with the '_body'
+      _hmt = _body._hmt;            // Unify 'Let._t' with the '_body'
       _targ.unify(_def.find(),work);
       return cnt+1;
     }
@@ -894,10 +886,10 @@ public class HM {
       _name=name;
       for( int i=0; i<t2s.length-1; i++ )
         t2s[i].find().unify(targ(i),work);
-      _t = T2.make_fun(t2s);
+      _hmt = T2.make_fun(t2s);
     }
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
-      prep_tree_impl(par,nongen,work,_t);
+      prep_tree_impl(par,nongen,work, _hmt);
       return 1;
     }
     @Override void add_hm_work(Worklist work){ }
@@ -918,11 +910,11 @@ public class HM {
       super(NAME,var1=T2.make_leaf(),T2.make_fun(var2=T2.make_leaf(),T2.make_struct(TPTR_PAIR,new String[]{"0","1"},new T2[]{var1,var2})));
     }
     @Override boolean hm(Worklist work) {
-      assert _t.is_fun();
-      T2 fun1 = _t.args(1);
+      assert _hmt.is_fun();
+      T2 fun1 = _hmt.args(1);
       assert fun1.is_fun();
       T2 pair = fun1.args(1);
-      assert pair.is_struct() && pair.args(0)==_t.args(0) && pair.args(1)==fun1.args(0);
+      assert pair.is_struct() && pair.args(0)== _hmt.args(0) && pair.args(1)==fun1.args(0);
       return false;
     }
     @Override Type apply(Syntax[] args) {
@@ -959,8 +951,8 @@ public class HM {
       return TPTR_PAIR.make_from(TypeStruct.make_tuple(ts));
     }
     @Override boolean hm(Worklist work) {
-      assert _t.is_fun();
-      assert _t.args(2).is_struct() && _t.args(2).args(0)==_t.args(0) && _t.args(2).args(1)==_t.args(1);
+      assert _hmt.is_fun();
+      assert _hmt.args(2).is_struct() && _hmt.args(2).args(0)== _hmt.args(0) && _hmt.args(2).args(1)== _hmt.args(1);
       return false;
     }
   }
@@ -979,8 +971,8 @@ public class HM {
       return TPTR_TRIPLE.make_from(TypeStruct.make_tuple(ts));
     }
     @Override boolean hm(Worklist work) {
-      assert _t.is_fun();
-      assert _t.args(3).is_struct() && _t.args(3).args(0)==_t.args(0) && _t.args(3).args(1)==_t.args(1);
+      assert _hmt.is_fun();
+      assert _hmt.args(3).is_struct() && _hmt.args(3).args(0)== _hmt.args(0) && _hmt.args(3).args(1)== _hmt.args(1);
       return false;
     }
   }
@@ -1043,7 +1035,7 @@ public class HM {
       return TypeInt.BOOL;
     }
     @Override boolean hm(Worklist work) {
-      assert _t.is_fun() && _t.args(0)==_t.args(1) && _t.args(2)==BOOL.find();
+      assert _hmt.is_fun() && _hmt.args(0)== _hmt.args(1) && _hmt.args(2)==BOOL.find();
       return false;
     }
   }
@@ -1063,7 +1055,7 @@ public class HM {
       return TypeInt.BOOL;
     }
     @Override boolean hm(Worklist work) {
-      assert _t.is_fun() && _t.args(0)==INT64.find() && _t.args(1)==BOOL.find();
+      assert _hmt.is_fun() && _hmt.args(0)==INT64.find() && _hmt.args(1)==BOOL.find();
       return false;
     }
   }
@@ -1080,7 +1072,7 @@ public class HM {
       return TypeInt.BOOL;
     }
     @Override boolean hm(Worklist work) {
-      assert _t.is_fun() && _t.args(0)==STRP.find() && _t.args(1)==BOOL.find();
+      assert _hmt.is_fun() && _hmt.args(0)==STRP.find() && _hmt.args(1)==BOOL.find();
       return false;
     }
   }
@@ -1103,7 +1095,7 @@ public class HM {
       return TypeInt.INT64;
     }
     @Override boolean hm(Worklist work) {
-      assert _t.is_fun() && _t.args(0)==INT64.find() && _t.args(1)==INT64.find() && _t.args(1)==INT64.find();
+      assert _hmt.is_fun() && _hmt.args(0)==INT64.find() && _hmt.args(1)==INT64.find() && _hmt.args(1)==INT64.find();
       return false;
     }
   }
@@ -1120,7 +1112,7 @@ public class HM {
       return TypeInt.INT64;
     }
     @Override boolean hm(Worklist work) {
-      assert _t.is_fun() && _t.args(0)==INT64.find() && _t.args(1)==INT64.find();
+      assert _hmt.is_fun() && _hmt.args(0)==INT64.find() && _hmt.args(1)==INT64.find();
       return false;
     }
   }
@@ -1137,7 +1129,7 @@ public class HM {
       return TypeMemPtr.STRPTR;
     }
     @Override boolean hm(Worklist work) {
-      assert _t.is_fun() && _t.args(0)==INT64.find() && _t.args(1)==STRP.find();
+      assert _hmt.is_fun() && _hmt.args(0)==INT64.find() && _hmt.args(1)==STRP.find();
       return false;
     }
   }
@@ -1153,7 +1145,7 @@ public class HM {
       return TypeFlt.FLT64;
     }
     @Override boolean hm(Worklist work) {
-      assert _t.is_fun() && _t.args(0)==FLT64.find() && _t.args(1).isa(NAME);
+      assert _hmt.is_fun() && _hmt.args(0)==FLT64.find() && _hmt.args(1).isa(NAME);
       return false;
     }
   }
