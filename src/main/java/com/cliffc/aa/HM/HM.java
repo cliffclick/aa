@@ -31,7 +31,7 @@ public class HM {
   static { BitsAlias.init0(); BitsFun.init0(); }
 
   static final boolean DO_HM  = true;
-  static final boolean DO_GCP = false;
+  static final boolean DO_GCP = true;
   static final Worklist work = new Worklist();
 
   public static Root hm( String sprog ) {
@@ -629,7 +629,7 @@ public class HM {
       Type flow = _fun.ccp(grp);
       if( flow.above_center() ) return Type.XSCALAR;
       if( !(flow instanceof TypeFunPtr) ) return Type.SCALAR;
-      TypeFunPtr tfp = (TypeFunPtr)_fun.ccp(grp);
+      TypeFunPtr tfp = (TypeFunPtr)flow;
       // Have some functions, meet over their returns.
       Type rez = Type.XSCALAR;
       for( int fidx : tfp._fidxs )
@@ -655,6 +655,7 @@ public class HM {
               fun._types[i] = formal.meet(actual);
               work.addAll(fun.targ(i)._deps);
               work.push(fun._body);
+              if( i==0 && fun instanceof If ) work.push(fun); // Specifically If might need more unification
             }
           }
         }
