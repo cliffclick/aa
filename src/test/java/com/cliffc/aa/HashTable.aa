@@ -7,30 +7,31 @@ HashTable = {@{     // No args, returns a hash table struct
 
   // Search the linked list for a key
   // takes a linked list (list) and a key (key) 
-  // returns the value or a nil to indicate not found
+  // returns the list or a nil to indicate not found
   search = { list key ->
     list ? (
-      list.key.eq(key) ? list.val : search(list.next,  key)
+      list.key.eq(key) ? list : search(list.next,  key)
     )
   };
 
   // Takes a key, which has a field 'hash' which has a no-arg function
   // and a field 'eq' which takes an arg.
   get = { key ->
-    entry = tab[key.hash() % #tab];
-    search(entry, key)
+    bucket = tab[key.hash() % #tab];  // find the bucket
+    entry = search(bucket, key);  // search the bucket for the key
+    entry ? entry.val  // if found return val else nil
   };
   
   // Takes a key, which has a field 'hash' which has a no-arg function
   // and a field 'eq' which takes an arg.  Takes a 'val'.  Returns any
   // oldval
   put = { key val ->
-    idx = key.hash() % #tab;     // Compute hash index
-    entry = tab[idx];            // Get table entry
+    idx = key.hash() % #tab;       // Compute hash index
+    entry = search(tab[idx], key); // Get bucket entry
     // On a hit, set val over the entry.val, and return the oldval.
-    entry && key.eq(entry.key) ? (oldval=entry.val; entry.val:=val; ^oldval);
-    // On a miss, linked-list insert key, val.
-    tab[idx]= @{key=key; val=val; next=entry};
+    entry ? (oldval = entry.val; entry.val := val; ^oldval);
+    // On a miss, linked-list insert key, val. Not atomic!?
+    tab[idx]= @{key = key; val = val; next = tab[idx]};
     0  // Missed
   }
 }}
