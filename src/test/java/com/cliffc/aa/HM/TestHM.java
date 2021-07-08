@@ -192,12 +192,12 @@ public class TestHM {
 
   // Basic field test
   @Test public void test27() { run(".x 5",
-                                   "Missing field x in 5", TypeMemPtr.make(BitsAlias.STRBITS0,TypeStr.con("Missing field x"))); }
+                                   "Missing field x in 5", Type.SCALAR); }
 
   // Basic field test.
   @Test public void test28() { run(".x @{ y =3}",
                                    "Missing field x",
-                                   TypeMemPtr.make(BitsAlias.STRBITS0,TypeStr.con("Missing field x"))); }
+                                   Type.SCALAR); }
 
   @Test public void test29() { run("{ g -> @{x=g, y=g}}",
                                    "{ A -> @{ x = $A, y = $A}[7] }", tfs(tuple9)); }
@@ -320,13 +320,8 @@ public class TestHM {
     Root syn = HM.hm("x = { z -> z}; (x { y -> .u y})");
     if( HM.DO_HM )
       assertEquals("{ @{ u = A}[] -> $A }",syn._hmt.p());
-    if( HM.DO_GCP ) {
-      if( HM.DO_HM ) {
-        assertEquals(tfs(Type.SCALAR), syn.flow_type());
-      } else {
-        assertEquals(tfs(TypeMemPtr.make(BitsAlias.STRBITS0,TypeStr.con("Missing field u"))), syn.flow_type());
-      }
-    }
+    if( HM.DO_GCP )
+      assertEquals(tfs(Type.SCALAR), syn.flow_type());
   }
 
   // Example from SimpleSub requiring 'x' to be both:

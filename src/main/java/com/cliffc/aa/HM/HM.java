@@ -399,7 +399,7 @@ public class HM {
           if( (_idx = Util.find(lam._args,_name)) != -1 )
             return _init(lam,lam.targ(_idx));
         } else if( syn instanceof Let ) {
-          Let let = (Let)syn;
+          Let let = (Let)syn;  _idx=-1;
           if( Util.eq(let._arg0,_name) )
             return _init(let,let._targ);
         }
@@ -862,7 +862,8 @@ public class HM {
         }
         if( tmp._obj.above_center() ) return Type.XSCALAR;
       }
-      return TypeMemPtr.make(BitsAlias.STRBITS0,TypeStr.con(("Missing field "+_id).intern()));
+      // TODO: Need an error type here
+      return Type.SCALAR;
     }
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par, nongen, work, T2.make_leaf());
@@ -1429,19 +1430,21 @@ public class HM {
         // field names and not by position.
         for( int i=0; i<_ids.length; i++ ) { // For all fields in LHS
           int idx = Util.find(that._ids,_ids[i]);
-          if( idx==-1 ) that.add_fld(_ids[i],make_err("Missing field "+_ids[i]+" in "+that.p()), work); // Extend 'that' with matching field from 'this'
+          if( idx==-1 ) that.add_fld(_ids[i],T2.make_leaf(), work); // Extend 'that' with matching field from 'this'
           else args(i)._unify(that.args(idx),work);    // Unify matching field
           that = that.find();                          // Recursively, might have already rolled this up
         }
         // Fields in RHS and not the LHS are also errors.
         for( int i=0; i<that._ids.length; i++ )  // For all fields in RHS
           if( Util.find(_ids,that._ids[i])==-1 ) // Missing in LHS
-            that.args(i)._unify(make_err("Missing field "+that._ids[i]+" in "+this.p()),work);
+            that.args(i)._unify(T2.make_leaf(),work);
 
         // Normal structural unification
       } else {
-        for( int i=0; i<_args.length; i++ ) // For all fields in LHS
+        for( int i=0; i<_args.length; i++ ) { // For all fields in LHS
           args(i)._unify(that.args(i),work);
+          if( (that=that.find()).is_err() ) break;
+        }
       }
       if( find().is_err() && !that.find().is_err() )
         // TODO: Find a more elegant way to preserve errors
@@ -1456,6 +1459,7 @@ public class HM {
       _args = Arrays.copyOf(_args,len+1);
       _ids [len] = id ;
       _args[len] = fld;
+      fld.push_update(_deps); // If field changes, all deps change
       work.addAll(_deps); //
       return true;        // Always progress
     }
@@ -1488,8 +1492,6 @@ public class HM {
     // -----------------
     // Make a (lazy) fresh copy of 'this' and unify it with 'that'.  This is
     // the same as calling 'fresh' then 'unify', without the clone of 'this'.
-    // The Syntax is used when making the 'fresh' copy for the occurs_check;
-    // it is another version of the 'nongen' set.
     // Returns progress.
     // If work is null, we are testing only and make no changes.
     static private final HashMap<T2,T2> VARS = new HashMap<>();
@@ -1534,6 +1536,7 @@ public class HM {
         for( int i=0; i<_args.length; i++ ) {
           progress |= args(i)._fresh_unify(that.args(i),nongen,work);
           if( progress && work==null ) return true;
+          if( (that=that.find()).is_err() ) return true;
         }
         BitsFun fidxs = meet_fidxs(that);
         if( fidxs!=that._fidxs ) progress=true;
@@ -1557,7 +1560,15 @@ public class HM {
           progress |= args(i)._fresh_unify(that.args(idx),nongen,work);
         if( progress && work==null ) return true;
       }
-      // Fields in RHS and not the LHS do not need to be added to the RHS.
+      // Fields in RHS and not the LHS unify with error.
+      for( int i=0; i<that._args.length; i++ ) {
+        int idx = Util.find(_ids,that._ids[i]);
+        if( idx == -1 && !that.args(i).is_err() ) {  // Missing field on RHS
+          if( work==null ) return true; // Will definitely make progress
+          progress |= that.args(i).unify(make_err("Missing field "+that._ids[i]+" in "+p()), work);
+        }
+      }
+      // Unify aliases
       BitsAlias alias = meet_alias(that);
       if( alias!=that._alias ) progress=true;
       if( progress && work==null ) return true;
@@ -1814,7 +1825,7 @@ public class HM {
     SB str(SB sb, VBitSet visit, VBitSet dups) {
 
       if( is_err () ) return sb.p(_err);
-      if( is_base() ) return sb.p(_name).p(':').p(_flow);
+      if( is_base() ) return sb.p(_flow);
       boolean dup = dups.get(_uid);
       if( is_leaf() ) {
         sb.p(_name);
