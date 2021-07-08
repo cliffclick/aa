@@ -11,7 +11,6 @@ public class TestHM {
 
   @Before public void reset() { HM.reset(); }
 
-  private void run( String prog, String rez_hm ) { run(prog,rez_hm,null); }
   private void run( String prog, String rez_hm, Type rez_gcp ) {
     Root syn = HM.hm(prog);
     if( HM.DO_HM )
@@ -31,8 +30,6 @@ public class TestHM {
   private static final String[] XY = new String[]{"^","x","y"};
   private static final String[] N1V1 = new String[]{"^","n1","v1"};
   private static final TypeMemPtr tuple9  = TypeMemPtr.make(7,TypeStruct.make(XY,Types.ts(Type.ANY,Type.SCALAR,Type.SCALAR)));
-  private static final TypeMemPtr ptrabc  = TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con("abc"));
-  private static final TypeMemPtr ptrtup3abc = TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(3),ptrabc));
 
   @Test(expected = RuntimeException.class)
   public void test00() { run( "fred",null,null); }
@@ -41,10 +38,10 @@ public class TestHM {
                                     "3", TypeInt.con(3));  }
 
   @Test public void test02() { run( "(pair1 3)" ,
-                                    "{ A -> ( 3, $A)[7] }", tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(3),Type.XSCALAR)))); }
+                                    "{ A -> ( 3, $A)[7] }", tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(3),Type.SCALAR)))); }
 
   @Test public void test03() { run( "{ z -> (pair (z 3) (z \"abc\")) }" ,
-                                    "{ { nScalar -> A } -> ( $A, $A)[7] }", ret_tuple2); }
+                                    "{ { nScalar -> A } -> ( $A, $A)[7] }", tfs(tuple2)); }
 
   @Test public void test04() { run( "fact = { n -> (if (?0 n) 1 (* n (fact (dec n))))}; fact",
                                     "{ int64 -> int64 }", tfs(TypeInt.INT64) ); }
@@ -57,7 +54,7 @@ public class TestHM {
       assertEquals("( nScalar, nScalar)[7]",syn._hmt.p());
     if( HM.DO_GCP )
       if( HM.DO_HM )
-        assertEquals(tuplen2/*ptrtup3abc*/,syn.flow_type());
+        assertEquals(tuplen2,syn.flow_type());
       else
         assertEquals(tuplen2,syn.flow_type());
   }
@@ -68,7 +65,7 @@ public class TestHM {
       assertEquals("( 3, *[4]\"abc\")[7]",syn._hmt.p());
     if( HM.DO_GCP )
       if( HM.DO_HM )
-        assertEquals(tuplen2/*ptrtup3abc*/,syn.flow_type());
+        assertEquals(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.NINT64,TypeMemPtr.STRPTR)),syn.flow_type());
       else
         assertEquals(tuplen2,syn.flow_type());
   }
@@ -106,7 +103,7 @@ public class TestHM {
   // Takes a '{a->b}' and a 'a' for a couple of different prims.
   @Test public void test14() { run("map = { fun -> { x -> (fun x)}};"+
                                    "(pair ((map str) 5) ((map factor) 2.3))",
-                                   "( *[4]str, (factor flt64 flt64))[7]", tuple2); }
+                                   "( *[4]str, flt64)[7]", tuple2); }
 
   // map takes a function and an element (collection?) and applies it (applies to collection?)
   @Test public void test15() { run("map = { fun x -> (fun x)}; (map {a->3} 5)",
@@ -125,7 +122,7 @@ public class TestHM {
   // different signatures, then attempting to pass them to a map & calling internally.
   // fcn takes a predicate 'p' and returns one of two fcns.
   //   let fcn = { p -> (if p {a -> pair[a,a        ]}
-  //                               {b -> pair[b,pair[3,b]]}) } in
+  //                          {b -> pair[b,pair[3,b]]}) } in
   // map takes a function and an element (collection?) and applies it (applies to collection?)
   //   let map = { fun x -> (fun x) }
   //          in { q -> ((map (fcn q)) 5) }
@@ -134,7 +131,7 @@ public class TestHM {
   @Test public void test18() { run("fcn = {p -> (if p {a -> (pair a a)} {b -> (pair b (pair 3 b))})};"+
                                    "map = { fun x -> (fun x)};"+
                                    "{ q -> (map (fcn q) 5)}",
-                                   "{ A -> ( B:\"Cannot unify A:( 3, $A)[7] and 5\", $B)[7] }",
+                                   "{ A -> ( B:Cannot unify A:( 3, $A)[7] and 5, $B)[7] }",
                                    tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(5),Type.NSCALR)))
                                    ); }
 
@@ -181,7 +178,7 @@ public class TestHM {
                                    "      (pair (fgz 3) (fgz 5))"+
                                    "}"
                                    ,
-                                   "{ { nint8 -> A } -> ( $A, $A)[7] }", ret_tuple2); }
+                                   "{ { nint8 -> A } -> ( $A, $A)[7] }", tfs(tuple2)); }
 
   // Basic structure test
   @Test public void test25() { run("@{x=2, y=3}",
@@ -195,12 +192,12 @@ public class TestHM {
 
   // Basic field test
   @Test public void test27() { run(".x 5",
-                                   "\"Cannot unify @{ x = A}[] and 5\"", TypeMemPtr.make(BitsAlias.STRBITS0,TypeStr.con("No field x in 5"))); }
+                                   "Missing field x in 5", TypeMemPtr.make(BitsAlias.STRBITS0,TypeStr.con("Missing field x"))); }
 
   // Basic field test.
   @Test public void test28() { run(".x @{ y =3}",
-                                   "\"Missing field x in @{ y = 3}:[7]\"",
-                                   TypeMemPtr.make(BitsAlias.STRBITS0,TypeStr.con("Missing field x in @{^==any; y==3}"))); }
+                                   "Missing field x",
+                                   TypeMemPtr.make(BitsAlias.STRBITS0,TypeStr.con("Missing field x"))); }
 
   @Test public void test29() { run("{ g -> @{x=g, y=g}}",
                                    "{ A -> @{ x = $A, y = $A}[7] }", tfs(tuple9)); }
@@ -273,7 +270,7 @@ public class TestHM {
         "p2 = (triple p1 p1 p1);"+
         "p3 = (triple p2 p2 p2);"+
         "p3",
-        "( ( ( { A B C -> ( $A, $B, $C)[7] }, { D E F -> ( $D, $E, $F)[7] }, { G H I -> ( $G, $H, $I)[7] })[7], ( { J K L -> ( $J, $K, $L)[7] }, { M N O -> ( $M, $N, $O)[7] }, { P Q R -> ( $P, $Q, $R)[7] })[7], ( { S T U -> ( $S, $T, $U)[7] }, { V21 V22 V23 -> ( $V21, $V22, $V23)[7] }, { V24 V25 V26 -> ( $V24, $V25, $V26)[7] })[7])[7], ( ( { V27 V28 V29 -> ( $V27, $V28, $V29)[7] }, { V30 V31 V32 -> ( $V30, $V31, $V32)[7] }, { V33 V34 V35 -> ( $V33, $V34, $V35)[7] })[7], ( { V36 V37 V38 -> ( $V36, $V37, $V38)[7] }, { V39 V40 V41 -> ( $V39, $V40, $V41)[7] }, { V42 V43 V44 -> ( $V42, $V43, $V44)[7] })[7], ( { V45 V46 V47 -> ( $V45, $V46, $V47)[7] }, { V48 V49 V50 -> ( $V48, $V49, $V50)[7] }, { V51 V52 V53 -> ( $V51, $V52, $V53)[7] })[7])[7], ( ( { V54 V55 V56 -> ( $V54, $V55, $V56)[7] }, { V57 V58 V59 -> ( $V57, $V58, $V59)[7] }, { V60 V61 V62 -> ( $V60, $V61, $V62)[7] })[7], ( { V63 V64 V65 -> ( $V63, $V64, $V65)[7] }, { V66 V67 V68 -> ( $V66, $V67, $V68)[7] }, { V69 V70 V71 -> ( $V69, $V70, $V71)[7] })[7], ( { V72 V73 V74 -> ( $V72, $V73, $V74)[7] }, { V75 V76 V77 -> ( $V75, $V76, $V77)[7] }, { V78 V79 V80 -> ( $V78, $V79, $V80)[7] })[7])[7])[7]",
+        "( A:( B:( C:{ D E F -> ( $D, $E, $F)[7] }, $G, $H)[7], $I, $J)[7], $K, $L)[7]",
         tmp2  );
   }
 
@@ -315,19 +312,39 @@ public class TestHM {
   // Example from SimpleSub requiring 'x' to be both a struct with field
   // 'v', and also a function type - specifically disallowed in 'aa'.
   @Test public void test38() { run("{ x -> y = ( x .v x ); 0}",
-                                   "{ \"Cannot unify @{ v = A}[] and { A -> B }\" -> 0 }", tfs(Type.XNIL)); }
+                                   "{ Cannot unify @{ v = A}[] and { A -> B } -> 0 }", tfs(Type.XNIL)); }
 
   // Really bad flow-type: function can be called from the REPL with any
   // argument type - and the worse case will be an error.
-  @Test public void test39() { run("x = { z -> z}; (x { y -> .u y})",
-                                   "{ @{ u = A}[] -> $A }",tfs(TypeMemPtr.make(BitsAlias.STRBITS0,TypeStr.con("No field u in Scalar")))); }
+  @Test public void test39() {
+    Root syn = HM.hm("x = { z -> z}; (x { y -> .u y})");
+    if( HM.DO_HM )
+      assertEquals("{ @{ u = A}[] -> $A }",syn._hmt.p());
+    if( HM.DO_GCP ) {
+      if( HM.DO_HM ) {
+        assertEquals(tfs(Type.SCALAR), syn.flow_type());
+      } else {
+        assertEquals(tfs(TypeMemPtr.make(BitsAlias.STRBITS0,TypeStr.con("Missing field u"))), syn.flow_type());
+      }
+    }
+  }
 
   // Example from SimpleSub requiring 'x' to be both:
   // - a recursive self-call function from "w = (x x)": $V66:{ $V66 -> V67 } AND
   // - a function which takes a struct with field 'u'
   // The first arg to x is two different kinds of functions, so fails unification.
-  @Test public void test40() { run("x = w = (x x); { z -> z}; (x { y -> .u y})",
-                                   "\"Cannot unify A:{ $A -> $A } and @{ u = A}[]\"", Type.SCALAR); }
+  @Test public void test40() {
+    Root syn = HM.hm("x = w = (x x); { z -> z}; (x { y -> .u y})");
+    if( HM.DO_HM )
+      assertEquals("Cannot unify A:{ $A -> $A } and @{ u = A}[]",syn._hmt.p());
+    if( HM.DO_GCP ) {
+      if( HM.DO_HM ) {
+        assertEquals(tfs(Type.SCALAR), syn.flow_type());
+      } else {
+        assertEquals(Type.SCALAR, syn.flow_type());
+      }
+    }
+  }
 
   // Example from test15:
   //   map={lst fcn -> lst ? fcn lst.1};
@@ -352,15 +369,10 @@ public class TestHM {
       if( HM.DO_GCP )
         assertEquals("3.4000000953674316",syn._hmt.p());
       else
-        assertEquals("\"Missing field y in @{ x = *[4]\"abc\"}[7]\"",syn._hmt.p());
+        assertEquals("Missing field y in @{ x = *[4]\"abc\"}[7]",syn._hmt.p());
     }
-    if( HM.DO_GCP ) {
-      if( HM.DO_HM ) {
-        assertEquals(TypeFlt.con(3.4000000953674316), syn.flow_type());
-      } else {
-        assertEquals(TypeFlt.con(3.4000000953674316), syn.flow_type());
-      }
-    }
+    if( HM.DO_GCP )
+      assertEquals(TypeFlt.con(3.4f), syn.flow_type());
   }
 
   // The z-merge is ignored; the last s2 is a fresh (unmerged) copy.
@@ -379,130 +391,10 @@ public class TestHM {
       if( HM.DO_GCP )
         assertEquals("1.2000000476837158",syn._hmt.p());
       else
-        assertEquals("\"Cannot unify 1.2000000476837158 and )[7]\"",syn._hmt.p());
+        assertEquals("Cannot unify 1.2000000476837158 and )[7]",syn._hmt.p());
     }
-    if( HM.DO_GCP ) {
-      if( HM.DO_HM ) {
-        assertEquals(TypeFlt.con(1.2f), syn.flow_type());
-      } else {
-        assertEquals(TypeFlt.con(1.2f), syn.flow_type());
-      }
-    }
+    if( HM.DO_GCP )
+      assertEquals(TypeFlt.con(1.2f), syn.flow_type());
   }
 
 }
-
-/**
-
-noinline_map: { lst:@{y=A} fcn:{A->B} -> B }
-in_int : @{ x=Nil, y=int}
-out_str: @{ x=Nil, y=str}
-pi     : @{ pi=flt }
-out_bol: int1/bool
-(pair str bool)
-
-Unify_Lift:
-  - assigns a type to a tvar, based on tvar?  Structure-for-structure, plus meet of Bases.
-  - applies the join to flow types in everywhere tvar appears
-  - follow top-level types/tvars
-  - No-esc-out uses pre-call memory
-  -- Concept: lift flow memory from non-memory TVars.
-  -- STUCK HERE...
-
-
-
-
-Example w/Store
-
-mem[#1s:@{y=Nil}]
-  Store.y mem #1s 5.2     adr<->@{y=Flt}  val=Flt
-mem[#1s:@{y=flt }]
-
-Now unify-lift: mem[#1s].y join with Flt.
-
-
-Example w/Call
-
-fcn = { mem adr val -> mem[adr].y = val }
-fcn: { @{y=A} A -> A }   // H-M tvar type
-
-mem[#1s:@{y=Nil}]   // Leaf:Nil can unify with anything
-  Call mem #1s  5.2  fcn
-    - val: flow makes it a Scalar
-    - lst: flow makes it a TMP[14,16,...]
-    - mem: flow makes it mem[14,16,...].y = Scalar
-    - fresh { @{y=A} A -> A } with { lst 5.2 -> rez }
-    - lst becomes @{y=A}
-    - A becomes 5.2
-    - unify Nil and 5.2 --> Flt
-
-
-
-Conflict on fcns:
-- Flow tracks set of valid call fidxs... until i start calling on things that
-  have merged, required H-M, and the merge loses the fidxs.
-
-- H-M can play top-down w/Opto/GCP; get H-M types.  So can track fcns thru args
-  and calls.  Unify_lift can recover some flow-fcn-fidxs, which can limit flow
-  targets.
-- Limit flow targets can limit H-M unification requirements:
-  fcn = pred ? {A->B} : {C->D}
-  (fcn foo)   // Implies foo:A:C all unified
-  // Suppose pred=TRUE, so {C->D} never happens, so foo[{A->B}] only
-  // Then foo:A
-
-
-
-
-Add combo GCP & HM ?
-
--- really fighting memory state here
--- did want mem to be indexed by alias#s... but this is variant over GCP time.
--- Similar to the unify of pred case:
-
--- unify (if pred x y):
-  -- pred==0 : y
-  -- pred==1 : x
-  -- pred==TOP : neither, skip
-  -- pred==BOT : x.unify(y)
-
--- unify of memory loads:  (load.fld mem adr)
-  -- adr is an ever-widening set of alais#s
-  -- mem[forAll aliases].fld unify Load
-  -- New alias in flow types: unify it also
-
--- Similar to unify of Stores
-
--- Still need a way to lift flows from unify;
-  -- Apply result type can be lifted to join of matching TVar inputs?...
-     (fcn arg1 arg2):rez
-     fcn is flow-typed as (TFP int:A scalar:B -> scalar:B)
-     arg1 is :>int, or else flow error
-     arg2 is e.g. str
-     rez is scalar, but join with arg2:str.
-  -- (fcn arg1 arg2):rez
-  -- fcn:{ int:A {xxx -> yyy}:{B -> C} -> C}
-     arg1 is int
-     -- arg2 is scalar - no lift
-     -- arg2 is {bbb -> ccc} - rez.join(ccc)
-
-
-So... no unify during iter/lift.  Start all unifies at leafs at GCP.
-Unify "like normal"
-
-
-Some decisions:
-- HM type structures carry a flowtype at every point, or not.
-- - If not, then when the HM type alters at a point, need to walk both HM and
-    flow types and "align" them: expect flow types to be sharper than HM, except for Applys, where HM's join.
-- - If so, then at each incremental HM union: leaf-vs-non-leaf the leaf type needs to meet with the
-    non-leaf-HM's flow types incrementally.
-- - or do not ever walk both?  Just JOIN at Applys
-
-Bare-HM-Leafs type as ANY (not ALL), and MEET with the base types they unify
-with.  When the Leaf unifies with something with structure, then we have to
-decide what to do (meet the structure dataflow and leaf dataflow; walk the
-structure and matching dataflow, just taking leaves, etc)
-
-
- */

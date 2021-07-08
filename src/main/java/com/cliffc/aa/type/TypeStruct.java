@@ -44,7 +44,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private byte[] _flags; // Field mod types; see fmeet, fdual, fstr.
   public boolean _open;  // Fields after _ts.length are treated as ALL (or ANY)
 
-  boolean _cyclic; // Type is cyclic.  This is a summary property, not a description of value sets, hence is not in the equals or hash
+  public boolean _cyclic; // Type is cyclic.  This is a summary property, not a description of value sets, hence is not in the equals or hash
   private TypeStruct     ( String name, boolean any, String[] flds, Type[] ts, byte[] flags, boolean open) { super(TSTRUCT, name, any); init(name, any, flds,ts,flags,open); }
   private TypeStruct init( String name, boolean any, String[] flds, Type[] ts, byte[] flags, boolean open) {
     super.init(TSTRUCT, name, any);
@@ -56,7 +56,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   // Precomputed hash code.  Note that it can NOT depend on the field types -
   // because during recursive construction the types are not available.
-  @Override int compute_hash() {
+  @Override public int compute_hash() {
     int hash = super.compute_hash()+(_open?1023:0), hash1=hash;
     for( int i=0; i<_flds.length; i++ ) hash = ((hash+(_flags[i]<<5))*_flds[i].hashCode())|(hash>>>17);
     return hash == 0 ? hash1 : hash;
@@ -92,7 +92,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // tested with a cyclic-aware equals check.
     return cycle_equals(t);
   }
-  
+
   private static final Ary<TypeStruct> CYCLES = new Ary<>(new TypeStruct[0]);
   private TypeStruct find_other() {
     int idx = CYCLES.find(this);
@@ -183,7 +183,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // cyclic types for which a DAG-like bottom-up-remove-dups approach cannot work.
   private static TypeStruct FREE=null;
   @Override protected TypeStruct free( TypeStruct ret ) { FREE=this; return ret; }
-  static TypeStruct malloc( String name, boolean any, String[] flds, Type[] ts, byte[] flags, boolean open ) {
+  public static TypeStruct malloc( String name, boolean any, String[] flds, Type[] ts, byte[] flags, boolean open ) {
     assert check_name(name);
     if( FREE == null ) return new TypeStruct(name, any,flds,ts,flags,open);
     TypeStruct t1 = FREE;  FREE = null;
@@ -673,7 +673,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   // Install, cleanup and return
-  TypeStruct install_cyclic(Ary<Type> reachs) {
+  public TypeStruct install_cyclic(Ary<Type> reachs) {
     // Check for dups.  If found, delete entire cycle, and return original.
     TypeStruct old = (TypeStruct)intern_lookup();
     // If the cycle already exists, just drop the new Type on the floor and let
@@ -710,7 +710,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // This is for a struct that has grown 'too deep', and needs to be
   // approximated to avoid infinite growth.
-  private static final NonBlockingHashMapLong<Type> UF = new NonBlockingHashMapLong<>();
+  public  static final NonBlockingHashMapLong<Type> UF = new NonBlockingHashMapLong<>();
   private static final IHashMap OLD2APX = new IHashMap();
   public TypeStruct approx( int cutoff, int alias ) {
     boolean shallow=true;
@@ -901,7 +901,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Check for duplicating an interned Type or a UF hit, and use that instead.
   // Computes the final hash code.
   private static final IHashMap DUPS = new IHashMap();
-  static TypeStruct shrink( Ary<Type> reaches, TypeStruct tstart ) {
+  public static TypeStruct shrink( Ary<Type> reaches, TypeStruct tstart ) {
     assert DUPS.isEmpty();
     // Structs never change their hash based on field types.  Set their hash first.
     for( int i=0; i<reaches._len; i++ ) {
@@ -1011,7 +1011,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // Reachable collection of TypeMemPtr and TypeStruct.
   // Optionally keep interned Types.  List is pre-order.
-  Ary<Type> reachable() { return reachable(false); }
+  public Ary<Type> reachable() { return reachable(false); }
   private Ary<Type> reachable( boolean keep ) {
     Ary<Type> work = new Ary<>(new Type[1],0);
     push(work, keep, this);

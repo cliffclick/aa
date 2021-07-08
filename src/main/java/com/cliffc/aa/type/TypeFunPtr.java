@@ -27,34 +27,18 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public int _nargs;            // Number of formals, including the display
   public Type _disp;            // Display; is_display_ptr
 
-  // Include a classic set of args/ret type, where a MEET of TFPs JOINS the
-  // args and MEETS the rets.  The bottom type takes nothing (all XSCALAR args)
-  // and returns anything (SCALAR).  Contrast this to the observed parameters
-  // to a FunNode + ParmNodes; here we take the MEET of actuals, and the return
-  // is computed.  Currently only used by H-M prototype.
-  
-  // TODO: Move _nargs and _disp into this; _disp is currently the observed actuals.
-  // TODO: Move Control and Memory into this, use the unified indices.
-  public Type[] _args;
-  public Type _ret;
-
-  private TypeFunPtr(BitsFun fidxs, int nargs, Type disp, Type[] args, Type ret ) { super(TFUNPTR); init(fidxs,nargs,disp,args,ret); }
-  private void init (BitsFun fidxs, int nargs, Type disp, Type[] args, Type ret ) { _fidxs = fidxs; _nargs=nargs; _disp=disp; _args=args; _ret=ret; }
+  private TypeFunPtr(BitsFun fidxs, int nargs, Type disp ) { super(TFUNPTR); init(fidxs,nargs,disp); }
+  private void init (BitsFun fidxs, int nargs, Type disp ) { _fidxs = fidxs; _nargs=nargs; _disp=disp; }
   @Override int compute_hash() {
     assert _disp._hash != 0;    // Part of a cyclic hash
-    // TODO: Someday a TFP takes a TFP arg, and so needs the cyclic-hash treatment.
-    int hash = 0;
-    for( Type t : _args ) { assert t._hash!=0; hash += t._hash; }
-    // TODO: Need to handle cycles for recursive fcns
-    return (TFUNPTR + _fidxs._hash + _nargs + _disp._hash + _ret._hash + hash)|256;
+    return (TFUNPTR + _fidxs._hash + _nargs + _disp._hash)|256;
   }
 
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeFunPtr) ) return false;
     TypeFunPtr tf = (TypeFunPtr)o;
-    // TODO: Need to handle cycles for recursive fcns
-    return _fidxs==tf._fidxs && _nargs == tf._nargs && _disp==tf._disp && _ret==tf._ret && _args==tf._args;
+    return _fidxs==tf._fidxs && _nargs == tf._nargs && _disp==tf._disp;
   }
   // Structs can contain TFPs in fields, and TFPs contain a Struct, but never
   // in a cycle.
@@ -63,8 +47,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     if( !(o instanceof TypeFunPtr) ) return false;
     TypeFunPtr tf = (TypeFunPtr)o;
     if( _fidxs!=tf._fidxs || _nargs != tf._nargs ) return false;
-    // TODO: Need to handle cycles for recursive fcns
-    if( _ret!=tf._ret || _args != tf._args ) return false;
     return _disp==tf._disp || _disp.cycle_equals(tf._disp);
   }
 
@@ -73,30 +55,22 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     _fidxs.str(sb);
     sb.p('{');                  // Collection (even of 1) start
     if( debug ) _disp.str(sb,dups,mem,debug).p(' ');
-    for( Type t : _args ) t.str(sb,dups,mem,debug).p(' ');
-    return _ret.str(sb.p("-> "),dups,mem,debug).p('}');
+    return sb.p('}');
   }
 
   public String names(boolean debug) { return FunNode.names(_fidxs,new SB(),debug).toString(); }
 
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
-  private static TypeFunPtr make( BitsFun fidxs, int nargs, Type disp, Type[] args, Type ret ) {
+  public static TypeFunPtr make( BitsFun fidxs, int nargs, Type disp ) {
     assert disp.is_display_ptr(); // Simple display ptr.  Just the alias.
-    // TODO: Need to break this apart for cyclic function ptrs
-    Type[] args2 = Types.hash_cons(args);
     TypeFunPtr t1 = FREE;
-    if( t1 == null ) t1 = new TypeFunPtr(fidxs,nargs,disp,args2,ret);
-    else {   FREE = null;        t1.init(fidxs,nargs,disp,args2,ret); }
+    if( t1 == null ) t1 = new TypeFunPtr(fidxs,nargs,disp);
+    else {   FREE = null;        t1.init(fidxs,nargs,disp); }
     TypeFunPtr t2 = (TypeFunPtr)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
 
-  public static TypeFunPtr make( BitsFun fidxs, int nargs, Type disp ) {
-    Type[] args = Types.get(nargs);
-    Arrays.fill(args,Type.XSCALAR);
-    return make(fidxs,nargs,disp,args, Type.SCALAR);
-  }
   public static TypeFunPtr make( int fidx, int nargs, Type disp ) { return make(BitsFun.make0(fidx),nargs,disp); }
   public static TypeFunPtr make_new_fidx( int parent, int nargs, Type disp ) { return make(BitsFun.make_new_fidx(parent),nargs,disp); }
   public        TypeFunPtr make_from( TypeMemPtr disp ) { return make(_fidxs,_nargs,disp); }
@@ -109,21 +83,15 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,EMPTY.dual()};
 
   @Override protected TypeFunPtr xdual() {
-    Type[] args = Types.get(_args.length);
-    for( int i=0; i<args.length; i++ ) args[i] = _args[i].dual();
-    args = Types.hash_cons(args);
-    return new TypeFunPtr(_fidxs.dual(),_nargs,_disp.dual(),args,_ret.dual());
+    return new TypeFunPtr(_fidxs.dual(),_nargs,_disp.dual());
   }
   @Override protected TypeFunPtr rdual() {
     if( _dual != null ) return _dual;
-    Type[] args = Types.get(_args.length);
-    TypeFunPtr dual = _dual = new TypeFunPtr(_fidxs.dual(),_nargs,_disp.rdual(),args,_ret.rdual());
+    TypeFunPtr dual = _dual = new TypeFunPtr(_fidxs.dual(),_nargs,_disp.rdual());
     if( _hash != 0 ) {
       assert _hash == compute_hash();
       dual._hash = dual.compute_hash(); // Compute hash before recursion
     }
-    for( int i=0; i<args.length; i++ ) args[i] = _args[i].rdual();
-    dual._args = Types.hash_cons(args); // hashcons cyclic arrays
     dual._dual = this;
     return dual;
   }
@@ -151,25 +119,10 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
     // If unequal length; then if short is low it "wins" (result is short) else
     // short is high and it "loses" (result is long).
-    Type[] args = _args.length <= tf._args.length ? argmeet(tf) : tf.argmeet(this);
     TypeFunPtr min_nargs = _nargs < tf._nargs ? this : tf;
     TypeFunPtr max_nargs = _nargs < tf._nargs ? tf : this;
     int nargs = min_nargs.above_center() ? max_nargs._nargs : min_nargs._nargs;
-    assert nargs==args.length; // TODO: Remove nargs calc, because i think this should be true
-    return make(fidxs,nargs,_disp.meet(tf._disp),args,_ret.meet(tf._ret));
-  }
-  // Meet 2 arg arrays, shorter is in 'this'.
-  private Type[] argmeet( TypeFunPtr tmax ) {
-    int len = above_center() ? tmax._args.length : _args.length;
-    // Meet of common elements
-    Type[] args = Types.get(len);
-    for( int i=0; i<_args.length; i++ )
-      args[i] = _args[i].join(tmax._args[i]); // Recursive not cyclic
-    // Elements only in the longer args; the short args must be high and so
-    // is effectively infinitely extended with high fields.
-    for( int i=_args.length; i<len; i++ )
-      args[i] = tmax._args[i];
-    return Types.hash_cons(args);
+    return make(fidxs,nargs,_disp.meet(tf._disp));
   }
 
   public BitsFun fidxs() { return _fidxs; }
@@ -189,7 +142,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public boolean may_nil() { return _fidxs.may_nil(); }
   @Override Type not_nil() {
     BitsFun bits = _fidxs.not_nil();
-    return bits==_fidxs ? this : make(bits,_nargs,_disp,_args,_ret);
+    return bits==_fidxs ? this : make(bits,_nargs,_disp);
   }
   @Override public Type meet_nil(Type nil) {
     assert nil==NIL || nil==XNIL;
@@ -204,7 +157,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
       if( _disp==DISP.dual() && nil==XNIL )  return XNIL;
       if( nil==NIL ) return NIL;
     }
-    return make(_fidxs.meet(BitsFun.NIL),_nargs,nil==NIL ? TypeMemPtr.DISP_SIMPLE : _disp, _args,_ret);
+    return make(_fidxs.meet(BitsFun.NIL),_nargs,nil==NIL ? TypeMemPtr.DISP_SIMPLE : _disp);
   }
   // Used during approximations, with a not-interned 'this'.
   // Updates-in-place.

@@ -93,7 +93,7 @@ import java.util.function.Predicate;
 
 public class Type<T extends Type<T>> implements Cloneable {
   static private int CNT=1;
-  int _uid;          // Unique ID, will have gaps, used to uniquely order Types
+  public int _uid;       // Unique ID, will have gaps, used to uniquely order Types
   public int _hash;      // Hash for this Type; built recursively
   byte _type;            // Simple types use a simple enum
   public String _name;   // All types can be named
@@ -162,7 +162,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // check of a (possibly very large) Type is always a simple pointer-equality
   // check, except during construction and intern'ing.
   private static final ConcurrentHashMap<Type,Type> INTERN = new ConcurrentHashMap<>();
-  static int RECURSIVE_MEET;    // Count of recursive meet depth
+  public static int RECURSIVE_MEET;    // Count of recursive meet depth
   @SuppressWarnings("unchecked")
   final Type hashcons() {
     _hash = compute_hash();     // Set hash
@@ -210,7 +210,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   boolean interned() { return INTERN.get(this)==this; }
   Type intern_lookup() { return INTERN.get(this); }
   static int intern_size() { return INTERN.size(); }
-  static boolean intern_check() {
+  public static boolean intern_check() {
     for( Type k : INTERN.keySet() )
       if( k.intern_check0() ) return false;
     return true;
