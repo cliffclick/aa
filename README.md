@@ -390,22 +390,28 @@ incA();incB();incA(); getA()*10+getB()
 Returns: `2*10+1` or `21`.
 
 
-`for` and `do` are ordinary variables
+`while` and `for` are ordinary variables
 -------------------------------------
 
-`do` takes a `pred` predicate function and a `body` function.  `pred` is tested
+`while` takes a `pred` predicate function and a `body` function.  `pred` is tested
 on every iteration, and looping stops when false.  `body` is executed for
 side-effects.
 
 ```C
-do={pred->{body->!pred()?^;body(); do pred body}};
+  while = { pred ->   // while is assigned to be a function which takes a predicate
+    { body ->         // and a body
+      pred() ?        // The predicate is evaluated; if false exit with 0
+    (body();          // Else evalute the body for side effects
+     while pred body) // And loop
+    }
+  };
 ```
 
 Computing an array of squares:
 ```C
 ary=[100];
 i:=0;
-do {i++ < #ary} {
+while {i++ < #ary} {
   ary[i]:=i*i
 };
 ary
@@ -420,7 +426,14 @@ repeats.  Early function exit works in the normal way for both `pred` and
 *break*, do an early return from the body with not-nil: `^1`.
 
 ```C
-for={pred->{body->!pred()?^;(tmp=body())?^tmp; for pred body}};
+  for = { pred->      // for is assigned to be a function which takes a predicate
+    { body ->         // and a body
+      pred() ?        // predicate is evaluated; if false, exit with 0
+      // Else evaluate body.  If true, exit with that value
+      ((tmp=body()) ? ^tmp; 
+       for pred body) // Else loop
+    }
+  };
 ```
 
 Return the index of the element matching `e`, or -1 if not found:
@@ -429,7 +442,7 @@ Return the index of the element matching `e`, or -1 if not found:
 find = { ary e ->
   i:=0;
   idx = for { i++ < #ary }
-    {ary[i]==e ? i+1};  // if found, exit non-zero
+    {ary[i]==e ? i+1};  // if found, exit index+1 (so non-zero)
   idx-1                 // if nil exit, then not-found so -1. 
 }
 ```
