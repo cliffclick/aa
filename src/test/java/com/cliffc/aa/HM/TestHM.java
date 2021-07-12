@@ -66,7 +66,7 @@ public class TestHM {
       assertEquals("( 3, *[4]\"abc\")[7]",syn._hmt.p());
     if( HM.DO_GCP )
       if( HM.DO_HM )
-        assertEquals(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.NINT64,TypeMemPtr.STRPTR)),syn.flow_type());
+        assertEquals(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(3),TypeMemPtr.make(4,TypeStr.ABC))),syn.flow_type());
       else
         assertEquals(tuplen2,syn.flow_type());
   }
@@ -102,9 +102,17 @@ public class TestHM {
   // Looking at when tvars are duplicated ("fresh" copies made).
   // This is the "map" problem with a scalar instead of a collection.
   // Takes a '{a->b}' and a 'a' for a couple of different prims.
-  @Test public void test14() { run("map = { fun -> { x -> (fun x)}};"+
-                                   "(pair ((map str) 5) ((map factor) 2.3))",
-                                   "( *[4]str, flt64)[7]", tuple2); }
+  @Test public void test14() {
+    Root syn = HM.hm("map = { fun -> { x -> (fun x)}};"+
+                     "(pair ((map str) 5) ((map factor) 2.3))");
+    if( HM.DO_HM )
+      assertEquals("( *[4]str, flt64)[7]",syn._hmt.p());
+    if( HM.DO_GCP )
+      if( HM.DO_HM )
+        assertEquals(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeMemPtr.STRPTR,TypeFlt.FLT64)),syn.flow_type());
+      else
+        assertEquals(tuple2,syn.flow_type());
+  }
 
   // map takes a function and an element (collection?) and applies it (applies to collection?)
   @Test public void test15() { run("map = { fun x -> (fun x)}; (map {a->3} 5)",
@@ -129,13 +137,19 @@ public class TestHM {
   //          in { q -> ((map (fcn q)) 5) }
   // Should return { q -> q ? [5,5] : [5,[3,5]] }
   // Ultimately, unifies "a" with "pair[3,a]" which throws recursive unification.
-  @Test public void test18() { run("fcn = {p -> (if p {a -> (pair a a)} {b -> (pair b (pair 3 b))})};"+
-                                   "map = { fun x -> (fun x)};"+
-                                   "{ q -> (map (fcn q) 5)}",
-                                   "{ A -> ( B:Cannot unify A:( 3, $A)[7] and 5, $B)[7] }",
-                                   tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(5),Type.NSCALR)))
-                                   ); }
-
+  @Test public void test18() {
+    Root syn = HM.hm("fcn = {p -> (if p {a -> (pair a a)} {b -> (pair b (pair 3 b))})};"+
+                     "map = { fun x -> (fun x)};"+
+                     "{ q -> (map (fcn q) 5)}");
+    if( HM.DO_HM )
+      assertEquals("{ A -> ( B:Cannot unify A:( 3, $A)[7] and 5, $B)[7] }",syn._hmt.p());
+    if( HM.DO_GCP )
+      if( HM.DO_HM )
+        assertEquals(tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,Type.XNSCALR,TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(3),Type.XNSCALR))))),syn.flow_type());
+      else
+        assertEquals(tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(5),Type.NSCALR))),syn.flow_type());
+  }
+  
   @Test public void test19() { run("cons ={x y-> {cadr -> (cadr x y)}};"+
                                    "cdr ={mycons -> (mycons { p q -> q})};"+
                                    "(cdr (cons 2 3))",
@@ -148,11 +162,19 @@ public class TestHM {
   //    let strz = (pair2 false "abc")
   // in pair(map(str,intz),map(isempty,strz))
   // Expects: ("2",false)
-  @Test public void test20() { run("cons ={x y-> {cadr -> (cadr x y)}};"+
-                                   "cdr ={mycons -> (mycons { p q -> q})};"+
-                                   "map ={fun parg -> (fun (cdr parg))};"+
-                                   "(pair (map str (cons 0 5)) (map isempty (cons 0 \"abc\")))",
-                                   "( *[4]str, int1)[7]", tuple2); }
+  @Test public void test20() {
+    Root syn = HM.hm("cons ={x y-> {cadr -> (cadr x y)}};"+
+                     "cdr ={mycons -> (mycons { p q -> q})};"+
+                     "map ={fun parg -> (fun (cdr parg))};"+
+                     "(pair (map str (cons 0 5)) (map isempty (cons 0 \"abc\")))");
+    if( HM.DO_HM )
+      assertEquals("( *[4]str, int1)[7]",syn._hmt.p());
+    if( HM.DO_GCP )
+      if( HM.DO_HM )
+        assertEquals(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeMemPtr.STRPTR,TypeInt.BOOL)),syn.flow_type());
+      else
+        assertEquals(tuple2,syn.flow_type());
+  }
 
   // Obscure factorial-like
   @Test public void test21() { run("f0 = { f x -> (if (?0 x) 1 (f (f0 f (dec x)) 2))}; (f0 * 99)",
@@ -349,14 +371,21 @@ public class TestHM {
   //   out_str = map(in_int,str:{int->str});"+        // Map over ints with int->str  conversion, returning a list of strings
   //   out_bool= map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
   //   (out_str,out_bool)",
-  @Test public void test41() { run("map={lst fcn -> (fcn .y lst) }; "+
-                                   "in_int=@{ x=0 y=2}; " +
-                                   "in_str=@{ x=0 y=\"abc\"}; " +
-                                   "out_str = (map in_int str); " +
-                                   "out_bool= (map in_str { xstr -> (eq xstr \"def\")}); "+
-                                   "(pair out_str out_bool)"  ,
-                                   "( *[4]str, int1)[7]", tuple2); }
-
+  @Test public void test41() {
+    Root syn = HM.hm("map={lst fcn -> (fcn .y lst) }; "+
+                     "in_int=@{ x=0 y=2}; " +
+                     "in_str=@{ x=0 y=\"abc\"}; " +
+                     "out_str = (map in_int str); " +
+                     "out_bool= (map in_str { xstr -> (eq xstr \"def\")}); "+
+                     "(pair out_str out_bool)");
+    if( HM.DO_HM )
+      assertEquals("( *[4]str, int1)[7]",syn._hmt.p());
+    if( HM.DO_GCP )
+      if( HM.DO_HM )
+        assertEquals(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeMemPtr.STRPTR,TypeInt.BOOL)),syn.flow_type());
+      else
+        assertEquals(tuple2,syn.flow_type());    
+  }
 
   // CCP Can help HM
   @Test public void test42() {

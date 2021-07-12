@@ -620,8 +620,7 @@ public class HM {
           { WDUPS.clear(); arg.find().walk_types_in(arg._flow); }
         // Walk the outputs, building an improved result
         Type rez2 = find().walk_types_out(rez);
-        if( rez != rez2 && rez2.isa(rez) )
-          rez = rez2;
+        rez = rez2.join(rez);   // Lift result
       }
 
       return rez;
@@ -1249,12 +1248,16 @@ public class HM {
         TypeStruct tstr = ADUPS.get(_uid);
         if( tstr==null ) {
           Type.RECURSIVE_MEET++;
-          Type[] ts = Types.get(_ids.length);
-          tstr = TypeStruct.malloc("",false,_ids,ts,TypeStruct.ffnls(_ids.length),true);
+          Type[] ts = Types.get(_ids.length+1);
+          String[] ids = new String[_ids.length+1];
+          ids[0] = "^";
+          System.arraycopy(_ids,0,ids,1,_ids.length);
+          tstr = TypeStruct.malloc("",false,ids,ts,TypeStruct.ffnls(ids.length),true);
           tstr._hash = tstr.compute_hash();
           ADUPS.put(_uid,tstr); // Stop cycles
+          ts[0] = Type.ANY;
           for( int i=0; i<_ids.length; i++ )
-            ts[i] = args(i)._as_flow(); // Recursive
+            ts[i+1] = args(i)._as_flow(); // Recursive
           if( --Type.RECURSIVE_MEET == 0 ) {
             // Shrink / remove cycle dups.  Might make new (smaller)
             // TypeStructs, so keep RECURSIVE_MEET enabled.
@@ -1729,7 +1732,7 @@ public class HM {
       }
 
       if( is_struct() ) {
-        fput(t);                // Recursive types need to put theirselves first
+        fput(t);                // Recursive types need to put themselves first
         if( !(t instanceof TypeMemPtr) )  return t;
         TypeMemPtr tmp = (TypeMemPtr)t;
         if( !(tmp._obj instanceof TypeStruct) ) return t;
