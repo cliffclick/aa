@@ -688,7 +688,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       walk( t -> {
           assert t._hash==0 || t._hash==t.compute_hash();
           if( t.interned() ) return false;
-          t.retern()._dual.retern(); return true;
+          if( t.retern() != t._dual ) t._dual.retern();
+          return true;
         });
 
       assert _ts[0].interned();

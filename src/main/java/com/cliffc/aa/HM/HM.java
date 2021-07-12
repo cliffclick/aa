@@ -4,8 +4,6 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -25,7 +23,7 @@ import static com.cliffc.aa.AA.unimpl;
 
 public class HM {
   // Mapping from primitive name to PrimSyn
-  static final HashMap<String,Constructor<? extends PrimSyn>> PRIMSYNS = new HashMap<>();
+  static final HashMap<String,PrimSyn> PRIMSYNS = new HashMap<>();
 
   static final boolean DEBUG_LEAKS=false;
   static { BitsAlias.init0(); BitsFun.init0(); }
@@ -39,21 +37,8 @@ public class HM {
     Worklist work = new Worklist();
     PrimSyn.WORK=work;
 
-    try {
-      PRIMSYNS.put(If   .NAME,If   .class.getConstructor());
-      PRIMSYNS.put(Pair1.NAME,Pair1.class.getConstructor());
-      PRIMSYNS.put(Pair .NAME,Pair .class.getConstructor());
-      PRIMSYNS.put(EQ   .NAME,EQ   .class.getConstructor());
-      PRIMSYNS.put(EQ0  .NAME,EQ0  .class.getConstructor());
-      PRIMSYNS.put(Mul  .NAME,Mul  .class.getConstructor());
-      PRIMSYNS.put(Dec  .NAME,Dec  .class.getConstructor());
-      PRIMSYNS.put(Str  .NAME,Str  .class.getConstructor());
-      PRIMSYNS.put(Triple .NAME,Triple .class.getConstructor());
-      PRIMSYNS.put(Factor .NAME,Factor .class.getConstructor());
-      PRIMSYNS.put(IsEmpty.NAME,IsEmpty.class.getConstructor());
-    } catch( NoSuchMethodException e ) {
-      throw new RuntimeException(e);
-    }
+    for( PrimSyn prim : new PrimSyn[]{new If(), new Pair1(), new Pair(), new EQ(), new EQ0(), new Mul(), new Dec(), new Str(), new Triple(), new Factor(), new IsEmpty()} )
+      PRIMSYNS.put(prim.name(),prim);
 
     // Parse
     Root prog = parse( sprog );
@@ -98,12 +83,12 @@ public class HM {
   }
 
   static void reset() {
+    BitsAlias.reset_to_init0();
+    BitsFun.reset_to_init0();
     PRIMSYNS.clear();
     Pair1.PAIR1S.clear();
     Lambda.FUNS.clear();
     T2.reset();
-    BitsAlias.reset_to_init0();
-    BitsFun.reset_to_init0();
     PrimSyn.reset();
   }
 
@@ -147,10 +132,9 @@ public class HM {
     if( isAlpha0(BUF[X]) ) {
       String id = id();
       if( skipWS()!='=' ) {
-        Constructor<? extends PrimSyn> con = PRIMSYNS.get(id); // No shadowing primitives or this lookup returns the prim instead of the shadow
-        if( con==null ) return new Ident(id);
-        try { return con.newInstance(); }
-        catch( InstantiationException|IllegalAccessException|InvocationTargetException e ) { throw new RuntimeException(e); }
+        PrimSyn prim = PRIMSYNS.get(id); // No shadowing primitives or this lookup returns the prim instead of the shadow
+        if( prim==null ) return new Ident(id);
+        return prim.make();     // Make a copy with fresh HM variables
       }
       // Let expression; "id = term(); term..."
       X++;                      // Skip '='
@@ -353,7 +337,7 @@ public class HM {
     final Type _con;
     Con(Type con) { super(); _con=con; }
     @Override SB str(SB sb) { return p1(sb); }
-    @Override SB p1(SB sb) { return sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString()); }
+    @Override SB p1(SB sb) { return sb.p(_con.toString()); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
     @Override boolean hm(Worklist work) { return false; }
     @Override Type val(Worklist work) { return _con; }
@@ -876,60 +860,66 @@ public class HM {
   }
 
 
-  abstract static class PrimSyn extends Lambda {
+  abstract static class PrimSyn extends Lambda implements Cloneable {
     static T2 BOOL, INT64, FLT64, STRP;
     static Worklist WORK;
-    static final int PAIR_ALIAS = BitsAlias.new_alias(BitsAlias.REC);
+    static int PAIR_ALIAS, TRIPLE_ALIAS;
     static void reset() {
+      PAIR_ALIAS   = BitsAlias.new_alias(BitsAlias.REC);
+      TRIPLE_ALIAS = BitsAlias.new_alias(BitsAlias.REC);
       BOOL  = T2.make_base(TypeInt.BOOL);
       INT64 = T2.make_base(TypeInt.INT64);
       FLT64 = T2.make_base(TypeFlt.FLT64);
       STRP  = T2.make_base(TypeMemPtr.STRPTR);
     }
-    final String _name;
+    abstract String name();
     private static final String[][] IDS = new String[][] {
       null,
       {"x"},
       {"x","y"},
       {"x","y","z"},
     };
-    PrimSyn(String name, T2 ...t2s) {
+    PrimSyn(T2 ...t2s) {
       super(null,IDS[t2s.length-1]);
-      _name=name;
-      assert WORK!=null; // TODO: Yank WORK and this unify step
-      for( int i=0; i<t2s.length-1; i++ )
-        t2s[i].find().unify(targ(i),WORK);
-      _hmt = T2.make_fun(BitsFun.make0(_fidx),t2s);
+      _hmt = T2.make_fun(BitsFun.make0(_fidx),t2s).fresh();
+      for( int i=0; i<_targs.length; i++ )
+        _targs[i] = _hmt.args(i).push_update(this);
     }
+    abstract PrimSyn make();
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par,nongen,work, _hmt);
       return 1;
     }
-    @Override void add_hm_work(Worklist work){ }
+    @Override boolean hm(Worklist work) {
+      T2 old = find();
+      if( old.is_err() ) return false;
+      assert old.is_fun();
+      for( int i=0; i<_targs.length; i++ )
+        if( targ(i).is_err() )
+          return old.unify(targ(i),work);
+
+      return false;
+    }
+    @Override void add_hm_work(Worklist work) {
+      if( find().is_err() ) work.push(_par);
+    }
     @Override void add_val_work(Syntax child, Worklist work) { throw unimpl(); }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
-    @Override SB str(SB sb){ return sb.p(_name); }
-    @Override SB p1(SB sb) { return sb.p(_name); }
+    @Override SB str(SB sb){ return sb.p(name()); }
+    @Override SB p1(SB sb) { return sb.p(name()); }
     @Override SB p2(SB sb, VBitSet dups){ return sb; }
   }
 
 
   // Curried Pair
   static class Pair1 extends PrimSyn {
-    static final String NAME = "pair1";
+    @Override String name() { return "pair1"; }
     static private T2 var1,var2;
     static HashMap<Type,Pair1X> PAIR1S = new HashMap<>();
     public Pair1() {
-      super(NAME,var1=T2.make_leaf(),T2.make_fun(BitsFun.ANY,var2=T2.make_leaf(),T2.make_struct(BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{var1,var2})));
+      super(var1=T2.make_leaf(),T2.make_fun(BitsFun.ANY,var2=T2.make_leaf(),T2.make_struct(BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{var1,var2})));
     }
-    @Override boolean hm(Worklist work) {
-      assert _hmt.is_fun();
-      T2 fun1 = _hmt.args(1);
-      assert fun1.is_fun();
-      T2 pair = fun1.args(1);
-      assert pair.is_struct() && pair.args(0)== _hmt.args(0) && pair.args(1)==fun1.args(0);
-      return false;
-    }
+    @Override PrimSyn make() { return new Pair1(); }
     @Override Type apply(Syntax[] args) {
       Type t = args[0]._flow;
       Pair1X p1x = PAIR1S.get(t);
@@ -938,11 +928,15 @@ public class HM {
       return p1x._flow;
     }
     static class Pair1X extends PrimSyn {
+      final Type _con;
+      @Override String name() { return "Pair1_"+_con; }
       static private T2 var2;
       public Pair1X(Type con) {
-        super(NAME,var2=T2.make_leaf(),T2.make_struct(BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{T2.make_base(con),var2}));
+        super(var2=T2.make_leaf(),T2.make_struct(BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{T2.make_base(con),var2}));
+        _con=con;
       }
-      @Override boolean hm(Worklist work) { throw unimpl(); }
+      @Override PrimSyn make() { throw unimpl(); }
+      //@Override boolean hm(Worklist work) { throw unimpl(); }
       @Override Type apply(Syntax[] args) {
         T2 tcon = find().args(1).args(0);
         assert tcon.is_base();
@@ -953,16 +947,12 @@ public class HM {
 
   // Pair
   static class Pair extends PrimSyn {
-    static final String NAME = "pair";
+    @Override String name() { return "pair"; }
     static private T2 var1,var2;
     public Pair() {
-      super(NAME,var1=T2.make_leaf(),var2=T2.make_leaf(),T2.make_struct(BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{var1,var2}));
+      super(var1=T2.make_leaf(),var2=T2.make_leaf(),T2.make_struct(BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{var1,var2}));
     }
-    @Override boolean hm(Worklist work) {
-      assert _hmt.is_fun();
-      assert _hmt.args(2).is_err() || (_hmt.args(2).is_struct() && _hmt.args(2).args(0)== _hmt.args(0) && _hmt.args(2).args(1)== _hmt.args(1));
-      return false;
-    }
+    @Override PrimSyn make() { return new Pair(); }
     @Override Type apply(Syntax[] args) {
       Type[] ts = TypeStruct.ts(args.length+1);
       ts[0] = Type.ANY;       // Display
@@ -974,28 +964,24 @@ public class HM {
 
   // Triple
   static class Triple extends PrimSyn {
-    static final String NAME = "triple";
+    @Override String name() { return "triple"; }
     static private T2 var1,var2,var3;
-    static private final int TRIPLE_ALIAS = BitsAlias.new_alias(BitsAlias.REC);
-    public Triple() { super(NAME,var1=T2.make_leaf(),var2=T2.make_leaf(),var3=T2.make_leaf(),T2.make_struct(BitsAlias.make0(TRIPLE_ALIAS),new String[]{"0","1","2"},new T2[]{var1,var2,var3})); }
+    public Triple() { super(var1=T2.make_leaf(),var2=T2.make_leaf(),var3=T2.make_leaf(),T2.make_struct(BitsAlias.make0(TRIPLE_ALIAS),new String[]{"0","1","2"},new T2[]{var1,var2,var3})); }
+    @Override PrimSyn make() { return new Triple(); }
     @Override Type apply(Syntax[] args) {
       Type[] ts = TypeStruct.ts(args.length+1);
       ts[0] = Type.ANY;       // Display
       for( int i=0; i<args.length; i++ ) ts[i+1] = args[i]._flow;
       return TypeMemPtr.make(TRIPLE_ALIAS,TypeStruct.make_tuple(ts));
     }
-    @Override boolean hm(Worklist work) {
-      assert _hmt.is_fun();
-      assert _hmt.args(3).is_struct() && _hmt.args(3).args(0)== _hmt.args(0) && _hmt.args(3).args(1)== _hmt.args(1);
-      return false;
-    }
   }
 
   // Special form of a Lambda body for IF which changes the H-M rules.
   // None-executing paths do not unify args.
   static class If extends PrimSyn {
-    static final String NAME = "if";
-    public If() { super(NAME,T2.make_leaf(),T2.make_leaf(),T2.make_leaf(),T2.make_leaf()); }
+    @Override String name() { return "if"; }
+    public If() { super(T2.make_leaf(),T2.make_leaf(),T2.make_leaf(),T2.make_leaf()); }
+    @Override PrimSyn make() { return new If(); }
     @Override Type apply( Syntax[] args) {
       Type pred= args[0]._flow;
       Type t1  = args[1]._flow;
@@ -1036,9 +1022,10 @@ public class HM {
 
   // EQ
   static class EQ extends PrimSyn {
-    static final String NAME = "eq";
+    @Override String name() { return "eq"; }
     static private T2 var1;
-    public EQ() { super(NAME,var1=T2.make_leaf(),var1,BOOL); }
+    public EQ() { super(var1=T2.make_leaf(),var1,BOOL); }
+    @Override PrimSyn make() { return new EQ(); }
     @Override Type apply( Syntax[] args) {
       Type x0 = args[0]._flow;
       Type x1 = args[1]._flow;
@@ -1048,16 +1035,13 @@ public class HM {
       // TODO: Can also know about nil/not-nil
       return TypeInt.BOOL;
     }
-    @Override boolean hm(Worklist work) {
-      assert _hmt.is_fun() && _hmt.args(0)== _hmt.args(1) && _hmt.args(2)==BOOL.find();
-      return false;
-    }
   }
 
   // ?0
   static class EQ0 extends PrimSyn {
-    static final String NAME = "?0";
-    public EQ0() { super(NAME,INT64,BOOL); }
+    @Override String name() { return "?0"; }
+    public EQ0() { super(INT64,BOOL); }
+    @Override PrimSyn make() { return new EQ0(); }
     @Override Type apply( Syntax[] args) {
       Type pred = args[0]._flow;
       if( pred.above_center() ) return TypeInt.BOOL.dual();
@@ -1068,15 +1052,12 @@ public class HM {
         return TypeInt.FALSE;
       return TypeInt.BOOL;
     }
-    @Override boolean hm(Worklist work) {
-      assert _hmt.is_fun() && _hmt.args(0)==INT64.find() && _hmt.args(1)==BOOL.find();
-      return false;
-    }
   }
 
   static class IsEmpty extends PrimSyn {
-    static final String NAME = "isempty";
-    public IsEmpty() { super(NAME,STRP,BOOL); }
+    @Override String name() { return "isempty"; }
+    public IsEmpty() { super(STRP,BOOL); }
+    @Override PrimSyn make() { return new IsEmpty(); }
     @Override Type apply( Syntax[] args) {
       Type pred = args[0]._flow;
       if( pred.above_center() ) return TypeInt.BOOL.dual();
@@ -1085,16 +1066,13 @@ public class HM {
         return TypeInt.con(to.getstr().isEmpty() ? 1 : 0);
       return TypeInt.BOOL;
     }
-    @Override boolean hm(Worklist work) {
-      assert _hmt.is_fun() && _hmt.args(0)==STRP.find() && _hmt.args(1)==BOOL.find();
-      return false;
-    }
   }
 
   // multiply
   static class Mul extends PrimSyn {
-    static final String NAME = "*";
-    public Mul() { super(NAME,INT64,INT64,INT64); }
+    @Override String name() { return "*"; }
+    public Mul() { super(INT64,INT64,INT64); }
+    @Override PrimSyn make() { return new Mul(); }
     @Override Type apply( Syntax[] args) {
       Type t0 = args[0]._flow;
       Type t1 = args[1]._flow;
@@ -1108,16 +1086,13 @@ public class HM {
       }
       return TypeInt.INT64;
     }
-    @Override boolean hm(Worklist work) {
-      assert _hmt.is_fun() && _hmt.args(0)==INT64.find() && _hmt.args(1)==INT64.find() && _hmt.args(1)==INT64.find();
-      return false;
-    }
   }
 
   // decrement
   static class Dec extends PrimSyn {
-    static final String NAME = "dec";
-    public Dec() { super(NAME,INT64,INT64); }
+    @Override String name() { return "dec"; }
+    public Dec() { super(INT64,INT64); }
+    @Override PrimSyn make() { return new Dec(); }
     @Override Type apply( Syntax[] args) {
       Type t0 = args[0]._flow;
       if( t0.above_center() ) return TypeInt.INT64.dual();
@@ -1125,16 +1100,13 @@ public class HM {
         return TypeInt.con(t0.getl()-1);
       return TypeInt.INT64;
     }
-    @Override boolean hm(Worklist work) {
-      assert _hmt.is_fun() && _hmt.args(0)==INT64.find() && _hmt.args(1)==INT64.find();
-      return false;
-    }
   }
 
   // int->str
   static class Str extends PrimSyn {
-    static final String NAME = "str";
-    public Str() { super(NAME,INT64,STRP); }
+    @Override String name() { return "str"; }
+    public Str() { super(INT64,STRP); }
+    @Override PrimSyn make() { return new Str(); }
     @Override Type apply( Syntax[] args) {
       Type i = args[0]._flow;
       if( i.above_center() ) return TypeMemPtr.STRPTR.dual();
@@ -1142,25 +1114,18 @@ public class HM {
         return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(String.valueOf(i.getl()).intern()));
       return TypeMemPtr.STRPTR;
     }
-    @Override boolean hm(Worklist work) {
-      assert _hmt.is_fun() && _hmt.args(0)==INT64.find() && _hmt.args(1)==STRP.find();
-      return false;
-    }
   }
 
 
   // flt->(factor flt flt)
   static class Factor extends PrimSyn {
-    static final String NAME = "factor";
-    public Factor() { super(NAME,FLT64,FLT64); }
+    @Override String name() { return "factor"; }
+    public Factor() { super(FLT64,FLT64); }
+    @Override PrimSyn make() { return new Factor(); }
     @Override Type apply( Syntax[] args) {
       Type flt = args[0]._flow;
       if( flt.above_center() ) return TypeFlt.FLT64.dual();
       return TypeFlt.FLT64;
-    }
-    @Override boolean hm(Worklist work) {
-      assert _hmt.is_fun() && _hmt.args(0)==FLT64.find() && _hmt.args(1)==FLT64.find();
-      return false;
     }
   }
 
@@ -1190,7 +1155,6 @@ public class HM {
     // Base types.
     Type _flow;
     BitsFun _fidxs;             // Unused except for is_fun
-    String _msg;                // Error message
     // Structs have field names and aliases
     BitsAlias _alias;           // Unused except for is_struct and NIL
     String[] _ids;
@@ -1211,11 +1175,15 @@ public class HM {
     }
     static T2 make_err(String s)   { T2 terr = new T2("Err"); terr._err = s.intern(); return terr; }
     T2 copy() {
-      try {
-        T2 t = (T2)clone();
-        if( _args!=null ) t._args = new T2[_args.length];
-        return t;
-      } catch( CloneNotSupportedException x ) { throw new RuntimeException(x); }
+      T2 t = new T2(_name);
+      if( _args!=null ) t._args = new T2[_args.length];
+      t._flow  = _flow;
+      t._fidxs = _fidxs;
+      t._alias = _alias;
+      t._ids   = _ids;
+      t._err   = _err;
+      t._deps  = _deps;
+      return t;
     }
 
     private T2(@NotNull String name) { _uid = CNT++; _name= name; }
@@ -1275,7 +1243,7 @@ public class HM {
       assert no_uf();
       if( is_base() ) return _flow;
       if( is_leaf() ) return Type.SCALAR;
-      if( is_err()  ) return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(_msg));
+      if( is_err()  ) return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(_err));
       if( is_fun()  ) return TypeFunPtr.make(_fidxs,_args.length-1,Type.ANY);
       if( is_struct() ) {
         TypeStruct tstr = ADUPS.get(_uid);
@@ -1331,11 +1299,20 @@ public class HM {
       // TODO: Probably gather unrelated strings in a set
       return _uid < that._uid ? _err : that._err;
     }
+    private int base_states() {
+      int cnt=0;
+      if( _flow !=null ) cnt++;
+      if( _fidxs!=null ) cnt++;
+      if( _alias!=null ) cnt++;
+      if( _err  !=null ) cnt++;
+      return cnt;
+    }
 
     // U-F union; this becomes that; returns 'that'.
     // No change if only testing, and reports progress.
     boolean union(T2 that, Worklist work) {
       assert no_uf(); // Cannot union twice
+      assert base_states()<=1 && that.base_states()<=1;
       if( this==that ) return false;
       if( work==null ) return true; // Report progress without changing
       // Keep the merge of all base types, revisiting deps if any changes
@@ -1344,7 +1321,9 @@ public class HM {
           _alias!=that._alias ||
           !Util.eq(_err,that._err) )
         work.addAll(that._deps); // Any progress, revisit deps
-
+      // If flow types are not compatible, return an error now
+      if( _flow!=null & that._flow!=null && (_flow.widen() != that._flow.widen() && !_flow.isa(that._flow.widen())) )
+        return union_err(that,work,"Cannot unify "+this.p()+" and "+that.p());
       that._flow  = meet_flow (that);
       that._fidxs = meet_fidxs(that);
       that._alias = meet_alias(that);
@@ -1353,6 +1332,10 @@ public class HM {
         that._alias = that._alias.meet_nil();
         that._flow = null;
       }
+      if( that._err!=null ) {   // Kill the base types in an error
+        that._flow=null;  that._fidxs=null;  that._alias=null;
+      }
+      _flow=null;  _fidxs=null;  _alias=null; _err=null; // Kill the base types in a unified type
 
       // Worklist: put updates on the worklist for revisiting
       if( _deps != null ) {
@@ -1468,6 +1451,7 @@ public class HM {
     private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
     private boolean fresh_base(T2 that, Worklist work) {
+      assert base_states()<=1 && that.base_states()<=1;
       boolean progress=false;
       Type      flow  = meet_flow (that);  progress |= flow  != that._flow ;
       BitsFun   fidxs = meet_fidxs(that);  progress |= fidxs != that._fidxs;
@@ -1476,15 +1460,32 @@ public class HM {
       if( !progress ) return false;
       if( work==null ) return true;
       // Progress
+      Type that_flow = that._flow;
       that._flow  = flow ;
       that._fidxs = fidxs;
       that._alias = alias;
       that._err   = err;
+      if( !_can_be_HM_base(that,that_flow) ) {
+        that._flow = that_flow; // Unwind for error message
+        String msg = "Cannot unify "+this.p()+" and "+that.p();
+        that._flow=null;  that._fidxs=null;  that._alias=null;  // Now kill the base types, since in-error
+        return that.union(make_err(msg),work);
+      }
+      assert that.base_states()<=1;
       that.add_deps_work(work);
       if( that.is_leaf() ) that._name = _name; // That is a base/err now
       return true;
     }
+    private boolean _can_be_HM_base(T2 that, Type that_flow) {
+      if( that.base_states() > 1 ) return false;
+      if( _flow==null || that_flow==null ) return true;
+      Type wthisflow =     _flow.widen();
+      Type wthatflow = that_flow.widen();
+      if( wthisflow==wthatflow ) return true;
+      return wthisflow.isa(wthatflow);
+    }
     private boolean union_err(T2 that, Worklist work, String msg) {
+      that._flow=null;  that._fidxs=null;  that._alias=null;  // Now kill the base types, since in-error
       union(that,work);
       return that.union(make_err(msg),work);
     }
@@ -1579,6 +1580,12 @@ public class HM {
     private boolean vput(T2 that, boolean progress) { VARS.put(this,that); return progress; }
 
     // Return a fresh copy of 'this'
+    T2 fresh() {
+      assert VARS.isEmpty();
+      T2 rez = _fresh(null);
+      VARS.clear();
+      return rez;
+    }
     private T2 _fresh(VStack nongen) {
       assert no_uf();
       T2 rez = VARS.get(this);
@@ -1711,9 +1718,11 @@ public class HM {
         if( tfp._fidxs==BitsFun.FULL.dual() ) return ret.walk_types_in(Type.XSCALAR);
         for( int fidx : ((TypeFunPtr)t)._fidxs ) {
           Lambda lambda = Lambda.FUNS.get(fidx);
-          Type body = lambda._body == null // Null only for primitives
-            ? lambda.find().args(lambda._targs.length).as_flow() // Get primitive return type
-            : lambda._body._flow;                                // Else use body type
+          Type body = lambda.find().is_err()
+            ? Type.SCALAR           // Error, no lift
+            : (lambda._body == null // Null only for primitives
+               ? lambda.find().args(lambda._targs.length).as_flow() // Get primitive return type
+               : lambda._body._flow); // Else use body type
           ret.walk_types_in(body);
         }
         return t;
@@ -1900,7 +1909,10 @@ public class HM {
 
         } else {
           sb.p("@{");
+          TreeMap<String,Integer> map = new TreeMap<String,Integer>();
           for( int i=0; i<_ids.length; i++ )
+            map.put( _ids[i], i );
+          for( int i : map.values() )
             args(i)._p(sb.p(' ').p(_ids[i]).p(" = "),visit,dups).p(',');
           sb.unchar().p("}");
         }
