@@ -149,7 +149,7 @@ public class TestHM {
       else
         assertEquals(tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(5),Type.NSCALR))),syn.flow_type());
   }
-  
+
   @Test public void test19() { run("cons ={x y-> {cadr -> (cadr x y)}};"+
                                    "cdr ={mycons -> (mycons { p q -> q})};"+
                                    "(cdr (cons 2 3))",
@@ -219,7 +219,7 @@ public class TestHM {
 
   // Basic field test.
   @Test public void test28() { run(".x @{ y =3}",
-                                   "Missing field x",
+                                   "Missing field x in @{ y = 3}[9]",
                                    Type.SCALAR); }
 
   @Test public void test29() { run("{ g -> @{x=g, y=g}}",
@@ -384,7 +384,7 @@ public class TestHM {
       if( HM.DO_HM )
         assertEquals(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeMemPtr.STRPTR,TypeInt.BOOL)),syn.flow_type());
       else
-        assertEquals(tuple2,syn.flow_type());    
+        assertEquals(tuple2,syn.flow_type());
   }
 
   // CCP Can help HM

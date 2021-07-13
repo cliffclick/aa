@@ -640,8 +640,9 @@ public class HM {
           for( int i=0; i<fun._types.length; i++ ) {
             Type formal = fun._types[i];
             Type actual = this instanceof Root ? Root.widen(fun.targ(i)) : _args[i]._flow;
-            if( formal != actual ) {
-              fun._types[i] = formal.meet(actual);
+            Type rez = formal.meet(actual);
+            if( formal != rez ) {
+              fun._types[i] = rez;
               work.addAll(fun.targ(i)._deps);
               work.push(fun._body);
               if( i==0 && fun instanceof If ) work.push(fun); // Specifically If might need more unification
@@ -686,7 +687,13 @@ public class HM {
         rez = rez.meet(Lambda.FUNS.get(fidx).apply(null));
       return rez;
     }
-    @Override Type val(Worklist work) { return _fun._flow; }
+    @Override Type val(Worklist work) {
+      // Here we do some extra work, "as if" our arguments (which only lazily exist)
+      // may have had their types change.
+      add_val_work(null,work);
+
+      return _fun._flow;
+    }
     // Expand functions to full signatures, recursively
     Type flow_type() { return add_sig(_flow); }
 
@@ -752,7 +759,7 @@ public class HM {
       for( int i=0; i<rec._ids.length; i++ ) {
         if( Util.find(_ids,rec._ids[i])== -1 && !rec.args(i).is_err() ) {
           if( work==null ) return true;
-          progress |= T2.make_err("Missing field "+rec._ids[i]).unify(rec.args(i),work);
+          progress |= rec.args(i).unify(find().miss_field(rec._ids[i]),work);
         }
       }
 
@@ -820,12 +827,12 @@ public class HM {
       if( work==null ) return true;
       if( rec.is_err() ) return find().unify(rec,work);
       // Not a struct or no field, force it to be one
-      if( rec.is_struct() ) // Effectively unify with an extended struct.
+      if( rec.is_struct() && rec._open ) // Effectively unify with an extended struct.
         return rec.add_fld(_id,find(),work);
       if( rec.is_leaf() )
-        return T2.make_struct(BitsAlias.EMPTY,new String[]{_id}, new T2[]{find().push_update(rec._deps)}).unify(rec.push_update(this), work);
+        return T2.make_struct(BitsAlias.EMPTY,new String[]{_id}, new T2[]{find().push_update(rec._deps)},true).unify(rec.push_update(this), work);
 
-      return T2.make_err("Missing field "+_id+" in "+rec.find().p()).unify(find(),work);
+      return find().unify(rec.miss_field(_id),work);
     }
     @Override void add_hm_work(Worklist work) {
       work.push(_par);
@@ -1157,6 +1164,7 @@ public class HM {
     // Structs have field names and aliases
     BitsAlias _alias;           // Unused except for is_struct and NIL
     String[] _ids;
+    boolean _open;              // Struct can be extended
     String _err;                // Error
 
     // Dependent (non-local) tvars to revisit
@@ -1166,13 +1174,16 @@ public class HM {
     static T2 make_leaf() { return new T2("V"+CNT); }
     static T2 make_base(Type flow) { T2 base = new T2("Base"); base._flow = flow; return base; }
     static T2 make_fun(BitsFun fidxs, T2... args) { T2 tfun = new T2("->",args); tfun._fidxs = fidxs; return tfun; }
-    static T2 make_struct( BitsAlias aliases, String[] ids, T2[] flds ) {
+    static T2 make_struct( BitsAlias aliases, String[] ids, T2[] flds ) { return make_struct(aliases,ids,flds,false); }
+    static T2 make_struct( BitsAlias aliases, String[] ids, T2[] flds, boolean open ) {
       T2 tstr = new T2("@{}",flds);
       tstr._alias=aliases;
       tstr._ids = ids;
+      tstr._open= open;
       return tstr;
     }
     static T2 make_err(String s)   { T2 terr = new T2("Err"); terr._err = s.intern(); return terr; }
+    T2 miss_field(String id) { return make_err("Missing field "+id+" in "+p()); }
     T2 copy() {
       T2 t = new T2(_name);
       if( _args!=null ) t._args = new T2[_args.length];
@@ -1182,6 +1193,7 @@ public class HM {
       t._ids   = _ids;
       t._err   = _err;
       t._deps  = _deps;
+      t._open  = _open;
       return t;
     }
 
@@ -1296,6 +1308,23 @@ public class HM {
       if( that._alias==null ) return this._alias;
       return _alias.meet(that._alias);
     }
+    private String[] meet_ids(T2 that) {
+      String[] ids = that._ids;
+      if( _ids==ids ) return ids;
+      if( _ids==null ) return ids;
+      if( ids==null ) return _ids;
+      if( _ids.length!=ids.length ) throw unimpl(); // Handled at a higher level
+      for( String id : ids )
+        if( Util.find(_ids, id) == -1 )
+          throw unimpl();
+      return ids;               // Return RHS
+    }
+    private boolean meet_opens(T2 that) {
+      if( _open==that._open ) return that._open;
+      if( !is_struct() ) return that._open;
+      if( !that.is_struct() ) return _open;
+      throw unimpl();
+    }
     private String meet_err(T2 that) {
       if( this._err==null ) return that._err;
       if( that._err==null ) return this._err;
@@ -1306,8 +1335,9 @@ public class HM {
       int cnt=0;
       if( _flow !=null ) cnt++;
       if( _fidxs!=null ) cnt++;
-      if( _alias!=null ) cnt++;
       if( _err  !=null ) cnt++;
+      if( _alias!=null ) { cnt++; assert _ids!=null; }
+      else assert _ids==null;
       return cnt;
     }
 
@@ -1322,6 +1352,8 @@ public class HM {
       if( _flow !=that._flow  ||
           _fidxs!=that._fidxs ||
           _alias!=that._alias ||
+          _ids  !=that._ids   ||
+          _open !=that._open  ||
           !Util.eq(_err,that._err) )
         work.addAll(that._deps); // Any progress, revisit deps
       // If flow types are not compatible, return an error now
@@ -1330,15 +1362,17 @@ public class HM {
       that._flow  = meet_flow (that);
       that._fidxs = meet_fidxs(that);
       that._alias = meet_alias(that);
+      that._ids   = meet_ids  (that);
+      that._open  = meet_opens(that);
       that._err   = meet_err  (that);
       if( this._flow==Type.XNIL && that.is_struct() ) {
         that._alias = that._alias.meet_nil();
         that._flow = null;
       }
       if( that._err!=null ) {   // Kill the base types in an error
-        that._flow=null;  that._fidxs=null;  that._alias=null;
+        that._flow=null;  that._fidxs=null;  that._alias=null;  that._ids=null;
       }
-      _flow=null;  _fidxs=null;  _alias=null; _err=null; // Kill the base types in a unified type
+      _flow=null;  _fidxs=null;  _alias=null; _ids=null; _err=null; // Kill the base types in a unified type
 
       // Worklist: put updates on the worklist for revisiting
       if( _deps != null ) {
@@ -1412,21 +1446,8 @@ public class HM {
 
       // Structs unify only on matching fields, and add missing fields.
       if( is_struct() ) {
-        // Unification for structs is more complicated; args are aligned via
-        // field names and not by position.
-        for( int i=0; i<_ids.length; i++ ) { // For all fields in LHS
-          int idx = Util.find(that._ids,_ids[i]);
-          if( idx==-1 ) that.add_fld(_ids[i],T2.make_leaf(), work); // Extend 'that' with matching field from 'this'
-          else args(i)._unify(that.args(idx),work);    // Unify matching field
-          that = that.find();                          // Recursively, might have already rolled this up
-        }
-        // Fields in RHS and not the LHS are also errors.
-        for( int i=0; i<that._ids.length; i++ )  // For all fields in RHS
-          if( Util.find(_ids,that._ids[i])==-1 ) // Missing in LHS
-            that.args(i)._unify(T2.make_leaf(),work);
-
-        // Normal structural unification
-      } else {
+        _unify_struct(that,work);
+      } else {                                // Normal structural unification
         for( int i=0; i<_args.length; i++ ) { // For all fields in LHS
           args(i)._unify(that.args(i),work);
           if( (that=that.find()).is_err() ) break;
@@ -1438,8 +1459,36 @@ public class HM {
       return find().union(that,work);
     }
 
+    private void _unify_struct(T2 that, Worklist work) {
+      assert this.is_struct() && that.is_struct();
+      // Unification for structs is more complicated; args are aligned via
+      // field names and not by position.  Conceptually, fields in one struct
+      // and not the other are put in both before unifying the structs.  Open
+      // structs copy from the other side; closed structs insert a missing
+      // field error.
+      for( int i=0; i<_ids.length; i++ ) { // For all fields in LHS
+        int idx = Util.find(that._ids,_ids[i]);
+        if( idx==-1 )           // Missing that field?  Copy from left if open, error if closed.
+          that.add_fld(_ids[i], that._open ? args(i) : that.miss_field(_ids[i]),  work);
+        else args(i)._unify(that.args(idx),work);    // Unify matching field
+        if( (that=that.find()).is_err() ) return; // Recursively, might have already rolled this up
+      }
+      // Fields in RHS and not the LHS are also merged; if the LHS is open we'd
+      // just copy the missing fields into it, then unify the structs
+      // (shortcut: just skip the copy).  If the LHS is closed, then the extra
+      // RHS fields are an error.
+      if( !_open )              // LHS is closed, so extras in RHS are errors
+        for( int i=0; i<that._ids.length; i++ )    // For all fields in RHS
+          if( Util.find(_ids,that._ids[i]) == -1 ) // Missing in LHS
+            that.args(i)._unify(miss_field(that._ids[i]),work); // If closed, extra field is an error
+      // Shortcut (for asserts): LHS gets same ids as RHS, since its about to be top-level unified
+      _ids = that._ids;
+      _open= that._open;
+    }
+
     private boolean add_fld(String id, T2 fld, Worklist work) {
       assert is_struct();
+      if( !_open && !fld.is_err() ) throw unimpl();
       int len = _ids.length;
       _ids  = Arrays.copyOf( _ids,len+1);
       _args = Arrays.copyOf(_args,len+1);
@@ -1459,6 +1508,8 @@ public class HM {
       Type      flow  = meet_flow (that);  progress |= flow  != that._flow ;
       BitsFun   fidxs = meet_fidxs(that);  progress |= fidxs != that._fidxs;
       BitsAlias alias = meet_alias(that);  progress |= alias != that._alias;
+      String[]  ids   = meet_ids  (that);  progress |= ids   != that._ids;
+      boolean   open  = meet_opens(that);  progress |= open  != that._open;
       String    err   = meet_err  (that);  progress |= !Util.eq(err,that._err);
       if( !progress ) return false;
       if( work==null ) return true;
@@ -1467,11 +1518,13 @@ public class HM {
       that._flow  = flow ;
       that._fidxs = fidxs;
       that._alias = alias;
+      that._ids   = ids;
+      that._open  = open;
       that._err   = err;
       if( !_can_be_HM_base(that,that_flow) ) {
         that._flow = that_flow; // Unwind for error message
         String msg = "Cannot unify "+this.p()+" and "+that.p();
-        that._flow=null;  that._fidxs=null;  that._alias=null;  // Now kill the base types, since in-error
+        that._flow=null;  that._fidxs=null;  that._alias=null;  that._ids=null; // Now kill the base types, since in-error
         return that.union(make_err(msg),work);
       }
       assert that.base_states()<=1;
@@ -1488,7 +1541,7 @@ public class HM {
       return wthisflow.isa(wthatflow);
     }
     private boolean union_err(T2 that, Worklist work, String msg) {
-      that._flow=null;  that._fidxs=null;  that._alias=null;  // Now kill the base types, since in-error
+      that._flow=null;  that._fidxs=null;  that._alias=null;  that._ids=null; // Now kill the base types, since in-error
       union(that,work);
       return that.union(make_err(msg),work);
     }
@@ -1554,24 +1607,34 @@ public class HM {
     private boolean _fresh_unify_struct(T2 that, VStack nongen, Worklist work) {
       assert is_struct() && that.is_struct();
       boolean progress = false;
-      for( int i=0; i<_args.length; i++ ) {
+      // Unification for structs is more complicated; args are aligned via
+      // field names and not by position.  Conceptually, fields in one struct
+      // and not the other are put in both before unifying the structs.  Open
+      // structs copy from the other side; closed structs insert a missing
+      // field error.
+      for( int i=0; i<_ids.length; i++ ) {
         int idx = Util.find(that._ids,_ids[i]);
         if( idx == -1 ) {       // Missing field on RHS
           if( work==null ) return true; // Will definitely make progress
           progress = true;
-          that.add_fld(_ids[i],args(i)._fresh(nongen), work);
+          // if both are closed, error on RHS
+          that.add_fld(_ids[i], that._open ? args(i)._fresh(nongen) : that.miss_field(_ids[i]),  work);
         } else
           progress |= args(i)._fresh_unify(that.args(idx),nongen,work);
         if( progress && work==null ) return true;
       }
-      // Fields in RHS and not the LHS unify with error.
-      for( int i=0; i<that._args.length; i++ ) {
-        int idx = Util.find(_ids,that._ids[i]);
-        if( idx == -1 && !that.args(i).is_err() ) {  // Missing field on RHS
-          if( work==null ) return true; // Will definitely make progress
-          progress |= that.args(i).unify(make_err("Missing field "+that._ids[i]+" in "+p()), work);
-        }
-      }
+      // Fields in RHS and not the LHS are also merged; if the LHS is open we'd
+      // just copy the missing fields into it, then unify the structs
+      // (shortcut: just skip the copy).  If the LHS is closed, then the extra
+      // RHS fields are an error.
+      if( !_open )
+        for( int i=0; i<that._ids.length; i++ )    // For all fields in RHS
+          if( Util.find(_ids,that._ids[i]) == -1 &&// Missing in LHS
+              !that.args(i).is_err() ) {           // And not yet an error
+            if( work == null ) return true; // Will definitely make progress
+            progress |= that.args(i).unify(miss_field(that._ids[i]), work);
+          }
+
       // Unify aliases
       BitsAlias alias = meet_alias(that);
       if( alias!=that._alias ) progress=true;
