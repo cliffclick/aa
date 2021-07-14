@@ -283,7 +283,7 @@ public class TestHM {
 
   // try the worse-case expo blow-up test case from SO
   @Test public void test35() {
-    TypeFunPtr tfp = TypeFunPtr.make(14,3,Type.ANY);
+    TypeFunPtr tfp = TypeFunPtr.make(15,3,Type.ANY);
     TypeMemPtr tmp0 = TypeMemPtr.make(8,TypeStruct.make_tuple(Type.ANY,tfp ,tfp ,tfp ));
     TypeMemPtr tmp1 = TypeMemPtr.make(8,TypeStruct.make_tuple(Type.ANY,tmp0,tmp0,tmp0));
     TypeMemPtr tmp2 = TypeMemPtr.make(8,TypeStruct.make_tuple(Type.ANY,tmp1,tmp1,tmp1));
@@ -447,5 +447,33 @@ public class TestHM {
       assertEquals(TypeMemPtr.STRPTR, syn.flow_type());
   }
 
+
+  // Basic nil test
+  @Test public void test46() { run(".x 0",
+                                   "May be nil when loading field x", Type.XSCALAR); }
+
+  // Basic nil test
+  @Test public void test47() { run("{ pred -> .x (if pred @{x=3} 0)}",
+                                   "{ A -> May be nil when loading field x }", tfs(TypeInt.con(3))); }
+
+  // Basic uplifting after check
+  @Test public void test48() { run("{ pred -> tmp=(if pred @{x=3} 0); (if tmp .x tmp 4) }",
+                                   "{ A -> nint8 }", tfs(TypeInt.NINT8)); }
+
+
+  // map is parametric in nil-ness
+  @Test public void test49() {
+    Root syn = HM.hm("{ pred -> \n"+
+                     "  map = { fun x -> (fun x) };\n" +
+                     "  (pair (map {str0 ->          .x str0   }          @{x = 3}   )\n" +
+                     "        (map {str1 -> (if str1 .x str1 4)} (if pred @{x = 5} 0))\n" +
+                     "  )\n"+
+                     "}");
+    if( HM.DO_HM )
+      assertEquals("{ A -> ( 3, nint8)[7] }",syn._hmt.p());
+    if( HM.DO_GCP )
+      if( HM.DO_HM ) tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(3), TypeInt.NINT8 )));
+      else           tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.NINT8 , TypeInt.NINT8 )));
+  }
 
 }

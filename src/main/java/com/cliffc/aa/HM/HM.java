@@ -37,7 +37,7 @@ public class HM {
     Worklist work = new Worklist();
     PrimSyn.WORK=work;
 
-    for( PrimSyn prim : new PrimSyn[]{new If(), new Pair1(), new Pair(), new EQ(), new EQ0(), new Mul(), new Dec(), new Str(), new Triple(), new Factor(), new IsEmpty()} )
+    for( PrimSyn prim : new PrimSyn[]{new If(), new Pair1(), new Pair(), new EQ(), new EQ0(), new Mul(), new Dec(), new Str(), new Triple(), new Factor(), new IsEmpty(), new NotNil()} )
       PRIMSYNS.put(prim.name(),prim);
 
     // Parse
@@ -116,6 +116,13 @@ public class HM {
       Ary<Syntax> args = new Ary<>(new Syntax[1],0);
       while( skipWS()!= ')' && X<BUF.length ) args.push(term());
       require(')');
+      // Guarding if-nil test inserts an upcast.  This is a syntatic transform only.
+      if( fun instanceof If &&
+          args.at(0) instanceof Ident ) {
+        Ident id = (Ident)args.at(0);
+        args.set(1,new Apply(new Lambda(args.at(1), id._name),
+                             new Apply(new NotNil(),new Ident(id._name))));
+      }
       return new Apply(fun,args.asAry());
     }
 
@@ -365,8 +372,10 @@ public class HM {
     @Override void add_hm_work(Worklist work) {
       work.push(_par);
       T2 t = _idt.find();
-      if( t.occurs_in(_par) )                        // Got captured in some parent?
-        t.add_deps_work(work);                       // Need to revisit dependent ids
+      if( t.nongen_in(_par == null ? null : _par._nongen) ) // Got captured in some parent?
+        t.add_deps_work(work);                              // Need to revisit dependent ids
+      if( _par instanceof Apply && ((Apply)_par)._fun instanceof NotNil )
+        work.push(((Apply)_par)._fun);
     }
     @Override Type val(Worklist work) {
       return _def instanceof Let ? ((Let)_def)._def._flow : ((Lambda)_def)._types[_idx];
@@ -621,8 +630,9 @@ public class HM {
         // Walk the outputs, building an improved result
         Type rez2 = find().walk_types_out(rez);
         rez = rez2.join(rez);   // Lift result
+        if( !_flow.isa(rez) )
+          rez = _flow; // TODO: Cheaty force monotonic
       }
-
       return rez;
     }
     @Override void add_val_work(Syntax child, Worklist work) {
@@ -818,11 +828,13 @@ public class HM {
     @Override SB p1 (SB sb) { return sb.p(".").p(_id); }
     @Override SB p2(SB sb, VBitSet dups) { return _rec.p0(sb,dups); }
     @Override boolean hm(Worklist work) {
+      if( find().is_err() ) return false; // Already an error; no progress
       T2 rec = _rec.find();
+      if( (rec._alias!=null && rec._alias.test(0)) || rec._flow == Type.XNIL )
+        return find().unify(T2.make_err("May be nil when loading field "+_id),work);
       int idx = rec._ids==null ? -1 : Util.find(rec._ids,_id);
       if( idx!= -1 )            // Unify against a pre-existing field
         return rec.args(idx).unify(find(), work);
-      if( find().is_err() ) return false; // Already an error; no progress
       // The remaining cases all make progress and return true
       if( work==null ) return true;
       if( rec.is_err() ) return find().unify(rec,work);
@@ -847,8 +859,7 @@ public class HM {
         if( tmp._obj instanceof TypeStruct ) {
           TypeStruct tstr = (TypeStruct)tmp._obj;
           int idx = tstr.find(_id);
-          if( idx!=-1 )
-            return tstr._ts[idx]; // Field type
+          if( idx!=-1 ) return tstr._ts[idx]; // Field type
         }
         if( tmp._obj.above_center() ) return Type.XSCALAR;
       }
@@ -988,6 +999,23 @@ public class HM {
     @Override String name() { return "if"; }
     public If() { super(T2.make_leaf(),T2.make_leaf(),T2.make_leaf(),T2.make_leaf()); }
     @Override PrimSyn make() { return new If(); }
+    @Override boolean hm(Worklist work) {
+      T2 rez = find().args(3);
+      // GCP helps HM: do not unify dead control paths
+      if( DO_GCP ) {            // Doing GCP during HM
+        Type pred = _types[0];
+        if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
+          return rez.unify(targ(2),work); // Unify only the false side
+        if( pred.above_center() ) // Neither side executes
+          return false;           // Unify neither side
+        if( !pred.must_nil() )    // Unify only the true side
+          return rez.unify(targ(1),work);
+      }
+      // Unify both sides with the result
+      return
+        rez.unify(targ(1),work) |
+        rez.find().unify(targ(2),work);
+    }
     @Override Type apply( Syntax[] args) {
       Type pred= args[0]._flow;
       Type t1  = args[1]._flow;
@@ -1006,23 +1034,6 @@ public class HM {
       }
       // Could be either, so meet
       return t1.meet(t2);
-    }
-    @Override boolean hm(Worklist work) {
-      T2 rez = find().args(3);
-      // GCP helps HM: do not unify dead control paths
-      if( DO_GCP ) {            // Doing GCP during HM
-        Type pred = _types[0];
-        if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
-          return rez.unify(targ(2),work); // Unify only the false side
-        if( pred.above_center() ) // Neither side executes
-          return false;           // Unify neither side
-        if( !pred.must_nil() )    // Unify only the true side
-          return rez.unify(targ(1),work);
-      }
-      // Unify both sides with the result
-      return
-        rez.unify(targ(1),work) |
-        rez.find().unify(targ(2),work);
     }
   }
 
@@ -1071,6 +1082,83 @@ public class HM {
       if( pred instanceof TypeMemPtr && (to=((TypeMemPtr)pred)._obj) instanceof TypeStr && to.is_con() )
         return TypeInt.con(to.getstr().isEmpty() ? 1 : 0);
       return TypeInt.BOOL;
+    }
+  }
+
+  // Remove a nil from a struct after a guarding if-test
+  static class NotNil extends PrimSyn {
+    @Override String name() { return "notnil"; }
+    public NotNil() { super(T2.make_leaf(),T2.make_leaf()); }
+    @Override PrimSyn make() { return new NotNil(); }
+    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
+      int cnt = super.prep_tree(par,nongen,work);
+      find().args(1).push_update(this);
+      return cnt;
+    }
+    @Override boolean hm(Worklist work) {
+      assert find().is_fun();
+      T2 arg = targ(0);
+      T2 ret = find().args(1);
+      if( arg.is_err () || ret.is_err () ) return false;
+      if( arg.is_leaf() && ret.is_leaf() ) return false;
+
+      // One or the other is a base.  If they are unrelated, strip the nil.
+      // If they are forced together, leave the nil.
+      if( arg.is_base() || ret.is_base() ) {
+        if( arg.is_base() && ret.is_base() && ret._flow == arg._flow.join(Type.NSCALR) ) return false;
+        if( arg==ret ) return false; // Cannot not-nil from self
+        if( work==null ) return true; // Progress will be made
+        if( arg.is_leaf() ) { arg.unify(T2.make_base(ret._flow),work); arg = arg.find(); }
+        if( ret.is_leaf() ) { ret.unify(T2.make_base(arg._flow),work); ret = ret.find(); }
+        assert arg.is_base() && ret.is_base();
+        ret._flow = arg._flow.join(Type.NSCALR); // Strip nil from base
+        return true;
+      }
+      // One or the other is a function.  Same as structs, can strip the nil from nil-able functions.
+      if( arg.is_fun() || ret.is_fun() )
+        throw unimpl();         // Strip nil from fidxs
+
+
+      // One or the other is a struct.
+      assert arg.is_struct() || ret.is_struct();
+      // See if the input and outputs vary anywhere
+      if( arg.is_struct() && ret.is_struct() && ret._alias == arg._alias.clear(0) && ret._ids.length==arg._ids.length ) {
+        int i=0; for( ; i<arg._ids.length; i++ ) {
+          int idx = Util.find(ret._ids,arg._ids[i]);
+          if( idx== -1 || arg.args(i)!=ret.args(idx) )
+            break;              // Missing or unequal fields
+        }
+        if( i==arg._ids.length )
+          return false;       // All fields are unified; only the alias differs by nil
+      }
+
+      // Make sure both are structs
+      if( work==null ) return true; // Progress will be made
+      if( arg.is_leaf() ) { arg.unify(T2.make_struct(ret._alias,new String[0],new T2[0],arg._open),work); arg = arg.find(); }
+      if( ret.is_leaf() ) { ret.unify(T2.make_struct(arg._alias,new String[0],new T2[0],arg._open),work); ret = ret.find(); }
+      assert arg.is_struct() && ret.is_struct();
+      ret._alias = arg._alias.clear(0); // Alias relationship is clear
+
+      // Unify all fields, but not the aliases, so cannot unify at the top level.
+      // Ignoring the open/not-open as expecting these to be the same.
+      for( int i=0; i<arg._ids.length; i++ ) {
+        String id = arg._ids[i];
+        int idx = Util.find(ret._ids,id);
+        if( idx==-1 ) ret.add_fld(id,arg.args(i),work);
+        else ret.args(idx).unify(arg.args(i),work);
+      }
+      for( int i=0; i<ret._ids.length; i++ ) {
+        String id = ret._ids[i];
+        if( Util.find(arg._ids,id)== -1 )
+          arg.add_fld(id,ret.args(i),work);
+      }
+
+      return true;            // Progress
+    }
+    @Override Type apply( Syntax[] args) {
+      Type val = args[0]._flow;
+      if( val==Type.XNIL ) return Type.XSCALAR; // Weird case of not-nil nil
+      return val.join(Type.NSCALR);
     }
   }
 
@@ -1428,6 +1516,8 @@ public class HM {
       // Special case for nil and struct
       if( this.is_struct() && that.is_base() && that._flow==Type.XNIL )
         return that.union(this,work);
+      if( that.is_struct() && this.is_base() && this._flow==Type.XNIL )
+        return this.union(that,work);
 
       // Cycle check
       long luid = dbl_uid(that);    // long-unique-id formed from this and that
@@ -1486,14 +1576,21 @@ public class HM {
       _open= that._open;
     }
 
+    // Insert a new field; keep fields sorted
     private boolean add_fld(String id, T2 fld, Worklist work) {
       assert is_struct();
-      if( !_open && !fld.is_err() ) throw unimpl();
       int len = _ids.length;
+      // Find insertion point
+      int idx = Arrays.binarySearch(_ids,id);
+      assert idx<0;             // Never found
+      idx = -idx-1;               // Insertion point
+      // Insert in sorted order
       _ids  = Arrays.copyOf( _ids,len+1);
       _args = Arrays.copyOf(_args,len+1);
-      _ids [len] = id ;
-      _args[len] = fld;
+      System.arraycopy( _ids,idx, _ids,idx+1,len-idx);
+      System.arraycopy(_args,idx,_args,idx+1,len-idx);
+      _ids [idx] = id ;
+      _args[idx] = fld;
       fld.push_update(_deps); // If field changes, all deps change
       work.addAll(_deps); //
       return true;        // Always progress
@@ -1575,6 +1672,24 @@ public class HM {
 
       // In the non-generative set, so do a hard unify, not a fresh-unify.
       if( nongen_in(nongen) ) return vput(that,_unify(that,work)); // Famous 'occurs-check', switch to normal unify
+
+      // LHS is a nil, RHS is a struct; add nil to RHS
+      if( is_base() && _flow==Type.XNIL && that.is_struct() ) {
+        if( that._alias.test(0) ) return false; // Already nil
+        if( work != null )
+          that._alias = that._alias.set(0); // Add nil
+        return true;
+      }
+      // If RHS is a nil, LHS is a struct; fresh-clone to RHS and add nil
+      if( that.is_base() && that._flow==Type.XNIL && this.is_struct() ) {
+        if( work==null ) return true;
+        T2 t2 = _fresh(nongen);
+        t2._alias = BitsAlias.NIL;
+        return t2._unify(that, work);
+      }
+
+
+      // LHS is a leaf, base, or error
       if( this._args==null ) return vput(that,fresh_base(that,work));
       if( that.is_leaf() )  // RHS is a tvar; union with a deep copy of LHS
         return work==null || vput(that,that.union(_fresh(nongen),work));
@@ -1674,26 +1789,6 @@ public class HM {
 
     // -----------------
     private static final VBitSet ODUPS = new VBitSet();
-    boolean occurs_in(Syntax syn) {
-      if( syn==null ) return false;
-      assert ODUPS.isEmpty();
-      boolean found = _occurs_in(syn);
-      ODUPS.clear();
-      return found;
-    }
-    boolean occurs_in_type(T2 x) {
-      assert ODUPS.isEmpty();
-      boolean found = _occurs_in_type(x);
-      ODUPS.clear();
-      return found;
-    }
-    boolean _occurs_in(Syntax syn) {
-      for( ; syn!=null; syn=syn._par )
-        if( _occurs_in_type(syn.find()) )
-          return true;
-      return false;
-    }
-
     boolean _occurs_in_type(T2 x) {
       assert no_uf() && x.no_uf();
       if( x==this ) return true;
@@ -1705,15 +1800,15 @@ public class HM {
       return false;
     }
 
-    boolean nongen_in(VStack syn) {
-      if( syn==null ) return false;
-      assert ODUPS.isEmpty();
-      boolean found = _nongen_in(syn);
+    boolean occurs_in_type(T2 x) {
       ODUPS.clear();
-      return found;
+      return _occurs_in_type(x);
     }
-    boolean _nongen_in(VStack nongen) {
-      for( T2 t2 : nongen )
+
+    boolean nongen_in(VStack vs) {
+      if( vs==null ) return false;
+      ODUPS.clear();
+      for( T2 t2 : vs )
         if( _occurs_in_type(t2.find()) )
           return true;
       return false;
