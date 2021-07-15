@@ -423,28 +423,31 @@ public class TestHM {
   }
 
 
+  // Requires a combo of HM and GCP to get the good answer
   @Test public void test45() {
     Root syn = HM.hm(
+"id = {x -> x};" +
 "loop = { name cnt ->" +
 "  (if cnt " +
 "    (loop" +
-"       fltfun = (if name {x->3} {x->x});" +
-"       result = (fltfun \"abc\");" +
-"       (str result)" +
+"       fltfun = (if name id {x->3});" +
+"       (fltfun \"abc\")" +
 "       (dec cnt)" +
 "     )" +
 "     name" +
 "   )"+
 "};" +
-"(loop \"def\" 2)");
-    if( HM.DO_HM ) {
-      if( HM.DO_GCP )
-        assertEquals("*[4]str",syn._hmt.p());
-      else
-        assertEquals("Cannot unify *[4]\"abc\" and 3",syn._hmt.p());
-    }
+"(loop \"def\" (id 2))");
+    if( HM.DO_HM )
+      assertEquals(HM.DO_GCP
+                   ? "*[4]str"  // Both HM and GCP
+                   : "Cannot unify *[4]\"abc\" and 3", // HM alone cannot do this one
+                   syn._hmt.p());
     if( HM.DO_GCP )
-      assertEquals(TypeMemPtr.STRPTR, syn.flow_type());
+      assertEquals(HM.DO_HM
+                   ? TypeMemPtr.STRPTR // Both HM and GCP
+                   : Type.NSCALR,      // GCP alone gets a very weak answer
+                   syn.flow_type());
   }
 
 
