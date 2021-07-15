@@ -476,4 +476,19 @@ public class TestHM {
       else           tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.NINT8 , TypeInt.NINT8 )));
   }
 
+  // map is parametric in nil-ness.  Verify still nil-checking.
+  @Test public void test50() {
+    Root syn = HM.hm("{ pred -> \n"+
+                     "  map = { fun x -> (fun x) };\n" +
+                     "  (pair (map {str0 ->          .x str0   }          @{x = 3}   )\n" +
+                     "        (map {str1 ->          .x str1   } (if pred @{x = 5} 0))\n" +
+                     "  )\n"+
+                     "}");
+    if( HM.DO_HM )
+      assertEquals("{ A -> May be nil when loading field x }",syn._hmt.p());
+    if( HM.DO_GCP )
+      if( HM.DO_HM ) tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.con(3), TypeInt.NINT8 )));
+      else           tfs(TypeMemPtr.make(7,TypeStruct.make_tuple(Type.ANY,TypeInt.NINT8 , TypeInt.NINT8 )));
+  }
+
 }
