@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeObj;
@@ -35,23 +34,23 @@ public class DefMemNode extends Node {
     return _live;
   }
 
-  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Mem",this,alloc_site); }
-
-  @Override public boolean unify( boolean test ) {
-    // Self should always should be a TMem
-    TV2 tvar = tvar();
-    assert tvar.isa("Mem");
-    // Structural unification on all objects
-    boolean progress=false;
-    for( int i=1; i<_defs._len; i++ ) {
-      Node n = in(i);
-      if( n==null ) continue;
-      TV2 tv = (n instanceof MrgProjNode && !tvar(i).is_dead() ? n.in(0) : n).tvar();
-      progress |= tvar.unify_at(i,tv,test);
-      if( progress && test ) return true;
-    }
-    return progress;
-  }
+  //@Override public TV2 new_tvar(String alloc_site) { return TV2.make("Mem",this,alloc_site); }
+  //
+  //@Override public boolean unify( boolean test ) {
+  //  // Self should always should be a TMem
+  //  TV2 tvar = tvar();
+  //  assert tvar.isa("Mem");
+  //  // Structural unification on all objects
+  //  boolean progress=false;
+  //  for( int i=1; i<_defs._len; i++ ) {
+  //    Node n = in(i);
+  //    if( n==null ) continue;
+  //    TV2 tv = (n instanceof MrgProjNode && !tvar(i).is_dead() ? n.in(0) : n).tvar();
+  //    progress |= tvar.unify_at(i,tv,test);
+  //    if( progress && test ) return true;
+  //  }
+  //  return progress;
+  //}
 
 
   @Override public boolean equals(Object o) { return this==o; } // Only one

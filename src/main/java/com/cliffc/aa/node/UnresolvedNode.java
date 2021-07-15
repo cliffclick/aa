@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
 import com.cliffc.aa.util.Util;
@@ -70,16 +69,16 @@ public class UnresolvedNode extends UnOrFunPtrNode {
     }
   }
 
-  @Override public TV2 new_tvar(String alloc_site) {
-    return TV2.make("Fun",this,alloc_site);
-  }
-
-  @Override public boolean unify( boolean test ) {
-    // Giant assert that all inputs are all Fun, ignoring dead.
-    for( Node n : _defs )
-      assert n.tvar().is_dead() || n.tvar().isa("Fun");
-    return false;
-  }
+  //@Override public TV2 new_tvar(String alloc_site) {
+  //  return TV2.make("Fun",this,alloc_site);
+  //}
+  //
+  //@Override public boolean unify( boolean test ) {
+  //  // Giant assert that all inputs are all Fun, ignoring dead.
+  //  for( Node n : _defs )
+  //    assert n.tvar().is_dead() || n.tvar().isa("Fun");
+  //  return false;
+  //}
 
   // Validate same name, operator-precedence and thunking
   private void add_def_unresolved( FunPtrNode ptr ) {

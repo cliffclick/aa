@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMap;
 
@@ -333,12 +332,8 @@ public final class CallEpiNode extends Node {
 
     // If no memory projection, then do not compute memory
     Type premem = call().mem()._val;
-    if( _keep==0 && ProjNode.proj(this,MEM_IDX)==null ) {
-      TV2 tv = tvar();
-      if( tv.isa("Ret") )
-        trez = unify_lift(trez,tv.get(REZ_IDX), premem);
+    if( _keep==0 && ProjNode.proj(this,MEM_IDX)==null )
       return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,trez);
-    }
 
     // Build epilog memory.
 
@@ -358,11 +353,6 @@ public final class CallEpiNode extends Node {
       pubs[i] = obj;
     }
     TypeMem tmem3 = TypeMem.make0(pubs);
-
-    // Lift result according to H-M typing
-    TV2 tv = tvar();
-    trez =         unify_lift(trez ,tv.get(REZ_IDX), tmem3);
-    tmem3=(TypeMem)unify_lift(tmem3,tv.get(MEM_IDX), tmem3);
 
     return TypeTuple.make(Type.CTRL,tmem3,trez);
   }
@@ -409,8 +399,6 @@ public final class CallEpiNode extends Node {
     if( mem instanceof IntrinsicNode ) // Better error message for Intrinsic if Call args are bad
       ((IntrinsicNode)mem)._badargs = call._badargs[1];
     call._is_copy=_is_copy=true;
-    call.reset_tvar("CEPI_set_is_copy");
-    this.reset_tvar("CEPI_set_is_copy");
     // Memory was split at the Call, according to the escapes aliases, and
     // rejoined at the CallEpi.  We need to make that explicit here.
     GVNGCM.retype_mem(null,call,this,false);
@@ -465,85 +453,51 @@ public final class CallEpiNode extends Node {
     return _live;
   }
 
-  @Override public TV2 new_tvar(String alloc_site) {
-    return _is_copy
-      ? TV2.make_leaf(this,alloc_site)
-      : TV2.make("Ret",this,alloc_site).push_dep(this);
-  }
+  //@Override public TV2 new_tvar(String alloc_site) {
+  //  return _is_copy
+  //    ? TV2.make_leaf(this,alloc_site)
+  //    : TV2.make("Ret",this,alloc_site).push_dep(this);
+  //}
 
-  @Override public boolean unify( boolean test ) {
-    if( _is_copy ) return false; // A copy
-    // Build a HM tvar (args->ret), same as HM.java Apply does.
-    Node fdx = call().fdx();
-    TV2 tfdx = fdx.tvar();
-    if( tfdx.is_leaf() ) return false; // Wait?  probably need for force fresh-fun
-    if( tfdx.is_dead() ) return false;
-    TV2 tcargs = call().tvar();
-    TV2 tcret  = tvar();
-    if( tcret.is_dead() ) return false;
-
-    // Thunks are a little odd, because they cheat on graph structure.
-    if( tfdx.isa("Ret") ) {     // The fdx._tvar is a Ret not a Fun
-      if( tcret == tfdx ) return false;
-      boolean progress = tfdx.unify(tcret,test);
-      if( progress && !test )
-        Env.GVN.add_flow_uses(call()); // Progress, neighbors on list
-      return progress;
-    }
-
-    // In an effort to detect possible progress without constructing endless
-    // new TV2s, we look for a common no-progress situation by inspecting the
-    // first layer in.
-    TV2 tfargs = tfdx.get("Args");
-    TV2 tfret  = tfdx.get("Ret" );
-    if( tfdx.isa("Fun") && tcargs==tfargs && tcret==tfret ) return false; // Equal parts, no progress
-
-    // Will make progress aligning the shapes
-    NonBlockingHashMap<Comparable,TV2> args = new NonBlockingHashMap<Comparable,TV2>(){{ put("Args",tcargs);  put("Ret",tcret); }};
-    TV2 tfun = TV2.make("Fun",fdx,"CallEpi_unify_Fun",args);
-    boolean progress = tfdx.unify(tfun,test);
-    if( progress && !test ) {
-      Env.GVN.add_flow_uses(call()); // Progress, neighbors on list
-      tcret.find().push_dep(this);
-      if( fdx instanceof FreshNode )
-        Env.GVN.add_reduce(fdx);
-    }
-    return progress;
-  }
-
-  // H-M typing demands all unified Nodes have the same type... which is a
-  // ASSERT/JOIN.  Hence the incoming type can be lifted to the join.
-  private Type unify_lift( Type t, TV2 tv, Type tcmem ) {
-    // TODO: Turn this back on
-    if( tv==null ) return t; // No structure, no change
-    //if( tv.is_base() ) t = t.join(tv._type);
-    //TV2 tvar  = call().tvar();
-    //Type tcall = call()._val;
-    //// Since tcall memory is pre-filtered for the call, and we want the memory
-    //// *into* the call (not the filtered memory into the Fun), peel the
-    //// top-layer of tvars/types and handle the pre-call memory special.
-    //if( !(tvar.is_tvar() && tcall instanceof TypeTuple) ) return t;
-    //TypeTuple ttcall = (TypeTuple)tcall;
-    //assert tvar.isa("Args");
-    //TV2 tv2 = tvar.get(MEM_IDX);
-    //if( tv2==null ) return t;
-    //Type t2 = tv2.find_tvar(tcmem,tv);
-    //// Found in input memory; JOIN with the call return type.
-    //if( t2!=t && !t2.above_center() )
-    //  t = t2.widen().join(t);
-    //// Check the other inputs.
-    //for( int i=MEM_IDX+1;i<call()._defs._len-1; i++ ) {
-    //  TV2 tvi = tvar.get(i);
-    //  if( tvi != null ) {
-    //    Type t3 = tvi.find_tvar(ttcall.at(i),tv);
-    //    // Found in input args; JOIN with the call return type.
-    //    if( t3!=t && !t3.above_center() )
-    //      t = t3.widen().join(t);
-    //  }
-    //}
-    return t;
-  }
-
+  //@Override public boolean unify( boolean test ) {
+  //  if( _is_copy ) return false; // A copy
+  //  // Build a HM tvar (args->ret), same as HM.java Apply does.
+  //  Node fdx = call().fdx();
+  //  TV2 tfdx = fdx.tvar();
+  //  if( tfdx.is_leaf() ) return false; // Wait?  probably need for force fresh-fun
+  //  if( tfdx.is_dead() ) return false;
+  //  TV2 tcargs = call().tvar();
+  //  TV2 tcret  = tvar();
+  //  if( tcret.is_dead() ) return false;
+  //
+  //  // Thunks are a little odd, because they cheat on graph structure.
+  //  if( tfdx.isa("Ret") ) {     // The fdx._tvar is a Ret not a Fun
+  //    if( tcret == tfdx ) return false;
+  //    boolean progress = tfdx.unify(tcret,test);
+  //    if( progress && !test )
+  //      Env.GVN.add_flow_uses(call()); // Progress, neighbors on list
+  //    return progress;
+  //  }
+  //
+  //  // In an effort to detect possible progress without constructing endless
+  //  // new TV2s, we look for a common no-progress situation by inspecting the
+  //  // first layer in.
+  //  TV2 tfargs = tfdx.get("Args");
+  //  TV2 tfret  = tfdx.get("Ret" );
+  //  if( tfdx.isa("Fun") && tcargs==tfargs && tcret==tfret ) return false; // Equal parts, no progress
+  //
+  //  // Will make progress aligning the shapes
+  //  NonBlockingHashMap<Comparable,TV2> args = new NonBlockingHashMap<Comparable,TV2>(){{ put("Args",tcargs);  put("Ret",tcret); }};
+  //  TV2 tfun = TV2.make("Fun",fdx,"CallEpi_unify_Fun",args);
+  //  boolean progress = tfdx.unify(tfun,test);
+  //  if( progress && !test ) {
+  //    Env.GVN.add_flow_uses(call()); // Progress, neighbors on list
+  //    tcret.find().push_dep(this);
+  //    if( fdx instanceof FreshNode )
+  //      Env.GVN.add_reduce(fdx);
+  //  }
+  //  return progress;
+  //}
 
   @Override Node is_pure_call() { return in(0) instanceof CallNode ? call().is_pure_call() : null; }
   // Return the set of updatable memory - including everything reachable from

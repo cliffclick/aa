@@ -4,7 +4,6 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
-import com.cliffc.aa.tvar.TV2;
 
 import java.util.HashMap;
 import java.util.function.Predicate;
@@ -17,7 +16,7 @@ public class StartNode extends Node {
   // a new constant.  A better answer is to make new constants appear with the
   // same liveness as their users.
   @Override public TypeMem live(GVNGCM.Mode opt_mode) { return TypeMem.ESCAPE; }
-  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Start",this,alloc_site); }
+  //@Override public TV2 new_tvar(String alloc_site) { return TV2.make("Start",this,alloc_site); }
   // StartNodes are never equal
   @Override public int hashCode() { return 123456789+1; }
   @Override public boolean equals(Object o) { return this==o; }

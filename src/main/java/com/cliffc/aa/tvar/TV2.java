@@ -10,6 +10,8 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
+import static com.cliffc.aa.AA.unimpl;
+
 // Type Variable.  TVars unify (ala Tarjan Union-Find), and can have structure
 // (such as "{ A -> B }").  TVars are tied to a TNode to enforce Type structure
 // on Types.  TVars with no structure either refer to a plain Node, or get
@@ -284,12 +286,13 @@ public class TV2 {
   // Structural unification.  Both 'this' and that' are the same afterwards.
   // Returns True if progress.
   public boolean unify(TV2 that, boolean test) {
-    assert !this.is_unified() && !that.is_unified();
-    if( this==that ) return false;
-    assert DUPS.isEmpty();
-    boolean progress = _unify(that,test);
-    DUPS.clear();
-    return progress;
+    //assert !this.is_unified() && !that.is_unified();
+    //if( this==that ) return false;
+    //assert DUPS.isEmpty();
+    //boolean progress = _unify(that,test);
+    //DUPS.clear();
+    //return progress;
+    throw unimpl();
   }
 
   // Classic structural unification, no "fresh".  Unifies 'this' into 'that'.
@@ -369,10 +372,11 @@ public class TV2 {
   // Returns progress.
   // If test, we are testing only and make no changes.
   public boolean fresh_unify(TV2 that, TV2[] vs, boolean test) {
-    assert VARS.isEmpty() && DUPS.isEmpty();
-    boolean progress = _fresh_unify(that,vs,test);
-    VARS.clear();  DUPS.clear();
-    return progress;
+    //assert VARS.isEmpty() && DUPS.isEmpty();
+    //boolean progress = _fresh_unify(that,vs,test);
+    //VARS.clear();  DUPS.clear();
+    //return progress;
+    throw unimpl();
   }
 
   // Apply 'this' structure on 'that'; no modifications to 'this'.  VARS maps

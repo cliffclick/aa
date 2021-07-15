@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
 import java.util.function.Predicate;
@@ -11,22 +10,8 @@ public class ConNode<T extends Type> extends Node {
   T _t;                         // Not final for testing
   public ConNode( T t ) {
     super(OP_CON,Env.START);
-    //assert !(t instanceof TypeFunPtr);
     _t=t;
     _live = all_live();
-    _tvar.free();
-    TV2 tv = null;
-    if( t        ==TypeMem.MEM ) tv = TV2.make_mem (this,"Con_mem_constructor");
-    if( t.widen()==Type.SCALAR ) tv = TV2.make_leaf(this,"Con_leaf_constructor");
-    if( tv==null )               tv = TV2.make_base(this,t,"Con_base_constructor");
-    _tvar = tv;
-  }
-  // Used by e.g. Env.XNIL to use dedicated TV2.NIL
-  public ConNode( T t, TV2 tvar ) {
-    super(OP_CON,Env.START);
-    _t=t;
-    _live = all_live();
-    _tvar.free(); _tvar = tvar;
   }
   // Allows ANY type with a normal unification, used for uninitialized variables
   // (as opposed to dead ones).

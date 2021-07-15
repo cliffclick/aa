@@ -5,7 +5,6 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
-import com.cliffc.aa.tvar.TV2;
 
 import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.AA.REZ_IDX;
@@ -193,22 +192,22 @@ public final class RetNode extends Node {
     return TypeMem.ALIVE;       // Basic aliveness
   }
 
-  @Override public TV2 new_tvar(String alloc_site) {
-    return TV2.make("Ret",this,alloc_site);
-  }
-
-  @Override public boolean unify( boolean test ) {
-    if( is_copy() ) return false; // Disappearing
-    FunPtrNode fptr = funptr();
-    if( fptr != null && fptr.is_forward_ref() ) return false;
-    TV2 tvar = tvar();
-    if( tvar.is_dead() ) return false;
-    assert tvar.isa("Ret");
-    boolean progress = false;
-    for( int i=0; i<=REZ_IDX; i++ )
-      progress |= tvar.unify_at(i,tvar(i),test);
-    return progress;
-  }
+  //@Override public TV2 new_tvar(String alloc_site) {
+  //  return TV2.make("Ret",this,alloc_site);
+  //}
+  //
+  //@Override public boolean unify( boolean test ) {
+  //  if( is_copy() ) return false; // Disappearing
+  //  FunPtrNode fptr = funptr();
+  //  if( fptr != null && fptr.is_forward_ref() ) return false;
+  //  TV2 tvar = tvar();
+  //  if( tvar.is_dead() ) return false;
+  //  assert tvar.isa("Ret");
+  //  boolean progress = false;
+  //  for( int i=0; i<=REZ_IDX; i++ )
+  //    progress |= tvar.unify_at(i,tvar(i),test);
+  //  return progress;
+  //}
 
   @Override public Node is_copy(int idx) { throw com.cliffc.aa.AA.unimpl(); }
   boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }

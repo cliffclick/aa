@@ -84,7 +84,6 @@ public class MemSplitNode extends Node {
     if( all.join(esc) == BitsAlias.EMPTY ) { // No overlap
       _escs.set(0,all.meet(esc));  // Update summary
       _escs.add(esc);              // Add escape set
-      reset_tvar("reset_add_split");// Expand H-M tuple result
       xval();                      // Expand val tuple result
       return _escs._len-1;
     }

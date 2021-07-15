@@ -101,12 +101,6 @@ public class GVNGCM {
   // Did a bulk not-monotonic update.  Forcibly update the entire region at
   // once; restores monotonicity over the whole region when done.
   public void revalive(Node... ns) {
-    for( Node n : ns )  if( n != null )  n.reset_tvar("gvn_revalive");
-    for( Node n : ns )  if( n != null )  n.unify(false);
-    revalive2(ns);
-  }
-  // Bulk not-monotonic update, without reseting tvars
-  public void revalive2(Node... ns) {
     for( Node n : ns ) {
       if( n == null ) continue;
       Type t = n.value(_opt_mode);

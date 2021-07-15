@@ -1,10 +1,8 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
@@ -63,7 +61,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert def_idx(_ts._ts.length)== _defs._len;
     set_def(def_idx(fidx),val);
     sets(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? val._val : Type.SCALAR,mutable));
-    tvar().reset_at(_ts._flds[fidx]);
     xval();
     Env.GVN.add_flow_uses(this);
   }
@@ -105,7 +102,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
         // Stomp field locally to ANY
         set_def(def_idx(i),Env.ANY);
         setsm(_ts.set_fld(i,Type.ANY,TypeStruct.FFNL));
-        tvar().reset_at(fld);
         Env.GVN.add_flow_uses(n);
       }
     }
@@ -150,19 +146,19 @@ public class NewObjNode extends NewNode<TypeStruct> {
     return t.above_center() ? TypeMem.DEAD : (t==Type.NSCALR ? TypeMem.ESC_NO_DISP : TypeMem.ESCAPE);
   }
 
-  @Override public boolean unify( boolean test ) {
-    // Self should always should be a TObj
-    TV2 tvar = tvar();
-    if( tvar.is_dead() ) return false;
-    assert tvar.isa("Obj");
-    // Structural unification on all fields
-    boolean progress=false;
-    for( int i=0; i<_ts._flds.length; i++ ) {
-      progress |= tvar.unify_at(_ts._flds[i],tvar(def_idx(i)),test);
-      if( progress && test ) return true;
-    }
-    return progress;
-  }
+  //@Override public boolean unify( boolean test ) {
+  //  // Self should always should be a TObj
+  //  TV2 tvar = tvar();
+  //  if( tvar.is_dead() ) return false;
+  //  assert tvar.isa("Obj");
+  //  // Structural unification on all fields
+  //  boolean progress=false;
+  //  for( int i=0; i<_ts._flds.length; i++ ) {
+  //    progress |= tvar.unify_at(_ts._flds[i],tvar(def_idx(i)),test);
+  //    if( progress && test ) return true;
+  //  }
+  //  return progress;
+  //}
 
   public Node[] parms() {
     throw com.cliffc.aa.AA.unimpl(); // TODO: yank this

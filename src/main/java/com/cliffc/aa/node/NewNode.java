@@ -1,9 +1,7 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
@@ -90,9 +88,9 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     return to.above_center() ? TypeMem.DEAD : TypeMem.ESCAPE;
   }
 
-  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Obj",this,alloc_site); }
-  
-  abstract public boolean unify( boolean test );
+  //@Override public TV2 new_tvar(String alloc_site) { return TV2.make("Obj",this,alloc_site); }
+
+  //abstract public boolean unify( boolean test );
 
   @Override BitsAlias escapees() { return _tptr._aliases; }
   abstract T dead_type();
@@ -106,7 +104,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeObj.UNUSED);
     Env.DEFMEM.set_def(_alias,Node.con(TypeObj.UNUSED));
     Env.GVN.revalive(this,ProjNode.proj(this,0),Env.DEFMEM);
-    tvar().unify(TV2.DEAD,false);
     if( is_dead() ) return;
     for( Node use : _uses )
       Env.GVN.add_flow_uses(use); // Get FPtrs from MrgProj, and dead Ptrs into New

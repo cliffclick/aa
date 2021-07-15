@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 
@@ -29,7 +28,7 @@ public class ThunkNode extends Node {
   }
   @Override public TypeMem all_live() { return TypeMem.ALIVE; }
 
-  @Override public TV2 new_tvar(String alloc_site) { return TV2.make_base(this,Type.CTRL,alloc_site); }
+  //@Override public TV2 new_tvar(String alloc_site) { return TV2.make_base(this,Type.CTRL,alloc_site); }
 
   @Override public Node is_copy(int idx) {
     if( _defs._len==2 ) return null;

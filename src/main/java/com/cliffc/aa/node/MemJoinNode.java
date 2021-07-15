@@ -35,7 +35,6 @@ public class MemJoinNode extends Node {
     // If some Split/Join path clears out, remove the (useless) split.
     for( int i=1; i<_defs._len; i++ )
       if( in(i) instanceof MProjNode && in(i).in(0)==msp && in(i)._uses._len==1 ) {
-        msp.reset_tvar("join_dead_split");    // Changing split arity, reset tvar
         in(0).xval();        // Update the default type
         msp.remove_alias(i);
         GVN.add_dead(in(i));

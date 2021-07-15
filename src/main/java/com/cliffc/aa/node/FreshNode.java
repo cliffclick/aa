@@ -21,9 +21,8 @@ public class FreshNode extends UnOrFunPtrNode {
     // Remove if TVar has already unified with the input.
     // TODO: TURN BACK ON.  Removes many FreshNodes but requires non-local info to put on worklist.
     // i.e. a remote unification can suddenly enable this.
-    if( !tvar().unify(id().tvar(),true) )
-     return id();
-
+    //if( !tvar().unify(id().tvar(),true) )
+    // return id();
 
     // Unwind ctrl-copy
     Node cc = in(0).is_copy(0);

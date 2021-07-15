@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.TV2;
 
 import static com.cliffc.aa.AA.MEM_IDX;
 
@@ -44,7 +43,7 @@ public class MProjNode extends ProjNode {
     return c.oob();
   }
 
-  @Override public TV2 new_tvar( String alloc_site) { return TV2.make_mem(this,alloc_site); }
+  //@Override public TV2 new_tvar( String alloc_site) { return TV2.make_mem(this,alloc_site); }
 
   @Override public void add_flow_use_extra(Node chg) {
     if( chg instanceof CallNode ) { // If the Call changes value

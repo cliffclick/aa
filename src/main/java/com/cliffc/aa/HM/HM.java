@@ -1076,7 +1076,7 @@ public class HM {
       if( pred.above_center() ) // Delay any values
         return Type.XSCALAR;    // t1.join(t2);     // Join of either
       if( !pred.must_nil() )    // True only
-        return t1;           
+        return t1;
       // Could be either, so meet
       return t1.meet(t2);
     }

@@ -97,7 +97,6 @@ public abstract class Node implements Cloneable {
     return tv == _tvar ? tv : (_tvar = tv); // Update U-F style in-place.
   }
   public TV2 tvar(int x) { return in(x).tvar(); } // nth TV2
-  public final void reset_tvar(String alloc_site) { _tvar.reset(this); _tvar = new_tvar(alloc_site); }
   public TV2 new_tvar(String alloc_site) { return TV2.make_leaf(this,alloc_site); }
 
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
@@ -200,8 +199,6 @@ public abstract class Node implements Cloneable {
   // Complete replacement; point uses to 'nnn' and removes 'this'.
   public Node subsume( Node nnn ) {
     assert !nnn.is_dead();
-    // When replacing one node with another, unify their type vars
-    if( !is_dead() ) tvar().unify(nnn.tvar(),false);
     insert(nnn);                // Change graph shape
     nnn.keep();                 // Keep-alive
     kill();                     // Delete the old, and anything it uses
@@ -547,7 +544,6 @@ public abstract class Node implements Cloneable {
       _val = nval;
       Env.GVN.add_flow_uses(this); // Put uses on worklist... values flows downhill
     }
-    unify(false); // Re-unify with re-flow
     return nval;
   }
 
@@ -594,7 +590,7 @@ public abstract class Node implements Cloneable {
   public TypeMem all_live() { return TypeMem.LIVE_BOT; }
 
   // The _val changed here, and more than the immediate _neighbors might change
-  // value/live/unify.
+  // value/live
   public void add_flow_extra(Type old) { }
   public void add_flow_use_extra(Node chg) { }
   public void add_flow_def_extra(Node chg) { }
@@ -672,20 +668,6 @@ public abstract class Node implements Cloneable {
   // Change values at this Node directly.
   public Node do_flow() {
     Node progress=null;
-    // Perform unification
-    TV2 tv1 = tvar();
-    int sz1 = tv1._args==null ? 0 : tv1._args.size();
-    if( unify(false) ) {
-      progress = this;          // Progress
-      TV2 tv2 = tvar();
-      int sz2 = tv2._args==null ? 0 : tv2._args.size();
-      if( !Util.eq(tv1.name(),tv2.name()) || sz1!=sz2 )
-        for( Node use : _uses )   // Unification gained structure; neighbors can unify
-          Env.GVN.add_flow(use).add_flow_use_extra(this);
-      if( this instanceof FreshNode )
-        Env.GVN.add_reduce(this);
-    }
-
     // Compute live bits.  If progress, push the defs on the flow worklist.
     // This is a reverse flow computation.  Always assumed live if keep.
     if( _keep==0 ) {
@@ -719,8 +701,6 @@ public abstract class Node implements Cloneable {
         Env.GVN.add_flow(use).add_flow_use_extra(this);
       // Progressing on CFG can mean CFG paths go dead
       if( is_CFG() ) for( Node use : _uses ) if( use.is_CFG() ) Env.GVN.add_reduce(use);
-      // Need to recompute dependent TVars
-      if( tvar()._deps!=null ) Env.GVN.add_flow(tvar()._deps);
       add_flow_extra(oval);
     }
     return progress;
@@ -816,9 +796,6 @@ public abstract class Node implements Cloneable {
   public final boolean more_ideal(VBitSet bs) {
     if( bs.tset(_uid) ) return false; // Been there, done that
     if( _keep == 0 && _live.is_live() ) { // Only non-keeps, which is just top-level scope and prims
-      // TODO Turn on unification progress
-      //if( unify(true) )
-      //  return true;            // Found more unification
       Type t = value(Env.GVN._opt_mode);
       if( _val != t )
         return true;            // Found a value improvement
@@ -848,8 +825,6 @@ public abstract class Node implements Cloneable {
     // Check for only forwards flow, and if possible then also on worklist
     Type    oval= _val, nval = value(Env.GVN._opt_mode);
     TypeMem oliv=_live, nliv = live (Env.GVN._opt_mode);
-    // TODO: Turn on HM checking
-    //boolean hm = lifting && unify(true); // Progress-only check, and only during Pesi not Opto
     boolean hm = false;
     if( nval != oval || nliv != oliv || hm ) {
       boolean ok = lifting

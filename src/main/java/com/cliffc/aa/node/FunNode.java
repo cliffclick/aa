@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
-import com.cliffc.aa.tvar.UQNodes;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
@@ -668,11 +667,9 @@ public class FunNode extends RegionNode {
     final int zlen = has_unknown_callers() ? 2 : 1;
     while( _defs._len > zlen ) {             // For all paths (except unknown-caller)
       Node ceproj = pop();
-      ceproj.reset_tvar("Fun_inline");
       CallNode call = (CallNode)ceproj.in(0); // Unhook without removal
       CallEpiNode cepi = call.cepi();
       cepi.del(cepi._defs.find(oldret));
-      cepi.reset_tvar("Fun_split_callers");
       unwireds.add(cepi);
       Env.GVN.add_reduce(cepi); // Visit for inlining later
       // And remove path from all Parms
@@ -685,11 +682,8 @@ public class FunNode extends RegionNode {
     HashMap<Node,Node> map = new HashMap<>();
     // Collect aliases that are cloning.
     BitSet aliases = new BitSet();
-    // Build a clonable set of TVars
-    TV2 tvs = TV2.make("inline_bulk", (UQNodes)null, "inline_bulk");
     // Clone the function body
     map.put(this,fun);
-    tvs.unify_at(_uid,tvar(),false);
     for( Node n : body ) {
       if( n==this ) continue;   // Already cloned the FunNode
       int old_alias = n instanceof NewNode ? ((NewNode)n)._alias : -1;
@@ -697,15 +691,12 @@ public class FunNode extends RegionNode {
       map.put(n,c);               // Map from old to new
       if( old_alias != -1 )       // Was a NewNode?
         aliases.set(old_alias);   // Record old alias before copy/split
-      tvs.unify_at(n._uid,n.tvar(),false); // Gather all TVars
       // Slightly better error message when cloning constructors
       if( path > 0 ) {
         if( n instanceof IntrinsicNode ) ((IntrinsicNode)c)._badargs = path_call._badargs[1];
         if( n instanceof   MemPrimNode ) ((  MemPrimNode)c)._badargs = path_call._badargs;
       }
     }
-    // Clone the TVars.  Rename the tvar._ns sets as well.
-    TV2 tvs_copy = tvs.repl_rename(_nongens,map);
 
     // Fill in edges.  New Nodes point to New instead of Old; everybody
     // shares old nodes not in the function (and not cloned).
@@ -715,16 +706,6 @@ public class FunNode extends RegionNode {
       for( Node def : n._defs ) {
         Node newdef = map.get(def);// Map old to new
         c.add_def(newdef==null ? def : newdef);
-      }
-      // Switch out the TVars
-      c._tvar.free();
-      c._tvar = tvs_copy.get(n._uid);
-      if( c instanceof FreshNode ) {
-        FreshNode fsh = (FreshNode)c;
-        fsh.unelock();          // Changing hash
-        fsh._tv2s = ((FreshNode)n)._tv2s.clone();
-        for( int i=0; i<fsh._tv2s.length; i++ )
-          fsh._tv2s[i] = fsh._tv2s[i].find().repl_rename(null,map);
       }
     }
 
@@ -750,20 +731,16 @@ public class FunNode extends RegionNode {
           new_unr.add_def(old_funptr);
           new_unr._val = new_unr.value(GVNGCM.Mode.PesiNoCG);
         }
-    } else {                           // Path split
-      Node old_funptr = fptr(); // Find the funptr for the path split
+    } else {                         // Path split
+      Node old_funptr = fptr();      // Find the funptr for the path split
       Node new_funptr = map.get(old_funptr);
-      new_funptr.insert(old_funptr);
+      new_funptr.insert(old_funptr); // Make cloned recursive calls, call the old version not the new version
       TypeFunPtr ofptr = (TypeFunPtr) old_funptr._val;
       path_call.set_fdx(new_funptr); // Force new_funptr, will re-wire later
       TypeFunPtr nfptr = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,ofptr._disp);
       path_call._val = CallNode.set_ttfp((TypeTuple) path_call._val,nfptr);
       for( Node use : oldret._uses ) // Check extra FunPtrs are dead
         if( use instanceof FunPtrNode ) Env.GVN.add_dead(map.get(use));
-      // New H-M dependencies
-      for( Node use : new_funptr._uses )
-        if( use instanceof CallNode && ((CallNode)use).fdx()==new_funptr )
-          new_funptr.tvar().push_dep(((CallNode)use).cepi());
 
     } // Else other funptr/displays on unrelated path, dead, can be ignored
 
@@ -808,7 +785,6 @@ public class FunNode extends RegionNode {
         Env.DEFMEM.make_mem(oorg.nnn()._alias,oorg);
         int oldalias = BitsAlias.parent(oorg.nnn()._alias);
         Env.DEFMEM.set_def(oldalias,Node.con(TypeObj.UNUSED));
-        oorg.reset_tvar("fun_inline_alias");      // Force new H-M unification of memory
         Env.GVN.add_mono(oorg.nnn());
         Env.GVN.add_flow_uses(oorg);
         split_alias=true;
@@ -823,7 +799,6 @@ public class FunNode extends RegionNode {
       nn._elock();              // In GVN table
     }
     if( split_alias ) {
-      Env.DEFMEM.reset_tvar("fun_inline_alias");
       Env.DEFMEM.xval();
     }
 
@@ -860,7 +835,7 @@ public class FunNode extends RegionNode {
           // Found an unwired call in original: musta been a recursive
           // self-call.  wire the clone, same as the original was wired, so the
           // clone keeps knowledge about its return type.
-          call2.set_fdx(call.fdx());
+          //call2.set_fdx(call.fdx());
           cepi2.wire1(call2,this,oldret);
           call2.xval();
           Env.GVN.add_flow_uses(this); // This gets wired, that gets wired, revisit all
@@ -882,10 +857,6 @@ public class FunNode extends RegionNode {
         }
       }
     }
-
-    // Get a good H-M after edges for Calls and CallEpis; needed for unify_lift typing.
-    for( CallEpiNode cepi : unwireds )
-      cepi.unify(false);
 
     // Retype memory, so we can everywhere lift the split-alias parents "up and out".
     GVNGCM.retype_mem(aliases,this.parm(MEM_IDX), oldret, true);

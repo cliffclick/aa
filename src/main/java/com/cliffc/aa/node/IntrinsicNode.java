@@ -4,7 +4,6 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
@@ -22,7 +21,7 @@ public class IntrinsicNode extends Node {
   }
 
   @Override public boolean is_mem() { return true; }
-  @Override public TV2 new_tvar(String alloc_site) { return TV2.make_mem(this,alloc_site); }
+  //@Override public TV2 new_tvar(String alloc_site) { return TV2.make_mem(this,alloc_site); }
   @Override public String xstr() { return _tn._name; }
   Node mem() { return in(1); }
   Node ptr() { return in(2); }
