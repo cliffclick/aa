@@ -8,18 +8,64 @@ import java.util.*;
 
 import static com.cliffc.aa.AA.unimpl;
 
-// Hindley-Milner typing.  Complete stand-alone, for research.  MEETs base
-// types, instead of declaring type error.  Requires SSA renumbering; looks
-// 'up' the Syntax tree for variables instead of building a 'nongen' set.
-//
-// T2 types form a Lattice, with 'unify' same as 'meet'.  T2's form a DAG
-// (cycles if i allow recursive unification) with sharing.  Each Syntax has a
-// T2, and the forest of T2s can share.  Leaves of a T2 can be either a simple
-// concrete base type, or a sharable leaf.  Unify is structural, and where not
-// unifyable the union is replaced with an Error.
+// Combined Hindley-Milner and Global Constant Propagation typing.
 
-// Extend to records with nil.
-// Extend to aliases.
+// Complete stand-alone, for research.
+
+// Treats HM as a Monotone Analysis Framework; converted to a worklist style.
+// The type-vars are monotonically unified, gradually growing over time - and
+// this is treated as the MAF lattice.  Some of the normal Algo-W work gets
+// done in a prepass; e.g. discovering identifier sources (SSA form), and
+// building the non-generative set.  Because of the non-local unification
+// behavior type-vars include a "dependent Syntax" set; a set of Syntax
+// elements put back on the worklist if this type unifies, beyond the expected
+// parent and AST children.
+//
+// The normal HM unification steps are treated as the MAF transfer "functions",
+// taking type-vars as inputs and producing new, unified, type-vars.  Because
+// unification happens in-place (normal Tarjan disjoint-set union), the xfer
+// "functions" are executed for side-effects only, and return a progress flag.
+// The transfer functions are virtual calls on each Syntax element.  Some of
+// the steps are empty because of the pre-pass (Let,Con).
+
+// HM Bases include anything from the GCP lattice, but 'widened' to form
+// borders between e.g. ints and pointers.  Includes polymorphic structures and
+// fields (structural typing not duck typing), polymorphic nil-checking and an
+// error type-var.  Both HM and GCP types fully support recursive types.
+//
+// Unification typically makes many many temporary type-vars and immediately
+// unifies them.  For efficiency, this algorithm checks to see if unification
+// requires an allocation first, instead of just "allocate and unify".  The
+// major place this happens is identifiers, which normally make a "fresh" copy
+// of their type-var, then unify.  I use a combined "make-fresh-and-unify"
+// unification algorithm there.  It is a structural clone of the normal unify,
+// except that it lazily makes a fresh-copy of the left-hand-side on demand
+// only; typically discovering that no fresh-copy is required.
+//
+// To engineer and debug the algorithm, the unification step includes a flag to
+// mean "actually unify, and report a progress flag" vs "report if progress".
+// The report-only mode is aggressively asserted for in the main loop; all
+// Syntax elements that can make progress are asserted as on the worklist.
+//
+// GCP gets the normal MAF treatment, no surprises there.
+//
+// The combined algorithm includes transfer functions taking facts from both
+// MAF lattices, producing results in the other lattice.
+
+// For the GCP->HM direction, the HM 'if' has a custom transfer function
+// instead of the usual one.  Unification looks at the GCP value, and unifies
+// either the true arm, or the false arm, or both or neither.  In this way GCP
+// allows HM to avoid picking up constraints from dead code.
+
+// For the HM->GCP direction, the GCP 'apply' has a customer transfer function
+// where the result from a call gets lifted (JOINed) based on the matching GCP
+// inputs - and the match comes from using the same HM type-var on both inputs
+// and outputs.  This allows e.g. "map" calls which typically merge many GCP
+// values at many applies (call sites) and thus end up typed as a Scalar to
+// Scalar, to improve the GCP type on a per-call-site basis.
+//
+// Test case 45 demonstrates this combined algorithm, with a program which can
+// only be typed using the combination of GCP and HM.
 
 public class HM {
   // Mapping from primitive name to PrimSyn
@@ -140,8 +186,7 @@ public class HM {
       String id = id();
       if( skipWS()!='=' ) {
         PrimSyn prim = PRIMSYNS.get(id); // No shadowing primitives or this lookup returns the prim instead of the shadow
-        if( prim==null ) return new Ident(id);
-        return prim.make();     // Make a copy with fresh HM variables
+        return prim==null ? new Ident(id) : prim.make(); // Make a prim copy with fresh HM variables
       }
       // Let expression; "id = term(); term..."
       X++;                      // Skip '='
@@ -168,7 +213,7 @@ public class HM {
       return new Struct(ids.asAry(),flds.asAry());
     }
 
-    // Field lookup is prefix or backwards: ".x term"
+    // Field lookup is prefix or backwards: ".x term" instead of "term.x"
     if( BUF[X]=='.' ) {
       X++;
       return new Field(id(),term());
@@ -223,7 +268,7 @@ public class HM {
   // ---------------------------------------------------------------------
   // Worklist of Syntax nodes
   private static class Worklist {
-    public int _cnt;
+    public int _cnt;                                          // Count of items ever popped (not the current length)
     private final Ary<Syntax> _ary = new Ary<>(Syntax.class); // For picking random element
     private final HashSet<Syntax> _work = new HashSet<>();    // For preventing dups
     public int len() { return _ary.len(); }
@@ -284,29 +329,30 @@ public class HM {
     }
     T2 debug_find() { return _hmt.debug_find(); } // Find, without the roll-up
 
-    // Dataflow types.  Varies during a run of CCP.
-    // Mapped by the unique HM types available.
+    // Dataflow types.  Varies during a run of GCP.
     Type _flow;
 
-    // Compute and set a new HM type.
+    // Compute a new HM type.
     // If no change, return false.
     // If a change, return always true, however:
     // - If 'work' is null do not change/set anything.
-    // - If 'work' is available, set a new HM in '_t' and update the worklist.
+    // - If 'work' is available, update the worklist.
     abstract boolean hm(Worklist work);
 
     abstract void add_hm_work(Worklist work); // Add affected neighbors to worklist
 
-    // Compute and return (and do not set) a new dataflow type for this T2 grp.
+    // Compute and return (and do not set) a new GCP type for this syntax.
     abstract Type val(Worklist work);
 
     void add_val_work(Syntax child, Worklist work) {} // Add affected neighbors to worklist
 
+    // First pass to "prepare" the tree; does e.g. Ident lookup, sets initial
+    // type-vars and counts tree size.
     abstract int prep_tree(Syntax par, VStack nongen, Worklist work);
     final void prep_tree_impl( Syntax par, VStack nongen, Worklist work, T2 t ) {
-      _par=par;
-      _hmt =t;
-      _flow = Type.XSCALAR;
+      _par = par;
+      _hmt = t;
+      _flow= Type.XSCALAR;
       _nongen = nongen;
       work.push(this);
     }
@@ -348,7 +394,7 @@ public class HM {
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
     @Override boolean hm(Worklist work) { return false; }
     @Override Type val(Worklist work) { return _con; }
-    @Override void add_hm_work(Worklist work) { work.push(_par); }
+    @Override void add_hm_work(Worklist work) { }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par, nongen, work, T2.make_base(_con));
       return 1;
@@ -358,20 +404,24 @@ public class HM {
 
 
   static class Ident extends Syntax {
-    final String _name;
-    Syntax _def;                // Cached syntax owner with name
-    int _idx;                   // Index in Lambda
+    final String _name;         // The identifier name
+    Syntax _def;                // Cached syntax defining point
+    int _idx;                   // Index in Lambda (which arg of many)
     T2 _idt;                    // Cached type var for the name in scope
     Ident(String name) { _name=name; }
     @Override SB str(SB sb) { return p1(sb); }
     @Override SB p1(SB sb) { return sb.p(_name); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
+    T2 idt() {
+      T2 idt = _idt.find();
+      return idt==_idt ? idt : (_idt=idt);
+    }
     @Override boolean hm(Worklist work) {
-      return _idt.find().fresh_unify(find(),_nongen,work);
+      return idt().fresh_unify(find(),_nongen,work);
     }
     @Override void add_hm_work(Worklist work) {
       work.push(_par);
-      T2 t = _idt.find();
+      T2 t = idt();
       if( t.nongen_in(_par == null ? null : _par._nongen) ) // Got captured in some parent?
         t.add_deps_work(work);                              // Need to revisit dependent ids
       if( _par instanceof Apply && ((Apply)_par)._fun instanceof NotNil )
@@ -1025,13 +1075,8 @@ public class HM {
         return t2;              // False only
       if( pred.above_center() ) // Delay any values
         return Type.XSCALAR;    // t1.join(t2);     // Join of either
-      assert !pred.may_nil();   // Already covered
-      // If meeting a nil changes things, then the original excluded nil and so
-      // was always true.
-      if( !pred.must_nil() ) {
-        assert pred.meet_nil(Type.XNIL) != pred; // Adding nil changes things, so original pred does not have a nil
-        return t1;              // True only
-      }
+      if( !pred.must_nil() )    // True only
+        return t1;           
       // Could be either, so meet
       return t1.meet(t2);
     }
