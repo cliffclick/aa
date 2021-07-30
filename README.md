@@ -224,7 +224,7 @@ Code            | Comment
 `{x:int -> x*2}(1)` | `2:int` types on parmeters too
 `{x:str -> x}(1)`   | `1 is not a str`
 **Recursive and co-recursive functions** | ---
-`fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)` | `6:int` fully evaluates at typing time
+`fact = { x -> x <= 1 ? 1 : x*fact(x-1) }; fact(3)` | `6:int` fully evaluates at typing time
 `fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)` | `:int` does not collapse at typing time
 `is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)` | `1:int`
 `is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)` | `0:int`
