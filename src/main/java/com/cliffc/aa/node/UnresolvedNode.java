@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.type.BitsFun;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
 import com.cliffc.aa.util.Util;
@@ -42,10 +43,9 @@ public class UnresolvedNode extends UnOrFunPtrNode {
   // Required property for value():
   // ANY >= value(ANY) >= value(other) >= value(ALL) >= ALL
   @Override public Type value(GVNGCM.Mode opt_mode) {
-    // Freeze after GVN - only still around for errors
     switch( opt_mode ) {
     case PesiCG:
-      return _val;
+      return _val; // Freeze after GVN - only still around for errors
     case Parse:
     case PesiNoCG:
       Type t = Type.ANY;
@@ -56,15 +56,20 @@ public class UnresolvedNode extends UnOrFunPtrNode {
       }
       return t;
     case Opto:
-      Type tx = Type.ANY;
+      // If all inputs are TFPs, result is a high choice of TFPs, plus the
+      // normal join over displays.
+      BitsFun fidxs = BitsFun.EMPTY;
+      Type tdsp = Type.ALL;
+      int nargs = -1;
       for( Node fptr : _defs ) {
         Type td = fptr._val;
-        if( td==Type.ANY && fptr instanceof FunPtrNode )
-          td = TypeFunPtr.make(((FunPtrNode)fptr).ret()._fidx,((FunPtrNode)fptr).nargs(),Type.ANY);
-        tx = tx.meet(td);
+        if( !(td instanceof TypeFunPtr) ) return td.oob();
+        TypeFunPtr tfp = (TypeFunPtr)td;
+        fidxs = fidxs.meet((tfp.above_center() ? tfp.dual() : tfp)._fidxs);
+        tdsp = tdsp.join(tfp._disp);
+        nargs = tfp._nargs;
       }
-      if( !(tx instanceof TypeFunPtr) ) return tx.oob();
-      return ((TypeFunPtr)tx).make_from(((TypeFunPtr)tx)._fidxs.dual());
+      return TypeFunPtr.make(fidxs.dual(),nargs,tdsp);
     default: throw com.cliffc.aa.AA.unimpl();
     }
   }

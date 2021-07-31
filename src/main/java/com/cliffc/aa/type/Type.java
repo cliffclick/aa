@@ -93,19 +93,16 @@ import java.util.function.Predicate;
 
 public class Type<T extends Type<T>> implements Cloneable {
   static private int CNT=1;
-  public int _uid;       // Unique ID, will have gaps, used to uniquely order Types
+  public int _uid;   // Unique ID, will have gaps, used to uniquely order Types
   public int _hash;      // Hash for this Type; built recursively
   byte _type;            // Simple types use a simple enum
   public String _name;   // All types can be named
   T _dual; // All types support a dual notion, eagerly computed and cached here
 
-  protected Type(byte type) { this(type,""); }
-  protected Type(byte type, String name) { _uid(); init(type,name); }
-  void _uid() {
-    _uid=CNT++;
-  }
-  protected void init(byte type) { init(type,""); }
-  protected void init(byte type, String name) { _type=type; _name=name; }
+  protected Type() { _uid = _uid(); }
+  private int _uid() { return CNT++; }
+  @SuppressWarnings("unchecked")
+  protected T init(byte type, String name) { _type=type; _name=name; return (T)this; }
   @Override public final int hashCode( ) { assert _hash!=0; return _hash; }
   // Compute the hash and return it, with all child types already having their
   // hash computed.  Subclasses override this.
@@ -134,7 +131,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) { return sb.p(_name).p(STRS[_type]); }
 
   // Shallow array compare, using '==' instead of 'equals'.  Since elements are
-  // interned, this is the same as 'equals' except asympotically faster unless
+  // interned, this is the same as 'equals' except asymptotically faster unless
   // there is a type-cycle, then infinitely faster.
   public static boolean eq( Type[] t0, Type[] t1 ) {
     if( t0==t1 ) return true;
@@ -149,13 +146,12 @@ public class Type<T extends Type<T>> implements Cloneable {
   // Object Pooling to handle frequent (re)construction of temp objects being
   // interned.  One-entry pool for now.
   private static Type FREE=null;
-  protected T free( T ret ) { assert getClass()==Type.class; FREE=this; return ret; }
+  private T free( T ret ) { FREE=this; return ret; }
   @SuppressWarnings("unchecked")
   private static Type make( byte type ) {
-    Type t1 = FREE;
-    if( t1 == null ) t1 = new Type(type, "");
-    else { FREE = null; t1.init(type, ""); }
-    Type t2 = t1.hashcons();
+    Type t1 = FREE == null ? new Type() : FREE;
+    FREE = null;
+    Type t2 = t1.init(type,"").hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
   // Hash-Cons - all Types are interned in this hash table.  Thus an equality
@@ -164,15 +160,16 @@ public class Type<T extends Type<T>> implements Cloneable {
   private static final ConcurrentHashMap<Type,Type> INTERN = new ConcurrentHashMap<>();
   public static int RECURSIVE_MEET;    // Count of recursive meet depth
   @SuppressWarnings("unchecked")
-  final Type hashcons() {
+  final T hashcons() {
     _hash = compute_hash();     // Set hash
-    Type t2 = INTERN.get(this); // Lookup
+    T t2 = (T)INTERN.get(this); // Lookup
     if( t2!=null ) {            // Found prior
       assert t2._dual != null;  // Prior is complete with dual
+      assert this != t2;        // Do not hashcons twice, should not get self back
       return t2;                // Return prior
     }
     if( RECURSIVE_MEET > 0 )    // Mid-building recursive types; do not intern
-      return this;
+      return (T)this;
     // Not in type table
     _dual = null;                // No dual yet
     INTERN.put(this,this);       // Put in table without dual
@@ -181,12 +178,12 @@ public class Type<T extends Type<T>> implements Cloneable {
     d._hash = d.compute_hash();  // Set dual hash
     _dual = d;
     if( this==d ) return d;      // Self-symmetric?  Dual is self
-    if( equals(d) ) { d.free(null); _dual=(T)this; return this; } // If self symmetric then use self
+    assert !equals(d);           // Self-symmetric is handled by caller
     assert d._dual==null;        // Else dual-dual not computed yet
     assert INTERN.get(d)==null;
     d._dual = (T)this;
     INTERN.put(d,d);
-    return this;
+    return (T)this;
   }
   // Remove a forward-ref type from the interning dictionary, prior to
   // interning it again - as a self-recursive type
@@ -211,24 +208,37 @@ public class Type<T extends Type<T>> implements Cloneable {
   Type intern_lookup() { return INTERN.get(this); }
   static int intern_size() { return INTERN.size(); }
   public static boolean intern_check() {
-    for( Type k : INTERN.keySet() )
-      if( k.intern_check0() ) return false;
-    return true;
-  }
-  static void intern_hash_quality() {
-    NonBlockingHashMapLong<Integer> hashs = new NonBlockingHashMapLong<>();
+    int errs=0;
     for( Type k : INTERN.keySet() ) {
-      Integer ii = hashs.get(k._hash);
-      hashs.put(k._hash,ii==null ? 1 : ii+1);
+      Type v = INTERN.get(k);
+      if( !k.intern_check0(v) ) {
+        System.out.println("INTERN_CHECK FAIL: "+k._uid+":"+k+" vs "+v._uid+":"+v);
+        errs++;
+      }
     }
-    for( long l : hashs.keySet() ) {
-      System.out.println("hash "+l+" repeats "+hashs.get(l));
-    }
+    return errs==0;
   }
-  private boolean intern_check0() {
-    Type v = INTERN.get(this);
-    if( this == v && _dual!=null && _dual._dual==this ) return false;
-    System.out.println("INTERN_CHECK FAIL: "+_uid+":"+this+" vs "+v._uid+":"+v);
+  private boolean intern_check0(Type v) {
+    if( this != v || _dual==null || _dual._dual!=this || compute_hash()!=_hash ) return false;
+    switch( _type ) {
+    case TSTRUCT:
+      TypeStruct ts = (TypeStruct)this;
+      for( TypeFld fld : ts._flds )
+        if( INTERN.get(fld)==null )
+          return false;
+      break;
+    case TMEMPTR:
+      TypeMemPtr tmp = (TypeMemPtr)this;
+      if( INTERN.get(tmp._obj)==null )
+        return false;
+      break;
+    case TFLD:
+      TypeFld fld = (TypeFld)this;
+      if( INTERN.get(fld._t)==null )
+        return false;
+      break;
+    default: break;
+    }
     return true;
   }
   // Debugging helper
@@ -271,14 +281,15 @@ public class Type<T extends Type<T>> implements Cloneable {
   static final byte TTUPLE  =18; // Tuples; finite collections of unrelated Types, kept in parallel
   static final byte TOBJ    =19; // Memory objects; arrays and structs and strings
   static final byte TSTRUCT =20; // Memory Structs; tuples with named fields
-  static final byte TARY    =21; // Memory String type; an array of chars
+  static final byte TARY    =21; // Memory Array type
   static final byte TSTR    =22; // Memory String type; an array of chars
-  static final byte TMEM    =23; // Memory type; a map of Alias#s to TOBJs
-  static final byte TMEMPTR =24; // Memory pointer type; a collection of Alias#s
-  static final byte TFUNPTR =25; // Function pointer, refers to a collection of concrete functions
-  static final byte TFUNSIG =26; // Function signature; formals & ret.  Not any concrete function.
-  static final byte TLIVE   =27; // Liveness; backwards flow of TypeObj
-  static final byte TLAST   =28; // Type check
+  static final byte TFLD    =23; // Fields in structs
+  static final byte TMEM    =24; // Memory type; a map of Alias#s to TOBJs
+  static final byte TMEMPTR =25; // Memory pointer type; a collection of Alias#s
+  static final byte TFUNPTR =26; // Function pointer, refers to a collection of concrete functions
+  static final byte TFUNSIG =27; // Function signature; formals & ret.  Not any concrete function.
+  static final byte TLIVE   =28; // Liveness; backwards flow of TypeObj
+  static final byte TLAST   =29; // Type check
 
   public  static final Type ALL    = make( TALL   ); // Bottom
   public  static final Type ANY    = make( TANY   ); // Top
@@ -311,7 +322,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   private boolean is_ptr() { byte t = _type;  return t == TFUNPTR || t == TMEMPTR; }
   private boolean is_num() { byte t = _type;  return t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TNREAL-10*/1,1,1,1,/*TSIMPLE-14*/0, 1,1,1,0,0,0,0,0,0,1,1,/*TFUNSIG-26*/0,/*TLIVE-27*/0}/*TLAST=29*/;
+  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TNREAL-10*/1,1,1,1,/*TSIMPLE-14*/0, 1,1,1,0,0,0,0,0,0,0,1,1,/*TFUNSIG-27*/0,/*TLIVE-28*/0}/*TLAST=29*/;
   public final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
   // Simplify pointers (lose what they point at).
   public Type simple_ptr() { return this; }
@@ -321,10 +332,7 @@ public class Type<T extends Type<T>> implements Cloneable {
 
   // Compute dual right now.  Overridden in subclasses.
   @SuppressWarnings("unchecked")
-  T xdual() {
-    assert is_simple();
-    return (T)new Type((byte)(_type^1));
-  }
+  T xdual() { return (T)new Type().init((byte)(_type^1),""); }
   T rdual() { assert _dual!=null; return _dual; }
 
   // Memoize meet results
@@ -333,14 +341,40 @@ public class Type<T extends Type<T>> implements Cloneable {
     static NonBlockingHashMap<Key,Type> INTERN_MEET = new NonBlockingHashMap<>();
     Key(Type a, Type b) { _a=a; _b=b; }
     Type _a, _b;
-    @Override public int hashCode() { return (_a._hash<<17)|(_a._hash>>15)|_b._hash; }
+    @Override public int hashCode() { return ((_a._hash<<17)|(_a._hash>>>15))^_b._hash; }
     @Override public boolean equals(Object o) { return _a==((Key)o)._a && _b==((Key)o)._b; }
     static Type get(Type a, Type b) {
       K._a=a;
       K._b=b;
       return INTERN_MEET.get(K);
     }
-    static void put(Type a, Type b, Type mt) { INTERN_MEET.put(new Key(a,b),mt); }
+    static void put(Type a, Type b, Type mt) {
+      INTERN_MEET.put(new Key(a,b),mt);
+      // Uncomment to check hash quality.
+      //Util.hash_quality_check_per(INTERN_MEET);
+    }
+    static void intern_meet_quality_check() {
+      NonBlockingHashMapLong<Integer> hashs = new NonBlockingHashMapLong<>();
+      for( Key k : INTERN_MEET.keySet() ) {
+        int hash = k.hashCode();
+        Integer ii = hashs.get(hash);
+        hashs.put(hash,ii==null ? 1 : ii+1);
+      }
+      int[] hist = new int[16];
+      int maxval=0;
+      long maxkey=-1;
+      for( long l : hashs.keySet() ) {
+        int reps = hashs.get(l);
+        if( reps > maxval ) { maxval=reps; maxkey=l; }
+        if( reps < hist.length ) hist[reps]++;
+        else System.out.println("hash "+l+" repeats "+reps);
+      }
+      for( int i=0; i<hist.length; i++ )
+        if( hist[i] > 0 )
+          System.out.println("Number of hashes with "+i+" repeats: "+hist[i]);
+      System.out.println("Max repeat key "+maxkey+" repeats: "+maxval);
+    }
+
   }
 
   // Compute the meet
@@ -886,7 +920,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   protected Type clone() {
     try {
       Type t = (Type)super.clone();
-      t._uid();
+      t._uid = _uid();
       t._dual = null;
       t._hash = 0;
       if( t instanceof TypeStruct )

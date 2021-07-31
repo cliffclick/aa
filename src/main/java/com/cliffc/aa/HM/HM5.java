@@ -25,8 +25,6 @@ public class HM5 {
   static boolean DEBUG_LEAKS=false;
 
   public static T2 hm( Syntax prog) {
-    Object dummy = TypeStruct.DISPLAY;
-
     Worklist work = new Worklist();
 
     // Simple types

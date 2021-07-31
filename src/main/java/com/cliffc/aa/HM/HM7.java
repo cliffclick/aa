@@ -25,8 +25,6 @@ public class HM7 {
   static boolean DEBUG_LEAKS=false;
 
   public static T2 hm( String sprog ) {
-    Object dummy = TypeStruct.DISPLAY;
-
     Worklist work = new Worklist();
 
     // Simple types

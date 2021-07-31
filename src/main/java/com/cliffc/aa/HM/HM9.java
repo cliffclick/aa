@@ -7,6 +7,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.*;
 
 import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.type.TypeFld.Access;
 
 // Combined Hindley-Milner and Global Constant Propagation typing.
 
@@ -78,8 +79,6 @@ public class HM9 {
   static final boolean DO_GCP = true;
 
   public static Root hm( String sprog ) {
-    Object dummy = TypeStruct.DISPLAY;
-
     Worklist work = new Worklist();
     PrimSyn.WORK=work;
 
@@ -838,14 +837,11 @@ public class HM9 {
       for( Syntax fld : _flds ) work.push(fld);
     }
     @Override Type val(Worklist work) {
-      Type[] ts = Types.get(_flds.length+1);
-      ts[0] = Type.ANY;
+      TypeFld[] ts = TypeFlds.get(_flds.length+1);
+      ts[0] = TypeFld.NO_DISP;
       for( int i=0; i<_flds.length; i++ )
-        ts[i+1] = _flds[i]._flow;
-      String[] ids = new String[_ids.length+1];
-      ids[0] = "^";
-      System.arraycopy(_ids,0,ids,1,_ids.length);
-      TypeStruct tstr = TypeStruct.make(ids,ts);
+        ts[i+1] = TypeFld.make(_ids[i],_flds[i]._flow,Access.Final,i+1);
+      TypeStruct tstr = TypeStruct.make(ts);
       TypeStruct t2 = tstr.approx(1,_alias);
       return TypeMemPtr.make(_alias,t2);
     }
@@ -908,8 +904,8 @@ public class HM9 {
         TypeMemPtr tmp = (TypeMemPtr)trec;
         if( tmp._obj instanceof TypeStruct ) {
           TypeStruct tstr = (TypeStruct)tmp._obj;
-          int idx = tstr.find(_id);
-          if( idx!=-1 ) return tstr._ts[idx]; // Field type
+          int idx = tstr.fld_find(_id);
+          if( idx!=-1 ) return tstr.at(idx); // Field type
         }
         if( tmp._obj.above_center() ) return Type.XSCALAR;
       }
@@ -1007,7 +1003,7 @@ public class HM9 {
       @Override Type apply(Syntax[] args) {
         T2 tcon = find().args(1).args(0);
         assert tcon.is_base();
-        return TypeMemPtr.make(PAIR_ALIAS,TypeStruct.make_tuple(Type.ANY,tcon._flow,args==null ? Root.widen(_targs[0]) : args[0]._flow));
+        return TypeMemPtr.make(PAIR_ALIAS,TypeStruct.make(TypeStruct.flds(tcon._flow,args==null ? Root.widen(_targs[0]) : args[0]._flow)));
       }
     }
   }
@@ -1021,10 +1017,10 @@ public class HM9 {
     }
     @Override PrimSyn make() { return new Pair(); }
     @Override Type apply(Syntax[] args) {
-      Type[] ts = TypeStruct.ts(args.length+1);
-      ts[0] = Type.ANY;       // Display
-      for( int i=0; i<args.length; i++ ) ts[i+1] = args[i]._flow;
-      return TypeMemPtr.make(PAIR_ALIAS,TypeStruct.make_tuple(ts));
+      TypeFld[] ts = TypeFlds.get(args.length+1);
+      ts[0] = TypeFld.NO_DISP;       // Display
+      for( int i=0; i<args.length; i++ ) ts[i+1] = TypeFld.make_tup(args[i]._flow,i);
+      return TypeMemPtr.make(PAIR_ALIAS,TypeStruct.make(ts));
     }
   }
 
@@ -1036,10 +1032,10 @@ public class HM9 {
     public Triple() { super(var1=T2.make_leaf(),var2=T2.make_leaf(),var3=T2.make_leaf(),T2.make_struct(BitsAlias.make0(TRIPLE_ALIAS),new String[]{"0","1","2"},new T2[]{var1,var2,var3})); }
     @Override PrimSyn make() { return new Triple(); }
     @Override Type apply(Syntax[] args) {
-      Type[] ts = TypeStruct.ts(args.length+1);
-      ts[0] = Type.ANY;       // Display
-      for( int i=0; i<args.length; i++ ) ts[i+1] = args[i]._flow;
-      return TypeMemPtr.make(TRIPLE_ALIAS,TypeStruct.make_tuple(ts));
+      TypeFld[] ts = TypeFlds.get(args.length+1);
+      ts[0] = TypeFld.NO_DISP;       // Display
+      for( int i=0; i<args.length; i++ ) ts[i+1] = TypeFld.make_tup(args[i]._flow,i);
+      return TypeMemPtr.make(TRIPLE_ALIAS,TypeStruct.make(ts));
     }
   }
 
@@ -1393,16 +1389,15 @@ public class HM9 {
         TypeStruct tstr = ADUPS.get(_uid);
         if( tstr==null ) {
           Type.RECURSIVE_MEET++;
-          Type[] ts = Types.get(_ids.length+1);
-          String[] ids = new String[_ids.length+1];
-          ids[0] = "^";
-          System.arraycopy(_ids,0,ids,1,_ids.length);
-          tstr = TypeStruct.malloc("",false,ids,ts,TypeStruct.ffnls(ids.length),true);
+          TypeFld[] ts = TypeFlds.get(_ids.length+1);
+          ts[0] = TypeFld.NO_DISP;
+          for( int i=0; i<_ids.length; i++ )
+            ts[i+1] = TypeFld.malloc(_ids[i],null,Access.Final,i);
+          tstr = TypeStruct.malloc("",false,ts,true);
           tstr._hash = tstr.compute_hash();
           ADUPS.put(_uid,tstr); // Stop cycles
-          ts[0] = Type.ANY;
           for( int i=0; i<_ids.length; i++ )
-            ts[i+1] = args(i)._as_flow(); // Recursive
+            ts[i+1].setX(args(i)._as_flow()); // Recursive
           if( --Type.RECURSIVE_MEET == 0 ) {
             // Shrink / remove cycle dups.  Might make new (smaller)
             // TypeStructs, so keep RECURSIVE_MEET enabled.
@@ -1941,9 +1936,9 @@ public class HM9 {
         if( !(tmp._obj instanceof TypeStruct) ) return t;
         TypeStruct ts = (TypeStruct)tmp._obj;
         for( int i=0; i<_args.length; i++ ) {
-          int idx = Util.find(ts._flds,_ids[i]);
+          int idx = ts.fld_find(_ids[i]);
           // Missing fields are walked as SCALAR
-          args(i).walk_types_in(idx==-1 ? Type.SCALAR : ts._ts[idx]);
+          args(i).walk_types_in(idx==-1 ? Type.SCALAR : ts.at(idx));
         }
         return ts;
       }
@@ -1968,20 +1963,25 @@ public class HM9 {
         TypeMemPtr tmp = (TypeMemPtr)t;
         if( !(tmp._obj instanceof TypeStruct) ) throw unimpl();
         TypeStruct ts = (TypeStruct)tmp._obj;
-        Type[] newts = null;    // Lazy expand into an updated struct
+        boolean progress=false;
         for( int i=0; i<_args.length; i++ ) {
-          int idx = Util.find(ts._flds,_ids[i]);
+          int idx = ts.fld_find(_ids[i]);
           if( idx==-1 ) continue;
-          Type targ = ts._ts[idx];
+          Type targ = ts.at(idx);
           Type rez = args(i).walk_types_out(targ);
-          if( targ != rez ) {
-            if( newts==null ) newts = Types.clone(ts._ts);
-            newts[idx] = rez;
-          }
+          progress |= targ != rez;
         }
-        if( newts != null )
-          t = tmp.make_from(ts.make_from(newts));
-        return t;
+        if( !progress ) return t;
+        // Make a new result
+        TypeFld[] flds = TypeFlds.get(ts.len());
+        for( int i=0; i<_args.length; i++ ) {
+          int idx = ts.fld_find(_ids[i]);
+          if( idx==-1 ) continue;
+          Type targ = ts.at(idx);
+          Type rez = args(i).walk_types_out(targ);
+          flds[i] = ts.fld(i).make_from(rez);
+        }
+        return tmp.make_from(ts.make_from(flds));
       }
       throw unimpl();           // Handled all cases
     }

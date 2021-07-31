@@ -5,6 +5,7 @@ import com.cliffc.aa.type.*;
 import org.junit.Test;
 
 import static com.cliffc.aa.AA.REZ_IDX;
+import static com.cliffc.aa.type.TypeFld.Access;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -52,9 +53,9 @@ public class TestLive {
     fdy._val = ti9;
 
     // New object, fields x,y holding ints
-    NewObjNode nnn = new NewObjNode(false,TypeStruct.DISPLAY,Node.con(Type.NIL));
-    nnn.create_active("x",fdx,TypeStruct.FFNL);
-    nnn.create_active("y",fdy,TypeStruct.FFNL);
+    NewObjNode nnn = new NewObjNode(false,TypeMemPtr.DISPLAY,Node.con(Type.NIL));
+    nnn.create_active("x",fdx,Access.Final);
+    nnn.create_active("y",fdy,Access.Final);
     nnn._val = Type.ANY;
     nnn.no_more_fields();
     nnn.xval();
@@ -94,7 +95,7 @@ public class TestLive {
     mem.xliv(GVNGCM.Mode.PesiNoCG);
     assertEquals(mem._live,expected_live); // Object demands of OProj, but OProj passes along request to NewObj
     nnn.xliv(GVNGCM.Mode.PesiNoCG);
-    assertEquals(TypeMem.ALIVE,nnn._live); // NewObj supplies object, needs what its input needs
+    assertEquals(expected_live,nnn._live); // NewObj supplies object, needs what its input needs
     mmm.xliv(GVNGCM.Mode.PesiNoCG);
     assertEquals(TypeMem.ALIVE,mmm._live); // Since ptr is scalar, all memory is alive
     fdx.xliv(GVNGCM.Mode.PesiNoCG);

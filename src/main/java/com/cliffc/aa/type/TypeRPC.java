@@ -7,8 +7,7 @@ import com.cliffc.aa.util.VBitSet;
 public class TypeRPC extends Type<TypeRPC> {
   private BitsRPC _rpcs;         //
 
-  private TypeRPC( BitsRPC rpcs ) { super(TRPC); init(rpcs); }
-  private void init( BitsRPC rpcs ) { _rpcs = rpcs; }
+  private TypeRPC init( BitsRPC rpcs ) { super.init(TRPC,""); _rpcs = rpcs; return this; }
   @Override public int compute_hash( ) { return ((TRPC + _rpcs._hash)<<1)|1; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -23,21 +22,20 @@ public class TypeRPC extends Type<TypeRPC> {
   }
 
   private static TypeRPC FREE=null;
-  @Override protected TypeRPC free( TypeRPC ret ) { FREE=this; return ret; }
-  public static TypeRPC make( int rpc ) { return make(BitsRPC.make0(rpc)); }
+  private TypeRPC free( TypeRPC ret ) { FREE=this; return ret; }
   public static TypeRPC make( BitsRPC rpcs ) {
-    TypeRPC t1 = FREE;
-    if( t1 == null ) t1 = new TypeRPC(rpcs);
-    else { FREE = null; t1.init(rpcs); }
-    TypeRPC t2 = (TypeRPC)t1.hashcons();
+    TypeRPC t1 = FREE == null ? new TypeRPC() : FREE;
+    FREE = null;
+    TypeRPC t2 = t1.init(rpcs).hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
 
+  public static TypeRPC make( int rpc ) { return make(BitsRPC.make0(rpc)); }
   public static final TypeRPC ALL_CALL = make(BitsRPC.FULL);
   private static final TypeRPC RPC1 = make(BitsRPC.new_rpc(BitsRPC.ALL));
   static final TypeRPC[] TYPES = new TypeRPC[]{RPC1,ALL_CALL};
 
-  @Override protected TypeRPC xdual() { return new TypeRPC(_rpcs.dual()); }
+  @Override protected TypeRPC xdual() { return new TypeRPC().init(_rpcs.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TRPC:   break;

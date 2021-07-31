@@ -11,6 +11,7 @@ import java.text.ParsePosition;
 import java.util.*;
 
 import static com.cliffc.aa.AA.*;
+import static com.cliffc.aa.type.TypeFld.Access;
 
 /** an implementation of language AA
  *
@@ -112,6 +113,7 @@ public class Parse implements Comparable<Parse> {
     _gvn.gcp (GVNGCM.Mode.Opto,scope()); // Global Constant Propagation
     _gvn.iter(GVNGCM.Mode.PesiCG); // Re-check all ideal calls now that types have been maximally lifted
     _e._scope.unkeep();
+    //assert Type.intern_check();
     return gather_errors();
   }
 
@@ -222,6 +224,7 @@ public class Parse implements Comparable<Parse> {
       TypeStruct ots = (TypeStruct)ot;
       alias = ots.fref_alias(); // Forward-ref alias was allocated at the forward ref
       tn = ots.merge_recursive_type((TypeStruct)t);
+      ot = null; // Crushed by the merge
       tn_crush = ((TypeStruct)tn).crush();
       _e.def_type(tvar,tn);
     }
@@ -347,14 +350,14 @@ public class Parse implements Comparable<Parse> {
     // Assign tokens to value
     for( int i=0; i<toks._len; i++ ) {
       String tok = toks.at(i);               // Token being assigned
-      byte mutable = ts_mutable(rs.get(i));  // Assignment is mutable or final
+      Access mutable = rs.get(i) ? Access.RW : Access.Final;  // Assignment is mutable or final
       // Find scope for token.  If not defining struct fields, look for any
       // prior def.  If defining a struct, tokens define a new field in this scope.
       ScopeNode scope = lookup_scope(tok,lookup_current_scope_only);
       if( scope==null ) {                    // Token not already bound at any scope
         if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
           ((FunPtrNode)ifex).bind(tok); // Debug only: give name to function
-        create(tok,Env.XNIL,TypeStruct.FRW);  // Create at top of scope as undefined
+        create(tok,Env.XNIL,Access.RW);  // Create at top of scope as undefined
         scope = scope();                // Scope is the current one
         scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
       }
@@ -559,11 +562,11 @@ public class Parse implements Comparable<Parse> {
     if( stk._ts != old_ts ) {
       lhs.keep();
       for( int i=old_defs._len; i<stk._defs._len; i++ ) {
-        String fname = stk._ts._flds[i-1];
+        String fname = stk._ts.fld(i-1)._fld;
         String msg = "'"+fname+"' not defined prior to the short-circuit";
         Parse bad = errMsg(rhsx);
         Node err = gvn(new ErrNode(ctrl(),bad,msg));
-        set_mem(gvn(new StoreNode(mem(),scope().ptr(),err,TypeStruct.FFNL,fname,bad)));
+        set_mem(gvn(new StoreNode(mem(),scope().ptr(),err,Access.Final,fname,bad)));
       }
       lhs.unkeep();
     }
@@ -627,7 +630,7 @@ public class Parse implements Comparable<Parse> {
 
         // Store or load against memory
         if( peek(":=") || peek_not('=','=')) {
-          byte fin = _buf[_x-2]==':' ? TypeStruct.FRW : TypeStruct.FFNL;
+          Access fin = _buf[_x-2]==':' ? Access.RW : Access.Final;
           Node stmt = stmt(false);
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
           else set_mem( gvn(new StoreNode(mem(),castnn,n=stmt.keep(),fin,fld ,errMsg(fld_start))));
@@ -722,7 +725,7 @@ public class Parse implements Comparable<Parse> {
     // Need a load/call/store sensible options
     Node n;
     if( scope==null ) {         // Token not already bound to a value
-      create(tok,Env.XNIL,ts_mutable(true));
+      create(tok,Env.XNIL,Access.RW);
       scope = scope();
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
@@ -743,7 +746,7 @@ public class Parse implements Comparable<Parse> {
     Node plus = _e.lookup_filter_fresh("+",2,ctrl());
     Node sum = do_call(errMsgs(0,_x,_x),args(plus,n,con(TypeInt.con(d))));
     // Active memory for the chosen scope, after the call to plus
-    set_mem(gvn(new StoreNode(mem(),ptr,sum,TypeStruct.FRW,tok,errMsg())));
+    set_mem(gvn(new StoreNode(mem(),ptr,sum,Access.RW,tok,errMsg())));
     return n.unkeep();          // Return pre-increment value
   }
 
@@ -824,7 +827,7 @@ public class Parse implements Comparable<Parse> {
       if( fref_env==null ) fref_env = _e;
       Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,errMsg(oldx),fref_env));
       // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
-      fref_env._scope.stk().create(tok,fref,TypeStruct.FFNL);
+      fref_env._scope.stk().create(tok,fref,Access.Final);
       return fref;
     }
     Node def = scope.get(tok);    // Get top-level value; only sane if no stores allowed to modify it
@@ -861,10 +864,9 @@ public class Parse implements Comparable<Parse> {
     require(')',oldx);          // Balanced closing paren
 
     // Build the tuple from gathered args
-    TypeStruct mt_tuple = TypeStruct.make(false,new String[]{"^"},TypeStruct.ts(Type.XNIL),new byte[]{TypeStruct.FFNL},true);
-    NewObjNode nn = new NewObjNode(false,BitsAlias.REC,mt_tuple,Env.XNIL);
+    NewObjNode nn = new NewObjNode(false,BitsAlias.REC,TypeStruct.open(TypeMemPtr.NO_DISP),Env.ANY);
     for( int i=0; i<args._len; i++ )
-      nn.create_active((""+i).intern(),args.at(i).unkeep(),TypeStruct.FFNL);
+      nn.create_active((""+i).intern(),args.at(i).unkeep(),Access.Final);
     nn._fld_starts = bads.asAry();
     nn.no_more_fields();
     init(nn);
@@ -900,7 +902,7 @@ public class Parse implements Comparable<Parse> {
    *  number of statements separated by ';'.
    *  func = { [[id]* ->]? stmts }
    */
-  private static final byte args_are_mutable=ts_mutable(false); // Args mutable or r/only by default
+  private static final Access args_are_mutable=Access.Final; // Args mutable or r/only by default
   private Node func() {
     int oldx = _x;              // Past opening '{'
     Ary<String> ids = new Ary<>(new String[1],0);
@@ -969,7 +971,7 @@ public class Parse implements Comparable<Parse> {
         // But here, in a function, the display is actually passed in as a hidden
         // extra argument and replaces the default.
         NewObjNode stk = e._scope.stk();
-        stk.update(0,ts_mutable(false),clo);
+        stk.update(0,Access.Final,clo);
         // Add a nongen memory arg
         _e._nongen.add_var(" mem",mem.tvar());
 
@@ -1180,12 +1182,12 @@ public class Parse implements Comparable<Parse> {
 
   // No mod is r/w.  ':=' is read-write, '=' is final.
   // Currently '-' is ambiguous with function arrow ->.
-  private byte tmod() {
-    if( peek_not('=','=') ) { _x--; return TypeStruct.FFNL; } // final     , leaving trailing '='
-    if( peek(":="       ) ) { _x--; return TypeStruct.FRW ; } // read-write, leaving trailing '='
-    if( peek("=="       ) ) { _x--; return TypeStruct.FRO ; } // read-only , leaving trailing '='
+  private Access tmod() {
+    if( peek_not('=','=') ) { _x--; return Access.Final   ; } // final     , leaving trailing '='
+    if( peek(":="       ) ) { _x--; return Access.RW      ; } // read-write, leaving trailing '='
+    if( peek("=="       ) ) { _x--; return Access.ReadOnly; } // read-only , leaving trailing '='
     // Default for unnamed field mod
-    return TypeStruct.FRW;
+    return Access.RW;
   }
 
   // Type or null or Type.ANY for '->' token
@@ -1208,27 +1210,21 @@ public class Parse implements Comparable<Parse> {
     }
 
     if( peek("@{") ) {          // Struct type
-      Ary<String> flds = new Ary<>(new String[]{"^"});
-      Ary<Type  > ts   = new Ary<>(new Type  []{TypeMemPtr.DISP_SIMPLE});
-      Ary<Byte  > mods = new Ary<>(new Byte  []{TypeStruct.FFNL});
+      Ary<TypeFld> flds = new Ary<>(new TypeFld[]{TypeMemPtr.DISP_FLD});
       while( true ) {
         String tok = token();            // Scan for 'id'
         if( tok == null ) break;         // end-of-struct-def
+        final String itok = tok.intern(); // Only 1 copy
         Type t = Type.SCALAR;            // Untyped, most generic field type
-        byte tmodf = tmod();             // Field access mod; trailing '=' left for us
+        Access tmodf = tmod();           // Field access mod; trailing '=' left for us
         if( peek('=') &&                 // Has type annotation?
             (t=typep(type_var)) == null) // Parse type, wrap ptrs
           t = Type.SCALAR;               // No type found, assume default
-        tok = tok.intern();              // Only 1 copy
-        if( flds.find(tok) != -1 ) throw unimpl(); // cannot use same field name twice
-        flds  .add(tok);                 // Gather for final type
-        ts    .add(t);
-        mods  .add(tmodf);
+        if( flds.find(fld -> Util.eq(fld._fld,itok) ) != -1 ) throw unimpl(); // cannot use same field name twice
+        flds.add(TypeFld.make(itok,t,tmodf,flds._len));
         if( !peek(';') ) break; // Final semi-colon is optional
       }
-      byte[] finals = new byte[mods._len];
-      for( int i=0; i<mods._len; i++ )  finals[i] = mods.at(i);
-      return peek('}') ? TypeStruct.make(false,flds.asAry(),ts.asAry(),finals,true) : null;
+      return peek('}') ? TypeStruct.make("",false,flds.asAry(),true) : null;
     }
 
     // "()" is the zero-entry tuple
@@ -1238,17 +1234,17 @@ public class Parse implements Comparable<Parse> {
     // "(,int)" is a 2-entry tuple
     // "(, , )" is a 2-entry tuple
     if( peek('(') ) { // Tuple type
+      Ary<TypeFld> flds = new Ary<>(new TypeFld[]{TypeMemPtr.DISP_FLD});
       byte c;
-      Ary<Type> ts = new Ary<>(new Type[]{TypeMemPtr.DISP_SIMPLE});
       while( (c=skipWS()) != ')' ) { // No more types...
         Type t = Type.SCALAR;    // Untyped, most generic field type
         if( c!=',' &&            // Has type annotation?
             (t=typep(type_var)) == null) // Parse type, wrap ptrs
           return null;                   // not a type
-        ts.add(t);
+        flds.add(TypeFld.make_tup(t,flds._len));
         if( !peek(',') ) break; // Final comma is optional
       }
-      return peek(')') ? TypeStruct.make_tuple_open(ts.asAry()) : null;
+      return peek(')') ? TypeStruct.make("",false,flds.asAry(),true) : null;
     }
 
     if( peek('[') ) {
@@ -1385,8 +1381,7 @@ public class Parse implements Comparable<Parse> {
   public  Node lookup( String tok ) { return _e.lookup(tok); }
   private ScopeNode lookup_scope( String tok, boolean lookup_current_scope_only ) { return _e.lookup_scope(tok,lookup_current_scope_only); }
   public  ScopeNode scope( ) { return _e._scope; }
-  private void create( String tok, Node n, byte mutable ) { scope().stk().create(tok,n,mutable); }
-  private static byte ts_mutable(boolean mutable) { return mutable ? TypeStruct.FRW : TypeStruct.FFNL; }
+  private void create( String tok, Node n, Access mutable ) { scope().stk().create(tok,n,mutable); }
 
   // Get the display pointer.  The function call
   // passed in the display as a hidden argument which we return here.

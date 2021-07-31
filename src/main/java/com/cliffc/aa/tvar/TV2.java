@@ -563,9 +563,10 @@ public class TV2 {
         return rez; // TODO: Handle These
       TypeStruct ts = (TypeStruct)t; //
       for( Comparable key : _args.keySet() ) {
-        int idx = ts.find((String)key);
-        if( idx!= -1 )          // If field exists
-          rez = get(key)._find_tvar(ts.at(idx),tv,rez);
+        //int idx = ts.find((String)key);
+        //if( idx!= -1 )          // If field exists
+        //  rez = get(key)._find_tvar(ts.at(idx),tv,rez);
+        throw unimpl();
       }
       return rez;
     case "Fun":

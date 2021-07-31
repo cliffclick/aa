@@ -10,8 +10,7 @@ public class TypeFlt extends Type<TypeFlt> {
   byte _x;                // -2 bot, -1 not-null, 0 con, +1 not-null-top +2 top
   byte _z;                // bitsiZe, one of: 32,64
   double _con;
-  private TypeFlt ( int x, int z, double con ) { super(TFLT); init(x,z,con); }
-  private void init(int x, int z, double con ) { super.init(TFLT); _x=(byte)x; _z=(byte)z; _con = con; }
+  private TypeFlt init(int x, int z, double con ) { super.init(TFLT,""); _x=(byte)x; _z=(byte)z; _con = con; return this; }
   // Hash does not depend on other types
   @Override int compute_hash() { return super.compute_hash()+_x+_z+(int)_con; }
   @Override public boolean equals( Object o ) {
@@ -27,13 +26,12 @@ public class TypeFlt extends Type<TypeFlt> {
     return sb.p(_x>0?"~":"").p(Math.abs(_x)==1?"n":"").p("flt").p(_z);
   }
   private static TypeFlt FREE=null;
-  @Override protected TypeFlt free( TypeFlt ret ) { FREE=this; return ret; }
+  private TypeFlt free( TypeFlt ret ) { FREE=this; return ret; }
   public static Type make( int x, int z, double con ) {
     if( x==0 && (double)((long)con)==con ) return TypeInt.con((long)con);
-    TypeFlt t1 = FREE;
-    if( t1 == null ) t1 = new TypeFlt(x,z,con);
-    else {  FREE = null;      t1.init(x,z,con); }
-    TypeFlt t2 = (TypeFlt)t1.hashcons();
+    TypeFlt t1 = FREE == null ? new TypeFlt() : FREE;
+    FREE = null;
+    TypeFlt t2 = t1.init(x,z,con).hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
   public static Type con(double con) { return make(0,log(con),con); }
@@ -52,7 +50,7 @@ public class TypeFlt extends Type<TypeFlt> {
   @Override public double getd() { assert is_con(); return _con; }
   @Override public long   getl() { assert is_con() && ((long)_con)==_con; return (long)_con; }
 
-  @Override protected TypeFlt xdual() { return _x==0 ? this : new TypeFlt(-_x,_z,_con); }
+  @Override protected TypeFlt xdual() { return _x==0 ? this : new TypeFlt().init(-_x,_z,_con); }
   @Override protected Type xmeet( Type t ) {
     assert t != this;
     switch( t._type ) {

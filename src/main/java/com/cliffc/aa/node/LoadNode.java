@@ -24,7 +24,7 @@ public class LoadNode extends Node {
   Node mem() { return in(MEM_IDX); }
   Node adr() { return in(2); }
   private Node set_mem(Node a) { return set_def(1,a); }
-  public int find(TypeStruct ts) { return ts.find(_fld); }
+  public int find(TypeStruct ts) { return ts.fld_find(_fld); }
 
   // Strictly reducing optimizations
   @Override public Node ideal_reduce() {
@@ -153,7 +153,7 @@ public class LoadNode extends Node {
         MrgProjNode mrg = (MrgProjNode)mem;
         NewNode nnn = mrg.nnn();
         if( nnn instanceof NewObjNode ) {
-          int idx = ((NewObjNode)nnn)._ts.find(fld);
+          int idx = ((NewObjNode)nnn)._ts.fld_find(fld);
           if( idx >= 0 && adr instanceof ProjNode && adr.in(0) == nnn ) return nnn; // Direct hit
         }  // wrong field name or wrong alias, cannot match
         if( aliases.test_recur(nnn._alias) ) return null; // Overlapping, but wrong address - dunno, so must fail
@@ -203,13 +203,15 @@ public class LoadNode extends Node {
       return get_fld(tobj);
     return tobj.oob();          // No loading from e.g. Strings
   }
-
+  
   @Override public void add_flow_use_extra(Node chg) {
     if( chg==adr() ) Env.GVN.add_flow(mem());  // Address into a Load changes, the Memory can be more alive.
     if( chg==mem() ) Env.GVN.add_flow(mem());  // Memory value lifts to ANY, memory live lifts also.
     if( chg==mem() ) Env.GVN.add_flow(adr());  // Memory value lifts to an alias, address is more alive
     // Memory improves, perhaps Load can bypass Call
     if( chg==mem() && mem().in(0) instanceof CallEpiNode ) Env.GVN.add_reduce(this);
+    // Memory becomes a MrgProj, maybe Load can bypass MrgProj
+    if( chg==mem() && chg instanceof MrgProjNode ) Env.GVN.add_mono(this);
   }
 
   // The only memory required here is what is needed to support the Load
@@ -245,7 +247,7 @@ public class LoadNode extends Node {
       return tobj.oob();
     // Struct; check for field
     TypeStruct ts = (TypeStruct)tobj;
-    int idx = ts.find(_fld);  // Find the named field
+    int idx = ts.fld_find(_fld);  // Find the named field
     if( idx == -1 ) return Type.ALL;
     return ts.at(idx);          // Field type
   }

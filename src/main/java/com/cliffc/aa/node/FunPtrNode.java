@@ -9,8 +9,34 @@ import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.Env.GVN;
 
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
-// TypeFunPtr with a constant fidx and variable displays.  Used to allow 1st
+// TypeFunPtr with a constant fidx and variable displays.  Used to allow first
 // class functions to be passed about.
+
+// FIDXs above-center are used by UnresolvedNode to represent choice.
+// Normal FunPtrs, in both GCP and Opto/Iter, should be a single (low) FIDX.
+
+// Display is e.g. *[12] (alias 12 struct), or some other thing to represent an
+// unused/dead display.  I've been using either ANY or XNIL.
+
+// There are several invariants we'd like to have:
+
+// The FIDX and DISP match sign: so {-15,ANY} and {+15,NIL} are OK, but
+// {+15,XNIL} and {+15,ANY} are not.  This one is in conflict with the others,
+// and is DROPPED.  Instead we allow e.g. {+15,ANY} to indicate a FIDX 15 with
+// no display.
+//
+// FunPtrNodes strictly fall during GCP; lift during Opto.
+// So e.g. any -> [-15,any] -> [-15,-12] -> [+15,+12] -> [+15,all] -> all.
+// But need to fall preserving the existing of DISP.
+// So e.g.  any -> [-15,any] -> [-15,xnil] -> [+15,nil] -> [+15,all] -> all.
+// So e.g.  any -> [-15,-12] ->                            [+15,+12] -> all.
+//
+// FunPtrNodes start being passed e.g. [+12], but during GCP can discover DISP
+// is dead... but then after GCP need to migrate the types from [+15,+12] to
+// [+15,nil] which is sideways.  Has to happen in a single monolithic pass
+// covering all instances of [+15,+12].  Also may impact mixed +15 and other
+// FIDXs with unrelated DISPs.  Instead a dead display just flips to ANY.
+
 public final class FunPtrNode extends UnOrFunPtrNode {
   public String _name;          // Optional for debug only
   private ErrMsg _referr;       // Forward-ref error, cleared after defining
@@ -42,7 +68,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   @Override public UnresolvedNode unk() { return null; }
   // Self short name
   @Override public String xstr() {
-    if( is_dead() || _defs._len==0 ) return "*fun";
+    if( is_dead() || _defs._len==0 || ret()==null) return "*fun";
     int fidx = ret()._fidx;    // Reliably returns a fidx
     FunNode fun = FunNode.find_fidx(fidx);
     return "*"+(fun==null ? ""+fidx : fun.name());
@@ -52,7 +78,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     if( is_dead() ) return "DEAD";
     if( _defs._len==0 ) return "MAKING";
     RetNode ret = ret();
-    if( ret.is_copy() ) return "gensym:"+xstr();
+    if( ret==null || ret.is_copy() ) return "gensym:"+xstr();
     FunNode fun = ret.fun();
     return fun==null ? xstr() : fun.str();
   }
@@ -103,12 +129,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
-    // Do not allow live() to impact value()!  Leads to a busted optimistic
-    // value+live result in GCP.
-    // If display is not live, do not compute it in the value.
-    //Type tdisp = _live.live_no_disp() ? Type.ANY : display()._val;
-    Type tdisp = display()._val;
-    return TypeFunPtr.make(ret()._fidx,nargs(),tdisp);
+    return TypeFunPtr.make(ret()._fidx,nargs(),display()._val);
   }
   @Override public void add_flow_extra(Type old) {
     if( old==_live )            // live impacts value
@@ -120,7 +141,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     return !opt_mode._CG ? TypeMem.ESCAPE : super.live(opt_mode);
   }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    return def==ret() ? TypeMem.ANYMEM : (_live==TypeMem.NO_DISP ? TypeMem.DEAD : TypeMem.ESCAPE);
+    return def==ret() ? TypeMem.ANYMEM : (_live==TypeMem.LNO_DISP ? TypeMem.DEAD : TypeMem.ESCAPE);
   }
 
   //@Override public TV2 new_tvar(String alloc_site) {
@@ -224,7 +245,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     _referr = null;             // No longer a forward ref
     set_def(0,def.in(0));       // Same inputs
     set_def(1,def.in(1));
-    dsp.set_def(NewObjNode.def_idx(dsp._ts.find(tok)),def);
+    dsp.set_def(NewObjNode.def_idx(dsp._ts.fld_find(tok)),def);
     dsp.xval();
 
     fptr.bind(tok); // Debug only, associate variable name with function

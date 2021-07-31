@@ -18,8 +18,11 @@ import java.util.function.Predicate;
 
 public class TypeLive extends TypeObj<TypeLive> {
   int _flags;
-  private TypeLive (boolean any, int flags ) { super     (TLIVE,"",any); init(any,flags); }
-  private void init(boolean any, int flags ) { super.init(TLIVE,"",any); _flags = flags;  }
+  private TypeLive init(boolean any, int flags ) {
+    super.init(TLIVE,"",any,any);
+    _flags = flags;
+    return this;
+  }
   @Override int compute_hash() { return super.compute_hash() + _flags;  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -34,14 +37,12 @@ public class TypeLive extends TypeObj<TypeLive> {
   }
   
   private static TypeLive FREE=null;
-  @Override protected TypeLive free( TypeLive ret ) { FREE=this; return ret; }
+  private TypeLive free( TypeLive ret ) { FREE=this; return ret; }
   private static TypeLive make( boolean any, int flags ) {
-    TypeLive t1 = FREE;
-    if( t1 == null ) t1 = new TypeLive(any,flags);
-    else {   FREE = null;      t1.init(any,flags); }
-    TypeLive t2 = (TypeLive)t1.hashcons();
-    if( t1!=t2 ) return t1.free(t2);
-    return t1;
+    TypeLive t1 = FREE == null ? new TypeLive() : FREE;
+    FREE = null;
+    TypeLive t2 = t1.init(any,flags).hashcons();
+    return t1==t2 ? t1 : t1.free(t2);
   }
 
   // Value is used as a call-argument, value-stored (address use is ok),
@@ -52,15 +53,15 @@ public class TypeLive extends TypeObj<TypeLive> {
   private static final int FLAG_WITH_DISP=2;
   public boolean is_ret() { return (_flags&FLAG_WITH_DISP)!=0; }
   
-  static final TypeLive NO_DISP= make(false,0 ); // no escape, no disp
-  static final TypeLive ESC_DISP= make(false,FLAG_ESCAPE); // escape, no disp
+  static final TypeLive NO_DISP= make(false,0 );          // no escape, no disp
+  static final TypeLive ESC_DISP=make(false,FLAG_ESCAPE); // escape, no disp
   static final TypeLive LIVE   = make(false,FLAG_WITH_DISP); // Basic alive
   static final TypeLive ESCAPE = make(false,FLAG_ESCAPE+FLAG_WITH_DISP); // Used as a call argument
   
   public static final TypeLive LIVE_BOT=make(false,FLAG_ESCAPE+FLAG_WITH_DISP);
   public static final TypeLive DEAD   = LIVE_BOT.dual();
 
-  @Override protected TypeLive xdual() { return new TypeLive(!_any,_flags); }
+  @Override protected TypeLive xdual() { return new TypeLive().init(!_any,_flags); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TLIVE:   break;

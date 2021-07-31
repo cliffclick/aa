@@ -15,9 +15,7 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
-    Object dummy0 = TypeStruct.TYPES;
-    Object dummy1 = TypeMemPtr.TYPES;
-    
+
     Type t0 = Type.XNSCALR;
     Type t1 = TypeFunPtr.GENERIC_FUNPTR.dual();
     Type t01 = t0.meet(t1);
@@ -26,8 +24,6 @@ public class TestType {
 
   @Test public void testBits0() {
     Type.init0(new HashMap<>());
-    Object dummy0 = TypeStruct.TYPES;
-    Object dummy1 = TypeMemPtr.TYPES;
 
     // This looks like a crossing-nil bug, but it is not quite.
     // What is "nil join *[4]->str"?
@@ -61,8 +57,6 @@ public class TestType {
   // Need the basic invariants: complete, distributed, commutative, associative.
   @Test public void testBits() {
     Type.init0(new HashMap<>());
-    Object dummy0 = TypeStruct.TYPES;
-    Object dummy1 = TypeMemPtr.TYPES;
     // 1 - obj
     //   2 - tuples & structs
     //   3 - arrays
@@ -157,7 +151,7 @@ public class TestType {
 
     Type abc = TypeStr  .ABC;   // String constant
     Type zer = TypeInt  .FALSE;
-    Type tp0 = TypeStruct.make_tuple(zer);  // tuple of a '0'
+    Type tp0 = TypeStruct.make(zer);  // tuple of a '0'
 
     Type tupX= tup.dual();
     Type strX= str.dual();
@@ -266,19 +260,18 @@ public class TestType {
     Type tff = tsx.meet(tf);     //
     assertEquals(tf,tff);        // tsx.isa(tf)
     TypeStruct t0 = TypeStruct.make(Types.ts(nil)); //  (nil)
-    TypeStruct ts0= TypeStruct.make(new String[]{"x"}, Types.ts(nil));  // @{x:nil}
+    TypeStruct ts0= TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("x",nil,1));  // @{x:nil}
     Type tss = ts0.meet(t0);
     assertEquals(t0,tss);      // t0.isa(ts0)
-    byte[] finals = new byte[]{TypeStruct.FFNL};
 
     // meet @{c:0}? and @{c:@{x:1}?,}
     int alias0 = BitsAlias.type_alias(BitsAlias.REC);
     int alias1 = BitsAlias.type_alias(alias0);
     int alias2 = BitsAlias.type_alias(BitsAlias.REC);
     int alias3 = BitsAlias.type_alias(alias0);
-    TypeObj a1 = TypeStruct.make(new String[]{"c"},TypeStruct.ts(Type.NIL                   ),finals); // @{c:nil}
-    TypeObj a3 = TypeStruct.make(new String[]{"x"},TypeStruct.ts(TypeInt.TRUE               ),finals); // @{x: 1 }
-    TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeStruct.ts(TypeMemPtr.make_nil(alias3,a3)),finals); // @{c:*{3#}?}
+    TypeObj a1 = TypeStruct.make(TypeFld.make("c",Type.NIL,0)); // @{c:nil}
+    TypeObj a3 = TypeStruct.make(TypeFld.make("x",TypeInt.TRUE,0)); // @{x: 1 }
+    TypeObj a2 = TypeStruct.make(TypeFld.make("c",TypeMemPtr.make_nil(alias3,a3),0)); // @{c:*{3#}?}
     Ary<TypeObj> tos = new Ary<>(TypeObj.class);
     tos.setX(BitsAlias.ALL,TypeObj.OBJ);
     tos.setX(alias1,a1);
@@ -291,14 +284,13 @@ public class TestType {
     // mem.ld(*[1+2]?) ==> @{c:0}
     // Currently retaining precision after nil: [~0] -> @{ x==1}
     Type ld = mem.ld((TypeMemPtr)ptr12);
-    TypeObj ax = TypeStruct.make(new String[]{"c"},TypeStruct.ts(Type.NIL),finals ); // @{c:nil}
+    TypeObj ax = TypeStruct.make(TypeFld.make("c",Type.NIL,0)); // @{c:nil}
     assertTrue(ld.isa(ax));
   }
 
 
   @Test public void testFunction() {
     Type.init0(new HashMap<>());
-    Type ignore = TypeTuple.ANY; // Break class-loader cycle; load Tuple before Fun.
     PrimNode[] ignore2 = PrimNode.PRIMS(); // Force node
 
     TypeFunPtr gf = TypeFunPtr.GENERIC_FUNPTR;
@@ -336,7 +328,6 @@ public class TestType {
   // structures caps out in the type system at some reasonable limit.
   @Test public void testRecursive() {
     Type.init0(new HashMap<>());
-    String[] flds = new String[]{"n","v"};
 
     // Recursive types no longer cyclic in the concrete definition?  Because
     // TypeObj can contain TypeMemPtrs but not another nested TypeObj...
@@ -346,19 +337,18 @@ public class TestType {
 
     // Anonymous recursive structs -
     // - struct with pointer to self
-    byte[] finals = TypeStruct.ffnls(2);
-    TypeStruct ts0 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals,true);
+    TypeStruct ts0 = TypeStruct.malloc("",false,TypeFlds.ts(TypeFld.malloc("n",null,0),TypeFld.malloc("v",null,1)),true);
     ts0._hash = ts0.compute_hash();
-    ts0._ts[0] = ts0ptr;    ts0._cyclic = true;
-    ts0._ts[1] = TypeInt.INT64;
+    ts0.fld(0).setX(ts0ptr       );    ts0._cyclic = true;
+    ts0.fld(1).setX(TypeInt.INT64);
     ts0 = ts0.install_cyclic(ts0.reachable());
     TypeMem ts0mem = TypeMem.make(alias1,ts0); // {1:@{n:*[1],v:int} }
 
     // - struct with pointer to self or nil
-    TypeStruct ts1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals,true);
+    TypeStruct ts1 = TypeStruct.malloc("",false,TypeFlds.ts(TypeFld.malloc("n",null,0),TypeFld.malloc("v",null,1)),true);
     ts1._hash = ts1.compute_hash();
-    ts1._ts[0] = ts0ptr0;  ts1._cyclic = true;
-    ts1._ts[1] = TypeInt.INT64;
+    ts1.fld(0).setX(ts0ptr0      );    ts1._cyclic = true;
+    ts1.fld(1).setX(TypeInt.INT64);
     ts1 = ts1.install_cyclic(ts1.reachable());
     TypeMem ts1mem = TypeMem.make(alias1,ts1); // {1:@{n:*[0,1],v:int} }
 
@@ -372,20 +362,20 @@ public class TestType {
     // AS0AS0AS0AS0AS0AS0...
     final int alias2 = BitsAlias.new_alias(BitsAlias.REC);
     TypeMemPtr tptr2= TypeMemPtr.make_nil(alias2,TypeObj.OBJ); // *[0,2]
-    TypeStruct ts2 = TypeStruct.make(flds,TypeStruct.ts(tptr2,TypeInt.INT64)); // @{n:*[0,2],v:int}
+    TypeStruct ts2 = TypeStruct.make(TypeFld.make("n",tptr2,0),TypeFld.make("v",TypeInt.INT64,1)); // @{n:*[0,2],v:int}
     TypeStruct ta2 = ts2.set_name("A:");
 
     // Peel A once without the nil: Memory#3: A:@{n:*[2],v:int}
     // ASAS0AS0AS0AS0AS0AS0...
     final int alias3 = BitsAlias.new_alias(BitsAlias.REC);
     TypeMemPtr tptr3= TypeMemPtr.make(alias3,TypeObj.OBJ); // *[3]
-    TypeStruct ts3 = TypeStruct.make(flds,TypeStruct.ts(tptr2,TypeInt.INT64)); // @{n:*[2],v:int}
+    TypeStruct ts3 = TypeStruct.make(TypeFld.make("n",tptr2,0),TypeFld.make("v",TypeInt.INT64,1)); // @{n:*[0,2],v:int}
     TypeStruct ta3 = ts3.set_name("A:");
 
     // Peel A twice without the nil: Memory#4: A:@{n:*[3],v:int}
     // ASASAS0AS0AS0AS0AS0AS0...
     final int alias4 = BitsAlias.new_alias(BitsAlias.REC);
-    TypeStruct ts4 = TypeStruct.make(flds,TypeStruct.ts(tptr3,TypeInt.INT64)); // @{n:*[3],v:int}
+    TypeStruct ts4 = TypeStruct.make(TypeFld.make("n",tptr3,0),TypeFld.make("v",TypeInt.INT64,1)); // @{n:*[3],v:int}
     TypeStruct ta4 = ts4.set_name("A:");
 
     // Then make a MemPtr{3,4}, and ld - should be a PeelOnce
@@ -406,20 +396,20 @@ public class TestType {
     Type mta = mem234.ld(ptr34);
     //assertEquals(ta3,mta);
     TypeMemPtr ptr023 = (TypeMemPtr)TypeMemPtr.make_nil(alias2,TypeObj.OBJ).meet(TypeMemPtr.make(alias3,TypeObj.OBJ));
-    TypeStruct xts = TypeStruct.make(flds,TypeStruct.ts(ptr023,TypeInt.INT64));
+    TypeStruct xts = TypeStruct.make(TypeFld.make("n",ptr023,0),TypeFld.make("v",TypeInt.INT64,1));
     Type xta = xts.set_name("A:");
     assertEquals(xta,mta);
 
     // Mismatched Names in a cycle; force a new cyclic type to appear
     final int alias5 = BitsAlias.new_alias(BitsAlias.REC);
-    TypeStruct tsnb = TypeStruct.make(flds,TypeStruct.ts(TypeMemPtr.make_nil(alias5,TypeObj.OBJ),TypeFlt.FLT64));
+    TypeStruct tsnb = TypeStruct.make(TypeFld.make("n",TypeMemPtr.make_nil(alias5,TypeObj.OBJ),0),TypeFld.make("v",TypeFlt.FLT64,1));
     TypeStruct tfb = tsnb.set_name("B:");
     Type mtab = ta2.meet(tfb);
 
     // TODO: Needs a way to easily test simple recursive types
     TypeStruct mtab0 = (TypeStruct)mtab;
-    assertEquals("n",mtab0._flds[0]);
-    assertEquals("v",mtab0._flds[1]);
+    assertEquals("n",mtab0.fld(0)._fld);
+    assertEquals("v",mtab0.fld(1)._fld);
     TypeMemPtr mtab1 = (TypeMemPtr)mtab0.at(0);
     assertTrue(mtab1._aliases.test(alias2)&& mtab1._aliases.test(alias5));
     assertEquals(Type.REAL,mtab0.at(1));
@@ -434,13 +424,10 @@ public class TestType {
     // less than 5.  Any data loop must contain a Phi; if structures are
     // nesting infinitely deep, then it must contain a NewNode also.
     int alias = BitsAlias.new_alias(BitsAlias.REC);
-    Type[] tts = Types.ts(Type.NIL,TypeInt.con(0));
-    String[] flds2 = new String[]{".","."};
-    TypeStruct ts = TypeStruct.make(flds2,tts,finals);
+    TypeStruct ts = TypeStruct.make(TypeFld.make(TypeFld.fldBot,Type.NIL,0),TypeFld.make(TypeFld.fldBot,TypeInt.con(0),1));
     TypeMemPtr phi = TypeMemPtr.make(alias,ts);
     for( int i=1; i<20; i++ ) {
-      Type[] ntts = TypeStruct.ts(phi,TypeInt.con(i));
-      TypeStruct newt = TypeStruct.make(flds2,ntts,finals);
+      TypeStruct newt = TypeStruct.make(TypeFld.make(TypeFld.fldBot,phi,0),TypeFld.make(TypeFld.fldBot,TypeInt.con(i),1));
       TypeStruct approx = newt.approx(2/*CUTOFF*/,alias);
       phi = TypeMemPtr.make(alias,approx);
     }
@@ -456,34 +443,34 @@ public class TestType {
     Object dummy1 = TypeMemPtr.TYPES;
     // Make a cycle: 0_A: -> 1_(n=*,v=i64) -> 2_TMP -> 3_B: -> 4_(n=*,v=f64) -> 5_TMP ->
     // Dual; then meet ~4_() and ~0_A
-    String[] flds = new String[]{"n","v"};
-    byte[] finals = TypeStruct.ffnls(2);
     final int alias = BitsAlias.REC;
 
     Type.RECURSIVE_MEET++;
-    TypeStruct as1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals,true).set_name("A:");
-    TypeStruct bs4 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals,true).set_name("B:");
+    TypeFld[] flds1 = TypeFlds.ts(TypeFld.malloc("n",null,0), TypeFld.malloc("v",null,1));
+    TypeFld[] flds4 = TypeFlds.ts(TypeFld.malloc("n",null,0), TypeFld.malloc("v",null,1));
+    TypeStruct as1 = TypeStruct.malloc("",false,flds1,true).set_name("A:");
+    TypeStruct bs4 = TypeStruct.malloc("",false,flds4,true).set_name("B:");
     as1._hash = as1.compute_hash();  as1._cyclic = true;
     bs4._hash = bs4.compute_hash();  bs4._cyclic = true;
     TypeMemPtr ap5 = TypeMemPtr.make(alias,as1);
     TypeMemPtr bp2 = TypeMemPtr.make(alias,bs4);
-    as1._ts[0] = bp2;
-    as1._ts[1] = TypeInt.INT64;
-    bs4._ts[0] = ap5;
-    bs4._ts[1] = TypeFlt.FLT64;
+    as1.fld(0).setX(bp2          );
+    as1.fld(1).setX(TypeInt.INT64);
+    bs4.fld(0).setX(ap5          );
+    bs4.fld(1).setX(TypeFlt.FLT64);
     Type.RECURSIVE_MEET--;
     as1 = as1.install_cyclic(as1.reachable());
-    bp2 = (TypeMemPtr)as1._ts[0];
+    bp2 = (TypeMemPtr)as1.at(0);
     bs4 = (TypeStruct)bp2._obj;
-    ap5 = (TypeMemPtr)bs4._ts[0];
+    ap5 = (TypeMemPtr)bs4.at(0);
 
     Type das1 = as1.dual();     // ~A:@{b,int}
     Type dbs4 = bs4.dual();     // ~B:@{a,flt}
     // Since names mismatch, but both as1 and bs4 are high... must fall hard.
     Type mt = das1.meet(dbs4);  // ~ ~@{a join b, int join flt} ==> @{a join b, int32}
     TypeStruct smt = (TypeStruct)mt;
-    assertEquals(TypeInt.INT32,smt._ts[1]);
-    TypeMemPtr smp = (TypeMemPtr)smt._ts[0];
+    assertEquals(TypeInt.INT32,smt.at(1));
+    TypeMemPtr smp = (TypeMemPtr)smt.at(0);
     assertEquals(smt,smp._obj);
     assertEquals(BitsAlias.RECORD_BITS,smp._aliases);
 
@@ -535,7 +522,6 @@ public class TestType {
 
   // Validate crush is monotonic
   @Test public void testCrush() {
-    Object dummy0 = TypeStruct.TYPES;
     TypeObj[] objs = new TypeObj[]{
       TypeObj.ISUSED,
       TypeObj.OBJ,
@@ -545,7 +531,7 @@ public class TestType {
       TypeStruct.INT64_INT64,
       TypeStruct.NAMEPT,
       TypeStruct.POINT,
-      TypeStruct.DISPLAY,
+      TypeMemPtr.DISPLAY,
       TypeStruct.A,
       TypeStruct.ARW,
     };
@@ -573,9 +559,6 @@ public class TestType {
 
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
-    Object dummy0 = TypeStruct.TYPES;
-    BitsFun.make_new_fidx(BitsFun.ALL);
-
     assertTrue(Type.check_startup());
   }
 

@@ -10,6 +10,7 @@ import org.junit.Test;
 import java.util.Arrays;
 import java.util.HashMap;
 
+import static com.cliffc.aa.type.TypeFld.Access;
 import static org.junit.Assert.assertEquals;
 
 public class TestNode {
@@ -231,7 +232,7 @@ public class TestNode {
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STR0));
     test1monotonic(new  CProjNode(_ins[0],0));
     test1monotonic(new    ErrNode(_ins[0],null,"\nerr\n"));
-    test1monotonic(new    FunNode(TypeStruct.ARGS_X,new Type[]{TypeMemPtr.DISP_SIMPLE,TypeInt.INT64}));
+    test1monotonic(new    FunNode(new String[]{"^","x"},new Type[]{TypeMemPtr.DISP_SIMPLE,TypeInt.INT64}));    
     test1monotonic(new FunPtrNode("anon",ret,null));
     test1monotonic(new FP2DispNode(_ins[1])); // Only takes in a TFP
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
@@ -239,13 +240,13 @@ public class TestNode {
       test1monotonic_intrinsic(prim);
     test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
-    NewObjNode nnn1 = new NewObjNode(false,TypeStruct.DISPLAY,Node.con(Type.NIL));
-    set_type(1,Type.SCALAR);  nnn1.create_active("x",_ins[1],TypeStruct.FFNL);
-    set_type(2,Type.SCALAR);  nnn1.create_active("y",_ins[2],TypeStruct.FFNL);
+    NewObjNode nnn1 = new NewObjNode(false,TypeMemPtr.DISPLAY,Node.con(Type.NIL));
+    set_type(1,Type.SCALAR);  nnn1.create_active("x",_ins[1],Access.Final);
+    set_type(2,Type.SCALAR);  nnn1.create_active("y",_ins[2],Access.Final);
     test1monotonic(nnn1);
-    NewObjNode nnn2 = new NewObjNode(false,TypeStruct.DISPLAY,Node.con(Type.NIL));
-    set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[1],TypeStruct.FFNL);
-    set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[2],TypeStruct.FFNL);
+    NewObjNode nnn2 = new NewObjNode(false,TypeMemPtr.DISPLAY,Node.con(Type.NIL));
+    set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[1],Access.Final);
+    set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[2],Access.Final);
     nnn2.sets(tname);
     test1monotonic(nnn2);
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
@@ -256,8 +257,8 @@ public class TestNode {
     test1monotonic(new   ProjNode(1, _ins[0]));
     test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
     test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],fun_plus)); // ctl,mem,val,rpc,fun
-    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FRW ,"x",null));
-    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FFNL,"x",null));
+    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],Access.RW   ,"x",null));
+    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],Access.Final,"x",null));
     //                  ScopeNode has no inputs, and value() call is monotonic
     test1monotonic(new AssertNode(_ins[1],_ins[2],TypeInt.FALSE    ,null, null));
     test1monotonic(new AssertNode(_ins[1],_ins[2],TypeMemPtr.STRPTR,null, null));

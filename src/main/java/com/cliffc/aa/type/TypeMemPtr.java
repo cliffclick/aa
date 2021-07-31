@@ -3,8 +3,11 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
+
 import java.util.HashMap;
 import java.util.function.Predicate;
+
+import static com.cliffc.aa.type.TypeFld.Access;
 
 // Pointers-to-memory; these can be both the address and the value part of
 // Loads and Stores.  They carry a set of aliased TypeObjs.
@@ -22,8 +25,12 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   // function call args).
   public TypeObj _obj;          // Meet/join of aliases.  Unused in simple_ptrs in graph nodes.
 
-  private TypeMemPtr(BitsAlias aliases, TypeObj obj ) { super     (TMEMPTR); init(aliases,obj); }
-  private void init (BitsAlias aliases, TypeObj obj ) { super.init(TMEMPTR); _aliases = aliases; _obj=obj; }
+  private TypeMemPtr init(BitsAlias aliases, TypeObj obj ) {
+    super.init(TMEMPTR,"");
+    _aliases = aliases;
+    _obj=obj;
+    return this;
+  }
   @Override int compute_hash() {
     assert _obj._hash != 0;
     return (TMEMPTR + _aliases._hash + _obj._hash)|1;
@@ -56,12 +63,11 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   }
 
   private static TypeMemPtr FREE=null;
-  @Override protected TypeMemPtr free( TypeMemPtr ret ) { FREE=this; return ret; }
+  private TypeMemPtr free( TypeMemPtr ret ) { FREE=this; return ret; }
   public static TypeMemPtr make(BitsAlias aliases, TypeObj obj ) {
-    TypeMemPtr t1 = FREE;
-    if( t1 == null ) t1 = new TypeMemPtr(aliases,obj);
-    else { FREE = null;          t1.init(aliases,obj); }
-    TypeMemPtr t2 = (TypeMemPtr)t1.hashcons();
+    TypeMemPtr t1 = FREE == null ? new TypeMemPtr() : FREE;
+    FREE = null;
+    TypeMemPtr t2 = t1.init(aliases,obj).hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
 
@@ -69,10 +75,22 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public static TypeMemPtr make_nil( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
   public TypeMemPtr make_from( TypeObj obj ) { return make(_aliases,obj); }
 
-  public  static final TypeMemPtr DISPLAY_PTR= new TypeMemPtr(BitsAlias.RECORD_BITS0,TypeStruct.DISPLAY );
+  // The display is a self-recursive structure: slot 0 is a ptr to a Display.
+  // To break class-init cycle, this is made here, now.
+  public static final TypeFld    DISP_FLD= TypeFld.malloc("^",Type.NIL,Access.Final,0);
+  public static final TypeStruct DISPLAY = TypeStruct.malloc("",false,TypeFlds.ts(DISP_FLD),true);
+  public static final TypeMemPtr DISPLAY_PTR= new TypeMemPtr().init(BitsAlias.RECORD_BITS0,DISPLAY );
+  public static final Type       NO_DISP= Type.ANY;
   static {
+    DISP_FLD._hash = DISP_FLD.compute_hash();
+    DISPLAY._hash = DISPLAY.compute_hash();
     DISPLAY_PTR._hash = DISPLAY_PTR.compute_hash(); // Filled in during DISPLAY.install_cyclic
+    assert DISPLAY.at(0) == Type.NIL;
+    DISP_FLD.setX(TypeMemPtr.DISPLAY_PTR);
+    DISPLAY.install_cyclic(new Ary<>(Types.ts(DISPLAY ,TypeMemPtr.DISPLAY_PTR)));
+    assert DISPLAY.is_display();
   }
+
   public  static final TypeMemPtr ISUSED0= make(BitsAlias.FULL    ,TypeObj.ISUSED); // Includes nil
   public  static final TypeMemPtr ISUSED = make(BitsAlias.NZERO   ,TypeObj.ISUSED); // Excludes nil
   public  static final TypeMemPtr OOP0   = make(BitsAlias.FULL    ,TypeObj.OBJ); // Includes nil
@@ -88,8 +106,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeMemPtr NILPTR = make(BitsAlias.NIL,TypeObj.ISUSED);
   public  static final TypeMemPtr EMTPTR = make(BitsAlias.EMPTY,TypeObj.UNUSED);
   public  static final TypeMemPtr DISP_SIMPLE= make(BitsAlias.RECORD_BITS0,TypeObj.ISUSED); // closed display
-  public  static final Type NO_DISP= Type.ANY;
-  static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,EMTPTR};
+  static final Type[] TYPES = new Type[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,EMTPTR,DISPLAY,DISPLAY_PTR};
 
   @Override public boolean is_display_ptr() {
     BitsAlias x = _aliases.strip_nil();
@@ -106,11 +123,15 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   }
 
   @Override protected TypeMemPtr xdual() {
-    return new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.dual());
+    BitsAlias ad = _aliases.dual();
+    TypeObj od = (TypeObj)_obj.dual();
+    if( ad==_aliases && od==_obj )
+      return this;              // Centerline TMP
+    return new TypeMemPtr().init(ad,od);
   }
   @Override TypeMemPtr rdual() {
     if( _dual != null ) return _dual;
-    TypeMemPtr dual = _dual = new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.rdual());
+    TypeMemPtr dual = _dual = new TypeMemPtr().init(_aliases.dual(),(TypeObj)_obj.rdual());
     dual._dual = this;
     if( _hash != 0 ) dual._hash = dual.compute_hash();
     return dual;
@@ -178,25 +199,24 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
       if( _obj.above_center() && nil==XNIL )  return XNIL;
       if( nil==NIL ) return NIL;
     }
-    return make(_aliases.meet(BitsAlias.NIL),nil==NIL ? TypeObj.ISUSED : _obj);
+    return make(_aliases.meet(BitsAlias.NIL),_obj);
   }
   // Used during approximations, with a not-interned 'this'.
   // Updates-in-place.
   public Type ax_meet_nil(Type nil) {
-    if( _aliases.isa(BitsAlias.NIL.dual()) ) {
-      if( _obj==TypeObj.XOBJ && nil==XNIL )  return XNIL;
+    if( _aliases.isa(BitsAlias.XNIL) ) {
+      if( _obj.above_center() && nil==XNIL )  return XNIL;
       if( nil==NIL ) return NIL;
     }
     _aliases = _aliases.meet(BitsAlias.NIL);
-    if( nil==NIL ) _obj = TypeObj.OBJ;
     return this;
   }
 
   public BitsAlias aliases() { return _aliases; }
 
-  // Build a mapping from types to their depth in a shortest-path walk from the
-  // root.  Only counts depth on TypeStructs with the matching alias.  Only
-  // used for testing.
+  // Only used for testing.  Build a mapping from types to their depth in a
+  // shortest-path walk from the root.  Only counts depth on TypeStructs with
+  // the matching alias.
   HashMap<Type,Integer> depth() {
     int alias = _aliases.getbit();
     HashMap<Type,Integer> ds = new HashMap<>();
@@ -207,10 +227,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
       while( !t0.isEmpty() ) {
         TypeStruct ts = t0.pop();
         if( ds.putIfAbsent(ts,d) == null )
-          for( Type tf : ts._ts ) {
-            if( ds.putIfAbsent(tf,d) == null &&  // Everything in ts is in the current depth
-                tf instanceof TypeMemPtr ) {
-              TypeMemPtr tmp = (TypeMemPtr)tf;
+          for( TypeFld fld : ts._flds ) {
+            if( ds.putIfAbsent(fld._t,d) == null &&  // Everything in flds is in the current depth
+                fld._t instanceof TypeMemPtr ) {
+              TypeMemPtr tmp = (TypeMemPtr)fld._t;
               if( tmp._obj instanceof TypeStruct )
                 (tmp._aliases.test(alias) ? t1 : t0).push((TypeStruct)tmp._obj);
             }
@@ -222,7 +242,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return ds;
   }
 
-  // Max depth of struct, with a matching alias TMP
+  // Only used for testing.  Max depth of struct, with a matching alias TMP.
   static int max(int alias, HashMap<Type,Integer> ds) {
     int max = -1;
     for( Type t : ds.keySet() )

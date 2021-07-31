@@ -22,8 +22,6 @@ import java.util.HashSet;
  */
 public class HM1 {
   public static HMType HM(Syntax prog) {
-    Object dummy = TypeStruct.DISPLAY;
-
     HashMap<String,HMType> env = new HashMap<>();
     // Simple types
     HMVar bool  = new HMVar(TypeInt.BOOL);

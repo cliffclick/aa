@@ -7,6 +7,8 @@ import com.cliffc.aa.util.*;
 
 import java.util.HashSet;
 
+import static com.cliffc.aa.type.TypeFld.Access;
+
 public class Env implements AutoCloseable {
   public final static GVNGCM GVN = new GVNGCM(); // Initial GVN
   public static    StartNode START; // Program start values (control, empty memory, cmd-line args)
@@ -18,6 +20,7 @@ public class Env implements AutoCloseable {
   public static      ConNode ALL_CTRL; // Default control
   public static      ConNode XCTRL; // Always dead control
   public static      ConNode XNIL;  // Common XNIL
+  public static      ConNode NIL;   // Common NIL
   public static      ConNode ANY;   // Common ANY / used for dead
   public static      ConNode ALL;   // Common ALL / used for errors
   public static      ConNode ALL_CALL; // Common during function call construction
@@ -76,6 +79,7 @@ public class Env implements AutoCloseable {
     ALL_CTRL= GVN.xform(new ConNode<>(Type.CTRL )).keep();
     XCTRL   = GVN.xform(new ConNode<>(Type.XCTRL)).keep();
     XNIL    = GVN.xform(new ConNode<>(Type.XNIL )).keep();
+    NIL     = GVN.xform(new ConNode<>(Type.NIL  )).keep();
     ANY     = GVN.xform(new ConNode<>(Type.ANY  )).keep();
     ALL     = GVN.xform(new ConNode<>(Type.ALL  )).keep();
     ALL_CALL= GVN.xform(new ConNode<>(TypeRPC.ALL_CALL)).keep();
@@ -96,7 +100,7 @@ public class Env implements AutoCloseable {
     for( NewNode.NewPrimNode lib : NewNode.NewPrimNode.INTRINSICS() )
       STK_0.add_fun(null,lib ._name,(FunPtrNode) GVN.xform(lib .as_fun(GVN)));
     // Top-level constants
-    STK_0.create_active("math_pi", Node.con(TypeFlt.PI),TypeStruct.FFNL);
+    STK_0.create_active("math_pi", Node.con(TypeFlt.PI),Access.Final);
     STK_0.no_more_fields();
     STK_0.unkeep();
     // Run the worklist dry

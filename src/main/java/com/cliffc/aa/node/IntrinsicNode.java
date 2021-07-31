@@ -7,6 +7,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
+import static com.cliffc.aa.type.TypeFld.Access;
 
 // Function to wrap another type in a Name, which typically involves setting a
 // vtable like field, i.e. memory updates.
@@ -131,10 +132,9 @@ public class IntrinsicNode extends Node {
   // Passed in a named TypeStruct, and the parent alias.
   public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, GVNGCM gvn, Parse bad ) {
     assert to.has_name();
-    assert Util.eq(to._flds[0],"^"); // Display already
-    assert to.fmod(0)==TypeStruct.FFNL; // Display is final
+    assert to.fld(0).is_display_ptr(); // Display already
     // Upgrade the type to one with no display for nnn.
-    to = to.set_fld(0,TypeMemPtr.NO_DISP,TypeStruct.FFNL);
+    to = to.set_fld(0,TypeMemPtr.NO_DISP,Access.Final);
     // Formal is unnamed, and this function adds the name.
     TypeTuple formals = TypeTuple.make(to.remove_name());
     TypeFunSig sig = TypeFunSig.make(TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.make0(alias),to)),formals);
@@ -146,10 +146,10 @@ public class IntrinsicNode extends Node {
       // Add input edges to the NewNode
       Node nodisp = Node.con(TypeMemPtr.NO_DISP);
       NewObjNode nnn = (NewObjNode)X.add(new NewObjNode(false,alias,to,nodisp));
-      for( int i=1; i<to._ts.length; i++ ) {
-        String argx = to._flds[i];
-        if( TypeStruct.fldBot(argx) ) argx = null;
-        nnn.add_def(X.xform(new ParmNode(i+DSP_IDX,argx,fun, (ConNode)Node.con(to._ts[i].simple_ptr()),bad)));
+      for( int i=1; i<to.len(); i++ ) {
+        String argx = to.fld(i)._fld;
+        if( Util.eq(argx,TypeFld.fldBot) ) argx = null;
+        nnn.add_def(X.xform(new ParmNode(i+DSP_IDX,argx,fun, (ConNode)Node.con(to.at(i).simple_ptr()),bad)));
       }
       Node mmem = Env.DEFMEM.make_mem_proj(nnn,memp);
       Node ptr = X.xform(new ProjNode(REZ_IDX, nnn));

@@ -9,6 +9,13 @@ import java.util.Arrays;
 public class Types {
   // Lazy expanding list of TypeAry customed to handle various Type[] lengths.
   private static final Ary<Types> TYPEARY = new Ary<>(new Types[1],0);
+
+  // Make a TypeAry to handle Type[] of length 'len'
+  private static Types tary( int len) {
+    Types tary = TYPEARY.atX(len);
+    return tary==null ? TYPEARY.setX(len,new Types(len)) : tary;
+  }
+  
   private static final Key K = new Key(null,0);
 
   // Wrapper to customize array.equals
@@ -40,12 +47,6 @@ public class Types {
   private final IHashMap _intern = new IHashMap();
   private final Ary<Type[]> _free = new Ary<>(new Type[1][],0);
   private Types( int len ) { _len=len; }
-
-  // Make a TypeAry to handle Type[] of length 'len'
-  private static Types tary( int len) {
-    Types tary = TYPEARY.atX(len);
-    return tary==null ? TYPEARY.setX(len,new Types(len)) : tary;
-  }
 
   private Types check() { assert check_();  return this; }
   private boolean check_() {
@@ -83,7 +84,9 @@ public class Types {
   public static Type[] get(int len) { return tary(len).check().get(); }
   public static void free(Type[] ts) { tary(ts.length)._free.push(ts); }
   public static Type[] hash_cons(Type[] ts) { return tary(ts.length).check().hash_cons_(ts); }
-  // TODO: Why is this API not auto-interning?
+  // Why is this API not auto-interning?  Because it is used to make cyclic
+  // types in TypeStructs, which means the fields will change over
+  // time... until the intern point.
   public static Type[] ts(Type t0) {
     Types t1 = tary(1).check();
     Type[] ts = t1.get();

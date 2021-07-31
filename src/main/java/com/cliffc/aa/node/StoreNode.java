@@ -7,13 +7,15 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Util;
 
+import static com.cliffc.aa.type.TypeFld.Access;
+
 // Store a value into a named struct field.  Does it's own nil-check and value
 // testing; also checks final field updates.
 public class StoreNode extends Node {
   final String _fld;        // Field being updated
-  private final byte _fin;  // TypeStruct.ffinal or TypeStruct.frw
+  private final Access _fin; // TypeFld.Access.Final or TypeFld.Access.RW
   private final Parse _bad;
-  public StoreNode( Node mem, Node adr, Node val, byte fin, String fld, Parse bad ) {
+  public StoreNode( Node mem, Node adr, Node val, Access fin, String fld, Parse bad ) {
     super(OP_STORE,null,mem,adr,val);
     _fld = fld;
     _fin = fin;
@@ -28,7 +30,7 @@ public class StoreNode extends Node {
   Node mem() { return in(1); }
   Node adr() { return in(2); }
   Node rez() { return in(3); }
-  public int find(TypeStruct ts) { return ts.find(_fld); }
+  public int find(TypeStruct ts) { return ts.fld_find(_fld); }
 
   @Override public Node ideal_reduce() {
     Node mem = mem();
@@ -47,7 +49,7 @@ public class StoreNode extends Node {
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
         !rez().is_forward_ref() &&
         mem._uses._len==2 &&
-        (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
+        (idx=nnn._ts.fld_find(_fld))!= -1 && nnn._ts.fld(idx)._access==Access.RW ) {
       // Update the value, and perhaps the final field
       nnn.update(idx,_fin,rez());
       mem.xval();
@@ -148,12 +150,11 @@ public class StoreNode extends Node {
       : ((TypeObj)tmem);
     if( !(objs instanceof TypeStruct) ) return bad("No such",fast,objs);
     TypeStruct ts = (TypeStruct)objs;
-    int idx = ts.find(_fld);
+    int idx = ts.fld_find(_fld);
     if( idx==-1 ) return bad("No such",fast,objs);
-    if( !ts.can_update(idx) ) {
-      String fstr = TypeStruct.fstring(ts.fmod(idx));
-      return bad("Cannot re-assign "+fstr,fast,ts);
-    }
+    Access access = ts.fld(idx)._access;
+    if( access!=Access.RW )
+      return bad("Cannot re-assign "+access,fast,ts);
     return null;
   }
   private ErrMsg bad( String msg, boolean fast, TypeObj to ) {
@@ -161,7 +162,7 @@ public class StoreNode extends Node {
     boolean is_closure = adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure;
     return ErrMsg.field(_bad,msg,_fld,is_closure,to);
   }
-  @Override public int hashCode() { return super.hashCode()+_fld.hashCode()+_fin; }
+  @Override public int hashCode() { return super.hashCode()+_fld.hashCode()+_fin.hashCode(); }
   // Stores are can be CSE/equal, and we might force a partial execution to
   // become a total execution (require a store on some path it didn't happen).
   // This can be undone later with splitting.

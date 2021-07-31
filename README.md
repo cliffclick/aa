@@ -441,13 +441,24 @@ Return the index of the element matching `e`, or -1 if not found:
 ```C
 find = { ary e ->
   i:=0;
-  idx = for { i++ < #ary }
-    {ary[i]==e ? i+1};  // if found, exit index+1 (so non-zero)
+  idx = for { i++ < #ary } {
+    ary[i]==e ? i+1     // if found, exit index+1 (so non-zero)
+  };
   idx-1                 // if nil exit, then not-found so -1. 
 }
 ```
 
+This can be tightened by realizing that `for` is not a special form, but simply
+a function with a return value:
 
+```C
+find = { ary e ->
+  i:=0;
+  for { i++ < #ary } {
+    ary[i]==e ? i+1     // if found, exit index+1 (so non-zero)
+  } -1                  // if nil exit, then not-found so -1. 
+}
+```
 
 
 

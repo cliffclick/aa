@@ -3,6 +3,7 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
+import static com.cliffc.aa.type.TypeFld.Access;
 
 import java.util.function.Predicate;
 import java.util.HashMap;
@@ -11,10 +12,10 @@ import java.util.HashMap;
 // should be replaced with a named Array.
 public class TypeStr extends TypeObj<TypeStr> {
   private String _con;          //
-  private TypeStr  (String name, boolean any, String con ) { super(TSTR,name,any); init(name,any,con); }
-  private void init(String name, boolean any, String con ) {
-    super.init(TSTR,name,any);
+  private TypeStr init(String name, boolean any, String con ) {
+    super.init(TSTR,name,any,any);
     _con = con;
+    return this;
   }
   @Override int compute_hash() { return super.compute_hash() + (_con==null ? 0 : _con.hashCode());  }
   @Override public boolean equals( Object o ) {
@@ -30,17 +31,15 @@ public class TypeStr extends TypeObj<TypeStr> {
     return sb;
   }
   private static TypeStr FREE=null;
-  @Override protected TypeStr free( TypeStr ret ) { FREE=this; return ret; }
-  public static TypeStr make( boolean any, String con ) { return make("",any,con); }
+  private TypeStr free( TypeStr ret ) { FREE=this; return ret; }
   public static TypeStr make( String name, boolean any, String con ) {
     assert con==null || !any;
-    TypeStr t1 = FREE;
-    if( t1 == null ) t1 = new TypeStr(name,any,con);
-    else {   FREE = null;     t1.init(name,any,con); }
-    TypeStr t2 = (TypeStr)t1.hashcons();
-    if( t1!=t2 ) return t1.free(t2);
-    return t1;
+    TypeStr t1 = FREE == null ? new TypeStr() : FREE;
+    FREE = null;
+    TypeStr t2 = t1.init(name,any,con).hashcons();
+    return t1==t2 ? t1 : t1.free(t2);
   }
+  public static TypeStr make( boolean any, String con ) { return make("",any,con); }
   public static TypeStr con(String con) { return make(false,con); }
   public static void init() {} // Used to force class init
 
@@ -53,7 +52,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   // Return a String from a TypeStr constant; assert otherwise.
   @Override public String getstr() { assert _con!=null; return _con; }
 
-  @Override protected TypeStr xdual() { return _con == null ? new TypeStr(_name, !_any,_con) : this; }
+  @Override protected TypeStr xdual() { return _con == null ? new TypeStr().init(_name, !_any,_con) : this; }
   @Override TypeStr rdual() {
     if( _dual != null ) return _dual;
     TypeStr dual = _dual = xdual();
@@ -90,8 +89,8 @@ public class TypeStr extends TypeObj<TypeStr> {
 
   // Update (approximately) the current TypeObj.  Strings are not allowed to be
   // updated, so this is a program type-error.
-  @Override public TypeObj update(byte fin, String fld, Type val) { return this; }
-  @Override public TypeObj st    (byte fin, String fld, Type val) { return this; }
+  @Override public TypeObj update(Access fin, String fld, Type val) { return this; }
+  @Override public TypeObj st    (Access fin, String fld, Type val) { return this; }
   @Override public boolean may_be_con() { return super.may_be_con() || _con != null; }
   @Override public boolean is_con() { return _con != null; }
   @Override public Type meet_nil(Type t) { return this; }

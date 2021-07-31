@@ -27,8 +27,6 @@ public class HM8 {
   static { BitsAlias.init0(); }
 
   public static Syntax hm( String sprog ) {
-    Object dummy = TypeStruct.DISPLAY;
-
     Worklist work = new Worklist();
 
     // Simple types

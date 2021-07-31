@@ -562,7 +562,6 @@ public abstract class Node implements Cloneable {
     for( Node use : _uses )      // Computed across all uses
       if( use.live_uses() ) {
         TypeMem ulive = use.live_use(opt_mode, this);
-        assert ulive.is_flattened();
         live = (TypeMem)live.meet(ulive); // Make alive used fields
       }
     assert live==TypeMem.DEAD || live.basic_live()==all_live().basic_live();

@@ -15,16 +15,17 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   public TypeTuple _formals;    // Control0, Memory1, Display2, Arg3, Arg4, ...
   public TypeTuple _ret;        // Control0, Memory1, Result2
 
-  private TypeFunSig(String[] args, TypeTuple formals, TypeTuple ret ) { super(TFUNSIG); init(args,formals,ret); }
-  private void init (String[] args, TypeTuple formals, TypeTuple ret ) {
-    _args=args;
-    _formals=formals;
-    _ret=ret;
+  private TypeFunSig init (String[] args, TypeTuple formals, TypeTuple ret ) {
+    super.init(TFUNSIG,"");
     assert args.length>=formals.len();
     assert (args[CTL_IDX]==null || Util.eq(args[CTL_IDX]," ctl")) && (formals.at(CTL_IDX)==Type.CTRL || formals.at(CTL_IDX)==Type.XCTRL);
     assert (args[MEM_IDX]==null || Util.eq(args[MEM_IDX]," mem")) && (formals.at(MEM_IDX) instanceof TypeMem || formals.at(MEM_IDX)==Type.ALL || formals.at(MEM_IDX)==Type.ANY);
     assert (args[DSP_IDX]==null || Util.eq(args[DSP_IDX],"^"   )) &&  formals.at(DSP_IDX).is_display_ptr();
     assert ret.len()==3 && ret.at(MEM_IDX) instanceof TypeMem;
+    _args=args;
+    _formals=formals;
+    _ret=ret;
+    return this;
   }
   @Override int compute_hash() {
     assert _formals._hash != 0;
@@ -67,12 +68,11 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   }
 
   private static TypeFunSig FREE=null;
-  @Override protected TypeFunSig free( TypeFunSig ret ) { FREE=this; return ret; }
+  private TypeFunSig free( TypeFunSig ret ) { FREE=this; return ret; }
   public static TypeFunSig make( String[] args, TypeTuple formals, TypeTuple ret ) {
-    TypeFunSig t1 = FREE;
-    if( t1 == null ) t1 = new TypeFunSig(args,formals,ret);
-    else {   FREE = null;        t1.init(args,formals,ret); }
-    TypeFunSig t2 = (TypeFunSig)t1.hashcons();
+    TypeFunSig t1 = FREE == null ? new TypeFunSig() : FREE;
+    FREE = null;
+    TypeFunSig t2 = t1.init(args,formals,ret).hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
   public static TypeFunSig make( TypeTuple ret, Type[] ts ) { return make(func_names,TypeTuple.make_args(ts),ret); }
@@ -90,7 +90,7 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   public Type arg(int idx) { return _formals._ts[idx]; }
   public Type display() { return arg(DSP_IDX); }
 
-  @Override protected TypeFunSig xdual() { return new TypeFunSig(_args,_formals.dual(),_ret.dual()); }
+  @Override protected TypeFunSig xdual() { return new TypeFunSig().init(_args,_formals.dual(),_ret.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUNSIG: break;

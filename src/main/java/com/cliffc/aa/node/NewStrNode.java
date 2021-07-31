@@ -34,7 +34,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
     @Override TypeStr valueobj() { return _ts; }
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { throw com.cliffc.aa.AA.unimpl(); } // No inputs
     // Constant Strings intern
-    @Override public int hashCode() { return _ts._hash; }
+    @Override public int hashCode() { return is_unused() ? super.hashCode() : _ts._hash; }
     @Override public boolean equals(Object o) { return o instanceof ConStr && _ts==((ConStr)o)._ts; }
   }
 
@@ -72,11 +72,11 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       Type m   = val(1);
       Type sp0 = val(3);
       Type sp1 = val(4);
-      if( m.above_center() || sp0.above_center() || sp1.above_center() ) return Type.ANY;
-      if( !(m instanceof TypeMem)   ) return Type.ALL;
+      if( !(m instanceof TypeMem)   ) return m.oob();
       if( sp0==Type.XNIL && sp1==Type.XNIL ) return TypeTuple.make(TypeObj.UNUSED,Type.XNIL);
       if( !sp0.isa(TypeMemPtr.STR0) ) return _value(TypeStr.STR);
       if( !sp1.isa(TypeMemPtr.STR0) ) return _value(TypeStr.STR);
+      if( sp0.above_center() || sp1.above_center() ) return Type.ANY;
       TypeMem mem = (TypeMem)m;
       TypeObj s0 = sp0==Type.XNIL ? TypeObj.UNUSED : mem.ld((TypeMemPtr)sp0);
       TypeObj s1 = sp1==Type.XNIL ? TypeObj.UNUSED : mem.ld((TypeMemPtr)sp1);

@@ -11,19 +11,48 @@ import static com.cliffc.aa.AA.*;
 public class TypeTuple extends Type<TypeTuple> {
   boolean _any;
   public Type[] _ts; // The fixed known types
-  protected TypeTuple( byte type, boolean any, Type[] ts ) { super(type); init(type, any, ts);  }
-  protected void init( byte type, boolean any, Type[] ts ) {
-    super.init(type);
+  protected TypeTuple init( boolean any, Type[] ts ) {
+    super.init(TTUPLE,"");
     _any = any;
     _ts = ts;
+    return this;
   }
 
   // If visit is null, children have had their hash already computed.
   // If visit is not null, children need to be recursively visited.
+  private static int rot(int x, int k) { return (x<<k) | (x>>(32-k)); }
+  @SuppressWarnings("fallthrough")
   @Override public int compute_hash( ) {
     int hash = TTUPLE+(_any?0:1);
-    for( Type t : _ts ) hash = (hash>>>17) | ((hash<<5) * t._hash);
-    return hash|1;
+    // Copied from http://burtleburtle.net/bob/c/lookup3.c
+    int i,a,b,c;
+    a = b = c = 0xdeadbeef + (_ts.length<<2) + hash;
+    for( i=0; i+2<_ts.length; i+=3 ) {
+      a += _ts[i+0]._hash;
+      b += _ts[i+1]._hash;
+      c += _ts[i+2]._hash;
+      a -= c;  a ^= rot(c, 4);  c += b;
+      b -= a;  b ^= rot(a, 6);  a += c;
+      c -= b;  c ^= rot(b, 8);  b += a;
+      a -= c;  a ^= rot(c,16);  c += b;
+      b -= a;  b ^= rot(a,19);  a += c;
+      c -= b;  c ^= rot(b, 4);  b += a;
+    }
+    switch(_ts.length-i) {
+    case 3: c += _ts[i+2]._hash;
+    case 2: b += _ts[i+1]._hash;
+    case 1: a += _ts[i+0]._hash;
+      c ^= b; c -= rot(b,14);
+      a ^= c; a -= rot(c,11);
+      b ^= a; b -= rot(a,25);
+      c ^= b; c -= rot(b,16);
+      a ^= c; a -= rot(c, 4);
+      b ^= a; b -= rot(a,14);
+      c ^= b; c -= rot(b,24);
+    case 0:
+      break;
+    }
+    return c;
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -50,16 +79,15 @@ public class TypeTuple extends Type<TypeTuple> {
   }
 
   private static TypeTuple FREE=null;
-  @Override protected TypeTuple free( TypeTuple ret ) { FREE=this; return ret; }
-  public static TypeTuple make0( boolean any, Type[] ts ) {
+  private TypeTuple free( TypeTuple ret ) { FREE=this; return ret; }
+  private static TypeTuple make( boolean any, Type[] ts ) {
+    TypeTuple t1 = FREE == null ? new TypeTuple() : FREE;
+    FREE = null;
     ts = Types.hash_cons(ts);
-    TypeTuple t1 = FREE;
-    if( t1 == null ) t1 = new TypeTuple(TTUPLE, any, ts);
-    else { FREE = null; t1.init(TTUPLE, any, ts); }
-    assert t1._type==TTUPLE;
-    TypeTuple t2 = (TypeTuple)t1.hashcons();
+    TypeTuple t2 = t1.init(any,ts).hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
+  public static TypeTuple make0( boolean any, Type[] ts ) { return make(any,ts); }
   public static TypeTuple make( Type[] ts ) { return make0(false,ts); }
   public static TypeTuple make( ) { return make0(false,Types.get(0)); }
   public static TypeTuple make( Type t0, Type t1 ) { return make0(false,Types.ts(t0,t1)); }
@@ -71,10 +99,11 @@ public class TypeTuple extends Type<TypeTuple> {
   // Make a Call args tuple from a Struct by adding Memory up front
   public static TypeTuple make(TypeStruct ts) {
     // TypeStruct includes a display/DSP_IDX, but what comes before
-    Type[] ts2 = Types.get(ts._ts.length+DSP_IDX);
+    Type[] ts2 = Types.get(ts.len()+DSP_IDX);
     ts2[CTL_IDX] = Type.CTRL;
     ts2[MEM_IDX] = TypeMem.ALLMEM;
-    System.arraycopy(ts._ts,0,ts2,DSP_IDX,ts._ts.length);
+    for( int i=0; i<ts.len(); i++ )
+      ts2[DSP_IDX+i] = ts.at(i);
     return make(ts2);
   }
   public static TypeTuple make_args(Type[] ts) {
@@ -130,7 +159,7 @@ public class TypeTuple extends Type<TypeTuple> {
     Type[] ts = Types.get(_ts.length);
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].dual();
     ts = Types.hash_cons(ts);
-    return new TypeTuple(TTUPLE, !_any, ts);
+    return new TypeTuple().init(!_any, ts);
   }
   // Standard Meet.  Tuples have an infinite extent of 'ALL' for low, or 'ANY'
   // for high.  After the meet, the infinite tail is trimmed.
@@ -191,7 +220,7 @@ public class TypeTuple extends Type<TypeTuple> {
       ts[i] = ts[i].simple_ptr();
     return make0(_any,ts);
   }
-  
+
   @Override public TypeTuple widen() {
     Type[] ts = Types.get(_ts.length);
     for( int i=0; i<ts.length; i++ )

@@ -32,8 +32,6 @@ public class HM3 {
   static final HashMap<String,HMType> ENV = new HashMap<>();
 
   public static HMType hm( Syntax prog) {
-    Object dummy = TypeStruct.DISPLAY;
-
     // Simple types
     HMVar bool  = new HMVar(TypeInt.BOOL);
     HMVar int64 = new HMVar(TypeInt.INT64);

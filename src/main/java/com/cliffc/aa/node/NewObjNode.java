@@ -7,6 +7,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.type.TypeFld.Access;
 
 // Allocates a TypeStruct and produces a Tuple with the TypeStruct and a TypeMemPtr.
 //
@@ -28,12 +29,14 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public NewObjNode( boolean is_closure, int par_alias, TypeStruct ts, Node clo ) {
     super(OP_NEWOBJ,par_alias,ts,clo);
     _is_closure = is_closure;
-    assert ts._ts[0].is_display_ptr();
+    assert ts.fld(0).is_display_ptr();
   }
-  public Node get(String name) { int idx = _ts.find(name);  assert idx >= 0; return fld(idx); }
-  public boolean exists(String name) { return _ts.find(name)!=-1; }
-  public boolean is_mutable(String name) { return mutable(name)==TypeStruct.FRW; }
-  public byte mutable(String name) { return _ts.fmod(_ts.find(name)); }
+  public Node get(String name) { int idx = _ts.fld_find(name);  assert idx >= 0; return fld(idx); }
+  public boolean exists(String name) { return _ts.fld_find(name)!=-1; }
+  public boolean is_mutable(String name) {
+    return _ts.fld(_ts.fld_find(name))._access==Access.RW;
+  }
+  //public Access mutable(String name) { return _ts.fmod(_ts.find(name)); }
 
   // Called when folding a Named Constructor into this allocation site
   void set_name( TypeStruct name ) { assert !name.above_center();  setsm(name); }
@@ -42,25 +45,25 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public void no_more_fields() { setsm(_ts.close()); }
 
   // Create a field from parser for an inactive this
-  public void create( String name, Node val, byte mutable ) {
+  public void create( String name, Node val, Access mutable ) {
     assert !Util.eq(name,"^"); // Closure field created on init
     create_active(name,val,mutable);
   }
 
   // Create a field from parser for an active this
-  public void create_active( String name, Node val, byte mutable ) {
-    assert def_idx(_ts._ts.length)== _defs._len;
-    assert _ts.find(name) == -1; // No dups
+  public void create_active( String name, Node val, Access mutable ) {
+    assert def_idx(_ts.len())== _defs._len;
+    assert _ts.fld_find(name) == -1; // No dups
     add_def(val);
-    setsm(_ts.add_fld(name,mutable,mutable==TypeStruct.FFNL ? val._val : Type.SCALAR));
+    setsm(_ts.add_fld(name,mutable,mutable==Access.Final ? val._val : Type.SCALAR));
     Env.GVN.add_flow(this);
   }
-  public void update( String tok, byte mutable, Node val ) { update(_ts.find(tok),mutable,val); }
+  public void update( String tok, Access mutable, Node val ) { update(_ts.fld_find(tok),mutable,val); }
   // Update the field & mod
-  public void update( int fidx, byte mutable, Node val ) {
-    assert def_idx(_ts._ts.length)== _defs._len;
+  public void update( int fidx, Access mutable, Node val ) {
+    assert def_idx(_ts.len())== _defs._len;
     set_def(def_idx(fidx),val);
-    sets(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? val._val : Type.SCALAR,mutable));
+    sets(_ts.set_fld(fidx,mutable==Access.Final ? val._val : Type.SCALAR,mutable));
     xval();
     Env.GVN.add_flow_uses(this);
   }
@@ -68,15 +71,15 @@ public class NewObjNode extends NewNode<TypeStruct> {
 
   // Add a named FunPtr to a New.  Auto-inflates to a Unresolved as needed.
   public FunPtrNode add_fun( Parse bad, String name, FunPtrNode ptr ) {
-    int fidx = _ts.find(name);
+    int fidx = _ts.fld_find(name);
     if( fidx == -1 ) {
-      create_active(name,ptr,TypeStruct.FFNL);
+      create_active(name,ptr,Access.Final);
     } else {
       Node n = _defs.at(def_idx(fidx));
       if( n instanceof UnresolvedNode ) n.add_def(ptr);
       else n = new UnresolvedNode(bad,n,ptr);
       n.xval(); // Update the input type, so the _ts field updates
-      update(fidx,TypeStruct.FFNL,n);
+      update(fidx,Access.Final,n);
     }
     return ptr;
   }
@@ -88,7 +91,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public void promote_forward( NewObjNode parent ) {
     assert parent != null;
     TypeStruct ts = _ts;
-    for( int i=0; i<ts._ts.length; i++ ) {
+    for( int i=0; i<ts.len(); i++ ) {
       Node n = fld(i);
       if( n != null && n.is_forward_ref() ) {
         // Remove current display from forward-refs display choices.
@@ -97,11 +100,11 @@ public class NewObjNode extends NewNode<TypeStruct> {
         n.set_def(1,Node.con(tdisp)); // TODO: BUGGY?  NEEDS TO CRAWL THE DISPLAY 1 LEVEL?
         n.xval();
         // Make field in the parent
-        String fld = ts._flds[i];
-        parent.create(fld,n,ts.fmod(i));
+        TypeFld fld = ts.fld(i);
+        parent.create(fld._fld,n,fld._access);
         // Stomp field locally to ANY
         set_def(def_idx(i),Env.ANY);
-        setsm(_ts.set_fld(i,Type.ANY,TypeStruct.FFNL));
+        setsm(_ts.set_fld(i,Type.ANY,Access.Final));
         Env.GVN.add_flow_uses(n);
       }
     }
@@ -112,7 +115,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     if( _val instanceof TypeTuple ) {
       TypeObj ts3 = (TypeObj)((TypeTuple)_val).at(MEM_IDX);
       if( ts3 != TypeObj.UNUSED ) {
-        TypeStruct ts4 = _ts.make_from(((TypeStruct)ts3)._ts);
+        TypeStruct ts4 = _ts.make_from(((TypeStruct)ts3)._flds);
         TypeStruct ts5 = ts4.crush();
         assert ts4.isa(ts5);
         if( ts5 != _crushed && ts5.isa(_crushed) ) {
@@ -130,9 +133,9 @@ public class NewObjNode extends NewNode<TypeStruct> {
 
   @Override TypeObj valueobj() {
     // Gather args and produce a TypeStruct
-    Type[] ts = Types.get(_ts._ts.length);
+    TypeFld[] ts = TypeFlds.get(_ts.len());
     for( int i=0; i<ts.length; i++ )
-      ts[i] = (_ts._open && i>0) ? Type.ALL : fld(i)._val;
+      ts[i] = _ts._flds[i].make_from((_ts._open && i>0) ? Type.ALL : fld(i)._val);
     return _ts.make_from(ts);  // Pick up field names and mods
   }
   @Override TypeStruct dead_type() { return TypeStruct.ANYSTRUCT; }
@@ -143,7 +146,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     if( !(to instanceof TypeStruct) ) return to.above_center() ? TypeMem.DEAD : TypeMem.ESCAPE;
     int idx = _defs.find(def)-1;
     Type t = ((TypeStruct)to).at(idx);
-    return t.above_center() ? TypeMem.DEAD : (t==Type.NSCALR ? TypeMem.ESC_NO_DISP : TypeMem.ESCAPE);
+    return t.above_center() ? TypeMem.DEAD : (t==Type.NSCALR ? TypeMem.LESC_NO_DISP : TypeMem.ESCAPE);
   }
 
   //@Override public boolean unify( boolean test ) {
@@ -159,9 +162,4 @@ public class NewObjNode extends NewNode<TypeStruct> {
   //  }
   //  return progress;
   //}
-
-  public Node[] parms() {
-    throw com.cliffc.aa.AA.unimpl(); // TODO: yank this
-    //return Arrays.copyOfRange(_defs._es,1,_defs._len); // All defs
-  }
 }

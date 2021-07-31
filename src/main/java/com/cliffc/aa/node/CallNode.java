@@ -94,7 +94,7 @@ public class CallNode extends Node {
   Parse[] _badargs;         // Errors for e.g. wrong arg counts or incompatible args; one error point per arg.
   public CallNode( boolean unpacked, Parse[] badargs, Node... defs ) {
     super(OP_CALL,defs);
-    assert defs[DSP_IDX]._val==Type.ANY || defs[DSP_IDX]._val==Type.ALL || defs[DSP_IDX]._val instanceof TypeMemPtr; // Temp; not required
+    assert defs[DSP_IDX]==null || defs[DSP_IDX]._val==Type.ALL || defs[DSP_IDX]._val==Type.ANY || defs[DSP_IDX]._val instanceof TypeMemPtr; // Temp; not required
     assert defs.length > DSP_IDX+1;
     _rpc = BitsRPC.new_rpc(BitsRPC.ALL); // Unique call-site index
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
@@ -424,7 +424,7 @@ public class CallNode extends Node {
     if( ctl != Type.CTRL ) return ctl.oob();
 
     // Not a memory to the call?
-    Type mem = mem()._val;
+    Type mem = mem()==null ? TypeMem.ANYMEM : mem()._val;
     TypeMem tmem = mem instanceof TypeMem ? (TypeMem)mem : TypeMem.ANYMEM;
 
     // Result type includes a type-per-input and an extra roll-up type of all
@@ -437,7 +437,7 @@ public class CallNode extends Node {
     // Also gather all aliases from all args.
     BitsAlias as = BitsAlias.EMPTY;
     for( int i=DSP_IDX; i<nargs(); i++ )
-      as = as.meet(get_alias(ts[i] = arg(i)._val));
+      as = as.meet(get_alias(ts[i] = arg(i)==null ? Type.XSCALAR : arg(i)._val));
     // Recursively search memory for aliases; compute escaping aliases
     BitsAlias as2 = tmem.all_reaching_aliases(as);
     ts[_defs._len] = TypeMemPtr.make(as2,TypeObj.ISUSED); // Set escapes as last type
@@ -449,7 +449,7 @@ public class CallNode extends Node {
     if( !_is_copy ) ts[MEM_IDX] = tmem.slice_reaching_aliases(as2);
 
     // Not a function to call?
-    Type tfx = fdx()._val;
+    Type tfx = fdx()==null ? TypeFunPtr.GENERIC_FUNPTR : fdx()._val;
     if( !(tfx instanceof TypeFunPtr) )
       tfx = tfx.oob(TypeFunPtr.GENERIC_FUNPTR);
     TypeFunPtr tfp = (TypeFunPtr)tfx;
@@ -484,7 +484,7 @@ public class CallNode extends Node {
       Env.GVN.add_flow_defs(this); // Args can be more-alive or more-dead
     // If Call flips to being in-error, all incoming args forced live/escape
     for( Node def : _defs )
-      if( def._live!=TypeMem.ESCAPE && err(true)!=null )
+      if( def!=null && def._live!=TypeMem.ESCAPE && err(true)!=null )
         Env.GVN.add_flow(def);
     // If not resolved, might now resolve
     if( _val instanceof TypeTuple && ttfp(_val)._fidxs.abit()==-1 )
@@ -608,7 +608,7 @@ public class CallNode extends Node {
   TypeMem live_use_call( int dfidx ) {
     Type tcall = _val;
     if( !(tcall instanceof TypeTuple) )
-      return tcall.above_center() ? TypeMem.DEAD : TypeMem.NO_DISP;
+      return tcall.above_center() ? TypeMem.DEAD : TypeMem.LNO_DISP;
     TypeFunPtr tfp = ttfp(tcall);
     // If resolve has chosen this dfidx, then the FunPtr is alive.
     BitsFun fidxs = tfp.fidxs();
@@ -617,7 +617,7 @@ public class CallNode extends Node {
     if( tfp.is_con() && !(fdx() instanceof FunPtrNode) )
       return TypeMem.DEAD; // Will be replaced by a constant
     // Otherwise the FIDX is alive
-    return TypeMem.NO_DISP;
+    return TypeMem.LNO_DISP;
   }
 
   // Amongst these choices return the least-cost.  Some or all might be invalid.
@@ -694,7 +694,7 @@ public class CallNode extends Node {
   @Override public ErrMsg err( boolean fast ) {
     // Fail for passed-in unknown references directly.
     for( int j=ARG_IDX; j<nargs(); j++ )
-      if( arg(j).is_forward_ref() )
+      if( arg(j)!=null && arg(j).is_forward_ref() )
         return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[j-ARG_IDX+1], FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx).fptr());
     // Expect a function pointer
     TypeFunPtr tfp = ttfpx(_val);

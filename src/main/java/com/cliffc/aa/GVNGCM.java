@@ -41,7 +41,7 @@ public class GVNGCM {
   public boolean on_reduce( Node n ) { return _work_reduce.on(n); }
 
   static public <N extends Node> N add_work( Work work, N n ) {
-    if( n.is_dead() ) return n;
+    if( n==null || n.is_dead() ) return n;
     if( !HAS_WORK ) HAS_WORK = true; // Filtered set
     return work.add(n);
   }

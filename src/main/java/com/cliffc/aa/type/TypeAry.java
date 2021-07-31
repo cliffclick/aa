@@ -9,12 +9,12 @@ public class TypeAry extends TypeObj<TypeAry> {
   private Type _elem;           // MEET over all elements.
   private TypeObj _stor;        // Storage class; widened over elements.  Can be, e.g. bits or complex structs with embedded pointers
 
-  private TypeAry ( String name, boolean any, TypeInt sz, Type elem, TypeObj stor ) { super(TARY,name,any); init(name,any,sz,elem,stor); }
-  private void init(String name, boolean any, TypeInt sz, Type elem, TypeObj stor ) {
-    super.init(TARY,name,any);
+  private TypeAry init(String name, boolean any, TypeInt sz, Type elem, TypeObj stor ) {
+    super.init(TARY,name,any,any);
     _size = sz;
     _elem = elem;
     _stor = stor;
+    return this;
   }
   @Override int compute_hash() { return super.compute_hash() + _size._hash + _elem._hash + _stor._hash;  }
   @Override public boolean equals( Object o ) {
@@ -34,14 +34,12 @@ public class TypeAry extends TypeObj<TypeAry> {
     return sb;
   }
   private static TypeAry FREE=null;
-  @Override protected TypeAry free( TypeAry ret ) { FREE=this; return ret; }
+  private TypeAry free( TypeAry ret ) { FREE=this; return ret; }
   public static TypeAry make( String name, boolean any, TypeInt sz, Type elem, TypeObj stor ) {
-    TypeAry t1 = FREE;
-    if( t1 == null ) t1 = new TypeAry(name,any,sz,elem,stor);
-    else {   FREE = null;     t1.init(name,any,sz,elem,stor); }
-    TypeAry t2 = (TypeAry)t1.hashcons();
-    if( t1!=t2 ) return t1.free(t2);
-    return t1;
+    TypeAry t1 = FREE == null ? new TypeAry() : FREE;
+    FREE = null;
+    TypeAry t2 = t1.init(name,any,sz,elem,stor).hashcons();
+    return t1==t2 ? t1 : t1.free(t2);
   }
 
   public static TypeAry make( TypeInt sz, Type elem, TypeObj stor ) { return make("",false,sz,elem,stor); }
@@ -50,7 +48,7 @@ public class TypeAry extends TypeObj<TypeAry> {
   public static final TypeAry BYTES = make("",false,TypeInt.con(3),TypeInt.INT8,TypeObj.OBJ ); // TODO: TypeObjBits2
   static final TypeAry[] TYPES = new TypeAry[]{ARY,ARY0,BYTES};
 
-  @Override protected TypeAry xdual() { return new TypeAry(_name, !_any,_size.dual(),_elem.dual(),(TypeObj)_stor.dual()); }
+  @Override protected TypeAry xdual() { return new TypeAry().init(_name, !_any,_size.dual(),_elem.dual(),(TypeObj)_stor.dual()); }
   @Override
   TypeAry rdual() {
     if( _dual != null ) return _dual;

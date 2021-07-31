@@ -7,6 +7,7 @@ import com.cliffc.aa.util.Ary;
 import java.util.HashMap;
 import java.util.function.Predicate;
 
+import static com.cliffc.aa.type.TypeFld.Access;
 import static com.cliffc.aa.AA.MEM_IDX;
 
 // Lexical-Scope Node.  Tracks control & phat memory, plus a stack frame (which
@@ -175,7 +176,7 @@ public class ScopeNode extends Node {
   // Test for being inside a ?: expression
   public boolean test_if() { return _ifs!=null && !_ifs.isEmpty(); }
 
-  public void def_if( String name, byte mutable, boolean create ) {
+  public void def_if( String name, Access mutable, boolean create ) {
     if( _ifs == null || _ifs._len==0 ) return; // Not inside an If
     _ifs.last().def(name,mutable,create);      // Var defined in arm of if
   }
@@ -183,19 +184,19 @@ public class ScopeNode extends Node {
   public Node check_if( boolean arm, Parse bad, GVNGCM gvn, Node ctrl, Node mem ) { return _ifs.last().check(this,arm,bad,gvn,ctrl,mem); }
 
   private static class IfScope {
-    HashMap<String,Byte> _tvars, _fvars;
+    HashMap<String,Access> _tvars, _fvars;
     boolean _arm = true;
     void flip() { _arm = !_arm; }
     // Record creation on either arm of an if
-    void def(String name, byte mutable, boolean create) {
+    void def(String name, Access mutable, boolean create) {
       if( _tvars == null ) { _tvars = new HashMap<>(); _fvars = new HashMap<>(); }
       // If there was no prior create inside the same if, then this update
       // predates the if and is not involved in a partial-creation error
       if( !create && !_arm && _tvars.get(name) != null )
         _fvars.put(name,mutable);
       if( create ) {
-        HashMap<String,Byte> vars = _arm ? _tvars : _fvars;
-        Byte res = vars.put(name,mutable);
+        HashMap<String,Access> vars = _arm ? _tvars : _fvars;
+        Access res = vars.put(name,mutable);
         assert res==null;         // No double-creation
       }
     }
@@ -211,14 +212,14 @@ public class ScopeNode extends Node {
         }
       }
       // Everything in this set is a partially-created variable error
-      HashMap<String,Byte> vars = arm ? _fvars : _tvars;
+      HashMap<String,Access> vars = arm ? _fvars : _tvars;
       if( vars.isEmpty() ) return mem;
       mem.unkeep();             // Passed-in 'hooked' memory
       for( String name : vars.keySet() ) {
         String msg = "'"+name+"' not defined on "+arm+" arm of trinary";
         Node err = gvn.xform(new ErrNode(ctrl,bad,msg));
         // Exactly like a parser store of an error, on the missing side
-        mem = gvn.xform(new StoreNode(mem,scope.ptr(),err,TypeStruct.FFNL,name,bad));
+        mem = gvn.xform(new StoreNode(mem,scope.ptr(),err,Access.Final,name,bad));
       }
       return mem.keep();        // Return 'hooked' memory
     }

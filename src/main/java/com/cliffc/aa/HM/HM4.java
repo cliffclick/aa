@@ -20,8 +20,6 @@ public class HM4 {
   static final HashMap<String,T2> PRIMS = new HashMap<>();
 
   public static T2 hm( Syntax prog) {
-    Object dummy = TypeStruct.DISPLAY;
-
     Ary<Syntax> work = new Ary<>(Syntax.class);
 
     // Simple types

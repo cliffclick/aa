@@ -6,6 +6,8 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
 
+import static com.cliffc.aa.type.TypeFld.Access;
+
 /**
    Memory type; the state of all of memory; memory edges order memory ops.
    Produced at the program start, consumed by all function calls, consumed be
@@ -62,11 +64,12 @@ public class TypeMem extends Type<TypeMem> {
   // not part of the hash/equals checks.  Optional.  Lazily filled in.
   private HashMap<TypeMemPtr,TypeMemPtr> _sharp_cache;
 
-  private TypeMem  (TypeObj[] pubs) { super(TMEM); init(pubs); }
-  private void init(TypeObj[] pubs) {
-    super.init(TMEM);
+  private TypeMem() {}
+  private TypeMem init(TypeObj[] pubs) {
+    super.init(TMEM,"");
     assert check(pubs);    // Caller has canonicalized arrays already
     _pubs = pubs;
+    return this;
   }
   // False if not 'tight' (no trailing null pairs) or any matching pairs (should
   // collapse to their parent) or any mixed parent/child.
@@ -158,12 +161,11 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   private static TypeMem FREE=null;
-  @Override protected TypeMem free( TypeMem ret ) { _pubs =null; _sharp_cache=null; FREE=this; return ret; }
+  private TypeMem free( TypeMem ret ) { _pubs =null; _sharp_cache=null; FREE=this; return ret; }
   private static TypeMem make(TypeObj[] pubs) {
-    TypeMem t1 = FREE;
-    if( t1 == null ) t1 = new TypeMem(pubs);
-    else { FREE = null;       t1.init(pubs); }
-    TypeMem t2 = (TypeMem)t1.hashcons();
+    TypeMem t1 = FREE == null ? new TypeMem() : FREE;
+    FREE = null;
+    TypeMem t2 = t1.init(pubs).hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
 
@@ -224,7 +226,7 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem EMPTY;// Every alias filled with anything
   public static final TypeMem  MEM; // FULL, except lifts REC, arrays, STR
   public static final TypeMem XMEM; //
-  public static final TypeMem DEAD, ALIVE, NO_DISP, ESC_NO_DISP, LIVE_BOT; // Sentinel for liveness flow; not part of lattice
+  public static final TypeMem DEAD, ALIVE, LNO_DISP, LESC_NO_DISP, LIVE_BOT; // Sentinel for liveness flow; not part of lattice
   public static final TypeMem ESCAPE; // Sentinel for liveness, where the value "escapes" the local scope
   public static final TypeMem ANYMEM,ALLMEM; // Every alias is unused (so above XOBJ or below OBJ)
   public static final TypeMem MEM_ABC, MEM_STR;
@@ -241,10 +243,10 @@ public class TypeMem extends Type<TypeMem> {
     // Not currently including closures
     TypeObj[] tos = new TypeObj[Math.max(BitsAlias.REC,BitsAlias.AARY)+1];
     tos[BitsAlias.ALL] = TypeObj.ISUSED;
-    tos[BitsAlias.REC]=TypeStruct.ALLSTRUCT;
+    tos[BitsAlias.REC] = TypeStruct.ALLSTRUCT;
     tos[BitsAlias.STR] = TypeStr.STR; //
     tos[BitsAlias.ABC] = TypeStr.ABC; //
-    tos[BitsAlias.AARY] = TypeAry.ARY; //
+    tos[BitsAlias.AARY]= TypeAry.ARY; //
     MEM  = make0(tos);
     XMEM = MEM.dual();
 
@@ -254,8 +256,8 @@ public class TypeMem extends Type<TypeMem> {
     // Sentinel for liveness flow; not part of lattice
     DEAD   = make_live(TypeLive.DEAD    );
     ALIVE  = make_live(TypeLive.LIVE    ); // Basic alive for all time
-    NO_DISP= make_live(TypeLive.NO_DISP);  // Basic alive, no display pointers
-    ESC_NO_DISP= make_live(TypeLive.ESC_DISP);  // Basic alive, no display pointers, and escapes.
+    LNO_DISP = make_live(TypeLive.NO_DISP);  // Basic alive, no display pointers
+    LESC_NO_DISP = make_live(TypeLive.ESC_DISP);  // Basic alive, no display pointers, and escapes.
     ESCAPE = make_live(TypeLive.ESCAPE  ); // Alive, plus escapes some call/memory
     LIVE_BOT=make_live(TypeLive.LIVE_BOT);
   }
@@ -267,7 +269,7 @@ public class TypeMem extends Type<TypeMem> {
     for( int i = 0; i< _pubs.length; i++ )
       if( _pubs[i] != null )
         pubs[i] = (TypeObj) _pubs[i].dual();
-    return new TypeMem(pubs);
+    return new TypeMem().init(pubs);
   }
   @Override protected Type xmeet( Type t ) {
     if( t._type != TMEM ) return ALL;
@@ -319,7 +321,7 @@ public class TypeMem extends Type<TypeMem> {
 
   // True if this is a liveness value that is NO_DISP, ESC_NO_DISP or DEAD
   public boolean live_no_disp() {
-    return this==TypeMem.NO_DISP || this==TypeMem.ESC_NO_DISP || this==TypeMem.DEAD;
+    return this==TypeMem.LNO_DISP || this==TypeMem.LESC_NO_DISP || this==TypeMem.DEAD;
   }
 
   // Shallow meet of all possible loadable values.  Used in Node.value calls, so must be monotonic.
@@ -368,8 +370,8 @@ public class TypeMem extends Type<TypeMem> {
       // fields may be added which we assume is a pointer to all.
       if( ts._open )
         return BitsAlias.FULL;  // Generic open struct points to all
-      for( int i=0; i<ts._ts.length; i++ ) {
-        Type fld = ts._ts[i];
+      for( TypeFld tfld : ts._flds ) {
+        Type fld = tfld._t;
         if( TypeMemPtr.OOP.isa(fld) )
           fld = TypeMemPtr.OOP;                      // All possible pointers
         if( fld instanceof TypeFunPtr ) fld = ((TypeFunPtr)fld)._disp;
@@ -457,7 +459,7 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Field store into a conservative set of aliases.
-  public TypeMem update( BitsAlias aliases, byte fin, String fld, Type val ) {
+  public TypeMem update( BitsAlias aliases, Access fin, String fld, Type val ) {
     Ary<TypeObj> pubs  = new Ary<>(_pubs .clone());
     for( int alias : aliases )
       if( alias != 0 )
@@ -512,8 +514,8 @@ public class TypeMem extends Type<TypeMem> {
         TypeObj to = at(alias);
         if( !(to instanceof TypeStruct) ) return true;
         TypeStruct ts = (TypeStruct)to;
-        int idx = ts.find(fld);
-        if( idx == -1 || ts.fmod(idx) != TypeStruct.FFNL )
+        int idx = ts.fld_find(fld);
+        if( idx == -1 || ts._flds[idx]._access != Access.Final )
           return true;          // Cannot check for R/O here, because R/O can lift to R/W
       }
     }
@@ -535,12 +537,6 @@ public class TypeMem extends Type<TypeMem> {
       if( tos[i] != null )
         tos[i] = tos[i].flatten_fields();
     return make0(tos);
-  }
-  public boolean is_flattened() {
-    for( int i=1; i< _pubs.length; i++ )
-      if( _pubs[i]!=null && !_pubs[i].is_flattened() )
-        return false;
-    return true;
   }
 
   @Override public TypeMem widen() {
