@@ -337,18 +337,17 @@ public class TestType {
 
     // Anonymous recursive structs -
     // - struct with pointer to self
-    TypeStruct ts0 = TypeStruct.malloc("",false,TypeFlds.ts(TypeFld.malloc("n",null,0),TypeFld.malloc("v",null,1)),true);
+    TypeFld fldv = TypeFld.make("v",TypeInt.INT64,1);
+    TypeStruct ts0 = TypeStruct.malloc("",false,TypeFlds.ts(TypeFld.malloc("n",null,0),fldv),true);
     ts0._hash = ts0.compute_hash();
-    ts0.fld(0).setX(ts0ptr       );    ts0._cyclic = true;
-    ts0.fld(1).setX(TypeInt.INT64);
+    ts0.fld(0).setX(ts0ptr);    ts0._cyclic = true;
     ts0 = ts0.install_cyclic(ts0.reachable());
     TypeMem ts0mem = TypeMem.make(alias1,ts0); // {1:@{n:*[1],v:int} }
 
     // - struct with pointer to self or nil
-    TypeStruct ts1 = TypeStruct.malloc("",false,TypeFlds.ts(TypeFld.malloc("n",null,0),TypeFld.malloc("v",null,1)),true);
+    TypeStruct ts1 = TypeStruct.malloc("",false,TypeFlds.ts(TypeFld.malloc("n",null,0),fldv),true);
     ts1._hash = ts1.compute_hash();
-    ts1.fld(0).setX(ts0ptr0      );    ts1._cyclic = true;
-    ts1.fld(1).setX(TypeInt.INT64);
+    ts1.fld(0).setX(ts0ptr0);    ts1._cyclic = true;
     ts1 = ts1.install_cyclic(ts1.reachable());
     TypeMem ts1mem = TypeMem.make(alias1,ts1); // {1:@{n:*[0,1],v:int} }
 
@@ -362,20 +361,20 @@ public class TestType {
     // AS0AS0AS0AS0AS0AS0...
     final int alias2 = BitsAlias.new_alias(BitsAlias.REC);
     TypeMemPtr tptr2= TypeMemPtr.make_nil(alias2,TypeObj.OBJ); // *[0,2]
-    TypeStruct ts2 = TypeStruct.make(TypeFld.make("n",tptr2,0),TypeFld.make("v",TypeInt.INT64,1)); // @{n:*[0,2],v:int}
+    TypeStruct ts2 = TypeStruct.make(TypeFld.make("n",tptr2,0),fldv); // @{n:*[0,2],v:int}
     TypeStruct ta2 = ts2.set_name("A:");
 
     // Peel A once without the nil: Memory#3: A:@{n:*[2],v:int}
     // ASAS0AS0AS0AS0AS0AS0...
     final int alias3 = BitsAlias.new_alias(BitsAlias.REC);
     TypeMemPtr tptr3= TypeMemPtr.make(alias3,TypeObj.OBJ); // *[3]
-    TypeStruct ts3 = TypeStruct.make(TypeFld.make("n",tptr2,0),TypeFld.make("v",TypeInt.INT64,1)); // @{n:*[0,2],v:int}
+    TypeStruct ts3 = TypeStruct.make(TypeFld.make("n",tptr2,0),fldv); // @{n:*[0,2],v:int}
     TypeStruct ta3 = ts3.set_name("A:");
 
     // Peel A twice without the nil: Memory#4: A:@{n:*[3],v:int}
     // ASASAS0AS0AS0AS0AS0AS0...
     final int alias4 = BitsAlias.new_alias(BitsAlias.REC);
-    TypeStruct ts4 = TypeStruct.make(TypeFld.make("n",tptr3,0),TypeFld.make("v",TypeInt.INT64,1)); // @{n:*[3],v:int}
+    TypeStruct ts4 = TypeStruct.make(TypeFld.make("n",tptr3,0),fldv); // @{n:*[3],v:int}
     TypeStruct ta4 = ts4.set_name("A:");
 
     // Then make a MemPtr{3,4}, and ld - should be a PeelOnce
@@ -396,7 +395,7 @@ public class TestType {
     Type mta = mem234.ld(ptr34);
     //assertEquals(ta3,mta);
     TypeMemPtr ptr023 = (TypeMemPtr)TypeMemPtr.make_nil(alias2,TypeObj.OBJ).meet(TypeMemPtr.make(alias3,TypeObj.OBJ));
-    TypeStruct xts = TypeStruct.make(TypeFld.make("n",ptr023,0),TypeFld.make("v",TypeInt.INT64,1));
+    TypeStruct xts = TypeStruct.make(TypeFld.make("n",ptr023,0),fldv);
     Type xta = xts.set_name("A:");
     assertEquals(xta,mta);
 
@@ -445,9 +444,11 @@ public class TestType {
     // Dual; then meet ~4_() and ~0_A
     final int alias = BitsAlias.REC;
 
+    TypeFld fldvi = TypeFld.make("v",TypeInt.INT64,1);
+    TypeFld fldvf = TypeFld.make("v",TypeFlt.FLT64,1);
     Type.RECURSIVE_MEET++;
-    TypeFld[] flds1 = TypeFlds.ts(TypeFld.malloc("n",null,0), TypeFld.malloc("v",null,1));
-    TypeFld[] flds4 = TypeFlds.ts(TypeFld.malloc("n",null,0), TypeFld.malloc("v",null,1));
+    TypeFld[] flds1 = TypeFlds.ts(TypeFld.malloc("n",null,0), fldvi);
+    TypeFld[] flds4 = TypeFlds.ts(TypeFld.malloc("n",null,0), fldvf);
     TypeStruct as1 = TypeStruct.malloc("",false,flds1,true).set_name("A:");
     TypeStruct bs4 = TypeStruct.malloc("",false,flds4,true).set_name("B:");
     as1._hash = as1.compute_hash();  as1._cyclic = true;
@@ -455,9 +456,7 @@ public class TestType {
     TypeMemPtr ap5 = TypeMemPtr.make(alias,as1);
     TypeMemPtr bp2 = TypeMemPtr.make(alias,bs4);
     as1.fld(0).setX(bp2          );
-    as1.fld(1).setX(TypeInt.INT64);
     bs4.fld(0).setX(ap5          );
-    bs4.fld(1).setX(TypeFlt.FLT64);
     Type.RECURSIVE_MEET--;
     as1 = as1.install_cyclic(as1.reachable());
     bp2 = (TypeMemPtr)as1.at(0);
