@@ -22,7 +22,7 @@ public class GVNGCM {
   public Mode _opt_mode=Mode.Parse;
 
   // Iterative worklists.
-  private final Work _work_dead   = new Work("dead"  , false) { @Override public Node apply(Node n) { return n._uses._len == 0 ? n.kill() : null; } };
+  private final Work _work_dead   = new Work("dead"  , false) { @Override public Node apply(Node n) { return n._keep==0 && n._uses._len == 0 ? n.kill() : null; } };
   private final Work _work_reduce = new Work("reduce", true ) { @Override public Node apply(Node n) { return n.do_reduce(); } };
   private final Work _work_flow   = new Work("flow"  , false) { @Override public Node apply(Node n) { return n.do_flow  (); } };
   private final Work _work_mono   = new Work("mono"  , true ) { @Override public Node apply(Node n) { return n.do_mono  (); } };
@@ -96,7 +96,7 @@ public class GVNGCM {
   // Record a Node, but do not optimize it for value and ideal calls, as it is
   // mid-construction from the parser.  Any function call with yet-to-be-parsed
   // call sites, and any loop top with an unparsed backedge needs to use this.
-  public <N extends Node> N init( N n ) { return add_flow(add_reduce(n.keep())); }
+  public <N extends Node> N init( N n ) { return add_flow(add_reduce(n.keep(2))); }
 
   // Did a bulk not-monotonic update.  Forcibly update the entire region at
   // once; restores monotonicity over the whole region when done.
@@ -126,7 +126,7 @@ public class GVNGCM {
   public Node xform( Node n ) {
     assert n._uses._len==0 && n._keep==0; // New to GVN
     Node x = iter(add_work_all(n),_all_works);
-    if( x==null ) x=n;          // Ignore lack-of-progress
+    assert !x.is_dead();
     return add_flow(x);         // No liveness (yet), since uses not known
   }
 
@@ -134,7 +134,8 @@ public class GVNGCM {
   // that is possibly "more ideal" than what was before.
   public Node xreduce( Node n ) {
     assert n._uses._len==0 && n._keep==0; // New to GVN
-    Node x = iter(add_work_all(n), _reduce_works);
+    n.do_flow();                // Compute _val (for finding constants)
+    Node x = n.do_reduce();     // Maybe find a more ideal Node
     if( x==null ) x=n;          // Ignore lack-of-progress
     return add_flow(x);         // No liveness (yet), since uses not known
   }
@@ -164,49 +165,34 @@ public class GVNGCM {
   }
 
   // Any time anything is on any worklist we can always conservatively iterate on it.
-  // Return null if no progress.  Otherwise return 'n' or a replacement for 'n'.
+  // Empties the worklist, attempting to do every possible thing.
+  // Returns 'x' or a replacement for 'x'.
   static int ITER_CNT;
   static int ITER_CNT_NOOP;
-  static int ITER_NEST=0;
   public Node iter(Node x, Work[] works) {
     if( !HAS_WORK ) return x;
-    if( x!=null ) x.keep(); // Always keep this guy, unless reducing it directly
-    ITER_NEST++;
-    Work outer = null;
-    boolean progress=false;
-    outer:
+    if( x!=null ) x.keep();
     while( true ) {
-      for( Work W : works ) {
-        Node n = W.pop();
-        if( n==null ) continue; // Worklist is empty
-        if( n.is_dead() ) { ITER_CNT_NOOP++; continue outer; }
-        boolean keep = x==n && W._replacing; // Allow X to be replaced
-        if( keep ) x.unkeep();               // Need to upgrade X in-place
-        if( n._keep>0 && W._replacing && ITER_NEST > 1 ) { // Will not upgrade in this iter, but may be in a recursive iter
-          if( outer==null ) outer = new Work("outer",true) { @Override public Node apply(Node n) { throw com.cliffc.aa.AA.unimpl(); } };
-          outer.add(n);         // Save for a recursive iter
-        }
-        Node m = W.apply(n);
-        if( m == null ) {       // not-null is progress
-          ITER_CNT_NOOP++;      // No progress
-        } else {
-          // VERY EXPENSIVE ASSERT
-          //assert W==_work_dead || Env.START.more_flow(true)==0; // Initial conditions are correct
-          ITER_CNT++; assert ITER_CNT < 35000; // Catch infinite ideal-loops
-          if( x==n ) x=m;       // Keep track of the replacement for x, if any
-          progress = true;      // flag progress
-        }
-        if( keep ) x.keep();
-        continue outer;
+      Work W=null;
+      for( Work work : works )
+        if( !(W = work).isEmpty() )
+          break;
+      if( W.isEmpty() ) break;      // All worklists empty
+      Node n = W.pop();
+      Node m = n.is_dead() ? null : W.apply(n);
+      if( m == null ) {       // not-null is progress
+        ITER_CNT_NOOP++;      // No progress
+      } else {
+        // VERY EXPENSIVE ASSERT
+        //assert W==_work_dead || Env.START.more_flow(true)==0; // Initial conditions are correct
+        ITER_CNT++; assert ITER_CNT < 35000; // Catch infinite ideal-loops
+        if( x==n ) x=m;       // Keep track of the replacement for x, if any
       }
-      HAS_WORK=false;
-      Node.roll_back_CNT();     // Can reclaim node numbers
-      if( x!=null ) x.unkeep();
-      if( outer!=null && progress )
-        for( Node n : outer._work ) add_reduce(n);
-      ITER_NEST--;
-      return progress ? x : null;
     }
+    HAS_WORK=false;
+    Node.roll_back_CNT();       // Can reclaim node numbers
+    if( x==null ) return null;  // No special node to track
+    return x.unkeep();
   }
 
   // Global Optimistic Constant Propagation.  Passed in the final program state
@@ -388,12 +374,8 @@ public class GVNGCM {
     @SuppressWarnings("unchecked")
     public <M extends Node> M init2( M n ) { return (M)init(n); }
     @Override public void close() {
-      if( _ret!=null ) _ret.keep(); // Thing being returned at close-point is always alive
       for( Node tmp : _tmps )
         add_unuse(tmp.unkeep()); // Needs proper liveness at least
-      assert Env.START.more_flow(true)==0; // Initial conditions are correct
-      iter((Node)null,_reduce_works); // Cleanup
-      if( _ret!=null ) _ret.unkeep();
     }
   }
 }

@@ -15,6 +15,7 @@ public class RegionNode extends Node {
   @Override public Node ideal_reduce() {
     // TODO: The unzip xform, especially for funnodes doing type-specialization
     // TODO: treat _cidx like U/F and skip_dead it also
+    if( _keep >= 2 ) return null; // Mid-construction in parser
     int dlen = _defs.len();
     for( int i=1; i<dlen; i++ ) {
       Node cc = in(i).is_copy(0);
@@ -112,8 +113,6 @@ public class RegionNode extends Node {
     for( int i = 1; i<r._defs._len; i++ )
       add_def(r.in(i));
     remove(idx);
-    Env.GVN.iter(null, Env.GVN._reduce_works);
-    assert r.is_dead();
     return this;
   }
 

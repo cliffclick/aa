@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
 // Split control
@@ -11,6 +10,7 @@ public class IfNode extends Node {
   public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); }
 
   @Override public Node ideal_reduce() {
+    if( _keep>0 ) return null;
     Node ctl = in(0);
     Node tst = in(1);
     if( ctl._val == Type.XCTRL && in(1)!=Env.ANY )

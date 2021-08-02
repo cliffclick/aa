@@ -58,9 +58,13 @@ public class ScopeNode extends Node {
             Env.GVN.add_mono(((MemSplitNode)use).join());
       old.add_flow_def_extra(n); // old loses a use, triggers extra
       Env.GVN.add_work_all(n);
-      Env.GVN.iter(Env.GVN._opt_mode);
     }
     return this;
+  }
+  public void replace_mem(Node st) {
+    set_def(MEM_IDX,null);
+    Node mem = Env.GVN.xform(st);
+    set_def(MEM_IDX,mem);
   }
   @Override public boolean is_mem() { return true; }
 
@@ -214,14 +218,14 @@ public class ScopeNode extends Node {
       // Everything in this set is a partially-created variable error
       HashMap<String,Access> vars = arm ? _fvars : _tvars;
       if( vars.isEmpty() ) return mem;
-      mem.unkeep();             // Passed-in 'hooked' memory
+      mem.unkeep(2);             // Passed-in 'hooked' memory
       for( String name : vars.keySet() ) {
         String msg = "'"+name+"' not defined on "+arm+" arm of trinary";
         Node err = gvn.xform(new ErrNode(ctrl,bad,msg));
         // Exactly like a parser store of an error, on the missing side
         mem = gvn.xform(new StoreNode(mem,scope.ptr(),err,Access.Final,name,bad));
       }
-      return mem.keep();        // Return 'hooked' memory
+      return mem.keep(2);        // Return 'hooked' memory
     }
   }
 }

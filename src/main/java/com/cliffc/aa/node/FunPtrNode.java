@@ -203,8 +203,8 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   // body (yet).  Make a function pointer that takes/ignores all args, and
   // returns a scalar.
   public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref, Env e ) {
-    FunNode fun = gvn.init(new FunNode(name)).unkeep();
-    RetNode ret = gvn.init(new RetNode(fun,Node.con(TypeMem.MEM),Node.con(Type.SCALAR),Node.con(TypeRPC.ALL_CALL),fun)).unkeep();
+    FunNode fun = gvn.init(new FunNode(name)).unkeep(2);
+    RetNode ret = gvn.init(new RetNode(fun,Node.con(TypeMem.MEM),Node.con(Type.SCALAR),Node.con(TypeRPC.ALL_CALL),fun)).unkeep(2);
     gvn.add_flow(fun);
     gvn.add_flow(ret);
     // Display is limited to any one of the current lexical scopes.

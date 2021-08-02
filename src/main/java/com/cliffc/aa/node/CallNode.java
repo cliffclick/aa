@@ -347,7 +347,7 @@ public class CallNode extends Node {
     // go under ideal_grow to avoid recomputing the test.
     Node mem = mem();
     CallEpiNode cepi = cepi();
-    if( _keep>0 || cepi==null ) return null;
+    if( _keep>0 || cepi==null || !(mem._val instanceof TypeMem) ) return null;
     ProjNode cepim = ProjNode.proj(cepi,MEM_IDX); // Memory projection from CEPI
     ProjNode cepid = ProjNode.proj(cepi,REZ_IDX); // Return projection from CEPI
     if( cepim == null ) return null;

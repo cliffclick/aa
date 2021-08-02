@@ -224,16 +224,20 @@ public abstract class Node implements Cloneable {
   // Typically used when needing to build several Nodes before building the
   // typically using Node; during construction the earlier Nodes have no users
   // (yet) and are not dead.  Acts "as if" there is an unknown user.
+  public <N extends Node> N keep() { return keep(1); }
   @SuppressWarnings("unchecked")
-  public <N extends Node> N keep() { _keep++;  return (N)this; }
+  public <N extends Node> N keep(int d) { _keep+=d;  return (N)this; }
   // Remove the keep flag, but do not delete.
+  public <N extends Node> N unkeep() { return unkeep(1); }
   @SuppressWarnings("unchecked")
-  public <N extends Node> N unkeep() { assert _keep > 0; _keep--;  return (N)this; }
+  public <N extends Node> N unkeep(int d) {
+    assert _keep >= d; _keep-=d;
+    return (N)this;
+  }
   // Remove the keep flag, and immediately allow optimizations.
-  public void unhook() {
-    assert _keep > 0; _keep--;
-    if( _keep==0 && _uses._len==0 ) Env.GVN.add_dead(this);
-    else Env.GVN.add_work_all(this);
+  public <N extends Node> N unhook() {
+    if( _keep==1 ) Env.GVN.add_work_all(this);
+    return unkeep();
   }
 
   // Uses.  Generally variable length; unordered, no nulls, compressed, unused trailing space
@@ -619,14 +623,18 @@ public abstract class Node implements Cloneable {
   // Reducing xforms, strictly fewer Nodes or Edges.  n may be either in or out
   // of VALS.  If a replacement is found, replace.  In any case, put in the
   // VALS table.  Return null if no progress, or this or the replacement.
+  // If keep is 0, there are no hidden users and can hack away.
+  // If keep is 1, there is exactly one hidden user, which will use the returned replacement.
+  // If keep is 2+, there are many hidden users and the Node cannot be replaced.
   public Node do_reduce() {
-    if( _keep>0 && !(this instanceof ScopeNode) ) return null;
     assert check_vals();
     Node nnn = _do_reduce();
     if( nnn!=null ) {                   // Something happened
-      if( nnn != this && !is_dead() ) { // Being replaced
+      if( nnn!=this ) {                 // Replacement
+        assert _keep<=1;                // Can only replace if zero or one
         Env.GVN.add_flow_uses(this);    // Visit users
         add_reduce_extra();
+        if( _keep==1 ) { _keep--; nnn._keep++; } // Move keep bits over
         subsume(nnn);                   // Replace
         for( Node use : nnn._uses ) {
           use.add_reduce_extra();
@@ -714,7 +722,10 @@ public abstract class Node implements Cloneable {
 
   public Node do_grow() {
     Node nnn = ideal_grow();
-    return nnn==null || nnn==this || is_dead() ? nnn : subsume(Env.GVN.add_flow(Env.GVN.add_reduce(nnn)));
+    if( nnn==null || nnn==this || is_dead() ) return nnn;
+    assert _keep<=1;
+    if( _keep==1 ) { _keep--; nnn._keep++; Env.GVN.add_dead(this); } // Doing an arbitrary replacement
+    return Env.GVN.add_flow(Env.GVN.add_reduce(nnn));
   }
 
   // Replace with a ConNode iff

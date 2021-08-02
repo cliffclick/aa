@@ -2,8 +2,8 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.MEM_IDX;
@@ -26,7 +26,7 @@ public class MemJoinNode extends Node {
     MemSplitNode msp = msp();
     // If the split count is lower than 2, then the split serves no purpose
     if( _defs._len == 2 && val(1).isa(_val) && _keep==0 ) {
-      msp()._is_copy=true;
+      msp._is_copy=true;
       GVNGCM.retype_mem(null,msp(),in(1), false);
       for( Node use : msp()._uses ) GVN.add_reduce(use);
       return in(1);             // Just become the last split
@@ -55,6 +55,7 @@ public class MemJoinNode extends Node {
   @Override public Node ideal_mono() {
     // If the Split memory has an obvious SESE region, move it into the Split
     MemSplitNode msp = msp();
+    if( msp==null ) return null; // During cleanout of dead code
     Node mem = msp.mem();
     if( !mem.is_prim() && mem.check_solo_mem_writer(msp) ) { // Split is only memory writer after mem
       Node head = find_sese_head(mem);                       // Find head of SESE region
@@ -220,7 +221,7 @@ public class MemJoinNode extends Node {
     int idx = msp.add_alias(head1_escs); // Add escape set, find index
     Node mspj;
     if( idx == _defs._len ) {         // Escape set added at the end
-      add_def(mspj = GVN.init(new MProjNode(msp,idx)).unkeep());
+      add_def(mspj = GVN.init(new MProjNode(msp,idx)).unkeep(2));
       mspj._tvar = msp.mem().tvar(); // Need to upgrade tvar to a TMem
     } else {             // Inserted into prior region
       mspj = in(idx);

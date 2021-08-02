@@ -188,7 +188,6 @@ public class FunNode extends RegionNode {
     return idx == -1 ? TypeRPC.ALL_CALL : _sig.arg(idx);
   }
   public int nargs() { return _sig.nargs(); }
-  void set_is_copy() { set_def(0,this); Env.GVN.add_reduce_uses(this); }
 
   public void set_nongens(TV2[] nongens) { _nongens = nongens; }
 
@@ -210,7 +209,7 @@ public class FunNode extends RegionNode {
     // Update _sig if parms are unused.  SIG falls during Iter and lifts during
     // GCP.  If parm is missing or not-live, then the corresponding SIG
     // argument can be ALL (all args allowed, including errors).
-    if( !is_forward_ref() && !is_prim() ) {
+    if( !is_forward_ref() && !is_prim() && _keep==0 ) {
       Node[] parms = parms();
       TypeFunSig progress = _sig;
       for( int i=1; i<parms.length; i++ )
@@ -916,5 +915,6 @@ public class FunNode extends RegionNode {
   }
 
   @Override public boolean equals(Object o) { return this==o; } // Only one
-  @Override public Node is_copy(int idx) { return null; }       // Never a copy, since inline rules are complex
+  @Override public Node is_copy(int idx) { return in(0)==this ? in(1) : null; } 
+  void set_is_copy() { set_def(0,this); Env.GVN.add_reduce_uses(this); }
 }

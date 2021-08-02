@@ -203,7 +203,7 @@ public class LoadNode extends Node {
       return get_fld(tobj);
     return tobj.oob();          // No loading from e.g. Strings
   }
-  
+
   @Override public void add_flow_use_extra(Node chg) {
     if( chg==adr() ) Env.GVN.add_flow(mem());  // Address into a Load changes, the Memory can be more alive.
     if( chg==mem() ) Env.GVN.add_flow(mem());  // Memory value lifts to ANY, memory live lifts also.
@@ -248,7 +248,7 @@ public class LoadNode extends Node {
     // Struct; check for field
     TypeStruct ts = (TypeStruct)tobj;
     int idx = ts.fld_find(_fld);  // Find the named field
-    if( idx == -1 ) return Type.ALL;
+    if( idx == -1 ) return tobj.oob();
     return ts.at(idx);          // Field type
   }
   // Upgrade, if !dsp and a function pointer

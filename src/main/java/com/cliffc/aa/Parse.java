@@ -373,7 +373,8 @@ public class Parse implements Comparable<Parse> {
 
         // Assign into display, changing an existing def
         Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
-        set_mem(gvn(new StoreNode(mem(),ptr,ifex,mutable,tok,badfs.at(i))));
+        StoreNode st = new StoreNode(mem(),ptr,ifex,mutable,tok,badfs.at(i));
+        scope().replace_mem(st);
         scope.def_if(tok,mutable,false); // Note 1-side-of-if update
       }
     }
@@ -394,36 +395,36 @@ public class Parse implements Comparable<Parse> {
     scope().push_if();            // Start if-expression tracking new defs
     Node ifex = init(new IfNode(ctrl(),expr));
     set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch
-    Node old_mem = mem().keep();          // Keep until parse false-side
+    Node old_mem = mem().keep(2);         // Keep until parse false-side
     Node tex = stmt(false);               // Parse true expression
     if( tex == null ) tex = err_ctrl2("missing expr after '?'");
-    tex.keep();                    // Keep until merge point
-    Node t_ctrl= ctrl().keep();    // Keep until merge point
-    Node t_mem = mem ().keep();    // Keep until merge point
+    tex.keep(2);                   // Keep until merge point
+    Node t_ctrl= ctrl().keep(2);   // Keep until merge point
+    Node t_mem = mem ().keep(2);   // Keep until merge point
 
     scope().flip_if();          // Flip side of tracking new defs
-    Env.GVN.add_work_all(ifex.unkeep());
+    Env.GVN.add_work_all(ifex.unkeep(2));
     set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch
     Env.GVN.add_reduce(ifex);
-    set_mem(old_mem.unkeep());     // Reset memory to before the IF
+    set_mem(old_mem.unkeep(2));    // Reset memory to before the IF
     Node fex = peek(':') ? stmt(false) : Env.XNIL;
     if( fex == null ) fex = err_ctrl2("missing expr after ':'");
-    fex.keep();                    // Keep until merge point
-    Node f_ctrl= ctrl().keep();    // Keep until merge point
-    Node f_mem = mem ().keep();    // Keep until merge point
+    fex.keep(2);                   // Keep until merge point
+    Node f_ctrl= ctrl().keep(2);   // Keep until merge point
+    Node f_mem = mem ().keep(2);   // Keep until merge point
 
     Parse bad = errMsg();
     t_mem = scope().check_if(true ,bad,_gvn,t_ctrl,t_mem); // Insert errors if created only 1 side
     f_mem = scope().check_if(false,bad,_gvn,f_ctrl,f_mem); // Insert errors if created only 1 side
     scope().pop_if();         // Pop the if-scope
-    RegionNode r = set_ctrl(init(new RegionNode(null,t_ctrl.unkeep(),f_ctrl.unkeep())));
+    RegionNode r = set_ctrl(init(new RegionNode(null,t_ctrl.unkeep(2),f_ctrl.unkeep(2))));
     r._val = Type.CTRL;
     _gvn.add_reduce(t_ctrl);
     _gvn.add_reduce(f_ctrl);
     if( t_ctrl._val==Type.XCTRL ) _gvn.add_flow(t_mem);
     if( f_ctrl._val==Type.XCTRL ) _gvn.add_flow(f_mem);
-    set_mem(   gvn(new PhiNode(TypeMem.FULL,bad,r       ,t_mem.unkeep(),f_mem.unkeep())));
-    Node rez = gvn(new PhiNode(Type.SCALAR ,bad,r.unkeep(),tex.unkeep(),  fex.unkeep())) ; // Ifex result
+    set_mem(   gvn(new PhiNode(TypeMem.FULL,bad,r        ,t_mem.unkeep(2),f_mem.unkeep(2))));
+    Node rez = gvn(new PhiNode(Type.SCALAR ,bad,r.unkeep(2),tex.unkeep(2),  fex.unkeep(2))) ; // Ifex result
     _gvn.add_work_all(r);
     return rez;
   }
@@ -440,9 +441,9 @@ public class Parse implements Comparable<Parse> {
       skipWS();
       int oldx = _x;
       int old_last = _lastNWS;
-      expr.keep();              // Keep alive across argument parse
+      expr.keep(2);             // Keep alive across argument parse
       Node arg = expr();
-      if( arg==null ) return expr.unkeep();
+      if( arg==null ) return expr.unkeep(2);
       // To avoid the common bug of forgetting a ';', these must be on the same line.
       int line_last = _lines.binary_search(old_last);
       int line_now  = _lines.binary_search(_x);
@@ -450,7 +451,7 @@ public class Parse implements Comparable<Parse> {
         _x = oldx;  _lastNWS = old_last;  expr.unhook();
         return err_ctrl2("Lisp-like function application split between lines "+line_last+" and "+line_now+", but must be on the same line; possible missing semicolon?");
       }
-      expr = do_call(errMsgs(oldx,oldx),args(expr.unkeep(),arg)); // Pass the 1 arg
+      expr = do_call(errMsgs(oldx,oldx),args(expr.unkeep(2),arg)); // Pass the 1 arg
     }
   }
 
@@ -530,37 +531,37 @@ public class Parse implements Comparable<Parse> {
   private Node _short_circuit_expr(Node lhs, int prec, String bintok, Node op, int opx, int lhsx, int rhsx) {
     // Capture state so we can unwind after parsing delayed execution
     NewObjNode stk = scope().stk(); // Display
-    Node old_ctrl = ctrl().keep();
-    Node old_mem  = mem ().keep();
-    op.keep();
+    Node old_ctrl = ctrl().keep(2);
+    Node old_mem  = mem ().keep(2);
+    op.keep(2);
     TypeStruct old_ts = stk._ts;
     Ary<Node> old_defs = stk._defs.deepCopy();
-    lhs.keep();
+    lhs.keep(2);
 
     // Insert a thunk header to capture the delayed execution
     ThunkNode thunk = (ThunkNode)gvn(new ThunkNode(mem()));
     set_ctrl(thunk);
-    set_mem (gvn(new ParmNode(MEM_IDX,"mem",thunk.keep(),TypeMem.MEM,Env.DEFMEM,null)));
+    set_mem (gvn(new ParmNode(MEM_IDX,"mem",thunk.keep(2),TypeMem.MEM,Env.DEFMEM,null)));
 
     // Delayed execution parse of RHS
     Node rhs = _expr_higher_require(prec,bintok,lhs);
 
     // Insert thunk tail, unwind memory state
-    ThretNode thet = gvn(new ThretNode(ctrl(),mem(),rhs,Env.GVN.add_flow(thunk.unkeep()))).keep();
-    set_ctrl(old_ctrl.unkeep());
-    set_mem (old_mem .unkeep());
+    ThretNode thet = gvn(new ThretNode(ctrl(),mem(),rhs,Env.GVN.add_flow(thunk.unkeep(2)))).keep(2);
+    set_ctrl(old_ctrl.unkeep(2));
+    set_mem (old_mem .unkeep(2));
     for( int i=0; i<old_defs._len; i++ )
       assert old_defs.at(i)==stk._defs.at(i); // Nothing peeked thru the Thunk & updated outside
 
     // Emit the call to both terms.  Both the emitted call and the thunk MUST
     // inline right now.
-    lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op.unkeep(),lhs.unkeep(),thet.unkeep()));
+    lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op.unkeep(2),lhs.unkeep(2),thet.unkeep(2)));
     assert thunk.is_dead() && thet.is_dead(); // Thunk, in fact, inlined
 
     // Extra variables in the thunk not available after the thunk.
     // Set them to Err.
     if( stk._ts != old_ts ) {
-      lhs.keep();
+      lhs.keep(2);
       for( int i=old_defs._len; i<stk._defs._len; i++ ) {
         String fname = stk._ts.fld(i-1)._fld;
         String msg = "'"+fname+"' not defined prior to the short-circuit";
@@ -568,7 +569,7 @@ public class Parse implements Comparable<Parse> {
         Node err = gvn(new ErrNode(ctrl(),bad,msg));
         set_mem(gvn(new StoreNode(mem(),scope().ptr(),err,Access.Final,fname,bad)));
       }
-      lhs.unkeep();
+      lhs.unkeep(2);
     }
     return lhs;
   }
@@ -633,7 +634,7 @@ public class Parse implements Comparable<Parse> {
           Access fin = _buf[_x-2]==':' ? Access.RW : Access.Final;
           Node stmt = stmt(false);
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
-          else set_mem( gvn(new StoreNode(mem(),castnn,n=stmt.keep(),fin,fld ,errMsg(fld_start))));
+          else scope().replace_mem( new StoreNode(mem(),castnn,n=stmt.keep(),fin,fld ,errMsg(fld_start)));
           skipWS();
           return n.unkeep();
         } else {
@@ -746,7 +747,7 @@ public class Parse implements Comparable<Parse> {
     Node plus = _e.lookup_filter_fresh("+",2,ctrl());
     Node sum = do_call(errMsgs(0,_x,_x),args(plus,n,con(TypeInt.con(d))));
     // Active memory for the chosen scope, after the call to plus
-    set_mem(gvn(new StoreNode(mem(),ptr,sum,Access.RW,tok,errMsg())));
+    scope().replace_mem(new StoreNode(mem(),ptr,sum,Access.RW,tok,errMsg()));
     return n.unkeep();          // Return pre-increment value
   }
 
@@ -874,7 +875,7 @@ public class Parse implements Comparable<Parse> {
 
     // NewNode returns a TypeMem and a TypeMemPtr (the reference).
     set_mem( Env.DEFMEM.make_mem_proj(nn,mem()) );
-    return gvn(new ProjNode(nn.unkeep(),REZ_IDX));
+    return gvn(new ProjNode(nn.unkeep(2),REZ_IDX));
   }
 
   /** Parse anonymous struct; the opening "@{" already parsed.  A lexical scope
@@ -994,7 +995,7 @@ public class Parse implements Comparable<Parse> {
         // to the function for faster access.
         RetNode ret = (RetNode)X.xform(new RetNode(ctrl(),mem(),rez,rpc,fun));
         // The FunPtr builds a real display; any up-scope references are passed in now.
-        Node fptr = X.xform(new FunPtrNode(null,ret,fresh_disp.unkeep()));
+        Node fptr = X.xform(new FunPtrNode(null,ret,fresh_disp.unhook()));
 
         _e = _e._par;                // Pop nested environment; pops nongen also
         return (X._ret=fptr);        // Return function; close-out and DCE 'e'
@@ -1405,11 +1406,11 @@ public class Parse implements Comparable<Parse> {
   private Node[] args(Node a0, Node a1, Node a2         ) { return _args(new Node[]{null,null,a0,a1,a2,a0}); }
   private Node[] args(Node a0, Node a1, Node a2, Node a3) { return _args(new Node[]{null,null,a0,a1,a2,a3,a0}); }
   private Node[] _args(Node[] args) {
-    args[CTL_IDX] = ctrl();     // Always control
-    args[MEM_IDX] = mem();      // Always memory
     //args[MEM_IDX] = gvn(new FreshNode(_e._nongen,ctrl(),mem())).keep(); // Always memory
     for( int i=ARG_IDX; i<args.length; i++ ) args[i].keep(); // Hook all args before reducing display
     args[DSP_IDX] = gvn(new FreshNode(_e._nongen,ctrl(),gvn(new FP2DispNode(args[DSP_IDX])))); // Reduce display
+    args[CTL_IDX] = ctrl();     // Always control
+    args[MEM_IDX] = mem();      // Always memory
     for( int i=ARG_IDX; i<args.length; i++ ) {
       args[i].unkeep();
       // Generally might want this in unkeep(), except for cost

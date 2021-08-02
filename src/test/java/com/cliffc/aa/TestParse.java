@@ -17,26 +17,22 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    // TODO: Mutually recursive types are busted
-    test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
-    // 2nd go reuses from 1st go
-    test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
-    // 
-    test_isa("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}", TypeFunPtr.GENERIC_FUNPTR);
-    // Mixed ABC's, making little abc's in-between.
-    test_isa("A= :@{n=B?; v=int}; "+
-             "a= A(0,5); "+
-             "B= :@{n=A?; v=flt}; "+
-             "b= B(a,3.14);"+
-             "C= :@{n=B?; v=str}"+
-             "c= C(b,\"abc\");"+
-             "(a,b,c)",
-             TypeFunPtr.GENERIC_FUNPTR);
+    //// TODO: Mutually recursive types are busted
+    //test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
+    //// 2nd go reuses from 1st go
+    //test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
+    ////
+    //test_isa("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}", TypeFunPtr.GENERIC_FUNPTR);
+    //// Mixed ABC's, making little abc's in-between.
+    //test_isa("A= :@{n=B?; v=int}; "+
+    //         "a= A(0,5); "+
+    //         "B= :@{n=A?; v=flt}; "+
+    //         "b= B(a,3.14);"+
+    //         "C= :@{n=B?; v=str}"+
+    //         "c= C(b,\"abc\");"+
+    //         "(a,b,c)",
+    //         TypeFunPtr.GENERIC_FUNPTR);
 
-
-
-
-    
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
     // The Meet loses precision to fast.  This is a typing bug.
@@ -77,7 +73,7 @@ public class TestParse {
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(1)",TypeInt.con(1));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
-    test("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
+    //test("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
     // id accepts and returns both ints and reference types (arrays).
     //test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",TypeStruct.make_tuple(Type.XNIL,TypeInt.INT8,TypeInt.con(3)));
   }

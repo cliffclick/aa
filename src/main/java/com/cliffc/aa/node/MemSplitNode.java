@@ -24,7 +24,8 @@ public class MemSplitNode extends Node {
   public MemJoinNode join() {
     Node prj = ProjNode.proj(this,0);
     if( prj==null ) return null;
-    return (MemJoinNode)prj._uses.at(0);
+    Node jn = prj._uses.at(0);
+    return jn instanceof MemJoinNode ? (MemJoinNode)jn : null;
   }
 
   @Override public boolean is_mem() { return true; }
@@ -143,9 +144,9 @@ public class MemSplitNode extends Node {
     BitsAlias head2_escs = head2.escapees();
     assert check_split(head1,head1_escs);
     // Insert empty split/join above head2
-    MemSplitNode msp = (MemSplitNode)Env.GVN.init(new MemSplitNode(head2.in(1))).unkeep();
-    MProjNode    mprj= (MProjNode   )Env.GVN.init(new MProjNode   (msp,0      )).unkeep();
-    MemJoinNode  mjn =               Env.GVN.init(new MemJoinNode (mprj       ));
+    MemSplitNode msp = Env.GVN.init(new MemSplitNode(head2.in(1))).unkeep(2);
+    MProjNode    mprj= Env.GVN.init(new MProjNode   (msp,0      )).unkeep(2);
+    MemJoinNode  mjn = Env.GVN.init(new MemJoinNode (mprj       ));
     head2.set_def(1,mjn);
     mjn._live = tail1._live;
     // Pull the SESE regions in parallel from below
@@ -156,7 +157,7 @@ public class MemSplitNode extends Node {
     if( tail1 instanceof ProjNode ) Env.GVN.add_flow(tail1.in(0));
     assert Env.START.more_flow(true)==0;
     Env.GVN.add_mono(mjn);       // See if other defs can move into the Join
-    for( Node use : mjn.unkeep()._uses )
+    for( Node use : mjn.unkeep(2)._uses )
       Env.GVN.add_work_all(use); // See if other uses can move into the Join
     return head1;
   }

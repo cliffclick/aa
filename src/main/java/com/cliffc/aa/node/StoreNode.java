@@ -48,7 +48,7 @@ public class StoreNode extends Node {
     if( mem instanceof MrgProjNode && mem._keep==0 &&
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
         !rez().is_forward_ref() &&
-        mem._uses._len==2 &&
+        mem._uses._len==2 && // Use is by DefMem and self
         (idx=nnn._ts.fld_find(_fld))!= -1 && nnn._ts.fld(idx)._access==Access.RW ) {
       // Update the value, and perhaps the final field
       nnn.update(idx,_fin,rez());
@@ -61,8 +61,8 @@ public class StoreNode extends Node {
     // If Store is of a MemJoin and it can enter the split region, do so.
     // Requires no other memory *reader* (or writer), as the reader will
     // now see the Store effects as part of the Join.
-    if( _keep==0 && tmp != null && mem._keep==0 && mem instanceof MemJoinNode && mem._uses._len==1 ) {
-      Node memw = get_mem_writer();
+    if( _keep<=1 && tmp != null && mem._keep==0 && mem instanceof MemJoinNode && mem._uses._len==1 ) {
+      Node memw = _uses._len==0 ? this : get_mem_writer(); // Zero or 1 mem-writer
       // Check the address does not have a memory dependence on the Join.
       // TODO: This is super conservative
       if( adr instanceof FreshNode ) adr = ((FreshNode)adr).id();
@@ -88,8 +88,11 @@ public class StoreNode extends Node {
       else if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) head2 = mem.in(0).in(0);
       else head2 = null;
       // Check no extra readers/writers at the split point
-      if( head2 != null && MemSplitNode.check_split(this,escapees()) )
-        return MemSplitNode.insert_split(this,escapees(),this,mem,head2);
+      if( head2 != null && MemSplitNode.check_split(this,escapees()) ) {
+        MemSplitNode.insert_split(this, escapees(), this, mem, head2);
+        assert _uses._len==1 && _uses.at(0) instanceof MemJoinNode;
+        return _uses.at(0); // Return the mem join
+      }
     }
     return null;
   }

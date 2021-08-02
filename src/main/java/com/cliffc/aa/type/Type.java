@@ -789,7 +789,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     if( above_center() && isa(t) ) return 0; // Can choose compatible format
     if( _type == t._type ) return 0; // Same type is OK
     if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion
-    if( _type == TALL || _type == TSCALAR || _type == TNSCALR ) return -1; // Scalar has to resolve
+    if( _type == TALL || t._type==TALL || _type == TSCALAR || _type == TNSCALR ) return -1; // Scalar has to resolve
     if( (_type == TREAL || _type == TNREAL) && t.is_num() ) return -1; // Real->Int/Flt has to resolve
     if( t._type == TNIL || t._type == TXNIL ) return (byte)(may_nil() ? -1 : 99); // Must resolve to a NIL first
 

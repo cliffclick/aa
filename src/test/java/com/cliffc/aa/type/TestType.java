@@ -14,12 +14,13 @@ import static org.junit.Assert.assertTrue;
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
-    Type.init0(new HashMap<>());
 
-    Type t0 = Type.XNSCALR;
-    Type t1 = TypeFunPtr.GENERIC_FUNPTR.dual();
-    Type t01 = t0.meet(t1);
-    System.out.println(t01);
+    TypeFld vi = TypeFld.make("v",TypeInt.INT64,2);
+    TypeStruct a0 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XSCALAR,         1),vi);
+    TypeStruct a1 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",TypeMemPtr.make(9,a0),1),vi);
+    TypeStruct a2 = a1.approx(1,9);
+   
+    System.out.println(a1);
   }
 
   @Test public void testBits0() {
