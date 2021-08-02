@@ -11,21 +11,21 @@ import static org.junit.Assert.*;
 public class TestApprox {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
-    Type.init0(new HashMap<>());
   }
 
   // Check TypeStruct.meet for a more complex recursive case
   @Test public void testTSMeet() {
-    Type.init0(new HashMap<>());
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
     int alias0 = BitsAlias.new_alias(BitsAlias.REC);
 
     // Build two structs pointing to each other.
     //   -> [,int] -> * -> [,flt] -> * ->
+    TypeFld fbint = TypeFld.make("b",TypeInt.INT64,1);
+    TypeFld fbflt = TypeFld.make("b",TypeFlt.FLT64,1);
     Type.RECURSIVE_MEET++;
-    TypeFld[] flds0 = TypeFlds.ts(TypeFld.malloc("a",null,0), TypeFld.malloc("b",null,1));
-    TypeFld[] flds1 = TypeFlds.ts(TypeFld.malloc("a",null,0), TypeFld.malloc("b",null,1));
+    TypeFld[] flds0 = TypeFlds.ts(TypeFld.malloc("a",null,0), fbint);
+    TypeFld[] flds1 = TypeFlds.ts(TypeFld.malloc("a",null,0), fbflt);
     TypeStruct t0 = TypeStruct.malloc("",false,flds0,true);
     TypeStruct t1 = TypeStruct.malloc("",false,flds1,true);
     t0._hash = t0.compute_hash();  t0._cyclic = true;
@@ -33,9 +33,7 @@ public class TestApprox {
     TypeMemPtr p0 = TypeMemPtr.make(alias0,t0);
     TypeMemPtr p1 = TypeMemPtr.make(alias0,t1);
     t0.fld(0).setX(p1           );
-    t0.fld(1).setX(TypeInt.INT64);
     t1.fld(0).setX(p0           );
-    t1.fld(1).setX(TypeFlt.FLT64);
     Type.RECURSIVE_MEET--;
     t0 = t0.install_cyclic(t0.reachable());
 
@@ -54,7 +52,6 @@ public class TestApprox {
   // Test approximating infinite recursive types.  Most simple test case: a
   // single linked-list chain of depth == CUTOFF.
   @Test public void testApprox1() {
-    Type.init0(new HashMap<>());
     final int CUTOFF = 3;
     int alias0 = BitsAlias.new_alias(BitsAlias.REC);
 
@@ -125,7 +122,6 @@ public class TestApprox {
   // Test approximating infinite recursive types.  End of chain is already
   // cyclic, and we add a few more depth.
   @Test public void testApprox2() {
-    Type.init0(new HashMap<>());
     final int CUTOFF = 3;
     int alias0 = BitsAlias.new_alias(BitsAlias.REC);
     BitsAlias alias = BitsAlias.make0(alias0);
@@ -235,7 +231,6 @@ public class TestApprox {
   // Approx:
   // A0 -> (X0 <-> X1) -> A1 -> X2 -> A23-> (X35<-> X45) -> A23
   @Test public void testApprox3() {
-    Type.init0(new HashMap<>());
     int alias0 = BitsAlias.new_alias(BitsAlias.REC);
     int alias1 = BitsAlias.new_alias(BitsAlias.REC);
 
@@ -256,21 +251,20 @@ public class TestApprox {
     // ...................................... (X3 <-> X4 ) -> A3 -> X5
     Type i13 = TypeStr.con("X3");
     Type i14 = TypeStr.con("X4");
+    TypeFld fi13 = TypeFld.make("v",i13,0);
+    TypeFld fi14 = TypeFld.make("v",i14,0);
+    TypeFld fpa3 = TypeFld.make("a",pa3,2);
     Type.RECURSIVE_MEET++;
-    TypeFld[] flds3 = TypeFlds.ts(TypeFld.malloc("v",null,0), TypeFld.malloc("x",null,1), TypeFld.malloc("a",null,2));
-    TypeFld[] flds4 = TypeFlds.ts(TypeFld.malloc("v",null,0), TypeFld.malloc("x",null,1), TypeFld.malloc("a",null,2));
+    TypeFld[] flds3 = TypeFlds.ts(fi13, TypeFld.malloc("x",null,1), fpa3);
+    TypeFld[] flds4 = TypeFlds.ts(fi14, TypeFld.malloc("x",null,1), fpa3);
     TypeStruct x3 = TypeStruct.malloc("",false,flds3,true);
     TypeStruct x4 = TypeStruct.malloc("",false,flds4,true);
     x3._hash = x3.compute_hash();  x3._cyclic = true;
     x4._hash = x4.compute_hash();  x4._cyclic = true;
     TypeMemPtr px3 = TypeMemPtr.make(alias1,x3);
     TypeMemPtr px4 = TypeMemPtr.make(alias1,x4);
-    x3.fld(0).setX(i13);
     x3.fld(1).setX(px4);
-    x3.fld(2).setX(pa3);
-    x4.fld(0).setX(i14);
     x4.fld(1).setX(px3);
-    x4.fld(2).setX(pa3);
     Type.RECURSIVE_MEET--;
     x3 = x3.install_cyclic(x3.reachable());
     px3 = (TypeMemPtr)x4.at(1);
@@ -302,21 +296,20 @@ public class TestApprox {
     // ..... (X0 <-> X1) -> A1 -> X2 -> A2 -> (X3 <-> X4 ) -> A3 -> X5
     Type i10 = TypeStr.con("X0");
     Type i11 = TypeStr.con("X1");
+    TypeFld fil0 = TypeFld.make("v",i10,0);
+    TypeFld fil1 = TypeFld.make("v",i11,0);
+    TypeFld fpa1 = TypeFld.make("a",pa1,2);
     Type.RECURSIVE_MEET++;
-    TypeFld[] flds0 = TypeFlds.ts(TypeFld.malloc("v",null,0), TypeFld.malloc("x",null,1), TypeFld.malloc("a",null,2));
-    TypeFld[] flds1 = TypeFlds.ts(TypeFld.malloc("v",null,0), TypeFld.malloc("x",null,1), TypeFld.malloc("a",null,2));
+    TypeFld[] flds0 = TypeFlds.ts(fil0, TypeFld.malloc("x",null,1), fpa1);
+    TypeFld[] flds1 = TypeFlds.ts(fil1, TypeFld.malloc("x",null,1), fpa1);
     TypeStruct x0 = TypeStruct.malloc("",false,flds0,true);
     TypeStruct x1 = TypeStruct.malloc("",false,flds1,true);
     x0._hash = x0.compute_hash();  x0._cyclic = true;
     x1._hash = x1.compute_hash();  x1._cyclic = true;
     TypeMemPtr px0 = TypeMemPtr.make(alias1,x0);
     TypeMemPtr px1 = TypeMemPtr.make(alias1,x1);
-    x0.fld(0).setX(i10);
     x0.fld(1).setX(px1);
-    x0.fld(2).setX(pa1);
-    x1.fld(0).setX(i11);
     x1.fld(1).setX(px0);
-    x1.fld(2).setX(pa1);
     Type.RECURSIVE_MEET--;
     x0 = x0.install_cyclic(x0.reachable());
     px0 = (TypeMemPtr)x1.at(1);
@@ -406,7 +399,6 @@ public class TestApprox {
   // ... and so forth.
   // The first few tree layers remain expanded, but the tree tail collapses.
   @Test public void testApprox4() {
-    Type.init0(new HashMap<>());
     final int CUTOFF = 3;
     int alias = BitsAlias.new_alias(BitsAlias.REC);
     TypeFld lnil = TypeFld.make("l",Type.NIL,1);
@@ -511,7 +503,6 @@ public class TestApprox {
   // Should approx to:
   // Z1 -> {l=A1,r=A1,v} depth=2, and Z1=A3
   @Test public void testApprox5() {
-    Type.init0(new HashMap<>());
     final int CUTOFF = 2;
     int alias = BitsAlias.new_alias(BitsAlias.REC);
 
@@ -546,7 +537,6 @@ public class TestApprox {
   // A3[0,18] -> {l=A3,r=A3,v} depth=1, cyclic
   //             {l=A1,r=A3,v} depth=2
   @Test public void testApprox6() {
-    Type.init0(new HashMap<>());
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
     final int CUTOFF = 2;
