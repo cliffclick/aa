@@ -18,39 +18,40 @@ public abstract class Node implements Cloneable {
   static final byte OP_CALLEPI= 2;
   static final byte OP_CAST   = 3;
   static final byte OP_CON    = 4;
-  static final byte OP_CPROJ  = 5;
-  static final byte OP_DEFMEM = 6;
-  static final byte OP_ERR    = 7;
-  static final byte OP_FRESH  = 8;
-  static final byte OP_FP2DISP= 9;
-  static final byte OP_FUN    =10;
-  static final byte OP_FUNPTR =11;
-  static final byte OP_IF     =12;
-  static final byte OP_JOIN   =13;
-  static final byte OP_LOAD   =14;
-  static final byte OP_LOOP   =15;
-  static final byte OP_NAME   =16; // Cast a prior NewObj to have a runtime Name
-  static final byte OP_NEWOBJ =17; // Allocate a new struct
-  static final byte OP_NEWARY =18; // Allocate a new array
-  static final byte OP_NEWSTR =19; // Allocate a new string
-  static final byte OP_PARM   =20;
-  static final byte OP_PHI    =21;
-  static final byte OP_PRIM   =22;
-  static final byte OP_PROJ   =23;
-  static final byte OP_REGION =24;
-  static final byte OP_RET    =25;
-  static final byte OP_SCOPE  =26;
-  static final byte OP_SPLIT  =27;
-  static final byte OP_START  =28;
-  static final byte OP_STMEM  =29;
-  static final byte OP_STORE  =30;
-  static final byte OP_THRET  =31;
-  static final byte OP_THUNK  =32;
-  static final byte OP_TYPE   =33;
-  static final byte OP_UNR    =34;
-  static final byte OP_MAX    =35;
+  static final byte OP_CONTYPE= 5;
+  static final byte OP_CPROJ  = 6;
+  static final byte OP_DEFMEM = 7;
+  static final byte OP_ERR    = 8;
+  static final byte OP_FRESH  = 9;
+  static final byte OP_FP2DISP=10;
+  static final byte OP_FUN    =11;
+  static final byte OP_FUNPTR =12;
+  static final byte OP_IF     =13;
+  static final byte OP_JOIN   =14;
+  static final byte OP_LOAD   =15;
+  static final byte OP_LOOP   =16;
+  static final byte OP_NAME   =17; // Cast a prior NewObj to have a runtime Name
+  static final byte OP_NEWOBJ =18; // Allocate a new struct
+  static final byte OP_NEWARY =19; // Allocate a new array
+  static final byte OP_NEWSTR =20; // Allocate a new string
+  static final byte OP_PARM   =21;
+  static final byte OP_PHI    =22;
+  static final byte OP_PRIM   =23;
+  static final byte OP_PROJ   =24;
+  static final byte OP_REGION =25;
+  static final byte OP_RET    =26;
+  static final byte OP_SCOPE  =27;
+  static final byte OP_SPLIT  =28;
+  static final byte OP_START  =29;
+  static final byte OP_STMEM  =30;
+  static final byte OP_STORE  =31;
+  static final byte OP_THRET  =32;
+  static final byte OP_THUNK  =33;
+  static final byte OP_TYPE   =34;
+  static final byte OP_UNR    =35;
+  static final byte OP_MAX    =36;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "DefMem", "Err", "Fresh", "FP2Disp", "Fun", "FunPtr", "If", "Join", "Load", "Loop", "Name", "NewObj", "NewAry", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Thret", "Thunk", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "DefMem", "Err", "Fresh", "FP2Disp", "Fun", "FunPtr", "If", "Join", "Load", "Loop", "Name", "NewObj", "NewAry", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Thret", "Thunk", "Type", "Unresolved" };
   static { assert STRS.length==OP_MAX; }
 
   // Unique dense node-numbering
@@ -437,101 +438,16 @@ public abstract class Node implements Cloneable {
   // Node, save that for the expanding ideal calls.
   // Returns null if no-progress or a better version of 'this'.  The
   // transformed graph must remain monotonic in both value() and live().
-  public Node ideal_reduce() {
-    switch( _op ) {             // Giant assert that these nodes are checked for do-nothing
-    case OP_CON:
-    case OP_DEFMEM:
-    case OP_PRIM:
-    case OP_SPLIT:
-    case OP_START:
-    case OP_STMEM:
-    case OP_THRET:
-    case OP_THUNK:
-      break;
-    default: throw com.cliffc.aa.AA.unimpl(); // Node not confirmed do-nothing
-    }
-    return null;
-  }
+  public Node ideal_reduce() { return null; }
 
   // Graph rewriting.  Keeps the same count of Nodes & Edges but might change
   // Edges or replace Nodes.  Returns null for no-progress.
-  public Node ideal_mono() {
-    switch( _op ) {             // Giant assert that these nodes are checked for do-nothing
-    case OP_CALL:
-    case OP_CALLEPI:
-    case OP_CON:
-    case OP_CPROJ:
-    case OP_DEFMEM:
-    case OP_FRESH:
-    case OP_ERR:
-    case OP_FP2DISP:
-    case OP_FUN:
-    case OP_FUNPTR:
-    case OP_IF:
-    case OP_JOIN:
-    case OP_LOOP:
-    case OP_NAME:
-    case OP_NEWARY:
-    case OP_NEWSTR:
-    case OP_PARM:
-    case OP_PHI:
-    case OP_PRIM:
-    case OP_PROJ:
-    case OP_REGION:
-    case OP_SCOPE:
-    case OP_SPLIT:
-    case OP_START:
-    case OP_STMEM:
-    case OP_THRET:
-    case OP_THUNK:
-    case OP_TYPE:
-    case OP_UNR:
-      break;
-    default: throw com.cliffc.aa.AA.unimpl(); // Node not confirmed do-nothing
-    }
-    return null;
-  }
+  public Node ideal_mono() { return null; }
 
   // Graph rewriting.  General growing xforms are here, except for inlining.
   // Things like inserting MemSplit/MemJoin (which strictly increase graph
   // parallelism).  Returns null for no-progress.
-  public Node ideal_grow() {
-    switch( _op ) {             // Giant assert that these nodes are checked for do-nothing
-    case OP_CALLEPI:
-    case OP_CAST:
-    case OP_CON:
-    case OP_CPROJ:
-    case OP_DEFMEM:
-    case OP_FRESH:
-    case OP_ERR:
-    case OP_FP2DISP:
-    case OP_FUN:
-    case OP_FUNPTR:
-    case OP_IF:
-    case OP_JOIN:
-    case OP_LOOP:
-    case OP_NAME:
-    case OP_NEWARY:
-    case OP_NEWOBJ:
-    case OP_NEWSTR:
-    case OP_PARM:
-    case OP_PHI:
-    case OP_PRIM:
-    case OP_PROJ:
-    case OP_REGION:
-    case OP_RET:
-    case OP_SCOPE:
-    case OP_SPLIT:
-    case OP_START:
-    case OP_STMEM:
-    case OP_THRET:
-    case OP_THUNK:
-    case OP_UNR:
-      break;
-    default: throw com.cliffc.aa.AA.unimpl(); // Node not confirmed do-nothing
-    }
-    return null;
-  }
+  public Node ideal_grow() { return null; }
 
   // Compute the current best Type for this Node, based on the types of its
   // inputs.  May return Type.ALL, especially if its inputs are in error.  It

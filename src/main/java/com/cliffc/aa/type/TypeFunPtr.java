@@ -2,7 +2,9 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.VBitSet;
+import static com.cliffc.aa.AA.unimpl;
 
 import java.util.function.Predicate;
 
@@ -182,7 +184,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     return (byte)(t instanceof TypeFunPtr ? 0 : 99); // Mixing TFP and a non-ptr
   }
   @SuppressWarnings("unchecked")
-  @Override void walk( Predicate<Type> p ) { if( p.test(this) ) { _disp.walk(p); } }
+  @Override public void walk( Predicate<Type> p ) { if( p.test(this) ) { _disp.walk(p); } }
 
   // Generic functions
   public boolean is_forward_ref() {
@@ -197,4 +199,9 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     return tf;
   }
   @Override public TypeFunPtr widen() { return GENERIC_FUNPTR; }
+  
+  @Override public Type make_from(Type head, TypeMem map, VBitSet visit) {
+    throw unimpl();
+  }
+
 }

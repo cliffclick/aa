@@ -197,7 +197,7 @@ public class TypeInt extends Type<TypeInt> {
     if( _x==0 && _con==0 ) return nil==Type.XNIL ? this : Type.NIL;
     return TypeInt.make(-2,_z,0);
   }
-  @Override void walk( Predicate<Type> p ) { p.test(this); }
+  @Override public void walk( Predicate<Type> p ) { p.test(this); }
   public TypeInt minsize(TypeInt ti) { return make(-2,Math.min(_z,ti._z),0);  }
   public TypeInt maxsize(TypeInt ti) { return make(-2,Math.max(_z,ti._z),0);  }
 }

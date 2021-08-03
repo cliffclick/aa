@@ -48,7 +48,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   public  static final TypeStr  ABC = make(false,"abc"); // a string constant
   private static final TypeStr  DEF = con("def"); // a string constant
   static final TypeStr[] TYPES = new TypeStr[]{STR,ABC,DEF};
-  static void init1( HashMap<String,Type> types ) { types.put("str",STR); }
+  static void init1( HashMap<String,Type> types ) { types.put("str",TypeMemPtr.STRPTR); }
   // Return a String from a TypeStr constant; assert otherwise.
   @Override public String getstr() { assert _con!=null; return _con; }
 
@@ -119,5 +119,5 @@ public class TypeStr extends TypeObj<TypeStr> {
     return 99;
   }
   @Override public TypeStr widen() { return STR; }
-  @Override void walk( Predicate<Type> p ) { p.test(this); }
+  @Override public void walk( Predicate<Type> p ) { p.test(this); }
 }

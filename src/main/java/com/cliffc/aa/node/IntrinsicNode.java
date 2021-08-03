@@ -130,7 +130,7 @@ public class IntrinsicNode extends Node {
   // Default name constructor using expanded args list.  Just a NewObjNode but the
   // result is a named type.  Same as convertTypeName on an unaliased NewObjNode.
   // Passed in a named TypeStruct, and the parent alias.
-  public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, GVNGCM gvn, Parse bad ) {
+  public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, Parse bad ) {
     assert to.has_name();
     assert to.fld(0).is_display_ptr(); // Display already
     // Upgrade the type to one with no display for nnn.

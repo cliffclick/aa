@@ -202,62 +202,49 @@ public class Parse implements Comparable<Parse> {
     if( t==null ) return err_ctrl2("Missing type after ':'");
     if( peek('?') ) return err_ctrl2("Named types are never nil");
     if( lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
+    Parse bad = errMsg();
     // Single-inheritance & vtables & RTTI:
     //            "Objects know thy Class"
-    // Which means a TypeObj knows its Name.  Its baked into the vtable.
+    // Which means a TypeObj knows its Name.  It's baked into the vtable.
     // Which means TypeObj is named and not the pointer-to-TypeObj.
     // "Point= :@{x,y}" declares "Point" to be a type Name for "@{x,y}".
-    Type tn, tn_crush = null;
-    int alias = -1;             // No alias for named primitives
-    Type ot = _e.lookup_type(tvar);
-    if( ot == null ) {                      // Name does not pre-exist
-      tn = t.set_name((tvar+":").intern()); // Add a name
-      if( tn instanceof TypeStruct ) {      // TypeObj decl
-        alias = BitsAlias.type_alias(BitsAlias.REC); // Assign an alias
-        tn = ((TypeStruct)tn).close();
-        tn_crush = ((TypeStruct)tn).crush();
+    Type named = t.set_name((tvar+":").intern()); // Add a name
+    ConTypeNode tn = _e.lookup_type(tvar);
+    if( tn == null ) {
+      // If this is a primitive type, there is no recursion and
+      // no special issues.  Make a constructor and be done.
+      if( !(t instanceof TypeObj) ) {
+        // Make a ConType with a named Type
+        tn = (ConTypeNode)gvn(new ConTypeNode(tvar,named,scope()));
+        _e.add_type(tvar,tn); // Add a type mapping
+        PrimNode cvt = PrimNode.convertTypeName(t,named,bad);
+        return _e.add_fun(bad,tvar,gvn(cvt.as_fun(_gvn)));
       }
-      _e.add_type(tvar,tn);                 // Assign type-name
-    } else {
-      if( !(ot instanceof TypeStruct) || !(t instanceof TypeStruct) || !ot.has_name() )
-        return err_ctrl2("Cannot re-assign type '"+tvar+"'");
-      TypeStruct ots = (TypeStruct)ot;
-      alias = ots.fref_alias(); // Forward-ref alias was allocated at the forward ref
-      tn = ots.merge_recursive_type((TypeStruct)t);
-      ot = null; // Crushed by the merge
-      tn_crush = ((TypeStruct)tn).crush();
-      _e.def_type(tvar,tn);
-    }
-    // Assign a generic alias & type to default memory
-    if( alias != -1 )
-      Env.DEFMEM.make_mem(alias,con(tn_crush));
 
-    // Add a constructor function.  If this is a primitive, build a constructor
-    // taking the primitive.
-    Parse bad = errMsg();
-    Node rez;
-    if( !(t instanceof TypeObj) ) {
-      PrimNode cvt = PrimNode.convertTypeName(t,tn,bad);
-      rez = _e.add_fun(bad,tvar,gvn(cvt.as_fun(_gvn))); // Return type-name constructor
-    } else {
-      // Get the prefix type name; it must exist (and has an alias# already).
-      if( t.has_name() ) throw unimpl();
-
-      // If this is a TypeObj, build a constructor taking a pointer-to-TypeObj
-      // - and the associated memory state, i.e.  takes a ptr-to-@{x,y} and
-      // returns a ptr-to-Named:@{x,y}.  This stores a v-table ptr into an
-      // object.  The alias# does not change, but a TypeMem[alias#] would now
-      // map to the Named variant.
-      FunPtrNode epi1 = IntrinsicNode.convertTypeName((TypeObj)tn,bad,_gvn);
-      rez = _e.add_fun(bad,tvar,epi1); // Return type-name constructor
-      // For Structs, add a second constructor taking an expanded arg list
-      if( tn instanceof TypeStruct ) {     // Add struct types with expanded arg lists
-        FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)tn, alias, _gvn, errMsg());
-        _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
-      }
+      // Always wrap Objs with a TypeMemPtr and a unique alias.
+      TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.type_alias(BitsAlias.REC),(TypeObj)named);
+      // Make a ConType with a named Type
+      tn = (ConTypeNode)gvn(new ConTypeNode(tvar,tmp,scope()));
+      _e.add_type(tvar,tn); // Add a type mapping
     }
-    _gvn.revalive(Env.DEFMEM);       // Update DEFMEM for both functions added
-    // TODO: Add reverse cast-away
+
+    // A forward-ref ConTypeNode.  Close the cycle.
+    tn.def_fref(named,_e);
+
+    // Add a copy of constructor functions.
+
+    // Build a constructor taking a pointer-to-TypeObj - and the associated
+    // memory state, i.e.  takes a ptr-to-@{x,y} and returns a ptr to
+    // Named:@{x,y}.  This stores a v-table ptr into an object.  The alias#
+    // does not change, but a TypeMem[alias#] would now map to the Named
+    // variant.
+    TypeStruct ts = (TypeStruct)((TypeMemPtr)tn._val)._obj;
+    FunPtrNode epi1 = IntrinsicNode.convertTypeName(ts,bad,_gvn);
+    Node rez = _e.add_fun(bad,tvar,epi1); // Return type-name constructor
+    // Add a second constructor taking an expanded arg list
+    FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(ts, tn.alias(), errMsg());
+    _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
+
     return rez;
   }
 
@@ -865,7 +852,7 @@ public class Parse implements Comparable<Parse> {
     require(')',oldx);          // Balanced closing paren
 
     // Build the tuple from gathered args
-    NewObjNode nn = new NewObjNode(false,BitsAlias.REC,TypeStruct.open(TypeMemPtr.NO_DISP),Env.ANY);
+    NewObjNode nn = new NewObjNode(false,TypeStruct.open(TypeMemPtr.NO_DISP),Env.ANY);
     for( int i=0; i<args._len; i++ )
       nn.create_active((""+i).intern(),args.at(i).unkeep(),Access.Final);
     nn._fld_starts = bads.asAry();
@@ -1170,12 +1157,12 @@ public class Parse implements Comparable<Parse> {
   // TypeObjs get wrapped in a pointer, and the pointer is returned instead.
   private Type typep(boolean type_var) {
     Type t = type0(type_var);
-    if( t==null ) return null;
+    if( t instanceof TypeMemPtr ) return typeq(t); // Named type is already a TMP
     if( !(t instanceof TypeObj) ) return t; // Primitives are not wrapped
-    // Automatically convert to reference for fields.
+    // Automatically convert unnamed structs to refs.
     // Make a reasonably precise alias.
-    int type_alias = t instanceof TypeStruct ? ((TypeStruct)t).fref_alias() : (t instanceof TypeStr ? BitsAlias.STR : BitsAlias.AARY);
-    TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.make0(type_alias),(TypeObj)t);
+    int type_alias = t instanceof TypeStruct ? BitsAlias.REC : (t instanceof TypeStr ? BitsAlias.STR : BitsAlias.AARY);
+    TypeMemPtr tmp = TypeMemPtr.make(type_alias,(TypeObj)t);
     return typeq(tmp);          // And check for null-ness
   }
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
@@ -1260,20 +1247,20 @@ public class Parse implements Comparable<Parse> {
     if( tok==null ) return null;
     tok = tok.intern();
     if( Util.eq(tok,"->") ) return Type.ANY; // Found -> return sentinel
-    Type t = _e.lookup_type(tok);
+    ConTypeNode t = _e.lookup_type(tok);
     if( t==null ) {              // Not a known type var
       if( lookup(tok) != null || // Yes a known normal var; resolve as a normal var
           !type_var ) {          // Or not inside a type-var assignment
         _x = oldx;               // Unwind if not a known type var
         return null;             // Not a type
       }
-      TypeStruct fref = TypeStruct.make_forward_def_type(tok);
-      _e.add_type(tok,t=fref);
-      // Make a generic alias for the type
-      int alias = fref.fref_alias();
-      Env.DEFMEM.make_mem(alias,con(TypeStruct.ALLSTRUCT.make_from(fref._name)));
+      // Make a forward-ref ConType and return its type
+      int alias = BitsAlias.type_alias(BitsAlias.REC);
+      TypeMemPtr tmp = TypeMemPtr.make(alias,(TypeObj)TypeObj.ISUSED.set_name((tok+":").intern()));
+      _e.add_type(tok,(ConTypeNode)gvn(new ConTypeNode(tok,tmp,scope())));
+      return tmp;
     }
-    return t;
+    return t._val;
   }
 
   // Require a closing character (after skipping WS) or polite error

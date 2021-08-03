@@ -17,7 +17,7 @@ import static com.cliffc.aa.AA.MEM_IDX;
 public class ScopeNode extends Node {
 
   // Mapping from type-variables to Types.  Types have a scope lifetime like values.
-  private final HashMap<String,Type> _types; // user-typing type names
+  private final HashMap<String,ConTypeNode> _types; // user-typing type names
   private Ary<IfScope> _ifs;                 // Nested set of IF-exprs used to track balanced new-refs
 
   public ScopeNode(Parse open, boolean closure) {
@@ -27,14 +27,19 @@ public class ScopeNode extends Node {
     _ifs = null;
     keep();
   }
-  public ScopeNode(HashMap<String,Type> types,  Node ctl, Node mem, Node ptr, Node rez) {
+  public ScopeNode(HashMap<String,ConTypeNode> types,  Node ctl, Node mem, Node ptr, Node rez) {
     super(OP_SCOPE,ctl,mem,ptr,rez);
     _types = types;
     keep();
   }
 
   // Add base types on startup
-  public void init() { Type.init0(_types); }
+  public void init() {
+    HashMap<String,Type> ts = new HashMap<>();
+    Type.init0(ts);
+    for( String tname : ts.keySet() )
+      _types.put(tname,Env.GVN.init(new ConTypeNode(tname,ts.get(tname),Env.SCP_0)));
+  }
 
   public   Node  ctrl() { return in(0); }
   public   Node  mem () { return in(MEM_IDX); }
@@ -77,17 +82,20 @@ public class ScopeNode extends Node {
   public void       early_kill() { pop(); pop(); pop(); }
 
   // Name to type lookup, or null
-  public Type get_type(String name) { return _types.get(name);  }
-  public HashMap<String,Type> types() { return _types; }
+  public ConTypeNode get_type(String name) { return _types.get(name);  }
 
-  // Extend the current Scope with a new type; cannot override existing name.
-  public void add_type( String name, Type t ) {
-    assert _types.get(name)==null;
-    _types.put( name, t );
+  // Alias to TypeMemPtr lookup, or null
+  public ConTypeNode get_type(int alias) {
+    for( ConTypeNode ctn : _types.values() )
+      if( ctn._t instanceof TypeMemPtr &&
+          ((TypeMemPtr)ctn._t)._aliases.test(alias) )
+        return ctn;
+    return null;
   }
-  // Replacing a recursive type with final definition
-  public void def_type( String name, Type t ) {
-    assert _types.get(name)!=null;
+  
+  // Extend the current Scope with a new type; cannot override existing name.
+  public void add_type( String name, ConTypeNode t ) {
+    assert _types.get(name)==null;
     _types.put( name, t );
   }
 

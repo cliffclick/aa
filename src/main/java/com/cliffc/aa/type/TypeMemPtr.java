@@ -262,8 +262,9 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return (byte)(t instanceof TypeMemPtr ? 0 : 99);  // Mixing TMP and a non-ptr
   }
   @SuppressWarnings("unchecked")
-  @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
+  @Override public void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
   public int getbit() { return _aliases.getbit(); }
+  public int getbit0() { return _aliases.strip_nil().getbit(); }
 
   // Widen for primitive specialization and H-M unification.  H-M distinguishes
   // ptr-to-array (and string) from ptr-to-record.  Must keep types at the same
@@ -278,4 +279,23 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( bs==null ) return this; // Already plenty wide
     return make(bs,_obj.widen());
   }
+
+  @Override public Type make_from(Type head, TypeMem mem, VBitSet visit) {
+    if( this!=head ) {
+      TypeObj[] pubs = mem.alias2objs();
+      boolean mapped=true;
+      for( int alias : _aliases )
+        if( pubs[alias]==null )
+          { mapped=false; break; }
+      if( mapped ) {
+        TypeObj obj = mem.ld(this);
+        if( obj!=TypeObj.XOBJ )
+          return make_from(obj);
+      }
+    }
+    TypeObj obj = (TypeObj)_obj.make_from(head,mem,visit);
+    if( obj == null ) return this;
+    return make_from(obj);
+  }
+
 }

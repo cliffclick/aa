@@ -219,14 +219,19 @@ public class Env implements AutoCloseable {
 
 
   // Type lookup in any scope
-  Type lookup_type( String name ) {
-    Type t = _scope.get_type(name);
+  ConTypeNode lookup_type( String name ) {
+    ConTypeNode t = _scope.get_type(name);
     if( t != null ) return t;
     return _par == null ? null : _par.lookup_type(name);
   }
+  // Lookup by alias
+  public ConTypeNode lookup_type( int alias ) {
+    ConTypeNode t = _scope.get_type(alias);
+    if( t != null ) return t;
+    return _par == null ? null : _par.lookup_type(alias);
+  }
   // Update type name token to type mapping in the current scope
-  void add_type( String name, Type t ) { _scope.add_type(name,t); }
-  void def_type( String name, Type t ) { _scope.def_type(name,t); }
+  void add_type( String name, ConTypeNode t ) { _scope.add_type(name,t); }
 
   // Collect TVars from all variables in-scope.  Used to build a
   // "non-generative" set of TVars for Hindley-Milner typing.

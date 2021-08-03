@@ -89,7 +89,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   @Override public boolean is_con() { return false; }
   @Override public boolean must_nil() { return false; }
   @Override public boolean  may_nil() { return false; }
-  @Override void walk( Predicate<Type> p ) { p.test(this); }
+  @Override public void walk( Predicate<Type> p ) { p.test(this); }
   // Widen (loss info), to make it suitable as the default function memory.
   // Must be monotonic, as CallEpiNode.value() uses this.
   public TypeObj crush() { return this; }

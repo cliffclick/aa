@@ -53,7 +53,6 @@ public class TestNode {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testNode() {
-    Type.init0(new HashMap<>());
     Env.file_scope(Env.top_scope());
   }
 
@@ -158,7 +157,6 @@ public class TestNode {
   public static void main( String[] args ) { new TestNode().testMonotonic();  }
   @SuppressWarnings("unchecked")
   @Test public void testMonotonic() {
-    Type.init0(new HashMap<>());
     Env top = Env.top_scope();
     Env.file_scope(top);
     assert _errs == 0;          // Start with no errors

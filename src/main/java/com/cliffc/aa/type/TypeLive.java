@@ -35,7 +35,7 @@ public class TypeLive extends TypeObj<TypeLive> {
     if( _any ) sb.p('~');
     return sb.p(STRS[_flags]);
   }
-  
+
   private static TypeLive FREE=null;
   private TypeLive free( TypeLive ret ) { FREE=this; return ret; }
   private static TypeLive make( boolean any, int flags ) {
@@ -52,12 +52,12 @@ public class TypeLive extends TypeObj<TypeLive> {
   // Keeps all values alive
   private static final int FLAG_WITH_DISP=2;
   public boolean is_ret() { return (_flags&FLAG_WITH_DISP)!=0; }
-  
+
   static final TypeLive NO_DISP= make(false,0 );          // no escape, no disp
   static final TypeLive ESC_DISP=make(false,FLAG_ESCAPE); // escape, no disp
   static final TypeLive LIVE   = make(false,FLAG_WITH_DISP); // Basic alive
   static final TypeLive ESCAPE = make(false,FLAG_ESCAPE+FLAG_WITH_DISP); // Used as a call argument
-  
+
   public static final TypeLive LIVE_BOT=make(false,FLAG_ESCAPE+FLAG_WITH_DISP);
   public static final TypeLive DEAD   = LIVE_BOT.dual();
 
@@ -100,5 +100,5 @@ public class TypeLive extends TypeObj<TypeLive> {
   @Override public boolean may_be_con() { return false; }
   @Override public boolean is_con() { return false; }
   @Override public Type meet_nil(Type t) { return this; }
-  @Override void walk( Predicate<Type> p ) { p.test(this); }
+  @Override public void walk( Predicate<Type> p ) { p.test(this); }
 }

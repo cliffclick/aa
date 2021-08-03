@@ -24,7 +24,6 @@ public class TestType {
   }
 
   @Test public void testBits0() {
-    Type.init0(new HashMap<>());
 
     // This looks like a crossing-nil bug, but it is not quite.
     // What is "nil join *[4]->str"?
@@ -57,7 +56,6 @@ public class TestType {
   // *classes* not *constants.  Hence there is no '4' bit, only '+4' and '&4'.
   // Need the basic invariants: complete, distributed, commutative, associative.
   @Test public void testBits() {
-    Type.init0(new HashMap<>());
     // 1 - obj
     //   2 - tuples & structs
     //   3 - arrays
@@ -92,7 +90,6 @@ public class TestType {
   }
 
   @Test public void testNamesInts() {
-    Type.init0(new HashMap<>());
 
     // Lattice around int8 and 0 is well formed; exactly 3 edges, 3 nodes
     // Confirm lattice: {~i16 -> ~i8 -> 0 -> i8 -> i16 }
@@ -143,7 +140,6 @@ public class TestType {
   // all ->  mem  -> { str,tup} -> { string constants, tuple constants} -> {~str,~tup} -> ~mem    -> any
   // all -> *mem? -> {*mem,nil} -> {*str,*tup,nil} -> {~*str,~*tup,nil} -> {~*mem,nil} -> ~*mem+? -> any
   @Test public void testOOPsNulls() {
-    Type.init0(new HashMap<>());
     Type bot = Type      .ALL;
 
     Type mem = TypeMem   .MEM;  // All memory
@@ -253,7 +249,6 @@ public class TestType {
   }
 
   @Test public void testStructTuple() {
-    Type.init0(new HashMap<>());
     Type nil  = Type.NIL;
     // Tuple is more general that Struct
     Type tf = TypeStruct.TFLT64; //  (  flt64); choice leading field name
@@ -291,7 +286,6 @@ public class TestType {
 
 
   @Test public void testFunction() {
-    Type.init0(new HashMap<>());
     PrimNode[] ignore2 = PrimNode.PRIMS(); // Force node
 
     TypeFunPtr gf = TypeFunPtr.GENERIC_FUNPTR;
@@ -328,7 +322,6 @@ public class TestType {
   // Test limits on recursive type structures; recursively building nested
   // structures caps out in the type system at some reasonable limit.
   @Test public void testRecursive() {
-    Type.init0(new HashMap<>());
 
     // Recursive types no longer cyclic in the concrete definition?  Because
     // TypeObj can contain TypeMemPtrs but not another nested TypeObj...
@@ -438,7 +431,6 @@ public class TestType {
 
   // Test a cycle with two names on mismatched cycle boundaries
   @Test public void testNameCycle() {
-    Type.init0(new HashMap<>());
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
     // Make a cycle: 0_A: -> 1_(n=*,v=i64) -> 2_TMP -> 3_B: -> 4_(n=*,v=f64) -> 5_TMP ->
@@ -479,7 +471,6 @@ public class TestType {
   }
 
   @Test public void testLoad() {
-    Type.init0(new HashMap<>());
     Object dummy0 = TypeStruct.TYPES;
     // All are ISA
     TypeMemPtr[] tmps = new TypeMemPtr[]{
@@ -558,7 +549,6 @@ public class TestType {
 
 
   @Test public void testCommuteSymmetricAssociative() {
-    Type.init0(new HashMap<>());
     assertTrue(Type.check_startup());
   }
 

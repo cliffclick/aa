@@ -853,6 +853,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     stack.pop();                // Pop, not part of anothers cycle
     return bcs;
   }
+  @SuppressWarnings("unchecked")
   private void mark_cyclic( BitSet bcs, Ary<Type> reaches ) {
     for( Type t : reaches ) {
       if( bcs.get(t._uid) ) {
@@ -1170,137 +1171,16 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return false;
   }
 
-  @Override void walk( Predicate<Type> p ) {
+  @Override public void walk( Predicate<Type> p ) {
     if( p.test(this) )
       for( TypeFld fld : _flds ) fld.walk(p);
   }
 
-
-  // Make a type-variable with no definition - it is assumed to be a
-  // forward-reference, to be resolved before the end of parsing.
-  public static TypeStruct make_forward_def_type(String tok) {
-    // Make a new top-level alias
-    int alias = BitsAlias.type_alias(BitsAlias.REC);
-    return malloc((tok+":").intern(),false,TypeFlds.ts(TypeFld.make("$fref",TypeInt.con(alias),Access.Final,0)),true).hashcons_free();
+  @Override public TypeStruct make_from(Type head, TypeMem mem, VBitSet visit) {
+    if( visit.tset(_uid) ) return null;
+    TypeFld[] flds = TypeFlds.clone(_flds);
+    for( int i=0; i<flds.length; i++ )
+      flds[i] = flds[i].make_from(head,mem,visit);
+    return make_from(flds);
   }
-  // Return the alias for a forward-ref type, or 0 if not a forward-ref
-  public int fref_alias() {
-    if( !has_name() || !Util.eq(_flds[0]._fld,"$fref") ) return BitsAlias.REC; // Not a forward ref
-    return (int)_flds[0]._t.getl();
-  }
-
-  // We have a cycle because we are unioning {t,this} and we have a graph from
-  // t->...->this.  This cycle may pre-exist once closed and can be detected
-  // doing a lookup after setting this===t.  The new cycle members are in the
-  // INTERN table, but if a prior cycle version exists, we need to remove the
-  // new cycle and use the prior one.
-  public TypeStruct merge_recursive_type( TypeStruct ts ) {
-    assert fref_alias()!=BitsAlias.REC;
-    assert intern_check();
-     /*     TODO:
-            even with free name change
-            was buggy with not interning the TypeFld from intial DISP_FLD
-
-            but the name/no-hash game doesn't work because a name+plus_hash
-            does not hit, even if everything else is the same because
-            hashes do not match.  So peels an iteration by mistake before
-            hitting the cycle.  Which right now causes a simple ISA test
-            to fail in testParse.
-
-            Theory#17
-            Drop free name change, figure on re-hitting old named cycle test-to-test.
-
-            During install here, walk as expected but UNTERN everything in the cycle.
-            Close the cycle & check the hash.  Then check for a hit.
-
-            Because this type is "late to the party" and saw any amount of AA code,
-            the constructor type got spread far and wide.  So would have to do a
-            type-system-wide visit to update all pointers to the correct version.
-
-            Instead walk the cycle, and flag as forwarding.
-            And on EVERY FREAK'N ACCESS TO RAW TYPES have to play the forwarding game.  Ugh.
-
-            Which is why i need to sleep on this.
-
-            Only happens for mutually recursive types with random AA code interspersed.
-
-            Alternative: recursive types allowed, but only All At Once.  I'll save the constructor construction until the mut-rec is done.
-            Alternative: Do The Big Walk and update all types.
-      */
-
-    // Make both nil and not-nil variants.  These *should be* the only pointers
-    // to 'this' getting its hash whacked.
-    int alias = fref_alias();
-    TypeMemPtr tmp0 = TypeMemPtr.make    (alias,this);
-    TypeMemPtr tmp1 = TypeMemPtr.make_nil(alias,this);
-    // Remove from INTERN table, since hacking type will not match hash
-    tmp0.untern()._dual.untern();
-    tmp1.untern()._dual.untern();
-    this.untern()._dual.untern();
-    ts.  untern()._dual.untern();
-    // Hack type and it's dual.  Type is now recursive.
-    _flds = ts._flds; _dual._flds = ts._dual._flds;
-    _open  = _dual._open   = false;
-    // Hash changes, e.g. field names.
-    _hash = compute_hash();  _dual._hash = _dual.compute_hash();
-    tmp0._hash = tmp0._dual._hash = 0;
-    tmp1._hash = tmp1._dual._hash = 0;
-
-    // Remove the entire new cycle members and recompute their hashes.
-    rehash_cyclic(new Ary<>(Type.class), this);
-
-    // Check for a prior.  This can ONLY happen during testing, because the
-    // same type name (different lexical scopes; name mangling) cannot be used twice.
-    TypeStruct old = (TypeStruct)intern_lookup();
-    if( old != null ) { free(null);  _dual.free(null);  return old; }
-
-    // Insert all members of the cycle into the hashcons.  If self-symmetric,
-    // also replace entire cycle with self at each point.
-    if( equals(_dual) ) throw AA.unimpl();
-    walk( t -> { if( t.interned() ) return false;
-        t.retern()._dual.retern(); return true; });
-
-    return this;
-  }
-
-  // Classic cycle-finding algorithm.  The tail has been folded into the head.
-  // The head (old fref), and none of the guts are marked cyclic.
-  private void rehash_cyclic(Ary<Type> stack, Type t ) {
-    if( stack._len > 0 && t==this ) {    // If visiting again... have found a cycle t->....->this
-      // All on the stack are flagged as being part of a cycle
-      Type st;
-      for( int i=stack._len-1; (st=stack.at(i))!=t; i-- ) {
-        if( st._hash!=0 ) st.untern()._dual.untern(); // Wrong hash
-        if( st instanceof TypeStruct )
-          ((TypeStruct)st)._cyclic = ((TypeStruct)st)._dual._cyclic = true;
-        st._hash = st._dual._hash = 0; // Clear.  Cannot compute until all children found/cycles walked.
-      }
-      _cyclic = _dual._cyclic = true;
-    } else {
-      if( t instanceof TypeMemPtr || t instanceof TypeFunPtr || t instanceof TypeStruct || t instanceof TypeFld ) {
-        stack.push(t);              // Push on stack, in case a cycle is found
-        if( t instanceof TypeMemPtr ) {
-          rehash_cyclic(stack,((TypeMemPtr)t)._obj);
-        } else if( t instanceof TypeFunPtr ) {
-          rehash_cyclic(stack,((TypeFunPtr)t)._disp);
-        } else if( t instanceof TypeFld ) {
-          rehash_cyclic(stack,((TypeFld)t)._t);
-        } else {
-          TypeStruct ts = (TypeStruct)t;
-          if( !ts._cyclic )    // Part of some other cycle
-            for( int i=0; i<ts._flds.length; i++ )
-              rehash_cyclic(stack, ts._flds[i]);
-        }
-        if( t._hash==0 ) {    // If part of a cycle, hash was cleared.  Rehash.
-          t      ._hash=t      .compute_hash();
-          t._dual._hash=t._dual.compute_hash();
-        } else                  // Some other part, not part of cycle
-          assert t._hash==t.compute_hash();
-        stack.pop();            // Pop, not part of anothers cycle
-      } else {
-        assert t._hash != 0;    // Not part of any cycle, unchanged
-      }
-    }
-  }
-
 }

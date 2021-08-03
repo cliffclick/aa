@@ -197,7 +197,7 @@ public class TypeFld extends Type<TypeFld> {
 
   @Override public TypeFld simple_ptr() { return make_from(_t.simple_ptr()); }
   @SuppressWarnings("unchecked")
-  @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }
+  @Override public void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }
 
   // Simple string find on an array
   static int fld_find(TypeFld[] flds, String fld) {
@@ -205,6 +205,10 @@ public class TypeFld extends Type<TypeFld> {
       if( Util.eq(flds[i]._fld,fld) )
         return i;
     return -1;
+  }
+
+  @Override public TypeFld make_from(Type head, TypeMem mem, VBitSet visit) {
+    return setX(_t.make_from(head,mem,visit)).hashcons_free();
   }
 
 }

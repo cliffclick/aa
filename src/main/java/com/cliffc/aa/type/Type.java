@@ -905,7 +905,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // If the test returns false, short-circuit the walk.  No attempt to guard
   // against recursive structure walks, so the 'test' must return false when
   // visiting the same Type again.
-  void walk( Predicate<Type> p ) { assert is_simple(); p.test(this); }
+  public void walk( Predicate<Type> p ) { assert is_simple(); p.test(this); }
 
   TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return null; }
 
@@ -913,6 +913,10 @@ public class Type<T extends Type<T>> implements Cloneable {
   public boolean is_display_ptr() { return _type==TSCALAR || _type==TXSCALAR || _type==TNIL || _type==TXNIL || _type==TANY || _type==TALL; }
   boolean is_display() { return false; }
 
+  // Make from existing type, replacing TMPs with alias from the map
+  public Type make_from(Type head, TypeMem map, VBitSet visit) { return this; }
+
+  
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }

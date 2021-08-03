@@ -35,12 +35,15 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
   // News do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
-  public NewNode( byte type, int parent_alias, T to         ) { super(type,(Node)null); _init(parent_alias,to); }
-  public NewNode( byte type, int parent_alias, T to,Node fld) { super(type, null, fld); _init(parent_alias,to); }
-  private void _init(int parent_alias, T ts) {
+
+  // Takes a parent alias, and splits a child out from it.
+  public NewNode( byte type, int par_alias, T to         ) { super(type,(Node)null); _init(BitsAlias.new_alias(par_alias),to); }
+  // Takes a alias and a field and uses them directly
+  public NewNode( byte type, int     alias, T to,Node fld) { super(type, null, fld); _init(                        alias, to); }
+  private void _init(int alias, T ts) {
     if( _elock ) unelock();    // Unlock before changing hash
-    _alias = BitsAlias.new_alias(parent_alias);
-    _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeObj.ISUSED);
+    _alias = alias;
+    _tptr = TypeMemPtr.make(BitsAlias.make0(alias),TypeObj.ISUSED);
     sets(ts);
   }
   @Override public String xstr() { return "New"+"*"+_alias; } // Self short name
@@ -140,8 +143,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   @Override @NotNull public NewNode copy( boolean copy_edges) {
     // Split the original '_alias' class into 2 sub-aliases
     NewNode<T> nnn = (NewNode<T>)super.copy(copy_edges);
-    nnn._init(_alias,_ts);      // Children alias classes, split from parent
-    _init(_alias,_ts); // The original NewNode also splits from the parent alias
+    nnn._init(BitsAlias.new_alias(_alias),_ts);      // Children alias classes, split from parent
+    _init(BitsAlias.new_alias(_alias),_ts); // The original NewNode also splits from the parent alias
     Env.GVN.add_flow(this);     // Alias changes flow
     return nnn;
   }

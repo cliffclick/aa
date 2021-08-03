@@ -315,7 +315,7 @@ public class GVNGCM {
 
   // Debugging hook
   private boolean check_not_monotonic( Node n, Type ot, Type nt) {
-    assert nt==nt.simple_ptr();    // Only simple pointers in node types
+    assert nt==nt.simple_ptr() || n instanceof ConTypeNode;    // Only simple pointers in node types
     if( ot.isa(nt) ) return false; // No bug
     _work_flow.del(n);             // Might be back on the lift
     add_flow(n);                   // Setup for a re-run

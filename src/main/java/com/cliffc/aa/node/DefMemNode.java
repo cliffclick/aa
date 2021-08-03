@@ -1,9 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeObj;
+import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.Env.GVN;
 
@@ -17,8 +15,10 @@ public class DefMemNode extends Node {
       Node n = in(i);
       if( n==null ) continue;
       if( n instanceof MrgProjNode ) { // NewNode still alive
-        NewNode nnn = n.in(0) instanceof NewNode ? (NewNode)n.in(0) : null;
-        tos[i] = (nnn != null && nnn._val!=Type.ANY && nnn._live !=TypeMem.DEAD ) ? nnn._crushed : TypeObj.UNUSED;
+        NewNode nnn = n.in(0) instanceof NewNode ? (NewNode) n.in(0) : null;
+        tos[i] = (nnn != null && nnn._val != Type.ANY && nnn._live != TypeMem.DEAD) ? nnn._crushed : TypeObj.UNUSED;
+      } else if( n instanceof ConTypeNode ) {
+        tos[i] = ((TypeMemPtr)n._val)._obj;
       } else {                  // Collapsed NewNode
         Type tn = n._val;
         if( tn instanceof TypeMem ) tn = ((TypeMem)tn).at(i);
