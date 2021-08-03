@@ -17,24 +17,6 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    // TODO: Mutually recursive types are busted
-    // Mixed ABC's, making little abc's in-between.
-    //*[28](^=any,
-    //  *[23]A:@{$; n=0; v=5},
-    //  *[18]B:@{$; n=$; v=3.14},
-    //  *[26]C:@{$; n=$; v=*[25]"abc"}
-    // )
-
-    //test_obj("A= :@{n=B?; v=int}; "+
-    //         "a= A(0,5); "+
-    //         "B= :@{n=A?; v=flt}; "+
-    //         "b= B(a,3.14);"+
-    //         "C= :@{n=B?; v=str};"+
-    //         "c= C(b,\"abc\");"+
-    //         "(a,b,c)",
-    //         TypeStruct.make(TypeStruct.tups(TypeInt.con(1),Type.XNIL,Type.XNIL)));
-
-
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
     // The Meet loses precision to fast.  This is a typing bug.
@@ -418,9 +400,20 @@ public class TestParse {
     test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
     test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR); // Same test, again, using the same Type.INTERN table
     test_isa("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}", TypeFunPtr.GENERIC_FUNPTR);
+    // Mixed ABC's, making little abc's in-between.
+    TypeMemPtr tmpA = TypeMemPtr.make(23,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,1),TypeFld.make("v",TypeInt.con(5    ),2)).set_name("A:"));
+    TypeMemPtr tmpB = TypeMemPtr.make(19,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpA     ,1),TypeFld.make("v",TypeFlt.con(3.14 ),2)).set_name("B:"));
+    TypeMemPtr tmpC = TypeMemPtr.make(35,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpB     ,1),TypeFld.make("v",TypeMemPtr.make(17,TypeStr.con("abc")),2)).set_name("C:"));
+    test_isa("A= :@{n=B?; v=int}; "+
+             "a= A(0,5); "+
+             "B= :@{n=A?; v=flt}; "+
+             "b= B(a,3.14);"+
+             "C= :@{n=B?; v=str};"+
+             "c= C(b,\"abc\");"+
+             "(a,b,c)",
+             TypeMemPtr.make(37,TypeStruct.make(TypeStruct.tups(tmpA,tmpB,tmpC))));
   }
 
-  private static final String[] FLDS2= new String[]{"^","nn","vv"};
   @Test public void testParse07() {
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", Type.XNIL);

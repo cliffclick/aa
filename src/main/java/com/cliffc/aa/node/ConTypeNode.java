@@ -77,7 +77,6 @@ public class ConTypeNode extends Node {
     TypeMemPtr t1 = (TypeMemPtr)_t.make_from(_t,mem,visit);
     TypeStruct t2 = ((TypeStruct)(t1._obj)).approx(1,alias());
     TypeMemPtr t3 = t1.make_from(t2);
-    assert Type.intern_check();
     return t3;
   }
   @Override public TypeMem all_live() { return TypeMem.ALIVE; }
@@ -86,6 +85,6 @@ public class ConTypeNode extends Node {
     if( this==o ) return true;
     if( !(o instanceof ConTypeNode) ) return false;
     ConTypeNode ct = (ConTypeNode)o;
-    return equals(ct) && Util.eq(_tname,ct._tname);
+    return Util.eq(_tname,ct._tname) && super.equals(ct);
   }
 }
