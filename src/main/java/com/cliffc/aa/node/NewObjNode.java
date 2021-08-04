@@ -118,7 +118,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     if( _val instanceof TypeTuple ) {
       TypeObj ts3 = (TypeObj)((TypeTuple)_val).at(MEM_IDX);
       if( ts3 != TypeObj.UNUSED ) {
-        TypeStruct ts4 = _ts.make_from(((TypeStruct)ts3)._flds);
+        TypeStruct ts4 = _ts.make_from_flds((TypeStruct)ts3);
         TypeStruct ts5 = ts4.crush();
         assert ts4.isa(ts5);
         if( ts5 != _crushed && ts5.isa(_crushed) ) {
@@ -138,7 +138,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     // Gather args and produce a TypeStruct
     TypeFld[] ts = TypeFlds.get(_ts.len());
     for( int i=0; i<ts.length; i++ )
-      ts[i] = _ts._flds[i].make_from((_ts._open && i>0) ? Type.ALL : fld(i)._val);
+      ts[i] = _ts.fld(i).make_from((_ts._open && i>0) ? Type.ALL : fld(i)._val);
     return _ts.make_from(ts);  // Pick up field names and mods
   }
   @Override TypeStruct dead_type() { return TypeStruct.ANYSTRUCT; }

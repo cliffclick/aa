@@ -3,10 +3,11 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
-import static com.cliffc.aa.type.TypeFld.Access;
 
-import java.util.function.Predicate;
 import java.util.HashMap;
+import java.util.function.Predicate;
+
+import static com.cliffc.aa.type.TypeFld.Access;
 
 // Strings.  Just an alternative TypeObj to TypeStruct - but basically really
 // should be replaced with a named Array.
@@ -90,21 +91,10 @@ public class TypeStr extends TypeObj<TypeStr> {
   // Update (approximately) the current TypeObj.  Strings are not allowed to be
   // updated, so this is a program type-error.
   @Override public TypeObj update(Access fin, String fld, Type val) { return this; }
-  @Override public TypeObj st    (Access fin, String fld, Type val) { return this; }
+
   @Override public boolean may_be_con() { return super.may_be_con() || _con != null; }
   @Override public boolean is_con() { return _con != null; }
   @Override public Type meet_nil(Type t) { return this; }
-  @Override public TypeObj st_meet(TypeObj obj) {
-    if( this==obj ) return this;
-    if( !(obj instanceof TypeStr) ) {
-      if( obj.getClass()==TypeObj.class ) return obj.st_meet(this);
-      throw com.cliffc.aa.AA.unimpl(); // Probably type error from parser
-    }
-    TypeStr str = (TypeStr)obj;
-    if( _con==null ) return str;
-    if( str._con==null ) return this;
-    throw com.cliffc.aa.AA.unimpl(); // Unequal strings is a parse error
-  }
   // Widen (loss info), to make it suitable as the default function memory.
   @Override public TypeObj crush() { return this; }
 

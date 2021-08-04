@@ -2,8 +2,10 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
-import static com.cliffc.aa.type.TypeFld.Access;
+
 import java.util.function.Predicate;
+
+import static com.cliffc.aa.type.TypeFld.Access;
 
 // Types which extend memory-based objects - currently Structs (which include
 // tuples but not TypeTuple) and Str (Strings); will include Arrays at some
@@ -64,8 +66,6 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     return this;
   }
 
-  public Type fld(String fld) { return oob(); } // No such field, returns ANY or ALL
-
   // Update (approximately) the current TypeObj.  Merges fields.
   public TypeObj update(Access fin, String fld, Type val) { return this; }
   // Approximate array update.
@@ -73,14 +73,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     if( this==ISUSED || this==OBJ ) return this;
     return TypeAry.ARY.dual().update(idx,val);
   }
-  // Exact object update.  Replaces fields.
-  public TypeObj st    (Access fin, String fld, Type val) { return this; }
-  // Keep the same basic type, and meet related fields.  Type error if basic
-  // types are unrelated.
-  public TypeObj st_meet(TypeObj obj) {
-    if( _any || obj._any )  return (TypeObj)meet(obj);  // One is high, so just keep other side
-    return obj.crush();    // Both are low, so keep other fields but crush them
-  }
+
   TypeObj flatten_fields() { return this; }
   TypeObj remove_other_flds(String fld, Type live) { return UNUSED; }
   @Override public TypeObj widen() { return ISUSED; }

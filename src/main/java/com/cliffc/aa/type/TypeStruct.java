@@ -37,9 +37,7 @@ import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
  *  cycle is the Meet's cycle.
 
 TODO:
- Cleaning up this mess somewhat... move the field parts into a TypeFld struct.
- TypeFld has: name, scalar Type, mod bits, a field-order number (includes a
- conforming Top and a undefined Bot field order).
+ Cleaning up this mess somewhat...
  TypeStruct uses a private TypeFld[] with a decent set of accessors: at/looping.
  The TypeFld[] comes from Types so fast == check.
  A try-with-resources:
@@ -52,8 +50,8 @@ These can be scope-alloced from a free-list.
 
  */
 public class TypeStruct extends TypeObj<TypeStruct> {
-  public TypeFld[] _flds; // The fields.  Effectively final.  Public for iteration.
-  public boolean _open;   // Fields after _fld.length are treated as ALL (or ANY)
+  private TypeFld[] _flds; // The fields.  Effectively final.  Public for iteration.
+  public boolean _open;    // Fields after _fld.length are treated as ALL (or ANY)
 
   public boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
   private TypeStruct init( String name, boolean any, TypeFld[] flds, boolean open ) {
@@ -224,6 +222,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public TypeStruct make_from( String name ) { return malloc(name,_any,_flds,_open).hashcons_free();  }
   // Make a TypeStruct with all new fields
   public TypeStruct make_from( TypeFld[] flds ) { return malloc(_name,_any,flds,_open).hashcons_free();  }
+  public TypeStruct make_from_flds( TypeStruct ts ) { return malloc(_name,_any,ts._flds,_open).hashcons_free();  }
 
   @Override boolean is_display() {
     return
@@ -1015,6 +1014,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return xmeet1((TypeStruct)t2,true);
   }
 
+  // ------ Utilities -------
+
+  public TypeFld fld( int idx ) { return _flds[idx]; } // Field by index
+  public Type at( int idx ) { return _flds[idx]._t; }  // Type by index
+  public Type last() { return _flds[_flds.length-1]._t; }
+  public int len() { return _flds.length; } // Count of fields
+  // Read-only iterator; for( TypeFld fld : flds() )...
+  // Not guarenteed to be in field-order nor name-order.
+  public TypeFld[] flds() { return _flds; }
 
   // Extend the current struct with a new named field
   public TypeStruct add_fld( String name, Access mutable ) { return add_fld(name,mutable,Type.SCALAR); }
@@ -1025,34 +1033,23 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     flds[_flds.length] = TypeFld.make(name==null ? TypeFld.fldBot : name,tfld,mutable,_flds.length);
     return make(_name,_any,flds,true);
   }
+  // Replace type and accessor
   public TypeStruct set_fld( int i, Type t, Access ff ) {
     TypeFld[] flds = TypeFlds.copyOf(_flds,_flds.length);
     flds[i] = TypeFld.make(_flds[i]._fld,t,ff,_flds[i]._order);
     return make_from(flds);
   }
 
-  // ------ Utilities -------
   // Return the index of the matching field (or nth tuple), or -1 if not found
   // or field-num out-of-bounds.
   public int fld_find( String fld ) {
-    assert fld != TypeFld.fldTop && fld != TypeFld.fldBot;
+    assert !Util.eq(fld,TypeFld.fldTop) && !Util.eq(fld,TypeFld.fldBot);
     return TypeFld.fld_find(_flds,fld);
   }
 
-  // Return type at field name
-  @Override public Type fld(String fld) {
-    int idx = fld_find(fld);
-    return idx==-1 ? Type.ANY : _flds[idx]._t;
-  }
-  public TypeFld fld( int idx ) { return _flds[idx]; }
-
-  public Type at( int idx ) { return _flds[idx]._t; }
-  public Type last() { return _flds[_flds.length-1]._t; }
-  public int len() { return _flds.length; }
-
   // Update (approximately) the current TypeObj.  Updates the named field.
   @Override public TypeStruct update(Access fin, String fld, Type val) { return update(fin,fld,val,false); }
-  @Override public TypeStruct st    (Access fin, String fld, Type val) { return update(fin,fld,val,true ); }
+
   private TypeStruct update(Access fin, String fld, Type val, boolean precise) {
     int idx = fld_find(fld);
     if( idx == -1 ) return this; // Unknown field, assume changes no fields
@@ -1065,35 +1062,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     TypeFld[] flds = TypeFlds.copyOf(_flds,_flds.length);
     flds[idx] = TypeFld.make(fld,pval,pfin,idx);
     return make(_name,_any,flds,_open);
-  }
-
-  // Keep the same basic type, and meet related fields.  Type error if basic
-  // types are unrelated.
-  @Override public TypeObj st_meet(TypeObj obj) {
-    //if( !(obj instanceof TypeStruct) ) {
-    //  if( obj.getClass()==TypeObj.class ) return obj.st_meet(this);
-    //  throw unimpl(); // Probably type error from parser
-    //}
-    //TypeStruct trhs = (TypeStruct)obj;
-    //if( trhs._ts.length < _ts.length ) throw com.cliffc.aa.AA.unimpl(); // Probably type error from parser
-    //
-    //Type[] ts = Types.clone(trhs._ts);
-    //byte[] flags = trhs._flags.clone();
-    //// Type error for mis-matched fields.  Meet common fields.
-    //int len = _ts.length;
-    //for( int i=0; i<trhs._ts.length; i++ ) {
-    //  if( i<len && !Util.eq(_flds[i],trhs._flds[i]) )
-    //    throw com.cliffc.aa.AA.unimpl(); // Probably type error from parser
-    //  if( is_modifable(trhs.fmod(i)) ) {
-    //    ts[i] = i<len ? trhs._ts[i].meet(_ts[i]) : ALL;
-    //    flags(flags,i,i<len ? fmeet(flags(i),trhs.flags(i)) : FBOT);
-    //  } // Else not modifiable, take RHS untouched
-    //  assert ts[i].simple_ptr()==ts[i];
-    //}
-    //if( !(_name.isEmpty() || Util.eq(trhs._name,_name)) ) throw com.cliffc.aa.AA.unimpl(); // Need to meet names
-    //// Note that "closed" is closed for all, same as lifting fields from a low struct.
-    //return malloc(trhs._name,false,trhs._flds,ts,flags,trhs._open&_open).hashcons_free();
-    throw unimpl();
   }
 
   @Override TypeObj flatten_fields() {
@@ -1176,11 +1144,20 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       for( TypeFld fld : _flds ) fld.walk(p);
   }
 
+  // Make a Type, replacing all dull pointers from the matching types in mem.
   @Override public TypeStruct make_from(Type head, TypeMem mem, VBitSet visit) {
     if( visit.tset(_uid) ) return null;
     TypeFld[] flds = TypeFlds.clone(_flds);
     for( int i=0; i<flds.length; i++ )
       flds[i] = flds[i].make_from(head,mem,visit);
     return make_from(flds);
+  }
+
+  // Used for assertions
+  @Override boolean intern_check1() {
+    for( TypeFld fld : _flds )
+      if( fld.intern_lookup()==null )
+        return false;
+    return true;
   }
 }

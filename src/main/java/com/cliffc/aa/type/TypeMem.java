@@ -370,7 +370,7 @@ public class TypeMem extends Type<TypeMem> {
       // fields may be added which we assume is a pointer to all.
       if( ts._open )
         return BitsAlias.FULL;  // Generic open struct points to all
-      for( TypeFld tfld : ts._flds ) {
+      for( TypeFld tfld : ts.flds() ) {
         Type fld = tfld._t;
         if( TypeMemPtr.OOP.isa(fld) )
           fld = TypeMemPtr.OOP;                      // All possible pointers
@@ -515,7 +515,7 @@ public class TypeMem extends Type<TypeMem> {
         if( !(to instanceof TypeStruct) ) return true;
         TypeStruct ts = (TypeStruct)to;
         int idx = ts.fld_find(fld);
-        if( idx == -1 || ts._flds[idx]._access != Access.Final )
+        if( idx == -1 || ts.fld(idx)._access != Access.Final )
           return true;          // Cannot check for R/O here, because R/O can lift to R/W
       }
     }

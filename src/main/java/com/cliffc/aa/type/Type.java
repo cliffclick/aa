@@ -220,27 +220,9 @@ public class Type<T extends Type<T>> implements Cloneable {
   }
   private boolean intern_check0(Type v) {
     if( this != v || _dual==null || _dual._dual!=this || compute_hash()!=_hash ) return false;
-    switch( _type ) {
-    case TSTRUCT:
-      TypeStruct ts = (TypeStruct)this;
-      for( TypeFld fld : ts._flds )
-        if( INTERN.get(fld)==null )
-          return false;
-      break;
-    case TMEMPTR:
-      TypeMemPtr tmp = (TypeMemPtr)this;
-      if( INTERN.get(tmp._obj)==null )
-        return false;
-      break;
-    case TFLD:
-      TypeFld fld = (TypeFld)this;
-      if( INTERN.get(fld._t)==null )
-        return false;
-      break;
-    default: break;
-    }
-    return true;
+    return intern_check1();
   }
+  boolean intern_check1() { return true; }
   // Debugging helper
   static Type intern_find(int uid) {
     for( Type k : INTERN.keySet() )

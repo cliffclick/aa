@@ -227,7 +227,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
       while( !t0.isEmpty() ) {
         TypeStruct ts = t0.pop();
         if( ds.putIfAbsent(ts,d) == null )
-          for( TypeFld fld : ts._flds ) {
+          for( TypeFld fld : ts.flds() ) {
             if( ds.putIfAbsent(fld._t,d) == null &&  // Everything in flds is in the current depth
                 fld._t instanceof TypeMemPtr ) {
               TypeMemPtr tmp = (TypeMemPtr)fld._t;
@@ -280,6 +280,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return make(bs,_obj.widen());
   }
 
+  // Make a Type, replacing all dull pointers from the matching types in mem.
   @Override public Type make_from(Type head, TypeMem mem, VBitSet visit) {
     if( this!=head ) {
       TypeObj[] pubs = mem.alias2objs();
@@ -294,8 +295,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
       }
     }
     TypeObj obj = (TypeObj)_obj.make_from(head,mem,visit);
-    if( obj == null ) return this;
-    return make_from(obj);
+    return obj == null ? this : make_from(obj);
   }
+
+  // Used for assertions
+  @Override boolean intern_check1() { return _obj.intern_lookup()!=null; }
 
 }

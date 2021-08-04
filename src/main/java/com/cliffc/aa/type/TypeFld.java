@@ -207,9 +207,12 @@ public class TypeFld extends Type<TypeFld> {
     return -1;
   }
 
+  // Make a Type, replacing all dull pointers from the matching types in mem.
   @Override public TypeFld make_from(Type head, TypeMem mem, VBitSet visit) {
     return setX(_t.make_from(head,mem,visit)).hashcons_free();
   }
+  // Used for assertions
+  @Override boolean intern_check1() { return _t.intern_lookup()!=null; }
 
 }
 

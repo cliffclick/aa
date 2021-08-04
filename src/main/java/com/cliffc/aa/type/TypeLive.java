@@ -93,7 +93,6 @@ public class TypeLive extends TypeObj<TypeLive> {
     if( lv  .above_center() ) return this;
     return LIVES[_flags|lv._flags];
   }
-  @Override public TypeObj st_meet(TypeObj obj) { throw com.cliffc.aa.AA.unimpl(); }
   // Widen (loss info), to make it suitable as the default function memory.
   @Override public TypeObj crush() { return this; }
 
