@@ -58,6 +58,7 @@ public class TestParse {
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(1)",TypeInt.con(1));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
     test("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
+    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(0);(1,);(1,).0;@{x;y];","Expected closing '}' but found ']' instead",63);
     // id accepts and returns both ints and reference types (arrays).
     //test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",TypeStruct.make_tuple(Type.XNIL,TypeInt.INT8,TypeInt.con(3)));
   }
@@ -318,6 +319,7 @@ public class TestParse {
     test   ("t=@{n=0;val=1.2}; u=math_rand(1) ? t : @{n=t;val=2.3}; u.val", TypeFlt.NFLT64); // structs merge field-by-field
     // Comments in the middle of a struct decl
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1;y=2})", TypeInt.con(5));
+    testerr("@{x;y]","Expected closing '}' but found ']' instead",1);
 
     // Lexical scoping.  Struct assignments make new fields, shadowing external variables.
     test("x=@{a:=1;b=@{a=  2;b=@{a=3;b=0}}}; x.b.b.a",TypeInt.con(3));

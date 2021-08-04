@@ -4,8 +4,6 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
-import java.util.HashMap;
-
 import static com.cliffc.aa.AA.MEM_IDX;
 
 // Proj memory
@@ -18,6 +16,7 @@ public class MrgProjNode extends ProjNode {
 
 
   @Override public Node ideal_reduce() {
+    if( _keep >= 2 ) return null;
     if( val(0).above_center() )
       return mem();
     NewNode nnn = nnn();

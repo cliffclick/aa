@@ -306,7 +306,10 @@ public class Parse implements Comparable<Parse> {
       if( peek(":=") ) rs.set(toks._len);              // Re-assignment parse
       else if( !peek_not('=','=') ) {                  // Not any assignment
         // For structs, allow a bare id as a default def of nil
-        if( lookup_current_scope_only && ts.isEmpty() && (peek(';') || peek('}') )){
+        if( lookup_current_scope_only && ts.isEmpty() && (peek(';') || peek('}') ||
+        // These next two tokens are syntactically invalid, but a semi-common error situation:
+        //   @{ fld;fld;fld;...  fld );  // Incorrect closing paren.  Go ahead and allow a bare id.
+                                                          peek(']') || peek(')' ))) {
           _x--;                                        // Push back statement end
           default_nil=true;                            // Shortcut def of nil
           rs.set(toks._len);                           // Shortcut mutable
