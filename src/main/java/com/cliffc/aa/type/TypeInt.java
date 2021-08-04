@@ -26,15 +26,14 @@ public class TypeInt extends Type<TypeInt> {
     if( _x==0 ) return sb.p(_con);
     return sb.p(_x>0?"~":"").p(Math.abs(_x)==1?"n":"").p("int").p(_z);
   }
-  private static TypeInt FREE=null;
-  private TypeInt free( TypeInt ret ) { FREE=this; return ret; }
+
+  static { new Pool(TINT,new TypeInt()); }
   public static TypeInt make( int x, int z, long con ) {
     if( Math.abs(x)==1 && z==1 && con==0) con=1; // not-null-bool is just a 1
-    TypeInt t1 = FREE == null ? new TypeInt() : FREE;
-    FREE = null;
-    TypeInt t2 = t1.init(x,z,con).hashcons();
-    return t1==t2 ? t1 : t1.free(t2);
+    TypeInt t1 = POOLS[TINT].malloc();
+    return t1.init(x,z,con).hashcons_free();
   }
+
   public static TypeInt con(long con) { return make(0,log(con),con); }
 
   static public  final TypeInt  INT64 = make(-2,64,0);
@@ -47,7 +46,7 @@ public class TypeInt extends Type<TypeInt> {
   static public  final TypeInt XINT1  = make( 2, 1,0);
   static public  final TypeInt NINT8  = make(-1, 8,0);
   static public  final TypeInt NINT64 = make(-1,64,0);
-  static public  final TypeInt ZERO   = new TypeInt().init(0,1,0).hashcons();
+  static public  final TypeInt ZERO   = new TypeInt().init(0,1,0).hashcons_free();
   static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,NINT64};
   static void init1( HashMap<String,Type> types ) {
     types.put("bool" ,BOOL);

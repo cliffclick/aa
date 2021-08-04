@@ -48,19 +48,13 @@ public class TypeFld extends Type<TypeFld> {
     return _t==null ? sb.p('!') : (_t==Type.SCALAR ? sb : _t.str(sb,dups,mem,debug));
   }
 
-  private static TypeFld FREE=null;
-  private TypeFld free( TypeFld ret ) { _hash=0; _t=null; FREE=this; return ret; }
   // Split malloc/hashcons is used when making cyclic structures
-  public static TypeFld malloc( String fld, Type t, int order ) { return malloc(fld,t,Access.Final,order); }
+  static { new Pool(TFLD,new TypeFld()); }
   public static TypeFld malloc( String fld, Type t, Access access, int order ) {
-    TypeFld t1 = FREE == null ? new TypeFld() : FREE;
-    FREE = null;
-    return t1.init(fld,t,access,order);
+    return POOLS[TFLD].<TypeFld>malloc().init(fld,t,access,order);
   }
-  public TypeFld hashcons_free() {
-    TypeFld t2 = hashcons();
-    return this==t2 ? this : free(t2);
-  }
+  public static TypeFld malloc( String fld, Type t, int order ) { return malloc(fld,t,Access.Final,order); }
+
   public static TypeFld make( String fld, Type t, int order ) { return make(fld,t,Access.Final,order); }
   public static TypeFld make( String fld, Type t, Access access, int order ) { return malloc(fld,t,access,order).hashcons_free(); }
 

@@ -143,24 +143,26 @@ public class Type<T extends Type<T>> implements Cloneable {
     return true;
   }
 
-  // Object Pooling to handle frequent (re)construction of temp objects being
-  // interned.  One-entry pool for now.
-  private static Type FREE=null;
-  private T free( T ret ) { FREE=this; return ret; }
-  @SuppressWarnings("unchecked")
-  private static Type make( byte type ) {
-    Type t1 = FREE == null ? new Type() : FREE;
-    FREE = null;
-    Type t2 = t1.init(type,"").hashcons();
-    return t1==t2 ? t1 : t1.free(t2);
+  // Construct a simple type, possibly from a pool
+  static Type make(byte type) {
+    Pool P = POOLS[type];
+    Type t1 = P.malloc();
+    return t1.init(type,"").hashcons_free();
   }
+  @SuppressWarnings("unchecked")
+  final T hashcons_free() {
+    T t2 = hashcons();
+    return this==t2 ? t2 : (T)POOLS[_type].free(this,t2);
+  }
+
+  // ----------------------------------------------------------
   // Hash-Cons - all Types are interned in this hash table.  Thus an equality
   // check of a (possibly very large) Type is always a simple pointer-equality
   // check, except during construction and intern'ing.
   private static final ConcurrentHashMap<Type,Type> INTERN = new ConcurrentHashMap<>();
   public static int RECURSIVE_MEET;    // Count of recursive meet depth
   @SuppressWarnings("unchecked")
-  final T hashcons() {
+  private T hashcons() {
     _hash = compute_hash();     // Set hash
     T t2 = (T)INTERN.get(this); // Lookup
     if( t2!=null ) {            // Found prior
@@ -231,6 +233,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     return null;
   }
 
+  // ----------------------------------------------------------
   // Simple types are implemented fully here.  "Simple" means: the code and
   // type hierarchy are simple, not that the Type is conceptually simple.
   static final byte TALL    = 0; // Bottom
@@ -272,6 +275,51 @@ public class Type<T extends Type<T>> implements Cloneable {
   static final byte TFUNSIG =27; // Function signature; formals & ret.  Not any concrete function.
   static final byte TLIVE   =28; // Liveness; backwards flow of TypeObj
   static final byte TLAST   =29; // Type check
+
+  // Object Pooling to handle frequent (re)construction of temp objects being
+  // interned.
+  static final Pool[] POOLS = new Pool[TLAST];
+  @SuppressWarnings("unchecked")
+  static class Pool {
+    private int _malloc, _free, _pool, _clone;
+    private final Ary<Type> _frees;
+    private final Type _gold;
+    Pool(byte t, Type gold) {
+      gold._type = t;
+      _gold=gold;
+      _frees= new Ary<>(new Type[1],0);
+      POOLS[t] = this;
+    }
+    <T extends Type> T malloc() {
+      if( _frees.isEmpty() ) { _malloc++; _clone--; return (T)_gold.clone(); }
+      else                   { _pool  ++; return (T)_frees.pop();  }
+    }
+    <T extends Type> T free(T t1, T t2) {
+      _frees.push(t1);
+      _free++;
+      return t2;
+    }
+  }
+  @SuppressWarnings("unchecked")
+  protected Type clone() {
+    try {
+      POOLS[_type]._clone++;
+      Type t = (Type)super.clone();
+      t._uid = _uid();
+      t._dual = null;
+      t._hash = 0;
+      if( t instanceof TypeStruct )
+        ((TypeStruct)t)._cyclic = false;
+      return t;
+    }
+    catch( CloneNotSupportedException cns ) { throw new RuntimeException(cns); }
+  }
+
+  // All the simple types share the same pool
+  static {
+    Pool P = new Pool(TALL,new Type());
+    for( int i=0; i<TSIMPLE; i++ ) POOLS[i]=P;
+  }
 
   public  static final Type ALL    = make( TALL   ); // Bottom
   public  static final Type ANY    = make( TANY   ); // Top
@@ -317,6 +365,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   T xdual() { return (T)new Type().init((byte)(_type^1),""); }
   T rdual() { assert _dual!=null; return _dual; }
 
+  // ----------------------------------------------------------
   // Memoize meet results
   private static class Key {
     static Key K = new Key(null,null);
@@ -497,23 +546,20 @@ public class Type<T extends Type<T>> implements Cloneable {
   // B:A:~int.meet(B:D:~int) == B:int // Nothing in common, fall to int
 
   static boolean check_name( String n ) { return n.isEmpty() || n.charAt(n.length()-1)==':'; }
-    // Make a named variant of any type, by just adding a name.
-  @SuppressWarnings("unchecked")
+  public boolean has_name() { return !_name.isEmpty(); }
+  // Make a named variant of any type, by just adding a name.
   public final T set_name(String name) {
     assert check_name(name);
-    Type t1 = clone();
-    t1._name = name;
-    Type t2 = t1.hashcons();
-    return (T)(t1==t2 ? t1 : t1.free(t2));
+    return _set_name(name);
   }
-  public boolean has_name() { return !_name.isEmpty(); }
   @SuppressWarnings("unchecked")
-  public final T remove_name() { // TODO: remove 1 layer of names
-    if( !has_name() ) return (T)this;
-    Type t1 = clone();
-    t1._name = "";
-    Type t2 = t1.hashcons();
-    return (T)(t1==t2 ? t1 : t1.free(t2));
+  public final T remove_name() { return has_name() ? _set_name("") : (T)this; }
+  @SuppressWarnings("unchecked")
+  private T _set_name(String name) {
+    POOLS[_type]._clone++;
+    T t1 = (T)clone();
+    t1._name = name;
+    return t1.hashcons_free();
   }
 
   // TODO: will also need a unique lexical numbering, not just a name, to
@@ -898,21 +944,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // Make from existing type, replacing TMPs with alias from the map
   public Type make_from(Type head, TypeMem map, VBitSet visit) { return this; }
 
-  
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
-  }
-  @SuppressWarnings("unchecked")
-  protected Type clone() {
-    try {
-      Type t = (Type)super.clone();
-      t._uid = _uid();
-      t._dual = null;
-      t._hash = 0;
-      if( t instanceof TypeStruct )
-        ((TypeStruct)t)._cyclic = false;
-      return t;
-    }
-    catch( CloneNotSupportedException cns ) { throw new RuntimeException(cns); }
   }
 }

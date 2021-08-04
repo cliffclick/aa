@@ -62,13 +62,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return sb;
   }
 
-  private static TypeMemPtr FREE=null;
-  private TypeMemPtr free( TypeMemPtr ret ) { FREE=this; return ret; }
+  static { new Pool(TMEMPTR,new TypeMemPtr()); }
   public static TypeMemPtr make(BitsAlias aliases, TypeObj obj ) {
-    TypeMemPtr t1 = FREE == null ? new TypeMemPtr() : FREE;
-    FREE = null;
-    TypeMemPtr t2 = t1.init(aliases,obj).hashcons();
-    return t1==t2 ? t1 : t1.free(t2);
+    TypeMemPtr t1 = POOLS[TMEMPTR].malloc();
+    return t1.init(aliases,obj).hashcons_free();
   }
 
   public static TypeMemPtr make( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias),obj); }

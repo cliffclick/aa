@@ -21,13 +21,10 @@ public class TypeRPC extends Type<TypeRPC> {
     return _rpcs.str(sb.p("#"));
   }
 
-  private static TypeRPC FREE=null;
-  private TypeRPC free( TypeRPC ret ) { FREE=this; return ret; }
+  static { new Pool(TRPC,new TypeRPC()); }
   public static TypeRPC make( BitsRPC rpcs ) {
-    TypeRPC t1 = FREE == null ? new TypeRPC() : FREE;
-    FREE = null;
-    TypeRPC t2 = t1.init(rpcs).hashcons();
-    return t1==t2 ? t1 : t1.free(t2);
+    TypeRPC t1 = POOLS[TRPC].malloc();
+    return t1.init(rpcs).hashcons_free();
   }
 
   public static TypeRPC make( int rpc ) { return make(BitsRPC.make0(rpc)); }

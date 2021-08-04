@@ -64,7 +64,6 @@ public class TypeMem extends Type<TypeMem> {
   // not part of the hash/equals checks.  Optional.  Lazily filled in.
   private HashMap<TypeMemPtr,TypeMemPtr> _sharp_cache;
 
-  private TypeMem() {}
   private TypeMem init(TypeObj[] pubs) {
     super.init(TMEM,"");
     assert check(pubs);    // Caller has canonicalized arrays already
@@ -160,13 +159,11 @@ public class TypeMem extends Type<TypeMem> {
     return bas;
   }
 
-  private static TypeMem FREE=null;
-  private TypeMem free( TypeMem ret ) { _pubs =null; _sharp_cache=null; FREE=this; return ret; }
+  static { new Pool(TMEM,new TypeMem()); }
   private static TypeMem make(TypeObj[] pubs) {
-    TypeMem t1 = FREE == null ? new TypeMem() : FREE;
-    FREE = null;
-    TypeMem t2 = t1.init(pubs).hashcons();
-    return t1==t2 ? t1 : t1.free(t2);
+    Pool P = POOLS[TMEM];
+    TypeMem t1 = P.malloc();
+    return t1.init(pubs).hashcons_free();
   }
 
   // Canonicalize memory before making.  Unless specified, the default memory is "do not care"

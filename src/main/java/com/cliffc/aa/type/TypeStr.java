@@ -31,15 +31,13 @@ public class TypeStr extends TypeObj<TypeStr> {
     else sb.p('"').p(_con).p('"');
     return sb;
   }
-  private static TypeStr FREE=null;
-  private TypeStr free( TypeStr ret ) { FREE=this; return ret; }
+
+  static { new Pool(TSTR,new TypeStr()); }
   public static TypeStr make( String name, boolean any, String con ) {
-    assert con==null || !any;
-    TypeStr t1 = FREE == null ? new TypeStr() : FREE;
-    FREE = null;
-    TypeStr t2 = t1.init(name,any,con).hashcons();
-    return t1==t2 ? t1 : t1.free(t2);
+    TypeStr t1 = POOLS[TSTR].malloc();
+    return t1.init(name,any,con).hashcons_free();
   }
+
   public static TypeStr make( boolean any, String con ) { return make("",any,con); }
   public static TypeStr con(String con) { return make(false,con); }
   public static void init() {} // Used to force class init

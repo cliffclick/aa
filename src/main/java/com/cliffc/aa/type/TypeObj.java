@@ -35,15 +35,12 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     return sb.p(_name).p(_any?"~":"").p(_any==_use ? "obj" : "use");
   }
 
-  private static TypeObj FREE=null;
-  TypeObj free( TypeObj ret ) { FREE=this; return ret; }
-  @SuppressWarnings("unchecked")
+  static { new Pool(TOBJ,new TypeObj()); }
   private static TypeObj make( String name, boolean any, boolean use ) {
-    TypeObj t1 = FREE == null ? new TypeObj() : FREE;
-    FREE = null;
-    TypeObj t2 = (TypeObj)t1.init(TOBJ,name,any,use).hashcons();
-    return t1==t2 ? t1 : t1.free(t2);
+    TypeObj t1 = POOLS[TOBJ].malloc();
+    return (TypeObj)t1.init(TOBJ,name,any,use).hashcons_free();
   }
+
   public static final TypeObj OBJ   = make("",false,false); // Any obj; allocated as *something*
   public static final TypeObj ISUSED= make("",false,true ); // Possibly allocated, the worst possible result
   public static final TypeObj UNUSED= (TypeObj)ISUSED.dual();    // Never allocated

@@ -67,14 +67,12 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     return sb.p('}');
   }
 
-  private static TypeFunSig FREE=null;
-  private TypeFunSig free( TypeFunSig ret ) { FREE=this; return ret; }
+  static { new Pool(TFUNSIG,new TypeFunSig()); }
   public static TypeFunSig make( String[] args, TypeTuple formals, TypeTuple ret ) {
-    TypeFunSig t1 = FREE == null ? new TypeFunSig() : FREE;
-    FREE = null;
-    TypeFunSig t2 = t1.init(args,formals,ret).hashcons();
-    return t1==t2 ? t1 : t1.free(t2);
+    TypeFunSig t1 = POOLS[TFUNSIG].malloc();
+    return t1.init(args,formals,ret).hashcons_free();
   }
+
   public static TypeFunSig make( TypeTuple ret, Type[] ts ) { return make(func_names,TypeTuple.make_args(ts),ret); }
   public static TypeFunSig make( TypeTuple ret, TypeMemPtr disp, Type arg1 ) { return make(ret,Types.ts(disp,arg1)); }
   public static TypeFunSig make( TypeTuple ret, TypeMemPtr disp, Type arg1, Type arg2 ) { return make(ret,Types.ts(disp,arg1,arg2)); }

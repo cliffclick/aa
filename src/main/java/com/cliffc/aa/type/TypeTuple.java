@@ -65,7 +65,7 @@ public class TypeTuple extends Type<TypeTuple> {
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     if( _any ) sb.p('~');
     sb.p('(');
-    if( _ts.length>0 ) {        // No commas for zero-length
+    if( _ts!=null && _ts.length>0 ) { // No commas for zero-length
       int j = _ts.length-1;     // Find length of trailing equal parts
       Type last = _ts[j];       // Last type
       for( j--; j>0; j-- ) if( _ts[j] != last )  break;
@@ -78,16 +78,13 @@ public class TypeTuple extends Type<TypeTuple> {
     return sb.p(')');
   }
 
-  private static TypeTuple FREE=null;
-  private TypeTuple free( TypeTuple ret ) { FREE=this; return ret; }
+  static { new Pool(TTUPLE,new TypeTuple()); }
   private static TypeTuple make( boolean any, Type[] ts ) {
-    TypeTuple t1 = FREE == null ? new TypeTuple() : FREE;
-    FREE = null;
-    ts = Types.hash_cons(ts);
-    TypeTuple t2 = t1.init(any,ts).hashcons();
-    return t1==t2 ? t1 : t1.free(t2);
+    TypeTuple t1 = POOLS[TTUPLE].malloc();
+    return t1.init(any,ts).hashcons_free();
   }
-  public static TypeTuple make0( boolean any, Type[] ts ) { return make(any,ts); }
+
+  public static TypeTuple make0( boolean any, Type[] ts ) { return make(any,Types.hash_cons(ts)); }
   public static TypeTuple make( Type[] ts ) { return make0(false,ts); }
   public static TypeTuple make( ) { return make0(false,Types.get(0)); }
   public static TypeTuple make( Type t0, Type t1 ) { return make0(false,Types.ts(t0,t1)); }

@@ -38,15 +38,13 @@ import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 
 TODO:
  Cleaning up this mess somewhat...
- TypeStruct uses a private TypeFld[] with a decent set of accessors: at/looping.
- The TypeFld[] comes from Types so fast == check.
  A try-with-resources:
     try( Ary<TypeFld> flds = TypeFld.get_flds()) {
       while( pred ) flds.push(fld); // Accumulate, drop dups, screw around
       malloc(... flds ...); // Finally use
     } // Exit unwinds the get_flds
 These can be scope-alloced from a free-list.
-
+Moving TypeStruct to an UNORDERED list of fields.
 
  */
 public class TypeStruct extends TypeObj<TypeStruct> {
@@ -173,18 +171,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // Unlike other types, TypeStruct might make cyclic types for which a
   // DAG-like bottom-up-remove-dups approach cannot work.
-  private static TypeStruct FREE=null;
-  private TypeStruct free( TypeStruct ret ) { _hash=0; _flds=null; _cyclic=false; FREE=this; return ret; }
-  public  static TypeStruct malloc( String name, boolean any, TypeFld[] flds, boolean open ) {
-    assert check_name(name);
-    TypeStruct t1 = FREE == null ? new TypeStruct() : FREE;
-    FREE = null;
-    return t1.init(name, any,flds,open);
+  static { new Pool(TSTRUCT,new TypeStruct()); }
+  public static TypeStruct malloc( String name, boolean any, TypeFld[] flds, boolean open ) {
+    return POOLS[TSTRUCT].<TypeStruct>malloc().init(name, any,flds,open);
   }
-  private TypeStruct hashcons_free() {
+  private TypeStruct hashcons_freeS() {
     _flds = TypeFlds.hash_cons(_flds);
-    TypeStruct t2 = hashcons();
-    return this==t2 ? this : free(t2);
+    return hashcons_free();
   }
 
   // Make a collection of fields, with no display and all with default names and final fields.
@@ -211,18 +204,18 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return make("",false,flds,false);
   }
   // Malloc/hashcons in one pass
-  public static TypeStruct make( String name, boolean any, TypeFld[] flds, boolean open ) { return malloc(name,any,flds,open).hashcons_free(); }
+  public static TypeStruct make( String name, boolean any, TypeFld[] flds, boolean open ) { return malloc(name,any,flds,open).hashcons_freeS(); }
 
   // Make an "open" struct with an initial display field.
   public static TypeStruct open(Type tdisp) { return make("",false,TypeFlds.ts(TypeFld.make_tup(tdisp,0)),true); }
   // Make a closed struct from an open one
-  public TypeStruct close() { assert _open; return malloc(_name,_any,_flds,false).hashcons_free(); } // Mark as no-more-fields
+  public TypeStruct close() { assert _open; return malloc(_name,_any,_flds,false).hashcons_freeS(); } // Mark as no-more-fields
 
   // Make a named TypeStruct from an unnamed one
-  public TypeStruct make_from( String name ) { return malloc(name,_any,_flds,_open).hashcons_free();  }
+  public TypeStruct make_from( String name ) { return malloc(name,_any,_flds,_open).hashcons_freeS();  }
   // Make a TypeStruct with all new fields
-  public TypeStruct make_from( TypeFld[] flds ) { return malloc(_name,_any,flds,_open).hashcons_free();  }
-  public TypeStruct make_from_flds( TypeStruct ts ) { return malloc(_name,_any,ts._flds,_open).hashcons_free();  }
+  public TypeStruct make_from( TypeFld[] flds ) { return malloc(_name,_any,flds,_open).hashcons_freeS();  }
+  public TypeStruct make_from_flds( TypeStruct ts ) { return malloc(_name,_any,ts._flds,_open).hashcons_freeS();  }
 
   @Override boolean is_display() {
     return
@@ -335,7 +328,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       flds[i] = tmax._flds[i];
     // Ignore name in the non-recursive meet, it will be computed by the outer
     // 'meet' call anyways.
-    return malloc("",_any&tmax._any,flds,_open|tmax._open).hashcons_free();
+    return malloc("",_any&tmax._any,flds,_open|tmax._open).hashcons_freeS();
   }
 
   // Recursive meet in progress.
@@ -1003,7 +996,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       if( !dts2._flds[i]._t.interned() )
         dts2._flds[i] = dts2._flds[i].hashcons_free();
     dull_cache.remove(dull._aliases);// Move the entry from dull cache to sharp cache
-    TypeStruct sts = dts2.hashcons_free();
+    TypeStruct sts = dts2.hashcons_freeS();
     return mem.sharput(dull,dull.make_from(sts));
   }
 

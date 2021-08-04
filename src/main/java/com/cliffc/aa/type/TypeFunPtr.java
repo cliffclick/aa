@@ -2,7 +2,6 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.VBitSet;
 import static com.cliffc.aa.AA.unimpl;
 
@@ -64,14 +63,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   public String names(boolean debug) { return FunNode.names(_fidxs,new SB(),debug).toString(); }
 
-  private static TypeFunPtr FREE=null;
-  private TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
+  static { new Pool(TFUNPTR,new TypeFunPtr()); }
   public static TypeFunPtr make( BitsFun fidxs, int nargs, Type disp ) {
     assert disp.is_display_ptr(); // Simple display ptr.  Just the alias.
-    TypeFunPtr t1 = FREE == null ? new TypeFunPtr() : FREE;
-    FREE = null;
-    TypeFunPtr t2 = t1.init(fidxs,nargs,disp).hashcons();
-    return t1==t2 ? t1 : t1.free(t2);
+    TypeFunPtr t1 = POOLS[TFUNPTR].malloc();
+    return t1.init(fidxs,nargs,disp).hashcons_free();
   }
 
   public static TypeFunPtr make( int fidx, int nargs, Type disp ) { return make(BitsFun.make0(fidx),nargs,disp); }
@@ -199,7 +195,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     return tf;
   }
   @Override public TypeFunPtr widen() { return GENERIC_FUNPTR; }
-  
+
   @Override public Type make_from(Type head, TypeMem map, VBitSet visit) {
     throw unimpl();
   }

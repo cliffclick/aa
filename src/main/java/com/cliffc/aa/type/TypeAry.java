@@ -27,19 +27,17 @@ public class TypeAry extends TypeObj<TypeAry> {
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     if( _any ) sb.p('~');
     sb.p('[');
-    if( _size != TypeInt.INT64 ) sb.p(_size);
+    if( _size!=null && _size != TypeInt.INT64 ) sb.p(_size);
     sb.p(']');
-    sb.p(_elem);
-    if( _elem != _stor ) sb.p('/').p(_stor);
+    if( _elem !=null ) sb.p(_elem);
+    if( _elem != _stor && _stor!=null ) sb.p('/').p(_stor);
     return sb;
   }
-  private static TypeAry FREE=null;
-  private TypeAry free( TypeAry ret ) { FREE=this; return ret; }
+
+  static { new Pool(TARY,new TypeAry()); }
   public static TypeAry make( String name, boolean any, TypeInt sz, Type elem, TypeObj stor ) {
-    TypeAry t1 = FREE == null ? new TypeAry() : FREE;
-    FREE = null;
-    TypeAry t2 = t1.init(name,any,sz,elem,stor).hashcons();
-    return t1==t2 ? t1 : t1.free(t2);
+    TypeAry t1 = POOLS[TARY].malloc();
+    return t1.init(name,any,sz,elem,stor).hashcons_free();
   }
 
   public static TypeAry make( TypeInt sz, Type elem, TypeObj stor ) { return make("",false,sz,elem,stor); }

@@ -25,15 +25,14 @@ public class TypeFlt extends Type<TypeFlt> {
     if( _x==0 ) return sb.p(_con);
     return sb.p(_x>0?"~":"").p(Math.abs(_x)==1?"n":"").p("flt").p(_z);
   }
-  private static TypeFlt FREE=null;
-  private TypeFlt free( TypeFlt ret ) { FREE=this; return ret; }
+
+  static { new Pool(TFLT,new TypeFlt()); }
   public static Type make( int x, int z, double con ) {
     if( x==0 && (double)((long)con)==con ) return TypeInt.con((long)con);
-    TypeFlt t1 = FREE == null ? new TypeFlt() : FREE;
-    FREE = null;
-    TypeFlt t2 = t1.init(x,z,con).hashcons();
-    return t1==t2 ? t1 : t1.free(t2);
+    TypeFlt t1 = POOLS[TFLT].malloc();
+    return t1.init(x,z,con).hashcons_free();
   }
+
   public static Type con(double con) { return make(0,log(con),con); }
 
   public static final TypeFlt FLT64 = (TypeFlt)make(-2,64,0);

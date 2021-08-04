@@ -36,13 +36,10 @@ public class TypeLive extends TypeObj<TypeLive> {
     return sb.p(STRS[_flags]);
   }
 
-  private static TypeLive FREE=null;
-  private TypeLive free( TypeLive ret ) { FREE=this; return ret; }
+  static { new Pool(TLIVE,new TypeLive()); }
   private static TypeLive make( boolean any, int flags ) {
-    TypeLive t1 = FREE == null ? new TypeLive() : FREE;
-    FREE = null;
-    TypeLive t2 = t1.init(any,flags).hashcons();
-    return t1==t2 ? t1 : t1.free(t2);
+    TypeLive t1 = POOLS[TLIVE].malloc();
+    return t1.init(any,flags).hashcons_free();
   }
 
   // Value is used as a call-argument, value-stored (address use is ok),
