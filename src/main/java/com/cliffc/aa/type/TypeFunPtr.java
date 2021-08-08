@@ -3,9 +3,10 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
-import static com.cliffc.aa.AA.unimpl;
 
 import java.util.function.Predicate;
+
+import static com.cliffc.aa.AA.unimpl;
 
 
 // Function indices or function pointers; a single instance can include all
@@ -85,13 +86,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     return new TypeFunPtr().init(_fidxs.dual(),_nargs,_disp.dual());
   }
   @Override protected TypeFunPtr rdual() {
+    assert _hash!=0;
     if( _dual != null ) return _dual;
     TypeFunPtr dual = _dual = new TypeFunPtr().init(_fidxs.dual(),_nargs,_disp.rdual());
-    if( _hash != 0 ) {
-      assert _hash == compute_hash();
-      dual._hash = dual.compute_hash(); // Compute hash before recursion
-    }
     dual._dual = this;
+    dual._hash = dual.compute_hash();
     return dual;
   }
   @Override protected Type xmeet( Type t ) {
@@ -189,7 +188,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     return fun != null && fun.is_forward_ref();
   }
   TypeFunPtr _sharpen_clone(TypeMemPtr disp) {
-    TypeFunPtr tf = (TypeFunPtr)clone();
+    TypeFunPtr tf = copy();
     tf._disp = disp;
     tf._hash = tf.compute_hash();
     return tf;
@@ -199,5 +198,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public Type make_from(Type head, TypeMem map, VBitSet visit) {
     throw unimpl();
   }
+
+  @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _disp.repeats_in_cycles(head,bs); }
 
 }

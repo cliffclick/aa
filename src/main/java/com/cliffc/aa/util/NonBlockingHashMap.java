@@ -132,18 +132,18 @@ public class NonBlockingHashMap<TypeK, TypeV>
   // than 'put'.  'get' can skip the extra indirection of skipping through the
   // CHM to reach the _kvs array.
   private transient Object[] _kvs;
-  private static final CHM   chm   (Object[] kvs) { return (CHM  )kvs[0]; }
-  private static final int[] hashes(Object[] kvs) { return (int[])kvs[1]; }
+  private static CHM   chm   ( Object[] kvs) { return (CHM  )kvs[0]; }
+  private static int[] hashes( Object[] kvs) { return (int[])kvs[1]; }
   // Number of K,V pairs in the table
-  private static final int len(Object[] kvs) { return (kvs.length-2)>>1; }
+  private static int len( Object[] kvs) { return (kvs.length-2)>>1; }
 
   // Time since last resize
   private transient long _last_resize_milli;
 
   // --- Minimum table size ----------------
-  // Pick size 8 K/V pairs, which turns into (8*2+2)*4+12 = 84 bytes on a
-  // standard 32-bit HotSpot, and (8*2+2)*8+12 = 156 bytes on 64-bit Azul.
-  private static final int MIN_SIZE_LOG=3;             //
+  // Pick size 4 K/V pairs, which turns into (4*2+2)*4+12 = 54 bytes on a
+  // standard 32-bit HotSpot, and (4*2+2)*8+12 = 92 bytes on 64-bit JVM.
+  private static final int MIN_SIZE_LOG=2;             //
   private static final int MIN_SIZE=(1<<MIN_SIZE_LOG); // Must be power of 2
 
   // --- Sentinels -------------------------
@@ -169,12 +169,12 @@ public class NonBlockingHashMap<TypeK, TypeV>
   // field only once, and share that read across all key/val calls - lest the
   // _kvs field move out from under us and back-to-back key & val calls refer
   // to different _kvs arrays.
-  private static final Object key(Object[] kvs,int idx) { return kvs[(idx<<1)+2]; }
-  private static final Object val(Object[] kvs,int idx) { return kvs[(idx<<1)+3]; }
-  private static final boolean CAS_key( Object[] kvs, int idx, Object old, Object key ) {
+  private static Object key( Object[] kvs, int idx) { return kvs[(idx<<1)+2]; }
+  private static Object val( Object[] kvs, int idx) { return kvs[(idx<<1)+3]; }
+  private static boolean CAS_key( Object[] kvs, int idx, Object old, Object key ) {
     return _unsafe.compareAndSwapObject( kvs, rawIndex(kvs,(idx<<1)+2), old, key );
   }
-  private static final boolean CAS_val( Object[] kvs, int idx, Object old, Object val ) {
+  private static boolean CAS_val( Object[] kvs, int idx, Object old, Object val ) {
     return _unsafe.compareAndSwapObject( kvs, rawIndex(kvs,(idx<<1)+3), old, val );
   }
 
@@ -187,7 +187,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
     System.out.println("=========");
   }
   // print the entire state of the table
-  private final void print( Object[] kvs ) {
+  private void print( Object[] kvs ) {
     for( int i=0; i<len(kvs); i++ ) {
       Object K = key(kvs,i);
       if( K != null ) {
@@ -239,7 +239,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
   // the reprobe limit on a 'get' call acts as a 'miss'; on a 'put' call it
   // can trigger a table resize.  Several places must have exact agreement on
   // what the reprobe_limit is, so we share it here.
-  private static final int reprobe_limit( int len ) {
+  private static int reprobe_limit( int len ) {
     return REPROBE_LIMIT + (len>>4);
   }
 
@@ -256,11 +256,11 @@ public class NonBlockingHashMap<TypeK, TypeV>
    *  elements will sacrifice space for a small amount of time gained.  The
    *  initial size will be rounded up internally to the next larger power of 2. */
   public NonBlockingHashMap( final int initial_sz ) { initialize(initial_sz); }
-  private final void initialize( int initial_sz ) {
+  private void initialize( int initial_sz ) {
     if( initial_sz < 0 ) throw new IllegalArgumentException();
     int i;                      // Convert to next largest power-of-2
     if( initial_sz > 1024*1024 ) initial_sz = 1024*1024;
-    for( i=MIN_SIZE_LOG; (1<<i) < (initial_sz<<2); i++ ) ;
+    for( i=MIN_SIZE_LOG; (1<<i) < initial_sz; i++ ) ;
     // Double size for K,V pairs, add 1 for CHM and 1 for hashes
     _kvs = new Object[((1<<i)<<1)+2];
     _kvs[0] = new CHM(new ConcurrentAutoTable()); // CHM in slot 0

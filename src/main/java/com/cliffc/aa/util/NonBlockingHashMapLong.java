@@ -116,7 +116,7 @@ public class NonBlockingHashMapLong<TypeV>
   private static final long _chm_offset = fieldOffset(NonBlockingHashMapLong.class, "_chm");
   private static final long _val_1_offset = fieldOffset(NonBlockingHashMapLong.class, "_val_1");
 
-  private final boolean CAS( final long offset, final Object old, final Object nnn ) {
+  private boolean CAS( final long offset, final Object old, final Object nnn ) {
     return UNSAFE.compareAndSwapObject(this, offset, old, nnn );
   }
 
@@ -142,7 +142,7 @@ public class NonBlockingHashMapLong<TypeV>
   // --- Minimum table size ----------------
   // Pick size 16 K/V pairs, which turns into (16*2)*4+12 = 140 bytes on a
   // standard 32-bit HotSpot, and (16*2)*8+12 = 268 bytes on 64-bit Azul.
-  private static final int MIN_SIZE_LOG=4;             //
+  private static final int MIN_SIZE_LOG=2;             //
   private static final int MIN_SIZE=(1<<MIN_SIZE_LOG); // Must be power of 2
 
   // --- Sentinels -------------------------

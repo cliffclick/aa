@@ -415,13 +415,13 @@ public class FunNode extends RegionNode {
         break;
       case OP_LOAD:
         if( !(to instanceof TypeStruct) ||
-            ((LoadNode)use).find((TypeStruct)to)== -1 )
+            ((LoadNode)use).find((TypeStruct)to)== null )
           return true;          // Did not find field
         break;
       case OP_STORE:
         if( ((StoreNode)use).rez()==n) break; // Storing as value is ok
         if( !(to instanceof TypeStruct) ||    // Address needs to find field
-            ((StoreNode)use).find((TypeStruct)to)== -1 )
+            ((StoreNode)use).find((TypeStruct)to)== null )
           return true;          // Did not find field
         break;
       case OP_CALL: break; // Argument pass-thru probably needs to check formals

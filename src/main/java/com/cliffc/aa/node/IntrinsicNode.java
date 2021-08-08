@@ -132,9 +132,10 @@ public class IntrinsicNode extends Node {
   // Passed in a named TypeStruct, and the parent alias.
   public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, Parse bad ) {
     assert to.has_name();
-    assert to.fld(0).is_display_ptr(); // Display already
+    TypeFld disp = to.fld_find("^");
+    assert disp.is_display_ptr(); // Display already
     // Upgrade the type to one with no display for nnn.
-    to = to.set_fld(0,TypeMemPtr.NO_DISP,Access.Final);
+    to.set_fld(disp.make_from(TypeMemPtr.NO_DISP));
     // Formal is unnamed, and this function adds the name.
     TypeTuple formals = TypeTuple.make(to.remove_name());
     TypeFunSig sig = TypeFunSig.make(TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.make0(alias),to)),formals);
@@ -147,9 +148,11 @@ public class IntrinsicNode extends Node {
       Node nodisp = Node.con(TypeMemPtr.NO_DISP);
       NewObjNode nnn = (NewObjNode)X.add(new NewObjNode(false,alias,to,nodisp));
       for( int i=1; i<to.len(); i++ ) {
-        String argx = to.fld(i)._fld;
-        if( Util.eq(argx,TypeFld.fldBot) ) argx = null;
-        nnn.add_def(X.xform(new ParmNode(i+DSP_IDX,argx,fun, (ConNode)Node.con(to.at(i).simple_ptr()),bad)));
+        //String argx = to.fld(i)._fld;
+        //if( Util.eq(argx,TypeFld.fldBot) ) argx = null;
+        //nnn.add_def(X.xform(new ParmNode(i+DSP_IDX,argx,fun, (ConNode)Node.con(to.at(i).simple_ptr()),bad)));
+        // TODO: makes mapping between fields and node index
+        throw unimpl();
       }
       Node mmem = Env.DEFMEM.make_mem_proj(nnn,memp);
       Node ptr = X.xform(new ProjNode(REZ_IDX, nnn));

@@ -15,11 +15,11 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
 
-    TypeFld vi = TypeFld.make("v",TypeInt.INT64,2);
-    TypeStruct a0 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XSCALAR,         1),vi);
-    TypeStruct a1 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",TypeMemPtr.make(9,a0),1),vi);
+    TypeFld vi = TypeFld.make("v",TypeInt.INT64);
+    TypeStruct a0 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XSCALAR         ),vi);
+    TypeStruct a1 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",TypeMemPtr.make(9,a0)),vi);
     TypeStruct a2 = a1.approx(1,9);
-   
+
     System.out.println(a1);
   }
 
@@ -148,7 +148,7 @@ public class TestType {
 
     Type abc = TypeStr  .ABC;   // String constant
     Type zer = TypeInt  .FALSE;
-    Type tp0 = TypeStruct.make(zer);  // tuple of a '0'
+    Type tp0 = TypeStruct.maket(zer);  // tuple of a '0'
 
     Type tupX= tup.dual();
     Type strX= str.dual();
@@ -248,26 +248,27 @@ public class TestType {
     assertEquals( Type.NSCALR, xi8.meet(xmem0)); // ~OOP+0 & ~i8 -> 0
   }
 
-  @Test public void testStructTuple() {
-    Type nil  = Type.NIL;
-    // Tuple is more general that Struct
-    Type tf = TypeStruct.TFLT64; //  (  flt64); choice leading field name
-    Type tsx= TypeStruct. FLT64; // @{x:flt64}; fixed  leading field name
-    Type tff = tsx.meet(tf);     //
-    assertEquals(tf,tff);        // tsx.isa(tf)
-    TypeStruct t0 = TypeStruct.make(Types.ts(nil)); //  (nil)
-    TypeStruct ts0= TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("x",nil,1));  // @{x:nil}
-    Type tss = ts0.meet(t0);
-    assertEquals(t0,tss);      // t0.isa(ts0)
+  // Old model: fields are ordered, and are MEETd in order.  If fields at the
+  // same index have different names, the names are MEET with a lattice.  If
+  // one struct has more fields than the other, the extras are included or not
+  // according if the other struct is up or down.  Tuple field names are NOT
+  // interesting, and only the order is used.  Meeting tuples and structs uses
+  // field orders, and will wipe out the field names and ends up as a tuple.
 
+  // New model: fields are UNordered, and are MEETd by matching name.  If
+  // fields have no match, they are included (or not) according to if the other
+  // struct is up or down.  Tuple field names are interesting and are digits
+  // according to the field order.  Meeting tuples and structs uses field
+  // names, and will commonly have no names in common.
+  @Test public void testStructTuple() {
     // meet @{c:0}? and @{c:@{x:1}?,}
     int alias0 = BitsAlias.type_alias(BitsAlias.REC);
     int alias1 = BitsAlias.type_alias(alias0);
     int alias2 = BitsAlias.type_alias(BitsAlias.REC);
     int alias3 = BitsAlias.type_alias(alias0);
-    TypeObj a1 = TypeStruct.make(TypeFld.make("c",Type.NIL,0)); // @{c:nil}
-    TypeObj a3 = TypeStruct.make(TypeFld.make("x",TypeInt.TRUE,0)); // @{x: 1 }
-    TypeObj a2 = TypeStruct.make(TypeFld.make("c",TypeMemPtr.make_nil(alias3,a3),0)); // @{c:*{3#}?}
+    TypeObj a1 = TypeStruct.make("c",Type.NIL, TypeFld.Access.Final); // @{c:nil}
+    TypeObj a3 = TypeStruct.make("x",TypeInt.TRUE, TypeFld.Access.Final); // @{x: 1 }
+    TypeObj a2 = TypeStruct.make("c",TypeMemPtr.make_nil(alias3,a3), TypeFld.Access.Final); // @{c:*{3#}?}
     Ary<TypeObj> tos = new Ary<>(TypeObj.class);
     tos.setX(BitsAlias.ALL,TypeObj.OBJ);
     tos.setX(alias1,a1);
@@ -280,7 +281,7 @@ public class TestType {
     // mem.ld(*[1+2]?) ==> @{c:0}
     // Currently retaining precision after nil: [~0] -> @{ x==1}
     Type ld = mem.ld((TypeMemPtr)ptr12);
-    TypeObj ax = TypeStruct.make(TypeFld.make("c",Type.NIL,0)); // @{c:nil}
+    TypeObj ax = TypeStruct.make(TypeFld.make("c",Type.NIL)); // @{c:nil}
     assertTrue(ld.isa(ax));
   }
 
@@ -322,28 +323,30 @@ public class TestType {
   // Test limits on recursive type structures; recursively building nested
   // structures caps out in the type system at some reasonable limit.
   @Test public void testRecursive() {
-
-    // Recursive types no longer cyclic in the concrete definition?  Because
-    // TypeObj can contain TypeMemPtrs but not another nested TypeObj...
+    Object dummy0 = TypeMemPtr.DISPLAY_PTR; // Must <clinit> out of RECURSIVE_MEET
     final int alias1 = BitsAlias.new_alias(BitsAlias.REC);
-    final TypeMemPtr ts0ptr = TypeMemPtr.make    (alias1,TypeStruct.ALLSTRUCT);
-    final TypeMemPtr ts0ptr0= TypeMemPtr.make_nil(alias1,TypeStruct.ALLSTRUCT);
 
     // Anonymous recursive structs -
     // - struct with pointer to self
-    TypeFld fldv = TypeFld.make("v",TypeInt.INT64,1);
-    TypeStruct ts0 = TypeStruct.malloc("",false,TypeFlds.ts(TypeFld.malloc("n",null,0),fldv),true);
-    ts0._hash = ts0.compute_hash();
-    ts0.fld(0).setX(ts0ptr);    ts0._cyclic = true;
-    ts0 = ts0.install_cyclic(ts0.reachable());
+    TypeFld fldv = TypeFld.make("v",TypeInt.INT64);
+    Type.RECURSIVE_MEET++;
+    TypeFld fldn0 = TypeFld.malloc("n");
+    TypeStruct ts0 = TypeStruct.malloc("",false,true,fldn0,fldv).set_hash();
+    final TypeMemPtr ts0ptr = TypeMemPtr.make(alias1,ts0);
+    fldn0.setX(ts0ptr);
+    Type.RECURSIVE_MEET--;
+    ts0 = ts0.install();
     TypeMem ts0mem = TypeMem.make(alias1,ts0); // {1:@{n:*[1],v:int} }
 
     // - struct with pointer to self or nil
-    TypeStruct ts1 = TypeStruct.malloc("",false,TypeFlds.ts(TypeFld.malloc("n",null,0),fldv),true);
-    ts1._hash = ts1.compute_hash();
-    ts1.fld(0).setX(ts0ptr0);    ts1._cyclic = true;
-    ts1 = ts1.install_cyclic(ts1.reachable());
-    TypeMem ts1mem = TypeMem.make(alias1,ts1); // {1:@{n:*[0,1],v:int} }
+    Type.RECURSIVE_MEET++;
+    TypeFld fldn1 = TypeFld.malloc("n");
+    TypeStruct ts1 = TypeStruct.malloc("",false,true,fldn1,fldv).set_hash();
+    final TypeMemPtr ts1ptr0 = TypeMemPtr.make_nil(alias1,ts1);
+    fldn1.setX(ts1ptr0);
+    Type.RECURSIVE_MEET--;
+    ts1 = ts1.install();
+    TypeMem ts1mem = TypeMem.make(alias1,ts1); // {1:@{n:*[1],v:int} }
 
     Type tsmt = ts0.meet(ts1);
     assertEquals(ts1,tsmt);
@@ -355,20 +358,20 @@ public class TestType {
     // AS0AS0AS0AS0AS0AS0...
     final int alias2 = BitsAlias.new_alias(BitsAlias.REC);
     TypeMemPtr tptr2= TypeMemPtr.make_nil(alias2,TypeObj.OBJ); // *[0,2]
-    TypeStruct ts2 = TypeStruct.make(TypeFld.make("n",tptr2,0),fldv); // @{n:*[0,2],v:int}
+    TypeStruct ts2 = TypeStruct.make(TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
     TypeStruct ta2 = ts2.set_name("A:");
 
     // Peel A once without the nil: Memory#3: A:@{n:*[2],v:int}
     // ASAS0AS0AS0AS0AS0AS0...
     final int alias3 = BitsAlias.new_alias(BitsAlias.REC);
     TypeMemPtr tptr3= TypeMemPtr.make(alias3,TypeObj.OBJ); // *[3]
-    TypeStruct ts3 = TypeStruct.make(TypeFld.make("n",tptr2,0),fldv); // @{n:*[0,2],v:int}
+    TypeStruct ts3 = TypeStruct.make(TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
     TypeStruct ta3 = ts3.set_name("A:");
 
     // Peel A twice without the nil: Memory#4: A:@{n:*[3],v:int}
     // ASASAS0AS0AS0AS0AS0AS0...
     final int alias4 = BitsAlias.new_alias(BitsAlias.REC);
-    TypeStruct ts4 = TypeStruct.make(TypeFld.make("n",tptr3,0),fldv); // @{n:*[3],v:int}
+    TypeStruct ts4 = TypeStruct.make(TypeFld.make("n",tptr3),fldv); // @{n:*[3],v:int}
     TypeStruct ta4 = ts4.set_name("A:");
 
     // Then make a MemPtr{3,4}, and ld - should be a PeelOnce
@@ -389,24 +392,23 @@ public class TestType {
     Type mta = mem234.ld(ptr34);
     //assertEquals(ta3,mta);
     TypeMemPtr ptr023 = (TypeMemPtr)TypeMemPtr.make_nil(alias2,TypeObj.OBJ).meet(TypeMemPtr.make(alias3,TypeObj.OBJ));
-    TypeStruct xts = TypeStruct.make(TypeFld.make("n",ptr023,0),fldv);
+    TypeStruct xts = TypeStruct.make(TypeFld.make("n",ptr023),fldv);
     Type xta = xts.set_name("A:");
     assertEquals(xta,mta);
 
     // Mismatched Names in a cycle; force a new cyclic type to appear
     final int alias5 = BitsAlias.new_alias(BitsAlias.REC);
-    TypeStruct tsnb = TypeStruct.make(TypeFld.make("n",TypeMemPtr.make_nil(alias5,TypeObj.OBJ),0),TypeFld.make("v",TypeFlt.FLT64,1));
+    TypeStruct tsnb = TypeStruct.make(TypeFld.make("n",TypeMemPtr.make_nil(alias5,TypeObj.OBJ)),TypeFld.make("v",TypeFlt.FLT64));
     TypeStruct tfb = tsnb.set_name("B:");
     Type mtab = ta2.meet(tfb);
 
     // TODO: Needs a way to easily test simple recursive types
     TypeStruct mtab0 = (TypeStruct)mtab;
-    assertEquals("n",mtab0.fld(0)._fld);
-    assertEquals("v",mtab0.fld(1)._fld);
-    TypeMemPtr mtab1 = (TypeMemPtr)mtab0.at(0);
+    assertEquals("n",mtab0.fld_find("n")._fld);
+    assertEquals("v",mtab0.fld_find("v")._fld);
+    TypeMemPtr mtab1 = (TypeMemPtr)mtab0.at("n");
     assertTrue(mtab1._aliases.test(alias2)&& mtab1._aliases.test(alias5));
-    assertEquals(Type.REAL,mtab0.at(1));
-
+    assertEquals(Type.REAL,mtab0.at("v"));
 
     // In the ptr/mem model, all Objs from the same NewNode are immediately
     // approximated by a single Alias#.  This stops any looping type growth.
@@ -417,10 +419,10 @@ public class TestType {
     // less than 5.  Any data loop must contain a Phi; if structures are
     // nesting infinitely deep, then it must contain a NewNode also.
     int alias = BitsAlias.new_alias(BitsAlias.REC);
-    TypeStruct ts = TypeStruct.make(TypeFld.make(TypeFld.fldBot,Type.NIL,0),TypeFld.make(TypeFld.fldBot,TypeInt.con(0),1));
+    TypeStruct ts = TypeStruct.make(TypeFld.make("ptr",Type.NIL),TypeFld.make("cnt",TypeInt.con(0)));
     TypeMemPtr phi = TypeMemPtr.make(alias,ts);
     for( int i=1; i<20; i++ ) {
-      TypeStruct newt = TypeStruct.make(TypeFld.make(TypeFld.fldBot,phi,0),TypeFld.make(TypeFld.fldBot,TypeInt.con(i),1));
+      TypeStruct newt = TypeStruct.make(TypeFld.make("ptr",phi),TypeFld.make("cnt",TypeInt.con(i)));
       TypeStruct approx = newt.approx(2/*CUTOFF*/,alias);
       phi = TypeMemPtr.make(alias,approx);
     }
@@ -431,38 +433,37 @@ public class TestType {
 
   // Test a cycle with two names on mismatched cycle boundaries
   @Test public void testNameCycle() {
-    Object dummy0 = TypeStruct.TYPES;
-    Object dummy1 = TypeMemPtr.TYPES;
+    Object dummy0 = TypeMemPtr.DISPLAY_PTR; // Must <clinit> out of RECURSIVE_MEET
     // Make a cycle: 0_A: -> 1_(n=*,v=i64) -> 2_TMP -> 3_B: -> 4_(n=*,v=f64) -> 5_TMP ->
     // Dual; then meet ~4_() and ~0_A
     final int alias = BitsAlias.REC;
 
-    TypeFld fldvi = TypeFld.make("v",TypeInt.INT64,1);
-    TypeFld fldvf = TypeFld.make("v",TypeFlt.FLT64,1);
+    TypeFld fldvi = TypeFld.make("v",TypeInt.INT64);
+    TypeFld fldvf = TypeFld.make("v",TypeFlt.FLT64);
     Type.RECURSIVE_MEET++;
-    TypeFld[] flds1 = TypeFlds.ts(TypeFld.malloc("n",null,0), fldvi);
-    TypeFld[] flds4 = TypeFlds.ts(TypeFld.malloc("n",null,0), fldvf);
-    TypeStruct as1 = TypeStruct.malloc("",false,flds1,true).set_name("A:");
-    TypeStruct bs4 = TypeStruct.malloc("",false,flds4,true).set_name("B:");
-    as1._hash = as1.compute_hash();  as1._cyclic = true;
-    bs4._hash = bs4.compute_hash();  bs4._cyclic = true;
+    TypeFld fldn1 = TypeFld.malloc("n");
+    TypeFld fldn4 = TypeFld.malloc("n");
+    TypeStruct as1 = TypeStruct.malloc("",false,true,fldn1,fldvi); as1._name = "A:";
+    TypeStruct bs4 = TypeStruct.malloc("",false,true,fldn4,fldvf); bs4._name = "B:";
+    as1.set_hash();
+    bs4.set_hash();
     TypeMemPtr ap5 = TypeMemPtr.make(alias,as1);
     TypeMemPtr bp2 = TypeMemPtr.make(alias,bs4);
-    as1.fld(0).setX(bp2          );
-    bs4.fld(0).setX(ap5          );
+    fldn1.setX(bp2);
+    fldn4.setX(ap5);
     Type.RECURSIVE_MEET--;
-    as1 = as1.install_cyclic(as1.reachable());
-    bp2 = (TypeMemPtr)as1.at(0);
+    as1 = as1.install();
+    bp2 = (TypeMemPtr)as1.at("n");
     bs4 = (TypeStruct)bp2._obj;
-    ap5 = (TypeMemPtr)bs4.at(0);
+    ap5 = (TypeMemPtr)bs4.at("n");
 
     Type das1 = as1.dual();     // ~A:@{b,int}
     Type dbs4 = bs4.dual();     // ~B:@{a,flt}
     // Since names mismatch, but both as1 and bs4 are high... must fall hard.
     Type mt = das1.meet(dbs4);  // ~ ~@{a join b, int join flt} ==> @{a join b, int32}
     TypeStruct smt = (TypeStruct)mt;
-    assertEquals(TypeInt.INT32,smt.at(1));
-    TypeMemPtr smp = (TypeMemPtr)smt.at(0);
+    assertEquals(TypeInt.INT32,smt.at("v"));
+    TypeMemPtr smp = (TypeMemPtr)smt.at("n");
     assertEquals(smt,smp._obj);
     assertEquals(BitsAlias.RECORD_BITS,smp._aliases);
 

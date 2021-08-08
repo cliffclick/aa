@@ -561,7 +561,7 @@ public class TestNodeSmall {
     // Display contains 'fact' pointing to self
     TypeMem tmem = (TypeMem) dsp_file_obj._val;
     TypeStruct tdisp0 = (TypeStruct)tmem.ld((TypeMemPtr)tdptr0);
-    assertEquals(tfptr0,tdisp0.at(tdisp0.fld_find("fact")));
+    assertEquals(tfptr0,tdisp0.at("fact"));
   }
 
 
@@ -602,8 +602,8 @@ public class TestNodeSmall {
     TypeTuple ts_int_abc = TypeTuple.make_args(TypeInt.INT64,TypeMemPtr.ABCPTR);
     // @{ a:int; b:"abc" }
     TypeStruct a_int_b_abc = TypeStruct.make(TypeFld.NO_DISP,
-                                             TypeFld.make("a",TypeInt.INT64,1),
-                                             TypeFld.make("b",TypeMemPtr.ABCPTR,2));
+                                             TypeFld.make("a",TypeInt.INT64),
+                                             TypeFld.make("b",TypeMemPtr.ABCPTR));
 
     // Build a bunch of function type signatures
     TypeFunSig[] sigs = new TypeFunSig[] {

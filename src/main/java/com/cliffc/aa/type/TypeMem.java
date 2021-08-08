@@ -111,7 +111,6 @@ public class TypeMem extends Type<TypeMem> {
   }
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  private static final char[] LIVEC = new char[]{' ','#','R','3'};
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     if( this==FULL ) return sb.p("[ all ]");
     if( this==EMPTY) return sb.p("[_____]");
@@ -505,15 +504,15 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // True if field is modifiable across any alias
-  public boolean fld_is_mod( BitsAlias aliases, String fld) {
+  public boolean fld_is_mod( BitsAlias aliases, String name) {
     for( int alias : aliases ) {
       if( alias != 0 ) {
         TypeObj to = at(alias);
         if( !(to instanceof TypeStruct) ) return true;
         TypeStruct ts = (TypeStruct)to;
-        int idx = ts.fld_find(fld);
-        if( idx == -1 || ts.fld(idx)._access != Access.Final )
-          return true;          // Cannot check for R/O here, because R/O can lift to R/W
+        TypeFld fld = ts.fld_find(name);
+        if( fld==null || fld._access != Access.Final )
+          return true; // Cannot check for R/O here, because R/O can lift to R/W
       }
     }
     return false;

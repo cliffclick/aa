@@ -6,6 +6,7 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.ARG_IDX;
+import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.Env.GVN;
 
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
@@ -245,13 +246,15 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     _referr = null;             // No longer a forward ref
     set_def(0,def.in(0));       // Same inputs
     set_def(1,def.in(1));
-    dsp.set_def(NewObjNode.def_idx(dsp._ts.fld_find(tok)),def);
-    dsp.xval();
-
-    fptr.bind(tok); // Debug only, associate variable name with function
-    Env.GVN.add_reduce_uses(this);
-    assert Env.START.more_flow(true)==0;
-    Env.GVN.iter(GVNGCM.Mode.Parse);
+    // TODO: converts a field name to an index in NewObj
+    //dsp.set_def(NewObjNode.def_idx(dsp._ts.fld_find(tok)),def);
+    //dsp.xval();
+    //
+    //fptr.bind(tok); // Debug only, associate variable name with function
+    //Env.GVN.add_reduce_uses(this);
+    //assert Env.START.more_flow(true)==0;
+    //Env.GVN.iter(GVNGCM.Mode.Parse);
+    throw unimpl();
   }
 
   @Override public ErrMsg err( boolean fast ) { return is_forward_ref() ? _referr : null; }

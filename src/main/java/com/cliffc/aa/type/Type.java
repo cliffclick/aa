@@ -107,6 +107,15 @@ public class Type<T extends Type<T>> implements Cloneable {
   // Compute the hash and return it, with all child types already having their
   // hash computed.  Subclasses override this.
   int compute_hash() { return (_type<<1)|1|_name.hashCode(); }
+  // Called during cyclic type construction, where much of the cycle has to be
+  // build before the hashes can be computed - and sometimes they are already
+  // computed (for e.g. hashing to look for interning to minimize).
+  @SuppressWarnings("unchecked")
+  public final T set_hash() {
+    if( _hash==0 ) _hash = compute_hash();
+    else    assert _hash== compute_hash();
+    return (T)this;
+  }
 
   // Is anything equals to this?
   @Override public boolean equals( Object o ) {
@@ -150,9 +159,10 @@ public class Type<T extends Type<T>> implements Cloneable {
     return t1.init(type,"").hashcons_free();
   }
   @SuppressWarnings("unchecked")
-  final T hashcons_free() {
+  T free(T t2) { return (T)POOLS[_type].free(this,t2); }
+  T hashcons_free() {
     T t2 = hashcons();
-    return this==t2 ? t2 : (T)POOLS[_type].free(this,t2);
+    return this==t2 ? t2 : free(t2);
   }
 
   // ----------------------------------------------------------
@@ -185,16 +195,6 @@ public class Type<T extends Type<T>> implements Cloneable {
     assert INTERN.get(d)==null;
     d._dual = (T)this;
     INTERN.put(d,d);
-    return (T)this;
-  }
-  // Remove a forward-ref type from the interning dictionary, prior to
-  // interning it again - as a self-recursive type
-  @SuppressWarnings("unchecked")
-  final T untern( ) {
-    assert _hash != 0;
-    assert INTERN.get(this)==this;
-    Type rez = INTERN.remove(this);
-    assert rez == this;
     return (T)this;
   }
   @SuppressWarnings("unchecked")
@@ -281,7 +281,8 @@ public class Type<T extends Type<T>> implements Cloneable {
   static final Pool[] POOLS = new Pool[TLAST];
   @SuppressWarnings("unchecked")
   static class Pool {
-    private int _malloc, _free, _pool, _clone;
+    private int _malloc, _free, _pool;
+    int _clone;                 // Allow TypeStruct a personal copy
     private final Ary<Type> _frees;
     private final Type _gold;
     Pool(byte t, Type gold) {
@@ -291,7 +292,7 @@ public class Type<T extends Type<T>> implements Cloneable {
       POOLS[t] = this;
     }
     <T extends Type> T malloc() {
-      if( _frees.isEmpty() ) { _malloc++; _clone--; return (T)_gold.clone(); }
+      if( _frees.isEmpty() ) { _malloc++; _clone--; return (T)_gold.copy(); }
       else                   { _pool  ++; return (T)_frees.pop();  }
     }
     <T extends Type> T free(T t1, T t2) {
@@ -300,19 +301,17 @@ public class Type<T extends Type<T>> implements Cloneable {
       return t2;
     }
   }
+  // Overridable clone method.  Not interned.
   @SuppressWarnings("unchecked")
-  protected Type clone() {
-    try {
-      POOLS[_type]._clone++;
-      Type t = (Type)super.clone();
-      t._uid = _uid();
-      t._dual = null;
-      t._hash = 0;
-      if( t instanceof TypeStruct )
-        ((TypeStruct)t)._cyclic = false;
-      return t;
-    }
-    catch( CloneNotSupportedException cns ) { throw new RuntimeException(cns); }
+  T copy() {
+    POOLS[_type]._clone++;
+    T t=null;
+    try { t = (T)clone(); }
+    catch( CloneNotSupportedException ignore ) {}
+    t._uid = _uid();            // Set a new uid
+    t._dual = null;
+    t._hash = 0;
+    return t;
   }
 
   // All the simple types share the same pool
@@ -332,7 +331,6 @@ public class Type<T extends Type<T>> implements Cloneable {
   public  static final Type   NIL  = make( TNIL   ); // The Nil.
   public  static final Type  XNIL  = make(TXNIL   ); // The ~Nil.
   public  static final Type   REAL = make( TREAL  );
-  private static final Type  XREAL = make(TXREAL  );
           static final Type  NREAL = make( TNREAL );
   private static final Type XNREAL = make(TXNREAL );
 
@@ -554,10 +552,9 @@ public class Type<T extends Type<T>> implements Cloneable {
   }
   @SuppressWarnings("unchecked")
   public final T remove_name() { return has_name() ? _set_name("") : (T)this; }
-  @SuppressWarnings("unchecked")
   private T _set_name(String name) {
     POOLS[_type]._clone++;
-    T t1 = (T)clone();
+    T t1 = copy();
     t1._name = name;
     return t1.hashcons_free();
   }
@@ -627,9 +624,6 @@ public class Type<T extends Type<T>> implements Cloneable {
   // MEET at a Loop; optimize no-final-updates on backedges.
   public Type meet_loop(Type t2) { return meet(t2); }
 
-
-  // Report OOB based on shallowest OOB component.
-  public Type oob_deep( Type t ) { return oop_deep_impl(t); }
   // Report OOB based on shallowest OOB component.
   public Type oop_deep_impl(Type t) { return oob(); }
   public Type       oob( ) { return oob(ALL); }
@@ -645,6 +639,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     TypeInt.init1(types);
     TypeFlt.init1(types);
     TypeStr.init1(types);
+    TypeStruct.RECURSIVE_MEET=0;
   }
 
   private static Ary<Type> ALL_TYPES; // Used for tests

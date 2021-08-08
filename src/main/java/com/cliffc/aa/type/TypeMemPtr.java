@@ -74,18 +74,21 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.
   // To break class-init cycle, this is made here, now.
-  public static final TypeFld    DISP_FLD= TypeFld.malloc("^",Type.NIL,Access.Final,0);
-  public static final TypeStruct DISPLAY = TypeStruct.malloc("",false,TypeFlds.ts(DISP_FLD),true);
-  public static final TypeMemPtr DISPLAY_PTR= new TypeMemPtr().init(BitsAlias.RECORD_BITS0,DISPLAY );
+  public static final TypeStruct DISPLAY;
+  public static final TypeMemPtr DISPLAY_PTR;
+  public static final TypeFld    DISP_FLD;
   public static final Type       NO_DISP= Type.ANY;
   static {
-    DISP_FLD._hash = DISP_FLD.compute_hash();
-    DISPLAY._hash = DISPLAY.compute_hash();
-    DISPLAY_PTR._hash = DISPLAY_PTR.compute_hash(); // Filled in during DISPLAY.install_cyclic
-    assert DISPLAY.at(0) == Type.NIL;
-    DISP_FLD.setX(TypeMemPtr.DISPLAY_PTR);
-    DISPLAY.install_cyclic(new Ary<>(Types.ts(DISPLAY ,TypeMemPtr.DISPLAY_PTR)));
-    assert DISPLAY.is_display();
+    // Install a (to be cyclic) DISPLAY.  Not cyclic during the install, since
+    // we cannot build the cycle all at once.
+    DISPLAY = TypeStruct.malloc("",false,true).add_fld(TypeFld.make("^",Type.ANY,Access.Final)).set_hash();
+    TypeStruct.RECURSIVE_MEET++;
+    DISPLAY_PTR = TypeMemPtr.make(BitsAlias.RECORD_BITS0,DISPLAY); // Normal create
+    DISP_FLD = TypeFld.make("^",DISPLAY_PTR,Access.Final);         // Normal create
+    DISPLAY.set_fld(DISP_FLD);                                     // Change field without changing hash
+    TypeStruct.RECURSIVE_MEET--;
+    TypeStruct ds = DISPLAY.install();
+    assert ds==DISPLAY && DISPLAY.is_display();
   }
 
   public  static final TypeMemPtr ISUSED0= make(BitsAlias.FULL    ,TypeObj.ISUSED); // Includes nil
@@ -93,14 +96,12 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeMemPtr OOP0   = make(BitsAlias.FULL    ,TypeObj.OBJ); // Includes nil
   public  static final TypeMemPtr OOP    = make(BitsAlias.NZERO   ,TypeObj.OBJ); // Excludes nil
   public  static final TypeMemPtr ARYPTR = make(BitsAlias.ARYBITS ,TypeAry.ARY);
-  public  static final TypeMemPtr ARY0   = make(BitsAlias.ARYBITS0,TypeAry.ARY);
   public  static final TypeMemPtr STRPTR = make(BitsAlias.STRBITS ,TypeStr.STR);
   public  static final TypeMemPtr STR0   = make(BitsAlias.STRBITS0,TypeStr.STR);
   public  static final TypeMemPtr ABCPTR = make(BitsAlias.ABC     ,TypeStr.ABC);
   public  static final TypeMemPtr ABC0   = make(ABCPTR._aliases.meet_nil(),TypeStr.ABC);
   public  static final TypeMemPtr STRUCT = make(BitsAlias.RECORD_BITS ,TypeStruct.ALLSTRUCT);
   public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECORD_BITS0,TypeStruct.ALLSTRUCT);
-  public  static final TypeMemPtr NILPTR = make(BitsAlias.NIL,TypeObj.ISUSED);
   public  static final TypeMemPtr EMTPTR = make(BitsAlias.EMPTY,TypeObj.UNUSED);
   public  static final TypeMemPtr DISP_SIMPLE= make(BitsAlias.RECORD_BITS0,TypeObj.ISUSED); // closed display
   static final Type[] TYPES = new Type[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,EMTPTR,DISPLAY,DISPLAY_PTR};
@@ -127,10 +128,11 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return new TypeMemPtr().init(ad,od);
   }
   @Override TypeMemPtr rdual() {
+    assert _hash!=0;
     if( _dual != null ) return _dual;
     TypeMemPtr dual = _dual = new TypeMemPtr().init(_aliases.dual(),(TypeObj)_obj.rdual());
     dual._dual = this;
-    if( _hash != 0 ) dual._hash = dual.compute_hash();
+    dual._hash = dual.compute_hash();
     return dual;
   }
   @Override protected Type xmeet( Type t ) {
@@ -294,6 +296,9 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     TypeObj obj = (TypeObj)_obj.make_from(head,mem,visit);
     return obj == null ? this : make_from(obj);
   }
+
+
+  @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _obj.repeats_in_cycles(head,bs); }
 
   // Used for assertions
   @Override boolean intern_check1() { return _obj.intern_lookup()!=null; }

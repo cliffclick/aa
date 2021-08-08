@@ -7,6 +7,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Util;
 
+import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
@@ -30,7 +31,7 @@ public class StoreNode extends Node {
   Node mem() { return in(1); }
   Node adr() { return in(2); }
   Node rez() { return in(3); }
-  public int find(TypeStruct ts) { return ts.fld_find(_fld); }
+  public TypeFld find(TypeStruct ts) { return ts.fld_find(_fld); }
 
   @Override public Node ideal_reduce() {
     Node mem = mem();
@@ -44,18 +45,20 @@ public class StoreNode extends Node {
     if( tmp!=null && _live.ld(tmp)==TypeObj.UNUSED )  return mem;
 
     // If Store is by a New and no other Stores, fold into the New.
-    NewObjNode nnn;  int idx;
+    NewObjNode nnn;  TypeFld tfld;
     if( mem instanceof MrgProjNode && mem._keep==0 &&
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
         !rez().is_forward_ref() &&
         mem._uses._len==2 && // Use is by DefMem and self
-        (idx=nnn._ts.fld_find(_fld))!= -1 && nnn._ts.fld(idx)._access==Access.RW ) {
+        (tfld=nnn._ts.fld_find(_fld))!= null && tfld._access==Access.RW ) {
       // Update the value, and perhaps the final field
-      nnn.update(idx,_fin,rez());
-      mem.xval();
-      Env.GVN.add_flow_uses(this);
-      add_reduce_extra();       // Folding in allows store followers to fold in
-      return mem;               // Store is replaced by using the New directly.
+      //nnn.update(idx,_fin,rez());
+      //mem.xval();
+      //Env.GVN.add_flow_uses(this);
+      //add_reduce_extra();       // Folding in allows store followers to fold in
+      //return mem;               // Store is replaced by using the New directly.
+      // TODO: makes mapping between node index and field
+      throw unimpl();
     }
 
     // If Store is of a MemJoin and it can enter the split region, do so.
@@ -153,9 +156,9 @@ public class StoreNode extends Node {
       : ((TypeObj)tmem);
     if( !(objs instanceof TypeStruct) ) return bad("No such",fast,objs);
     TypeStruct ts = (TypeStruct)objs;
-    int idx = ts.fld_find(_fld);
-    if( idx==-1 ) return bad("No such",fast,objs);
-    Access access = ts.fld(idx)._access;
+    TypeFld fld = ts.fld_find(_fld);
+    if( fld!=null ) return bad("No such",fast,objs);
+    Access access = fld._access;
     if( access!=Access.RW )
       return bad("Cannot re-assign "+access,fast,ts);
     return null;

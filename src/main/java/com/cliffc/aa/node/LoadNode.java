@@ -24,7 +24,7 @@ public class LoadNode extends Node {
   Node mem() { return in(MEM_IDX); }
   Node adr() { return in(2); }
   private Node set_mem(Node a) { return set_def(1,a); }
-  public int find(TypeStruct ts) { return ts.fld_find(_fld); }
+  public TypeFld find(TypeStruct ts) { return ts.fld_find(_fld); }
 
   // Strictly reducing optimizations
   @Override public Node ideal_reduce() {
@@ -153,8 +153,8 @@ public class LoadNode extends Node {
         MrgProjNode mrg = (MrgProjNode)mem;
         NewNode nnn = mrg.nnn();
         if( nnn instanceof NewObjNode ) {
-          int idx = ((NewObjNode)nnn)._ts.fld_find(fld);
-          if( idx >= 0 && adr instanceof ProjNode && adr.in(0) == nnn ) return nnn; // Direct hit
+          TypeFld tfld = ((NewObjNode)nnn)._ts.fld_find(fld);
+          if( tfld!=null && adr instanceof ProjNode && adr.in(0) == nnn ) return nnn; // Direct hit
         }  // wrong field name or wrong alias, cannot match
         if( aliases.test_recur(nnn._alias) ) return null; // Overlapping, but wrong address - dunno, so must fail
         mem = mrg.mem(); // Advance past
@@ -247,9 +247,9 @@ public class LoadNode extends Node {
       return tobj.oob();
     // Struct; check for field
     TypeStruct ts = (TypeStruct)tobj;
-    int idx = ts.fld_find(_fld);  // Find the named field
-    if( idx == -1 ) return tobj.oob();
-    return ts.at(idx);          // Field type
+    TypeFld fld = ts.fld_find(_fld);  // Find the named field
+    if( fld!=null ) return tobj.oob();
+    return fld._t;          // Field type
   }
   // Upgrade, if !dsp and a function pointer
   private @NotNull Type get_fld2( TypeObj tobj ) {
@@ -325,7 +325,7 @@ public class LoadNode extends Node {
       ? ((TypeMem)tmem).ld(ptr) // General load from memory
       : ((TypeObj)tmem);
     if( objs==TypeObj.UNUSED ) return null; // No error, since might fall to anything
-    if( !(objs instanceof TypeStruct) || find((TypeStruct)objs) == -1 )
+    if( !(objs instanceof TypeStruct) || find((TypeStruct)objs) == null )
       return bad(fast,objs);
     return null;
   }

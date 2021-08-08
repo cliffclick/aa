@@ -553,11 +553,13 @@ public class Parse implements Comparable<Parse> {
     if( stk._ts != old_ts ) {
       lhs.keep(2);
       for( int i=old_defs._len; i<stk._defs._len; i++ ) {
-        String fname = stk._ts.fld(i-1)._fld;
-        String msg = "'"+fname+"' not defined prior to the short-circuit";
-        Parse bad = errMsg(rhsx);
-        Node err = gvn(new ErrNode(ctrl(),bad,msg));
-        set_mem(gvn(new StoreNode(mem(),scope().ptr(),err,Access.Final,fname,bad)));
+        // TODO: alignment between old_defs and struct fields
+        throw unimpl();
+        //String fname = stk._ts.fld(i-1)._fld;
+        //String msg = "'"+fname+"' not defined prior to the short-circuit";
+        //Parse bad = errMsg(rhsx);
+        //Node err = gvn(new ErrNode(ctrl(),bad,msg));
+        //set_mem(gvn(new StoreNode(mem(),scope().ptr(),err,Access.Final,fname,bad)));
       }
       lhs.unkeep(2);
     }
@@ -962,7 +964,7 @@ public class Parse implements Comparable<Parse> {
         // But here, in a function, the display is actually passed in as a hidden
         // extra argument and replaces the default.
         NewObjNode stk = e._scope.stk();
-        stk.update(0,Access.Final,clo);
+        stk.update("^",Access.Final,clo);
         // Add a nongen memory arg
         _e._nongen.add_var(" mem",mem.tvar());
 
@@ -1212,10 +1214,10 @@ public class Parse implements Comparable<Parse> {
             (t=typep(type_var)) == null) // Parse type, wrap ptrs
           t = Type.SCALAR;               // No type found, assume default
         if( flds.find(fld -> Util.eq(fld._fld,itok) ) != -1 ) throw unimpl(); // cannot use same field name twice
-        flds.add(TypeFld.make(itok,t,tmodf,flds._len));
+        flds.add(TypeFld.make(itok,t,tmodf));
         if( !peek(';') ) break; // Final semi-colon is optional
       }
-      return peek('}') ? TypeStruct.make("",false,flds.asAry(),true) : null;
+      return peek('}') ? TypeStruct.make("",false,true,flds) : null;
     }
 
     // "()" is the zero-entry tuple
@@ -1235,7 +1237,7 @@ public class Parse implements Comparable<Parse> {
         flds.add(TypeFld.make_tup(t,flds._len));
         if( !peek(',') ) break; // Final comma is optional
       }
-      return peek(')') ? TypeStruct.make("",false,flds.asAry(),true) : null;
+      return peek(')') ? TypeStruct.make("",false,true,flds) : null;
     }
 
     if( peek('[') ) {

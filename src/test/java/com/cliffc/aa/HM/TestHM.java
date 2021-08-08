@@ -23,14 +23,14 @@ public class TestHM {
     return TypeFunSig.make(TypeTuple.make_ret(ret),TypeTuple.make_args());
   }
 
-  private static TypeStruct make_tups(Type t0, Type t1         ) { return TypeStruct.make(TypeStruct.tups(t0,t1   )); }
-  private static TypeStruct make_tups(Type t0, Type t1, Type t2) { return TypeStruct.make(TypeStruct.tups(t0,t1,t2)); }
+  private static TypeStruct make_tups(Type t0, Type t1         ) { return TypeStruct.tups(t0,t1   ); }
+  private static TypeStruct make_tups(Type t0, Type t1, Type t2) { return TypeStruct.tups(t0,t1,t2); }
   private static final TypeMemPtr tuple2  = TypeMemPtr.make(7,make_tups(Type.SCALAR,   Type.SCALAR   ));
   private static final TypeMemPtr tuplen2 = TypeMemPtr.make(7,make_tups(Type.NSCALR,   Type.NSCALR   ));
   private static final TypeMemPtr tuple82 = TypeMemPtr.make(7,make_tups(TypeInt.NINT8, TypeInt.NINT8 ));
   private static final TypeMemPtr tuple55 = TypeMemPtr.make(7,make_tups(TypeInt.con(5),TypeInt.con(5)));
   private static final TypeFunSig ret_tuple2 = tfs(tuple2);
-  private static final TypeMemPtr tuple9  = TypeMemPtr.make(9,TypeStruct.make(TypeStruct.flds(Type.SCALAR,Type.SCALAR)));
+  private static final TypeMemPtr tuple9  = TypeMemPtr.make(9,TypeStruct.args(Type.SCALAR,Type.SCALAR));
 
   @Test(expected = RuntimeException.class)
   public void test00() { run( "fred",null,null); }
@@ -206,7 +206,7 @@ public class TestHM {
   // Basic structure test
   @Test public void test25() { run("@{x=2, y=3}",
                                    "@{ x = 2, y = 3}",
-                                   TypeMemPtr.make(9,TypeStruct.make(TypeStruct.flds(TypeInt.con(2),TypeInt.con(3))))
+                                   TypeMemPtr.make(9,TypeStruct.args(TypeInt.con(2),TypeInt.con(3)))
                                    ); }
 
   // Basic field test
@@ -239,11 +239,11 @@ public class TestHM {
     BitsAlias aliases = BitsAlias.make0(alias);
     if( nil ) aliases = aliases.meet_nil();
     TypeMemPtr cycle_ptr0 = TypeMemPtr.make(aliases,TypeObj.XOBJ);
-    TypeStruct cycle_str1 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr0,1),TypeFld.make("v1",fld,2));
+    TypeStruct cycle_str1 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr0),TypeFld.make("v1",fld));
     TypeMemPtr cycle_ptr1 = TypeMemPtr.make(aliases,cycle_str1);
-    TypeStruct cycle_str2 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr1,1),TypeFld.make("v1",fld,2));
+    TypeStruct cycle_str2 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr1),TypeFld.make("v1",fld));
     TypeStruct cycle_strn = cycle_str2.approx(1,alias);
-    TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn.at(1);
+    TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn.at("n1");
     return cycle_ptrn;
   }
   private static TypeMemPtr build_cycle2( boolean nil, Type fld ) {
@@ -254,13 +254,13 @@ public class TestHM {
     if( nil ) aliases0 = aliases0.meet_nil();
     if( nil ) aliases9 = aliases9.meet_nil();
     TypeMemPtr cycle_ptr0 = TypeMemPtr.make(aliases0,TypeObj.XOBJ);
-    TypeStruct cycle_str1 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr0,1),TypeFld.make("v1",fld,2));
+    TypeStruct cycle_str1 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr0),TypeFld.make("v1",fld));
     TypeMemPtr cycle_ptr1 = TypeMemPtr.make(aliases9,cycle_str1);
-    TypeStruct cycle_str2 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr1,1),TypeFld.make("v1",fld,2));
+    TypeStruct cycle_str2 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr1),TypeFld.make("v1",fld));
     TypeMemPtr cycle_ptr2 = TypeMemPtr.make(aliases0,cycle_str2);
-    TypeStruct cycle_str3 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr2,1),TypeFld.make("v1",fld,2));
+    TypeStruct cycle_str3 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr2),TypeFld.make("v1",fld));
     TypeStruct cycle_strn = cycle_str3.approx(1,9);
-    TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn.at(1);
+    TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn.at("n1");
     return cycle_ptrn;
   }
 
@@ -545,17 +545,17 @@ public class TestHM {
     if( HM.DO_GCP ) {
       Type tf   = TypeMemPtr.make(BitsAlias.FULL.make(10,11),
                                   TypeStruct.make(TypeFld.NO_DISP,
-                                                  TypeFld.make("and"     ,TypeFunPtr.make(BitsFun.make0(15,18),1,TypeMemPtr.NO_DISP),1),
-                                                  TypeFld.make("or"      ,TypeFunPtr.make(BitsFun.make0(16,19),1,TypeMemPtr.NO_DISP),2),
-                                                  TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(17,20),2,TypeMemPtr.NO_DISP),3)));
+                                                  TypeFld.make("and"     ,TypeFunPtr.make(BitsFun.make0(15,18),1,TypeMemPtr.NO_DISP)),
+                                                  TypeFld.make("or"      ,TypeFunPtr.make(BitsFun.make0(16,19),1,TypeMemPtr.NO_DISP)),
+                                                  TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(17,20),2,TypeMemPtr.NO_DISP))));
       Type xbool= TypeMemPtr.make(12,TypeStruct.make(TypeFld.NO_DISP,
-                                                     TypeFld.make("true", tf,1),
-                                                     TypeFld.make("false",tf,2),
-                                                     TypeFld.make("force",TypeFunPtr.make(24,1,TypeMemPtr.NO_DISP),3)));
+                                                     TypeFld.make("true", tf),
+                                                     TypeFld.make("false",tf),
+                                                     TypeFld.make("force",TypeFunPtr.make(24,1,TypeMemPtr.NO_DISP))));
       TypeStruct rez = TypeStruct.make(TypeFld.NO_DISP,
-                                       TypeFld.make("a",HM.DO_HM ? TypeInt.INT64: Type.NSCALR,1),
-                                       TypeFld.make("b",HM.DO_HM ? Type.SCALAR  : Type.NSCALR,2),
-                                       TypeFld.make("bool",xbool,3));
+                                       TypeFld.make("a",HM.DO_HM ? TypeInt.INT64: Type.NSCALR),
+                                       TypeFld.make("b",HM.DO_HM ? Type.SCALAR  : Type.NSCALR),
+                                       TypeFld.make("bool",xbool));
       assertEquals(TypeMemPtr.make(15,rez),syn.flow_type());
     }
   }
@@ -603,14 +603,14 @@ public class TestHM {
       // true/false=*[10,11]@{$; and=[15,19]{any }; or=[16,20]{any }; not=[17,21]{any }; thenElse=[18,22]{any }}
       Type tf   = TypeMemPtr.make(BitsAlias.FULL.make(10,11),
                                   TypeStruct.make(TypeFld.NO_DISP,
-                                                  TypeFld.make("and"     ,TypeFunPtr.make(BitsFun.make0(15,19),1,TypeMemPtr.NO_DISP),1),
-                                                  TypeFld.make("or"      ,TypeFunPtr.make(BitsFun.make0(16,20),1,TypeMemPtr.NO_DISP),2),
-                                                  TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(17,21),1,TypeMemPtr.NO_DISP),3),
-                                                  TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(18,22),2,TypeMemPtr.NO_DISP),4)));
+                                                  TypeFld.make("and"     ,TypeFunPtr.make(BitsFun.make0(15,19),1,TypeMemPtr.NO_DISP)),
+                                                  TypeFld.make("or"      ,TypeFunPtr.make(BitsFun.make0(16,20),1,TypeMemPtr.NO_DISP)),
+                                                  TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(17,21),1,TypeMemPtr.NO_DISP)),
+                                                  TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(18,22),2,TypeMemPtr.NO_DISP))));
       // *[12]@{^=any; true=$TF; false=$TF}
       TypeStruct rez = TypeStruct.make(TypeFld.NO_DISP,
-                                       TypeFld.make("true" ,tf,1),
-                                       TypeFld.make("false",tf,2) );
+                                       TypeFld.make("true" ,tf),
+                                       TypeFld.make("false",tf) );
       assertEquals(TypeMemPtr.make(12,rez),syn.flow_type());
     }
 
@@ -654,16 +654,16 @@ public class TestHM {
 
       Type tt = TypeMemPtr.make(BitsAlias.FULL.make(9),
                                 TypeStruct.make(TypeFld.NO_DISP,
-                                                TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(15),1,TypeMemPtr.NO_DISP),1),
-                                                TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(16),2,TypeMemPtr.NO_DISP),2)));
+                                                TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(15),1,TypeMemPtr.NO_DISP)),
+                                                TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(16),2,TypeMemPtr.NO_DISP))));
       Type ff = TypeMemPtr.make(BitsAlias.FULL.make(10),
                                 TypeStruct.make(TypeFld.NO_DISP,
-                                                TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(17),1,TypeMemPtr.NO_DISP),1),
-                                                TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(18),2,TypeMemPtr.NO_DISP),2)));
+                                                TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(17),1,TypeMemPtr.NO_DISP)),
+                                                TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(18),2,TypeMemPtr.NO_DISP))));
       TypeStruct rez = TypeStruct.make(TypeFld.NO_DISP,
-                                       TypeFld.make("true"   ,tt,1),
-                                       TypeFld.make("false"  ,ff,2),
-                                       TypeFld.make("boolSub",TypeFunPtr.make(BitsFun.make0(22),1,TypeMemPtr.NO_DISP),3));
+                                       TypeFld.make("true"   ,tt),
+                                       TypeFld.make("false"  ,ff),
+                                       TypeFld.make("boolSub",TypeFunPtr.make(BitsFun.make0(22),1,TypeMemPtr.NO_DISP)));
       assertEquals(TypeMemPtr.make(11,rez),syn.flow_type());
     }
   }
