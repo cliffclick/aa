@@ -14,7 +14,7 @@ public class TestHM {
   private void run( String prog, String rez_hm, Type rez_gcp ) {
     Root syn = HM.hm(prog);
     if( HM.DO_HM )
-      assertEquals(rez_hm,syn._hmt.p());
+      assertEquals(stripIndent(rez_hm),stripIndent(syn._hmt.p()));
     if( HM.DO_GCP )
       assertEquals(rez_gcp,syn.flow_type());
   }
@@ -22,6 +22,8 @@ public class TestHM {
   private static TypeFunSig tfs(Type ret) {
     return TypeFunSig.make(TypeTuple.make_ret(ret),TypeTuple.make_args());
   }
+
+  private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
 
   private static TypeStruct make_tups(Type t0, Type t1         ) { return TypeStruct.tups(t0,t1   ); }
   private static TypeStruct make_tups(Type t0, Type t1, Type t2) { return TypeStruct.tups(t0,t1,t2); }
@@ -668,4 +670,150 @@ public class TestHM {
     }
   }
 
+  // Full on Peano arithmetic.  
+  @Test public void test58() {
+    Root syn = HM.hm(
+"void = @{};                                   "+
+"err  = {unused->(err unused)};                "+
+// Booleans, support AND, OR, THENELSE.  Eg. b.false.and is a function which
+// ignores its input and returns false.
+"b=                                            "+
+"  true = @{                                   "+
+"    and      = {o -> o}                       "+ // true  AND anything is that thing
+"    or       = {o -> b.true}                  "+ // true  OR  anything is true
+"    thenElse = {then else->(then void) }      "+
+"  };                                          "+
+"  false = @{                                  "+
+"    and      = {o -> b.false}                 "+ // false AND anything is false
+"    or       = {o -> o}                       "+ // false OR  anything is that thing
+"    thenElse = {then else->(else void) }      "+
+"  };                                          "+
+"  @{true=true, false=false};                  "+
+// Natural numbers are formed from zero (z) and succ (s).
+// They are structs which support isZero, pred, succ and add.
+"n=                                            "+
+// Zero, is a struct supporting functions "isZero" (always true), "pred"
+// (error; no predecessor of zero), "succ" successor, and "add" which is a no-op.
+"  z = @{                                      "+
+"    isZero = {unused ->b.true},               "+
+"    pred   = err                              "+
+"    succ   = {unused -> (n.s n.z)},           "+
+"    add    = {o-> o}                          "+
+"  };                                          "+
+// Successor, is a function taking a natural number and returning the successor
+// (which is just a struct supporting the functions of natural numbers).
+"  s = {pred ->                                "+
+"    self=@{                                   "+
+"      isZero = {unused ->b.false},            "+ // isZero is always false for anything other than zero
+"      pred   = {unused->pred},                "+ // careful! 'pred=' is a label, the returned 'pred' was given as the argument
+"      succ   = {unused -> (n.s self)},        "+ 
+"      add    = {m -> ((pred.add m).succ void)}"+ // a little odd, but really this counts down (via recursion) on the LHS and applies that many succ on the RHS
+"    };                                        "+
+"    self                                      "+
+"  };                                          "+
+"  @{s=s, z=z};                                "+
+// Do some Maths
+"one = (n.s n.z);                              "+ // One is the successor of zero
+"two = (one.add one);                          "+ // Two is one plus one
+"three =(n.s two);                             "+ // Three is the successor of two
+// Return a result, so things are not dead.
+"@{b=b,n=n, one=one,two=two,three=three}"+
+"");
+    
+    if( HM.DO_HM )
+      assertEquals(stripIndent(
+"@{" +
+// Booleans, support AND, OR, THENELSE.  Eg. b.false.and is a function which
+// ignores its input and returns false.
+"  b=@{ false=A:@{ and={B->A}, or={C->C}, thenElse={D {()->E} ->E} },"+
+"       true =F:@{ and={G->G}, or={H->F}, thenElse={{()->I} J ->I} }"+
+"  },"+
+// Natural numbers are formed from zero (z) and succ (s).
+"  n=@{"+
+"    s={"+
+// K is the type var of a natural number: a struct supporting pred,succ,add,isZero.
+// So 's' succ is a function which takes a natural number (K) and returns a K.
+"      K:@{ add   ={ L:@{ succ={()->L} } ->L },"+
+"           isZero={ M -> N:@{ and={N->N}, or={N->N}, thenElse={ {()->O} {()->O} -> O }}},"+
+"           pred  ={ P -> K},"+
+"           succ  ={ Q -> K}"+
+"        } -> K },"+
+"    z=K"+         // Zero is also a natural number
+"  },"+
+// One is formed by taking the successor of zero: "(n.s n.z)".  It has the same
+// shape as any natural number ("self" structural shape above), but its type is
+// not unified with "self".
+"  one=R:@{"+
+"    add   ={ S:@{ succ={()->S}} -> S},"+
+"    isZero={  T  -> U:@{ and={U->U}, or={U->U}, thenElse={ {()->V21} {()->V21}->V21}}},"+
+"    pred=  { V22 -> R },"+
+"    succ=  { V23 -> R }"+      // Note: succ takes an 'unused'
+"  },"+
+// Has all the fields of a natural number.
+"  three=V24:@{ "+
+"    add   ={ V25:@{ succ={()->V25} }->V25  },"+
+"    isZero={ V26 -> V27:@{ and={V27->V27}, or={V27->V27}, thenElse={ {()->V28} {()->V28} ->V28 }}},"+
+"    pred  ={ V29 -> V24 },"+
+"    succ  ={ ()  -> V24 }"+ // Note 'succ' only takes 'void', and not an 'unused'.
+"  },"+
+// Has all the fields of a natural number.
+"  two=V30:@{ "+
+"    add   ={ V31:@{succ={()->V31}} ->V31 },"+
+"    isZero={ V32 -> V33:@{ and={V33->V33}, or={V33->V33}, thenElse={ {()->V34} {()->V34} ->V34 }}},"+
+"    pred  ={ V35 -> V30},"+
+"    succ  ={ ()  -> V30}"+ // Note 'succ' only takes a 'void', and not an 'unused'.
+"  }"+
+"}"+
+""), stripIndent(syn._hmt.p()));
+    if( HM.DO_GCP ) {
+      // *[16]@{^ = any;
+      //        b = *[12]@{$;
+      //          true =*[10]@{$; and=[16]{any }; or=[17]{any }; thenElse=[18]{any }};
+      //          false=*[11]@{$; and=[19]{any }; or=[20]{any }; thenElse=[21]{any }}
+      //        };
+      //        n = *[15]@{$;
+      //                   s = [29]{any };
+      //                   z =*[13]@{$; isZero=[22]{any }; pred=[15]{any }; succ=[23]{any }; add=[24]{any }}
+      //        };
+      //        one = *[14]@{$; isZero=[25]{any }; pred=[26]{any }; succ=[27]{any }; add=[28]{any }};
+      //        two = $;
+      //        three=$
+      // }
+      TypeFld bt = bfun("true" ,10,16,17,18);
+      TypeFld bf = bfun("false",11,19,20,21);
+      TypeFld b  = mptr("b",12,TypeStruct.make(TypeFld.NO_DISP,bt,bf)); // Booleans
+
+      TypeFld z  = nfun("z",13,22,15,23,24);
+      TypeFld s  = mfun("s",29);
+      TypeFld n  = mptr("n",15,TypeStruct.make(TypeFld.NO_DISP,s,z));
+
+      TypeFld n1 = nfun("one"  ,14,25,26,27,28);
+      TypeFld n2 = nfun("two"  ,14,25,26,27,28);
+      TypeFld n3 = nfun("three",14,25,26,27,28);
+      
+      Type rez = TypeMemPtr.make(16,TypeStruct.make(TypeFld.NO_DISP,b,n,n1,n2,n3));
+      assertEquals(rez,syn.flow_type());
+    }
+  }
+
+      // Make field holding a pointer to a struct
+  private static TypeFld mptr( String fld, int alias, TypeStruct ts ) {
+    return TypeFld.make(fld,TypeMemPtr.make(alias,ts));
+  }
+  // Make a field holding a function pointer
+  private static TypeFld mfun( String fld, int fidx ) { return mfun(fld,fidx,1); }
+  private static TypeFld mfun( String fld, int fidx, int nargs ) {
+    return TypeFld.make(fld ,TypeFunPtr.make(BitsFun.make0(fidx),nargs,TypeMemPtr.NO_DISP));
+  }
+
+  // Make a boolean field, with struct fields and,or,thenElse
+  private static TypeFld bfun( String fld, int alias, int afidx, int ofidx, int tfidx ) {
+    return mptr(fld,alias,TypeStruct.make(TypeFld.NO_DISP,mfun("and",afidx),mfun("or",ofidx),mfun("thenElse",tfidx,2) ));
+  }
+
+  // Make a natural numbers field, with struct fields isZero,pred,succ,add
+  private static TypeFld nfun( String fld, int alias, int zfidx, int pfidx, int sfidx, int afidx ) {
+    return mptr(fld,alias,TypeStruct.make(TypeFld.NO_DISP,mfun("isZero",zfidx),mfun("pred",pfidx),mfun("succ",sfidx), mfun("add",afidx) ));
+  }
+  
 }
