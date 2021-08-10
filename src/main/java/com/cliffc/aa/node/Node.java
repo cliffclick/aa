@@ -659,11 +659,8 @@ public abstract class Node implements Cloneable {
     // Call can always inline to fold constant.
     if( this instanceof ProjNode && in(0) instanceof CallNode && ((ProjNode)this)._idx>0 )
       return false;
-    // Is in-error; do not remove the error.
-    if( err(true) != null )
-      return false;
-    // Is a constant
-    return t.is_con();
+    // Is a constant and not in error?  Do not remove the error.
+    return t.is_con() && err(true) == null;
   }
 
   // Make globally shared common ConNode for this type.

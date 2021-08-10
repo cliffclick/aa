@@ -131,31 +131,25 @@ public class IntrinsicNode extends Node {
   // result is a named type.  Same as convertTypeName on an unaliased NewObjNode.
   // Passed in a named TypeStruct, and the parent alias.
   public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, Parse bad ) {
-    assert to.has_name();
-    TypeFld disp = to.fld_find("^");
-    assert disp.is_display_ptr(); // Display already
+    assert to.has_name() && to.fld_find("^").is_display_ptr(); // Display already
     // Upgrade the type to one with no display for nnn.
-    to.set_fld(disp.make_from(TypeMemPtr.NO_DISP));
-    // Formal is unnamed, and this function adds the name.
-    TypeTuple formals = TypeTuple.make(to.remove_name());
-    TypeFunSig sig = TypeFunSig.make(TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.make0(alias),to)),formals);
+    to = to.set_fld("^",Access.Final,TypeMemPtr.NO_DISP);
 
     try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
-      FunNode fun = (FunNode) X.xform(new FunNode(to._name,sig,-1,false).add_def(Env.ALL_CTRL));
+      FunNode fun = (FunNode) X.xform(new FunNode(to._name,null,-1,false).add_def(Env.ALL_CTRL));
       Node rpc = X.xform(new ParmNode(  0    ,"rpc",fun,Env.ALL_CALL,null));
       Node memp= X.xform(new ParmNode(MEM_IDX,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
       // Add input edges to the NewNode
       Node nodisp = Node.con(TypeMemPtr.NO_DISP);
       NewObjNode nnn = (NewObjNode)X.add(new NewObjNode(false,alias,to,nodisp));
-      for( int i=1; i<to.len(); i++ ) {
-        //String argx = to.fld(i)._fld;
-        //if( Util.eq(argx,TypeFld.fldBot) ) argx = null;
-        //nnn.add_def(X.xform(new ParmNode(i+DSP_IDX,argx,fun, (ConNode)Node.con(to.at(i).simple_ptr()),bad)));
-        // TODO: makes mapping between fields and node index
-        throw unimpl();
-      }
+      for( TypeFld fld : to.flds() )
+        if( !Util.eq(fld._fld,"^") ) // Display already handled
+          nnn.create_edge(fld._fld,X.xform(new ParmNode(nnn.len()-1+DSP_IDX,fld._fld,fun, (ConNode)Node.con(fld._t.simple_ptr()),bad)));
       Node mmem = Env.DEFMEM.make_mem_proj(nnn,memp);
       Node ptr = X.xform(new ProjNode(REZ_IDX, nnn));
+      // Formal is unnamed, and this function adds the name.
+      TypeTuple formals = nnn.as_formals();
+      fun._sig = TypeFunSig.make(TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.make0(alias),to)),formals);
       RetNode ret = (RetNode)X.xform(new RetNode(fun,mmem,ptr,rpc,fun));
       return (X._ret=X.init2(new FunPtrNode(to._name,ret)));
     }

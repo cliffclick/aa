@@ -195,7 +195,7 @@ public class TypeFld extends Type<TypeFld> {
 
   // Make a Type, replacing all dull pointers from the matching types in mem.
   @Override public TypeFld make_from(Type head, TypeMem mem, VBitSet visit) {
-    return setX(_t.make_from(head,mem,visit)).hashcons_free();
+    return make_from(_t.make_from(head,mem,visit));
   }
 
   @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _t.repeats_in_cycles(head,bs); }

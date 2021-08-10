@@ -190,7 +190,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   TypeFunPtr _sharpen_clone(TypeMemPtr disp) {
     TypeFunPtr tf = copy();
     tf._disp = disp;
-    tf._hash = tf.compute_hash();
     return tf;
   }
   @Override public TypeFunPtr widen() { return GENERIC_FUNPTR; }

@@ -206,7 +206,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     assert INTERN.get(this)==this;
     return (T)this;
   }
-  boolean interned() { return INTERN.get(this)==this; }
+  boolean interned() { return _hash!=0 && INTERN.get(this)==this; }
   Type intern_lookup() { return INTERN.get(this); }
   static int intern_size() { return INTERN.size(); }
   public static boolean intern_check() {

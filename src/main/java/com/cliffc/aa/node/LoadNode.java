@@ -248,7 +248,7 @@ public class LoadNode extends Node {
     // Struct; check for field
     TypeStruct ts = (TypeStruct)tobj;
     TypeFld fld = ts.fld_find(_fld);  // Find the named field
-    if( fld!=null ) return tobj.oob();
+    if( fld==null ) return tobj.oob();
     return fld._t;          // Field type
   }
   // Upgrade, if !dsp and a function pointer

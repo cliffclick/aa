@@ -3,11 +3,10 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Util;
 
-import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
@@ -52,13 +51,11 @@ public class StoreNode extends Node {
         mem._uses._len==2 && // Use is by DefMem and self
         (tfld=nnn._ts.fld_find(_fld))!= null && tfld._access==Access.RW ) {
       // Update the value, and perhaps the final field
-      //nnn.update(idx,_fin,rez());
-      //mem.xval();
-      //Env.GVN.add_flow_uses(this);
-      //add_reduce_extra();       // Folding in allows store followers to fold in
-      //return mem;               // Store is replaced by using the New directly.
-      // TODO: makes mapping between node index and field
-      throw unimpl();
+      nnn.update(_fld,_fin,rez());
+      mem.xval();
+      Env.GVN.add_flow_uses(this);
+      add_reduce_extra();       // Folding in allows store followers to fold in
+      return mem;               // Store is replaced by using the New directly.
     }
 
     // If Store is of a MemJoin and it can enter the split region, do so.
@@ -157,7 +154,7 @@ public class StoreNode extends Node {
     if( !(objs instanceof TypeStruct) ) return bad("No such",fast,objs);
     TypeStruct ts = (TypeStruct)objs;
     TypeFld fld = ts.fld_find(_fld);
-    if( fld!=null ) return bad("No such",fast,objs);
+    if( fld==null ) return bad("No such",fast,objs);
     Access access = fld._access;
     if( access!=Access.RW )
       return bad("Cannot re-assign "+access,fast,ts);
