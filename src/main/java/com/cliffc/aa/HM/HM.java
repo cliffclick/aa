@@ -515,16 +515,14 @@ public class HM {
     @Override SB p2(SB sb, VBitSet dups) { return _body.p0(sb,dups); }
     T2 targ(int i) { T2 targ = _targs[i].find(); return targ==_targs[i] ? targ : (_targs[i]=targ); }
     @Override boolean hm(Worklist work) {
-      boolean progress = false;
       // The normal lambda work
       T2 old = find();
       if( old.is_err() ) return false;
       if( old.is_fun() ) {      // Already a function?  Compare-by-parts
+        boolean progress = false;
         for( int i=0; i<_targs.length; i++ )
-          if( old.args(i).unify(targ(i),work) )
-            { progress=true; break; }
-        if( !progress && !old.args(_targs.length).unify(_body.find(),work) )
-          return false;           // Shortcut: no progress, no allocation
+          progress |= old.args(i).unify(targ(i),work);
+        return old.args(_targs.length).unify(_body.find(),work) | progress;
       }
       // Make a new T2 for progress
       T2[] targs = Arrays.copyOf(_targs,_targs.length+1);
@@ -815,16 +813,13 @@ public class HM {
       return sb;
     }
     @Override boolean hm(Worklist work) {
-      boolean progress = false, must_alloc=false;
+      boolean progress = false;
 
       // Force result to be a struct with at least these fields.
       // Do not allocate a T2 unless we need to pick up fields.
       T2 rec = find();
       if( rec.is_err() ) return false;
-      for( String id : _ids )
-        if( Util.find(rec._ids, id) == -1 )
-          { must_alloc = true; break; }
-      if( must_alloc ) {              // Must allocate.
+      if( rec.is_leaf() ) {           // Must allocate.
         if( work==null ) return true; // Will progress
         T2[] t2s = new T2[_ids.length];
         for( int i=0; i<_ids.length; i++ )
@@ -833,6 +828,7 @@ public class HM {
         rec=find();
         progress = true;
       }
+      if( !rec.is_struct() ) throw unimpl();
 
       // Extra fields are unified with ERR since they are not created here:
       // error to load from a non-existing field
@@ -858,7 +854,7 @@ public class HM {
       for( Syntax fld : _flds ) work.push(fld);
     }
     @Override Type val(Worklist work) {
-      TypeFld flds[] = new TypeFld[_flds.length+1];
+      TypeFld[] flds = new TypeFld[_flds.length+1];
       flds[0] = TypeFld.NO_DISP;
       for( int i=0; i<_flds.length; i++ )
         flds[i+1] = TypeFld.make(_ids[i],_flds[i]._flow,Access.Final);
@@ -911,7 +907,7 @@ public class HM {
         return rec.add_fld(_id,find(),work);
       if( rec.is_leaf() )
         return T2.make_struct(BitsAlias.EMPTY,new String[]{_id}, new T2[]{find().push_update(rec._deps)},true).unify(rec, work);
-
+      // Closed record, field is missing
       return find().unify(rec.miss_field(_id),work);
     }
     @Override void add_hm_work(Worklist work) {
@@ -945,7 +941,7 @@ public class HM {
   }
 
 
-  abstract static class PrimSyn extends Lambda implements Cloneable {
+  abstract static class PrimSyn extends Lambda {
     static T2 BOOL, INT64, FLT64, STRP;
     static Worklist WORK;
     static int PAIR_ALIAS, TRIPLE_ALIAS;
@@ -1081,7 +1077,7 @@ public class HM {
       }
       // Unify both sides with the result
       return
-        rez.unify(targ(1),work) |
+        rez       .unify(targ(1),work) |
         rez.find().unify(targ(2),work);
     }
     @Override Type apply( Syntax[] args) {
@@ -1179,14 +1175,21 @@ public class HM {
         return true;
       }
       // Already an expanded nilable with struct
-      if( arg.is_struct() && ret.is_struct() && arg._alias == arg._alias.meet_nil() && arg._ids.length == ret._ids.length ) {
+      if( arg.is_struct() && ret.is_struct() && arg._alias == arg._alias.meet_nil() ) {
         // But cannot just check the aliases, since they may not match.
         // Also check that the fields align
         boolean progress=false;
-        for( int i=0; i<arg._ids.length; i++ )
-          if( !Util.eq(arg._ids[i],ret._ids[i]) ||
-              arg.args(i)!=ret.args(i) )
+        for( int i=0; i<arg._ids.length; i++ ) {
+          int idx = Util.find(ret._ids,arg._ids[i]);
+          if( idx != -1 && arg.args(i)!=ret.args(idx) )
             { progress=true; break; } // Field/HMtypes misalign
+          if( idx == -1 && ret._open )
+            { progress=true; break; }
+        }
+        if( !progress && arg._open )
+          for( int i=0; i<ret._ids.length; i++ )
+            if( Util.find(arg._ids,ret._ids[i])== -1 )
+              { progress=true; break; }
         if( !progress ) return false; // No progress
       }
       if( work==null ) return true;
@@ -1288,7 +1291,7 @@ public class HM {
   // T2, and the forest of T2s can share.  Leaves of a T2 can be either a
   // simple concrete base type, or a sharable leaf.  Unify is structural, and
   // where not unifyable the union is replaced with an Error.
-  static class T2 implements Cloneable {
+  static class T2 {
     private static int CNT=0;
     final int _uid;
 
@@ -1496,7 +1499,7 @@ public class HM {
       if( _open==that._open ) return that._open;
       if( !is_struct() ) return that._open;
       if( !that.is_struct() ) return _open;
-      throw unimpl();
+      return false; // most conservative answer
     }
     private String meet_err(T2 that) {
       if( this._err==null ) return that._err;
@@ -1656,33 +1659,32 @@ public class HM {
       return find().union(that,work);
     }
 
+    // Unify this struct into that struct
     private void _unify_struct(T2 that, Worklist work) {
       assert this.is_struct() && that.is_struct();
       T2 thsi = this;
       // Unification for structs is more complicated; args are aligned via
-      // field names and not by position.  Conceptually, fields in one struct
-      // and not the other are put in both before unifying the structs.  Open
-      // structs copy from the other side; closed structs insert a missing
-      // field error.
+      // field names and not by position.  Fields in one struct and not the
+      // other are put in if the other is open, and dropped otherwise.
       for( int i=0; i<thsi._ids.length; i++ ) { // For all fields in LHS
         int idx = Util.find(that._ids,thsi._ids[i]);
-        if( idx==-1 )           // Missing that field?  Copy from left if open, error if closed.
-          that.add_fld(thsi._ids[i], that._open ? thsi.args(i) : that.miss_field(thsi._ids[i]),  work);
-        else thsi.args(i)._unify(that.args(idx),work);    // Unify matching field
+        if( idx==-1 ) {         // Missing that field?  Copy from left if open, error if closed.
+          // Extra fields on closed are dropped
+          if( that._open ) that.add_fld(thsi._ids[i], thsi.args(i), work);
+        } else thsi.args(i)._unify(that.args(idx),work);    // Unify matching field
         if( (that=that.find()).is_err() ) return; // Recursively, might have already rolled this up
-        thsi = thsi.find();  assert thsi.is_struct();
+        if( (thsi=thsi.find()).is_err() ) return; // Recursively, might have already rolled this up
+        assert thsi.is_struct();
       }
-      // Fields in RHS and not the LHS are also merged; if the LHS is open we'd
-      // just copy the missing fields into it, then unify the structs
-      // (shortcut: just skip the copy).  If the LHS is closed, then the extra
-      // RHS fields are an error.
-      if( !thsi._open )         // LHS is closed, so extras in RHS are errors
+      // Only common fields end up in the result.
+      if( !thsi._open )         // LHS is closed, so extras in RHS are dropped
         for( int i=0; i<that._ids.length; i++ )    // For all fields in RHS
           if( Util.find(thsi._ids,that._ids[i]) == -1 ) // Missing in LHS
-            that.args(i)._unify(miss_field(that._ids[i]),work); // If closed, extra field is an error
+            that.del_fld(i--, work);                    // Drop from RHS
+
       // Shortcut (for asserts): LHS gets same ids as RHS, since its about to be top-level unified
+      thsi._open= that._open = thsi.meet_opens(that);
       thsi._ids = that._ids;
-      thsi._open= that._open;
     }
 
     // Insert a new field; keep fields sorted
@@ -1692,7 +1694,7 @@ public class HM {
       // Find insertion point
       int idx = Arrays.binarySearch(_ids,id);
       assert idx<0;             // Never found
-      idx = -idx-1;               // Insertion point
+      idx = -idx-1;             // Insertion point
       // Insert in sorted order
       _ids  = Arrays.copyOf( _ids,len+1);
       _args = Arrays.copyOf(_args,len+1);
@@ -1703,6 +1705,22 @@ public class HM {
       fld.push_update(_deps); // If field changes, all deps change
       work.addAll(_deps); //
       return true;        // Always progress
+    }
+    // Delete a field
+    private boolean del_fld( int i, Worklist work) {
+      assert is_struct();
+      int len = _ids.length;
+      // Must copy, since otherwise shared.
+      String[] ids = Arrays.copyOf(_ids ,len-1);
+      T2[]    args = Arrays.copyOf(_args,len-1);
+      System.arraycopy(_ids ,i+1,ids ,i,len-1-i);
+      System.arraycopy(_args,i+1,args,i,len-1-i);
+      if( len > i+1 ) ids [len-2] = _ids [len-1];
+      if( len > i+1 ) args[len-2] = _args[len-1];
+      _ids  =  ids;
+      _args = args;
+      work.addAll(_deps);
+      return true;
     }
 
     private long dbl_uid(T2 t) { return dbl_uid(t._uid); }
@@ -1855,10 +1873,10 @@ public class HM {
       for( int i=0; i<_ids.length; i++ ) {
         int idx = Util.find(that._ids,_ids[i]);
         if( idx == -1 ) {       // Missing field on RHS
-          if( work==null ) return true; // Will definitely make progress
-          progress = true;
-          // if both are closed, error on RHS
-          that.add_fld(_ids[i], that._open ? args(i)._fresh(nongen) : that.miss_field(_ids[i]),  work);
+          if( that._open ) {    // If RHS is open, copy field into it.
+            if( work==null ) return true; // Will definitely make progress
+            progress |= that.add_fld(_ids[i], args(i)._fresh(nongen), work);
+          }
         } else
           progress |= args(i)._fresh_unify(that.args(idx),nongen,work);
         if( (that=that.find()).is_err() ) return true;
@@ -1869,12 +1887,13 @@ public class HM {
       // (shortcut: just skip the copy).  If the LHS is closed, then the extra
       // RHS fields are an error.
       if( !_open )
-        for( int i=0; i<that._ids.length; i++ )    // For all fields in RHS
-          if( Util.find(_ids,that._ids[i]) == -1 &&// Missing in LHS
-              !that.args(i).is_err() ) {           // And not yet an error
-            if( work == null ) return true; // Will definitely make progress
-            progress |= that.args(i).unify(miss_field(that._ids[i]), work);
+        for( int i=0; i<that._ids.length; i++ )      // For all fields in RHS
+          if( Util.find(_ids,that._ids[i]) == -1 ) { // Missing in LHS
+            if( work == null ) return true;          // Will definitely make progress
+            progress |= that.del_fld(i--, work);     // Extra fields on both sides are dropped
           }
+
+      that._open = meet_opens(that);
 
       // Unify aliases
       BitsAlias alias = meet_alias(that);
@@ -2184,6 +2203,7 @@ public class HM {
         if( _ids==null ) sb.p("_ ");
         else for( int i=0; i<_ids.length; i++ )
                str(sb.p(' ').p(_ids[i]).p(" = "),visit,_args[i],dups).p(',');
+        if( _open ) sb.p(" ...,");
         return sb.unchar().p("}");
       }
 
@@ -2227,15 +2247,14 @@ public class HM {
 
       // Special printing for structures: @{ fld0 = body, fld1 = body, ... }
       if( is_struct() ) {
+        char close;
         if( is_tuple() ) {
-          if( _ids.length == 0 ) return sb.p("()");
           sb.p('(');
           for( int i=0; i<_ids.length; i++ ) {
             int idx = Util.find(_ids,new String(new char[]{(char)('0'+i)}).intern());
             args(idx)._p(sb.p(' '),visit,dups).p(',');
           }
-          sb.unchar().p(')');
-
+          close = ')';
         } else {
           sb.p("@{");
           TreeMap<String,Integer> map = new TreeMap<>();
@@ -2243,9 +2262,11 @@ public class HM {
             map.put( _ids[i], i );
           for( int i : map.values() )
             args(i)._p(sb.p(' ').p(_ids[i]).p(" = "),visit,dups).p(',');
-          sb.unchar().p("}");
+          close = '}';
         }
-        //return _alias.str(sb);
+        if( _open ) sb.p(" ...,");
+        if( _ids.length>0 ) sb.unchar();
+        sb.p(close);
         if( _alias.test(0) ) sb.p('?');
         return sb;
       }

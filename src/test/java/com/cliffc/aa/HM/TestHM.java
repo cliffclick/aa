@@ -234,7 +234,7 @@ public class TestHM {
   // Load some fields from an unknown struct: area of a rectangle.
   // Since no nil-check, correctly types as needing a not-nil input.
   @Test public void test31() { run("{ sq -> (* sq.x sq.y) }", // { sq -> sq.x * sq.y }
-                                   "{ @{ x = int64, y = int64} -> int64 }", tfs(TypeInt.INT64)); }
+                                   "{ @{ x = int64, y = int64, ...} -> int64 }", tfs(TypeInt.INT64)); }
 
   private static TypeMemPtr build_cycle( int alias, boolean nil, Type fld ) {
     // Build a cycle of length 2.
@@ -273,7 +273,7 @@ public class TestHM {
   @Test public void test32() {
     Root syn = HM.hm("map = { fcn lst -> @{ n1 = (map fcn lst.n0), v1 = (fcn lst.v0) } }; map");
     if( HM.DO_HM )
-      assertEquals("{ { A -> B } C:@{ n0 = C, v0 = A} -> D:@{ n1 = D, v1 = B} }",syn._hmt.p());
+      assertEquals("{ { A -> B } C:@{ n0 = C, v0 = A, ...} -> D:@{ n1 = D, v1 = B} }",syn._hmt.p());
     if( HM.DO_GCP )
       // Build a cycle of length 2, without nil.
       assertEquals(tfs(build_cycle(9,false,Type.SCALAR)),syn.flow_type());
@@ -285,7 +285,7 @@ public class TestHM {
   @Test public void test33() {
     Root syn = HM.hm("map = { fcn lst -> (if lst @{ n1=(map fcn lst.n0), v1=(fcn lst.v0) } 0) }; map");
     if( HM.DO_HM )
-      assertEquals("{ { A -> B } C:@{ n0 = C, v0 = A}? -> D:@{ n1 = D, v1 = B}? }",syn._hmt.p());
+      assertEquals("{ { A -> B } C:@{ n0 = C, v0 = A, ...}? -> D:@{ n1 = D, v1 = B}? }",syn._hmt.p());
     if( HM.DO_GCP )
       // Build a cycle of length 2, with nil.
       assertEquals(tfs(build_cycle(9,true,Type.SCALAR)),syn.flow_type());
@@ -321,7 +321,7 @@ public class TestHM {
   @Test public void test36() {
     Root syn = HM.hm("map = { lst -> (if lst @{ n1= arg= lst.n0; (if arg @{ n1=(map arg.n0), v1=(str arg.v0)} 0), v1=(str lst.v0) } 0) }; map");
     if( HM.DO_HM )
-      assertEquals("{ A:@{ n0 = @{ n0 = A, v0 = int64}?, v0 = int64}? -> B:@{ n1 = @{ n1 = B, v1 = *[4]str}?, v1 = *[4]str}? }",syn._hmt.p());
+      assertEquals("{ A:@{ n0 = @{ n0 = A, v0 = int64, ...}?, v0 = int64, ...}? -> B:@{ n1 = @{ n1 = B, v1 = *[4]str}?, v1 = *[4]str}? }",syn._hmt.p());
     if( HM.DO_GCP )
       assertEquals(tfs(build_cycle2(true,TypeMemPtr.STRPTR)),syn.flow_type());
   }
@@ -332,14 +332,14 @@ public class TestHM {
   // Example from SimpleSub requiring 'x' to be both a struct with field
   // 'v', and also a function type - specifically disallowed in 'aa'.
   @Test public void test38() { run("{ x -> y = ( x x.v ); 0}",
-                                   "{ Cannot unify @{ v = A} and { A -> B } -> A? }", tfs(Type.XNIL)); }
+                                   "{ Cannot unify @{ v = A, ...} and { A -> B } -> A? }", tfs(Type.XNIL)); }
 
   // Really bad flow-type: function can be called from the REPL with any
   // argument type - and the worse case will be an error.
   @Test public void test39() {
     Root syn = HM.hm("x = { z -> z}; (x { y -> y.u})");
     if( HM.DO_HM )
-      assertEquals("{ @{ u = A} -> A }",syn._hmt.p());
+      assertEquals("{ @{ u = A, ...} -> A }",syn._hmt.p());
     if( HM.DO_GCP )
       assertEquals(tfs(Type.SCALAR), syn.flow_type());
   }
@@ -351,7 +351,7 @@ public class TestHM {
   @Test public void test40() {
     Root syn = HM.hm("x = w = (x x); { z -> z}; (x { y -> y.u})");
     if( HM.DO_HM )
-      assertEquals("Cannot unify A:{ A -> A } and @{ u = A}",syn._hmt.p());
+      assertEquals("Cannot unify A:{ A -> A } and @{ u = A, ...}",syn._hmt.p());
     if( HM.DO_GCP ) {
       if( HM.DO_HM ) {
         assertEquals(tfs(Type.SCALAR), syn.flow_type());
@@ -391,7 +391,7 @@ public class TestHM {
       if( HM.DO_GCP )
         assertEquals("3.4000000953674316",syn._hmt.p());
       else
-        assertEquals("Missing field y in @{ x = *[4]\"abc\"}",syn._hmt.p());
+        assertEquals("Missing field y in ()",syn._hmt.p());
     }
     if( HM.DO_GCP )
       assertEquals(TypeFlt.con(3.4f), syn.flow_type());
@@ -399,7 +399,7 @@ public class TestHM {
 
   // The z-merge is ignored; the last s2 is a fresh (unmerged) copy.
   @Test public void test43() {
-    Root syn = HM.hm("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4 }; z = (if pred s1 s2); s2.y");
+    Root syn = HM.hm("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4 }; z = (if pred s1 s2).x; s2.y");
     if( HM.DO_HM )
       assertEquals("3.4000000953674316",syn._hmt.p());
     if( HM.DO_GCP )
@@ -502,7 +502,7 @@ public class TestHM {
                      "total_size"                // What is this type?
                      );
     if( HM.DO_HM )
-      assertEquals("{ A:@{ size = int64} B:@{ next = B, val = A}? -> int64 }",syn._hmt.p());
+      assertEquals("{ A:@{ size = int64, ...} B:@{ next = B, val = A, ...}? -> int64 }",syn._hmt.p());
     if( HM.DO_GCP )
       if( HM.DO_HM ) assertEquals(tfs(TypeInt.INT64),syn.flow_type());
       else           assertEquals(tfs(Type.SCALAR  ),syn.flow_type());
@@ -670,7 +670,7 @@ public class TestHM {
     }
   }
 
-  // Full on Peano arithmetic.  
+  // Full on Peano arithmetic.
   @Test public void test58() {
     Root syn = HM.hm(
 "void = @{};                                   "+
@@ -706,7 +706,7 @@ public class TestHM {
 "    self=@{                                   "+
 "      isZero = {unused ->b.false},            "+ // isZero is always false for anything other than zero
 "      pred   = {unused->pred},                "+ // careful! 'pred=' is a label, the returned 'pred' was given as the argument
-"      succ   = {unused -> (n.s self)},        "+ 
+"      succ   = {unused -> (n.s self)},        "+
 "      add    = {m -> ((pred.add m).succ void)}"+ // a little odd, but really this counts down (via recursion) on the LHS and applies that many succ on the RHS
 "    };                                        "+
 "    self                                      "+
@@ -719,7 +719,7 @@ public class TestHM {
 // Return a result, so things are not dead.
 "@{b=b,n=n, one=one,two=two,three=three}"+
 "");
-    
+
     if( HM.DO_HM )
       assertEquals(stripIndent(
 "@{" +
@@ -733,7 +733,7 @@ public class TestHM {
 "    s={"+
 // K is the type var of a natural number: a struct supporting pred,succ,add,isZero.
 // So 's' succ is a function which takes a natural number (K) and returns a K.
-"      K:@{ add   ={ L:@{ succ={()->L} } ->L },"+
+"      K:@{ add   ={ L:@{ succ={()->L}, ...} ->L },"+
 "           isZero={ M -> N:@{ and={N->N}, or={N->N}, thenElse={ {()->O} {()->O} -> O }}},"+
 "           pred  ={ P -> K},"+
 "           succ  ={ Q -> K}"+
@@ -744,21 +744,21 @@ public class TestHM {
 // shape as any natural number ("self" structural shape above), but its type is
 // not unified with "self".
 "  one=R:@{"+
-"    add   ={ S:@{ succ={()->S}} -> S},"+
+"    add   ={ S:@{ succ={()->S}, ...} -> S},"+
 "    isZero={  T  -> U:@{ and={U->U}, or={U->U}, thenElse={ {()->V21} {()->V21}->V21}}},"+
 "    pred=  { V22 -> R },"+
 "    succ=  { V23 -> R }"+      // Note: succ takes an 'unused'
 "  },"+
 // Has all the fields of a natural number.
 "  three=V24:@{ "+
-"    add   ={ V25:@{ succ={()->V25} }->V25  },"+
+"    add   ={ V25:@{ succ={()->V25}, ... }->V25  },"+
 "    isZero={ V26 -> V27:@{ and={V27->V27}, or={V27->V27}, thenElse={ {()->V28} {()->V28} ->V28 }}},"+
 "    pred  ={ V29 -> V24 },"+
 "    succ  ={ ()  -> V24 }"+ // Note 'succ' only takes 'void', and not an 'unused'.
 "  },"+
 // Has all the fields of a natural number.
 "  two=V30:@{ "+
-"    add   ={ V31:@{succ={()->V31}} ->V31 },"+
+"    add   ={ V31:@{succ={()->V31}, ...} ->V31 },"+
 "    isZero={ V32 -> V33:@{ and={V33->V33}, or={V33->V33}, thenElse={ {()->V34} {()->V34} ->V34 }}},"+
 "    pred  ={ V35 -> V30},"+
 "    succ  ={ ()  -> V30}"+ // Note 'succ' only takes a 'void', and not an 'unused'.
@@ -790,13 +790,13 @@ public class TestHM {
       TypeFld n1 = nfun("one"  ,14,25,26,27,28);
       TypeFld n2 = nfun("two"  ,14,25,26,27,28);
       TypeFld n3 = nfun("three",14,25,26,27,28);
-      
+
       Type rez = TypeMemPtr.make(16,TypeStruct.make(TypeFld.NO_DISP,b,n,n1,n2,n3));
       assertEquals(rez,syn.flow_type());
     }
   }
 
-      // Make field holding a pointer to a struct
+  // Make field holding a pointer to a struct
   private static TypeFld mptr( String fld, int alias, TypeStruct ts ) {
     return TypeFld.make(fld,TypeMemPtr.make(alias,ts));
   }
@@ -815,5 +815,31 @@ public class TestHM {
   private static TypeFld nfun( String fld, int alias, int zfidx, int pfidx, int sfidx, int afidx ) {
     return mptr(fld,alias,TypeStruct.make(TypeFld.NO_DISP,mfun("isZero",zfidx),mfun("pred",pfidx),mfun("succ",sfidx), mfun("add",afidx) ));
   }
-  
+
+
+  // Unexpected restriction on extra fields.
+  @Test public void test59() {
+    Root syn = HM.hm(
+"sx = { ignore -> "+
+"  self0=@{ succ = (sx self0)}; "+
+"  self0 "+
+"};"+
+"self1=@{ succ = self1, nope=7 };"+
+"(sx self1)"+
+"");
+
+    if( HM.DO_HM )
+      assertEquals(stripIndent("A:@{ succ=A }"), stripIndent(syn._hmt.p()));
+    if( HM.DO_GCP ) {
+      // Build a cycle of length 1.
+      Type.RECURSIVE_MEET++;
+      TypeFld f = TypeFld.malloc("succ");
+      TypeStruct ts = TypeStruct.malloc("",false,false,TypeFld.NO_DISP,f).set_hash();
+      TypeMemPtr p = TypeMemPtr.make(9,ts);
+      f.setX(p);
+      Type.RECURSIVE_MEET--;
+      ts.install();
+      assertEquals(p,syn.flow_type());
+    }
+  }
 }

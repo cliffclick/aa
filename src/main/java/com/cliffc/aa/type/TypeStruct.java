@@ -59,7 +59,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( TypeFld fld : _flds.values() )
       // Can depend on the field name and access, but NOT the type - because recursion
       hash ^= (fld._fld.hashCode() + fld._access.hashCode());
-    assert hash!=0;
+    if( hash==0 ) hash = super.compute_hash();
     return hash;
   }
 
