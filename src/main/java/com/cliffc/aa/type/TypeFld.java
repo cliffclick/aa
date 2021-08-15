@@ -8,10 +8,14 @@ import org.jetbrains.annotations.NotNull;
 import java.util.function.Predicate;
 
 
-// A field in a TypeStruct
+/**
+ * A field in a TypeStruct
+ */
 public class TypeFld extends Type<TypeFld> {
-  // Field names are never null, and never zero-length.  If the 1st char is a
-  // '*' the field is Top; a '.' is Bot; all other values are valid field names.
+  /**
+   * Field names are never null, and never zero-length.  If the 1st char is a
+   * '*' the field is Top; a '.' is Bot; all other values are valid field names.
+   */
   public @NotNull String _fld;  // The field name
   public Type _t;               // Field type.  Usually some type of Scalar, or ANY or ALL.
   public Access _access;        // Field access type: read/write, final, read/only

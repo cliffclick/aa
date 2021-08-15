@@ -4,7 +4,9 @@ import com.cliffc.aa.util.Ary;
 
 import java.util.HashMap;
 
-// RPC Bits supporting a lattice; immutable; hash-cons'd.
+/**
+ * RPC Bits supporting a lattice; immutable; hash-cons'd.
+ */
 public class BitsRPC extends Bits<BitsRPC> {
   // Intern: lookup and return an existing Bits or install in hashmap and
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.

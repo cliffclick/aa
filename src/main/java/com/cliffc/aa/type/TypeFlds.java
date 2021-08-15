@@ -3,13 +3,19 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.IHashMap;
 
-// Class to make hashcons Type[].
-// Bug to change after interning.
+/**
+ * Class to make hashcons Type[].
+ * Bug to change after interning.
+ */
 public class TypeFlds {
-  // Lazy expanding list of TypeAry customed to handle various Type[] lengths.
+  /**
+   * Lazy expanding list of TypeAry customed to handle various Type[] lengths.
+   */
   private static final Ary<TypeFlds> TYPEARY = new Ary<>(new TypeFlds[1],0);
 
-  // Make a TypeAry to handle Type[] of length 'len'
+  /**
+   * Make a TypeAry to handle Type[] of length 'len'
+   */
   private static TypeFlds tary( int len) {
     TypeFlds tary = TYPEARY.atX(len);
     return tary==null ? TYPEARY.setX(len,new TypeFlds(len)) : tary;
@@ -17,7 +23,9 @@ public class TypeFlds {
 
   private static final Key K = new Key(null,0);
 
-  // Wrapper to customize array.equals
+  /**
+   * Wrapper to customize array.equals
+   */
   private static class Key {
     TypeFld[] _ts;
     int _hash;
@@ -55,7 +63,9 @@ public class TypeFlds {
   }
 
 
-  // Return a free Type[]
+  /**
+   * Return a free Type[]
+   */
   private TypeFld[] get() {
     if( _free.isEmpty() )
       _free.push(new TypeFld[_len]);

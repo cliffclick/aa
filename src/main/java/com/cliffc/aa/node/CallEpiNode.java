@@ -7,19 +7,21 @@ import com.cliffc.aa.type.*;
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.Env.GVN;
 
-// See CallNode.  Slot 0 is the Call.  The remaining slots are Returns which
-// are typed as standard function returns: {Ctrl,Mem,Val}.  These Returns
-// represent call-graph edges that are known to be possible and thus their fidx
-// appears in the Call's BitsFun type.
-//
-// Pre-opto it is possible for the all-functions type to appear at a Call, and
-// in this case the CallEpi must assume all possible calls may happen, they are
-// just not wired up yet.
-//
-// It is also possible that we have discovered and wired up a function, but
-// that the input/output types are not yet monotonic, and we do not flow values
-// across those edges until the types align.  This is controlled with a small
-// bit-vector.
+/*
+ See CallNode.  Slot 0 is the Call.  The remaining slots are Returns which
+ are typed as standard function returns: {Ctrl,Mem,Val}.  These Returns
+ represent call-graph edges that are known to be possible and thus their fidx
+ appears in the Call's BitsFun type.
+
+ Pre-opto it is possible for the all-functions type to appear at a Call, and
+ in this case the CallEpi must assume all possible calls may happen, they are
+ just not wired up yet.
+
+ It is also possible that we have discovered and wired up a function, but
+ that the input/output types are not yet monotonic, and we do not flow values
+ across those edges until the types align.  This is controlled with a small
+ bit-vector.
+*/
 
 public final class CallEpiNode extends Node {
   public boolean _is_copy;

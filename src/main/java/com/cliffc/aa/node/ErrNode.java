@@ -24,10 +24,12 @@ public final class ErrNode extends Node {
   }
   @Override public TypeMem live_use( GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ALIVE; }
   @Override public ErrMsg err( boolean fast ) {
-    // While you might think we should ALWAYS report these, as their existence
-    // means the program is in-error - the program may have other earlier
-    // errors we want to report in preference to this one.  If any user
-    // has ANOTHER ALL/Err input, return null instead.
+    /*
+     While you might think we should ALWAYS report these, as their existence
+     means the program is in-error - the program may have other earlier
+     errors we want to report in preference to this one.  If any user
+     has ANOTHER ALL/Err input, return null instead.
+    */
     for( Node use : _uses )
       for( Node def : use._defs )
         if( def != null && def != this && def._val ==Type.ALL )

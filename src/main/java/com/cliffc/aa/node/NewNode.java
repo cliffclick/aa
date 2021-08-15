@@ -8,11 +8,13 @@ import org.jetbrains.annotations.NotNull;
 
 import static com.cliffc.aa.AA.*;
 
-// Allocates a TypeObj and produces a Tuple with the TypeObj and a TypeMemPtr.
-//
-// NewNodes have a unique alias class - they do not alias with any other
-// NewNode, even if they have the same type.  Upon cloning both NewNodes get
-// new aliases that inherit (tree-like) from the original alias.
+/**
+ Allocates a TypeObj and produces a Tuple with the TypeObj and a TypeMemPtr.
+
+ NewNodes have a unique alias class - they do not alias with any other
+ NewNode, even if they have the same type.  Upon cloning both NewNodes get
+ new aliases that inherit (tree-like) from the original alias.
+*/
 
 public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // Unique alias class, one class per unique memory allocation site.

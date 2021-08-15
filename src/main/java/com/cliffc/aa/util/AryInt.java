@@ -4,7 +4,9 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.function.IntUnaryOperator;
 
-// ArrayList with saner syntax
+/**
+ * ArrayList with saner syntax
+ */
 public class AryInt {
   public int[] _es;
   public int _len;

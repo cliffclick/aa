@@ -2,9 +2,10 @@ package com.cliffc.aa.type;
 
 import java.util.HashMap;
 
-// Alias Bits supporting a lattice; immutable; hash-cons'd.
-//
-// Alias Bits map 1-to-1 with allocation sites (NewNode)
+/**
+ * Alias Bits supporting a lattice; immutable; hash-cons'd.
+ * Alias Bits map 1-to-1 with allocation sites (NewNode)
+ */
 public class BitsAlias extends Bits<BitsAlias> {
   // Intern: lookup and return an existing Bits or install in hashmap and
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.

@@ -8,17 +8,18 @@ import java.util.*;
 
 import static com.cliffc.aa.AA.unimpl;
 
-// Hindley-Milner typing.  Complete stand-alone, for research.  MEETs base
-// types, instead of declaring type error.  Requires SSA renumbering; looks
-// 'up' the Syntax tree for variables instead of building a 'nongen' set.
-//
-// T2 types form a Lattice, with 'unify' same as 'meet'.  T2's form a DAG
-// (cycles if i allow recursive unification) with sharing.  Each Syntax has a
-// T2, and the forest of T2s can share.  Leaves of a T2 can be either a simple
-// concrete base type, or a sharable leaf.  Unify is structural, and where not
-// unifyable the union is replaced with an Error.
+/*
+ Hindley-Milner typing.  Complete stand-alone, for research.  MEETs base
+ types, instead of declaring type error.  Requires SSA renumbering; looks
+ 'up' the Syntax tree for variables instead of building a 'nongen' set.
 
-// This version has a nice language parser.
+ T2 types form a Lattice, with 'unify' same as 'meet'.  T2's form a DAG
+ (cycles if i allow recursive unification) with sharing.  Each Syntax has a
+ T2, and the forest of T2s can share.  Leaves of a T2 can be either a simple
+ concrete base type, or a sharable leaf.  Unify is structural, and where not
+ unifyable the union is replaced with an Error.
+ This version has a nice language parser.
+*/
 
 public class HM6 {
   static final HashMap<String,T2> PRIMS = new HashMap<>();

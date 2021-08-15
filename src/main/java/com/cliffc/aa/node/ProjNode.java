@@ -7,7 +7,9 @@ import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
 
-// Proj data
+/**
+ * Proj data
+ */
 public class ProjNode extends Node {
   public int _idx;
   public ProjNode( Node head, int idx ) { this(OP_PROJ,head,idx); }

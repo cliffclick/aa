@@ -9,9 +9,11 @@ import com.cliffc.aa.util.Ary;
 import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.Env.GVN;
 
-// Join a split set of aliases from a SESE region, split by an earlier MemSplit.
-// This allows more precision in the SESE that may otherwise merge many paths
-// in and out, and is especially targeting non-inlined calls.
+/**
+ * Join a split set of aliases from a SESE region, split by an earlier MemSplit.
+ * This allows more precision in the SESE that may otherwise merge many paths
+ * in and out, and is especially targeting non-inlined calls.
+ */
 public class MemJoinNode extends Node {
 
   public MemJoinNode( MProjNode mprj ) { super(OP_JOIN,mprj);  assert mprj.in(0) instanceof MemSplitNode;  }

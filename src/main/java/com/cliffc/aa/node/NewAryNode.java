@@ -4,8 +4,10 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.NonBlockingHashMap;
 
-// Allocates a TypeAry in memory.  Takes in the size and initial element value
-// produces the pointer.  Hence liveness is odd.
+/**
+ * Allocates a TypeAry in memory.  Takes in the size and initial element value
+ * produces the pointer.  Hence liveness is odd.
+ */
 abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
   public NewAryNode( TypeAry tary, String name, int op_prec,TypeInt sz ) {
     super(OP_NEWARY,BitsAlias.AARY,tary,name,false,op_prec,Type.CTRL,TypeMem.ALLMEM,null,sz);

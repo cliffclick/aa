@@ -4,10 +4,12 @@ import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 import static com.cliffc.aa.AA.*;
 
-// Internal fixed-length non-recursive tuples.  Used for function arguments,
-// and multi-arg results like IfNode and CallNode.  This is not the same as a
-// no-named-field TypeStruct, and is not exposed at the language level.  With
-// mixed tuple lengths, tuples are infinitely extended with ANY/ALL.
+/**
+ * Internal fixed-length non-recursive tuples.  Used for function arguments,
+ * and multi-arg results like IfNode and CallNode.  This is not the same as a
+ * no-named-field TypeStruct, and is not exposed at the language level.  With
+ * mixed tuple lengths, tuples are infinitely extended with ANY/ALL.
+ */
 public class TypeTuple extends Type<TypeTuple> {
   boolean _any;
   public Type[] _ts; // The fixed known types
@@ -18,13 +20,15 @@ public class TypeTuple extends Type<TypeTuple> {
     return this;
   }
 
-  // If visit is null, children have had their hash already computed.
-  // If visit is not null, children need to be recursively visited.
+  /**
+   * If visit is null, children have had their hash already computed.
+   * If visit is not null, children need to be recursively visited.
+   */
   private static int rot(int x, int k) { return (x<<k) | (x>>(32-k)); }
   @SuppressWarnings("fallthrough")
   @Override public int compute_hash( ) {
     int hash = TTUPLE+(_any?0:1);
-    // Copied from http://burtleburtle.net/bob/c/lookup3.c
+    /* Copied from http://burtleburtle.net/bob/c/lookup3.c */
     int i,a,b,c;
     a = b = c = 0xdeadbeef + (_ts.length<<2) + hash;
     for( i=0; i+2<_ts.length; i+=3 ) {

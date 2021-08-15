@@ -4,8 +4,10 @@ import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.IHashMap;
 import java.util.Arrays;
 
-// Class to make hashcons Type[].
-// Bug to change after interning.
+/**
+ * Class to make hashcons Type[].
+ * Bug to change after interning.
+ */
 public class Types {
   // Lazy expanding list of TypeAry customed to handle various Type[] lengths.
   private static final Ary<Types> TYPEARY = new Ary<>(new Types[1],0);

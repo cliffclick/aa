@@ -9,12 +9,14 @@ import com.cliffc.aa.type.TypeTuple;
 import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.AA.REZ_IDX;
 
-// See CallNode comments.  The RetNode gathers {control (function exits or
-// not), memory, value, rpc, fun}, and sits at the end of a function.  The RPC
-// dictates which calls can be reached from here.  The Fun is used to rapidly
-// find the FunNode, as a SESE region shortcut.  A FunPtrNode points to this
-// Ret, and is used for all function-pointer uses.  Otherwise only CallEpis
-// point to a Ret representing wired calls.
+/**
+ See CallNode comments.  The RetNode gathers {control (function exits or
+ not), memory, value, rpc, fun}, and sits at the end of a function.  The RPC
+ dictates which calls can be reached from here.  The Fun is used to rapidly
+ find the FunNode, as a SESE region shortcut.  A FunPtrNode points to this
+ Ret, and is used for all function-pointer uses.  Otherwise only CallEpis
+ point to a Ret representing wired calls.
+*/
 
 public final class RetNode extends Node {
   int _fidx;                 // Shortcut to fidx when the FunNode has collapsed
@@ -31,9 +33,11 @@ public final class RetNode extends Node {
   public Node rpc() { return in(3); }
   public FunNode fun() { return (FunNode)in(4); }
   @Override public boolean is_mem() { return true; }
-  // If this function is not using any displays, then there is a single unique
-  // FunPtr.  Otherwise this call is ambiguous, as each execution of the
-  // FunPtrNode makes a new display.
+  /**
+   * If this function is not using any displays, then there is a single unique
+   * FunPtr.  Otherwise this call is ambiguous, as each execution of the
+   * FunPtrNode makes a new display.
+   */
   public FunPtrNode funptr() {
     FunPtrNode fpn=null;
     for( Node use : _uses )

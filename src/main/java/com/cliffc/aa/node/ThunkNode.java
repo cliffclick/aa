@@ -9,10 +9,12 @@ import java.util.function.Predicate;
 // Thunk: a limited function.
 // See Thret (Return).
 
-// Expected 1 caller only, determined after Parse.expr(), so the single input
-// is just a constant hook: StartNode.
-// No arguments, not even a display (uses the existing display, no scope implied).
-// Produces a Control & Memory.
+/**
+ * Expected 1 caller only, determined after Parse.expr(), so the single input
+ * is just a constant hook: StartNode.
+ * No arguments, not even a display (uses the existing display, no scope implied).
+ * Produces a Control & Memory.
+ */
 public class ThunkNode extends Node {
   public ThunkNode( Node mem ) { super(OP_THUNK,null,mem); }
   @Override public Node ideal_reduce() { return null; }

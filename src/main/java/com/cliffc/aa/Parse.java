@@ -119,10 +119,12 @@ public class Parse implements Comparable<Parse> {
 
   private void remove_unknown_callers() {
     Ary<Node> uses = Env.ALL_CTRL._uses;
-    // For all unknown uses of functions, they will all be known after GCP.
-    // Remove the hyper-conservative ALL_CTRL edge.  Note that I canNOT run the
-    // pessimistic iter() at this point, as GCP needs to discover all the
-    // actual call-graph edges and install them directly on the FunNodes.
+    /*
+     For all unknown uses of functions, they will all be known after GCP.
+     Remove the hyper-conservative ALL_CTRL edge.  Note that I canNOT run the
+     pessimistic iter() at this point, as GCP needs to discover all the
+     actual call-graph edges and install them directly on the FunNodes.
+    */
     for( int i=0; i<uses._len; i++ ) {
       Node use = uses.at(i);
       if( !use.is_prim() ) {
@@ -231,13 +233,15 @@ public class Parse implements Comparable<Parse> {
     // A forward-ref ConTypeNode.  Close the cycle.
     tn.def_fref(named,_e);
 
-    // Add a copy of constructor functions.
+    /**
+     Add a copy of constructor functions.
+     Build a constructor taking a pointer-to-TypeObj - and the associated
+     memory state, i.e.  takes a ptr-to-@{x,y} and returns a ptr to
+     Named:@{x,y}.  This stores a v-table ptr into an object.  The alias#
+     does not change, but a TypeMem[alias#] would now map to the Named
+     variant.
+    */
 
-    // Build a constructor taking a pointer-to-TypeObj - and the associated
-    // memory state, i.e.  takes a ptr-to-@{x,y} and returns a ptr to
-    // Named:@{x,y}.  This stores a v-table ptr into an object.  The alias#
-    // does not change, but a TypeMem[alias#] would now map to the Named
-    // variant.
     TypeStruct ts = (TypeStruct)((TypeMemPtr)tn._val)._obj;
     FunPtrNode epi1 = IntrinsicNode.convertTypeName(ts,bad,_gvn);
     Node rez = _e.add_fun(bad,tvar,epi1); // Return type-name constructor

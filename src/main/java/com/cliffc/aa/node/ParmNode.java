@@ -8,9 +8,11 @@ import com.cliffc.aa.type.Type;
 import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.MEM_IDX;
 
-// Function parameter node; almost just a Phi with a name.  There is a dense
-// numbering matching function arguments, with -1 reserved for the RPC and 0
-// for memory.
+/**
+ * Function parameter node; almost just a Phi with a name.  There is a dense
+ * numbering matching function arguments, with -1 reserved for the RPC and 0
+ * for memory.
+ */
 public class ParmNode extends PhiNode {
   public final int _idx; // Parameter index, MEM_IDX, FUN_IDX is display, ARGIDX+ normal args
   final String _name;    // Parameter name

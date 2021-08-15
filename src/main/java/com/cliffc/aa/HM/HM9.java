@@ -9,64 +9,61 @@ import java.util.*;
 import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeFld.Access;
 
-// Combined Hindley-Milner and Global Constant Propagation typing.
+/*
+ Combined Hindley-Milner and Global Constant Propagation typing.
+ Complete stand-alone, for research.
+ Treats HM as a Monotone Analysis Framework; converted to a worklist style.
+ The type-vars are monotonically unified, gradually growing over time - and
+ this is treated as the MAF lattice.  Some of the normal Algo-W work gets
+ done in a prepass; e.g. discovering identifier sources (SSA form), and
+ building the non-generative set.  Because of the non-local unification
+ behavior type-vars include a "dependent Syntax" set; a set of Syntax
+ elements put back on the worklist if this type unifies, beyond the expected
+ parent and AST children.
 
-// Complete stand-alone, for research.
+ The normal HM unification steps are treated as the MAF transfer "functions",
+ taking type-vars as inputs and producing new, unified, type-vars.  Because
+ unification happens in-place (normal Tarjan disjoint-set union), the xfer
+ "functions" are executed for side-effects only, and return a progress flag.
+ The transfer functions are virtual calls on each Syntax element.  Some of
+ the steps are empty because of the pre-pass (Let,Con).
+ HM Bases include anything from the GCP lattice, but 'widened' to form
+ borders between e.g. ints and pointers.  Includes polymorphic structures and
+ fields (structural typing not duck typing), polymorphic nil-checking and an
+ error type-var.  Both HM and GCP types fully support recursive types.
 
-// Treats HM as a Monotone Analysis Framework; converted to a worklist style.
-// The type-vars are monotonically unified, gradually growing over time - and
-// this is treated as the MAF lattice.  Some of the normal Algo-W work gets
-// done in a prepass; e.g. discovering identifier sources (SSA form), and
-// building the non-generative set.  Because of the non-local unification
-// behavior type-vars include a "dependent Syntax" set; a set of Syntax
-// elements put back on the worklist if this type unifies, beyond the expected
-// parent and AST children.
-//
-// The normal HM unification steps are treated as the MAF transfer "functions",
-// taking type-vars as inputs and producing new, unified, type-vars.  Because
-// unification happens in-place (normal Tarjan disjoint-set union), the xfer
-// "functions" are executed for side-effects only, and return a progress flag.
-// The transfer functions are virtual calls on each Syntax element.  Some of
-// the steps are empty because of the pre-pass (Let,Con).
+ Unification typically makes many many temporary type-vars and immediately
+ unifies them.  For efficiency, this algorithm checks to see if unification
+ requires an allocation first, instead of just "allocate and unify".  The
+ major place this happens is identifiers, which normally make a "fresh" copy
+ of their type-var, then unify.  I use a combined "make-fresh-and-unify"
+ unification algorithm there.  It is a structural clone of the normal unify,
+ except that it lazily makes a fresh-copy of the left-hand-side on demand
+ only; typically discovering that no fresh-copy is required.
 
-// HM Bases include anything from the GCP lattice, but 'widened' to form
-// borders between e.g. ints and pointers.  Includes polymorphic structures and
-// fields (structural typing not duck typing), polymorphic nil-checking and an
-// error type-var.  Both HM and GCP types fully support recursive types.
-//
-// Unification typically makes many many temporary type-vars and immediately
-// unifies them.  For efficiency, this algorithm checks to see if unification
-// requires an allocation first, instead of just "allocate and unify".  The
-// major place this happens is identifiers, which normally make a "fresh" copy
-// of their type-var, then unify.  I use a combined "make-fresh-and-unify"
-// unification algorithm there.  It is a structural clone of the normal unify,
-// except that it lazily makes a fresh-copy of the left-hand-side on demand
-// only; typically discovering that no fresh-copy is required.
-//
-// To engineer and debug the algorithm, the unification step includes a flag to
-// mean "actually unify, and report a progress flag" vs "report if progress".
-// The report-only mode is aggressively asserted for in the main loop; all
-// Syntax elements that can make progress are asserted as on the worklist.
-//
-// GCP gets the normal MAF treatment, no surprises there.
-//
-// The combined algorithm includes transfer functions taking facts from both
-// MAF lattices, producing results in the other lattice.
+ To engineer and debug the algorithm, the unification step includes a flag to
+ mean "actually unify, and report a progress flag" vs "report if progress".
+ The report-only mode is aggressively asserted for in the main loop; all
+ Syntax elements that can make progress are asserted as on the worklist.
 
-// For the GCP->HM direction, the HM 'if' has a custom transfer function
-// instead of the usual one.  Unification looks at the GCP value, and unifies
-// either the true arm, or the false arm, or both or neither.  In this way GCP
-// allows HM to avoid picking up constraints from dead code.
+ GCP gets the normal MAF treatment, no surprises there.
 
-// For the HM->GCP direction, the GCP 'apply' has a customer transfer function
-// where the result from a call gets lifted (JOINed) based on the matching GCP
-// inputs - and the match comes from using the same HM type-var on both inputs
-// and outputs.  This allows e.g. "map" calls which typically merge many GCP
-// values at many applies (call sites) and thus end up typed as a Scalar to
-// Scalar, to improve the GCP type on a per-call-site basis.
-//
-// Test case 45 demonstrates this combined algorithm, with a program which can
-// only be typed using the combination of GCP and HM.
+ The combined algorithm includes transfer functions taking facts from both
+ MAF lattices, producing results in the other lattice.
+ For the GCP->HM direction, the HM 'if' has a custom transfer function
+ instead of the usual one.  Unification looks at the GCP value, and unifies
+ either the true arm, or the false arm, or both or neither.  In this way GCP
+ allows HM to avoid picking up constraints from dead code.
+ For the HM->GCP direction, the GCP 'apply' has a customer transfer function
+ where the result from a call gets lifted (JOINed) based on the matching GCP
+ inputs - and the match comes from using the same HM type-var on both inputs
+ and outputs.  This allows e.g. "map" calls which typically merge many GCP
+ values at many applies (call sites) and thus end up typed as a Scalar to
+ Scalar, to improve the GCP type on a per-call-site basis.
+
+ Test case 45 demonstrates this combined algorithm, with a program which can
+ only be typed using the combination of GCP and HM.
+*/
 
 public class HM9 {
   // Mapping from primitive name to PrimSyn

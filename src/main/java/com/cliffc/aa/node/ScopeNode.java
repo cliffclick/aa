@@ -10,13 +10,17 @@ import java.util.function.Predicate;
 import static com.cliffc.aa.type.TypeFld.Access;
 import static com.cliffc.aa.AA.MEM_IDX;
 
-// Lexical-Scope Node.  Tracks control & phat memory, plus a stack frame (which
-// is just a NewNode).  The stack frame maps local variable names to Nodes and
-// is modeled as a true memory indirection - for true closures.  Unless there
-// is an upwards funarg the stack frame will optimize away.
+/**
+ * Lexical-Scope Node.  Tracks control & phat memory, plus a stack frame (which
+ * is just a NewNode).  The stack frame maps local variable names to Nodes and
+ * is modeled as a true memory indirection - for true closures.  Unless there
+ * is an upwards funarg the stack frame will optimize away.
+ */
 public class ScopeNode extends Node {
 
-  // Mapping from type-variables to Types.  Types have a scope lifetime like values.
+  /**
+   * Mapping from type-variables to Types.  Types have a scope lifetime like values.
+   */
   private final HashMap<String,ConTypeNode> _types; // user-typing type names
   private Ary<IfScope> _ifs;                 // Nested set of IF-exprs used to track balanced new-refs
 

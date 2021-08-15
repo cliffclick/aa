@@ -4,7 +4,9 @@ import com.cliffc.aa.node.Node;
 import com.cliffc.aa.util.*;
 import java.util.HashMap;
 
-// Unique immutable lazy-defined sets of Nodes.
+/**
+ * Unique immutable lazy-defined sets of Nodes.
+ */
 public class UQNodes extends NonBlockingHashMapLong<Node> {
   private static final NonBlockingHashMap<UQNodes,UQNodes> UQSETS = new NonBlockingHashMap<>();
   private static UQNodes KEY = new UQNodes();

@@ -93,13 +93,17 @@ public class GVNGCM {
     ITER_CNT = ITER_CNT_NOOP = 0;
   }
 
-  // Record a Node, but do not optimize it for value and ideal calls, as it is
-  // mid-construction from the parser.  Any function call with yet-to-be-parsed
-  // call sites, and any loop top with an unparsed backedge needs to use this.
+  /**
+   * Record a Node, but do not optimize it for value and ideal calls, as it is
+   * mid-construction from the parser.  Any function call with yet-to-be-parsed
+   * call sites, and any loop top with an unparsed backedge needs to use this.
+   */
   public <N extends Node> N init( N n ) { return add_flow(add_reduce(n.keep(2))); }
 
-  // Did a bulk not-monotonic update.  Forcibly update the entire region at
-  // once; restores monotonicity over the whole region when done.
+  /**
+   * Did a bulk not-monotonic update.  Forcibly update the entire region at
+   * once; restores monotonicity over the whole region when done.
+   */
   public void revalive(Node... ns) {
     for( Node n : ns ) {
       if( n == null ) continue;

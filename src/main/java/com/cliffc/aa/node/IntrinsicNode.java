@@ -9,9 +9,11 @@ import com.cliffc.aa.util.Util;
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
 
-// Function to wrap another type in a Name, which typically involves setting a
-// vtable like field, i.e. memory updates.
-// Names an unaliased memory.  Needs to collapse away, or else an error.
+/**
+ * Function to wrap another type in a Name, which typically involves setting a
+ * vtable like field, i.e. memory updates.
+ * Names an unaliased memory.  Needs to collapse away, or else an error.
+ */
 public class IntrinsicNode extends Node {
   public final TypeObj _tn;     // Named type
   Parse _badargs;               // Filled in when inlined in CallNode

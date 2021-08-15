@@ -13,9 +13,11 @@ import java.util.BitSet;
 
 // TODO: Parse12 gen test, seeing many back-to-back identical split/join.
 
-// Split a set of aliases into a SESE region, to be joined by a later MemJoin.
-// This allows more precision in the SESE that may otherwise merge many paths
-// in and out, and is especially targeting non-inlined calls.
+/**
+ * Split a set of aliases into a SESE region, to be joined by a later MemJoin.
+ * This allows more precision in the SESE that may otherwise merge many paths
+ * in and out, and is especially targeting non-inlined calls.
+ */
 public class MemSplitNode extends Node {
   Ary<BitsAlias> _escs = new Ary<>(new BitsAlias[]{new BitsAlias()});
   boolean _is_copy;             // Set by MemJoin as last split goes away

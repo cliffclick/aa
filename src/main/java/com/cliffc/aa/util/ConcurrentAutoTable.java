@@ -76,9 +76,11 @@ public class ConcurrentAutoTable implements Serializable {
    */
   public int internal_size() { return _cat._t.length; }
 
-  // Only add 'x' to some slot in table, hinted at by 'hash'.  The sum can
-  // overflow.  Value is CAS'd so no counts are lost.  The CAS is retried until
-  // it succeeds.  Returned value is the old value.
+  /**
+   * Only add 'x' to some slot in table, hinted at by 'hash'.  The sum can
+   * overflow.  Value is CAS'd so no counts are lost.  The CAS is retried until
+   * it succeeds.  Returned value is the old value.
+   */
   private long add_if( long x ) { return _cat.add_if(x,hash(),this); }
 
   // The underlying array of concurrently updated long counters

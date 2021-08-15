@@ -7,11 +7,13 @@ import java.util.function.Predicate;
 
 import static com.cliffc.aa.type.TypeFld.Access;
 
-// Types which extend memory-based objects - currently Structs (which include
-// tuples but not TypeTuple) and Str (Strings); will include Arrays at some
-// point.  Structs have memory words addressed by a base-pointer and a field
-// name (for tuples, the field number), and Arrays have memory words addressed
-// by a base-pointer and an index.
+/**
+ * Types which extend memory-based objects - currently Structs (which include
+ * tuples but not TypeTuple) and Str (Strings); will include Arrays at some
+ * point.  Structs have memory words addressed by a base-pointer and a field
+ * name (for tuples, the field number), and Arrays have memory words addressed
+ * by a base-pointer and an index.
+ */
 public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   boolean _any;                 // True=choice/join; False=all/meet
   boolean _use;                 // Equal to _any for OBJ/XOBJ; unequal to _any for UNUSED/ISUSED

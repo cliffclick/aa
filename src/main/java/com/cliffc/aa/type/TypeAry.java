@@ -3,7 +3,9 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
-// A TypeObj where fields are indexed by dynamic integer.
+/**
+ * A TypeObj where fields are indexed by dynamic integer.
+ */
 public class TypeAry extends TypeObj<TypeAry> {
   public  TypeInt _size;        // Count of elements
   private Type _elem;           // MEET over all elements.

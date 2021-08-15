@@ -6,28 +6,27 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
-// Hindley-Milner typing.  Complete stand-alone, for research.  MEETs base
-// types, instead of declaring type error.  Requires SSA renumbering; uses a
-// global Env instead locally tracking.
-//
-// Testing in this version changing out the AST tree-walk for a worklist based
-// approach, where unification happens in any order.  In particular, it means
-// that (unlike a tree-walk), function types will get used before the function
-// is typed.  This means that a "fresh" copy of a function type to be used to
-// unify against will not have all the contraints at first unification.
-//
-// (0) Build the AST with parent pointers also, and declare the AST a "graph".
-//     Break the HM() call into a "makes progress" test and a "do it".
-// (1) Find all ids (which are all unique ala SSA), and keep a stack of the
-//     non-generative ones at each Ident.  Leaf AST on the worklist.  Check for
-//     missing-name syntax.  Requires 1 tree pass.
-// (2) Put root on worklist.
-// (3) Pull from worklist until empty:
-// (4)   Call hm() to get a HMType or null.
-// (6)   If progress (not null)
-// (7)   Then set new HMType, and put graph neighbors on worklist
-// (8) Report HMTypes.
-//
+/**
+ * Hindley-Milner typing.  Complete stand-alone, for research.  MEETs base
+ * types, instead of declaring type error.  Requires SSA renumbering; uses a
+ * global Env instead locally tracking.
+ * Testing in this version changing out the AST tree-walk for a worklist based
+ * approach, where unification happens in any order.  In particular, it means
+ * that (unlike a tree-walk), function types will get used before the function
+ * is typed.  This means that a "fresh" copy of a function type to be used to
+ * unify against will not have all the contraints at first unification.
+ * (0) Build the AST with parent pointers also, and declare the AST a "graph".
+ * Break the HM() call into a "makes progress" test and a "do it".
+ * (1) Find all ids (which are all unique ala SSA), and keep a stack of the
+ * non-generative ones at each Ident.  Leaf AST on the worklist.  Check for
+ * missing-name syntax.  Requires 1 tree pass.
+ * (2) Put root on worklist.
+ * (3) Pull from worklist until empty:
+ * (4)   Call hm() to get a HMType or null.
+ * (6)   If progress (not null)
+ * (7)   Then set new HMType, and put graph neighbors on worklist
+ * (8) Report HMTypes.
+ */
 public class HM3 {
   static final HashMap<String,HMType> ENV = new HashMap<>();
 

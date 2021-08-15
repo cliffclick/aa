@@ -9,8 +9,10 @@ import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.type.TypeFld.Access;
 
-// Store a value into a named struct field.  Does it's own nil-check and value
-// testing; also checks final field updates.
+/**
+ * Store a value into a named struct field.  Does it's own nil-check and value
+ * testing; also checks final field updates.
+ */
 public class StoreNode extends Node {
   final String _fld;        // Field being updated
   private final Access _fin; // TypeFld.Access.Final or TypeFld.Access.RW

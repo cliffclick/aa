@@ -2,7 +2,7 @@ package com.cliffc.aa.type;
 
 import java.util.HashMap;
 
-// Function index Bits supporting a lattice; immutable; hash-cons'd.
+/** Function index Bits supporting a lattice; immutable; hash-cons'd. */
 
 public class BitsFun extends Bits<BitsFun> {
   // Intern: lookup and return an existing Bits or install in hashmap and

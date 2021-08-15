@@ -13,75 +13,77 @@ import java.util.BitSet;
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.Env.GVN;
 
-// Call/apply node.
-//
-// Control is not required for an apply but inlining the function body will
-// require it; slot 0 is for Control.  Slot 1 is function memory, slot 2 the
-// function ptr - a Node typed as a TypeFunPtr; can be a FunPtrNode, an
-// Unresolved, or e.g. a Phi or a Load.  Slots 3+ are for other args.
-//
-// When the function type simplifies to a single FIDX, the Call can inline.
-//
-// TFPs are actually Closures and include an extra argument for the enclosed
-// environment (actually expanded out to one arg-per-used-scope).  These extra
-// arguments are part of the function signature but are not direct inputs into
-// the call.  FP2Closure strips out the FIDX and passes on just the display.
-//
-// The Call-graph is lazily discovered during GCP/opto.  Before then all
-// functions are kept alive with a special control (see FunNode), and all Calls
-// are assumed to call all functions... unless their fun() input is a trival
-// function constant.
-//
-// As the Call-graph is discovered, Calls are "wired" to make it explicit: the
-// Call control is wired to the FunNode/Region; call args are wired directly to
-// function ParmNodes/PhiNode; the CallEpi is wired to the function RetNode.
-// After GCP/opto the call-graph is explicit and fairly precise.  The call-site
-// index is just like a ReturnPC value on a real machine; it dictates which of
-// several possible returns apply... and can be merged like a PhiNode.
-//
-// Memory into   a Call is limited to call-reachable read-write memory.
-// Memory out of a Call is limited to call-reachable writable   memory.
-//
-// ASCIIGram: Vertical   lines are part of the original graph.
-//            Horizontal lines are lazily wired during GCP.
-//
-// TFP&Math
-//  Memory: limited to reachable
-//  |  |  arg0 arg1
-//  |  \  |   /           Other Calls
-//  |   | |  /             /  |  \
-//  |   v v v             /   |   \
-//  |    Call            /    |    \
-//  |    C/M/Args       /     |     \
-//  |      +--------->------>------->            Wired during GCP
-//  |               FUN0   FUN1   FUN2
-//  |               +--+   +--+   +--+
-//  |               |  |   |  |   |  |
-//  |               |  |   |  |   |  |
-//  |               +--+   +--+   +--+
-//  |          /-----Ret<---Ret<---Ret--\        Wired during GCP
-//  |   CallEpi     fptr   fptr   fptr  Other
-//  |    CProj         \    |    /       CallEpis
-//  |    MProj          \   |   /
-//  |    DProj           TFP&Math
-//  \   / | \
-//  MemMerge: limited to reachable writable
-//
-// Wiring a Call changes the Node graph and has to preserve invariants.  The
-// graph has a major type invariant: at every moment in time computing the
-// value() call on a Node (from the types of its inputs) produces a type which
-// is monotonically better (either up or down, according to iter() vs gcp()).
-//
-// Wiring adds a bunch of edges and thus inputs.  The graph has to keep the
-// type invariant after adding the edges, and this is not always possible; the
-// types can flow to the Fun and the Call at a different rate, and the two
-// not-connected Nodes might be out-of-type-order relative to each other.  The
-// progress and monotonicity properties guarantee they will eventually align.
-//
-// Discovery of a CG edge happens when a Call's function value changes, but
-// graph type alignment might be much later.  We want to act on the discovery
-// of a CG edge now, but not flow types until they align.  See CallEpi for
-// wired_not_typed bits.
+/*
+ Call/apply node.
+
+ Control is not required for an apply but inlining the function body will
+ require it; slot 0 is for Control.  Slot 1 is function memory, slot 2 the
+ function ptr - a Node typed as a TypeFunPtr; can be a FunPtrNode, an
+ Unresolved, or e.g. a Phi or a Load.  Slots 3+ are for other args.
+
+ When the function type simplifies to a single FIDX, the Call can inline.
+
+ TFPs are actually Closures and include an extra argument for the enclosed
+ environment (actually expanded out to one arg-per-used-scope).  These extra
+ arguments are part of the function signature but are not direct inputs into
+ the call.  FP2Closure strips out the FIDX and passes on just the display.
+
+ The Call-graph is lazily discovered during GCP/opto.  Before then all
+ functions are kept alive with a special control (see FunNode), and all Calls
+ are assumed to call all functions... unless their fun() input is a trival
+ function constant.
+
+ As the Call-graph is discovered, Calls are "wired" to make it explicit: the
+ Call control is wired to the FunNode/Region; call args are wired directly to
+ function ParmNodes/PhiNode; the CallEpi is wired to the function RetNode.
+ After GCP/opto the call-graph is explicit and fairly precise.  The call-site
+ index is just like a ReturnPC value on a real machine; it dictates which of
+ several possible returns apply... and can be merged like a PhiNode.
+
+ Memory into   a Call is limited to call-reachable read-write memory.
+ Memory out of a Call is limited to call-reachable writable   memory.
+
+ ASCIIGram: Vertical   lines are part of the original graph.
+            Horizontal lines are lazily wired during GCP.
+
+ TFP&Math
+  Memory: limited to reachable
+  |  |  arg0 arg1
+  |  \  |   /           Other Calls
+  |   | |  /             /  |  \
+  |   v v v             /   |   \
+  |    Call            /    |    \
+  |    C/M/Args       /     |     \
+  |      +--------->------>------->            Wired during GCP
+  |               FUN0   FUN1   FUN2
+  |               +--+   +--+   +--+
+  |               |  |   |  |   |  |
+  |               |  |   |  |   |  |
+  |               +--+   +--+   +--+
+  |          /-----Ret<---Ret<---Ret--\        Wired during GCP
+  |   CallEpi     fptr   fptr   fptr  Other
+  |    CProj         \    |    /       CallEpis
+  |    MProj          \   |   /
+  |    DProj           TFP&Math
+  \   / | \
+  MemMerge: limited to reachable writable
+
+ Wiring a Call changes the Node graph and has to preserve invariants.  The
+ graph has a major type invariant: at every moment in time computing the
+ value() call on a Node (from the types of its inputs) produces a type which
+ is monotonically better (either up or down, according to iter() vs gcp()).
+
+ Wiring adds a bunch of edges and thus inputs.  The graph has to keep the
+ type invariant after adding the edges, and this is not always possible; the
+ types can flow to the Fun and the Call at a different rate, and the two
+ not-connected Nodes might be out-of-type-order relative to each other.  The
+ progress and monotonicity properties guarantee they will eventually align.
+
+ Discovery of a CG edge happens when a Call's function value changes, but
+ graph type alignment might be much later.  We want to act on the discovery
+ of a CG edge now, but not flow types until they align.  See CallEpi for
+ wired_not_typed bits.
+*/
 
 public class CallNode extends Node {
   int _rpc;                 // Call-site return PC

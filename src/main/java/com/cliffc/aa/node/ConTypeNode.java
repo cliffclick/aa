@@ -10,11 +10,13 @@ import static com.cliffc.aa.AA.unimpl;
 
 // Naming names is hard, and I dont like this name.
 
-// Node computes a flow-type, generally a TypeMemPtr to a TypeStruct which is
-// somehow recursive.  The type recursion can be direct or indirect (or not at
-// all).  Other than the Env.START input all other inputs are other ConTypes.
-// Once all ConTypes (all user type variables) are parsed, all ConTypes taken
-// together can GCP to actual constants and be replaced with ConNodes.
+/**
+ * Node computes a flow-type, generally a TypeMemPtr to a TypeStruct which is
+ * somehow recursive.  The type recursion can be direct or indirect (or not at
+ * all).  Other than the Env.START input all other inputs are other ConTypes.
+ * Once all ConTypes (all user type variables) are parsed, all ConTypes taken
+ * together can GCP to actual constants and be replaced with ConNodes.
+ */
 public class ConTypeNode extends Node {
   public final String _tname;   // Type-def name
   public Type _t;               // Updated when closing a forward-ref cycle

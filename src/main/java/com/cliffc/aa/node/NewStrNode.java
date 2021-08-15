@@ -6,8 +6,10 @@ import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
-// Allocates a TypeStr in memory.  Weirdly takes a string OBJECT (not pointer),
-// and produces the pointer.  Hence liveness is odd.
+/**
+ * Allocates a TypeStr in memory.  Weirdly takes a string OBJECT (not pointer),
+ * and produces the pointer.  Hence liveness is odd.
+ */
 public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   public NewStrNode( TypeStr to, String name, boolean reads, int op_prec, Type... args) {
     super(OP_NEWSTR,BitsAlias.STR,to,name,reads,op_prec,args);

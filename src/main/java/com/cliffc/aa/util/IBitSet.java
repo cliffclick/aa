@@ -4,9 +4,11 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Iterator;
 
-// Standard bit-set but supports the notion of an 'infinite extension' of 1.
-// i.e. all bits past the end are either 0 or 1.
-// Supports update-in-place, mutable, NOT hash-consed
+/**
+ * Standard bit-set but supports the notion of an 'infinite extension' of 1.
+ * i.e. all bits past the end are either 0 or 1.
+ * Supports update-in-place, mutable, NOT hash-consed
+ */
 public class IBitSet implements Iterable<Integer> {
   private boolean _sign; // false=infinite zeros, true=infinite ones
   private final AryInt _bits = new AryInt();

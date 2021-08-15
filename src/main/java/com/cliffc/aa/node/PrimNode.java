@@ -10,13 +10,13 @@ import java.util.HashSet;
 
 import static com.cliffc.aa.AA.*;
 
-// Primitives can be used as an internal operator (their apply() call does the
-// primitive operation).  Primitives are wrapped as functions when returned
-// from Env lookup, although the immediate lookup+apply is optimized to just
-// make a new primitive.  See FunNode for function Node structure.
-//
-// Fun/Parm-per-arg/Prim/Ret
-//
+/**
+ * Primitives can be used as an internal operator (their apply() call does the
+ * primitive operation).  Primitives are wrapped as functions when returned
+ * from Env lookup, although the immediate lookup+apply is optimized to just
+ * make a new primitive.  See FunNode for function Node structure.
+ * Fun/Parm-per-arg/Prim/Ret
+ */
 public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
   final TypeFunSig _sig;        // Argument types; 0 is display, 1 is 1st real arg
@@ -130,8 +130,10 @@ public abstract class PrimNode extends Node {
     return new ConvertTypeName(from,to,badargs);
   }
 
-  // Apply types are 1-based (same as the incoming node index), and not
-  // zero-based (not same as the _formals and _args fields).
+  /**
+   * Apply types are 1-based (same as the incoming node index), and not
+   * zero-based (not same as the _formals and _args fields).
+   */
   public abstract Type apply( Type[] args ); // Execute primitive
   @Override public String xstr() { return _name+":"+_sig._formals.at(ARG_IDX); }
   @Override public Type value(GVNGCM.Mode opt_mode) {

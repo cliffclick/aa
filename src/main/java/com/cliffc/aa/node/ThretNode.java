@@ -5,12 +5,14 @@ import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
 
-// Thret: a limited function return
-// See Thunk (Fun)
 
-// Expected 1 callepi only, determined after Parse.expr().
-// Takes in Control & Memory & Value.
-// Produces Control & Memory & Value.
+/**
+ * Thret: a limited function return
+ * See Thunk (Fun)
+ * Expected 1 callepi only, determined after Parse.expr().
+ * Takes in Control & Memory & Value.
+ * Produces Control & Memory & Value.
+ */
 public class ThretNode extends Node {
   public ThretNode( Node ctrl, Node mem, Node val, ThunkNode thunk ) { super(OP_THRET,ctrl,mem,val,thunk); _live = TypeMem.ALLMEM; }
   public Node ctrl() { return in(0); }

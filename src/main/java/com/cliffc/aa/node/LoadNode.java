@@ -8,8 +8,10 @@ import org.jetbrains.annotations.NotNull;
 
 import static com.cliffc.aa.AA.MEM_IDX;
 
-// Load a named field from a struct.  Does it's own nil-check testing.  Loaded
-// value depends on the struct typing.
+/**
+ * Load a named field from a struct.  Does it's own nil-check testing.  Loaded
+ * value depends on the struct typing.
+ */
 public class LoadNode extends Node {
   private final String _fld;
   private final Parse _bad;

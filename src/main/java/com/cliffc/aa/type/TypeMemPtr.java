@@ -9,20 +9,23 @@ import java.util.function.Predicate;
 
 import static com.cliffc.aa.type.TypeFld.Access;
 
-// Pointers-to-memory; these can be both the address and the value part of
-// Loads and Stores.  They carry a set of aliased TypeObjs.
+/**
+ * Pointers-to-memory; these can be both the address and the value part of
+ * Loads and Stores.  They carry a set of aliased TypeObjs.
+ */
 public final class TypeMemPtr extends Type<TypeMemPtr> {
   // List of known memory aliases.  Zero is nil.
   public BitsAlias _aliases;
 
-  // The _obj field is unused (trivially OBJ or XOBJ) for TMPs used as graph
-  // node results, because memory contents are modified in TypeMems and
-  // TypeObjs and NOT in pointers - hence this field "goes stale" rapidly as
-  // graph nodes manipulate the state of memory.
-  //
-  // The _obj field can be filled out accurately with a TypeMem.sharpen call,
-  // and is used to e.g. check pointer types at type assertions (including
-  // function call args).
+  /**
+   * The _obj field is unused (trivially OBJ or XOBJ) for TMPs used as graph
+   * node results, because memory contents are modified in TypeMems and
+   * TypeObjs and NOT in pointers - hence this field "goes stale" rapidly as
+   * graph nodes manipulate the state of memory.
+   * The _obj field can be filled out accurately with a TypeMem.sharpen call,
+   * and is used to e.g. check pointer types at type assertions (including
+   * function call args).
+   */
   public TypeObj _obj;          // Meet/join of aliases.  Unused in simple_ptrs in graph nodes.
 
   private TypeMemPtr init(BitsAlias aliases, TypeObj obj ) {

@@ -1170,8 +1170,8 @@ public class NonBlockingHashMap<TypeK, TypeV>
         oldval = val(oldkvs,idx);
 
       return true;
-    } // end copy_slot
-  } // End of CHM
+    }
+  }
 
 
   // --- Snapshot ------------------------------------------------------------
@@ -1401,4 +1401,4 @@ public class NonBlockingHashMap<TypeK, TypeV>
     }
   }
 
-} // End NonBlockingHashMap class
+}

@@ -12,7 +12,9 @@ import java.util.function.Predicate;
 
 import static com.cliffc.aa.AA.unimpl;
 
-// Sea-of-Nodes
+/**
+ * Sea-of-Nodes
+ */
 public abstract class Node implements Cloneable {
   static final byte OP_CALL   = 1;
   static final byte OP_CALLEPI= 2;
@@ -71,9 +73,11 @@ public abstract class Node implements Cloneable {
     assert LIVE.get(CNT-1) && !LIVE.get(CNT);
     _INIT0_CNT=CNT;
   }
-  // Reset is called after a top-level exec exits (e.g. junits) with no parse
-  // state left alive.  NOT called after a line in the REPL or a user-call to
-  // "eval" as user state carries on.
+  /**
+   * Reset is called after a top-level exec exits (e.g. junits) with no parse
+   * state left alive.  NOT called after a line in the REPL or a user-call to
+   * "eval" as user state carries on.
+   */
   public static void reset_to_init0() {
     CNT = 0;
     LIVE.clear();

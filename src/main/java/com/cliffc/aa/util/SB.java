@@ -32,8 +32,10 @@ public final class SB {
   public SB p( int    s ) { _sb.append(s); return this; }
   public SB p( long   s ) { _sb.append(s); return this; }
   public SB p( boolean s) { _sb.append(s); return this; }
-  // Not spelled "p" on purpose: too easy to accidentally say "p(1.0)" and
-  // suddenly call the autoboxed version.
+  /**
+   * Not spelled "p" on purpose: too easy to accidentally say "p(1.0)" and
+   * suddenly call the autoboxed version.
+   */
   public SB pobj( Object s ) { _sb.append(s.toString()); return this; }
   public SB i( int d ) { for( int i=0; i<d+_indent; i++ ) p("  "); return this; }
   public SB i( ) { return i(0); }
@@ -47,14 +49,14 @@ public final class SB {
 
   public SB nl( ) { return p(System.lineSeparator()); }
 
-  // Delete last char.  Useful when doing string-joins and JSON printing and an
-  // extra seperater char needs to be removed:
-  //
-  //   sb.p('[');
-  //   for( Foo foo : foos )
-  //     sb.p(foo).p(',');
-  //   sb.unchar().p(']');  // remove extra trailing comma
-  //
+  /**
+   * Delete last char.  Useful when doing string-joins and JSON printing and an
+   * extra seperater char needs to be removed:
+   * sb.p('[');
+   * for( Foo foo : foos )
+   * sb.p(foo).p(',');
+   * sb.unchar().p(']');  // remove extra trailing comma
+   */
   public SB unchar() { return unchar(1); }
   public SB unchar(int x) { _sb.setLength(_sb.length()-x); return this; }
 

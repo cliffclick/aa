@@ -9,8 +9,10 @@ import java.util.function.Predicate;
 
 import static com.cliffc.aa.type.TypeFld.Access;
 
-// Strings.  Just an alternative TypeObj to TypeStruct - but basically really
-// should be replaced with a named Array.
+/**
+ * Strings.  Just an alternative TypeObj to TypeStruct - but basically really
+ * should be replaced with a named Array.
+ */
 public class TypeStr extends TypeObj<TypeStr> {
   private String _con;          //
   private TypeStr init(String name, boolean any, String con ) {

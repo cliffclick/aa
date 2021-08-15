@@ -7,7 +7,9 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-// ArrayList with saner syntax
+/**
+ * ArrayList with saner syntax
+ */
 public class Ary<E> implements Iterable<E> {
   public E[] _es;
   public int _len;

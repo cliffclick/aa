@@ -12,33 +12,38 @@ import java.util.*;
 
 import static com.cliffc.aa.AA.unimpl;
 
-// Type Variable.  TVars unify (ala Tarjan Union-Find), and can have structure
-// (such as "{ A -> B }").  TVars are tied to a TNode to enforce Type structure
-// on Types.  TVars with no structure either refer to a plain Node, or get
-// unioned into another TVar.  TVars with structure have to match structure to
-// be unified, but then can be recursively unified.
-
-// See HM.java for the prototype this is based from.
+/*
+ Type Variable.  TVars unify (ala Tarjan Union-Find), and can have structure
+ (such as "{ A -> B }").  TVars are tied to a TNode to enforce Type structure
+ on Types.  TVars with no structure either refer to a plain Node, or get
+ unioned into another TVar.  TVars with structure have to match structure to
+ be unified, but then can be recursively unified.
+ See HM.java for the prototype this is based from.
+*/
 
 public class TV2 {
   // Unique ID
   private static int UID=1;
   public final int _uid;
-  // - "Args", "Ret", "Fun", "Mem", "Obj", "If".  A structural tag for the H-M
-  // "type", these have to be equal during unification; their Keys in _args are
-  // unioned and equal keys are unified
-  // - "Base" - some constant Type, Base Types MEET when unified.
-  // - "Nil" - The XNIL/NIL Type.  Always loses all unifications.
-  // - "Fresh": A one-off indirection to another TV2 which needs to be fresh-
-  // unified instead of normal-unification of this TV2.  The freshable TV2 is
-  // under the solo key "Fresh".
-  // - "Dead": a dead Node or a Type.ANY ConNode, and a dead TV2.  Unifies with
-  // everything, wins all unifications, and has no structure.
-  // - "Free": Nothing points to it, can be re-used.
+  /**
+   * - "Args", "Ret", "Fun", "Mem", "Obj", "If".  A structural tag for the H-M
+   * "type", these have to be equal during unification; their Keys in _args are
+   * unioned and equal keys are unified
+   * - "Base" - some constant Type, Base Types MEET when unified.
+   * - "Nil" - The XNIL/NIL Type.  Always loses all unifications.
+   * - "Fresh": A one-off indirection to another TV2 which needs to be fresh-
+   * unified instead of normal-unification of this TV2.  The freshable TV2 is
+   * under the solo key "Fresh".
+   * - "Dead": a dead Node or a Type.ANY ConNode, and a dead TV2.  Unifies with
+   * everything, wins all unifications, and has no structure.
+   * - "Free": Nothing points to it, can be re-used.
+   */
   private String _name;
-  // Set of structural H-M parts.  Indexed by dense integer for fixed-size (ala
-  // Args,Ret,Fun), indexed by sparse integer alias for TMem, indexed by String
-  // for Obj field names.  Can be null if empty.
+  /**
+   * Set of structural H-M parts.  Indexed by dense integer for fixed-size (ala
+   * Args,Ret,Fun), indexed by sparse integer alias for TMem, indexed by String
+   * for Obj field names.  Can be null if empty.
+   */
   public NonBlockingHashMap<Comparable,TV2> _args;
 
   // U-F algo.  Only set when unified, monotonic null->unification_target.

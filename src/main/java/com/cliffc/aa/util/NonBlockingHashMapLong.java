@@ -1019,8 +1019,8 @@ public class NonBlockingHashMapLong<TypeV>
         oldval = _vals[idx];
 
       return copied_into_new;
-    } // end copy_slot
-  } // End of CHM
+    }
+  }
 
 
   // --- Snapshot ------------------------------------------------------------
@@ -1308,4 +1308,4 @@ public class NonBlockingHashMapLong<TypeV>
     }
   }
 
-}  // End NonBlockingHashMapLong class
+}

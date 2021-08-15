@@ -5,7 +5,9 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
-// Merge results; extended by ParmNode
+/**
+ * Merge results; extended by ParmNode
+ */
 public class PhiNode extends Node {
   final Parse _badgc;
   final Type _t;                // Just a flag to signify scalar vs memory vs object

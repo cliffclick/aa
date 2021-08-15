@@ -9,13 +9,15 @@ import com.cliffc.aa.util.Util;
 import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.type.TypeFld.Access;
 
-// Allocates a TypeStruct and produces a Tuple with the TypeStruct and a TypeMemPtr.
-//
-// During Parsing we construct closures whose field names are discovered as we
-// parse.  Hence we support a type which represents some concrete fields, and a
-// choice of all possible remaining fields.  The _any choice means we can add
-// fields, although the closure remains impossibly low until the lexical scope
-// ends and no more fields can appear.
+/**
+ Allocates a TypeStruct and produces a Tuple with the TypeStruct and a TypeMemPtr.
+
+ During Parsing we construct closures whose field names are discovered as we
+ parse.  Hence we support a type which represents some concrete fields, and a
+ choice of all possible remaining fields.  The _any choice means we can add
+ fields, although the closure remains impossibly low until the lexical scope
+ ends and no more fields can appear.
+*/
 
 public class NewObjNode extends NewNode<TypeStruct> {
   public final boolean _is_closure; // For error messages

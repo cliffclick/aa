@@ -7,7 +7,9 @@ import com.cliffc.aa.type.*;
 
 import java.util.Arrays;
 
-// "fresh" the incoming TVar: make a fresh instance.
+/**
+ * "fresh" the incoming TVar: make a fresh instance.
+ */
 public class FreshNode extends UnOrFunPtrNode {
   TV2[] _tv2s;
   public FreshNode( Env.VStack vs, Node ctrl, Node ld ) { super(OP_FRESH, ctrl, ld); _tv2s = vs.compact(); }

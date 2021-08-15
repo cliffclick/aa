@@ -3,7 +3,9 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
-// Extract a Display pointer (a TypeMemPtr) from a TypeFunPtr.
+/**
+ * Extract a Display pointer (a TypeMemPtr) from a TypeFunPtr.
+ */
 public final class FP2DispNode extends Node {
   public FP2DispNode( Node funptr ) { super(OP_FP2DISP,funptr); }
 

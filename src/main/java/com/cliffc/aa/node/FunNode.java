@@ -11,48 +11,50 @@ import java.util.*;
 
 import static com.cliffc.aa.AA.*;
 
-// FunNodes are lexically scoped.  During parsing/graph-gen a closure is
-// allocated for local variables as a standard NewObj.  Local escape analysis
-// is used to remove NewObjs that do not escape the local lifetime.  Scoped
-// variables pass in their NewObj pointer just "as if" a normal struct.
-//
-// Function bodies are self-contained; they only take data in through ParmNodes
-// and ConNodes, and only control through the Fun.  They only return values
-// through the Ret - including exposed lexically scoped uses.
-//
-// FunNode is a RegionNode; args point to all the known callers.  Zero slot is
-// null, same as a C2 Region.  Args 1+ point to the callers control.  Before
-// GCP/opto arg 1 points to ALL_CTRL as the generic unknown worse-case caller.
-// ALL_CTRL is removed just prior to GCP, the precise call-graph is discovered,
-// and calls are directly wired to the FunNode as part of GCP.  After GCP the
-// call-graph is known precisely and is explicit in the graph.
-//
-// FunNodes are finite in count and are unique densely numbered, see BitsFun.
-// A single function number is generally called a 'fidx' and collections 'fidxs'.
-//
-// Pointing to the FunNode are ParmNodes which are also PhiNodes; one input
-// path for each known caller.  Zero slot points to the FunNode.  Arg1 points
-// to the generic unknown worse-case caller (a type-specific ConNode with
-// worse-case legit bottom type).  ParmNodes merge all input path types (since
-// they are a Phi), and the call "loses precision" for type inference there.
-// Parm#1 and up (NOT the zero-slot but the zero idx) are the classic function
-// arguments; Parm#-1 is for the RPC and Parm#0 is for memory.
-//
-// Ret points to the return control, memory, value and RPC, as well as the
-// original Fun.  A FunPtr points to a Ret, and a Call will use a FunPtr (or a
-// merge of FunPtrs) to indicate which function it calls.  After a call-graph
-// edge is discovered, the Call is "wired" to the Fun.  A CallEpi points to the
-// Ret, the Fun control points to a CProj to the Call, and each Parm points to
-// a DProj (MProj) to the Call.  These direct edges allow direct data flow
-// during gcp & iter.
-//
-// Memory both is and is-not treated special: the function body flows memory
-// through from the initial Parm to the Ret in the normal way.  However the
-// incoming memory argument is specifically trimmed by the Call to only those
-// aliases used by the function body (either read or write), and the Ret only
-// returns those memories explicitly written.  All the other aliases are
-// treated as "pass-through" and explicitly routed around the Fun/Ret by the
-// Call/CallEpi pair.
+/**
+ FunNodes are lexically scoped.  During parsing/graph-gen a closure is
+ allocated for local variables as a standard NewObj.  Local escape analysis
+ is used to remove NewObjs that do not escape the local lifetime.  Scoped
+ variables pass in their NewObj pointer just "as if" a normal struct.
+
+ Function bodies are self-contained; they only take data in through ParmNodes
+ and ConNodes, and only control through the Fun.  They only return values
+ through the Ret - including exposed lexically scoped uses.
+
+ FunNode is a RegionNode; args point to all the known callers.  Zero slot is
+ null, same as a C2 Region.  Args 1+ point to the callers control.  Before
+ GCP/opto arg 1 points to ALL_CTRL as the generic unknown worse-case caller.
+ ALL_CTRL is removed just prior to GCP, the precise call-graph is discovered,
+ and calls are directly wired to the FunNode as part of GCP.  After GCP the
+ call-graph is known precisely and is explicit in the graph.
+
+ FunNodes are finite in count and are unique densely numbered, see BitsFun.
+ A single function number is generally called a 'fidx' and collections 'fidxs'.
+
+ Pointing to the FunNode are ParmNodes which are also PhiNodes; one input
+ path for each known caller.  Zero slot points to the FunNode.  Arg1 points
+ to the generic unknown worse-case caller (a type-specific ConNode with
+ worse-case legit bottom type).  ParmNodes merge all input path types (since
+ they are a Phi), and the call "loses precision" for type inference there.
+ Parm#1 and up (NOT the zero-slot but the zero idx) are the classic function
+ arguments; Parm#-1 is for the RPC and Parm#0 is for memory.
+
+ Ret points to the return control, memory, value and RPC, as well as the
+ original Fun.  A FunPtr points to a Ret, and a Call will use a FunPtr (or a
+ merge of FunPtrs) to indicate which function it calls.  After a call-graph
+ edge is discovered, the Call is "wired" to the Fun.  A CallEpi points to the
+ Ret, the Fun control points to a CProj to the Call, and each Parm points to
+ a DProj (MProj) to the Call.  These direct edges allow direct data flow
+ during gcp & iter.
+
+ Memory both is and is-not treated special: the function body flows memory
+ through from the initial Parm to the Ret in the normal way.  However the
+ incoming memory argument is specifically trimmed by the Call to only those
+ aliases used by the function body (either read or write), and the Ret only
+ returns those memories explicitly written.  All the other aliases are
+ treated as "pass-through" and explicitly routed around the Fun/Ret by the
+ Call/CallEpi pair.
+*/
 
 
 public class FunNode extends RegionNode {

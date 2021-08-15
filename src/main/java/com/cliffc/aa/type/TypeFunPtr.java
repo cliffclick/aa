@@ -8,18 +8,17 @@ import static com.cliffc.aa.AA.unimpl;
 import java.util.function.Predicate;
 
 
-// Function indices or function pointers; a single instance can include all
-// possible aliased function pointers.  Function pointers can be executed, are
-// not GC'd, and cannot be Loaded or Stored through (although they can be
-// loaded & stored).
-//
-// A TypeFunPtr includes a set of function indices and the display and NOT
-// e.g. the function arguments nor formals.  Formals are stored in the FunNode.
-//
-// Each function index (or fidx) is a constant value, a classic code pointer.
-// Cloning the code immediately also splits the fidx with a new fidx bit for
-// both the original and the new code.
-//
+/**
+ * Function indices or function pointers; a single instance can include all
+ * possible aliased function pointers.  Function pointers can be executed, are
+ * not GC'd, and cannot be Loaded or Stored through (although they can be
+ * loaded & stored).
+ * A TypeFunPtr includes a set of function indices and the display and NOT
+ * e.g. the function arguments nor formals.  Formals are stored in the FunNode.
+ * Each function index (or fidx) is a constant value, a classic code pointer.
+ * Cloning the code immediately also splits the fidx with a new fidx bit for
+ * both the original and the new code.
+ */
 public final class TypeFunPtr extends Type<TypeFunPtr> {
   // List of known functions in set, or 'flip' for choice-of-functions.
   // A single bit is a classic code pointer.
