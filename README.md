@@ -55,13 +55,13 @@ BNF                           | Comment
 `stmt = [id[:type] [:]=]* ifex` | ids are (re-)assigned, and are available in later statements.
 `stmt = ^ifex`                | Early function exit
 `ifex = apply [? stmt [: stmt]]` | trinary logic; the else-clause will default to 0
-`apply = expr+`               | Lisp-like application-as-adjacent
+`apply = expr+`               | Lisp-like application-as-adjacent, e.g. `str 5`
 `expr = term [binop term]*`   | gather all the binops and sort by prec
 `term = uniop term`           | Any number of uniops
 `term = id++`                 |   post-inc/dec operators
 `term = id--`                 |   post-inc/dec operators
-`term = tfact bopen stmts bclose`      | If bopen/bclose is arity 2, e.g. `arg[idx]`
-`term = tfact bopen stmts bclose stmt` | If bopen/bclose is arity 3, e.g. `arg[idx]=val`
+`term = tfact bop+ stmts bop-`      | Balanced/split operator arity-2, e.g. array lookup, `ary [ idx ]`
+`term = tfact bop- stmts bop- stmt` | Balanced/split operator arity-3, e.g. array assign, `ary [ idx ]:= val`
 `term = tfact post`           |   A term is a tfact and some more stuff...
 `post = empty`                | A term can be just a plain 'tfact'
 `post = (tuple) post`         | Application argument list
@@ -72,8 +72,8 @@ BNF                           | Comment
 `fact = id`                   | variable lookup
 `fact = num`                  | number
 `fact = "string"`             | string
-`fact = [stmts]`              | array decl with size
-`fact = [stmts,[stmts,]*]`    | array decl with tuple
+`fact = bop+ stmts bop-`      | Balanced/split operator, arity-1, e.g. array decl with size: `[ 17 ]`
+`fact = bop+ [stmts,[stmts,]*] bop-`  | Balanced/split operator, arity-N, e.g. array decl with elements: `[ "Cliff", "John", "Lisa" ]`
 `fact = (stmts)`              | General statements parsed recursively
 `fact = tuple`                | Tuple builder
 `fact = func`                 | Anonymous function declaration
@@ -83,6 +83,8 @@ BNF                           | Comment
 `tuple= (stmts,[stmts,])`     | Tuple; final comma is optional
 `binop= +-*%&/<>!= [] ]=`     | etc; primitive lookup; can determine infix binop at parse-time, also pipe but GFM screws up
 `uniop= -!~ []`               | etc; primitive lookup; can determine infix uniop at parse-time
+`bop+ = [`                    | Balanced/split operator open
+`bop- = ] ]= ]:= `            | Balanced/split operator close
 `func = { [id[:type]* ->]? stmts}` | Anonymous function declaration, if no args then the -> is optional
 `str  = [.\%]*`               | String contents; \t\n\r\% standard escapes
 `str  = %[num]?[.num]?fact`   | Percent escape embeds a 'fact' in a string; "name=%name\n"
@@ -93,8 +95,6 @@ BNF                           | Comment
 `tmod = := ! = ! ==`          | ':=' or (missing) is r/w, '=' is final, '==' is r/w
 `tstruct = @{ [id [tmod [type?]],]*}` | Struct types are field names with optional access and optional types.  Spaces not allowed
 `tvar = id`                   | Type variable lookup
-`bopen = [`                   | Split/Balanced-operator open
-`bclose = ] ]= ]:= `          | Split/Balanced-operator close
 
 SIMPLE EXAMPLES
 ---------------
