@@ -230,7 +230,7 @@ public class TestNode {
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STR0));
     test1monotonic(new  CProjNode(_ins[0],0));
     test1monotonic(new    ErrNode(_ins[0],null,"\nerr\n"));
-    test1monotonic(new    FunNode(new String[]{"^","x"},new Type[]{TypeMemPtr.DISP_SIMPLE,TypeInt.INT64}));    
+    test1monotonic(new    FunNode(TypeStruct.INT64));
     test1monotonic(new FunPtrNode("anon",ret,null));
     test1monotonic(new FP2DispNode(_ins[1])); // Only takes in a TFP
     test1monotonic(new     IfNode(_ins[0],_ins[1]));

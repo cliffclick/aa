@@ -3,16 +3,17 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
 
 // Memory-based primitives
 public abstract class MemPrimNode extends PrimNode {
-  MemPrimNode( String name, String[] args, TypeTuple formals, Type ret ) { super(name,args,formals,ret); _op_prec = 0; }
-  Node mem() { return in(1); }
-  Node adr() { return in(2); }
-  Node idx() { return in(3); }
-  Node rez() { return in(4); }
+  MemPrimNode( String name, TypeStruct formals, Type ret ) { super(name,formals,ret); _op_prec = 0; }
+  Node mem() { return in(MEM_IDX); }
+  Node adr() { return in(ARG_IDX); }
+  Node idx() { return in(ARG_IDX+1); }
+  Node rez() { return in(ARG_IDX+2); }
   abstract String bal_close();
   @Override public String xstr() { return _name+(bal_close()==null?"":bal_close()); }
 
@@ -46,7 +47,7 @@ public abstract class MemPrimNode extends PrimNode {
 
   // ------------------------------------------------------------
   public abstract static class ReadPrimNode extends MemPrimNode {
-    ReadPrimNode( String name, String[] args, TypeTuple formals, Type ret ) { super(name,args,formals,ret); }
+    ReadPrimNode( String name, TypeStruct formals, Type ret ) { super(name,formals,ret); }
 
     @Override public FunPtrNode as_fun( GVNGCM gvn ) {
       try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
@@ -57,8 +58,8 @@ public abstract class MemPrimNode extends PrimNode {
         fun._bal_close = bal_close();
         add_def(null);              // Control for the primitive in slot 0
         add_def(mem );              // Memory  for the primitive in slot 1
-        for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // First is display, never used
-          add_def(X.xform(new ParmNode(i,_sig._args[i],fun, (ConNode)Node.con(_sig.arg(i).simple_ptr()),null)));
+        for( TypeFld arg : _sig._formals.flds() )
+          add_def(Util.eq(arg._fld,"^") ? null : X.xform(new ParmNode(arg._order,arg._fld,fun, (ConNode)Node.con(arg._t.simple_ptr()),null)));
         X.xform(this);
         // Functions return the set of *modified* memory.  ReadPrimNodes do not modify
         // memory.
@@ -83,11 +84,11 @@ public abstract class MemPrimNode extends PrimNode {
 
   // Array length
   static class LValueLength extends ReadPrimNode {
-    LValueLength() { super("#",new String[]{" ctl"," mem","^","ary"},TypeTuple.LVAL_LEN,TypeInt.INT64); }
+    LValueLength() { super("#",TypeMemPtr.LVAL_LEN,TypeInt.INT64); }
     @Override public String bal_close() { return null; } // Balanced op
     @Override public Type value(GVNGCM.Mode opt_mode) {
-      Type mem = val(1);
-      Type adr = val(2);
+      Type mem = val(MEM_IDX);
+      Type adr = val(ARG_IDX);
       if( !(mem  instanceof TypeMem  ) ) return mem .oob();
       if( !(adr instanceof TypeMemPtr) ) return adr.oob();
       TypeMemPtr ptr = (TypeMemPtr)mem.sharptr(adr);
@@ -128,13 +129,13 @@ public abstract class MemPrimNode extends PrimNode {
 
   // Produces a binop LValue, where the leading TMP is a non-zero array
   static class LValueRead extends ReadPrimNode {
-    LValueRead() { super("[",new String[]{" ctl"," mem","^","ary","idx"},TypeTuple.LVAL_RD,Type.SCALAR); }
+    LValueRead() { super("[",TypeMemPtr.LVAL_RD,Type.SCALAR); }
     @Override public String bal_close() { return "]"; } // Balanced op
     @Override public byte op_prec() { return 0; } // Balanced op
     @Override public Type value(GVNGCM.Mode opt_mode) {
-      Type mem = val(1);
-      Type adr = val(2);
-      Type idx = val(3);
+      Type mem = val(MEM_IDX);
+      Type adr = val(ARG_IDX);
+      Type idx = val(ARG_IDX+1);
       if( !(mem  instanceof TypeMem  ) ) return mem .oob();
       if( !(adr instanceof TypeMemPtr) ) return adr.oob();
       if( !(idx instanceof TypeInt) && idx != Type.XNIL ) return idx.oob();
@@ -155,7 +156,7 @@ public abstract class MemPrimNode extends PrimNode {
 
   // ------------------------------------------------------------
   public abstract static class WritePrimNode extends MemPrimNode {
-    WritePrimNode( String name, String[] args, TypeTuple formals, Type ret ) { super(name,args,formals,ret); }
+    WritePrimNode( String name, TypeStruct formals, Type ret ) { super(name,formals,ret); }
     @Override public boolean is_mem() { return true; }
 
     @Override public FunPtrNode as_fun( GVNGCM gvn ) {
@@ -167,8 +168,8 @@ public abstract class MemPrimNode extends PrimNode {
         fun._bal_close = bal_close();
         add_def(null);              // Control for the primitive in slot 0
         add_def(mem );              // Memory  for the primitive in slot 1
-        for( int i=ARG_IDX; i<_sig.nargs(); i++ ) // First is display, never used
-          add_def(X.xform(new ParmNode(i,_sig._args[i],fun, (ConNode)Node.con(_sig.arg(i).simple_ptr()),null)));
+        for( TypeFld arg : _sig._formals.flds() )
+          add_def(Util.eq(arg._fld,"^") ? null : X.xform(new ParmNode(arg._order,arg._fld,fun, (ConNode)Node.con(arg._t.simple_ptr()),null)));
         // Write prims return both a value and memory.
         MemPrimNode prim = (MemPrimNode)X.xform(this);
         RetNode ret = (RetNode)X.xform(new RetNode(fun,prim,prim.rez(),rpc,fun));
@@ -198,14 +199,14 @@ public abstract class MemPrimNode extends PrimNode {
 
   // Produces a triop LValue, where the leading TMP is a non-zero array
   static class LValueWrite extends WritePrimNode {
-    LValueWrite() { super("[",new String[]{" ctl"," mem","^","ary","idx","val"},TypeTuple.LVAL_WR,Type.SCALAR); }
+    LValueWrite() { super("[",TypeMemPtr.LVAL_WR,Type.SCALAR); }
     @Override public String bal_close() { return "]:="; } // Balanced op
     @Override public byte op_prec() { return 0; }
     @Override public Type value(GVNGCM.Mode opt_mode) {
-      Type mem = val(1);
-      Type ary = val(2);
-      Type idx = val(3);
-      Type val = val(4);
+      Type mem = val(MEM_IDX);
+      Type ary = val(ARG_IDX  );
+      Type idx = val(ARG_IDX+1);
+      Type val = val(ARG_IDX+2);
       if( !(mem instanceof TypeMem   ) ) return mem.oob();
       if( !(ary instanceof TypeMemPtr) ) return ary.oob();
       if( !(idx instanceof TypeInt) && idx!=Type.XNIL ) return idx.oob();
@@ -224,14 +225,14 @@ public abstract class MemPrimNode extends PrimNode {
 
   // Produces a triop LValue, where the leading TMP is a non-zero array
   static class LValueWriteFinal extends WritePrimNode {
-    LValueWriteFinal() { super("[",new String[]{" ctl"," mem","^","ary","idx","val"},TypeTuple.LVAL_WR,Type.SCALAR); }
+    LValueWriteFinal() { super("[",TypeMemPtr.LVAL_WR,Type.SCALAR); }
     @Override public String bal_close() { return "]="; } // Balanced op
     @Override public byte op_prec() { return 0; }
     @Override public Type value(GVNGCM.Mode opt_mode) {
-      Type mem = val(1);
-      Type ary = val(2);
-      Type idx = val(3);
-      Type val = val(4);
+      Type mem = val(MEM_IDX);
+      Type ary = val(ARG_IDX  );
+      Type idx = val(ARG_IDX+1);
+      Type val = val(ARG_IDX+2);
       if( !(mem instanceof TypeMem   ) ) return mem.oob();
       if( !(ary instanceof TypeMemPtr) ) return ary.oob();
       if( !(idx instanceof TypeInt) && idx!=Type.XNIL ) return idx.oob();

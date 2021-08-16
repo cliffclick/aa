@@ -78,9 +78,9 @@ public class FunNode extends RegionNode {
   public FunNode(           PrimNode prim) { this(prim._name,prim._sig,prim._op_prec,prim._thunk_rhs); }
   public FunNode(NewNode.NewPrimNode prim) { this(prim._name,prim._sig,prim._op_prec,false); }
   // Used to start an anonymous function in the Parser
-  public FunNode(String[] flds, Type[] ts) { this(null,TypeFunSig.make(flds,TypeTuple.make_args(ts),TypeTuple.RET),-1,false); }
+  public FunNode(TypeStruct formals) { this(null,TypeFunSig.make(formals,TypeTuple.RET),-1,false); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(name,TypeFunSig.make(TypeTuple.RET,TypeTuple.NO_ARGS),-2,false); add_def(Env.ALL_CTRL); }
+  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.NO_ARGS,TypeTuple.RET),-2,false); add_def(Env.ALL_CTRL); }
   // Shared common constructor
   FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs ) { this(name,sig,op_prec,thunk_rhs,BitsFun.new_fidx()); }
   // Shared common constructor
@@ -213,8 +213,11 @@ public class FunNode extends RegionNode {
       Node[] parms = parms();
       TypeFunSig progress = _sig;
       for( int i=1; i<parms.length; i++ )
-        if( (parms[i]==null || parms[i]._live==TypeMem.DEAD) && _sig._formals.at(i)!=Type.ALL )
-          _sig = _sig.make_from_arg(i,Type.ALL);
+        if( (parms[i]==null || parms[i]._live==TypeMem.DEAD) ) {
+          TypeFld formal = _sig._formals.fld_idx(i);
+          if( formal._t!=Type.ALL )
+            _sig = _sig.make_from_arg(formal.make_from(Type.ALL));
+        }
       // Can resolve some least_cost choices
       if( progress != _sig ) {
         FunPtrNode fptr = fptr();
@@ -260,7 +263,7 @@ public class FunNode extends RegionNode {
     }
 
     // Look for appropriate type-specialize callers
-    TypeTuple formals = _thunk_rhs ? null : type_special(parms);
+    TypeStruct formals = _thunk_rhs ? null : type_special(parms);
     Ary<Node> body = find_body(ret);
     int path = -1;              // Paths will split according to type
     if( formals == null ) {     // No type-specialization to do
@@ -274,7 +277,7 @@ public class FunNode extends RegionNode {
     }
 
     // Check for dups (already done this but failed to resolve all calls, so trying again).
-    TypeTuple fformals = formals;
+    TypeStruct fformals = formals;
     if( path == -1 && FUNS.find(fun -> fun != null && !fun.is_dead() &&
                                 fun._sig._formals==fformals && fun._sig._ret == _sig._ret &&
                                 fun.in(1)==in(1)) != -1 )
@@ -335,7 +338,7 @@ public class FunNode extends RegionNode {
             if( (fdx==parm && !parm._val.isa(TypeFunPtr.GENERIC_FUNPTR) ) ||
                 fdx instanceof UnresolvedNode ) { // Call overload not resolved
               Type t0 = parm.val(1);                   // Generic type in slot#1
-              for( int i=2; i<parm._defs._len; i++ ) { // For all other inputs
+              for( int i=2; i<parm._defs._len; i++ ) { // For all other wired inputs
                 Type tp = parm.val(i);
                 if( tp.above_center() ) continue; // This parm input is in-error
                 Type ti = tp.widen();             // Get the widen'd type
@@ -351,55 +354,51 @@ public class FunNode extends RegionNode {
   }
 
   // Find types for which splitting appears to help.
-  private Type[] find_type_split( Node[] parms ) {
+  private TypeStruct find_type_split( Node[] parms ) {
     assert has_unknown_callers(); // Only overly-wide calls.
 
     // Look for splitting to help an Unresolved Call.
     int idx = find_type_split_index(parms);
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
-      Type[] sig = Types.get(parms.length);
-      sig[CTL_IDX] = Type.CTRL;
-      sig[MEM_IDX] = TypeMem.MEM;
-      sig[DSP_IDX] = parms[DSP_IDX]==null
-        ? _sig.display().simple_ptr()
-        : parms[DSP_IDX].val(idx);
-      for( int i=ARG_IDX; i<parms.length; i++ )
-        sig[i] = parms[i]==null ? Type.ALL : parms[i].val(idx).widen();
-      return sig;
+      TypeStruct formals = _sig._formals;
+      for( int i=DSP_IDX; i<parms.length; i++ )
+        formals = formals.replace_fld(_sig._formals.fld_idx(i).make_from(parms[i]==null ? Type.ALL : parms[i].val(idx).widen()));
+      return formals;
     }
 
-    // Look for splitting to help a pointer from an unspecialized type
-    boolean progress = false;
-    Type[] sig = new Type[parms.length];
-    Type tmem = parms[MEM_IDX]._val;
-    sig[CTL_IDX] = Type.CTRL;
-    sig[MEM_IDX] = TypeMem.MEM;
-    if( tmem instanceof TypeMem ) {
-      for( int i=DSP_IDX; i<parms.length; i++ ) { // For all parms
-        Node parm = parms[i];
-        if( parm == null ) { sig[i]=Type.ALL; continue; } // (some can be dead)
-        if( parm._val==Type.ALL ) return null;            // No split with error args
-        sig[i] = parm._val;                               // Current type
-        if( i==DSP_IDX ) continue; // No split on the display
-        // Best possible type
-        Type tp = Type.ALL;
-        for( Node def : parm._defs )
-          if( def != this )
-            tp = tp.join(def._val);
-        if( !(tp instanceof TypeMemPtr) ) continue; // Not a pointer
-        TypeObj to = ((TypeMem)tmem).ld((TypeMemPtr)tp).widen(); //
-        // Are all the uses of parm compatible with this TMP?
-        // Also, flag all used fields.
-        if( bad_mem_use(parm, to) )
-          continue;               // So bad usage
-
-        sig[i] = TypeMemPtr.make(BitsAlias.FULL,to); // Signature takes any alias but has sharper guts
-        progress = true;
-      }
-    }
-    if( progress ) return sig;
-
-    return null;
+    //// Look for splitting to help a pointer from an unspecialized type
+    //boolean progress = false;
+    //Type[] sig = new Type[parms.length];
+    //Type tmem = parms[MEM_IDX]._val;
+    //sig[CTL_IDX] = Type.CTRL;
+    //sig[MEM_IDX] = TypeMem.MEM;
+    //if( tmem instanceof TypeMem ) {
+    //  for( int i=DSP_IDX; i<parms.length; i++ ) { // For all parms
+    //    Node parm = parms[i];
+    //    if( parm == null ) { sig[i]=Type.ALL; continue; } // (some can be dead)
+    //    if( parm._val==Type.ALL ) return null;            // No split with error args
+    //    sig[i] = parm._val;                               // Current type
+    //    if( i==DSP_IDX ) continue; // No split on the display
+    //    // Best possible type
+    //    Type tp = Type.ALL;
+    //    for( Node def : parm._defs )
+    //      if( def != this )
+    //        tp = tp.join(def._val);
+    //    if( !(tp instanceof TypeMemPtr) ) continue; // Not a pointer
+    //    TypeObj to = ((TypeMem)tmem).ld((TypeMemPtr)tp).widen(); //
+    //    // Are all the uses of parm compatible with this TMP?
+    //    // Also, flag all used fields.
+    //    if( bad_mem_use(parm, to) )
+    //      continue;               // So bad usage
+    //
+    //    sig[i] = TypeMemPtr.make(BitsAlias.FULL,to); // Signature takes any alias but has sharper guts
+    //    progress = true;
+    //  }
+    //}
+    //if( progress ) return sig;
+    //
+    //return null;
+    throw unimpl();
   }
 
   // Check all uses are compatible with sharpening to a pointer.
@@ -428,7 +427,7 @@ public class FunNode extends RegionNode {
       case OP_RET: break;  // Return pass-thru should be ok
       case OP_NEWSTR:
         TypeFunSig sig = ((NewStrNode)use)._sig;
-        Type formal = sig._formals.at(use._defs.find(n)-2);
+        Type formal = sig._formals.fld_idx(use._defs.find(n))._t;
         if( !TypeMemPtr.OOP0.dual().isa(formal) )
           return true;
         break;
@@ -463,12 +462,11 @@ public class FunNode extends RegionNode {
   // on arguments that help immediately.
   //
   // Same argument for field Loads from unspecialized values.
-  private TypeTuple type_special( Node[] parms ) {
+  private TypeStruct type_special( Node[] parms ) {
     if( !has_unknown_callers() ) return null; // Only overly-wide calls.
-    Type[] sig = find_type_split(parms);
-    if( sig == null ) return null; // No unresolved calls; no point in type-specialization
+    TypeStruct formals = find_type_split(parms);
+    if( formals == null ) return null; // No unresolved calls; no point in type-specialization
     // Make a new function header with new signature
-    TypeTuple formals = TypeTuple.make_args(sig);
     if( !formals.isa(_sig._formals) ) return null;    // Fails in error cases
     return formals == _sig._formals ? null : formals; // Must see improvement
   }
@@ -616,10 +614,10 @@ public class FunNode extends RegionNode {
     return m;                   // Return path to split on
   }
 
-  private FunNode make_new_fun(RetNode ret, TypeTuple new_formals) {
+  private FunNode make_new_fun(RetNode ret, TypeStruct new_formals) {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
-    FunNode fun = new FunNode(_name,TypeFunSig.make(_sig._args,new_formals,_sig._ret),_op_prec,_thunk_rhs,BitsFun.new_fidx(oldfidx));
+    FunNode fun = new FunNode(_name,TypeFunSig.make(new_formals,_sig._ret),_op_prec,_thunk_rhs,BitsFun.new_fidx(oldfidx));
     fun._bal_close = _bal_close;
     fun.pop();                  // Remove null added by RegionNode, will be added later
     fun.unkeep();               // Ret will clone and not construct

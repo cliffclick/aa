@@ -353,7 +353,7 @@ public class TestParse {
     testerr ("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
-    test_obj_isa("x=@{n}",TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("n",Type.XNIL,Access.RW)));
+    test_obj_isa("x=@{n}",TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("n",Type.XNIL,Access.RW,ARG_IDX)));
   }
 
   @Test public void testParse05() {
@@ -402,9 +402,9 @@ public class TestParse {
     test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR); // Same test, again, using the same Type.INTERN table
     test_isa("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}", TypeFunPtr.GENERIC_FUNPTR);
     // Mixed ABC's, making little abc's in-between.
-    TypeMemPtr tmpA = TypeMemPtr.make(23,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL),TypeFld.make("v",TypeInt.con(5    ))).set_name("A:"));
-    TypeMemPtr tmpB = TypeMemPtr.make(19,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpA     ),TypeFld.make("v",TypeFlt.con(3.14 ))).set_name("B:"));
-    TypeMemPtr tmpC = TypeMemPtr.make(35,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpB     ),TypeFld.make("v",TypeMemPtr.make(17,TypeStr.con("abc")))).set_name("C:"));
+    TypeMemPtr tmpA = TypeMemPtr.make(23,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,ARG_IDX),TypeFld.make("v",TypeInt.con(5    )                    ,ARG_IDX+1)).set_name("A:"));
+    TypeMemPtr tmpB = TypeMemPtr.make(19,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpA     ,ARG_IDX),TypeFld.make("v",TypeFlt.con(3.14 )                    ,ARG_IDX+1)).set_name("B:"));
+    TypeMemPtr tmpC = TypeMemPtr.make(35,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpB     ,ARG_IDX),TypeFld.make("v",TypeMemPtr.make(17,TypeStr.con("abc")),ARG_IDX+1)).set_name("C:"));
     test_isa("A= :@{n=B?; v=int}; "+
              "a= A(0,5); "+
              "B= :@{n=A?; v=flt}; "+
@@ -430,7 +430,7 @@ public class TestParse {
     // interspersed with recursive computation calls.
     test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v&x.v} : 0};"+
                  "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
-                 TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("nn",TypeMemPtr.STRUCT0),TypeFld.make("vv",TypeInt.INT8)));
+                 TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("nn",TypeMemPtr.STRUCT0,ARG_IDX),TypeFld.make("vv",TypeInt.INT8,ARG_IDX+1)));
     // Test does loads after recursive call, which should be allowed to bypass.
     test("sum={x -> x ? sum(x.n) + x.v : 0};"+
          "sum(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
@@ -464,23 +464,23 @@ public class TestParse {
     // Test inferring a recursive struct type, with a little help
     test_struct("map={x:@{n=;v=flt}? -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
                 TypeStruct.make(TypeFld.NO_DISP,
-                                TypeFld.make("nn",TypeMemPtr.make_nil(14,TypeObj.ISUSED)),
-                                TypeFld.make("vv",TypeFlt.con(1.2*1.2)                  )));
+                                TypeFld.make("nn",TypeMemPtr.make_nil(14,TypeObj.ISUSED),ARG_IDX  ),
+                                TypeFld.make("vv",TypeFlt.con(1.2*1.2)                  ,ARG_IDX+1)));
 
     // Test inferring a recursive struct type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
     test_struct("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
                 TypeStruct.make(TypeFld.NO_DISP,
-                                TypeFld.make("nn",TypeMemPtr.make_nil(23,TypeObj.ISUSED)),
-                                TypeFld.make("vv",TypeFlt.con(1.2*1.2)                  )));
+                                TypeFld.make("nn",TypeMemPtr.make_nil(23,TypeObj.ISUSED),ARG_IDX  ),
+                                TypeFld.make("vv",TypeFlt.con(1.2*1.2)                  ,ARG_IDX+1)));
 
     // Test inferring a recursive struct type, with less help. Too complex to
     // inline, so actual inference happens
     test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0};"+
                  "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1.2};v=2.3};v=3.4};v=4.5})",
                 TypeStruct.make(TypeMemPtr.DISP_FLD,
-                                TypeFld.make("nn",TypeMemPtr.STRUCT0),
-                                TypeFld.make("vv",TypeFlt.FLT64     )));
+                                TypeFld.make("nn",TypeMemPtr.STRUCT0,ARG_IDX  ),
+                                TypeFld.make("vv",TypeFlt.FLT64     ,ARG_IDX+1)));
 
     // Test inferring a recursive tuple type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
@@ -624,8 +624,8 @@ public class TestParse {
   @Test public void testParse10() {
     // Test re-assignment in struct
     test_obj_isa("x=@{n:=1;v:=2}", TypeStruct.make(TypeMemPtr.DISP_FLD,
-                                                   TypeFld.make("n",TypeInt.con(1),Access.RW),
-                                                   TypeFld.make("v",TypeInt.con(2),Access.RW)));
+                                                   TypeFld.make("n",TypeInt.con(1),Access.RW,ARG_IDX  ),
+                                                   TypeFld.make("v",TypeInt.con(2),Access.RW,ARG_IDX+1)));
     testerr ("x=@{n =1;v:=2}; x.n  = 3; x.n", "Cannot re-assign final field '.n' in @{n=1; v:=2}",18);
     test    ("x=@{n:=1;v:=2}; x.n  = 3", TypeInt.con(3));
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3; v:=2}");
@@ -639,7 +639,7 @@ public class TestParse {
     testerr ("ptr2rw = @{f:=1}; ptr2final:@{f=} = ptr2rw; ptr2final", "*@{f:=1} is not a *@{f=; ...}",27); // Cannot cast-to-final
 
     test_obj_isa("ptr2   = @{f =1}; ptr2final:@{f=} = ptr2  ; ptr2final", // Good cast
-                 TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("f",TypeInt.con(1))));
+                 TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("f",TypeInt.con(1),ARG_IDX)));
     testerr ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; ptr2rw", "*@{f=1} is not a *@{f:=; ...}", 18); // Cannot cast-away final
     test    ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; 2", TypeInt.con(2)); // Dead cast-away of final
     test    ("@{x:=1;y =2}:@{x;y=}.y", TypeInt.con(2)); // Allowed reading final field

@@ -8,6 +8,8 @@ import java.util.HashMap;
 import java.util.function.Predicate;
 
 import static com.cliffc.aa.type.TypeFld.Access;
+import static com.cliffc.aa.AA.ARG_IDX;
+import static com.cliffc.aa.AA.DSP_IDX;
 
 // Pointers-to-memory; these can be both the address and the value part of
 // Loads and Stores.  They carry a set of aliased TypeObjs.
@@ -81,10 +83,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   static {
     // Install a (to be cyclic) DISPLAY.  Not cyclic during the install, since
     // we cannot build the cycle all at once.
-    DISPLAY = TypeStruct.malloc("",false,true).add_fld(TypeFld.make("^",Type.ANY,Access.Final)).set_hash();
+    DISPLAY = TypeStruct.malloc("",false,true).add_fld(TypeFld.make("^",Type.ANY,Access.Final,DSP_IDX)).set_hash();
     TypeStruct.RECURSIVE_MEET++;
     DISPLAY_PTR = TypeMemPtr.make(BitsAlias.RECORD_BITS0,DISPLAY); // Normal create
-    DISP_FLD = TypeFld.make("^",DISPLAY_PTR,Access.Final);         // Normal create
+    DISP_FLD = TypeFld.make("^",DISPLAY_PTR,Access.Final,DSP_IDX); // Normal create
     DISPLAY.set_fld(DISP_FLD);                                     // Change field without changing hash
     TypeStruct.RECURSIVE_MEET--;
     TypeStruct ds = DISPLAY.install();
@@ -104,7 +106,17 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECORD_BITS0,TypeStruct.ALLSTRUCT);
   public  static final TypeMemPtr EMTPTR = make(BitsAlias.EMPTY,TypeObj.UNUSED);
   public  static final TypeMemPtr DISP_SIMPLE= make(BitsAlias.RECORD_BITS0,TypeObj.ISUSED); // closed display
-  static final Type[] TYPES = new Type[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,EMTPTR,DISPLAY,DISPLAY_PTR};
+
+  public  static final TypeStruct FORMAL_STRPTR = TypeStruct.args(TypeMemPtr.STRPTR); // { str -> }
+  public  static final TypeStruct OOP_OOP = TypeStruct.args(TypeMemPtr.ISUSED0,TypeMemPtr.ISUSED0); // { ptr? ptr? -> }
+  public  static final TypeStruct LVAL_LEN= TypeStruct.make("ary",TypeMemPtr.ARYPTR,Access.Final); // Array length
+  public  static final TypeStruct LVAL_RD = TypeStruct.make2flds("ary",TypeMemPtr.ARYPTR,"idx",TypeInt.INT64); // Array & index
+  public  static final TypeStruct LVAL_WR = TypeStruct.make(TypeFld.NO_DISP, // Array & index & element
+                                                            TypeFld.make("ary",TypeMemPtr.ARYPTR,ARG_IDX  ),
+                                                            TypeFld.make("idx",TypeInt.INT64    ,ARG_IDX+1),
+                                                            TypeFld.make("val",Type.SCALAR      ,ARG_IDX+2));
+  
+  static final Type[] TYPES = new Type[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,EMTPTR,DISPLAY,DISPLAY_PTR,OOP_OOP,LVAL_LEN,LVAL_RD,LVAL_WR};
 
   @Override public boolean is_display_ptr() {
     BitsAlias x = _aliases.strip_nil();

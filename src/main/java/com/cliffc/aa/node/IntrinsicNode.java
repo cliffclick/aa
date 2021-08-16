@@ -133,7 +133,7 @@ public class IntrinsicNode extends Node {
   public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, Parse bad ) {
     assert to.has_name() && to.fld_find("^").is_display_ptr(); // Display already
     // Upgrade the type to one with no display for nnn.
-    to = to.set_fld("^",Access.Final,TypeMemPtr.NO_DISP);
+    to = to.replace_fld(TypeFld.NO_DISP);
 
     try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
       FunNode fun = (FunNode) X.xform(new FunNode(to._name,null,-1,false).add_def(Env.ALL_CTRL));

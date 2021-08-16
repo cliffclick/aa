@@ -239,9 +239,9 @@ public class TestHM9 {
     BitsAlias aliases = BitsAlias.make0(alias);
     if( nil ) aliases = aliases.meet_nil();
     TypeMemPtr cycle_ptr0 = TypeMemPtr.make(aliases,TypeObj.XOBJ);
-    TypeStruct cycle_str1 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr0),TypeFld.make("v1",fld));
+    TypeStruct cycle_str1 = TypeStruct.make2flds("n1",cycle_ptr0,"v1",fld);
     TypeMemPtr cycle_ptr1 = TypeMemPtr.make(aliases,cycle_str1);
-    TypeStruct cycle_str2 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr1),TypeFld.make("v1",fld));
+    TypeStruct cycle_str2 = TypeStruct.make2flds("n1",cycle_ptr1,"v1",fld);
     TypeStruct cycle_strn = cycle_str2.approx(1,alias);
     TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn.at("n1");
     return cycle_ptrn;
@@ -309,18 +309,18 @@ public class TestHM9 {
         // Unrolled, known to only produce results where either other nested
         // struct is from a different allocation site.
         TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.FULL.make(0,10),TypeObj.XOBJ);
-        TypeStruct cycle_str1 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr0),TypeFld.make("v1",TypeMemPtr.STRPTR));
+        TypeStruct cycle_str1 = TypeStruct.make2flds("n1",cycle_ptr0,"v1",TypeMemPtr.STRPTR);
         TypeMemPtr cycle_ptr1 = TypeMemPtr.make(BitsAlias.FULL.make(0, 9),cycle_str1);
-        TypeStruct cycle_str2 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr1),TypeFld.make("v1",TypeMemPtr.STRPTR));
+        TypeStruct cycle_str2 = TypeStruct.make2flds("n1",cycle_ptr1,"v1",TypeMemPtr.STRPTR);
         TypeMemPtr cycle_ptr2 = TypeMemPtr.make(BitsAlias.FULL.make(0,10),cycle_str2);
-        TypeStruct cycle_str3 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr2),TypeFld.make("v1",TypeMemPtr.STRPTR));
+        TypeStruct cycle_str3 = TypeStruct.make2flds("n1",cycle_ptr2,"v1",TypeMemPtr.STRPTR);
         cycle_strX = cycle_str3;
       } else {
         // Not unrolled, both structs are folded
         TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.FULL.make(0,7, 8),TypeObj.XOBJ);
-        TypeStruct cycle_str1 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr0),TypeFld.make("v1",TypeMemPtr.STRPTR));
+        TypeStruct cycle_str1 = TypeStruct.make2flds("n1",cycle_ptr0,"v1",TypeMemPtr.STRPTR);
         TypeMemPtr cycle_ptr1 = TypeMemPtr.make(BitsAlias.FULL.make(0,7, 8),cycle_str1);
-        TypeStruct cycle_str2 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n1",cycle_ptr1),TypeFld.make("v1",TypeMemPtr.STRPTR));
+        TypeStruct cycle_str2 = TypeStruct.make2flds("n1",cycle_ptr1,"v1",TypeMemPtr.STRPTR);
         cycle_strX = cycle_str2;
       }
       TypeStruct cycle_strn = cycle_strX.approx(1,9);

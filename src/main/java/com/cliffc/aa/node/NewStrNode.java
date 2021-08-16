@@ -5,11 +5,13 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
+import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.AA.ARG_IDX;
 
 // Allocates a TypeStr in memory.  Weirdly takes a string OBJECT (not pointer),
 // and produces the pointer.  Hence liveness is odd.
 public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
-  public NewStrNode( TypeStr to, String name, boolean reads, int op_prec, Type... args) {
+  public NewStrNode( TypeStr to, String name, boolean reads, int op_prec, TypeFld... args) {
     super(OP_NEWSTR,BitsAlias.STR,to,name,reads,op_prec,args);
   }
   @Override public boolean unify( boolean test ) {
@@ -30,7 +32,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
 
   // --------------------------------------------------------------------------
   public static class ConStr extends NewStrNode {
-    public ConStr( String str ) { super(TypeStr.con(str),"con",false,-1,Type.CTRL,TypeMem.ALLMEM,null); }
+    public ConStr( String str ) { super(TypeStr.con(str),"con",false,-1,TypeFld.MEM); }
     @Override TypeStr valueobj() { return _ts; }
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { throw com.cliffc.aa.AA.unimpl(); } // No inputs
     // Constant Strings intern
@@ -39,7 +41,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   }
 
   public static class ConvertI64Str extends NewStrNode {
-    public ConvertI64Str( ) { super(TypeStr.STR,"str",false,-1,Type.CTRL,TypeMem.ALLMEM,null,TypeInt.INT64); }
+    public ConvertI64Str( ) { super(TypeStr.STR,"str",false,-1,TypeFld.MEM,TypeFld.make_arg(TypeInt.INT64,ARG_IDX)); }
     @Override TypeObj valueobj() {
       Type t = val(3);
       if( t.above_center() || !(t instanceof TypeInt) ) return t.oob(TypeStr.STR);
@@ -50,7 +52,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   }
 
   public static class ConvertF64Str extends NewStrNode {
-    public ConvertF64Str( ) { super(TypeStr.STR,"str",false,-1,Type.CTRL,TypeMem.ALLMEM,null,TypeFlt.FLT64); }
+    public ConvertF64Str( ) { super(TypeStr.STR,"str",false,-1,TypeFld.MEM,TypeFld.make_arg(TypeFlt.FLT64,ARG_IDX)); }
     @Override TypeObj valueobj() {
       Type t = val(3);
       if( t.above_center() || !(t instanceof TypeFlt) ) return t.oob(TypeStr.STR);
@@ -66,12 +68,15 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   // If neither argument is NIL, the two strings are concatenated into a new third string.
   public static class AddStrStr extends NewStrNode {
     private static int OP_PREC=7;
-    public AddStrStr( ) { super(TypeStr.STR,"+",true,OP_PREC,Type.CTRL,TypeMem.MEM_STR,null,TypeMemPtr.STR0,TypeMemPtr.STR0); }
+    public AddStrStr( ) { super(TypeStr.STR,"+",true,OP_PREC,
+                                TypeFld.make(" mem",TypeMem.MEM_STR,MEM_IDX),
+                                TypeFld.make_arg(TypeMemPtr.STR0,ARG_IDX  ),
+                                TypeFld.make_arg(TypeMemPtr.STR0,ARG_IDX+1)); }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       if( is_unused() ) return Type.ANY;
-      Type m   = val(1);
-      Type sp0 = val(3);
-      Type sp1 = val(4);
+      Type m   = val(MEM_IDX);
+      Type sp0 = val(ARG_IDX);
+      Type sp1 = val(ARG_IDX+1);
       if( !(m instanceof TypeMem)   ) return m.oob();
       if( sp0==Type.XNIL && sp1==Type.XNIL ) return TypeTuple.make(TypeObj.UNUSED,Type.XNIL);
       if( !sp0.isa(TypeMemPtr.STR0) ) return _value(TypeStr.STR);

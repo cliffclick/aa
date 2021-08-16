@@ -210,13 +210,14 @@ public class CallNode extends Node {
           Node fdx = pop();
           remove(_defs._len-1); // Pop off the NewNode tuple
           int len = nnn._defs._len;
-          for( int i=1; NewNode.def_idx(i)<len; i++ ) // Push the args; unpacks the tuple
-            add_def( nnn.fld(i));
-          add_def(fdx);          // FIDX is last
-          _unpacked = true;      // Only do it once
-          keep().xval();         // Recompute value, this is not monotonic since replacing tuple with args
-          GVN.add_work_all(unkeep());// Revisit after unpacking
-          return this;
+          //for( int i=1; NewNode.def_idx(i)<len; i++ ) // Push the args; unpacks the tuple
+          //  add_def( nnn.fld(i));
+          //add_def(fdx);          // FIDX is last
+          //_unpacked = true;      // Only do it once
+          //keep().xval();         // Recompute value, this is not monotonic since replacing tuple with args
+          //GVN.add_work_all(unkeep());// Revisit after unpacking
+          //return this;
+          throw unimpl();
         }
       }
     }
@@ -627,7 +628,7 @@ public class CallNode extends Node {
     assert choices.abit()!= -1 || (choices.above_center() == (GVN._opt_mode==GVNGCM.Mode.Opto));
     int best_cvts=99999;           // Too expensive
     FunPtrNode best_fptr=null;     //
-    TypeTuple best_formals=null;  //
+    TypeStruct best_formals=null;  //
     boolean tied=false;            // Ties not allowed
     for( int fidx : choices ) {
       // Parent/kids happen during inlining
@@ -637,11 +638,11 @@ public class CallNode extends Node {
 
         FunNode fun = FunNode.find_fidx(kidx);
         if( fun.nargs()!=nargs() || fun.in(0)==fun ) continue; // BAD/dead
-        TypeTuple formals = fun._sig._formals; // Type of each argument
+        TypeStruct formals = fun._sig._formals; // Type of each argument
         int cvts=0;                        // Arg conversion cost
         for( int j=DSP_IDX; j<nargs(); j++ ) {
           Type actual = arg(j)._val;
-          Type formal = formals.at(j);
+          Type formal = formals.fld_idx(j)._t;
           if( actual==formal ) continue;
           if( Type.ALL==formal ) continue; // Allows even error arguments
           byte cvt = actual.isBitShape(formal); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
@@ -657,8 +658,8 @@ public class CallNode extends Node {
         } else if( cvts==best_cvts ) {
           // Look for monotonic formals
           int fcnt=0, bcnt=0;
-          for( int i=0; i<formals._ts.length; i++ ) {
-            Type ff = formals.at(i), bf = best_formals.at(i);
+          for( int i=DSP_IDX; i<formals.len(); i++ ) {
+            Type ff = formals.fld_idx(i)._t, bf = best_formals.fld_idx(i)._t;
             if( ff==bf ) continue;
             Type mt = ff.meet(bf);
             if( ff==mt ) bcnt++;       // Best formal is higher than new
@@ -749,9 +750,9 @@ public class CallNode extends Node {
         for( int kid=fidx; kid!=0; kid = tree.next_kid(fidx,kid) ) {
           FunNode fun = FunNode.find_fidx(kid);
           if( fun==null || fun.is_dead() ) continue;
-          TypeTuple formals = fun._sig._formals; // Type of each argument
+          TypeStruct formals = fun._sig._formals; // Type of each argument
           if( fun.parm(j)==null ) continue;  // Formal is dead
-          Type formal = formals.at(j);
+          Type formal = formals.fld_idx(j)._t;
           if( actual.isa(formal) ) continue; // Actual is a formal
           if( fast ) return ErrMsg.FAST;     // Fail-fast
           if( ts==null ) ts = new Ary<>(new Type[1],0);

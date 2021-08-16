@@ -8,7 +8,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.*;
 import java.util.function.Predicate;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
 import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 
@@ -40,7 +40,8 @@ import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 public class TypeStruct extends TypeObj<TypeStruct> {
   public boolean _open;   // Extra fields are treated as ALL (or ANY)
   public boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
-  private final IdentityHashMap<String,TypeFld> _flds = new IdentityHashMap<>();  // The fields.  Effectively final.  Public for iteration.
+  // The fields indexed by field name.  Effectively final.  Public iterator, but private.
+  private final IdentityHashMap<String,TypeFld> _flds = new IdentityHashMap<>();
 
   private TypeStruct init( String name, boolean any, boolean open ) {
     super.init(TSTRUCT, name, any, any);
@@ -152,9 +153,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
            : "PRIMS_"+t1);
     } else {
       boolean field_sep=false;
-      TreeMap<String, TypeFld> sorted = new TreeMap<>();
-      sorted.putAll(_flds);
-      for( TypeFld fld : sorted.values() ) {
+      for( TypeFld fld : sorted_flds() ) {
         if( !debug && Util.eq(fld._fld,"^") ) continue; // Do not print the ever-present display
         fld.str(sb,dups,mem,debug); // Field name, access mod, type
         sb.p(is_tup ? ", " : "; "); // Between fields
@@ -183,11 +182,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static TypeStruct make0() { return malloc("",false,false).add_fld(TypeFld.NO_DISP); }
   private TypeStruct add_arg(Type t, int n) { return add_fld(TypeFld.make_arg(t,n)); }
   private TypeStruct add_tup(Type t, int n) { return add_fld(TypeFld.make_tup(t,n)); }
-  public static TypeStruct args(Type t1                  ) { return make0().add_arg(t1,1)              .hashcons_free(); }
-  public static TypeStruct args(Type t1, Type t2         ) { return make0().add_arg(t1,1).add_arg(t2,2).hashcons_free(); }
-  public static TypeStruct tups(Type t1                  ) { return make0().add_tup(t1,1)              .hashcons_free(); }
-  public static TypeStruct tups(Type t1, Type t2         ) { return make0().add_tup(t1,1).add_tup(t2,2).hashcons_free(); }
-  public static TypeStruct tups(Type t1, Type t2, Type t3) { return make0().add_tup(t1,1).add_tup(t2,2).add_tup(t3,3).hashcons_free(); }
+  public static TypeStruct args(Type t1                  ) { return make0().add_arg(t1,ARG_IDX)                      .hashcons_free(); }
+  public static TypeStruct args(Type t1, Type t2         ) { return make0().add_arg(t1,ARG_IDX).add_arg(t2,ARG_IDX+1).hashcons_free(); }
+  public static TypeStruct tups(Type t1                  ) { return make0().add_tup(t1,ARG_IDX)                      .hashcons_free(); }
+  public static TypeStruct tups(Type t1, Type t2         ) { return make0().add_tup(t1,ARG_IDX).add_tup(t2,ARG_IDX+1).hashcons_free(); }
+  public static TypeStruct tups(Type t1, Type t2, Type t3) { return make0().add_tup(t1,ARG_IDX).add_tup(t2,ARG_IDX+1).add_tup(t3,ARG_IDX+2).hashcons_free(); }
 
   // Arys are used by the parser
   public static TypeStruct make( String name, boolean any, boolean open, Ary<TypeFld> flds ) {
@@ -196,7 +195,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return ts.hashcons_free();
   }
   // Used to make a few testing constants
-  public static TypeStruct make( String fld_name, Type t, Access a ) { return make(TypeFld.NO_DISP,TypeFld.make(fld_name,t,a)); }
+  public static TypeStruct make( String fld_name, Type t, Access a ) { return make(TypeFld.NO_DISP,TypeFld.make(fld_name,t,a,ARG_IDX)); }
   // Used to make a few (larger and recursive) testing constants.  Some of the
   // fields are interned and some are recursive and without a type.
   public static TypeStruct malloc( String name, boolean any, boolean open, TypeFld... flds ) {
@@ -214,6 +213,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( TypeFld fld : flds ) ts.add_fld(fld);
     return ts.hashcons_free();
   }
+  public static TypeStruct make2flds( String f1, Type t1, String f2, Type t2 ) {
+    return make("",false,false,TypeFld.NO_DISP,TypeFld.make(f1,t1,ARG_IDX),TypeFld.make(f2,t2,ARG_IDX+1));
+  }
+
   // Add fields from a Type[].  Will auto-allocate the Type[], if not already
   // allocated - which is a perf-hit in high usage points.  Typically used this
   // way in tests.
@@ -251,7 +254,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
 
   // Make an "open" struct with an initial display field.
-  public static TypeStruct open(Type tdisp) { return make("",false,true,TypeFld.make_tup(tdisp,0)); }
+  public static TypeStruct open(Type tdisp) { return make("",false,true,TypeFld.make_arg(tdisp,DSP_IDX)); }
   // Make a closed struct from an open one
   public TypeStruct close() { assert _open; return make_from(_name,_any,false); } // Mark as no-more-fields
 
@@ -287,11 +290,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final TypeStruct C0    = make("c",TypeInt.FALSE,Access.Final); // @{c:0}
   private static final TypeStruct D1    = make("d",TypeInt.TRUE ,Access.Final); // @{d:1}
   public  static final TypeStruct ARW   = make("a",TypeFlt.FLT64,Access.RW   );
-  public  static final TypeStruct FLT64 = args(TypeFlt.FLT64); // {flt->flt}
-  public  static final TypeStruct INT64_INT64= args(TypeInt.INT64,TypeInt.INT64); // {int int->int }
+  public  static final TypeStruct NO_ARGS = make0().hashcons_free();
+  public  static final TypeStruct FLT64 = args(TypeFlt.FLT64);     // { flt -> }
+  public  static final TypeStruct INT64 = args(TypeInt.INT64);     // { int -> }
+  public  static final TypeStruct SCALAR1=args(SCALAR);            // { scalar -> }
+  public  static final TypeStruct INT64_INT64= args(TypeInt.INT64,TypeInt.INT64); // { int int -> }
+  public  static final TypeStruct FLT64_FLT64= args(TypeFlt.FLT64,TypeFlt.FLT64); // { flt flt -> }
 
   // Pile of sample structs for testing
-  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,POINT,NAMEPT,A,C0,D1,ARW,INT64_INT64};
+  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,POINT,NAMEPT,A,C0,D1,ARW,INT64_INT64,SCALAR1};
 
   // Dual the flds, dual the tuple.  Return a not-interned thing.
   @Override protected TypeStruct xdual() {
@@ -1052,32 +1059,49 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // ------ Utilities -------
 
+  // Field by name.
   public TypeFld fld_find( String name ) {
     assert !Util.eq(name,TypeFld.fldTop) && !Util.eq(name,TypeFld.fldBot);
     return _flds.get(name);
   }
-  // NPE if field-not-found
+  // Field type.  NPE if field-not-found
   public Type at( String name ) { return fld_find(name)._t; }
+  // Field by index.  Error if not unique.
+  public TypeFld fld_idx( int idx ) {
+    // TODO: reverse map.
+    TypeFld fx=null;
+    for( TypeFld fld : _flds.values() ) {
+      assert fld._order!=TypeFld.oTop && fld._order!=TypeFld.oBot;
+      if( fld._order==idx ) {
+        assert fx==null;        // Gotta be unique
+        fx = fld;
+      }
+    }
+    assert fx!=null;
+    return fx;
+  }
 
+  // All fields for iterating.
   public Collection<TypeFld> flds() { return _flds.values(); }
+  public Collection<TypeFld> sorted_flds() {
+    TreeMap<String, TypeFld> sorted = new TreeMap<>();
+    sorted.putAll(_flds);
+    return sorted.values();
+  }
   public int len() { return _flds.size(); } // Count of fields
 
+
   // Extend the current struct with a new named field, making a new struct
-  public TypeStruct add_fld( String name, Access mutable ) { return add_fld(name,mutable,Type.SCALAR); }
-  public TypeStruct add_fld( String name, Access mutable, Type tfld ) {
+  public TypeStruct add_fld( String name, Access mutable, int order ) { return add_fld(name,mutable,Type.SCALAR,order); }
+  public TypeStruct add_fld( String name, Access mutable, Type tfld, int order ) {
     assert name==null || Util.eq(name,TypeFld.fldBot) || fld_find(name)==null;
     assert !_any && _open;
     TypeStruct ts = copy();
-    ts.add_fld(TypeFld.make(name,tfld,mutable));
+    ts.add_fld(TypeFld.make(name,tfld,mutable,order));
     return ts.hashcons_free();
   }
-  // Replace an existing field, making a new struct
-  public TypeStruct set_fld( String name, Access mutable, Type tfld ) {
-    assert fld_find(name)!=null;
-    TypeStruct ts = copy();
-    ts.set_fld(TypeFld.make(name,tfld,mutable));
-    return ts.hashcons_free();
-  }
+  // Replace an existing field in the current struct.
+  public TypeStruct replace_fld( TypeFld fld ) { return copy().set_fld(fld).hashcons_free(); }
 
   // Update (approximately) the current TypeObj.  Updates the named field.
   @Override public TypeStruct update(Access fin, String fld, Type val) { return update(fin,fld,val,false); }

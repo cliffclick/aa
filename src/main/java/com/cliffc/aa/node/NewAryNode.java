@@ -2,13 +2,14 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.NonBlockingHashMap;
+
+import static com.cliffc.aa.AA.ARG_IDX;
 
 // Allocates a TypeAry in memory.  Takes in the size and initial element value
 // produces the pointer.  Hence liveness is odd.
 abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
   public NewAryNode( TypeAry tary, String name, int op_prec,TypeInt sz ) {
-    super(OP_NEWARY,BitsAlias.AARY,tary,name,false,op_prec,Type.CTRL,TypeMem.ALLMEM,null,sz);
+    super(OP_NEWARY,BitsAlias.AARY,tary,name,false,op_prec,TypeFld.MEM,TypeFld.make("len",sz,ARG_IDX));
   }
   @Override TypeAry dead_type() { return TypeAry.ARY.dual(); }
 
@@ -24,7 +25,7 @@ abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
     @Override public String bal_close() { return "]"; } // Balanced op
     @Override public byte op_prec() { return 0; } // Balanced op
     @Override TypeObj valueobj() {
-      Type sz = val(3);
+      Type sz = val(ARG_IDX);
       if( !(sz instanceof TypeInt) ) return sz.oob(TypeObj.ISUSED);
       // Storage class can be found by looking at _live, needs the reverse-flow of use sizes.
       return TypeAry.make((TypeInt)sz,Type.XNIL,TypeObj.OBJ);

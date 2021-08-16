@@ -601,9 +601,7 @@ public class TestNodeSmall {
     TypeTuple ts_int_flt = TypeTuple.make_args(TypeInt.INT64,TypeFlt.FLT64);
     TypeTuple ts_int_abc = TypeTuple.make_args(TypeInt.INT64,TypeMemPtr.ABCPTR);
     // @{ a:int; b:"abc" }
-    TypeStruct a_int_b_abc = TypeStruct.make(TypeFld.NO_DISP,
-                                             TypeFld.make("a",TypeInt.INT64),
-                                             TypeFld.make("b",TypeMemPtr.ABCPTR));
+    TypeStruct a_int_b_abc = TypeStruct.make2flds("a",TypeInt.INT64,"b",TypeMemPtr.ABCPTR);
 
     // Build a bunch of function type signatures
     TypeFunSig[] sigs = new TypeFunSig[] {

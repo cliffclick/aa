@@ -108,11 +108,11 @@ public class TypeTuple extends Type<TypeTuple> {
     assert ts[MEM_IDX] instanceof TypeMem && ts[DSP_IDX].is_display_ptr();
     return make(ts);
   }
-  public TypeTuple make_from_arg(int idx, Type arg ) {
-    Type[] ts = Types.clone(_ts);
-    ts[idx]=arg;
-    return make0(_any,ts);
-  }
+  //public TypeTuple make_from_arg(int idx, Type arg ) {
+  //  Type[] ts = Types.clone(_ts);
+  //  ts[idx]=arg;
+  //  return make0(_any,ts);
+  //}
 
   public static TypeTuple make_args(                       ) { return make(Type.CTRL,TypeMem.ALLMEM,Type.ALL ); }
   public static TypeTuple make_args(Type t2                ) { return make(Type.CTRL,TypeMem.ALLMEM,Type.ALL,t2); }
@@ -141,9 +141,6 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple FLT64_FLT64= make_args(TypeFlt.FLT64,TypeFlt.FLT64); // {flt flt->flt }
   public  static final TypeTuple OOP_OOP    = make_args(TypeMemPtr.ISUSED0,TypeMemPtr.ISUSED0);
   public  static final TypeTuple SCALAR1    = make_args(SCALAR);
-  public  static final TypeTuple LVAL_LEN   = make_args(TypeMemPtr.ARYPTR); // Array
-  public  static final TypeTuple LVAL_RD    = make_args(TypeMemPtr.ARYPTR,TypeInt.INT64); // Array & index
-  public  static final TypeTuple LVAL_WR    = make_args(TypeMemPtr.ARYPTR,TypeInt.INT64,Type.SCALAR); // Array & index & element
 
   //
   static final TypeTuple[] TYPES = new TypeTuple[]{

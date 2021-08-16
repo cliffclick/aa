@@ -20,7 +20,6 @@ public class TestType {
     TypeStruct a1 = TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",TypeMemPtr.make(9,a0)),vi);
     TypeStruct a2 = a1.approx(1,9);
 
-    System.out.println(a1);
   }
 
   @Test public void testBits0() {

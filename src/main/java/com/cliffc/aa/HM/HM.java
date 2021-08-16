@@ -6,6 +6,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
+import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeFld.Access;
 
@@ -857,7 +858,7 @@ public class HM {
       TypeFld[] flds = new TypeFld[_flds.length+1];
       flds[0] = TypeFld.NO_DISP;
       for( int i=0; i<_flds.length; i++ )
-        flds[i+1] = TypeFld.make(_ids[i],_flds[i]._flow,Access.Final);
+        flds[i+1] = TypeFld.make(_ids[i],_flds[i]._flow,Access.Final,ARG_IDX+i);
       TypeStruct tstr = TypeStruct.make(flds);
       TypeStruct t2 = tstr.approx(1,_alias);
       return TypeMemPtr.make(_alias,t2);
@@ -1037,7 +1038,7 @@ public class HM {
     @Override Type apply(Syntax[] args) {
       TypeFld[] ts = new TypeFld[args.length+1];
       ts[0] = TypeFld.NO_DISP;  // Display
-      for( int i=0; i<args.length; i++ ) ts[i+1] = TypeFld.make_tup(args[i]._flow,i+1);
+      for( int i=0; i<args.length; i++ ) ts[i+1] = TypeFld.make_tup(args[i]._flow,ARG_IDX+i);
       return TypeMemPtr.make(PAIR_ALIAS,TypeStruct.make(ts));
     }
   }
@@ -1052,7 +1053,7 @@ public class HM {
     @Override Type apply(Syntax[] args) {
       TypeFld[] ts = new TypeFld[args.length+1];
       ts[0] = TypeFld.NO_DISP;  // Display
-      for( int i=0; i<args.length; i++ ) ts[i+1] = TypeFld.make_tup(args[i]._flow,i+1);
+      for( int i=0; i<args.length; i++ ) ts[i+1] = TypeFld.make_tup(args[i]._flow,ARG_IDX+i);
       return TypeMemPtr.make(TRIPLE_ALIAS,TypeStruct.make(ts));
     }
   }

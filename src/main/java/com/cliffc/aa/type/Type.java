@@ -277,7 +277,19 @@ public class Type<T extends Type<T>> implements Cloneable {
   static final byte TLAST   =29; // Type check
 
   // Object Pooling to handle frequent (re)construction of temp objects being
-  // interned.
+  // interned.  This is a performance hack and a big one: big because its
+  // invasive, big because the performance gain is dramatic.  The hash-cons'ing
+  // INTERN table has an extremely high hit rate and this hack avoids the high
+  // volume allocation (and constant hardware cache misses and memory bandwidth
+  // costs) associated with the constant creation and interning of Types.
+
+  // This means most Type fields are "effectively final" instead of final: they
+  // get cleared upon free, and modified when pull from the free list.  Once
+  // the object interns, the fields are "effectively final".  During construction
+  // of cyclic types, some objects are pulled from the free list, partially
+  // initialized, used to build a cycle, then have some fields set (sometimes
+  // more than once) to close the cycle.  However, once a Type is interned, its
+  // fields are forever more "final".
   static final Pool[] POOLS = new Pool[TLAST];
   @SuppressWarnings("unchecked")
   static class Pool {

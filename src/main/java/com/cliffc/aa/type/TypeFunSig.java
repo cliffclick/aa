@@ -1,36 +1,32 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
-import static com.cliffc.aa.AA.*;
+
+import static com.cliffc.aa.AA.DSP_IDX;
+import static com.cliffc.aa.AA.MEM_IDX;
 
 // Function signatures: formal arguments (and return) used to type-check.  This
 // is NOT any "code pointer" or "function index" or "fidx"; see TypeFunPtr.
 public final class TypeFunSig extends Type<TypeFunSig> {
-  // Formal 0 is the Memory type, using TypeObj.ISUSED for ignored memory state.
-  // Formal 1 is the Display pointer.
-  // Formals 2-N are the normal arguments.
-  public String[] _args;        // " mem", "^", ....
-  public TypeTuple _formals;    // Control0, Memory1, Display2, Arg3, Arg4, ...
+  public TypeStruct _formals;   // Control0, Memory1, Display2, Arg3, Arg4, ...
   public TypeTuple _ret;        // Control0, Memory1, Result2
+  private int _max_arg;
 
-  private TypeFunSig init (String[] args, TypeTuple formals, TypeTuple ret ) {
+  private TypeFunSig init(TypeStruct formals, TypeTuple ret ) {
     super.init(TFUNSIG,"");
-    assert args.length>=formals.len();
-    assert (args[CTL_IDX]==null || Util.eq(args[CTL_IDX]," ctl")) && (formals.at(CTL_IDX)==Type.CTRL || formals.at(CTL_IDX)==Type.XCTRL);
-    assert (args[MEM_IDX]==null || Util.eq(args[MEM_IDX]," mem")) && (formals.at(MEM_IDX) instanceof TypeMem || formals.at(MEM_IDX)==Type.ALL || formals.at(MEM_IDX)==Type.ANY);
-    assert (args[DSP_IDX]==null || Util.eq(args[DSP_IDX],"^"   )) &&  formals.at(DSP_IDX).is_display_ptr();
+    TypeFld disp=null;
+    assert (disp=formals.fld_find("^")) == null || disp.is_display_ptr();
     assert ret.len()==3 && ret.at(MEM_IDX) instanceof TypeMem;
-    _args=args;
     _formals=formals;
     _ret=ret;
+    _max_arg = 0;
+    for( TypeFld arg : _formals.flds() )
+      _max_arg = Math.max(_max_arg,arg._order);
     return this;
   }
   @Override int compute_hash() {
-    assert _formals._hash != 0;
     int hash=TFUNSIG + _formals._hash + _ret._hash;
-    for( int i=0; i<_args.length; i++ ) i+=_args[i].hashCode();
     return hash==0 ? 3 : hash;
   }
 
@@ -38,57 +34,48 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     if( this==o ) return true;
     if( !(o instanceof TypeFunSig) ) return false;
     TypeFunSig tf = (TypeFunSig)o;
-    if( _formals!=tf._formals || _ret!=tf._ret || _args.length!=tf._args.length ) return false;
-    if( _args == tf._args ) return true;
-    for( int i=0; i<_args.length; i++ )
-      if( !Util.eq(_args[i],tf._args[i]) )
-        return false;
-    return true;
+    return _formals==tf._formals && _ret==tf._ret;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     if( debug ) sb.p('_').p(_uid);
     sb.p(_name);
-    sb.p('{');
-    boolean field_sep=false;
-    for( int i=0; i<nargs(); i++ ) {
-      if( !debug && i==CTL_IDX && Util.eq(_args[CTL_IDX]," ctl") ) continue; // Do not print the Control
-      if( !debug && i==MEM_IDX && Util.eq(_args[MEM_IDX]," mem") ) continue; // Do not print the memory
-      if( !debug && i==DSP_IDX && Util.eq(_args[DSP_IDX],"^"   ) ) continue; // Do not print the ever-present display
-      sb.p(_args[i]);
-      if( arg(i) != Type.SCALAR )
-        arg(i).str(sb.p(':'),dups,mem,debug);
-      sb.p(" ");  field_sep=true;
+    sb.p("{ ");
+    for( TypeFld arg : _formals.sorted_flds() ) {
+      sb.p(arg._fld);
+      if( arg._t != Type.SCALAR )
+        arg._t.str(sb.p(':'),dups,mem,debug);
+      sb.p(' ');
     }
-    if( field_sep ) sb.unchar();
-    sb.p(" -> ");
+    sb.p("-> ");
     if( _ret != Type.SCALAR ) _ret.str(sb,dups,mem,debug);
-    return sb.p('}');
+    return sb.p("}");
   }
 
   static { new Pool(TFUNSIG,new TypeFunSig()); }
-  public static TypeFunSig make( String[] args, TypeTuple formals, TypeTuple ret ) {
+  public static TypeFunSig make( TypeStruct formals, TypeTuple ret ) {
     TypeFunSig t1 = POOLS[TFUNSIG].malloc();
-    return t1.init(args,formals,ret).hashcons_free();
+    return t1.init(formals,ret).hashcons_free();
   }
 
-  public static TypeFunSig make( TypeTuple ret, Type[] ts ) { return make(func_names,TypeTuple.make_args(ts),ret); }
-  public static TypeFunSig make( TypeTuple ret, TypeMemPtr disp, Type arg1 ) { return make(ret,Types.ts(disp,arg1)); }
-  public static TypeFunSig make( TypeTuple ret, TypeMemPtr disp, Type arg1, Type arg2 ) { return make(ret,Types.ts(disp,arg1,arg2)); }
-  public static TypeFunSig make( TypeTuple ret, TypeTuple formals ) { return make(func_names,formals,ret); }
-  public TypeFunSig make_from_arg( int idx, Type arg ) { return make(_args,_formals.make_from_arg(idx,arg),_ret); }
+  //public static TypeFunSig make( TypeTuple ret, Type[] ts ) { return make(func_names,TypeTuple.make_args(ts),ret); }
+  //public static TypeFunSig make( TypeTuple ret, TypeMemPtr disp, Type arg1 ) { return make(TypeStruct.args(arg1),ret); }
+  //public static TypeFunSig make( TypeTuple ret, TypeMemPtr disp, Type arg1, Type arg2 ) { return make(ret,Types.ts(disp,arg1,arg2)); }
+  public static TypeFunSig make( TypeTuple ret, Type arg1 ) { return make(TypeStruct.args(arg1),ret); }
+  public static TypeFunSig make( TypeTuple ret, Type arg1, Type arg2 ) { return make(TypeStruct.args(arg1,arg2),ret); }
+  public TypeFunSig make_from_arg( TypeFld arg ) { return make(_formals.replace_fld(arg),_ret); }
 
   public static final String[] func_names = new String[]{" ctl", " mem", "^" , "arg3", "arg4", "arg5" }; // TODO: Extend as needed
 
-  public static final TypeFunSig II_I = make(TypeTuple.make_ret(TypeInt.INT64),TypeTuple.INT64_INT64);
+  public static final TypeFunSig II_I = make(TypeStruct.INT64_INT64, TypeTuple.make_ret(TypeInt.INT64));
   static final TypeFunSig[] TYPES = new TypeFunSig[]{II_I};
 
-  public int nargs() { return _formals._ts.length; }
-  public Type arg(int idx) { return _formals._ts[idx]; }
+  public int nargs() { return _max_arg+1; }
+  public TypeFld arg(int idx) { return _formals.fld_idx(idx); }
   public Type display() { return arg(DSP_IDX); }
 
-  @Override protected TypeFunSig xdual() { return new TypeFunSig().init(_args,_formals.dual(),_ret.dual()); }
+  @Override protected TypeFunSig xdual() { return new TypeFunSig().init(_formals.dual(),_ret.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUNSIG: break;
@@ -109,7 +96,7 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     default: throw typerr(t);   // All else should not happen
     }
     TypeFunSig tf = (TypeFunSig)t;
-    return make((TypeTuple)_ret.meet(tf._ret),(TypeTuple)_formals.meet(tf._formals));
+    return make((TypeStruct)_formals.meet(tf._formals),(TypeTuple)_ret.meet(tf._ret));
   }
 
   @Override public boolean above_center() { return _formals.above_center(); }

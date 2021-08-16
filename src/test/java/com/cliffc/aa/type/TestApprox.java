@@ -5,6 +5,7 @@ import org.junit.Test;
 
 import java.util.HashMap;
 
+import static com.cliffc.aa.AA.DSP_IDX;
 import static org.junit.Assert.*;
 
 
@@ -20,8 +21,8 @@ public class TestApprox {
 
     // Build two structs pointing to each other.
     //   -> [,int] -> * -> [,flt] -> * ->
-    TypeFld fbint = TypeFld.make("b",TypeInt.INT64);
-    TypeFld fbflt = TypeFld.make("b",TypeFlt.FLT64);
+    TypeFld fbint = TypeFld.make("b",TypeInt.INT64,TypeFld.oBot);
+    TypeFld fbflt = TypeFld.make("b",TypeFlt.FLT64,TypeFld.oBot);
     Type.RECURSIVE_MEET++;
     TypeFld f01 = TypeFld.malloc("a");
     TypeFld f10 = TypeFld.malloc("a");
@@ -52,8 +53,8 @@ public class TestApprox {
     int alias0 = BitsAlias.new_alias(BitsAlias.REC);
 
     // Build a depth-CUTOFF linked list chain
-    TypeStruct t0 = TypeStruct.make(TypeFld.make("a",Type.XNIL      ),
-                                    TypeFld.make("b",TypeInt.con(99)));
+    TypeStruct t0 = TypeStruct.make(TypeFld.make("a",Type.XNIL      ,TypeFld.oBot),
+                                    TypeFld.make("b",TypeInt.con(99),TypeFld.oBot));
     TypeMemPtr p0 = TypeMemPtr.make(alias0,t0);
     HashMap<Type,Integer> ds = p0.depth();
     assertEquals(0,(int)ds.get(t0));
@@ -696,12 +697,12 @@ public class TestApprox {
 
     // The approx that gets built: fib3->dsp3->fib3->dsp3->...
     Type.RECURSIVE_MEET++;
-    TypeStruct dsp3 = TypeStruct.malloc("",false,false,TypeFld.malloc("^"), TypeFld.malloc("fib")).set_hash();
+    TypeStruct dsp3 = TypeStruct.malloc("",false,false,TypeFld.malloc("^",null, TypeFld.Access.Final,DSP_IDX), TypeFld.malloc("fib")).set_hash();
     TypeMemPtr ptr3 = TypeMemPtr.make(alias,dsp3);
     TypeStruct arg3 = TypeStruct.make(TypeFld.make("->",Type.SCALAR),
                                       TypeFld.make("^",ptr3.simple_ptr()),
                                       TypeFld.make("x",TypeInt.INT64));
-    TypeFunPtr tfp3 = TypeFunPtr.make(fidxs,2,(TypeMemPtr)ptr3.simple_ptr());
+    TypeFunPtr tfp3 = TypeFunPtr.make(fidxs,2,ptr3.simple_ptr());
     dsp3.fld_find("^").setX(TypeMemPtr.DISPLAY_PTR);
     dsp3.fld_find("fib").setX(tfp3);
     Type.RECURSIVE_MEET--;

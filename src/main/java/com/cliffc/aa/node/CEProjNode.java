@@ -30,7 +30,7 @@ public class CEProjNode extends CProjNode {
       return false;             // Call not executing this wired path
 
     // Argument count mismatch
-    TypeTuple formals = fun._sig._formals;
+    TypeStruct formals = fun._sig._formals;
     if( ttcall.len()-2/*minus fun, minus esc*/ != formals.len() ) return false;
 
     // Cannot use the obvious argument check "actual.isa(formal)"!!!!!
