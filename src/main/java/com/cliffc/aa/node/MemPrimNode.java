@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
 
@@ -58,8 +57,9 @@ public abstract class MemPrimNode extends PrimNode {
         fun._bal_close = bal_close();
         add_def(null);              // Control for the primitive in slot 0
         add_def(mem );              // Memory  for the primitive in slot 1
-        for( TypeFld arg : _sig._formals.flds() )
-          add_def(Util.eq(arg._fld,"^") ? null : X.xform(new ParmNode(arg._order,arg._fld,fun, (ConNode)Node.con(arg._t.simple_ptr()),null)));
+        while( len() < _sig.nargs() ) add_def(null);
+          for( TypeFld arg : _sig._formals.flds() )
+          set_def(arg._order,X.xform(new ParmNode(arg._order, arg._fld, fun, (ConNode) Node.con(arg._t.simple_ptr()), null)));
         X.xform(this);
         // Functions return the set of *modified* memory.  ReadPrimNodes do not modify
         // memory.
@@ -98,12 +98,12 @@ public abstract class MemPrimNode extends PrimNode {
     }
     // Similar to LoadNode, of a field named '#'
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-      TypeMem live = _live_use(opt_mode,def);
+      TypeMem live = _live_use(def);
       return def==adr()
         ? (live.above_center() ? TypeMem.DEAD : _live)
         : live;
     }
-    public TypeMem _live_use(GVNGCM.Mode opt_mode, Node def ) {
+    public TypeMem _live_use( Node def ) {
       Type tmem = mem()._val;
       Type tptr = adr()._val;
       if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
@@ -168,8 +168,9 @@ public abstract class MemPrimNode extends PrimNode {
         fun._bal_close = bal_close();
         add_def(null);              // Control for the primitive in slot 0
         add_def(mem );              // Memory  for the primitive in slot 1
+        while( len() < _sig.nargs() ) add_def(null);
         for( TypeFld arg : _sig._formals.flds() )
-          add_def(Util.eq(arg._fld,"^") ? null : X.xform(new ParmNode(arg._order,arg._fld,fun, (ConNode)Node.con(arg._t.simple_ptr()),null)));
+          set_def(arg._order,X.xform(new ParmNode(arg._order,arg._fld,fun, (ConNode)Node.con(arg._t.simple_ptr()),null)));
         // Write prims return both a value and memory.
         MemPrimNode prim = (MemPrimNode)X.xform(this);
         RetNode ret = (RetNode)X.xform(new RetNode(fun,prim,prim.rez(),rpc,fun));

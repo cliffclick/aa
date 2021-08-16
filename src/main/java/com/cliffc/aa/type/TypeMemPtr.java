@@ -111,11 +111,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeStruct OOP_OOP = TypeStruct.args(TypeMemPtr.ISUSED0,TypeMemPtr.ISUSED0); // { ptr? ptr? -> }
   public  static final TypeStruct LVAL_LEN= TypeStruct.make("ary",TypeMemPtr.ARYPTR,Access.Final); // Array length
   public  static final TypeStruct LVAL_RD = TypeStruct.make2flds("ary",TypeMemPtr.ARYPTR,"idx",TypeInt.INT64); // Array & index
-  public  static final TypeStruct LVAL_WR = TypeStruct.make(TypeFld.NO_DISP, // Array & index & element
-                                                            TypeFld.make("ary",TypeMemPtr.ARYPTR,ARG_IDX  ),
+  public  static final TypeStruct LVAL_WR = TypeStruct.make(TypeFld.make("ary",TypeMemPtr.ARYPTR,ARG_IDX  ),
                                                             TypeFld.make("idx",TypeInt.INT64    ,ARG_IDX+1),
                                                             TypeFld.make("val",Type.SCALAR      ,ARG_IDX+2));
-  
+
   static final Type[] TYPES = new Type[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,EMTPTR,DISPLAY,DISPLAY_PTR,OOP_OOP,LVAL_LEN,LVAL_RD,LVAL_WR};
 
   @Override public boolean is_display_ptr() {

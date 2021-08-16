@@ -7,7 +7,6 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
-import static com.cliffc.aa.type.TypeFld.Access;
 
 // Function to wrap another type in a Name, which typically involves setting a
 // vtable like field, i.e. memory updates.
@@ -144,7 +143,7 @@ public class IntrinsicNode extends Node {
       NewObjNode nnn = (NewObjNode)X.add(new NewObjNode(false,alias,to,nodisp));
       for( TypeFld fld : to.flds() )
         if( !Util.eq(fld._fld,"^") ) // Display already handled
-          nnn.create_edge(fld._fld,X.xform(new ParmNode(nnn.len()-1+DSP_IDX,fld._fld,fun, (ConNode)Node.con(fld._t.simple_ptr()),bad)));
+          nnn.create_edge(X.xform(new ParmNode(nnn.len()-1+DSP_IDX,fld._fld,fun, (ConNode)Node.con(fld._t.simple_ptr()),bad)));
       Node mmem = Env.DEFMEM.make_mem_proj(nnn,memp);
       Node ptr = X.xform(new ProjNode(REZ_IDX, nnn));
       // Formal is unnamed, and this function adds the name.

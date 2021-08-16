@@ -26,7 +26,7 @@ public abstract class PrimNode extends Node {
   PrimNode( String name, TypeStruct formals, Type ret ) {
     super(OP_PRIM);
     _name=name;
-    assert formals.fld_find("^")==TypeFld.NO_DISP; // Room for no closure
+    assert formals.fld_find("^")==null; // No display
     _sig=TypeFunSig.make(formals,TypeTuple.make_ret(ret));
     _badargs=null;
     _op_prec = -1;              // Not set yet
@@ -139,13 +139,13 @@ public abstract class PrimNode extends Node {
   @Override public String xstr() { return _name+":"+_sig._formals.fld_idx(ARG_IDX)._t; }
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Type[] ts = new Type[_defs._len]; // 1-based
-    // If all inputs are constants we constant fold.  If any input is high, we
+    // If all inputs are constants we constant-fold.  If any input is high, we
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
-    for( int i=1; i<_defs._len; i++ ) { // first is control
-      Type tactual = val(i);
-      Type tformal = _sig.arg(i+ARG_IDX-1); // first is control
-      Type t = tformal.dual().meet(ts[i] = tactual);
+    for( TypeFld fld : _sig._formals.flds() ) {
+      Type tactual = ts[fld._order] = val(fld._order);
+      Type tformal = fld._t;
+      Type t = tformal.dual().meet(tactual);
       if( !t.is_con() ) {
         is_con = false;         // Some non-constant
         if( t.above_center() ) has_high=true;
@@ -186,9 +186,9 @@ public abstract class PrimNode extends Node {
       add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
       Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
       if( _thunk_rhs ) add_def(mem);      // Memory if thunking
+      while( len() < _sig.nargs() ) add_def(null);
       for( TypeFld fld : _sig._formals.flds() )
-        if( fld._order >= ARG_IDX )
-          add_def(X.xform(new ParmNode(fld._order,fld._fld,fun, Env.ALL,null)));
+        set_def(fld._order,X.xform(new ParmNode(fld._order,fld._fld,fun, Env.ALL,null)));
       Node that = X.xform(this);
       Node ctl,rez;
       if( _thunk_rhs ) {
@@ -248,8 +248,8 @@ public abstract class PrimNode extends Node {
   // TODO: Type-check strptr input args
   static class ConvertStrStr extends PrimNode {
     ConvertStrStr() { super("str",TypeMemPtr.FORMAL_STRPTR,TypeMemPtr.OOP); }
-    @Override public Node ideal_reduce() { return in(1); }
-    @Override public Type value(GVNGCM.Mode opt_mode) { return val(1); }
+    @Override public Node ideal_reduce() { return in(ARG_IDX); }
+    @Override public Type value(GVNGCM.Mode opt_mode) { return val(ARG_IDX); }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   }
 
@@ -355,7 +355,7 @@ public abstract class PrimNode extends Node {
     AndI64() { super("&"); }
     // And can preserve bit-width
     @Override public Type value(GVNGCM.Mode opt_mode) {
-      Type t1 = val(1), t2 = val(2);
+      Type t1 = val(ARG_IDX), t2 = val(ARG_IDX+1);
       // 0 AND anything is 0
       if( t1 == Type. NIL || t2 == Type. NIL ) return Type. NIL;
       if( t1 == Type.XNIL || t2 == Type.XNIL ) return Type.XNIL;
@@ -380,7 +380,7 @@ public abstract class PrimNode extends Node {
     OrI64() { super("|"); }
     // And can preserve bit-width
     @Override public Type value(GVNGCM.Mode opt_mode) {
-      Type t1 = val(1), t2 = val(2);
+      Type t1 = val(ARG_IDX), t2 = val(ARG_IDX+1);
       // 0 OR anything is that thing
       if( t1 == Type.NIL || t1 == Type.XNIL ) return t2;
       if( t2 == Type.NIL || t2 == Type.XNIL ) return t1;
@@ -404,7 +404,7 @@ public abstract class PrimNode extends Node {
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpI64 extends PrimNode {
     Prim2RelOpI64( String name ) { super(name,TypeStruct.INT64_INT64,TypeInt.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(args[1].getl(),args[2].getl())?TypeInt.TRUE:TypeInt.FALSE; }
+    @Override public Type apply( Type[] args ) { return op(args[ARG_IDX].getl(),args[ARG_IDX+1].getl())?TypeInt.TRUE:TypeInt.FALSE; }
     abstract boolean op( long x, long y );
   }
 
@@ -424,16 +424,16 @@ public abstract class PrimNode extends Node {
       // equals if your inputs are the same node, and you are unequals if your
       // input is 2 different NewNodes (or casts of NewNodes).  Otherwise you
       // have to do the runtime test.
-      if( in(1)==in(2) ) return TypeInt.TRUE;
-      Node nn1 = in(1).in(0), nn2 = in(2).in(0);
+      if( in(ARG_IDX)==in(ARG_IDX+1) ) return TypeInt.TRUE;
+      Node nn1 = in(ARG_IDX).in(0), nn2 = in(ARG_IDX+1).in(0);
       if( nn1 instanceof NewNode &&
           nn2 instanceof NewNode &&
           nn1 != nn2 ) return TypeInt.FALSE;
       // Constants can only do nil-vs-not-nil, since e.g. two strings "abc" and
       // "abc" are equal constants in the type system but can be two different
       // string pointers.
-      Type t1 = val(1);
-      Type t2 = val(2);
+      Type t1 = val(ARG_IDX);
+      Type t2 = val(ARG_IDX+1);
       if( t1==Type.NIL || t1==Type.XNIL ) return vs_nil(t2,TypeInt.TRUE,TypeInt.FALSE);
       if( t2==Type.NIL || t2==Type.XNIL ) return vs_nil(t1,TypeInt.TRUE,TypeInt.FALSE);
       if( t1.above_center() || t2.above_center() ) return TypeInt.BOOL.dual();
@@ -453,18 +453,18 @@ public abstract class PrimNode extends Node {
       // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
       // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
       // equals if your inputs are the same node, and you are unequals if your
-      // input is 2 different NewNodes (or casts of NewNodes).  Otherwise you
+      // input is 2 different NewNodes (or casts of NewNodes).  Otherwise, you
       // have to do the runtime test.
-      if( in(1)==in(2) ) return TypeInt.FALSE;
-      Node nn1 = in(1).in(0), nn2 = in(2).in(0);
+      if( in(ARG_IDX)==in(ARG_IDX+1) ) return TypeInt.FALSE;
+      Node nn1 = in(ARG_IDX).in(0), nn2 = in(ARG_IDX+1).in(0);
       if( nn1 instanceof NewNode &&
           nn2 instanceof NewNode &&
           nn1 != nn2 ) return TypeInt.TRUE;
       // Constants can only do nil-vs-not-nil, since e.g. two strings "abc" and
       // "abc" are equal constants in the type system but can be two different
       // string pointers.
-      Type t1 = val(1);
-      Type t2 = val(2);
+      Type t1 = val(ARG_IDX);
+      Type t2 = val(ARG_IDX+1);
       if( t1==Type.NIL || t1==Type.XNIL ) return EQ_OOP.vs_nil(t2,TypeInt.FALSE,TypeInt.TRUE);
       if( t2==Type.NIL || t2==Type.XNIL ) return EQ_OOP.vs_nil(t1,TypeInt.FALSE,TypeInt.TRUE);
       if( t1.above_center() || t2.above_center() ) return TypeInt.BOOL.dual();
@@ -478,7 +478,7 @@ public abstract class PrimNode extends Node {
     // Rare function which takes a Scalar (works for both ints and ptrs)
     Not() { super("!",TypeStruct.SCALAR1,TypeInt.BOOL); }
     @Override public Type value(GVNGCM.Mode opt_mode) {
-      Type t = val(1);
+      Type t = val(ARG_IDX);
       if( t== Type.XNIL ||
           t== Type. NIL ||
           t== TypeInt.ZERO )
@@ -493,7 +493,7 @@ public abstract class PrimNode extends Node {
   static class RandI64 extends PrimNode {
     RandI64() { super("math_rand",TypeStruct.INT64,TypeInt.INT64); }
     @Override public Type value(GVNGCM.Mode opt_mode) {
-      Type t = val(1);
+      Type t = val(ARG_IDX);
       if( t.above_center() ) return TypeInt.BOOL.dual();
       if( TypeInt.INT64.dual().isa(t) && t.isa(TypeInt.INT64) )
         return t.meet(TypeInt.FALSE);

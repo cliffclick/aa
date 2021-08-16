@@ -153,7 +153,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
            : "PRIMS_"+t1);
     } else {
       boolean field_sep=false;
-      for( TypeFld fld : sorted_flds() ) {
+      for( TypeFld fld : osorted_flds() ) {
         if( !debug && Util.eq(fld._fld,"^") ) continue; // Do not print the ever-present display
         fld.str(sb,dups,mem,debug); // Field name, access mod, type
         sb.p(is_tup ? ", " : "; "); // Between fields
@@ -179,7 +179,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   // Make a collection of fields, with no display and all with default names and final fields.
-  private static TypeStruct make0() { return malloc("",false,false).add_fld(TypeFld.NO_DISP); }
+  private static TypeStruct make0() { return malloc("",false,false); }
   private TypeStruct add_arg(Type t, int n) { return add_fld(TypeFld.make_arg(t,n)); }
   private TypeStruct add_tup(Type t, int n) { return add_fld(TypeFld.make_tup(t,n)); }
   public static TypeStruct args(Type t1                  ) { return make0().add_arg(t1,ARG_IDX)                      .hashcons_free(); }
@@ -195,7 +195,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return ts.hashcons_free();
   }
   // Used to make a few testing constants
-  public static TypeStruct make( String fld_name, Type t, Access a ) { return make(TypeFld.NO_DISP,TypeFld.make(fld_name,t,a,ARG_IDX)); }
+  public static TypeStruct make( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a,ARG_IDX)); }
   // Used to make a few (larger and recursive) testing constants.  Some of the
   // fields are interned and some are recursive and without a type.
   public static TypeStruct malloc( String name, boolean any, boolean open, TypeFld... flds ) {
@@ -214,7 +214,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return ts.hashcons_free();
   }
   public static TypeStruct make2flds( String f1, Type t1, String f2, Type t2 ) {
-    return make("",false,false,TypeFld.NO_DISP,TypeFld.make(f1,t1,ARG_IDX),TypeFld.make(f2,t2,ARG_IDX+1));
+    return make("",false,false,TypeFld.make(f1,t1,ARG_IDX),TypeFld.make(f2,t2,ARG_IDX+1));
   }
 
   // Add fields from a Type[].  Will auto-allocate the Type[], if not already
@@ -923,6 +923,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // (i.e., error checking arguments).  Given a TypeMem and a BitsAlias it
   // returns a TypeObj (and extends the HashMap for future calls).  The TypeObj
   // may contain deep pointers to other deep TypeObjs, including cyclic types.
+  // This function is monotonic in its arguments.
   static TypeMemPtr sharpen( TypeMem mem, TypeMemPtr dull ) {
     assert dull==dull.simple_ptr() && mem.sharp_get(dull)==null;
 
@@ -1083,8 +1084,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // All fields for iterating.
   public Collection<TypeFld> flds() { return _flds.values(); }
-  public Collection<TypeFld> sorted_flds() {
+  // Alpha sorted
+  public Collection<TypeFld> asorted_flds() {
     TreeMap<String, TypeFld> sorted = new TreeMap<>();
+    sorted.putAll(_flds);
+    return sorted.values();
+  }
+  // Field order sorted
+  public Collection<TypeFld> osorted_flds() {
+    TreeMap<String, TypeFld> sorted = new TreeMap<>((f0,f1)->fld_find(f0)._order-fld_find(f1)._order);
     sorted.putAll(_flds);
     return sorted.values();
   }

@@ -5,6 +5,7 @@ import org.junit.Test;
 
 import java.util.HashMap;
 
+import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.DSP_IDX;
 import static org.junit.Assert.*;
 
@@ -624,15 +625,15 @@ public class TestApprox {
     // A is basic RECORD type, actually equal to TypeStruct.DISPLAY.
     // B,C,D are child aliases of A and are alias6,7,8.
     // D is a LHS end type: D -> (nil,88)
-    TypeStruct tsD = TypeStruct.tups(TypeInt.con(88));
+    TypeStruct tsD = TypeStruct.make(TypeFld.NO_DISP, TypeFld.make_tup(TypeInt.con(88),ARG_IDX));
     TypeMemPtr tmpD = TypeMemPtr.make(ba8,tsD); // Note not nil
     // Add (alternating the repeating field left and right):
     //   B1 = ( A , 99 )
-    TypeStruct tsB1 = TypeStruct.make(TypeFld.make("^",tmp0),TypeFld.make_tup(TypeInt.con(99),1));
+    TypeStruct tsB1 = TypeStruct.make(TypeFld.make("^",tmp0,DSP_IDX),TypeFld.make_tup(TypeInt.con(99),ARG_IDX));
     assertEquals(tsB1,tsB1.approx(CUTOFF,alias6));
     TypeMemPtr tmpB1= TypeMemPtr.make(ba6,tsB1); // Note not nil
     //   C1 = ( D , B1 )
-    TypeStruct tsC1 = TypeStruct.make(TypeFld.make("^",tmpD),TypeFld.make_tup(tmpB1,1));
+    TypeStruct tsC1 = TypeStruct.make(TypeFld.make("^",tmpD,DSP_IDX),TypeFld.make_tup(tmpB1,ARG_IDX));
     assertEquals(tsC1,tsC1.approx(CUTOFF,alias7));
     TypeMemPtr tmpC1= TypeMemPtr.make(ba7,tsC1); // Note not nil
 
@@ -646,12 +647,12 @@ public class TestApprox {
     while( tmpC1 != tmp1 && cnt < 100 ) {
       tmp1 = tmpC1;
       //   B2 = ( C1, 99 )
-      TypeStruct tsB2 = TypeStruct.make(TypeFld.make("^",tmpC1),TypeFld.make_tup(TypeInt.con(99),1));
+      TypeStruct tsB2 = TypeStruct.make(TypeFld.make("^",tmpC1,DSP_IDX),TypeFld.make_tup(TypeInt.con(99),ARG_IDX));
       TypeStruct tsB2x = tsB2.approx(CUTOFF,alias6);
       TypeMemPtr tmpB2= TypeMemPtr.make(ba6,tsB2x); // Note not nil
 
       //   C2 = ( D , B2 )
-      TypeStruct tsC2 = TypeStruct.make(TypeFld.make("^",tmpD),TypeFld.make_tup(tmpB2,1));
+      TypeStruct tsC2 = TypeStruct.make(TypeFld.make("^",tmpD,DSP_IDX),TypeFld.make_tup(tmpB2,ARG_IDX));
       TypeStruct tsC2x = tsC2.approx(CUTOFF,alias7);
       TypeMemPtr tmpC2= TypeMemPtr.make(ba7,tsC2x); // Note not nil
       tmpC1 = tmpC2;

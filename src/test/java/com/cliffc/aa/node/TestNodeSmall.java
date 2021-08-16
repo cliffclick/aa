@@ -500,7 +500,6 @@ public class TestNodeSmall {
     //   FunPtr - Ret
     gvn._opt_mode=GVNGCM.Mode.Parse;
     ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
-    ctl._val = Type.CTRL;
     ConNode mem = (ConNode)gvn.xform(new ConNode<>(TypeMem.ANYMEM)).keep();
     ConNode rpc = (ConNode)gvn.xform(new ConNode<>(TypeRPC.ALL_CALL));
     ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISP_SIMPLE));
@@ -511,11 +510,10 @@ public class TestNodeSmall {
     ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(DSP_IDX, dsp_file));
     Env.ALL_DISPLAYS = Env.ALL_DISPLAYS.set(dsp_file._alias);
     // The Fun and Fun._tf:
-    TypeTuple formals = TypeTuple.make_args(Types.ts(Type.CTRL,
-                                                     TypeMem.MEM,
-                                                     dsp_file_ptr._val, // File-scope display as arg0
-                                                     Type.SCALAR));  // Some scalar arg1
-    TypeFunSig sig = TypeFunSig.make(TypeTuple.RET,formals);
+    TypeStruct formals = TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
+                                         TypeFld.make("^",dsp_file_ptr._val,DSP_IDX), // File-scope display as arg0
+                                         TypeFld.make("x",Type.SCALAR,ARG_IDX));  // Some scalar arg1
+    TypeFunSig sig = TypeFunSig.make(formals,TypeTuple.RET);
     FunNode fun = new FunNode(null,sig,-1,false);
     gvn.init(fun.add_def(ctl).add_def(ctl)).unkeep();
     // Parms for the Fun.  Note that the default type is "weak" because the
@@ -556,7 +554,7 @@ public class TestNodeSmall {
     // Validate cyclic display/function type
     TypeFunPtr tfptr0 = (TypeFunPtr) fptr._val;
     Type tdptr0 = tfptr0._disp;
-    Type tret = ((TypeTuple) ret._val).at(2);
+    Type tret = ((TypeTuple) ret._val).at(REZ_IDX);
     assertEquals(tdptr0,tret); // Returning the display
     // Display contains 'fact' pointing to self
     TypeMem tmem = (TypeMem) dsp_file_obj._val;
@@ -596,26 +594,28 @@ public class TestNodeSmall {
 
     // Build a bunch of aliases.
     int a1 = BitsAlias.new_alias(BitsAlias.REC);
-    int a2 = BitsAlias.new_alias(BitsAlias.REC);
+    int a2 = BitsAlias.new_alias(BitsAlias.STR);
     int a3 = BitsAlias.new_alias(BitsAlias.REC);
-    TypeTuple ts_int_flt = TypeTuple.make_args(TypeInt.INT64,TypeFlt.FLT64);
-    TypeTuple ts_int_abc = TypeTuple.make_args(TypeInt.INT64,TypeMemPtr.ABCPTR);
+    TypeFld fmem = TypeFld.make(" mem",TypeMem.MEM,Access.Final,MEM_IDX);
+    TypeFld fint = TypeFld.make_arg(TypeInt.INT64,ARG_IDX);
+    TypeStruct ts_int_flt = TypeStruct.make(fmem,fint,TypeFld.make_arg(TypeFlt.FLT64,ARG_IDX+1));
+    TypeStruct ts_int_abc = TypeStruct.make(fmem,fint,TypeFld.make_arg(TypeMemPtr.ABCPTR,ARG_IDX+1));
     // @{ a:int; b:"abc" }
     TypeStruct a_int_b_abc = TypeStruct.make2flds("a",TypeInt.INT64,"b",TypeMemPtr.ABCPTR);
+    TypeStruct ts_flt_str = TypeStruct.make(fmem,TypeFld.make_arg(TypeFlt.FLT64,ARG_IDX),TypeFld.make_arg(TypeMemPtr.make(BitsAlias.REC,a_int_b_abc),ARG_IDX+1));
 
     // Build a bunch of function type signatures
     TypeFunSig[] sigs = new TypeFunSig[] {
-      TypeFunSig.make(TypeTuple.RET,ts_int_flt), // {int flt   -> }
-      TypeFunSig.make(TypeTuple.RET,ts_int_abc), // {int "abc" -> }
-      // { flt @{a:int; b:"abc"} -> }
-      TypeFunSig.make(TypeTuple.RET,TypeTuple.make_args(TypeFlt.FLT64,TypeMemPtr.make(BitsAlias.REC,a_int_b_abc))),
+      TypeFunSig.make(ts_int_flt,TypeTuple.RET), // {int flt   -> }
+      TypeFunSig.make(ts_int_abc,TypeTuple.RET), // {int "abc" -> }
+      TypeFunSig.make(ts_flt_str,TypeTuple.RET), // { flt @{a:int; b:"abc"} -> }
     };
 
     // Build a bunch of memory parm types
     TypeMem[] mems = new TypeMem[] {
       tmem(null),
       tmem(null).dual(),
-      tmem(new int[]{a1},TypeStr.STR),
+      tmem(new int[]{a2},TypeStr.STR),
       tmem(new int[]{a1},a_int_b_abc),
     };
 
@@ -683,31 +683,31 @@ public class TestNodeSmall {
     CallNode call = gvn.init(new CallNode(true, null, ctl, null/*mem*/, null/*disp*/, null/*x*/, null/*y*/, null/*fidx*/));
     CallEpiNode cepi = gvn.init(new CallEpiNode(call, Env.DEFMEM)); // Unwired
     Node cpj = gvn.xform(new CProjNode(call,0));
-    ConNode mem = (ConNode)gvn.xform(new ConNode<>(tmem ));
-    ConNode arg1= (ConNode)gvn.xform(new ConNode<>(targ1));
-    ConNode arg2= (ConNode)gvn.xform(new ConNode<>(targ2));
+    ConNode mem = gvn.xform(new ConNode<>(tmem )).keep(2);
+    ConNode arg1= gvn.xform(new ConNode<>(targ1)).keep(2);
+    ConNode arg2= gvn.xform(new ConNode<>(targ2)).keep(2);
 
     // Make nodes
     FunNode fun = new FunNode(null,tsig,-1,false).unkeep();
     gvn.xform(fun.add_def(cpj));
 
-    ParmNode parmem= gvn.init(new ParmNode( 0,"mem" ,fun,mem ,null));
-    ParmNode parm1 = gvn.init(new ParmNode( 2,"arg1",fun,arg1,null));
-    ParmNode parm2 = gvn.init(new ParmNode( 3,"arg2",fun,arg2,null));
+    ParmNode parmem= gvn.init(new ParmNode(MEM_IDX,  " mem",fun,mem .unkeep(2),null)).unkeep(2);
+    ParmNode parm1 = gvn.init(new ParmNode(ARG_IDX,  "arg1",fun,arg1.unkeep(2),null)).unkeep(2);
+    ParmNode parm2 = gvn.init(new ParmNode(ARG_IDX+1,"arg2",fun,arg2.unkeep(2),null)).unkeep(2);
 
     // Types for normal args before memory type
-    Type tp1 = parm1 .xval ();
-    Type tp2 = parm2 .xval ();
-    Type tpm = parmem.value(gvn._opt_mode);
+    Type tpm = parmem.xval();
+    Type tp1 = parm1 .xval();
+    Type tp2 = parm2 .xval();
 
     // Check the isa(sig) on complex pointer args
     Type actual1 = tpm.sharptr(tp1);
-    Type formal1 = fun.formal(2);
-    if( !actual1.isa(formal1) && !formal1.isa(actual1) )
+    Type formal1 = fun.formal(ARG_IDX);
+    if( !actual1.above_center() && !actual1.isa(formal1) && !formal1.isa(actual1) )
       perror("arg1-vs-formal1",actual1,formal1);
     Type actual2 = tpm.sharptr(tp2);
-    Type formal2 = fun.formal(3);
-    if( !actual2.isa(formal2) && !formal2.isa(actual2) )
+    Type formal2 = fun.formal(ARG_IDX+1);
+    if( !actual2.above_center() && !actual2.isa(formal2) && !formal2.isa(actual2) )
       perror("arg2-vs-formal2",actual2,formal2);
 
     // Record for later monotonic check

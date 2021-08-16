@@ -108,16 +108,10 @@ public class TypeTuple extends Type<TypeTuple> {
     assert ts[MEM_IDX] instanceof TypeMem && ts[DSP_IDX].is_display_ptr();
     return make(ts);
   }
-  //public TypeTuple make_from_arg(int idx, Type arg ) {
-  //  Type[] ts = Types.clone(_ts);
-  //  ts[idx]=arg;
-  //  return make0(_any,ts);
-  //}
 
   public static TypeTuple make_args(                       ) { return make(Type.CTRL,TypeMem.ALLMEM,Type.ALL ); }
   public static TypeTuple make_args(Type t2                ) { return make(Type.CTRL,TypeMem.ALLMEM,Type.ALL,t2); }
   public static TypeTuple make_args(Type t2,Type t3        ) { return make(Type.CTRL,TypeMem.ALLMEM,Type.ALL,t2,t3); }
-  public static TypeTuple make_args(Type t2,Type t3,Type t4) { return make(Type.CTRL,TypeMem.ALLMEM,Type.ALL,t2,t3,t4); }
   public static TypeTuple make_ret(Type trez) { return make(Type.CTRL,TypeMem.ANYMEM,trez); }
 
 

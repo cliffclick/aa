@@ -156,16 +156,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // not done by default.
   // TODO: Allow CSE if all fields are final at construction.
   @Override public boolean equals(Object o) {  return this==o; }
-  public MrgProjNode mrg() {
-    Node ptr = _uses.at(0);
-    if( !(ptr instanceof MrgProjNode) ) ptr = _uses.at(1);
-    return (MrgProjNode)ptr;
-  }
-  ProjNode ptr() {
-    Node ptr = _uses.at(0);
-    if( ptr instanceof MrgProjNode ) ptr = _uses.at(1);
-    return (ProjNode)ptr;
-  }
 
   // --------------------------------------------------------------------------
   public static abstract class NewPrimNode<T extends TypeObj<T>> extends NewNode<T> {
@@ -205,10 +195,10 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
         // Add input edges to the intrinsic
         if( _reads ) set_def(MEM_IDX, memp); // Memory is already null by default
-        for( TypeFld arg : _sig._formals.sorted_flds() ) {
+        while( len() < _sig.nargs() ) add_def(null);
+        for( TypeFld arg : _sig._formals.flds() ) {
           if( arg._order==MEM_IDX ) continue; // Already handled MEM_IDX
-          while( arg._order > len() ) add_def(null);
-          add_def(X.xform(new ParmNode(arg._order,arg._fld,fun, (ConNode)Node.con(arg._t.simple_ptr()),null)));
+          set_def(arg._order,X.xform(new ParmNode(arg._order,arg._fld,fun, (ConNode)Node.con(arg._t.simple_ptr()),null)));
         }
         NewNode nnn = (NewNode)X.xform(this);
         Node mem = Env.DEFMEM.make_mem_proj(nnn,memp);

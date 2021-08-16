@@ -55,10 +55,10 @@ public class NewObjNode extends NewNode<TypeStruct> {
   // Create a field from parser for an active this
   public void create_active( String name, Node val, Access mutable ) {
     setsm(_ts.add_fld(name,mutable,mutable==Access.Final ? val._val : Type.SCALAR,_defs._len));
-    create_edge(name,val);
+    create_edge(val);
   }
   // Used by IntrinsicNode
-  public void create_edge( String name, Node val ) {
+  public void create_edge( Node val ) {
     add_def(val);
     Env.GVN.add_flow(this);
   }
@@ -93,7 +93,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
   // according to use.
   public void promote_forward( NewObjNode parent ) {
     assert parent != null;
-    TypeStruct ts = _ts;
     for( TypeFld fld : _ts.flds() ) {
       Node n = in(fld._order);
       if( n != null && n.is_forward_ref() ) {
@@ -118,7 +117,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
       TypeObj ts3 = (TypeObj)((TypeTuple)_val).at(MEM_IDX);
       if( ts3 != TypeObj.UNUSED ) {
         TypeStruct ts4 = _ts.make_from((TypeStruct)ts3);
-        TypeStruct ts5 = _ts.crush();
+        TypeStruct ts5 = ts4.crush();
         assert ts4.isa(ts5);
         if( ts5 != _crushed && ts5.isa(_crushed) ) {
           setsm(ts4);

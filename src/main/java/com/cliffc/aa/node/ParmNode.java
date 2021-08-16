@@ -4,7 +4,6 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
 
 import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.MEM_IDX;
@@ -71,7 +70,7 @@ public class ParmNode extends PhiNode {
     if( !opt_mode._CG && fun.has_unknown_callers() )
       return val(1);
     Node mem = fun.parm(MEM_IDX);
-    // All callers known; merge the wired & flowing ones
+    // All callers' known; merge the wired & flowing ones
     Type t = Type.ANY;
     for( int i=1; i<_defs._len; i++ ) {
       if( fun.val(i)==Type.XCTRL || fun.val(i)==Type.ANY ) continue; // Only meet alive paths
@@ -87,7 +86,7 @@ public class ParmNode extends PhiNode {
     // Check against formals; if OOB, always produce an error.
     Type formal = fun.formal(_idx);
     // Good case:
-    if( t.isa(formal) ) return t.simple_ptr();
+    if( t.above_center() || t.isa(formal) ) return t.simple_ptr();
     return Type.ALL;
   }
 
@@ -120,7 +119,7 @@ public class ParmNode extends PhiNode {
     for( int i=1; i<_defs._len; i++ ) {
       if( fun.val(i)==Type.XCTRL ) continue;// Ignore dead paths
       Type argt = mem == null ? in(i)._val : in(i).sharptr(mem.in(i)); // Arg type for this incoming path
-      if( argt!=Type.ALL && !argt.isa(formal) ) { // Argument is legal?  ALL args are in-error elsewhere
+      if( argt!=Type.ALL && !argt.above_center() && !argt.isa(formal) ) { // Argument is legal?  ALL args are in-error elsewhere
         // The merge of all incoming calls for this argument is not legal.
         // Find the call bringing the broken args, and use it for error
         // reporting - it MUST exist, or we have a really weird situation

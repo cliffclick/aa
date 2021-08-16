@@ -222,7 +222,7 @@ public abstract class Node implements Cloneable {
   public static void roll_back_CNT() { while( !LIVE.get(CNT-1) ) CNT--; }
 
   // "keep" a Node during all optimizations because it is somehow unfinished.
-  // Typically used when needing to build several Nodes before building the
+  // Typically, used when needing to build several Nodes before building the
   // typically using Node; during construction the earlier Nodes have no users
   // (yet) and are not dead.  Acts "as if" there is an unknown user.
   public <N extends Node> N keep() { return keep(1); }
@@ -573,7 +573,7 @@ public abstract class Node implements Cloneable {
       return con(_val);
 
     // Try CSE
-    if( !_elock ) {             // Not in VALS
+    if( !_elock && _keep <=1 ) {// Not in VALS and can still replace
       Node x = VALS.get(this);  // Try VALS
       if( x != null )           // Hit
         return merge(x);        // Graph replace with x

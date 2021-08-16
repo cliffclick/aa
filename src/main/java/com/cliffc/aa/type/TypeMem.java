@@ -60,7 +60,7 @@ public class TypeMem extends Type<TypeMem> {
   // A cache of sharpened pointers.  Pointers get sharpened by looking up their
   // aliases in this memory (perhaps merging several aliases).  The process is
   // recursive and "deeply" sharpens pointers, and is somewhat expensive.
-  // Maintain a cache of prior results.  Not related to the objects Type, so
+  // Maintain a cache of prior results.  Not related to the object's Type, so
   // not part of the hash/equals checks.  Optional.  Lazily filled in.
   private HashMap<TypeMemPtr,TypeMemPtr> _sharp_cache;
 

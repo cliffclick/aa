@@ -185,7 +185,7 @@ public class FunNode extends RegionNode {
   boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
   // Formal types.
   Type formal(int idx) {
-    return idx == -1 ? TypeRPC.ALL_CALL : _sig.arg(idx);
+    return idx == -1 ? TypeRPC.ALL_CALL : _sig.arg(idx)._t;
   }
   public int nargs() { return _sig.nargs(); }
 
@@ -212,12 +212,10 @@ public class FunNode extends RegionNode {
     if( !is_forward_ref() && !is_prim() && _keep==0 ) {
       Node[] parms = parms();
       TypeFunSig progress = _sig;
-      for( int i=1; i<parms.length; i++ )
-        if( (parms[i]==null || parms[i]._live==TypeMem.DEAD) ) {
-          TypeFld formal = _sig._formals.fld_idx(i);
-          if( formal._t!=Type.ALL )
-            _sig = _sig.make_from_arg(formal.make_from(Type.ALL));
-        }
+      for( TypeFld fld : _sig._formals.flds() )
+        if( fld._t!=Type.ALL &&
+            (parms[fld._order]==null || parms[fld._order]._live==TypeMem.DEAD) )
+          _sig = _sig.make_from_arg(fld.make_from(Type.ALL));
       // Can resolve some least_cost choices
       if( progress != _sig ) {
         FunPtrNode fptr = fptr();
@@ -913,6 +911,6 @@ public class FunNode extends RegionNode {
   }
 
   @Override public boolean equals(Object o) { return this==o; } // Only one
-  @Override public Node is_copy(int idx) { return in(0)==this ? in(1) : null; } 
+  @Override public Node is_copy(int idx) { return in(0)==this ? in(1) : null; }
   void set_is_copy() { set_def(0,this); Env.GVN.add_reduce_uses(this); }
 }

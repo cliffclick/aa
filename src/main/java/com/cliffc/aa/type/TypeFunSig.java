@@ -42,7 +42,7 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     if( debug ) sb.p('_').p(_uid);
     sb.p(_name);
     sb.p("{ ");
-    for( TypeFld arg : _formals.sorted_flds() ) {
+    for( TypeFld arg : _formals.osorted_flds() ) {
       sb.p(arg._fld);
       if( arg._t != Type.SCALAR )
         arg._t.str(sb.p(':'),dups,mem,debug);
