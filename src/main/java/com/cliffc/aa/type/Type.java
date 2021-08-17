@@ -917,15 +917,15 @@ public class Type<T extends Type<T>> implements Cloneable {
     case TXNIL:   return nil; // Preserve high/low flavor
     case TNIL:    return NIL;
     case TXNREAL:
-    case TXNSCALR:  return TypeInt.BOOL;
+    case TXNSCALR:return TypeInt.BOOL;
     case TREAL:   case TNREAL:    return REAL;
     case TSCALAR: case TNSCALR:   return SCALAR;
     case TCTRL:   case TXCTRL:
     case TOBJ:
     case TSTR:
     case TSTRUCT:
-    case TMEM:      return ALL;
-    default:        throw typerr(null); // Overridden in subclass
+    case TMEM:    return ALL;
+    default:      throw typerr(null); // Overridden in subclass
     }
   }
 

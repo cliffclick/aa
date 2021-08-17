@@ -10,7 +10,6 @@ import java.util.function.Predicate;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
-import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 
 /** A memory-based collection of optionally named fields.  This is a recursive
  *  type, only produced by NewNode and structure or tuple constants.  Fields
@@ -174,19 +173,29 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   TypeStruct hashcons_free() {
     // All subparts already interned
-    for( TypeFld fld : _flds.values() ) assert fld.interned();
+    if( RECURSIVE_MEET ==0 ) for( TypeFld fld : _flds.values() ) assert fld.interned();
     return super.hashcons_free();
   }
 
   // Make a collection of fields, with no display and all with default names and final fields.
   private static TypeStruct make0() { return malloc("",false,false); }
   private TypeStruct add_arg(Type t, int n) { return add_fld(TypeFld.make_arg(t,n)); }
-  private TypeStruct add_tup(Type t, int n) { return add_fld(TypeFld.make_tup(t,n)); }
-  public static TypeStruct args(Type t1                  ) { return make0().add_arg(t1,ARG_IDX)                      .hashcons_free(); }
-  public static TypeStruct args(Type t1, Type t2         ) { return make0().add_arg(t1,ARG_IDX).add_arg(t2,ARG_IDX+1).hashcons_free(); }
-  public static TypeStruct tups(Type t1                  ) { return make0().add_tup(t1,ARG_IDX)                      .hashcons_free(); }
-  public static TypeStruct tups(Type t1, Type t2         ) { return make0().add_tup(t1,ARG_IDX).add_tup(t2,ARG_IDX+1).hashcons_free(); }
-  public static TypeStruct tups(Type t1, Type t2, Type t3) { return make0().add_tup(t1,ARG_IDX).add_tup(t2,ARG_IDX+1).add_tup(t3,ARG_IDX+2).hashcons_free(); }
+  public static TypeStruct args(Type t1         ) { return make0().add_arg(t1,ARG_IDX)                      .hashcons_free(); }
+  public static TypeStruct args(Type t1, Type t2) { return make0().add_arg(t1,ARG_IDX).add_arg(t2,ARG_IDX+1).hashcons_free(); }
+  // Used by tests only, so ... is ok.
+  public static TypeStruct tups(Type... ts ) {
+    TypeStruct st = make0();
+    for( int i=0; i<ts.length; i++ )
+      st.add_fld(TypeFld.make_tup(ts[i],ARG_IDX+i));
+    return st.hashcons_free();
+  }
+  public static TypeStruct tupsD(Type... ts ) {
+    TypeStruct st = make0();
+    st.add_fld(TypeFld.NO_DISP);
+    for( int i=0; i<ts.length; i++ )
+      st.add_fld(TypeFld.make_tup(ts[i],ARG_IDX+i));
+    return st.hashcons_free();
+  }
 
   // Arys are used by the parser
   public static TypeStruct make( String name, boolean any, boolean open, Ary<TypeFld> flds ) {
@@ -213,8 +222,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( TypeFld fld : flds ) ts.add_fld(fld);
     return ts.hashcons_free();
   }
+  // Without NO_DISP
   public static TypeStruct make2flds( String f1, Type t1, String f2, Type t2 ) {
     return make("",false,false,TypeFld.make(f1,t1,ARG_IDX),TypeFld.make(f2,t2,ARG_IDX+1));
+  }
+  // With NO_DISP
+  public static TypeStruct make2fldsD( String f1, Type t1, String f2, Type t2 ) {
+    return make("",false,false,TypeFld.NO_DISP,TypeFld.make(f1,t1,ARG_IDX),TypeFld.make(f2,t2,ARG_IDX+1));
   }
 
   // Add fields from a Type[].  Will auto-allocate the Type[], if not already
@@ -225,7 +239,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     TypeStruct st = malloc(name,any,open);
     st.add_fld(TypeFld.NO_DISP);
     for( int i=0; i<ts.length; i++ )
-      st.add_fld(TypeFld.make_tup(ts[i],i+1));
+      st.add_fld(TypeFld.make_tup(ts[i],ARG_IDX+i));
     return st.hashcons_free();
   }
 
@@ -962,7 +976,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Check caches and return
     if( mem.sharp_get(dull) != null ) return;
     if( dull_cache.get(dull._aliases) != null ) return;
-    if( dull==NO_DISP || dull==NO_DISP.dual() ) { mem.sharput(dull,dull); return; }
+    if( dull==TypeMemPtr.NO_DISP || dull==TypeMemPtr.NO_DISP.dual() ) { mem.sharput(dull,dull); return; }
     // Walk and meet "dull" fields; all TMPs will point to ISUSED (hence are dull).
     boolean any = dull._aliases.above_center();
     Type t = any ? TypeObj.ISUSED : TypeObj.UNUSED;
@@ -1021,6 +1035,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Copy, replace dull with not-interned dull clone.  Fields are also cloned, not interned.
     TypeStruct dts2 = ((TypeStruct)dptr._obj)._clone().set_hash();
     TypeMemPtr dptr2 = dptr.copy();
+    dptr2._obj = dts2;
     dull_cache.put(dull._aliases,dptr2);
     // walk all fields, copy unless TMP.
     for( Map.Entry<String,TypeFld> e : dts2._flds.entrySet() ) {
@@ -1100,6 +1115,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
 
   // Extend the current struct with a new named field, making a new struct
+  public TypeStruct add_tup( Type t, int order ) { return add_fld(TypeFld.TUPS[order],Access.Final,t,order); }
   public TypeStruct add_fld( String name, Access mutable, int order ) { return add_fld(name,mutable,Type.SCALAR,order); }
   public TypeStruct add_fld( String name, Access mutable, Type tfld, int order ) {
     assert name==null || Util.eq(name,TypeFld.fldBot) || fld_find(name)==null;

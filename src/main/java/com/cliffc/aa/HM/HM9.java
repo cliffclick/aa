@@ -1005,7 +1005,7 @@ public class HM9 {
       @Override Type apply(Syntax[] args) {
         T2 tcon = find().args(1).args(0);
         assert tcon.is_base();
-        return TypeMemPtr.make(PAIR_ALIAS,TypeStruct.tups(tcon._flow,args.length==0 ? Root.widen(_targs[0]) : args[0]._flow));
+        return TypeMemPtr.make(PAIR_ALIAS,TypeStruct.maket(tcon._flow,args.length==0 ? Root.widen(_targs[0]) : args[0]._flow));
       }
     }
   }

@@ -138,7 +138,7 @@ public abstract class PrimNode extends Node {
   // == :{ptr ptr -> int1}  ==>>  == :ptr
   @Override public String xstr() { return _name+":"+_sig._formals.fld_idx(ARG_IDX)._t; }
   @Override public Type value(GVNGCM.Mode opt_mode) {
-    Type[] ts = new Type[_defs._len]; // 1-based
+    Type[] ts = Types.get(_defs._len); // 1-based
     // If all inputs are constants we constant-fold.  If any input is high, we
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
@@ -152,14 +152,16 @@ public abstract class PrimNode extends Node {
       }
     }
     Type rez = _sig._ret.at(REZ_IDX); // Ignore control,memory from primitive
-    return is_con ? apply(ts) : (has_high ? rez.dual() : rez);
+    Type rez2 = is_con ? apply(ts) : (has_high ? rez.dual() : rez);
+    Types.free(ts);
+    return rez2;
   }
   @Override public ErrMsg err( boolean fast ) {
-    for( int i=1; i<_defs._len; i++ ) { // first is control
-      Type tactual = val(i);
-      Type tformal = _sig.arg(i+ARG_IDX-1).simple_ptr(); // 0 is display, 1 is memory, 2 is first real arg
+    for( TypeFld fld : _sig._formals.flds() ) {
+      Type tactual = val(fld._order);
+      Type tformal = fld._t;
       if( !tactual.isa(tformal) )
-        return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[i],tactual,null,tformal);
+        return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[fld._order],tactual,null,tformal);
     }
     return null;
   }
@@ -218,22 +220,24 @@ public abstract class PrimNode extends Node {
       _badargs = new Parse[]{badargs};
     }
     @Override public Type value(GVNGCM.Mode opt_mode) {
-      Type[] ts = new Type[_defs._len];
-      for( int i=1; i<_defs._len; i++ )
+      Type[] ts = Types.get(_defs._len);
+      for( int i=ARG_IDX; i<_defs._len; i++ )
         ts[i] = _defs.at(i)._val;
-      return apply(ts);     // Apply (convert) even if some args are not constant
+      Type t = apply(ts);     // Apply (convert) even if some args are not constant
+      Types.free(ts);
+      return t;
     }
     @Override public Type apply( Type[] args ) {
-      Type actual = args[1];
+      Type actual = args[ARG_IDX];
       if( actual==Type.ANY || actual==Type.ALL ) return actual;
-      Type formal = _sig.arg(ARG_IDX);
+      Type formal = _sig.arg(ARG_IDX)._t;
       // Wrapping function will not inline if args are in-error
       assert formal.dual().isa(actual) && actual.isa(formal);
       return actual.set_name(_sig._ret.at(REZ_IDX)._name);
     }
     @Override public ErrMsg err( boolean fast ) {
-      Type actual = val(1);
-      Type formal = _sig.arg(ARG_IDX);
+      Type actual = val(ARG_IDX);
+      Type formal = _sig.arg(ARG_IDX)._t;
       if( !actual.isa(formal) ) // Actual is not a formal
         return ErrMsg.typerr(_badargs[0],actual,null,formal);
       return null;
@@ -256,7 +260,7 @@ public abstract class PrimNode extends Node {
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpF64 extends PrimNode {
     Prim1OpF64( String name ) { super(name,TypeStruct.FLT64,TypeFlt.FLT64); }
-    public Type apply( Type[] args ) { return TypeFlt.con(op(args[1].getd())); }
+    public Type apply( Type[] args ) { return TypeFlt.con(op(args[ARG_IDX].getd())); }
     abstract double op( double d );
   }
 
@@ -268,7 +272,7 @@ public abstract class PrimNode extends Node {
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpI64 extends PrimNode {
     Prim1OpI64( String name ) { super(name,TypeStruct.INT64,TypeInt.INT64); }
-    @Override public Type apply( Type[] args ) { return TypeInt.con(op(args[1].getl())); }
+    @Override public Type apply( Type[] args ) { return TypeInt.con(op(args[ARG_IDX].getl())); }
     abstract long op( long d );
   }
 
@@ -280,7 +284,7 @@ public abstract class PrimNode extends Node {
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpF64 extends PrimNode {
     Prim2OpF64( String name ) { super(name,TypeStruct.FLT64_FLT64,TypeFlt.FLT64); }
-    @Override public Type apply( Type[] args ) { return TypeFlt.con(op(args[1].getd(),args[2].getd())); }
+    @Override public Type apply( Type[] args ) { return TypeFlt.con(op(args[ARG_IDX].getd(),args[ARG_IDX+1].getd())); }
     abstract double op( double x, double y );
   }
 
@@ -307,7 +311,7 @@ public abstract class PrimNode extends Node {
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpF64 extends PrimNode {
     Prim2RelOpF64( String name ) { super(name,TypeStruct.FLT64_FLT64,TypeInt.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(args[1].getd(),args[2].getd())?TypeInt.TRUE:TypeInt.FALSE; }
+    @Override public Type apply( Type[] args ) { return op(args[ARG_IDX].getd(),args[ARG_IDX+1].getd())?TypeInt.TRUE:TypeInt.FALSE; }
     abstract boolean op( double x, double y );
   }
 
@@ -322,7 +326,7 @@ public abstract class PrimNode extends Node {
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpI64 extends PrimNode {
     Prim2OpI64( String name ) { super(name,TypeStruct.INT64_INT64,TypeInt.INT64); }
-    @Override public Type apply( Type[] args ) { return TypeInt.con(op(args[1].getl(),args[2].getl())); }
+    @Override public Type apply( Type[] args ) { return TypeInt.con(op(args[ARG_IDX].getl(),args[ARG_IDX+1].getl())); }
     abstract long op( long x, long y );
   }
 

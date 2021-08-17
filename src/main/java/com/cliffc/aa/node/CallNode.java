@@ -208,16 +208,14 @@ public class CallNode extends Node {
         if( mem instanceof MrgProjNode && mem.in(0)==arg.in(0) ) {
           NewNode nnn = (NewNode)arg.in(0);
           Node fdx = pop();
-          remove(_defs._len-1); // Pop off the NewNode tuple
-          int len = nnn._defs._len;
-          //for( int i=1; NewNode.def_idx(i)<len; i++ ) // Push the args; unpacks the tuple
-          //  add_def( nnn.fld(i));
-          //add_def(fdx);          // FIDX is last
-          //_unpacked = true;      // Only do it once
-          //keep().xval();         // Recompute value, this is not monotonic since replacing tuple with args
-          //GVN.add_work_all(unkeep());// Revisit after unpacking
-          //return this;
-          throw unimpl();
+          pop(); // Pop off the NewNode tuple
+          for( int i=ARG_IDX; i<nnn._defs._len; i++ ) // Push the args; unpacks the tuple
+            add_def( nnn.in(i));
+          add_def(fdx);          // FIDX is last
+          _unpacked = true;      // Only do it once
+          keep().xval();         // Recompute value, this is not monotonic since replacing tuple with args
+          GVN.add_work_all(unkeep());// Revisit after unpacking
+          return this;
         }
       }
     }
@@ -639,18 +637,19 @@ public class CallNode extends Node {
         FunNode fun = FunNode.find_fidx(kidx);
         if( fun.nargs()!=nargs() || fun.in(0)==fun ) continue; // BAD/dead
         TypeStruct formals = fun._sig._formals; // Type of each argument
-        int cvts=0;                        // Arg conversion cost
-        for( int j=DSP_IDX; j<nargs(); j++ ) {
-          Type actual = arg(j)._val;
-          Type formal = formals.fld_idx(j)._t;
+        int cvts=0;                             // Arg conversion cost
+        for( TypeFld fld : formals.flds() ) {
+          Type actual = arg(fld._order)._val;
+          Type formal = fld._t;
           if( actual==formal ) continue;
+          if( fld._order <= MEM_IDX ) continue; // isBitShape not defined on memory
           if( Type.ALL==formal ) continue; // Allows even error arguments
           byte cvt = actual.isBitShape(formal); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
           if( cvt == -1 ) return null; // Might be the best choice, or only choice, dunno
           cvts += cvt;
         }
 
-        if( cvts < best_cvts ) {
+        if( cvts < 99 && cvts < best_cvts ) {
           best_cvts = cvts;
           best_fptr = get_fptr(fun,unk); // This can be null, if function is run-time computed & has multiple displays.
           best_formals = formals;
@@ -658,8 +657,10 @@ public class CallNode extends Node {
         } else if( cvts==best_cvts ) {
           // Look for monotonic formals
           int fcnt=0, bcnt=0;
-          for( int i=DSP_IDX; i<formals.len(); i++ ) {
-            Type ff = formals.fld_idx(i)._t, bf = best_formals.fld_idx(i)._t;
+          for( TypeFld fld : formals.flds() ) {
+            TypeFld best_fld = best_formals.fld_find(fld._fld);
+            if( best_fld==null ) { fcnt=bcnt=-1; break; } // Not monotonic, no obvious winner
+            Type ff = fld._t, bf = best_fld._t;
             if( ff==bf ) continue;
             Type mt = ff.meet(bf);
             if( ff==mt ) bcnt++;       // Best formal is higher than new

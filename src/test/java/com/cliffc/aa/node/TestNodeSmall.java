@@ -691,9 +691,9 @@ public class TestNodeSmall {
     FunNode fun = new FunNode(null,tsig,-1,false).unkeep();
     gvn.xform(fun.add_def(cpj));
 
-    ParmNode parmem= gvn.init(new ParmNode(MEM_IDX,  " mem",fun,mem .unkeep(2),null)).unkeep(2);
-    ParmNode parm1 = gvn.init(new ParmNode(ARG_IDX,  "arg1",fun,arg1.unkeep(2),null)).unkeep(2);
-    ParmNode parm2 = gvn.init(new ParmNode(ARG_IDX+1,"arg2",fun,arg2.unkeep(2),null)).unkeep(2);
+    ParmNode parmem= gvn.init(new ParmNode(MEM_IDX," mem",fun,mem .unkeep(2),null)).unkeep(2);
+    ParmNode parm1 = gvn.init(new ParmNode(ARG_IDX,  "x" ,fun,arg1.unkeep(2),null)).unkeep(2);
+    ParmNode parm2 = gvn.init(new ParmNode(ARG_IDX+1,"y" ,fun,arg2.unkeep(2),null)).unkeep(2);
 
     // Types for normal args before memory type
     Type tpm = parmem.xval();

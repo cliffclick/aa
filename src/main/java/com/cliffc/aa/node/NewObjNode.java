@@ -158,7 +158,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   }
 
   // As formals to a call.
-  TypeTuple as_formals() {
+  TypeStruct as_formals() {
     Type[] ts2 = Types.get(_ts.len()+DSP_IDX);
     ts2[CTL_IDX] = Type.CTRL;
     ts2[MEM_IDX] = TypeMem.ALLMEM;

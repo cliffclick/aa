@@ -7,7 +7,9 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.*;
+import java.util.BitSet;
+import java.util.HashMap;
+import java.util.Map;
 
 import static com.cliffc.aa.AA.*;
 
@@ -364,39 +366,37 @@ public class FunNode extends RegionNode {
       return formals;
     }
 
-    //// Look for splitting to help a pointer from an unspecialized type
-    //boolean progress = false;
-    //Type[] sig = new Type[parms.length];
-    //Type tmem = parms[MEM_IDX]._val;
-    //sig[CTL_IDX] = Type.CTRL;
-    //sig[MEM_IDX] = TypeMem.MEM;
-    //if( tmem instanceof TypeMem ) {
-    //  for( int i=DSP_IDX; i<parms.length; i++ ) { // For all parms
-    //    Node parm = parms[i];
-    //    if( parm == null ) { sig[i]=Type.ALL; continue; } // (some can be dead)
-    //    if( parm._val==Type.ALL ) return null;            // No split with error args
-    //    sig[i] = parm._val;                               // Current type
-    //    if( i==DSP_IDX ) continue; // No split on the display
-    //    // Best possible type
-    //    Type tp = Type.ALL;
-    //    for( Node def : parm._defs )
-    //      if( def != this )
-    //        tp = tp.join(def._val);
-    //    if( !(tp instanceof TypeMemPtr) ) continue; // Not a pointer
-    //    TypeObj to = ((TypeMem)tmem).ld((TypeMemPtr)tp).widen(); //
-    //    // Are all the uses of parm compatible with this TMP?
-    //    // Also, flag all used fields.
-    //    if( bad_mem_use(parm, to) )
-    //      continue;               // So bad usage
-    //
-    //    sig[i] = TypeMemPtr.make(BitsAlias.FULL,to); // Signature takes any alias but has sharper guts
-    //    progress = true;
-    //  }
-    //}
-    //if( progress ) return sig;
-    //
-    //return null;
-    throw unimpl();
+    // Look for splitting to help a pointer from an unspecialized type
+    Type tmem = parms[MEM_IDX]._val;
+    if( tmem instanceof TypeMem ) {
+      boolean progress = false;
+      TypeStruct formals = TypeStruct.ALLSTRUCT;
+      for( int i=DSP_IDX; i<parms.length; i++ ) { // For all parms
+        if( i==DSP_IDX ) continue; // No split on the display
+        ParmNode parm = (ParmNode)parms[i];
+        if( parm == null ) continue;            // (some can be dead)
+        if( parm._val==Type.ALL ) return null;  // No split with error args
+        // Best possible type
+        Type tp = Type.ALL;
+        for( Node def : parm._defs )
+          if( def != this )
+            tp = tp.join(def._val);
+        formals = formals.add_fld(parm._name, TypeFld.Access.Final,tp,i);
+        if( !(tp instanceof TypeMemPtr) ) continue; // Not a pointer
+        TypeObj to = ((TypeMem)tmem).ld((TypeMemPtr)tp).widen(); //
+        // Are all the uses of parm compatible with this TMP?
+        // Also, flag all used fields.
+        if( bad_mem_use(parm, to) )
+          continue;               // So bad usage
+
+        TypeMemPtr arg = TypeMemPtr.make(BitsAlias.FULL,to); // Signature takes any alias but has sharper guts
+        formals = formals.replace_fld(TypeFld.make(parm._name,arg,i));
+        progress = true;
+      }
+      if( progress ) return formals;
+    }
+
+    return null;
   }
 
   // Check all uses are compatible with sharpening to a pointer.
@@ -590,11 +590,11 @@ public class FunNode extends RegionNode {
       if( self_recursive && body.find(call)!=-1 ) continue; // Self-recursive; amounts to unrolling
       int ncon=0;
       // Count constant inputs on non-error paths
-      for( int j=MEM_IDX; j<parms.length; j++ ) {
-        Node parm = parms[j];
+      for( TypeFld arg : _sig._formals.flds() ) {
+        Node parm = parms[arg._order];
         if( parm != null ) {    // Some can be dead
           Type actual = parm.in(i).sharptr(mem.in(i));
-          Type formal = formal(j);
+          Type formal = arg._t;
           if( !actual.isa(formal) ) // Path is in-error?
             { ncon = -2; break; }   // This path is in-error, cannot inline even if small & constants
           if( actual.is_con() ) ncon++; // Count constants along each path

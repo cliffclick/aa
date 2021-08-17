@@ -4,6 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFld;
 
 import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.MEM_IDX;
@@ -16,6 +17,9 @@ public class ParmNode extends PhiNode {
   final String _name;    // Parameter name
   public ParmNode( int idx, String name, Node fun, ConNode defalt, Parse badgc) {
     this(idx,name,fun,defalt._t,defalt,badgc);
+  }
+  public ParmNode( TypeFld fld, Node fun, ConNode defalt, Parse badgc) {
+    this(fld._order,fld._fld,fun,fld._t,defalt,badgc);
   }
   public ParmNode( int idx, String name, Node fun, Type tdef, Node defalt, Parse badgc) {
     super(OP_PARM,fun,tdef,defalt,badgc);
@@ -84,9 +88,9 @@ public class ParmNode extends PhiNode {
     // High, but valid, values like choice-functions need to pass thru,
     // so following Calls agree that SOME function will be called.
     // Check against formals; if OOB, always produce an error.
-    Type formal = fun.formal(_idx);
-    // Good case:
-    if( t.above_center() || t.isa(formal) ) return t.simple_ptr();
+    TypeFld arg = fun._sig._formals.fld_find(_name);
+    // Good case: nothing in signature (parm is dead, so legit), type needs to fall, or it isa formal.
+    if( arg==null || t.above_center() || t.isa(arg._t) ) return t.simple_ptr();
     return Type.ALL;
   }
 

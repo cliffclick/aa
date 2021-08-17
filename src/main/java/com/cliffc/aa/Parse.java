@@ -900,9 +900,6 @@ public class Parse implements Comparable<Parse> {
   private static final Access args_are_mutable=Access.Final; // Args mutable or r/only by default
   private Node func() {
     int oldx = _x;              // Past opening '{'
-    Ary<String> ids = new Ary<>(new String[1],0);
-    Ary<Type  > ts  = new Ary<>(new Type  [1],0);
-    Ary<Parse > bads= new Ary<>(new Parse [1],0);
 
     // Push an extra hidden display argument.  Similar to java inner-class ptr
     // or when inside of a struct definition: 'this'.
@@ -910,94 +907,88 @@ public class Parse implements Comparable<Parse> {
     TypeMemPtr tpar_disp = (TypeMemPtr) parent_display._val; // Just a TMP of the right alias
     Node fresh_disp = gvn(new FreshNode(_e._nongen,ctrl(),parent_display)).keep();
 
-    // TODO Make a TypeFunSig by making a TypeStruct incrementally as adding arguments
-    throw unimpl();
-    
-    //ids .push(" ctl");
-    //ts  .push(Type.CTRL);
-    //bads.push(null);
-    //ids .push(" mem");
-    //ts  .push(TypeMem.MEM);
-    //bads.push(null);
-    //ids .push("^");
-    //ts  .push(tpar_disp);
-    //bads.push(null);
-    //
-    //// Parse arguments
-    //while( true ) {
-    //  String tok = token();
-    //  if( tok == null ) { _x=oldx; break; } // not a "[id]* ->"
-    //  if( Util.eq((tok=tok.intern()),"->") ) break; // End of argument list
-    //  if( !isAlpha0((byte)tok.charAt(0)) ) { _x=oldx; break; } // not a "[id]* ->"
-    //  Type t = Type.SCALAR;    // Untyped, most generic type
-    //  Parse bad = errMsg();    // Capture location in case of type error
-    //  if( peek(':') &&         // Has type annotation?
-    //      (t=type())==null ) { // Get type
-    //    // If no type, might be "{ x := ...}" or "{ fun arg := ...}" which can
-    //    // be valid stmts, hence this may be a no-arg function.
-    //    if( ids._len-1 <= 2 ) { _x=oldx; break; }
-    //    else {
-    //      // Might be: "{ x y z:bad -> body }" which cannot be any stmt.  This
-    //      // is an error in any case.  Treat as a bad type on a valid function.
-    //      err_ctrl0(peek(',') ? "Bad type arg, found a ',' did you mean to use a ';'?" : "Missing or bad type arg");
-    //      t = Type.SCALAR;
-    //      skipNonWS();         // Skip possible type sig, looking for next arg
-    //    }
-    //  }
-    //  ids .add(tok);   // Accumulate args
-    //  ts  .add(t  );
-    //  bads.add(bad);
-    //}
-    //// If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
-    //// args, and then reset.  Also reset to just the mem & display args.
-    //if( _x == oldx ) { ids.set_len(ARG_IDX); ts.set_len(ARG_IDX); bads.set_len(ARG_IDX);  }
-    //
-    //try( GVNGCM.Build<Node> X = _gvn.new Build<>()) { // Nest an environment for the local vars
-    //  // Build the FunNode header
-    //  FunNode fun = (FunNode)X.xform(new FunNode(ids.asAry(),ts.asAry()).add_def(Env.ALL_CTRL));
-    //  // Record H-M VStack in case we clone
-    //  fun.set_nongens(_e._nongen.compact());
-    //  // Build Parms for system incoming values
-    //  Node rpc = X.xform(new ParmNode(0      ,"rpc" ,fun,con(TypeRPC.ALL_CALL),null));
-    //  Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-    //  Node clo = X.xform(new ParmNode(DSP_IDX,"^"   ,fun,con(tpar_disp),null));
-    //
-    //  // Increase scope depth for function body.
-    //  try( Env e = new Env(_e,errMsg(oldx-1), true, fun, mem) ) { // Nest an environment for the local vars
-    //    _e = e;                   // Push nested environment
-    //    // Display is special: the default is simply the outer lexical scope.
-    //    // But here, in a function, the display is actually passed in as a hidden
-    //    // extra argument and replaces the default.
-    //    NewObjNode stk = e._scope.stk();
-    //    stk.update("^",Access.Final,clo);
-    //    // Add a nongen memory arg
-    //    _e._nongen.add_var(" mem",mem.tvar());
-    //
-    //    // Parms for all arguments
-    //    Parse errmsg = errMsg();  // Lazy error message
-    //    for( int i=ARG_IDX; i<ids._len; i++ ) { // User parms start
-    //      Node parm = X.xform(new ParmNode(i,ids.at(i),fun,con(Type.SCALAR),errmsg));
-    //      _e._nongen.add_var(ids.at(i),parm.tvar());
-    //      create(ids.at(i),parm, args_are_mutable);
-    //    }
-    //
-    //    // Parse function body
-    //    Node rez = stmts();       // Parse function body
-    //    if( rez == null ) rez = err_ctrl2("Missing function body");
-    //    require('}',oldx-1);      // Matched with opening {}
-    //
-    //    // Merge normal exit into all early-exit paths
-    //    if( e._scope.is_closure() ) rez = merge_exits(rez);
-    //    // Standard return; function control, memory, result, RPC.  Plus a hook
-    //    // to the function for faster access.
-    //    RetNode ret = (RetNode)X.xform(new RetNode(ctrl(),mem(),rez,rpc,fun));
-    //    // The FunPtr builds a real display; any up-scope references are passed in now.
-    //    Node fptr = X.xform(new FunPtrNode(null,ret,fresh_disp.unhook()));
-    //
-    //    _e = _e._par;                // Pop nested environment; pops nongen also
-    //    return (X._ret=fptr);        // Return function; close-out and DCE 'e'
-    //  }
-    //}
+    // Incrementally build up the formals
+    TypeStruct formals = TypeStruct.make("",false,true,
+                                         TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
+                                         TypeFld.make("^",tpar_disp,DSP_IDX));
+    TypeStruct no_args_formals = formals;
+    Ary<Parse> bads= new Ary<>(new Parse[1],0);
+
+    // Parse arguments
+    while( true ) {
+      String tok = token();
+      if( tok == null ) { _x=oldx; break; } // not a "[id]* ->"
+      if( Util.eq((tok=tok.intern()),"->") ) break; // End of argument list
+      if( !isAlpha0((byte)tok.charAt(0)) ) { _x=oldx; break; } // not a "[id]* ->"
+      Type t = Type.SCALAR;    // Untyped, most generic type
+      Parse bad = errMsg();    // Capture location in case of type error
+      if( peek(':') &&         // Has type annotation?
+          (t=type())==null ) { // Get type
+        // If no type, might be "{ x := ...}" or "{ fun arg := ...}" which can
+        // be valid stmts, hence this may be a no-arg function.
+        if( bads._len-1 <= 2 ) { _x=oldx; break; }
+        else {
+          // Might be: "{ x y z:bad -> body }" which cannot be any stmt.  This
+          // is an error in any case.  Treat as a bad type on a valid function.
+          err_ctrl0(peek(',') ? "Bad type arg, found a ',' did you mean to use a ';'?" : "Missing or bad type arg");
+          t = Type.SCALAR;
+          skipNonWS();         // Skip possible type sig, looking for next arg
+        }
+      }
+      formals = formals.add_fld(tok,Access.Final,t,ARG_IDX+bads._len); // Accumulate args
+      bads.add(bad);
+    }
+    // If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
+    // args, and then reset.  Also reset to just the mem & display args.
+    if( _x == oldx ) { formals = no_args_formals;  bads.set_len(ARG_IDX); }
+
+    try( GVNGCM.Build<Node> X = _gvn.new Build<>()) { // Nest an environment for the local vars
+      // Build the FunNode header
+      FunNode fun = (FunNode)X.xform(new FunNode(formals.close()).add_def(Env.ALL_CTRL));
+      // Record H-M VStack in case we clone
+      fun.set_nongens(_e._nongen.compact());
+      // Build Parms for system incoming values
+      Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,con(TypeRPC.ALL_CALL),null));
+      Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+      Node clo = X.xform(new ParmNode(DSP_IDX,"^"   ,fun,con(tpar_disp),null));
+
+      // Increase scope depth for function body.
+      try( Env e = new Env(_e,errMsg(oldx-1), true, fun, mem) ) { // Nest an environment for the local vars
+        _e = e;                   // Push nested environment
+        // Display is special: the default is simply the outer lexical scope.
+        // But here, in a function, the display is actually passed in as a hidden
+        // extra argument and replaces the default.
+        NewObjNode stk = e._scope.stk();
+        stk.update("^",Access.Final,clo);
+        // Add a nongen memory arg
+        _e._nongen.add_var(" mem",mem.tvar());
+
+        // Parms for all arguments
+        Parse errmsg = errMsg();  // Lazy error message
+        for( TypeFld fld : formals.flds() ) { // User parms start
+          if( fld._order <= DSP_IDX ) continue;// Already handled
+          Node parm = X.xform(new ParmNode(fld,fun,con(Type.SCALAR),errmsg));
+          _e._nongen.add_var(fld._fld,parm.tvar());
+          create(fld._fld,parm, args_are_mutable);
+        }
+
+        // Parse function body
+        Node rez = stmts();       // Parse function body
+        if( rez == null ) rez = err_ctrl2("Missing function body");
+        require('}',oldx-1);      // Matched with opening {}
+
+        // Merge normal exit into all early-exit paths
+        if( e._scope.is_closure() ) rez = merge_exits(rez);
+        // Standard return; function control, memory, result, RPC.  Plus a hook
+        // to the function for faster access.
+        RetNode ret = (RetNode)X.xform(new RetNode(ctrl(),mem(),rez,rpc,fun));
+        // The FunPtr builds a real display; any up-scope references are passed in now.
+        Node fptr = X.xform(new FunPtrNode(null,ret,fresh_disp.unhook()));
+
+        _e = _e._par;                // Pop nested environment; pops nongen also
+        return (X._ret=fptr);        // Return function; close-out and DCE 'e'
+      }
+    }
   }
 
   private Node merge_exits(Node rez) {
@@ -1191,20 +1182,23 @@ public class Parse implements Comparable<Parse> {
   // Type or null or Type.ANY for '->' token
   private Type type0(boolean type_var) {
     if( peek('{') ) {           // Function type
-      Ary<Type> ts = new Ary<>(new Type[]{Type.CTRL,TypeMem.ALLMEM,TypeMemPtr.DISP_SIMPLE});  Type t;
+      TypeStruct formals = TypeStruct.make("",false,true,
+                                           TypeFld.make_tup(TypeMem.ALLMEM,MEM_IDX),
+                                           TypeFld.make_tup(TypeMemPtr.DISP_SIMPLE,DSP_IDX));
+      TypeStruct no_args_formals = formals;  Type t; // Collect arg types
       while( (t=typep(type_var)) != null && t != Type.ANY  )
-        ts.add(t);              // Collect arg types
+        formals = formals.add_tup(t,formals.len()-2+ARG_IDX);
       Type ret;
       if( t==Type.ANY ) {       // Found ->, expect return type
         ret = typep(type_var);
         if( ret == null ) return null; // should return TypeErr missing type after ->
       } else {                  // Allow no-args and simple return type
-        if( ts._len != ARG_IDX+1 ) return null; // should return TypeErr missing -> in tfun
-        ret = ts.pop();         // e.g. { int } Get single return type
+        if( formals.len()-2 != 1 ) return null; // should return TypeErr missing -> in tfun
+        ret = formals.fld_idx(ARG_IDX); // e.g. { int } Get single return type
+        formals = no_args_formals;
       }
-      TypeTuple targs = TypeTuple.make_args(ts.asAry());
       if( !peek('}') ) return null;
-      return typeq(TypeFunSig.make(TypeTuple.make_ret(ret),targs));
+      return typeq(TypeFunSig.make(formals,TypeTuple.make_ret(ret)));
     }
 
     if( peek("@{") ) {          // Struct type
@@ -1219,7 +1213,7 @@ public class Parse implements Comparable<Parse> {
             (t=typep(type_var)) == null) // Parse type, wrap ptrs
           t = Type.SCALAR;               // No type found, assume default
         if( flds.find(fld -> Util.eq(fld._fld,itok) ) != -1 ) throw unimpl(); // cannot use same field name twice
-        flds.add(TypeFld.make(itok,t,tmodf,TypeFld.oBot));
+        flds.add(TypeFld.make(itok,t,tmodf,flds._len-1+ARG_IDX));
         if( !peek(';') ) break; // Final semi-colon is optional
       }
       return peek('}') ? TypeStruct.make("",false,true,flds) : null;
@@ -1239,7 +1233,7 @@ public class Parse implements Comparable<Parse> {
         if( c!=',' &&            // Has type annotation?
             (t=typep(type_var)) == null) // Parse type, wrap ptrs
           return null;                   // not a type
-        flds.add(TypeFld.make_tup(t,flds._len));
+        flds.add(TypeFld.make_tup(t,ARG_IDX+flds._len-1));
         if( !peek(',') ) break; // Final comma is optional
       }
       return peek(')') ? TypeStruct.make("",false,true,flds) : null;

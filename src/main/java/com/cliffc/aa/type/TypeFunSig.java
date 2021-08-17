@@ -66,8 +66,6 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   public static TypeFunSig make( TypeTuple ret, Type arg1, Type arg2 ) { return make(TypeStruct.args(arg1,arg2),ret); }
   public TypeFunSig make_from_arg( TypeFld arg ) { return make(_formals.replace_fld(arg),_ret); }
 
-  public static final String[] func_names = new String[]{" ctl", " mem", "^" , "arg3", "arg4", "arg5" }; // TODO: Extend as needed
-
   public static final TypeFunSig II_I = make(TypeStruct.INT64_INT64, TypeTuple.make_ret(TypeInt.INT64));
   static final TypeFunSig[] TYPES = new TypeFunSig[]{II_I};
 

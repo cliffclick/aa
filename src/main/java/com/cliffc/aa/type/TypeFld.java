@@ -76,8 +76,8 @@ public class TypeFld extends Type<TypeFld> {
   TypeFld malloc_from() { return malloc(_fld,_t,_access,_order); }
 
   // Some convenient default constructors
-  private static final String[] ARGS = new String[]{" ctl", " mem", "^","x","y","z"};
-  private static final String[] TUPS = new String[]{" ctl", " mem", "^","0","1","2"};
+  static final String[] ARGS = new String[]{" ctl", " mem", "^","x","y","z"};
+  static final String[] TUPS = new String[]{" ctl", " mem", "^","0","1","2"};
   public static TypeFld make_arg( Type t, int order ) { return make(ARGS[order],t,Access.Final,order);  }
   public static TypeFld make_tup( Type t, int order ) { return make(TUPS[order],t,Access.Final,order);  }
   public TypeFld make_from(Type t) { return t==_t ? this : make(_fld,t,_access,_order); }

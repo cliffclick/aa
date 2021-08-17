@@ -41,12 +41,12 @@ public class IntrinsicNode extends Node {
     // This function call takes in and returns a plain ptr-to-object.
     // Only after folding together does the name become apparent.
     try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
-      TypeTuple formals = TypeTuple.make_args(TypeMemPtr.STRUCT);
-      TypeFunSig sig = TypeFunSig.make(TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.RECORD_BITS,tn)),formals);
+      TypeStruct formals = TypeStruct.args(TypeMemPtr.STRUCT);
+      TypeFunSig sig = TypeFunSig.make(formals,TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.RECORD_BITS,tn)));
       FunNode fun = X.init2((FunNode)new FunNode(tn._name,sig,-1,false).add_def(Env.ALL_CTRL));
-      Node rpc = X.xform(new ParmNode( 0     ,"rpc",fun,Env.ALL_CALL,null));
-      Node mem = X.xform(new ParmNode(MEM_IDX,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-      Node ptr = X.xform(new ParmNode(ARG_IDX,"ptr",fun,(ConNode)Node.con(TypeMemPtr.make(BitsAlias.RECORD_BITS,TypeObj.ISUSED)),badargs));
+      Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
+      Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+      Node ptr = X.xform(new ParmNode(ARG_IDX,"x",fun,(ConNode)Node.con(TypeMemPtr.make(BitsAlias.RECORD_BITS,TypeObj.ISUSED)),badargs));
       Node cvt = X.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
       RetNode ret = (RetNode)X.xform(new RetNode(fun,cvt,ptr,rpc,fun));
       return (X._ret = X.init2(new FunPtrNode(tn._name,ret)));
@@ -133,22 +133,21 @@ public class IntrinsicNode extends Node {
     assert to.has_name() && to.fld_find("^").is_display_ptr(); // Display already
     // Upgrade the type to one with no display for nnn.
     to = to.replace_fld(TypeFld.NO_DISP);
+    TypeFunSig sig = TypeFunSig.make(to.remove_name(),TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.make0(alias),to)));
 
     try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
-      FunNode fun = (FunNode) X.xform(new FunNode(to._name,null,-1,false).add_def(Env.ALL_CTRL));
-      Node rpc = X.xform(new ParmNode(  0    ,"rpc",fun,Env.ALL_CALL,null));
-      Node memp= X.xform(new ParmNode(MEM_IDX,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+      FunNode fun = (FunNode) X.xform(new FunNode(to._name,sig,-1,false).add_def(Env.ALL_CTRL));
+      Node rpc = X.xform(new ParmNode(  0    ," rpc",fun,Env.ALL_CALL,null));
+      Node memp= X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
       // Add input edges to the NewNode
       Node nodisp = Node.con(TypeMemPtr.NO_DISP);
       NewObjNode nnn = (NewObjNode)X.add(new NewObjNode(false,alias,to,nodisp));
+      while( nnn.len() < sig.nargs() ) nnn.add_def(null);
       for( TypeFld fld : to.flds() )
         if( !Util.eq(fld._fld,"^") ) // Display already handled
-          nnn.create_edge(X.xform(new ParmNode(nnn.len()-1+DSP_IDX,fld._fld,fun, (ConNode)Node.con(fld._t.simple_ptr()),bad)));
+          nnn.set_def(fld._order,(X.xform(new ParmNode(fld,fun, (ConNode)Node.con(fld._t.simple_ptr()),bad))));
       Node mmem = Env.DEFMEM.make_mem_proj(nnn,memp);
       Node ptr = X.xform(new ProjNode(REZ_IDX, nnn));
-      // Formal is unnamed, and this function adds the name.
-      TypeTuple formals = nnn.as_formals();
-      fun._sig = TypeFunSig.make(TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.make0(alias),to)),formals);
       RetNode ret = (RetNode)X.xform(new RetNode(fun,mmem,ptr,rpc,fun));
       return (X._ret=X.init2(new FunPtrNode(to._name,ret)));
     }

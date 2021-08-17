@@ -13,11 +13,10 @@ import static com.cliffc.aa.AA.ARG_IDX;
 import static org.junit.Assert.*;
 
 public class TestParse {
-  private static final BitsFun TEST_FUNBITS = BitsFun.make0(46);
+  private static final BitsFun TEST_FUNBITS = BitsFun.make0(43);
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*\"abc\", 2)");
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
     // The Meet loses precision to fast.  This is a typing bug.
@@ -46,7 +45,7 @@ public class TestParse {
     test("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
     testerr("math_rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",3);
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(46),3, TypeMemPtr.NO_DISP)); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(TEST_FUNBITS,3, TypeMemPtr.NO_DISP)); // {Scalar Scalar -> Scalar}
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y' in @{x=1}",19);
     testerr("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
     test("x=@{a:=1;         b= {a=a+1;b=0}}; x.         b(); x.a",TypeInt.con(2));
@@ -235,7 +234,7 @@ public class TestParse {
     test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
     test_obj("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
-             TypeStruct.tups(Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
+             TypeStruct.tupsD(Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.con(1) );
@@ -269,7 +268,7 @@ public class TestParse {
     testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *str",41);
     // Test that the type-check is on the variable and not the function.
     test_obj("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
-             TypeStruct.tups(TypeInt.con(4),TypeInt.con(4)));
+             TypeStruct.tupsD(TypeInt.con(4),TypeInt.con(4)));
     testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
             "3 is not a *@{x:=; y:=; ...}", 66);
     testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",
@@ -390,8 +389,8 @@ public class TestParse {
     TypeStruct tt3 = (TypeStruct)te3._tmem.ld((TypeMemPtr)te3._t);
     assertEquals("A:", tt3._name);
     assertTrue  (tt3.fld_find("^").is_display_ptr());
-    assertEquals(Type.XNIL     ,tt3.fld_find("n"));
-    assertEquals(TypeInt.con(3),tt3.fld_find("v"));
+    assertEquals(Type.XNIL     ,tt3.fld_find("n")._t);
+    assertEquals(TypeInt.con(3),tt3.fld_find("v")._t);
 
     // Missing type B is also never worked on.
     test_isa("A= :@{n=B?; v=int}", TypeFunPtr.GENERIC_FUNPTR);
@@ -402,9 +401,9 @@ public class TestParse {
     test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR); // Same test, again, using the same Type.INTERN table
     test_isa("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}", TypeFunPtr.GENERIC_FUNPTR);
     // Mixed ABC's, making little abc's in-between.
-    TypeMemPtr tmpA = TypeMemPtr.make(23,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,ARG_IDX),TypeFld.make("v",TypeInt.con(5    )                    ,ARG_IDX+1)).set_name("A:"));
+    TypeMemPtr tmpA = TypeMemPtr.make(21,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,ARG_IDX),TypeFld.make("v",TypeInt.con(5    )                    ,ARG_IDX+1)).set_name("A:"));
     TypeMemPtr tmpB = TypeMemPtr.make(19,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpA     ,ARG_IDX),TypeFld.make("v",TypeFlt.con(3.14 )                    ,ARG_IDX+1)).set_name("B:"));
-    TypeMemPtr tmpC = TypeMemPtr.make(35,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpB     ,ARG_IDX),TypeFld.make("v",TypeMemPtr.make(17,TypeStr.con("abc")),ARG_IDX+1)).set_name("C:"));
+    TypeMemPtr tmpC = TypeMemPtr.make(31,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpB     ,ARG_IDX),TypeFld.make("v",TypeMemPtr.make(17,TypeStr.con("abc")),ARG_IDX+1)).set_name("C:"));
     test_isa("A= :@{n=B?; v=int}; "+
              "a= A(0,5); "+
              "B= :@{n=A?; v=flt}; "+
@@ -412,7 +411,7 @@ public class TestParse {
              "C= :@{n=B?; v=str};"+
              "c= C(b,\"abc\");"+
              "(a,b,c)",
-             TypeMemPtr.make(37,TypeStruct.tups(tmpA,tmpB,tmpC)));
+             TypeMemPtr.make(33,TypeStruct.tupsD(tmpA,tmpB,tmpC)));
   }
 
   @Test public void testParse07() {
@@ -459,7 +458,7 @@ public class TestParse {
     assertNotNull(nxfld);
     assertNotNull(vxfld);
     assertTrue(nxfld._t instanceof TypeMemPtr);
-    assertEquals(2.3*2.3,vxfld.getd(),1e-6);
+    assertEquals(2.3*2.3,vxfld._t.getd(),1e-6);
 
     // Test inferring a recursive struct type, with a little help
     test_struct("map={x:@{n=;v=flt}? -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",

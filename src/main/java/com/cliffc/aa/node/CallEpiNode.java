@@ -121,7 +121,7 @@ public final class CallEpiNode extends Node {
       if( parm instanceof ParmNode && parm.in(0)==fun ) {
         int idx = ((ParmNode)parm)._idx;
         Type actual = CallNode.targ(tcall,idx);
-        if( actual.isBitShape(formals.fld_idx(idx)._t) == 99 ) // Requires user-specified conversion
+        if( idx >= ARG_IDX && actual.isBitShape(formals.fld_idx(idx)._t) == 99 ) // Requires user-specified conversion
           return null;
       }
     }
