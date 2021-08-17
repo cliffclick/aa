@@ -556,12 +556,11 @@ public class Parse implements Comparable<Parse> {
       lhs.keep(2);
       for( int i=old_defs._len; i<stk._defs._len; i++ ) {
         // TODO: alignment between old_defs and struct fields
-        throw unimpl();
-        //String fname = stk._ts.fld(i-1)._fld;
-        //String msg = "'"+fname+"' not defined prior to the short-circuit";
-        //Parse bad = errMsg(rhsx);
-        //Node err = gvn(new ErrNode(ctrl(),bad,msg));
-        //set_mem(gvn(new StoreNode(mem(),scope().ptr(),err,Access.Final,fname,bad)));
+        String fname = stk._ts.fld_idx(i)._fld;
+        String msg = "'"+fname+"' not defined prior to the short-circuit";
+        Parse bad = errMsg(rhsx);
+        Node err = gvn(new ErrNode(ctrl(),bad,msg));
+        set_mem(gvn(new StoreNode(mem(),scope().ptr(),err,Access.Final,fname,bad)));
       }
       lhs.unkeep(2);
     }

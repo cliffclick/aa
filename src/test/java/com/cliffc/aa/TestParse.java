@@ -192,9 +192,9 @@ public class TestParse {
     test("0 && 1 || 2 && 3", TypeInt.con(3));    // Precedence
 
     test_obj("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
-             TypeStruct.tups(TypeInt.con(1),Type.XNIL,Type.XNIL));
+             TypeStruct.tupsD(TypeInt.con(1),Type.XNIL,Type.XNIL));
     test_obj("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
-             TypeStruct.tups(TypeInt.con(2),TypeInt.con(1),Type.XNIL));
+             TypeStruct.tupsD(TypeInt.con(2),TypeInt.con(1),Type.XNIL));
     test("(x=1) && x+2", TypeInt.con(3)); // Def x in 1st position
 
     testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
@@ -470,7 +470,7 @@ public class TestParse {
     // inlines so doesn't actually test inferring a recursive type.
     test_struct("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
                 TypeStruct.make(TypeFld.NO_DISP,
-                                TypeFld.make("nn",TypeMemPtr.make_nil(23,TypeObj.ISUSED),ARG_IDX  ),
+                                TypeFld.make("nn",TypeMemPtr.make_nil(14,TypeObj.ISUSED),ARG_IDX  ),
                                 TypeFld.make("vv",TypeFlt.con(1.2*1.2)                  ,ARG_IDX+1)));
 
     // Test inferring a recursive struct type, with less help. Too complex to
@@ -484,7 +484,7 @@ public class TestParse {
     // Test inferring a recursive tuple type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
     test_ptr("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
-             (alias) -> TypeMemPtr.make(alias,TypeStruct.tups(Type.XNIL,TypeFlt.con(1.2*1.2))));
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.tupsD(Type.XNIL,TypeFlt.con(1.2*1.2))));
 
     test_obj_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
                  "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
@@ -587,7 +587,7 @@ public class TestParse {
     testerr("x=1+y","Unknown ref 'y'",4);
 
     test("x:=1", TypeInt.TRUE);
-    test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.tups(Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
+    test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.tupsD(Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
 
     testerr("x=1; x:=2; x", "Cannot re-assign final val 'x'", 5);
     testerr("x=1; x =2; x", "Cannot re-assign final val 'x'", 5);
@@ -717,7 +717,7 @@ public class TestParse {
     test    ("[3][0]", Type.XNIL);
     test    ("ary = [3]; ary[0]:=2", TypeInt.con(2));
     test_obj("ary = [3]; ary[0]:=0; ary[1]:=1; ary[2]:=2; (ary[0],ary[1],ary[2])", // array create, array storing
-             TypeStruct.tups(TypeInt.INT8,TypeInt.INT8,TypeInt.INT8));
+             TypeStruct.tupsD(TypeInt.INT8,TypeInt.INT8,TypeInt.INT8));
     testary("0[0]","0 is not a *[]Scalar/obj",1);
     testary("[3] [4]","Index must be out of bounds",5);
     testary("[3] [-1]","Index must be out of bounds",5);
@@ -894,7 +894,7 @@ HashTable = {@{
   static private void test_struct( String program, TypeStruct expected) {
     try( TypeEnv te = run(program) ) {
       TypeStruct actual = (TypeStruct)te._tmem.ld((TypeMemPtr)te._t);
-      //actual = actual.set_fld(0,TypeMemPtr.NO_DISP,Access.Final);
+      actual = actual.replace_fld(TypeFld.NO_DISP);
       assertEquals(expected,actual);
     }
   }

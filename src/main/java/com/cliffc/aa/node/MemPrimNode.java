@@ -19,7 +19,7 @@ public abstract class MemPrimNode extends PrimNode {
   @Override public ErrMsg err(boolean fast) {
     Type tmem = mem()._val;
     Type tadr = adr()._val;
-    Type tidx = _defs._len <= 3 ? Type.XNIL : idx()._val;
+    Type tidx = _defs._len <= ARG_IDX+1 ? Type.XNIL : idx()._val;
     if( tmem==Type.ANY ) return null; // No error
     if( tadr==Type.ANY ) return null; // No error
     if( tidx==Type.ANY ) return null; // No error

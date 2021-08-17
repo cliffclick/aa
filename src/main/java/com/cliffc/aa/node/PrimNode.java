@@ -517,12 +517,12 @@ public abstract class PrimNode extends Node {
     AndThen() { super("&&",ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
     // Expect this to inline everytime
     @Override public Node ideal_grow() {
-      if( _defs._len != 4 ) return null; // Already did this
+      if( _defs._len != ARG_IDX+2 ) return null; // Already did this
       try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
-        Node ctl = in(0);
-        Node mem = in(1);
-        Node lhs = in(2);
-        Node rhs = in(3);
+        Node ctl = in(CTL_IDX  );
+        Node mem = in(MEM_IDX  );
+        Node lhs = in(ARG_IDX  );
+        Node rhs = in(ARG_IDX+1);
         // Expand to if/then/else
         Node iff = X.xform(new IfNode(ctl,lhs));
         Node fal = X.xform(new CProjNode(iff,0));
@@ -542,7 +542,7 @@ public abstract class PrimNode extends Node {
         set_def(0,reg );
         set_def(1,phim);
         set_def(2,phi );
-        pop();                    // Remove arg2, trigger is_copy
+        pop();   pop();     // Remove args, trigger is_copy
         X.add(this);
         for( Node use : _uses ) X.add(use);
         return null;
@@ -560,7 +560,7 @@ public abstract class PrimNode extends Node {
     //@Override public TV2 new_tvar(String alloc_site) { return TV2.make("Thunk",this,alloc_site); }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
     @Override public Node is_copy(int idx) {
-      return _defs._len==4 ? null : in(idx);
+      return _defs._len==ARG_IDX+2 ? null : in(idx);
     }
   }
 
@@ -573,12 +573,12 @@ public abstract class PrimNode extends Node {
     OrElse() { super("||",ORELSE,Type.SCALAR); _thunk_rhs=true; }
     // Expect this to inline everytime
     @Override public Node ideal_grow() {
-      if( _defs._len != 4 ) return null; // Already did this
+      if( _defs._len != ARG_IDX+2 ) return null; // Already did this
       try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
-        Node ctl = in(0);
-        Node mem = in(1);
-        Node lhs = in(2);
-        Node rhs = in(3);
+        Node ctl = in(CTL_IDX  );
+        Node mem = in(MEM_IDX  );
+        Node lhs = in(ARG_IDX  );
+        Node rhs = in(ARG_IDX+1);
         // Expand to if/then/else
         Node iff = X.xform(new IfNode(ctl,lhs));
         Node fal = X.xform(new CProjNode(iff,0));
@@ -598,7 +598,7 @@ public abstract class PrimNode extends Node {
         set_def(0,reg );
         set_def(1,phim);
         set_def(2,phi );
-        pop();                    // Remove arg2, trigger is_copy
+        pop();   pop();     // Remove args, trigger is_copy
         X.add(this);
         for( Node use : _uses ) X.add(use);
         return null;
@@ -616,7 +616,7 @@ public abstract class PrimNode extends Node {
     //@Override public TV2 new_tvar(String alloc_site) { return TV2.make("Thunk",this,alloc_site); }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
     @Override public Node is_copy(int idx) {
-      return _defs._len==4 ? null : in(idx);
+      return _defs._len==ARG_IDX+2 ? null : in(idx);
     }
   }
 

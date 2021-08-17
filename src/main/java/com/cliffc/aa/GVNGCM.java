@@ -333,11 +333,11 @@ public class GVNGCM {
     // Update all memory ops
     while( !work.isEmpty() ) {
       Node wrk = work.pop();
-      if( !wrk.is_mem() && wrk!=mem ) continue; // Not a memory Node?
+      if( !(wrk instanceof CallNode) && !wrk.is_mem() && wrk!=mem ) continue; // Not a memory Node?
       Type twrk = wrk._val;
       Type tmem0 = twrk instanceof TypeTuple ? ((TypeTuple)twrk).at(1) : twrk;
       if( !(tmem0 instanceof TypeMem) ) continue; // Node does have have a memory type?
-      if( aliases!=null && !((TypeMem)tmem0).has_used(aliases) ) continue; // Not does not use the listed memory?
+      if( aliases!=null && !((TypeMem)tmem0).has_used(aliases) ) continue; // Does not use the listed memory?
       if( wrk instanceof CallNode ) { // Do the CEPI for a Call, skipping in-between
         CallEpiNode cepi = ((CallNode)wrk).cepi();
         if( cepi != null ) work.push(cepi);

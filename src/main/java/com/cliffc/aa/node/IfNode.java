@@ -5,6 +5,8 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
+import static com.cliffc.aa.AA.ARG_IDX;
+
 // Split control
 public class IfNode extends Node {
   public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); }
@@ -30,7 +32,7 @@ public class IfNode extends Node {
     }
 
     if( tst instanceof PrimNode.Not && tst._uses._len==1 )
-      return flip(Env.GVN.xreduce(new IfNode(ctl,tst.in(1))));
+      return flip(Env.GVN.xreduce(new IfNode(ctl,tst.in(ARG_IDX))));
 
     return null;
   }
