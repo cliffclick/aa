@@ -284,7 +284,7 @@ public class CallNode extends Node {
           set_dsp(fptr.display());
         set_fdx(fptr);          // Resolve to 1 choice
         xval();                 // Force value update; least-cost LOWERS types (by removing a choice)
-        add_flow_use_extra(fptr);
+        add_work_use_extra(Env.GVN._work_flow,fptr);
         if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
         return this;
       }
@@ -306,7 +306,7 @@ public class CallNode extends Node {
 
 
     // Wire valid targets.
-    if( cepi!=null && cepi.check_and_wire() )
+    if( cepi!=null && cepi.check_and_wire(Env.GVN._work_flow) )
       return this;              // Some wiring happened
 
     // Check for dead args and trim; must be after all wiring is done because
@@ -477,38 +477,39 @@ public class CallNode extends Node {
     BitsAlias esc_out2 = precall.and_unused(esc_out); // Filter by unused pre-call
     return esc_out2.meet(esc_in);
   }
-  @Override public void add_flow_extra(Type old) {
+  @Override public void add_work_extra(Work work, Type old) {
     if( old==Type.ANY || _val==Type.ANY ||
         (old instanceof TypeTuple && ttfp(old).above_center()) )
-      Env.GVN.add_flow_defs(this); // Args can be more-alive or more-dead
+      add_work_defs(work);      // Args can be more-alive or more-dead
     // If Call flips to being in-error, all incoming args forced live/escape
     for( Node def : _defs )
       if( def!=null && def._live!=TypeMem.ESCAPE && err(true)!=null )
-        Env.GVN.add_flow(def);
+        work.add(def);
     // If not resolved, might now resolve
     if( _val instanceof TypeTuple && ttfp(_val)._fidxs.abit()==-1 )
       Env.GVN.add_reduce(this);
   }
-  @Override public void add_flow_def_extra(Node chg) {
+  @Override public void add_work_def_extra(Work work, Node chg) {
     // Projections live after a call alter liveness of incoming args
     if( chg instanceof ProjNode )
-      Env.GVN.add_flow(in(((ProjNode)chg)._idx));
+      work.add(in(((ProjNode)chg)._idx));
   }
-  @Override public void add_flow_use_extra(Node chg) {
+  @Override public void add_work_use_extra(Work work, Node chg) {
     CallEpiNode cepi = cepi();
     if( chg == fdx() ) {           // FIDX falls to sane from too-high
-      Env.GVN.add_flow_defs(this); // All args become alive
+      add_work_defs(work);         // All args become alive
       if( cepi!=null ) {
         Env.GVN.add_work_all(cepi);  // FDX gets stable, might wire, might unify_lift
-        Env.GVN.add_flow_defs(cepi); // Wired Rets might no longer be alive (might unwire)
+        work.add(cepi);
+        cepi.add_work_defs(work); // Wired Rets might no longer be alive (might unwire)
       }
     } else if( chg == mem() ) {
-      if( cepi != null ) Env.GVN.add_flow(cepi);
+      if( cepi != null ) work.add(cepi);
     } else {                    // Args lifted, may resolve
       if( fdx() instanceof UnresolvedNode )
         Env.GVN.add_reduce(this);
       if( Env.GVN._opt_mode._CG && err(true)==null )
-        Env.GVN.add_flow(mem()); // Call not-in-error, memory may lift
+        work.add(mem());        // Call not-in-error, memory may lift
     }
   }
 
@@ -693,6 +694,36 @@ public class CallNode extends Node {
 
   //@Override public boolean unify( boolean test ) { assert tvar().isa("Args"); return false; }
 
+  // Resolve a call, removing ambiguity during the GCP/Combo pass.
+  @Override public void remove_ambi(Work work) {
+    TypeFunPtr tfp = ttfpx(_val);
+    BitsFun fidxs = tfp.fidxs();
+    if( !fidxs.above_center() ) return; // Resolved after all
+    assert fidxs!=BitsFun.ANY;          // Too many choices
+    // Pick least-cost among choices
+    FunPtrNode fptr = least_cost(fidxs,fdx());
+    if( fptr==null ) {             // Not resolving, program is in-error
+      _not_resolved_by_gcp = true; // will drop fdx in lattice
+    } else {                       // Set in resolved choice
+      set_dsp(fptr.display());
+      set_fdx(fptr);            // Set resolved edge
+    }
+    work.add(this);             // Progress
+  }
+
+  // See if we can resolve an unresolved Call
+  @Override public void combo_resolve(Work ambi) {
+    if( _live == TypeMem.DEAD ) return;
+    // Wait until the Call is reachable
+    if( ctl()._val != Type.CTRL || !(_val instanceof TypeTuple) ) return;
+    // Only ambiguous if FIDXs are both above_center and there are more than one
+    BitsFun fidxs = ttfp(_val).fidxs();
+    if( !fidxs.above_center() || fidxs.abit() != -1 ) return;
+    // Track ambiguous calls: resolve after GCP gets stable, and if we
+    // can resolve we continue to let GCP fall.
+    ambi.add(this);
+  }
+  
   @Override public ErrMsg err( boolean fast ) {
     // Fail for passed-in unknown references directly.
     for( int j=ARG_IDX; j<nargs(); j++ )

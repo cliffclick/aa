@@ -292,7 +292,7 @@ public class FunNode extends RegionNode {
     // Split the callers according to the new 'fun'.
     FunNode fun = make_new_fun(ret, formals);
     split_callers(ret,fun,body,path);
-    assert Env.START.more_flow(true)==0; // Initial conditions are correct
+    assert Env.START.more_flow(Env.GVN._work_flow,true)==0; // Initial conditions are correct
     return this;
   }
 
@@ -811,27 +811,27 @@ public class FunNode extends RegionNode {
       CallEpiNode cepi2 = (CallEpiNode)map.get(cepi);
       if( path < 0 ) {          // Type-split, wire both & resolve later
         BitsFun call_fidxs = ((TypeFunPtr) call.fdx()._val).fidxs();
-        assert call_fidxs.test_recur(    fidx()) ;  cepi.wire1(call,this,oldret);
-        if(    call_fidxs.test_recur(fun.fidx()) )  cepi.wire1(call, fun,newret);
+        assert call_fidxs.test_recur(    fidx()) ;  cepi.wire1(Env.GVN._work_flow,call,this,oldret);
+        if(    call_fidxs.test_recur(fun.fidx()) )  cepi.wire1(Env.GVN._work_flow,call, fun,newret);
         if( cepi2!=null ) {
           // Found an unwired call in original: musta been a recursive self-
           // call.  wire the clone, same as the original was wired, so the
           // clone keeps knowledge about its return type.
           CallNode call2 = cepi2.call();
           BitsFun call_fidxs2 = ((TypeFunPtr) call2.fdx()._val).fidxs();
-          if(    call_fidxs2.test_recur(    fidx()) )  cepi2.wire1(call2,this,oldret);
-          assert call_fidxs2.test_recur(fun.fidx()) ;  cepi2.wire1(call2, fun,newret);
+          if(    call_fidxs2.test_recur(    fidx()) )  cepi2.wire1(Env.GVN._work_flow,call2,this,oldret);
+          assert call_fidxs2.test_recur(fun.fidx()) ;  cepi2.wire1(Env.GVN._work_flow,call2, fun,newret);
         }
       } else {                  // Non-type split, wire left or right
-        if( call==path_call ) cepi.wire1(call, fun,newret);
-        else                  cepi.wire1(call,this,oldret);
+        if( call==path_call ) cepi.wire1(Env.GVN._work_flow,call, fun,newret);
+        else                  cepi.wire1(Env.GVN._work_flow,call,this,oldret);
         if( cepi2!=null && cepi2.call()!=path_call ) {
           CallNode call2 = cepi2.call();
           // Found an unwired call in original: musta been a recursive
           // self-call.  wire the clone, same as the original was wired, so the
           // clone keeps knowledge about its return type.
           //call2.set_fdx(call.fdx());
-          cepi2.wire1(call2,this,oldret);
+          cepi2.wire1(Env.GVN._work_flow,call2,this,oldret);
           call2.xval();
           Env.GVN.add_flow_uses(this); // This gets wired, that gets wired, revisit all
         }
@@ -847,7 +847,7 @@ public class FunNode extends RegionNode {
         for( int i=0; i<ncepi.nwired(); i++ ) {
           RetNode xxxret = ncepi.wired(i); // Neither newret nor oldret
           if( xxxret != newret && xxxret != oldret ) { // Not self-recursive
-            ncepi.wire0(ncepi.call(),xxxret.fun());
+            ncepi.wire0(Env.GVN._work_flow,ncepi.call(),xxxret.fun());
           }
         }
       }

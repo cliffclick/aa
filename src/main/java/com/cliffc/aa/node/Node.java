@@ -180,7 +180,7 @@ public abstract class Node implements Cloneable {
     old._uses.del(this);
     // Either last use of old & goes dead, or at least 1 fewer uses & changes liveness
     Env.GVN.add_unuse(old);
-    if( old._uses._len!=0 && old._keep ==0 ) old.add_flow_def_extra(this);
+    if( old._uses._len!=0 && old._keep ==0 ) old.add_work_def_extra(Env.GVN._work_flow,this);
     return this;
   }
 
@@ -510,9 +510,10 @@ public abstract class Node implements Cloneable {
 
   // The _val changed here, and more than the immediate _neighbors might change
   // value/live
-  public void add_flow_extra(Type old) { }
-  public void add_flow_use_extra(Node chg) { }
-  public void add_flow_def_extra(Node chg) { }
+  public void add_work_defs(Work work) { for( Node def : _defs ) work.add(def); }
+  public void add_work_extra(Work work, Type old) { }
+  public void add_work_use_extra(Work work, Node chg) { }
+  public void add_work_def_extra(Work work, Node chg) { }
   // Inputs changed here, and more than the immediate _neighbors might reduce
   public void add_reduce_extra() { }
 
@@ -521,6 +522,50 @@ public abstract class Node implements Cloneable {
   // the worklist.  If 'test' then make no changes, but return if progress
   // would be made.
   public boolean unify(boolean test) { return false; }
+
+  // Support for resolving ambiguous calls during GCP/Combo
+  public void remove_ambi(Work work) {}
+
+  // Do One Step of forwards-dataflow analysis.  Assert monotonic progress.
+  // If progressed, add neighbors on worklist.
+  public void combo_forwards(Work work) {
+    Type oval = _val;           // Old local type
+    Type nval = value(GVNGCM.Mode.Opto);// New type
+    if( oval == nval ) return;  // No progress
+    assert nval==nval.simple_ptr() || this instanceof ConTypeNode; // Only simple pointers in node types
+    assert oval.isa(nval);      // Monotonic
+    _val = nval;                // Record progress
+    for( Node use : _uses ) {   // Classic forwards flow on change
+      work.add(use).add_work_use_extra(work,this);
+      if( use instanceof CallEpiNode ) ((CallEpiNode)use).check_and_wire(work);
+    }
+    add_work_extra(work,oval);
+    if( this instanceof CallEpiNode ) ((CallEpiNode)this).check_and_wire(work);
+    // All liveness is skipped if may_be_con, since the possible constant
+    // has no inputs.
+    assert oval.may_be_con() || !nval.may_be_con(); // May_be_con is monotonic
+    if( oval.may_be_con() && !nval.may_be_con() )
+      for( Node def : _defs ) work.add(def); // Now check liveness
+  }
+
+  // Do One Step of backwards-dataflow analysis.  Assert monotonic progress.
+  // If progressed, add neighbors on worklist.
+  public void combo_backwards(Work work) {
+    TypeMem oliv = _live;
+    TypeMem nliv = live(GVNGCM.Mode.Opto);
+    if( oliv == nliv ) return;  // No progress
+    assert oliv.isa(nliv);      // Monotonic
+    _live = nliv;               // Record progress
+    add_work_extra(work,nliv);
+    for( Node def : _defs )     // Classic reverse flow on change
+      if( def!=null ) work.add(def).add_work_def_extra(work,this);
+  }
+
+  // Do One Step of Hindley-Milner unification.  Assert monotonic progress.
+  // If progressed, add neighbors on worklist.
+  public void combo_unify(Work work) { throw unimpl(); }
+  // See if we can resolve an unresolved Call during the Combined algorithm
+  public void combo_resolve(Work ambi) { }
 
   // Return any type error message, or null if no error
   public ErrMsg err( boolean fast ) { return null; }
@@ -554,7 +599,7 @@ public abstract class Node implements Cloneable {
         subsume(nnn);                   // Replace
         for( Node use : nnn._uses ) {
           use.add_reduce_extra();
-          use.add_flow_use_extra(nnn);
+          use.add_work_use_extra(Env.GVN._work_flow,nnn);
         }
       }
       Env.GVN.add_reduce(nnn);  // Rerun the replacement
@@ -601,8 +646,8 @@ public abstract class Node implements Cloneable {
         assert nliv.isa(oliv);    // Monotonically improving
         _live = nliv;             // Record progress
         for( Node def : _defs )   // Put defs on worklist... liveness flows uphill
-          if( def != null ) Env.GVN.add_flow(def).add_flow_def_extra(this);
-        add_flow_extra(oliv);
+          if( def != null ) Env.GVN.add_flow(def).add_work_def_extra(Env.GVN._work_flow,this);
+        add_work_extra(Env.GVN._work_flow,oliv);
       }
     }
 
@@ -621,10 +666,10 @@ public abstract class Node implements Cloneable {
       }
       // Put uses on worklist... values flows downhill
       for( Node use : _uses )
-        Env.GVN.add_flow(use).add_flow_use_extra(this);
+        Env.GVN.add_flow(use).add_work_use_extra(Env.GVN._work_flow,this);
       // Progressing on CFG can mean CFG paths go dead
       if( is_CFG() ) for( Node use : _uses ) if( use.is_CFG() ) Env.GVN.add_reduce(use);
-      add_flow_extra(oval);
+      add_work_extra(Env.GVN._work_flow,oval);
     }
     return progress;
   }
@@ -685,14 +730,15 @@ public abstract class Node implements Cloneable {
   }
 
   // Forward reachable walk, setting types to ANY and making all dead.
-  public final void walk_initype( GVNGCM gvn, VBitSet bs ) {
-    if( bs.tset(_uid) ) return;    // Been there, done that
+  public final void walk_initype( Work work ) {
+    if( work.on(this) ) return;    // Been there, done that
+    work.add(this);                // On worklist and mark visited
     _val = Type.ANY;               // Highest value
     _live = TypeMem.DEAD;          // Not alive
+    assert _tvar.is_leaf();        // Leaf type variable
     // Walk reachable graph
-    gvn.add_flow(this);
-    for( Node use : _uses ) use.walk_initype(gvn,bs);
-    for( Node def : _defs ) if( def != null ) def.walk_initype(gvn,bs);
+    for( Node use : _uses )                   use.walk_initype(work);
+    for( Node def : _defs ) if( def != null ) def.walk_initype(work);
   }
 
   // At least as alive
@@ -741,8 +787,8 @@ public abstract class Node implements Cloneable {
 
   // Assert all value and liveness calls only go forwards.  Returns >0 for failures.
   private static final VBitSet FLOW_VISIT = new VBitSet();
-  public  final int more_flow(boolean lifting) { FLOW_VISIT.clear();  return more_flow(lifting,0);  }
-  private int more_flow( boolean lifting, int errs ) {
+  public  final int more_flow(Work work,boolean lifting) { FLOW_VISIT.clear();  return more_flow(work,lifting,0);  }
+  private int more_flow( Work work,boolean lifting, int errs ) {
     if( FLOW_VISIT.tset(_uid) ) return errs; // Been there, done that
     if( Env.GVN.on_dead(this) ) return errs; // Do not check dying nodes
     // Check for only forwards flow, and if possible then also on worklist
@@ -753,14 +799,14 @@ public abstract class Node implements Cloneable {
       boolean ok = lifting
         ? nval.isa(oval) && nliv.isa(oliv)
         : oval.isa(nval) && oliv.isa(nliv);
-      if( !ok || (!Env.GVN.on_flow(this) && !Env.GVN.on_dead(this) && _keep==0) ) { // Still-to-be-computed?
+      if( !ok || (!work.on(this) && !Env.GVN.on_dead(this) && _keep==0) ) { // Still-to-be-computed?
         FLOW_VISIT.clear(_uid); // Pop-frame & re-run in debugger
         System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
         errs++;
       }
     }
-    for( Node def : _defs ) if( def != null ) errs = def.more_flow(lifting,errs);
-    for( Node use : _uses ) if( use != null ) errs = use.more_flow(lifting,errs);
+    for( Node def : _defs ) if( def != null ) errs = def.more_flow(work,lifting,errs);
+    for( Node use : _uses ) if( use != null ) errs = use.more_flow(work,lifting,errs);
     return errs;
   }
 

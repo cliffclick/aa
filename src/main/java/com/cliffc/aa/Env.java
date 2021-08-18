@@ -281,22 +281,22 @@ public class Env implements AutoCloseable {
     @Override public String toString() {
       // These types get large & complex; find all the dups up-front to allow
       // for prettier printing.  Uses '$A' style for repeats.
-      NonBlockingHashMapLong<String> dups = new NonBlockingHashMapLong<>();
-      VBitSet bs = new VBitSet();
+      VBitSet dups  = new VBitSet();
+      VBitSet visit = new VBitSet();
       for( VStack vs = this; vs!=null ; vs=vs._par )
         if( vs._tvars != null )
           for( TV2 tv2 : vs._tvars )
-            if( tv2 != null ) tv2.find_dups(bs,dups,0);
+            if( tv2 != null ) tv2._get_dups(visit,dups);
 
       // Print stack of types, grouped by depth
-      bs.clr();
+      visit.clr();
       SB sb = new SB().p("[");
       for( VStack vs = this; vs!=null ; vs=vs._par ) {
         if( vs._tvars != null ) {
           for( int i=0; i<vs._tvars._len; i++ ) {
             sb.p(vs._flds.at(i)).p('=');
             TV2 tv2 = vs._tvars.at(i);
-            if( tv2 !=null ) tv2.str(sb,bs,dups,false,0,0);
+            if( tv2 !=null ) tv2.str(sb,visit,dups,true);
             sb.p(", ");
           }
           if( vs._tvars._len>0 ) sb.unchar(2);

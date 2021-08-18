@@ -106,7 +106,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     return null;
   }
   // Called if Display goes unused
-  @Override public void add_flow_use_extra(Node chg) {
+  @Override public void add_work_use_extra(Work work, Node chg) {
     Type tdsp = display()._val;
     if( tdsp instanceof TypeMemPtr && ((TypeMemPtr)tdsp)._obj==TypeObj.UNUSED )
       Env.GVN.add_reduce(this);
@@ -131,9 +131,9 @@ public final class FunPtrNode extends UnOrFunPtrNode {
       return TypeFunPtr.EMPTY;
     return TypeFunPtr.make(ret()._fidx,nargs(),display()._val);
   }
-  @Override public void add_flow_extra(Type old) {
+  @Override public void add_work_extra(Work work, Type old) {
     if( old==_live )            // live impacts value
-      Env.GVN.add_flow(this);
+      work.add(this);
   }
 
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
@@ -249,7 +249,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     dsp.update(tok,dsp.access(tok),def);
     fptr.bind(tok); // Debug only, associate variable name with function
     //Env.GVN.add_reduce_uses(this);
-    assert Env.START.more_flow(true)==0;
+    assert Env.START.more_flow(Env.GVN._work_flow,true)==0;
     Env.GVN.iter(GVNGCM.Mode.Parse);
   }
 

@@ -66,7 +66,7 @@ public final class CallEpiNode extends Node {
 
     // See if we can wire any new fidxs directly between Call/Fun and Ret/CallEpi.
     // This *adds* edges, but enables a lot of shrinking via inlining.
-    if( check_and_wire() ) return this;
+    if( check_and_wire(Env.GVN._work_flow) ) return this;
 
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.
@@ -93,7 +93,7 @@ public final class CallEpiNode extends Node {
     // Parser thunks eagerly inline
     if( call.fdx() instanceof ThretNode ) {
       ThretNode tret = (ThretNode)call.fdx();
-      wire1(call,tret.thunk(),tret);
+      wire1(Env.GVN._work_flow,call,tret.thunk(),tret);
       return set_is_copy(tret.ctrl(), tret.mem(), tret.rez()); // Collapse the CallEpi into the Thret
     }
 
@@ -175,7 +175,7 @@ public final class CallEpiNode extends Node {
 
   // Used during GCP and Ideal calls to see if wiring is possible.
   // Return true if a new edge is wired
-  public boolean check_and_wire( ) {
+  public boolean check_and_wire( Work work ) {
     if( !(_val instanceof TypeTuple) ) return false; // Collapsing
     CallNode call = call();
     Type tcall = call._val;
@@ -195,7 +195,7 @@ public final class CallEpiNode extends Node {
       if( _defs.find(ret) != -1 ) continue;   // Wired already
       if( !CEProjNode.good_call(tcall,fun) ) continue; // Args fail basic sanity
       progress=true;
-      wire1(call,fun,ret);      // Wire Call->Fun, Ret->CallEpi
+      wire1(work,call,fun,ret);      // Wire Call->Fun, Ret->CallEpi
     }
     return progress;
   }
@@ -203,18 +203,18 @@ public final class CallEpiNode extends Node {
   // Wire the call args to a known function, letting the function have precise
   // knowledge of its callers and arguments.  This adds a edges in the graph
   // but NOT in the CG, until _cg_wired gets set.
-  void wire1( CallNode call, Node fun, Node ret ) {
+  void wire1( Work work, CallNode call, Node fun, Node ret ) {
     assert _defs.find(ret)==-1; // No double wiring
-    wire0(call,fun);
+    wire0(work,call,fun);
     // Wire self to the return
     add_def(ret);
-    GVN.add_flow(this);
-    GVN.add_flow(call);
-    GVN.add_flow_defs(call);
+    work.add(this);
+    work.add(call);
+    call.add_work_defs(work);
   }
 
   // Wire without the redundancy check, or adding to the CallEpi
-  void wire0(CallNode call, Node fun) {
+  void wire0(Work work, CallNode call, Node fun) {
     // Wire.  Bulk parallel function argument path add
 
     // Add an input path to all incoming arg ParmNodes from the Call.  Cannot
@@ -234,14 +234,16 @@ public final class CallEpiNode extends Node {
       }
       actual._live = arg._live; // Set it before CSE during init1
       arg.add_def(actual.init1());
+      work.add(actual);       // Also on the Combo worklist
       if( arg._val.is_con() ) // Added an edge, value may change or go in-error
-        GVN.add_flow_defs(arg); // So use-liveness changes
+        arg.add_work_defs(work); // So use-liveness changes
     }
 
     // Add matching control to function via a CallGraph edge.
-    fun.add_def(new CEProjNode(call,fun instanceof FunNode && !((FunNode) fun)._thunk_rhs ? ((FunNode)fun)._sig : null).init1());
-    GVN.add_flow(fun);
-    GVN.add_flow_uses(fun);
+    Node cep = new CEProjNode(call,fun instanceof FunNode && !((FunNode) fun)._thunk_rhs ? ((FunNode)fun)._sig : null).init1();
+    fun.add_def(work.add(cep));
+    work.add(fun);
+    for( Node use : fun._uses ) work.add(use);
     if( fun instanceof ThunkNode ) GVN.add_reduce_uses(fun);
     if( fun instanceof FunNode ) GVN.add_inline((FunNode)fun);
   }
@@ -365,12 +367,12 @@ public final class CallEpiNode extends Node {
     return TypeMemPtr.OOP0.dual().isa(trez) ? BitsAlias.NZERO : BitsAlias.EMPTY;
   }
 
-  @Override public void add_flow_use_extra(Node chg) {
-    if( chg instanceof CallNode ) { // If the Call changes value
-      Env.GVN.add_flow(chg.in(MEM_IDX));       // The called memory   changes liveness
-      Env.GVN.add_flow(((CallNode)chg).fdx()); // The called function changes liveness
-      for( int i=0; i<nwired(); i++ )          // Called returns change liveness
-        Env.GVN.add_flow(wired(i));
+  @Override public void add_work_use_extra(Work work, Node chg) {
+    if( chg instanceof CallNode ) {    // If the Call changes value
+      work.add(chg.in(MEM_IDX));       // The called memory   changes liveness
+      work.add(((CallNode)chg).fdx()); // The called function changes liveness
+      for( int i=0; i<nwired(); i++ )  // Called returns change liveness
+        work.add(wired(i));
     }
   }
 

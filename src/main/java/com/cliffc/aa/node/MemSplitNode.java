@@ -155,7 +155,7 @@ public class MemSplitNode extends Node {
     if( mprj.is_dead() ) Env.GVN.revalive(msp);
     else Env.GVN.revalive(msp,mprj,mjn);
     if( tail1 instanceof ProjNode ) Env.GVN.add_flow(tail1.in(0));
-    assert Env.START.more_flow(true)==0;
+    assert Env.START.more_flow(Env.GVN._work_flow,true)==0;
     Env.GVN.add_mono(mjn);       // See if other defs can move into the Join
     for( Node use : mjn.unkeep(2)._uses )
       Env.GVN.add_work_all(use); // See if other uses can move into the Join

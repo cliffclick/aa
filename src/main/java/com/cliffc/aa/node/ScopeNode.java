@@ -61,7 +61,7 @@ public class ScopeNode extends Node {
         for( Node use : old._uses )
           if( use instanceof MemSplitNode )
             Env.GVN.add_mono(((MemSplitNode)use).join());
-      old.add_flow_def_extra(n); // old loses a use, triggers extra
+      old.add_work_def_extra(Env.GVN._work_flow,n); // old loses a use, triggers extra
       Env.GVN.add_work_all(n);
     }
     return this;

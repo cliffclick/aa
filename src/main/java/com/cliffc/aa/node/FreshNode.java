@@ -4,6 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
+import static com.cliffc.aa.AA.unimpl;
 
 import java.util.Arrays;
 
@@ -32,7 +33,7 @@ public class FreshNode extends UnOrFunPtrNode {
   }
 
   @Override public Type value(GVNGCM.Mode opt_mode) { return val(1); }
-  @Override public void add_flow_extra(Type old) {
+  @Override public void add_work_extra(Work work,Type old) {
     // Types changed, now might collapse
     if( !no_tvar_structure(old) && no_tvar_structure(_val) )
       Env.GVN.add_reduce(this);
@@ -50,7 +51,10 @@ public class FreshNode extends UnOrFunPtrNode {
     return t.isa(TypeInt.INT64) || t.isa(TypeFlt.FLT64) || t.isa(TypeMemPtr.ISUSED0);
   }
 
-  @Override public boolean unify( boolean test ) {  return tvar(1).fresh_unify(tvar(),_tv2s,test); }
+  @Override public boolean unify( boolean test ) {
+    throw unimpl();
+    //return tvar(1).fresh_unify(tvar(),_tv2s,test);
+  }
 
   @Override public byte op_prec() { return id().op_prec(); }
   @Override Node is_pure_call() { return id().is_pure_call(); }

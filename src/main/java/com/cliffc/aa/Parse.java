@@ -110,9 +110,9 @@ public class Parse implements Comparable<Parse> {
     _e.close_display(_gvn);
     _gvn.iter(GVNGCM.Mode.PesiNoCG); // Pessimistic optimizations; might improve error situation
     remove_unknown_callers();
-    _gvn.gcp (GVNGCM.Mode.Opto,scope()); // Global Constant Propagation
+    Combo.opto();                  // Global Constant Propagation and Hindley-Milner Typing
     _gvn.iter(GVNGCM.Mode.PesiCG); // Re-check all ideal calls now that types have been maximally lifted
-    _gvn.gcp (GVNGCM.Mode.Opto,scope()); // Global Constant Propagation
+    Combo.opto();                  // Global Constant Propagation and Hindley-Milner Typing
     _gvn.iter(GVNGCM.Mode.PesiCG); // Re-check all ideal calls now that types have been maximally lifted
     _e._scope.unkeep();
     //assert Type.intern_check();

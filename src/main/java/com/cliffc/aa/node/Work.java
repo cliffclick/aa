@@ -13,7 +13,7 @@ public abstract class Work implements Function<Node,Node> {
   public Work(String name, boolean replacing) { _name=name; _replacing = replacing; }
   public int len() { return _work._len; }
   public <N extends Node> N add(N n) {
-    if( !_on.tset(n._uid) ) _work.push(n);
+    if( n!=null && !_on.tset(n._uid) ) _work.push(n);
     return n;
   }
   public abstract Node apply(Node n);

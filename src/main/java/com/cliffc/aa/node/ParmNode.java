@@ -95,11 +95,11 @@ public class ParmNode extends PhiNode {
   }
 
   // If an input to a Mem Parm changes, the flow results of other Parms can change
-  @Override public void add_flow_use_extra(Node chg) {
+  @Override public void add_work_use_extra(Work work, Node chg) {
     if( is_mem() )
       for( Node parm : in(0)._uses )
         if( parm instanceof ParmNode && parm != this )
-          Env.GVN.add_flow(parm);
+          work.add(parm);
   }
 
   //@Override public TV2 new_tvar(String alloc_site) {

@@ -110,8 +110,8 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       TypeMem esc1 = ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr1)._aliases,"",Type.SCALAR);
       return (TypeMem)esc0.meet(esc1);
     }
-    @Override public void add_flow_use_extra(Node chg) {
-      if( chg==in(3) || chg==in(4) ) Env.GVN.add_flow(in(1));  // Address into a Load changes, the Memory can be more alive.
+    @Override public void add_work_use_extra(Work work,Node chg) {
+      if( chg==in(3) || chg==in(4) ) work.add(in(1));  // Address into a Load changes, the Memory can be more alive.
     }
   }
 }

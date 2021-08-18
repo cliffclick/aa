@@ -56,7 +56,7 @@ public class MrgProjNode extends ProjNode {
     }
     return null;
   }
-  @Override public void add_flow_def_extra(Node chg) {
+  @Override public void add_work_def_extra(Work work, Node chg) {
     for( Node use : _uses ) {          // Lost a use, could be a 2nd mem writer
       if( use instanceof MrgProjNode ) // Look for back-to-back MrgProj
         Env.GVN.add_grow(use);

@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.type.*;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -549,7 +550,7 @@ public class TestNodeSmall {
     }
 
     // Now run GCP to closure.  This is the key call being tested.
-    gvn.gcp(GVNGCM.Mode.Opto,env);
+    Combo.opto();
 
     // Validate cyclic display/function type
     TypeFunPtr tfptr0 = (TypeFunPtr) fptr._val;

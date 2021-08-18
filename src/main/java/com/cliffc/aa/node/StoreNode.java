@@ -7,6 +7,7 @@ import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
+import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
@@ -97,7 +98,7 @@ public class StoreNode extends Node {
     return null;
   }
   // Liveness changes, check if reduce
-  @Override public void add_flow_extra(Type old) {
+  @Override public void add_work_extra(Work work,Type old) {
     Env.GVN.add_reduce(this); // Args can be more-alive
   }
   // If changing an input or value allows the store to no longer be in-error,
@@ -193,7 +194,8 @@ public class StoreNode extends Node {
     if( progress && test ) return progress;
 
     // Unify the given aliases and field against the stored type
-    return tmem.unify_alias_fld(n,tmp._aliases,fld,rez.tvar(),test,alloc_site);
+    //return tmem.unify_alias_fld(n,tmp._aliases,fld,rez.tvar(),test,alloc_site);
+    throw unimpl();
   }
 
 }

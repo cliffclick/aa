@@ -2,7 +2,9 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.tvar.UQNodes;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeTuple;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
 
@@ -24,21 +26,15 @@ public class GVNGCM {
   // Iterative worklists.
   private final Work _work_dead   = new Work("dead"  , false) { @Override public Node apply(Node n) { return n._keep==0 && n._uses._len == 0 ? n.kill() : null; } };
   private final Work _work_reduce = new Work("reduce", true ) { @Override public Node apply(Node n) { return n.do_reduce(); } };
-  private final Work _work_flow   = new Work("flow"  , false) { @Override public Node apply(Node n) { return n.do_flow  (); } };
+  public  final Work _work_flow   = new Work("flow"  , false) { @Override public Node apply(Node n) { return n.do_flow  (); } };
   private final Work _work_mono   = new Work("mono"  , true ) { @Override public Node apply(Node n) { return n.do_mono  (); } };
   private final Work _work_grow   = new Work("grow"  , true ) { @Override public Node apply(Node n) { return n.do_grow  (); } };
   private final Work _work_inline = new Work("inline", false) { @Override public Node apply(Node n) { return ((FunNode)n).ideal_inline(false); } };
   public  final Work _work_dom    = new Work("dom"   , false) { @Override public Node apply(Node n) { return n.do_mono  (); } };
-  @SuppressWarnings("unchecked")
   private final Work[]    _new_works = new Work[]{           _work_flow,_work_reduce,_work_mono,_work_grow             };
-  @SuppressWarnings("unchecked")
-  public  final Work[] _reduce_works = new Work[]{_work_dead,_work_flow,_work_reduce                                    };
-  @SuppressWarnings("unchecked")
   private final Work[]    _all_works = new Work[]{_work_dead,_work_flow,_work_reduce,_work_mono,_work_grow,_work_inline};
   static private boolean HAS_WORK;
   public boolean on_dead  ( Node n ) { return _work_dead  .on(n); }
-  public boolean on_flow  ( Node n ) { return _work_flow  .on(n); }
-  public boolean on_reduce( Node n ) { return _work_reduce.on(n); }
 
   static public <N extends Node> N add_work( Work work, N n ) {
     if( n==null || n.is_dead() ) return n;
@@ -56,9 +52,9 @@ public class GVNGCM {
   public void add_flow( UQNodes deps ) { if( deps != null ) for( Node dep : deps.values() ) add_flow(dep); }
   public void add_reduce_uses( Node n ) { add_work_uses(_work_reduce,n); }
   // n goes unused
-  public Node add_unuse( Node n ) {
-    if( n._uses._len==0 && n._keep==0 ) { add_dead(n); return n; } // might be dead
-    return add_reduce(add_flow(n));
+  public void add_unuse( Node n ) {
+    if( n._uses._len==0 && n._keep==0 ) { add_dead(n); return; } // might be dead
+    add_reduce(add_flow(n));
   }
   static public void add_work_defs( Work work, Node n ) {
     for( Node def : n._defs )
@@ -195,133 +191,6 @@ public class GVNGCM {
     return x.unkeep();
   }
 
-  // Global Optimistic Constant Propagation.  Passed in the final program state
-  // (including any return result, i/o & memory state).  Returns the most-precise
-  // types possible, and replaces constants types with constants.
-  //
-  // Besides the obvious GCP algorithm (and the type-precision that results
-  // from the analysis), GCP does a few more things.
-  //
-  // GCP builds an explicit Call-Graph.  Before GCP not all callers are known
-  // and this is approximated by being called by ALL_CTRL, a ConNode of Type
-  // CTRL, as a permanently available unknown caller.  If the whole program is
-  // available to us then we can compute all callers conservatively and fairly
-  // precisely - we may have extra never-taken caller/callee edges, but no
-  // missing caller/callee edges.  These edges are virtual (represented by
-  // ALL_CTRL) before GCP.  Just before GCP we remove the ALL_CTRL path, and
-  // during GCP we add in physical CG edges as possible calls are discovered.
-  //
-  // GCP resolves all ambiguous (overloaded) calls, using the precise types
-  // first, and then inserting conversions using a greedy decision.  If this is
-  // not sufficient to resolve all calls, the program is ambiguous and wrong.
-  public void gcp(Mode mode, ScopeNode rez ) {
-    _opt_mode = mode;
-    // Set all values to ALL and lives to DEAD, their most optimistic types.
-    VBitSet visit = new VBitSet();
-    Env.START.walk_initype(this,visit);
-    assert Env.START.more_flow(false)==0; // Initial conditions are correct
-    // Collect unresolved calls, and verify they get resolved.
-    Ary<CallNode> ambi_calls = new Ary<>(new CallNode[1],0);
-
-    // Repeat, if we remove some ambiguous choices, and keep falling until the
-    // graph stabilizes without ambiguity.
-    while( !_work_flow.isEmpty() ) {
-      // Analysis phase.
-      // Work down list until all reachable nodes types quit falling
-      Node n;
-      while( (n=_work_flow.pop()) != null ) {
-        if( n.is_dead() ) continue; // Can be dead functions after removing ambiguous calls
-
-        // Forwards flow
-        Type oval = n._val;                                // Old local type
-        Type nval = n.value(_opt_mode);                    // New type
-        if( oval != nval ) {                               // Progress
-          if( check_not_monotonic(n, oval, nval) ) continue; // Debugging hook
-          n._val = nval;            // Record progress
-          for( Node use : n._uses ) // Classic forwards flow on change
-            add_flow(use).add_flow_use_extra(n);
-          n.add_flow_extra(oval);
-          if( n instanceof CallEpiNode ) check_and_wire((CallEpiNode)n);
-          for( Node use : n._uses )
-            if( use instanceof CallEpiNode ) check_and_wire((CallEpiNode)use);
-          // All liveness is skipped if may_be_con, since the possible constant
-          // has no inputs.
-          assert oval.may_be_con() || !nval.may_be_con(); // May_be_con is monotonic
-          if( oval.may_be_con() && !nval.may_be_con() )
-            add_flow_defs(n);   // Now check liveness
-        }
-
-        // Reverse flow
-        TypeMem oliv = n._live;
-        TypeMem nliv = n.live(_opt_mode);
-        if( oliv != nliv ) {      // Liveness progress
-          if( check_not_monotonic(n, oliv, nliv) ) continue; // Debugging hook
-          n._live = nliv;           // Record progress
-          n.add_flow_extra(nliv);
-          for( Node def : n._defs ) // Classic reverse flow on change
-            if( def!=null ) add_flow(def).add_flow_def_extra(n);
-        }
-        // See if we can resolve an unresolved
-        if( n instanceof CallNode && n._live != TypeMem.DEAD ) {
-          CallNode call = (CallNode)n;
-          if( call.ctl()._val == Type.CTRL && call._val instanceof TypeTuple ) { // Wait until the Call is reachable
-            // Track ambiguous calls: resolve after GCP gets stable, and if we
-            // can resolve we continue to let GCP fall.
-            BitsFun fidxs = CallNode.ttfp(call._val).fidxs();
-            if( fidxs.above_center() && fidxs.abit() == -1 && ambi_calls.find(call) == -1 )
-              ambi_calls.add(call);
-          }
-        }
-        // Very expensive assert
-        //assert Env.START.more_flow(false)==0; // Initial conditions are correct
-      }
-
-      // Remove CallNode ambiguity after worklist runs dry.  This makes a
-      // 'least_cost' choice on unresolved Calls, and lowers them in the
-      // lattice... allowing more GCP progress.
-      while( !ambi_calls.isEmpty() )
-        remove_ambi(ambi_calls.pop());
-    }
-
-    assert Env.START.more_flow(false)==0; // Final conditions are correct
-    visit.clear();
-    Env.START.walk_opt(visit);
-  }
-
-  private void remove_ambi( CallNode call ) {
-    TypeFunPtr tfp = CallNode.ttfpx(call._val);
-    FunPtrNode fptr = null;
-    BitsFun fidxs = tfp.fidxs();
-    if( !fidxs.above_center() ) return; // Resolved after all
-    if( fidxs!=BitsFun.ANY ) {          // And have choices
-      // Pick least-cost among choices
-      fptr = call.least_cost(fidxs,call.fdx());
-      if( fptr==null ) { // Not resolving, program is in-error
-        call._not_resolved_by_gcp = true; // will drop fdx in lattice
-        add_flow(call);
-        return;
-      }
-    }
-    call.set_dsp(fptr.display());
-    call.set_fdx(fptr);         // Set resolved edge
-    add_flow(call);
-    assert Env.START.more_flow(false)==0; // Post conditions are correct
-  }
-
-  private void check_and_wire( CallEpiNode cepi ) {
-    if( !cepi.check_and_wire() ) return;
-    assert Env.START.more_flow(false)==0;
-  }
-
-  // Debugging hook
-  private boolean check_not_monotonic( Node n, Type ot, Type nt) {
-    assert nt==nt.simple_ptr() || n instanceof ConTypeNode;    // Only simple pointers in node types
-    if( ot.isa(nt) ) return false; // No bug
-    _work_flow.del(n);             // Might be back on the lift
-    add_flow(n);                   // Setup for a re-run
-    System.out.println("Not monotonic");
-    return true;    // Just single-step forward in debugging to re-run n.value
-  }
 
   // Walk all memory edges, and 'retype' them, probably DOWN (counter to
   // 'iter').  Used when inlining, and the inlined body needs to acknowledge

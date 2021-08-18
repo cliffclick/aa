@@ -6,6 +6,7 @@ import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Util;
 import org.jetbrains.annotations.NotNull;
 
+import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.AA.MEM_IDX;
 
 // Load a named field from a struct.  Does it's own nil-check testing.  Loaded
@@ -204,10 +205,10 @@ public class LoadNode extends Node {
     return tobj.oob();          // No loading from e.g. Strings
   }
 
-  @Override public void add_flow_use_extra(Node chg) {
-    if( chg==adr() ) Env.GVN.add_flow(mem());  // Address into a Load changes, the Memory can be more alive.
-    if( chg==mem() ) Env.GVN.add_flow(mem());  // Memory value lifts to ANY, memory live lifts also.
-    if( chg==mem() ) Env.GVN.add_flow(adr());  // Memory value lifts to an alias, address is more alive
+  @Override public void add_work_use_extra(Work work, Node chg) {
+    if( chg==adr() ) work.add(mem());  // Address into a Load changes, the Memory can be more alive.
+    if( chg==mem() ) work.add(mem());  // Memory value lifts to ANY, memory live lifts also.
+    if( chg==mem() ) work.add(adr());  // Memory value lifts to an alias, address is more alive
     // Memory improves, perhaps Load can bypass Call
     if( chg==mem() && mem().in(0) instanceof CallEpiNode ) Env.GVN.add_reduce(this);
     // Memory becomes a MrgProj, maybe Load can bypass MrgProj
@@ -283,19 +284,20 @@ public class LoadNode extends Node {
 
     // Make a Ptr:[0:Obj] and unify with the address.
     TV2 tptr = TV2.make("Ptr",adr(),"Load_unify");
-    tptr.args_put(0,tobj);
-    boolean progress = adr().tvar().unify(tptr,test);
-    if( test && progress ) return progress;
-
-    // Make a Mem:[alias:Obj] and unify with all aliases.
-    for( int alias : tmp._aliases ) {
-      // TODO: Probably wrong, as no reason to believe that as soon as alias
-      // sharpens above AARY that it has hit its best sane value.
-      if( alias <= BitsAlias.AARY ) continue; // No unify on parser-specific values
-      progress |= tmem.unify_at(alias,tobj.find(),test);
-      if( test && progress ) return progress;
-    }
-    return progress;
+    //tptr.args_put(0,tobj);
+    //boolean progress = adr().tvar().unify(tptr,test);
+    //if( test && progress ) return progress;
+    //
+    //// Make a Mem:[alias:Obj] and unify with all aliases.
+    //for( int alias : tmp._aliases ) {
+    //  // TODO: Probably wrong, as no reason to believe that as soon as alias
+    //  // sharpens above AARY that it has hit its best sane value.
+    //  if( alias <= BitsAlias.AARY ) continue; // No unify on parser-specific values
+    //  progress |= tmem.unify_at(alias,tobj.find(),test);
+    //  if( test && progress ) return progress;
+    //}
+    //return progress;
+    throw unimpl();
   }
 
   public static boolean unify( Node n, String fld, boolean test, String alloc_site) {
@@ -308,7 +310,8 @@ public class LoadNode extends Node {
     TypeMemPtr tmp = (TypeMemPtr)tadr;
 
     // Unify the given aliases and field against the loaded type
-    return tmem.unify_alias_fld(n,tmp._aliases,fld,n.tvar(),test,alloc_site);
+    //return tmem.unify_alias_fld(n,tmp._aliases,fld,n.tvar(),test,alloc_site);
+    throw unimpl();
   }
 
   @Override public ErrMsg err( boolean fast ) {

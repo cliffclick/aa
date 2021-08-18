@@ -70,7 +70,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     return null;
   }
 
-  @Override public void add_flow_def_extra(Node chg) {
+  @Override public void add_work_def_extra(Work work, Node chg) {
     if( chg instanceof MrgProjNode && chg._live.at(_alias)==TypeObj.UNUSED )
       Env.GVN.add_reduce(chg);
   }
