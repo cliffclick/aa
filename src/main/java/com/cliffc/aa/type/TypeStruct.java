@@ -122,8 +122,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // TODO: might get here with more unrelated structs, so need to check eg access, and missing names
     assert _flds.size()==t._flds.size();
     for( TypeFld fld : _flds.values() ) {
+      TypeFld fld1 = t._flds.get(fld._fld);
+      if( fld1==null ) return false;
       Type t0 = fld._t;
-      Type t1 = t._flds.get(fld._fld)._t;
+      Type t1 = fld1._t;
       if( t0!=t1 &&                // Normally suffices to test ptr-equals only
           (t0==null || t1==null || // Happens when asserting on partially-built cyclic types
            !t0.cycle_equals(t1)) ) // Must do a full cycle-check

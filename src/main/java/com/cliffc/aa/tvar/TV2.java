@@ -1,9 +1,7 @@
 package com.cliffc.aa.tvar;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.node.CallEpiNode;
-import com.cliffc.aa.node.Node;
-import com.cliffc.aa.node.FreshNode;
+import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
@@ -36,8 +34,8 @@ public class TV2 {
   // everything, wins all unifications, and has no structure.
   // - "Free": Nothing points to it, can be re-used.
   private String _name;
-  // Set of structural H-M parts.  Can be null if empty.  
-  public NonBlockingHashMap<String,TV2> _args;
+  // Set of structural H-M parts.  Can be null if empty.
+  NonBlockingHashMap<String,TV2> _args;
 
   // U-F algo.  Only set when unified, monotonic null->unification_target.
   // Can change again to shorten unification changes.
@@ -100,7 +98,7 @@ public class TV2 {
     TV2 tv = _get(key);
     return tv==null ? null : tv.find();
   }
-  
+
   // When inserting a new key, propagate deps
   public TV2 args_put(String key, TV2 tv) {
     _args.put(key,tv);          // Pick up a key->tv mapping
@@ -109,15 +107,20 @@ public class TV2 {
   }
 
   // Unify-at a selected key.
-  public boolean unify_at(String key, TV2 tv2, boolean test ) {
-    if( is_dead() ) return unify(tv2,test);
-    assert is_tvar() && _args!=null && !tv2.is_unified();
+  public boolean unify_at(int key, TV2 tv2, Work work ) { return unify_at(""+key,tv2,work); }
+  public boolean unify_at(String key, TV2 tv2, Work work ) {
+    if( is_dead() ) return unify(tv2,work);// if i am dead, all my parts are dead, so tv2 is unifying with a dead part
+    assert !tv2.is_unified();
+    if( !is_tvar() ) {
+      if( work==null ) return true;
+      throw unimpl();           // TODO: Expand, but needs a _name
+    }
     TV2 old = get(key);
     if( old!=null )
-      return old.unify(tv2,test);
-    if( test ) return true;
+      return old.unify(tv2,work); // This old becomes that
+    if( work==null ) return true; // Would add part
     args_put(key,tv2);
-    Env.GVN.add_flow(_deps);    // Re-CallEpi
+    work.add(_deps);
     return true;
   }
 
@@ -135,14 +138,8 @@ public class TV2 {
   }
   // Make a new primitive base TV2
   public static TV2 make_base(Node n, Type type, @NotNull String alloc_site) {
-    if( type instanceof TypeObj ) { // Constant object?
-      return make("Obj",n,alloc_site); // Empty object constant
-    }
     UQNodes ns = n==null ? null : UQNodes.make(n);
-    type = type.widen();
-    TV2 tv2 = new TV2("Base",null,type,ns,alloc_site);
-    assert tv2.is_base() && !tv2.is_leaf();
-    return tv2;
+    return new TV2("Base",null,type,ns,alloc_site);
   }
   // Make a new primitive base TV2
   public static TV2 make_err(Node n, String msg, @NotNull String alloc_site) {
@@ -194,8 +191,8 @@ public class TV2 {
   }
 
   // --------------------------------------------
-  // Tarjan U-F find, without the roll-up.  Used for debug printing.
-  TV2 debug_find() {
+  // Tarjan U-F find, without the roll-up.  Used for debug printing and asserts
+  public TV2 debug_find() {
     if( !is_unified() ) return this;
     TV2 top = _unified;
     if( !top.is_unified() ) return top; // Shortcut
@@ -205,7 +202,7 @@ public class TV2 {
     assert cnt<100;             // Infinite roll-up loop
     return top;
   }
-  
+
   // Classic Tarjan U-F with rollup
   private TV2 _find0() {
     TV2 top = debug_find();
@@ -227,7 +224,7 @@ public class TV2 {
     TV2 n = get("?");
     switch( n._name ) {
     case "Leaf":   return this;   //
-    case "Base": 
+    case "Base":
       // Nested nilable-and-not-leaf, need to fixup the nilable.
       // "this" becomes a base+XNIL
       _type = n._type.meet_nil(Type.XNIL);
@@ -241,7 +238,7 @@ public class TV2 {
     case "Nil":                 // Nested nilable; collapse the layer
       _args.put("?",n.get("?"));
       break;
-    default: 
+    default:
       throw unimpl();
     }
 
@@ -250,9 +247,9 @@ public class TV2 {
     return this;
   }
 
-  
+
   // U-F union; 'this' becomes 'that'.  No change if only testing, and reports
-  // progress.  If progress and not testing, adds _deps to worklist.  
+  // progress.  If progress and not testing, adds _deps to worklist.
   public boolean union(TV2 that, boolean test) {
     assert !is_unified() && !that.is_unified() && !is_dead();
     if( this==that ) return false;
@@ -295,7 +292,7 @@ public class TV2 {
     if( _type != that._type ) return false; // Base types, if present, must match
     if( !Util.eq(_name,that._name) ) return false; // Mismatched tvar names
     if( _args.size() != that._args.size() ) return false;
-    
+
     // Cycles stall the equal/unequal decision until we see a difference.
     TV2 tc = CDUPS.get(this);
     if( tc!=null )  return tc==that; // Cycle check; true if both cycling the same
@@ -309,7 +306,7 @@ public class TV2 {
     }
     return true;
   }
-  
+
   // True if args are equal
   public boolean eq(Node[] args) {
     //for( int i=0; i<args.length; i++ )
@@ -326,7 +323,7 @@ public class TV2 {
 //
 //// Structural unification.  Both 'this' and that' are the same afterwards.
 //// Returns True if progress.
-  public boolean unify(TV2 that, boolean test) {
+  public boolean unify(TV2 that, Work work) {
 //  //assert !this.is_unified() && !that.is_unified();
 //  //if( this==that ) return false;
 //  //assert DUPS.isEmpty();
@@ -738,7 +735,7 @@ public class TV2 {
       sb.p("V").p(_uid);
       return is_unified() ? _unified.str(sb.p(">>"), visit, dups, debug) : sb;
     }
-    
+
     if( dup ) sb.p("$V").p(_uid);
     if( visit.tset(_uid) && dup ) return sb;
     if( dup ) sb.p(':');

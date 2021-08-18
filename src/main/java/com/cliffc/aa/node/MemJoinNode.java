@@ -167,12 +167,12 @@ public class MemJoinNode extends Node {
   }
 
   // Unify alias-by-alias, except on the alias sets
-  @Override public boolean unify( boolean test ) {
+  @Override public boolean unify( Work work ) {
     MemSplitNode msp = msp();
     if( msp==null ) return false;
     TV2 tmem = tvar(0);
-    boolean progress = tvar().unify(tmem,test);
-    if( progress && test ) return true;
+    boolean progress = tvar().unify(tmem, work);
+    if( progress && work==null ) return true;
     Ary<BitsAlias> escs = msp()._escs;
     //for( int i=1; i<_defs._len; i++ ) {
     //  if( !tvar(i).isa("Mem") ) continue; // TODO: Unify anyways, forces faster progress

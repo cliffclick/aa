@@ -876,7 +876,7 @@ public class FunNode extends RegionNode {
   }
 
   // Funs get special treatment by the H-M algo.
-  @Override public boolean unify( boolean test ) { return false; }
+  @Override public boolean unify( Work work ) { return false; }
 
   // True if this is a forward_ref
   @Override public boolean is_forward_ref() { return _op_prec==-2; }

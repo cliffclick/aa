@@ -63,8 +63,8 @@ public class CastNode extends Node {
     return def==in(0) ? TypeMem.ALIVE : _live;
   }
 
-  @Override public boolean unify(boolean test) { return tvar(1).unify(tvar(),test); }
-  
+  @Override public boolean unify( Work work ) { return tvar(1).unify(tvar(), work); }
+
   @Override public @NotNull CastNode copy( boolean copy_edges) {
     CastNode nnn = (CastNode)super.copy(copy_edges);
     return Env.GVN._work_dom.add(nnn);

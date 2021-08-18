@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
@@ -14,13 +13,12 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   public NewStrNode( TypeStr to, String name, boolean reads, int op_prec, TypeFld... args) {
     super(OP_NEWSTR,BitsAlias.STR,to,name,reads,op_prec,args);
   }
-  @Override public boolean unify( boolean test ) {
+  @Override public boolean unify( Work work ) {
     // Self should always should be a TObj
-    TV2 tvar = tvar();
-    if( tvar.is_dead() ) return false;
-    assert tvar.isa("Obj");
-    // TODO: Structural unification on all fields
-    return false;
+    TV2 tv = tvar();
+    if( tv.is_dead() ) return false;
+    if( tv.is_struct() ) return false;
+    return work==null || tv.unify(TV2.make("@{}",this,"NewStr"),work);
   }
 
   @Override TypeStr dead_type() { return TypeStr.XSTR; }
@@ -43,7 +41,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   public static class ConvertI64Str extends NewStrNode {
     public ConvertI64Str( ) { super(TypeStr.STR,"str",false,-1,TypeFld.MEM,TypeFld.make_arg(TypeInt.INT64,ARG_IDX)); }
     @Override TypeObj valueobj() {
-      Type t = val(3);
+      Type t = val(ARG_IDX);
       if( t.above_center() || !(t instanceof TypeInt) ) return t.oob(TypeStr.STR);
       if( !t.is_con() ) return TypeStr.STR;
       return TypeStr.make(false,Long.toString(t.getl()).intern());
@@ -54,7 +52,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   public static class ConvertF64Str extends NewStrNode {
     public ConvertF64Str( ) { super(TypeStr.STR,"str",false,-1,TypeFld.MEM,TypeFld.make_arg(TypeFlt.FLT64,ARG_IDX)); }
     @Override TypeObj valueobj() {
-      Type t = val(3);
+      Type t = val(ARG_IDX);
       if( t.above_center() || !(t instanceof TypeFlt) ) return t.oob(TypeStr.STR);
       if( !t.is_con() ) return TypeStr.STR;
       return TypeStr.make(false,Double.toString(t.getd()).intern());
@@ -67,7 +65,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   // If one  argument  is  NIL, the other non-nil argument is returned.
   // If neither argument is NIL, the two strings are concatenated into a new third string.
   public static class AddStrStr extends NewStrNode {
-    private static int OP_PREC=7;
+    private static final int OP_PREC=7;
     public AddStrStr( ) { super(TypeStr.STR,"+",true,OP_PREC,
                                 TypeFld.make(" mem",TypeMem.MEM_STR,MEM_IDX),
                                 TypeFld.make_arg(TypeMemPtr.STR0,ARG_IDX  ),
@@ -97,12 +95,12 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
     @Override TypeObj valueobj() { throw com.cliffc.aa.AA.unimpl(); }
     @Override public byte op_prec() { return (byte)OP_PREC; }
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-      if( def==in(3) || def==in(4) ) return TypeMem.ALIVE;
-      assert def==in(1);
+      if( def==in(ARG_IDX) || def==in(ARG_IDX+1) ) return TypeMem.ALIVE;
+      assert def==in(MEM_IDX);
       // Memory for aliases is alive, as-if a READ/LOAD
-      Type tmem = val(1);
-      Type tptr0= val(3);
-      Type tptr1= val(4);
+      Type tmem = val(MEM_IDX);
+      Type tptr0= val(ARG_IDX);
+      Type tptr1= val(ARG_IDX+1);
       if( !(tmem  instanceof TypeMem   ) ) return tmem .oob(TypeMem.ALLMEM); // Not a memory?
       if( !(tptr0 instanceof TypeMemPtr) ) return tptr0.oob(TypeMem.ALLMEM); // Not a pointer?
       if( !(tptr1 instanceof TypeMemPtr) ) return tptr1.oob(TypeMem.ALLMEM); // Not a pointer?
@@ -111,7 +109,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       return (TypeMem)esc0.meet(esc1);
     }
     @Override public void add_work_use_extra(Work work,Node chg) {
-      if( chg==in(3) || chg==in(4) ) work.add(in(1));  // Address into a Load changes, the Memory can be more alive.
+      if( chg==in(ARG_IDX) || chg==in(ARG_IDX+1) ) work.add(in(MEM_IDX));  // Address into a Load changes, the Memory can be more alive.
     }
   }
 }

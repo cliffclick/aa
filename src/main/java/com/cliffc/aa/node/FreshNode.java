@@ -51,7 +51,7 @@ public class FreshNode extends UnOrFunPtrNode {
     return t.isa(TypeInt.INT64) || t.isa(TypeFlt.FLT64) || t.isa(TypeMemPtr.ISUSED0);
   }
 
-  @Override public boolean unify( boolean test ) {
+  @Override public boolean unify( Work work ) {
     throw unimpl();
     //return tvar(1).fresh_unify(tvar(),_tv2s,test);
   }

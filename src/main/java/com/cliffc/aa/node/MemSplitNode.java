@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
@@ -57,16 +58,17 @@ public class MemSplitNode extends Node {
     if( join!=null ) Env.GVN.add_flow(join);
   }
 
-  @Override public boolean unify( boolean test ) {
+  @Override public boolean unify( Work work ) {
     TV2 tself = tvar();
     if( tself.isa("SplitMem") ) {
-      assert tself._args.size()==_escs._len; // If changing the split-arity, need to reset_tvar
-      return false;
+      //assert tself._args.size()==_escs._len; // If changing the split-arity, need to reset_tvar
+      //return false;
+      throw AA.unimpl();
     }
-    if( test ) return true;
+    if( work==null ) return true;
     Node[] parms = new Node[_escs._len];
     Arrays.fill(parms,mem());
-    return tvar().unify(TV2.make("SplitMem",this,"unify",parms),test);
+    return tvar().unify(TV2.make("SplitMem",this,"unify",parms), work);
   }
 
   // Find index for alias
@@ -75,7 +77,7 @@ public class MemSplitNode extends Node {
     for( int i=1; i<_escs._len; i++ )
       if( _escs.at(i).test(alias) )
         return i;
-    throw com.cliffc.aa.AA.unimpl(); // Should be found
+    throw AA.unimpl(); // Should be found
   }
 
   // Find the escape set this esc set belongs to, or make a new one.
@@ -140,6 +142,7 @@ public class MemSplitNode extends Node {
   // New/Mrg pairs are just the Mrg; the New is not part of the SESE region.
   // Call/CallEpi pairs are: MProj->{CallEpi}->Call.
   static Node insert_split(Node tail1, BitsAlias head1_escs, Node head1, Node tail2, Node head2) {
+    assert Env.START.more_flow(Env.GVN._work_flow,true)==0;
     assert tail1.is_mem() && head1.is_mem() && tail2.is_mem() && head2.is_mem();
     BitsAlias head2_escs = head2.escapees();
     assert check_split(head1,head1_escs);

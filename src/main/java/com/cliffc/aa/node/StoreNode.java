@@ -177,11 +177,11 @@ public class StoreNode extends Node {
     return _fin==st._fin && Util.eq(_fld,st._fld);
   }
 
-  @Override public boolean unify( boolean test ) {
-    return unify(this,rez(),_fld,test,"Store_unify");
+  @Override public boolean unify( Work work ) {
+    return unify(this,rez(),_fld, work,"Store_unify");
   }
 
-  public static boolean unify( Node n, Node rez, String fld, boolean test, String alloc_site) {
+  public static boolean unify( Node n, Node rez, String fld, Work work, String alloc_site) {
     // Input should be a TMem
     TV2 tmem = n.tvar(1);
     if( !tmem.isa("Mem") ) return false;
@@ -190,8 +190,8 @@ public class StoreNode extends Node {
     if( !(tadr instanceof TypeMemPtr) ) return false; // Wait until types are sharper
     TypeMemPtr tmp = (TypeMemPtr)tadr;
     // This produces same memory
-    boolean progress = n.tvar().unify(tmem,test);
-    if( progress && test ) return progress;
+    boolean progress = n.tvar().unify(tmem,work);
+    if( progress && work==null ) return progress;
 
     // Unify the given aliases and field against the stored type
     //return tmem.unify_alias_fld(n,tmp._aliases,fld,rez.tvar(),test,alloc_site);

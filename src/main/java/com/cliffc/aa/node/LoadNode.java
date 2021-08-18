@@ -265,7 +265,7 @@ public class LoadNode extends Node {
   }
 
 
-  @Override public boolean unify( boolean test ) {
+  @Override public boolean unify( Work work ) {
     // Input should be a TMem
     TV2 tmem = tvar(1);
     if( !tmem.isa("Mem") ) return false;
@@ -300,7 +300,7 @@ public class LoadNode extends Node {
     throw unimpl();
   }
 
-  public static boolean unify( Node n, String fld, boolean test, String alloc_site) {
+  public static boolean unify( Node n, String fld, Work work, String alloc_site) {
     // Input should be a TMem
     TV2 tmem = n.tvar(1);
     if( !tmem.isa("Mem") ) return false;
@@ -310,7 +310,7 @@ public class LoadNode extends Node {
     TypeMemPtr tmp = (TypeMemPtr)tadr;
 
     // Unify the given aliases and field against the loaded type
-    //return tmem.unify_alias_fld(n,tmp._aliases,fld,n.tvar(),test,alloc_site);
+    //return tmem.unify_alias_fld(n,tmp._aliases,fld,n.tvar(),work,alloc_site);
     throw unimpl();
   }
 

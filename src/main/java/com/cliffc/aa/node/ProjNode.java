@@ -2,11 +2,10 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
-
-import static com.cliffc.aa.AA.unimpl;
 
 // Proj data
 public class ProjNode extends Node {
@@ -37,16 +36,16 @@ public class ProjNode extends Node {
   }
 
   // Unify with the parent TVar sub-part
-  @Override public boolean unify( boolean test ) {
-    //if( in(0) instanceof NewNode ) { // TODO: Not really a proper use of Proj
-    //  NewNode nnn = (NewNode)in(0);
-    //  TV2 tv = tvar();
-    //  if( tv.is_base() && tv._type==nnn._tptr ) return false; // No progress
-    //  return tv.unify(TV2.make("Ptr",this,"DProj_NewNode",nnn),test);
-    //}
-    //TV2 tv0 = tvar(0);
-    //return tv0._args!=null && tv0.unify_at(_idx,tvar(),test);
-    throw unimpl();
+  @Override public boolean unify( Work work ) {
+    TV2 tv = tvar();
+    if( in(0) instanceof NewNode ) { // TODO: Not really a proper use of Proj
+      NewNode nnn = (NewNode)in(0);
+      if( tv.is_base() && tv._type==nnn._tptr ) return false; // No progress
+      // Unify as a Base pointer
+      return work==null || tv.unify(TV2.make_base(this,nnn._tptr,"DProj_NewNode"),work);
+    }
+    TV2 tv0 = tvar(0);          // Input should be a TVar with parts
+    return tv0.unify_at(_idx,tv,work);
   }
 
   public static ProjNode proj( Node head, int idx ) {

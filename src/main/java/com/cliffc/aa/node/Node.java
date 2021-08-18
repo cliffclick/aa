@@ -518,10 +518,13 @@ public abstract class Node implements Cloneable {
   public void add_reduce_extra() { }
 
   // Unifies this Node with others; Call/CallEpi with Fun/Parm/Ret.  NewNodes &
-  // Load/Stores, etc.  Returns true if progress, and puts neighbors back on
-  // the worklist.  If 'test' then make no changes, but return if progress
+  // Load/Stores, etc.  Returns true if progressed, and puts neighbors back on
+  // the worklist.  If work==null then make no changes, but return if progress
   // would be made.
-  public boolean unify(boolean test) { return false; }
+  public boolean unify( Work work ) { return false; }
+
+  // HM changes; push related neighbors
+  public void add_work_hm(Work work) { }
 
   // Support for resolving ambiguous calls during GCP/Combo
   public void remove_ambi(Work work) {}
@@ -563,7 +566,15 @@ public abstract class Node implements Cloneable {
 
   // Do One Step of Hindley-Milner unification.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
-  public void combo_unify(Work work) { throw unimpl(); }
+  public void combo_unify(Work work) {
+    if( _live==TypeMem.DEAD ) return; // No HM progress on dead code
+    TV2 old = tvar();
+    if( unify(work) ) {
+      assert !_tvar.debug_find().unify(old.debug_find(),null);// monotonic: unifying with the result is no-progress
+      add_work_hm(work);        // Neighbors on worklist
+    }
+  }
+
   // See if we can resolve an unresolved Call during the Combined algorithm
   public void combo_resolve(Work ambi) { }
 
@@ -788,21 +799,23 @@ public abstract class Node implements Cloneable {
   // Assert all value and liveness calls only go forwards.  Returns >0 for failures.
   private static final VBitSet FLOW_VISIT = new VBitSet();
   public  final int more_flow(Work work,boolean lifting) { FLOW_VISIT.clear();  return more_flow(work,lifting,0);  }
-  private int more_flow( Work work,boolean lifting, int errs ) {
+  private int more_flow( Work work, boolean lifting, int errs ) {
     if( FLOW_VISIT.tset(_uid) ) return errs; // Been there, done that
     if( Env.GVN.on_dead(this) ) return errs; // Do not check dying nodes
-    // Check for only forwards flow, and if possible then also on worklist
-    Type    oval= _val, nval = value(Env.GVN._opt_mode);
-    TypeMem oliv=_live, nliv = live (Env.GVN._opt_mode);
-    boolean hm = false;
-    if( nval != oval || nliv != oliv || hm ) {
-      boolean ok = lifting
-        ? nval.isa(oval) && nliv.isa(oliv)
-        : oval.isa(nval) && oliv.isa(nliv);
-      if( !ok || (!work.on(this) && !Env.GVN.on_dead(this) && _keep==0) ) { // Still-to-be-computed?
-        FLOW_VISIT.clear(_uid); // Pop-frame & re-run in debugger
-        System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
-        errs++;
+    // If on worklist or partially built, do not check
+    if( !work.on(this) && _keep==0 ) {
+      Type    oval= _val, nval = value(Env.GVN._opt_mode); // Forwards flow
+      TypeMem oliv=_live, nliv = live (Env.GVN._opt_mode); // Backwards flow
+      boolean hm = Combo.DO_HM && !lifting && oliv!=TypeMem.DEAD && unify(null);  // HM unification if alive
+      if( nval != oval || nliv != oliv || hm ) { // Check for progress
+        boolean ok = lifting
+          ? nval.isa(oval) && nliv.isa(oliv)
+          : oval.isa(nval) && oliv.isa(nliv);
+        if( !ok || hm ) {         // Still-to-be-computed?
+          FLOW_VISIT.clear(_uid); // Pop-frame & re-run in debugger
+          System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
+          errs++;
+        }
       }
     }
     for( Node def : _defs ) if( def != null ) errs = def.more_flow(work,lifting,errs);
