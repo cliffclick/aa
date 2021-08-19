@@ -49,7 +49,7 @@ public class TV2 {
 
   // Debug only.  Set of unioned Nodes.  null for empty.  Helpful to track where TV2s come from.
   private UQNodes _ns;     //
-  private @NotNull String _alloc_site; // Creation site; used to track excessive creation.
+  private @NotNull final String _alloc_site; // Creation site; used to track excessive creation.
 
   // Track allocation statistics
   static private class ACnts { int _malloc, _unified, _free; }
@@ -110,11 +110,7 @@ public class TV2 {
   public boolean unify_at(int key, TV2 tv2, Work work ) { return unify_at(""+key,tv2,work); }
   public boolean unify_at(String key, TV2 tv2, Work work ) {
     if( is_dead() ) return unify(tv2,work);// if i am dead, all my parts are dead, so tv2 is unifying with a dead part
-    assert !tv2.is_unified();
-    if( !is_tvar() ) {
-      if( work==null ) return true;
-      throw unimpl();           // TODO: Expand, but needs a _name
-    }
+    assert is_tvar() && !tv2.is_unified();
     TV2 old = get(key);
     if( old!=null )
       return old.unify(tv2,work); // This old becomes that
@@ -178,6 +174,7 @@ public class TV2 {
   public static TV2 DEAD = new TV2("Dead",null,null,null,"static");
 
   public static void reset_to_init0() {
+    UID=1;
   }
   public void reset(Node n) { if( _ns!=null ) _ns.remove(n._uid); }
 
@@ -316,29 +313,27 @@ public class TV2 {
     throw unimpl();
   }
 
-//// --------------------------------------------
-//// Used in the recursive unification process.  During unify detects cycles,
-//// to allow cyclic unification.
-//private static final NonBlockingHashMapLong<TV2> DUPS = new NonBlockingHashMapLong<>();
-//
-//// Structural unification.  Both 'this' and that' are the same afterwards.
-//// Returns True if progress.
+  // --------------------------------------------
+  // Used in the recursive unification process.  During unify detects cycles,
+  // to allow cyclic unification.
+  private static final NonBlockingHashMapLong<TV2> DUPS = new NonBlockingHashMapLong<>();
+
+  // Structural unification.  Both 'this' and that' are the same afterwards.
+  // Returns True if progressed.
   public boolean unify(TV2 that, Work work) {
-//  //assert !this.is_unified() && !that.is_unified();
-//  //if( this==that ) return false;
-//  //assert DUPS.isEmpty();
-//  //boolean progress = _unify(that,test);
-//  //DUPS.clear();
-//  //return progress;
-    throw unimpl();
+    if( this==that ) return false;
+    assert DUPS.isEmpty();
+    boolean progress = _unify(that,work);
+    DUPS.clear();
+    return progress;
   }
-//
-//// Classic structural unification, no "fresh".  Unifies 'this' into 'that'.
-//// Both 'this' and 'that' are the same afterwards.  Returns true if progress.
-//private boolean _unify(TV2 that, boolean test) {
-//  assert !is_unified() && !that.is_unified();
-//  if( this==that ) return false;
-//
+
+  // Classic structural unification, no "fresh".  Unifies 'this' into 'that'.
+  // Both 'this' and 'that' are the same afterwards.  Returns true if progress.
+  private boolean _unify(TV2 that, Work work) {
+    assert !is_unified() && !that.is_unified();
+    if( this==that ) return false;
+
 //  // Check for simple, non-recursive, unification.
 //  // NIL always loses and makes no progress (no structure implications)
 //  if( this.is_nil () ) return false;
@@ -382,7 +377,9 @@ public class TV2 {
 //
 //  // TODO: Check for being equal, cyclic-ly, and return a prior if possible.
 //  return find().union(that);
-//}
+    throw unimpl();
+  }
+  
 //private boolean union_err(TV2 that, String msg) {
 //  union(that);
 //  return that.union(make_err(null,msg,"TV2.unify_err"));

@@ -746,7 +746,6 @@ public abstract class Node implements Cloneable {
     work.add(this);                // On worklist and mark visited
     _val = Type.ANY;               // Highest value
     _live = TypeMem.DEAD;          // Not alive
-    assert _tvar.is_leaf();        // Leaf type variable
     // Walk reachable graph
     for( Node use : _uses )                   use.walk_initype(work);
     for( Node def : _defs ) if( def != null ) def.walk_initype(work);

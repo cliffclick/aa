@@ -1,11 +1,11 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
 
-import java.util.HashMap;
 import java.util.function.Predicate;
 
 // Program execution start
@@ -21,4 +21,5 @@ public class StartNode extends Node {
   @Override public int hashCode() { return 123456789+1; }
   @Override public boolean equals(Object o) { return this==o; }
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }
+  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Start",this,alloc_site); }
 }

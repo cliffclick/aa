@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.Env.GVN;
@@ -455,11 +456,11 @@ public final class CallEpiNode extends Node {
     return _live;
   }
 
-  //@Override public TV2 new_tvar(String alloc_site) {
-  //  return _is_copy
-  //    ? TV2.make_leaf(this,alloc_site)
-  //    : TV2.make("Ret",this,alloc_site).push_dep(this);
-  //}
+  @Override public TV2 new_tvar(String alloc_site) {
+    assert !_is_copy;
+    // return _is_copy ? TV2.make_leaf(this,alloc_site)
+    return TV2.make("CallEpi",this,alloc_site).push_dep(this);
+  }
 
   //@Override public boolean unify( boolean test ) {
   //  if( _is_copy ) return false; // A copy
