@@ -1943,6 +1943,11 @@ public class HM {
 
     // -----------------
     private static final VBitSet ODUPS = new VBitSet();
+    boolean occurs_in_type(T2 x) {
+      ODUPS.clear();
+      return _occurs_in_type(x);
+    }
+
     boolean _occurs_in_type(T2 x) {
       assert no_uf() && x.no_uf();
       if( x==this ) return true;
@@ -1952,11 +1957,6 @@ public class HM {
           if( _occurs_in_type(x.args(i)) )
             return true;
       return false;
-    }
-
-    boolean occurs_in_type(T2 x) {
-      ODUPS.clear();
-      return _occurs_in_type(x);
     }
 
     boolean nongen_in(VStack vs) {

@@ -3,8 +3,10 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
 
 import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.AA.unimpl;
 
 // Proj memory
 public class MrgProjNode extends ProjNode {
@@ -93,15 +95,5 @@ public class MrgProjNode extends ProjNode {
     return _live;
   }
 
-  //@Override public TV2 new_tvar( String alloc_site) { return TV2.make_mem(this,alloc_site); }
-  //
-  //@Override public boolean unify( boolean test ) {
-  //  if( !(in(0) instanceof NewNode) ) return false;
-  //  TV2 tmem = mem().tvar();
-  //  if( !tmem.isa("Mem") ) return false;
-  //  TV2 tself = tvar();
-  //  return tself.unify(tmem,test) |                  // Unify bulk memory
-  //    tmem.unify_at(nnn()._alias,nnn().tvar(),test); // Unify at the alias
-  //}
-
+  @Override public TV2 new_tvar( String alloc_site) { return null; }
 }

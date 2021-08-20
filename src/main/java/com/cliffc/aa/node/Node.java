@@ -97,6 +97,7 @@ public abstract class Node implements Cloneable {
     TV2 tv = _tvar.find();     // Do U-F step
     return tv == _tvar ? tv : (_tvar = tv); // Update U-F style in-place.
   }
+  public boolean has_tvar() { return _tvar!=null; }
   public TV2 tvar(int x) { return in(x).tvar(); } // nth TV2
   public TV2 new_tvar(String alloc_site) { return TV2.make_leaf(this,alloc_site); }
 
@@ -567,8 +568,10 @@ public abstract class Node implements Cloneable {
   // Do One Step of Hindley-Milner unification.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
   public void combo_unify(Work work) {
-    if( _live==TypeMem.DEAD ) return; // No HM progress on dead code
+    if( _live==TypeMem.DEAD ||  // No HM progress on dead code
+        !has_tvar() ) return;   // Has no TVar in the first place
     TV2 old = tvar();
+    if( old.is_err() ) return;  // No unifications with error
     if( unify(work) ) {
       assert !_tvar.debug_find().unify(old.debug_find(),null);// monotonic: unifying with the result is no-progress
       add_work_hm(work);        // Neighbors on worklist
@@ -805,7 +808,7 @@ public abstract class Node implements Cloneable {
     if( !work.on(this) && _keep==0 ) {
       Type    oval= _val, nval = value(Env.GVN._opt_mode); // Forwards flow
       TypeMem oliv=_live, nliv = live (Env.GVN._opt_mode); // Backwards flow
-      boolean hm = Combo.DO_HM && !lifting && oliv!=TypeMem.DEAD && unify(null);  // HM unification if alive
+      boolean hm = Combo.DO_HM && !lifting && oliv!=TypeMem.DEAD && _tvar!=null && unify(null);  // HM unification if alive
       if( nval != oval || nliv != oliv || hm ) { // Check for progress
         boolean ok = lifting
           ? nval.isa(oval) && nliv.isa(oliv)

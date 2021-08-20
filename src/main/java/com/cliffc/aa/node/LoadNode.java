@@ -6,8 +6,7 @@ import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Util;
 import org.jetbrains.annotations.NotNull;
 
-import static com.cliffc.aa.AA.unimpl;
-import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.AA.*;
 
 // Load a named field from a struct.  Does it's own nil-check testing.  Loaded
 // value depends on the struct typing.
@@ -16,15 +15,15 @@ public class LoadNode extends Node {
   private final Parse _bad;
 
   public LoadNode( Node mem, Node adr, String fld, Parse bad ) {
-    super(OP_LOAD,null,mem,adr);
+    super(OP_LOAD,null,mem,null,adr);
     _fld = fld;
     _bad = bad;
   }
   @Override public String xstr() { return "."+_fld; }   // Self short name
   String  str() { return xstr(); } // Inline short name
   Node mem() { return in(MEM_IDX); }
-  Node adr() { return in(2); }
-  private Node set_mem(Node a) { return set_def(1,a); }
+  Node adr() { return in(ARG_IDX); }
+  private Node set_mem(Node a) { return set_def(MEM_IDX,a); }
   public TypeFld find(TypeStruct ts) { return ts.fld_find(_fld); }
 
   // Strictly reducing optimizations
@@ -264,54 +263,9 @@ public class LoadNode extends Node {
     return tfld;
   }
 
-
+  // Standard memory unification; the Load unifies with the loaded field.
   @Override public boolean unify( Work work ) {
-    // Input should be a TMem
-    TV2 tmem = tvar(1);
-    if( !tmem.isa("Mem") ) return false;
-    // Address needs to name the aliases
-    Type tadr = val(2);
-    if( !(tadr instanceof TypeMemPtr) ) return false; // Wait until types are sharper
-    TypeMemPtr tmp = (TypeMemPtr)tadr;
-
-    // Make a Obj["fld":self] type.
-    // Make a Ptr:[0:Obj] and unify with the address.
-    // Make a Mem:[alias:Obj] and unify with all aliases.
-
-    // Make a Obj["fld":self] type.
-    TV2 tobj = TV2.make("Obj",(UQNodes) null,"Load_unify");
-    tobj.args_put(_fld,tvar());
-
-    // Make a Ptr:[0:Obj] and unify with the address.
-    TV2 tptr = TV2.make("Ptr",adr(),"Load_unify");
-    //tptr.args_put(0,tobj);
-    //boolean progress = adr().tvar().unify(tptr,test);
-    //if( test && progress ) return progress;
-    //
-    //// Make a Mem:[alias:Obj] and unify with all aliases.
-    //for( int alias : tmp._aliases ) {
-    //  // TODO: Probably wrong, as no reason to believe that as soon as alias
-    //  // sharpens above AARY that it has hit its best sane value.
-    //  if( alias <= BitsAlias.AARY ) continue; // No unify on parser-specific values
-    //  progress |= tmem.unify_at(alias,tobj.find(),test);
-    //  if( test && progress ) return progress;
-    //}
-    //return progress;
-    throw unimpl();
-  }
-
-  public static boolean unify( Node n, String fld, Work work, String alloc_site) {
-    // Input should be a TMem
-    TV2 tmem = n.tvar(1);
-    if( !tmem.isa("Mem") ) return false;
-    // Address needs to name the aliases
-    Type tadr = n.val(2);
-    if( !(tadr instanceof TypeMemPtr) ) return false; // Wait until types are sharper
-    TypeMemPtr tmp = (TypeMemPtr)tadr;
-
-    // Unify the given aliases and field against the loaded type
-    //return tmem.unify_alias_fld(n,tmp._aliases,fld,n.tvar(),work,alloc_site);
-    throw unimpl();
+    return StoreNode.unify("@{}",this,adr().tvar(),adr()._val,this,_fld,work);
   }
 
   @Override public ErrMsg err( boolean fast ) {

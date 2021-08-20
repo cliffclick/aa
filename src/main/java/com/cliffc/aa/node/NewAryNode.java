@@ -1,9 +1,12 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.NonBlockingHashMap;
 
 import static com.cliffc.aa.AA.ARG_IDX;
+import static com.cliffc.aa.AA.unimpl;
 
 // Allocates a TypeAry in memory.  Takes in the size and initial element value
 // produces the pointer.  Hence liveness is odd.
@@ -32,27 +35,20 @@ abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
     }
   }
 
-  //@Override public TV2 new_tvar(String alloc_site) {
-  //  final Node n = this;
-  //  NonBlockingHashMap<Comparable,TV2> args = new NonBlockingHashMap<Comparable,TV2>(){{
-  //      put(" len" ,TV2.make_base(null,TypeInt.INT64,alloc_site));
-  //      put(" elem",TV2.make_leaf(null,alloc_site));
-  //    }};
-  //  return TV2.make("Obj",this,alloc_site,args);
-  //}
+  @Override public TV2 new_tvar(String alloc_site) {
+    NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<String,TV2>(){{ put("elem",TV2.make_leaf(null,alloc_site)); }};
+    return TV2.make("Ary",this,alloc_site,args);
+  }
 
-  //@Override public boolean unify( boolean test ) {
-  //  // Self should always should be a TObj
-  //  TV2 tvar = tvar();
-  //  if( tvar.is_dead() ) return false;
-  //  if( _defs._len <=3 ) return false; // Mid-kill
-  //  if( tvar.isa("Obj") &&
-  //      tvar.get(" len") == tvar(3) && // Size equals
-  //      tvar.get(" elem") != null )    // Has an element type
-  //    return false;
-  //  // Structural unification on all fields
-  //  return tvar.unify_at(" len",tvar(3),test);
-  //}
+  @Override public boolean unify( Work work ) {
+    assert _tvar.isa("Ary");     // Self should always should be a Ary
+    // Length is an int
+    TV2 len = tvar(ARG_IDX);
+    if( len.is_base() && len._type.isa(TypeInt.INT64) )
+      return false;
+    return work==null ||        // Fast cutout
+      len.unify(TV2.make_base(in(ARG_IDX),TypeInt.INT64,"NewAry"),work);
+  }
 
 }
 

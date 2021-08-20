@@ -4,6 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Util;
 
@@ -168,17 +169,33 @@ public class NewObjNode extends NewNode<TypeStruct> {
     throw unimpl();
   }
 
-  //@Override public boolean unify( boolean test ) {
-  //  // Self should always should be a TObj
-  //  TV2 tvar = tvar();
-  //  if( tvar.is_dead() ) return false;
-  //  assert tvar.isa("Obj");
-  //  // Structural unification on all fields
-  //  boolean progress=false;
-  //  for( int i=0; i<_ts._flds.length; i++ ) {
-  //    progress |= tvar.unify_at(_ts._flds[i],tvar(def_idx(i)),test);
-  //    if( progress && test ) return true;
-  //  }
-  //  return progress;
-  //}
+  @Override public TV2 new_tvar(String alloc_site) { return TV2.make_struct(this,alloc_site); }
+
+  @Override public boolean unify( Work work ) {
+    TV2 rec = tvar();
+    assert rec.is_struct();
+
+    // One time (post parse) pick up the complete field list.
+    if( rec.open() )
+      return work==null ||      // Cutout before allocation if testing
+        rec.unify(TV2.make_struct(this,"NewObj_unify",_ts,_defs),work);
+
+    // Extra fields are unified as Error since they are not created here:
+    // error to load from a non-existing field.
+    for( String key : rec.args() )
+      if( _ts.fld_find(key)==null && !rec.get(key).is_err() )
+        throw unimpl();         // Not already an error, and field is extra
+
+    // Unify existing fields.  Ignore extras on either side.
+    boolean progress = false;
+    for( TypeFld fld : _ts.flds() ) {
+      TV2 tvfld = rec.get(fld._fld);
+      if( tvfld != null &&      // Limit to matching fields
+          (progress |= tvfld.unify(tvar(fld._order),work)) &&
+          work==null )
+        return true; // Fast cutout if testing
+    }
+    rec.push_dep(this);
+    return progress;
+  }
 }

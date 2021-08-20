@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
@@ -690,9 +691,9 @@ public class CallNode extends Node {
   }
 
   // Gather incoming args.  NOT an application point (yet), that is a CallEpi.
-  //@Override public TV2 new_tvar(String alloc_site) { return TV2.make("Args",this,alloc_site,parms()); }
+  @Override public TV2 new_tvar( String alloc_site) { return TV2.make("Call",this,alloc_site,parms()); }
 
-  //@Override public boolean unify( boolean test ) { assert tvar().isa("Args"); return false; }
+  @Override public boolean unify( Work work ) { assert tvar().isa("Call"); return false; }
 
   // Resolve a call, removing ambiguity during the GCP/Combo pass.
   @Override public void remove_ambi(Work work) {
@@ -723,7 +724,7 @@ public class CallNode extends Node {
     // can resolve we continue to let GCP fall.
     ambi.add(this);
   }
-  
+
   @Override public ErrMsg err( boolean fast ) {
     // Fail for passed-in unknown references directly.
     for( int j=ARG_IDX; j<nargs(); j++ )

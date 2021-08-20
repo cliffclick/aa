@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
@@ -120,8 +121,15 @@ public abstract class MemPrimNode extends PrimNode {
       return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,"#", Type.SCALAR);
     }
 
+    @Override public TV2 new_tvar( String alloc_site) { return TV2.make_base(this,TypeInt.INT64,alloc_site); }
+
     @Override public boolean unify( Work work ) {
-      return LoadNode.unify(this," len", work,"[]_unify");
+      // The input is an array, but that's about all we can say
+      TV2 tptr = tvar(ARG_IDX);
+      if( tptr.isa("Ary") ) return false;
+      if( work == null ) return true;
+      tptr.unify(TV2.make("Ary",this,"array_len"),work);
+      return true;
     }
 
     @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
@@ -147,8 +155,9 @@ public abstract class MemPrimNode extends PrimNode {
       return ary.ld(idx2);
     }
 
+    // Standard memory unification; the Load unifies with the loaded field.
     @Override public boolean unify( Work work ) {
-      return LoadNode.unify(this," elem", work,"[]_unify");
+      return StoreNode.unify("@{}",this,adr().tvar(),adr()._val,this,"elem",work);
     }
 
     @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
@@ -192,10 +201,6 @@ public abstract class MemPrimNode extends PrimNode {
       if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? BitsAlias.EMPTY : BitsAlias.FULL;
       return ((TypeMemPtr)adr)._aliases;
     }
-
-    @Override public boolean unify( Work work ) {
-      throw unimpl();
-    }
   }
 
   // Produces a triop LValue, where the leading TMP is a non-zero array
@@ -219,7 +224,13 @@ public abstract class MemPrimNode extends PrimNode {
       return tmem2;
     }
     @Override public boolean unify( Work work ) {
-      return StoreNode.unify(this,rez()," elem", work,"[]:=_unify");
+      boolean progress = false;
+      TV2 idx = tvar(ARG_IDX+1);
+      if( !(idx.is_base() && idx._type.isa(TypeInt.INT64)) ) {
+        if( work==null ) return true;
+        progress = idx.unify(TV2.make_base(idx(), TypeInt.INT64, "[]:="), work);
+      }
+      return StoreNode.unify("Ary",this,adr().tvar(),adr()._val,rez(),"elem",work) | progress;
     }
     @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
   }
@@ -244,8 +255,16 @@ public abstract class MemPrimNode extends PrimNode {
       TypeMem tmem2 = tmem.update(tary._aliases,tidx,val);
       return tmem2;
     }
+
+    // Unify address as Ary, idx as int64, Ary.elem and val to self.
     @Override public boolean unify( Work work ) {
-      return StoreNode.unify(this,rez()," elem", work,"[]=_unify");
+      boolean progress = false;
+      TV2 idx = tvar(ARG_IDX+1);
+      if( !(idx.is_base() && idx._type.isa(TypeInt.INT64)) ) {
+        if( work==null ) return true;
+        progress = idx.unify(TV2.make_base(idx(), TypeInt.INT64, "[]:="), work);
+      }
+      return StoreNode.unify("Ary",this,adr().tvar(),adr()._val,rez(),"elem",work) | progress;
     }
     @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
     @Override public ErrMsg err(boolean fast) {

@@ -10,20 +10,20 @@ import java.util.Arrays;
 
 // "fresh" the incoming TVar: make a fresh instance.
 public class FreshNode extends UnOrFunPtrNode {
-  TV2[] _tv2s;
+  TV2[] _tv2s;                  // Compacted VStack of nongen TV2s, used during "fresh"
   public FreshNode( Env.VStack vs, Node ctrl, Node ld ) { super(OP_FRESH, ctrl, ld); _tv2s = vs.compact(); }
 
-  Node id() { return in(1); }
+  Node id() { return in(1); }   // The HM identifier
   @Override public Node ideal_reduce() {
     if( id()==this ) return null; // Dead self-cycle
     // Remove Fresh of base type values: things that can never have structure.
     if( no_tvar_structure(_val) )
       return id();
     // Remove if TVar has already unified with the input.
-    // TODO: TURN BACK ON.  Removes many FreshNodes but requires non-local info to put on worklist.
+    // Removes many FreshNodes but requires non-local info to put on worklist.
     // i.e. a remote unification can suddenly enable this.
-    //if( !tvar().unify(id().tvar(),true) )
-    // return id();
+    if( !tvar().unify(id().tvar(),null) ) // Unification progress?
+     return id();
 
     // Unwind ctrl-copy
     Node cc = in(0).is_copy(0);
@@ -52,8 +52,7 @@ public class FreshNode extends UnOrFunPtrNode {
   }
 
   @Override public boolean unify( Work work ) {
-    throw unimpl();
-    //return tvar(1).fresh_unify(tvar(),_tv2s,test);
+    return tvar(1).fresh_unify(tvar(),_tv2s,work);
   }
 
   @Override public byte op_prec() { return id().op_prec(); }

@@ -959,8 +959,6 @@ public class Parse implements Comparable<Parse> {
         // extra argument and replaces the default.
         NewObjNode stk = e._scope.stk();
         stk.update("^",Access.Final,clo);
-        // Add a nongen memory arg
-        _e._nongen.add_var(" mem",mem.tvar());
 
         // Parms for all arguments
         Parse errmsg = errMsg();  // Lazy error message

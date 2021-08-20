@@ -4,6 +4,9 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
+
+import static com.cliffc.aa.AA.unimpl;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
@@ -17,6 +20,7 @@ public class PhiNode extends Node {
     else _t = Type.SCALAR;
     _badgc = badgc;
     _live = all_live();         // Recompute starting live after setting t
+    if( t instanceof TypeMem ) _tvar=null;  // No HM for memory
   }
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
   // For ParmNodes
@@ -71,24 +75,19 @@ public class PhiNode extends Node {
   }
 
 
-  //@Override public TV2 new_tvar(String alloc_site) {
-  //  if( _t==null ) return null;
-  //  return _t==TypeMem.ALLMEM ? TV2.make_mem(this,alloc_site) : TV2.make_leaf(this,alloc_site);
-  //}
-  //
-  //// All inputs unify
-  //@Override public boolean unify( boolean test ) {
-  //  if( !(in(0) instanceof RegionNode) ) return false;
-  //  RegionNode r = (RegionNode) in(0);
-  //  boolean progress = false;
-  //  for( int i=1; i<_defs._len; i++ ) {
-  //    if( r.val(i)!=Type.XCTRL && r.val(i)!=Type.ANY ) { // Only unify alive paths
-  //      progress |= tvar().unify(tvar(i), test);
-  //      if( progress && test ) return true;
-  //    }
-  //  }
-  //  return progress;
-  //}
+  // All inputs unify
+  @Override public boolean unify( Work work ) {
+    if( !(in(0) instanceof RegionNode) ) return false; // Dying
+    RegionNode r = (RegionNode) in(0);
+    boolean progress = false;
+    for( int i=1; i<_defs._len; i++ ) {
+      if( r.val(i)!=Type.XCTRL && r.val(i)!=Type.ANY ) { // Only unify alive paths
+        progress |= tvar().unify(tvar(i), work);
+        if( progress && work==null ) return true; // Fast cutout
+      }
+    }
+    return progress;
+  }
 
   @Override BitsAlias escapees() { return BitsAlias.FULL; }
   @Override public TypeMem all_live() {

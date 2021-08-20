@@ -102,15 +102,10 @@ public class ParmNode extends PhiNode {
           work.add(parm);
   }
 
-  //@Override public TV2 new_tvar(String alloc_site) {
-  //  if( _name==null ) return null; // Wait till initialized
-  //  return _idx==MEM_IDX ? TV2.make_mem(this,alloc_site) : TV2.make_leaf(this,alloc_site);
-  //}
-  //
-  //// While Parms are mostly Phis (and yes for value flows), during unification
-  //// Parms are already treated by the H-M algo, and (via fresh_unify) get
-  //// "fresh" TVars for every input path.
-  //@Override public boolean unify( boolean test ) { return false; }
+  // While Parms are mostly Phis (and yes for value flows), during unification
+  // Parms are already treated by the H-M algo, and (via fresh_unify) get
+  // "fresh" TVars for every input path.
+  @Override public boolean unify( Work work ) { return false; }
 
   @Override public ErrMsg err( boolean fast ) {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere

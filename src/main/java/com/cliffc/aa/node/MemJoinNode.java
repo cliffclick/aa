@@ -166,22 +166,7 @@ public class MemJoinNode extends Node {
     return super.live(opt_mode);
   }
 
-  // Unify alias-by-alias, except on the alias sets
-  @Override public boolean unify( Work work ) {
-    MemSplitNode msp = msp();
-    if( msp==null ) return false;
-    TV2 tmem = tvar(0);
-    boolean progress = tvar().unify(tmem, work);
-    if( progress && work==null ) return true;
-    Ary<BitsAlias> escs = msp()._escs;
-    //for( int i=1; i<_defs._len; i++ ) {
-    //  if( !tvar(i).isa("Mem") ) continue; // TODO: Unify anyways, forces faster progress
-    //  progress |= tmem.unify_alias(escs.at(i),tvar(i),test);
-    //  if( progress && test ) return true;
-    //}
-    //return progress;
-    throw unimpl();
-  }
+  @Override public TV2 new_tvar(String alloc_site) { return null; }
 
   // Move the given SESE region just ahead of the split into the join/split
   // area.  The head node has the escape-set.
@@ -224,7 +209,6 @@ public class MemJoinNode extends Node {
     Node mspj;
     if( idx == _defs._len ) {         // Escape set added at the end
       add_def(mspj = GVN.init(new MProjNode(msp,idx)).unkeep(2));
-      mspj._tvar = msp.mem().tvar(); // Need to upgrade tvar to a TMem
     } else {             // Inserted into prior region
       mspj = in(idx);
       assert idx!=0;     // No partial overlap; all escape sets are independent

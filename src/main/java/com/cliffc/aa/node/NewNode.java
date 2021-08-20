@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
@@ -93,8 +94,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   }
 
   //@Override public TV2 new_tvar(String alloc_site) { return TV2.make("Obj",this,alloc_site); }
-
-  //abstract public boolean unify( boolean test );
+  abstract public TV2 new_tvar(String alloc_site);
 
   @Override BitsAlias escapees() { return _tptr._aliases; }
   abstract T dead_type();

@@ -58,18 +58,7 @@ public class MemSplitNode extends Node {
     if( join!=null ) Env.GVN.add_flow(join);
   }
 
-  @Override public boolean unify( Work work ) {
-    TV2 tself = tvar();
-    if( tself.isa("SplitMem") ) {
-      //assert tself._args.size()==_escs._len; // If changing the split-arity, need to reset_tvar
-      //return false;
-      throw AA.unimpl();
-    }
-    if( work==null ) return true;
-    Node[] parms = new Node[_escs._len];
-    Arrays.fill(parms,mem());
-    return tvar().unify(TV2.make("SplitMem",this,"unify",parms), work);
-  }
+  @Override public TV2 new_tvar(String alloc_site) { return null; }
 
   // Find index for alias
   int find_alias_index( int alias ) {

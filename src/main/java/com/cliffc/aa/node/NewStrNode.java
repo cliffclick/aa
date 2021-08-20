@@ -13,13 +13,8 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   public NewStrNode( TypeStr to, String name, boolean reads, int op_prec, TypeFld... args) {
     super(OP_NEWSTR,BitsAlias.STR,to,name,reads,op_prec,args);
   }
-  @Override public boolean unify( Work work ) {
-    // Self should always should be a TObj
-    TV2 tv = tvar();
-    if( tv.is_dead() ) return false;
-    if( tv.is_struct() ) return false;
-    return work==null || tv.unify(TV2.make("@{}",this,"NewStr"),work);
-  }
+  
+  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Str",this,alloc_site); }
 
   @Override TypeStr dead_type() { return TypeStr.XSTR; }
   protected static void add_libs( Ary<NewPrimNode> INTRINSICS ) {

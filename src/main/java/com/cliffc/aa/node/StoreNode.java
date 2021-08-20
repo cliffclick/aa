@@ -5,6 +5,7 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.NonBlockingHashMap;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -178,24 +179,41 @@ public class StoreNode extends Node {
   }
 
   @Override public boolean unify( Work work ) {
-    return unify(this,rez(),_fld, work,"Store_unify");
+    return unify("@{}",this,adr().tvar(),adr()._val,rez(),_fld,work);
   }
 
-  public static boolean unify( Node n, Node rez, String fld, Work work, String alloc_site) {
-    // Input should be a TMem
-    TV2 tmem = n.tvar(1);
-    if( !tmem.isa("Mem") ) return false;
-    // Address needs to name the aliases
-    Type tadr = n.val(2);
-    if( !(tadr instanceof TypeMemPtr) ) return false; // Wait until types are sharper
-    TypeMemPtr tmp = (TypeMemPtr)tadr;
-    // This produces same memory
-    boolean progress = n.tvar().unify(tmem,work);
-    if( progress && work==null ) return progress;
+  // Common memory-update unification.  Store unifies with the stored value.
+  // The ptr has to be not-nilable and have the fld, which unifies with the
+  // value.  If the fld is missing, then if the ptr is open, add the field else
+  // missing field error.
+  public static boolean unify( String name, Node st, TV2 ptr, Type tptr, Node val, String fld, Work work ) {
+    // Store value is always the stored value
+    boolean progress = st.tvar().unify(val.tvar(),work);
 
-    // Unify the given aliases and field against the stored type
-    //return tmem.unify_alias_fld(n,tmp._aliases,fld,rez.tvar(),test,alloc_site);
-    throw unimpl();
+    if( ptr.is_leaf() ) {
+      NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<String,TV2>(){{ put(fld,val.tvar()); }};
+      return ptr.unify(TV2.make(name,st,"Store_update",args),work);
+    }
+
+    if( ptr.is_nilable() || (tptr instanceof TypeMemPtr && tptr.must_nil()) )
+      throw unimpl(); //return find().unify(T2.make_err("May be nil when loading field "+_id),work);
+
+    ptr.push_dep(st);
+
+    // Matching fields unify
+    if( ptr.get(fld)!=null )
+      return ptr.unify_at(fld,st.tvar(), work) | progress;
+
+    // Add field if open
+    if( ptr.open() ) { // Effectively unify with an extended struct.
+      ptr.args_put(fld,st.tvar());
+      return true;              // Progress
+    }
+
+    // Closed record, field is missing
+    if( st.tvar().is_err() ) return false; // Already an error
+    return work ==null ||
+      st.tvar().unify(ptr.miss_field(st,fld,"Store_update"),work);
   }
 
 }
