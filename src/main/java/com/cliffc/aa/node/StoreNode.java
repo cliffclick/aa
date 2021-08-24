@@ -187,16 +187,18 @@ public class StoreNode extends Node {
   // value.  If the fld is missing, then if the ptr is open, add the field else
   // missing field error.
   public static boolean unify( String name, Node st, TV2 ptr, Type tptr, Node val, String fld, Work work ) {
+    if( st.tvar().is_err() ) return false; // Already an error, no progress
     // Store value is always the stored value
     boolean progress = st.tvar().unify(val.tvar(),work);
 
     if( ptr.is_leaf() ) {
+      if( tptr instanceof TypeMemPtr && tptr.must_nil() ) work.add(st); // If nil, will be a nil-access error
       NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<String,TV2>(){{ put(fld,val.tvar()); }};
-      return ptr.unify(TV2.make(name,st,"Store_update",args),work);
+      return ptr.unify(TV2.make(name,st,tptr,"Store_update",args),work);
     }
 
     if( ptr.is_nilable() || (tptr instanceof TypeMemPtr && tptr.must_nil()) )
-      throw unimpl(); //return find().unify(T2.make_err("May be nil when loading field "+_id),work);
+      return work==null || st.tvar().unify(TV2.make_err(st,"May be nil when accessing field "+fld,"Store_update"),work);
 
     ptr.push_dep(st);
 
@@ -213,7 +215,7 @@ public class StoreNode extends Node {
     // Closed record, field is missing
     if( st.tvar().is_err() ) return false; // Already an error
     return work ==null ||
-      st.tvar().unify(ptr.miss_field(st,fld,"Store_update"),work);
+      ptr.unify(ptr.miss_field(st,fld,"Store_update"),work);
   }
 
 }

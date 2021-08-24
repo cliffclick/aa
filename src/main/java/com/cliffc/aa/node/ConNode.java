@@ -3,9 +3,13 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
 
 import java.util.function.Predicate;
 
+// Constant value nodes; no computation needed.  Hashconsed for unique
+// constants, except for XNIL.  XNIL allows for a TV2 typevar Nilable-Leaf with
+// each Leaf unifying on its own.
 public class ConNode<T extends Type> extends Node {
   T _t;                         // Not final for testing
   public ConNode( T t ) {
@@ -40,13 +44,24 @@ public class ConNode<T extends Type> extends Node {
     return TypeMem.make_live(live);
   }
   @Override public TypeMem all_live() { return _t==Type.CTRL ? TypeMem.ALIVE : (_t instanceof TypeMem ? TypeMem.ALIVE : TypeMem.LIVE_BOT); }
+
+  @Override public boolean unify( Work work ) {
+    TV2 self = tvar();
+    if( self.is_base() || self.is_nilable() || self.is_struct() ) return false;
+    if( work==null ) return true;
+    assert self.is_leaf();
+    String asite = "Con_unify";
+    TV2 tv2 = _t==Type.XNIL ? TV2.make_nil(this,_t,TV2.make_leaf(this,asite),asite) : TV2.make_base(this,_t,asite);
+    return self.unify(tv2,work);
+  }
+
   @Override public String toString() { return str(); }
   @Override public int hashCode() { return _t.hashCode(); }// In theory also slot 0, but slot 0 is always Start
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof ConNode) ) return false;
     ConNode con = (ConNode)o;
-    return _t==con._t;
+    return _t!=Type.XNIL && _t==con._t;
   }
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }
 }

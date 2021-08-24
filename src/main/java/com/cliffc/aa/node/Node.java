@@ -91,7 +91,7 @@ public abstract class Node implements Cloneable {
   // typing.  This is a Type Variable which can unify with other TV2s forcing
   // Type-equivalence (JOIN of unified Types), and includes gross structure
   // (functions, structs, pointers, or simple Types).
-  @NotNull TV2 _tvar;
+  TV2 _tvar;
   // H-M Type-Variables
   public TV2 tvar() {
     TV2 tv = _tvar.find();     // Do U-F step
@@ -808,7 +808,7 @@ public abstract class Node implements Cloneable {
     if( !work.on(this) && _keep==0 ) {
       Type    oval= _val, nval = value(Env.GVN._opt_mode); // Forwards flow
       TypeMem oliv=_live, nliv = live (Env.GVN._opt_mode); // Backwards flow
-      boolean hm = Combo.DO_HM && !lifting && oliv!=TypeMem.DEAD && _tvar!=null && unify(null);  // HM unification if alive
+      boolean hm = Combo.DO_HM && !lifting && oliv!=TypeMem.DEAD && _tvar!=null && !tvar().is_err() && unify(null);  // HM unification if alive
       if( nval != oval || nliv != oliv || hm ) { // Check for progress
         boolean ok = lifting
           ? nval.isa(oval) && nliv.isa(oliv)

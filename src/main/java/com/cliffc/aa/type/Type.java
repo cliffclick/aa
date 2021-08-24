@@ -918,6 +918,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     case TNIL:    return NIL;
     case TXNREAL:
     case TXNSCALR:return TypeInt.BOOL;
+    case TALL:
     case TREAL:   case TNREAL:    return REAL;
     case TSCALAR: case TNSCALR:   return SCALAR;
     case TCTRL:   case TXCTRL:

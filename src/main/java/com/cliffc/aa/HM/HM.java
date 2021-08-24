@@ -175,7 +175,7 @@ public class HM {
       Ary<Syntax> args = new Ary<>(new Syntax[1],0);
       while( skipWS()!= ')' && X<BUF.length ) args.push(fterm());
       require(')');
-      // Guarding if-nil test inserts an upcast.  This is a syntatic transform only.
+      // Guarding if-nil test inserts an upcast.  This is a syntactic transform only.
       if( fun instanceof If &&
           args.at(0) instanceof Ident ) {
         Ident id = (Ident)args.at(0);
@@ -1397,7 +1397,7 @@ public class HM {
       if( n.is_base() ) {
         _flow = n._flow .meet_nil(Type.XNIL);
         _args = null;
-        _name = n._name;
+        _name = "Base";
       } else if( n.is_struct() ) {
         _alias= n._alias.meet_nil();
         _args = n._args.clone();

@@ -11,7 +11,11 @@ import java.util.Arrays;
 // "fresh" the incoming TVar: make a fresh instance.
 public class FreshNode extends UnOrFunPtrNode {
   TV2[] _tv2s;                  // Compacted VStack of nongen TV2s, used during "fresh"
-  public FreshNode( Env.VStack vs, Node ctrl, Node ld ) { super(OP_FRESH, ctrl, ld); _tv2s = vs.compact(); }
+   public FreshNode( Env.VStack vs, Node ctrl, Node ld ) {
+     super(OP_FRESH, ctrl, ld);
+     _tv2s = vs.compact();
+     ld.tvar().push_dep(this);
+   }
 
   Node id() { return in(1); }   // The HM identifier
   @Override public Node ideal_reduce() {
@@ -53,6 +57,12 @@ public class FreshNode extends UnOrFunPtrNode {
 
   @Override public boolean unify( Work work ) {
     return tvar(1).fresh_unify(tvar(),_tv2s,work);
+  }
+  @Override public void add_work_hm(Work work) {
+    work.add(in(1));
+    TV2 t = tvar(1);
+    if( t.nongen_in(_tv2s) )
+      t.add_deps_work(work); // recursive work.add(_deps)
   }
 
   @Override public byte op_prec() { return id().op_prec(); }

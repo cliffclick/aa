@@ -173,6 +173,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
 
   @Override public boolean unify( Work work ) {
     TV2 rec = tvar();
+    if( rec.is_err() ) return false;
     assert rec.is_struct();
 
     // One time (post parse) pick up the complete field list.
@@ -182,12 +183,15 @@ public class NewObjNode extends NewNode<TypeStruct> {
 
     // Extra fields are unified as Error since they are not created here:
     // error to load from a non-existing field.
+    boolean progress = false;
     for( String key : rec.args() )
-      if( _ts.fld_find(key)==null && !rec.get(key).is_err() )
-        throw unimpl();         // Not already an error, and field is extra
+      if( _ts.fld_find(key)==null && !rec.get(key).is_err() ) {
+        if( work==null ) return true;
+        progress |= rec.get(key).unify(rec.miss_field(this,key,"NewObj_err"),work);
+        if( (rec=rec.find()).is_err() ) return true;
+      }
 
     // Unify existing fields.  Ignore extras on either side.
-    boolean progress = false;
     for( TypeFld fld : _ts.flds() ) {
       TV2 tvfld = rec.get(fld._fld);
       if( tvfld != null &&      // Limit to matching fields

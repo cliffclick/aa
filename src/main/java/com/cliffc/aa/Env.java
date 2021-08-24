@@ -19,8 +19,6 @@ public class Env implements AutoCloseable {
   public static   DefMemNode DEFMEM;// Default memory (all structure types)
   public static      ConNode ALL_CTRL; // Default control
   public static      ConNode XCTRL; // Always dead control
-  public static      ConNode XNIL;  // Common XNIL
-  public static      ConNode NIL;   // Common NIL
   public static      ConNode ANY;   // Common ANY / used for dead
   public static      ConNode ALL;   // Common ALL / used for errors
   public static      ConNode ALL_CALL; // Common during function call construction
@@ -40,7 +38,7 @@ public class Env implements AutoCloseable {
   private Env(  ) {
     _par = null;
     _nongen = null;
-    _scope = init(CTL_0,XNIL,MEM_0,Type.XNIL,null,true);
+    _scope = init(CTL_0,Node.con(Type.XNIL),MEM_0,Type.XNIL,null,true);
   }
 
   // A file-level Env, or below.  Contains user written code.
@@ -79,8 +77,6 @@ public class Env implements AutoCloseable {
     START   = GVN.init (new StartNode());
     ALL_CTRL= GVN.xform(new ConNode<>(Type.CTRL )).keep();
     XCTRL   = GVN.xform(new ConNode<>(Type.XCTRL)).keep();
-    XNIL    = GVN.xform(new ConNode<>(Type.XNIL )).keep();
-    NIL     = GVN.xform(new ConNode<>(Type.NIL  )).keep();
     ANY     = GVN.xform(new ConNode<>(Type.ANY  )).keep();
     ALL     = GVN.xform(new ConNode<>(Type.ALL  )).keep();
     ALL_CALL= GVN.xform(new ConNode<>(TypeRPC.ALL_CALL)).keep();

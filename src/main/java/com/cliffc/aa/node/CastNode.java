@@ -5,7 +5,12 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.util.NonBlockingHashMap;
+
 import org.jetbrains.annotations.NotNull;
+
+import static com.cliffc.aa.AA.unimpl;
 
 // Gain precision after an If-test.
 public class CastNode extends Node {
@@ -63,7 +68,51 @@ public class CastNode extends Node {
     return def==in(0) ? TypeMem.ALIVE : _live;
   }
 
-  @Override public boolean unify( Work work ) { return tvar(1).unify(tvar(), work); }
+  // Unifies the input to '(Nil ?:self)'
+  @Override public boolean unify( Work work ) {
+    TV2 maynil = tvar(1);
+    TV2 notnil = tvar();
+    boolean progress = false;
+
+    // Can already be nil-checked and will then unify to self
+    if( maynil==notnil ) throw unimpl(); // return false;
+
+    // Already an expanded nilable
+    if( maynil.is_nilable() && maynil.get("?") == notnil ) throw unimpl(); // return false
+
+    // Expand nilable to either base
+    if( maynil.is_base() && notnil.is_base() )
+      throw unimpl(); //
+
+    // Two structs, one nilable.  Nilable is moved into the alias, but also
+    // need to align the fields.
+    if( maynil.is_struct() && notnil.is_struct() && maynil._type == maynil._type.meet_nil(Type.XNIL) ) {
+      // Also check that the fields align
+      for( String fld : maynil.args() ) {
+        TV2 mfld = maynil.get(fld);
+        TV2 nfld = notnil.get(fld);
+        if( (nfld!=null && nfld!=mfld) ||
+            (nfld==null && notnil.open()) )
+          { progress = true; break; }
+      }
+      // Find any extra fields
+      if( !progress && maynil.open() )
+        for( String fld : notnil.args() )
+          if( maynil.get(fld) == null )
+            { progress = true; break; }
+      if( !progress ) return false; // No progress
+    }
+
+    // All other paths may progress
+    if( work == null ) return true;
+
+    // Can be nilable of nilable; fold the layer
+    if( maynil.is_nilable() && notnil.is_nilable() )
+      throw unimpl();
+
+    // Unify the maynil with a nilable version of notnil
+    return TV2.make_nil(in(1),val(1),notnil,"Cast_unify").find().unify(maynil, work) | progress;
+  }
 
   @Override public @NotNull CastNode copy( boolean copy_edges) {
     CastNode nnn = (CastNode)super.copy(copy_edges);

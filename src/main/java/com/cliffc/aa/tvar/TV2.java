@@ -22,9 +22,10 @@ public class TV2 {
   // Unique ID
   private static int UID=1;
   public final int _uid;
-  // - "Args", "Ret", "Fun", "Mem", "Obj", "If".  A structural tag for the H-M
+  // - "Args", "Ret", "Fun", "Obj", "@{}".  A structural tag for the H-M
   // "type", these have to be equal during unification; their Keys in _args are
   // unioned and equal keys are unified
+  // - "Nil", with argument "?"
   // - "Base" - some constant Type, Base Types MEET when unified.
   // - "Err": a dead Node or a Type.ANY ConNode, and a dead TV2.  Unifies with
   // everything, wins all unifications, and has no structure.
@@ -141,7 +142,12 @@ public class TV2 {
     UQNodes ns = n==null ? null : UQNodes.make(n);
     return new TV2("Base",null,type,ns,alloc_site);
   }
-  // Make a new primitive base TV2
+    // Make a new Nil
+  public static TV2 make_nil(Node n, Type type, TV2 leaf, @NotNull String alloc_site) {
+    NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<String,TV2>(){{ put("?",leaf); }};
+    return new TV2("Nil",args,type,UQNodes.make(n),alloc_site);
+  }
+// Make a new primitive base TV2
   public static TV2 make_err(Node n, String msg, @NotNull String alloc_site) {
     UQNodes ns = n==null ? null : UQNodes.make(n);
     TV2 tv2 = new TV2("Err",null,TypeStr.con(msg.intern()),ns,alloc_site);
@@ -152,13 +158,19 @@ public class TV2 {
     return make_err(n,"Missing field "+fld+" in "+this,alloc_site);
   }
 
-
   // Structural constructor, empty
   public static TV2 make(@NotNull String name, Node n, @NotNull String alloc_site ) { return make(name,n,alloc_site,new NonBlockingHashMap<>()); }
   // Structural constructor
-  public static TV2 make(@NotNull String name, Node n, @NotNull String alloc_site, NonBlockingHashMap<String,TV2> args) {
+  public static TV2 make(@NotNull String name, Node n,  @NotNull String alloc_site, NonBlockingHashMap<String,TV2> args) {
     assert args!=null;          // Must have some structure
     TV2 tv2 = new TV2(name,args,null,UQNodes.make(n),alloc_site);
+    assert !tv2.is_base() && !tv2.is_leaf();
+    return tv2;
+  }
+  // Structural constructor with address
+  public static TV2 make(@NotNull String name, Node n, Type t, @NotNull String alloc_site, NonBlockingHashMap<String,TV2> args) {
+    assert args!=null;          // Must have some structure
+    TV2 tv2 = new TV2(name,args,t,UQNodes.make(n),alloc_site);
     assert !tv2.is_base() && !tv2.is_leaf();
     return tv2;
   }
@@ -192,10 +204,16 @@ public class TV2 {
         args.put(ts.fld_idx(i)._fld,ntvs.at(i).tvar());
     TV2 tv2 = make("@{}",n,alloc_site,args);
     tv2._open = false;          // Closed now; no more fields
+    tv2._type = n._tptr;        // Pick up alias info
     return tv2;
   }
 
-  public static TV2 DEAD = new TV2("Dead",null,null,null,"static");
+  TV2 copy(String alloc_site) {
+    TV2 t = new TV2(_name,_args==null ? null : new NonBlockingHashMap<>(),_type,_ns,alloc_site);
+    t._deps = _deps;
+    t._open = _open;
+    return t;
+  }
 
   public static void reset_to_init0() {
     UID=1;
@@ -229,7 +247,7 @@ public class TV2 {
     TV2 top = debug_find();
     if( top == this ) return top;
     TV2 v = this;               // Rerun, rolling up to top
-    while( v != top ) v = v._union(top);
+    while( v != top ) { TV2 next = v._unified; v._union(top); v = next; }
     return top;
   }
 
@@ -255,6 +273,8 @@ public class TV2 {
     case "@{}":
       _type = n._type.meet_nil(Type.XNIL); // Add a nil alias
       _args = (NonBlockingHashMap<String,TV2>)n._args.clone();  // Shallow copy the TV2 fields
+      _open = n._open;
+      _name = "@{}";
       break;
     case "Nil":                 // Nested nilable; collapse the layer
       _args.put("?",n.get("?"));
@@ -276,20 +296,22 @@ public class TV2 {
     assert !is_err() || that.is_err(); // Become the error, not error become that
     if( this==that ) return false;
     if( work==null ) return true; // All remaining paths make progress
-    // Keep the merge of all base types, and add _deps.
-    if( _type != that._type )  Env.GVN.add_flow(_deps);
-    if( _type!=null && that._type!=null && !_type.widen().isa(that._type.widen()) )
-      throw unimpl();      // Error, mismatched base types, e.g. int and string
-    if( that._type==null ) that._type = _type;
-    else if( _type!=null ) that._type = _type.meet(that._type);
-    if( is_struct() ) that._open &= _open; // Most conservative answer
+    if( !that.is_err() ) {
+      // Keep the merge of all base types, and add _deps.
+      if( _type != that._type )  Env.GVN.add_flow(_deps);
+      if( _type!=null && that._type!=null && _type!=Type.XNIL && !_type.widen().isa(that._type.widen()) )
+        throw unimpl();      // Error, mismatched base types, e.g. int and string
+      if( that._type==null ) that._type = _type;
+      else if( _type!=null ) that._type = _type.meet(that._type);
+      if( is_struct() ) that._open &= _open; // Most conservative answer
+    }
+    work.add(_deps);            // Revisit
     // Hard union this into that, no more testing
-    _union(that);
-    return true;
+    return _union(that);
   }
   // Union this into that; this can already be unified (if rolling up).
   // Crush all the extra fields in this, to avoid accidental usage.
-  private TV2 _union(TV2 that) {
+  private boolean _union(TV2 that) {
     assert !that.is_unified();
     _unified=that;
     assert is_unified();
@@ -301,14 +323,28 @@ public class TV2 {
     _type = null;
     _deps = null;
     _ns   = null;
-    return that;
+    return true;
   }
 
   // U-F union; this is nilable and becomes that.
   // No change if only testing, and reports progress.
+  @SuppressWarnings("unchecked")
   boolean unify_nil(TV2 that, Work work) {
     assert is_nilable() && !that.is_nilable();
-    throw unimpl();
+    if( work==null ) return true; // Will make progress
+    // Clone the top-level struct and make this nilable point to the clone;
+    // this will collapse into the clone at the next find() call.
+    // Unify the nilable leaf into that.
+    TV2 leaf = get("?");  assert leaf.is_leaf();
+    TV2 copy = that.copy("unify_nil");
+    if( that.is_base() ) {
+      copy._type = copy._type.join(Type.NSCALR);
+    } else if( that.is_struct() ) {
+      copy._type = copy._type.join(Type.NSCALR);
+      copy._args = (NonBlockingHashMap<String, TV2>) that._args.clone();
+    } else
+      throw unimpl();
+    return leaf._union(copy) | that._union(find());
   }
 
   // --------------------------------------------
@@ -386,8 +422,8 @@ public class TV2 {
       return lhs.union(rhs,work);
     }
     // Any leaf immediately unifies with any non-leaf
-    if( this.is_leaf() ) return this.union(that,work);
-    if( that.is_leaf() ) return that.union(this,work);
+    if( this.is_leaf() || that.is_err() ) return this.union(that,work);
+    if( that.is_leaf() || this.is_err() ) return that.union(this,work);
     // Special case for nilable union something
     if( this.is_nilable() && !that.is_nilable() ) return this.unify_nil(that,work);
     if( that.is_nilable() && !this.is_nilable() ) return that.unify_nil(this,work);
@@ -412,7 +448,7 @@ public class TV2 {
       TV2 vthis = get(key); assert vthis!=null;
       TV2 vthat = that.get(key);
       if( vthat==null ) {
-        if( that.open() ) throw unimpl(); // that.add_fld(key,vthis,work);
+        if( that.open() ) that.add_fld(key,vthis,work);
       } else vthis._unify(vthat,work); // Matching fields unify
       if( this.find() != this ) throw unimpl();
       if( that.find() != that ) throw unimpl();
@@ -423,11 +459,25 @@ public class TV2 {
     for( String key : that._args.keySet() )
       if( args.get(key)==null )
         if( !this.open() )
-          throw unimpl();//that.del_fld(i--, work);  // Drop from RHS
+          that.del_fld(key, work);  // Drop from RHS
 
     if( find().is_err() && !that.is_err() )
       throw unimpl(); // TODO: Check for being equal, cyclic-ly, and return a prior if possible.
     return find().union(that,work);
+  }
+
+  // Insert a new field
+  private void add_fld( String id, TV2 fld, Work work) {
+    assert is_struct();
+    _args.put(id,fld);
+    fld.push_deps(_deps);
+    work.add(_deps);
+  }
+  // Delete a field
+  private void del_fld( String fld, Work work) {
+    assert is_struct();
+    _args.remove(fld);
+    work.add(_deps);
   }
 
 //private boolean union_err(TV2 that, String msg) {
@@ -676,10 +726,11 @@ public class TV2 {
 //
   // --------------------------------------------
   private static final VBitSet ODUPS = new VBitSet();
-  boolean nongen_in(TV2[] vs) {
+  public boolean nongen_in(TV2[] vs) {
     if( vs==null ) return false;
     ODUPS.clear();
     for( TV2 t2 : vs )
+      // Cannot do the U-F hack on 'vs' because it shows up in FreshNode hashCode.
       if( _occurs_in_type(t2.find()) )
         return true;
     return false;
@@ -701,11 +752,10 @@ public class TV2 {
     assert !is_unified() && !x.is_unified();
     if( x==this ) return true;
     if( ODUPS.tset(x._uid) ) return false; // Been there, done that
-    if( x.is_tvar() )
-      throw unimpl();
-//    for( Comparable key : x._args.keySet() )
-//      if( _occurs_in_type(x.get(key)) )
-//        return true;
+    if( x.is_tvar() && x._args!=null )
+      for( TV2 tv2 : x._args.values() )
+        if( _occurs_in_type(tv2) )
+          return true;
     return false;
   }
 
@@ -722,6 +772,7 @@ public class TV2 {
   // down the function parts; if any changes the fresh-application may make
   // progress.
   static final VBitSet DEPS_VISIT  = new VBitSet();
+  public void push_deps( UQNodes deps) { if( deps!=null ) for( Node dep : deps.values() ) push_dep(dep);}
   public TV2 push_dep(Node dep) {
     assert DEPS_VISIT.isEmpty();
     _push_update(dep);
@@ -732,7 +783,7 @@ public class TV2 {
     assert !is_unified();
     if( DEPS_VISIT.tset(_uid) ) return;
     if( _deps!=null && _deps.get(dep._uid)!=null ) return; // Already here and in all children
-    if( isa("Dead") ) return;
+    if( dep.is_dead() ) return;
     _deps = _deps==null ? UQNodes.make(dep) : _deps.add(dep);
     if( _args!=null )
       for( String key : _args.keySet() ) // Structural recursion on a complex TV2
@@ -742,11 +793,23 @@ public class TV2 {
   // Merge Dependent Node lists, 'this' into 'that'.  Required to trigger
   // CEPI.unify_lift when types change structurally, or when structures are
   // unifing on field names.
-  private void merge_deps( TV2 that ) { if( !that.isa("Dead") ) that._deps = that._deps==null ? _deps : that._deps.addAll(_deps); }
+  private void merge_deps( TV2 that ) { that._deps = that._deps == null ? _deps : that._deps.addAll(_deps); }
   // Merge Node lists, 'this' into 'that', for easier debugging.
   // Lazily remove dead nodes on the fly.
-  private void merge_ns  ( TV2 that ) { if( !that.isa("Dead") ) that._ns   = that._ns  ==null ? _ns   : that._ns  .addAll(_ns  ); }
+  private void merge_ns  ( TV2 that ) { that._ns   = that._ns   == null ? _ns   : that._ns  .addAll(_ns  ); }
 
+  // Recursively add-deps to worklist
+  public void add_deps_work( Work work ) { assert DEPS_VISIT.isEmpty(); add_deps_work_impl(work); DEPS_VISIT.clear(); }
+  private void add_deps_work_impl( Work work ) {
+    if( is_leaf() ) {
+      work.add(_deps);
+    } else {
+      if( DEPS_VISIT.tset(_uid) ) return;
+      if( _args != null )
+        for( TV2 tv2 : _args.values() )
+          tv2.add_deps_work_impl(work);
+    }
+  }
 
   // --------------------------------------------
   // Pretty print
@@ -759,11 +822,13 @@ public class TV2 {
   public VBitSet _get_dups(VBitSet visit, VBitSet dups) {
     if( visit.tset(_uid) ) {
       dups.set(debug_find()._uid);
-    } else
+    } else {
       if( _args!=null )
         for( TV2 t : _args.values() )
-          if( t!=null )
             t._get_dups(visit,dups);
+      if( _unified!=null )
+        _unified._get_dups(visit,dups);
+    }
     return dups;
   }
 
@@ -771,15 +836,14 @@ public class TV2 {
   // If debug is on, does NOT roll-up - no side effects.
   @Override public String toString() { return str(new SB(), new VBitSet(), get_dups(), true ).toString(); }
   public SB str(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
-
-    if( is_err () )  return sb.p(_type);
-    if( is_base() )  return sb.p(_type);
     boolean dup = dups.get(_uid);
     if( is_unified() || is_leaf() ) {
       if( !debug ) throw unimpl();
       sb.p("V").p(_uid);
       return is_unified() ? _unified.str(sb.p(">>"), visit, dups, debug) : sb;
     }
+    if( is_err () )  return sb.p(_type);
+    if( is_base() )  return sb.p(_type);
 
     if( dup ) sb.p("$V").p(_uid);
     if( visit.tset(_uid) && dup ) return sb;

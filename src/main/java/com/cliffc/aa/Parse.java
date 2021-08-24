@@ -270,7 +270,7 @@ public class Parse implements Comparable<Parse> {
   private Node stmt(boolean lookup_current_scope_only) {
     if( peek('^') ) {           // Early function exit
       Node ifex = ifex();
-      if( ifex==null ) ifex=Env.XNIL;
+      if( ifex==null ) ifex=con(Type.XNIL);
       if( _e._par._par==null )
         return err_ctrl1(Node.ErrMsg.syntax(this,"Function exit but outside any function"));
       return _e.early_exit(this,ifex);
@@ -328,7 +328,7 @@ public class Parse implements Comparable<Parse> {
     }
 
     // Normal statement value parse
-    Node ifex = default_nil ? Env.XNIL : ifex(); // Parse an expression for the statement value
+    Node ifex = default_nil ? con(Type.XNIL) : ifex(); // Parse an expression for the statement value
     // Check for no-statement after start of assignment, e.g. "x = ;"
     if( ifex == null ) {        // No statement?
       if( toks._len == 0 ) return _e.nongen_pop(null);
@@ -349,7 +349,7 @@ public class Parse implements Comparable<Parse> {
       if( scope==null ) {                    // Token not already bound at any scope
         if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
           ((FunPtrNode)ifex).bind(tok); // Debug only: give name to function
-        create(tok,Env.XNIL,Access.RW);  // Create at top of scope as undefined
+        create(tok,con(Type.XNIL),Access.RW);  // Create at top of scope as undefined
         scope = scope();                // Scope is the current one
         scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
       }
@@ -399,7 +399,7 @@ public class Parse implements Comparable<Parse> {
     set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch
     Env.GVN.add_reduce(ifex);
     set_mem(old_mem.unkeep(2));    // Reset memory to before the IF
-    Node fex = peek(':') ? stmt(false) : Env.XNIL;
+    Node fex = peek(':') ? stmt(false) : con(Type.XNIL);
     if( fex == null ) fex = err_ctrl2("missing expr after ':'");
     fex.keep(2);                   // Keep until merge point
     Node f_ctrl= ctrl().keep(2);   // Keep until merge point
@@ -719,7 +719,7 @@ public class Parse implements Comparable<Parse> {
     // Need a load/call/store sensible options
     Node n;
     if( scope==null ) {         // Token not already bound to a value
-      create(tok,Env.XNIL,Access.RW);
+      create(tok,con(Type.XNIL),Access.RW);
       scope = scope();
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
@@ -1025,7 +1025,7 @@ public class Parse implements Comparable<Parse> {
     val .add_def(rez   );
     set_ctrl(Env.XCTRL);
     set_mem (con(TypeMem.XMEM));
-    return Env.XNIL;
+    return con(Type.XNIL);
   }
 
   /** A balanced operator as a fact().  Any balancing token can be used.
