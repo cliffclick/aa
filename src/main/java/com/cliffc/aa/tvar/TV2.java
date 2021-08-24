@@ -161,7 +161,7 @@ public class TV2 {
   // Structural constructor, empty
   public static TV2 make(@NotNull String name, Node n, @NotNull String alloc_site ) { return make(name,n,alloc_site,new NonBlockingHashMap<>()); }
   // Structural constructor
-  public static TV2 make(@NotNull String name, Node n,  @NotNull String alloc_site, NonBlockingHashMap<String,TV2> args) {
+  public static TV2 make(@NotNull String name, Node n, @NotNull String alloc_site, NonBlockingHashMap<String,TV2> args) {
     assert args!=null;          // Must have some structure
     TV2 tv2 = new TV2(name,args,null,UQNodes.make(n),alloc_site);
     assert !tv2.is_base() && !tv2.is_leaf();
@@ -262,23 +262,22 @@ public class TV2 {
   private TV2 _find_nil() {
     TV2 n = get("?");
     switch( n._name ) {
-    case "Leaf":   return this;   //
-    case "Base":
-      // Nested nilable-and-not-leaf, need to fixup the nilable.
-      // "this" becomes a base+XNIL
-      _type = n._type.meet_nil(Type.XNIL);
-      _args = null;             // TODO: Free /recycle the args
-      _name = "Base";
-      break;
-    case "@{}":
-      _type = n._type.meet_nil(Type.XNIL); // Add a nil alias
-      _args = (NonBlockingHashMap<String,TV2>)n._args.clone();  // Shallow copy the TV2 fields
-      _open = n._open;
-      _name = "@{}";
-      break;
+    case "Leaf":   return this; // Normal default, no change
     case "Nil":                 // Nested nilable; collapse the layer
       _args.put("?",n.get("?"));
       break;
+      
+    case "Base":
+    case "@{}":
+    case "Str":
+      // Nested nilable-and-not-leaf, need to fixup the nilable.
+      // "this" becomes a shallow copy of the leaf 'n' with XNIL.
+      _type = n._type.meet_nil(Type.XNIL);
+      _args = n._args==null ? null : (NonBlockingHashMap<String,TV2>)n._args.clone();  // Shallow copy the TV2 fields
+      _open = n._open;
+      _name = n._name;
+      break;
+    case "Ary":
     default:
       throw unimpl();
     }
@@ -337,11 +336,11 @@ public class TV2 {
     // Unify the nilable leaf into that.
     TV2 leaf = get("?");  assert leaf.is_leaf();
     TV2 copy = that.copy("unify_nil");
-    if( that.is_base() ) {
+    if( that.is_base() ||
+        that.is_struct() ||
+        that.isa("Str") ) {
       copy._type = copy._type.join(Type.NSCALR);
-    } else if( that.is_struct() ) {
-      copy._type = copy._type.join(Type.NSCALR);
-      copy._args = (NonBlockingHashMap<String, TV2>) that._args.clone();
+      copy._args = that._args==null ? null : (NonBlockingHashMap<String, TV2>)that._args.clone();
     } else
       throw unimpl();
     return leaf._union(copy) | that._union(find());
@@ -436,8 +435,11 @@ public class TV2 {
     DUPS.put(luid,that);          // Close cycles
 
     // Check for mismatched, cannot unify
-    if( !Util.eq(_name,that._name) )
-      throw unimpl(); //return union_err(that,work,"Cannot unify "+this.p()+" and "+that.p());
+    if( !Util.eq(_name,that._name) ) {
+      if( work==null ) return true;
+      TV2 err = make_err(null,"Cannot unify "+this+" and "+that,"unify_fail");
+      return union(err,work) & that.union(err,work);
+    }
     assert _args!=that._args; // Not expecting to share _args and not 'this'
 
     // Structural recursion unification, this into that.  Aligned keys unify
@@ -529,14 +531,32 @@ public class TV2 {
     // LHS leaf, RHS is unchanged but goes in the VARS
     if( this.is_leaf() ) return vput(that,false);
     if( that.is_leaf() )  // RHS is a tvar; union with a deep copy of LHS
-      throw unimpl(); //return work==null || vput(that,that.union(_fresh(nongen),work));
+      return work==null || vput(that,that.union(_fresh(nongen),work));
 
     // Bases MEET cons in RHS
     if( is_base() && that.is_base() ) throw unimpl();
 
     // Special handling for nilable
-    if( this.is_nilable() && !that.is_nilable() ) throw unimpl();
-    if( that.is_nilable() && !this.is_nilable() ) throw unimpl();
+    if( this.is_nilable() && !that.is_nilable() ) {
+      Type mt = that._type.meet_nil(Type.XNIL);
+      if( mt == that._type ) return false;
+      if( work==null ) return true;
+      throw unimpl();
+    }
+    
+    // That is nilable and this is not
+    if( that.is_nilable() && !this.is_nilable() ) {
+      assert is_base() || is_struct();
+      if( work==null ) return true;
+      TV2 copy = this;
+      if( _type.must_nil() ) { // Make a not-nil version
+        copy = copy("fresh_unify_vs_nil");
+        copy._type = _type.join(Type.NSCALR);
+        if( _args!=null ) throw unimpl(); // shallow copy
+      }
+      boolean progress = copy._fresh_unify(that.get("?"),nongen,work);
+      return _type.must_nil() ? vput(that,progress) : progress;
+    }
 
     // Check for being the same structure
     if( !Util.eq(_name,that._name) )
@@ -579,51 +599,35 @@ public class TV2 {
   private boolean vput(TV2 that, boolean progress) { VARS.put(this,that); return progress; }
   private TV2 vput(TV2 that) { VARS.put(this,that); return that; }
 
-//  // Replicate LHS, including structure and cycles, replacing leafs as they appear
-//  private TV2 repl(TV2[] vs) {
-//  assert !is_unified();        // Already chased these down
-//  if( is_dead() ) return this; // Dead always unifies and wins
-//  TV2 t = VARS.get(this);      // Prior answer?
-//  if( t!=null ) return t;      // Been there, done that, return prior answer
-//
-//  if( is_leaf() ) // If occurs_in lexical scope, keep same variable, else make a new leaf
-//    return vput( occurs_in(vs) ? this : make_leaf_ns(null,"TV2_repl_leaf") );
-//
-//  // Must replicate Base's, like a Mem or Obj.
-//  if( is_base() ) return vput(make_base(null,_type,"TV2_repl_base"));
-//  // A few no-arg variants (Nil, Fresh)
-//  if( _args==null ) return vput(new TV2(_name,null,null,null,"TV2_repl_shallow"));
-//
-//  // Structural recursion replicate
-//  TV2 rez = new TV2(_name, new NonBlockingHashMap<>(),null,null,"TV2_repl_deep");
-//  VARS.put(this,rez); // Insert in dups BEFORE structural recursion, to stop cycles
-//  for( Comparable key : _args.keySet() )
-//    rez.args_put(key,get(key).repl(vs));
-//  return rez;
-//    throw unimpl();
-//  }
+  //// Return a fresh copy of 'this'
+  //T2 fresh() {
+  //  assert VARS.isEmpty();
+  //  T2 rez = _fresh(null);
+  //  VARS.clear();
+  //  return rez;
+  //}
 
-//// Do a repl, then rename all _ns lists.
-//public TV2 repl_rename(TV2[]vs, HashMap<Node,Node> map) {
-//  assert VARS.isEmpty() && DUPS.isEmpty();
-//  TV2 tv = repl(vs);
-//  _rename(tv,map);
-//  VARS.clear();  DUPS.clear();
-//  return tv;
-//}
-//private void _rename(TV2 tv, HashMap<Node,Node> map) {
-//  if( DUPS.get(_uid) != null ) return; // Been there, remapped this
-//  DUPS.put(_uid,this);                 // Only remap once
-//  if( this==tv ) return;               // Using the same TVar
-//  assert tv._ns==null && tv._deps==null;
-//  tv._deps= _deps==null ? null : _deps.rename(map);
-//  tv._ns  = _ns  ==null ? null : _ns  .rename(map);
-//  if( _args != null )
-//    for( Comparable key : _args.keySet() )
-//      _args.get(key)._rename(tv.get(key),map);
-//}
-//
-//
+  private TV2 _fresh(TV2[] nongen) {
+    assert !is_unified();       // Already chased these down
+    TV2 rez = VARS.get(this);
+    if( rez!=null ) return rez; // Been there, done that
+    // Unlike the original algorithm, to handle cycles here we stop making a
+    // copy if it appears at this level in the nongen set.  Otherwise we'd
+    // clone it down to the leaves - and keep all the nongen leaves.  Stopping
+    // here preserves the cyclic structure instead of unrolling it.
+    if( nongen_in(nongen) )  return vput(this);
+    // New leaf
+    if( is_leaf() ) return vput(make_leaf_ns(_ns,"_fresh_leaf"));
+
+    TV2 t = copy("_fresh_copy");
+    VARS.put(this,t);       // Stop cyclic structure looping
+    if( _args!=null )
+      for( String key : _args.keySet() )
+        t._args.put(key,get(key)._fresh(nongen));
+    return t;
+  }
+
+
 //// --------------------------------------------
 //
 //// Used by Loads and Stores.  Unify tv against all aliases at this field
@@ -801,7 +805,7 @@ public class TV2 {
   // Recursively add-deps to worklist
   public void add_deps_work( Work work ) { assert DEPS_VISIT.isEmpty(); add_deps_work_impl(work); DEPS_VISIT.clear(); }
   private void add_deps_work_impl( Work work ) {
-    if( is_leaf() ) {
+    if( _args==null ) {
       work.add(_deps);
     } else {
       if( DEPS_VISIT.tset(_uid) ) return;

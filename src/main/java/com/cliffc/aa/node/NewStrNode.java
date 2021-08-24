@@ -4,8 +4,8 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
-import static com.cliffc.aa.AA.MEM_IDX;
-import static com.cliffc.aa.AA.ARG_IDX;
+
+import static com.cliffc.aa.AA.*;
 
 // Allocates a TypeStr in memory.  Weirdly takes a string OBJECT (not pointer),
 // and produces the pointer.  Hence liveness is odd.
@@ -13,8 +13,14 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   public NewStrNode( TypeStr to, String name, boolean reads, int op_prec, TypeFld... args) {
     super(OP_NEWSTR,BitsAlias.STR,to,name,reads,op_prec,args);
   }
-  
+
   @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Str",this,alloc_site); }
+
+  @Override public boolean unify(Work work) {
+    TV2 tv = tvar();
+    if( tv._type==null ) { tv._type = _tptr; return true; }
+    return false;
+  }
 
   @Override TypeStr dead_type() { return TypeStr.XSTR; }
   protected static void add_libs( Ary<NewPrimNode> INTRINSICS ) {
@@ -27,7 +33,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   public static class ConStr extends NewStrNode {
     public ConStr( String str ) { super(TypeStr.con(str),"con",false,-1,TypeFld.MEM); }
     @Override TypeStr valueobj() { return _ts; }
-    @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { throw com.cliffc.aa.AA.unimpl(); } // No inputs
+    @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { throw unimpl(); } // No inputs
     // Constant Strings intern
     @Override public int hashCode() { return is_unused() ? super.hashCode() : _ts._hash; }
     @Override public boolean equals(Object o) { return o instanceof ConStr && _ts==((ConStr)o)._ts; }
@@ -87,7 +93,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       return _value(TypeStr.make(false,(str0.getstr()+str1.getstr()).intern()));
     }
     TypeTuple _value(TypeObj tobj) { return TypeTuple.make(Type.CTRL,tobj,_tptr); }
-    @Override TypeObj valueobj() { throw com.cliffc.aa.AA.unimpl(); }
+    @Override TypeObj valueobj() { throw unimpl(); }
     @Override public byte op_prec() { return (byte)OP_PREC; }
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
       if( def==in(ARG_IDX) || def==in(ARG_IDX+1) ) return TypeMem.ALIVE;

@@ -8,7 +8,6 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMap;
 import com.cliffc.aa.util.Util;
 
-import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
@@ -190,6 +189,7 @@ public class StoreNode extends Node {
     if( st.tvar().is_err() ) return false; // Already an error, no progress
     // Store value is always the stored value
     boolean progress = st.tvar().unify(val.tvar(),work);
+    if( ptr.is_err() ) return progress;
 
     if( ptr.is_leaf() ) {
       if( tptr instanceof TypeMemPtr && tptr.must_nil() ) work.add(st); // If nil, will be a nil-access error

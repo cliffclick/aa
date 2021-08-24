@@ -525,7 +525,7 @@ public abstract class Node implements Cloneable {
   public boolean unify( Work work ) { return false; }
 
   // HM changes; push related neighbors
-  public void add_work_hm(Work work) { }
+  public void add_work_hm(Work work) { tvar().add_deps_work(work); }
 
   // Support for resolving ambiguous calls during GCP/Combo
   public void remove_ambi(Work work) {}
