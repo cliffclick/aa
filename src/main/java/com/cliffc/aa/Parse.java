@@ -149,9 +149,13 @@ public class Parse implements Comparable<Parse> {
     ArrayList<Node.ErrMsg> errs0 = new ArrayList<>(errs);
     Collections.sort(errs0);
 
-    Type res = scope().rez()._val; // New and improved result
+    Node rez = scope().rez();
     Type mem = scope().mem()._val;
-    return new TypeEnv(res, mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM),_e,errs0.isEmpty() ? null : errs0);
+    return new TypeEnv(rez._val,
+                       mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM),
+                       rez.tvar(),
+                       _e,
+                       errs0.isEmpty() ? null : errs0);
   }
 
   /** Parse a top-level:
@@ -883,6 +887,7 @@ public class Parse implements Comparable<Parse> {
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
       assert ctrl() != e._scope;
+      e._scope.stk().update("^",Access.Final,Env.ANY);
       ptr = e._scope.ptr().keep();    // A pointer to the constructed object
       e._par._scope.set_ctrl(ctrl()); // Carry any control changes back to outer scope
       e._par._scope.set_mem (mem ()); // Carry any memory  changes back to outer scope

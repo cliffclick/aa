@@ -367,6 +367,7 @@ public class TypeMem extends Type<TypeMem> {
       if( ts._open )
         return BitsAlias.FULL;  // Generic open struct points to all
       for( TypeFld tfld : ts.flds() ) {
+        if( Util.eq(tfld._fld,"^") ) continue; // Display is not actually reachable from a struct after the parse
         Type fld = tfld._t;
         if( TypeMemPtr.OOP.isa(fld) )
           fld = TypeMemPtr.OOP;                      // All possible pointers
@@ -518,6 +519,7 @@ public class TypeMem extends Type<TypeMem> {
     return false;
   }
 
+  // For live-ness purposes, flatten all field contents.
   public TypeMem flatten_fields() {
     TypeObj to, tof=null;
     int i; for( i=1; i< _pubs.length; i++ ) {

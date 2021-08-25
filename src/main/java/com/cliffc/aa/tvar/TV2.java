@@ -266,7 +266,7 @@ public class TV2 {
     case "Nil":                 // Nested nilable; collapse the layer
       _args.put("?",n.get("?"));
       break;
-      
+
     case "Base":
     case "@{}":
     case "Str":
@@ -543,7 +543,7 @@ public class TV2 {
       if( work==null ) return true;
       throw unimpl();
     }
-    
+
     // That is nilable and this is not
     if( that.is_nilable() && !this.is_nilable() ) {
       assert is_base() || is_struct();
@@ -839,11 +839,14 @@ public class TV2 {
   // Fancy print for Debuggers - includes explicit U-F re-direction.
   // If debug is on, does NOT roll-up - no side effects.
   @Override public String toString() { return str(new SB(), new VBitSet(), get_dups(), true ).toString(); }
+  public String p() { VCNT=0; VNAMES.clear(); return str(new SB(), new VBitSet(), get_dups(), false ).toString(); }
+  private static int VCNT;
+  private static final HashMap<TV2,String> VNAMES = new HashMap<>();
   public SB str(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     boolean dup = dups.get(_uid);
+    if( !debug && is_unified() ) return find().str(sb,visit,dups,debug);
     if( is_unified() || is_leaf() ) {
-      if( !debug ) throw unimpl();
-      sb.p("V").p(_uid);
+      sb.p(VNAMES.computeIfAbsent(this,( k ->  debug ? ("V"+k._uid) : ((++VCNT)-1+'A' < 'V' ? (""+(char)('A'+VCNT-1)) : ("V"+VCNT)))));
       return is_unified() ? _unified.str(sb.p(">>"), visit, dups, debug) : sb;
     }
     if( is_err () )  return sb.p(_type);
@@ -867,14 +870,30 @@ public class TV2 {
     // Special printing for structures
     if( is_struct() ) {
       if( is_prim() ) return sb.p("@{PRIMS}");
-      sb.p("@{");
-      if( _type!=null ) _type.str(sb,visit,null,debug); // Probably want a custom printer
+      final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
+      sb.p(is_tup ? "(" : "@{");
+      if( _type==null ) sb.p("[?]"); // Should always have an alias
+      else {
+        if( _type instanceof TypeMemPtr ) ((TypeMemPtr)_type)._aliases.clear(0).str(sb);
+        else _type.str(sb,visit,null,debug); // Weirdo type printing
+      }
       sb.p(' ');
       if( _args==null ) sb.p("_ ");
-      else for( String fld : _args.keySet() )
-             str0(sb.p(' ').p(fld).p(" = "),visit,_args.get(fld),dups,debug).p(',');
+      else {
+        // Print a display first, and skip if NO_DSP
+        TV2 dsp = _args.get("^");
+        if( dsp!=null && dsp._type!=TypeMemPtr.NO_DISP )
+          dsp._type.str(sb.p("^ = "),visit,null,debug);
+        for( String fld : sorted_flds() ) {
+          if( !Util.eq(fld,"^") ) // Skip display, already printed
+            // Skip field names in a tuple
+            str0(is_tup ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,_args.get(fld),dups,debug).p(',');
+        }
+      }
       if( open() ) sb.p(" ...,");
-      return sb.unchar().p("}");
+      sb.unchar().p(!is_tup ? "}" : ")");
+      if( _type!=null && _type.must_nil() ) sb.p("?");
+      return sb;
     }
 
     // Generic structural T2
@@ -885,4 +904,6 @@ public class TV2 {
     return sb.unchar().p(")");
   }
   static private SB str0(SB sb, VBitSet visit, TV2 t, VBitSet dups, boolean debug) { return t==null ? sb.p("_") : t.str(sb,visit,dups,debug); }
+  private boolean is_tup() {  return _args.size()<=1 || _args.containsKey("0"); }
+  private Collection<String> sorted_flds() { return new TreeMap<>(_args).keySet(); }
 }

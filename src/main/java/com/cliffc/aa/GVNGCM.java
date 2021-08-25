@@ -180,7 +180,7 @@ public class GVNGCM {
         ITER_CNT_NOOP++;      // No progress
       } else {
         // VERY EXPENSIVE ASSERT
-        //assert W==_work_dead || Env.START.more_flow(true)==0; // Initial conditions are correct
+        //assert W==_work_dead || Env.START.more_flow(_work_flow,true)==0; // Initial conditions are correct
         ITER_CNT++; assert ITER_CNT < 35000; // Catch infinite ideal-loops
         if( x==n ) x=m;       // Keep track of the replacement for x, if any
       }

@@ -1,6 +1,7 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 import org.junit.Ignore;
@@ -17,6 +18,22 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
+    test("@{n=0;v=1.2}",
+         TypeMemPtr.make(BitsAlias.make0(13),
+                         TypeStruct.make2fldsD("n",Type.XNIL,"v",TypeFlt.con(1.2))),
+         "@{[13] n = 0, v = 1.2}");
+    test("-1", TypeInt.con( -1), "-1");
+    test("(1,2)", TypeMemPtr.make(BitsAlias.make0(13),TypeStruct.tupsD(TypeInt.con(1),TypeInt.con(2))), "([13] 1,2)");
+    //
+    //
+    //// failing
+    //test("{ g -> f = { ignore -> g }; ( f(3), f(\"abc\"))}",
+    //     TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP),
+    //     "{ A -> ( A, A) }");
+    //
+    //test("sum={x -> x ? sum(x.n) + x.v : 0};"+
+    //    "sum(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
+    //  TypeInt.INT64);
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
     // The Meet loses precision to fast.  This is a typing bug.
@@ -463,15 +480,15 @@ public class TestParse {
     // Test inferring a recursive struct type, with a little help
     test_struct("map={x:@{n=;v=flt}? -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
                 TypeStruct.make(TypeFld.NO_DISP,
-                                TypeFld.make("nn",TypeMemPtr.make_nil(14,TypeObj.ISUSED),ARG_IDX  ),
-                                TypeFld.make("vv",TypeFlt.con(1.2*1.2)                  ,ARG_IDX+1)));
+                                TypeFld.make("nn",Type.XNIL,           ARG_IDX  ),
+                                TypeFld.make("vv",TypeFlt.con(1.2*1.2),ARG_IDX+1)));
 
     // Test inferring a recursive struct type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
     test_struct("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
                 TypeStruct.make(TypeFld.NO_DISP,
-                                TypeFld.make("nn",TypeMemPtr.make_nil(14,TypeObj.ISUSED),ARG_IDX  ),
-                                TypeFld.make("vv",TypeFlt.con(1.2*1.2)                  ,ARG_IDX+1)));
+                                TypeFld.make("nn",Type.XNIL,           ARG_IDX  ),
+                                TypeFld.make("vv",TypeFlt.con(1.2*1.2),ARG_IDX+1)));
 
     // Test inferring a recursive struct type, with less help. Too complex to
     // inline, so actual inference happens
@@ -500,23 +517,26 @@ public class TestParse {
 
     // Too big to inline, multi-recursive
     test_ptr("tmp=@{"+
-                    "  l=@{"+
-                    "    l=@{ l=0; r=0; v=3 };"+
-                    "    r=@{ l=0; r=0; v=7 };"+
-                    "    v=5"+
-                    "  };"+
-                    "  r=@{"+
-                    "    l=@{ l=0; r=0; v=15 };"+
-                    "    r=@{ l=0; r=0; v=22 };"+
-                    "    v=20"+
-                    "  };"+
-                    "  v=12 "+
-                    "};"+
-                    "map={tree -> tree"+
-                    "     ? @{ll=map(tree.l);rr=map(tree.r);vv=tree.v&tree.v}"+
-                    "     : 0};"+
-                    "map(tmp)",
-             "@{ll=*$?; rr=$; vv=int8}");
+             "  l=@{"+
+             "    l=@{ l=0; r=0; v=3 };"+
+             "    r=@{ l=0; "+
+             "         r=@{ l=0; r=0; v=9 }; "+
+             "         v=7"+
+             "    };"+
+             "    v=5"+
+             "  };"+
+             "  r=@{"+
+             "    l=@{ l=0; r=0; v=15 };"+
+             "    r=@{ l=0; r=0; v=22 };"+
+             "    v=20"+
+             "  };"+
+             "  v=12 "+
+             "};"+
+             "map={tree -> tree"+
+             "     ? @{ll=map(tree.l);rr=map(tree.r);vv=tree.v&tree.v}"+
+             "     : 0};"+
+             "map(tmp)",
+             "@{ll=*@{ll=*@{ll=0; rr=0; vv=3}; rr=*@{ll=*@{$; rr=$; vv=int8}?; $; vv=7}; vv=5}; rr=*@{$; rr=*@{$; $; vv=22}; vv=20}; vv=12}");
 
 
     // Failed attempt at a Tree-structure inference test.  Triggered all sorts
@@ -533,7 +553,7 @@ public class TestParse {
          "     ? @{ll=map(tree.l);vv=tree.v}"+
          "     : 0};"+
          "map(tmp)",
-            "Cannot re-assign final field '.l' in @{l=*use; v:=0}",36);
+            "Cannot re-assign final field '.l' in @{l=*~use; v:=0}",36);
 
     // Good tree-structure inference test
     test_ptr("tmp=@{"+
@@ -553,7 +573,7 @@ public class TestParse {
          "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
-         "@{l=*$?; r=$; v=int64}");
+         "@{l=*@{l=*@{l=0; r=0; v=6}; r=*@{l=*@{$; r=$; v=30}?; $; v=14}; v=10}; r=*@{$; r=*@{$; $; v=44}; v=40}; v=24}");
 
     // A linked-list mixing ints and strings, always in pairs
     String ll_cona = "a=0; ";
@@ -848,6 +868,18 @@ HashTable = {@{
       assertEquals(expected,te._t);
     }
   }
+  static private void test( String program, Type expected, String hm_expect ) {
+    try( TypeEnv te = run(program) ) {
+      Type actual_flow = te._tmem.sharptr(te._t);
+      TV2 actual_hm = te._hmt;
+      String actual_str = actual_hm.p();
+      assertEquals(expected,actual_flow);
+      if( Combo.DO_HM )
+        assertEquals(stripIndent(hm_expect),stripIndent(actual_str));
+    }
+  }
+  private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
+
   static private void test_prim( String program, String prim ) {
     Env top = Env.top_scope();
     Type expected = top.lookup_valtype(prim);

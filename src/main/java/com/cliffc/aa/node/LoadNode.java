@@ -1,12 +1,14 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.Env;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Util;
 import org.jetbrains.annotations.NotNull;
 
-import static com.cliffc.aa.AA.*;
+import static com.cliffc.aa.AA.ARG_IDX;
+import static com.cliffc.aa.AA.MEM_IDX;
 
 // Load a named field from a struct.  Does it's own nil-check testing.  Loaded
 // value depends on the struct typing.
@@ -162,6 +164,9 @@ public class LoadNode extends Node {
         Node jmem = ((MemJoinNode)mem).can_bypass(aliases);
         if( jmem == null ) return null;
         mem = jmem;
+      } else if( mem instanceof ParmNode ) {
+        if( mem.in(0).is_copy(1)!=null ) mem = mem.in(1); // FunNode is dying, copy, so ParmNode is also
+        else return null;
 
       } else if( mem instanceof PhiNode ||
                  mem instanceof StartMemNode ||
