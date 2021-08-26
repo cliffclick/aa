@@ -1,16 +1,16 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.function.Function;
 
-import static com.cliffc.aa.type.TypeFld.Access;
 import static com.cliffc.aa.AA.ARG_IDX;
+import static com.cliffc.aa.type.TypeFld.Access;
 import static org.junit.Assert.*;
 
 public class TestParse {
@@ -18,17 +18,16 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    test("@{n=0;v=1.2}",
-         TypeMemPtr.make(BitsAlias.make0(13),
-                         TypeStruct.make2fldsD("n",Type.XNIL,"v",TypeFlt.con(1.2))),
-         "@{[13] n = 0, v = 1.2}");
-    test("-1", TypeInt.con( -1), "-1");
-    test("(1,2)", TypeMemPtr.make(BitsAlias.make0(13),TypeStruct.tupsD(TypeInt.con(1),TypeInt.con(2))), "([13] 1,2)");
-    //
-    //
-    //// failing
+    test("{&}",
+         TypeFunPtr.make(BitsFun.make0(35),5, TypeMemPtr.NO_DISP),
+         TypeFunSig.make(TypeStruct.make2flds("x",TypeInt.INT64,"y",TypeInt.INT64),
+                         TypeTuple.make_ret(TypeInt.INT64)),
+         "{ A A -> A }");
+
+    // failing
     //test("{ g -> f = { ignore -> g }; ( f(3), f(\"abc\"))}",
     //     TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP),
+    //     null,                  // TODO: Needs sig
     //     "{ A -> ( A, A) }");
     //
     //test("sum={x -> x ? sum(x.n) + x.v : 0};"+
@@ -751,9 +750,16 @@ public class TestParse {
 
 
   // Parametric polymorphism
-  @Ignore
   @Test public void testParse15() {
-    TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeObj.ISUSED);
+    test("-1", TypeInt.con( -1), null, "-1");
+    test("(1,2)", TypeMemPtr.make(BitsAlias.make0(13),TypeStruct.tupsD(TypeInt.con(1),TypeInt.con(2))), null, "([13] 1,2)");
+    test("@{ n=0; v=1.2 }",
+         TypeMemPtr.make(BitsAlias.make0(13),
+                         TypeStruct.make2fldsD("n",Type.XNIL,"v",TypeFlt.con(1.2))),
+         null,
+         "@{[13] n = 0, v = 1.2}");
+
+
     // Should be typable with H-M
     test_ptr("noinline_map={lst fcn -> lst ? fcn lst.1};"+
         "in_int=(0,2);"+       // List of ints
@@ -778,9 +784,9 @@ public class TestParse {
       "(*(*\"abc\", $), *(3.14, 3.14))");
 
     // recursive unification.  Trivially types as a dead fcn ptr.
-    test_isa("x={x -> x x}",TypeFunPtr.make(BitsFun.make0(46),3,tdisp));
+    test_isa("x={x -> x x}",TypeFunPtr.make(BitsFun.make0(46),3,TypeMemPtr.NO_DISP));
     // recursive unification.  Passing an ID to x then passes ID to ID, returning ID.
-    test_isa("x={x -> x x}; x({y->y})",TypeFunPtr.make(BitsFun.make0(47),4,tdisp));
+    test_isa("x={x -> x x}; x({y->y})",TypeFunPtr.make(BitsFun.make0(47),4,TypeMemPtr.NO_DISP));
     // Looks like recursive unification, but x is a function of 0 arguments,
     // being called with 1 argument.  Error to call it.
     testerr("x={x x};x(1)","Passing 1 arguments to x which takes 0 arguments",9);
@@ -868,12 +874,19 @@ HashTable = {@{
       assertEquals(expected,te._t);
     }
   }
-  static private void test( String program, Type expected, String hm_expect ) {
+  static private void test( String program, Type expected, TypeFunSig expected_sig, String hm_expect ) {
     try( TypeEnv te = run(program) ) {
       Type actual_flow = te._tmem.sharptr(te._t);
       TV2 actual_hm = te._hmt;
       String actual_str = actual_hm.p();
       assertEquals(expected,actual_flow);
+      if( expected instanceof TypeFunPtr ) {
+        TypeFunPtr fptr = (TypeFunPtr)expected;
+        FunNode fun = FunNode.find_fidx(fptr.fidx());
+        TypeFunSig actual_sig = fun._sig;
+        assertEquals(expected_sig,actual_sig);
+      } else
+        assert expected_sig==null;
       if( Combo.DO_HM )
         assertEquals(stripIndent(hm_expect),stripIndent(actual_str));
     }

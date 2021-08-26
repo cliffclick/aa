@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.util.Ary;
 
 import java.util.ArrayList;
@@ -122,6 +123,13 @@ public abstract class PrimNode extends Node {
     return PRIMS;
   }
 
+  // All primitives are effectively H-M Lambdas
+  @Override public boolean unify( Work work ) {
+    assert _tvar.is_fun();
+    
+    return false;
+  }
+  
   public static PrimNode convertTypeName( Type from, Type to, Parse badargs ) {
     return new ConvertTypeName(from,to,badargs);
   }
@@ -206,6 +214,8 @@ public abstract class PrimNode extends Node {
       // *modify* memory (see Intrinsic*Node for some primitives that *modify*
       // memory).  Thunking (short circuit) prims return both memory and a value.
       RetNode ret = (RetNode)X.xform(new RetNode(ctl,mem,rez,rpc,fun));
+      // Setup the TVAR once
+      tvar().unify(TV2.make_fun(ret,TypeFunPtr.make(fun._fidx,_sig.nargs(),TypeMemPtr.NO_DISP),_sig,"as_fun"),Env.GVN._work_flow);
       // No closures are added to primitives
       return (X._ret = new FunPtrNode(_name,ret));
     }

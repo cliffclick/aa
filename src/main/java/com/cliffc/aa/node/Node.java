@@ -491,10 +491,12 @@ public abstract class Node implements Cloneable {
   }
   public boolean live_uses() {
     return _live != TypeMem.DEAD &&    // Only live uses make more live
-      // And no chance use turns into a constant (which then does not use anything)
-      !(_live.basic_live() && _val.may_be_con() && !is_prim() && err(true)==null &&
-        // FunPtrs still use their Rets, even if constant
-        !(this instanceof FunPtrNode));
+      (!_live.basic_live() ||   // Complex alive always counts
+       !_val.may_be_con() ||    // Use might be replaced with a constant (and not have this input)
+       is_prim() ||             // Always live prims
+       err(true)!=null ||       // Always live errors
+       // FunPtrs still use their Rets, even if constant
+       (this instanceof FunPtrNode));
   }
 
   // Shortcut to update self-live

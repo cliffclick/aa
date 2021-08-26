@@ -9,6 +9,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.*;
 
 import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.ARG_IDX;
 
 // Type Variable.  TVars unify (ala Tarjan Union-Find), and can have structure
 // (such as "{ A -> B }").  TVars are tied to a TNode to enforce Type structure
@@ -142,12 +143,26 @@ public class TV2 {
     UQNodes ns = n==null ? null : UQNodes.make(n);
     return new TV2("Base",null,type,ns,alloc_site);
   }
-    // Make a new Nil
+  // Make a new Nil
   public static TV2 make_nil(Node n, Type type, TV2 leaf, @NotNull String alloc_site) {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<String,TV2>(){{ put("?",leaf); }};
     return new TV2("Nil",args,type,UQNodes.make(n),alloc_site);
   }
-// Make a new primitive base TV2
+  // Make a new function
+  public static TV2 make_fun(RetNode ret, TypeFunPtr fptr, TypeFunSig sig, @NotNull String alloc_site) {
+    assert fptr._disp==TypeMemPtr.NO_DISP; // Just for fidxs, arg counts
+    assert fptr._nargs==sig.nargs();
+    NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<String,TV2>();
+    UQNodes ns = UQNodes.make(ret.rez());
+    args.put(" ret",TV2.make_leaf(ret.rez(),alloc_site));
+    Node[] parms = ret.fun().parms();
+    for( int i=ARG_IDX; i<parms.length; i++ ) {
+      args.put(""+i,TV2.make_leaf(parms[i],alloc_site));
+      ns = ns.add(parms[i]);
+    }
+    return new TV2("->",args,fptr,ns,alloc_site);
+  }
+  // Make a new primitive base TV2
   public static TV2 make_err(Node n, String msg, @NotNull String alloc_site) {
     UQNodes ns = n==null ? null : UQNodes.make(n);
     TV2 tv2 = new TV2("Err",null,TypeStr.con(msg.intern()),ns,alloc_site);
@@ -858,43 +873,50 @@ public class TV2 {
 
     // Special printing for functions
     if( is_fun() ) {
+      if( _type==null ) sb.p("[?]"); // Should always have an alias
+      else {
+        if( _type instanceof TypeFunPtr ) ((TypeFunPtr)_type)._fidxs.clear(0).str(sb);
+        else _type.str(sb,visit,null,debug); // Weirdo type printing
+      }
       sb.p("{");
-      _type.str(sb,visit,null,debug); // Probably want a custom printer
+      if( _type instanceof TypeFunPtr && ((TypeFunPtr)_type)._disp != TypeMemPtr.NO_DISP )
+        ((TypeFunPtr)_type)._disp.str(sb.p("^="),visit,null,debug);
       sb.p(' ');
-      //for( int i=0; i<_args.length-1; i++ )
-      //  str(sb,visit,_args[i],dups,debug).p(" ");
-      //return str(sb.p("-> "),visit,_args[_args.length-1],dups).p(" }");
-      return sb.p("FIX FUNCTION PRINTING");
+      for( String fld : sorted_flds() )
+        if( !Util.eq(" ret",fld) )
+          str0(sb,visit,_args.get(fld),dups,debug).p(' ');
+      return str0(sb.p("-> "),visit,_args.get(" ret"),dups,debug).p(" }");
     }
 
     // Special printing for structures
     if( is_struct() ) {
       if( is_prim() ) return sb.p("@{PRIMS}");
       final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
-      sb.p(is_tup ? "(" : "@{");
       if( _type==null ) sb.p("[?]"); // Should always have an alias
       else {
         if( _type instanceof TypeMemPtr ) ((TypeMemPtr)_type)._aliases.clear(0).str(sb);
         else _type.str(sb,visit,null,debug); // Weirdo type printing
       }
-      sb.p(' ');
+      sb.p(is_tup ? "(" : "@{");
       if( _args==null ) sb.p("_ ");
       else {
         // Print a display first, and skip if NO_DSP
         TV2 dsp = _args.get("^");
         if( dsp!=null && dsp._type!=TypeMemPtr.NO_DISP )
           dsp._type.str(sb.p("^ = "),visit,null,debug);
-        for( String fld : sorted_flds() ) {
+        for( String fld : sorted_flds() )
           if( !Util.eq(fld,"^") ) // Skip display, already printed
             // Skip field names in a tuple
             str0(is_tup ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,_args.get(fld),dups,debug).p(',');
-        }
       }
       if( open() ) sb.p(" ...,");
       sb.unchar().p(!is_tup ? "}" : ")");
       if( _type!=null && _type.must_nil() ) sb.p("?");
       return sb;
     }
+
+    if( is_nilable() )
+      return sb.p("0");
 
     // Generic structural T2
     sb.p("(").p(_name).p(" ");
