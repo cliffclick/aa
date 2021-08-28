@@ -27,8 +27,8 @@ public class AssertNode extends Node {
     _env = e;
   }
   @Override public String xstr() { return "assert:"+_t; }
-  Node mem() { return in(1); }
-  Node arg() { return in(2); }
+  Node mem() { return in(MEM_IDX); }
+  Node arg() { return in(REZ_IDX); }
 
   @Override public Node ideal_reduce() {
     Type actual = arg().sharptr(mem());
@@ -114,7 +114,7 @@ public class AssertNode extends Node {
     if( def==arg() ) return _live;                   // Alive as I am
     // Alive (like normal liveness), plus the address, plus whatever can be
     // reached from the address.
-    return ScopeNode.compute_live_mem(mem(),arg());
+    return ScopeNode.compute_live_mem(null,mem(),arg());
   }
 
   // Check TypeNode for being in-error

@@ -228,12 +228,15 @@ public class FunNode extends RegionNode {
         if( fld._t!=Type.ALL &&
             (parms[fld._order]==null || parms[fld._order]._live==TypeMem.DEAD) )
           _sig = _sig.make_from_arg(fld.make_from(Type.ALL));
+      if( ret!=null && ret._val!=_sig._ret && ret._val instanceof TypeTuple )
+        _sig = _sig.make_from_ret((TypeTuple)ret._val);
       // Can resolve some least_cost choices
       if( progress != _sig ) {
         if( fptr != null )
           for( Node use : fptr()._uses )
             if( use instanceof UnresolvedNode )
               Env.GVN.add_reduce_uses(use);
+        return this;            // Progress
       }
     }
 

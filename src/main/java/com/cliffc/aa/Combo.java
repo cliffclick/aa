@@ -14,7 +14,7 @@ See HM/HM.java for a complete stand-alone research version.
 ==============================================================================
 Treats Hindly-Milner as a Monotone Analysis Framework; converted to a worklist
 style.  The type variables are monotonically unified, gradually growing over
-time - and this is treated as the MAF lattice.  Some of the normal Algo-W work
+time - and this is treated as the MAF lattice.  Some normal Algo-W work
 has already been done; e.g. discovering identifier sources (SSA form), and
 building the non-generative set.  Because of the non-local unification behavior
 type variables include a "dependent" set; a set of Nodes put back on the
@@ -23,7 +23,7 @@ worklist if this type unifies, beyond the expected Node graph neighbors.
 The normal HM unification steps are treated as the MAF transfer functions,
 taking type variables as inputs and producing new, unified, type variables.
 Because unification happens in-place (normal disjoint-set union), the transfer
-functions are executed for side-effects only and return a progress flag.  The
+functions are executed for side effects only and return a progress flag.  The
 transfer functions are virtual calls on Nodes, similar to the existing
 Node.value() calls.
 
@@ -32,7 +32,7 @@ between e.g. ints and pointers.  Includes polymorphic structures and fields
 (structural typing not duck typing), polymorphic nil-checking and an error type
 variable.  Both HM and GCP types fully support recursive types.
 
-Unification typically makes many many temporary type variables and immediately
+Unification typically makes many temporary type variables and immediately
 unifies them.  For efficiency, this algorithm checks to see if unification
 requires an allocation first, instead of just "allocate and unify".  The major
 place this happens is identifiers, which normally make a "fresh" copy of their
@@ -48,7 +48,7 @@ are asserted as on the worklist.
 
 ==============================================================================
 
-Global Optimistic Constant Propagation treated as the usual Monotone Analysis
+Global Optimistic Constant Propagation is treated as the usual Monotone Analysis
 Framework.  Passed in the parsed program state (including any return result, i/o
 and memory state).  Returns the most-precise types possible, and replaces
 constants types with constants.
@@ -62,8 +62,8 @@ CTRL, as a permanently available unknown caller.  If the whole program is
 available to us then we can compute all callers conservatively and fairly
 precisely - we may have extra never-taken caller/callee edges, but no
 missing caller/callee edges.  These edges are virtual (represented by
-ALL_CTRL) before GCP.  Just before GCP we remove the ALL_CTRL path, and
-during GCP we add in physical CG edges as possible calls are discovered.
+ALL_CTRL) before GCP.  During GCP we discover most ALL_CTRL paths are dead,
+and we add in physical CG edges as possible calls are discovered.
 
 GCP resolves all ambiguous (overloaded) calls, using the precise types
 first, and then inserting conversions using a greedy decision.  If this is

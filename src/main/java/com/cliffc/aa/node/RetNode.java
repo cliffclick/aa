@@ -179,7 +179,10 @@ public final class RetNode extends Node {
     Type val = rez()._val;
     return TypeTuple.make(ctl,mem,val);
   }
-
+  @Override public void add_work_extra(Work work, Type old) {
+    // Return type changed, so Fun._sig changes.
+    if( !is_copy() ) Env.GVN.add_reduce(fun());
+  }
 
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {

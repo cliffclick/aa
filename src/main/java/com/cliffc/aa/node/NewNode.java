@@ -204,6 +204,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
         Node mem = Env.DEFMEM.make_mem_proj(nnn,memp);
         Node ptr = X.xform(new ProjNode(nnn,REZ_IDX));
         RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,ptr,rpc,fun));
+        Env.SCP_0.add_def(ret);
         return (X._ret = new FunPtrNode(_name,ret));
       }
     }

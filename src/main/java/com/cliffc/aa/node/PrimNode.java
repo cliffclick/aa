@@ -221,6 +221,7 @@ public abstract class PrimNode extends Node {
       // *modify* memory (see Intrinsic*Node for some primitives that *modify*
       // memory).  Thunking (short circuit) prims return both memory and a value.
       RetNode ret = (RetNode)X.xform(new RetNode(ctl,mem,rez,rpc,fun));
+      Env.SCP_0.add_def(ret);
       // No closures are added to primitives
       return (X._ret = new FunPtrNode(_name,ret));
     }

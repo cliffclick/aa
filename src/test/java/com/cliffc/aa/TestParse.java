@@ -21,7 +21,7 @@ public class TestParse {
   @Test public void testParse() {
     //test("{ g -> (g,3)}",
     //     TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP),
-    //     TypeFunSig.make(TypeStruct.make("g",Type.SCALAR,Access.Final),
+    //     TypeFunSig.make(TypeStruct.make(TypeFld.make("^",Type.ALL,DSP_IDX),TypeFld.make("g",Type.SCALAR,ARG_IDX)),
     //                     TypeTuple.make_ret(TypeMemPtr.OOP)),
     //     "[43]{ A -> ( A, 3) }");
 
@@ -63,7 +63,7 @@ public class TestParse {
     test("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
     testerr("math_rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",3);
-    test_isa("{x y -> x+y}", TypeFunPtr.make(TEST_FUNBITS,3, TypeMemPtr.NO_DISP)); // {Scalar Scalar -> Scalar}
+    testerr("{x y -> x+y}", "Scalar is none of (flt64,int64,*str?)",8); // {Scalar Scalar -> Scalar}
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y' in @{x=1}",19);
     testerr("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
     test("x=@{a:=1;         b= {a=a+1;b=0}}; x.         b(); x.a",TypeInt.con(2));
@@ -226,10 +226,11 @@ public class TestParse {
     // hidden internal call from {&} to the primitive is never inlined (has ~Scalar args)
     // so 'x&1' never sees the TypeInt return from primitive AND.
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(12),TypeObj.ISUSED);
-    test_isa("{x -> x&1}", TypeFunPtr.make(TEST_FUNBITS,2,tdisp)); // {Int -> Int}
+    //test_isa("{x -> x&1}", TypeFunPtr.make(TEST_FUNBITS,2,tdisp)); // {Int -> Int}
+    testerr("{x -> x&1}", "Scalar is not a int64",6); // {Int -> Int}
 
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFunPtr.make(TEST_FUNBITS,3,tdisp)); // {Scalar Scalar -> Scalar}
+    testerr("{x y -> x+y}", "Scalar is none of (flt64,int64,*str?)",8); // {Scalar Scalar -> Scalar}
 
     // Function execution and result typing
     test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2)); // trivially inlined; capture external variable
@@ -462,8 +463,8 @@ public class TestParse {
 
     test_isa(ll_def, TypeFunPtr.GENERIC_FUNPTR);
     test(ll_def+ll_con+"; tmp.next.val", TypeFlt.con(1.2));
-    test_isa(ll_def+ll_con+ll_map, TypeFunPtr.GENERIC_FUNPTR);
-    test_isa(ll_def+ll_con+ll_map+ll_fun, TypeFunPtr.GENERIC_FUNPTR);
+    //test_isa(ll_def+ll_con+ll_map, TypeFunPtr.GENERIC_FUNPTR);
+    //test_isa(ll_def+ll_con+ll_map+ll_fun, TypeFunPtr.GENERIC_FUNPTR);
 
     // TODO: Needs a way to easily test simple recursive types
     TypeEnv te4 = Exec.go(Env.file_scope(Env.top_scope()),"args",ll_def+ll_con+ll_map+ll_fun+ll_apl);

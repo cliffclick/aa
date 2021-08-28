@@ -1,14 +1,16 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.Env;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
 import java.util.HashMap;
 import java.util.function.Predicate;
 
-import static com.cliffc.aa.type.TypeFld.Access;
 import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.type.TypeFld.Access;
 
 // Lexical-Scope Node.  Tracks control & phat memory, plus a stack frame (which
 // is just a NewNode).  The stack frame maps local variable names to Nodes and
@@ -80,6 +82,7 @@ public class ScopeNode extends Node {
   public    PhiNode early_mem () { return (   PhiNode)in(5); }
   public    PhiNode early_val () { return (   PhiNode)in(6); }
   public void       early_kill() { pop(); pop(); pop(); }
+  static final int RET_IDX = 7;
 
   // Name to type lookup, or null
   public ConTypeNode get_type(String name) { return _types.get(name);  }
@@ -118,7 +121,24 @@ public class ScopeNode extends Node {
       // Wipe out return memory
       return set_mem(Node.con(TypeMem.XMEM));
 
-    return null;
+    // If the result is never a function
+    int progress = _defs._len;
+    if( Env.GVN._opt_mode._CG &&
+        !TypeFunPtr.GENERIC_FUNPTR.dual().isa(trez) || trez==Type.XNIL )
+      // Wipe out extra function edges.  They are there to act "as if" the
+      // exit-scope calls them; effectively an extra wired call use with the
+      // most conservative caller.
+      while( _defs._len > RET_IDX ) pop();
+    // If the result is a function, wipe out wrong fidxs
+    if( Env.GVN._opt_mode._CG &&
+        trez instanceof TypeFunPtr ) {
+      BitsFun fidxs = ((TypeFunPtr)trez)._fidxs;
+      for( int i=RET_IDX; i<_defs._len; i++ )
+        if( !fidxs.test(((RetNode)in(i))._fidx) )
+          remove(i--);
+    }
+
+    return progress == _defs._len ? null : this;
   }
   @Override public Type value(GVNGCM.Mode opt_mode) { return Type.ALL; }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
@@ -131,11 +151,24 @@ public class ScopeNode extends Node {
   // aliases and fold them into 'live'.  This is unlike other live_use
   // because this "turns around" the incoming live memory to also be the
   // demanded/used memory.
-  static TypeMem compute_live_mem(Node mem, Node rez) {
+  static TypeMem compute_live_mem(ScopeNode scope, Node mem, Node rez) {
     Type tmem = mem._val;
     Type trez = rez._val;
     if( !(tmem instanceof TypeMem ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
     if( TypeMemPtr.OOP.isa(trez) ) return ((TypeMem)tmem).flatten_fields(); // All possible pointers, so all memory is alive
+    // For function pointers, all memory returnable from any function is live.
+    if( trez instanceof TypeFunPtr ) {
+      BitsFun fidxs = ((TypeFunPtr)trez)._fidxs;
+      TypeMem tmem2 = TypeMem.ANYMEM;
+      for( int i=RET_IDX; i<scope._defs._len; i++ ) {
+        RetNode ret = (RetNode)scope.in(i);
+        int fidx = ret.fidx();
+        if( ret._val instanceof TypeTuple && fidxs.test(fidx) ) {
+          tmem2 = (TypeMem)tmem2.meet(((TypeTuple)ret._val).at(1));
+        }
+      }
+      return tmem2.flatten_fields();
+    }
     if( !(trez instanceof TypeMemPtr) ) return TypeMem.ANYMEM; // Not a pointer, basic live only
     if( trez.above_center() ) return TypeMem.ANYMEM; // Have infinite choices still, report basic live only
     // Find everything reachable from the pointer and memory, and report it all
@@ -149,7 +182,7 @@ public class ScopeNode extends Node {
     if( this==Env.SCP_0 )  return opt_mode._CG ? TypeMem.DEAD : TypeMem.ALLMEM;
     if( opt_mode == GVNGCM.Mode.Parse ) return TypeMem.MEM;
     // All fields in all reachable pointers from rez() will be marked live
-    return compute_live_mem(mem(),rez());
+    return compute_live_mem(this,mem(),rez());
   }
 
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
@@ -167,6 +200,9 @@ public class ScopeNode extends Node {
     // pointer, this will include the memory slice.
     if( def == mem() )
       return opt_mode==GVNGCM.Mode.Parse ? TypeMem.ALLMEM : _live.flatten_fields();
+    // Top-level function pointer escape
+    if( def instanceof RetNode )
+      return _live;
     // Merging exit path
     return def._live;
   }

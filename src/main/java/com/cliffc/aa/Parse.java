@@ -965,6 +965,7 @@ public class Parse implements Comparable<Parse> {
         // Standard return; function control, memory, result, RPC.  Plus a hook
         // to the function for faster access.
         RetNode ret = (RetNode)X.xform(new RetNode(ctrl(),mem(),rez,rpc,fun));
+        Env.FILE._scope.add_def(ret);
         // The FunPtr builds a real display; any up-scope references are passed in now.
         Node fptr = X.xform(new FunPtrNode(null,ret,fresh_disp.unhook()));
 
