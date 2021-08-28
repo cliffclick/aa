@@ -102,7 +102,7 @@ public class CallNode extends Node {
     _badargs = badargs;
   }
 
-  @Override public String xstr() { return  _is_copy ? "CopyCall" : (is_dead() ? "Xall" : "Call"); } // Self short name
+  @Override public String xstr() { return (_is_copy ? "CopyCall" : (is_dead() ? "Xall" : "Call"))+(_not_resolved_by_gcp?"_UNRESOLVED":""); } // Self short name
   String  str() { return xstr(); }       // Inline short name
   @Override public boolean is_mem() {    // Some calls are known to not write memory
     CallEpiNode cepi = cepi();
@@ -454,7 +454,7 @@ public class CallNode extends Node {
       tfx = tfx.oob(TypeFunPtr.GENERIC_FUNPTR);
     TypeFunPtr tfp = (TypeFunPtr)tfx;
     BitsFun fidxs = tfp.fidxs();
-    if( _not_resolved_by_gcp && // If overloads not resolvable, then take them all and we are in-error
+    if( _not_resolved_by_gcp && // If overloads not resolvable, then take them all, and we are in-error
         fidxs.above_center() && tfp!=TypeFunPtr.GENERIC_FUNPTR.dual() )
       tfp = tfp.make_from(fidxs.dual()); // Force FIDXS low (take all), and we are in-error
 
@@ -489,12 +489,17 @@ public class CallNode extends Node {
     // If not resolved, might now resolve
     if( _val instanceof TypeTuple && ttfp(_val)._fidxs.abit()==-1 )
       Env.GVN.add_reduce(this);
+    // If escapes lowers, can allow e.g. swapping with New
+    if( _val instanceof TypeTuple && tesc(old)!=tesc(_val) )
+      Env.GVN.add_grow(this);
   }
+  
   @Override public void add_work_def_extra(Work work, Node chg) {
     // Projections live after a call alter liveness of incoming args
     if( chg instanceof ProjNode )
       work.add(in(((ProjNode)chg)._idx));
   }
+  
   @Override public void add_work_use_extra(Work work, Node chg) {
     CallEpiNode cepi = cepi();
     if( chg == fdx() ) {           // FIDX falls to sane from too-high
@@ -637,7 +642,7 @@ public class CallNode extends Node {
           continue;
 
         FunNode fun = FunNode.find_fidx(kidx);
-        if( fun.nargs()!=nargs() || fun.in(0)==fun ) continue; // BAD/dead
+        if( fun.is_dead() || fun.nargs()!=nargs() || fun.in(0)==fun ) continue; // BAD/dead
         TypeStruct formals = fun._sig._formals; // Type of each argument
         int cvts=0;                             // Arg conversion cost
         for( TypeFld fld : formals.flds() ) {
@@ -696,20 +701,17 @@ public class CallNode extends Node {
   @Override public boolean unify( Work work ) { assert tvar().isa("Call"); return false; }
 
   // Resolve a call, removing ambiguity during the GCP/Combo pass.
-  @Override public void remove_ambi(Work work) {
+  @Override public boolean remove_ambi() {
     TypeFunPtr tfp = ttfpx(_val);
     BitsFun fidxs = tfp.fidxs();
-    if( !fidxs.above_center() ) return; // Resolved after all
-    assert fidxs!=BitsFun.ANY;          // Too many choices
+    if( !fidxs.above_center() ) return true; // Resolved after all
+    assert fidxs!=BitsFun.ANY;               // Too many choices
     // Pick least-cost among choices
     FunPtrNode fptr = least_cost(fidxs,fdx());
-    if( fptr==null ) {             // Not resolving, program is in-error
-      _not_resolved_by_gcp = true; // will drop fdx in lattice
-    } else {                       // Set in resolved choice
-      set_dsp(fptr.display());
-      set_fdx(fptr);            // Set resolved edge
-    }
-    work.add(this);             // Progress
+    if( fptr==null ) return false; // Not resolved, no progress
+    set_dsp(fptr.display());       // Pick up the display
+    set_fdx(fptr);                 // Set resolved edge
+    return true;                   // Progress
   }
 
   // See if we can resolve an unresolved Call

@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
@@ -91,7 +90,7 @@ public class ParmNode extends PhiNode {
     TypeFld arg = fun._sig._formals.fld_find(_name);
     // Good case: nothing in signature (parm is dead, so legit), type needs to fall, or it isa formal.
     if( arg==null || t.above_center() || t.isa(arg._t) ) return t.simple_ptr();
-    return Type.ALL;
+    return _t;
   }
 
   // If an input to a Mem Parm changes, the flow results of other Parms can change
@@ -123,7 +122,7 @@ public class ParmNode extends PhiNode {
         // Find the call bringing the broken args, and use it for error
         // reporting - it MUST exist, or we have a really weird situation
         for( Node def : fun._defs ) {
-          if( def instanceof CProjNode ) {
+          if( def instanceof CProjNode && def.in(0) instanceof CallNode ) {
             CallNode call = (CallNode)def.in(0);
             if( call.nargs() != fun.nargs() )
               return null;      // #args errors reported before bad-args

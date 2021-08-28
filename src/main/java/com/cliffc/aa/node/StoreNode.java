@@ -54,6 +54,7 @@ public class StoreNode extends Node {
       // Update the value, and perhaps the final field
       nnn.update(_fld,_fin,rez());
       mem.xval();
+      Env.DEFMEM.xval();
       Env.GVN.add_flow_uses(this);
       add_reduce_extra();       // Folding in allows store followers to fold in
       return mem;               // Store is replaced by using the New directly.

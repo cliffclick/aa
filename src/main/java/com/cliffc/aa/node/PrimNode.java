@@ -123,13 +123,20 @@ public abstract class PrimNode extends Node {
     return PRIMS;
   }
 
-  // All primitives are effectively H-M Lambdas
+  // All primitives are effectively H-M Applies with a hidden internal Lambda.
   @Override public boolean unify( Work work ) {
-    assert _tvar.is_fun();
-    
-    return false;
+    boolean progress = false;
+    for( TypeFld fld : _sig._formals.flds() )
+      progress |= prim_unify(tvar(fld._order),fld._t,work);
+    progress |= prim_unify(tvar(),_sig._ret.at(REZ_IDX),work);
+    return progress;
   }
-  
+  private boolean prim_unify(TV2 arg, Type t, Work work) {
+    return (!arg.is_base() || !t.isa(arg._type)) &&
+      arg.unify(TV2.make_base(this, arg._type==null ? t : t.meet(arg._type), "Prim_unify"), work);
+  }
+
+
   public static PrimNode convertTypeName( Type from, Type to, Parse badargs ) {
     return new ConvertTypeName(from,to,badargs);
   }
@@ -214,8 +221,6 @@ public abstract class PrimNode extends Node {
       // *modify* memory (see Intrinsic*Node for some primitives that *modify*
       // memory).  Thunking (short circuit) prims return both memory and a value.
       RetNode ret = (RetNode)X.xform(new RetNode(ctl,mem,rez,rpc,fun));
-      // Setup the TVAR once
-      tvar().unify(TV2.make_fun(ret,TypeFunPtr.make(fun._fidx,_sig.nargs(),TypeMemPtr.NO_DISP),_sig,"as_fun"),Env.GVN._work_flow);
       // No closures are added to primitives
       return (X._ret = new FunPtrNode(_name,ret));
     }

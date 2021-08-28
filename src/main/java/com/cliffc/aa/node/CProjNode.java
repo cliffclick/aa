@@ -16,6 +16,7 @@ public class CProjNode extends ProjNode {
     return "CProj"+_idx;
   }
   @Override public Type value(GVNGCM.Mode opt_mode) {
+    // Normal projection, except pinch to CTRL.
     Type x = super.value(opt_mode);
     if( x==Type.ANY ) return Type.XCTRL;
     if( x==Type.ALL ) return Type. CTRL;

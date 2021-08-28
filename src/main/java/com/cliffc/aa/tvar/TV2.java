@@ -154,10 +154,10 @@ public class TV2 {
     assert fptr._nargs==sig.nargs();
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<String,TV2>();
     UQNodes ns = UQNodes.make(ret.rez());
-    args.put(" ret",TV2.make_leaf(ret.rez(),alloc_site));
+    args.put(" ret",ret.rez().tvar()); // Return from the return result tvar
     Node[] parms = ret.fun().parms();
     for( int i=ARG_IDX; i<parms.length; i++ ) {
-      args.put(""+i,TV2.make_leaf(parms[i],alloc_site));
+      args.put(""+i,parms[i].tvar()); // Each argument from the parms directly
       ns = ns.add(parms[i]);
     }
     return new TV2("->",args,fptr,ns,alloc_site);

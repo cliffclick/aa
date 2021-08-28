@@ -79,8 +79,8 @@ public final class CallEpiNode extends Node {
       Type tretmem = tret.at(1);
       if( fun != null && fun._defs._len==2 && // Function is only called by 1 (and not the unknown caller)
           (call.err(true)==null || fun._thunk_rhs) &&       // And args are ok
-          (tdef==null || CallNode.emem(tcall).isa(tdef)) && // Pre-GCP, call memory has to be as good as the default
-          (tdef==null || tretmem.isa(tdef)) &&  // Call and return memory at least as good as default
+          (tdef==null || GVN._opt_mode._CG || CallNode.emem(tcall).isa(tdef)) && // Pre-GCP, call memory has to be as good as the default
+          (tdef==null || GVN._opt_mode._CG || tretmem.isa(tdef) ) &&  // Call and return memory at least as good as default
           call.mem().in(0) != call &&   // Dead self-recursive
           fun.in(1)._uses._len==1 &&    // And only calling fun
           ret._live.isa(_live) &&       // Call and return liveness compatible
@@ -241,7 +241,7 @@ public final class CallEpiNode extends Node {
     }
 
     // Add matching control to function via a CallGraph edge.
-    Node cep = new CEProjNode(call,fun instanceof FunNode && !((FunNode) fun)._thunk_rhs ? ((FunNode)fun)._sig : null).init1();
+    Node cep = new CEProjNode(call).init1();
     fun.add_def(work.add(cep));
     work.add(fun);
     for( Node use : fun._uses ) work.add(use);
@@ -280,7 +280,7 @@ public final class CallEpiNode extends Node {
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
     if( fidxs.above_center() ) return TypeTuple.CALLE.dual(); // Not resolved yet
 
-    // Default memory: global worse-case scenario
+    // Default memory: global worst-case scenario
     TypeMem defmem = Env.DEFMEM._val instanceof TypeMem
       ? (TypeMem)Env.DEFMEM._val
       : Env.DEFMEM._val.oob(TypeMem.ALLMEM);
@@ -351,6 +351,8 @@ public final class CallEpiNode extends Node {
       boolean eout = esc_out       .test_recur(i);
       TypeObj pre = caller_mem.at(i);
       TypeObj obj = ein || eout ? (TypeObj)(pre.meet(post_call.at(i))) : pre;
+      // Before GCP, must use DefMem to keeps types strong as the Parser
+      // During GCP, can lift default actual memories.
       if( !opt_mode._CG )       // Before GCP, must use DefMem to keeps types strong as the Parser
         obj = (TypeObj)obj.join(defmem.at(i));
       pubs[i] = obj;

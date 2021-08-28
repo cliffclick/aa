@@ -1146,10 +1146,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return ts.hashcons_free();
   }
 
-  @Override TypeObj flatten_fields() {
+  @Override public TypeObj flatten_fields() {
     TypeStruct ts = malloc(_name,_any,_open);
     for( TypeFld fld : flds() )
-      ts.add_fld(fld.make_from(Type.SCALAR,Access.bot()));
+      ts.add_fld(fld.make_from(fld._t.oob(Type.SCALAR),Access.bot()));
     return ts.hashcons_free();
   }
 
@@ -1161,8 +1161,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     TypeStruct ts = _clone();
     for( Map.Entry<String,TypeFld> e : ts._flds.entrySet() ) {
       TypeFld fld = e.getValue();
-      if( !Util.eq(fld._fld,name) ) fld.setX(XSCALAR,Access.bot());
-      e.setValue(fld.hashcons_free());
+      e.setValue(fld.setX( Util.eq(fld._fld,name) ? live : XSCALAR, Access.bot()).hashcons_free());
     }
     return ts.hashcons_free();
   }

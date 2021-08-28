@@ -10,6 +10,7 @@ import java.util.HashSet;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 public class Env implements AutoCloseable {
+  public static Env FILE;
   public final static GVNGCM GVN = new GVNGCM(); // Initial GVN
   public static    StartNode START; // Program start values (control, empty memory, cmd-line args)
   public static    CProjNode CTL_0; // Program start value control
@@ -110,7 +111,7 @@ public class Env implements AutoCloseable {
   // A new Env for the current Parse scope (generally a file-scope or a
   // test-scope), above this is the basic public Env with all the primitives
   public static Env file_scope(Env top_scope) {
-    return new Env(top_scope,null, true, top_scope._scope.ctrl(), top_scope._scope.mem());
+    return (FILE = new Env(top_scope,null, true, top_scope._scope.ctrl(), top_scope._scope.mem()));
   }
 
   // Wire up an early function exit
@@ -142,7 +143,6 @@ public class Env implements AutoCloseable {
     close_display(GVN);
     GVN.add_dead(_scope);
     GVN.iter(GVN._opt_mode);
-    assert _scope.is_dead();
   }
 
   // Record global static state for reset

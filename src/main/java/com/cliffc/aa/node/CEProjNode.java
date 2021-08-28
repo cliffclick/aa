@@ -3,18 +3,30 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
-// Proj control
+// Call-graph *edges*.  Always unique (so no hash-consing).  Individually
+// turned on or off according to which functions reach a Call or Scope.
 public class CEProjNode extends CProjNode {
-  final TypeFunSig _sig;
-  public CEProjNode( CallNode call, TypeFunSig sig ) { super(call); _sig = sig; }
+  public CEProjNode( Node call ) { super(call); }
   @Override public String xstr() { return "CEProj"; }
   @Override public Type value(GVNGCM.Mode opt_mode) {
-    if( _uses._len<1 ) return Type.CTRL;
+    if( _uses._len<1 ) return Type.CTRL; // Dead
+    // Check for the default path from the Exit Scope
+    if( in(0) instanceof ScopeNode ) {
+      assert _uses._len==1;
+      if( !opt_mode._CG ) return Type.CTRL; // Until Opto, still wiring (so missing unknown users)
+      FunNode fun = (FunNode)_uses.at(0);
+      Type trez = ((ScopeNode)in(0)).rez()._val;
+      TypeFunPtr tfp = TypeFunPtr.make(fun._fidx,fun.nargs(),TypeMemPtr.NO_DISP);
+      if( tfp.isa(trez) )
+        return Type.CTRL;
+      return Type.XCTRL;
+    }
+
+    // Expect a call here
     return good_call(val(0),_uses.at(0)) ? Type.CTRL : Type.XCTRL;
   }
 
   // Never equal to another CEProj, since Call-Graph *edges* are unique
-  @Override public int hashCode() { return super.hashCode()+(_sig==null ? 0 : _sig._hash); }
   @Override public boolean equals(Object o) { return this==o; }
 
   static boolean good_call(Type tcall, Node ftun ) {

@@ -184,7 +184,12 @@ public class FunNode extends RegionNode {
   @Override @NotNull public Node copy( boolean copy_edges) { throw unimpl(); }
 
   // True if may have future unknown callers.
-  boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
+  boolean has_unknown_callers() {
+    return _defs._len > 1 &&
+      (in(1) == Env.ALL_CTRL ||  // Primitives, which survive a call to Parse.go
+       // User code, which does not survive a call to Parse.go
+       (in(1) instanceof CEProjNode && in(1).in(0) instanceof ScopeNode));
+  }
   // Formal types.
   Type formal(int idx) {
     return idx == -1 ? TypeRPC.ALL_CALL : _sig.arg(idx)._t;
@@ -197,6 +202,7 @@ public class FunNode extends RegionNode {
   // Graph rewriting via general inlining.  All other graph optimizations are
   // already done.
   @Override public Node ideal_reduce() {
+    // Common Region reductions; killing off dead paths
     Node rez = super.ideal_reduce();
     if( rez != null ) return rez;
     // Check for FunPtr/Ret dead/gone, and the function is no longer callable
@@ -204,9 +210,13 @@ public class FunNode extends RegionNode {
     RetNode ret = ret();
     if( has_unknown_callers() && ret==null && _keep==0 ) {
       assert !is_prim();
-      assert in(1)==Env.ALL_CTRL;
+      Env.GVN.add_flow_uses(this); // All parms can lift
       return set_def(1,Env.XCTRL);
     }
+    // Backdoor hook to trigger FunPtr dropping a unused display
+    FunPtrNode fptr = fptr();
+    if( parm(DSP_IDX)==null && fptr !=null && !(fptr.display() instanceof ConNode) )
+      Env.GVN.add_reduce(fptr);
 
     // Update _sig if parms are unused.  SIG falls during Iter and lifts during
     // GCP.  If parm is missing or not-live, then the corresponding SIG
@@ -220,7 +230,6 @@ public class FunNode extends RegionNode {
           _sig = _sig.make_from_arg(fld.make_from(Type.ALL));
       // Can resolve some least_cost choices
       if( progress != _sig ) {
-        FunPtrNode fptr = fptr();
         if( fptr != null )
           for( Node use : fptr()._uses )
             if( use instanceof UnresolvedNode )

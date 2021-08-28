@@ -1,5 +1,6 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.node.CallNode;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.node.Work;
 import com.cliffc.aa.util.VBitSet;
@@ -135,11 +136,28 @@ public abstract class Combo {
       // Remove CallNode ambiguity after worklist runs dry.  This makes a
       // 'least_cost' choice on unresolved Calls, and lowers them in the
       // lattice... allowing more GCP progress.
-      while( !ambi.isEmpty() )
-        ambi.pop().remove_ambi(work);
+      remove_ambi(ambi,work);
+      // If nothing resolved and there are still ambiguous calls, the program
+      // is in error.  Force them to act as-if called by all choices and finish
+      // off Opto.
+      if( work.isEmpty() )
+        for( Node call : ambi._work )
+          if( !((CallNode)call)._not_resolved_by_gcp )
+            ((CallNode)work.add(call))._not_resolved_by_gcp = true;
     }
 
     assert Env.START.more_flow(work,false)==0; // Final conditions are correct
     Env.START.walk_opt(new VBitSet());
+  }
+
+  private static void remove_ambi(Work ambi, Work work) {
+    assert work.isEmpty();
+    for( int i=0; i<ambi.len(); i++ ) {
+      CallNode call = (CallNode)ambi.at(i);
+      if( call.remove_ambi() ) {
+        ambi.del(i--);
+        work.add(call);
+      }
+    }
   }
 }

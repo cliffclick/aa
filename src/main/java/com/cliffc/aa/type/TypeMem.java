@@ -476,6 +476,7 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Everything NOT in the 'escs' is flattened to UNUSED.
+  // Everything YES in the 'escs' is flattened to SCALAR.
   public TypeMem remove_no_escapes( BitsAlias escs, String fld, Type live ) {
     TypeObj[] tos = new TypeObj[Math.max(_pubs.length,escs.max()+1)];
     for( int i=1; i<tos.length; i++ )

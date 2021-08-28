@@ -92,7 +92,7 @@ public class ScopeNode extends Node {
         return ctn;
     return null;
   }
-  
+
   // Extend the current Scope with a new type; cannot override existing name.
   public void add_type( String name, ConTypeNode t ) {
     assert _types.get(name)==null;
@@ -122,6 +122,10 @@ public class ScopeNode extends Node {
   }
   @Override public Type value(GVNGCM.Mode opt_mode) { return Type.ALL; }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
+  @Override public void add_work_use_extra(Work work, Node chg) {
+    if( chg==rez() )            // If the result changed
+      GVNGCM.add_work_uses(work,this);// Then default-reachable functions changed
+  }
 
   // From a memory and a possible pointer-to-memory, find all the reachable
   // aliases and fold them into 'live'.  This is unlike other live_use
@@ -144,7 +148,6 @@ public class ScopeNode extends Node {
     // Prim scope is not used past Call-Graph discovery
     if( this==Env.SCP_0 )  return opt_mode._CG ? TypeMem.DEAD : TypeMem.ALLMEM;
     if( opt_mode == GVNGCM.Mode.Parse ) return TypeMem.MEM;
-    assert _uses._len==0;
     // All fields in all reachable pointers from rez() will be marked live
     return compute_live_mem(mem(),rez());
   }

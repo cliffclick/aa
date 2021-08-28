@@ -2,11 +2,10 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.MEM_IDX;
-import static com.cliffc.aa.AA.unimpl;
 
 // Proj memory
 public class MrgProjNode extends ProjNode {
@@ -19,7 +18,7 @@ public class MrgProjNode extends ProjNode {
 
   @Override public Node ideal_reduce() {
     if( _keep >= 2 ) return null;
-    if( val(0).above_center() )
+    if( !is_prim() && val(0).above_center() )
       return mem();
     NewNode nnn = nnn();
     Node mem = mem();

@@ -200,7 +200,7 @@ public class LoadNode extends Node {
 
     // Loading from TypeMem - will get a TypeObj out.
     Node mem = mem();
-    Type tmem = mem._val, tfld; // Memory
+    Type tmem = mem._val;       // Memory
     if( !(tmem instanceof TypeMem) ) return tmem.oob(); // Nothing sane
     TypeObj tobj = ((TypeMem)tmem).ld((TypeMemPtr)tadr);
     if( tobj instanceof TypeStruct )

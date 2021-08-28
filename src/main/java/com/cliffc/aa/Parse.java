@@ -107,36 +107,17 @@ public class Parse implements Comparable<Parse> {
     prog();                     // Parse a program
     // Delete names at the top scope before starting optimization.
     _e._scope.keep();
-    _e.close_display(_gvn);
+    _e.close_display(_gvn);          // No more fields added to the top parse scope
+    Env.GVN.add_flow_uses(_e._scope);// Post-parse, revisit top-level called functions
     _gvn.iter(GVNGCM.Mode.PesiNoCG); // Pessimistic optimizations; might improve error situation
-    remove_unknown_callers();
-    Combo.opto();                  // Global Constant Propagation and Hindley-Milner Typing
-    _gvn.iter(GVNGCM.Mode.PesiCG); // Re-check all ideal calls now that types have been maximally lifted
-    Combo.opto();                  // Global Constant Propagation and Hindley-Milner Typing
-    _gvn.iter(GVNGCM.Mode.PesiCG); // Re-check all ideal calls now that types have been maximally lifted
+    Env.DEFMEM.unkeep();             // Memory not forced alive
+    Combo.opto();                    // Global Constant Propagation and Hindley-Milner Typing
+    _gvn.iter(GVNGCM.Mode.PesiCG);   // Re-check all ideal calls now that types have been maximally lifted
+    Combo.opto();                    // Global Constant Propagation and Hindley-Milner Typing
+    _gvn.iter(GVNGCM.Mode.PesiCG);   // Re-check all ideal calls now that types have been maximally lifted
     _e._scope.unkeep();
     //assert Type.intern_check();
     return gather_errors();
-  }
-
-  private void remove_unknown_callers() {
-    Ary<Node> uses = Env.ALL_CTRL._uses;
-    // For all unknown uses of functions, they will all be known after GCP.
-    // Remove the hyper-conservative ALL_CTRL edge.  Note that I canNOT run the
-    // pessimistic iter() at this point, as GCP needs to discover all the
-    // actual call-graph edges and install them directly on the FunNodes.
-    for( int i=0; i<uses._len; i++ ) {
-      Node use = uses.at(i);
-      if( !use.is_prim() ) {
-        assert use instanceof FunNode;
-        assert use.in(1)==Env.ALL_CTRL;
-        use.set_def(1,Env.XCTRL);
-        i--;
-      }
-    }
-    // No longer force all memory alive
-    Env.DEFMEM.unkeep();
-    Env.DEFMEM.insert(Env.ANY);
   }
 
   private TypeEnv gather_errors() {
@@ -948,7 +929,7 @@ public class Parse implements Comparable<Parse> {
 
     try( GVNGCM.Build<Node> X = _gvn.new Build<>()) { // Nest an environment for the local vars
       // Build the FunNode header
-      FunNode fun = (FunNode)X.xform(new FunNode(formals.close()).add_def(Env.ALL_CTRL));
+      FunNode fun = (FunNode)X.xform(new FunNode(formals.close()).add_def(gvn(new CEProjNode(Env.FILE._scope))));
       // Record H-M VStack in case we clone
       fun.set_nongens(_e._nongen.compact());
       // Build Parms for system incoming values
@@ -969,7 +950,7 @@ public class Parse implements Comparable<Parse> {
         Parse errmsg = errMsg();  // Lazy error message
         for( TypeFld fld : formals.flds() ) { // User parms start
           if( fld._order <= DSP_IDX ) continue;// Already handled
-          Node parm = X.xform(new ParmNode(fld,fun,con(Type.SCALAR),errmsg));
+          Node parm = X.xform(new ParmNode(fld,fun,con(fld._t.simple_ptr()),errmsg));
           _e._nongen.add_var(fld._fld,parm.tvar());
           create(fld._fld,parm, args_are_mutable);
         }

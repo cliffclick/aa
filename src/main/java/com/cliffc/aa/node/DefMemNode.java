@@ -5,10 +5,10 @@ import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.Env.GVN;
 
+// Default memory, to keep things alive during parsing
 public class DefMemNode extends Node {
   public DefMemNode( Node ctrl) { super(OP_DEFMEM,ctrl); }
   @Override public TypeMem value(GVNGCM.Mode opt_mode) {
-    if( opt_mode._CG ) return TypeMem.ANYMEM;
     if( _defs._len <= 1 ) return TypeMem.ALLMEM;
     TypeObj[] tos = new TypeObj[_defs._len];
     for( int i=1; i<_defs._len; i++ ) {
@@ -16,7 +16,12 @@ public class DefMemNode extends Node {
       if( n==null ) continue;
       if( n instanceof MrgProjNode ) { // NewNode still alive
         NewNode nnn = n.in(0) instanceof NewNode ? (NewNode) n.in(0) : null;
-        tos[i] = (nnn != null && nnn._val != Type.ANY && nnn._live != TypeMem.DEAD) ? nnn._crushed : TypeObj.UNUSED;
+        tos[i] = (nnn != null && nnn._val != Type.ANY && nnn._live != TypeMem.DEAD )
+          // Prior to getting the call-graph, must be super conservative.
+          // After the call graph, can flow types as normal - used for a
+          // conservative caller if a FunPtr escapes to the exit scope.
+          ? (opt_mode._CG ? nnn._ts : nnn._crushed)
+          : TypeObj.UNUSED;
       } else if( n instanceof ConTypeNode ) {
         tos[i] = ((TypeMemPtr)n._val)._obj;
       } else {                  // Collapsed NewNode
@@ -29,29 +34,14 @@ public class DefMemNode extends Node {
   }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    if( opt_mode._CG ) return TypeMem.DEAD; // Have a Call-Graph, do not need DefMem
     if( def==in(0) ) return TypeMem.ALIVE;  // Control
+    if( opt_mode._CG && def instanceof MrgProjNode ) {
+      NewNode nnn = ((MrgProjNode)def).nnn();
+      // All above-center fields are not-live, below-center are full alive.
+      return TypeMem.make(nnn._alias,nnn._ts.flatten_fields());
+    }
     return _live;
   }
-
-  //@Override public TV2 new_tvar(String alloc_site) { return TV2.make("Mem",this,alloc_site); }
-  //
-  //@Override public boolean unify( boolean test ) {
-  //  // Self should always should be a TMem
-  //  TV2 tvar = tvar();
-  //  assert tvar.isa("Mem");
-  //  // Structural unification on all objects
-  //  boolean progress=false;
-  //  for( int i=1; i<_defs._len; i++ ) {
-  //    Node n = in(i);
-  //    if( n==null ) continue;
-  //    TV2 tv = (n instanceof MrgProjNode && !tvar(i).is_dead() ? n.in(0) : n).tvar();
-  //    progress |= tvar.unify_at(i,tv,test);
-  //    if( progress && test ) return true;
-  //  }
-  //  return progress;
-  //}
-
 
   @Override public boolean equals(Object o) { return this==o; } // Only one
 

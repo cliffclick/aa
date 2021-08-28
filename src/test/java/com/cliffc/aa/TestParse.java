@@ -5,6 +5,7 @@ import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.function.Function;
@@ -18,11 +19,12 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    test("{&}",
-         TypeFunPtr.make(BitsFun.make0(35),5, TypeMemPtr.NO_DISP),
-         TypeFunSig.make(TypeStruct.make2flds("x",TypeInt.INT64,"y",TypeInt.INT64),
-                         TypeTuple.make_ret(TypeInt.INT64)),
-         "{ A A -> A }");
+    //test("{ g -> (g,3)}",
+    //     TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP),
+    //     TypeFunSig.make(TypeStruct.make("g",Type.SCALAR,Access.Final),
+    //                     TypeTuple.make_ret(TypeMemPtr.OOP)),
+    //     "[43]{ A -> ( A, 3) }");
+
 
     // failing
     //test("{ g -> f = { ignore -> g }; ( f(3), f(\"abc\"))}",
@@ -535,7 +537,7 @@ public class TestParse {
              "     ? @{ll=map(tree.l);rr=map(tree.r);vv=tree.v&tree.v}"+
              "     : 0};"+
              "map(tmp)",
-             "@{ll=*@{ll=*@{ll=0; rr=0; vv=3}; rr=*@{ll=*@{$; rr=$; vv=int8}?; $; vv=7}; vv=5}; rr=*@{$; rr=*@{$; $; vv=22}; vv=20}; vv=12}");
+             "@{ll=*$?; rr=$; vv=int8}");
 
 
     // Failed attempt at a Tree-structure inference test.  Triggered all sorts
@@ -552,7 +554,7 @@ public class TestParse {
          "     ? @{ll=map(tree.l);vv=tree.v}"+
          "     : 0};"+
          "map(tmp)",
-            "Cannot re-assign final field '.l' in @{l=*~use; v:=0}",36);
+            "Cannot re-assign final field '.l' in @{l=*use; v:=0}",36);
 
     // Good tree-structure inference test
     test_ptr("tmp=@{"+
@@ -572,7 +574,7 @@ public class TestParse {
          "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
-         "@{l=*@{l=*@{l=0; r=0; v=6}; r=*@{l=*@{$; r=$; v=30}?; $; v=14}; v=10}; r=*@{$; r=*@{$; $; v=44}; v=40}; v=24}");
+         "@{l=*$?; r=$; v=int64}");
 
     // A linked-list mixing ints and strings, always in pairs
     String ll_cona = "a=0; ";
@@ -689,7 +691,7 @@ public class TestParse {
     test("x:=0; {^1 ?  x=1 ; x=3}(); x",TypeInt.con(1));  // Return of an ifex
     test("f={0 ? ^0; 7}; f()", TypeInt.con(7));
     // Find: returns 0 if not found, or first element which passes predicate.
-    test("find={list pred -> !list ? ^0; pred(list.1) ? ^list.1; find(list.0,pred)}; find(((0,3),2),{e -> e&1})", TypeInt.con(3));
+    test("find={list pred -> !list ? ^0; pred(list.1) ? ^list.1; find(list.0,pred)}; find(((0,3),2),{e -> e&1})", TypeInt.INT8);
     test("x:=0; {1 ? ^2; x=3}(); x",Type.XNIL);  // Following statement is ignored
     // Curried functions
     test("for={A->    A+3 }; for 2  ", TypeInt.con(5));
@@ -749,7 +751,8 @@ public class TestParse {
   }
 
 
-  // Parametric polymorphism
+  // Combined H-M and GCP Typing
+  @Ignore
   @Test public void testParse15() {
     test("-1", TypeInt.con( -1), null, "-1");
     test("(1,2)", TypeMemPtr.make(BitsAlias.make0(13),TypeStruct.tupsD(TypeInt.con(1),TypeInt.con(2))), null, "([13] 1,2)");
@@ -758,6 +761,12 @@ public class TestParse {
                          TypeStruct.make2fldsD("n",Type.XNIL,"v",TypeFlt.con(1.2))),
          null,
          "@{[13] n = 0, v = 1.2}");
+    test("{&}",
+         TypeFunPtr.make(BitsFun.make0(35),5, TypeMemPtr.NO_DISP),
+         TypeFunSig.make(TypeStruct.make2flds("x",TypeInt.INT64,"y",TypeInt.INT64),
+                         TypeTuple.make_ret(TypeInt.INT64)),
+         "[35]{ int64 int64 -> int64 }");
+
 
 
     // Should be typable with H-M

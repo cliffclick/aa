@@ -493,6 +493,7 @@ public abstract class Node implements Cloneable {
     return _live != TypeMem.DEAD &&    // Only live uses make more live
       (!_live.basic_live() ||   // Complex alive always counts
        !_val.may_be_con() ||    // Use might be replaced with a constant (and not have this input)
+       _val instanceof TypeFunPtr || // Always compute funptrs, as constants they keep function bodies alive
        is_prim() ||             // Always live prims
        err(true)!=null ||       // Always live errors
        // FunPtrs still use their Rets, even if constant
@@ -530,7 +531,7 @@ public abstract class Node implements Cloneable {
   public void add_work_hm(Work work) { tvar().add_deps_work(work); }
 
   // Support for resolving ambiguous calls during GCP/Combo
-  public void remove_ambi(Work work) {}
+  public boolean remove_ambi() {return false;}
 
   // Do One Step of forwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
@@ -550,7 +551,8 @@ public abstract class Node implements Cloneable {
     // All liveness is skipped if may_be_con, since the possible constant
     // has no inputs.
     assert oval.may_be_con() || !nval.may_be_con(); // May_be_con is monotonic
-    if( oval.may_be_con() && !nval.may_be_con() )
+    if( !(!oval.may_be_con() || oval instanceof TypeFunPtr) &&
+         (!nval.may_be_con() || nval instanceof TypeFunPtr) )
       for( Node def : _defs ) work.add(def); // Now check liveness
   }
 
@@ -652,7 +654,7 @@ public abstract class Node implements Cloneable {
   // Change values at this Node directly.
   public Node do_flow() {
     Node progress=null;
-    // Compute live bits.  If progress, push the defs on the flow worklist.
+    // Compute live bits.  If progressing, push the defs on the flow worklist.
     // This is a reverse flow computation.  Always assumed live if keep.
     if( _keep==0 ) {
       TypeMem oliv = _live;
@@ -667,7 +669,7 @@ public abstract class Node implements Cloneable {
       }
     }
 
-    // Compute best value.  If progress, push uses on the flow worklist.
+    // Compute best value.  If progressing, push uses on the flow worklist.
     // This is a forward flow computation.
     Type oval = _val; // Get old type
     Type nval = value(Env.GVN._opt_mode);// Get best type
@@ -751,6 +753,7 @@ public abstract class Node implements Cloneable {
     work.add(this);                // On worklist and mark visited
     _val = Type.ANY;               // Highest value
     _live = TypeMem.DEAD;          // Not alive
+    if( this instanceof CallNode ) ((CallNode)this)._not_resolved_by_gcp = false; // Try again
     // Walk reachable graph
     for( Node use : _uses )                   use.walk_initype(work);
     for( Node def : _defs ) if( def != null ) def.walk_initype(work);
@@ -815,11 +818,10 @@ public abstract class Node implements Cloneable {
         boolean ok = lifting
           ? nval.isa(oval) && nliv.isa(oliv)
           : oval.isa(nval) && oliv.isa(nliv);
-        if( !ok || hm ) {         // Still-to-be-computed?
-          FLOW_VISIT.clear(_uid); // Pop-frame & re-run in debugger
-          System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
-          errs++;
-        }
+        FLOW_VISIT.clear(_uid); // Pop-frame & re-run in debugger
+        System.err.println(!ok ? "Monotonicity bug" : "Progress bug");
+        System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
+        errs++;
       }
     }
     for( Node def : _defs ) if( def != null ) errs = def.more_flow(work,lifting,errs);

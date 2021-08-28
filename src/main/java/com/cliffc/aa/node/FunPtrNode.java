@@ -3,9 +3,10 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
-import static com.cliffc.aa.AA.ARG_IDX;
+import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.Env.GVN;
 
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
@@ -96,8 +97,13 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     // Display is known dead?  Yank it.
     Node dsp = display();
     Type tdsp = dsp._val;
-    if( tdsp instanceof TypeMemPtr && ((TypeMemPtr)tdsp)._obj==TypeObj.UNUSED && !(dsp instanceof ConNode) )
+    if( !(dsp instanceof ConNode) && tdsp instanceof TypeMemPtr && ((TypeMemPtr)tdsp)._obj==TypeObj.UNUSED )
       return set_def(1,Env.ANY); // No display needed
+
+    // Also unused if function has no display parm.
+    FunNode fun = xfun();
+    if( !(dsp instanceof ConNode) && fun!=null && fun.is_copy(0)==null && fun.parm(DSP_IDX)==null )
+      return set_def(1,Env.ANY);
 
     // Remove unused displays.  Track uses; Calling with no display is OK.
     // Uses storing the FPTR and passing it along still require a display.
@@ -117,7 +123,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     for( Node call : _uses ) {
       if( call instanceof CallNode ) {
         if( call._defs.find(e->e==this) < call._defs._len-1 )
-          return true;          // Call-use other than the last position is using the display
+          return true;          // Call-use other than the last position is using the display portion of this FPTR
       } else {
         return true;            // Anything other than a Call is using the display
       }
@@ -144,35 +150,12 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     return def==ret() ? TypeMem.ANYMEM : (_live==TypeMem.LNO_DISP ? TypeMem.DEAD : TypeMem.ESCAPE);
   }
 
-  //@Override public TV2 new_tvar(String alloc_site) {
-  //  return TV2.make("Fun",this,alloc_site);
-  //}
-  //
-  //@Override public boolean unify( boolean test ) {
-  //  // Build a HM tvar (args->ret), same as HM.java Lambda does.
-  //  // FunNodes are just argument collections (no return).
-  //  RetNode ret = ret();
-  //  FunNode fun = xfun();
-  //  if( fun==null ) return false;
-  //  TV2 tret = ret.tvar();
-  //  if( tret.is_dead() ) return false;
-  //  assert tret.isa("Ret"); // Ret is always a Ret
-  //
-  //  // Check for progress before allocation
-  //  TV2 tvar = tvar();
-  //  if( tvar.is_dead() ) return false;
-  //  assert tvar.isa("Fun"); // Self is always a Fun
-  //  TV2 tvar_args = tvar.get("Args");
-  //  TV2 tvar_ret  = tvar.get("Ret" );
-  //  Node[] parms = fun.parms();
-  //  parms[0] = fun;
-  //  if( tvar_args!=null && tvar_args.eq(parms) && tvar_ret==tret ) return false; // Equal parts
-  //  // Build function arguments; "fun" itself is just control.
-  //  TV2 targ = TV2.make("Args",fun,"FunPtr_unify_Args",parms);
-  //  NonBlockingHashMap<Comparable,TV2> args = new NonBlockingHashMap<Comparable,TV2>(){{ put("Args",targ);  put("Ret",tret); }};
-  //  TV2 tfun = TV2.make("Fun",this,"FunPtr_unify_Fun",args);
-  //  return tvar.unify(tfun,test);
-  //}
+  @Override public boolean unify( Work work ) {
+    if( tvar().is_fun() ) return false;
+    RetNode ret = ret();
+    FunNode fun = ret.fun();
+    return tvar().unify(TV2.make_fun(ret,TypeFunPtr.make(fun._fidx,fun._sig.nargs(),TypeMemPtr.NO_DISP),fun._sig,"FunPtr_unify"),work);
+  }
 
   // Filter out all the wrong-arg-count functions from Parser.
   @Override public FunPtrNode filter( int nargs ) {
