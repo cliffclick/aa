@@ -375,6 +375,7 @@ public class TV2 {
     if( this==that ) return true;
     if( _type != that._type ) return false; // Base types, if present, must match
     if( !Util.eq(_name,that._name) ) return false; // Mismatched tvar names
+    if( is_leaf() && that.is_leaf() ) return false; // Mismatched leafs
     if( _args==that._args ) return true; // Same arrays (generally both null)
     if( _args.size() != that._args.size() ) return false;
 

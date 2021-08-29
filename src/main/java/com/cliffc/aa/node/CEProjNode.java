@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
 
 // Call-graph *edges*.  Always unique (so no hash-consing).  Individually
 // turned on or off according to which functions reach a Call or Scope.
@@ -70,4 +71,6 @@ public class CEProjNode extends CProjNode {
     //}
     return true;
   }
+
+  @Override public TV2 new_tvar( String alloc_site) { return null; }
 }

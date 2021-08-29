@@ -9,8 +9,9 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.function.Function;
+import java.util.function.Supplier;
 
-import static com.cliffc.aa.AA.ARG_IDX;
+import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
 import static org.junit.Assert.*;
 
@@ -19,11 +20,6 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    //test("{ g -> (g,3)}",
-    //     TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP),
-    //     TypeFunSig.make(TypeStruct.make(TypeFld.make("^",Type.ALL,DSP_IDX),TypeFld.make("g",Type.SCALAR,ARG_IDX)),
-    //                     TypeTuple.make_ret(TypeMemPtr.OOP)),
-    //     "[43]{ A -> ( A, 3) }");
 
 
     // failing
@@ -756,17 +752,26 @@ public class TestParse {
   @Ignore
   @Test public void testParse15() {
     test("-1", TypeInt.con( -1), null, "-1");
-    test("(1,2)", TypeMemPtr.make(BitsAlias.make0(13),TypeStruct.tupsD(TypeInt.con(1),TypeInt.con(2))), null, "([13] 1,2)");
+    test("(1,2)", TypeMemPtr.make(BitsAlias.make0(13),TypeStruct.tupsD(TypeInt.con(1),TypeInt.con(2))), null, "[13]( 1,2)");
     test("@{ n=0; v=1.2 }",
          TypeMemPtr.make(BitsAlias.make0(13),
                          TypeStruct.make2fldsD("n",Type.XNIL,"v",TypeFlt.con(1.2))),
          null,
-         "@{[13] n = 0, v = 1.2}");
+         "[13]@{ n = 0, v = 1.2}");
     test("{&}",
          TypeFunPtr.make(BitsFun.make0(35),5, TypeMemPtr.NO_DISP),
-         TypeFunSig.make(TypeStruct.make2flds("x",TypeInt.INT64,"y",TypeInt.INT64),
-                         TypeTuple.make_ret(TypeInt.INT64)),
+         (() -> TypeFunSig.make(TypeStruct.make2flds("x",TypeInt.INT64,"y",TypeInt.INT64),
+                                TypeTuple.make_ret(TypeInt.INT64))),
          "[35]{ int64 int64 -> int64 }");
+    test("{ g -> (g,3)}",
+      TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP),
+      ( () -> TypeFunSig.make(TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
+          TypeFld.make("^",Type.ALL,DSP_IDX),
+          TypeFld.make("g",Type.SCALAR,ARG_IDX)),
+        TypeTuple.make(Type.CTRL,
+          TypeMem.make(14,TypeStruct.make2fldsD("0",Type.SCALAR,"1",TypeInt.con(3))),
+          TypeMemPtr.make(14,TypeObj.ISUSED)))),
+      "[43]{ A -> [14]( A, 3) }");
 
 
 
@@ -884,19 +889,34 @@ HashTable = {@{
       assertEquals(expected,te._t);
     }
   }
-  static private void test( String program, Type expected, TypeFunSig expected_sig, String hm_expect ) {
+  static private void test( String program, Type expect, Supplier<TypeFunSig> expect_sig_maker, String hm_expect ) {
     try( TypeEnv te = run(program) ) {
       Type actual_flow = te._tmem.sharptr(te._t);
       TV2 actual_hm = te._hmt;
       String actual_str = actual_hm.p();
-      assertEquals(expected,actual_flow);
-      if( expected instanceof TypeFunPtr ) {
-        TypeFunPtr fptr = (TypeFunPtr)expected;
+      assertEquals(expect,actual_flow);
+      if( expect instanceof TypeFunPtr ) {
+        TypeFunPtr fptr = (TypeFunPtr)expect;
         FunNode fun = FunNode.find_fidx(fptr.fidx());
         TypeFunSig actual_sig = fun._sig;
-        assertEquals(expected_sig,actual_sig);
+        TypeFunSig expect_sig = expect_sig_maker.get();
+        assertEquals(expect_sig._formals,actual_sig._formals);
+        // Do not exactly match returning memory (gets weird without HM).
+        TypeMem emem = (TypeMem)expect_sig._ret.at(MEM_IDX);
+        TypeMem amem = (TypeMem)actual_sig._ret.at(MEM_IDX);
+        Type erez = expect_sig._ret.at(REZ_IDX);
+        Type arez = actual_sig._ret.at(REZ_IDX);
+        assertEquals(erez,arez);
+        assertTrue(emem.isa(amem));
+        // Check that loading from pointers match
+        if( erez instanceof TypeMemPtr ) {
+          Type eld = emem.ld((TypeMemPtr)erez);
+          Type ald = amem.ld((TypeMemPtr)erez);
+          assertEquals(eld,ald);
+        }
+
       } else
-        assert expected_sig==null;
+        assert expect_sig_maker==null;
       if( Combo.DO_HM )
         assertEquals(stripIndent(hm_expect),stripIndent(actual_str));
     }

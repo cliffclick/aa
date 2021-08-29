@@ -1149,7 +1149,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   @Override public TypeObj flatten_fields() {
     TypeStruct ts = malloc(_name,_any,_open);
     for( TypeFld fld : flds() )
-      ts.add_fld(fld.make_from(fld._t.oob(Type.SCALAR),Access.bot()));
+      ts.add_fld(fld.make_from(fld._t.above_center() && fld._t!=Type.XNIL ? Type.XSCALAR : Type.SCALAR,Access.bot()));
     return ts.hashcons_free();
   }
 

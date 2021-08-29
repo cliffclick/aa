@@ -9,12 +9,12 @@ import java.util.HashMap;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 /**
-   Memory type; the state of all of memory; memory edges order memory ops.
+   Memory type; the state of all memory; memory edges order memory ops.
    Produced at the program start, consumed by all function calls, consumed be
-   Loads, consumed and produced by Stores.  Can be broken out in the "equiv-
-   alence class" (Alias#) model of memory over a bulk memory to allow more fine
-   grained knowledge.  Memory is accessed via Alias#s, where all TypeObjs in an
-   Alias class are Meet together as an approximation.
+   Loads, consumed and produced by Stores.  Can be broken out in the
+   "equivalence class" (Alias#) model of memory over a bulk memory to allow
+   more fine-grained knowledge.  Memory is accessed via Alias#s, where all
+   TypeObjs in an Alias class are Meet together as an approximation.
 
    Conceptually, each alias# represents an infinite set of pointers - broken
    into equivalence classes.  We can split such a class in half - some pointers
