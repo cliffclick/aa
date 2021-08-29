@@ -20,13 +20,6 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-
-
-    // failing
-    //test("{ g -> f = { ignore -> g }; ( f(3), f(\"abc\"))}",
-    //     TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP),
-    //     null,                  // TODO: Needs sig
-    //     "{ A -> ( A, A) }");
     //
     //test("sum={x -> x ? sum(x.n) + x.v : 0};"+
     //    "sum(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
@@ -534,7 +527,7 @@ public class TestParse {
              "     ? @{ll=map(tree.l);rr=map(tree.r);vv=tree.v&tree.v}"+
              "     : 0};"+
              "map(tmp)",
-             "@{ll=*$?; rr=$; vv=int8}");
+             "@{ll=*@{ll=*@{ll=0; rr=0; vv=3}; rr=*@{ll=*@{$; rr=$; vv=int8}?; $; vv=7}; vv=5}; rr=*@{$; rr=*@{$; $; vv=22}; vv=20}; vv=12}");
 
 
     // Failed attempt at a Tree-structure inference test.  Triggered all sorts
@@ -551,7 +544,7 @@ public class TestParse {
          "     ? @{ll=map(tree.l);vv=tree.v}"+
          "     : 0};"+
          "map(tmp)",
-            "Cannot re-assign final field '.l' in @{l=*use; v:=0}",36);
+            "Cannot re-assign final field '.l' in @{l=*~use; v:=0}",36);
 
     // Good tree-structure inference test
     test_ptr("tmp=@{"+
@@ -571,7 +564,7 @@ public class TestParse {
          "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
-         "@{l=*$?; r=$; v=int64}");
+         "@{l=*@{l=*@{l=0; r=0; v=6}; r=*@{l=*@{$; r=$; v=30}?; $; v=14}; v=10}; r=*@{$; r=*@{$; $; v=44}; v=40}; v=24}");
 
     // A linked-list mixing ints and strings, always in pairs
     String ll_cona = "a=0; ";
@@ -751,27 +744,40 @@ public class TestParse {
   // Combined H-M and GCP Typing
   @Ignore
   @Test public void testParse15() {
-    test("-1", TypeInt.con( -1), null, "-1");
-    test("(1,2)", TypeMemPtr.make(BitsAlias.make0(13),TypeStruct.tupsD(TypeInt.con(1),TypeInt.con(2))), null, "[13]( 1,2)");
+    test("-1", (()->TypeInt.con(-1)), null, "-1");
+    test("(1,2)", (() -> TypeMemPtr.make(BitsAlias.make0(13),TypeStruct.tupsD(TypeInt.con(1),TypeInt.con(2)))), null, "[13]( 1,2)");
+
     test("@{ n=0; v=1.2 }",
-         TypeMemPtr.make(BitsAlias.make0(13),
-                         TypeStruct.make2fldsD("n",Type.XNIL,"v",TypeFlt.con(1.2))),
+         (() -> TypeMemPtr.make(BitsAlias.make0(13),
+                                TypeStruct.make2fldsD("n",Type.XNIL,"v",TypeFlt.con(1.2)))),
          null,
          "[13]@{ n = 0, v = 1.2}");
+
     test("{&}",
-         TypeFunPtr.make(BitsFun.make0(35),5, TypeMemPtr.NO_DISP),
+         (() -> TypeFunPtr.make(BitsFun.make0(35),5, TypeMemPtr.NO_DISP)),
          (() -> TypeFunSig.make(TypeStruct.make2flds("x",TypeInt.INT64,"y",TypeInt.INT64),
                                 TypeTuple.make_ret(TypeInt.INT64))),
          "[35]{ int64 int64 -> int64 }");
+
     test("{ g -> (g,3)}",
-      TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP),
-      ( () -> TypeFunSig.make(TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
-          TypeFld.make("^",Type.ALL,DSP_IDX),
-          TypeFld.make("g",Type.SCALAR,ARG_IDX)),
-        TypeTuple.make(Type.CTRL,
-          TypeMem.make(14,TypeStruct.make2fldsD("0",Type.SCALAR,"1",TypeInt.con(3))),
-          TypeMemPtr.make(14,TypeObj.ISUSED)))),
-      "[43]{ A -> [14]( A, 3) }");
+         (() -> TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP)),
+         ( () -> TypeFunSig.make(TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
+                                                 TypeFld.make("^",Type.ALL,DSP_IDX),
+                                                 TypeFld.make("g",Type.SCALAR,ARG_IDX)),
+                                 TypeTuple.make(Type.CTRL,
+                                                TypeMem.make(14,TypeStruct.make2fldsD("0",Type.SCALAR,"1",TypeInt.con(3))),
+                                                TypeMemPtr.make(14,TypeObj.ISUSED)))),
+         "[43]{ A -> [14]( A, 3) }");
+
+    test("{ g -> f = { ignore -> g }; ( f(3), f(\"abc\"))}",
+         (() -> TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.make(12,TypeObj.ISUSED))),
+         ( () -> TypeFunSig.make(TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
+                                                 TypeFld.make("^",TypeMemPtr.make(12,TypeObj.ISUSED),DSP_IDX),
+                                                 TypeFld.make("g",Type.SCALAR,ARG_IDX)),
+                                 TypeTuple.make(Type.CTRL,
+                                                TypeMem.make(18,TypeStruct.make2fldsD("0",Type.SCALAR,"1",Type.SCALAR)),
+                                                TypeMemPtr.make(18,TypeObj.ISUSED)))),
+         "[43]{ A -> [18]( A, A) }");
 
 
 
@@ -889,11 +895,12 @@ HashTable = {@{
       assertEquals(expected,te._t);
     }
   }
-  static private void test( String program, Type expect, Supplier<TypeFunSig> expect_sig_maker, String hm_expect ) {
+  static private void test( String program, Supplier<Type> expect_maker, Supplier<TypeFunSig> expect_sig_maker, String hm_expect ) {
     try( TypeEnv te = run(program) ) {
       Type actual_flow = te._tmem.sharptr(te._t);
       TV2 actual_hm = te._hmt;
       String actual_str = actual_hm.p();
+      Type expect = expect_maker.get();
       assertEquals(expect,actual_flow);
       if( expect instanceof TypeFunPtr ) {
         TypeFunPtr fptr = (TypeFunPtr)expect;

@@ -110,7 +110,7 @@ public class Parse implements Comparable<Parse> {
     _e.close_display(_gvn);          // No more fields added to the top parse scope
     Env.GVN.add_flow_uses(_e._scope);// Post-parse, revisit top-level called functions
     _gvn.iter(GVNGCM.Mode.PesiNoCG); // Pessimistic optimizations; might improve error situation
-    Env.DEFMEM.unkeep();             // Memory not forced alive
+    Env.DEFMEM.unkeep(2);            // Memory not forced alive
     Combo.opto();                    // Global Constant Propagation and Hindley-Milner Typing
     _gvn.iter(GVNGCM.Mode.PesiCG);   // Re-check all ideal calls now that types have been maximally lifted
     Combo.opto();                    // Global Constant Propagation and Hindley-Milner Typing

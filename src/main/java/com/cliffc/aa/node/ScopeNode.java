@@ -9,7 +9,7 @@ import com.cliffc.aa.util.Ary;
 import java.util.HashMap;
 import java.util.function.Predicate;
 
-import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 // Lexical-Scope Node.  Tracks control & phat memory, plus a stack frame (which
@@ -155,24 +155,30 @@ public class ScopeNode extends Node {
     Type tmem = mem._val;
     Type trez = rez._val;
     if( !(tmem instanceof TypeMem ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
-    if( TypeMemPtr.OOP.isa(trez) ) return ((TypeMem)tmem).flatten_fields(); // All possible pointers, so all memory is alive
+    TypeMem tmem0 = (TypeMem)tmem;
+    if( TypeMemPtr.OOP.isa(trez) ) return tmem0.flatten_fields(); // All possible pointers, so all memory is alive
     // For function pointers, all memory returnable from any function is live.
-    if( trez instanceof TypeFunPtr ) {
+    if( trez instanceof TypeFunPtr && scope != null ) {
       BitsFun fidxs = ((TypeFunPtr)trez)._fidxs;
-      TypeMem tmem2 = TypeMem.ANYMEM;
+      Type disp = ((TypeFunPtr)trez)._disp;
+      BitsAlias esc_in = disp instanceof TypeMemPtr ? ((TypeMemPtr)disp)._aliases : BitsAlias.EMPTY;
+      TypeMem tmem3 = TypeMem.ANYMEM;
       for( int i=RET_IDX; i<scope._defs._len; i++ ) {
         RetNode ret = (RetNode)scope.in(i);
         int fidx = ret.fidx();
         if( ret._val instanceof TypeTuple && fidxs.test(fidx) ) {
-          tmem2 = (TypeMem)tmem2.meet(((TypeTuple)ret._val).at(1));
+          TypeTuple tret = (TypeTuple)ret._val;
+          TypeMem post_call = (TypeMem)tret.at(MEM_IDX);
+          Type trez2 = tret.at(REZ_IDX);
+          TypeMem cepi_out = CallEpiNode.live_out(tmem0, post_call, trez2, esc_in, null);
+          tmem3 = (TypeMem)tmem3.meet(cepi_out);
         }
       }
-      return tmem2.flatten_fields();
+      return tmem3.flatten_fields();
     }
     if( !(trez instanceof TypeMemPtr) ) return TypeMem.ANYMEM; // Not a pointer, basic live only
     if( trez.above_center() ) return TypeMem.ANYMEM; // Have infinite choices still, report basic live only
     // Find everything reachable from the pointer and memory, and report it all
-    TypeMem tmem0 = (TypeMem)tmem;
     BitsAlias aliases = tmem0.all_reaching_aliases(((TypeMemPtr)trez)._aliases);
     return tmem0.slice_reaching_aliases(aliases).flatten_fields();
   }

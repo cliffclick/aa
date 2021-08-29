@@ -35,6 +35,7 @@ public class UQNodes extends NonBlockingHashMapLong<Node> {
   // Add a node to a unique-set: copy, insert key, re-hash/intern.
   public UQNodes add( Node tn ) {
     assert KEY.isEmpty();
+    if( tn==null ) return this;
     assert !tn.is_dead();
     if( get(tn._uid)!=null ) return this; // Already in there
     // Fold them together

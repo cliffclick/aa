@@ -342,23 +342,8 @@ public final class CallEpiNode extends Node {
 
     // Approximate "live out of call", includes things that are alive before
     // the call but not flowing in.  Catches all the "new in call" returns.
-    BitsAlias esc_out = esc_out(post_call,trez);
     TypeMem caller_mem = premem instanceof TypeMem ? (TypeMem)premem : premem.oob(TypeMem.ALLMEM);
-    int len = opt_mode._CG ? Math.max(caller_mem.len(),post_call.len()) : defmem.len();
-    TypeObj[] pubs = new TypeObj[len];
-    for( int i=1; i<pubs.length; i++ ) {
-      boolean ein  = tescs._aliases.test_recur(i);
-      boolean eout = esc_out       .test_recur(i);
-      TypeObj pre = caller_mem.at(i);
-      TypeObj obj = ein || eout ? (TypeObj)(pre.meet(post_call.at(i))) : pre;
-      // Before GCP, must use DefMem to keeps types strong as the Parser
-      // During GCP, can lift default actual memories.
-      if( !opt_mode._CG )       // Before GCP, must use DefMem to keeps types strong as the Parser
-        obj = (TypeObj)obj.join(defmem.at(i));
-      pubs[i] = obj;
-    }
-    TypeMem tmem3 = TypeMem.make0(pubs);
-
+    TypeMem tmem3 = live_out(caller_mem,post_call,trez,tescs._aliases,opt_mode._CG ? null : defmem);
     return TypeTuple.make(Type.CTRL,tmem3,trez);
   }
 
@@ -370,6 +355,29 @@ public final class CallEpiNode extends Node {
     return TypeMemPtr.OOP0.dual().isa(trez) ? BitsAlias.NZERO : BitsAlias.EMPTY;
   }
 
+  // Approximate "live out of call", includes things that are alive before
+  // the call but not flowing in.  Catches all the "new in call" returns.
+  static TypeMem live_out(TypeMem caller_mem, TypeMem post_call, Type trez, BitsAlias esc_in, TypeMem defmem) {
+    BitsAlias esc_out = esc_out(post_call,trez);
+    int len = defmem==null ? Math.max(caller_mem.len(),post_call.len()) : defmem.len();
+    TypeObj[] pubs = new TypeObj[len];
+    // TODO: Wildly inefficient
+    for( int i=1; i<pubs.length; i++ ) {
+      boolean ein  = esc_in .test_recur(i);
+      boolean eout = esc_out.test_recur(i);
+      TypeObj pre = caller_mem.at(i);
+      TypeObj obj = ein || eout ? (TypeObj)(pre.meet(post_call.at(i))) : pre;
+      // Before GCP, must use DefMem to keeps types strong as the Parser
+      // During GCP, can lift default actual memories.
+      if( defmem!=null ) // Before GCP, must use DefMem to keeps types strong as the Parser
+        obj = (TypeObj)obj.join(defmem.at(i));
+      pubs[i] = obj;
+    }
+    TypeMem tmem3 = TypeMem.make0(pubs);
+    return tmem3;
+  }
+
+  
   @Override public void add_work_use_extra(Work work, Node chg) {
     if( chg instanceof CallNode ) {    // If the Call changes value
       work.add(chg.in(MEM_IDX));       // The called memory   changes liveness

@@ -130,6 +130,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     return null;
   }
   @Override public void add_work_extra(Work work,Type old) {
+    super.add_work_extra(work,old);
     Env.GVN.add_mono(this); // Can update crushed
   }
 

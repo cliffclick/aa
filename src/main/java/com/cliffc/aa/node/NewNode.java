@@ -76,14 +76,18 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       Env.GVN.add_reduce(chg);
   }
   // Reducing a NewNode to 'any' changes DEFMEM
-  @Override public void add_reduce_extra() {
-    Env.GVN.add_flow(Env.DEFMEM);
-  }
+  @Override public void add_reduce_extra() {  Env.GVN.add_flow(Env.DEFMEM);  }
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
     return TypeTuple.make(Type.CTRL, is_unused() ? TypeObj.UNUSED : valueobj(),_tptr);   // Complex obj, simple ptr.
   }
   abstract TypeObj valueobj();
+
+  // Flow typing a NewNode to 'any' changes DEFMEM
+  @Override public void add_work_extra(Work work, Type oval) {
+    if( _val==Type.ANY || _live==TypeMem.DEAD )  work.add(Env.DEFMEM);
+  }
+
 
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 

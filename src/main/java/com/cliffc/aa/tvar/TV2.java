@@ -157,7 +157,7 @@ public class TV2 {
     args.put(" ret",ret.rez().tvar()); // Return from the return result tvar
     Node[] parms = ret.fun().parms();
     for( int i=ARG_IDX; i<parms.length; i++ ) {
-      args.put(""+i,parms[i].tvar()); // Each argument from the parms directly
+      args.put(""+i,parms[i]==null ? TV2.make_leaf(ret.fun(),"alloc_site") : parms[i].tvar()); // Each argument from the parms directly
       ns = ns.add(parms[i]);
     }
     return new TV2("->",args,fptr,ns,alloc_site);

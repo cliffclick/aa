@@ -35,11 +35,6 @@ public class DefMemNode extends Node {
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==in(0) ) return TypeMem.ALIVE;  // Control
-    if( opt_mode._CG && def instanceof MrgProjNode ) {
-      NewNode nnn = ((MrgProjNode)def).nnn();
-      // All above-center fields are not-live, below-center are full alive.
-      return TypeMem.make(nnn._alias,nnn._ts.flatten_fields());
-    }
     return _live;
   }
 

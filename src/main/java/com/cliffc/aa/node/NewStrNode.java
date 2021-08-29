@@ -86,7 +86,8 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       TypeObj s1 = sp1==Type.XNIL ? TypeObj.UNUSED : mem.ld((TypeMemPtr)sp1);
       if( sp0==Type.XNIL ) return _value(s1);
       if( sp1==Type.XNIL ) return _value(s0);
-      if( !(s0 instanceof TypeStr) || !(s1 instanceof TypeStr) ) return _value(TypeStr.STR);
+      if( !(s0 instanceof TypeStr) || !(s1 instanceof TypeStr) )
+        return _value(s0.above_center() && s1.above_center() ? TypeStr.XSTR : TypeStr.STR);
       TypeStr str0 = (TypeStr)s0;
       TypeStr str1 = (TypeStr)s1;
       if( !str0.is_con() || !str1.is_con() ) return _value(TypeStr.STR);
