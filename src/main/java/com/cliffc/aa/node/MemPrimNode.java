@@ -97,6 +97,9 @@ public abstract class MemPrimNode extends PrimNode {
       TypeAry ary = (TypeAry)ptr._obj;
       return ary._size;
     }
+    @Override public void add_work_use_extra(Work work, Node chg) {
+      if( chg==mem() ) work.add(adr());  // Memory value lifts to an alias, address is more alive
+    }
     // Similar to LoadNode, of a field named '#'
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
       TypeMem live = _live_use(def);

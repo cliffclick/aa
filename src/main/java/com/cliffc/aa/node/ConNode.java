@@ -16,7 +16,8 @@ public class ConNode<T extends Type> extends Node {
     super(OP_CON,Env.START);
     _t=t;
     _live = all_live();
-    if( t==Type.CTRL || t==Type.XCTRL ) { _tvar.free(); _tvar=null; }
+    if( t==Type.CTRL || t==Type.XCTRL || t instanceof TypeRPC )
+      { _tvar.free(); _tvar=null; }
   }
   // Allows ANY type with a normal unification, used for uninitialized variables
   // (as opposed to dead ones).

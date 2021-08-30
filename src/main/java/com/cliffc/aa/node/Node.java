@@ -471,7 +471,7 @@ public abstract class Node implements Cloneable {
   public Type val(int idx) { return in(idx)._val; }
 
   // Compute the current best liveness for this Node, based on the liveness of
-  // its uses.  If basic_liveness(), returns a simple DEAD/ALIVE.  Otherwise
+  // its uses.  If basic_liveness(), returns a simple DEAD/ALIVE.  Otherwise,
   // computes the alive memory set down to the field level.  May return
   // TypeMem.FULL, especially if its uses are of unwired functions.
   // It must be monotonic.
@@ -492,12 +492,22 @@ public abstract class Node implements Cloneable {
   public boolean live_uses() {
     return _live != TypeMem.DEAD &&    // Only live uses make more live
       (!_live.basic_live() ||   // Complex alive always counts
-       !_val.may_be_con() ||    // Use might be replaced with a constant (and not have this input)
-       _val instanceof TypeFunPtr || // Always compute funptrs, as constants they keep function bodies alive
+       !may_be_con_live(_val) ||// Use might be replaced with a constant (and not have this input)
        is_prim() ||             // Always live prims
        err(true)!=null ||       // Always live errors
        // FunPtrs still use their Rets, even if constant
        (this instanceof FunPtrNode));
+  }
+
+  // True if 't' may_be_con AND is not a TypeFunPtr.  If a Node computes a
+  // constant, it can be replaced with a constant Node and all inputs go dead
+  // and the corresponding ConNode gets flagged live.  However, this messes
+  // with Nodes computing a constant TypeFunPtr, since it allows the entire
+  // function to go dead.  Easy fix: disallow for TypeFunPtr.  Hard (better)
+  // fix: make the corresponding FunPtrNode go alive.
+  static boolean may_be_con_live(Type t) {
+    return t.may_be_con() &&      // Use might be replaced with a constant (and not have this input)
+      !(t instanceof TypeFunPtr); // Always compute funptrs, as constants they keep function bodies alive
   }
 
   // Shortcut to update self-live
@@ -550,9 +560,8 @@ public abstract class Node implements Cloneable {
     if( this instanceof CallEpiNode ) ((CallEpiNode)this).check_and_wire(work);
     // All liveness is skipped if may_be_con, since the possible constant
     // has no inputs.
-    assert oval.may_be_con() || !nval.may_be_con(); // May_be_con is monotonic
-    if( !(!oval.may_be_con() || oval instanceof TypeFunPtr) &&
-         (!nval.may_be_con() || nval instanceof TypeFunPtr) )
+    assert may_be_con_live(oval) || !may_be_con_live(oval); // May_be_con_live is monotonic
+    if( may_be_con_live(oval) && !may_be_con_live(nval) )
       for( Node def : _defs ) work.add(def); // Now check liveness
   }
 
@@ -678,7 +687,7 @@ public abstract class Node implements Cloneable {
       assert nval.isa(oval);    // Monotonically improving
       _val = nval;
       // If becoming a constant, check for replacing with a ConNode
-      if( !oval.may_be_con() && nval.may_be_con() ) {
+      if( !may_be_con_live(oval) && may_be_con_live(nval) ) {
         Env.GVN.add_reduce(this);
         Env.GVN.add_flow_defs(this); // Since a constant, inputs are no longer live
       }
@@ -819,7 +828,7 @@ public abstract class Node implements Cloneable {
           ? nval.isa(oval) && nliv.isa(oliv)
           : oval.isa(nval) && oliv.isa(nliv);
         FLOW_VISIT.clear(_uid); // Pop-frame & re-run in debugger
-        System.err.println(!ok ? "Monotonicity bug" : "Progress bug");
+        System.err.println(ok ? "Progress bug" : "Monotonicity bug");
         System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
         errs++;
       }

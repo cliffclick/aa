@@ -620,7 +620,7 @@ public class CallNode extends Node {
     BitsFun fidxs = tfp.fidxs();
     if( fidxs.above_center() ) return TypeMem.DEAD; // Nothing above-center is chosen
     if( dfidx != -1 && !fidxs.test_recur(dfidx) ) return TypeMem.DEAD; // Not in the fidx set.
-    if( tfp.is_con() && !(fdx() instanceof FunPtrNode) )
+    if( may_be_con_live(tfp) )
       return TypeMem.DEAD; // Will be replaced by a constant
     // Otherwise the FIDX is alive
     return TypeMem.LNO_DISP;
@@ -695,10 +695,7 @@ public class CallNode extends Node {
     return null;
   }
 
-  // Gather incoming args.  NOT an application point (yet), that is a CallEpi.
-  @Override public TV2 new_tvar( String alloc_site) { return TV2.make("Call",this,alloc_site,parms()); }
-
-  @Override public boolean unify( Work work ) { assert tvar().isa("Call"); return false; }
+  @Override public TV2 new_tvar( String alloc_site) { return null; }
 
   // Resolve a call, removing ambiguity during the GCP/Combo pass.
   @Override public boolean remove_ambi() {

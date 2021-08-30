@@ -2,10 +2,9 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeTuple;
+import static com.cliffc.aa.AA.unimpl;
 
 // Proj data
 public class ProjNode extends Node {
@@ -44,9 +43,12 @@ public class ProjNode extends Node {
   @Override public boolean unify( Work work ) {
     TV2 tv = tvar();
     if( in(0) instanceof NewNode ) // TODO: Not really a proper use of Proj
-      return tv.unify(in(0).tvar(),work);
-    TV2 tv0 = tvar(0);          // Input should be a TVar with parts
-    return tv0.unify_at(_idx,tv,work);
+      return tv.unify(tvar(0),work);
+    if( in(0) instanceof CallEpiNode ) // Only DProj#2 and its the return value
+      return tv.unify(tvar(0),work);
+    if( in(0) instanceof CallNode )
+      return tv.unify(in(0).tvar(_idx),work); // Unify with Call arguments
+    throw unimpl();
   }
 
   public static ProjNode proj( Node head, int idx ) {

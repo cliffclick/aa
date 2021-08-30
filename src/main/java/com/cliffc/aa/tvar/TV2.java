@@ -8,8 +8,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
-import static com.cliffc.aa.AA.unimpl;
-import static com.cliffc.aa.AA.ARG_IDX;
+import static com.cliffc.aa.AA.*;
 
 // Type Variable.  TVars unify (ala Tarjan Union-Find), and can have structure
 // (such as "{ A -> B }").  TVars are tied to a TNode to enforce Type structure
@@ -125,6 +124,7 @@ public class TV2 {
   }
 
   public Set<String> args() { return _args.keySet(); }
+  public int len() { return _args==null ? 0 : _args.size(); }
 
   // --------------------------------------------
   // Public factories
@@ -156,12 +156,16 @@ public class TV2 {
     UQNodes ns = UQNodes.make(ret.rez());
     args.put(" ret",ret.rez().tvar()); // Return from the return result tvar
     Node[] parms = ret.fun().parms();
-    for( int i=ARG_IDX; i<parms.length; i++ ) {
+    for( int i=DSP_IDX; i<parms.length; i++ ) {
       args.put(""+i,parms[i]==null ? TV2.make_leaf(ret.fun(),"alloc_site") : parms[i].tvar()); // Each argument from the parms directly
       ns = ns.add(parms[i]);
     }
     return new TV2("->",args,fptr,ns,alloc_site);
   }
+  public static TV2 make_fun(Node n, Type fptr, NonBlockingHashMap<String,TV2> args, @NotNull String alloc_site) {
+    return new TV2("->",args,fptr,UQNodes.make(n),alloc_site);
+  }
+
   // Make a new primitive base TV2
   public static TV2 make_err(Node n, String msg, @NotNull String alloc_site) {
     UQNodes ns = n==null ? null : UQNodes.make(n);
@@ -455,6 +459,8 @@ public class TV2 {
     if( rez!=null ) return false; // Been there, done that
     DUPS.put(luid,that);          // Close cycles
 
+    if( work==null ) return true; // Here we definitely make progress; bail out early if just testing
+
     // Check for mismatched, cannot unify
     if( !Util.eq(_name,that._name) ) {
       if( work==null ) return true;
@@ -498,7 +504,7 @@ public class TV2 {
   }
   // Delete a field
   private void del_fld( String fld, Work work) {
-    assert is_struct();
+    assert is_struct() || isa("Ary");
     _args.remove(fld);
     work.add(_deps);
   }
@@ -555,7 +561,13 @@ public class TV2 {
       return work==null || vput(that,that.union(_fresh(nongen),work));
 
     // Bases MEET cons in RHS
-    if( is_base() && that.is_base() ) throw unimpl();
+    if( is_base() && that.is_base() ) {
+      Type mt = _type.meet(that._type);
+      if( mt==that._type ) return vput(that,false);
+      if( work == null ) return true;
+      that._type = mt;
+      return vput(that,true);
+    }
 
     // Special handling for nilable
     if( this.is_nilable() && !that.is_nilable() ) {
@@ -891,7 +903,7 @@ public class TV2 {
         ((TypeFunPtr)_type)._disp.str(sb.p("^="),visit,null,debug);
       sb.p(' ');
       for( String fld : sorted_flds() )
-        if( !Util.eq(" ret",fld) )
+        if( !Util.eq(" ret",fld) && Integer.parseInt(fld)!=DSP_IDX )
           str0(sb,visit,_args.get(fld),dups,debug).p(' ');
       return str0(sb.p("-> "),visit,_args.get(" ret"),dups,debug).p(" }");
     }
@@ -908,7 +920,7 @@ public class TV2 {
       sb.p(is_tup ? "(" : "@{");
       if( _args==null ) sb.p("_ ");
       else {
-        // Print a display first, and skip if NO_DSP
+        // Print a display first, and skip if NO_DSP or not debug
         TV2 dsp = _args.get("^");
         if( dsp!=null && dsp._type!=TypeMemPtr.NO_DISP )
           dsp._type.str(sb.p("^ = "),visit,null,debug);

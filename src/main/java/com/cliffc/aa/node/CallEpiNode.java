@@ -2,8 +2,9 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.NonBlockingHashMap;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.Env.GVN;
@@ -344,6 +345,11 @@ public final class CallEpiNode extends Node {
     // the call but not flowing in.  Catches all the "new in call" returns.
     TypeMem caller_mem = premem instanceof TypeMem ? (TypeMem)premem : premem.oob(TypeMem.ALLMEM);
     TypeMem tmem3 = live_out(caller_mem,post_call,trez,tescs._aliases,opt_mode._CG ? null : defmem);
+
+    // Can we lift for H-M types?
+    //if( DO_HM )
+    //  throw unimpl();
+
     return TypeTuple.make(Type.CTRL,tmem3,trez);
   }
 
@@ -377,7 +383,7 @@ public final class CallEpiNode extends Node {
     return tmem3;
   }
 
-  
+
   @Override public void add_work_use_extra(Work work, Node chg) {
     if( chg instanceof CallNode ) {    // If the Call changes value
       work.add(chg.in(MEM_IDX));       // The called memory   changes liveness
@@ -466,51 +472,46 @@ public final class CallEpiNode extends Node {
     return _live;
   }
 
-  @Override public TV2 new_tvar(String alloc_site) {
+  @Override public boolean unify( Work work ) {
     assert !_is_copy;
-    // return _is_copy ? TV2.make_leaf(this,alloc_site)
-    return TV2.make("CallEpi",this,alloc_site).push_dep(this);
-  }
+    CallNode call = call();
+    Node fdx = call.fdx();
+    TV2 tfun = fdx.tvar();
+    TV2 tvar = tvar();
+    if( tfun.is_err() )
+      return tvar().unify(tfun,work);
 
-  //@Override public boolean unify( boolean test ) {
-  //  if( _is_copy ) return false; // A copy
-  //  // Build a HM tvar (args->ret), same as HM.java Apply does.
-  //  Node fdx = call().fdx();
-  //  TV2 tfdx = fdx.tvar();
-  //  if( tfdx.is_leaf() ) return false; // Wait?  probably need for force fresh-fun
-  //  if( tfdx.is_dead() ) return false;
-  //  TV2 tcargs = call().tvar();
-  //  TV2 tcret  = tvar();
-  //  if( tcret.is_dead() ) return false;
-  //
-  //  // Thunks are a little odd, because they cheat on graph structure.
-  //  if( tfdx.isa("Ret") ) {     // The fdx._tvar is a Ret not a Fun
-  //    if( tcret == tfdx ) return false;
-  //    boolean progress = tfdx.unify(tcret,test);
-  //    if( progress && !test )
-  //      Env.GVN.add_flow_uses(call()); // Progress, neighbors on list
-  //    return progress;
-  //  }
-  //
-  //  // In an effort to detect possible progress without constructing endless
-  //  // new TV2s, we look for a common no-progress situation by inspecting the
-  //  // first layer in.
-  //  TV2 tfargs = tfdx.get("Args");
-  //  TV2 tfret  = tfdx.get("Ret" );
-  //  if( tfdx.isa("Fun") && tcargs==tfargs && tcret==tfret ) return false; // Equal parts, no progress
-  //
-  //  // Will make progress aligning the shapes
-  //  NonBlockingHashMap<Comparable,TV2> args = new NonBlockingHashMap<Comparable,TV2>(){{ put("Args",tcargs);  put("Ret",tcret); }};
-  //  TV2 tfun = TV2.make("Fun",fdx,"CallEpi_unify_Fun",args);
-  //  boolean progress = tfdx.unify(tfun,test);
-  //  if( progress && !test ) {
-  //    Env.GVN.add_flow_uses(call()); // Progress, neighbors on list
-  //    tcret.find().push_dep(this);
-  //    if( fdx instanceof FreshNode )
-  //      Env.GVN.add_reduce(fdx);
-  //  }
-  //  return progress;
-  //}
+    boolean progress = false;
+    if( !tfun.is_fun() ) {
+      if( work==null ) return true;
+      NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
+      for( int i=DSP_IDX; i<call._defs._len-1; i++ )
+        args.put(""+i,call.tvar(i));
+      args.put(" ret",tvar);
+      progress = tfun.unify(TV2.make_fun(this, fdx._val, args, "CallEpi_unify"), work);
+      tfun = tfun.find();
+    }
+    // TODO: Handle Thunks
+
+    if( tfun.len()-1-1 != call._defs._len-1-ARG_IDX ) //
+      //progress = T2.make_err("Mismatched argument lengths").unify(find(), work);
+      throw unimpl();
+
+    // Check for progress amongst args
+    for( int i=DSP_IDX; i<call._defs._len-1; i++ ) {
+      TV2 actual = call.tvar(i);
+      TV2 formal = tfun.get(""+i);
+      if( actual!=formal ) {
+        progress |= actual.unify(formal,work);
+        if( progress && work==null ) return true; // Early exit
+        if( tfun.is_unified() || tfun.is_err() ) throw unimpl();
+      }
+    }
+    // Check for progress on the return
+    progress |= tfun.get(" ret").unify(tvar,work);
+    if( tfun.is_unified() || tfun.is_err() ) throw unimpl();
+    return progress;
+  }
 
   @Override Node is_pure_call() { return in(0) instanceof CallNode ? call().is_pure_call() : null; }
   // Return the set of updatable memory - including everything reachable from
