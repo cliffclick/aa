@@ -157,7 +157,7 @@ public abstract class MemPrimNode extends PrimNode {
 
     // Standard memory unification; the Load unifies with the loaded field.
     @Override public boolean unify( Work work ) {
-      return StoreNode.unify("@{}",this,adr().tvar(),adr()._val,this,"elem",work);
+      return StoreNode.unify("Ary",this,adr().tvar(),adr()._val,this,"elem",work);
     }
 
     @Override public TypeInt apply( Type[] args ) { throw unimpl(); }

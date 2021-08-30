@@ -85,7 +85,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
   // Flow typing a NewNode to 'any' changes DEFMEM
   @Override public void add_work_extra(Work work, Type oval) {
-    if( _val==Type.ANY || _live==TypeMem.DEAD )  work.add(Env.DEFMEM);
+    if( _val==Type.ANY || _live==TypeMem.DEAD || oval==TypeMem.DEAD )  work.add(Env.DEFMEM);
   }
 
 

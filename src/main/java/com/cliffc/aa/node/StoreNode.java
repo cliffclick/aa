@@ -195,7 +195,7 @@ public class StoreNode extends Node {
     if( ptr.is_leaf() ) {
       if( tptr instanceof TypeMemPtr && tptr.must_nil() ) work.add(st); // If nil, will be a nil-access error
       NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<String,TV2>(){{ put(fld,val.tvar()); }};
-      return ptr.unify(TV2.make(name,st,tptr,"Store_update",args),work);
+      return ptr.unify(TV2.make_open_struct(name,st,tptr,"Store_update",args),work);
     }
 
     if( ptr.is_nilable() || (tptr instanceof TypeMemPtr && tptr.must_nil()) )

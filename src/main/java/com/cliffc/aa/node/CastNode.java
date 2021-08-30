@@ -2,19 +2,17 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
-import com.cliffc.aa.tvar.TV2;
-import com.cliffc.aa.util.NonBlockingHashMap;
-
 import org.jetbrains.annotations.NotNull;
 
 import static com.cliffc.aa.AA.unimpl;
 
 // Gain precision after an If-test.
 public class CastNode extends Node {
-  public final Type _t;                // TypeVar???
+  public final Type _t;
   public CastNode( Node ctrl, Node ret, Type t ) {
     super(OP_CAST,ctrl,ret); _t=t;
     Env.GVN._work_dom.add(this);
@@ -70,8 +68,8 @@ public class CastNode extends Node {
 
   // Unifies the input to '(Nil ?:self)'
   @Override public boolean unify( Work work ) {
-    TV2 maynil = tvar(1);
-    TV2 notnil = tvar();
+    TV2 maynil = tvar(1); // arg in HM
+    TV2 notnil = tvar();  // ret in HM
     boolean progress = false;
 
     // Can already be nil-checked and will then unify to self
@@ -91,9 +89,10 @@ public class CastNode extends Node {
       for( String fld : maynil.args() ) {
         TV2 mfld = maynil.get(fld);
         TV2 nfld = notnil.get(fld);
-        if( (nfld!=null && nfld!=mfld) ||
-            (nfld==null && notnil.open()) )
-          { progress = true; break; }
+        if( nfld!=null && nfld!=mfld )
+          { progress = true; break; } // Unequal fields
+        //if( nfld==null && notnil.open() ) // Missing field case, cannot find a test case
+        //  { progress = true; break; }
       }
       // Find any extra fields
       if( !progress && maynil.open() )
@@ -108,10 +107,10 @@ public class CastNode extends Node {
 
     // Can be nilable of nilable; fold the layer
     if( maynil.is_nilable() && notnil.is_nilable() )
-      throw unimpl();
+      throw unimpl(); // return maynil.unify(notnil,work);
 
     // Unify the maynil with a nilable version of notnil
-    return TV2.make_nil(in(1),val(1),notnil,"Cast_unify").find().unify(maynil, work) | progress;
+    return TV2.make_nil(in(1),val(1),notnil,"Cast_unify").push_dep(this).find().unify(maynil, work) | progress;
   }
 
   @Override public @NotNull CastNode copy( boolean copy_edges) {

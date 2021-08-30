@@ -1184,8 +1184,8 @@ public class HM {
           int idx = Util.find(ret._ids,arg._ids[i]);
           if( idx != -1 && arg.args(i)!=ret.args(idx) )
             { progress=true; break; } // Field/HMtypes misalign
-          if( idx == -1 && ret._open )
-            { progress=true; break; }
+          //if( idx == -1 && ret._open ) // Missing field to add, cannot find a test case
+          //  { progress=true; break; }
         }
         if( !progress && arg._open )
           for( int i=0; i<ret._ids.length; i++ )
@@ -1677,11 +1677,12 @@ public class HM {
         if( (thsi=thsi.find()).is_err() ) return; // Recursively, might have already rolled this up
         assert thsi.is_struct();
       }
-      // Only common fields end up in the result.
-      if( !thsi._open )         // LHS is closed, so extras in RHS are dropped
-        for( int i=0; i<that._ids.length; i++ )    // For all fields in RHS
-          if( Util.find(thsi._ids,that._ids[i]) == -1 ) // Missing in LHS
-            that.del_fld(i--, work);                    // Drop from RHS
+      for( int i=0; i<that._ids.length; i++ ) // For all fields in RHS
+        if( Util.find(thsi._ids,that._ids[i]) == -1 ) // Missing in LHS
+          if( thsi._open )                            // LHS is open, so add missing
+            thsi.add_fld(that._ids[i],that.args(i),work);
+          else                  // LHS is closed, so extras in RHS are dropped
+            that.del_fld(i--, work); // Drop from RHS
 
       // Shortcut (for asserts): LHS gets same ids as RHS, since its about to be top-level unified
       thsi._open= that._open = thsi.meet_opens(that);

@@ -564,7 +564,7 @@ public abstract class Node implements Cloneable {
     if( oliv == nliv ) return;  // No progress
     assert oliv.isa(nliv);      // Monotonic
     _live = nliv;               // Record progress
-    add_work_extra(work,nliv);
+    add_work_extra(work,oliv);
     for( Node def : _defs )     // Classic reverse flow on change
       if( def!=null ) work.add(def).add_work_def_extra(work,this);
   }

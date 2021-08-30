@@ -211,6 +211,11 @@ public class TV2 {
     tv2._open = true;           // Start out open
     return tv2;
   }
+  public static TV2 make_open_struct(@NotNull String name, Node n, Type t, @NotNull String alloc_site, NonBlockingHashMap<String,TV2> args) {
+    TV2 tv2 = new TV2(name,args,t,UQNodes.make(n),alloc_site);
+    tv2._open = true;           // Start out open
+    return tv2;
+  }
   // Structural constructor from an array of nodes and keys from a TypeStruct
   public static TV2 make_struct(NewObjNode n, @NotNull String alloc_site, TypeStruct ts, Ary<Node> ntvs) {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
@@ -472,12 +477,11 @@ public class TV2 {
       if( that.find() != that ) throw unimpl();
       assert this._args==args;
     }
-
-    // Only common fields end up in the result
+    // Fields on the RHS are aligned with the LHS also
     for( String key : that._args.keySet() )
       if( args.get(key)==null )
-        if( !this.open() )
-          that.del_fld(key, work);  // Drop from RHS
+        if( this.open() )  this.add_fld(key,that.get(key),work); // Add to LHS
+        else               that.del_fld(key, work);              // Drop from RHS
 
     if( find().is_err() && !that.is_err() )
       throw unimpl(); // TODO: Check for being equal, cyclic-ly, and return a prior if possible.
@@ -485,11 +489,12 @@ public class TV2 {
   }
 
   // Insert a new field
-  private void add_fld( String id, TV2 fld, Work work) {
+  private boolean add_fld( String id, TV2 fld, Work work) {
     assert is_struct();
     _args.put(id,fld);
     fld.push_deps(_deps);
     work.add(_deps);
+    return true;
   }
   // Delete a field
   private void del_fld( String fld, Work work) {
@@ -588,7 +593,7 @@ public class TV2 {
       if( rhs==null ) {         // No RHS to unify against
         if( that.open() ) {     // If RHS is open, copy field into it
           if( work==null ) return true; // Will definitely make progress
-          throw unimpl();
+          progress |= that.add_fld(key,lhs._fresh(nongen), work);
         } // If closed, no copy
       } else {
         progress |= lhs._fresh_unify(rhs,nongen,work);
@@ -599,13 +604,12 @@ public class TV2 {
     // Fields in RHS and not the LHS are also merged; if the LHS is open we'd
     // just copy the missing fields into it, then unify the structs (shortcut:
     // just skip the copy).  If the LHS is closed, then the extra RHS fields
-    // are an error.
+    // are removed.
     if( !open() )
-      for( String id : that.args() ) // For all fields in RHS
-        if( get(id)==null ) {       // Missing in LHS
+      for( String id : that.args() )      // For all fields in RHS
+        if( get(id)==null ) {             // Missing in LHS
           if( work == null ) return true; // Will definitely make progress
-          //progress |= that.del_fld(i--, work);     // Extra fields on both sides are dropped
-          throw unimpl();
+          { that._args.remove(id); progress=true; } // Extra fields on both sides are dropped
         }
     that._open &= this._open;
 
@@ -806,17 +810,20 @@ public class TV2 {
     if( dep.is_dead() ) return;
     _deps = _deps==null ? UQNodes.make(dep) : _deps.add(dep);
     if( _args!=null )
-      for( String key : _args.keySet() ) // Structural recursion on a complex TV2
-        get(key)._push_update(dep);
+      for( TV2 arg : _args.values() ) // Structural recursion on a complex TV2
+        arg.find()._push_update(dep);
   }
 
   // Merge Dependent Node lists, 'this' into 'that'.  Required to trigger
   // CEPI.unify_lift when types change structurally, or when structures are
   // unifing on field names.
-  private void merge_deps( TV2 that ) { that._deps = that._deps == null ? _deps : that._deps.addAll(_deps); }
+  private void merge_deps( TV2 that ) {
+    if( that._deps == null && that._args==null) that._deps = _deps;
+    else that.push_deps(_deps);
+  }
   // Merge Node lists, 'this' into 'that', for easier debugging.
   // Lazily remove dead nodes on the fly.
-  private void merge_ns  ( TV2 that ) { that._ns   = that._ns   == null ? _ns   : that._ns  .addAll(_ns  ); }
+  private void merge_ns( TV2 that ) { that._ns = that._ns == null ? _ns : that._ns.addAll(_ns); }
 
   // Recursively add-deps to worklist
   public void add_deps_work( Work work ) { assert DEPS_VISIT.isEmpty(); add_deps_work_impl(work); DEPS_VISIT.clear(); }

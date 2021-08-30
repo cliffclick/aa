@@ -159,17 +159,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
     return t.above_center() ? TypeMem.DEAD : (t==Type.NSCALR ? TypeMem.LESC_NO_DISP : TypeMem.ESCAPE);
   }
 
-  // As formals to a call.
-  TypeStruct as_formals() {
-    Type[] ts2 = Types.get(_ts.len()+DSP_IDX);
-    ts2[CTL_IDX] = Type.CTRL;
-    ts2[MEM_IDX] = TypeMem.ALLMEM;
-    //for( TypeFld fld : _ts.flds() )
-    //  ts2[DSP_IDX+_idxs.get(fld._fld)-1] = fld._t;
-    //return TypeTuple.make(ts2);
-    throw unimpl();
-  }
-
   @Override public TV2 new_tvar(String alloc_site) { return TV2.make_struct(this,alloc_site); }
 
   @Override public boolean unify( Work work ) {
