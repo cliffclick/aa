@@ -20,13 +20,6 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    // HM type for resulting structure internally is screwed up.
-    //"missing field display" errors and a dead display
-    //test("sum={x -> x ? sum(x.n) + x.v : 0};"+
-    //    "sum(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
-    //  (() ->TypeInt.INT64),
-    //  null,
-    //  "int64");
 
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
@@ -445,7 +438,7 @@ public class TestParse {
     // Test does loads after recursive call, which should be allowed to bypass.
     test("sum={x -> x ? sum(x.n) + x.v : 0};"+
          "sum(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
-         TypeInt.INT64);
+         (() ->TypeInt.INT64), null, "int64");
 
     // User-defined linked list.
     String ll_def = "List=:@{next;val};";

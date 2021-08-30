@@ -83,7 +83,7 @@ public class IfNode extends Node {
   }
   @Override public TypeMem all_live() { return TypeMem.ALIVE; }
 
-  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("If",this,alloc_site); }
+  @Override public TV2 new_tvar(String alloc_site) { return null; }
 
   @Override public Node is_copy(int idx) {
     if( !(_val instanceof TypeTuple) ) return null;

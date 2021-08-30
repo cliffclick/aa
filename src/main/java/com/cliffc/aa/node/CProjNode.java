@@ -5,6 +5,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.tvar.TV2;
 
 // Proj control
 public class CProjNode extends ProjNode {
@@ -34,6 +35,8 @@ public class CProjNode extends ProjNode {
 
   @Override public TypeMem all_live() { return TypeMem.ALIVE; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
+
+  @Override public TV2 new_tvar(String alloc_site) { return null; }
 
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.

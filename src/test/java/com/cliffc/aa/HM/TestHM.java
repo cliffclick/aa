@@ -842,4 +842,19 @@ public class TestHM {
       assertEquals(p,syn.flow_type());
     }
   }
+
+  // Checking an AA example
+  @Test public void test60() {
+    Root syn = HM.hm(
+"prod = { x -> (if x (* (prod x.n) x.v) 1)};"+
+"(prod @{n= @{n=0, v=3}, v=2})"+
+"");
+
+    if( HM.DO_HM )
+      assertEquals(stripIndent("int64"), stripIndent(syn._hmt.p()));
+    if( HM.DO_GCP ) {
+      assertEquals(TypeInt.INT64,syn.flow_type());
+    }
+  }
+
 }

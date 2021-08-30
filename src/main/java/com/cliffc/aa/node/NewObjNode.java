@@ -174,12 +174,13 @@ public class NewObjNode extends NewNode<TypeStruct> {
     // Extra fields are unified as Error since they are not created here:
     // error to load from a non-existing field.
     boolean progress = false;
-    for( String key : rec.args() )
-      if( _ts.fld_find(key)==null && !rec.get(key).is_err() ) {
-        if( work==null ) return true;
-        progress |= rec.get(key).unify(rec.miss_field(this,key,"NewObj_err"),work);
-        if( (rec=rec.find()).is_err() ) return true;
-      }
+    if( !is_unused() )
+      for( String key : rec.args() )
+        if( _ts.fld_find(key)==null && !rec.get(key).is_err() ) {
+          if( work==null ) return true;
+          progress |= rec.get(key).unify(rec.miss_field(this,key,"NewObj_err"),work);
+          if( (rec=rec.find()).is_err() ) return true;
+        }
 
     // Unify existing fields.  Ignore extras on either side.
     for( TypeFld fld : _ts.flds() ) {
