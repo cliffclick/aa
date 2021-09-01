@@ -402,15 +402,6 @@ public class TV2 {
     return true;
   }
 
-  // True if args are equal
-  public boolean eq(Node[] args) {
-    //for( int i=0; i<args.length; i++ )
-    //  if( args[i]!=null && args[i].tvar()!=get(""+i) )
-    //    return false;
-    //return true;
-    throw unimpl();
-  }
-
   // --------------------------------------------
   // Used in the recursive unification process.  During unify detects cycles,
   // to allow cyclic unification.
@@ -508,16 +499,6 @@ public class TV2 {
     _args.remove(fld);
     work.add(_deps);
   }
-
-//private boolean union_err(TV2 that, String msg) {
-//  union(that);
-//  return that.union(make_err(null,msg,"TV2.unify_err"));
-//}
-//
-//private boolean unify_base(TV2 that) {
-//  that._type = _type.meet(that._type);
-//  return union(that);
-//}
 
   // Used in the recursive unification process.  During fresh_unify tracks the
   // mapping from LHS TV2s to RHS TVs.
@@ -631,14 +612,6 @@ public class TV2 {
   private boolean vput(TV2 that, boolean progress) { VARS.put(this,that); return progress; }
   private TV2 vput(TV2 that) { VARS.put(this,that); return that; }
 
-  //// Return a fresh copy of 'this'
-  //T2 fresh() {
-  //  assert VARS.isEmpty();
-  //  T2 rez = _fresh(null);
-  //  VARS.clear();
-  //  return rez;
-  //}
-
   private TV2 _fresh(TV2[] nongen) {
     assert !is_unified();       // Already chased these down
     TV2 rez = VARS.get(this);
@@ -659,107 +632,6 @@ public class TV2 {
     return t;
   }
 
-
-//// --------------------------------------------
-//
-//// Used by Loads and Stores.  Unify tv against all aliases at this field
-//// only.  Aliases are either produced by the Parser (so very generic) or from
-//// forwards-flow from News and very specific.  Ignore the generic ones until
-//// they refine.  TODO: As aliases further refine, need to undo-redo prior
-//// unifies against larger/weaker aliases.
-//public boolean unify_alias_fld(Node ldst, BitsAlias aliases, String fld, TV2 tv, boolean test, String alloc_site) {
-//  assert isa("Mem");
-//  assert !tv.is_unified();
-//  boolean progress=false;
-//  for( int alias : aliases ) {
-//    // TODO: Probably wrong, as no reason to believe that as soon as alias
-//    // sharpens above AARY that it has hit its best sane value.
-//    if( alias <= BitsAlias.AARY ) return false; // No unify on parser-specific values
-//    TV2 tobj = get(alias);
-//    if( tobj == null ) {      // Missing, act as a fresh TV2 and lazily manifest
-//      if( test ) return true; // Definitely will be progress
-//      progress = true;
-//      TV2 tvo = make("Obj",ldst,alloc_site);
-//      args_put(alias,tvo);
-//      tvo.args_put(fld,tv);
-//    } else if( tobj.isa("Obj") ) {
-//      progress = tobj.unify_at(fld,tv.find(),test);
-//    } else if( tobj.is_dead() || tobj.isa("Err") ) {
-//      tobj.unify(tv.find(),test);
-//    } else
-//      throw com.cliffc.aa.AA.unimpl();
-//    if( progress && test ) return progress; // Shortcut
-//  }
-//  return progress;
-//}
-
-
-//// --------------------------------------------
-//// Find instances of 'tv' inside of 'this' via structural recursion.  Walk
-//// the matching Type at the same time.  Report the first one found, and
-//// assert all the others have the same Type.
-//public Type find_tvar(Type t, TV2 tv) {
-//  assert DUPS.isEmpty();
-//  Type rez = _find_tvar(t,tv,Type.ALL);
-//  DUPS.clear();
-//  return rez;
-//}
-//private Type _find_tvar(Type t, TV2 tv, Type rez) {
-//  if( tv.is_dead() ) return rez;
-//  if( t==Type.ALL ) return rez; // Join against 'ALL' never changes anything
-//  if( tv==this ) {
-//    rez = rez.join(t);
-//    return rez;
-//  }
-//  switch(_name) {
-//  case "Mem":
-//    if( t ==Type.ANY ) return rez; // No substructure in type
-//    TypeMem tmem = (TypeMem)t;
-//    for( Comparable key : _args.keySet() ) {
-//      TypeObj to = tmem.at((Integer) key);
-//      TV2 obj = get(key);
-//      if( obj!=null )
-//        rez = obj._find_tvar(to,tv,rez);
-//    }
-//    return rez;
-//  case "Obj":
-//    if( t==TypeObj.UNUSED || t==TypeObj.ISUSED )
-//      return rez; // No substructure in type
-//    if( t instanceof TypeStr || t instanceof TypeAry )
-//      return rez; // TODO: Handle These
-//    TypeStruct ts = (TypeStruct)t; //
-//    for( Comparable key : _args.keySet() ) {
-//      //int idx = ts.find((String)key);
-//      //if( idx!= -1 )          // If field exists
-//      //  rez = get(key)._find_tvar(ts.at(idx),tv,rez);
-//      throw unimpl();
-//    }
-//    return rez;
-//  case "Fun":
-//    if( t.is_forward_ref() ) return rez;
-//    if( !(t instanceof TypeFunPtr) ) return rez;
-//    // TypeFunPtrs carry only a set of FIDXS & a DISPLAY.
-//    // Hence no other Type is available here for lifting.
-//    return rez;
-//  case "Ret":
-//    TypeTuple tt = (TypeTuple)t;
-//    for( int i=0; i<tt.len(); i++ )
-//      rez = get(i)._find_tvar(tt.at(i),tv,rez);
-//    return rez;
-//  case "Ptr":
-//    if( !(t instanceof TypeMemPtr) ) return rez;
-//    return get(0)._find_tvar(((TypeMemPtr)t)._obj,tv,rez);
-//  case "Base":
-//  case "Dead":
-//  case "Err":
-//  case "Leaf":
-//  case "Nil":
-//    return rez; // No substructure in TV2 and not equal already
-//
-//  default: throw com.cliffc.aa.AA.unimpl();
-//  }
-//}
-//
   // --------------------------------------------
   private static final VBitSet ODUPS = new VBitSet();
   public boolean nongen_in(TV2[] vs) {
@@ -795,11 +667,81 @@ public class TV2 {
     return false;
   }
 
-//// Get TV2 from array, with U-F rollup
-//public static TV2 get(TV2[] vs, int i) {
-//  TV2 tv = vs[i].find();
-//  return vs[i]==tv ? tv : (vs[i]=tv); // U-F rollup
-//}
+  // --------------------------------------------
+  // Attempt to lift a GCP call result, based on HM types.  Walk the input HM
+  // type and GCP flow type in parallel and create a mapping.  Then walk the
+  // output HM type and GCP flow type in parallel, and join output GCP types
+  // with the matching input GCP type.
+  public static final NonBlockingHashMap  <TV2,Type> T2MAP = new NonBlockingHashMap<>();
+  public static final NonBlockingHashMapLong<String> WDUPS = new NonBlockingHashMapLong<>();
+  public Type walk_types_in(TypeMem tmem, Type t) {
+    assert !is_unified();
+    long duid = dbl_uid(t._uid);
+    if( WDUPS.putIfAbsent(duid,"")!=null ) return t;
+    if( is_err() ) return fput(t); //
+    // Base variables (when widened to an HM type) might force a lift.
+    if( is_base() ) return fput(_type.widen().join(t));
+    // Free variables keep the input flow type.
+    if( is_leaf() ) return fput(t);
+    // Nilable
+    if( is_nilable() ) throw unimpl();
+    if( t==Type.SCALAR || t==Type.NSCALR ) return fput(t); // Will be scalar for all the breakdown types
+    // Functions being called or passed in can have their return types appear
+    // in the call result.
+    if( is_fun() ) {
+      if( !(t instanceof TypeFunPtr) ) return t; // Typically, some kind of error situation
+      TypeFunPtr tfp = (TypeFunPtr)t;
+      TV2 ret = get(" ret");
+      if( tfp._fidxs==BitsFun.FULL        ) return ret.walk_types_in(tmem,Type. SCALAR);
+      if( tfp._fidxs==BitsFun.FULL.dual() ) return ret.walk_types_in(tmem,Type.XSCALAR);
+      for( int fidx : tfp._fidxs ) {
+        FunNode fun = FunNode.find_fidx(fidx);
+        if( fun.fptr().tvar().is_err() ) throw unimpl();
+        Type tret = ((TypeTuple)fun.ret()._val).at(REZ_IDX);
+        ret.walk_types_in(tmem,tret);
+      }
+      return t;
+    }
+
+    if( is_struct() ) {
+      fput(t);                // Recursive types need to put themselves first
+      if( !(t instanceof TypeMemPtr) )  return t;
+      throw unimpl();
+    }
+
+    if( isa("Ary") ) {
+      fput(t);                // Recursive types need to put themselves first
+      if( !(t instanceof TypeMemPtr) )  return t;
+      TypeMemPtr tptr = (TypeMemPtr)tmem.sharptr(t);
+      if( !(tptr._obj instanceof TypeAry) ) return t;
+      TypeAry tary = (TypeAry)tptr._obj;
+      TV2 elem = get("elem");
+      if( elem == null ) return t;
+      return elem.walk_types_in(tmem,tary.elem());
+    }
+
+    throw unimpl();
+  }
+  // Gather occurs of each TV2, and MEET all the corresponding Types.
+  private Type fput(final Type t) {
+    T2MAP.merge(this, t, Type::meet);
+    return t;
+  }
+
+  public Type walk_types_out(Type t) {
+    assert !is_unified();
+    if( t == Type.XSCALAR ) return t;  // No lift possible
+    Type tmap = T2MAP.get(this);
+    if( tmap != null ) return tmap;
+    if( is_err() ) throw unimpl();
+    assert !is_leaf() && !is_base(); // All output leafs found as inputs already
+    if( is_fun() ) return t; // No change, already known as a function (and no TFS in the flow types)
+    if( is_struct() ) {
+      TypeStruct ts = (TypeStruct)((TypeMemPtr)t)._obj;
+      throw unimpl();
+    }
+    throw unimpl();
+  }
 
 
   // --------------------------------------------

@@ -20,6 +20,11 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
+    // id accepts and returns all types and keeps precision
+    test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
+         (() -> TypeMemPtr.make(13,TypeStruct.tupsD(TypeInt.INT8,TypeInt.con(3)))),
+         null,
+         "[99](int8, 3)");
 
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
@@ -742,11 +747,10 @@ public class TestParse {
   @Ignore
   @Test public void testParse15() {
     test("-1", (()->TypeInt.con(-1)), null, "-1");
-    test("(1,2)", (() -> TypeMemPtr.make(BitsAlias.make0(13),TypeStruct.tupsD(TypeInt.con(1),TypeInt.con(2)))), null, "[13]( 1,2)");
+    test("(1,2)", (() -> TypeMemPtr.make(13,TypeStruct.tupsD(TypeInt.con(1),TypeInt.con(2)))), null, "[13]( 1,2)");
 
     test("@{ n=0; v=1.2 }",
-         (() -> TypeMemPtr.make(BitsAlias.make0(13),
-                                TypeStruct.make2fldsD("n",Type.XNIL,"v",TypeFlt.con(1.2)))),
+         (() -> TypeMemPtr.make(13, TypeStruct.make2fldsD("n",Type.XNIL,"v",TypeFlt.con(1.2)))),
          null,
          "[13]@{ n = 0, v = 1.2}");
 
@@ -896,7 +900,7 @@ HashTable = {@{
     try( TypeEnv te = run(program) ) {
       Type actual_flow = te._tmem.sharptr(te._t);
       TV2 actual_hm = te._hmt;
-      String actual_str = actual_hm.p();
+      String hm_actual = actual_hm.p();
       Type expect = expect_maker.get();
       assertEquals(expect,actual_flow);
       if( expect instanceof TypeFunPtr ) {
@@ -922,7 +926,7 @@ HashTable = {@{
       } else
         assert expect_sig_maker==null;
       if( Combo.DO_HM )
-        assertEquals(stripIndent(hm_expect),stripIndent(actual_str));
+        assertEquals(stripIndent(hm_expect),stripIndent(hm_actual));
     }
   }
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }

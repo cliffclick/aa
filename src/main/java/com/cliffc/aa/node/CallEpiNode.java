@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
@@ -346,12 +347,26 @@ public final class CallEpiNode extends Node {
     TypeMem caller_mem = premem instanceof TypeMem ? (TypeMem)premem : premem.oob(TypeMem.ALLMEM);
     TypeMem tmem3 = live_out(caller_mem,post_call,trez,tescs._aliases,opt_mode._CG ? null : defmem);
 
-    // Can we lift for H-M types?
-    //if( DO_HM )
-    //  throw unimpl();
+    // Attempt to lift the result, based on HM types.  Walk the input HM type
+    // and GCP flow type in parallel and create a mapping.  Then walk the
+    // output HM type and CCP flow type in parallel, and join output CCP types
+    // with the matching input CCP type.
+    if( Combo.DO_HM && opt_mode._CG ) {
+      // Walk the inputs, building a mapping
+      CallNode call = call();
+      Node fdx = call.fdx();
+      TV2.T2MAP.clear();
+      { TV2.WDUPS.clear(); fdx.tvar().walk_types_in(caller_mem,fdx._val); }
+      for( int i=DSP_IDX; i<call._defs._len-1; i++ )
+        { TV2.WDUPS.clear(); call.tvar(i).walk_types_in(caller_mem,call.val(i)); }
+      // Walk the outputs, building an improved result
+      Type trez2 = tvar().walk_types_out(trez);
+      trez = trez2.join(trez);
+    }
 
     return TypeTuple.make(Type.CTRL,tmem3,trez);
   }
+
 
   static BitsAlias esc_out( TypeMem tmem, Type trez ) {
     if( trez == Type.XNIL || trez == Type.NIL ) return BitsAlias.EMPTY;
@@ -382,7 +397,6 @@ public final class CallEpiNode extends Node {
     TypeMem tmem3 = TypeMem.make0(pubs);
     return tmem3;
   }
-
 
   @Override public void add_work_use_extra(Work work, Node chg) {
     if( chg instanceof CallNode ) {    // If the Call changes value

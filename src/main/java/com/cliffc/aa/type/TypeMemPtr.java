@@ -282,12 +282,15 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   // which disallows nil).
   @Override public TypeMemPtr widen() {
     // Flatten to either all-structs or all-strings, unless both.
-    BitsAlias bs = null;
-    if( _aliases.isa(BitsAlias.RECORD_BITS0) )  bs = BitsAlias.RECORD_BITS0;
-    if( _aliases.isa(BitsAlias.STRBITS0) ) bs = bs==null ? BitsAlias.STRBITS0 : BitsAlias.FULL;
-    if( _aliases.isa(BitsAlias.ARYBITS0) ) bs = bs==null ? BitsAlias.ARYBITS0 : BitsAlias.FULL;
-    if( bs==null ) return this; // Already plenty wide
-    return make(bs,_obj.widen());
+    TypeObj obj = _obj.widen();
+    boolean z = _aliases.test(0);
+    if( _aliases.isa(BitsAlias.RECORD_BITS0) )
+      return make(z ? BitsAlias.RECORD_BITS0 :BitsAlias.RECORD_BITS,obj);
+    if( _aliases.isa(BitsAlias.STRBITS0) )
+      return make(z ? BitsAlias.STRBITS0 :BitsAlias.STRBITS,obj);
+    if( _aliases.isa(BitsAlias.ARYBITS0) )
+      return make(z ? BitsAlias.ARYBITS0 :BitsAlias.ARYBITS,obj);
+    return make(_aliases,obj);
   }
 
   // Make a Type, replacing all dull pointers from the matching types in mem.

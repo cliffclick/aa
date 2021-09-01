@@ -235,7 +235,7 @@ public class LoadNode extends Node {
 
     // If the load is of a constant, no memory nor address is needed
     Type tfld = get_fld2(((TypeMem)tmem).ld((TypeMemPtr)tptr));
-    if( tfld.is_con() && err(true)==null )
+    if( may_be_con_live(tfld) && err(true)==null )
       return TypeMem.DEAD;
 
     if( def==adr() )            // Load is sane, so address is alive

@@ -173,7 +173,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public static TypeStruct malloc( String name, boolean any, boolean open ) {
     return POOLS[TSTRUCT].<TypeStruct>malloc().init(name,any,open);
   }
-  TypeStruct hashcons_free() {
+  public TypeStruct hashcons_free() {
     // All subparts already interned
     if( RECURSIVE_MEET ==0 ) for( TypeFld fld : _flds.values() ) assert fld.interned();
     return super.hashcons_free();

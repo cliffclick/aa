@@ -87,9 +87,10 @@ public class TypeAry extends TypeObj<TypeAry> {
     return make(_size,Type.SCALAR,_stor);
   }
 
-  public Type ld(TypeInt idx) {
-    return _elem;
-  }
+  // Type at a specific index
+  public Type ld(TypeInt idx) { return _elem; }
+  // Type over all elements
+  public Type elem() { return _elem; }
   @Override public TypeObj update(TypeInt idx, Type val) {
     if( idx.above_center() ) return this; // Nothing updates
     if( val.isa(_elem) ) return this;     // No change
