@@ -16,33 +16,32 @@ import static com.cliffc.aa.type.TypeFld.Access;
 
 // Treats HM as a Monotone Analysis Framework; converted to a worklist style.
 // The type-vars are monotonically unified, gradually growing over time - and
-// this is treated as the MAF lattice.  Some of the normal Algo-W work gets
-// done in a prepass; e.g. discovering identifier sources (SSA form), and
-// building the non-generative set.  Because of the non-local unification
-// behavior type-vars include a "dependent Syntax" set; a set of Syntax
-// elements put back on the worklist if this type unifies, beyond the expected
-// parent and AST children.
+// this is treated as the MAF lattice.  Some normal Algo-W work gets done in a
+// prepass; e.g. discovering identifier sources (SSA form), and building the
+// non-generative set.  Because of the non-local unification behavior type-vars
+// include a "dependent Syntax" set; a set of Syntax elements put back on the
+// worklist if this type unifies, beyond the expected parent and AST children.
 //
 // The normal HM unification steps are treated as the MAF transfer "functions",
 // taking type-vars as inputs and producing new, unified, type-vars.  Because
-// unification happens in-place (normal Tarjan disjoint-set union), the xfer
-// "functions" are executed for side-effects only, and return a progress flag.
-// The transfer functions are virtual calls on each Syntax element.  Some of
-// the steps are empty because of the pre-pass (Let,Con).
+// unification happens in-place (normal Tarjan disjoint-set union), the
+// transfer "functions" are executed for side effects only, and return a
+// progress flag.  The transfer functions are virtual calls on each Syntax
+// element.  Some steps are empty because of the pre-pass (Let,Con).
 
 // HM Bases include anything from the GCP lattice, but 'widened' to form
 // borders between e.g. ints and pointers.  Includes polymorphic structures and
 // fields (structural typing not duck typing), polymorphic nil-checking and an
 // error type-var.  Both HM and GCP types fully support recursive types.
 //
-// Unification typically makes many many temporary type-vars and immediately
-// unifies them.  For efficiency, this algorithm checks to see if unification
-// requires an allocation first, instead of just "allocate and unify".  The
-// major place this happens is identifiers, which normally make a "fresh" copy
-// of their type-var, then unify.  I use a combined "make-fresh-and-unify"
-// unification algorithm there.  It is a structural clone of the normal unify,
-// except that it lazily makes a fresh-copy of the left-hand-side on demand
-// only; typically discovering that no fresh-copy is required.
+// Unification typically makes many temporary type-vars and immediately unifies
+// them.  For efficiency, this algorithm checks to see if unification requires
+// an allocation first, instead of just "allocate and unify".  The major place
+// this happens is identifiers, which normally make a "fresh" copy of their
+// type-var, then unify.  I use a combined "make-fresh-and-unify" unification
+// algorithm there.  It is a structural clone of the normal unify, except that
+// it lazily makes a fresh-copy of the left-hand-side on demand only; typically
+// discovering that no fresh-copy is required.
 //
 // To engineer and debug the algorithm, the unification step includes a flag to
 // mean "actually unify, and report a progress flag" vs "report if progress".
