@@ -43,7 +43,7 @@ public class TestHM {
   @Test public void test01() { run( "3" ,
                                     "3", TypeInt.con(3));  }
 
-  @Test public void test02() { run( "(pair1 3)" ,
+  @Test public void test02() { run( "{ x -> (pair 3 x) }" ,
                                     "{ A -> ( 3, A) }", tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(3),Type.SCALAR)))); }
 
   @Test public void test03() { run( "{ z -> (pair (z 0) (z \"abc\")) }" ,
@@ -53,7 +53,7 @@ public class TestHM {
                                     "{ int64 -> int64 }", tfs(TypeInt.INT64) ); }
 
   // Because {y->y} is passed in, all 'y' types must agree.
-  // This unifies 3 and "abc" which results in 'all'
+  // This unifies 3 and 5 which results in 'nint8'
   @Test public void test05() {
     Root syn = HM.hm("({ x -> (pair (x 3) (x 5)) } {y->y})");
     if( HM.DO_HM )
@@ -147,7 +147,7 @@ public class TestHM {
                      "map = { fun x -> (fun x)};"+
                      "{ q -> (map (fcn q) 5)}");
     if( HM.DO_HM )
-      assertEquals("{ A? -> ( B:Cannot unify A:( 3, A) and 5, B) }",syn._hmt.p());
+      assertEquals("{ A? -> ( Cannot unify A:( 3, A) and 5, Cannot unify A:( 3, A) and 5) }",syn._hmt.p());
     if( HM.DO_GCP )
       if( HM.DO_HM )
         assertEquals(tfs(TypeMemPtr.make(7,make_tups(Type.XNSCALR,TypeMemPtr.make(7,make_tups(TypeInt.con(3),Type.XNSCALR))))),syn.flow_type());
@@ -306,7 +306,7 @@ public class TestHM {
 
   // try the worse-case expo blow-up test case from SO
   @Test public void test35() {
-    TypeFunPtr tfp  = TypeFunPtr.make(16,3,Type.ANY);
+    TypeFunPtr tfp  = TypeFunPtr.make(15,3,Type.ANY);
     TypeMemPtr tmp0 = TypeMemPtr.make(8,make_tups(tfp ,tfp ,tfp ));
     TypeMemPtr tmp1 = TypeMemPtr.make(8,make_tups(tmp0,tmp0,tmp0));
     TypeMemPtr tmp2 = TypeMemPtr.make(8,make_tups(tmp1,tmp1,tmp1));
@@ -316,7 +316,7 @@ public class TestHM {
         "p2 = (triple p1 p1 p1);"+
         "p3 = (triple p2 p2 p2);"+
         "p3",
-        "( ( ( { A B C -> ( A, B, C) }, { D E F -> ( D, E, F) }, { G H I -> ( G, H, I) }), ( { J K L -> ( J, K, L) }, { M N O -> ( M, N, O) }, { P Q R -> ( P, Q, R) }), ( { S T U -> ( S, T, U) }, { V21 V22 V23 -> ( V21, V22, V23) }, { V24 V25 V26 -> ( V24, V25, V26) })), ( ( { V27 V28 V29 -> ( V27, V28, V29) }, { V30 V31 V32 -> ( V30, V31, V32) }, { V33 V34 V35 -> ( V33, V34, V35) }), ( { V36 V37 V38 -> ( V36, V37, V38) }, { V39 V40 V41 -> ( V39, V40, V41) }, { V42 V43 V44 -> ( V42, V43, V44) }), ( { V45 V46 V47 -> ( V45, V46, V47) }, { V48 V49 V50 -> ( V48, V49, V50) }, { V51 V52 V53 -> ( V51, V52, V53) })), ( ( { V54 V55 V56 -> ( V54, V55, V56) }, { V57 V58 V59 -> ( V57, V58, V59) }, { V60 V61 V62 -> ( V60, V61, V62) }), ( { V63 V64 V65 -> ( V63, V64, V65) }, { V66 V67 V68 -> ( V66, V67, V68) }, { V69 V70 V71 -> ( V69, V70, V71) }), ( { V72 V73 V74 -> ( V72, V73, V74) }, { V75 V76 V77 -> ( V75, V76, V77) }, { V78 V79 V80 -> ( V78, V79, V80) })))",
+        "( ( ( { A B C -> ( A, B, C) }, { D E F -> ( D, E, F) }, { G H I -> ( G, H, I) }), ( { J K L -> ( J, K, L) }, { M N O -> ( M, N, O) }, { P Q R -> ( P, Q, R) }), ( { S T U -> ( S, T, U) }, { V22 V23 V24 -> ( V22, V23, V24) }, { V25 V26 V27 -> ( V25, V26, V27) })), ( ( { V28 V29 V30 -> ( V28, V29, V30) }, { V31 V32 V33 -> ( V31, V32, V33) }, { V34 V35 V36 -> ( V34, V35, V36) }), ( { V37 V38 V39 -> ( V37, V38, V39) }, { V40 V41 V42 -> ( V40, V41, V42) }, { V43 V44 V45 -> ( V43, V44, V45) }), ( { V46 V47 V48 -> ( V46, V47, V48) }, { V49 V50 V51 -> ( V49, V50, V51) }, { V52 V53 V54 -> ( V52, V53, V54) })), ( ( { V55 V56 V57 -> ( V55, V56, V57) }, { V58 V59 V60 -> ( V58, V59, V60) }, { V61 V62 V63 -> ( V61, V62, V63) }), ( { V64 V65 V66 -> ( V64, V65, V66) }, { V67 V68 V69 -> ( V67, V68, V69) }, { V70 V71 V72 -> ( V70, V71, V72) }), ( { V73 V74 V75 -> ( V73, V74, V75) }, { V76 V77 V78 -> ( V76, V77, V78) }, { V79 V80 V81 -> ( V79, V80, V81) })))",
         tmp2  );
   }
 
@@ -355,7 +355,7 @@ public class TestHM {
   @Test public void test40() {
     Root syn = HM.hm("x = w = (x x); { z -> z}; (x { y -> y.u})");
     if( HM.DO_HM )
-      assertEquals("Cannot unify A:{ A -> A } and @{ u = A, ...}",syn._hmt.p());
+      assertEquals("Cannot unify A:{ A -> A } and @{ u = A:{ A -> A }, ...}",syn._hmt.p());
     if( HM.DO_GCP ) {
       if( HM.DO_HM ) {
         assertEquals(tfs(Type.SCALAR), syn.flow_type());
@@ -395,7 +395,7 @@ public class TestHM {
       if( HM.DO_GCP )
         assertEquals("3.4000000953674316",syn._hmt.p());
       else
-        assertEquals("Missing field y in ()",syn._hmt.p());
+        assertEquals("Missing field y in ( )",syn._hmt.p());
     }
     if( HM.DO_GCP )
       assertEquals(TypeFlt.con(3.4f), syn.flow_type());
@@ -417,7 +417,7 @@ public class TestHM {
       if( HM.DO_GCP )
         assertEquals("1.2000000476837158",syn._hmt.p());
       else
-        assertEquals("Cannot unify 1.2000000476837158 and ()",syn._hmt.p());
+        assertEquals("Cannot unify ( ) and 1.2000000476837158",syn._hmt.p());
     }
     if( HM.DO_GCP )
       assertEquals(TypeFlt.con(1.2f), syn.flow_type());
@@ -546,7 +546,7 @@ public class TestHM {
           }
         }
        */
-      assertEquals("@{ a = nint8, b = (), bool = @{ false = A:@{ and = { A -> A }, or = { A -> A }, thenElse = { { () -> B } { () -> B } -> B }}, force = { C? -> D:@{ and = { D -> D }, or = { D -> D }, thenElse = { { () -> E } { () -> E } -> E }} }, true = F:@{ and = { F -> F }, or = { F -> F }, thenElse = { { () -> G } { () -> G } -> G }}}}",syn._hmt.p());
+      assertEquals("@{ a = nint8, b = (), bool = @{ false = A:@{ and = { A -> A }, or = { A -> A }, thenElse = { { ( ) -> B } { ( ) -> B } -> B }}, force = { C? -> D:@{ and = { D -> D }, or = { D -> D }, thenElse = { { ( ) -> E } { ( ) -> E } -> E }} }, true = F:@{ and = { F -> F }, or = { F -> F }, thenElse = { { ( ) -> G } { ( ) -> G } -> G }}}}",syn._hmt.p());
     }
     if( HM.DO_GCP ) {
       Type tf   = TypeMemPtr.make(BitsAlias.FULL.make(10,11),
@@ -597,12 +597,12 @@ public class TestHM {
       assertEquals("@{ false = A:@{ and = { A -> A }, "+
                          "not = { B -> A }, "+
                          "or = { A -> A }, "+
-                         "thenElse = { { () -> C } { () -> C } -> C }"+
+                         "thenElse = { { ( ) -> C } { ( ) -> C } -> C }"+
                        "}, "+
                        "true = D:@{ and = { D -> D }, "+
                          "not = { E -> D }, "+
                          "or = { D -> D }, "+
-                         "thenElse = { { () -> F } { () -> F } -> F }"+
+                         "thenElse = { { ( ) -> F } { ( ) -> F } -> F }"+
                        "}"+
                     "}",syn._hmt.p());
     if( HM.DO_GCP ) {
@@ -745,23 +745,23 @@ public class TestHM {
 // not unified with "self".
 "  one=R:@{"+
 "    add   ={ S:@{ succ={()->S}, ...} -> S},"+
-"    isZero={  T  -> U:@{ and={U->U}, or={U->U}, thenElse={ {()->V21} {()->V21}->V21}}},"+
-"    pred=  { V22 -> R },"+
-"    succ=  { V23 -> R }"+      // Note: succ takes an 'unused'
+"    isZero={  T  -> U:@{ and={U->U}, or={U->U}, thenElse={ {()->V22} {()->V22}->V22}}},"+
+"    pred=  { V23 -> R },"+
+"    succ=  { V24 -> R }"+      // Note: succ takes an 'unused'
 "  },"+
 // Has all the fields of a natural number.
-"  three=V24:@{ "+
-"    add   ={ V25:@{ succ={()->V25}, ... }->V25  },"+
-"    isZero={ V26 -> V27:@{ and={V27->V27}, or={V27->V27}, thenElse={ {()->V28} {()->V28} ->V28 }}},"+
-"    pred  ={ V29 -> V24 },"+
-"    succ  ={ ()  -> V24 }"+ // Note 'succ' only takes 'void', and not an 'unused'.
+"  three=V25:@{ "+
+"    add   ={ V26:@{ succ={()->V26}, ... }->V26  },"+
+"    isZero={ V27 -> V28:@{ and={V28->V28}, or={V28->V28}, thenElse={ {()->V29} {()->V29} ->V29 }}},"+
+"    pred  ={ V30 -> V25 },"+
+"    succ  ={ ()  -> V25 }"+ // Note 'succ' only takes 'void', and not an 'unused'.
 "  },"+
 // Has all the fields of a natural number.
-"  two=V30:@{ "+
-"    add   ={ V31:@{succ={()->V31}, ...} ->V31 },"+
-"    isZero={ V32 -> V33:@{ and={V33->V33}, or={V33->V33}, thenElse={ {()->V34} {()->V34} ->V34 }}},"+
-"    pred  ={ V35 -> V30},"+
-"    succ  ={ ()  -> V30}"+ // Note 'succ' only takes a 'void', and not an 'unused'.
+"  two=V31:@{ "+
+"    add   ={ V32:@{succ={()->V32}, ...} ->V32 },"+
+"    isZero={ V33 -> V34:@{ and={V34->V34}, or={V34->V34}, thenElse={ {()->V35} {()->V35} ->V35 }}},"+
+"    pred  ={ V36 -> V31},"+
+"    succ  ={ ()  -> V31}"+ // Note 'succ' only takes a 'void', and not an 'unused'.
 "  }"+
 "}"+
 ""), stripIndent(syn._hmt.p()));

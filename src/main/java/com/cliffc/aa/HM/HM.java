@@ -89,13 +89,13 @@ public class HM {
   static { BitsAlias.init0(); BitsFun.init0(); }
 
   static final boolean DO_HM  = true;
-  static final boolean DO_GCP = true;
+  static final boolean DO_GCP = false;
 
   public static Root hm( String sprog ) {
     Worklist work = new Worklist();
     PrimSyn.WORK=work;
 
-    for( PrimSyn prim : new PrimSyn[]{new If(), new Pair1(), new Pair(), new EQ(), new EQ0(), new Mul(), new Add(), new Dec(), new Str(), new Triple(), new Factor(), new IsEmpty(), new NotNil()} )
+    for( PrimSyn prim : new PrimSyn[]{new If(), new Pair(), new EQ(), new EQ0(), new Mul(), new Add(), new Dec(), new Str(), new Triple(), new Factor(), new IsEmpty(), new NotNil()} )
       PRIMSYNS.put(prim.name(),prim);
 
     // Parse
@@ -144,7 +144,6 @@ public class HM {
     BitsAlias.reset_to_init0();
     BitsFun.reset_to_init0();
     PRIMSYNS.clear();
-    Pair1.PAIR1S.clear();
     Lambda.FUNS.clear();
     T2.reset();
     PrimSyn.reset();
@@ -318,12 +317,12 @@ public class HM {
       // Collect dups across the forest of types
       VBitSet dups = new VBitSet();
       for( VStack vs = this; vs!=null; vs = vs._par )
-        vs._nongen.get_dups(dups);
+        vs._nongen._get_dups(new VBitSet(),dups);
       // Now recursively print
       return str(new SB(),dups).toString();
     }
     SB str(SB sb, VBitSet dups) {
-      _nongen.str(sb,new VBitSet(),dups);
+      _nongen.str(sb,new VBitSet(),dups,true);
       if( _par!=null ) _par.str(sb.p(" , "),dups);
       return sb;
     }
@@ -392,10 +391,10 @@ public class HM {
     // Line-by-line print with more detail
     public String p() { return p0(new SB(), new VBitSet()).toString(); }
     final SB p0(SB sb, VBitSet dups) {
-      _hmt.get_dups(dups);
+      _hmt._get_dups(new VBitSet(),dups);
       VBitSet visit = new VBitSet();
       p1(sb.i());
-      if( DO_HM  ) _hmt .str(sb.p(", HM="), visit,dups);
+      if( DO_HM  ) _hmt .str(sb.p(", HM="), visit,dups,true);
       if( DO_GCP ) _flow.str(sb.p(", CCP="),visit.clr(),null,false);
       sb.nl();
       return p2(sb.ii(1),dups).di(1);
@@ -518,17 +517,18 @@ public class HM {
       // The normal lambda work
       T2 old = find();
       if( old.is_err() ) return false;
-      if( old.is_fun() ) {      // Already a function?  Compare-by-parts
-        boolean progress = false;
-        for( int i=0; i<_targs.length; i++ )
-          progress |= old.args(i).unify(targ(i),work);
-        return old.args(_targs.length).unify(_body.find(),work) | progress;
+      if( !old.is_fun() ) {     // Not a function?  Make it one.
+        if( work==null ) return true;
+        T2[] targs = Arrays.copyOf(_targs,_targs.length+1);
+        targs[_targs.length] = _body.find();
+        T2 fun = T2.make_fun(BitsFun.make0(_fidx),targs);
+        return old.unify(fun,work);
       }
-      // Make a new T2 for progress
-      T2[] targs = Arrays.copyOf(_targs,_targs.length+1);
-      targs[_targs.length] = _body.find();
-      T2 fun = T2.make_fun(BitsFun.make0(_fidx),targs);
-      return old.unify(fun,work);
+
+      boolean progress = false;
+      for( int i=0; i<_targs.length; i++ )
+        progress |= old.arg(""+i).unify(targ(i),work);
+      return old.arg("ret").unify(_body.find(),work) | progress;
     }
     @Override void add_hm_work(Worklist work) {
       work.push(_par );
@@ -636,16 +636,16 @@ public class HM {
         return tfun.find().is_err() ? find().unify(tfun.find(),work) : progress;
       }
 
-      if( tfun._args.length != _args.length+1 )
+      if( tfun._args.size() != _args.length+1 )
         progress = T2.make_err("Mismatched argument lengths").unify(find(), work);
       // Check for progress amongst arg pairs
       for( int i=0; i<_args.length; i++ ) {
-        progress |= tfun.args(i).unify(_args[i].find(),work);
+        progress |= tfun.arg(""+i).unify(_args[i].find(),work);
         if( progress && work==null ) return true; // Will-progress & just-testing early exit
         if( (tfun=tfun.find()).is_err() ) return find().unify(tfun,work);
       }
       // Check for progress on the return
-      progress |= tfun.args(_args.length).unify(find(),work);
+      progress |= tfun.arg("ret").unify(find(),work);
       if( (tfun=tfun.find()).is_err() ) return find().unify(tfun,work);
 
       return progress;
@@ -824,7 +824,7 @@ public class HM {
         T2[] t2s = new T2[_ids.length];
         for( int i=0; i<_ids.length; i++ )
           t2s[i] = _flds[i].find();
-        T2.make_struct(BitsAlias.make0(_alias),_ids,t2s).unify(rec,work);
+        T2.make_struct(false,BitsAlias.make0(_alias),_ids,t2s).unify(rec,work);
         rec=find();
         progress = true;
       }
@@ -832,17 +832,18 @@ public class HM {
 
       // Extra fields are unified with ERR since they are not created here:
       // error to load from a non-existing field
-      for( int i=0; i<rec._ids.length; i++ ) {
-        if( Util.find(_ids,rec._ids[i])== -1 && !rec.args(i).is_err() ) {
-          if( work==null ) return true;
-          progress |= rec.args(i).unify(find().miss_field(rec._ids[i]),work);
+      if( rec._args != null )
+        for( String id : rec._args.keySet() ) {
+          if( Util.find(_ids,id)== -1 && !rec.arg(id).is_err() ) {
+            if( work==null ) return true;
+            progress |= rec.arg(id).unify(find().miss_field(id),work);
+          }
         }
-      }
 
       // Unify existing fields.  Ignore extras on either side.
       for( int i=0; i<_ids.length; i++ ) {
-        int idx = Util.find(rec._ids,_ids[i]);
-        if( idx!= -1 ) progress |= rec.args(idx).unify(_flds[i].find(),work);
+        T2 fld = rec.arg(_ids[i]);
+        if( fld!=null ) progress |= fld.unify(_flds[i].find(),work);
         if( work==null && progress ) return true;
       }
       rec.push_update(this);
@@ -864,12 +865,15 @@ public class HM {
     }
 
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
-      T2[] t2s = new T2[_ids.length];
-      prep_tree_impl(par, nongen, work, T2.make_struct(BitsAlias.make0(_alias),_ids,t2s));
+      prep_tree_impl(par, nongen, work, T2.make_struct(false,BitsAlias.make0(_alias),null,null));
       int cnt = 1;              // One for self
-      for( int i=0; i<_flds.length; i++ ) { // Prep all sub-fields
+      T2[] t2s = new T2[_ids.length];
+      if( _ids.length!=0 ) _hmt._args = new NonBlockingHashMap<>();
+      assert _hmt._deps==null;
+      for( int i=0; i<_ids.length; i++ ) { // Prep all sub-fields
         cnt += _flds[i].prep_tree(this,nongen,work);
         t2s[i] = _flds[i].find();
+        _hmt._args.put(_ids[i],t2s[i]);
       }
       return cnt;
     }
@@ -893,20 +897,20 @@ public class HM {
     @Override boolean hm(Worklist work) {
       if( find().is_err() ) return false; // Already an error; no progress
       T2 rec = _rec.find();
-      if( rec.is_nilable() || (rec._alias!=null && rec._alias.test(0)) )
+      if( rec.is_nil() || (rec._flow!=null && rec._flow.must_nil()) )
         return find().unify(T2.make_err("May be nil when loading field "+_id),work);
       rec.push_update(this);
-      int idx = rec._ids==null ? -1 : Util.find(rec._ids,_id);
-      if( idx!= -1 )            // Unify against a pre-existing field
-        return rec.args(idx).unify(find(), work);
+      T2 fld = rec.arg(_id);
+      if( fld!=null )           // Unify against a pre-existing field
+        return fld.unify(find(), work);
       // The remaining cases all make progress and return true
       if( work==null ) return true;
       if( rec.is_err() ) return find().unify(rec,work);
       // Not a struct or no field, force it to be one
-      if( rec.is_struct() && rec._open ) // Effectively unify with an extended struct.
+      if( rec.is_struct() && rec.is_open() ) // Effectively unify with an extended struct.
         return rec.add_fld(_id,find(),work);
       if( rec.is_leaf() )
-        return T2.make_struct(BitsAlias.EMPTY,new String[]{_id}, new T2[]{find().push_update(rec._deps)},true).unify(rec, work);
+        return T2.make_struct(true,BitsAlias.EMPTY,new String[]{_id}, new T2[]{find().push_update(rec._deps)}).unify(rec, work);
       // Closed record, field is missing
       return find().unify(rec.miss_field(_id),work);
     }
@@ -964,7 +968,7 @@ public class HM {
       super(null,IDS[t2s.length-1]);
       _hmt = T2.make_fun(BitsFun.make0(_fidx),t2s).fresh();
       for( int i=0; i<_targs.length; i++ )
-        _targs[i] = _hmt.args(i).push_update(this);
+        _targs[i] = _hmt.arg(""+i).push_update(this);
     }
     abstract PrimSyn make();
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
@@ -992,46 +996,12 @@ public class HM {
   }
 
 
-  // Curried Pair
-  static class Pair1 extends PrimSyn {
-    @Override String name() { return "pair1"; }
-    static private T2 var1,var2;
-    static HashMap<Type,Pair1X> PAIR1S = new HashMap<>();
-    public Pair1() {
-      super(var1=T2.make_leaf(),T2.make_fun(BitsFun.ANY,var2=T2.make_leaf(),T2.make_struct(BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{var1,var2})));
-    }
-    @Override PrimSyn make() { return new Pair1(); }
-    @Override Type apply(Syntax[] args) {
-      Type t = args[0]._flow;
-      Pair1X p1x = PAIR1S.get(t);
-      if( p1x == null )
-        PAIR1S.put(t,p1x = new Pair1X(t));
-      return p1x._flow;
-    }
-    static class Pair1X extends PrimSyn {
-      final Type _con;
-      @Override String name() { return "Pair1_"+_con; }
-      static private T2 var2;
-      public Pair1X(Type con) {
-        super(var2=T2.make_leaf(),T2.make_struct(BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{T2.make_base(con),var2}));
-        _con=con;
-      }
-      @Override PrimSyn make() { throw unimpl(); }
-      //@Override boolean hm(Worklist work) { throw unimpl(); }
-      @Override Type apply(Syntax[] args) {
-        T2 tcon = find().args(1).args(0);
-        assert tcon.is_base();
-        return TypeMemPtr.make(PAIR_ALIAS,TypeStruct.maket(tcon._flow,args.length==0 ? Root.widen(_targs[0]) : args[0]._flow));
-      }
-    }
-  }
-
   // Pair
   static class Pair extends PrimSyn {
     @Override String name() { return "pair"; }
     static private T2 var1,var2;
     public Pair() {
-      super(var1=T2.make_leaf(),var2=T2.make_leaf(),T2.make_struct(BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{var1,var2}));
+      super(var1=T2.make_leaf(),var2=T2.make_leaf(),T2.make_struct(false,BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{var1,var2}));
     }
     @Override PrimSyn make() { return new Pair(); }
     @Override Type apply(Syntax[] args) {
@@ -1047,7 +1017,7 @@ public class HM {
   static class Triple extends PrimSyn {
     @Override String name() { return "triple"; }
     static private T2 var1,var2,var3;
-    public Triple() { super(var1=T2.make_leaf(),var2=T2.make_leaf(),var3=T2.make_leaf(),T2.make_struct(BitsAlias.make0(TRIPLE_ALIAS),new String[]{"0","1","2"},new T2[]{var1,var2,var3})); }
+    public Triple() { super(var1=T2.make_leaf(),var2=T2.make_leaf(),var3=T2.make_leaf(),T2.make_struct(false,BitsAlias.make0(TRIPLE_ALIAS),new String[]{"0","1","2"},new T2[]{var1,var2,var3})); }
     @Override PrimSyn make() { return new Triple(); }
     @Override Type apply(Syntax[] args) {
       TypeFld[] ts = new TypeFld[args.length+1];
@@ -1064,7 +1034,7 @@ public class HM {
     public If() { super(T2.make_leaf(),T2.make_leaf(),T2.make_leaf(),T2.make_leaf()); }
     @Override PrimSyn make() { return new If(); }
     @Override boolean hm(Worklist work) {
-      T2 rez = find().args(3);
+      T2 rez = find().arg("ret");
       // GCP helps HM: do not unify dead control paths
       if( DO_GCP ) {            // Doing GCP during HM
         Type pred = _types[0];
@@ -1151,18 +1121,18 @@ public class HM {
     @Override PrimSyn make() { return new NotNil(); }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       int cnt = super.prep_tree(par,nongen,work);
-      find().args(1).push_update(this);
+      find().arg("ret").push_update(this);
       return cnt;
     }
     @Override boolean hm(Worklist work) {
       T2 arg = targ(0);
       if( arg.is_err() ) return false; // Already an error
       T2 fun = find(); assert fun.is_fun();
-      T2 ret = fun.args(1);
-      // If the arg is already nilchecked, can be a nilable of a nilable.
+      T2 ret = fun.arg("ret");
+      // If the arg is already nil-checked, can be a nilable of a nilable.
       if( arg==ret ) return false;
       // Already an expanded nilable
-      if( arg.is_nilable() && arg.args(0) == ret ) return false;
+      if( arg.is_nil() && arg.arg("?") == ret ) return false;
       // Already an expanded nilable with base
       if( arg.is_base() && ret.is_base() ) {
         if( arg._flow == ret._flow.meet_nil(Type.XNIL) ) return false;
@@ -1175,26 +1145,25 @@ public class HM {
         return true;
       }
       // Already an expanded nilable with struct
-      if( arg.is_struct() && ret.is_struct() && arg._alias == arg._alias.meet_nil() ) {
+      if( arg.is_struct() && ret.is_struct() && arg._flow == arg._flow.meet_nil(Type.XNIL) ) {
         // But cannot just check the aliases, since they may not match.
         // Also check that the fields align
         boolean progress=false;
-        for( int i=0; i<arg._ids.length; i++ ) {
-          int idx = Util.find(ret._ids,arg._ids[i]);
-          if( idx != -1 && arg.args(i)!=ret.args(idx) )
-            { progress=true; break; } // Field/HMtypes misalign
+        for( String fld : arg._args.keySet() ) {
+          if( arg.arg(fld) != ret.arg(fld) )
+            { progress=true; break; } // Field/HMtypes misaligned
           //if( idx == -1 && ret._open ) // Missing field to add, cannot find a test case
           //  { progress=true; break; }
         }
-        if( !progress && arg._open )
-          for( int i=0; i<ret._ids.length; i++ )
-            if( Util.find(arg._ids,ret._ids[i])== -1 )
+        if( !progress && arg.is_open() )
+          for( String fld : ret._args.keySet() )
+            if( arg.arg(fld)==null )
               { progress=true; break; }
         if( !progress ) return false; // No progress
       }
       if( work==null ) return true;
-      // If the arg is already nilchecked, can be a nilable of a nilable.
-      if( arg.is_nilable() && ret.is_nilable() )
+      // If the arg is already nil-checked, can be a nilable of a nilable.
+      if( arg.is_nil() && ret.is_nil() )
         return arg.unify(ret,work);
       // Unify with arg with a nilable version of the ret.
       return T2.make_nil(ret).find().unify(arg,work);
@@ -1300,97 +1269,113 @@ public class HM {
     // and arguments and Type constants.
     @NotNull String _name; // name, e.g. "->" or "pair" or "V123" or "base"
 
-    // Structural parts to unify with, or slot 0 is used during normal U-F
-    T2[] _args;
+    // Structural parts to unify with, or null.
+    // If Leaf or Error, then null.
+    // If unified, contains the single key ">>".
+    // If Base   , contains the single key "Base".
+    // If Nil    , contains the single key "?"
+    // If Lambda , contains keys "0","1","2" for args or "ret" for return.
+    // If Apply  , contains keys "fun" and "0","1","2" for args
+    // If Struct , contains keys for the field labels.  No display.  Is null if no fields.
+    NonBlockingHashMap<String,T2> _args;
 
-    // A dataflow type.  Unused for everything except base type-vars (i.e.
-    // constants, primitive tvars).  Splitting these to make it easier to tease
-    // apart when they should be used, and when not.  Root needs a way to
-    // recursively make a flow type from an HM type and the confusion is that
-    // the _flow field is a valid flow type... it is not except and only for
-    // Base types.
+    // A dataflow type or null.
+    // If Leaf, or unified or Nil or Apply, then null.
+    // If Base, then the flow type.
+    // If Lambda, then a TFP and the BitsFun   matters.
+    // If Struct, then a TMP and the BitsAlias matters.
+    // If Error, then a TypeStr with the error (not a TMP to a TS).
     Type _flow;
-    BitsFun _fidxs;             // Unused except for is_fun
-    // Structs have field names and aliases
-    BitsAlias _alias;           // Unused except for is_struct and NIL
-    String[] _ids;
-    boolean _open;              // Struct can be extended
-    String _err;                // Error
 
     // Dependent (non-local) tvars to revisit
     Ary<Syntax> _deps;
 
     // Constructor factories.
-    static T2 make_leaf() { return new T2("V"+CNT); }
-    static T2 make_nil(T2 leaf) { return new T2("?",leaf); }
-    static T2 make_base(Type flow) { T2 base = new T2("Base"); base._flow = flow; return base; }
-    static T2 make_fun(BitsFun fidxs, T2... args) { T2 tfun = new T2("->",args); tfun._fidxs = fidxs; return tfun; }
-    static T2 make_struct( BitsAlias aliases, String[] ids, T2[] flds ) { return make_struct(aliases,ids,flds,false); }
-    static T2 make_struct( BitsAlias aliases, String[] ids, T2[] flds, boolean open ) {
-      T2 tstr = new T2("@{}",flds);
-      tstr._alias=aliases;
-      tstr._ids = ids;
-      tstr._open= open;
-      return tstr;
+    static T2 make_leaf() { return new T2("V",null,null); }
+    static T2 make_nil (T2 leaf) { return new T2("?",null,"?",leaf); }
+    static T2 make_base(Type flow) { return new T2("Base",flow,null); }
+    static T2 make_fun (BitsFun fidxs, T2... t2s) {
+      NonBlockingHashMap<String,T2> args = new NonBlockingHashMap<>();
+      for( int i=0; i<t2s.length-1; i++ )
+        args.put(""+i,t2s[i]);
+      args.put("ret",t2s[t2s.length-1]);
+      return new T2("->",TypeFunPtr.make(fidxs,t2s.length-1,Type.ANY),args);
     }
-    static T2 make_err(String s)   { T2 terr = new T2("Err"); terr._err = s.intern(); return terr; }
+    // A struct with fields
+    static T2 make_struct( boolean open, BitsAlias aliases, String[] ids, T2[] flds ) {
+      NonBlockingHashMap<String,T2> args = ids==null ? null : new NonBlockingHashMap<>();
+      if( ids!=null )
+        for( int i=0; i<ids.length; i++ )
+          args.put(ids[i],flds[i]);
+      Type flow = TypeMemPtr.make(aliases,TypeStruct.make("",false,open));
+      return new T2("@{}",flow,args);
+    }
+    static T2 make_err(String s) { return new T2("Err",TypeStr.con(s.intern()),null); }
     T2 miss_field(String id) { return make_err("Missing field "+id+" in "+p()); }
+    @SuppressWarnings("unchecked")
     T2 copy() {
-      T2 t = new T2(_name);
-      if( _args!=null ) t._args = new T2[_args.length];
-      t._flow  = _flow;
-      t._fidxs = _fidxs;
-      t._alias = _alias;
-      t._ids   = _ids;
-      t._err   = _err;
+      T2 t = new T2(_name,_flow,null);
+      if( _args!=null ) t._args = (NonBlockingHashMap<String,T2>)_args.clone();
+      assert _deps==null || _args==null;
       t._deps  = _deps;
-      t._open  = _open;
       return t;
     }
 
-    private T2(@NotNull String name) { _uid = CNT++; _name= name; }
-    private T2(@NotNull String name, T2 @NotNull ... args) {
-      this(name);
-      _args= args;
+    private T2(@NotNull String name, Type flow, NonBlockingHashMap<String,T2> args) {
+      _uid  = CNT++;
+      _name = name;
+      _args = args;
+      _flow = flow;
+    }
+    // Single arg
+    private T2(@NotNull String name, Type flow, String key, T2 arg) {
+      this(name,flow,new NonBlockingHashMap<String,T2>(){{put(key,arg);}});
     }
 
-    // A type var, not a concrete leaf.  Might be U-Fd or not.
-    boolean is_leaf() { return _name.charAt(0)=='V' || _name.charAt(0)=='X'; }
-    boolean no_uf()   { return _name.charAt(0)!='X' && (!is_nilable() || _args[0].is_leaf()); }
+    // A type var, not a concrete leaf.
     boolean isa(String name) { return Util.eq(_name,name); }
-    boolean is_base() { return isa("Base"); }
-    boolean is_nilable() { return isa("?"); }
-    boolean is_fun () { return isa("->"); }
-    boolean is_struct() { return isa("@{}"); }
-    boolean is_err()  { return isa("Err"); }
+    boolean is_leaf() { return isa("V"); }
+    boolean unified() { return isa("X"); }
+    boolean is_base()  { return isa("Base"); }
+    boolean is_nil()   { return isa("?"   ); }
+    boolean is_fun ()  { return isa("->"  ); }
+    boolean is_struct(){ return isa("@{}" ); }
+    boolean is_err()   { return isa("Err" ); }
+    boolean is_open() {
+      assert is_struct();
+      return ((TypeStruct)((TypeMemPtr)_flow)._obj)._open;
+    }
+    int size() { return _args==null ? 0 : _args.size(); }
 
     T2 debug_find() {// Find, without the roll-up
-      if( !is_leaf() ) return this; // Shortcut
+      if( !unified() ) return this; // Shortcut
       if( _args==null ) return this;
-      T2 u = _args[0];
-      if( u.no_uf() ) return u;  // Shortcut
+      T2 u = _args.get(">>");
+      if( !u.unified() ) return u;  // Shortcut
       // U-F search, no fixup
-      while( u.is_leaf() && !u.no_uf() ) u = u._args[0];
+      while( u.unified() ) u = u.arg(">>");
       return u;
     }
 
     T2 find() {
       T2 u = _find0();
-      return u.is_nilable() ? u._find_nil() : u;
+      return u.is_nil() ? u._find_nil() : u;
     }
     // U-F find
     private T2 _find0() {
       T2 u = debug_find();
-      if( u==this || u==_args[0] ) return u;
-      T2 v = this, v2;
+      if( u==this ) return u;
+      if( u==_args.get(">>") ) return u;
       // UF fixup
-      while( v.is_leaf() && (v2=v._args[0])!=u ) { v._args[0]=u; v = v2; }
+      T2 v = this, v2;
+      while( (v2=v._args.get(">>"))!=u ) { v._args.put(">>",u); v = v2; }
       return u;
     }
     // Nilable fixup.  nil-of-leaf is OK.  nil-of-anything-else folds into a
     // nilable version of the anything-else.
+    @SuppressWarnings("unchecked")
     private T2 _find_nil() {
-      T2 n = args(0);
+      T2 n = arg("?");
       if( n.is_leaf() ) return this;
       // Nested nilable-and-not-leaf, need to fixup the nilable
       if( n.is_base() ) {
@@ -1398,27 +1383,25 @@ public class HM {
         _args = null;
         _name = "Base";
       } else if( n.is_struct() ) {
-        _alias= n._alias.meet_nil();
-        _args = n._args.clone();
-        _ids  = n._ids.clone();
-        _open = n._open;
+        _flow = n._flow.meet_nil(Type.XNIL);
+        _args = n._args==null ? null : (NonBlockingHashMap<String, T2>)n._args.clone();  // Shallow copy the TV2 fields
         _name = n._name;
-      } else if( n.is_nilable() ) {
-        _args[0] = n.args(0);
+      } else if( n.is_nil() ) {
+        _args.put("?",n.arg("?"));
       } else
         throw unimpl();
 
-      if( n._deps!=null ) {
-        if( _deps == null ) _deps = n._deps;
-        else _deps.addAll(n._deps);
-      }
+      n.merge_deps(this);
       return this;
     }
-    // U-F find on the args array
-    T2 args(int i) {
-      T2 u = _args[i];
+    // U-F find on the args collection
+    T2 arg( String key) {
+      if( _args==null ) return null;
+      T2 u = _args.get(key);
+      if( u==null ) return null;
       T2 uu = u.find();
-      return u==uu ? uu : (_args[i]=uu);
+      if( u!=uu ) _args.put(key,uu);
+      return uu;
     }
 
     // Recursively build a conservative flow type from an HM type.  The HM
@@ -1436,157 +1419,105 @@ public class HM {
       return t;
     }
     Type _as_flow() {
-      assert no_uf();
+      assert !unified();
       if( is_base() ) return _flow;
       if( is_leaf() ) return Type.SCALAR;
-      if( is_err()  ) return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(_err));
-      if( is_fun()  ) return TypeFunPtr.make(_fidxs,_args.length-1,Type.ANY);
-      if( is_nilable() ) return Type.SCALAR;
+      if( is_err()  ) throw unimpl();//return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(_err));
+      if( is_fun()  ) throw unimpl(); //return TypeFunPtr.make(_fidxs,_args.length-1,Type.ANY);
+      if( is_nil() ) return Type.SCALAR;
       if( is_struct() ) {
         TypeStruct tstr = ADUPS.get(_uid);
         if( tstr==null ) {
           Type.RECURSIVE_MEET++;
           tstr = TypeStruct.malloc("",false,true).add_fld(TypeFld.NO_DISP);
-          for( String id : _ids ) tstr.add_fld(TypeFld.malloc(id));
-          tstr.set_hash();
-          ADUPS.put(_uid,tstr); // Stop cycles
-          for( int i=0; i<_ids.length; i++ )
-            tstr.fld_find(_ids[i]).setX(args(i)._as_flow()); // Recursive
-          if( --Type.RECURSIVE_MEET == 0 )
-            // Shrink / remove cycle dups.  Might make new (smaller)
-            // TypeStructs, so keep RECURSIVE_MEET enabled.
-            tstr = tstr.install();
+          //for( String id : _ids ) tstr.add_fld(TypeFld.malloc(id));
+          //tstr.set_hash();
+          //ADUPS.put(_uid,tstr); // Stop cycles
+          //for( int i=0; i<_ids.length; i++ )
+          //  tstr.fld_find(_ids[i]).setX(args(i)._as_flow()); // Recursive
+          //if( --Type.RECURSIVE_MEET == 0 )
+          //  // Shrink / remove cycle dups.  Might make new (smaller)
+          //  // TypeStructs, so keep RECURSIVE_MEET enabled.
+          //  tstr = tstr.install();
+          throw unimpl();
         } else {
           tstr._cyclic=true;    // Been there, done that, just mark it cyclic
         }
-        return TypeMemPtr.make(_alias,tstr);
+        throw unimpl(); //return TypeMemPtr.make(_alias,tstr);
       }
 
       throw unimpl();
     }
 
 
-    // If LHS is null, return RHS (and no progress)
-    // If RHS is null, return LHS (and progress)
-    // Else return meet (and progress is LHS!=RHS)
-    private Type meet_flow(T2 that) {
-      if( this._flow==null ) return that._flow;
-      if( that._flow==null ) return this._flow;
-      return _flow.meet(that._flow);
-    }
-    private BitsFun meet_fidxs(T2 that) {
-      if( this._fidxs==null ) return that._fidxs;
-      if( that._fidxs==null ) return this._fidxs;
-      return _fidxs.meet(that._fidxs);
-    }
-    private BitsAlias meet_alias(T2 that) {
-      if( this._alias==null ) return that._alias;
-      if( that._alias==null ) return this._alias;
-      return _alias.meet(that._alias);
-    }
-    private String[] meet_ids(T2 that) {
-      String[] ids = that._ids;
-      if( _ids==ids ) return ids;
-      if( _ids==null ) return ids;
-      if( ids==null ) return _ids;
-      if( _ids.length!=ids.length ) throw unimpl(); // Handled at a higher level
-      for( String id : ids )
-        if( Util.find(_ids, id) == -1 )
-          throw unimpl();
-      return ids;               // Return RHS
-    }
-    private boolean meet_opens(T2 that) {
-      if( _open==that._open ) return that._open;
-      if( !is_struct() ) return that._open;
-      if( !that.is_struct() ) return _open;
-      return false; // most conservative answer
-    }
-    private String meet_err(T2 that) {
-      if( this._err==null ) return that._err;
-      if( that._err==null ) return this._err;
-      // TODO: Probably gather unrelated strings in a set
-      return _uid < that._uid ? _err : that._err;
-    }
-    private int base_states() {
-      int cnt=0;
-      if( _flow !=null ) cnt++;
-      if( _fidxs!=null ) cnt++;
-      if( _err  !=null ) cnt++;
-      if( _alias!=null ) { cnt++; assert _ids!=null; }
-      else assert _ids==null;
-      return cnt;
-    }
-
     // U-F union; this becomes that; returns 'that'.
     // No change if only testing, and reports progress.
     boolean union(T2 that, Worklist work) {
-      assert no_uf() && that.no_uf(); // Cannot union twice
-      assert base_states()<=1 && that.base_states()<=1;
+      assert !unified() && !that.unified(); // Cannot union twice
       if( this==that ) return false;
       if( work==null ) return true; // Report progress without changing
-      // Keep the merge of all base types, revisiting deps if any changes
-      if( _flow !=that._flow  ||
-          _fidxs!=that._fidxs ||
-          _alias!=that._alias ||
-          _ids  !=that._ids   ||
-          _open !=that._open  ||
-          !Util.eq(_err,that._err) )
-        work.addAll(that._deps); // Any progress, revisit deps
-      // If flow types are not compatible, return an error now
-      if( _flow!=null & that._flow!=null && (_flow.widen() != that._flow.widen() && !_flow.isa(that._flow.widen())) )
-        return union_err(that,work,"Cannot unify "+this.p()+" and "+that.p());
-      that._flow  = meet_flow (that);
-      that._fidxs = meet_fidxs(that);
-      that._alias = meet_alias(that);
-      that._ids   = meet_ids  (that);
-      that._open  = meet_opens(that);
-      that._err   = meet_err  (that);
-      assert that._flow != Type.XNIL;
-      if( that._err!=null ) {   // Kill the base types in an error
-        that._flow=null;  that._fidxs=null;  that._alias=null;  that._ids=null;
+
+      if( !that.is_err() ) {
+        // Keep the merge of all base types, and add _deps.
+        if( that._flow==null ) that._flow = _flow;
+        else if( _flow!=null ) {
+          if( _flow.getClass()!=that._flow.getClass() )
+            return union_err(that,work,"Cannot unify "+this.p()+" and "+that.p());
+          that._flow = meet_flow(that);
+        }
       }
+      that.add_deps_work(work);
+      this.add_deps_work(work);      // Any progress, revisit deps
       // Hard union this into that, no more testing.
-      return _union(that,work);
+      return _union(that);
+    }
+
+    // Hard unify this into that, no testing for progress.
+    private boolean _union( T2 that ) {
+      assert !unified() && !that.unified(); // Cannot union twice
+      _flow=null;       // Kill the base type in a unified type
+      // Worklist: put updates on the worklist for revisiting
+      merge_deps(that);         // Merge update lists, for future unions
+      _args = new NonBlockingHashMap<String,T2>(){{put(">>",that);}};
+      _name = "X";             // Flag as a unified
+      assert unified();
+      return true;
     }
 
     // U-F union; this is nilable and becomes that.
     // No change if only testing, and reports progress.
     boolean unify_nil(T2 that, Worklist work) {
-      assert is_nilable() && !that.is_nilable();
+      assert is_nil() && !that.is_nil();
       if( work==null ) return true; // Will make progress
       // Clone the top-level struct and make this nilable point to the clone;
       // this will collapse into the clone at the next find() call.
       // Unify the nilable leaf into that.
-      T2 leaf = args(0);  assert leaf.is_leaf();
+      T2 leaf = arg("?");  assert leaf.is_leaf();
       T2 copy = that.copy();
-      if( that.is_base() ) {
+      if( that.is_base() || that.is_struct() ) {
         copy._flow = copy._flow.join(Type.NSCALR);
-      } else if( that.is_struct() ) {
-        copy._alias = copy._alias.clear(0);
-        System.arraycopy(that._args,0,copy._args,0,that._args.length);
       } else
         throw unimpl();
-      return leaf._union(copy,work) | that._union(find(),work);
+      return leaf._union(copy) | that._union(find());
     }
 
-    // Hard unify this into that, no testing for progress.
-    private boolean _union(T2 that, Worklist work) {
-      assert that.no_uf();
-      _flow=null;  _fidxs=null;  _alias=null; _ids=null; _err=null; // Kill the base types in a unified type
-      // Worklist: put updates on the worklist for revisiting
-      if( _deps != null ) {
-        work.addAll(_deps); // Re-Apply
-        // Merge update lists, for future unions
-        if( that._deps==null && that._args==null ) that._deps = _deps;
-        else for( Syntax dep : _deps ) that.push_update(dep);
-        _deps = null;
-      }
-      if( _args==null || _args.length!=1 ) _args = new T2[1];
-      // Unify the two base types, preserving errors
-      _args[0] = that;         // U-F update
-      _name = "X"+_uid; // Flag as a leaf & unified
-      assert !no_uf();
-      return true;
+    // Meet flow types.  Complex because the 'open' flag is kept in a
+    // TypeStruct, if any, and must be treated conservatively.
+    Type meet_flow(T2 that) {
+      if( _flow==that._flow ) return _flow;
+      if( this._flow==null ) return remove_open(that._flow);
+      if( that._flow==null ) return remove_open(this._flow);
+      Type mt = _flow.meet(that._flow);
+      return is_open(_flow) && is_open(that._flow) ? mt : remove_open(mt);
+    }
+
+    private static boolean is_open(Type flow) {
+      if( !(flow instanceof TypeMemPtr) ) return false;
+      TypeMemPtr tfp = (TypeMemPtr)flow;
+      return tfp._obj instanceof TypeStruct && ((TypeStruct) tfp._obj)._open;
+    }
+    private static Type remove_open(Type flow) {
+      return is_open(flow) ? ((TypeMemPtr)flow).make_from(TypeStruct.NO_ARGS) : flow;
     }
 
     // -----------------
@@ -1608,7 +1539,7 @@ public class HM {
     // (work is null) and returns a progress flag.  If updating, both 'this'
     // and 'that' are the same afterwards.
     private boolean _unify(T2 that, Worklist work) {
-      assert no_uf() && that.no_uf();
+      assert !unified() && !that.unified();
       if( this==that ) return false;
 
       // All leaf types immediately unify.
@@ -1625,8 +1556,8 @@ public class HM {
       if( this.is_leaf() || that.is_err() ) return this.union(that,work);
       if( that.is_leaf() || this.is_err() ) return that.union(this,work);
       // Special case for nilable union something
-      if( this.is_nilable() && !that.is_nilable() ) return this.unify_nil(that,work);
-      if( that.is_nilable() && !this.is_nilable() ) return that.unify_nil(this,work);
+      if( this.is_nil() && !that.is_nil() ) return this.unify_nil(that,work);
+      if( that.is_nil() && !this.is_nil() ) return that.unify_nil(this,work);
 
       // Cycle check
       long luid = dbl_uid(that);    // long-unique-id formed from this and that
@@ -1642,133 +1573,59 @@ public class HM {
       assert _args!=that._args; // Not expecting to share _args and not 'this'
 
       // Structural recursion unification.
-
-      // Structs unify only on matching fields, and add missing fields.
-      if( is_struct() ) {
-        _unify_struct(that,work);
-        that = that.find();
-      } else {                                // Normal structural unification
-        for( int i=0; i<_args.length; i++ ) { // For all fields in LHS
-          args(i)._unify(that.args(i),work);
-          if( (that=that.find()).is_err() ) break;
-        }
-      }
-      if( find().is_err() && !that.is_err() )
-        // TODO: Find a more elegant way to preserve errors
-        return that.union(find(),work); // Preserve errors
-      return find().union(that,work);
-    }
-
-    // Unify this struct into that struct
-    private void _unify_struct(T2 that, Worklist work) {
-      assert this.is_struct() && that.is_struct();
       T2 thsi = this;
-      // Unification for structs is more complicated; args are aligned via
-      // field names and not by position.  Fields in one struct and not the
-      // other are put in if the other is open, and dropped otherwise.
-      for( int i=0; i<thsi._ids.length; i++ ) { // For all fields in LHS
-        int idx = Util.find(that._ids,thsi._ids[i]);
-        if( idx==-1 ) {         // Missing that field?  Copy from left if open, error if closed.
-          // Extra fields on closed are dropped
-          if( that._open ) that.add_fld(thsi._ids[i], thsi.args(i), work);
-        } else thsi.args(i)._unify(that.args(idx),work);    // Unify matching field
-        if( (that=that.find()).is_err() ) return; // Recursively, might have already rolled this up
-        if( (thsi=thsi.find()).is_err() ) return; // Recursively, might have already rolled this up
-        assert thsi.is_struct();
+      for( String key : thsi._args.keySet() ) {
+        T2 vthis = thsi.arg(key);
+        T2 vthat = that.arg(key);
+        if( vthat==null ) {
+          if( that.is_open() ) that.add_fld(key,vthis,work);
+        } else vthis._unify(vthat,work); // Matching fields unify
+        if( (thsi=thsi.find()).is_err() ) break;
+        if( (that=that.find()).is_err() ) break;
       }
-      for( int i=0; i<that._ids.length; i++ ) // For all fields in RHS
-        if( Util.find(thsi._ids,that._ids[i]) == -1 ) // Missing in LHS
-          if( thsi._open )                            // LHS is open, so add missing
-            thsi.add_fld(that._ids[i],that.args(i),work);
-          else                  // LHS is closed, so extras in RHS are dropped
-            that.del_fld(i--, work); // Drop from RHS
+      // Fields on the RHS are aligned with the LHS also
+      if( !thsi.is_err() && !that.is_err() )
+        for( String key : that._args.keySet() )
+          if( thsi.arg(key)==null )
+            if( thsi.is_open() )  this.add_fld(key,that.arg(key),work); // Add to LHS: todo: need a find() here
+            else                  that.del_fld(key, work);              // Drop from RHS
 
-      // Shortcut (for asserts): LHS gets same ids as RHS, since its about to be top-level unified
-      thsi._open= that._open = thsi.meet_opens(that);
-      thsi._ids = that._ids;
+      if( that.debug_find() != that ) throw unimpl();
+      if( thsi.is_err() && !that.is_err() )
+        return that._union(thsi); // Preserve error on LHS
+      return thsi.union(that,work);
     }
 
     // Insert a new field; keep fields sorted
     private boolean add_fld(String id, T2 fld, Worklist work) {
       assert is_struct();
-      int len = _ids.length;
-      // Find insertion point
-      int idx = Arrays.binarySearch(_ids,id);
-      assert idx<0;             // Never found
-      idx = -idx-1;             // Insertion point
-      // Insert in sorted order
-      _ids  = Arrays.copyOf( _ids,len+1);
-      _args = Arrays.copyOf(_args,len+1);
-      System.arraycopy( _ids,idx, _ids,idx+1,len-idx);
-      System.arraycopy(_args,idx,_args,idx+1,len-idx);
-      _ids [idx] = id ;
-      _args[idx] = fld;
-      fld.push_update(_deps); // If field changes, all deps change
-      work.addAll(_deps); //
-      return true;        // Always progress
+      if( _args==null ) {
+        _args = new NonBlockingHashMap<>();
+        fld.push_update(_deps);
+        _deps=null;
+      }
+      _args.put(id,fld);
+      add_deps_work(work);
+      return true;
     }
     // Delete a field
-    private boolean del_fld( int i, Worklist work) {
+    private boolean del_fld( String id, Worklist work) {
       assert is_struct();
-      int len = _ids.length;
-      // Must copy, since otherwise shared.
-      String[] ids = Arrays.copyOf(_ids ,len-1);
-      T2[]    args = Arrays.copyOf(_args,len-1);
-      System.arraycopy(_ids ,i+1,ids ,i,len-1-i);
-      System.arraycopy(_args,i+1,args,i,len-1-i);
-      if( len > i+1 ) ids [len-2] = _ids [len-1];
-      if( len > i+1 ) args[len-2] = _args[len-1];
-      _ids  =  ids;
-      _args = args;
-      work.addAll(_deps);
+      add_deps_work(work);
+      T2 fld = _args.remove(id);
+      if( _args.size()==0 ) {
+        _args=null;
+        _deps = fld._deps;
+      }
       return true;
     }
 
     private long dbl_uid(T2 t) { return dbl_uid(t._uid); }
     private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
-    private boolean fresh_base(T2 that, Worklist work) {
-      assert base_states()<=1 && that.base_states()<=1;
-      boolean progress=false;
-      Type      flow  = meet_flow (that);  progress |= flow  != that._flow ;
-      BitsFun   fidxs = meet_fidxs(that);  progress |= fidxs != that._fidxs;
-      BitsAlias alias = meet_alias(that);  progress |= alias != that._alias;
-      String[]  ids   = meet_ids  (that);  progress |= ids   != that._ids;
-      boolean   open  = meet_opens(that);  progress |= open  != that._open;
-      String    err   = meet_err  (that);  progress |= !Util.eq(err,that._err);
-      if( !progress ) return false;
-      if( work==null ) return true;
-      // Progress
-      Type that_flow = that._flow;
-      that._flow  = flow ;
-      that._fidxs = fidxs;
-      that._alias = alias;
-      that._ids   = ids;
-      that._open  = open;
-      that._err   = err;
-      if( !_can_be_HM_base(that,that_flow) ) {
-        that._flow = that_flow; // Unwind for error message
-        String msg = "Cannot unify "+this.p()+" and "+that.p();
-        that._flow=null;  that._fidxs=null;  that._alias=null;  that._ids=null; // Now kill the base types, since in-error
-        return that.union(make_err(msg),work);
-      }
-      assert that.base_states()<=1;
-      that.add_deps_work(work);
-      if( that.is_leaf() ) that._name = _name; // That is a base/err now
-      return true;
-    }
-    private boolean _can_be_HM_base(T2 that, Type that_flow) {
-      if( that.base_states() > 1 ) return false;
-      if( _flow==null || that_flow==null ) return true;
-      Type wthisflow =     _flow.widen();
-      Type wthatflow = that_flow.widen();
-      if( wthisflow==wthatflow ) return true;
-      return wthisflow.isa(wthatflow);
-    }
     private boolean union_err(T2 that, Worklist work, String msg) {
-      that._flow=null;  that._fidxs=null;  that._alias=null;  that._ids=null; // Now kill the base types, since in-error
-      union(that,work);
-      return that.union(make_err(msg),work);
+      union(make_err(msg),work);
+      return that.union(find(),work);
     }
 
     // -----------------
@@ -1789,122 +1646,92 @@ public class HM {
 
     // Outer recursive version, wraps a VARS check around other work
     private boolean _fresh_unify(T2 that, VStack nongen, Worklist work) {
-      assert no_uf() && that.no_uf();
+      assert !unified() && !that.unified();
+      // Check for cycles
       T2 prior = VARS.get(this);
       if( prior!=null )         // Been there, done that
-        return prior.find()._unify(that,work);  // Also 'prior' needs unification with 'that'
+        return prior.find()._unify(that,work);  // Also, 'prior' needs unification with 'that'
+      // Check for equals
       if( cycle_equals(that) ) return vput(that,false);
 
       if( that.is_err() ) return vput(that,false); // That is an error, ignore 'this' and no progress
       if( this.is_err() ) return vput(that,_unify(that,work));
 
       // In the non-generative set, so do a hard unify, not a fresh-unify.
-      if( nongen_in(nongen) ) return vput(that,_unify(that,work)); // Famous 'occurs-check', switch to normal unify
+      if( nongen_in(nongen) ) return vput(that,_unify(that,work)); // Famous 'occurs-check', switch to the normal unify
 
-      // LHS is a leaf, base, or error
-      if( this._args==null ) return vput(that,fresh_base(that,work));
+      // LHS leaf, RHS is unchanged but goes in the VARS
+      if( this.is_leaf() ) return vput(that,false);
       if( that.is_leaf() )  // RHS is a tvar; union with a deep copy of LHS
         return work==null || vput(that,that.union(_fresh(nongen),work));
 
-      // Special handling for nilable
-      if( this.is_nilable() && !that.is_nilable() ) {
-        if( that.is_base() ) {
-          Type mt = that._flow.meet_nil(Type.XNIL);
-          if( mt==that._flow ) return false; // Nilable already
-          if( work!=null ) that._flow = mt;
-          return true;
-        }
-        if( that.is_struct() ) {
-          if( that._alias.test(0) ) return false; // Nilable already
-          throw unimpl();
-        }
+      // Bases MEET cons in RHS
+      if( is_base() && that.is_base() ) {
+        Type mt = meet_flow(that);
+        if( mt==that._flow ) return vput(that,false);
+        if( work == null ) return true;
+        that._flow = mt;
+        return vput(that,true);
+      }
 
-        throw unimpl();
+      // Special handling for nilable
+      if( this.is_nil() && !that.is_nil() ) {
+        Type mt = that._flow.meet_nil(Type.XNIL);
+        if( mt==that._flow ) return false; // Nilable already
+        if( work!=null ) that._flow = mt;
+        return true;
       }
       // That is nilable and this is not
-      if( that.is_nilable() && !this.is_nilable() ) {
-        if( this.is_struct() ) {
-          // fresh_unify a not-nil version of this with the not-nil version of that
-          T2 copy = this;
-          if( copy._alias.test(0) ) { // make a not=nil version of struct
-            copy = this.copy();
-            copy._alias = copy._alias.clear(0);
-            System.arraycopy(this._args,0,copy._args,0,this._args.length);
-          }
-          boolean progress = copy._fresh_unify(that.args(0),nongen,work);
-          return _alias.test(0) ? vput(that,progress) : progress;
+      if( that.is_nil() && !this.is_nil() ) {
+        assert is_base() || is_struct();
+        if( work==null ) return true;
+        T2 copy = this;
+        if( _flow.must_nil() ) { // Make a not-nil version
+          copy = copy();
+          copy._flow = _flow.join(Type.NSCALR);
+          if( _args!=null ) throw unimpl(); // shallow copy
         }
-        throw unimpl();
+        boolean progress = copy._fresh_unify(that.arg("?"),nongen,work);
+        return _flow.must_nil() ? vput(that,progress) : progress;
       }
 
-      if( !Util.eq(_name,that._name) ||
-          (!is_struct() && _args.length != that._args.length) )
+      if( !Util.eq(_name,that._name) )
         return work == null || vput(that,that._unify(make_err("Cannot unify "+this.p()+" and "+that.p()),work));
 
       // Structural recursion unification, lazy on LHS
-      vput(that,false); // Early set, to stop cycles
-      boolean progress = false;
-      if( is_struct() )
-        progress = _fresh_unify_struct(that,nongen,work);
-      else {
-        for( int i=0; i<_args.length; i++ ) {
-          progress |= args(i)._fresh_unify(that.args(i),nongen,work);
-          if( progress && work==null ) return true;
-          if( (that=that.find()).is_err() ) return true;
-        }
-        if( is_fun() ) {
-          BitsFun fidxs = meet_fidxs(that);
-          if( fidxs!=that._fidxs ) progress=true;
-          if( progress && work==null ) return true;
-          that._fidxs = fidxs;
-        }
-      }
-      return progress;
-    }
-
-    // Unification with structs must honor field names.
-    private boolean _fresh_unify_struct(T2 that, VStack nongen, Worklist work) {
-      assert is_struct() && that.is_struct();
-      boolean progress = false;
-      // Unification for structs is more complicated; args are aligned via
-      // field names and not by position.  Conceptually, fields in one struct
-      // and not the other are put in both before unifying the structs.  Open
-      // structs copy from the other side; closed structs insert a missing
-      // field error.
-      for( int i=0; i<_ids.length; i++ ) {
-        int idx = Util.find(that._ids,_ids[i]);
-        if( idx == -1 ) {       // Missing field on RHS
-          if( that._open ) {    // If RHS is open, copy field into it.
+      boolean progress = vput(that,false); // Early set, to stop cycles
+      boolean missing = size()!= that.size();
+      for( String key : _args.keySet() ) {
+        T2 lhs = this.arg(key);
+        T2 rhs = that.arg(key);
+        if( rhs==null ) {         // No RHS to unify against
+          missing = true;         // Might be missing RHS
+          if( that.is_open() ) {     // If RHS is open, copy field into it
             if( work==null ) return true; // Will definitely make progress
-            progress |= that.add_fld(_ids[i], args(i)._fresh(nongen), work);
-          }
-        } else
-          progress |= args(i)._fresh_unify(that.args(idx),nongen,work);
+            progress |= that.add_fld(key,lhs._fresh(nongen), work);
+          } // If closed, no copy
+        } else {
+          progress |= lhs._fresh_unify(rhs,nongen,work);
+        }
         if( (that=that.find()).is_err() ) return true;
         if( progress && work==null ) return true;
       }
       // Fields in RHS and not the LHS are also merged; if the LHS is open we'd
-      // just copy the missing fields into it, then unify the structs
-      // (shortcut: just skip the copy).  If the LHS is closed, then the extra
-      // RHS fields are an error.
-      if( !_open )
-        for( int i=0; i<that._ids.length; i++ )      // For all fields in RHS
-          if( Util.find(_ids,that._ids[i]) == -1 ) { // Missing in LHS
-            if( work == null ) return true;          // Will definitely make progress
-            progress |= that.del_fld(i--, work);     // Extra fields on both sides are dropped
+      // just copy the missing fields into it, then unify the structs (shortcut:
+      // just skip the copy).  If the LHS is closed, then the extra RHS fields
+      // are removed.
+      if( missing && !is_open() && that._args!=null )
+        for( String id : that._args.keySet() ) // For all fields in RHS
+          if( arg(id)==null ) {                // Missing in LHS
+            if( work == null ) return true;    // Will definitely make progress
+            progress |= that.del_fld(id,work); // Extra fields on both sides are dropped
           }
-
-      that._open = meet_opens(that);
-
-      // Unify aliases
-      BitsAlias alias = meet_alias(that);
-      if( alias!=that._alias ) progress=true;
-      if( progress && work==null ) return true;
-      that._alias = alias;
+      // Meet open flags and aliases
+      that._flow = meet_flow(that);
       return progress;
     }
-
-    private boolean vput(T2 that, boolean progress) { VARS.put(this,that); return progress; }
+    private boolean vput(T2 that, boolean progress) { VARS.put(this,that);
+      return progress; }
 
     // Return a fresh copy of 'this'
     T2 fresh() {
@@ -1914,11 +1741,11 @@ public class HM {
       return rez;
     }
     private T2 _fresh(VStack nongen) {
-      assert no_uf();
+      assert !unified();
       T2 rez = VARS.get(this);
       if( rez!=null ) return rez; // Been there, done that
       // Unlike the original algorithm, to handle cycles here we stop making a
-      // copy if it appears at this level in the nongen set.  Otherwise we'd
+      // copy if it appears at this level in the nongen set.  Otherwise, we'd
       // clone it down to the leaves - and keep all the nongen leaves.
       // Stopping here preserves the cyclic structure instead of unrolling it.
       if( nongen_in(nongen) ) {
@@ -1935,8 +1762,8 @@ public class HM {
         T2 t = copy();
         VARS.put(this,t);       // Stop cyclic structure looping
         if( _args!=null )
-          for( int i=0; i<_args.length; i++ )
-            t._args[i] = args(i)._fresh(nongen);
+          for( String key : _args.keySet() )
+            t._args.put(key, arg(key)._fresh(nongen));
         return t;
       }
     }
@@ -1949,12 +1776,12 @@ public class HM {
     }
 
     boolean _occurs_in_type(T2 x) {
-      assert no_uf() && x.no_uf();
+      assert !unified() && !x.unified();
       if( x==this ) return true;
       if( ODUPS.tset(x._uid) ) return false; // Been there, done that
       if( !x.is_leaf() && x._args!=null )
-        for( int i=0; i<x._args.length; i++ )
-          if( _occurs_in_type(x.args(i)) )
+        for( String key : x._args.keySet() )
+          if( _occurs_in_type(x.arg(key)) )
             return true;
       return false;
     }
@@ -1978,34 +1805,20 @@ public class HM {
       return rez;
     }
     boolean _cycle_equals(T2 t) {
-      assert no_uf() && t.no_uf();
+      assert !unified() && !t.unified();
       if( this==t ) return true;
-      if( _flow !=t._flow  ||  // Base-cases have to be completely identical
-          _fidxs!=t._fidxs ||
-          _alias!=t._alias ||
-          !Util.eq(_err,t._err) )
-        return false;
+      if( _flow !=t._flow ) return false;         // Base-cases have to be completely identical
       if( !Util.eq(_name,t._name) ) return false; // Wrong type-var names
+      if( is_leaf() ) return false;               // Two leaves must be the same leaf, already checked for above
+      if( size() != t.size() ) return false;      // Mismatched sizes
       if( _args==t._args ) return true;           // Same arrays (generally both null)
-      if( _args.length != t._args.length )        // Mismatched sizes
-        return false;
       // Cycles stall the equal/unequal decision until we see a difference.
       T2 tc = CDUPS.get(this);
       if( tc!=null )  return tc==t; // Cycle check; true if both cycling the same
       CDUPS.put(this,t);
-      if( is_struct() )         // Struct equality honors field names without regard to order
-        return _cycle_equals_struct(t);
-      for( int i=0; i<_args.length; i++ )
-        if( !args(i)._cycle_equals(t.args(i)) )
-          return false;
-      return true;
-    }
-
-    private boolean _cycle_equals_struct(T2 t) {
-      assert is_struct() && t.is_struct();
-      for( int i=0; i<_args.length; i++ ) {
-        int idx = Util.find(t._ids,_ids[i]);
-        if( idx==-1 || !args(i)._cycle_equals(t.args(idx)) )
+      for( String key : _args.keySet() ) {
+        T2 arg = t.arg(key);
+        if( arg==null || !arg(key)._cycle_equals(arg) )
           return false;
       }
       return true;
@@ -2017,36 +1830,42 @@ public class HM {
     Type walk_types_in(Type t) {
       long duid = dbl_uid(t._uid);
       if( Apply.WDUPS.putIfAbsent(duid,"")!=null ) return t;
-      assert no_uf();
+      assert !unified();
       if( is_err() ) return fput(t); //
       // Base variables (when widened to an HM type) might force a lift.
-      if( is_base() ) return fput(_flow.widen().join(t));
+      if( is_base() ) {
+        //if( t==_flow ) return fput(t);
+        //if( t.isa(_flow) )
+        //  return fput(t);
+        //if( _flow.isa(t) )
+        //  return fput(_flow);
+        //return fput(_flow.join(t));
+        return t;
+      }
       // Free variables keep the input flow type.
       if( is_leaf() ) return fput(t);
       // Nilable
-      if( is_nilable() ) {
-        fput(t);
-        args(0).walk_types_in(t); // TODO: Not sure if i should strip nil or not
-        return t;
-      }
+      if( is_nil() )            // TODO: Not sure if i should strip nil or not
+        throw unimpl(); // return arg(0).walk_types_in(fput(t));
       if( t==Type.SCALAR || t==Type.NSCALR ) return fput(t); // Will be scalar for all the breakdown types
       if( is_fun() ) {
         if( !(t instanceof TypeFunPtr) ) return t; // Typically, some kind of error situation
         // TODO: PAIR1 should report better
         TypeFunPtr tfp = (TypeFunPtr)t;
-        T2 ret = args(_args.length-1);
-        if( tfp._fidxs==BitsFun.FULL        ) return ret.walk_types_in(Type. SCALAR);
-        if( tfp._fidxs==BitsFun.FULL.dual() ) return ret.walk_types_in(Type.XSCALAR);
-        for( int fidx : ((TypeFunPtr)t)._fidxs ) {
-          Lambda lambda = Lambda.FUNS.get(fidx);
-          Type body = lambda.find().is_err()
-            ? Type.SCALAR           // Error, no lift
-            : (lambda._body == null // Null only for primitives
-               ? lambda.find().args(lambda._targs.length).as_flow() // Get primitive return type
-               : lambda._body._flow); // Else use body type
-          ret.walk_types_in(body);
-        }
-        return t;
+        //T2 ret = args(_args.length-1);
+        //if( tfp._fidxs==BitsFun.FULL        ) return ret.walk_types_in(Type. SCALAR);
+        //if( tfp._fidxs==BitsFun.FULL.dual() ) return ret.walk_types_in(Type.XSCALAR);
+        //for( int fidx : ((TypeFunPtr)t)._fidxs ) {
+        //  Lambda lambda = Lambda.FUNS.get(fidx);
+        //  Type body = lambda.find().is_err()
+        //    ? Type.SCALAR           // Error, no lift
+        //    : (lambda._body == null // Null only for primitives
+        //       ? lambda.find().args(lambda._targs.length).as_flow() // Get primitive return type
+        //       : lambda._body._flow); // Else use body type
+        //  ret.walk_types_in(body);
+        //}
+        //return t;
+        throw unimpl();
       }
 
       if( is_struct() ) {
@@ -2055,12 +1874,13 @@ public class HM {
         TypeMemPtr tmp = (TypeMemPtr)t;
         if( !(tmp._obj instanceof TypeStruct) ) return t;
         TypeStruct ts = (TypeStruct)tmp._obj;
-        for( int i=0; i<_args.length; i++ ) {
-          TypeFld fld = ts.fld_find(_ids[i]);
-          // Missing fields are walked as SCALAR
-          args(i).walk_types_in(fld==null ? Type.SCALAR : fld._t);
-        }
-        return ts;
+        //for( int i=0; i<_args.length; i++ ) {
+        //  TypeFld fld = ts.fld_find(_ids[i]);
+        //  // Missing fields are walked as SCALAR
+        //  args(i).walk_types_in(fld==null ? Type.SCALAR : fld._t);
+        //}
+        //return ts;
+        throw unimpl();
       }
 
       throw unimpl();
@@ -2071,12 +1891,23 @@ public class HM {
     }
 
     Type walk_types_out(Type t) {
-      assert no_uf();
+      assert !unified();
       if( t == Type.XSCALAR ) return t;  // No lift possible
       Type tmap = Apply.T2MAP.get(this);
       if( tmap != null ) return tmap;
       if( is_err() ) throw unimpl();
-      assert !is_leaf() && !is_base();        // All output leafs found as inputs already
+      //assert !is_leaf() && !is_base();        // All output leafs found as inputs already
+      if( is_leaf() ) return t;
+      if( is_base() ) {
+        if( _flow == t ) return t;
+        //if( t.isa(_flow) )
+        //  return t;
+        //if( _flow.widen().isa(t) )
+        //  return _flow.widen(); // probably needs widen?
+        //return _flow.widen().join(t);
+        return _flow;
+        //throw unimpl();
+      }
       if( is_fun() ) return t; // No change, already known as a function (and no TFS in the flow types)
       if( is_struct() ) {
         if( !(t instanceof TypeMemPtr) ) throw unimpl();
@@ -2084,24 +1915,24 @@ public class HM {
         if( !(tmp._obj instanceof TypeStruct) ) throw unimpl();
         TypeStruct ts = (TypeStruct)tmp._obj;
         boolean progress=false;
-        for( int i=0; i<_args.length; i++ ) {
-          TypeFld fld = ts.fld_find(_ids[i]);
-          if( fld==null ) continue;
-          Type targ = fld._t;
-          Type rez = args(i).walk_types_out(targ);
-          progress |= targ != rez;
-        }
-        if( !progress ) return t;
-        // Make a new result
-        //TypeFlds flds = TypeFlds.malloc();
         //for( int i=0; i<_args.length; i++ ) {
         //  TypeFld fld = ts.fld_find(_ids[i]);
         //  if( fld==null ) continue;
         //  Type targ = fld._t;
         //  Type rez = args(i).walk_types_out(targ);
-        //  flds.add(fld.make_from(rez));
+        //  progress |= targ != rez;
         //}
-        //return tmp.make_from(ts.make_from(flds));
+        //if( !progress ) return t;
+        //// Make a new result
+        //TypeStruct ts1 = ts;
+        //for( int i=0; i<_args.length; i++ ) {
+        //  TypeFld fld = ts.fld_find(_ids[i]);
+        //  if( fld==null ) continue;
+        //  Type targ = fld._t;
+        //  Type rez = args(i).walk_types_out(targ);
+        //  ts1 = ts1.replace_fld(fld.make_from(rez));
+        //}
+        //return tmp.make_from(ts1);
         throw unimpl();
       }
       throw unimpl();           // Handled all cases
@@ -2114,12 +1945,13 @@ public class HM {
     private void _find_fidxs() {
       if( FIDX_VISIT.tset(_uid) ) return;
       if( is_struct() )
-        for( T2 arg : _args )
-          arg._find_fidxs();
-      if( is_fun() ) {
-        FIDXS = FIDXS.meet(_fidxs);
-        args(_args.length-1)._find_fidxs();
-      }
+      //  for( T2 arg : _args )
+      //    arg._find_fidxs();
+      if( is_fun() )
+        throw unimpl();
+      //  FIDXS = FIDXS.meet(_fidxs);
+      //  args(_args.length-1)._find_fidxs();
+      //}
     }
 
     // -----------------
@@ -2131,162 +1963,138 @@ public class HM {
     T2 push_update( Ary<Syntax> as ) { if( as != null ) for( Syntax a : as ) push_update(a);  return this;   }
     T2 push_update( Syntax a) { assert UPDATE_VISIT.isEmpty(); push_update_impl(a); UPDATE_VISIT.clear(); return this; }
     private void push_update_impl(Syntax a) {
-      assert no_uf();
+      assert !unified();
       if( UPDATE_VISIT.tset(_uid) ) return;
-      if( _deps==null ) _deps = new Ary<>(Syntax.class);
-      if( _deps.find(a)==-1 ) _deps.push(a);
-      if( _args!=null )
-        for( int i=0; i<_args.length; i++ )
-          if( _args[i]!=null )
-            args(i).push_update_impl(a);
+      if( _args == null ) {
+        if( _deps==null ) _deps = new Ary<>(Syntax.class);
+        if( _deps.find(a)==-1 ) _deps.push(a);
+      } else {
+        assert _deps==null;
+        for( T2 t2 : _args.values() )
+          t2.find().push_update_impl(a);
+      }
     }
 
     // Recursively add-deps to worklist
     void add_deps_work( Worklist work ) { assert UPDATE_VISIT.isEmpty(); add_deps_work_impl(work); UPDATE_VISIT.clear(); }
     private void add_deps_work_impl( Worklist work ) {
-      if( is_leaf() ) {
+      if( _args==null ) {
         work.addAll(_deps);
       } else {
         if( UPDATE_VISIT.tset(_uid) ) return;
-        if( _args != null )
-          for( int i=0; i<_args.length; i++ )
-            args(i).add_deps_work_impl(work);
+        for( T2 t2 : _args.values() )
+          t2.add_deps_work_impl(work);
       }
     }
+
+    // Merge this._deps into that
+    void merge_deps( T2 that ) {
+      if( _deps == null ) return;
+      // Merge update lists, for future unions
+      if( that._args==null ) that._deps = that._deps==null ? _deps : that._deps.addAll(_deps);
+      else {
+        assert that._deps==null;
+        for( Syntax dep : _deps ) that.push_update(dep);
+      }
+      _deps = null;
+    }
+
 
     // -----------------
     // Glorious Printing
 
     // Look for dups, in a tree or even a forest (which Syntax.p() does)
-    VBitSet get_dups(VBitSet dups) { return _get_dups(new VBitSet(),dups); }
-    VBitSet _get_dups(VBitSet visit, VBitSet dups) {
+    public VBitSet get_dups() { return _get_dups(new VBitSet(),new VBitSet()); }
+    public VBitSet _get_dups(VBitSet visit, VBitSet dups) {
       if( visit.tset(_uid) ) {
         dups.set(debug_find()._uid);
-      } else
+      } else {
         if( _args!=null )
-          for( T2 t : _args )
-            if( t!=null )
-              t._get_dups(visit,dups);
+          for( T2 t : _args.values() )
+            t._get_dups(visit,dups);
+      }
       return dups;
     }
 
+    @Override public String toString() { return str(new SB(), new VBitSet(), get_dups(), true ).toString(); }
+    public String p() { VCNT=0; VNAMES.clear(); return str(new SB(), new VBitSet(), get_dups(), false ).toString(); }
+    private static int VCNT;
+    private static final HashMap<T2,String> VNAMES = new HashMap<>();
+
     // Fancy print for Debuggers - includes explicit U-F re-direction.
     // Does NOT roll-up U-F, has no side-effects.
-    @Override public String toString() { return str(new SB(), new VBitSet(), get_dups(new VBitSet()) ).toString(); }
-    SB str(SB sb, VBitSet visit, VBitSet dups) {
-
-      if( is_err () ) return sb.p(_err);
-      if( is_base() ) return sb.p(_flow);
+    SB str(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
       boolean dup = dups.get(_uid);
-      if( is_leaf() ) {
-        sb.p(_name);
-        return no_uf() ? sb : _args[0].str(sb.p(">>"), visit, dups);
+      if( !debug && unified() ) return find().str(sb,visit,dups,debug);
+      if( unified() || is_leaf() ) {
+        vname(sb,debug);
+        return unified() ? _args.get(">>").str(sb.p(">>"), visit, dups, debug) : sb;
       }
-      if( dup ) sb.p("$V").p(_uid);
+      if( is_err () )  return sb.p(_flow.getstr());
+      if( is_base() )  return sb.p(_flow);
+
+      if( dup ) vname(sb,debug);
       if( visit.tset(_uid) && dup ) return sb;
       if( dup ) sb.p(':');
 
       // Special printing for functions
       if( is_fun() ) {
-        sb.p("{");
-        if( _fidxs==null ) sb.p('_'); else _fidxs.str(sb);
-        sb.p(' ');
-        for( int i=0; i<_args.length-1; i++ )
-          str(sb,visit,_args[i],dups).p(" ");
-        return str(sb.p("-> "),visit,_args[_args.length-1],dups).p(" }");
+        if( debug )
+          if( _flow==null ) sb.p("[?]"); // Should always have an alias
+          else {
+            if( _flow instanceof TypeFunPtr ) ((TypeFunPtr)_flow)._fidxs.clear(0).str(sb);
+            else _flow.str(sb,visit,null,debug); // Weirdo type printing
+          }
+        sb.p("{ ");
+        for( String fld : sorted_flds() )
+          if( !Util.eq("ret",fld) )
+            str0(sb,visit,_args.get(fld),dups,debug).p(' ');
+        return str0(sb.p("-> "),visit,_args.get("ret"),dups,debug).p(" }");
       }
 
       // Special printing for structures
       if( is_struct() ) {
-        sb.p("@{");
-        if( _alias==null ) sb.p('_'); else _alias.str(sb);
-        sb.p(' ');
-        if( _ids==null ) sb.p("_ ");
-        else for( int i=0; i<_ids.length; i++ )
-               str(sb.p(' ').p(_ids[i]).p(" = "),visit,_args[i],dups).p(',');
-        if( _open ) sb.p(" ...,");
-        return sb.unchar().p("}");
-      }
-
-      // Generic structural T2
-      sb.p("(").p(_name).p(" ");
-      for( T2 t : _args ) str(sb,visit,t,dups).p(" ");
-      return sb.unchar().p(")");
-    }
-    static private SB str(SB sb, VBitSet visit, T2 t, VBitSet dups) { return t==null ? sb.p("_") : t.str(sb,visit,dups); }
-
-    // Same as toString but calls find().  Can thus side-effect & roll-up U-Fs, so not a toString
-    public String p() { return p(get_dups(new VBitSet())); }
-    private static int VCNT;
-    private static final HashMap<T2,Integer> VNAMES = new HashMap<>();
-    String p(VBitSet dups) { VCNT=0; VNAMES.clear(); return find()._p(new SB(), new VBitSet(), dups).toString(); }
-    private SB _p(SB sb, VBitSet visit, VBitSet dups) {
-      assert no_uf();
-      if( is_base() ) return sb.p(_flow); // One-shot bases just do type
-      if( is_leaf() || dups.get(_uid) ) { // Leafs or Duplicates?  Take some effort to pretty-print cycles
-        Integer ii = VNAMES.get(this);
-        if( ii==null )  VNAMES.put(this,ii=VCNT++); // Type-var name
-        // 2nd and later visits use the short form
-        boolean later = visit.tset(_uid);
-        // Removed as being more confusing to more academic readers
-        //if( later ) sb.p('$');
-        char c = (char)('A'+ii);
-        if( c<'V' ) sb.p(c); else sb.p("V"+ii);
-        if( later ) return sb;
-        if( is_leaf() ) return sb;
-        sb.p(':'); // Dups now print their structure
-      }
-      if( is_err () ) return sb.p(_err);
-
-      // Special printing for functions: { arg -> body }
-      if( is_fun() ) {
-        sb.p("{ ");
-        for( int i=0; i<_args.length-1; i++ )
-          args(i)._p(sb,visit,dups).p(" ");
-        return args(_args.length-1)._p(sb.p("-> "),visit,dups).p(" }");
-      }
-
-      // Special printing for structures: @{ fld0 = body, fld1 = body, ... }
-      if( is_struct() ) {
-        char close;
-        if( is_tuple() ) {
-          sb.p('(');
-          for( int i=0; i<_ids.length; i++ ) {
-            int idx = Util.find(_ids,new String(new char[]{(char)('0'+i)}).intern());
-            args(idx)._p(sb.p(' '),visit,dups).p(',');
+        if( is_prim() ) return sb.p("@{PRIMS}");
+        final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
+        if( debug )
+          if( _flow==null ) sb.p("[?]"); // Should always have an alias
+          else {
+            if( _flow instanceof TypeMemPtr ) ((TypeMemPtr)_flow)._aliases.clear(0).str(sb);
+            else _flow.str(sb,visit,null,debug); // Weirdo type printing
           }
-          close = ')';
-        } else {
-          sb.p("@{");
-          TreeMap<String,Integer> map = new TreeMap<>();
-          for( int i=0; i<_ids.length; i++ )
-            map.put( _ids[i], i );
-          for( int i : map.values() )
-            args(i)._p(sb.p(' ').p(_ids[i]).p(" = "),visit,dups).p(',');
-          close = '}';
+        sb.p(is_tup ? "(" : "@{");
+        if( _args==null ) sb.p(" ");
+        else {
+          for( String fld : sorted_flds() )
+            // Skip field names in a tuple
+            str0(is_tup ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,_args.get(fld),dups,debug).p(',');
         }
-        if( _open ) sb.p(" ...,");
-        if( _ids.length>0 ) sb.unchar();
-        sb.p(close);
-        if( _alias.test(0) ) sb.p('?');
+        if( is_open() ) sb.p(" ...,");
+        if( _args!=null && _args.size() > 0 ) sb.unchar();
+        sb.p(!is_tup ? "}" : ")");
+        if( _flow!=null && _flow.must_nil() ) sb.p("?");
         return sb;
       }
 
-      if( is_nilable() )
-        return args(0)._p(sb,visit,dups).p('?');
+      if( is_nil() )
+        return str0(sb,visit,arg("?"),dups,debug).p('?');
 
-      // Generic structural T2: (fun arg0 arg1...)
+      // Generic structural T2
       sb.p("(").p(_name).p(" ");
-      for( int i=0; i<_args.length; i++ ) args(i)._p(sb,visit,dups).p(" ");
+      if( _args!=null )
+        for( String s : _args.keySet() )
+          str0(sb.p(s).p(':'),visit,_args.get(s),dups,debug).p(" ");
       return sb.unchar().p(")");
     }
-
-    boolean is_tuple() {
-      if( _ids==null ) return false;
-      for( String id : _ids )
-        if( !isDigit((byte) id.charAt(0)) )
-          return false;
-      return true;
+    static private SB str0(SB sb, VBitSet visit, T2 t, VBitSet dups, boolean debug) { return t==null ? sb.p("_") : t.str(sb,visit,dups,debug); }
+    private void vname( SB sb, boolean debug) {
+      final boolean vuid = debug && (unified()||is_leaf());
+      sb.p(VNAMES.computeIfAbsent(this, (k -> vuid ? (_name + k._uid) : ((++VCNT) - 1 + 'A' < 'V' ? ("" + (char) ('A' + VCNT - 1)) : ("V" + VCNT)))));
+    }
+    private boolean is_tup() { return _args==null || _args.isEmpty() || _args.containsKey("0"); }
+    private Collection<String> sorted_flds() { return new TreeMap<>(_args).keySet(); }
+    boolean is_prim() {
+      return is_struct() && _args!=null && _args.containsKey("!");
     }
 
     // Debugging tool
@@ -2295,12 +2103,11 @@ public class HM {
       if( visit.tset(_uid) ) return null;
       if( _uid==uid ) return this;
       if( _args==null ) return null;
-      for( T2 arg : _args )
+      for( T2 arg : _args.values() )
         if( (arg=arg._find(uid,visit)) != null )
           return arg;
       return null;
     }
     static void reset() { CNT=0; DUPS.clear(); VARS.clear(); ODUPS.clear(); CDUPS.clear(); UPDATE_VISIT.clear(); }
   }
-
 }
