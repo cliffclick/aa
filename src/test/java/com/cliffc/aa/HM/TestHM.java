@@ -149,10 +149,7 @@ public class TestHM {
     if( HM.DO_HM )
       assertEquals("{ A? -> ( Cannot unify A:( 3, A) and 5, Cannot unify A:( 3, A) and 5) }",syn._hmt.p());
     if( HM.DO_GCP )
-      if( HM.DO_HM )
-        assertEquals(tfs(TypeMemPtr.make(7,make_tups(Type.XNSCALR,TypeMemPtr.make(7,make_tups(TypeInt.con(3),Type.XNSCALR))))),syn.flow_type());
-      else
-        assertEquals(tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(5),Type.NSCALR))),syn.flow_type());
+      assertEquals(tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(5),Type.NSCALR))),syn.flow_type());
   }
 
   @Test public void test19() { run("cons ={x y-> {cadr -> (cadr x y)}};"+

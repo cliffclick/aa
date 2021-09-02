@@ -89,7 +89,7 @@ public class HM {
   static { BitsAlias.init0(); BitsFun.init0(); }
 
   static final boolean DO_HM  = true;
-  static final boolean DO_GCP = false;
+  static final boolean DO_GCP = true;
 
   public static Root hm( String sprog ) {
     Worklist work = new Worklist();
@@ -541,7 +541,7 @@ public class HM {
     Type apply(Syntax[] args) { return _body._flow; }
     @Override void add_val_work(Syntax child, Worklist work) {
       // Body changed, all Apply sites need to recompute
-      work.addAll(find()._deps);
+      find().add_deps_work(work);
     }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
@@ -677,14 +677,14 @@ public class HM {
       if( DO_HM ) {
         T2MAP.clear();  WDUPS.clear();
         // Walk the inputs, building a mapping
-        _fun.find().walk_types_in(_fun._flow);
+        //_fun.find().walk_types_in(_fun._flow);
         for( Syntax arg : _args )
           { WDUPS.clear(); arg.find().walk_types_in(arg._flow); }
         // Walk the outputs, building an improved result
         Type rez2 = find().walk_types_out(rez);
-        rez = rez2.join(rez);   // Lift result
-        if( !_flow.isa(rez) )
-          rez = _flow; // TODO: Cheaty force monotonic
+        Type rez3 = rez2.join(rez);   // Lift result
+        if( rez != rez3 && (_flow == rez3 || !rez3.isa(_flow)) ) // Happens in some error cases
+          rez = rez3; // Upgrade
       }
       return rez;
     }
@@ -706,7 +706,7 @@ public class HM {
             Type rez = formal.meet(actual);
             if( formal != rez ) {
               fun._types[i] = rez;
-              work.addAll(fun.targ(i)._deps);
+              fun.targ(i).add_deps_work(work);
               work.push(fun._body);
               if( i==0 && fun instanceof If ) work.push(fun); // Specifically If might need more unification
             }
@@ -740,7 +740,7 @@ public class HM {
     // function with the worse-case legal args.
     static Type widen(T2 t2) { return t2.as_flow(); }
     @Override Type val(Worklist work) {
-      if( _fun._flow.above_center() || work==null )
+      if( _fun._flow.above_center() )
         return _fun._flow;
       // Root-widening needs to call all functions which can be returned from
       // the Root or from any function reachable from the Root via struct &
@@ -1423,27 +1423,26 @@ public class HM {
       if( is_base() ) return _flow;
       if( is_leaf() ) return Type.SCALAR;
       if( is_err()  ) throw unimpl();//return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(_err));
-      if( is_fun()  ) throw unimpl(); //return TypeFunPtr.make(_fidxs,_args.length-1,Type.ANY);
+      if( is_fun()  ) return TypeFunPtr.make(((TypeFunPtr)_flow)._fidxs,_args.size()-1,Type.ANY);
       if( is_nil() ) return Type.SCALAR;
       if( is_struct() ) {
         TypeStruct tstr = ADUPS.get(_uid);
         if( tstr==null ) {
           Type.RECURSIVE_MEET++;
           tstr = TypeStruct.malloc("",false,true).add_fld(TypeFld.NO_DISP);
-          //for( String id : _ids ) tstr.add_fld(TypeFld.malloc(id));
-          //tstr.set_hash();
-          //ADUPS.put(_uid,tstr); // Stop cycles
-          //for( int i=0; i<_ids.length; i++ )
-          //  tstr.fld_find(_ids[i]).setX(args(i)._as_flow()); // Recursive
-          //if( --Type.RECURSIVE_MEET == 0 )
-          //  // Shrink / remove cycle dups.  Might make new (smaller)
-          //  // TypeStructs, so keep RECURSIVE_MEET enabled.
-          //  tstr = tstr.install();
-          throw unimpl();
+          for( String id : _args.keySet() ) tstr.add_fld(TypeFld.malloc(id));
+          tstr.set_hash();
+          ADUPS.put(_uid,tstr); // Stop cycles
+          for( String id : _args.keySet() )
+            tstr.fld_find(id).setX(arg(id)._as_flow()); // Recursive
+          if( --Type.RECURSIVE_MEET == 0 )
+            // Shrink / remove cycle dups.  Might make new (smaller)
+            // TypeStructs, so keep RECURSIVE_MEET enabled.
+            tstr = tstr.install();
         } else {
           tstr._cyclic=true;    // Been there, done that, just mark it cyclic
         }
-        throw unimpl(); //return TypeMemPtr.make(_alias,tstr);
+        return ((TypeMemPtr)_flow).make_from(tstr);
       }
 
       throw unimpl();
@@ -1846,26 +1845,24 @@ public class HM {
       if( is_leaf() ) return fput(t);
       // Nilable
       if( is_nil() )            // TODO: Not sure if i should strip nil or not
-        throw unimpl(); // return arg(0).walk_types_in(fput(t));
+        return arg("?").walk_types_in(fput(t));
       if( t==Type.SCALAR || t==Type.NSCALR ) return fput(t); // Will be scalar for all the breakdown types
       if( is_fun() ) {
         if( !(t instanceof TypeFunPtr) ) return t; // Typically, some kind of error situation
-        // TODO: PAIR1 should report better
         TypeFunPtr tfp = (TypeFunPtr)t;
-        //T2 ret = args(_args.length-1);
-        //if( tfp._fidxs==BitsFun.FULL        ) return ret.walk_types_in(Type. SCALAR);
-        //if( tfp._fidxs==BitsFun.FULL.dual() ) return ret.walk_types_in(Type.XSCALAR);
-        //for( int fidx : ((TypeFunPtr)t)._fidxs ) {
-        //  Lambda lambda = Lambda.FUNS.get(fidx);
-        //  Type body = lambda.find().is_err()
-        //    ? Type.SCALAR           // Error, no lift
-        //    : (lambda._body == null // Null only for primitives
-        //       ? lambda.find().args(lambda._targs.length).as_flow() // Get primitive return type
-        //       : lambda._body._flow); // Else use body type
-        //  ret.walk_types_in(body);
-        //}
-        //return t;
-        throw unimpl();
+        T2 ret = arg("ret");
+        if( tfp._fidxs==BitsFun.FULL        ) return ret.walk_types_in(Type. SCALAR);
+        if( tfp._fidxs==BitsFun.FULL.dual() ) return ret.walk_types_in(Type.XSCALAR);
+        for( int fidx : ((TypeFunPtr)t)._fidxs ) {
+          Lambda lambda = Lambda.FUNS.get(fidx);
+          Type body = lambda.find().is_err()
+            ? Type.SCALAR           // Error, no lift
+            : (lambda._body == null // Null only for primitives
+               ? lambda.find().arg("ret").as_flow() // Get primitive return type
+               : lambda._body._flow); // Else use body type
+          ret.walk_types_in(body);
+        }
+        return t;
       }
 
       if( is_struct() ) {
@@ -1874,13 +1871,12 @@ public class HM {
         TypeMemPtr tmp = (TypeMemPtr)t;
         if( !(tmp._obj instanceof TypeStruct) ) return t;
         TypeStruct ts = (TypeStruct)tmp._obj;
-        //for( int i=0; i<_args.length; i++ ) {
-        //  TypeFld fld = ts.fld_find(_ids[i]);
-        //  // Missing fields are walked as SCALAR
-        //  args(i).walk_types_in(fld==null ? Type.SCALAR : fld._t);
-        //}
-        //return ts;
-        throw unimpl();
+        for( String id : _args.keySet() ) {
+          TypeFld fld = ts.fld_find(id);
+          // Missing fields are walked as SCALAR
+          arg(id).walk_types_in(fld==null ? Type.SCALAR : fld._t);
+        }
+        return ts;
       }
 
       throw unimpl();
@@ -1915,25 +1911,24 @@ public class HM {
         if( !(tmp._obj instanceof TypeStruct) ) throw unimpl();
         TypeStruct ts = (TypeStruct)tmp._obj;
         boolean progress=false;
-        //for( int i=0; i<_args.length; i++ ) {
-        //  TypeFld fld = ts.fld_find(_ids[i]);
-        //  if( fld==null ) continue;
-        //  Type targ = fld._t;
-        //  Type rez = args(i).walk_types_out(targ);
-        //  progress |= targ != rez;
-        //}
-        //if( !progress ) return t;
-        //// Make a new result
-        //TypeStruct ts1 = ts;
-        //for( int i=0; i<_args.length; i++ ) {
-        //  TypeFld fld = ts.fld_find(_ids[i]);
-        //  if( fld==null ) continue;
-        //  Type targ = fld._t;
-        //  Type rez = args(i).walk_types_out(targ);
-        //  ts1 = ts1.replace_fld(fld.make_from(rez));
-        //}
-        //return tmp.make_from(ts1);
-        throw unimpl();
+        for( String id : _args.keySet() ) {
+          TypeFld fld = ts.fld_find(id);
+          if( fld==null ) continue;
+          Type targ = fld._t;
+          Type rez = arg(id).walk_types_out(targ);
+          progress |= targ != rez;
+        }
+        if( !progress ) return t;
+        // Make a new result
+        TypeStruct ts1 = ts;
+        for( String id : _args.keySet() ) {
+          TypeFld fld = ts.fld_find(id);
+          if( fld==null ) continue;
+          Type targ = fld._t;
+          Type rez = arg(id).walk_types_out(targ);
+          ts1 = ts1.replace_fld(fld.make_from(rez));
+        }
+        return tmp.make_from(ts1);
       }
       throw unimpl();           // Handled all cases
     }
