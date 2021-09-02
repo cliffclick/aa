@@ -577,7 +577,7 @@ public class HM {
     @Override Type val(Worklist work) { return _body._flow; }
     @Override void add_val_work(Syntax child, Worklist work) {
       if( child==_def )
-        work.addAll(_def.find()._deps);
+        _def.find().add_deps_work(work);
     }
 
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {

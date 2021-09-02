@@ -551,13 +551,13 @@ public class TestHM {
     if( HM.DO_GCP ) {
       Type tf   = TypeMemPtr.make(BitsAlias.FULL.make(10,11),
                                   TypeStruct.make(TypeFld.NO_DISP,
-                                                  TypeFld.make("and"     ,TypeFunPtr.make(BitsFun.make0(15,18),1,TypeMemPtr.NO_DISP),ARG_IDX  ),
-                                                  TypeFld.make("or"      ,TypeFunPtr.make(BitsFun.make0(16,19),1,TypeMemPtr.NO_DISP),ARG_IDX+1),
-                                                  TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(17,20),2,TypeMemPtr.NO_DISP),ARG_IDX+2)));
+                                                  TypeFld.make("and"     ,TypeFunPtr.make(BitsFun.make0(14,17),1,TypeMemPtr.NO_DISP),ARG_IDX  ),
+                                                  TypeFld.make("or"      ,TypeFunPtr.make(BitsFun.make0(15,18),1,TypeMemPtr.NO_DISP),ARG_IDX+1),
+                                                  TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(16,19),2,TypeMemPtr.NO_DISP),ARG_IDX+2)));
       Type xbool= TypeMemPtr.make(12,TypeStruct.make(TypeFld.NO_DISP,
                                                      TypeFld.make("true", tf                                      ,ARG_IDX  ),
                                                      TypeFld.make("false",tf                                      ,ARG_IDX+1),
-                                                     TypeFld.make("force",TypeFunPtr.make(24,1,TypeMemPtr.NO_DISP),ARG_IDX+2)));
+                                                     TypeFld.make("force",TypeFunPtr.make(23,1,TypeMemPtr.NO_DISP),ARG_IDX+2)));
       TypeStruct rez = TypeStruct.make(TypeFld.NO_DISP,
                                        TypeFld.make("a",HM.DO_HM ? TypeInt.INT64: Type.NSCALR,ARG_IDX  ),
                                        TypeFld.make("b",HM.DO_HM ? Type.SCALAR  : Type.NSCALR,ARG_IDX+1),
@@ -609,10 +609,10 @@ public class TestHM {
       // true/false=*[10,11]@{$; and=[15,19]{any }; or=[16,20]{any }; not=[17,21]{any }; thenElse=[18,22]{any }}
       Type tf   = TypeMemPtr.make(BitsAlias.FULL.make(10,11),
                                   TypeStruct.make(TypeFld.NO_DISP,
-                                                  TypeFld.make("and"     ,TypeFunPtr.make(BitsFun.make0(15,19),1,TypeMemPtr.NO_DISP),ARG_IDX  ),
-                                                  TypeFld.make("or"      ,TypeFunPtr.make(BitsFun.make0(16,20),1,TypeMemPtr.NO_DISP),ARG_IDX+1),
-                                                  TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(17,21),1,TypeMemPtr.NO_DISP),ARG_IDX+2),
-                                                  TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(18,22),2,TypeMemPtr.NO_DISP),ARG_IDX+3)));
+                                                  TypeFld.make("and"     ,TypeFunPtr.make(BitsFun.make0(14,18),1,TypeMemPtr.NO_DISP),ARG_IDX  ),
+                                                  TypeFld.make("or"      ,TypeFunPtr.make(BitsFun.make0(15,19),1,TypeMemPtr.NO_DISP),ARG_IDX+1),
+                                                  TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(16,20),1,TypeMemPtr.NO_DISP),ARG_IDX+2),
+                                                  TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(17,21),2,TypeMemPtr.NO_DISP),ARG_IDX+3)));
       // *[12]@{^=any; true=$TF; false=$TF}
       TypeStruct rez = TypeStruct.make2fldsD("true" ,tf,"false",tf );
       assertEquals(TypeMemPtr.make(12,rez),syn.flow_type());
@@ -657,15 +657,15 @@ public class TestHM {
     if( HM.DO_GCP ) {
 
       Type tt = TypeMemPtr.make(BitsAlias.FULL.make(9),
-                                TypeStruct.make2fldsD("not"     ,TypeFunPtr.make(BitsFun.make0(15),1,TypeMemPtr.NO_DISP),
-                                                      "thenElse",TypeFunPtr.make(BitsFun.make0(16),2,TypeMemPtr.NO_DISP)));
+                                TypeStruct.make2fldsD("not"     ,TypeFunPtr.make(BitsFun.make0(14),1,TypeMemPtr.NO_DISP),
+                                                      "thenElse",TypeFunPtr.make(BitsFun.make0(15),2,TypeMemPtr.NO_DISP)));
       Type ff = TypeMemPtr.make(BitsAlias.FULL.make(10),
-                                TypeStruct.make2fldsD("not"     ,TypeFunPtr.make(BitsFun.make0(17),1,TypeMemPtr.NO_DISP),
-                                                      "thenElse",TypeFunPtr.make(BitsFun.make0(18),2,TypeMemPtr.NO_DISP)));
+                                TypeStruct.make2fldsD("not"     ,TypeFunPtr.make(BitsFun.make0(16),1,TypeMemPtr.NO_DISP),
+                                                      "thenElse",TypeFunPtr.make(BitsFun.make0(17),2,TypeMemPtr.NO_DISP)));
       TypeStruct rez = TypeStruct.make(TypeFld.NO_DISP,
                                        TypeFld.make("true"   ,tt                                                     ,ARG_IDX  ),
                                        TypeFld.make("false"  ,ff                                                     ,ARG_IDX+1),
-                                       TypeFld.make("boolSub",TypeFunPtr.make(BitsFun.make0(22),1,TypeMemPtr.NO_DISP),ARG_IDX+2));
+                                       TypeFld.make("boolSub",TypeFunPtr.make(BitsFun.make0(21),1,TypeMemPtr.NO_DISP),ARG_IDX+2));
       assertEquals(TypeMemPtr.make(11,rez),syn.flow_type());
     }
   }
@@ -779,17 +779,17 @@ public class TestHM {
       //        two = $;
       //        three=$
       // }
-      TypeFld bt = bfun("true" ,10,16,17,18, 0);
-      TypeFld bf = bfun("false",11,19,20,21, 1);
+      TypeFld bt = bfun("true" ,10,15,16,17, 0);
+      TypeFld bf = bfun("false",11,18,19,20, 1);
       TypeFld b  = mptr("b",12,TypeStruct.make(TypeFld.NO_DISP,bt,bf),0); // Booleans
 
-      TypeFld s  = mfun("s",29, 0);
-      TypeFld z  = nfun("z",13,22,15,23,24, 1);
+      TypeFld s  = mfun("s",28, 0);
+      TypeFld z  = nfun("z",13,21,14,22,23, 1);
       TypeFld n  = mptr("n",15,TypeStruct.make(TypeFld.NO_DISP,s,z), 1);
 
-      TypeFld n1 = nfun("one"  ,14,25,26,27,28, 2);
-      TypeFld n2 = nfun("two"  ,14,25,26,27,28, 3);
-      TypeFld n3 = nfun("three",14,25,26,27,28, 4);
+      TypeFld n1 = nfun("one"  ,14,24,25,26,27, 2);
+      TypeFld n2 = nfun("two"  ,14,24,25,26,27, 3);
+      TypeFld n3 = nfun("three",14,24,25,26,27, 4);
 
       Type rez = TypeMemPtr.make(16,TypeStruct.make(TypeFld.NO_DISP,b,n,n1,n2,n3));
       assertEquals(rez,syn.flow_type());
