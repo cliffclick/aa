@@ -846,6 +846,8 @@ public class Type<T extends Type<T>> implements Cloneable {
     default: throw typerr(null); // Overridden in subclass
     }
   }
+  // Recursive version called from TypeStruct
+  Type _widen() { return widen(); }
 
   // True if type must include a nil (as opposed to may-nil, which means the
   // type can choose something other than nil).
