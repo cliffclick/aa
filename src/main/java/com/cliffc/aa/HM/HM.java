@@ -89,8 +89,8 @@ public class HM {
   static final boolean DEBUG_LEAKS=false;
   static { BitsAlias.init0(); BitsFun.init0(); }
 
-  static final boolean DO_HM  = true;
-  static final boolean DO_GCP = false;
+  static final boolean DO_HM  = false;
+  static final boolean DO_GCP = true;
 
   public static Root hm( String sprog ) {
     Worklist work = new Worklist();
@@ -441,9 +441,8 @@ public class HM {
     }
     @Override void add_hm_work(Worklist work) {
       work.push(_par);
-      T2 t = idt();
-      if( t.nongen_in(_par == null ? null : _par._nongen) ) // Got captured in some parent?
-        t.add_deps_work(work);                              // Need to revisit dependent ids
+      if( _par!=null && idt().nongen_in(_par._nongen) ) // Got captured in some parent?
+        idt().add_deps_work(work);  // Need to revisit dependent ids
       if( _par instanceof Apply && ((Apply)_par)._fun instanceof NotNil )
         work.push(((Apply)_par)._fun);
     }
@@ -790,6 +789,12 @@ public class HM {
       return _fun._flow;
     }
 
+    @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
+      int cnt = super.prep_tree(par,nongen,work);
+      _hmt.push_update(this);
+      return cnt;
+    }
+
     // Expand functions to full signatures, recursively
     Type flow_type() { return add_sig(_flow); }
     private static Type add_sig(Type t) {
@@ -930,7 +935,7 @@ public class HM {
       // Not a struct or no field, force it to be one
       if( rec.is_struct() && rec.is_open() ) // Effectively unify with an extended struct.
         return rec.add_fld(_id,find(),work);
-      if( rec.is_leaf() )
+      if( rec.is_leaf() || rec.is_fun() )
         return T2.make_struct(true,BitsAlias.EMPTY,new String[]{_id}, new T2[]{find().push_update(rec._deps)}).unify(rec, work);
       // Closed record, field is missing
       return find().unify(rec.miss_field(_id),work);
@@ -1941,7 +1946,7 @@ public class HM {
     }
 
     // -----------------
-    // Visit all reachable functions and do something.
+    // Visit all reachable functions and do something, and return a predicate.
     private static final VBitSet FIDX_VISIT  = new VBitSet();
     boolean do_funcs( Predicate<T2> action) {  FIDX_VISIT.clear(); return _do_funcs(action); }
     private boolean _do_funcs(Predicate<T2> action) {
@@ -1964,6 +1969,7 @@ public class HM {
       throw unimpl();
     }
 
+    // Widen all reachable bases.
     private boolean widen_bases(Worklist work) {
       if( FIDX_VISIT.tset(_uid) ) return false;
       if( is_base() ) {
