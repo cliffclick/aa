@@ -63,7 +63,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
                                    // the count of commas dictates the length, zero commas is zero length.
                                    // Tuples are always final.
  *  tmod = := | = | ==             // ':=' or '' is r/w, '=' is final, '==' is r/o
- *  tstruct = @{ [id [tmod [type?]],]*}  // Struct types are field names with optional types.  Spaces not allowed
+ *  tstruct = @{ [id [tmod [type?]];]*}  // Struct types are field names with optional types.
  *  tvar = id                      // Type variable lookup
  */
 
@@ -1124,7 +1124,7 @@ public class Parse implements Comparable<Parse> {
    *  tary = '[' type? ']'                 // Cannot specify type for array size
    *  tfun = {[[type]* ->]? type }         // Function types mirror func decls
    *  tmod = = | := | ==                   // '=' is r/final, ':=' is r/w, '==' is read-only
-   *  tstruct = @{ [id [tmod [type?]];]*}  // Struct types are field names with optional types.  Spaces not allowed
+   *  tstruct = @{ [id [tmod [type?]];]*}  // Struct types are field names with optional types.
    *  ttuple = ([type?] [,[type?]]*)       // List of types, trailing comma optional
    *  tvar = A previously declared type variable
    *
