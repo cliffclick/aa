@@ -54,14 +54,16 @@ BNF                           | Comment
 `tstmt= tvar = :type`         | type variable assignment
 `stmt = [id[:type] [:]=]* ifex` | ids are (re-)assigned, and are available in later statements.
 `stmt = ^ifex`                | Early function exit
-`ifex = apply [? stmt [: stmt]]` | trinary logic; the else-clause will default to 0
+`ifex = apply`                | 
+`ifex = apply ? stmt`         | trinary logic; the else-clause will default to 0
+`ifex = apply ? stmt : stmt`  | trinary logic
 `apply = expr+`               | Lisp-like application-as-adjacent, e.g. `str 5`
 `expr = term [binop term]*`   | gather all the binops and sort by prec
 `term = uniop term`           | Any number of uniops
 `term = id++`                 |   post-inc/dec operators
 `term = id--`                 |   post-inc/dec operators
 `term = tfact bop+ stmts bop-`      | Balanced/split operator arity-2, e.g. array lookup, `ary [ idx ]`
-`term = tfact bop- stmts bop- stmt` | Balanced/split operator arity-3, e.g. array assign, `ary [ idx ]:= val`
+`term = tfact bop+ stmts bop- stmt` | Balanced/split operator arity-3, e.g. array assign, `ary [ idx ]:= val`
 `term = tfact post`           |   A term is a tfact and some more stuff...
 `post = empty`                | A term can be just a plain 'tfact'
 `post = (tuple) post`         | Application argument list
@@ -80,20 +82,20 @@ BNF                           | Comment
 `fact = @{ stmts }`           | Anonymous struct declaration; assignments declare fields
 `fact = {binop}`              | Special syntactic form of binop; no spaces allowed; returns function constant
 `fact = {uniop}`              | Special syntactic form of uniop; no spaces allowed; returns function constant
-`tuple= (stmts,[stmts,])`     | Tuple; final comma is optional
+`tuple= ( stmts,[stmts,] )`   | Tuple; final comma is optional
 `binop= +-*%&/<>!= [] ]=`     | etc; primitive lookup; can determine infix binop at parse-time, also pipe but GFM screws up
 `uniop= -!~ []`               | etc; primitive lookup; can determine infix uniop at parse-time
 `bop+ = [`                    | Balanced/split operator open
 `bop- = ] ]= ]:= `            | Balanced/split operator close
-`func = { [id[:type]* ->]? stmts}` | Anonymous function declaration, if no args then the -> is optional
+`func = { [id[:type]* ->]? stmts }` | Anonymous function declaration, if no args then the -> is optional
 `str  = [.\%]*`               | String contents; \t\n\r\% standard escapes
 `str  = %[num]?[.num]?fact`   | Percent escape embeds a 'fact' in a string; "name=%name\n"
 `type = tcon OR tvar OR tfun[?] OR tstruct[?] OR ttuple[?]` | // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nilable'
 `tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]` | Primitive types
-`tfun = {[[type]* ->]? type }` | Function types mirror func decls
-`ttuple = ([[type],]* )`      | Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length.  Tuples are always final.
+`tfun = { [[type]* ->]? type }` | Function types mirror func decls
+`ttuple = ( [[type],]* )`     | Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length.  Tuples are always final.
 `tmod = := ! = ! ==`          | ':=' or (missing) is r/w, '=' is final, '==' is r/w
-`tstruct = @{ [id [tmod [type?]],]*}` | Struct types are field names with optional access and optional types.  Spaces not allowed
+`tstruct = @{ [id [tmod [type?]],]* }` | Struct types are field names with optional access and optional types.  Spaces not allowed
 `tvar = id`                   | Type variable lookup
 
 SIMPLE EXAMPLES
