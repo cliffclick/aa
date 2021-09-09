@@ -96,7 +96,6 @@ import static com.cliffc.aa.type.TypeFld.Access;
 // idea: err keeps the un-unifiable parts separate, better errors later
 
 
-
 public class HM {
   // Mapping from primitive name to PrimSyn
   static final HashMap<String,PrimSyn> PRIMSYNS = new HashMap<>();
@@ -1445,7 +1444,7 @@ public class HM {
       if( n.is_base() || n.is_struct() ) {
         _flow = n._flow.meet_nil(Type.XNIL);
         _open = n._open;
-        assert _is_func_input == n._is_func_input;
+        assert !_is_func_input || n._is_func_input;
         _args = n._args==null ? null : (NonBlockingHashMap<String, T2>)n._args.clone();  // Shallow copy the TV2 fields
         _name = n._name;
       } else if( n.is_nil() ) {
@@ -1571,7 +1570,7 @@ public class HM {
       } else
         throw unimpl();
       leaf.add_deps_work(work);
-      return leaf._union(copy) | that._union(find());
+      return leaf.union(copy,work) | that._union(find());
     }
 
     // -----------------
@@ -1779,7 +1778,6 @@ public class HM {
       if( missing && !is_open() && that._args!=null )
         for( String id : that._args.keySet() ) // For all fields in RHS
           if( arg(id)==null ) {                // Missing in LHS
-            if( that.is_open() ) throw unimpl();
             if( !that.arg(id).is_err() ) {
               if( work == null ) return true;    // Will definitely make progress
               progress |= that.arg(id).unify(miss_field(id), work);
@@ -1935,37 +1933,25 @@ public class HM {
       return t;
     }
 
+    // Walk an Apply output flow type, and attempt to replace parts of it with
+    // stronger flow types from the matching input types.
     Type walk_types_out( Type t, Apply apply ) {
       assert !unified();
       if( t == Type.XSCALAR ) return t;  // No lift possible
-      if( is_leaf() || is_err() || t==Type.SCALAR ) { // If never mapped on input, leaf is unbound by input
-        Type tmap = Apply.T2MAP.get(this);
+      Type tmap = Apply.T2MAP.get(this); // Output HM type has a matching input HM type has a matching input flow type
+      if( is_leaf() || is_err() ) { // If never mapped on input, leaf is unbound by input
         if( tmap==null || !tmap.isa(t) ) return t;
         push_update(apply);     // Re-run apply if this leaf re-maps
         return tmap;
       }
-      if( is_base() ) {
-        Type tmap = Apply.T2MAP.get(this);
-        if( tmap==null ) return _flow;
-        if( tmap==t ) return t;
-        if( t.isa(tmap) ) return t;
-        if( tmap.isa(t) ) return tmap;
-        return tmap.join(t);
-      }
+      if( is_base() ) return tmap==null ? _flow : tmap.join(t);
       if( is_nil() ) return t.join(Type.NSCALR); // nil is a function wrapping a leaf which is not-nil
       if( is_fun() ) return t; // No change, already known as a function (and no TFS in the flow types)
       if( is_struct() ) {
-        if( !(t instanceof TypeMemPtr) ) {
-          if( t==Type.NSCALR ) {
-            Type x = as_flow();
-            return x.join(Type.NSCALR);
-          }
-          if( TypeMemPtr.STRUCT0.join(t).above_center() )  return t; // Cannot ever be a struct
-          throw unimpl();       // Not sure what gets here
-        }
+        if( !(t instanceof TypeMemPtr) )
+          return tmap == null ? as_flow().join(t) : tmap;  // The most struct-like thing you can be
         TypeMemPtr tmp = (TypeMemPtr)t;
         TypeStruct ts0 = (TypeStruct)tmp._obj;
-
         TypeStruct ts = Apply.WDUPS.get(_uid);
         if( ts != null ) ts._cyclic = true;
         else {
@@ -2010,7 +1996,7 @@ public class HM {
     private void widen_bases() {
       walk((e, key) -> {
           if( Util.eq(key,"ret") ) return false; // Early exit
-          if( e.is_leaf() ) e._is_func_input=true;
+          e._is_func_input=true;
           if( e.is_base() ) e._flow = e._flow.widen();
           return true;
         });

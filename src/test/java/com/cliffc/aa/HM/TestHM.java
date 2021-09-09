@@ -899,7 +899,7 @@ public class TestHM {
     if( HM.DO_HM )
       assertEquals(stripIndent("@{ f    =  { A:@{ a=B;... } A -> A };"+
                                "   res1 = @{ a = Missing field a in () };"+
-                               "   res2 = @{ a=int64; b=nflt32 }"+
+                               "   res2 = @{ a=int64; b=flt64 }"+
                                "}"), stripIndent(syn._hmt.p()));
     if( HM.DO_GCP ) {
       Type tmp9 = HM.DO_HM ? TypeMemPtr.make(BitsAlias.FULL.make(9,10,11,12),TypeStruct.maket()) : Type.SCALAR;
