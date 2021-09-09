@@ -76,7 +76,7 @@ public class CastNode extends Node {
     if( maynil==notnil ) throw unimpl(); // return false;
 
     // Already an expanded nilable
-    if( maynil.is_nilable() && maynil.get("?") == notnil ) throw unimpl(); // return false
+    if( maynil.is_nil() && maynil.get("?") == notnil ) throw unimpl(); // return false
 
     // Expand nilable to either base
     if( maynil.is_base() && notnil.is_base() )
@@ -106,7 +106,7 @@ public class CastNode extends Node {
     if( work == null ) return true;
 
     // Can be nilable of nilable; fold the layer
-    if( maynil.is_nilable() && notnil.is_nilable() )
+    if( maynil.is_nil() && notnil.is_nil() )
       throw unimpl(); // return maynil.unify(notnil,work);
 
     // Unify the maynil with a nilable version of notnil

@@ -1,12 +1,11 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.NonBlockingHashMap;
 
 import static com.cliffc.aa.AA.ARG_IDX;
-import static com.cliffc.aa.AA.unimpl;
 
 // Allocates a TypeAry in memory.  Takes in the size and initial element value
 // produces the pointer.  Hence liveness is odd.
@@ -42,6 +41,7 @@ abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
 
   @Override public boolean unify( Work work ) {
     assert _tvar.isa("Ary");     // Self should always should be a Ary
+    if( is_unused() ) return false;
     // Length is an int
     TV2 len = tvar(ARG_IDX);
     if( len.is_base() && len._type.isa(TypeInt.INT64) )

@@ -49,7 +49,7 @@ public class ConNode<T extends Type> extends Node {
 
   @Override public boolean unify( Work work ) {
     TV2 self = tvar();
-    if( self.is_base() || self.is_nilable() || self.is_struct() || self.isa("Str") ) return false;
+    if( self.is_base() || self.is_nil() || self.is_struct() || self.isa("Str") ) return false;
     if( work==null ) return true;
     assert self.is_leaf();
     String asite = "Con_unify";

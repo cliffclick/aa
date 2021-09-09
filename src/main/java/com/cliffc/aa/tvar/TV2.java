@@ -68,17 +68,18 @@ public class TV2 {
 
   // Accessors
   public boolean is_unified() { return _unified!=null; }
-  public boolean isa(String s){ return !is_unified() && Util.eq(_name,s); }
-  public boolean is_tvar   () { return !is_unified() && _args!=null; } // Excludes unified,base,dead,free; includes nil,fun,struct
+  public boolean isa(String s){ return Util.eq(_name,s); }
+  public boolean is_tvar   () { return _args!=null; } // Excludes unified,base,dead,free; includes nil,fun,struct
   // Flat TV2s; no args.
-  public boolean is_free   () { return !is_unified() && isa("Free"   ); } // Allocated and then freed.  TBD if this pays off
-  public boolean is_err    () { return !is_unified() && isa("Err"    ); } // Error; exciting if not eventually dead
-  public boolean is_base   () { return !is_unified() && isa("Base"   ); } // Some base constant (no internal TV2s)
-  public boolean is_leaf   () { return !is_unified() && isa("Leaf"   ); } // Classic H-M leaf type variable, probably eventually unifies
+  public boolean is_free   () { return isa("Free"   ); } // Allocated and then freed.  TBD if this pays off
+  public boolean is_err    () { return isa("Err"    ); } // Error; exciting if not eventually dead
+  public boolean is_base   () { return isa("Base"   ); } // Some base constant (no internal TV2s)
+  public boolean is_leaf   () { return isa("Leaf"   ); } // Classic H-M leaf type variable, probably eventually unifies
   // Structural TV2s; has args
-  public boolean is_nilable() { return !is_unified() && isa("Nil"    ); } // Some nilable TV2
-  public boolean is_fun    () { return !is_unified() && isa("->"     ); } // A function, arg keys are numbered from ARG_IDX, and the return key is "ret"
-  public boolean is_struct () { return !is_unified() && isa("@{}"    ); } // A struct, keys are field names
+  public boolean is_nil() { return isa("Nil"    ); } // Some nilable TV2
+  public boolean is_fun    () { return isa("->"     ); } // A function, arg keys are numbered from ARG_IDX, and the return key is "ret"
+  public boolean is_struct () { return isa("@{}"    ); } // A struct, keys are field names
+  public boolean is_ary    () { return isa("Ary"    ); } // A struct, keys are field names
   //public TV2 get_unified() { assert is_unified(); return _unified; }
   public String name() { return _name; }
 
@@ -277,7 +278,7 @@ public class TV2 {
 
   public TV2 find() {
     TV2 top = _find0();
-    return top.is_nilable() ? top._find_nil() : top;
+    return top.is_nil() ? top._find_nil() : top;
   }
 
   // Nilable fixup.  nil-of-leaf is OK.  nil-of-anything-else folds into a
@@ -341,6 +342,7 @@ public class TV2 {
     ALLOCS.get(_alloc_site)._unified++;
     merge_deps(that);           // Merge update lists, for future unions
     merge_ns  (that);           // Merge Node list, for easier debugging
+    _name = "X"+_uid;
     _args = null;               // Clean out extra state from 'this'
     _open = false;
     _type = null;
@@ -353,7 +355,7 @@ public class TV2 {
   // No change if only testing, and reports progress.
   @SuppressWarnings("unchecked")
   boolean unify_nil(TV2 that, Work work) {
-    assert is_nilable() && !that.is_nilable();
+    assert is_nil() && !that.is_nil();
     if( work==null ) return true; // Will make progress
     // Clone the top-level struct and make this nilable point to the clone;
     // this will collapse into the clone at the next find() call.
@@ -440,8 +442,8 @@ public class TV2 {
     if( this.is_leaf() || that.is_err() ) return this.union(that,work);
     if( that.is_leaf() || this.is_err() ) return that.union(this,work);
     // Special case for nilable union something
-    if( this.is_nilable() && !that.is_nilable() ) return this.unify_nil(that,work);
-    if( that.is_nilable() && !this.is_nilable() ) return that.unify_nil(this,work);
+    if( this.is_nil() && !that.is_nil() ) return this.unify_nil(that,work);
+    if( that.is_nil() && !this.is_nil() ) return that.unify_nil(this,work);
 
     // Cycle check.
     long luid = dbl_uid(that);  // long-unique-id formed from this and that
@@ -551,7 +553,7 @@ public class TV2 {
     }
 
     // Special handling for nilable
-    if( this.is_nilable() && !that.is_nilable() ) {
+    if( this.is_nil() && !that.is_nil() ) {
       Type mt = that._type.meet_nil(Type.XNIL);
       if( mt == that._type ) return false;
       if( work==null ) return true;
@@ -559,7 +561,7 @@ public class TV2 {
     }
 
     // That is nilable and this is not
-    if( that.is_nilable() && !this.is_nilable() ) {
+    if( that.is_nil() && !this.is_nil() ) {
       assert is_base() || is_struct();
       if( work==null ) return true;
       TV2 copy = this;
@@ -678,22 +680,23 @@ public class TV2 {
     assert !is_unified();
     long duid = dbl_uid(t._uid);
     if( WDUPS.putIfAbsent(duid,"")!=null ) return t;
-    if( is_err() ) return fput(t); //
+    if( is_err() ) return fput(Type.SCALAR); //
     // Base variables (when widened to an HM type) might force a lift.
-    if( is_base() ) return fput(_type.widen().join(t));
+    if( is_base() ) return fput(_type);
     // Free variables keep the input flow type.
     if( is_leaf() ) return fput(t);
     // Nilable
-    if( is_nilable() ) throw unimpl();
+    if( is_nil() ) throw unimpl();
     if( t==Type.SCALAR || t==Type.NSCALR ) return fput(t); // Will be scalar for all the breakdown types
     // Functions being called or passed in can have their return types appear
     // in the call result.
     if( is_fun() ) {
       if( !(t instanceof TypeFunPtr) ) return t; // Typically, some kind of error situation
+      fput(t);                     // Recursive types put themselves first
       TypeFunPtr tfp = (TypeFunPtr)t;
       TV2 ret = get(" ret");
-      if( tfp._fidxs==BitsFun.FULL        ) return ret.walk_types_in(tmem,Type. SCALAR);
-      if( tfp._fidxs==BitsFun.FULL.dual() ) return ret.walk_types_in(tmem,Type.XSCALAR);
+      if( tfp._fidxs==BitsFun.FULL        ) return t;
+      if( tfp._fidxs==BitsFun.FULL.dual() ) return t;
       for( int fidx : tfp._fidxs ) {
         FunNode fun = FunNode.find_fidx(fidx);
         if( fun.fptr().tvar().is_err() ) throw unimpl();
@@ -728,16 +731,32 @@ public class TV2 {
     return t;
   }
 
-  public Type walk_types_out(Type t) {
+  public Type walk_types_out(Type t, CallEpiNode cepi) {
     assert !is_unified();
     if( t == Type.XSCALAR ) return t;  // No lift possible
     Type tmap = T2MAP.get(this);
-    if( tmap != null ) return tmap;
-    if( is_err() ) throw unimpl();
-    assert !is_leaf() && !is_base(); // All output leafs found as inputs already
+    if( is_leaf() || is_err() ) { // If never mapped on input, leaf is unbound by input
+      if( tmap==null ) return t;
+      push_dep(cepi);           // Re-run apply if this leaf re-maps
+      return tmap.join(t);
+    }
+    if( is_base() ) return tmap==null ? _type : tmap.join(t);
+    if( is_nil() ) throw unimpl(); // return t.join(Type.NSCALR); // nil is a function wrapping a leaf which is not-nil
     if( is_fun() ) return t; // No change, already known as a function (and no TFS in the flow types)
     if( is_struct() ) {
+      if( !(t instanceof TypeMemPtr) ) {
+        if( tmap==null ) throw unimpl(); // return tmap == null ? as_flow().join(t) : tmap;  // The most struct-like thing you can be
+        return tmap;
+      }
       TypeStruct ts = (TypeStruct)((TypeMemPtr)t)._obj;
+      throw unimpl();
+    }
+    if( is_ary() ) {
+      if( !(t instanceof TypeMemPtr) ) {
+        if( tmap==null ) throw unimpl(); // return tmap == null ? as_flow().join(t) : tmap;  // The most struct-like thing you can be
+        return tmap;
+      }
+
       throw unimpl();
     }
     throw unimpl();
@@ -877,7 +896,7 @@ public class TV2 {
       return sb;
     }
 
-    if( is_nilable() )
+    if( is_nil() )
       return sb.p("0");
 
     // Generic structural T2

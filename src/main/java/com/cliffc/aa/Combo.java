@@ -91,7 +91,7 @@ type on a per-call-site basis.
 
  */
 public abstract class Combo {
-  public static final boolean DO_HM=false;
+  public static final boolean DO_HM=true;
 
   public static void opto() {
     Env.GVN._opt_mode = GVNGCM.Mode.Opto;

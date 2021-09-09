@@ -354,14 +354,14 @@ public final class CallEpiNode extends Node {
     if( Combo.DO_HM && opt_mode._CG ) {
       // Walk the inputs, building a mapping
       CallNode call = call();
-      Node fdx = call.fdx();
       TV2.T2MAP.clear();
-      { TV2.WDUPS.clear(); fdx.tvar().walk_types_in(caller_mem,fdx._val); }
       for( int i=DSP_IDX; i<call._defs._len-1; i++ )
         { TV2.WDUPS.clear(); call.tvar(i).walk_types_in(caller_mem,call.val(i)); }
       // Walk the outputs, building an improved result
-      Type trez2 = tvar().walk_types_out(trez);
-      trez = trez2.join(trez);
+      Type trez2 = tvar().walk_types_out(trez,this);
+      Type trez3 = trez2.join(trez); // Lift result
+      assert trez3.isa(trez);        // Monotonic...
+      trez = trez3;                  // Upgrade
     }
 
     return TypeTuple.make(Type.CTRL,tmem3,trez);

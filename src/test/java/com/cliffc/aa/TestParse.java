@@ -20,11 +20,6 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    // id accepts and returns all types and keeps precision
-    test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
-         (() -> TypeMemPtr.make(13,TypeStruct.tupsD(TypeInt.INT8,TypeInt.con(3)))),
-         null,
-         "[99](int8, 3)");
 
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
@@ -70,6 +65,11 @@ public class TestParse {
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(0);(1,);(1,).0;@{x;y];","Expected closing '}' but found ']' instead",63);
     // id accepts and returns both ints and reference types (arrays).
     //test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",TypeStruct.make_tuple(Type.XNIL,TypeInt.INT8,TypeInt.con(3)));
+    // id accepts and returns all types and keeps precision
+    test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
+      (() -> TypeMemPtr.make(18,TypeStruct.tupsD(TypeInt.INT8,TypeInt.con(3)))),
+      null,
+      "[99](int8, 3)");
   }
 
   @Test public void testParse00() {
@@ -779,6 +779,11 @@ public class TestParse {
                                                 TypeMem.make(18,TypeStruct.make2fldsD("0",Type.SCALAR,"1",Type.SCALAR)),
                                                 TypeMemPtr.make(18,TypeObj.ISUSED)))),
          "[43]{ A -> [18]( A, A) }");
+    // id accepts and returns all types and keeps precision
+    test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
+         (() -> TypeMemPtr.make(18,TypeStruct.tupsD(TypeInt.INT8,TypeInt.con(3)))),
+         null,
+         "[99](int8, 3)");
 
 
 

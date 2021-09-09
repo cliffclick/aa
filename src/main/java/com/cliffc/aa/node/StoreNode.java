@@ -198,7 +198,7 @@ public class StoreNode extends Node {
       return ptr.unify(TV2.make_open_struct(name,st,tptr,"Store_update",args),work);
     }
 
-    if( ptr.is_nilable() || (tptr instanceof TypeMemPtr && tptr.must_nil()) )
+    if( ptr.is_nil() || (tptr instanceof TypeMemPtr && tptr.must_nil()) )
       return work==null || st.tvar().unify(TV2.make_err(st,"May be nil when accessing field "+fld,"Store_update"),work);
 
     ptr.push_dep(st);
