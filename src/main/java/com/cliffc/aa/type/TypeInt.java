@@ -29,7 +29,7 @@ public class TypeInt extends Type<TypeInt> {
 
   static { new Pool(TINT,new TypeInt()); }
   public static TypeInt make( int x, int z, long con ) {
-    if( Math.abs(x)==1 && z==1 && con==0) con=1; // not-null-bool is just a 1
+    if( Math.abs(x)==1 && z==1 && con==0) { con=1; x=0; } // not-null-bool is just a 1
     TypeInt t1 = POOLS[TINT].malloc();
     return t1.init(x,z,con).hashcons_free();
   }
@@ -182,8 +182,8 @@ public class TypeInt extends Type<TypeInt> {
   @Override public boolean must_nil() { return _x==-2 || (_x==0 && _con==0); }
   @Override public boolean may_nil() { return _x>0 || (_x==0 && _con==0); }
   @Override Type not_nil() {
-    // Choice {+0+1} ==> {+1}
-    if( this==BOOL.dual() ) return make(1,1,1);
+    // Choice {+0+1} ==> {+1}, which is just {1}
+    if( this==BOOL.dual() ) return TRUE;
     // {0} ==> {0,1}
     if( this==FALSE ) return BOOL;
     // Choice any-int ==> any-not-nil-int

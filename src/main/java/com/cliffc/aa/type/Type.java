@@ -837,12 +837,13 @@ public class Type<T extends Type<T>> implements Cloneable {
     case TREAL:   case TXREAL:
     case TSCALAR: case TXSCALAR:
     case TNSCALR: case TXNSCALR:
-    case TNIL:    case TXNIL:
       return SCALAR;
     case TANY : case TALL  :
       return this;
     case TCTRL: case TXCTRL:
       return Type.CTRL;
+    case TNIL:    case TXNIL:
+      return this;
     default: throw typerr(null); // Overridden in subclass
     }
   }
