@@ -3,7 +3,6 @@ package com.cliffc.aa.HM;
 import com.cliffc.aa.HM.HM.Root;
 import com.cliffc.aa.type.*;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import static com.cliffc.aa.AA.ARG_IDX;
@@ -679,21 +678,6 @@ public class TestHM {
     }
   }
 
-  @Ignore
-  @Test public void test58y() {
-    Root syn = HM.hm(
-"A=@{x=3, y=3.2};"+
-"B=@{x=4, z=\"abc\"};"+
-"rez = { pred -> (if pred A B)};"+
-"rez"+
-                     "");
-    if( HM.DO_HM )
-      assertEquals(stripIndent("{ A? -> @{x=nint8} }"), stripIndent(syn._hmt.p()));
-    if( HM.DO_GCP )
-      assertEquals(tfs(TypeMemPtr.make(BitsAlias.FULL.make(9,10),TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("x",TypeInt.NINT8,3)))), syn.flow_type());
-  }
-
-
   // Full on Peano arithmetic.
   @Test public void test58() {
     Root syn = HM.hm(
@@ -841,34 +825,8 @@ public class TestHM {
   }
 
 
-  // Unexpected restriction on extra fields.
-  @Test public void test59() {
-    Root syn = HM.hm(
-"sx = { ignore -> "+
-"  self0=@{ succ = (sx self0)}; "+
-"  self0 "+
-"};"+
-"self1=@{ succ = self1, nope=7 };"+
-"(sx self1)"+
-"");
-
-    if( HM.DO_HM )
-      assertEquals(stripIndent("A:@{nope= Missing field nope in A:@{succ=A}; succ=A}"), stripIndent(syn._hmt.p()));
-    if( HM.DO_GCP ) {
-      // Build a cycle of length 1.
-      Type.RECURSIVE_MEET++;
-      TypeFld f = TypeFld.malloc("succ",null,TypeFld.Access.Final,ARG_IDX);
-      TypeStruct ts = TypeStruct.malloc("",false,false,TypeFld.NO_DISP,f).set_hash();
-      TypeMemPtr p = TypeMemPtr.make(9,ts);
-      f.setX(p);
-      Type.RECURSIVE_MEET--;
-      ts.install();
-      assertEquals(p,syn.flow_type());
-    }
-  }
-
   // Checking an AA example
-  @Test public void test60() {
+  @Test public void test59() {
     Root syn = HM.hm(
 "prod = { x -> (if x (* (prod x.n) x.v) 1)};"+
 "(prod @{n= @{n=0, v=3}, v=2})"+
@@ -882,6 +840,32 @@ public class TestHM {
   }
 
 
+  // Unexpected restriction on extra fields.
+  @Test public void test60() {
+    Root syn = HM.hm(
+      "sx = { ignore -> "+
+        "  self0=@{ succ = (sx self0)}; "+
+        "  self0 "+
+        "};"+
+        "self1=@{ succ = self1, nope=7 };"+
+        "(sx self1)"+
+        "");
+
+    if( HM.DO_HM )
+      assertEquals(stripIndent("A:@{ succ=A}"), stripIndent(syn._hmt.p()));
+    if( HM.DO_GCP ) {
+      // Build a cycle of length 1.
+      Type.RECURSIVE_MEET++;
+      TypeFld f = TypeFld.malloc("succ",null,TypeFld.Access.Final,ARG_IDX);
+      TypeStruct ts = TypeStruct.malloc("",false,false,TypeFld.NO_DISP,f).set_hash();
+      TypeMemPtr p = TypeMemPtr.make(9,ts);
+      f.setX(p);
+      Type.RECURSIVE_MEET--;
+      ts.install();
+      assertEquals(p,syn.flow_type());
+    }
+  }
+
 
   // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
   // pass in a field 'a'... and still no error.  Fixed.
@@ -891,7 +875,26 @@ public class TestHM {
 
   // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
   // pass in a field 'a'... and still no error.  Fixed.
-  @Test public void test62() {
+  @Test public void test62() { run("f = { p1 -> p1.a };"+"(f @{b=2.3})",
+                                    "Missing field a in @{b=flt64}",
+                                   Type.SCALAR);  }
+
+  @Test public void test63() {
+    Root syn = HM.hm(
+"A=@{x=3, y=3.2};"+
+"B=@{x=4, z=\"abc\"};"+
+"rez = { pred -> (if pred A B)};"+
+"rez"+
+                     "");
+    if( HM.DO_HM )
+      assertEquals(stripIndent("{ A? -> @{x=nint8} }"), stripIndent(syn._hmt.p()));
+    if( HM.DO_GCP )
+      assertEquals(tfs(TypeMemPtr.make(BitsAlias.FULL.make(9,10),TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("x",TypeInt.NINT8,3)))), syn.flow_type());
+  }
+
+  // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
+  // pass in a field 'a'... and still no error.  Fixed.
+  @Test public void test64() {
     Root syn = HM.hm("f = { p1 p2 -> (if p2.a p1 p2)};"+
                      "res1 = (f @{a=2,      c=\"def\"} @{    b=2.3,d=\"abc\"});"+
                      "res2 = (f @{a=2,b=1.2,c=\"def\"} @{a=3,b=2.3,d=\"abc\"});"+

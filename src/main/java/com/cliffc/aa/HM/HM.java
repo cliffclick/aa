@@ -1661,12 +1661,12 @@ public class HM {
       return true;
     }
     // Delete a field
-    private void del_fld( String id, Worklist work) {
+    private boolean del_fld( String id, Worklist work) {
       assert is_struct();
       add_deps_work(work);
       _args.remove(id);
-      if( _args.size()==0 )
-        _args=null;
+      if( _args.size()==0 ) _args=null;
+      return true;
     }
 
     private long dbl_uid(T2 t) { return dbl_uid(t._uid); }
@@ -1758,12 +1758,14 @@ public class HM {
         T2 lhs = this.arg(key);
         T2 rhs = that.arg(key);
         if( rhs==null ) {         // No RHS to unify against
-          if( work==null ) return true; // Will definitely make progress
           missing = true;         // Might be missing RHS
           if( that.is_open() ) {  // If RHS is open, copy field into it
+            if( work==null ) return true; // Will definitely make progress
             progress |= that.add_fld(key,lhs._fresh(nongen), work);
-          } else {
-            progress |= that.add_fld(key,that.miss_field(key),work);
+          } else if( this.is_open() ) {
+            if( work==null ) return true; // Will definitely make progress
+            T2 t2 = that.miss_field(key);
+            progress |= lhs._fresh_unify(t2,nongen,work) | that.add_fld(key,t2,work);
           }
         } else {
           progress |= lhs._fresh_unify(rhs,nongen,work);
@@ -1780,7 +1782,7 @@ public class HM {
           if( arg(id)==null ) {                // Missing in LHS
             if( !that.arg(id).is_err() ) {
               if( work == null ) return true;    // Will definitely make progress
-              progress |= that.arg(id).unify(miss_field(id), work);
+              progress |= that.del_fld(id,work);
             }
           }
       // Meet open flags and aliases
@@ -1789,8 +1791,7 @@ public class HM {
       that._open &= _open;
       return progress;
     }
-    private boolean vput(T2 that, boolean progress) { VARS.put(this,that);
-      return progress; }
+    private boolean vput(T2 that, boolean progress) { VARS.put(this,that); return progress; }
 
     // Return a fresh copy of 'this'
     T2 fresh() {
