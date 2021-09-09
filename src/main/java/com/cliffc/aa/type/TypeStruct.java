@@ -14,10 +14,14 @@ import static com.cliffc.aa.type.TypeFld.Access;
 /** A memory-based collection of optionally named fields.  This is a recursive
  *  type, only produced by NewNode and structure or tuple constants.  Fields
  *  can be indexed by field name or numeric constant (i.e. tuples), but NOT by
- *  a general number - thats an Array.
+ *  a general number - thats an Array.  Fields are matched on name and not
+ *  index; field order is irrevelant to named fields.
  *
- *  Fields are matched on name and not index; field order is irrevelant to
- *  named fields.
+ *  Structs can be open or closed (and like all Types, high or low).  An open
+ *  struct acts as-if it has an all possible field names (except those
+ *  explicitly mentioned) set to SCALAR or XSCALAR.  Adding a new SCALAR field
+ *  to an open low struct is a no-op, since such a field already implicitly
+ *  exists.
  *
  *  The recursive type poses some interesting challenges.  It is represented as
  *  literally a cycle of pointers which must include a TypeStruct (and not a
