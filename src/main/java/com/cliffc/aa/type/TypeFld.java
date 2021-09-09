@@ -73,7 +73,7 @@ public class TypeFld extends Type<TypeFld> {
   public static TypeFld make( String fld, Type t, int order ) { return make(fld,t,Access.Final,order); }
   public static TypeFld make( String fld, Type t ) { return make(fld,t,Access.Final,oBot); }
   // Make a not-interned version for building cyclic types
-  TypeFld malloc_from() { return malloc(_fld,_t,_access,_order); }
+  public TypeFld malloc_from() { return malloc(_fld,_t,_access,_order); }
 
   // Some convenient default constructors
   static final String[] ARGS = new String[]{" ctl", " mem", "^","x","y","z"};

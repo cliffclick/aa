@@ -14,10 +14,14 @@ import static com.cliffc.aa.type.TypeFld.Access;
 /** A memory-based collection of optionally named fields.  This is a recursive
  *  type, only produced by NewNode and structure or tuple constants.  Fields
  *  can be indexed by field name or numeric constant (i.e. tuples), but NOT by
- *  a general number - thats an Array.
+ *  a general number - thats an Array.  Fields are matched on name and not
+ *  index; field order is irrevelant to named fields.
  *
- *  Fields are matched on name and not index; field order is irrevelant to
- *  named fields.
+ *  Structs can be open or closed (and like all Types, high or low).  An open
+ *  struct acts as-if it has an all possible field names (except those
+ *  explicitly mentioned) set to SCALAR or XSCALAR.  Adding a new SCALAR field
+ *  to an open low struct is a no-op, since such a field already implicitly
+ *  exists.
  *
  *  The recursive type poses some interesting challenges.  It is represented as
  *  literally a cycle of pointers which must include a TypeStruct (and not a
@@ -137,7 +141,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
   private boolean is_tup() {
     if( _flds.size()<=1 ) return true;
-    return _flds.get("0")!=null;
+    return _flds.get("0")!=null && _flds.get("0")._order==ARG_IDX;
   }
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
@@ -154,7 +158,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
            : "PRIMS_"+t1);
     } else {
       boolean field_sep=false;
-      for( TypeFld fld : osorted_flds() ) {
+      for( TypeFld fld : is_tup() ? osorted_flds() : asorted_flds() ) {
         if( !debug && Util.eq(fld._fld,"^") ) continue; // Do not print the ever-present display
         fld.str(sb,dups,mem,debug); // Field name, access mod, type
         sb.p(is_tup ? ", " : "; "); // Between fields
@@ -1178,17 +1182,29 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       st.add_fld( Util.eq("^",fld._fld) ? fld : fld.make_from(Type.ALL,Access.bot()));
     return st.hashcons_free();
   }
+  
   // Keep field names and orders.  Widen all field contents, including finals.
+  // Handles cycles
   @Override public TypeStruct widen() {
-    boolean widen=false;
-    for( TypeFld fld : flds() )
-      if( fld._t.widen()!=fld._t )
-        { widen=true; break; }
-    if( !widen ) return this;
-    TypeStruct ts = malloc(_name,_any,_open);
-    for( TypeFld fld : _flds.values() )
-      ts.add_fld(fld.make_from(fld._t.widen()));
-    return ts.hashcons_free();
+    assert WIDEN_HASH.isEmpty();
+    TypeStruct w = _widen();
+    WIDEN_HASH.clear();
+    return w;
+  }
+
+  private static final NonBlockingHashMapLong<TypeStruct> WIDEN_HASH = new NonBlockingHashMapLong<>();
+  @Override TypeStruct _widen() {
+    TypeStruct ts = WIDEN_HASH.get(_uid);
+    if( ts!=null ) { ts._cyclic=true; return ts; }
+    RECURSIVE_MEET++;
+    ts = malloc(_name,_any,_open);
+    WIDEN_HASH.put(_uid,ts);
+    for( TypeFld fld : _flds.values() ) ts.add_fld(fld.malloc_from());
+    ts.set_hash();
+    for( TypeFld fld : ts._flds.values() ) fld.setX(fld._t._widen());
+    if( --RECURSIVE_MEET == 0 )
+      ts = ts.install();
+    return ts;
   }
 
   // True if isBitShape on all bits

@@ -280,18 +280,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   // ptr-to-array (and string) from ptr-to-record.  Must keep types at the same
   // resolution as H-M, so pointers all permit nil (unless I track a H-M type
   // which disallows nil).
-  @Override public TypeMemPtr widen() {
-    // Flatten to either all-structs or all-strings, unless both.
-    TypeObj obj = _obj.widen();
-    boolean z = _aliases.test(0);
-    if( _aliases.isa(BitsAlias.RECORD_BITS0) )
-      return make(z ? BitsAlias.RECORD_BITS0 :BitsAlias.RECORD_BITS,obj);
-    if( _aliases.isa(BitsAlias.STRBITS0) )
-      return make(z ? BitsAlias.STRBITS0 :BitsAlias.STRBITS,obj);
-    if( _aliases.isa(BitsAlias.ARYBITS0) )
-      return make(z ? BitsAlias.ARYBITS0 :BitsAlias.ARYBITS,obj);
-    return make(_aliases,obj);
-  }
+  @Override public TypeMemPtr  widen() { return make(_aliases.widen(),_obj. widen()); }
+  @Override        TypeMemPtr _widen() { return make(_aliases.widen(),_obj._widen()); }
 
   // Make a Type, replacing all dull pointers from the matching types in mem.
   @Override public Type make_from(Type head, TypeMem mem, VBitSet visit) {

@@ -837,15 +837,18 @@ public class Type<T extends Type<T>> implements Cloneable {
     case TREAL:   case TXREAL:
     case TSCALAR: case TXSCALAR:
     case TNSCALR: case TXNSCALR:
-    case TNIL:    case TXNIL:
       return SCALAR;
     case TANY : case TALL  :
       return this;
     case TCTRL: case TXCTRL:
       return Type.CTRL;
+    case TNIL:    case TXNIL:
+      return this;
     default: throw typerr(null); // Overridden in subclass
     }
   }
+  // Recursive version called from TypeStruct
+  Type _widen() { return widen(); }
 
   // True if type must include a nil (as opposed to may-nil, which means the
   // type can choose something other than nil).
