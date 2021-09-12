@@ -20,6 +20,9 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
+    test("noinline_inc={x -> x&1}; noinline_p={x -> noinline_inc(x)*2}; noinline_p",
+      (()->TypeFunPtr.GENERIC_FUNPTR),null,"{ int -> int }" );
+    //test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
 
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.

@@ -1889,12 +1889,14 @@ public class HM {
       assert !unified();
       if( is_err() ) return fput(Type.SCALAR); //
       // Base variables (when widened to an HM type) might force a lift.
-      if( is_base() ) return fput(_flow);
+      if( is_base() ) return fput(_flow.meet(t));
       // Free variables keep the input flow type.
       if( is_leaf() ) return fput(t);
       // Nilable
-      if( is_nil() )
-        return arg("?").walk_types_in(fput(t.join(Type.NSCALR)));
+      if( is_nil() ) {
+        //fput(t == Type.XNIL ? Type.XSCALAR : t.join(Type.NSCALR));
+        return arg("?").walk_types_in(t);
+      }
       if( is_fun() ) {
         if( !(t instanceof TypeFunPtr) ) return t; // Typically, some kind of error situation
         fput(t);                // Recursive types put themselves first
@@ -1946,7 +1948,7 @@ public class HM {
         return tmap;
       }
       if( is_base() ) return tmap==null ? _flow : tmap.join(t);
-      if( is_nil() ) return t.join(Type.NSCALR); // nil is a function wrapping a leaf which is not-nil
+      if( is_nil() ) return t; // nil is a function wrapping a leaf which is not-nil
       if( is_fun() ) return t; // No change, already known as a function (and no TFS in the flow types)
       if( is_struct() ) {
         if( !(t instanceof TypeMemPtr) )

@@ -151,10 +151,34 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   }
 
   @Override public boolean unify( Work work ) {
-    if( tvar().is_fun() ) return false;
+    TV2 self = tvar();
+    if( self.is_err() ) return false;
     RetNode ret = ret();
     FunNode fun = ret.fun();
-    return tvar().unify(TV2.make_fun(ret,TypeFunPtr.make(fun._fidx,fun._sig.nargs(),TypeMemPtr.NO_DISP),fun._sig,"FunPtr_unify"),work);
+
+    boolean progress = false;
+    if( !self.is_fun() ) {      // Force a function if not already
+      if( work==null ) return true;
+      progress = self.unify(TV2.make_fun(ret.rez(),TypeFunPtr.make(fun._fidx,fun._sig.nargs(),TypeMemPtr.NO_DISP),fun._sig,"FunPtr_unify"),work);
+      self = self.find();
+    }
+
+    // Return
+    progress |= self.unify_at(ret.rez()," ret",ret.rez().tvar(),work);
+
+    // Each argument from the parms directly
+    Node[] parms = fun.parms();
+    for( int i=DSP_IDX; i<parms.length; i++ ) {
+      String key = (""+i).intern();
+      TV2 old = self.get(key);
+      TV2 arg = parms[i]==null ? old : parms[i].tvar();
+      if( arg==null )  arg = TV2.make_leaf(fun,"alloc_site"); // null on 1st visit to a missing (unused) parm
+      if( old==arg ) continue;      // No progress
+      if( work==null ) return true; // Early cutout
+      progress |= self.unify_at(parms[i],key,arg,work);
+    }
+
+    return progress;
   }
 
   // Filter out all the wrong-arg-count functions from Parser.

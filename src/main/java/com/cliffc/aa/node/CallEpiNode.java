@@ -294,9 +294,9 @@ public final class CallEpiNode extends Node {
       // children as expected; same if the parent is still wired (perhaps with
       // some children).  If only 1 child is wired, then we have an extra fidx
       // for a not-wired child.  If this fidx is really some unknown caller we
-      // would have to get super conservative; but its actually just a recently
+      // would have to get very conservative; but it's actually just a recently
       // split child fidx.  If we get the RetNode via FunNode.find_fidx we suffer
-      // the non-local progress curse.  If we get super conservative, we end up
+      // the non-local progress curse.  If we get very conservative, we end up
       // rolling backwards (original fidx returned int; each split will only
       // ever return int-or-better).  So instead we "freeze in place".
       outerloop:
@@ -491,7 +491,6 @@ public final class CallEpiNode extends Node {
     CallNode call = call();
     Node fdx = call.fdx();
     TV2 tfun = fdx.tvar();
-    TV2 tvar = tvar();
     if( tfun.is_err() )
       return tvar().unify(tfun,work);
 
@@ -500,9 +499,10 @@ public final class CallEpiNode extends Node {
       if( work==null ) return true;
       NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
       for( int i=DSP_IDX; i<call._defs._len-1; i++ )
-        args.put(""+i,call.tvar(i));
-      args.put(" ret",tvar);
-      progress = tfun.unify(TV2.make_fun(this, fdx._val, args, "CallEpi_unify"), work);
+        args.put((""+i).intern(),call.tvar(i));
+      args.put(" ret",tvar());
+      TV2 nfun = TV2.make_fun(this, fdx._val, args, "CallEpi_unify");
+      progress = tfun.unify(nfun, work);
       tfun = tfun.find();
     }
     // TODO: Handle Thunks
@@ -514,16 +514,15 @@ public final class CallEpiNode extends Node {
     // Check for progress amongst args
     for( int i=DSP_IDX; i<call._defs._len-1; i++ ) {
       TV2 actual = call.tvar(i);
-      TV2 formal = tfun.get(""+i);
-      if( actual!=formal ) {
-        progress |= actual.unify(formal,work);
-        if( progress && work==null ) return true; // Early exit
-        if( tfun.is_unified() || tfun.is_err() ) throw unimpl();
-      }
+      TV2 formal = tfun.get((""+i).intern());
+      progress |= actual.unify(formal,work);
+      if( progress && work==null ) return true; // Early exit
+      if( (tfun=tfun.find()).is_err() ) throw unimpl();
     }
     // Check for progress on the return
-    progress |= tfun.get(" ret").unify(tvar,work);
-    if( tfun.is_unified() || tfun.is_err() ) throw unimpl();
+    progress |= tvar().unify(tfun.get(" ret"),work);
+    if( (tfun=tfun.find()).is_err() ) return tvar().unify(tfun,work);
+
     return progress;
   }
 

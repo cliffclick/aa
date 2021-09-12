@@ -933,9 +933,9 @@ public class Parse implements Comparable<Parse> {
       // Record H-M VStack in case we clone
       fun.set_nongens(_e._nongen.compact());
       // Build Parms for system incoming values
-      Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,con(TypeRPC.ALL_CALL),null));
+      Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
       Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-      Node clo = X.xform(new ParmNode(DSP_IDX,"^"   ,fun,con(tpar_disp),null));
+      Node clo = X.xform(new ParmNode(DSP_IDX,"^"   ,fun,tpar_disp,parent_display/*con(tpar_disp)*/,null));
 
       // Increase scope depth for function body.
       try( Env e = new Env(_e,errMsg(oldx-1), true, fun, mem) ) { // Nest an environment for the local vars
@@ -950,10 +950,15 @@ public class Parse implements Comparable<Parse> {
         Parse errmsg = errMsg();  // Lazy error message
         for( TypeFld fld : formals.flds() ) { // User parms start
           if( fld._order <= DSP_IDX ) continue;// Already handled
-          Node parm = X.xform(new ParmNode(fld,fun,con(fld._t.simple_ptr()),errmsg));
-          _e._nongen.add_var(fld._fld,parm.tvar());
+          Node parm = X.xform(new ParmNode(fld,fun,Env.ALL_PARM,errmsg));
+          e._nongen.add_var(fld._fld,parm.tvar());
           create(fld._fld,parm, args_are_mutable);
         }
+        for( TypeFld fld : formals.flds() ) { // User parms start
+          if( fld._order <= DSP_IDX ) continue;// Already handled
+          if( fld._t != Type.SCALAR )
+            throw unimpl();     // Add a arg type check
+        }    
 
         // Parse function body
         Node rez = stmts();       // Parse function body
@@ -969,8 +974,8 @@ public class Parse implements Comparable<Parse> {
         // The FunPtr builds a real display; any up-scope references are passed in now.
         Node fptr = X.xform(new FunPtrNode(null,ret,fresh_disp.unhook()));
 
-        _e = _e._par;                // Pop nested environment; pops nongen also
-        return (X._ret=fptr);        // Return function; close-out and DCE 'e'
+        _e = e._par;            // Pop nested environment; pops nongen also
+        return (X._ret=fptr);   // Return function; close-out and DCE 'e'
       }
     }
   }

@@ -44,7 +44,7 @@ public class ProjNode extends Node {
     TV2 tv = tvar();
     if( in(0) instanceof NewNode ) // TODO: Not really a proper use of Proj
       return tv.unify(tvar(0),work);
-    if( in(0) instanceof CallEpiNode ) // Only DProj#2 and its the return value
+    if( in(0) instanceof CallEpiNode ) // Only DProj#2 and it's the return value
       return tv.unify(tvar(0),work);
     if( in(0) instanceof CallNode )
       return tv.unify(in(0).tvar(_idx),work); // Unify with Call arguments

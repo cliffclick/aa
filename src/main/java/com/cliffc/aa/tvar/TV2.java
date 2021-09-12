@@ -1,6 +1,5 @@
 package com.cliffc.aa.tvar;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
@@ -10,13 +9,57 @@ import java.util.*;
 
 import static com.cliffc.aa.AA.*;
 
-// Type Variable.  TVars unify (ala Tarjan Union-Find), and can have structure
-// (such as "{ A -> B }").  TVars are tied to a TNode to enforce Type structure
-// on Types.  TVars with no structure either refer to a plain Node, or get
-// unioned into another TVar.  TVars with structure have to match structure to
-// be unified, but then can be recursively unified.
+/** Hindley-Milner based type variables.
+ *
+ * TV2s unify (ala Tarjan Union-Find), and can have structure such as "{ A -> B
+ * }" or "@{ x = A, y = A }".  TV2s includes polymorphic structures and fields
+ * (structural typing not duck typing), polymorphic nil-checking and an error
+ * type.  TV2 types fully support recursive types.
+ *
+ * TV2 Bases include anything from the GCP lattice, and are generally sharper
+ * than e.g. 'int'.  Bases with values of '3' and "abc" are fine.  These are
+ * widened to the normal HM types if passed to any function; they remain sharp
+ * if returned or passed to primitives.  Functions include the set of FIDXs
+ * used in the unification; this set is generally less precise than that from
+ * GCP.  Function arguments that escape have their GCP type widened "as if"
+ * called from the most HM-general legal call site; otherwise GCP assumes
+ * escaping functions are never called and their arguments have unrealistic
+ * high flow types.
+ *
+ * Unification typically makes many temporary type-vars and immediately unifies
+ * them.  For efficiency, this algorithm checks to see if unification requires
+ * an allocation first, instead of just "allocate and unify".  The major place
+ * this happens is identifiers, which normally make a "fresh" copy of their
+ * type-var, then unify.  I use a combined "make-fresh-and-unify" unification
+ * algorithm there.  It is a structural clone of the normal unify, except that
+ * it lazily makes a fresh-copy of the left-hand-side on demand only; typically
+ * discovering that no fresh-copy is required.
+ *
+ * To engineer and debug the algorithm, the unification step includes a flag to
+ * mean "actually unify, and report a progress flag" vs "report if progress".
+ * The report-only mode is aggressively asserted for in the main loop; all
+ * Syntax elements that can make progress are asserted as on the worklist.
+ *
+ * See HM.java for the prototype this is based from.
+ *
+ * 
+ * Mapping from a classic lambda-calculus AST to Sea-of-Nodes
+ *
+ * - Ids: HM identifiers are SSA edges in the Sea-of-Nodes.  A 'FreshNode' is
+ *   used explicitly, for a id reference needing a 'fresh_unify'.  These appear
+ *   for each display reference and reading ParmNodes to init the display.
+ *   Other typical 'aa' ids are actually Loads agains the display.
+ * - Lambda: FunPtrNodes (not FunNodes), which includes the display argument.
+ * - Apply: CallEpiNodes (not CallNodes)
+ * - Let: Strictly used to make new Displays at function headers and the parse
+ *   start.  Normal 'aa' variables are field loads against the display.
+ * - Struct: NewObjNode
+ * - Field: Loads and Stores.
+ * - If: IfNode
+ * - NotNil: Cast of not-nil.  Cast is used for other operations but is only
+ *   polymorphic for nil.
+ */
 
-// See HM.java for the prototype this is based from.
 
 public class TV2 {
   // Unique ID
@@ -29,18 +72,35 @@ public class TV2 {
   // - "Base" - some constant Type, Base Types MEET when unified.
   // - "Err": a dead Node or a Type.ANY ConNode, and a dead TV2.  Unifies with
   // everything, wins all unifications, and has no structure.
-  // - "Free": Nothing points to it, can be re-used.
   private String _name;
-  // Set of structural H-M parts.  Can be null if empty.
+
+
+  // Structural parts to unify with, or null.
+  // If Leaf or Error, then null.
+  // If unified, contains the single key ">>".
+  // If Base   , contains the single key "Base".
+  // If Nil    , contains the single key "?"
+  // If Lambda , contains keys "0","1","2" for args or "ret" for return.
+  // If Apply  , contains keys "fun" and "0","1","2" for args
+  // If Struct , contains keys for the field labels.  No display.  Is null if no fields.
   NonBlockingHashMap<String,TV2> _args;
-  private boolean _open;        // Can be extended
+
+  // A dataflow type or null.
+  // If Leaf, or unified or Nil or Apply, then null.
+  // If Base, then the flow type.
+  // If Lambda, then a TFP and the BitsFun   matters.
+  // If Struct, then a TMP and the BitsAlias matters.
+  // If Error, then a TypeStr with the error (not a TMP to a TS).
+  public Type _type;
+
+  private boolean _open; // Structs allow more fields.  Not quite the same as TypeStruct._open field.
+
+  // Theory: when positive polarity and negative polarity, bases need to widen.
+  //private boolean _is_func_input;
 
   // U-F algo.  Only set when unified, monotonic null->unification_target.
   // Can change again to shorten unification changes.
   private TV2 _unified;
-
-  // Base primitive types, not really tied to any Node.  TypeInt, TypeFlt.
-  public Type _type;
 
   // Set of dependent CallEpiNodes, to be re-worklisted if the called function changes TV2.
   private UQNodes _deps;
@@ -104,10 +164,8 @@ public class TV2 {
     return tv;
   }
 
-  // Unify-at a selected key.
-  public boolean unify_at(int key, TV2 tv2, Work work ) { return unify_at(""+key,tv2,work); }
-  // Unify-at a key.  Expect caller is already a tvar.
-  public boolean unify_at(String key, TV2 tv2, Work work ) {
+  // Unify-at a key.  Expect caller already has args
+  public boolean unify_at(Node n, String key, TV2 tv2, Work work ) {
     if( is_err() ) return unify(tv2,work);// if i am dead, all my parts are dead, so tv2 is unifying with a dead part
     assert is_tvar() && !tv2.is_unified();
     TV2 old = get(key);
@@ -116,6 +174,7 @@ public class TV2 {
     if( work==null ) return true; // Would add part
     args_put(key,tv2);
     work.add(_deps);
+    _ns = _ns.add(n);
     return true;
   }
 
@@ -144,24 +203,18 @@ public class TV2 {
     UQNodes ns = n==null ? null : UQNodes.make(n);
     return new TV2("Base",null,type,ns,alloc_site);
   }
+  public void set_as_base(Type t) { assert is_leaf(); _name="Base"; _type=t; }
   // Make a new Nil
-  public static TV2 make_nil(Node n, Type type, TV2 leaf, @NotNull String alloc_site) {
+  public static TV2 make_nil(Node n, @NotNull String alloc_site) {
+    TV2 leaf = make_leaf(n,alloc_site);
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<String,TV2>(){{ put("?",leaf); }};
-    return new TV2("Nil",args,type,UQNodes.make(n),alloc_site);
+    return new TV2("Nil",args,Type.XNIL,UQNodes.make(n),alloc_site);
   }
   // Make a new function
-  public static TV2 make_fun(RetNode ret, TypeFunPtr fptr, TypeFunSig sig, @NotNull String alloc_site) {
+  public static TV2 make_fun(Node n, TypeFunPtr fptr, TypeFunSig sig, @NotNull String alloc_site) {
     assert fptr._disp==TypeMemPtr.NO_DISP; // Just for fidxs, arg counts
     assert fptr._nargs==sig.nargs();
-    NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<String,TV2>();
-    UQNodes ns = UQNodes.make(ret.rez());
-    args.put(" ret",ret.rez().tvar()); // Return from the return result tvar
-    Node[] parms = ret.fun().parms();
-    for( int i=DSP_IDX; i<parms.length; i++ ) {
-      args.put(""+i,parms[i]==null ? TV2.make_leaf(ret.fun(),"alloc_site") : parms[i].tvar()); // Each argument from the parms directly
-      ns = ns.add(parms[i]);
-    }
-    return new TV2("->",args,fptr,ns,alloc_site);
+    return new TV2("->",new NonBlockingHashMap<String,TV2>(),fptr,UQNodes.make(n),alloc_site);
   }
   public static TV2 make_fun(Node n, Type fptr, NonBlockingHashMap<String,TV2> args, @NotNull String alloc_site) {
     return new TV2("->",args,fptr,UQNodes.make(n),alloc_site);
@@ -200,7 +253,7 @@ public class TV2 {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
     for( int i=0; i<ntvs.length; i++ )
       if( ntvs[i]!=null && ntvs[i].has_tvar() )
-        args.put(""+i,ntvs[i].tvar());
+        args.put((""+i).intern(),ntvs[i].tvar());
     return make(name,n,alloc_site,args);
   }
 
@@ -216,7 +269,8 @@ public class TV2 {
     tv2._open = true;           // Start out open
     return tv2;
   }
-  public static TV2 make_open_struct(@NotNull String name, Node n, Type t, @NotNull String alloc_site, NonBlockingHashMap<String,TV2> args) {
+  // Make a new struct for a field load/store.  Could be an array or struct
+  public static TV2 make_open_struct(String name, Node n, Type t, @NotNull String alloc_site, NonBlockingHashMap<String,TV2> args) {
     TV2 tv2 = new TV2(name,args,t,UQNodes.make(n),alloc_site);
     tv2._open = true;           // Start out open
     return tv2;
@@ -250,6 +304,7 @@ public class TV2 {
     _name = "Free";
     _args = null;
     _type = null;
+    _open = false;
     _deps = null;
     _ns   = null;
   }
@@ -268,17 +323,18 @@ public class TV2 {
   }
 
   // Classic Tarjan U-F with rollup
-  private TV2 _find0() {
-    TV2 top = debug_find();
-    if( top == this ) return top;
-    TV2 v = this;               // Rerun, rolling up to top
-    while( v != top ) { TV2 next = v._unified; v._union(top); v = next; }
-    return top;
-  }
-
   public TV2 find() {
     TV2 top = _find0();
     return top.is_nil() ? top._find_nil() : top;
+  }
+
+  private TV2 _find0() {
+    TV2 top = debug_find();
+    if( top == this ) return top;
+    if( top == _unified ) return top;
+    TV2 v = this;               // Rerun, rolling up to top
+    while( v != top ) { TV2 next = v._unified; v._unified=top; v = next; }
+    return top;
   }
 
   // Nilable fixup.  nil-of-leaf is OK.  nil-of-anything-else folds into a
@@ -320,17 +376,22 @@ public class TV2 {
     assert !is_err() || that.is_err(); // Become the error, not error become that
     if( this==that ) return false;
     if( work==null ) return true; // All remaining paths make progress
+    // Keep the merge of all base types, and add _deps.
     if( !that.is_err() ) {
-      // Keep the merge of all base types, and add _deps.
-      if( _type != that._type )  Env.GVN.add_flow(_deps);
-      if( _type!=null && that._type!=null && _type!=Type.XNIL && !_type.widen().isa(that._type.widen()) )
-        throw unimpl();      // Error, mismatched base types, e.g. int and string
       if( that._type==null ) that._type = _type;
-      else if( _type!=null ) that._type = _type.meet(that._type);
-      if( is_struct() ) that._open &= _open; // Most conservative answer
+      else if( _type!=null ) {
+        if( _type.getClass()!=that._type.getClass() )
+          throw unimpl(); // return union_err(that,work,"Cannot unify "+this.p()+" and "+that.p());
+        that._type = _type.meet(that._type);
+        that._open &= _open;
+      }
     }
-    work.add(_deps);            // Revisit
-    // Hard union this into that, no more testing
+    //if( _is_func_input ) that.widen_bases();
+
+    // Work all the deps
+    that.add_deps_work(work);
+    this.add_deps_work(work);      // Any progress, revisit deps
+    // Hard union this into that, no more testing.
     return _union(that);
   }
   // Union this into that; this can already be unified (if rolling up).
@@ -488,18 +549,20 @@ public class TV2 {
   }
 
   // Insert a new field
-  private boolean add_fld( String id, TV2 fld, Work work) {
+  public boolean add_fld( String id, TV2 fld, Work work) {
     assert is_struct();
+    if( _args==null ) _args = new NonBlockingHashMap<>();
     _args.put(id,fld);
     fld.push_deps(_deps);
-    work.add(_deps);
+    add_deps_work(work);
     return true;
   }
   // Delete a field
   private void del_fld( String fld, Work work) {
-    assert is_struct() || isa("Ary");
+    assert is_struct() || is_ary();
     _args.remove(fld);
-    work.add(_deps);
+    if( _args.size()==0 )  _args=null;
+    add_deps_work(work);
   }
 
   // Used in the recursive unification process.  During fresh_unify tracks the
@@ -614,6 +677,12 @@ public class TV2 {
   private boolean vput(TV2 that, boolean progress) { VARS.put(this,that); return progress; }
   private TV2 vput(TV2 that) { VARS.put(this,that); return that; }
 
+  private TV2 fresh(TV2[] nongen) {
+    assert VARS.isEmpty();
+    TV2 tv2 = _fresh(nongen);
+    VARS.clear();
+    return tv2;
+  }
   private TV2 _fresh(TV2[] nongen) {
     assert !is_unified();       // Already chased these down
     TV2 rez = VARS.get(this);
@@ -682,7 +751,7 @@ public class TV2 {
     if( WDUPS.putIfAbsent(duid,"")!=null ) return t;
     if( is_err() ) return fput(Type.SCALAR); //
     // Base variables (when widened to an HM type) might force a lift.
-    if( is_base() ) return fput(_type);
+    if( is_base() ) return fput(_type.meet(t));
     // Free variables keep the input flow type.
     if( is_leaf() ) return fput(t);
     // Nilable
@@ -709,7 +778,15 @@ public class TV2 {
     if( is_struct() ) {
       fput(t);                // Recursive types need to put themselves first
       if( !(t instanceof TypeMemPtr) )  return t;
-      throw unimpl();
+      TypeMemPtr tptr = (TypeMemPtr)(t.simple_ptr()==t ? tmem.sharptr(t) : t);
+      if( !(tptr._obj instanceof TypeStruct) ) return tptr;
+      TypeStruct ts = (TypeStruct)tptr._obj; // Always a TypeStruct here
+      if( _args!=null )
+        for( String id : _args.keySet() ) {
+          TypeFld fld = ts.fld_find(id);
+          get(id).walk_types_in(tmem,fld==null ? Type.XSCALAR : fld._t);
+        }
+      return tptr.make_from(ts);
     }
 
     if( isa("Ary") ) {
@@ -741,7 +818,7 @@ public class TV2 {
       return tmap.join(t);
     }
     if( is_base() ) return tmap==null ? _type : tmap.join(t);
-    if( is_nil() ) throw unimpl(); // return t.join(Type.NSCALR); // nil is a function wrapping a leaf which is not-nil
+    if( is_nil() ) return t; // nil is a function wrapping a leaf which is not-nil
     if( is_fun() ) return t; // No change, already known as a function (and no TFS in the flow types)
     if( is_struct() ) {
       if( !(t instanceof TypeMemPtr) ) {
@@ -759,6 +836,52 @@ public class TV2 {
 
       throw unimpl();
     }
+    throw unimpl();
+  }
+
+  // --------------------------------------------
+  // Recursively build a conservative flow type from an HM type.  
+
+  // No function arguments, just function returns.
+  static final NonBlockingHashMapLong<TypeStruct> ADUPS = new NonBlockingHashMapLong<>();
+  public Type as_flow() {
+    assert ADUPS.isEmpty();
+    Type t = _as_flow();
+    ADUPS.clear();
+    return t;
+  }
+  Type _as_flow() {
+    assert !is_unified();
+    if( is_base() ) return _type;
+    if( is_leaf() ) return Type.SCALAR;
+    if( is_err()  ) throw unimpl(); // return _type;
+    if( is_fun()  ) return TypeFunPtr.make(((TypeFunPtr)_type)._fidxs,_args.size()-1,Type.ANY);
+    if( is_nil() ) return Type.SCALAR;
+    if( is_struct() ) {
+      TypeStruct tstr = ADUPS.get(_uid);
+      if( tstr==null ) {
+        Type.RECURSIVE_MEET++;
+        tstr = TypeStruct.malloc("",false,false).add_fld(TypeFld.NO_DISP);
+        if( _args!=null )
+          for( String id : _args.keySet() )
+            tstr.add_fld(TypeFld.malloc(id));
+        tstr.set_hash();
+        ADUPS.put(_uid,tstr); // Stop cycles
+        if( _args!=null )
+          for( String id : _args.keySet() )
+            tstr.fld_find(id).setX(get(id)._as_flow()); // Recursive
+        if( --Type.RECURSIVE_MEET == 0 )
+          // Shrink / remove cycle dups.  Might make new (smaller)
+          // TypeStructs, so keep RECURSIVE_MEET enabled.
+          tstr = tstr.install();
+      } else {
+        tstr._cyclic=true;    // Been there, done that, just mark it cyclic
+      }
+      // The HM is_struct wants to be a TypeMemPtr, but the recursive builder
+      // is built around TypeStruct.
+      return ((TypeMemPtr)_type).make_from(tstr);
+    }
+    
     throw unimpl();
   }
 
@@ -784,32 +907,26 @@ public class TV2 {
     _deps = _deps==null ? UQNodes.make(dep) : _deps.add(dep);
     if( _args!=null )
       for( TV2 arg : _args.values() ) // Structural recursion on a complex TV2
-        arg.find()._push_update(dep);
+        arg.debug_find()._push_update(dep);
+  }
+
+  // Recursively add-deps to worklist
+  public void add_deps_work( Work work ) { assert DEPS_VISIT.isEmpty(); add_deps_work_impl(work); DEPS_VISIT.clear(); }
+  private void add_deps_work_impl( Work work ) {
+    work.add(_deps);
+    if( DEPS_VISIT.tset(_uid) ) return;
+    if( _args != null )
+      for( TV2 tv2 : _args.values() )
+        tv2.add_deps_work_impl(work);
   }
 
   // Merge Dependent Node lists, 'this' into 'that'.  Required to trigger
   // CEPI.unify_lift when types change structurally, or when structures are
   // unifing on field names.
-  private void merge_deps( TV2 that ) {
-    if( that._deps == null && that._args==null) that._deps = _deps;
-    else that.push_deps(_deps);
-  }
+  private void merge_deps( TV2 that ) { that.push_deps(_deps); }
   // Merge Node lists, 'this' into 'that', for easier debugging.
   // Lazily remove dead nodes on the fly.
   private void merge_ns( TV2 that ) { that._ns = that._ns == null ? _ns : that._ns.addAll(_ns); }
-
-  // Recursively add-deps to worklist
-  public void add_deps_work( Work work ) { assert DEPS_VISIT.isEmpty(); add_deps_work_impl(work); DEPS_VISIT.clear(); }
-  private void add_deps_work_impl( Work work ) {
-    if( _args==null ) {
-      work.add(_deps);
-    } else {
-      if( DEPS_VISIT.tset(_uid) ) return;
-      if( _args != null )
-        for( TV2 tv2 : _args.values() )
-          tv2.add_deps_work_impl(work);
-    }
-  }
 
   // --------------------------------------------
   // Pretty print
@@ -859,13 +976,12 @@ public class TV2 {
         if( _type instanceof TypeFunPtr ) ((TypeFunPtr)_type)._fidxs.clear(0).str(sb);
         else _type.str(sb,visit,null,debug); // Weirdo type printing
       }
-      sb.p("{");
-      if( _type instanceof TypeFunPtr && ((TypeFunPtr)_type)._disp != TypeMemPtr.NO_DISP )
-        ((TypeFunPtr)_type)._disp.str(sb.p("^="),visit,null,debug);
-      sb.p(' ');
+      sb.p("{ ");
       for( String fld : sorted_flds() )
-        if( !Util.eq(" ret",fld) && Integer.parseInt(fld)!=DSP_IDX )
+        if( !Util.eq(" ret",fld) ) {
+          if( Util.eq("2",fld) ) sb.p("^=");
           str0(sb,visit,_args.get(fld),dups,debug).p(' ');
+        }
       return str0(sb.p("-> "),visit,_args.get(" ret"),dups,debug).p(" }");
     }
 
@@ -880,16 +996,9 @@ public class TV2 {
       }
       sb.p(is_tup ? "(" : "@{");
       if( _args==null ) sb.p("_ ");
-      else {
-        // Print a display first, and skip if NO_DSP or not debug
-        TV2 dsp = _args.get("^");
-        if( dsp!=null && dsp._type!=TypeMemPtr.NO_DISP )
-          dsp._type.str(sb.p("^ = "),visit,null,debug);
-        for( String fld : sorted_flds() )
-          if( !Util.eq(fld,"^") ) // Skip display, already printed
-            // Skip field names in a tuple
-            str0(is_tup ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,_args.get(fld),dups,debug).p(',');
-      }
+      else
+        for( String fld : sorted_flds() ) // Skip field names in a tuple
+          str0(is_tup ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,_args.get(fld),dups,debug).p(',');
       if( open() ) sb.p(" ...,");
       sb.unchar().p(!is_tup ? "}" : ")");
       if( _type!=null && _type.must_nil() ) sb.p("?");
@@ -897,7 +1006,7 @@ public class TV2 {
     }
 
     if( is_nil() )
-      return sb.p("0");
+      return sb.p("0?");
 
     // Generic structural T2
     sb.p("(").p(_name).p(" ");
@@ -907,6 +1016,6 @@ public class TV2 {
     return sb.unchar().p(")");
   }
   static private SB str0(SB sb, VBitSet visit, TV2 t, VBitSet dups, boolean debug) { return t==null ? sb.p("_") : t.str(sb,visit,dups,debug); }
-  private boolean is_tup() {  return _args.size()<=1 || _args.containsKey("0"); }
+  private boolean is_tup() {  return _args==null || _args.isEmpty() || _args.containsKey("0"); }
   private Collection<String> sorted_flds() { return new TreeMap<>(_args).keySet(); }
 }

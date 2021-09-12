@@ -2,10 +2,12 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.*;
 
 import java.util.function.Predicate;
+
+import static com.cliffc.aa.AA.unimpl;
 
 // Constant value nodes; no computation needed.  Hashconsed for unique
 // constants, except for XNIL.  XNIL allows for a TV2 typevar Nilable-Leaf with
@@ -18,6 +20,9 @@ public class ConNode<T extends Type> extends Node {
     _live = all_live();
     if( t==Type.CTRL || t==Type.XCTRL || t instanceof TypeRPC )
       { _tvar.free(); _tvar=null; }
+    else if( t == Type.XNIL )
+      { _tvar.free(); _tvar = TV2.make_nil(this,"Con_constructor"); }
+    else _tvar.set_as_base(t);
   }
   // Allows ANY type with a normal unification, used for uninitialized variables
   // (as opposed to dead ones).
@@ -27,12 +32,17 @@ public class ConNode<T extends Type> extends Node {
   }
   // Used by FunPtrNode
   ConNode( byte type, T tfp, RetNode ret, Node closure ) { super(type,ret,closure); _t = tfp; }
-  @Override public String xstr() { return Env.ALL_CTRL == this ? "ALL_CTL" : (_t==null?"(null)":_t.toString()); }
+  @Override public String xstr() {
+    if( Env.ALL_CTRL == this ) return "ALL_CTL";
+    if( Env.ALL_PARM == this ) return "ALL_PARM";
+    return _t==null ? "(null)" : _t.toString();
+  }
   @Override public Type value(GVNGCM.Mode opt_mode) {
     // ALL_CTRL is used for unknown callers; during and after GCP there are no
     // unknown callers.  However, we keep the ALL_CTRL for primitives, so we can
     // reset the compilation state easily.
     if( opt_mode._CG && Env.ALL_CTRL == this ) return Type.XCTRL;
+    if( opt_mode._CG && Env.ALL_PARM == this ) return Type.XSCALAR;
     return _t.simple_ptr();
   }
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
@@ -51,10 +61,11 @@ public class ConNode<T extends Type> extends Node {
     TV2 self = tvar();
     if( self.is_base() || self.is_nil() || self.is_struct() || self.isa("Str") ) return false;
     if( work==null ) return true;
-    assert self.is_leaf();
-    String asite = "Con_unify";
-    TV2 tv2 = _t==Type.XNIL ? TV2.make_nil(this,_t,TV2.make_leaf(this,asite),asite) : TV2.make_base(this,_t,asite);
-    return self.unify(tv2,work);
+    throw unimpl();
+    //assert self.is_leaf();
+    //String asite = "Con_unify";
+    //TV2 tv2 = _t==Type.XNIL ? TV2.make_nil(this,asite) : TV2.make_base(this,_t,asite);
+    //return self.unify(tv2,work);
   }
 
   @Override public String toString() { return str(); }
@@ -63,6 +74,8 @@ public class ConNode<T extends Type> extends Node {
     if( this==o ) return true;
     if( !(o instanceof ConNode) ) return false;
     ConNode con = (ConNode)o;
+    if( con == Env.ALL_CTRL ) return false; // Only equal to itself
+    if( con == Env.ALL_PARM ) return false; // Only equal to itself
     return _t!=Type.XNIL && _t==con._t;
   }
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }

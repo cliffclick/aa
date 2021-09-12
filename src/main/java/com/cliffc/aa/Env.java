@@ -19,6 +19,7 @@ public class Env implements AutoCloseable {
   public static    ScopeNode SCP_0; // Program start scope
   public static   DefMemNode DEFMEM;// Default memory (all structure types)
   public static      ConNode ALL_CTRL; // Default control
+  public static      ConNode ALL_PARM; // Default parameter
   public static      ConNode XCTRL; // Always dead control
   public static      ConNode ANY;   // Common ANY / used for dead
   public static      ConNode ALL;   // Common ALL / used for errors
@@ -76,10 +77,11 @@ public class Env implements AutoCloseable {
     // Top-level default values; ALL_CTRL is used by declared functions to
     // indicate that future not-yet-parsed code may call the function.
     START   = GVN.init (new StartNode());
-    ALL_CTRL= GVN.xform(new ConNode<>(Type.CTRL )).keep();
-    XCTRL   = GVN.xform(new ConNode<>(Type.XCTRL)).keep();
-    ANY     = GVN.xform(new ConNode<>(Type.ANY  )).keep();
-    ALL     = GVN.xform(new ConNode<>(Type.ALL  )).keep();
+    ALL_CTRL= GVN.xform(new ConNode<>(Type.CTRL  )).keep();
+    ALL_PARM= GVN.xform(new ConNode<>(Type.SCALAR)).keep();
+    XCTRL   = GVN.xform(new ConNode<>(Type.XCTRL )).keep();
+    ANY     = GVN.xform(new ConNode<>(Type.ANY   )).keep();
+    ALL     = GVN.xform(new ConNode<>(Type.ALL   )).keep();
     ALL_CALL= GVN.xform(new ConNode<>(TypeRPC.ALL_CALL)).keep();
     // Initial control & memory
     CTL_0  = GVN.init(new    CProjNode(START,0));

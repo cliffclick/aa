@@ -98,7 +98,7 @@ public class FunNode extends RegionNode {
   }
 
   // Find FunNodes by fidx
-  static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
+  public static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
   public static void reset() { FUNS.clear(); _must_inline=0; }
   public static FunNode find_fidx( int fidx ) { return FUNS.atX(fidx); }
   int fidx() { return _fidx; }

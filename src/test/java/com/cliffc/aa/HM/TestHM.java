@@ -203,6 +203,14 @@ public class TestHM {
                                    "(is_even 3)" ,
                                    "int1", TypeInt.BOOL); }
 
+  @Test public void test23x() { run(
+"all = @{"+
+"  is_even = { dsp n -> (if (eq0 n) 0 (dsp.is_odd  dsp (dec n)))},"+
+"  is_odd  = { dsp n -> (if (eq0 n) 1 (dsp.is_even dsp (dec n)))} "+
+"}; "+
+"{ x -> (all.is_even all x)}",
+                                   "{int64 -> int1}", tfs(TypeInt.BOOL)); }
+
   // Toss a function into a pair & pull it back out
   @Test public void test24() { run("{ g -> fgz = "+
                                    "         cons = {x y -> {cadr -> (cadr x y)}};"+

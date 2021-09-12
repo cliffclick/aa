@@ -11,8 +11,8 @@ import java.util.Arrays;
 // "fresh" the incoming TVar: make a fresh instance.
 public class FreshNode extends UnOrFunPtrNode {
   TV2[] _tv2s;                  // Compacted VStack of nongen TV2s, used during "fresh"
-   public FreshNode( Env.VStack vs, Node ctrl, Node ld ) {
-     super(OP_FRESH, ctrl, ld);
+   public FreshNode( Env.VStack vs, Node ld ) {
+     super(OP_FRESH, null, ld);
      _tv2s = vs.compact();
      ld.tvar().push_dep(this);
    }

@@ -496,7 +496,7 @@ public abstract class Node implements Cloneable {
        is_prim() ||             // Always live prims
        err(true)!=null ||       // Always live errors
        // FunPtrs still use their Rets, even if constant
-       (this instanceof FunPtrNode));
+       (this instanceof FunPtrNode) );
   }
 
   // True if 't' may_be_con AND is not a TypeFunPtr.  If a Node computes a
@@ -560,7 +560,7 @@ public abstract class Node implements Cloneable {
     if( this instanceof CallEpiNode ) ((CallEpiNode)this).check_and_wire(work);
     // All liveness is skipped if may_be_con, since the possible constant
     // has no inputs.
-    assert may_be_con_live(oval) || !may_be_con_live(oval); // May_be_con_live is monotonic
+    assert may_be_con_live(oval) || !may_be_con_live(nval); // May_be_con_live is monotonic
     if( may_be_con_live(oval) && !may_be_con_live(nval) )
       for( Node def : _defs ) work.add(def); // Now check liveness
   }

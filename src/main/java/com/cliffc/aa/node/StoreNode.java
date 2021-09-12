@@ -186,37 +186,40 @@ public class StoreNode extends Node {
   // The ptr has to be not-nilable and have the fld, which unifies with the
   // value.  If the fld is missing, then if the ptr is open, add the field else
   // missing field error.
-  public static boolean unify( String name, Node st, TV2 ptr, Type tptr, Node val, String fld, Work work ) {
+  public static boolean unify( String name, Node st, TV2 ptr, Type tptr, Node val, String id, Work work ) {
     if( st.tvar().is_err() ) return false; // Already an error, no progress
+    // Propagate an error
+    if( ptr.is_err() ) return st.tvar().unify(ptr,work);
+
+    // Check for nil address
+    if( ptr.is_nil() || (tptr instanceof TypeMemPtr && tptr.must_nil()) )
+      return work==null || st.tvar().unify(TV2.make_err(st,"May be nil when accessing field "+id,"Store_update"),work);
+    
     // Store value is always the stored value
     boolean progress = st.tvar().unify(val.tvar(),work);
-    if( ptr.is_err() ) return progress;
-
-    if( ptr.is_leaf() ) {
-      if( tptr instanceof TypeMemPtr && tptr.must_nil() ) work.add(st); // If nil, will be a nil-access error
-      NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<String,TV2>(){{ put(fld,val.tvar()); }};
-      return ptr.unify(TV2.make_open_struct(name,st,tptr,"Store_update",args),work);
-    }
-
-    if( ptr.is_nil() || (tptr instanceof TypeMemPtr && tptr.must_nil()) )
-      return work==null || st.tvar().unify(TV2.make_err(st,"May be nil when accessing field "+fld,"Store_update"),work);
-
     ptr.push_dep(st);
-
+    
     // Matching fields unify
-    if( ptr.get(fld)!=null )
-      return ptr.unify_at(fld,st.tvar(), work) | progress;
+    TV2 fld = ptr.get(id);
+    if( fld!=null )             // Unify against pre-existing field
+      return fld.unify(st.tvar(), work) | progress;
 
+    // The remaining cases all make progress and return true
+    if( work==null ) return true;
+    
     // Add field if open
-    if( ptr.open() ) { // Effectively unify with an extended struct.
-      ptr.args_put(fld,st.tvar());
-      return true;              // Progress
+    if( ptr.is_struct() && ptr.open() ) // Effectively unify with an extended struct.
+      return ptr.add_fld(id,st.tvar(),work);
+
+    // Unify against an open struct with the named field
+    if( ptr.is_leaf() || ptr.is_fun() ) {
+      TV2 tv2 = TV2.make_open_struct(name,st,TypeMemPtr.make(BitsAlias.EMPTY,TypeStruct.make()),"Store_update",new NonBlockingHashMap<String,TV2>());
+      tv2.args_put(id,st.tvar());
+      return tv2.unify(ptr,work);
     }
 
     // Closed record, field is missing
-    if( st.tvar().is_err() ) return false; // Already an error
-    return work ==null ||
-      ptr.unify(ptr.miss_field(st,fld,"Store_update"),work);
+    return st.tvar().unify(ptr.miss_field(st,id,"Store_update"),work);
   }
 
 }
