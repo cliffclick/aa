@@ -82,7 +82,7 @@ public class FunNode extends RegionNode {
   // Used to start an anonymous function in the Parser
   public FunNode(TypeStruct formals) { this(null,TypeFunSig.make(formals,TypeTuple.RET),-1,false); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.NO_ARGS,TypeTuple.RET),-2,false); add_def(Env.ALL_CTRL); }
+  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.EMPTY,TypeTuple.RET),-2,false); add_def(Env.ALL_CTRL); }
   // Shared common constructor
   FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs ) { this(name,sig,op_prec,thunk_rhs,BitsFun.new_fidx()); }
   // Shared common constructor

@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
@@ -273,7 +274,7 @@ public abstract class MemPrimNode extends PrimNode {
     @Override public ErrMsg err(boolean fast) {
       ErrMsg msg = super.err(fast);
       if( msg != null ) return msg;
-      return Node.ErrMsg.syntax(_badargs[0],"Final array assignment not supported.");
+      return ErrMsg.syntax(_badargs[0],"Final array assignment not supported.");
     }
   }
 

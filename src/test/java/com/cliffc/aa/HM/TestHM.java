@@ -211,6 +211,14 @@ public class TestHM {
 "{ x -> (all.is_even all x)}",
                                    "{int64 -> int1}", tfs(TypeInt.BOOL)); }
 
+  @Test public void test23y() { run(
+"dsp = @{"+
+"  id = { dsp n -> n}"+
+"}; "+
+"(pair (dsp.id dsp 3) (dsp.id dsp \"abc\"))",
+                                   "(int64, [4]str))", TypeInt.NINT8); }
+
+
   // Toss a function into a pair & pull it back out
   @Test public void test24() { run("{ g -> fgz = "+
                                    "         cons = {x y -> {cadr -> (cadr x y)}};"+

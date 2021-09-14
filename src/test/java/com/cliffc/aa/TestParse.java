@@ -20,6 +20,7 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
+    test("-1",  TypeInt.con( -1));
     test("noinline_inc={x -> x&1}; noinline_p={x -> noinline_inc(x)*2}; noinline_p",
       (()->TypeFunPtr.GENERIC_FUNPTR),null,"{ int -> int }" );
     //test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
@@ -395,36 +396,37 @@ public class TestParse {
     test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
     test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*A:(0, 2), 3)");
 
-    // TODO: Needs a way to easily test simple recursive types
-    TypeEnv te3 = Exec.go(Env.file_scope(Env.top_scope()),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
-    if( te3._errs != null ) System.err.println(te3._errs.toString());
-    assertNull(te3._errs);
-    TypeStruct tt3 = (TypeStruct)te3._tmem.ld((TypeMemPtr)te3._t);
-    assertEquals("A:", tt3._name);
-    assertTrue  (tt3.fld_find("^").is_display_ptr());
-    assertEquals(Type.XNIL     ,tt3.fld_find("n")._t);
-    assertEquals(TypeInt.con(3),tt3.fld_find("v")._t);
-
-    // Missing type B is also never worked on.
-    test_isa("A= :@{n=B?; v=int}", TypeFunPtr.GENERIC_FUNPTR);
-    test_isa("A= :@{n=B?; v=int}; a = A(0,2)", TypeMemPtr.ISUSED);
-    test_isa("A= :@{n=B?; v=int}; a = A(0,2); a.n", Type.NIL);
-    // Mutually recursive type
-    test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
-    test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR); // Same test, again, using the same Type.INTERN table
-    test_isa("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}", TypeFunPtr.GENERIC_FUNPTR);
-    // Mixed ABC's, making little abc's in-between.
-    TypeMemPtr tmpA = TypeMemPtr.make(21,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,ARG_IDX),TypeFld.make("v",TypeInt.con(5    )                    ,ARG_IDX+1)).set_name("A:"));
-    TypeMemPtr tmpB = TypeMemPtr.make(19,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpA     ,ARG_IDX),TypeFld.make("v",TypeFlt.con(3.14 )                    ,ARG_IDX+1)).set_name("B:"));
-    TypeMemPtr tmpC = TypeMemPtr.make(31,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpB     ,ARG_IDX),TypeFld.make("v",TypeMemPtr.make(17,TypeStr.con("abc")),ARG_IDX+1)).set_name("C:"));
-    test_isa("A= :@{n=B?; v=int}; "+
-             "a= A(0,5); "+
-             "B= :@{n=A?; v=flt}; "+
-             "b= B(a,3.14);"+
-             "C= :@{n=B?; v=str};"+
-             "c= C(b,\"abc\");"+
-             "(a,b,c)",
-             TypeMemPtr.make(33,TypeStruct.tupsD(tmpA,tmpB,tmpC)));
+    //// TODO: Needs a way to easily test simple recursive types
+    //TypeEnv te3 = Exec.go(Env.file_scope(Env.top_scope()),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
+    //if( te3._errs != null ) System.err.println(te3._errs.toString());
+    //assertNull(te3._errs);
+    //TypeStruct tt3 = (TypeStruct)te3._tmem.ld((TypeMemPtr)te3._t);
+    //assertEquals("A:", tt3._name);
+    //assertTrue  (tt3.fld_find("^").is_display_ptr());
+    //assertEquals(Type.XNIL     ,tt3.fld_find("n")._t);
+    //assertEquals(TypeInt.con(3),tt3.fld_find("v")._t);
+    //
+    //// Missing type B is also never worked on.
+    //test_isa("A= :@{n=B?; v=int}", TypeFunPtr.GENERIC_FUNPTR);
+    //test_isa("A= :@{n=B?; v=int}; a = A(0,2)", TypeMemPtr.ISUSED);
+    //test_isa("A= :@{n=B?; v=int}; a = A(0,2); a.n", Type.NIL);
+    //// Mutually recursive type
+    //test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
+    //test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR); // Same test, again, using the same Type.INTERN table
+    //test_isa("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}", TypeFunPtr.GENERIC_FUNPTR);
+    //// Mixed ABC's, making little abc's in-between.
+    //TypeMemPtr tmpA = TypeMemPtr.make(21,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,ARG_IDX),TypeFld.make("v",TypeInt.con(5    )                    ,ARG_IDX+1)).set_name("A:"));
+    //TypeMemPtr tmpB = TypeMemPtr.make(19,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpA     ,ARG_IDX),TypeFld.make("v",TypeFlt.con(3.14 )                    ,ARG_IDX+1)).set_name("B:"));
+    //TypeMemPtr tmpC = TypeMemPtr.make(31,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpB     ,ARG_IDX),TypeFld.make("v",TypeMemPtr.make(17,TypeStr.con("abc")),ARG_IDX+1)).set_name("C:"));
+    //test_isa("A= :@{n=B?; v=int}; "+
+    //         "a= A(0,5); "+
+    //         "B= :@{n=A?; v=flt}; "+
+    //         "b= B(a,3.14);"+
+    //         "C= :@{n=B?; v=str};"+
+    //         "c= C(b,\"abc\");"+
+    //         "(a,b,c)",
+    //         TypeMemPtr.make(33,TypeStruct.tupsD(tmpA,tmpB,tmpC)));
+    throw unimpl();
   }
 
   @Test public void testParse07() {
@@ -460,48 +462,49 @@ public class TestParse {
     //test_isa(ll_def+ll_con+ll_map, TypeFunPtr.GENERIC_FUNPTR);
     //test_isa(ll_def+ll_con+ll_map+ll_fun, TypeFunPtr.GENERIC_FUNPTR);
 
-    // TODO: Needs a way to easily test simple recursive types
-    TypeEnv te4 = Exec.go(Env.file_scope(Env.top_scope()),"args",ll_def+ll_con+ll_map+ll_fun+ll_apl);
-    if( te4._errs != null ) System.err.println(te4._errs.toString());
-    assertNull(te4._errs);
-    TypeStruct tt4 = (TypeStruct)te4._tmem.sharpen((TypeMemPtr)te4._t)._obj;
-    assertEquals("List:", tt4._name);
-    TypeFld nxfld = tt4.fld_find("next");
-    TypeFld vxfld = tt4.fld_find("val" );
-    assertNotNull(nxfld);
-    assertNotNull(vxfld);
-    assertTrue(nxfld._t instanceof TypeMemPtr);
-    assertEquals(2.3*2.3,vxfld._t.getd(),1e-6);
-
-    // Test inferring a recursive struct type, with a little help
-    test_struct("map={x:@{n=;v=flt}? -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-                TypeStruct.make(TypeFld.NO_DISP,
-                                TypeFld.make("nn",Type.XNIL,           ARG_IDX  ),
-                                TypeFld.make("vv",TypeFlt.con(1.2*1.2),ARG_IDX+1)));
-
-    // Test inferring a recursive struct type, with less help.  This one
-    // inlines so doesn't actually test inferring a recursive type.
-    test_struct("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-                TypeStruct.make(TypeFld.NO_DISP,
-                                TypeFld.make("nn",Type.XNIL,           ARG_IDX  ),
-                                TypeFld.make("vv",TypeFlt.con(1.2*1.2),ARG_IDX+1)));
-
-    // Test inferring a recursive struct type, with less help. Too complex to
-    // inline, so actual inference happens
-    test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0};"+
-                 "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1.2};v=2.3};v=3.4};v=4.5})",
-                TypeStruct.make(TypeMemPtr.DISP_FLD,
-                                TypeFld.make("nn",TypeMemPtr.STRUCT0,ARG_IDX  ),
-                                TypeFld.make("vv",TypeFlt.FLT64     ,ARG_IDX+1)));
-
-    // Test inferring a recursive tuple type, with less help.  This one
-    // inlines so doesn't actually test inferring a recursive type.
-    test_ptr("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
-             (alias) -> TypeMemPtr.make(alias,TypeStruct.tupsD(Type.XNIL,TypeFlt.con(1.2*1.2))));
-
-    test_obj_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
-                 "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
-                 TypeStruct.maket(TypeMemPtr.STRUCT0,TypeFlt.FLT64));
+    //// TODO: Needs a way to easily test simple recursive types
+    //TypeEnv te4 = Exec.go(Env.file_scope(Env.top_scope()),"args",ll_def+ll_con+ll_map+ll_fun+ll_apl);
+    //if( te4._errs != null ) System.err.println(te4._errs.toString());
+    //assertNull(te4._errs);
+    //TypeStruct tt4 = (TypeStruct)te4._tmem.sharpen((TypeMemPtr)te4._t)._obj;
+    //assertEquals("List:", tt4._name);
+    //TypeFld nxfld = tt4.fld_find("next");
+    //TypeFld vxfld = tt4.fld_find("val" );
+    //assertNotNull(nxfld);
+    //assertNotNull(vxfld);
+    //assertTrue(nxfld._t instanceof TypeMemPtr);
+    //assertEquals(2.3*2.3,vxfld._t.getd(),1e-6);
+    //
+    //// Test inferring a recursive struct type, with a little help
+    //test_struct("map={x:@{n=;v=flt}? -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
+    //            TypeStruct.make(TypeFld.NO_DISP,
+    //                            TypeFld.make("nn",Type.XNIL,           ARG_IDX  ),
+    //                            TypeFld.make("vv",TypeFlt.con(1.2*1.2),ARG_IDX+1)));
+    //
+    //// Test inferring a recursive struct type, with less help.  This one
+    //// inlines so doesn't actually test inferring a recursive type.
+    //test_struct("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
+    //            TypeStruct.make(TypeFld.NO_DISP,
+    //                            TypeFld.make("nn",Type.XNIL,           ARG_IDX  ),
+    //                            TypeFld.make("vv",TypeFlt.con(1.2*1.2),ARG_IDX+1)));
+    //
+    //// Test inferring a recursive struct type, with less help. Too complex to
+    //// inline, so actual inference happens
+    //test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0};"+
+    //             "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1.2};v=2.3};v=3.4};v=4.5})",
+    //            TypeStruct.make(TypeMemPtr.DISP_FLD,
+    //                            TypeFld.make("nn",TypeMemPtr.STRUCT0,ARG_IDX  ),
+    //                            TypeFld.make("vv",TypeFlt.FLT64     ,ARG_IDX+1)));
+    //
+    //// Test inferring a recursive tuple type, with less help.  This one
+    //// inlines so doesn't actually test inferring a recursive type.
+    //test_ptr("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
+    //         (alias) -> TypeMemPtr.make(alias,TypeStruct.tupsD(Type.XNIL,TypeFlt.con(1.2*1.2))));
+    //
+    //test_obj_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
+    //             "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
+    //             TypeStruct.maket(TypeMemPtr.STRUCT0,TypeFlt.FLT64));
+    throw unimpl();
   }
 
 
@@ -891,141 +894,131 @@ HashTable = {@{
    */
 
 
-  // Caller must close TypeEnv
   static private TypeEnv run( String program ) {
-    TypeEnv te = Exec.open(Env.file_scope(Env.top_scope()),"args",program);
+    TypeEnv te = Env.exec_go("test",program);
     if( te._errs != null ) System.err.println(te._errs.toString());
     assertNull(te._errs);
     return te;
   }
 
   static private void test( String program, Type expected ) {
-    try( TypeEnv te = run(program) ) {
-      assertEquals(expected,te._t);
-    }
+    TypeEnv te = run(program);
+    assertEquals(expected,te._t);
   }
   static private void test( String program, Supplier<Type> expect_maker, Supplier<TypeFunSig> expect_sig_maker, String hm_expect ) {
-    try( TypeEnv te = run(program) ) {
-      Type actual_flow = te._tmem.sharptr(te._t);
-      TV2 actual_hm = te._hmt;
-      String hm_actual = actual_hm.p();
-      Type expect = expect_maker.get();
-      assertEquals(expect,actual_flow);
-      if( expect instanceof TypeFunPtr ) {
-        TypeFunPtr fptr = (TypeFunPtr)expect;
-        FunNode fun = FunNode.find_fidx(fptr.fidx());
-        TypeFunSig actual_sig = fun._sig;
-        TypeFunSig expect_sig = expect_sig_maker.get();
-        assertEquals(expect_sig._formals,actual_sig._formals);
-        // Do not exactly match returning memory (gets weird without HM).
-        TypeMem emem = (TypeMem)expect_sig._ret.at(MEM_IDX);
-        TypeMem amem = (TypeMem)actual_sig._ret.at(MEM_IDX);
-        Type erez = expect_sig._ret.at(REZ_IDX);
-        Type arez = actual_sig._ret.at(REZ_IDX);
-        assertEquals(erez,arez);
-        assertTrue(emem.isa(amem));
-        // Check that loading from pointers match
-        if( erez instanceof TypeMemPtr ) {
-          Type eld = emem.ld((TypeMemPtr)erez);
-          Type ald = amem.ld((TypeMemPtr)erez);
-          assertEquals(eld,ald);
-        }
+    TypeEnv te = run(program);
+    Type actual_flow = te._tmem.sharptr(te._t);
+    TV2 actual_hm = te._hmt;
+    String hm_actual = actual_hm.p();
+    Type expect = expect_maker.get();
+    assertEquals(expect,actual_flow);
+    if( expect instanceof TypeFunPtr ) {
+      TypeFunPtr fptr = (TypeFunPtr)expect;
+      FunNode fun = FunNode.find_fidx(fptr.fidx());
+      TypeFunSig actual_sig = fun._sig;
+      TypeFunSig expect_sig = expect_sig_maker.get();
+      assertEquals(expect_sig._formals,actual_sig._formals);
+      // Do not exactly match returning memory (gets weird without HM).
+      TypeMem emem = (TypeMem)expect_sig._ret.at(MEM_IDX);
+      TypeMem amem = (TypeMem)actual_sig._ret.at(MEM_IDX);
+      Type erez = expect_sig._ret.at(REZ_IDX);
+      Type arez = actual_sig._ret.at(REZ_IDX);
+      assertEquals(erez,arez);
+      assertTrue(emem.isa(amem));
+      // Check that loading from pointers match
+      if( erez instanceof TypeMemPtr ) {
+        Type eld = emem.ld((TypeMemPtr)erez);
+        Type ald = amem.ld((TypeMemPtr)erez);
+        assertEquals(eld,ald);
+      }
 
-      } else
-        assert expect_sig_maker==null;
-      if( Combo.DO_HM )
-        assertEquals(stripIndent(hm_expect),stripIndent(hm_actual));
-    }
+    } else
+      assert expect_sig_maker==null;
+    if( Combo.DO_HM )
+      assertEquals(stripIndent(hm_expect),stripIndent(hm_actual));
   }
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
 
   static private void test_prim( String program, String prim ) {
-    Env top = Env.top_scope();
-    Type expected = top.lookup_valtype(prim);
-    try( TypeEnv te = Exec.open(Env.file_scope(top),"args",program) ) {
-      if( te._errs != null ) System.err.println(te._errs.toString());
-      assertNull(te._errs);
-      assertEquals(expected,te._t);
-    }
+    //Env top = Env.top_scope();
+    //Type expected = top.lookup_valtype(prim);
+    //try( TypeEnv te = Exec.open(Env.file_scope(top),"args",program) ) {
+    //  if( te._errs != null ) System.err.println(te._errs.toString());
+    //  assertNull(te._errs);
+    //  assertEquals(expected,te._t);
+    //}
+    throw unimpl();
   }
   static private void test_name( String program, Type... args ) {
-    try( TypeEnv te = run(program) ) {
-      assertTrue(te._t instanceof TypeFunPtr);
-      TypeFunPtr actual = (TypeFunPtr)te._t;
-      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),ARG_IDX+1, TypeMemPtr.NO_DISP);
-      assertEquals(expected,actual);
-    }
+    TypeEnv te = run(program);
+    assertTrue(te._t instanceof TypeFunPtr);
+    TypeFunPtr actual = (TypeFunPtr)te._t;
+    TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),ARG_IDX+1, TypeMemPtr.NO_DISP);
+    assertEquals(expected,actual);
   }
   static private void test_ptr( String program, Function<Integer,Type> expected ) {
-    try( TypeEnv te = run(program) ) {
-      TypeMemPtr actual = te._tmem.sharpen((TypeMemPtr)te._t);
-      int alias = actual.getbit(); // internally asserts only 1 bit set
-      Type t_expected = expected.apply(alias);
-      assertEquals(t_expected,actual);
-    }
+    TypeEnv te = run(program);
+    TypeMemPtr actual = te._tmem.sharpen((TypeMemPtr)te._t);
+    int alias = actual.getbit(); // internally asserts only 1 bit set
+    Type t_expected = expected.apply(alias);
+    assertEquals(t_expected,actual);
   }
   static private void test_ptr0( String program, Function<Integer,Type> expected ) {
-    try( TypeEnv te = run(program) ) {
-      TypeMemPtr tmp = te._tmem.sharpen((TypeMemPtr)te._t);
-      BitsAlias bits = tmp._aliases;
-      assertTrue(bits.test(0));
-      int alias = bits.strip_nil().getbit(); // internally asserts only 1 bit set
-      Type t_expected = expected.apply(alias);
-      assertEquals(t_expected,tmp);
-    }
+    TypeEnv te = run(program);
+    TypeMemPtr tmp = te._tmem.sharpen((TypeMemPtr)te._t);
+    BitsAlias bits = tmp._aliases;
+    assertTrue(bits.test(0));
+    int alias = bits.strip_nil().getbit(); // internally asserts only 1 bit set
+    Type t_expected = expected.apply(alias);
+    assertEquals(t_expected,tmp);
   }
   static private void test_obj( String program, TypeObj expected) {
-    try( TypeEnv te = run(program) ) {
-      assertTrue(te._t instanceof TypeMemPtr);
-      int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
-      TypeObj actual = te._tmem.ld((TypeMemPtr)te._t);
-      assertEquals(expected,actual);
-    }
+    TypeEnv te = run(program);
+    assertTrue(te._t instanceof TypeMemPtr);
+    int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
+    TypeObj actual = te._tmem.ld((TypeMemPtr)te._t);
+    assertEquals(expected,actual);
   }
   static private void test_struct( String program, TypeStruct expected) {
-    try( TypeEnv te = run(program) ) {
-      TypeStruct actual = (TypeStruct)te._tmem.ld((TypeMemPtr)te._t);
-      actual = actual.replace_fld(TypeFld.NO_DISP);
-      assertEquals(expected,actual);
-    }
+    TypeEnv te = run(program);
+    TypeStruct actual = (TypeStruct)te._tmem.ld((TypeMemPtr)te._t);
+    actual = actual.replace_fld(TypeFld.NO_DISP);
+    assertEquals(expected,actual);
   }
   static private void test_obj_isa( String program, TypeObj expected) {
-    try( TypeEnv te = run(program) ) {
-      int alias = ((TypeMemPtr)te._t)._aliases.strip_nil().getbit(); // internally asserts only 1 bit set
-      TypeObj actual = te._tmem.sharpen((TypeMemPtr)te._t)._obj;
-      assertTrue(actual.isa(expected));
-    }
+    TypeEnv te = run(program);
+    int alias = ((TypeMemPtr)te._t)._aliases.strip_nil().getbit(); // internally asserts only 1 bit set
+    TypeObj actual = te._tmem.sharpen((TypeMemPtr)te._t)._obj;
+    assertTrue(actual.isa(expected));
   }
   static private void test_ptr( String program, String expected ) {
-    try( TypeEnv te = run(program) ) {
-      assertTrue(te._t instanceof TypeMemPtr);
-      TypeObj to = te._tmem.ld((TypeMemPtr)te._t); // Peek thru pointer
-      SB sb = to.str(new SB(),new VBitSet(),te._tmem,false);      // Print what we see, with memory
-      assertEquals(expected,strip_alias_numbers(sb.toString()));
-    }
+    TypeEnv te = run(program);
+    assertTrue(te._t instanceof TypeMemPtr);
+    TypeObj to = te._tmem.ld((TypeMemPtr)te._t); // Peek thru pointer
+    SB sb = to.str(new SB(),new VBitSet(),te._tmem,false);      // Print what we see, with memory
+    assertEquals(expected,strip_alias_numbers(sb.toString()));
   }
   static private void test( String program, Function<Integer,Type> expected ) {
-    try( TypeEnv te = run(program) ) {
-      Type t_expected = expected.apply(-99); // unimpl
-      assertEquals(t_expected,te._t);
-    }
+    TypeEnv te = run(program);
+    Type t_expected = expected.apply(-99); // unimpl
+    assertEquals(t_expected,te._t);
   }
   static private void test_isa( String program, Type expected ) {
-    try( TypeEnv te = run(program) ) {
-      Type actual = te._tmem.sharptr(te._t);
-      assertTrue(actual.isa(expected));
-    }
+    TypeEnv te = run(program);
+    Type actual = te._tmem.sharptr(te._t);
+    assertTrue(actual.isa(expected));
   }
   static private void testerr( String program, String err, String cursor ) {
     System.out.println("fix test, cur_off="+cursor.length());
     fail();
   }
   static void testerr( String program, String err, int cur_off ) {
-    TypeEnv te = Exec.go(Env.file_scope(Env.top_scope()),"args",program);
-    assertTrue(te._errs != null && te._errs.size()>=1);
-    String cursor = new String(new char[cur_off]).replace('\0', ' ');
-    String err2 = new SB().p("args:1:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
-    assertEquals(err2,strip_alias_numbers(te._errs.get(0).toString()));
+    //TypeEnv te = Exec.go(Env.file_scope(Env.top_scope()),"args",program);
+    //assertTrue(te._errs != null && te._errs.size()>=1);
+    //String cursor = new String(new char[cur_off]).replace('\0', ' ');
+    //String err2 = new SB().p("args:1:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
+    //assertEquals(err2,strip_alias_numbers(te._errs.get(0).toString()));
+    throw unimpl();
   }
   private static String strip_alias_numbers( String err ) {
     // Remove alias#s from the result string: *[123]@{x=1,y=2} ==> *[$]@{x=1,y=2}
@@ -1040,11 +1033,12 @@ HashTable = {@{
     return err.replaceAll("\\[[,0-9]*", "\\[\\$");
   }
   static private void testary( String program, String err, int cur_off ) {
-    TypeEnv te = Exec.go(Env.file_scope(Env.top_scope()),"args",program);
-    assertTrue(te._errs != null && te._errs.size()>=1);
-    String cursor = new String(new char[cur_off]).replace('\0', ' ');
-    String err2 = new SB().p("args:1:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
-    assertEquals(err2,te._errs.get(0).toString());
+    //TypeEnv te = Exec.go(Env.file_scope(new Env()),"args",program);
+    //assertTrue(te._errs != null && te._errs.size()>=1);
+    //String cursor = new String(new char[cur_off]).replace('\0', ' ');
+    //String err2 = new SB().p("args:1:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
+    //assertEquals(err2,te._errs.get(0).toString());
+    throw unimpl();
   }
 
 }

@@ -19,7 +19,7 @@ public class TestNodeSmall {
 
   @Ignore
   @Test public void testUnresolvedAdd() {
-    Env top = Env.top_scope();
+    Env top = new Env();
     GVNGCM gvn = Env.GVN;
 
     // Current theory on Unresolved:  Call.resolve moves closer to the centerline:
@@ -247,7 +247,7 @@ public class TestNodeSmall {
   @SuppressWarnings("unchecked")
   @Ignore
   @Test public void testCallNodeResolve() {
-    Env top = Env.top_scope();
+    Env top = new Env();
     GVNGCM gvn = Env.GVN;
 
     // Make a Unknown/CallNode/CallEpi combo.
@@ -400,7 +400,7 @@ public class TestNodeSmall {
   }
 
   @Test public void testCallNodeResolve2() {
-    Env top = Env.top_scope();
+    Env top = new Env();
     GVNGCM gvn = Env.GVN;
     gvn._opt_mode=GVNGCM.Mode.Parse;
 
@@ -486,7 +486,7 @@ public class TestNodeSmall {
   // Code: "gen_ctr={cnt;{cnt++}}; ctrA=gen_ctr(); ctrB=gen_ctr(); ctrA(); ctrB(); ctrB()"
   //
   @Test public void testRecursiveDisplay() {
-    Env top = Env.top_scope();
+    //Env top = Env.top_scope();
     GVNGCM gvn = Env.GVN;
 
     // Build the graph for the "fact" example:
@@ -530,7 +530,7 @@ public class TestNodeSmall {
     dsp_file.create("fact",fptr,Access.Final);
     dsp_file.no_more_fields();
     // Return the fptr to keep all alive
-    ScopeNode env = new ScopeNode(null,true);
+    ScopeNode env = new ScopeNode(true);
     env.set_ctrl(ctl);
     env.set_ptr (dsp_file_ptr);
     env.set_mem (dsp_file_obj);
@@ -587,7 +587,7 @@ public class TestNodeSmall {
 
   private static int ERR=0;
   @Test public void testMemoryArgs() {
-    Env top = Env.top_scope();
+    //Env top = Env.top_scope();
     GVNGCM gvn = Env.GVN;
 
     // Check Parm.value calls are monotonic, and within Fun.sig bounds -

@@ -1,4 +1,86 @@
 =======================================
+9/12/2021
+
+Combining HM & forward-flow.
+
+
+- display arg comes from the FDX.
+- GCP TypeFunPtr fed into slot "^".
+- Drop FP2DISP; drop extra FDX input to Call.
+- Call peels out TypeMemPtr disp for output value()
+- Call DOES NOT INCLUDE TFP IN OUTPUT TYPE, get it from fdx() directly.
+- HMT for the function includes Display field
+- Use fixed arg names, since names not available at Call sites.  TypeStruct.ARGS[2]="^", "a", "b", ....
+- - Replace (""+i).intern() with CallNode.argstr(i) { if( i<26 ) return ARGS[i]; else big_name(i)};
+- Explicit pass display (as we do now)
+- Fresh incoming args when moving into nested display
+- Display Loads are ... Field Loads, no FreshNode
+- - Drop FreshNode from parser after Loads.
+- - Add FreshNode in parser before getting 1st display; nested display loads are just loads.
+- CallEpi unifies arguments as before; display unifies to display, etc.
+- Ponder moving ConNode ALL_CTRL, ALL_PARM to private Node class
+
+
+// Both AA and HM Syntax, at once:
+dsp0 = @{  // PRIM scope
+  PRIMS...
+ 
+  dsp1 = @{     // File scope
+    ^ = dsp0;   // Fresh record prior display
+    
+    // <{} # dsp> is syntax for combined standard HM function type and also the display being carried.
+    
+    // So, "is_even is a function/display tuple that...."
+    is_even = <{ dsp_extern n ->
+      // make the local display (during Parser.func())
+      dsp = @{            // This is a LET syntax defining the local display
+         ^ = dsp_extern;  // fresh of dsp_extern
+         n = n;           // fresh of n
+      };
+      
+      // iter() folds all the FreshNodes of the local display, so parser might as well.
+      
+      // The final result can be in or out of the display
+      (if dsp.n 0 (dsp.^.is_odd  dsp.^ (dsp.^.^.dec dsp.n)))
+    } # dsp1>;
+    
+    // "is_odd is a function/display tuple that...."
+    is_odd  = <{ dsp_extern n ->
+      // make the local display (during Parser.func())
+      dsp = @{
+         ^ = dsp_extern;  // fresh of dsp_extern
+         n = n;           // fresh of n
+      };
+      (if dsp.n 1 (dsp.^.is_even dsp.^ (dsp.^.^.dec dsp.n)))
+    } # dsp1 >;
+  };
+};
+dsp0.dsp1.is_even
+
+
+ALSO hacking primitive lookups to be normal lookups.
+Before other parsing, parse fixed string/file for prims
+All operators must be final-assigned, so can bypass the display lookup.
+
+_+_ = { x y -> $$AddI64I64(x,y) }  // java classForName.  Required to be a binop FunPtr
+_+_ = $$AddF64F64 // Allowed to combine/overload.
+!_  = uniop prefix
+str = $$Int2Str; // can be normal name
+
+Later;
+- have token '+' in binop position.
+- replace with _+_ and do NORMAL lookup.
+
+Drop {+} syntax.  User can just write _+_.
+
+
+
+
+
+
+
+
+=======================================
 6/14/2021
 
 Up to dealing with memory and arrays in the Type vars.

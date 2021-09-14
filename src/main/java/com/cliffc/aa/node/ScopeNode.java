@@ -22,7 +22,7 @@ public class ScopeNode extends Node {
   private final HashMap<String,ConTypeNode> _types; // user-typing type names
   private Ary<IfScope> _ifs;                 // Nested set of IF-exprs used to track balanced new-refs
 
-  public ScopeNode(Parse open, boolean closure) {
+  public ScopeNode(boolean closure) {
     super(OP_SCOPE,null,null,null,null);
     if( closure ) { add_def(null); add_def(null); add_def(null); } // Wire up an early-function-exit path
     _types = new HashMap<>();
@@ -35,13 +35,13 @@ public class ScopeNode extends Node {
     keep();
   }
 
-  // Add base types on startup
-  public void init() {
-    HashMap<String,Type> ts = new HashMap<>();
-    Type.init0(ts);
-    for( String tname : ts.keySet() )
-      _types.put(tname,Env.GVN.init(new ConTypeNode(tname,ts.get(tname),Env.SCP_0)));
-  }
+  //// Add base types on startup
+  //public void init() {
+  //  HashMap<String,Type> ts = new HashMap<>();
+  //  Type.init0(ts);
+  //  for( String tname : ts.keySet() )
+  //    _types.put(tname,Env.GVN.init(new ConTypeNode(tname,ts.get(tname),Env.SCP_0)));
+  //}
 
   public   Node  ctrl() { return in(0); }
   public   Node  mem () { return in(MEM_IDX); }

@@ -33,6 +33,16 @@ public abstract class PrimNode extends Node {
     _op_prec = -1;              // Not set yet
     _thunk_rhs=false;
   }
+
+  // aa source to define the primitives.  Unlike normal aa, this code allows
+  // $$JavaClassName; the Java class static function "funptr" returns a
+  // FunPtrNode.  Typically used in the call position.
+  public static final String PRIM_SOURCE =
+    
+    "_&_ = { x y -> $$AndI64(x,y) };" +
+
+    "";
+  
   private static PrimNode[] PRIMS = null; // All primitives
   public static PrimNode[][] PRECEDENCE = null;  // Just the binary operators, grouped by precedence
   public static String  [][] PREC_TOKS  = null;  // Just the binary op tokens, grouped by precedence
@@ -546,7 +556,7 @@ public abstract class PrimNode extends Node {
         Node fal = X.xform(new CProjNode(iff,0));
         Node tru = X.xform(new CProjNode(iff,1));
         // Call on true branch; if false do not call.
-        Node dsp = X.xform(new FP2DispNode(rhs));
+        Node dsp = rhs; //X.xform(new FP2DispNode(rhs));
         Node cal = X.xform(new CallNode(true,_badargs,tru,mem,dsp,rhs));
         Node cep = X.xform(new CallEpiNode(cal,Env.DEFMEM));
         Node ccc = X.xform(new CProjNode(cep));
@@ -602,7 +612,7 @@ public abstract class PrimNode extends Node {
         Node fal = X.xform(new CProjNode(iff,0));
         Node tru = X.xform(new CProjNode(iff,1));
         // Call on false branch; if true do not call.
-        Node dsp = X.xform(new FP2DispNode(rhs));
+        Node dsp = rhs; //X.xform(new FP2DispNode(rhs));
         Node cal = X.xform(new CallNode(true,_badargs,fal,mem,dsp,rhs));
         Node cep = X.xform(new CallEpiNode(cal,Env.DEFMEM));
         Node ccc = X.xform(new CProjNode(cep));

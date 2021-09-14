@@ -7,12 +7,10 @@ import com.cliffc.aa.tvar.TV2;
 
 import java.util.ArrayList;
 
-public class TypeEnv implements AutoCloseable {
+public class TypeEnv{
   final Type _t;
   final TypeMem _tmem;
   final TV2 _hmt;
-  final Env _env;
-  final ArrayList<Node.ErrMsg> _errs;
-  TypeEnv( Type t, TypeMem tmem, TV2 hmt, Env env, ArrayList<Node.ErrMsg> errs ) { _t=t; _tmem=tmem; _hmt=hmt; _env=env; _errs = errs; }
-  @Override public void close() { _env.close(); }
+  final ArrayList<ErrMsg> _errs;
+  TypeEnv( Type t, TypeMem tmem, TV2 hmt, ArrayList<ErrMsg> errs ) { _t=t; _tmem=tmem; _hmt=hmt; _errs = errs; }
 }

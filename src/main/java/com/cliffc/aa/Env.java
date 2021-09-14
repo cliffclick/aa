@@ -3,27 +3,37 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 
-import static com.cliffc.aa.type.TypeFld.Access;
+import static com.cliffc.aa.AA.DSP_IDX;
+import static com.cliffc.aa.AA.unimpl;
 
 public class Env implements AutoCloseable {
-  public static Env FILE;
+  public static Env TOP,FILE;
   public final static GVNGCM GVN = new GVNGCM(); // Initial GVN
+
+  public static      ConNode ANY;   // Common ANY / used for dead
+  public static      ConNode ALL;   // Common ALL / used for errors
+  public static      ConNode XCTRL; // Always dead control
+  public static      ConNode XNIL;  // Default 0
+  public static      ConNode ALL_CTRL; // Default control
+  public static      ConNode ALL_PARM; // Default parameter
+  public static      ConNode ALL_CALL; // Common during function call construction
+
   public static    StartNode START; // Program start values (control, empty memory, cmd-line args)
   public static    CProjNode CTL_0; // Program start value control
   public static StartMemNode MEM_0; // Program start value memory
   public static   NewObjNode STK_0; // Program start stack frame (has primitives)
   public static    ScopeNode SCP_0; // Program start scope
+
   public static   DefMemNode DEFMEM;// Default memory (all structure types)
-  public static      ConNode ALL_CTRL; // Default control
-  public static      ConNode ALL_PARM; // Default parameter
-  public static      ConNode XCTRL; // Always dead control
-  public static      ConNode ANY;   // Common ANY / used for dead
-  public static      ConNode ALL;   // Common ALL / used for errors
-  public static      ConNode ALL_CALL; // Common during function call construction
+
   // Set of all display aliases, used to track escaped displays at call sites for asserts.
   public static BitsAlias ALL_DISPLAYS = BitsAlias.EMPTY;
   // Set of lexically active display aliases, used for a conservative display
@@ -31,89 +41,116 @@ public class Env implements AutoCloseable {
   public static BitsAlias LEX_DISPLAYS = BitsAlias.EMPTY;
 
 
+  static {
+    // Top-level default values; ALL_CTRL is used by declared functions to
+    // indicate that future not-yet-parsed code may call the function.
+    START   = GVN.init (new StartNode());
+    ANY     = GVN.xform(new ConNode<>(Type.ANY   )).keep();
+    ALL     = GVN.xform(new ConNode<>(Type.ALL   )).keep();
+    XCTRL   = GVN.xform(new ConNode<>(Type.XCTRL )).keep();
+    XNIL    = GVN.xform(new ConNode<>(Type.XNIL  )).keep();
+    ALL_CTRL= GVN.xform(new ConNode<>(Type.CTRL  )).keep();
+    ALL_PARM= GVN.xform(new ConNode<>(Type.SCALAR)).keep();
+    ALL_CALL= GVN.xform(new ConNode<>(TypeRPC.ALL_CALL)).keep();
+    // Initial control & memory
+    CTL_0  = GVN.init(new    CProjNode(START,0));
+    MEM_0  = GVN.init(new StartMemNode(START  ));
+    DEFMEM = GVN.init(new   DefMemNode(CTL_0));
+  }
+
+
   final public Env _par;         // Parent environment
   public final ScopeNode _scope; // Lexical anchor; "end of display"; goes when this environment leaves scope
   public VStack _nongen;         // Hindley-Milner "non-generative" variable set; current/pending defs
 
-  // Top-level Env.  Contains, e.g. the primitives.
-  // Above any file-scope level Env.
-  private Env(  ) {
-    _par = null;
-    _nongen = null;
-    _scope = init(CTL_0,Node.con(Type.XNIL),MEM_0,Type.XNIL,null,true);
-  }
-
-  // A file-level Env, or below.  Contains user written code.
-  Env( Env par, Parse P, boolean is_closure, Node ctrl, Node mem ) {
-    GVN._opt_mode=GVNGCM.Mode.Parse;
+  // Shared Env.
+  private Env( Env par, VStack nongen, boolean is_closure, Node ctrl, Node mem, TypeStruct ts, Node dsp_ptr ) {
     _par = par;
-    nongen_push(par);
-    ScopeNode s = par._scope;   // Parent scope
-    _scope = init(ctrl,s.ptr(),mem,s.stk()._tptr,P==null ? null : P.errMsg(),is_closure);
-  }
-  // Make the Scope object for an Env.
-  private static ScopeNode init(Node ctl, Node clo, Node mem, Type back_ptr, Parse errmsg, boolean is_closure) {
-    TypeStruct tdisp = TypeStruct.open(back_ptr);
+    _nongen = nongen;
     mem.keep(2);
-    NewObjNode nnn = GVN.xform(new NewObjNode(is_closure,tdisp,clo)).keep(2);
-    MrgProjNode  frm = DEFMEM.make_mem_proj(nnn,mem.unkeep(2));
+    NewObjNode nnn = GVN.xform(new NewObjNode(is_closure,ts,dsp_ptr)).keep(2);
+    MrgProjNode frm = DEFMEM.make_mem_proj(nnn,mem.unkeep(2));
     Node ptr = GVN.xform(new ProjNode(nnn.unkeep(2),AA.REZ_IDX));
+    _scope = new ScopeNode(is_closure);
+    _scope.set_ctrl(ctrl);
+    _scope.set_ptr (ptr);  // Address for 'nnn', the local stack frame
+    _scope.set_mem (frm);  // Memory includes local stack frame
+    _scope.set_rez (Node.con(Type.SCALAR));
     ALL_DISPLAYS = ALL_DISPLAYS.set(nnn._alias);   // Displays for all time
     LEX_DISPLAYS = LEX_DISPLAYS.set(nnn._alias);   // Lexically active displays
-    ScopeNode scope = new ScopeNode(errmsg,is_closure);
-    scope.set_ctrl(ctl);
-    scope.set_ptr (ptr);  // Address for 'nnn', the local stack frame
-    scope.set_mem (frm);  // Memory includes local stack frame
-    scope.set_rez (Node.con(Type.SCALAR));
-    return scope;
   }
 
-  // Makes a new top Env with primitives
-  public static Env top_scope() {
-    boolean first_time = START == null;
-    if( first_time ) record_for_top_reset1();
-    else top_reset();
-
-    // Top-level default values; ALL_CTRL is used by declared functions to
-    // indicate that future not-yet-parsed code may call the function.
-    START   = GVN.init (new StartNode());
-    ALL_CTRL= GVN.xform(new ConNode<>(Type.CTRL  )).keep();
-    ALL_PARM= GVN.xform(new ConNode<>(Type.SCALAR)).keep();
-    XCTRL   = GVN.xform(new ConNode<>(Type.XCTRL )).keep();
-    ANY     = GVN.xform(new ConNode<>(Type.ANY   )).keep();
-    ALL     = GVN.xform(new ConNode<>(Type.ALL   )).keep();
-    ALL_CALL= GVN.xform(new ConNode<>(TypeRPC.ALL_CALL)).keep();
-    // Initial control & memory
-    CTL_0  = GVN.init(new    CProjNode(START,0));
-    DEFMEM = GVN.init(new   DefMemNode(  CTL_0));
-    MEM_0  = GVN.init(new StartMemNode(START  ));
-    // Top-most (file-scope) lexical environment
-    Env top = new Env();
-    // Top-level display defining all primitives
-    SCP_0 = top._scope;
-    SCP_0.init();               // Add base types
+  // Top-level Env.  Contains, e.g. the primitives.
+  // Above any file-scope level Env.
+  public Env( ) {
+    this(null,null,true,CTL_0,MEM_0,TypeStruct.make("",false,true,TypeFld.make("^",Type.XNIL, DSP_IDX)),XNIL);
+    SCP_0 = _scope;
     STK_0 = SCP_0.stk();
-
-    STK_0.keep();               // Inputs & type will rapidly change
-    for( PrimNode prim : PrimNode.PRIMS() )
-      STK_0.add_fun(null,prim._name,(FunPtrNode) GVN.xform(prim.as_fun(GVN)));
-    for( NewNode.NewPrimNode lib : NewNode.NewPrimNode.INTRINSICS() )
-      STK_0.add_fun(null,lib ._name,(FunPtrNode) GVN.xform(lib .as_fun(GVN)));
-    // Top-level constants
-    STK_0.create_active("math_pi", Node.con(TypeFlt.PI),Access.Final);
-    STK_0.no_more_fields();
-    STK_0.unkeep();
-    // Run the worklist dry
-    GVN.iter(GVNGCM.Mode.Parse);
-
-    if( first_time ) record_for_top_reset2();
-    return top;
+    //SCP_0.init();               // Add base types; TODO: move into init code
   }
 
-  // A new Env for the current Parse scope (generally a file-scope or a
-  // test-scope), above this is the basic public Env with all the primitives
-  public static Env file_scope(Env top_scope) {
-    return (FILE = new Env(top_scope,null, true, top_scope._scope.ctrl(), top_scope._scope.mem()));
+
+  // A file-level Env, or below.  Contains user written code as opposed to primitives.
+  Env( Env par, boolean is_closure, Node ctrl, Node mem ) {
+    this(par,new VStack(par._nongen),is_closure,ctrl,mem,
+         par._scope.stk()._ts,par._scope.ptr());
+  }
+
+  // Make the prims, and parse a top-level string in one go.  Used by tests or
+  // by the command-line parse.  Not used by the REPL.
+  static TypeEnv exec_go(String src, String str) {
+    TOP = new Env();
+    // Parse PRIM_SOURCE for the primitives
+    PrimNode.PRIMS();           // Initialize
+    TypeEnv te = TOP.gather_errors(new Parse("PRIMS",true,TOP,PrimNode.PRIM_SOURCE).prog());
+    assert te._errs==null && te._t==Type.XNIL; // Primitives parsed fine
+    // Now parse the source string
+    FILE = new Env(TOP,true,TOP._scope.ctrl(),TOP._scope.mem());
+    TypeEnv te1 = Exec.go(FILE,src,str);
+    return te1;
+  }
+
+  // Gather and report errors and typing
+  TypeEnv gather_errors(ErrMsg err) {
+    // Hunt for typing errors in the alive code
+    HashSet<ErrMsg> errs = new HashSet<>();
+    errs.add(err);
+    VBitSet bs = new VBitSet();
+    _scope.walkerr_def(errs,bs);
+    ArrayList<ErrMsg> errs0 = new ArrayList<>(errs);
+    Collections.sort(errs0);
+
+    Node rez = _scope.rez();
+    Type mem = _scope.mem()._val;
+    return new TypeEnv(rez._val,
+                       mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM),
+                       rez.tvar(),
+                       errs0.isEmpty() ? null : errs0);
+  }
+
+
+
+  // Promote any forward refs in this display to an outer scope.
+  // Close the currently open display, and remove its alias from the set of
+  // active display aliases (which are otherwise available to all function
+  // definitions getting parsed).
+  @Override public void close() {
+    // Promote forward refs to the next outer scope
+    NewObjNode stk = _scope.stk();
+    ScopeNode pscope = _par._scope;
+    if( pscope != null && _par._par != null )
+      stk.promote_forward(pscope.stk());
+
+    Node ptr = _scope.ptr();
+    //if( ptr == null ) return;   // Already done
+    LEX_DISPLAYS = LEX_DISPLAYS.clear(stk._alias);
+    stk.no_more_fields();
+    GVN.add_flow(stk);          // Scope object going dead, trigger following projs to cleanup
+    _scope.set_ptr(null);       // Clear pointer to display
+    GVN.add_flow(ptr);          // Clearing pointer changes liveness
+    GVN.add_work_all(_scope.unkeep());
+    GVN.add_dead(_scope);
+    GVN.iter(GVN._opt_mode);
   }
 
   // Wire up an early function exit
@@ -121,55 +158,29 @@ public class Env implements AutoCloseable {
     return _scope.is_closure() ? P.do_exit(_scope,val) : _par.early_exit(P,val); // Hunt for an early-exit-enabled scope
   }
 
-  // Close any currently open display, and remove its alias from the set of
-  // active display aliases (which are otherwise available to all function
-  // definitions getting parsed).
-  public void close_display( GVNGCM gvn ) {
-    Node ptr = _scope.ptr();
-    if( ptr == null ) return;   // Already done
-    NewObjNode stk = _scope.stk();
-    stk.no_more_fields();
-    gvn.add_flow(stk);          // Scope object going dead, trigger following projs to cleanup
-    _scope.set_ptr(null);       // Clear pointer to display
-    gvn.add_flow(ptr);          // Clearing pointer changes liveness
-    gvn.add_work_all(_scope.unkeep());
-    LEX_DISPLAYS = LEX_DISPLAYS.clear(stk._alias);
-  }
-
-  // Close the current Env and lexical scope.
-  @Override public void close() {
-    // Promote forward refs to the next outer scope
-    ScopeNode pscope = _par._scope;
-    if( pscope != null && _par._par != null )
-      _scope.stk().promote_forward(pscope.stk());
-    close_display(GVN);
-    GVN.add_dead(_scope);
-    GVN.iter(GVN._opt_mode);
-  }
-
-  // Record global static state for reset
-  private static void record_for_top_reset1() {
-    BitsAlias.init0();
-    BitsFun  .init0();
-    BitsRPC  .init0();
-  }
-  private static void record_for_top_reset2() { GVN.init0(); Node.init0(); }
-
-  // Reset all global statics for the next parse.  Useful during testing when
-  // many top-level parses happen in a row.
-  private static void top_reset() {
-    BitsAlias .reset_to_init0();
-    BitsFun   .reset_to_init0();
-    BitsRPC   .reset_to_init0();
-    TV2       .reset_to_init0();
-    GVN       .reset_to_init0();
-    Node      .reset_to_init0();
-    FunNode   .reset();
-    NewNode.NewPrimNode.reset();
-    PrimNode  .reset();
-    ALL_DISPLAYS = BitsAlias.EMPTY; // Reset aliases declared as Displays
-    LEX_DISPLAYS = BitsAlias.EMPTY;
-  }
+  //// Record global static state for reset
+  //private static void record_for_top_reset1() {
+  //  BitsAlias.init0();
+  //  BitsFun  .init0();
+  //  BitsRPC  .init0();
+  //}
+  //private static void record_for_top_reset2() { GVN.init0(); Node.init0(); }
+  //
+  //// Reset all global statics for the next parse.  Useful during testing when
+  //// many top-level parses happen in a row.
+  //private static void top_reset() {
+  //  BitsAlias .reset_to_init0();
+  //  BitsFun   .reset_to_init0();
+  //  BitsRPC   .reset_to_init0();
+  //  TV2       .reset_to_init0();
+  //  GVN       .reset_to_init0();
+  //  Node      .reset_to_init0();
+  //  FunNode   .reset();
+  //  NewNode.NewPrimNode.reset();
+  //  PrimNode  .reset();
+  //  ALL_DISPLAYS = BitsAlias.EMPTY; // Reset aliases declared as Displays
+  //  LEX_DISPLAYS = BitsAlias.EMPTY;
+  //}
 
   // Return Scope for a name, so can be used to determine e.g. mutability
   ScopeNode lookup_scope( String name, boolean lookup_current_scope_only ) {
@@ -195,21 +206,54 @@ public class Env implements AutoCloseable {
 
   // Lookup the operator name.  Use the longest name that's found, so that long
   // strings of operator characters are naturally broken by (greedy) strings.
-  // If nargs is positive, filter by nargs.
-  // If nargs is zero, this is a balanced-op lookup, filter by op_prec==0
-  // Always makes a 'fresh' result, as-if HM.Ident primitive lookup.
-  UnOrFunPtrNode lookup_filter_fresh( String name, int nargs, Node ctrl ) {
+
+  // Prefix uniop lookup.  The '_' follows the uniop name.
+  UnOrFunPtrNode lookup_filter_uni( String name ) {
     if( !Parse.isOp(name) ) return null; // Limit to operators
     for( int i=name.length(); i>0; i-- ) {
-      UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(name.substring(0,i).intern());
-      if( n != null ) {         // First name found will return
-        UnOrFunPtrNode u = nargs == 0 // Requiring a balanced-op?
-          ? (n.op_prec()==0 ? n : null) // Return a balanced-op or error
-          : n.filter(nargs);    // Non-balanced ops also check arg count; distinguish e.g. -x from x-y.
-        return u==null ? null : (UnOrFunPtrNode)Env.GVN.xform(new FreshNode(_nongen,ctrl,u));
+      UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(name.substring(0,i)+"_".intern());
+      if( n != null && n.op_prec() > 0 ) { // First name found will return
+        UnOrFunPtrNode m = n.filter(1);    // Filter down to 1 arg
+        if( m!=null )
+          return m;
       }
     }
     return null;
+  }
+
+  UnOrFunPtrNode lookup_filter_2( String name ) {
+    if( !Parse.isOp(name) ) return null; // Limit to operators
+    for( int i=name.length(); i>0; i-- ) {
+      UnOrFunPtrNode n = (UnOrFunPtrNode)lookup("_"+name.substring(0,i)+"_".intern());
+      if( n != null && n.op_prec() > 0 ) { // First name found will return
+        UnOrFunPtrNode m = n.filter(2);    // Filter down to 2 args
+        if( m!=null )
+          return m;
+      }
+    }
+    return null;
+  }
+
+  String lookup_filter_bal( String bopen ) {
+    if( !Parse.isOp(bopen) ) return null; // Limit to operators
+    for( int i=bopen.length(); i>0; i-- ) {
+      UnOrFunPtrNode n = (UnOrFunPtrNode)lookup("_"+bopen.substring(0,i)+"_".intern());
+      if( n != null && n.op_prec() == 0 ) // First name found will return
+        return n.funptr()._name;
+    }
+    return null;
+  }
+
+  UnOrFunPtrNode lookup_filter_bal( String bopen, String bclose ) {
+    if( !Parse.isOp(bopen ) ) return null; // Limit to operators
+    if( !Parse.isOp(bclose) ) return null; // Limit to operators
+    String name = "_"+bopen+"_"+bclose+"_";
+    // Try both the 2 and 3 forms
+    //UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(name.intern());
+    //if( n != null && n.op_prec()==0 )
+    //  return n;
+    //return null;
+    throw unimpl();
   }
 
   // Update function name token to Node mapping in the current scope

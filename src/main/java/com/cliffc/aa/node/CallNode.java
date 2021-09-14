@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
@@ -95,8 +96,6 @@ public class CallNode extends Node {
   Parse[] _badargs;         // Errors for e.g. wrong arg counts or incompatible args; one error point per arg.
   public CallNode( boolean unpacked, Parse[] badargs, Node... defs ) {
     super(OP_CALL,defs);
-    assert defs[DSP_IDX]==null || defs[DSP_IDX]._val==Type.ALL || defs[DSP_IDX]._val==Type.ANY || defs[DSP_IDX]._val instanceof TypeMemPtr; // Temp; not required
-    assert defs.length > DSP_IDX+1;
     _rpc = BitsRPC.new_rpc(BitsRPC.ALL); // Unique call-site index
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
     _badargs = badargs;
@@ -264,9 +263,10 @@ public class CallNode extends Node {
           if( fdx instanceof UnresolvedNode ) {
             fptr = ((UnresolvedNode)fdx).find_fidx(fidx);
             if( fptr != null ) { // Gonna improve
-              if( dsp() instanceof FP2DispNode && dsp().in(0)==fdx )
-                set_dsp(fptr.display());
-              return set_fdx(fptr);
+              //if( dsp() instanceof FP2DispNode && dsp().in(0)==fdx )
+              //  set_dsp(fptr.display());
+              //return set_fdx(fptr);
+              throw unimpl();
             }
           }
         }

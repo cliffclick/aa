@@ -28,9 +28,16 @@ public abstract class AA {
   }
   public static void main( String[] args ) {
     System.out.println(ABV.toString());
-    if( args.length > 0 ) System.out.println(Exec.go(Env.file_scope(Env.top_scope()),"args",String.join(" ",args))._t.toString());
-    else REPL.go();
+    // Command line program
+    if( args.length > 0 ) {
+      TypeEnv te = Env.exec_go("args",String.join(" ",args));
+      System.out.println(te._t.toString());
+    } else {
+      REPL.go();
+    }
   }
+
+
   public static boolean DEBUG = true;
   public static <T> T p(T x, String s) {
     if( !AA.DEBUG ) return x;
@@ -40,5 +47,5 @@ public abstract class AA {
   public static String p    () { return Env.START.dumprpo(false,false); }  // Debugging hook
   public static String plive() { return Env.START.dumprpo(false,true ); }  // Debugging hook
   public static Node f(int uid) { return Env.START.find(uid); }        // Debugging hook
-  public static int UID=-1;  
+  public static int UID=-1;
 }

@@ -23,35 +23,34 @@ public abstract class Node implements Cloneable {
   static final byte OP_DEFMEM = 7;
   static final byte OP_ERR    = 8;
   static final byte OP_FRESH  = 9;
-  static final byte OP_FP2DISP=10;
-  static final byte OP_FUN    =11;
-  static final byte OP_FUNPTR =12;
-  static final byte OP_IF     =13;
-  static final byte OP_JOIN   =14;
-  static final byte OP_LOAD   =15;
-  static final byte OP_LOOP   =16;
-  static final byte OP_NAME   =17; // Cast a prior NewObj to have a runtime Name
-  static final byte OP_NEWOBJ =18; // Allocate a new struct
-  static final byte OP_NEWARY =19; // Allocate a new array
-  static final byte OP_NEWSTR =20; // Allocate a new string
-  static final byte OP_PARM   =21;
-  static final byte OP_PHI    =22;
-  static final byte OP_PRIM   =23;
-  static final byte OP_PROJ   =24;
-  static final byte OP_REGION =25;
-  static final byte OP_RET    =26;
-  static final byte OP_SCOPE  =27;
-  static final byte OP_SPLIT  =28;
-  static final byte OP_START  =29;
-  static final byte OP_STMEM  =30;
-  static final byte OP_STORE  =31;
-  static final byte OP_THRET  =32;
-  static final byte OP_THUNK  =33;
-  static final byte OP_TYPE   =34;
-  static final byte OP_UNR    =35;
-  static final byte OP_MAX    =36;
+  static final byte OP_FUN    =10;
+  static final byte OP_FUNPTR =11;
+  static final byte OP_IF     =12;
+  static final byte OP_JOIN   =13;
+  static final byte OP_LOAD   =14;
+  static final byte OP_LOOP   =15;
+  static final byte OP_NAME   =16; // Cast a prior NewObj to have a runtime Name
+  static final byte OP_NEWOBJ =17; // Allocate a new struct
+  static final byte OP_NEWARY =18; // Allocate a new array
+  static final byte OP_NEWSTR =19; // Allocate a new string
+  static final byte OP_PARM   =20;
+  static final byte OP_PHI    =21;
+  static final byte OP_PRIM   =22;
+  static final byte OP_PROJ   =23;
+  static final byte OP_REGION =24;
+  static final byte OP_RET    =25;
+  static final byte OP_SCOPE  =26;
+  static final byte OP_SPLIT  =27;
+  static final byte OP_START  =28;
+  static final byte OP_STMEM  =29;
+  static final byte OP_STORE  =30;
+  static final byte OP_THRET  =31;
+  static final byte OP_THUNK  =32;
+  static final byte OP_TYPE   =33;
+  static final byte OP_UNR    =34;
+  static final byte OP_MAX    =35;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "DefMem", "Err", "Fresh", "FP2Disp", "Fun", "FunPtr", "If", "Join", "Load", "Loop", "Name", "NewObj", "NewAry", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Thret", "Thunk", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "DefMem", "Err", "Fresh", "Fun", "FunPtr", "If", "Join", "Load", "Loop", "Name", "NewObj", "NewAry", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Thret", "Thunk", "Type", "Unresolved" };
   static { assert STRS.length==OP_MAX; }
 
   // Unique dense node-numbering
@@ -937,107 +936,4 @@ public abstract class Node implements Cloneable {
     if( n != null ) return n;   // Take last answer first
     return P.test(this) ? this : null;
   }
-
-  // ----------------------------------------------
-  // Error levels
-  public enum Level {
-    ForwardRef,               // Forward refs
-    ErrNode,                  // ErrNodes
-    Syntax,                   // Syntax
-    Field,                    // Field naming errors
-    TypeErr,                  // Type errors
-    NilAdr,                   // Address might be nil on mem op
-    BadArgs,                  // Unspecified primitive bad args
-    UnresolvedCall,           // Unresolved calls
-    AllTypeErr,               // Type errors, with one of the types All
-    Assert,                   // Assert type errors
-    TrailingJunk,             // Trailing syntax junk
-    MixedPrimGC,              // Mixed primitives & GC
-  }
-
-  // Error messages
-  public static class ErrMsg implements Comparable<ErrMsg> {
-    public       Parse _loc;    // Point in code to blame
-    public final String _msg;   // Printable error message, minus code context
-    public final Level _lvl;    // Priority for printing
-    public int _order;          // Message order as they are found.
-    public static final ErrMsg FAST = new ErrMsg(null,"fast",Level.Syntax);
-    public static final ErrMsg BADARGS = new ErrMsg(null,"bad arguments",Level.BadArgs);
-    public ErrMsg(Parse loc, String msg, Level lvl) { _loc=loc; _msg=msg; _lvl=lvl; }
-    public static ErrMsg forward_ref(Parse loc, FunPtrNode fun) { return forward_ref(loc,fun._name); }
-    public static ErrMsg forward_ref(Parse loc, String name) {
-      return new ErrMsg(loc,"Unknown ref '"+name+"'",Level.ForwardRef);
-    }
-    public static ErrMsg syntax(Parse loc, String msg) {
-      return new ErrMsg(loc,msg,Level.Syntax);
-    }
-    public static ErrMsg unresolved(Parse loc, String msg) {
-      return new ErrMsg(loc,msg,Level.UnresolvedCall);
-    }
-    public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type expected ) { return typerr(loc,actual,t0mem,expected,Level.TypeErr); }
-    public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type expected, Level lvl ) {
-      TypeMem tmem = t0mem instanceof TypeMem ? (TypeMem)t0mem : null;
-      VBitSet vb = new VBitSet();
-      SB sb = actual.str(new SB(),vb, tmem, false).p(" is not a ");
-      vb.clear();
-      expected.str(sb,vb,null,false); // Expected is already a complex ptr, does not depend on memory
-      if( actual==Type.ALL && lvl==Level.TypeErr ) lvl=Level.AllTypeErr; // ALLs have failed earlier, so this is a lower priority error report
-      return new ErrMsg(loc,sb.toString(),lvl);
-    }
-    public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type[] expecteds ) {
-      TypeMem tmem = t0mem instanceof TypeMem ? (TypeMem)t0mem : null;
-      VBitSet vb = new VBitSet();
-      SB sb = actual.str(new SB(),vb, tmem,false);
-      sb.p( expecteds.length==1 ? " is not a " : " is none of (");
-      vb.clear();
-      for( Type expect : expecteds ) expect.str(sb,vb,null,false).p(',');
-      sb.unchar().p(expecteds.length==1 ? "" : ")");
-      return new ErrMsg(loc,sb.toString(),Level.TypeErr);
-    }
-    public static ErrMsg asserterr( Parse loc, Type actual, Type t0mem, Type expected ) {
-      return typerr(loc,actual,t0mem,expected,Level.Assert);
-    }
-    public static ErrMsg field(Parse loc, String msg, String fld, boolean closure, TypeObj to) {
-      SB sb = new SB().p(msg).p(closure ? " val '" : " field '.").p(fld).p("'");
-      if( to != null && !closure ) to.str(sb.p(" in "),new VBitSet(),null,false);
-      return new ErrMsg(loc,sb.toString(),Level.Field);
-    }
-    public static ErrMsg niladr(Parse loc, String msg, String fld) {
-      String f = fld==null ? msg : msg+" field '."+fld+"'";
-      return new ErrMsg(loc,f,Level.NilAdr);
-    }
-    public static ErrMsg badGC(Parse loc) {
-      return new ErrMsg(loc,"Cannot mix GC and non-GC types",Level.MixedPrimGC);
-    }
-    public static ErrMsg trailingjunk(Parse loc) {
-      return new ErrMsg(loc,"Syntax error; trailing junk",Level.TrailingJunk);
-    }
-
-    @Override public String toString() {
-      return _loc==null ? _msg : _loc.errLocMsg(_msg);
-    }
-    @Override public int compareTo(ErrMsg msg) {
-      int cmp = _lvl.compareTo(msg._lvl);
-      if( cmp != 0 ) return cmp;
-      return _order - msg._order;
-      //cmp = _loc.compareTo(msg._loc);
-      //if( cmp != 0 ) return cmp;
-      //return _msg.compareTo(msg._msg);
-    }
-    @Override public boolean equals(Object obj) {
-      if( this==obj ) return true;
-      if( !(obj instanceof ErrMsg) ) return false;
-      ErrMsg err = (ErrMsg)obj;
-      if( _lvl!=err._lvl || !_msg.equals(err._msg) ) return false;
-      // Spread a missing loc; cheaty but only a little bit.
-      // TODO: track down missing loc in Parser
-      if( _loc==null && err._loc!=null ) _loc=err._loc;
-      if( _loc!=null && err._loc==null ) err._loc=_loc;
-      return _loc==err._loc || _loc.equals(err._loc);
-    }
-    @Override public int hashCode() {
-      return (_loc==null ? 0 : _loc.hashCode())+_msg.hashCode()+_lvl.hashCode();
-    }
-  }
-
 }

@@ -310,7 +310,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final TypeStruct C0    = make("c",TypeInt.FALSE,Access.Final); // @{c:0}
   private static final TypeStruct D1    = make("d",TypeInt.TRUE ,Access.Final); // @{d:1}
   public  static final TypeStruct ARW   = make("a",TypeFlt.FLT64,Access.RW   );
-  public  static final TypeStruct NO_ARGS = make0().hashcons_free();
+  public  static final TypeStruct EMPTY = make0().hashcons_free();
   public  static final TypeStruct FLT64 = args(TypeFlt.FLT64);     // { flt -> }
   public  static final TypeStruct INT64 = args(TypeInt.INT64);     // { int -> }
   public  static final TypeStruct SCALAR1=args(SCALAR);            // { scalar -> }

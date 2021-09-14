@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
+import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -66,8 +67,7 @@ public class AssertNode extends Node {
         Node chk    = X.xform(new AssertNode(postmem,val,sig._ret.at(REZ_IDX),_error_parse,_env));
         RetNode ret = (RetNode)X.xform(new RetNode(ctl,postmem,chk,rpc,fun));
         // Just the same Closure when we make a new TFP
-        Node clos = X.xform(new FP2DispNode(arg));
-        return (X._ret=X.xform(new FunPtrNode(ret,clos)));
+        return (X._ret=X.xform(new FunPtrNode(ret,arg)));
       }
     }
 

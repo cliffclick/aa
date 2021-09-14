@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
@@ -53,7 +54,8 @@ public class TestNode {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testNode() {
-    Env.file_scope(Env.top_scope());
+    //Env.file_scope(Env.top_scope());
+    throw AA.unimpl();
   }
 
   // A sparse list of all subtypes.  The outer array is the index into
@@ -157,8 +159,8 @@ public class TestNode {
   public static void main( String[] args ) { new TestNode().testMonotonic();  }
   @SuppressWarnings("unchecked")
   @Test public void testMonotonic() {
-    Env top = Env.top_scope();
-    Env.file_scope(top);
+    Env top = new Env();
+    //Env.file_scope(top);
     assert _errs == 0;          // Start with no errors
 
     // Types we are testing
@@ -232,7 +234,6 @@ public class TestNode {
     test1monotonic(new    ErrNode(_ins[0],null,"\nerr\n"));
     test1monotonic(new    FunNode(TypeStruct.INT64));
     test1monotonic(new FunPtrNode("anon",ret,null));
-    test1monotonic(new FP2DispNode(_ins[1])); // Only takes in a TFP
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     for( NewNode.NewPrimNode prim : NewNode.NewPrimNode.INTRINSICS() )
       test1monotonic_intrinsic(prim);
