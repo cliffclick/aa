@@ -26,7 +26,7 @@ public class RegionNode extends Node {
     // Look for dead paths.  If found, cut dead path out of all Phis and this
     // Node, and return-for-progress.
     for( int i=1; i<dlen; i++ )
-      if( val(i)==Type.XCTRL && !(i==1 && is_prim()) ) { // Found dead path; cut out
+      if( val(i)==Type.XCTRL && in(i)!=Env.ALL_CTRL ) { // Found dead path; cut out
         for( Node phi : _uses )
           if( phi instanceof PhiNode )
             phi.remove(i);

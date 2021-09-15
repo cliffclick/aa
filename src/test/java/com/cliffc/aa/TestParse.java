@@ -76,6 +76,8 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
+    test_obj("str(3.14)"       , TypeStr.con("3.14"));
+    test_obj("str(3.14)"       , TypeStr.con("3.14"));
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -119,19 +121,19 @@ public class TestParse {
 
 
     // Variable lookup
-    test("math_pi", TypeFlt.PI);
+    test("math.pi", TypeFlt.PI);
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk",0);
     testerr("!", "Syntax error; trailing junk",0);
-    test_prim("{+}", "+");
-    test_prim("{!}", "!"); // uniops are just like normal functions
+    test_prim("{_+_}", "+");
+    test_prim("{!_}", "!"); // uniops are just like normal functions
     // Function application, traditional paren/comma args
     test("{+}(1,2)", TypeInt.con( 3));
     test("{-}(1,2)", TypeInt.con(-1)); // binary version
     test(" - (1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
     testerr("{!}()     ", "Passing 0 arguments to {!} which takes 1 arguments",3);
-    testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function",10);
+    testerr("math.pi(1)", "A function is being called, but 3.141592653589793 is not a function",10);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",3);
 
     // Parsed as +(1,(2*3))

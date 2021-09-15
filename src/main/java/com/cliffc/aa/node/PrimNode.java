@@ -316,23 +316,23 @@ public abstract class PrimNode extends Node {
     abstract double op( double x, double y );
   }
 
-  static class AddF64 extends Prim2OpF64 {
-    AddF64() { super("+"); }
+  public static class AddF64 extends Prim2OpF64 {
+    public AddF64() { super("+"); }
     double op( double l, double r ) { return l+r; }
   }
 
-  static class SubF64 extends Prim2OpF64 {
-    SubF64() { super("-"); }
+  public static class SubF64 extends Prim2OpF64 {
+    public SubF64() { super("-"); }
     double op( double l, double r ) { return l-r; }
   }
 
-  static class MulF64 extends Prim2OpF64 {
-    MulF64() { super("*"); }
+  public static class MulF64 extends Prim2OpF64 {
+    public MulF64() { super("*"); }
     @Override double op( double l, double r ) { return l*r; }
   }
 
-  static class DivF64 extends Prim2OpF64 {
-    DivF64() { super("/"); }
+  public static class DivF64 extends Prim2OpF64 {
+    public DivF64() { super("/"); }
     @Override double op( double l, double r ) { return l/r; }
   }
 
@@ -343,12 +343,12 @@ public abstract class PrimNode extends Node {
     abstract boolean op( double x, double y );
   }
 
-  static class LT_F64 extends Prim2RelOpF64 { LT_F64() { super("<" ); } boolean op( double l, double r ) { return l< r; } }
-  static class LE_F64 extends Prim2RelOpF64 { LE_F64() { super("<="); } boolean op( double l, double r ) { return l<=r; } }
-  static class GT_F64 extends Prim2RelOpF64 { GT_F64() { super(">" ); } boolean op( double l, double r ) { return l> r; } }
-  static class GE_F64 extends Prim2RelOpF64 { GE_F64() { super(">="); } boolean op( double l, double r ) { return l>=r; } }
-  static class EQ_F64 extends Prim2RelOpF64 { EQ_F64() { super("=="); } boolean op( double l, double r ) { return l==r; } }
-  static class NE_F64 extends Prim2RelOpF64 { NE_F64() { super("!="); } boolean op( double l, double r ) { return l!=r; } }
+  public static class LT_F64 extends Prim2RelOpF64 { public LT_F64() { super("<" ); } boolean op( double l, double r ) { return l< r; } }
+  public static class LE_F64 extends Prim2RelOpF64 { public LE_F64() { super("<="); } boolean op( double l, double r ) { return l<=r; } }
+  public static class GT_F64 extends Prim2RelOpF64 { public GT_F64() { super(">" ); } boolean op( double l, double r ) { return l> r; } }
+  public static class GE_F64 extends Prim2RelOpF64 { public GE_F64() { super(">="); } boolean op( double l, double r ) { return l>=r; } }
+  public static class EQ_F64 extends Prim2RelOpF64 { public EQ_F64() { super("=="); } boolean op( double l, double r ) { return l==r; } }
+  public static class NE_F64 extends Prim2RelOpF64 { public NE_F64() { super("!="); } boolean op( double l, double r ) { return l!=r; } }
 
 
   // 2Ops have uniform input/output types, so take a shortcut on name printing
@@ -358,28 +358,28 @@ public abstract class PrimNode extends Node {
     abstract long op( long x, long y );
   }
 
-  static class AddI64 extends Prim2OpI64 {
-    AddI64() { super("+"); }
+  public static class AddI64 extends Prim2OpI64 {
+    public AddI64() { super("+"); }
     @Override long op( long l, long r ) { return l+r; }
   }
 
-  static class SubI64 extends Prim2OpI64 {
-    SubI64() { super("-"); }
+  public static class SubI64 extends Prim2OpI64 {
+    public SubI64() { super("-"); }
     @Override long op( long l, long r ) { return l-r; }
   }
 
-  static class MulI64 extends Prim2OpI64 {
-    MulI64() { super("*"); }
+  public static class MulI64 extends Prim2OpI64 {
+    public MulI64() { super("*"); }
     @Override long op( long l, long r ) { return l*r; }
   }
 
-  static class DivI64 extends Prim2OpI64 {
-    DivI64() { super("/"); }
+  public static class DivI64 extends Prim2OpI64 {
+    public DivI64() { super("/"); }
     @Override long op( long l, long r ) { return l/r; } // Long division
   }
 
-  static class ModI64 extends Prim2OpI64 {
-    ModI64() { super("%"); }
+  public static class ModI64 extends Prim2OpI64 {
+    public ModI64() { super("%"); }
     @Override long op( long l, long r ) { return l%r; }
   }
 
@@ -408,8 +408,8 @@ public abstract class PrimNode extends Node {
     @Override long op( long l, long r ) { return l&r; }
   }
 
-  static class OrI64 extends Prim2OpI64 {
-    OrI64() { super("|"); }
+  public static class OrI64 extends Prim2OpI64 {
+    public OrI64() { super("|"); }
     // And can preserve bit-width
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type t1 = val(ARG_IDX), t2 = val(ARG_IDX+1);
@@ -440,12 +440,12 @@ public abstract class PrimNode extends Node {
     abstract boolean op( long x, long y );
   }
 
-  static class LT_I64 extends Prim2RelOpI64 { LT_I64() { super("<" ); } boolean op( long l, long r ) { return l< r; } }
-  static class LE_I64 extends Prim2RelOpI64 { LE_I64() { super("<="); } boolean op( long l, long r ) { return l<=r; } }
-  static class GT_I64 extends Prim2RelOpI64 { GT_I64() { super(">" ); } boolean op( long l, long r ) { return l> r; } }
-  static class GE_I64 extends Prim2RelOpI64 { GE_I64() { super(">="); } boolean op( long l, long r ) { return l>=r; } }
-  static class EQ_I64 extends Prim2RelOpI64 { EQ_I64() { super("=="); } boolean op( long l, long r ) { return l==r; } }
-  static class NE_I64 extends Prim2RelOpI64 { NE_I64() { super("!="); } boolean op( long l, long r ) { return l!=r; } }
+  public static class LT_I64 extends Prim2RelOpI64 { public LT_I64() { super("<" ); } boolean op( long l, long r ) { return l< r; } }
+  public static class LE_I64 extends Prim2RelOpI64 { public LE_I64() { super("<="); } boolean op( long l, long r ) { return l<=r; } }
+  public static class GT_I64 extends Prim2RelOpI64 { public GT_I64() { super(">" ); } boolean op( long l, long r ) { return l> r; } }
+  public static class GE_I64 extends Prim2RelOpI64 { public GE_I64() { super(">="); } boolean op( long l, long r ) { return l>=r; } }
+  public static class EQ_I64 extends Prim2RelOpI64 { public EQ_I64() { super("=="); } boolean op( long l, long r ) { return l==r; } }
+  public static class NE_I64 extends Prim2RelOpI64 { public NE_I64() { super("!="); } boolean op( long l, long r ) { return l!=r; } }
 
 
   static class EQ_OOP extends PrimNode {
@@ -506,9 +506,9 @@ public abstract class PrimNode extends Node {
   }
 
 
-  static class Not extends PrimNode {
+  public static class Not extends PrimNode {
     // Rare function which takes a Scalar (works for both ints and ptrs)
-    Not() { super("!",TypeStruct.SCALAR1,TypeInt.BOOL); }
+    public Not() { super("!",TypeStruct.SCALAR1,TypeInt.BOOL); }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type t = val(ARG_IDX);
       if( t== Type.XNIL ||

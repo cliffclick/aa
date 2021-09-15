@@ -8,7 +8,7 @@ import com.cliffc.aa.util.Ary;
 import static com.cliffc.aa.AA.*;
 
 // Allocates a TypeStr in memory.  Weirdly takes a string OBJECT (not pointer),
-// and produces the pointer.  Hence liveness is odd.
+// and produces the pointer.  Hence, liveness is odd.
 public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   public NewStrNode( TypeStr to, String name, boolean reads, int op_prec, TypeFld... args) {
     super(OP_NEWSTR,BitsAlias.STR,to,name,reads,op_prec,args);

@@ -215,11 +215,14 @@ public abstract class Node implements Cloneable {
     // Similar to unelock(), except do not put on any worklist
     if( _elock ) { _elock = false; Node x = VALS.remove(this); assert x == this; }
     while( _defs._len > 0 ) unuse(_defs.pop());
-    set_dead();                 // officially dead now
-    LIVE.clear(_uid);           // Off the LIVE set.  CNT cannot roll back unless the GVN worklists are also clear
+    _defs = _uses = null;       // TODO: Poor-man's indication of a dead node, probably needs to recycle these...
+    LIVE.clear(_uid);           // Off the LIVE set.  CNT cannot roll back unless the GVN work lists are also clear
+    if( this instanceof FunNode ) ((FunNode)this).free();
     return this;
   }
-  // Called when GVN worklists are empty
+  public boolean is_dead() { return _uses == null; }
+
+  // Called when GVN work lists are empty
   public static void roll_back_CNT() { while( !LIVE.get(CNT-1) ) CNT--; }
 
   // "keep" a Node during all optimizations because it is somehow unfinished.
@@ -239,6 +242,7 @@ public abstract class Node implements Cloneable {
   // Remove the keep flag, and immediately allow optimizations.
   public <N extends Node> N unhook() {
     if( _keep==1 ) Env.GVN.add_work_all(this);
+    if( _keep==1 && _uses.isEmpty() ) Env.GVN.add_dead(this);
     return unkeep();
   }
 
@@ -888,9 +892,6 @@ public abstract class Node implements Cloneable {
     for( Node def : _defs )  if( def != null )  def.walk_opt(visit);
     for( Node use : _uses )                     use.walk_opt(visit);
   }
-
-  public boolean is_dead() { return _uses == null; }
-  public void set_dead( ) { _defs = _uses = null; }   // TODO: Poor-mans indication of a dead node, probably needs to recycle these...
 
   // Overridden in subclasses that return TypeTuple value types.  Such nodes
   // are always followed by ProjNodes to break out the tuple slices.  If the

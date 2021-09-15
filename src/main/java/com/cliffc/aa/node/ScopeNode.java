@@ -103,7 +103,8 @@ public class ScopeNode extends Node {
     Node mem = mem();
     Node rez = rez();
     Type trez = rez==null ? null : rez._val;
-    if( Env.GVN._opt_mode != GVNGCM.Mode.Parse &&   // Past parsing
+    if( this!=Env.TOP._scope && // Not the top-level, which is always alive
+        Env.GVN._opt_mode != GVNGCM.Mode.Parse &&   // Past parsing
         rez != null &&          // Have a return result
         // If type(rez) can never lift to any TMP, then we will not return a
         // pointer, and do not need the memory state on exit.

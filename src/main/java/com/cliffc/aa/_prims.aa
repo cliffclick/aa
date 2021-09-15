@@ -4,11 +4,51 @@
 
 
 int =: $$com.cliffc.aa.type.TypeInt;
+flt =: $$com.cliffc.aa.type.TypeFlt;
 
-// Bin ops
-_&_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$AndI64(x,y) };
 
-// Uni ops
+// Convert to str
+str = { x:int -> $$com.cliffc.aa.node.NewStrNode$ConvertI64Str(x); };
+str = { x:flt -> $$com.cliffc.aa.node.NewStrNode$ConvertF64Str(x); };
+
+// Simple integer math
+_+_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$AddI64(x,y) };
+_-_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$SubI64(x,y) };
+_*_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$MulI64(x,y) };
+_/_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$DivI64(x,y) };
+_%_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$ModI64(x,y) };
+
+// Unary minus
 -_  = { x:int -> $$com.cliffc.aa.node.PrimNode$MinusI64(x) };
 
-0 // end of file
+// Logical
+_&_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$AndI64(x,y) };
+_|_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$OrI64 (x,y) };
+
+// Unary negate; takes a Scalar
+!_  = { x -> $$com.cliffc.aa.node.PrimNode$Not(x) };
+
+// Integer relations
+_<_  = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$LT_I64(x,y) };
+_<=_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$LE_I64(x,y) };
+_>_  = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$GT_I64(x,y) };
+_>=_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$GE_I64(x,y) };
+_==_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$EQ_I64(x,y) };
+_!=_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$NE_I64(x,y) };
+
+// Simple float math
+_+_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$AddF64(x,y) };
+_-_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$SubF64(x,y) };
+_*_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$MulF64(x,y) };
+_/_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$DivF64(x,y) };
+
+// Float relations
+_<_  = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$LT_F64(x,y) };
+_<=_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$LE_F64(x,y) };
+_>_  = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$GT_F64(x,y) };
+_>=_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$GE_F64(x,y) };
+_==_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$EQ_F64(x,y) };
+_!=_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$NE_F64(x,y) };
+
+
+// end of file

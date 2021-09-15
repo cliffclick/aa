@@ -222,12 +222,12 @@ public class LoadNode extends Node {
 
   // The only memory required here is what is needed to support the Load
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    TypeMem live = _live_use(opt_mode,def);
+    TypeMem live = _live_use(def);
     return def==adr()
       ? (live.above_center() ? TypeMem.DEAD : _live)
       : live;
   }
-  public TypeMem _live_use(GVNGCM.Mode opt_mode, Node def ) {
+  public TypeMem _live_use( Node def ) {
     Type tmem = mem()._val;
     Type tptr = adr()._val;
     if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?

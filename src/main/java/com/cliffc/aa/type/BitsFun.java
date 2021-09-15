@@ -41,6 +41,7 @@ public class BitsFun extends Bits<BitsFun> {
 
   // Make a NEW fidx, with the given parent, and return the Bits with just it
   static BitsFun make_new_fidx( int parent_fidx ) { return make0(new_fidx(parent_fidx)); }
+  public static void free(int fidx) { TREE.free(fidx); }
   public static BitsFun make0( int bit ) { return FULL.make(bit); }
   public static BitsFun make0( int... bits ) { return FULL.make(bits); }
   public static int peek() { return TREE.peek(); }

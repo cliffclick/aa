@@ -99,11 +99,15 @@ public class FunNode extends RegionNode {
 
   // Find FunNodes by fidx
   private static int FLEN;
-  public static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});  
+  public static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
   public static void init0() { FLEN = FUNS.len(); }
   public static void reset_to_init0() { FUNS.set_len(FLEN); _must_inline=0; }
   public static FunNode find_fidx( int fidx ) { return FUNS.atX(fidx); }
   int fidx() { return _fidx; }
+  public void free() {
+    FUNS.clear(_fidx);
+    BitsFun.free(_fidx);
+  }
 
   // Short self name
   @Override public String xstr() { return name(); }
@@ -223,13 +227,16 @@ public class FunNode extends RegionNode {
     // Update _sig if parms are unused.  SIG falls during Iter and lifts during
     // GCP.  If parm is missing or not-live, then the corresponding SIG
     // argument can be ALL (all args allowed, including errors).
-    if( !is_forward_ref() && !is_prim() && _keep==0 ) {
+    if( !is_forward_ref()  && _keep==0 ) {
       Node[] parms = parms();
       TypeFunSig progress = _sig;
       for( TypeFld fld : _sig._formals.flds() )
-        if( fld._t!=Type.ALL &&
-            (parms[fld._order]==null || parms[fld._order]._live==TypeMem.DEAD) )
-          _sig = _sig.make_from_arg(fld.make_from(Type.ALL));
+        if( parms[fld._order]==null || parms[fld._order]._live==TypeMem.DEAD ) {
+          if( fld.is_display_ptr() ) // Dead display can be removed
+            _sig = _sig.make_from_remove("^"); 
+          else if( fld._t!=Type.ALL ) // Other dead args need to keep knowledge they ever existed
+            _sig = _sig.make_from_arg(fld.make_from(Type.ALL));
+        }
       if( ret!=null && ret._val!=_sig._ret && ret._val instanceof TypeTuple )
         _sig = _sig.make_from_ret((TypeTuple)ret._val);
       // Can resolve some least_cost choices
@@ -304,7 +311,7 @@ public class FunNode extends RegionNode {
 
     // --------------
     // Split the callers according to the new 'fun'.
-    FunNode fun = make_new_fun(ret, formals);
+    FunNode fun = make_new_fun(ret, formals, path);
     split_callers(ret,fun,body,path);
     assert Env.START.more_flow(Env.GVN._work_flow,true)==0; // Initial conditions are correct
     return this;
@@ -626,28 +633,32 @@ public class FunNode extends RegionNode {
     return m;                   // Return path to split on
   }
 
-  private FunNode make_new_fun(RetNode ret, TypeStruct new_formals) {
+  private FunNode make_new_fun(RetNode ret, TypeStruct new_formals, int path) {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
     FunNode fun = new FunNode(_name,TypeFunSig.make(new_formals,_sig._ret),_op_prec,_thunk_rhs,BitsFun.new_fidx(oldfidx));
     fun._bal_close = _bal_close;
     fun.pop();                  // Remove null added by RegionNode, will be added later
     fun.unkeep();               // Ret will clone and not construct
-    // Renumber the original as well; the original _fidx is now a *class* of 2
-    // fidxs.  Each FunNode fidx is only ever a constant, so the original Fun
-    // becomes the other child fidx.
-    int newfidx = _fidx = BitsFun.new_fidx(oldfidx);
-    FUNS.setX(newfidx,this);    // Track FunNode by fidx
-    FUNS.clear(oldfidx);        // Old fidx no longer refers to a single FunNode
-    ret.set_fidx(newfidx);      // Renumber in the old RetNode
-    // Right now, force the type upgrade on old_fptr.  old_fptr carries the old
-    // parent FIDX and is on the worklist.  Eventually, it comes off and the
-    // value() call lifts to the child fidx.  Meanwhile its value can be used
-    // to wire a size-split to itself (e.g. fib()), which defeats the purpose
-    // of a size-split (single caller only, so inlines).
-    for( Node old_fptr : ret._uses )
-      if( old_fptr instanceof FunPtrNode ) // Can be many old funptrs with different displays
-        old_fptr.xval();                   // Upgrade FIDX
+
+    // If type-splitting renumber the original as well; the original _fidx is
+    // now a *class* of 2 fidxs.  Each FunNode fidx is only ever a constant, so
+    // the original Fun becomes the other child fidx.  If size-splitting there
+    // are no callers of the new fidx other than the call site.
+    if( path == -1 ) {
+      int newfidx = _fidx = BitsFun.new_fidx(oldfidx);
+      FUNS.setX(newfidx,this);    // Track FunNode by fidx
+      FUNS.clear(oldfidx);        // Old fidx no longer refers to a single FunNode
+      ret.set_fidx(newfidx);      // Renumber in the old RetNode
+      // Right now, force the type upgrade on old_fptr.  old_fptr carries the old
+      // parent FIDX and is on the worklist.  Eventually, it comes off and the
+      // value() call lifts to the child fidx.  Meanwhile its value can be used
+      // to wire a size-split to itself (e.g. fib()), which defeats the purpose
+      // of a size-split (single caller only, so inlines).
+      for( Node old_fptr : ret._uses )
+        if( old_fptr instanceof FunPtrNode ) // Can be many old funptrs with different displays
+          old_fptr.xval();                   // Upgrade FIDX
+    }
     Env.GVN.add_flow(ret);
     Env.GVN.add_flow(this);
     Env.GVN.add_flow_uses(this);
@@ -872,7 +883,7 @@ public class FunNode extends RegionNode {
     GVNGCM.retype_mem(aliases,fun .parm(MEM_IDX), newret, true);
 
     // Unhook the hooked FunPtrs
-    for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) use.unkeep();
+    for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) use.unhook();
   }
 
   // Compute value from inputs.  Simple meet over inputs.

@@ -192,7 +192,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     @Override public FunPtrNode clazz_node( ) {
       try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
         assert in(0)==null && _uses._len==0;
-        // Extra '$' in name copies the op_prec one inlining level from clazz_node into the _prim.aa
         FunNode  fun = ( FunNode) X.xform(new  FunNode(_name,this).add_def(Env.ALL_CTRL));
         ParmNode rpc = (ParmNode) X.xform(new ParmNode(0,"rpc",fun,Env.ALL_CALL,null));
         Node memp= X.xform(new ParmNode(TypeMem.MEM,null,fun,MEM_IDX," mem").add_def(Env.DEFMEM));
@@ -209,7 +208,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
         Node mem = Env.DEFMEM.make_mem_proj(nnn,memp);
         Node ptr = X.xform(new ProjNode(nnn,REZ_IDX));
         RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,ptr,rpc,fun));
-        Env.SCP_0.add_def(ret);
         return (X._ret = new FunPtrNode(_name,ret));
       }
     }

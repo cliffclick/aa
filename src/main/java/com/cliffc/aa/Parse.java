@@ -291,12 +291,12 @@ public class Parse implements Comparable<Parse> {
     for( int i=0; i<toks._len; i++ ) {
       String tok = toks.at(i);               // Token being assigned
       Access mutable = rs.get(i) ? Access.RW : Access.Final;  // Assignment is mutable or final
+      if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
+        ((FunPtrNode)ifex).bind(tok); // Debug only: give name to function
       // Find scope for token.  If not defining struct fields, look for any
       // prior def.  If defining a struct, tokens define a new field in this scope.
       ScopeNode scope = lookup_scope(tok,lookup_current_scope_only);
       if( scope==null ) {                    // Token not already bound at any scope
-        if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
-          ((FunPtrNode)ifex).bind(tok); // Debug only: give name to function
         create(tok,con(Type.XNIL),Access.RW);  // Create at top of scope as undefined
         scope = scope();                // Scope is the current one
         scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
@@ -310,7 +310,6 @@ public class Parse implements Comparable<Parse> {
         else ; // Can be here if already in-error
 
       } else { // Store into scope/NewObjNode/display
-
         // Assign into display, changing an existing def
         Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
         StoreNode st = new StoreNode(mem(),ptr,ifex,mutable,tok,badfs.at(i));

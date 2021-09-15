@@ -503,7 +503,7 @@ public final class CallEpiNode extends Node {
     if( !tfun.is_fun() ) {
       if( work==null ) return true;
       NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
-      for( int i=DSP_IDX; i<call._defs._len-1; i++ )
+      for( int i=DSP_IDX; i<call._defs._len; i++ )
         args.put((""+i).intern(),call.tvar(i));
       args.put(" ret",tvar());
       TV2 nfun = TV2.make_fun(this, fdx._val, args, "CallEpi_unify");
@@ -517,7 +517,7 @@ public final class CallEpiNode extends Node {
       throw unimpl();
 
     // Check for progress amongst args
-    for( int i=DSP_IDX; i<call._defs._len-1; i++ ) {
+    for( int i=DSP_IDX; i<call._defs._len; i++ ) {
       TV2 actual = call.tvar(i);
       TV2 formal = tfun.get((""+i).intern());
       progress |= actual.unify(formal,work);

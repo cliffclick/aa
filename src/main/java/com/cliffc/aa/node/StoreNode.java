@@ -9,6 +9,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMap;
 import com.cliffc.aa.util.Util;
 
+import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
@@ -51,14 +52,18 @@ public class StoreNode extends Node {
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
         !rez().is_forward_ref() &&
         mem._uses._len==2 && // Use is by DefMem and self
-        (tfld=nnn._ts.fld_find(_fld))!= null && tfld._access==Access.RW ) {
-      // Update the value, and perhaps the final field
-      nnn.update(_fld,_fin,rez());
-      mem.xval();
-      Env.DEFMEM.xval();
-      Env.GVN.add_flow_uses(this);
-      add_reduce_extra();       // Folding in allows store followers to fold in
-      return mem;               // Store is replaced by using the New directly.
+        (tfld=nnn._ts.fld_find(_fld))!= null ) {
+      // Have to be allowed to directly update NewObjNode
+      if( tfld._access==Access.RW || rez() instanceof FunPtrNode ) {
+        // Field is modifiable; update New directly.
+        if( tfld._access==Access.RW ) nnn.update(_fld,_fin,rez()); // Update the value, and perhaps the final field
+        else                          nnn.add_fun(_bad,_fld,(FunPtrNode)rez()); // Stacked FunPtrs into an Unresolved
+        mem.xval();             // Update memory state
+        Env.DEFMEM.xval();      // Update default memory state
+        Env.GVN.add_flow_uses(this);
+        add_reduce_extra();     // Folding in allows store followers to fold in
+        return mem;             // Store is replaced by using the New directly.
+      }
     }
 
     // If Store is of a MemJoin and it can enter the split region, do so.
@@ -139,7 +144,7 @@ public class StoreNode extends Node {
     if( def==mem() ) return _live; // Pass full liveness along
     if( def==adr() ) return TypeMem.ALIVE; // Basic aliveness
     if( def==rez() ) return TypeMem.ESCAPE;// Value escapes
-    throw com.cliffc.aa.AA.unimpl();       // Should not reach here
+    throw unimpl();       // Should not reach here
   }
 
   @Override public ErrMsg err( boolean fast ) {
@@ -195,11 +200,11 @@ public class StoreNode extends Node {
     // Check for nil address
     if( ptr.is_nil() || (tptr instanceof TypeMemPtr && tptr.must_nil()) )
       return work==null || st.tvar().unify(TV2.make_err(st,"May be nil when accessing field "+id,"Store_update"),work);
-    
+
     // Store value is always the stored value
     boolean progress = st.tvar().unify(val.tvar(),work);
     ptr.push_dep(st);
-    
+
     // Matching fields unify
     TV2 fld = ptr.get(id);
     if( fld!=null )             // Unify against pre-existing field
@@ -207,7 +212,7 @@ public class StoreNode extends Node {
 
     // The remaining cases all make progress and return true
     if( work==null ) return true;
-    
+
     // Add field if open
     if( ptr.is_struct() && ptr.open() ) // Effectively unify with an extended struct.
       return ptr.add_fld(id,st.tvar(),work);

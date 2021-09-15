@@ -42,7 +42,7 @@ import static com.cliffc.aa.AA.*;
  *
  * See HM.java for the prototype this is based from.
  *
- * 
+ *
  * Mapping from a classic lambda-calculus AST to Sea-of-Nodes
  *
  * - Ids: HM identifiers are SSA edges in the Sea-of-Nodes.  A 'FreshNode' is
@@ -517,7 +517,6 @@ public class TV2 {
 
     // Check for mismatched, cannot unify
     if( !Util.eq(_name,that._name) ) {
-      if( work==null ) return true;
       TV2 err = make_err(null,"Cannot unify "+this+" and "+that,"unify_fail");
       return union(err,work) & that.union(err,work);
     }
@@ -840,7 +839,7 @@ public class TV2 {
   }
 
   // --------------------------------------------
-  // Recursively build a conservative flow type from an HM type.  
+  // Recursively build a conservative flow type from an HM type.
 
   // No function arguments, just function returns.
   static final NonBlockingHashMapLong<TypeStruct> ADUPS = new NonBlockingHashMapLong<>();
@@ -881,7 +880,7 @@ public class TV2 {
       // is built around TypeStruct.
       return ((TypeMemPtr)_type).make_from(tstr);
     }
-    
+
     throw unimpl();
   }
 

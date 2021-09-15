@@ -1,9 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
-import com.cliffc.aa.ErrMsg;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
@@ -274,33 +271,13 @@ public class CallNode extends Node {
       FunPtrNode fptr = least_cost(fidxs, fdx); // Check for least-cost target
       if( fptr != null ) {
         if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
-        //if( fptr.display()._val.isa(dsp()._val) )
-        //  set_dsp(fptr.display());
-        //set_fdx(fptr);          // Resolve to 1 choice
-        //xval();                 // Force value update; least-cost LOWERS types (by removing a choice)
-        //add_work_use_extra(Env.GVN._work_flow,fptr);
-        //if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
-        //return this;
-        throw unimpl();
+        set_fdx(fptr);          // Resolve to 1 choice
+        xval();                 // Force value update; least-cost LOWERS types (by removing a choice)
+        add_work_use_extra(Env.GVN._work_flow,fptr);
+        if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
+        return this;
       }
     }
-
-    // See if the display is always dead; common for Unresolved of primitives.
-    UnresolvedNode unk;
-    if( fdx instanceof UnOrFunPtrNode && (unk=((UnOrFunPtrNode)fdx).unk())!=null ) {
-      //if( !(dsp() instanceof ConNode && dsp()._val==Type.ANY) ) {
-      //boolean dsp_nil=true;
-      //for( Node fptr : unk._defs )
-      //  if( !(fptr instanceof FunPtrNode) || ((FunPtrNode)fptr).display()._val!=TypeMemPtr.NO_DISP )
-      //    { dsp_nil=false; break; }
-      //if( dsp_nil ) {           // Display is unused by any Unresolved
-      //  set_dsp(Env.ANY);
-      //  return this;
-      //}
-      //}
-      throw unimpl();
-    }
-
 
     // Wire valid targets.
     if( cepi!=null && cepi.check_and_wire(Env.GVN._work_flow) )
@@ -562,11 +539,10 @@ public class CallNode extends Node {
            (err(true)==null &&  // Not in-error
             // And fully wired (no new users will wire)
             (opt_mode==GVNGCM.Mode.Opto || all_fcns_wired()) ) ) {
-      //  int argn = _defs.find(def);
-      //  ProjNode proj = ProjNode.proj(this, argn);
-      //  if( proj == null || proj._live == TypeMem.DEAD )
-      //    return TypeMem.DEAD; // Arg not used
-        throw unimpl();
+        int argn = _defs.find(def);
+        ProjNode proj = ProjNode.proj(this, argn);
+        if( proj == null || proj._live == TypeMem.DEAD )
+          return TypeMem.DEAD; // Arg not used
       }
       if( def instanceof ThretNode ) return TypeMem.ALLMEM;
       assert def.all_live().basic_live();
@@ -641,8 +617,10 @@ public class CallNode extends Node {
         TypeStruct formals = fun._sig._formals; // Type of each argument
         int cvts=0;                             // Arg conversion cost
         for( TypeFld fld : formals.flds() ) {
-          Type actual = arg(fld._order)._val;
           Type formal = fld._t;
+          Type actual = arg(fld._order)._val;
+          if( fld.is_display_ptr() && actual instanceof TypeFunPtr )
+            actual = ((TypeFunPtr)actual)._disp;
           if( actual==formal ) continue;
           if( fld._order <= MEM_IDX ) continue; // isBitShape not defined on memory
           if( Type.ALL==formal ) continue; // Allows even error arguments

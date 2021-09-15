@@ -1132,6 +1132,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   // Replace an existing field in the current struct.
   public TypeStruct replace_fld( TypeFld fld ) { return copy().set_fld(fld).hashcons_free(); }
+  public TypeStruct del_fld( String name ) {
+    TypeStruct ts = copy();
+    ts._flds.remove(name);
+    return ts.hashcons_free();
+  }
 
   // Update (approximately) the current TypeObj.  Updates the named field.
   @Override public TypeStruct update(Access fin, String fld, Type val) { return update(fin,fld,val,false); }

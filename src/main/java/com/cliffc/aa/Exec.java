@@ -34,15 +34,14 @@ public abstract class Exec {
     Env.GVN.add_flow_uses(e._scope);// Post-parse, revisit top-level called functions
     e.close();                // No more fields added to the parse scope
 
-    if( err==null ) {
-      // Type
-      Env.GVN.iter(GVNGCM.Mode.PesiNoCG); // Pessimistic optimizations; might improve error situation
-      Combo.opto();                    // Global Constant Propagation and Hindley-Milner Typing
-      Env.GVN.iter(GVNGCM.Mode.PesiCG);// Re-check all ideal calls now that types have been maximally lifted
-      Combo.opto();                    // Global Constant Propagation and Hindley-Milner Typing
-      Env.GVN.iter(GVNGCM.Mode.PesiCG);// Re-check all ideal calls now that types have been maximally lifted
-      //assert Type.intern_check();
-    }
+    // Type
+    Env.GVN.iter(GVNGCM.Mode.PesiNoCG); // Pessimistic optimizations; might improve error situation
+    Combo.opto();                    // Global Constant Propagation and Hindley-Milner Typing
+    Env.GVN.iter(GVNGCM.Mode.PesiCG);// Re-check all ideal calls now that types have been maximally lifted
+    Combo.opto();                    // Global Constant Propagation and Hindley-Milner Typing
+    Env.GVN.iter(GVNGCM.Mode.PesiCG);// Re-check all ideal calls now that types have been maximally lifted
+    //assert Type.intern_check();
+    
     return e.gather_errors(err);
   }
 
