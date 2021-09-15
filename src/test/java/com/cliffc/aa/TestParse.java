@@ -20,7 +20,6 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    test("-1",  TypeInt.con( -1));
     test("noinline_inc={x -> x&1}; noinline_p={x -> noinline_inc(x)*2}; noinline_p",
       (()->TypeFunPtr.GENERIC_FUNPTR),null,"{ int -> int }" );
     //test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
@@ -895,7 +894,7 @@ HashTable = {@{
 
 
   static private TypeEnv run( String program ) {
-    TypeEnv te = Env.exec_go("test",program);
+    TypeEnv te = Exec.file("test",program);
     if( te._errs != null ) System.err.println(te._errs.toString());
     assertNull(te._errs);
     return te;

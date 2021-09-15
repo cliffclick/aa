@@ -9,7 +9,6 @@ import com.cliffc.aa.util.Util;
 import org.junit.Test;
 
 import java.util.Arrays;
-import java.util.HashMap;
 
 import static com.cliffc.aa.type.TypeFld.Access;
 import static org.junit.Assert.assertEquals;
@@ -159,7 +158,6 @@ public class TestNode {
   public static void main( String[] args ) { new TestNode().testMonotonic();  }
   @SuppressWarnings("unchecked")
   @Test public void testMonotonic() {
-    Env top = new Env();
     //Env.file_scope(top);
     assert _errs == 0;          // Start with no errors
 
@@ -205,7 +203,7 @@ public class TestNode {
     FunNode fun_forward_ref = new FunNode("some_fcn");
     Env.DEFMEM._val = TypeMem.MEM;
 
-    Node unr = top.lookup("+"); // All the "+" functions
+    Node unr = Env.TOP.lookup("+"); // All the "+" functions
     FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
     RetNode ret = fun_plus.ret();
     CallNode call = new CallNode(false,null,_ins[0],unr,mem);

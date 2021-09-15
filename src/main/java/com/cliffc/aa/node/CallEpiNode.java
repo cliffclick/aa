@@ -58,7 +58,7 @@ public final class CallEpiNode extends Node {
           assert !BitsFun.is_parent(ret.fidx());
           // Remove the edge.  Pre-GCP all CG edges are virtual, and are lazily
           // and pessimistically filled in by ideal calls.  During the course
-          // of lifting types some of the manifested CG edges are killed.
+          // of lifting types, some manifested CG edges are killed.
           // Post-GCP all CG edges are manifest, but types can keep lifting
           // and so CG edges can still be killed.
           unwire(call,ret);
@@ -89,6 +89,10 @@ public final class CallEpiNode extends Node {
           !fun.noinline() ) {           // And not turned off
         assert fun.in(1).in(0)==call;   // Just called by us
         fun.set_is_copy();              // Collapse the FunNode into the Call
+        if( fun._name.charAt(0)=='$' )  // Inlining a primitive into a wrapper from _prims.aa
+          // Copy the op_prec up 1 layer
+          // TODO: Make an official user-mode operator syntax, and put it in _prims.aa
+          ((FunNode)call.ctl())._op_prec = fun._op_prec;
         return set_is_copy(ret.ctl(), ret.mem(), ret.rez()); // Collapse the CallEpi into the Ret
       }
     }
@@ -143,7 +147,7 @@ public final class CallEpiNode extends Node {
     // Check that function return memory and post-call memory are compatible
     if( !(_val instanceof TypeTuple) ) return null;
     Type selfmem = ((TypeTuple) _val).at(MEM_IDX);
-    if( !rmem._val.isa( selfmem ) && !(selfmem==TypeMem.ANYMEM && call.is_pure_call()!=null) )
+    if( !rmem._val.isa( selfmem ) && call.is_pure_call()==null )
       return null;
 
     // Check for zero-op body (id function)
@@ -184,6 +188,7 @@ public final class CallEpiNode extends Node {
     Type tcall = call._val;
     if( !(tcall instanceof TypeTuple) ) return false;
     BitsFun fidxs = CallNode.ttfp(tcall)._fidxs;
+    assert fidxs!=BitsFun.FULL;
     if( fidxs.above_center() )  return false; // Still choices to be made during GCP.
 
     // Check all fidxs for being wirable
@@ -507,7 +512,7 @@ public final class CallEpiNode extends Node {
     }
     // TODO: Handle Thunks
 
-    if( tfun.len()-1-1 != call._defs._len-1-ARG_IDX ) //
+    if( tfun.len()-1-1 != call.nargs()-ARG_IDX ) //
       //progress = T2.make_err("Mismatched argument lengths").unify(find(), work);
       throw unimpl();
 

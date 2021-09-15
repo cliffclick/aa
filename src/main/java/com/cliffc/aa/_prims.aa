@@ -1,0 +1,14 @@
+// aa source to define the primitives.  Unlike normal aa, this code allows
+// $$JavaClassName; the Java class function "clazz_node" returns a Node.
+// Typically used in the call position, with a FunPtrNode returned.
+
+
+int =: $$com.cliffc.aa.type.TypeInt;
+
+// Bin ops
+_&_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$AndI64(x,y) };
+
+// Uni ops
+-_  = { x:int -> $$com.cliffc.aa.node.PrimNode$MinusI64(x) };
+
+0 // end of file

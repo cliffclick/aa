@@ -24,9 +24,9 @@ public abstract class PrimNode extends Node {
   Parse[] _badargs;             // Filled in when inlined in CallNode
   byte _op_prec;                // Operator precedence, computed from table.  Generally 1-9.
   public boolean _thunk_rhs;    // Thunk (delay) right-hand-argument.
-  PrimNode( String name, TypeStruct formals, Type ret ) {
+  public PrimNode( String name, TypeStruct formals, Type ret ) {
     super(OP_PRIM);
-    _name=name;
+    _name = name;
     assert formals.fld_find("^")==null; // No display
     _sig=TypeFunSig.make(formals,TypeTuple.make_ret(ret));
     _badargs=null;
@@ -34,20 +34,10 @@ public abstract class PrimNode extends Node {
     _thunk_rhs=false;
   }
 
-  // aa source to define the primitives.  Unlike normal aa, this code allows
-  // $$JavaClassName; the Java class static function "funptr" returns a
-  // FunPtrNode.  Typically used in the call position.
-  public static final String PRIM_SOURCE =
-    
-    "_&_ = { x y -> $$AndI64(x,y) };" +
-
-    "";
-  
   private static PrimNode[] PRIMS = null; // All primitives
   public static PrimNode[][] PRECEDENCE = null;  // Just the binary operators, grouped by precedence
   public static String  [][] PREC_TOKS  = null;  // Just the binary op tokens, grouped by precedence
   public static String  []   PRIM_TOKS  = null;  // Primitive tokens, longer first for greedy token search
-  public static void reset() { PRIMS=null; }
 
   public static PrimNode[] PRIMS() {
     if( PRIMS!=null ) return PRIMS;
@@ -88,7 +78,7 @@ public abstract class PrimNode extends Node {
       new MemPrimNode.ReadPrimNode.LValueWriteFinal(), // Final Write an L-Value: (ary,idx,elem) ==> elem
     };
 
-    // These are unary ops, precedence determined outside of 'Parse.expr'
+    // These are unary ops, precedence determined outside 'Parse.expr'
     PrimNode[] uniops = new PrimNode[] {
       new MemPrimNode.ReadPrimNode.LValueLength(), // The other array ops are "balanced ops" and use term() for precedence
       new MinusF64(),
@@ -207,18 +197,28 @@ public abstract class PrimNode extends Node {
   // Called during basic Env creation and making of type constructors, this
   // wraps a PrimNode as a full 1st-class function to be passed about or
   // assigned to variables.
-  public FunPtrNode as_fun( GVNGCM gvn ) {
-    try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
-      assert _defs._len==0 && _uses._len==0;
-      FunNode fun = (FunNode) X.xform(new FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
-      Node rpc = X.xform(new ParmNode(0,"rpc",fun,Env.ALL_CALL,null));
-      add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
-      Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+  @Override public FunPtrNode clazz_node( ) {
+    // Find the same clazz node with op_prec set
+    PrimNode that=null;
+    for( PrimNode p : PRIMS() )
+      if( p.getClass() == getClass() )
+        { that=p; break; }
+    assert that != null;
+    kill(); // Kill self, use one from primitive table that has op_prec set
+
+    try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
+      assert that._defs._len==0 && that._uses._len==0;
+      // Extra '$' in name copies the op_prec one inlining level from clazz_node into the _prim.aa
+      FunNode fun = new FunNode(("$"+_name).intern(),that); // No callers (yet)
+      fun._val = Type.CTRL;
+      Node rpc = X.xform(new ParmNode(TypeRPC.ALL_CALL,null,fun,0,"rpc"));
+      that.add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
+      Node mem = X.xform(new ParmNode(TypeMem.MEM,null,fun,MEM_IDX," mem"));
       if( _thunk_rhs ) add_def(mem);      // Memory if thunking
-      while( len() < _sig.nargs() ) add_def(null);
+      while( that.len() < _sig.nargs() ) that.add_def(null);
       for( TypeFld fld : _sig._formals.flds() )
-        set_def(fld._order,X.xform(new ParmNode(fld._order,fld._fld,fun, Env.ALL,null)));
-      Node that = X.xform(this);
+        that.set_def(fld._order,X.xform(new ParmNode(fld._t,null,fun,fld._order,fld._fld)));
+      that = (PrimNode)X.xform(that);
       Node ctl,rez;
       if( _thunk_rhs ) {
         ctl = X.xform(new CProjNode(that));
@@ -235,7 +235,7 @@ public abstract class PrimNode extends Node {
       RetNode ret = (RetNode)X.xform(new RetNode(ctl,mem,rez,rpc,fun));
       Env.SCP_0.add_def(ret);
       // No closures are added to primitives
-      return (X._ret = new FunPtrNode(_name,ret));
+      return (X._ret = (FunPtrNode)X.xform(new FunPtrNode(_name,ret)));
     }
   }
 
@@ -304,8 +304,8 @@ public abstract class PrimNode extends Node {
     abstract long op( long d );
   }
 
-  static class MinusI64 extends Prim1OpI64 {
-    MinusI64() { super("-"); }
+  public static class MinusI64 extends Prim1OpI64 {
+    public MinusI64() { super("-"); }
     @Override long op( long x ) { return -x; }
   }
 
@@ -383,8 +383,8 @@ public abstract class PrimNode extends Node {
     @Override long op( long l, long r ) { return l%r; }
   }
 
-  static class AndI64 extends Prim2OpI64 {
-    AndI64() { super("&"); }
+  public static class AndI64 extends Prim2OpI64 {
+    public AndI64() { super("&"); }
     // And can preserve bit-width
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type t1 = val(ARG_IDX), t2 = val(ARG_IDX+1);

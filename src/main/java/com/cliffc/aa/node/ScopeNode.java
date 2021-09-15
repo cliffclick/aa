@@ -35,14 +35,6 @@ public class ScopeNode extends Node {
     keep();
   }
 
-  //// Add base types on startup
-  //public void init() {
-  //  HashMap<String,Type> ts = new HashMap<>();
-  //  Type.init0(ts);
-  //  for( String tname : ts.keySet() )
-  //    _types.put(tname,Env.GVN.init(new ConTypeNode(tname,ts.get(tname),Env.SCP_0)));
-  //}
-
   public   Node  ctrl() { return in(0); }
   public   Node  mem () { return in(MEM_IDX); }
   public   Node  ptr () { return in(2); }
@@ -200,7 +192,7 @@ public class ScopeNode extends Node {
     if( def == ctrl() ) return TypeMem.ALIVE;
     if( def == rez () ) return def.all_live().basic_live() ? TypeMem.LIVE_BOT : TypeMem.ANYMEM;
     // Returned display is dead in a whole program.
-    // In a partial-program, whats in the display is exported to the next step.
+    // In a partial-program, what's in the display is exported to the next step.
     if( def == ptr () ) return opt_mode._CG ? TypeMem.DEAD : TypeMem.LIVE_BOT; // Returned display is dead after CG
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.

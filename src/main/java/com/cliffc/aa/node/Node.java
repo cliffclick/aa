@@ -74,8 +74,9 @@ public abstract class Node implements Cloneable {
   // state left alive.  NOT called after a line in the REPL or a user-call to
   // "eval" as user state carries on.
   public static void reset_to_init0() {
-    CNT = 0;
+    CNT = _INIT0_CNT;
     LIVE.clear();
+    LIVE.set(0,CNT);
     VALS.clear();
   }
 
@@ -756,15 +757,16 @@ public abstract class Node implements Cloneable {
   }
 
   // Forward reachable walk, setting types to ANY and making all dead.
-  public final void walk_initype( Work work ) {
+  public final void walk_initype( Work work, boolean hi ) {
     if( work.on(this) ) return;    // Been there, done that
     work.add(this);                // On worklist and mark visited
-    _val = Type.ANY;               // Highest value
-    _live = TypeMem.DEAD;          // Not alive
+    _val = hi ? Type.ANY : Type.ALL; // Highest value
+    _live = hi ? TypeMem.DEAD : all_live(); // Not alive
+    if( !hi ) _elock = false;               // Clear elock if reset_to_init0
     if( this instanceof CallNode ) ((CallNode)this)._not_resolved_by_gcp = false; // Try again
     // Walk reachable graph
-    for( Node use : _uses )                   use.walk_initype(work);
-    for( Node def : _defs ) if( def != null ) def.walk_initype(work);
+    for( Node use : _uses )                   use.walk_initype(work,hi);
+    for( Node def : _defs ) if( def != null ) def.walk_initype(work,hi);
   }
 
   // At least as alive
@@ -927,6 +929,9 @@ public abstract class Node implements Cloneable {
   // Aliases that a MemJoin might choose between.  Not valid for nodes which do
   // not manipulate memory.
   BitsAlias escapees() { throw unimpl("graph error"); }
+
+  // Return a node for a java Class.  Used by the primitives.
+  public Node clazz_node() { throw unimpl(); }
 
   // Walk a subset of the dominator tree, looking for the last place (highest
   // in tree) this predicate passes, or null if it never does.

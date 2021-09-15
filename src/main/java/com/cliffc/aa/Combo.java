@@ -103,7 +103,7 @@ public abstract class Combo {
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
-    Env.START.walk_initype(work);
+    Env.START.walk_initype(work,true);
     assert Env.START.more_flow(work,false)==0; // Initial conditions are correct
 
     // Repeat; if we have any escaping calls, assume they are called with the

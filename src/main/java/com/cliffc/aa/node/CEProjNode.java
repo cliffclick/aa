@@ -44,7 +44,7 @@ public class CEProjNode extends CProjNode {
 
     // Argument count mismatch
     TypeStruct formals = fun._sig._formals;
-    if( ttcall.len()-2/*minus fun, minus esc*/ != fun._sig.nargs() ) return false;
+    if( ttcall.len()-1/*minus esc*/ != fun._sig.nargs() ) return false;
 
     // Cannot use the obvious argument check "actual.isa(formal)"!!!!!
 

@@ -19,7 +19,6 @@ public class TestNodeSmall {
 
   @Ignore
   @Test public void testUnresolvedAdd() {
-    Env top = new Env();
     GVNGCM gvn = Env.GVN;
 
     // Current theory on Unresolved:  Call.resolve moves closer to the centerline:
@@ -43,7 +42,7 @@ public class TestNodeSmall {
     // Kinda sorta looks like: use startype on incoming, and JOIN.
 
     gvn._opt_mode=GVNGCM.Mode.Parse;
-    UnresolvedNode uadd = (UnresolvedNode)top.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
+    UnresolvedNode uadd = (UnresolvedNode)Env.TOP.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
     FunPtrNode aflt = (FunPtrNode)uadd.in(0);
     FunPtrNode aint = (FunPtrNode)uadd.in(1);
     FunPtrNode astr = (FunPtrNode)uadd.in(2);
@@ -247,17 +246,16 @@ public class TestNodeSmall {
   @SuppressWarnings("unchecked")
   @Ignore
   @Test public void testCallNodeResolve() {
-    Env top = new Env();
     GVNGCM gvn = Env.GVN;
 
     // Make a Unknown/CallNode/CallEpi combo.
     // Unwired.  Validate the resolve process and monotonicity.
     gvn._opt_mode=GVNGCM.Mode.Parse;
     ConNode ctrl = (ConNode) gvn.xform(new ConNode<>(Type.CTRL));
-    UnresolvedNode fp_mul = (UnresolvedNode)top.lookup("*"); // {int int -> int} and {flt flt -> flt}
+    UnresolvedNode fp_mul = (UnresolvedNode)Env.TOP.lookup("*"); // {int int -> int} and {flt flt -> flt}
     FunPtrNode mflt = (FunPtrNode)fp_mul.in(0);
     FunPtrNode mint = (FunPtrNode)fp_mul.in(1);
-    UnresolvedNode fp_add = (UnresolvedNode)top.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
+    UnresolvedNode fp_add = (UnresolvedNode)Env.TOP.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
     FunPtrNode aflt = (FunPtrNode)fp_add.in(0);
     FunPtrNode aint = (FunPtrNode)fp_add.in(1);
     FunPtrNode astr = (FunPtrNode)fp_add.in(2);
@@ -400,11 +398,10 @@ public class TestNodeSmall {
   }
 
   @Test public void testCallNodeResolve2() {
-    Env top = new Env();
     GVNGCM gvn = Env.GVN;
     gvn._opt_mode=GVNGCM.Mode.Parse;
 
-    UnresolvedNode fp_add = (UnresolvedNode)top.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
+    UnresolvedNode fp_add = (UnresolvedNode)Env.TOP.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
     FunPtrNode aflt = (FunPtrNode)fp_add.in(0);
     FunPtrNode aint = (FunPtrNode)fp_add.in(1);
     FunPtrNode astr = (FunPtrNode)fp_add.in(2);

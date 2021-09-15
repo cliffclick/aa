@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
@@ -954,6 +955,8 @@ public class Type<T extends Type<T>> implements Cloneable {
 
   // Make from existing type, replacing TMPs with alias from the map
   public Type make_from(Type head, TypeMem map, VBitSet visit) { return this; }
+
+  public Type clazz_type() { throw AA.unimpl(); }
 
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

@@ -87,6 +87,7 @@ public class GVNGCM {
     _work_dom.clear();
     _opt_mode = Mode.Parse;
     ITER_CNT = ITER_CNT_NOOP = 0;
+    Env.START.walk_initype(_work_flow,false);
   }
 
   // Record a Node, but do not optimize it for value and ideal calls, as it is

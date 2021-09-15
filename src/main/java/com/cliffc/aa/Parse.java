@@ -157,7 +157,7 @@ public class Parse implements Comparable<Parse> {
     // Which means a TypeObj knows its Name.  It's baked into the vtable.
     // Which means TypeObj is named and not the pointer-to-TypeObj.
     // "Point= :@{x,y}" declares "Point" to be a type Name for "@{x,y}".
-    Type named = t.set_name((tvar+":").intern()); // Add a name
+    Type named = _prims ? t : t.set_name((tvar+":").intern()); // Add a name
     ConTypeNode tn = _e.lookup_type(tvar);
     if( tn == null ) {
       // If this is a primitive type, there is no recursion and
@@ -166,8 +166,9 @@ public class Parse implements Comparable<Parse> {
         // Make a ConType with a named Type
         tn = (ConTypeNode)gvn(new ConTypeNode(tvar,named,scope()));
         _e.add_type(tvar,tn); // Add a type mapping
+        if( _prims ) return tn;
         PrimNode cvt = PrimNode.convertTypeName(t,named,bad);
-        return _e.add_fun(bad,tvar,gvn(cvt.as_fun(_gvn)));
+        return _e.add_fun(bad,tvar,gvn(cvt.clazz_node()));
       }
 
       // Always wrap Objs with a TypeMemPtr and a unique alias.
@@ -541,9 +542,10 @@ public class Parse implements Comparable<Parse> {
       if( unifun != null ) {
         FunPtrNode ptr = unifun.funptr();
         // Token might have been longer than the filtered name; happens if a
-        // bunch of operator characters are adjacent but we can make an operator
-        // out of the first few.
-        _x = oldx+ptr._name.length();
+        // bunch of operator characters are adjacent, but we can make an
+        // operator out of the first few.  The name also ends in '_' to
+        // indicate its a prefix operator.
+        _x = oldx+ptr._name.length()-1;
         unifun.keep();
         Node term = term();
         if( term==null ) { unifun.unhook(); _x = oldx; return null; }
@@ -748,6 +750,8 @@ public class Parse implements Comparable<Parse> {
     // Anonymous struct
     if( peek2(c,"@{") ) return struct();
 
+    if( _prims && peek2(c,"$$") ) return java_class_node();
+
     // Check for a valid 'id'
     String tok = token0();
     if( tok == null ) { _x = oldx; return null; }
@@ -908,11 +912,6 @@ public class Parse implements Comparable<Parse> {
           e._nongen.add_var(fld._fld,parm.tvar());
           create(fld._fld,parm, args_are_mutable);
         }
-        for( TypeFld fld : formals.flds() ) { // User parms start
-          if( fld._order <= DSP_IDX ) continue;// Already handled
-          if( fld._t != Type.SCALAR )
-            throw unimpl();     // Add a arg type check
-        }
 
         // Parse function body
         Node rez = stmts();       // Parse function body
@@ -1008,6 +1007,33 @@ public class Parse implements Comparable<Parse> {
   private Node typechk(Node x, Type t, Node mem, Parse bad) {
     return t == null || x._val.isa(t) ? x : gvn(new AssertNode(mem,x,t,bad,_e));
   }
+
+  // Must be a valid java class name on the current class path that subclasses
+  // Node.  Must have a no-arg constructor.  Returned node must be valid in the
+  // aa context.
+  @SuppressWarnings("unchecked")
+  private Node java_class_node() throws RuntimeException {
+    int x = _x;
+    while( isJava(_buf[_x]) ) _x++;
+    String str = new String(_buf,x,_x-x);
+    try {
+      Class clazz = Class.forName(str);
+      Node n = (Node)clazz.getConstructor().newInstance();
+      return n.clazz_node();
+    } catch( Exception e ) { throw new RuntimeException(e); } // Unrecoverable
+  }
+  @SuppressWarnings("unchecked")
+  private Type java_class_type() throws RuntimeException {
+    int x = _x;
+    while( isJava(_buf[_x]) ) _x++;
+    String str = new String(_buf,x,_x-x);
+    try {
+      Class clazz = Class.forName(str);
+      Type t = (Type)clazz.getConstructor().newInstance();
+      return t.clazz_type();
+    } catch( Exception e ) { throw new RuntimeException(e); } // Unrecoverable
+  }
+
 
   private String token() { skipWS();  return token0(); }
   // Lexical tokens.  Any alpha, followed by any alphanumerics is a alpha-
@@ -1187,6 +1213,9 @@ public class Parse implements Comparable<Parse> {
       return peek(']') ? TypeAry.make(TypeInt.INT64,e,TypeObj.OBJ) : null;
     }
 
+    // Check for a $$java_class
+    if( peek2(_buf[_x],"$$") ) return java_class_type();
+
     // Primitive type
     int oldx = _x;
     String tok = token();
@@ -1213,7 +1242,7 @@ public class Parse implements Comparable<Parse> {
   private void require( char c, int oldx ) {
     if( peek(c) ) return;
     Parse bad = errMsg();       // Generic error
-    bad._x = oldx;              // Openning point
+    bad._x = oldx;              // Opening point
     err_ctrl3("Expected closing '"+c+"' but "+(_x>=_buf.length?"ran out of text":"found '"+(char)(_buf[_x])+"' instead"),bad);
   }
   private void require( String s, int oldx ) {
@@ -1293,6 +1322,7 @@ public class Parse implements Comparable<Parse> {
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
   private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
+  private static boolean isJava  (byte c) { return isAlpha1(c) || (c=='$') || (c=='.'); }
   private static boolean isOp0   (byte c) { return "!#$%*+,-.=<>^[]~/&|".indexOf(c) != -1; }
   private static boolean isOp1   (byte c) { return isOp0(c) || ":?_".indexOf(c) != -1; }
   public  static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
@@ -1336,20 +1366,13 @@ public class Parse implements Comparable<Parse> {
   }
 
   // Wiring for call arguments
-  private Node[] args(Node a0, Node a1                  ) { return _args(new Node[]{null,null,a0,a1,a0}); }
-  private Node[] args(Node a0, Node a1, Node a2         ) { return _args(new Node[]{null,null,a0,a1,a2,a0}); }
-  private Node[] args(Node a0, Node a1, Node a2, Node a3) { return _args(new Node[]{null,null,a0,a1,a2,a3,a0}); }
+  private Node[] args(Node a0, Node a1                  ) { return _args(new Node[]{null,null,a0,a1}); }
+  private Node[] args(Node a0, Node a1, Node a2         ) { return _args(new Node[]{null,null,a0,a1,a2}); }
+  private Node[] args(Node a0, Node a1, Node a2, Node a3) { return _args(new Node[]{null,null,a0,a1,a2,a3}); }
   private Node[] _args(Node[] args) {
-    for( int i=ARG_IDX; i<args.length; i++ ) args[i].keep(); // Hook all args before reducing display
     args[CTL_IDX] = ctrl();     // Always control
     args[MEM_IDX] = mem();      // Always memory
-    throw unimpl(); // Calling unkeep on the FDX passed in the DSP_IDX?
-    //for( int i=ARG_IDX; i<args.length; i++ ) {
-    //  args[i].unkeep();
-    //  // Generally might want this in unkeep(), except for cost
-    //  if( args[i]._val.is_con() ) Env.GVN.add_reduce(args[i]);
-    //}
-    //return args;
+    return args;
   }
 
   // Insert a call, with memory splits.  Wiring happens later, and when a call

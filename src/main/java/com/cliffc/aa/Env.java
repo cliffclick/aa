@@ -10,9 +10,32 @@ import com.cliffc.aa.util.VBitSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 import static com.cliffc.aa.AA.DSP_IDX;
 import static com.cliffc.aa.AA.unimpl;
+
+// An "environment", a lexical Scope tracking mechanism that runs 1-for-1 in
+// parallel with a ScopeNode.
+//
+// TOP: The top-most environment, which includes the primitives (e.g. "+") and top-level types (e.g. "int64")
+// TOP._scope: Node placeholder pointing to all the primitives and types, keeping them alive.
+// The TOP env is closed when the 'aa' process no longer accepts more code.
+
+// FILE: The next env down; the results of a single complete normal parse and typing.
+// FILE._scope: Result of said parse.
+
+// The FILE level env is used to hold the results of a single file parse, or a
+// single test (but not a collection of tests in the same test function), or a
+// single REPL session (but not a single REPL line).
+
+// Testing generally starts with TOP, then parses whole complete (short)
+// programs at a FILE env and checks their typing - within the same TOP scope.
+// A single testParseXX() function will have many tests but only one TOP.
+
+// The REPL starts with a TOP, then opens a FILE level env - then opens a
+// single-line Env, parses and types it, then exports it to the FILE env.
 
 public class Env implements AutoCloseable {
   public static Env TOP,FILE;
@@ -33,6 +56,7 @@ public class Env implements AutoCloseable {
   public static    ScopeNode SCP_0; // Program start scope
 
   public static   DefMemNode DEFMEM;// Default memory (all structure types)
+  private static int MAX_ALIAS;
 
   // Set of all display aliases, used to track escaped displays at call sites for asserts.
   public static BitsAlias ALL_DISPLAYS = BitsAlias.EMPTY;
@@ -56,6 +80,22 @@ public class Env implements AutoCloseable {
     CTL_0  = GVN.init(new    CProjNode(START,0));
     MEM_0  = GVN.init(new StartMemNode(START  ));
     DEFMEM = GVN.init(new   DefMemNode(CTL_0));
+
+    // The Top-Level environment; holds the primitives.
+    TOP = new Env();
+    // Parse PRIM_SOURCE for the primitives
+    PrimNode.PRIMS();           // Initialize
+
+    try {
+      // Loading from a file is a Bad Idea in the long run
+      byte[] encoded = Files.readAllBytes(Paths.get("./src/main/java/com/cliffc/aa/_prims.aa"));
+      String prog = new String(encoded);
+      ErrMsg err = new Parse("PRIMS",true,TOP,prog).prog();
+      Env.GVN.iter(GVNGCM.Mode.PesiNoCG);
+      TypeEnv te = TOP.gather_errors(err);
+      assert te._errs==null && te._t==Type.XNIL; // Primitives parsed fine
+    } catch( Exception e ) { throw new RuntimeException(e); }; // Unrecoverable
+    record_for_reset();
   }
 
 
@@ -63,11 +103,12 @@ public class Env implements AutoCloseable {
   public final ScopeNode _scope; // Lexical anchor; "end of display"; goes when this environment leaves scope
   public VStack _nongen;         // Hindley-Milner "non-generative" variable set; current/pending defs
 
-  // Shared Env.
-  private Env( Env par, VStack nongen, boolean is_closure, Node ctrl, Node mem, TypeStruct ts, Node dsp_ptr ) {
+  // Shared Env constructor.
+  private Env( Env par, VStack nongen, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr ) {
     _par = par;
     _nongen = nongen;
     mem.keep(2);
+    TypeStruct ts = TypeStruct.make("",false,true,TypeFld.make("^",dsp_ptr._val, DSP_IDX));
     NewObjNode nnn = GVN.xform(new NewObjNode(is_closure,ts,dsp_ptr)).keep(2);
     MrgProjNode frm = DEFMEM.make_mem_proj(nnn,mem.unkeep(2));
     Node ptr = GVN.xform(new ProjNode(nnn.unkeep(2),AA.REZ_IDX));
@@ -82,8 +123,8 @@ public class Env implements AutoCloseable {
 
   // Top-level Env.  Contains, e.g. the primitives.
   // Above any file-scope level Env.
-  public Env( ) {
-    this(null,null,true,CTL_0,MEM_0,TypeStruct.make("",false,true,TypeFld.make("^",Type.XNIL, DSP_IDX)),XNIL);
+  private Env( ) {
+    this(null,null,true,CTL_0,MEM_0,XNIL);
     SCP_0 = _scope;
     STK_0 = SCP_0.stk();
     //SCP_0.init();               // Add base types; TODO: move into init code
@@ -92,29 +133,14 @@ public class Env implements AutoCloseable {
 
   // A file-level Env, or below.  Contains user written code as opposed to primitives.
   Env( Env par, boolean is_closure, Node ctrl, Node mem ) {
-    this(par,new VStack(par._nongen),is_closure,ctrl,mem,
-         par._scope.stk()._ts,par._scope.ptr());
-  }
-
-  // Make the prims, and parse a top-level string in one go.  Used by tests or
-  // by the command-line parse.  Not used by the REPL.
-  static TypeEnv exec_go(String src, String str) {
-    TOP = new Env();
-    // Parse PRIM_SOURCE for the primitives
-    PrimNode.PRIMS();           // Initialize
-    TypeEnv te = TOP.gather_errors(new Parse("PRIMS",true,TOP,PrimNode.PRIM_SOURCE).prog());
-    assert te._errs==null && te._t==Type.XNIL; // Primitives parsed fine
-    // Now parse the source string
-    FILE = new Env(TOP,true,TOP._scope.ctrl(),TOP._scope.mem());
-    TypeEnv te1 = Exec.go(FILE,src,str);
-    return te1;
+    this(par,new VStack(par._nongen),is_closure,ctrl,mem, par._scope.ptr());
   }
 
   // Gather and report errors and typing
   TypeEnv gather_errors(ErrMsg err) {
     // Hunt for typing errors in the alive code
     HashSet<ErrMsg> errs = new HashSet<>();
-    errs.add(err);
+    if( err!= null ) errs.add(err);
     VBitSet bs = new VBitSet();
     _scope.walkerr_def(errs,bs);
     ArrayList<ErrMsg> errs0 = new ArrayList<>(errs);
@@ -122,7 +148,8 @@ public class Env implements AutoCloseable {
 
     Node rez = _scope.rez();
     Type mem = _scope.mem()._val;
-    return new TypeEnv(rez._val,
+    return new TypeEnv(_scope,
+                       rez._val,
                        mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM),
                        rez.tvar(),
                        errs0.isEmpty() ? null : errs0);
@@ -158,29 +185,31 @@ public class Env implements AutoCloseable {
     return _scope.is_closure() ? P.do_exit(_scope,val) : _par.early_exit(P,val); // Hunt for an early-exit-enabled scope
   }
 
-  //// Record global static state for reset
-  //private static void record_for_top_reset1() {
-  //  BitsAlias.init0();
-  //  BitsFun  .init0();
-  //  BitsRPC  .init0();
-  //}
-  //private static void record_for_top_reset2() { GVN.init0(); Node.init0(); }
-  //
-  //// Reset all global statics for the next parse.  Useful during testing when
-  //// many top-level parses happen in a row.
-  //private static void top_reset() {
-  //  BitsAlias .reset_to_init0();
-  //  BitsFun   .reset_to_init0();
-  //  BitsRPC   .reset_to_init0();
-  //  TV2       .reset_to_init0();
-  //  GVN       .reset_to_init0();
-  //  Node      .reset_to_init0();
-  //  FunNode   .reset();
-  //  NewNode.NewPrimNode.reset();
-  //  PrimNode  .reset();
-  //  ALL_DISPLAYS = BitsAlias.EMPTY; // Reset aliases declared as Displays
-  //  LEX_DISPLAYS = BitsAlias.EMPTY;
-  //}
+  // Record global static state for reset
+  private static void record_for_reset() {
+    MAX_ALIAS = DEFMEM.len();
+    Node.init0(); // Record end of primitives
+    GVN.init0();
+    FunNode.init0();
+    BitsAlias.init0();
+    BitsFun  .init0();
+    BitsRPC  .init0();
+  }
+
+  // Reset all global statics for the next parse.  Useful during testing when
+  // many top-level parses happen in a row.
+  static void top_reset() {
+    while( DEFMEM.len() > MAX_ALIAS ) DEFMEM.pop();
+    Node      .reset_to_init0();
+    GVN       .reset_to_init0();
+    FunNode   .reset_to_init0();
+    BitsAlias .reset_to_init0();
+    BitsFun   .reset_to_init0();
+    BitsRPC   .reset_to_init0();
+    TV2       .reset_to_init0();
+    // Reset aliases declared as Displays
+    ALL_DISPLAYS = LEX_DISPLAYS = BitsAlias.make0(STK_0._alias);
+  }
 
   // Return Scope for a name, so can be used to determine e.g. mutability
   ScopeNode lookup_scope( String name, boolean lookup_current_scope_only ) {
@@ -211,7 +240,7 @@ public class Env implements AutoCloseable {
   UnOrFunPtrNode lookup_filter_uni( String name ) {
     if( !Parse.isOp(name) ) return null; // Limit to operators
     for( int i=name.length(); i>0; i-- ) {
-      UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(name.substring(0,i)+"_".intern());
+      UnOrFunPtrNode n = (UnOrFunPtrNode)lookup((name.substring(0,i)+"_").intern());
       if( n != null && n.op_prec() > 0 ) { // First name found will return
         UnOrFunPtrNode m = n.filter(1);    // Filter down to 1 arg
         if( m!=null )
@@ -224,7 +253,7 @@ public class Env implements AutoCloseable {
   UnOrFunPtrNode lookup_filter_2( String name ) {
     if( !Parse.isOp(name) ) return null; // Limit to operators
     for( int i=name.length(); i>0; i-- ) {
-      UnOrFunPtrNode n = (UnOrFunPtrNode)lookup("_"+name.substring(0,i)+"_".intern());
+      UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(("_"+name.substring(0,i)+"_").intern());
       if( n != null && n.op_prec() > 0 ) { // First name found will return
         UnOrFunPtrNode m = n.filter(2);    // Filter down to 2 args
         if( m!=null )
@@ -237,7 +266,7 @@ public class Env implements AutoCloseable {
   String lookup_filter_bal( String bopen ) {
     if( !Parse.isOp(bopen) ) return null; // Limit to operators
     for( int i=bopen.length(); i>0; i-- ) {
-      UnOrFunPtrNode n = (UnOrFunPtrNode)lookup("_"+bopen.substring(0,i)+"_".intern());
+      UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(("_"+bopen.substring(0,i)+"_").intern());
       if( n != null && n.op_prec() == 0 ) // First name found will return
         return n.funptr()._name;
     }
@@ -247,9 +276,9 @@ public class Env implements AutoCloseable {
   UnOrFunPtrNode lookup_filter_bal( String bopen, String bclose ) {
     if( !Parse.isOp(bopen ) ) return null; // Limit to operators
     if( !Parse.isOp(bclose) ) return null; // Limit to operators
-    String name = "_"+bopen+"_"+bclose+"_";
+    String name = ("_"+bopen+"_"+bclose+"_").intern();
     // Try both the 2 and 3 forms
-    //UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(name.intern());
+    //UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(name);
     //if( n != null && n.op_prec()==0 )
     //  return n;
     //return null;

@@ -30,8 +30,12 @@ public abstract class AA {
     System.out.println(ABV.toString());
     // Command line program
     if( args.length > 0 ) {
-      TypeEnv te = Env.exec_go("args",String.join(" ",args));
-      System.out.println(te._t.toString());
+      TypeEnv te = Exec.go(Env.TOP,"args",String.join(" ",args));
+      if( te._errs!=null ) System.out.println(te._errs.toString());
+      else {
+        System.out.println(te._hmt.toString());
+        System.out.println(te._tmem.sharptr(te._t).toString());
+      }
     } else {
       REPL.go();
     }

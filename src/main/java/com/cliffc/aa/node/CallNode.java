@@ -111,25 +111,21 @@ public class CallNode extends Node {
   // Call arguments:
   // 0 - Control.  If XCTRL, call is not reached.
   // 1 - Memory.  This is memory into the call and also arg#0
-  // 2 - Display, a TypeMemPtr.  Can be nil, if no display is passed.
+  // 2 - Function.  A TypeFunPtr; includes the display type.
   // 3+  Other "normal" arguments, numbered#ARG_IDX and up.
-  // Last - Set of FIDXS for call targets, typed as a TFP with the display ignored.
   //     The output type here is trimmed to what is "resolved"
   public  Node ctl() { return in(CTL_IDX); }
   public  Node mem() { return in(MEM_IDX); }
-  public  Node dsp() { return in(DSP_IDX); } // Display
-  public  Node fdx() { return _defs.last(); } // FIDX
+  public  Node fdx() { return in(DSP_IDX); } // Function and display
 
-  // Number of actual arguments, including closure/display at DSP_IDX, and not
-  // counting the FIDX in the last position.
-  int nargs() { return _defs._len-1; }
+  // Number of actual arguments, including closure/display at DSP_IDX.
+  int nargs() { return _defs._len; }
   // Actual arguments.  Arg(1) is allowed and refers to memory; arg(2) to the Display/TFP.
   Node arg ( int x ) { assert x>=0; return _defs.at(x); }
   // Set an argument.  Use 'set_fun' to set the Code.
   Node set_arg (int idx, Node arg) { assert idx>=DSP_IDX && idx <nargs(); return set_def(idx,arg); }
-  public Node set_dsp( Node dsp) { return set_def(DSP_IDX, dsp); }
+  public Node set_fdx( Node fun) { return set_def(DSP_IDX, fun); }
   public void set_mem( Node mem) { set_def(MEM_IDX, mem); }
-  public Node set_fdx( Node fun) { return set_def(_defs._len-1,fun); }
   public BitsFun fidxs() {
     Type tf = fdx()._val;
     return tf instanceof TypeFunPtr ? ((TypeFunPtr)tf).fidxs() : null;
@@ -139,11 +135,10 @@ public class CallNode extends Node {
   // takes a Type, upcasts to tuple, & slices by name.
   // ts[0] == in(0) == ctl() == Ctrl
   // ts[1] == in(1) == mem() == Mem into the callee = mem()
-  // ts[2] == in(2) == fun() == Display pointer, NOT FUNCTION POINTER, no FIDX.
+  // ts[2] == in(2) == fun() == Function pointer
   // ts[3] == in(3) == arg(3)
   // ts[4] == in(4) == arg(4)
   // ....
-  // ts[_defs._len-1] = Function pointer with FIDX.
   // ts[_defs._len] = Escape-in aliases as a BitsAlias
   static        Type       tctl( Type tcall ) { return             ((TypeTuple)tcall).at(CTL_IDX); }
   static        TypeMem    emem( Type tcall ) { return emem(       ((TypeTuple)tcall)._ts ); }
@@ -156,16 +151,16 @@ public class CallNode extends Node {
   // No-check must-be-correct get TFP
   static public TypeFunPtr ttfp( Type tcall ) {
     TypeTuple tt = (TypeTuple)tcall;
-    return (TypeFunPtr)tt.at(tt.len()-2); // 2nd-to-last type
+    return (TypeFunPtr)tt.at(DSP_IDX);
   }
   // Return TFP or null if not well structured
   static public TypeFunPtr ttfpx(Type tcall ) {
     if( !(tcall instanceof TypeTuple) ) return null;
     TypeTuple tt = (TypeTuple)tcall;
-    Type t = tt.at(tt.len()-2);
+    Type t = tt.at(DSP_IDX);
     return t instanceof TypeFunPtr ? (TypeFunPtr)t : null;
   }
-  static TypeTuple set_ttfp( TypeTuple tcall, TypeFunPtr nfptr ) { return tcall.set(tcall.len()-2,nfptr); }
+  static TypeTuple set_ttfp( TypeTuple tcall, TypeFunPtr nfptr ) { return tcall.set(DSP_IDX,nfptr); }
   static Type targ( Type tcall, int x ) { return targ(((TypeTuple)tcall)._ts,x); }
   static Type targ( Type[] ts, int x ) { return ts[x]; }
 
@@ -207,11 +202,9 @@ public class CallNode extends Node {
         // Find a tuple being passed in directly; unpack
         if( mem instanceof MrgProjNode && mem.in(0)==arg.in(0) ) {
           NewNode nnn = (NewNode)arg.in(0);
-          Node fdx = pop();
           pop(); // Pop off the NewNode tuple
           for( int i=ARG_IDX; i<nnn._defs._len; i++ ) // Push the args; unpacks the tuple
             add_def( nnn.in(i));
-          add_def(fdx);          // FIDX is last
           _unpacked = true;      // Only do it once
           keep().xval();         // Recompute value, this is not monotonic since replacing tuple with args
           GVN.add_work_all(unkeep());// Revisit after unpacking
@@ -229,10 +222,10 @@ public class CallNode extends Node {
       if( (ctl() instanceof ConNode) ) return null;
       // Kill all inputs with type-safe dead constants
       set_mem(Node.con(TypeMem.XMEM));
-      set_dsp(Node.con(TypeFunPtr.GENERIC_FUNPTR.dual()));
-      if( is_dead() ) return this;
-      for( int i=ARG_IDX; i<_defs._len; i++ )
-        set_def(i,Env.ANY);
+      //set_dsp(Node.con(TypeFunPtr.GENERIC_FUNPTR.dual()));
+      //if( is_dead() ) return this;
+      //for( int i=ARG_IDX; i<_defs._len; i++ )
+      //  set_def(i,Env.ANY);
       //gvn.add_work_defs(this);
       //return set_def(0,Env.XCTRL,gvn);
       throw unimpl();
@@ -258,7 +251,7 @@ public class CallNode extends Node {
           // FunPtr.  Common for non-upwardsly exposed targets.
           FunPtrNode fptr = ret.funptr();
           if( fptr != null && !fptr.display()._live.live().is_escape() )
-            return set_dsp(fptr);
+            throw unimpl(); //return set_dsp(fptr);
           // See if FunPtr is available just above an Unresolved.
           if( fdx instanceof UnresolvedNode ) {
             fptr = ((UnresolvedNode)fdx).find_fidx(fidx);
@@ -281,28 +274,31 @@ public class CallNode extends Node {
       FunPtrNode fptr = least_cost(fidxs, fdx); // Check for least-cost target
       if( fptr != null ) {
         if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
-        if( fptr.display()._val.isa(dsp()._val) )
-          set_dsp(fptr.display());
-        set_fdx(fptr);          // Resolve to 1 choice
-        xval();                 // Force value update; least-cost LOWERS types (by removing a choice)
-        add_work_use_extra(Env.GVN._work_flow,fptr);
-        if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
-        return this;
+        //if( fptr.display()._val.isa(dsp()._val) )
+        //  set_dsp(fptr.display());
+        //set_fdx(fptr);          // Resolve to 1 choice
+        //xval();                 // Force value update; least-cost LOWERS types (by removing a choice)
+        //add_work_use_extra(Env.GVN._work_flow,fptr);
+        //if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
+        //return this;
+        throw unimpl();
       }
     }
 
     // See if the display is always dead; common for Unresolved of primitives.
     UnresolvedNode unk;
-    if( fdx instanceof UnOrFunPtrNode && (unk=((UnOrFunPtrNode)fdx).unk())!=null &&
-        !(dsp() instanceof ConNode && dsp()._val==Type.ANY) ) {
-      boolean dsp_nil=true;
-      for( Node fptr : unk._defs )
-        if( !(fptr instanceof FunPtrNode) || ((FunPtrNode)fptr).display()._val!=TypeMemPtr.NO_DISP )
-          { dsp_nil=false; break; }
-      if( dsp_nil ) {           // Display is unused by any Unresolved
-        set_dsp(Env.ANY);
-        return this;
-      }
+    if( fdx instanceof UnOrFunPtrNode && (unk=((UnOrFunPtrNode)fdx).unk())!=null ) {
+      //if( !(dsp() instanceof ConNode && dsp()._val==Type.ANY) ) {
+      //boolean dsp_nil=true;
+      //for( Node fptr : unk._defs )
+      //  if( !(fptr instanceof FunPtrNode) || ((FunPtrNode)fptr).display()._val!=TypeMemPtr.NO_DISP )
+      //    { dsp_nil=false; break; }
+      //if( dsp_nil ) {           // Display is unused by any Unresolved
+      //  set_dsp(Env.ANY);
+      //  return this;
+      //}
+      //}
+      throw unimpl();
     }
 
 
@@ -433,10 +429,21 @@ public class CallNode extends Node {
     ts[CTL_IDX] = Type.CTRL;
     ts[MEM_IDX] = tmem;         // Memory into the callee, not caller
 
-    // Copy args for called functions.  FIDX is refined below.
+    // Not a function to call?
+    Type tfx = fdx()==null ? TypeFunPtr.GENERIC_FUNPTR : fdx()._val;
+    if( !(tfx instanceof TypeFunPtr) )
+      tfx = tfx.oob(TypeFunPtr.GENERIC_FUNPTR);
+    TypeFunPtr tfp = (TypeFunPtr)tfx;
+    BitsFun fidxs = tfp.fidxs();
+    if( _not_resolved_by_gcp && // If overloads not resolvable, then take them all, and we are in-error
+        fidxs.above_center() && tfp!=TypeFunPtr.GENERIC_FUNPTR.dual() )
+      tfp = tfp.make_from(fidxs.dual()); // Force FIDXS low (take all), and we are in-error
+    ts[DSP_IDX] = tfp;
+
+    // Copy args for called functions.  FIDX is already refined.
     // Also gather all aliases from all args.
-    BitsAlias as = BitsAlias.EMPTY;
-    for( int i=DSP_IDX; i<nargs(); i++ )
+    BitsAlias as = get_alias(tfp._disp);
+    for( int i=ARG_IDX; i<nargs(); i++ )
       as = as.meet(get_alias(ts[i] = arg(i)==null ? Type.XSCALAR : arg(i)._val));
     // Recursively search memory for aliases; compute escaping aliases
     BitsAlias as2 = tmem.all_reaching_aliases(as);
@@ -447,18 +454,6 @@ public class CallNode extends Node {
     // and thus avoids self-merging.  Once we decide to inline, keep the entire
     // alias set since this filtering by the CallNode goes away as we inline.
     if( !_is_copy ) ts[MEM_IDX] = tmem.slice_reaching_aliases(as2);
-
-    // Not a function to call?
-    Type tfx = fdx()==null ? TypeFunPtr.GENERIC_FUNPTR : fdx()._val;
-    if( !(tfx instanceof TypeFunPtr) )
-      tfx = tfx.oob(TypeFunPtr.GENERIC_FUNPTR);
-    TypeFunPtr tfp = (TypeFunPtr)tfx;
-    BitsFun fidxs = tfp.fidxs();
-    if( _not_resolved_by_gcp && // If overloads not resolvable, then take them all, and we are in-error
-        fidxs.above_center() && tfp!=TypeFunPtr.GENERIC_FUNPTR.dual() )
-      tfp = tfp.make_from(fidxs.dual()); // Force FIDXS low (take all), and we are in-error
-
-    ts[_defs._len-1] = tfp;    // FIDX is the last _def, 2nd-to-last type in ts
 
     return TypeTuple.make(ts);
   }
@@ -493,13 +488,13 @@ public class CallNode extends Node {
     if( _val instanceof TypeTuple && tesc(old)!=tesc(_val) )
       Env.GVN.add_grow(this);
   }
-  
+
   @Override public void add_work_def_extra(Work work, Node chg) {
     // Projections live after a call alter liveness of incoming args
     if( chg instanceof ProjNode )
       work.add(in(((ProjNode)chg)._idx));
   }
-  
+
   @Override public void add_work_use_extra(Work work, Node chg) {
     CallEpiNode cepi = cepi();
     if( chg == fdx() ) {           // FIDX falls to sane from too-high
@@ -564,14 +559,14 @@ public class CallNode extends Node {
       // Post GCP, if not wired, then Call is in error, so ESCAPE.
       if( opt_mode._CG && _val==Type.ANY ) return TypeMem.DEAD;
       if( opt_mode._CG &&       // Either mid-GCP or post-GCP
-          (def==dsp() ||        // Display is not a user-visible arg, so if unused can go away
            (err(true)==null &&  // Not in-error
             // And fully wired (no new users will wire)
-            (opt_mode==GVNGCM.Mode.Opto || all_fcns_wired()) )) ) {
-        int argn = _defs.find(def);
-        ProjNode proj = ProjNode.proj(this, argn);
-        if( proj == null || proj._live == TypeMem.DEAD )
-          return TypeMem.DEAD; // Arg not used
+            (opt_mode==GVNGCM.Mode.Opto || all_fcns_wired()) ) ) {
+      //  int argn = _defs.find(def);
+      //  ProjNode proj = ProjNode.proj(this, argn);
+      //  if( proj == null || proj._live == TypeMem.DEAD )
+      //    return TypeMem.DEAD; // Arg not used
+        throw unimpl();
       }
       if( def instanceof ThretNode ) return TypeMem.ALLMEM;
       assert def.all_live().basic_live();
@@ -706,9 +701,10 @@ public class CallNode extends Node {
     // Pick least-cost among choices
     FunPtrNode fptr = least_cost(fidxs,fdx());
     if( fptr==null ) return false; // Not resolved, no progress
-    set_dsp(fptr.display());       // Pick up the display
-    set_fdx(fptr);                 // Set resolved edge
-    return true;                   // Progress
+    //set_dsp(fptr.display());       // Pick up the display
+    //set_fdx(fptr);                 // Set resolved edge
+    //return true;                   // Progress
+    throw unimpl();
   }
 
   // See if we can resolve an unresolved Call

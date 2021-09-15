@@ -16,13 +16,20 @@ public class ParmNode extends PhiNode {
   public final int _idx; // Parameter index, MEM_IDX, FUN_IDX is display, ARGIDX+ normal args
   final String _name;    // Parameter name
   public ParmNode( int idx, String name, Node fun, ConNode defalt, Parse badgc) {
-    this(idx,name,fun,defalt._t,defalt,badgc);
+    this(defalt._t,badgc,fun,idx,name);
+    add_def(defalt);
   }
   public ParmNode( TypeFld fld, Node fun, ConNode defalt, Parse badgc) {
-    this(fld._order,fld._fld,fun,fld._t,defalt,badgc);
+    this(fld._t,badgc,fun,fld._order,fld._fld);
+    add_def(defalt);
   }
   public ParmNode( int idx, String name, Node fun, Type tdef, Node defalt, Parse badgc) {
-    super(OP_PARM,fun,tdef,defalt,badgc);
+    this(tdef,badgc,fun,idx,name);
+    add_def(defalt);
+  }
+
+  public ParmNode( Type tdef, Parse badgc, Node fun, int idx, String name ) {
+    super(OP_PARM,tdef,badgc,fun);
     assert idx>=0;
     _idx=idx;
     _name=name;
@@ -63,7 +70,7 @@ public class ParmNode extends PhiNode {
   @Override public Type value(GVNGCM.Mode opt_mode) {
     // Not executing?
     Type ctl = val(0);
-    if( ctl != Type.CTRL ) return ctl.oob();
+    if( ctl != Type.CTRL && ctl != Type.ALL ) return ctl.oob();
     Node in0 = in(0);
     if( in0 instanceof ThunkNode ) return val(1);
     if( !(in0 instanceof FunNode) )  return ctl.oob();
@@ -71,8 +78,11 @@ public class ParmNode extends PhiNode {
     // caller can be that bad.  During & after GCP all unknown callers are
     // accounted for.
     FunNode fun = (FunNode)in0;
-    if( !opt_mode._CG && fun.has_unknown_callers() )
-      return val(1);
+    if( !opt_mode._CG && (fun.has_unknown_callers() || fun.is_prim() && fun._defs._len==1 ) ) {
+      TypeFld fld = fun._sig._formals.fld_find(_name);
+      if( _idx!=MEM_IDX && fld != null ) return fld._t;
+      return len()==1 ? _t : val(1);
+    }
     Node mem = fun.parm(MEM_IDX);
     // All callers' known; merge the wired & flowing ones
     Type t = Type.ANY;

@@ -50,10 +50,10 @@ public abstract class MemPrimNode extends PrimNode {
   public abstract static class ReadPrimNode extends MemPrimNode {
     ReadPrimNode( String name, TypeStruct formals, Type ret ) { super(name,formals,ret); }
 
-    @Override public FunPtrNode as_fun( GVNGCM gvn ) {
-      try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
+    @Override public FunPtrNode clazz_node( ) {
+      try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
         assert _defs._len==0 && _uses._len==0;
-        FunNode  fun = ( FunNode) X.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
+        FunNode  fun = ( FunNode) X.xform(new  FunNode(_name,this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
         ParmNode rpc = (ParmNode) X.xform(new ParmNode( 0     ,"rpc" ,fun,Env.ALL_CALL,null));
         ParmNode mem = (ParmNode) X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
         fun._bal_close = bal_close();
@@ -172,10 +172,10 @@ public abstract class MemPrimNode extends PrimNode {
     WritePrimNode( String name, TypeStruct formals, Type ret ) { super(name,formals,ret); }
     @Override public boolean is_mem() { return true; }
 
-    @Override public FunPtrNode as_fun( GVNGCM gvn ) {
-      try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
+    @Override public FunPtrNode clazz_node( ) {
+      try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
         assert _defs._len==0 && _uses._len==0;
-        FunNode  fun = ( FunNode) X.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
+        FunNode  fun = ( FunNode) X.xform(new  FunNode(_name,this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
         ParmNode rpc = (ParmNode) X.xform(new ParmNode( 0     ,"rpc" ,fun,Env.ALL_CALL,null));
         ParmNode mem = (ParmNode) X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
         fun._bal_close = bal_close();

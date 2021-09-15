@@ -64,7 +64,7 @@ public class FunNode extends RegionNode {
   public TypeFunSig _sig;   // Apparent signature; clones typically sharpen
   // Operator precedence; only set on top-level primitive wrappers.
   // -1 for normal non-operator functions and -2 for forward_decls.
-  public final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
+  public byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
   // Function is parsed infix, with the RHS argument thunked.  Flag is used by
   // the Parser only for short-circuit operations like '||' and '&&'.
   public final boolean _thunk_rhs;
@@ -77,8 +77,8 @@ public class FunNode extends RegionNode {
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
-  public FunNode(           PrimNode prim) { this(prim._name,prim._sig,prim._op_prec,prim._thunk_rhs); }
-  public FunNode(NewNode.NewPrimNode prim) { this(prim._name,prim._sig,prim._op_prec,false); }
+  public FunNode(String name,           PrimNode prim) { this(name,prim._sig,prim._op_prec,prim._thunk_rhs); }
+  public FunNode(String name,NewNode.NewPrimNode prim) { this(name,prim._sig,prim._op_prec,false); }
   // Used to start an anonymous function in the Parser
   public FunNode(TypeStruct formals) { this(null,TypeFunSig.make(formals,TypeTuple.RET),-1,false); }
   // Used to forward-decl anon functions
@@ -98,8 +98,10 @@ public class FunNode extends RegionNode {
   }
 
   // Find FunNodes by fidx
-  public static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
-  public static void reset() { FUNS.clear(); _must_inline=0; }
+  private static int FLEN;
+  public static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});  
+  public static void init0() { FLEN = FUNS.len(); }
+  public static void reset_to_init0() { FUNS.set_len(FLEN); _must_inline=0; }
   public static FunNode find_fidx( int fidx ) { return FUNS.atX(fidx); }
   int fidx() { return _fidx; }
 
@@ -878,6 +880,7 @@ public class FunNode extends RegionNode {
     // Will be an error eventually, but act like its executed so the trailing
     // EpilogNode gets visited during GCP
     if( is_forward_ref() ) return Type.CTRL;
+    if( is_prim() ) return Type.CTRL;
     if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
     if( in(0)==this ) return _defs._len>=2 ? val(1) : Type.XCTRL; // is_copy
     for( int i=1; i<_defs._len; i++ ) {

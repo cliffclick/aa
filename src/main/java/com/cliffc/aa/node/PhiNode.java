@@ -1,19 +1,13 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
-import com.cliffc.aa.ErrMsg;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.TV2;
-
-import static com.cliffc.aa.AA.unimpl;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
   final Parse _badgc;
   final Type _t;                // Just a flag to signify scalar vs memory vs object
-  private PhiNode( byte op, Type t, Parse badgc, Node... vals ) {
+  PhiNode( byte op, Type t, Parse badgc, Node... vals ) {
     super(op,vals);
     if( t instanceof TypeMem ) _t = TypeMem.ALLMEM;
     else if( t instanceof TypeObj ) _t = TypeObj.OBJ; // Need to check liveness
@@ -24,8 +18,6 @@ public class PhiNode extends Node {
     if( t instanceof TypeMem ) _tvar=null;  // No HM for memory
   }
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
-  // For ParmNodes
-  PhiNode( byte op, Node fun, Type tdef, Node defalt, Parse badgc ) { this(op,tdef,badgc, fun,defalt); }
   @Override public boolean is_mem() { return _t==TypeMem.ALLMEM; }
   @Override public int hashCode() { return super.hashCode()+_t.hashCode(); }
   @Override public boolean equals(Object o) {
