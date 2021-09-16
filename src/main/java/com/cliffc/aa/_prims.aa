@@ -62,6 +62,7 @@ str = { x:str? -> x };
 // Math
 math = @{
   pi = $$com.cliffc.aa.node.ConNode$PI;
+  rand = { x:int -> $$com.cliffc.aa.node.PrimNode$RandI64(x) };
 };
 
 // end of file

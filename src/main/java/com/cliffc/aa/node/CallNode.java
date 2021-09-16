@@ -333,6 +333,8 @@ public class CallNode extends Node {
       return _ideal_grow((MrgProjNode)mem,cepim,cepid,escs,-1);
     // Check for prior Join/MrgProj/New
     if( mem instanceof MemJoinNode ) {
+      if( !mem.check_solo_mem_writer(this) )
+        return null;
       for( int i=1; i<mem._defs._len; i++ )
         if( mem.in(i) instanceof MrgProjNode ) {
           Node x = _ideal_grow((MrgProjNode)mem.in(i),cepim,cepid,escs,i);

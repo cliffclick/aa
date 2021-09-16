@@ -522,8 +522,8 @@ public abstract class PrimNode extends Node {
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   }
 
-  static class RandI64 extends PrimNode {
-    RandI64() { super("math_rand",TypeStruct.INT64,TypeInt.INT64); }
+  public static class RandI64 extends PrimNode {
+    public RandI64() { super("rand",TypeStruct.INT64,TypeInt.INT64); }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type t = val(ARG_IDX);
       if( t.above_center() ) return TypeInt.BOOL.dual();

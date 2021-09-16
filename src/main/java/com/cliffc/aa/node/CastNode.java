@@ -70,6 +70,7 @@ public class CastNode extends Node {
   @Override public boolean unify( Work work ) {
     TV2 maynil = tvar(1); // arg in HM
     TV2 notnil = tvar();  // ret in HM
+    if( maynil.is_err() ) return false;
 
     // Can already be nil-checked and will then unify to self
     if( maynil==notnil ) throw unimpl(); // return false;
@@ -108,7 +109,7 @@ public class CastNode extends Node {
       throw unimpl(); // return maynil.unify(notnil,work);
 
     // Unify the maynil with a nilable version of notnil
-    return TV2.make_nil(in(1),"Cast_unify").find().unify(maynil, work);
+    return TV2.make_nil(notnil,"Cast_unify").find().unify(maynil, work);
   }
 
   @Override public @NotNull CastNode copy( boolean copy_edges) {

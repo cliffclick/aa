@@ -190,7 +190,7 @@ public final class CallEpiNode extends Node {
     Type tcall = call._val;
     if( !(tcall instanceof TypeTuple) ) return false;
     BitsFun fidxs = CallNode.ttfp(tcall)._fidxs;
-    assert fidxs!=BitsFun.FULL;
+    if( fidxs==BitsFun.FULL ) return false; // Error call
     if( fidxs.above_center() )  return false; // Still choices to be made during GCP.
 
     // Check all fidxs for being wirable
@@ -324,10 +324,10 @@ public final class CallEpiNode extends Node {
     }
 
     // Compute call-return value from all callee returns
-    Type trez = Type   .ANY   ;
+    Type trez = Type   .SCALAR;
     Type tmem = TypeMem.ANYMEM;
     if( fidxs == BitsFun.FULL ) { // Called something unknown
-      trez = Type.ALL;            // Unknown target does worst thing
+      trez = Type.SCALAR;         // Unknown target does worst thing
       tmem = defmem;
     } else {                      // All targets are known & wired
       for( int i=0; i<nwired(); i++ ) {
@@ -340,19 +340,22 @@ public final class CallEpiNode extends Node {
         }
       }
     }
-    TypeMem post_call = (TypeMem)tmem;
 
-    // If no memory projection, then do not compute memory
-    if( (_keep==0 && ProjNode.proj(this,MEM_IDX)==null) || call().mem()==null )
-      return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,trez);
     Type premem = call().mem()._val;
-
-    // Build epilog memory.
-
-    // Approximate "live out of call", includes things that are alive before
-    // the call but not flowing in.  Catches all the "new in call" returns.
     TypeMem caller_mem = premem instanceof TypeMem ? (TypeMem)premem : premem.oob(TypeMem.ALLMEM);
-    TypeMem tmem3 = live_out(caller_mem,post_call,trez,tescs._aliases,opt_mode._CG ? null : defmem);
+    
+    // If no memory projection, then do not compute memory
+    TypeMem tmem3;
+    if( (_keep==0 && ProjNode.proj(this,MEM_IDX)==null) || call().mem()==null ) {
+      tmem3 = TypeMem.ANYMEM;
+    } else {
+      // Build epilog memory.
+
+      // Approximate "live out of call", includes things that are alive before
+      // the call but not flowing in.  Catches all the "new in call" returns.
+      TypeMem post_call = (TypeMem)tmem;
+      tmem3 = live_out(caller_mem,post_call,trez,tescs._aliases,opt_mode._CG ? null : defmem);
+    }
 
     // Attempt to lift the result, based on HM types.  Walk the input HM type
     // and GCP flow type in parallel and create a mapping.  Then walk the

@@ -781,12 +781,13 @@ public abstract class Node implements Cloneable {
     _val = Type.ALL;               // Lowest value
     _live = all_live();            // Full alive
     _elock = false;                // Clear elock if reset_to_init0
+    _tvar = new_tvar("reset");
     // Walk reachable graph
     for( Node use : _uses )                   use.walk_reset(work);
     for( Node def : _defs ) if( def != null ) def.walk_reset(work);
     if( this instanceof CallNode ) ((CallNode)this)._not_resolved_by_gcp = false; // Try again
     if( this instanceof FunNode || this instanceof ParmNode ) {
-      while( in(len()-1)._uid >= Node._INIT0_CNT ) pop(); // Kill wired primitive inputs
+      while( len()>1 && in(len()-1)._uid >= Node._INIT0_CNT ) pop(); // Kill wired primitive inputs
     }
   }
 
@@ -934,7 +935,6 @@ public abstract class Node implements Cloneable {
   }
   // Easy assertion check
   boolean check_solo_mem_writer(Node memw) {
-    if( is_prim() ) return true; // Several top-level memory primitives, including top scope & defmem blow this
     boolean found=false;
     for( Node use : _uses )
       if( use == memw ) found=true; // Only memw mem-writer follows

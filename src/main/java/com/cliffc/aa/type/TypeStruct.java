@@ -156,6 +156,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       sb.p(t1 instanceof TypeFunPtr
            ? (((TypeFunPtr)t1)._fidxs.above_center() ? "PRIMS" : "LOW_PRIMS")
            : "PRIMS_"+t1);
+    } else if( (bfld=fld_find("pi")) != null ) {
+      sb.p("MATH");
     } else {
       boolean field_sep=false;
       for( TypeFld fld : is_tup() ? osorted_flds() : asorted_flds() ) {

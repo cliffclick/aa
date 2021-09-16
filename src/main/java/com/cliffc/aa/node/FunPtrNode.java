@@ -154,6 +154,8 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   @Override public boolean unify( Work work ) {
     TV2 self = tvar();
     if( self.is_err() ) return false;
+    if( is_forward_ref() )
+      return work==null || self.unify(TV2.make_err(this,"A forward reference is not a function","FunPtr_unify"),work);
     RetNode ret = ret();
     FunNode fun = ret.fun();
 
@@ -173,7 +175,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
       String key = (""+i).intern();
       TV2 old = self.get(key);
       TV2 arg = parms[i]==null ? old : parms[i].tvar();
-      if( arg==null )  arg = TV2.make_leaf(fun,"alloc_site"); // null on 1st visit to a missing (unused) parm
+      if( arg==null )  arg = TV2.make_leaf(fun,"FunPtr_unify"); // null on 1st visit to a missing (unused) parm
       if( old==arg ) continue;      // No progress
       if( work==null ) return true; // Early cutout
       progress |= self.unify_at(parms[i],key,arg,work);

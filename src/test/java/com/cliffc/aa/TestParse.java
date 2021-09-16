@@ -163,7 +163,7 @@ public class TestParse {
     test("x=2; y=x+1; x*y", TypeInt.con(6));
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
     test("1+(x=2*3)+x*x", TypeInt.con(1+6+6*6));
-    testerr("x=(1+(x=2)+x); x", "Cannot re-assign final val 'x'",0);
+    testerr("x=(1+(x=2)+x); x", "Cannot re-assign final field '.x' in @{x=2}",0);
     test("x:=1;x++"  ,TypeInt.con(1));
     test("x:=1;x++;x",TypeInt.con(2));
     test("x:=1;x++ + x--",TypeInt.con(3));
@@ -173,23 +173,27 @@ public class TestParse {
     // Conditional:
     test   ("0 ?    2  : 3", TypeInt.con(3)); // false
     test   ("2 ?    2  : 3", TypeInt.con(2)); // true
-    test   ("math_rand(1)?x=4:x=3;x", TypeInt.NINT8); // x defined on both arms, so available after
-    test   ("math_rand(1)?x=2:  3;4", TypeInt.con(4)); // x-defined on 1 side only, but not used thereafter
-    test   ("math_rand(1)?(y=2;x=y*y):x=3;x", TypeInt.NINT8); // x defined on both arms, so available after, while y is not
-    testerr("math_rand(1)?x=2: 3 ;x", "'x' not defined on false arm of trinary",20);
-    testerr("math_rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
+    test   ("math.rand(1)?x=4:x=3;x", TypeInt.NINT8); // x defined on both arms, so available after
+    test   ("math.rand(1)?x=2:  3;4", TypeInt.con(4)); // x-defined on 1 side only, but not used thereafter
+    test   ("math.rand(1)?(y=2;x=y*y):x=3;x", TypeInt.NINT8); // x defined on both arms, so available after, while y is not
+    testerr("math.rand(1)?x=2: 3 ;x", "'x' not defined on false arm of trinary",20);
+    testerr("math.rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
     testerr("0 ? x=2 : 3;x", "'x' not defined on false arm of trinary",11);
     test   ("2 ? x=2 : 3;x", TypeInt.con(2)); // off-side is constant-dead, so missing x-assign is ignored
     test   ("2 ? x=2 : y  ", TypeInt.con(2)); // off-side is constant-dead, so missing 'y'      is ignored
-    testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign final val 'x'",7);
+    testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign final field '.x' in @{x=1}",7);
     test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
-    test   ("math_rand(1)?1:int:2:int",TypeInt.NINT8); // no ambiguity between conditionals and type annotations
-    testerr("math_rand(1)?1: :2:int","missing expr after ':'",16); // missing type
-    testerr("math_rand(1)?1::2:int","missing expr after ':'",15); // missing type
-    testerr("math_rand(1)?1:\"a\"", "Cannot mix GC and non-GC types",18);
-    test   ("math_rand(1)?1",TypeInt.BOOL); // Missing optional else defaults to nil
-    test_ptr0("math_rand(1)?\"abc\"", (alias)->TypeMemPtr.make_nil(alias,TypeStr.ABC));
-    test   ("x:=0;math_rand(1)?(x:=1);x",TypeInt.BOOL);
+    test   ("math.rand(1)?1:int:2:int",TypeInt.NINT8); // no ambiguity between conditionals and type annotations
+    testerr("math.rand(1)?1: :2:int","missing expr after ':'",16); // missing type
+    testerr("math.rand(1)?1::2:int","missing expr after ':'",15); // missing type
+    testerr("math.rand(1)?1:\"a\"", "Cannot mix GC and non-GC types",18);
+    test   ("math.rand(1)?1",TypeInt.BOOL); // Missing optional else defaults to nil
+    test("math.rand(1)?\"abc\"",
+      (()->TypeMemPtr.make_nil(17,TypeStr.ABC)),
+      null,
+      "str?"
+    );
+    test   ("x:=0;math.rand(1)?(x:=1);x",TypeInt.BOOL);
     testerr("a.b.c();","Unknown ref 'a'",0);
   }
 
@@ -211,7 +215,7 @@ public class TestParse {
 
     testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
     testerr("0 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x definitely not alive
-    test("math_rand(1) && (x=2;x*x) || 3 && 4", TypeInt.INT8); // local use of x in short-circuit; requires unzip to find 4
+    test("math.rand(1) && (x=2;x*x) || 3 && 4", TypeInt.INT8); // local use of x in short-circuit; requires unzip to find 4
   }
 
   @Test public void testParse02() {
@@ -254,7 +258,7 @@ public class TestParse {
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
 
     // This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
-    testerr("(math_rand(1) ? {+} : {*})(2,3)","Unable to resolve call",26); // either 2+3 or 2*3, or {5,6} which is INT8.
+    testerr("(math.rand(1) ? {+} : {*})(2,3)","Unable to resolve call",26); // either 2+3 or 2*3, or {5,6} which is INT8.
   }
 
   @Test public void testParse03() {
@@ -320,8 +324,8 @@ public class TestParse {
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3; v:=2}");
     testerr("(a=@{x=0;y=0}; a.)", "Missing field name after '.'",17);
     testerr("a=@{x=0;y=0}; a.x=1; a","Cannot re-assign final field '.x' in @{x=0; y=0}",16);
-    test   ("a=@{x=0;y=1}; b=@{x=2}  ; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2; structs can be partially merged
-    testerr("a=@{x=0;y=1}; b=@{x=2}; c=math_rand(1)?a:b; c.y",  "Unknown field '.y' in @{x=int8}",46);
+    test   ("a=@{x=0;y=1}; b=@{x=2}  ; c=math.rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2; structs can be partially merged
+    testerr("a=@{x=0;y=1}; b=@{x=2}; c=math.rand(1)?a:b; c.y",  "Unknown field '.y' in @{x=int8}",46);
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y' in @{x=1}",19);
     test   ("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1;y=2})", TypeInt.con(5));     // passed in to func
     test   ("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1;y=2;z=3})", TypeInt.con(5)); // extra fields OK
@@ -329,7 +333,7 @@ public class TestParse {
     test   ("a=@{x=(b=1.2)*b;y=b}; a.y", TypeFlt.con(1.2 )); // ok to use temp defs
     test   ("a=@{x=(b=1.2)*b;y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
     testerr("a=@{x=(b=1.2)*b;y=b}; b", "Unknown ref 'b'",22);
-    test   ("t=@{n=0;val=1.2}; u=math_rand(1) ? t : @{n=t;val=2.3}; u.val", TypeFlt.NFLT64); // structs merge field-by-field
+    test   ("t=@{n=0;val=1.2}; u=math.rand(1) ? t : @{n=t;val=2.3}; u.val", TypeFlt.NFLT64); // structs merge field-by-field
     // Comments in the middle of a struct decl
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1;y=2})", TypeInt.con(5));
     testerr("@{x;y]","Expected closing '}' but found ']' instead",1);
@@ -373,15 +377,15 @@ public class TestParse {
     test   ("x:str? = 0", Type.XNIL); // question-type allows nil or not; zero digit is nil
     test_obj("x:str? = \"abc\"", TypeStr.ABC); // question-type allows nil or not
     testerr("x:str  = 0", "0 is not a *str", 1);
-    test_ptr0("math_rand(1)?0:\"abc\"", (alias)->TypeMemPtr.make_nil(alias,TypeStr.ABC));
-    testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", 26);
-    test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-nil-ness after a nil-check
+    test_ptr0("math.rand(1)?0:\"abc\"", (alias)->TypeMemPtr.make_nil(alias,TypeStr.ABC));
+    testerr("(math.rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", 26);
+    test   ("p=math.rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-nil-ness after a nil-check
     test   ("x:int = y:str? = z:flt = 0", Type.XNIL); // nil/0 freely recasts
     test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not nil
     test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not nil
     test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name nil
-    test   ("a = math_rand(1) ? 0 : @{x=1}; // a is nil or a struct\n"+
-            "b = math_rand(1) ? 0 : @{c=a}; // b is nil or a struct\n"+
+    test   ("a = math.rand(1) ? 0 : @{x=1}; // a is nil or a struct\n"+
+            "b = math.rand(1) ? 0 : @{c=a}; // b is nil or a struct\n"+
             "b ? (b.c ? b.c.x : 0) : 0      // Nil-safe field load", TypeInt.BOOL); // Nested nil-safe field load
   }
 
@@ -442,11 +446,11 @@ public class TestParse {
     // ops, no overload resolution.  Does final stores into new objects
     // interspersed with recursive computation calls.
     test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v&x.v} : 0};"+
-                 "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
+                 "map(@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
                  TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("nn",TypeMemPtr.STRUCT0,ARG_IDX),TypeFld.make("vv",TypeInt.INT8,ARG_IDX+1)));
     // Test does loads after recursive call, which should be allowed to bypass.
     test("sum={x -> x ? sum(x.n) + x.v : 0};"+
-         "sum(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
+         "sum(@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
          (() ->TypeInt.INT64), null, "int64");
 
     // User-defined linked list.
@@ -490,7 +494,7 @@ public class TestParse {
     //// Test inferring a recursive struct type, with less help. Too complex to
     //// inline, so actual inference happens
     //test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0};"+
-    //             "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1.2};v=2.3};v=3.4};v=4.5})",
+    //             "map(@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=0;v=1.2};v=2.3};v=3.4};v=4.5})",
     //            TypeStruct.make(TypeMemPtr.DISP_FLD,
     //                            TypeFld.make("nn",TypeMemPtr.STRUCT0,ARG_IDX  ),
     //                            TypeFld.make("vv",TypeFlt.FLT64     ,ARG_IDX+1)));
@@ -501,7 +505,7 @@ public class TestParse {
     //         (alias) -> TypeMemPtr.make(alias,TypeStruct.tupsD(Type.XNIL,TypeFlt.con(1.2*1.2))));
     //
     //test_obj_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
-    //             "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
+    //             "map((math.rand(1)?0: (math.rand(1)?0: (math.rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
     //             TypeStruct.maket(TypeMemPtr.STRUCT0,TypeFlt.FLT64));
     throw unimpl();
   }
@@ -575,10 +579,10 @@ public class TestParse {
 
     // A linked-list mixing ints and strings, always in pairs
     String ll_cona = "a=0; ";
-    String ll_conb = "b=math_rand(1) ? ((a,1),\"abc\") : a; ";
-    String ll_conc = "c=math_rand(1) ? ((b,2),\"def\") : b; ";
-    String ll_cond = "d=math_rand(1) ? ((c,3),\"ghi\") : c; ";
-    String ll_cone = "e=math_rand(1) ? ((d,4),\"jkl\") : d; ";
+    String ll_conb = "b=math.rand(1) ? ((a,1),\"abc\") : a; ";
+    String ll_conc = "c=math.rand(1) ? ((b,2),\"def\") : b; ";
+    String ll_cond = "d=math.rand(1) ? ((c,3),\"ghi\") : c; ";
+    String ll_cone = "e=math.rand(1) ? ((d,4),\"jkl\") : d; ";
     String ll_cont = "tmp=e; ";
     // Standard pair-UN-aware map call
     String ll_map2 = "map = {fun list -> list ? (map(fun,list.0),fun(list.1)) : 0};";
@@ -610,12 +614,12 @@ public class TestParse {
     testerr("x=1; x:=2; x", "Cannot re-assign final val 'x'", 5);
     testerr("x=1; x =2; x", "Cannot re-assign final val 'x'", 5);
 
-    test("math_rand(1)?(x=4):(x=3);x", TypeInt.NINT8); // x defined on both arms, so available after
-    test("math_rand(1)?(x:=4):(x:=3);x", TypeInt.NINT8); // x defined on both arms, so available after
-    test("math_rand(1)?(x:=4):(x:=3);x:=x+1", TypeInt.INT64); // x mutable on both arms, so mutable after
+    test("math.rand(1)?(x=4):(x=3);x", TypeInt.NINT8); // x defined on both arms, so available after
+    test("math.rand(1)?(x:=4):(x:=3);x", TypeInt.NINT8); // x defined on both arms, so available after
+    test("math.rand(1)?(x:=4):(x:=3);x:=x+1", TypeInt.INT64); // x mutable on both arms, so mutable after
     test   ("x:=0; 1 ? (x:=4):; x:=x+1", TypeInt.con(5)); // x mutable ahead; ok to mutate on 1 arm and later
     test   ("x:=0; 1 ? (x =4):; x", TypeInt.con(4)); // x final on 1 arm, dead on other arm
-    testerr("x:=0; math_rand(1) ? (x =4):3; x=2; x", "Cannot re-assign read-only val 'x'",31);
+    testerr("x:=0; math.rand(1) ? (x =4):3; x=2; x", "Cannot re-assign read-only val 'x'",31);
     // A final store, but defs of @{a} do not escape into nonline_x, hence do
     // not merge and escape out.
     test("noinline_x={@{a}}; noinline_x().a=2; noinline_x().a",  TypeInt.INT8);
@@ -647,8 +651,8 @@ public class TestParse {
     test    ("x=@{n:=1;v:=2}; x.n  = 3", TypeInt.con(3));
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3; v:=2}");
     testerr ("x=@{n:=1;v:=2}; x.n  = 3; x.v = 1; x.n = 4; x.n", "Cannot re-assign final field '.n' in @{n=3; v=1}",37);
-    test    ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n", TypeInt.NINT8);
-    testerr ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5; tmp.n", "Cannot re-assign read-only field '.n' in @{n==nint8; v:=nint8}",63);
+    test    ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math.rand(1) ? x : y; tmp.n", TypeInt.NINT8);
+    testerr ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math.rand(1) ? x : y; tmp.n = 5; tmp.n", "Cannot re-assign read-only field '.n' in @{n==nint8; v:=nint8}",63);
     test    ("x=@{n:=1;v:=2}; foo={q -> q.n=3}; foo(x); x.n",TypeInt.con(3)); // Side effects persist out of functions
     // Tuple assignment
     testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0' in (1, 2)",11);

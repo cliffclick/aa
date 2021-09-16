@@ -201,6 +201,7 @@ public class Env implements AutoCloseable {
   // many top-level parses happen in a row.
   static void top_reset() {
     while( DEFMEM.len() > MAX_ALIAS ) DEFMEM.pop();
+    TV2       .reset_to_init0();
     Node.VALS.clear();                         // Clean out hashtable
     Node.RESET_VISIT.clear();
     Env.START.walk_reset(Env.GVN._work_flow);  // Clean out any wired prim calls
@@ -213,7 +214,6 @@ public class Env implements AutoCloseable {
     BitsAlias .reset_to_init0();
     BitsFun   .reset_to_init0();
     BitsRPC   .reset_to_init0();
-    TV2       .reset_to_init0();
     // Reset aliases declared as Displays
     ALL_DISPLAYS = LEX_DISPLAYS = BitsAlias.make0(STK_0._alias);
 

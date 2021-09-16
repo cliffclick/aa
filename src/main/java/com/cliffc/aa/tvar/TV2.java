@@ -139,7 +139,8 @@ public class TV2 {
   public boolean is_nil() { return isa("Nil"    ); } // Some nilable TV2
   public boolean is_fun    () { return isa("->"     ); } // A function, arg keys are numbered from ARG_IDX, and the return key is "ret"
   public boolean is_struct () { return isa("@{}"    ); } // A struct, keys are field names
-  public boolean is_ary    () { return isa("Ary"    ); } // A struct, keys are field names
+  public boolean is_ary    () { return isa("Ary"    ); } // A array, key elem is element type
+  public boolean is_str    () { return isa("Str"    ); } // A string
   //public TV2 get_unified() { assert is_unified(); return _unified; }
   public String name() { return _name; }
 
@@ -205,10 +206,9 @@ public class TV2 {
   }
   public void set_as_base(Type t) { assert is_leaf(); _name="Base"; _type=t; }
   // Make a new Nil
-  public static TV2 make_nil(Node n, @NotNull String alloc_site) {
-    TV2 leaf = make_leaf(n,alloc_site);
-    NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<String,TV2>(){{ put("?",leaf); }};
-    return new TV2("Nil",args,Type.XNIL,UQNodes.make(n),alloc_site);
+  public static TV2 make_nil(TV2 notnil, @NotNull String alloc_site) {
+    NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<String,TV2>(){{ put("?",notnil); }};
+    return new TV2("Nil",args,Type.XNIL,notnil._ns,alloc_site);
   }
   // Make a new function
   public static TV2 make_fun(Node n, TypeFunPtr fptr, TypeFunSig sig, @NotNull String alloc_site) {
@@ -242,7 +242,6 @@ public class TV2 {
   }
   // Structural constructor with address
   public static TV2 make(@NotNull String name, Node n, Type t, @NotNull String alloc_site, NonBlockingHashMap<String,TV2> args) {
-    assert args!=null;          // Must have some structure
     TV2 tv2 = new TV2(name,args,t,UQNodes.make(n),alloc_site);
     assert !tv2.is_base() && !tv2.is_leaf();
     return tv2;
@@ -380,8 +379,10 @@ public class TV2 {
     if( !that.is_err() ) {
       if( that._type==null ) that._type = _type;
       else if( _type!=null ) {
-        if( _type.getClass()!=that._type.getClass() )
-          throw unimpl(); // return union_err(that,work,"Cannot unify "+this.p()+" and "+that.p());
+        if( _type.getClass()!=that._type.getClass() ) {
+          union(make_err(null,"Cannot unify "+this.p()+" and "+that.p(),"union"),work);
+          return that.union(find(),work);
+        }
         that._type = _type.meet(that._type);
         that._open &= _open;
       }
@@ -754,8 +755,9 @@ public class TV2 {
     // Free variables keep the input flow type.
     if( is_leaf() ) return fput(t);
     // Nilable
-    if( is_nil() ) throw unimpl();
-    if( t==Type.SCALAR || t==Type.NSCALR ) return fput(t); // Will be scalar for all the breakdown types
+    if( is_nil() )
+      return get("?").walk_types_in(tmem,fput(t.join(Type.NSCALR)));
+
     // Functions being called or passed in can have their return types appear
     // in the call result.
     if( is_fun() ) {
@@ -801,7 +803,7 @@ public class TV2 {
 
     if( isa("Str") )
       return fput(_type.meet(t));
-    
+
     throw unimpl();
   }
   // Gather occurs of each TV2, and MEET all the corresponding Types.
@@ -838,6 +840,7 @@ public class TV2 {
 
       throw unimpl();
     }
+    if( is_str() ) return tmap==null ? _type : tmap.join(t);
     throw unimpl();
   }
 
@@ -932,9 +935,8 @@ public class TV2 {
 
   // --------------------------------------------
   // Pretty print
-  boolean is_prim() {
-    return is_struct() && _args!=null && _args.containsKey("!");
-  }
+  boolean is_prim() { return is_struct() && _args!=null && _args.containsKey("!_"); }
+  boolean is_math() { return is_struct() && _args!=null && _args.containsKey("pi"); }
 
   // Look for dups, in a tree or even a forest (which Syntax.p() does)
   public VBitSet get_dups() { return _get_dups(new VBitSet(),new VBitSet()); }
@@ -990,6 +992,7 @@ public class TV2 {
     // Special printing for structures
     if( is_struct() ) {
       if( is_prim() ) return sb.p("@{PRIMS}");
+      if( is_math() ) return sb.p("@{MATH}");
       final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
       if( _type==null ) sb.p("[?]"); // Should always have an alias
       else {
@@ -1010,12 +1013,17 @@ public class TV2 {
     if( is_nil() )
       return sb.p("0?");
 
+    if( is_str() )
+      return sb.p("str").p(_type.must_nil()?"?":"");
+
     // Generic structural T2
     sb.p("(").p(_name).p(" ");
     if( _args!=null )
       for( String s : _args.keySet() )
         str0(sb.p(s).p(':'),visit,_args.get(s),dups,debug).p(" ");
-    return sb.unchar().p(")");
+    sb.unchar().p(")");
+    if( _type!=null && _type.must_nil() ) sb.p('?');
+    return sb;
   }
   static private SB str0(SB sb, VBitSet visit, TV2 t, VBitSet dups, boolean debug) { return t==null ? sb.p("_") : t.str(sb,visit,dups,debug); }
   private boolean is_tup() {  return _args==null || _args.isEmpty() || _args.containsKey("0"); }

@@ -218,8 +218,10 @@ public class GVNGCM {
       if( skip_calls && wrk instanceof MProjNode && wrk.in(0) instanceof CallNode )
         continue;               // Skip the inside of calls
       // Retype function signatures as well
-      if( wrk instanceof RetNode || wrk instanceof ParmNode )
-        ((FunNode)wrk.in(0))._sig = ((FunNode)wrk.in(0)).re_sig();
+      if( wrk instanceof RetNode || wrk instanceof ParmNode ) {
+        FunNode fun = wrk instanceof RetNode ? ((RetNode)wrk).fun() : (FunNode)wrk.in(0);
+        fun._sig = fun.re_sig();
+      }
 
       work.addAll(wrk._uses);
     }

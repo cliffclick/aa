@@ -107,7 +107,7 @@ public abstract class Combo {
     assert Env.START.more_flow(work,false)==0; // Initial conditions are correct
 
     // Repeat; if we have any escaping calls, assume they are called with the
-    // most pessimistic, but HM-type valid, arguments.  Otherwise we must
+    // most pessimistic, but HM-type valid, arguments.  Otherwise, we must
     // assume they are called with Scalar which generally makes a type error.
     int cnt=0;                  // Debug counter
     while( !work.isEmpty() ) {
