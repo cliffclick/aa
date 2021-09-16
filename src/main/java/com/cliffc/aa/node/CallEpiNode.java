@@ -88,6 +88,8 @@ public final class CallEpiNode extends Node {
           ret._live.isa(_live) &&       // Call and return liveness compatible
           !fun.noinline() ) {           // And not turned off
         assert fun.in(1).in(0)==call;   // Just called by us
+        int idx = Env.SCP_0._defs.find(ret);
+        if( idx!=-1 ) Env.SCP_0.del(idx);
         fun.set_is_copy();              // Collapse the FunNode into the Call
         if( fun._name.charAt(0)=='$' )  // Inlining a primitive into a wrapper from _prims.aa
           // Copy the op_prec up 1 layer

@@ -74,8 +74,8 @@ public class ConNode<T extends Type> extends Node {
     if( this==o ) return true;
     if( !(o instanceof ConNode) ) return false;
     ConNode con = (ConNode)o;
-    if( con == Env.ALL_CTRL ) return false; // Only equal to itself
-    if( con == Env.ALL_PARM ) return false; // Only equal to itself
+    if( this== Env.ALL_CTRL || con == Env.ALL_CTRL ) return false; // Only equal to itself
+    if( this== Env.ALL_PARM || con == Env.ALL_PARM ) return false; // Only equal to itself
     return _t!=Type.XNIL && _t==con._t;
   }
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }

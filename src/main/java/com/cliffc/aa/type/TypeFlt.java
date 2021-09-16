@@ -123,5 +123,4 @@ public class TypeFlt extends Type<TypeFlt> {
     return FLT64;
   }
   @Override public void walk( Predicate<Type> p ) { p.test(this); }
-  @Override public Type clazz_type() { return TypeFlt.FLT64; }
 }

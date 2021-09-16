@@ -2,9 +2,7 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.tvar.UQNodes;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
 
@@ -219,6 +217,10 @@ public class GVNGCM {
       if( wrk==exit ) continue;                 // Stop at end
       if( skip_calls && wrk instanceof MProjNode && wrk.in(0) instanceof CallNode )
         continue;               // Skip the inside of calls
+      // Retype function signatures as well
+      if( wrk instanceof RetNode || wrk instanceof ParmNode )
+        ((FunNode)wrk.in(0))._sig = ((FunNode)wrk.in(0)).re_sig();
+      
       work.addAll(wrk._uses);
     }
   }

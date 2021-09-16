@@ -76,8 +76,6 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
-    test_obj("str(3.14)"       , TypeStr.con("3.14"));
-    test_obj("str(3.14)"       , TypeStr.con("3.14"));
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator

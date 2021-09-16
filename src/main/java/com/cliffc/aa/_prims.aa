@@ -3,13 +3,10 @@
 // Typically used in the call position, with a FunPtrNode returned.
 
 
-int =: $$com.cliffc.aa.type.TypeInt;
-flt =: $$com.cliffc.aa.type.TypeFlt;
+int =: $$com.cliffc.aa.type.TypeInt#INT64;
+flt =: $$com.cliffc.aa.type.TypeFlt#FLT64;
+str =: $$com.cliffc.aa.type.TypeMemPtr#STRPTR;
 
-
-// Convert to str
-str = { x:int -> $$com.cliffc.aa.node.NewStrNode$ConvertI64Str(x); };
-str = { x:flt -> $$com.cliffc.aa.node.NewStrNode$ConvertF64Str(x); };
 
 // Simple integer math
 _+_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$AddI64(x,y) };
@@ -49,6 +46,12 @@ _>_  = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$GT_F64(x,y) };
 _>=_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$GE_F64(x,y) };
 _==_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$EQ_F64(x,y) };
 _!=_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$NE_F64(x,y) };
+
+
+// Convert to str
+str = { x:int -> $$com.cliffc.aa.node.NewStrNode$ConvertI64Str(x); };
+str = { x:flt -> $$com.cliffc.aa.node.NewStrNode$ConvertF64Str(x); };
+str = { x:str -> x };
 
 
 // end of file

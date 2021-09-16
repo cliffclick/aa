@@ -218,6 +218,7 @@ public abstract class Node implements Cloneable {
     _defs = _uses = null;       // TODO: Poor-man's indication of a dead node, probably needs to recycle these...
     LIVE.clear(_uid);           // Off the LIVE set.  CNT cannot roll back unless the GVN work lists are also clear
     if( this instanceof FunNode ) ((FunNode)this).free();
+    if( this instanceof NewNode ) ((NewNode)this).free();
     return this;
   }
   public boolean is_dead() { return _uses == null; }

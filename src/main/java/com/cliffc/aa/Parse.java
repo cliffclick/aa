@@ -1,14 +1,15 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
+import java.lang.reflect.Field;
 import java.text.NumberFormat;
 import java.text.ParsePosition;
-import java.util.*;
+import java.util.BitSet;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
@@ -1021,15 +1022,20 @@ public class Parse implements Comparable<Parse> {
       return n.clazz_node();
     } catch( Exception e ) { throw new RuntimeException(e); } // Unrecoverable
   }
-  @SuppressWarnings("unchecked")
+
   private Type java_class_type() throws RuntimeException {
     int x = _x;
     while( isJava(_buf[_x]) ) _x++;
     String str = new String(_buf,x,_x-x);
+    require('#',x);
+    x = _x;
+    while( isJava(_buf[_x]) ) _x++;
+    String field = new String(_buf,x,_x-x);
     try {
       Class clazz = Class.forName(str);
-      Type t = (Type)clazz.getConstructor().newInstance();
-      return t.clazz_type();
+      Field f = clazz.getDeclaredField(field);
+      Type t = (Type)f.get(null);
+      return t;
     } catch( Exception e ) { throw new RuntimeException(e); } // Unrecoverable
   }
 
@@ -1354,7 +1360,7 @@ public class Parse implements Comparable<Parse> {
     // exists at scope up in the display.
     Env e = _e;
     Node ptr = e._scope.ptr();
-    Node fptr = gvn(new FreshNode(e._nongen,ctrl(),ptr));
+    Node fptr = gvn(new FreshNode(e._nongen,ctrl(),ptr)); // TODO: turn on
     Node mmem = mem();
     while( true ) {
       if( scope == e._scope ) return ptr;

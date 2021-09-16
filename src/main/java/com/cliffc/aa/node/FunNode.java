@@ -228,19 +228,10 @@ public class FunNode extends RegionNode {
     // GCP.  If parm is missing or not-live, then the corresponding SIG
     // argument can be ALL (all args allowed, including errors).
     if( !is_forward_ref()  && _keep==0 ) {
-      Node[] parms = parms();
-      TypeFunSig progress = _sig;
-      for( TypeFld fld : _sig._formals.flds() )
-        if( parms[fld._order]==null || parms[fld._order]._live==TypeMem.DEAD ) {
-          if( fld.is_display_ptr() ) // Dead display can be removed
-            _sig = _sig.make_from_remove("^"); 
-          else if( fld._t!=Type.ALL ) // Other dead args need to keep knowledge they ever existed
-            _sig = _sig.make_from_arg(fld.make_from(Type.ALL));
-        }
-      if( ret!=null && ret._val!=_sig._ret && ret._val instanceof TypeTuple )
-        _sig = _sig.make_from_ret((TypeTuple)ret._val);
+      TypeFunSig progress = re_sig();
       // Can resolve some least_cost choices
       if( progress != _sig ) {
+        _sig = progress;
         if( fptr != null )
           for( Node use : fptr()._uses )
             if( use instanceof UnresolvedNode )
@@ -251,6 +242,24 @@ public class FunNode extends RegionNode {
 
     return null;
   }
+
+  // Recompute a new signature, or the same old one
+  public TypeFunSig re_sig() {
+    Node[] parms = parms();
+    TypeFunSig progress = _sig;
+    for( TypeFld fld : _sig._formals.flds() )
+      if( parms[fld._order]==null || parms[fld._order]._live==TypeMem.DEAD ) {
+        if( fld.is_display_ptr() ) // Dead display can be removed
+          progress = progress.make_from_remove("^");
+        else if( fld._t!=Type.ALL ) // Other dead args need to keep knowledge they ever existed
+          progress = progress.make_from_arg(fld.make_from(Type.ALL));
+      }
+    RetNode ret = ret();
+    if( ret!=null && ret._val!=progress._ret && ret._val instanceof TypeTuple )
+      progress = progress.make_from_ret((TypeTuple)ret._val);
+    return progress;
+  }
+
 
   public Node ideal_inline(boolean check_progress) {
     // If no trailing RetNode and hence no FunPtr... function is uncallable
@@ -804,7 +813,7 @@ public class FunNode extends RegionNode {
         Env.DEFMEM.make_mem(nnrg.nnn()._alias,nnrg);
         Env.DEFMEM.make_mem(oorg.nnn()._alias,oorg);
         int oldalias = BitsAlias.parent(oorg.nnn()._alias);
-        Env.DEFMEM.set_def(oldalias,Node.con(TypeObj.UNUSED));
+        Env.DEFMEM.set_def(oldalias,Env.DEFMEM.in(BitsAlias.parent(oldalias)));
         Env.GVN.add_mono(oorg.nnn());
         Env.GVN.add_flow_uses(oorg);
         split_alias=true;

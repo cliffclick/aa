@@ -150,8 +150,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
     // Special shortcut for the all-prims display type
-    TypeFld bfld;
-    if( (bfld=fld_find("!")) != null && fld_find("math_pi") != null ) {
+    TypeFld bfld=fld_find("!_");
+    if( bfld != null ) {
       Type t1 = bfld._t;
       sb.p(t1 instanceof TypeFunPtr
            ? (((TypeFunPtr)t1)._fidxs.above_center() ? "PRIMS" : "LOW_PRIMS")
