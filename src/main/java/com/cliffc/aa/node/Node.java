@@ -77,7 +77,6 @@ public abstract class Node implements Cloneable {
     CNT = _INIT0_CNT;
     LIVE.clear();
     LIVE.set(0,CNT);
-    VALS.clear();
   }
 
 
@@ -460,7 +459,7 @@ public abstract class Node implements Cloneable {
   // must be monotonic.  This is a forwards-flow transfer-function computation.
   abstract public Type value(GVNGCM.Mode opt_mode);
 
-  // Shortcut to update self-value.  Typically used in contexts where it is NOT
+  // Shortcut to update self-value.  Typically, used in contexts where it is NOT
   // locally monotonic - hence we cannot run any monotonicity asserts until the
   // invariant is restored over the entire region.
   public Type xval( ) {
@@ -773,6 +772,24 @@ public abstract class Node implements Cloneable {
     for( Node use : _uses )                   use.walk_initype(work,hi);
     for( Node def : _defs ) if( def != null ) def.walk_initype(work,hi);
   }
+
+  // Reset
+  public static final VBitSet RESET_VISIT = new VBitSet();
+  public final void walk_reset( Work work ) {
+    if( RESET_VISIT.tset(_uid) ) return; // Been there, done that
+    work.add(this);                // On worklist and mark visited
+    _val = Type.ALL;               // Lowest value
+    _live = all_live();            // Full alive
+    _elock = false;                // Clear elock if reset_to_init0
+    // Walk reachable graph
+    for( Node use : _uses )                   use.walk_reset(work);
+    for( Node def : _defs ) if( def != null ) def.walk_reset(work);
+    if( this instanceof CallNode ) ((CallNode)this)._not_resolved_by_gcp = false; // Try again
+    if( this instanceof FunNode || this instanceof ParmNode ) {
+      while( in(len()-1)._uid >= Node._INIT0_CNT ) pop(); // Kill wired primitive inputs
+    }
+  }
+
 
   // At least as alive
   private Node merge(Node x) {

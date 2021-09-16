@@ -201,6 +201,12 @@ public class Env implements AutoCloseable {
   // many top-level parses happen in a row.
   static void top_reset() {
     while( DEFMEM.len() > MAX_ALIAS ) DEFMEM.pop();
+    Node.VALS.clear();                         // Clean out hashtable
+    Node.RESET_VISIT.clear();
+    Env.START.walk_reset(Env.GVN._work_flow);  // Clean out any wired prim calls
+    Env.GVN.iter(GVNGCM.Mode.Parse);   // Clean out any dead; reset prim types
+    for( Node n : Node.VALS.keySet() ) // Assert no leftover bits from the prior compilation
+      assert n._uid < Node._INIT0_CNT; //
     Node      .reset_to_init0();
     GVN       .reset_to_init0();
     FunNode   .reset_to_init0();
@@ -210,6 +216,7 @@ public class Env implements AutoCloseable {
     TV2       .reset_to_init0();
     // Reset aliases declared as Displays
     ALL_DISPLAYS = LEX_DISPLAYS = BitsAlias.make0(STK_0._alias);
+
   }
 
   // Return Scope for a name, so can be used to determine e.g. mutability
@@ -238,6 +245,7 @@ public class Env implements AutoCloseable {
   // strings of operator characters are naturally broken by (greedy) strings.
 
   // Prefix uniop lookup.  The '_' follows the uniop name.
+  // Note that "!_var" parses as "! _var" and not as "!_ var".
   UnOrFunPtrNode lookup_filter_uni( String name ) {
     if( !Parse.isOp(name) ) return null; // Limit to operators
     for( int i=name.length(); i>0; i-- ) {

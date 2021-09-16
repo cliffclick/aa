@@ -177,18 +177,14 @@ public class ScopeNode extends Node {
   }
 
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
-    // Prim scope is not used past Call-Graph discovery
-    if( this==Env.SCP_0 )  return opt_mode._CG ? TypeMem.DEAD : TypeMem.ALLMEM;
+    // Prim scope is always alive
+    if( this==Env.SCP_0 )  return TypeMem.ALLMEM;
     if( opt_mode == GVNGCM.Mode.Parse ) return TypeMem.MEM;
     // All fields in all reachable pointers from rez() will be marked live
     return compute_live_mem(this,mem(),rez());
   }
 
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    // The top scope is always alive, and represents what all future unparsed
-    // code MIGHT do.
-    if( this==Env.SCP_0 && opt_mode._CG )
-      return TypeMem.DEAD;
     // Basic liveness ("You are Alive!") for control and returned value
     if( def == ctrl() ) return TypeMem.ALIVE;
     if( def == rez () ) return def.all_live().basic_live() ? TypeMem.LIVE_BOT : TypeMem.ANYMEM;

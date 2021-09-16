@@ -745,7 +745,16 @@ public class Parse implements Comparable<Parse> {
       return tuple(oldx,s,first_arg_start);     // Parse a tuple
     }
     // Anonymous function
-    if( peek1(c,'{') ) return func(); // Anonymous function
+    if( peek1(c,'{') ) {
+      String tok = token0();
+      Node op = tok == null ? null : _e.lookup(tok.intern());
+      if( peek('}') && op != null && op.op_prec() > 0 )
+        // This is a primitive operator lookup as a function constant, and
+        // makes a FRESH copy like HM.Ident.
+        return gvn(new FreshNode(_e._nongen,ctrl(),op));
+      _x = oldx+1;              // Back to the opening paren
+      return func(); // Anonymous function
+    }
 
     // Anonymous struct
     if( peek2(c,"@{") ) return struct();
@@ -1048,8 +1057,10 @@ public class Parse implements Comparable<Parse> {
   private String token0() {
     if( _x >= _buf.length ) return null;
     byte c=_buf[_x];  int x = _x;
-    if( isOp0(c) || (c=='_' && isOp0(_buf[_x+1])) ) while( _x < _buf.length && isOp1   (_buf[_x]) ) _x++;
-    else if( isAlpha0(c) )                          while( _x < _buf.length && isAlpha1(_buf[_x]) ) _x++;
+    if( isOp0(c) || (c=='_' && _x+1 < _buf.length && isOp0(_buf[_x+1])) )
+      while( _x < _buf.length && isOp1   (_buf[_x]) ) _x++;
+    else if( isAlpha0(c) )
+      while( _x < _buf.length && isAlpha1(_buf[_x]) ) _x++;
     else return null; // Not a token; specifically excludes e.g. all bytes >= 128, or most bytes < 32
     if( (c==':' || c==',') && _x-x==1 ) // Disallow bare ':' as a token; ambiguous with ?: and type annotations; same for ','
       { _x=x; return null; } // Unwind, not a token
@@ -1406,7 +1417,7 @@ public class Parse implements Comparable<Parse> {
 
   // Whack current control with a syntax error
   private ErrNode err_ctrl1( ErrMsg msg ) { return init(new ErrNode(Env.START,msg)); }
-  private ErrNode err_ctrl2( String msg ) { return init(new ErrNode(ctrl(),errMsg(),msg)).unkeep(); }
+  private ErrNode err_ctrl2( String msg ) { return init(new ErrNode(ctrl(),errMsg(),msg)).unkeep(2); }
   private void err_ctrl0(String s) { err_ctrl3(s,errMsg()); }
   private void err_ctrl3(String s, Parse open) {
     set_ctrl(gvn(new ErrNode(ctrl(),open,s)));

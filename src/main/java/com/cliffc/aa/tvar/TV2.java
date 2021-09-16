@@ -799,6 +799,9 @@ public class TV2 {
       return elem.walk_types_in(tmem,tary.elem());
     }
 
+    if( isa("Str") )
+      return fput(_type.meet(t));
+    
     throw unimpl();
   }
   // Gather occurs of each TV2, and MEET all the corresponding Types.

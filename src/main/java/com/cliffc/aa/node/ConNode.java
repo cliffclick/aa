@@ -76,8 +76,13 @@ public class ConNode<T extends Type> extends Node {
     ConNode con = (ConNode)o;
     if( this== Env.ALL_CTRL || con == Env.ALL_CTRL ) return false; // Only equal to itself
     if( this== Env.ALL_PARM || con == Env.ALL_PARM ) return false; // Only equal to itself
-    return _t!=Type.XNIL && _t==con._t;
+    return _t==con._t;
   }
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }
+  @SuppressWarnings("unchecked")
+  public static class PI extends ConNode {
+    public PI() { super(TypeFlt.PI); }
+    @Override public Node clazz_node( ) { return this; }
+  }
 }
 

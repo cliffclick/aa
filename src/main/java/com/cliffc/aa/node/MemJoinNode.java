@@ -7,7 +7,6 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.MEM_IDX;
-import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.Env.GVN;
 
 // Join a split set of aliases from a SESE region, split by an earlier MemSplit.
@@ -58,7 +57,7 @@ public class MemJoinNode extends Node {
     MemSplitNode msp = msp();
     if( msp==null ) return null; // During cleanout of dead code
     Node mem = msp.mem();
-    if( !mem.is_prim() && mem.check_solo_mem_writer(msp) ) { // Split is only memory writer after mem
+    if( mem.check_solo_mem_writer(msp) ) { // Split is only memory writer after mem
       Node head = find_sese_head(mem);                       // Find head of SESE region
       if( head instanceof MemSplitNode )                     // Back to back split/join combo
         return combine_splits((MemSplitNode)head);

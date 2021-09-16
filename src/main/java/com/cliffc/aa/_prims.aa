@@ -5,6 +5,7 @@
 
 int =: $$com.cliffc.aa.type.TypeInt#INT64;
 flt =: $$com.cliffc.aa.type.TypeFlt#FLT64;
+ptr =: $$com.cliffc.aa.type.TypeMemPtr#ISUSED;
 str =: $$com.cliffc.aa.type.TypeMemPtr#STRPTR;
 
 
@@ -47,11 +48,20 @@ _>=_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$GE_F64(x,y) };
 _==_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$EQ_F64(x,y) };
 _!=_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$NE_F64(x,y) };
 
+// Pointer ==
+_==_ = { x:ptr? y:ptr? -> $$com.cliffc.aa.node.PrimNode$EQ_OOP(x,y) };
+_!=_ = { x:ptr? y:ptr? -> $$com.cliffc.aa.node.PrimNode$NE_OOP(x,y) };
 
 // Convert to str
 str = { x:int -> $$com.cliffc.aa.node.NewStrNode$ConvertI64Str(x); };
 str = { x:flt -> $$com.cliffc.aa.node.NewStrNode$ConvertF64Str(x); };
-str = { x:str -> x };
+str = { x:str? -> x };
 
+
+// --------------
+// Math
+math = @{
+  pi = $$com.cliffc.aa.node.ConNode$PI;
+};
 
 // end of file

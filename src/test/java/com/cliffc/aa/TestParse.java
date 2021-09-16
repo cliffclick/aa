@@ -4,7 +4,6 @@ import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -76,7 +75,6 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
-    // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
     test("-1",  TypeInt.con( -1));
@@ -117,32 +115,34 @@ public class TestParse {
     test_obj("str(\"abc\")"    , TypeStr.ABC);
     test("\"abc\"==\"abc\"",TypeInt.TRUE); // Constant strings intern
 
-
     // Variable lookup
     test("math.pi", TypeFlt.PI);
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk",0);
     testerr("!", "Syntax error; trailing junk",0);
-    test_prim("{_+_}", "+");
-    test_prim("{!_}", "!"); // uniops are just like normal functions
+    test_prim("_+_", "_+_");
+    test_prim("{_+_}", "_+_");
+    // "!_var" parses as "! _var" and not "!_ var".  If you want the "!" operator,
+    // must use the wrapping syntax.
+    test_prim("{!_}", "!_"); // uniops are just like normal functions
     // Function application, traditional paren/comma args
-    test("{+}(1,2)", TypeInt.con( 3));
-    test("{-}(1,2)", TypeInt.con(-1)); // binary version
+    test("_+_(1,2)", TypeInt.con( 3));
+    test("{_-_}(1,2)", TypeInt.con(-1)); // binary version
     test(" - (1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
-    testerr("{!}()     ", "Passing 0 arguments to {!} which takes 1 arguments",3);
+    testerr("{!_}() ", "Passing 0 arguments to {!_} which takes 1 arguments",4);
     testerr("math.pi(1)", "A function is being called, but 3.141592653589793 is not a function",10);
-    testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",3);
+    testerr("{_+_}(1,2,3)", "Passing 3 arguments to {_+_} which takes 2 arguments",5);
 
     // Parsed as +(1,(2*3))
-    test("{+}(1, 2 * 3) ", TypeInt.con(7));
+    test("_+_(1, 2 * 3) ", TypeInt.con(7));
     // Parsed as +( (1+2*3) , (4*5+6) )
-    test("{+}(1 + 2 * 3, 4 * 5 + 6) ", TypeInt.con(33));
+    test("_+_(1 + 2 * 3, 4 * 5 + 6) ", TypeInt.con(33));
     // Statements
     test("(1;2 )", TypeInt.con(2));
     test("(1;2;)", TypeInt.con(2)); // final semicolon is optional
-    test("{+}(1;2 ,3)", TypeInt.con(5)); // statements in arguments
-    test("{+}(1;2;,3)", TypeInt.con(5)); // statements in arguments
+    test("{_+_}(1;2 ,3)", TypeInt.con(5)); // statements in arguments
+    test("{_+_}(1;2;,3)", TypeInt.con(5)); // statements in arguments
     // Operators squished together
     test("-1== -1",  TypeInt.TRUE);
     test("0== !!1",  TypeInt.FALSE);
@@ -806,7 +806,7 @@ public class TestParse {
     test("id={x->x};id(1)",TypeInt.con(1));
     test("{x->x}(3.14)",TypeFlt.con(3.14));
     test_prim("{x->x}({+})","+");
-    test("id={x->x};id({+})(id(1),id(math_pi))",TypeFlt.make(0,64,Math.PI+1));
+    test("id={x->x};id({+})(id(1),id(math.pi))",TypeFlt.make(0,64,Math.PI+1));
 
     // Straight from TestHM.test08; types as {A -> (A,A)}.
     // Function is never called, so returns the uncalled-function type.
@@ -939,85 +939,88 @@ HashTable = {@{
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
 
   static private void test_prim( String program, String prim ) {
-    //Env top = Env.top_scope();
-    //Type expected = top.lookup_valtype(prim);
-    //try( TypeEnv te = Exec.open(Env.file_scope(top),"args",program) ) {
-    //  if( te._errs != null ) System.err.println(te._errs.toString());
-    //  assertNull(te._errs);
-    //  assertEquals(expected,te._t);
-    //}
-    throw unimpl();
+    Type expected = Env.TOP.lookup_valtype(prim);
+    TypeEnv te = run(program);
+    if( te._errs != null ) System.err.println(te._errs);
+    assertNull(te._errs);
+    assertEquals(expected,te._t);
   }
   static private void test_name( String program, Type... args ) {
-    TypeEnv te = run(program);
-    assertTrue(te._t instanceof TypeFunPtr);
-    TypeFunPtr actual = (TypeFunPtr)te._t;
-    TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),ARG_IDX+1, TypeMemPtr.NO_DISP);
-    assertEquals(expected,actual);
+    //TypeEnv te = run(program);
+    //assertTrue(te._t instanceof TypeFunPtr);
+    //TypeFunPtr actual = (TypeFunPtr)te._t;
+    //TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),ARG_IDX+1, TypeMemPtr.NO_DISP);
+    //assertEquals(expected,actual);
+    throw unimpl();
   }
   static private void test_ptr( String program, Function<Integer,Type> expected ) {
-    TypeEnv te = run(program);
-    TypeMemPtr actual = te._tmem.sharpen((TypeMemPtr)te._t);
-    int alias = actual.getbit(); // internally asserts only 1 bit set
-    Type t_expected = expected.apply(alias);
-    assertEquals(t_expected,actual);
+    //TypeEnv te = run(program);
+    //TypeMemPtr actual = te._tmem.sharpen((TypeMemPtr)te._t);
+    //int alias = actual.getbit(); // internally asserts only 1 bit set
+    //Type t_expected = expected.apply(alias);
+    //assertEquals(t_expected,actual);
+    throw unimpl();
   }
   static private void test_ptr0( String program, Function<Integer,Type> expected ) {
-    TypeEnv te = run(program);
-    TypeMemPtr tmp = te._tmem.sharpen((TypeMemPtr)te._t);
-    BitsAlias bits = tmp._aliases;
-    assertTrue(bits.test(0));
-    int alias = bits.strip_nil().getbit(); // internally asserts only 1 bit set
-    Type t_expected = expected.apply(alias);
-    assertEquals(t_expected,tmp);
+    //TypeEnv te = run(program);
+    //TypeMemPtr tmp = te._tmem.sharpen((TypeMemPtr)te._t);
+    //BitsAlias bits = tmp._aliases;
+    //assertTrue(bits.test(0));
+    //int alias = bits.strip_nil().getbit(); // internally asserts only 1 bit set
+    //Type t_expected = expected.apply(alias);
+    //assertEquals(t_expected,tmp);
+    throw unimpl();
   }
   static private void test_obj( String program, TypeObj expected) {
     TypeEnv te = run(program);
     assertTrue(te._t instanceof TypeMemPtr);
-    int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
     TypeObj actual = te._tmem.ld((TypeMemPtr)te._t);
     assertEquals(expected,actual);
   }
   static private void test_struct( String program, TypeStruct expected) {
-    TypeEnv te = run(program);
-    TypeStruct actual = (TypeStruct)te._tmem.ld((TypeMemPtr)te._t);
-    actual = actual.replace_fld(TypeFld.NO_DISP);
-    assertEquals(expected,actual);
+    //TypeEnv te = run(program);
+    //TypeStruct actual = (TypeStruct)te._tmem.ld((TypeMemPtr)te._t);
+    //actual = actual.replace_fld(TypeFld.NO_DISP);
+    //assertEquals(expected,actual);
+    throw unimpl();
   }
   static private void test_obj_isa( String program, TypeObj expected) {
-    TypeEnv te = run(program);
-    int alias = ((TypeMemPtr)te._t)._aliases.strip_nil().getbit(); // internally asserts only 1 bit set
-    TypeObj actual = te._tmem.sharpen((TypeMemPtr)te._t)._obj;
-    assertTrue(actual.isa(expected));
+    //TypeEnv te = run(program);
+    //int alias = ((TypeMemPtr)te._t)._aliases.strip_nil().getbit(); // internally asserts only 1 bit set
+    //TypeObj actual = te._tmem.sharpen((TypeMemPtr)te._t)._obj;
+    //assertTrue(actual.isa(expected));
+    throw unimpl();
   }
   static private void test_ptr( String program, String expected ) {
-    TypeEnv te = run(program);
-    assertTrue(te._t instanceof TypeMemPtr);
-    TypeObj to = te._tmem.ld((TypeMemPtr)te._t); // Peek thru pointer
-    SB sb = to.str(new SB(),new VBitSet(),te._tmem,false);      // Print what we see, with memory
-    assertEquals(expected,strip_alias_numbers(sb.toString()));
+    //TypeEnv te = run(program);
+    //assertTrue(te._t instanceof TypeMemPtr);
+    //TypeObj to = te._tmem.ld((TypeMemPtr)te._t); // Peek thru pointer
+    //SB sb = to.str(new SB(),new VBitSet(),te._tmem,false);      // Print what we see, with memory
+    //assertEquals(expected,strip_alias_numbers(sb.toString()));
+    throw unimpl();
   }
   static private void test( String program, Function<Integer,Type> expected ) {
-    TypeEnv te = run(program);
-    Type t_expected = expected.apply(-99); // unimpl
-    assertEquals(t_expected,te._t);
+    //TypeEnv te = run(program);
+    //Type t_expected = expected.apply(-99); // unimpl
+    //assertEquals(t_expected,te._t);
+    throw unimpl();
   }
   static private void test_isa( String program, Type expected ) {
-    TypeEnv te = run(program);
-    Type actual = te._tmem.sharptr(te._t);
-    assertTrue(actual.isa(expected));
+    //TypeEnv te = run(program);
+    //Type actual = te._tmem.sharptr(te._t);
+    //assertTrue(actual.isa(expected));
+    throw unimpl();
   }
   static private void testerr( String program, String err, String cursor ) {
     System.out.println("fix test, cur_off="+cursor.length());
     fail();
   }
   static void testerr( String program, String err, int cur_off ) {
-    //TypeEnv te = Exec.go(Env.file_scope(Env.top_scope()),"args",program);
-    //assertTrue(te._errs != null && te._errs.size()>=1);
-    //String cursor = new String(new char[cur_off]).replace('\0', ' ');
-    //String err2 = new SB().p("args:1:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
-    //assertEquals(err2,strip_alias_numbers(te._errs.get(0).toString()));
-    throw unimpl();
+    TypeEnv te = Exec.file("test",program);
+    assertTrue(te._errs != null && te._errs.size()>=1);
+    String cursor = new String(new char[cur_off]).replace('\0', ' ');
+    String err2 = new SB().p("test:1:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
+    assertEquals(err2,strip_alias_numbers(te._errs.get(0).toString()));
   }
   private static String strip_alias_numbers( String err ) {
     // Remove alias#s from the result string: *[123]@{x=1,y=2} ==> *[$]@{x=1,y=2}

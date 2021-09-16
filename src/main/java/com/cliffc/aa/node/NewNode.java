@@ -49,6 +49,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     if( _elock ) unelock();    // Unlock before changing hash
     _alias = alias;
     _tptr = TypeMemPtr.make(BitsAlias.make0(alias),TypeObj.ISUSED);
+    _tvar._type = _tptr; // Set the type
     sets(ts);
   }
   @Override public String xstr() { return "New"+"*"+_alias; } // Self short name
@@ -155,8 +156,10 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   }
 
   void free() {
-    Env.DEFMEM.set_def(_alias,null);
-    GVNGCM.retype_mem(null,Env.DEFMEM,null,false);
+    if( Env.DEFMEM.len() > _alias ) {
+      Env.DEFMEM.set_def(_alias, null);
+      GVNGCM.retype_mem(null, Env.DEFMEM, null, false);
+    }
     BitsAlias.free(_alias);
   }
 

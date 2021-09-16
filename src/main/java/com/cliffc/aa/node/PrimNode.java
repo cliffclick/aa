@@ -448,8 +448,8 @@ public abstract class PrimNode extends Node {
   public static class NE_I64 extends Prim2RelOpI64 { public NE_I64() { super("!="); } boolean op( long l, long r ) { return l!=r; } }
 
 
-  static class EQ_OOP extends PrimNode {
-    EQ_OOP() { super("==",TypeMemPtr.OOP_OOP,TypeInt.BOOL); }
+  public static class EQ_OOP extends PrimNode {
+    public EQ_OOP() { super("==",TypeMemPtr.OOP_OOP,TypeInt.BOOL); }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
       // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
@@ -479,8 +479,8 @@ public abstract class PrimNode extends Node {
     }
   }
 
-  static class NE_OOP extends PrimNode {
-    NE_OOP() { super("!=",TypeMemPtr.OOP_OOP,TypeInt.BOOL); }
+  public static class NE_OOP extends PrimNode {
+    public NE_OOP() { super("!=",TypeMemPtr.OOP_OOP,TypeInt.BOOL); }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
       // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
