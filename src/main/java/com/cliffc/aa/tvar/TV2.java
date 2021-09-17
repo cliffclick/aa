@@ -770,7 +770,8 @@ public class TV2 {
       for( int fidx : tfp._fidxs ) {
         FunNode fun = FunNode.find_fidx(fidx);
         if( fun.fptr().tvar().is_err() ) throw unimpl();
-        Type tret = ((TypeTuple)fun.ret()._val).at(REZ_IDX);
+        Type tret = fun.ret()._val;
+        tret = tret instanceof TypeTuple ? ((TypeTuple)tret).at(REZ_IDX) : tret.oob(Type.SCALAR);
         ret.walk_types_in(tmem,tret);
       }
       return t;

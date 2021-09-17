@@ -20,7 +20,7 @@ public class ParmNode extends PhiNode {
     add_def(defalt);
   }
   public ParmNode( TypeFld fld, Node fun, ConNode defalt, Parse badgc) {
-    this(fld._t,badgc,fun,fld._order,fld._fld);
+    this(fld._t.simple_ptr(),badgc,fun,fld._order,fld._fld);
     add_def(defalt);
   }
   public ParmNode( int idx, String name, Node fun, Type tdef, Node defalt, Parse badgc) {
@@ -80,7 +80,7 @@ public class ParmNode extends PhiNode {
     FunNode fun = (FunNode)in0;
     if( !opt_mode._CG && (fun.has_unknown_callers() || fun.is_prim() && fun._defs._len==1 ) ) {
       TypeFld fld = fun._sig._formals.fld_find(_name);
-      if( _idx!=MEM_IDX && fld != null ) return fld._t;
+      if( _idx!=MEM_IDX && fld != null ) return fld._t.simple_ptr();
       return len()==1 ? _t : val(1);
     }
     Node mem = fun.parm(MEM_IDX);

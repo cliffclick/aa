@@ -4,7 +4,6 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
 import static com.cliffc.aa.AA.MEM_IDX;
@@ -186,17 +185,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     }
     String bal_close() { return null; }
 
-    private static final Ary<NewPrimNode> INTRINSICS = new Ary<>(NewPrimNode.class);
-    static { reset(); }
-    public static void reset() { INTRINSICS.clear(); }
-    public static Ary<NewPrimNode> INTRINSICS() {
-      if( INTRINSICS.isEmpty() ) {
-        NewAryNode.add_libs(INTRINSICS);
-        NewStrNode.add_libs(INTRINSICS);
-      }
-      return INTRINSICS;
-    }
-
     // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
     @Override public FunPtrNode clazz_node( ) {
       try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
@@ -211,7 +199,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
         while( len() < _sig.nargs() ) add_def(null);
         for( TypeFld arg : _sig._formals.flds() ) {
           if( arg._order==MEM_IDX ) continue; // Already handled MEM_IDX
-          set_def(arg._order,X.xform(new ParmNode(arg._order,arg._fld,fun, (ConNode)Node.con(arg._t.simple_ptr()),null)));
+          set_def(arg._order,X.xform(new ParmNode(arg,fun, (ConNode)Node.con(arg._t.simple_ptr()),null)));
         }
         NewNode nnn = (NewNode)X.xform(this);
         Node mem = Env.DEFMEM.make_mem_proj(nnn,memp);

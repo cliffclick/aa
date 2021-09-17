@@ -902,7 +902,7 @@ public class Parse implements Comparable<Parse> {
       // Build Parms for system incoming values
       Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
       Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-      Node clo = X.xform(new ParmNode(DSP_IDX,"^"   ,fun,tpar_disp,parent_display/*con(tpar_disp)*/,null));
+      Node clo = X.xform(new ParmNode(DSP_IDX,"^"   ,fun,tpar_disp,parent_display,null));
 
       // Increase scope depth for function body.
       try( Env e = new Env(_e, true, fun, mem) ) { // Nest an environment for the local vars
@@ -932,7 +932,7 @@ public class Parse implements Comparable<Parse> {
         // Standard return; function control, memory, result, RPC.  Plus a hook
         // to the function for faster access.
         RetNode ret = (RetNode)X.xform(new RetNode(ctrl(),mem(),rez,rpc,fun));
-        (_prims ? Env.TOP : Env.FILE)._scope.add_def(ret);
+        Env.TOP._scope.add_def(ret);
         // The FunPtr builds a real display; any up-scope references are passed in now.
         Node fptr = X.xform(new FunPtrNode(null,ret,fresh_disp.unhook()));
 

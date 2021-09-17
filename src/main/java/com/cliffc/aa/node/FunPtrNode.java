@@ -172,10 +172,11 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     // Each argument from the parms directly
     Node[] parms = fun.parms();
     for( int i=DSP_IDX; i<parms.length; i++ ) {
+      if( parms[i]==null ) continue;
       String key = (""+i).intern();
       TV2 old = self.get(key);
-      TV2 arg = parms[i]==null ? old : parms[i].tvar();
-      if( arg==null )  arg = TV2.make_leaf(fun,"FunPtr_unify"); // null on 1st visit to a missing (unused) parm
+      TV2 arg = parms[i].tvar();
+      assert arg!=null;//if( arg==null )  arg = TV2.make_leaf(fun,"FunPtr_unify"); // null on 1st visit to a missing (unused) parm
       if( old==arg ) continue;      // No progress
       if( work==null ) return true; // Early cutout
       progress |= self.unify_at(parms[i],key,arg,work);

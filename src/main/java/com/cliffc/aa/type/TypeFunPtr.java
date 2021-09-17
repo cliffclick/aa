@@ -200,4 +200,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _disp.repeats_in_cycles(head,bs); }
 
+  @Override public boolean is_display_ptr() { return _disp.is_display_ptr(); }
+
 }

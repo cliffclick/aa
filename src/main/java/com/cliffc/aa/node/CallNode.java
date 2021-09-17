@@ -291,7 +291,7 @@ public class CallNode extends Node {
     // arg is still alive.
     if( GVN._opt_mode._CG && err(true)==null ) {
       Node progress = null;
-      for( int i=DSP_IDX; i<nargs(); i++ )
+      for( int i=ARG_IDX; i<nargs(); i++ )
         if( ProjNode.proj(this,i)==null &&
             !(arg(i) instanceof ConNode) ) // Not already folded
           progress = set_arg(i,Env.ANY);   // Kill dead arg

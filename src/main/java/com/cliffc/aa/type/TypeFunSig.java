@@ -16,7 +16,7 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   private TypeFunSig init(TypeStruct formals, TypeTuple ret ) {
     super.init(TFUNSIG,"");
     TypeFld disp=null;
-    assert (disp=formals.fld_find("^")) == null || disp.is_display_ptr();
+    assert (disp=formals.fld_find("^")) == null || (disp.is_display_ptr() && disp._t instanceof TypeFunPtr);
     assert ret.len()==3 && ret.at(MEM_IDX) instanceof TypeMem;
     _formals=formals;
     _ret=ret;

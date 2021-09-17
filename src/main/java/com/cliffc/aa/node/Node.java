@@ -761,16 +761,16 @@ public abstract class Node implements Cloneable {
   }
 
   // Forward reachable walk, setting types to ANY and making all dead.
-  public final void walk_initype( Work work, boolean hi ) {
+  public final void walk_initype( Work work ) {
     if( work.on(this) ) return;    // Been there, done that
     work.add(this);                // On worklist and mark visited
-    _val = hi ? Type.ANY : Type.ALL; // Highest value
-    _live = hi ? TypeMem.DEAD : all_live(); // Not alive
-    if( !hi ) _elock = false;               // Clear elock if reset_to_init0
+    _val = Type.ANY;               // Highest value
+    _live = TypeMem.DEAD;          // Not alive
+    _tvar = new_tvar("reset");
     if( this instanceof CallNode ) ((CallNode)this)._not_resolved_by_gcp = false; // Try again
     // Walk reachable graph
-    for( Node use : _uses )                   use.walk_initype(work,hi);
-    for( Node def : _defs ) if( def != null ) def.walk_initype(work,hi);
+    for( Node use : _uses )                   use.walk_initype(work);
+    for( Node def : _defs ) if( def != null ) def.walk_initype(work);
   }
 
   // Reset

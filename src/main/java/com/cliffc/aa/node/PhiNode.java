@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
 // Merge results; extended by ParmNode
@@ -68,9 +69,13 @@ public class PhiNode extends Node {
   }
 
 
+  @Override public TV2 new_tvar(String alloc_site) {
+    return _t instanceof TypeMem ? null : super.new_tvar(alloc_site);
+  }
   // All inputs unify
   @Override public boolean unify( Work work ) {
     if( !(in(0) instanceof RegionNode) ) return false; // Dying
+    if( _tvar==null ) return false; // Memory not part of HM
     RegionNode r = (RegionNode) in(0);
     boolean progress = false;
     for( int i=1; i<_defs._len; i++ ) {

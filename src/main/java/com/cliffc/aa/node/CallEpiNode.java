@@ -324,7 +324,7 @@ public final class CallEpiNode extends Node {
     }
 
     // Compute call-return value from all callee returns
-    Type trez = Type   .SCALAR;
+    Type trez = Type   .XSCALAR;
     Type tmem = TypeMem.ANYMEM;
     if( fidxs == BitsFun.FULL ) { // Called something unknown
       trez = Type.SCALAR;         // Unknown target does worst thing
@@ -343,7 +343,7 @@ public final class CallEpiNode extends Node {
 
     Type premem = call().mem()._val;
     TypeMem caller_mem = premem instanceof TypeMem ? (TypeMem)premem : premem.oob(TypeMem.ALLMEM);
-    
+
     // If no memory projection, then do not compute memory
     TypeMem tmem3;
     if( (_keep==0 && ProjNode.proj(this,MEM_IDX)==null) || call().mem()==null ) {
@@ -498,6 +498,7 @@ public final class CallEpiNode extends Node {
 
   @Override public boolean unify( Work work ) {
     assert !_is_copy;
+    if( tvar().is_err() ) return false;
     CallNode call = call();
     Node fdx = call.fdx();
     TV2 tfun = fdx.tvar();
@@ -518,8 +519,7 @@ public final class CallEpiNode extends Node {
     // TODO: Handle Thunks
 
     if( tfun.len()-1-1 != call.nargs()-ARG_IDX ) //
-      //progress = T2.make_err("Mismatched argument lengths").unify(find(), work);
-      throw unimpl();
+      return tvar().unify(TV2.make_err(this,"Mismatched argument lengths","CallEpi_unify"),work);
 
     // Check for progress amongst args
     for( int i=DSP_IDX; i<call._defs._len; i++ ) {

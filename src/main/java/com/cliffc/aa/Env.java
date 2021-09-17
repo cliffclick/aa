@@ -149,8 +149,16 @@ public class Env implements AutoCloseable {
 
     Node rez = _scope.rez();
     Type mem = _scope.mem()._val;
+    TypeFunSig sig = null;
+    if( rez._val instanceof TypeFunPtr ) {
+      int fidx2 = -1;
+      for( int fidx : ((TypeFunPtr)rez._val)._fidxs )
+        { fidx2 = fidx; break; }
+      sig = FunNode.FUNS.at(fidx2)._sig;
+    }
     return new TypeEnv(_scope,
                        rez._val,
+                       sig,
                        mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM),
                        rez.tvar(),
                        errs0.isEmpty() ? null : errs0);

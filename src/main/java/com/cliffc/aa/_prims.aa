@@ -53,10 +53,11 @@ _==_ = { x:ptr? y:ptr? -> $$com.cliffc.aa.node.PrimNode$EQ_OOP(x,y) };
 _!=_ = { x:ptr? y:ptr? -> $$com.cliffc.aa.node.PrimNode$NE_OOP(x,y) };
 
 // Convert to str
-str = { x:int -> $$com.cliffc.aa.node.NewStrNode$ConvertI64Str(x); };
-str = { x:flt -> $$com.cliffc.aa.node.NewStrNode$ConvertF64Str(x); };
+str = { x:int -> $$com.cliffc.aa.node.NewStrNode$ConvertI64Str(x) };
+str = { x:flt -> $$com.cliffc.aa.node.NewStrNode$ConvertF64Str(x) };
 str = { x:str? -> x };
 
+_+_ = { x:str? y:str? -> $$com.cliffc.aa.node.NewStrNode$AddStrStr(x,y) };
 
 // --------------
 // Math

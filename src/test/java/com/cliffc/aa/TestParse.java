@@ -1,6 +1,5 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
@@ -219,16 +218,19 @@ public class TestParse {
   }
 
   @Test public void testParse02() {
+    test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2)); // trivially inlined; capture external variable
+    test("{x -> x&1}",
+         (() -> TypeFunPtr.make(40,ARG_IDX+1, TypeMemPtr.NO_DISP)),
+         ( () -> TypeFunSig.make(TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
+                                                 TypeFld.make("x",Type.SCALAR,ARG_IDX)),
+                                 TypeTuple.make(Type.CTRL,
+                                                Env.SCP_0.in(1)._val,
+                                                TypeInt.BOOL)) ),
+           "[40]{ int64 -> int64 }");
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
-    // Since call not-taken, post GCP Parms not loaded from _tf, limited to ~Scalar.  The
-    // hidden internal call from {&} to the primitive is never inlined (has ~Scalar args)
-    // so 'x&1' never sees the TypeInt return from primitive AND.
-    TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(12),TypeObj.ISUSED);
-    //test_isa("{x -> x&1}", TypeFunPtr.make(TEST_FUNBITS,2,tdisp)); // {Int -> Int}
-    testerr("{x -> x&1}", "Scalar is not a int64",6); // {Int -> Int}
 
     // Anonymous function definition
-    testerr("{x y -> x+y}", "Scalar is none of (flt64,int64,*str?)",8); // {Scalar Scalar -> Scalar}
+    testerr("{x y -> x+y}", "Scalar is none of (int64,flt64,*str?)",8); // {Scalar Scalar -> Scalar}
 
     // Function execution and result typing
     test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2)); // trivially inlined; capture external variable
@@ -916,9 +918,7 @@ HashTable = {@{
     Type expect = expect_maker.get();
     assertEquals(expect,actual_flow);
     if( expect instanceof TypeFunPtr ) {
-      TypeFunPtr fptr = (TypeFunPtr)expect;
-      FunNode fun = FunNode.find_fidx(fptr.fidx());
-      TypeFunSig actual_sig = fun._sig;
+      TypeFunSig actual_sig = te._sig;
       TypeFunSig expect_sig = expect_sig_maker.get();
       assertEquals(expect_sig._formals,actual_sig._formals);
       // Do not exactly match returning memory (gets weird without HM).

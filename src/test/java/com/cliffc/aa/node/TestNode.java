@@ -3,6 +3,8 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.node.NewAryNode;
+import com.cliffc.aa.node.NewStrNode;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.Util;
@@ -233,8 +235,10 @@ public class TestNode {
     test1monotonic(new    FunNode(TypeStruct.INT64));
     test1monotonic(new FunPtrNode("anon",ret,null));
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
-    for( NewNode.NewPrimNode prim : NewNode.NewPrimNode.INTRINSICS() )
-      test1monotonic_intrinsic(prim);
+    test1monotonic_intrinsic(new NewAryNode.NewAry(TypeAry.ARY0,TypeInt.INT64));
+    test1monotonic_intrinsic(new NewStrNode.ConvertI64Str());
+    test1monotonic_intrinsic(new NewStrNode.ConvertF64Str());
+    test1monotonic_intrinsic(new NewStrNode.AddStrStr());
     test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
     NewObjNode nnn1 = new NewObjNode(false,TypeMemPtr.DISPLAY,Node.con(Type.NIL));
