@@ -104,10 +104,6 @@ public class FunNode extends RegionNode {
   public static void reset_to_init0() { FUNS.set_len(FLEN); _must_inline=0; }
   public static FunNode find_fidx( int fidx ) { return FUNS.atX(fidx); }
   int fidx() { return _fidx; }
-  public void free() {
-    FUNS.clear(_fidx);
-    BitsFun.free(_fidx);
-  }
 
   // Short self name
   @Override public String xstr() { return name(); }
@@ -391,8 +387,12 @@ public class FunNode extends RegionNode {
     int idx = find_type_split_index(parms);
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
       TypeStruct formals = _sig._formals;
-      for( int i=DSP_IDX; i<parms.length; i++ )
-        formals = formals.replace_fld(_sig._formals.fld_idx(i).make_from(parms[i]==null ? Type.ALL : parms[i].val(idx).widen()));
+      for( TypeFld fld : formals.flds() ) {
+        Node parm = parms[fld._order];
+        TypeFld fld2 = fld.make_from(parm==null ? Type.ALL : parm.val(idx).widen());
+        if( fld2.isa(fld) )
+          formals = formals.replace_fld(fld2);
+      }
       return formals;
     }
 
@@ -797,6 +797,7 @@ public class FunNode extends RegionNode {
             }
             parm.set_def(1,defx);
           }
+        fun.set_def(1,in(1).copy(true));
       } else                     // Path Split
         fun.set_def(1,Env.XCTRL);
     }
@@ -884,6 +885,11 @@ public class FunNode extends RegionNode {
             ncepi.wire0(Env.GVN._work_flow,ncepi.call(),xxxret.fun());
           }
         }
+        // CEProjs from the Call never re-wire, as they are not uniquely
+        // identified by input alone.  Other Projs DO rewire, if any target
+        // function uses them.
+        for( Node use : ncepi.call()._uses )
+          if( use._uses._len==0 ) Env.GVN.add_dead(use);
       }
     }
 

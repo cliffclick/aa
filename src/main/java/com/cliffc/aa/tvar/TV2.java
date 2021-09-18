@@ -769,6 +769,7 @@ public class TV2 {
       if( tfp._fidxs==BitsFun.FULL.dual() ) return t;
       for( int fidx : tfp._fidxs ) {
         FunNode fun = FunNode.find_fidx(fidx);
+        if( fun == null || fun.is_dead() ) continue; // Stale dead fidx
         if( fun.fptr().tvar().is_err() ) throw unimpl();
         Type tret = fun.ret()._val;
         tret = tret instanceof TypeTuple ? ((TypeTuple)tret).at(REZ_IDX) : tret.oob(Type.SCALAR);

@@ -216,7 +216,7 @@ public abstract class Node implements Cloneable {
     while( _defs._len > 0 ) unuse(_defs.pop());
     _defs = _uses = null;       // TODO: Poor-man's indication of a dead node, probably needs to recycle these...
     LIVE.clear(_uid);           // Off the LIVE set.  CNT cannot roll back unless the GVN work lists are also clear
-    if( this instanceof FunNode ) ((FunNode)this).free();
+    if( this instanceof RetNode ) ((RetNode)this).free();
     if( this instanceof NewNode ) ((NewNode)this).free();
     return this;
   }
@@ -869,7 +869,7 @@ public abstract class Node implements Cloneable {
       Node def = _defs.at(i);   // Walk data defs for more errors
       if( def == null || def._val == Type.XCTRL ) continue;
       // Walk function bodies that are wired, but not bare FunPtrs.
-      if( def instanceof FunPtrNode && !def.is_forward_ref() )
+      if( def instanceof FunPtrNode && !def.is_forward_ref() && !(this instanceof ScopeNode) )
         continue;
       def.walkerr_def(errs,bs);
     }

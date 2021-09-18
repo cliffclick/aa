@@ -188,7 +188,7 @@ public class TestParse {
     testerr("math.rand(1)?1:\"a\"", "Cannot mix GC and non-GC types",18);
     test   ("math.rand(1)?1",TypeInt.BOOL); // Missing optional else defaults to nil
     test("math.rand(1)?\"abc\"",
-      (()->TypeMemPtr.make_nil(17,TypeStr.ABC)),
+      (()->TypeMemPtr.make_nil(20,TypeStr.ABC)),
       null,
       "str?"
     );
@@ -218,7 +218,7 @@ public class TestParse {
   }
 
   @Test public void testParse02() {
-    test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2)); // trivially inlined; capture external variable
+    // Anonymous function definition
     test("{x -> x&1}",
          (() -> TypeFunPtr.make(40,ARG_IDX+1, TypeMemPtr.NO_DISP)),
          ( () -> TypeFunSig.make(TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
@@ -228,8 +228,6 @@ public class TestParse {
                                                 TypeInt.BOOL)) ),
            "[40]{ int64 -> int64 }");
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
-
-    // Anonymous function definition
     testerr("{x y -> x+y}", "Scalar is none of (int64,flt64,*str?)",8); // {Scalar Scalar -> Scalar}
 
     // Function execution and result typing
@@ -245,12 +243,12 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
     testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64",9);
-    testerr("sq={x -> x*x}; sq(\"abc\")", "*\"abc\" is none of (flt64,int64)",9);
-    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0 which takes 2 arguments",16);
+    testerr("sq={x -> x*x}; sq(\"abc\")", "*\"abc\" is none of (int64,flt64)",9);
+    testerr("f0 = { f x -> f0(x-1) }; f0({_+_},2)", "Passing 1 arguments to f0 which takes 2 arguments",16);
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
-    test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
+    test("f0 = { x -> x ? {_+_}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
     test_obj("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
              TypeStruct.tupsD(Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
@@ -260,7 +258,7 @@ public class TestParse {
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
 
     // This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
-    testerr("(math.rand(1) ? {+} : {*})(2,3)","Unable to resolve call",26); // either 2+3 or 2*3, or {5,6} which is INT8.
+    testerr("(math.rand(1) ? {_+_} : {_*_})(2,3)","Unable to resolve call",26); // either 2+3 or 2*3, or {5,6} which is INT8.
   }
 
   @Test public void testParse03() {

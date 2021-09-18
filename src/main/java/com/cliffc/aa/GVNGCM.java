@@ -190,6 +190,11 @@ public class GVNGCM {
     return x.unkeep();
   }
 
+  public void iter_dead() {
+    Node n;
+    while( (n=_work_dead.pop()) != null )
+      _work_dead.apply(n);
+  }
 
   // Walk all memory edges, and 'retype' them, probably DOWN (counter to
   // 'iter').  Used when inlining, and the inlined body needs to acknowledge

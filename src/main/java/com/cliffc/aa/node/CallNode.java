@@ -123,20 +123,17 @@ public class CallNode extends Node {
   Node set_arg (int idx, Node arg) { assert idx>=DSP_IDX && idx <nargs(); return set_def(idx,arg); }
   public Node set_fdx( Node fun) { return set_def(DSP_IDX, fun); }
   public void set_mem( Node mem) { set_def(MEM_IDX, mem); }
-  public BitsFun fidxs() {
-    Type tf = fdx()._val;
-    return tf instanceof TypeFunPtr ? ((TypeFunPtr)tf).fidxs() : null;
-  }
 
   // Add a bunch of utilities for breaking down a Call.value tuple:
   // takes a Type, upcasts to tuple, & slices by name.
   // ts[0] == in(0) == ctl() == Ctrl
   // ts[1] == in(1) == mem() == Mem into the callee = mem()
-  // ts[2] == in(2) == fun() == Function pointer
+  // ts[2] == in(2) == dsp() == Display pointer
   // ts[3] == in(3) == arg(3)
   // ts[4] == in(4) == arg(4)
   // ....
-  // ts[_defs._len] = Escape-in aliases as a BitsAlias
+  // ts[_defs._len]   = Function, as a TFP
+  // ts[_defs._len+1] = Escape-in aliases as a TMP
   static        Type       tctl( Type tcall ) { return             ((TypeTuple)tcall).at(CTL_IDX); }
   static        TypeMem    emem( Type tcall ) { return emem(       ((TypeTuple)tcall)._ts ); }
   static        TypeMem    emem( Type[] ts  ) { return (TypeMem   ) ts[MEM_IDX]; } // callee memory passed into function
@@ -146,18 +143,12 @@ public class CallNode extends Node {
     return (TypeMemPtr)tt.at(tt.len()-1);
   }
   // No-check must-be-correct get TFP
-  static public TypeFunPtr ttfp( Type tcall ) {
-    TypeTuple tt = (TypeTuple)tcall;
-    return (TypeFunPtr)tt.at(DSP_IDX);
+  static public TypeFunPtr ttfp( Type t ) {
+    if( !(t instanceof TypeTuple) ) return (TypeFunPtr)t.oob(TypeFunPtr.GENERIC_FUNPTR);
+    TypeTuple tcall = (TypeTuple)t;
+    return (TypeFunPtr)tcall.at(tcall.len()-2);
   }
-  // Return TFP or null if not well structured
-  static public TypeFunPtr ttfpx(Type tcall ) {
-    if( !(tcall instanceof TypeTuple) ) return null;
-    TypeTuple tt = (TypeTuple)tcall;
-    Type t = tt.at(DSP_IDX);
-    return t instanceof TypeFunPtr ? (TypeFunPtr)t : null;
-  }
-  static TypeTuple set_ttfp( TypeTuple tcall, TypeFunPtr nfptr ) { return tcall.set(DSP_IDX,nfptr); }
+  static TypeTuple set_ttfp( TypeTuple tcall, TypeFunPtr nfptr ) { return tcall.set(tcall.len()-2,nfptr); }
   static Type targ( Type tcall, int x ) { return targ(((TypeTuple)tcall)._ts,x); }
   static Type targ( Type[] ts, int x ) { return ts[x]; }
 
@@ -172,8 +163,8 @@ public class CallNode extends Node {
     set_rpc(BitsRPC.new_rpc(_rpc)); // New child RPC for 'this' as well.
     // Swap out the existing old rpc users for the new.
     // Might be no users of either.
-    Node new_rpc = Node.con(TypeRPC.make(_rpc));
-    old_rpc.subsume(new_rpc);
+    if( old_rpc._uses._len==0 ) old_rpc.kill();
+    else old_rpc.subsume(Node.con(TypeRPC.make(_rpc)));
     return call;
   }
 
@@ -404,7 +395,7 @@ public class CallNode extends Node {
 
     // Result type includes a type-per-input and an extra roll-up type of all
     // escaping aliases.
-    final Type[] ts = Types.get(_defs._len+1);
+    final Type[] ts = Types.get(_defs._len+2);
     ts[CTL_IDX] = Type.CTRL;
     ts[MEM_IDX] = tmem;         // Memory into the callee, not caller
 
@@ -417,7 +408,7 @@ public class CallNode extends Node {
     if( _not_resolved_by_gcp && // If overloads not resolvable, then take them all, and we are in-error
         fidxs.above_center() && tfp!=TypeFunPtr.GENERIC_FUNPTR.dual() )
       tfp = tfp.make_from(fidxs.dual()); // Force FIDXS low (take all), and we are in-error
-    ts[DSP_IDX] = tfp;
+    ts[DSP_IDX] = tfp._disp;
 
     // Copy args for called functions.  FIDX is already refined.
     // Also gather all aliases from all args.
@@ -426,7 +417,8 @@ public class CallNode extends Node {
       as = as.meet(get_alias(ts[i] = arg(i)==null ? Type.XSCALAR : arg(i)._val));
     // Recursively search memory for aliases; compute escaping aliases
     BitsAlias as2 = tmem.all_reaching_aliases(as);
-    ts[_defs._len] = TypeMemPtr.make(as2,TypeObj.ISUSED); // Set escapes as last type
+    ts[_defs._len  ] = tfp;
+    ts[_defs._len+1] = TypeMemPtr.make(as2,TypeObj.ISUSED); // Set escapes as last type
     // Only pass along escaping aliases; others are not available to the call
     // body.  In the case of recursive calls, aliases made new in the body may
     // not be passed into the recursive calls, and thus not into the call head
@@ -497,8 +489,7 @@ public class CallNode extends Node {
   // have not seen all possible function-body uses.  Check for #FIDXs == nwired().
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
     if( !opt_mode._CG ) {
-      BitsFun fidxs = fidxs();
-      if( fidxs == null ) return TypeMem.ALLMEM; // Assume Something Good will yet happen
+      BitsFun fidxs = ttfp(_val).fidxs();
       if( fidxs.above_center() ) return _live; // Got choices, dunno which one will stick
       CallEpiNode cepi = cepi();
       if( cepi==null ) return _live; // Collapsing
@@ -553,7 +544,7 @@ public class CallNode extends Node {
 
     // After we have the exact callers, use liveness directly.  True if we have
     // the Call Graph, or the callers are known directly.  If the call is
-    // in-error, act as-if we do not known the Call Graph.
+    // in-error, act as-if we do not know the Call Graph.
     if( !(_val instanceof TypeTuple) ) // No type to sharpen
       return _val.oob(TypeMem.ALLMEM);
     if( opt_mode._CG || fdx() instanceof FunPtrNode ) // All callers known
@@ -578,8 +569,8 @@ public class CallNode extends Node {
   }
 
   private boolean all_fcns_wired() {
-    BitsFun fidxs = fidxs();
-    if( _is_copy || fidxs==null ) return true;
+    BitsFun fidxs = ttfp(_val)._fidxs;
+    if( _is_copy || fidxs==BitsFun.FULL ) return true;
     CallEpiNode cepi = cepi();
     return cepi != null && fidxs.bitCount() <= cepi.nwired();
   }
@@ -615,7 +606,7 @@ public class CallNode extends Node {
           continue;
 
         FunNode fun = FunNode.find_fidx(kidx);
-        if( fun.is_dead() || fun.nargs()!=nargs() || fun.in(0)==fun ) continue; // BAD/dead
+        if( fun==null || fun.is_dead() || fun.nargs()!=nargs() || fun.in(0)==fun ) continue; // BAD/dead
         TypeStruct formals = fun._sig._formals; // Type of each argument
         int cvts=0;                             // Arg conversion cost
         for( TypeFld fld : formals.flds() ) {
@@ -674,8 +665,7 @@ public class CallNode extends Node {
 
   // Resolve a call, removing ambiguity during the GCP/Combo pass.
   @Override public boolean remove_ambi() {
-    TypeFunPtr tfp = ttfpx(_val);
-    BitsFun fidxs = tfp.fidxs();
+    BitsFun fidxs = ttfp(_val).fidxs();
     if( !fidxs.above_center() ) return true; // Resolved after all
     assert fidxs!=BitsFun.ANY;               // Too many choices
     // Pick least-cost among choices
@@ -706,12 +696,10 @@ public class CallNode extends Node {
       if( arg(j)!=null && arg(j).is_forward_ref() )
         return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[j-ARG_IDX+1], FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx).fptr());
     // Expect a function pointer
-    TypeFunPtr tfp = ttfpx(_val);
-    if( tfp==null ) {
+    TypeFunPtr tfp = ttfp(_val);
+    if( tfp._fidxs==BitsFun.FULL ) {
       if( fast ) return ErrMsg.FAST;
-      Type t = _val;
-      if( t instanceof TypeTuple ) t = ((TypeTuple)t).at(DSP_IDX);
-      return ErrMsg.unresolved(_badargs[0],"A function is being called, but "+t+" is not a function type");
+      return ErrMsg.unresolved(_badargs[0],"A function is being called, but "+fdx()._val+" is not a function type");
     }
 
     // Indirectly, forward-ref for function type

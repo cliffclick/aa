@@ -70,10 +70,9 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   @Override public UnresolvedNode unk() { return null; }
   // Self short name
   @Override public String xstr() {
-    if( is_dead() || _defs._len==0 || ret()==null) return "*fun";
-    int fidx = ret()._fidx;    // Reliably returns a fidx
-    FunNode fun = FunNode.find_fidx(fidx);
-    return "*"+(fun==null ? ""+fidx : fun.name());
+    RetNode ret = ret();
+    if( is_dead() || _defs._len==0 || ret==null) return "*fun";
+    return "*"+_name;
   }
   // Inline longer name
   @Override String str() {
@@ -95,21 +94,22 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   @Override public Node ideal_reduce() {
     if( is_forward_ref() ) return null;
 
-    // Display is known dead?  Yank it.
     Node dsp = display();
-    Type tdsp = dsp._val;
-    if( !(dsp instanceof ConNode) && tdsp instanceof TypeMemPtr && ((TypeMemPtr)tdsp)._obj==TypeObj.UNUSED )
-      return set_def(1,Env.ANY); // No display needed
-
-    // Also unused if function has no display parm.
-    FunNode fun = xfun();
-    if( !(dsp instanceof ConNode) && fun!=null && fun.is_copy(0)==null && fun.parm(DSP_IDX)==null )
-      return set_def(1,Env.ANY);
-
-    // Remove unused displays.  Track uses; Calling with no display is OK.
-    // Uses storing the FPTR and passing it along still require a display.
-    if( GVN._opt_mode._CG && !(dsp instanceof ConNode) && !display_used() )
-      return set_def(1,Env.ANY); // No display needed
+    if( dsp!=Env.ANY ) {
+      Type tdsp = dsp._val;
+      FunNode fun;
+      // Display is known dead?
+      if( (tdsp instanceof TypeMemPtr && ((TypeMemPtr)tdsp)._obj==TypeObj.UNUSED) ||
+          // Collapsing to a gensym, no need for display
+          ret().is_copy() ||
+          // Also unused if function has no display parm.
+          ((fun=xfun())!=null && fun.is_copy(0)==null && fun.parm(DSP_IDX)==null) ||
+          // Remove unused displays.  Track uses; Calling with no display is OK.
+          // Uses storing the FPTR and passing it along still require a display.
+          (GVN._opt_mode._CG && !display_used())
+          )
+        return set_def(1,Env.ANY); // No display needed
+    }
     return null;
   }
   // Called if Display goes unused
@@ -119,17 +119,17 @@ public final class FunPtrNode extends UnOrFunPtrNode {
       Env.GVN.add_reduce(this);
   }
 
-  // Is the display used?
+  // Is the display used?  Calls may use the TFP portion but not the display.
   private boolean display_used() {
     for( Node call : _uses ) {
-      if( call instanceof CallNode ) {
-        if( call._defs.find(e->e==this) < call._defs._len-1 )
-          return true;          // Call-use other than the last position is using the display portion of this FPTR
-      } else {
-        return true;            // Anything other than a Call is using the display
-      }
+      if( !(call instanceof CallNode) ) return true; // Anything other than a Call is using the display
+      for( int i=ARG_IDX; i<call.len(); i++ )
+        if( call.in(i)==this ) return true; // Call-use other than the last position is using the display portion of this FPTR
+      assert ((CallNode)call).fdx()==this;
+      if( ProjNode.proj(call,DSP_IDX)!=null )
+        return true;            // Call needs the display and fptr both
     }
-    return false;
+    return false;               // Only uses are Calls needing the fptr but not the display
   }
 
 
@@ -157,6 +157,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     if( is_forward_ref() )
       return work==null || self.unify(TV2.make_err(this,"A forward reference is not a function","FunPtr_unify"),work);
     RetNode ret = ret();
+    if( ret.is_copy() ) return false; // GENSYM
     FunNode fun = ret.fun();
 
     boolean progress = false;
@@ -241,6 +242,8 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     FunNode.FUNS.setX(dfun._fidx,null); // Untrack dfun by old fidx
     dfun._fidx = rfun._fidx;
     FunNode.FUNS.setX(dfun._fidx,dfun); // Track FunNode by new fidx
+    ret().unelock();
+    ret()._fidx = 0; // No longer killing def fidx when dying
 
     // Update the fidx
     RetNode dret = def.ret();
@@ -259,7 +262,6 @@ public final class FunPtrNode extends UnOrFunPtrNode {
 
     dsp.update(tok,dsp.access(tok),def);
     fptr.bind(tok); // Debug only, associate variable name with function
-    //Env.GVN.add_reduce_uses(this);
     assert Env.START.more_flow(Env.GVN._work_flow,true)==0;
     Env.GVN.iter(GVNGCM.Mode.Parse);
   }

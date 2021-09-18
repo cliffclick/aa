@@ -198,7 +198,7 @@ public final class CallEpiNode extends Node {
     for( int fidx : fidxs ) {                 // For all fidxs
       if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
       FunNode fun = FunNode.find_fidx(fidx);  // Lookup, even if not wired
-      if( fun.is_dead() ) continue;           // Already dead, stale fidx
+      if( fun==null || fun.is_dead() ) continue; // Already dead, stale fidx
       if( fun.is_forward_ref() ) continue;    // Not forward refs, which at GCP just means a syntax error
       RetNode ret = fun.ret();
       if( ret==null ) continue;               // Mid-death
@@ -275,16 +275,16 @@ public final class CallEpiNode extends Node {
     // along to the function being called.
     // tcall[0] = Control
     // tcall[1] = Memory passed around the functions.
-    // tcall[2] = TypeFunPtr passed to FP2Closure
+    // tcall[2] = Display
     // tcall[3+]= Arg types
     Type ctl = CallNode.tctl(tcall); // Call is reached or not?
     if( ctl != Type.CTRL && ctl != Type.ALL )
       return TypeTuple.CALLE.dual();
-    TypeFunPtr tfptr= CallNode.ttfpx(tcall); // Peel apart Call tuple
+    TypeFunPtr tfptr= CallNode.ttfp(tcall);  // Peel apart Call tuple
     TypeMemPtr tescs= CallNode.tesc(tcall);  // Peel apart Call tuple
 
     // Fidxes; if still in the parser, assuming calling everything
-    BitsFun fidxs = tfptr==null || tfptr.is_forward_ref() ? BitsFun.FULL : tfptr.fidxs();
+    BitsFun fidxs = tfptr.fidxs();
     // NO fidxs, means we're not calling anything.
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
     if( fidxs.above_center() ) return TypeTuple.CALLE.dual(); // Not resolved yet
@@ -324,10 +324,10 @@ public final class CallEpiNode extends Node {
     }
 
     // Compute call-return value from all callee returns
-    Type trez = Type   .XSCALAR;
+    Type trez = Type   .ANY;
     Type tmem = TypeMem.ANYMEM;
     if( fidxs == BitsFun.FULL ) { // Called something unknown
-      trez = Type.SCALAR;         // Unknown target does worst thing
+      trez = Type.ALL;         // Unknown target does worst thing
       tmem = defmem;
     } else {                      // All targets are known & wired
       for( int i=0; i<nwired(); i++ ) {

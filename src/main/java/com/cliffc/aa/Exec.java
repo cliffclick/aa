@@ -15,7 +15,8 @@ public abstract class Exec {
 
     // Kill, cleanup and reset for another parse
     te._scope.unhook();   // The exiting scope is removed
-    while( te._scope.len()>0 ) te._scope.pop(); // All edges removed, otherwise a self-cycle keeps alive
+    // All edges removed, otherwise a self-cycle keeps alive
+    while( te._scope.len()>0 ) te._scope.pop();
     Env.top_reset();                   // Hard reset
 
     return te;
