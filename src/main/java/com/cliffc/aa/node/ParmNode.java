@@ -1,8 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.ErrMsg;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFld;
 
@@ -51,20 +49,12 @@ public class ParmNode extends PhiNode {
     FunNode fun = fun();
     if( fun._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
     assert fun._defs._len==_defs._len;
-    if( fun.in(0)!=null && in(1) != this) // FunNode is a Copy
-      return in(1);             // So return the copy
+    if( fun.in(0)!=null )       // FunNode is a Copy
+      return in(1)==this ? Env.ANY : in(1);             // So return the copy
     // Do not otherwise fold away, as this lets Nodes in *this* function depend
     // on values in some other function... which, if code-split, gets confused
     // (would have to re-insert the Parm).
     return null;
-  }
-
-  private boolean valid_args( FunNode fun, int i, Node mem ) {
-    if( fun._thunk_rhs ) return true; // Always allow folding of Thunks
-    // Check arg type, after sharpening
-    Type actual = mem==null ? val(i) : in(i).sharptr(mem.in(i));
-    Type formal = fun.formal(_idx);
-    return actual.isa(formal);
   }
 
   @Override public Type value(GVNGCM.Mode opt_mode) {

@@ -671,10 +671,8 @@ public class CallNode extends Node {
     // Pick least-cost among choices
     FunPtrNode fptr = least_cost(fidxs,fdx());
     if( fptr==null ) return false; // Not resolved, no progress
-    //set_dsp(fptr.display());       // Pick up the display
-    //set_fdx(fptr);                 // Set resolved edge
-    //return true;                   // Progress
-    throw unimpl();
+    set_fdx(fptr);                 // Set resolved edge
+    return true;                   // Progress
   }
 
   // See if we can resolve an unresolved Call

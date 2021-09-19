@@ -1230,7 +1230,7 @@ public class Parse implements Comparable<Parse> {
     }
 
     // Check for a $$java_class
-    if( peek2(_buf[_x],"$$") ) return java_class_type();
+    if( _x < _buf.length && peek2(_buf[_x],"$$") ) return java_class_type();
 
     // Primitive type
     int oldx = _x;

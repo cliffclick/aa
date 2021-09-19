@@ -75,7 +75,6 @@ public class GVNGCM {
 
   // Initial state after loading e.g. primitives.
   void init0() {
-    for( Work work : _all_works ) assert work.isEmpty();
   }
   // Reset is called after a top-level exec exits (e.g. junits) with no parse
   // state left alive.  NOT called after a line in the REPL or a user-call to

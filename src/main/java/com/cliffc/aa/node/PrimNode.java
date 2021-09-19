@@ -173,12 +173,22 @@ public abstract class PrimNode extends Node {
     Types.free(ts);
     return rez2;
   }
+
+  @Override public Node ideal_reduce() {
+    if( _live != TypeMem.DEAD ) return null;
+    Node progress=null;
+    for( int i=ARG_IDX; i<_defs._len; i++ )
+      if( in(i)!=Env.ANY ) progress=set_def(i,Env.ANY);
+    return progress;
+  }
+
+
   @Override public ErrMsg err( boolean fast ) {
     for( TypeFld fld : _sig._formals.flds() ) {
       Type tactual = val(fld._order);
       Type tformal = fld._t;
       if( !tactual.isa(tformal) )
-        return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[fld._order],tactual,null,tformal);
+        return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[fld._order-ARG_IDX],tactual,null,tformal);
     }
     return null;
   }

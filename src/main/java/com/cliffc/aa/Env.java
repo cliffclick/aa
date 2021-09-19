@@ -45,6 +45,7 @@ public class Env implements AutoCloseable {
   public static      ConNode ALL;   // Common ALL / used for errors
   public static      ConNode XCTRL; // Always dead control
   public static      ConNode XNIL;  // Default 0
+  public static      ConNode XUSE;  // Unused objects (dead displays)
   public static      ConNode ALL_CTRL; // Default control
   public static      ConNode ALL_PARM; // Default parameter
   public static      ConNode ALL_CALL; // Common during function call construction
@@ -56,7 +57,7 @@ public class Env implements AutoCloseable {
   public static    ScopeNode SCP_0; // Program start scope
 
   public static   DefMemNode DEFMEM;// Default memory (all structure types)
-  private static int MAX_ALIAS;
+  public static final Node[] DEFMEM_RESET;
 
   // Set of all display aliases, used to track escaped displays at call sites for asserts.
   public static BitsAlias ALL_DISPLAYS = BitsAlias.EMPTY;
@@ -73,6 +74,7 @@ public class Env implements AutoCloseable {
     ALL     = GVN.xform(new ConNode<>(Type.ALL   )).keep();
     XCTRL   = GVN.xform(new ConNode<>(Type.XCTRL )).keep();
     XNIL    = GVN.xform(new ConNode<>(Type.XNIL  )).keep();
+    XUSE    = GVN.xform(new ConNode<>(TypeObj.UNUSED)).keep();
     ALL_CTRL= GVN.xform(new ConNode<>(Type.CTRL  )).keep();
     ALL_PARM= GVN.xform(new ConNode<>(Type.SCALAR)).keep();
     ALL_CALL= GVN.xform(new ConNode<>(TypeRPC.ALL_CALL)).keep();
@@ -83,6 +85,8 @@ public class Env implements AutoCloseable {
 
     // The Top-Level environment; holds the primitives.
     TOP = new Env();
+    SCP_0 = TOP._scope;
+    STK_0 = SCP_0.stk();
     // Parse PRIM_SOURCE for the primitives
     PrimNode.PRIMS();           // Initialize
 
@@ -92,10 +96,12 @@ public class Env implements AutoCloseable {
       String prog = new String(encoded);
       ErrMsg err = new Parse("PRIMS",true,TOP,prog).prog();
       TOP._scope.set_rez(ALL_PARM);
+      while( DEFMEM._defs.last()==null ) DEFMEM.pop(); // Remove temp unused aliases
       Env.GVN.iter(GVNGCM.Mode.PesiNoCG);
       TypeEnv te = TOP.gather_errors(err);
       assert te._errs==null && te._t==Type.SCALAR; // Primitives parsed fine
     } catch( Exception e ) { throw new RuntimeException(e); }; // Unrecoverable
+    DEFMEM_RESET = DEFMEM._defs.asAry();
     record_for_reset();
   }
 
@@ -124,12 +130,7 @@ public class Env implements AutoCloseable {
 
   // Top-level Env.  Contains, e.g. the primitives.
   // Above any file-scope level Env.
-  private Env( ) {
-    this(null,null,true,CTL_0,MEM_0,XNIL);
-    SCP_0 = _scope;
-    STK_0 = SCP_0.stk();
-    //SCP_0.init();               // Add base types; TODO: move into init code
-  }
+  private Env( ) { this(null,null,true,CTL_0,MEM_0,XNIL); }
 
 
   // A file-level Env, or below.  Contains user written code as opposed to primitives.
@@ -196,7 +197,6 @@ public class Env implements AutoCloseable {
 
   // Record global static state for reset
   private static void record_for_reset() {
-    MAX_ALIAS = DEFMEM.len();
     Node.init0(); // Record end of primitives
     GVN.init0();
     FunNode.init0();
@@ -208,7 +208,9 @@ public class Env implements AutoCloseable {
   // Reset all global statics for the next parse.  Useful during testing when
   // many top-level parses happen in a row.
   static void top_reset() {
-    while( DEFMEM.len() > MAX_ALIAS ) DEFMEM.pop();
+    while( DEFMEM.len() > DEFMEM_RESET.length ) DEFMEM.pop();
+    for( int i=0; i<DEFMEM_RESET.length; i++ )
+      DEFMEM.set_def(i,DEFMEM_RESET[i]);
     Env.GVN.iter_dead(); // Clear out the dead before clearing VALS, since they may not be reachable and will blow the elock assert
     TV2.reset_to_init0();
     Node.VALS.clear();                         // Clean out hashtable

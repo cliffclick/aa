@@ -390,7 +390,8 @@ public final class CallEpiNode extends Node {
   // the call but not flowing in.  Catches all the "new in call" returns.
   static TypeMem live_out(TypeMem caller_mem, TypeMem post_call, Type trez, BitsAlias esc_in, TypeMem defmem) {
     BitsAlias esc_out = esc_out(post_call,trez);
-    int len = defmem==null ? Math.max(caller_mem.len(),post_call.len()) : defmem.len();
+    int len = Math.max(Math.max(caller_mem.len(),post_call.len()),esc_out.max()+1);
+    if( defmem!=null ) len = Math.max(len,defmem.len());
     TypeObj[] pubs = new TypeObj[len];
     // TODO: Wildly inefficient
     for( int i=1; i<pubs.length; i++ ) {

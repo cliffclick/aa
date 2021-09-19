@@ -591,7 +591,7 @@ public class FunNode extends RegionNode {
     assert cnts[OP_SCOPE]==0;
     assert cnts[OP_REGION] <= cnts[OP_IF];
 
-    // Specifically ignoring constants, parms, phis, rpcs, types,
+    // Specifically ignoring constants, parms, phis, RPCs, types,
     // unresolved, and casts.  These all track & control values, but actually
     // do not generate any code.
     if( cnts[OP_CALL] > 2 || // Careful inlining more calls; leads to exponential growth
@@ -611,7 +611,7 @@ public class FunNode extends RegionNode {
     int m=-1, mncons = -1;
     for( int i=has_unknown_callers() ? 2 : 1; i<_defs._len; i++ ) {
       Node call = in(i).in(0);
-      if( !(call instanceof CallNode) ) continue; // Not well formed
+      if( !(call instanceof CallNode) ) continue; // Not well-formed
       if( ((CallNode)call).nargs() != nargs() ) continue; // Will not inline
       if( call._val == Type.ALL ) continue; // Otherwise in-error
       TypeFunPtr tfp = CallNode.ttfp(call._val);
@@ -661,7 +661,7 @@ public class FunNode extends RegionNode {
       ret.set_fidx(newfidx);      // Renumber in the old RetNode
       // Right now, force the type upgrade on old_fptr.  old_fptr carries the old
       // parent FIDX and is on the worklist.  Eventually, it comes off and the
-      // value() call lifts to the child fidx.  Meanwhile its value can be used
+      // value() call lifts to the child fidx.  Meanwhile, its value can be used
       // to wire a size-split to itself (e.g. fib()), which defeats the purpose
       // of a size-split (single caller only, so inlines).
       for( Node old_fptr : ret._uses )
@@ -814,7 +814,7 @@ public class FunNode extends RegionNode {
         Env.DEFMEM.make_mem(nnrg.nnn()._alias,nnrg);
         Env.DEFMEM.make_mem(oorg.nnn()._alias,oorg);
         int oldalias = BitsAlias.parent(oorg.nnn()._alias);
-        Env.DEFMEM.set_def(oldalias,Env.DEFMEM.in(BitsAlias.parent(oldalias)));
+        Env.DEFMEM.set_def(oldalias,Env.XUSE); // Old alias is dead
         Env.GVN.add_mono(oorg.nnn());
         Env.GVN.add_flow_uses(oorg);
         split_alias=true;

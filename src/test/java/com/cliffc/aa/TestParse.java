@@ -258,7 +258,7 @@ public class TestParse {
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
 
     // This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
-    testerr("(math.rand(1) ? {_+_} : {_*_})(2,3)","Unable to resolve call",26); // either 2+3 or 2*3, or {5,6} which is INT8.
+    testerr("(math.rand(1) ? {_+_} : {_*_})(2,3)","Unable to resolve call",30); // either 2+3 or 2*3, or {5,6} which is INT8.
   }
 
   @Test public void testParse03() {

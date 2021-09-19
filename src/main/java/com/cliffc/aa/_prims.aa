@@ -3,10 +3,13 @@
 // Typically used in the call position, with a FunPtrNode returned.
 
 
-int =: $$com.cliffc.aa.type.TypeInt#INT64;
-flt =: $$com.cliffc.aa.type.TypeFlt#FLT64;
-ptr =: $$com.cliffc.aa.type.TypeMemPtr#ISUSED;
-str =: $$com.cliffc.aa.type.TypeMemPtr#STRPTR;
+int   =: $$com.cliffc.aa.type.TypeInt#INT64;
+int1  =: $$com.cliffc.aa.type.TypeInt#BOOL;
+flt   =: $$com.cliffc.aa.type.TypeFlt#FLT64;
+flt32 =: $$com.cliffc.aa.type.TypeFlt#FLT32;
+flt64 =: $$com.cliffc.aa.type.TypeFlt#FLT64;
+ptr   =: $$com.cliffc.aa.type.TypeMemPtr#ISUSED;
+str   =: $$com.cliffc.aa.type.TypeMemPtr#STRPTR;
 
 
 // Simple integer math
