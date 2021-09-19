@@ -54,6 +54,14 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   @Override public String xstr() { return "New"+"*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
 
+  public MrgProjNode mem() {
+    if( _uses._len < 1 ) return null;
+    if( _uses.at(0) instanceof MrgProjNode ) return (MrgProjNode)_uses.at(0);
+    if( _uses._len < 2 ) return null;
+    if( _uses.at(1) instanceof MrgProjNode ) return (MrgProjNode)_uses.at(1);
+    return null;
+  }
+
   // Recompute default memory cache on a change.  Might not be monotonic,
   // e.g. during Node create, or folding a Store.
   public final void sets( T ts ) {
@@ -123,12 +131,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     if( _uses._len==0 ) return false; // Dead or being created
     Node mem = _uses.at(0);
     // If only either address or memory remains, then memory contents are dead
-    if( _uses._len==1 ) {
-      if( mem instanceof MrgProjNode ) return true; // No pointer, just dead memory
-      // Just a pointer; currently on Strings become memory constants and
-      // constant-fold - leaving the allocation dead.
-      return !(val(1) instanceof TypeStr);
-    }
+    if( _uses._len==1 )
+      return mem instanceof MrgProjNode; // No pointer, just dead memory
     Node ptr = _uses.at(1);
     if( ptr instanceof MrgProjNode ) ptr = _uses.at(0); // Get ptr not mem
     if( ptr._keep>0 ) return false;

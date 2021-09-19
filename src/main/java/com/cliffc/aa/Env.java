@@ -95,7 +95,7 @@ public class Env implements AutoCloseable {
       byte[] encoded = Files.readAllBytes(Paths.get("./src/main/java/com/cliffc/aa/_prims.aa"));
       String prog = new String(encoded);
       ErrMsg err = new Parse("PRIMS",true,TOP,prog).prog();
-      TOP._scope.set_rez(ALL_PARM);
+      TOP._scope.set_rez(Node.con(Type.SCALAR));
       while( DEFMEM._defs.last()==null ) DEFMEM.pop(); // Remove temp unused aliases
       Env.GVN.iter(GVNGCM.Mode.PesiNoCG);
       TypeEnv te = TOP.gather_errors(err);

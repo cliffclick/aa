@@ -73,6 +73,7 @@ public class ParmNode extends PhiNode {
       if( _idx!=MEM_IDX && fld != null ) return fld._t.simple_ptr();
       return len()==1 ? _t : val(1);
     }
+    if( fun.len()!=len() ) return Type.ALL; // Collapsing
     Node mem = fun.parm(MEM_IDX);
     // All callers' known; merge the wired & flowing ones
     Type t = Type.ANY;
@@ -110,11 +111,14 @@ public class ParmNode extends PhiNode {
   @Override public ErrMsg err( boolean fast ) {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere
     FunNode fun = fun();
-    if( fun.in(0)== fun ) return null; // Dead, being inlined
-    assert fun._defs._len==_defs._len;
-    if( _idx <= MEM_IDX ) return null; // No arg check on RPC or memory
+    if( fun.in(0)== fun ) return null;  // Dead, being inlined
+    if( fun.len()!=len() ) return null; // Broken, dying
+    if( _idx <= MEM_IDX ) return null;  // No arg check on RPC or memory
     Node mem = fun.parm(MEM_IDX);
-    Type formal = fun.formal(_idx);
+    assert _name!=null;
+    TypeFld ffld = fun._sig._formals.fld_find(_name);
+    if( ffld==null ) return null; // dead display, because loading a high value
+    Type formal = ffld._t;
     for( int i=1; i<_defs._len; i++ ) {
       if( fun.val(i)==Type.XCTRL ) continue;// Ignore dead paths
       Type argt = mem == null ? in(i)._val : in(i).sharptr(mem.in(i)); // Arg type for this incoming path

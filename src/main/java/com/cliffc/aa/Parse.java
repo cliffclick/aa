@@ -191,12 +191,13 @@ public class Parse implements Comparable<Parse> {
     // variant.
     TypeStruct ts = (TypeStruct)((TypeMemPtr)tn._val)._obj;
     FunPtrNode epi1 = IntrinsicNode.convertTypeName(ts,bad,_gvn);
-    Node rez = _e.add_fun(bad,tvar,epi1); // Return type-name constructor
+    _e.add_fun(bad,tvar,epi1); // Return type-name constructor
     // Add a second constructor taking an expanded arg list
     FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(ts, tn.alias(), errMsg());
     _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
+    scope().stk().mem().xval();// Type upgrade immediately after adding
 
-    return rez;
+    return _e.lookup(tvar); // Returns an Unresolved of constructors
   }
 
   /** A statement is a list of variables to final-assign or re-assign, and an
@@ -932,9 +933,12 @@ public class Parse implements Comparable<Parse> {
         // Standard return; function control, memory, result, RPC.  Plus a hook
         // to the function for faster access.
         RetNode ret = (RetNode)X.xform(new RetNode(ctrl(),mem(),rez,rpc,fun));
-        Env.TOP._scope.add_def(ret);
         // The FunPtr builds a real display; any up-scope references are passed in now.
         Node fptr = X.xform(new FunPtrNode(null,ret,fresh_disp.unhook()));
+        // Hook function at the TOP scope, in case it escapes all current
+        // enclosing scopes.  This hook is removed as part of doing the Combo
+        // pass which computes a real Call Graph and all escapes.
+        Env.TOP._scope.add_def(ret);
 
         _e = e._par;            // Pop nested environment; pops nongen also
         return (X._ret=fptr);   // Return function; close-out and DCE 'e'

@@ -92,6 +92,7 @@ public class ScopeNode extends Node {
   public void add_type( String name, ConTypeNode t ) {
     assert _types.get(name)==null;
     _types.put( name, t );
+    add_def(t);                 // Hook constant so it does not die
   }
 
   public boolean is_closure() { assert _defs._len==4 || _defs._len==7; return _defs._len==7; }

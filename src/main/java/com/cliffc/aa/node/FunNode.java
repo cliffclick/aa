@@ -470,6 +470,8 @@ public class FunNode extends RegionNode {
         if( use instanceof MemPrimNode.LValueWrite || use instanceof MemPrimNode.LValueWriteFinal )
           if( ((MemPrimNode)use).idx() == n ) return true; // Use as index is broken
           else break;   // Use for array base or value is fine
+        if( use instanceof PrimNode.AddF64 ) return true;
+        if( use instanceof PrimNode.AddI64 ) return true;
         if( use instanceof PrimNode.MulF64 ) return true;
         if( use instanceof PrimNode.MulI64 ) return true;
         if( use instanceof PrimNode.AndI64 ) return true;

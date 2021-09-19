@@ -139,8 +139,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
-  private boolean is_tup() {
-    if( _flds.size()<=1 ) return true;
+  public boolean is_tup() {
+    if( _flds.size()==0 || (_flds.size()==1 && _flds.get("^")!=null) ) return true;
     return _flds.get("0")!=null && _flds.get("0")._order==ARG_IDX;
   }
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {

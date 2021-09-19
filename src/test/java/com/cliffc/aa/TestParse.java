@@ -189,9 +189,7 @@ public class TestParse {
     test   ("math.rand(1)?1",TypeInt.BOOL); // Missing optional else defaults to nil
     test("math.rand(1)?\"abc\"",
       (()->TypeMemPtr.make_nil(20,TypeStr.ABC)),
-      null,
-      "str?"
-    );
+      null, "*[0,20]\"abc\"?" );
     test   ("x:=0;math.rand(1)?(x:=1);x",TypeInt.BOOL);
     testerr("a.b.c();","Unknown ref 'a'",0);
   }
@@ -304,15 +302,19 @@ public class TestParse {
     testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32",3);
 
     // Named types
-    test_name("A= :(       )" ); // Zero-length tuple
-    test_name("A= :(   ,   )", Type.SCALAR); // One-length tuple
-    test_name("A= :(   ,  ,)", Type.SCALAR  ,Type.SCALAR  );
-    test_name("A= :(flt,   )", TypeFlt.FLT64 );
-    test_name("A= :(flt,int)", TypeFlt.FLT64,TypeInt.INT64);
-    test_name("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
+    test_named_tuple("A= :(       )" ); // Zero-length tuple
+    test_named_tuple("A= :(   ,   )", Type.SCALAR); // One-length tuple
+    test_named_tuple("A= :(   ,  ,)", Type.SCALAR  ,Type.SCALAR  );
+    test_named_tuple("A= :(flt,   )", TypeFlt.FLT64 );
+    test_named_tuple("A= :(flt,int)", TypeFlt.FLT64,TypeInt.INT64);
+    test_named_tuple("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
 
-    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*\"abc\", 2)");
-    test_ptr("A= :(str?, int); A( (\"abc\",2) )","A:(*\"abc\", 2)");
+    test("A= :(str?, int); A( \"abc\",2 )",
+      (()-> TypeMemPtr.make(22,TypeStruct.tupsD(TypeMemPtr.make(20,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
+      null, "[22](*[20]\"abc\",2)");
+    test("A= :(str?, int); A( (\"abc\",2) )",
+      (()-> TypeMemPtr.make(21,TypeStruct.tupsD(TypeMemPtr.make(20,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
+      null, "[21](*[20]\"abc\",2)");
     testerr("A= :(str?, int)?","Named types are never nil",16);
   }
 
@@ -345,7 +347,7 @@ public class TestParse {
     test("x=@{a:=1;b=@{a=a+1;c=a}}; x.a*10+x.b.c",TypeInt.con(1*10+2));
     // Similar to Python; if the first ref to a variable finds it in some
     // (possibly external) scope, futher refs all refer to the same variable.
-    // Here 'a:=a+1' or 'a++' in the scope of 'b' increment the external variable.
+    // Here 'a:=a+1' or 'a++' in the scope of 'b' increments the external variable.
     // If the first ref to a variable is a set/store, then the variable
     // is defined locally.  Hence 'b=0' shadows the external x.b, and x.b
     // is NOT set to 0.
@@ -947,13 +949,15 @@ HashTable = {@{
     assertNull(te._errs);
     assertEquals(expected,te._t);
   }
-  static private void test_name( String program, Type... args ) {
-    //TypeEnv te = run(program);
-    //assertTrue(te._t instanceof TypeFunPtr);
-    //TypeFunPtr actual = (TypeFunPtr)te._t;
-    //TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),ARG_IDX+1, TypeMemPtr.NO_DISP);
-    //assertEquals(expected,actual);
-    throw unimpl();
+  static private void test_named_tuple( String program, Type... args ) {
+    TypeEnv te = run(program);
+    assertTrue(te._t instanceof TypeFunPtr);
+    TypeFunPtr actual = (TypeFunPtr)te._t;
+    TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),ARG_IDX+args.length, TypeMemPtr.NO_DISP);
+    assertEquals(expected,actual);
+    if( te._sig._formals.is_tup() )
+      for( TypeFld fld : te._sig._formals.flds() )
+        assertEquals(args[fld._order-ARG_IDX],fld._t);
   }
   static private void test_ptr( String program, Function<Integer,Type> expected ) {
     //TypeEnv te = run(program);

@@ -30,13 +30,18 @@ public abstract class Exec {
     // Parse a program
     ErrMsg err = new Parse(src,false,e,str).prog();
 
-    // Delete names before starting typing/optimization
+    // Close file scope; no program text in this file, so no more fields to add.
     e._scope.keep();
     Env.GVN.add_flow_uses(e._scope);// Post-parse, revisit top-level called functions
     e.close();                // No more fields added to the parse scope
+    // Pessimistic optimizations; might improve error situation
+    Env.GVN.iter(GVNGCM.Mode.PesiNoCG);
+    // Remove any Env.TOP hooks to function pointers, only kept alive until we
+    // can compute a real Call Graph.
+    while( !Env.SCP_0._defs.last().is_prim() )
+      Env.SCP_0.pop();
 
     // Type
-    Env.GVN.iter(GVNGCM.Mode.PesiNoCG); // Pessimistic optimizations; might improve error situation
     Combo.opto();                    // Global Constant Propagation and Hindley-Milner Typing
     Env.GVN.iter(GVNGCM.Mode.PesiCG);// Re-check all ideal calls now that types have been maximally lifted
     Combo.opto();                    // Global Constant Propagation and Hindley-Milner Typing

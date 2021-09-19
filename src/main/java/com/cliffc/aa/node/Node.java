@@ -584,7 +584,7 @@ public abstract class Node implements Cloneable {
 
   // Do One Step of Hindley-Milner unification.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
-  public void combo_unify(Work work) {
+public void combo_unify(Work work) {
     if( _live==TypeMem.DEAD ||  // No HM progress on dead code
         !has_tvar() ) return;   // Has no TVar in the first place
     TV2 old = tvar();

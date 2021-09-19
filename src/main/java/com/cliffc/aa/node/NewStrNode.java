@@ -31,7 +31,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
     // Constant Strings intern
     @Override public int hashCode() { return is_unused() ? super.hashCode() : _ts._hash; }
     @Override public boolean equals(Object o) { return o instanceof ConStr && _ts==((ConStr)o)._ts; }
-    @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Str",this,_ts,alloc_site,null); }
+    @Override public TV2 new_tvar(String alloc_site) { return TV2.make_base(this,_tptr==null ? null : _tptr.make_from(_ts),alloc_site); }
   }
 
   public static class ConvertI64Str extends NewStrNode {

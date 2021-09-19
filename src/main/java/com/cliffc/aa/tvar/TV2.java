@@ -1005,7 +1005,8 @@ public class TV2 {
       if( _args==null ) sb.p("_ ");
       else
         for( String fld : sorted_flds() ) // Skip field names in a tuple
-          str0(is_tup ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,_args.get(fld),dups,debug).p(',');
+          if( !(is_tup && Util.eq(fld,"^")) )
+            str0(is_tup ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,_args.get(fld),dups,debug).p(',');
       if( open() ) sb.p(" ...,");
       sb.unchar().p(!is_tup ? "}" : ")");
       if( _type!=null && _type.must_nil() ) sb.p("?");
