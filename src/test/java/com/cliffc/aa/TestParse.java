@@ -323,7 +323,7 @@ public class TestParse {
     testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",14);
     testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x' in @{x=1}",8);
     test   ("a=@{x=1.2;y;}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing semicolon optional
-    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3; v:=2}");
+    test   ("x=@{n:=1;v:=2}; x.n := 3; x", "*[9]@{^=any; n:=3; v:=2}","[9]@{^=any, n=3, v=2}");
     testerr("(a=@{x=0;y=0}; a.)", "Missing field name after '.'",17);
     testerr("a=@{x=0;y=0}; a.x=1; a","Cannot re-assign final field '.x' in @{x=0; y=0}",16);
     test   ("a=@{x=0;y=1}; b=@{x=2}  ; c=math.rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2; structs can be partially merged
@@ -346,10 +346,10 @@ public class TestParse {
     // After the new field, the new field is used.
     test("x=@{a:=1;b=@{a=a+1;c=a}}; x.a*10+x.b.c",TypeInt.con(1*10+2));
     // Similar to Python; if the first ref to a variable finds it in some
-    // (possibly external) scope, futher refs all refer to the same variable.
+    // (possibly external) scope, further refs all refer to the same variable.
     // Here 'a:=a+1' or 'a++' in the scope of 'b' increments the external variable.
     // If the first ref to a variable is a set/store, then the variable
-    // is defined locally.  Hence 'b=0' shadows the external x.b, and x.b
+    // is defined locally.  Hence, 'b=0' shadows the external x.b, and x.b
     // is NOT set to 0.
     test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
 
@@ -941,6 +941,18 @@ HashTable = {@{
       assertEquals(stripIndent(hm_expect),stripIndent(hm_actual));
   }
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
+
+  static private void test( String program, String flow_expect, String hm_expect ) {
+    TypeEnv te = run(program);
+    Type flow_actual = te._tmem.sharptr(te._t);
+    String flow_str = flow_actual.toString();      // Print what we see, with memory
+    TV2 hm_actual = te._hmt;
+    String hm_str = hm_actual.p();
+    assertEquals(flow_expect,flow_str);
+    if( Combo.DO_HM )
+      assertEquals(stripIndent(hm_expect),stripIndent(hm_str));
+  }
+
 
   static private void test_prim( String program, String prim ) {
     Type expected = Env.TOP.lookup_valtype(prim);

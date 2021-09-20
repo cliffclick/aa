@@ -527,25 +527,25 @@ public class TV2 {
     // directly.  Fields in one TV2 and not in the other are put in the result
     // if the other is open, and dropped otherwise.
     NonBlockingHashMap<String,TV2> args = _args;
+    TV2 thsi = this;
     for( String key : args.keySet() ) {
-      TV2 vthis = get(key); assert vthis!=null;
+      TV2 vthis = thsi.get(key); assert vthis!=null;
       TV2 vthat = that.get(key);
       if( vthat==null ) {
         if( that.open() ) that.add_fld(key,vthis,work);
       } else vthis._unify(vthat,work); // Matching fields unify
-      if( this.find() != this ) throw unimpl();
+      thsi = thsi.find();
       if( that.find() != that ) throw unimpl();
-      assert this._args==args;
     }
     // Fields on the RHS are aligned with the LHS also
     for( String key : that._args.keySet() )
       if( args.get(key)==null )
-        if( this.open() )  this.add_fld(key,that.get(key),work); // Add to LHS
+        if( thsi.open() )  thsi.add_fld(key,that.get(key),work); // Add to LHS
         else               that.del_fld(key, work);              // Drop from RHS
 
-    if( find().is_err() && !that.is_err() )
+    if( thsi.is_err() && !that.is_err() )
       throw unimpl(); // TODO: Check for being equal, cyclic-ly, and return a prior if possible.
-    return find().union(that,work);
+    return thsi.union(that,work);
   }
 
   // Insert a new field

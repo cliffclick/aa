@@ -76,7 +76,7 @@ public class CastNode extends Node {
     if( maynil==notnil ) throw unimpl(); // return false;
 
     // Already an expanded nilable
-    if( maynil.is_nil() && maynil.get("?") == notnil ) throw unimpl(); // return false
+    if( maynil.is_nil() && maynil.get("?") == notnil ) return false;
 
     // Expand nilable to either base
     if( maynil.is_base() && notnil.is_base() )
