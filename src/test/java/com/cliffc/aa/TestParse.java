@@ -382,7 +382,7 @@ public class TestParse {
     test   ("x:str? = 0", Type.XNIL); // question-type allows nil or not; zero digit is nil
     test_obj("x:str? = \"abc\"", TypeStr.ABC); // question-type allows nil or not
     testerr("x:str  = 0", "0 is not a *str", 1);
-    test_ptr0("math.rand(1)?0:\"abc\"", (alias)->TypeMemPtr.make_nil(alias,TypeStr.ABC));
+    test("math.rand(1)?0:\"abc\"", "*\"abc\"?","*\"abc\"?");
     testerr("(math.rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", 26);
     test   ("p=math.rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-nil-ness after a nil-check
     test   ("x:int = y:str? = z:flt = 0", Type.XNIL); // nil/0 freely recasts
@@ -980,16 +980,6 @@ HashTable = {@{
     //int alias = actual.getbit(); // internally asserts only 1 bit set
     //Type t_expected = expected.apply(alias);
     //assertEquals(t_expected,actual);
-    throw unimpl();
-  }
-  static private void test_ptr0( String program, Function<Integer,Type> expected ) {
-    //TypeEnv te = run(program);
-    //TypeMemPtr tmp = te._tmem.sharpen((TypeMemPtr)te._t);
-    //BitsAlias bits = tmp._aliases;
-    //assertTrue(bits.test(0));
-    //int alias = bits.strip_nil().getbit(); // internally asserts only 1 bit set
-    //Type t_expected = expected.apply(alias);
-    //assertEquals(t_expected,tmp);
     throw unimpl();
   }
   static private void test_obj( String program, TypeObj expected) {
