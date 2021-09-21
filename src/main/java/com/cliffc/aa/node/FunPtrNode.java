@@ -86,7 +86,6 @@ public final class FunPtrNode extends UnOrFunPtrNode {
 
   // Debug only: make an attempt to bind name to a function
   public void bind( String tok ) {
-    assert _name==null || _name.equals(tok); // Attempt to double-bind
     _name = tok;
     fun().bind(tok);
   }
