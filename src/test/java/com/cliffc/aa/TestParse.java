@@ -3,6 +3,7 @@ package com.cliffc.aa;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -189,7 +190,7 @@ public class TestParse {
     test   ("math.rand(1)?1",TypeInt.BOOL); // Missing optional else defaults to nil
     test("math.rand(1)?\"abc\"",
       (()->TypeMemPtr.make_nil(20,TypeStr.ABC)),
-      null, "*[0,20]\"abc\"?" );
+      null, "*\"abc\"?" );
     test   ("x:=0;math.rand(1)?(x:=1);x",TypeInt.BOOL);
     testerr("a.b.c();","Unknown ref 'a'",0);
   }
@@ -311,10 +312,10 @@ public class TestParse {
 
     test("A= :(str?, int); A( \"abc\",2 )",
       (()-> TypeMemPtr.make(22,TypeStruct.tupsD(TypeMemPtr.make(20,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
-      null, "[22](*[20]\"abc\",2)");
+      null, "(*\"abc\",2)");
     test("A= :(str?, int); A( (\"abc\",2) )",
       (()-> TypeMemPtr.make(21,TypeStruct.tupsD(TypeMemPtr.make(20,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
-      null, "[21](*[20]\"abc\",2)");
+      null, "(*\"abc\",2)");
     testerr("A= :(str?, int)?","Named types are never nil",16);
   }
 
@@ -323,7 +324,7 @@ public class TestParse {
     testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",14);
     testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x' in @{x=1}",8);
     test   ("a=@{x=1.2;y;}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing semicolon optional
-    test   ("x=@{n:=1;v:=2}; x.n := 3; x", "*[9]@{^=any; n:=3; v:=2}","[9]@{^=any, n=3, v=2}");
+    test   ("x=@{n:=1;v:=2}; x.n := 3; x", "*@{n:=3; v:=2}","@{n=3, v=2}");
     testerr("(a=@{x=0;y=0}; a.)", "Missing field name after '.'",17);
     testerr("a=@{x=0;y=0}; a.x=1; a","Cannot re-assign final field '.x' in @{x=0; y=0}",16);
     test   ("a=@{x=0;y=1}; b=@{x=2}  ; c=math.rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2; structs can be partially merged
@@ -354,12 +355,12 @@ public class TestParse {
     test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
 
     // Tuple
-    test_obj_isa("(0,\"abc\")", TypeStruct.maket(Type.NIL,TypeMemPtr.OOP));
+    test("(0,\"abc\")","*(0, *\"abc\")","(0?,*\"abc\")");
     test("(1,\"abc\").0", TypeInt.TRUE);
     test_obj("(1,\"abc\").1", TypeStr.ABC);
 
     // Named type variables
-    test("gal=:flt; gal", TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP));
+    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(40),4, TypeMemPtr.NO_DISP));
     test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
@@ -371,7 +372,8 @@ public class TestParse {
     testerr ("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
-    test_obj_isa("x=@{n}",TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("n",Type.XNIL,Access.RW,ARG_IDX)));
+    test("x=@{n}",(()->TypeMemPtr.make(19,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,Access.RW,ARG_IDX)))),
+         null,"@{n=0?}");
   }
 
   @Test public void testParse05() {
@@ -945,7 +947,7 @@ HashTable = {@{
   static private void test( String program, String flow_expect, String hm_expect ) {
     TypeEnv te = run(program);
     Type flow_actual = te._tmem.sharptr(te._t);
-    String flow_str = flow_actual.toString();      // Print what we see, with memory
+    String flow_str = flow_actual.str(new SB(),new VBitSet(),null,false).toString(); // Print what we see
     TV2 hm_actual = te._hmt;
     String hm_str = hm_actual.p();
     assertEquals(flow_expect,flow_str);

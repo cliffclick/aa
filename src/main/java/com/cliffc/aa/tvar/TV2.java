@@ -868,7 +868,7 @@ public class TV2 {
       TypeStruct tstr = ADUPS.get(_uid);
       if( tstr==null ) {
         Type.RECURSIVE_MEET++;
-        tstr = TypeStruct.malloc("",false,false).add_fld(TypeFld.NO_DISP);
+        tstr = TypeStruct.malloc("",false,false);
         if( _args!=null )
           for( String id : _args.keySet() )
             tstr.add_fld(TypeFld.malloc(id));
@@ -969,7 +969,8 @@ public class TV2 {
       return is_unified() ? _unified.str(sb.p(">>"), visit, dups, debug) : sb;
     }
     if( is_err () )  return sb.p(_type);
-    if( is_base() )  return sb.p(_type);
+    if( is_base() )
+      return _type.str(sb,visit,null,debug);
 
     if( dup ) sb.p("$V").p(_uid);
     if( visit.tset(_uid) && dup ) return sb;
@@ -998,14 +999,16 @@ public class TV2 {
       final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
       if( _type==null ) sb.p("[?]"); // Should always have an alias
       else {
-        if( _type instanceof TypeMemPtr ) ((TypeMemPtr)_type)._aliases.clear(0).str(sb);
-        else _type.str(sb,visit,null,debug); // Weirdo type printing
+        if( _type instanceof TypeMemPtr ) { // Print aliases in debug mode
+          if( debug ) ((TypeMemPtr)_type)._aliases.clear(0).str(sb) ;
+        } else _type.str(sb,visit,null,debug); // Weirdo type printing
       }
       sb.p(is_tup ? "(" : "@{");
       if( _args==null ) sb.p("_ ");
       else
-        for( String fld : sorted_flds() ) // Skip field names in a tuple
-          if( !(is_tup && Util.eq(fld,"^")) )
+        for( String fld : sorted_flds() )
+          if( !Util.eq(fld,"^") || (debug && !is_tup()) ) // Skip ever-present display
+            // Skip field names in a tuple
             str0(is_tup ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,_args.get(fld),dups,debug).p(',');
       if( open() ) sb.p(" ...,");
       sb.unchar().p(!is_tup ? "}" : ")");

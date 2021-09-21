@@ -767,7 +767,16 @@ public class CallNode extends Node {
         return (CallEpiNode)cepi;
     return null;
   }
-  @Override public Node is_copy(int idx) { return _is_copy ? (_val==Type.ANY ? Env.ANY : in(idx)) : null; }
+ 
+  @Override public Node is_copy(int idx) {
+    if( !_is_copy ) return null;
+    if( _val==Type.ANY ) return Env.ANY;
+    if( idx!=DSP_IDX ) return in(idx);
+    // The display out of a Call is the FunPtr in to the Call.
+    // Map to the FunPtr to the Display.
+    if( fdx() instanceof FunPtrNode )  return ((FunPtrNode)fdx()).display();
+    else throw unimpl(); // Need a FP2DISP
+  }
   void set_rpc(int rpc) { unelock(); _rpc=rpc; } // Unlock before changing hash
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {

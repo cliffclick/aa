@@ -66,11 +66,10 @@ public abstract class PrimNode extends Node {
 
     // Other primitives, not binary operators
     PrimNode[] others = new PrimNode[] {
-      // These are called like a function
+      // These are called like a function, so do not have a precedence
       new RandI64(),
 
       new ConvertInt64F64(),
-      new ConvertStrStr(),
 
       // These are balanced-ops, called by Parse.term()
       new MemPrimNode.ReadPrimNode.LValueRead  (), // Read  an L-Value: (ary,idx) ==> elem
@@ -138,10 +137,6 @@ public abstract class PrimNode extends Node {
     return arg.unify(TV2.make_base(this, arg._type==null ? t : t.meet(arg._type), "Prim_unify"), work);
   }
 
-
-  public static PrimNode convertTypeName( Type from, Type to, Parse badargs ) {
-    return new ConvertTypeName(from,to,badargs);
-  }
 
   // Apply types are 1-based (same as the incoming node index), and not
   // zero-based (not same as the _formals and _args fields).
@@ -212,7 +207,7 @@ public abstract class PrimNode extends Node {
     PrimNode that=null;
     for( PrimNode p : PRIMS() )
       if( p.getClass() == getClass() )
-        { that=p; break; }
+        { that=p; break; }      // Found an original PrimNode with op_prec set\
     assert that != null;
     kill(); // Kill self, use one from primitive table that has op_prec set
 
@@ -253,9 +248,13 @@ public abstract class PrimNode extends Node {
   // --------------------
   // Default name constructor using a single tuple type
   static class ConvertTypeName extends PrimNode {
-    ConvertTypeName(Type from, Type to, Parse badargs) {
+    ConvertTypeName(Type from, Type to, Parse badargs, Node p) {
       super(to._name,TypeStruct.args(from),to);
       _badargs = new Parse[]{badargs};
+      add_def(null);
+      add_def(null);
+      add_def(null);
+      add_def(p);
     }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type[] ts = Types.get(_defs._len);
@@ -287,13 +286,24 @@ public abstract class PrimNode extends Node {
     @Override public Type apply( Type[] args ) { return TypeFlt.con((double)args[1].getl()); }
   }
 
-  // TODO: Type-check strptr input args
-  static class ConvertStrStr extends PrimNode {
-    ConvertStrStr() { super("str",TypeMemPtr.FORMAL_STRPTR,TypeMemPtr.OOP); }
-    @Override public Node ideal_reduce() { return in(ARG_IDX); }
-    @Override public Type value(GVNGCM.Mode opt_mode) { return val(ARG_IDX); }
-    @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
+
+  // Takes in a Scalar and Names it.
+  public static FunPtrNode convertTypeName( Type from, Type to, Parse badargs ) {
+    try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
+      TypeStruct formals = TypeStruct.args(from);
+      TypeFunSig sig = TypeFunSig.make(formals,TypeTuple.make_ret(to));
+      Node ctl = X.xform(new CEProjNode(Env.FILE._scope));
+      FunNode fun = X.init2((FunNode)new FunNode(to._name,sig,-1,false).add_def(ctl));
+      Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
+      Node ptr = X.xform(new ParmNode(ARG_IDX,"x",fun,(ConNode)Node.con(from),badargs));
+      Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+      Node cvt = X.xform(new ConvertTypeName(from,to,badargs,ptr));
+      RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,cvt,rpc,fun));
+      Env.SCP_0.add_def(ret);
+      return (X._ret = X.init2(new FunPtrNode(to._name,ret)));
+    }
   }
+
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpF64 extends PrimNode {

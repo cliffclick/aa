@@ -168,8 +168,9 @@ public class Parse implements Comparable<Parse> {
         tn = (ConTypeNode)gvn(new ConTypeNode(tvar,named,scope()));
         _e.add_type(tvar,tn); // Add a type mapping
         if( _prims ) return tn;
-        PrimNode cvt = PrimNode.convertTypeName(t,named,bad);
-        return _e.add_fun(bad,tvar,gvn(cvt.clazz_node()));
+        FunPtrNode fptr = PrimNode.convertTypeName(t,named,bad);
+        // Make a trivial constructor
+        return _e.add_fun(bad,tvar,fptr);
       }
 
       // Always wrap Objs with a TypeMemPtr and a unique alias.

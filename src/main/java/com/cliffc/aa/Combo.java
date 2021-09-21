@@ -186,7 +186,7 @@ public abstract class Combo {
             TV2 tparm = tfun.get((""+((ParmNode)parm)._idx).intern());
             if( tparm != null ) {
               Type t = tparm.as_flow();
-              parm.set_def(1,Node.con(t));
+              parm.set_def(1,Node.con(t.simple_ptr()));
               parm.in(1)._live = parm._live;
               work.add(parm);
             }
