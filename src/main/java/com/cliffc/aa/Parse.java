@@ -870,6 +870,8 @@ public class Parse implements Comparable<Parse> {
 
     // Parse arguments
     while( true ) {
+      skipWS();
+      Parse badp = errMsg();   // Capture location in case of parameter error
       String tok = token();
       if( tok == null ) { _x=oldx; break; } // not a "[id]* ->"
       if( Util.eq((tok=tok.intern()),"->") ) break; // End of argument list
@@ -889,7 +891,8 @@ public class Parse implements Comparable<Parse> {
           skipNonWS();         // Skip possible type sig, looking for next arg
         }
       }
-      formals = formals.add_fld(tok,Access.Final,t,ARG_IDX+bads._len); // Accumulate args
+      if( formals.fld_find(tok) != null ) err_ctrl3("Duplicate parameter name '" + tok + "'", badp);
+      else formals = formals.add_fld(tok,Access.Final,t,ARG_IDX+bads._len); // Accumulate args
       bads.add(bad);
     }
     // If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
