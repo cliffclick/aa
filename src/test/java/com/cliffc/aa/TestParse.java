@@ -259,6 +259,7 @@ public class TestParse {
     // This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
     testerr("(math.rand(1) ? {_+_} : {_*_})(2,3)","Unable to resolve call",30); // either 2+3 or 2*3, or {5,6} which is INT8.
     test("f = g = {-> 3}; f() == g();", TypeInt.TRUE);
+    testerr("add = {x:int x:int -> x + x}", "Duplicate parameter name 'x'", 13);
   }
 
   @Test public void testParse03() {
