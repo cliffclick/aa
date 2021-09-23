@@ -397,7 +397,7 @@ public class TestParse {
   @Test public void testParse06() {
     // Building recursive types
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
-    test_ptr("A= :(str?, int); A(0,2)","A:(0, 2)");
+    test("A= :(str?, int); A(0,2)","*A:(0, 2)","*A:(0,2)");
     // Named recursive types
     test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make("A:",false,false,Type.XNIL,TypeInt.con(2))));
     test_ptr("A= :(A?, int); A(0,2)","A:(0, 2)");

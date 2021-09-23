@@ -1016,8 +1016,8 @@ public class TV2 {
       return sb;
     }
 
-    if( is_nil() )
-      return sb.p("0?");
+    // Nil prints as a plain '0'
+    if( is_nil() ) return sb.p("0");
 
     if( is_str() )
       return sb.p("str").p(_type.must_nil()?"?":"");
