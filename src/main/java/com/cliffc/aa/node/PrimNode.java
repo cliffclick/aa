@@ -219,7 +219,7 @@ public abstract class PrimNode extends Node {
       Node rpc = X.xform(new ParmNode(TypeRPC.ALL_CALL,null,fun,0,"rpc"));
       that.add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
       Node mem = X.xform(new ParmNode(TypeMem.MEM,null,fun,MEM_IDX," mem"));
-      if( _thunk_rhs ) add_def(mem);      // Memory if thunking
+      if( _thunk_rhs ) that.add_def(mem);  // Memory if thunking
       while( that.len() < _sig.nargs() ) that.add_def(null);
       for( TypeFld fld : _sig._formals.flds() )
         that.set_def(fld._order,X.xform(new ParmNode(fld._t,null,fun,fld._order,fld._fld)));
@@ -559,10 +559,10 @@ public abstract class PrimNode extends Node {
   // Classic '&&' short-circuit.  The RHS is a *Thunk* not a value.  Inlines
   // immediate into the operators' wrapper function, which in turn aggressively
   // inlines during parsing.
-  static class AndThen extends PrimNode {
+  public static class AndThen extends PrimNode {
     private static final TypeStruct ANDTHEN = TypeStruct.make2flds("pred",Type.SCALAR,"thunk",TypeTuple.RET);
     // Takes a value on the LHS, and a THUNK on the RHS.
-    AndThen() { super("&&",ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
+    public AndThen() { super("&&",ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
     // Expect this to inline everytime
     @Override public Node ideal_grow() {
       if( _defs._len != ARG_IDX+2 ) return null; // Already did this
@@ -576,8 +576,7 @@ public abstract class PrimNode extends Node {
         Node fal = X.xform(new CProjNode(iff,0));
         Node tru = X.xform(new CProjNode(iff,1));
         // Call on true branch; if false do not call.
-        Node dsp = rhs; //X.xform(new FP2DispNode(rhs));
-        Node cal = X.xform(new CallNode(true,_badargs,tru,mem,dsp,rhs));
+        Node cal = X.xform(new CallNode(true,_badargs,tru,mem,rhs));
         Node cep = X.xform(new CallEpiNode(cal,Env.DEFMEM));
         Node ccc = X.xform(new CProjNode(cep));
         Node memc= X.xform(new MProjNode(cep));
@@ -615,10 +614,10 @@ public abstract class PrimNode extends Node {
   // Classic '||' short-circuit.  The RHS is a *Thunk* not a value.  Inlines
   // immediate into the operators' wrapper function, which in turn aggressively
   // inlines during parsing.
-  static class OrElse extends PrimNode {
+  public static class OrElse extends PrimNode {
     private static final TypeStruct ORELSE = TypeStruct.make2flds("pred",Type.SCALAR,"thunk",TypeTuple.RET);
     // Takes a value on the LHS, and a THUNK on the RHS.
-    OrElse() { super("||",ORELSE,Type.SCALAR); _thunk_rhs=true; }
+    public OrElse() { super("||",ORELSE,Type.SCALAR); _thunk_rhs=true; }
     // Expect this to inline everytime
     @Override public Node ideal_grow() {
       if( _defs._len != ARG_IDX+2 ) return null; // Already did this
@@ -632,8 +631,7 @@ public abstract class PrimNode extends Node {
         Node fal = X.xform(new CProjNode(iff,0));
         Node tru = X.xform(new CProjNode(iff,1));
         // Call on false branch; if true do not call.
-        Node dsp = rhs; //X.xform(new FP2DispNode(rhs));
-        Node cal = X.xform(new CallNode(true,_badargs,fal,mem,dsp,rhs));
+        Node cal = X.xform(new CallNode(true,_badargs,fal,mem,rhs));
         Node cep = X.xform(new CallEpiNode(cal,Env.DEFMEM));
         Node ccc = X.xform(new CProjNode(cep));
         Node memc= X.xform(new MProjNode(cep));

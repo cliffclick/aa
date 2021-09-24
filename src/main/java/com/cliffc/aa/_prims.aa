@@ -2,7 +2,6 @@
 // $$JavaClassName; the Java class function "clazz_node" returns a Node.
 // Typically used in the call position, with a FunPtrNode returned.
 
-
 int   =: $$com.cliffc.aa.type.TypeInt#INT64;
 int1  =: $$com.cliffc.aa.type.TypeInt#BOOL;
 flt   =: $$com.cliffc.aa.type.TypeFlt#FLT64;
@@ -23,9 +22,16 @@ _%_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$ModI64(x,y) };
 // Unary minus
 -_  = { x:int -> $$com.cliffc.aa.node.PrimNode$MinusI64(x) };
 
-// Logical
+// Logical & bitwise
 _&_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$AndI64(x,y) };
 _|_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$OrI64 (x,y) };
+
+// TODO: Some way in the parser to specify RHS should be thunked.
+// Then can drop the primitives and write:
+//_&&_ = {:thunking pred thunk -> pred ? thunk() : 0    }
+//_||_ = {:thunking pred thunk -> pred ? pred : thunk() }
+_&&_ = { pred thunk -> $$com.cliffc.aa.node.PrimNode$AndThen(pred,thunk); };
+_||_ = { pred thunk -> $$com.cliffc.aa.node.PrimNode$OrElse (pred,thunk); };
 
 // Unary negate; takes a Scalar
 !_  = { x -> $$com.cliffc.aa.node.PrimNode$Not(x) };
@@ -61,6 +67,7 @@ str = { x:int -> $$com.cliffc.aa.node.NewStrNode$ConvertI64Str(x) };
 str = { x:flt -> $$com.cliffc.aa.node.NewStrNode$ConvertF64Str(x) };
 str = { x:str? -> x };
 
+// String concat
 _+_ = { x:str? y:str? -> $$com.cliffc.aa.node.NewStrNode$AddStrStr(x,y) };
 
 // --------------

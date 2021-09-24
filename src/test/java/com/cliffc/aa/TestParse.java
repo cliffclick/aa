@@ -189,7 +189,7 @@ public class TestParse {
     testerr("math.rand(1)?1:\"a\"", "Cannot mix GC and non-GC types",18);
     test   ("math.rand(1)?1",TypeInt.BOOL); // Missing optional else defaults to nil
     test("math.rand(1)?\"abc\"",
-      (()->TypeMemPtr.make_nil(20,TypeStr.ABC)),
+      (()->TypeMemPtr.make_nil(14,TypeStr.ABC)),
       null, "*\"abc\"?" );
     test   ("x:=0;math.rand(1)?(x:=1);x",TypeInt.BOOL);
     testerr("a.b.c();","Unknown ref 'a'",0);
@@ -219,13 +219,13 @@ public class TestParse {
   @Test public void testParse02() {
     // Anonymous function definition
     test("{x -> x&1}",
-         (() -> TypeFunPtr.make(40,ARG_IDX+1, TypeMemPtr.NO_DISP)),
+         (() -> TypeFunPtr.make(36,ARG_IDX+1, TypeMemPtr.NO_DISP)),
          ( () -> TypeFunSig.make(TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
                                                  TypeFld.make("x",Type.SCALAR,ARG_IDX)),
                                  TypeTuple.make(Type.CTRL,
                                                 Env.SCP_0.in(1)._val,
                                                 TypeInt.BOOL)) ),
-           "[40]{ int64 -> int64 }");
+           "[36]{ int64 -> int64 }");
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
     testerr("{x y -> x+y}", "Scalar is none of (int64,flt64,*str?)",8); // {Scalar Scalar -> Scalar}
 
@@ -313,10 +313,10 @@ public class TestParse {
     test_named_tuple("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
 
     test("A= :(str?, int); A( \"abc\",2 )",
-      (()-> TypeMemPtr.make(22,TypeStruct.tupsD(TypeMemPtr.make(20,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
+      (()-> TypeMemPtr.make(16,TypeStruct.tupsD(TypeMemPtr.make(14,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
       null, "(*\"abc\",2)");
     test("A= :(str?, int); A( (\"abc\",2) )",
-      (()-> TypeMemPtr.make(21,TypeStruct.tupsD(TypeMemPtr.make(20,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
+      (()-> TypeMemPtr.make(15,TypeStruct.tupsD(TypeMemPtr.make(14,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
       null, "(*\"abc\",2)");
     testerr("A= :(str?, int)?","Named types are never nil",16);
   }
@@ -357,12 +357,12 @@ public class TestParse {
     test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
 
     // Tuple
-    test("(0,\"abc\")","*(0, *\"abc\")","(0?,*\"abc\")");
+    test("(0,\"abc\")","*(0, *\"abc\")","(0,*\"abc\")");
     test("(1,\"abc\").0", TypeInt.TRUE);
     test_obj("(1,\"abc\").1", TypeStr.ABC);
 
     // Named type variables
-    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(40),4, TypeMemPtr.NO_DISP));
+    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(36),4, TypeMemPtr.NO_DISP));
     test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
@@ -374,8 +374,8 @@ public class TestParse {
     testerr ("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
-    test("x=@{n}",(()->TypeMemPtr.make(19,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,Access.RW,ARG_IDX)))),
-         null,"@{n=0?}");
+    test("x=@{n}",(()->TypeMemPtr.make(13,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,Access.RW,ARG_IDX)))),
+         null,"@{n=0}");
   }
 
   @Test public void testParse05() {

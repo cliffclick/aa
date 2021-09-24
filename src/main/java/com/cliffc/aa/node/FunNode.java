@@ -67,7 +67,7 @@ public class FunNode extends RegionNode {
   public byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
   // Function is parsed infix, with the RHS argument thunked.  Flag is used by
   // the Parser only for short-circuit operations like '||' and '&&'.
-  public final boolean _thunk_rhs;
+  public boolean _thunk_rhs;
   // Hindly-Milner non-generative set, used during cloning
   private TV2[] _nongens;
 

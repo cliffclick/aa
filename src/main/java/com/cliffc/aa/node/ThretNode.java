@@ -18,18 +18,15 @@ public class ThretNode extends Node {
   public Node rez () { return in(2); }
   public ThunkNode thunk() { return (ThunkNode)in(3); }
   @Override public Type value(GVNGCM.Mode opt_mode) {
-    return TypeTuple.RET;
+    return Type.SCALAR;
   }
   @Override public TypeMem live(GVNGCM.Mode opt_mode ) { return TypeMem.ALLMEM; }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==ctrl() ) return TypeMem.ALIVE;
-    if( def==mem () ) return _live;
+    if( def==mem () ) return TypeMem.ALLMEM;
     if( def==rez () ) return TypeMem.ESCAPE;
     if( def==thunk()) return TypeMem.ALIVE;
     throw com.cliffc.aa.AA.unimpl();
   }
-  //@Override public TV2 new_tvar(String alloc_site) {
-  //  return TV2.make("Ret",this,alloc_site,in(0),in(1),in(2));
-  //}
 }

@@ -391,7 +391,7 @@ public class CallNode extends Node {
 
     // Not a memory to the call?
     Type mem = mem()==null ? TypeMem.ANYMEM : mem()._val;
-    TypeMem tmem = mem instanceof TypeMem ? (TypeMem)mem : TypeMem.ANYMEM;
+    TypeMem tmem = mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM);
 
     // Result type includes a type-per-input and an extra roll-up type of all
     // escaping aliases.
@@ -767,7 +767,7 @@ public class CallNode extends Node {
         return (CallEpiNode)cepi;
     return null;
   }
- 
+
   @Override public Node is_copy(int idx) {
     if( !_is_copy ) return null;
     if( _val==Type.ANY ) return Env.ANY;

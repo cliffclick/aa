@@ -12,7 +12,7 @@ public class PhiNode extends Node {
     super(op,vals);
     if( t instanceof TypeMem ) _t = TypeMem.ALLMEM;
     else if( t instanceof TypeObj ) _t = TypeObj.OBJ; // Need to check liveness
-    else if( t instanceof TypeTuple ) _t = Type.SCALAR;
+    else if( t instanceof TypeFunPtr ) _t = TypeFunPtr.GENERIC_FUNPTR;
     else _t = Type.SCALAR;
     _badgc = badgc;
     _live = all_live();         // Recompute starting live after setting t
@@ -89,7 +89,7 @@ public class PhiNode extends Node {
 
   @Override BitsAlias escapees() { return BitsAlias.FULL; }
   @Override public TypeMem all_live() {
-    return _t==Type.SCALAR ? TypeMem.LIVE_BOT : TypeMem.ALLMEM;
+    return _t==Type.SCALAR || _t instanceof TypeFunPtr ? TypeMem.LIVE_BOT : TypeMem.ALLMEM;
   }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     Node r = in(0);

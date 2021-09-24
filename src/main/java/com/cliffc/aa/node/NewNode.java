@@ -193,9 +193,9 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     @Override public FunPtrNode clazz_node( ) {
       try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
         assert in(0)==null && _uses._len==0;
-        FunNode  fun = ( FunNode) X.xform(new  FunNode(_name,this).add_def(Env.ALL_CTRL));
-        ParmNode rpc = (ParmNode) X.xform(new ParmNode(0,"rpc",fun,Env.ALL_CALL,null));
-        Node memp= X.xform(new ParmNode(TypeMem.MEM,null,fun,MEM_IDX," mem").add_def(Env.DEFMEM));
+        FunNode  fun = ( FunNode) X.xform(new  FunNode(_name,this));
+        ParmNode rpc = (ParmNode) X.xform(new ParmNode(TypeRPC.ALL_CALL,null,fun,0,"rpc"));
+        Node memp= X.xform(new ParmNode(TypeMem.MEM,null,fun,MEM_IDX," mem"));
         fun._bal_close = bal_close();
 
         // Add input edges to the intrinsic
@@ -203,13 +203,14 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
         while( len() < _sig.nargs() ) add_def(null);
         for( TypeFld arg : _sig._formals.flds() ) {
           if( arg._order==MEM_IDX ) continue; // Already handled MEM_IDX
-          set_def(arg._order,X.xform(new ParmNode(arg,fun, (ConNode)Node.con(arg._t.simple_ptr()),null)));
+          set_def(arg._order,X.xform(new ParmNode(arg._t.simple_ptr(), null, fun, arg._order, arg._fld)));
         }
         NewNode nnn = (NewNode)X.xform(this);
         Node mem = Env.DEFMEM.make_mem_proj(nnn,memp);
         Node ptr = X.xform(new ProjNode(nnn,REZ_IDX));
         RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,ptr,rpc,fun));
-        return (X._ret = new FunPtrNode(_name,ret));
+        Env.SCP_0.add_def(ret);
+        return (X._ret = (FunPtrNode)X.xform(new FunPtrNode(_name,ret)));
       }
     }
   }

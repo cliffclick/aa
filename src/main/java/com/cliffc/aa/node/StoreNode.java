@@ -49,6 +49,7 @@ public class StoreNode extends Node {
     // If Store is by a New and no other Stores, fold into the New.
     NewObjNode nnn;  TypeFld tfld;
     if( mem instanceof MrgProjNode && mem._keep==0 &&
+        _keep <= 1 &&
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
         !rez().is_forward_ref() &&
         mem._uses._len==2 && // Use is by DefMem and self

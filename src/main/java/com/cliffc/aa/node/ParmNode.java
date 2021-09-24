@@ -68,7 +68,7 @@ public class ParmNode extends PhiNode {
     // caller can be that bad.  During & after GCP all unknown callers are
     // accounted for.
     FunNode fun = (FunNode)in0;
-    if( !opt_mode._CG && (fun.has_unknown_callers() || fun.is_prim() && fun._defs._len==1 ) ) {
+    if( !opt_mode._CG && (fun.has_unknown_callers() || fun.is_prim()) ) {
       TypeFld fld = fun._sig._formals.fld_find(_name);
       if( _idx!=MEM_IDX && fld != null ) return fld._t.simple_ptr();
       return len()==1 ? _t : val(1);

@@ -166,13 +166,13 @@ public class LoadNode extends Node {
         if( jmem == null ) return null;
         mem = jmem;
       } else if( mem instanceof ParmNode ) {
-        if( mem.in(0).is_copy(1)!=null ) mem = mem.in(1); // FunNode is dying, copy, so ParmNode is also
+        if( mem.in(0) instanceof FunNode && mem.in(0).is_copy(1)!=null ) mem = mem.in(1); // FunNode is dying, copy, so ParmNode is also
         else return null;
 
-      } else if( mem instanceof PhiNode ||
+      } else if( mem instanceof PhiNode || // Would have to match on both sides, and Phi the results
                  mem instanceof StartMemNode ||
                  mem instanceof ConNode) {
-        return null;            // Would have to match on both sides, and Phi the results
+        return null;
       } else {
         throw com.cliffc.aa.AA.unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
       }
