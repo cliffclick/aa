@@ -31,7 +31,7 @@ public abstract class AA {
     // Command line program
     if( args.length > 0 ) {
       TypeEnv te = Exec.go(Env.TOP,"args",String.join(" ",args));
-      if( te._errs!=null ) System.out.println(te._errs.toString());
+      if( te._errs!=null ) System.out.println(te._errs);
       else {
         System.out.println(te._hmt.toString());
         System.out.println(te._tmem.sharptr(te._t).toString());
