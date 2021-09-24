@@ -147,11 +147,13 @@ public class MemJoinNode extends Node {
     Ary<BitsAlias> escs = msp()._escs;
     TypeObj[] pubs = new TypeObj[Env.DEFMEM._defs._len];
     for( int alias=1, i; alias<Env.DEFMEM._defs._len; alias++ ) {
+      i=0;                                 // In the base memory
       if( escs.at(0).test_recur(alias) ) { // In some RHS set
-        for( i=1; i<_defs._len; i++ )
-          if( escs.at(i).test_recur(alias) )
+        for( int j=1; j<_defs._len; j++ )
+          if( escs.at(j).test_recur(alias) )
+            i=j;
             break;
-      } else i=0;                     // In the base memory
+      }
       if( alias == 1 || Env.DEFMEM.in(alias) != null ) // Check never-made aliases
         pubs[alias] = mems[i].at(alias); // Merge alias
     }
