@@ -943,4 +943,87 @@ all
                    syn.flow_type());
     }
   }
+
+
+ @Test public void test65() {
+  Root syn = HM.hm("""
+      void = @{};
+      err  = {unused->(err unused)};
+      n=
+        z = @{
+          pred   = err
+          succ   = {unused -> (n.s n.z)}
+          add    = {o-> o}
+          };
+        s = {pred ->
+          self=@{
+            pred   = {unused->pred}
+            succ   = {unused -> (n.s self)}
+            add    = {m -> ((pred.add m).succ void)}
+            };
+          self
+          };
+        zx =@{
+          pred   = err
+          succ   = {unused -> (n.s n.zx)}
+          add    = {o-> o}
+          xnope  = void
+          };
+
+        @{s=s z=z  zx=zx};
+      zy =@{
+          pred   = err
+          succ   = {unused -> (n.s zy)}
+          add    = {o-> o}
+          ynope  = void
+          };
+      one  = (n.s n.z);
+      onez = (one.add n.z);
+      onex = (one.add n.zx);
+      oney = (one.add zy);
+      @{n=n one=one onez=onez onex=onex oney=oney xnope = onex.xnope ynope=oney.ynope}
+""");
+  
+  if( HM.DO_HM )
+    assertEquals(stripIndent(
+// strange type for add below                             
+// promised to propagate extra fields on the result
+// but the runtime does not keep them.
+// so I tried to make a 'notZero' with an extra 'nope' field.
+// accessing the field fails
+// but if you comment the output in the record, again we get no visible type error out :-(
+// the computed type of notOne does not respect the promises of the add method.
+//one.add should keep extra fields of the I parameter, but it does not.
+                             """
+@{
+  n= @{
+    s = {
+      A:@{
+        add={B:@{succ={()->B};...}->B};
+        pred={C->A};
+        succ={D->A}
+      }
+      -> A };
+    z=A};
+  notNope= Missing field nope in A:@{succ={()->A}};
+  one   = E:@{add={F:@{succ={()->F};...}->F}; pred={G->E}; succ={ H->E} };
+  onenz = I:@{add={J:@{succ={()->J};...}->J}; pred={K->I}; succ={()->I} };
+  onez  = L:@{add={M:@{succ={()->M};...}->M}; pred={N->L}; succ={()->L} }
 }
+"""), stripIndent(syn._hmt.p()));
+ }
+
+}
+
+//@{n=@{s={A:@{add={B:@{succ={()->B};...}->B};pred={C->A};succ={D->A}}->A};
+//      z =A;
+//      zx=A
+//  };
+//  one = E:@{add={F:@{succ={()->F};...}->F};pred={G->E};succ={ H->E}};
+//  onex= I:@{add={J:@{succ={()->J};...}->J};pred={K->I};succ={()->I}};
+//  oney= L:@{add={M:@{succ={()->M};...}->M};pred={N->L};succ={()->L}};
+//  onez= O:@{add={P:@{succ={()->P};...}->P};pred={Q->O};succ={()->O}};
+//  xnope=MissingfieldxnopeinA:@{add={B:@{succ={()->B};...}->B};pred={C->A};succ={()->A}};
+//  ynope=MissingfieldynopeinA:@{add={B:@{succ={()->B};...}->B};pred={C->A};succ={()->A}}}
+//
+//
