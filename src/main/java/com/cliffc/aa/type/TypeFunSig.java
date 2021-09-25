@@ -20,7 +20,7 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     assert ret.len()==3 && ret.at(MEM_IDX) instanceof TypeMem;
     _formals=formals;
     _ret=ret;
-    _max_arg = 0;
+    _max_arg = DSP_IDX;
     for( TypeFld arg : _formals.flds() )
       _max_arg = Math.max(_max_arg,arg._order);
     return this;
@@ -66,6 +66,8 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   public static TypeFunSig make( TypeTuple ret, Type arg1, Type arg2 ) { return make(TypeStruct.args(arg1,arg2),ret); }
   public TypeFunSig make_from_arg( TypeFld arg ) { return make(_formals.replace_fld(arg),_ret); }
   public TypeFunSig make_from_ret( TypeTuple ret ) { return make(_formals,ret); }
+  public TypeFunSig make_from_remove( String fld ) { return make(_formals.del_fld(fld),_ret); }
+
 
   public static final TypeFunSig II_I = make(TypeStruct.INT64_INT64, TypeTuple.make_ret(TypeInt.INT64));
   static final TypeFunSig[] TYPES = new TypeFunSig[]{II_I};

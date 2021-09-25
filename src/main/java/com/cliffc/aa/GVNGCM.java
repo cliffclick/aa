@@ -2,9 +2,7 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.tvar.UQNodes;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
 
@@ -77,7 +75,6 @@ public class GVNGCM {
 
   // Initial state after loading e.g. primitives.
   void init0() {
-    for( Work work : _all_works ) assert work.isEmpty();
   }
   // Reset is called after a top-level exec exits (e.g. junits) with no parse
   // state left alive.  NOT called after a line in the REPL or a user-call to
@@ -85,6 +82,7 @@ public class GVNGCM {
   void reset_to_init0() {
     for( Work work : _all_works ) work.clear();
     _work_dom.clear();
+    HAS_WORK = true;
     _opt_mode = Mode.Parse;
     ITER_CNT = ITER_CNT_NOOP = 0;
   }
@@ -191,6 +189,11 @@ public class GVNGCM {
     return x.unkeep();
   }
 
+  public void iter_dead() {
+    Node n;
+    while( (n=_work_dead.pop()) != null )
+      _work_dead.apply(n);
+  }
 
   // Walk all memory edges, and 'retype' them, probably DOWN (counter to
   // 'iter').  Used when inlining, and the inlined body needs to acknowledge
@@ -218,6 +221,12 @@ public class GVNGCM {
       if( wrk==exit ) continue;                 // Stop at end
       if( skip_calls && wrk instanceof MProjNode && wrk.in(0) instanceof CallNode )
         continue;               // Skip the inside of calls
+      // Retype function signatures as well
+      if( wrk instanceof RetNode || wrk instanceof ParmNode ) {
+        FunNode fun = wrk instanceof RetNode ? ((RetNode)wrk).fun() : (FunNode)wrk.in(0);
+        fun._sig = fun.re_sig();
+      }
+
       work.addAll(wrk._uses);
     }
   }

@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
@@ -8,6 +9,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMap;
 import com.cliffc.aa.util.Util;
 
+import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
@@ -47,17 +49,22 @@ public class StoreNode extends Node {
     // If Store is by a New and no other Stores, fold into the New.
     NewObjNode nnn;  TypeFld tfld;
     if( mem instanceof MrgProjNode && mem._keep==0 &&
+        _keep <= 1 &&
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
         !rez().is_forward_ref() &&
         mem._uses._len==2 && // Use is by DefMem and self
-        (tfld=nnn._ts.fld_find(_fld))!= null && tfld._access==Access.RW ) {
-      // Update the value, and perhaps the final field
-      nnn.update(_fld,_fin,rez());
-      mem.xval();
-      Env.DEFMEM.xval();
-      Env.GVN.add_flow_uses(this);
-      add_reduce_extra();       // Folding in allows store followers to fold in
-      return mem;               // Store is replaced by using the New directly.
+        (tfld=nnn._ts.fld_find(_fld))!= null ) {
+      // Have to be allowed to directly update NewObjNode
+      if( tfld._access==Access.RW || rez() instanceof FunPtrNode ) {
+        // Field is modifiable; update New directly.
+        if( tfld._access==Access.RW ) nnn.update(_fld,_fin,rez()); // Update the value, and perhaps the final field
+        else                          nnn.add_fun(_bad,_fld,(FunPtrNode)rez()); // Stacked FunPtrs into an Unresolved
+        mem.xval();             // Update memory state
+        Env.DEFMEM.xval();      // Update default memory state
+        Env.GVN.add_flow_uses(this);
+        add_reduce_extra();     // Folding in allows store followers to fold in
+        return mem;             // Store is replaced by using the New directly.
+      }
     }
 
     // If Store is of a MemJoin and it can enter the split region, do so.
@@ -138,7 +145,7 @@ public class StoreNode extends Node {
     if( def==mem() ) return _live; // Pass full liveness along
     if( def==adr() ) return TypeMem.ALIVE; // Basic aliveness
     if( def==rez() ) return TypeMem.ESCAPE;// Value escapes
-    throw com.cliffc.aa.AA.unimpl();       // Should not reach here
+    throw unimpl();       // Should not reach here
   }
 
   @Override public ErrMsg err( boolean fast ) {
@@ -186,37 +193,40 @@ public class StoreNode extends Node {
   // The ptr has to be not-nilable and have the fld, which unifies with the
   // value.  If the fld is missing, then if the ptr is open, add the field else
   // missing field error.
-  public static boolean unify( String name, Node st, TV2 ptr, Type tptr, Node val, String fld, Work work ) {
+  public static boolean unify( String name, Node st, TV2 ptr, Type tptr, Node val, String id, Work work ) {
     if( st.tvar().is_err() ) return false; // Already an error, no progress
+    // Propagate an error
+    if( ptr.is_err() ) return st.tvar().unify(ptr,work);
+
+    // Check for nil address
+    if( ptr.is_nil() || (tptr instanceof TypeMemPtr && tptr.must_nil()) )
+      return work==null || st.tvar().unify(TV2.make_err(st,"May be nil when accessing field "+id,"Store_update"),work);
+
     // Store value is always the stored value
     boolean progress = st.tvar().unify(val.tvar(),work);
-    if( ptr.is_err() ) return progress;
-
-    if( ptr.is_leaf() ) {
-      if( tptr instanceof TypeMemPtr && tptr.must_nil() ) work.add(st); // If nil, will be a nil-access error
-      NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<String,TV2>(){{ put(fld,val.tvar()); }};
-      return ptr.unify(TV2.make_open_struct(name,st,tptr,"Store_update",args),work);
-    }
-
-    if( ptr.is_nil() || (tptr instanceof TypeMemPtr && tptr.must_nil()) )
-      return work==null || st.tvar().unify(TV2.make_err(st,"May be nil when accessing field "+fld,"Store_update"),work);
-
     ptr.push_dep(st);
 
     // Matching fields unify
-    if( ptr.get(fld)!=null )
-      return ptr.unify_at(fld,st.tvar(), work) | progress;
+    TV2 fld = ptr.get(id);
+    if( fld!=null )             // Unify against pre-existing field
+      return fld.unify(st.tvar(), work) | progress;
+
+    // The remaining cases all make progress and return true
+    if( work==null ) return true;
 
     // Add field if open
-    if( ptr.open() ) { // Effectively unify with an extended struct.
-      ptr.args_put(fld,st.tvar());
-      return true;              // Progress
+    if( ptr.is_struct() && ptr.open() ) // Effectively unify with an extended struct.
+      return ptr.add_fld(id,st.tvar(),work);
+
+    // Unify against an open struct with the named field
+    if( ptr.is_leaf() || ptr.is_fun() ) {
+      TV2 tv2 = TV2.make_open_struct(name,st,TypeMemPtr.make(BitsAlias.EMPTY,TypeStruct.make()),"Store_update",new NonBlockingHashMap<String,TV2>());
+      tv2.args_put(id,st.tvar());
+      return tv2.unify(ptr,work);
     }
 
     // Closed record, field is missing
-    if( st.tvar().is_err() ) return false; // Already an error
-    return work ==null ||
-      ptr.unify(ptr.miss_field(st,fld,"Store_update"),work);
+    return st.tvar().unify(ptr.miss_field(st,id,"Store_update"),work);
   }
 
 }

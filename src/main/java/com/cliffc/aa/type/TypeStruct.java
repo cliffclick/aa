@@ -139,8 +139,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
-  private boolean is_tup() {
-    if( _flds.size()<=1 ) return true;
+  public boolean is_tup() {
+    if( _flds.size()==0 || (_flds.size()==1 && _flds.get("^")!=null) ) return true;
     return _flds.get("0")!=null && _flds.get("0")._order==ARG_IDX;
   }
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
@@ -150,12 +150,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
     // Special shortcut for the all-prims display type
-    TypeFld bfld;
-    if( (bfld=fld_find("!")) != null && fld_find("math_pi") != null ) {
+    TypeFld bfld=fld_find("!_");
+    if( bfld != null ) {
       Type t1 = bfld._t;
       sb.p(t1 instanceof TypeFunPtr
            ? (((TypeFunPtr)t1)._fidxs.above_center() ? "PRIMS" : "LOW_PRIMS")
            : "PRIMS_"+t1);
+    } else if( (bfld=fld_find("pi")) != null ) {
+      sb.p("MATH");
     } else {
       boolean field_sep=false;
       for( TypeFld fld : is_tup() ? osorted_flds() : asorted_flds() ) {
@@ -310,7 +312,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final TypeStruct C0    = make("c",TypeInt.FALSE,Access.Final); // @{c:0}
   private static final TypeStruct D1    = make("d",TypeInt.TRUE ,Access.Final); // @{d:1}
   public  static final TypeStruct ARW   = make("a",TypeFlt.FLT64,Access.RW   );
-  public  static final TypeStruct NO_ARGS = make0().hashcons_free();
+  public  static final TypeStruct EMPTY = make0().hashcons_free();
   public  static final TypeStruct FLT64 = args(TypeFlt.FLT64);     // { flt -> }
   public  static final TypeStruct INT64 = args(TypeInt.INT64);     // { int -> }
   public  static final TypeStruct SCALAR1=args(SCALAR);            // { scalar -> }
@@ -1132,6 +1134,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   // Replace an existing field in the current struct.
   public TypeStruct replace_fld( TypeFld fld ) { return copy().set_fld(fld).hashcons_free(); }
+  public TypeStruct del_fld( String name ) {
+    TypeStruct ts = copy();
+    ts._flds.remove(name);
+    return ts.hashcons_free();
+  }
 
   // Update (approximately) the current TypeObj.  Updates the named field.
   @Override public TypeStruct update(Access fin, String fld, Type val) { return update(fin,fld,val,false); }

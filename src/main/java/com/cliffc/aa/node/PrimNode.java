@@ -24,20 +24,20 @@ public abstract class PrimNode extends Node {
   Parse[] _badargs;             // Filled in when inlined in CallNode
   byte _op_prec;                // Operator precedence, computed from table.  Generally 1-9.
   public boolean _thunk_rhs;    // Thunk (delay) right-hand-argument.
-  PrimNode( String name, TypeStruct formals, Type ret ) {
+  public PrimNode( String name, TypeStruct formals, Type ret ) {
     super(OP_PRIM);
-    _name=name;
+    _name = name;
     assert formals.fld_find("^")==null; // No display
     _sig=TypeFunSig.make(formals,TypeTuple.make_ret(ret));
     _badargs=null;
     _op_prec = -1;              // Not set yet
     _thunk_rhs=false;
   }
+
   private static PrimNode[] PRIMS = null; // All primitives
   public static PrimNode[][] PRECEDENCE = null;  // Just the binary operators, grouped by precedence
   public static String  [][] PREC_TOKS  = null;  // Just the binary op tokens, grouped by precedence
   public static String  []   PRIM_TOKS  = null;  // Primitive tokens, longer first for greedy token search
-  public static void reset() { PRIMS=null; }
 
   public static PrimNode[] PRIMS() {
     if( PRIMS!=null ) return PRIMS;
@@ -66,11 +66,10 @@ public abstract class PrimNode extends Node {
 
     // Other primitives, not binary operators
     PrimNode[] others = new PrimNode[] {
-      // These are called like a function
+      // These are called like a function, so do not have a precedence
       new RandI64(),
 
       new ConvertInt64F64(),
-      new ConvertStrStr(),
 
       // These are balanced-ops, called by Parse.term()
       new MemPrimNode.ReadPrimNode.LValueRead  (), // Read  an L-Value: (ary,idx) ==> elem
@@ -78,7 +77,7 @@ public abstract class PrimNode extends Node {
       new MemPrimNode.ReadPrimNode.LValueWriteFinal(), // Final Write an L-Value: (ary,idx,elem) ==> elem
     };
 
-    // These are unary ops, precedence determined outside of 'Parse.expr'
+    // These are unary ops, precedence determined outside 'Parse.expr'
     PrimNode[] uniops = new PrimNode[] {
       new MemPrimNode.ReadPrimNode.LValueLength(), // The other array ops are "balanced ops" and use term() for precedence
       new MinusF64(),
@@ -139,10 +138,6 @@ public abstract class PrimNode extends Node {
   }
 
 
-  public static PrimNode convertTypeName( Type from, Type to, Parse badargs ) {
-    return new ConvertTypeName(from,to,badargs);
-  }
-
   // Apply types are 1-based (same as the incoming node index), and not
   // zero-based (not same as the _formals and _args fields).
   public abstract Type apply( Type[] args ); // Execute primitive
@@ -173,12 +168,22 @@ public abstract class PrimNode extends Node {
     Types.free(ts);
     return rez2;
   }
+
+  @Override public Node ideal_reduce() {
+    if( _live != TypeMem.DEAD ) return null;
+    Node progress=null;
+    for( int i=ARG_IDX; i<_defs._len; i++ )
+      if( in(i)!=Env.ANY ) progress=set_def(i,Env.ANY);
+    return progress;
+  }
+
+
   @Override public ErrMsg err( boolean fast ) {
     for( TypeFld fld : _sig._formals.flds() ) {
       Type tactual = val(fld._order);
       Type tformal = fld._t;
       if( !tactual.isa(tformal) )
-        return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[fld._order],tactual,null,tformal);
+        return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[fld._order-ARG_IDX],tactual,null,tformal);
     }
     return null;
   }
@@ -197,18 +202,28 @@ public abstract class PrimNode extends Node {
   // Called during basic Env creation and making of type constructors, this
   // wraps a PrimNode as a full 1st-class function to be passed about or
   // assigned to variables.
-  public FunPtrNode as_fun( GVNGCM gvn ) {
-    try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
-      assert _defs._len==0 && _uses._len==0;
-      FunNode fun = (FunNode) X.xform(new FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
-      Node rpc = X.xform(new ParmNode(0,"rpc",fun,Env.ALL_CALL,null));
-      add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
-      Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-      if( _thunk_rhs ) add_def(mem);      // Memory if thunking
-      while( len() < _sig.nargs() ) add_def(null);
+  @Override public FunPtrNode clazz_node( ) {
+    // Find the same clazz node with op_prec set
+    PrimNode that=null;
+    for( PrimNode p : PRIMS() )
+      if( p.getClass() == getClass() )
+        { that=p; break; }      // Found an original PrimNode with op_prec set\
+    assert that != null;
+    kill(); // Kill self, use one from primitive table that has op_prec set
+
+    try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
+      assert that._defs._len==0 && that._uses._len==0;
+      // Extra '$' in name copies the op_prec one inlining level from clazz_node into the _prim.aa
+      FunNode fun = new FunNode(("$"+_name).intern(),that); // No callers (yet)
+      fun._val = Type.CTRL;
+      Node rpc = X.xform(new ParmNode(TypeRPC.ALL_CALL,null,fun,0,"rpc"));
+      that.add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
+      Node mem = X.xform(new ParmNode(TypeMem.MEM,null,fun,MEM_IDX," mem"));
+      if( _thunk_rhs ) that.add_def(mem);  // Memory if thunking
+      while( that.len() < _sig.nargs() ) that.add_def(null);
       for( TypeFld fld : _sig._formals.flds() )
-        set_def(fld._order,X.xform(new ParmNode(fld._order,fld._fld,fun, Env.ALL,null)));
-      Node that = X.xform(this);
+        that.set_def(fld._order,X.xform(new ParmNode(fld._t,null,fun,fld._order,fld._fld)));
+      that = (PrimNode)X.xform(that);
       Node ctl,rez;
       if( _thunk_rhs ) {
         ctl = X.xform(new CProjNode(that));
@@ -225,7 +240,7 @@ public abstract class PrimNode extends Node {
       RetNode ret = (RetNode)X.xform(new RetNode(ctl,mem,rez,rpc,fun));
       Env.SCP_0.add_def(ret);
       // No closures are added to primitives
-      return (X._ret = new FunPtrNode(_name,ret));
+      return (X._ret = (FunPtrNode)X.xform(new FunPtrNode(_name,ret)));
     }
   }
 
@@ -233,9 +248,13 @@ public abstract class PrimNode extends Node {
   // --------------------
   // Default name constructor using a single tuple type
   static class ConvertTypeName extends PrimNode {
-    ConvertTypeName(Type from, Type to, Parse badargs) {
+    ConvertTypeName(Type from, Type to, Parse badargs, Node p) {
       super(to._name,TypeStruct.args(from),to);
       _badargs = new Parse[]{badargs};
+      add_def(null);
+      add_def(null);
+      add_def(null);
+      add_def(p);
     }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type[] ts = Types.get(_defs._len);
@@ -267,13 +286,24 @@ public abstract class PrimNode extends Node {
     @Override public Type apply( Type[] args ) { return TypeFlt.con((double)args[1].getl()); }
   }
 
-  // TODO: Type-check strptr input args
-  static class ConvertStrStr extends PrimNode {
-    ConvertStrStr() { super("str",TypeMemPtr.FORMAL_STRPTR,TypeMemPtr.OOP); }
-    @Override public Node ideal_reduce() { return in(ARG_IDX); }
-    @Override public Type value(GVNGCM.Mode opt_mode) { return val(ARG_IDX); }
-    @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
+
+  // Takes in a Scalar and Names it.
+  public static FunPtrNode convertTypeName( Type from, Type to, Parse badargs ) {
+    try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
+      TypeStruct formals = TypeStruct.args(from);
+      TypeFunSig sig = TypeFunSig.make(formals,TypeTuple.make_ret(to));
+      Node ctl = X.xform(new CEProjNode(Env.FILE._scope));
+      FunNode fun = X.init2((FunNode)new FunNode(to._name,sig,-1,false).add_def(ctl));
+      Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
+      Node ptr = X.xform(new ParmNode(ARG_IDX,"x",fun,(ConNode)Node.con(from),badargs));
+      Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+      Node cvt = X.xform(new ConvertTypeName(from,to,badargs,ptr));
+      RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,cvt,rpc,fun));
+      Env.SCP_0.add_def(ret);
+      return (X._ret = X.init2(new FunPtrNode(to._name,ret)));
+    }
   }
+
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpF64 extends PrimNode {
@@ -294,8 +324,8 @@ public abstract class PrimNode extends Node {
     abstract long op( long d );
   }
 
-  static class MinusI64 extends Prim1OpI64 {
-    MinusI64() { super("-"); }
+  public static class MinusI64 extends Prim1OpI64 {
+    public MinusI64() { super("-"); }
     @Override long op( long x ) { return -x; }
   }
 
@@ -306,23 +336,23 @@ public abstract class PrimNode extends Node {
     abstract double op( double x, double y );
   }
 
-  static class AddF64 extends Prim2OpF64 {
-    AddF64() { super("+"); }
+  public static class AddF64 extends Prim2OpF64 {
+    public AddF64() { super("+"); }
     double op( double l, double r ) { return l+r; }
   }
 
-  static class SubF64 extends Prim2OpF64 {
-    SubF64() { super("-"); }
+  public static class SubF64 extends Prim2OpF64 {
+    public SubF64() { super("-"); }
     double op( double l, double r ) { return l-r; }
   }
 
-  static class MulF64 extends Prim2OpF64 {
-    MulF64() { super("*"); }
+  public static class MulF64 extends Prim2OpF64 {
+    public MulF64() { super("*"); }
     @Override double op( double l, double r ) { return l*r; }
   }
 
-  static class DivF64 extends Prim2OpF64 {
-    DivF64() { super("/"); }
+  public static class DivF64 extends Prim2OpF64 {
+    public DivF64() { super("/"); }
     @Override double op( double l, double r ) { return l/r; }
   }
 
@@ -333,12 +363,12 @@ public abstract class PrimNode extends Node {
     abstract boolean op( double x, double y );
   }
 
-  static class LT_F64 extends Prim2RelOpF64 { LT_F64() { super("<" ); } boolean op( double l, double r ) { return l< r; } }
-  static class LE_F64 extends Prim2RelOpF64 { LE_F64() { super("<="); } boolean op( double l, double r ) { return l<=r; } }
-  static class GT_F64 extends Prim2RelOpF64 { GT_F64() { super(">" ); } boolean op( double l, double r ) { return l> r; } }
-  static class GE_F64 extends Prim2RelOpF64 { GE_F64() { super(">="); } boolean op( double l, double r ) { return l>=r; } }
-  static class EQ_F64 extends Prim2RelOpF64 { EQ_F64() { super("=="); } boolean op( double l, double r ) { return l==r; } }
-  static class NE_F64 extends Prim2RelOpF64 { NE_F64() { super("!="); } boolean op( double l, double r ) { return l!=r; } }
+  public static class LT_F64 extends Prim2RelOpF64 { public LT_F64() { super("<" ); } boolean op( double l, double r ) { return l< r; } }
+  public static class LE_F64 extends Prim2RelOpF64 { public LE_F64() { super("<="); } boolean op( double l, double r ) { return l<=r; } }
+  public static class GT_F64 extends Prim2RelOpF64 { public GT_F64() { super(">" ); } boolean op( double l, double r ) { return l> r; } }
+  public static class GE_F64 extends Prim2RelOpF64 { public GE_F64() { super(">="); } boolean op( double l, double r ) { return l>=r; } }
+  public static class EQ_F64 extends Prim2RelOpF64 { public EQ_F64() { super("=="); } boolean op( double l, double r ) { return l==r; } }
+  public static class NE_F64 extends Prim2RelOpF64 { public NE_F64() { super("!="); } boolean op( double l, double r ) { return l!=r; } }
 
 
   // 2Ops have uniform input/output types, so take a shortcut on name printing
@@ -348,33 +378,33 @@ public abstract class PrimNode extends Node {
     abstract long op( long x, long y );
   }
 
-  static class AddI64 extends Prim2OpI64 {
-    AddI64() { super("+"); }
+  public static class AddI64 extends Prim2OpI64 {
+    public AddI64() { super("+"); }
     @Override long op( long l, long r ) { return l+r; }
   }
 
-  static class SubI64 extends Prim2OpI64 {
-    SubI64() { super("-"); }
+  public static class SubI64 extends Prim2OpI64 {
+    public SubI64() { super("-"); }
     @Override long op( long l, long r ) { return l-r; }
   }
 
-  static class MulI64 extends Prim2OpI64 {
-    MulI64() { super("*"); }
+  public static class MulI64 extends Prim2OpI64 {
+    public MulI64() { super("*"); }
     @Override long op( long l, long r ) { return l*r; }
   }
 
-  static class DivI64 extends Prim2OpI64 {
-    DivI64() { super("/"); }
+  public static class DivI64 extends Prim2OpI64 {
+    public DivI64() { super("/"); }
     @Override long op( long l, long r ) { return l/r; } // Long division
   }
 
-  static class ModI64 extends Prim2OpI64 {
-    ModI64() { super("%"); }
+  public static class ModI64 extends Prim2OpI64 {
+    public ModI64() { super("%"); }
     @Override long op( long l, long r ) { return l%r; }
   }
 
-  static class AndI64 extends Prim2OpI64 {
-    AndI64() { super("&"); }
+  public static class AndI64 extends Prim2OpI64 {
+    public AndI64() { super("&"); }
     // And can preserve bit-width
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type t1 = val(ARG_IDX), t2 = val(ARG_IDX+1);
@@ -398,8 +428,8 @@ public abstract class PrimNode extends Node {
     @Override long op( long l, long r ) { return l&r; }
   }
 
-  static class OrI64 extends Prim2OpI64 {
-    OrI64() { super("|"); }
+  public static class OrI64 extends Prim2OpI64 {
+    public OrI64() { super("|"); }
     // And can preserve bit-width
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type t1 = val(ARG_IDX), t2 = val(ARG_IDX+1);
@@ -430,16 +460,16 @@ public abstract class PrimNode extends Node {
     abstract boolean op( long x, long y );
   }
 
-  static class LT_I64 extends Prim2RelOpI64 { LT_I64() { super("<" ); } boolean op( long l, long r ) { return l< r; } }
-  static class LE_I64 extends Prim2RelOpI64 { LE_I64() { super("<="); } boolean op( long l, long r ) { return l<=r; } }
-  static class GT_I64 extends Prim2RelOpI64 { GT_I64() { super(">" ); } boolean op( long l, long r ) { return l> r; } }
-  static class GE_I64 extends Prim2RelOpI64 { GE_I64() { super(">="); } boolean op( long l, long r ) { return l>=r; } }
-  static class EQ_I64 extends Prim2RelOpI64 { EQ_I64() { super("=="); } boolean op( long l, long r ) { return l==r; } }
-  static class NE_I64 extends Prim2RelOpI64 { NE_I64() { super("!="); } boolean op( long l, long r ) { return l!=r; } }
+  public static class LT_I64 extends Prim2RelOpI64 { public LT_I64() { super("<" ); } boolean op( long l, long r ) { return l< r; } }
+  public static class LE_I64 extends Prim2RelOpI64 { public LE_I64() { super("<="); } boolean op( long l, long r ) { return l<=r; } }
+  public static class GT_I64 extends Prim2RelOpI64 { public GT_I64() { super(">" ); } boolean op( long l, long r ) { return l> r; } }
+  public static class GE_I64 extends Prim2RelOpI64 { public GE_I64() { super(">="); } boolean op( long l, long r ) { return l>=r; } }
+  public static class EQ_I64 extends Prim2RelOpI64 { public EQ_I64() { super("=="); } boolean op( long l, long r ) { return l==r; } }
+  public static class NE_I64 extends Prim2RelOpI64 { public NE_I64() { super("!="); } boolean op( long l, long r ) { return l!=r; } }
 
 
-  static class EQ_OOP extends PrimNode {
-    EQ_OOP() { super("==",TypeMemPtr.OOP_OOP,TypeInt.BOOL); }
+  public static class EQ_OOP extends PrimNode {
+    public EQ_OOP() { super("==",TypeMemPtr.OOP_OOP,TypeInt.BOOL); }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
       // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
@@ -469,8 +499,8 @@ public abstract class PrimNode extends Node {
     }
   }
 
-  static class NE_OOP extends PrimNode {
-    NE_OOP() { super("!=",TypeMemPtr.OOP_OOP,TypeInt.BOOL); }
+  public static class NE_OOP extends PrimNode {
+    public NE_OOP() { super("!=",TypeMemPtr.OOP_OOP,TypeInt.BOOL); }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
       // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
@@ -496,9 +526,9 @@ public abstract class PrimNode extends Node {
   }
 
 
-  static class Not extends PrimNode {
+  public static class Not extends PrimNode {
     // Rare function which takes a Scalar (works for both ints and ptrs)
-    Not() { super("!",TypeStruct.SCALAR1,TypeInt.BOOL); }
+    public Not() { super("!",TypeStruct.SCALAR1,TypeInt.BOOL); }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type t = val(ARG_IDX);
       if( t== Type.XNIL ||
@@ -512,8 +542,8 @@ public abstract class PrimNode extends Node {
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   }
 
-  static class RandI64 extends PrimNode {
-    RandI64() { super("math_rand",TypeStruct.INT64,TypeInt.INT64); }
+  public static class RandI64 extends PrimNode {
+    public RandI64() { super("rand",TypeStruct.INT64,TypeInt.INT64); }
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type t = val(ARG_IDX);
       if( t.above_center() ) return TypeInt.BOOL.dual();
@@ -529,10 +559,10 @@ public abstract class PrimNode extends Node {
   // Classic '&&' short-circuit.  The RHS is a *Thunk* not a value.  Inlines
   // immediate into the operators' wrapper function, which in turn aggressively
   // inlines during parsing.
-  static class AndThen extends PrimNode {
+  public static class AndThen extends PrimNode {
     private static final TypeStruct ANDTHEN = TypeStruct.make2flds("pred",Type.SCALAR,"thunk",TypeTuple.RET);
     // Takes a value on the LHS, and a THUNK on the RHS.
-    AndThen() { super("&&",ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
+    public AndThen() { super("&&",ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
     // Expect this to inline everytime
     @Override public Node ideal_grow() {
       if( _defs._len != ARG_IDX+2 ) return null; // Already did this
@@ -546,8 +576,7 @@ public abstract class PrimNode extends Node {
         Node fal = X.xform(new CProjNode(iff,0));
         Node tru = X.xform(new CProjNode(iff,1));
         // Call on true branch; if false do not call.
-        Node dsp = X.xform(new FP2DispNode(rhs));
-        Node cal = X.xform(new CallNode(true,_badargs,tru,mem,dsp,rhs));
+        Node cal = X.xform(new CallNode(true,_badargs,tru,mem,rhs));
         Node cep = X.xform(new CallEpiNode(cal,Env.DEFMEM));
         Node ccc = X.xform(new CProjNode(cep));
         Node memc= X.xform(new MProjNode(cep));
@@ -585,10 +614,10 @@ public abstract class PrimNode extends Node {
   // Classic '||' short-circuit.  The RHS is a *Thunk* not a value.  Inlines
   // immediate into the operators' wrapper function, which in turn aggressively
   // inlines during parsing.
-  static class OrElse extends PrimNode {
+  public static class OrElse extends PrimNode {
     private static final TypeStruct ORELSE = TypeStruct.make2flds("pred",Type.SCALAR,"thunk",TypeTuple.RET);
     // Takes a value on the LHS, and a THUNK on the RHS.
-    OrElse() { super("||",ORELSE,Type.SCALAR); _thunk_rhs=true; }
+    public OrElse() { super("||",ORELSE,Type.SCALAR); _thunk_rhs=true; }
     // Expect this to inline everytime
     @Override public Node ideal_grow() {
       if( _defs._len != ARG_IDX+2 ) return null; // Already did this
@@ -602,8 +631,7 @@ public abstract class PrimNode extends Node {
         Node fal = X.xform(new CProjNode(iff,0));
         Node tru = X.xform(new CProjNode(iff,1));
         // Call on false branch; if true do not call.
-        Node dsp = X.xform(new FP2DispNode(rhs));
-        Node cal = X.xform(new CallNode(true,_badargs,fal,mem,dsp,rhs));
+        Node cal = X.xform(new CallNode(true,_badargs,fal,mem,rhs));
         Node cep = X.xform(new CallEpiNode(cal,Env.DEFMEM));
         Node ccc = X.xform(new CProjNode(cep));
         Node memc= X.xform(new MProjNode(cep));

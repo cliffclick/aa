@@ -70,13 +70,13 @@ public class CastNode extends Node {
   @Override public boolean unify( Work work ) {
     TV2 maynil = tvar(1); // arg in HM
     TV2 notnil = tvar();  // ret in HM
-    boolean progress = false;
+    if( maynil.is_err() ) return false;
 
     // Can already be nil-checked and will then unify to self
     if( maynil==notnil ) throw unimpl(); // return false;
 
     // Already an expanded nilable
-    if( maynil.is_nil() && maynil.get("?") == notnil ) throw unimpl(); // return false
+    if( maynil.is_nil() && maynil.get("?") == notnil ) return false;
 
     // Expand nilable to either base
     if( maynil.is_base() && notnil.is_base() )
@@ -85,14 +85,13 @@ public class CastNode extends Node {
     // Two structs, one nilable.  Nilable is moved into the alias, but also
     // need to align the fields.
     if( maynil.is_struct() && notnil.is_struct() && maynil._type == maynil._type.meet_nil(Type.XNIL) ) {
+      boolean progress = false;
       // Also check that the fields align
       for( String fld : maynil.args() ) {
         TV2 mfld = maynil.get(fld);
         TV2 nfld = notnil.get(fld);
         if( nfld!=null && nfld!=mfld )
           { progress = true; break; } // Unequal fields
-        //if( nfld==null && notnil.open() ) // Missing field case, cannot find a test case
-        //  { progress = true; break; }
       }
       // Find any extra fields
       if( !progress && maynil.open() )
@@ -110,7 +109,7 @@ public class CastNode extends Node {
       throw unimpl(); // return maynil.unify(notnil,work);
 
     // Unify the maynil with a nilable version of notnil
-    return TV2.make_nil(in(1),val(1),notnil,"Cast_unify").push_dep(this).find().unify(maynil, work) | progress;
+    return TV2.make_nil(notnil,"Cast_unify").find().unify(maynil, work);
   }
 
   @Override public @NotNull CastNode copy( boolean copy_edges) {

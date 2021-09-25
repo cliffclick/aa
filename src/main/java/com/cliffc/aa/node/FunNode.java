@@ -64,10 +64,10 @@ public class FunNode extends RegionNode {
   public TypeFunSig _sig;   // Apparent signature; clones typically sharpen
   // Operator precedence; only set on top-level primitive wrappers.
   // -1 for normal non-operator functions and -2 for forward_decls.
-  public final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
+  public byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
   // Function is parsed infix, with the RHS argument thunked.  Flag is used by
   // the Parser only for short-circuit operations like '||' and '&&'.
-  public final boolean _thunk_rhs;
+  public boolean _thunk_rhs;
   // Hindly-Milner non-generative set, used during cloning
   private TV2[] _nongens;
 
@@ -77,12 +77,12 @@ public class FunNode extends RegionNode {
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
-  public FunNode(           PrimNode prim) { this(prim._name,prim._sig,prim._op_prec,prim._thunk_rhs); }
-  public FunNode(NewNode.NewPrimNode prim) { this(prim._name,prim._sig,prim._op_prec,false); }
+  public FunNode(String name,           PrimNode prim) { this(name,prim._sig,prim._op_prec,prim._thunk_rhs); }
+  public FunNode(String name,NewNode.NewPrimNode prim) { this(name,prim._sig,prim._op_prec,false); }
   // Used to start an anonymous function in the Parser
   public FunNode(TypeStruct formals) { this(null,TypeFunSig.make(formals,TypeTuple.RET),-1,false); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.NO_ARGS,TypeTuple.RET),-2,false); add_def(Env.ALL_CTRL); }
+  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.EMPTY,TypeTuple.RET),-2,false); add_def(Env.ALL_CTRL); }
   // Shared common constructor
   FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs ) { this(name,sig,op_prec,thunk_rhs,BitsFun.new_fidx()); }
   // Shared common constructor
@@ -98,8 +98,10 @@ public class FunNode extends RegionNode {
   }
 
   // Find FunNodes by fidx
-  static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
-  public static void reset() { FUNS.clear(); _must_inline=0; }
+  private static int FLEN;
+  public static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
+  public static void init0() { FLEN = FUNS.len(); }
+  public static void reset_to_init0() { FUNS.set_len(FLEN); _must_inline=0; }
   public static FunNode find_fidx( int fidx ) { return FUNS.atX(fidx); }
   int fidx() { return _fidx; }
 
@@ -221,17 +223,11 @@ public class FunNode extends RegionNode {
     // Update _sig if parms are unused.  SIG falls during Iter and lifts during
     // GCP.  If parm is missing or not-live, then the corresponding SIG
     // argument can be ALL (all args allowed, including errors).
-    if( !is_forward_ref() && !is_prim() && _keep==0 ) {
-      Node[] parms = parms();
-      TypeFunSig progress = _sig;
-      for( TypeFld fld : _sig._formals.flds() )
-        if( fld._t!=Type.ALL &&
-            (parms[fld._order]==null || parms[fld._order]._live==TypeMem.DEAD) )
-          _sig = _sig.make_from_arg(fld.make_from(Type.ALL));
-      if( ret!=null && ret._val!=_sig._ret && ret._val instanceof TypeTuple )
-        _sig = _sig.make_from_ret((TypeTuple)ret._val);
+    if( !is_forward_ref()  && _keep==0 ) {
+      TypeFunSig progress = re_sig();
       // Can resolve some least_cost choices
       if( progress != _sig ) {
+        _sig = progress;
         if( fptr != null )
           for( Node use : fptr()._uses )
             if( use instanceof UnresolvedNode )
@@ -242,6 +238,24 @@ public class FunNode extends RegionNode {
 
     return null;
   }
+
+  // Recompute a new signature, or the same old one
+  public TypeFunSig re_sig() {
+    Node[] parms = parms();
+    TypeFunSig progress = _sig;
+    for( TypeFld fld : _sig._formals.flds() )
+      if( parms[fld._order]==null || parms[fld._order]._live==TypeMem.DEAD ) {
+        if( fld.is_display_ptr() ) // Dead display can be removed
+          progress = progress.make_from_remove("^");
+        else if( fld._t!=Type.ALL ) // Other dead args need to keep knowledge they ever existed
+          progress = progress.make_from_arg(fld.make_from(Type.ALL));
+      }
+    RetNode ret = ret();
+    if( ret!=null && ret._val!=progress._ret && ret._val instanceof TypeTuple )
+      progress = progress.make_from_ret((TypeTuple)ret._val);
+    return progress;
+  }
+
 
   public Node ideal_inline(boolean check_progress) {
     // If no trailing RetNode and hence no FunPtr... function is uncallable
@@ -302,7 +316,7 @@ public class FunNode extends RegionNode {
 
     // --------------
     // Split the callers according to the new 'fun'.
-    FunNode fun = make_new_fun(ret, formals);
+    FunNode fun = make_new_fun(ret, formals, path);
     split_callers(ret,fun,body,path);
     assert Env.START.more_flow(Env.GVN._work_flow,true)==0; // Initial conditions are correct
     return this;
@@ -373,8 +387,12 @@ public class FunNode extends RegionNode {
     int idx = find_type_split_index(parms);
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
       TypeStruct formals = _sig._formals;
-      for( int i=DSP_IDX; i<parms.length; i++ )
-        formals = formals.replace_fld(_sig._formals.fld_idx(i).make_from(parms[i]==null ? Type.ALL : parms[i].val(idx).widen()));
+      for( TypeFld fld : formals.flds() ) {
+        Node parm = parms[fld._order];
+        TypeFld fld2 = fld.make_from(parm==null ? Type.ALL : parm.val(idx).widen());
+        if( fld2.isa(fld) )
+          formals = formals.replace_fld(fld2);
+      }
       return formals;
     }
 
@@ -452,6 +470,8 @@ public class FunNode extends RegionNode {
         if( use instanceof MemPrimNode.LValueWrite || use instanceof MemPrimNode.LValueWriteFinal )
           if( ((MemPrimNode)use).idx() == n ) return true; // Use as index is broken
           else break;   // Use for array base or value is fine
+        if( use instanceof PrimNode.AddF64 ) return true;
+        if( use instanceof PrimNode.AddI64 ) return true;
         if( use instanceof PrimNode.MulF64 ) return true;
         if( use instanceof PrimNode.MulI64 ) return true;
         if( use instanceof PrimNode.AndI64 ) return true;
@@ -573,7 +593,7 @@ public class FunNode extends RegionNode {
     assert cnts[OP_SCOPE]==0;
     assert cnts[OP_REGION] <= cnts[OP_IF];
 
-    // Specifically ignoring constants, parms, phis, rpcs, types,
+    // Specifically ignoring constants, parms, phis, RPCs, types,
     // unresolved, and casts.  These all track & control values, but actually
     // do not generate any code.
     if( cnts[OP_CALL] > 2 || // Careful inlining more calls; leads to exponential growth
@@ -593,7 +613,7 @@ public class FunNode extends RegionNode {
     int m=-1, mncons = -1;
     for( int i=has_unknown_callers() ? 2 : 1; i<_defs._len; i++ ) {
       Node call = in(i).in(0);
-      if( !(call instanceof CallNode) ) continue; // Not well formed
+      if( !(call instanceof CallNode) ) continue; // Not well-formed
       if( ((CallNode)call).nargs() != nargs() ) continue; // Will not inline
       if( call._val == Type.ALL ) continue; // Otherwise in-error
       TypeFunPtr tfp = CallNode.ttfp(call._val);
@@ -624,28 +644,32 @@ public class FunNode extends RegionNode {
     return m;                   // Return path to split on
   }
 
-  private FunNode make_new_fun(RetNode ret, TypeStruct new_formals) {
+  private FunNode make_new_fun(RetNode ret, TypeStruct new_formals, int path) {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
     FunNode fun = new FunNode(_name,TypeFunSig.make(new_formals,_sig._ret),_op_prec,_thunk_rhs,BitsFun.new_fidx(oldfidx));
     fun._bal_close = _bal_close;
     fun.pop();                  // Remove null added by RegionNode, will be added later
     fun.unkeep();               // Ret will clone and not construct
-    // Renumber the original as well; the original _fidx is now a *class* of 2
-    // fidxs.  Each FunNode fidx is only ever a constant, so the original Fun
-    // becomes the other child fidx.
-    int newfidx = _fidx = BitsFun.new_fidx(oldfidx);
-    FUNS.setX(newfidx,this);    // Track FunNode by fidx
-    FUNS.clear(oldfidx);        // Old fidx no longer refers to a single FunNode
-    ret.set_fidx(newfidx);      // Renumber in the old RetNode
-    // Right now, force the type upgrade on old_fptr.  old_fptr carries the old
-    // parent FIDX and is on the worklist.  Eventually, it comes off and the
-    // value() call lifts to the child fidx.  Meanwhile its value can be used
-    // to wire a size-split to itself (e.g. fib()), which defeats the purpose
-    // of a size-split (single caller only, so inlines).
-    for( Node old_fptr : ret._uses )
-      if( old_fptr instanceof FunPtrNode ) // Can be many old funptrs with different displays
-        old_fptr.xval();                   // Upgrade FIDX
+
+    // If type-splitting renumber the original as well; the original _fidx is
+    // now a *class* of 2 fidxs.  Each FunNode fidx is only ever a constant, so
+    // the original Fun becomes the other child fidx.  If size-splitting there
+    // are no callers of the new fidx other than the call site.
+    if( path == -1 ) {
+      int newfidx = _fidx = BitsFun.new_fidx(oldfidx);
+      FUNS.setX(newfidx,this);    // Track FunNode by fidx
+      FUNS.clear(oldfidx);        // Old fidx no longer refers to a single FunNode
+      ret.set_fidx(newfidx);      // Renumber in the old RetNode
+      // Right now, force the type upgrade on old_fptr.  old_fptr carries the old
+      // parent FIDX and is on the worklist.  Eventually, it comes off and the
+      // value() call lifts to the child fidx.  Meanwhile, its value can be used
+      // to wire a size-split to itself (e.g. fib()), which defeats the purpose
+      // of a size-split (single caller only, so inlines).
+      for( Node old_fptr : ret._uses )
+        if( old_fptr instanceof FunPtrNode ) // Can be many old funptrs with different displays
+          old_fptr.xval();                   // Upgrade FIDX
+    }
     Env.GVN.add_flow(ret);
     Env.GVN.add_flow(this);
     Env.GVN.add_flow_uses(this);
@@ -775,6 +799,7 @@ public class FunNode extends RegionNode {
             }
             parm.set_def(1,defx);
           }
+        fun.set_def(1,in(1).copy(true));
       } else                     // Path Split
         fun.set_def(1,Env.XCTRL);
     }
@@ -791,7 +816,7 @@ public class FunNode extends RegionNode {
         Env.DEFMEM.make_mem(nnrg.nnn()._alias,nnrg);
         Env.DEFMEM.make_mem(oorg.nnn()._alias,oorg);
         int oldalias = BitsAlias.parent(oorg.nnn()._alias);
-        Env.DEFMEM.set_def(oldalias,Node.con(TypeObj.UNUSED));
+        Env.DEFMEM.set_def(oldalias,Env.XUSE); // Old alias is dead
         Env.GVN.add_mono(oorg.nnn());
         Env.GVN.add_flow_uses(oorg);
         split_alias=true;
@@ -862,6 +887,11 @@ public class FunNode extends RegionNode {
             ncepi.wire0(Env.GVN._work_flow,ncepi.call(),xxxret.fun());
           }
         }
+        // CEProjs from the Call never re-wire, as they are not uniquely
+        // identified by input alone.  Other Projs DO rewire, if any target
+        // function uses them.
+        for( Node use : ncepi.call()._uses )
+          if( use._uses._len==0 ) Env.GVN.add_dead(use);
       }
     }
 
@@ -870,7 +900,7 @@ public class FunNode extends RegionNode {
     GVNGCM.retype_mem(aliases,fun .parm(MEM_IDX), newret, true);
 
     // Unhook the hooked FunPtrs
-    for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) use.unkeep();
+    for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) use.unhook();
   }
 
   // Compute value from inputs.  Simple meet over inputs.
@@ -878,6 +908,7 @@ public class FunNode extends RegionNode {
     // Will be an error eventually, but act like its executed so the trailing
     // EpilogNode gets visited during GCP
     if( is_forward_ref() ) return Type.CTRL;
+    if( is_prim() ) return Type.CTRL;
     if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
     if( in(0)==this ) return _defs._len>=2 ? val(1) : Type.XCTRL; // is_copy
     for( int i=1; i<_defs._len; i++ ) {

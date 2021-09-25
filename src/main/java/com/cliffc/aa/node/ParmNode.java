@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFld;
 
@@ -15,13 +14,20 @@ public class ParmNode extends PhiNode {
   public final int _idx; // Parameter index, MEM_IDX, FUN_IDX is display, ARGIDX+ normal args
   final String _name;    // Parameter name
   public ParmNode( int idx, String name, Node fun, ConNode defalt, Parse badgc) {
-    this(idx,name,fun,defalt._t,defalt,badgc);
+    this(defalt._t,badgc,fun,idx,name);
+    add_def(defalt);
   }
   public ParmNode( TypeFld fld, Node fun, ConNode defalt, Parse badgc) {
-    this(fld._order,fld._fld,fun,fld._t,defalt,badgc);
+    this(fld._t.simple_ptr(),badgc,fun,fld._order,fld._fld);
+    add_def(defalt);
   }
   public ParmNode( int idx, String name, Node fun, Type tdef, Node defalt, Parse badgc) {
-    super(OP_PARM,fun,tdef,defalt,badgc);
+    this(tdef,badgc,fun,idx,name);
+    add_def(defalt);
+  }
+
+  public ParmNode( Type tdef, Parse badgc, Node fun, int idx, String name ) {
+    super(OP_PARM,tdef,badgc,fun);
     assert idx>=0;
     _idx=idx;
     _name=name;
@@ -43,26 +49,18 @@ public class ParmNode extends PhiNode {
     FunNode fun = fun();
     if( fun._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
     assert fun._defs._len==_defs._len;
-    if( fun.in(0)!=null && in(1) != this) // FunNode is a Copy
-      return in(1);             // So return the copy
+    if( fun.in(0)!=null )       // FunNode is a Copy
+      return in(1)==this ? Env.ANY : in(1);             // So return the copy
     // Do not otherwise fold away, as this lets Nodes in *this* function depend
     // on values in some other function... which, if code-split, gets confused
     // (would have to re-insert the Parm).
     return null;
   }
 
-  private boolean valid_args( FunNode fun, int i, Node mem ) {
-    if( fun._thunk_rhs ) return true; // Always allow folding of Thunks
-    // Check arg type, after sharpening
-    Type actual = mem==null ? val(i) : in(i).sharptr(mem.in(i));
-    Type formal = fun.formal(_idx);
-    return actual.isa(formal);
-  }
-
   @Override public Type value(GVNGCM.Mode opt_mode) {
     // Not executing?
     Type ctl = val(0);
-    if( ctl != Type.CTRL ) return ctl.oob();
+    if( ctl != Type.CTRL && ctl != Type.ALL ) return ctl.oob();
     Node in0 = in(0);
     if( in0 instanceof ThunkNode ) return val(1);
     if( !(in0 instanceof FunNode) )  return ctl.oob();
@@ -70,8 +68,12 @@ public class ParmNode extends PhiNode {
     // caller can be that bad.  During & after GCP all unknown callers are
     // accounted for.
     FunNode fun = (FunNode)in0;
-    if( !opt_mode._CG && fun.has_unknown_callers() )
-      return val(1);
+    if( !opt_mode._CG && (fun.has_unknown_callers() || fun.is_prim()) ) {
+      TypeFld fld = fun._sig._formals.fld_find(_name);
+      if( _idx!=MEM_IDX && fld != null ) return fld._t.simple_ptr();
+      return len()==1 ? _t : val(1);
+    }
+    if( fun.len()!=len() ) return Type.ALL; // Collapsing
     Node mem = fun.parm(MEM_IDX);
     // All callers' known; merge the wired & flowing ones
     Type t = Type.ANY;
@@ -109,11 +111,14 @@ public class ParmNode extends PhiNode {
   @Override public ErrMsg err( boolean fast ) {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere
     FunNode fun = fun();
-    if( fun.in(0)== fun ) return null; // Dead, being inlined
-    assert fun._defs._len==_defs._len;
-    if( _idx <= MEM_IDX ) return null; // No arg check on RPC or memory
+    if( fun.in(0)== fun ) return null;  // Dead, being inlined
+    if( fun.len()!=len() ) return null; // Broken, dying
+    if( _idx <= MEM_IDX ) return null;  // No arg check on RPC or memory
     Node mem = fun.parm(MEM_IDX);
-    Type formal = fun.formal(_idx);
+    assert _name!=null;
+    TypeFld ffld = fun._sig._formals.fld_find(_name);
+    if( ffld==null ) return null; // dead display, because loading a high value
+    Type formal = ffld._t;
     for( int i=1; i<_defs._len; i++ ) {
       if( fun.val(i)==Type.XCTRL ) continue;// Ignore dead paths
       Type argt = mem == null ? in(i)._val : in(i).sharptr(mem.in(i)); // Arg type for this incoming path

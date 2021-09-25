@@ -15,10 +15,6 @@ abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
   }
   @Override TypeAry dead_type() { return TypeAry.ARY.dual(); }
 
-  protected static void add_libs( Ary<NewPrimNode> INTRINSICS ) {
-    INTRINSICS.push(new NewAry(TypeAry.ARY0,TypeInt.INT64));
-  }
-
   // --------------------------------------------------------------------------
   // "[" defines a new array, and expects an integer size.  Produces
   // partial-alloc type which is consumed by "]" to produce the array.

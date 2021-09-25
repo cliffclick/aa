@@ -3,9 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.MEM_IDX;
 
@@ -50,6 +48,10 @@ public final class RetNode extends Node {
     if( !super.equals(o) ) return false;
     return _fidx==((RetNode)o)._fidx;
   }
+  public void free() {
+    FunNode.FUNS.clear(_fidx);
+    BitsFun.free(_fidx);
+  }
 
   // Short self name
   @Override public String xstr() {
@@ -61,8 +63,12 @@ public final class RetNode extends Node {
   @Override public Node ideal_reduce() {
     // If control is dead, but the Ret is alive, we're probably only using the
     // FunPtr as a 'gensym'.  Nuke the function body.
-    if( !is_copy() && ctl()._val == Type.XCTRL && !is_prim() && fun()._val ==Type.XCTRL )
+    Node progress = null;
+    if( !is_copy() && ctl()._val == Type.XCTRL && !is_prim() && fun()._val ==Type.XCTRL ) {
       set_def(4,null);          // We're a copy now!
+      progress=this;
+      Env.GVN.add_reduce_uses(this); // Following FunPtrs do not need their displays
+    }
 
     // If no users inlining, wipe out all edges
     if( is_copy() && in(0)!=null ) {
@@ -77,13 +83,13 @@ public final class RetNode extends Node {
         return this;              // Progress
       }
     }
-    if( is_copy() ) return null;
+    if( is_copy() ) return progress;
     // Collapsed to a constant?  Remove any control interior.
     Node ctl = ctl();
     if( rez()._val.is_con() && ctl!=fun() && // Profit: can change control and delete function interior
         (mem()._val ==TypeMem.EMPTY || (mem() instanceof ParmNode && mem().in(0)==fun())) ) // Memory has to be trivial also
       return set_def(0,fun());  // Gut function body
-    return null;
+    return progress;
   }
 
   // Look for a tail recursive call

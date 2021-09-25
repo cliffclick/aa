@@ -75,6 +75,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static int  new_alias(int par) { return set_alias(par); }
   public static int type_alias(int par) { return set_alias(par); }
   private static int set_alias(int par) { return TREE.split(par); }
+  public static void free(int fidx) { TREE.free(fidx); }
 
   BitsAlias widen() {
     if( isa(RECORD_BITS ) ) return BitsAlias.RECORD_BITS ;

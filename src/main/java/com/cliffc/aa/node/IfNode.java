@@ -86,6 +86,7 @@ public class IfNode extends Node {
   @Override public TV2 new_tvar(String alloc_site) { return null; }
 
   @Override public Node is_copy(int idx) {
+    if( is_prim() ) return null;
     if( !(_val instanceof TypeTuple) ) return null;
     TypeTuple tt = (TypeTuple) _val;
     if( tt==TypeTuple.IF_ANY ) return Env.XCTRL;

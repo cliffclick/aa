@@ -132,22 +132,23 @@ Code            | Comment
 `math_pi`       | `3.141592653589793:flt` Should be `math.pi` but name spaces not implemented
 **primitive function lookup** | ---
 `+`             | `"Syntax error; trailing junk"` unadorned primitive not allowed
-`{+}`           | `{{+:{int int -> int}, +:{flt flt -> flt}}` returns a union of '+' functions
-`{!}`           | `!:{int -> int1}` function taking an `int` and returning a `bool`
+`_+_`           | `{{+:{int int -> int}, +:{flt flt -> flt}}` returns a union of '+' functions.  The underscores indicate a binary op
+`{_+_}`         | Same as above
+`{!_}`          | `!:{int -> int1}` function taking an `int` and returning a `bool`.  The under indicates a prefix unary op
 **Function application, traditional paren/comma args** | ---
-`{+}(1,2)`      | `3:int`
-`{-}(1,2)`      | `-1:int` binary version
-`{-}(1)`        | `-1:int` unary version
+`_+_(1,2)`      | `3:int`
+`_-_(1,2)`      | `-1:int` binary version
+`-_(1)`         | `-1:int` unary version
 **Errors; mismatch arg count** | ---
 `!()`           | `Call to unary function '!', but missing the one required argument`
 `math_pi(1)`    | `A function is being called, but 3.141592653589793 is not a function type`
-`{+}(1,2,3)`    | `Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments`
+`_+_(1,2,3)`    | `Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments`
 **Arguments separated by commas and are full statements** | ---
-`{+}(1, 2 * 3)` | `7:int`
-`{+}(1 + 2 * 3, 4 * 5 + 6)` | `33:int`
+`_+_(1, 2 * 3)` | `7:int`
+`_+_(1 + 2 * 3, 4 * 5 + 6)` | `33:int`
 `(1;2 )`        | `2:int` just parens around two statements
 `(1;2;)`        | `2:int` final semicolon is optional
-`{+}(1;2 ,3)`   | `5:int` full statements in arguments
+`_+_(1;2 ,3)`   | `5:int` full statements in arguments
 **Syntax for variable assignment** | ---
 `x=1`           | `1:int` assignments have values
 `x:=1`          | `1:int` Same thing, not final
@@ -198,8 +199,8 @@ Code            | Comment
 `id`              | `{A->A}` No type-vars yet
 `id(1)`           | `1:int`
 `id(3.14)`        | `3.14:flt`
-`id({+})`         | `{{+:{int int -> int}, +:{flt flt -> flt}}`
-`id({+})(id(1),id(math_pi))` | `4.141592653589793:flt`
+`id(_+_)`         | `{{+:{int int -> int}, +:{flt flt -> flt}}`
+`id(_+_)(id(1),id(math_pi))` | `4.141592653589793:flt`
 **Function execution and result typing** | ---
 `x=3; andx={y -> x & y}; andx(2)` | `2:int` capture external variable
 `x=3; and2={x -> x & 2}; and2(x)` | `2:int` shadow  external variable
@@ -207,7 +208,7 @@ Code            | Comment
 `fun={x -> }`     | `Missing function body`
 `mul3={x -> y=3; x*y}; mul3(2)` | `6:int` // multiple statements in func body
 `x=3; addx={y -> x+y}; addx(2)` | `5:int` Overloaded `+` resolves to `:int`
-`x=3; mul2={x -> x*2}; mul2(2.1)` | `4.2:flt` Overloaded `{+}:flt` resolves with I->F conversion
+`x=3; mul2={x -> x*2}; mul2(2.1)` | `4.2:flt` Overloaded `_+_:flt` resolves with I->F conversion
 `x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)` | `10.2:flt` Overloaded `mul2` specialized into int and flt variants
 `sq={x -> x*x}; sq 2.1` | `4.41:flt` No `()` required for single args
 **Type annotations** | ---

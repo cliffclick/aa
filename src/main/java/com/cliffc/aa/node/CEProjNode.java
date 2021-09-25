@@ -42,10 +42,6 @@ public class CEProjNode extends CProjNode {
     if( !tfp.fidxs().test_recur(fun._fidx) )
       return false;             // Call not executing this wired path
 
-    // Argument count mismatch
-    TypeStruct formals = fun._sig._formals;
-    if( ttcall.len()-2/*minus fun, minus esc*/ != fun._sig.nargs() ) return false;
-
     // Cannot use the obvious argument check "actual.isa(formal)"!!!!!
 
     // If the actual is higher than formal (not even above_center), but then
@@ -53,23 +49,8 @@ public class CEProjNode extends CProjNode {
     // test for static properties (e.g. argument count, or constant ALL
     // arguments).
 
-
-    //// Check good args
-    //TypeMem tmem = (TypeMem)ttcall.at(AA.MEM_IDX);
-    //for( int i=AA.MEM_IDX; i<formals.len(); i++ ) {
-    //  Type formal = formals.at(i);
-    //  Type actual0= ttcall.at(i);
-    //  if( actual0==Type.ANY ) continue; // Allow ignored args
-    //  Type actual = tmem.sharptr(actual0);
-    //  if( formal.isa(actual) ) continue; // Low but sane
-    //  if( actual.isa(formal) &&
-    //      (!actual.above_center() ||
-    //       actual==Type.XNIL ||
-    //       formal.dual().isa(actual))  )
-    //    continue;
-    //  return false;
-    //}
-    return true;
+    // Argument count mismatch
+    return ttcall.len()-1/*tfp*/-1/*esc*/ == fun._sig.nargs();
   }
 
   @Override public TV2 new_tvar( String alloc_site) { return null; }

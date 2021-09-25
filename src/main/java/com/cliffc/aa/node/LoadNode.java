@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -165,13 +166,13 @@ public class LoadNode extends Node {
         if( jmem == null ) return null;
         mem = jmem;
       } else if( mem instanceof ParmNode ) {
-        if( mem.in(0).is_copy(1)!=null ) mem = mem.in(1); // FunNode is dying, copy, so ParmNode is also
+        if( mem.in(0) instanceof FunNode && mem.in(0).is_copy(1)!=null ) mem = mem.in(1); // FunNode is dying, copy, so ParmNode is also
         else return null;
 
-      } else if( mem instanceof PhiNode ||
+      } else if( mem instanceof PhiNode || // Would have to match on both sides, and Phi the results
                  mem instanceof StartMemNode ||
                  mem instanceof ConNode) {
-        return null;            // Would have to match on both sides, and Phi the results
+        return null;
       } else {
         throw com.cliffc.aa.AA.unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
       }
@@ -221,12 +222,12 @@ public class LoadNode extends Node {
 
   // The only memory required here is what is needed to support the Load
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    TypeMem live = _live_use(opt_mode,def);
+    TypeMem live = _live_use(def);
     return def==adr()
       ? (live.above_center() ? TypeMem.DEAD : _live)
       : live;
   }
-  public TypeMem _live_use(GVNGCM.Mode opt_mode, Node def ) {
+  public TypeMem _live_use( Node def ) {
     Type tmem = mem()._val;
     Type tptr = adr()._val;
     if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?

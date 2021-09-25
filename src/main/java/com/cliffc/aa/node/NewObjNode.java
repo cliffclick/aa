@@ -139,9 +139,8 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert FLDS.isEmpty();
     // Gather args and produce a TypeStruct
     for( TypeFld fld : _ts.flds() ) {
-      // Open NewObjs assume all field types are crushed to error, except the
-      // display which is required (and not crushable) for parsing.
-      Type t = _ts._open && !Util.eq(fld._fld,"^") ? Type.ALL : val(fld._order);
+      // TODO: why assume crushed to error?  primitive scope is open and do not want it crushed
+      Type t = val(fld._order);
       FLDS.push(fld.make_from(t));
     }
     TypeStruct ts = _ts.make_from(FLDS);

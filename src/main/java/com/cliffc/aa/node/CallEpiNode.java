@@ -58,7 +58,7 @@ public final class CallEpiNode extends Node {
           assert !BitsFun.is_parent(ret.fidx());
           // Remove the edge.  Pre-GCP all CG edges are virtual, and are lazily
           // and pessimistically filled in by ideal calls.  During the course
-          // of lifting types some of the manifested CG edges are killed.
+          // of lifting types, some manifested CG edges are killed.
           // Post-GCP all CG edges are manifest, but types can keep lifting
           // and so CG edges can still be killed.
           unwire(call,ret);
@@ -88,7 +88,16 @@ public final class CallEpiNode extends Node {
           ret._live.isa(_live) &&       // Call and return liveness compatible
           !fun.noinline() ) {           // And not turned off
         assert fun.in(1).in(0)==call;   // Just called by us
+        int idx = Env.SCP_0._defs.find(ret);
+        if( idx!=-1 ) Env.SCP_0.del(idx);
         fun.set_is_copy();              // Collapse the FunNode into the Call
+        if( fun._name!=null && fun._name.charAt(0)=='$' ) { // Inlining a primitive into a wrapper from _prims.aa
+          FunNode outer_fun = (FunNode)call.ctl();
+          // Copy the op_prec up 1 layer
+          // TODO: Make an official user-mode operator syntax, and put it in _prims.aa
+          outer_fun._op_prec = fun._op_prec;
+          outer_fun._thunk_rhs = fun._thunk_rhs;
+        }
         return set_is_copy(ret.ctl(), ret.mem(), ret.rez()); // Collapse the CallEpi into the Ret
       }
     }
@@ -143,7 +152,7 @@ public final class CallEpiNode extends Node {
     // Check that function return memory and post-call memory are compatible
     if( !(_val instanceof TypeTuple) ) return null;
     Type selfmem = ((TypeTuple) _val).at(MEM_IDX);
-    if( !rmem._val.isa( selfmem ) && !(selfmem==TypeMem.ANYMEM && call.is_pure_call()!=null) )
+    if( !rmem._val.isa( selfmem ) && call.is_pure_call()==null )
       return null;
 
     // Check for zero-op body (id function)
@@ -184,6 +193,7 @@ public final class CallEpiNode extends Node {
     Type tcall = call._val;
     if( !(tcall instanceof TypeTuple) ) return false;
     BitsFun fidxs = CallNode.ttfp(tcall)._fidxs;
+    if( fidxs==BitsFun.FULL ) return false; // Error call
     if( fidxs.above_center() )  return false; // Still choices to be made during GCP.
 
     // Check all fidxs for being wirable
@@ -191,7 +201,7 @@ public final class CallEpiNode extends Node {
     for( int fidx : fidxs ) {                 // For all fidxs
       if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
       FunNode fun = FunNode.find_fidx(fidx);  // Lookup, even if not wired
-      if( fun.is_dead() ) continue;           // Already dead, stale fidx
+      if( fun==null || fun.is_dead() ) continue; // Already dead, stale fidx
       if( fun.is_forward_ref() ) continue;    // Not forward refs, which at GCP just means a syntax error
       RetNode ret = fun.ret();
       if( ret==null ) continue;               // Mid-death
@@ -268,16 +278,16 @@ public final class CallEpiNode extends Node {
     // along to the function being called.
     // tcall[0] = Control
     // tcall[1] = Memory passed around the functions.
-    // tcall[2] = TypeFunPtr passed to FP2Closure
+    // tcall[2] = Display
     // tcall[3+]= Arg types
     Type ctl = CallNode.tctl(tcall); // Call is reached or not?
     if( ctl != Type.CTRL && ctl != Type.ALL )
       return TypeTuple.CALLE.dual();
-    TypeFunPtr tfptr= CallNode.ttfpx(tcall); // Peel apart Call tuple
+    TypeFunPtr tfptr= CallNode.ttfp(tcall);  // Peel apart Call tuple
     TypeMemPtr tescs= CallNode.tesc(tcall);  // Peel apart Call tuple
 
     // Fidxes; if still in the parser, assuming calling everything
-    BitsFun fidxs = tfptr==null || tfptr.is_forward_ref() ? BitsFun.FULL : tfptr.fidxs();
+    BitsFun fidxs = tfptr.fidxs();
     // NO fidxs, means we're not calling anything.
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
     if( fidxs.above_center() ) return TypeTuple.CALLE.dual(); // Not resolved yet
@@ -294,9 +304,9 @@ public final class CallEpiNode extends Node {
       // children as expected; same if the parent is still wired (perhaps with
       // some children).  If only 1 child is wired, then we have an extra fidx
       // for a not-wired child.  If this fidx is really some unknown caller we
-      // would have to get super conservative; but its actually just a recently
+      // would have to get very conservative; but it's actually just a recently
       // split child fidx.  If we get the RetNode via FunNode.find_fidx we suffer
-      // the non-local progress curse.  If we get super conservative, we end up
+      // the non-local progress curse.  If we get very conservative, we end up
       // rolling backwards (original fidx returned int; each split will only
       // ever return int-or-better).  So instead we "freeze in place".
       outerloop:
@@ -317,10 +327,10 @@ public final class CallEpiNode extends Node {
     }
 
     // Compute call-return value from all callee returns
-    Type trez = Type   .ANY   ;
+    Type trez = Type   .ANY;
     Type tmem = TypeMem.ANYMEM;
     if( fidxs == BitsFun.FULL ) { // Called something unknown
-      trez = Type.ALL;            // Unknown target does worst thing
+      trez = Type.ALL;         // Unknown target does worst thing
       tmem = defmem;
     } else {                      // All targets are known & wired
       for( int i=0; i<nwired(); i++ ) {
@@ -333,19 +343,22 @@ public final class CallEpiNode extends Node {
         }
       }
     }
-    TypeMem post_call = (TypeMem)tmem;
+
+    Type premem = call().mem()._val;
+    TypeMem caller_mem = premem instanceof TypeMem ? (TypeMem)premem : premem.oob(TypeMem.ALLMEM);
 
     // If no memory projection, then do not compute memory
-    if( (_keep==0 && ProjNode.proj(this,MEM_IDX)==null) || call().mem()==null )
-      return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,trez);
-    Type premem = call().mem()._val;
+    TypeMem tmem3;
+    if( (_keep==0 && ProjNode.proj(this,MEM_IDX)==null) || call().mem()==null ) {
+      tmem3 = TypeMem.ANYMEM;
+    } else {
+      // Build epilog memory.
 
-    // Build epilog memory.
-
-    // Approximate "live out of call", includes things that are alive before
-    // the call but not flowing in.  Catches all the "new in call" returns.
-    TypeMem caller_mem = premem instanceof TypeMem ? (TypeMem)premem : premem.oob(TypeMem.ALLMEM);
-    TypeMem tmem3 = live_out(caller_mem,post_call,trez,tescs._aliases,opt_mode._CG ? null : defmem);
+      // Approximate "live out of call", includes things that are alive before
+      // the call but not flowing in.  Catches all the "new in call" returns.
+      TypeMem post_call = (TypeMem)tmem;
+      tmem3 = live_out(caller_mem,post_call,trez,tescs._aliases,opt_mode._CG ? null : defmem);
+    }
 
     // Attempt to lift the result, based on HM types.  Walk the input HM type
     // and GCP flow type in parallel and create a mapping.  Then walk the
@@ -380,7 +393,8 @@ public final class CallEpiNode extends Node {
   // the call but not flowing in.  Catches all the "new in call" returns.
   static TypeMem live_out(TypeMem caller_mem, TypeMem post_call, Type trez, BitsAlias esc_in, TypeMem defmem) {
     BitsAlias esc_out = esc_out(post_call,trez);
-    int len = defmem==null ? Math.max(caller_mem.len(),post_call.len()) : defmem.len();
+    int len = Math.max(Math.max(caller_mem.len(),post_call.len()),esc_out.max()+1);
+    if( defmem!=null ) len = Math.max(len,defmem.len());
     TypeObj[] pubs = new TypeObj[len];
     // TODO: Wildly inefficient
     for( int i=1; i<pubs.length; i++ ) {
@@ -488,10 +502,10 @@ public final class CallEpiNode extends Node {
 
   @Override public boolean unify( Work work ) {
     assert !_is_copy;
+    if( tvar().is_err() ) return false;
     CallNode call = call();
     Node fdx = call.fdx();
     TV2 tfun = fdx.tvar();
-    TV2 tvar = tvar();
     if( tfun.is_err() )
       return tvar().unify(tfun,work);
 
@@ -499,31 +513,30 @@ public final class CallEpiNode extends Node {
     if( !tfun.is_fun() ) {
       if( work==null ) return true;
       NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
-      for( int i=DSP_IDX; i<call._defs._len-1; i++ )
-        args.put(""+i,call.tvar(i));
-      args.put(" ret",tvar);
-      progress = tfun.unify(TV2.make_fun(this, fdx._val, args, "CallEpi_unify"), work);
+      for( int i=DSP_IDX; i<call._defs._len; i++ )
+        args.put((""+i).intern(),call.tvar(i));
+      args.put(" ret",tvar());
+      TV2 nfun = TV2.make_fun(this, fdx._val, args, "CallEpi_unify");
+      progress = tfun.unify(nfun, work);
       tfun = tfun.find();
     }
     // TODO: Handle Thunks
 
-    if( tfun.len()-1-1 != call._defs._len-1-ARG_IDX ) //
-      //progress = T2.make_err("Mismatched argument lengths").unify(find(), work);
-      throw unimpl();
+    if( tfun.len()-1-1 != call.nargs()-ARG_IDX ) //
+      return tvar().unify(TV2.make_err(this,"Mismatched argument lengths","CallEpi_unify"),work);
 
     // Check for progress amongst args
-    for( int i=DSP_IDX; i<call._defs._len-1; i++ ) {
+    for( int i=DSP_IDX; i<call._defs._len; i++ ) {
       TV2 actual = call.tvar(i);
-      TV2 formal = tfun.get(""+i);
-      if( actual!=formal ) {
-        progress |= actual.unify(formal,work);
-        if( progress && work==null ) return true; // Early exit
-        if( tfun.is_unified() || tfun.is_err() ) throw unimpl();
-      }
+      TV2 formal = tfun.get((""+i).intern());
+      progress |= actual.unify(formal,work);
+      if( progress && work==null ) return true; // Early exit
+      if( (tfun=tfun.find()).is_err() ) throw unimpl();
     }
     // Check for progress on the return
-    progress |= tfun.get(" ret").unify(tvar,work);
-    if( tfun.is_unified() || tfun.is_err() ) throw unimpl();
+    progress |= tvar().unify(tfun.get(" ret"),work);
+    if( (tfun=tfun.find()).is_err() ) return tvar().unify(tfun,work);
+
     return progress;
   }
 

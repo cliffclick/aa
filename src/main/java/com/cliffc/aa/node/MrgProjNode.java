@@ -24,7 +24,7 @@ public class MrgProjNode extends ProjNode {
     Node mem = mem();
     Type t = mem._val;
     // Alias is dead-on-entry.  Then this MrgPrj no longer lifts
-    if( t instanceof TypeMem && ((TypeMem)t).at(nnn._alias)==TypeObj.UNUSED && nnn.is_unused() ) // New is dead for no pointers
+    if( /*t instanceof TypeMem && ((TypeMem)t).at(nnn._alias)==TypeObj.UNUSED &&*/ nnn.is_unused() ) // New is dead for no pointers
       return mem;                // Kill MrgNode when it no longer lifts values
 
     // New is dead from below.
@@ -81,7 +81,7 @@ public class MrgProjNode extends ProjNode {
     TypeObj to = (TypeObj)((TypeTuple)tn).at(MEM_IDX);
     TypeMem tmem = (TypeMem)tm;
     return nnn.is_unused()      // This is a cycle-breaking lifting value
-      ? tmem.set   (nnn._alias,TypeObj.UNUSED)
+      ? tmem.set   (nnn._alias,tmem.at(nnn._alias))
       : tmem.st_new(nnn._alias, to);
   }
 

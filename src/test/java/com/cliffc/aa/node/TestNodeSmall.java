@@ -19,7 +19,6 @@ public class TestNodeSmall {
 
   @Ignore
   @Test public void testUnresolvedAdd() {
-    Env top = Env.top_scope();
     GVNGCM gvn = Env.GVN;
 
     // Current theory on Unresolved:  Call.resolve moves closer to the centerline:
@@ -43,7 +42,7 @@ public class TestNodeSmall {
     // Kinda sorta looks like: use startype on incoming, and JOIN.
 
     gvn._opt_mode=GVNGCM.Mode.Parse;
-    UnresolvedNode uadd = (UnresolvedNode)top.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
+    UnresolvedNode uadd = (UnresolvedNode)Env.TOP.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
     FunPtrNode aflt = (FunPtrNode)uadd.in(0);
     FunPtrNode aint = (FunPtrNode)uadd.in(1);
     FunPtrNode astr = (FunPtrNode)uadd.in(2);
@@ -247,17 +246,16 @@ public class TestNodeSmall {
   @SuppressWarnings("unchecked")
   @Ignore
   @Test public void testCallNodeResolve() {
-    Env top = Env.top_scope();
     GVNGCM gvn = Env.GVN;
 
     // Make a Unknown/CallNode/CallEpi combo.
     // Unwired.  Validate the resolve process and monotonicity.
     gvn._opt_mode=GVNGCM.Mode.Parse;
     ConNode ctrl = (ConNode) gvn.xform(new ConNode<>(Type.CTRL));
-    UnresolvedNode fp_mul = (UnresolvedNode)top.lookup("*"); // {int int -> int} and {flt flt -> flt}
+    UnresolvedNode fp_mul = (UnresolvedNode)Env.TOP.lookup("*"); // {int int -> int} and {flt flt -> flt}
     FunPtrNode mflt = (FunPtrNode)fp_mul.in(0);
     FunPtrNode mint = (FunPtrNode)fp_mul.in(1);
-    UnresolvedNode fp_add = (UnresolvedNode)top.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
+    UnresolvedNode fp_add = (UnresolvedNode)Env.TOP.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
     FunPtrNode aflt = (FunPtrNode)fp_add.in(0);
     FunPtrNode aint = (FunPtrNode)fp_add.in(1);
     FunPtrNode astr = (FunPtrNode)fp_add.in(2);
@@ -400,11 +398,10 @@ public class TestNodeSmall {
   }
 
   @Test public void testCallNodeResolve2() {
-    Env top = Env.top_scope();
     GVNGCM gvn = Env.GVN;
     gvn._opt_mode=GVNGCM.Mode.Parse;
 
-    UnresolvedNode fp_add = (UnresolvedNode)top.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
+    UnresolvedNode fp_add = (UnresolvedNode)Env.TOP.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
     FunPtrNode aflt = (FunPtrNode)fp_add.in(0);
     FunPtrNode aint = (FunPtrNode)fp_add.in(1);
     FunPtrNode astr = (FunPtrNode)fp_add.in(2);
@@ -486,7 +483,7 @@ public class TestNodeSmall {
   // Code: "gen_ctr={cnt;{cnt++}}; ctrA=gen_ctr(); ctrB=gen_ctr(); ctrA(); ctrB(); ctrB()"
   //
   @Test public void testRecursiveDisplay() {
-    Env top = Env.top_scope();
+    //Env top = Env.top_scope();
     GVNGCM gvn = Env.GVN;
 
     // Build the graph for the "fact" example:
@@ -530,7 +527,7 @@ public class TestNodeSmall {
     dsp_file.create("fact",fptr,Access.Final);
     dsp_file.no_more_fields();
     // Return the fptr to keep all alive
-    ScopeNode env = new ScopeNode(null,true);
+    ScopeNode env = new ScopeNode(true);
     env.set_ctrl(ctl);
     env.set_ptr (dsp_file_ptr);
     env.set_mem (dsp_file_obj);
@@ -587,7 +584,7 @@ public class TestNodeSmall {
 
   private static int ERR=0;
   @Test public void testMemoryArgs() {
-    Env top = Env.top_scope();
+    //Env top = Env.top_scope();
     GVNGCM gvn = Env.GVN;
 
     // Check Parm.value calls are monotonic, and within Fun.sig bounds -

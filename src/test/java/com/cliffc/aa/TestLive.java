@@ -15,7 +15,7 @@ public class TestLive {
     gvn._opt_mode = GVNGCM.Mode.PesiNoCG;
 
     // Liveness is a backwards flow.  Scope always demands all return results.
-    ScopeNode scope = new ScopeNode(null,false);
+    ScopeNode scope = new ScopeNode(false);
 
     Node fullmem = new ConNode<>(TypeMem.FULL);
     fullmem._val = TypeMem.FULL;
@@ -37,7 +37,7 @@ public class TestLive {
 
   @SuppressWarnings("unchecked")
   @Test public void testNewObj() {
-    Env env = Env.top_scope();
+    //Env env = Env.top_scope();
     GVNGCM gvn = Env.GVN;
     Node._INIT0_CNT = 1; // No prims
     // Always memory for the NewObj
@@ -68,7 +68,7 @@ public class TestLive {
     ptr.xval();
 
     // Use the object for scope exit
-    ScopeNode scope = new ScopeNode(null,false);
+    ScopeNode scope = new ScopeNode(false);
     scope.set_mem(mem);
     scope.set_rez(ptr);
     scope._val = Type.ALL;

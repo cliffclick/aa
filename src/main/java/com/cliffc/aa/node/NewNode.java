@@ -4,7 +4,6 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
 import static com.cliffc.aa.AA.MEM_IDX;
@@ -49,10 +48,19 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     if( _elock ) unelock();    // Unlock before changing hash
     _alias = alias;
     _tptr = TypeMemPtr.make(BitsAlias.make0(alias),TypeObj.ISUSED);
+    _tvar._type = _tptr; // Set the type
     sets(ts);
   }
   @Override public String xstr() { return "New"+"*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
+
+  public MrgProjNode mem() {
+    if( _uses._len < 1 ) return null;
+    if( _uses.at(0) instanceof MrgProjNode ) return (MrgProjNode)_uses.at(0);
+    if( _uses._len < 2 ) return null;
+    if( _uses.at(1) instanceof MrgProjNode ) return (MrgProjNode)_uses.at(1);
+    return null;
+  }
 
   // Recompute default memory cache on a change.  Might not be monotonic,
   // e.g. during Node create, or folding a Store.
@@ -85,7 +93,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
   // Flow typing a NewNode to 'any' changes DEFMEM
   @Override public void add_work_extra(Work work, Type oval) {
-    if( _val==Type.ANY || _live==TypeMem.DEAD || oval==TypeMem.DEAD )  work.add(Env.DEFMEM);
+    if( _val==Type.ANY || oval==Type.ANY || _live==TypeMem.DEAD || oval==TypeMem.DEAD )  work.add(Env.DEFMEM);
   }
 
 
@@ -123,12 +131,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     if( _uses._len==0 ) return false; // Dead or being created
     Node mem = _uses.at(0);
     // If only either address or memory remains, then memory contents are dead
-    if( _uses._len==1 ) {
-      if( mem instanceof MrgProjNode ) return true; // No pointer, just dead memory
-      // Just a pointer; currently on Strings become memory constants and
-      // constant-fold - leaving the allocation dead.
-      return !(val(1) instanceof TypeStr);
-    }
+    if( _uses._len==1 )
+      return mem instanceof MrgProjNode; // No pointer, just dead memory
     Node ptr = _uses.at(1);
     if( ptr instanceof MrgProjNode ) ptr = _uses.at(0); // Get ptr not mem
     if( ptr._keep>0 ) return false;
@@ -154,6 +158,14 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     return nnn;
   }
 
+  void free() {
+    if( Env.DEFMEM.len() > _alias ) {
+      Env.DEFMEM.set_def(_alias, null);
+      GVNGCM.retype_mem(null, Env.DEFMEM, null, false);
+    }
+    BitsAlias.free(_alias);
+  }
+
   @Override public int hashCode() { return super.hashCode()+ _alias; }
   // Only ever equal to self, because of unique _alias.  We can collapse equal
   // NewNodes and join alias classes, but this is not the normal CSE and so is
@@ -177,24 +189,13 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     }
     String bal_close() { return null; }
 
-    private static final Ary<NewPrimNode> INTRINSICS = new Ary<>(NewPrimNode.class);
-    static { reset(); }
-    public static void reset() { INTRINSICS.clear(); }
-    public static Ary<NewPrimNode> INTRINSICS() {
-      if( INTRINSICS.isEmpty() ) {
-        NewAryNode.add_libs(INTRINSICS);
-        NewStrNode.add_libs(INTRINSICS);
-      }
-      return INTRINSICS;
-    }
-
     // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
-    public FunPtrNode as_fun( GVNGCM gvn ) {
-      try(GVNGCM.Build<FunPtrNode> X = gvn.new Build<>()) {
+    @Override public FunPtrNode clazz_node( ) {
+      try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
         assert in(0)==null && _uses._len==0;
-        FunNode  fun = ( FunNode) X.xform(new  FunNode(this).add_def(Env.ALL_CTRL));
-        ParmNode rpc = (ParmNode) X.xform(new ParmNode(0,"rpc",fun,Env.ALL_CALL,null));
-        Node memp= X.xform(new ParmNode(MEM_IDX," mem",fun, TypeMem.MEM, Env.DEFMEM,null));
+        FunNode  fun = ( FunNode) X.xform(new  FunNode(_name,this));
+        ParmNode rpc = (ParmNode) X.xform(new ParmNode(TypeRPC.ALL_CALL,null,fun,0,"rpc"));
+        Node memp= X.xform(new ParmNode(TypeMem.MEM,null,fun,MEM_IDX," mem"));
         fun._bal_close = bal_close();
 
         // Add input edges to the intrinsic
@@ -202,14 +203,14 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
         while( len() < _sig.nargs() ) add_def(null);
         for( TypeFld arg : _sig._formals.flds() ) {
           if( arg._order==MEM_IDX ) continue; // Already handled MEM_IDX
-          set_def(arg._order,X.xform(new ParmNode(arg._order,arg._fld,fun, (ConNode)Node.con(arg._t.simple_ptr()),null)));
+          set_def(arg._order,X.xform(new ParmNode(arg._t.simple_ptr(), null, fun, arg._order, arg._fld)));
         }
         NewNode nnn = (NewNode)X.xform(this);
         Node mem = Env.DEFMEM.make_mem_proj(nnn,memp);
         Node ptr = X.xform(new ProjNode(nnn,REZ_IDX));
         RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,ptr,rpc,fun));
         Env.SCP_0.add_def(ret);
-        return (X._ret = new FunPtrNode(_name,ret));
+        return (X._ret = (FunPtrNode)X.xform(new FunPtrNode(_name,ret)));
       }
     }
   }

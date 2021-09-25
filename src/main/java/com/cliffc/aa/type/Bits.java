@@ -1,8 +1,6 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.IBitSet;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
@@ -478,6 +476,15 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
           _kids[i][0] = i<_init.length ? _init[i] : 1;
     }
     int peek() { return _kids[1][_kids[1][0]]; } // for testing
+    void free(int b) {
+      if( is_parent(b) ) return; // Too hard to compress
+      int par = parent(b);
+      int idx = Util.find(_kids[par],b);
+      int cnt = _kids[par][0]-1; // Count on this line, minus the removed one
+      _kids[par][idx] = _kids[par][cnt]; // Shuffle last element over removed
+      _kids[par][cnt] = b;      // Put last bit at end, for reuse
+      _kids[par][0] = cnt;    // Lower count
+    }
     // Smear out the kids in a non-canonical representation, to allow the caller
     // to iterate more easily.
     public VBitSet plus_kids( Bits<B> bits) {

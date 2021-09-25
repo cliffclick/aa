@@ -22,7 +22,7 @@ public class ScopeNode extends Node {
   private final HashMap<String,ConTypeNode> _types; // user-typing type names
   private Ary<IfScope> _ifs;                 // Nested set of IF-exprs used to track balanced new-refs
 
-  public ScopeNode(Parse open, boolean closure) {
+  public ScopeNode(boolean closure) {
     super(OP_SCOPE,null,null,null,null);
     if( closure ) { add_def(null); add_def(null); add_def(null); } // Wire up an early-function-exit path
     _types = new HashMap<>();
@@ -33,14 +33,6 @@ public class ScopeNode extends Node {
     super(OP_SCOPE,ctl,mem,ptr,rez);
     _types = types;
     keep();
-  }
-
-  // Add base types on startup
-  public void init() {
-    HashMap<String,Type> ts = new HashMap<>();
-    Type.init0(ts);
-    for( String tname : ts.keySet() )
-      _types.put(tname,Env.GVN.init(new ConTypeNode(tname,ts.get(tname),Env.SCP_0)));
   }
 
   public   Node  ctrl() { return in(0); }
@@ -100,6 +92,7 @@ public class ScopeNode extends Node {
   public void add_type( String name, ConTypeNode t ) {
     assert _types.get(name)==null;
     _types.put( name, t );
+    add_def(t);                 // Hook constant so it does not die
   }
 
   public boolean is_closure() { assert _defs._len==4 || _defs._len==7; return _defs._len==7; }
@@ -111,7 +104,8 @@ public class ScopeNode extends Node {
     Node mem = mem();
     Node rez = rez();
     Type trez = rez==null ? null : rez._val;
-    if( Env.GVN._opt_mode != GVNGCM.Mode.Parse &&   // Past parsing
+    if( this!=Env.TOP._scope && // Not the top-level, which is always alive
+        Env.GVN._opt_mode != GVNGCM.Mode.Parse &&   // Past parsing
         rez != null &&          // Have a return result
         // If type(rez) can never lift to any TMP, then we will not return a
         // pointer, and do not need the memory state on exit.
@@ -184,23 +178,19 @@ public class ScopeNode extends Node {
   }
 
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
-    // Prim scope is not used past Call-Graph discovery
-    if( this==Env.SCP_0 )  return opt_mode._CG ? TypeMem.DEAD : TypeMem.ALLMEM;
+    // Prim scope is always alive
+    if( this==Env.SCP_0 )  return TypeMem.ALLMEM;
     if( opt_mode == GVNGCM.Mode.Parse ) return TypeMem.MEM;
     // All fields in all reachable pointers from rez() will be marked live
     return compute_live_mem(this,mem(),rez());
   }
 
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    // The top scope is always alive, and represents what all future unparsed
-    // code MIGHT do.
-    if( this==Env.SCP_0 && opt_mode._CG )
-      return TypeMem.DEAD;
     // Basic liveness ("You are Alive!") for control and returned value
     if( def == ctrl() ) return TypeMem.ALIVE;
     if( def == rez () ) return def.all_live().basic_live() ? TypeMem.LIVE_BOT : TypeMem.ANYMEM;
     // Returned display is dead in a whole program.
-    // In a partial-program, whats in the display is exported to the next step.
+    // In a partial-program, what's in the display is exported to the next step.
     if( def == ptr () ) return opt_mode._CG ? TypeMem.DEAD : TypeMem.LIVE_BOT; // Returned display is dead after CG
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.

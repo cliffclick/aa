@@ -1,14 +1,16 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.node.NewAryNode;
+import com.cliffc.aa.node.NewStrNode;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.Util;
 import org.junit.Test;
 
 import java.util.Arrays;
-import java.util.HashMap;
 
 import static com.cliffc.aa.type.TypeFld.Access;
 import static org.junit.Assert.assertEquals;
@@ -53,7 +55,8 @@ public class TestNode {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testNode() {
-    Env.file_scope(Env.top_scope());
+    //Env.file_scope(Env.top_scope());
+    throw AA.unimpl();
   }
 
   // A sparse list of all subtypes.  The outer array is the index into
@@ -157,8 +160,7 @@ public class TestNode {
   public static void main( String[] args ) { new TestNode().testMonotonic();  }
   @SuppressWarnings("unchecked")
   @Test public void testMonotonic() {
-    Env top = Env.top_scope();
-    Env.file_scope(top);
+    //Env.file_scope(top);
     assert _errs == 0;          // Start with no errors
 
     // Types we are testing
@@ -203,7 +205,7 @@ public class TestNode {
     FunNode fun_forward_ref = new FunNode("some_fcn");
     Env.DEFMEM._val = TypeMem.MEM;
 
-    Node unr = top.lookup("+"); // All the "+" functions
+    Node unr = Env.TOP.lookup("+"); // All the "+" functions
     FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
     RetNode ret = fun_plus.ret();
     CallNode call = new CallNode(false,null,_ins[0],unr,mem);
@@ -232,10 +234,11 @@ public class TestNode {
     test1monotonic(new    ErrNode(_ins[0],null,"\nerr\n"));
     test1monotonic(new    FunNode(TypeStruct.INT64));
     test1monotonic(new FunPtrNode("anon",ret,null));
-    test1monotonic(new FP2DispNode(_ins[1])); // Only takes in a TFP
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
-    for( NewNode.NewPrimNode prim : NewNode.NewPrimNode.INTRINSICS() )
-      test1monotonic_intrinsic(prim);
+    test1monotonic_intrinsic(new NewAryNode.NewAry(TypeAry.ARY0,TypeInt.INT64));
+    test1monotonic_intrinsic(new NewStrNode.ConvertI64Str());
+    test1monotonic_intrinsic(new NewStrNode.ConvertF64Str());
+    test1monotonic_intrinsic(new NewStrNode.AddStrStr());
     test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
     NewObjNode nnn1 = new NewObjNode(false,TypeMemPtr.DISPLAY,Node.con(Type.NIL));

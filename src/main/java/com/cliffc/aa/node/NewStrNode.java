@@ -3,12 +3,11 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.*;
 
 // Allocates a TypeStr in memory.  Weirdly takes a string OBJECT (not pointer),
-// and produces the pointer.  Hence liveness is odd.
+// and produces the pointer.  Hence, liveness is odd.
 public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   public NewStrNode( TypeStr to, String name, boolean reads, int op_prec, TypeFld... args) {
     super(OP_NEWSTR,BitsAlias.STR,to,name,reads,op_prec,args);
@@ -23,11 +22,6 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   }
 
   @Override TypeStr dead_type() { return TypeStr.XSTR; }
-  protected static void add_libs( Ary<NewPrimNode> INTRINSICS ) {
-    INTRINSICS.push(new ConvertI64Str());
-    INTRINSICS.push(new ConvertF64Str());
-    INTRINSICS.push(new AddStrStr());
-  }
 
   // --------------------------------------------------------------------------
   public static class ConStr extends NewStrNode {
@@ -37,6 +31,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
     // Constant Strings intern
     @Override public int hashCode() { return is_unused() ? super.hashCode() : _ts._hash; }
     @Override public boolean equals(Object o) { return o instanceof ConStr && _ts==((ConStr)o)._ts; }
+    @Override public TV2 new_tvar(String alloc_site) { return TV2.make_base(this,_tptr==null ? null : _tptr.make_from(_ts),alloc_site); }
   }
 
   public static class ConvertI64Str extends NewStrNode {
@@ -67,7 +62,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   // If neither argument is NIL, the two strings are concatenated into a new third string.
   public static class AddStrStr extends NewStrNode {
     private static final int OP_PREC=7;
-    public AddStrStr( ) { super(TypeStr.STR,"+",true,OP_PREC,
+    public AddStrStr( ) { super(TypeStr.STR,"$+",true,OP_PREC,
                                 TypeFld.make(" mem",TypeMem.MEM_STR,MEM_IDX),
                                 TypeFld.make_arg(TypeMemPtr.STR0,ARG_IDX  ),
                                 TypeFld.make_arg(TypeMemPtr.STR0,ARG_IDX+1)); }

@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
@@ -9,7 +10,7 @@ import com.cliffc.aa.type.TypeMem;
  *  is not well-typed. */
 public final class ErrNode extends Node {
   final ErrMsg _err;
-  public ErrNode( Node ctrl, Parse loc, String msg ) { this(ctrl,new ErrMsg(loc,msg,Level.ErrNode)); }
+  public ErrNode( Node ctrl, Parse loc, String msg ) { this(ctrl,new ErrMsg(loc,msg,ErrMsg.Level.ErrNode)); }
   public ErrNode( Node ctrl, ErrMsg err ) {
     super(OP_ERR,ctrl);
     _err = err;
