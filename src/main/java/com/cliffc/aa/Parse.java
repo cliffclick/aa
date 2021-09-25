@@ -191,7 +191,7 @@ public class Parse implements Comparable<Parse> {
     // does not change, but a TypeMem[alias#] would now map to the Named
     // variant.
     TypeStruct ts = (TypeStruct)((TypeMemPtr)tn._val)._obj;
-    FunPtrNode epi1 = IntrinsicNode.convertTypeName(ts,bad,_gvn);
+    FunPtrNode epi1 = IntrinsicNode.convertTypeName(ts,bad);
     _e.add_fun(bad,tvar,epi1); // Return type-name constructor
     // Add a second constructor taking an expanded arg list
     FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(ts, tn.alias(), errMsg());
@@ -778,7 +778,7 @@ public class Parse implements Comparable<Parse> {
       // Must be a forward reference
       Env fref_env = _e.lookup_fref(tok=tok.intern());
       if( fref_env==null ) fref_env = _e;
-      Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,errMsg(oldx),fref_env));
+      Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,errMsg(oldx)));
       // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
       fref_env._scope.stk().create(tok,fref,Access.Final);
       return fref;
@@ -903,7 +903,7 @@ public class Parse implements Comparable<Parse> {
       // Build the FunNode header
       FunNode fun = (FunNode)X.xform(new FunNode(formals.close()).add_def(_prims ? Env.ALL_CTRL : gvn(new CEProjNode(Env.FILE._scope))));
       // Record H-M VStack in case we clone
-      fun.set_nongens(_e._nongen.compact());
+      //fun.set_nongens(_e._nongen.compact());
       // Build Parms for system incoming values
       Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
       Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
@@ -1051,8 +1051,7 @@ public class Parse implements Comparable<Parse> {
     try {
       Class clazz = Class.forName(str);
       Field f = clazz.getDeclaredField(field);
-      Type t = (Type)f.get(null);
-      return t;
+      return (Type)f.get(null);
     } catch( Exception e ) { throw new RuntimeException(e); } // Unrecoverable
   }
 
@@ -1379,7 +1378,7 @@ public class Parse implements Comparable<Parse> {
     // exists at scope up in the display.
     Env e = _e;
     Node ptr = e._scope.ptr();
-    Node fptr = gvn(new FreshNode(e._nongen,ctrl(),ptr)); // TODO: turn on
+    //Node fptr = gvn(new FreshNode(e._nongen,ctrl(),ptr)); // TODO: turn on
     Node mmem = mem();
     while( true ) {
       if( scope == e._scope ) return ptr;
@@ -1392,7 +1391,7 @@ public class Parse implements Comparable<Parse> {
   // Wiring for call arguments
   private Node[] args(Node a0, Node a1                  ) { return _args(new Node[]{null,null,a0,a1}); }
   private Node[] args(Node a0, Node a1, Node a2         ) { return _args(new Node[]{null,null,a0,a1,a2}); }
-  private Node[] args(Node a0, Node a1, Node a2, Node a3) { return _args(new Node[]{null,null,a0,a1,a2,a3}); }
+  //private Node[] args(Node a0, Node a1, Node a2, Node a3) { return _args(new Node[]{null,null,a0,a1,a2,a3}); }
   private Node[] _args(Node[] args) {
     args[CTL_IDX] = ctrl();     // Always control
     args[MEM_IDX] = mem();      // Always memory

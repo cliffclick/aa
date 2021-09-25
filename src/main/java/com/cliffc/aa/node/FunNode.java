@@ -20,7 +20,7 @@ import static com.cliffc.aa.AA.*;
 //
 // Function bodies are self-contained; they only take data in through ParmNodes
 // and ConNodes, and only control through the Fun.  They only return values
-// through the Ret - including exposed lexically scoped uses.
+// through the RetNode - including exposed lexically scoped uses.
 //
 // FunNode is a RegionNode; args point to all the known callers.  Zero slot is
 // null, same as a C2 Region.  Args 1+ point to the callers control.  Before
@@ -41,17 +41,17 @@ import static com.cliffc.aa.AA.*;
 // arguments; Parm#-1 is for the RPC and Parm#0 is for memory.
 //
 // Ret points to the return control, memory, value and RPC, as well as the
-// original Fun.  A FunPtr points to a Ret, and a Call will use a FunPtr (or a
+// original Fun.  A FunPtr points to a RetNode, and a Call will use a FunPtr (or a
 // merge of FunPtrs) to indicate which function it calls.  After a call-graph
 // edge is discovered, the Call is "wired" to the Fun.  A CallEpi points to the
-// Ret, the Fun control points to a CProj to the Call, and each Parm points to
+// RetNode, the Fun control points to a CProj to the Call, and each Parm points to
 // a DProj (MProj) to the Call.  These direct edges allow direct data flow
 // during gcp & iter.
 //
 // Memory both is and is-not treated special: the function body flows memory
-// through from the initial Parm to the Ret in the normal way.  However the
+// through from the initial Parm to the RetNode in the normal way.  However, the
 // incoming memory argument is specifically trimmed by the Call to only those
-// aliases used by the function body (either read or write), and the Ret only
+// aliases used by the function body (either read or write), and the RetNode only
 // returns those memories explicitly written.  All the other aliases are
 // treated as "pass-through" and explicitly routed around the Fun/Ret by the
 // Call/CallEpi pair.
@@ -68,8 +68,6 @@ public class FunNode extends RegionNode {
   // Function is parsed infix, with the RHS argument thunked.  Flag is used by
   // the Parser only for short-circuit operations like '||' and '&&'.
   public boolean _thunk_rhs;
-  // Hindly-Milner non-generative set, used during cloning
-  private TV2[] _nongens;
 
   private byte _cnt_size_inlines; // Count of size-based inlines; prevents infinite unrolling via inlining
   public static int _must_inline; // Used for asserts
@@ -197,8 +195,6 @@ public class FunNode extends RegionNode {
     return idx == -1 ? TypeRPC.ALL_CALL : _sig.arg(idx)._t;
   }
   public int nargs() { return _sig.nargs(); }
-
-  public void set_nongens(TV2[] nongens) { _nongens = nongens; }
 
   // ----
   // Graph rewriting via general inlining.  All other graph optimizations are

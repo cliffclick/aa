@@ -22,8 +22,8 @@ public class MrgProjNode extends ProjNode {
       return mem();
     NewNode nnn = nnn();
     Node mem = mem();
-    Type t = mem._val;
     // Alias is dead-on-entry.  Then this MrgPrj no longer lifts
+    //Type t = mem._val;
     if( /*t instanceof TypeMem && ((TypeMem)t).at(nnn._alias)==TypeObj.UNUSED &&*/ nnn.is_unused() ) // New is dead for no pointers
       return mem;                // Kill MrgNode when it no longer lifts values
 
@@ -33,7 +33,7 @@ public class MrgProjNode extends ProjNode {
       return this;
     }
 
-    // If is of a MemJoin and it can enter the split region, do so.
+    // If is of a MemJoin, and it can enter the split region, do so.
     if( _keep==0 && mem instanceof MemJoinNode && mem._uses._len==1 ) {
       MrgProjNode mprj = new MrgProjNode(nnn,mem);
       MemJoinNode mjn = ((MemJoinNode)mem).add_alias_below_new(mprj,this);

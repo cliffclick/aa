@@ -11,8 +11,8 @@ import static com.cliffc.aa.AA.MEM_IDX;
 // not), memory, value, rpc, fun}, and sits at the end of a function.  The RPC
 // dictates which calls can be reached from here.  The Fun is used to rapidly
 // find the FunNode, as a SESE region shortcut.  A FunPtrNode points to this
-// Ret, and is used for all function-pointer uses.  Otherwise only CallEpis
-// point to a Ret representing wired calls.
+// Ret, and is used for all function-pointer uses.  Otherwise, only CallEpis
+// point to a RetNode representing wired calls.
 
 public final class RetNode extends Node {
   int _fidx;                 // Shortcut to fidx when the FunNode has collapsed

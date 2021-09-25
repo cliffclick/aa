@@ -31,7 +31,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // The memory state for Env.DEFMEM, the default memory.  All non-final fields
   // are ALL; final fields keep their value.  All field flags are moved to
   // bottom, e.g. as-if all fields are now final-stored.  Will be set to
-  // TypeObj.UNUSE for never-allocated (eg dead allocations)
+  // TypeObj.UNUSED for never-allocated (e.g. dead allocations)
   TypeObj _crushed;
 
   // Just TMP.make(_alias,OBJ)

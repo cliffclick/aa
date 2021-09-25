@@ -235,16 +235,14 @@ public final class CallEpiNode extends Node {
     // so there's no Parm/Phi to attach the incoming arg to.
     for( Node arg : fun._uses ) {
       if( arg.in(0) != fun || !(arg instanceof ParmNode) ) continue;
-      Node actual;
       int idx = ((ParmNode)arg)._idx;
-      switch( idx ) {
-      case 0: actual = new ConNode<>(TypeRPC.make(call._rpc)); break; // Always RPC is a constant
-      case MEM_IDX: actual = new MProjNode(call,(Env.DEFMEM._uses._len==0) ? Env.ANY : Env.DEFMEM); break;    // Memory into the callee
-      default: actual = idx >= call.nargs()              // Check for args present
-          ? new ConNode<>(Type.ALL) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
-          : new ProjNode(call,idx); // Normal args
-        break;
-      }
+      Node actual = switch( idx ) {
+      case 0 -> new ConNode<>(TypeRPC.make(call._rpc)); // Always RPC is a constant
+      case MEM_IDX -> new MProjNode(call, (Env.DEFMEM._uses._len == 0) ? Env.ANY : Env.DEFMEM);    // Memory into the callee
+      default -> idx >= call.nargs()              // Check for args present
+      ? new ConNode<>(Type.ALL) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
+      : new ProjNode(call, idx); // Normal args
+      };
       actual._live = arg._live; // Set it before CSE during init1
       arg.add_def(actual.init1());
       work.add(actual);       // Also on the Combo worklist

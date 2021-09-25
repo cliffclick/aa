@@ -121,7 +121,7 @@ public class CallNode extends Node {
   Node arg ( int x ) { assert x>=0; return _defs.at(x); }
   // Set an argument.  Use 'set_fun' to set the Code.
   Node set_arg (int idx, Node arg) { assert idx>=DSP_IDX && idx <nargs(); return set_def(idx,arg); }
-  public Node set_fdx( Node fun) { return set_def(DSP_IDX, fun); }
+  public void set_fdx( Node fun) {set_def(DSP_IDX, fun);}
   public void set_mem( Node mem) { set_def(MEM_IDX, mem); }
 
   // Add a bunch of utilities for breaking down a Call.value tuple:
@@ -642,8 +642,8 @@ public class CallNode extends Node {
           }
           // If one is monotonically higher than the other, take it
           if( fcnt > 0 && bcnt==0 ) { best_fptr = get_fptr(fun,unk); best_formals = formals; }
-          else if( fcnt==0 && bcnt > 0 ) {} // Keep current
-          else tied=true;                   // Tied, ambiguous
+          else if( fcnt != 0 || bcnt <= 0 ) tied = true; // Tied, ambiguous
+          // Keep current
         }
       }
     }

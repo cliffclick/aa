@@ -32,7 +32,7 @@ public class IntrinsicNode extends Node {
   // vtable name type in memory.  Unaliased, so the same memory cannot be
   // referred to without the Name.  Error if the memory cannot be proven
   // unaliased.  The Ideal call collapses the Name into the unaliased NewNode.
-  public static FunPtrNode convertTypeName( TypeObj tn, Parse badargs, GVNGCM gvn ) {
+  public static FunPtrNode convertTypeName( TypeObj tn, Parse badargs ) {
     // The incoming memory type is *exact* and does not have any extra fields.
     // The usual duck typing is "this-or-below", which allows and ignores extra
     // fields.  For Naming - which involves installing a v-table (or any other

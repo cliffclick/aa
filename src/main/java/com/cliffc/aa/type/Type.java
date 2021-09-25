@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
@@ -747,59 +746,27 @@ public class Type<T extends Type<T>> implements Cloneable {
 
   // True if value is above the centerline (no definite value, ambiguous)
   public boolean above_center() {
-    switch( _type ) {
-    case TALL:
-    case TCTRL:
-    case TREAL:   case TNREAL:
-    case TSCALAR: case TNSCALR:
-    case TNIL:
-      return false;             // These are all below center
-    case TANY:
-    case TXCTRL:
-    case TXREAL:   case TXNREAL:
-    case TXSCALAR: case TXNSCALR:
-    case TXNIL:
-      return true;              // These are all above center
-    default: throw typerr(null);// Overridden in subclass
-    }
+    return switch( _type ) {
+      case TALL, TCTRL, TREAL, TNREAL, TSCALAR, TNSCALR, TNIL -> false;       // These are all below center
+      case TANY, TXCTRL, TXREAL, TXNREAL, TXSCALAR, TXNSCALR, TXNIL -> true;  // These are all above center
+      default -> throw typerr(null);// Overridden in subclass
+    };
   }
   // True if value is higher-equal to SOME constant.
   public boolean may_be_con() {
-    switch( _type ) {
-    case TALL:
-    case TSCALAR:  case TNSCALR:
-    case TREAL:    case TNREAL:
-    case TXCTRL:
-    case TCTRL:
-      return false;             // These all include not-constant things
-    case TANY:
-    case TXREAL:   case TXNREAL:
-    case TXSCALAR: case TXNSCALR:
-    case TNIL:     case TXNIL:
-      return true;              // These all include some constants
-    default: throw typerr(null);
-    }
+    return switch( _type ) {
+      case TALL, TSCALAR, TNSCALR, TREAL, TNREAL, TXCTRL, TCTRL -> false;    // These all include not-constant things
+      case TANY, TXREAL, TXNREAL, TXSCALAR, TXNSCALR, TNIL, TXNIL -> true;   // These all include some constants
+      default -> throw typerr(null);
+    };
   }
   // True if exactly a constant (not higher, not lower)
   public boolean is_con() {
-    switch( _type ) {
-    case TALL:
-    case TCTRL:
-    case TNREAL:
-    case TREAL:
-    case TNSCALR:
-    case TSCALAR:
-    case TANY:
-    case TXCTRL:
-    case TXNREAL:
-    case TXREAL:
-    case TXNSCALR:
-    case TXSCALAR:
-      return false;             // Not exactly a constant
-    case TNIL: case TXNIL:
-      return true;
-    default: throw typerr(null);// Overridden in subclass
-    }
+    return switch( _type ) {
+      case TALL, TCTRL, TNREAL, TREAL, TNSCALR, TSCALAR, TANY, TXCTRL, TXNREAL, TXREAL, TXNSCALR, TXSCALAR -> false; // Not exactly a constant
+      case TNIL, TXNIL -> true;
+      default -> throw typerr(null);// Overridden in subclass
+    };
   }
   public Type high() { return above_center() ? this : dual(); }
 
@@ -834,19 +801,12 @@ public class Type<T extends Type<T>> implements Cloneable {
   // "widen" a narrow type for primitive type-specialization and H-M
   // unification.  e.g. "3" becomes "int64".
   public Type widen() {
-    switch( _type ) {
-    case TREAL:   case TXREAL:
-    case TSCALAR: case TXSCALAR:
-    case TNSCALR: case TXNSCALR:
-      return SCALAR;
-    case TANY : case TALL  :
-      return this;
-    case TCTRL: case TXCTRL:
-      return Type.CTRL;
-    case TNIL:    case TXNIL:
-      return this;
-    default: throw typerr(null); // Overridden in subclass
-    }
+    return switch( _type ) {
+      case TREAL, TXREAL, TSCALAR, TXSCALAR, TNSCALR, TXNSCALR -> SCALAR;
+      case TANY, TALL, TNIL, TXNIL -> this;
+      case TCTRL, TXCTRL -> Type.CTRL;
+      default -> throw typerr(null); // Overridden in subclass
+    };
   }
   // Recursive version called from TypeStruct
   Type _widen() { return widen(); }
@@ -854,23 +814,11 @@ public class Type<T extends Type<T>> implements Cloneable {
   // True if type must include a nil (as opposed to may-nil, which means the
   // type can choose something other than nil).
   public boolean must_nil() {
-    switch( _type ) {
-    case TALL:
-    case TREAL:
-    case TSCALAR:
-    case TNIL: case TXNIL:
-    case TCTRL:  // Nonsense, only for IfNode.value test
-    case TXCTRL: // Nonsense, only for IfNode.value test
-    case TMEM:   // Nonsense, only for IfNode.value test
-      return true;              // These all must include a nil
-    case TANY:                  // All above-center types are not required to include a nil
-    case TXREAL:
-    case TXSCALAR:
-    case TXNSCALR: case TNSCALR:
-    case TXNREAL:  case TNREAL:
-      return false;             // These all may be non-nil
-    default: throw typerr(null); // Overridden in subclass
-    }
+    return switch( _type ) {
+      case TALL, TREAL, TSCALAR, TNIL, TXNIL, TCTRL, TXCTRL, TMEM -> true; // These all must include a nil
+      case TANY, TXREAL, TXSCALAR, TXNSCALR, TNSCALR, TXNREAL, TNREAL -> false;  // These all may be non-nil
+      default -> throw typerr(null); // Overridden in subclass
+    };
   }
   // Mismatched scalar types that can only cross-nils
   final Type cross_nil(Type t) { return must_nil() || t.must_nil() ? SCALAR : NSCALR; }
@@ -878,23 +826,11 @@ public class Type<T extends Type<T>> implements Cloneable {
   // True if type may include a nil (as opposed to must-nil).
   // True for many above-center or zero values.
   public boolean may_nil() {
-    switch(_type) {
-    case TALL:
-    case TREAL:
-    case TSCALAR:
-    case TXNSCALR: case TNSCALR:
-    case TXNREAL:  case TNREAL:
-    case TTUPLE:
-      return false;
-    case TANY:
-    case TXREAL:
-    case TXSCALAR:
-    case TCTRL:  // Nonsense, only for IfNode.value test
-    case TXCTRL: // Nonsense, only for IfNode.value test
-    case TMEM:   // Nonsense, only for IfNode.value test
-      return true;
-    default: throw typerr(null); // Overridden in subclass
-    }
+    return switch( _type ) {
+      case TALL, TREAL, TSCALAR, TXNSCALR, TNSCALR, TXNREAL, TNREAL, TTUPLE -> false;
+      case TANY, TXREAL, TXSCALAR, TCTRL, TXCTRL, TMEM -> true;
+      default -> throw typerr(null); // Overridden in subclass
+    };
   }
 
   // Return the type without a nil-choice.  Only applies to above_center types,
@@ -902,36 +838,24 @@ public class Type<T extends Type<T>> implements Cloneable {
   // with above-center types.  If called with below-center, there is no
   // nil-choice (might be a must-nil but not a choice-nil), so can return this.
   Type not_nil() {
-    switch( _type ) {
-    case TXSCALAR:  return XNSCALR;
-    case TXREAL  :  return XNREAL ;
-    case TSCALAR:   case TNSCALR:   case TXNSCALR:
-    case TREAL:     case TNREAL:    case TXNREAL:
-    case TNIL:      case TXNIL:
-      return this;
-    default: throw typerr(null); // Overridden in subclass
-    }
+    return switch( _type ) {
+      case TXSCALAR -> XNSCALR;
+      case TXREAL -> XNREAL;
+      case TSCALAR, TNSCALR, TXNSCALR, TREAL, TNREAL, TXNREAL, TNIL, TXNIL -> this;
+      default -> throw typerr(null); // Overridden in subclass
+    };
   }
   public Type meet_nil(Type nil) {
     assert nil==NIL || nil==XNIL;
-    switch( _type ) {
-    case TANY:
-    case TXREAL:
-    case TXSCALAR:
-    case TXNIL:   return nil; // Preserve high/low flavor
-    case TNIL:    return NIL;
-    case TXNREAL:
-    case TXNSCALR:return TypeInt.BOOL;
-    case TALL:
-    case TREAL:   case TNREAL:    return REAL;
-    case TSCALAR: case TNSCALR:   return SCALAR;
-    case TCTRL:   case TXCTRL:
-    case TOBJ:
-    case TSTR:
-    case TSTRUCT:
-    case TMEM:    return ALL;
-    default:      throw typerr(null); // Overridden in subclass
-    }
+    return switch( _type ) {
+      case TANY, TXREAL, TXSCALAR, TXNIL -> nil; // Preserve high/low flavor
+      case TNIL -> NIL;
+      case TXNREAL, TXNSCALR -> TypeInt.BOOL;
+      case TALL, TREAL, TNREAL -> REAL;
+      case TSCALAR, TNSCALR -> SCALAR;
+      case TCTRL, TXCTRL, TOBJ, TSTR, TSTRUCT, TMEM -> ALL;
+      default -> throw typerr(null); // Overridden in subclass
+    };
   }
 
   // Is t type contained within this?  Short-circuits on a true
@@ -955,8 +879,6 @@ public class Type<T extends Type<T>> implements Cloneable {
 
   // Make from existing type, replacing TMPs with alias from the map
   public Type make_from(Type head, TypeMem map, VBitSet visit) { return this; }
-
-  public Type clazz_type() { throw AA.unimpl(); }
 
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
