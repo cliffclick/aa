@@ -127,9 +127,11 @@ public class TestHM {
   @Test public void test16() { run("map = { fun x -> (fun x)}; (map { a-> (pair a a)} 5)",
                                    "( int64, int64)", tuple55); }
 
-  @Test public void test17() { run("fcn = { p -> { a -> (pair a a) }};"+
-                                   "map = { fun x -> (fun x)};"+
-                                   "{ q -> (map (fcn q) 5)}",
+  @Test public void test17() { run("""
+fcn = { p -> { a -> (pair a a) }};
+map = { fun x -> (fun x)};
+{ q -> (map (fcn q) 5)}
+""",
                                    "{ A -> ( int64, int64) }", tfs(tuple55)); }
 
   // Checking behavior when using "if" to merge two functions with sufficiently
@@ -168,10 +170,12 @@ public class TestHM {
   // in pair(map(str,intz),map(isempty,strz))
   // Expects: ("2",false)
   @Test public void test20() {
-    Root syn = HM.hm("cons ={x y-> {cadr -> (cadr x y)}};"+
-                     "cdr ={mycons -> (mycons { p q -> q})};"+
-                     "map ={fun parg -> (fun (cdr parg))};"+
-                     "(pair (map str (cons 0 5)) (map isempty (cons 0 \"abc\")))");
+    Root syn = HM.hm("""
+cons ={x y-> {cadr -> (cadr x y)}};
+cdr ={mycons -> (mycons { p q -> q})};
+map ={fun parg -> (fun (cdr parg))};
+(pair (map str (cons 0 5)) (map isempty (cons 0 "abc")))
+""");
     if( HM.DO_HM )
       assertEquals("( *[4]str, int1)",syn._hmt.p());
     if( HM.DO_GCP )
@@ -203,30 +207,30 @@ public class TestHM {
                                    "(is_even 3)" ,
                                    "int1", TypeInt.BOOL); }
 
-  @Test public void test23x() { run(
-"all = @{"+
-"  is_even = { dsp n -> (if (eq0 n) 0 (dsp.is_odd  dsp (dec n)))},"+
-"  is_odd  = { dsp n -> (if (eq0 n) 1 (dsp.is_even dsp (dec n)))} "+
-"}; "+
-"{ x -> (all.is_even all x)}",
+  @Test public void test23x() { run("""
+all = @{
+  is_even = { dsp n -> (if (eq0 n) 0 (dsp.is_odd  dsp (dec n)))},
+  is_odd  = { dsp n -> (if (eq0 n) 1 (dsp.is_even dsp (dec n)))}
+};
+{ x -> (all.is_even all x)}
+""",
                                    "{int64 -> int1}", tfs(TypeInt.BOOL)); }
 
-  @Test public void test23y() { run(
-"dsp = @{"+
-"  id = { dsp n -> n}"+
-"}; "+
-"(pair (dsp.id dsp 3) (dsp.id dsp \"abc\"))",
-                                   "(int64, [4]str))", TypeInt.NINT8); }
+  @Test public void test23y() { run("""
+dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp "abc"))
+""",
+                                    "(int64, *[4]str)", TypeMemPtr.make(7,make_tups(TypeInt.NINT64,TypeMemPtr.STRPTR))); }
 
 
   // Toss a function into a pair & pull it back out
-  @Test public void test24() { run("{ g -> fgz = "+
-                                   "         cons = {x y -> {cadr -> (cadr x y)}};"+
-                                   "         cdr = {mycons -> (mycons { p q -> q})};"+
-                                   "         (cdr (cons 2 { z -> (g z) }));"+
-                                   "      (pair (fgz 3) (fgz 5))"+
-                                   "}"
-                                   ,
+  @Test public void test24() { run("""
+{ g -> fgz =
+         cons = {x y -> {cadr -> (cadr x y)}};
+         cdr = {mycons -> (mycons { p q -> q})};
+         (cdr (cons 2 { z -> (g z) }));
+      (pair (fgz 3) (fgz 5))
+}
+""",
                                    "{ { int64 -> A } -> ( A, A) }", tfs(tuple2)); }
 
   // Basic structure test
@@ -399,12 +403,14 @@ public class TestHM {
   //   out_bool= map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
   //   (out_str,out_bool)",
   @Test public void test41() {
-    Root syn = HM.hm("map={lst fcn -> (fcn lst.y) }; "+
-                     "in_int=@{ x=0 y=2}; " +
-                     "in_str=@{ x=0 y=\"abc\"}; " +
-                     "out_str = (map in_int str); " +
-                     "out_bool= (map in_str { xstr -> (eq xstr \"def\")}); "+
-                     "(pair out_str out_bool)");
+    Root syn = HM.hm("""
+map={lst fcn -> (fcn lst.y) };
+in_int=@{ x=0 y=2};
+in_str=@{ x=0 y=\"abc\"};
+out_str = (map in_int str);
+out_bool= (map in_str { xstr -> (eq xstr "def")});
+(pair out_str out_bool)
+""");
     if( HM.DO_HM )
       assertEquals("( *[4]str, int1)",syn._hmt.p());
     if( HM.DO_GCP )
@@ -452,19 +458,20 @@ public class TestHM {
 
   // Requires a combo of HM and GCP to get the good answer
   @Test public void test45() {
-    Root syn = HM.hm(
-"id = {x -> x};" +
-"loop = { name cnt ->" +
-"  (if cnt " +
-"    (loop" +
-"       fltfun = (if name id {x->3});" +
-"       (fltfun \"abc\")" +
-"       (dec cnt)" +
-"     )" +
-"     name" +
-"   )"+
-"};" +
-"(loop \"def\" (id 2))");
+    Root syn = HM.hm("""
+id = {x -> x};
+loop = { name cnt ->
+  (if cnt
+    (loop
+       fltfun = (if name id {x->3});
+       (fltfun "abc")
+       (dec cnt)
+     )
+     name
+   )
+};
+(loop "def" (id 2))
+""");
     if( HM.DO_HM )
       assertEquals(HM.DO_GCP
                    ? "*[0,4]str?"  // Both HM and GCP
@@ -493,12 +500,14 @@ public class TestHM {
 
   // map is parametric in nil-ness
   @Test public void test49() {
-    Root syn = HM.hm("{ pred -> \n"+
-                     "  map = { fun x -> (fun x) };\n" +
-                     "  (pair (map {str0 ->          str0.x   }          @{x = 3}   )\n" +
-                     "        (map {str1 -> (if str1 str1.x 4)} (if pred @{x = 5} 0))\n" +
-                     "  )\n"+
-                     "}");
+    Root syn = HM.hm("""
+{ pred ->
+  map = { fun x -> (fun x) };
+  (pair (map {str0 ->          str0.x   }          @{x = 3}   )
+        (map {str1 -> (if str1 str1.x 4)} (if pred @{x = 5} 0))
+  )
+}
+""");
     if( HM.DO_HM )
       assertEquals("{ A? -> ( int64, int64) }",syn._hmt.p());
     if( HM.DO_GCP )
@@ -507,12 +516,14 @@ public class TestHM {
 
   // map is parametric in nil-ness.  Verify still nil-checking.
   @Test public void test50() {
-    Root syn = HM.hm("{ pred -> \n"+
-                     "  map = { fun x -> (fun x) };\n" +
-                     "  (pair (map {str0 ->          str0.x   }          @{x = 3}   )\n" +
-                     "        (map {str1 ->          str1.x   } (if pred @{x = 5} 0))\n" +
-                     "  )\n"+
-                     "}");
+    Root syn = HM.hm("""
+{ pred ->
+  map = { fun x -> (fun x) };
+  (pair (map {str0 ->          str0.x   }          @{x = 3}   )
+        (map {str1 ->          str1.x   } (if pred @{x = 5} 0))
+  )
+}
+""");
     if( HM.DO_HM )
       assertEquals("{ A? -> May be nil when loading field x }",syn._hmt.p());
     if( HM.DO_GCP )
@@ -601,22 +612,23 @@ public class TestHM {
 
   // Regression test; was NPE.  Was testMyBoolsNullPException from marco.servetto@gmail.com.
   @Test public void test55() {
-    Root syn = HM.hm("void = @{};                           "+
-                     "true = @{                             "+
-                     "  and      = {b -> b}                 "+
-                     "  or       = {b -> true}              "+
-                     "  not      = {unused ->true}          "+
-                     "  thenElse = {then else->(then void) }"+
-                     "};                                    "+
-                     "false = @{                            "+
-                     "  and      = {b -> false}             "+
-                     "  or       = {b -> b}                 "+
-                     "  not      = {unused ->true}          "+
-                     "  thenElse = {then else->(else void) }"+
-                     "};                                    "+
-                     "boolSub ={b ->(if b true false)};     "+
-                     "@{true=(boolSub 1) false=(boolSub 0)} "+
-                     "");
+    Root syn = HM.hm("""
+void = @{};
+true = @{
+  and      = {b -> b}
+  or       = {b -> true}
+  not      = {unused ->true}
+  thenElse = {then else->(then void) }
+};
+false = @{
+  and      = {b -> false}
+  or       = {b -> b}
+  not      = {unused ->true}
+  thenElse = {then else->(else void) }
+};
+boolSub ={b ->(if b true false)};
+@{true=(boolSub 1) false=(boolSub 0)}
+""");
     if( HM.DO_HM )
       assertEquals("@{ false = A:@{ and = { A -> A }; "+
                          "not = { B -> A }; "+
@@ -662,20 +674,20 @@ public class TestHM {
   }
 
   @Test public void test57() {
-    Root syn = HM.hm(
-"all =                                      "+
-"true = @{                                  "+
-"  not = {unused -> all.false},             "+
-"  thenElse = {then else->(then 7) }        "+
-"};                                         "+
-"false = @{                                 "+
-"  not = {unused -> all.true},              "+
-"  thenElse = {then else->(else 7) }        "+
-"};                                         "+
-"boolSub ={b ->(if b true false)};          "+
-"@{true=true, false=false, boolSub=boolSub};"+
-"all"+
-"");
+    Root syn = HM.hm("""
+all =
+true = @{
+  not = {unused -> all.false},
+  thenElse = {then else->(then 7) }
+};
+false = @{
+  not = {unused -> all.true},
+  thenElse = {then else->(else 7) }
+};
+boolSub ={b ->(if b true false)};
+@{true=true, false=false, boolSub=boolSub};
+all
+""");
     if( HM.DO_HM )
         assertEquals("@{ boolSub = { A? -> @{ not = { B -> C:@{ not = { D -> C }; thenElse = { { int64 -> E } { int64 -> E } -> E }} }; thenElse = { { int64 -> F } { int64 -> F } -> F }} }; false = C; true = C}",syn._hmt.p());
     if( HM.DO_GCP ) {

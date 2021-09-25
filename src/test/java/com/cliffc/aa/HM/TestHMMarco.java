@@ -24,9 +24,9 @@ public class TestHMMarco {
   }
   void ok(String code,String type) {
     Root syn = HM.hm(code);
-    assertEquals(stripIndent(type),stripIndent(syn._hmt.p()));    
+    assertEquals(stripIndent(type),stripIndent(syn._hmt.p()));
   }
-  
+
   @Test public void testId() {ok("""
     all={a->a};
     all
@@ -42,30 +42,30 @@ public class TestHMMarco {
       ""","""
       @{id1={A->A};id2={B->B}}
       """);}
-  
+
   @Test public void test51() {ok("""
-    total_size = { a as -> 
-      (if as                
-        (+ a.size (total_size as .val  as .next)) 
+    total_size = { a as ->
+      (if as
+        (+ a.size (total_size as .val  as .next))
         a .size
       )};
-    total_size      
-    ""","""
-    { A:@{ size = int64;...} B:@{ next = B; val = A;...}? -> int64 }    
-    """);
+    total_size
+""","""
+    { A:@{ size = int64;...} B:@{ next = B; val = A;...}? -> int64 }
+""");
     }
   //still need to test some stuff around here
   @Test public void test52() {ok("""
-    recF = { a as -> 
+    recF = { a as ->
       (if as
         x = (+ a.size (recF as.val as.next));
-        y = (+ a.size (recF as as.next)); 
+        y = (+ a.size (recF as as.next));
         xy = (+ x y);
         (+ xy as.size)
-        a.size      
+        a.size
       )};
-    recF      
-    ""","""
+    recF
+""","""
     {
     A:@{
       next=B:@{
@@ -81,8 +81,8 @@ public class TestHMMarco {
     B
     ->
     int64
-    }    
-    """);
+    }
+""");
     }
   @Test public void testMyBoolsBase() {ok("""
     void = @{};
@@ -94,12 +94,12 @@ public class TestHMMarco {
     false = @{
       and      = {b -> false}
       or       = {b -> b}
-      thenElse = {then else->(else void) }     
+      thenElse = {then else->(else void) }
       };
     boolSub ={b ->(if b true false)};
-    @{true=(boolSub 1) false=(boolSub 0)}    
-    ""","""
-    @{ 
+    @{true=(boolSub 1) false=(boolSub 0)}
+""","""
+    @{
       false = A:@{
         and      = { A -> A };
         or       = { A -> A };
@@ -111,7 +111,7 @@ public class TestHMMarco {
         thenElse = { { () -> D } { () -> D } -> D }
         }
       }
-    """);}
+""");}
   @Test public void testMyBoolsRepeatedType() {ok("""
     void = @{};
     true = @{
@@ -124,11 +124,11 @@ public class TestHMMarco {
       and      = {b -> false}
       or       = {b -> b}
       not      = {unused ->true}
-      thenElse = {then else->(else void) }      
+      thenElse = {then else->(else void) }
       };
     boolSub ={b ->(if b true false)};
-    @{true=(boolSub 1) false=(boolSub 0)}    
-    ""","""
+    @{true=(boolSub 1) false=(boolSub 0)}
+""","""
     @{
       false=A:@{
         and={A->A};
@@ -143,7 +143,7 @@ public class TestHMMarco {
         thenElse={ {()->F} {()->F}  -> F  }
         }
       }
-    """);}
+""");}
   @Test public void testMyBoolsNotFalseUndefined() {fails("""
     void = @{};
     true = @{
@@ -156,11 +156,11 @@ public class TestHMMarco {
       and      = {b -> false}
       or       = {b -> b}
       not      = {unused ->true}
-      thenElse = {then else->(else void) }      
+      thenElse = {then else->(else void) }
       };
     boolSub ={b ->(if b true false)};
-    @{true=(boolSub 1) false=(boolSub 0)}    
-    ""","Parse error, false is undefined in");}
+    @{true=(boolSub 1) false=(boolSub 0)}
+""","Parse error, false is undefined in");}
 
   //This changed and becomed less precise. Is this what we want?
   @Test public void testMyBoolsSmallType() {ok("""
@@ -171,29 +171,29 @@ public class TestHMMarco {
         };
       false = @{
         not      = {unused ->all.true}
-        thenElse = {then else->(else 5) }      
+        thenElse = {then else->(else 5) }
         };
       boolSub = {b ->(if b all.true all.false)};
       @{true=true false=false boolSub=boolSub};
-    all    
-    ""","""
+    all
+""","""
     @{
       boolSub={ A?  ->  B:@{
         not={C->B};
-        thenElse={  {5->D} {5->D}  ->  D }
+        thenElse={  {int64->D} {int64->D}  ->  D }
         }};
       false=B;
       true=B
       }
-    """);}
+""");}
   @Test public void testMyBoolsNestedEncoding() {ok("""
     void = @{};
-    true = 
+    true =
       false = @{
         and      = {b -> false}
         or       = {b -> b}
         not      = {unused ->true}
-        thenElse = {then else->(else void) }      
+        thenElse = {then else->(else void) }
         };
       @{
         and      = {b -> b}
@@ -201,9 +201,9 @@ public class TestHMMarco {
         not      = {unused ->false}
         thenElse = {then else->(then void) }
         };
-    boolSub ={b ->(if b true (true.not void))};      
+    boolSub ={b ->(if b true (true.not void))};
     @{true=(boolSub 1) false=(boolSub 0)}
-    ""","""
+""","""
     @{
       false=A:@{
         and={A->A};
@@ -234,8 +234,8 @@ public class TestHMMarco {
         thenElse={ {()->J} {()->J} -> J }
         }
       }
-    """);}
-  
+""");}
+
   //What is the difference between local variable decs and record field declartions?
   //is there something I can do in one way but not the other?
   @Test public void testBoolsAndNatsFails() {fails("""
@@ -249,11 +249,11 @@ public class TestHMMarco {
     _false = @{
       and      = {b -> false}
       or       = {b -> b}
-      thenElse = {then else->(else void) }      
+      thenElse = {then else->(else void) }
       };
     boolSub ={b ->(if b true false)};
     true=(boolSub 1);
-    false=(boolSub 0);    
+    false=(boolSub 0);
     z = @{
       isZero = {unused ->true}
       pred = err
@@ -270,8 +270,8 @@ public class TestHMMarco {
         };
       (orZero self)
       };
-    @{true=true false=false z=z s=s}    
-    ""","Parse error, s is undefined in (s n)");}
+    @{true=true false=false z=z s=s}
+""","Parse error, s is undefined in (s n)");}
 //  -So, now we must use master
 //  -try the 'one' outside of all. those it still causes unifications?
   @Test public void testBoolsAndNatsTopRecordBrokenSucc() {ok("""
@@ -286,7 +286,7 @@ public class TestHMMarco {
       false = @{
         and      = {b -> all.false}
         or       = {b -> b}
-        thenElse = {then else->(else void) }      
+        thenElse = {then else->(else void) }
         };
       boolSub ={b ->(if b true false)};
       z = @{
@@ -364,7 +364,7 @@ public class TestHMMarco {
         }
       }
     """*/);}
-  
+
   static final String goodBaseBool="""
     void = @{};
     err  = {unused->(err unused)};
@@ -376,9 +376,9 @@ public class TestHMMarco {
    false = @{
       and      = {b -> all.false}
       or       = {b -> b}
-      thenElse = {then else->(else void) }      
+      thenElse = {then else->(else void) }
       };
-    """;
+""";
   static final String goodBaseNat="""
     z = @{
       isZero = {unused ->all.true}
@@ -398,16 +398,16 @@ public class TestHMMarco {
     one = (s z);
     two = (one.add one);
     three = (s two);
-    """;
+""";
   //        add ={m -> (self.succ (pred.add m))}//old wrong add
   @Test public void testBoolsAndNatsTopRecord() {ok("""
     all=
-      """
+"""
     +goodBaseBool
     +goodBaseNat+"""
       @{true=true false=false z=z s=s};
     all
-    ""","""
+""","""
     @{
       false=A:@{
         and={A->A};
@@ -426,14 +426,14 @@ public class TestHMMarco {
       true=A;
       z=C
       }
-    """);}
+""");}
   @Test public void testBoolsBase() {ok("""
     all=
-      """
+"""
       +goodBaseBool+"""
       @{true=true false=false};
     all
-    ""","""
+""","""
     @{
       false=A:@{
         and     = {B->A};
@@ -446,7 +446,7 @@ public class TestHMMarco {
         thenElse= {{()->I} J ->I}
         }
       }
-    """);}
+""");}
   @Test public void testMiniNat() {ok("""
       void = @{};
       err  = {unused->(err unused)};
@@ -475,7 +475,7 @@ public class TestHMMarco {
       notOne = (one.add notZero);
       notNope = (one.add notZero).nope;
       @{n=n one=one notOne=notOne notNope=notNope}
-      """,
+""",
       """
       @{//strange type for add below
         n=@{//promised to propagate extra fields on the result
@@ -505,7 +505,7 @@ public class TestHMMarco {
           succ={K->H}
           }
         }
-      """);}
+""");}
   @Test public void testBoolsBaseNatOut() {ok("""
     void = @{};
     err  = {unused->(err unused)};
@@ -518,7 +518,7 @@ public class TestHMMarco {
       false = @{
         and      = {o -> b.false}
         or       = {o -> o}
-        thenElse = {then else->(else void) }      
+        thenElse = {then else->(else void) }
         };
       @{true=true false=false};
     n=
@@ -549,7 +549,7 @@ public class TestHMMarco {
     two = (one.add one);
     three =(n.s two);
     @{b=b n=n one=one two=two three=three notOne=notOne}
-    """,
+""",
     """
     @{
       b=@{
@@ -639,7 +639,7 @@ public class TestHMMarco {
         succ={()->V38}
         }
       }
-    """
+"""
     /*"""
     @{
       b=@{
@@ -679,7 +679,7 @@ public class TestHMMarco {
           U:@{
             and={U->U};
             or={U->U};
-            thenElse={ {()->V21}{()->V21}->V21} 
+            thenElse={ {()->V21}{()->V21}->V21}
             }
           };
         nope=Missing field nope in A:@{
@@ -730,7 +730,7 @@ public class TestHMMarco {
 
   @Test public void testLists() {ok("""
     all=
-      """
+"""
     +goodBaseBool//TODO: the concat method looks ill typed
     +goodBaseNat+"""
     empty = @{
@@ -747,7 +747,7 @@ public class TestHMMarco {
         pop     = {unused->tail}
         top     = {unused->elem}
         push    = {elem -> (all.cons elem self)}
-        concat  = {m -> 
+        concat  = {m ->
           (((self.pop void).concat m).push (self.top void))
           }
         size    = {unused ->(all.s (tail.size void))}
@@ -756,7 +756,7 @@ public class TestHMMarco {
       };
       @{true=true false=false z=z s=s empty=empty cons=cons};
     all
-    ""","""
+""","""
     @{
       cons={
         A
@@ -792,7 +792,7 @@ public class TestHMMarco {
     true=E;
     z=G
     }
-    """);}
+""");}
 
   @Test public void testMyBools() {ok("""
     void = @{};
@@ -804,14 +804,14 @@ public class TestHMMarco {
     false = @{
       and = {b -> false}
       or = {b -> b}
-      thenElse = {then else->(else void) }      
+      thenElse = {then else->(else void) }
       };
     forceSubtyping ={b ->(if b true false)};
     bool=@{true=(forceSubtyping 1) false=(forceSubtyping 0) force=forceSubtyping};
     a=(bool.false.thenElse {unused->3} {unused->4});
     b=(bool.false.thenElse {unused->@{}} {unused->@{}});
     @{a=a b=b bool=bool}
-    ""","""
+""","""
     @{
       a=nint8;
       b=();
@@ -833,7 +833,7 @@ public class TestHMMarco {
           }
         }
       }
-    """);
+""");
     }
   }
 
@@ -841,7 +841,7 @@ public class TestHMMarco {
   data={a:int b:B}->{a:int c:C}->{a:int b:B}->..
   can I pass data to a function expecting
     f ({a:int}->{a:int}..)
-    
+
     Test T->T? and then apply to A?
     Test linked list loops of different length
     Test numbers

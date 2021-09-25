@@ -134,7 +134,7 @@ public class HM {
 
     while( work.len()>0 ) {     // While work
       int oldcnt = T2.CNT;      // Used for cost-check when no-progress
-      assert work._cnt<3000;
+      assert work._cnt<10000;
       Syntax syn = work.pop();  // Get work
       if( DO_HM ) {
         T2 old = syn._hmt;        // Old value for progress assert
