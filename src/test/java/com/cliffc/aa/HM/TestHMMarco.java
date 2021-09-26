@@ -3,6 +3,7 @@ package com.cliffc.aa.HM;
 
 import com.cliffc.aa.HM.HM.*;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -447,6 +448,8 @@ public class TestHMMarco {
         }
       }
 """);}
+
+  @Ignore
   @Test public void testMiniNat() {ok("""
       void = @{};
       err  = {unused->(err unused)};

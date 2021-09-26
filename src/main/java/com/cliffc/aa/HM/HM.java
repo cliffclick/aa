@@ -9,7 +9,6 @@ import java.util.function.BiPredicate;
 
 import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.unimpl;
-import static com.cliffc.aa.type.TypeFld.Access;
 
 // Combined Hindley-Milner and Global Constant Propagation typing.
 
@@ -712,7 +711,7 @@ public class HM {
         WDUPS.clear();
         Type rez2 = find().walk_types_out(rez,this);
         Type rez3 = rez2.join(rez);   // Lift result
-        assert _flow.isa(rez3) && rez3.isa(rez ); // Monotonic...
+        assert _flow.isa(rez3) ; // Monotonic...
         rez = rez3; // Upgrade
       }
       return rez;
@@ -920,7 +919,7 @@ public class HM {
       TypeFld[] flds = new TypeFld[_flds.length+1];
       flds[0] = TypeFld.NO_DISP;
       for( int i=0; i<_flds.length; i++ )
-        flds[i+1] = TypeFld.make(_ids[i],_flds[i]._flow,Access.Final,ARG_IDX+i);
+        flds[i+1] = TypeFld.make(_ids[i],_flds[i]._flow);
       TypeStruct tstr = TypeStruct.make(flds);
       TypeStruct t2 = tstr.approx(1,_alias);
       return TypeMemPtr.make(_alias,t2);
@@ -1951,8 +1950,10 @@ public class HM {
       if( is_nil() ) return t; // nil is a function wrapping a leaf which is not-nil
       if( is_fun() ) return t; // No change, already known as a function (and no TFS in the flow types)
       if( is_struct() ) {
+        if( !(t instanceof TypeMemPtr) && tmap!=null )
+          t = tmap;
         if( !(t instanceof TypeMemPtr) )
-          return tmap == null ? as_flow().join(t) : tmap;  // The most struct-like thing you can be
+          t = as_flow();
         TypeMemPtr tmp = (TypeMemPtr)t;
         TypeStruct ts0 = (TypeStruct)tmp._obj;
         TypeStruct ts = Apply.WDUPS.get(_uid);
