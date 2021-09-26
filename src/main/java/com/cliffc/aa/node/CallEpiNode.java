@@ -389,12 +389,35 @@ public final class CallEpiNode extends Node {
 
   // Approximate "live out of call", includes things that are alive before
   // the call but not flowing in.  Catches all the "new in call" returns.
+
+  // A little profiling on some simple test cases (so the stats are suspect on
+  // larger programs) shows:
+  // - About 80% of the time, the esc_in and esc_out are full, and about 20%
+  //   they are empty and about 1% they are sorta reasonable.
+  // - About 50% of the time, the caller_mem and post_call mem are the same.
+  //   The actual memory contents are all over the map.
+  // - The length hits the largest alias pretty quick.
   static TypeMem live_out(TypeMem caller_mem, TypeMem post_call, Type trez, BitsAlias esc_in, TypeMem defmem) {
+    // Fast cutout for same memory
+    if( caller_mem == post_call )
+      return caller_mem;        // Not joining with DEFMEM
     BitsAlias esc_out = esc_out(post_call,trez);
     int len = Math.max(Math.max(caller_mem.len(),post_call.len()),esc_out.max()+1);
     if( defmem!=null ) len = Math.max(len,defmem.len());
+
+    // Fast cutout for full aliases
+    if( esc_in ==BitsAlias.FULL || esc_in ==BitsAlias.NZERO ||
+        esc_out==BitsAlias.FULL || esc_out==BitsAlias.NZERO ) {
+      TypeMem mt = (TypeMem)caller_mem.meet(post_call);
+      return defmem==null ? mt : (TypeMem)mt.join(defmem);
+    }
+
+    // Fast cutout for empty aliases
+    if( esc_in ==BitsAlias.EMPTY && esc_out==BitsAlias.EMPTY )
+      return caller_mem;        // Not joining with DEFMEM
+
+    // TODO: Wildly inefficient, but perhaps not all that common
     TypeObj[] pubs = new TypeObj[len];
-    // TODO: Wildly inefficient
     for( int i=1; i<pubs.length; i++ ) {
       boolean ein  = esc_in .test_recur(i);
       boolean eout = esc_out.test_recur(i);
