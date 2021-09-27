@@ -390,52 +390,45 @@ public class TestParse {
     test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not nil
     test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not nil
     test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name nil
-    test   ("a = math.rand(1) ? 0 : @{x=1}; // a is nil or a struct\n"+
-            "b = math.rand(1) ? 0 : @{c=a}; // b is nil or a struct\n"+
-            "b ? (b.c ? b.c.x : 0) : 0      // Nil-safe field load", TypeInt.BOOL); // Nested nil-safe field load
+    test   ("""
+      a = math.rand(1) ? 0 : @{x=1}; // a is nil or a struct
+      b = math.rand(1) ? 0 : @{c=a}; // b is nil or a struct
+      b ? (b.c ? b.c.x : 0) : 0      // Nil-safe field load""", TypeInt.BOOL); // Nested nil-safe field load
   }
 
   @Test public void testParse06() {
     // Building recursive types
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
-    test("A= :(str?, int); A(0,2)","*A:(0, 2)","*A:(0,2)");
+    test("A= :(str?, int); A(0,2)","*A:(0, 2)","(0,2)"); // TODO: Named types in HM
     // Named recursive types
-    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make("A:",false,false,Type.XNIL,TypeInt.con(2))));
-    test_ptr("A= :(A?, int); A(0,2)","A:(0, 2)");
-    test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*A:(0, 2), 3)");
+    test("A= :(A?, int); A(0,2)","*A:(0, 2)","(0,2)");
+    test("A= :(A?, int); A(0,2)","*A:(0, 2)","(0,2)");
+    test("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", "1.2","1.2");
+    test("A= :(A?, int); A(A(0,2),3)","*A:(*A:(0, 2), 3)","((0,2),3)");
 
-    //// TODO: Needs a way to easily test simple recursive types
-    //TypeEnv te3 = Exec.go(Env.file_scope(Env.top_scope()),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
-    //if( te3._errs != null ) System.err.println(te3._errs.toString());
-    //assertNull(te3._errs);
-    //TypeStruct tt3 = (TypeStruct)te3._tmem.ld((TypeMemPtr)te3._t);
-    //assertEquals("A:", tt3._name);
-    //assertTrue  (tt3.fld_find("^").is_display_ptr());
-    //assertEquals(Type.XNIL     ,tt3.fld_find("n")._t);
-    //assertEquals(TypeInt.con(3),tt3.fld_find("v")._t);
-    //
-    //// Missing type B is also never worked on.
-    //test_isa("A= :@{n=B?; v=int}", TypeFunPtr.GENERIC_FUNPTR);
-    //test_isa("A= :@{n=B?; v=int}; a = A(0,2)", TypeMemPtr.ISUSED);
-    //test_isa("A= :@{n=B?; v=int}; a = A(0,2); a.n", Type.NIL);
-    //// Mutually recursive type
-    //test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
-    //test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR); // Same test, again, using the same Type.INTERN table
-    //test_isa("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}", TypeFunPtr.GENERIC_FUNPTR);
-    //// Mixed ABC's, making little abc's in-between.
+    test("A= :@{n=A?; v=int}; A(@{n=0;v=3})","*A:@{n=0; v=3}","@{n=0,v=3}");
+
+    // Missing type B is also never worked on.
+    test("A= :@{n=B?; v=int}", "[~36+37]{}","A");
+    test("A= :@{n=B?; v=int}; a = A(0,2)", "*A:@{n=0; v=2}","@{n=0,v=2}");
+    test("A= :@{n=B?; v=int}; a = A(0,2); a.n", "0", "0");
+    // Mutually recursive type
+    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", "[~40+41]{}", "A");
+    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", "[~36+37]{}", "A"); // Same test, again, using the same Type.INTERN table
+    test("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}", "[~42+43]{}", "A");
+    // Mixed ABC's, making little abc's in-between.
     //TypeMemPtr tmpA = TypeMemPtr.make(21,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,ARG_IDX),TypeFld.make("v",TypeInt.con(5    )                    ,ARG_IDX+1)).set_name("A:"));
     //TypeMemPtr tmpB = TypeMemPtr.make(19,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpA     ,ARG_IDX),TypeFld.make("v",TypeFlt.con(3.14 )                    ,ARG_IDX+1)).set_name("B:"));
     //TypeMemPtr tmpC = TypeMemPtr.make(31,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpB     ,ARG_IDX),TypeFld.make("v",TypeMemPtr.make(17,TypeStr.con("abc")),ARG_IDX+1)).set_name("C:"));
-    //test_isa("A= :@{n=B?; v=int}; "+
-    //         "a= A(0,5); "+
-    //         "B= :@{n=A?; v=flt}; "+
-    //         "b= B(a,3.14);"+
-    //         "C= :@{n=B?; v=str};"+
-    //         "c= C(b,\"abc\");"+
-    //         "(a,b,c)",
-    //         TypeMemPtr.make(33,TypeStruct.tupsD(tmpA,tmpB,tmpC)));
-    throw unimpl();
+    test("""
+A= :@{n=B?; v=int};
+a= A(0,5);
+B= :@{n=A?; v=flt};
+b= B(a,3.14);
+C= :@{n=B?; v=str};
+c= C(b,"abc");
+(a,b,c)
+""","","");
   }
 
   @Test public void testParse07() {

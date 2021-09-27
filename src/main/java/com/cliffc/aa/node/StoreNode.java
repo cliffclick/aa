@@ -97,7 +97,7 @@ public class StoreNode extends Node {
       else if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) head2 = mem.in(0).in(0);
       else head2 = null;
       // Check no extra readers/writers at the split point
-      if( head2 != null && MemSplitNode.check_split(this,escapees()) ) {
+      if( head2 != null && MemSplitNode.check_split(this,escapees(),mem) ) {
         MemSplitNode.insert_split(this, escapees(), this, mem, head2);
         assert _uses._len==1 && _uses.at(0) instanceof MemJoinNode;
         return _uses.at(0); // Return the mem join

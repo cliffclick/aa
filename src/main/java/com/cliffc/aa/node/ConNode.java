@@ -79,7 +79,11 @@ public class ConNode<T extends Type> extends Node {
   }
 
   @Override public String toString() { return str(); }
-  @Override public int hashCode() { return _t.hashCode(); }// In theory also slot 0, but slot 0 is always Start
+  @Override public int hashCode() {
+    // In theory also slot 0, but slot 0 is always Start.
+    // Two XNILs are typically different because their TV2s are different
+    return _t.hashCode();
+  }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof ConNode) ) return false;
@@ -87,6 +91,8 @@ public class ConNode<T extends Type> extends Node {
     if( this== Env.ALL_CTRL || con == Env.ALL_CTRL ) return false; // Only equal to itself
     if( this== Env.ALL_PARM || con == Env.ALL_PARM ) return false; // Only equal to itself
     if( this== Env.ALL_CALL || con == Env.ALL_CALL ) return false; // Only equal to itself
+    if( _t==Type.XNIL && con._t==Type.XNIL /*&& tvar()!=con.tvar()*/ )
+      return false;             // Different versions of TV2 NotNil
     return _t==con._t;
   }
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }

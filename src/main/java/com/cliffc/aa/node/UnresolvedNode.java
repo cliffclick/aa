@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.BitsFun;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
@@ -74,16 +75,17 @@ public class UnresolvedNode extends UnOrFunPtrNode {
     }
   }
 
-  //@Override public TV2 new_tvar(String alloc_site) {
-  //  return TV2.make("Fun",this,alloc_site);
-  //}
-  //
-  //@Override public boolean unify( boolean test ) {
-  //  // Giant assert that all inputs are all Fun, ignoring dead.
-  //  for( Node n : _defs )
-  //    assert n.tvar().is_dead() || n.tvar().isa("Fun");
-  //  return false;
-  //}
+  // An Unresolved is its own Leaf, because it might gather fairly unrelated
+  // functions - such as integer-add vs string-add, or the 1-argument leading
+  // '+' operator vs the more expected binop.
+  @Override public boolean unify( Work work ) {
+    // Giant assert that all inputs are all Fun, ignoring errors.
+    for( Node n : _defs ) {
+      TV2 tv = n.tvar();
+      assert tv.is_err() || tv.is_fun() || tv.is_leaf();
+    }
+    return false;
+  }
 
   // Validate same name, operator-precedence and thunking
   private void add_def_unresolved( FunPtrNode ptr ) {

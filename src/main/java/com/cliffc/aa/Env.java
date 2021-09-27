@@ -208,10 +208,16 @@ public class Env implements AutoCloseable {
   // Reset all global statics for the next parse.  Useful during testing when
   // many top-level parses happen in a row.
   static void top_reset() {
+    // Kill all extra objects hooked by DEFMEM.
     while( DEFMEM.len() > DEFMEM_RESET.length ) DEFMEM.pop();
     for( int i=0; i<DEFMEM_RESET.length; i++ )
       DEFMEM.set_def(i,DEFMEM_RESET[i]);
-    Env.GVN.iter_dead(); // Clear out the dead before clearing VALS, since they may not be reachable and will blow the elock assert
+    // Kill all extra constants and cyclic ConTypeNodes hooked by Start
+    Node c;
+    while( !(c=START._uses.last()).is_prim() )
+      while( c.len()>0 ) c.pop();
+    // Clear out the dead before clearing VALS, since they may not be reachable and will blow the elock assert
+    Env.GVN.iter_dead();
     TV2.reset_to_init0();
     Node.VALS.clear();                         // Clean out hashtable
     Node.RESET_VISIT.clear();

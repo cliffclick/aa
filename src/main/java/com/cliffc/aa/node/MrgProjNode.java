@@ -52,7 +52,7 @@ public class MrgProjNode extends ProjNode {
     Node head2 = MemJoinNode.find_sese_head(mem);
     if( head2 != null && !head2.is_prim() ) {
       BitsAlias escs1 = escapees();
-      if( MemSplitNode.check_split(this,escs1) )
+      if( MemSplitNode.check_split(this,escs1,mem) )
         return MemSplitNode.insert_split(this,escs1,this,head2,mem);
     }
     return null;

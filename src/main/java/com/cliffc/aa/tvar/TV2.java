@@ -211,9 +211,8 @@ public class TV2 {
     return new TV2("Nil",args,Type.XNIL,notnil._ns,alloc_site);
   }
   // Make a new function
-  public static TV2 make_fun(Node n, TypeFunPtr fptr, TypeFunSig sig, @NotNull String alloc_site) {
+  public static TV2 make_fun(Node n, TypeFunPtr fptr, @NotNull String alloc_site) {
     assert fptr._disp==TypeMemPtr.NO_DISP; // Just for fidxs, arg counts
-    assert fptr._nargs==sig.nargs();
     return new TV2("->",new NonBlockingHashMap<String,TV2>(),fptr,UQNodes.make(n),alloc_site);
   }
   public static TV2 make_fun(Node n, Type fptr, NonBlockingHashMap<String,TV2> args, @NotNull String alloc_site) {

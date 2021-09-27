@@ -162,7 +162,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     boolean progress = false;
     if( !self.is_fun() ) {      // Force a function if not already
       if( work==null ) return true;
-      progress = self.unify(TV2.make_fun(ret.rez(),TypeFunPtr.make(fun._fidx,fun._sig.nargs(),TypeMemPtr.NO_DISP),fun._sig,"FunPtr_unify"),work);
+      progress = self.unify(TV2.make_fun(ret.rez(),TypeFunPtr.make(fun._fidx,fun._sig.nargs(),TypeMemPtr.NO_DISP),"FunPtr_unify"),work);
       self = self.find();
     }
 

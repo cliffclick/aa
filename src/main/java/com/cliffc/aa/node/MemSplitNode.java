@@ -134,7 +134,7 @@ public class MemSplitNode extends Node {
     assert Env.START.more_flow(Env.GVN._work_flow,true)==0;
     assert tail1.is_mem() && head1.is_mem() && tail2.is_mem() && head2.is_mem();
     BitsAlias head2_escs = head2.escapees();
-    assert check_split(head1,head1_escs);
+    assert check_split(head1,head1_escs,head1.in(1));
     // Insert empty split/join above head2
     MemSplitNode msp = Env.GVN.init(new MemSplitNode(head2.in(1))).unkeep(2);
     MProjNode    mprj= Env.GVN.init(new MProjNode   (msp,0      )).unkeep(2);
@@ -154,9 +154,8 @@ public class MemSplitNode extends Node {
     return head1;
   }
 
-  static boolean check_split( Node head1, BitsAlias head1_escs ) { return check_split(head1,head1_escs,head1.in(1)); }
   static boolean check_split( Node head1, BitsAlias head1_escs, Node tail2 ) {
-    if( head1._keep > 1 || tail2._keep > 1 ) return false;
+    if( head1._keep > 1 || tail2._keep > 1 ) return false; // Still being constructed
     // Must have only 1 mem-writer (this can fail if used by different control paths)
     if( !tail2.check_solo_mem_writer(head1) ) return false;
     // No alias overlaps
@@ -165,8 +164,12 @@ public class MemSplitNode extends Node {
     // Cannot have any Loads following head1; because after the split
     // they will not see the effects of previous stores that also move
     // into the split.
-    return (tail2._uses._len==1) ||
-      (tail2._uses._len==2 && tail2._uses.find(Env.DEFMEM)!= -1 );
+    // Allow exactly 1 use (and an optional DEFMEM)
+    if(  tail2._uses._len!=1 &&
+        (tail2._uses._len!=2 || tail2._uses.find(Env.DEFMEM)== -1 ) )
+      return false;
+    
+    return true;
   }
 
 
