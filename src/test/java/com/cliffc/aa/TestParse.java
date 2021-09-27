@@ -417,9 +417,6 @@ public class TestParse {
     test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", "[~36+37]{}", "A"); // Same test, again, using the same Type.INTERN table
     test("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}", "[~42+43]{}", "A");
     // Mixed ABC's, making little abc's in-between.
-    //TypeMemPtr tmpA = TypeMemPtr.make(21,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,ARG_IDX),TypeFld.make("v",TypeInt.con(5    )                    ,ARG_IDX+1)).set_name("A:"));
-    //TypeMemPtr tmpB = TypeMemPtr.make(19,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpA     ,ARG_IDX),TypeFld.make("v",TypeFlt.con(3.14 )                    ,ARG_IDX+1)).set_name("B:"));
-    //TypeMemPtr tmpC = TypeMemPtr.make(31,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",tmpB     ,ARG_IDX),TypeFld.make("v",TypeMemPtr.make(17,TypeStr.con("abc")),ARG_IDX+1)).set_name("C:"));
     test("""
 A= :@{n=B?; v=int};
 a= A(0,5);
@@ -428,7 +425,7 @@ b= B(a,3.14);
 C= :@{n=B?; v=str};
 c= C(b,"abc");
 (a,b,c)
-""","","");
+""","*(*A:@{n=0; v=5}, *B:@{n=$; v=3.14}, *C:@{n=$; v=*\"abc\"})","( A:@{ n = 0, v = 5}, B:@{ n = A, v = 3.14}, @{ n = B, v = *\"abc\"})");
   }
 
   @Test public void testParse07() {
@@ -968,14 +965,7 @@ HashTable = {@{
       for( TypeFld fld : te._sig._formals.flds() )
         assertEquals(args[fld._order-ARG_IDX],fld._t);
   }
-  static private void test_ptr( String program, Function<Integer,Type> expected ) {
-    //TypeEnv te = run(program);
-    //TypeMemPtr actual = te._tmem.sharpen((TypeMemPtr)te._t);
-    //int alias = actual.getbit(); // internally asserts only 1 bit set
-    //Type t_expected = expected.apply(alias);
-    //assertEquals(t_expected,actual);
-    throw unimpl();
-  }
+
   static private void test_obj( String program, TypeObj expected) {
     TypeEnv te = run(program);
     assertTrue(te._t instanceof TypeMemPtr);

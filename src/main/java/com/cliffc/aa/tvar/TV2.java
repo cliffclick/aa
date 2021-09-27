@@ -963,15 +963,14 @@ public class TV2 {
   public SB str(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     boolean dup = dups.get(_uid);
     if( !debug && is_unified() ) return find().str(sb,visit,dups,debug);
-    if( is_unified() || is_leaf() ) {
+    if( is_unified() || is_leaf() || dup ) {
       sb.p(VNAMES.computeIfAbsent(this,( k ->  debug ? ("V"+k._uid) : ((++VCNT)-1+'A' < 'V' ? (""+(char)('A'+VCNT-1)) : ("V"+VCNT)))));
-      return is_unified() ? _unified.str(sb.p(">>"), visit, dups, debug) : sb;
+      if( !dup ) return is_unified() ? _unified.str(sb.p(">>"), visit, dups, debug) : sb;
     }
     if( is_err () )  return sb.p(_type);
     if( is_base() )
       return _type.str(sb,visit,null,debug);
 
-    if( dup ) sb.p("$V").p(_uid);
     if( visit.tset(_uid) && dup ) return sb;
     if( dup ) sb.p(':');
 

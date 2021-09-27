@@ -478,8 +478,8 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     int peek() { return _kids[1][_kids[1][0]]; } // for testing
     void free(int b) {
       if( is_parent(b) ) return; // Too hard to compress
-      int par = parent(b);
-      int idx = Util.find(_kids[par],b);
+      int par = parent(b), idx=-1;
+      for( int i=1; i<_kids[par].length; i++ ) if( _kids[par][i]==b ) { idx=i; break; }
       int cnt = _kids[par][0]-1; // Count on this line, minus the removed one
       _kids[par][idx] = _kids[par][cnt]; // Shuffle last element over removed
       _kids[par][cnt] = b;      // Put last bit at end, for reuse

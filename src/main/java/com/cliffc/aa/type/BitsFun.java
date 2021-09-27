@@ -44,7 +44,6 @@ public class BitsFun extends Bits<BitsFun> {
   public static void free(int fidx) { TREE.free(fidx); }
   public static BitsFun make0( int bit ) { return FULL.make(bit); }
   public static BitsFun make0( int... bits ) { return FULL.make(bits); }
-  public static int peek() { return TREE.peek(); }
   // True if this fidx has been split thus has children
   public static boolean is_parent( int idx ) { return TREE.is_parent(idx); }
   // Return parent fidx from child fidx.

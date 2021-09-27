@@ -310,9 +310,6 @@ public class Env implements AutoCloseable {
     throw unimpl();
   }
 
-  // Update function name token to Node mapping in the current scope
-  Node add_fun( Parse bad, String name, Node val ) { return _scope.stk().add_fun(bad,name,(FunPtrNode)val); }
-
 
   // Type lookup in any scope
   ConTypeNode lookup_type( String name ) {

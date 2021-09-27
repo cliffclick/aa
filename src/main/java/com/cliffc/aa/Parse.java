@@ -168,9 +168,10 @@ public class Parse implements Comparable<Parse> {
         tn = (ConTypeNode)gvn(new ConTypeNode(tvar,named,scope()));
         _e.add_type(tvar,tn); // Add a type mapping
         if( _prims ) return tn;
-        FunPtrNode fptr = PrimNode.convertTypeName(t,named,bad);
         // Make a trivial constructor
-        return _e.add_fun(bad,tvar,fptr);
+        FunPtrNode fptr = PrimNode.convertTypeName(t,named,bad);
+        do_store(null,fptr,Access.Final,tvar,bad);
+        return fptr;
       }
 
       // Always wrap Objs with a TypeMemPtr and a unique alias.
@@ -192,12 +193,10 @@ public class Parse implements Comparable<Parse> {
     // variant.
     TypeStruct ts = (TypeStruct)((TypeMemPtr)tn._val)._obj;
     FunPtrNode epi1 = IntrinsicNode.convertTypeName(ts,bad);
-    _e.add_fun(bad,tvar,epi1); // Return type-name constructor
+    do_store(null,epi1,Access.Final,tvar,bad);
     // Add a second constructor taking an expanded arg list
     FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(ts, tn.alias(), errMsg());
-    _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
-    scope().stk().mem().xval();// Type upgrade immediately after adding
-
+    do_store(scope(),epi2,Access.Final,tvar,bad);
     return _e.lookup(tvar); // Returns an Unresolved of constructors
   }
 
@@ -294,34 +293,39 @@ public class Parse implements Comparable<Parse> {
     for( int i=0; i<toks._len; i++ ) {
       String tok = toks.at(i);               // Token being assigned
       Access mutable = rs.get(i) ? Access.RW : Access.Final;  // Assignment is mutable or final
-      if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
-        ((FunPtrNode)ifex).bind(tok); // Debug only: give name to function
-      // Find scope for token.  If not defining struct fields, look for any
-      // prior def.  If defining a struct, tokens define a new field in this scope.
       ScopeNode scope = lookup_scope(tok,lookup_current_scope_only);
-      if( scope==null ) {                    // Token not already bound at any scope
-        create(tok,con(Type.XNIL),Access.RW);  // Create at top of scope as undefined
-        scope = scope();                // Scope is the current one
-        scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
-      }
-      // Handle re-assignments and forward referenced function definitions.
-      Node n = scope.stk().get(tok); // Get prior direct binding
-      if( n.is_forward_ref() ) {     // Prior is a f-ref
-        assert !scope.stk().is_mutable(tok) && scope == scope();
-        if( ifex instanceof FunPtrNode )
-          ((FunPtrNode)n).merge_ref_def(tok,(FunPtrNode)ifex,scope.stk());
-        else ; // Can be here if already in-error
-
-      } else { // Store into scope/NewObjNode/display
-        // Assign into display, changing an existing def
-        Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
-        StoreNode st = new StoreNode(mem(),ptr,ifex,mutable,tok,badfs.at(i));
-        scope().replace_mem(st);
-        scope.def_if(tok,mutable,false); // Note 1-side-of-if update
-      }
+      do_store(scope,ifex,mutable,tok,badfs.at(i));
     }
 
     return _e.nongen_pop(ifex.unkeep());
+  }
+
+  // Assign into display, changing an existing def
+  private void do_store(ScopeNode scope, Node ifex, Access mutable, String tok, Parse bad) {
+    if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
+      ((FunPtrNode)ifex).bind(tok); // Debug only: give name to function
+    // Find scope for token.  If not defining struct fields, look for any
+    // prior def.  If defining a struct, tokens define a new field in this scope.
+    if( scope==null ) {                    // Token not already bound at any scope
+      create(tok,con(Type.XNIL),Access.RW);  // Create at top of scope as undefined
+      scope = scope();                // Scope is the current one
+      scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
+    }
+    // Handle re-assignments and forward referenced function definitions.
+    Node n = scope.stk().get(tok); // Get prior direct binding
+    if( n.is_forward_ref() ) {     // Prior is a f-ref
+      assert !scope.stk().is_mutable(tok) && scope == scope();
+      if( ifex instanceof FunPtrNode )
+        ((FunPtrNode)n).merge_ref_def(tok,(FunPtrNode)ifex,scope.stk());
+      // Can be here if already in-error
+
+    } else {
+      // Store into scope/NewObjNode/display
+      Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
+      StoreNode st = new StoreNode(mem(),ptr,ifex,mutable,tok,bad);
+      scope().replace_mem(st);
+      scope.def_if(tok,mutable,false); // Note 1-side-of-if update
+    }
   }
 
   /** Parse an if-expression, with lazy eval on the branches.  Assignments to
