@@ -429,11 +429,13 @@ c= C(b,"abc");
   }
 
   @Test public void testParse07() {
+    test("A= :@{n=A?; v=int}; f={x -> x ? A(f(x.n),x.v*x.v) : 0}", "","");
+    test("A= :@{n=A?; v=int}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}", "","");
     // Passing a function recursively
-    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", Type.XNIL);
-    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
-    test_isa("A= :@{n=A?; v=int}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}", TypeFunPtr.GENERIC_FUNPTR);
-    test    ("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
+    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(_&_,2)", "0","0");
+    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(_+_,2)", "2","2");
+    test("A= :@{n=A?; v=int}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}", "","");
+    test("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
     test("tmp=((0,1.2),2.3); sq={x->x*x}; map={f t -> t ? (map(f,t.0),f t.1) : 0}; map(sq,tmp).1",TypeFlt.con(2.3*2.3));
     // Calling a function twice which returns the same alias.  Verify no pointer confusion.
     test("noinline_x={@{a}}; x0=noinline_x(); x1=noinline_x(); x0.a:=2; x1.a",  TypeInt.INT8);

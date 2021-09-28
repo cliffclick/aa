@@ -95,6 +95,7 @@ public class PhiNode extends Node {
     Node r = in(0);
     if( r==def ) return TypeMem.ALIVE;
     if( r!=null ) {
+      if( r.len() != len() ) return _live;
       // The same def can appear on several inputs; check them all.
       int i; for( i=1; i<_defs._len; i++ )
         if( in(i)==def && !r.val(i).above_center() )

@@ -214,8 +214,10 @@ public class Env implements AutoCloseable {
       DEFMEM.set_def(i,DEFMEM_RESET[i]);
     // Kill all extra constants and cyclic ConTypeNodes hooked by Start
     Node c;
-    while( !(c=START._uses.last()).is_prim() )
+    while( !(c=START._uses.last()).is_prim() ) {
       while( c.len()>0 ) c.pop();
+      Env.GVN.add_dead(c);
+    }
     // Clear out the dead before clearing VALS, since they may not be reachable and will blow the elock assert
     Env.GVN.iter_dead();
     TV2.reset_to_init0();

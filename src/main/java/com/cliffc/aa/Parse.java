@@ -1350,7 +1350,7 @@ public class Parse implements Comparable<Parse> {
   private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
   private static boolean isJava  (byte c) { return isAlpha1(c) || (c=='$') || (c=='.'); }
-  private static boolean isOp0   (byte c) { return "!#$%*+,-.=<>^[]~/&|".indexOf(c) != -1; }
+  private static boolean isOp0   (byte c) { return "!#$%*+-.=<>^[]~/&|".indexOf(c) != -1; }
   private static boolean isOp1   (byte c) { return isOp0(c) || ":?_".indexOf(c) != -1; }
   public  static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
 
