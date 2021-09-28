@@ -1,4 +1,48 @@
 =======================================
+9/28/2021
+
+Still wrestling with theory.
+"f = { x -> x ? (f(x.next),x.val*x.val) : 0 }; f"
+
+Returns a self-recursive function.
+During Combo
+
+- Phase1, no calls from external world.
+  Hence 'f' is never called.
+  Hence 'x' is ~Scalar.
+  Hence '?:' does not execute either branch.
+  Hence no H-M action, everything remains a Leaf.
+  Hence no binding on 'x's type from H-M.
+- Phase2, turn on external calls.
+  Since 'x' is not bound by H-M, falls to Scalar.
+  Both '?:' branches execute.
+  Hence 'x' as a nScalar is used for x.next and x.val
+  Hence 'x.next' reports an Err.
+  
+  THEORY: NO ASYMPOTOTIC GAIN from doing this.  Just drop Scalar values in on
+  escaping functions - CEProj->Scope goes ~Ctrl->Ctrl and ALL_PARM is always
+  Scalar.
+
+  Still need to deal with Err terms.  Basically claim no Err outputs from
+  Nodes.  Means no asking 'err' during Iter/GCP.  Issues like Loads peeking
+  thru 2nd-final-Store.
+
+  Ugh, think i need to still keep these.  Means, e.g., when x==Scalar, 'x.next'
+  is in-error although I can return a Scalar loaded value instead of 'ALL'.
+  During error report might have to filter (only report if error-out and not
+  error-in).
+  
+  
+- During Phase2, H-M computes x=: A:@{next=A?,val=Real}
+  Hence H-M lifts f() result to a tuple T:(T?,Real)
+- Phase3, Iter with HM
+  Lift all flow types to HM type, lather, rinse, repeat normal iter.
+  
+
+
+
+
+=======================================
 9/12/2021
 
 Combining HM & forward-flow.

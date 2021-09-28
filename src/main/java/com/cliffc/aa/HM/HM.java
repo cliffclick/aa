@@ -120,10 +120,6 @@ public class HM {
     int init_T2s = T2.CNT;
     main_work_loop(prog,work);
     assert prog.more_work(work);
-    if( DO_GCP && prog.lower_escaping_vals(work) ) {
-      main_work_loop(prog,work);
-      assert !prog.lower_escaping_vals(work) && work.len()==0;
-    }
 
     System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+work._cnt+", T2s: "+T2.CNT);
     return prog;
@@ -316,11 +312,6 @@ public class HM {
     //public Syntax pop() { Syntax s = _ary.del(  _cnt++%_ary._len); _work.remove(s); return s; }
     public boolean has(Syntax s) { return _work.contains(s); }
     public void addAll(Ary<? extends Syntax> ss) { if( ss != null ) for( Syntax s : ss ) push(s); }
-    public void clear() {
-      _cnt=0;
-      _ary.clear();
-      _work.clear();
-    }
     @Override public String toString() { return _ary.toString(); }
   }
 
@@ -546,12 +537,7 @@ public class HM {
         progress |= old.arg(""+i).unify(targ(i),work);
       return old.arg("ret").unify(_body.find(),work) | progress;
     }
-    @Override void add_hm_work(Worklist work) {
-      work.push(_par );
-      work.push(_body);
-      for( int i=0; i<_targs.length; i++ )
-        if( targ(i).occurs_in_type(find()) ) work.addAll(targ(i)._deps);
-    }
+    @Override void add_hm_work(Worklist work) { throw unimpl(); }
     @Override Type val(Worklist work) { return TypeFunPtr.make(_fidx,_args.length,Type.ANY); }
     // Ignore arguments, and return body type.  Very conservative.
     Type apply(Syntax[] args) { return _body._flow; }
@@ -722,15 +708,24 @@ public class HM {
       // If an argument changes type, adjust the lambda arg types
       Type flow = _fun._flow;
       if( flow.above_center() ) return;
-      if( !(flow instanceof TypeFunPtr) ) return;
-      // Meet the actuals over the formals.
-      for( int fidx : ((TypeFunPtr)flow)._fidxs ) {
-        Lambda fun = Lambda.FUNS.get(fidx);
-        if( fun!=null ) {
+      assert RVISIT.isEmpty();
+      walk(flow,work);
+      RVISIT.clear();
+    }
+    private static final VBitSet RVISIT = new VBitSet();
+    private void walk( Type flow, Worklist work) {
+      if( RVISIT.tset(flow._uid) ) return;
+      // Find any functions
+      if( flow instanceof TypeFunPtr ) {
+        // Meet the actuals over the formals.
+        for( int fidx : ((TypeFunPtr)flow)._fidxs ) {
+          Lambda fun = Lambda.FUNS.get(fidx);
           fun.find().push_update(this); // Discovered as call-site; if the Lambda changes the Apply needs to be revisited.
           for( int i=0; i<fun._types.length; i++ ) {
             Type formal = fun._types[i];
-            Type actual = _args[i]._flow;
+            Type actual = this instanceof Root
+              ? Root.widen(fun.targ(i)) // Root assumed args
+              : _args[i]._flow;         // Actual observed args
             Type rez = formal.meet(actual);
             if( formal != rez ) {
               fun._types[i] = rez;
@@ -740,7 +735,21 @@ public class HM {
             }
           }
         }
+        return;
       }
+      // For Root, recursively walk structures
+      if( flow instanceof TypeMemPtr ) {
+        TypeMemPtr tmp = (TypeMemPtr)flow;
+        if( tmp._obj instanceof TypeStr ) return;
+        TypeStruct ts = ((TypeStruct)tmp._obj);
+        for( TypeFld fld : ts.flds() )
+          walk(fld._t,work);
+        return;
+      }
+      if( flow instanceof TypeInt || flow instanceof TypeFlt ) return;
+      if( flow==Type.ANY || flow==Type.ALL || flow == Type.SCALAR || flow == Type.NSCALR || flow == Type.XSCALAR || flow == Type.XNSCALR )
+        return;
+      throw unimpl();
     }
 
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
@@ -766,60 +775,9 @@ public class HM {
 
     @Override void add_hm_work(Worklist work) { }
     @Override Type val(Worklist work) { return _fun._flow; }
-    @Override void add_val_work(Syntax child, Worklist work) {
-      if( child==_fun ) work.push(this);
-    }
     // Root-widening is when Root acts as-if it is calling the returned
     // function with the worse-case legal args.
     static Type widen(T2 t2) { return t2.as_flow(); }
-    boolean lower_escaping_vals(Worklist work) {
-      // Root-widening needs to call all functions which can be returned from
-      // the Root or from any function reachable from the Root via struct &
-      // fields, or by being returned from another function.
-      RVISIT.clear();
-      RPROG = false;
-      walk(_flow,work);
-      return RPROG;
-    }
-    private static final VBitSet RVISIT = new VBitSet();
-    private static boolean RPROG;
-    private static void walk( Type flow, Worklist work) {
-      if( RVISIT.tset(flow._uid) ) return;
-      if( flow instanceof TypeFunPtr ) {
-        BitsFun fidxs = ((TypeFunPtr)flow)._fidxs;
-        assert !fidxs.test(1);
-        if( fidxs==BitsFun.EMPTY ) return;
-        for( int fidx : fidxs ) {
-          Lambda fun = Lambda.FUNS.get(fidx);
-          // For each returned function, assume Root calls all arguments with
-          // worse-case values.
-          for( int i=0; i<fun._types.length; i++ ) {
-            Type formal = fun._types[i];
-            Type actual = Root.widen(fun.targ(i));
-            Type rez = formal.meet(actual);
-            if( formal != rez ) {
-              fun._types[i] = rez;
-              work.addAll(fun.targ(i)._deps);
-              work.push(fun._body);
-              RPROG=true;
-            }
-          }
-        }
-        return;
-      }
-      if( flow instanceof TypeMemPtr ) {
-        TypeMemPtr tmp = (TypeMemPtr)flow;
-        if( tmp._obj instanceof TypeStr ) return;
-        TypeStruct ts = ((TypeStruct)tmp._obj);
-        for( TypeFld fld : ts.flds() )
-          walk(fld._t,work);
-        return;
-      }
-      if( flow instanceof TypeInt || flow instanceof TypeFlt ) return;
-      if( flow==Type.ANY || flow == Type.SCALAR || flow == Type.NSCALR || flow == Type.XSCALAR || flow == Type.XNSCALR )
-        return;
-      throw unimpl();
-    }
 
 
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
@@ -880,26 +838,8 @@ public class HM {
       // Do not allocate a T2 unless we need to pick up fields.
       T2 rec = find();
       if( rec.is_err() ) return false;
-      if( rec.is_leaf() ) {           // Must allocate.
-        if( work==null ) return true; // Will progress
-        T2[] t2s = new T2[_ids.length];
-        for( int i=0; i<_ids.length; i++ )
-          t2s[i] = _flds[i].find();
-        T2.make_struct(false,BitsAlias.make0(_alias),_ids,t2s).unify(rec,work);
-        rec=find();
-        progress = true;
-      }
-      if( !rec.is_struct() ) throw unimpl();
-
-      // Extra fields are unified with ERR since they are not created here:
-      // error to load from a non-existing field
-      if( rec._args != null )
-        for( String id : rec._args.keySet() ) {
-          if( Util.find(_ids,id)== -1 && !rec.arg(id).is_err() ) {
-            if( work==null ) return true;
-            progress |= rec.arg(id).unify(find().miss_field(id),work);
-          }
-        }
+      assert rec.is_struct();
+      assert check_fields(rec);
 
       // Unify existing fields.  Ignore extras on either side.
       for( int i=0; i<_ids.length; i++ ) {
@@ -910,6 +850,15 @@ public class HM {
       rec.push_update(this);
 
       return progress;
+    }
+    // Extra fields are unified with ERR since they are not created here:
+    // error to load from a non-existing field
+    private boolean check_fields(T2 rec) {
+      if( rec._args != null )
+        for( String id : rec._args.keySet() )
+          if( Util.find(_ids,id)==-1 && !rec.arg(id).is_err() )
+            return false;
+      return true;
     }
     @Override void add_hm_work(Worklist work) {
       work.push(_par);
@@ -1179,7 +1128,7 @@ public class HM {
   static class NotNil extends PrimSyn {
     @Override String name() { return " notnil"; }
     public NotNil() { super(T2.make_leaf(),T2.make_leaf()); }
-    @Override PrimSyn make() { return new NotNil(); }
+    @Override PrimSyn make() { throw unimpl(); /*return new NotNil(); */}
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       int cnt = super.prep_tree(par,nongen,work);
       find().arg("ret").push_update(this);
@@ -1197,29 +1146,15 @@ public class HM {
       // Already an expanded nilable with base
       if( arg.is_base() && ret.is_base() ) {
         assert !arg.is_open() && !ret.is_open();
-        if( arg._flow == ret._flow.meet_nil(Type.XNIL) ) return false;
-        if( work==null ) return true;
-        Type mt = arg._flow.meet(ret._flow);
-        Type rflow = mt.join(Type.NSCALR);
-        Type aflow = mt.meet_nil(Type.XNIL);
-        if( rflow != ret._flow ) { ret._flow=rflow; work.push(_par); }
-        if( aflow != arg._flow ) { arg._flow=aflow; work.push(_par); }
-        return true;
+        assert arg._flow == ret._flow.meet_nil(Type.XNIL);
+        return false;
       }
       // Already an expanded nilable with struct
       if( arg.is_struct() && ret.is_struct() && arg._flow == arg._flow.meet_nil(Type.XNIL) ) {
-        // But cannot just check the aliases, since they may not match.
-        // Also check that the fields align
-        boolean progress=false;
-        for( String fld : arg._args.keySet() ) {
-          if( arg.arg(fld) != ret.arg(fld) )
-            { progress=true; break; } // Field/HMtypes misaligned
-        }
-        if( !progress && arg.is_open() )
-          for( String fld : ret._args.keySet() )
-            if( arg.arg(fld)==null )
-              { progress=true; break; }
-        if( !progress ) return false; // No progress
+        // Check that the fields align
+        assert check_fields0(arg,ret);
+        assert arg.is_open() || check_fields1(ret,arg);
+        return false;
       }
       if( work==null ) return true;
       // If the arg is already nil-checked, can be a nilable of a nilable.
@@ -1227,6 +1162,18 @@ public class HM {
         return arg.unify(ret,work);
       // Unify with arg with a nilable version of the ret.
       return T2.make_nil(ret).find().unify(arg,work);
+    }
+    private static boolean check_fields0(T2 arg, T2 ret) {
+      for( String fld : arg._args.keySet() )
+        if( arg.arg(fld) != ret.arg(fld) )
+          return false;
+      return true;
+    }
+    private static boolean check_fields1(T2 ret, T2 arg) {
+      for( String fld : ret._args.keySet() )
+        if( arg.arg(fld)==null )
+          return false;
+      return true;
     }
     @Override Type apply( Syntax[] args) {
       Type val = args[0]._flow;
@@ -1357,7 +1304,7 @@ public class HM {
 
     // Constructor factories.
     static T2 make_leaf() { return new T2("V",null,null,false); }
-    static T2 make_nil (T2 leaf) { return new T2("?",null,new NonBlockingHashMap<String,T2>(){{put("?",leaf);}},false); }
+    static T2 make_nil (T2 leaf) { return new T2("?",null,new NonBlockingHashMap<>(){{put("?",leaf);}},false); }
     static T2 make_base(Type flow) { assert !(flow instanceof TypeStruct); return new T2("Base",flow,null,false); }
     static T2 make_fun( boolean is_func_input, BitsFun fidxs, T2... t2s ) {
       NonBlockingHashMap<String,T2> args = new NonBlockingHashMap<>();
@@ -1548,7 +1495,7 @@ public class HM {
       _flow=null;
       _open=false;
       _is_func_input = false;
-      _args = new NonBlockingHashMap<String,T2>(){{put(">>",that);}};
+      _args = new NonBlockingHashMap<>() {{put(">>", that);}};
       _name = "X";             // Flag as a unified
       assert unified();
       return true;
@@ -1744,8 +1691,7 @@ public class HM {
         return _flow.must_nil() ? vput(that,progress) : progress;
       }
 
-      if( !Util.eq(_name,that._name) )
-        return work == null || vput(that,that._unify(make_err("Cannot unify "+this.p()+" and "+that.p()),work));
+      assert Util.eq(_name,that._name);
 
       // Both same (probably both nil)
       if( _args==that._args ) return vput(that,false);
@@ -1824,10 +1770,6 @@ public class HM {
 
     // -----------------
     private static final VBitSet ODUPS = new VBitSet();
-    boolean occurs_in_type(T2 x) {
-      ODUPS.clear();
-      return _occurs_in_type(x);
-    }
 
     boolean _occurs_in_type(T2 x) {
       assert !unified() && !x.unified();
