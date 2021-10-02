@@ -29,17 +29,11 @@ public class ConNode<T extends Type> extends Node {
   // Used by FunPtrNode
   ConNode( byte type, T tfp, RetNode ret, Node closure ) { super(type,ret,closure); _t = tfp; }
   @Override public String xstr() {
-    if( Env.ALL_CTRL == this ) return "ALL_CTL";
     if( Env.ALL_PARM == this ) return "ALL_PARM";
     if( Env.ALL_CALL == this ) return "ALL_CALL";
     return _t==null ? "(null)" : _t.toString();
   }
   @Override public Type value(GVNGCM.Mode opt_mode) {
-    // ALL_CTRL is used for unknown callers; during and after GCP there are no
-    // unknown callers.  However, we keep the ALL_CTRL for primitives, so we can
-    // reset the compilation state easily.
-    if( opt_mode._CG && Env.ALL_CTRL == this ) return Type.XCTRL;
-    if( opt_mode._CG && Env.ALL_PARM == this ) return Type.XSCALAR;
     return _t.simple_ptr();
   }
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
@@ -88,7 +82,6 @@ public class ConNode<T extends Type> extends Node {
     if( this==o ) return true;
     if( !(o instanceof ConNode) ) return false;
     ConNode con = (ConNode)o;
-    if( this== Env.ALL_CTRL || con == Env.ALL_CTRL ) return false; // Only equal to itself
     if( this== Env.ALL_PARM || con == Env.ALL_PARM ) return false; // Only equal to itself
     if( this== Env.ALL_CALL || con == Env.ALL_CALL ) return false; // Only equal to itself
     if( _t==Type.XNIL && con._t==Type.XNIL /*&& tvar()!=con.tvar()*/ )

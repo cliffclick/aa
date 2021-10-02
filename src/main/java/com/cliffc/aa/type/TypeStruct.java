@@ -43,6 +43,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
 public class TypeStruct extends TypeObj<TypeStruct> {
   public boolean _open;   // Extra fields are treated as ALL (or ANY)
   public boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
+  private short _max_arg; // Max field number
   // The fields indexed by field name.  Effectively final.  Public iterator, but private.
   private final IdentityHashMap<String,TypeFld> _flds = new IdentityHashMap<>();
 
@@ -51,6 +52,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     _open  = open;
     _hash = 0;                  // No hash, as fields are changing
     _flds.clear();              // No leftover fields from pool
+    _max_arg = DSP_IDX;         // Min of the max
     return this;
   }
 
@@ -60,9 +62,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // We can count on the field names and accesses but not field order, nor field type.
   @Override public int compute_hash() {
     int hash = super.compute_hash() +(_open?1023:0);
-    for( TypeFld fld : _flds.values() )
+    for( TypeFld fld : _flds.values() ) {
       // Can depend on the field name and access, but NOT the type - because recursion
       hash ^= (fld._fld.hashCode() + fld._access.hashCode());
+      _max_arg = (short)Math.max(_max_arg,fld._order);
+    }
     if( hash==0 ) hash = super.compute_hash();
     return hash;
   }
@@ -300,6 +304,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       this==TypeMemPtr.DISPLAY || this==TypeMemPtr.DISPLAY._dual ||
       ((disp=_flds.get("^"))!=null && disp.is_display_ptr());
   }
+  public int nargs() { return _max_arg+1; }
 
   // The lattice extreme values
   public  static final TypeStruct ANYSTRUCT = make("",true ,false);
@@ -653,13 +658,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // folding up.  Otherwise unrelated types might expand endlessly.
     TypeFunPtr nt = OLD2APX.get(old);
     if( nt != null ) return ufind(nt);
-    if( old._disp==Type.ANY )
+    if( old._dsp==Type.ANY )
        return old; // no ufind because its old
 
     // Walk internal structure, meeting into the approximation
     TypeFunPtr nmp = old.copy();
     OLD2APX.put(old,nmp);
-    nmp._disp = ax_impl_ptr(alias,cutoff,cutoffs,d,dold,(TypeMemPtr)old._disp);
+    nmp._dsp = ax_impl_ptr(alias,cutoff,cutoffs,d,dold,(TypeMemPtr)old._dsp);
     OLD2APX.put(old,null);      // Do not keep sharing the "tails"
     return nmp;
   }
@@ -689,7 +694,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       TypeFunPtr optr = (TypeFunPtr)old;
       nptr._fidxs = nptr._fidxs.meet(optr._fidxs);
       // While structs normally meet, function args *join*, although the return still meets.
-      nptr._disp = ax_meet(bs,nptr._disp,optr._disp);
+      nptr._dsp = ax_meet(bs,nptr._dsp,optr._dsp);
       break;
     }
     case TMEMPTR: {
@@ -782,10 +787,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
           break;
         case TFUNPTR:           // Update TypeFunPtr internal field
           TypeFunPtr tfptr = (TypeFunPtr)t0;
-          Type t6 = tfptr._disp;
+          Type t6 = tfptr._dsp;
           Type t7 = ufind(t6);
           if( t6 != t7 ) {
-            tfptr._disp = t7;
+            tfptr._dsp = t7;
             progress |= post_mod(tfptr);
             if( !t7.interned() ) reaches.push(t7);
           }
@@ -864,9 +869,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     while( idx < work._len ) {
       Type t = work.at(idx++);
       switch( t._type ) {
-      case TMEMPTR:  push(work, ((TypeMemPtr)t)._obj ); break;
-      case TFUNPTR:  push(work, ((TypeFunPtr)t)._disp); break;
-      case TFLD   :  push(work, ((TypeFld   )t)._t   ); break;
+      case TMEMPTR:  push(work, ((TypeMemPtr)t)._obj); break;
+      case TFUNPTR:  push(work, ((TypeFunPtr)t)._dsp); break;
+      case TFLD   :  push(work, ((TypeFld   )t)._t  ); break;
       case TSTRUCT:  for( TypeFld tf : ((TypeStruct)t)._flds.values() ) push(work, tf); break;
       default: break;
       }
@@ -929,9 +934,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
     CSTACK.push(t);              // Push on stack, in case a cycle is found
     switch( t._type ) {
-    case TMEMPTR: get_cyclic(((TypeMemPtr)t)._obj ); break;
-    case TFUNPTR: get_cyclic(((TypeFunPtr)t)._disp); break;
-    case TFLD   : get_cyclic(((TypeFld   )t)._t   ); break;
+    case TMEMPTR: get_cyclic(((TypeMemPtr)t)._obj); break;
+    case TFUNPTR: get_cyclic(((TypeFunPtr)t)._dsp); break;
+    case TFLD   : get_cyclic(((TypeFld   )t)._t  ); break;
     case TSTRUCT: CVISIT.set(t._uid); for( TypeFld fld : ((TypeStruct)t)._flds.values() ) get_cyclic(fld); break;
     default: break;
     }
@@ -1005,7 +1010,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Visit all dull pointers and recursively collect
     for( TypeFld fld : ((TypeStruct)t).flds() ) {
       Type tt = fld._t;
-      if( tt instanceof TypeFunPtr ) tt = ((TypeFunPtr)tt)._disp;
+      if( tt instanceof TypeFunPtr ) tt = ((TypeFunPtr)tt)._dsp;
       if( tt instanceof TypeMemPtr )
         _dull(mem,(TypeMemPtr)tt,dull_cache);
     }
@@ -1052,8 +1057,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         fld.setX(_sharp(mem,((TypeMemPtr)fld._t),dull_cache));
       if( fld._t instanceof TypeFunPtr ) {
         TypeFunPtr tf = (TypeFunPtr) fld._t;
-        if( tf._disp instanceof TypeMemPtr ) { // Need  a pointer to sharpen
-          TypeMemPtr dptr3 = _sharp(mem, (TypeMemPtr) tf._disp, dull_cache);
+        // TODO: Sharpen ret as well
+        if( tf._dsp instanceof TypeMemPtr ) { // Need  a pointer to sharpen
+          TypeMemPtr dptr3 = _sharp(mem, (TypeMemPtr) tf._dsp, dull_cache);
           fld.setX(dptr3.interned()             // Sharp return?
                    ? tf.make_from(dptr3)        // Make sharp TFP field
                    : tf._sharpen_clone(dptr3)); // Make dull  TFP field

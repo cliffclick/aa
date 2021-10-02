@@ -262,7 +262,7 @@ public class LoadNode extends Node {
     Type tfld = get_fld(tobj);
     TypeFunPtr tfp;
     if( tfld instanceof TypeFunPtr &&
-        (tfp=(TypeFunPtr)tfld)._disp!=TypeMemPtr.NO_DISP && // Display not alive
+        (tfp=(TypeFunPtr)tfld)._dsp!=TypeMemPtr.NO_DISP && // Display not alive
         err(true)==null &&
         _live.live_no_disp() )
       tfld = tfp.make_no_disp();

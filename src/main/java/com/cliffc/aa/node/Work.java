@@ -17,6 +17,7 @@ public abstract class Work implements Function<Node,Node> {
     if( n!=null && !_on.tset(n._uid) ) _work.push(n);
     return n;
   }
+  public void add(Ary<Node> ns) { for( Node n : ns )  add(n); }
   public void add(UQNodes uq) {  if( uq!=null ) for( Node n : uq.values() )  add(n); }
   public abstract Node apply(Node n);
 

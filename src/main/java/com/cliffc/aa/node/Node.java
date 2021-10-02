@@ -368,7 +368,7 @@ public abstract class Node implements Cloneable {
     Node prior = null;
     for( int i=nodes._len-1; i>=0; i-- ) {
       Node n = nodes.at(i);
-      if( !(n._uid <= Env.ALL_CTRL._uid || !n.is_prim() || prims) )
+      if( n.is_prim() && !prims )
         continue;               // Visited, but do not print
       // Add a nl after the last of a multi-tail sequence.
       if( (prior != null && prior.is_multi_tail() && !n.is_multi_tail()) ||
@@ -468,6 +468,8 @@ public abstract class Node implements Cloneable {
     if( nval!=oval ) {
       _val = nval;
       Env.GVN.add_flow_uses(this); // Put uses on worklist... values flows downhill
+      if( !may_be_con_live(oval) && may_be_con_live(nval) )
+        Env.GVN.add_flow_defs(this); // If computing a constant
     }
     return nval;
   }
@@ -771,6 +773,7 @@ public void combo_unify(Work work) {
     // Walk reachable graph
     for( Node use : _uses )                   use.walk_initype(work);
     for( Node def : _defs ) if( def != null ) def.walk_initype(work);
+    if( this instanceof FreshNode ) ((FreshNode)this).id().tvar().push_dep(this);
   }
 
   // Reset
@@ -786,8 +789,8 @@ public void combo_unify(Work work) {
     for( Node use : _uses )                   use.walk_reset(work);
     for( Node def : _defs ) if( def != null ) def.walk_reset(work);
     if( this instanceof CallNode ) ((CallNode)this)._not_resolved_by_gcp = false; // Try again
-    if( this instanceof FunNode || this instanceof ParmNode ) {
-      while( len()>1 && in(len()-1)._uid >= Node._INIT0_CNT ) pop(); // Kill wired primitive inputs
+    if( this instanceof RegionNode || this instanceof PhiNode ) {
+      while( len()>1 && !in(len()-1).is_prim() ) pop(); // Kill wired primitive inputs
     }
   }
 
@@ -900,7 +903,7 @@ public void combo_unify(Work work) {
     TypeFunPtr tfp;
     if( val instanceof TypeFunPtr &&
         _live.live_no_disp() &&
-        (tfp=(TypeFunPtr)val)._disp!=TypeMemPtr.NO_DISP )
+        (tfp=(TypeFunPtr)val)._dsp!=TypeMemPtr.NO_DISP )
       val = tfp.make_no_disp();
     if( should_con(val) )
       subsume(con(val)).xliv(GVNGCM.Mode.Opto);

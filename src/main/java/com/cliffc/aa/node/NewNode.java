@@ -158,6 +158,9 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     return nnn;
   }
 
+  // Freeing a dead alias requires an (expensive) touch of everybody holding on
+  // to a mapping for the old alias (all TypeMems), but it allows the alias to
+  // be immediately recycled.
   void free() {
     if( Env.DEFMEM.len() > _alias ) {
       Env.DEFMEM.set_def(_alias, null);
@@ -177,13 +180,17 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   public static abstract class NewPrimNode<T extends TypeObj<T>> extends NewNode<T> {
     public final String _name;    // Unique library call name
     final TypeFunSig _sig;        // Arguments
+    final TypeFunPtr _tfp;        // Fidx, nargs, return
     final boolean _reads;         // Reads old memory (all of these ops *make* new memory, none *write* old memory)
     final int _op_prec;
-    NewPrimNode(byte op, int parent_alias, T to, String name, boolean reads, int op_prec, TypeFld... args) {
+    NewPrimNode(byte op, int parent_alias, T to, String name, boolean reads, Type ret, int op_prec, TypeFld... args) {
       super(op,parent_alias,to);
       _name = name;
       _reads = reads;
-      _sig = TypeFunSig.make(TypeStruct.make(args),TypeTuple.RET);
+      TypeStruct formals = TypeStruct.make(args);
+      _sig = TypeFunSig.make(formals,TypeTuple.RET);
+      int fidx = BitsFun.new_fidx();
+      _tfp=TypeFunPtr.make(BitsFun.make0(fidx),formals.nargs(),TypeMemPtr.NO_DISP,ret);
       assert (reads == (_sig._formals.fld_find(" mem")._t!=TypeMem.ALLMEM)); // If reading, then memory has some requirements
       _op_prec = op_prec;
     }

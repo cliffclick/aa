@@ -677,7 +677,7 @@ public class TestApprox {
     // args known post-parse but not pre-parse.
     TypeStruct tfp0_args = TypeStruct.make("", true, false, TypeMemPtr.DISP_FLD);
 
-    TypeFunPtr tfp0 = TypeFunPtr.make(BitsFun.ANY,2,TypeFunPtr.DISP.simple_ptr()); // fib with generic display
+    TypeFunPtr tfp0 = TypeFunPtr.make(BitsFun.ANY,2,TypeFunPtr.DISP.simple_ptr(),Type.SCALAR); // fib with generic display
     TypeStruct dsp0 = TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("fib",tfp0));// The display with weak fib-type
     TypeMemPtr ptr0 = TypeMemPtr.make(alias,dsp0);
     // Args for a strong fib: { ^:ptr0 x:int64 -> ~Scalar } // LOW
@@ -685,7 +685,7 @@ public class TestApprox {
                                       TypeFld.make("^",ptr0.simple_ptr()),
                                       TypeFld.make("x",TypeInt.INT64));
 
-    TypeFunPtr tfp1 = TypeFunPtr.make(fidxs,2,ptr0.simple_ptr()); // FIB with weak display
+    TypeFunPtr tfp1 = TypeFunPtr.make(fidxs,2,ptr0.simple_ptr(),Type.SCALAR); // FIB with weak display
     TypeStruct dsp1 = TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("fib",tfp1)); // Display with stronger FIB-type
     TypeMemPtr ptr1 = TypeMemPtr.make(alias,dsp1);
     // Args for a strong fib: { ^:ptr x:int -> ~Scalar } // LOW.  Display still not recursive.
@@ -693,7 +693,7 @@ public class TestApprox {
                                       TypeFld.make("^",ptr1.simple_ptr()),
                                       TypeFld.make("x",TypeInt.INT64));
 
-    TypeFunPtr tfp2 = TypeFunPtr.make(fidxs,2,ptr1.simple_ptr()); // fib2->dsp1->fib1->dsp0->fib0->generic_display
+    TypeFunPtr tfp2 = TypeFunPtr.make(fidxs,2,ptr1.simple_ptr(),Type.SCALAR); // fib2->dsp1->fib1->dsp0->fib0->generic_display
     TypeStruct dsp2 = TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("fib",tfp2)); // dsp2->fib2->dsp1->fib1->dsp0->fib0->generic_display
 
     // The approx that gets built: fib3->dsp3->fib3->dsp3->...
@@ -703,7 +703,7 @@ public class TestApprox {
     TypeStruct arg3 = TypeStruct.make(TypeFld.make("->",Type.SCALAR),
                                       TypeFld.make("^",ptr3.simple_ptr()),
                                       TypeFld.make("x",TypeInt.INT64));
-    TypeFunPtr tfp3 = TypeFunPtr.make(fidxs,2,ptr3.simple_ptr());
+    TypeFunPtr tfp3 = TypeFunPtr.make(fidxs,2,ptr3.simple_ptr(),Type.SCALAR);
     dsp3.fld_find("^").setX(TypeMemPtr.DISPLAY_PTR);
     dsp3.fld_find("fib").setX(tfp3);
     Type.RECURSIVE_MEET--;

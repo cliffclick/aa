@@ -2,9 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV2;
-import com.cliffc.aa.type.BitsFun;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFunPtr;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
 import java.util.Arrays;
@@ -25,7 +23,7 @@ public class UnresolvedNode extends UnOrFunPtrNode {
   }
   @Override public Node ideal_reduce() {
     if( _defs._len < 2 )               // One function, consumer should treat as a copy
-      throw com.cliffc.aa.AA.unimpl(); // Should collapse
+      return in(0);                    // Collapse
     // Back-to-back Unresolved collapse (happens due to inlining)
     boolean progress=false;
     for( int i=0; i<_defs._len; i++ ) {
@@ -37,6 +35,9 @@ public class UnresolvedNode extends UnOrFunPtrNode {
           add_def(u.in(j));
         set_def(i,pop());
       }
+      assert in(i) instanceof FunPtrNode;
+      if( in(i).in(0)==null )
+        { progress = true; remove(i--); }
     }
     return progress ? this : null;
   }
@@ -60,22 +61,25 @@ public class UnresolvedNode extends UnOrFunPtrNode {
       // If all inputs are TFPs, result is a high choice of TFPs, plus the
       // normal join over displays.
       BitsFun fidxs = BitsFun.EMPTY;
-      Type tdsp = Type.ALL;
+      Type tdsp = Type.ALL, tret = Type.ALL;
       int nargs = -1;
       for( Node fptr : _defs ) {
         Type td = fptr._val;
         if( !(td instanceof TypeFunPtr) ) return td.oob();
         TypeFunPtr tfp = (TypeFunPtr)td;
         fidxs = fidxs.meet((tfp.above_center() ? tfp.dual() : tfp)._fidxs);
-        tdsp = tdsp.join(tfp._disp);
+        tdsp = tdsp.join(tfp._dsp);
+        tret = tret.join(tfp._ret);
         nargs = tfp._nargs;
       }
-      return TypeFunPtr.make(fidxs.dual(),nargs,tdsp);
+      if( fidxs.abit()!= -1 )
+        return TypeFunPtr.make(fidxs,nargs,tdsp,tret);
+      return TypeFunPtr.make(fidxs.dual(),nargs,tdsp,tret);
     default: throw com.cliffc.aa.AA.unimpl();
     }
   }
 
-  // An Unresolved is its own Leaf, because it might gather fairly unrelated
+  // An UnresolvedNode is its own Leaf, because it might gather fairly unrelated
   // functions - such as integer-add vs string-add, or the 1-argument leading
   // '+' operator vs the more expected binop.
   @Override public boolean unify( Work work ) {

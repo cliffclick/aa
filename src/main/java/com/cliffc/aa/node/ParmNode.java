@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFld;
 
@@ -48,8 +49,9 @@ public class ParmNode extends PhiNode {
       return in(0).is_copy(_idx); // Dying, or thunks
     FunNode fun = fun();
     if( fun._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
+    if( len()==1 ) return null;
     assert fun._defs._len==_defs._len;
-    if( fun.in(0)!=null )       // FunNode is a Copy
+    if( fun.is_copy(0)!=null )       // FunNode is a Copy
       return in(1)==this ? Env.ANY : in(1);             // So return the copy
     // Do not otherwise fold away, as this lets Nodes in *this* function depend
     // on values in some other function... which, if code-split, gets confused
@@ -64,20 +66,45 @@ public class ParmNode extends PhiNode {
     Node in0 = in(0);
     if( in0 instanceof ThunkNode ) return val(1);
     if( !(in0 instanceof FunNode) )  return ctl.oob();
-    // If unknown callers, then always the default value because some unknown
-    // caller can be that bad.  During & after GCP all unknown callers are
-    // accounted for.
     FunNode fun = (FunNode)in0;
-    if( !opt_mode._CG && (fun.has_unknown_callers() || fun.is_prim()) ) {
-      TypeFld fld = fun._sig._formals.fld_find(_name);
-      if( _idx!=MEM_IDX && fld != null ) return fld._t.simple_ptr();
-      return len()==1 ? _t : val(1);
-    }
     if( fun.len()!=len() ) return Type.ALL; // Collapsing
-    Node mem = fun.parm(MEM_IDX);
-    // All callers' known; merge the wired & flowing ones
+
+    // If using a primitive, trust the signature.  The primitive is always "as-if" called
+    // by the most conservative caller, and it pessimizes already.
+    if( is_prim() && fun.is_unknown_alive() ) {
+      TypeFld fld = fun._sig._formals.fld_find(_name);
+      if( fld != null )  return fld._t.simple_ptr();
+      // Else take 1st arg
+    }
+    // If pre-Call-Graph, assume the value will be exported externally and thus
+    // called by the most conservative caller.  The default input already pessimizes.
+    if( !opt_mode._CG ) {
+      return _defs._len <=1 ? _t : val(1);
+    }
+
+    // If we have a Call Graph, then we merge all the normal input paths.  If
+    // we are also exporting, the export path is lifted by the H-M typing which
+    // is not known for a while.  During Opto, treat Leafs as ~Scalars; post
+    // Opto no more lifting will occur and Leafs are treated as Scalars.
     Type t = Type.ANY;
-    for( int i=1; i<_defs._len; i++ ) {
+    Node mem = fun.parm(MEM_IDX);
+    int i=1;
+    // Lift by HM
+    if( fun.has_unknown_callers() ) {
+      i = 2;
+      if( fun.is_unknown_alive() ) {
+        assert fun.val(1) == Type.CTRL || fun.val(1) == Type.ANY;
+        t = mem == null ? val(1) : in(1).sharptr(mem.in(1));
+        if( _tvar != null ) {
+          TV2 tv = tvar();
+          Type ta = tv.as_flow(opt_mode == GVNGCM.Mode.Opto && Combo.HM_IS_HIGH);
+          t = t.join(ta);
+        }
+      }
+    }
+
+    // Merge all remaining paths
+    for( ; i<_defs._len; i++ ) {
       if( fun.val(i)==Type.XCTRL || fun.val(i)==Type.ANY ) continue; // Only meet alive paths
       // Check arg type, after sharpening
       Type ta = mem == null ? val(i) : in(i).sharptr(mem.in(i));

@@ -20,7 +20,8 @@ import static com.cliffc.aa.AA.*;
 //
 public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
-  final TypeFunSig _sig;        // Argument types; ctrl, mem, disp, normal args, plus return
+  final TypeFunSig _sig;        // Argument types; ctrl, mem, disp, normal args
+  final TypeFunPtr _tfp;        // FIDX, nargs, display argument, return type
   Parse[] _badargs;             // Filled in when inlined in CallNode
   byte _op_prec;                // Operator precedence, computed from table.  Generally 1-9.
   public boolean _thunk_rhs;    // Thunk (delay) right-hand-argument.
@@ -28,7 +29,9 @@ public abstract class PrimNode extends Node {
     super(OP_PRIM);
     _name = name;
     assert formals.fld_find("^")==null; // No display
-    _sig=TypeFunSig.make(formals,TypeTuple.make_ret(ret));
+    _sig=TypeFunSig.make(formals,TypeTuple.RET);
+    int fidx = BitsFun.new_fidx();
+    _tfp=TypeFunPtr.make(BitsFun.make0(fidx),formals.nargs(),TypeMemPtr.NO_DISP,ret);
     _badargs=null;
     _op_prec = -1;              // Not set yet
     _thunk_rhs=false;
@@ -127,7 +130,7 @@ public abstract class PrimNode extends Node {
     boolean progress = false;
     for( TypeFld fld : _sig._formals.flds() )
       progress |= prim_unify(tvar(fld._order),fld._t,work);
-    progress |= prim_unify(tvar(),_sig._ret.at(REZ_IDX),work);
+    progress |= prim_unify(tvar(),_tfp._ret,work);
     return progress;
   }
   private boolean prim_unify(TV2 arg, Type t, Work work) {
@@ -163,7 +166,7 @@ public abstract class PrimNode extends Node {
         if( t.above_center() ) has_high=true;
       }
     }
-    Type rez = _sig._ret.at(REZ_IDX); // Ignore control,memory from primitive
+    Type rez = _tfp._ret;
     Type rez2 = is_con ? apply(ts) : (has_high ? rez.dual() : rez);
     Types.free(ts);
     return rez2;
@@ -270,7 +273,8 @@ public abstract class PrimNode extends Node {
       Type formal = _sig.arg(ARG_IDX)._t;
       // Wrapping function will not inline if args are in-error
       assert formal.dual().isa(actual) && actual.isa(formal);
-      return actual.set_name(_sig._ret.at(REZ_IDX)._name);
+      //return actual.set_name(_sig._ret.at(REZ_IDX)._name);
+      throw unimpl(); //return actual.set_name(_name);
     }
     @Override public ErrMsg err( boolean fast ) {
       Type actual = val(ARG_IDX);
@@ -560,7 +564,7 @@ public abstract class PrimNode extends Node {
   // immediate into the operators' wrapper function, which in turn aggressively
   // inlines during parsing.
   public static class AndThen extends PrimNode {
-    private static final TypeStruct ANDTHEN = TypeStruct.make2flds("pred",Type.SCALAR,"thunk",TypeTuple.RET);
+    private static final TypeStruct ANDTHEN = TypeStruct.make2flds("pred",Type.SCALAR,"thunk",Type.SCALAR);
     // Takes a value on the LHS, and a THUNK on the RHS.
     public AndThen() { super("&&",ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
     // Expect this to inline everytime
@@ -615,7 +619,7 @@ public abstract class PrimNode extends Node {
   // immediate into the operators' wrapper function, which in turn aggressively
   // inlines during parsing.
   public static class OrElse extends PrimNode {
-    private static final TypeStruct ORELSE = TypeStruct.make2flds("pred",Type.SCALAR,"thunk",TypeTuple.RET);
+    private static final TypeStruct ORELSE = TypeStruct.make2flds("pred",Type.SCALAR,"thunk",Type.SCALAR);
     // Takes a value on the LHS, and a THUNK on the RHS.
     public OrElse() { super("||",ORELSE,Type.SCALAR); _thunk_rhs=true; }
     // Expect this to inline everytime

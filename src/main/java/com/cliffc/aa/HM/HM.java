@@ -538,7 +538,7 @@ public class HM {
       return old.arg("ret").unify(_body.find(),work) | progress;
     }
     @Override void add_hm_work(Worklist work) { throw unimpl(); }
-    @Override Type val(Worklist work) { return TypeFunPtr.make(_fidx,_args.length,Type.ANY); }
+    @Override Type val(Worklist work) { return TypeFunPtr.make(_fidx,_args.length,Type.ANY,Type.SCALAR); }
     // Ignore arguments, and return body type.  Very conservative.
     Type apply(Syntax[] args) { return _body._flow; }
     @Override void add_val_work(Syntax child, Worklist work) {
@@ -1314,7 +1314,7 @@ public class HM {
         if( is_func_input )  t2.widen_bases();
       }
       args.put("ret",t2s[t2s.length-1]);
-      return new T2("->",TypeFunPtr.make(fidxs,t2s.length-1,Type.ANY),args,false);
+      return new T2("->",TypeFunPtr.make(fidxs,t2s.length-1,Type.ANY,Type.SCALAR),args,false);
     }
     // A struct with fields
     static T2 make_struct( boolean open, BitsAlias aliases, String[] ids, T2[] flds ) {
@@ -1430,8 +1430,8 @@ public class HM {
       if( is_base() ) return _flow;
       if( is_leaf() ) return Type.SCALAR;
       if( is_err()  ) return _flow;
-      if( is_fun()  ) return TypeFunPtr.make(((TypeFunPtr)_flow)._fidxs,_args.size()-1,Type.ANY);
-      if( is_nil() ) return Type.SCALAR;
+      if( is_fun()  ) return _flow;
+      if( is_nil()  ) return Type.SCALAR;
       if( is_struct() ) {
         TypeStruct tstr = ADUPS.get(_uid);
         if( tstr==null ) {

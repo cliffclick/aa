@@ -517,7 +517,7 @@ public class HM9 {
       for( int i=0; i<_targs.length; i++ )
         if( targ(i).occurs_in_type(find()) ) work.addAll(targ(i)._deps);
     }
-    @Override Type val(Worklist work) { return TypeFunPtr.make(_fidx,_args.length,Type.ANY); }
+    @Override Type val(Worklist work) { return TypeFunPtr.make(_fidx,_args.length,Type.ANY,Type.SCALAR); }
     // Ignore arguments, and return body type.  Very conservative.
     Type apply(Syntax[] args) { return _body._flow; }
     @Override void add_val_work(Syntax child, Worklist work) {
@@ -1388,7 +1388,7 @@ public class HM9 {
       if( is_base() ) return _flow;
       if( is_leaf() ) return Type.SCALAR;
       if( is_err()  ) return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(_err));
-      if( is_fun()  ) return TypeFunPtr.make(_fidxs,_args.length-1,Type.ANY);
+      if( is_fun()  ) return _flow;
       if( is_struct() ) {
         TypeStruct tstr = ADUPS.get(_uid);
         if( tstr==null ) {

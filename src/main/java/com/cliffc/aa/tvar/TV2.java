@@ -212,7 +212,7 @@ public class TV2 {
   }
   // Make a new function
   public static TV2 make_fun(Node n, TypeFunPtr fptr, @NotNull String alloc_site) {
-    assert fptr._disp==TypeMemPtr.NO_DISP; // Just for fidxs, arg counts
+    assert fptr._dsp==TypeMemPtr.NO_DISP; // Just for fidxs, arg counts
     return new TV2("->",new NonBlockingHashMap<String,TV2>(),fptr,UQNodes.make(n),alloc_site);
   }
   public static TV2 make_fun(Node n, Type fptr, NonBlockingHashMap<String,TV2> args, @NotNull String alloc_site) {
@@ -768,7 +768,7 @@ public class TV2 {
       if( tfp._fidxs==BitsFun.FULL.dual() ) return t;
       for( int fidx : tfp._fidxs ) {
         FunNode fun = FunNode.find_fidx(fidx);
-        if( fun == null || fun.is_dead() ) continue; // Stale dead fidx
+        if( fun == null || fun.is_dead() || fun.fptr()==null ) continue; // Stale dead fidx
         if( fun.fptr().tvar().is_err() ) throw unimpl();
         Type tret = fun.ret()._val;
         tret = tret instanceof TypeTuple ? ((TypeTuple)tret).at(REZ_IDX) : tret.oob(Type.SCALAR);
@@ -846,23 +846,26 @@ public class TV2 {
   }
 
   // --------------------------------------------
-  // Recursively build a conservative flow type from an HM type.
+
+  // Recursively build a flow type from an HM type.
+  // During Opto, its  optimistic.
+  // During Iter, its pessimistic.
 
   // No function arguments, just function returns.
   static final NonBlockingHashMapLong<TypeStruct> ADUPS = new NonBlockingHashMapLong<>();
-  public Type as_flow() {
+  public Type as_flow(boolean opto) {
     assert ADUPS.isEmpty();
-    Type t = _as_flow();
+    Type t = _as_flow(opto);
     ADUPS.clear();
     return t;
   }
-  Type _as_flow() {
+  Type _as_flow(boolean opto) {
     assert !is_unified();
     if( is_base() ) return _type;
-    if( is_leaf() ) return Type.SCALAR;
+    if( is_leaf() ) return opto ? Type.XNSCALR : Type.SCALAR;
     if( is_err()  ) throw unimpl(); // return _type;
-    if( is_fun()  ) return TypeFunPtr.make(((TypeFunPtr)_type)._fidxs,_args.size()-1,Type.ANY);
-    if( is_nil() ) return Type.SCALAR;
+    if( is_fun()  ) return _type;
+    if( is_nil() ) return opto ? Type.XNSCALR : Type.SCALAR;
     if( is_struct() ) {
       TypeStruct tstr = ADUPS.get(_uid);
       if( tstr==null ) {
@@ -875,7 +878,7 @@ public class TV2 {
         ADUPS.put(_uid,tstr); // Stop cycles
         if( _args!=null )
           for( String id : _args.keySet() )
-            tstr.fld_find(id).setX(get(id)._as_flow()); // Recursive
+            tstr.fld_find(id).setX(get(id)._as_flow(opto)); // Recursive
         if( --Type.RECURSIVE_MEET == 0 )
           // Shrink / remove cycle dups.  Might make new (smaller)
           // TypeStructs, so keep RECURSIVE_MEET enabled.

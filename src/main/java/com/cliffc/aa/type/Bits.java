@@ -532,7 +532,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     int _i=-1;
     @Override public boolean hasNext() {
       if( _bits==null )
-        if( _i==-1 ) { _i=0; return true; } else return false;
+        if( _i==-1 && _con!=0 ) { _i=0; return true; } else return false;
       int idx;
       while( (idx=idx(++_i)) < _bits.length )
         if( (_bits[idx]&mask(_i)) != 0 )

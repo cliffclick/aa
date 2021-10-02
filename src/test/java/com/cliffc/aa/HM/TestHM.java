@@ -338,7 +338,7 @@ dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp "abc"))
 
   // try the worse-case expo blow-up test case from SO
   @Test public void test35() {
-    TypeFunPtr tfp  = TypeFunPtr.make(15,3,Type.ANY);
+    TypeFunPtr tfp  = TypeFunPtr.make(15,3,Type.ANY,Type.SCALAR);
     TypeMemPtr tmp0 = TypeMemPtr.make(8,make_tups(tfp ,tfp ,tfp ));
     TypeMemPtr tmp1 = TypeMemPtr.make(8,make_tups(tmp0,tmp0,tmp0));
     TypeMemPtr tmp2 = TypeMemPtr.make(8,make_tups(tmp1,tmp1,tmp1));
@@ -588,13 +588,13 @@ loop = { name cnt ->
     if( HM.DO_GCP ) {
       Type tf   = TypeMemPtr.make(BitsAlias.FULL.make(10,11),
                                   TypeStruct.make(TypeFld.NO_DISP,
-                                                  TypeFld.make("and"     ,TypeFunPtr.make(BitsFun.make0(14,17),1,TypeMemPtr.NO_DISP)),
-                                                  TypeFld.make("or"      ,TypeFunPtr.make(BitsFun.make0(15,18),1,TypeMemPtr.NO_DISP)),
-                                                  TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(16,19),2,TypeMemPtr.NO_DISP))));
+                                                  TypeFld.make("and"     ,TypeFunPtr.make(BitsFun.make0(14,17),1)),
+                                                  TypeFld.make("or"      ,TypeFunPtr.make(BitsFun.make0(15,18),1)),
+                                                  TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(16,19),2))));
       Type xbool= TypeMemPtr.make(12,TypeStruct.make(TypeFld.NO_DISP,
-                                                     TypeFld.make("true", tf                                      ),
-                                                     TypeFld.make("false",tf                                      ),
-                                                     TypeFld.make("force",TypeFunPtr.make(23,1,TypeMemPtr.NO_DISP))));
+                                                     TypeFld.make("true", tf),
+                                                     TypeFld.make("false",tf),
+                                                     TypeFld.make("force",TypeFunPtr.make(BitsFun.make0(23),1))));
       TypeStruct rez = TypeStruct.make(TypeFld.NO_DISP,
                                        TypeFld.make("a", HM.DO_HM ? TypeInt.NINT8 : Type.SCALAR),
                                        TypeFld.make("b", HM.DO_HM ? TypeMemPtr.make(BitsAlias.FULL.make(13,14),TypeStruct.maket()) : Type.SCALAR),
@@ -647,10 +647,10 @@ boolSub ={b ->(if b true false)};
       // true/false=*[10,11]@{$; and=[15,19]{any }; or=[16,20]{any }; not=[17,21]{any }; thenElse=[18,22]{any }}
       Type tf   = TypeMemPtr.make(BitsAlias.FULL.make(10,11),
                                   TypeStruct.make(TypeFld.NO_DISP,
-                                                  TypeFld.make("and"     ,TypeFunPtr.make(BitsFun.make0(14,18),1,TypeMemPtr.NO_DISP)),
-                                                  TypeFld.make("or"      ,TypeFunPtr.make(BitsFun.make0(15,19),1,TypeMemPtr.NO_DISP)),
-                                                  TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(16,20),1,TypeMemPtr.NO_DISP)),
-                                                  TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(17,21),2,TypeMemPtr.NO_DISP))));
+                                                  TypeFld.make("and"     ,TypeFunPtr.make(BitsFun.make0(14,18),1)),
+                                                  TypeFld.make("or"      ,TypeFunPtr.make(BitsFun.make0(15,19),1)),
+                                                  TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(16,20),1)),
+                                                  TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(17,21),2))));
       // *[12]@{^=any; true=$TF; false=$TF}
       TypeStruct rez = TypeStruct.make("",false,false,TypeFld.NO_DISP,TypeFld.make("true",tf),TypeFld.make("false",tf));
       assertEquals(TypeMemPtr.make(12,rez),syn.flow_type());
@@ -696,16 +696,16 @@ all
 
       Type tt = TypeMemPtr.make(BitsAlias.FULL.make(9),
                                 TypeStruct.make("",false,false,TypeFld.NO_DISP,
-                                                TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(14),1,TypeMemPtr.NO_DISP)),
-                                                TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(15),2,TypeMemPtr.NO_DISP))));
+                                                TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(14),1)),
+                                                TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(15),2))));
       Type ff = TypeMemPtr.make(BitsAlias.FULL.make(10),
                                 TypeStruct.make("",false,false,TypeFld.NO_DISP,
-                                                TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(16),1,TypeMemPtr.NO_DISP)),
-                                                TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(17),2,TypeMemPtr.NO_DISP))));
+                                                TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(16),1)),
+                                                TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(17),2))));
       TypeStruct rez = TypeStruct.make(TypeFld.NO_DISP,
-                                       TypeFld.make("true"   ,tt                                                     ),
-                                       TypeFld.make("false"  ,ff                                                     ),
-                                       TypeFld.make("boolSub",TypeFunPtr.make(BitsFun.make0(21),1,TypeMemPtr.NO_DISP)));
+                                       TypeFld.make("true"   ,tt),
+                                       TypeFld.make("false"  ,ff),
+                                       TypeFld.make("boolSub",TypeFunPtr.make(BitsFun.make0(21),1)));
       assertEquals(TypeMemPtr.make(11,rez),syn.flow_type());
     }
   }
@@ -843,7 +843,7 @@ all
   // Make a field holding a function pointer
   private static TypeFld mfun( String fld, int fidx ) { return mfun(fld,fidx,1); }
   private static TypeFld mfun( String fld, int fidx, int nargs ) {
-    return TypeFld.make(fld,TypeFunPtr.make(BitsFun.make0(fidx),nargs,TypeMemPtr.NO_DISP));
+    return TypeFld.make(fld,TypeFunPtr.make(BitsFun.make0(fidx),nargs));
   }
 
   // Make a boolean field, with struct fields and,or,thenElse
@@ -941,7 +941,7 @@ all
       //*[13]@{^=any; f=[15]{any }; res1=*[9,10,11,12]($); res2=$}
       assertEquals(TypeMemPtr.make(BitsAlias.make0(13),
                       TypeStruct.make(TypeFld.NO_DISP,
-                                      TypeFld.make("f",TypeFunPtr.make(BitsFun.make0(15),2,TypeMemPtr.NO_DISP)),
+                                      TypeFld.make("f",TypeFunPtr.make(BitsFun.make0(15),2)),
                                       TypeFld.make("res1",tmp9),
                                       TypeFld.make("res2",tmp9))),
                    syn.flow_type());
@@ -1015,5 +1015,39 @@ all
 
   }
 
+
+  // Poster-child collection, larger example
+  @Test public void test66() {
+    Root syn = HM.hm("""
+rand = (factor 1.2).0;
+cage = { ->
+  put = { pet ->
+    @{ put = put,
+       get = pet
+     }
+  };
+  (put 0)
+};
+cat = @{ name="Pete", purr_vol=1.2 };
+dog = @{ name="Spot", wag_rate=2.3 };
+cage1 = (cage);
+cage2 = (cage);
+catcage = (cage1.put cat);
+dogcage = (cage2.put dog);
+petcage = (if rand catcage dogcage);
+maybecat = catcage.get;
+maybedog = dogcage.get;
+maybepet = petcage.get;
+(triple (if maybecat maybecat.purr_vol 9.9)
+        (if maybedog maybedog.wag_rate 9.9)
+        (if maybepet maybepet.name "no_name")
+)
+""");
+    if( HM.DO_HM )
+      assertEquals(stripIndent("(flt64,flt64,*[4]str)"), stripIndent(syn._hmt.p()));
+    if( HM.DO_GCP )
+      assertEquals(TypeMemPtr.make(8,make_tups(TypeFlt.FLT64,TypeFlt.FLT64,TypeMemPtr.STRPTR)),syn.flow_type());
+    
+  }
 }
 

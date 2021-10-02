@@ -24,10 +24,10 @@ import static com.cliffc.aa.AA.*;
 //
 // FunNode is a RegionNode; args point to all the known callers.  Zero slot is
 // null, same as a C2 Region.  Args 1+ point to the callers control.  Before
-// GCP/opto arg 1 points to ALL_CTRL as the generic unknown worse-case caller.
-// ALL_CTRL is removed just prior to GCP, the precise call-graph is discovered,
-// and calls are directly wired to the FunNode as part of GCP.  After GCP the
-// call-graph is known precisely and is explicit in the graph.
+// GCP/opto arg 1 points to SCP_0 as the generic unknown worse-case caller.
+// This goes dead during GCP, the precise call-graph is discovered, and calls
+// are directly wired to the FunNode as part of GCP.  After GCP the call-graph
+// is known precisely and is explicit in the graph.
 //
 // FunNodes are finite in count and are unique densely numbered, see BitsFun.
 // A single function number is generally called a 'fidx' and collections 'fidxs'.
@@ -75,12 +75,12 @@ public class FunNode extends RegionNode {
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
-  public FunNode(String name,           PrimNode prim) { this(name,prim._sig,prim._op_prec,prim._thunk_rhs); }
-  public FunNode(String name,NewNode.NewPrimNode prim) { this(name,prim._sig,prim._op_prec,false); }
+  public FunNode(String name,           PrimNode prim) { this(name,prim._sig,prim._op_prec,prim._thunk_rhs,prim._tfp.fidx()); }
+  public FunNode(String name,NewNode.NewPrimNode prim) { this(name,prim._sig,prim._op_prec,false          ,prim._tfp.fidx()); }
   // Used to start an anonymous function in the Parser
   public FunNode(TypeStruct formals) { this(null,TypeFunSig.make(formals,TypeTuple.RET),-1,false); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.EMPTY,TypeTuple.RET),-2,false); add_def(Env.ALL_CTRL); }
+  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.EMPTY,TypeTuple.RET),-2,false); add_def(Env.SCP_0); }
   // Shared common constructor
   FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs ) { this(name,sig,op_prec,thunk_rhs,BitsFun.new_fidx()); }
   // Shared common constructor
@@ -185,11 +185,13 @@ public class FunNode extends RegionNode {
 
   // True if may have future unknown callers.
   boolean has_unknown_callers() {
-    return _defs._len > 1 &&
-      (in(1) == Env.ALL_CTRL ||  // Primitives, which survive a call to Parse.go
-       // User code, which does not survive a call to Parse.go
-       (in(1) instanceof CEProjNode && in(1).in(0) instanceof ScopeNode));
+    return _defs._len == 1 || in(1) instanceof ScopeNode;
   }
+  // True if this function escapes the top-level scope
+  boolean is_unknown_alive() {
+    return _defs._len==1 || (in(1) instanceof ScopeNode && ((ScopeNode)in(1)).top_escapes().test_recur(_fidx));
+  }
+
   // Formal types.
   Type formal(int idx) {
     return idx == -1 ? TypeRPC.ALL_CALL : _sig.arg(idx)._t;
@@ -208,7 +210,11 @@ public class FunNode extends RegionNode {
     RetNode ret = ret();
     if( has_unknown_callers() && ret==null && _keep==0 ) {
       assert !is_prim();
-      Env.GVN.add_flow_uses(this); // All parms can lift
+      if( _defs._len<= 1 ) return null;
+      for( Node use : _uses ) { // All parms can lift
+        Env.GVN.add_flow(use);
+        Env.GVN.add_flow_defs(use); //
+      }
       return set_def(1,Env.XCTRL);
     }
     // Backdoor hook to trigger FunPtr dropping a unused display
@@ -246,9 +252,9 @@ public class FunNode extends RegionNode {
         else if( fld._t!=Type.ALL ) // Other dead args need to keep knowledge they ever existed
           progress = progress.make_from_arg(fld.make_from(Type.ALL));
       }
-    RetNode ret = ret();
-    if( ret!=null && ret._val!=progress._ret && ret._val instanceof TypeTuple )
-      progress = progress.make_from_ret((TypeTuple)ret._val);
+    //RetNode ret = ret();
+    //if( ret!=null && ret._val!=progress._ret && ret._val instanceof TypeTuple )
+    //  progress = progress.make_from_ret((TypeTuple)ret._val);
     return progress;
   }
 
@@ -301,7 +307,7 @@ public class FunNode extends RegionNode {
     // Check for dups (already done this but failed to resolve all calls, so trying again).
     TypeStruct fformals = formals;
     if( path == -1 && FUNS.find(fun -> fun != null && !fun.is_dead() &&
-                                fun._sig._formals==fformals && fun._sig._ret == _sig._ret &&
+                                fun._sig._formals==fformals && //fun._sig._ret == _sig._ret &&
                                 fun.in(1)==in(1)) != -1 )
       return null;              // Done this before
     if( noinline() ) return null;
@@ -643,7 +649,7 @@ public class FunNode extends RegionNode {
   private FunNode make_new_fun(RetNode ret, TypeStruct new_formals, int path) {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
-    FunNode fun = new FunNode(_name,TypeFunSig.make(new_formals,_sig._ret),_op_prec,_thunk_rhs,BitsFun.new_fidx(oldfidx));
+    FunNode fun = new FunNode(_name,_sig.make_from(new_formals),_op_prec,_thunk_rhs,BitsFun.new_fidx(oldfidx));
     fun._bal_close = _bal_close;
     fun.pop();                  // Remove null added by RegionNode, will be added later
     fun.unkeep();               // Ret will clone and not construct
@@ -764,7 +770,7 @@ public class FunNode extends RegionNode {
       new_funptr.insert(old_funptr); // Make cloned recursive calls, call the old version not the new version
       TypeFunPtr ofptr = (TypeFunPtr) old_funptr._val;
       path_call.set_fdx(new_funptr); // Force new_funptr, will re-wire later
-      TypeFunPtr nfptr = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,ofptr._disp);
+      TypeFunPtr nfptr = ofptr.make_from(BitsFun.make0(newret._fidx));
       path_call._val = CallNode.set_ttfp((TypeTuple) path_call._val,nfptr);
       for( Node use : oldret._uses ) // Check extra FunPtrs are dead
         if( use instanceof FunPtrNode ) Env.GVN.add_dead(map.get(use));
@@ -778,7 +784,7 @@ public class FunNode extends RegionNode {
         ((MemSplitNode)e.getKey()).split_alias(e.getValue(),aliases);
 
     // Wired Call Handling:
-    if( has_unknown_callers() ) { // Not called by any unknown caller
+    if( zlen==2 ) {               // Not called by any unknown caller
       if( path < 0 ) {            // Type Split
         // Change the unknown caller parm types to match the new sig.  Default
         // memory includes the other half of alias splits, which might be
@@ -795,7 +801,6 @@ public class FunNode extends RegionNode {
             }
             parm.set_def(1,defx);
           }
-        fun.set_def(1,in(1).copy(true));
       } else                     // Path Split
         fun.set_def(1,Env.XCTRL);
     }
@@ -821,7 +826,7 @@ public class FunNode extends RegionNode {
       if( nn instanceof FunPtrNode ) { // FunPtrs pick up the new fidx
         TypeFunPtr ofptr = (TypeFunPtr)nt;
         if( ofptr.fidx()==oldret._fidx )
-          nt = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,ofptr._disp);
+          nt = ofptr.make_from(BitsFun.make0(newret._fidx));
       }
       nn._val = nt;             // Values
       nn._elock();              // In GVN table
@@ -905,9 +910,10 @@ public class FunNode extends RegionNode {
     // EpilogNode gets visited during GCP
     if( is_forward_ref() ) return Type.CTRL;
     if( is_prim() ) return Type.CTRL;
-    if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
     if( in(0)==this ) return _defs._len>=2 ? val(1) : Type.XCTRL; // is_copy
-    for( int i=1; i<_defs._len; i++ ) {
+    if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
+    int i = has_unknown_callers() && !is_unknown_alive() ? 2 : 1;
+    for( ; i<_defs._len; i++ ) {
       Type c = val(i);
       if( c == Type.CTRL || c == Type.ALL ) return Type.CTRL; // Valid path
     }
@@ -951,6 +957,9 @@ public class FunNode extends RegionNode {
   }
 
   @Override public boolean equals(Object o) { return this==o; } // Only one
-  @Override public Node is_copy(int idx) { return in(0)==this ? in(1) : null; }
+  @Override public Node is_copy(int idx) {
+    if( len()==1 ) return in(0); // Collapsing
+    return in(0)==this ? in(1) : null;
+  }
   void set_is_copy() { set_def(0,this); Env.GVN.add_reduce_uses(this); }
 }

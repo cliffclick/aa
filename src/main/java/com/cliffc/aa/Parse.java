@@ -757,7 +757,7 @@ public class Parse implements Comparable<Parse> {
       if( peek('}') && op != null && op.op_prec() > 0 )
         // This is a primitive operator lookup as a function constant, and
         // makes a FRESH copy like HM.Ident.
-        return gvn(new FreshNode(_e._nongen,ctrl(),op));
+        return gvn(new FreshNode(_e._nongen,op));
       _x = oldx+1;              // Back to the opening paren
       return func(); // Anonymous function
     }
@@ -863,7 +863,7 @@ public class Parse implements Comparable<Parse> {
     // or when inside of a struct definition: 'this'.
     Node parent_display = scope().ptr();
     TypeMemPtr tpar_disp = (TypeMemPtr) parent_display._val; // Just a TMP of the right alias
-    Node fresh_disp = gvn(new FreshNode(_e._nongen,ctrl(),parent_display)).keep();
+    Node fresh_disp = gvn(new FreshNode(_e._nongen,parent_display)).keep();
 
     // Incrementally build up the formals
     TypeStruct formals = TypeStruct.make("",false,true,
@@ -905,7 +905,7 @@ public class Parse implements Comparable<Parse> {
 
     try( GVNGCM.Build<Node> X = _gvn.new Build<>()) { // Nest an environment for the local vars
       // Build the FunNode header
-      FunNode fun = (FunNode)X.xform(new FunNode(formals.close()).add_def(_prims ? Env.ALL_CTRL : gvn(new CEProjNode(Env.FILE._scope))));
+      FunNode fun = (FunNode)X.xform(new FunNode(formals.close()).add_def(_prims ? Env.SCP_0 : Env.FILE._scope));
       // Record H-M VStack in case we clone
       //fun.set_nongens(_e._nongen.compact());
       // Build Parms for system incoming values
@@ -1382,7 +1382,7 @@ public class Parse implements Comparable<Parse> {
     // exists at scope up in the display.
     Env e = _e;
     Node ptr = e._scope.ptr();
-    //Node fptr = gvn(new FreshNode(e._nongen,ctrl(),ptr)); // TODO: turn on
+    ptr = gvn(new FreshNode(e._nongen,ptr)); // TODO: turn on
     Node mmem = mem();
     while( true ) {
       if( scope == e._scope ) return ptr;

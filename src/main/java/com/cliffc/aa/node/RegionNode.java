@@ -26,13 +26,10 @@ public class RegionNode extends Node {
     // Look for dead paths.  If found, cut dead path out of all Phis and this
     // Node, and return-for-progress.
     for( int i=1; i<dlen; i++ )
-      if( val(i)==Type.XCTRL && // Found dead path; cut out
-          // Remove wired dead calls into primitives, but not the guts of
-          // primitives with control flow (&&,||)
-          (!is_prim() || (this instanceof FunNode && in(i)!=Env.ALL_CTRL) ) ) {
+      if( kill_path(i) ) {
         for( Node phi : _uses )
           if( phi instanceof PhiNode )
-            phi.remove(i);
+            Env.GVN.add_flow(phi.remove(i));
         unwire(i);
         remove(i);
         if( this instanceof FunNode && _defs._len==2 && in(1).in(0) instanceof CallNode ) {
@@ -43,7 +40,7 @@ public class RegionNode extends Node {
       }
 
     if( dlen == 1 ) return null; // No live inputs; dead in value() call
-    if( in(1) == Env.ALL_CTRL ) return null; // Alive from unknown caller
+    if( this instanceof FunNode && ((FunNode)this).has_unknown_callers() ) return null; // Alive from unknown caller
     if( dlen==2 ) {                          // Exactly 1 live path
       // If only 1 live path and no Phis then return 1 live path.
       for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;
@@ -71,6 +68,18 @@ public class RegionNode extends Node {
 
     return null;
   }
+  private boolean kill_path(int i) {
+    if( val(i)==Type.XCTRL && // Found dead path; cut out
+        // Remove wired dead calls into primitives, but not the guts of
+        // primitives with control flow (&&,||)
+        (!is_prim() || in(i)!=Env.SCP_0 ) )
+      return true;
+    // The unknown-caller path cannot be taken
+    if( in(i) instanceof ScopeNode && !((FunNode)this).is_unknown_alive() )
+      return true;
+    return false;
+  }
+
   @Override public void add_work_def_extra(Work work, Node chg) {
     if( chg.is_CFG() ) {           // If losing an extra CFG user
       for( Node use : _uses )

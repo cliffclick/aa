@@ -46,7 +46,6 @@ public class Env implements AutoCloseable {
   public static      ConNode XCTRL; // Always dead control
   public static      ConNode XNIL;  // Default 0
   public static      ConNode XUSE;  // Unused objects (dead displays)
-  public static      ConNode ALL_CTRL; // Default control
   public static      ConNode ALL_PARM; // Default parameter
   public static      ConNode ALL_CALL; // Common during function call construction
 
@@ -67,15 +66,13 @@ public class Env implements AutoCloseable {
 
 
   static {
-    // Top-level default values; ALL_CTRL is used by declared functions to
-    // indicate that future not-yet-parsed code may call the function.
+    // Top-level or common default values
     START   = GVN.init (new StartNode());
     ANY     = GVN.xform(new ConNode<>(Type.ANY   )).keep();
     ALL     = GVN.xform(new ConNode<>(Type.ALL   )).keep();
     XCTRL   = GVN.xform(new ConNode<>(Type.XCTRL )).keep();
     XNIL    = GVN.xform(new ConNode<>(Type.XNIL  )).keep();
     XUSE    = GVN.xform(new ConNode<>(TypeObj.UNUSED)).keep();
-    ALL_CTRL= GVN.xform(new ConNode<>(Type.CTRL  )).keep();
     ALL_PARM= GVN.xform(new ConNode<>(Type.SCALAR)).keep();
     ALL_CALL= GVN.xform(new ConNode<>(TypeRPC.ALL_CALL)).keep();
     // Initial control & memory
@@ -207,7 +204,7 @@ public class Env implements AutoCloseable {
 
   // Reset all global statics for the next parse.  Useful during testing when
   // many top-level parses happen in a row.
-  static void top_reset() {
+  public static void top_reset() {
     // Kill all extra objects hooked by DEFMEM.
     while( DEFMEM.len() > DEFMEM_RESET.length ) DEFMEM.pop();
     for( int i=0; i<DEFMEM_RESET.length; i++ )
@@ -271,7 +268,7 @@ public class Env implements AutoCloseable {
       if( n != null && n.op_prec() > 0 ) { // First name found will return
         UnOrFunPtrNode m = n.filter(1);    // Filter down to 1 arg
         if( m!=null )
-          return m;
+          return (UnOrFunPtrNode)Env.GVN.xform(new FreshNode(_nongen,m));
       }
     }
     return null;
@@ -284,7 +281,7 @@ public class Env implements AutoCloseable {
       if( n != null && n.op_prec() > 0 ) { // First name found will return
         UnOrFunPtrNode m = n.filter(2);    // Filter down to 2 args
         if( m!=null )
-          return m;
+          return (UnOrFunPtrNode)Env.GVN.xform(new FreshNode(_nongen,m));
       }
     }
     return null;

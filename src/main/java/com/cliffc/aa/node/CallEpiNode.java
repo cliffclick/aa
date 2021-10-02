@@ -152,7 +152,7 @@ public final class CallEpiNode extends Node {
     // Check that function return memory and post-call memory are compatible
     if( !(_val instanceof TypeTuple) ) return null;
     Type selfmem = ((TypeTuple) _val).at(MEM_IDX);
-    if( !rmem._val.isa( selfmem ) && call.is_pure_call()==null )
+    if( !rmem._val.isa( selfmem ) /*&& call.is_pure_call()==null*/ )
       return null;
 
     // Check for zero-op body (id function)
@@ -381,7 +381,7 @@ public final class CallEpiNode extends Node {
 
   static BitsAlias esc_out( TypeMem tmem, Type trez ) {
     if( trez == Type.XNIL || trez == Type.NIL ) return BitsAlias.EMPTY;
-    if( trez instanceof TypeFunPtr ) trez = ((TypeFunPtr)trez)._disp;
+    if( trez instanceof TypeFunPtr ) trez = ((TypeFunPtr)trez)._dsp;
     if( trez instanceof TypeMemPtr )
       return tmem.all_reaching_aliases(((TypeMemPtr)trez)._aliases);
     return TypeMemPtr.OOP0.dual().isa(trez) ? BitsAlias.NZERO : BitsAlias.EMPTY;
@@ -414,7 +414,7 @@ public final class CallEpiNode extends Node {
 
     // Fast cutout for empty aliases
     if( esc_in ==BitsAlias.EMPTY && esc_out==BitsAlias.EMPTY )
-      return caller_mem;        // Not joining with DEFMEM
+      return defmem==null ? caller_mem : (TypeMem)caller_mem.join(defmem);
 
     // TODO: Wildly inefficient, but perhaps not all that common
     TypeObj[] pubs = new TypeObj[len];

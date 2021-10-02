@@ -10,8 +10,8 @@ import static com.cliffc.aa.AA.ARG_IDX;
 // Allocates a TypeAry in memory.  Takes in the size and initial element value
 // produces the pointer.  Hence liveness is odd.
 abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
-  public NewAryNode( TypeAry tary, String name, int op_prec,TypeInt sz ) {
-    super(OP_NEWARY,BitsAlias.AARY,tary,name,false,op_prec,TypeFld.MEM,TypeFld.make("len",sz,ARG_IDX));
+  public NewAryNode( TypeAry tary, String name, int op_prec, TypeInt sz ) {
+    super(OP_NEWARY,BitsAlias.AARY,tary,name,false,TypeAry.ARY,op_prec,TypeFld.MEM,TypeFld.make("len",sz,ARG_IDX));
   }
   @Override TypeAry dead_type() { return TypeAry.ARY.dual(); }
 

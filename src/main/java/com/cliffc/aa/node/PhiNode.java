@@ -13,10 +13,11 @@ public class PhiNode extends Node {
     if( t instanceof TypeMem ) _t = TypeMem.ALLMEM;
     else if( t instanceof TypeObj ) _t = TypeObj.OBJ; // Need to check liveness
     else if( t instanceof TypeFunPtr ) _t = TypeFunPtr.GENERIC_FUNPTR;
+    else if( t instanceof TypeRPC ) _t = TypeRPC.ALL_CALL;
     else _t = Type.SCALAR;
     _badgc = badgc;
     _live = all_live();         // Recompute starting live after setting t
-    if( t instanceof TypeMem ) _tvar=null;  // No HM for memory
+    if( t instanceof TypeMem || t instanceof TypeRPC ) _tvar=null;  // No HM for memory
   }
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
   @Override public boolean is_mem() { return _t==TypeMem.ALLMEM; }
@@ -35,9 +36,10 @@ public class PhiNode extends Node {
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
     if( r._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
-    if( r._defs.len() > 1 &&  r.in(1) == Env.ALL_CTRL ) return null;
-    if( r instanceof FunNode && ((FunNode)r).noinline() )
-      return null; // Do not start peeling apart parameters to a no-inline function
+    if( r instanceof FunNode ) {
+      if( ((FunNode)r).has_unknown_callers() ) return null; // Still finding incoming edges
+      if( ((FunNode)r).noinline() )  return null; // Do not start peeling apart parameters to a no-inline function
+    }
     // If only 1 unique live input, return that
     Node live=null;
     for( int i=1; i<_defs._len; i++ ) {
@@ -70,7 +72,7 @@ public class PhiNode extends Node {
 
 
   @Override public TV2 new_tvar(String alloc_site) {
-    return _t instanceof TypeMem ? null : super.new_tvar(alloc_site);
+    return _t instanceof TypeMem || _t instanceof TypeRPC ? null : super.new_tvar(alloc_site);
   }
   // All inputs unify
   @Override public boolean unify( Work work ) {
@@ -89,7 +91,7 @@ public class PhiNode extends Node {
 
   @Override BitsAlias escapees() { return BitsAlias.FULL; }
   @Override public TypeMem all_live() {
-    return _t==Type.SCALAR || _t instanceof TypeFunPtr ? TypeMem.LIVE_BOT : TypeMem.ALLMEM;
+    return _t==Type.SCALAR || _t instanceof TypeFunPtr || _t instanceof TypeRPC ? TypeMem.LIVE_BOT : TypeMem.ALLMEM;
   }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     Node r = in(0);

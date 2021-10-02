@@ -408,11 +408,11 @@ public class CallNode extends Node {
     if( _not_resolved_by_gcp && // If overloads not resolvable, then take them all, and we are in-error
         fidxs.above_center() && tfp!=TypeFunPtr.GENERIC_FUNPTR.dual() )
       tfp = tfp.make_from(fidxs.dual()); // Force FIDXS low (take all), and we are in-error
-    ts[DSP_IDX] = tfp._disp;
+    ts[DSP_IDX] = tfp._dsp;
 
     // Copy args for called functions.  FIDX is already refined.
     // Also gather all aliases from all args.
-    BitsAlias as = get_alias(tfp._disp);
+    BitsAlias as = get_alias(tfp._dsp);
     for( int i=ARG_IDX; i<nargs(); i++ )
       as = as.meet(get_alias(ts[i] = arg(i)==null ? Type.XSCALAR : arg(i)._val));
     // Recursively search memory for aliases; compute escaping aliases
@@ -511,7 +511,9 @@ public class CallNode extends Node {
       if( !opt_mode._CG ) return TypeMem.ESCAPE; // Prior to GCP, assume all fptrs are alive and display escapes
       // During GCP, unresolved calls might resolve & remove this use.  Keep dead till resolve fails.
       // If we have a fidx directly, use it more precisely.
-      int dfidx = def instanceof FunPtrNode ? ((FunPtrNode)def).ret()._fidx : -1;
+      int dfidx = -1;
+      FunPtrNode fptr;  RetNode ret;
+      if( def instanceof FunPtrNode && (ret=(fptr=((FunPtrNode)def)).ret())!=null ) dfidx = ret._fidx;
       return live_use_call(dfidx);
     }
     if( def==ctl() ) return TypeMem.ALIVE;
@@ -613,7 +615,7 @@ public class CallNode extends Node {
           Type formal = fld._t;
           Type actual = arg(fld._order)._val;
           if( fld.is_display_ptr() && actual instanceof TypeFunPtr )
-            actual = ((TypeFunPtr)actual)._disp;
+            actual = ((TypeFunPtr)actual)._dsp;
           if( actual==formal ) continue;
           if( fld._order <= MEM_IDX ) continue; // isBitShape not defined on memory
           if( Type.ALL==formal ) continue; // Allows even error arguments

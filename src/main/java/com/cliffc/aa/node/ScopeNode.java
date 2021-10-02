@@ -134,7 +134,11 @@ public class ScopeNode extends Node {
 
     return progress == _defs._len ? null : this;
   }
-  @Override public Type value(GVNGCM.Mode opt_mode) { return Type.ALL; }
+
+  // Produce a tuple of the return result and a summary of all escaping
+  // functions, on behalf of the following CEProjs.
+  @Override public Type value(GVNGCM.Mode opt_mode) { return Type.CTRL; }
+
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public void add_work_use_extra(Work work, Node chg) {
     if( chg==rez() )            // If the result changed
@@ -154,7 +158,7 @@ public class ScopeNode extends Node {
     // For function pointers, all memory returnable from any function is live.
     if( trez instanceof TypeFunPtr && scope != null ) {
       BitsFun fidxs = ((TypeFunPtr)trez)._fidxs;
-      Type disp = ((TypeFunPtr)trez)._disp;
+      Type disp = ((TypeFunPtr)trez)._dsp;
       BitsAlias esc_in = disp instanceof TypeMemPtr ? ((TypeMemPtr)disp)._aliases : BitsAlias.EMPTY;
       TypeMem tmem3 = TypeMem.ANYMEM;
       for( int i=RET_IDX; i<scope._defs._len; i++ ) {
@@ -202,6 +206,23 @@ public class ScopeNode extends Node {
     // Merging exit path
     return def._live;
   }
+
+  // Set of top-level escaping functions
+  public BitsFun top_escapes() {
+    if( _val.above_center() ) return BitsFun.EMPTY;
+    if( is_prim() ) return BitsFun.FULL; // All the primitives escape
+    if( !Env.GVN._opt_mode._CG ) return BitsFun.FULL; // Not run Opto yet
+    Type trez = rez()._val;
+    // TODO: CACHE
+    if( trez.above_center() ) return BitsFun.EMPTY;
+    if( TypeFunPtr.GENERIC_FUNPTR.isa(trez) ) return BitsFun.FULL; // Can lift to any function
+    Type tmem0 = mem()._val;
+    TypeMem tmem = tmem0 instanceof TypeMem ? (TypeMem)tmem0 : tmem0.oob(TypeMem.ALLMEM);
+    BitsFun fidxs = trez.all_reaching_fidxs(tmem);
+    return fidxs;
+  }
+
+
 
   @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal

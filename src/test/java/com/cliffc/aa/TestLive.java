@@ -37,7 +37,6 @@ public class TestLive {
 
   @SuppressWarnings("unchecked")
   @Test public void testNewObj() {
-    //Env env = Env.top_scope();
     GVNGCM gvn = Env.GVN;
     Node._INIT0_CNT = 1; // No prims
     // Always memory for the NewObj
@@ -71,7 +70,7 @@ public class TestLive {
     ScopeNode scope = new ScopeNode(false);
     scope.set_mem(mem);
     scope.set_rez(ptr);
-    scope._val = Type.ALL;
+    scope._val = TypeTuple.EXIT_STATE;
 
     // Check 'live' is stable on creation, except for mem & scope
     // which are 'turning around' liveness.

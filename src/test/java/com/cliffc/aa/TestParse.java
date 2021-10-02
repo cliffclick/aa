@@ -75,6 +75,8 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
+    test_obj("str(3.14)"       , TypeStr.con("3.14"));
+    test("-1",  TypeInt.con( -1));
     test("1",   TypeInt.TRUE);
     // Unary operator
     test("-1",  TypeInt.con( -1));
@@ -219,15 +221,13 @@ public class TestParse {
   @Test public void testParse02() {
     // Anonymous function definition
     test("{x -> x&1}",
-         (() -> TypeFunPtr.make(36,ARG_IDX+1, TypeMemPtr.NO_DISP)),
+         (() -> TypeFunPtr.make(29,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.BOOL)),
          ( () -> TypeFunSig.make(TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
                                                  TypeFld.make("x",Type.SCALAR,ARG_IDX)),
-                                 TypeTuple.make(Type.CTRL,
-                                                Env.SCP_0.in(1)._val,
-                                                TypeInt.BOOL)) ),
-           "[36]{ int64 -> int64 }");
+                                 TypeTuple.RET)),
+           "[29]{ int64 -> int64 }");
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
-    testerr("{x y -> x+y}", "Scalar is none of (int64,flt64,*str?)",8); // {Scalar Scalar -> Scalar}
+    testerr("{x y -> x+y}", "Scalar is none of (flt64,int64,*str?)",8); // {Scalar Scalar -> Scalar}
 
     // Function execution and result typing
     test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2)); // trivially inlined; capture external variable
@@ -242,8 +242,8 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
     testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64",9);
-    testerr("sq={x -> x*x}; sq(\"abc\")", "*\"abc\" is none of (int64,flt64)",9);
-    testerr("f0 = { f x -> f0(x-1) }; f0({_+_},2)", "Passing 1 arguments to f0 which takes 2 arguments",16);
+    testerr("sq={x -> x*x}; sq(\"abc\")", "*\"abc\" is none of (flt64,int64)",9);
+    testerr("f0 = { f x -> f0(x-1) }; f0(_+_,2)", "Passing 1 arguments to f0 which takes 2 arguments",16);
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
@@ -257,7 +257,7 @@ public class TestParse {
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
 
     // This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
-    testerr("(math.rand(1) ? {_+_} : {_*_})(2,3)","Unable to resolve call",30); // either 2+3 or 2*3, or {5,6} which is INT8.
+    testerr("(math.rand(1) ? _+_ : _*_)(2,3)","Unable to resolve call",26); // either 2+3 or 2*3, or {5,6} which is INT8.
     test("f = g = {-> 3}; f() == g();", TypeInt.TRUE);
     testerr("add = {x:int x:int -> x + x}", "Duplicate parameter name 'x'", 13);
   }
@@ -362,7 +362,7 @@ public class TestParse {
     test_obj("(1,\"abc\").1", TypeStr.ABC);
 
     // Named type variables
-    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(36),4, TypeMemPtr.NO_DISP));
+    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(36),4, TypeMemPtr.NO_DISP, null));
     test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
@@ -762,29 +762,31 @@ c= C(b,"abc");
          "[13]@{ n = 0, v = 1.2}");
 
     test("{&}",
-         (() -> TypeFunPtr.make(BitsFun.make0(35),5, TypeMemPtr.NO_DISP)),
+         (() -> TypeFunPtr.make(BitsFun.make0(35),5, TypeMemPtr.NO_DISP,TypeInt.INT64)),
          (() -> TypeFunSig.make(TypeStruct.make2flds("x",TypeInt.INT64,"y",TypeInt.INT64),
-                                TypeTuple.make_ret(TypeInt.INT64))),
+                                TypeTuple.RET)),
          "[35]{ int64 int64 -> int64 }");
 
     test("{ g -> (g,3)}",
-         (() -> TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP)),
+         (() -> TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP,
+                                // TODO: how do i express the expected return state of memory
+                                //TypeMem.make(14,TypeStruct.make2fldsD("0",Type.SCALAR,"1",TypeInt.con(3))),
+                                TypeMemPtr.make(14,TypeObj.ISUSED))),
          ( () -> TypeFunSig.make(TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
                                                  TypeFld.make("^",Type.ALL,DSP_IDX),
                                                  TypeFld.make("g",Type.SCALAR,ARG_IDX)),
-                                 TypeTuple.make(Type.CTRL,
-                                                TypeMem.make(14,TypeStruct.make2fldsD("0",Type.SCALAR,"1",TypeInt.con(3))),
-                                                TypeMemPtr.make(14,TypeObj.ISUSED)))),
+                                 TypeTuple.RET)),
          "[43]{ A -> [14]( A, 3) }");
 
     test("{ g -> f = { ignore -> g }; ( f(3), f(\"abc\"))}",
-         (() -> TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.make(12,TypeObj.ISUSED))),
+         (() -> TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.make(12,TypeObj.ISUSED),
+                                // TODO: how do i express the expected return state of memory
+                                //TypeMem.make(18,TypeStruct.make2fldsD("0",Type.SCALAR,"1",Type.SCALAR)),
+                                TypeMemPtr.make(18,TypeObj.ISUSED))),
          ( () -> TypeFunSig.make(TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
                                                  TypeFld.make("^",TypeMemPtr.make(12,TypeObj.ISUSED),DSP_IDX),
                                                  TypeFld.make("g",Type.SCALAR,ARG_IDX)),
-                                 TypeTuple.make(Type.CTRL,
-                                                TypeMem.make(18,TypeStruct.make2fldsD("0",Type.SCALAR,"1",Type.SCALAR)),
-                                                TypeMemPtr.make(18,TypeObj.ISUSED)))),
+                                 TypeTuple.RET)),
          "[43]{ A -> [18]( A, A) }");
     // id accepts and returns all types and keeps precision
     test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
@@ -812,15 +814,15 @@ c= C(b,"abc");
 
     // Straight from TestHM.test08; types as {A -> (A,A)}.
     // Function is never called, so returns the uncalled-function type.
-    test("fun={ g -> f={x -> g}; (f 3,f 1)}", TypeFunPtr.make(BitsFun.make0(46),ARG_IDX+1,Type.ANY));
+    test("fun={ g -> f={x -> g}; (f 3,f 1)}", TypeFunPtr.make(BitsFun.make0(46),ARG_IDX+1,Type.ANY,null));
     // Called with different typevars A
     test_ptr("fun={ g -> f={x -> g}; (f 3,f 1)}; (fun \"abc\",fun 3.14)",
       "(*(*\"abc\", $), *(3.14, 3.14))");
 
     // recursive unification.  Trivially types as a dead fcn ptr.
-    test_isa("x={x -> x x}",TypeFunPtr.make(BitsFun.make0(46),3,TypeMemPtr.NO_DISP));
+    test_isa("x={x -> x x}",TypeFunPtr.make(BitsFun.make0(46),3,TypeMemPtr.NO_DISP,null));
     // recursive unification.  Passing an ID to x then passes ID to ID, returning ID.
-    test_isa("x={x -> x x}; x({y->y})",TypeFunPtr.make(BitsFun.make0(47),4,TypeMemPtr.NO_DISP));
+    test_isa("x={x -> x x}; x({y->y})",TypeFunPtr.make(BitsFun.make0(47),4,TypeMemPtr.NO_DISP,null));
     // Looks like recursive unification, but x is a function of 0 arguments,
     // being called with 1 argument.  Error to call it.
     testerr("x={x x};x(1)","Passing 1 arguments to x which takes 0 arguments",9);
@@ -917,20 +919,6 @@ HashTable = {@{
       TypeFunSig actual_sig = te._sig;
       TypeFunSig expect_sig = expect_sig_maker.get();
       assertEquals(expect_sig._formals,actual_sig._formals);
-      // Do not exactly match returning memory (gets weird without HM).
-      TypeMem emem = (TypeMem)expect_sig._ret.at(MEM_IDX);
-      TypeMem amem = (TypeMem)actual_sig._ret.at(MEM_IDX);
-      Type erez = expect_sig._ret.at(REZ_IDX);
-      Type arez = actual_sig._ret.at(REZ_IDX);
-      assertEquals(erez,arez);
-      assertTrue(emem.isa(amem));
-      // Check that loading from pointers match
-      if( erez instanceof TypeMemPtr ) {
-        Type eld = emem.ld((TypeMemPtr)erez);
-        Type ald = amem.ld((TypeMemPtr)erez);
-        assertEquals(eld,ald);
-      }
-
     } else
       assert expect_sig_maker==null;
     if( Combo.DO_HM )
@@ -961,7 +949,7 @@ HashTable = {@{
     TypeEnv te = run(program);
     assertTrue(te._t instanceof TypeFunPtr);
     TypeFunPtr actual = (TypeFunPtr)te._t;
-    TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),ARG_IDX+args.length, TypeMemPtr.NO_DISP);
+    TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),ARG_IDX+args.length, TypeMemPtr.NO_DISP,null);
     assertEquals(expected,actual);
     if( te._sig._formals.is_tup() )
       for( TypeFld fld : te._sig._formals.flds() )

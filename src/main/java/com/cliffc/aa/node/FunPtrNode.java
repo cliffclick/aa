@@ -61,7 +61,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     _name = name;
     _referr = referr;
   }
-  public RetNode ret() { return (RetNode)in(0); }
+  public RetNode ret() { return in(0)==null ? null : (RetNode)in(0); }
   public Node display(){ return in(1); }
   public FunNode fun() { return ret().fun(); }
   public FunNode xfun() { RetNode ret = ret(); return ret !=null && ret.in(4) instanceof FunNode ? ret.fun() : null; }
@@ -135,7 +135,9 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
-    return TypeFunPtr.make(ret()._fidx,nargs(),display()._val);
+    RetNode ret = ret();
+    TypeTuple tret = (TypeTuple)(ret._val instanceof TypeTuple ? ret._val : ret._val.oob(TypeTuple.RET));
+    return TypeFunPtr.make(ret._fidx,nargs(),display()._val,tret.at(REZ_IDX));
   }
   @Override public void add_work_extra(Work work, Type old) {
     if( old==_live )            // live impacts value
@@ -147,7 +149,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     return !opt_mode._CG ? TypeMem.ESCAPE : super.live(opt_mode);
   }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    return def==ret() ? TypeMem.ANYMEM : (_live==TypeMem.LNO_DISP ? TypeMem.DEAD : TypeMem.ESCAPE);
+    return def==in(0) ? TypeMem.ANYMEM : (_live==TypeMem.LNO_DISP ? TypeMem.DEAD : TypeMem.ESCAPE);
   }
 
   @Override public boolean unify( Work work ) {
@@ -162,7 +164,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     boolean progress = false;
     if( !self.is_fun() ) {      // Force a function if not already
       if( work==null ) return true;
-      progress = self.unify(TV2.make_fun(ret.rez(),TypeFunPtr.make(fun._fidx,fun._sig.nargs(),TypeMemPtr.NO_DISP),"FunPtr_unify"),work);
+      progress = self.unify(TV2.make_fun(ret.rez(),((TypeFunPtr)_val).make_no_disp(),"FunPtr_unify"),work);
       self = self.find();
     }
 
@@ -215,7 +217,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   // returns a scalar.
   public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(name)).unkeep(2);
-    RetNode ret = gvn.init(new RetNode(fun,Node.con(TypeMem.MEM),Node.con(Type.SCALAR),Node.con(TypeRPC.ALL_CALL),fun)).unkeep(2);
+    RetNode ret = gvn.init(new RetNode(fun,Node.con(TypeMem.MEM),Env.ALL,Node.con(TypeRPC.ALL_CALL),fun)).unkeep(2);
     gvn.add_flow(fun);
     gvn.add_flow(ret);
     // Display is limited to any one of the current lexical scopes.
@@ -232,7 +234,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   public void merge_ref_def( String tok, FunPtrNode def, NewObjNode dsp ) {
     FunNode rfun = fun();
     FunNode dfun = def.fun();
-    assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.ALL_CTRL; // Forward ref has no callers
+    assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.SCP_0; // Forward ref has no callers
     assert dfun._defs._len==2 && dfun.in(0)==null;
     assert def ._uses._len==0;  // Def is brand new, no uses
 

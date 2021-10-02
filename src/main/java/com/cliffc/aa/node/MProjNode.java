@@ -36,7 +36,7 @@ public class MProjNode extends ProjNode {
         Type t = ct.at(_idx);
         // Break forward dead-alias cycles in recursive functions by inspecting
         // dead-ness in DefMem.
-        if( in(0) instanceof CallNode && !opt_mode._CG)
+        if( in(0) instanceof CallNode && !opt_mode._CG && !((CallNode)in(0))._is_copy )
           t = t.join(in(1)._val);
         return t;
       }

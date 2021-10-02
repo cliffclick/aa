@@ -297,7 +297,7 @@ public class TestNodeSmall {
     TypeFunPtr tmint = v(mint,gvn), tmintX = tmint.dual();
     TypeFunPtr tmflt = v(mflt,gvn), tmfltX = tmflt.dual();
 
-    TypeFunPtr tmul1E = TypeFunPtr.make(BitsFun.EMPTY,0,NO_DISP); // All bad choices
+    TypeFunPtr tmul1E = TypeFunPtr.make(BitsFun.EMPTY,0,NO_DISP,null); // All bad choices
 
     assert tadd1X.isa(tnum1X) && tnum1X.isa(tflt1X) && tflt1X.isa(tnum1) && tnum1.isa(tadd1);
 
@@ -401,7 +401,7 @@ public class TestNodeSmall {
     GVNGCM gvn = Env.GVN;
     gvn._opt_mode=GVNGCM.Mode.Parse;
 
-    UnresolvedNode fp_add = (UnresolvedNode)Env.TOP.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
+    UnresolvedNode fp_add = (UnresolvedNode)Env.TOP.lookup("_+_"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
     FunPtrNode aflt = (FunPtrNode)fp_add.in(0);
     FunPtrNode aint = (FunPtrNode)fp_add.in(1);
     FunPtrNode astr = (FunPtrNode)fp_add.in(2);
@@ -422,7 +422,7 @@ public class TestNodeSmall {
     Type f64 = TypeFlt.FLT64;
     Type scl = Type.SCALAR;
     Type abc = TypeMemPtr.ABCPTR.simple_ptr(); // Constant string
-    Type tup = TypeMemPtr.STRUCT.simple_ptr(); // Tuple pointer (always wrong
+    Type tup = TypeMemPtr.STRUCT.simple_ptr(); // Tuple pointer (always wrong)
     // All args, including duals
     Type[] targs = new Type[]{i64,i64.dual(),
                               f64,f64.dual(),
@@ -466,8 +466,12 @@ public class TestNodeSmall {
         if( key0.isa(key1) )
           assertTrue(cvals.get(key0).isa(cvals.get(key1)));
 
-
-
+    arg3.unkeep(2);
+    arg4.unkeep(2);
+    fdx.unkeep(2);
+    call.unkeep(2);
+    cepi.unhook().unhook();
+    Env.top_reset();                   // Hard reset
   }
 
   // When making a recursive function, we get a pointer cycle with the display
@@ -483,7 +487,6 @@ public class TestNodeSmall {
   // Code: "gen_ctr={cnt;{cnt++}}; ctrA=gen_ctr(); ctrB=gen_ctr(); ctrA(); ctrB(); ctrB()"
   //
   @Test public void testRecursiveDisplay() {
-    //Env top = Env.top_scope();
     GVNGCM gvn = Env.GVN;
 
     // Build the graph for the "fact" example:
@@ -505,7 +508,7 @@ public class TestNodeSmall {
     // yet built.
     NewObjNode dsp_file = (NewObjNode)gvn.xform(new NewObjNode(true,TypeMemPtr.DISPLAY,dsp_prims));
     MrgProjNode dsp_file_obj = Env.DEFMEM.make_mem_proj(dsp_file,mem);
-    ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(DSP_IDX, dsp_file));
+    ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(DSP_IDX, dsp_file)).keep();
     Env.ALL_DISPLAYS = Env.ALL_DISPLAYS.set(dsp_file._alias);
     // The Fun and Fun._tf:
     TypeStruct formals = TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
@@ -551,13 +554,23 @@ public class TestNodeSmall {
 
     // Validate cyclic display/function type
     TypeFunPtr tfptr0 = (TypeFunPtr) fptr._val;
-    Type tdptr0 = tfptr0._disp;
+    Type tdptr0 = tfptr0._dsp;
     Type tret = ((TypeTuple) ret._val).at(REZ_IDX);
     assertEquals(tdptr0,tret); // Returning the display
     // Display contains 'fact' pointing to self
     TypeMem tmem = (TypeMem) dsp_file_obj._val;
     TypeStruct tdisp0 = (TypeStruct)tmem.ld((TypeMemPtr)tdptr0);
     assertEquals(tfptr0,tdisp0.at("fact"));
+
+    // Cleanup after test
+    ctl.unkeep(2);
+    mem.unhook();
+    dsp_file_ptr.unhook();
+    env.unkeep(2).unhook();
+    fun.unhook();
+    ret.unkeep(2);
+    fptr.unkeep(2); fptr.pop(); fptr.pop();
+    Env.top_reset();                   // Hard reset
   }
 
 
@@ -584,7 +597,6 @@ public class TestNodeSmall {
 
   private static int ERR=0;
   @Test public void testMemoryArgs() {
-    //Env top = Env.top_scope();
     GVNGCM gvn = Env.GVN;
 
     // Check Parm.value calls are monotonic, and within Fun.sig bounds -
@@ -678,16 +690,17 @@ public class TestNodeSmall {
     assert targ1.simple_ptr()==targ1;
     assert targ2.simple_ptr()==targ2;
     ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
-    CallNode call = gvn.init(new CallNode(true, null, ctl, null/*mem*/, null/*disp*/, null/*x*/, null/*y*/, null/*fidx*/));
+    ConNode cmem= (ConNode)gvn.xform(new ConNode<>(TypeMem.ALLMEM));
+    CallNode call = gvn.init(new CallNode(true, null, ctl.unkeep(2), cmem, null/*fidx*/, null/*x*/, null/*y*/));
     CallEpiNode cepi = gvn.init(new CallEpiNode(call, Env.DEFMEM)); // Unwired
-    Node cpj = gvn.xform(new CProjNode(call,0));
-    ConNode mem = gvn.xform(new ConNode<>(tmem )).keep(2);
-    ConNode arg1= gvn.xform(new ConNode<>(targ1)).keep(2);
-    ConNode arg2= gvn.xform(new ConNode<>(targ2)).keep(2);
+    Node    cpj = gvn.init(new CProjNode(call.unkeep(2),0));
+    ConNode mem = gvn.init(new ConNode<>(tmem ));
+    ConNode arg1= gvn.init(new ConNode<>(targ1));
+    ConNode arg2= gvn.init(new ConNode<>(targ2));
 
     // Make nodes
     FunNode fun = new FunNode(null,tsig,-1,false).unkeep();
-    gvn.xform(fun.add_def(cpj));
+    gvn.xform(fun.add_def(cpj.unkeep(2)));
 
     ParmNode parmem= gvn.init(new ParmNode(MEM_IDX," mem",fun,mem .unkeep(2),null)).unkeep(2);
     ParmNode parm1 = gvn.init(new ParmNode(ARG_IDX,  "x" ,fun,arg1.unkeep(2),null)).unkeep(2);
@@ -707,6 +720,13 @@ public class TestNodeSmall {
     Type formal2 = fun.formal(ARG_IDX+1);
     if( !actual2.above_center() && !actual2.isa(formal2) && !formal2.isa(actual2) )
       perror("arg2-vs-formal2",actual2,formal2);
+
+    // Clean up
+    cepi.unkeep().unhook();
+    parmem.kill();
+    parm1.kill();
+    parm2.kill();
+    Env.GVN.iter_dead();
 
     // Record for later monotonic check
     return new Type[]{tpm,tp1,tp2};

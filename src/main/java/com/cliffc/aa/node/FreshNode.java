@@ -4,20 +4,20 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import static com.cliffc.aa.AA.unimpl;
 
 import java.util.Arrays;
 
 // "fresh" the incoming TVar: make a fresh instance.
 public class FreshNode extends UnOrFunPtrNode {
   TV2[] _tv2s;                  // Compacted VStack of nongen TV2s, used during "fresh"
-  public FreshNode( Env.VStack vs, Node ctrl, Node ld ) {
-     super(OP_FRESH, ctrl, ld);
-     _tv2s = vs.compact();
-     ld.tvar().push_dep(this);
+  public FreshNode( Env.VStack vs, Node ld ) {
+     super(OP_FRESH, ld);
+     _tv2s = vs.compact();      // TODO: express this during Combo reset
+     // Pushed during Combo reset on fresh vars
+     //ld.tvar().push_dep(this);
    }
 
-  Node id() { return in(1); }   // The HM identifier
+  Node id() { return in(0); }   // The HM identifier
   @Override public Node ideal_reduce() {
     if( id()==this ) return null; // Dead self-cycle
     // Remove Fresh of base type values: things that can never have structure.
@@ -29,14 +29,10 @@ public class FreshNode extends UnOrFunPtrNode {
     if( !tvar().unify(id().tvar(),null) ) // Unification progress?
      return id();
 
-    // Unwind ctrl-copy
-    Node cc = in(0).is_copy(0);
-    if( cc!=null ) return set_def(0,cc);
-
     return null;
   }
 
-  @Override public Type value(GVNGCM.Mode opt_mode) { return val(1); }
+  @Override public Type value(GVNGCM.Mode opt_mode) { return val(0); }
   @Override public void add_work_extra(Work work,Type old) {
     // Types changed, now might collapse
     if( !no_tvar_structure(old) && no_tvar_structure(_val) )
@@ -56,11 +52,11 @@ public class FreshNode extends UnOrFunPtrNode {
   }
 
   @Override public boolean unify( Work work ) {
-    return tvar(1).fresh_unify(tvar(),_tv2s,work);
+    return tvar(0).fresh_unify(tvar(),_tv2s,work);
   }
   @Override public void add_work_hm(Work work) {
-    work.add(in(1));
-    TV2 t = tvar(1);
+    work.add(in(0));
+    TV2 t = tvar(0);
     if( t.nongen_in(_tv2s) )
       t.add_deps_work(work); // recursive work.add(_deps)
   }

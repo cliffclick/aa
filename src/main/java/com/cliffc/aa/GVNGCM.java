@@ -8,6 +8,8 @@ import com.cliffc.aa.util.VBitSet;
 
 import java.util.BitSet;
 
+import static com.cliffc.aa.AA.unimpl;
+
 // Global Value Numbering, Global Code Motion
 public class GVNGCM {
 
@@ -199,12 +201,12 @@ public class GVNGCM {
   // 'iter').  Used when inlining, and the inlined body needs to acknowledge
   // bypasses aliases.  Used during code-clone, to lift the split alias parent
   // up & out.
+  private static final Work WORK_RETYPE = new Work("retype",false) { @Override public Node apply( Node n) { throw unimpl(); } };
   public static void retype_mem( BitSet aliases, Node mem, Node exit, boolean skip_calls ) {
-    Ary<Node> work = new Ary<>(new Node[1],0);
-    work.push(mem);
+    WORK_RETYPE.add(mem);
     // Update all memory ops
-    while( !work.isEmpty() ) {
-      Node wrk = work.pop();
+    while( !WORK_RETYPE.isEmpty() ) {
+      Node wrk = WORK_RETYPE.pop();
       if( !(wrk instanceof CallNode) && !wrk.is_mem() && wrk!=mem ) continue; // Not a memory Node?
       Type twrk = wrk._val;
       Type tmem0 = twrk instanceof TypeTuple ? ((TypeTuple)twrk).at(1) : twrk;
@@ -212,7 +214,7 @@ public class GVNGCM {
       if( aliases!=null && !((TypeMem)tmem0).has_used(aliases) ) continue; // Does not use the listed memory?
       if( wrk instanceof CallNode ) { // Do the CEPI for a Call, skipping in-between
         CallEpiNode cepi = ((CallNode)wrk).cepi();
-        if( cepi != null ) work.push(cepi);
+        if( cepi != null ) WORK_RETYPE.add(cepi);
       }
       Type tval = wrk.value(Env.GVN._opt_mode); // Recompute memory value
       if( twrk == tval ) continue;              // No change
@@ -227,8 +229,9 @@ public class GVNGCM {
         fun._sig = fun.re_sig();
       }
 
-      work.addAll(wrk._uses);
+      WORK_RETYPE.add(wrk._uses);
     }
+    assert Env.START.more_flow(Env.GVN._work_flow,true)==0;
   }
 
   public class Build<N extends Node> implements AutoCloseable {

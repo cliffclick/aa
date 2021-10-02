@@ -10,7 +10,7 @@ import static com.cliffc.aa.AA.*;
 // and produces the pointer.  Hence, liveness is odd.
 public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   public NewStrNode( TypeStr to, String name, boolean reads, int op_prec, TypeFld... args) {
-    super(OP_NEWSTR,BitsAlias.STR,to,name,reads,op_prec,args);
+    super(OP_NEWSTR,BitsAlias.STR,to,name,reads,TypeStr.STR,op_prec,args);
   }
 
   @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Str",this,alloc_site); }
@@ -71,24 +71,28 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       Type m   = val(MEM_IDX);
       Type sp0 = val(ARG_IDX);
       Type sp1 = val(ARG_IDX+1);
-      if( !(m instanceof TypeMem)   ) return m.oob();
-      if( sp0==Type.XNIL && sp1==Type.XNIL ) return TypeTuple.make(TypeObj.UNUSED,Type.XNIL);
-      if( !sp0.isa(TypeMemPtr.STR0) ) return _value(TypeStr.STR);
-      if( !sp1.isa(TypeMemPtr.STR0) ) return _value(TypeStr.STR);
-      if( sp0.above_center() || sp1.above_center() ) return Type.ANY;
+      if( !(m instanceof TypeMem)   ) return _value(sp0,sp1,m.oob(TypeObj.ISUSED));
+      if( sp0==Type.XNIL && sp1==Type.XNIL ) return TypeTuple.make(Type.CTRL,TypeObj.UNUSED,Type.XNIL);
+      if( sp0.above_center() || sp1.above_center() ) return _value(sp0,sp1,TypeObj.UNUSED);
+      if( !sp0.isa(TypeMemPtr.STR0.simple_ptr()) ) return _value(sp0,sp1,TypeStr.STR);
+      if( !sp1.isa(TypeMemPtr.STR0.simple_ptr()) ) return _value(sp0,sp1,TypeStr.STR);
       TypeMem mem = (TypeMem)m;
       TypeObj s0 = sp0==Type.XNIL ? TypeObj.UNUSED : mem.ld((TypeMemPtr)sp0);
       TypeObj s1 = sp1==Type.XNIL ? TypeObj.UNUSED : mem.ld((TypeMemPtr)sp1);
-      if( sp0==Type.XNIL ) return _value(s1);
-      if( sp1==Type.XNIL ) return _value(s0);
+      if( sp0==Type.XNIL ) return _value(sp0,sp1,s1);
+      if( sp1==Type.XNIL ) return _value(sp0,sp1,s0);
       if( !(s0 instanceof TypeStr) || !(s1 instanceof TypeStr) )
-        return _value(s0.above_center() && s1.above_center() ? TypeStr.XSTR : TypeStr.STR);
+        return _value(sp0,sp1,s0.above_center() && s1.above_center() ? TypeStr.XSTR : TypeStr.STR);
       TypeStr str0 = (TypeStr)s0;
       TypeStr str1 = (TypeStr)s1;
-      if( !str0.is_con() || !str1.is_con() ) return _value(TypeStr.STR);
-      return _value(TypeStr.make(false,(str0.getstr()+str1.getstr()).intern()));
+      if( !str0.is_con() || !str1.is_con() )
+        return _value(sp0,sp1,TypeStr.STR);
+      return _value(sp0,sp1,TypeStr.make(false,(str0.getstr()+str1.getstr()).intern()));
     }
-    TypeTuple _value(TypeObj tobj) { return TypeTuple.make(Type.CTRL,tobj,_tptr); }
+    TypeTuple _value(Type sp0, Type sp1, TypeObj tobj) {
+      Type tp = sp0.must_nil() && sp1.must_nil() ? _tptr.meet_nil(Type.XNIL) : _tptr;
+      return TypeTuple.make(Type.CTRL,tobj,tp);
+    }
     @Override TypeObj valueobj() { throw unimpl(); }
     @Override public byte op_prec() { return (byte)OP_PREC; }
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {

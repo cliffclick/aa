@@ -283,7 +283,7 @@ public class TestHM9 {
 
   // try the worse-case expo blow-up test case from SO
   @Test public void test35() {
-    TypeFunPtr tfp = TypeFunPtr.make(15,3,Type.ANY);
+    TypeFunPtr tfp = TypeFunPtr.make(15,3,Type.ANY,null);
     TypeMemPtr tmp0 = TypeMemPtr.make(8,TypeStruct.maket(tfp ,tfp ,tfp ));
     TypeMemPtr tmp1 = TypeMemPtr.make(8,TypeStruct.maket(tmp0,tmp0,tmp0));
     TypeMemPtr tmp2 = TypeMemPtr.make(8,TypeStruct.maket(tmp1,tmp1,tmp1));

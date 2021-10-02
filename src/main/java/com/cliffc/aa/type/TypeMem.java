@@ -371,7 +371,7 @@ public class TypeMem extends Type<TypeMem> {
         Type fld = tfld._t;
         if( TypeMemPtr.OOP.isa(fld) )
           fld = TypeMemPtr.OOP;                      // All possible pointers
-        if( fld instanceof TypeFunPtr ) fld = ((TypeFunPtr)fld)._disp;
+        if( fld instanceof TypeFunPtr ) fld = ((TypeFunPtr)fld)._dsp;
         if( !(fld instanceof TypeMemPtr) ) continue; // Not a pointer, no more aliases
         if( ((TypeMemPtr)fld)._aliases.test(1) )
           return BitsAlias.FULL; // All possible pointers
