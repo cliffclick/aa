@@ -44,7 +44,8 @@ public class IntrinsicNode extends Node {
     try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
       TypeStruct formals = TypeStruct.args(TypeMemPtr.STRUCT);
       TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(BitsAlias.RECORD_BITS,tn));
-      FunNode fun = X.init2((FunNode)new FunNode(tn._name,sig,-1,false).add_def(Env.SCP_0));
+      FunNode fun = X.init2((FunNode)new FunNode(tn._name,sig,-1,false).add_def(Env.FILE._scope));
+      assert !fun.is_prim(); // prims use Env.SCP_0 not FILE scope
       Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
       Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
       Node ptr = X.xform(new ParmNode(ARG_IDX,"x",fun,(ConNode)Node.con(TypeMemPtr.make(BitsAlias.RECORD_BITS,TypeObj.ISUSED)),badargs));
@@ -137,7 +138,8 @@ public class IntrinsicNode extends Node {
     TypeFunSig sig = TypeFunSig.make(to.remove_name(),to);
 
     try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
-      FunNode fun = (FunNode) X.xform(new FunNode(to._name,sig,-1,false).add_def(Env.SCP_0));
+      FunNode fun = (FunNode) X.xform(new FunNode(to._name,sig,-1,false).add_def(Env.FILE._scope));
+      assert !fun.is_prim(); // prims use Env.SCP_0 not FILE scope
       Node rpc = X.xform(new ParmNode(  0    ," rpc",fun,Env.ALL_CALL,null));
       Node memp= X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
       // Add input edges to the NewNode

@@ -272,9 +272,8 @@ public abstract class PrimNode extends Node {
       if( actual==Type.ANY || actual==Type.ALL ) return actual;
       Type formal = _sig.arg(ARG_IDX)._t;
       // Wrapping function will not inline if args are in-error
-      assert formal.dual().isa(actual) && actual.isa(formal);
-      //return actual.set_name(_sig._ret.at(REZ_IDX)._name);
-      throw unimpl(); //return actual.set_name(_name);
+      assert actual.isa(formal);
+      return actual.set_name(_tfp._ret._name);
     }
     @Override public ErrMsg err( boolean fast ) {
       Type actual = val(ARG_IDX);
@@ -296,7 +295,7 @@ public abstract class PrimNode extends Node {
     try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
       TypeStruct formals = TypeStruct.args(from);
       TypeFunSig sig = TypeFunSig.make(formals,to);
-      Node ctl = X.xform(new CEProjNode(Env.FILE._scope));
+      Node ctl = Env.FILE._scope;
       FunNode fun = X.init2((FunNode)new FunNode(to._name,sig,-1,false).add_def(ctl));
       Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
       Node ptr = X.xform(new ParmNode(ARG_IDX,"x",fun,(ConNode)Node.con(from),badargs));

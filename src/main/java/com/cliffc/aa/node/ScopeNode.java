@@ -139,8 +139,13 @@ public class ScopeNode extends Node {
 
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public void add_work_use_extra(Work work, Node chg) {
-    if( chg==rez() )            // If the result changed
-      GVNGCM.add_work_uses(work,this);// Then default-reachable functions changed
+    if( chg==rez() ) {                 // If the result changed
+      for( Node use : _uses ) {
+        if( use != this ) work.add(use);
+        if( use instanceof FunNode ) // If escaping functions, their parms now take the default path
+          work.add(use._uses);
+      }
+    }
   }
 
   // From a memory and a possible pointer-to-memory, find all the reachable

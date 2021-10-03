@@ -359,7 +359,7 @@ public class TestParse {
     test_obj("(1,\"abc\").1", TypeStr.ABC);
 
     // Named type variables
-    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(36),4, TypeMemPtr.NO_DISP, TypeFlt.FLT64));
+    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(29),4, TypeMemPtr.NO_DISP, TypeFlt.FLT64.set_name("gal:")));
     test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
@@ -406,13 +406,13 @@ public class TestParse {
     test("A= :@{n=A?; v=int}; A(@{n=0;v=3})","*A:@{n=0; v=3}","@{n=0,v=3}");
 
     // Missing type B is also never worked on.
-    test("A= :@{n=B?; v=int}", "[~36+37]{}","A");
+    test("A= :@{n=B?; v=int}", "[~29+73]{->*use }","A");
     test("A= :@{n=B?; v=int}; a = A(0,2)", "*A:@{n=0; v=2}","@{n=0,v=2}");
     test("A= :@{n=B?; v=int}; a = A(0,2); a.n", "0", "0");
     // Mutually recursive type
-    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", "[~40+41]{}", "A");
-    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", "[~36+37]{}", "A"); // Same test, again, using the same Type.INTERN table
-    test("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}", "[~42+43]{}", "A");
+    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", "[~76+77]{->*use }", "A");
+    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", "[~29+73]{->*use }", "A"); // Same test, again, using the same Type.INTERN table
+    test("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}", "[~78+79]{->*use }", "A");
     // Mixed ABC's, making little abc's in-between.
     test("""
 A= :@{n=B?; v=int};
@@ -426,7 +426,7 @@ c= C(b,"abc");
   }
 
   @Test public void testParse07() {
-    test("A= :@{n=A?; v=int}; f={x -> x ? A(f(x.n),x.v*x.v) : 0}", "","");
+    test("A= :@{n=A?; v=int}; f={x    -> x ? A(f(x.n),x.v*x.v) : 0}", "","");
     test("A= :@{n=A?; v=int}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}", "","");
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(_&_,2)", "0","0");

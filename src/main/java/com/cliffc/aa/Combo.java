@@ -149,6 +149,7 @@ public abstract class Combo {
         if( !fidxs.test(1) ) // If BitsFun.ALL is set, we are already in-error
           for( int fidx : fidxs ) {
             FunNode fun = FunNode.find_fidx(fidx);
+            work.add(fun);
             for( Node parm : fun._uses )
               if( parm.has_tvar() && parm.tvar().is_leaf() )
                 work.add(parm);

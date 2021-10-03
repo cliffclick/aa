@@ -456,7 +456,6 @@ public class Type<T extends Type<T>> implements Cloneable {
       if( mt.interned() ) // recursive type creation?
         mt = mt.dual();   // Force low
     }
-    if( mt.is_simple() ) n=""; // No named simple types
     if( mt._type==TOBJ ) n=""; // OBJ splits into strings (arrays) and structs, which can keep their names
 
     // Inject the name
@@ -881,7 +880,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   public Type make_from(Type head, TypeMem map, VBitSet visit) { return this; }
 
   public BitsFun all_reaching_fidxs(Type tmem) { return BitsFun.EMPTY; }
-  
+
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }
