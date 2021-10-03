@@ -290,8 +290,8 @@ public class TestNode {
     n.add_def( null  );
     n.add_def(_ins[n._defs._len]);
     if( n instanceof MemPrimNode ) n.add_def(mem);
-    if( n._sig.nargs() >= 3 )      n.add_def(_ins[n._defs._len-1]);
-    if( n._sig.nargs() >= 4 )      n.add_def(_ins[n._defs._len-1]);
+    if( n._sig._formals.nargs() >= 3 )      n.add_def(_ins[n._defs._len-1]);
+    if( n._sig._formals.nargs() >= 4 )      n.add_def(_ins[n._defs._len-1]);
     test1monotonic_init(n);
   }
   // Fill a Node with {null,edge,edge} and start the search

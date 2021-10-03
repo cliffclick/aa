@@ -59,7 +59,7 @@ public abstract class MemPrimNode extends PrimNode {
         fun._bal_close = bal_close();
         add_def(null);              // Control for the primitive in slot 0
         add_def(mem );              // Memory  for the primitive in slot 1
-        while( len() < _sig.nargs() ) add_def(null);
+        while( len() < _sig._formals.nargs() ) add_def(null);
           for( TypeFld arg : _sig._formals.flds() )
           set_def(arg._order,X.xform(new ParmNode(arg._order, arg._fld, fun, (ConNode) Node.con(arg._t.simple_ptr()), null)));
         X.xform(this);
@@ -181,7 +181,7 @@ public abstract class MemPrimNode extends PrimNode {
         fun._bal_close = bal_close();
         add_def(null);              // Control for the primitive in slot 0
         add_def(mem );              // Memory  for the primitive in slot 1
-        while( len() < _sig.nargs() ) add_def(null);
+        while( len() < _sig._formals.nargs() ) add_def(null);
         for( TypeFld arg : _sig._formals.flds() )
           set_def(arg._order,X.xform(new ParmNode(arg._order,arg._fld,fun, (ConNode)Node.con(arg._t.simple_ptr()),null)));
         // Write prims return both a value and memory.

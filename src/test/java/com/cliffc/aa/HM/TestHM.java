@@ -20,7 +20,7 @@ public class TestHM {
   }
   // Simple no-arg signature returning the type
   private static TypeFunSig tfs(Type ret) {
-    return TypeFunSig.make(TypeTuple.make_ret(ret),TypeTuple.make_args());
+    return TypeFunSig.make(TypeStruct.EMPTY,ret);
   }
 
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }

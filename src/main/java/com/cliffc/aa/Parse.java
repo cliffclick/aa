@@ -1191,7 +1191,7 @@ public class Parse implements Comparable<Parse> {
         formals = no_args_formals;
       }
       if( !peek('}') ) return null;
-      return typeq(TypeFunSig.make(formals));
+      return typeq(TypeFunSig.make(formals,ret));
     }
 
     if( peek("@{") ) {          // Struct type

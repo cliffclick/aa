@@ -76,11 +76,11 @@ public class FunNode extends RegionNode {
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
   public FunNode(String name,           PrimNode prim) { this(name,prim._sig,prim._op_prec,prim._thunk_rhs,prim._tfp.fidx()); }
-  public FunNode(String name,NewNode.NewPrimNode prim) { this(name,TypeFunSig.make(prim._formals),prim._op_prec,false,prim._tfp.fidx()); }
+  public FunNode(String name,NewNode.NewPrimNode prim) { this(name,TypeFunSig.make(prim._formals,prim._tfp._ret),prim._op_prec,false,prim._tfp.fidx()); }
   // Used to start an anonymous function in the Parser
-  public FunNode(TypeStruct formals) { this(null,TypeFunSig.make(formals),-1,false); }
+  public FunNode(TypeStruct formals) { this(null,TypeFunSig.make(formals,Type.SCALAR),-1,false); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.EMPTY),-2,false); add_def(Env.SCP_0); }
+  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.EMPTY,Type.ALL),-2,false); add_def(Env.SCP_0); }
   // Shared common constructor
   FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs ) { this(name,sig,op_prec,thunk_rhs,BitsFun.new_fidx()); }
   // Shared common constructor
@@ -196,7 +196,7 @@ public class FunNode extends RegionNode {
   Type formal(int idx) {
     return idx == -1 ? TypeRPC.ALL_CALL : _sig.arg(idx)._t;
   }
-  public int nargs() { return _sig.nargs(); }
+  public int nargs() { return formals().nargs(); }
 
   // ----
   // Graph rewriting via general inlining.  All other graph optimizations are

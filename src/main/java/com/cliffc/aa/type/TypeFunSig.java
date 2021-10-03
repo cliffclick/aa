@@ -8,30 +8,28 @@ import static com.cliffc.aa.AA.DSP_IDX;
 // Function signatures: formal arguments (and return) used to type-check.  This
 // is NOT any "code pointer" or "function index" or "fidx"; see TypeFunPtr.
 public final class TypeFunSig extends Type<TypeFunSig> {
-  public TypeStruct _formals;   // Control0, Memory1, Display2, Arg3, Arg4, ...
-  private int _max_arg;
+  public TypeStruct _formals;   // Display2, Arg3, Arg4, ... (no memory)
+  public Type _ret;             // Plain return type (no memory)
 
-  private TypeFunSig init(TypeStruct formals ) {
+  private TypeFunSig init(TypeStruct formals, Type ret ) {
     super.init(TFUNSIG,"");
     TypeFld disp=null;
     assert (disp=formals.fld_find("^")) == null || disp.is_display_ptr();
     assert formals.fld_find(" mem")==null; // No memory
     _formals=formals;
-    _max_arg = DSP_IDX;
-    for( TypeFld arg : _formals.flds() )
-      _max_arg = Math.max(_max_arg,arg._order);
+    _ret=ret;
     return this;
   }
   @Override int compute_hash() {
-    int hash=TFUNSIG + _formals._hash;
-    return hash==0 ? 3 : hash;
+    int hash=TFUNSIG + _formals._hash + _ret._hash;
+    return hash==0 ? TFUNSIG : hash;
   }
 
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeFunSig) ) return false;
     TypeFunSig tf = (TypeFunSig)o;
-    return _formals==tf._formals;
+    return _formals==tf._formals && _ret==tf._ret;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
@@ -45,30 +43,28 @@ public final class TypeFunSig extends Type<TypeFunSig> {
         arg._t.str(sb.p(':'),dups,mem,debug);
       sb.p(' ');
     }
-    return sb.p("-> }");
+    return _ret.str(sb.p("-> "),dups,mem,debug).p("}");
   }
 
   static { new Pool(TFUNSIG,new TypeFunSig()); }
-  public static TypeFunSig make( TypeStruct formals ) {
+  public static TypeFunSig make( TypeStruct formals, Type ret ) {
     TypeFunSig t1 = POOLS[TFUNSIG].malloc();
-    return t1.init(formals).hashcons_free();
+    return t1.init(formals,ret).hashcons_free();
   }
 
-  public static TypeFunSig make( Type arg1 ) { return make(TypeStruct.args(arg1)); }
-  public static TypeFunSig make( Type arg1, Type arg2 ) { return make(TypeStruct.args(arg1,arg2)); }
-  public TypeFunSig make_from( TypeStruct formals ) { return make(formals); }
-  public TypeFunSig make_from_arg( TypeFld arg ) { return make(_formals.replace_fld(arg)); }
-  public TypeFunSig make_from_remove( String fld ) { return make(_formals.del_fld(fld)); }
+  public static TypeFunSig make1( Type arg1 ) { return make(TypeStruct.args(arg1),Type.SCALAR); }
+  public static TypeFunSig make2( Type arg1, Type arg2 ) { return make(TypeStruct.args(arg1,arg2),Type.SCALAR); }
+  public TypeFunSig make_from( TypeStruct formals ) { return make(formals,_ret); }
+  public TypeFunSig make_from_arg( TypeFld arg ) { return make(_formals.replace_fld(arg),_ret); }
+  public TypeFunSig make_from_remove( String fld ) { return make(_formals.del_fld(fld),_ret); }
 
-
-  public static final TypeFunSig II_I = make(TypeStruct.INT64_INT64);
+  public static final TypeFunSig II_I = make(TypeStruct.INT64_INT64,TypeInt.INT64);
   static final TypeFunSig[] TYPES = new TypeFunSig[]{II_I};
 
-  public int nargs() { return _max_arg+1; }
   public TypeFld arg(int idx) { return _formals.fld_idx(idx); }
   public Type display() { return arg(DSP_IDX); }
 
-  @Override protected TypeFunSig xdual() { return new TypeFunSig().init(_formals.dual()); }
+  @Override protected TypeFunSig xdual() { return new TypeFunSig().init(_formals.dual(),_ret.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUNSIG: break;
@@ -89,7 +85,7 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     default: throw typerr(t);   // All else should not happen
     }
     TypeFunSig tf = (TypeFunSig)t;
-    return make((TypeStruct)_formals.meet(tf._formals));
+    return make((TypeStruct)_formals.meet(tf._formals),_ret.meet(tf._ret));
   }
 
   @Override public boolean above_center() { return _formals.above_center(); }

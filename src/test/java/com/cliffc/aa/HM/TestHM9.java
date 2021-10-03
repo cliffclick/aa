@@ -20,7 +20,7 @@ public class TestHM9 {
   }
   // Simple no-arg signature returning the type
   private static TypeFunSig tfs(Type ret) {
-    return TypeFunSig.make(TypeTuple.make_ret(ret),TypeTuple.make_args());
+    return TypeFunSig.make(TypeStruct.EMPTY,ret);
   }
 
   private static final TypeMemPtr tuple2  = TypeMemPtr.make(7,TypeStruct.maket(Type.SCALAR,   Type.SCALAR   ));

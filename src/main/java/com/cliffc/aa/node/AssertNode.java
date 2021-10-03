@@ -44,7 +44,7 @@ public class AssertNode extends Node {
       TypeFunSig sig = (TypeFunSig)_t;
       try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
         X.add(this);
-        Node[] args = new Node[sig.nargs()];
+        Node[] args = new Node[sig._formals.nargs()];
         FunNode fun = (FunNode)X.init(new FunNode(null,sig,-1,false).add_def(Env.FILE._scope));
         fun._val = Type.CTRL;
         args[CTL_IDX] = fun;            // Call control
@@ -54,7 +54,7 @@ public class AssertNode extends Node {
           if( fld._order >= ARG_IDX )
             // All the parms; types in the function signature
             args[fld._order] = X.xform(new ParmNode(fld,fun,(ConNode)Node.con(Type.SCALAR),_error_parse));
-        Parse[] badargs = new Parse[sig.nargs()];
+        Parse[] badargs = new Parse[sig._formals.nargs()];
         Arrays.fill(badargs,_error_parse);
         Node rpc= X.xform(new ParmNode(0," rpc",fun,Env.ALL_CALL,null));
         CallNode call = (CallNode)X.xform(new CallNode(true,badargs,args));
@@ -63,11 +63,10 @@ public class AssertNode extends Node {
         Node postmem= X.xform(new MProjNode(cepi));
         Node val    = X.xform(new  ProjNode(cepi,AA.REZ_IDX));
         // Type-check the return also
-        throw unimpl(); // Type ret = sig._ret...
-        //Node chk    = X.xform(new AssertNode(postmem,val,sig._ret.at(REZ_IDX),_error_parse,_env));
-        //RetNode ret = (RetNode)X.xform(new RetNode(ctl,postmem,chk,rpc,fun));
-        //// Just the same Closure when we make a new TFP
-        //return (X._ret=X.xform(new FunPtrNode(ret,arg)));
+        Node chk    = X.xform(new AssertNode(postmem,val,sig._ret,_error_parse,_env));
+        RetNode ret = (RetNode)X.xform(new RetNode(ctl,postmem,chk,rpc,fun));
+        // Just the same Closure when we make a new TFP
+        return (X._ret=X.xform(new FunPtrNode(ret,arg)));
       }
     }
 
