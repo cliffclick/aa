@@ -128,7 +128,7 @@ public final class CallEpiNode extends Node {
     if( ret==null ) return null;
 
     // Single choice; check no conversions needed.
-    TypeStruct formals = fun._sig._formals;
+    TypeStruct formals = fun.formals();
     for( Node parm : fun._uses ) {
       if( parm instanceof ParmNode && parm.in(0)==fun ) {
         int idx = ((ParmNode)parm)._idx;

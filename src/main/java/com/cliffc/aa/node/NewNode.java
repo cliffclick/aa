@@ -179,7 +179,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // --------------------------------------------------------------------------
   public static abstract class NewPrimNode<T extends TypeObj<T>> extends NewNode<T> {
     public final String _name;    // Unique library call name
-    final TypeFunSig _sig;        // Arguments
+    final TypeStruct _formals;    // Arguments
     final TypeFunPtr _tfp;        // Fidx, nargs, return
     final boolean _reads;         // Reads old memory (all of these ops *make* new memory, none *write* old memory)
     final int _op_prec;
@@ -187,11 +187,9 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       super(op,parent_alias,to);
       _name = name;
       _reads = reads;
-      TypeStruct formals = TypeStruct.make(args);
-      _sig = TypeFunSig.make(formals,TypeTuple.RET);
+      _formals = TypeStruct.make(args);
       int fidx = BitsFun.new_fidx();
-      _tfp=TypeFunPtr.make(BitsFun.make0(fidx),formals.nargs(),TypeMemPtr.NO_DISP,ret);
-      assert (reads == (_sig._formals.fld_find(" mem")._t!=TypeMem.ALLMEM)); // If reading, then memory has some requirements
+      _tfp=TypeFunPtr.make(BitsFun.make0(fidx),_formals.nargs(),TypeMemPtr.NO_DISP,ret);
       _op_prec = op_prec;
     }
     String bal_close() { return null; }
@@ -207,8 +205,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
         // Add input edges to the intrinsic
         if( _reads ) set_def(MEM_IDX, memp); // Memory is already null by default
-        while( len() < _sig.nargs() ) add_def(null);
-        for( TypeFld arg : _sig._formals.flds() ) {
+        while( len() < _formals.nargs() ) add_def(null);
+        for( TypeFld arg : _formals.flds() ) {
           if( arg._order==MEM_IDX ) continue; // Already handled MEM_IDX
           set_def(arg._order,X.xform(new ParmNode(arg._t.simple_ptr(), null, fun, arg._order, arg._fld)));
         }

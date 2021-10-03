@@ -61,7 +61,7 @@ public class FunNode extends RegionNode {
   public String _name;          // Debug-only name
   public String _bal_close; // null for everything except "balanced oper functions", e.g. "[]"
   public int _fidx;         // Unique number for this piece of code
-  public TypeFunSig _sig;   // Apparent signature; clones typically sharpen
+  private TypeFunSig _sig;   // Apparent signature; clones typically sharpen
   // Operator precedence; only set on top-level primitive wrappers.
   // -1 for normal non-operator functions and -2 for forward_decls.
   public byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
@@ -76,11 +76,11 @@ public class FunNode extends RegionNode {
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
   public FunNode(String name,           PrimNode prim) { this(name,prim._sig,prim._op_prec,prim._thunk_rhs,prim._tfp.fidx()); }
-  public FunNode(String name,NewNode.NewPrimNode prim) { this(name,prim._sig,prim._op_prec,false          ,prim._tfp.fidx()); }
+  public FunNode(String name,NewNode.NewPrimNode prim) { this(name,TypeFunSig.make(prim._formals),prim._op_prec,false,prim._tfp.fidx()); }
   // Used to start an anonymous function in the Parser
-  public FunNode(TypeStruct formals) { this(null,TypeFunSig.make(formals,TypeTuple.RET),-1,false); }
+  public FunNode(TypeStruct formals) { this(null,TypeFunSig.make(formals),-1,false); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.EMPTY,TypeTuple.RET),-2,false); add_def(Env.SCP_0); }
+  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.EMPTY),-2,false); add_def(Env.SCP_0); }
   // Shared common constructor
   FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs ) { this(name,sig,op_prec,thunk_rhs,BitsFun.new_fidx()); }
   // Shared common constructor
@@ -252,12 +252,10 @@ public class FunNode extends RegionNode {
         else if( fld._t!=Type.ALL ) // Other dead args need to keep knowledge they ever existed
           progress = progress.make_from_arg(fld.make_from(Type.ALL));
       }
-    //RetNode ret = ret();
-    //if( ret!=null && ret._val!=progress._ret && ret._val instanceof TypeTuple )
-    //  progress = progress.make_from_ret((TypeTuple)ret._val);
     return progress;
   }
-
+  public TypeStruct formals() { return _sig._formals; }
+  public void set_re_sig() { _sig = re_sig(); }
 
   public Node ideal_inline(boolean check_progress) {
     // If no trailing RetNode and hence no FunPtr... function is uncallable
@@ -456,8 +454,8 @@ public class FunNode extends RegionNode {
       case OP_CALL: break; // Argument pass-thru probably needs to check formals
       case OP_RET: break;  // Return pass-thru should be ok
       case OP_NEWSTR:
-        TypeFunSig sig = ((NewStrNode)use)._sig;
-        Type formal = sig._formals.fld_idx(use._defs.find(n))._t;
+        TypeStruct formals = ((NewStrNode)use)._formals;
+        Type formal = formals.fld_idx(use._defs.find(n))._t;
         if( !TypeMemPtr.OOP0.dual().isa(formal) )
           return true;
         break;
@@ -546,6 +544,9 @@ public class FunNode extends RegionNode {
     while( !work.isEmpty() ) {  // While have work
       Node n = work.pop();      // Get work
       if( n==null ) continue;   // Defs can be null
+      // As a special case for H-M, always clone uses of nil constants.
+      // These need private H-M variables to support polymorphic nil-typing.
+      if( n instanceof ConNode && ((ConNode)n)._t==Type.XNIL ) freached.tset(n._uid);
       if( !freached.get (n._uid) ) continue; // Not reached from fcn top
       if(  breached.tset(n._uid) ) continue; // Already visited?
       body.push(n);                          // Part of body

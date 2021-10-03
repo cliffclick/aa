@@ -3,8 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.node.NewAryNode;
-import com.cliffc.aa.node.NewStrNode;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.Util;
@@ -304,7 +302,7 @@ public class TestNode {
     n.add_def(_ins[1]);         // memory
     n.add_def(null);            // display
     n.add_def(_ins[2]);         // arg#1
-    if( n._sig.nargs() >= 2 ) n.add_def(_ins[3]);
+    if( n._formals.nargs() >= 2 ) n.add_def(_ins[3]);
     test1monotonic_init(n);
   }
 

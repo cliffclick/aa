@@ -759,7 +759,7 @@ public class HM9 {
     private static Type add_sig(Type t) {
       if( t instanceof TypeFunPtr ) {
         Type rez = add_sig(xval((TypeFunPtr)t));
-        return TypeFunSig.make(TypeTuple.make_ret(rez),TypeTuple.make_args());
+        return TypeFunSig.make(TypeTuple.make_args());
       } else {
         return t;
       }

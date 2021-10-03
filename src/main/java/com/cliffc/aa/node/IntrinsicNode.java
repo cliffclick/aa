@@ -43,7 +43,7 @@ public class IntrinsicNode extends Node {
     // Only after folding together does the name become apparent.
     try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
       TypeStruct formals = TypeStruct.args(TypeMemPtr.STRUCT);
-      TypeFunSig sig = TypeFunSig.make(formals,TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.RECORD_BITS,tn)));
+      TypeFunSig sig = TypeFunSig.make(formals);
       FunNode fun = X.init2((FunNode)new FunNode(tn._name,sig,-1,false).add_def(Env.SCP_0));
       Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
       Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
@@ -134,7 +134,7 @@ public class IntrinsicNode extends Node {
     assert to.has_name() && to.fld_find("^").is_display_ptr(); // Display already
     // Upgrade the type to one with no display for nnn.
     to = to.replace_fld(TypeFld.NO_DISP);
-    TypeFunSig sig = TypeFunSig.make(to.remove_name(),TypeTuple.make_ret(TypeMemPtr.make(BitsAlias.make0(alias),to)));
+    TypeFunSig sig = TypeFunSig.make(to.remove_name());
 
     try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
       FunNode fun = (FunNode) X.xform(new FunNode(to._name,sig,-1,false).add_def(Env.SCP_0));

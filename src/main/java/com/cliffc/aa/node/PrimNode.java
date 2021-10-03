@@ -29,7 +29,7 @@ public abstract class PrimNode extends Node {
     super(OP_PRIM);
     _name = name;
     assert formals.fld_find("^")==null; // No display
-    _sig=TypeFunSig.make(formals,TypeTuple.RET);
+    _sig=TypeFunSig.make(formals);
     int fidx = BitsFun.new_fidx();
     _tfp=TypeFunPtr.make(BitsFun.make0(fidx),formals.nargs(),TypeMemPtr.NO_DISP,ret);
     _badargs=null;
@@ -295,7 +295,7 @@ public abstract class PrimNode extends Node {
   public static FunPtrNode convertTypeName( Type from, Type to, Parse badargs ) {
     try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
       TypeStruct formals = TypeStruct.args(from);
-      TypeFunSig sig = TypeFunSig.make(formals,TypeTuple.make_ret(to));
+      TypeFunSig sig = TypeFunSig.make(formals);
       Node ctl = X.xform(new CEProjNode(Env.FILE._scope));
       FunNode fun = X.init2((FunNode)new FunNode(to._name,sig,-1,false).add_def(ctl));
       Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));

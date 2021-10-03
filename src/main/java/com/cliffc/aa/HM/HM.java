@@ -797,7 +797,7 @@ public class HM {
         for( int fidx : fun._fidxs )
           rez = rez.meet(Lambda.FUNS.get(fidx).apply(NARGS));
         Type rez2 = add_sig(rez);
-        return TypeFunSig.make(TypeTuple.make_ret(rez2),TypeTuple.make_args());
+        return TypeFunSig.make(TypeTuple.make_args());
       } else {
         return t;
       }

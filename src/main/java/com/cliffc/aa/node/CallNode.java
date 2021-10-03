@@ -609,8 +609,8 @@ public class CallNode extends Node {
 
         FunNode fun = FunNode.find_fidx(kidx);
         if( fun==null || fun.is_dead() || fun.nargs()!=nargs() || fun.in(0)==fun ) continue; // BAD/dead
-        TypeStruct formals = fun._sig._formals; // Type of each argument
-        int cvts=0;                             // Arg conversion cost
+        TypeStruct formals = fun.formals(); // Type of each argument
+        int cvts=0;                         // Arg conversion cost
         for( TypeFld fld : formals.flds() ) {
           Type formal = fld._t;
           Type actual = arg(fld._order)._val;
@@ -746,8 +746,8 @@ public class CallNode extends Node {
         for( int kid=fidx; kid!=0; kid = tree.next_kid(fidx,kid) ) {
           FunNode fun = FunNode.find_fidx(kid);
           if( fun==null || fun.is_dead() ) continue;
-          TypeStruct formals = fun._sig._formals; // Type of each argument
-          if( fun.parm(j)==null ) continue;  // Formal is dead
+          TypeStruct formals = fun.formals(); // Type of each argument
+          if( fun.parm(j)==null ) continue;   // Formal is dead
           Type formal = formals.fld_idx(j)._t;
           if( actual.isa(formal) ) continue; // Actual is a formal
           if( fast ) return ErrMsg.FAST;     // Fail-fast

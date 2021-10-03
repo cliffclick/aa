@@ -35,7 +35,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   }
 
   public static class ConvertI64Str extends NewStrNode {
-    public ConvertI64Str( ) { super(TypeStr.STR,"str",false,-1,TypeFld.MEM,TypeFld.make_arg(TypeInt.INT64,ARG_IDX)); }
+    public ConvertI64Str( ) { super(TypeStr.STR,"str",false,-1,TypeFld.make_arg(TypeInt.INT64,ARG_IDX)); }
     @Override TypeObj valueobj() {
       Type t = val(ARG_IDX);
       if( t.above_center() || !(t instanceof TypeInt) ) return t.oob(TypeStr.STR);
@@ -46,7 +46,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   }
 
   public static class ConvertF64Str extends NewStrNode {
-    public ConvertF64Str( ) { super(TypeStr.STR,"str",false,-1,TypeFld.MEM,TypeFld.make_arg(TypeFlt.FLT64,ARG_IDX)); }
+    public ConvertF64Str( ) { super(TypeStr.STR,"str",false,-1,TypeFld.make_arg(TypeFlt.FLT64,ARG_IDX)); }
     @Override TypeObj valueobj() {
       Type t = val(ARG_IDX);
       if( t.above_center() || !(t instanceof TypeFlt) ) return t.oob(TypeStr.STR);
@@ -63,7 +63,6 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   public static class AddStrStr extends NewStrNode {
     private static final int OP_PREC=7;
     public AddStrStr( ) { super(TypeStr.STR,"$+",true,OP_PREC,
-                                TypeFld.make(" mem",TypeMem.MEM_STR,MEM_IDX),
                                 TypeFld.make_arg(TypeMemPtr.STR0,ARG_IDX  ),
                                 TypeFld.make_arg(TypeMemPtr.STR0,ARG_IDX+1)); }
     @Override public Type value(GVNGCM.Mode opt_mode) {

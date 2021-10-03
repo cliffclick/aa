@@ -4,7 +4,6 @@ import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
 import static com.cliffc.aa.AA.DSP_IDX;
-import static com.cliffc.aa.AA.MEM_IDX;
 
 // Function signatures: formal arguments (and return) used to type-check.  This
 // is NOT any "code pointer" or "function index" or "fidx"; see TypeFunPtr.
@@ -12,11 +11,11 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   public TypeStruct _formals;   // Control0, Memory1, Display2, Arg3, Arg4, ...
   private int _max_arg;
 
-  private TypeFunSig init(TypeStruct formals, TypeTuple ret ) {
+  private TypeFunSig init(TypeStruct formals ) {
     super.init(TFUNSIG,"");
     TypeFld disp=null;
     assert (disp=formals.fld_find("^")) == null || disp.is_display_ptr();
-    assert ret.len()==3 && ret.at(MEM_IDX) instanceof TypeMem;
+    assert formals.fld_find(" mem")==null; // No memory
     _formals=formals;
     _max_arg = DSP_IDX;
     for( TypeFld arg : _formals.flds() )
@@ -50,26 +49,26 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   }
 
   static { new Pool(TFUNSIG,new TypeFunSig()); }
-  public static TypeFunSig make( TypeStruct formals, TypeTuple ret ) {
+  public static TypeFunSig make( TypeStruct formals ) {
     TypeFunSig t1 = POOLS[TFUNSIG].malloc();
-    return t1.init(formals,ret).hashcons_free();
+    return t1.init(formals).hashcons_free();
   }
 
-  public static TypeFunSig make( TypeTuple ret, Type arg1 ) { return make(TypeStruct.args(arg1),ret); }
-  public static TypeFunSig make( TypeTuple ret, Type arg1, Type arg2 ) { return make(TypeStruct.args(arg1,arg2),ret); }
-  public TypeFunSig make_from( TypeStruct formals ) { return make(formals,TypeTuple.RET); }
-  public TypeFunSig make_from_arg( TypeFld arg ) { return make(_formals.replace_fld(arg),TypeTuple.RET); }
-  public TypeFunSig make_from_remove( String fld ) { return make(_formals.del_fld(fld),TypeTuple.RET); }
+  public static TypeFunSig make( Type arg1 ) { return make(TypeStruct.args(arg1)); }
+  public static TypeFunSig make( Type arg1, Type arg2 ) { return make(TypeStruct.args(arg1,arg2)); }
+  public TypeFunSig make_from( TypeStruct formals ) { return make(formals); }
+  public TypeFunSig make_from_arg( TypeFld arg ) { return make(_formals.replace_fld(arg)); }
+  public TypeFunSig make_from_remove( String fld ) { return make(_formals.del_fld(fld)); }
 
 
-  public static final TypeFunSig II_I = make(TypeStruct.INT64_INT64, TypeTuple.make_ret(TypeInt.INT64));
+  public static final TypeFunSig II_I = make(TypeStruct.INT64_INT64);
   static final TypeFunSig[] TYPES = new TypeFunSig[]{II_I};
 
   public int nargs() { return _max_arg+1; }
   public TypeFld arg(int idx) { return _formals.fld_idx(idx); }
   public Type display() { return arg(DSP_IDX); }
 
-  @Override protected TypeFunSig xdual() { return new TypeFunSig().init(_formals.dual(),TypeTuple.RET.dual()); }
+  @Override protected TypeFunSig xdual() { return new TypeFunSig().init(_formals.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUNSIG: break;
@@ -90,7 +89,7 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     default: throw typerr(t);   // All else should not happen
     }
     TypeFunSig tf = (TypeFunSig)t;
-    return make((TypeStruct)_formals.meet(tf._formals),TypeTuple.RET);
+    return make((TypeStruct)_formals.meet(tf._formals));
   }
 
   @Override public boolean above_center() { return _formals.above_center(); }

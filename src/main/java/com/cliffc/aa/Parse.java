@@ -867,7 +867,6 @@ public class Parse implements Comparable<Parse> {
 
     // Incrementally build up the formals
     TypeStruct formals = TypeStruct.make("",false,true,
-                                         TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
                                          TypeFld.make("^",tpar_disp,DSP_IDX));
     TypeStruct no_args_formals = formals;
     Ary<Parse> bads= new Ary<>(new Parse[1],0);
@@ -1178,11 +1177,10 @@ public class Parse implements Comparable<Parse> {
   private Type type0(boolean type_var) {
     if( peek('{') ) {           // Function type
       TypeStruct formals = TypeStruct.make("",false,true,
-                                           TypeFld.make_tup(TypeMem.ALLMEM,MEM_IDX),
                                            TypeFld.make_tup(TypeMemPtr.DISP_SIMPLE,DSP_IDX));
       TypeStruct no_args_formals = formals;  Type t; // Collect arg types
       while( (t=typep(type_var)) != null && t != Type.ANY  )
-        formals = formals.add_tup(t,formals.len()-2+ARG_IDX);
+        formals = formals.add_tup(t,formals.len()-1+ARG_IDX);
       Type ret;
       if( t==Type.ANY ) {       // Found ->, expect return type
         ret = typep(type_var);
@@ -1193,7 +1191,7 @@ public class Parse implements Comparable<Parse> {
         formals = no_args_formals;
       }
       if( !peek('}') ) return null;
-      return typeq(TypeFunSig.make(formals,TypeTuple.make_ret(ret)));
+      return typeq(TypeFunSig.make(formals));
     }
 
     if( peek("@{") ) {          // Struct type

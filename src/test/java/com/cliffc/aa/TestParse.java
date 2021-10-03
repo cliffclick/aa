@@ -75,7 +75,6 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
-    test_obj("str(3.14)"       , TypeStr.con("3.14"));
     test("-1",  TypeInt.con( -1));
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -222,9 +221,7 @@ public class TestParse {
     // Anonymous function definition
     test("{x -> x&1}",
          (() -> TypeFunPtr.make(29,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.BOOL)),
-         ( () -> TypeFunSig.make(TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
-                                                 TypeFld.make("x",Type.SCALAR,ARG_IDX)),
-                                 TypeTuple.RET)),
+         ( () -> TypeStruct.make(TypeFld.make("x",Type.SCALAR,ARG_IDX))),
            "[29]{ int64 -> int64 }");
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
     testerr("{x y -> x+y}", "Scalar is none of (flt64,int64,*str?)",8); // {Scalar Scalar -> Scalar}
@@ -763,8 +760,7 @@ c= C(b,"abc");
 
     test("{&}",
          (() -> TypeFunPtr.make(BitsFun.make0(35),5, TypeMemPtr.NO_DISP,TypeInt.INT64)),
-         (() -> TypeFunSig.make(TypeStruct.make2flds("x",TypeInt.INT64,"y",TypeInt.INT64),
-                                TypeTuple.RET)),
+         (() -> TypeStruct.make2flds("x",TypeInt.INT64,"y",TypeInt.INT64)),
          "[35]{ int64 int64 -> int64 }");
 
     test("{ g -> (g,3)}",
@@ -772,10 +768,9 @@ c= C(b,"abc");
                                 // TODO: how do i express the expected return state of memory
                                 //TypeMem.make(14,TypeStruct.make2fldsD("0",Type.SCALAR,"1",TypeInt.con(3))),
                                 TypeMemPtr.make(14,TypeObj.ISUSED))),
-         ( () -> TypeFunSig.make(TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
-                                                 TypeFld.make("^",Type.ALL,DSP_IDX),
-                                                 TypeFld.make("g",Type.SCALAR,ARG_IDX)),
-                                 TypeTuple.RET)),
+         ( () -> TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
+                                 TypeFld.make("^",Type.ALL,DSP_IDX),
+                                 TypeFld.make("g",Type.SCALAR,ARG_IDX))),
          "[43]{ A -> [14]( A, 3) }");
 
     test("{ g -> f = { ignore -> g }; ( f(3), f(\"abc\"))}",
@@ -783,10 +778,9 @@ c= C(b,"abc");
                                 // TODO: how do i express the expected return state of memory
                                 //TypeMem.make(18,TypeStruct.make2fldsD("0",Type.SCALAR,"1",Type.SCALAR)),
                                 TypeMemPtr.make(18,TypeObj.ISUSED))),
-         ( () -> TypeFunSig.make(TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
-                                                 TypeFld.make("^",TypeMemPtr.make(12,TypeObj.ISUSED),DSP_IDX),
-                                                 TypeFld.make("g",Type.SCALAR,ARG_IDX)),
-                                 TypeTuple.RET)),
+         ( () -> TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
+                                 TypeFld.make("^",TypeMemPtr.make(12,TypeObj.ISUSED),DSP_IDX),
+                                 TypeFld.make("g",Type.SCALAR,ARG_IDX))),
          "[43]{ A -> [18]( A, A) }");
     // id accepts and returns all types and keeps precision
     test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
@@ -908,7 +902,7 @@ HashTable = {@{
     TypeEnv te = run(program);
     assertEquals(expected,te._t);
   }
-  static private void test( String program, Supplier<Type> expect_maker, Supplier<TypeFunSig> expect_sig_maker, String hm_expect ) {
+  static private void test( String program, Supplier<Type> expect_maker, Supplier<TypeStruct> expect_formal_maker, String hm_expect ) {
     TypeEnv te = run(program);
     Type actual_flow = te._tmem.sharptr(te._t);
     TV2 actual_hm = te._hmt;
@@ -916,11 +910,11 @@ HashTable = {@{
     Type expect = expect_maker.get();
     assertEquals(expect,actual_flow);
     if( expect instanceof TypeFunPtr ) {
-      TypeFunSig actual_sig = te._sig;
-      TypeFunSig expect_sig = expect_sig_maker.get();
-      assertEquals(expect_sig._formals,actual_sig._formals);
+      TypeStruct actual_formals = te._formals;
+      TypeStruct expect_formals = expect_formal_maker.get();
+      assertEquals(expect_formals,actual_formals);
     } else
-      assert expect_sig_maker==null;
+      assert expect_formal_maker==null;
     if( Combo.DO_HM )
       assertEquals(stripIndent(hm_expect),stripIndent(hm_actual));
   }
@@ -951,8 +945,8 @@ HashTable = {@{
     TypeFunPtr actual = (TypeFunPtr)te._t;
     TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),ARG_IDX+args.length, TypeMemPtr.NO_DISP,null);
     assertEquals(expected,actual);
-    if( te._sig._formals.is_tup() )
-      for( TypeFld fld : te._sig._formals.flds() )
+    if( te._formals.is_tup() )
+      for( TypeFld fld : te._formals.flds() )
         assertEquals(args[fld._order-ARG_IDX],fld._t);
   }
 

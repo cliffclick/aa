@@ -69,17 +69,15 @@ public class ParmNode extends PhiNode {
     FunNode fun = (FunNode)in0;
     if( fun.len()!=len() ) return Type.ALL; // Collapsing
 
-    // If using a primitive, trust the signature.  The primitive is always "as-if" called
-    // by the most conservative caller, and it pessimizes already.
-    if( is_prim() && fun.is_unknown_alive() ) {
-      TypeFld fld = fun._sig._formals.fld_find(_name);
-      if( fld != null )  return fld._t.simple_ptr();
-      // Else take 1st arg
-    }
+    // Trust the signature, if any.
+    TypeFld fld = fun.formals().fld_find(_name);
+    Type t0 = fld==null ? Type.ANY : fld._t.simple_ptr();
+    if( is_prim() && fld!=null ) return t0;
     // If pre-Call-Graph, assume the value will be exported externally and thus
     // called by the most conservative caller.  The default input already pessimizes.
-    if( !opt_mode._CG ) {
-      return _defs._len <=1 ? _t : val(1);
+    if( !opt_mode._CG && fun.is_unknown_alive() ) {
+      Type tin = _defs._len <= 1 ? _t : val(1);
+      return t0 == Type.ANY ? tin : tin.join(t0);   // No need to visit other inputs
     }
 
     // If we have a Call Graph, then we merge all the normal input paths.  If
@@ -116,7 +114,7 @@ public class ParmNode extends PhiNode {
     // High, but valid, values like choice-functions need to pass thru,
     // so following Calls agree that SOME function will be called.
     // Check against formals; if OOB, always produce an error.
-    TypeFld arg = fun._sig._formals.fld_find(_name);
+    TypeFld arg = fun.formals().fld_find(_name);
     // Good case: nothing in signature (parm is dead, so legit), type needs to fall, or it isa formal.
     if( arg==null || t.above_center() || t.isa(arg._t) ) return t.simple_ptr();
     return _t;
@@ -143,7 +141,7 @@ public class ParmNode extends PhiNode {
     if( _idx <= MEM_IDX ) return null;  // No arg check on RPC or memory
     Node mem = fun.parm(MEM_IDX);
     assert _name!=null;
-    TypeFld ffld = fun._sig._formals.fld_find(_name);
+    TypeFld ffld = fun.formals().fld_find(_name);
     if( ffld==null ) return null; // dead display, because loading a high value
     Type formal = ffld._t;
     for( int i=1; i<_defs._len; i++ ) {
