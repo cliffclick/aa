@@ -321,8 +321,9 @@ public class Parse implements Comparable<Parse> {
 
     } else {
       // Store into scope/NewObjNode/display
+      ifex.keep(2);
       Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
-      StoreNode st = new StoreNode(mem(),ptr,ifex,mutable,tok,bad);
+      StoreNode st = new StoreNode(mem(),ptr,ifex.unkeep(2),mutable,tok,bad);
       scope().replace_mem(st);
       scope.def_if(tok,mutable,false); // Note 1-side-of-if update
     }

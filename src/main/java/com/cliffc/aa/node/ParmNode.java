@@ -111,7 +111,7 @@ public class ParmNode extends PhiNode {
 
     if( _idx <= 0 ) return t;
     if( fun.in(0)==fun ) return t.simple_ptr(); // Function is collapsing, memory not available to check formals
-    // High, but valid, values like choice-functions need to pass thru,
+    // High, but valid, values like choice-functions need to pass through,
     // so following Calls agree that SOME function will be called.
     // Check against formals; if OOB, always produce an error.
     TypeFld arg = fun.formals().fld_find(_name);

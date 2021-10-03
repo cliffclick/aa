@@ -1,8 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
@@ -208,17 +206,26 @@ public class ScopeNode extends Node {
   }
 
   // Set of top-level escaping functions
+  private Type _escache_trez, _escache_tmem; // Small cache has a 50% hit rate
+  private BitsFun _escache_escs;
   public BitsFun top_escapes() {
     if( _val.above_center() ) return BitsFun.EMPTY;
     if( is_prim() ) return BitsFun.FULL; // All the primitives escape
     if( !Env.GVN._opt_mode._CG ) return BitsFun.FULL; // Not run Opto yet
     Type trez = rez()._val;
-    // TODO: CACHE
-    if( trez.above_center() ) return BitsFun.EMPTY;
+    Type tmem = mem()._val;
+    if( _escache_trez == trez &&  _escache_tmem == tmem ) return _escache_escs; // Cache hit
+    // Cache miss, compute the hard way
+    if( trez.above_center() )
+      if( Combo.HM_IS_HIGH ) return BitsFun.EMPTY;
+      else if( trez instanceof TypeFunPtr )
+        trez = trez.dual();   // Bring the escaping unresolved functions down low
     if( TypeFunPtr.GENERIC_FUNPTR.isa(trez) ) return BitsFun.FULL; // Can lift to any function
-    Type tmem0 = mem()._val;
-    TypeMem tmem = tmem0 instanceof TypeMem ? (TypeMem)tmem0 : tmem0.oob(TypeMem.ALLMEM);
+    tmem = tmem instanceof TypeMem ? (TypeMem)tmem : tmem.oob(TypeMem.ALLMEM);
     BitsFun fidxs = trez.all_reaching_fidxs(tmem);
+    _escache_trez = trez;
+    _escache_tmem = tmem;
+    _escache_escs = fidxs;
     return fidxs;
   }
 

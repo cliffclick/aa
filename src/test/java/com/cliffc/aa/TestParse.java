@@ -359,7 +359,7 @@ public class TestParse {
     test_obj("(1,\"abc\").1", TypeStr.ABC);
 
     // Named type variables
-    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(36),4, TypeMemPtr.NO_DISP, null));
+    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(36),4, TypeMemPtr.NO_DISP, TypeFlt.FLT64));
     test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
@@ -943,8 +943,8 @@ HashTable = {@{
     TypeEnv te = run(program);
     assertTrue(te._t instanceof TypeFunPtr);
     TypeFunPtr actual = (TypeFunPtr)te._t;
-    TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),ARG_IDX+args.length, TypeMemPtr.NO_DISP,null);
-    assertEquals(expected,actual);
+    assertEquals(ARG_IDX+args.length,actual._nargs);
+    assertTrue(actual._ret instanceof TypeMemPtr && actual._ret.simple_ptr()==actual._ret);
     if( te._formals.is_tup() )
       for( TypeFld fld : te._formals.flds() )
         assertEquals(args[fld._order-ARG_IDX],fld._t);
