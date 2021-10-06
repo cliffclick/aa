@@ -482,6 +482,8 @@ public class CallNode extends Node {
         Env.GVN.add_reduce(this);
       if( Env.GVN._opt_mode._CG && err(true)==null )
         work.add(mem());        // Call not-in-error, memory may lift
+      if( Env.GVN._opt_mode._CG && err(true)!=null )
+        add_work_defs(work);    // Call in-error, all args are now used
     }
   }
 
@@ -588,7 +590,7 @@ public class CallNode extends Node {
     if( dfidx != -1 && !fidxs.test_recur(dfidx) ) return TypeMem.DEAD; // Not in the fidx set.
     if( may_be_con_live(tfp) )
       return TypeMem.DEAD; // Will be replaced by a constant
-    // Otherwise the FIDX is alive
+    // Otherwise the FIDX is alive but not the display
     return TypeMem.LNO_DISP;
   }
 
@@ -669,7 +671,7 @@ public class CallNode extends Node {
   @Override public boolean remove_ambi() {
     BitsFun fidxs = ttfp(_val).fidxs();
     if( !fidxs.above_center() ) return true; // Resolved after all
-    assert fidxs!=BitsFun.ANY;               // Too many choices
+    if( fidxs == BitsFun.ANY ) return false; // Too many choices, no progress
     // Pick least-cost among choices
     FunPtrNode fptr = least_cost(fidxs,fdx());
     if( fptr==null ) return false; // Not resolved, no progress

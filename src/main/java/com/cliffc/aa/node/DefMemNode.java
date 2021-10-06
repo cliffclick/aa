@@ -35,6 +35,7 @@ public class DefMemNode extends Node {
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     if( def==in(0) ) return TypeMem.ALIVE;  // Control
+    if( opt_mode._CG ) return TypeMem.DEAD; // Not used after Combo
     return _live;
   }
 

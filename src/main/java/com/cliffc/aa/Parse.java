@@ -105,7 +105,7 @@ public class Parse implements Comparable<Parse> {
   public ErrMsg prog() {
     _gvn._opt_mode = GVNGCM.Mode.Parse;
     Node res = stmts();
-    if( res == null ) res = con(Type.ANY);
+    if( res == null ) res = Env.ANY;
     scope().set_rez(res);  // Hook result
     if( skipWS() != -1 ) return ErrMsg.trailingjunk(this);
     return null;
@@ -551,13 +551,13 @@ public class Parse implements Comparable<Parse> {
         // Token might have been longer than the filtered name; happens if a
         // bunch of operator characters are adjacent, but we can make an
         // operator out of the first few.  The name also ends in '_' to
-        // indicate its a prefix operator.
+        // indicate it's a prefix operator.
         _x = oldx+ptr._name.length()-1;
         unifun.keep();
         Node term = term();
-        if( term==null ) { unifun.unhook(); _x = oldx; return null; }
-        unifun.unkeep();
-        return do_call(errMsgs(0,oldx),args(unifun,term));
+        if( term!=null )
+          return do_call(errMsgs(0,oldx),args(unifun.unkeep(),term));
+        unifun.unhook();        // Unwind and try normal term
       }
     }
 
@@ -770,8 +770,8 @@ public class Parse implements Comparable<Parse> {
 
     // Check for a valid 'id'
     String tok = token0();
-    if( tok == null ) { _x = oldx; return null; }
-    tok = tok.intern();
+    tok = tok==null ? null : tok.intern();
+    if( tok == null || Util.eq("_",tok)) { _x = oldx; return null; }
     if( Util.eq(tok,"=") || Util.eq(tok,"^") )
       { _x = oldx; return null; } // Disallow '=' as a fact, too easy to make mistakes
     ScopeNode scope = lookup_scope(tok,false);

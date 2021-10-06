@@ -1,7 +1,8 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.node.*;
-import com.cliffc.aa.type.BitsFun;
+import com.cliffc.aa.node.CallNode;
+import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.Work;
 import com.cliffc.aa.util.VBitSet;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -42,7 +43,7 @@ lazily makes a fresh-copy of the left-hand-side on demand only; typically
 discovering that no fresh-copy is required.
 
 To engineer and debug the algorithm, the unification step includes a flag to
-mean "actually unify and report a progress flag" vs "report if progress".  The
+mean "actually unify and report a progress" vs "report if progress".  The
 report-only mode is aggressively asserted for; all Nodes that can make progress
 are asserted as on the worklist.
 
@@ -51,19 +52,23 @@ are asserted as on the worklist.
 Global Optimistic Constant Propagation is treated as the usual Monotone
 Analysis Framework.  Passed in the parsed program state (including any return
 result, i/o and memory state).  Returns the most-precise types possible, and
-replaces constants types with constants.
+replaces computed constants with constant nodes.  GCP types are computed using
+the virtual value() call, which computes a new type from the node neighbors
+without reference to the old type.  It has no side-effects.
 
 Besides the obvious GCP algorithm (and the type-precision that results from the
-analysis), GCP does a few more things.
+analysis), GCP does a few more things:
 
 GCP builds an explicit Call-Graph.  Before GCP not all callers are known and
-this is approximated by being called by a CEProj to SCP_0 as a permanently
-available unknown caller.  If the whole program is available to us then we can
-compute all callers conservatively and fairly precisely - we may have extra
-never-taken caller/callee edges, but no missing caller/callee edges.  These
-edges are virtual (represented by the CEProj) before GCP.  During GCP we
-discover most CEProj paths are dead, and we add in physical CG edges as
-possible calls are discovered.
+this is approximated by being called by a ScopeNode as a permanently available
+unknown caller.  If the whole program is available to us then we can compute
+all callers conservatively and fairly precisely - we may have extra never-taken
+caller/callee edges, but no missing caller/callee edges.  These edges are
+virtual before GCP.  During GCP we discover most paths are dead, and we add in
+physical CG edges as possible calls are discovered.
+
+GCP discovers functions which escape at the top-most level, and wires the
+RetNode to the top-most Scope to mimic future unknown callers.
 
 GCP resolves all ambiguous (overloaded) calls, using the precise types first,
 and then inserting conversions using a greedy decision.  If this is not
@@ -71,8 +76,17 @@ sufficient to resolve all calls, the program is ambiguous and wrong.
 
 ==============================================================================
 
-The combined algorithm includes transfer functions taking facts from both MAF
-lattices, producing results in the other lattice.
+Global Optimistic Liveness is also computed.  This is the reverse version of
+GCP, treated as the usual Monotone Analysis Framework.  Liveness is precise
+through memory, tracking in-use aliases and fields of structures.  Similar to
+GCP, liveness is computed using a virtual live() call - which typically uses
+the default version.  Each live-use edge is checked with a virtual live_use
+call, which is typically overloaded for every Node.
+
+==============================================================================
+
+The combined algorithm includes transfer functions taking facts from one MAF
+lattice and produces results in some other MAF lattice.
 
 For the GCP->HM direction, the HM IfNode has a custom transfer function instead
 of the usual one.  Unification looks at the GCP value, and unifies either the
@@ -89,6 +103,35 @@ outputs.  This allows e.g. "map" calls which typically merge many GCP values at
 many call sites and thus end up typed as a Scalar to Scalar, to improve the GCP
 type on a per-call-site basis.
 
+Also for the HM->GCP direction, HM is used to lift external calls to escaped
+functions.  This probably needs more explaination: Functions which do not
+escape the borders of the compilation unit are treated as private, and all
+their callers are known (the Call Graph is found by GCP as explained above).
+Functions which DO escape are treated "as-if" called by an unknown caller with
+the most conservative possible arguments; e.g. exposed module entry points, or
+functions defined in the REPL and yet to be called by a future REPL entry.
+Without HM, GCP assumes an external caller calls with Scalar arguments (and
+memory filled with Scalars); with HM the GCP inputs are lifted to the HM
+structural types.
+
+Also for the HM->GCP direction, loads from external pointers are lifted.  The
+HM-required memory structure is not reflected in the external memory, nor does
+GCP have the external alias numbers.
+
+For the Live->HM direction, dead Nodes do not unify hence do not force structure
+on the HM variables.
+
+For the GCP->Live direction, Nodes which (may) compute a constant do not need
+their inputs, and so their inputs are treated as dead.
+
+==============================================================================
+
+10/5/2021 - As of this writing, the full GCP+HM+Live combined algorithm "gets
+stuck" too high when typing this expression: "f={ x -> x ? (f(x.n),x.v&x.v)}"
+"f" escapes at the top level, and so is first called by an external caller and
+only after that recursively calls itself.
+
+
  */
 public abstract class Combo {
   public static final boolean DO_HM=true;
@@ -99,7 +142,7 @@ public abstract class Combo {
     // General worklist algorithm
     Work work = new Work("Combo",false) { @Override public Node apply(Node n) { throw unimpl(); } };
     // Collect unresolved calls, and verify they get resolved.
-    Work ambi = new Work("Ambi",false) { @Override public Node apply(Node n) { throw unimpl(); } };
+    Work ambi = new Work("Ambi" ,false) { @Override public Node apply(Node n) { throw unimpl(); } };
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
@@ -141,19 +184,21 @@ public abstract class Combo {
       // lattice... allowing more GCP progress.
       remove_ambi(ambi,work);
 
-      //
+      // Combo Phase 2: HM has fallen (and picked up structure) as far as it
+      // will go.  Nodes depending on being called from top-level escaped
+      // functions will have been lifted by an optimistic HM.  HM leaves were
+      // pinned to Type.XNSCALR to keep the GCP values from falling too soon.
+      // Now that we have a valid HM computed, we allow the top-level escaped
+      // functions to all be called by the most conservative callers who also
+      // are at least HM correct: no fair calling an escaped function with
+      // type-unsafe arguments.
       if( work.isEmpty() && HM_IS_HIGH ) {
+        assert Env.START.more_flow(work,false)==0; // Final conditions are correct
         HM_IS_HIGH=false;
         // All escaping fcn parms to worklist
-        BitsFun fidxs = Env.FILE._scope.top_escapes();
-        if( !fidxs.test(1) ) // If BitsFun.ALL is set, we are already in-error
-          for( int fidx : fidxs ) {
-            FunNode fun = FunNode.find_fidx(fidx);
-            work.add(fun);
-            for( Node parm : fun._uses )
-              if( parm.has_tvar() && parm.tvar().is_leaf() )
-                work.add(parm);
-          }
+        Node.RESET_VISIT.clear();
+        Env.START.walk_combo_phase2(work,Env.FILE._scope.top_escapes());
+        assert Env.START.more_flow(work,false)==0; // Final conditions are correct
       }
       // If nothing resolved and there are still ambiguous calls, the program
       // is in error.  Force them to act as-if called by all choices and finish

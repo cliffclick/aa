@@ -4,7 +4,8 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
-import static com.cliffc.aa.AA.unimpl;
+
+import static com.cliffc.aa.AA.*;
 
 // Proj data
 public class ProjNode extends Node {
@@ -44,10 +45,19 @@ public class ProjNode extends Node {
     TV2 tv = tvar();
     if( in(0) instanceof NewNode ) // TODO: Not really a proper use of Proj
       return tv.unify(tvar(0),work);
-    if( in(0) instanceof CallEpiNode ) // Only DProj#2 and it's the return value
+    if( in(0) instanceof CallEpiNode ) { // Only DProj#2 and it's the return value
+      assert _idx==REZ_IDX;
       return tv.unify(tvar(0),work);
-    if( in(0) instanceof CallNode )
-      return tv.unify(in(0).tvar(_idx),work); // Unify with Call arguments
+    }
+    if( in(0) instanceof CallNode ) {
+      TV2 tv2 = in(0).tvar(_idx);
+      if( _idx==DSP_IDX ) {     // Specifically for the function/display, only unify on the display part.
+        if( tv2.is_fun() ) return tv.unify(tv2.get("2"),work);
+        else if( tv2.is_err() ) return false;
+        else throw unimpl();
+      }
+      return tv.unify(tv2,work); // Unify with Call arguments
+    }
     throw unimpl();
   }
 

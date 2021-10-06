@@ -61,25 +61,14 @@ public class IfNode extends Node {
     if( in(0) instanceof ProjNode && in(0).in(0)==this )
       return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
     Type pred = val(1);
-    if( pred instanceof TypeTuple)return TypeTuple.IF_ANY;// Nonsense, so test is dead
-    if( pred instanceof TypeObj ) return TypeTuple.IF_ANY;// Nonsense, so test is dead
-    if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY; // Choice of {0,1}
-    if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL; // Can be either
     if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
       return TypeTuple.IF_FALSE;   // False only
-
-    // Already checked for exactly NIL.
-    // If pred maybe a nil, then we can choose nil or something else
-    if( pred. may_nil() ) return TypeTuple.IF_ANY;
-    // If pred must include a nil, then we can see nil or something else
-    if( pred.must_nil() ) return TypeTuple.IF_ALL;
-    // Let input fall before deciding
-    if( pred.above_center() ) return TypeTuple.IF_ANY;
-    // If meeting a nil changes things, then the original excluded nil and so
-    // was always true.
-    if( pred.meet_nil(Type.NIL) != pred ) return TypeTuple.IF_TRUE;
-
-    throw AA.unimpl(); // Dunno what test this is?
+    if( pred.above_center() ? !pred.may_nil() : !pred.must_nil() )
+      return TypeTuple.IF_TRUE;   // True only
+    if( pred.above_center() ) // Wait until predicate falls
+      return TypeTuple.IF_ANY;
+    
+    return TypeTuple.IF_ALL;
   }
   @Override public TypeMem all_live() { return TypeMem.ALIVE; }
 

@@ -160,6 +160,7 @@ public class TV2 {
 
   // When inserting a new key, propagate deps
   public TV2 args_put(String key, TV2 tv) {
+    assert !(Util.eq("^",key) && tv.is_fun());
     _args.put(key,tv);          // Pick up a key->tv mapping
     merge_deps(tv);             // tv gets all deps that 'this' has
     return tv;
@@ -186,6 +187,14 @@ public class TV2 {
 
   public Set<String> args() { return _args.keySet(); }
   public int len() { return _args==null ? 0 : _args.size(); }
+  public int nargs() {
+    assert is_fun();
+    int nargs = _args.size();
+    nargs--; assert _args.containsKey(" ret"); // Do not count return
+    if( _args.containsKey("2") ) nargs--; // Do not count display
+    assert !_args.containsKey("^"); // Canonical display name
+    return nargs;
+  }
 
   // --------------------------------------------
   // Public factories
@@ -263,7 +272,7 @@ public class TV2 {
 
   // A new struct from a NewObj
   public static TV2 make_struct(NewObjNode n, @NotNull String alloc_site) {
-    TV2 tv2 = new TV2("@{}",new NonBlockingHashMap<>(),null,UQNodes.make(n),alloc_site);
+    TV2 tv2 = new TV2("@{}",new NonBlockingHashMap<>(),TypeMemPtr.EMTPTR,UQNodes.make(n),alloc_site);
     tv2._open = true;           // Start out open
     return tv2;
   }
@@ -343,7 +352,7 @@ public class TV2 {
     switch( n._name ) {
     case "Leaf":   return this; // Normal default, no change
     case "Nil":                 // Nested nilable; collapse the layer
-      _args.put("?",n.get("?"));
+      args_put("?",n.get("?"));
       break;
 
     case "Base":
@@ -534,7 +543,7 @@ public class TV2 {
         if( that.open() ) that.add_fld(key,vthis,work);
       } else vthis._unify(vthat,work); // Matching fields unify
       thsi = thsi.find();
-      if( that.find() != that ) throw unimpl();
+      that = that.find();
     }
     // Fields on the RHS are aligned with the LHS also
     for( String key : that._args.keySet() )
@@ -551,7 +560,7 @@ public class TV2 {
   public boolean add_fld( String id, TV2 fld, Work work) {
     assert is_struct();
     if( _args==null ) _args = new NonBlockingHashMap<>();
-    _args.put(id,fld);
+    args_put(id,fld);
     fld.push_deps(_deps);
     add_deps_work(work);
     return true;
@@ -698,7 +707,7 @@ public class TV2 {
     VARS.put(this,t);       // Stop cyclic structure looping
     if( _args!=null )
       for( String key : _args.keySet() )
-        t._args.put(key,get(key)._fresh(nongen));
+        t.args_put(key,get(key)._fresh(nongen));
     return t;
   }
 
@@ -743,11 +752,10 @@ public class TV2 {
   // output HM type and GCP flow type in parallel, and join output GCP types
   // with the matching input GCP type.
   public static final NonBlockingHashMap  <TV2,Type> T2MAP = new NonBlockingHashMap<>();
-  public static final NonBlockingHashMapLong<String> WDUPS = new NonBlockingHashMapLong<>();
+  public static final NonBlockingHashMapLong<TypeStruct> WDUPS = new NonBlockingHashMapLong<>();
   public Type walk_types_in(TypeMem tmem, Type t) {
     assert !is_unified();
-    long duid = dbl_uid(t._uid);
-    if( WDUPS.putIfAbsent(duid,"")!=null ) return t;
+    if( WDUPS.putIfAbsent(dbl_uid(t._uid),TypeStruct.ALLSTRUCT)!=null ) return t;
     if( is_err() ) return fput(Type.SCALAR); //
     // Base variables (when widened to an HM type) might force a lift.
     if( is_base() ) return fput(_type.meet(t));
@@ -826,12 +834,33 @@ public class TV2 {
     if( is_nil() ) return t; // nil is a function wrapping a leaf which is not-nil
     if( is_fun() ) return t; // No change, already known as a function (and no TFS in the flow types)
     if( is_struct() ) {
-      if( !(t instanceof TypeMemPtr) ) {
-        if( tmap==null ) throw unimpl(); // return tmap == null ? as_flow().join(t) : tmap;  // The most struct-like thing you can be
-        return tmap;
+      if( !(t instanceof TypeMemPtr) && tmap!=null )
+        t = tmap;
+      if( !(t instanceof TypeMemPtr) )
+        t = as_flow(false);
+      TypeMemPtr tmp = (TypeMemPtr)t;
+      if( tmp._obj==TypeObj.UNUSED ) return t; // No lift possible
+      TypeStruct ts0 = (TypeStruct)tmp._obj;
+      long duid = dbl_uid(_uid);
+      TypeStruct ts = WDUPS.get(duid);
+      if( ts != null ) ts._cyclic = true;
+      else {
+        Type.RECURSIVE_MEET++;
+        ts = TypeStruct.malloc("",false,false);
+        for( TypeFld fld : ts0.flds() ) ts.add_fld(fld.malloc_from());
+        ts.set_hash();
+        WDUPS.put(duid,ts); // Stop cycles
+        for( TypeFld fld : ts.flds() ) {
+          TV2 tv2 = get(fld._fld);
+          if( tv2 != null )
+            fld.setX(tv2.walk_types_out(fld._t,cepi));
+        }
+        if( --Type.RECURSIVE_MEET == 0 )
+          // Shrink / remove cycle dups.  Might make new (smaller)
+          // TypeStructs, so keep RECURSIVE_MEET enabled.
+          ts = ts.install();
       }
-      TypeStruct ts = (TypeStruct)((TypeMemPtr)t)._obj;
-      throw unimpl();
+      return tmp.make_from(ts);
     }
     if( is_ary() ) {
       if( !(t instanceof TypeMemPtr) ) {
@@ -848,8 +877,8 @@ public class TV2 {
   // --------------------------------------------
 
   // Recursively build a flow type from an HM type.
-  // During Opto, its  optimistic.
-  // During Iter, its pessimistic.
+  // During Opto, it's  optimistic.
+  // During Iter, it's pessimistic.
 
   // No function arguments, just function returns.
   static final NonBlockingHashMapLong<TypeStruct> ADUPS = new NonBlockingHashMapLong<>();
@@ -862,10 +891,11 @@ public class TV2 {
   Type _as_flow(boolean opto) {
     assert !is_unified();
     if( is_base() ) return _type;
-    if( is_leaf() ) return opto ? Type.XNSCALR : Type.SCALAR;
-    if( is_err()  ) throw unimpl(); // return _type;
-    if( is_fun()  ) return _type;
-    if( is_nil() ) return opto ? Type.XNSCALR : Type.SCALAR;
+    if( is_leaf() ) return opto ? Type.XNSCALR : Type.ALL;
+    if( is_err()  ) return Type.ALL; // No lift
+    if( is_fun()  )
+      return _type instanceof TypeFunPtr ? _type : Type.ALL;
+    if( is_nil() ) return opto ? Type.XNSCALR : Type.ALL;
     if( is_struct() ) {
       TypeStruct tstr = ADUPS.get(_uid);
       if( tstr==null ) {

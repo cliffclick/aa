@@ -1,21 +1,18 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
-import com.cliffc.aa.ErrMsg;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 import org.jetbrains.annotations.NotNull;
 
-import static com.cliffc.aa.AA.ARG_IDX;
-import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.AA.*;
 
 // Load a named field from a struct.  Does it's own nil-check testing.  Loaded
 // value depends on the struct typing.
 public class LoadNode extends Node {
-  private final String _fld;
+  private final String _fld;    // Field being loaded
   private final Parse _bad;
+  public boolean _hm_lift;     // Value type can be lifted by HM
 
   public LoadNode( Node mem, Node adr, String fld, Parse bad ) {
     super(OP_LOAD,null,mem,null,adr);
@@ -150,7 +147,7 @@ public class LoadNode extends Node {
         } else if( mem0 instanceof CallNode ) { // Lifting out of a Call
           mem = ((CallNode)mem0).mem();
         } else {
-          throw com.cliffc.aa.AA.unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
+          throw unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
         }
       } else if( mem instanceof MrgProjNode ) {
         MrgProjNode mrg = (MrgProjNode)mem;
@@ -174,7 +171,7 @@ public class LoadNode extends Node {
                  mem instanceof ConNode) {
         return null;
       } else {
-        throw com.cliffc.aa.AA.unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
+        throw unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
       }
     }
   }
@@ -185,7 +182,7 @@ public class LoadNode extends Node {
     // each clone body updates both aliases everywhere.
     if( !is_load ) return null; // For now, Store types NEVER bypass a call.
     CallNode call = cepi.call();
-    if( !tmem0.fld_is_mod(aliases,fld) && !tmem1.fld_is_mod(aliases,fld) )
+    if( tmem0.fld_not_mod(aliases, fld) && tmem1.fld_not_mod(aliases, fld) )
       return call.mem(); // Loads from final memory can bypass calls.  Stores cannot, store-over-final is in error.
     TypeMemPtr escs = CallNode.tesc(call._val);
     if( escs._aliases.join(aliases)==BitsAlias.EMPTY )
@@ -195,6 +192,14 @@ public class LoadNode extends Node {
 
 
   @Override public Type value(GVNGCM.Mode opt_mode) {
+    Type tx = _value();
+    if( _hm_lift ) {
+      Type th = tvar().as_flow(opt_mode == GVNGCM.Mode.Opto && Combo.HM_IS_HIGH);
+      tx = tx.join(th).simple_ptr();
+    }
+    return tx;
+  }
+  private Type _value() {
     Node adr = adr();
     Type tadr = adr._val;
     if( !(tadr instanceof TypeMemPtr) ) return tadr.oob();
@@ -205,46 +210,8 @@ public class LoadNode extends Node {
     if( !(tmem instanceof TypeMem) ) return tmem.oob(); // Nothing sane
     TypeObj tobj = ((TypeMem)tmem).ld((TypeMemPtr)tadr);
     if( tobj instanceof TypeStruct )
-      // TODO: NOT DOING THIS IN VALUE, BECAUSE NEED TO FLOW AVAIL VALUES FORWARDS ALWAYS
       return get_fld(tobj);
     return tobj.oob();          // No loading from e.g. Strings
-  }
-
-  @Override public void add_work_use_extra(Work work, Node chg) {
-    if( chg==adr() ) work.add(mem());  // Address into a Load changes, the Memory can be more alive.
-    if( chg==mem() ) work.add(mem());  // Memory value lifts to ANY, memory live lifts also.
-    if( chg==mem() ) work.add(adr());  // Memory value lifts to an alias, address is more alive
-    // Memory improves, perhaps Load can bypass Call
-    if( chg==mem() && mem().in(0) instanceof CallEpiNode ) Env.GVN.add_reduce(this);
-    // Memory becomes a MrgProj, maybe Load can bypass MrgProj
-    if( chg==mem() && chg instanceof MrgProjNode ) Env.GVN.add_mono(this);
-  }
-
-  // The only memory required here is what is needed to support the Load
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    TypeMem live = _live_use(def);
-    return def==adr()
-      ? (live.above_center() ? TypeMem.DEAD : _live)
-      : live;
-  }
-  public TypeMem _live_use( Node def ) {
-    Type tmem = mem()._val;
-    Type tptr = adr()._val;
-    if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
-    if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
-    if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
-
-    // If the load is of a constant, no memory nor address is needed
-    Type tfld = get_fld2(((TypeMem)tmem).ld((TypeMemPtr)tptr));
-    if( may_be_con_live(tfld) && err(true)==null )
-      return TypeMem.DEAD;
-
-    if( def==adr() )            // Load is sane, so address is alive
-      return tfld.above_center() ? TypeMem.DEAD : TypeMem.ALIVE;
-
-    // Only named the named field from the named aliases is live.
-    Type ldef = _live.live_no_disp() ? Type.NSCALR : Type.SCALAR;
-    return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld, ldef);
   }
 
   // Load the value
@@ -257,21 +224,41 @@ public class LoadNode extends Node {
     if( fld==null ) return tobj.oob();
     return fld._t;          // Field type
   }
-  // Upgrade, if !dsp and a function pointer
-  private @NotNull Type get_fld2( TypeObj tobj ) {
-    Type tfld = get_fld(tobj);
-    TypeFunPtr tfp;
-    if( tfld instanceof TypeFunPtr &&
-        (tfp=(TypeFunPtr)tfld)._dsp!=TypeMemPtr.NO_DISP && // Display not alive
-        err(true)==null &&
-        _live.live_no_disp() )
-      tfld = tfp.make_no_disp();
-    return tfld;
+
+  @Override public void add_work_use_extra(Work work, Node chg) {
+    if( chg==adr() ) work.add(mem());  // Address into a Load changes, the Memory can be more alive.
+    if( chg==mem() ) work.add(mem());  // Memory value lifts to ANY, memory live lifts also.
+    if( chg==mem() ) work.add(adr());  // Memory value lifts to an alias, address is more alive
+    // Memory improves, perhaps Load can bypass Call
+    if( chg==mem() && mem().in(0) instanceof CallEpiNode ) Env.GVN.add_reduce(this);
+    // Memory becomes a MrgProj, maybe Load can bypass MrgProj
+    if( chg==mem() && chg instanceof MrgProjNode ) Env.GVN.add_mono(this);
+  }
+
+  // The only memory required here is what is needed to support the Load.
+  // If the Load is alive, so is the address.
+
+  // If the Load computes a constant, the address live-ness is determined how
+  // Combo deals with constants, and not here.
+  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+    if( def==adr() ) return TypeMem.ALIVE;
+    Type tmem = mem()._val;
+    Type tptr = adr()._val;
+    if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
+    if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
+    if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
+    // Only named the named field from the named aliases is live.
+    Type ldef = _live.live_no_disp() ? Type.NSCALR : Type.SCALAR;
+    return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld, ldef);
   }
 
   // Standard memory unification; the Load unifies with the loaded field.
   @Override public boolean unify( Work work ) {
     return StoreNode.unify("@{}",this,adr().tvar(),adr()._val,this,_fld,work);
+  }
+  public void add_work_hm(Work work) {
+    super.add_work_hm(work);
+    work.add(adr());
   }
 
   @Override public ErrMsg err( boolean fast ) {
@@ -288,7 +275,7 @@ public class LoadNode extends Node {
       ? ((TypeMem)tmem).ld(ptr) // General load from memory
       : ((TypeObj)tmem);
     if( objs==TypeObj.UNUSED ) return null; // No error, since might fall to anything
-    if( !(objs instanceof TypeStruct) || find((TypeStruct)objs) == null )
+    if( !(objs instanceof TypeStruct) || adr().tvar().get(_fld)==null )
       return bad(fast,objs);
     return null;
   }

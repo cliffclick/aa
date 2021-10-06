@@ -87,16 +87,20 @@ public class ParmNode extends PhiNode {
     Type t = Type.ANY;
     Node mem = fun.parm(MEM_IDX);
     int i=1;
-    // Lift by HM
+    // Lift the external caller by HM
     if( fun.has_unknown_callers() ) {
       i = 2;
       if( fun.is_unknown_alive() ) {
+        assert fun.in(1) instanceof ScopeNode;
         assert fun.val(1) == Type.CTRL || fun.val(1) == Type.ANY;
         t = mem == null ? val(1) : in(1).sharptr(mem.in(1));
-        if( _tvar != null ) {
+        if( _tvar != null ) { // Lift if HM is available
           TV2 tv = tvar();
           Type ta = tv.as_flow(opt_mode == GVNGCM.Mode.Opto && Combo.HM_IS_HIGH);
           t = t.join(ta);
+        } else { // Else Input memory is the Scope escape-out memory
+          if( mem==this && opt_mode._CG )
+            t = ((ScopeNode)fun.in(1)).mem()._val;
         }
       }
     }

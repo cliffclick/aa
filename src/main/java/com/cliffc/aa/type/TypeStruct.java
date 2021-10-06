@@ -1086,6 +1086,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     //return xmeet1((TypeStruct)t2,true);
     throw unimpl();
   }
+  
+  @Override public TypeStruct simple_ptr() {
+    TypeStruct ts = malloc(_name,_any,_open);
+    for( TypeFld fld : flds() ) {
+      Type t = fld._t.simple_ptr();
+      ts.add_fld(t==fld._t ? fld : fld.make_from(t));
+    }
+    return ts.hashcons_free();    
+  }
 
   // ------ Utilities -------
 
@@ -1107,7 +1116,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         fx = fld;
       }
     }
-    assert fx!=null;
     return fx;
   }
 
@@ -1166,7 +1174,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   @Override public TypeObj flatten_fields() {
     TypeStruct ts = malloc(_name,_any,_open);
     for( TypeFld fld : flds() )
-      ts.add_fld(fld.make_from(fld._t.above_center() && fld._t!=Type.XNIL ? Type.XSCALAR : Type.SCALAR,Access.bot()));
+      ts.add_fld(fld.make_from(fld._t==Type.XSCALAR||fld._t==Type.ANY ? Type.XSCALAR : Type.SCALAR,Access.bot()));
     return ts.hashcons_free();
   }
 
@@ -1195,7 +1203,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       st.add_fld( Util.eq("^",fld._fld) ? fld : fld.make_from(Type.ALL,Access.bot()));
     return st.hashcons_free();
   }
-  
+
   // Keep field names and orders.  Widen all field contents, including finals.
   // Handles cycles
   @Override public TypeStruct widen() {

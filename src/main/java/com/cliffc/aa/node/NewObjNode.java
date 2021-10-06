@@ -154,7 +154,9 @@ public class NewObjNode extends NewNode<TypeStruct> {
     TypeObj to = _live.at(_alias);
     if( !(to instanceof TypeStruct) ) return to.above_center() ? TypeMem.DEAD : TypeMem.ESCAPE;
     int idx=0;  while( in(idx)!=def ) idx++; // Index of node
-    Type t = ((TypeStruct)to).fld_idx(idx)._t;
+    TypeFld fld = ((TypeStruct)to).fld_idx(idx);
+    if( fld==null ) return TypeMem.DEAD; // No such field is alive
+    Type t = fld._t;
     return t.above_center() ? TypeMem.DEAD : (t==Type.NSCALR ? TypeMem.LESC_NO_DISP : TypeMem.ESCAPE);
   }
 

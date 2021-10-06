@@ -325,7 +325,7 @@ public class TypeMem extends Type<TypeMem> {
     if( ptr._aliases == BitsAlias.NIL.dual() || ptr._aliases == BitsAlias.NIL )
       return TypeObj.XOBJ;
     if( ptr._aliases == BitsAlias.EMPTY )
-      return oob(TypeObj.OBJ);
+      return ptr._obj.oob(TypeObj.OBJ);
     if( this== FULL ) return TypeObj. OBJ;
     if( this==EMPTY ) return TypeObj.XOBJ;
     return ld(_pubs,ptr._aliases);
@@ -505,19 +505,19 @@ public class TypeMem extends Type<TypeMem> {
     return bs;
   }
 
-  // True if field is modifiable across any alias
-  public boolean fld_is_mod( BitsAlias aliases, String name) {
+  // False if field is modifiable across any alias
+  public boolean fld_not_mod( BitsAlias aliases, String name) {
     for( int alias : aliases ) {
       if( alias != 0 ) {
         TypeObj to = at(alias);
-        if( !(to instanceof TypeStruct) ) return true;
+        if( !(to instanceof TypeStruct) ) return false;
         TypeStruct ts = (TypeStruct)to;
         TypeFld fld = ts.fld_find(name);
-        if( fld==null || fld._access != Access.Final )
-          return true; // Cannot check for R/O here, because R/O can lift to R/W
+        if( fld!=null && fld._access == Access.RW )
+          return false;
       }
     }
-    return false;
+    return true;                // Not modified in any alias
   }
 
   // For live-ness purposes, flatten all field contents.
@@ -538,6 +538,7 @@ public class TypeMem extends Type<TypeMem> {
     return make0(tos);
   }
 
+  // Recursively widen fields
   @Override public TypeMem widen() {
     TypeObj[] tos = _pubs.clone();
     tos[0] = null;
@@ -546,6 +547,17 @@ public class TypeMem extends Type<TypeMem> {
         tos[i] = tos[i].widen();
     return make0(tos);
   }
+
+  // Lift (join) memory contents based on the sharp pointer
+  public TypeMem lift_at( TypeMemPtr ptr ) {
+    TypeObj[] tos = _pubs.clone();
+    tos[0] = null;
+    for( int i=1; i< _pubs.length; i++ )
+      if( ptr._aliases.test_recur(i) )
+        tos[i] = (TypeObj)at(i).join(ptr._obj).simple_ptr();
+    return make0(tos);
+  }
+
 
   @Override public boolean above_center() {
     for( TypeObj alias : _pubs )

@@ -1050,10 +1050,10 @@ public class HM {
         Type pred = _types[0];
         if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
           return rez.unify(targ(2),work); // Unify only the false side
-        if( pred.above_center() ) // Neither side executes
-          return false;           // Unify neither side
-        if( !pred.must_nil() )    // Unify only the true side
+        if( pred.above_center() ? !pred.may_nil() : !pred.must_nil() )
           return rez.unify(targ(1),work);
+        if( pred.above_center() ) // Wait until predicate falls
+          return false;
       }
       // Unify both sides with the result
       return
@@ -1691,7 +1691,8 @@ public class HM {
         return _flow.must_nil() ? vput(that,progress) : progress;
       }
 
-      assert Util.eq(_name,that._name);
+      if( !Util.eq(_name,that._name) )
+        return work == null || vput(that,that._unify(make_err("Cannot unify "+this.p()+" and "+that.p()),work));
 
       // Both same (probably both nil)
       if( _args==that._args ) return vput(that,false);

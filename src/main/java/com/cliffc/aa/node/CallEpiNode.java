@@ -287,8 +287,8 @@ public final class CallEpiNode extends Node {
     // Fidxes; if still in the parser, assuming calling everything
     BitsFun fidxs = tfptr.fidxs();
     // NO fidxs, means we're not calling anything.
-    if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
-    if( fidxs.above_center() ) return TypeTuple.CALLE.dual(); // Not resolved yet
+    if( fidxs==BitsFun.EMPTY ) return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,Type.ANY);
+    if( fidxs.above_center() ) return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,Type.ANY); // Not resolved yet
 
     // Default memory: global worst-case scenario
     TypeMem defmem = Env.DEFMEM._val instanceof TypeMem
@@ -369,10 +369,12 @@ public final class CallEpiNode extends Node {
       for( int i=DSP_IDX; i<call._defs._len-1; i++ )
         { TV2.WDUPS.clear(); call.tvar(i).walk_types_in(caller_mem,call.val(i)); }
       // Walk the outputs, building an improved result
-      Type trez2 = tvar().walk_types_out(trez,this);
-      Type trez3 = trez2.join(trez); // Lift result
-      assert trez3.isa(trez);        // Monotonic...
-      trez = trez3;                  // Upgrade
+      Type trez_sharp = tmem3.sharptr(trez);
+      Type trez_lift = tvar().walk_types_out(trez_sharp,this);
+      Type trez_lift_dull = trez_lift.simple_ptr();
+      if( trez_lift instanceof TypeMemPtr )
+        tmem3 = tmem3.lift_at((TypeMemPtr)trez_lift);  // Upgrade memory result
+      trez = trez_lift_dull.join(trez);                // Upgrade scalar result
     }
 
     return TypeTuple.make(Type.CTRL,tmem3,trez);
@@ -523,18 +525,21 @@ public final class CallEpiNode extends Node {
 
   @Override public boolean unify( Work work ) {
     assert !_is_copy;
-    if( tvar().is_err() ) return false;
+    if( tvar().is_err() ) return false; // Already sick, nothing to do
     CallNode call = call();
     Node fdx = call.fdx();
     TV2 tfun = fdx.tvar();
-    if( tfun.is_err() )
+    if( tfun.is_err() )         // Unify with function error
       return tvar().unify(tfun,work);
 
+    // If the function is not a function, make it a function
     boolean progress = false;
     if( !tfun.is_fun() ) {
       if( work==null ) return true;
       NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
-      for( int i=DSP_IDX; i<call._defs._len; i++ )
+      // The display is extracted from the FunPtr and is not the function itself
+      args.put("2",TV2.make_leaf(fdx,"CallEip_unify"));
+      for( int i=ARG_IDX; i<call._defs._len; i++ )
         args.put((""+i).intern(),call.tvar(i));
       args.put(" ret",tvar());
       TV2 nfun = TV2.make_fun(this, fdx._val, args, "CallEpi_unify");
@@ -543,11 +548,11 @@ public final class CallEpiNode extends Node {
     }
     // TODO: Handle Thunks
 
-    if( tfun.len()-1-1 != call.nargs()-ARG_IDX ) //
+    if( tfun.nargs() != call.nargs()-ARG_IDX ) //
       return tvar().unify(TV2.make_err(this,"Mismatched argument lengths","CallEpi_unify"),work);
 
     // Check for progress amongst args
-    for( int i=DSP_IDX; i<call._defs._len; i++ ) {
+    for( int i=ARG_IDX; i<call._defs._len; i++ ) {
       TV2 actual = call.tvar(i);
       TV2 formal = tfun.get((""+i).intern());
       progress |= actual.unify(formal,work);

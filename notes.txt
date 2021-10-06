@@ -1,4 +1,40 @@
 =======================================
+10/4/2021
+
+Still wrestling with theory.
+"f = { x -> x ? (f(x.next),x.val*x.val) : 0 }; f"
+
+3 interlocking optimistic passes being combined, with lots of bonus extra bits:
+At end of pass1:
+- X IS ~nScalar (passed-in no-nil instead of more correct ~Scalar to force IF to trigger one side)
+- So x.v is ANY                // Loading from ~Scalar
+- So x.v MIGHT be a constant   // ANY can fall to e.g. 3.14
+- So x.v inputs are DEAD.      // If we fall to a constant, no need to Load
+- So Cast does not unify       // Cast-not-nil is maybe-dead, and Dead do not unify & force bad unifications.
+- So X does not merge @{.n} and @{.v}, and is DEAD.
+- So no H-M resolution for X.
+
+Start of pass2:
+- H-M for X is still a Leaf, so X falls to Scalar.
+- Function body resolves; X's H-M type is "T=@{n=T, v=int}?"
+Which tries to Lift X from Scalar, but Too Late.
+
+Observation:
+Const IF, no unify on dead branch    : value->HM    cross point.
+Base types in HM                     : value->HM    cross point.
+HM lifts post-call & loads           : HM   ->value cross point
+Escaping fcn entry point lifts via HM: HM   ->value cross point.
+Live-is-dead, so no unification      : live ->HM    cross point.
+Value-maybe-con, so args are dead    : value->live  cross point.
+
+Of these 3 interlocking optimistic passes, if I drop value-maybe-con, I remove
+live from the interlock.  Now the liveness can run first and feed into the
+interlocked value<->HM pass.
+
+
+
+
+=======================================
 9/28/2021
 
 Still wrestling with theory.

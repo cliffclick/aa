@@ -512,8 +512,9 @@ public abstract class Node implements Cloneable {
   // function to go dead.  Easy fix: disallow for TypeFunPtr.  Hard (better)
   // fix: make the corresponding FunPtrNode go alive.
   static boolean may_be_con_live(Type t) {
-    return t.may_be_con() &&      // Use might be replaced with a constant (and not have this input)
-      !(t instanceof TypeFunPtr); // Always compute funptrs, as constants they keep function bodies alive
+    //return t.may_be_con() &&      // Use might be replaced with a constant (and not have this input)
+    //  !(t instanceof TypeFunPtr); // Always compute FunPtrs, as constants they keep function bodies alive
+    return false;
   }
 
   // Shortcut to update self-live
@@ -558,17 +559,22 @@ public abstract class Node implements Cloneable {
     assert nval==nval.simple_ptr() || this instanceof ConTypeNode; // Only simple pointers in node types
     assert oval.isa(nval);      // Monotonic
     _val = nval;                // Record progress
-    for( Node use : _uses ) {   // Classic forwards flow on change
+
+    // Classic forwards flow on change.  Also wire Call Graph edges.    
+    for( Node use : _uses ) {   
       work.add(use).add_work_use_extra(work,this);
       if( use instanceof CallEpiNode ) ((CallEpiNode)use).check_and_wire(work);
+      if( use instanceof   ScopeNode ) ((  ScopeNode)use).check_and_wire(work);
     }
     add_work_extra(work,oval);
     if( this instanceof CallEpiNode ) ((CallEpiNode)this).check_and_wire(work);
-    // All liveness is skipped if may_be_con, since the possible constant
-    // has no inputs.
+    // All liveness is skipped if may_be_con, since the possible constant has
+    // no inputs.  If values drop from being possible constants to not being a
+    // constant, liveness must be revisited.
     assert may_be_con_live(oval) || !may_be_con_live(nval); // May_be_con_live is monotonic
     if( may_be_con_live(oval) && !may_be_con_live(nval) )
       for( Node def : _defs ) work.add(def); // Now check liveness
+    
   }
 
   // Do One Step of backwards-dataflow analysis.  Assert monotonic progress.
@@ -586,7 +592,7 @@ public abstract class Node implements Cloneable {
 
   // Do One Step of Hindley-Milner unification.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
-public void combo_unify(Work work) {
+  public void combo_unify(Work work) {
     if( _live==TypeMem.DEAD ||  // No HM progress on dead code
         !has_tvar() ) return;   // Has no TVar in the first place
     TV2 old = tvar();
@@ -776,6 +782,20 @@ public void combo_unify(Work work) {
     if( this instanceof FreshNode ) ((FreshNode)this).id().tvar().push_dep(this);
   }
 
+  // Combo phase 2: all nodes previously lifted by HM go back on the worklist,
+  // as the default HM will no longer lift to Type.XNSCALR.
+  public final void walk_combo_phase2( Work work, BitsFun top_escapes ) {
+    if( RESET_VISIT.tset(_uid) ) return; // Been there, done that
+    if( this instanceof LoadNode && tvar().is_leaf() ) { work.add(this); ((LoadNode)this)._hm_lift = false; } // Loads are lifted.
+    if( this instanceof FunNode  && top_escapes.test(((FunNode)this)._fidx) ) work.add(this);
+    if( this instanceof ParmNode && has_tvar() && tvar().is_leaf() &&
+        top_escapes.test(((ParmNode)this).fun()._fidx ))
+      work.add(this); // External parms are lifted.
+    // Walk reachable graph
+    for( Node use : _uses )                   use.walk_combo_phase2(work,top_escapes);
+    for( Node def : _defs ) if( def != null ) def.walk_combo_phase2(work,top_escapes);
+  }
+
   // Reset
   public static final VBitSet RESET_VISIT = new VBitSet();
   public final void walk_reset( Work work ) {
@@ -792,6 +812,7 @@ public void combo_unify(Work work) {
     if( this instanceof RegionNode || this instanceof PhiNode ) {
       while( len()>1 && !in(len()-1).is_prim() ) pop(); // Kill wired primitive inputs
     }
+    if( this instanceof LoadNode ) ((LoadNode)this)._hm_lift = true;
   }
 
 

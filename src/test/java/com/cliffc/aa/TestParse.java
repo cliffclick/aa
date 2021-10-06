@@ -122,18 +122,17 @@ public class TestParse {
     testerr("+", "Syntax error; trailing junk",0);
     testerr("!", "Syntax error; trailing junk",0);
     test_prim("_+_", "_+_");
-    test_prim("{_+_}", "_+_");
     // "!_var" parses as "! _var" and not "!_ var".  If you want the "!" operator,
     // must use the wrapping syntax.
-    test_prim("{!_}", "!_"); // uniops are just like normal functions
+    test_prim("!_", "!_"); // uniops are just like normal functions
     // Function application, traditional paren/comma args
     test("_+_(1,2)", TypeInt.con( 3));
-    test("{_-_}(1,2)", TypeInt.con(-1)); // binary version
+    test("_-_(1,2)", TypeInt.con(-1)); // binary version
     test(" - (1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
-    testerr("{!_}() ", "Passing 0 arguments to {!_} which takes 1 arguments",4);
+    testerr("!_() ", "Passing 0 arguments to !_ which takes 1 arguments",2);
     testerr("math.pi(1)", "A function is being called, but 3.141592653589793 is not a function",10);
-    testerr("{_+_}(1,2,3)", "Passing 3 arguments to {_+_} which takes 2 arguments",5);
+    testerr("_+_(1,2,3)", "Passing 3 arguments to _+_ which takes 2 arguments",3);
 
     // Parsed as +(1,(2*3))
     test("_+_(1, 2 * 3) ", TypeInt.con(7));
@@ -142,8 +141,8 @@ public class TestParse {
     // Statements
     test("(1;2 )", TypeInt.con(2));
     test("(1;2;)", TypeInt.con(2)); // final semicolon is optional
-    test("{_+_}(1;2 ,3)", TypeInt.con(5)); // statements in arguments
-    test("{_+_}(1;2;,3)", TypeInt.con(5)); // statements in arguments
+    test("_+_(1;2 ,3)", TypeInt.con(5)); // statements in arguments
+    test("_+_(1;2;,3)", TypeInt.con(5)); // statements in arguments
     // Operators squished together
     test("-1== -1",  TypeInt.TRUE);
     test("0== !!1",  TypeInt.FALSE);
@@ -371,7 +370,7 @@ public class TestParse {
     testerr ("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
-    test("x=@{n}",(()->TypeMemPtr.make(13,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,Access.RW,ARG_IDX)))),
+    test("x=@{n}",(()->TypeMemPtr.make(14,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,Access.RW,ARG_IDX)))),
          null,"@{n=0}");
   }
 
@@ -406,13 +405,13 @@ public class TestParse {
     test("A= :@{n=A?; v=int}; A(@{n=0;v=3})","*A:@{n=0; v=3}","@{n=0,v=3}");
 
     // Missing type B is also never worked on.
-    test("A= :@{n=B?; v=int}", "[~29+73]{->*use }","A");
+    test("A= :@{n=B?; v=int}", "[~29+73]{->*~use }","A");
     test("A= :@{n=B?; v=int}; a = A(0,2)", "*A:@{n=0; v=2}","@{n=0,v=2}");
     test("A= :@{n=B?; v=int}; a = A(0,2); a.n", "0", "0");
     // Mutually recursive type
-    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", "[~76+77]{->*use }", "A");
-    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", "[~29+73]{->*use }", "A"); // Same test, again, using the same Type.INTERN table
-    test("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}", "[~78+79]{->*use }", "A");
+    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", "[~76+77]{->*~use }", "A");
+    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", "[~29+73]{->*~use }", "A"); // Same test, again, using the same Type.INTERN table
+    test("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}", "[~78+79]{->*~use }", "A");
     // Mixed ABC's, making little abc's in-between.
     test("""
 A= :@{n=B?; v=int};
@@ -426,8 +425,10 @@ c= C(b,"abc");
   }
 
   @Test public void testParse07() {
-    test("A= :@{n=A?; v=int}; f={x    -> x ? A(f(x.n),x.v*x.v) : 0}", "","");
+    // Simple recursive call being returned.
+    test("T= :@{n=T?; v=int}; f={x -> x ? T(f(x.n),x.v&x.v)}", "[75]{->*use? }","[75]{ A:@{ n = A, v = int64, ...}? -> B:@{ n = B, v = int64}? }");
     test("A= :@{n=A?; v=int}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}", "","");
+    test("f={x -> x ? (f x.n,x.v&x.v)}", "[73]{->*use? }","[73]{A:@{n=A,v=int64,...}?->B:(B,int64)?}");
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(_&_,2)", "0","0");
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(_+_,2)", "2","2");

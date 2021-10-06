@@ -33,14 +33,14 @@ public class ScopeNode extends Node {
     keep();
   }
 
-  public   Node  ctrl() { return in(0); }
+  public   Node  ctrl() { return in(CTL_IDX); }
   public   Node  mem () { return in(MEM_IDX); }
-  public   Node  ptr () { return in(2); }
-  public   Node  rez () { return in(3); }
+  public   Node  ptr () { return in(DSP_IDX); }
+  public   Node  rez () { return in(ARG_IDX); }
   public NewObjNode stk () { return (NewObjNode)ptr().in(0); }
-  public <N extends Node> N set_ctrl( N n ) { set_def(0,n); return n; }
-  public void set_ptr ( Node n) { set_def(2,n); }
-  public void set_rez ( Node n) { set_def(3,n); }
+  public <N extends Node> N set_ctrl( N n ) { set_def(CTL_IDX,n); return n; }
+  public void set_ptr ( Node n) { set_def(DSP_IDX,n); }
+  public void set_rez ( Node n) { set_def(ARG_IDX,n); }
 
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
   public Node set_mem( Node n) {
@@ -71,7 +71,7 @@ public class ScopeNode extends Node {
   public RegionNode early_ctrl() { return (RegionNode)in(4); }
   public    PhiNode early_mem () { return (   PhiNode)in(5); }
   public    PhiNode early_val () { return (   PhiNode)in(6); }
-  public void       early_kill() { pop(); pop(); pop(); }
+  public void       early_kill() { set_def(4,null); set_def(5,null); set_def(6,null); }
   static final int RET_IDX = 7;
 
   // Name to type lookup, or null
@@ -93,7 +93,11 @@ public class ScopeNode extends Node {
     add_def(t);                 // Hook constant so it does not die
   }
 
-  public boolean is_closure() { assert _defs._len==4 || _defs._len==7; return _defs._len==7; }
+  // If inputs 4,5,6 are early_ctrl, _mem and _val then you are a closure.
+  public boolean is_closure() {
+    if( len() < 7 ) return false;
+    return !(in(4) instanceof RetNode);
+  }
 
   @Override public Node ideal_reduce() {
     Node ctrl = in(0).is_copy(0);
@@ -102,16 +106,22 @@ public class ScopeNode extends Node {
     Node mem = mem();
     Node rez = rez();
     Type trez = rez==null ? null : rez._val;
-    if( this!=Env.TOP._scope && // Not the top-level, which is always alive
+    if( this!=Env.SCP_0 &&      // Not the top-level, which is always alive
         Env.GVN._opt_mode != GVNGCM.Mode.Parse &&   // Past parsing
-        rez != null &&          // Have a return result
-        // If type(rez) can never lift to any TMP, then we will not return a
-        // pointer, and do not need the memory state on exit.
-        (!TypeMemPtr.OOP0.dual().isa(trez) || trez==Type.XNIL) &&
+        //rez != null &&          // Have a return result
         // And not already wiped it out
-        !(mem instanceof ConNode && mem._val ==TypeMem.XMEM) )
+        !(mem instanceof ConNode && mem._val ==TypeMem.ANYMEM) &&
+        // And used memory is dead
+        compute_live_mem(this,mem,rez)==TypeMem.ANYMEM ) {
+      // All default mem-Parms of escaping functions update.
+      for( Node use : _uses )
+        if( use instanceof FunNode )
+          for( Node parm : use._uses )
+            if( parm instanceof ParmNode && ((ParmNode)parm)._idx==MEM_IDX )
+              Env.GVN.add_flow(parm);
       // Wipe out return memory
-      return set_mem(Node.con(TypeMem.XMEM));
+      return set_mem(Node.con(TypeMem.ANYMEM));
+    }
 
     // If the result is never a function
     int progress = _defs._len;
@@ -139,13 +149,17 @@ public class ScopeNode extends Node {
 
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public void add_work_use_extra(Work work, Node chg) {
-    if( chg==rez() ) {                 // If the result changed
+    if( chg==rez() ) {          // If the result changed
       for( Node use : _uses ) {
         if( use != this ) work.add(use);
         if( use instanceof FunNode ) // If escaping functions, their parms now take the default path
           work.add(use._uses);
       }
     }
+    if( chg==mem() )            // If the memory changed
+      for( Node use : _uses )
+        if( use instanceof FunNode ) // If escaping functions, their parms now take the default path
+          work.add(((FunNode)use).parm(MEM_IDX));
   }
 
   // From a memory and a possible pointer-to-memory, find all the reachable
@@ -164,7 +178,8 @@ public class ScopeNode extends Node {
       Type disp = ((TypeFunPtr)trez)._dsp;
       BitsAlias esc_in = disp instanceof TypeMemPtr ? ((TypeMemPtr)disp)._aliases : BitsAlias.EMPTY;
       TypeMem tmem3 = TypeMem.ANYMEM;
-      for( int i=RET_IDX; i<scope._defs._len; i++ ) {
+      for( int i=ARG_IDX+1 ; i<scope._defs._len; i++ ) {
+        if( !(scope.in(i) instanceof RetNode) ) continue;
         RetNode ret = (RetNode)scope.in(i);
         int fidx = ret.fidx();
         if( ret._val instanceof TypeTuple && fidxs.test(fidx) ) {
@@ -185,8 +200,8 @@ public class ScopeNode extends Node {
   }
 
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
-    // Prim scope is always alive
-    if( this==Env.SCP_0 )  return TypeMem.ALLMEM;
+    // Primitive scope does not demand any memory
+    if( this==Env.SCP_0 )  return TypeMem.ANYMEM;
     if( opt_mode == GVNGCM.Mode.Parse ) return TypeMem.MEM;
     // All fields in all reachable pointers from rez() will be marked live
     return compute_live_mem(this,mem(),rez());
@@ -234,6 +249,22 @@ public class ScopeNode extends Node {
     return fidxs;
   }
 
+  // GCP discovers functions which escape at the top-most level, and wires the
+  // RetNode to the top-most Scope to mimic future unknown callers.
+  void check_and_wire( Work work ) {
+    if( this==Env.SCP_0 ) return; // Do not wire the escaping primitives?
+    BitsFun escs = top_escapes();
+    if( escs.bitCount() <= len()-(ARG_IDX+1) ) return;
+    if( escs==BitsFun.FULL ) return; // Error exit
+    for( int fidx : escs ) {
+      boolean found=false;
+      for( int i=ARG_IDX+1; i<len(); i++ )
+        if( in(i) instanceof RetNode && ((RetNode)in(i))._fidx==fidx )
+          {found=true; break; };
+      if( !found )
+        add_def(FunNode.find_fidx(fidx).ret());
+    }
+  }
 
 
   @Override public int hashCode() { return 123456789; }

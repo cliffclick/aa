@@ -119,8 +119,10 @@ public class IntrinsicNode extends Node {
     return TypeMem.ALIVE;
   }
   @Override BitsAlias escapees() { return ptr().in(0).escapees(); }
-  //
+  // We must inline and fold away to be correct.  The only allowed caller is the unknown one.
   @Override public ErrMsg err( boolean fast ) {
+    if( in(0) instanceof FunNode && in(0).len()==2 && ((FunNode)in(0)).has_unknown_callers() )
+      return null;             // No error if only called by the unknown caller
     if( fast ) return ErrMsg.FAST;
     Type ptr = ptr()._val;
     Type mem = mem()._val;
@@ -143,7 +145,7 @@ public class IntrinsicNode extends Node {
       Node rpc = X.xform(new ParmNode(  0    ," rpc",fun,Env.ALL_CALL,null));
       Node memp= X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
       // Add input edges to the NewNode
-      Node nodisp = Node.con(TypeMemPtr.NO_DISP);
+      Node nodisp = Env.ANY;
       NewObjNode nnn = (NewObjNode)X.add(new NewObjNode(false,alias,to,nodisp));
       while( nnn.len() < to.nargs() ) nnn.add_def(null);
       for( TypeFld fld : to.flds() )

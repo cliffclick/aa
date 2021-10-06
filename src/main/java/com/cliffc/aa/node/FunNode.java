@@ -123,7 +123,7 @@ public class FunNode extends RegionNode {
     return name(name,_bal_close,fidx(),_op_prec,is_forward_ref(),debug);
   }
   static String name(String name, String bal, int fidx, int op_prec, boolean fref, boolean debug) {
-    if( op_prec >= 0 && name != null ) name = '{'+name+(bal==null?"":bal)+'}'; // Primitives wrap
+    if( op_prec >= 0 && name != null && bal!=null ) name = name+bal; // Primitives wrap
     if( name==null ) name="";
     if( debug ) name = name + "["+fidx+"]"; // FIDX in debug
     return fref ? "?"+name : name;          // Leading '?'
@@ -136,11 +136,9 @@ public class FunNode extends RegionNode {
     if( fidxs==BitsFun.EMPTY ) return sb.p("[]");
     // See if this is just one common name, common for overloaded functions
     String s=null;
-    boolean prim=false;
     for( Integer ii : fidxs ) {
       FunNode fun = find_fidx(ii);
       if( fun!=null ) {
-        prim |= fun._op_prec >= 0;
         if( fun._name != null ) s = fun._name;
         else if( !fun.is_dead() )
           for( Node fptr : fun.ret()._uses ) // For all displays for this fun
@@ -154,7 +152,7 @@ public class FunNode extends RegionNode {
       }
     }
     if( s!=null )
-      if( prim ) sb.p('{').p(s).p('}'); else sb.p(s);
+      sb.p(s);
     // Make a list of the fidxs
     if( debug ) {
       int cnt = 0;

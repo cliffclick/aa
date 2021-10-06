@@ -220,13 +220,18 @@ public class StoreNode extends Node {
 
     // Unify against an open struct with the named field
     if( ptr.is_leaf() || ptr.is_fun() ) {
-      TV2 tv2 = TV2.make_open_struct(name,st,TypeMemPtr.make(BitsAlias.EMPTY,TypeStruct.make()),"Store_update", new NonBlockingHashMap<>());
+      TV2 tv2 = TV2.make_open_struct(name,st,TypeMemPtr.make(BitsAlias.REC,TypeStruct.make()),"Store_update", new NonBlockingHashMap<>());
       tv2.args_put(id,st.tvar());
       return tv2.unify(ptr,work);
     }
 
     // Closed record, field is missing
     return st.tvar().unify(ptr.miss_field(st,id,"Store_update"),work);
+  }
+
+  @Override public void add_work_hm(Work work) {
+    super.add_work_hm(work);
+    work.add(adr());
   }
 
 }
