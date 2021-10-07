@@ -83,7 +83,11 @@ public class TypeFld extends Type<TypeFld> {
   public TypeFld make_from(Type t) { return t==_t ? this : make(_fld,t,_access,_order); }
   public TypeFld make_from(Type t, Access a) { return (t==_t && a==_access) ? this : make(_fld,t,a,_order); }
 
-  @Override protected TypeFld xdual() { return new TypeFld().init(sdual(_fld),_t._dual,_access.dual(),odual(_order)); }
+  @Override protected TypeFld xdual() {
+    if( _t==_t._dual && _order==odual(_order) && _access==_access.dual() )
+      return this;              // Self symmetric
+    return new TypeFld().init(sdual(_fld),_t._dual,_access.dual(),odual(_order));
+  }
   @Override protected TypeFld rdual() {
     assert _hash!=0;
     if( _dual != null ) return _dual;

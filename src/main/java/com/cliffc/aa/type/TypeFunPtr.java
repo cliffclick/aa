@@ -220,7 +220,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public boolean is_display_ptr() { return _dsp.is_display_ptr(); }
 
   // All reaching fidxs, including any function returns
-  @Override public BitsFun all_reaching_fidxs(Type tmem) {
+  @Override public BitsFun all_reaching_fidxs( TypeMem tmem) {
     // Myself, plus any function returns
     return _fidxs.meet(_ret.all_reaching_fidxs(tmem));
   }

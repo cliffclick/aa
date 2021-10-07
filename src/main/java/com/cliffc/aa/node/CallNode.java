@@ -480,9 +480,11 @@ public class CallNode extends Node {
     } else {                    // Args lifted, may resolve
       if( fdx() instanceof UnresolvedNode )
         Env.GVN.add_reduce(this);
-      if( Env.GVN._opt_mode._CG && err(true)==null )
+      ErrMsg err = err(true);
+      if( err==null ) work.add(cepi); // Call goes from err -> not_err, CEPI makes progress
+      if( Env.GVN._opt_mode._CG && err==null )
         work.add(mem());        // Call not-in-error, memory may lift
-      if( Env.GVN._opt_mode._CG && err(true)!=null )
+      if( Env.GVN._opt_mode._CG && err!=null )
         add_work_defs(work);    // Call in-error, all args are now used
     }
   }
@@ -508,17 +510,29 @@ public class CallNode extends Node {
   }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+
     if( def==fdx() ) {                         // Function argument
       if( def instanceof ThretNode ) return TypeMem.ALLMEM; // Always inlines eagerly, so this is always temporary
       if( !opt_mode._CG ) return TypeMem.ESCAPE; // Prior to GCP, assume all fptrs are alive and display escapes
-      // During GCP, unresolved calls might resolve & remove this use.  Keep dead till resolve fails.
-      // If we have a fidx directly, use it more precisely.
-      int dfidx = -1;
-      FunPtrNode fptr;  RetNode ret;
-      if( def instanceof FunPtrNode && (ret=(fptr=((FunPtrNode)def)).ret())!=null ) dfidx = ret._fidx;
-      return live_use_call(dfidx);
+      Type tcall = _val;
+      if( !(tcall instanceof TypeTuple) ) // Call is has no value (yet)?
+        return tcall.above_center() ? TypeMem.DEAD : TypeMem.ESCAPE;
+      TypeFunPtr tfp = ttfp(tcall);
+      BitsFun fidxs = tfp.fidxs();
+      if( fidxs.above_center() ) return TypeMem.DEAD; // Nothing above-center is chosen
+      // If using a specific FunPtr and its in the resolved set, test more precisely
+      RetNode ret;
+      if( def instanceof FunPtrNode && // Have a FunPtr
+          (ret=((FunPtrNode)def).ret())!=null && // Well-structured function
+          !fidxs.test_recur(ret._fidx) )                // FIDX directly not used
+        return TypeMem.DEAD;                            // Not in the fidx set.
+      // Otherwise, the FIDX is alive.  Check the display.
+      ProjNode dsp = ProjNode.proj(this,DSP_IDX);
+      return dsp!=null && dsp._live==TypeMem.ALIVE ? TypeMem.ALIVE : TypeMem.LNO_DISP;
     }
+
     if( def==ctl() ) return TypeMem.ALIVE;
+
     if( def!=mem() ) {         // Some argument
       // Check that all fidxs are wired; an unwired fidx might be in-error
       // and we want the argument alive for errors.  This is a value turn-
@@ -577,21 +591,6 @@ public class CallNode extends Node {
     if( _is_copy || fidxs==BitsFun.FULL ) return true;
     CallEpiNode cepi = cepi();
     return cepi != null && fidxs.bitCount() <= cepi.nwired();
-  }
-
-  TypeMem live_use_call( int dfidx ) {
-    Type tcall = _val;
-    if( !(tcall instanceof TypeTuple) )
-      return tcall.above_center() ? TypeMem.DEAD : TypeMem.LNO_DISP;
-    TypeFunPtr tfp = ttfp(tcall);
-    // If resolve has chosen this dfidx, then the FunPtr is alive.
-    BitsFun fidxs = tfp.fidxs();
-    if( fidxs.above_center() ) return TypeMem.DEAD; // Nothing above-center is chosen
-    if( dfidx != -1 && !fidxs.test_recur(dfidx) ) return TypeMem.DEAD; // Not in the fidx set.
-    if( may_be_con_live(tfp) )
-      return TypeMem.DEAD; // Will be replaced by a constant
-    // Otherwise the FIDX is alive but not the display
-    return TypeMem.LNO_DISP;
   }
 
   // Amongst these choices return the least-cost.  Some or all might be invalid.

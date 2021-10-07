@@ -879,7 +879,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // Make from existing type, replacing TMPs with alias from the map
   public Type make_from(Type head, TypeMem map, VBitSet visit) { return this; }
 
-  public BitsFun all_reaching_fidxs(Type tmem) { return BitsFun.EMPTY; }
+  public BitsFun all_reaching_fidxs( TypeMem tmem) { return BitsFun.EMPTY; }
 
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

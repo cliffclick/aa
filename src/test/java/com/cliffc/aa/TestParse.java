@@ -19,10 +19,6 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    test("noinline_inc={x -> x&1}; noinline_p={x -> noinline_inc(x)*2}; noinline_p",
-      (()->TypeFunPtr.GENERIC_FUNPTR),null,"{ int -> int }" );
-    //test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
-
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
     // The Meet loses precision to fast.  This is a typing bug.
@@ -44,34 +40,36 @@ public class TestParse {
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
     testerr("x=1+y","Unknown ref 'y'",4);
     test_obj("str(3.14)", TypeStr.con("3.14"));
-    test("math_rand(1)?x=4:x=3;x", TypeInt.NINT8); // x defined on both arms, so available after
-    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3; v:=2}");
+    test("math.rand(1)?x=4:x=3;x", TypeInt.NINT8); // x defined on both arms, so available after
+    test("x=@{n:=1;v:=2}; x.n := 3; x", "*@{n:=3; v:=2}","@{n=3, v=2}");
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     testerr("sq={x -> x*x}; sq(\"abc\")", "*\"abc\" is none of (flt64,int64)",9);
     test("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
-    testerr("math_rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
-    testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",3);
+    testerr("math.rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
+    testerr("_+_(1,2,3)", "Passing 3 arguments to _+_ which takes 2 arguments",3);
     testerr("{x y -> x+y}", "Scalar is none of (flt64,int64,*str?)",8); // {Scalar Scalar -> Scalar}
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y' in @{x=1}",19);
     testerr("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
     test("x=@{a:=1;         b= {a=a+1;b=0}}; x.         b(); x.a",TypeInt.con(2));
     test("x=@{a:=1;noinline_b= {a=a+1;b=0}}; x.noinline_b(); x.a",TypeInt.NINT8);
 
-    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", Type.XNIL);
+    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(_&_,2)", Type.XNIL);
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(1)",TypeInt.con(1));
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(1)",TypeInt.con(1));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
-    test("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
+    //test("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(0);(1,);(1,).0;@{x;y];","Expected closing '}' but found ']' instead",63);
+    test("noinline_inc={x -> x&1}; noinline_p={x -> noinline_inc(x)*2}; noinline_p",
+      (()->TypeFunPtr.make(29,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.INT64)),
+      ( () -> TypeStruct.args(Type.SCALAR)),
+      "[29]{ int64 -> int64 }" );
     // id accepts and returns both ints and reference types (arrays).
-    //test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",TypeStruct.make_tuple(Type.XNIL,TypeInt.INT8,TypeInt.con(3)));
-    // id accepts and returns all types and keeps precision
-    test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
-      (() -> TypeMemPtr.make(18,TypeStruct.tupsD(TypeInt.INT8,TypeInt.con(3)))),
-      null,
-      "[99](int8, 3)");
+    //test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
+    //  (() -> TypeMemPtr.make(18,TypeStruct.tupsD(TypeInt.INT8,TypeInt.con(3)))),
+    //  null,
+    //  "[99](int8, 3)");
   }
 
   @Test public void testParse00() {
@@ -405,13 +403,13 @@ public class TestParse {
     test("A= :@{n=A?; v=int}; A(@{n=0;v=3})","*A:@{n=0; v=3}","@{n=0,v=3}");
 
     // Missing type B is also never worked on.
-    test("A= :@{n=B?; v=int}", "[~29+73]{->*~use }","A");
+    test("A= :@{n=B?; v=int}", "[~29+74]{->*use }","A");
     test("A= :@{n=B?; v=int}; a = A(0,2)", "*A:@{n=0; v=2}","@{n=0,v=2}");
     test("A= :@{n=B?; v=int}; a = A(0,2); a.n", "0", "0");
-    // Mutually recursive type
-    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", "[~76+77]{->*~use }", "A");
-    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", "[~29+73]{->*~use }", "A"); // Same test, again, using the same Type.INTERN table
-    test("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}", "[~78+79]{->*~use }", "A");
+    // Mutually recursive types
+    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}; (A,B)", "*([~29+74]{->any }, [~77+78]{->any })", "(A,B)");
+    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}; (A,B)", "*([~77+78]{->any }, [~29+74]{->any })", "(A,B)");
+    test("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}; (A,B,C)", "*([~29+74]{->any }, [~77+78]{->any }, [~79+80]{->any })", "(A,B,C)");
     // Mixed ABC's, making little abc's in-between.
     test("""
 A= :@{n=B?; v=int};
@@ -426,9 +424,9 @@ c= C(b,"abc");
 
   @Test public void testParse07() {
     // Simple recursive call being returned.
-    test("T= :@{n=T?; v=int}; f={x -> x ? T(f(x.n),x.v&x.v)}", "[75]{->*use? }","[75]{ A:@{ n = A, v = int64, ...}? -> B:@{ n = B, v = int64}? }");
     test("A= :@{n=A?; v=int}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}", "","");
-    test("f={x -> x ? (f x.n,x.v&x.v)}", "[73]{->*use? }","[73]{A:@{n=A,v=int64,...}?->B:(B,int64)?}");
+    test("f={x -> x ? (f x.n,x.v&x.v)}", "[74]{->*use? }","[74]{A:@{n=A,v=int64,...}?->B:(B,int64)?}");
+    test("T= :@{n=T?; v=int}; f={x -> x ? T(f(x.n),x.v&x.v)}", "[76]{->*use? }","[76]{ A:@{ n=A, v=int64, ...}? -> B:@{ n=B, v=int64}? }");
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(_&_,2)", "0","0");
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(_+_,2)", "2","2");

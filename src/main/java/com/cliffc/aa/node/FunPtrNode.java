@@ -171,7 +171,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     // Return
     progress |= self.unify_at(ret.rez()," ret",ret.rez().tvar(),work);
 
-    // Each argument from the parms directly
+    // Each normal argument from the parms directly
     Node[] parms = fun.parms();
     for( int i=DSP_IDX; i<parms.length; i++ ) {
       if( parms[i]==null ) continue;
@@ -182,8 +182,13 @@ public final class FunPtrNode extends UnOrFunPtrNode {
       if( old==arg ) continue;      // No progress
       if( work==null ) return true; // Early cutout
       progress |= self.unify_at(parms[i],key,arg,work);
+      // The display is part of the fat function-pointer.  Here we act like an
+      // HM.Apply or a CallEpi.unify.
+      if( i==DSP_IDX && display()!=Env.ANY ) {
+        TV2 tdsp = display().tvar();
+        progress |= tdsp.unify(arg,work);
+      }
     }
-
     return progress;
   }
 

@@ -6,7 +6,6 @@ import com.cliffc.aa.util.VBitSet;
 import java.util.function.Predicate;
 
 import static com.cliffc.aa.type.TypeFld.Access;
-import static com.cliffc.aa.AA.unimpl;
 
 // Types which extend memory-based objects - currently Structs (which include
 // tuples but not TypeTuple) and Str (Strings); will include Arrays at some
@@ -86,7 +85,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   // Must be monotonic, as CallEpiNode.value() uses this.
   public TypeObj crush() { return this; }
   // All reaching fidxs
-  @Override public BitsFun all_reaching_fidxs(Type tmem) {
-    throw unimpl();
+  @Override public BitsFun all_reaching_fidxs( TypeMem tmem) {
+    return above_center() ? BitsFun.EMPTY : BitsFun.FULL;
   }
 }

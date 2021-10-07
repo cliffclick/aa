@@ -242,7 +242,7 @@ public class ScopeNode extends Node {
         trez = trez.dual();   // Bring the escaping unresolved functions down low
     if( TypeFunPtr.GENERIC_FUNPTR.isa(trez) ) return BitsFun.FULL; // Can lift to any function
     tmem = tmem instanceof TypeMem ? (TypeMem)tmem : tmem.oob(TypeMem.ALLMEM);
-    BitsFun fidxs = trez.all_reaching_fidxs(tmem);
+    BitsFun fidxs = trez.all_reaching_fidxs((TypeMem)tmem);
     _escache_trez = trez;
     _escache_tmem = tmem;
     _escache_escs = fidxs;
@@ -251,10 +251,9 @@ public class ScopeNode extends Node {
 
   // GCP discovers functions which escape at the top-most level, and wires the
   // RetNode to the top-most Scope to mimic future unknown callers.
-  void check_and_wire( Work work ) {
+  void check_and_wire() {
     if( this==Env.SCP_0 ) return; // Do not wire the escaping primitives?
     BitsFun escs = top_escapes();
-    if( escs.bitCount() <= len()-(ARG_IDX+1) ) return;
     if( escs==BitsFun.FULL ) return; // Error exit
     for( int fidx : escs ) {
       boolean found=false;

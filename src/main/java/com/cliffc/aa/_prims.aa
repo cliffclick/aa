@@ -10,6 +10,7 @@ flt64 =: $$com.cliffc.aa.type.TypeFlt#FLT64;
 real  =: $$com.cliffc.aa.type.Type#REAL;
 ptr   =: $$com.cliffc.aa.type.TypeMemPtr#ISUSED;
 str   =: $$com.cliffc.aa.type.TypeMemPtr#STRPTR;
+ary   =: $$com.cliffc.aa.type.TypeMemPtr#ARYPTR;
 
 
 // Simple integer math
@@ -69,6 +70,12 @@ str = { x:str? -> x };
 
 // String concat
 _+_ = { x:str? y:str? -> $$com.cliffc.aa.node.NewStrNode$AddStrStr(x,y) };
+
+
+// --------------
+// Arrays
+#_  = { ary:ary -> $$com.cliffc.aa.node.MemPrimNode$LValueLength(ary) };
+//[_] = { len:int -> $$com.cliffc.aa.node.MemPrimNode$LValueLength(ary) };
 
 // --------------
 // Math

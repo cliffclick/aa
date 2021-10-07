@@ -52,7 +52,10 @@ public class ProjNode extends Node {
     if( in(0) instanceof CallNode ) {
       TV2 tv2 = in(0).tvar(_idx);
       if( _idx==DSP_IDX ) {     // Specifically for the function/display, only unify on the display part.
-        if( tv2.is_fun() ) return tv.unify(tv2.get("2"),work);
+        if( tv2.is_fun() ) {    // Expecting the call input to be a function
+          TV2 tdsp = tv2.get("2"); // Unify against the function display
+          return tdsp != null && tv.unify(tdsp, work);
+        }
         else if( tv2.is_err() ) return false;
         else throw unimpl();
       }

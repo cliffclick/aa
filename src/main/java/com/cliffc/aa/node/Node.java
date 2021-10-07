@@ -3,13 +3,16 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
+import static com.cliffc.aa.AA.DSP_IDX;
 import static com.cliffc.aa.AA.unimpl;
 
 // Sea-of-Nodes
@@ -560,11 +563,11 @@ public abstract class Node implements Cloneable {
     assert oval.isa(nval);      // Monotonic
     _val = nval;                // Record progress
 
-    // Classic forwards flow on change.  Also wire Call Graph edges.    
-    for( Node use : _uses ) {   
+    // Classic forwards flow on change.  Also wire Call Graph edges.
+    for( Node use : _uses ) {
       work.add(use).add_work_use_extra(work,this);
       if( use instanceof CallEpiNode ) ((CallEpiNode)use).check_and_wire(work);
-      if( use instanceof   ScopeNode ) ((  ScopeNode)use).check_and_wire(work);
+      if( use instanceof   ScopeNode ) ((  ScopeNode)use).check_and_wire();
     }
     add_work_extra(work,oval);
     if( this instanceof CallEpiNode ) ((CallEpiNode)this).check_and_wire(work);
@@ -574,7 +577,7 @@ public abstract class Node implements Cloneable {
     assert may_be_con_live(oval) || !may_be_con_live(nval); // May_be_con_live is monotonic
     if( may_be_con_live(oval) && !may_be_con_live(nval) )
       for( Node def : _defs ) work.add(def); // Now check liveness
-    
+
   }
 
   // Do One Step of backwards-dataflow analysis.  Assert monotonic progress.
@@ -780,6 +783,9 @@ public abstract class Node implements Cloneable {
     for( Node use : _uses )                   use.walk_initype(work);
     for( Node def : _defs ) if( def != null ) def.walk_initype(work);
     if( this instanceof FreshNode ) ((FreshNode)this).id().tvar().push_dep(this);
+    if( this instanceof LoadNode ) ((LoadNode)this)._hm_lift = true;
+    if( this instanceof ProjNode && ((ProjNode)this)._idx==DSP_IDX && in(0) instanceof CallNode )
+      ((CallNode)in(0)).fdx().tvar().push_dep(this);
   }
 
   // Combo phase 2: all nodes previously lifted by HM go back on the worklist,
@@ -787,9 +793,9 @@ public abstract class Node implements Cloneable {
   public final void walk_combo_phase2( Work work, BitsFun top_escapes ) {
     if( RESET_VISIT.tset(_uid) ) return; // Been there, done that
     if( this instanceof LoadNode && tvar().is_leaf() ) { work.add(this); ((LoadNode)this)._hm_lift = false; } // Loads are lifted.
-    if( this instanceof FunNode  && top_escapes.test(((FunNode)this)._fidx) ) work.add(this);
+    if( this instanceof FunNode  && top_escapes.test_recur(((FunNode)this)._fidx) ) work.add(this);
     if( this instanceof ParmNode && has_tvar() && tvar().is_leaf() &&
-        top_escapes.test(((ParmNode)this).fun()._fidx ))
+        top_escapes.test_recur(((ParmNode)this).fun()._fidx ))
       work.add(this); // External parms are lifted.
     // Walk reachable graph
     for( Node use : _uses )                   use.walk_combo_phase2(work,top_escapes);
@@ -812,7 +818,6 @@ public abstract class Node implements Cloneable {
     if( this instanceof RegionNode || this instanceof PhiNode ) {
       while( len()>1 && !in(len()-1).is_prim() ) pop(); // Kill wired primitive inputs
     }
-    if( this instanceof LoadNode ) ((LoadNode)this)._hm_lift = true;
   }
 
 

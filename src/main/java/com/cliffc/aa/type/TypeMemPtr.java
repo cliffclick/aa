@@ -7,9 +7,8 @@ import com.cliffc.aa.util.VBitSet;
 import java.util.HashMap;
 import java.util.function.Predicate;
 
+import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
-import static com.cliffc.aa.AA.ARG_IDX;
-import static com.cliffc.aa.AA.DSP_IDX;
 
 // Pointers-to-memory; these can be both the address and the value part of
 // Loads and Stores.  They carry a set of aliased TypeObjs.
@@ -303,6 +302,14 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
 
   @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _obj.repeats_in_cycles(head,bs); }
+
+  @Override public BitsFun all_reaching_fidxs( TypeMem tmem) {
+    BitsFun fidxs = BitsFun.EMPTY;
+    for( int alias : _aliases )
+      if( alias!=0 )
+        fidxs = fidxs.meet(tmem.at(alias).all_reaching_fidxs(tmem));
+    return fidxs;
+  }
 
   // Used for assertions
   @Override boolean intern_check1() { return _obj.intern_lookup()!=null; }

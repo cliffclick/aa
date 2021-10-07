@@ -48,26 +48,28 @@ public abstract class MemPrimNode extends PrimNode {
 
   // ------------------------------------------------------------
   public abstract static class ReadPrimNode extends MemPrimNode {
-    ReadPrimNode( String name, TypeStruct formals, Type ret ) { super(name,formals,ret); }
-
+    public ReadPrimNode( String name, TypeStruct formals, Type ret ) { super(name,formals,ret); }
+    
     @Override public FunPtrNode clazz_node( ) {
       try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
         assert _defs._len==0 && _uses._len==0;
-        FunNode  fun = ( FunNode) X.xform(new  FunNode(_name,this).add_def(Env.SCP_0)); // Points to ScopeNode only
-        ParmNode rpc = (ParmNode) X.xform(new ParmNode( 0     ,"rpc" ,fun,Env.ALL_CALL,null));
-        ParmNode mem = (ParmNode) X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+        FunNode  fun = ( FunNode) X.xform(new  FunNode(_name,this));
+        ParmNode rpc = (ParmNode) X.xform(new ParmNode(TypeRPC.ALL_CALL,null,fun,0      ,"rpc"));
+        Node mem     =            X.xform(new ParmNode(TypeMem.MEM     ,null,fun,MEM_IDX," mem"));
         fun._bal_close = bal_close();
         add_def(null);              // Control for the primitive in slot 0
         add_def(mem );              // Memory  for the primitive in slot 1
         while( len() < _sig._formals.nargs() ) add_def(null);
-          for( TypeFld arg : _sig._formals.flds() )
-          set_def(arg._order,X.xform(new ParmNode(arg._order, arg._fld, fun, (ConNode) Node.con(arg._t.simple_ptr()), null)));
-        X.xform(this);
+        for( TypeFld arg : _sig._formals.flds() )
+          if( arg._order!=MEM_IDX ) // Already handled MEM_IDX
+            set_def(arg._order,X.xform(new ParmNode(arg._t.simple_ptr(), null, fun, arg._order, arg._fld)));
+        Node nnn = X.xform(this);
         // Functions return the set of *modified* memory.  ReadPrimNodes do not modify
         // memory.
-        RetNode ret = (RetNode)X.xform(new RetNode(fun,mem(),this,rpc,fun));
+        RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,nnn,rpc,fun));
+        Env.SCP_0.add_def(ret);
         // No closures are added to primitives
-        return (X._ret = new FunPtrNode(_name,ret));
+        return (X._ret = (FunPtrNode)X.xform(new FunPtrNode(_name,ret)));
       }
     }
 
@@ -85,9 +87,9 @@ public abstract class MemPrimNode extends PrimNode {
   }
 
   // Array length
-  static class LValueLength extends ReadPrimNode {
-    LValueLength() { super("#",TypeMemPtr.LVAL_LEN,TypeInt.INT64); }
-    @Override public String bal_close() { return null; } // Balanced op
+  public static class LValueLength extends ReadPrimNode {
+    public LValueLength() { super("$#",TypeMemPtr.LVAL_LEN,TypeInt.INT64); _op_prec=1;}
+    @Override public String bal_close() { return null; } // Not a balanced op
     @Override public Type value(GVNGCM.Mode opt_mode) {
       Type mem = val(MEM_IDX);
       Type adr = val(ARG_IDX);
@@ -103,28 +105,16 @@ public abstract class MemPrimNode extends PrimNode {
     }
     // Similar to LoadNode, of a field named '#'
     @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-      TypeMem live = _live_use(def);
-      return def==adr()
-        ? (live.above_center() ? TypeMem.DEAD : _live)
-        : live;
-    }
-    public TypeMem _live_use( Node def ) {
+      if( def==adr() ) return TypeMem.ALIVE;
       Type tmem = mem()._val;
       Type tptr = adr()._val;
       if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
       if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
       if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
-
-      Type tobj = ((TypeMem)tmem).ld((TypeMemPtr)tptr);
-      if( !(tobj instanceof TypeAry) )
-        return tobj.oob(TypeMem.ALLMEM);
-      Type tlen = ((TypeAry)tobj)._size;
-      if( tlen.is_con() ) return TypeMem.DEAD;
-      if( def==adr() )          // Load is sane, so address is alive
-        return tlen.above_center() ? TypeMem.DEAD : TypeMem.ALIVE;
+      // Only named the named field from the named aliases is live.
       return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,"#", Type.SCALAR);
     }
-
+    
     @Override public TV2 new_tvar( String alloc_site) { return TV2.make_base(this,TypeInt.INT64,alloc_site); }
 
     @Override public boolean unify( Work work ) {

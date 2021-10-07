@@ -1086,14 +1086,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     //return xmeet1((TypeStruct)t2,true);
     throw unimpl();
   }
-  
+
   @Override public TypeStruct simple_ptr() {
     TypeStruct ts = malloc(_name,_any,_open);
     for( TypeFld fld : flds() ) {
       Type t = fld._t.simple_ptr();
       ts.add_fld(t==fld._t ? fld : fld.make_from(t));
     }
-    return ts.hashcons_free();    
+    return ts.hashcons_free();
   }
 
   // ------ Utilities -------
@@ -1256,6 +1256,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( TypeFld fld : flds() )
       ts.add_fld(fld.make_from(head,mem,visit));
     return ts.hashcons_free();
+  }
+
+  @Override public BitsFun all_reaching_fidxs( TypeMem tmem) {
+    BitsFun fidxs = BitsFun.EMPTY;
+    for( TypeFld fld : flds() )
+      fidxs = fidxs.meet(fld._t.all_reaching_fidxs(tmem));
+    return fidxs;
   }
 
   // Used for assertions

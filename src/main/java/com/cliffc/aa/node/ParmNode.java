@@ -92,8 +92,10 @@ public class ParmNode extends PhiNode {
       i = 2;
       if( fun.is_unknown_alive() ) {
         assert fun.in(1) instanceof ScopeNode;
-        assert fun.val(1) == Type.CTRL || fun.val(1) == Type.ANY;
-        t = mem == null ? val(1) : in(1).sharptr(mem.in(1));
+        assert fun.val(1) == Type.CTRL;
+        t = fld==null
+          ? fld._t              // Use formal signature if available
+          : (mem == null ? val(1) : in(1).sharptr(mem.in(1)));
         if( _tvar != null ) { // Lift if HM is available
           TV2 tv = tvar();
           Type ta = tv.as_flow(opt_mode == GVNGCM.Mode.Opto && Combo.HM_IS_HIGH);
@@ -118,9 +120,8 @@ public class ParmNode extends PhiNode {
     // High, but valid, values like choice-functions need to pass through,
     // so following Calls agree that SOME function will be called.
     // Check against formals; if OOB, always produce an error.
-    TypeFld arg = fun.formals().fld_find(_name);
     // Good case: nothing in signature (parm is dead, so legit), type needs to fall, or it isa formal.
-    if( arg==null || t.above_center() || t.isa(arg._t) ) return t.simple_ptr();
+    if( fld==null || t.above_center() || t.isa(fld._t) ) return t.simple_ptr();
     return _t;
   }
 

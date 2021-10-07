@@ -1,8 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Combo;
-import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMap;
@@ -327,8 +325,11 @@ public final class CallEpiNode extends Node {
     // Compute call-return value from all callee returns
     Type trez = Type   .ANY;
     Type tmem = TypeMem.ANYMEM;
-    if( fidxs == BitsFun.FULL ) { // Called something unknown
-      trez = Type.ALL;         // Unknown target does worst thing
+    CallNode call = call();
+    ErrMsg err = call.err(true);
+    if( fidxs == BitsFun.FULL ||  // Called something unknown
+        err!=null  ) { // Call is in-error
+      trez = Type.ALL;            // Unknown target does worst thing
       tmem = defmem;
     } else {                      // All targets are known & wired
       for( int i=0; i<nwired(); i++ ) {
@@ -362,9 +363,8 @@ public final class CallEpiNode extends Node {
     // and GCP flow type in parallel and create a mapping.  Then walk the
     // output HM type and CCP flow type in parallel, and join output CCP types
     // with the matching input CCP type.
-    if( Combo.DO_HM && opt_mode._CG ) {
+    if( Combo.DO_HM && opt_mode._CG && err==null ) {
       // Walk the inputs, building a mapping
-      CallNode call = call();
       TV2.T2MAP.clear();
       for( int i=DSP_IDX; i<call._defs._len-1; i++ )
         { TV2.WDUPS.clear(); call.tvar(i).walk_types_in(caller_mem,call.val(i)); }
@@ -497,7 +497,7 @@ public final class CallEpiNode extends Node {
           break;
         }
     }
-    del(_defs.find(ret));
+    remove(_defs.find(ret));
     Env.GVN.add_reduce(ret);
     assert sane_wiring();
     return this;
@@ -538,7 +538,7 @@ public final class CallEpiNode extends Node {
       if( work==null ) return true;
       NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
       // The display is extracted from the FunPtr and is not the function itself
-      args.put("2",TV2.make_leaf(fdx,"CallEip_unify"));
+      //args.put("2",TV2.make_leaf(fdx,"CallEpi_unify"));
       for( int i=ARG_IDX; i<call._defs._len; i++ )
         args.put((""+i).intern(),call.tvar(i));
       args.put(" ret",tvar());
@@ -564,6 +564,12 @@ public final class CallEpiNode extends Node {
     if( (tfun=tfun.find()).is_err() ) return tvar().unify(tfun,work);
 
     return progress;
+  }
+  
+  @Override public void add_work_hm(Work work) {
+    super.add_work_hm(work);
+    // My tvar changed, so my value lift changes
+    work.add(this);
   }
 
   @Override Node is_pure_call() { return in(0) instanceof CallNode ? call().is_pure_call() : null; }

@@ -210,7 +210,7 @@ public abstract class PrimNode extends Node {
     PrimNode that=null;
     for( PrimNode p : PRIMS() )
       if( p.getClass() == getClass() )
-        { that=p; break; }      // Found an original PrimNode with op_prec set\
+        { that=p; break; }      // Found an original PrimNode with op_prec set
     assert that != null;
     kill(); // Kill self, use one from primitive table that has op_prec set
 
