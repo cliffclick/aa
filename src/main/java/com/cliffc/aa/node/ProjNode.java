@@ -15,8 +15,6 @@ public class ProjNode extends Node {
   ProjNode( byte op, Node ifn, int idx ) {
     super(op,ifn);
     _idx=idx;
-    if( in(0) instanceof NewNode )
-      _tvar = in(0).tvar();     // Pre-unify
   }
   @Override public String xstr() { return "DProj"+_idx; }
 
@@ -42,6 +40,7 @@ public class ProjNode extends Node {
 
   // Unify with the parent TVar sub-part
   @Override public boolean unify( Work work ) {
+    if( _tvar==null ) return false;
     TV2 tv = tvar();
     if( in(0) instanceof NewNode ) // TODO: Not really a proper use of Proj
       return tv.unify(tvar(0),work);
@@ -69,6 +68,11 @@ public class ProjNode extends Node {
       if( use instanceof ProjNode && ((ProjNode)use)._idx==idx )
         return (ProjNode)use;
     return null;
+  }
+
+  @Override public boolean is_display_ptr() {
+    if( in(0) instanceof NewObjNode ) return in(0).is_display_ptr();
+    throw unimpl();
   }
 
   void set_idx( int idx ) { unelock(); _idx=idx; } // Unlock before changing hash

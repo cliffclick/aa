@@ -216,13 +216,13 @@ public class TV2 {
   public void set_as_base(Type t) { assert is_leaf(); _name="Base"; _type=t; }
   // Make a new Nil
   public static TV2 make_nil(TV2 notnil, @NotNull String alloc_site) {
-    NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<String,TV2>(){{ put("?",notnil); }};
+    NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>() {{put("?", notnil);}};
     return new TV2("Nil",args,Type.XNIL,notnil._ns,alloc_site);
   }
   // Make a new function
   public static TV2 make_fun(Node n, TypeFunPtr fptr, @NotNull String alloc_site) {
     assert fptr._dsp==TypeMemPtr.NO_DISP; // Just for fidxs, arg counts
-    return new TV2("->",new NonBlockingHashMap<String,TV2>(),fptr,UQNodes.make(n),alloc_site);
+    return new TV2("->", new NonBlockingHashMap<>(),fptr,UQNodes.make(n),alloc_site);
   }
   public static TV2 make_fun(Node n, Type fptr, NonBlockingHashMap<String,TV2> args, @NotNull String alloc_site) {
     return new TV2("->",args,fptr,UQNodes.make(n),alloc_site);
@@ -272,7 +272,7 @@ public class TV2 {
 
   // A new struct from a NewObj
   public static TV2 make_struct(NewObjNode n, @NotNull String alloc_site) {
-    TV2 tv2 = new TV2("@{}",new NonBlockingHashMap<>(),TypeMemPtr.EMTPTR,UQNodes.make(n),alloc_site);
+    TV2 tv2 = new TV2("@{}",new NonBlockingHashMap<>(),n._tptr,UQNodes.make(n),alloc_site);
     tv2._open = true;           // Start out open
     return tv2;
   }
@@ -375,6 +375,15 @@ public class TV2 {
     return this;
   }
 
+  // Return the flow type MEET of this and that, or null if the types are not
+  // compatible.
+  private Type meet(TV2 that) {
+    Type mt = _type.meet(that._type);
+    if( mt!=this._type && mt.getClass()!=this._type.getClass() &&
+        mt!=that._type && mt.getClass()!=that._type.getClass() )
+      return null;
+    return mt;
+  }
 
   // U-F union; 'this' becomes 'that'.  No change if only testing, and reports
   // progress.  If progress and not testing, adds _deps to worklist.
@@ -387,15 +396,15 @@ public class TV2 {
     if( !that.is_err() ) {
       if( that._type==null ) that._type = _type;
       else if( _type!=null ) {
-        if( _type.getClass()!=that._type.getClass() ) {
+        Type mt = meet(that);
+        if( mt==null ) {
           union(make_err(null,"Cannot unify "+this.p()+" and "+that.p(),"union"),work);
           return that.union(find(),work);
         }
-        that._type = _type.meet(that._type);
+        that._type = mt;
         that._open &= _open;
       }
     }
-    //if( _is_func_input ) that.widen_bases();
 
     // Work all the deps
     that.add_deps_work(work);
@@ -470,6 +479,40 @@ public class TV2 {
       TV2 lhs =      get(key);  assert lhs!=null;
       TV2 rhs = that.get(key);
       if( rhs==null || !lhs._eq(rhs) ) return false;
+    }
+    return true;
+  }
+
+  // --------------------------------------------
+  // Cyclic (structural) compatibility check.
+
+  // Two TV2s are compatible if they are 'eq' except for Leafs, and simply
+  // unifying the Leafs weould make them 'eq'.
+  public final boolean compatible( TV2 that ) {
+    assert CDUPS.isEmpty();
+    boolean compat = _compat(that);
+    CDUPS.clear();
+    return compat;
+  }
+  private boolean _compat( TV2 that) {
+    assert !is_unified() && !that.is_unified();
+    if( this==that ) return true;
+    if( !Util.eq(_name,that._name) ) return false; // Mismatched tvar names
+    if( is_leaf() && that.is_leaf() ) return true; // Mismatched leafs are OK
+    if( _args==that._args ) return true; // Same arrays (generally both null)
+    if( _args.size() != that._args.size() ) return false;
+    if( meet(that)==null ) return false; // Base types must be compatible
+
+    // Cycles stall the equal/unequal decision until we see a difference.
+    TV2 tc = CDUPS.get(this);
+    if( tc!=null )  return tc==that; // Cycle check; true if both cycling the same
+    CDUPS.put(this,that);
+
+    // Structural recursion
+    for( String key : _args.keySet() ) {
+      TV2 lhs =      get(key);  assert lhs!=null;
+      TV2 rhs = that.get(key);
+      if( rhs==null || !lhs._compat(rhs) ) return false;
     }
     return true;
   }
@@ -567,7 +610,8 @@ public class TV2 {
   }
   // Delete a field
   private void del_fld( String fld, Work work) {
-    assert is_struct() || is_ary();
+    assert is_struct() || is_ary() ||
+      (is_fun() && Util.eq("2",fld));
     _args.remove(fld);
     if( _args.size()==0 )  _args=null;
     add_deps_work(work);
@@ -583,15 +627,16 @@ public class TV2 {
 
   // Returns progress.
   // If work==null, we are testing only and make no changes.
-  public boolean fresh_unify(TV2 that, TV2[] vs, Work work) {
+  public boolean fresh_unify(TV2 that, TV2[] nongen, Work work) {
     assert VARS.isEmpty() && DUPS.isEmpty();
-    boolean progress = _fresh_unify(that,vs,work);
+    boolean progress = _fresh_unify(that,nongen,work);
     VARS.clear();  DUPS.clear();
     return progress;
   }
 
   // Apply 'this' structure on 'that'; no modifications to 'this'.  VARS maps
   // from the cloned LHS to the RHS replacement.
+  @SuppressWarnings("unchecked")
   private boolean _fresh_unify(TV2 that, TV2[] nongen, Work work ) {
     assert !is_unified() && !that.is_unified();
 
@@ -639,7 +684,8 @@ public class TV2 {
       if( _type.must_nil() ) { // Make a not-nil version
         copy = copy("fresh_unify_vs_nil");
         copy._type = _type.join(Type.NSCALR);
-        if( _args!=null ) throw unimpl(); // shallow copy
+        if( _args!=null )
+          copy._args = (NonBlockingHashMap<String, TV2>) _args.clone(); // shallow copy
       }
       boolean progress = copy._fresh_unify(that.get("?"),nongen,work);
       return _type.must_nil() ? vput(that,progress) : progress;
@@ -677,7 +723,12 @@ public class TV2 {
           if( work == null ) return true; // Will definitely make progress
           { that._args.remove(id); progress=true; } // Extra fields on both sides are dropped
         }
-    that._open &= this._open;
+    Type mt = that._type.meet(_type);   // All aliases
+    boolean open = that._open & _open;
+    if( that._open != open || that._type != mt ) progress = true;
+    if( work==null && progress ) return true;
+    that._open = open; // Pick up open stat
+    that._type = mt;   // Pick up all aliases
 
     return progress;
   }
@@ -713,24 +764,12 @@ public class TV2 {
 
   // --------------------------------------------
   private static final VBitSet ODUPS = new VBitSet();
+
   public boolean nongen_in(TV2[] vs) {
     if( vs==null ) return false;
     ODUPS.clear();
     for( TV2 t2 : vs )
-      // Cannot do the U-F hack on 'vs' because it shows up in FreshNode hashCode.
       if( _occurs_in_type(t2.find()) )
-        return true;
-    return false;
-  }
-
-  // Does 'this' type occur in any scope, mid-definition (as a forward-ref).
-  // If not, then return false (and typically make a fresh copy).
-  // If it does, then 'this' reference is a recursive self-reference
-  // and needs to keep the self-type instead of making fresh.
-  boolean _occurs_in(TV2[] vs) {
-    // Can NOT modify 'vs' for U-F, because blows FreshNode hash.
-    for( TV2 v : vs )
-      if( _occurs_in_type(v.find()) )
         return true;
     return false;
   }
@@ -740,11 +779,12 @@ public class TV2 {
     if( x==this ) return true;
     if( ODUPS.tset(x._uid) ) return false; // Been there, done that
     if( x.is_tvar() && x._args!=null )
-      for( TV2 tv2 : x._args.values() )
-        if( _occurs_in_type(tv2) )
+      for( String key : x._args.keySet() )
+        if( _occurs_in_type(x.get(key)) )
           return true;
     return false;
   }
+
 
   // --------------------------------------------
   // Attempt to lift a GCP call result, based on HM types.  Walk the input HM
@@ -863,12 +903,20 @@ public class TV2 {
       return tmp.make_from(ts);
     }
     if( is_ary() ) {
-      if( !(t instanceof TypeMemPtr) ) {
-        if( tmap==null ) throw unimpl(); // return tmap == null ? as_flow().join(t) : tmap;  // The most struct-like thing you can be
-        return tmap;
-      }
-
-      throw unimpl();
+      if( !(t instanceof TypeMemPtr) && tmap!=null )
+        t = tmap;
+      if( !(t instanceof TypeMemPtr) )
+        t = as_flow(false);
+      TypeMemPtr tmp = (TypeMemPtr)t;
+      if( tmp._obj==TypeObj.UNUSED ) return t; // No lift possible
+      TypeAry ta0 = (TypeAry)tmp._obj;
+      // TODO: Needs the cycle treatment like Structs
+      TV2 tvlen = get("len" );
+      TypeInt len = tvlen==null ? TypeInt.INT64 : (TypeInt)tvlen.walk_types_out(ta0._size,cepi);
+      TV2 tvelem = get("elem" );
+      Type elem = tvelem==null ? Type.SCALAR : tvelem.walk_types_out(ta0.elem(),cepi);
+      TypeAry tary = TypeAry.make(len,elem,ta0.stor());
+      return tmp.make_from(tary);
     }
     if( is_str() ) return tmap==null ? _type : tmap.join(t);
     throw unimpl();
@@ -891,11 +939,16 @@ public class TV2 {
   Type _as_flow(boolean opto) {
     assert !is_unified();
     if( is_base() ) return _type;
-    if( is_leaf() ) return opto ? Type.XNSCALR : Type.ALL;
+    if( is_leaf() ) return opto ? Type.XNSCALR : Type.SCALAR;
     if( is_err()  ) return Type.ALL; // No lift
-    if( is_fun()  )
-      return _type instanceof TypeFunPtr ? _type : Type.ALL;
-    if( is_nil() ) return opto ? Type.XNSCALR : Type.ALL;
+    if( is_fun()  ) {
+      TV2 tvdsp = get("2");
+      TV2 tvret = get(" ret");
+      Type tdsp = tvdsp==null ? Type.ANY : tvdsp._as_flow(opto);
+      Type tret = tvret==null ? Type.ANY : tvret._as_flow(opto);
+      return _type instanceof TypeFunPtr ? ((TypeFunPtr)_type).make_from(tdsp.simple_ptr(),tret) : Type.ALL;
+    }
+    if( is_nil() ) return opto ? Type.XNSCALR : Type.SCALAR;
     if( is_struct() ) {
       TypeStruct tstr = ADUPS.get(_uid);
       if( tstr==null ) {
@@ -919,6 +972,15 @@ public class TV2 {
       // The HM is_struct wants to be a TypeMemPtr, but the recursive builder
       // is built around TypeStruct.
       return ((TypeMemPtr)_type).make_from(tstr);
+    }
+
+    if( is_ary() ) {
+      TV2 tvlen = get("len" );
+      TypeInt tlen = tvlen==null ? TypeInt.INT64 : (TypeInt)tvlen._as_flow(opto);
+      TV2 tvelem = get("elem" );
+      Type te = tvelem==null ? Type.SCALAR : tvelem._as_flow(opto);
+      TypeAry tary = TypeAry.make(tlen,te,TypeObj.OBJ);
+      return ((TypeMemPtr)_type).make_from(tary);
     }
 
     throw unimpl();

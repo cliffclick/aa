@@ -515,7 +515,7 @@ public class TestNodeSmall {
                                          TypeFld.make("^",dsp_file_ptr._val,DSP_IDX), // File-scope display as arg0
                                          TypeFld.make("x",Type.SCALAR,ARG_IDX));  // Some scalar arg1
     TypeFunSig sig = TypeFunSig.make(formals,TypeTuple.RET);
-    FunNode fun = new FunNode(null,sig,-1,false);
+    FunNode fun = new FunNode(null,sig,-1,false,null);
     gvn.init(fun.add_def(ctl).add_def(ctl)).unkeep();
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
@@ -550,7 +550,7 @@ public class TestNodeSmall {
     }
 
     // Now run GCP to closure.  This is the key call being tested.
-    Combo.opto();
+    Combo.opto(false);
 
     // Validate cyclic display/function type
     TypeFunPtr tfptr0 = (TypeFunPtr) fptr._val;
@@ -699,7 +699,7 @@ public class TestNodeSmall {
     ConNode arg2= gvn.init(new ConNode<>(targ2));
 
     // Make nodes
-    FunNode fun = new FunNode(null,tsig,-1,false).unkeep();
+    FunNode fun = new FunNode(null,tsig,-1,false,null).unkeep();
     gvn.xform(fun.add_def(cpj.unkeep(2)));
 
     ParmNode parmem= gvn.init(new ParmNode(MEM_IDX," mem",fun,mem .unkeep(2),null)).unkeep(2);

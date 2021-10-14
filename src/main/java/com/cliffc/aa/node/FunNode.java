@@ -69,28 +69,35 @@ public class FunNode extends RegionNode {
   // the Parser only for short-circuit operations like '||' and '&&'.
   public boolean _thunk_rhs;
 
+  // Lexically scoping parent function(s).  Used to build the H-M non-gen set.
+  // Only one, unless a parent clones.  Also null at the top.
+  private Ary<FunNode> _parfuns;
+  // H-M non-generative set, only active during Combo.
+  public TV2[] _nongen;
+
   private byte _cnt_size_inlines; // Count of size-based inlines; prevents infinite unrolling via inlining
   public static int _must_inline; // Used for asserts
 
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
-  public FunNode(String name,           PrimNode prim) { this(name,prim._sig,prim._op_prec,prim._thunk_rhs,prim._tfp.fidx()); }
-  public FunNode(String name,NewNode.NewPrimNode prim) { this(name,TypeFunSig.make(prim._formals,prim._tfp._ret),prim._op_prec,false,prim._tfp.fidx()); }
+  public FunNode(String name,           PrimNode prim) { this(name, prim._tfp.fidx(), prim._sig,prim._op_prec,prim._thunk_rhs,null); }
+  public FunNode(String name,NewNode.NewPrimNode prim) { this(name, prim._tfp.fidx(), TypeFunSig.make(prim._formals,prim._tfp._ret),prim._op_prec,false,null); }
   // Used to start an anonymous function in the Parser
-  public FunNode(TypeStruct formals) { this(null,TypeFunSig.make(formals,Type.SCALAR),-1,false); }
+  public FunNode(TypeStruct formals, FunNode parfun) { this(null,TypeFunSig.make(formals,Type.SCALAR),-1,false,parfun); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.EMPTY,Type.ALL),-2,false); add_def(Env.SCP_0); }
+  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.EMPTY,Type.ALL),-2,false,null); add_def(Env.SCP_0); }
+  // Shared common constructor for Named type constructors
+  FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs, FunNode parfun ) { this(name, BitsFun.new_fidx(), sig,op_prec,thunk_rhs,parfun); }
   // Shared common constructor
-  FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs ) { this(name,sig,op_prec,thunk_rhs,BitsFun.new_fidx()); }
-  // Shared common constructor
-  private FunNode(String name, TypeFunSig sig, int op_prec, boolean thunk_rhs, int fidx) {
+  private FunNode( String name, int fidx, TypeFunSig sig, int op_prec, boolean thunk_rhs, FunNode parfun ) {
     super(OP_FUN);
     _name = name;
     _fidx = fidx;
     _sig = sig;
     _op_prec = (byte)op_prec;
     _thunk_rhs = thunk_rhs;
+    _parfuns = parfun==null ? null : new Ary<>(new FunNode[]{parfun});
     FUNS.setX(fidx(),this); // Track FunNode by fidx; assert single-bit fidxs
     keep();                 // Always keep, until RetNode is constructed
   }
@@ -182,7 +189,7 @@ public class FunNode extends RegionNode {
   @Override @NotNull public Node copy( boolean copy_edges) { throw unimpl(); }
 
   // True if may have future unknown callers.
-  boolean has_unknown_callers() {
+  public boolean has_unknown_callers() {
     return _defs._len == 1 || in(1) instanceof ScopeNode;
   }
   // True if this function escapes the top-level scope
@@ -244,7 +251,7 @@ public class FunNode extends RegionNode {
     Node[] parms = parms();
     TypeFunSig progress = _sig;
     for( TypeFld fld : _sig._formals.flds() )
-      if( parms[fld._order]==null || parms[fld._order]._live==TypeMem.DEAD ) {
+      if( parms[fld._order]==null || (parms[fld._order]._live==TypeMem.DEAD && !is_prim()) ) {
         if( fld.is_display_ptr() ) // Dead display can be removed
           progress = progress.make_from_remove("^");
         else if( fld._t!=Type.ALL ) // Other dead args need to keep knowledge they ever existed
@@ -648,7 +655,8 @@ public class FunNode extends RegionNode {
   private FunNode make_new_fun(RetNode ret, TypeStruct new_formals, int path) {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
-    FunNode fun = new FunNode(_name,_sig.make_from(new_formals),_op_prec,_thunk_rhs,BitsFun.new_fidx(oldfidx));
+    FunNode fun = new FunNode(_name, BitsFun.new_fidx(oldfidx), _sig.make_from(new_formals),_op_prec,_thunk_rhs,null);
+    fun._parfuns = _parfuns;
     fun._bal_close = _bal_close;
     fun.pop();                  // Remove null added by RegionNode, will be added later
     fun.unkeep();               // Ret will clone and not construct
@@ -922,6 +930,20 @@ public class FunNode extends RegionNode {
   // Funs get special treatment by the H-M algo.
   @Override public TV2 new_tvar( String alloc_site) { return null; }
   @Override public boolean unify( Work work ) { return false; }
+
+  // Nongenerative set for Hindly-Milner
+  public void prep_nongen() {
+    // Gather TV2s from parents
+    Ary<TV2> tv2s = new Ary<>(TV2.class);
+    if( _parfuns != null )
+      throw unimpl();
+
+    // Gather the rest from my parms
+    for( Node use : _uses )
+      if( use instanceof ParmNode && use._tvar!=null )
+        tv2s.push(use._tvar);
+    _nongen = tv2s.asAry();
+  }
 
   // True if this is a forward_ref
   @Override public boolean is_forward_ref() { return _op_prec==-2; }

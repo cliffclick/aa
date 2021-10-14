@@ -19,7 +19,7 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    // TODO:
+  // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
     // The Meet loses precision to fast.  This is a typing bug.
 
@@ -66,10 +66,10 @@ public class TestParse {
       ( () -> TypeStruct.args(Type.SCALAR)),
       "[29]{ int64 -> int64 }" );
     // id accepts and returns both ints and reference types (arrays).
-    //test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
-    //  (() -> TypeMemPtr.make(18,TypeStruct.tupsD(TypeInt.INT8,TypeInt.con(3)))),
-    //  null,
-    //  "[99](int8, 3)");
+    test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
+      (() -> TypeMemPtr.make(9,TypeStruct.tupsD(TypeInt.INT8,TypeInt.con(3)))),
+      null,
+      "(int64, 3)");
   }
 
   @Test public void testParse00() {
@@ -187,7 +187,7 @@ public class TestParse {
     testerr("math.rand(1)?1:\"a\"", "Cannot mix GC and non-GC types",18);
     test   ("math.rand(1)?1",TypeInt.BOOL); // Missing optional else defaults to nil
     test("math.rand(1)?\"abc\"",
-      (()->TypeMemPtr.make_nil(14,TypeStr.ABC)),
+      (()->TypeMemPtr.make_nil(17,TypeStr.ABC)),
       null, "*\"abc\"?" );
     test   ("x:=0;math.rand(1)?(x:=1);x",TypeInt.BOOL);
     testerr("a.b.c();","Unknown ref 'a'",0);
@@ -217,9 +217,9 @@ public class TestParse {
   @Test public void testParse02() {
     // Anonymous function definition
     test("{x -> x&1}",
-         (() -> TypeFunPtr.make(29,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.BOOL)),
+         (() -> TypeFunPtr.make(78,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.BOOL)),
          ( () -> TypeStruct.make(TypeFld.make("x",Type.SCALAR,ARG_IDX))),
-           "[29]{ int64 -> int64 }");
+           "[78]{ int64 -> int64 }");
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
     testerr("{x y -> x+y}", "Scalar is none of (flt64,int64,*str?)",8); // {Scalar Scalar -> Scalar}
 
@@ -241,7 +241,7 @@ public class TestParse {
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
-    test("f0 = { x -> x ? {_+_}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
+    test("f0 = { x -> x ? _+_(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
     test_obj("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
              TypeStruct.tupsD(Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
@@ -307,10 +307,10 @@ public class TestParse {
     test_named_tuple("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
 
     test("A= :(str?, int); A( \"abc\",2 )",
-      (()-> TypeMemPtr.make(16,TypeStruct.tupsD(TypeMemPtr.make(14,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
+      (()-> TypeMemPtr.make(29,TypeStruct.tupsD(TypeMemPtr.make(17,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
       null, "(*\"abc\",2)");
     test("A= :(str?, int); A( (\"abc\",2) )",
-      (()-> TypeMemPtr.make(15,TypeStruct.tupsD(TypeMemPtr.make(14,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
+      (()-> TypeMemPtr.make(18,TypeStruct.tupsD(TypeMemPtr.make(17,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
       null, "(*\"abc\",2)");
     testerr("A= :(str?, int)?","Named types are never nil",16);
   }
@@ -356,7 +356,7 @@ public class TestParse {
     test_obj("(1,\"abc\").1", TypeStr.ABC);
 
     // Named type variables
-    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(29),4, TypeMemPtr.NO_DISP, TypeFlt.FLT64.set_name("gal:")));
+    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(82),4, TypeMemPtr.NO_DISP, TypeFlt.FLT64.set_name("gal:")));
     test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
@@ -403,13 +403,13 @@ public class TestParse {
     test("A= :@{n=A?; v=int}; A(@{n=0;v=3})","*A:@{n=0; v=3}","@{n=0,v=3}");
 
     // Missing type B is also never worked on.
-    test("A= :@{n=B?; v=int}", "[~29+74]{->*use }","A");
+    test("A= :@{n=B?; v=int}", "[~78+88]{->*use }","A");
     test("A= :@{n=B?; v=int}; a = A(0,2)", "*A:@{n=0; v=2}","@{n=0,v=2}");
     test("A= :@{n=B?; v=int}; a = A(0,2); a.n", "0", "0");
     // Mutually recursive types
-    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}; (A,B)", "*([~29+74]{->any }, [~77+78]{->any })", "(A,B)");
-    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}; (A,B)", "*([~77+78]{->any }, [~29+74]{->any })", "(A,B)");
-    test("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}; (A,B,C)", "*([~29+74]{->any }, [~77+78]{->any }, [~79+80]{->any })", "(A,B,C)");
+    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}; (A,B)", "*([~78+88]{->any }, [~29+82]{->any })", "(A,B)");
+    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}; (A,B)", "*([~29+82]{->any }, [~78+88]{->any })", "(A,B)");
+    test("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}; (A,B,C)", "*([~78+88]{->any }, [~29+82]{->any }, [~95+96]{->any })", "(A,B,C)");
     // Mixed ABC's, making little abc's in-between.
     test("""
 A= :@{n=B?; v=int};
@@ -419,7 +419,8 @@ b= B(a,3.14);
 C= :@{n=B?; v=str};
 c= C(b,"abc");
 (a,b,c)
-""","*(*A:@{n=0; v=5}, *B:@{n=$; v=3.14}, *C:@{n=$; v=*\"abc\"})","( A:@{ n = 0, v = 5}, B:@{ n = A, v = 3.14}, @{ n = B, v = *\"abc\"})");
+""",     "*(*A:@{n=0; v=5}, *B:@{n=$; v=3.14}, *C:@{n=$; v=*\"abc\"})",
+         "(@{n=0,v=5},@{n=@{n=0,v=5},v=3.14},@{n=@{n=@{n=0,v=5},v=3.14},v=*\"abc\"})");
   }
 
   @Test public void testParse07() {
@@ -605,15 +606,15 @@ c= C(b,"abc");
     test("x:=1", TypeInt.TRUE);
     test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.tupsD(Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
 
-    testerr("x=1; x:=2; x", "Cannot re-assign final val 'x'", 5);
-    testerr("x=1; x =2; x", "Cannot re-assign final val 'x'", 5);
+    testerr("x=1; x:=2; x", "Cannot re-assign final field '.x' in @{x=1}", 5);
+    testerr("x=1; x =2; x", "Cannot re-assign final field '.x' in @{x=1}", 5);
 
     test("math.rand(1)?(x=4):(x=3);x", TypeInt.NINT8); // x defined on both arms, so available after
     test("math.rand(1)?(x:=4):(x:=3);x", TypeInt.NINT8); // x defined on both arms, so available after
     test("math.rand(1)?(x:=4):(x:=3);x:=x+1", TypeInt.INT64); // x mutable on both arms, so mutable after
     test   ("x:=0; 1 ? (x:=4):; x:=x+1", TypeInt.con(5)); // x mutable ahead; ok to mutate on 1 arm and later
     test   ("x:=0; 1 ? (x =4):; x", TypeInt.con(4)); // x final on 1 arm, dead on other arm
-    testerr("x:=0; math.rand(1) ? (x =4):3; x=2; x", "Cannot re-assign read-only val 'x'",31);
+    testerr("x:=0; math.rand(1) ? (x =4):3; x=2; x", "Cannot re-assign read-only field '.x' in @{x==int8}",31);
     // A final store, but defs of @{a} do not escape into nonline_x, hence do
     // not merge and escape out.
     test("noinline_x={@{a}}; noinline_x().a=2; noinline_x().a",  TypeInt.INT8);

@@ -112,6 +112,26 @@ public class NewObjNode extends NewNode<TypeStruct> {
     }
   }
 
+  @Override public Node ideal_reduce() {
+    Node x = super.ideal_reduce();
+    if( x!=null ) return x;
+    if( is_prim() ) return null;
+    // Dead fields are set to ANY
+    TypeObj to = _live.at(_alias);
+    if( !(to instanceof TypeStruct) ) return null;
+    TypeStruct ts = (TypeStruct)to;
+    Node progress = null;
+    for( TypeFld tfld : _ts.flds() ) {
+      TypeFld lfld = ts.fld_find(tfld._fld);
+      if( lfld !=null && lfld._t==Type.XSCALAR ) {
+        int idx = lfld._order;
+        if( in(idx) != Env.ANY )
+          progress = set_def(idx,Env.ANY);
+      }
+    }
+    return progress;
+  }
+
   @Override public Node ideal_mono() {
     // If the value lifts a final field, so does the default lift.
     if( _val instanceof TypeTuple ) {
@@ -194,4 +214,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     rec.push_dep(this);
     return progress;
   }
+
+  // True if loading from a display/closure
+  @Override public boolean is_display_ptr() { return _is_closure; }
 }

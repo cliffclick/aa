@@ -1,7 +1,6 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
@@ -14,7 +13,7 @@ import java.util.BitSet;
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
 
-/** an implementation of language AA
+/*** an implementation of language AA
  *
  *  GRAMMAR:
  *  prog = stmts END
@@ -64,6 +63,64 @@ import static com.cliffc.aa.type.TypeFld.Access;
  *  tmod = := | = | ==             // ':=' or '' is r/w, '=' is final, '==' is r/o
  *  tstruct = @{ [id [tmod [type?]];]*}  // Struct types are field names with optional types.
  *  tvar = id                      // Type variable lookup
+
+
+ * The Display
+ *
+ * The Parser builds an IR presentation of the program semantics, which has
+ * some subtleties.  See FunNode and CallNode for how function headers adnd
+ * call sites are represented.  See FunPtrNode for a discussion on the "fat"
+ * function pointers AA uses.  Included in function pointer is the Display, or
+ * "Environment" variable - a hidden extra variable representing the accessible
+ * call-stack of non-local variables.  AA supports full closures, and a full
+ * closure requires its stack to be heap allocated.  Hence the display might be
+ * implemented as a non-local stack offset or it might be a heap object.
+ * Keeping this explicit in the IR allows me to clone an outer function with a
+ * escaping display without requiring cloning all the escaping inner functions.
+
+ * Example:  Simple function to generate a private counter:
+ *    gen = { cnt; ({cnt},{cnt++}) };
+ *    (cntA,incA) = gen();  // Generate A counter, with a getter and incrementer
+ *    (cntB,incB) = gen();  // Generate B counter, with a getter and incrementer
+ *    incA(); incA(); incB();       // Now counter A=2 and B=1
+ *    assert cntA()==2 && cntB==1;  // Assert counters are independent
+ *
+ * Here the variable 'cnt' escapes the lifetime of 'gen' and gen's display must
+ * be stack allocated.
+ *
+ * Example: Same, except the inner functions are brought out at the top-level:
+ *    _cnt = { cnt  } // Direct access to 'gen.cnt'
+ *    _inc = { cnt++} // Direct access to 'gen.cnt'
+ *    gen = { cnt; ( _cnt, _inc ) }
+ * And then we clone 'gen':
+ *    gen2 = { cnt; ( _cnt, _inc ) }
+ * But _cnt and _inc refer to the original 'gen' counter and not the new one.
+ *
+ * Example: Same, except the display is explicit:
+ *    _cnt = { dsp -> dsp.cnt  } // Code, not fptr, needs display
+ *    _inc = { dsp -> dsp.cnt++} // Code, not fptr, needs display
+ *    gen  = { dsp  = @{cnt}; ( (_cnt,dsp ), (_inc,dsp ) ) }
+ * And cloning gen:
+ *    gen2 = { dsp2 = @{cnt}; ( (_cnt,dsp2), (_inc,dsp2) ) }
+ * Here the two 'gen's can share their inner functions but use different displays.
+ *
+ *
+ * The Display is also available during @{} structure initialization, as a
+ * default argument to nested functions.
+ *
+ * Example:
+ *   circle = @{ r=1.0; area = { -> 2*math.pi*r } }  // Uses 'r'
+ *   square = @{ x=1.2; area = { -> x*x } }          // Uses 'x'
+ *
+ * Each following init code is allowed to use all the fields that came before
+ * it (plus itself for recursive functions), and is treated like a function
+ * taking a hidden display argument of the structure itself.
+ *
+ * Example: x = @{ fld1=init1; fld2=init2; ... }
+ * Becomes: x = @{ fld1=0; fld2=0; ... }; x.fld1=init1(x); x.fld2=init2(x);...
+ * Except the init1 does not get to use any x fields, the init2 call can only
+ * use fld1 and so forth.  The init codes can change mutable fields as well.
+ *
  */
 
 public class Parse implements Comparable<Parse> {
@@ -169,7 +226,7 @@ public class Parse implements Comparable<Parse> {
         _e.add_type(tvar,tn); // Add a type mapping
         if( _prims ) return tn;
         // Make a trivial constructor
-        FunPtrNode fptr = PrimNode.convertTypeName(t,named,bad);
+        FunPtrNode fptr = PrimNode.convertTypeName(t,named,bad,_e._fun);
         do_store(null,fptr,Access.Final,tvar,bad);
         return fptr;
       }
@@ -192,10 +249,10 @@ public class Parse implements Comparable<Parse> {
     // does not change, but a TypeMem[alias#] would now map to the Named
     // variant.
     TypeStruct ts = (TypeStruct)((TypeMemPtr)tn._val)._obj;
-    FunPtrNode epi1 = IntrinsicNode.convertTypeName(ts,bad);
+    FunPtrNode epi1 = IntrinsicNode.convertTypeName(ts,bad,_e._fun);
     do_store(null,epi1,Access.Final,tvar,bad);
     // Add a second constructor taking an expanded arg list
-    FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(ts, tn.alias(), errMsg());
+    FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(ts, tn.alias(), errMsg(),_e._fun);
     do_store(scope(),epi2,Access.Final,tvar,bad);
     return _e.lookup(tvar); // Returns an Unresolved of constructors
   }
@@ -233,7 +290,6 @@ public class Parse implements Comparable<Parse> {
     Ary<Parse > badts= new Ary<>(new Parse [1],0);
     BitSet rs = new BitSet();
     boolean default_nil = false;
-    _e.nongen_push(_e);
     while( true ) {
       skipWS();
       int oldx = _x;            // Unwind token parse point
@@ -271,7 +327,7 @@ public class Parse implements Comparable<Parse> {
         }
       }
 
-      toks .add(_e._nongen.add_var(tok.intern(),TV2.make_leaf_ns(null,"Env.add_var")));
+      toks .add(tok.intern());
       ts   .add(t  );
       badfs.add(badf);
       badts.add(badt);
@@ -281,7 +337,7 @@ public class Parse implements Comparable<Parse> {
     Node ifex = default_nil ? con(Type.XNIL) : ifex(); // Parse an expression for the statement value
     // Check for no-statement after start of assignment, e.g. "x = ;"
     if( ifex == null ) {        // No statement?
-      if( toks._len == 0 ) return _e.nongen_pop(null);
+      if( toks._len == 0 ) return null;
       ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
     }
     // Honor all type requests, all at once, by inserting type checks on the ifex.
@@ -294,10 +350,18 @@ public class Parse implements Comparable<Parse> {
       String tok = toks.at(i);               // Token being assigned
       Access mutable = rs.get(i) ? Access.RW : Access.Final;  // Assignment is mutable or final
       ScopeNode scope = lookup_scope(tok,lookup_current_scope_only);
+      // Balanced operators are ALSO stored in the same scope under a special unparseable name.
+      // The term() call, when it does balanced op lookups, uses the same special name.
+      String bal_close;
+      if( ifex instanceof FunPtrNode && (bal_close=((FunPtrNode)ifex).fun()._bal_close) != null ) {
+        String btok = (" "+tok.substring(0,bal_close.length()+1)).intern();
+        do_store(scope,ifex,mutable,btok,badfs.at(i));
+      }
+      // Store down the full name 2nd, to overwrite the short bal-op name
       do_store(scope,ifex,mutable,tok,badfs.at(i));
     }
 
-    return _e.nongen_pop(ifex.unkeep());
+    return ifex.unkeep();
   }
 
   // Assign into display, changing an existing def
@@ -434,7 +498,7 @@ public class Parse implements Comparable<Parse> {
       lhs.keep();
       // Get the matching FunPtr (or Unresolved).
       // This is a primitive lookup and always returns a FRESH copy (see HM.Ident).
-      UnOrFunPtrNode op = _e.lookup_filter_2(bintok.intern()); // BinOp, or null
+      UnOrFunPtrNode op = _e.lookup_filter_bin(bintok); // BinOp, or null
       assert op!=null;          // Since found valid token, must find matching primnode
       FunNode sfun = op.funptr().fun();
       assert sfun._op_prec == prec;
@@ -443,10 +507,10 @@ public class Parse implements Comparable<Parse> {
         lhs = _short_circuit_expr(lhs.unkeep(),prec,bintok,op,opx,lhsx,rhsx);
       } else {                  // Not a thunk!  Eager evaluation of RHS
         op.keep();
-        Node rhs = _expr_higher_require(prec,bintok,lhs.unkeep());
+        Node rhs = _expr_higher_require(prec,bintok,lhs);
         // Emit the call to both terms
         // LHS in unhooked prior to optimizing/replacing.
-        lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op.unkeep(),lhs,rhs));
+        lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op.unkeep(),lhs.unkeep(),rhs));
       }
       // Invariant: LHS is unhooked
     }
@@ -525,6 +589,7 @@ public class Parse implements Comparable<Parse> {
   /** Any number field-lookups or function applications, then an optional assignment
    *    term = id++ | id--
    *    term = uniop term
+   *    term = bopen term bclose
    *    term = tfact [tuple | .field | [.field[:]=stmt | .field++ | .field-- | e]
    *    term = tfact bopen stmts bclose      // if bopen/bclose is arity-2 e.g. ary[idx]
    *    term = tfact bopen stmts bclose stmt // if bopen/bclose is arity-3 e.g. ary[idx]=val
@@ -553,10 +618,17 @@ public class Parse implements Comparable<Parse> {
         // operator out of the first few.  The name also ends in '_' to
         // indicate it's a prefix operator.
         _x = oldx+ptr._name.length()-1;
+        // Balanced ops also need to subtract the unparsed trailing balanced close
+        String bal_close = ptr.fun()._bal_close;
+        if( bal_close !=null )
+          _x = _x - bal_close.length();
         unifun.keep();
         Node term = term();
-        if( term!=null )
+        if( term!=null ) {
+          if( bal_close != null )
+            require(bal_close,oldx);
           return do_call(errMsgs(0,oldx),args(unifun.unkeep(),term));
+        }
         unifun.unhook();        // Unwind and try normal term
       }
     }
@@ -573,7 +645,10 @@ public class Parse implements Comparable<Parse> {
         String fld = token0();  // Field name
         if( fld == null ) {     // Not a token, check for a field number
           int fldnum = field_number();
-          if( fldnum == -1 ) return err_ctrl2("Missing field name after '.'");
+          if( fldnum == -1 ) {
+            if( n._uses._len==0 ) n.kill();
+            return err_ctrl2("Missing field name after '.'");
+          }
           fld = ""+fldnum;      // Convert to a field name
         }
         fld=fld.intern();
@@ -635,10 +710,10 @@ public class Parse implements Comparable<Parse> {
         tok = token();
         if( tok==null ) { n.unhook(); return err_ctrl2("Missing close after '"+bop+"'"); }
 
-        // Need to find which balanced op close.  Find the longest matching name
-        UnOrFunPtrNode unr = _e.lookup_filter_bal(bop,tok);
-        if( unr==null ) { n.unhook(); return err_ctrl2("No such operation '_"+bop+"_"+tok+"'"); }
-
+        //// Need to find which balanced op close.  Find the longest matching name
+        //UnOrFunPtrNode unr = _e.lookup_filter_bal(bop,tok);
+        //if( unr==null ) { n.unhook(); return err_ctrl2("No such operation '_"+bop+"_"+tok+"'"); }
+        //
         //FunPtrNode fptr=null;
         //UnresolvedNode unr = ((UnOrFunPtrNode)bfun.unkeep()).unk();
         //if( unr!=null ) {       // Unresolved of balanced ops?
@@ -690,7 +765,6 @@ public class Parse implements Comparable<Parse> {
     // Scope is discovered by walking lexical display stack.
     // Pointer to the proper display is found via ptr-walking live display stack.
     // Now properly load from the display.
-    // This does a HM.Ident lookup, producing a FRESH tvar every time.
     Node ptr = get_display_ptr(scope);
     n = gvn(new LoadNode(mem(),ptr,tok,null));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
@@ -698,7 +772,7 @@ public class Parse implements Comparable<Parse> {
     // Do a full lookup on "+", and execute the function
     n.keep();
     // This is a primitive lookup and always returns a FRESH copy (see HM.Ident).
-    Node plus = _e.lookup_filter_2("+");
+    Node plus = _e.lookup_filter_bin("+");
     Node sum = do_call(errMsgs(0,_x,_x),args(plus,n,con(TypeInt.con(d))));
     // Active memory for the chosen scope, after the call to plus
     scope().replace_mem(new StoreNode(mem(),ptr,sum,Access.RW,tok,errMsg()));
@@ -729,7 +803,7 @@ public class Parse implements Comparable<Parse> {
    *  fact = balop+ stmts balop-           // Constructor with initial size
    *    Ex:    [      7      ]             // Array constructor
    *  fact = balop+ stmts[, stmts]* balop- // Constructor with initial elements
-   *    Ex:    [      1   ,  2        ]    // Array constructor with initial elements
+   *    Ex:    [      1   ,  2        ]    // Array constructor with initial elements'
    *  fact = {func}    // Anonymous function declaration
    *  fact = id        // variable lookup
    */
@@ -752,20 +826,12 @@ public class Parse implements Comparable<Parse> {
       return tuple(oldx,s,first_arg_start);     // Parse a tuple
     }
     // Anonymous function
-    if( peek1(c,'{') ) {
-      String tok = token0();
-      Node op = tok == null ? null : _e.lookup(tok.intern());
-      if( peek('}') && op != null && op.op_prec() > 0 )
-        // This is a primitive operator lookup as a function constant, and
-        // makes a FRESH copy like HM.Ident.
-        return gvn(new FreshNode(_e._nongen,op));
-      _x = oldx+1;              // Back to the opening paren
-      return func(); // Anonymous function
-    }
+    if( peek1(c,'{') ) return func();
 
     // Anonymous struct
     if( peek2(c,"@{") ) return struct();
 
+    // Primitive parsing only, directly get a Java intrinsic implementation
     if( _prims && peek2(c,"$$") ) return java_class_node();
 
     // Check for a valid 'id'
@@ -781,20 +847,19 @@ public class Parse implements Comparable<Parse> {
       // tail-half of a balanced-op, which is parsed by term() above.
       if( isOp(tok) ) { _x = oldx; return null; }
       // Must be a forward reference
-      Env fref_env = _e.lookup_fref(tok=tok.intern());
-      if( fref_env==null ) fref_env = _e;
       Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,errMsg(oldx)));
       // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
-      fref_env._scope.stk().create(tok,fref,Access.Final);
+      _e._scope.stk().create(tok,fref,Access.Final);
       return fref;
     }
 
-    // Else must load against most recent display update.  Get the display to
-    // load against.  If the scope is local, we load against it directly,
-    // otherwise the display is passed in as a hidden argument.
-    // This does a HM.Ident lookup, producing a FRESH tvar every time.
+    // Else must load against most recent display update.  Get the display to load
+    // against.  This does a HM.Ident lookup, producing a FRESH tvar every time.
     Node ptr = get_display_ptr(scope);
-    return gvn(new LoadNode(mem(),ptr,tok.intern(),null));
+    Node ld = gvn(new LoadNode(mem(),ptr,tok.intern(),null));
+    return ptr.is_display_ptr()
+      ? ld                              // Inside a def, no fresh
+      : gvn(new FreshNode(_e._fun,ld)); // After a field is defined, yes fresh
   }
 
 
@@ -837,7 +902,7 @@ public class Parse implements Comparable<Parse> {
    */
   private Node struct() {
     int oldx = _x-1; Node ptr;  // Opening @{
-    try( Env e = new Env(_e, false, ctrl(), mem()) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e, null, false, ctrl(), mem()) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
@@ -864,7 +929,7 @@ public class Parse implements Comparable<Parse> {
     // or when inside of a struct definition: 'this'.
     Node parent_display = scope().ptr();
     TypeMemPtr tpar_disp = (TypeMemPtr) parent_display._val; // Just a TMP of the right alias
-    Node fresh_disp = gvn(new FreshNode(_e._nongen,parent_display)).keep();
+    Node fresh_disp = parent_display; // gvn(new FreshNode(_e._fun,parent_display)).keep();
 
     // Incrementally build up the formals
     TypeStruct formals = TypeStruct.make("",false,true,
@@ -905,16 +970,16 @@ public class Parse implements Comparable<Parse> {
 
     try( GVNGCM.Build<Node> X = _gvn.new Build<>()) { // Nest an environment for the local vars
       // Build the FunNode header
-      FunNode fun = (FunNode)X.xform(new FunNode(formals.close()).add_def(_prims ? Env.SCP_0 : Env.FILE._scope));
+      FunNode fun = (FunNode)X.xform(new FunNode(formals.close(),_e._fun).add_def(_prims ? Env.SCP_0 : Env.FILE._scope));
       // Record H-M VStack in case we clone
       //fun.set_nongens(_e._nongen.compact());
       // Build Parms for system incoming values
       Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
       Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-      Node clo = X.xform(new ParmNode(DSP_IDX,"^"   ,fun,tpar_disp,parent_display,null));
+      Node clo = X.xform(new ParmNode(DSP_IDX,"^"   ,fun,tpar_disp,fresh_disp,null));
 
       // Increase scope depth for function body.
-      try( Env e = new Env(_e, true, fun, mem) ) { // Nest an environment for the local vars
+      try( Env e = new Env(_e, fun, true, fun, mem) ) { // Nest an environment for the local vars
         _e = e;                   // Push nested environment
         // Display is special: the default is simply the outer lexical scope.
         // But here, in a function, the display is actually passed in as a hidden
@@ -927,7 +992,6 @@ public class Parse implements Comparable<Parse> {
         for( TypeFld fld : formals.flds() ) { // User parms start
           if( fld._order <= DSP_IDX ) continue;// Already handled
           Node parm = X.xform(new ParmNode(fld,fun,Env.ALL_PARM,errmsg));
-          e._nongen.add_var(fld._fld,parm.tvar());
           create(fld._fld,parm, args_are_mutable);
         }
 
@@ -942,7 +1006,7 @@ public class Parse implements Comparable<Parse> {
         // to the function for faster access.
         RetNode ret = (RetNode)X.xform(new RetNode(ctrl(),mem(),rez,rpc,fun));
         // The FunPtr builds a real display; any up-scope references are passed in now.
-        Node fptr = X.xform(new FunPtrNode(null,ret,fresh_disp.unhook()));
+        Node fptr = X.xform(new FunPtrNode(null,ret,fresh_disp));
         // Hook function at the TOP scope, in case it escapes all current
         // enclosing scopes.  This hook is removed as part of doing the Combo
         // pass which computes a real Call Graph and all escapes.
@@ -1016,12 +1080,14 @@ public class Parse implements Comparable<Parse> {
     int oldx = _x;
     String bal = token();
     if( bal==null ) return null;
-    String xbal = _e.lookup_filter_bal(bal.intern());
-    if( xbal==null ) { _x=oldx; return null; }
-    // Actual minimal length op might be smaller than the parsed token
-    // (greedy algo vs not-greed)
-    _x = oldx+xbal.length();
-    return xbal;
+    UnOrFunPtrNode xbal = _e.lookup_filter_bal(bal);
+    if( xbal==null || xbal.funptr().fun()._bal_close==null )
+      { _x=oldx; return null; } // Not a balanced operator
+    //// Actual minimal length op might be smaller than the parsed token
+    //// (greedy algo vs not-greed)
+    //_x = oldx+xbal.length();
+    //return xbal;
+    throw unimpl();
   }
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.
@@ -1381,7 +1447,6 @@ public class Parse implements Comparable<Parse> {
     // exists at scope up in the display.
     Env e = _e;
     Node ptr = e._scope.ptr();
-    ptr = gvn(new FreshNode(e._nongen,ptr)); // TODO: turn on
     Node mmem = mem();
     while( true ) {
       if( scope == e._scope ) return ptr;

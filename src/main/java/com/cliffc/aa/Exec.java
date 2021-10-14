@@ -25,7 +25,7 @@ public abstract class Exec {
   // Parse and type a string.  Can be nested.  In theory, will be eval() someday.
   // In theory, can keep the result node and promote them for the REPL.
   public static TypeEnv go( Env top, String src, String str ) { // Execute string
-    Env e = Env.FILE = new Env(top,false,top._scope.ctrl(),top._scope.mem());
+    Env e = Env.FILE = new Env(top,null,false,top._scope.ctrl(),top._scope.mem());
 
     // Parse a program
     ErrMsg err = new Parse(src,false,e,str).prog();
@@ -36,15 +36,12 @@ public abstract class Exec {
     e.close();                // No more fields added to the parse scope
     // Pessimistic optimizations; might improve error situation
     Env.GVN.iter(GVNGCM.Mode.PesiNoCG);
-    // Remove any Env.TOP hooks to function pointers, only kept alive until we
-    // can compute a real Call Graph.
-    while( !Env.SCP_0._defs.last().is_prim() )
-      Env.SCP_0.pop();
+    // Remove all the things kept alive until Combo runs
+    Env.pre_combo();
 
-    // Type
-    Combo.opto();                    // Global Constant Propagation and Hindley-Milner Typing
+    Combo.opto(true);                // Global Constant Propagation and Hindley-Milner Typing
     Env.GVN.iter(GVNGCM.Mode.PesiCG);// Re-check all ideal calls now that types have been maximally lifted
-    Combo.opto();                    // Global Constant Propagation and Hindley-Milner Typing
+    Combo.opto(false);               // Global Constant Propagation and Hindley-Milner Typing
     Env.GVN.iter(GVNGCM.Mode.PesiCG);// Re-check all ideal calls now that types have been maximally lifted
     //assert Type.intern_check();
     Env.FILE=null;

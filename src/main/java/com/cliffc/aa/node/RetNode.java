@@ -30,7 +30,7 @@ public final class RetNode extends Node {
   public FunNode fun() { return (FunNode)in(4); }
   @Override public boolean is_mem() { return true; }
   // If this function is not using any displays, then there is a single unique
-  // FunPtr.  Otherwise this call is ambiguous, as each execution of the
+  // FunPtr.  Otherwise, this call is ambiguous, as each execution of the
   // FunPtrNode makes a new display.
   public FunPtrNode funptr() {
     FunPtrNode fpn=null;

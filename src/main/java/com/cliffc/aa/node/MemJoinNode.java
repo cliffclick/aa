@@ -7,6 +7,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.Env.GVN;
 
 // Join a split set of aliases from a SESE region, split by an earlier MemSplit.
@@ -78,14 +79,14 @@ public class MemJoinNode extends Node {
       if( head instanceof CallNode ) return null; // Do not swallow a Call/CallEpi into a Split/Join
       if( head instanceof CallEpiNode ) return null; // Do not swallow a Call/CallEpi into a Split/Join
       if( head instanceof MemSplitNode ) return null; // TODO: Handle back-to-back split/join/split/join
-      throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
+      throw unimpl(); // Break out another SESE split
     }
     if( mem instanceof MrgProjNode ) return mem;
     if( mem instanceof ParmNode ) return null;
     if( mem instanceof PhiNode ) return null;
     if( mem instanceof StartMemNode ) return null;
     if( mem instanceof ConNode ) return null;
-    throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
+    throw unimpl(); // Break out another SESE split
   }
 
   // Move one escape set from the lower Split/Join to the upper.
@@ -142,20 +143,29 @@ public class MemJoinNode extends Node {
     }
     if( !diff ) return mems[0]; // All memories the same
 
-    // Walk all aliases and take from matching escape set in the Split.  Since
-    // nothing overlaps this is unambiguous.
-    Ary<BitsAlias> escs = msp()._escs;
-    TypeObj[] pubs = new TypeObj[Env.DEFMEM._defs._len];
-    for( int alias=1, i; alias<Env.DEFMEM._defs._len; alias++ ) {
-      if( escs.at(0).test_recur(alias) ) { // In some RHS set
-        for( i=1; i<_defs._len; i++ )
-          if( escs.at(i).test_recur(alias) )
-            break;
-      } else i=0;                     // In the base memory
-      if( alias == 1 || Env.DEFMEM.in(alias) != null ) // Check never-made aliases
-        pubs[alias] = mems[i].at(alias); // Merge alias
+    if( opt_mode._CG ) {
+      // During or after Combo, the memory types are complete.  Simply MEET.
+      Type t = Type.ANY;
+      for( TypeMem tmem : mems )
+        t = t.meet(tmem);
+      return t;
+    } else {
+      // Pre Call-Graph, we must rely on Env.DEFMEM.
+      // Walk all aliases and take from matching escape set in the Split.  Since
+      // nothing overlaps this is unambiguous.
+      Ary<BitsAlias> escs = msp()._escs;
+      TypeObj[] pubs = new TypeObj[Env.DEFMEM._defs._len];
+      for( int alias=1, i; alias<Env.DEFMEM._defs._len; alias++ ) {
+        if( escs.at(0).test_recur(alias) ) { // In some RHS set
+          for( i=1; i<_defs._len; i++ )
+            if( escs.at(i).test_recur(alias) )
+              break;
+        } else i=0;                     // In the base memory
+        if( alias == 1 || Env.DEFMEM.in(alias) != null ) // Check never-made aliases
+          pubs[alias] = mems[i].at(alias); // Merge alias
+      }
+      return TypeMem.make0(pubs);
     }
-    return TypeMem.make0(pubs);
   }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 

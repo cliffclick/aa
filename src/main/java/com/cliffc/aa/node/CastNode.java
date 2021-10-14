@@ -62,6 +62,7 @@ public class CastNode extends Node {
     if( _val!=old )
       work.add(this);
   }
+  
   @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
     return def==in(0) ? TypeMem.ALIVE : _live;
   }

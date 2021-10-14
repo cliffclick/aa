@@ -32,7 +32,7 @@ public class IntrinsicNode extends Node {
   // vtable name type in memory.  Unaliased, so the same memory cannot be
   // referred to without the Name.  Error if the memory cannot be proven
   // unaliased.  The Ideal call collapses the Name into the unaliased NewNode.
-  public static FunPtrNode convertTypeName( TypeObj tn, Parse badargs ) {
+  public static FunPtrNode convertTypeName( TypeObj tn, Parse badargs, FunNode parfun ) {
     // The incoming memory type is *exact* and does not have any extra fields.
     // The usual duck typing is "this-or-below", which allows and ignores extra
     // fields.  For Naming - which involves installing a v-table (or any other
@@ -44,7 +44,7 @@ public class IntrinsicNode extends Node {
     try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
       TypeStruct formals = TypeStruct.args(TypeMemPtr.STRUCT);
       TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(BitsAlias.RECORD_BITS,tn));
-      FunNode fun = X.init2((FunNode)new FunNode(tn._name,sig,-1,false).add_def(Env.FILE._scope));
+      FunNode fun = X.init2((FunNode)new FunNode(tn._name,sig,-1,false,parfun).add_def(Env.FILE._scope));
       assert !fun.is_prim(); // prims use Env.SCP_0 not FILE scope
       Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
       Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
@@ -133,14 +133,14 @@ public class IntrinsicNode extends Node {
   // Default name constructor using expanded args list.  Just a NewObjNode but the
   // result is a named type.  Same as convertTypeName on an unaliased NewObjNode.
   // Passed in a named TypeStruct, and the parent alias.
-  public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, Parse bad ) {
+  public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, Parse bad, FunNode parfun ) {
     assert to.has_name() && to.fld_find("^").is_display_ptr(); // Display already
     // Upgrade the type to one with no display for nnn.
     to = to.replace_fld(TypeFld.NO_DISP);
     TypeFunSig sig = TypeFunSig.make(to.remove_name(),to);
 
     try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
-      FunNode fun = (FunNode) X.xform(new FunNode(to._name,sig,-1,false).add_def(Env.FILE._scope));
+      FunNode fun = (FunNode) X.xform(new FunNode(to._name,sig,-1,false,parfun).add_def(Env.FILE._scope));
       assert !fun.is_prim(); // prims use Env.SCP_0 not FILE scope
       Node rpc = X.xform(new ParmNode(  0    ," rpc",fun,Env.ALL_CALL,null));
       Node memp= X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));

@@ -1,9 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
-import com.cliffc.aa.ErrMsg;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMap;
@@ -46,13 +43,28 @@ public class StoreNode extends Node {
     if( ta.above_center() ) return mem;
     if( tmp!=null && _live.ld(tmp)==TypeObj.UNUSED )  return mem;
 
+    // No need for 'Fresh' address, as Stores have no TVar (produce memory not a scalar)
+    if( adr() instanceof FreshNode )
+      return set_def(2,((FreshNode)adr()).id());
+
+    // Escape a dead MemSplit
+    if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode &&
+        ((MemSplitNode)mem.in(0)).join()==null ) {
+      set_def(1,mem.in(0).in(1));
+      xval();                   // Update memory state to include all the default memory
+      return this;
+    }
+
     // If Store is by a New and no other Stores, fold into the New.
     NewObjNode nnn;  TypeFld tfld;
     if( mem instanceof MrgProjNode && mem._keep==0 &&
         _keep <= 1 &&
+        // Store into a NewObjNode, same memory and address
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
+        // Do not fold (or hide) errors
         !rez().is_forward_ref() &&
-        mem._uses._len==2 && // Use is by DefMem and self
+        // Do not bypass a parallel writer
+        mem.check_solo_mem_writer(this) && // Use is by DefMem and self
         (tfld=nnn._ts.fld_find(_fld))!= null ) {
       // Have to be allowed to directly update NewObjNode
       if( tfld._access==Access.RW || rez() instanceof FunPtrNode ) {
@@ -81,6 +93,7 @@ public class StoreNode extends Node {
 
     return null;
   }
+
   @Override public Node ideal_mono() { return null; }
   @Override public Node ideal_grow() {
     Node mem = mem();
@@ -160,6 +173,7 @@ public class StoreNode extends Node {
     TypeObj objs = tmem instanceof TypeMem
       ? ((TypeMem)tmem).ld(ptr) // General load from memory
       : ((TypeObj)tmem);
+    if( objs==TypeObj.UNUSED ) return null; // No error, too high yet
     if( !(objs instanceof TypeStruct) ) return bad("No such",fast,objs);
     TypeStruct ts = (TypeStruct)objs;
     TypeFld fld = ts.fld_find(_fld);
@@ -185,53 +199,55 @@ public class StoreNode extends Node {
     return _fin==st._fin && Util.eq(_fld,st._fld);
   }
 
+  @Override public TV2 new_tvar( String alloc_site) { return null; }
   @Override public boolean unify( Work work ) {
-    return unify("@{}",this,adr().tvar(),adr()._val,rez(),_fld,work);
+    TV2 ptr = adr().tvar();
+    if( ptr.is_err() ) return false;
+    return unify("@{}",this,ptr,adr()._val,rez().tvar(),_fld,work);
   }
 
-  // Common memory-update unification.  Store unifies with the stored value.
-  // The ptr has to be not-nilable and have the fld, which unifies with the
-  // value.  If the fld is missing, then if the ptr is open, add the field else
-  // missing field error.
-  public static boolean unify( String name, Node st, TV2 ptr, Type tptr, Node val, String id, Work work ) {
-    if( st.tvar().is_err() ) return false; // Already an error, no progress
-    // Propagate an error
-    if( ptr.is_err() ) return st.tvar().unify(ptr,work);
-
+  // Common memory-update unification.  The ptr has to be not-nilable and have
+  // the fld, which unifies with the value.  If the fld is missing, then if the
+  // ptr is open, add the field else missing field error.
+  public static boolean unify( String name, Node ldst, TV2 ptr, Type tptr, TV2 tval, String id, Work work ) {
     // Check for nil address
-    if( ptr.is_nil() || (tptr instanceof TypeMemPtr && tptr.must_nil()) )
-      return work==null || st.tvar().unify(TV2.make_err(st,"May be nil when accessing field "+id,"Store_update"),work);
+    if( !Combo.NIL_OK )
+      if( ptr.is_nil() || (tptr instanceof TypeMemPtr && tptr.must_nil()) )
+        return work==null || ldst.tvar().unify(TV2.make_err(ldst,"May be nil when accessing field "+id,"Store_update"),work);
 
-    // Store value is always the stored value
-    boolean progress = st.tvar().unify(val.tvar(),work);
-    ptr.push_dep(st);
+    // If the Load/Store is in flow-type error
+    if( !Combo.NIL_OK && ldst.err(true)!=null )
+      return work==null || ptr.unify(TV2.make_err(ldst,ldst.err(false)._msg,"Store_update"),work);
 
     // Matching fields unify
     TV2 fld = ptr.get(id);
     if( fld!=null )             // Unify against pre-existing field
-      return fld.unify(st.tvar(), work) | progress;
+      return fld.unify(tval, work);
+
+    if( !(tptr instanceof TypeMemPtr) )
+      return false;
 
     // The remaining cases all make progress and return true
     if( work==null ) return true;
 
     // Add field if open
     if( ptr.is_struct() && ptr.open() ) // Effectively unify with an extended struct.
-      return ptr.add_fld(id,st.tvar(),work);
+      return ptr.add_fld(id,tval,work);
 
     // Unify against an open struct with the named field
     if( ptr.is_leaf() || ptr.is_fun() ) {
-      TV2 tv2 = TV2.make_open_struct(name,st,TypeMemPtr.make(BitsAlias.REC,TypeStruct.make()),"Store_update", new NonBlockingHashMap<>());
-      tv2.args_put(id,st.tvar());
+      TV2 tv2 = TV2.make_open_struct(name,ldst,tptr,"Store_update", new NonBlockingHashMap<>());
+      tv2.args_put(id,tval);
       return tv2.unify(ptr,work);
     }
 
     // Closed record, field is missing
-    return st.tvar().unify(ptr.miss_field(st,id,"Store_update"),work);
+    return tval.unify(ptr.miss_field(ldst,id,"Store_update"),work);
   }
 
   @Override public void add_work_hm(Work work) {
-    super.add_work_hm(work);
     work.add(adr());
+    work.add(rez());
   }
 
 }

@@ -3,8 +3,6 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
-import static com.cliffc.aa.AA.unimpl;
-
 // A TypeObj where fields are indexed by dynamic integer.
 public class TypeAry extends TypeObj<TypeAry> {
   public  TypeInt _size;        // Count of elements
@@ -93,6 +91,7 @@ public class TypeAry extends TypeObj<TypeAry> {
   public Type ld(TypeInt idx) { return _elem; }
   // Type over all elements
   public Type elem() { return _elem; }
+  public TypeObj stor() { return _stor; }
   @Override public TypeObj update(TypeInt idx, Type val) {
     if( idx.above_center() ) return this; // Nothing updates
     if( val.isa(_elem) ) return this;     // No change
@@ -107,6 +106,6 @@ public class TypeAry extends TypeObj<TypeAry> {
   }
 
   @Override public BitsFun all_reaching_fidxs( TypeMem tmem) {
-    throw unimpl();             // Need to check for arrays-of-functions
+    return _elem.all_reaching_fidxs(tmem);
   }
 }

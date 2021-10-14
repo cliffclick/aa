@@ -50,6 +50,14 @@ public class IfNode extends Node {
     return that;
   }
 
+  // Some CSE folded my input, extra Casts might optimize
+  @Override public void add_work_use_extra(Work work, Node chg) {
+    if( in(1)==chg )
+      for( Node uctl : _uses )
+        for( Node cast : uctl._uses )
+          if( cast instanceof CastNode )
+            work.add(cast);
+  }
 
   @Override public TypeTuple value(GVNGCM.Mode opt_mode) {
     // If the input is exactly zero, we can return false: {ANY,CONTROL}

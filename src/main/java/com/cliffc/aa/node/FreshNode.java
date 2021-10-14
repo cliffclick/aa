@@ -1,38 +1,34 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Combo;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
-import java.util.Arrays;
-
-// "fresh" the incoming TVar: make a fresh instance.
+// "fresh" the incoming TVar: make a fresh instance before unifying
 public class FreshNode extends UnOrFunPtrNode {
-  TV2[] _tv2s;                  // Compacted VStack of nongen TV2s, used during "fresh"
-  public FreshNode( Env.VStack vs, Node ld ) {
-     super(OP_FRESH, ld);
-     _tv2s = vs.compact();      // TODO: express this during Combo reset
-     // Pushed during Combo reset on fresh vars
-     //ld.tvar().push_dep(this);
-   }
+  public FreshNode( FunNode fun, Node ld ) { super(OP_FRESH, fun, ld); }
 
-  Node id() { return in(0); }   // The HM identifier
+  // The lexical scope, or null for top-level
+  FunNode fun() {
+    return in(0)==Env.CTL_0 ? null : (FunNode)in(0);
+  }
+  Node id() { return in(1); }       // The HM identifier
+  TV2[] nongen() { return fun()==null ? null : fun()._nongen; }
   @Override public Node ideal_reduce() {
     if( id()==this ) return null; // Dead self-cycle
     // Remove Fresh of base type values: things that can never have structure.
     if( no_tvar_structure(_val) )
       return id();
     // Remove if TVar has already unified with the input.
-    // Removes many FreshNodes but requires non-local info to put on worklist.
-    // i.e. a remote unification can suddenly enable this.
-    if( !tvar().unify(id().tvar(),null) ) // Unification progress?
+    if( _tvar!=null && tvar()==id().tvar() )
      return id();
 
     return null;
   }
 
-  @Override public Type value(GVNGCM.Mode opt_mode) { return val(0); }
+  @Override public Type value(GVNGCM.Mode opt_mode) { return id()._val; }
   @Override public void add_work_extra(Work work,Type old) {
     // Types changed, now might collapse
     if( !no_tvar_structure(old) && no_tvar_structure(_val) )
@@ -48,16 +44,17 @@ public class FreshNode extends UnOrFunPtrNode {
 
   // Things that can never have type-variable internal structure.
   private static boolean no_tvar_structure(Type t) {
-    return t.isa(TypeInt.INT64) || t.isa(TypeFlt.FLT64) || t.isa(TypeMemPtr.ISUSED0);
+    return t.isa(TypeInt.INT64) || t.isa(TypeFlt.FLT64);
   }
 
   @Override public boolean unify( Work work ) {
-    return tvar(0).fresh_unify(tvar(),_tv2s,work);
+    return id().tvar().fresh_unify(tvar(),nongen(),work);
   }
   @Override public void add_work_hm(Work work) {
-    work.add(in(0));
-    TV2 t = tvar(0);
-    if( t.nongen_in(_tv2s) )
+    super.add_work_hm(work);
+    work.add(id());
+    TV2 t = id().tvar();
+    if( t.nongen_in(nongen()) )
       t.add_deps_work(work); // recursive work.add(_deps)
   }
 
@@ -71,11 +68,11 @@ public class FreshNode extends UnOrFunPtrNode {
     return id() instanceof UnOrFunPtrNode ? ((UnOrFunPtrNode)id()).funptr() : null;
   }
 
-  @Override public int hashCode() { return super.hashCode()+Arrays.hashCode(_tv2s); }
+  // Two FreshNodes are only equal, if they have compatible TVars
   @Override public boolean equals(Object o) {
-    if( this==o ) return true;
-    if( !super.equals(o) ) return false;
-    return (o instanceof FreshNode) && Arrays.equals(_tv2s,((FreshNode)o)._tv2s);
+    if( _tvar==null ) return this==o;
+    if( !(o instanceof FreshNode) ) return false;
+    if( Combo.NIL_OK ) return false;
+    return tvar().compatible(((FreshNode) o).tvar());
   }
-
 }

@@ -1112,7 +1112,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( TypeFld fld : _flds.values() ) {
       assert fld._order!=TypeFld.oTop && fld._order!=TypeFld.oBot;
       if( fld._order==idx ) {
-        assert fx==null;        // Gotta be unique
+        assert fx==null;        // Got to be unique
         fx = fld;
       }
     }
@@ -1123,13 +1123,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public Collection<TypeFld> flds() { return _flds.values(); }
   // Alpha sorted
   public Collection<TypeFld> asorted_flds() {
-    TreeMap<String, TypeFld> sorted = new TreeMap<>();
-    sorted.putAll(_flds);
+    TreeMap<String, TypeFld> sorted = new TreeMap<>(_flds);
     return sorted.values();
   }
   // Field order sorted
   public Collection<TypeFld> osorted_flds() {
-    TreeMap<String, TypeFld> sorted = new TreeMap<>((f0,f1)->fld_find(f0)._order-fld_find(f1)._order);
+    TreeMap<String, TypeFld> sorted = new TreeMap<>(Comparator.comparingInt(f0 -> fld_find(f0)._order));
     sorted.putAll(_flds);
     return sorted.values();
   }

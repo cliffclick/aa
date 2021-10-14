@@ -519,13 +519,12 @@ public class CallNode extends Node {
         return tcall.above_center() ? TypeMem.DEAD : TypeMem.ESCAPE;
       TypeFunPtr tfp = ttfp(tcall);
       BitsFun fidxs = tfp.fidxs();
-      if( fidxs.above_center() ) return TypeMem.DEAD; // Nothing above-center is chosen
       // If using a specific FunPtr and its in the resolved set, test more precisely
       RetNode ret;
-      if( def instanceof FunPtrNode && // Have a FunPtr
+      if( def instanceof FunPtrNode &&           // Have a FunPtr
           (ret=((FunPtrNode)def).ret())!=null && // Well-structured function
-          !fidxs.test_recur(ret._fidx) )                // FIDX directly not used
-        return TypeMem.DEAD;                            // Not in the fidx set.
+          !fidxs.test_recur(ret._fidx) )         // FIDX directly not used
+        return TypeMem.DEAD;                     // Not in the fidx set.
       // Otherwise, the FIDX is alive.  Check the display.
       ProjNode dsp = ProjNode.proj(this,DSP_IDX);
       return dsp!=null && dsp._live==TypeMem.ALIVE ? TypeMem.ALIVE : TypeMem.LNO_DISP;
@@ -653,7 +652,7 @@ public class CallNode extends Node {
     if( best_cvts >= 99 ) return null; // No valid functions
     return tied ? null : best_fptr; // Ties need to have the ambiguity broken another way
   }
-  private static FunPtrNode get_fptr(FunNode fun, Node unk) {
+  static FunPtrNode get_fptr(FunNode fun, Node unk) {
     RetNode ret = fun.ret();
     FunPtrNode fptr = ret.funptr();
     if( fptr != null ) return fptr; // Only one choice
@@ -667,13 +666,15 @@ public class CallNode extends Node {
   @Override public TV2 new_tvar( String alloc_site) { return null; }
 
   // Resolve a call, removing ambiguity during the GCP/Combo pass.
-  @Override public boolean remove_ambi() {
+  @Override public boolean remove_ambi(Ary<Node> oldfdx) {
     BitsFun fidxs = ttfp(_val).fidxs();
-    if( !fidxs.above_center() ) return true; // Resolved after all
-    if( fidxs == BitsFun.ANY ) return false; // Too many choices, no progress
+    if( !fidxs.above_center() ) return true ; // Resolved after all
+    if( fidxs == BitsFun.ANY )  return false; // Too many choices, no progress
     // Pick least-cost among choices
-    FunPtrNode fptr = least_cost(fidxs,fdx());
+    Node fdx = fdx();
+    FunPtrNode fptr = least_cost(fidxs,fdx);
     if( fptr==null ) return false; // Not resolved, no progress
+    oldfdx.push(fdx.keep());       // Keep current liveness until the end of Combo
     set_fdx(fptr);                 // Set resolved edge
     return true;                   // Progress
   }

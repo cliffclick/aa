@@ -54,7 +54,7 @@ public class TestHM {
   // Because {y->y} is passed in, all 'y' types must agree.
   // This unifies 3 and 5 which results in 'nint8'
   @Test public void test05() {
-    Root syn = HM.hm("({ x -> (pair (x 3) (x 5)) } {y->y})");
+    Root syn = HM.hm("({ id -> (pair (id 3) (id 5)) } {x->x})");
     if( HM.DO_HM )
       assertEquals("( int64, int64)",syn._hmt.p());
     if( HM.DO_GCP )
@@ -85,7 +85,7 @@ public class TestHM {
                                     "5", TypeInt.con(5)); }
 
   // example that demonstrates generic and non-generic variables:
-  @Test public void test09() { run( "{ g -> f = { x -> g }; (pair (f 3) (f \"abc\"))}",
+  @Test public void test09() { run( "{ g -> f = { ignore -> g }; (pair (f 3) (f \"abc\"))}",
                                     "{ A -> ( A, A) }", ret_tuple2); }
 
   @Test public void test10() { run( "{ f g -> (f g)}",
@@ -218,9 +218,8 @@ all = @{
 """,
                                    "{int64 -> int1}", tfs(TypeInt.BOOL)); }
 
-  @Test public void test23y() { run("""
-dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp "abc"))
-""",
+  @Test public void test23y() { run(
+"dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp \"abc\"))",
                                     "(int64, *[4]str)", TypeMemPtr.make(7,make_tups(TypeInt.NINT64,TypeMemPtr.STRPTR))); }
 
 
@@ -1047,7 +1046,7 @@ maybepet = petcage.get;
       assertEquals(stripIndent("(flt64,flt64,*[4]str)"), stripIndent(syn._hmt.p()));
     if( HM.DO_GCP )
       assertEquals(TypeMemPtr.make(8,make_tups(TypeFlt.FLT64,TypeFlt.FLT64,TypeMemPtr.STRPTR)),syn.flow_type());
-    
   }
+
 }
 

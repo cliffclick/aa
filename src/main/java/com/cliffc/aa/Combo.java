@@ -1,8 +1,7 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.node.CallNode;
-import com.cliffc.aa.node.Node;
-import com.cliffc.aa.node.Work;
+import com.cliffc.aa.node.*;
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -136,17 +135,39 @@ only after that recursively calls itself.
 public abstract class Combo {
   public static final boolean DO_HM=true;
   public static boolean HM_IS_HIGH;
+  public static boolean NIL_OK;
 
-  public static void opto() {
+  public static void opto(boolean nil_ok) {
     Env.GVN._opt_mode = GVNGCM.Mode.Opto;
+    
+    // If true, H-M "may be nil" errors from Loads and Stores are tolerated.
+    // This allows FreshNodes used once by an if-test and again by some Loads
+    // and Stores to get the same H-M type.  With the same H-M type its legit
+    // to CSE the Freshs together... which enables the following Cast to detect
+    // that the Load/Store address was indeed nil-checked.
+
+    // During the 2nd Combo pass this is turned off, and all "may be nil"
+    // errors are correctly checked for.
+    
+    // TODO: Probably needs a more robust and less kludgey handling.  I could
+    // argue that at the time the Cast is inserted into the graph it guaranteed
+    // can lift the address - I just want to be able to prove it from Combo.
+    NIL_OK = nil_ok;
     // General worklist algorithm
     Work work = new Work("Combo",false) { @Override public Node apply(Node n) { throw unimpl(); } };
     // Collect unresolved calls, and verify they get resolved.
     Work ambi = new Work("Ambi" ,false) { @Override public Node apply(Node n) { throw unimpl(); } };
+    // Collect old fdx of resolved calls; during resolution they go unused
+    // changing their liveness in a not-monotonic way.  Force them to be
+    // remain live until the of Combo.
+    Ary<Node> oldfdx = new Ary<>(Node.class);
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
     Env.START.walk_initype(work);
+    // Make the non-gen set in a pre-pass
+    for( FunNode fun : FunNode.FUNS ) if( fun!=null ) fun._nongen=null; // Clear old stuff
+    for( FunNode fun : FunNode.FUNS ) if( fun!=null && !fun.is_dead() ) fun.prep_nongen();// Make new
     assert Env.START.more_flow(work,false)==0; // Initial conditions are correct
     HM_IS_HIGH=true;
 
@@ -182,7 +203,7 @@ public abstract class Combo {
       // Remove CallNode ambiguity after worklist runs dry.  This makes a
       // 'least_cost' choice on unresolved Calls, and lowers them in the
       // lattice... allowing more GCP progress.
-      remove_ambi(ambi,work);
+      remove_ambi(ambi,work,oldfdx);
 
       // Combo Phase 2: HM has fallen (and picked up structure) as far as it
       // will go.  Nodes depending on being called from top-level escaped
@@ -210,17 +231,19 @@ public abstract class Combo {
     }
 
     assert Env.START.more_flow(work,false)==0; // Final conditions are correct
+    while( !oldfdx.isEmpty() ) oldfdx.pop().unhook();
     Env.START.walk_opt(new VBitSet());
   }
 
   // Resolve ambiguous calls, and put on the worklist to make more progress.
-  private static void remove_ambi(Work ambi, Work work) {
+  private static void remove_ambi(Work ambi, Work work, Ary<Node> oldfdx) {
     assert work.isEmpty();
     for( int i=0; i<ambi.len(); i++ ) {
       CallNode call = (CallNode)ambi.at(i);
-      if( call.remove_ambi() ) {
+      if( call.remove_ambi(oldfdx) ) {
         ambi.del(i--);
         work.add(call);
+        work.add(call.cepi());
       }
     }
   }

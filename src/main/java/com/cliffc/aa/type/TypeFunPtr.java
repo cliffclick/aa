@@ -85,6 +85,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public        TypeFunPtr make_from( TypeMemPtr dsp ) { return make(_fidxs,_nargs, dsp,_ret); }
   public        TypeFunPtr make_from( BitsFun fidxs  ) { return make( fidxs,_nargs,_dsp,_ret); }
   public        TypeFunPtr make_from_ret( Type ret  ) { return make( _fidxs,_nargs,_dsp,ret); }
+  public        TypeFunPtr make_from( Type dsp, Type ret ) { return make(_fidxs,_nargs, dsp,ret); }
   public        TypeFunPtr make_no_disp( ) { return make(_fidxs,_nargs,TypeMemPtr.NO_DISP,_ret); }
   public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR; // Open display, allows more fields
 
@@ -137,6 +138,14 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   public BitsFun fidxs() { return _fidxs; }
   public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
+
+  // Widens, not lowers.
+  @Override public TypeFunPtr simple_ptr() {
+    Type ds = _dsp.simple_ptr();
+    Type rs = _ret.simple_ptr();
+    if( _dsp==ds && _ret==rs ) return this;
+    return make_from(ds,rs);
+  }
 
   @Override public boolean above_center() { return _fidxs.above_center() || (_fidxs.is_con() && _dsp.above_center()); }
   @Override public boolean may_be_con()   {

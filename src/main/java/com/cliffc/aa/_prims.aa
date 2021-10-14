@@ -2,8 +2,8 @@
 // $$JavaClassName; the Java class function "clazz_node" returns a Node.
 // Typically used in the call position, with a FunPtrNode returned.
 
-int   =: $$com.cliffc.aa.type.TypeInt#INT64;
 int1  =: $$com.cliffc.aa.type.TypeInt#BOOL;
+int   =: $$com.cliffc.aa.type.TypeInt#INT64;
 flt   =: $$com.cliffc.aa.type.TypeFlt#FLT64;
 flt32 =: $$com.cliffc.aa.type.TypeFlt#FLT32;
 flt64 =: $$com.cliffc.aa.type.TypeFlt#FLT64;
@@ -29,8 +29,8 @@ _|_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$OrI64 (x,y) };
 
 // TODO: Some way in the parser to specify RHS should be thunked.
 // Then can drop the primitives and write:
-//_&&_ = {:thunking pred thunk -> pred ? thunk() : 0    }
-//_||_ = {:thunking pred thunk -> pred ? pred : thunk() }
+//_&&_ = { pred thunk:lazy -> pred ? thunk() : 0    }
+//_||_ = { pred thunk:lazy -> pred ? pred : thunk() }
 _&&_ = { pred thunk -> $$com.cliffc.aa.node.PrimNode$AndThen(pred,thunk); };
 _||_ = { pred thunk -> $$com.cliffc.aa.node.PrimNode$OrElse (pred,thunk); };
 
@@ -75,7 +75,7 @@ _+_ = { x:str? y:str? -> $$com.cliffc.aa.node.NewStrNode$AddStrStr(x,y) };
 // --------------
 // Arrays
 #_  = { ary:ary -> $$com.cliffc.aa.node.MemPrimNode$LValueLength(ary) };
-//[_] = { len:int -> $$com.cliffc.aa.node.MemPrimNode$LValueLength(ary) };
+[_] = { len:int -> $$com.cliffc.aa.node.NewAryNode$NewAry(len) };
 
 // --------------
 // Math

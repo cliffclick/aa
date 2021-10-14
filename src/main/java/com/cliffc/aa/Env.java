@@ -3,18 +3,15 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 
 import static com.cliffc.aa.AA.DSP_IDX;
-import static com.cliffc.aa.AA.unimpl;
 
 // An "environment", a lexical Scope tracking mechanism that runs 1-for-1 in
 // parallel with a ScopeNode.
@@ -105,12 +102,12 @@ public class Env implements AutoCloseable {
 
   final public Env _par;         // Parent environment
   public final ScopeNode _scope; // Lexical anchor; "end of display"; goes when this environment leaves scope
-  public VStack _nongen;         // Hindley-Milner "non-generative" variable set; current/pending defs
+  public final FunNode _fun;     // Matching FunNode for this lexical environment
 
   // Shared Env constructor.
-  private Env( Env par, VStack nongen, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr ) {
+  private Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr ) {
     _par = par;
-    _nongen = nongen;
+    _fun = fun;
     mem.keep(2);
     TypeStruct ts = TypeStruct.make("",false,true,TypeFld.make("^",dsp_ptr._val, DSP_IDX));
     NewObjNode nnn = GVN.xform(new NewObjNode(is_closure,ts,dsp_ptr)).keep(2);
@@ -131,8 +128,8 @@ public class Env implements AutoCloseable {
 
 
   // A file-level Env, or below.  Contains user written code as opposed to primitives.
-  Env( Env par, boolean is_closure, Node ctrl, Node mem ) {
-    this(par,new VStack(par._nongen),is_closure,ctrl,mem, par._scope.ptr());
+  Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem ) {
+    this(par,fun,is_closure,ctrl,mem, par._scope.ptr());
   }
 
   // Gather and report errors and typing
@@ -158,7 +155,7 @@ public class Env implements AutoCloseable {
                        rez._val,
                        formals,
                        mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM),
-                       rez.tvar(),
+                       rez.has_tvar() ? rez.tvar() : null,
                        errs0.isEmpty() ? null : errs0);
   }
 
@@ -192,6 +189,34 @@ public class Env implements AutoCloseable {
     return _scope.is_closure() ? P.do_exit(_scope,val) : _par.early_exit(P,val); // Hunt for an early-exit-enabled scope
   }
 
+  // Remove all the hooks keeping things alive until Combo sorts it out right.
+  static void pre_combo() {
+    // Remove any Env.TOP hooks to function pointers, only kept alive until we
+    // can compute a real Call Graph.
+    while( !SCP_0._defs.last().is_prim() )
+      SCP_0.pop();
+    // Replace the default memory into unknown caller functions, with the
+    // matching display.
+    for( Node use : DEFMEM._uses ) {
+      FunNode fun;
+      if( use instanceof ParmNode && !use.is_prim() && use.in(1)==DEFMEM && (fun=((ParmNode)use).fun()).has_unknown_callers() ) {
+        ParmNode mem = (ParmNode)use, dsp = fun.parm(DSP_IDX);
+        if( dsp !=null ) {
+          Node display = dsp.in(1).in(0);
+          if( display instanceof NewObjNode ) {
+            MrgProjNode defmem = ((NewObjNode)display).mem();
+            mem.set_def(1,defmem);
+          }
+        }
+      }
+    }
+
+    // Kill all extra objects hooked by DEFMEM.
+    while( DEFMEM.len() > DEFMEM_RESET.length ) DEFMEM.pop();
+    for( int i=0; i<DEFMEM_RESET.length; i++ )
+      DEFMEM.set_def(i,DEFMEM_RESET[i]);
+  }
+
   // Record global static state for reset
   private static void record_for_reset() {
     Node.init0(); // Record end of primitives
@@ -205,10 +230,6 @@ public class Env implements AutoCloseable {
   // Reset all global statics for the next parse.  Useful during testing when
   // many top-level parses happen in a row.
   public static void top_reset() {
-    // Kill all extra objects hooked by DEFMEM.
-    while( DEFMEM.len() > DEFMEM_RESET.length ) DEFMEM.pop();
-    for( int i=0; i<DEFMEM_RESET.length; i++ )
-      DEFMEM.set_def(i,DEFMEM_RESET[i]);
     // Kill all extra constants and cyclic ConTypeNodes hooked by Start
     Node c;
     while( !(c=START._uses.last()).is_prim() ) {
@@ -261,52 +282,39 @@ public class Env implements AutoCloseable {
 
   // Prefix uniop lookup.  The '_' follows the uniop name.
   // Note that "!_var" parses as "! _var" and not as "!_ var".
+  // Also "[_]" is a balanced uni-op.
   UnOrFunPtrNode lookup_filter_uni( String name ) {
     if( !Parse.isOp(name) ) return null; // Limit to operators
-    for( int i=name.length(); i>0; i-- ) {
-      UnOrFunPtrNode n = (UnOrFunPtrNode)lookup((name.substring(0,i)+"_").intern());
-      if( n != null && n.op_prec() > 0 ) { // First name found will return
-        UnOrFunPtrNode m = n.filter(1);    // Filter down to 1 arg
-        if( m!=null )
-          return (UnOrFunPtrNode)Env.GVN.xform(new FreshNode(_nongen,m));
-      }
-    }
-    return null;
+    UnOrFunPtrNode n = _lookup_filter(1,    name,1);     // Lookup unbalanced uni-op
+    return  n==null ?  _lookup_filter(0," "+name,1) : n; // Try again for a balanced uni-op
   }
 
-  UnOrFunPtrNode lookup_filter_2( String name ) {
+  // Infix binop lookup
+  // _+_       - Normal binop, looks up "_+_"
+  UnOrFunPtrNode lookup_filter_bin( String name ) {
     if( !Parse.isOp(name) ) return null; // Limit to operators
-    for( int i=name.length(); i>0; i-- ) {
-      UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(("_"+name.substring(0,i)+"_").intern());
-      if( n != null && n.op_prec() > 0 ) { // First name found will return
-        UnOrFunPtrNode m = n.filter(2);    // Filter down to 2 args
+    return _lookup_filter(1,"_"+name,2);
+  }
+  // Infix balanced operators, including 3 argument
+  // _[_]      - array-lookup     balanced op, looks up " _[_"
+  // _[_]=_    - array-assignment balanced op, looks up " _[_"
+  UnOrFunPtrNode lookup_filter_bal( String name ) {
+    if( !Parse.isOp(name) ) return null; // Limit to operators
+    return _lookup_filter(0," _"+name,2);
+  }
+
+  private UnOrFunPtrNode _lookup_filter( int op_prec_test, String name, int nargs ) {
+    for( int i=name.length(); i>0; i-- ) { // First name found will return
+      // Prepare the name from the token
+      String name2 = name.substring(0,i)+"_";
+      UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(name2.intern());
+      if( n != null && n.op_prec() >= op_prec_test ) {
+        UnOrFunPtrNode m = n.filter(nargs); // Filter for args
         if( m!=null )
-          return (UnOrFunPtrNode)Env.GVN.xform(new FreshNode(_nongen,m));
+          return (UnOrFunPtrNode)Env.GVN.xform(new FreshNode(_fun,m));
       }
     }
     return null;
-  }
-
-  String lookup_filter_bal( String bopen ) {
-    if( !Parse.isOp(bopen) ) return null; // Limit to operators
-    for( int i=bopen.length(); i>0; i-- ) {
-      UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(("_"+bopen.substring(0,i)+"_").intern());
-      if( n != null && n.op_prec() == 0 ) // First name found will return
-        return n.funptr()._name;
-    }
-    return null;
-  }
-
-  UnOrFunPtrNode lookup_filter_bal( String bopen, String bclose ) {
-    if( !Parse.isOp(bopen ) ) return null; // Limit to operators
-    if( !Parse.isOp(bclose) ) return null; // Limit to operators
-    String name = ("_"+bopen+"_"+bclose+"_").intern();
-    // Try both the 2 and 3 forms
-    //UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(name);
-    //if( n != null && n.op_prec()==0 )
-    //  return n;
-    //return null;
-    throw unimpl();
   }
 
 
@@ -324,84 +332,4 @@ public class Env implements AutoCloseable {
   }
   // Update type name token to type mapping in the current scope
   void add_type( String name, ConTypeNode t ) { _scope.add_type(name,t); }
-
-  // Collect TVars from all variables in-scope.  Used to build a
-  // "non-generative" set of TVars for Hindley-Milner typing.
-  public HashSet<TV2> collect_active_scope() {
-    HashSet<TV2> tvars = new HashSet<>();
-    Env e = this;
-    while( e!=null ) {
-      for( Node def : _scope.stk()._defs )
-        if( def != null ) tvars.add(def.tvar());
-      e = e._par;
-    }
-    return tvars;
-  }
-
-  // Small classic tree of TV2s, immutable, with sharing at the root parts.
-  // Used to track the lexical scopes of vars, to allow for the H-M 'occurs_in'
-  // check.  This stack sub-sequences the main Env._scope stack, having splits
-  // for every unrelated set of mutually-self-recursive definitions.  This is
-  // typically just a single variable, currently being defined.
-  Node nongen_pop(Node ret) { _nongen = _nongen._par; return ret;}
-  void nongen_push(Env par) { _nongen = new VStack(par._nongen); }
-  public static class VStack {
-    public final VStack _par;          // Parent
-    public Ary<String> _flds;          // Field names, unique per-Scope
-    public Ary<TV2> _tvars; // Type variable, set at first reference (forward-ref or not)
-    private VStack( VStack par ) { _par=par; _flds = new Ary<>(new String[1],0); _tvars = new Ary<>(new TV2[1],0); }
-    String add_var(String fld, TV2 tv) { _flds.push(fld);  _tvars.push(tv); return fld; }
-    public boolean isEmpty() {
-      return _flds.isEmpty() && (_par == null || _par.isEmpty());
-    }
-
-    // Return a compact list of active tvars
-    public TV2[] compact() {
-      int cnt=0;
-      for( VStack vs = this; vs!=null; vs=vs._par )
-        cnt += vs._tvars._len;
-      TV2[] tv2s = new TV2[cnt];
-      cnt=0;
-      for( VStack vs = this; vs!=null; vs=vs._par ) {
-        System.arraycopy(vs._tvars._es,0,tv2s,cnt,vs._tvars._len);
-        cnt += vs._tvars._len;
-      }
-      return tv2s;
-    }
-
-
-    @Override public String toString() {
-      // These types get large & complex; find all the dups up-front to allow
-      // for prettier printing.  Uses '$A' style for repeats.
-      VBitSet dups  = new VBitSet();
-      VBitSet visit = new VBitSet();
-      for( VStack vs = this; vs!=null ; vs=vs._par )
-        if( vs._tvars != null )
-          for( TV2 tv2 : vs._tvars )
-            if( tv2 != null ) tv2._get_dups(visit,dups);
-
-      // Print stack of types, grouped by depth
-      visit.clr();
-      SB sb = new SB().p("[");
-      for( VStack vs = this; vs!=null ; vs=vs._par ) {
-        if( vs._tvars != null ) {
-          for( int i=0; i<vs._tvars._len; i++ ) {
-            sb.p(vs._flds.at(i)).p('=');
-            TV2 tv2 = vs._tvars.at(i);
-            if( tv2 !=null ) tv2.str(sb,visit,dups,true);
-            sb.p(", ");
-          }
-          if( vs._tvars._len>0 ) sb.unchar(2);
-        }
-        sb.p(" >> ");
-      }
-      if( _par!=null ) sb.unchar(4);
-      return sb.p("]").toString();
-    }
-  }
-
-  Env lookup_fref(String tok) {
-    if( _nongen!=null && _nongen._flds.find(tok)!= -1 ) return this;
-    return _par==null ? null : _par.lookup_fref(tok);
-  }
 }

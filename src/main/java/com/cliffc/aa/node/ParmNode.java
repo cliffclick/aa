@@ -5,8 +5,7 @@ import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFld;
 
-import static com.cliffc.aa.AA.ARG_IDX;
-import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.AA.*;
 
 // Function parameter node; almost just a Phi with a name.  There is a dense
 // numbering matching function arguments, with -1 reserved for the RPC and 0
@@ -33,7 +32,7 @@ public class ParmNode extends PhiNode {
     _idx=idx;
     _name=name;
   }
-  FunNode fun() { return (FunNode) in(0); }
+  public FunNode fun() { return (FunNode) in(0); }
   @Override public String xstr() { return "Parm:"+_name; }
   @Override public int hashCode() { return super.hashCode()+_idx; }
   @Override public boolean equals(Object o) {
@@ -94,8 +93,8 @@ public class ParmNode extends PhiNode {
         assert fun.in(1) instanceof ScopeNode;
         assert fun.val(1) == Type.CTRL;
         t = fld==null
-          ? fld._t              // Use formal signature if available
-          : (mem == null ? val(1) : in(1).sharptr(mem.in(1)));
+          ? (mem == null ? val(1) : in(1).sharptr(mem.in(1)))
+          : fld._t;              // Use formal signature if available
         if( _tvar != null ) { // Lift if HM is available
           TV2 tv = tvar();
           Type ta = tv.as_flow(opt_mode == GVNGCM.Mode.Opto && Combo.HM_IS_HIGH);
@@ -137,6 +136,10 @@ public class ParmNode extends PhiNode {
   // Parms are already treated by the H-M algo, and (via fresh_unify) get
   // "fresh" TVars for every input path.
   @Override public boolean unify( Work work ) { return false; }
+
+  // True if loading from a display/closure
+  @Override public boolean is_display_ptr() { return _idx==DSP_IDX; }
+
 
   @Override public ErrMsg err( boolean fast ) {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere

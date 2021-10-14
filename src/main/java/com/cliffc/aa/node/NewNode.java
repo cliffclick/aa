@@ -48,7 +48,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     if( _elock ) unelock();    // Unlock before changing hash
     _alias = alias;
     _tptr = TypeMemPtr.make(BitsAlias.make0(alias),TypeObj.ISUSED);
-    _tvar._type = _tptr; // Set the type
     sets(ts);
   }
   @Override public String xstr() { return "New"+"*"+_alias; } // Self short name
@@ -105,7 +104,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     return to.above_center() ? TypeMem.DEAD : TypeMem.ESCAPE;
   }
 
-  //@Override public TV2 new_tvar(String alloc_site) { return TV2.make("Obj",this,alloc_site); }
   abstract public TV2 new_tvar(String alloc_site);
 
   @Override BitsAlias escapees() { return _tptr._aliases; }
@@ -118,7 +116,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       pop();                    // Kill all fields except memory
     _crushed = _ts = dead_type();
     _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeObj.UNUSED);
-    Env.DEFMEM.set_def(_alias,Node.con(TypeObj.UNUSED));
+    if( !Env.GVN._opt_mode._CG ) // If pre-Combo, also kill in DEFMEM
+      Env.DEFMEM.set_def(_alias,Node.con(TypeObj.UNUSED));
     Env.GVN.revalive(this,ProjNode.proj(this,0),Env.DEFMEM);
     if( is_dead() ) return;
     for( Node use : _uses )

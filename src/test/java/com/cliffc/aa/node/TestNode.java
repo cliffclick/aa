@@ -230,10 +230,10 @@ public class TestNode {
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STR0));
     test1monotonic(new  CProjNode(_ins[0],0));
     test1monotonic(new    ErrNode(_ins[0],null,"\nerr\n"));
-    test1monotonic(new    FunNode(TypeStruct.INT64));
+    test1monotonic(new    FunNode(TypeStruct.INT64,null));
     test1monotonic(new FunPtrNode("anon",ret,null));
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
-    test1monotonic_intrinsic(new NewAryNode.NewAry(TypeAry.ARY0,TypeInt.INT64));
+    test1monotonic_intrinsic(new NewAryNode.NewAry());
     test1monotonic_intrinsic(new NewStrNode.ConvertI64Str());
     test1monotonic_intrinsic(new NewStrNode.ConvertF64Str());
     test1monotonic_intrinsic(new NewStrNode.AddStrStr());

@@ -291,12 +291,12 @@ public abstract class PrimNode extends Node {
 
 
   // Takes in a Scalar and Names it.
-  public static FunPtrNode convertTypeName( Type from, Type to, Parse badargs ) {
+  public static FunPtrNode convertTypeName( Type from, Type to, Parse badargs, FunNode parfun ) {
     try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
       TypeStruct formals = TypeStruct.args(from);
       TypeFunSig sig = TypeFunSig.make(formals,to);
       Node ctl = Env.FILE._scope;
-      FunNode fun = X.init2((FunNode)new FunNode(to._name,sig,-1,false).add_def(ctl));
+      FunNode fun = X.init2((FunNode)new FunNode(to._name,sig,-1,false,parfun).add_def(ctl));
       Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
       Node ptr = X.xform(new ParmNode(ARG_IDX,"x",fun,(ConNode)Node.con(from),badargs));
       Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));

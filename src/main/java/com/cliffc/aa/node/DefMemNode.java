@@ -8,7 +8,9 @@ import static com.cliffc.aa.Env.GVN;
 // Default memory, to keep things alive during parsing
 public class DefMemNode extends Node {
   public DefMemNode( Node ctrl) { super(OP_DEFMEM,ctrl); }
-  @Override public TypeMem value(GVNGCM.Mode opt_mode) {
+  @Override public Type value(GVNGCM.Mode opt_mode) {
+    if( opt_mode != GVNGCM.Mode.Parse )
+      return _val;
     if( _defs._len <= 1 ) return TypeMem.ALLMEM;
     TypeObj[] tos = new TypeObj[_defs._len];
     for( int i=1; i<_defs._len; i++ ) {

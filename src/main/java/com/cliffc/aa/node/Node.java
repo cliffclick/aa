@@ -261,7 +261,7 @@ public abstract class Node implements Cloneable {
     for( Node def : defs ) if( def != null ) def._uses.add(this);
     _val  = Type.ALL;
     _live = all_live();
-    _tvar = new_tvar("constructor");
+    _tvar = null;
   }
 
   // Is a primitive
@@ -275,7 +275,6 @@ public abstract class Node implements Cloneable {
       n._uid = newuid();                  // A new UID
       n._defs = new Ary<>(new Node[1],0); // New empty defs
       n._uses = new Ary<>(new Node[1],0); // New empty uses
-      n._tvar = n.new_tvar("copy_constructor");
       n._keep = 0;              // Not keeping, even if cloning a mid-keeper operation
       n._elock=false;           // Not in GVN
       if( copy_edges )
@@ -551,7 +550,7 @@ public abstract class Node implements Cloneable {
   public void add_work_hm(Work work) { tvar().add_deps_work(work); }
 
   // Support for resolving ambiguous calls during GCP/Combo
-  public boolean remove_ambi() {return false;}
+  public boolean remove_ambi(Ary<Node> oldfdx) {return false;}
 
   // Do One Step of forwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
@@ -596,12 +595,11 @@ public abstract class Node implements Cloneable {
   // Do One Step of Hindley-Milner unification.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
   public void combo_unify(Work work) {
-    if( _live==TypeMem.DEAD ||  // No HM progress on dead code
-        !has_tvar() ) return;   // Has no TVar in the first place
-    TV2 old = tvar();
-    if( old.is_err() ) return;  // No unifications with error
+    if( _live==TypeMem.DEAD )  return ; // No HM progress on dead code
+    TV2 old = _tvar==null ? null : tvar();
+    if( old!=null && old.is_err() ) return;  // No unifications with error
     if( unify(work) ) {
-      assert !_tvar.debug_find().unify(old.debug_find(),null);// monotonic: unifying with the result is no-progress
+      assert old==null || !_tvar.debug_find().unify(old.debug_find(),null);// monotonic: unifying with the result is no-progress
       add_work_hm(work);        // Neighbors on worklist
     }
   }
@@ -777,13 +775,13 @@ public abstract class Node implements Cloneable {
     work.add(this);                // On worklist and mark visited
     _val = Type.ANY;               // Highest value
     _live = TypeMem.DEAD;          // Not alive
-    _tvar = new_tvar("reset");
-    if( this instanceof CallNode ) ((CallNode)this)._not_resolved_by_gcp = false; // Try again
+    _tvar = new_tvar("Combo");
     // Walk reachable graph
     for( Node use : _uses )                   use.walk_initype(work);
     for( Node def : _defs ) if( def != null ) def.walk_initype(work);
-    if( this instanceof FreshNode ) ((FreshNode)this).id().tvar().push_dep(this);
-    if( this instanceof LoadNode ) ((LoadNode)this)._hm_lift = true;
+    if( this instanceof CallNode ) (( CallNode)this)._not_resolved_by_gcp = false; // Try again
+    if( this instanceof FreshNode) ((FreshNode)this).id().tvar().push_dep(this);
+    if( this instanceof LoadNode ) (( LoadNode)this)._hm_lift = true;
     if( this instanceof ProjNode && ((ProjNode)this)._idx==DSP_IDX && in(0) instanceof CallNode )
       ((CallNode)in(0)).fdx().tvar().push_dep(this);
   }
@@ -792,7 +790,7 @@ public abstract class Node implements Cloneable {
   // as the default HM will no longer lift to Type.XNSCALR.
   public final void walk_combo_phase2( Work work, BitsFun top_escapes ) {
     if( RESET_VISIT.tset(_uid) ) return; // Been there, done that
-    if( this instanceof LoadNode && tvar().is_leaf() ) { work.add(this); ((LoadNode)this)._hm_lift = false; } // Loads are lifted.
+    if( this instanceof LoadNode ) { work.add(this); ((LoadNode)this)._hm_lift = false; } // Loads are lifted.
     if( this instanceof FunNode  && top_escapes.test_recur(((FunNode)this)._fidx) ) work.add(this);
     if( this instanceof ParmNode && has_tvar() && tvar().is_leaf() &&
         top_escapes.test_recur(((ParmNode)this).fun()._fidx ))
@@ -931,8 +929,13 @@ public abstract class Node implements Cloneable {
         _live.live_no_disp() &&
         (tfp=(TypeFunPtr)val)._dsp!=TypeMemPtr.NO_DISP )
       val = tfp.make_no_disp();
-    if( should_con(val) )
-      subsume(con(val)).xliv(GVNGCM.Mode.Opto);
+    if( should_con(val) ) {
+      Node con = con(val);
+      con._tvar = _tvar;
+      subsume(con).xliv(GVNGCM.Mode.Opto);
+    }
+    // FreshNodes can now CSE
+    if( Combo.NIL_OK && !is_dead() ) unelock();
 
     // Walk reachable graph
     if( is_dead() ) return;
@@ -970,6 +973,9 @@ public abstract class Node implements Cloneable {
       else if( use.is_mem() ) return false; // Found a 2nd mem-writer
     return found;
   }
+
+  // Is a display pointer vs a struct pointer
+  public boolean is_display_ptr() { throw unimpl(); }
 
   // Shortcut
   public Type sharptr( Node mem ) { return mem._val.sharptr(_val); }

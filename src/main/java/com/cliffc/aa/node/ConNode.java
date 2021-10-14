@@ -18,7 +18,6 @@ public class ConNode<T extends Type> extends Node {
     super(OP_CON,Env.START);
     _t=t;
     _live = all_live();
-    _set_tvar();
   }
   // Allows ANY type with a normal unification, used for uninitialized variables
   // (as opposed to dead ones).
@@ -48,21 +47,16 @@ public class ConNode<T extends Type> extends Node {
   }
   @Override public TypeMem all_live() { return _t==Type.CTRL ? TypeMem.ALIVE : (_t instanceof TypeMem ? TypeMem.ALIVE : TypeMem.LIVE_BOT); }
 
-  private void _set_tvar() {
-    if( _t==Type.CTRL || _t==Type.XCTRL || _t instanceof TypeRPC )
-      { _tvar.free(); _tvar=null; }
-    else if( _t == Type.XNIL )
-      { _tvar.free(); _tvar = TV2.make_nil(TV2.make_leaf(this,"Con_constructor"),"Con_constructor"); }
-    else _tvar.set_as_base(_t);
-  }
-
   @Override public TV2 new_tvar(String alloc_site) {
-    _tvar = super.new_tvar(alloc_site);
-    if( _t!=null ) _set_tvar();
-    return _tvar;
+    if( _t==Type.CTRL || _t==Type.XCTRL || _t instanceof TypeRPC )
+      return null;
+    if( _t == Type.XNIL )
+      return TV2.make_nil(TV2.make_leaf(this,alloc_site),alloc_site);
+    return TV2.make_base(this,_t,alloc_site);
   }
 
   @Override public boolean unify( Work work ) {
+    if( _tvar==null ) return false;
     TV2 self = tvar();
     if( self.is_base() || self.is_nil() || self.is_struct() || self.isa("Str") ) return false;
     if( work==null ) return true;

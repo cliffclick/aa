@@ -95,6 +95,7 @@ public final class CallEpiNode extends Node {
           // TODO: Make an official user-mode operator syntax, and put it in _prims.aa
           outer_fun._op_prec = fun._op_prec;
           outer_fun._thunk_rhs = fun._thunk_rhs;
+          outer_fun._bal_close = fun._bal_close;
         }
         return set_is_copy(ret.ctl(), ret.mem(), ret.rez()); // Collapse the CallEpi into the Ret
       }
@@ -328,7 +329,7 @@ public final class CallEpiNode extends Node {
     CallNode call = call();
     ErrMsg err = call.err(true);
     if( fidxs == BitsFun.FULL ||  // Called something unknown
-        err!=null  ) { // Call is in-error
+      (err!=null && !opt_mode._CG) ) { // Call is in-error before Combo
       trez = Type.ALL;            // Unknown target does worst thing
       tmem = defmem;
     } else {                      // All targets are known & wired
@@ -366,7 +367,15 @@ public final class CallEpiNode extends Node {
     if( Combo.DO_HM && opt_mode._CG && err==null ) {
       // Walk the inputs, building a mapping
       TV2.T2MAP.clear();
-      for( int i=DSP_IDX; i<call._defs._len-1; i++ )
+      // Walk the display first, skipping through the function pointer to the display
+      TV2.WDUPS.clear();
+      TV2 tfun = call.fdx().tvar();
+      if( tfun.is_fun() ) {
+        TV2 dsp = tfun.get("2");
+        if( dsp!=null )  dsp.walk_types_in(caller_mem,tfptr._dsp);
+      }
+      // Walk the args
+      for( int i=ARG_IDX; i<call._defs._len-1; i++ )
         { TV2.WDUPS.clear(); call.tvar(i).walk_types_in(caller_mem,call.val(i)); }
       // Walk the outputs, building an improved result
       Type trez_sharp = tmem3.sharptr(trez);
@@ -528,6 +537,7 @@ public final class CallEpiNode extends Node {
     if( tvar().is_err() ) return false; // Already sick, nothing to do
     CallNode call = call();
     Node fdx = call.fdx();
+    if( !(fdx._val instanceof TypeFunPtr) ) return false;
     TV2 tfun = fdx.tvar();
     if( tfun.is_err() )         // Unify with function error
       return tvar().unify(tfun,work);
@@ -538,7 +548,7 @@ public final class CallEpiNode extends Node {
       if( work==null ) return true;
       NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
       // The display is extracted from the FunPtr and is not the function itself
-      //args.put("2",TV2.make_leaf(fdx,"CallEpi_unify"));
+      args.put("2",TV2.make_leaf(fdx,"CallEpi_unify"));
       for( int i=ARG_IDX; i<call._defs._len; i++ )
         args.put((""+i).intern(),call.tvar(i));
       args.put(" ret",tvar());
@@ -565,7 +575,7 @@ public final class CallEpiNode extends Node {
 
     return progress;
   }
-  
+
   @Override public void add_work_hm(Work work) {
     super.add_work_hm(work);
     // My tvar changed, so my value lift changes

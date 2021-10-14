@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.util.Util;
 import org.jetbrains.annotations.NotNull;
 
@@ -226,7 +227,7 @@ public class LoadNode extends Node {
   }
 
   @Override public void add_work_use_extra(Work work, Node chg) {
-    if( chg==adr() ) work.add(mem());  // Address into a Load changes, the Memory can be more alive.
+    if( chg==adr() ) { work.add(mem()); Env.GVN.add_reduce(this); } // Address into a Load changes, the Memory can be more alive, or this not in Error
     if( chg==mem() ) work.add(mem());  // Memory value lifts to ANY, memory live lifts also.
     if( chg==mem() ) work.add(adr());  // Memory value lifts to an alias, address is more alive
     // Memory improves, perhaps Load can bypass Call
@@ -254,12 +255,21 @@ public class LoadNode extends Node {
 
   // Standard memory unification; the Load unifies with the loaded field.
   @Override public boolean unify( Work work ) {
-    return StoreNode.unify("@{}",this,adr().tvar(),adr()._val,this,_fld,work);
+    if( tvar().is_err() ) return false; // Already an error, no progress
+    // Propagate an error
+    TV2 ptr = adr().tvar();
+    if( ptr.is_err() ) return tvar().unify(ptr,work);
+    ptr.push_dep(this);
+
+    return StoreNode.unify("@{}",this,ptr,adr()._val,tvar(),_fld,work);
   }
   public void add_work_hm(Work work) {
     super.add_work_hm(work);
     work.add(adr());
   }
+
+  @Override public boolean is_display_ptr() { return Util.eq("^",_fld); }
+
 
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;
@@ -275,7 +285,10 @@ public class LoadNode extends Node {
       ? ((TypeMem)tmem).ld(ptr) // General load from memory
       : ((TypeObj)tmem);
     if( objs==TypeObj.UNUSED ) return null; // No error, since might fall to anything
-    if( !(objs instanceof TypeStruct) || adr().tvar().get(_fld)==null )
+    // Both type systems know about the field
+    if( !(objs instanceof TypeStruct) || ((TypeStruct)objs).fld_find(_fld)==null )
+      return bad(fast,objs);
+    if( Env.GVN._opt_mode == GVNGCM.Mode.PesiCG && adr().has_tvar() && adr().tvar().get(_fld)==null )
       return bad(fast,objs);
     return null;
   }

@@ -436,10 +436,11 @@ public class HM {
 
 
   static class Ident extends Syntax {
-    final String _name;         // The identifier name
-    Syntax _def;                // Cached syntax defining point
-    int _idx;                   // Index in Lambda (which arg of many)
-    T2 _idt;                    // Cached type var for the name in scope
+    private final String _name; // The identifier name
+    private Syntax _def;        // Cached syntax defining point
+    private int _idx;           // Index in Lambda (which arg of many)
+    private T2 _idt;            // Cached type var for the name in scope
+    private boolean _fresh;     // True if fresh-unify; short-cut for common case of an id inside its def vs in a Let body.
     Ident(String name) { _name=name; }
     @Override SB str(SB sb) { return p1(sb); }
     @Override SB p1(SB sb) { return sb.p(_name); }
@@ -449,7 +450,8 @@ public class HM {
       return idt==_idt ? idt : (_idt=idt);
     }
     @Override boolean hm(Worklist work) {
-      return idt().fresh_unify(find(),_nongen,work);
+      T2 idt = idt(), hmt=find();
+      return _fresh ? idt.fresh_unify(hmt,_nongen,work) : idt.unify(hmt,work);
     }
     @Override void add_hm_work(Worklist work) {
       work.push(_par);
@@ -471,16 +473,17 @@ public class HM {
         if( syn instanceof Lambda ) {
           Lambda lam = (Lambda)syn;
           if( (_idx = Util.find(lam._args,_name)) != -1 )
-            return _init(lam,lam.targ(_idx));
+            return _init(lam,lam.targ(_idx),false);
         } else if( syn instanceof Let ) {
           Let let = (Let)syn;  _idx=-1;
           if( Util.eq(let._arg0,_name) )
-            return _init(let,let._targ);
+            return _init(let,let._targ, !let._targ.nongen_in(nongen));
         }
       }
       throw new RuntimeException("Parse error, "+_name+" is undefined in "+_par);
     }
-    private int _init(Syntax def,T2 idt) { _def = def; _idt = idt; return 1; }
+    private int _init(Syntax def,T2 idt, boolean fresh) {
+      _def = def; _idt = idt; _fresh=fresh; return 1; }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
   }
 
@@ -746,7 +749,7 @@ public class HM {
           walk(fld._t,work);
         return;
       }
-      if( flow instanceof TypeInt || flow instanceof TypeFlt ) return;
+      if( flow instanceof TypeInt || flow instanceof TypeFlt || flow==Type.XNIL ) return;
       if( flow==Type.ANY || flow==Type.ALL || flow == Type.SCALAR || flow == Type.NSCALR || flow == Type.XSCALAR || flow == Type.XNSCALR )
         return;
       throw unimpl();
@@ -1776,7 +1779,7 @@ public class HM {
       assert !unified() && !x.unified();
       if( x==this ) return true;
       if( ODUPS.tset(x._uid) ) return false; // Been there, done that
-      if( !x.is_leaf() && x._args!=null )
+      if( x._args!=null )
         for( String key : x._args.keySet() )
           if( _occurs_in_type(x.arg(key)) )
             return true;
