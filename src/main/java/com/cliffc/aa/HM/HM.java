@@ -848,8 +848,10 @@ public class HM {
       if( t instanceof TypeFunPtr ) {
         TypeFunPtr fun = (TypeFunPtr)t;
         Type rez = Type.XSCALAR;
-        for( int fidx : fun._fidxs )
-          rez = rez.meet(Lambda.FUNS.get(fidx).apply(NARGS));
+        if( fun._fidxs.test(1) ) rez = Type.SCALAR;
+        else
+          for( int fidx : fun._fidxs )
+            rez = rez.meet(Lambda.FUNS.get(fidx).apply(NARGS));
         Type rez2 = add_sig(rez);
         return TypeFunSig.make(TypeStruct.EMPTY,rez2);
       } else {
@@ -1490,7 +1492,7 @@ public class HM {
     // around TypeStruct.
 
     // No function arguments, just function returns.
-    static final NonBlockingHashMapLong<TypeStruct> ADUPS = new NonBlockingHashMapLong<>();
+    static final NonBlockingHashMapLong<Type> ADUPS = new NonBlockingHashMapLong<>();
     Type as_flow(boolean prim) {
       assert Type.intern_check();
       assert ADUPS.isEmpty();
@@ -1507,12 +1509,15 @@ public class HM {
       if( is_err()  ) return _flow;
       if( is_fun()  ) {
         if( prim ) return _flow;
+        Type tfun = ADUPS.get(_uid);
+        if( tfun != null )  return tfun;  // TODO: Returning recursive flow-type functions
+        ADUPS.put(_uid,Type.SCALAR);
         Type rez = arg("ret")._as_flow(prim);
         return ((TypeFunPtr)_flow).make_from_ret(rez).make_from(BitsFun.FULL);
       }
       if( is_nil()  ) return Type.SCALAR;
       if( is_struct() ) {
-        TypeStruct tstr = ADUPS.get(_uid);
+        TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);
         if( tstr==null ) {
           Type.RECURSIVE_MEET++;
           tstr = TypeStruct.malloc("",false,false).add_fld(TypeFld.NO_DISP);
@@ -1679,7 +1684,7 @@ public class HM {
         if( (that=that.find()).is_err() ) break;
       }
       // Fields on the RHS are aligned with the LHS also
-      if( !thsi.is_err() && !that.is_err() )
+      if( !thsi.is_err() && !that.is_err() && that._args!=null )
         for( String key : that._args.keySet() )
           if( thsi.arg(key)==null ) { // Missing field in this
             progress = true;
@@ -1781,7 +1786,6 @@ public class HM {
         if( _flow.must_nil() ) { // Make a not-nil version
           copy = copy();
           copy._flow = _flow.join(Type.NSCALR);
-          if( _args!=null ) throw unimpl(); // shallow copy
         }
         boolean progress = copy._fresh_unify(that.arg("?"),nongen,work);
         return _flow.must_nil() ? vput(that,progress) : progress;
