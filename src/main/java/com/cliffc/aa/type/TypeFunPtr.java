@@ -36,8 +36,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   }
   private static int rot(int x, int k) { return (x<<k) | (x>>(32-k)); }
   @Override int compute_hash() {
-    assert _dsp._hash != 0 && _ret._hash!=0;    // Part of a cyclic hash
-    int hash= TFUNPTR + rot(_fidxs._hash,4) + rot(_nargs,8) + rot(_dsp._hash,12) + rot(_ret._hash,20);
+    assert _dsp._hash != 0 /*&& _ret._hash!=0*/;    // Part of a cyclic hash
+    int hash= TFUNPTR + rot(_fidxs._hash,4) + rot(_nargs,8) + rot(_dsp._hash,12)/* + rot(_ret._hash,20)*/;
     if( hash==0 ) throw unimpl();
     return hash;
   }
@@ -48,15 +48,14 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     TypeFunPtr tf = (TypeFunPtr)o;
     return _fidxs==tf._fidxs && _nargs == tf._nargs && _dsp==tf._dsp && _ret==tf._ret;
   }
-  // Structs can contain TFPs in fields, and TFPs contain a Struct, but never
-  // in a cycle.
+  // Structs can contain TFPs in fields and TFPs contain a Struct in a cycle.
   @Override public boolean cycle_equals( Type o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeFunPtr) ) return false;
     TypeFunPtr tf = (TypeFunPtr)o;
     if( _fidxs!=tf._fidxs || _nargs != tf._nargs ) return false;
     if( _dsp!=tf._dsp && !_dsp.cycle_equals(tf._dsp) ) return false;
-    if( _ret!=tf._ret && !_ret.cycle_equals(tf._ret) ) return false;
+    if( _ret!=tf._ret && (_ret==null || !_ret.cycle_equals(tf._ret)) ) return false;
     return true;
   }
 
@@ -75,8 +74,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   static { new Pool(TFUNPTR,new TypeFunPtr()); }
   public static TypeFunPtr make( BitsFun fidxs, int nargs, Type dsp, Type ret ) {
     assert dsp.is_display_ptr(); // Simple display ptr.  Just the alias.
+    return malloc(fidxs,nargs,dsp,ret).hashcons_free();
+  }
+  private static TypeFunPtr malloc(BitsFun fidxs, int nargs, Type dsp, Type ret ) {
     TypeFunPtr t1 = POOLS[TFUNPTR].malloc();
-    return t1.init(fidxs,nargs,dsp,ret).hashcons_free();
+    return t1.init(fidxs,nargs,dsp,ret);
   }
 
   public static TypeFunPtr make( int fidx, int nargs, Type dsp, Type ret ) { return make(BitsFun.make0(fidx),nargs,dsp,ret); }
@@ -94,14 +96,16 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,EMPTY.dual()};
 
   @Override protected TypeFunPtr xdual() {
-    return new TypeFunPtr().init(_fidxs.dual(),_nargs,_dsp.dual(),_ret.dual());
+    return malloc(_fidxs.dual(),_nargs,_dsp.dual(),_ret.dual());
   }
   @Override protected TypeFunPtr rdual() {
-    assert _hash!=0;
+    assert _hash==compute_hash();;
     if( _dual != null ) return _dual;
-    TypeFunPtr dual = _dual = new TypeFunPtr().init(_fidxs.dual(),_nargs,_dsp.rdual(),_ret.rdual());
-    dual._dual = this;
+    TypeFunPtr dual = _dual = malloc(_fidxs.dual(),_nargs,null,null);
+    dual._dual = this;          // Stop the recursion
+    dual._dsp = _dsp.rdual();
     dual._hash = dual.compute_hash();
+    dual._ret = _ret.rdual();
     return dual;
   }
   @Override protected Type xmeet( Type t ) {

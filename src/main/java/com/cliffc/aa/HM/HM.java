@@ -1494,11 +1494,11 @@ public class HM {
     // No function arguments, just function returns.
     static final NonBlockingHashMapLong<Type> ADUPS = new NonBlockingHashMapLong<>();
     Type as_flow(boolean prim) {
-      assert Type.intern_check();
+      //assert Type.intern_check(); // Very expensive assert
       assert ADUPS.isEmpty();
       Type t = _as_flow(prim);
       ADUPS.clear();
-      assert Type.intern_check();
+      //assert Type.intern_check(); // Very expensive assert
       return t;
     }
     Type _as_flow(boolean prim) {

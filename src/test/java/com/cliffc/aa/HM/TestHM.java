@@ -812,7 +812,10 @@ all
           TypeFld n  = mptr("n",15,TypeStruct.make(TypeFld.NO_DISP,s,z));
       
           TypeFld n1 = nfun("one"  ,14,24,25,26,27);
-          TypeFld n2 = HM.DO_HM ? nfun("two"  ,14,24,25,26,27) : TypeFld.make("two",Type.SCALAR);
+          // With lift ON
+          //TypeFld n2 = HM.DO_HM ? nfun("two"  ,14,24,25,26,27) : TypeFld.make("two",Type.SCALAR);
+          // With lift OFF
+          TypeFld n2 = TypeFld.make("two",Type.SCALAR);
           TypeFld n3 = nfun("three",14,24,25,26,27);
       
           Type rez = TypeMemPtr.make(16,TypeStruct.make(TypeFld.NO_DISP,b,n,n1,n2,n3));
@@ -1008,6 +1011,14 @@ all
     }
   }
 """,
+        /*
+         *[14]@{^    =any;
+                false=*[10,11]@{$; and=[15,18]{any ->Scalar }; or=[16,19]{any ->Scalar }; thenElse=[17,20]{any ->Scalar }}; 
+                true = $; 
+                s    = [  35 ]{any ->Scalar }; 
+                z=*[12]@{$; add=[27]{any ->Scalar }; isZero=[25]{any ->Scalar }; pred=[14]{any ->Scalar }; succ=[26]{any ->Scalar }}
+          }
+        */
         Type.SCALAR);
   }
 
