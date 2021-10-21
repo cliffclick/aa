@@ -121,7 +121,7 @@ public class CallNode extends Node {
   Node arg ( int x ) { assert x>=0; return _defs.at(x); }
   // Set an argument.  Use 'set_fun' to set the Code.
   Node set_arg (int idx, Node arg) { assert idx>=DSP_IDX && idx <nargs(); return set_def(idx,arg); }
-  public void set_fdx( Node fun) {set_def(DSP_IDX, fun);}
+  public Node set_fdx( Node fun) { return set_def(DSP_IDX, fun);}
   public void set_mem( Node mem) { set_def(MEM_IDX, mem); }
 
   // Add a bunch of utilities for breaking down a Call.value tuple:
@@ -225,9 +225,25 @@ public class CallNode extends Node {
     if( fidxs==BitsFun.EMPTY ) // TODO: zap function to empty function constant
       return null;             // Zero choices
 
-    // If we have a single function allowed, force the function constant.
+
+    // If the function is unresolved, see if we can resolve it now.
+    // Fidxs are typically low during iter, but can be high during
+    // iter post-GCP on error calls where nothing resolves.
     Node fdx = fdx();           // Function epilog/function pointer
     int fidx = fidxs.abit();    // Check for single target
+    //if( fidx == -1 && !fidxs.above_center() && !fidxs.test(1)) {
+    //  FunPtrNode fptr = least_cost(fidxs, fdx); // Check for least-cost target
+    //  if( fptr != null ) {
+    //    if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
+    //    set_fdx(fptr);          // Resolve to 1 choice
+    //    xval();                 // Force value update; least-cost LOWERS types (by removing a choice)
+    //    add_work_use_extra(Env.GVN._work_flow,fptr);
+    //    if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
+    //    return this;
+    //  }
+    //}
+
+    // If we have a single function allowed, force the function constant.
     if( fidx != -1 && !(fdx instanceof FunPtrNode) ) {
       // Check that the single target is well-formed
       FunNode fun = FunNode.find_fidx(Math.abs(fidx));
@@ -244,33 +260,15 @@ public class CallNode extends Node {
           if( fdx instanceof UnresolvedNode ) {
             fptr = ((UnresolvedNode)fdx).find_fidx(fidx);
             if( fptr != null ) { // Gonna improve
-              //if( dsp() instanceof FP2DispNode && dsp().in(0)==fdx )
-              //  set_dsp(fptr.display());
-              //return set_fdx(fptr);
-              throw unimpl();
+              return set_fdx(fptr);
             }
           }
         }
       }
     }
 
-    // If the function is unresolved, see if we can resolve it now.
-    // Fidxs are typically low during iter, but can be high during
-    // iter post-GCP on error calls where nothing resolves.
-    CallEpiNode cepi = cepi();
-    if( fidx == -1 && !fidxs.above_center() && !fidxs.test(1)) {
-      FunPtrNode fptr = least_cost(fidxs, fdx); // Check for least-cost target
-      if( fptr != null ) {
-        if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
-        set_fdx(fptr);          // Resolve to 1 choice
-        xval();                 // Force value update; least-cost LOWERS types (by removing a choice)
-        add_work_use_extra(Env.GVN._work_flow,fptr);
-        if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
-        return this;
-      }
-    }
-
     // Wire valid targets.
+    CallEpiNode cepi = cepi();
     if( cepi!=null && cepi.check_and_wire(Env.GVN._work_flow) )
       return this;              // Some wiring happened
 
@@ -405,13 +403,30 @@ public class CallNode extends Node {
       tfx = tfx.oob(TypeFunPtr.GENERIC_FUNPTR);
     TypeFunPtr tfp = (TypeFunPtr)tfx;
     BitsFun fidxs = tfp.fidxs();
-    if( _not_resolved_by_gcp && // If overloads not resolvable, then take them all, and we are in-error
-        fidxs.above_center() && tfp!=TypeFunPtr.GENERIC_FUNPTR.dual() )
-      tfp = tfp.make_from(fidxs.dual()); // Force FIDXS low (take all), and we are in-error
-    ts[DSP_IDX] = tfp._dsp;
+    BitsFun fidxs2 = least_cost2(fidxs);
+    if( fidxs != fidxs2 ) {
+      Type tret = tfp._ret;
+      // Cannot match Unresolved, because fidxs flow infinitely far, and
+      // if the FunPtr sharpens return type, this is not a neighbor.
+      //for( int fidx : fidxs2 ) { // Code matches UnresolvedNode
+      //  Type rez = ((TypeFunPtr)FunNode.find_fidx(fidx).fptr()._val)._ret;
+      //  tret = fidxs2.above_center() ? tret.join(rez) : tret.meet(rez);
+      //}
+      tfp = TypeFunPtr.make(fidxs2,tfp._nargs,tfp._dsp,tret);
+    }
+    //if( fidxs.above_center() && tfp!=TypeFunPtr.GENERIC_FUNPTR.dual() ) {
+    //  if( _not_resolved_by_gcp ) { // If overloads not resolvable, then take them all, and we are in-error
+    //    tfp = tfp.make_from(fidxs.dual()); // Force FIDXS low (take all), and we are in-error
+    //  } else {
+    //    FunPtrNode fptr = least_cost(fidxs,fdx());
+    //    if( fptr!=null )
+    //      tfp = (TypeFunPtr)fptr._val;
+    //  }
+    //}
 
     // Copy args for called functions.  FIDX is already refined.
     // Also gather all aliases from all args.
+    ts[DSP_IDX] = tfp._dsp;
     BitsAlias as = get_alias(tfp._dsp);
     for( int i=ARG_IDX; i<nargs(); i++ )
       as = as.meet(get_alias(ts[i] = arg(i)==null ? Type.XSCALAR : arg(i)._val));
@@ -592,6 +607,60 @@ public class CallNode extends Node {
     return cepi != null && fidxs.bitCount() <= cepi.nwired();
   }
 
+  // Resolve choice calls based on the left arg.
+  public BitsFun least_cost2(BitsFun choices) {
+    if( choices==BitsFun.EMPTY || choices==BitsFun.FULL|| choices==BitsFun.ANY  || choices.abit() != -1 )
+      return choices;  // Too many, zero or one choice - nothing to improve
+    Type actual = val(ARG_IDX);
+    BitsFun fdxs = BitsFun.EMPTY;
+    final boolean hi = choices.above_center();
+    // For low ties amongst int and float, always lift to int
+    int fi=0, ff=0, fx=0;
+    for( int fidx : choices ) {
+      // Parent/kids happen during inlining
+      for( int kidx=fidx; kidx!=0; kidx=BitsFun.next_kid(fidx,kidx) ) {
+        FunNode fun = FunNode.find_fidx(kidx);
+        if( fun==null || fun.is_dead() || fun.nargs()!=nargs() || fun.in(0)==fun ) continue; // BAD/dead
+        Type formal = fun.formals().fld_idx(ARG_IDX)._t;
+        boolean isa = actual.isa(formal);
+        if( isa || (!hi && formal.isa(actual)) ) {
+          BitsFun fdxs0 = pairwise_above(fdxs,kidx,formal);
+          if( fdxs0 != fdxs ) { // Progress?
+            fdxs = fdxs0;       // Keep progress
+            if( isa ) {
+              if( formal instanceof TypeInt ) fi = kidx;
+              else if( formal instanceof TypeFlt ) ff = kidx;
+              else fx = kidx;   // Something else
+            } else {
+              fx = kidx;        // Something failed the isa test
+            }
+          }
+        }
+      }
+    }
+
+    if( (!hi || !Combo.HM_IS_HIGH ) && fi!=0 && ff!=0 && fx==0 ) {
+      fdxs = fdxs.clear(ff);
+    }
+    if( hi && fdxs.abit()== -1 )
+      fdxs = fdxs.dual();
+    return fdxs;
+  }
+
+  // Pairwise, toss out any fidx who's first formal is dominated by this formal
+  // or vice-versa, or toss this fidx in otherwise.
+  private static BitsFun pairwise_above(BitsFun fidxs, int nidx, Type nformal) {
+    for( int fidx : fidxs ) {
+      Type formal = FunNode.find_fidx(fidx).formals().fld_idx(ARG_IDX)._t;
+      if( nformal.isa(formal) )
+        return fidxs.clear(fidx).set(nidx); // Keep the tighter bounds
+      if( formal.isa(nformal) )
+        return fidxs;           // Keep the tigher bounds
+    }
+    return fidxs.set(nidx);     // Extend
+  }
+
+
   // Amongst these choices return the least-cost.  Some or all might be invalid.
   public FunPtrNode least_cost(BitsFun choices, Node unk) {
     if( choices==BitsFun.EMPTY ) return null;
@@ -670,13 +739,15 @@ public class CallNode extends Node {
     BitsFun fidxs = ttfp(_val).fidxs();
     if( !fidxs.above_center() ) return true ; // Resolved after all
     if( fidxs == BitsFun.ANY )  return false; // Too many choices, no progress
-    // Pick least-cost among choices
-    Node fdx = fdx();
-    FunPtrNode fptr = least_cost(fidxs,fdx);
-    if( fptr==null ) return false; // Not resolved, no progress
-    oldfdx.push(fdx.keep());       // Keep current liveness until the end of Combo
-    set_fdx(fptr);                 // Set resolved edge
-    return true;                   // Progress
+    return false;
+    // TODO Yank this whole method
+    //// Pick least-cost among choices
+    //Node fdx = fdx();
+    //FunPtrNode fptr = least_cost(fidxs,fdx);
+    //if( fptr==null ) return false; // Not resolved, no progress
+    //oldfdx.push(fdx.keep());       // Keep current liveness until the end of Combo
+    //set_fdx(fptr);                 // Set resolved edge
+    //return true;                   // Progress
   }
 
   // See if we can resolve an unresolved Call
@@ -710,13 +781,23 @@ public class CallNode extends Node {
 
     BitsFun fidxs = tfp.fidxs();
     if( fidxs.above_center() ) return null; // Not resolved (yet)
+    Type tfdx;
+    if( fidxs.is_empty() ) {// This is an unresolved call
+      if( fast ) return ErrMsg.FAST;
+      // See if we can find some FIDX choices to give a better error message
+      if( (tfdx=fdx()._val) instanceof TypeFunPtr ) {
+        BitsFun fx = ((TypeFunPtr)tfdx)._fidxs;
+        if( fx.above_center() ) { fidxs = fx; tfp = tfp.make_from(fx); }
+      }
+    }
+
     // bad-arg-count
     if( tfp._nargs != nargs() )
       return fast ? ErrMsg.FAST : ErrMsg.syntax(_badargs[0],"Passing "+(nargs()-ARG_IDX)+" arguments to "+tfp.names(false)+" which takes "+(tfp._nargs-ARG_IDX)+" arguments");
 
     // Call did not resolve.
-    if( fidxs.is_empty() ) // This is an unresolved call
-      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
+    if( fidxs.is_empty() )
+      return ErrMsg.unresolved(_badargs[0],"Unable to resolve call");
 
     // Also happens if more than one FIDX shares the same Unresolved.
     // Basically means we did not clone enough to remove a choice amongst primitives.

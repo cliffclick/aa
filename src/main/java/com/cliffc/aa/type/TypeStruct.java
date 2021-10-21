@@ -1257,10 +1257,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return ts.hashcons_free();
   }
 
-  @Override public BitsFun all_reaching_fidxs( TypeMem tmem) {
+  @Override BitsFun _all_reaching_fidxs( TypeMem tmem) {
     BitsFun fidxs = BitsFun.EMPTY;
     for( TypeFld fld : flds() )
-      fidxs = fidxs.meet(fld._t.all_reaching_fidxs(tmem));
+      fidxs = fidxs.meet(fld._t._all_reaching_fidxs(tmem));
     return fidxs;
   }
 

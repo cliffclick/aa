@@ -135,24 +135,24 @@ only after that recursively calls itself.
 public abstract class Combo {
   public static final boolean DO_HM=true;
   public static boolean HM_IS_HIGH;
-  public static boolean NIL_OK;
 
-  public static void opto(boolean nil_ok) {
+  // If true, H-M "may be nil" errors from Loads and Stores are tolerated.
+  // This allows FreshNodes used once by an if-test and again by some Loads
+  // and Stores to get the same H-M type.  With the same H-M type its legit
+  // to CSE the Freshs together... which enables the following Cast to detect
+  // that the Load/Store address was indeed nil-checked.
+
+  // During the 2nd Combo pass this is turned off, and all "may be nil"
+  // errors are correctly checked for.
+
+  // TODO: Probably needs a more robust and less kludgey handling.  I could
+  // argue that at the time the Cast is inserted into the graph it guaranteed
+  // can lift the address - I just want to be able to prove it from Combo.
+  public static boolean CHECK_FOR_NOT_NIL = false;
+
+  public static void opto() {
     Env.GVN._opt_mode = GVNGCM.Mode.Opto;
-    
-    // If true, H-M "may be nil" errors from Loads and Stores are tolerated.
-    // This allows FreshNodes used once by an if-test and again by some Loads
-    // and Stores to get the same H-M type.  With the same H-M type its legit
-    // to CSE the Freshs together... which enables the following Cast to detect
-    // that the Load/Store address was indeed nil-checked.
 
-    // During the 2nd Combo pass this is turned off, and all "may be nil"
-    // errors are correctly checked for.
-    
-    // TODO: Probably needs a more robust and less kludgey handling.  I could
-    // argue that at the time the Cast is inserted into the graph it guaranteed
-    // can lift the address - I just want to be able to prove it from Combo.
-    NIL_OK = nil_ok;
     // General worklist algorithm
     Work work = new Work("Combo",false) { @Override public Node apply(Node n) { throw unimpl(); } };
     // Collect unresolved calls, and verify they get resolved.
@@ -232,6 +232,7 @@ public abstract class Combo {
 
     assert Env.START.more_flow(work,false)==0; // Final conditions are correct
     while( !oldfdx.isEmpty() ) oldfdx.pop().unhook();
+    Node.VALS.clear();
     Env.START.walk_opt(new VBitSet());
   }
 

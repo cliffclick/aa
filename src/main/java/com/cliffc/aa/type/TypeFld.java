@@ -143,7 +143,7 @@ public class TypeFld extends Type<TypeFld> {
     HiNoAccess;
     public static final Access[] values = values();
     static Access bot() { return ReadOnly; }
-    Access dual() { return values[("6453120".charAt(ordinal()))-'0']; }
+    public Access dual() { return values[("6453120".charAt(ordinal()))-'0']; }
     private static final String[] FMEET = {
       /*    0123456 */
       /*0*/"0000000",
@@ -208,6 +208,13 @@ public class TypeFld extends Type<TypeFld> {
     assert _dual==null;     // Not interned
     _t = t;
     _access = access;
+    return this;
+  }
+  public TypeFld setX(Type t, int order) {
+    if( _t==t && _order==order ) return this; // No change
+    _t = t;
+    _order = order;
+    assert _hash==0;  // Not hashed, since hash just changed
     return this;
   }
 

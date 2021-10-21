@@ -857,7 +857,7 @@ public class Parse implements Comparable<Parse> {
     // against.  This does a HM.Ident lookup, producing a FRESH tvar every time.
     Node ptr = get_display_ptr(scope);
     Node ld = gvn(new LoadNode(mem(),ptr,tok.intern(),null));
-    return ptr.is_display_ptr()
+    return ptr.is_display_ptr() || ld.is_forward_ref()
       ? ld                              // Inside a def, no fresh
       : gvn(new FreshNode(_e._fun,ld)); // After a field is defined, yes fresh
   }

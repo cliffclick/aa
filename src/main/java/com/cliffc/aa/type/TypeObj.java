@@ -85,7 +85,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   // Must be monotonic, as CallEpiNode.value() uses this.
   public TypeObj crush() { return this; }
   // All reaching fidxs
-  @Override public BitsFun all_reaching_fidxs( TypeMem tmem) {
+  @Override BitsFun _all_reaching_fidxs( TypeMem tmem) {
     return above_center() ? BitsFun.EMPTY : BitsFun.FULL;
   }
 }

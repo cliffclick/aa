@@ -1,4 +1,63 @@
 =======================================
+
+Pondering time for the major tech-debt cleanup
+
+- drop retype memory, Call assume fcn body has problem mem types always, can inline without type check
+- drop escapes logic, is used to help rescue (in small code) precision for recursive struct read/build.  Rely on HM instead
+- Several tests fail because cannot bypass constructors over recursive fcns, due to recursive aliasing.
+- - Figure it out!!!
+- - Build tuples & structs AFTER all initial fields are gathered.
+- - Functions in tuples take a display (self), so can be build ahead of the struct NewObj
+
+
+- Insert a int/flt Class with fields for _+_,_*_,_-_,_/_ and hash and eq, for instance
+- Create the int/flt Class at _prims.aa time.
+- Parser cant do int/flt constants until these classes exist, then short-cuts to them.
+- - int = :@{ _val; _+_ = { x:int y:int -> java_i64_add(x,y):int };
+                    _+_ = { x:int y:flt -> java_i64_add(flt(x),y):int };
+                    flt = { x:int -> java_int2flt(x):flt }
+                    ...
+            };
+    flt = :{ .... }
+    
+
+
+CallEpi Lift:
+
+- If it CAN unify, it Might.  So... a "compatible" test.  If the output HM "is
+compatible" with ANY input, it MIGHT (eventually) be equal to any of them.
+Take an output TVar, and JOIN against ALL compatible input TVars, at any depth.
+Compatible means: "test-unify says progress, or both are same"
+
+UGH:  lift any part of output from any part of input....
+Need to walk & part-out all of (iTV,iType).
+Can pre-JOIN the iTypes from all the compatible iTVs?
+
+"Obvious correct but slow" version:
+- For all inputs, look at (iTV,iType).
+- - For all prior incompatible iTVs,
+- - - see if this iTV is compatible with any: if so, join again.
+- - - else add a new incompatible (iTV,iType).
+- - Test&Set recursive; return;
+- - Recursive walk iTV parts
+-
+- Start with a top-level TVar & Type for Output: (oTV,oType)
+- For all incompatible iTV
+- - if oTV is compatible to iTV
+- - - Find singular iTV
+- oType &= iType // join; may add structure to oType
+- Test&Set recursive; return oType
+- Recursive walk (oTV,oType)
+- - Build up oType parts from recursive sup-parts
+
+Faster?
+- return if oType is already ~Scalar or above; cannot lift any more.
+- return if iType is already Scalar or below; will not lift.
+
+
+
+
+=======================================
 10/4/2021
 
 Still wrestling with theory.

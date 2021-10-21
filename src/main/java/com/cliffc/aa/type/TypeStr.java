@@ -109,5 +109,5 @@ public class TypeStr extends TypeObj<TypeStr> {
   @Override public TypeStr  widen() { return STR; }
   @Override public void walk( Predicate<Type> p ) { p.test(this); }
 
-  @Override public BitsFun all_reaching_fidxs( TypeMem tmem) { return BitsFun.EMPTY; }
+  @Override BitsFun _all_reaching_fidxs( TypeMem tmem) { return BitsFun.EMPTY; }
 }

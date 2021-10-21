@@ -105,7 +105,7 @@ public class TypeAry extends TypeObj<TypeAry> {
     return ARY;
   }
 
-  @Override public BitsFun all_reaching_fidxs( TypeMem tmem) {
-    return _elem.all_reaching_fidxs(tmem);
+  @Override BitsFun _all_reaching_fidxs( TypeMem tmem ) {
+    return _elem._all_reaching_fidxs(tmem);
   }
 }

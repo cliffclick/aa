@@ -72,6 +72,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public static TypeMemPtr make( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias),obj); }
   public static TypeMemPtr make_nil( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
   public TypeMemPtr make_from( TypeObj obj ) { return make(_aliases,obj); }
+  public TypeMemPtr make_from( BitsAlias aliases ) { return make(aliases,_obj); }
 
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.
   // To break class-init cycle, this is made here, now.
@@ -303,11 +304,12 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
   @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _obj.repeats_in_cycles(head,bs); }
 
-  @Override public BitsFun all_reaching_fidxs( TypeMem tmem) {
+  @Override BitsFun _all_reaching_fidxs( TypeMem tmem) {
     BitsFun fidxs = BitsFun.EMPTY;
+    if( Type.ARF.tset(_uid) ) return fidxs;
     for( int alias : _aliases )
       if( alias!=0 )
-        fidxs = fidxs.meet(tmem.at(alias).all_reaching_fidxs(tmem));
+        fidxs = fidxs.meet(tmem.at(alias)._all_reaching_fidxs(tmem));
     return fidxs;
   }
 

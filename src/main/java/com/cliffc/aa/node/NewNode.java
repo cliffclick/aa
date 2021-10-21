@@ -117,7 +117,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     _crushed = _ts = dead_type();
     _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeObj.UNUSED);
     if( !Env.GVN._opt_mode._CG ) // If pre-Combo, also kill in DEFMEM
-      Env.DEFMEM.set_def(_alias,Node.con(TypeObj.UNUSED));
+      Env.DEFMEM.set_def(_alias,Env.XUSE);
     Env.GVN.revalive(this,ProjNode.proj(this,0),Env.DEFMEM);
     if( is_dead() ) return;
     for( Node use : _uses )
@@ -198,6 +198,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
         assert in(0)==null && _uses._len==0;
         FunNode  fun = ( FunNode) X.xform(new  FunNode(_name,this));
+        fun._java_fun = true;
         ParmNode rpc = (ParmNode) X.xform(new ParmNode(TypeRPC.ALL_CALL,null,fun,0,"rpc"));
         Node memp= X.xform(new ParmNode(TypeMem.MEM,null,fun,MEM_IDX," mem"));
         fun._bal_close = bal_close();
@@ -213,7 +214,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
         Node mem = Env.DEFMEM.make_mem_proj(nnn,memp);
         Node ptr = X.xform(new ProjNode(nnn,REZ_IDX));
         RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,ptr,rpc,fun));
-        Env.SCP_0.add_def(ret);
         return (X._ret = (FunPtrNode)X.xform(new FunPtrNode(_name,ret)));
       }
     }

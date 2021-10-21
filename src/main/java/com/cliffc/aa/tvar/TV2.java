@@ -627,10 +627,11 @@ public class TV2 {
 
   // Returns progress.
   // If work==null, we are testing only and make no changes.
+  private static int FCNT;
   public boolean fresh_unify(TV2 that, TV2[] nongen, Work work) {
-    assert VARS.isEmpty() && DUPS.isEmpty();
+    assert VARS.isEmpty() && DUPS.isEmpty() && FCNT==0;
     boolean progress = _fresh_unify(that,nongen,work);
-    VARS.clear();  DUPS.clear();
+    VARS.clear();  DUPS.clear();  FCNT=0;
     return progress;
   }
 
@@ -699,6 +700,8 @@ public class TV2 {
     // directly unified.  Fields on one side check to see if the other side is
     // open; if open the field is copied else deleted
     boolean progress = vput(that,false); // Early set, to stop cycles
+    FCNT++;                              // Recursion count on Fresh
+    assert FCNT < 100;          // Infinite _fresh_unify cycles
     for( String key : _args.keySet() ) {
       TV2 lhs =      get(key);  assert lhs!=null;
       TV2 rhs = that.get(key);
@@ -713,6 +716,7 @@ public class TV2 {
       if( (that=that.find()).is_err() ) return true;
       if( progress && work==null ) return true;
     }
+    FCNT--;
     // Fields in RHS and not the LHS are also merged; if the LHS is open we'd
     // just copy the missing fields into it, then unify the structs (shortcut:
     // just skip the copy).  If the LHS is closed, then the extra RHS fields
@@ -736,7 +740,7 @@ public class TV2 {
   private boolean vput(TV2 that, boolean progress) { VARS.put(this,that); return progress; }
   private TV2 vput(TV2 that) { VARS.put(this,that); return that; }
 
-  private TV2 fresh(TV2[] nongen) {
+  public TV2 fresh(TV2[] nongen) {
     assert VARS.isEmpty();
     TV2 tv2 = _fresh(nongen);
     VARS.clear();
@@ -1058,6 +1062,7 @@ public class TV2 {
   public SB str(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     boolean dup = dups.get(_uid);
     if( !debug && is_unified() ) return find().str(sb,visit,dups,debug);
+    if( is_base() && _type==Type.ANY ) return sb.p("any");
     if( is_unified() || is_leaf() || dup ) {
       sb.p(VNAMES.computeIfAbsent(this,( k ->  debug ? ("V"+k._uid) : ((++VCNT)-1+'A' < 'V' ? (""+(char)('A'+VCNT-1)) : ("V"+VCNT)))));
       if( !dup ) return is_unified() ? _unified.str(sb.p(">>"), visit, dups, debug) : sb;

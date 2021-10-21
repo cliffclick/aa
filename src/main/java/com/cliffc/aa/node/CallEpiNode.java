@@ -74,7 +74,7 @@ public final class CallEpiNode extends Node {
     if( nwired()==1 && fidxs.abit() != -1 ) { // Wired to 1 target
       RetNode ret = wired(0);                 // One wired return
       FunNode fun = ret.fun();
-      Type tdef = Env.DEFMEM._uses._len==0 ? null : Env.DEFMEM._val;
+      Type tdef = Env.DEFMEM._uses._len==0 || fun._java_fun ? null : Env.DEFMEM._val;
       TypeTuple tret = ret._val instanceof TypeTuple ? (TypeTuple) ret._val : (TypeTuple)ret._val.oob(TypeTuple.RET);
       Type tretmem = tret.at(1);
       if( fun != null && fun._defs._len==2 && // Function is only called by 1 (and not the unknown caller)
@@ -122,7 +122,7 @@ public final class CallEpiNode extends Node {
     FunNode fun = FunNode.find_fidx(fidx);
     assert !fun.is_forward_ref() && !fun.is_dead()
       && fun.nargs() == cnargs; // All checked by call.err
-    if( fun._val != Type.CTRL ) return null;
+    if( fun._val != Type.CTRL || fun._java_fun ) return null;
     RetNode ret = fun.ret();    // Return from function
     if( ret==null ) return null;
 
@@ -239,10 +239,12 @@ public final class CallEpiNode extends Node {
       case 0 -> new ConNode<>(TypeRPC.make(call._rpc)); // Always RPC is a constant
       case MEM_IDX -> new MProjNode(call, (Env.DEFMEM._uses._len == 0) ? Env.ANY : Env.DEFMEM);    // Memory into the callee
       default -> idx >= call.nargs()              // Check for args present
-      ? new ConNode<>(Type.ALL) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
+      ? Env.ALL  // Missing args, still wire (to keep FunNode neighbors) but will error out later.
       : new ProjNode(call, idx); // Normal args
       };
       actual._live = arg._live; // Set it before CSE during init1
+      if( GVN._opt_mode == GVNGCM.Mode.Opto )
+        actual._tvar = actual.new_tvar("check_and_wire");
       arg.add_def(actual.init1());
       work.add(actual);       // Also on the Combo worklist
       if( arg._val.is_con() ) // Added an edge, value may change or go in-error
@@ -287,7 +289,7 @@ public final class CallEpiNode extends Node {
     BitsFun fidxs = tfptr.fidxs();
     // NO fidxs, means we're not calling anything.
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,Type.ANY);
-    if( fidxs.above_center() ) return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,Type.ANY); // Not resolved yet
+    if( fidxs==BitsFun.ANY   ) return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,Type.ANY); // Not resolved yet
 
     // Default memory: global worst-case scenario
     TypeMem defmem = Env.DEFMEM._val instanceof TypeMem
@@ -295,7 +297,7 @@ public final class CallEpiNode extends Node {
       : Env.DEFMEM._val.oob(TypeMem.ALLMEM);
 
     // Any not-wired unknown call targets?
-    if( fidxs!=BitsFun.FULL ) {
+    if( fidxs!=BitsFun.FULL && !fidxs.above_center() ) {
       // If fidxs includes a parent fidx, then it was split - currently exactly
       // in two.  If both children are wired, then proceed to merge both
       // children as expected; same if the parent is still wired (perhaps with
@@ -324,8 +326,8 @@ public final class CallEpiNode extends Node {
     }
 
     // Compute call-return value from all callee returns
-    Type trez = Type   .ANY;
-    Type tmem = TypeMem.ANYMEM;
+    Type trez = fidxs.above_center() ? Type.ALL       : Type.ANY;
+    Type tmem = fidxs.above_center() ? TypeMem.ALLMEM : TypeMem.ANYMEM;
     CallNode call = call();
     ErrMsg err = call.err(true);
     if( fidxs == BitsFun.FULL ||  // Called something unknown
@@ -336,10 +338,14 @@ public final class CallEpiNode extends Node {
       for( int i=0; i<nwired(); i++ ) {
         RetNode ret = wired(i);
         if( fidxs.test_recur(ret._fidx) ) { // Can be wired, but later fidx is removed
-          Type tret = ret._val;
-          if( !(tret instanceof TypeTuple) ) tret = tret.oob(TypeTuple.RET);
-          tmem = tmem.meet(((TypeTuple)tret).at(MEM_IDX));
-          trez = trez.meet(((TypeTuple)tret).at(REZ_IDX));
+          TypeTuple tret = (TypeTuple)(ret._val instanceof TypeTuple ? ret._val : ret._val.oob(TypeTuple.RET));
+          if( fidxs.above_center() ) {
+            tmem = tmem.join(tret.at(MEM_IDX));
+            trez = trez.join(tret.at(REZ_IDX));
+          } else {
+            tmem = tmem.meet(tret.at(MEM_IDX));
+            trez = trez.meet(tret.at(REZ_IDX));
+          }
         }
       }
     }
@@ -538,12 +544,37 @@ public final class CallEpiNode extends Node {
     CallNode call = call();
     Node fdx = call.fdx();
     if( !(fdx._val instanceof TypeFunPtr) ) return false;
-    TV2 tfun = fdx.tvar();
+
+    // Call selected fidxs
+    BitsFun fidxs = CallNode.ttfp(call._val)._fidxs;
+    if( fidxs.above_center() )
+      return false; // No unification until call resolves, same as dead code does not unify
+
+    //boolean progress = false;
+    //if( ((TypeFunPtr)fdx._val)._fidxs.above_center() ) {
+    //  FreshNode fresh = (FreshNode)fdx;
+    //  // Unify against the selected fidxs only
+    //  for( int fidx : fidxs ) {
+    //    FunPtrNode fptr = FunNode.find_fidx(fidx).fptr();
+    //    progress |= unify_fun(fptr.tvar().fresh(fresh.nongen()),work);
+    //  }
+    //
+    //} else {
+    //  // Unify against the input... should be the same as unifying against the
+    //  // selected fidxs?
+    //  progress |= unify_fun(fdx.tvar(),work);
+    //}
+    //return progress;
+    return unify_fun(fdx.tvar(),work);
+  }
+
+  private boolean unify_fun(TV2 tfun, Work work) {
     if( tfun.is_err() )         // Unify with function error
       return tvar().unify(tfun,work);
-
     // If the function is not a function, make it a function
     boolean progress = false;
+    CallNode call = call();
+    Node fdx = call.fdx();
     if( !tfun.is_fun() ) {
       if( work==null ) return true;
       NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
@@ -575,6 +606,7 @@ public final class CallEpiNode extends Node {
 
     return progress;
   }
+
 
   @Override public void add_work_hm(Work work) {
     super.add_work_hm(work);

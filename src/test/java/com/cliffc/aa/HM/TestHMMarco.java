@@ -16,7 +16,7 @@ public class TestHMMarco {
     return s.replace("\n","").replace(" ","");
     }
   void fails(String code,String msg) {
-    try{HM.hm(code);}
+    try{HM.hm(code,0,true,false);}
     catch(Throwable t) {
       if(!t.getMessage().startsWith(msg)){
         assertEquals(msg,t.getMessage());
@@ -24,7 +24,7 @@ public class TestHMMarco {
       }
   }
   void ok(String code,String type) {
-    Root syn = HM.hm(code);
+    Root syn = HM.hm(code,0,true,false);
     assertEquals(stripIndent(type),stripIndent(syn._hmt.p()));
   }
 

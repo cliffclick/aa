@@ -19,7 +19,8 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-  // TODO:
+    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(_&_,2)", Type.XNIL);
+    // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
     // The Meet loses precision to fast.  This is a typing bug.
 
@@ -507,33 +508,42 @@ c= C(b,"abc");
 
 
   @Test public void testParse08() {
-    // Main issue with the map() test is final assignments crossing recursive
-    // not-inlined calls.  Smaller test case:
-    test_ptr("tmp=@{val=2;nxt=@{val=1;nxt=0}}; noinline_map={tree -> tree ? @{vv=tree.val&tree.val;nn=noinline_map(tree.nxt)} : 0}; noinline_map(tmp)",
-             "@{vv=int8; nn=*$?}");
+//    // Main issue with the map() test is final assignments crossing recursive
+//    // not-inlined calls.  Smaller test case:
+//    test("""
+//tmp = @{ val=2; nxt= @{ val=1; nxt=0} };
+//noinline_map={ tree -> tree ? @{ vv=tree.val&tree.val; nn=noinline_map(tree.nxt)} : 0};
+//noinline_map(tmp)
+//""", "*@{nn=$; noinline_map=any; vv=int8}?","A:@{nn=A,noinline_map=any,vv=int64}?");
 
     // Too big to inline, multi-recursive
-    test_ptr("tmp=@{"+
-             "  l=@{"+
-             "    l=@{ l=0; r=0; v=3 };"+
-             "    r=@{ l=0; "+
-             "         r=@{ l=0; r=0; v=9 }; "+
-             "         v=7"+
-             "    };"+
-             "    v=5"+
-             "  };"+
-             "  r=@{"+
-             "    l=@{ l=0; r=0; v=15 };"+
-             "    r=@{ l=0; r=0; v=22 };"+
-             "    v=20"+
-             "  };"+
-             "  v=12 "+
-             "};"+
-             "map={tree -> tree"+
-             "     ? @{ll=map(tree.l);rr=map(tree.r);vv=tree.v&tree.v}"+
-             "     : 0};"+
-             "map(tmp)",
-             "@{ll=*@{ll=*@{ll=0; rr=0; vv=3}; rr=*@{ll=*@{$; rr=$; vv=int8}?; $; vv=7}; vv=5}; rr=*@{$; rr=*@{$; $; vv=22}; vv=20}; vv=12}");
+    test("""
+tmp=@{
+  l=@{
+    l=@{ l=0; r=0; v=3 };
+    r=@{ l=0;
+         r=@{ l=0; r=0; v=9 };
+         v=7
+    };
+    v=5
+  };
+  r=@{
+    l=@{ l=0; r=0; v=15 };
+    r=@{ l=0; r=0; v=22 };
+    v=20
+  };
+  v=12
+};
+map={tree -> tree
+     ? @{ ll=map(tree.l);
+          rr=map(tree.r);
+          vv=tree.v & tree.v
+       }
+     : 0};
+map(tmp)
+""",
+         "@{ll=*@{ll=*@{ll=0; rr=0; vv=3}; rr=*@{ll=*@{$; rr=$; vv=int8}?; $; vv=7}; vv=5}; rr=*@{$; rr=*@{$; $; vv=22}; vv=20}; vv=12}",
+         "");
 
 
     // Failed attempt at a Tree-structure inference test.  Triggered all sorts
@@ -635,7 +645,7 @@ c= C(b,"abc");
   // final to r/w, nor r/w to final.  Can cast both to r/o.  The reason you
   // cannot cast to a final, is that some other caller/thread with some other
   // r/w copy of the same pointer you have, can modify the supposedly final
-  // object.  Hence you cannot cast to "final", but you can cast to "read-only"
+  // object.  Hence, you cannot cast to "final", but you can cast to "read-only"
   // which only applies to you, and not to other r/w pointers.
   @Test public void testParse10() {
     // Test re-assignment in struct
@@ -674,7 +684,7 @@ c= C(b,"abc");
     testerr ("f={ptr:@{x;y=} -> ptr.y=3}; f(@{x:=1;y:=2});", "*@{x:=1; y:=2} is not a *@{x:=; y=; ...}",30);
     //testerr ("f={ptr:@{x;y} -> ptr.y=3}; f(@{x:=1;y:=2}:@{x;y=})", "*@{.==nScalar} is not a *@{x:=; y:=; ...}",29);
     test    ("ptr=@{a:=1}; val=ptr.a; ptr.a=2; val",TypeInt.con(1));
-    // Allowed to build final pointer cycles
+    // You are allowed to build final pointer cycles
     test    ("ptr0=@{p:=0;v:=1}; ptr1=@{p=ptr0;v:=2}; ptr0.p=ptr1; ptr0.p.v+ptr1.p.v+(ptr0.p==ptr1)", TypeInt.con(4)); // final pointer-cycle is ok
   }
 

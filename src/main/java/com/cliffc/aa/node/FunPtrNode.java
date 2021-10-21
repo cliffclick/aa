@@ -142,6 +142,15 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   @Override public void add_work_extra(Work work, Type old) {
     if( old==_live )            // live impacts value
       work.add(this);
+    if( old instanceof TypeFunPtr )
+      for( Node use : _uses )
+        if( use instanceof UnresolvedNode )
+          for( Node call : use._uses )
+            if( call instanceof CallNode ) {
+              TypeFunPtr tfp = CallNode.ttfp(call._val);
+              if( tfp.fidxs()==((TypeFunPtr)old).fidxs() )
+                work.add(call);
+            }
   }
 
   @Override public TypeMem live(GVNGCM.Mode opt_mode) {
@@ -254,8 +263,8 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     // Update the fidx
     RetNode dret = def.ret();
     dret.set_fidx(rfun._fidx);
-    FunPtrNode fptr = dret.funptr();
-    fptr.xval();
+    assert dret.funptr()==def;
+    def.xval();
     Env.GVN.add_flow_uses(this);
 
     // The existing forward-ref becomes a normal (not f-ref) but internal
@@ -265,9 +274,9 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     _referr = null;             // No longer a forward ref
     set_def(0,def.in(0));       // Same inputs
     set_def(1,def.in(1));
-
+    // Field at def point, points directly now.
     dsp.update(tok,dsp.access(tok),def);
-    fptr.bind(tok); // Debug only, associate variable name with function
+    def.bind(tok);         // Debug only, associate variable name with function
     assert Env.START.more_flow(Env.GVN._work_flow,true)==0;
     Env.GVN.iter(GVNGCM.Mode.Parse);
   }

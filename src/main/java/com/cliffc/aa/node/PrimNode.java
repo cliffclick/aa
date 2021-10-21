@@ -219,6 +219,7 @@ public abstract class PrimNode extends Node {
       // Extra '$' in name copies the op_prec one inlining level from clazz_node into the _prim.aa
       FunNode fun = new FunNode(("$"+_name).intern(),that); // No callers (yet)
       fun._val = Type.CTRL;
+      fun._java_fun = true;
       Node rpc = X.xform(new ParmNode(TypeRPC.ALL_CALL,null,fun,0,"rpc"));
       that.add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
       Node mem = X.xform(new ParmNode(TypeMem.MEM,null,fun,MEM_IDX," mem"));
@@ -241,7 +242,6 @@ public abstract class PrimNode extends Node {
       // *modify* memory (see Intrinsic*Node for some primitives that *modify*
       // memory).  Thunking (short circuit) prims return both memory and a value.
       RetNode ret = (RetNode)X.xform(new RetNode(ctl,mem,rez,rpc,fun));
-      Env.SCP_0.add_def(ret);
       // No closures are added to primitives
       return (X._ret = (FunPtrNode)X.xform(new FunPtrNode(_name,ret)));
     }

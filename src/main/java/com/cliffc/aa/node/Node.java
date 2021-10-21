@@ -573,10 +573,9 @@ public abstract class Node implements Cloneable {
     // All liveness is skipped if may_be_con, since the possible constant has
     // no inputs.  If values drop from being possible constants to not being a
     // constant, liveness must be revisited.
-    assert may_be_con_live(oval) || !may_be_con_live(nval); // May_be_con_live is monotonic
-    if( may_be_con_live(oval) && !may_be_con_live(nval) )
-      for( Node def : _defs ) work.add(def); // Now check liveness
-
+    //assert may_be_con_live(oval) || !may_be_con_live(nval); // May_be_con_live is monotonic
+    //if( may_be_con_live(oval) && !may_be_con_live(nval) )
+    //  for( Node def : _defs ) work.add(def); // Now check liveness
   }
 
   // Do One Step of backwards-dataflow analysis.  Assert monotonic progress.
@@ -595,7 +594,8 @@ public abstract class Node implements Cloneable {
   // Do One Step of Hindley-Milner unification.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
   public void combo_unify(Work work) {
-    if( _live==TypeMem.DEAD )  return ; // No HM progress on dead code
+    if( _live==TypeMem.DEAD )  return; // No HM progress on dead code
+    if( _val == Type.ANY ) return;     // No HM progress on untyped code
     TV2 old = _tvar==null ? null : tvar();
     if( old!=null && old.is_err() ) return;  // No unifications with error
     if( unify(work) ) {
@@ -795,6 +795,7 @@ public abstract class Node implements Cloneable {
     if( this instanceof ParmNode && has_tvar() && tvar().is_leaf() &&
         top_escapes.test_recur(((ParmNode)this).fun()._fidx ))
       work.add(this); // External parms are lifted.
+    if( this instanceof CallNode && CallNode.ttfp(_val)._fidxs.above_center() ) work.add(this);
     // Walk reachable graph
     for( Node use : _uses )                   use.walk_combo_phase2(work,top_escapes);
     for( Node def : _defs ) if( def != null ) def.walk_combo_phase2(work,top_escapes);
@@ -873,7 +874,7 @@ public abstract class Node implements Cloneable {
     if( !work.on(this) && _keep==0 ) {
       Type    oval= _val, nval = value(Env.GVN._opt_mode); // Forwards flow
       TypeMem oliv=_live, nliv = live (Env.GVN._opt_mode); // Backwards flow
-      boolean hm = Combo.DO_HM && !lifting && oliv!=TypeMem.DEAD && _tvar!=null && !tvar().is_err() && unify(null);  // HM unification if alive
+      boolean hm = Combo.DO_HM && !lifting && oliv!=TypeMem.DEAD && _tvar!=null && !tvar().is_err() && _val!=Type.ANY && unify(null);  // HM unification if alive
       if( nval != oval || nliv != oliv || hm ) { // Check for progress
         boolean ok = lifting
           ? nval.isa(oval) && nliv.isa(oliv)
@@ -919,29 +920,40 @@ public abstract class Node implements Cloneable {
   public void walk_opt( VBitSet visit ) {
     assert !is_dead();
     if( visit.tset(_uid) ) return; // Been there, done that
-
-    // Replace any constants.  Since the node computes a constant, its inputs
-    // were never marked live, and so go dead and so go to ANY and so are not
-    // available to recompute the constant later.
-    Type val = _val;
-    TypeFunPtr tfp;
-    if( val instanceof TypeFunPtr &&
-        _live.live_no_disp() &&
-        (tfp=(TypeFunPtr)val)._dsp!=TypeMemPtr.NO_DISP )
-      val = tfp.make_no_disp();
-    if( should_con(val) ) {
-      Node con = con(val);
-      con._tvar = _tvar;
-      subsume(con).xliv(GVNGCM.Mode.Opto);
-    }
-    // FreshNodes can now CSE
-    if( Combo.NIL_OK && !is_dead() ) unelock();
-
+    _elock = false;                // Removed from VALS
     // Walk reachable graph
     if( is_dead() ) return;
     Env.GVN.add_work_all(this);
     for( Node def : _defs )  if( def != null )  def.walk_opt(visit);
     for( Node use : _uses )                     use.walk_opt(visit);
+
+    // If a Call takes in from e.g. an Unknown, but computes a single target
+    // after Combo, replace its FDX with a constant FunPtr.
+    Type t = _val;
+    if( this instanceof CallNode && t instanceof TypeTuple ) {
+      TypeFunPtr tfp = CallNode.ttfp(_val);
+      Type tfdx = ((CallNode)this).fdx()._val;
+      if( tfp._fidxs.abit()!=-1 && tfdx instanceof TypeFunPtr && ((TypeFunPtr)tfdx).fidxs() != tfp.fidxs() ) {
+        if( tfp._dsp!=Type.ANY ) throw unimpl();
+        Node fptr = FunNode.find_fidx(tfp.fidx()).fptr();
+        ((CallNode)this).set_fdx(fptr);
+      }
+    }
+
+    // Yank any constant values and replace with a constant node.
+    TypeFunPtr tfp=null;
+    if( t instanceof TypeFunPtr &&
+        (tfp=(TypeFunPtr)t)._dsp!=TypeMemPtr.NO_DISP &&
+        _live.live_no_disp() )
+      t = tfp.make_no_disp();
+    if( should_con(t) ) {
+      Node con = t instanceof TypeFunPtr
+        ? new FunPtrNode(FunNode.find_fidx(tfp.fidx()).ret(),Env.ANY)
+        : new ConNode<>(t);
+      con._tvar = _tvar;
+      Env.GVN.revalive(subsume(con));
+    }
+
   }
 
   // Overridden in subclasses that return TypeTuple value types.  Such nodes

@@ -792,7 +792,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     if( _type == t._type ) return 0; // Same type is OK
     if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion
     if( _type == TALL || t._type==TALL || _type == TSCALAR || _type == TNSCALR ) return -1; // Scalar has to resolve
-    if( (_type == TREAL || _type == TNREAL) && t.is_num() ) return -1; // Real->Int/Flt has to resolve
+    if( _type == TREAL || _type == TNREAL ) return 99; // Real->Int/Flt has to resolve.  Real->String needs a convert
     if( t._type == TNIL || t._type == TXNIL ) return (byte)(may_nil() ? -1 : 99); // Must resolve to a NIL first
 
     throw typerr(t);  // Overridden in subtypes
@@ -879,7 +879,14 @@ public class Type<T extends Type<T>> implements Cloneable {
   // Make from existing type, replacing TMPs with alias from the map
   public Type make_from(Type head, TypeMem map, VBitSet visit) { return this; }
 
-  public BitsFun all_reaching_fidxs( TypeMem tmem) { return BitsFun.EMPTY; }
+  static final VBitSet ARF = new VBitSet();
+  public final BitsFun all_reaching_fidxs( TypeMem tmem) {
+    assert ARF.isEmpty();
+    BitsFun arf = _all_reaching_fidxs(tmem);
+    ARF.clear();
+    return arf;
+  }
+  BitsFun _all_reaching_fidxs( TypeMem tmem ) { return BitsFun.EMPTY; }
 
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

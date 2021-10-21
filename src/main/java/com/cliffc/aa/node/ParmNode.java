@@ -68,16 +68,18 @@ public class ParmNode extends PhiNode {
     FunNode fun = (FunNode)in0;
     if( fun.len()!=len() ) return Type.ALL; // Collapsing
 
+    // If pre-Call-Graph, assume the value will be exported externally and thus
+    // called by the most conservative caller.  The default input already pessimizes.
+    if( !opt_mode._CG && fun._java_fun ) {
+      //Type tin = _defs._len <= 1 ? _t : val(1);
+      //return t0 == Type.ANY ? tin : tin.join(t0);   // No need to visit other inputs
+      return _t;
+    }
+
     // Trust the signature, if any.
     TypeFld fld = fun.formals().fld_find(_name);
     Type t0 = fld==null ? Type.ANY : fld._t.simple_ptr();
     if( is_prim() && fld!=null ) return t0;
-    // If pre-Call-Graph, assume the value will be exported externally and thus
-    // called by the most conservative caller.  The default input already pessimizes.
-    if( !opt_mode._CG && fun.is_unknown_alive() ) {
-      Type tin = _defs._len <= 1 ? _t : val(1);
-      return t0 == Type.ANY ? tin : tin.join(t0);   // No need to visit other inputs
-    }
 
     // If we have a Call Graph, then we merge all the normal input paths.  If
     // we are also exporting, the export path is lifted by the H-M typing which
@@ -89,9 +91,9 @@ public class ParmNode extends PhiNode {
     // Lift the external caller by HM
     if( fun.has_unknown_callers() ) {
       i = 2;
-      if( fun.is_unknown_alive() ) {
+      if( fun.len() > 1 && fun.is_unknown_alive() ) {
         assert fun.in(1) instanceof ScopeNode;
-        assert fun.val(1) == Type.CTRL;
+        assert fun.val(1) == Type.CTRL || fun.val(1) == Type.ALL;
         t = fld==null
           ? (mem == null ? val(1) : in(1).sharptr(mem.in(1)))
           : fld._t;              // Use formal signature if available

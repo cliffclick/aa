@@ -68,6 +68,10 @@ public class FunNode extends RegionNode {
   // Function is parsed infix, with the RHS argument thunked.  Flag is used by
   // the Parser only for short-circuit operations like '||' and '&&'.
   public boolean _thunk_rhs;
+  // Function is generated from whole-cloth via classForName.clazz__node.  Gets
+  // to keep-alive and have default types until inlined once, then gets
+  // removed.
+  public boolean _java_fun;
 
   // Lexically scoping parent function(s).  Used to build the H-M non-gen set.
   // Only one, unless a parent clones.  Also null at the top.
@@ -260,6 +264,7 @@ public class FunNode extends RegionNode {
     return progress;
   }
   public TypeStruct formals() { return _sig._formals; }
+  public TypeFunSig sig() { return _sig; }
   public void set_re_sig() { _sig = re_sig(); }
 
   public Node ideal_inline(boolean check_progress) {

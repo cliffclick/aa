@@ -54,7 +54,7 @@ public abstract class MemPrimNode extends PrimNode {
     @Override public FunPtrNode clazz_node( ) {
       try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
         assert _defs._len==0 && _uses._len==0;
-        FunNode  fun = ( FunNode) X.xform(new  FunNode(_name,this));
+        FunNode  fun = ( FunNode) X.xform(new  FunNode(_name,this));  fun._java_fun = true;
         ParmNode rpc = (ParmNode) X.xform(new ParmNode(TypeRPC.ALL_CALL,null,fun,0      ,"rpc"));
         Node mem     =            X.xform(new ParmNode(TypeMem.MEM     ,null,fun,MEM_IDX," mem"));
         fun._bal_close = bal_close();
@@ -68,7 +68,6 @@ public abstract class MemPrimNode extends PrimNode {
         // Functions return the set of *modified* memory.  ReadPrimNodes do not modify
         // memory.
         RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,nnn,rpc,fun));
-        Env.SCP_0.add_def(ret);
         // No closures are added to primitives
         return (X._ret = (FunPtrNode)X.xform(new FunPtrNode(_name,ret)));
       }
@@ -171,6 +170,7 @@ public abstract class MemPrimNode extends PrimNode {
         ParmNode rpc = (ParmNode) X.xform(new ParmNode( 0     ,"rpc" ,fun,Env.ALL_CALL,null));
         ParmNode mem = (ParmNode) X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
         fun._bal_close = bal_close();
+        fun._java_fun = true;
         add_def(null);              // Control for the primitive in slot 0
         add_def(mem );              // Memory  for the primitive in slot 1
         while( len() < _sig._formals.nargs() ) add_def(null);

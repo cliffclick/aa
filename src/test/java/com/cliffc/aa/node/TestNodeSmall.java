@@ -42,7 +42,7 @@ public class TestNodeSmall {
     // Kinda sorta looks like: use startype on incoming, and JOIN.
 
     gvn._opt_mode=GVNGCM.Mode.Parse;
-    UnresolvedNode uadd = (UnresolvedNode)Env.TOP.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
+    UnresolvedNode uadd = (UnresolvedNode)Env.TOP.lookup("_+_"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
     FunPtrNode aflt = (FunPtrNode)uadd.in(0);
     FunPtrNode aint = (FunPtrNode)uadd.in(1);
     FunPtrNode astr = (FunPtrNode)uadd.in(2);
@@ -550,7 +550,7 @@ public class TestNodeSmall {
     }
 
     // Now run GCP to closure.  This is the key call being tested.
-    Combo.opto(false);
+    Combo.opto();
 
     // Validate cyclic display/function type
     TypeFunPtr tfptr0 = (TypeFunPtr) fptr._val;
