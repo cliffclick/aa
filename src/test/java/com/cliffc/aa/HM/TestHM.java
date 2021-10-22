@@ -1019,7 +1019,26 @@ all
                 z=*[12]@{$; add=[27]{any ->Scalar }; isZero=[25]{any ->Scalar }; pred=[14]{any ->Scalar }; succ=[26]{any ->Scalar }}
           }
         */
-        Type.SCALAR);
+        () -> {
+          TypeFld and = bfun2("and" ,15,18,1);
+          TypeFld or  = bfun2("or"  ,16,19,1);
+          TypeFld thn = bfun2("thenElse",17,20,2);
+          TypeMemPtr tf = TypeMemPtr.make(BitsAlias.make0(10).or(11),TypeStruct.make(TypeFld.NO_DISP,and,or,thn));
+          TypeFld f = TypeFld.make("false",tf);
+          TypeFld t = TypeFld.make("true",tf);
+          
+          TypeFld s = mfun("s",35);
+
+          TypeFld pred  = mfun("pred"  ,14);
+          TypeFld isZero= mfun("isZero",25);
+          TypeFld add   = mfun("add"   ,27);
+          TypeFld succ  = mfun("succ"  ,26);
+          TypeFld z = TypeFld.make("z",TypeMemPtr.make(BitsAlias.make0(12),TypeStruct.make(TypeFld.NO_DISP,pred,isZero,add,succ)));
+          return TypeMemPtr.make(BitsAlias.make0(14),TypeStruct.make(TypeFld.NO_DISP,f,t,s,z));
+        });
+  }
+private static TypeFld bfun2(String fld, int a0, int a1, int nargs ) {
+    return TypeFld.make(fld,TypeFunPtr.make(BitsFun.make0(a0,a1),nargs));
   }
 
 
