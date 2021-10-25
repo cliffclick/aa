@@ -41,7 +41,7 @@ public class TestHM {
   private void run( String prog, String rez_hm_gcp, String rez_hm_alone, Type rez_gcp_hm, Type rez_gcp_alone ) {
     run(prog, rez_hm_gcp, rez_hm_alone, ()->rez_gcp_hm, ()-> rez_gcp_alone );
   }
-  
+
   // Simple no-arg signature returning the type
   private static TypeFunSig tfs(Type ret) { return TypeFunSig.make(TypeStruct.EMPTY,ret); }
 
@@ -76,14 +76,14 @@ public class TestHM {
   // Because {y->y} is passed in, all 'y' types must agree.
   // This unifies 3 and 5 which results in 'nint8'
   @Test public void test05() {
-    run("({ id -> (pair (id 3) (id 5)) } {x->x})", "( int64, int64)",tuple82);
+    run("({ id -> (pair (id 3) (id 5)) } {x->x})", "( nint8, nint8)",tuple82);
   }
 
   @Test public void test06() {
     run("id={x->x}; (pair (id 3) (id \"abc\"))",
         // HM is sharper here than in test05, because id is generalized per each use site
-        "( int64, *[4]str)",
-        "( int64, *[4]str)",
+        "( 3, *[4]\"abc\")",
+        "( 3, *[4]\"abc\")",
         // GCP with HM
         // With lift ON
         //TypeMemPtr.make(7,make_tups(TypeInt.NINT64,TypeMemPtr.make(4,TypeStr.STR))),
@@ -143,14 +143,14 @@ public class TestHM {
 
   // map takes a function and an element (collection?) and applies it (applies to collection?)
   @Test public void test16() { run("map = { fun x -> (fun x)}; (map { a-> (pair a a)} 5)",
-                                   "( int64, int64)", tuple55); }
+                                   "( 5, 5)", tuple55); }
 
   @Test public void test17() { run("""
 fcn = { p -> { a -> (pair a a) }};
 map = { fun x -> (fun x)};
 { q -> (map (fcn q) 5)}
 """,
-                                   "{ A -> ( int64, int64) }", tfs(tuple55)); }
+                                   "{ A -> ( 5, 5) }", tfs(tuple55)); }
 
   // Checking behavior when using "if" to merge two functions with sufficiently
   // different signatures, then attempting to pass them to a map & calling internally.
@@ -166,8 +166,8 @@ map = { fun x -> (fun x)};
     run("fcn = {p -> (if p {a -> (pair a a)} {b -> (pair b (pair 3 b))})};"+
         "map = { fun x -> (fun x)};"+
         "{ q -> (map (fcn q) 5)}",
-        "{ A? -> ( Cannot unify A:( int64, A) and int64, Cannot unify A:( int64, A) and int64) }",
-        "{ A? -> ( Cannot unify A:( int64, A) and 5, Cannot unify A:( int64, A) and 5) }",
+        "{ A? -> ( B:Cannot unify 5 and C:( 3, C), B) }",
+        "{ A? -> ( B:Cannot unify 5 and C:( 3, C), B) }",
         // tfs(*[7](^=any, ~nScalar, *[7]($, 3, ~nScalar)))
         // With Lift ON
         //tfs(TypeMemPtr.make(7,make_tups(Type.XNSCALR,TypeMemPtr.make(7,make_tups(TypeInt.con(3),Type.XNSCALR))))),
@@ -180,7 +180,7 @@ map = { fun x -> (fun x)};
   @Test public void test19() { run("cons ={x y-> {cadr -> (cadr x y)}};"+
                                    "cdr ={mycons -> (mycons { p q -> q})};"+
                                    "(cdr (cons 2 3))",
-                                   "int64", TypeInt.con(3)); }
+                                   "3", TypeInt.con(3)); }
 
   // Take 2nd element of pair, and applies a function.
   //    let map = fn parg fun => (fun (cdr parg))
@@ -236,8 +236,8 @@ all = @{
 
   @Test public void test23y() {
     run("dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp \"abc\"))",
-        "( int64, *[4]str)",
-        "( int64, *[4]str)",
+        "( 3, *[4]\"abc\")",
+        "( 3, *[4]\"abc\")",
         // With lift On
         //TypeMemPtr.make(7,make_tups(TypeInt.NINT64,TypeMemPtr.STRPTR)),
         // With lift Off
@@ -384,7 +384,7 @@ all = @{
   // Example from SimpleSub requiring 'x' to be both a struct with field
   // 'v', and also a function type - specifically disallowed in 'aa'.
   @Test public void test38() { run("{ x -> y = ( x x.v ); 0}",
-                                   "{ Cannot unify @{ v = A; ...} and { A -> B } -> A? }", tfs(Type.XNIL)); }
+                                   "{ Cannot unify @{ v = A; ...} and { A -> B } -> C? }", tfs(Type.XNIL)); }
 
   // Really bad flow-type: function can be called from the REPL with any
   // argument type - and the worse case will be an error.
@@ -399,9 +399,15 @@ all = @{
   // - a function which takes a struct with field 'u'
   // The first arg to x is two different kinds of functions, so fails unification.
   @Test public void test40() {
+    _run0("x = w = (x x); { z -> z}; (x { y -> y.u})",
+      "Cannot unify @{ u = A:{ A -> A }; ...} and A",
+      ()->Type.SCALAR,1);
+    _run0("x = w = (x x); { z -> z}; (x { y -> y.u})",
+      "Cannot unify @{ u = A:{ A -> A }; ...} and A",
+      ()->Type.SCALAR,0);
     run("x = w = (x x); { z -> z}; (x { y -> y.u})",
-        "Cannot unify A:{ A -> A } and @{ u = A:{ A -> A }; ...}",
-        "Cannot unify A:{ A -> A } and @{ u = A:{ A -> A }; ...}",
+        "Cannot unify @{ u = A:{ A -> A }; ...} and A",
+        "Cannot unify @{ u = A:{ A -> A }; ...} and A",
         tfs(Type.SCALAR),
         Type.SCALAR);
   }
@@ -692,7 +698,7 @@ all
                                            TypeFld.make("true"   ,tt),
                                            TypeFld.make("false"  ,ff),
                                            TypeFld.make("boolSub",TypeFunPtr.make(BitsFun.make0(21),1)));
-          
+
           return TypeMemPtr.make(11,rez);
         });
   }
@@ -806,18 +812,18 @@ all
           TypeFld bt = bfun("true" ,10,15,16,17);
           TypeFld bf = bfun("false",11,18,19,20);
           TypeFld b  = mptr("b",12,TypeStruct.make(TypeFld.NO_DISP,bt,bf)); // Booleans
-      
+
           TypeFld s  = mfun("s",28);
           TypeFld z  = nfun("z",13,21,14,22,23);
           TypeFld n  = mptr("n",15,TypeStruct.make(TypeFld.NO_DISP,s,z));
-      
+
           TypeFld n1 = nfun("one"  ,14,24,25,26,27);
           // With lift ON
           //TypeFld n2 = HM.DO_HM ? nfun("two"  ,14,24,25,26,27) : TypeFld.make("two",Type.SCALAR);
           // With lift OFF
           TypeFld n2 = TypeFld.make("two",Type.SCALAR);
           TypeFld n3 = nfun("three",14,24,25,26,27);
-      
+
           Type rez = TypeMemPtr.make(16,TypeStruct.make(TypeFld.NO_DISP,b,n,n1,n2,n3));
           return rez;
         });
@@ -1013,9 +1019,9 @@ all
 """,
         /*
          *[14]@{^    =any;
-                false=*[10,11]@{$; and=[15,18]{any ->Scalar }; or=[16,19]{any ->Scalar }; thenElse=[17,20]{any ->Scalar }}; 
-                true = $; 
-                s    = [  35 ]{any ->Scalar }; 
+                false=*[10,11]@{$; and=[15,18]{any ->Scalar }; or=[16,19]{any ->Scalar }; thenElse=[17,20]{any ->Scalar }};
+                true = $;
+                s    = [  35 ]{any ->Scalar };
                 z=*[12]@{$; add=[27]{any ->Scalar }; isZero=[25]{any ->Scalar }; pred=[14]{any ->Scalar }; succ=[26]{any ->Scalar }}
           }
         */
@@ -1026,7 +1032,7 @@ all
           TypeMemPtr tf = TypeMemPtr.make(BitsAlias.make0(10).or(11),TypeStruct.make(TypeFld.NO_DISP,and,or,thn));
           TypeFld f = TypeFld.make("false",tf);
           TypeFld t = TypeFld.make("true",tf);
-          
+
           TypeFld s = mfun("s",35);
 
           TypeFld pred  = mfun("pred"  ,14);
