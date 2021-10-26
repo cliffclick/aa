@@ -3,6 +3,7 @@ package com.cliffc.aa.HM;
 import com.cliffc.aa.HM.HM.Root;
 import com.cliffc.aa.type.*;
 import org.junit.Test;
+
 import java.util.function.Supplier;
 
 import static org.junit.Assert.assertEquals;
@@ -166,8 +167,8 @@ map = { fun x -> (fun x)};
     run("fcn = {p -> (if p {a -> (pair a a)} {b -> (pair b (pair 3 b))})};"+
         "map = { fun x -> (fun x)};"+
         "{ q -> (map (fcn q) 5)}",
-        "{ A? -> ( B:Cannot unify 5 and C:( 3, C), B) }",
-        "{ A? -> ( B:Cannot unify 5 and C:( 3, C), B) }",
+        "{ A? -> ( B:Cannot unify 5 and ( 3, B), B) }",
+        "{ A? -> ( B:Cannot unify 5 and ( 3, B), B) }",
         // tfs(*[7](^=any, ~nScalar, *[7]($, 3, ~nScalar)))
         // With Lift ON
         //tfs(TypeMemPtr.make(7,make_tups(Type.XNSCALR,TypeMemPtr.make(7,make_tups(TypeInt.con(3),Type.XNSCALR))))),
@@ -225,6 +226,14 @@ map ={fun parg -> (fun (cdr parg))};
                                    "int1", TypeInt.BOOL); }
 
   @Test public void test23x() {
+    _run0("""
+all = @{
+  is_even = { dsp n -> (if (eq0 n) 0 (dsp.is_odd  dsp (dec n)))},
+  is_odd  = { dsp n -> (if (eq0 n) 1 (dsp.is_even dsp (dec n)))}
+};
+{ x -> (all.is_even all x)}
+""",
+      "{int64 -> int1}", null,2);
     run("""
 all = @{
   is_even = { dsp n -> (if (eq0 n) 0 (dsp.is_odd  dsp (dec n)))},
@@ -232,7 +241,8 @@ all = @{
 };
 { x -> (all.is_even all x)}
 """,
-        "{int64 -> int1}", tfs(TypeInt.BOOL)); }
+        "{int64 -> int1}", tfs(TypeInt.BOOL));
+  }
 
   @Test public void test23y() {
     run("dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp \"abc\"))",
@@ -384,7 +394,8 @@ all = @{
   // Example from SimpleSub requiring 'x' to be both a struct with field
   // 'v', and also a function type - specifically disallowed in 'aa'.
   @Test public void test38() { run("{ x -> y = ( x x.v ); 0}",
-                                   "{ Cannot unify @{ v = A; ...} and { A -> B } -> C? }", tfs(Type.XNIL)); }
+                                   "{ { A:Missing field v in {A->B} -> B } -> C? }",
+                                   tfs(Type.XNIL)); }
 
   // Really bad flow-type: function can be called from the REPL with any
   // argument type - and the worse case will be an error.
@@ -399,15 +410,9 @@ all = @{
   // - a function which takes a struct with field 'u'
   // The first arg to x is two different kinds of functions, so fails unification.
   @Test public void test40() {
-    _run0("x = w = (x x); { z -> z}; (x { y -> y.u})",
-      "Cannot unify @{ u = A:{ A -> A }; ...} and A",
-      ()->Type.SCALAR,1);
-    _run0("x = w = (x x); { z -> z}; (x { y -> y.u})",
-      "Cannot unify @{ u = A:{ A -> A }; ...} and A",
-      ()->Type.SCALAR,0);
     run("x = w = (x x); { z -> z}; (x { y -> y.u})",
-        "Cannot unify @{ u = A:{ A -> A }; ...} and A",
-        "Cannot unify @{ u = A:{ A -> A }; ...} and A",
+        "A:Cannot unify { A -> A } and @{ u = A; ... }",
+        "A:Cannot unify { A -> A } and @{ u = A; ... }",
         tfs(Type.SCALAR),
         Type.SCALAR);
   }
@@ -439,6 +444,10 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
 
   // CCP Can help HM
   @Test public void test42() {
+    _run0("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4 }; (if pred s1 s2).y",
+      "Missing field y in ( )",
+      null,
+      1);
     run("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4 }; (if pred s1 s2).y",
         "3.4000000953674316",
         "Missing field y in ( )",
