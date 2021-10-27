@@ -464,13 +464,178 @@ find = { ary e ->
 ```
 
 
+The AA Type System
+==================
+
+AA uses a combined [_Hindley-Milner_](https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system) and _Global Constant Propagation_ typing.
+
+
+Extensions to Hindley-Milner
+----------------------------
+
+AA treats HM as a _Monotone Analysis Framework_; converted to a worklist style.
+The type variables are monotonically unified, gradually growing over time - and
+this is treated as the MAF lattice.  Some normal Algo-W work gets done in a
+prepass; e.g. discovering identifier sources (SSA form), and building the
+non-generative set.  Because of the non-local unification behavior type
+variables include a "dependent" set; a set of elements put back on the worklist
+if this type unifies, beyond the expected graph neighbors.
+
+The normal HM unification steps are treated as the MAF transfer "functions",
+taking type variables as inputs and producing new, unified, type variables.
+Because unification happens in-place (normal
+[Disjoint-set Union](https://en.wikipedia.org/wiki/Disjoint-set_data_structure),
+the transfer "functions" are executed for side effects only, and return a
+progress flag.  The transfer functions are virtual calls.  Some steps are empty
+because of the pre-pass (Let,Con).
+
+HM base (ground) types include anything from the GCP lattice, and are generally
+sharper than e.g. 'int'.  Bases with values of '3' and the string "abc" are
+fine.
+
+HM includes polymorphic structures and fields
+([structural typing](https://en.wikipedia.org/wiki/Structural_type_system) not
+[duck typing](https://en.wikipedia.org/wiki/Duck_typing)), polymorphic
+nil-checking and an error type variable.  Both HM and GCP types fully support
+recursive types, e.g.```{ f -> (f f) }``` is well typed with the recursive type
+```A:{ A -> B }```.
+
+HM errors keep all the not-unifiable types, all at once.  Further unifications
+with the error either add a new not-unifiable type, or unify with one of the
+prior types.  These means that types can ALWAYS unify, including nonsensical
+unifications between e.g. the constant 5 and a struct @{ x,y }.  The errors
+are reported when a type prints.
+
+Because of the error handling,
+[dead errors](https://en.wikipedia.org/wiki/Dead_code) are not reported and not
+considered a typing error.  It is OK to have type errors in dead code.
+
+Unification typically makes many temporary type variables and immediately
+unifies them.  For efficiency, this algorithm checks to see if unification
+requires an allocation first, instead of just "allocate and unify".  The major
+place this happens is identifiers, which normally make a "fresh" copy of their
+type variable, then unify.  I use a combined "make-fresh-and-unify" unification
+algorithm there.  It is a structural clone of the normal unify, except that it
+lazily makes a fresh-copy of the left-hand-side on demand only; typically
+discovering that no fresh-copy is required.
+
+To engineer and debug the algorithm, the unification step includes a flag to
+mean "actually unify, and report a progress flag" vs "report if progress".  The
+report-only mode is aggressively asserted for in many places; all program
+points that can make progress are asserted as on the worklist.
+
+
+Extensions to Global Constant Propagation
+-----------------------------------------
+
+_Global Constant Propagation_ (GCP) is an extension to the algorithm with the
+same name, applied to typing.  GCP is another _Monotone Analysis Framework_
+with types from a [Lattice](https://en.wikipedia.org/wiki/Lattice_(order)).
+The lattice is a symmetric complete bounded (ranked) lattice, the meet is
+commutative and associative.  The lattice has a dual (symmetric), and join is
+defined using meet and dual: ```~(~x meet ~y)```.
+
+The lattice contains the usual presentation for integers (a Top, constants, and
+a Bottom), extended with ranges (e.g. ```int1, int8, uint8, int32, int64```).
+The lattice also contains a representation for IEEE754 numbers (```flt32,
+flt64```), for pointers and structures, and for functions.  The lattice
+contains unique indices for each function (internally called a _fidx_), which
+are used to build a precise
+[Call Graph](https://en.wikipedia.org/wiki/Call_graph) at typing time.
+Similarly, the lattice contains unique indices for new allocation sites
+(internally called an _alias_) which are used to determine aliasing
+relationships up to equivalence-class precision.  All types in the lattice
+understand _nil_ exactly, e.g. there are nil-able and not-nil variants of all
+lattice elements.  There are several other extensions not mentioned here.
+
+Any value which can fit in a machine register (or a small count of them) is
+typed as a _Scalar_.  This includes integers, floats, pointers and code
+pointers, and excludes structures and the code itself.
+
+All types which contain other types (e.g. structures or functions) fully
+understand recursive types.
+
+_GCP_ is normally a forwards flow algorithm, flowing precise types forwards
+from the initial program point to the exit.  This _GCP_ **also** computes
+_liveness_, as a backwards flow algorithm with only slightly less precision
+than the forwards variant.  As mentioned above in the HM presentation, errors
+in dead (not live) code are ignored.
+
+_GCP_ gets the normal _MAF_ treatment, no surprises here.  _GCP_ may be run in
+two modes: _optimistic_ vs _pessimistic_.  In the _pessmistic_ variant, the
+program always correct; the algorithm can be stopped at any point.  However
+locally correct transformations can be made (such as folding "3+5" into "8", or
+removing dead code).  This pessmistic version is run as a pre-pass before the
+main combined algorithm to cleanup "easy" things.  In the _optimistic_ variant,
+the analysis must run to completion before the typing is correct, types are not
+incrementally correct.  However the _optimistic_ variant delivers a more
+precise type (allows typing strictly more programs).
+
+
+Combining Hindley-Milner and Global Constant Propagation
+--------------------------------------------------------
+
+The combined algorithm includes transfer functions taking facts from both
+_MAF_ lattices, producing results in the other lattice.
+
+For the GCP &#8594; HM direction, the HM 'if' has a custom transfer function
+instead of the usual one.  Unification looks at the GCP value, and unifies
+either the true arm, or the false arm, or both or neither.  In this way GCP
+allows HM to avoid picking up constraints from dead code.
+
+Also for GCP &#8594; HM, the HM ground terms or base terms include anything
+from the GCP lattice.  E.g. both '3' and 'int64' are valid HM base terms.
+
+For the HM &#8594; GCP direction, the 'apply' step has a customer GCP transfer
+function where the result from a call gets lifted (JOINed) based on the
+matching GCP inputs - and the match comes from using the same HM type variable
+on both inputs and outputs.  This allows e.g. "map" calls which typically merge
+many GCP values at many applies (call sites) and thus end up being weakly typed
+as a Scalar to Scalar, to improve the GCP type on a per-call-site basis.
+
+Test case ```aa/src/test/java/com/cliffc/aa/HM/TestHM.java:test45```
+demonstrates this combined algorithm, with a program which can only be typed
+using the combination of GCP and HM.
+
+Since GCP is a forwards flow algorithm, functions that escape at the top level
+(e.g. module level or whole typing-event level) have to decide how they are
+called.  GCP might assume they are not called (and uncalled functions are
+dead), or might assume they are called with the worst possible arguments (which
+would typically lead to type errors).  Instead GCP uses the HM type variables,
+converted to the GCP lattice, to get initial types.
+
+Core AA
+-------
+
+There is a highly restricted subset of AA (really a plain lambda calculus) in
+```aa/src/main/java/com/cliffc/aa/HM/HM.java``` to demonstrate this type
+system.
+
+
+BNF for the "core AA" syntax:
+
+```
+   e  = number | string | primitives | (fe0 fe1*) | { id* -> fe0 } | id | id = fe0; fe1 | @{ (label = fe0)* }
+   fe = e | fe.label                 // optional field after expression
+```
+
+BNF for the "core AA" pretty-printed types:
+
+```
+   T = base | { T* -> T } | @{ (label = T)* } | T? | X:T | X | (Error T+)
+   base = any GCP lattice element, all are nilable
+   Multiple stacked T????s collapse
+```
+
+-------------------------------------------
+
 
 Done Stuff
 ----------
 
 * Static typing; types optional & fully inferred at every place.
 * Nil-ptr distinguished; nil/notnil types (e.g. Kotlin)
-* Duck-typing.  Interfaces.
+* Structural-typing (duck typing with strong types).  Interfaces.
 * Anonymous (and named) structure types.
 * Functional; 1st class functions.  All functions are anonymous.
 * REPL
