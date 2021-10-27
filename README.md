@@ -476,7 +476,7 @@ Extensions to Hindley-Milner
 AA treats HM as a _Monotone Analysis Framework_; converted to a worklist style.
 The type variables are monotonically unified, gradually growing over time - and
 this is treated as the MAF lattice.  Some normal Algo-W work gets done in a
-prepass; e.g. discovering identifier sources (SSA form), and building the
+pre-pass; e.g. discovering identifier sources (SSA form), and building the
 non-generative set.  Because of the non-local unification behavior type
 variables include a "dependent" set; a set of elements put back on the worklist
 if this type unifies, beyond the expected graph neighbors.
@@ -562,13 +562,13 @@ than the forwards variant.  As mentioned above in the HM presentation, errors
 in dead (not live) code are ignored.
 
 _GCP_ gets the normal _MAF_ treatment, no surprises here.  _GCP_ may be run in
-two modes: _optimistic_ vs _pessimistic_.  In the _pessmistic_ variant, the
-program always correct; the algorithm can be stopped at any point.  However
+two modes: _optimistic_ vs _pessimistic_.  In the _pessimistic_ variant, the
+program always correct; the algorithm can be stopped at any point.  However,
 locally correct transformations can be made (such as folding "3+5" into "8", or
-removing dead code).  This pessmistic version is run as a pre-pass before the
+removing dead code).  This pessimistic version is run as a pre-pass before the
 main combined algorithm to cleanup "easy" things.  In the _optimistic_ variant,
 the analysis must run to completion before the typing is correct, types are not
-incrementally correct.  However the _optimistic_ variant delivers a more
+incrementally correct.  However, the _optimistic_ variant delivers a more
 precise type (allows typing strictly more programs).
 
 

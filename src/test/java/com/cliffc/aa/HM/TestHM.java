@@ -226,14 +226,6 @@ map ={fun parg -> (fun (cdr parg))};
                                    "int1", TypeInt.BOOL); }
 
   @Test public void test23x() {
-    _run0("""
-all = @{
-  is_even = { dsp n -> (if (eq0 n) 0 (dsp.is_odd  dsp (dec n)))},
-  is_odd  = { dsp n -> (if (eq0 n) 1 (dsp.is_even dsp (dec n)))}
-};
-{ x -> (all.is_even all x)}
-""",
-      "{int64 -> int1}", null,2);
     run("""
 all = @{
   is_even = { dsp n -> (if (eq0 n) 0 (dsp.is_odd  dsp (dec n)))},
@@ -444,10 +436,6 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
 
   // CCP Can help HM
   @Test public void test42() {
-    _run0("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4 }; (if pred s1 s2).y",
-      "Missing field y in ( )",
-      null,
-      1);
     run("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4 }; (if pred s1 s2).y",
         "3.4000000953674316",
         "Missing field y in ( )",
@@ -464,7 +452,7 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
   @Test public void test44() {
     run("fun = (if (isempty \"abc\") {x->x} {x->1.2}); (fun @{})",
         "1.2000000476837158",
-        "Cannot unify ( ) and flt64",
+        "Cannot unify 1.2000000476837158 and ()",
         TypeFlt.con(1.2f),
         TypeFlt.con(1.2f));
   }
@@ -486,7 +474,7 @@ loop = { name cnt ->
 (loop "def" (id 2))
 """,
         "*[0,4]str?",  // Both HM and GCP
-        "Cannot unify *[4]\"abc\" and int64", // HM alone cannot do this one
+        "Cannot unify int8 and *[0,4]str?", // HM alone cannot do this one
         // With lift ON
         //TypeMemPtr.make(4,TypeStr.STR), // Both HM and GCP
         // With lift OFF
