@@ -1,8 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.node.FunNode;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 
 import java.util.function.Predicate;
 
@@ -46,7 +45,10 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     if( this==o ) return true;
     if( !(o instanceof TypeFunPtr) ) return false;
     TypeFunPtr tf = (TypeFunPtr)o;
-    return _fidxs==tf._fidxs && _nargs == tf._nargs && _dsp==tf._dsp && _ret==tf._ret;
+    if( _fidxs!=tf._fidxs || _nargs != tf._nargs || _dsp!=tf._dsp ) return false;
+    if( _ret==tf._ret ) return true;
+    // Allow 2 closed 1-long return cycles to be equal.
+    return _ret==this && tf._ret==tf;
   }
   // Structs can contain TFPs in fields and TFPs contain a Struct in a cycle.
   @Override public boolean cycle_equals( Type o ) {
@@ -73,12 +75,120 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   static { new Pool(TFUNPTR,new TypeFunPtr()); }
   public static TypeFunPtr make( BitsFun fidxs, int nargs, Type dsp, Type ret ) {
+    // Assert the fidxs do not appear in the chain of returns.
+    Type x = ret;
+    while( x instanceof TypeFunPtr ) {
+      TypeFunPtr xfp = (TypeFunPtr)x;
+      assert !fidxs.overlaps(xfp._fidxs);
+      if( xfp._ret==xfp ) break; // Self-cycle ends search
+      x = xfp._ret;
+    }
     assert dsp.is_display_ptr(); // Simple display ptr.  Just the alias.
     return malloc(fidxs,nargs,dsp,ret).hashcons_free();
   }
+
+  // Preserve the invariant that the fidxs do not appear in the chain of
+  // returns, by converting to a cyclic type or otherwise rolling-up the return
+  // chain.  Prevents infinitely long types, very similarly to the TypeStruct
+  // approx call, except the problem is much simpler.
+
+  // If the return-chain contains an instance of fidxs, we approximate to
+  // prevent the same fidx appearing twice.
+
+  // Scan 1: Follow chain to the end and return either the repeat point or
+  // null.  If no repeats, build the TFP as usual.  If repeating, also gather
+  // all FIDXS seen.
+  //
+  // Scan 2: Follow the repeat point to the end, and return either all the
+  // FIDXS seen if the end is high/cycle, or null otherwise.  If ends high/
+  // cycle build a length-1 cycle from all FIDXS.
+  //
+  // Scan 3: starting both from the repeat point and the start, recurse until
+  // one or both are LOW.  Return (LOW meet other), and unwind the recursion
+  // wrapping merged TFPs as we go.
+  //
+  static private BitsFun _SCAN1_FIDXS;
+  static public TypeFunPtr make0( BitsFun fidxs, int nargs, Type dsp, Type tret ) {
+    _SCAN1_FIDXS = null;        // Reset
+    TypeFunPtr trepeat = _scan1(fidxs,tret);
+    if( trepeat==null )
+      return make(fidxs,nargs,dsp,tret);   // build as usual
+    BitsFun scan2_fidxs = trepeat._scan2();
+    if( scan2_fidxs!=null )
+      return make_recursive(fidxs.meet(_SCAN1_FIDXS),nargs,dsp);  // build a 1-cycle
+    assert fidxs.overlaps(trepeat._fidxs);
+    // The final meet
+    Type mdsp = dsp.meet(trepeat._dsp);
+    int mnargs = Math.min(nargs,trepeat._nargs);
+    Type mret = _scan3(tret,trepeat._ret);
+    return make(fidxs.meet(trepeat._fidxs),mnargs,mdsp,mret);
+  }
+
+  // Scan 1: Follow chain to the end and return either the repeat point or
+  // null.  If no repeats, build the TFP as usual.  If repeating, also gather
+  // all FIDXS seen.
+  static private TypeFunPtr _scan1( BitsFun fidxs, Type tret ) {
+    if( !(tret instanceof TypeFunPtr) )
+      return null; // The end, no repeats, valid as-is.
+    TypeFunPtr tfret = (TypeFunPtr)tret;
+    // Check for repeats
+    if( fidxs.overlaps(tfret._fidxs) ) {
+      assert _SCAN1_FIDXS == null;
+      _SCAN1_FIDXS = tfret._fidxs;
+      return tfret;             // The repeat point
+    }
+    // Hit a cyclic-end, with no repeats.  Counts as a high-end
+    if( tfret._ret == tfret )
+      return null;              // The end, no repeats
+    // Carry on the recursion
+    TypeFunPtr tfp = _scan1(fidxs,tfret._ret);
+    if( tfp==null ) return null; // Found the end, valid as-is
+    _SCAN1_FIDXS = _SCAN1_FIDXS.meet(tfret._fidxs); // Gather fidxs on the unwind
+    return tfp;
+  }
+
+  // Scan 2: Follow the repeat point to the end, and return either all the
+  // FIDXS seen if the end is high/cycle, or null otherwise.  If ends high/
+  // cycle build a length-1 cycle from all FIDXS.
+  private BitsFun _scan2() {
+    if( !(_ret instanceof TypeFunPtr) )
+      // If high, making a cycle.  If low, moving on to scan3.
+      return _ret.above_center() ? BitsFun.EMPTY : null;
+    TypeFunPtr tfret = (TypeFunPtr)_ret;
+    if( tfret._ret==tfret )     // Ending cycle?
+      return tfret._fidxs;      // Ending high/cycle, return FIDXS
+    // Need to keep scanning here
+    throw unimpl();
+  }
+
+  // Scan 3: starting both from the repeat point and the start, recurse until
+  // one or both are LOW.  Return (LOW meet other), and unwind the recursion
+  // wrapping merged TFPs as we go.
+  static private Type _scan3(Type t0, Type t1) {
+    if( t0 instanceof TypeFunPtr && t1 instanceof TypeFunPtr )
+      throw unimpl();
+    Type mt = t0.meet(t1);
+    assert !(mt instanceof TypeFunPtr); // Since low ending, the meet never falls to a TFP
+    return mt;
+  }
+
+  // Allocate and init
   private static TypeFunPtr malloc(BitsFun fidxs, int nargs, Type dsp, Type ret ) {
     TypeFunPtr t1 = POOLS[TFUNPTR].malloc();
     return t1.init(fidxs,nargs,dsp,ret);
+  }
+
+  // Make self recursive
+  static private TypeFunPtr make_recursive( BitsFun fidxs, int nargs, Type dsp ) {
+    TypeFunPtr tfp = malloc(fidxs,nargs,Type.ANY,null);
+    tfp._ret = tfp;
+    tfp._hash = tfp.compute_hash();
+    TypeFunPtr old = (TypeFunPtr)tfp.intern_lookup();
+    if( old!=null )             // Return prior hit
+      return POOLS[TFUNPTR].free(tfp,old);
+    tfp.rdual();
+    if( tfp.retern() != tfp.dual() ) tfp.dual().retern();
+    return tfp;
   }
 
   public static TypeFunPtr make( int fidx, int nargs, Type dsp, Type ret ) { return make(BitsFun.make0(fidx),nargs,dsp,ret); }
@@ -99,7 +209,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     return malloc(_fidxs.dual(),_nargs,_dsp.dual(),_ret.dual());
   }
   @Override protected TypeFunPtr rdual() {
-    assert _hash==compute_hash();;
+    assert _hash==compute_hash();
     if( _dual != null ) return _dual;
     TypeFunPtr dual = _dual = malloc(_fidxs.dual(),_nargs,null,null);
     dual._dual = this;          // Stop the recursion
@@ -135,9 +245,13 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     TypeFunPtr min_nargs = _nargs < tf._nargs ? this : tf;
     TypeFunPtr max_nargs = _nargs < tf._nargs ? tf : this;
     int nargs = min_nargs.above_center() ? max_nargs._nargs : min_nargs._nargs;
-    Type    dsp =          _dsp.meet(tf._dsp);
-    Type    ret =          _ret.meet(tf._ret);
-    return make(fidxs,nargs,dsp,ret);
+    Type dsp = _dsp.meet(tf._dsp);
+    // If both are short cycles, the result is a short cycle
+    if( _ret==this && tf._ret==tf )
+      return make_recursive(fidxs,nargs,dsp);
+    // Otherwise, recursively find the return
+    Type ret = _ret.meet(tf._ret);
+    return make0(fidxs,nargs,dsp,ret);
   }
 
   public BitsFun fidxs() { return _fidxs; }
@@ -160,7 +274,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public boolean is_con()       {
     return _dsp==TypeMemPtr.NO_DISP && // No display (could be constant display?)
       // Single bit covers all functions (no new children added, but new splits
-      // can appear).  Currently not tracking this at the top-level, so instead
+      // can appear).  Currently, not tracking this at the top-level, so instead
       // just triggering off of a simple heuristic: a single bit above BitsFun.FULL.
       _fidxs.abit() > 1 &&
       !is_forward_ref();
@@ -234,8 +348,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   // All reaching fidxs, including any function returns
   @Override BitsFun _all_reaching_fidxs( TypeMem tmem) {
+    if( Type.ARF.tset(_uid) ) return _fidxs;
     // Myself, plus any function returns
     return _fidxs.meet(_ret._all_reaching_fidxs(tmem));
   }
-
 }

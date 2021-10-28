@@ -358,7 +358,8 @@ all = @{
 
   // try the worse-case expo blow-up test case from SO
   @Test public void test35() {
-    TypeFunPtr tfp  = TypeFunPtr.make(15,3,Type.ANY,Type.SCALAR);
+    TypeMemPtr tmps = TypeMemPtr.make(8,make_tups(Type.SCALAR,Type.SCALAR,Type.SCALAR));
+    TypeFunPtr tfp  = TypeFunPtr.make(15,3,Type.ANY,tmps);
     TypeMemPtr tmp0 = TypeMemPtr.make(8,make_tups(tfp ,tfp ,tfp ));
     TypeMemPtr tmp1 = TypeMemPtr.make(8,make_tups(tmp0,tmp0,tmp0));
     TypeMemPtr tmp2 = TypeMemPtr.make(8,make_tups(tmp1,tmp1,tmp1));
@@ -405,7 +406,7 @@ all = @{
     run("x = w = (x x); { z -> z}; (x { y -> y.u})",
         "A:Cannot unify { A -> A } and @{ u = A; ... }",
         "A:Cannot unify { A -> A } and @{ u = A; ... }",
-        tfs(Type.SCALAR),
+        Type.SCALAR,
         Type.SCALAR);
   }
 
@@ -506,7 +507,7 @@ loop = { name cnt ->
   )
 }
 """,
-        "{ A? -> ( int64, int64) }",
+        "{ A? -> ( 3, nint8) }",
         tfs(TypeMemPtr.make(7,make_tups(TypeInt.NINT8, TypeInt.NINT8 ))));
   }
 
@@ -520,8 +521,8 @@ loop = { name cnt ->
   )
 }
 """,
-        "{ A? -> May be nil when loading field x }",
-        "{ A? -> May be nil when loading field x }",
+        "{ A? -> ( 3, May be nil when loading field x ) }",
+        "{ A? -> ( 3, May be nil when loading field x ) }",
         tfs(TypeMemPtr.make(7,make_tups(TypeInt.NINT8, TypeInt.NINT8 ))),
         tfs(TypeMemPtr.make(7,make_tups(TypeInt.NINT8, TypeInt.NINT8 ))));
   }

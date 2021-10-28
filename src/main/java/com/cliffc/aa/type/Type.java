@@ -308,6 +308,8 @@ public class Type<T extends Type<T>> implements Cloneable {
       else                   { _pool  ++; return (T)_frees.pop();  }
     }
     <T extends Type> T free(T t1, T t2) {
+      t1._dual = null;
+      t1._hash = 0;
       _frees.push(t1);
       _free++;
       return t2;

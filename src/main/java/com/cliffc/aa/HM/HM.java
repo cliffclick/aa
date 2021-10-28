@@ -151,6 +151,8 @@ public class HM {
       int oldcnt = T2.CNT;      // Used for cost-check when no-progress
       cnt++; assert cnt<10000;  // Check for infinite loops
       Syntax syn = work.pop();  // Get work
+
+      // Do Hindley-Milner work
       if( DO_HM ) {
         T2 old = syn._hmt;      // Old value for progress assert
         if( syn.hm(work) ) {
@@ -160,6 +162,7 @@ public class HM {
           assert oldcnt==T2.CNT;// No-progress consumes no-new-T2s
         }
       }
+      // Do Global Constant Propagation work
       if( DO_GCP ) {
         Type old = syn._flow;
         Type t = syn.val(work);
@@ -171,6 +174,9 @@ public class HM {
             syn._par.add_val_work(syn,work); // Push affected neighbors on worklist
           }
         }
+        // Eagerly apply function formal updates
+        while( Apply.AFWORK.len() > 0 )
+          ((Apply)Apply.AFWORK.pop()).update_fun_args(work);
       }
 
       // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
@@ -195,9 +201,8 @@ public class HM {
             if( fldt2!=null ) rec._args.remove(fld._id);
             self._err = err+" in "+rec.p();
           }
-          if( rec.is_nil() ) {
+          if( rec.is_nil() || (rec._aliases != null && rec._aliases.test(0)) )
             self._err = "May be nil when loading field "+fld._id;
-          }
         }
         if( self.is_err2() ) {
           // If any contain nil, then we may have folded in a not-nil.
@@ -440,8 +445,10 @@ public class HM {
     // Compute and return (and do not set) a new GCP type for this syntax.
     abstract Type val(Worklist work);
 
-    boolean add_val_work(Syntax child, Worklist work) {return false;} // Add affected neighbors to worklist
+    void add_val_work(Syntax child, Worklist work) {} // Add affected neighbors to worklist
 
+    // Visit whole tree recursively, applying 'map' to self, and reducing that
+    // with the recursive value from all children.
     abstract <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce );
 
     // First pass to "prepare" the tree; does e.g. Ident lookup, sets initial
@@ -461,12 +468,16 @@ public class HM {
     final boolean more_work_impl(Worklist work) {
       if( DO_HM && (!work.has(this) || HM_FREEZE) && hm(null) )   // Any more HM work?
         return false;           // Found HM work not on worklist or when frozen
-      Type t;
-      if( DO_GCP &&                     // Doing GCP AND
-          (!_flow.isa(t=val(null)) ||   // And flow is not monotonically falling OR
-            // Not on worklist AND (either flow or add_val_work makes progress)
-            (!work.has(this) && (_flow!=t || add_val_work(null,null)) ) ))
-        return false;           // Found GCP work not on worklist
+      if( DO_GCP ) {            // Doing GCP AND
+        Type t = val(null);
+        if( !_flow.isa(t) ||    // Flow is not monotonically falling
+            (!work.has(this) && _flow!=t) || // Flow progress not on worklist
+            // update_fun_args supposed to be eagerly applied
+            (this instanceof Apply &&
+             !(this instanceof Root && work.has(this)) &&
+             ((Apply)this).update_fun_args(null)) )
+          return false;       
+      }
       return true;
     }
     // Print for debugger
@@ -611,13 +622,15 @@ public class HM {
       return old.arg("ret").unify(_body.find(),work) | progress;
     }
     @Override void add_hm_work(Worklist work) { throw unimpl(); }
-    @Override Type val(Worklist work) { return TypeFunPtr.make(_fidx,_args.length,Type.ANY,Type.SCALAR); }
+    @Override Type val(Worklist work) {
+      Type tret = _body!=null && _body._flow!=null ? _body._flow : Type.ANY;
+      return TypeFunPtr.make0(BitsFun.make0(_fidx),_args.length,Type.ANY,tret);
+    }
     // Ignore arguments, and return body type.  Very conservative.
     Type apply(Syntax[] args) { return _body._flow; }
-    @Override boolean add_val_work(Syntax child, Worklist work) {
+    @Override void add_val_work(Syntax child, Worklist work) {
       // Body changed, all Apply sites need to recompute
       if( work!=null ) find().add_deps_work(work);
-      return false;
     }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       // Prep self
@@ -666,10 +679,10 @@ public class HM {
       work.addAll(_def.find()._deps);
     }
     @Override Type val(Worklist work) { return _body._flow; }
-    @Override boolean add_val_work(Syntax child, Worklist work) {
+    // Definition changed; all dependents need to revisit
+    @Override void add_val_work(Syntax child, Worklist work) {
       if( child==_def && work!=null )
         _def.find().add_deps_work(work);
-      return false;
     }
 
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
@@ -771,9 +784,15 @@ public class HM {
       }
       return rez;
     }
-    @Override boolean add_val_work(Syntax child, Worklist work) {
+    @Override void add_val_work(Syntax child, Worklist work) {
       // If function changes type, recompute self
       if( child==_fun && work!=null ) work.push(this);
+      // Actual arguments might have changed; apply them to formals
+      update_fun_args(work);
+    }
+    private static VBitSet RVISIT = new VBitSet();
+    static private Worklist AFWORK = new Worklist(0);
+    boolean update_fun_args(Worklist work) {
       // If an argument changes type, adjust the lambda arg types
       Type flow = _fun._flow;
       if( flow.above_center() ) return false;
@@ -782,7 +801,6 @@ public class HM {
       RVISIT.clear();
       return progress;
     }
-    private static final VBitSet RVISIT = new VBitSet();
     private boolean walk( Type flow, Worklist work) {
       boolean progress=false;
       if( RVISIT.tset(flow._uid) ) return false;
@@ -802,9 +820,11 @@ public class HM {
             if( formal != rez ) {
               if( work==null ) return true;
               progress = true;
-              fun._types[i] = rez;
+              fun._types[i] = rez; // The key change being tracked
               fun.targ(i).add_deps_work(work);
               work.push(fun._body);
+              // One formal update might lead to more formal updates
+              for( Syntax s : fun.targ(i)._deps )  if( s instanceof Apply )  AFWORK.push(s);
               if( i==0 && fun instanceof If ) work.push(fun); // Specifically If might need more unification
             }
           }
@@ -871,7 +891,7 @@ public class HM {
     }
     // Root-widening is when Root acts as-if it is calling the returned
     // function with the worse-case legal args.
-    static Type widen(T2 t2) { return t2.as_flow(false); }
+    static Type widen(T2 t2) { return t2.as_flow(); }
 
 
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
@@ -1007,8 +1027,6 @@ public class HM {
     @Override boolean hm(Worklist work) {
       T2 self = find();
       T2 rec = _rec.find();
-      //if( rec.is_nil() || (rec._flow!=null && rec._flow.must_nil()) )
-      //  return self.make_err("May be nil when loading field "+_id+" from %s", work)!=null;
       rec.push_update(this);
       T2 fld = rec.arg(_id);
       if( fld!=null )           // Unify against a pre-existing field
@@ -1052,7 +1070,6 @@ public class HM {
         }
         if( tmp._obj.above_center() ) return Type.XSCALAR;
       }
-      // TODO: Need an error type here
       return Type.SCALAR;
     }
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
@@ -1110,8 +1127,8 @@ public class HM {
     }
     @Override final Type apply(Syntax[] args) {
       Type t = apply2(args);
-      _body_flow = _body_flow.meet(t);
-      return t;
+      assert _body_flow.isa(t); // No need for a meet
+      return (_body_flow = t);
     }
     abstract Type apply2(Syntax[] args);
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
@@ -1489,7 +1506,7 @@ public class HM {
       T2 u = _args.get(">>");
       if( !u.unified() ) return u;  // Shortcut
       // U-F search, no fixup
-      while( u.unified() ) u = u.arg(">>");
+      while( u.unified() ) u = u._args.get(">>");
       return u;
     }
 
@@ -1543,27 +1560,26 @@ public class HM {
 
     // No function arguments, just function returns.
     static final NonBlockingHashMapLong<Type> ADUPS = new NonBlockingHashMapLong<>();
-    Type as_flow(boolean prim) {
+    Type as_flow() {
       //assert Type.intern_check(); // Very expensive assert
       assert ADUPS.isEmpty();
-      Type t = _as_flow(prim);
+      Type t = _as_flow();
       ADUPS.clear();
       //assert Type.intern_check(); // Very expensive assert
       return t;
     }
-    Type _as_flow(boolean prim) {
+    Type _as_flow() {
       assert !unified();
       if( is_leaf() )
-        return prim ? Type.SCALAR : (HM_FREEZE ? Type.SCALAR : Type.XNSCALR);
+        return HM_FREEZE ? Type.SCALAR : Type.XNSCALR;
       if( is_base() ) return _flow;
       if( is_nil()  ) return Type.SCALAR;
       if( is_fun()  ) {
-        if( prim ) return _flow;
         Type tfun = ADUPS.get(_uid);
         if( tfun != null )  return tfun;  // TODO: Returning recursive flow-type functions
         ADUPS.put(_uid,Type.SCALAR);
-        Type rez = arg("ret")._as_flow(prim);
-        return TypeFunPtr.make(BitsFun.FULL,size()-1,Type.ANY,rez);
+        Type rez = arg("ret")._as_flow();
+        return TypeFunPtr.make(HM_FREEZE ? BitsFun.FULL : _fidxs,size()-1,Type.ANY,rez);
       }
       if( is_struct() ) {
         TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);
@@ -1577,7 +1593,7 @@ public class HM {
           ADUPS.put(_uid,tstr); // Stop cycles
           if( _args!=null )
             for( String id : _args.keySet() )
-              tstr.fld_find(id).setX(arg(id)._as_flow(prim)); // Recursive
+              tstr.fld_find(id).setX(arg(id)._as_flow()); // Recursive
           if( --Type.RECURSIVE_MEET == 0 )
             // Shrink / remove cycle dups.  Might make new (smaller)
             // TypeStructs, so keep RECURSIVE_MEET enabled.
@@ -2204,7 +2220,7 @@ public class HM {
     // down the function parts; if any changes the fresh-application may make
     // progress.
     static final VBitSet UPDATE_VISIT  = new VBitSet();
-    T2 push_update( Ary<Syntax> as ) { if( as != null ) for( Syntax a : as ) push_update(a);  return this;   }
+    void push_update( Ary<Syntax> as ) { if( as != null ) for( Syntax a : as ) push_update(a); }
     T2 push_update( Syntax a) { assert UPDATE_VISIT.isEmpty(); push_update_impl(a); UPDATE_VISIT.clear(); return this; }
     private void push_update_impl(Syntax a) {
       assert !unified();

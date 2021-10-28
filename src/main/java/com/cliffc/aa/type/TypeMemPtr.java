@@ -306,7 +306,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
   @Override BitsFun _all_reaching_fidxs( TypeMem tmem) {
     BitsFun fidxs = BitsFun.EMPTY;
-    if( Type.ARF.tset(_uid) ) return fidxs;
+    if( Type.ARF.tset(_uid) || tmem==null ) return fidxs;
     for( int alias : _aliases )
       if( alias!=0 )
         fidxs = fidxs.meet(tmem.at(alias)._all_reaching_fidxs(tmem));
