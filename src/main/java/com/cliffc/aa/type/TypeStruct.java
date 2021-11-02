@@ -490,21 +490,16 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // speculative and not interned.
     if( --RECURSIVE_MEET > 0 )
       return mt;                // And, if not yet done, just exit with it
-
-    // Remove any final UF before installation.
-    // Do not install until the cycle is complete.
-    RECURSIVE_MEET++;
-    mt = mt.shrink();
-    Ary<Type> reaches = mt.reachable(); // Recompute reaches after shrink
-    assert check_uf(reaches);
-    UF.clear();
-    RECURSIVE_MEET--;
-    // This completes 'mt' as the Meet structure.
-    return mt.install_cyclic(reaches);
+    MEETS0.clear();
+    // Minimize and intern the cyclic result
+    return mt.install();
   }
 
-  // Test entry point.  The struct is part of a single SCC (not a DAG of
-  // connected SCCs), and some parts are not hashed.
+  // Install a cyclic structure.  'this' is not interned and points to a
+  // (possibly cyclic) graph of not-interned Types.  Minimize the graph, set
+  // the hashes everywhere, check for a prior existing Type.  Return a prior,
+  // or else set all the duals and intern the entire graph.
+  @SuppressWarnings("unchecked")
   public TypeStruct install() {
     RECURSIVE_MEET++;
     TypeStruct mt = shrink();
@@ -512,30 +507,25 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     assert check_uf(reaches);
     UF.clear();
     RECURSIVE_MEET--;
-    return mt.install_cyclic(reaches);
-  }
-
-  // other places all call shrink / check_uf / UF.clear / etc.
-  // Boilerplate the other stuff.
-
-  // Install, cleanup and return
-  TypeStruct install_cyclic(Ary<Type> reachs) {
+    
+    // Install, cleanup and return
     // Walk all, set cycle bits and hashes
-    get_cyclic();
+    mt.get_cyclic();
     // Check for dups.  If found, delete entire cycle, and return original.
-    TypeStruct old = (TypeStruct)intern_lookup();
-    if( old == null ) {         // Not a dup
-      for( Type t : reachs )
-        assert t.intern_lookup()==null && t._hash==t.compute_hash() && t._dual==null;
-      rdual();               // Complete cyclic dual
-      // Insert all members of the cycle into the hashcons.  If self-symmetric,
-      // also replace entire cycle with self at each point.
-      for( Type t : reachs )
-        if( t.retern() != t._dual ) t._dual.retern();
-      old = this;
+    TypeStruct old = (TypeStruct)mt.intern_lookup();
+    if( old != null ) {
+      // Free entire cycle
+      for( Type t : reaches ) t.free(null);
+      return old;               // Found cycle already; return original.
     }
-    MEETS0.clear();
-    return old;
+    for( Type t : reaches )
+      assert t.intern_lookup()==null && t._hash==t.compute_hash() && t._dual==null;
+    mt.rdual();               // Complete cyclic dual
+    // Insert all members of the cycle into the hashcons.  If self-symmetric,
+    // also replace entire cycle with self at each point.
+    for( Type t : reaches )
+      if( t.retern() != t._dual ) t._dual.retern();
+    return mt;
   }
 
   // Shallow clone, not interned.  Fields are also cloned, but not deeper.
@@ -572,18 +562,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     assert UF.isEmpty();
     assert OLD2APX.isEmpty();
     TypeStruct apx = ax_impl_struct( alias, true, cutoff, null, 0, this, this );
-    // Remove any leftover internal duplication
-    apx = apx.shrink();
     RECURSIVE_MEET--;
-    TypeStruct rez = this;
-    if( apx != this ) {
-      Ary<Type> reaches = apx.reachable();
-      assert check_uf(reaches);
-      assert !check_interned(reaches); // Stronger than check_uf: nothing is interned
-      rez = apx.install_cyclic(reaches);
-      assert this.isa(rez);
-    }
-    UF.clear();
+    // Remove any leftover internal duplication
+    TypeStruct rez = apx.install();    
+    assert this.isa(rez);
     OLD2APX.clear();
     return rez;
   }
@@ -692,7 +674,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       Type xt = nt.meet(old);
       // A complete (non-cyclic) type might attempt interning and get a hash.
       // Remove it and preserve the no-hash-if-not-interned invariant.
-      xt._hash=0; 
+      if( !xt.interned() ) xt._hash=0; 
       return xt;
     }
     assert nt._hash==0;         // Not definable yet, as nt may yet pick up fields
@@ -995,15 +977,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // See if we need to cycle-install any cyclic types
     if( dull_cache.isEmpty() )
       return sharp;
-    // On exit, cyclic-intern all cyclic things; remove from dull cache.
-    RECURSIVE_MEET++;
-    TypeStruct mt = (TypeStruct)sharp._obj;
-    mt = mt.shrink();                   // No shrinking nor UF expected
-    Ary<Type> reaches = mt.reachable(); // Recompute reaches after shrink
-    assert check_uf(reaches);
-    UF.clear();
-    RECURSIVE_MEET--;
-    mt = mt.install_cyclic(reaches); // But yes cycles
+    // On exit, cyclic-intern all cyclic things; remove from dull cache.    
+    TypeStruct mt = ((TypeStruct)sharp._obj).install();    
     sharp = sharp.make_from(mt);
     return mem.sharput(dull,sharp);
   }
