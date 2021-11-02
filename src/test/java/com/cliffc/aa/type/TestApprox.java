@@ -723,4 +723,165 @@ public class TestApprox {
     TypeStruct rez = dsp2.approx(CUTOFF,alias);
     assertEquals(dsp3,rez);
   }
+
+
+  // Regression test from TestHM.test58; both HM and GCP, rseed==0; Asserts
+  // doing a complex approx call that "!this.isa(rez)"; the returned type is
+  // not isa the 'this' type.  This looks like: "this.meet(rez)" does not
+  // minimize cycles properly, and this ISA rez but the standard isa test fails
+  // because "this.meet(rez)" is not minimized properly.
+  @Test public void testApprox9() {
+    Object dummy0 = TypeStruct.TYPES;
+
+    int alias13 = BitsAlias.new_alias(BitsAlias.REC);
+    int alias14 = BitsAlias.new_alias(BitsAlias.REC);
+    BitsAlias a13   = BitsAlias.FULL.make(        alias13);
+    BitsAlias a14   = BitsAlias.FULL.make(        alias14);
+    BitsAlias a1314 = BitsAlias.FULL.make(alias13,alias14);
+    int fidx14 = BitsFun.new_fidx();
+    int fidx25 = BitsFun.new_fidx();
+    BitsFun f14   = BitsFun.make0(fidx14       );
+    BitsFun f25   = BitsFun.make0(       fidx25);
+    BitsFun f1425 = BitsFun.make0(fidx14,fidx25);
+    int fidx22 = BitsFun.new_fidx();
+    int fidx26 = BitsFun.new_fidx();
+    BitsFun f22   = BitsFun.make0(fidx22       );
+    BitsFun f26   = BitsFun.make0(       fidx26);
+    BitsFun f2226 = BitsFun.make0(fidx22,fidx26);
+
+    // THIS, highly shrunk
+    //
+    //STRUCT4:@{
+    //  PRED4  =[25]{any ->
+    //    *[13,14]:STRUCT2:@{
+    //      PRED2 =[14,25]{any ->
+    //        *[13]:STRUCT1:@{
+    //          PRED1  =[14]{any ->~Scalar };
+    //          SUCC1  =[22]{any ->
+    //            *[14]:STRUCT0:@{
+    //              PRED0 =[25]{any ->*[13]:STRUCT1 };
+    //              SUCC0 =[26]{any ->~Scalar }
+    //            }
+    //          }
+    //        }
+    //      };
+    //      SUCC2  =[22,26]{any ->
+    //        *[14]:STRUCT3:@{
+    //          PRED3 =[25]{any ->~Scalar };
+    //          SUCC0
+    //        }
+    //      }
+    //    }
+    //  };
+    //  SUCC4  =[26]{any ->*[14]:STRUCT0 }
+    //}
+    //TypeStruct t=null;
+    //{
+    //  Type.RECURSIVE_MEET++;
+    //  TypeFld pred0 = TypeFld.malloc("pred");
+    //  TypeFld pred1 = TypeFld.malloc("pred");
+    //  TypeFld pred2 = TypeFld.malloc("pred");
+    //  TypeFld pred3 = TypeFld.malloc("pred");
+    //  TypeFld pred4 = TypeFld.malloc("pred");
+    //  TypeFld succ0 = TypeFld.malloc("succ");
+    //  TypeFld succ1 = TypeFld.malloc("succ");
+    //  TypeFld succ2 = TypeFld.malloc("succ");
+    //  TypeFld succ4 = TypeFld.malloc("succ");
+    //  TypeStruct str0 = TypeStruct.make(pred0,succ0).set_hash();
+    //  TypeStruct str1 = TypeStruct.make(pred1,succ1).set_hash();
+    //  TypeStruct str2 = TypeStruct.make(pred2,succ2).set_hash();
+    //  TypeStruct str3 = TypeStruct.make(pred3,succ0).set_hash();
+    //  TypeStruct str4 = TypeStruct.make(pred4,succ4).set_hash();
+    //  _help0(pred0,  f25,a13  ,str1);
+    //  _helpx(pred1,f14             );
+    //  _help0(pred2,f1425,a13  ,str1);
+    //  _helpx(pred3,  f25           );
+    //  _help0(pred4,  f25,a1314,str2);
+    //  _helpx(succ0,  f26           );
+    //  _help0(succ1,f22  ,  a14,str0);
+    //  _help0(succ2,f2226,  a14,str3);
+    //  _help0(succ4,  f26,  a14,str0);
+    //  Type.RECURSIVE_MEET--;
+    //  t = str4.install();
+    //}
+
+    //REZ (shortened); result of approx, alias=14, depth=1
+    //C:@{
+    //  pred  =[14,25]{any ->*[13,14]C$ };
+    //  succ  =[22,26]{any ->*[   14]C$ }
+    //}
+    TypeStruct rez=null;
+    {
+      Type.RECURSIVE_MEET++;
+      TypeFld pred = TypeFld.malloc("pred");
+      TypeFld succ = TypeFld.malloc("succ");
+      rez = TypeStruct.make(pred,succ).set_hash();
+      _help0(pred,f1425,a1314,rez);
+      _help0(succ,f2226,a14  ,rez);
+      Type.RECURSIVE_MEET--;
+      rez = rez.install();
+    }
+
+    //Type mt = t.meet(rez);
+    // approx on 't' returns 'rez' which fails 't.isa(rez)'.
+    // Their meet is != rez.
+
+    // THIS.MEET(REZ) (shortened); result of this.meet(rez) BUT re-installing
+    // it directly gives me REZ back.  This tells me that the meet operation
+    // did not return a minimal result.
+    //
+    //STRUCT3:@{
+    //  PRED3=[14,25]{any -> *[13,14]
+    //    STRUCT2:@{
+    //      PRED2 =[14,25]{any -> *[13,14]
+    //        STRUCT1:@{
+    //          PRED0:pred=[14,25]{any -> *[13,14]
+    //            STRUCT0:@{
+    //              PRED0
+    //              SUCC0:succ=[22,26]{any ->*[14]STRUCT1 } // STRUCT0 for this test case
+    //            }
+    //          };
+    //          SUCC1:succ=[22,26]{any ->*[14]STRUCT0 } // STRUCT2 for this test case
+    //        }
+    //      };
+    //      SUCC0
+    //    }
+    //  };
+    //  SUCC1
+    //}
+    TypeStruct thismeetrez=null;
+    {
+      Type.RECURSIVE_MEET++;
+      //TypeFld pred0 = TypeFld.malloc("pred");
+      TypeFld pred2 = TypeFld.malloc("pred");
+      //TypeFld pred3 = TypeFld.malloc("pred");
+      //TypeFld succ0 = TypeFld.malloc("succ");
+      TypeFld succ1 = TypeFld.malloc("succ");
+      //TypeStruct str0 = TypeStruct.make(pred0,succ0).set_hash();
+      TypeStruct str1 = TypeStruct.make(rez.fld_find("pred"),succ1).set_hash();
+      TypeStruct str2 = TypeStruct.make(pred2,rez.fld_find("succ")).set_hash();
+      //TypeStruct str3 = TypeStruct.make(pred3,succ1).set_hash();
+      //_help0(pred0,f1425,a1314,str0);
+      _help0(pred2,f1425,a1314,str1);
+      //_help0(pred3,f1425,a1314,str2);
+      //_help0(succ0,f2226,a14  ,str0);
+      _help0(succ1,f2226,a14  ,str2);
+      Type.RECURSIVE_MEET--;
+      //thismeetrez = str3.install();
+      thismeetrez = str2.install();
+    }
+
+    // Install shrinks
+    assertEquals(rez,thismeetrez);
+  }
+
+  // Make the field point at the struct
+  private static void _help0( TypeFld fld, BitsFun fidx, BitsAlias alias, TypeStruct rez ) {
+    TypeMemPtr ptr = TypeMemPtr.make(alias,rez);
+    fld.setX(TypeFunPtr.make(fidx,1,TypeMemPtr.NO_DISP,ptr));
+  }
+  private static void _helpx( TypeFld fld, BitsFun fidx ) {
+    fld.setX(TypeFunPtr.make(fidx,1,TypeMemPtr.NO_DISP,Type.XSCALAR));
+  }
+
 }

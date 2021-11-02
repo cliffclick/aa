@@ -108,6 +108,7 @@ public class HM {
   static boolean DO_GCP;
 
   static boolean HM_FREEZE;
+  static boolean ROOT_FREEZE;
   public static Root hm( String sprog, int rseed, boolean do_hm, boolean do_gcp ) {
     Type.RECURSIVE_MEET=0;      // Reset between failed tests
     DO_HM  = do_hm ;
@@ -126,6 +127,16 @@ public class HM {
     // Pass 1: Everything starts high/top/leaf and falls; escaping function args are assumed high
     int init_T2s = T2.CNT;  // Profiling bit
     HM_FREEZE = false;
+    ROOT_FREEZE = false;
+    main_work_loop(prog,work);
+    assert prog.more_work(work);
+
+    // Give up on the Root GCP arg types.  Drop them to the best Root
+    // approximation and never lift again.
+    ROOT_FREEZE = true;
+    prog.update_fun_args(work);
+    while( Apply.AFWORK.len() > 0 )
+      ((Apply)Apply.AFWORK.pop()).update_fun_args(work);
     main_work_loop(prog,work);
     assert prog.more_work(work);
 
@@ -476,7 +487,7 @@ public class HM {
             (this instanceof Apply &&
              !(this instanceof Root && work.has(this)) &&
              ((Apply)this).update_fun_args(null)) )
-          return false;       
+          return false;
       }
       return true;
     }
@@ -788,10 +799,10 @@ public class HM {
       // If function changes type, recompute self
       if( child==_fun && work!=null ) work.push(this);
       // Actual arguments might have changed; apply them to formals
-      update_fun_args(work);
+      if( work!=null ) AFWORK.push(this);
     }
-    private static VBitSet RVISIT = new VBitSet();
-    static private Worklist AFWORK = new Worklist(0);
+    private static final VBitSet RVISIT = new VBitSet();
+    static private final Worklist AFWORK = new Worklist(0);
     boolean update_fun_args(Worklist work) {
       // If an argument changes type, adjust the lambda arg types
       Type flow = _fun._flow;
@@ -1561,19 +1572,18 @@ public class HM {
     // No function arguments, just function returns.
     static final NonBlockingHashMapLong<Type> ADUPS = new NonBlockingHashMapLong<>();
     Type as_flow() {
-      //assert Type.intern_check(); // Very expensive assert
       assert ADUPS.isEmpty();
       Type t = _as_flow();
       ADUPS.clear();
-      //assert Type.intern_check(); // Very expensive assert
       return t;
     }
     Type _as_flow() {
       assert !unified();
       if( is_leaf() )
-        return HM_FREEZE ? Type.SCALAR : Type.XNSCALR;
+        return ROOT_FREEZE ? Type.SCALAR : Type.XNSCALR;
       if( is_base() ) return _flow;
-      if( is_nil()  ) return Type.SCALAR;
+      if( is_nil()  )
+        return ROOT_FREEZE ? Type.SCALAR : Type.XNSCALR;
       if( is_fun()  ) {
         Type tfun = ADUPS.get(_uid);
         if( tfun != null )  return tfun;  // TODO: Returning recursive flow-type functions
@@ -1758,6 +1768,7 @@ public class HM {
     // Structural recursion unification.  Called nested, and called by NotNil
     // at the top-level directly.
     static boolean unify_flds(T2 thsi, T2 that, Worklist work, boolean top_level) {
+      if( thsi._args==that._args ) return false;  // Already equal (and probably both nil)
       boolean progress = false;
       for( String key : thsi._args.keySet() ) {
         T2 fthis = thsi.arg(key); // Field of this
