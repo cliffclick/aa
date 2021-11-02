@@ -160,7 +160,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       sb.p(t1 instanceof TypeFunPtr
            ? (((TypeFunPtr)t1)._fidxs.above_center() ? "PRIMS" : "LOW_PRIMS")
            : "PRIMS_"+t1);
-    } else if( (bfld=fld_find("pi")) != null ) {
+    } else if( fld_find("pi") != null ) {
       sb.p("MATH");
     } else {
       boolean field_sep=false;
@@ -495,39 +495,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return mt.install();
   }
 
-  // Install a cyclic structure.  'this' is not interned and points to a
-  // (possibly cyclic) graph of not-interned Types.  Minimize the graph, set
-  // the hashes everywhere, check for a prior existing Type.  Return a prior,
-  // or else set all the duals and intern the entire graph.
-  @SuppressWarnings("unchecked")
-  public TypeStruct install() {
-    RECURSIVE_MEET++;
-    TypeStruct mt = shrink();
-    Ary<Type> reaches = mt.reachable(); // Recompute reaches after shrink
-    assert check_uf(reaches);
-    UF.clear();
-    RECURSIVE_MEET--;
-    
-    // Install, cleanup and return
-    // Walk all, set cycle bits and hashes
-    mt.get_cyclic();
-    // Check for dups.  If found, delete entire cycle, and return original.
-    TypeStruct old = (TypeStruct)mt.intern_lookup();
-    if( old != null ) {
-      // Free entire cycle
-      for( Type t : reaches ) t.free(null);
-      return old;               // Found cycle already; return original.
-    }
-    for( Type t : reaches )
-      assert t.intern_lookup()==null && t._hash==t.compute_hash() && t._dual==null;
-    mt.rdual();               // Complete cyclic dual
-    // Insert all members of the cycle into the hashcons.  If self-symmetric,
-    // also replace entire cycle with self at each point.
-    for( Type t : reaches )
-      if( t.retern() != t._dual ) t._dual.retern();
-    return mt;
-  }
-
   // Shallow clone, not interned.  Fields are also cloned, but not deeper.
   private TypeStruct _clone() {
     assert interned();
@@ -544,9 +511,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return ts;
   }
 
-  // This is for a struct that has grown 'too deep', and needs to be
-  // approximated to avoid infinite growth.
-  public  static final NonBlockingHashMapLong<Type> UF = new NonBlockingHashMapLong<>();
   private static final IHashMap OLD2APX = new IHashMap();
   public TypeStruct approx( int cutoff, int alias ) {
     boolean shallow=true;
@@ -559,12 +523,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Scan the old copy for elements that are too deep.
     // 'Meet' those into the clone at one layer up.
     RECURSIVE_MEET++;
-    assert UF.isEmpty();
+    assert Min.UF.isEmpty();
     assert OLD2APX.isEmpty();
     TypeStruct apx = ax_impl_struct( alias, true, cutoff, null, 0, this, this );
     RECURSIVE_MEET--;
     // Remove any leftover internal duplication
-    TypeStruct rez = apx.install();    
+    TypeStruct rez = apx.install();
     assert this.isa(rez);
     OLD2APX.clear();
     return rez;
@@ -579,7 +543,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Use alternative OLD past depth, to keep looping unrelated types
     // folding up.  Otherwise unrelated types might expand endlessly.
     TypeStruct nt = OLD2APX.get(old);
-    if( nt != null ) return ufind(nt);
+    if( nt != null ) return Min.ufind(nt);
 
     if( isnews ) {            // Depth-increasing struct?
       if( d==cutoff ) {       // Cannot increase depth any more
@@ -619,7 +583,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Use alternative OLD past depth, to keep looping unrelated types
     // folding up.  Otherwise unrelated types might expand endlessly.
     TypeMemPtr nt = OLD2APX.get(old);
-    if( nt != null ) return ufind(nt);
+    if( nt != null ) return Min.ufind(nt);
 
     // Walk internal structure, meeting into the approximation
     TypeMemPtr nmp = old.copy();
@@ -642,7 +606,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Use alternative OLD past depth, to keep looping unrelated types
     // folding up.  Otherwise unrelated types might expand endlessly.
     TypeFunPtr nt = OLD2APX.get(old);
-    if( nt != null ) return ufind(nt);
+    if( nt != null ) return Min.ufind(nt);
     if( old._dsp!=Type.ANY ) {
       // Walk internal structure, meeting into the approximation
       TypeFunPtr nmp = old.copy();
@@ -674,11 +638,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       Type xt = nt.meet(old);
       // A complete (non-cyclic) type might attempt interning and get a hash.
       // Remove it and preserve the no-hash-if-not-interned invariant.
-      if( !xt.interned() ) xt._hash=0; 
+      if( !xt.interned() ) xt._hash=0;
       return xt;
     }
     assert nt._hash==0;         // Not definable yet, as nt may yet pick up fields
-    nt = ufind(nt);
+    nt = Min.ufind(nt);
     if( nt == old ) return old;
     if( bs.tset(nt._uid,old._uid) ) return nt; // Been there, done that
 
@@ -690,7 +654,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       TypeFunPtr nptr = (TypeFunPtr)nt;
       if( old == Type.NIL || old == Type.XNIL ) return nptr.ax_meet_nil(old);
       if( old == Type.SCALAR )
-        return union(nt,old); // Result is a scalar, which changes the structure of the new types.
+        return Min.union(nt,old); // Result is a scalar, which changes the structure of the new types.
       if( old == Type.XSCALAR ) break; // Result is the nt unchanged
       if( !(old instanceof TypeFunPtr) ) throw AA.unimpl(); // Not a xscalar, not a funptr, probably falls to scalar
       TypeFunPtr optr = (TypeFunPtr)old;
@@ -704,7 +668,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       TypeMemPtr nptr = (TypeMemPtr)nt;
       if( old == Type.NIL || old == Type.XNIL ) return nptr.ax_meet_nil(old);
       if( old == Type.SCALAR )
-        return union(nt,old); // Result is a scalar, which changes the structure of the new types.
+        return Min.union(nt,old); // Result is a scalar, which changes the structure of the new types.
       if( old == Type.XSCALAR || old == Type.ANY ) break; // Result is the nt unchanged
       if( !(old instanceof TypeMemPtr) ) throw AA.unimpl(); // Not a xscalar, not a memptr, probably falls to scalar
       TypeMemPtr optr = (TypeMemPtr)old;
@@ -743,219 +707,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return nt;
   }
 
-  // Walk an existing, not-interned, structure.  Stop at any interned leaves.
-  // Check for duplicating an interned Type or a UF hit, and use that instead.
-  // Computes the final hash code.
-  private static final IHashMap DUPS = new IHashMap();
-  private TypeStruct shrink() {
-    Ary<Type> reaches = reachable();
-    assert DUPS.isEmpty();
-    // Set all hashes.  Hash recursion stops at TypeStructs, so do them first.
-    for( int i=0; i<reaches._len; i++ )
-      if( reaches.at(i) instanceof TypeStruct ) reaches.at(i).set_hash();
-    // Now TMPs
-    for( int i=0; i<reaches._len; i++ )
-      if( reaches.at(i) instanceof TypeMemPtr ) reaches.at(i).set_hash();
-    for( int i=0; i<reaches._len; i++ )
-      if( reaches.at(i) instanceof TypeFunPtr ) reaches.at(i).set_hash();
-    // And all the rest.
-    for( int i=0; i<reaches._len; i++ )
-      reaches.at(i).set_hash();
-
-    // Need back-edges to do this iteratively in 1 pass.  This algo just sweeps
-    // until no more progress, but with generic looping instead of recursion.
-    boolean progress = true;
-    while( progress ) {
-      progress = false;
-      DUPS.clear();
-      for( int j=0; j<reaches._len; j++ ) {
-        Type t = reaches.at(j);
-        Type t0 = ufind(t);
-        Type t1 = t0.intern_lookup();
-        if( t1==null ) t1 = DUPS.get(t0);
-        if( t1 != null ) t1 = ufind(t1);
-        if( t1 == t0 ) continue; // This one is already interned
-        if( t1 != null ) { union(t0,t1); progress = true; continue; }
-
-        switch( t._type ) {
-        case TMEMPTR:           // Update TypeMemPtr internal field
-          TypeMemPtr tm = (TypeMemPtr)t0;
-          TypeObj t4 = tm._obj;
-          TypeObj t5 = ufind(t4);
-          if( t4 != t5 ) {
-            tm._obj = t5;
-            progress |= post_mod(tm);
-            if( !t5.interned() ) reaches.push(t5);
-          }
-          break;
-        case TFUNPTR:           // Update TypeFunPtr internal field
-          boolean fprogress=false;
-          TypeFunPtr tfptr = (TypeFunPtr)t0;
-          Type t6 = tfptr._dsp;
-          Type t7 = ufind(t6);
-          if( t6 != t7 ) {
-            tfptr._dsp = t7;
-            fprogress = true;
-            if( !t7.interned() ) reaches.push(t7);
-          }
-          t6 = tfptr._ret;
-          t7 = ufind(t6);
-          if( t6 != t7 ) {
-            tfptr._ret = t7;
-            fprogress = true;
-            if( !t7.interned() ) reaches.push(t7);
-          }
-          if( fprogress ) progress |= post_mod(tfptr);
-          break;
-        case TSTRUCT:           // Update all TypeStruct fields
-          TypeStruct ts = (TypeStruct)t0;
-          for( TypeFld tfld : ts.flds() ) {
-            TypeFld tfld2 = ufind(tfld);
-            if( tfld != tfld2 ) {
-              progress = true;
-              ts.set_fld(tfld2);
-            }
-          }
-          break;
-        case TFLD:              // Update all TFlds
-          TypeFld tfld = (TypeFld)t0;
-          Type tft = tfld._t, t2 = ufind(tft);
-          if( tft != t2 ) {
-            progress = true;
-            int old_hash = tfld._hash;
-            tfld._t = t2;
-            assert old_hash == tfld.compute_hash();
-          }
-          break;
-
-        default: break;
-        }
-        DUPS.put(t0);
-      }
-    }
-    DUPS.clear();
-    return ufind(this);
-  }
-
-  // Set hash after field mod, and re-install in dups
-  private static boolean post_mod(Type t) {
-    t._hash = t.compute_hash();
-    DUPS.put(t);
-    return true;
-  }
-
-
-  @SuppressWarnings("unchecked")
-  private static <T extends Type> T ufind(T t) {
-    T t0 = (T)UF.get(t._uid), tu;
-    if( t0 == null ) return t;  // One step, hit end of line
-    // Find end of U-F line
-    while( (tu = (T)UF.get(t0._uid)) != null ) t0=tu;
-    // Set whole line to 1-step end of line
-    while( (tu = (T)UF.get(t ._uid)) != null ) { assert t._uid != t0._uid; UF.put(t._uid,t0); t=tu; }
-    return t0;
-  }
-  private static <T extends Type> T union( T lost, T kept) {
-    if( lost == kept ) return kept;
-    assert !lost.interned();
-    assert UF.get(lost._uid)==null && UF.get(kept._uid)==null;
-    assert lost._uid != kept._uid;
-    UF.put(lost._uid,kept);
-    return kept;
-  }
-
-  // Walk, looking for prior interned
-  private static boolean check_interned(Ary<Type> reachs) {
-    for( Type t : reachs )
-      if( t.intern_lookup() != null )
-        return true;
-    return false;
-  }
-
-  // Reachable collection of Types that form cycles: TypeMemPtr, TypeFunPtr,
-  // TypeFld, TypeStruct, and anything not interned reachable from them.
-  public Ary<Type> reachable() {
-    Ary<Type> work = new Ary<>(new Type[1],0);
-    push(work, this);
-    int idx=0;
-    while( idx < work._len ) {
-      Type t = work.at(idx++);
-      switch( t._type ) {
-      case TMEMPTR:  push(work, ((TypeMemPtr)t)._obj); break;
-      case TFUNPTR:  push(work, ((TypeFunPtr)t)._dsp); push(work, ((TypeFunPtr)t)._ret); break;
-      case TFLD   :  push(work, ((TypeFld   )t)._t  ); break;
-      case TSTRUCT:  for( TypeFld tf : ((TypeStruct)t).flds() ) push(work, tf); break;
-      default: break;
-      }
-    }
-    return work;
-  }
-  private void push( Ary<Type> work, Type t ) {
-    if( !t.interned() && work.find(t)==-1 )
-      work.push(t);
-  }
-
-  // Walk, looking for not-minimal.  Happens during 'approx' which might
-  // require running several rounds of 'replace' to fold everything up.
-  static boolean check_uf(Ary<Type> reaches) {
-    int err=0;
-    HashMap<Type,Type> ss = new HashMap<>();
-    for( Type t : reaches ) {
-      Type tt;
-      if( ss.get(t) != null || // Found unresolved dup; ts0.equals(ts1) but ts0!=ts1
-          ((tt = t.intern_lookup()) != null && tt != t) ||
-          ufind(t) != t )
-        err++;
-      ss.put(t,t);
-    }
-    return err == 0;
-  }
-
-  // Set the cyclic bit on structs in cycles.  Set the hashcode for everything
-  // reachable.  Stops at interned edges.  Can be modified to return e.g.
-  // everything not-interned, or just members of cycles.  Can be handed an
-  // arbitrary graph, including a DAG of unrelated Strongly Connected
-  // Components.
-
-  // Almost classic cycle-finding algorithm but since Structs have labeled
-  // out-edges (with field names), we can have multiple output edges from the
-  // same node (struct) to the same TypeMemPtr.  The classic cycle-finders do
-  // not work with multi-edges.
-  private static final Ary<Type> CSTACK = new Ary<>(Type.class);
-  private static final VBitSet CVISIT = new VBitSet();
-  private void get_cyclic( ) {
-    assert CSTACK.isEmpty() && CVISIT.cardinality()==0;
-    get_cyclic(this);
-    assert CSTACK.isEmpty();
-    CVISIT.clear();
-  }
-  private static void get_cyclic(Type t ) {
-    t.set_hash();               // Set hash while we're here
-    if( t.interned() ) return;  // Already interned (so hashed, cyclic set, etc)
-    if( CVISIT.test(t._uid) ) { // If visiting again... have found a cycle t->....->t
-      // All on the stack are flagged as being part of a cycle
-      int i;
-      i=CSTACK._len-1;
-      while( i >= 0 && CSTACK.at(i)!=t ) i--;
-      if( i== -1 ) return;  // Due to multi-edges, we might not find if dupped, so just ignore
-      for( ; i < CSTACK._len; i++ ) { // Set cyclic bit
-        Type t2 = CSTACK.at(i);
-        if( t2 instanceof TypeStruct ) ((TypeStruct)t2)._cyclic = true;
-      }
-      return;
-    }
-    CSTACK.push(t);              // Push on stack, in case a cycle is found
-    switch( t._type ) {
-    case TMEMPTR: get_cyclic(((TypeMemPtr)t)._obj); break;
-    case TFUNPTR: get_cyclic(((TypeFunPtr)t)._dsp);
-                  get_cyclic(((TypeFunPtr)t)._ret);  break;
-    case TFLD   : get_cyclic(((TypeFld   )t)._t  ); break;
-    case TSTRUCT: CVISIT.set(t._uid); for( TypeFld fld : ((TypeStruct)t).flds() ) get_cyclic(fld); break;
-    default: break;
-    }
-    CSTACK.pop();               // Pop, not part of anothers cycle
-  }
-
 
   // Build a (recursively) sharpened pointer from memory.  Alias sets can be
   // looked-up directly in a map from BitsAlias to TypeObjs.  This is useful
@@ -977,8 +728,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // See if we need to cycle-install any cyclic types
     if( dull_cache.isEmpty() )
       return sharp;
-    // On exit, cyclic-intern all cyclic things; remove from dull cache.    
-    TypeStruct mt = ((TypeStruct)sharp._obj).install();    
+    // On exit, cyclic-intern all cyclic things; remove from dull cache.
+    TypeStruct mt = ((TypeStruct)sharp._obj).install();
     sharp = sharp.make_from(mt);
     return mem.sharput(dull,sharp);
   }
@@ -1201,7 +952,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // set to bottom; only the field names are kept.
   @Override public TypeStruct crush() {
     if( _any ) return this;     // No crush on high structs
-    TypeStruct st = malloc(_name,_any,_open);
+    TypeStruct st = malloc(_name,false,_open);
     // Widen all fields, as-if crushed by errors, even finals.
     for( TypeFld fld : flds() )
       // Keep only the display pointer, as it cannot be stomped even with error code

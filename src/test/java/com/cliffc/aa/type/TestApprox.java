@@ -45,7 +45,6 @@ public class TestApprox {
     assertEquals(Type.REAL,mt.at("b"));
     TypeMemPtr pmt = (TypeMemPtr)mt.at("a");
     assertSame(mt,pmt._obj);
-    assert TypeStruct.check_uf(mt.reachable());
   }
 
   // Test approximating infinite recursive types.  Most simple test case: a

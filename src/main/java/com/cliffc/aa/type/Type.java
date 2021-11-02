@@ -233,6 +233,10 @@ public class Type<T extends Type<T>> implements Cloneable {
     return null;
   }
 
+  // Cyclic (complex/slow) interning
+  @SuppressWarnings("unchecked")
+  public T install() { return Min.install((T)this); }
+  
   // ----------------------------------------------------------
   // Simple types are implemented fully here.  "Simple" means: the code and
   // type hierarchy are simple, not that the Type is conceptually simple.
