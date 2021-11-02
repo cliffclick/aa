@@ -62,7 +62,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // We can count on the field names and accesses but not field order, nor field type.
   @Override public int compute_hash() {
     int hash = super.compute_hash() +(_open?1023:0);
-    for( TypeFld fld : _flds.values() ) {
+    for( TypeFld fld : flds() ) {
       // Can depend on the field name and access, but NOT the type - because recursion
       hash ^= (fld._fld.hashCode() + fld._access.hashCode());
       _max_arg = (short)Math.max(_max_arg,fld._order);
@@ -78,7 +78,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( !super.equals(t) ) return 0;
     if( _flds.size() != t._flds.size() || _open != t._open ) return 0;
     // All fields must be equals
-    for( TypeFld fld : _flds.values() ) {
+    for( TypeFld fld : flds() ) {
       TypeFld fld2 = t._flds.get(fld._fld);
       if( fld2==null ) return 0; // Missing field name
       int cmp = fld.cmp(fld2);
@@ -129,7 +129,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private boolean cycle_equals0( TypeStruct t ) {
     // TODO: might get here with more unrelated structs, so need to check eg access, and missing names
     assert _flds.size()==t._flds.size();
-    for( TypeFld fld : _flds.values() ) {
+    for( TypeFld fld : flds() ) {
       TypeFld fld1 = t._flds.get(fld._fld);
       if( fld1==null ) return false;
       Type t0 = fld._t;
@@ -185,7 +185,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   public TypeStruct hashcons_free() {
     // All subparts already interned
-    if( RECURSIVE_MEET ==0 ) for( TypeFld fld : _flds.values() ) assert fld.interned();
+    if( RECURSIVE_MEET ==0 ) for( TypeFld fld : flds() ) assert fld.interned();
     return super.hashcons_free();
   }
 
@@ -259,7 +259,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public TypeStruct make_from(String name, boolean any, boolean open ) {
     assert interned();
     TypeStruct ts = malloc(name,any,open);
-    for( TypeFld fld : _flds.values() ) ts.add_fld(fld);
+    for( TypeFld fld : flds() ) ts.add_fld(fld);
     return ts.hashcons_free();
   }
   // Keep the name,any,open but change the fields
@@ -331,7 +331,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Dual the flds, dual the tuple.  Return a not-interned thing.
   @Override protected TypeStruct xdual() {
     TypeStruct ts = malloc(_name,!_any,!_open);
-    for( TypeFld fld : _flds.values() ) ts.add_fld(fld.dual());
+    for( TypeFld fld : flds() ) ts.add_fld(fld.dual());
     return ts;
   }
 
@@ -344,11 +344,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     dual._dual = this;          // Stop the recursion
     dual._cyclic = _cyclic;     // Only here for recursive structs
     // Have to add the fields first, then set the hash, then loop over the fields recursing.
-    for( TypeFld fld : _flds.values() )
+    for( TypeFld fld : flds() )
       // Some fields are interned already, the cyclic ones are not.
       dual.add_fld(fld.interned() ? fld._dual : fld.xdual());
     dual._hash = dual.compute_hash();
-    for( TypeFld fld : _flds.values() )
+    for( TypeFld fld : flds() )
       // Some fields are interned already, the cyclic ones are not.
       if( !fld.interned() )
         dual.set_fld(fld.rdual());
@@ -406,18 +406,18 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private TypeStruct ymeet( TypeStruct that, boolean cyclic ) {
     TypeStruct ts = malloc("",_any&that._any,_open|that._open);
     // Fields in both
-    for( TypeFld fld : _flds.values() ) {
+    for( TypeFld fld : flds() ) {
       TypeFld tfld = that._flds.get(fld._fld);
       if( tfld != null ) ts.add_fld(cyclic ? TypeFld.cmeet(fld,tfld) : fld.xmeet(tfld));
     }
     // Fields in LHS, and RHS is high (can extend with LHS fields)
     if( that._any )
-      for( TypeFld fld : _flds.values() )
+      for( TypeFld fld : flds() )
         if( !that._flds.containsKey(fld._fld) )
           ts.add_fld(fld); // Only in LHS and RHS is a high field
     // Fields in RHS, and LHS is high (can extend with RHS fields)
     if( _any )
-      for( TypeFld fld : that._flds.values() )
+      for( TypeFld fld : that.flds() )
         if( !_flds.containsKey(fld._fld) )
           ts.add_fld(fld); // Only in RHS and LHS is a high field
     ts._name = mtname(that,ts); // Set name
@@ -542,7 +542,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private TypeStruct _clone() {
     assert interned();
     TypeStruct ts = malloc(_name,_any,_open);
-    for( TypeFld fld : _flds.values() )
+    for( TypeFld fld : flds() )
       ts.add_fld(fld.malloc_from()); // Shallow field clone
     return ts;
   }
@@ -550,7 +550,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   @Override TypeStruct copy() {
     POOLS[_type]._clone++;
     TypeStruct ts = new TypeStruct().init(_name,_any,_open);
-    for( TypeFld fld : _flds.values() ) ts.add_fld(fld);
+    for( TypeFld fld : flds() ) ts.add_fld(fld);
     return ts;
   }
 
@@ -560,8 +560,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final IHashMap OLD2APX = new IHashMap();
   public TypeStruct approx( int cutoff, int alias ) {
     boolean shallow=true;
-    for( TypeFld fld : _flds.values() )
-      if( fld._t._type == TMEMPTR ) { shallow=false; break; }
+    for( TypeFld fld : flds() )
+      if( fld._t instanceof TypeMemPtr ||
+          (fld._t instanceof TypeFunPtr && !((TypeFunPtr)fld._t)._ret.is_simple()) )
+        { shallow=false; break; }
     if( shallow ) return this;  // Fast cutout for boring structs
 
     // Scan the old copy for elements that are too deep.
@@ -686,7 +688,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // the new types, so their hash remains undefined.
   private static Type ax_meet( BitSetSparse bs, Type nt, Type old ) {
     assert old.interned();
-    if( nt.interned() ) return nt.meet(old);
+    if( nt.interned() ) {
+      Type xt = nt.meet(old);
+      // A complete (non-cyclic) type might attempt interning and get a hash.
+      // Remove it and preserve the no-hash-if-not-interned invariant.
+      xt._hash=0; 
+      return xt;
+    }
     assert nt._hash==0;         // Not definable yet, as nt may yet pick up fields
     nt = ufind(nt);
     if( nt == old ) return old;
@@ -819,7 +827,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
           break;
         case TSTRUCT:           // Update all TypeStruct fields
           TypeStruct ts = (TypeStruct)t0;
-          for( TypeFld tfld : ts._flds.values() ) {
+          for( TypeFld tfld : ts.flds() ) {
             TypeFld tfld2 = ufind(tfld);
             if( tfld != tfld2 ) {
               progress = true;
@@ -894,7 +902,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       case TMEMPTR:  push(work, ((TypeMemPtr)t)._obj); break;
       case TFUNPTR:  push(work, ((TypeFunPtr)t)._dsp); push(work, ((TypeFunPtr)t)._ret); break;
       case TFLD   :  push(work, ((TypeFld   )t)._t  ); break;
-      case TSTRUCT:  for( TypeFld tf : ((TypeStruct)t)._flds.values() ) push(work, tf); break;
+      case TSTRUCT:  for( TypeFld tf : ((TypeStruct)t).flds() ) push(work, tf); break;
       default: break;
       }
     }
@@ -960,7 +968,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     case TFUNPTR: get_cyclic(((TypeFunPtr)t)._dsp);
                   get_cyclic(((TypeFunPtr)t)._ret);  break;
     case TFLD   : get_cyclic(((TypeFld   )t)._t  ); break;
-    case TSTRUCT: CVISIT.set(t._uid); for( TypeFld fld : ((TypeStruct)t)._flds.values() ) get_cyclic(fld); break;
+    case TSTRUCT: CVISIT.set(t._uid); for( TypeFld fld : ((TypeStruct)t).flds() ) get_cyclic(fld); break;
     default: break;
     }
     CSTACK.pop();               // Pop, not part of anothers cycle
@@ -1042,7 +1050,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static boolean _is_sharp(Type t) {
     if( !(t instanceof TypeStruct) ) return true;
     TypeStruct ts = (TypeStruct)t;
-    for( TypeFld fld : ts._flds.values() ) {
+    for( TypeFld fld : ts.flds() ) {
       Type tt = fld._t;
       assert fld.interned()==tt.interned();
       if( !tt.interned() ||     // Not interned internal, then this is not finished
@@ -1132,7 +1140,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public TypeFld fld_idx( int idx ) {
     // TODO: reverse map.
     TypeFld fx=null;
-    for( TypeFld fld : _flds.values() ) {
+    for( TypeFld fld : flds() ) {
       assert fld._order!=TypeFld.oTop && fld._order!=TypeFld.oBot;
       if( fld._order==idx ) {
         assert fx==null;        // Got to be unique
@@ -1242,9 +1250,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     RECURSIVE_MEET++;
     ts = malloc(_name,_any,_open);
     WIDEN_HASH.put(_uid,ts);
-    for( TypeFld fld : _flds.values() ) ts.add_fld(fld.malloc_from());
+    for( TypeFld fld : flds() ) ts.add_fld(fld.malloc_from());
     ts.set_hash();
-    for( TypeFld fld : ts._flds.values() ) fld.setX(fld._t._widen());
+    for( TypeFld fld : ts.flds() ) fld.setX(fld._t._widen());
     if( --RECURSIVE_MEET == 0 )
       ts = ts.install();
     return ts;
@@ -1262,13 +1270,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   @Override boolean contains( Type t, VBitSet bs ) {
     if( bs==null ) bs=new VBitSet();
     if( bs.tset(_uid) ) return false;
-    for( TypeFld fld : _flds.values() ) if( fld._t==t || fld._t.contains(t,bs) ) return true;
+    for( TypeFld fld : flds() ) if( fld._t==t || fld._t.contains(t,bs) ) return true;
     return false;
   }
 
   @Override public void walk( Predicate<Type> p ) {
     if( p.test(this) )
-      for( TypeFld fld : _flds.values() ) fld.walk(p);
+      for( TypeFld fld : flds() ) fld.walk(p);
   }
 
   // Make a Type, replacing all dull pointers from the matching types in mem.

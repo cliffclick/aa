@@ -58,6 +58,7 @@ public class TestHM {
   private static final TypeMemPtr tuple9  = TypeMemPtr.make(9,TypeStruct.make(TypeFld.NO_DISP,
                                                                               TypeFld.make("x",Type.SCALAR),
                                                                               TypeFld.make("y",Type.SCALAR)));
+  private static final BitsAlias ptr90() { return BitsAlias.FULL.make(9,10); }
 
   @Test(expected = RuntimeException.class)
   public void test00() { run( "fred","",Type.ALL); }
@@ -579,13 +580,13 @@ loop = { name cnt ->
         () -> {
           Type tf   = TypeMemPtr.make(BitsAlias.FULL.make(10,11),
                                       TypeStruct.make(TypeFld.NO_DISP,
-                                                      TypeFld.make("and"     ,TypeFunPtr.make(BitsFun.make0(14,17),1)),
-                                                      TypeFld.make("or"      ,TypeFunPtr.make(BitsFun.make0(15,18),1)),
-                                                      TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(16,19),2))));
+                                                      bfun2("and"     ,14,17,1),
+                                                      bfun2("or"      ,15,18,1),
+                                                      bfun2("thenElse",16,19,2)));
           Type xbool= TypeMemPtr.make(12,TypeStruct.make(TypeFld.NO_DISP,
                                                          TypeFld.make("true", tf),
                                                          TypeFld.make("false",tf),
-                                                         TypeFld.make("force",TypeFunPtr.make(BitsFun.make0(23),1))));
+                                                         TypeFld.make("force",TypeFunPtr.make(BitsFun.make0(23),1,TypeMemPtr.NO_DISP,tf))));
           TypeStruct rez = TypeStruct.make(TypeFld.NO_DISP,
                                            // With lift ON
                                            //TypeFld.make("a", HM.DO_HM ? TypeInt.NINT8 : Type.SCALAR),
@@ -604,9 +605,10 @@ loop = { name cnt ->
   @Test public void test53() { run( "{ x y -> (if x x y) }",
                                     "{ A? A -> A }", tfs(Type.SCALAR));  }
 
-  // Double nested.  Currently fails to unify x and y.
+  // Regression test; double nested.  Failed to unify x and y.
   @Test public void test54() { run( "{ x y -> (if x (if x x y) y) }",
                                     "{ A? A -> A }", tfs(Type.SCALAR));  }
+
 
   // Regression test; was NPE.  Was testMyBoolsNullPException from marco.servetto@gmail.com.
   @Test public void test55() {
@@ -639,13 +641,38 @@ boolSub ={b ->(if b true false)};
             "}"+
         "}",
         () -> {
-          // true/false=*[10,11]@{$; and=[15,19]{any }; or=[16,20]{any }; not=[17,21]{any }; thenElse=[18,22]{any }}
-          Type tf   = TypeMemPtr.make(BitsAlias.FULL.make(10,11),
-                                      TypeStruct.make(TypeFld.NO_DISP,
-                                                      TypeFld.make("and"     ,TypeFunPtr.make(BitsFun.make0(14,18),1)),
-                                                      TypeFld.make("or"      ,TypeFunPtr.make(BitsFun.make0(15,19),1)),
-                                                      TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(16,20),1)),
-                                                      TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(17,21),2))));
+          // NOT = *[10]@{
+          //   NO_DSP;
+          //   and=[14]{any ->Scalar };
+          //   not=[16]{any ->NOT };
+          //   or =[15]{any ->NOT };
+          //   thenElse=[17]{any ->Scalar }
+          // }
+          TypeFld and = mfun("and",14);
+          TypeFld thn = mfun("thenElse",17,2);
+          Type.RECURSIVE_MEET++;
+          TypeFld or  = TypeFld.malloc("or" );
+          TypeFld not = TypeFld.malloc("not");
+          TypeStruct nots = TypeStruct.make(TypeFld.NO_DISP,and,thn,or,not).set_hash();
+          TypeMemPtr notp = TypeMemPtr.make(BitsAlias.make0(10),nots);
+          or .setX(TypeFunPtr.make(BitsFun.make0(15),1,TypeMemPtr.NO_DISP,notp));
+          not.setX(TypeFunPtr.make(BitsFun.make0(16),1,TypeMemPtr.NO_DISP,notp));
+          Type.RECURSIVE_MEET--;
+          nots = nots.install();
+          notp = TypeMemPtr.make(BitsAlias.make0(10),nots);
+          // TF = *[10,11]@{
+          //   NO_DSP;
+          //   and     =[14,18]{any ->Scalar };
+          //   or      =[15,19]{any ->Scalar };
+          //   thenElse=[17,21]{any ->Scalar };
+          //   not     =[16,20]{any -> NOT };
+          // }
+          Type tf = TypeMemPtr.make(BitsAlias.FULL.make(10,11),
+                                    TypeStruct.make(TypeFld.NO_DISP,
+                                                    bfun2("and"      ,14,18,1),
+                                                    bfun2("or"       ,15,19,1),
+                                                    bfun2("thenElse" ,17,21,2),
+                                                    TypeFld.make("not",TypeFunPtr.make(BitsFun.make0(16,20),1,TypeMemPtr.NO_DISP,notp))));
           // *[12]@{^=any; true=$TF; false=$TF}
           TypeStruct rez = TypeStruct.make("",false,false,TypeFld.NO_DISP,TypeFld.make("true",tf),TypeFld.make("false",tf));
           return TypeMemPtr.make(12,rez);
@@ -682,23 +709,48 @@ boolSub ={b ->(if b true false)};
 @{true=true, false=false, boolSub=boolSub};
 all
 """,
-        "@{ boolSub = { A? -> @{ not = { B -> C:@{ not = { D -> C }; thenElse = { { int64 -> E } { int64 -> E } -> E }} }; thenElse = { { int64 -> F } { int64 -> F } -> F }} }; false = C; true = C}",
+        "@{ boolSub = { A? -> @{ not = { B -> C:@{ not = { D -> C }; thenElse = { { 7 -> E } { 7 -> E } -> E }} }; thenElse = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
         () -> {
-          Type tt = TypeMemPtr.make(BitsAlias.FULL.make(9),
-                                    TypeStruct.make("",false,false,TypeFld.NO_DISP,
-                                                    TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(14),1)),
-                                                    TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(15),2))));
-          Type ff = TypeMemPtr.make(BitsAlias.FULL.make(10),
-                                    TypeStruct.make("",false,false,TypeFld.NO_DISP,
-                                                    TypeFld.make("not"     ,TypeFunPtr.make(BitsFun.make0(16),1)),
-                                                    TypeFld.make("thenElse",TypeFunPtr.make(BitsFun.make0(17),2))));
+          // BOOL :*[9,10]@{ NO_DISP; thenElse=[15,17]{any -> Scalar }; not =[14,16]{any -> $BOOL  }; };
+          TypeFld thn = ffld(2,"thenElse",15,17);
+          Type.RECURSIVE_MEET++;
+          TypeFld not = TypeFld.malloc("not");
+          TypeStruct bool = TypeStruct.make(TypeFld.NO_DISP,thn,not).set_hash();
+          TypeMemPtr boolp = TypeMemPtr.make(ptr90(),bool);
+          not.setX(TypeFunPtr.make(BitsFun.make0(14,16),1,TypeMemPtr.NO_DISP,boolp));
+          Type.RECURSIVE_MEET--;
+          bool = bool.install();
+          boolp = TypeMemPtr.make(ptr90(),bool);
+
+          // FALSE:*[  10]@{ NO_DISP; thenElse=[   17]{any -> Scalar }; not =[   16]{any -> $TRUE  }; };
+          // TRUE :*[9   ]@{ NO_DISP; thenElse=[15   ]{any -> Scalar }; not =[14   ]{any -> $FALSE }; };
+          TypeFld thn15 = mfun("thenElse",15,2);
+          TypeFld thn17 = mfun("thenElse",17,2);
+          Type.RECURSIVE_MEET++;
+          TypeFld notf = TypeFld.malloc("not");
+          TypeFld nott = TypeFld.malloc("not");
+          TypeStruct fs = TypeStruct.make(TypeFld.NO_DISP,thn17,notf).set_hash();
+          TypeStruct ts = TypeStruct.make(TypeFld.NO_DISP,thn15,nott).set_hash();
+          TypeMemPtr fps = TypeMemPtr.make(BitsAlias.make0(10),fs);
+          TypeMemPtr tps = TypeMemPtr.make(BitsAlias.make0( 9),ts);
+          notf.setX(TypeFunPtr.make(BitsFun.make0(16),1,TypeMemPtr.NO_DISP,tps));
+          nott.setX(TypeFunPtr.make(BitsFun.make0(14),1,TypeMemPtr.NO_DISP,fps));
+          Type.RECURSIVE_MEET--;
+          fs = fs.install();
+          fps = TypeMemPtr.make(BitsAlias.make0(10),fs);
+          tps = (TypeMemPtr)((TypeFunPtr)fs.fld_find("not")._t)._ret;
+          // *[11]@{ NO_DISP; boolSub=[21]{ any -> BOOL }; false = $FALSE; true  = $TRUE; }
           TypeStruct rez = TypeStruct.make(TypeFld.NO_DISP,
-                                           TypeFld.make("true"   ,tt),
-                                           TypeFld.make("false"  ,ff),
-                                           TypeFld.make("boolSub",TypeFunPtr.make(BitsFun.make0(21),1)));
+                                           TypeFld.make("false"  ,fps),
+                                           TypeFld.make("true"   ,tps),
+                                           TypeFld.make("boolSub",TypeFunPtr.make(BitsFun.make0(21),1,TypeMemPtr.NO_DISP,boolp)));
 
           return TypeMemPtr.make(11,rez);
         });
+  }
+
+  private static TypeFld ffld( int nargs, String fld, int... fidxs ) {
+    return TypeFld.make(fld,TypeFunPtr.make(BitsFun.make0(fidxs),nargs));
   }
 
   // Full on Peano arithmetic.
@@ -884,9 +936,9 @@ all
     run("f = { p1 p2 -> (if p2.a p1 p2)};"+"(f @{a=2}   @{b=2.3})",
         "@{ a= Missing field a in ()}",
         "@{ a= Missing field a in ()}",
-        () -> TypeMemPtr.make(BitsAlias.FULL.make(9,10),
+        () -> TypeMemPtr.make(ptr90(),
                               TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("a",Type.SCALAR))),
-        () -> TypeMemPtr.make(BitsAlias.FULL.make(9,10),
+        () -> TypeMemPtr.make(ptr90(),
                               TypeStruct.make(TypeFld.NO_DISP)));
   }
 
@@ -903,7 +955,7 @@ all
         "rez"+
         "",
         "{ A? -> @{x=nint8} }",
-        () -> tfs(TypeMemPtr.make(BitsAlias.FULL.make(9,10),TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("x",TypeInt.NINT8)))));
+        () -> tfs(TypeMemPtr.make(ptr90(),TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("x",TypeInt.NINT8)))));
   }
 
   // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
@@ -938,7 +990,7 @@ all
           //*[13]@{^=any; f=[15]{any }; res1=*[9,10,11,12]($); res2=$}
           Type rezhm = TypeMemPtr.make(BitsAlias.make0(13),
                                        TypeStruct.make(TypeFld.NO_DISP,
-                                                       TypeFld.make("f",TypeFunPtr.make(BitsFun.make0(15),2)),
+                                                       mfun("f",15,2),
                                                        TypeFld.make("res1",tmp9hm),
                                                        TypeFld.make("res2",tmp9hmab)));
           return rezhm;
@@ -946,7 +998,7 @@ all
         () -> {
           return TypeMemPtr.make(BitsAlias.make0(13),
                                  TypeStruct.make(TypeFld.NO_DISP,
-                                                 TypeFld.make("f",TypeFunPtr.make(BitsFun.make0(15),2)),
+                                                 mfun("f",15,2),
                                                  TypeFld.make("res1",Type.SCALAR),
                                                  TypeFld.make("res2",Type.SCALAR)));
         });
@@ -1041,7 +1093,7 @@ all
           return TypeMemPtr.make(BitsAlias.make0(14),TypeStruct.make(TypeFld.NO_DISP,f,t,s,z));
         });
   }
-private static TypeFld bfun2(String fld, int a0, int a1, int nargs ) {
+  private static TypeFld bfun2(String fld, int a0, int a1, int nargs ) {
     return TypeFld.make(fld,TypeFunPtr.make(BitsFun.make0(a0,a1),nargs));
   }
 

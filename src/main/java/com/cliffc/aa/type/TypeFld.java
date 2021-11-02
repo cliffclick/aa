@@ -60,7 +60,7 @@ public class TypeFld extends Type<TypeFld> {
   }
 
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
-    if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
+    if( dups.tset(_uid) ) return sb.p(_fld).p('$'); // Break recursive printing cycle
     if( !TypeStruct.isDigit(_fld.charAt(0)) ) // Do not print number-named fields for tuples
       _access.str(sb.p(_fld));
     return _t==null ? sb.p('!') : (_t==Type.SCALAR ? sb : _t.str(sb,dups,mem,debug));

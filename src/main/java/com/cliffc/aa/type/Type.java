@@ -360,7 +360,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // exactly 1 value.
   private static /*final*/ Type[] SCALAR_PRIMS;
 
-  private boolean is_simple() { return _type < TSIMPLE; }
+  boolean is_simple() { return _type < TSIMPLE; }
   private boolean is_ptr() { byte t = _type;  return t == TFUNPTR || t == TMEMPTR; }
   private boolean is_num() { byte t = _type;  return t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
