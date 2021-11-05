@@ -185,7 +185,7 @@ public final class RetNode extends Node {
     Type val = rez()._val;
     return TypeTuple.make(ctl,mem,val);
   }
-  @Override public void add_work_extra(Work work, Type old) {
+  @Override public void add_work_extra(WorkNode work, Type old) {
     // Return type changed, so Fun._sig changes.
     if( !is_copy() ) Env.GVN.add_reduce(fun());
   }
@@ -203,7 +203,7 @@ public final class RetNode extends Node {
 
   // Funs get special treatment by the H-M algo.
   @Override public TV2 new_tvar( String alloc_site) { return null; }
-  @Override public boolean unify( Work work ) { return false; }
+  @Override public boolean unify( WorkNode work ) { return false; }
 
   @Override public Node is_copy(int idx) { throw com.cliffc.aa.AA.unimpl(); }
   boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }

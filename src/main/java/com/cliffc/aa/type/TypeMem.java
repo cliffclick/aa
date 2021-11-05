@@ -511,7 +511,7 @@ public class TypeMem extends Type<TypeMem> {
         TypeObj to = at(alias);
         if( !(to instanceof TypeStruct) ) return false;
         TypeStruct ts = (TypeStruct)to;
-        TypeFld fld = ts.fld_find(name);
+        TypeFld fld = ts.get(name);
         if( fld!=null && fld._access == Access.RW )
           return false;
       }

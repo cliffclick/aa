@@ -46,7 +46,7 @@ public class MProjNode extends ProjNode {
 
   @Override public TV2 new_tvar( String alloc_site) { return null; }
 
-  @Override public void add_work_use_extra(Work work, Node chg) {
+  @Override public void add_work_use_extra(WorkNode work, Node chg) {
     if( chg instanceof CallNode ) {    // If the Call changes value
       work.add(chg.in(MEM_IDX));       // The called memory   changes liveness
       work.add(((CallNode)chg).fdx()); // The called function changes liveness

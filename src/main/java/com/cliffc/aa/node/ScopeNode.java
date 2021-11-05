@@ -148,7 +148,7 @@ public class ScopeNode extends Node {
   @Override public Type value(GVNGCM.Mode opt_mode) { return Type.CTRL; }
 
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
-  @Override public void add_work_use_extra(Work work, Node chg) {
+  @Override public void add_work_use_extra(WorkNode work, Node chg) {
     if( chg==rez() ) {          // If the result changed
       for( Node use : _uses ) {
         if( use != this ) work.add(use);

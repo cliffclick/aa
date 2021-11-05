@@ -25,7 +25,7 @@ public class LoadNode extends Node {
   Node mem() { return in(MEM_IDX); }
   Node adr() { return in(ARG_IDX); }
   private Node set_mem(Node a) { return set_def(MEM_IDX,a); }
-  public TypeFld find(TypeStruct ts) { return ts.fld_find(_fld); }
+  public TypeFld find(TypeStruct ts) { return ts.get(_fld); }
 
   // Strictly reducing optimizations
   @Override public Node ideal_reduce() {
@@ -154,7 +154,7 @@ public class LoadNode extends Node {
         MrgProjNode mrg = (MrgProjNode)mem;
         NewNode nnn = mrg.nnn();
         if( nnn instanceof NewObjNode ) {
-          TypeFld tfld = ((NewObjNode)nnn)._ts.fld_find(fld);
+          TypeFld tfld = ((NewObjNode)nnn)._ts.get(fld);
           if( tfld!=null && adr instanceof ProjNode && adr.in(0) == nnn ) return nnn; // Direct hit
         }  // wrong field name or wrong alias, cannot match
         if( aliases.test_recur(nnn._alias) ) return null; // Overlapping, but wrong address - dunno, so must fail
@@ -221,12 +221,12 @@ public class LoadNode extends Node {
       return tobj.oob();
     // Struct; check for field
     TypeStruct ts = (TypeStruct)tobj;
-    TypeFld fld = ts.fld_find(_fld);  // Find the named field
+    TypeFld fld = ts.get(_fld);  // Find the named field
     if( fld==null ) return tobj.oob();
     return fld._t;          // Field type
   }
 
-  @Override public void add_work_use_extra(Work work, Node chg) {
+  @Override public void add_work_use_extra(WorkNode work, Node chg) {
     if( chg==adr() ) { work.add(mem()); Env.GVN.add_reduce(this); } // Address into a Load changes, the Memory can be more alive, or this not in Error
     if( chg==mem() ) work.add(mem());  // Memory value lifts to ANY, memory live lifts also.
     if( chg==mem() ) work.add(adr());  // Memory value lifts to an alias, address is more alive
@@ -254,7 +254,7 @@ public class LoadNode extends Node {
   }
 
   // Standard memory unification; the Load unifies with the loaded field.
-  @Override public boolean unify( Work work ) {
+  @Override public boolean unify( WorkNode work ) {
     if( tvar().is_err() ) return false; // Already an error, no progress
     // Propagate an error
     TV2 ptr = adr().tvar();
@@ -263,7 +263,7 @@ public class LoadNode extends Node {
 
     return StoreNode.unify("@{}",this,ptr,adr()._val,tvar(),_fld,work);
   }
-  public void add_work_hm(Work work) {
+  public void add_work_hm(WorkNode work) {
     super.add_work_hm(work);
     work.add(adr());
   }
@@ -286,7 +286,7 @@ public class LoadNode extends Node {
       : ((TypeObj)tmem);
     if( objs==TypeObj.UNUSED ) return null; // No error, since might fall to anything
     // Both type systems know about the field
-    if( !(objs instanceof TypeStruct) || ((TypeStruct)objs).fld_find(_fld)==null )
+    if( !(objs instanceof TypeStruct) || ((TypeStruct)objs).get(_fld)==null )
       return bad(fast,objs);
     if( Env.GVN._opt_mode == GVNGCM.Mode.PesiCG && adr().has_tvar() && adr().tvar().get(_fld)==null )
       return bad(fast,objs);

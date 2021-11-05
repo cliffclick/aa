@@ -2,7 +2,9 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.tvar.UQNodes;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeTuple;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
 
@@ -24,22 +26,23 @@ public class GVNGCM {
   public Mode _opt_mode=Mode.Parse;
 
   // Iterative worklists.
-  private final Work _work_dead   = new Work("dead"  , false) { @Override public Node apply(Node n) { return n._keep==0 && n._uses._len == 0 ? n.kill() : null; } };
-  private final Work _work_reduce = new Work("reduce", true ) { @Override public Node apply(Node n) { return n.do_reduce(); } };
-  public  final Work _work_flow   = new Work("flow"  , false) { @Override public Node apply(Node n) { return n.do_flow  (); } };
-  private final Work _work_mono   = new Work("mono"  , true ) { @Override public Node apply(Node n) { return n.do_mono  (); } };
-  private final Work _work_grow   = new Work("grow"  , true ) { @Override public Node apply(Node n) { return n.do_grow  (); } };
-  private final Work _work_inline = new Work("inline", false) { @Override public Node apply(Node n) { return ((FunNode)n).ideal_inline(false); } };
-  public  final Work _work_dom    = new Work("dom"   , false) { @Override public Node apply(Node n) { return n.do_mono  (); } };
-  private final Work[]    _new_works = new Work[]{           _work_flow,_work_reduce,_work_mono,_work_grow             };
-  private final Work[]    _all_works = new Work[]{_work_dead,_work_flow,_work_reduce,_work_mono,_work_grow,_work_inline};
+  private final WorkNode  _work_dead   = new WorkNode("dead"  , false) { @Override public Node apply(Node n) { return n._keep==0 && n._uses._len == 0 ? n.kill() : null; } };
+  private final WorkNode  _work_reduce = new WorkNode("reduce", true ) { @Override public Node apply(Node n) { return n.do_reduce(); } };
+  public  final WorkNode  _work_flow   = new WorkNode("flow"  , false) { @Override public Node apply(Node n) { return n.do_flow  (); } };
+  private final WorkNode  _work_mono   = new WorkNode("mono"  , true ) { @Override public Node apply(Node n) { return n.do_mono  (); } };
+  private final WorkNode  _work_grow   = new WorkNode("grow"  , true ) { @Override public Node apply(Node n) { return n.do_grow  (); } };
+  private final WorkNode  _work_inline = new WorkNode("inline", false) { @Override public Node apply(Node n) { return ((FunNode)n).ideal_inline(false); } };
+  public  final WorkNode  _work_dom    = new WorkNode("dom"   , false) { @Override public Node apply(Node n) { return n.do_mono  (); } };
+  private final WorkNode []    _new_works = new WorkNode[]{           _work_flow,_work_reduce,_work_mono,_work_grow             };
+  private final WorkNode []    _all_works = new WorkNode[]{_work_dead,_work_flow,_work_reduce,_work_mono,_work_grow,_work_inline};
   static private boolean HAS_WORK;
   public boolean on_dead  ( Node n ) { return _work_dead  .on(n); }
 
-  static public <N extends Node> N add_work( Work work, N n ) {
+  static public <N extends Node> N add_work( WorkNode work, N n ) {
     if( n==null || n.is_dead() ) return n;
     if( !HAS_WORK ) HAS_WORK = true; // Filtered set
-    return work.add(n);
+    work.add(n);
+    return n;
   }
   public void add_dead  ( Node n ) { add_work(_work_dead, n); }
   public <N extends Node> N add_reduce( N n ) { return add_work(_work_reduce,n); }
@@ -56,12 +59,12 @@ public class GVNGCM {
     if( n._uses._len==0 && n._keep==0 ) { add_dead(n); return; } // might be dead
     add_reduce(add_flow(n));
   }
-  static public void add_work_defs( Work work, Node n ) {
+  static public void add_work_defs( WorkNode work, Node n ) {
     for( Node def : n._defs )
       if( def != null && def != n )
         add_work(work,def);
   }
-  static public void add_work_uses( Work work, Node n ) {
+  static public void add_work_uses( WorkNode work, Node n ) {
     for( Node use : n._uses )
       if( use != n )
         add_work(work,use);
@@ -69,7 +72,7 @@ public class GVNGCM {
   public Node add_work_all( Node n ) {
     if( n.is_dead() ) return n;
     if( !HAS_WORK ) HAS_WORK = true; // Filtered set
-    for( Work work : _new_works ) work.add(n);
+    for( WorkNode work : _new_works ) work.add(n);
     if( n instanceof FunNode )
       add_work(_work_inline,(FunNode)n);
     return n;
@@ -82,7 +85,7 @@ public class GVNGCM {
   // state left alive.  NOT called after a line in the REPL or a user-call to
   // "eval" as user state carries on.
   void reset_to_init0() {
-    for( Work work : _all_works ) work.clear();
+    for( WorkNode work : _all_works ) work.clear();
     _work_dom.clear();
     HAS_WORK = true;
     _opt_mode = Mode.Parse;
@@ -149,10 +152,11 @@ public class GVNGCM {
       // Only a very few nodes can make progress via dominance relations, and
       // these can make progress "very far" in the graph.  So instead of using
       // a neighbors list, we bulk revisit them here.
-      for( int i=0; i<_work_dom.len(); i++ ) {
-        Node dom = _work_dom.at(i);
-        if( dom.is_dead() ) _work_dom.del(i--);
-        else progress |= _work_dom.apply(dom)!=null;
+      for( long k : _work_dom.keySetLong() ) {
+        Node dom = _work_dom.get(k);
+      //  if( dom.is_dead() ) _work_dom.del(i--);
+      //  else progress |= _work_dom.apply(dom)!=null;
+        throw unimpl("changing worklist impl");
       }
     }
     IDEAL_VISIT.clear();
@@ -165,12 +169,12 @@ public class GVNGCM {
   // Returns 'x' or a replacement for 'x'.
   static int ITER_CNT;
   static int ITER_CNT_NOOP;
-  public Node iter(Node x, Work[] works) {
+  public Node iter(Node x, WorkNode[] works) {
     if( !HAS_WORK ) return x;
     if( x!=null ) x.keep();
     while( true ) {
-      Work W=null;
-      for( Work work : works )
+      WorkNode W=null;
+      for( WorkNode work : works )
         if( !(W = work).isEmpty() )
           break;
       if( W.isEmpty() ) break;      // All worklists empty
@@ -201,7 +205,7 @@ public class GVNGCM {
   // 'iter').  Used when inlining, and the inlined body needs to acknowledge
   // bypasses aliases.  Used during code-clone, to lift the split alias parent
   // up & out.
-  private static final Work WORK_RETYPE = new Work("retype",false) { @Override public Node apply( Node n) { throw unimpl(); } };
+  private static final WorkNode WORK_RETYPE = new WorkNode("retype",false) { @Override public Node apply( Node n) { throw unimpl(); } };
   public static void retype_mem( BitSet aliases, Node mem, Node exit, boolean skip_calls ) {
     WORK_RETYPE.add(mem);
     // Update all memory ops

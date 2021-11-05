@@ -55,7 +55,7 @@ public class ConNode<T extends Type> extends Node {
     return TV2.make_base(this,_t,alloc_site);
   }
 
-  @Override public boolean unify( Work work ) {
+  @Override public boolean unify( WorkNode work ) {
     if( _tvar==null ) return false;
     TV2 self = tvar();
     if( self.is_base() || self.is_nil() || self.is_struct() || self.isa("Str") ) return false;

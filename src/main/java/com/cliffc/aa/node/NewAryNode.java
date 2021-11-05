@@ -36,7 +36,7 @@ public abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
     return TV2.make("Ary",this,_tptr,alloc_site,args);
   }
 
-  @Override public boolean unify( Work work ) {
+  @Override public boolean unify( WorkNode work ) {
     assert _tvar.isa("Ary");     // Self should always should be a Ary
     if( is_unused() ) return false;
     // Length is an int

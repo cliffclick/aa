@@ -134,7 +134,7 @@ public class IntrinsicNode extends Node {
   // result is a named type.  Same as convertTypeName on an unaliased NewObjNode.
   // Passed in a named TypeStruct, and the parent alias.
   public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, Parse bad, FunNode parfun ) {
-    assert to.has_name() && to.fld_find("^").is_display_ptr(); // Display already
+    assert to.has_name() && to.get("^").is_display_ptr(); // Display already
     // Upgrade the type to one with no display for nnn.
     to = to.replace_fld(TypeFld.NO_DISP);
     TypeFunSig sig = TypeFunSig.make(to.remove_name(),to);

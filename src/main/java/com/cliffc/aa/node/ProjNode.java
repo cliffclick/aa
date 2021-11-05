@@ -39,7 +39,7 @@ public class ProjNode extends Node {
   }
 
   // Unify with the parent TVar sub-part
-  @Override public boolean unify( Work work ) {
+  @Override public boolean unify( WorkNode work ) {
     if( _tvar==null ) return false;
     TV2 tv = tvar();
     if( in(0) instanceof NewNode ) // TODO: Not really a proper use of Proj

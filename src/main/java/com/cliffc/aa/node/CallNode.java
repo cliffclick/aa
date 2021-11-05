@@ -459,7 +459,7 @@ public class CallNode extends Node {
     BitsAlias esc_out2 = precall.and_unused(esc_out); // Filter by unused pre-call
     return esc_out2.meet(esc_in);
   }
-  @Override public void add_work_extra(Work work, Type old) {
+  @Override public void add_work_extra(WorkNode work, Type old) {
     if( old==Type.ANY || _val==Type.ANY ||
         (old instanceof TypeTuple && ttfp(old).above_center()) )
       add_work_defs(work);      // Args can be more-alive or more-dead
@@ -475,13 +475,13 @@ public class CallNode extends Node {
       Env.GVN.add_grow(this);
   }
 
-  @Override public void add_work_def_extra(Work work, Node chg) {
+  @Override public void add_work_def_extra(WorkNode work, Node chg) {
     // Projections live after a call alter liveness of incoming args
     if( chg instanceof ProjNode )
       work.add(in(((ProjNode)chg)._idx));
   }
 
-  @Override public void add_work_use_extra(Work work, Node chg) {
+  @Override public void add_work_use_extra(WorkNode work, Node chg) {
     CallEpiNode cepi = cepi();
     if( chg == fdx() ) {           // FIDX falls to sane from too-high
       add_work_defs(work);         // All args become alive
@@ -702,7 +702,7 @@ public class CallNode extends Node {
           // Look for monotonic formals
           int fcnt=0, bcnt=0;
           for( TypeFld fld : formals.flds() ) {
-            TypeFld best_fld = best_formals.fld_find(fld._fld);
+            TypeFld best_fld = best_formals.get(fld._fld);
             if( best_fld==null ) { fcnt=bcnt=-1; break; } // Not monotonic, no obvious winner
             Type ff = fld._t, bf = best_fld._t;
             if( ff==bf ) continue;
@@ -751,7 +751,7 @@ public class CallNode extends Node {
   }
 
   // See if we can resolve an unresolved Call
-  @Override public void combo_resolve(Work ambi) {
+  @Override public void combo_resolve(WorkNode ambi) {
     if( _live == TypeMem.DEAD ) return;
     // Wait until the Call is reachable
     if( ctl()._val != Type.CTRL || !(_val instanceof TypeTuple) ) return;

@@ -3,7 +3,7 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.*;
 
-import java.util.function.Predicate;
+import java.util.function.*;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -20,7 +20,7 @@ import static com.cliffc.aa.AA.unimpl;
 // Cloning the code immediately also splits the fidx with a new fidx bit for
 // both the original and the new code.
 //
-public final class TypeFunPtr extends Type<TypeFunPtr> {
+public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   // List of known functions in set, or 'flip' for choice-of-functions.
   // A single bit is a classic code pointer.
   public BitsFun _fidxs;        // Known function bits
@@ -33,12 +33,42 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     _fidxs = fidxs; _nargs=nargs; _dsp=dsp; _ret=ret;
     return this;
   }
-  private static int rot(int x, int k) { return (x<<k) | (x>>(32-k)); }
+  boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
+  @Override public boolean cyclic() { return _cyclic; }
+  @Override public void set_cyclic() { _cyclic = true; }
+  @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_dsp,"dsp");  map.apply(_ret,"ret"); }
+  @Override public void walk_update( UnaryOperator<Type> map ) { _dsp = map.apply(_dsp); _ret = map.apply(_ret); }
+
+
+  // Static properties hashcode, no edge hashes
+  @Override int static_hash() {
+    Util.add_hash(super.static_hash()+_nargs);
+    Util.add_hash(_fidxs._hash);
+    return Util.get_hash();
+  }
+  // Excludes _ret._hash, which is part of cyclic hashes
   @Override int compute_hash() {
-    assert _dsp._hash != 0 /*&& _ret._hash!=0*/;    // Part of a cyclic hash
-    int hash= TFUNPTR + rot(_fidxs._hash,4) + rot(_nargs,8) + rot(_dsp._hash,12)/* + rot(_ret._hash,20)*/;
-    if( hash==0 ) throw unimpl();
-    return hash;
+    assert _dsp._hash != 0;
+    return Util.hash_spread(static_hash()+_dsp._hash);
+  }
+
+  // Static properties equals, no edges.  Already known to be the same class
+  // and not-equals
+  @Override boolean static_eq(TypeFunPtr t) {
+    if( _fidxs != t._fidxs || _nargs != t._nargs ) return false;
+    if( _dsp!=t._dsp ) {
+      assert (  _dsp._hash!=0) ==   _dsp.interned();
+      assert (t._dsp._hash!=0) == t._dsp.interned();
+      // If both are interned, they must be equal
+      if( _dsp._hash!=0 && t._dsp._hash!=0 && _dsp!=t._dsp ) return false;
+    }
+    if( _ret!=t._ret ) {
+      assert (  _ret._hash!=0) ==   _ret.interned();
+      assert (t._ret._hash!=0) == t._ret.interned();
+      // If both are interned, they must be equal
+      if( _ret._hash!=0 && t._ret._hash!=0 && _ret!=t._ret ) return false;
+    }    
+    return true;                // Assumed equal, if edges become equal
   }
 
   @Override public boolean equals( Object o ) {
@@ -351,5 +381,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     if( Type.ARF.tset(_uid) ) return _fidxs;
     // Myself, plus any function returns
     return _fidxs.meet(_ret._all_reaching_fidxs(tmem));
-  }
+  }  
+
 }

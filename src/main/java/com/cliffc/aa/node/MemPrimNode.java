@@ -100,7 +100,7 @@ public abstract class MemPrimNode extends PrimNode {
       TypeAry ary = (TypeAry)ptr._obj;
       return ary._size;
     }
-    @Override public void add_work_use_extra(Work work, Node chg) {
+    @Override public void add_work_use_extra(WorkNode work, Node chg) {
       if( chg==mem() ) work.add(adr());  // Memory value lifts to an alias, address is more alive
     }
     // Similar to LoadNode, of a field named '#'
@@ -117,7 +117,7 @@ public abstract class MemPrimNode extends PrimNode {
 
     @Override public TV2 new_tvar( String alloc_site) { return TV2.make_base(this,TypeInt.INT64,alloc_site); }
 
-    @Override public boolean unify( Work work ) {
+    @Override public boolean unify( WorkNode work ) {
       // The input is an array, but that's about all we can say
       TV2 tptr = tvar(ARG_IDX);
       if( tptr.isa("Ary") ) return false;
@@ -151,7 +151,7 @@ public abstract class MemPrimNode extends PrimNode {
     }
 
     // Standard memory unification; the Load unifies with the loaded field.
-    @Override public boolean unify( Work work ) {
+    @Override public boolean unify( WorkNode work ) {
       return StoreNode.unify("Ary",this,adr().tvar(),adr()._val,tvar(),"elem",work);
     }
 
@@ -220,7 +220,7 @@ public abstract class MemPrimNode extends PrimNode {
       return tmem2;
     }
     @Override public TV2 new_tvar( String alloc_site) { return null; }
-    @Override public boolean unify( Work work ) {
+    @Override public boolean unify( WorkNode work ) {
       boolean progress = false;
       TV2 idx = tvar(ARG_IDX+1);
       if( !(idx.is_base() && idx._type.isa(TypeInt.INT64)) ) {
@@ -255,7 +255,7 @@ public abstract class MemPrimNode extends PrimNode {
 
     // Unify address as Ary, idx as int64, Ary.elem and val to self.
     @Override public TV2 new_tvar( String alloc_site) { return null; }
-    @Override public boolean unify( Work work ) {
+    @Override public boolean unify( WorkNode work ) {
       boolean progress = false;
       TV2 idx = tvar(ARG_IDX+1);
       if( !(idx.is_base() && idx._type.isa(TypeInt.INT64)) ) {

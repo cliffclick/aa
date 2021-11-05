@@ -27,20 +27,20 @@ public class NewObjNode extends NewNode<TypeStruct> {
   // closures so variable stores can more easily fold into them.
   public NewObjNode( boolean is_closure, TypeStruct disp, Node clo ) {
     super(OP_NEWOBJ,BitsAlias.REC,disp);
-    assert disp.fld_find("^").is_display_ptr();
+    assert disp.get("^").is_display_ptr();
     _is_closure = is_closure;
     add_def(clo);
   }
   // Called by IntrinsicNode.convertTypeNameStruct
   public NewObjNode( boolean is_closure, int alias, TypeStruct ts, Node clo ) {
     super(OP_NEWOBJ,alias,ts,clo);
-    assert ts.fld_find("^").is_display_ptr();
+    assert ts.get("^").is_display_ptr();
     _is_closure = is_closure;
   }
-  public Node get(String name) { return in(_ts.fld_find(name)._order); }
-  public boolean exists(String name) { return _ts.fld_find(name)!=null; }
+  public Node get(String name) { return in(_ts.get(name)._order); }
+  public boolean exists(String name) { return _ts.get(name)!=null; }
   public boolean is_mutable(String name) { return access(name)==Access.RW; }
-  public Access access(String name) { return _ts.fld_find(name)._access; }
+  public Access access(String name) { return _ts.get(name)._access; }
 
   // Called when folding a Named Constructor into this allocation site
   void set_name( TypeStruct name ) { assert !name.above_center();  setsm(name); }
@@ -63,7 +63,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     add_def(val);
     Env.GVN.add_flow(this);
   }
-  public void update( String tok, Access mutable, Node val ) { update(_ts.fld_find(tok),mutable,val); }
+  public void update( String tok, Access mutable, Node val ) { update(_ts.get(tok),mutable,val); }
   // Update the field & mod
   private void update( TypeFld fld, Access mutable, Node val ) {
      set_def(fld._order,val);
@@ -75,7 +75,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
 
   // Add a named FunPtr to a New.  Auto-inflates to a Unresolved as needed.
   public FunPtrNode add_fun( Parse bad, String name, FunPtrNode ptr ) {
-    TypeFld fld = _ts.fld_find(name);
+    TypeFld fld = _ts.get(name);
     if( fld == null ) {
       create_active(name,ptr,Access.Final);
     } else {
@@ -122,7 +122,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     TypeStruct ts = (TypeStruct)to;
     Node progress = null;
     for( TypeFld tfld : _ts.flds() ) {
-      TypeFld lfld = ts.fld_find(tfld._fld);
+      TypeFld lfld = ts.get(tfld._fld);
       if( lfld !=null && lfld._t==Type.XSCALAR ) {
         int idx = lfld._order;
         if( in(idx) != Env.ANY )
@@ -149,7 +149,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     }
     return null;
   }
-  @Override public void add_work_extra(Work work,Type old) {
+  @Override public void add_work_extra(WorkNode work,Type old) {
     super.add_work_extra(work,old);
     Env.GVN.add_mono(this); // Can update crushed
   }
@@ -182,7 +182,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
 
   @Override public TV2 new_tvar(String alloc_site) { return TV2.make_struct(this,alloc_site); }
 
-  @Override public boolean unify( Work work ) {
+  @Override public boolean unify( WorkNode work ) {
     TV2 rec = tvar();
     if( rec.is_err() ) return false;
     assert rec.is_struct();
@@ -197,7 +197,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     boolean progress = false;
     if( !is_unused() )
       for( String key : rec.args() )
-        if( _ts.fld_find(key)==null && !rec.get(key).is_err() ) {
+        if( _ts.get(key)==null && !rec.get(key).is_err() ) {
           if( work==null ) return true;
           progress |= rec.get(key).unify(rec.miss_field(this,key,"NewObj_err"),work);
           if( (rec=rec.find()).is_err() ) return true;

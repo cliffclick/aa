@@ -5,6 +5,7 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.util.Work;
 
 import java.util.function.Predicate;
 
@@ -80,7 +81,7 @@ public class RegionNode extends Node {
     return false;
   }
 
-  @Override public void add_work_def_extra(Work work, Node chg) {
+  @Override public void add_work_def_extra(WorkNode work, Node chg) {
     if( chg.is_CFG() ) {           // If losing an extra CFG user
       for( Node use : _uses )
         if( use._op == OP_REGION ) // Then stacked regions can fold
@@ -141,7 +142,7 @@ public class RegionNode extends Node {
     return Type.XCTRL;
   }
   // Control into a Region allows Phis to make progress
-  @Override public void add_work_use_extra(Work work, Node chg) {
+  @Override public void add_work_use_extra(WorkNode work, Node chg) {
     Env.GVN.add_reduce(this);
     for( Node phi : _uses )
       if( phi instanceof PhiNode ) {

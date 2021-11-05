@@ -15,7 +15,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
 
   @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Str",this,alloc_site); }
 
-  @Override public boolean unify(Work work) {
+  @Override public boolean unify(WorkNode work) {
     TV2 tv = tvar();
     if( tv._type==null ) { tv._type = _tptr; return true; }
     return false;
@@ -108,7 +108,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       TypeMem esc1 = ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr1)._aliases,"",Type.SCALAR);
       return (TypeMem)esc0.meet(esc1);
     }
-    @Override public void add_work_use_extra(Work work,Node chg) {
+    @Override public void add_work_use_extra(WorkNode work,Node chg) {
       if( chg==in(ARG_IDX) || chg==in(ARG_IDX+1) ) work.add(in(MEM_IDX));  // Address into a Load changes, the Memory can be more alive.
     }
   }

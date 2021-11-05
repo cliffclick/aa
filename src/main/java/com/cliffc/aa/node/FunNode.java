@@ -934,7 +934,7 @@ public class FunNode extends RegionNode {
 
   // Funs get special treatment by the H-M algo.
   @Override public TV2 new_tvar( String alloc_site) { return null; }
-  @Override public boolean unify( Work work ) { return false; }
+  @Override public boolean unify( WorkNode work ) { return false; }
 
   // Nongenerative set for Hindly-Milner
   public void prep_nongen() {

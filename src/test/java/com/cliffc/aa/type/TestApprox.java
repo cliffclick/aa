@@ -1,7 +1,6 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.Env;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -133,10 +132,10 @@ public class TestApprox {
     TypeStruct t1 = TypeStruct.malloc("",false,true,TypeFld.malloc("a"),TypeFld.malloc("b")).set_hash();
     TypeMemPtr p0 = TypeMemPtr.make(alias0,t0);
     TypeMemPtr p1 = TypeMemPtr.make(alias0,t1);
-    t0.fld_find("a").setX(p1           );
-    t0.fld_find("b").setX(TypeInt.INT64);
-    t1.fld_find("a").setX(p0           );
-    t1.fld_find("b").setX(TypeFlt.FLT64);
+    t0.get("a").setX(p1           );
+    t0.get("b").setX(TypeInt.INT64);
+    t1.get("a").setX(p0           );
+    t1.get("b").setX(TypeFlt.FLT64);
     Type.RECURSIVE_MEET--;
     t0 = t0.install();
     p1 = (TypeMemPtr)t0.at("a");
@@ -252,8 +251,8 @@ public class TestApprox {
     TypeStruct x4 = TypeStruct.malloc("",false,true,fi14,TypeFld.malloc("x"),fpa3).set_hash();
     TypeMemPtr px3 = TypeMemPtr.make(alias1,x3);
     TypeMemPtr px4 = TypeMemPtr.make(alias1,x4);
-    x3.fld_find("x").setX(px4);
-    x4.fld_find("x").setX(px3);
+    x3.get("x").setX(px4);
+    x4.get("x").setX(px3);
     Type.RECURSIVE_MEET--;
     x3 = x3.install();
     px3 = (TypeMemPtr)x4.at("x");
@@ -293,8 +292,8 @@ public class TestApprox {
     TypeStruct x1 = TypeStruct.malloc("",false,true,fil1, TypeFld.malloc("x"), fpa1).set_hash();
     TypeMemPtr px0 = TypeMemPtr.make(alias1,x0);
     TypeMemPtr px1 = TypeMemPtr.make(alias1,x1);
-    x0.fld_find("x").setX(px1);
-    x1.fld_find("x").setX(px0);
+    x0.get("x").setX(px1);
+    x1.get("x").setX(px0);
     Type.RECURSIVE_MEET--;
     x0 = x0.install();
     px0 = (TypeMemPtr)x1.at("x");
@@ -530,9 +529,9 @@ public class TestApprox {
     Type.RECURSIVE_MEET++;
     TypeStruct  x1 = TypeStruct.malloc("",false,true,TypeFld.malloc("l"), TypeFld.malloc("r"), TypeFld.malloc("v")).set_hash();
     TypeMemPtr px1 = TypeMemPtr.make_nil(alias,x1);
-    x1.fld_find("l").setX(Type.XNIL  );
-    x1.fld_find("r").setX(px1        );
-    x1.fld_find("v").setX(Type.SCALAR);
+    x1.get("l").setX(Type.XNIL  );
+    x1.get("r").setX(px1        );
+    x1.get("v").setX(Type.SCALAR);
     Type.RECURSIVE_MEET--;
     x1 = x1.install();
     assertSame(px1,x1.at("r"));
@@ -547,9 +546,9 @@ public class TestApprox {
     Type.RECURSIVE_MEET++;
     TypeStruct  x3 = TypeStruct.malloc("",false,true,TypeFld.malloc("l"), TypeFld.malloc("r"), TypeFld.malloc("v")).set_hash();
     TypeMemPtr px3 = TypeMemPtr.make_nil(alias,x3);
-    x3.fld_find("l").setX(px3);//TypeMemPtr.make_nil(alias,TypeObj.OBJ);
-    x3.fld_find("r").setX(px3);
-    x3.fld_find("v").setX(Type.SCALAR);
+    x3.get("l").setX(px3);//TypeMemPtr.make_nil(alias,TypeObj.OBJ);
+    x3.get("r").setX(px3);
+    x3.get("v").setX(Type.SCALAR);
     Type.RECURSIVE_MEET--;
     x3 = x3.install();
     px3 = (TypeMemPtr)x3.at("l");
@@ -640,7 +639,7 @@ public class TestApprox {
     // Add repeatedly until stable:
     //   B2 = ( C1, 99 )
     //   C2 = ( D , B2 )
-    // This should approx by meeting a C with a A, which should drop off the
+    // This should approx by meeting a C with an A, which should drop off the
     // RHS of the C.  The C LHS is a D, which again meets with A to finish the
     // collapse.  Bug is that types flip-flop between 2 variants endlessly.
     cnt = 0;  tmp1 = null;
@@ -704,8 +703,8 @@ public class TestApprox {
                                       TypeFld.make("^",ptr3.simple_ptr()),
                                       TypeFld.make("x",TypeInt.INT64));
     TypeFunPtr tfp3 = TypeFunPtr.make(fidxs,2,ptr3.simple_ptr(),Type.SCALAR);
-    dsp3.fld_find("^").setX(TypeMemPtr.DISPLAY_PTR);
-    dsp3.fld_find("fib").setX(tfp3);
+    dsp3.get("^").setX(TypeMemPtr.DISPLAY_PTR);
+    dsp3.get("fib").setX(tfp3);
     Type.RECURSIVE_MEET--;
     dsp3 = dsp3.install();
 
@@ -730,88 +729,26 @@ public class TestApprox {
   // not isa the 'this' type.  This looks like: "this.meet(rez)" does not
   // minimize cycles properly, and this ISA rez but the standard isa test fails
   // because "this.meet(rez)" is not minimized properly.
-  @Ignore
   @Test public void testApprox9() {
     Object dummy0 = TypeStruct.TYPES;
 
     int alias13 = BitsAlias.new_alias(BitsAlias.REC);
     int alias14 = BitsAlias.new_alias(BitsAlias.REC);
-    BitsAlias a13   = BitsAlias.FULL.make(        alias13);
     BitsAlias a14   = BitsAlias.FULL.make(        alias14);
     BitsAlias a1314 = BitsAlias.FULL.make(alias13,alias14);
     int fidx14 = BitsFun.new_fidx();
     int fidx25 = BitsFun.new_fidx();
-    BitsFun f14   = BitsFun.make0(fidx14       );
-    BitsFun f25   = BitsFun.make0(       fidx25);
     BitsFun f1425 = BitsFun.make0(fidx14,fidx25);
     int fidx22 = BitsFun.new_fidx();
     int fidx26 = BitsFun.new_fidx();
-    BitsFun f22   = BitsFun.make0(fidx22       );
-    BitsFun f26   = BitsFun.make0(       fidx26);
     BitsFun f2226 = BitsFun.make0(fidx22,fidx26);
-
-    // THIS, highly shrunk
-    //
-    //STRUCT4:@{
-    //  PRED4  =[25]{any ->
-    //    *[13,14]:STRUCT2:@{
-    //      PRED2 =[14,25]{any ->
-    //        *[13]:STRUCT1:@{
-    //          PRED1  =[14]{any ->~Scalar };
-    //          SUCC1  =[22]{any ->
-    //            *[14]:STRUCT0:@{
-    //              PRED0 =[25]{any ->*[13]:STRUCT1 };
-    //              SUCC0 =[26]{any ->~Scalar }
-    //            }
-    //          }
-    //        }
-    //      };
-    //      SUCC2  =[22,26]{any ->
-    //        *[14]:STRUCT3:@{
-    //          PRED3 =[25]{any ->~Scalar };
-    //          SUCC0
-    //        }
-    //      }
-    //    }
-    //  };
-    //  SUCC4  =[26]{any ->*[14]:STRUCT0 }
-    //}
-    //TypeStruct t=null;
-    //{
-    //  Type.RECURSIVE_MEET++;
-    //  TypeFld pred0 = TypeFld.malloc("pred");
-    //  TypeFld pred1 = TypeFld.malloc("pred");
-    //  TypeFld pred2 = TypeFld.malloc("pred");
-    //  TypeFld pred3 = TypeFld.malloc("pred");
-    //  TypeFld pred4 = TypeFld.malloc("pred");
-    //  TypeFld succ0 = TypeFld.malloc("succ");
-    //  TypeFld succ1 = TypeFld.malloc("succ");
-    //  TypeFld succ2 = TypeFld.malloc("succ");
-    //  TypeFld succ4 = TypeFld.malloc("succ");
-    //  TypeStruct str0 = TypeStruct.make(pred0,succ0).set_hash();
-    //  TypeStruct str1 = TypeStruct.make(pred1,succ1).set_hash();
-    //  TypeStruct str2 = TypeStruct.make(pred2,succ2).set_hash();
-    //  TypeStruct str3 = TypeStruct.make(pred3,succ0).set_hash();
-    //  TypeStruct str4 = TypeStruct.make(pred4,succ4).set_hash();
-    //  _help0(pred0,  f25,a13  ,str1);
-    //  _helpx(pred1,f14             );
-    //  _help0(pred2,f1425,a13  ,str1);
-    //  _helpx(pred3,  f25           );
-    //  _help0(pred4,  f25,a1314,str2);
-    //  _helpx(succ0,  f26           );
-    //  _help0(succ1,f22  ,  a14,str0);
-    //  _help0(succ2,f2226,  a14,str3);
-    //  _help0(succ4,  f26,  a14,str0);
-    //  Type.RECURSIVE_MEET--;
-    //  t = str4.install();
-    //}
 
     //REZ (shortened); result of approx, alias=14, depth=1
     //C:@{
     //  pred  =[14,25]{any ->*[13,14]C$ };
     //  succ  =[22,26]{any ->*[   14]C$ }
     //}
-    TypeStruct rez=null;
+    TypeStruct rez;
     {
       Type.RECURSIVE_MEET++;
       TypeFld pred = TypeFld.malloc("pred");
@@ -823,52 +760,16 @@ public class TestApprox {
       rez = rez.install();
     }
 
-    //Type mt = t.meet(rez);
-    // approx on 't' returns 'rez' which fails 't.isa(rez)'.
-    // Their meet is != rez.
-
-    // THIS.MEET(REZ) (shortened); result of this.meet(rez) BUT re-installing
-    // it directly gives me REZ back.  This tells me that the meet operation
-    // did not return a minimal result.
-    //
-    //STRUCT3:@{
-    //  PRED3=[14,25]{any -> *[13,14]
-    //    STRUCT2:@{
-    //      PRED2 =[14,25]{any -> *[13,14]
-    //        STRUCT1:@{
-    //          PRED0:pred=[14,25]{any -> *[13,14]
-    //            STRUCT0:@{
-    //              PRED0
-    //              SUCC0:succ=[22,26]{any ->*[14]STRUCT1 } // STRUCT0 for this test case
-    //            }
-    //          };
-    //          SUCC1:succ=[22,26]{any ->*[14]STRUCT0 } // STRUCT2 for this test case
-    //        }
-    //      };
-    //      SUCC0
-    //    }
-    //  };
-    //  SUCC1
-    //}
-    TypeStruct thismeetrez=null;
+    TypeStruct thismeetrez;
     {
       Type.RECURSIVE_MEET++;
-      //TypeFld pred0 = TypeFld.malloc("pred");
       TypeFld pred2 = TypeFld.malloc("pred");
-      //TypeFld pred3 = TypeFld.malloc("pred");
-      //TypeFld succ0 = TypeFld.malloc("succ");
       TypeFld succ1 = TypeFld.malloc("succ");
-      //TypeStruct str0 = TypeStruct.make(pred0,succ0).set_hash();
-      TypeStruct str1 = TypeStruct.make(rez.fld_find("pred"),succ1).set_hash();
-      TypeStruct str2 = TypeStruct.make(pred2,rez.fld_find("succ")).set_hash();
-      //TypeStruct str3 = TypeStruct.make(pred3,succ1).set_hash();
-      //_help0(pred0,f1425,a1314,str0);
+      TypeStruct str1 = TypeStruct.make(rez.get("pred"),succ1).set_hash();
+      TypeStruct str2 = TypeStruct.make(pred2,rez.get("succ")).set_hash();
       _help0(pred2,f1425,a1314,str1);
-      //_help0(pred3,f1425,a1314,str2);
-      //_help0(succ0,f2226,a14  ,str0);
       _help0(succ1,f2226,a14  ,str2);
       Type.RECURSIVE_MEET--;
-      //thismeetrez = str3.install();
       thismeetrez = str2.install();
     }
 
@@ -880,9 +781,6 @@ public class TestApprox {
   private static void _help0( TypeFld fld, BitsFun fidx, BitsAlias alias, TypeStruct rez ) {
     TypeMemPtr ptr = TypeMemPtr.make(alias,rez);
     fld.setX(TypeFunPtr.make(fidx,1,TypeMemPtr.NO_DISP,ptr));
-  }
-  private static void _helpx( TypeFld fld, BitsFun fidx ) {
-    fld.setX(TypeFunPtr.make(fidx,1,TypeMemPtr.NO_DISP,Type.XSCALAR));
   }
 
 }

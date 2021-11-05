@@ -3,20 +3,19 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
+import java.util.function.IntSupplier;
 
 import static com.cliffc.aa.AA.DSP_IDX;
 import static com.cliffc.aa.AA.unimpl;
 
 // Sea-of-Nodes
-public abstract class Node implements Cloneable {
+public abstract class Node implements Cloneable, IntSupplier {
   static final byte OP_CALL   = 1;
   static final byte OP_CALLEPI= 2;
   static final byte OP_CAST   = 3;
@@ -67,6 +66,7 @@ public abstract class Node implements Cloneable {
     LIVE.set(CNT);
     return CNT++;
   }
+  @Override public int getAsInt() { return _uid; }
 
   // Initial state after loading e.g. primitives.
   public static void init0() {
@@ -533,10 +533,10 @@ public abstract class Node implements Cloneable {
 
   // The _val changed here, and more than the immediate _neighbors might change
   // value/live
-  public void add_work_defs(Work work) { for( Node def : _defs ) work.add(def); }
-  public void add_work_extra(Work work, Type old) { }
-  public void add_work_use_extra(Work work, Node chg) { }
-  public void add_work_def_extra(Work work, Node chg) { }
+  public void add_work_defs(WorkNode work) { for( Node def : _defs ) work.add(def); }
+  public void add_work_extra(WorkNode work, Type old) { }
+  public void add_work_use_extra(WorkNode work, Node chg) { }
+  public void add_work_def_extra(WorkNode work, Node chg) { }
   // Inputs changed here, and more than the immediate _neighbors might reduce
   public void add_reduce_extra() { }
 
@@ -544,17 +544,17 @@ public abstract class Node implements Cloneable {
   // Load/Stores, etc.  Returns true if progressed, and puts neighbors back on
   // the worklist.  If work==null then make no changes, but return if progress
   // would be made.
-  public boolean unify( Work work ) { return false; }
+  public boolean unify( WorkNode work ) { return false; }
 
   // HM changes; push related neighbors
-  public void add_work_hm(Work work) { tvar().add_deps_work(work); }
+  public void add_work_hm(WorkNode work) { tvar().add_deps_work(work); }
 
   // Support for resolving ambiguous calls during GCP/Combo
   public boolean remove_ambi(Ary<Node> oldfdx) {return false;}
 
   // Do One Step of forwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
-  public void combo_forwards(Work work) {
+  public void combo_forwards(WorkNode work) {
     Type oval = _val;           // Old local type
     Type nval = value(GVNGCM.Mode.Opto);// New type
     if( oval == nval ) return;  // No progress
@@ -580,7 +580,7 @@ public abstract class Node implements Cloneable {
 
   // Do One Step of backwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
-  public void combo_backwards(Work work) {
+  public void combo_backwards(WorkNode work) {
     TypeMem oliv = _live;
     TypeMem nliv = live(GVNGCM.Mode.Opto);
     if( oliv == nliv ) return;  // No progress
@@ -593,7 +593,7 @@ public abstract class Node implements Cloneable {
 
   // Do One Step of Hindley-Milner unification.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
-  public void combo_unify(Work work) {
+  public void combo_unify(WorkNode work) {
     if( _live==TypeMem.DEAD )  return; // No HM progress on dead code
     if( _val == Type.ANY ) return;     // No HM progress on untyped code
     TV2 old = _tvar==null ? null : tvar();
@@ -605,7 +605,7 @@ public abstract class Node implements Cloneable {
   }
 
   // See if we can resolve an unresolved Call during the Combined algorithm
-  public void combo_resolve(Work ambi) { }
+  public void combo_resolve(WorkNode ambi) { }
 
   // Return any type error message, or null if no error
   public ErrMsg err( boolean fast ) { return null; }
@@ -770,7 +770,7 @@ public abstract class Node implements Cloneable {
   }
 
   // Forward reachable walk, setting types to ANY and making all dead.
-  public final void walk_initype( Work work ) {
+  public final void walk_initype( WorkNode work ) {
     if( work.on(this) ) return;    // Been there, done that
     work.add(this);                // On worklist and mark visited
     _val = Type.ANY;               // Highest value
@@ -788,7 +788,7 @@ public abstract class Node implements Cloneable {
 
   // Combo phase 2: all nodes previously lifted by HM go back on the worklist,
   // as the default HM will no longer lift to Type.XNSCALR.
-  public final void walk_combo_phase2( Work work, BitsFun top_escapes ) {
+  public final void walk_combo_phase2( WorkNode work, BitsFun top_escapes ) {
     if( RESET_VISIT.tset(_uid) ) return; // Been there, done that
     if( this instanceof LoadNode ) { work.add(this); ((LoadNode)this)._hm_lift = false; } // Loads are lifted.
     if( this instanceof FunNode  && top_escapes.test_recur(((FunNode)this)._fidx) ) work.add(this);
@@ -803,7 +803,7 @@ public abstract class Node implements Cloneable {
 
   // Reset
   public static final VBitSet RESET_VISIT = new VBitSet();
-  public final void walk_reset( Work work ) {
+  public final void walk_reset( WorkNode work ) {
     if( RESET_VISIT.tset(_uid) ) return; // Been there, done that
     work.add(this);                // On worklist and mark visited
     _val = Type.ALL;               // Lowest value
@@ -866,8 +866,8 @@ public abstract class Node implements Cloneable {
 
   // Assert all value and liveness calls only go forwards.  Returns >0 for failures.
   private static final VBitSet FLOW_VISIT = new VBitSet();
-  public  final int more_flow(Work work,boolean lifting) { FLOW_VISIT.clear();  return more_flow(work,lifting,0);  }
-  private int more_flow( Work work, boolean lifting, int errs ) {
+  public  final int more_flow(WorkNode work,boolean lifting) { FLOW_VISIT.clear();  return more_flow(work,lifting,0);  }
+  private int more_flow( WorkNode work, boolean lifting, int errs ) {
     if( FLOW_VISIT.tset(_uid) ) return errs; // Been there, done that
     if( Env.GVN.on_dead(this) ) return errs; // Do not check dying nodes
     // If on worklist or partially built, do not check

@@ -28,7 +28,7 @@ public abstract class PrimNode extends Node {
   public PrimNode( String name, TypeStruct formals, Type ret ) {
     super(OP_PRIM);
     _name = name;
-    assert formals.fld_find("^")==null; // No display
+    assert formals.get("^")==null; // No display
     int fidx = BitsFun.new_fidx();
     _sig=TypeFunSig.make(formals,ret);
     _tfp=TypeFunPtr.make(BitsFun.make0(fidx),formals.nargs(),TypeMemPtr.NO_DISP,ret);
@@ -126,14 +126,14 @@ public abstract class PrimNode extends Node {
   }
 
   // All primitives are effectively H-M Applies with a hidden internal Lambda.
-  @Override public boolean unify( Work work ) {
+  @Override public boolean unify( WorkNode work ) {
     boolean progress = false;
     for( TypeFld fld : _sig._formals.flds() )
       progress |= prim_unify(tvar(fld._order),fld._t,work);
     progress |= prim_unify(tvar(),_tfp._ret,work);
     return progress;
   }
-  private boolean prim_unify(TV2 arg, Type t, Work work) {
+  private boolean prim_unify(TV2 arg, Type t, WorkNode work) {
     if( arg.is_base() && t.isa(arg._type) ) return false;
     if( arg.is_err() ) return false;
     if( work==null ) return true;

@@ -3,10 +3,12 @@ package com.cliffc.aa.util;
 import java.util.concurrent.ConcurrentMap;
 
 public class Util {
+  // Fast linear scan for a hit, returns index or -1
   public static int find( int[] es, int e ) {
     for( int i=0; i<es.length; i++ ) if( es[i]==e ) return i;
     return -1;
   }
+  // Fast linear scan for a hit, returns index or -1
   public static <E> int find( E[] es, E e ) {
     for( int i=0; i<es.length; i++ ) if( es[i]==e ) return i;
     return -1;
@@ -47,4 +49,50 @@ public class Util {
         System.out.println("Number of hashes with "+i+" repeats: "+hist[i]);
     System.out.println("Max repeat key "+maxkey+" repeats: "+maxval);
   }
+
+
+  // Copied from http://burtleburtle.net/bob/c/lookup3.c
+  // Call add_hash as many times as you like, then get_hash at the end.
+  // Uses global statics, does not nest.
+  private static int rot(int x, int k) { return (x<<k) | (x>>(32-k)); }
+  private static int a,b,c,x;
+  static public void add_hash( int h ) {
+    switch( x ) {
+    case 0: a+=h; x++; return;
+    case 1: a+=h; x++; return;
+    case 2: a+=h; x++; return;
+    case 3:
+      a -= c;  a ^= rot(c, 4);  c += b;
+      b -= a;  b ^= rot(a, 6);  a += c;
+      c -= b;  c ^= rot(b, 8);  b += a;
+      a -= c;  a ^= rot(c,16);  c += b;
+      b -= a;  b ^= rot(a,19);  a += c;
+      c -= b;  c ^= rot(b, 4);  b += a;
+      x=0;
+    }
+  }
+  // Return the resulting hash, which is never 0
+  static public int get_hash() {
+    if( x!=0 ) {
+      c ^= b; c -= rot(b,14);
+      a ^= c; a -= rot(c,11);
+      b ^= a; b -= rot(a,25);
+      c ^= b; c -= rot(b,16);
+      a ^= c; a -= rot(c, 4);
+      b ^= a; b -= rot(a,14);
+      c ^= b; c -= rot(b,24);
+    }
+    int hash=c;
+    if( hash==0 ) hash=b;
+    if( hash==0 ) hash=a;
+    if( hash==0 ) hash=0xcafebabe;
+    a=b=c=x=0;
+    return hash;                   
+  }
+  // Single-use hash spreader
+  static public int hash_spread(int hash) {
+    Util.add_hash(hash);
+    return Util.get_hash();
+  }
+
 }

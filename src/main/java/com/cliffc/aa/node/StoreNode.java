@@ -30,7 +30,7 @@ public class StoreNode extends Node {
   Node mem() { return in(1); }
   Node adr() { return in(2); }
   Node rez() { return in(3); }
-  public TypeFld find(TypeStruct ts) { return ts.fld_find(_fld); }
+  public TypeFld find(TypeStruct ts) { return ts.get(_fld); }
 
   @Override public Node ideal_reduce() {
     Node mem = mem();
@@ -65,7 +65,7 @@ public class StoreNode extends Node {
         !rez().is_forward_ref() &&
         // Do not bypass a parallel writer
         mem.check_solo_mem_writer(this) && // Use is by DefMem and self
-        (tfld=nnn._ts.fld_find(_fld))!= null ) {
+        (tfld=nnn._ts.get(_fld))!= null ) {
       // Have to be allowed to directly update NewObjNode
       if( tfld._access==Access.RW || rez() instanceof FunPtrNode ) {
         // Field is modifiable; update New directly.
@@ -119,7 +119,7 @@ public class StoreNode extends Node {
     return null;
   }
   // Liveness changes, check if reduce
-  @Override public void add_work_extra(Work work,Type old) {
+  @Override public void add_work_extra(WorkNode work,Type old) {
     Env.GVN.add_reduce(this); // Args can be more-alive
   }
   // If changing an input or value allows the store to no longer be in-error,
@@ -176,7 +176,7 @@ public class StoreNode extends Node {
     if( objs==TypeObj.UNUSED ) return null; // No error, too high yet
     if( !(objs instanceof TypeStruct) ) return bad("No such",fast,objs);
     TypeStruct ts = (TypeStruct)objs;
-    TypeFld fld = ts.fld_find(_fld);
+    TypeFld fld = ts.get(_fld);
     if( fld==null ) return bad("No such",fast,objs);
     Access access = fld._access;
     if( access!=Access.RW )
@@ -200,7 +200,7 @@ public class StoreNode extends Node {
   }
 
   @Override public TV2 new_tvar( String alloc_site) { return null; }
-  @Override public boolean unify( Work work ) {
+  @Override public boolean unify( WorkNode work ) {
     TV2 ptr = adr().tvar();
     if( ptr.is_err() ) return false;
     return unify("@{}",this,ptr,adr()._val,rez().tvar(),_fld,work);
@@ -209,7 +209,7 @@ public class StoreNode extends Node {
   // Common memory-update unification.  The ptr has to be not-nilable and have
   // the fld, which unifies with the value.  If the fld is missing, then if the
   // ptr is open, add the field else missing field error.
-  public static boolean unify( String name, Node ldst, TV2 ptr, Type tptr, TV2 tval, String id, Work work ) {
+  public static boolean unify( String name, Node ldst, TV2 ptr, Type tptr, TV2 tval, String id, WorkNode work ) {
     // Check for nil address
     if( Combo.CHECK_FOR_NOT_NIL )
       if( ptr.is_nil() || (tptr instanceof TypeMemPtr && tptr.must_nil()) )
@@ -245,7 +245,7 @@ public class StoreNode extends Node {
     return tval.unify(ptr.miss_field(ldst,id,"Store_update"),work);
   }
 
-  @Override public void add_work_hm(Work work) {
+  @Override public void add_work_hm(WorkNode work) {
     work.add(adr());
     work.add(rez());
   }

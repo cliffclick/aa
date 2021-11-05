@@ -78,7 +78,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     return null;
   }
 
-  @Override public void add_work_def_extra(Work work, Node chg) {
+  @Override public void add_work_def_extra(WorkNode work, Node chg) {
     if( chg instanceof MrgProjNode && chg._live.at(_alias)==TypeObj.UNUSED )
       Env.GVN.add_reduce(chg);
   }
@@ -91,7 +91,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   abstract TypeObj valueobj();
 
   // Flow typing a NewNode to 'any' changes DEFMEM
-  @Override public void add_work_extra(Work work, Type oval) {
+  @Override public void add_work_extra(WorkNode work, Type oval) {
     if( _val==Type.ANY || oval==Type.ANY || _live==TypeMem.DEAD || oval==TypeMem.DEAD )  work.add(Env.DEFMEM);
   }
 

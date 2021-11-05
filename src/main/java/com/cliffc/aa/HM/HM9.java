@@ -1414,7 +1414,7 @@ public class HM9 {
           //}
           throw unimpl();
         } else {
-          tstr._cyclic=true;    // Been there, done that, just mark it cyclic
+          tstr.set_cyclic();    // Been there, done that, just mark it cyclic
         }
         return TypeMemPtr.make(_alias,tstr);
       }

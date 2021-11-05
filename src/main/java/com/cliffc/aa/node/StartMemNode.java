@@ -11,7 +11,7 @@ public class StartMemNode extends Node {
   @Override public boolean is_mem() { return true; }
   @Override public Type value(GVNGCM.Mode opt_mode) { return TypeMem.ANYMEM; }
   @Override public TV2 new_tvar(String alloc_site) { return null; }
-  @Override public boolean unify( Work work ) { return false; }
+  @Override public boolean unify( WorkNode work ) { return false; }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // StartMemNodes are never equal
   @Override public int hashCode() { return 123456789+2; }

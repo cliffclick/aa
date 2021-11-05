@@ -75,7 +75,7 @@ public class PhiNode extends Node {
     return _t instanceof TypeMem || _t instanceof TypeRPC ? null : super.new_tvar(alloc_site);
   }
   // All inputs unify
-  @Override public boolean unify( Work work ) {
+  @Override public boolean unify( WorkNode work ) {
     if( !(in(0) instanceof RegionNode) ) return false; // Dying
     if( _tvar==null ) return false; // Memory not part of HM
     RegionNode r = (RegionNode) in(0);

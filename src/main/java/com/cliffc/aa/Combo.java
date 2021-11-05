@@ -154,9 +154,9 @@ public abstract class Combo {
     Env.GVN._opt_mode = GVNGCM.Mode.Opto;
 
     // General worklist algorithm
-    Work work = new Work("Combo",false) { @Override public Node apply(Node n) { throw unimpl(); } };
+    WorkNode work = new WorkNode("Combo",false) { @Override public Node apply(Node n) { throw unimpl(); } };
     // Collect unresolved calls, and verify they get resolved.
-    Work ambi = new Work("Ambi" ,false) { @Override public Node apply(Node n) { throw unimpl(); } };
+    WorkNode ambi = new WorkNode("Ambi" ,false) { @Override public Node apply(Node n) { throw unimpl(); } };
     // Collect old fdx of resolved calls; during resolution they go unused
     // changing their liveness in a not-monotonic way.  Force them to be
     // remain live until the of Combo.
@@ -225,9 +225,10 @@ public abstract class Combo {
       // is in error.  Force them to act as-if called by all choices and finish
       // off the combined algorithm.
       if( work.isEmpty() && !HM_IS_HIGH )
-        for( Node call : ambi._work )
-          if( !((CallNode)call)._not_resolved_by_gcp )
-            ((CallNode)work.add(call))._not_resolved_by_gcp = true;
+        //for( Node call : ambi._work )
+        //  if( !((CallNode)call)._not_resolved_by_gcp )
+        //    ((CallNode)work.add(call))._not_resolved_by_gcp = true;
+        throw unimpl("changing worklist impl");
     }
 
     assert Env.START.more_flow(work,false)==0; // Final conditions are correct
@@ -237,15 +238,16 @@ public abstract class Combo {
   }
 
   // Resolve ambiguous calls, and put on the worklist to make more progress.
-  private static void remove_ambi(Work ambi, Work work, Ary<Node> oldfdx) {
+  private static void remove_ambi(WorkNode ambi, WorkNode work, Ary<Node> oldfdx) {
     assert work.isEmpty();
-    for( int i=0; i<ambi.len(); i++ ) {
-      CallNode call = (CallNode)ambi.at(i);
-      if( call.remove_ambi(oldfdx) ) {
-        ambi.del(i--);
-        work.add(call);
-        work.add(call.cepi());
-      }
-    }
+    //for( int i=0; i<ambi.len(); i++ ) {
+    //  CallNode call = (CallNode)ambi.at(i);
+    //  if( call.remove_ambi(oldfdx) ) {
+    //    ambi.del(i--);
+    //    work.add(call);
+    //    work.add(call.cepi());
+    //  }
+    //}
+    throw unimpl("changing worklist impl");
   }
 }

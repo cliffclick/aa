@@ -6,7 +6,7 @@ import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
-import java.util.function.Predicate;
+import java.util.function.*;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
@@ -40,9 +40,8 @@ import static com.cliffc.aa.type.TypeFld.Access;
  *  element... but when both types have looped, we can stop and the discovered
  *  cycle is the Meet's cycle.
  */
-public class TypeStruct extends TypeObj<TypeStruct> {
+public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
   public boolean _open;   // Extra fields are treated as ALL (or ANY)
-  public boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
   private short _max_arg; // Max field number
   // The fields indexed by field name.  Effectively final.  Public iterator, but private.
   private final IdentityHashMap<String,TypeFld> _flds = new IdentityHashMap<>();
@@ -56,27 +55,35 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return this;
   }
 
+  boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
+  @Override public boolean cyclic() { return _cyclic; }
+  @Override public void set_cyclic() { _cyclic = true; }
+  @Override public void walk1( BiFunction<Type,String,Type> map ) { for( String key : keys() ) map.apply(_flds.get(key),key); }
+  @Override public void walk_update( UnaryOperator<Type> map ) { for( String key : keys() )  _flds.put(key,(TypeFld)map.apply(_flds.get(key)));  }
+
   // Hash code computation.
   // Fairly subtle, because the typical hash code is built up from the hashes of
   // its parts, but the parts are not available during construction of a cyclic type.
   // We can count on the field names and accesses but not field order, nor field type.
-  @Override public int compute_hash() {
-    int hash = super.compute_hash() +(_open?1023:0);
+  @Override int static_hash() {
+    final int hash0 = (super.static_hash() + 0xcafebabe) ^ (_open?1023:0);
+    int hash = hash0;
     for( TypeFld fld : flds() ) {
-      // Can depend on the field name and access, but NOT the type - because recursion
-      hash ^= (fld._fld.hashCode() + fld._access.hashCode());
+      // Can depend on the field name and access, but NOT the type - because recursion.
+      // Same hash independent of field visitation order, because the iterator does
+      // not make order guarantees.
+      hash += (fld._fld.hashCode() + fld._access.hashCode());
       _max_arg = (short)Math.max(_max_arg,fld._order);
     }
-    if( hash==0 ) hash = super.compute_hash();
+    if( hash==0 ) hash = Util.hash_spread(hash0);
     return hash;
   }
+  @Override public int compute_hash() { return static_hash(); }
 
   // Returns 1 for definitely equals, 0 for definitely unequals, and -1 if
   // needing the cyclic test.
   private int cmp( TypeStruct t ) {
-    assert _hash!=0 && t._hash!=0; // Not comparable until both are hashable
-    if( !super.equals(t) ) return 0;
-    if( _flds.size() != t._flds.size() || _open != t._open ) return 0;
+    if( !super.equals(t) || _flds.size() != t._flds.size() || _open != t._open ) return 0;
     // All fields must be equals
     for( TypeFld fld : flds() ) {
       TypeFld fld2 = t._flds.get(fld._fld);
@@ -87,6 +94,26 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return 1;                   // Everything is equals, right now
   }
 
+
+  // Static properties equals, no edges.  Already known to be the same class
+  // and not-equals.  May-equal fields are treated as equals
+  @Override boolean static_eq( TypeStruct t ) {
+    if( !super.equals(t) || _flds.size() != t._flds.size() || _open != t._open ) return false;
+    for( TypeFld fld1 : flds() ) {
+      TypeFld fld2 = t._flds.get(fld1._fld);
+      if( fld2==null ) return false; // Missing field name
+      assert (fld1._hash!=0) == fld1.interned();
+      assert (fld2._hash!=0) == fld2.interned();
+      // If both are interned, they must be equal
+      if( fld1._hash!=0 && fld2._hash!=0 && fld1!=fld2 ) return false;
+      // Also fail if other parts differ
+      if( fld1.cmp(fld2)==0 ) return false;
+    }
+    // If any fields are not interned, assume they might be equal
+    return true;
+  }
+
+
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeStruct) ) return false;
@@ -95,6 +122,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // normal Type.INTERN check, we also get here during building of cyclic
     // structures for which we'll fall into the cyclic check - as the Type[]s
     // are not interned yet.
+    assert _hash!=0 && t._hash!=0; // Not comparable until both are hashable
     int x = cmp(t);
     if( x != -1 ) return x == 1;
     // Unlike all other non-cyclic structures which are built bottom-up, cyclic
@@ -154,13 +182,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
     // Special shortcut for the all-prims display type
-    TypeFld bfld=fld_find("!_");
+    TypeFld bfld= get("!_");
     if( bfld != null ) {
       Type t1 = bfld._t;
       sb.p(t1 instanceof TypeFunPtr
            ? (((TypeFunPtr)t1)._fidxs.above_center() ? "PRIMS" : "LOW_PRIMS")
            : "PRIMS_"+t1);
-    } else if( fld_find("pi") != null ) {
+    } else if( get("pi") != null ) {
       sb.p("MATH");
     } else {
       boolean field_sep=false;
@@ -472,8 +500,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // For-all fields do the Meet.  Some are not-recursive and mapped, some
     // are part of the cycle and mapped or not.
     for( TypeFld fld : mt.flds() ) {
-      TypeFld lff = this.fld_find(fld._fld);
-      TypeFld rtf = that.fld_find(fld._fld);
+      TypeFld lff = this.get(fld._fld);
+      TypeFld rtf = that.get(fld._fld);
       Type lfi = lff == null ? null : lff._t;
       Type rti = rtf == null ? null : rtf._t;
       Type mti = (lfi==null) ? rti : (rti==null ? lfi : lfi.meet(rti));
@@ -523,7 +551,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Scan the old copy for elements that are too deep.
     // 'Meet' those into the clone at one layer up.
     RECURSIVE_MEET++;
-    assert Min.UF.isEmpty();
+    assert Cyclic.UF.isEmpty();
     assert OLD2APX.isEmpty();
     TypeStruct apx = ax_impl_struct( alias, true, cutoff, null, 0, this, this );
     RECURSIVE_MEET--;
@@ -543,7 +571,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Use alternative OLD past depth, to keep looping unrelated types
     // folding up.  Otherwise unrelated types might expand endlessly.
     TypeStruct nt = OLD2APX.get(old);
-    if( nt != null ) return Min.ufind(nt);
+    if( nt != null ) return Cyclic.ufind(nt);
 
     if( isnews ) {            // Depth-increasing struct?
       if( d==cutoff ) {       // Cannot increase depth any more
@@ -562,9 +590,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( TypeFld fld : old.flds() ) {
       Type t = fld._t;
       if( t instanceof TypeMemPtr )
-        nts.fld_find(fld._fld).setX(ax_impl_ptr (alias,cutoff,cutoffs,d,dold,(TypeMemPtr)t));
+        nts.get(fld._fld).setX(ax_impl_ptr (alias,cutoff,cutoffs,d,dold,(TypeMemPtr)t));
       else if( t instanceof TypeFunPtr )
-        nts.fld_find(fld._fld).setX(ax_impl_fptr(alias,cutoff,cutoffs,d,dold,(TypeFunPtr)t));
+        nts.get(fld._fld).setX(ax_impl_fptr(alias,cutoff,cutoffs,d,dold,(TypeFunPtr)t));
     }
     if( isnews && d==cutoff ) {
       while( !cutoffs.isEmpty() ) { // At depth limit, meet with cutoff to make the approximation
@@ -583,7 +611,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Use alternative OLD past depth, to keep looping unrelated types
     // folding up.  Otherwise unrelated types might expand endlessly.
     TypeMemPtr nt = OLD2APX.get(old);
-    if( nt != null ) return Min.ufind(nt);
+    if( nt != null ) return Cyclic.ufind(nt);
 
     // Walk internal structure, meeting into the approximation
     TypeMemPtr nmp = old.copy();
@@ -606,7 +634,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Use alternative OLD past depth, to keep looping unrelated types
     // folding up.  Otherwise unrelated types might expand endlessly.
     TypeFunPtr nt = OLD2APX.get(old);
-    if( nt != null ) return Min.ufind(nt);
+    if( nt != null ) return Cyclic.ufind(nt);
     if( old._dsp!=Type.ANY ) {
       // Walk internal structure, meeting into the approximation
       TypeFunPtr nmp = old.copy();
@@ -642,7 +670,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       return xt;
     }
     assert nt._hash==0;         // Not definable yet, as nt may yet pick up fields
-    nt = Min.ufind(nt);
+    nt = Cyclic.ufind(nt);
     if( nt == old ) return old;
     if( bs.tset(nt._uid,old._uid) ) return nt; // Been there, done that
 
@@ -654,7 +682,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       TypeFunPtr nptr = (TypeFunPtr)nt;
       if( old == Type.NIL || old == Type.XNIL ) return nptr.ax_meet_nil(old);
       if( old == Type.SCALAR )
-        return Min.union(nt,old); // Result is a scalar, which changes the structure of the new types.
+        return Cyclic.union(nt,old); // Result is a scalar, which changes the structure of the new types.
       if( old == Type.XSCALAR ) break; // Result is the nt unchanged
       if( !(old instanceof TypeFunPtr) ) throw AA.unimpl(); // Not a xscalar, not a funptr, probably falls to scalar
       TypeFunPtr optr = (TypeFunPtr)old;
@@ -668,7 +696,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       TypeMemPtr nptr = (TypeMemPtr)nt;
       if( old == Type.NIL || old == Type.XNIL ) return nptr.ax_meet_nil(old);
       if( old == Type.SCALAR )
-        return Min.union(nt,old); // Result is a scalar, which changes the structure of the new types.
+        return Cyclic.union(nt,old); // Result is a scalar, which changes the structure of the new types.
       if( old == Type.XSCALAR || old == Type.ANY ) break; // Result is the nt unchanged
       if( !(old instanceof TypeMemPtr) ) throw AA.unimpl(); // Not a xscalar, not a memptr, probably falls to scalar
       TypeMemPtr optr = (TypeMemPtr)old;
@@ -685,7 +713,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       nts._any &= ots._any ;  nts._use = nts._any;
       nts._open|= ots._open;
       for( TypeFld ofld : ots.flds() ) {
-        TypeFld nfld = nts.fld_find(ofld._fld);
+        TypeFld nfld = nts.get(ofld._fld);
         if( nfld == null ) {
           if( nts._any ) nts.add_fld(ofld); // New is high, so gets all the old fields
         } else {
@@ -697,7 +725,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         nts._flds.entrySet().removeIf( e -> !ots._flds.containsKey(e.getValue()._fld) );
       // Now recursively do all common fields
       for( TypeFld ofld : ots.flds() ) {
-        TypeFld nfld = nts.fld_find(ofld._fld);
+        TypeFld nfld = nts.get(ofld._fld);
         if( nfld != null && nfld != ofld )
           nfld.setX(ax_meet(bs,nfld._t,ofld._t));
       }
@@ -856,12 +884,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // ------ Utilities -------
 
   // Field by name.
-  public TypeFld fld_find( String name ) {
+  public TypeFld get( String name ) {
     assert !Util.eq(name,TypeFld.fldTop) && !Util.eq(name,TypeFld.fldBot);
     return _flds.get(name);
   }
   // Field type.  NPE if field-not-found
-  public Type at( String name ) { return fld_find(name)._t; }
+  public Type at( String name ) { return get(name)._t; }
   // Field by index.  Error if not unique.
   public TypeFld fld_idx( int idx ) {
     // TODO: reverse map.
@@ -878,6 +906,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // All fields for iterating.
   public Collection<TypeFld> flds() { return _flds.values(); }
+  public Collection<String> keys() { return _flds.keySet(); }
   // Alpha sorted
   public Collection<TypeFld> asorted_flds() {
     TreeMap<String, TypeFld> sorted = new TreeMap<>(_flds);
@@ -885,7 +914,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   // Field order sorted
   public Collection<TypeFld> osorted_flds() {
-    TreeMap<String, TypeFld> sorted = new TreeMap<>(Comparator.comparingInt(f0 -> fld_find(f0)._order));
+    TreeMap<String, TypeFld> sorted = new TreeMap<>(Comparator.comparingInt(f0 -> get(f0)._order));
     sorted.putAll(_flds);
     return sorted.values();
   }
@@ -896,7 +925,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public TypeStruct add_tup( Type t, int order ) { return add_fld(TypeFld.TUPS[order],Access.Final,t,order); }
   public TypeStruct add_fld( String name, Access mutable, int order ) { return add_fld(name,mutable,Type.SCALAR,order); }
   public TypeStruct add_fld( String name, Access mutable, Type tfld, int order ) {
-    assert name==null || Util.eq(name,TypeFld.fldBot) || fld_find(name)==null;
+    assert name==null || Util.eq(name,TypeFld.fldBot) || get(name)==null;
     assert !_any && _open;
     TypeStruct ts = copy();
     ts.add_fld(TypeFld.make(name,tfld,mutable,order));
@@ -914,7 +943,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   @Override public TypeStruct update(Access fin, String fld, Type val) { return update(fin,fld,val,false); }
 
   TypeStruct update(Access fin, String name, Type val, boolean precise) {
-    TypeFld fld = fld_find(name);
+    TypeFld fld = get(name);
     if( fld == null ) return this; // Unknown field, assume changes no fields
     // Pointers & Memory to a Store can fall during GCP, and go from r/w to r/o
     // and the StoreNode output must remain monotonic.  This means store
@@ -937,7 +966,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Used during liveness propagation from Loads.
   // Fields not-loaded are not-live.
   @Override TypeObj remove_other_flds(String name, Type live) {
-    TypeFld nfld = fld_find(name);
+    TypeFld nfld = get(name);
     if( nfld == null ) return UNUSED; // No such field, so all fields will be XSCALAR so UNUSED instead
     TypeStruct ts = _clone();
     for( Map.Entry<String,TypeFld> e : ts._flds.entrySet() ) {
@@ -1028,4 +1057,5 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         return false;
     return true;
   }
+
 }

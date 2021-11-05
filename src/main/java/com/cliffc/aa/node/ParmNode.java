@@ -77,7 +77,7 @@ public class ParmNode extends PhiNode {
     }
 
     // Trust the signature, if any.
-    TypeFld fld = fun.formals().fld_find(_name);
+    TypeFld fld = fun.formals().get(_name);
     Type t0 = fld==null ? Type.ANY : fld._t.simple_ptr();
     if( is_prim() && fld!=null ) return t0;
 
@@ -127,7 +127,7 @@ public class ParmNode extends PhiNode {
   }
 
   // If an input to a Mem Parm changes, the flow results of other Parms can change
-  @Override public void add_work_use_extra(Work work, Node chg) {
+  @Override public void add_work_use_extra(WorkNode work, Node chg) {
     if( is_mem() )
       for( Node parm : in(0)._uses )
         if( parm instanceof ParmNode && parm != this )
@@ -137,7 +137,7 @@ public class ParmNode extends PhiNode {
   // While Parms are mostly Phis (and yes for value flows), during unification
   // Parms are already treated by the H-M algo, and (via fresh_unify) get
   // "fresh" TVars for every input path.
-  @Override public boolean unify( Work work ) { return false; }
+  @Override public boolean unify( WorkNode work ) { return false; }
 
   // True if loading from a display/closure
   @Override public boolean is_display_ptr() { return _idx==DSP_IDX; }
@@ -151,7 +151,7 @@ public class ParmNode extends PhiNode {
     if( _idx <= MEM_IDX ) return null;  // No arg check on RPC or memory
     Node mem = fun.parm(MEM_IDX);
     assert _name!=null;
-    TypeFld ffld = fun.formals().fld_find(_name);
+    TypeFld ffld = fun.formals().get(_name);
     if( ffld==null ) return null; // dead display, because loading a high value
     Type formal = ffld._t;
     for( int i=1; i<_defs._len; i++ ) {

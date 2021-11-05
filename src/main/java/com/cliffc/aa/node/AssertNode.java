@@ -104,7 +104,7 @@ public class AssertNode extends Node {
     // Value is capped to the assert value.
     return t1.oob(t0);
   }
-  @Override public void add_work_use_extra(Work work, Node chg) {
+  @Override public void add_work_use_extra(WorkNode work, Node chg) {
     if( ideal_reduce()!=null )
       Env.GVN.add_reduce(this);
   }

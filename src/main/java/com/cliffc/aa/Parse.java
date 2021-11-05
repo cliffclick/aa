@@ -960,7 +960,7 @@ public class Parse implements Comparable<Parse> {
           skipNonWS();         // Skip possible type sig, looking for next arg
         }
       }
-      if( formals.fld_find(tok) != null ) err_ctrl3("Duplicate parameter name '" + tok + "'", badp);
+      if( formals.get(tok) != null ) err_ctrl3("Duplicate parameter name '" + tok + "'", badp);
       else formals = formals.add_fld(tok,Access.Final,t,ARG_IDX+bads._len); // Accumulate args
       bads.add(bad);
     }

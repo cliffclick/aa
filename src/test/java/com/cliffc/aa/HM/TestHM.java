@@ -738,7 +738,7 @@ all
           Type.RECURSIVE_MEET--;
           fs = fs.install();
           fps = TypeMemPtr.make(BitsAlias.make0(10),fs);
-          tps = (TypeMemPtr)((TypeFunPtr)fs.fld_find("not")._t)._ret;
+          tps = (TypeMemPtr)((TypeFunPtr)fs.get("not")._t)._ret;
           // *[11]@{ NO_DISP; boolSub=[21]{ any -> BOOL }; false = $FALSE; true  = $TRUE; }
           TypeStruct rez = TypeStruct.make(TypeFld.NO_DISP,
                                            TypeFld.make("false"  ,fps),

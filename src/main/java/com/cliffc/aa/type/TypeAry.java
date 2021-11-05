@@ -2,9 +2,10 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
+import java.util.function.*;
 
 // A TypeObj where fields are indexed by dynamic integer.
-public class TypeAry extends TypeObj<TypeAry> {
+public class TypeAry extends TypeObj<TypeAry> implements Cyclic {
   public  TypeInt _size;        // Count of elements
   private Type _elem;           // MEET over all elements.
   private TypeObj _stor;        // Storage class; widened over elements.  Can be, e.g. bits or complex structs with embedded pointers
@@ -16,6 +17,15 @@ public class TypeAry extends TypeObj<TypeAry> {
     _stor = stor;
     return this;
   }
+  boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
+  @Override public boolean cyclic() { return _cyclic; }
+  @Override public void set_cyclic() { _cyclic = true; }
+  @Override public void walk1( BiFunction<Type,String,Type> map ) {
+    //return map.apply(_t);
+    throw com.cliffc.aa.AA.unimpl();
+  }
+  @Override public void walk_update( UnaryOperator<Type> update ) { throw com.cliffc.aa.AA.unimpl(); }
+  
   @Override int compute_hash() { return super.compute_hash() + _size._hash + _elem._hash + _stor._hash;  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;

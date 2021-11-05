@@ -1,18 +1,17 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
-import java.util.function.Predicate;
+import java.util.function.*;
 
-import static com.cliffc.aa.AA.*;
+import static com.cliffc.aa.AA.ARG_IDX;
+import static com.cliffc.aa.AA.DSP_IDX;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 // Pointers-to-memory; these can be both the address and the value part of
 // Loads and Stores.  They carry a set of aliased TypeObjs.
-public final class TypeMemPtr extends Type<TypeMemPtr> {
+public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   // List of known memory aliases.  Zero is nil.
   public BitsAlias _aliases;
 
@@ -32,10 +31,28 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     _obj=obj;
     return this;
   }
-  @Override int compute_hash() {
-    assert _obj._hash != 0;
-    return (TMEMPTR + _aliases._hash + _obj._hash)|1;
+  boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
+  @Override public boolean cyclic() { return _cyclic; }
+  @Override public void set_cyclic() { _cyclic = true; }
+  @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_obj,"obj"); }
+  @Override public void walk_update( UnaryOperator<Type> update ) { _obj = (TypeObj)update.apply(_obj); }
+
+  int _hash() { return Util.hash_spread(super.static_hash() + _aliases._hash); }
+  @Override int  static_hash() { assert (_obj._hash!=0) == _obj.interned();  return _hash(); } // No edges
+  @Override int compute_hash() { assert  _obj._hash!=0;                      return _hash() + _obj._hash; } // Always edges
+  // Static properties equals plus interned edges.  Already known to be the
+  // same class and not-equals
+  @Override boolean static_eq(TypeMemPtr t) {
+    if( _aliases != t._aliases ) return false;
+    if( _obj==t._obj ) return true;
+    assert (  _obj._hash!=0) ==   _obj.interned();
+    assert (t._obj._hash!=0) == t._obj.interned();
+    // If both are interned, they must be equal
+    if( _obj._hash!=0 && t._obj._hash!=0 ) return _obj==t._obj;
+    // If either is not interned, assume they might become equals and report equals
+    return true;
   }
+  
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeMemPtr) ) return false;
@@ -317,5 +334,4 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
   // Used for assertions
   @Override boolean intern_check1() { return _obj.intern_lookup()!=null; }
-
 }

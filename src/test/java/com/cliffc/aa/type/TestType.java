@@ -401,8 +401,8 @@ public class TestType {
 
     // TODO: Needs a way to easily test simple recursive types
     TypeStruct mtab0 = (TypeStruct)mtab;
-    assertEquals("n",mtab0.fld_find("n")._fld);
-    assertEquals("v",mtab0.fld_find("v")._fld);
+    assertEquals("n",mtab0.get("n")._fld);
+    assertEquals("v",mtab0.get("v")._fld);
     TypeMemPtr mtab1 = (TypeMemPtr)mtab0.at("n");
     assertTrue(mtab1._aliases.test(alias2)&& mtab1._aliases.test(alias5));
     assertEquals(Type.REAL,mtab0.at("v"));

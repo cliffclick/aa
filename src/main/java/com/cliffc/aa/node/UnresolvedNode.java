@@ -82,7 +82,7 @@ public class UnresolvedNode extends UnOrFunPtrNode {
   // An UnresolvedNode is its own Leaf, because it might gather fairly unrelated
   // functions - such as integer-add vs string-add, or the 1-argument leading
   // '+' operator vs the more expected binop.
-  @Override public boolean unify( Work work ) {
+  @Override public boolean unify( WorkNode work ) {
     // Giant assert that all inputs are all Fun, ignoring errors.
     for( Node n : _defs ) {
       TV2 tv = n.tvar();

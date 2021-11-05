@@ -15,6 +15,7 @@ public class CEProjNode extends CProjNode {
   @Override public Type value(GVNGCM.Mode opt_mode) {
     if( _uses._len<1 ) return Type.CTRL; // Dead
     assert !(in(0) instanceof ScopeNode);
+    if( in(0).is_copy(0) != null ) return Type.CTRL;
     // Expect a call here
     return good_call(val(0),_uses.at(0)) ? Type.CTRL : Type.XCTRL;
   }

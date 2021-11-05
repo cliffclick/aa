@@ -5,6 +5,7 @@ import com.cliffc.aa.util.*;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
+import java.util.function.IntSupplier;
 
 /** an implementation of language AA
  */
@@ -91,7 +92,7 @@ import java.util.function.Predicate;
 
 // Current solution is that nil is signed: XNIL and NIL.
 
-public class Type<T extends Type<T>> implements Cloneable {
+public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   static private int CNT=1;
   public int _uid;   // Unique ID, will have gaps, used to uniquely order Types
   public int _hash;      // Hash for this Type; built recursively
@@ -101,12 +102,15 @@ public class Type<T extends Type<T>> implements Cloneable {
 
   protected Type() { _uid = _uid(); }
   private int _uid() { return CNT++; }
+  @Override public int getAsInt() { return _uid; }
   @SuppressWarnings("unchecked")
   protected T init(byte type, String name) { _type=type; _name=name; return (T)this; }
   @Override public final int hashCode( ) { assert _hash!=0; return _hash; }
+  // Static properties hashcode, optionally edge hashs
+  int static_hash() { return (_type<<1)|1|_name.hashCode(); }
   // Compute the hash and return it, with all child types already having their
   // hash computed.  Subclasses override this.
-  int compute_hash() { return (_type<<1)|1|_name.hashCode(); }
+  int compute_hash() { return static_hash(); }
   // Called during cyclic type construction, where much of the cycle has to be
   // build before the hashes can be computed - and sometimes they are already
   // computed (for e.g. hashing to look for interning to minimize).
@@ -117,6 +121,9 @@ public class Type<T extends Type<T>> implements Cloneable {
     return (T)this;
   }
 
+  // Static properties equals; not-interned edges are ignored.  Already
+  // known to be the same class and not-equals
+  boolean static_eq(T t) { return equals(t); }
   // Is anything equals to this?
   @Override public boolean equals( Object o ) {
     if( this == o ) return true;
@@ -235,8 +242,8 @@ public class Type<T extends Type<T>> implements Cloneable {
 
   // Cyclic (complex/slow) interning
   @SuppressWarnings("unchecked")
-  public T install() { return Min.install((T)this); }
-  
+  public T install() { return Cyclic.install((T)this); }
+
   // ----------------------------------------------------------
   // Simple types are implemented fully here.  "Simple" means: the code and
   // type hierarchy are simple, not that the Type is conceptually simple.

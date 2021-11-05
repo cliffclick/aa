@@ -57,7 +57,7 @@ public class CastNode extends Node {
     // Lift result.
     return _t.join(t);
   }
-  @Override public void add_work_extra(Work work, Type old) {
+  @Override public void add_work_extra(WorkNode work, Type old) {
     // If address sharpens, Cast can go dead because all Load uses make constants.
     if( _val!=old )
       work.add(this);
@@ -68,7 +68,7 @@ public class CastNode extends Node {
   }
 
   // Unifies the input to '(Nil ?:self)'
-  @Override public boolean unify( Work work ) {
+  @Override public boolean unify( WorkNode work ) {
     TV2 maynil = tvar(1); // arg in HM
     TV2 notnil = tvar();  // ret in HM
     if( maynil.is_err() ) return false;
@@ -114,8 +114,9 @@ public class CastNode extends Node {
   }
 
   @Override public @NotNull CastNode copy( boolean copy_edges) {
-    CastNode nnn = (CastNode)super.copy(copy_edges);
-    return Env.GVN._work_dom.add(nnn);
+    @NotNull CastNode nnn = (CastNode)super.copy(copy_edges);
+    Env.GVN._work_dom.add(nnn);
+    return nnn;
   }
 
   private static boolean checked( Node n, Node addr ) {

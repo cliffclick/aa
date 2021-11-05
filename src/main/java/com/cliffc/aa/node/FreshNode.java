@@ -28,7 +28,7 @@ public class FreshNode extends UnOrFunPtrNode {
   }
 
   @Override public Type value(GVNGCM.Mode opt_mode) { return id()._val; }
-  @Override public void add_work_extra(Work work,Type old) {
+  @Override public void add_work_extra(WorkNode work,Type old) {
     // Types changed, now might collapse
     if( !no_tvar_structure(old) && no_tvar_structure(_val) )
       Env.GVN.add_reduce(this);
@@ -46,7 +46,7 @@ public class FreshNode extends UnOrFunPtrNode {
     return t.isa(TypeInt.INT64) || t.isa(TypeFlt.FLT64);
   }
 
-  @Override public boolean unify( Work work ) {
+  @Override public boolean unify( WorkNode work ) {
 
     // If the Fresh is an above-center TypeFunPtr, then it is a function choice
     // and actually expects a following Call selecting which function.
@@ -81,7 +81,7 @@ public class FreshNode extends UnOrFunPtrNode {
 
     return id().tvar().fresh_unify(tvar(),nongen,work);
   }
-  @Override public void add_work_hm(Work work) {
+  @Override public void add_work_hm(WorkNode work) {
     super.add_work_hm(work);
     work.add(id());
     TV2 t = id().tvar();

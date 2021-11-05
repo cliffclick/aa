@@ -192,6 +192,31 @@ public class NonBlockingHashMapLong<TypeV>
       print_impl(i,K,V);
   }
 
+  /**
+   * Returns a string representation of this map.  The string representation
+   * consists of a list of key-value mappings in the order returned by the
+   * map's <tt>entrySet</tt> view's iterator, enclosed in braces
+   * (<tt>"{}"</tt>).  Adjacent mappings are separated by the characters
+   * <tt>", "</tt> (comma and space).  Each key-value mapping is rendered as
+   * the key followed by an equals sign (<tt>"="</tt>) followed by the
+   * associated value.  Keys and values are converted to strings as by
+   * {@link String#valueOf(Object)}.
+   *
+   * @return a string representation of this map
+   */
+  @Override
+  public String toString() {
+    IteratorLong iter = new IteratorLong();
+    if( !iter.hasNext() )  return "{}";
+    SB sb = new SB("{");
+    for( long key=iter.next(); iter.hasNext(); key=iter.next() ) {
+      TypeV val = get(key);
+      sb.p(key).p('=').p(val == this ? "(this Map)" : val.toString()).p(", ");
+    }
+    return sb.unchar(2).p("}").toString();
+  }
+
+  
   // Count of reprobes
   private transient ConcurrentAutoTable _reprobes = new ConcurrentAutoTable();
   /** Get and clear the current count of reprobes.  Reprobes happen on key
@@ -355,6 +380,14 @@ public class NonBlockingHashMapLong<TypeV>
     return false;
   }
 
+  // Get *any* valid Key.  Useful for making worklists out of a hashtable - the
+  // hashtable can remove dup work.  Repeated calls probably return the same
+  // Key, so only useful if keys are removed after calling.
+  public long getKey() {
+    if( _val_1 != TOMBSTONE ) throw new IllegalArgumentException("Cannot return key 0 and distinguish from no key");
+    return _chm._getKey();
+  }
+  
   // --- get -----------------------------------------------------------------
   /** Returns the value to which the specified key is mapped, or {@code null}
    *  if this map contains no mapping for the key.
@@ -1020,6 +1053,15 @@ public class NonBlockingHashMapLong<TypeV>
 
       return copied_into_new;
     } // end copy_slot
+
+    // Get *any* random key, or 0
+    private long _getKey() {
+      for( int i=0; i<_keys.length; i++ )
+        if( _keys[i] != NO_KEY && Prime.unbox(_vals[i])!=TOMBSTONE )
+          return _keys[i];
+      return _newchm == null ? 0 : _newchm._getKey();
+    } 
+   
   } // End of CHM
 
 

@@ -1,20 +1,18 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.Util;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.function.Predicate;
+import java.util.function.*;
 
-import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.AA.DSP_IDX;
+import static com.cliffc.aa.AA.MEM_IDX;
 
 
 // A field in a TypeStruct, with a type and a name and an Access.  Field
 // accesses make a small lattice of: {choice,r/w,final,r-o}.  Note that mixing
 // r/w and final moves to r-o and loses the final property.  No field order.
-public class TypeFld extends Type<TypeFld> {
+public class TypeFld extends Type<TypeFld> implements Cyclic {
   // Field names are never null, and never zero-length.  Names can be fldTop or fldBot.
   public String _fld;           // The field name
   public Type _t;               // Field type.  Usually some type of Scalar, or ANY or ALL.
@@ -28,29 +26,51 @@ public class TypeFld extends Type<TypeFld> {
     _hash = 0;
     return this;
   }
+  boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
+  @Override public boolean cyclic() { return _cyclic; }
+  @Override public void set_cyclic() { _cyclic = true; }
+  @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_t,"t"); }
+  @Override public void walk_update( UnaryOperator<Type> update ) { _t = update.apply(_t); }
 
-  @Override public int compute_hash() { return _fld.hashCode()+_t.hashCode()+_access.hashCode()+_order; }
-  @Override public boolean equals( Object o ) {
-    if( this==o ) return true;
-    if( !(o instanceof TypeFld) ) return false;
-    TypeFld t = (TypeFld)o;
-    // Check for obviously equals or not-equals
-    int x = cmp(t);
-    if( x != -1 ) return x == 1;
-    // Needs a cycle check
-    return cycle_equals(t);
-  }
+  // Ignore edges hash
+  int _hash() { return Util.hash_spread(super.static_hash() + _fld.hashCode() + _access.hashCode( ) + _order); };
+  @Override int  static_hash() { assert (_t._hash!=0) == _t.interned();  return _hash(); } // No edges
+  @Override int compute_hash() { assert  _t._hash!=0;                    return _hash() + _t._hash; } // Always edges
 
   // Returns 1 for definitely equals, 0 for definitely unequals and -1 for needing the circular test.
   int cmp(TypeFld t) {
     if( this==t ) return 1;
     if( !Util.eq(_fld,t._fld) || _access!=t._access || _order!=t._order ) return 0; // Definitely not equals without recursion
     if( _t==t._t ) return 1;    // All fields bitwise equals.
-    if( _t==null || t._t==null ) return 0; // Mid-construction (during cycle building)
+    if( _t==null || t._t==null ) return 0; // Mid-construction (during cycle building), declare unequal
     if( _t._type!=t._t._type ) return 0; // Last chance to avoid cycle check; types have a chance of being equal
+    // Cannot ask if interned here, since in a cycle the child will ask us again
+    if( _t._hash!=0 && t._t._hash!=0 && _t._hash!=t._t._hash ) return 0; // Another last chance at unequals
     // Some type pointer-not-equals, needs a cycle check
     return -1;
   }
+
+  // Static properties equals; not-interned edges are ignored.
+  // If cmp reports -1, then consider as equals.
+  @Override boolean static_eq(TypeFld t) {
+    int cmp = cmp(t);
+    if( cmp!= -1 ) return cmp==1;
+    assert (  _t._hash!=0) ==   _t.interned();
+    assert (t._t._hash!=0) == t._t.interned();
+    // If both are interned, they must be equal
+    if( _t._hash!=0 && t._t._hash!=0 ) return _t==t._t;
+    // If either is not interned, assume they might become equals and report equals
+    return true;
+  }
+
+  @Override public boolean equals( Object o ) {
+    if( this==o ) return true;
+    if( !(o instanceof TypeFld) ) return false;
+    // Check for obviously equals or not-equals
+    int x = cmp((TypeFld)o);
+    return x==-1 ? cycle_equals((TypeFld)o) : (x==1);
+  }
+
   @Override public boolean cycle_equals( Type o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeFld) ) return false;
@@ -200,7 +220,7 @@ public class TypeFld extends Type<TypeFld> {
   public TypeFld setX(Type t) {
     if( _t==t) return this; // No change
     _t = t;
-    assert _hash==0;  // Not hashed, since hash just changed
+    assert _hash==0 || _hash==compute_hash();  // Not hashed, since hash just changed
     return this;
   }
   public TypeFld setX(Type t, Access access) {
@@ -234,6 +254,5 @@ public class TypeFld extends Type<TypeFld> {
 
   // Used for assertions
   @Override boolean intern_check1() { return _t.intern_lookup()!=null; }
-
 }
 

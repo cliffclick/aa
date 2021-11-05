@@ -112,7 +112,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     return null;
   }
   // Called if Display goes unused
-  @Override public void add_work_use_extra(Work work, Node chg) {
+  @Override public void add_work_use_extra(WorkNode work, Node chg) {
     Type tdsp = display()._val;
     if( tdsp instanceof TypeMemPtr && ((TypeMemPtr)tdsp)._obj==TypeObj.UNUSED )
       Env.GVN.add_reduce(this);
@@ -139,7 +139,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     TypeTuple tret = (TypeTuple)(ret._val instanceof TypeTuple ? ret._val : ret._val.oob(TypeTuple.RET));
     return TypeFunPtr.make(ret._fidx,nargs(),display()._val,tret.at(REZ_IDX));
   }
-  @Override public void add_work_extra(Work work, Type old) {
+  @Override public void add_work_extra(WorkNode work, Type old) {
     if( old==_live )            // live impacts value
       work.add(this);
     if( old instanceof TypeFunPtr )
@@ -161,7 +161,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     return def==in(0) ? TypeMem.ANYMEM : (_live==TypeMem.LNO_DISP ? TypeMem.DEAD : TypeMem.ESCAPE);
   }
 
-  @Override public boolean unify( Work work ) {
+  @Override public boolean unify( WorkNode work ) {
     TV2 self = tvar();
     if( self.is_err() ) return false;
     if( is_forward_ref() )

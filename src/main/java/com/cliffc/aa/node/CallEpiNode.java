@@ -4,6 +4,7 @@ import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMap;
+import com.cliffc.aa.util.Work;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.Env.GVN;
@@ -186,7 +187,7 @@ public final class CallEpiNode extends Node {
 
   // Used during GCP and Ideal calls to see if wiring is possible.
   // Return true if a new edge is wired
-  public boolean check_and_wire( Work work ) {
+  public boolean check_and_wire( WorkNode work ) {
     if( !(_val instanceof TypeTuple) ) return false; // Collapsing
     CallNode call = call();
     Type tcall = call._val;
@@ -215,7 +216,7 @@ public final class CallEpiNode extends Node {
   // Wire the call args to a known function, letting the function have precise
   // knowledge of its callers and arguments.  This adds a edges in the graph
   // but NOT in the CG, until _cg_wired gets set.
-  void wire1( Work work, CallNode call, Node fun, Node ret ) {
+  void wire1( WorkNode work, CallNode call, Node fun, Node ret ) {
     assert _defs.find(ret)==-1; // No double wiring
     wire0(work,call,fun);
     // Wire self to the return
@@ -226,7 +227,7 @@ public final class CallEpiNode extends Node {
   }
 
   // Wire without the redundancy check, or adding to the CallEpi
-  void wire0(Work work, CallNode call, Node fun) {
+  void wire0(WorkNode work, CallNode call, Node fun) {
     // Wire.  Bulk parallel function argument path add
 
     // Add an input path to all incoming arg ParmNodes from the Call.  Cannot
@@ -450,7 +451,7 @@ public final class CallEpiNode extends Node {
     return tmem3;
   }
 
-  @Override public void add_work_use_extra(Work work, Node chg) {
+  @Override public void add_work_use_extra(WorkNode work, Node chg) {
     if( chg instanceof CallNode ) {    // If the Call changes value
       work.add(chg.in(MEM_IDX));       // The called memory   changes liveness
       work.add(((CallNode)chg).fdx()); // The called function changes liveness
@@ -538,7 +539,7 @@ public final class CallEpiNode extends Node {
     return _live;
   }
 
-  @Override public boolean unify( Work work ) {
+  @Override public boolean unify( WorkNode work ) {
     assert !_is_copy;
     if( tvar().is_err() ) return false; // Already sick, nothing to do
     CallNode call = call();
@@ -568,7 +569,7 @@ public final class CallEpiNode extends Node {
     return unify_fun(fdx.tvar(),work);
   }
 
-  private boolean unify_fun(TV2 tfun, Work work) {
+  private boolean unify_fun(TV2 tfun, WorkNode work) {
     if( tfun.is_err() )         // Unify with function error
       return tvar().unify(tfun,work);
     // If the function is not a function, make it a function
@@ -608,7 +609,7 @@ public final class CallEpiNode extends Node {
   }
 
 
-  @Override public void add_work_hm(Work work) {
+  @Override public void add_work_hm(WorkNode work) {
     super.add_work_hm(work);
     // My tvar changed, so my value lift changes
     work.add(this);

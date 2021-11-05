@@ -51,7 +51,7 @@ public class IfNode extends Node {
   }
 
   // Some CSE folded my input, extra Casts might optimize
-  @Override public void add_work_use_extra(Work work, Node chg) {
+  @Override public void add_work_use_extra(WorkNode work, Node chg) {
     if( in(1)==chg )
       for( Node uctl : _uses )
         for( Node cast : uctl._uses )

@@ -167,7 +167,7 @@ public class TV2 {
   }
 
   // Unify-at a key.  Expect caller already has args
-  public boolean unify_at(Node n, String key, TV2 tv2, Work work ) {
+  public boolean unify_at(Node n, String key, TV2 tv2, WorkNode work ) {
     if( is_err() ) return unify(tv2,work);// if i am dead, all my parts are dead, so tv2 is unifying with a dead part
     assert is_tvar() && !tv2.is_unified();
     TV2 old = get(key);
@@ -387,7 +387,7 @@ public class TV2 {
 
   // U-F union; 'this' becomes 'that'.  No change if only testing, and reports
   // progress.  If progress and not testing, adds _deps to worklist.
-  public boolean union(TV2 that, Work work) {
+  public boolean union(TV2 that, WorkNode work) {
     assert !is_unified() && !that.is_unified() && !is_err();
     assert !is_err() || that.is_err(); // Become the error, not error become that
     if( this==that ) return false;
@@ -433,7 +433,7 @@ public class TV2 {
   // U-F union; this is nilable and becomes that.
   // No change if only testing, and reports progress.
   @SuppressWarnings("unchecked")
-  boolean unify_nil(TV2 that, Work work) {
+  boolean unify_nil(TV2 that, WorkNode work) {
     assert is_nil() && !that.is_nil();
     if( work==null ) return true; // Will make progress
     // Clone the top-level struct and make this nilable point to the clone;
@@ -526,7 +526,7 @@ public class TV2 {
 
   // Structural unification.  Both 'this' and that' are the same afterwards.
   // Returns True if progressed.
-  public boolean unify(TV2 that, Work work) {
+  public boolean unify(TV2 that, WorkNode work) {
     if( this==that ) return false;
     assert DUPS.isEmpty();
     boolean progress = _unify(that,work);
@@ -536,7 +536,7 @@ public class TV2 {
 
   // Classic structural unification, no "fresh".  Unifies 'this' into 'that'.
   // Both 'this' and 'that' are the same afterwards.  Returns true if progress.
-  private boolean _unify(TV2 that, Work work) {
+  private boolean _unify(TV2 that, WorkNode work) {
     assert !is_unified() && !that.is_unified();
     if( this==that ) return false;
 
@@ -600,7 +600,7 @@ public class TV2 {
   }
 
   // Insert a new field
-  public boolean add_fld( String id, TV2 fld, Work work) {
+  public boolean add_fld( String id, TV2 fld, WorkNode work) {
     assert is_struct();
     if( _args==null ) _args = new NonBlockingHashMap<>();
     args_put(id,fld);
@@ -609,7 +609,7 @@ public class TV2 {
     return true;
   }
   // Delete a field
-  private void del_fld( String fld, Work work) {
+  private void del_fld( String fld, WorkNode work) {
     assert is_struct() || is_ary() ||
       (is_fun() && Util.eq("2",fld));
     _args.remove(fld);
@@ -628,7 +628,7 @@ public class TV2 {
   // Returns progress.
   // If work==null, we are testing only and make no changes.
   private static int FCNT;
-  public boolean fresh_unify(TV2 that, TV2[] nongen, Work work) {
+  public boolean fresh_unify(TV2 that, TV2[] nongen, WorkNode work) {
     assert VARS.isEmpty() && DUPS.isEmpty() && FCNT==0;
     boolean progress = _fresh_unify(that,nongen,work);
     VARS.clear();  DUPS.clear();  FCNT=0;
@@ -638,7 +638,7 @@ public class TV2 {
   // Apply 'this' structure on 'that'; no modifications to 'this'.  VARS maps
   // from the cloned LHS to the RHS replacement.
   @SuppressWarnings("unchecked")
-  private boolean _fresh_unify(TV2 that, TV2[] nongen, Work work ) {
+  private boolean _fresh_unify(TV2 that, TV2[] nongen, WorkNode work ) {
     assert !is_unified() && !that.is_unified();
 
     // Check for cycles
@@ -837,7 +837,7 @@ public class TV2 {
       TypeStruct ts = (TypeStruct)tptr._obj; // Always a TypeStruct here
       if( _args!=null )
         for( String id : _args.keySet() ) {
-          TypeFld fld = ts.fld_find(id);
+          TypeFld fld = ts.get(id);
           get(id).walk_types_in(tmem,fld==null ? Type.XSCALAR : fld._t);
         }
       return tptr.make_from(ts);
@@ -887,7 +887,7 @@ public class TV2 {
       TypeStruct ts0 = (TypeStruct)tmp._obj;
       long duid = dbl_uid(_uid);
       TypeStruct ts = WDUPS.get(duid);
-      if( ts != null ) ts._cyclic = true;
+      if( ts != null ) ts.set_cyclic();
       else {
         Type.RECURSIVE_MEET++;
         ts = TypeStruct.malloc("",false,false);
@@ -965,13 +965,13 @@ public class TV2 {
         ADUPS.put(_uid,tstr); // Stop cycles
         if( _args!=null )
           for( String id : _args.keySet() )
-            tstr.fld_find(id).setX(get(id)._as_flow(opto)); // Recursive
+            tstr.get(id).setX(get(id)._as_flow(opto)); // Recursive
         if( --Type.RECURSIVE_MEET == 0 )
           // Shrink / remove cycle dups.  Might make new (smaller)
           // TypeStructs, so keep RECURSIVE_MEET enabled.
           tstr = tstr.install();
       } else {
-        tstr._cyclic=true;    // Been there, done that, just mark it cyclic
+        tstr.set_cyclic();    // Been there, done that, just mark it cyclic
       }
       // The HM is_struct wants to be a TypeMemPtr, but the recursive builder
       // is built around TypeStruct.
@@ -1016,8 +1016,8 @@ public class TV2 {
   }
 
   // Recursively add-deps to worklist
-  public void add_deps_work( Work work ) { assert DEPS_VISIT.isEmpty(); add_deps_work_impl(work); DEPS_VISIT.clear(); }
-  private void add_deps_work_impl( Work work ) {
+  public void add_deps_work( WorkNode work ) { assert DEPS_VISIT.isEmpty(); add_deps_work_impl(work); DEPS_VISIT.clear(); }
+  private void add_deps_work_impl( WorkNode work ) {
     work.add(_deps);
     if( DEPS_VISIT.tset(_uid) ) return;
     if( _args != null )

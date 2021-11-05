@@ -44,7 +44,7 @@ public class MemJoinNode extends Node {
 
     return null;
   }
-  @Override public void add_work_def_extra(Work work, Node chg) {
+  @Override public void add_work_def_extra(WorkNode work, Node chg) {
     if( _uses._len==1 ) {
       Node u = _uses.at(0);
       if( u instanceof StoreNode ||

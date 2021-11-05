@@ -1076,7 +1076,7 @@ public class HM {
         TypeMemPtr tmp = (TypeMemPtr)trec;
         if( tmp._obj instanceof TypeStruct ) {
           TypeStruct tstr = (TypeStruct)tmp._obj;
-          TypeFld fld = tstr.fld_find(_id);
+          TypeFld fld = tstr.get(_id);
           if( fld!=null ) return fld._t; // Field type
         }
         if( tmp._obj.above_center() ) return Type.XSCALAR;
@@ -1603,13 +1603,13 @@ public class HM {
           ADUPS.put(_uid,tstr); // Stop cycles
           if( _args!=null )
             for( String id : _args.keySet() )
-              tstr.fld_find(id).setX(arg(id)._as_flow()); // Recursive
+              tstr.get(id).setX(arg(id)._as_flow()); // Recursive
           if( --Type.RECURSIVE_MEET == 0 )
             // Shrink / remove cycle dups.  Might make new (smaller)
             // TypeStructs, so keep RECURSIVE_MEET enabled.
             tstr = tstr.install();
         } else {
-          tstr._cyclic=true;    // Been there, done that, just mark it cyclic
+          tstr.set_cyclic();    // Been there, done that, just mark it cyclic
         }
         return TypeMemPtr.make(_aliases,tstr);
       }
@@ -2113,7 +2113,7 @@ public class HM {
       TypeMemPtr tmp = (TypeMemPtr)t;
       if( !(tmp._obj instanceof TypeStruct) ) return t.oob(Type.SCALAR);
       TypeStruct ts = (TypeStruct)tmp._obj;
-      TypeFld fld = ts.fld_find(id);
+      TypeFld fld = ts.get(id);
       if( fld==null ) return ts.oob(Type.SCALAR);
       return fld._t;
     }
@@ -2171,20 +2171,20 @@ public class HM {
         if( ts0.above_center() )
           return Type.ALL;
         TypeStruct ts = WDUPS.get(_uid);
-        if( ts != null ) ts._cyclic = true;
+        if( ts != null ) ts.set_cyclic();
         else {
           Type.RECURSIVE_MEET++;
           ts = TypeStruct.malloc("",false,false);
-          ts.add_fld(ts0.fld_find("^"));  // Copy display (which never appears in the HM type)
+          ts.add_fld(ts0.get("^"));  // Copy display (which never appears in the HM type)
           for( String id : _args.keySet() )
             ts.add_fld( TypeFld.malloc(id,null,Access.Final,TypeFld.oBot) );
           ts.set_hash();
           WDUPS.put(_uid,ts); // Stop cycles
           for( String id : _args.keySet() ) {
-            TypeFld fld0 = ts0.fld_find(id);
+            TypeFld fld0 = ts0.get(id);
             Type f0t = fld0==null ? Type.SCALAR  : fld0._t;
             int order= fld0==null ? TypeFld.oBot : fld0._order;
-            ts.fld_find(id).setX( arg(id).walk_types_out(f0t,jt,apply), order);
+            ts.get(id).setX( arg(id).walk_types_out(f0t,jt,apply), order);
           }
           if( --Type.RECURSIVE_MEET == 0 )
             ts = ts.install();
