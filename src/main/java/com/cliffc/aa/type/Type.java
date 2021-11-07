@@ -319,6 +319,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       else                   { _pool  ++; return (T)_frees.pop();  }
     }
     <T extends Type> T free(T t1, T t2) {
+      assert t1._hash==0 || t1.intern_lookup()!=t1;
       t1._dual = null;
       t1._hash = 0;
       _frees.push(t1);

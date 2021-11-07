@@ -1914,7 +1914,7 @@ public class HM {
             if( work==null ) return true; // Will definitely make progress
             T2 nrhs = lhs._fresh(nongen); // New RHS value
             if( !that.is_open() )
-              throw unimpl();   // TODO: Stamp "missing field" into nrhs
+              nrhs._err = "Missing field "+key;   // TODO: Stamp "missing field" into nrhs
             progress |= that.add_fld(key,nrhs,work);
           } // Else neither side is open, field is not needed in RHS
         } else {

@@ -48,8 +48,8 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
 
   private TypeStruct init( String name, boolean any, boolean open ) {
     super.init(TSTRUCT, name, any, any);
+    _cyclic = false;
     _open  = open;
-    _hash = 0;                  // No hash, as fields are changing
     _flds.clear();              // No leftover fields from pool
     _max_arg = DSP_IDX;         // Min of the max
     return this;
@@ -86,7 +86,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     if( !super.equals(t) || _flds.size() != t._flds.size() || _open != t._open ) return 0;
     // All fields must be equals
     for( TypeFld fld : flds() ) {
-      TypeFld fld2 = t._flds.get(fld._fld);
+      TypeFld fld2 = t.get(fld._fld);
       if( fld2==null ) return 0; // Missing field name
       int cmp = fld.cmp(fld2);
       if( cmp!= 1 ) return cmp; // Fields do not match, or needs a cyclic check
@@ -100,14 +100,8 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
   @Override boolean static_eq( TypeStruct t ) {
     if( !super.equals(t) || _flds.size() != t._flds.size() || _open != t._open ) return false;
     for( TypeFld fld1 : flds() ) {
-      TypeFld fld2 = t._flds.get(fld1._fld);
-      if( fld2==null ) return false; // Missing field name
-      assert (fld1._hash!=0) == fld1.interned();
-      assert (fld2._hash!=0) == fld2.interned();
-      // If both are interned, they must be equal
-      if( fld1._hash!=0 && fld2._hash!=0 && fld1!=fld2 ) return false;
-      // Also fail if other parts differ
-      if( fld1.cmp(fld2)==0 ) return false;
+      TypeFld fld2 = t.get(fld1._fld);
+      if( fld2==null || fld1.cmp(fld2)==0 ) return false;
     }
     // If any fields are not interned, assume they might be equal
     return true;
@@ -250,7 +244,13 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
   public static TypeStruct malloc( String name, boolean any, boolean open, TypeFld... flds ) {
     TypeStruct ts = malloc(name,any,open);
     for( TypeFld fld : flds ) ts.add_fld(fld);
-    return ts;
+    return ts.set_hash();
+  }
+  public static TypeStruct mallocD( TypeFld... flds ) {
+    TypeStruct ts = malloc("",false,false);
+    ts.add_fld(TypeFld.NO_DISP);
+    for( TypeFld fld : flds ) ts.add_fld(fld);
+    return ts.set_hash();
   }
 
   // Make using the fields, with no struct name, low and closed; typical for a

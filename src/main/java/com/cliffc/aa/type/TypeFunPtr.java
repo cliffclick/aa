@@ -30,6 +30,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
 
   private TypeFunPtr init(BitsFun fidxs, int nargs, Type dsp, Type ret ) {
     super.init(TFUNPTR,"");
+    _cyclic = false;
     _fidxs = fidxs; _nargs=nargs; _dsp=dsp; _ret=ret;
     return this;
   }
@@ -44,6 +45,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   @Override int static_hash() {
     Util.add_hash(super.static_hash()+_nargs);
     Util.add_hash(_fidxs._hash);
+    Util.add_hash(_dsp._type);
     return Util.get_hash();
   }
   // Excludes _ret._hash, which is part of cyclic hashes
@@ -53,22 +55,9 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   }
 
   // Static properties equals, no edges.  Already known to be the same class
-  // and not-equals
+  // and not-equals.
   @Override boolean static_eq(TypeFunPtr t) {
-    if( _fidxs != t._fidxs || _nargs != t._nargs ) return false;
-    if( _dsp!=t._dsp ) {
-      assert (  _dsp._hash!=0) ==   _dsp.interned();
-      assert (t._dsp._hash!=0) == t._dsp.interned();
-      // If both are interned, they must be equal
-      if( _dsp._hash!=0 && t._dsp._hash!=0 && _dsp!=t._dsp ) return false;
-    }
-    if( _ret!=t._ret ) {
-      assert (  _ret._hash!=0) ==   _ret.interned();
-      assert (t._ret._hash!=0) == t._ret.interned();
-      // If both are interned, they must be equal
-      if( _ret._hash!=0 && t._ret._hash!=0 && _ret!=t._ret ) return false;
-    }    
-    return true;                // Assumed equal, if edges become equal
+    return _fidxs == t._fidxs &&  _nargs == t._nargs && _dsp._type == t._dsp._type && _ret._type == t._ret._type;
   }
 
   @Override public boolean equals( Object o ) {

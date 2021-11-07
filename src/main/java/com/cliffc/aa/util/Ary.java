@@ -137,6 +137,11 @@ public class Ary<E> implements Iterable<E> {
     return old;
   }
 
+  // Increment length, revealing the E behind the _len, or null
+  public E inc_len( ) {
+    if( _len >= _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);
+    return _es[_len++];
+  }
   public Ary<E> set_len( int len ) {
     if( len > _len )
       while( len>= _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);

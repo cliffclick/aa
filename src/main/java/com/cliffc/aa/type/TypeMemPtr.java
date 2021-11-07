@@ -27,6 +27,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
 
   private TypeMemPtr init(BitsAlias aliases, TypeObj obj ) {
     super.init(TMEMPTR,"");
+    _cyclic = false;
     _aliases = aliases;
     _obj=obj;
     return this;
@@ -37,21 +38,12 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_obj,"obj"); }
   @Override public void walk_update( UnaryOperator<Type> update ) { _obj = (TypeObj)update.apply(_obj); }
 
-  int _hash() { return Util.hash_spread(super.static_hash() + _aliases._hash); }
-  @Override int  static_hash() { assert (_obj._hash!=0) == _obj.interned();  return _hash(); } // No edges
-  @Override int compute_hash() { assert  _obj._hash!=0;                      return _hash() + _obj._hash; } // Always edges
-  // Static properties equals plus interned edges.  Already known to be the
-  // same class and not-equals
-  @Override boolean static_eq(TypeMemPtr t) {
-    if( _aliases != t._aliases ) return false;
-    if( _obj==t._obj ) return true;
-    assert (  _obj._hash!=0) ==   _obj.interned();
-    assert (t._obj._hash!=0) == t._obj.interned();
-    // If both are interned, they must be equal
-    if( _obj._hash!=0 && t._obj._hash!=0 ) return _obj==t._obj;
-    // If either is not interned, assume they might become equals and report equals
-    return true;
-  }
+  int _hash() { return Util.hash_spread(super.static_hash() + _aliases._hash + _obj._type); }
+  @Override int  static_hash() { return _hash(); } // No edges
+  @Override int compute_hash() { assert  _obj._hash!=0;  return _hash() + _obj._hash; } // Always edges
+  // Static properties equals.  Already known to be the same class and
+  // not-equals.  Ignore edges.
+  @Override boolean static_eq(TypeMemPtr t) { return _aliases == t._aliases && _obj._type == t._obj._type; }
   
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;

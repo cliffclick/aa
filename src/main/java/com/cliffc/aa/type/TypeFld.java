@@ -22,8 +22,8 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   private TypeFld init( @NotNull String fld, Type t, Access access, int order ) {
     super.init(TFLD,"");
     assert !(t instanceof TypeFld);
+    _cyclic = false;
     _fld=fld; _t=t; _access=access; _order=order;
-    _hash = 0;
     return this;
   }
   boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
@@ -44,24 +44,13 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     if( _t==t._t ) return 1;    // All fields bitwise equals.
     if( _t==null || t._t==null ) return 0; // Mid-construction (during cycle building), declare unequal
     if( _t._type!=t._t._type ) return 0; // Last chance to avoid cycle check; types have a chance of being equal
-    // Cannot ask if interned here, since in a cycle the child will ask us again
-    if( _t._hash!=0 && t._t._hash!=0 && _t._hash!=t._t._hash ) return 0; // Another last chance at unequals
     // Some type pointer-not-equals, needs a cycle check
     return -1;
   }
 
   // Static properties equals; not-interned edges are ignored.
-  // If cmp reports -1, then consider as equals.
-  @Override boolean static_eq(TypeFld t) {
-    int cmp = cmp(t);
-    if( cmp!= -1 ) return cmp==1;
-    assert (  _t._hash!=0) ==   _t.interned();
-    assert (t._t._hash!=0) == t._t.interned();
-    // If both are interned, they must be equal
-    if( _t._hash!=0 && t._t._hash!=0 ) return _t==t._t;
-    // If either is not interned, assume they might become equals and report equals
-    return true;
-  }
+  // 0 is false, either 1 or -1 is true.
+  @Override boolean static_eq(TypeFld t) { return cmp(t)!=0; }
 
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -74,9 +63,9 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   @Override public boolean cycle_equals( Type o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeFld) ) return false;
-    TypeFld t2 = (TypeFld)o;
-    if( !Util.eq(_fld,t2._fld) || _access!=t2._access || _order!=t2._order ) return false;
-    return _t == t2._t || _t.cycle_equals(t2._t);
+    int cmp = cmp((TypeFld)o);
+    if( cmp!= -1 ) return cmp==1;
+    return _t.cycle_equals(((TypeFld)o)._t);
   }
 
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
