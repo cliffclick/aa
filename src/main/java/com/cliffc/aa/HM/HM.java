@@ -361,8 +361,13 @@ public class HM {
     return require('"', new Con(TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(new String(BUF,start,X-start).intern()))));
   }
   private static byte skipWS() {
-    while( X<BUF.length && isWS(BUF[X]) ) X++;
-    return X==BUF.length ? -1 : BUF[X];
+    while(true) {
+      if( X == BUF.length ) return -1;
+      if( X+1<BUF.length && BUF[X]=='/' && BUF[X+1]=='/' )
+        while( BUF[X]!='\n' ) X++;
+      if( !isWS(BUF[X]) ) return BUF[X];
+      X++;
+    }
   }
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
   private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }

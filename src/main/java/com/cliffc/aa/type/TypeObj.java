@@ -16,12 +16,13 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   boolean _any;                 // True=choice/join; False=all/meet
   boolean _use;                 // Equal to _any for OBJ/XOBJ; unequal to _any for UNUSED/ISUSED
   @SuppressWarnings("unchecked")
-  protected O init(byte type, String name, boolean any, boolean use) {
-    super.init(type,name);
+  O init(String name, boolean any, boolean use) {
+    super.init(name);
     _any=any;
     _use=use;
     return (O)this;
   }
+  @Override O copy() { return _copy().init(_name,_any,_use); }
   // Hash does not depend on other types, so never changes
   @Override int compute_hash() { return super.compute_hash()+(_any?1:0)+(_use?2:0); }
   @Override public boolean equals( Object o ) {
@@ -37,8 +38,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
 
   static { new Pool(TOBJ,new TypeObj()); }
   private static TypeObj make( String name, boolean any, boolean use ) {
-    TypeObj t1 = POOLS[TOBJ].malloc();
-    return (TypeObj)t1.init(TOBJ,name,any,use).hashcons_free();
+    return (TypeObj)POOLS[TOBJ].<TypeObj>malloc().init(name,any,use).hashcons_free();
   }
 
   public static final TypeObj OBJ   = make("",false,false); // Any obj; allocated as *something*
@@ -49,7 +49,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
 
   @Override boolean is_display() { return false; }
   @SuppressWarnings("unchecked")
-  @Override protected O xdual() { return (O)new TypeObj().init(TOBJ,_name,!_any,!_use); }
+  @Override protected O xdual() { return POOLS[_type].<O>malloc().init(_name,!_any,!_use); }
   @Override protected Type xmeet( Type t ) {
     if( !(t instanceof TypeObj) ) return ALL;
     assert this!=t; // already handled

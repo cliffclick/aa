@@ -65,7 +65,6 @@ public class TypeMem extends Type<TypeMem> {
   private HashMap<TypeMemPtr,TypeMemPtr> _sharp_cache;
 
   private TypeMem init(TypeObj[] pubs) {
-    super.init(TMEM,"");
     assert check(pubs);    // Caller has canonicalized arrays already
     _pubs = pubs;
     return this;
@@ -265,7 +264,7 @@ public class TypeMem extends Type<TypeMem> {
     for( int i = 0; i< _pubs.length; i++ )
       if( _pubs[i] != null )
         pubs[i] = (TypeObj) _pubs[i].dual();
-    return new TypeMem().init(pubs);
+    return POOLS[TMEM].<TypeMem>malloc().init(pubs);
   }
   @Override protected Type xmeet( Type t ) {
     if( t._type != TMEM ) return ALL;

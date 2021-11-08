@@ -27,14 +27,15 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   public int _nargs;            // Number of formals, including the display
   public Type _dsp;             // Display; is_display_ptr
   public Type _ret;             // Return scalar type
+  boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
 
   private TypeFunPtr init(BitsFun fidxs, int nargs, Type dsp, Type ret ) {
-    super.init(TFUNPTR,"");
+    super.init("");
     _cyclic = false;
     _fidxs = fidxs; _nargs=nargs; _dsp=dsp; _ret=ret;
     return this;
   }
-  boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
+  @Override TypeFunPtr copy() { return _copy().init(_fidxs,_nargs,_dsp,_ret); }  
   @Override public boolean cyclic() { return _cyclic; }
   @Override public void set_cyclic() { _cyclic = true; }
   @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_dsp,"dsp");  map.apply(_ret,"ret"); }

@@ -11,7 +11,7 @@ public class TypeTuple extends Type<TypeTuple> {
   boolean _any;
   public Type[] _ts; // The fixed known types
   protected TypeTuple init( boolean any, Type[] ts ) {
-    super.init(TTUPLE,"");
+    super.init("");
     _any = any;
     _ts = ts;
     return this;
@@ -119,7 +119,7 @@ public class TypeTuple extends Type<TypeTuple> {
     Type[] ts = Types.get(_ts.length);
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].dual();
     ts = Types.hash_cons(ts);
-    return new TypeTuple().init(!_any, ts);
+    return POOLS[TTUPLE].<TypeTuple>malloc().init(!_any, ts);
   }
   // Standard Meet.  Tuples have an infinite extent of 'ALL' for low, or 'ANY'
   // for high.  After the meet, the infinite tail is trimmed.

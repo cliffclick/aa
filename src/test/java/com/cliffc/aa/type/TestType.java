@@ -440,8 +440,8 @@ public class TestType {
     Type.RECURSIVE_MEET++;
     TypeFld fldn1 = TypeFld.malloc("n");
     TypeFld fldn4 = TypeFld.malloc("n");
-    TypeStruct as1 = TypeStruct.malloc("",false,true,fldn1,fldvi); as1._name = "A:";
-    TypeStruct bs4 = TypeStruct.malloc("",false,true,fldn4,fldvf); bs4._name = "B:";
+    TypeStruct as1 = TypeStruct.malloc("A:",false,true,fldn1,fldvi);
+    TypeStruct bs4 = TypeStruct.malloc("B:",false,true,fldn4,fldvf);
     as1.set_hash();
     bs4.set_hash();
     TypeMemPtr ap5 = TypeMemPtr.make(alias,as1);

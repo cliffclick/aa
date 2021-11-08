@@ -343,13 +343,15 @@ all = @{
     // Build a cycle of length 2.
     BitsAlias aliases = BitsAlias.make0(alias);
     if( nil ) aliases = aliases.meet_nil();
-    TypeMemPtr cycle_ptr0 = TypeMemPtr.make(aliases,TypeObj.XOBJ);
-    TypeStruct cycle_str1 = TypeStruct.make("",false,false,NO_DSP,TypeFld.make("n1",cycle_ptr0),TypeFld.make("v1",fld));
-    TypeMemPtr cycle_ptr1 = TypeMemPtr.make(aliases,cycle_str1);
-    TypeStruct cycle_str2 = TypeStruct.make("",false,false,NO_DSP,TypeFld.make("n1",cycle_ptr1),TypeFld.make("v1",fld));
-    TypeStruct cycle_strn = cycle_str2.approx(1,alias);
-    TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn.at("n1");
-    return cycle_ptrn;
+    TypeFld v1 = TypeFld.make("v1",fld);
+    Type.RECURSIVE_MEET++;
+    TypeFld n1 = TypeFld.malloc("n1");
+    TypeStruct cycle_str = TypeStruct.malloc("",false,false,NO_DSP,n1,v1);
+    TypeMemPtr cycle_ptr = TypeMemPtr.make(aliases,cycle_str);
+    n1.setX(cycle_ptr);
+    Type.RECURSIVE_MEET--;
+    cycle_str = cycle_str.install();
+    return (TypeMemPtr)cycle_str.get("n1")._t;
   }
   private static TypeMemPtr build_cycle2( boolean nil, Type fld ) {
     // Unrolled, known to only produce results where either other nested
@@ -376,7 +378,7 @@ all = @{
   @Test public void test32() {
     run("map = { fcn lst -> @{ n1 = (map fcn lst.n0), v1 = (fcn lst.v0) } }; map",
         "{ { A -> B } C:@{ n0 = C; v0 = A; ...} -> D:@{ n1 = D; v1 = B} }",
-        // Build a cycle of length 2, without nil.
+        // Build a cycle, without nil.
         tfs(build_cycle(9,false,Type.SCALAR)));
   }
 
@@ -386,7 +388,7 @@ all = @{
   @Test public void test33() {
     run("map = { fcn lst -> (if lst @{ n1=(map fcn lst.n0), v1=(fcn lst.v0) } 0) }; map",
         "{ { A -> B } C:@{ n0 = C; v0 = A; ...}? -> D:@{ n1 = D; v1 = B}? }",
-        // Build a cycle of length 2, with nil.
+        // Build a cycle, with nil.
         () -> tfs(build_cycle(9,true,Type.SCALAR)));
   }
 
@@ -791,53 +793,52 @@ all
 
   // Full on Peano arithmetic.
   @Test public void test58() {
-    run(
-        "void = @{};                                   "+
-        "err  = {unused->(err unused)};                "+
-        // Booleans, support AND, OR, THENELSE.  Eg. b.false.and is a function which
-        // ignores its input and returns false.
-        "b=                                            "+
-        "  true = @{                                   "+
-        "    and      = {o -> o}                       "+ // true  AND anything is that thing
-        "    or       = {o -> b.true}                  "+ // true  OR  anything is true
-        "    thenElse = {then else->(then void) }      "+
-        "  };                                          "+
-        "  false = @{                                  "+
-        "    and      = {o -> b.false}                 "+ // false AND anything is false
-        "    or       = {o -> o}                       "+ // false OR  anything is that thing
-        "    thenElse = {then else->(else void) }      "+
-        "  };                                          "+
-        "  @{true=true, false=false};                  "+
-        // Natural numbers are formed from zero (z) and succ (s).
-        // They are structs which support isZero, pred, succ and add.
-        "n=                                            "+
-        // Zero, is a struct supporting functions "isZero" (always true), "pred"
-        // (error; no predecessor of zero), "succ" successor, and "add" which is a no-op.
-        "  z = @{                                      "+
-        "    isZero = {unused ->b.true},               "+
-        "    pred   = err                              "+
-        "    succ   = {unused -> (n.s n.z)},           "+
-        "    add    = {o-> o}                          "+
-        "  };                                          "+
-        // Successor, is a function taking a natural number and returning the successor
-        // (which is just a struct supporting the functions of natural numbers).
-        "  s = {pred ->                                "+
-        "    self=@{                                   "+
-        "      isZero = {unused ->b.false},            "+ // isZero is always false for anything other than zero
-        "      pred   = {unused->pred},                "+ // careful! 'pred=' is a label, the returned 'pred' was given as the argument
-        "      succ   = {unused -> (n.s self)},        "+
-        "      add    = {m -> ((pred.add m).succ void)}"+ // a little odd, but really this counts down (via recursion) on the LHS and applies that many succ on the RHS
-        "    };                                        "+
-        "    self                                      "+
-        "  };                                          "+
-        "  @{s=s, z=z};                                "+
-        // Do some Maths
-        "one = (n.s n.z);                              "+ // One is the successor of zero
-        "two = (one.add one);                          "+ // Two is one plus one
-        "three =(n.s two);                             "+ // Three is the successor of two
-        // Return a result, so things are not dead.
-        "@{b=b,n=n, one=one,two=two,three=three}"+
-        "",
+    run("""        
+void = @{};
+err  = {unused->(err unused)};
+// Booleans, support AND, OR, THEN/ELSE.
+b=
+  true = @{
+    and_ = {o -> o}        // true AND anything is that thing
+    _or_ = {o -> b.true}   // true OR  anything is true
+    then = {then else->(then void) }
+  };
+  false = @{
+    and_ = {o -> b.false}  // false AND anything is false
+    _or_ = {o -> o}        // false OR  anything is that thing
+    then = {then else->(else void) }
+  };
+  @{true=true, false=false};
+// Natural numbers are formed from zero (z) and succ (s).
+// They are structs which support zero, pred, succ and add.
+n=
+// Zero, is a struct supporting functions "zero" (always true), "pred"
+// (error; no predecessor of zero), "succ" successor, and "add_" which is a no-op.
+  z = @{
+    zero = {unused ->b.true},
+    pred = err
+    succ = {unused -> (n.s n.z)},
+    add_ = {o-> o}
+  };
+// Successor, is a function taking a natural number and returning the successor
+// (which is just a struct supporting the functions of natural numbers).
+  s = {pred ->
+    self=@{
+      zero = {unused ->b.false},  // zero is always false for anything other than zero
+      pred = {unused->pred},      // careful! 'pred=' is a label, the returned 'pred' was given as the argument
+      succ = {unused -> (n.s self)},
+      add_ = {m -> ((pred.add_ m).succ void)} // a little odd, but really this counts down (via recursion) on the LHS and applies that many succ on the RHS
+    };
+    self
+  };
+  @{s=s, z=z};
+// Do some Maths
+one = (n.s n.z);      // One is the successor of zero
+two = (one.add_ one); // Two is one plus one
+three =(n.s two);     // Three is the successor of two
+// Return a result, so things are not dead.
+@{b=b,n=n, one=one,two=two,three=three}
+""",
         "@{" +
         // Booleans, support AND, OR, THENELSE.  Eg. b.false.and is a function which
         // ignores its input and returns false.

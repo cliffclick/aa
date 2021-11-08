@@ -100,11 +100,10 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   public String _name;   // All types can be named
   T _dual; // All types support a dual notion, eagerly computed and cached here
 
-  protected Type() { _uid = _uid(); }
-  private int _uid() { return CNT++; }
+  private static int _uid() { return CNT++; }
   @Override public int getAsInt() { return _uid; }
   @SuppressWarnings("unchecked")
-  protected T init(byte type, String name) { _type=type; _name=name; return (T)this; }
+  T init(String name) { _name=name; return (T)this; }
   @Override public final int hashCode( ) { assert _hash!=0; return _hash; }
   // Static properties hashcode, optionally edge hashs
   int static_hash() { return (_type<<1)|1|_name.hashCode(); }
@@ -160,11 +159,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   }
 
   // Construct a simple type, possibly from a pool
-  static Type make(byte type) {
-    Pool P = POOLS[type];
-    Type t1 = P.malloc();
-    return t1.init(type,"").hashcons_free();
-  }
+  static Type make(byte type) { return POOLS[type].malloc().init("").hashcons_free(); }
   @SuppressWarnings("unchecked")
   T free(T t2) { return (T)POOLS[_type].free(this,t2); }
   T hashcons_free() {
@@ -310,41 +305,47 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     private final Type _gold;
     Pool(byte t, Type gold) {
       gold._type = t;
+      gold._name = "";
       _gold=gold;
       _frees= new Ary<>(new Type[1],0);
       POOLS[t] = this;
     }
     <T extends Type> T malloc() {
-      if( _frees.isEmpty() ) { _malloc++; _clone--; return (T)_gold.copy(); }
-      else                   { _pool  ++; return (T)_frees.pop();  }
+      if( _frees.isEmpty() ) {
+        _malloc++;              // Make fresh
+        try { T t = (T)_gold.clone(); t._uid = _uid(); return t; }
+        catch( CloneNotSupportedException ignore ) {throw new RuntimeException("shut java up about not clonable");}
+      } else {
+        _pool++;                // Pull a from free pool
+        return (T)_frees.pop();
+      }
     }
     <T extends Type> T free(T t1, T t2) {
-      assert t1._hash==0 || t1.intern_lookup()!=t1;
-      t1._dual = null;
-      t1._hash = 0;
-      _frees.push(t1);
+      assert !t1.interned();
+      if( t1 instanceof TypeMemPtr ) ((TypeMemPtr)t1)._aliases=null; // is-free tag for TMP
+      t1._dual = null;   // Too easy to make mistakes, so zap now
+      t1._hash = 0;      // Too easy to make mistakes, so zap now
+      t1._name = "";     // Too easy to make mistakes, so zap now
+      _frees.push(t1);   // On the free list
       _free++;
+      assert _frees._len<100; // Basically asserting we get Types from Pool.malloc and not by normal allocation
       return t2;
     }
   }
-  // Overridable clone method.  Not interned.
-  @SuppressWarnings("unchecked")
-  T copy() {
-    POOLS[_type]._clone++;
-    T t=null;
-    try { t = (T)clone(); }
-    catch( CloneNotSupportedException ignore ) {}
-    t._uid = _uid();            // Set a new uid
-    t._dual = null;
-    t._hash = 0;
-    return t;
+
+  // All the simple type pools
+  static {
+    for( int i=0; i<TSIMPLE; i++ )
+      POOLS[i]=new Pool((byte)i,new Type());
   }
 
-  // All the simple types share the same pool
-  static {
-    Pool P = new Pool(TALL,new Type());
-    for( int i=0; i<TSIMPLE; i++ ) POOLS[i]=P;
+  protected T _copy() {
+    POOLS[_type]._clone++;  POOLS[_type]._malloc--; // Move the count from malloc to clone
+    return POOLS[_type].malloc();
   }
+
+  // Overridable clone method.  Not interned.
+  T copy() { assert is_simple(); return _copy(); }
 
   public  static final Type ALL    = make( TALL   ); // Bottom
   public  static final Type ANY    = make( TANY   ); // Top
@@ -370,7 +371,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // TypeTuple - these may be passed as a scalar reference type in the future
   // but for now Tuples explicitly refer to multiple values, and a SCALAR is
   // exactly 1 value.
-  private static /*final*/ Type[] SCALAR_PRIMS;
+  private static Type[] SCALAR_PRIMS;
 
   boolean is_simple() { return _type < TSIMPLE; }
   private boolean is_ptr() { byte t = _type;  return t == TFUNPTR || t == TMEMPTR; }
@@ -385,8 +386,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   public final T dual() { return _dual; }
 
   // Compute dual right now.  Overridden in subclasses.
-  @SuppressWarnings("unchecked")
-  T xdual() { return (T)new Type().init((byte)(_type^1),""); }
+  T xdual() { return POOLS[_type^1].malloc(); }
   T rdual() { assert _dual!=null; return _dual; }
 
   // ----------------------------------------------------------

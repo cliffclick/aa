@@ -27,8 +27,8 @@ public class TestApprox {
     Type.RECURSIVE_MEET++;
     TypeFld f01 = TypeFld.malloc("a");
     TypeFld f10 = TypeFld.malloc("a");
-    TypeStruct t0 = TypeStruct.malloc("",false,true,f01,fbint).set_hash();
-    TypeStruct t1 = TypeStruct.malloc("",false,true,f10,fbflt).set_hash();
+    TypeStruct t0 = TypeStruct.malloc("",false,true,f01,fbint);
+    TypeStruct t1 = TypeStruct.malloc("",false,true,f10,fbflt);
     TypeMemPtr p0 = TypeMemPtr.make(alias0,t0);
     TypeMemPtr p1 = TypeMemPtr.make(alias0,t1);
     f01.setX(p1);
@@ -64,7 +64,7 @@ public class TestApprox {
     ds = p1.depth();
     assertEquals(1,(int)ds.get(t0));
     assertEquals(0,(int)ds.get(t1));
-    assertEquals(0,(int)ds.get(p0));
+    assertEquals(1,(int)ds.get(p0));
 
     TypeStruct t2 = TypeStruct.make(TypeFld.make("a",p1), TypeFld.make("b",TypeInt.con(97)));
     TypeMemPtr p2 = TypeMemPtr.make(alias0,t2);
@@ -97,13 +97,13 @@ public class TestApprox {
     TypeStruct tax = t3.approx(CUTOFF,alias0);
     TypeMemPtr pax = TypeMemPtr.make(alias0,tax);
     HashMap<Type,Integer> ds2 = pax.depth();
-    assertEquals(CUTOFF,TypeMemPtr.max(alias0,ds2));
+    assertEquals(CUTOFF-1,TypeMemPtr.max(alias0,ds2));
     TypeMemPtr txp1 = (TypeMemPtr)tax.at("a");
-    assertEquals(0,(int)ds2.get(txp1));
+    assertEquals(1,(int)ds2.get(txp1));
     TypeStruct txs1 = (TypeStruct)txp1._obj;
     assertEquals(1,(int)ds2.get(txs1));
     TypeMemPtr txp2 = (TypeMemPtr)txs1.at("a");
-    assertEquals(1,(int)ds2.get(txp2));
+    assertEquals(2,(int)ds2.get(txp2));
     TypeStruct txs2 = (TypeStruct)txp2._obj;
     assertEquals(2,(int)ds2.get(txs2));
     assertEquals(TypeInt.NINT8,txs2.at("b"));
@@ -179,11 +179,11 @@ public class TestApprox {
     HashMap<Type,Integer> ds2 = pax.depth();
     assertEquals(CUTOFF-1,TypeMemPtr.max(alias0,ds2));
     TypeMemPtr txp1 = (TypeMemPtr)tax.at("a");
-    assertEquals(0,(int)ds2.get(txp1));
+    assertEquals(1,(int)ds2.get(txp1));
     TypeStruct txs1 = (TypeStruct)txp1._obj;
     assertEquals(1,(int)ds2.get(txs1));
     TypeMemPtr txp2 = (TypeMemPtr)txs1.at("a");
-    assertEquals(1,(int)ds2.get(txp2));
+    assertEquals(2,(int)ds2.get(txp2));
     TypeStruct txs2 = (TypeStruct)txp2._obj;
     assertEquals(CUTOFF-1,(int)ds2.get(txs2));
     assertEquals(Type.REAL,txs2.at("b"));
@@ -204,16 +204,16 @@ public class TestApprox {
     ds2 = pax4.depth();
     assertEquals(CUTOFF-1,TypeMemPtr.max(alias0,ds2));
     TypeMemPtr t4p1 = (TypeMemPtr)tax4.at("a");
-    assertEquals(0,(int)ds2.get(t4p1));
+    assertEquals(1,(int)ds2.get(t4p1));
     TypeStruct t4s1 = (TypeStruct)t4p1._obj;
     assertEquals(1,(int)ds2.get(t4s1));
     TypeMemPtr t4p2 = (TypeMemPtr)t4s1.at("a");
-    assertEquals(1,(int)ds2.get(t4p2));
+    assertEquals(2,(int)ds2.get(t4p2));
     TypeStruct t4s2 = (TypeStruct)t4p2._obj;
     assertEquals(CUTOFF-1,(int)ds2.get(t4s2));
     assertEquals(Type.REAL,t4s2.at("b"));
     TypeMemPtr t4p3 = (TypeMemPtr)t4s2.at("a");
-    assertEquals(1,(int)ds2.get(t4p3));
+    assertEquals(2,(int)ds2.get(t4p3));
     assertEquals(t4s2,t4p3._obj);
     assertTrue(t4.isa(tax4));
   }
@@ -360,7 +360,7 @@ public class TestApprox {
     assertEquals(0,(int)depths.get(zsa0));
     assertEquals(1,(int)depths.get(zsa1));
     assertEquals(2,(int)depths.get(zsa23));
-    assertEquals(3,TypeMemPtr.max(alias0,depths));
+    assertEquals(2,TypeMemPtr.max(alias0,depths));
     assertTrue(a0.isa(zsa0));
   }
 
@@ -459,7 +459,7 @@ public class TestApprox {
     check_leaf(p7,alias,TypeInt.con(7));
 
     depths = pz1.depth();
-    assertEquals(3,TypeMemPtr.max(alias,depths));
+    assertEquals(2,TypeMemPtr.max(alias,depths));
   }
 
   // Leaf is a TypeInt.NINT8, and both pointer fields are either NIL or contain

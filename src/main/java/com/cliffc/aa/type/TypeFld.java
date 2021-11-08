@@ -18,15 +18,16 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public Type _t;               // Field type.  Usually some type of Scalar, or ANY or ALL.
   public Access _access;        // Field access type: read/write, final, read/only
   public int _order;            // Field order in the struct, or -1 for undefined (Bot) or -2 for conforming (top)
+  boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
 
   private TypeFld init( @NotNull String fld, Type t, Access access, int order ) {
-    super.init(TFLD,"");
     assert !(t instanceof TypeFld);
     _cyclic = false;
     _fld=fld; _t=t; _access=access; _order=order;
     return this;
   }
-  boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
+  @Override TypeFld copy() { return _copy().init(_fld,_t,_access,_order); }
+  
   @Override public boolean cyclic() { return _cyclic; }
   @Override public void set_cyclic() { _cyclic = true; }
   @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_t,"t"); }
@@ -34,8 +35,8 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
 
   // Ignore edges hash
   int _hash() { return Util.hash_spread(super.static_hash() + _fld.hashCode() + _access.hashCode( ) + _order); };
-  @Override int  static_hash() { assert (_t._hash!=0) == _t.interned();  return _hash(); } // No edges
-  @Override int compute_hash() { assert  _t._hash!=0;                    return _hash() + _t._hash; } // Always edges
+  @Override int  static_hash() { return _hash(); } // No edges
+  @Override int compute_hash() { assert _t._hash!=0; return _hash() + _t._hash; } // Always edges
 
   // Returns 1 for definitely equals, 0 for definitely unequals and -1 for needing the circular test.
   int cmp(TypeFld t) {
@@ -93,14 +94,14 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public TypeFld make_from(Type t, Access a) { return (t==_t && a==_access) ? this : make(_fld,t,a,_order); }
 
   @Override protected TypeFld xdual() {
-    if( _t==_t._dual && _order==odual(_order) && _access==_access.dual() )
+    if( _fld==sdual(_fld) && _t==_t._dual && _order==odual(_order) && _access==_access.dual() )
       return this;              // Self symmetric
-    return new TypeFld().init(sdual(_fld),_t._dual,_access.dual(),odual(_order));
+    return POOLS[TFLD].<TypeFld>malloc().init(sdual(_fld),_t._dual,_access.dual(),odual(_order));
   }
   @Override protected TypeFld rdual() {
     assert _hash!=0;
     if( _dual != null ) return _dual;
-    TypeFld dual = _dual = new TypeFld().init(sdual(_fld),_t==null ? null : _t.rdual(),_access.dual(),odual(_order));
+    TypeFld dual = _dual = POOLS[TFLD].<TypeFld>malloc().init(sdual(_fld),_t==null ? null : _t.rdual(),_access.dual(),odual(_order));
     dual._dual = this;
     dual._hash = dual.compute_hash();
     return dual;

@@ -14,7 +14,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
 public class TypeStr extends TypeObj<TypeStr> {
   private String _con;          //
   private TypeStr init(String name, boolean any, String con ) {
-    super.init(TSTR,name,any,any);
+    super.init(name,any,any);
     _con = con;
     return this;
   }
@@ -51,7 +51,8 @@ public class TypeStr extends TypeObj<TypeStr> {
   // Return a String from a TypeStr constant; assert otherwise.
   @Override public String getstr() { assert _con!=null; return _con; }
 
-  @Override protected TypeStr xdual() { return _con == null ? new TypeStr().init(_name, !_any,_con) : this; }
+  @Override protected TypeStr xdual() {
+    return _con == null ? POOLS[TSTR].<TypeStr>malloc().init(_name, !_any,_con) : this; }
   @Override TypeStr rdual() {
     if( _dual != null ) return _dual;
     TypeStr dual = _dual = xdual();

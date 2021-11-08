@@ -11,7 +11,7 @@ public class TypeAry extends TypeObj<TypeAry> implements Cyclic {
   private TypeObj _stor;        // Storage class; widened over elements.  Can be, e.g. bits or complex structs with embedded pointers
 
   private TypeAry init(String name, boolean any, TypeInt sz, Type elem, TypeObj stor ) {
-    super.init(TARY,name,any,any);
+    super.init(name,any,any);
     _size = sz;
     _elem = elem;
     _stor = stor;
@@ -56,7 +56,7 @@ public class TypeAry extends TypeObj<TypeAry> implements Cyclic {
   public static final TypeAry BYTES = make("",false,TypeInt.con(3),TypeInt.INT8,TypeObj.OBJ ); // TODO: TypeObjBits2
   static final TypeAry[] TYPES = new TypeAry[]{ARY,ARY0,BYTES};
 
-  @Override protected TypeAry xdual() { return new TypeAry().init(_name, !_any,_size.dual(),_elem.dual(),(TypeObj)_stor.dual()); }
+  @Override protected TypeAry xdual() { return POOLS[TARY].<TypeAry>malloc().init(_name, !_any,_size.dual(),_elem.dual(),(TypeObj)_stor.dual()); }
   @Override
   TypeAry rdual() {
     if( _dual != null ) return _dual;

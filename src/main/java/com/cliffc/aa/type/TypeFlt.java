@@ -10,7 +10,8 @@ public class TypeFlt extends Type<TypeFlt> {
   byte _x;                // -2 bot, -1 not-null, 0 con, +1 not-null-top +2 top
   byte _z;                // bitsiZe, one of: 32,64
   double _con;
-  private TypeFlt init(int x, int z, double con ) { super.init(TFLT,""); _x=(byte)x; _z=(byte)z; _con = con; return this; }
+  private TypeFlt init(int x, int z, double con ) { _x=(byte)x; _z=(byte)z; _con = con; return this; }
+  @Override TypeFlt copy() { return _copy().init(_x,_z,_con); }  
   // Hash does not depend on other types
   @Override int compute_hash() { return super.compute_hash()+_x+_z+(int)_con; }
   @Override public boolean equals( Object o ) {
@@ -49,7 +50,7 @@ public class TypeFlt extends Type<TypeFlt> {
   @Override public double getd() { assert is_con(); return _con; }
   @Override public long   getl() { assert is_con() && ((long)_con)==_con; return (long)_con; }
 
-  @Override protected TypeFlt xdual() { return _x==0 ? this : new TypeFlt().init(-_x,_z,_con); }
+  @Override protected TypeFlt xdual() { return _x==0 ? this : POOLS[TFLT].<TypeFlt>malloc().init(-_x,_z,_con); }
   @Override protected Type xmeet( Type t ) {
     assert t != this;
     switch( t._type ) {

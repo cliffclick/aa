@@ -19,7 +19,7 @@ import java.util.function.Predicate;
 public class TypeLive extends TypeObj<TypeLive> {
   int _flags;
   private TypeLive init(boolean any, int flags ) {
-    super.init(TLIVE,"",any,any);
+    super.init("",any,any);
     _flags = flags;
     return this;
   }
@@ -58,7 +58,7 @@ public class TypeLive extends TypeObj<TypeLive> {
   public static final TypeLive LIVE_BOT=make(false,FLAG_ESCAPE+FLAG_WITH_DISP);
   public static final TypeLive DEAD   = LIVE_BOT.dual();
 
-  @Override protected TypeLive xdual() { return new TypeLive().init(!_any,_flags); }
+  @Override protected TypeLive xdual() { return POOLS[TLIVE].<TypeLive>malloc().init(!_any,_flags); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TLIVE:   break;

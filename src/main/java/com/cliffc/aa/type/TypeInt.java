@@ -10,7 +10,8 @@ public class TypeInt extends Type<TypeInt> {
   private byte _x;        // -2 bot, -1 not-null, 0 con, +1 not-null-top +2 top
   public  byte _z;        // bitsiZe, one of: 1,8,16,32,64
   private long _con;      // hi or lo according to _x
-  private TypeInt init(int x, int z, long con ) { super.init(TINT,""); _x=(byte)x; _z=(byte)z; _con = con; return this; }
+  private TypeInt init(int x, int z, long con ) { _x=(byte)x; _z=(byte)z; _con = con; return this; }
+  @Override TypeInt copy() { return _copy().init(_x,_z,_con); }  
   // Hash does not depend on other types
   @Override int compute_hash() { return super.compute_hash()+_x+_z+(int)_con; }
   @Override public boolean equals( Object o ) {
@@ -46,7 +47,7 @@ public class TypeInt extends Type<TypeInt> {
   static public  final TypeInt XINT1  = make( 2, 1,0);
   static public  final TypeInt NINT8  = make(-1, 8,0);
   static public  final TypeInt NINT64 = make(-1,64,0);
-  static public  final TypeInt ZERO   = new TypeInt().init(0,1,0).hashcons_free();
+  static public  final TypeInt ZERO   = POOLS[TINT].<TypeInt>malloc().init(0,1,0).hashcons_free();
   static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,NINT64};
   static void init1( HashMap<String,Type> types ) {
     types.put("bool" ,BOOL);
@@ -61,7 +62,7 @@ public class TypeInt extends Type<TypeInt> {
   @Override public long   getl() { assert is_con(); return _con; }
   @Override public double getd() { assert is_con() && (long)((double)_con)==_con; return _con; }
 
-  @Override protected TypeInt xdual() { return _x==0 ? this : new TypeInt().init(-_x,_z,_con); }
+  @Override protected TypeInt xdual() { return _x==0 ? this : POOLS[TINT].<TypeInt>malloc().init(-_x,_z,_con); }
   @Override protected Type xmeet( Type t ) {
     assert t != this;
     switch( t._type ) {

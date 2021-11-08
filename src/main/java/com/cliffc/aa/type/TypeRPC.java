@@ -7,7 +7,7 @@ import com.cliffc.aa.util.VBitSet;
 public class TypeRPC extends Type<TypeRPC> {
   private BitsRPC _rpcs;         //
 
-  private TypeRPC init( BitsRPC rpcs ) { super.init(TRPC,""); _rpcs = rpcs; return this; }
+  private TypeRPC init( BitsRPC rpcs ) { super.init(""); _rpcs = rpcs; return this; }
   @Override public int compute_hash( ) { return ((TRPC + _rpcs._hash)<<1)|1; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -23,8 +23,7 @@ public class TypeRPC extends Type<TypeRPC> {
 
   static { new Pool(TRPC,new TypeRPC()); }
   public static TypeRPC make( BitsRPC rpcs ) {
-    TypeRPC t1 = POOLS[TRPC].malloc();
-    return t1.init(rpcs).hashcons_free();
+    return POOLS[TRPC].<TypeRPC>malloc().init(rpcs).hashcons_free();
   }
 
   public static TypeRPC make( int rpc ) { return make(BitsRPC.make0(rpc)); }
@@ -32,7 +31,7 @@ public class TypeRPC extends Type<TypeRPC> {
   private static final TypeRPC RPC1 = make(BitsRPC.new_rpc(BitsRPC.ALL));
   static final TypeRPC[] TYPES = new TypeRPC[]{RPC1,ALL_CALL};
 
-  @Override protected TypeRPC xdual() { return new TypeRPC().init(_rpcs.dual()); }
+  @Override protected TypeRPC xdual() { return POOLS[TRPC].<TypeRPC>malloc().init(_rpcs.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TRPC:   break;

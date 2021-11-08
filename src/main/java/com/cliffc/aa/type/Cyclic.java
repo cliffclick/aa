@@ -36,7 +36,6 @@ interface Cyclic {
     head = _dfa_min(head);
     _reachable(head,false);     // Recompute reachable; skip interned; probably shrinks
     assert check_uf();
-    UF.clear();
     Type.RECURSIVE_MEET--;
 
     // Set cyclic bits for faster equals/meets.

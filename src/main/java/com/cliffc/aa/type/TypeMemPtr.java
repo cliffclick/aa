@@ -24,15 +24,16 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   // and is used to e.g. check pointer types at type assertions (including
   // function call args).
   public TypeObj _obj;          // Meet/join of aliases.  Unused in simple_ptrs in graph nodes.
+  boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
 
   private TypeMemPtr init(BitsAlias aliases, TypeObj obj ) {
-    super.init(TMEMPTR,"");
     _cyclic = false;
     _aliases = aliases;
     _obj=obj;
     return this;
   }
-  boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
+  @Override TypeMemPtr copy() { return _copy().init(_aliases,_obj); }
+  
   @Override public boolean cyclic() { return _cyclic; }
   @Override public void set_cyclic() { _cyclic = true; }
   @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_obj,"obj"); }
@@ -44,7 +45,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   // Static properties equals.  Already known to be the same class and
   // not-equals.  Ignore edges.
   @Override boolean static_eq(TypeMemPtr t) { return _aliases == t._aliases && _obj._type == t._obj._type; }
-  
+
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeMemPtr) ) return false;
@@ -147,12 +148,12 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     TypeObj od = (TypeObj)_obj.dual();
     if( ad==_aliases && od==_obj )
       return this;              // Centerline TMP
-    return new TypeMemPtr().init(ad,od);
+    return POOLS[TMEMPTR].<TypeMemPtr>malloc().init(ad,od);
   }
   @Override TypeMemPtr rdual() {
     assert _hash!=0;
     if( _dual != null ) return _dual;
-    TypeMemPtr dual = _dual = new TypeMemPtr().init(_aliases.dual(),(TypeObj)_obj.rdual());
+    TypeMemPtr dual = _dual = POOLS[TMEMPTR].<TypeMemPtr>malloc().init(_aliases.dual(),(TypeObj)_obj.rdual());
     dual._dual = this;
     dual._hash = dual.compute_hash();
     return dual;
@@ -239,26 +240,21 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   // shortest-path walk from the root.  Only counts depth on TypeStructs with
   // the matching alias.
   HashMap<Type,Integer> depth() {
-    int alias = _aliases.getbit();
     HashMap<Type,Integer> ds = new HashMap<>();
-    Ary<TypeStruct> t0 = new Ary<>(new TypeStruct[]{(TypeStruct)_obj});
-    Ary<TypeStruct> t1 = new Ary<>(new TypeStruct[1],0);
+    Work<Type> t0 = new Work<>(), t1 = new Work<>();
+    t0.add(_obj);
     int d=0;                    // Current depth
+    ds.put(this,d);             // 
     while( !t0.isEmpty() ) {
-      while( !t0.isEmpty() ) {
-        TypeStruct ts = t0.pop();
-        if( ds.putIfAbsent(ts,d) == null )
-          for( TypeFld fld : ts.flds() ) {
-            if( ds.putIfAbsent(fld._t,d) == null &&  // Everything in flds is in the current depth
-                fld._t instanceof TypeMemPtr ) {
-              TypeMemPtr tmp = (TypeMemPtr)fld._t;
-              if( tmp._obj instanceof TypeStruct )
-                (tmp._aliases.test(alias) ? t1 : t0).push((TypeStruct)tmp._obj);
-            }
-          }
-      }
-      Ary<TypeStruct> tmp = t0; t0 = t1; t1 = tmp; // Swap t0,t1
-      d++;                                         // Raise depth
+      for( Type t=t0.pop(); t!=null; t=t0.pop() )
+        if( t instanceof Cyclic &&
+            ds.putIfAbsent(t,d) ==null ) {
+          final Work<Type> ft0=t0, ft1=t1;
+          ((Cyclic)t).walk1((tc,label)->(tc instanceof TypeMemPtr && ((TypeMemPtr)tc)._aliases.overlaps(_aliases) ? ft1 : ft0).add(tc));
+        }
+      // Swap worklists, raise depth
+      Work<Type> tmp = t0; t0 = t1; t1 = tmp; // Swap t0,t1
+      d++;                                    // Raise depth
     }
     return ds;
   }
@@ -269,7 +265,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     for( Type t : ds.keySet() )
       if( (t instanceof TypeMemPtr) && ((TypeMemPtr)t)._aliases.test(alias) )
         max = Math.max(max,ds.get(t));
-    return max+1;               // Struct is 1 more depth than TMP
+    return max;
   }
 
   // Lattice of conversions:

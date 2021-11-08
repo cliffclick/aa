@@ -12,7 +12,7 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   public Type _ret;             // Plain return type (no memory)
 
   private TypeFunSig init(TypeStruct formals, Type ret ) {
-    super.init(TFUNSIG,"");
+    super.init("");
     TypeFld disp=null;
     assert (disp=formals.get("^")) == null || disp.is_display_ptr();
     assert formals.get(" mem")==null; // No memory
@@ -64,7 +64,7 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   public TypeFld arg(int idx) { return _formals.fld_idx(idx); }
   public Type display() { return arg(DSP_IDX); }
 
-  @Override protected TypeFunSig xdual() { return new TypeFunSig().init(_formals.dual(),_ret.dual()); }
+  @Override protected TypeFunSig xdual() {  return POOLS[TFUNSIG].<TypeFunSig>malloc().init(_formals.dual(),_ret.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUNSIG: break;
