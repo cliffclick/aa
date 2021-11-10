@@ -33,7 +33,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     return this;
   }
   @Override TypeMemPtr copy() { return _copy().init(_aliases,_obj); }
-  
+
   @Override public boolean cyclic() { return _cyclic; }
   @Override public void set_cyclic() { _cyclic = true; }
   @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_obj,"obj"); }
@@ -83,8 +83,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
 
   public static TypeMemPtr make( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias),obj); }
   public static TypeMemPtr make_nil( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
-  public TypeMemPtr make_from( TypeObj obj ) { return make(_aliases,obj); }
-  public TypeMemPtr make_from( BitsAlias aliases ) { return make(aliases,_obj); }
+  public TypeMemPtr make_from( TypeObj obj ) { return _obj==obj ? this : make(_aliases,obj); }
+  public TypeMemPtr make_from( BitsAlias aliases ) { return _aliases==aliases ? this : make(aliases,_obj); }
 
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.
   // To break class-init cycle, this is made here, now.
@@ -238,13 +238,13 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
 
   // Only used for testing.  Build a mapping from types to their depth in a
   // shortest-path walk from the root.  Only counts depth on TypeStructs with
-  // the matching alias.
-  HashMap<Type,Integer> depth() {
+  // the matching alias.  Does not bump the depth of a backedge.
+  public HashMap<Type,Integer> depth() {
     HashMap<Type,Integer> ds = new HashMap<>();
     Work<Type> t0 = new Work<>(), t1 = new Work<>();
     t0.add(_obj);
     int d=0;                    // Current depth
-    ds.put(this,d);             // 
+    ds.put(this,d);             //
     while( !t0.isEmpty() ) {
       for( Type t=t0.pop(); t!=null; t=t0.pop() )
         if( t instanceof Cyclic &&
@@ -259,12 +259,17 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     return ds;
   }
 
-  // Only used for testing.  Max depth of struct, with a matching alias TMP.
-  static int max(int alias, HashMap<Type,Integer> ds) {
+  // Only used for testing.  Max depth of struct, with a matching alias TMP
+  // that is not a backedge.
+  public int max(HashMap<Type,Integer> ds) {
     int max = -1;
     for( Type t : ds.keySet() )
-      if( (t instanceof TypeMemPtr) && ((TypeMemPtr)t)._aliases.test(alias) )
-        max = Math.max(max,ds.get(t));
+      if( (t instanceof TypeMemPtr) && ((TypeMemPtr)t)._aliases.overlaps(_aliases) ) {
+        int dtmp = ds.get(t);
+        Integer dstr = ds.get(((TypeMemPtr)t)._obj);
+        if( dstr==null || dtmp<=dstr ) // Disallow backedge
+          max = Math.max(max,dtmp);
+      }
     return max;
   }
 

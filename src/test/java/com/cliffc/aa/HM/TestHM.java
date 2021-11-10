@@ -214,9 +214,9 @@ map = { fun x -> (fun x)};
         // With Lift ON
         //tfs(TypeMemPtr.make(7,make_tups(Type.XNSCALR,TypeMemPtr.make(7,make_tups(TypeInt.con(3),Type.XNSCALR))))),
         // With Lift OFF
-        tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(5),Type.NSCALR))),
+        tfs(TypeMemPtr.make(7,make_tups(TypeInt.NINT8,Type.SCALAR))),
         // tfs(*[7](^=any, 5, nScalar))
-        tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(5),Type.NSCALR))));
+        tfs(TypeMemPtr.make(7,make_tups(TypeInt.NINT8,Type.SCALAR))));
   }
 
   @Test public void test19() { run("cons ={x y-> {cadr -> (cadr x y)}};"+
@@ -366,7 +366,7 @@ all = @{
     TypeStruct cycle_str2 = TypeStruct.make("",false,false,NO_DSP,TypeFld.make("n1",cycle_ptr1),TypeFld.make("v1",fld));
     TypeMemPtr cycle_ptr2 = TypeMemPtr.make(aliases0,cycle_str2);
     TypeStruct cycle_str3 = TypeStruct.make("",false,false,NO_DSP,TypeFld.make("n1",cycle_ptr2),TypeFld.make("v1",fld));
-    TypeStruct cycle_strn = cycle_str3.approx(1,9);
+    TypeStruct cycle_strn = cycle_str3.approx(1,aliases9);
     TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn.at("n1");
     return cycle_ptrn;
   }
@@ -402,18 +402,13 @@ all = @{
   // try the worse-case expo blow-up test case from SO
   @Test public void test35() {
     TypeMemPtr tmps = TypeMemPtr.make(8,make_tups(Type.SCALAR,Type.SCALAR,Type.SCALAR));
-    TypeFunPtr tfp  = TypeFunPtr.make(15,3,Type.ANY,tmps);
-    TypeMemPtr tmp0 = TypeMemPtr.make(8,make_tups(tfp ,tfp ,tfp ));
-    TypeMemPtr tmp1 = TypeMemPtr.make(8,make_tups(tmp0,tmp0,tmp0));
-    TypeMemPtr tmp2 = TypeMemPtr.make(8,make_tups(tmp1,tmp1,tmp1));
-
     run("p0 = { x y z -> (triple x y z) };"+
         "p1 = (triple p0 p0 p0);"+
         "p2 = (triple p1 p1 p1);"+
         "p3 = (triple p2 p2 p2);"+
         "p3",
         "( ( ( { A B C -> ( A, B, C) }, { D E F -> ( D, E, F) }, { G H I -> ( G, H, I) }), ( { J K L -> ( J, K, L) }, { M N O -> ( M, N, O) }, { P Q R -> ( P, Q, R) }), ( { S T U -> ( S, T, U) }, { V22 V23 V24 -> ( V22, V23, V24) }, { V25 V26 V27 -> ( V25, V26, V27) })), ( ( { V28 V29 V30 -> ( V28, V29, V30) }, { V31 V32 V33 -> ( V31, V32, V33) }, { V34 V35 V36 -> ( V34, V35, V36) }), ( { V37 V38 V39 -> ( V37, V38, V39) }, { V40 V41 V42 -> ( V40, V41, V42) }, { V43 V44 V45 -> ( V43, V44, V45) }), ( { V46 V47 V48 -> ( V46, V47, V48) }, { V49 V50 V51 -> ( V49, V50, V51) }, { V52 V53 V54 -> ( V52, V53, V54) })), ( ( { V55 V56 V57 -> ( V55, V56, V57) }, { V58 V59 V60 -> ( V58, V59, V60) }, { V61 V62 V63 -> ( V61, V62, V63) }), ( { V64 V65 V66 -> ( V64, V65, V66) }, { V67 V68 V69 -> ( V67, V68, V69) }, { V70 V71 V72 -> ( V70, V71, V72) }), ( { V73 V74 V75 -> ( V73, V74, V75) }, { V76 V77 V78 -> ( V76, V77, V78) }, { V79 V80 V81 -> ( V79, V80, V81) })))",
-        tmp2  );
+        tmps );
   }
 
   // Need to see if a map call, inlined a few times, 'rolls up'.  Sometimes
@@ -800,12 +795,12 @@ err  = {unused->(err unused)};
 b=
   true = @{
     and_ = {o -> o}        // true AND anything is that thing
-    _or_ = {o -> b.true}   // true OR  anything is true
+    or__ = {o -> b.true}   // true OR  anything is true
     then = {then else->(then void) }
   };
   false = @{
     and_ = {o -> b.false}  // false AND anything is false
-    _or_ = {o -> o}        // false OR  anything is that thing
+    or__ = {o -> o}        // false OR  anything is that thing
     then = {then else->(else void) }
   };
   @{true=true, false=false};
@@ -840,20 +835,20 @@ three =(n.s two);     // Three is the successor of two
 @{b=b,n=n, one=one,two=two,three=three}
 """,
         "@{" +
-        // Booleans, support AND, OR, THENELSE.  Eg. b.false.and is a function which
+        // Booleans, support AND, OR, THEN/ELSE.  Eg. b.false.and is a function which
         // ignores its input and returns false.
-        "  b=@{ false=A:@{ and={B->A}; or={C->C}; thenElse={D {()->E} ->E} };"+
-        "       true =F:@{ and={G->G}; or={H->F}; thenElse={{()->I} J ->I} }"+
+        "  b=@{ false=A:@{ and_={B->A}; or__={C->C}; then={D {()->E} ->E} };"+
+        "       true =F:@{ and_={G->G}; or__={H->F}; then={{()->I} J ->I} }"+
         "  };"+
         // Natural numbers are formed from zero (z) and succ (s).
         "  n=@{"+
         "    s={"+
-        // K is the type var of a natural number: a struct supporting pred,succ,add,isZero.
+        // K is the type var of a natural number: a struct supporting pred,succ,add,zero.
         // So 's' succ is a function which takes a natural number (K) and returns a K.
-        "      K:@{ add   ={ L:@{ succ={()->L}; ...} ->L };"+
-        "           isZero={ M -> N:@{ and={N->N}; or={N->N}; thenElse={ {()->O} {()->O} -> O }}};"+
-        "           pred  ={ P -> K};"+
-        "           succ  ={ Q -> K}"+
+        "      K:@{ add_={ L:@{ succ={()->L}; ...} ->L };"+
+        "           pred={ M -> K};"+
+        "           succ={ N -> K};"+
+        "           zero={ O -> P:@{ and_={P->P}; or__={P->P}; then={ {()->Q} {()->Q} -> Q }}}"+
         "        } -> K };"+
         "    z=K"+         // Zero is also a natural number
         "  };"+
@@ -861,51 +856,51 @@ three =(n.s two);     // Three is the successor of two
         // shape as any natural number ("self" structural shape above), but its type is
         // not unified with "self".
         "  one=R:@{"+
-        "    add   ={ S:@{ succ={()->S}; ...} -> S};"+
-        "    isZero={  T  -> U:@{ and={U->U}; or={U->U}; thenElse={ {()->V22} {()->V22}->V22}}};"+
-        "    pred=  { V23 -> R };"+
-        "    succ=  { V24 -> R }"+      // Note: succ takes an 'unused'
+        "    add_={ S:@{ succ={()->S}; ...} -> S};"+
+        "    pred={ T -> R };"+
+        "    succ={ U -> R };"+ // Note: succ takes an 'unused'
+        "    zero={V22->V23:@{ and_={V23->V23}; or__={V23->V23}; then={ {()->V24} {()->V24} -> V24}}}"+
         "  };"+
         // Has all the fields of a natural number.
         "  three=V25:@{ "+
-        "    add   ={ V26:@{ succ={()->V26}; ... }->V26  };"+
-        "    isZero={ V27 -> V28:@{ and={V28->V28}; or={V28->V28}; thenElse={ {()->V29} {()->V29} ->V29 }}};"+
-        "    pred  ={ V30 -> V25 };"+
-        "    succ  ={ ()  -> V25 }"+ // Note 'succ' only takes 'void', and not an 'unused'.
+        "    add_={ V26:@{ succ={()->V26}; ... }->V26  };"+
+        "    pred={ V27 -> V25};"+
+        "    succ={ ()  -> V25};"+ // Note 'succ' only takes 'void', and not an 'unused'.
+        "    zero={ V28 -> V29:@{ and_={V29->V29}; or__={V29->V29}; then={ {()->V30} {()->V30} -> V30}}}"+
         "  };"+
         // Has all the fields of a natural number.
         "  two=V31:@{ "+
-        "    add   ={ V32:@{succ={()->V32}; ...} ->V32 };"+
-        "    isZero={ V33 -> V34:@{ and={V34->V34}; or={V34->V34}; thenElse={ {()->V35} {()->V35} ->V35 }}};"+
-        "    pred  ={ V36 -> V31};"+
-        "    succ  ={ ()  -> V31}"+ // Note 'succ' only takes a 'void', and not an 'unused'.
+        "    add_={ V32:@{succ={()->V32}; ...} ->V32 };"+
+        "    pred={ V33 -> V31};"+
+        "    succ={ ()  -> V31};"+ // Note 'succ' only takes a 'void', and not an 'unused'.
+        "    zero={V34->V35:@{and_={V35->V35};or__={V35->V35};then={{()->V36}{()->V36}->V36}}}"+
         "  }"+
         "}"+
         "",
         () -> {
           // *[16]@{ ^=any;
           //   b    =*[12]@{^$;
-          //     true =_939162$ : *[10]@{^$; and=[15]{any -> Scalar  }; or=[16]{any ->_939162$ }; thenElse=[17]{any ->Scalar }}
+          //     true =_939162$ : *[10]@{^$; and_=[15]{any -> Scalar  }; or__=[16]{any ->_939162$ }; then=[17]{any ->Scalar }}
           Type.RECURSIVE_MEET++;
-          TypeFld tor = TypeFld.malloc("or");
-          TypeStruct tts = TypeStruct.mallocD(mfun("and",15),tor,mfun("thenElse",17,2));
+          TypeFld tor = TypeFld.malloc("or__");
+          TypeStruct tts = TypeStruct.mallocD(mfun("and_",15),tor,mfun("then",17,2));
           tor.setX(mfun(1,TypeMemPtr.make(10,tts),16));
           Type.RECURSIVE_MEET--;
           Type tmp10 = TypeMemPtr.make(10,tts.install());
-          //     false=_930816$ : *[11]@{^$; and=[18]{any ->_930816$ }; or=[19]{any -> Scalar  }; thenElse=[20]{any ->Scalar }};
+          //     false=_930816$ : *[11]@{^$; and_=[18]{any ->_930816$ }; or__=[19]{any -> Scalar  }; then=[20]{any ->Scalar }};
           Type.RECURSIVE_MEET++;
-          TypeFld fand = TypeFld.malloc("and");
-          TypeStruct fts = TypeStruct.mallocD(fand,mfun("or",19),mfun("thenElse",20,2));
+          TypeFld fand = TypeFld.malloc("and_");
+          TypeStruct fts = TypeStruct.mallocD(fand,mfun("or__",19),mfun("then",20,2));
           fand.setX(mfun(1,TypeMemPtr.make(11,fts),18));
           Type.RECURSIVE_MEET--;
           Type tmp11 = TypeMemPtr.make(11,fts.install());
           //   };
           TypeFld b = mptr("b",12,TypeStruct.make(NO_DSP,TypeFld.make("true",tmp10),TypeFld.make("false",tmp11)));
 
-          //           _953381$ : *[10,11]@{^$; and=[15,18]{any ->_953381$ }; or=[16,19]{any ->Scalar }; thenElse=[17,20]{any ->Scalar }}
+          //           _953381$ : *[10,11]@{^$; and_=[15,18]{any ->_953381$ }; or__=[16,19]{any ->Scalar }; then=[17,20]{any ->Scalar }}
           Type.RECURSIVE_MEET++;
-          TypeFld tfand = TypeFld.malloc("and");
-          TypeStruct tfts = TypeStruct.mallocD(tfand,bfun2("or",16,19,1),bfun2("thenElse",17,20,2));
+          TypeFld tfand = TypeFld.malloc("and_");
+          TypeStruct tfts = TypeStruct.mallocD(tfand,bfun2("or__",16,19,1),bfun2("then",17,20,2));
           tfand.setX(mfun(1,TypeMemPtr.make(ptr1011(),fts),15,18));
           Type.RECURSIVE_MEET--;
           Type tmp1011 = TypeMemPtr.make(ptr1011(),tts.install());
@@ -913,21 +908,21 @@ three =(n.s two);     // Three is the successor of two
           //   n    =*[15]@{^$;
           //     s=[28]{any ->
           //       _953384$ : *[14]@{^$;
-          //         add   =[23,27]{any -> Scalar   };
-          //         isZero=[21,24]{any -> _953381$ };
-          //         pred  =[14,25]{any -> Scalar   };
-          //         succ  =[22,26]{any -> _953384$ }
+          //         add_=[23,27]{any -> Scalar   };
+          //         zero=[21,24]{any -> _953381$ };
+          //         pred=[14,25]{any -> Scalar   };
+          //         succ=[22,26]{any -> _953384$ }
           //       }
           Type.RECURSIVE_MEET++;
           TypeFld succ = TypeFld.malloc("succ");
-          TypeStruct sts = TypeStruct.mallocD(bfun2("add",23,27,1),TypeFld.make("isZero",mfun(1,tmp1011,21,24)),bfun2("pred",14,25,1),succ);
-          succ.setX(mfun(1,TypeMemPtr.make(14,sts),22,26));
+          TypeStruct sts = TypeStruct.mallocD(bfun2("add_",23,27,1),TypeFld.make("zero",mfun(1,tmp1011,21,24)),bfun2("pred",14,25,1),succ);
+          succ.setX(mfun(1,TypeMemPtr.make(BitsAlias.FULL.make(13,14),sts),22,26));
           Type.RECURSIVE_MEET--;
           TypeMemPtr sret = TypeMemPtr.make(14,sts.install());
           TypeFld sfld = TypeFld.make("s",mfun(1,sret,28));
           //     };
-          //     z=*[13]@{^$; add=[23]{any ->Scalar }; isZero=[21]{any ->_939162$ }; pred=[14]{any ->~Scalar }; succ=[22]{any ->_953384$ }}
-          TypeFld zfld = mptr("z",13,TypeStruct.make(NO_DSP,mfun(1,"add",23),mfun(1,"isZero",tmp10,21),mfun(1,"pred",Type.XSCALAR,14),mfun(1,"succ",((TypeFunPtr)sfld._t)._ret,22)));
+          //     z=*[13]@{^$; add_=[23]{any ->Scalar }; zero=[21]{any ->_939162$ }; pred=[14]{any ->~Scalar }; succ=[22]{any ->_953384$ }}
+          TypeFld zfld = mptr("z",13,TypeStruct.make(NO_DSP,mfun(1,"add_",23),mfun(1,"zero",tmp10,21),mfun(1,"pred",Type.XSCALAR,14),mfun(1,"succ",((TypeFunPtr)sfld._t)._ret,22)));
           //   };
           TypeFld nfld = mptr("n",15,TypeStruct.make(NO_DSP,sfld,zfld));
           //   one  =_953384$;

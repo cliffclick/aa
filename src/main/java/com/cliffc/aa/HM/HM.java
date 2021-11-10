@@ -101,6 +101,8 @@ import static com.cliffc.aa.type.TypeFld.Access;
 public class HM {
   // Mapping from primitive name to PrimSyn
   static final HashMap<String,PrimSyn> PRIMSYNS = new HashMap<>();
+  // Precision of cyclic GCP types
+  static final int CUTOFF=1;
 
   static { BitsAlias.init0(); BitsFun.init0(); }
 
@@ -218,8 +220,8 @@ public class HM {
         if( self.is_err2() ) {
           // If any contain nil, then we may have folded in a not-nil.
           // To preserve monotonicity, we make them all nil.
-          // Example: (3.unify(notnil)).unify("abc") ==        int8       .unify("abc")  == (Error int8,"abc" )
-          // Example:  3.unify("abc")).unify(notnil) == (Error int8,"abc").unify(notnil) == (Error int8,"abc"?)
+          // Example: (3.unify(notnil)).unify("abc") ==       int8     .unify("abc")  == (Error int8,"abc" ) <<-- Should be "abc"?
+          // Example:  3.unify("abc")).unify(notnil) == (Error 3,"abc").unify(notnil) == (Error int8,"abc"?)
           boolean nil =
             (self. _flow  !=null && self. _flow  .must_nil()) ||
             (self._eflow  !=null && self._eflow  .must_nil()) ||
@@ -833,6 +835,15 @@ public class HM {
               ? Root.widen(fun.targ(i)) // Root assumed args
               : _args[i]._flow;         // Actual observed args
             Type rez = formal.meet(actual);
+            // Shrink any cyclic result
+            if( rez instanceof TypeMemPtr ) {
+              TypeMemPtr rez2 = (TypeMemPtr)rez;
+              if( rez2._obj instanceof TypeStruct ) {
+                TypeStruct ts = (TypeStruct)rez2._obj;
+                TypeStruct apx = ts.approx(CUTOFF,rez2._aliases);
+                rez = rez2.make_from(apx);
+              }
+            }
             if( formal != rez ) {
               if( work==null ) return true;
               progress = true;
@@ -1000,7 +1011,7 @@ public class HM {
       for( int i=0; i<_flds.length; i++ )
         flds[i+1] = TypeFld.make(_ids[i],_flds[i]._flow);
       TypeStruct tstr = TypeStruct.make(flds);
-      TypeStruct t2 = tstr.approx(1,_alias);
+      TypeStruct t2 = tstr.approx(CUTOFF,BitsAlias.make0(_alias));
       return TypeMemPtr.make(_alias,t2);
     }
 
@@ -1166,7 +1177,9 @@ public class HM {
       TypeFld[] ts = new TypeFld[args.length+1];
       ts[0] = TypeFld.NO_DISP;  // Display
       for( int i=0; i<args.length; i++ ) ts[i+1] = TypeFld.make_tup(args[i]._flow,ARG_IDX+i);
-      return TypeMemPtr.make(PAIR_ALIAS,TypeStruct.make(ts));
+      TypeStruct tstr = TypeStruct.make(ts);
+      TypeStruct ts2 = tstr.approx(CUTOFF,BitsAlias.make0(PAIR_ALIAS));
+      return TypeMemPtr.make(PAIR_ALIAS,ts2);
     }
   }
 
@@ -1181,7 +1194,9 @@ public class HM {
       TypeFld[] ts = new TypeFld[args.length+1];
       ts[0] = TypeFld.NO_DISP;  // Display
       for( int i=0; i<args.length; i++ ) ts[i+1] = TypeFld.make_tup(args[i]._flow,ARG_IDX+i);
-      return TypeMemPtr.make(TRIPLE_ALIAS,TypeStruct.make(ts));
+      TypeStruct tstr = TypeStruct.make(ts);
+      TypeStruct ts2 = tstr.approx(CUTOFF,BitsAlias.make0(TRIPLE_ALIAS));
+      return TypeMemPtr.make(TRIPLE_ALIAS,ts2);
     }
   }
 
@@ -1599,6 +1614,9 @@ public class HM {
       if( is_struct() ) {
         TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);
         if( tstr==null ) {
+          // Returning a high version of struct
+          if( !ROOT_FREEZE )
+            return Type.XNSCALR;
           Type.RECURSIVE_MEET++;
           tstr = TypeStruct.malloc("",false,false).add_fld(TypeFld.NO_DISP);
           if( _args!=null )

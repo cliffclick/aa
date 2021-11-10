@@ -18,10 +18,16 @@ interface Cyclic {
   boolean cyclic();
   void set_cyclic();
 
-  // Walk the outgoing edges 1-step only, mapping and reducing a result
+  // Walk and apply a map.  No return, so just for side-effects.
+  // Does not recurse.  Does not guard against cycles.
+  // TODO: Useful to make a reducing version for side-effect-free summary over a type?
   void walk1( BiFunction<Type,String,Type> map );
 
-  // Update the edges in-place
+  // Map and replace all child_types.  Does not recurse.  Does not guard
+  // against cycles.  Example:
+  //          [fidx]{    dsp ->     ret   }
+  //          cyclic.walk_update( child_type ->  map(child_type) );
+  //          [fidx]{map(dsp) -> map(ret) }
   void walk_update( UnaryOperator<Type> map );
 
   // Install a cyclic structure.  'head' is not interned and points to a
@@ -32,10 +38,8 @@ interface Cyclic {
   static <T extends Type> T install( T head ) {
     Type.RECURSIVE_MEET++;
     _reachable(head,true);      // Compute 1st-cut reachable
-    //head = _shrink(head);
     head = _dfa_min(head);
     _reachable(head,false);     // Recompute reachable; skip interned; probably shrinks
-    assert check_uf();
     Type.RECURSIVE_MEET--;
 
     // Set cyclic bits for faster equals/meets.
@@ -95,44 +99,6 @@ interface Cyclic {
   }
 
   // -----------------------------------------------------------------
-  // Support Disjoint-Set Union-Find on Types
-  NonBlockingHashMapLong<Type> UF = new NonBlockingHashMapLong<>();
-  @SuppressWarnings("unchecked")
-  static <T extends Type> T ufind(T t) {
-    T t0 = (T)UF.get(t._uid), tu;
-    if( t0 == null ) return t;  // One step, hit end of line
-    // Find end of U-F line
-    while( (tu = (T)UF.get(t0._uid)) != null ) t0=tu;
-    // Set whole line to 1-step end of line
-    while( (tu = (T)UF.get(t ._uid)) != null ) { assert t._uid != t0._uid; UF.put(t._uid,t0); t=tu; }
-    return t0;
-  }
-  static <T extends Type> T union( T lost, T kept) {
-    if( lost == kept ) return kept;
-    assert !lost.interned();
-    assert UF.get(lost._uid)==null && UF.get(kept._uid)==null;
-    assert lost._uid != kept._uid;
-    UF.put(lost._uid,kept);
-    return kept;
-  }
-
-  // Walk, looking for not-minimal.  Happens during 'approx' which might
-  // require running several rounds of 'shrink' to fold everything up.
-  static boolean check_uf() {
-    int err=0;
-    NonBlockingHashMap<Type,Type> ss = new NonBlockingHashMap<>();
-    for( Type t : REACHABLE ) {
-      Type tt;
-      if( ss.get(t) != null || // Found unresolved dup; ts0.equals(ts1) but ts0!=ts1
-          ((tt = t.intern_lookup()) != null && tt != t) ||
-          ufind(t) != t )
-        err++;
-      ss.put(t,t);
-    }
-    return err == 0;
-  }
-
-  // -----------------------------------------------------------------
   // Reachable collection of Types that form cycles: TypeMemPtr, TypeFunPtr,
   // TypeFld, TypeStruct, and anything not interned reachable from them.
   Ary<Type> REACHABLE = new Ary<>(new Type[1],0);
@@ -152,104 +118,6 @@ interface Cyclic {
         ((Cyclic)t).walk1((tc,label) -> !ON_REACH.tset(tc._uid) ? REACHABLE.push(tc) : tc);
     }
   }
-
-  // -----------------------------------------------------------------
-  // This is a Type minimization algorithm done "bottom up" or pessimistically.
-  // It repeatedly finds instances of local duplication and removes them,
-  // repeating until hitting a fixed point.  Local dups include any already
-  // interned Types, or DUPS (local interning or hash-equivalence) or a UF hit.
-  // Computes the final hash code as part of intern checking.
-  IHashMap DUPS = new IHashMap();
-  private static <T extends Type> T _shrink(T nt) {
-    assert DUPS.isEmpty();
-    // Set all hashes.  Hash recursion stops at TypeStructs, so do them first,
-    // then do dependent hashes.
-    for( Type t : REACHABLE ) if( t instanceof TypeStruct ) t.set_hash();
-    for( Type t : REACHABLE ) if( t instanceof TypeMemPtr ) t.set_hash();
-    for( Type t : REACHABLE ) if( t instanceof TypeFunPtr ) t.set_hash();
-    for( Type t : REACHABLE ) t.set_hash();    // And all the rest.
-
-    // Need back-edges to do this iteratively in 1 pass.  This algo just sweeps
-    // until no more progress, but with generic looping instead of recursion.
-    boolean progress = true;
-    while( progress ) {
-      progress = false;
-      DUPS.clear();
-      for( Type t : REACHABLE ) {
-        Type t0 = ufind(t);
-        Type t1 = t0.intern_lookup();
-        if( t1==null ) t1 = DUPS.get(t0);
-        if( t1 != null ) t1 = ufind(t1);
-        if( t1 == t0 ) continue; // This one is already interned
-        if( t1 != null ) { union(t0,t1); progress = true; continue; }
-
-        switch( t._type ) {
-        case Type.TMEMPTR:      // Update TypeMemPtr internal field
-          TypeMemPtr tm = (TypeMemPtr)t0;
-          TypeObj t4 = tm._obj;
-          TypeObj t5 = ufind(t4);
-          if( t4 != t5 ) {
-            tm._obj = t5;
-            progress |= post_mod(tm);
-            if( !t5.interned() ) REACHABLE.push(t5);
-          }
-          break;
-        case Type.TFUNPTR:      // Update TypeFunPtr internal field
-          boolean fprogress=false;
-          TypeFunPtr tfptr = (TypeFunPtr)t0;
-          Type t6 = tfptr._dsp;
-          Type t7 = ufind(t6);
-          if( t6 != t7 ) {
-            tfptr._dsp = t7;
-            fprogress = true;
-            if( !t7.interned() ) REACHABLE.push(t7);
-          }
-          t6 = tfptr._ret;
-          t7 = ufind(t6);
-          if( t6 != t7 ) {
-            tfptr._ret = t7;
-            fprogress = true;
-            if( !t7.interned() ) REACHABLE.push(t7);
-          }
-          if( fprogress ) progress |= post_mod(tfptr);
-          break;
-        case Type.TSTRUCT:      // Update all TypeStruct fields
-          TypeStruct ts = (TypeStruct)t0;
-          for( TypeFld tfld : ts.flds() ) {
-            TypeFld tfld2 = ufind(tfld);
-            if( tfld != tfld2 ) {
-              progress = true;
-              ts.set_fld(tfld2);
-            }
-          }
-          break;
-        case Type.TFLD:         // Update all TFlds
-          TypeFld tfld = (TypeFld)t0;
-          Type tft = tfld._t, t2 = ufind(tft);
-          if( tft != t2 ) {
-            progress = true;
-            int old_hash = tfld._hash;
-            tfld._t = t2;
-            assert old_hash == tfld.compute_hash();
-          }
-          break;
-
-        default: break;
-        }
-        DUPS.put(t0);
-      }
-    }
-    DUPS.clear();
-    return ufind(nt);
-  }
-
-  // Set hash after field mod, and re-install in dups
-  private static boolean post_mod(Type t) {
-    t._hash = t.compute_hash();
-    DUPS.put(t);
-    return true;
-  }
-
 
   // --------------------------------------------------------------------------
   // This is a Type minimization algorithm done "top down" or optimistically.
@@ -538,7 +406,7 @@ interface Cyclic {
     // Walk the reachable set and all forward edges, building a reverse-edge set.
     for( Type t : REACHABLE )  {
       if( t._hash!=0 && !t.interned() )
-        t._hash=0; // Invariant: not-interned has no hash
+        t._hash=0;              // Invariant: not-interned has no hash
       if( t instanceof Cyclic )
         ((Cyclic)t).walk1( (t2,label) -> DefUse.add_def_use(t,label,t2) );
     }

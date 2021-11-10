@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.Env;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -79,7 +80,7 @@ public class TestApprox {
     assertEquals(1,(int)ds.get(t2));
     assertEquals(0,(int)ds.get(t3));
     // No single depth is beyond cutoff
-    assertEquals(CUTOFF,TypeMemPtr.max(alias0,ds));
+    assertEquals(CUTOFF,p3.max(ds));
 
     // For all TypeStruct X at depth CUTOFF-1, make a clone of X and X's sub-
     // graph, except every edge to a type at depth CUTOFF is replaced with the
@@ -94,10 +95,10 @@ public class TestApprox {
     // collapse redundant ptrs to t1, and MEET t0-tail and t1-tail
     // t3[,99] -> p2 -> t2[,99] -> {p0,p1} -> t1[,{flt&int}] -> {p0,p1}
 
-    TypeStruct tax = t3.approx(CUTOFF,alias0);
+    TypeStruct tax = t3.approx(CUTOFF,p3._aliases);
     TypeMemPtr pax = TypeMemPtr.make(alias0,tax);
     HashMap<Type,Integer> ds2 = pax.depth();
-    assertEquals(CUTOFF-1,TypeMemPtr.max(alias0,ds2));
+    assertEquals(CUTOFF-1,p3.max(ds2));
     TypeMemPtr txp1 = (TypeMemPtr)tax.at("a");
     assertEquals(1,(int)ds2.get(txp1));
     TypeStruct txs1 = (TypeStruct)txp1._obj;
@@ -158,7 +159,7 @@ public class TestApprox {
     assertEquals(1,(int)ds.get(t2));
     assertEquals(0,(int)ds.get(t3));
     // No single depth is beyond cutoff
-    assertEquals(CUTOFF,TypeMemPtr.max(alias0,ds));
+    assertEquals(CUTOFF,p3.max(ds));
 
     // For all TypeStruct X at depth CUTOFF-1, make a clone of X and X's sub-
     // graph, except every edge to a type at depth CUTOFF is replaced with the
@@ -173,11 +174,11 @@ public class TestApprox {
     // collapse redundant ptrs to t1, and MEET t0-tail and t1-tail
     // t3[,98] -> p2 -> t2[,99] -> {p0,p1} -> t1[,{flt&int}] -> {p0,p1}
 
-    TypeStruct tax = t3.approx(CUTOFF,alias0);
+    TypeStruct tax = t3.approx(CUTOFF,alias);
     TypeMemPtr pax = TypeMemPtr.make(alias0,tax);
 
     HashMap<Type,Integer> ds2 = pax.depth();
-    assertEquals(CUTOFF-1,TypeMemPtr.max(alias0,ds2));
+    assertEquals(CUTOFF-1,p3.max(ds2));
     TypeMemPtr txp1 = (TypeMemPtr)tax.at("a");
     assertEquals(1,(int)ds2.get(txp1));
     TypeStruct txs1 = (TypeStruct)txp1._obj;
@@ -198,11 +199,11 @@ public class TestApprox {
     TypeMemPtr p4 = TypeMemPtr.make(alias0,t4);
     ds = p4.depth();
     assertEquals(CUTOFF,(int)ds.get(txs2)); // Structure too deep
-    TypeStruct tax4 = t4.approx(CUTOFF,alias0);
+    TypeStruct tax4 = t4.approx(CUTOFF,alias);
     TypeMemPtr pax4 = TypeMemPtr.make(alias0,tax4);
 
     ds2 = pax4.depth();
-    assertEquals(CUTOFF-1,TypeMemPtr.max(alias0,ds2));
+    assertEquals(CUTOFF-1,p3.max(ds2));
     TypeMemPtr t4p1 = (TypeMemPtr)tax4.at("a");
     assertEquals(1,(int)ds2.get(t4p1));
     TypeStruct t4s1 = (TypeStruct)t4p1._obj;
@@ -265,7 +266,7 @@ public class TestApprox {
 
     // Check sanity
     HashMap<Type,Integer> depths = pa2.depth();
-    int maxd = TypeMemPtr.max(alias0,depths);
+    int maxd = pa2.max(depths);
     assertEquals(1,maxd);
     assertEquals(1,(int)depths.get(a3));
 
@@ -309,10 +310,10 @@ public class TestApprox {
     assertEquals(1,(int)depths.get(a1));
     assertEquals(2,(int)depths.get(a2));
     assertEquals(3,(int)depths.get(a3));
-    assertEquals(3,TypeMemPtr.max(alias0,depths));
+    assertEquals(3,pa0.max(depths));
 
     // Approximate
-    TypeStruct  zsa0 = a0.approx(3,alias0);
+    TypeStruct  zsa0 = a0.approx(3,BitsAlias.make0(alias0));
     TypeMemPtr pzsa0 = TypeMemPtr.make(alias0,zsa0);
 
     // Check sanity!
@@ -360,7 +361,7 @@ public class TestApprox {
     assertEquals(0,(int)depths.get(zsa0));
     assertEquals(1,(int)depths.get(zsa1));
     assertEquals(2,(int)depths.get(zsa23));
-    assertEquals(2,TypeMemPtr.max(alias0,depths));
+    assertEquals(2,pa0.max(depths));
     assertTrue(a0.isa(zsa0));
   }
 
@@ -434,10 +435,10 @@ public class TestApprox {
     assertEquals(3,(int)depths.get(x9));
     assertEquals(3,(int)depths.get(x10));
     assertEquals(3,(int)depths.get(x12));
-    assertEquals(3,TypeMemPtr.max(alias,depths));
+    assertEquals(3,px1.max(depths));
 
     // Approximate
-    TypeStruct z1 = x1.approx(CUTOFF,alias);
+    TypeStruct z1 = x1.approx(CUTOFF,BitsAlias.make0(alias));
     TypeMemPtr pz1 = TypeMemPtr.make(alias,z1);
     assertSame( TypeInt.con(1), z1.at("v"));
     TypeMemPtr p2 = (TypeMemPtr)z1.at("l") ;
@@ -459,7 +460,7 @@ public class TestApprox {
     check_leaf(p7,alias,TypeInt.con(7));
 
     depths = pz1.depth();
-    assertEquals(2,TypeMemPtr.max(alias,depths));
+    assertEquals(2,px1.max(depths));
   }
 
   // Leaf is a TypeInt.NINT8, and both pointer fields are either NIL or contain
@@ -492,24 +493,24 @@ public class TestApprox {
 
     TypeStruct  x1= TypeStruct.make(TypeFld.make("l",Type.SCALAR),TypeFld.make("r",Type.SCALAR),TypeFld.make("v",Type.SCALAR));
     TypeMemPtr px1= TypeMemPtr.make(alias,x1);
-    assertEquals(0,TypeMemPtr.max(alias,px1.depth()));
+    assertEquals(0,px1.max(px1.depth()));
 
     TypeStruct  x2= TypeStruct.make(TypeFld.make("l",   px1     ),TypeFld.make("r",Type.SCALAR),TypeFld.make("v",Type.SCALAR));
     TypeMemPtr px2= TypeMemPtr.make(alias,x2);
-    assertEquals(1,TypeMemPtr.max(alias,px2.depth()));
+    assertEquals(1,px1.max(px2.depth()));
 
     TypeStruct  x3= TypeStruct.make(TypeFld.make("l",   px1     ),TypeFld.make("r",     px1   ),TypeFld.make("v",Type.SCALAR));
     TypeMemPtr px3= TypeMemPtr.make(alias,x3);
-    assertEquals(1,TypeMemPtr.max(alias,px3.depth()));
+    assertEquals(1,px1.max(px3.depth()));
 
     TypeStruct  x4= TypeStruct.make(TypeFld.make("l",   px2     ),TypeFld.make("r",     px3   ),TypeFld.make("v",Type.SCALAR));
     TypeMemPtr px4= TypeMemPtr.make(alias,x4);
-    assertEquals(2,TypeMemPtr.max(alias,px4.depth()));
+    assertEquals(2,px1.max(px4.depth()));
 
     // Approximate
-    TypeStruct z1 = x4.approx(CUTOFF,alias);
+    TypeStruct z1 = x4.approx(CUTOFF,BitsAlias.make0(alias));
     TypeMemPtr pz1 = TypeMemPtr.make(alias,z1);
-    assertEquals(1,TypeMemPtr.max(alias,pz1.depth()));
+    assertEquals(1,pz1.max(pz1.depth()));
     assertSame(x3,z1);
   }
 
@@ -520,6 +521,7 @@ public class TestApprox {
   // Should approx to:
   // A3[0,18] -> {l=A3,r=A3,v} depth=1, cyclic
   //             {l=A1,r=A3,v} depth=2
+  @Ignore // invalid, after the change to approx
   @Test public void testApprox6() {
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
@@ -541,7 +543,7 @@ public class TestApprox {
 
     TypeStruct  z0= TypeStruct.make(TypeFld.make("l",px1),TypeFld.make("r",px2),TypeFld.make("v",Type.SCALAR));
     // Approximate
-    TypeStruct z1 = z0.approx(CUTOFF,alias);
+    TypeStruct z1 = z0.approx(CUTOFF,BitsAlias.make0(alias));
 
     Type.RECURSIVE_MEET++;
     TypeStruct  x3 = TypeStruct.malloc("",false,true,TypeFld.malloc("l"), TypeFld.malloc("r"), TypeFld.malloc("v")).set_hash();
@@ -573,7 +575,7 @@ public class TestApprox {
     int cnt=0;
     while( tmp0 != tmp1 && cnt < 100 ) {
       TypeStruct ts1 = TypeStruct.make(TypeFld.make("^",tmp1=tmp0));
-      TypeStruct ts1x = ts1.approx(CUTOFF,BitsAlias.REC);
+      TypeStruct ts1x = ts1.approx(CUTOFF,BitsAlias.RECORD_BITS);
       // Extend with nil-or-not endlessly.
       tmp0 = TypeMemPtr.make(BitsAlias.RECORD_BITS0,ts1x);
       cnt++;
@@ -598,17 +600,17 @@ public class TestApprox {
     // Add a struct with alias6 & approx.  Expect no change, despite alias6
     // being a child of RECORD.
     TypeStruct ts6 = TypeStruct.make(TypeFld.make("^",tmp0));
-    TypeStruct ts6x = ts6.approx(CUTOFF,alias6);
+    TypeStruct ts6x = ts6.approx(CUTOFF,ba6);
     assertEquals(ts6,ts6x);
     TypeMemPtr tmp6 = TypeMemPtr.make(ba60,ts6);
     // Again with alias7
     TypeStruct ts7 = TypeStruct.make(TypeFld.make("^",tmp6));
-    TypeStruct ts7x = ts7.approx(CUTOFF,alias7);
+    TypeStruct ts7x = ts7.approx(CUTOFF,ba7);
     assertEquals(ts7,ts7x);
     TypeMemPtr tmp7 = TypeMemPtr.make(ba70,ts7);
     // Again with alias8
     TypeStruct ts8 = TypeStruct.make(TypeFld.make("^",tmp7));
-    TypeStruct ts8x = ts8.approx(CUTOFF,alias8);
+    TypeStruct ts8x = ts8.approx(CUTOFF,ba8);
     assertEquals(ts8,ts8x);
 
 
@@ -629,11 +631,11 @@ public class TestApprox {
     // Add (alternating the repeating field left and right):
     //   B1 = ( A , 99 )
     TypeStruct tsB1 = TypeStruct.make(TypeFld.make("^",tmp0,DSP_IDX),TypeFld.make_tup(TypeInt.con(99),ARG_IDX));
-    assertEquals(tsB1,tsB1.approx(CUTOFF,alias6));
+    assertEquals(tsB1,tsB1.approx(CUTOFF,ba6));
     TypeMemPtr tmpB1= TypeMemPtr.make(ba6,tsB1); // Note not nil
     //   C1 = ( D , B1 )
     TypeStruct tsC1 = TypeStruct.make(TypeFld.make("^",tmpD,DSP_IDX),TypeFld.make_tup(tmpB1,ARG_IDX));
-    assertEquals(tsC1,tsC1.approx(CUTOFF,alias7));
+    assertEquals(tsC1,tsC1.approx(CUTOFF,ba7));
     TypeMemPtr tmpC1= TypeMemPtr.make(ba7,tsC1); // Note not nil
 
     // Add repeatedly until stable:
@@ -647,17 +649,17 @@ public class TestApprox {
       tmp1 = tmpC1;
       //   B2 = ( C1, 99 )
       TypeStruct tsB2 = TypeStruct.make(TypeFld.make("^",tmpC1,DSP_IDX),TypeFld.make_tup(TypeInt.con(99),ARG_IDX));
-      TypeStruct tsB2x = tsB2.approx(CUTOFF,alias6);
+      TypeStruct tsB2x = tsB2.approx(CUTOFF,ba6);
       TypeMemPtr tmpB2= TypeMemPtr.make(ba6,tsB2x); // Note not nil
 
       //   C2 = ( D , B2 )
       TypeStruct tsC2 = TypeStruct.make(TypeFld.make("^",tmpD,DSP_IDX),TypeFld.make_tup(tmpB2,ARG_IDX));
-      TypeStruct tsC2x = tsC2.approx(CUTOFF,alias7);
+      TypeStruct tsC2x = tsC2.approx(CUTOFF,ba7);
       TypeMemPtr tmpC2= TypeMemPtr.make(ba7,tsC2x); // Note not nil
       tmpC1 = tmpC2;
       cnt++;
     }
-    assertEquals(CUTOFF,cnt);
+    assertEquals(CUTOFF-1,cnt);
 
   }
 
@@ -719,7 +721,7 @@ public class TestApprox {
     assertEquals(dsp3,mt);
 
     // Build the approx
-    TypeStruct rez = dsp2.approx(CUTOFF,alias);
+    TypeStruct rez = dsp2.approx(CUTOFF,BitsAlias.make0(alias));
     assertEquals(dsp3,rez);
   }
 

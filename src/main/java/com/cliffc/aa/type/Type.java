@@ -328,7 +328,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       t1._name = "";     // Too easy to make mistakes, so zap now
       _frees.push(t1);   // On the free list
       _free++;
-      assert _frees._len<100; // Basically asserting we get Types from Pool.malloc and not by normal allocation
+      assert _frees._len<200; // Basically asserting we get Types from Pool.malloc and not by normal allocation
       return t2;
     }
   }

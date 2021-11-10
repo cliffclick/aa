@@ -14,25 +14,24 @@ import static com.cliffc.aa.type.TypeFld.Access;
 /** A memory-based collection of optionally named fields.  This is a recursive
  *  type, only produced by NewNode and structure or tuple constants.  Fields
  *  can be indexed by field name or numeric constant (i.e. tuples), but NOT by
- *  a general number - thats an Array.  Fields are matched on name and not
- *  index; field order is irrevelant to named fields.
+ *  a general number - that's an Array.  Fields are matched on name and not
+ *  index; field order is irrelevant to named fields.
  *
- *  Structs can be open or closed (and like all Types, high or low).  An open
- *  struct acts as-if it has an all possible field names (except those
- *  explicitly mentioned) set to SCALAR or XSCALAR.  Adding a new SCALAR field
- *  to an open low struct is a no-op, since such a field already implicitly
- *  exists.
+ *  Structs can be open or closed (and like all Types, high or low).  A struct
+ *  acts as-if it has an all possible field names (except those explicitly
+ *  mentioned) set to ANY (open) or ALL (closed).  Adding a new field to a
+ *  closed struct is a no-op, since such a field already implicitly exists.
  *
  *  The recursive type poses some interesting challenges.  It is represented as
  *  literally a cycle of pointers which must include a TypeStruct (and not a
  *  TypeTuple which only roots Types), a TypeMemPtr (edge) or a TypeFunPtr
- *  (display pointer) and a TypeFld.  Type inference involves finding the Meet
- *  of two cyclic structures.  The cycles will not generally be of the same
- *  length.  However, each field Meets independently (and fields in one
- *  structure but not the other are not in the final Meet).  This means we are
- *  NOT trying to solve the general problem of graph-equivalence (a known NP
- *  hard problem).  Instead we can solve each field independently and also
- *  intersect across common fields.
+ *  (display and return pointers) and a TypeFld.  Type inference involves
+ *  finding the Meet of two cyclic structures.  The cycles will not generally
+ *  be of the same length.  However, each field Meets independently (and fields
+ *  in one structure but not the other use the open/close rules).  This means
+ *  we are NOT trying to solve the general problem of graph-equivalence (a
+ *  known NP hard problem).  Instead, we can solve each field independently and
+ *  also intersect across common fields.
  *
  *  When solving across a single field, we will find some prefix and then
  *  possibly a cycle - conceptually the type unrolls forever.  When doing the
@@ -43,9 +42,11 @@ import static com.cliffc.aa.type.TypeFld.Access;
 public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
   public boolean _open;   // Extra fields are treated as ALL (or ANY)
   private short _max_arg; // Max field number
-  // The fields indexed by field name.  Effectively final.  Public iterator, but private.
+  // The fields indexed by field name.  Effectively final.  Public iterator, but private field.
   private IdentityHashMap<String,TypeFld> _flds;
-  boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
+  // Type is cyclic.  This is a summary property, not a part of the type, hence
+  // is not in the equals nor hash.  Used to optimize non-cyclic access.
+  boolean _cyclic; 
 
   TypeStruct init( String name, boolean any, boolean open ) {
     super.init(name, any, any);
@@ -63,8 +64,6 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     return ts;
   }
 
-  @Override public boolean cyclic() { return _cyclic; }
-  @Override public void set_cyclic() { _cyclic = true; }
   @Override public void walk1( BiFunction<Type,String,Type> map ) { for( String key : keys() ) map.apply(_flds.get(key),key); }
   @Override public void walk_update( UnaryOperator<Type> map ) { for( String key : keys() )  _flds.put(key,(TypeFld)map.apply(_flds.get(key)));  }
 
@@ -113,7 +112,6 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     // If any fields are not interned, assume they might be equal
     return true;
   }
-
 
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -547,7 +545,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
   // otherwise cyclic types.
   private static final IHashMap OLD2APX = new IHashMap();
   private static final Ary<TypeMemPtr> CUTOFFS = new Ary<>(TypeMemPtr.class);
-  public TypeStruct approx( int cutoff, int alias ) {
+  public TypeStruct approx( int cutoff, BitsAlias aliases ) {
     // Fast-path cutout for boring structs
     boolean shallow=true;
     for( TypeFld fld : flds() )
@@ -555,37 +553,41 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
           (fld._t instanceof TypeFunPtr && !((TypeFunPtr)fld._t)._ret.is_simple()) )
         { shallow=false; break; }
     if( shallow ) return this;  // Fast cutout for boring structs
-    // Assert the input has only grown 1 layer of 'alias' past the cutoff
-    TypeMemPtr ptr = TypeMemPtr.make(alias,this);
-    assert TypeMemPtr.max(alias,ptr.depth()) <= cutoff+1;
+    TypeMemPtr ptr = TypeMemPtr.make(aliases,this);
 
-    // Scan the old copy for elements that are too deep.
-    // 'Meet' those into the clone at one layer up.
-    RECURSIVE_MEET++;
-    assert Cyclic.UF.isEmpty() && OLD2APX.isEmpty() && MEETS0.isEmpty() && CUTOFFS.isEmpty();
-    TypeMemPtr apxptr = ax_impl_ptr( alias, cutoff, 0, ptr, ptr );
-    assert CUTOFFS.isEmpty();
-    MEETS0.clear();
-    RECURSIVE_MEET--;
-    // Remove any leftover internal duplication
-    BitsAlias aliases = apxptr._aliases;
-    TypeStruct rez = ((TypeStruct)apxptr._obj).install();
-    assert this.isa(rez);
-    Cyclic.UF.clear();  OLD2APX.clear();
-    assert TypeMemPtr.max(alias,TypeMemPtr.make(aliases,rez).depth()) < cutoff;
-    return rez;
+    while( true ) {
+      int max = ptr.max(ptr.depth());
+      if( max < cutoff )
+        return (TypeStruct)ptr._obj;
+      // Scan the old copy for elements that are too deep.
+      // 'Meet' those into the clone at one layer up.
+      RECURSIVE_MEET++;
+      assert OLD2APX.isEmpty() && MEETS0.isEmpty() && CUTOFFS.isEmpty();
+      TypeMemPtr apxptr = ax_impl_ptr( aliases, cutoff, 0, ptr, ptr );
+      assert CUTOFFS.isEmpty();
+      MEETS0.clear();
+      RECURSIVE_MEET--;
+      // apxptr may die/recycle at install, and may include e.g. nil where the
+      // original aliases do not
+      BitsAlias aliases2 = apxptr._aliases;
+      // Remove any leftover internal duplication.
+      TypeStruct rez = ((TypeStruct)apxptr._obj).install();
+      assert this.isa(rez);
+      OLD2APX.clear();
+      ptr = TypeMemPtr.make(aliases2,rez);
+    }
   }
 
   // Make a new TypeStruct which is the merge of the original TypeStruct with
   // the too-deep parts merged into shallower parts.
-  private static TypeStruct ax_impl_struct( int alias, int cutoff, int d, TypeMemPtr dold, TypeStruct old ) {
+  private static TypeStruct ax_impl_struct( BitsAlias aliases, int cutoff, int d, TypeMemPtr dold, TypeStruct old ) {
     assert old.interned();
     // TODO: If past depth, never use OLD, forces maximal cloning for the
     // last step, as the last step will be MEET with an arbitrary structure.
     // Use alternative OLD past depth, to keep looping unrelated types
     // folding up.  Otherwise unrelated types might expand endlessly.
     TypeStruct nt = OLD2APX.get(old);
-    if( nt != null ) return Cyclic.ufind(nt);
+    if( nt != null ) return nt;
 
     // Clone the old, to make the approximation into
     TypeStruct nts = old._clone();
@@ -593,24 +595,24 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     for( TypeFld fld : old.flds() ) {
       Type t = fld._t;
       if( t instanceof TypeMemPtr )
-        nts.get(fld._fld).setX(ax_impl_ptr (alias,cutoff,d,dold,(TypeMemPtr)t));
+        nts.get(fld._fld).setX(ax_impl_ptr (aliases,cutoff,d,dold,(TypeMemPtr)t));
       else if( t instanceof TypeFunPtr )
-        nts.get(fld._fld).setX(ax_impl_fptr(alias,cutoff,d,dold,(TypeFunPtr)t));
+        nts.get(fld._fld).setX(ax_impl_fptr(aliases,cutoff,d,dold,(TypeFunPtr)t));
     }
     OLD2APX.put(old,null); // Do not keep sharing the "tails"
     return nts;
   }
 
-  private static TypeMemPtr ax_impl_ptr( int alias, int cutoff, int d, TypeMemPtr dold, TypeMemPtr old ) {
+  private static TypeMemPtr ax_impl_ptr( BitsAlias aliases, int cutoff, int d, TypeMemPtr dold, TypeMemPtr old ) {
     assert old.interned();
     // TODO: If past depth, never use OLD, forces maximal cloning for the
     // last step, as the last step will be MEET with an arbitrary structure.
     // Use alternative OLD past depth, to keep looping unrelated types
     // folding up.  Otherwise unrelated types might expand endlessly.
     TypeMemPtr nt = OLD2APX.get(old);
-    if( nt != null ) return Cyclic.ufind(nt);
+    if( nt != null ) return nt;
 
-    boolean news = old._aliases.test(alias);
+    boolean news = old._aliases.overlaps(aliases);
     if( news ) {              // Depth-increasing pointer?
       if( d==cutoff ) {       // Cannot increase depth any more
         CUTOFFS.push(old);    // Save cutoff point for later MEET
@@ -626,7 +628,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     TypeMemPtr nmp = old.copy();
     OLD2APX.put(old,nmp);
     if( old._obj instanceof TypeStruct )
-      nmp._obj = ax_impl_struct(alias, cutoff,d,dold,(TypeStruct)old._obj);
+      nmp._obj = ax_impl_struct(aliases, cutoff,d,dold,(TypeStruct)old._obj);
     else if( old._obj == TypeObj.XOBJ || old._obj==nmp._obj )
       ; // No change to nmp._obj
     else if( old._obj == TypeObj.OBJ )
@@ -635,26 +637,26 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
       throw unimpl();
     if( news && d==cutoff ) {
       while( !CUTOFFS.isEmpty() ) { // At depth limit, meet with cutoff to make the approximation
-        Type mt = ax_meet(new BitSetSparse(), nmp,CUTOFFS.pop());
+        Type mt = ax_meet(new BitSetSparse(), nmp, CUTOFFS.pop());
         assert mt==nmp;
       }
     }
     OLD2APX.put(old,null);      // Do not keep sharing the "tails"
     return nmp;
   }
-  private static Type ax_impl_fptr( int alias, int cutoff, int d, TypeMemPtr dold, TypeFunPtr old ) {
+  private static Type ax_impl_fptr( BitsAlias aliases, int cutoff, int d, TypeMemPtr dold, TypeFunPtr old ) {
     assert old.interned();
     // TODO: If past depth, never use OLD, forces maximal cloning for the
     // last step, as the last step will be MEET with an arbitrary structure.
     // Use alternative OLD past depth, to keep looping unrelated types
     // folding up.  Otherwise unrelated types might expand endlessly.
     TypeFunPtr nt = OLD2APX.get(old);
-    if( nt != null ) return Cyclic.ufind(nt);
-    if( old._dsp!=Type.ANY ) {
+    if( nt != null ) return nt;
+    if( old._dsp!=Type.ANY && old._dsp!=ALL ) {
       // Walk internal structure, meeting into the approximation
       TypeFunPtr nmp = old.copy();
       OLD2APX.put(old,nmp);
-      nmp._dsp = ax_impl_ptr(alias,cutoff,d,dold,(TypeMemPtr)old._dsp);
+      nmp._dsp = ax_impl_ptr(aliases,cutoff,d,dold,(TypeMemPtr)old._dsp);
       OLD2APX.put(old,null);      // Do not keep sharing the "tails"
       old = nmp;
     }
@@ -663,9 +665,9 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
       TypeFunPtr nmp = old.copy();
       OLD2APX.put(old,nmp);
       if( old._ret instanceof TypeMemPtr )
-        nmp._ret = ax_impl_ptr (alias,cutoff,d,dold,(TypeMemPtr)old._ret);
+        nmp._ret = ax_impl_ptr (aliases,cutoff,d,dold,(TypeMemPtr)old._ret);
       else
-        nmp._ret = ax_impl_fptr(alias,cutoff,d,dold,(TypeFunPtr)old._ret);
+        nmp._ret = ax_impl_fptr(aliases,cutoff,d,dold,(TypeFunPtr)old._ret);
       OLD2APX.put(old,null);      // Do not keep sharing the "tails"
       old = nmp;
     }
@@ -685,9 +687,9 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
       return xt;
     }
     assert nt._hash==0;         // Not definable yet, as nt may yet pick up fields
-    nt = Cyclic.ufind(nt);
     if( nt == old ) return old;
-    if( bs.tset(nt._uid,old._uid) ) return nt; // Been there, done that
+    if( old instanceof Cyclic && ((Cyclic)old).cyclic() && bs.tset(nt._uid,old._uid) )
+      return nt; // Been there, done that
 
     // TODO: Make a non-recursive "meet into".
     // Meet old into nt
@@ -696,9 +698,8 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     case TFUNPTR: {
       TypeFunPtr nptr = (TypeFunPtr)nt;
       if( old == Type.NIL || old == Type.XNIL ) return nptr.ax_meet_nil(old);
-      if( old == Type.SCALAR )
-        return Type.SCALAR; // Result is a scalar, which changes the structure of the new types.
-      if( old == Type.XSCALAR ) break; // Result is the nt unchanged
+      if( old == Type.SCALAR ) return old; 
+      if( old == Type.XSCALAR || old == Type.XNSCALR ) break; // Result is the nt unchanged
       if( !(old instanceof TypeFunPtr) ) throw AA.unimpl(); // Not a xscalar, not a funptr, probably falls to scalar
       TypeFunPtr optr = (TypeFunPtr)old;
       nptr._fidxs = nptr._fidxs.meet(optr._fidxs);
@@ -710,10 +711,9 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     case TMEMPTR: {
       TypeMemPtr nptr = (TypeMemPtr)nt;
       if( old == Type.NIL || old == Type.XNIL ) return nptr.ax_meet_nil(old);
-      if( old == Type.SCALAR )
-        return Type.SCALAR; // Result is a scalar, which changes the structure of the new types.
+      if( old == Type.SCALAR ) return old;
       if( old == Type.XSCALAR || old == Type.ANY ) break; // Result is the nt unchanged
-      if( !(old instanceof TypeMemPtr) ) throw AA.unimpl(); // Not a xscalar, not a memptr, probably falls to scalar
+      if( !(old instanceof TypeMemPtr) ) return Type.SCALAR; // Not a TMP
       TypeMemPtr optr = (TypeMemPtr)old;
       nptr._aliases = nptr._aliases.meet(optr._aliases);
       nptr._obj = (TypeObj)ax_meet(bs,nptr._obj,optr._obj);
@@ -736,8 +736,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
         }
       }
       // Remove new fields that are not in old.
-      if( !ots._any )
-        nts._flds.entrySet().removeIf( e -> !ots._flds.containsKey(e.getValue()._fld) );
+      nts._flds.entrySet().removeIf( e -> !ots._flds.containsKey(e.getValue()._fld) );
       // Now recursively do all common fields
       for( TypeFld ofld : ots.flds() ) {
         TypeFld nfld = nts.get(ofld._fld);
@@ -935,6 +934,8 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
   }
   public int len() { return _flds.size(); } // Count of fields
 
+  @Override public boolean cyclic() { return _cyclic; }
+  @Override public void set_cyclic() { _cyclic = true; }
 
   // Extend the current struct with a new named field, making a new struct
   public TypeStruct add_tup( Type t, int order ) { return add_fld(TypeFld.TUPS[order],Access.Final,t,order); }

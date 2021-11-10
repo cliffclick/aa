@@ -13,11 +13,8 @@ import static org.junit.Assert.assertTrue;
 
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
+  private TypeFunPtr make(BitsFun fidxs,Type ret) { return TypeFunPtr.make(fidxs,1,TypeMemPtr.NO_DISP,ret); }
   @Test public void testType() {
-    Type t0 = TypeInt.BOOL;
-    Type t1 = Type.NSCALR;
-    Type t2 = t0.join(t1);
-    assertEquals(TypeInt.TRUE,t2);
   }
 
   @Test public void testBits0() {
@@ -420,11 +417,11 @@ public class TestType {
     TypeMemPtr phi = TypeMemPtr.make(alias,ts);
     for( int i=1; i<20; i++ ) {
       TypeStruct newt = TypeStruct.make(TypeFld.make("ptr",phi),TypeFld.make("cnt",TypeInt.con(i)));
-      TypeStruct approx = newt.approx(2/*CUTOFF*/,alias);
+      TypeStruct approx = newt.approx(2/*CUTOFF*/,BitsAlias.make0(alias));
       phi = TypeMemPtr.make(alias,approx);
     }
     HashMap<Type,Integer> ds = phi.depth();
-    int d = TypeMemPtr.max(alias,ds);
+    int d = phi.max(ds);
     assertTrue(0 <= d && d <10);
   }
 

@@ -26,6 +26,7 @@ public class ConTypeNode extends Node {
   public boolean is_forward_ref() { return is_forward_ref(_t); }
   public static boolean is_forward_ref(Type t) { return t instanceof TypeMemPtr && !(((TypeMemPtr)t)._obj instanceof TypeStruct); }
   public int alias() { return ((TypeMemPtr)_t).getbit0(); }
+  public BitsAlias aliases() { return ((TypeMemPtr)_t)._aliases; }
 
   // Define a forward-ref Type
   public void def_fref(Type t, Env e) {
@@ -75,7 +76,7 @@ public class ConTypeNode extends Node {
     VBitSet visit = new VBitSet();
 
     TypeMemPtr t1 = (TypeMemPtr)_t.make_from(_t,mem,visit);
-    TypeStruct t2 = ((TypeStruct)(t1._obj)).approx(1,alias());
+    TypeStruct t2 = ((TypeStruct)(t1._obj)).approx(1,aliases());
     TypeMemPtr t3 = t1.make_from(t2);
     return t3;
   }
