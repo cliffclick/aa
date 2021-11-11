@@ -795,7 +795,7 @@ public class HM {
       // and CCP flow type in parallel and create a mapping.  Then walk the
       // output HM type and CCP flow type in parallel, and join output CCP
       // types with the matching input CCP type.
-      if( false && DO_HM ) {
+      if( DO_HM ) {
         Type rez3 = T2.hm_apply_lift(rez,this);
         assert _flow.isa(rez3) ; // Monotonic...
         rez = rez3; // Upgrade
@@ -2045,6 +2045,7 @@ public class HM {
     // flow Type, and the mapping is made recursively.
     static private final HashMap<T2,Type> T2MAP = new HashMap<>();
     static private final NonBlockingHashMapLong<TypeStruct> WDUPS = new NonBlockingHashMapLong<>();
+    static private final BitSet WBS = new BitSet();
 
     // Walk the input types, finding all the Leafs.  Repeats of the same Leaf
     // has its flow Types MEETed.  If HM_FREEZE, then these are the exact
@@ -2059,21 +2060,25 @@ public class HM {
     // The resulting type is used to lift the result via a JOIN.
     static Type hm_apply_lift( Type rez, Apply apply ) {
       T2MAP.clear();
-      { WDUPS.clear(); apply._fun.find().walk_types_in(apply._fun._flow); }
+      { WDUPS.clear(true); apply._fun.find().walk_types_in(apply._fun._flow); }
       for( Syntax arg : apply._args )
-        { WDUPS.clear(); arg.find().walk_types_in(arg._flow); }
+        { WDUPS.clear(true); arg.find().walk_types_in(arg._flow); }
 
       // If !HM_FREEZE, pre-compute a monolithic JOIN
       Type jt = null;
       if( !HM_FREEZE ) {
         jt = Type.ALL;
-        for( Type flow : T2MAP.values() )
-          jt = jt.join(flow);
+        for( T2 t2 : T2MAP.keySet() )
+          if( t2.is_leaf() )
+            jt = jt.join(T2MAP.get(t2));
       }
 
       // Walk the outputs, building a lifting result
-      WDUPS.clear();
+      WDUPS.clear(true);  WBS.clear();
       Type rez2 = apply.find().walk_types_out(rez, jt, apply);
+      if( rez2 != rez && rez2==jt )   // Lifting looks like the leaf-join
+        for( T2 t2 : T2MAP.keySet() ) // So depend on all leafs.  TODO: be more exact
+          t2.push_update(apply);
       Type rez3 = rez.join(rez2);    // Lifted result
       return rez3;
     }
@@ -2083,7 +2088,7 @@ public class HM {
     // Walk a T2 and a matching flow-type, and build a map from T2 to flow-types.
     // Stop if either side loses corresponding structure.  This operation must be
     // monotonic because the result is JOINd with GCP types.
-    Type walk_types_in(Type t) {
+    Type walk_types_in(Type t) {     //noinspection UnusedReturnValue
       long duid = dbl_uid(t._uid);
       if( WDUPS.putIfAbsent(duid,TypeStruct.ALLSTRUCT)!=null ) return t;
       assert !unified();
@@ -2139,6 +2144,7 @@ public class HM {
     // stronger flow types from the matching input types.
     Type walk_types_out( Type t, Type jt, Apply apply ) {
       assert !unified();
+      if( t==Type.XSCALAR || t==Type.XNSCALR ) return t; // Cannot lift anymore
       // Theory:
       // (1) first structural walk the LHS and get lifted parts.
       // (2) build lifted-from-parts flow Type
@@ -2150,16 +2156,14 @@ public class HM {
       // - NOTE: must install Scalar mappings when walking-in, to distinguish
       //   first seeing a Scalar (and not installing), then seeing a high value
       //   (but not MEET'ing with Scalar)
-      // - don't walk from a flow ~Scalar, as already lifted as much as possible
-      // - lump all the "always compatible" Leafs together and pre-JOIN
 
       if( is_err() ) return Type.ALL; // Do not attempt lift
 
       if( is_leaf() )
-        return lift(jt);
+        return lift(jt,apply);
 
       if( is_base() )
-        return lift(jt);
+        return lift(jt,apply);
 
       if( is_nil() ) { // The wrapped leaf gets compat_lift, then nil is added
         Type tnil = arg("?").walk_types_out(t.join(Type.NSCALR),jt,apply);
@@ -2167,12 +2171,16 @@ public class HM {
       }
 
       if( is_fun() ) {
-        if( t==Type.SCALAR ) t = TypeFunPtr.GENERIC_FUNPTR;
+        if( t==Type.SCALAR || t==Type.ALL ) t = TypeFunPtr.GENERIC_FUNPTR;
         if( t instanceof TypeFunPtr ) {
           TypeFunPtr tfp = (TypeFunPtr)t;
+          for( int fidx : tfp._fidxs ) if( WBS.get(fidx) ) return t; // Recursive function return, no more lifting
+          for( int fidx : tfp._fidxs ) WBS.set(fidx);                // Guard against recursive functions
           Type tret = tfp._ret;
           Type trlift = arg("ret").walk_types_out(tret, jt, apply);
-          return tfp.make_from_ret(trlift);
+          Type rez = TypeFunPtr.make0( tfp._fidxs,tfp._nargs,tfp._dsp,trlift);
+          for( int fidx : tfp._fidxs ) WBS.clear(fidx); // Clear fidxs
+          return rez;
         }
         // TODO: Flow Scalar is OK, will lift to a TFP->Scalar
         throw unimpl();
@@ -2193,16 +2201,18 @@ public class HM {
           Type.RECURSIVE_MEET++;
           ts = TypeStruct.malloc("",false,false);
           ts.add_fld(ts0.get("^"));  // Copy display (which never appears in the HM type)
-          for( String id : _args.keySet() )
-            ts.add_fld( TypeFld.malloc(id,null,Access.Final,TypeFld.oBot) );
+          if( _args!=null )
+            for( String id : _args.keySet() )
+              ts.add_fld( TypeFld.malloc(id,null,Access.Final,TypeFld.oBot) );
           ts.set_hash();
           WDUPS.put(_uid,ts); // Stop cycles
-          for( String id : _args.keySet() ) {
-            TypeFld fld0 = ts0.get(id);
-            Type f0t = fld0==null ? Type.SCALAR  : fld0._t;
-            int order= fld0==null ? TypeFld.oBot : fld0._order;
-            ts.get(id).setX( arg(id).walk_types_out(f0t,jt,apply), order);
-          }
+          if( _args!=null )
+            for( String id : _args.keySet() ) {
+              TypeFld fld0 = ts0.get(id);
+              Type f0t = fld0==null ? Type.SCALAR  : fld0._t;
+              int order= fld0==null ? TypeFld.oBot : fld0._order;
+              ts.get(id).setX( arg(id).walk_types_out(f0t,jt,apply), order);
+            }
           if( --Type.RECURSIVE_MEET == 0 )
             ts = ts.install();
         }
@@ -2213,10 +2223,12 @@ public class HM {
       throw unimpl();           // Handled all cases
     }
 
-    private Type lift(Type jt) {
+    private Type lift(Type jt, Apply apply) {
       if( jt!=null ) return jt;
       Type xt = T2MAP.get(this);
-      return xt==null ? Type.SCALAR : xt;
+      if( xt==null ) return Type.SCALAR;
+      push_update(apply);    // Apply depends on this leaf
+      return xt;
     }
 
 

@@ -540,7 +540,8 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
   // -------------------------------------------------------------------------
   // Approximate an otherwise endless unrolled sequence of:
   //    ...TMP[alias] -> Struct -> [FunPtr]* -> TMP[alias] -> Struct -> ...
-
+  public TypeStruct approx( int cutoff, BitsAlias aliases ) { return approx2(cutoff,aliases); }
+  
   // By chopping off the endless tail, pulling it back one recursion layer and
   // meeting.  This forces unrolled part to look like the cyclic part (at least
   // past the cutoff), which then re-rolls.  Used to prevent endless growth of
@@ -761,7 +762,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
 
   // This version IS associative with meet: A.apx.B == A.B.apx
   private static final IHashMap AXCYCLIC = new IHashMap();
-  public TypeStruct approx( int cutoff, BitsAlias aliases ) {
+  public TypeStruct approx2( int cutoff, BitsAlias aliases ) {
     // Fast-path cutout for boring structs
     boolean shallow=true;
     for( TypeFld fld : flds() )
