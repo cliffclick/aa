@@ -30,6 +30,7 @@ public class BitsFun extends Bits<BitsFun> {
 
   // Have to make a first BitsFun here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
+  public  static final BitsFun NZERO = new BitsFun().make_impl(ALL,null);
   public  static final BitsFun FULL = new BitsFun().make_impl(1,new long[]{1L | (1L<<ALL)});
   public  static final BitsFun ANY = FULL.dual();
   public  static final BitsFun NIL = make0(0);

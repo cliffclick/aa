@@ -46,7 +46,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
   private IdentityHashMap<String,TypeFld> _flds;
   // Type is cyclic.  This is a summary property, not a part of the type, hence
   // is not in the equals nor hash.  Used to optimize non-cyclic access.
-  boolean _cyclic; 
+  boolean _cyclic;
 
   TypeStruct init( String name, boolean any, boolean open ) {
     super.init(name, any, any);
@@ -537,15 +537,19 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     return ts;
   }
 
+  // -------------------------------------------------------------------------
   // Approximate an otherwise endless unrolled sequence of:
   //    ...TMP[alias] -> Struct -> [FunPtr]* -> TMP[alias] -> Struct -> ...
+
   // By chopping off the endless tail, pulling it back one recursion layer and
   // meeting.  This forces unrolled part to look like the cyclic part (at least
   // past the cutoff), which then re-rolls.  Used to prevent endless growth of
   // otherwise cyclic types.
+
+  // This version is NOT associative with meet: A.apx.B != A.B.apx
   private static final IHashMap OLD2APX = new IHashMap();
   private static final Ary<TypeMemPtr> CUTOFFS = new Ary<>(TypeMemPtr.class);
-  public TypeStruct approx( int cutoff, BitsAlias aliases ) {
+  public TypeStruct approx1( int cutoff, BitsAlias aliases ) {
     // Fast-path cutout for boring structs
     boolean shallow=true;
     for( TypeFld fld : flds() )
@@ -698,7 +702,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     case TFUNPTR: {
       TypeFunPtr nptr = (TypeFunPtr)nt;
       if( old == Type.NIL || old == Type.XNIL ) return nptr.ax_meet_nil(old);
-      if( old == Type.SCALAR ) return old; 
+      if( old == Type.SCALAR ) return old;
       if( old == Type.XSCALAR || old == Type.XNSCALR ) break; // Result is the nt unchanged
       if( !(old instanceof TypeFunPtr) ) throw AA.unimpl(); // Not a xscalar, not a funptr, probably falls to scalar
       TypeFunPtr optr = (TypeFunPtr)old;
@@ -749,7 +753,46 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     return nt;
   }
 
+  // -------------------------------------------------------------------------
+  // Approximate an otherwise endless unrolled sequence of:
+  //    ...TMP[alias] -> Struct -> [FunPtr]* -> TMP[alias] -> Struct -> ...
 
+  // By chopping off the endless tail, and meeting it with SCALAR.
+
+  // This version IS associative with meet: A.apx.B == A.B.apx
+  private static final IHashMap AXCYCLIC = new IHashMap();
+  public TypeStruct approx( int cutoff, BitsAlias aliases ) {
+    // Fast-path cutout for boring structs
+    boolean shallow=true;
+    for( TypeFld fld : flds() )
+      if( fld._t instanceof TypeMemPtr ||
+          (fld._t instanceof TypeFunPtr && !((TypeFunPtr)fld._t)._ret.is_simple()) )
+        { shallow=false; break; }
+    if( shallow ) return this;  // Fast cutout for boring structs
+    AXCYCLIC.clear();
+    Type apx = _apx(cutoff-1,aliases,this);
+    apx = apx.install();
+    return (TypeStruct)apx;
+  }
+
+  // deep clone, lowering cutoff at TMP, chopping off when cutoff hits 0
+  private static Type _apx( int cutoff, BitsAlias aliases, Type t ) {
+    if( !(t instanceof Cyclic) ) return t;
+    Type c = AXCYCLIC.get(t);     // Check for cycles
+    if( c!=null ) return c;       // Return prior
+    AXCYCLIC.put(t,c = t.copy()); // Stop cycles
+    if( c instanceof TypeMemPtr && aliases.overlaps(((TypeMemPtr)c)._aliases) ) {
+      if( cutoff == 0 )
+        return AXCYCLIC.put(t,Type.SCALAR); // Cutoff to Scalar
+      cutoff--;                             // Lower cutoff
+    }
+    // Recursively apply
+    final int fcutoff = cutoff;
+    ((Cyclic)c).walk_update(fld -> _apx(fcutoff,aliases,fld));
+    return c;
+  }
+
+  // -------------------------------------------------------------------------
   // Build a (recursively) sharpened pointer from memory.  Alias sets can be
   // looked-up directly in a map from BitsAlias to TypeObjs.  This is useful
   // for resolving all the deep pointer structures at a point in the program

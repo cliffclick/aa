@@ -31,7 +31,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   @Override public boolean cyclic() { return _cyclic; }
   @Override public void set_cyclic() { _cyclic = true; }
   @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_t,"t"); }
-  @Override public void walk_update( UnaryOperator<Type> update ) { _t = update.apply(_t); }
+  @Override public void walk_update( UnaryOperator<Type> map ) { _t = map.apply(_t); }
 
   // Ignore edges hash
   int _hash() { return Util.hash_spread(super.static_hash() + _fld.hashCode() + _access.hashCode( ) + _order); };

@@ -83,6 +83,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
 
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
+    if( _fidxs==null ) return sb.p("[free]");
     _fidxs.str(sb);
     sb.p('{');                  // Collection (even of 1) start
     if( debug ) _dsp.str(sb,dups,mem,debug).p(' ');

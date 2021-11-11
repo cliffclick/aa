@@ -13,7 +13,6 @@ import static org.junit.Assert.assertTrue;
 
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
-  private TypeFunPtr make(BitsFun fidxs,Type ret) { return TypeFunPtr.make(fidxs,1,TypeMemPtr.NO_DISP,ret); }
   @Test public void testType() {
   }
 

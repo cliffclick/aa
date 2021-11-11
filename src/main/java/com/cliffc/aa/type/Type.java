@@ -311,18 +311,21 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       POOLS[t] = this;
     }
     <T extends Type> T malloc() {
+      T t;
       if( _frees.isEmpty() ) {
         _malloc++;              // Make fresh
-        try { T t = (T)_gold.clone(); t._uid = _uid(); return t; }
+        try { t = (T)_gold.clone(); t._uid = _uid(); }
         catch( CloneNotSupportedException ignore ) {throw new RuntimeException("shut java up about not clonable");}
       } else {
         _pool++;                // Pull a from free pool
-        return (T)_frees.pop();
+        t = (T)_frees.pop();
       }
+      return t;                 // Set breakpoints here to find a uid
     }
     <T extends Type> T free(T t1, T t2) {
       assert !t1.interned();
       if( t1 instanceof TypeMemPtr ) ((TypeMemPtr)t1)._aliases=null; // is-free tag for TMP
+      if( t1 instanceof TypeFunPtr ) ((TypeFunPtr)t1)._fidxs  =null; // is-free tag for TFP
       t1._dual = null;   // Too easy to make mistakes, so zap now
       t1._hash = 0;      // Too easy to make mistakes, so zap now
       t1._name = "";     // Too easy to make mistakes, so zap now

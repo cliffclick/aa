@@ -133,7 +133,7 @@ public class HM {
     main_work_loop(prog,work);
     assert prog.more_work(work);
 
-    // Give up on the Root GCP arg types.  Drop them to the best Root
+    // Pass 2: Give up on the Root GCP arg types.  Drop them to the best Root
     // approximation and never lift again.
     ROOT_FREEZE = true;
     prog.update_fun_args(work);
@@ -142,14 +142,14 @@ public class HM {
     main_work_loop(prog,work);
     assert prog.more_work(work);
 
-    // Pass 2: H-M types freeze, escaping function args are assumed lowest H-M compatible and
+    // Pass 3: H-M types freeze, escaping function args are assumed lowest H-M compatible and
     // GCP types continue to run downhill.
     HM_FREEZE = true;
     prog.visit((syn)->{syn.add_val_work(null,work); return work.push(syn); },( a, b)->null);
     main_work_loop(prog,work);
     assert prog.more_work(work);
 
-    // Pass 3: Error propagation, no types change.
+    // Pass 4: Error propagation, no types change.
     pass3(prog);
 
     // Profiling print
@@ -835,15 +835,6 @@ public class HM {
               ? Root.widen(fun.targ(i)) // Root assumed args
               : _args[i]._flow;         // Actual observed args
             Type rez = formal.meet(actual);
-            // Shrink any cyclic result
-            if( rez instanceof TypeMemPtr ) {
-              TypeMemPtr rez2 = (TypeMemPtr)rez;
-              if( rez2._obj instanceof TypeStruct ) {
-                TypeStruct ts = (TypeStruct)rez2._obj;
-                TypeStruct apx = ts.approx(CUTOFF,rez2._aliases);
-                rez = rez2.make_from(apx);
-              }
-            }
             if( formal != rez ) {
               if( work==null ) return true;
               progress = true;
@@ -1060,7 +1051,6 @@ public class HM {
         return fld.unify(self, work);
 
       // Add struct-ness if possible
-      boolean progress = false;
       if( !rec.is_struct() && !rec.is_nil() ) {
         //if( !rec.is_leaf() && self._err==null )
         //  self._err = "Missing field " + _id + " in " + rec.p();
@@ -1068,7 +1058,6 @@ public class HM {
         rec._aliases = BitsAlias.EMPTY;
         if( rec._args==null ) rec._args = new NonBlockingHashMap<>();
         assert rec.is_struct();
-        progress = true;
       }
       // Add the field
       if( rec.is_struct() && rec.is_open() ) {
@@ -1472,6 +1461,7 @@ public class HM {
       t._open = _open;
       // TODO: stop sharing _deps
       t._deps = _deps;
+      t._err = _err;
       return t;
     }
 
@@ -1606,19 +1596,18 @@ public class HM {
         return ROOT_FREEZE ? Type.SCALAR : Type.XNSCALR;
       if( is_fun()  ) {
         Type tfun = ADUPS.get(_uid);
-        if( tfun != null )  return tfun;  // TODO: Returning recursive flow-type functions
-        ADUPS.put(_uid,Type.SCALAR);
+        if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
+        ADUPS.put(_uid, Type.XSCALAR);
         Type rez = arg("ret")._as_flow();
-        return TypeFunPtr.make(HM_FREEZE ? BitsFun.FULL : _fidxs,size()-1,Type.ANY,rez);
+        return TypeFunPtr.make(ROOT_FREEZE ? BitsFun.NZERO : _fidxs,size()-1,Type.ANY,rez);
       }
       if( is_struct() ) {
         TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);
         if( tstr==null ) {
           // Returning a high version of struct
-          if( !ROOT_FREEZE )
-            return Type.XNSCALR;
+          if( !ROOT_FREEZE ) return Type.XNSCALR;
           Type.RECURSIVE_MEET++;
-          tstr = TypeStruct.malloc("",false,false).add_fld(TypeFld.NO_DISP);
+          tstr = TypeStruct.malloc("",is_open(),false).add_fld(TypeFld.NO_DISP);
           if( _args!=null )
             for( String id : _args.keySet() )
               tstr.add_fld(TypeFld.malloc(id));
@@ -1631,8 +1620,6 @@ public class HM {
             // Shrink / remove cycle dups.  Might make new (smaller)
             // TypeStructs, so keep RECURSIVE_MEET enabled.
             tstr = tstr.install();
-        } else {
-          tstr.set_cyclic();    // Been there, done that, just mark it cyclic
         }
         return TypeMemPtr.make(_aliases,tstr);
       }
@@ -1660,7 +1647,9 @@ public class HM {
         if( that._args==null ) { that._args = _args; _args=null; }
         else that._args.putAll(_args);
       }
-      if( _err!=null && that._err==null ) that._err = _err; // TODO: Combine single errors
+      if( _err!=null && that._err==null ) that._err = _err;
+      else if( _err!=null && !_err.equals(that._err) )
+        throw unimpl();         // TODO: Combine single errors
 
       // Work all the deps
       that.add_deps_work(work);
@@ -1921,6 +1910,10 @@ public class HM {
         BitsAlias mt = that._aliases==null ? _aliases : _aliases.meet(that._aliases);
         if( mt!=that._aliases ) { progress = true; that._aliases=mt; }
       }
+      if( _err!=null && !_err.equals(that._err) ) {
+        if( that._err!=null ) throw unimpl(); // TODO: Combine single error messages
+        else { progress = true; that._err = _err; }
+      }
 
       // Both same (probably both nil)
       if( _args==that._args ) return vput(that,progress);
@@ -2028,6 +2021,7 @@ public class HM {
       if( _flow   !=t._flow    ) return false; // Base-cases have to be completely identical
       if( _fidxs  !=t._fidxs   ) return false; // Base-cases have to be completely identical
       if( _aliases!=t._aliases ) return false; // Base-cases have to be completely identical
+      if( _err!=null && !_err.equals(t._err) ) return false; // Base-cases have to be completely identical
       if( is_leaf() ) return false;               // Two leaves must be the same leaf, already checked for above
       if( size() != t.size() ) return false;      // Mismatched sizes
       if( _args==t._args ) return true;           // Same arrays (generally both null)
