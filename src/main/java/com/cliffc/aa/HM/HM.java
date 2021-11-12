@@ -145,7 +145,7 @@ public class HM {
     // Pass 3: H-M types freeze, escaping function args are assumed lowest H-M compatible and
     // GCP types continue to run downhill.
     HM_FREEZE = true;
-    prog.visit((syn)->{syn.add_val_work(null,work); return work.push(syn); },( a, b)->null);
+    prog.visit((syn) -> { syn.add_val_work(null,work); return work.push(syn); }, (a,b)->null);
     main_work_loop(prog,work);
     assert prog.more_work(work);
 
@@ -2067,7 +2067,7 @@ public class HM {
       // If !HM_FREEZE, pre-compute a monolithic JOIN
       Type jt = null;
       if( !HM_FREEZE ) {
-        jt = Type.ALL;
+        jt = Type.SCALAR;
         for( T2 t2 : T2MAP.keySet() )
           if( t2.is_leaf() )
             jt = jt.join(T2MAP.get(t2));
@@ -2157,7 +2157,7 @@ public class HM {
       //   first seeing a Scalar (and not installing), then seeing a high value
       //   (but not MEET'ing with Scalar)
 
-      if( is_err() ) return Type.ALL; // Do not attempt lift
+      if( is_err() ) return Type.SCALAR; // Do not attempt lift
 
       if( is_leaf() )
         return lift(jt,apply);
@@ -2189,35 +2189,31 @@ public class HM {
       if( is_struct() ) {
         if( t==Type.SCALAR ) t = TypeMemPtr.DISPLAY_PTR;
         if( !(t instanceof TypeMemPtr ) ) // Flow will not lift to a TMP->Struct?
-          return Type.ALL;                // An error situation, no lifting
+          return Type.SCALAR;             // An error situation, no lifting
         TypeMemPtr tmp = (TypeMemPtr)t;
         TypeStruct ts0 = (TypeStruct)tmp._obj;
         // Can be made to work above_center, but no sensible lifting so don't bother
-        if( ts0.above_center() )
-          return Type.ALL;
+        if( ts0.above_center() )  return Type.SCALAR;
         TypeStruct ts = WDUPS.get(_uid);
-        if( ts != null ) ts.set_cyclic();
-        else {
-          Type.RECURSIVE_MEET++;
-          ts = TypeStruct.malloc("",false,false);
-          ts.add_fld(ts0.get("^"));  // Copy display (which never appears in the HM type)
-          if( _args!=null )
-            for( String id : _args.keySet() )
-              ts.add_fld( TypeFld.malloc(id,null,Access.Final,TypeFld.oBot) );
-          ts.set_hash();
-          WDUPS.put(_uid,ts); // Stop cycles
-          if( _args!=null )
-            for( String id : _args.keySet() ) {
-              TypeFld fld0 = ts0.get(id);
-              Type f0t = fld0==null ? Type.SCALAR  : fld0._t;
-              int order= fld0==null ? TypeFld.oBot : fld0._order;
-              ts.get(id).setX( arg(id).walk_types_out(f0t,jt,apply), order);
-            }
-          if( --Type.RECURSIVE_MEET == 0 )
-            ts = ts.install();
-        }
-        t = tmp.make_from(ts);
-        return t;
+        if( ts != null ) return t; // Recursive, stop cycles
+        Type.RECURSIVE_MEET++;
+        ts = TypeStruct.malloc("",false,false);
+        ts.add_fld(ts0.get("^")); // Copy display (which never appears in the HM type)
+        if( _args!=null )
+          for( String id : _args.keySet() )
+            ts.add_fld( TypeFld.malloc(id,null,Access.Final,TypeFld.oBot) );
+        ts.set_hash();
+        WDUPS.put(_uid,ts);     // Stop cycles
+        if( _args!=null )
+          for( String id : _args.keySet() ) {
+            TypeFld fld0 = ts0.get(id);
+            Type f0t = fld0==null ? Type.SCALAR  : fld0._t;
+            int order= fld0==null ? TypeFld.oBot : fld0._order;
+            ts.get(id).setX( arg(id).walk_types_out(f0t,jt,apply), order);
+          }
+        if( --Type.RECURSIVE_MEET == 0 )
+          ts = ts.install();
+        return tmp.make_from(ts);
       }
 
       throw unimpl();           // Handled all cases
