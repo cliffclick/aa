@@ -208,14 +208,14 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Add a low nil.
   @SuppressWarnings("unchecked")
   public B meet_nil() {
-    if( above_center() ) return make(0); // Crossing centerline, drop all above bits, just [0]
+    if( above_center() ) return make(0); // Crossing the centerline, drop all above bits, just [0]
     if( test(0) ) return (B)this;// Already has nil
     long[] bs = _bits;
     if( bs==null )              // Is a single compressed bit
       or(bs = bits(Math.abs(_con)),Math.abs(_con)); // Decompress single bit into array
     else bs = _bits.clone();    // Make a private set
     bs[0] |= 1;                 // Set nil
-    return make(false,bs);      // Its below center now, even if the original was above
+    return make(false,bs);      // It's below center now, even if the original was above
   }
 
   // Test a specific bit is set or clear on a given bits
@@ -288,7 +288,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // expanding into a large bit array.  After that we need to honor the tree
   // semantics; any set bits automatically include all their children as well.
   //
-  // AS-IF: For any given set-bit, we "unpack" it setting every child bit.  We
+  // AS-IF: For any given set-bit, we "unpack" it, setting every child bit.  We
   // then do the proper AND/OR operation on the bits, followed by a repack.
   //
 

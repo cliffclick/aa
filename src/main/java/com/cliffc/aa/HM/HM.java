@@ -2187,9 +2187,8 @@ public class HM {
       }
 
       if( is_struct() ) {
-        if( t==Type.SCALAR ) t = TypeMemPtr.DISPLAY_PTR;
         if( !(t instanceof TypeMemPtr ) ) // Flow will not lift to a TMP->Struct?
-          return Type.SCALAR;             // An error situation, no lifting
+          return t.must_nil() ? Type.SCALAR : Type.NSCALR;
         TypeMemPtr tmp = (TypeMemPtr)t;
         TypeStruct ts0 = (TypeStruct)tmp._obj;
         // Can be made to work above_center, but no sensible lifting so don't bother
