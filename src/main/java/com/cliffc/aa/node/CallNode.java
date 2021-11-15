@@ -412,7 +412,7 @@ public class CallNode extends Node {
       //  Type rez = ((TypeFunPtr)FunNode.find_fidx(fidx).fptr()._val)._ret;
       //  tret = fidxs2.above_center() ? tret.join(rez) : tret.meet(rez);
       //}
-      tfp = TypeFunPtr.make(fidxs2,tfp._nargs,tfp._dsp,tret);
+      tfp = TypeFunPtr.make(fidxs2,tfp.nargs(),tfp._dsp,tret);
     }
     //if( fidxs.above_center() && tfp!=TypeFunPtr.GENERIC_FUNPTR.dual() ) {
     //  if( _not_resolved_by_gcp ) { // If overloads not resolvable, then take them all, and we are in-error
@@ -792,8 +792,8 @@ public class CallNode extends Node {
     }
 
     // bad-arg-count
-    if( tfp._nargs != nargs() )
-      return fast ? ErrMsg.FAST : ErrMsg.syntax(_badargs[0],"Passing "+(nargs()-ARG_IDX)+" arguments to "+tfp.names(false)+" which takes "+(tfp._nargs-ARG_IDX)+" arguments");
+    if( tfp.nargs() != nargs() )
+      return fast ? ErrMsg.FAST : ErrMsg.syntax(_badargs[0],"Passing "+(nargs()-ARG_IDX)+" arguments to "+tfp.names(false)+" which takes "+(tfp.nargs()-ARG_IDX)+" arguments");
 
     // Call did not resolve.
     if( fidxs.is_empty() )

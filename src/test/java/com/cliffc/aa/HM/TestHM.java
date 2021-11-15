@@ -112,8 +112,10 @@ public class TestHM {
   @Test public void test03() { run( "{ z -> (pair (z 0) (z \"abc\")) }" ,
                                     "{ { *[0,4]str? -> A } -> ( A, A) }", tfs(tuple2)); }
 
-  @Test public void test04() { run( "fact = { n -> (if (eq0 n) 1 (* n (fact (dec n))))}; fact",
-                                    "{ int64 -> int64 }", tfs(TypeInt.INT64) ); }
+  @Test public void test04() {
+    run( "fact = { n -> (if (eq0 n) 1 (* n (fact (dec n))))}; fact",
+         "{ int64 -> int64 }", tfs(TypeInt.INT64) );
+  }
 
   // Because {y->y} is passed in, all 'y' types must agree.
   // This unifies 3 and 5 which results in 'nint8'
@@ -260,11 +262,13 @@ map ={fun parg -> (fun (cdr parg))};
                                    "int64", TypeInt.INT64); }
 
   // Mutual recursion
-  @Test public void test23() { run("is_even = "+
-                                   "  is_odd = { n -> (if (eq0 n) 0 (is_even (dec n)))}; "+
-                                   "     { n -> (if (eq0 n) 1 (is_odd (dec n)))};"+
-                                   "(is_even 3)" ,
-                                   "int1", TypeInt.BOOL); }
+  @Test public void test23() {
+    run("is_even = "+
+        "  is_odd = { n -> (if (eq0 n) 0 (is_even (dec n)))}; "+
+        "     { n -> (if (eq0 n) 1 (is_odd (dec n)))};"+
+        "(is_even 3)" ,
+        "int1", TypeInt.BOOL);
+  }
 
   @Test public void test23x() {
     run("""
@@ -430,7 +434,7 @@ all = @{
   // 'v', and also a function type - specifically disallowed in 'aa'.
   @Test public void test38() { run("{ x -> y = ( x x.v ); 0}",
                                    "{ { A:Missing field v in {A->B} -> B } -> C? }",
-                                   tfs(Type.XNIL)); }
+                                   tfs(Type.NIL)); }
 
   // Really bad flow-type: function can be called from the REPL with any
   // argument type - and the worse case will be an error.
@@ -885,6 +889,10 @@ three =(n.s two);     // Three is the successor of two
   // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
   // pass in a field 'a'... and still no error.  Fixed.
   @Test public void test61() {
+    _run0("f = { p1 p2 -> (if p2.a p1 p2)};"+"(f @{a=2}   @{b=2.3})",
+      "@{ a= Missing field a }",
+      () -> TypeMemPtr.make(ptr90(),
+        TypeStruct.make(NO_DSP)),0);
     run("f = { p1 p2 -> (if p2.a p1 p2)};"+"(f @{a=2}   @{b=2.3})",
         "@{ a= Missing field a }",
         () -> TypeMemPtr.make(ptr90(),

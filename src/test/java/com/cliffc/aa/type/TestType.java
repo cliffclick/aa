@@ -34,7 +34,7 @@ public class TestType {
     //       [0,2]-> rec ^ [4]->str => [~0+4]->~obj
     //
     // nil.isa(*rec?) so nil.join(*str) isa (*rec?).join(*str)
-    Type t0 = Type.XNIL;         // [0  ] -> obj
+    Type t0 = Type.NIL;          // [0  ] -> obj
     Type t1 = TypeMemPtr.STRUCT0;// [0,2] -> rec
     assertTrue(t0.isa(t1));      // [0,2] -> obj -- meet is not t1
     Type t2 = TypeMemPtr.OOP0;   // [0,2] -> obj
@@ -200,7 +200,7 @@ public class TestType {
 
     // "~str?" or "*[~0+4+]~str?" includes a nil, but nothing can fall to a nil
     // (breaks lattice)... instead they fall to their appropriate nil-type.
-    assertEquals(Type.NIL,xstr0.meet( nil ));
+    assertEquals(Type.XNIL,xstr0.meet( xnil ));
 
     // This is a choice ptr-to-alias#1, vs a nil-able ptr-to-alias#2.  Since
     // they are from different alias classes, they are NEVER equal (unless both
@@ -213,15 +213,15 @@ public class TestType {
 
     // "~@{}?" or "*[~0+2+]~@{}?" includes a nil, but nothing can fall to a nil
     // (breaks lattice)... instead they fall to their appropriate nil-type.
-    assertEquals(TypeMemPtr.NIL,xtup0.meet( nil ));
+    assertEquals(Type.XNIL,xtup0.meet( xnil ));
     assertTrue (xtup0.isa(pzer0));
     assertTrue (xtup .isa(pzer ));
     //assertTrue(TypeMem.MEM_TUP.dual().ld(xstr).isa(TypeMem.MEM_ZER.ld(pabc)));
 
-    assertTrue(xnil .isa(pabc0)); // nil expands as [0]->obj so !isa [2]->"abc"
-    assertTrue(xnil .isa(pstr0)); // nil expands as [0]->obj so !isa [4]->str
-    assertTrue(xnil .isa(ptup0)); // nil expands as [0]->obj so !isa [2]->()
-    assertTrue(xnil .isa(pzer0)); // nil expands as [0]->obj so !isa [2]->@{}
+    assertTrue(nil .isa(pabc0)); // nil expands as [0]->obj so !isa [2]->"abc"
+    assertTrue(nil .isa(pstr0)); // nil expands as [0]->obj so !isa [4]->str
+    assertTrue(nil .isa(ptup0)); // nil expands as [0]->obj so !isa [2]->()
+    assertTrue(nil .isa(pzer0)); // nil expands as [0]->obj so !isa [2]->@{}
 
     assertTrue (pabc0.isa(pstr0));
     assertTrue (pabc .isa(pstr ));
@@ -238,7 +238,7 @@ public class TestType {
     // Crossing ints and *[ALL]+null
     Type  i8 = TypeInt.INT8;
     Type xi8 = i8.dual();
-    assertEquals( Type.NSCALR, xi8.meet(xmem0)); // ~OOP+0 & ~i8 -> 0
+    assertEquals( Type.XNIL, xi8.meet(xmem0)); // ~OOP+0 & ~i8 -> 0
   }
 
   // Old model: fields are ordered, and are MEETd in order.  If fields at the
@@ -270,7 +270,7 @@ public class TestType {
     TypeMem mem = TypeMem.make0(tos.asAry()); // [7:@{c==nil},8:{c=*[0,9]},9:@{x==1}]
     // *[1]? join *[2] ==> *[1+2]?
     // {~0+7+8} -> @{ c== [~0] -> @{x==1}} // Retain precision after nil
-    Type ptr12 = Type.NIL.join(TypeMemPtr.make(-alias1,(TypeObj)a1.dual())).join( TypeMemPtr.make(-alias2,(TypeObj)a2.dual()));
+    Type ptr12 = Type.XNIL.join(TypeMemPtr.make(-alias1,(TypeObj)a1.dual())).join( TypeMemPtr.make(-alias2,(TypeObj)a2.dual()));
     // mem.ld(*[1+2]?) ==> @{c:0}
     // Currently retaining precision after nil: [~0] -> @{ x==1}
     Type ld = mem.ld((TypeMemPtr)ptr12);
@@ -294,7 +294,7 @@ public class TestType {
     assertTrue(f1i2i.isa(gf));        // To be long  result, short must be high
     // To have GF.dual() be anything else and short, GF.dual must be high and
     // thus the result is a copy of F1I2I.
-    assertTrue(gf.dual().isa(f1i2i)); // To be short result, short must be low
+    //assertTrue(gf.dual().isa(f1i2i)); // To be short result, short must be low
 
     assertTrue(f1i2i.isa(gf));
     TypeFunPtr f1f2f = TypeFunPtr.make_new_fidx(BitsFun.ALL,2,NO_DISP,TypeFlt.FLT64);
@@ -303,7 +303,7 @@ public class TestType {
     int fidx0 = f1i2i.fidx();
     int fidx1 = f1f2f.fidx();
     BitsFun funs = BitsFun.make0(fidx0).meet(BitsFun.make0(fidx1));
-    TypeFunPtr f3i2r = TypeFunPtr.make(funs,2,NO_DISP,Type.REAL);
+    TypeFunPtr f3i2r = TypeFunPtr.make(funs,2,NO_DISP,Type.SCALAR);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));
@@ -401,7 +401,7 @@ public class TestType {
     assertEquals("v",mtab0.get("v")._fld);
     TypeMemPtr mtab1 = (TypeMemPtr)mtab0.at("n");
     assertTrue(mtab1._aliases.test(alias2)&& mtab1._aliases.test(alias5));
-    assertEquals(Type.REAL,mtab0.at("v"));
+    assertEquals(Type.SCALAR,mtab0.at("v"));
 
     // In the ptr/mem model, all Objs from the same NewNode are immediately
     // approximated by a single Alias#.  This stops any looping type growth.

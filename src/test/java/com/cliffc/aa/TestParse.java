@@ -953,7 +953,7 @@ HashTable = {@{
     TypeEnv te = run(program);
     assertTrue(te._t instanceof TypeFunPtr);
     TypeFunPtr actual = (TypeFunPtr)te._t;
-    assertEquals(ARG_IDX+args.length,actual._nargs);
+    assertEquals(ARG_IDX+args.length,actual.nargs());
     assertTrue(actual._ret instanceof TypeMemPtr && actual._ret.simple_ptr()==actual._ret);
     if( te._formals.is_tup() )
       for( TypeFld fld : te._formals.flds() )

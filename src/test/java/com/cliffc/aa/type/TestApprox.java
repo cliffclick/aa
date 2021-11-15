@@ -78,7 +78,7 @@ public class TestApprox {
 
     // End result should be a cycle of length 1: [,real] -> * ->
     // And NOT: [,real] -> * -> [,real] -> * ->
-    assertEquals(Type.REAL,mt.at("b"));
+    assertEquals(Type.SCALAR,mt.at("b"));
     TypeMemPtr pmt = (TypeMemPtr)mt.at("a");
     assertSame(mt,pmt._obj);
   }

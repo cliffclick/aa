@@ -6,12 +6,14 @@ import com.cliffc.aa.util.VBitSet;
 import java.util.HashMap;
 import java.util.function.Predicate;
 
+import static com.cliffc.aa.AA.unimpl;
+
 public class TypeInt extends Type<TypeInt> {
   private byte _x;        // -2 bot, -1 not-null, 0 con, +1 not-null-top +2 top
   public  byte _z;        // bitsiZe, one of: 1,8,16,32,64
   private long _con;      // hi or lo according to _x
   private TypeInt init(int x, int z, long con ) { _x=(byte)x; _z=(byte)z; _con = con; return this; }
-  @Override TypeInt copy() { return _copy().init(_x,_z,_con); }  
+  @Override TypeInt copy() { return _copy().init(_x,_z,_con); }
   // Hash does not depend on other types
   @Override int compute_hash() { return super.compute_hash()+_x+_z+(int)_con; }
   @Override public boolean equals( Object o ) {
@@ -24,12 +26,13 @@ public class TypeInt extends Type<TypeInt> {
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     sb.p(_name);
     if( _con != 0 ) return sb.p(_x<0 ? "&" : (_x>0 ? "+" : "")).p(_con);
-    if( _x==0 ) return sb.p(_con);
+    if( _x==0 ) return _con==0 ? sb.p("0z") : sb.p(_con);
     return sb.p(_x>0?"~":"").p(Math.abs(_x)==1?"n":"").p("int").p(_z);
   }
 
   static { new Pool(TINT,new TypeInt()); }
   public static TypeInt make( int x, int z, long con ) {
+    assert con==0 || log(con)==z;
     if( Math.abs(x)==1 && z==1 && con==0) { con=1; x=0; } // not-null-bool is just a 1
     TypeInt t1 = POOLS[TINT].malloc();
     return t1.init(x,z,con).hashcons_free();
@@ -43,12 +46,14 @@ public class TypeInt extends Type<TypeInt> {
   static public  final TypeInt  INT8  = make(-2, 8,0);
   static public  final TypeInt  BOOL  = make(-2, 1,0);
   static public  final TypeInt TRUE   = make( 0, 1,1);
-  static public  final Type    FALSE  = make( 0, 1,0);
-  static public  final TypeInt XINT1  = make( 2, 1,0);
+  static public  final TypeInt FALSE  = make( 0, 1,0);
   static public  final TypeInt NINT8  = make(-1, 8,0);
+  static public  final TypeInt NINT32 = make(-1,32,0);
   static public  final TypeInt NINT64 = make(-1,64,0);
-  static public  final TypeInt ZERO   = POOLS[TINT].<TypeInt>malloc().init(0,1,0).hashcons_free();
-  static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,NINT64};
+  static public  final TypeInt ZERO   = FALSE;
+  static public  final TypeInt C3     = make( 0, 8,3);
+  static public  final TypeInt C123   = make( 0,32,123456789L);
+  static final TypeInt[] TYPES = new TypeInt[]{INT64,NINT64,INT32,INT16,INT8,NINT8,BOOL,TRUE,ZERO,C3,C123};
   static void init1( HashMap<String,Type> types ) {
     types.put("bool" ,BOOL);
     types.put("int1" ,BOOL);
@@ -110,47 +115,39 @@ public class TypeInt extends Type<TypeInt> {
   }
 
   Type xmeetf( TypeFlt tf ) {
-    int tx = _x;
-    if( tx > 0 ) {                // Top Int, size 1 to 64
-      if( tf._x < 0 ) return tf; // (~Int | Flt) = Flt // choice includes 1 which is in all flts
-      if( tf._x > 0 ) // ~Int | ~Flt = ~Int of some type; defaults to Int tossing all the non-integral Flt choices
-        return make(Math.min(_x,tf._x),Math.min(tf._z>>1,_z),0); // Choices limited to smaller-ints (to fit in float of same range)
-      // Float constant: cast "for free" to Int constant if possible, else fall to same as Flt-bottom
-      long con = (long)tf._con;
-      // Fits in the int choices, just keep float, but could return the int constant just as well
-      if( con == tf._con && log(con) <= _z )  return tf;
-      return TypeFlt.make(con==0 ? -2 : -1, tf._z,0);
-    }
-
-    if( tx == 0 ) {             // Constant int
-      int lg = log(_con);
-      if( tf._x< 0) {           // Bottom float/double
-        // Wider of (ints-wider-by-1) and floats
-        if( (lg<<1) <= tf._z ) return TypeFlt.make((_con!=0 && tf._x==-1) ? -1 : -2, tf._z,0); // Fits in a float
-        return REAL;
-      }
-      if( tf._x== 0 ) {         // Int constant vs Float constant
-        if( _con==tf._con ) return this; // Matching int constant wins
-        if( ((long)tf._con) == tf._con ) // Float is a integer
-          return xmeet(TypeInt.con((long)tf._con)); // Return as-if meeting 2 integers
-        return TypeFlt.make(_con==0 || tf._con==0 ? -2 : -1,Math.max(TypeFlt.log(_con),tf._z),0);
-      }
-      // tf._x > 0 // Can a high float fall to the int constant?
-      double dcon = tf._z==32 ? (float)_con : (double)_con;
-      if( (long)dcon == _con && (_con!=0 || tf._x == 2) )
-        return this;
-      tx = _con==0 ? -2 : -1; // Fall from constant
-    } // Fall into the bottom-int case
-
-    // Bottom Int or constant did not fit, size 1 to 64
-    if( tf._x > 0 ) return make(tx,_z,0); // ( Int | ~Flt) = Int, since can choose 1.0
-    // Float constant: cast "for free" to Int if possible, else fall to same as Flt-bottom
-    long icon = (long)tf._con;
-    if( tf._x== 0 && icon == tf._con )
-      return make(-2,Math.max(_z,log(icon)),0);
-    if( (_z<<1) <= tf._z ) return TypeFlt.make(Math.min(tx,tf._x),tf._z,0);
-    if( (_z<<1) <= 64 ) return TypeFlt.FLT64; // Fits in the float
-    return must_nil() || tf.must_nil() ? REAL : NREAL;
+    return switch( _x ) {
+    case -2, -1 -> // Low int
+      switch( tf._x ) {
+      case -2,-1,0 -> _low(tf,Math.min(_x,tf._x)); // narrow ints fit in a fatter float; if both are fat go to Scalar
+      case  1,2 -> this;  // high NZ float can pick '1', so any low int will do
+      default -> throw unimpl();
+      };
+    case  0 ->                  // Constant integer
+      switch( tf._x ) {
+      case -2 -> _z<tf._z ? tf : (_z==32 ? TypeFlt.FLT64  : SCALAR); // narrow ints fit in a fatter float
+      case -1 -> this==ZERO ? TypeFlt.make(-2,tf._z,0)
+        : _z < tf._z ? tf : TypeFlt.NFLT64; // narrow ints fit in a fatter float
+      case  0 -> this==ZERO         // no float constant is ever any int
+        ? (tf._z==32 ? TypeFlt.FLT32 : TypeFlt.FLT64) // expand 0z to int1, mix with flt con
+        : (tf._z==32 && _z<32 ? TypeFlt.NFLT32 : TypeFlt.NFLT64); // expand to int32, mix with flt con
+      case  1 -> this==ZERO ? BOOL     // Zero vs NZ float
+        : _z < tf._z ? this : TypeInt.make(-1,_z,0); // High float; con is OK if small enough
+      case  2 -> _z < tf._z ? this : TypeInt.make(-1,_z,0); // High float; con is OK if small enough
+      default -> throw unimpl();
+      };
+    case  1, 2 ->               // High int
+      switch( tf._x ) {
+      case -2, -1 -> tf;      // high int can pick '1', so any low float will do
+      case  0 -> tf._z==32 ? TypeFlt.NFLT32 : TypeFlt.NFLT64; // high int can pick '1'
+      case  1, 2 -> TypeInt.make( Math.min(_x,tf._x),Math.min(_z,tf._z>>1),0); // Pick smaller size in the ints
+      default -> throw unimpl();
+      };
+    default -> throw unimpl();
+    };
+  }
+  // narrow ints fit in a fatter float; if both are fat go to Scalar
+  Type _low(TypeFlt tf, int nz) {
+    return _z<tf._z && tf._z==32 ? TypeFlt.make(nz,32,0) : (_z<64 ? TypeFlt.make(nz,64,0) : (nz==-1 ? Type.NSCALR : Type.SCALAR));
   }
 
   // Lattice of conversions:
@@ -167,11 +164,10 @@ public class TypeInt extends Type<TypeInt> {
     if( t._type == Type.TMEMPTR ) return 99; // No flt->ptr conversion
     if( t._type == Type.TFUNPTR ) return 99; // No flt->ptr conversion
     if( t._type == Type.TALL ) return 99;
-    if( t._type == TREAL ) return 1;
     if( t._type == TSCALAR ) return 9; // Might have to autobox
     if( t._type == TSTR ) return 99;
     if( t == NIL || t == XNIL ) return 99; // Cannot not-nil to nil
-    throw com.cliffc.aa.AA.unimpl();
+    throw unimpl();
   }
   @Override public Type widen() {
     assert _x <= 0;
@@ -181,7 +177,7 @@ public class TypeInt extends Type<TypeInt> {
   @Override public boolean may_be_con() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
   @Override public boolean must_nil() { return _x==-2 || (_x==0 && _con==0); }
-  @Override public boolean may_nil() { return _x==2 || (_x==0 && _con==0); }
+  @Override public boolean may_nil() { return _x==2; }
   @Override Type not_nil() {
     // Choice {+0+1} ==> {+1}, which is just {1}
     if( this==BOOL.dual() ) return TRUE;
@@ -193,9 +189,9 @@ public class TypeInt extends Type<TypeInt> {
     return this;
   }
   @Override public Type meet_nil(Type nil) {
-    if( _x==2 ) return nil;
-    if( _x==0 && _con==0 ) return nil==Type.XNIL ? this : Type.NIL;
-    return TypeInt.make(-2,_z,0);
+    if( nil==Type.XNIL )
+      return _x==2 ? Type.XNIL : (_x==-2 || (_x==0&&_con==0)? Type.SCALAR : Type.NSCALR);
+    return TypeInt.make(-2,_x<=0?_z:1,0);
   }
   @Override public void walk( Predicate<Type> p ) { p.test(this); }
   public TypeInt minsize(TypeInt ti) { return make(-2,Math.min(_z,ti._z),0);  }

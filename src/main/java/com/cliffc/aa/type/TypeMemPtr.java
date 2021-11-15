@@ -66,7 +66,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
       return sb.p('$'); // Break recursive printing cycle
     }
     if( _aliases==null ) return sb.p("*[free]");
-    //if( _aliases==BitsAlias.NIL || _aliases==BitsAlias.NIL.dual() ) return sb.p(debug ? " 0" : "0");
     TypeObj to = (mem == null || _aliases==BitsAlias.RECORD_BITS) ? _obj : mem.ld(this);
     if( to == TypeObj.XOBJ ) to = _obj;
     sb.p('*');
@@ -187,9 +186,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     if( _obj==TypeObj.ISUSED || _obj==TypeObj.UNUSED ) return this;
     return make(_aliases,_aliases.above_center() ? TypeObj.UNUSED : TypeObj.ISUSED);
   }
-  @Override public boolean above_center() {
-    return _aliases.above_center();
-  }
+  @Override public boolean above_center() { return _aliases.above_center(); }
   @Override public Type oop_deep_impl(Type t) {
     if( !(t instanceof TypeMemPtr) ) return oob();
     TypeMemPtr tmp = (TypeMemPtr)t;
@@ -211,18 +208,12 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   }
   @Override public Type meet_nil(Type nil) {
     assert nil==NIL || nil==XNIL;
-    // See testLattice15.  The UNSIGNED NIL tests as a lattice:
-    //    [~0]->~obj  ==>  NIL  ==>  [0]-> obj
-    // But loses the pointed-at type down to OBJ.
-    // So using SIGNED NIL, which also tests as a lattice:
-    //    [~0]->~obj ==>  XNIL  ==>  [0]->~obj
-    //    [~0]-> obj ==>   NIL  ==>  [0]-> obj
-
-    if( _aliases.isa(BitsAlias.XNIL) ) {
-      if( _obj.above_center() && nil==XNIL )  return XNIL;
-      if( nil==NIL ) return NIL;
-    }
-    return make(_aliases.meet(BitsAlias.NIL),_obj);
+    // See testLattice15.
+    if( nil==XNIL )
+      return _aliases.test(0) ? (_aliases.above_center() ? XNIL : SCALAR) : NSCALR;
+    if( _aliases.above_center() ) return make(BitsAlias.NIL,_obj);   
+    BitsAlias aliases = _aliases.above_center() ? _aliases.dual() : _aliases;
+    return make(aliases.set(0),_obj);
   }
   // Used during approximations, with a not-interned 'this'.
   // Updates-in-place.

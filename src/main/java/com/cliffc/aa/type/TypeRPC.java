@@ -29,9 +29,12 @@ public class TypeRPC extends Type<TypeRPC> {
   public static TypeRPC make( int rpc ) { return make(BitsRPC.make0(rpc)); }
   public static final TypeRPC ALL_CALL = make(BitsRPC.FULL);
   private static final TypeRPC RPC1 = make(BitsRPC.new_rpc(BitsRPC.ALL));
-  static final TypeRPC[] TYPES = new TypeRPC[]{RPC1,ALL_CALL};
+  private static final TypeRPC EMPTY = make(BitsRPC.EMPTY);
+  static final TypeRPC[] TYPES = new TypeRPC[]{RPC1,ALL_CALL,EMPTY};
 
-  @Override protected TypeRPC xdual() { return POOLS[TRPC].<TypeRPC>malloc().init(_rpcs.dual()); }
+  @Override protected TypeRPC xdual() {
+    return _rpcs==BitsRPC.EMPTY ? this : POOLS[TRPC].<TypeRPC>malloc().init(_rpcs.dual());
+  }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TRPC:   break;
@@ -72,7 +75,10 @@ public class TypeRPC extends Type<TypeRPC> {
   }
   @Override public Type meet_nil(Type nil) {
     // See testLattice15.
-    if( _rpcs.isa(BitsRPC.NIL.dual()) ) return nil;
-    return make(_rpcs.meet(BitsRPC.NIL));
+    if( nil==XNIL )
+      return _rpcs.test(0) ? (_rpcs.above_center() ? XNIL : SCALAR) : NSCALR;
+    if( _rpcs.above_center() ) return make(BitsRPC.NIL);   
+    BitsRPC rpcs = _rpcs.above_center() ? _rpcs.dual() : _rpcs;
+    return make(rpcs.set(0));
   }
 }

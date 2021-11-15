@@ -24,7 +24,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   // List of known functions in set, or 'flip' for choice-of-functions.
   // A single bit is a classic code pointer.
   public BitsFun _fidxs;        // Known function bits
-  public int _nargs;            // Number of formals, including the display
+  private int _nargs;           // Number of formals, including the display
   public Type _dsp;             // Display; is_display_ptr
   public Type _ret;             // Return scalar type
   boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
@@ -86,8 +86,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     if( _fidxs==null ) return sb.p("[free]");
     _fidxs.str(sb);
     sb.p('{');                  // Collection (even of 1) start
-    if( debug ) _dsp.str(sb,dups,mem,debug).p(' ');
-    sb.p("->");
+    if( debug ) _dsp.str(sb,dups,mem,debug).p(",");
+    sb.p(_nargs).p(" ->");
     _ret.str(sb,dups,mem,debug).p(' ');
     return sb.p('}');
   }
@@ -223,16 +223,17 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR; // Open display, allows more fields
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL ,1,Type.ALL,Type.ALL);
+  public  static final TypeFunPtr ARG2   =         make(BitsFun.FULL ,2,Type.ALL,Type.ALL);
   public  static final TypeFunPtr EMPTY  =         make(BitsFun.EMPTY,0,Type.ANY,Type.ANY);
-  static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,EMPTY.dual()};
+  static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,ARG2/*,EMPTY.dual()*/};
 
   @Override protected TypeFunPtr xdual() {
-    return malloc(_fidxs.dual(),_nargs,_dsp.dual(),_ret.dual());
+    return malloc(_fidxs.dual(),-_nargs,_dsp.dual(),_ret.dual());
   }
   @Override protected TypeFunPtr rdual() {
     assert _hash==compute_hash();
     if( _dual != null ) return _dual;
-    TypeFunPtr dual = _dual = malloc(_fidxs.dual(),_nargs,null,null);
+    TypeFunPtr dual = _dual = malloc(_fidxs.dual(),-_nargs,null,null);
     dual._dual = this;          // Stop the recursion
     dual._dsp = _dsp.rdual();
     dual._hash = dual.compute_hash();
@@ -263,9 +264,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
 
     // If unequal length; then if short is low it "wins" (result is short) else
     // short is high and it "loses" (result is long).
-    TypeFunPtr min_nargs = _nargs < tf._nargs ? this : tf;
-    TypeFunPtr max_nargs = _nargs < tf._nargs ? tf : this;
-    int nargs = min_nargs.above_center() ? max_nargs._nargs : min_nargs._nargs;
+    //TypeFunPtr min_nargs = _nargs < tf._nargs ? this : tf;
+    //TypeFunPtr max_nargs = _nargs < tf._nargs ? tf : this;
+    //int nargs = min_nargs.above_center() ? max_nargs._nargs : min_nargs._nargs;
+    //int nargs = fidxs.above_center() ? Math.max(_nargs,tf._nargs) : Math.min(_nargs,tf._nargs);
+    int nargs = Math.min(_nargs,tf._nargs);
     Type dsp = _dsp.meet(tf._dsp);
     // If both are short cycles, the result is a short cycle
     if( _ret==this && tf._ret==tf )
@@ -277,6 +280,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
 
   public BitsFun fidxs() { return _fidxs; }
   public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
+  public int nargs() { return Math.abs(_nargs); }
 
   // Widens, not lowers.
   @Override public TypeFunPtr simple_ptr() {
@@ -286,7 +290,12 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     return make_from(ds,rs);
   }
 
-  @Override public boolean above_center() { return _fidxs.above_center() || (_fidxs.is_con() && _dsp.above_center()); }
+  @Override public boolean above_center() {
+    //return _fidxs.above_center() ||
+    //  (_fidxs.is_con() && (_dsp.above_center() ||
+    //                       _dsp.is_con() && _ret.above_center()));
+    return _fidxs.above_center() || _fidxs.is_empty();
+  }
   @Override public boolean may_be_con()   {
     return _dsp.may_be_con() &&
       _fidxs.abit() != -1 &&
@@ -308,20 +317,12 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   }
   @Override public Type meet_nil(Type nil) {
     assert nil==NIL || nil==XNIL;
-    // See testLattice15.  The UNSIGNED NIL tests as a lattice:
-    //    [~0]->~obj  ==>  NIL  ==>  [0]-> obj
-    // But loses the pointed-at type down to OBJ.
-    // So using SIGNED NIL, which also tests as a lattice:
-    //    [~0]->~obj ==>  XNIL  ==>  [0]->~obj
-    //    [~0]-> obj ==>   NIL  ==>  [0]-> obj
-
-    if( _fidxs.isa(BitsFun.NIL.dual()) ) {
-      if( _dsp==DISP.dual() && nil==XNIL )  return XNIL;
-      if( nil==NIL ) return NIL;
-    }
-    return make(_fidxs.meet(BitsFun.NIL),_nargs,
-                nil==NIL ? TypeMemPtr.DISP_SIMPLE : _dsp,
-                _ret);
+    // See testLattice15.
+    if( nil==XNIL )
+      return _fidxs.test(0) ? (_fidxs.above_center() ? XNIL : SCALAR) : NSCALR;
+    if( _fidxs.above_center() ) return make_from(BitsFun.NIL);
+    BitsFun fidxs = _fidxs.above_center() ? _fidxs.dual() : _fidxs;
+    return make_from(fidxs.set(0));
   }
   // Used during approximations, with a not-interned 'this'.
   // Updates-in-place.

@@ -228,8 +228,8 @@ public class HM {
             (self._fidxs  !=null && self._fidxs  .test(0)   ) ||
             (self._aliases!=null && self._aliases.test(0)   );
           if( nil ) {
-            if( self. _flow  !=null ) self. _flow   = self. _flow  .meet_nil(Type.XNIL);
-            if( self._eflow  !=null ) self._eflow   = self._eflow  .meet_nil(Type.XNIL);
+            if( self. _flow  !=null ) self. _flow   = self. _flow  .meet(Type.NIL);
+            if( self._eflow  !=null ) self._eflow   = self._eflow  .meet(Type.NIL);
             if( self._fidxs  !=null ) self._fidxs   = self._fidxs  .set(0);
             if( self._aliases!=null ) self._aliases = self._aliases.set(0);
           }
@@ -343,7 +343,7 @@ public class HM {
     return s;
   }
   private static Syntax number() {
-    if( BUF[X]=='0' ) { X++; return new Con(Type.XNIL); }
+    if( BUF[X]=='0' ) { X++; return new Con(Type.NIL); }
     int sum=0;
     while( X<BUF.length && isDigit(BUF[X]) )
       sum = sum*10+BUF[X++]-'0';
@@ -527,7 +527,7 @@ public class HM {
     @Override void add_hm_work(Worklist work) { }
     @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       // A '0' turns into a nilable leaf.
-      T2 base = _con==Type.XNIL ? T2.make_nil(T2.make_leaf()) : T2.make_base(_con);
+      T2 base = _con==Type.NIL ? T2.make_nil(T2.make_leaf()) : T2.make_base(_con);
       prep_tree_impl(par, nongen, work, base);
       return 1;
     }
@@ -1052,8 +1052,6 @@ public class HM {
 
       // Add struct-ness if possible
       if( !rec.is_struct() && !rec.is_nil() ) {
-        //if( !rec.is_leaf() && self._err==null )
-        //  self._err = "Missing field " + _id + " in " + rec.p();
         rec._open = true;
         rec._aliases = BitsAlias.EMPTY;
         if( rec._args==null ) rec._args = new NonBlockingHashMap<>();
@@ -1076,7 +1074,7 @@ public class HM {
     }
     @Override Type val(Worklist work) {
       Type trec = _rec._flow;
-      if( trec.above_center() ) return Type.XSCALAR;
+      if( trec.above_center() || trec==Type.NIL ) return Type.XSCALAR;
       if( trec instanceof TypeMemPtr ) {
         TypeMemPtr tmp = (TypeMemPtr)trec;
         if( tmp._obj instanceof TypeStruct ) {
@@ -1257,7 +1255,7 @@ public class HM {
       if( pred==Type.ALL ) return TypeInt.BOOL;
       if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
         return TypeInt.TRUE;
-      if( pred.meet_nil(Type.NIL)!=pred )
+      if( pred.meet(Type.NIL)!=pred )
         return TypeInt.FALSE;
       return TypeInt.BOOL;
     }
@@ -1298,7 +1296,7 @@ public class HM {
       // Already an expanded nilable with base
       if( arg.is_base() && ret.is_base() ) {
         assert !arg.is_open() && !ret.is_open();
-        assert arg._flow == ret._flow.meet_nil(Type.XNIL);
+        assert arg._flow == ret._flow.meet(Type.NIL);
         return false;
       }
       // Already an expanded nilable with struct
@@ -1429,7 +1427,7 @@ public class HM {
 
     // Contains a Bases flow-type, or null if not a Base.
     Type _flow;
-    Type _eflow;                // Error flow; incompatible with _flw
+    Type _eflow;                // Error flow; incompatible with _flow
 
     // Contains the set of Lambdas, or null if not a Lambda.
     // If set, then keys x,y,z,ret may appear.
@@ -1553,8 +1551,8 @@ public class HM {
       _args.remove("?");  // No longer have the "?" key, not a nilable anymore
       // Nested nilable-and-not-leaf, need to fixup the nilable
       if( n.is_base() ) {
-        _flow = n._flow.meet_nil(Type.XNIL);
-        if( n._eflow!=null ) _eflow = n._eflow.meet_nil(Type.XNIL);
+        _flow = n._flow.meet(Type.NIL);
+        if( n._eflow!=null ) _eflow = n._eflow.meet(Type.NIL);
       }
       if( n.is_fun() ) {
         throw unimpl();
@@ -1869,7 +1867,7 @@ public class HM {
       // Special handling for nilable
       boolean progress = false;
       if( this.is_nil() && !that.is_nil() ) {
-        Type mt  = that. _flow==null ? null : that. _flow.meet_nil(Type.XNIL);
+        Type mt  = that. _flow==null ? null : that. _flow.meet(Type.NIL);
         if(  mt!=that. _flow ) { if( work==null ) return true; progress = true; that._flow   =mt; }
         Type emt = that._eflow==null ? null : that._eflow.meet_nil(Type.XNIL);
         if( emt!=that._eflow ) { if( work==null ) return true; progress = true; that._eflow  =emt;}
@@ -2096,7 +2094,7 @@ public class HM {
       if( is_leaf() ) return fput(t);
       // Nilable
       if( is_nil() ) {
-        if( !t.isa(Type.XNIL) )
+        if( !t.isa(Type.NIL) )
           arg("?").walk_types_in(t.join(Type.NSCALR));
         return t;
       }
@@ -2167,7 +2165,7 @@ public class HM {
 
       if( is_nil() ) { // The wrapped leaf gets compat_lift, then nil is added
         Type tnil = arg("?").walk_types_out(t.join(Type.NSCALR),jt,apply);
-        return tnil.meet(Type.XNIL);
+        return tnil.meet(Type.NIL);
       }
 
       if( is_fun() ) {
@@ -2178,7 +2176,7 @@ public class HM {
           for( int fidx : tfp._fidxs ) WBS.set(fidx);                // Guard against recursive functions
           Type tret = tfp._ret;
           Type trlift = arg("ret").walk_types_out(tret, jt, apply);
-          Type rez = TypeFunPtr.make0( tfp._fidxs,tfp._nargs,tfp._dsp,trlift);
+          Type rez = TypeFunPtr.make0( tfp._fidxs,tfp.nargs(),tfp._dsp,trlift);
           for( int fidx : tfp._fidxs ) WBS.clear(fidx); // Clear fidxs
           return rez;
         }

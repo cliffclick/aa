@@ -11,7 +11,7 @@ public class TypeFlt extends Type<TypeFlt> {
   byte _z;                // bitsiZe, one of: 32,64
   double _con;
   private TypeFlt init(int x, int z, double con ) { _x=(byte)x; _z=(byte)z; _con = con; return this; }
-  @Override TypeFlt copy() { return _copy().init(_x,_z,_con); }  
+  @Override TypeFlt copy() { return _copy().init(_x,_z,_con); }
   // Hash does not depend on other types
   @Override int compute_hash() { return super.compute_hash()+_x+_z+(int)_con; }
   @Override public boolean equals( Object o ) {
@@ -39,8 +39,10 @@ public class TypeFlt extends Type<TypeFlt> {
   public static final TypeFlt FLT64 = (TypeFlt)make(-2,64,0);
   public static final TypeFlt FLT32 = (TypeFlt)make(-2,32,0);
   public static final TypeFlt PI    = (TypeFlt)con(Math.PI);
+  public static final TypeFlt HALF  = (TypeFlt)con(0.5);
   public static final TypeFlt NFLT64= (TypeFlt)make(-1,64,0);
-  public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,FLT32,PI,NFLT64};
+  public static final TypeFlt NFLT32= (TypeFlt)make(-1,32,0);
+  public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,NFLT64,PI,NFLT32,FLT32,HALF};
   static void init1( HashMap<String,Type> types ) {
     types.put("flt32",FLT32);
     types.put("flt64",FLT64);
@@ -93,13 +95,14 @@ public class TypeFlt extends Type<TypeFlt> {
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean may_be_con() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
-  @Override public boolean must_nil() { return _x==-2 || (_x==0 && _con==0); }
-  @Override public boolean  may_nil() { return _x > 0 || (_x==0 && _con==0); }
+  @Override public boolean must_nil() { return _x==-2; }
+  @Override public boolean  may_nil() { return _x== 2; }
   @Override Type not_nil() { return _x==2 ? make(1,_z,_con) : this; }
   @Override public Type meet_nil(Type nil) {
-    if( _x==2 ) return nil;
-    if( _x==0 && _con==0 ) return nil==Type.XNIL ? this : Type.NIL;
-    return TypeFlt.make(-2,_z,0);
+    if( nil==Type.XNIL )
+      return _x==2 ? Type.XNIL : (_x==-2 ? Type.SCALAR : Type.NSCALR);
+    if( _x >0 ) return TypeInt.BOOL; // High float picks '1', mixes nil to bool
+    return _z==32 ? FLT32 : FLT64;   // Constant or low, just keeps size
   }
 
   // Lattice of conversions:
@@ -115,7 +118,6 @@ public class TypeFlt extends Type<TypeFlt> {
     if( t._type == Type.TMEMPTR ) return 99; // No flt->ptr conversion
     if( t._type == Type.TFUNPTR ) return 99; // No flt->ptr conversion
     if( t._type == Type.TALL ) return 99;
-    if( t._type == Type.TREAL ) return 1;
     if( t._type == TSCALAR ) return 9; // Might have to autobox
     throw com.cliffc.aa.AA.unimpl();
   }

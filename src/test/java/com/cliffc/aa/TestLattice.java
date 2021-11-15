@@ -1628,6 +1628,56 @@ public class TestLattice {
     test(_xobj);
     
   }
+
+  // Nil, not-nil, ints, floats, scalars
+  @Test public void testLattice18() {
+    N.reset();
+    N  sclr = new N(" sclr");
+    N nsclr = new N("nsclr",sclr );
+    
+    N int64 = new N("int64",sclr );
+    N flt64 = new N("flt64",sclr );
+    N obj40 = new N("obj*?",sclr );
+    
+    N nint_ = new N("nint ",int64,nsclr);
+    N nflt_ = new N("nflt ",flt64,nsclr);
+    N obj4_ = new N("obj* ",obj40,nsclr);
+
+    N int8  = new N("int8 ",int64,flt64);
+    N nint8 = new N("nint8",int8 ,nint_, nflt_);
+    
+    N lonil = new N("lonil",int8 ,obj40);
+    N hinil = new N("hinil",nsclr);
+
+    N xnit8 = new N("xnit8",nint8);
+    N xint8 = new N("xint8",xnit8,hinil);
+    
+    N xnint = new N("~nint",xnit8);
+    N xnflt = new N("~nflt",xnit8);
+    N xnobj = new N("~obj*",obj4_);
+    
+    N xint_ = new N("~int6",xnint,xint8);
+    N xflt_ = new N("~flt6",xnflt,xint8);
+    N xobj4 = new N("~obj?",xnobj,hinil);
+    
+    N xnscl = new N("~nscl",xnint,xnflt,xnobj,lonil);
+    N xsclr = new N("~scal",xint_,xflt_,xobj4,xnscl);
+
+    sclr .set_dual(xsclr);
+    nsclr.set_dual(xnscl);
+    int64.set_dual(xint_);
+    int8 .set_dual(xint8);
+    flt64.set_dual(xflt_);
+    obj40.set_dual(xobj4);
+    nint8.set_dual(xnit8);
+    nint_.set_dual(xnint);
+    nflt_.set_dual(xnflt);
+    obj4_.set_dual(xnobj);
+    lonil.set_dual(hinil);
+    
+    test(xsclr);
+  }
+
   
   // Open question for a future testLattice test:
   //

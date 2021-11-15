@@ -7,7 +7,6 @@ int   =: $$com.cliffc.aa.type.TypeInt#INT64;
 flt   =: $$com.cliffc.aa.type.TypeFlt#FLT64;
 flt32 =: $$com.cliffc.aa.type.TypeFlt#FLT32;
 flt64 =: $$com.cliffc.aa.type.TypeFlt#FLT64;
-real  =: $$com.cliffc.aa.type.Type#REAL;
 ptr   =: $$com.cliffc.aa.type.TypeMemPtr#ISUSED;
 str   =: $$com.cliffc.aa.type.TypeMemPtr#STRPTR;
 ary   =: $$com.cliffc.aa.type.TypeMemPtr#ARYPTR;

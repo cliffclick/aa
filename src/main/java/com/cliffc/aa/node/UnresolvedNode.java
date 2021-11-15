@@ -70,7 +70,7 @@ public class UnresolvedNode extends UnOrFunPtrNode {
         fidxs = fidxs.meet((tfp.above_center() ? tfp.dual() : tfp)._fidxs);
         tdsp = tdsp.join(tfp._dsp);
         tret = tret.join(tfp._ret);
-        nargs = tfp._nargs;
+        nargs = tfp.nargs();
       }
       if( fidxs.abit()!= -1 )
         return TypeFunPtr.make(fidxs,nargs,tdsp,tret);
