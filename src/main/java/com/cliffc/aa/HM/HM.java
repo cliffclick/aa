@@ -2196,17 +2196,20 @@ public class HM {
         Type.RECURSIVE_MEET++;
         ts = TypeStruct.malloc("",false,false);
         ts.add_fld(ts0.get("^")); // Copy display (which never appears in the HM type)
+        // Add fields common to both.  If the field is in HM and not in GCP,
+        // not helpful to force it into GCP since it has to come in as a
+        // potential error field - an ALL field in GCP.
         if( _args!=null )
           for( String id : _args.keySet() )
-            ts.add_fld( TypeFld.malloc(id,null,Access.Final,TypeFld.oBot) );
+            if( ts0.get(id)!=null )
+              ts.add_fld( TypeFld.malloc(id,null,Access.Final,TypeFld.oBot) );
         ts.set_hash();
         WDUPS.put(_uid,ts);     // Stop cycles
         if( _args!=null )
           for( String id : _args.keySet() ) {
             TypeFld fld0 = ts0.get(id);
-            Type f0t = fld0==null ? Type.SCALAR  : fld0._t;
-            int order= fld0==null ? TypeFld.oBot : fld0._order;
-            ts.get(id).setX( arg(id).walk_types_out(f0t,jt,apply), order);
+            if( fld0 !=null )
+              ts.get(id).setX( arg(id).walk_types_out(fld0._t,jt,apply), fld0._order);
           }
         if( --Type.RECURSIVE_MEET == 0 )
           ts = ts.install();
