@@ -343,38 +343,6 @@ all = @{
                                    "{ @{ x = int64; y = int64; ...} -> int64 }", tfs(TypeInt.INT64));
   }
 
-  private static TypeMemPtr build_cycle( int alias, boolean nil, Type fld ) {
-    // Build a cycle of length 2.
-    BitsAlias aliases = BitsAlias.make0(alias);
-    if( nil ) aliases = aliases.meet_nil();
-    TypeFld v1 = TypeFld.make("v1",fld);
-    Type.RECURSIVE_MEET++;
-    TypeFld n1 = TypeFld.malloc("n1");
-    TypeStruct cycle_str = TypeStruct.malloc("",false,false,NO_DSP,n1,v1);
-    TypeMemPtr cycle_ptr = TypeMemPtr.make(aliases,cycle_str);
-    n1.setX(cycle_ptr);
-    Type.RECURSIVE_MEET--;
-    cycle_str = cycle_str.install();
-    return (TypeMemPtr)cycle_str.get("n1")._t;
-  }
-  private static TypeMemPtr build_cycle2( boolean nil, Type fld ) {
-    // Unrolled, known to only produce results where either other nested
-    // struct is from a different allocation site.
-    BitsAlias aliases0 = BitsAlias.make0(10);
-    BitsAlias aliases9 = BitsAlias.make0( 9);
-    if( nil ) aliases0 = aliases0.meet_nil();
-    if( nil ) aliases9 = aliases9.meet_nil();
-    TypeMemPtr cycle_ptr0 = TypeMemPtr.make(aliases0,TypeObj.XOBJ);
-    TypeStruct cycle_str1 = TypeStruct.make("",false,false,NO_DSP,TypeFld.make("n1",cycle_ptr0),TypeFld.make("v1",fld));
-    TypeMemPtr cycle_ptr1 = TypeMemPtr.make(aliases9,cycle_str1);
-    TypeStruct cycle_str2 = TypeStruct.make("",false,false,NO_DSP,TypeFld.make("n1",cycle_ptr1),TypeFld.make("v1",fld));
-    TypeMemPtr cycle_ptr2 = TypeMemPtr.make(aliases0,cycle_str2);
-    TypeStruct cycle_str3 = TypeStruct.make("",false,false,NO_DSP,TypeFld.make("n1",cycle_ptr2),TypeFld.make("v1",fld));
-    TypeStruct cycle_strn = cycle_str3.approx(1,aliases9);
-    TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn.at("n1");
-    return cycle_ptrn;
-  }
-
 
   // Recursive linked-list discovery, with no end clause.  Since this code has
   // no exit (its an infinite loop, endlessly reading from an infinite input

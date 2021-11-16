@@ -729,8 +729,7 @@ public class HM {
   static class Apply extends Syntax {
     final Syntax _fun;
     final Syntax[] _args;
-    private Type _jt;           // Test monotonic progress on apply-lift
-    Apply(Syntax fun, Syntax... args) { _fun = fun; _args = args; _jt = Type.ANY; }
+    Apply(Syntax fun, Syntax... args) { _fun = fun; _args = args; }
     @Override SB str(SB sb) {
       _fun.str(sb.p("(")).p(" ");
       for( Syntax arg : _args )
@@ -827,7 +826,6 @@ public class HM {
         for( T2 t2 : T2.T2MAP.keySet() )
           if( t2.is_leaf() )
             jt = jt.join(T2.T2MAP.get(t2));
-        //if( _jt!=jt ) {  assert _jt.isa(jt); _jt = jt; }
       }
 
       // Walk the outputs, building a lifting result
