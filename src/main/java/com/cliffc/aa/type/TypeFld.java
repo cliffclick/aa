@@ -26,7 +26,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     _fld=fld; _t=t; _access=access; _order=order;
     return this;
   }
-  @Override TypeFld copy() { return _copy().init(_fld,_t,_access,_order); }
+  @Override public TypeFld copy() { return _copy().init(_fld,_t,_access,_order); }
   
   @Override public boolean cyclic() { return _cyclic; }
   @Override public void set_cyclic() { _cyclic = true; }

@@ -729,7 +729,8 @@ public class HM {
   static class Apply extends Syntax {
     final Syntax _fun;
     final Syntax[] _args;
-    Apply(Syntax fun, Syntax... args) { _fun = fun; _args = args; }
+    private Type _jt;           // Test monotonic progress on apply-lift
+    Apply(Syntax fun, Syntax... args) { _fun = fun; _args = args; _jt = Type.ANY; }
     @Override SB str(SB sb) {
       _fun.str(sb.p("(")).p(" ");
       for( Syntax arg : _args )
@@ -796,12 +797,49 @@ public class HM {
       // output HM type and CCP flow type in parallel, and join output CCP
       // types with the matching input CCP type.
       if( DO_HM ) {
-        Type rez3 = T2.hm_apply_lift(rez,this);
+        Type rez3 = hm_apply_lift(rez);
         assert _flow.isa(rez3) ; // Monotonic...
         rez = rez3; // Upgrade
       }
       return rez;
     }
+    // Walk the input types, finding all the Leafs.  Repeats of the same Leaf
+    // has its flow Types MEETed.  If HM_FREEZE, then these are the exact
+    // Leafs.  If !HM_FREEZE, then all Leafs are assumed unified and all their
+    // corresponding flows are JOINed.
+
+    // Then walk the output types, building a corresponding flow Type, but
+    // matching against input Leafs.  If HM_FREEZE Leafs must match exactly,
+    // replacing the input flow Type with the corresponding flow Type.  If
+    // !HM_FREEZE, replace with the one flow Type.
+
+    // The resulting type is used to lift the result via a JOIN.
+    Type hm_apply_lift( Type rez ) {
+      T2.T2MAP.clear();
+      { T2.WDUPS.clear(true); _fun.find().walk_types_in(_fun._flow); }
+      for( Syntax arg : _args )
+        { T2.WDUPS.clear(true); arg.find().walk_types_in(arg._flow); }
+
+      // If !HM_FREEZE, pre-compute a monolithic JOIN
+      Type jt = null;
+      if( !HM_FREEZE ) {
+        jt = Type.SCALAR;
+        for( T2 t2 : T2.T2MAP.keySet() )
+          if( t2.is_leaf() )
+            jt = jt.join(T2.T2MAP.get(t2));
+        //if( _jt!=jt ) {  assert _jt.isa(jt); _jt = jt; }
+      }
+
+      // Walk the outputs, building a lifting result
+      T2.WDUPS.clear(true);  T2.WBS.clear();
+      Type rez2 = find().walk_types_out(rez, jt, this);
+      if( rez2 != rez && rez2==jt )   // Lifting looks like the leaf-join
+        for( T2 t2 : T2.T2MAP.keySet() ) // So depend on all leafs.  TODO: be more exact
+          t2.push_update(this);
+      Type rez3 = rez.join(rez2);    // Lifted result
+      return rez3;
+    }
+
     @Override void add_val_work(Syntax child, Worklist work) {
       // If function changes type, recompute self
       if( child==_fun && work!=null ) work.push(this);
@@ -858,7 +896,7 @@ public class HM {
           progress |= walk(fld._t,work);
         return progress;
       }
-      if( flow instanceof TypeInt || flow instanceof TypeFlt || flow==Type.XNIL ) return false;
+      if( flow instanceof TypeInt || flow instanceof TypeFlt || flow==Type.NIL ) return false;
       if( flow==Type.ANY || flow==Type.ALL || flow == Type.SCALAR || flow == Type.NSCALR || flow == Type.XSCALAR || flow == Type.XNSCALR )
         return false;
       throw unimpl();
@@ -1875,6 +1913,7 @@ public class HM {
         if( bf!=that._fidxs  ) { if( work==null ) return true; progress = true; that._fidxs  =bf; }
         BitsAlias bs = that._aliases==null ? null : that._aliases.set(0);
         if( bs!=that._aliases) { if( work==null ) return true; progress = true; that._aliases=bs; }
+        if( progress ) that.add_deps_work(work);
         return vput(that,progress);
       }
       // That is nilable and this is not
@@ -2036,51 +2075,15 @@ public class HM {
     }
 
     // -----------------
+    static private final HashMap<T2,Type> T2MAP = new HashMap<>();
+    static private final NonBlockingHashMapLong<TypeStruct> WDUPS = new NonBlockingHashMapLong<>();
+    static private final BitSet WBS = new BitSet();
+
     // Lift the flow Type of an Apply, according to its inputs.  This is to
     // help preserve flow precision across polymorphic calls, where the input
     // flow types all meet - but HM understands how the T2s split back apart
     // after the Apply.  During this work, every T2 is mapped one-to-one to a
     // flow Type, and the mapping is made recursively.
-    static private final HashMap<T2,Type> T2MAP = new HashMap<>();
-    static private final NonBlockingHashMapLong<TypeStruct> WDUPS = new NonBlockingHashMapLong<>();
-    static private final BitSet WBS = new BitSet();
-
-    // Walk the input types, finding all the Leafs.  Repeats of the same Leaf
-    // has its flow Types MEETed.  If HM_FREEZE, then these are the exact
-    // Leafs.  If !HM_FREEZE, then all Leafs are assumed unified and all their
-    // corresponding flows are JOINed.
-
-    // Then walk the output types, building a corresponding flow Type, but
-    // matching against input Leafs.  If HM_FREEZE Leafs must match exactly,
-    // replacing the input flow Type with the corresponding flow Type.  If
-    // !HM_FREEZE, replace with the one flow Type.
-
-    // The resulting type is used to lift the result via a JOIN.
-    static Type hm_apply_lift( Type rez, Apply apply ) {
-      T2MAP.clear();
-      { WDUPS.clear(true); apply._fun.find().walk_types_in(apply._fun._flow); }
-      for( Syntax arg : apply._args )
-        { WDUPS.clear(true); arg.find().walk_types_in(arg._flow); }
-
-      // If !HM_FREEZE, pre-compute a monolithic JOIN
-      Type jt = null;
-      if( !HM_FREEZE ) {
-        jt = Type.SCALAR;
-        for( T2 t2 : T2MAP.keySet() )
-          if( t2.is_leaf() )
-            jt = jt.join(T2MAP.get(t2));
-      }
-
-      // Walk the outputs, building a lifting result
-      WDUPS.clear(true);  WBS.clear();
-      Type rez2 = apply.find().walk_types_out(rez, jt, apply);
-      if( rez2 != rez && rez2==jt )   // Lifting looks like the leaf-join
-        for( T2 t2 : T2MAP.keySet() ) // So depend on all leafs.  TODO: be more exact
-          t2.push_update(apply);
-      Type rez3 = rez.join(rez2);    // Lifted result
-      return rez3;
-    }
-
     private Type fput( final Type t) { T2MAP.merge(this, t, Type::meet); return t; }
 
     // Walk a T2 and a matching flow-type, and build a map from T2 to flow-types.
@@ -2093,20 +2096,18 @@ public class HM {
       // Free variables keep the input flow type.
       if( is_leaf() ) return fput(t);
       // Nilable
-      if( is_nil() ) {
-        if( !t.isa(Type.NIL) )
-          arg("?").walk_types_in(t.join(Type.NSCALR));
-        return t;
-      }
+      if( is_nil() )
+        return arg("?").walk_types_in(t.join(Type.NSCALR));
       // Base variables (when widened to an HM type) might force a lift.
       if( is_base() ) return fput(_flow.meet(t));
       if( is_fun() ) {
-        if( !(t instanceof TypeFunPtr) ) return t; // Typically, some kind of error situation
+        if( !(t instanceof TypeFunPtr) ) t = t.oob(TypeFunPtr.GENERIC_FUNPTR);
         TypeFunPtr tfp = (TypeFunPtr)t;
         T2 ret = arg("ret");
-        if( tfp._fidxs.test(1) ) return t; // External unknown function, returns the worst
-        if( tfp._fidxs == BitsFun.EMPTY ) return t; // Internal, unknown function
-        for( int fidx : ((TypeFunPtr)t)._fidxs ) {
+        BitsFun fidxs = _fidxs.meet(tfp._fidxs);
+        if( fidxs.test(1) ) return t; // External unknown function, returns the worst
+        if( fidxs == BitsFun.EMPTY ) return t; // Internal, unknown function
+        for( int fidx : fidxs ) {
           Lambda lambda = Lambda.FUNS.get(fidx);
           Type body = lambda.find().is_err()
             ? Type.SCALAR           // Error, no lift
@@ -2195,22 +2196,36 @@ public class HM {
         if( ts != null ) return t; // Recursive, stop cycles
         Type.RECURSIVE_MEET++;
         ts = TypeStruct.malloc("",false,false);
-        ts.add_fld(ts0.get("^")); // Copy display (which never appears in the HM type)
-        // Add fields common to both.  If the field is in HM and not in GCP,
-        // not helpful to force it into GCP since it has to come in as a
-        // potential error field - an ALL field in GCP.
+
+        // Add fields.  Common to both are easy, and will be walked (recursive,
+        // cyclic).  Solo fields in GCP are kept, and lifted "as if" an HM
+        // field will appear with max lifting.  Solo fields in HM are ignored,
+        // as GCP will appear with them later.
         if( _args!=null )
-          for( String id : _args.keySet() )
-            if( ts0.get(id)!=null )
+          for( String id : _args.keySet() ) // Forall fields in HM
+            if( ts0.get(id)!=null )         // and in GCP
               ts.add_fld( TypeFld.malloc(id,null,Access.Final,TypeFld.oBot) );
-        ts.set_hash();
-        WDUPS.put(_uid,ts);     // Stop cycles
+        if( is_open() && !HM_FREEZE )     // If can add fields to HM
+          for( TypeFld fld : ts0.flds() ) // Forall fields in GCP
+            if( get(fld._fld)==null )     // Solo in GCP
+              ts.add_fld( fld.copy() );   // Add a copy
+        WDUPS.put(_uid,ts.set_hash());    // Stop cycles
+
+        // Walk fields common to both, setting (cyclic, recursive) the lifted type
         if( _args!=null )
-          for( String id : _args.keySet() ) {
+          for( String id : _args.keySet() ) { // Forall fields in HM
             TypeFld fld0 = ts0.get(id);
-            if( fld0 !=null )
+            if( fld0 !=null )                 // and in GCP
+              // Recursively walk and lift into the new ts struct
               ts.get(id).setX( arg(id).walk_types_out(fld0._t,jt,apply), fld0._order);
           }
+        // Now do the other side.  Missing on HM side might later appear and
+        // lift to anything.
+        if( is_open() && !HM_FREEZE )       // If can add fields to HM
+          for( TypeFld fld : ts0.flds() )   // Forall fields in GCP
+            if( get(fld._fld)==null )       // Solo in GCP
+              ts.get(fld._fld).setX( jt, fld._order );
+        // Close off the recursion
         if( --Type.RECURSIVE_MEET == 0 )
           ts = ts.install();
         return tmp.make_from(ts);
