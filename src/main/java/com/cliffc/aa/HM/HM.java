@@ -506,21 +506,21 @@ public class HM {
     final SB p0(SB sb, VBitSet dups) {
       _hmt._get_dups(new VBitSet(),dups);
       VBitSet visit = new VBitSet();
-      p1(sb.i());
+      p1(sb.i(),dups);
       if( DO_HM  ) _hmt .str(sb.p(", HMT="), visit,dups,true);
       if( DO_GCP ) _flow.str(sb.p(", GCP="),visit.clr(),null,true);
       sb.nl();
-      return p2(sb.ii(1),dups).di(1);
+      return p2(sb.ii(2),dups).di(2);
     }
-    abstract SB p1(SB sb);      // Self short print
+    abstract SB p1(SB sb, VBitSet dups); // Self short print
     abstract SB p2(SB sb, VBitSet dups); // Recursion print
   }
 
   static class Con extends Syntax {
     final Type _con;
     Con(Type con) { super(); _con=con; }
-    @Override SB str(SB sb) { return p1(sb); }
-    @Override SB p1(SB sb) { return sb.p(_con.toString()); }
+    @Override SB str(SB sb) { return p1(sb,null); }
+    @Override SB p1(SB sb, VBitSet dups) { return sb.p(_con.toString()); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
     @Override boolean hm(Worklist work) { return false; }
     @Override Type val(Worklist work) { return _con; }
@@ -543,8 +543,8 @@ public class HM {
     private T2 _idt;            // Cached type var for the name in scope
     private boolean _fresh;     // True if fresh-unify; short-cut for common case of an id inside its def vs in a Let body.
     Ident(String name) { _name=name; }
-    @Override SB str(SB sb) { return p1(sb); }
-    @Override SB p1(SB sb) { return sb.p(_name); }
+    @Override SB str(SB sb) { return p1(sb,null); }
+    @Override SB p1(SB sb, VBitSet dups) { return sb.p(_name); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
     T2 idt() {
       T2 idt = _idt.find();
@@ -619,7 +619,7 @@ public class HM {
       for( String arg : _args ) sb.p(arg).p(' ');
       return _body.str(sb.p("-> ")).p(" }");
     }
-    @Override SB p1(SB sb) {
+    @Override SB p1(SB sb, VBitSet dups) {
       sb.p("{ ");
       for( int i=0; i<_args.length; i++ ) {
         sb.p(_args[i]);
@@ -641,11 +641,13 @@ public class HM {
     }
     @Override void add_hm_work(Worklist work) { throw unimpl(); }
     @Override Type val(Worklist work) {
-      Type tret = _body!=null && _body._flow!=null ? _body._flow : Type.ANY;
+      assert _body!=null;
+      // Body flow is null during init
+      Type tret = _body._flow==null ? Type.XSCALAR : _body._flow;
       return TypeFunPtr.make0(BitsFun.make0(_fidx),_args.length,Type.ANY,tret);
     }
-    // Ignore arguments, and return body type.  Very conservative.
-    Type apply(Syntax[] args) { return _body._flow; }
+    // Ignore arguments, and return body type for a particular call site.  Very conservative.
+    Type apply(Type[] flows) { return _body._flow; }
     @Override void add_val_work(Syntax child, Worklist work) {
       // Body changed, all Apply sites need to recompute
       if( work!=null ) find().add_deps_work(work);
@@ -687,7 +689,7 @@ public class HM {
     T2 _targ;
     Let(String arg0, Syntax def, Syntax body) { _arg0=arg0; _body=body; _def=def; _targ=T2.make_leaf(); }
     @Override SB str(SB sb) { return _body.str(_def.str(sb.p(_arg0).p(" = ")).p("; ")); }
-    @Override SB p1(SB sb) { return sb.p(_arg0).p(" = ... ; ..."); }
+    @Override SB p1(SB sb, VBitSet dups) { return sb.p(_arg0).p(" = ... ; ..."); }
     @Override SB p2(SB sb, VBitSet dups) { _def.p0(sb,dups); return _body.p0(sb,dups); }
     @Override boolean hm(Worklist work) { return false;  }
     @Override void add_hm_work(Worklist work) {
@@ -736,7 +738,7 @@ public class HM {
         arg.str(sb).p(" ");
       return sb.unchar().p(")");
     }
-    @Override SB p1(SB sb) { return sb.p("(...)"); }
+    @Override SB p1(SB sb, VBitSet dups) { return sb.p("(...)"); }
     @Override SB p2(SB sb, VBitSet dups) {
       _fun.p0(sb,dups);
       for( Syntax arg : _args ) arg.p0(sb,dups);
@@ -783,59 +785,50 @@ public class HM {
       if( tfp._fidxs == BitsFun.EMPTY )
         return Type.XSCALAR; // Nothing being called, stay high
       // Have some functions, meet over their returns.
-      Type rez = Type.XSCALAR;
-      if( tfp._fidxs.test(1) ) rez = Type.SCALAR; // Unknown, passed-in function.  Returns the worst
-      else
-        for( int fidx : tfp._fidxs )
-          rez = rez.meet(Lambda.FUNS.get(fidx).apply(_args));
-      if( rez==Type.XSCALAR ) // Fast path cutout, no improvement possible
-        return rez;
+      Type rez = tfp._ret;
 
-      // Attempt to lift the result, based on HM types.  Walk the input HM type
-      // and CCP flow type in parallel and create a mapping.  Then walk the
-      // output HM type and CCP flow type in parallel, and join output CCP
-      // types with the matching input CCP type.
+      // Attempt to lift the result, based on HM types.  
       if( DO_HM ) {
-        Type rez3 = hm_apply_lift(rez);
-        assert _flow.isa(rez3) ; // Monotonic...
-        rez = rez3; // Upgrade
+
+        // Walk the input HM type and CCP flow type in parallel and create a
+        // mapping.  Then walk the output HM type and CCP flow type in parallel,
+        // and join output CCP types with the matching input CCP type.
+          
+        // Walk the input types, finding all the Leafs.  Repeats of the same Leaf
+        // has its flow Types MEETed.  If HM_FREEZE, then these are the exact
+        // Leafs.  If !HM_FREEZE, then all Leafs are assumed unified and all their
+        // corresponding flows are JOINed.
+
+
+        // The resulting type is used to lift the result via a JOIN.
+        T2.T2MAP.clear();
+        for( Syntax arg : _args )
+          { T2.WDUPS.clear(true); arg.find().walk_types_in(arg._flow); }
+        
+        // If !HM_FREEZE, pre-compute a monolithic JOIN.
+        // Any leaf or base may unify with any other.
+        Type jt = null;
+        if( !HM_FREEZE ) {
+          jt = Type.SCALAR;
+          for( T2 t2 : T2.T2MAP.keySet() )
+            if( t2.is_leaf() || t2.is_base() )
+              jt = jt.join(T2.T2MAP.get(t2));
+        }
+
+        // Then walk the output types, building a corresponding flow Type, but
+        // matching against input Leafs.  If HM_FREEZE Leafs must match
+        // exactly, replacing the input flow Type with the corresponding flow
+        // Type.  If !HM_FREEZE, replace with the one flow Type.
+
+        T2.WDUPS.clear(true);  T2.WBS.clear();
+        Type lift = find().walk_types_out(rez, jt, this);
+        if( lift != rez && lift==jt ) // Lifting looks like the leaf-join
+          for( T2 t2 : T2.T2MAP.keySet() ) // So depend on all leafs.  TODO: be more exact
+            t2.push_update(this);
+        Type lifted = rez.join(lift); // Lifted result
+        rez = lifted;                 // Keep pre-/post-lift in variables for easier debugging
       }
       return rez;
-    }
-    // Walk the input types, finding all the Leafs.  Repeats of the same Leaf
-    // has its flow Types MEETed.  If HM_FREEZE, then these are the exact
-    // Leafs.  If !HM_FREEZE, then all Leafs are assumed unified and all their
-    // corresponding flows are JOINed.
-
-    // Then walk the output types, building a corresponding flow Type, but
-    // matching against input Leafs.  If HM_FREEZE Leafs must match exactly,
-    // replacing the input flow Type with the corresponding flow Type.  If
-    // !HM_FREEZE, replace with the one flow Type.
-
-    // The resulting type is used to lift the result via a JOIN.
-    Type hm_apply_lift( Type rez ) {
-      T2.T2MAP.clear();
-      { T2.WDUPS.clear(true); _fun.find().walk_types_in(_fun._flow); }
-      for( Syntax arg : _args )
-        { T2.WDUPS.clear(true); arg.find().walk_types_in(arg._flow); }
-
-      // If !HM_FREEZE, pre-compute a monolithic JOIN
-      Type jt = null;
-      if( !HM_FREEZE ) {
-        jt = Type.SCALAR;
-        for( T2 t2 : T2.T2MAP.keySet() )
-          if( t2.is_leaf() )
-            jt = jt.join(T2.T2MAP.get(t2));
-      }
-
-      // Walk the outputs, building a lifting result
-      T2.WDUPS.clear(true);  T2.WBS.clear();
-      Type rez2 = find().walk_types_out(rez, jt, this);
-      if( rez2 != rez && rez2==jt )   // Lifting looks like the leaf-join
-        for( T2 t2 : T2.T2MAP.keySet() ) // So depend on all leafs.  TODO: be more exact
-          t2.push_update(this);
-      Type rez3 = rez.join(rez2);    // Lifted result
-      return rez3;
     }
 
     @Override void add_val_work(Syntax child, Worklist work) {
@@ -924,7 +917,7 @@ public class HM {
 
 
   static class Root extends Apply {
-    static final Syntax[] NARGS = new Syntax[0];
+    static final Type[] FLOWS = new Type[0];
     Root(Syntax body) { super(body); }
     @Override SB str(SB sb) { return _fun.str(sb); }
     @Override boolean hm(final Worklist work) {
@@ -965,7 +958,7 @@ public class HM {
         if( fun._fidxs.test(1) ) rez = Type.SCALAR;
         else
           for( int fidx : fun._fidxs )
-            rez = rez.meet(Lambda.FUNS.get(fidx).apply(NARGS));
+            rez = rez.meet(Lambda.FUNS.get(fidx).apply(FLOWS));
         Type rez2 = add_sig(rez);
         return TypeFunSig.make(TypeStruct.EMPTY,rez2);
       } else {
@@ -995,7 +988,7 @@ public class HM {
       }
       return sb.p("}");
     }
-    @Override SB p1(SB sb) { return sb.p("@{").p(_alias).p(" ... } "); }
+    @Override SB p1(SB sb, VBitSet dups) { return sb.p("@{").p(_alias).p(" ... } "); }
     @Override SB p2(SB sb, VBitSet dups) {
       for( int i=0; i<_ids.length; i++ )
         _flds[i].p0(sb.i().p(_ids[i]).p(" = ").nl(),dups);
@@ -1076,7 +1069,7 @@ public class HM {
     final Syntax _rec;
     Field( String id, Syntax str ) { _id=id; _rec =str; }
     @Override SB str(SB sb) { return _rec.str(sb).p(".").p(_id); }
-    @Override SB p1 (SB sb) { return sb.p(".").p(_id); }
+    @Override SB p1(SB sb, VBitSet dups) { return sb.p(".").p(_id); }
     @Override SB p2(SB sb, VBitSet dups) { return _rec.p0(sb,dups); }
     @Override boolean hm(Worklist work) {
       T2 self = find();
@@ -1138,16 +1131,15 @@ public class HM {
 
 
   abstract static class PrimSyn extends Lambda {
-    static T2 BOOL, INT64, FLT64, STRP;
     static int PAIR_ALIAS, TRIPLE_ALIAS;
     static void reset() {
       PAIR_ALIAS   = BitsAlias.new_alias(BitsAlias.REC);
       TRIPLE_ALIAS = BitsAlias.new_alias(BitsAlias.REC);
-      BOOL  = T2.make_base(TypeInt.BOOL);
-      INT64 = T2.make_base(TypeInt.INT64);
-      FLT64 = T2.make_base(TypeFlt.FLT64);
-      STRP  = T2.make_base(TypeMemPtr.STRPTR);
     }
+    static T2 BOOL (){ return T2.make_base(TypeInt.BOOL); }
+    static T2 INT64(){ return T2.make_base(TypeInt.INT64); }
+    static T2 STRP (){ return T2.make_base(TypeMemPtr.STRPTR); }
+    static T2 FLT64(){ return T2.make_base(TypeFlt.FLT64); }
     abstract String name();
     private static final String[][] IDS = new String[][] {
       null,
@@ -1155,13 +1147,11 @@ public class HM {
       {"x","y"},
       {"x","y","z"},
     };
-    Type _body_flow;
     PrimSyn(T2 ...t2s) {
       super(null,IDS[t2s.length-1]);
       _hmt = T2.make_fun(BitsFun.make0(_fidx), t2s).fresh();
       for( int i=0; i<_targs.length; i++ )
         _targs[i] = _hmt.arg(Lambda.ARGNAMES[i]).push_update(this);
-      _body_flow = Type.ANY;
     }
     abstract PrimSyn make();
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
@@ -1175,16 +1165,16 @@ public class HM {
       if( find().is_err() )
         throw unimpl();         // Untested; should be ok
     }
-    @Override final Type apply(Syntax[] args) {
-      Type t = apply2(args);
-      assert _body_flow.isa(t); // No need for a meet
-      return (_body_flow = t);
+    @Override Type val(Worklist work) {
+      assert _body==null;
+      Type ret = apply(_types);
+      return TypeFunPtr.make0(BitsFun.make0(_fidx),_args.length,Type.ANY,ret);
     }
-    abstract Type apply2(Syntax[] args);
+
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
     @Override SB str(SB sb){ return sb.p(name()); }
-    @Override SB p1(SB sb) { return sb.p(name()); }
-    @Override SB p2(SB sb, VBitSet dups){ return sb; }
+    @Override SB p1(SB sb, VBitSet dups) { return sb.p(name()); }
+    @Override SB p2(SB sb, VBitSet dups) { return sb; }
   }
 
 
@@ -1196,10 +1186,10 @@ public class HM {
       super(var1=T2.make_leaf(),var2=T2.make_leaf(),T2.make_struct(false,BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{var1,var2}));
     }
     @Override PrimSyn make() { return new Pair(); }
-    @Override Type apply2(Syntax[] args) {
-      TypeFld[] ts = new TypeFld[args.length+1];
+    @Override Type apply(Type[] flows) {
+      TypeFld[] ts = new TypeFld[flows.length+1];
       ts[0] = TypeFld.NO_DISP;  // Display
-      for( int i=0; i<args.length; i++ ) ts[i+1] = TypeFld.make_tup(args[i]._flow,ARG_IDX+i);
+      for( int i=0; i<flows.length; i++ ) ts[i+1] = TypeFld.make_tup(flows[i],ARG_IDX+i);
       TypeStruct tstr = TypeStruct.make(ts);
       TypeStruct ts2 = tstr.approx(CUTOFF,BitsAlias.make0(PAIR_ALIAS));
       return TypeMemPtr.make(PAIR_ALIAS,ts2);
@@ -1213,10 +1203,10 @@ public class HM {
     static private T2 var1,var2,var3;
     public Triple() { super(var1=T2.make_leaf(),var2=T2.make_leaf(),var3=T2.make_leaf(),T2.make_struct(false,BitsAlias.make0(TRIPLE_ALIAS),new String[]{"0","1","2"},new T2[]{var1,var2,var3})); }
     @Override PrimSyn make() { return new Triple(); }
-    @Override Type apply2(Syntax[] args) {
-      TypeFld[] ts = new TypeFld[args.length+1];
+    @Override Type apply(Type[] flows) {
+      TypeFld[] ts = new TypeFld[flows.length+1];
       ts[0] = TypeFld.NO_DISP;  // Display
-      for( int i=0; i<args.length; i++ ) ts[i+1] = TypeFld.make_tup(args[i]._flow,ARG_IDX+i);
+      for( int i=0; i<flows.length; i++ ) ts[i+1] = TypeFld.make_tup(flows[i],ARG_IDX+i);
       TypeStruct tstr = TypeStruct.make(ts);
       TypeStruct ts2 = tstr.approx(CUTOFF,BitsAlias.make0(TRIPLE_ALIAS));
       return TypeMemPtr.make(TRIPLE_ALIAS,ts2);
@@ -1246,10 +1236,10 @@ public class HM {
         rez       .unify(targ(1),work) |
         rez.find().unify(targ(2),work);
     }
-    @Override Type apply2( Syntax[] args) {
-      Type pred= args[0]._flow;
-      Type t1  = args[1]._flow;
-      Type t2  = args[2]._flow;
+    @Override Type apply( Type[] flows) {
+      Type pred= flows[0];
+      Type t1  = flows[1];
+      Type t2  = flows[2];
       // Conditional Constant Propagation: only prop types from executable sides
       if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
         return t2;              // False only
@@ -1266,11 +1256,11 @@ public class HM {
   static class EQ extends PrimSyn {
     @Override String name() { return "eq"; }
     static private T2 var1;
-    public EQ() { super(var1=T2.make_leaf(),var1,BOOL); }
+    public EQ() { super(var1=T2.make_leaf(),var1,BOOL()); }
     @Override PrimSyn make() { return new EQ(); }
-    @Override Type apply2( Syntax[] args) {
-      Type x0 = args[0]._flow;
-      Type x1 = args[1]._flow;
+    @Override Type apply( Type[] flows) {
+      Type x0 = flows[0];
+      Type x1 = flows[1];
       if( x0.above_center() || x1.above_center() ) return TypeInt.BOOL.dual();
       if( x0.is_con() && x1.is_con() && x0==x1 )
         return TypeInt.TRUE;
@@ -1282,10 +1272,10 @@ public class HM {
   // EQ0
   static class EQ0 extends PrimSyn {
     @Override String name() { return "eq0"; }
-    public EQ0() { super(INT64,BOOL); }
+    public EQ0() { super(INT64(),BOOL()); }
     @Override PrimSyn make() { return new EQ0(); }
-    @Override Type apply2( Syntax[] args) {
-      Type pred = args[0]._flow;
+    @Override Type apply( Type[] flows) {
+      Type pred = flows[0];
       if( pred.above_center() )
         return pred.may_nil() ? TypeInt.BOOL.dual() : TypeInt.FALSE;
       if( pred==Type.ALL ) return TypeInt.BOOL;
@@ -1299,10 +1289,10 @@ public class HM {
 
   static class IsEmpty extends PrimSyn {
     @Override String name() { return "isempty"; }
-    public IsEmpty() { super(STRP,BOOL); }
+    public IsEmpty() { super(STRP(),BOOL()); }
     @Override PrimSyn make() { return new IsEmpty(); }
-    @Override Type apply2( Syntax[] args) {
-      Type pred = args[0]._flow;
+    @Override Type apply( Type[] flows) {
+      Type pred = flows[0];
       if( pred.above_center() ) return TypeInt.BOOL.dual();
       TypeObj to;
       if( pred instanceof TypeMemPtr && (to=((TypeMemPtr)pred)._obj) instanceof TypeStr && to.is_con() )
@@ -1352,8 +1342,8 @@ public class HM {
       // Unify with arg with a nilable version of the ret.
       return T2.make_nil(ret).find().unify(arg,work);
     }
-    @Override Type apply2( Syntax[] args) {
-      Type val = args[0]._flow;
+    @Override Type apply( Type[] flows) {
+      Type val = flows[0];
       if( val==Type.XNIL ) return Type.XSCALAR; // Weird case of not-nil nil
       return val.join(Type.NSCALR);
     }
@@ -1362,11 +1352,11 @@ public class HM {
   // multiply
   static class Mul extends PrimSyn {
     @Override String name() { return "*"; }
-    public Mul() { super(INT64,INT64,INT64); }
+    public Mul() { super(INT64(),INT64(),INT64()); }
     @Override PrimSyn make() { return new Mul(); }
-    @Override Type apply2( Syntax[] args) {
-      Type t0 = args[0]._flow;
-      Type t1 = args[1]._flow;
+    @Override Type apply( Type[] flows) {
+      Type t0 = flows[0];
+      Type t1 = flows[1];
       if( t0.above_center() || t1.above_center() )
         return TypeInt.INT64.dual();
       if( t0 instanceof TypeInt && t1 instanceof TypeInt ) {
@@ -1382,11 +1372,11 @@ public class HM {
   // add integers
   static class Add extends PrimSyn {
     @Override String name() { return "+"; }
-    public Add() { super(INT64,INT64,INT64); }
+    public Add() { super(INT64(),INT64(),INT64()); }
     @Override PrimSyn make() { return new Add(); }
-    @Override Type apply2( Syntax[] args) {
-      Type t0 = args[0]._flow;
-      Type t1 = args[1]._flow;
+    @Override Type apply( Type[] flows) {
+      Type t0 = flows[0];
+      Type t1 = flows[1];
       if( t0.above_center() || t1.above_center() )
         return TypeInt.INT64.dual();
       if( t0 instanceof TypeInt && t1 instanceof TypeInt ) {
@@ -1400,10 +1390,10 @@ public class HM {
   // decrement
   static class Dec extends PrimSyn {
     @Override String name() { return "dec"; }
-    public Dec() { super(INT64,INT64); }
+    public Dec() { super(INT64(),INT64()); }
     @Override PrimSyn make() { return new Dec(); }
-    @Override Type apply2( Syntax[] args) {
-      Type t0 = args[0]._flow;
+    @Override Type apply( Type[] flows) {
+      Type t0 = flows[0];
       if( t0.above_center() ) return TypeInt.INT64.dual();
       if( t0 instanceof TypeInt && t0.is_con() )
         return TypeInt.con(t0.getl()-1);
@@ -1414,10 +1404,10 @@ public class HM {
   // int->str
   static class Str extends PrimSyn {
     @Override String name() { return "str"; }
-    public Str() { super(INT64,STRP); }
+    public Str() { super(INT64(),STRP()); }
     @Override PrimSyn make() { return new Str(); }
-    @Override Type apply2( Syntax[] args) {
-      Type i = args[0]._flow;
+    @Override Type apply( Type[] flows) {
+      Type i = flows[0];
       if( i.above_center() ) return TypeMemPtr.STRPTR.dual();
       if( i instanceof TypeInt && i.is_con() )
         return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(String.valueOf(i.getl()).intern()));
@@ -1429,10 +1419,10 @@ public class HM {
   // flt->(factor flt flt)
   static class Factor extends PrimSyn {
     @Override String name() { return "factor"; }
-    public Factor() { super(FLT64,FLT64); }
+    public Factor() { super(FLT64(),FLT64()); }
     @Override PrimSyn make() { return new Factor(); }
-    @Override Type apply2( Syntax[] args) {
-      Type flt = args[0]._flow;
+    @Override Type apply( Type[] flows) {
+      Type flt = flows[0];
       if( flt.above_center() ) return TypeFlt.FLT64.dual();
       return TypeFlt.FLT64;
     }
@@ -1531,7 +1521,7 @@ public class HM {
     static T2 make_base(Type flow) {
       assert !(flow instanceof TypeStruct) && !(flow instanceof TypeFunPtr);
       T2 t2 = new T2(null);
-      t2._flow=flow;
+      t2._flow=flow.widen(); // TODO: needed?  removes HM narrow base types
       return t2;
     }
     static T2 make_fun( BitsFun fidxs, T2... t2s ) {
@@ -1790,7 +1780,7 @@ public class HM {
 
       // Two bases unify by smaller uid
       if( is_base() && that.is_base() )
-        return _uid<that._uid ? this.union(that,work) : that.union(this,work);
+        return _uid<that._uid ? that.union(this,work) : this.union(that,work);
 
       // Special case for nilable union something
       if( this.is_nil() && !that.is_nil() ) return this.unify_nil(that,work);
@@ -2082,7 +2072,6 @@ public class HM {
     // flow types all meet - but HM understands how the T2s split back apart
     // after the Apply.  During this work, every T2 is mapped one-to-one to a
     // flow Type, and the mapping is made recursively.
-    private Type fput( final Type t) { T2MAP.merge(this, t, Type::meet); return t; }
 
     // Walk a T2 and a matching flow-type, and build a map from T2 to flow-types.
     // Stop if either side loses corresponding structure.  This operation must be
@@ -2092,29 +2081,18 @@ public class HM {
       if( WDUPS.putIfAbsent(duid,TypeStruct.ALLSTRUCT)!=null ) return t;
       assert !unified();
       // Free variables keep the input flow type.
-      if( is_leaf() ) return fput(t);
+      // Bases can (sorta) act like a leaf: they can keep their polymorphic "shape" and induce it on the result
+      if( is_leaf() || is_base() )
+        { T2MAP.merge(this, t, HM_FREEZE ? Type::meet : Type::join); return t; }
       // Nilable
       if( is_nil() )
         return arg("?").walk_types_in(t.join(Type.NSCALR));
-      // Base variables (when widened to an HM type) might force a lift.
-      if( is_base() ) return fput(_flow.meet(t));
       if( is_fun() ) {
-        if( !(t instanceof TypeFunPtr) ) t = t.oob(TypeFunPtr.GENERIC_FUNPTR);
-        TypeFunPtr tfp = (TypeFunPtr)t;
-        T2 ret = arg("ret");
-        BitsFun fidxs = _fidxs.meet(tfp._fidxs);
-        if( fidxs.test(1) ) return t; // External unknown function, returns the worst
-        if( fidxs == BitsFun.EMPTY ) return t; // Internal, unknown function
-        for( int fidx : fidxs ) {
-          Lambda lambda = Lambda.FUNS.get(fidx);
-          Type body = lambda.find().is_err()
-            ? Type.SCALAR           // Error, no lift
-            : (lambda instanceof PrimSyn      //
-               ? ((PrimSyn)lambda)._body_flow // Primitive use _body_flow
-               : lambda._body._flow);         // Lambda use body type
-          ret.walk_types_in(body);
-        }
-        return t;
+        T2 t2ret = arg("ret");
+        Type fret = t instanceof TypeFunPtr ? ((TypeFunPtr)t)._ret : t.oob(Type.SCALAR);
+        if( fret == Type.ANY || fret == Type.ALL )
+          throw unimpl();       // Should fix to Scalar before starting
+        return t2ret.walk_types_in(fret);
       }
 
       if( is_struct() ) {
@@ -2156,11 +2134,17 @@ public class HM {
 
       if( is_err() ) return Type.SCALAR; // Do not attempt lift
 
-      if( is_leaf() )
-        return lift(jt,apply);
-
-      if( is_base() )
-        return lift(jt,apply);
+      if( is_leaf() || is_base() ) {
+        Type xt = T2MAP.get(this);
+        if( xt==null ) return Type.SCALAR;
+        if( jt!=null ) return jt;
+        // T2 base on input being used to lift GCP on output.
+        // T2 base is widened, which widens the lift.
+        //if( is_base() )
+        //  xt = xt.meet(_flow);
+        push_update(apply);    // Apply depends on this leaf
+        return xt;
+      }
 
       if( is_nil() ) { // The wrapped leaf gets compat_lift, then nil is added
         Type tnil = arg("?").walk_types_out(t.join(Type.NSCALR),jt,apply);
@@ -2231,15 +2215,6 @@ public class HM {
 
       throw unimpl();           // Handled all cases
     }
-
-    private Type lift(Type jt, Apply apply) {
-      if( jt!=null ) return jt;
-      Type xt = T2MAP.get(this);
-      if( xt==null ) return Type.SCALAR;
-      push_update(apply);    // Apply depends on this leaf
-      return xt;
-    }
-
 
     // -----------------
     // Widen all reachable bases on function inputs
@@ -2331,7 +2306,7 @@ public class HM {
       }
 
       // Dup printing for all but bases (which are short, just repeat them)
-      if( !is_base() || is_err() ) {
+      if( debug || !is_base() || is_err() ) {
         if( dup ) vname(sb,debug);
         if( visit.tset(_uid) && dup ) return sb;
         if( dup ) sb.p(':');

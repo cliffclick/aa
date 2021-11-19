@@ -120,7 +120,11 @@ public class TestHM {
   // Because {y->y} is passed in, all 'y' types must agree.
   // This unifies 3 and 5 which results in 'nint8'
   @Test public void test05() {
-    run("({ id -> (pair (id 3) (id 5)) } {x->x})", "( nint8, nint8)",tuple82);
+    run("({ id -> (pair (id 3) (id 5)) } {x->x})",
+        "( nint8, nint8)",
+        "( nint8, nint8)",
+        tuple82, //TypeMemPtr.make(7,make_tups(TypeInt.con(3),TypeInt.con(5))),
+        tuple82);
   }
 
   @Test public void test06() {
@@ -130,9 +134,9 @@ public class TestHM {
         "( 3, *[4]\"abc\")",
         // GCP with HM
         // With lift ON
-        //TypeMemPtr.make(7,make_tups(TypeInt.NINT64,TypeMemPtr.make(4,TypeStr.STR))),
+        TypeMemPtr.make(7,make_tups(TypeInt.con(3),TypeMemPtr.make(4,TypeStr.ABC))),
         // With lift OFF
-        TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
+        //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
         // GCP is weaker without HM
         tuplen2);
   }
@@ -175,9 +179,9 @@ public class TestHM {
         "( *[4]str, flt64)",
         "( *[4]str, flt64)",
         // With lift ON
-        //TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeFlt.FLT64)),
+        TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeFlt.FLT64)),
         // With lift OFF
-        TypeMemPtr.make(7,make_tups(Type.SCALAR,Type.SCALAR)),
+        //TypeMemPtr.make(7,make_tups(Type.SCALAR,Type.SCALAR)),
         tuple2);
   }
 
@@ -243,9 +247,9 @@ map ={fun parg -> (fun (cdr parg))};
         "( *[4]str, int1)",
         "( *[4]str, int1)",
         // With Lift ON
-        //TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeInt.BOOL)),
+        TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeInt.BOOL)),
         // With Lift OFF
-        tuple2,
+        //tuple2,
         tuple2);
   }
 
@@ -286,9 +290,9 @@ all = @{
         "( 3, *[4]\"abc\")",
         "( 3, *[4]\"abc\")",
         // With lift On
-        //TypeMemPtr.make(7,make_tups(TypeInt.NINT64,TypeMemPtr.STRPTR)),
+        TypeMemPtr.make(7,make_tups(TypeInt.con(3),TypeMemPtr.make(4,TypeStr.ABC))),
         // With lift Off
-        TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
+        //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
         tuplen2);
   }
 
@@ -443,16 +447,16 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
         "( *[4]str, int1)",
         "( *[4]str, int1)",
         // With lift ON
-        //TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeInt.BOOL)),
+        TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeInt.BOOL)),
         // With lift OFF
-        tuple2,
+        //tuple2,
         tuple2);
   }
 
   // CCP Can help HM
   @Test public void test42() {
     run("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4 }; (if pred s1 s2).y",
-        "3.4000000953674316",
+        "3.4f",
         "Missing field y in ( )",
         TypeFlt.con(3.4f),
         TypeFlt.con(3.4f));
@@ -461,13 +465,13 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
   // The z-merge is ignored; the last s2 is a fresh (unmerged) copy.
   @Test public void test43() {
     run("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4 }; z = (if pred s1 s2).x; s2.y",
-        "3.4000000953674316",TypeFlt.con(3.4f));
+        "3.4f",TypeFlt.con(3.4f));
   }
 
   @Test public void test44() {
     run("fun = (if (isempty \"abc\") {x->x} {x->1.2}); (fun @{})",
-        "1.2000000476837158",
-        "Cannot unify 1.2000000476837158 and ()",
+        "1.2f",
+        "Cannot unify 1.2f and ()",
         TypeFlt.con(1.2f),
         TypeFlt.con(1.2f));
   }
@@ -491,9 +495,9 @@ loop = { name cnt ->
         "*[0,4]str?",  // Both HM and GCP
         "Cannot unify int8 and *[0,4]str?", // HM alone cannot do this one
         // With lift ON
-        //TypeMemPtr.make(4,TypeStr.STR), // Both HM and GCP
+        TypeMemPtr.make(4,TypeStr.STR), // Both HM and GCP
         // With lift OFF
-        Type.NSCALR,
+        //Type.NSCALR,
         Type.NSCALR);                   // GCP alone gets a very weak answer
   }
 
@@ -537,8 +541,8 @@ loop = { name cnt ->
 """,
         "{ A? -> ( 3, May be nil when loading field x ) }",
         "{ A? -> ( 3, May be nil when loading field x ) }",
-        tfs(TypeMemPtr.make(7,make_tups(TypeInt.NINT8, TypeInt.NINT8 ))),
-        tfs(TypeMemPtr.make(7,make_tups(TypeInt.NINT8, TypeInt.NINT8 ))));
+        tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(3), TypeInt.con(5) ))),
+        tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(3), TypeInt.con(5) ))));
   }
 
   @Test public void test51() {
@@ -1031,10 +1035,11 @@ maybepet = petcage.get;
         "(nflt32,nflt32,*[4]str)",
         "(nflt32,nflt32,*[4]str)",
         // With lift ON
-        //TypeMemPtr.make(8, make_tups(TypeFlt.FLT64, TypeFlt.FLT64, TypeMemPtr.STRPTR)),
+        TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.STRPTR)),
+        TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.STRPTR)));
         // With lift OFF
-        TypeMemPtr.make(8, make_tups(Type.SCALAR  , Type.SCALAR  , TypeMemPtr.STRPTR)),
-        TypeMemPtr.make(8, make_tups(Type.SCALAR  , Type.SCALAR  , TypeMemPtr.STRPTR)) );
+        //TypeMemPtr.make(8, make_tups(Type.SCALAR  , Type.SCALAR  , TypeMemPtr.STRPTR)),
+        //TypeMemPtr.make(8, make_tups(Type.SCALAR  , Type.SCALAR  , TypeMemPtr.STRPTR)) );
   }
 
 }
