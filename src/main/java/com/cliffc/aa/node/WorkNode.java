@@ -12,5 +12,5 @@ public abstract class WorkNode extends Work<Node> implements Function<Node,Node>
   public void add(Ary<Node> ns) { for( Node n : ns )  add(n); }
   public void add(UQNodes uq) {  if( uq!=null ) for( Node n : uq.values() )  add(n); }
   public abstract Node apply(Node n);
-  @Override public String toString() { return _name+keySet().toString(); }
+  @Override public String toString() { return _name+super.toString(); }
 }

@@ -541,13 +541,33 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
   // Approximate an otherwise endless unrolled sequence of:
   //    ...TMP[alias] -> Struct -> [FunPtr]* -> TMP[alias] -> Struct -> ...
   public TypeStruct approx( int cutoff, BitsAlias aliases ) { return approx2(cutoff,aliases); }
-  
+
   // By chopping off the endless tail, pulling it back one recursion layer and
   // meeting.  This forces unrolled part to look like the cyclic part (at least
   // past the cutoff), which then re-rolls.  Used to prevent endless growth of
   // otherwise cyclic types.
 
-  // This version is NOT associative with meet: A.apx.B != A.B.apx
+  /**
+   This version is NOT associative with meet: A.apx.B != A.B.apx
+
+  "Wrap-and-Approx" is not monotonic!  Can only happen if we have a nested
+  instance of alias#12.  This can happen from an ordinary MEET.
+  
+  [12]@{                               [12]@{
+    pred=~scalar                         pred=~scalar
+    succ= *[12]@{     >>> FALLS >>>      succ= scalar // Succ field falls
+      pred=*[12]@{ something }         }
+    }
+  }
+  
+  ----- Approx on [12] for both types: -----
+  [12]@{                               [12]@{
+    pred= $recursive$  <<< LIFTS <<<     pred=~scalar 
+    succ= $recursive$                    succ= scalar
+  }                                    }
+  
+  */
+
   private static final IHashMap OLD2APX = new IHashMap();
   private static final Ary<TypeMemPtr> CUTOFFS = new Ary<>(TypeMemPtr.class);
   public TypeStruct approx1( int cutoff, BitsAlias aliases ) {
@@ -570,7 +590,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
       assert OLD2APX.isEmpty() && MEETS0.isEmpty() && CUTOFFS.isEmpty();
       TypeMemPtr apxptr = ax_impl_ptr( aliases, cutoff, 0, ptr, ptr );
       assert CUTOFFS.isEmpty();
-      MEETS0.clear();
+      OLD2APX.clear();  MEETS0.clear();
       RECURSIVE_MEET--;
       // apxptr may die/recycle at install, and may include e.g. nil where the
       // original aliases do not
@@ -578,7 +598,6 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
       // Remove any leftover internal duplication.
       TypeStruct rez = ((TypeStruct)apxptr._obj).install();
       assert this.isa(rez);
-      OLD2APX.clear();
       ptr = TypeMemPtr.make(aliases2,rez);
     }
   }
@@ -718,7 +737,10 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
       if( old == Type.NIL || old == Type.XNIL ) return nptr.ax_meet_nil(old);
       if( old == Type.SCALAR ) return old;
       if( old == Type.XSCALAR || old == Type.ANY ) break; // Result is the nt unchanged
-      if( !(old instanceof TypeMemPtr) ) return Type.SCALAR; // Not a TMP
+      if( !(old instanceof TypeMemPtr) ) {
+        if( old instanceof Cyclic && ((Cyclic)old).cyclic() ) bs.clr(nt._uid,old._uid);
+        return Type.SCALAR; // Not a TMP
+      }
       TypeMemPtr optr = (TypeMemPtr)old;
       nptr._aliases = nptr._aliases.meet(optr._aliases);
       nptr._obj = (TypeObj)ax_meet(bs,nptr._obj,optr._obj);
@@ -761,7 +783,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
   // By chopping off the endless tail, and meeting it with SCALAR.
 
   // This version IS associative with meet: A.apx.B == A.B.apx
-  private static final IHashMap AXCYCLIC = new IHashMap();
+  private static final Ary<IHashMap> AXCYCLICS = new Ary<>(IHashMap.class);
   public TypeStruct approx2( int cutoff, BitsAlias aliases ) {
     // Fast-path cutout for boring structs
     boolean shallow=true;
@@ -770,7 +792,9 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
           (fld._t instanceof TypeFunPtr && !((TypeFunPtr)fld._t)._ret.is_simple()) )
         { shallow=false; break; }
     if( shallow ) return this;  // Fast cutout for boring structs
-    AXCYCLIC.clear();
+    for( int i=0; i<cutoff; i++ )
+      if( i>= AXCYCLICS._len ) AXCYCLICS.push(new IHashMap());
+      else AXCYCLICS.at(i).clear();
     Type apx = _apx(cutoff-1,aliases,this);
     apx = apx.install();
     return (TypeStruct)apx;
@@ -779,14 +803,14 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
   // deep clone, lowering cutoff at TMP, chopping off when cutoff hits 0
   private static Type _apx( int cutoff, BitsAlias aliases, Type t ) {
     if( !(t instanceof Cyclic) ) return t;
-    Type c = AXCYCLIC.get(t);     // Check for cycles
-    if( c!=null ) return c;       // Return prior
-    AXCYCLIC.put(t,c = t.copy()); // Stop cycles
-    if( c instanceof TypeMemPtr && aliases.overlaps(((TypeMemPtr)c)._aliases) ) {
+    if( t instanceof TypeMemPtr && aliases.overlaps(((TypeMemPtr)t)._aliases) ) {
       if( cutoff == 0 )
-        return AXCYCLIC.put(t,Type.SCALAR); // Cutoff to Scalar
-      cutoff--;                             // Lower cutoff
+        return Type.SCALAR;     // Cutoff to Scalar
+      cutoff--;                 // Lower cutoff
     }
+    Type c = AXCYCLICS.at(cutoff).get(t);     // Check for cycles
+    if( c!=null ) return c;                   // Return prior
+    AXCYCLICS.at(cutoff).put(t,c = t.copy()); // Stop cycles
     // Recursively apply
     final int fcutoff = cutoff;
     ((Cyclic)c).walk_update(fld -> _apx(fcutoff,aliases,fld));

@@ -1,6 +1,6 @@
 package com.cliffc.aa.HM;
 
-import com.cliffc.aa.HM.HM.Root;
+import com.cliffc.aa.HM.HM10.Root;
 import com.cliffc.aa.type.*;
 import org.junit.Test;
 
@@ -8,11 +8,11 @@ import java.util.function.Supplier;
 
 import static org.junit.Assert.assertEquals;
 
-public class TestHM {
+public class TestHM10 {
 
   private void _run0( String prog, String rez_hm, Supplier<Type> frez_gcp, int rseed ) {
     HM.reset();
-    Root syn = HM.hm(prog, rseed, rez_hm!=null, frez_gcp!=null );
+    Root syn = HM10.hm(prog, rseed, rez_hm!=null, frez_gcp!=null );
     if(  rez_hm !=null )  assertEquals(stripIndent(rez_hm),stripIndent(syn._hmt.p()));
     if( frez_gcp!=null )  assertEquals(frez_gcp.get(),syn.flow_type());
   }
@@ -25,8 +25,8 @@ public class TestHM {
 
   // Run same program in all 3 combinations
   private void run( String prog, String rez_hm, Supplier<Type> frez_gcp ) {
-    //_run1(prog,rez_hm,frez_gcp);
-    //_run1(prog,rez_hm,null    );
+    _run1(prog,rez_hm,frez_gcp);
+    _run1(prog,rez_hm,null    );
     _run1(prog,null  ,frez_gcp);
   }
   private void run( String prog, String rez_hm, Type rez_gcp ) {
@@ -35,8 +35,8 @@ public class TestHM {
 
   // Run same program in all 3 combinations, but answers vary across combos
   private void run( String prog, String rez_hm_gcp, String rez_hm_alone, Supplier<Type> frez_gcp_hm, Supplier<Type> frez_gcp_alone ) {
-    //_run1(prog,rez_hm_gcp  ,frez_gcp_hm   );
-    //_run1(prog,rez_hm_alone,null          );
+    _run1(prog,rez_hm_gcp  ,frez_gcp_hm   );
+    _run1(prog,rez_hm_alone,null          );
     _run1(prog,null        ,frez_gcp_alone);
   }
   private void run( String prog, String rez_hm_gcp, String rez_hm_alone, Type rez_gcp_hm, Type rez_gcp_alone ) {
@@ -92,6 +92,12 @@ public class TestHM {
   private static TypeFld bfun( String fld, int alias, int afidx, int ofidx, int tfidx ) {
     return mptr(fld,alias,TypeStruct.make(NO_DSP,mfun("and_",afidx),mfun("or__",ofidx),mfun("then",tfidx,2) ) );
   }
+
+  // Make a natural numbers field, with struct fields isZero,pred,succ,add
+  private static TypeFld nfun( String fld, int alias, int zfidx, int pfidx, int sfidx, int afidx) {
+    return mptr(fld,alias,TypeStruct.make(NO_DSP,mfun("isZero",zfidx),mfun("pred",pfidx),mfun("succ",sfidx), mfun("add",afidx) ));
+  }
+
 
 
   @Test(expected = RuntimeException.class)
@@ -268,7 +274,7 @@ map ={fun parg -> (fun (cdr parg))};
         "int1", TypeInt.BOOL);
   }
 
-  @Test public void test67() {
+  @Test public void test23x() {
     run("""
 all = @{
   is_even = { dsp n -> (if (eq0 n) 0 (dsp.is_odd  dsp (dec n)))},
@@ -279,7 +285,7 @@ all = @{
         "{int64 -> int1}", tfs(TypeInt.BOOL));
   }
 
-  @Test public void test68() {
+  @Test public void test23y() {
     run("dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp \"abc\"))",
         "( 3, *[4]\"abc\")",
         "( 3, *[4]\"abc\")",
@@ -557,22 +563,22 @@ loop = { name cnt ->
   // Create a boolean-like structure, and unify.
   @Test public void test52() {
     run("void = @{};"+              // Same as '()'; all empty structs are alike
-        "true = @{"+                // 'true' is a struct with and,or,then
+        "true = @{"+                // 'true' is a struct with and,or,thenElse
         "  and= {b -> b}"+
         "  or = {b -> true}"+
-        "  then = {then else->(then void) }"+
+        "  thenElse = {then else->(then void) }"+
         "};"+
-        "false = @{"+               // 'false' is a struct with and,or,then
+        "false = @{"+               // 'false' is a struct with and,or,thenElse
         "  and= {b -> false}"+
         "  or = {b -> b}"+
-        "  then = {then else->(else void) }"+
+        "  thenElse = {then else->(else void) }"+
         "};"+
         "forceSubtyping ={b ->(if b true false)};"+ // A unified version
         // Trying really hard here to unify 'true' and 'false'
         "bool=@{true=(forceSubtyping 1), false=(forceSubtyping 0), force=forceSubtyping};"+
         // Apply the unified 'false' to two different return contexts
-        "a=(bool.false.then { x-> 3 } { y-> 4 });"+
-        "b=(bool.false.then { z->@{}} { z->@{}});"+
+        "a=(bool.false.thenElse { x-> 3 } { y-> 4 });"+
+        "b=(bool.false.thenElse { z->@{}} { z->@{}});"+
         // Look at the results
         "@{a=a,b=b, bool=bool}"+
         "",
@@ -581,19 +587,19 @@ loop = { name cnt ->
             a = nint8,
             b = (),
             bool = @{
-              false =        A:@{ and = { A -> A }, or = { A -> A }, then = { { () -> B } { () -> B } -> B } },
-              force = { C -> D:@{ and = { D -> D }, or = { D -> D }, then = { { () -> E } { () -> E } -> E } } },
-              true =         F:@{ and = { F -> F }, or = { F -> F }, then = { { () -> G } { () -> G } -> G } }
+              false =        A:@{ and = { A -> A }, or = { A -> A }, thenElse = { { () -> B } { () -> B } -> B } },
+              force = { C -> D:@{ and = { D -> D }, or = { D -> D }, thenElse = { { () -> E } { () -> E } -> E } } },
+              true =         F:@{ and = { F -> F }, or = { F -> F }, thenElse = { { () -> G } { () -> G } -> G } }
             }
           }
          */
-        "@{ a = nint8; b = ( ); bool = @{ false = A:@{ and = { A -> A }; or = { A -> A }; then = { { ( ) -> B } { ( ) -> B } -> B }}; force = { C? -> D:@{ and = { D -> D }; or = { D -> D }; then = { { ( ) -> E } { ( ) -> E } -> E }} }; true = F:@{ and = { F -> F }; or = { F -> F }; then = { { ( ) -> G } { ( ) -> G } -> G }}}}",
+        "@{ a = nint8; b = ( ); bool = @{ false = A:@{ and = { A -> A }; or = { A -> A }; thenElse = { { ( ) -> B } { ( ) -> B } -> B }}; force = { C? -> D:@{ and = { D -> D }; or = { D -> D }; thenElse = { { ( ) -> E } { ( ) -> E } -> E }} }; true = F:@{ and = { F -> F }; or = { F -> F }; thenElse = { { ( ) -> G } { ( ) -> G } -> G }}}}",
         () -> {
           Type tf   = TypeMemPtr.make(ptr1011(),
                                       TypeStruct.make(NO_DSP,
                                                       bfun2("and"     ,14,17,1),
                                                       bfun2("or"      ,15,18,1),
-                                                      bfun2("then",16,19,2)));
+                                                      bfun2("thenElse",16,19,2)));
           Type xbool= TypeMemPtr.make(12,TypeStruct.make(NO_DSP,
                                                          TypeFld.make("true", tf),
                                                          TypeFld.make("false",tf),
@@ -629,13 +635,13 @@ true = @{
   and      = {b -> b}
   or       = {b -> true}
   not      = {unused ->true}
-  then = {then else->(then void) }
+  thenElse = {then else->(then void) }
 };
 false = @{
   and      = {b -> false}
   or       = {b -> b}
   not      = {unused ->true}
-  then = {then else->(else void) }
+  thenElse = {then else->(else void) }
 };
 boolSub ={b ->(if b true false)};
 @{true=(boolSub 1) false=(boolSub 0)}
@@ -643,20 +649,20 @@ boolSub ={b ->(if b true false)};
         "@{ false = A:@{ and = { A -> A }; "+
               "not = { B -> A }; "+
               "or = { A -> A }; "+
-              "then = { { ( ) -> C } { ( ) -> C } -> C }"+
+              "thenElse = { { ( ) -> C } { ( ) -> C } -> C }"+
             "}; "+
             "true = D:@{ and = { D -> D }; "+
               "not = { E -> D }; "+
               "or = { D -> D }; "+
-              "then = { { ( ) -> F } { ( ) -> F } -> F }"+
+              "thenElse = { { ( ) -> F } { ( ) -> F } -> F }"+
             "}"+
         "}",
         () -> {
 /* *[12]@{^=any;
-      false=*[10,11]@{^$; and=[14,18]{any ->Scalar }; not=[16,20]{any ->Scalar }; or=[15,19]{any ->Scalar }; then=[17,21]{any ->Scalar }};
+      false=*[10,11]@{^$; and=[14,18]{any ->Scalar }; not=[16,20]{any ->Scalar }; or=[15,19]{any ->Scalar }; thenElse=[17,21]{any ->Scalar }};
       true =_30870$
     }*/
-          TypeMemPtr com = TypeMemPtr.make(ptr1011(),TypeStruct.make(NO_DSP,bfun2("and",14,18,1),bfun2("not",16,20,1),bfun2("or" ,15,19,1),bfun2("then",17,21,2)));
+          TypeMemPtr com = TypeMemPtr.make(ptr1011(),TypeStruct.make(NO_DSP,bfun2("and",14,18,1),bfun2("not",16,20,1),bfun2("or" ,15,19,1),bfun2("thenElse",17,21,2)));
           return TypeMemPtr.make(12,TypeStruct.make(NO_DSP,TypeFld.make("false",com),TypeFld.make("true",com)));
         } );
   }
@@ -687,32 +693,32 @@ boolSub ={b ->(if b true false)};
 all =
 true = @{
   not = {unused -> all.false},
-  then = {then else->(then 7) }
+  thenElse = {then else->(then 7) }
 };
 false = @{
   not = {unused -> all.true},
-  then = {then else->(else 7) }
+  thenElse = {then else->(else 7) }
 };
 boolSub ={b ->(if b true false)};
 @{true=true, false=false, boolSub=boolSub};
 all
 """,
-        "@{ boolSub = { A? -> @{ not = { B -> C:@{ not = { D -> C }; then = { { 7 -> E } { 7 -> E } -> E }} }; then = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
+        "@{ boolSub = { A? -> @{ not = { B -> C:@{ not = { D -> C }; thenElse = { { 7 -> E } { 7 -> E } -> E }} }; thenElse = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
         () -> {
           /*
            *[11]@{^=any;
              boolSub=[21]{any ->
                *[9,10]@{^$;
-                  not=[14,16]{any ->*[9,10]@{^$; not=[14,16]{any ->Scalar }; then=[15,17]{any ->Scalar }} };
-                  then$}
+                  not=[14,16]{any ->*[9,10]@{^$; not=[14,16]{any ->Scalar }; thenElse=[15,17]{any ->Scalar }} };
+                  thenElse$}
              };
-             false=*[10]@{^$; not=[16]{any ->*[ 9]@{^$; not=[14]{any ->Scalar }; then=[15]{any ->Scalar }} }; then=[17]{any ->Scalar }};
-             true =*[ 9]@{^$; not=[14]{any ->*[10]@{^$; not=[16]{any ->Scalar }; then$                   } }; then$                   }
+             false=*[10]@{^$; not=[16]{any ->*[ 9]@{^$; not=[14]{any ->Scalar }; thenElse=[15]{any ->Scalar }} }; thenElse=[17]{any ->Scalar }};
+             true =*[ 9]@{^$; not=[14]{any ->*[10]@{^$; not=[16]{any ->Scalar }; thenElse$                   } }; thenElse$                   }
            }
           */
-          TypeFld te5  = mfun(2,"then",15);
-          TypeFld te7  = mfun(2,"then",17);
-          TypeFld te57 = mfun(2,"then",15,17);
+          TypeFld te5  = mfun(2,"thenElse",15);
+          TypeFld te7  = mfun(2,"thenElse",17);
+          TypeFld te57 = mfun(2,"thenElse",15,17);
           TypeFld not46 = mfun(1,"not",TypeMemPtr.make(ptr90(),TypeStruct.make(NO_DSP,mfun(1,"not",14,16),te57)),14,16);
           TypeFld not6  = mfun(1,"not",TypeMemPtr.make(   9   ,TypeStruct.make(NO_DSP,mfun(1,"not",14   ),te5 )),   16);
           TypeFld not4  = mfun(1,"not",TypeMemPtr.make(   10  ,TypeStruct.make(NO_DSP,mfun(1,"not",16   ),te7 )),   14);
@@ -855,6 +861,10 @@ three =(n.s two);     // Three is the successor of two
   // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
   // pass in a field 'a'... and still no error.  Fixed.
   @Test public void test61() {
+    _run0("f = { p1 p2 -> (if p2.a p1 p2)};"+"(f @{a=2}   @{b=2.3})",
+      "@{ a= Missing field a }",
+      () -> TypeMemPtr.make(ptr90(),
+        TypeStruct.make(NO_DSP)),0);
     run("f = { p1 p2 -> (if p2.a p1 p2)};"+"(f @{a=2}   @{b=2.3})",
         "@{ a= Missing field a }",
         () -> TypeMemPtr.make(ptr90(),
@@ -912,29 +922,29 @@ all=
   void = @{};
   err  = {unused->(err unused)};
   true = @{
-    and  = {b -> b}
-    or   = {b -> all.true}
-    then = {then else->(then void) }
+    and      = {b -> b}
+    or       = {b -> all.true}
+    thenElse = {then else->(then void) }
     };
   false = @{
-    and  = {b -> all.false}
-    or   = {b -> b}
-    then = {then else->(else void) }
+    and      = {b -> all.false}
+    or       = {b -> b}
+    thenElse = {then else->(else void) }
     };
   boolSub ={b ->(if b true false)};
   z = @{
-    zero = {unused ->all.true}
+    isZero = {unused ->all.true}
     pred = err
     succ = {n -> (all.s n)}
-    add_ = {n-> n}
+    add = {n-> n}
     };
-  orZero = {n ->(true.then {unused ->n} {unused ->z})};
+  orZero = {n ->(true.thenElse {unused ->n} {unused ->z})};
   s = {pred ->
     self=@{
-      zero = {unused ->all.false}
+      isZero = {unused ->all.false}
       pred = {unused->pred}
       succ = {unused -> (all.s self)}
-      add_ ={m -> (self.succ (pred.add_ m))}
+      add ={m -> (self.succ (pred.add m))}
       };
     (orZero self)
     };
@@ -947,12 +957,12 @@ all
   false=A:@{
     and={A->A};
     or={A->A};
-    then={{()->B}{()->B}->B}
+    thenElse={{()->B}{()->B}->B}
     };
   s={
     C:@{
-      add_={C->C};
-      zero={D->A};
+      add={C->C};
+      isZero={D->A};
       pred={E->C};
       succ={C->C}
       }
@@ -960,8 +970,8 @@ all
     };
   true=A;
   z=@{
-    add_={F->F};
-    zero={G->A};
+    add={F->F};
+    isZero={G->A};
     pred={H->I};
     succ={C->C}
     }
@@ -969,27 +979,27 @@ all
 """,
         /*
          *[14]@{^    =any;
-                false=*[10,11]@{$; and=[15,18]{any ->Scalar }; or=[16,19]{any ->Scalar }; then=[17,20]{any ->Scalar }};
+                false=*[10,11]@{$; and=[15,18]{any ->Scalar }; or=[16,19]{any ->Scalar }; thenElse=[17,20]{any ->Scalar }};
                 true = tf$;
                 s    = [  35 ]{any ->Scalar };
-                z=*[12]@{$; add_=[27]{any ->Scalar }; zero=[25]{any ->tf$ }; pred=[14]{any ->Scalar }; succ=[26]{any ->Scalar }}
+                z=*[12]@{$; add=[27]{any ->Scalar }; isZero=[25]{any ->tf$ }; pred=[14]{any ->Scalar }; succ=[26]{any ->Scalar }}
           }
         */
         () -> {
           TypeFld and = bfun2("and" ,15,18,1);
           TypeFld or  = bfun2("or"  ,16,19,1);
-          TypeFld thn = bfun2("then",17,20,2);
+          TypeFld thn = bfun2("thenElse",17,20,2);
           TypeMemPtr tf = TypeMemPtr.make(ptr1011(),TypeStruct.make(NO_DSP,and,or,thn));
           TypeFld f = TypeFld.make("false",tf);
           TypeFld t = TypeFld.make("true",tf);
 
           TypeFld s = mfun("s",35);
 
-          TypeFld pred = mfun(1,"pred",Type.XSCALAR,14);
-          TypeFld zero = mfun(1,"zero",tf,25);
-          TypeFld add_ = mfun("add_"  ,27);
-          TypeFld succ = mfun("succ"  ,26);
-          TypeFld z = TypeFld.make("z",TypeMemPtr.make(BitsAlias.make0(12),TypeStruct.make(NO_DSP,pred,zero,add_,succ)));
+          TypeFld pred  = mfun(1,"pred",Type.XSCALAR,14);
+          TypeFld isZero= mfun(1,"isZero",tf,25);
+          TypeFld add   = mfun("add"   ,27);
+          TypeFld succ  = mfun("succ"  ,26);
+          TypeFld z = TypeFld.make("z",TypeMemPtr.make(BitsAlias.make0(12),TypeStruct.make(NO_DSP,pred,isZero,add,succ)));
           return TypeMemPtr.make(BitsAlias.make0(14),TypeStruct.make(NO_DSP,f,t,s,z));
         });
   }
@@ -1033,3 +1043,4 @@ maybepet = petcage.get;
   }
 
 }
+

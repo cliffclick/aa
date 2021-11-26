@@ -152,12 +152,12 @@ public class GVNGCM {
       // Only a very few nodes can make progress via dominance relations, and
       // these can make progress "very far" in the graph.  So instead of using
       // a neighbors list, we bulk revisit them here.
-      for( long k : _work_dom.keySetLong() ) {
-        Node dom = _work_dom.get(k);
+      //for( long k : _work_dom.keySetLong() ) {
+      //  Node dom = _work_dom.get(k);
       //  if( dom.is_dead() ) _work_dom.del(i--);
       //  else progress |= _work_dom.apply(dom)!=null;
-        throw unimpl("changing worklist impl");
-      }
+      //}
+      throw unimpl("changing worklist impl");
     }
     IDEAL_VISIT.clear();
     // Expensive assert

@@ -16,6 +16,43 @@ public class TestType {
   @Test public void testType() {
   }
 
+  @Test public void testTFPChain() {
+    // Problem is that a Lambda Transfer Function wants to simply wrap its return in a TFP.
+    // In recursive cases we might get:
+    //  INPUT                   WRAP WITH [2]{->}               APPROX
+    // ~scalar          ==>> [2]{-> ~scalar         } ==>> $[2  ]{->~scalar}
+    // $[2  ]{->$[2  ]} ==>> [2]{-> $[2  ]{->$[2  ]}} ==>> $[2  ]{->$[2]   }
+    // $[2,3]{->$[2,3]} ==>> [2]{-> $[2,3]{->$[2,3]}} ==>> $[2,3]{->$[2,3] } \___ NOT MONOTONIC
+    // scalar           ==>> [2]{-> scalar          } ==>> $[2  ]{->scalar } /
+
+    // And fails monotonicity for the last row.
+
+    int a2 = BitsFun.new_fidx();
+    int a3 = BitsFun.new_fidx();
+    BitsFun b2  = BitsFun.make0(a2);
+    BitsFun b3  = BitsFun.make0(a3);
+    BitsFun b23 = BitsFun.make0(a2,a3);
+    Type       x0 = Type.XSCALAR;
+    TypeFunPtr x1 = make(b2 ,x0);
+    TypeFunPtr x2 = make(b23,x1);
+    Type       x3 = Type. SCALAR;
+
+    assertTrue(x0.isa(x1));
+    assertTrue(x1.isa(x2));
+    assertTrue(x2.isa(x3));
+
+    // Wrapping:
+    TypeFunPtr wx0 = make(b2,x0);
+    TypeFunPtr wx1 = make(b2,x1);
+    TypeFunPtr wx2 = make(b2,x2);
+    TypeFunPtr wx3 = make(b2,x3);
+    
+    assertTrue(wx0.isa(wx1));
+    assertTrue(wx1.isa(wx2));
+    assertTrue(wx2.isa(wx3));  // CHECK MONOTONIC
+  }
+  static TypeFunPtr make( BitsFun fidxs, Type ret) { return TypeFunPtr.makex(fidxs,1,TypeMemPtr.NO_DISP,ret); }
+
   @Test public void testBits0() {
 
     // This looks like a crossing-nil bug, but it is not quite.

@@ -98,7 +98,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
 //
 
 
-public class HM {
+public class HM10 {
   // Mapping from primitive name to PrimSyn
   static final HashMap<String,PrimSyn> PRIMSYNS = new HashMap<>();
   // Precision of cyclic GCP types
@@ -109,7 +109,6 @@ public class HM {
   static boolean DO_HM ;
   static boolean DO_GCP;
 
-  static boolean DO_NOTNIL=false;
   static boolean HM_FREEZE;
   static boolean ROOT_FREEZE;
   public static Root hm( String sprog, int rseed, boolean do_hm, boolean do_gcp ) {
@@ -124,43 +123,45 @@ public class HM {
     Root prog = parse( sprog );
 
     // Pass 0: Prep for SSA; pre-gather all the (unique) ids
-    Work<Syntax> work = new Work<>(rseed);
+    Worklist work = new Worklist(rseed);
     int cnt_syns = prog.prep_tree(null,null,work);
 
     // Pass 1: Everything starts high/top/leaf and falls; escaping function args are assumed high
-    int work_cnt=0;
     int init_T2s = T2.CNT;  // Profiling bit
     HM_FREEZE = false;
     ROOT_FREEZE = false;
-    work_cnt+=main_work_loop(prog,work);
+    main_work_loop(prog,work);
     assert prog.more_work(work);
 
     // Pass 2: Give up on the Root GCP arg types.  Drop them to the best Root
     // approximation and never lift again.
     ROOT_FREEZE = true;
-    prog.update_root_args(work);
-    work_cnt+=main_work_loop(prog,work);
+    prog.update_fun_args(work);
+    while( Apply.AFWORK.len() > 0 )
+      ((Apply)Apply.AFWORK.pop()).update_fun_args(work);
+    main_work_loop(prog,work);
     assert prog.more_work(work);
 
     // Pass 3: H-M types freeze, escaping function args are assumed lowest H-M compatible and
     // GCP types continue to run downhill.
     HM_FREEZE = true;
-    //prog.visit((syn) -> { syn.add_val_work(null,work); return work.add(syn); }, (a,b)->null);
-    work_cnt+=main_work_loop(prog,work);
+    prog.visit((syn) -> { syn.add_val_work(null,work); return work.push(syn); }, (a,b)->null);
+    main_work_loop(prog,work);
     assert prog.more_work(work);
 
     // Pass 4: Error propagation, no types change.
     pass3(prog);
 
     // Profiling print
-    System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+work_cnt+", T2s: "+(init_T2s-T2.CNT));
+    System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+work._cnt+", T2s: "+T2.CNT);
     return prog;
   }
 
-  static int main_work_loop(Root prog, Work<Syntax> work) {
+  static void main_work_loop(Root prog, Worklist work) {
 
     int cnt=0;
     while( work.len()>0 ) {     // While work
+      int oldcnt = T2.CNT;      // Used for cost-check when no-progress
       cnt++; assert cnt<10000;  // Check for infinite loops
       Syntax syn = work.pop();  // Get work
 
@@ -170,6 +171,8 @@ public class HM {
         if( syn.hm(work) ) {
           assert syn.debug_find()==old.debug_find(); // monotonic: unifying with the result is no-progress
           syn.add_hm_work(work);// Push affected neighbors on worklist
+        } else {
+          assert oldcnt==T2.CNT;// No-progress consumes no-new-T2s
         }
       }
       // Do Global Constant Propagation work
@@ -179,15 +182,19 @@ public class HM {
         if( t!=old ) {           // Progress
           assert old.isa(t);     // Monotonic falling
           syn._flow = t;         // Update type
-          if( syn._par!=null )   // Push affected neighbors on worklist
-            syn._par.add_val_work(syn,work);
+          if( syn._par!=null ) { // Generally, parent needs revisit
+            work.push(syn._par); // Assume parent needs revisit
+            syn._par.add_val_work(syn,work); // Push affected neighbors on worklist
+          }
         }
+        // Eagerly apply function formal updates
+        while( Apply.AFWORK.len() > 0 )
+          ((Apply)Apply.AFWORK.pop()).update_fun_args(work);
       }
 
       // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
       assert prog.more_work(work);
     }
-    return cnt;
   }
 
   static void pass3(Root prog) {
@@ -231,7 +238,6 @@ public class HM {
       }, (a,b)->null);
   }
 
-  // Reset global statics between tests
   static void reset() {
     BitsAlias.reset_to_init0();
     BitsFun.reset_to_init0();
@@ -266,8 +272,7 @@ public class HM {
       while( skipWS()!= ')' && X<BUF.length ) args.push(fterm());
       require(')');
       // Guarding if-nil test inserts an upcast.  This is a syntactic transform only.
-      if( DO_NOTNIL &&
-          fun instanceof If &&
+      if( fun instanceof If &&
           args.at(0) instanceof Ident ) {
         Ident id = (Ident)args.at(0);
         args.set(1,new Apply(new Lambda(args.at(1), id._name),
@@ -380,6 +385,26 @@ public class HM {
   }
 
   // ---------------------------------------------------------------------
+  // Worklist of Syntax nodes
+  private static class Worklist {
+    private final int _rseed;   // Randomize worklist draws
+    public int _cnt;     // Next item to get
+    Worklist(int rseed) { _rseed=rseed; }
+    private final Ary<Syntax> _ary = new Ary<>(Syntax.class); // For picking random element
+    private final HashSet<Syntax> _work = new HashSet<>();    // For preventing dups
+    public int len() { return _ary.len(); }
+    public Syntax push(Syntax s) { if( s!=null && !_work.contains(s) ) _work.add(_ary.push(s)); return s; }
+    public Syntax pop() {
+      Syntax s = _ary.del( (_cnt+=_rseed)%_ary._len );
+      _work.remove(s);
+      return s;
+    }
+    public boolean has(Syntax s) { return _work.contains(s); }
+    public void addAll(Ary<? extends Syntax> ss) { if( ss != null ) for( Syntax s : ss ) push(s); }
+    @Override public String toString() { return _ary.toString(); }
+  }
+
+  // ---------------------------------------------------------------------
   // Small classic tree of T2s, immutable, with sharing at the root parts.
   static class VStack implements Iterable<T2> {
     final VStack _par;
@@ -413,11 +438,7 @@ public class HM {
   }
 
   // ---------------------------------------------------------------------
-  static abstract class Syntax implements IntSupplier {
-    private static int CNT=1;
-    final int _uid=CNT++;
-    @Override public int getAsInt() { return _uid; }
-
+  static abstract class Syntax {
     Syntax _par;                // Parent in the AST
     VStack _nongen;             // Non-generative type variables
     T2 _hmt;                    // Current HM type
@@ -435,14 +456,14 @@ public class HM {
     // If a change, return always true, however:
     // - If 'work' is null do not change/set anything.
     // - If 'work' is available, update the worklist.
-    abstract boolean hm(Work<Syntax> work);
+    abstract boolean hm(Worklist work);
 
-    abstract void add_hm_work(Work<Syntax> work); // Add affected neighbors to worklist
+    abstract void add_hm_work(Worklist work); // Add affected neighbors to worklist
 
     // Compute and return (and do not set) a new GCP type for this syntax.
-    abstract Type val(Work<Syntax> work);
+    abstract Type val(Worklist work);
 
-    void add_val_work(Syntax child, @NotNull Work<Syntax> work) {} // Add affected neighbors to worklist
+    void add_val_work(Syntax child, Worklist work) {} // Add affected neighbors to worklist
 
     // Visit whole tree recursively, applying 'map' to self, and reducing that
     // with the recursive value from all children.
@@ -450,25 +471,29 @@ public class HM {
 
     // First pass to "prepare" the tree; does e.g. Ident lookup, sets initial
     // type-vars and counts tree size.
-    abstract int prep_tree(Syntax par, VStack nongen, Work<Syntax> work);
-    final void prep_tree_impl( Syntax par, VStack nongen, Work<Syntax> work, T2 t ) {
+    abstract int prep_tree(Syntax par, VStack nongen, Worklist work);
+    final void prep_tree_impl( Syntax par, VStack nongen, Worklist work, T2 t ) {
       _par = par;
       _hmt = t;
       _flow= Type.XSCALAR;
       _nongen = nongen;
-      work.add(this);
+      work.push(this);
     }
     void prep_lookup_deps(Ident id) {}
 
     // Giant Assert: True if OK; all Syntaxs off worklist do not make progress
-    abstract boolean more_work(Work<Syntax> work);
-    final boolean more_work_impl(Work<Syntax> work) {
-      if( DO_HM && (!work.on(this) || HM_FREEZE) && hm(null) )   // Any more HM work?
+    abstract boolean more_work(Worklist work);
+    final boolean more_work_impl(Worklist work) {
+      if( DO_HM && (!work.has(this) || HM_FREEZE) && hm(null) )   // Any more HM work?
         return false;           // Found HM work not on worklist or when frozen
       if( DO_GCP ) {            // Doing GCP AND
         Type t = val(null);
-        assert _flow.isa(t);    // Flow is not monotonically falling
-        if( !work.on(this) && _flow!=t ) // Flow progress not on worklist
+        if( !_flow.isa(t) ||    // Flow is not monotonically falling
+            (!work.has(this) && _flow!=t) || // Flow progress not on worklist
+            // update_fun_args supposed to be eagerly applied
+            (this instanceof Apply &&
+             !(this instanceof Root && work.has(this)) &&
+             ((Apply)this).update_fun_args(null)) )
           return false;
       }
       return true;
@@ -497,16 +522,16 @@ public class HM {
     @Override SB str(SB sb) { return p1(sb,null); }
     @Override SB p1(SB sb, VBitSet dups) { return sb.p(_con.toString()); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
-    @Override boolean hm(Work<Syntax> work) { return false; }
-    @Override Type val(Work<Syntax> work) { return _con; }
-    @Override void add_hm_work(Work<Syntax> work) { }
-    @Override int prep_tree( Syntax par, VStack nongen, Work<Syntax> work ) {
+    @Override boolean hm(Worklist work) { return false; }
+    @Override Type val(Worklist work) { return _con; }
+    @Override void add_hm_work(Worklist work) { }
+    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       // A '0' turns into a nilable leaf.
       T2 base = _con==Type.NIL ? T2.make_nil(T2.make_leaf()) : T2.make_base(_con);
       prep_tree_impl(par, nongen, work, base);
       return 1;
     }
-    @Override boolean more_work(Work<Syntax> work) { return more_work_impl(work); }
+    @Override boolean more_work(Worklist work) { return more_work_impl(work); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
   }
 
@@ -525,21 +550,21 @@ public class HM {
       T2 idt = _idt.find();
       return idt==_idt ? idt : (_idt=idt);
     }
-    @Override boolean hm(Work<Syntax> work) {
+    @Override boolean hm(Worklist work) {
       T2 idt = idt(), hmt=find();
       return _fresh ? idt.fresh_unify(hmt,_nongen,work) : idt.unify(hmt,work);
     }
-    @Override void add_hm_work(Work<Syntax> work) {
-      work.add(_par);
+    @Override void add_hm_work(Worklist work) {
+      work.push(_par);
       if( _par!=null && idt().nongen_in(_par._nongen) ) // Got captured in some parent?
         idt().add_deps_work(work);  // Need to revisit dependent ids
       if( _par instanceof Apply && ((Apply)_par)._fun instanceof NotNil )
-        work.add(((Apply)_par)._fun);
+        work.push(((Apply)_par)._fun);
     }
-    @Override Type val(Work<Syntax> work) {
+    @Override Type val(Worklist work) {
       return _def instanceof Let ? ((Let)_def)._def._flow : ((Lambda)_def)._types[_idx];
     }
-    @Override int prep_tree( Syntax par, VStack nongen, Work<Syntax> work ) {
+    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
       for( Syntax syn = _par; syn!=null; syn = syn._par )
         syn.prep_lookup_deps(this);
@@ -560,7 +585,7 @@ public class HM {
     }
     private int _init(Syntax def,T2 idt, boolean fresh) {
       _def = def; _idt = idt; _fresh=fresh; return 1; }
-    @Override boolean more_work(Work<Syntax> work) { return more_work_impl(work); }
+    @Override boolean more_work(Worklist work) { return more_work_impl(work); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
   }
 
@@ -568,13 +593,11 @@ public class HM {
   static class Lambda extends Syntax {
     // Map from FIDXs to Lambdas
     static final NonBlockingHashMapLong<Lambda> FUNS = new NonBlockingHashMapLong<>();
-    final String[] _args;       // Lambda argument names
-    final Syntax _body;         // Lambda body
-    final T2[]      _targs;     // HM argument types
-    final Type[]    _types;     // Flow argument types
-    final Ident[][] _refs;      // Identifiers referring to this argument
-    final int _fidx;            // Unique function idx
-    final Ary<Apply> _applys;   // Applys using this Lambda
+    final String[] _args;                 // Lambda argument names
+    final Syntax _body;                   // Lambda body
+    final T2[] _targs;                    // HM argument types
+    final Type[] _types;                  // Flow argument types
+    final int _fidx;                      // Unique function idx
     static final String[] ARGNAMES = new String[]{" x"," y"," z"};
 
     Lambda(Syntax body, String... args) {
@@ -586,13 +609,10 @@ public class HM {
       // Flow types for all arguments
       _types = new Type[args.length];
       for( int i=0; i<args.length; i++ ) _types[i] = Type.XSCALAR;
-      // Idents referring to this argument
-      _refs = new Ident[args.length][];
-      _applys = new Ary<>(Apply.class);
       // A unique FIDX for this Lambda
       _fidx = BitsFun.new_fidx();
       FUNS.put(_fidx,this);
-      _flow = TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length,Type.ANY,Type.XSCALAR);
+      _flow = val(null);
     }
     @Override SB str(SB sb) {
       sb.p("{ ");
@@ -611,7 +631,7 @@ public class HM {
     }
     @Override SB p2(SB sb, VBitSet dups) { return _body.p0(sb,dups); }
     T2 targ(int i) { T2 targ = _targs[i].find(); return targ==_targs[i] ? targ : (_targs[i]=targ); }
-    @Override boolean hm(Work<Syntax> work) {
+    @Override boolean hm(Worklist work) {
       // The normal lambda work
       T2 old = find();
       boolean progress = false;
@@ -619,29 +639,20 @@ public class HM {
         progress |= old.arg(ARGNAMES[i]).unify(targ(i),work);
       return old.arg("ret").unify(_body.find(),work) | progress;
     }
-    @Override void add_hm_work(Work<Syntax> work) { throw unimpl(); }
-    @Override Type val(Work<Syntax> work) {
-      // Just wrap a function around the body return
-      return TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length,Type.ANY,_body._flow);
+    @Override void add_hm_work(Worklist work) { throw unimpl(); }
+    @Override Type val(Worklist work) {
+      assert _body!=null;
+      // Body flow is null during init
+      Type tret = _body._flow==null ? Type.XSCALAR : _body._flow;
+      return TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length,Type.ANY,tret);
     }
-    // Meet the formal argument# with a new Apply callsite actual arg.
-    void arg_meet(int argn, Type cflow, Work<Syntax> work) {
-      Type old = _types[argn];
-      Type mt = old.meet(cflow);
-      if( mt==old ) return;     // No change
-      _types[argn]=mt;          // Yes change, update
-      work.add(_refs[argn]);    // And revisit referrers
-      if( this instanceof PrimSyn ) work.add(this); // Primitives recompute
-    }
-
     // Ignore arguments, and return body type for a particular call site.  Very conservative.
     Type apply(Type[] flows) { return _body._flow; }
-    @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) {
-      work.add(this);
+    @Override void add_val_work(Syntax child, Worklist work) {
       // Body changed, all Apply sites need to recompute
-      work.addAll(_applys);
+      if( work!=null ) find().add_deps_work(work);
     }
-    @Override int prep_tree( Syntax par, VStack nongen, Work<Syntax> work ) {
+    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       // Prep self
       prep_tree_impl(par,nongen,work,T2.make_leaf());
       // Extend the nongen set by the new variables
@@ -659,15 +670,9 @@ public class HM {
     }
     @Override void prep_lookup_deps(Ident id) {
       for( int i=0; i<_args.length; i++ )
-        if( Util.eq(_args[i],id._name) ) {
-          Ident[] refs = _refs[i];
-          if( refs==null ) _refs[i] = refs = new Ident[0];
-          // Hard linear-time append ident to the end.  Should be very limited in size.
-          _refs[i] = refs = Arrays.copyOf(refs,refs.length+1);
-          refs[refs.length-1] = id;
-        }
+        if( Util.eq(_args[i],id._name) ) _targs[i].push_update(id);
     }
-    @Override boolean more_work(Work<Syntax> work) {
+    @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
       return _body.more_work(work);
     }
@@ -682,26 +687,25 @@ public class HM {
     final String _arg0;
     final Syntax _def, _body;
     T2 _targ;
-    Syntax[] _refs;               // Identifiers referring here
-    Let(String arg0, Syntax def, Syntax body) { _arg0=arg0; _body=body; _def=def; _targ=T2.make_leaf(); _refs=new Ident[0]; }
+    Let(String arg0, Syntax def, Syntax body) { _arg0=arg0; _body=body; _def=def; _targ=T2.make_leaf(); }
     @Override SB str(SB sb) { return _body.str(_def.str(sb.p(_arg0).p(" = ")).p("; ")); }
     @Override SB p1(SB sb, VBitSet dups) { return sb.p(_arg0).p(" = ... ; ..."); }
     @Override SB p2(SB sb, VBitSet dups) { _def.p0(sb,dups); return _body.p0(sb,dups); }
-    @Override boolean hm(Work<Syntax> work) { return false;  }
-    @Override void add_hm_work(Work<Syntax> work) {
-      work.add(_par);
-      work.add(_body);
-      work.add(_def);
+    @Override boolean hm(Worklist work) { return false;  }
+    @Override void add_hm_work(Worklist work) {
+      work.push(_par);
+      work.push(_body);
+      work.push(_def);
       work.addAll(_def.find()._deps);
     }
-    @Override Type val(Work<Syntax> work) { return _body._flow; }
+    @Override Type val(Worklist work) { return _body._flow; }
     // Definition changed; all dependents need to revisit
-    @Override void add_val_work( Syntax child, @NotNull Work<Syntax> work) {
-      if( child==_def ) work.add(_refs);
-      else              work.add(this);
+    @Override void add_val_work(Syntax child, Worklist work) {
+      if( child==_def && work!=null )
+        _def.find().add_deps_work(work);
     }
 
-    @Override int prep_tree( Syntax par, VStack nongen, Work<Syntax> work ) {
+    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
       prep_tree_impl(par,nongen,work,_body._hmt);
       int cnt = _body.prep_tree(this,           nongen       ,work) +
                 _def .prep_tree(this,new VStack(nongen,_targ),work);
@@ -710,13 +714,9 @@ public class HM {
       return cnt+1;
     }
     @Override void prep_lookup_deps(Ident id) {
-      if( Util.eq(id._name,_arg0) ) {
-        // Hard linear-time append ident to the end.  Should be very limited in size.
-        _refs = Arrays.copyOf(_refs,_refs.length+1);
-        _refs[_refs.length-1] = id;
-      }
+      if( Util.eq(id._name,_arg0) ) _targ.push_update(id);
     }
-    @Override boolean more_work(Work<Syntax> work) {
+    @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
       return _body.more_work(work) && _def.more_work(work);
     }
@@ -747,7 +747,7 @@ public class HM {
 
     // Unifiying these: make_fun(this.arg0 this.arg1 -> new     )
     //                      _fun{_fun.arg0 _fun.arg1 -> _fun.rez}
-    @Override boolean hm(Work<Syntax> work) {
+    @Override boolean hm(Worklist work) {
       // Progress if:
       //   _fun is not a function
       //   any arg-pair-unifies make progress
@@ -774,61 +774,132 @@ public class HM {
       progress |= find().unify(tfun.arg("ret"),work);
       return progress;
     }
-    @Override void add_hm_work(Work<Syntax> work) {
-      work.add(_par);
-      work.add(_args);
+    @Override void add_hm_work(Worklist work) {
+      work.push(_par);
+      for( Syntax arg : _args ) work.push(arg);
     }
-    @Override Type val(Work<Syntax> work) {
+    @Override Type val(Worklist work) {
       Type flow = _fun._flow;
       if( !(flow instanceof TypeFunPtr) ) return flow.oob(Type.SCALAR);
       TypeFunPtr tfp = (TypeFunPtr)flow;
       if( tfp._fidxs == BitsFun.EMPTY )
         return Type.XSCALAR; // Nothing being called, stay high
-      if( work!=null )
-        for( int fidx : tfp._fidxs ) {
-          Lambda lambda = Lambda.FUNS.get(fidx);
-          if( lambda._applys.find(this) == -1 ) {
-            // new call site for lambda; all args must meet into this lambda;
-            lambda._applys.push(this);
-            for( int i=0; i<_args.length; i++ )
-              lambda.arg_meet(i,_args[i]._flow,work);
-            if( lambda instanceof PrimSyn ) // Normal lambdas update from their _body alone
-              work.add(lambda);             // But primitives re-apply arguments
-          }
-      }
       // Have some functions, meet over their returns.
       Type rez = tfp._ret;
-      // Attempt to lift the result, based on HM types.
-      if( DO_HM )
-        throw unimpl();
+
+      // Attempt to lift the result, based on HM types.  
+      if( DO_HM ) {
+
+        // Walk the input HM type and CCP flow type in parallel and create a
+        // mapping.  Then walk the output HM type and CCP flow type in parallel,
+        // and join output CCP types with the matching input CCP type.
+          
+        // Walk the input types, finding all the Leafs.  Repeats of the same Leaf
+        // has its flow Types MEETed.  If HM_FREEZE, then these are the exact
+        // Leafs.  If !HM_FREEZE, then all Leafs are assumed unified and all their
+        // corresponding flows are JOINed.
+
+
+        // The resulting type is used to lift the result via a JOIN.
+        T2.T2MAP.clear();
+        for( Syntax arg : _args )
+          { T2.WDUPS.clear(true); arg.find().walk_types_in(arg._flow); }
+        
+        // If !HM_FREEZE, pre-compute a monolithic JOIN.
+        // Any leaf or base may unify with any other.
+        Type jt = null;
+        if( !HM_FREEZE ) {
+          jt = Type.SCALAR;
+          for( T2 t2 : T2.T2MAP.keySet() )
+            if( t2.is_leaf() || t2.is_base() )
+              jt = jt.join(T2.T2MAP.get(t2));
+        }
+
+        // Then walk the output types, building a corresponding flow Type, but
+        // matching against input Leafs.  If HM_FREEZE Leafs must match
+        // exactly, replacing the input flow Type with the corresponding flow
+        // Type.  If !HM_FREEZE, replace with the one flow Type.
+
+        T2.WDUPS.clear(true);  T2.WBS.clear();
+        Type lift = find().walk_types_out(rez, jt, this);
+        if( lift != rez && lift==jt ) // Lifting looks like the leaf-join
+          for( T2 t2 : T2.T2MAP.keySet() ) // So depend on all leafs.  TODO: be more exact
+            t2.push_update(this);
+        Type lifted = rez.join(lift); // Lifted result
+        rez = lifted;                 // Keep pre-/post-lift in variables for easier debugging
+      }
       return rez;
     }
 
-    @Override void add_val_work( Syntax child, @NotNull Work<Syntax> work) {
-      // push self, because self returns the changed-functions' ret
-      if( child==_fun ) { work.add(this); return; }
-
-      // Check for some Lambdas present
+    @Override void add_val_work(Syntax child, Worklist work) {
+      // If function changes type, recompute self
+      if( child==_fun && work!=null ) work.push(this);
+      // Actual arguments might have changed; apply them to formals
+      if( work!=null ) AFWORK.push(this);
+    }
+    private static final VBitSet RVISIT = new VBitSet();
+    static private final Worklist AFWORK = new Worklist(0);
+    boolean update_fun_args(Worklist work) {
+      // If an argument changes type, adjust the lambda arg types
       Type flow = _fun._flow;
-      if( !(flow instanceof TypeFunPtr) ) return;
-      TypeFunPtr tfp = (TypeFunPtr)flow;
-      if( tfp._fidxs == BitsFun.EMPTY ) return;
-
-      // child arg to a call-site changed; find the arg#;
-      int argn = Util.find(_args,child);
-
-      // visit all Lambdas; meet the child flow into the Lambda arg#
-      for( int fidx : tfp._fidxs )
-        Lambda.FUNS.get(fidx).arg_meet(argn,child._flow,work);
+      if( flow.above_center() ) return false;
+      assert RVISIT.isEmpty();
+      boolean progress = walk(flow,work);
+      RVISIT.clear();
+      return progress;
+    }
+    private boolean walk( Type flow, Worklist work) {
+      boolean progress=false;
+      if( RVISIT.tset(flow._uid) ) return false;
+      // Find any functions
+      if( flow instanceof TypeFunPtr ) {
+        if( ((TypeFunPtr)flow)._fidxs.test(1) ) return false; // All of them
+        // Meet the actuals over the formals.
+        for( int fidx : ((TypeFunPtr)flow)._fidxs ) {
+          Lambda fun = Lambda.FUNS.get(fidx);
+          fun.find().push_update(this); // Discovered as call-site; if the Lambda changes the Apply needs to be revisited.
+          for( int i=0; i<fun._types.length; i++ ) {
+            Type formal = fun._types[i];
+            Type actual = this instanceof Root
+              ? Root.widen(fun.targ(i)) // Root assumed args
+              : _args[i]._flow;         // Actual observed args
+            Type rez = formal.meet(actual);
+            if( formal != rez ) {
+              if( work==null ) return true;
+              progress = true;
+              fun._types[i] = rez; // The key change being tracked
+              fun.targ(i).add_deps_work(work);
+              work.push(fun._body);
+              // One formal update might lead to more formal updates
+              for( Syntax s : fun.targ(i)._deps )  if( s instanceof Apply )  AFWORK.push(s);
+              if( i==0 && fun instanceof If ) work.push(fun); // Specifically If might need more unification
+            }
+          }
+        }
+        return progress;
+      }
+      // For Root, recursively walk structures
+      if( flow instanceof TypeMemPtr ) {
+        TypeMemPtr tmp = (TypeMemPtr)flow;
+        if( tmp._obj instanceof TypeStr ) return false;
+        TypeStruct ts = ((TypeStruct)tmp._obj);
+        for( TypeFld fld : ts.flds() )
+          progress |= walk(fld._t,work);
+        return progress;
+      }
+      if( flow instanceof TypeInt || flow instanceof TypeFlt || flow==Type.NIL ) return false;
+      if( flow==Type.ANY || flow==Type.ALL || flow == Type.SCALAR || flow == Type.NSCALR || flow == Type.XSCALAR || flow == Type.XNSCALR )
+        return false;
+      throw unimpl();
     }
 
-    @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
+    @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
       int cnt = 1+_fun.prep_tree(this,nongen,work);
       for( Syntax arg : _args ) cnt += arg.prep_tree(this,nongen,work);
       return cnt;
     }
-    @Override boolean more_work(Work<Syntax> work) {
+    @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
       if( !_fun.more_work(work) ) return false;
       for( Syntax arg : _args ) if( !arg.more_work(work) ) return false;
@@ -849,56 +920,31 @@ public class HM {
     static final Type[] FLOWS = new Type[0];
     Root(Syntax body) { super(body); }
     @Override SB str(SB sb) { return _fun.str(sb); }
-    @Override boolean hm(final Work<Syntax> work) {
+    @Override boolean hm(final Worklist work) {
       boolean progress = find().unify(_fun.find(),work);
       if( find().is_fun() ) progress |= find().widen_bases();
       return progress;
     }
 
-    @Override void add_hm_work(Work<Syntax> work) { }
-    @Override Type val(Work<Syntax> work) {
-      super.val(work);
+    @Override void add_hm_work(Worklist work) { }
+    @Override Type val(Worklist work) {
+      // Check for root-escaping functions to get upgrades to their input GCP
+      // values, based on changing HM values.  Normally root-escaping functions
+      // are assumed called by the external caller with the most generous
+      // arguments (basically ANY/XSCALAR not SCALAR/ALL) until HM chimes in.
+      // GCP arguments are then assumed to be compatible with the HM arguments.
+      add_val_work(null,work);
       return _fun._flow;
     }
+    // Root-widening is when Root acts as-if it is calling the returned
+    // function with the worse-case legal args.
+    static Type widen(T2 t2) { return t2.as_flow(); }
 
-    //@Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
-    //  int cnt = super.prep_tree(par,nongen,work);
-    //  _hmt.push_update(this);
-    //  return cnt;
-    //}
-    // After GCP stability, we guess (badly) that all escaping functions
-    // are called by folks outside of Root with the worst possible args.
-    // TODO: Force programmer type annotations for module entry points.
-    private static final VBitSet RVISIT = new VBitSet();
-    void update_root_args(Work<Syntax> work) {
-      // If an argument changes type, adjust the lambda arg types
-      Type flow = _fun._flow;
-      if( flow.above_center() ) return;
-      RVISIT.clear();
-      walk(flow,work);
-    }
-    private static void walk( Type flow, Work<Syntax> work) {
-      if( RVISIT.tset(flow._uid) ) return;
-        // Find any functions
-      if( flow instanceof TypeFunPtr ) {
-        if( ((TypeFunPtr)flow)._fidxs.test(1) ) return; // All of them
-        // Meet the actuals over the formals.
-        for( int fidx : ((TypeFunPtr)flow)._fidxs ) {
-          Lambda fun = Lambda.FUNS.get(fidx);
-          for( int i=0; i<fun._types.length; i++ )
-            fun.arg_meet(i,Type.SCALAR,work);
-          if( fun instanceof PrimSyn ) work.add(fun);
-        }
-      }
 
-      // recursively walk structures for nested functions
-      if( flow instanceof TypeMemPtr ) {
-        TypeMemPtr tmp = (TypeMemPtr)flow;
-        if( tmp._obj instanceof TypeStr ) return;
-        TypeStruct ts = ((TypeStruct)tmp._obj);
-        for( TypeFld fld : ts.flds() )
-          walk(fld._t,work);
-      }
+    @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
+      int cnt = super.prep_tree(par,nongen,work);
+      _hmt.push_update(this);
+      return cnt;
     }
 
     // Expand functions to full signatures, recursively
@@ -948,7 +994,7 @@ public class HM {
         _flds[i].p0(sb.i().p(_ids[i]).p(" = ").nl(),dups);
       return sb;
     }
-    @Override boolean hm(Work<Syntax> work) {
+    @Override boolean hm(Worklist work) {
       boolean progress = false;
 
       // Force result to be a struct with at least these fields.
@@ -975,11 +1021,11 @@ public class HM {
             return false;
       return true;
     }
-    @Override void add_hm_work(Work<Syntax> work) {
-      work.add(_par);
-      work.add(_flds);
+    @Override void add_hm_work(Worklist work) {
+      work.push(_par);
+      for( Syntax fld : _flds ) work.push(fld);
     }
-    @Override Type val(Work<Syntax> work) {
+    @Override Type val(Worklist work) {
       TypeFld[] flds = new TypeFld[_flds.length+1];
       flds[0] = TypeFld.NO_DISP;
       for( int i=0; i<_flds.length; i++ )
@@ -988,9 +1034,8 @@ public class HM {
       TypeStruct t2 = tstr.approx(CUTOFF,BitsAlias.make0(_alias));
       return TypeMemPtr.make(_alias,t2);
     }
-    @Override void add_val_work(Syntax child, Work<Syntax> work) { work.add(this); }
 
-    @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
+    @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par, nongen, work, T2.make_struct(false,BitsAlias.make0(_alias),null,null));
       int cnt = 1;              // One for self
       T2[] t2s = new T2[_ids.length];
@@ -1003,7 +1048,7 @@ public class HM {
       }
       return cnt;
     }
-    @Override boolean more_work(Work<Syntax> work) {
+    @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
       for( Syntax fld : _flds )
         if( !fld.more_work(work) )
@@ -1026,7 +1071,7 @@ public class HM {
     @Override SB str(SB sb) { return _rec.str(sb).p(".").p(_id); }
     @Override SB p1(SB sb, VBitSet dups) { return sb.p(".").p(_id); }
     @Override SB p2(SB sb, VBitSet dups) { return _rec.p0(sb,dups); }
-    @Override boolean hm(Work<Syntax> work) {
+    @Override boolean hm(Worklist work) {
       T2 self = find();
       T2 rec = _rec.find();
       rec.push_update(this);
@@ -1051,12 +1096,12 @@ public class HM {
       self._err = "Missing field "+_id;
       return true;
     }
-    @Override void add_hm_work(Work<Syntax> work) {
-      work.add(_par);
-      work.add(_rec);
+    @Override void add_hm_work(Worklist work) {
+      work.push(_par);
+      work.push(_rec);
       _rec.add_hm_work(work);
     }
-    @Override Type val(Work<Syntax> work) {
+    @Override Type val(Worklist work) {
       Type trec = _rec._flow;
       if( trec.above_center() || trec==Type.NIL ) return Type.XSCALAR;
       if( trec instanceof TypeMemPtr ) {
@@ -1070,12 +1115,11 @@ public class HM {
       }
       return Type.SCALAR;
     }
-    @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) { work.add(this); }
-    @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
+    @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par, nongen, work, T2.make_leaf());
       return _rec.prep_tree(this,nongen,work)+1;
     }
-    @Override boolean more_work(Work<Syntax> work) {
+    @Override boolean more_work(Worklist work) {
       if( !more_work_impl(work) ) return false;
       return _rec.more_work(work);
     }
@@ -1110,24 +1154,24 @@ public class HM {
         _targs[i] = _hmt.arg(Lambda.ARGNAMES[i]).push_update(this);
     }
     abstract PrimSyn make();
-    @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
+    @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par,nongen,work, _hmt);
       return 1;
     }
-    @Override boolean hm(Work<Syntax> work) {
+    @Override boolean hm(Worklist work) {
       return false;
     }
-    @Override void add_hm_work(Work<Syntax> work) {
+    @Override void add_hm_work(Worklist work) {
       if( find().is_err() )
         throw unimpl();         // Untested; should be ok
     }
-    @Override Type val(Work<Syntax> work) {
+    @Override Type val(Worklist work) {
       assert _body==null;
       Type ret = apply(_types);
       return TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length,Type.ANY,ret);
     }
 
-    @Override boolean more_work(Work<Syntax> work) { return more_work_impl(work); }
+    @Override boolean more_work(Worklist work) { return more_work_impl(work); }
     @Override SB str(SB sb){ return sb.p(name()); }
     @Override SB p1(SB sb, VBitSet dups) { return sb.p(name()); }
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
@@ -1175,7 +1219,7 @@ public class HM {
     @Override String name() { return "if"; }
     public If() { super(T2.make_leaf(),T2.make_leaf(),T2.make_leaf(),T2.make_leaf()); }
     @Override PrimSyn make() { return new If(); }
-    @Override boolean hm(Work<Syntax> work) {
+    @Override boolean hm(Worklist work) {
       T2 rez = find().arg("ret");
       // GCP helps HM: do not unify dead control paths
       if( DO_GCP ) {            // Doing GCP during HM
@@ -1262,7 +1306,12 @@ public class HM {
     @Override String name() { return " notnil"; }
     public NotNil() { super(T2.make_leaf(),T2.make_leaf()); }
     @Override PrimSyn make() { throw unimpl(); /*return new NotNil(); */}
-    @Override boolean hm(Work<Syntax> work) {
+    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) {
+      int cnt = super.prep_tree(par,nongen,work);
+      find().arg("ret").push_update(this);
+      return cnt;
+    }
+    @Override boolean hm(Worklist work) {
       T2 arg = targ(0);
       T2 fun = find(); assert fun.is_fun();
       T2 ret = fun.arg("ret");
@@ -1385,10 +1434,9 @@ public class HM {
   // T2, and the forest of T2s can share.  Leaves of a T2 can be either a
   // simple concrete base type, or a sharable leaf.  Unify is structural, and
   // where not unifyable the union is replaced with an Error.
-  static class T2 implements IntSupplier {
-    private static int CNT=1;
-    final int _uid=CNT++;
-    @Override public int getAsInt() { return _uid; }
+  static class T2 {
+    private static int CNT=0;
+    final int _uid;
 
     // Structural parts to unify with, or null.
     // If Leaf   , then null and _flow is null.
@@ -1424,7 +1472,7 @@ public class HM {
     Ary<Syntax> _deps;
 
 
-    private T2(NonBlockingHashMap<String,T2> args) { _args = args; }
+    private T2(NonBlockingHashMap<String,T2> args) { _uid = CNT++; _args = args; }
 
     @SuppressWarnings("unchecked")
     T2 copy() {
@@ -1550,9 +1598,6 @@ public class HM {
       return this;
     }
 
-    private long dbl_uid(T2 t) { return dbl_uid(t._uid); }
-    private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
-
     // -----------------
     // Recursively build a conservative flow type from an HM type.  The HM
     // is_struct wants to be a TypeMemPtr, but the recursive builder is built
@@ -1610,7 +1655,7 @@ public class HM {
     // -----------------
     // U-F union; this becomes that; returns 'that'.
     // No change if only testing, and reports progress.
-    boolean union(T2 that, Work<Syntax> work) {
+    boolean union(T2 that, Worklist work) {
       assert !unified() && !that.unified(); // Cannot union twice
       if( this==that ) return false;
       if( work==null ) return true; // Report progress without changing
@@ -1640,7 +1685,7 @@ public class HM {
     // Hard unify this into that, no testing for progress.
     private boolean _union( T2 that ) {
       assert !unified() && !that.unified(); // Cannot union twice
-      // Work<Syntax>: put updates on the worklist for revisiting
+      // Worklist: put updates on the worklist for revisiting
       merge_deps(that);    // Merge update lists, for future unions
       // Kill extra information, to prevent accidentally using it
       _args = new NonBlockingHashMap<>() {{put(">>", that);}};
@@ -1685,7 +1730,7 @@ public class HM {
 
     // U-F union; this is nilable and becomes that.
     // No change if only testing, and reports progress.
-    boolean unify_nil(T2 that, Work<Syntax> work) {
+    boolean unify_nil(T2 that, Worklist work) {
       assert is_nil() && !that.is_nil();
       if( work==null ) return true; // Will make progress
       // Clone the top-level struct and make this nilable point to the clone;
@@ -1712,7 +1757,7 @@ public class HM {
     // If work and change, unifies 'this' into 'that' (changing both), and
     // updates the worklist.
     static private final HashMap<Long,T2> DUPS = new HashMap<>();
-    boolean unify( T2 that, Work<Syntax> work ) {
+    boolean unify( T2 that, Worklist work ) {
       if( this==that ) return false;
       assert VARS.isEmpty() && DUPS.isEmpty();
       boolean progress = _unify(that,work);
@@ -1723,7 +1768,7 @@ public class HM {
     // Structural unification, 'this' into 'that'.  No change if just testing
     // (work is null) and returns a progress flag.  If updating, both 'this'
     // and 'that' are the same afterwards.
-    private boolean _unify(T2 that, Work<Syntax> work) {
+    private boolean _unify(T2 that, Worklist work) {
       assert !unified() && !that.unified();
       if( this==that ) return false;
 
@@ -1758,7 +1803,7 @@ public class HM {
 
     // Structural recursion unification.  Called nested, and called by NotNil
     // at the top-level directly.
-    static boolean unify_flds(T2 thsi, T2 that, Work<Syntax> work, boolean top_level) {
+    static boolean unify_flds(T2 thsi, T2 that, Worklist work, boolean top_level) {
       if( thsi._args==that._args ) return false;  // Already equal (and probably both nil)
       boolean progress = false;
       for( String key : thsi._args.keySet() ) {
@@ -1789,7 +1834,7 @@ public class HM {
     }
 
     // Insert a new field
-    private boolean add_fld(String id, T2 fld, Work<Syntax> work) {
+    private boolean add_fld(String id, T2 fld, Worklist work) {
       if( _args==null ) {
         _args = new NonBlockingHashMap<>();
         fld.push_update(_deps);
@@ -1799,12 +1844,15 @@ public class HM {
       return true;
     }
     // Delete a field
-    private boolean del_fld( String id, Work<Syntax> work) {
+    private boolean del_fld( String id, Worklist work) {
       add_deps_work(work);
       _args.remove(id);
       if( _args.size()==0 ) _args=null;
       return true;
     }
+
+    private long dbl_uid(T2 t) { return dbl_uid(t._uid); }
+    private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
     // -----------------
     // Make a (lazy) fresh copy of 'this' and unify it with 'that'.  This is
@@ -1813,7 +1861,7 @@ public class HM {
     // If work is null, we are testing only and make no changes.
     static private final HashMap<T2,T2> VARS = new HashMap<>();
     // Outer version, wraps a VARS check around other work
-    boolean fresh_unify(T2 that, VStack nongen, Work<Syntax> work) {
+    boolean fresh_unify(T2 that, VStack nongen, Worklist work) {
       assert VARS.isEmpty() && DUPS.isEmpty();
       int old = CNT;
       boolean progress = _fresh_unify(that,nongen,work);
@@ -1825,7 +1873,7 @@ public class HM {
 
     // Inner version, self-recursive and uses VARS and DUPS for cycles.
     @SuppressWarnings("unchecked")
-    private boolean _fresh_unify(T2 that, VStack nongen, Work<Syntax> work) {
+    private boolean _fresh_unify(T2 that, VStack nongen, Worklist work) {
       assert !unified() && !that.unified();
       // Check for cycles
       T2 prior = VARS.get(this);
@@ -2209,8 +2257,8 @@ public class HM {
     }
 
     // Recursively add-deps to worklist
-    void add_deps_work( Work<Syntax> work ) { assert UPDATE_VISIT.isEmpty(); add_deps_work_impl(work); UPDATE_VISIT.clear(); }
-    private void add_deps_work_impl( Work<Syntax> work ) {
+    void add_deps_work( Worklist work ) { assert UPDATE_VISIT.isEmpty(); add_deps_work_impl(work); UPDATE_VISIT.clear(); }
+    private void add_deps_work_impl( Worklist work ) {
       work.addAll(_deps);
       if( UPDATE_VISIT.tset(_uid) ) return;
       if( _args != null )

@@ -87,7 +87,7 @@ public class Util {
     if( hash==0 ) hash=a;
     if( hash==0 ) hash=0xcafebabe;
     a=b=c=x=0;
-    return hash;                   
+    return hash;
   }
   // Single-use hash spreader
   static public int hash_spread(int hash) {
@@ -95,4 +95,11 @@ public class Util {
     return Util.get_hash();
   }
 
+  static public int gcd(int x, int y) {
+    if( x==0 || y== 0 ) return 0;
+    int a = Math.max(x,y), r;
+    int b = Math.min(x,y);
+    while((r=(a % b)) != 0) { a = b;  b = r; }
+    return b;
+  }
 }
