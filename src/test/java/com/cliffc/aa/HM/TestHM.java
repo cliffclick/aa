@@ -26,7 +26,7 @@ public class TestHM {
   // Run same program in all 3 combinations
   private void run( String prog, String rez_hm, Supplier<Type> frez_gcp ) {
     //_run1(prog,rez_hm,frez_gcp);
-    //_run1(prog,rez_hm,null    );
+    _run1(prog,rez_hm,null    );
     _run1(prog,null  ,frez_gcp);
   }
   private void run( String prog, String rez_hm, Type rez_gcp ) {
@@ -597,7 +597,7 @@ loop = { name cnt ->
           Type xbool= TypeMemPtr.make(12,TypeStruct.make(NO_DSP,
                                                          TypeFld.make("true", tf),
                                                          TypeFld.make("false",tf),
-                                                         mfun(1,"force",tf,21)));
+                                                         mfun(1,"force",tf,23)));
           TypeStruct rez = TypeStruct.make(NO_DSP,
                                            // With lift ON
                                            //TypeFld.make("a", HM.DO_HM ? TypeInt.NINT8 : Type.SCALAR),
@@ -697,7 +697,7 @@ boolSub ={b ->(if b true false)};
 @{true=true, false=false, boolSub=boolSub};
 all
 """,
-        "@{ boolSub = { A? -> @{ not = { B -> C:@{ not = { D -> C }; then = { { 7 -> E } { 7 -> E } -> E }} }; then = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
+        "@{ boolSub = { A? -> @{ not = { B -> C:@{ not = { D -> C }; then = { { int64 -> E } { int64 -> E } -> E }} }; then = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
         () -> {
           /*
            *[11]@{^=any;
@@ -716,7 +716,7 @@ all
           TypeFld not46 = mfun(1,"not",TypeMemPtr.make(ptr90(),TypeStruct.make(NO_DSP,mfun(1,"not",14,16),te57)),14,16);
           TypeFld not6  = mfun(1,"not",TypeMemPtr.make(   9   ,TypeStruct.make(NO_DSP,mfun(1,"not",14   ),te5 )),   16);
           TypeFld not4  = mfun(1,"not",TypeMemPtr.make(   10  ,TypeStruct.make(NO_DSP,mfun(1,"not",16   ),te7 )),   14);
-          TypeFld bs = mfun(1,"boolSub",TypeMemPtr.make(ptr90(),TypeStruct.make(NO_DSP,not46,te57)),19);
+          TypeFld bs = mfun(1,"boolSub",TypeMemPtr.make(ptr90(),TypeStruct.make(NO_DSP,not46,te57)),21);
           TypeFld f = mptr("false",10,TypeStruct.make(NO_DSP,not6,te7));
           TypeFld t = mptr("true" , 9,TypeStruct.make(NO_DSP,not4,te5));
           return TypeMemPtr.make(11,TypeStruct.make(NO_DSP,bs,f,t));
@@ -952,18 +952,18 @@ all
   s={
     C:@{
       add_={C->C};
-      zero={D->A};
-      pred={E->C};
-      succ={C->C}
+      pred={D->C};
+      succ={C->C};
+      zero={E->A}
       }
     ->C
     };
   true=A;
   z=@{
     add_={F->F};
-    zero={G->A};
-    pred={H->I};
-    succ={C->C}
+    pred={G->H};
+    succ={C->C};
+    zero={I->A}
     }
   }
 """,
@@ -983,12 +983,12 @@ all
           TypeFld f = TypeFld.make("false",tf);
           TypeFld t = TypeFld.make("true",tf);
 
-          TypeFld s = mfun("s",33);
+          TypeFld s = mfun("s",35);
 
           TypeFld pred = mfun(1,"pred",Type.XSCALAR,14);
-          TypeFld zero = mfun(1,"zero",tf,23);
-          TypeFld add_ = mfun("add_"  ,25);
-          TypeFld succ = mfun("succ"  ,24);
+          TypeFld zero = mfun(1,"zero",tf,25);
+          TypeFld add_ = mfun("add_"  ,27);
+          TypeFld succ = mfun("succ"  ,26);
           TypeFld z = TypeFld.make("z",TypeMemPtr.make(BitsAlias.make0(12),TypeStruct.make(NO_DSP,pred,zero,add_,succ)));
           return TypeMemPtr.make(BitsAlias.make0(14),TypeStruct.make(NO_DSP,f,t,s,z));
         });
