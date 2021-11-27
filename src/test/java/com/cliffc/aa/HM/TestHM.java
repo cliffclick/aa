@@ -536,7 +536,7 @@ loop = { name cnt ->
         "{ A? -> ( 3, May be nil when loading field x ) }",
         "{ A? -> ( 3, May be nil when loading field x ) }",
         tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(3), TypeInt.con(5) ))),
-        tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(3), TypeInt.con(5) ))));
+        tfs(TypeMemPtr.make(7,make_tups(TypeInt.NINT8 , TypeInt.NINT8 ))));
   }
 
   @Test public void test51() {
@@ -597,7 +597,7 @@ loop = { name cnt ->
           Type xbool= TypeMemPtr.make(12,TypeStruct.make(NO_DSP,
                                                          TypeFld.make("true", tf),
                                                          TypeFld.make("false",tf),
-                                                         mfun(1,"force",tf,23)));
+                                                         mfun(1,"force",tf,21)));
           TypeStruct rez = TypeStruct.make(NO_DSP,
                                            // With lift ON
                                            //TypeFld.make("a", HM.DO_HM ? TypeInt.NINT8 : Type.SCALAR),
@@ -716,7 +716,7 @@ all
           TypeFld not46 = mfun(1,"not",TypeMemPtr.make(ptr90(),TypeStruct.make(NO_DSP,mfun(1,"not",14,16),te57)),14,16);
           TypeFld not6  = mfun(1,"not",TypeMemPtr.make(   9   ,TypeStruct.make(NO_DSP,mfun(1,"not",14   ),te5 )),   16);
           TypeFld not4  = mfun(1,"not",TypeMemPtr.make(   10  ,TypeStruct.make(NO_DSP,mfun(1,"not",16   ),te7 )),   14);
-          TypeFld bs = mfun(1,"boolSub",TypeMemPtr.make(ptr90(),TypeStruct.make(NO_DSP,not46,te57)),21);
+          TypeFld bs = mfun(1,"boolSub",TypeMemPtr.make(ptr90(),TypeStruct.make(NO_DSP,not46,te57)),19);
           TypeFld f = mptr("false",10,TypeStruct.make(NO_DSP,not6,te7));
           TypeFld t = mptr("true" , 9,TypeStruct.make(NO_DSP,not4,te5));
           return TypeMemPtr.make(11,TypeStruct.make(NO_DSP,bs,f,t));
@@ -983,12 +983,12 @@ all
           TypeFld f = TypeFld.make("false",tf);
           TypeFld t = TypeFld.make("true",tf);
 
-          TypeFld s = mfun("s",35);
+          TypeFld s = mfun("s",33);
 
           TypeFld pred = mfun(1,"pred",Type.XSCALAR,14);
-          TypeFld zero = mfun(1,"zero",tf,25);
-          TypeFld add_ = mfun("add_"  ,27);
-          TypeFld succ = mfun("succ"  ,26);
+          TypeFld zero = mfun(1,"zero",tf,23);
+          TypeFld add_ = mfun("add_"  ,25);
+          TypeFld succ = mfun("succ"  ,24);
           TypeFld z = TypeFld.make("z",TypeMemPtr.make(BitsAlias.make0(12),TypeStruct.make(NO_DSP,pred,zero,add_,succ)));
           return TypeMemPtr.make(BitsAlias.make0(14),TypeStruct.make(NO_DSP,f,t,s,z));
         });
@@ -1025,11 +1025,12 @@ maybepet = petcage.get;
         "(nflt32,nflt32,*[4]str)",
         "(nflt32,nflt32,*[4]str)",
         // With lift ON
-        TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.STRPTR)),
-        TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.STRPTR)));
+        //TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.STRPTR)),
+        //TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.STRPTR)));
         // With lift OFF
-        //TypeMemPtr.make(8, make_tups(Type.SCALAR  , Type.SCALAR  , TypeMemPtr.STRPTR)),
-        //TypeMemPtr.make(8, make_tups(Type.SCALAR  , Type.SCALAR  , TypeMemPtr.STRPTR)) );
+        TypeMemPtr.make(8, make_tups(Type.SCALAR  , Type.SCALAR  , TypeMemPtr.STRPTR)),
+        // Needs cutoff==2 or HM to discover .name field is a string
+        TypeMemPtr.make(8, make_tups(Type.SCALAR  , Type.SCALAR  , Type.SCALAR)) );
   }
 
 }
