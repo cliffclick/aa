@@ -790,7 +790,10 @@ public class HM {
       TypeFunPtr tfp = (TypeFunPtr)flow;
       if( tfp._fidxs == BitsFun.EMPTY )
         return Type.XSCALAR; // Nothing being called, stay high
-      if( work!=null )
+      if( work!=null &&
+          // 'ALL' happens from functions being passed in via Root (top-level
+          // arguments), and are not any local function being analyzed.
+          tfp._fidxs != BitsFun.NZERO )
         for( int fidx : tfp._fidxs ) {
           Lambda lambda = Lambda.FUNS.get(fidx);
           if( lambda._applys.find(this) == -1 ) {
@@ -824,8 +827,9 @@ public class HM {
       int argn = Util.find(_args,child);
 
       // visit all Lambdas; meet the child flow into the Lambda arg#
-      for( int fidx : tfp._fidxs )
-        Lambda.FUNS.get(fidx).arg_meet(argn,child._flow,work);
+      if( tfp._fidxs != BitsFun.NZERO )
+        for( int fidx : tfp._fidxs )
+          Lambda.FUNS.get(fidx).arg_meet(argn,child._flow,work);
     }
 
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
@@ -863,11 +867,6 @@ public class HM {
       return _fun._flow;
     }
 
-    //@Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
-    //  int cnt = super.prep_tree(par,nongen,work);
-    //  _hmt.push_update(this);
-    //  return cnt;
-    //}
     // After GCP stability, we guess (badly) that all escaping functions
     // are called by folks outside of Root with the worst possible args.
     // TODO: Force programmer type annotations for module entry points.
@@ -894,8 +893,11 @@ public class HM {
         // Meet the actuals over the formals.
         for( int fidx : ((TypeFunPtr)flow)._fidxs ) {
           Lambda fun = Lambda.FUNS.get(fidx);
-          for( int i=0; i<fun._types.length; i++ )
-            fun.arg_meet(i,Type.SCALAR,work);
+          for( int i=0; i<fun._types.length; i++ ) {
+            // GCP external argument limited to HM compatible type
+            Type aflow = DO_HM ? fun.targ(i).as_flow() : Type.SCALAR;
+            fun.arg_meet(i,aflow,work);
+          }
           if( fun instanceof PrimSyn ) work.add(fun);
         }
       }
@@ -1609,51 +1611,51 @@ public class HM {
 
     // No function arguments, just function returns.
     static final NonBlockingHashMapLong<Type> ADUPS = new NonBlockingHashMapLong<>();
-    //Type as_flow() {
-    //  assert ADUPS.isEmpty();
-    //  Type t = _as_flow();
-    //  ADUPS.clear();
-    //  return t;
-    //}
-    //Type _as_flow() {
-    //  assert !unified();
-    //  if( is_leaf() )
-    //    return ROOT_FREEZE ? Type.SCALAR : Type.XNSCALR;
-    //  if( is_base() ) return _flow;
-    //  if( is_nil()  )
-    //    return ROOT_FREEZE ? Type.SCALAR : Type.XNSCALR;
-    //  if( is_fun()  ) {
-    //    Type tfun = ADUPS.get(_uid);
-    //    if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
-    //    ADUPS.put(_uid, Type.XSCALAR);
-    //    Type rez = arg("ret")._as_flow();
-    //    return TypeFunPtr.make(ROOT_FREEZE ? BitsFun.NZERO : _fidxs,size()-1,Type.ANY,rez);
-    //  }
-    //  if( is_struct() ) {
-    //    TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);
-    //    if( tstr==null ) {
-    //      // Returning a high version of struct
-    //      if( !ROOT_FREEZE ) return Type.XNSCALR;
-    //      Type.RECURSIVE_MEET++;
-    //      tstr = TypeStruct.malloc("",is_open(),false).add_fld(TypeFld.NO_DISP);
-    //      if( _args!=null )
-    //        for( String id : _args.keySet() )
-    //          tstr.add_fld(TypeFld.malloc(id));
-    //      tstr.set_hash();
-    //      ADUPS.put(_uid,tstr); // Stop cycles
-    //      if( _args!=null )
-    //        for( String id : _args.keySet() )
-    //          tstr.get(id).setX(arg(id)._as_flow()); // Recursive
-    //      if( --Type.RECURSIVE_MEET == 0 )
-    //        // Shrink / remove cycle dups.  Might make new (smaller)
-    //        // TypeStructs, so keep RECURSIVE_MEET enabled.
-    //        tstr = tstr.install();
-    //    }
-    //    return TypeMemPtr.make(_aliases,tstr);
-    //  }
-    //
-    //  throw unimpl();
-    //}
+    Type as_flow() {
+      assert ADUPS.isEmpty();
+      Type t = _as_flow();
+      ADUPS.clear();
+      return t;
+    }
+    Type _as_flow() {
+      assert !unified();
+      if( is_leaf() )
+        return ROOT_FREEZE ? Type.SCALAR : Type.XNSCALR;
+      if( is_base() ) return _flow;
+      if( is_nil()  )
+        return ROOT_FREEZE ? Type.SCALAR : Type.XNSCALR;
+      if( is_fun()  ) {
+        Type tfun = ADUPS.get(_uid);
+        if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
+        ADUPS.put(_uid, Type.XSCALAR);
+        Type rez = arg("ret")._as_flow();
+        return TypeFunPtr.make(ROOT_FREEZE ? BitsFun.NZERO : _fidxs,size()-1,Type.ANY,rez);
+      }
+      if( is_struct() ) {
+        TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);
+        if( tstr==null ) {
+          // Returning a high version of struct
+          if( !ROOT_FREEZE ) return Type.XNSCALR;
+          Type.RECURSIVE_MEET++;
+          tstr = TypeStruct.malloc("",is_open(),false).add_fld(TypeFld.NO_DISP);
+          if( _args!=null )
+            for( String id : _args.keySet() )
+              tstr.add_fld(TypeFld.malloc(id));
+          tstr.set_hash();
+          ADUPS.put(_uid,tstr); // Stop cycles
+          if( _args!=null )
+            for( String id : _args.keySet() )
+              tstr.get(id).setX(arg(id)._as_flow()); // Recursive
+          if( --Type.RECURSIVE_MEET == 0 )
+            // Shrink / remove cycle dups.  Might make new (smaller)
+            // TypeStructs, so keep RECURSIVE_MEET enabled.
+            tstr = tstr.install();
+        }
+        return TypeMemPtr.make(_aliases,tstr);
+      }
+
+      throw unimpl();
+    }
 
 
     // -----------------
@@ -1842,10 +1844,8 @@ public class HM {
 
     // Insert a new field
     private boolean add_fld(String id, T2 fld, Work<Syntax> work) {
-      if( _args==null ) {
-        _args = new NonBlockingHashMap<>();
-        fld.push_update(_deps);
-      }
+      if( _args==null ) _args = new NonBlockingHashMap<>();
+      fld.push_update(_deps);
       _args.put(id,fld);
       add_deps_work(work);
       return true;

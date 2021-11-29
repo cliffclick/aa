@@ -17,7 +17,7 @@ public class TestHM {
     if( frez_gcp!=null )  assertEquals(frez_gcp.get(),syn.flow_type());
   }
 
-  private static final int[] rseeds = new int[]{0,1,2,3,4,5,6,7};
+  private static final int[] rseeds = new int[]{6,0,1,2,3,4,5,6,7};
   private void _run1( String prog, String rez_hm, Supplier<Type> frez_gcp ) {
     for( int rseed : rseeds )
       _run0(prog,rez_hm,frez_gcp,rseed);
@@ -25,7 +25,7 @@ public class TestHM {
 
   // Run same program in all 3 combinations
   private void run( String prog, String rez_hm, Supplier<Type> frez_gcp ) {
-    //_run1(prog,rez_hm,frez_gcp);
+    _run1(prog,rez_hm,frez_gcp);
     _run1(prog,rez_hm,null    );
     _run1(prog,null  ,frez_gcp);
   }
@@ -35,7 +35,7 @@ public class TestHM {
 
   // Run same program in all 3 combinations, but answers vary across combos
   private void run( String prog, String rez_hm_gcp, String rez_hm_alone, Supplier<Type> frez_gcp_hm, Supplier<Type> frez_gcp_alone ) {
-    //_run1(prog,rez_hm_gcp  ,frez_gcp_hm   );
+    _run1(prog,rez_hm_gcp  ,frez_gcp_hm   );
     _run1(prog,rez_hm_alone,null          );
     _run1(prog,null        ,frez_gcp_alone);
   }
@@ -418,7 +418,7 @@ all = @{
     run("x = w = (x x); { z -> z}; (x { y -> y.u})",
         "A:Cannot unify { A -> A } and @{ u = A; ... }",
         "A:Cannot unify { A -> A } and @{ u = A; ... }",
-        Type.SCALAR,
+        tfs(Type.SCALAR),
         Type.SCALAR);
   }
 
@@ -1031,7 +1031,7 @@ maybepet = petcage.get;
         //TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.STRPTR)),
         //TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.STRPTR)));
         // With lift OFF
-        TypeMemPtr.make(8, make_tups(Type.SCALAR  , Type.SCALAR  , TypeMemPtr.STRPTR)),
+        TypeMemPtr.make(8, make_tups(Type.SCALAR  , Type.SCALAR  , Type.SCALAR)),
         // Needs cutoff==2 or HM to discover .name field is a string
         TypeMemPtr.make(8, make_tups(Type.SCALAR  , Type.SCALAR  , Type.SCALAR)) );
   }
