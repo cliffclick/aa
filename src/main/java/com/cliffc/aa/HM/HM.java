@@ -153,7 +153,7 @@ public class HM {
     pass3(prog);
 
     // Profiling print
-    System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+work_cnt+", T2s: "+(init_T2s-T2.CNT));
+    System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+work_cnt+", T2s: "+(T2.CNT-init_T2s));
     return prog;
   }
 
@@ -805,7 +805,7 @@ public class HM {
       // Have some functions, meet over their returns.
       Type rez = tfp._ret;
       // Attempt to lift the result, based on HM types.
-      if( DO_HM )
+      if( false && DO_HM )
         throw unimpl();
       return rez;
     }
@@ -972,20 +972,19 @@ public class HM {
       return sb;
     }
     @Override boolean hm(Work<Syntax> work) {
-      boolean progress = false;
-
       // Force result to be a struct with at least these fields.
       // Do not allocate a T2 unless we need to pick up fields.
       T2 rec = find();
       assert check_fields(rec);
+      rec.push_update(this);
 
       // Unify existing fields.  Ignore extras on either side.
+      boolean progress = false;
       for( int i=0; i<_ids.length; i++ ) {
         T2 fld = rec.arg(_ids[i]);
         if( fld!=null ) progress |= fld.unify(_flds[i].find(),work);
         if( work==null && progress ) return true;
       }
-      rec.push_update(this);
 
       return progress;
     }
@@ -1576,6 +1575,33 @@ public class HM {
     private long dbl_uid(T2 t) { return dbl_uid(t._uid); }
     private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
+    // True if any portion allows for nil
+    boolean has_nil() {
+      if(  _flow!=null &&  _flow.join(Type.NSCALR)!= _flow ) return true;
+      if( _eflow!=null && _eflow.join(Type.NSCALR)!=_eflow ) return true;
+      if( _fidxs  !=null && _fidxs  .test(0) ) return true;
+      if( _aliases!=null && _aliases.test(0) ) return true;
+      return false;
+    }
+
+    // Strip off nil
+    T2 strip_nil() {
+      if(    _flow!=null )    _flow =   _flow.join(Type.NSCALR);
+      if(   _eflow!=null )   _eflow =  _eflow.join(Type.NSCALR);
+      if(   _fidxs!=null )   _fidxs =  _fidxs.clear(0);
+      if( _aliases!=null ) _aliases =_aliases.clear(0);
+      return this;
+    }
+    // Add nil
+    T2 add_nil() {
+      if(    _flow!=null )    _flow =   _flow.meet(Type.NIL);
+      if(   _eflow!=null )   _eflow =  _eflow.meet(Type.NIL);
+      if(   _fidxs!=null )   _fidxs =  _fidxs.set(0);
+      if( _aliases!=null ) _aliases =_aliases.set(0);
+      return this;
+    }
+
+
     // -----------------
     // Recursively build a conservative flow type from an HM type.  The HM
     // is_struct wants to be a TypeMemPtr, but the recursive builder is built
@@ -1710,26 +1736,25 @@ public class HM {
     }
 
 
-    // U-F union; this is nilable and becomes that.
+    // U-F union; that is nilable and this becomes that.
     // No change if only testing, and reports progress.
     boolean unify_nil(T2 that, Work<Syntax> work) {
-      assert is_nil() && !that.is_nil();
-      if( work==null ) return true; // Will make progress
-      // Clone the top-level struct and make this nilable point to the clone;
-      // this will collapse into the clone at the next find() call.
-      // Unify the nilable leaf into that.
-      T2 leaf = arg("?");  assert leaf.is_leaf();
-      T2 copy = that.copy();
-      if( that.is_base() ) {
-        copy._flow = that._flow.join(Type.NSCALR);
-        if( that._eflow != null ) copy._eflow = that._eflow.join(Type.NSCALR);
-      }
-      if( that.is_fun() )
-        throw unimpl();
-      if( that.is_struct() )
-        copy._aliases = that._aliases.clear(0);
+      assert !is_nil() && that.is_nil();
+      if( work==null ) return true; // Will make progress;
+      T2 leaf = that.arg("?");  assert leaf.is_leaf();
       leaf.add_deps_work(work);
-      return leaf.union(copy,work) | that._union(find());
+      T2 copy = copy().strip_nil();
+      return leaf.union(copy,work) | _union(that);
+    }
+    // U-F union; that is nilable and a fresh copy of this becomes that.
+    // No change if only testing, and reports progress.
+    boolean unify_nil(T2 that, Work<Syntax> work, VStack nongen) {
+      assert !is_nil() && that.is_nil();
+      if( work==null ) return true; // Will make progress;
+      T2 leaf = that.arg("?");  assert leaf.is_leaf();
+      T2 copy = copy().strip_nil();
+      copy._fresh_unify(leaf,nongen,work);
+      return vput(that,true);
     }
 
     // -----------------
@@ -1765,8 +1790,8 @@ public class HM {
         return _uid<that._uid ? that.union(this,work) : this.union(that,work);
 
       // Special case for nilable union something
-      if( this.is_nil() && !that.is_nil() ) return this.unify_nil(that,work);
-      if( that.is_nil() && !this.is_nil() ) return that.unify_nil(this,work);
+      if( this.is_nil() && !that.is_nil() ) return that.unify_nil(this,work);
+      if( that.is_nil() && !this.is_nil() ) return this.unify_nil(that,work);
 
       // Cycle check
       long luid = dbl_uid(that);    // long-unique-id formed from this and that
@@ -1884,17 +1909,8 @@ public class HM {
         return vput(that,progress);
       }
       // That is nilable and this is not
-      if( that.is_nil() && !this.is_nil() ) {
-        if( work==null ) return true;
-        T2 copy = copy();
-        if( is_base  () ) copy._flow   = _flow   .join(Type.NSCALR);
-        if(_eflow!=null)  copy._eflow  = _eflow  .join(Type.NSCALR);
-        if( is_fun   () ) copy._fidxs  = _fidxs  .clear(0);
-        if( is_struct() ) copy._aliases= _aliases.clear(0);
-        T2 leaf = that.arg("?"); assert leaf.is_leaf();
-        copy._fresh_unify(leaf,nongen,work);
-        return vput(that,true);
-      }
+      if( that.is_nil() && !this.is_nil() )
+        return unify_nil(that,work,nongen);
 
       // Progress on the parts
       if( _flow!=null ) progress = unify_base(that, work);
@@ -1938,7 +1954,7 @@ public class HM {
         T2 rhs = that.arg(key);
         if( rhs==null ) {         // No RHS to unify against
           missing = true;         // Might be missing RHS
-          if( is_open() || that.is_open() ) {
+          if( is_open() || that.is_open() || lhs.is_err() ) {
             if( work==null ) return true; // Will definitely make progress
             T2 nrhs = lhs._fresh(nongen); // New RHS value
             if( !that.is_open() )

@@ -36,7 +36,7 @@ public class TestHM {
   // Run same program in all 3 combinations, but answers vary across combos
   private void run( String prog, String rez_hm_gcp, String rez_hm_alone, Supplier<Type> frez_gcp_hm, Supplier<Type> frez_gcp_alone ) {
     //_run1(prog,rez_hm_gcp  ,frez_gcp_hm   );
-    //_run1(prog,rez_hm_alone,null          );
+    _run1(prog,rez_hm_alone,null          );
     _run1(prog,null        ,frez_gcp_alone);
   }
   private void run( String prog, String rez_hm_gcp, String rez_hm_alone, Type rez_gcp_hm, Type rez_gcp_alone ) {
@@ -128,9 +128,9 @@ public class TestHM {
         "( 3, *[4]\"abc\")",
         // GCP with HM
         // With lift ON
-        TypeMemPtr.make(7,make_tups(TypeInt.con(3),TypeMemPtr.make(4,TypeStr.ABC))),
+        //TypeMemPtr.make(7,make_tups(TypeInt.con(3),TypeMemPtr.make(4,TypeStr.ABC))),
         // With lift OFF
-        //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
+        TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
         // GCP is weaker without HM
         tuplen2);
   }
@@ -173,9 +173,9 @@ public class TestHM {
         "( *[4]str, flt64)",
         "( *[4]str, flt64)",
         // With lift ON
-        TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeFlt.FLT64)),
+        //TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeFlt.FLT64)),
         // With lift OFF
-        //TypeMemPtr.make(7,make_tups(Type.SCALAR,Type.SCALAR)),
+        TypeMemPtr.make(7,make_tups(Type.SCALAR,Type.SCALAR)),
         tuple2);
   }
 
@@ -241,9 +241,9 @@ map ={fun parg -> (fun (cdr parg))};
         "( *[4]str, int1)",
         "( *[4]str, int1)",
         // With Lift ON
-        TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeInt.BOOL)),
+        //TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeInt.BOOL)),
         // With Lift OFF
-        //tuple2,
+        tuple2,
         tuple2);
   }
 
@@ -284,9 +284,9 @@ all = @{
         "( 3, *[4]\"abc\")",
         "( 3, *[4]\"abc\")",
         // With lift On
-        TypeMemPtr.make(7,make_tups(TypeInt.con(3),TypeMemPtr.make(4,TypeStr.ABC))),
+        //TypeMemPtr.make(7,make_tups(TypeInt.con(3),TypeMemPtr.make(4,TypeStr.ABC))),
         // With lift Off
-        //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
+        TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
         tuplen2);
   }
 
@@ -357,14 +357,14 @@ all = @{
   @Test public void test33() {
     run("map = { fcn lst -> (if lst @{ n1=(map fcn lst.n0), v1=(fcn lst.v0) } 0) }; map",
         "{ { A -> B } C:@{ n0 = C; v0 = A; ...}? -> D:@{ n1 = D; v1 = B}? }",
-        tfs(TypeMemPtr.make_nil(9,TypeStruct.make(NO_DSP,TypeFld.make("n1",Type.SCALAR),TypeFld.make("v1",Type.SCALAR)))));
+        ()->tfs(TypeMemPtr.make_nil(9,TypeStruct.make(NO_DSP,TypeFld.make("n1",Type.SCALAR),TypeFld.make("v1",Type.SCALAR)))));
   }
 
   // Recursive linked-list discovery, with no end clause
   @Test public void test34() {
     run("map = { fcn lst -> (if lst @{ n1 = (map fcn lst.n0), v1 = (fcn lst.v0) } 0) }; (map dec @{n0 = 0, v0 = 5})",
         "A:@{ n1 = A; v1 = int64}?",
-        TypeMemPtr.make_nil(9,TypeStruct.make(NO_DSP,TypeFld.make("n1",Type.SCALAR),TypeFld.make("v1",TypeInt.con(4)))));
+        ()->TypeMemPtr.make_nil(9,TypeStruct.make(NO_DSP,TypeFld.make("n1",Type.SCALAR),TypeFld.make("v1",TypeInt.con(4)))));
   }
 
   // try the worse-case expo blow-up test case from SO
@@ -441,9 +441,9 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
         "( *[4]str, int1)",
         "( *[4]str, int1)",
         // With lift ON
-        TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeInt.BOOL)),
+        //TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeInt.BOOL)),
         // With lift OFF
-        //tuple2,
+        tuple2,
         tuple2);
   }
 
@@ -487,11 +487,11 @@ loop = { name cnt ->
 (loop "def" (id 2))
 """,
         "*[0,4]str?",  // Both HM and GCP
-        "Cannot unify int8 and *[0,4]str?", // HM alone cannot do this one
+        "Cannot unify 3 and *[4]str", // HM alone cannot do this one
         // With lift ON
-        TypeMemPtr.make(4,TypeStr.STR), // Both HM and GCP
+        //TypeMemPtr.make(4,TypeStr.STR), // Both HM and GCP
         // With lift OFF
-        //Type.NSCALR,
+        Type.NSCALR,
         Type.NSCALR);                   // GCP alone gets a very weak answer
   }
 
@@ -535,7 +535,10 @@ loop = { name cnt ->
 """,
         "{ A? -> ( 3, May be nil when loading field x ) }",
         "{ A? -> ( 3, May be nil when loading field x ) }",
-        tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(3), TypeInt.con(5) ))),
+        // With lift ON
+        // tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(3), TypeInt.con(5) ))),
+        tfs(TypeMemPtr.make(7,make_tups(TypeInt.NINT8 , TypeInt.NINT8 ))),
+        // With lift OFF
         tfs(TypeMemPtr.make(7,make_tups(TypeInt.NINT8 , TypeInt.NINT8 ))));
   }
 
