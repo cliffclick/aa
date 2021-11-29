@@ -603,7 +603,7 @@ public class HM {
       sb.p("{ ");
       for( int i=0; i<_args.length; i++ ) {
         sb.p(_args[i]);
-        if( DO_HM  ) sb.p(", HMT=" ).p(targ(i).toString());
+        if( DO_HM  ) _targs[i].str(sb.p(", HMT=" ),new VBitSet(),dups,true);
         if( DO_GCP ) sb.p(", GCP=").p(_types[i]);
         sb.nl().i().p("  ");
       }
@@ -2048,6 +2048,7 @@ public class HM {
       assert !unified() && !t.unified();
       if( this==t ) return true;
       if( _flow   !=t._flow    ) return false; // Base-cases have to be completely identical
+      if( _eflow  !=t._eflow   ) return false;
       if( _fidxs  !=t._fidxs   ) return false; // Base-cases have to be completely identical
       if( _aliases!=t._aliases ) return false; // Base-cases have to be completely identical
       if( _err!=null && !_err.equals(t._err) ) return false; // Base-cases have to be completely identical

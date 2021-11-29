@@ -487,7 +487,7 @@ loop = { name cnt ->
 (loop "def" (id 2))
 """,
         "*[0,4]str?",  // Both HM and GCP
-        "Cannot unify 3 and *[4]str", // HM alone cannot do this one
+        "Cannot unify int8 and *[0,4]str?", // HM alone cannot do this one
         // With lift ON
         //TypeMemPtr.make(4,TypeStr.STR), // Both HM and GCP
         // With lift OFF
