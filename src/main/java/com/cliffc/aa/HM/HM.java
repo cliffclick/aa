@@ -1754,8 +1754,12 @@ public class HM {
       assert !is_nil() && that.is_nil();
       if( work==null ) return true; // Will make progress;
       T2 leaf = that.arg("?");  assert leaf.is_leaf();
-      T2 copy = copy().strip_nil();
-      copy._fresh_unify(leaf,nongen,work);
+      // A shallow copy and fresh-unify fails if 'this' is cyclic, because the
+      // shallow copy peels one part of the loop.
+      //T2 copy = copy().strip_nil();
+      //copy._fresh_unify(leaf,nongen,work);
+      T2 copy = _fresh(nongen).strip_nil();
+      copy._unify(leaf,work);
       return vput(that,true);
     }
 
