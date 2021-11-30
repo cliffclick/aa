@@ -1,4 +1,33 @@
 =======================================
+11/29/2021
+
+And now i need a monotonic Apply-Lift for the combo HM+GCP.
+Failed previously for being not-monotonic.
+Theory:
+- if a T2 appears on the input of an Apply, and a GCP is structurally the same,
+- THEN if the T2 appears on the output, we can assert the input & output are the
+  same flow type, and JOIN the input flow to the output flow.
+
+- TO be monotonic, if any T2 leaf might join with any other, we must assume they will
+  before the HMTs become stable.
+  
+- If the GCPs are high after stability ... we'll become unstable.  The falling
+  GCP will trigger an IF to unify both sides which will split the T2s.  But
+  which T2 do we split?
+
+- Haven't thot thru similar bases unifying like leaves.
+- Haven't thot thru diff    bases unifying like leaves - and being errors.
+
+- Periodically what starts as a T2 leaf (so can join) becomes structure.  We
+  lose the joining.  Assume GCP follows the T2.  Should be no (effective) join
+  lossage: GCP should be XSCALAR until it follows.
+
+- Keep result as XSCALAR, until T2 and GCP are in-sync structurally
+- Or we stop the extra-lift, which means quit pre-joining all T2s.
+- - If GCP is still high here, "we have a situation"
+
+
+=======================================
 
 Pondering time for the major tech-debt cleanup
 
