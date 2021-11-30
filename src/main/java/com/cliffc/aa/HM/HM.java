@@ -109,9 +109,7 @@ public class HM {
   static boolean DO_HM ;
   static boolean DO_GCP;
 
-  static boolean DO_NOTNIL=true;
   static boolean HM_FREEZE;
-  static boolean ROOT_FREEZE;
   public static Root hm( String sprog, int rseed, boolean do_hm, boolean do_gcp ) {
     Type.RECURSIVE_MEET=0;      // Reset between failed tests
     DO_HM  = do_hm ;
@@ -131,13 +129,12 @@ public class HM {
     int work_cnt=0;
     int init_T2s = T2.CNT;  // Profiling bit
     HM_FREEZE = false;
-    ROOT_FREEZE = false;
     work_cnt+=main_work_loop(prog,work);
     assert prog.more_work(work);
 
     // Pass 2: Give up on the Root GCP arg types.  Drop them to the best Root
     // approximation and never lift again.
-    ROOT_FREEZE = true;
+    // TODO: Combine pass2 & pass3
     prog.update_root_args(work);
     work_cnt+=main_work_loop(prog,work);
     assert prog.more_work(work);
@@ -150,7 +147,7 @@ public class HM {
     assert prog.more_work(work);
 
     // Pass 4: Error propagation, no types change.
-    pass3(prog);
+    pass4(prog);
 
     // Profiling print
     System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+work_cnt+", T2s: "+(T2.CNT-init_T2s));
@@ -190,16 +187,15 @@ public class HM {
     return cnt;
   }
 
-  static void pass3(Root prog) {
+  static void pass4(Root prog) {
     prog.visit( syn -> {
         T2 self = syn.find();
         if( syn instanceof Field ) {
           Field fld = (Field)syn;
           T2 rec = fld._rec.find();
           if( !self.is_err() && rec.is_err2() && rec.is_struct() && rec.is_open() ) {
-            BitsAlias old = rec._aliases; rec._aliases=null;  // Turn off struct-ness for print
+            rec._aliases=null;  // Turn off struct-ness for print
             self._err = "Missing field "+fld._id+" in "+rec.p();
-            //rec._aliases = old;
           }
           String err = self._err;
           T2 fldt2 = rec.get(fld._id);
@@ -210,23 +206,12 @@ public class HM {
           if( rec.is_nil() || (rec._aliases != null && rec._aliases.test(0)) )
             self._err = "May be nil when loading field "+fld._id;
         }
-        if( self.is_err2() ) {
+        if( self.is_err2() && self.has_nil() )
           // If any contain nil, then we may have folded in a not-nil.
           // To preserve monotonicity, we make them all nil.
           // Example: (3.unify(notnil)).unify("abc") ==       int8     .unify("abc")  == (Error int8,"abc" ) <<-- Should be "abc"?
           // Example:  3.unify("abc")).unify(notnil) == (Error 3,"abc").unify(notnil) == (Error int8,"abc"?)
-          boolean nil =
-            (self. _flow  !=null && self. _flow  .must_nil()) ||
-            (self._eflow  !=null && self._eflow  .must_nil()) ||
-            (self._fidxs  !=null && self._fidxs  .test(0)   ) ||
-            (self._aliases!=null && self._aliases.test(0)   );
-          if( nil ) {
-            if( self. _flow  !=null ) self. _flow   = self. _flow  .meet(Type.NIL);
-            if( self._eflow  !=null ) self._eflow   = self._eflow  .meet(Type.NIL);
-            if( self._fidxs  !=null ) self._fidxs   = self._fidxs  .set(0);
-            if( self._aliases!=null ) self._aliases = self._aliases.set(0);
-          }
-        }
+          self.add_nil();
         return null;
       }, (a,b)->null);
   }
@@ -266,8 +251,7 @@ public class HM {
       while( skipWS()!= ')' && X<BUF.length ) args.push(fterm());
       require(')');
       // Guarding if-nil test inserts an upcast.  This is a syntactic transform only.
-      if( DO_NOTNIL &&
-          fun instanceof If &&
+      if( fun instanceof If &&
           args.at(0) instanceof Ident ) {
         Ident id = (Ident)args.at(0);
         args.set(1,new Apply(new Lambda(args.at(1), id._name),
@@ -880,12 +864,12 @@ public class HM {
       Type flow = _fun._flow;
       if( DO_GCP && !flow.above_center() ) {
         RVISIT.clear();
-        walk(flow,work);
+        _walk_root_funs(flow,work);
       }
 
     }
     // TODO: Type walker
-    private static void walk( Type flow, Work<Syntax> work) {
+    private static void _walk_root_funs( Type flow, Work<Syntax> work) {
       if( RVISIT.tset(flow._uid) ) return;
         // Find any functions
       if( flow instanceof TypeFunPtr ) {
@@ -908,7 +892,7 @@ public class HM {
         if( tmp._obj instanceof TypeStr ) return;
         TypeStruct ts = ((TypeStruct)tmp._obj);
         for( TypeFld fld : ts.flds() )
-          walk(fld._t,work);
+          _walk_root_funs(fld._t,work);
       }
     }
     // TODO: T2 walker
@@ -1015,7 +999,7 @@ public class HM {
     @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) { work.add(this); }
 
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
-      prep_tree_impl(par, nongen, work, T2.make_struct(false,BitsAlias.make0(_alias),null,null));
+      prep_tree_impl(par, nongen, work, T2.make_open_struct(BitsAlias.make0(_alias),null,null));
       int cnt = 1;              // One for self
       T2[] t2s = new T2[_ids.length];
       if( _ids.length!=0 ) _hmt._args = new NonBlockingHashMap<>();
@@ -1163,7 +1147,7 @@ public class HM {
     @Override String name() { return "pair"; }
     static private T2 var1,var2;
     public Pair() {
-      super(var1=T2.make_leaf(),var2=T2.make_leaf(),T2.make_struct(false,BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{var1,var2}));
+      super(var1=T2.make_leaf(),var2=T2.make_leaf(),T2.make_open_struct(BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{var1,var2}));
     }
     @Override PrimSyn make() { return new Pair(); }
     @Override Type apply(Type[] flows) {
@@ -1181,7 +1165,7 @@ public class HM {
   static class Triple extends PrimSyn {
     @Override String name() { return "triple"; }
     static private T2 var1,var2,var3;
-    public Triple() { super(var1=T2.make_leaf(),var2=T2.make_leaf(),var3=T2.make_leaf(),T2.make_struct(false,BitsAlias.make0(TRIPLE_ALIAS),new String[]{"0","1","2"},new T2[]{var1,var2,var3})); }
+    public Triple() { super(var1=T2.make_leaf(),var2=T2.make_leaf(),var3=T2.make_leaf(),T2.make_open_struct(BitsAlias.make0(TRIPLE_ALIAS),new String[]{"0","1","2"},new T2[]{var1,var2,var3})); }
     @Override PrimSyn make() { return new Triple(); }
     @Override Type apply(Type[] flows) {
       TypeFld[] ts = new TypeFld[flows.length+1];
@@ -1510,14 +1494,14 @@ public class HM {
       return t2;
     }
     // A struct with fields
-    static T2 make_struct( boolean open, BitsAlias aliases, String[] ids, T2[] flds ) {
+    static T2 make_open_struct( BitsAlias aliases, String[] ids, T2[] flds ) {
       NonBlockingHashMap<String,T2> args = ids==null ? null : new NonBlockingHashMap<>();
       if( ids!=null )
         for( int i=0; i<ids.length; i++ )
           args.put(ids[i],flds[i]);
       T2 t2 = new T2(args);
       t2._aliases = aliases;
-      t2._open = open;
+      t2._open = false;
       return t2;
     }
 
@@ -1579,10 +1563,10 @@ public class HM {
 
     // True if any portion allows for nil
     boolean has_nil() {
-      if(  _flow!=null &&  _flow.join(Type.NSCALR)!= _flow ) return true;
-      if( _eflow!=null && _eflow.join(Type.NSCALR)!=_eflow ) return true;
-      if( _fidxs  !=null && _fidxs  .test(0) ) return true;
-      if( _aliases!=null && _aliases.test(0) ) return true;
+      if(  _flow  !=null &&  _flow.must_nil() ) return true;
+      if( _eflow  !=null && _eflow.must_nil() ) return true;
+      if( _fidxs  !=null && _fidxs   .test(0) ) return true;
+      if( _aliases!=null && _aliases .test(0) ) return true;
       return false;
     }
 
@@ -1595,12 +1579,11 @@ public class HM {
       return this;
     }
     // Add nil
-    T2 add_nil() {
+    void add_nil() {
       if(    _flow!=null )    _flow =   _flow.meet(Type.NIL);
       if(   _eflow!=null )   _eflow =  _eflow.meet(Type.NIL);
       if(   _fidxs!=null )   _fidxs =  _fidxs.set(0);
       if( _aliases!=null ) _aliases =_aliases.set(0);
-      return this;
     }
 
 
@@ -1619,23 +1602,20 @@ public class HM {
     }
     Type _as_flow() {
       assert !unified();
-      if( is_leaf() )
-        return ROOT_FREEZE ? Type.SCALAR : Type.XNSCALR;
+      if( is_leaf() ) return Type.SCALAR;
       if( is_base() ) return _flow;
-      if( is_nil()  )
-        return ROOT_FREEZE ? Type.SCALAR : Type.XNSCALR;
+      if( is_nil()  ) return Type.SCALAR;
       if( is_fun()  ) {
         Type tfun = ADUPS.get(_uid);
         if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
         ADUPS.put(_uid, Type.XSCALAR);
         Type rez = arg("ret")._as_flow();
-        return TypeFunPtr.make(ROOT_FREEZE ? BitsFun.NZERO : _fidxs,size()-1,Type.ANY,rez);
+        return TypeFunPtr.make(BitsFun.NZERO,size()-1,Type.ANY,rez);
       }
       if( is_struct() ) {
         TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);
         if( tstr==null ) {
           // Returning a high version of struct
-          if( !ROOT_FREEZE ) return Type.XNSCALR;
           Type.RECURSIVE_MEET++;
           tstr = TypeStruct.malloc("",is_open(),false).add_fld(TypeFld.NO_DISP);
           if( _args!=null )
@@ -2286,7 +2266,7 @@ public class HM {
     // Does NOT roll-up U-F, has no side-effects.
     SB str(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
       boolean dup = dups.get(_uid);
-      if( !debug && unified() ) return find().str(sb,visit,dups,debug);
+      if( !debug && unified() ) return find().str(sb,visit,dups,false);
       if( unified() || (is_leaf() && _err==null) ) {
         vname(sb,debug);
         return unified() ? _args.get(">>").str(sb.p(">>"), visit, dups, debug) : sb;
@@ -2304,7 +2284,7 @@ public class HM {
         if( is_err2() ) {
           sb.p("Cannot unify ");
           if( is_fun   () ) str_fun   (sb,visit,dups,debug).p(" and ");
-          if( is_base  () ) str_base  (sb,visit,dups,debug).p(" and ");
+          if( is_base  () ) str_base  (sb)                 .p(" and ");
           if( _eflow!=null) sb.p(_eflow)                   .p(" and ");
           if( is_struct() ) str_struct(sb,visit,dups,debug).p(" and ");
           return sb.unchar(5);
@@ -2312,19 +2292,10 @@ public class HM {
         return sb.p(_err);      // Just a simple error
       }
 
-      if( is_base() )
-        return str_base(sb,visit,dups,debug);
-
-      // Special printing for functions
-      if( is_fun() )
-        return str_fun(sb,visit,dups,debug);
-
-      // Special printing for structures
-      if( is_struct() )
-        return str_struct(sb,visit,dups,debug);
-
-      if( is_nil() )
-        return str0(sb,visit,arg("?"),dups,debug).p('?');
+      if( is_base  () ) return str_base(sb);
+      if( is_fun   () ) return str_fun(sb,visit,dups,debug);
+      if( is_struct() ) return str_struct(sb,visit,dups,debug);
+      if( is_nil   () ) return str0(sb,visit,arg("?"),dups,debug).p('?');
 
       // Generic structural T2
       sb.p("( ");
@@ -2334,9 +2305,7 @@ public class HM {
       return sb.unchar().p(")");
     }
     static private SB str0(SB sb, VBitSet visit, T2 t, VBitSet dups, boolean debug) { return t==null ? sb.p("_") : t.str(sb,visit,dups,debug); }
-    private SB str_base(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
-      return sb.p(_flow);
-    }
+    private SB str_base(SB sb) { return sb.p(_flow); }
     private SB str_fun(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
       if( debug ) _fidxs.clear(0).str(sb);
       sb.p("{ ");
@@ -2377,9 +2346,7 @@ public class HM {
     }
     private boolean is_tup() { return _args==null || _args.isEmpty() || _args.containsKey("0"); }
     private Collection<String> sorted_flds() { return new TreeMap<>(_args).keySet(); }
-    boolean is_prim() {
-      return is_struct() && _args!=null && _args.containsKey("!");
-    }
+    boolean is_prim() { return is_struct() && _args!=null && _args.containsKey("!"); }
 
     // Debugging tool
     T2 find(int uid) { return _find(uid,new VBitSet()); }
