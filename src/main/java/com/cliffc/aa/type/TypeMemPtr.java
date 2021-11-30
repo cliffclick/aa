@@ -206,6 +206,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     BitsAlias bits = _aliases.not_nil();
     return bits==_aliases ? this : make(bits,_obj);
   }
+  @Override public Type remove_nil() {
+    BitsAlias bits = _aliases.clear(0);
+    return bits==_aliases ? this : make(bits,_obj);
+  }
   @Override public Type meet_nil(Type nil) {
     assert nil==NIL || nil==XNIL;
     // See testLattice15.

@@ -837,6 +837,16 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       default -> throw typerr(null); // Overridden in subclass
     };
   }
+  // Return the type without a nil.  Only applies to below_center types,
+  // as these are the only types with a nil.
+  public Type remove_nil() {
+    return switch( _type ) {
+      case TNIL -> XNSCALR;
+      case TSCALAR -> NSCALR;
+      case TNSCALR -> this; // No nil already
+      default -> throw typerr(null);         // Overridden in subclass
+    };
+  }
   public Type meet_nil(Type nil) {
     assert nil==NIL || nil==XNIL;
     return switch( _type ) {

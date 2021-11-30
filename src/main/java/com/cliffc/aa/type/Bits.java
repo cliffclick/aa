@@ -65,7 +65,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // The NIL bit has both meet & join flavors, required for a lattice.
   long[] _bits;   // Bits set or null for a single bit
   int _con;       // value of single bit
-  int _hash;      // Pre-computed hashcode
+  public int _hash;// Pre-computed hashcode
   // Intern: lookup and return an existing Bits or install in hashmap and
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
   abstract B make_impl(int con, long[] bits );

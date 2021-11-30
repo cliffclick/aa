@@ -188,6 +188,12 @@ public class TypeInt extends Type<TypeInt> {
     // Never had a nil choice
     return this;
   }
+  @Override public Type remove_nil() {
+    if( _x > 0 ) return this;
+    if( _x==0 && _con!=0 ) return this; // Non-zero constant
+    if( this==BOOL ) return TRUE; // Removing 0 from a range 0-1 leaves only 1
+    throw unimpl();
+  }
   @Override public Type meet_nil(Type nil) {
     if( nil==Type.XNIL )
       return _x==2 ? Type.XNIL : (_x==-2 || (_x==0&&_con==0)? Type.SCALAR : Type.NSCALR);

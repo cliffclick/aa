@@ -110,6 +110,7 @@ public class HM {
   static boolean DO_GCP;
 
   static boolean HM_FREEZE;
+  static boolean DO_LIFT=true;
   public static Root hm( String sprog, int rseed, boolean do_hm, boolean do_gcp ) {
     Type.RECURSIVE_MEET=0;      // Reset between failed tests
     DO_HM  = do_hm ;
@@ -768,11 +769,13 @@ public class HM {
       work.add(_par);
       work.add(_args);
     }
-    @Override Type val(Work<Syntax> work) {
+
+    // Record call-site actual arguments on lambda formals
+    Type _val( Work<Syntax> work ) {
       Type flow = _fun._flow;
       if( !(flow instanceof TypeFunPtr) ) return flow.oob(Type.SCALAR);
       TypeFunPtr tfp = (TypeFunPtr)flow;
-      if( tfp._fidxs == BitsFun.EMPTY )
+      if( tfp._fidxs == BitsFun.EMPTY || (DO_HM && !_fun.find().is_fun()) )
         return Type.XSCALAR; // Nothing being called, stay high
       if( work!=null &&
           // 'ALL' happens from functions being passed in via Root (top-level
@@ -789,12 +792,61 @@ public class HM {
               work.add(lambda);             // But primitives re-apply arguments
           }
       }
+      return flow;
+    }
+
+    @Override Type val(Work<Syntax> work) {
+      Type flow = _val(work);
+      if( !(flow instanceof TypeFunPtr) ) return flow;
+      TypeFunPtr tfp = (TypeFunPtr)flow;
       // Have some functions, meet over their returns.
-      Type rez = tfp._ret;
+      Type ret = tfp._ret;
       // Attempt to lift the result, based on HM types.
-      if( false && DO_HM )
-        throw unimpl();
-      return rez;
+      if( DO_LIFT && DO_HM ) {
+        assert _flow.isa(ret) ; // Monotonic...
+        Type lift = hm_apply_lift(find(),ret);
+        assert _flow.isa(lift) ; // Monotonic...
+        ret = lift; // Upgrade
+      }
+      return ret;
+    }
+
+
+    // Walk the input HM type and CCP flow type in parallel and create a
+    // mapping.  Then walk the output HM type and CCP flow type in parallel,
+    // and join output CCP types with the matching input CCP type.
+
+    // Walk the input types, finding all the Leafs.  Repeats of the same Leaf
+    // has its flow Types MEETed.  If HM_FREEZE, then these are the exact
+    // Leafs.  If !HM_FREEZE, then all Leafs are assumed unified and all their
+    // corresponding flows are JOINed.
+    Type hm_apply_lift(T2 rezt2, Type ret) {
+      // The resulting type is used to lift the result via a JOIN.
+      T2.T2MAP.clear();
+      for( Syntax arg : _args )
+        { T2.WDUPS.clear(true); arg.find().walk_types_in(arg._flow); }
+
+      // If !HM_FREEZE, pre-compute a monolithic JOIN.
+      // Any leaf or base may unify with any other.
+      Type jt = null;
+      if( !HM_FREEZE ) {
+        jt = Type.SCALAR;
+        for( T2 t2 : T2.T2MAP.keySet() )
+          if( t2.is_leaf() || t2.is_base() )
+            jt = jt.join(T2.T2MAP.get(t2));
+      }
+
+      // Then walk the output types, building a corresponding flow Type, but
+      // matching against input Leafs.  If HM_FREEZE Leafs must match
+      // exactly, replacing the input flow Type with the corresponding flow
+      // Type.  If !HM_FREEZE, replace with the one flow Type.
+      T2.WDUPS.clear(true);  T2.WBS.clear();
+      Type lift = rezt2.walk_types_out(ret, jt, this);
+      //if( lift != rez && lift==jt ) // Lifting looks like the leaf-join
+      //  for( T2 t2 : T2.T2MAP.keySet() ) // So depend on all leafs.  TODO: be more exact
+      //    t2.push_update(this);
+      //return rez.join(lift);    // Lifted result
+      return ret;
     }
 
     @Override void add_val_work( Syntax child, @NotNull Work<Syntax> work) {
@@ -840,6 +892,11 @@ public class HM {
 
 
   // -----------------
+
+  // Root is nearly, but not quite, an Apply.  The _fun field does NOT have to
+  // hold a Lambda; it can be anything.  Hence, the _hmt is just a copy of the
+  // _fun field (and NOT the function's result - which is what Apply does).
+  //
   static class Root extends Apply {
     static final Type[] FLOWS = new Type[0];
     Root(Syntax body) { super(body); }
@@ -847,8 +904,21 @@ public class HM {
     @Override boolean hm(final Work<Syntax> work) { return find().unify(_fun.find(),work); }
     @Override void add_hm_work( @NotNull Work<Syntax> work) { }
     @Override Type val(Work<Syntax> work) {
-      super.val(work);
-      return _fun._flow;
+      _val(work);
+      Type flow = _fun._flow;
+      T2 fun = _fun.find();
+      if( !fun.is_fun() ) return flow;
+      if( !(flow instanceof TypeFunPtr) ) return flow;
+      TypeFunPtr tfp = (TypeFunPtr)flow;
+
+      // Have some functions, meet over their returns.
+      Type ret = tfp._ret;
+      // Attempt to lift the result, based on HM types.
+      if( DO_LIFT && DO_HM ) {
+        Type lift = hm_apply_lift(fun.arg("ret"),ret);
+        ret = lift; // Upgrade
+      }
+      return tfp.make_from(Type.ANY,ret);
     }
 
     // After GCP stability, we guess (badly) that all escaping functions
@@ -910,7 +980,8 @@ public class HM {
       }
     }
 
-    // Expand functions to full signatures, recursively
+    // Expand functions to full signatures, recursively.
+    // Used by testing.
     private static final VBitSet ADD_SIG = new VBitSet();
     Type flow_type() { ADD_SIG.clear(); return add_sig(_flow); }
     private static Type add_sig(Type t) {
@@ -1586,6 +1657,51 @@ public class HM {
       if( _aliases!=null ) _aliases =_aliases.set(0);
     }
 
+    // True if 'this isa t2'.  Must be monotonic.
+    boolean isa( T2 t2 ) {
+      // Leaf can "fall" (unify, expand) into anything.
+      // Conversely, nothing can "fall" into a Leaf
+      if(    is_leaf() ) return true;
+      if( t2.is_leaf() ) return false;
+      // Structurally equal
+      if( cycle_equals(t2) ) return true;
+
+      // Structural breakdown
+      // Check base terms
+      if( not_isa(   _flow, t2.   _flow) ) return false;
+      if( not_isa(  _eflow, t2.  _eflow) ) return false;
+      if( not_isa(  _fidxs, t2.  _fidxs) ) return false;
+      if( not_isa(_aliases, t2._aliases) ) return false;
+      // Check argument names.  Defensive copy did not go deep, and the
+      // lifting does the recursion so we only need to check shallow here.
+      if( _args!=null )
+        for( String key : _args.keySet() )
+          if( t2._args==null || !t2._args.containsKey(key) )
+            return false;
+      // All parts isa
+      return true;
+    }
+    private static boolean not_isa( Type t0, Type t1 ) {
+      return (t0 != null || t1 != null) && (t0 == null || t1 == null || !t0.isa(t1));
+    }
+    @SuppressWarnings("unchecked")
+    private static boolean not_isa( Bits t0, Bits t1 ) {
+      return (t0 != null || t1 != null) && (t0 == null || t1 == null || !t0.isa(t1));
+    }
+
+    // Varies as unification happens; not suitable for a HashMap/HashSet unless
+    // unchanging (e.g. defensive clone)
+    @Override public int hashCode() {
+      int hash = 0;
+      if(    _flow!=null ) hash+=    _flow._hash;
+      if(   _eflow!=null ) hash+=   _eflow._hash;
+      if(   _fidxs!=null ) hash+=   _fidxs._hash;
+      if( _aliases!=null ) hash+= _aliases._hash;
+      if( _args!=null )
+        for( String key : _args.keySet() )
+          hash += key.hashCode();
+      return hash;
+    }
 
     // -----------------
     // Recursively build a conservative flow type from an HM type.  The HM
@@ -2121,23 +2237,23 @@ public class HM {
       //   first seeing a Scalar (and not installing), then seeing a high value
       //   (but not MEET'ing with Scalar)
 
-      if( is_err() ) return Type.SCALAR; // Do not attempt lift
+      if( is_err() ) return record_lift(t,jt,Type.SCALAR); // Do not attempt lift
 
       if( is_leaf() || is_base() ) {
         Type xt = T2MAP.get(this);
-        if( xt==null ) return Type.SCALAR;
-        if( jt!=null ) return jt;
+        if( xt==null ) return record_lift(t,jt,Type.SCALAR);
+        if( jt!=null ) return record_lift(t,jt,jt);
         // T2 base on input being used to lift GCP on output.
         // T2 base is widened, which widens the lift.
         //if( is_base() )
         //  xt = xt.meet(_flow);
         push_update(apply);    // Apply depends on this leaf
-        return xt;
+        return record_lift(t,jt,xt);
       }
 
       if( is_nil() ) { // The wrapped leaf gets compat_lift, then nil is added
-        Type tnil = arg("?").walk_types_out(t.join(Type.NSCALR),jt,apply);
-        return tnil.meet(Type.NIL);
+        Type tnil = arg("?").walk_types_out(t.remove_nil(),jt,apply);
+        return record_lift(t,jt,tnil.meet(Type.NIL));
       }
 
       if( is_fun() ) {
@@ -2150,7 +2266,7 @@ public class HM {
           Type trlift = arg("ret").walk_types_out(tret, jt, apply);
           Type rez = TypeFunPtr.makex( tfp._fidxs,tfp.nargs(),tfp._dsp,trlift);
           for( int fidx : tfp._fidxs ) WBS.clear(fidx); // Clear fidxs
-          return rez;
+          return record_lift(t,jt,rez);
         }
         // TODO: Flow Scalar is OK, will lift to a TFP->Scalar
         throw unimpl();
@@ -2158,11 +2274,11 @@ public class HM {
 
       if( is_struct() ) {
         if( !(t instanceof TypeMemPtr ) ) // Flow will not lift to a TMP->Struct?
-          return t.must_nil() ? Type.SCALAR : Type.NSCALR;
+          return record_lift(t,jt,t.must_nil() ? Type.SCALAR : Type.NSCALR);
         TypeMemPtr tmp = (TypeMemPtr)t;
         TypeStruct ts0 = (TypeStruct)tmp._obj;
         // Can be made to work above_center, but no sensible lifting so don't bother
-        if( ts0.above_center() )  return Type.SCALAR;
+        if( ts0.above_center() )  return record_lift(t,jt,Type.SCALAR);
         TypeStruct ts = WDUPS.get(_uid);
         if( ts != null ) return t; // Recursive, stop cycles
         Type.RECURSIVE_MEET++;
@@ -2199,10 +2315,59 @@ public class HM {
         // Close off the recursion
         if( --Type.RECURSIVE_MEET == 0 )
           ts = ts.install();
-        return tmp.make_from(ts);
+        return record_lift(t,jt,tmp.make_from(ts));
       }
 
       throw unimpl();           // Handled all cases
+    }
+
+    // Walking the T2:self and output flow type:t in parallel.  If I find an
+    // output leaf that has a corresponding input leaf I can use it (or jt) to
+    // lift the output flow to the matching input flow.  Record all these,
+    // and verify monotonicity.
+    static class LiftSet {
+      T2 _t2;  Type _t, _jt, _rez;
+      private static final HashSet<LiftSet> LIFTS = new HashSet<>();
+      private static LiftSet FREE;
+      private void set( T2 t2, Type t, Type jt, Type rez) { _t2=t2; _t=t; _jt=jt; _rez=rez; }
+      static Type add( T2 t2, Type t, Type jt, Type rez ) {
+        if( FREE==null ) FREE=new LiftSet();
+        FREE.set(t2,t,jt,rez);
+        // Fast dup check
+        if( LIFTS.contains(FREE) ) return rez;
+        for( LiftSet lf : LIFTS )
+          assert !lf.isa(FREE) || lf._rez.isa(rez);
+        FREE._t2 = t2.copy(); // Defensive copy
+        LIFTS.add(FREE);
+        FREE=null;
+        return rez;
+      }
+      // IsA relationship.
+      private boolean isa( LiftSet lf ) {
+        if( !_t.isa(lf._t) ) return false;
+        if( _jt!=null || lf._jt!=null )
+          if( _jt==null || lf._jt==null || !_jt.isa(lf._jt) ) return false;
+        return _t2.isa(lf._t2);
+      }
+      @Override public boolean equals( Object o ) {
+        if( !(o instanceof LiftSet) ) return false;
+        LiftSet lf = (LiftSet)o;
+        if( _t!=lf._t || _jt!=lf._jt ) return false;
+        return _t2.cycle_equals(lf._t2);
+      }
+      @Override public int hashCode() { return _t2.hashCode() + _t._hash + (_jt==null ? 0 : _jt._hash); }
+      @Override public String toString() { return "("+_t2+","+_t+","+_jt+")->"+_rez; }
+    }
+    // Giant Assert that Apply-Lift is monotonic
+    boolean _record_lift(Type t, Type jt, Type rez) {
+      if( t.isa(rez) ) return true; // No lifting going on
+      if( !is_leaf() && !is_base() ) return true; // not checking structural types, just the leaves
+      LiftSet.add(this,t,jt,rez);
+      return true;
+    }
+    Type record_lift(Type t, Type jt, Type rez) {
+      assert _record_lift(t,jt,rez);
+      return rez;
     }
 
     // -----------------
@@ -2359,6 +2524,6 @@ public class HM {
           return arg;
       return null;
     }
-    static void reset() { CNT=0; DUPS.clear(); VARS.clear(); ODUPS.clear(); CDUPS.clear(); ADUPS.clear(); UPDATE_VISIT.clear(); }
+    static void reset() { CNT=0; DUPS.clear(); VARS.clear(); ODUPS.clear(); CDUPS.clear(); ADUPS.clear(); UPDATE_VISIT.clear(); LiftSet.LIFTS.clear(); }
   }
 }
