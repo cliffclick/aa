@@ -170,8 +170,9 @@ public class TypeInt extends Type<TypeInt> {
     throw unimpl();
   }
   @Override public Type widen() {
-    assert _x <= 0;
-    return INT64;
+    if( _x> 0 ) return this;
+    if( _x==0 ) return _con==0 ? INT64 : NINT64;
+    return make(_x,64,0);
   }
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean may_be_con() { return _x>=0; }

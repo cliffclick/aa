@@ -789,12 +789,17 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   }
   // "widen" a narrow type for primitive type-specialization and H-M
   // unification.  e.g. "3" becomes "int64".
+  // TODO: This is NOT associative with MEET.
+  // Example:
+  //   5.widen.meet(2.3f) == nint64.meet(2.3f) == nScalar
+  //   5.meet(2.3f).widen == nflt32.widen      == nflt64
   public Type widen() {
     return switch( _type ) {
-      case TSCALAR, TXSCALAR, TNSCALR, TXNSCALR -> SCALAR;
-      case TANY, TALL, TNIL, TXNIL -> this;
-      case TCTRL, TXCTRL -> Type.CTRL;
-      default -> throw typerr(null); // Overridden in subclass
+    case TSCALAR, TNSCALR -> SCALAR;
+    case TXSCALAR, TXNSCALR -> this; // Too high 
+    case TANY, TALL, TNIL, TXNIL -> this;
+    case TCTRL, TXCTRL -> Type.CTRL;
+    default -> throw typerr(null); // Overridden in subclass
     };
   }
   // Recursive version called from TypeStruct

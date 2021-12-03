@@ -288,7 +288,14 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   // ptr-to-array (and string) from ptr-to-record.  Must keep types at the same
   // resolution as H-M, so pointers all permit nil (unless I track a H-M type
   // which disallows nil).
-  @Override public TypeMemPtr  widen() { return make(_aliases.widen(),_obj. widen()); }
+  @Override public TypeMemPtr  widen() {
+    if( above_center() ) return this;
+    BitsAlias a = _obj instanceof TypeStr
+      ? BitsAlias.STRBITS
+      : (_obj instanceof TypeAry ? BitsAlias.ARYBITS : BitsAlias.RECORD_BITS);
+    if( _aliases.test(0) ) a = a.set(0);
+    return make(a,_obj. widen());
+  }
   @Override        TypeMemPtr _widen() { return make(_aliases.widen(),_obj._widen()); }
 
   // Make a Type, replacing all dull pointers from the matching types in mem.

@@ -123,8 +123,9 @@ public class TypeFlt extends Type<TypeFlt> {
     throw com.cliffc.aa.AA.unimpl();
   }
   @Override public Type widen() {
-    assert _x <= 0;
-    return FLT64;
+    if( _x> 0 ) return this;
+    if( _x==0 ) return _con==0 ? FLT64 : NFLT64;
+    return make(_x,64,0);
   }
   @Override public void walk( Predicate<Type> p ) { p.test(this); }
 }

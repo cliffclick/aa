@@ -17,7 +17,7 @@ public class TestHM {
     if( frez_gcp!=null )  assertEquals(frez_gcp.get(),syn.flow_type());
   }
 
-  private static final int[] rseeds = new int[]{0,1,2,3,4,5,6,7};
+  private static final int[] rseeds = new int[]{4,0,1,2,3,4,5,6,7};
   private void _run1( String prog, String rez_hm, Supplier<Type> frez_gcp ) {
     for( int rseed : rseeds )
       _run0(prog,rez_hm,frez_gcp,rseed);
@@ -173,9 +173,9 @@ public class TestHM {
         "( *[4]str, flt64)",
         "( *[4]str, flt64)",
         // With lift ON
-        //TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeFlt.FLT64)),
+        TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeFlt.FLT64)),
         // With lift OFF
-        TypeMemPtr.make(7,make_tups(Type.SCALAR,Type.SCALAR)),
+        //TypeMemPtr.make(7,make_tups(Type.SCALAR,Type.SCALAR)),
         tuple2);
   }
 
@@ -241,9 +241,9 @@ map ={fun parg -> (fun (cdr parg))};
         "( *[4]str, int1)",
         "( *[4]str, int1)",
         // With Lift ON
-        //TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeInt.BOOL)),
+        TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeInt.BOOL)),
         // With Lift OFF
-        tuple2,
+        //tuple2,
         tuple2);
   }
 
@@ -300,7 +300,7 @@ all = @{
       (pair (fgz 3) (fgz 5))
 }
 """,
-        "{ { int64 -> A } -> ( A, A) }", tfs(tuple2));
+        "{ { nint64 -> A } -> ( A, A) }", tfs(tuple2));
   }
 
   // Basic structure test
@@ -700,7 +700,7 @@ boolSub ={b ->(if b true false)};
 @{true=true, false=false, boolSub=boolSub};
 all
 """,
-        "@{ boolSub = { A? -> @{ not = { B -> C:@{ not = { D -> C }; then = { { int64 -> E } { int64 -> E } -> E }} }; then = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
+        "@{ boolSub = { A? -> @{ not = { B -> C:@{ not = { D -> C }; then = { { nint64 -> E } { nint64 -> E } -> E }} }; then = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
         () -> {
           /*
            *[11]@{^=any;
