@@ -2171,7 +2171,7 @@ public class HM {
       // Free variables keep the input flow type.
       // Bases can (sorta) act like a leaf: they can keep their polymorphic "shape" and induce it on the result
       if( is_leaf() || is_base() )
-        { T2MAP.merge(this, t, HM_FREEZE ? Type::meet : Type::join); return t; }
+        { T2MAP.merge(this, t, Type::meet); return t; }
       // Nilable
       if( is_nil() )
         return arg("?").walk_types_in(t.join(Type.NSCALR));
@@ -2211,20 +2211,8 @@ public class HM {
 
       if( is_err() ) return record_lift(apply,t,Type.SCALAR); // Do not attempt lift
 
-      if( is_leaf() ) {
-        Type rez = _lift_leaf(apply,t,true);// Pre-freeze, match leaf or base
-        if( rez!=null ) return rez;
-        // Post-freeze, match direct hit only
-        Type xt = T2MAP.get(this);
-        if( xt==null || xt==t ) return t; // No mapping, no lift
-        push_update(apply);    // Apply depends on this leaf
-        return record_lift(apply,t,xt);
-      }
-
-      if( is_base() ) {
-        Type rez = _lift_leaf(apply,t,false);
-        return rez==null ? t : rez;
-      }
+      if( is_leaf() ) return _lift_leaf(apply,t,true );
+      if( is_base() ) return _lift_leaf(apply,t,false);
 
       if( is_nil() ) { // The wrapped leaf gets lifted, then nil is added
         Type tnil = arg("?").walk_types_out(t.remove_nil(),apply);
@@ -2298,19 +2286,33 @@ public class HM {
     }
 
     private Type _lift_leaf(Apply apply, Type t, boolean base) {
-      if( HM_FREEZE ) return null; // Post-freeze, be exact
-      Type jt2 = Type.SCALAR;
-      for( T2 t2 : T2.T2MAP.keySet() )
-        if( t2.is_leaf() || (base && t2.is_base()) )
-          jt2 = jt2.join(T2.T2MAP.get(t2));
-      if( jt2==Type.SCALAR || t.isa(jt2) ) return jt2; // No lift
-      // Using all these leafs to lift, so depend on them still being leafs.
-      for( T2 t2 : T2.T2MAP.keySet() )
-        if( t2.is_leaf() || (base && t2.is_base()) )
-          t2.push_update(apply);
-      return record_lift(apply,t,jt2);
+      Type jt = Type.SCALAR;
+      if( HM_FREEZE ) {         // Post-freeze, be exact
+        // Post-freeze, match direct hit only
+        jt = _lift_leaf(jt);
+        if( jt==Type.SCALAR || jt==t ) return t; // No mapping, no lift
+        push_update(apply);    // Apply depends on this leaf
+      } else {
+        // Pre-freeze: join of possibilities
+        for( T2 t2 : T2.T2MAP.keySet() )
+          if( t2.is_leaf() || (t2.is_base() && (base || _flow==t2._flow)) )
+            jt = _lift_leaf(jt);
+        if( jt ==Type.SCALAR || jt==t || t.isa(jt) ) return jt; // No lift
+        // Using all these leafs to lift, so depend on them still being leafs.
+        for( T2 t2 : T2.T2MAP.keySet() )
+          if( t2.is_leaf() || (t2.is_base() && (base || _flow==t2._flow)) )
+            t2.push_update(apply);
+      }
+      return record_lift(apply,t,jt);
     }
-
+    private Type _lift_leaf(Type jt) {
+      Type tx = T2MAP.get(this);
+      if( tx==null ) return jt;
+      if( is_base() )           // Weaken base-lifts by the HMT base
+        tx = tx.meet(_flow.widen());
+      return jt.join(tx);       // Join of possibilities
+    }
+    
     // Walking the T2:self and output flow type:t in parallel.  If I find an
     // output leaf that has a corresponding input leaf I can use it (or jt) to
     // lift the output flow to the matching input flow.  Record all these,

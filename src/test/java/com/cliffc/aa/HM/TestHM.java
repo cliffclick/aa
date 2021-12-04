@@ -17,7 +17,7 @@ public class TestHM {
     if( frez_gcp!=null )  assertEquals(frez_gcp.get(),syn.flow_type());
   }
 
-  private static final int[] rseeds = new int[]{4,0,1,2,3,4,5,6,7};
+  private static final int[] rseeds = new int[]{0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
   private void _run1( String prog, String rez_hm, Supplier<Type> frez_gcp ) {
     for( int rseed : rseeds )
       _run0(prog,rez_hm,frez_gcp,rseed);
@@ -128,9 +128,9 @@ public class TestHM {
         "( 3, *[4]\"abc\")",
         // GCP with HM
         // With lift ON
-        //TypeMemPtr.make(7,make_tups(TypeInt.con(3),TypeMemPtr.make(4,TypeStr.ABC))),
+        TypeMemPtr.make(7,make_tups(TypeInt.NINT64,TypeMemPtr.make(4,TypeStr.STR))),
         // With lift OFF
-        TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
+        //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
         // GCP is weaker without HM
         tuplen2);
   }
@@ -241,7 +241,7 @@ map ={fun parg -> (fun (cdr parg))};
         "( *[4]str, int1)",
         "( *[4]str, int1)",
         // With Lift ON
-        TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeInt.BOOL)),
+        TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeInt.INT64)),
         // With Lift OFF
         //tuple2,
         tuple2);
@@ -250,7 +250,8 @@ map ={fun parg -> (fun (cdr parg))};
   // Obscure factorial-like
   @Test public void test21() {
     run("f0 = { f x -> (if (eq0 x) 1 (f (f0 f (dec x)) 2))}; (f0 * 99)",
-        "int64",TypeInt.INT64);
+        "int64","int64",
+         TypeInt.NINT64,TypeInt.INT64);
   }
 
   // Obscure factorial-like
@@ -284,9 +285,9 @@ all = @{
         "( 3, *[4]\"abc\")",
         "( 3, *[4]\"abc\")",
         // With lift On
-        //TypeMemPtr.make(7,make_tups(TypeInt.con(3),TypeMemPtr.make(4,TypeStr.ABC))),
+        TypeMemPtr.make(7,make_tups(TypeInt.NINT64,TypeMemPtr.make(4,TypeStr.STR))),
         // With lift Off
-        TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
+        //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
         tuplen2);
   }
 
@@ -441,9 +442,9 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
         "( *[4]str, int1)",
         "( *[4]str, int1)",
         // With lift ON
-        //TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeInt.BOOL)),
+        TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeInt.INT64)),
         // With lift OFF
-        tuple2,
+        //tuple2,
         tuple2);
   }
 
@@ -489,9 +490,9 @@ loop = { name cnt ->
         "*[0,4]str?",  // Both HM and GCP
         "Cannot unify int8 and *[0,4]str?", // HM alone cannot do this one
         // With lift ON
-        //TypeMemPtr.make(4,TypeStr.STR), // Both HM and GCP
+        TypeMemPtr.make(4,TypeStr.STR), // Both HM and GCP
         // With lift OFF
-        Type.NSCALR,
+        //Type.NSCALR,
         Type.NSCALR);                   // GCP alone gets a very weak answer
   }
 
@@ -594,8 +595,8 @@ loop = { name cnt ->
         () -> {
           Type tf   = TypeMemPtr.make(ptr1011(),
                                       TypeStruct.make(NO_DSP,
-                                                      bfun2("and"     ,14,17,1),
-                                                      bfun2("or"      ,15,18,1),
+                                                      bfun2("and" ,14,17,1),
+                                                      bfun2("or"  ,15,18,1),
                                                       bfun2("then",16,19,2)));
           Type xbool= TypeMemPtr.make(12,TypeStruct.make(NO_DSP,
                                                          TypeFld.make("true", tf),
@@ -603,10 +604,9 @@ loop = { name cnt ->
                                                          mfun(1,"force",tf,23)));
           TypeStruct rez = TypeStruct.make(NO_DSP,
                                            // With lift ON
-                                           //TypeFld.make("a", HM.DO_HM ? TypeInt.NINT8 : Type.SCALAR),
-                                           //TypeFld.make("b", HM.DO_HM ? TypeMemPtr.make(BitsAlias.FULL.make(13,14),TypeStruct.maket()) : Type.SCALAR),
+                                           TypeFld.make("a", HM.DO_HM ? TypeInt.NINT64 : Type.SCALAR),
                                            // With lift OFF
-                                           TypeFld.make("a", Type.SCALAR),
+                                           //TypeFld.make("a", Type.SCALAR),
                                            TypeFld.make("b", Type.SCALAR),
                                            TypeFld.make("bool",xbool));
           return TypeMemPtr.make(15,rez);
@@ -986,12 +986,19 @@ all
           TypeFld f = TypeFld.make("false",tf);
           TypeFld t = TypeFld.make("true",tf);
 
-          TypeFld s = mfun("s",35);
+          Type xs = HM.DO_HM
+            ? TypeMemPtr.make(13,TypeStruct.make(NO_DSP,
+                                                 mfun(  "add_"   ,34),
+                                                 mfun(  "pred"   ,32),
+                                                 mfun(  "succ"   ,33),
+                                                 mfun(1,"zero",tf,31)))
+            : Type.SCALAR;
+          TypeFld s = mfun(1,"s",xs,35);
 
           TypeFld pred = mfun(1,"pred",Type.XSCALAR,14);
           TypeFld zero = mfun(1,"zero",tf,25);
-          TypeFld add_ = mfun("add_"  ,27);
-          TypeFld succ = mfun("succ"  ,26);
+          TypeFld add_ = mfun(  "add_"   ,27);
+          TypeFld succ = mfun(1,"succ",xs,26);
           TypeFld z = TypeFld.make("z",TypeMemPtr.make(BitsAlias.make0(12),TypeStruct.make(NO_DSP,pred,zero,add_,succ)));
           return TypeMemPtr.make(BitsAlias.make0(14),TypeStruct.make(NO_DSP,f,t,s,z));
         });
