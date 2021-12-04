@@ -817,9 +817,10 @@ public class HM {
     Type hm_apply_lift(T2 rezt2, Type ret) {
       // Walk the input types, finding all the Leafs.  Repeats of the same Leaf
       // has its flow Types MEETed.
+      T2.HAS_OPEN=false;
       T2.T2MAP.clear();
       for( Syntax arg : _args )
-        { T2.WDUPS.clear(true); arg.find().walk_types_in(arg._flow); }
+        { T2.WDUPS.clear(true); arg.find().walk_types_in(arg._flow,this); }        
 
       // Then walk the output types, building a corresponding flow Type, but
       // matching against input Leafs.  If HM_FREEZE Leafs must match
@@ -2076,7 +2077,7 @@ public class HM {
     private T2 _fresh(VStack nongen) {
       assert !unified();
       T2 rez = VARS.get(this);
-      if( rez!=null ) return rez; // Been there, done that
+      if( rez!=null ) return rez.find(); // Been there, done that
       // Unlike the original algorithm, to handle cycles here we stop making a
       // copy if it appears at this level in the nongen set.  Otherwise, we'd
       // clone it down to the leaves - and keep all the nongen leaves.
@@ -2092,6 +2093,7 @@ public class HM {
       if( _args!=null )
         for( String key : _args.keySet() )
           t._args.put(key, arg(key)._fresh(nongen));
+      assert !t.unified();
       return t;
     }
 
@@ -2152,6 +2154,7 @@ public class HM {
 
     // -----------------
     static private final HashMap<T2,Type> T2MAP = new HashMap<>();
+    static private boolean HAS_OPEN;
     static private final NonBlockingHashMapLong<TypeStruct> WDUPS = new NonBlockingHashMapLong<>();
     static private final BitSet WBS = new BitSet();
 
@@ -2164,7 +2167,7 @@ public class HM {
     // Walk a T2 and a matching flow-type, and build a map from T2 to flow-types.
     // Stop if either side loses corresponding structure.  This operation must be
     // monotonic because the result is JOINd with GCP types.
-    Type walk_types_in(Type t) {     //noinspection UnusedReturnValue
+    Type walk_types_in(Type t, Apply apply) {     //noinspection UnusedReturnValue
       long duid = dbl_uid(t._uid);
       if( WDUPS.putIfAbsent(duid,TypeStruct.ALLSTRUCT)!=null ) return t;
       assert !unified();
@@ -2174,19 +2177,22 @@ public class HM {
         { T2MAP.merge(this, t, Type::meet); return t; }
       // Nilable
       if( is_nil() )
-        return arg("?").walk_types_in(t.join(Type.NSCALR));
+        return arg("?").walk_types_in(t.join(Type.NSCALR),apply);
       if( is_fun() ) {          // Walk returns not arguments
         T2 t2ret = arg("ret");
         Type fret = t instanceof TypeFunPtr ? ((TypeFunPtr)t)._ret : t.oob(Type.SCALAR);
         if( fret == Type.ANY || fret == Type.ALL )
           throw unimpl();       // Should fix to Scalar before starting
-        return t2ret.walk_types_in(fret);
+        return t2ret.walk_types_in(fret,apply);
       }
 
       if( is_struct() ) {       // Walk all fields
-        if( _args!=null )
+        if( is_open() ) {       // Open structs MAY add a new XSCALAR field at any time
+          HAS_OPEN=true;        // So assume we added an XSCALAR, and no need to walk other fields
+          push_update(apply);   // Depends on being open
+        } else if( _args!=null )
           for( String id : _args.keySet() )
-            arg(id).walk_types_in(at_fld(t,id));
+            arg(id).walk_types_in(at_fld(t,id),apply);
         return t;
       }
 
@@ -2294,14 +2300,17 @@ public class HM {
         push_update(apply);    // Apply depends on this leaf
       } else {
         // Pre-freeze: join of possibilities
-        for( T2 t2 : T2.T2MAP.keySet() )
-          if( t2.is_leaf() || (t2.is_base() && (base || _flow==t2._flow)) )
-            jt = _lift_leaf(jt);
-        if( jt ==Type.SCALAR || jt==t || t.isa(jt) ) return jt; // No lift
-        // Using all these leafs to lift, so depend on them still being leafs.
-        for( T2 t2 : T2.T2MAP.keySet() )
-          if( t2.is_leaf() || (t2.is_base() && (base || _flow==t2._flow)) )
-            t2.push_update(apply);
+        if( HAS_OPEN ) jt = Type.XSCALAR;
+        else {
+          for( T2 t2 : T2.T2MAP.keySet() )
+            if( t2.is_leaf() || (t2.is_base() && (base || _flow==t2._flow)) )
+              jt = t2._lift_leaf(jt);
+          if( jt ==Type.SCALAR || jt==t || t.isa(jt) ) return jt; // No lift
+          // Using all these leafs to lift, so depend on them still being leafs.
+          for( T2 t2 : T2.T2MAP.keySet() )
+            if( t2.is_leaf() || (t2.is_base() && (base || _flow==t2._flow)) )
+              t2.push_update(apply);
+        }
       }
       return record_lift(apply,t,jt);
     }
@@ -2312,7 +2321,7 @@ public class HM {
         tx = tx.meet(_flow.widen());
       return jt.join(tx);       // Join of possibilities
     }
-    
+
     // Walking the T2:self and output flow type:t in parallel.  If I find an
     // output leaf that has a corresponding input leaf I can use it (or jt) to
     // lift the output flow to the matching input flow.  Record all these,
