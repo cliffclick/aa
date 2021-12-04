@@ -676,12 +676,7 @@ public class HM {
     @Override SB p1(SB sb, VBitSet dups) { return sb.p(_arg0).p(" = ... ; ..."); }
     @Override SB p2(SB sb, VBitSet dups) { _def.p0(sb,dups); return _body.p0(sb,dups); }
     @Override boolean hm(Work<Syntax> work) { return false;  }
-    @Override void add_hm_work( @NotNull Work<Syntax> work) {
-      work.add(_par);
-      work.add(_body);
-      work.add(_def);
-      work.addAll(_def.find()._deps);
-    }
+    @Override void add_hm_work( @NotNull Work<Syntax> work) { throw unimpl();  }
     @Override Type val(Work<Syntax> work) { return _body._flow; }
     // Definition changed; all dependents need to revisit
     @Override void add_val_work( Syntax child, @NotNull Work<Syntax> work) {
@@ -820,7 +815,7 @@ public class HM {
       T2.HAS_OPEN=false;
       T2.T2MAP.clear();
       for( Syntax arg : _args )
-        { T2.WDUPS.clear(true); arg.find().walk_types_in(arg._flow,this); }        
+        { T2.WDUPS.clear(true); arg.find().walk_types_in(arg._flow,this); }
 
       // Then walk the output types, building a corresponding flow Type, but
       // matching against input Leafs.  If HM_FREEZE Leafs must match
@@ -1448,10 +1443,9 @@ public class HM {
   // T2, and the forest of T2s can share.  Leaves of a T2 can be either a
   // simple concrete base type, or a sharable leaf.  Unify is structural, and
   // where not unifyable the union is replaced with an Error.
-  static class T2 implements IntSupplier {
+  static class T2 {
     private static int CNT=1;
     final int _uid=CNT++;
-    @Override public int getAsInt() { return _uid; }
 
     // Structural parts to unify with, or null.
     // If Leaf   , then null and _flow is null.
@@ -1657,11 +1651,8 @@ public class HM {
       if( not_isa(  _fidxs, t2.  _fidxs) ) return false;
       if( not_isa(_aliases, t2._aliases) ) return false;
       // Check argument names.  Defensive copy did not go deep, and the
-      // lifting does the recursion so we only need to check shallow here.
-      if( _args!=null )
-        for( String key : _args.keySet() )
-          if( t2._args==null || !t2._args.containsKey(key) )
-            return false;
+      // lifting does the recursion, so we only need to check shallow here.
+      if( _args!=null ) throw unimpl();
       // All parts isa
       return true;
     }
@@ -2281,7 +2272,7 @@ public class HM {
         if( is_open() && !HM_FREEZE )       // If can add fields to HM
           for( TypeFld fld : ts0.flds() )   // Forall fields in GCP
             if( get(fld._fld)==null && !Util.eq(fld._fld,"^") ) // Solo in GCP
-              ts.get(fld._fld).setX( fld._t, fld._order );
+              ts.get(fld._fld).setX( Type.XSCALAR, fld._order );
         // Close off the recursion
         if( --Type.RECURSIVE_MEET == 0 )
           ts = ts.install();

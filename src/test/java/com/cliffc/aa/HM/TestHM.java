@@ -19,7 +19,8 @@ public class TestHM {
 
   private static final int[] rseeds = new int[]{0,1,2,3,4,5,6,7};
   private void _run1( String prog, String rez_hm, Supplier<Type> frez_gcp ) {
-    for( int rseed : rseeds )
+    //for( int rseed : rseeds )
+    for( int rseed=0; rseed<32; rseed++ )
       _run0(prog,rez_hm,frez_gcp,rseed);
   }
 

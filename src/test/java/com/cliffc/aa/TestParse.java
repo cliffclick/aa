@@ -19,7 +19,6 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(_&_,2)", Type.XNIL);
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
     // The Meet loses precision to fast.  This is a typing bug.

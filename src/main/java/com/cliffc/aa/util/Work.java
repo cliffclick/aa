@@ -4,23 +4,26 @@ import java.util.function.IntSupplier;
 
 // Simple worklist.  Filters dups on a add.
 // Constant-time remove until empty.
+// Supports psuedo random pop.
+@SuppressWarnings("unchecked")
 public class Work<E extends IntSupplier> extends BitSetSparse {
   private final Ary<Object> _work = new Ary<>(new Object[1],0);
-  private final int _rseed;
+  private final int _rseed;     // Psuedo-random draw
   private int _idx;             // Next item to get
-  public Work() { this(123); }
+  public Work() { this(123); }  // Default seed
   public Work(int rseed) { _rseed = rseed; }
   public int len() { return _work._len; }
   public boolean isEmpty() { return _work.isEmpty(); }
-  public E add(E e) {
+  public E add(E e) {           // Add, filtering dups
     if( e!=null && !tset(e.getAsInt()) )
       _work.push(e);
     return e;
   }
+  // Bulk adders
   public void add(E[] es) { if(es!=null) for( E e : es ) add(e); }
   public void addAll(Ary<? extends E> es) { if( es!=null ) for( E e : es ) add(e); }
   public boolean on(E e) { return test(e.getAsInt()); }
-  @SuppressWarnings("unchecked")
+  // Pull a psuedo-random element.  Order depends on rseed.
   public E pop() {
     if( _work._len==0 ) return null;
     _idx = (_idx+_rseed)&((1<<30)-1);
@@ -28,4 +31,7 @@ public class Work<E extends IntSupplier> extends BitSetSparse {
     clr(e.getAsInt());
     return e;
   }
+  // Get/delete "idx"th elements; error if OOB.
+  public E at(int idx) { return (E)_work.at(idx); }
+  public void del(int idx) { clr(((E)_work.del(idx)).getAsInt()); }
 }

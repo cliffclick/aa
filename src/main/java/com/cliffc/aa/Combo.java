@@ -225,10 +225,9 @@ public abstract class Combo {
       // is in error.  Force them to act as-if called by all choices and finish
       // off the combined algorithm.
       if( work.isEmpty() && !HM_IS_HIGH )
-        //for( Node call : ambi._work )
-        //  if( !((CallNode)call)._not_resolved_by_gcp )
-        //    ((CallNode)work.add(call))._not_resolved_by_gcp = true;
-        throw unimpl("changing worklist impl");
+        for( int i=0; i<ambi.len(); i++ )
+          if( !((CallNode)ambi.at(i))._not_resolved_by_gcp )
+            ((CallNode)work.add(ambi.at(i)))._not_resolved_by_gcp = true;
     }
 
     assert Env.START.more_flow(work,false)==0; // Final conditions are correct
@@ -240,14 +239,13 @@ public abstract class Combo {
   // Resolve ambiguous calls, and put on the worklist to make more progress.
   private static void remove_ambi(WorkNode ambi, WorkNode work, Ary<Node> oldfdx) {
     assert work.isEmpty();
-    //for( int i=0; i<ambi.len(); i++ ) {
-    //  CallNode call = (CallNode)ambi.at(i);
-    //  if( call.remove_ambi(oldfdx) ) {
-    //    ambi.del(i--);
-    //    work.add(call);
-    //    work.add(call.cepi());
-    //  }
-    //}
-    throw unimpl("changing worklist impl");
+    for( int i=0; i<ambi.len(); i++ ) {
+      CallNode call = (CallNode)ambi.at(i);
+      if( call.remove_ambi(oldfdx) ) {
+        ambi.del(i--);
+        work.add(call);
+        work.add(call.cepi());
+      }
+    }
   }
 }
