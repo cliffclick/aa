@@ -26,7 +26,7 @@ public class TypeInt extends Type<TypeInt> {
   @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
     sb.p(_name);
     if( _con != 0 ) return sb.p(_x<0 ? "&" : (_x>0 ? "+" : "")).p(_con);
-    if( _x==0 ) return _con==0 ? sb.p("0z") : sb.p(_con);
+    if( _x==0 ) return _con==0 ? sb.p("0") : sb.p(_con);
     return sb.p(_x>0?"~":"").p(Math.abs(_x)==1?"n":"").p("int").p(_z);
   }
 

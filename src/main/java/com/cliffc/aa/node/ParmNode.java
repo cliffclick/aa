@@ -98,9 +98,10 @@ public class ParmNode extends PhiNode {
           ? (mem == null ? val(1) : in(1).sharptr(mem.in(1)))
           : fld._t;              // Use formal signature if available
         if( _tvar != null ) { // Lift if HM is available
-          TV2 tv = tvar();
-          Type ta = tv.as_flow(opt_mode == GVNGCM.Mode.Opto && Combo.HM_IS_HIGH);
-          t = t.join(ta);
+          //TV2 tv = tvar();
+          //Type ta = tv.as_flow(opt_mode == GVNGCM.Mode.Opto && Combo.HM_IS_HIGH);
+          //t = t.join(ta);
+          throw unimpl();
         } else { // Else Input memory is the Scope escape-out memory
           if( mem==this && opt_mode._CG )
             t = ((ScopeNode)fun.in(1)).mem()._val;

@@ -540,7 +540,7 @@ public abstract class PrimNode extends Node {
         return TypeInt.TRUE;
       if( t. may_nil() ) return TypeInt.BOOL.dual();
       if( t.must_nil() ) return TypeInt.BOOL;
-      return Type.XNIL;           // Cannot be a nil, so return a nil
+      return Type.NIL;          // Cannot be a nil, so return a nil
     }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   }

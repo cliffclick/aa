@@ -9,9 +9,9 @@ package com.cliffc.aa;
 public abstract class Exec {
   // Parse and type a file-level string.  Reset back to Env.<clinit> when done.
   // Suitable for repeated tests
-  public static TypeEnv file( String src, String str ) { // Execute string
+  public static TypeEnv file( String src, String str, int rseed, boolean do_gcp, boolean do_hmt ) { // Execute string
 
-    TypeEnv te = go(Env.TOP,src,str);
+    TypeEnv te = go(Env.TOP,src,str,rseed,do_gcp,do_hmt);
 
     // Kill, cleanup and reset for another parse
     te._scope.unhook();   // The exiting scope is removed
@@ -24,7 +24,10 @@ public abstract class Exec {
 
   // Parse and type a string.  Can be nested.  In theory, will be eval() someday.
   // In theory, can keep the result node and promote them for the REPL.
-  public static TypeEnv go( Env top, String src, String str ) { // Execute string
+  public static TypeEnv go( Env top, String src, String str, int rseed, boolean do_gcp, boolean do_hmt ) { // Execute string
+    AA.RSEED = rseed;
+    AA.DO_GCP = do_gcp;
+    AA.DO_HMT = do_hmt;
     Env e = Env.FILE = new Env(top,null,false,top._scope.ctrl(),top._scope.mem());
 
     // Parse a program
@@ -38,20 +41,11 @@ public abstract class Exec {
     // Pessimistic optimizations; might improve error situation
     Env.GVN.iter(GVNGCM.Mode.PesiNoCG);
     
-    // Remove all the things kept alive until Combo runs
-    Env.pre_combo();
-    Combo.CHECK_FOR_NOT_NIL = false; // See Combo for an explanation
-    Combo.opto();                    // Global Constant Propagation and Hindley-Milner Typing
+    Env.pre_combo();   // Remove all the things kept alive until Combo runs
+    Combo.opto();      // Global Constant Propagation and Hindley-Milner Typing
     
     Env.GVN.iter(GVNGCM.Mode.PesiCG);// Re-check all ideal calls now that types have been maximally lifted
     
-    Combo.CHECK_FOR_NOT_NIL = true;  // See Combo for an explanation
-    Combo.opto();                    // Global Constant Propagation and Hindley-Milner Typing
-    
-    Env.GVN.iter(GVNGCM.Mode.PesiCG);// Re-check all ideal calls now that types have been maximally lifted
-    
-    Combo.CHECK_FOR_NOT_NIL = false; // Reset
-    //assert Type.intern_check();
     Env.FILE=null;
 
     return e.gather_errors(err);

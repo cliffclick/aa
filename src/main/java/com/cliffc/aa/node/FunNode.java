@@ -328,7 +328,7 @@ public class FunNode extends RegionNode {
     // Split the callers according to the new 'fun'.
     FunNode fun = make_new_fun(ret, formals, path);
     split_callers(ret,fun,body,path);
-    assert Env.START.more_flow(Env.GVN._work_flow,true)==0; // Initial conditions are correct
+    assert Env.START.more_work(Env.GVN._work_flow,true)==0; // Initial conditions are correct
     return this;
   }
 

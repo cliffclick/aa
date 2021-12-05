@@ -238,7 +238,7 @@ public class MemJoinNode extends Node {
     old.unkeep();               // Alive, but keep==0
     nnn.xval();  xval();        // Force update, since not locally monotonic
     GVN.add_flow_defs(this);
-    assert Env.START.more_flow(Env.GVN._work_flow,true)==0;
+    assert Env.START.more_work(Env.GVN._work_flow,true)==0;
     return this;
   }
 

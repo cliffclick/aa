@@ -277,7 +277,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     // Field at def point, points directly now.
     dsp.update(tok,dsp.access(tok),def);
     def.bind(tok);         // Debug only, associate variable name with function
-    assert Env.START.more_flow(Env.GVN._work_flow,true)==0;
+    assert Env.START.more_work(Env.GVN._work_flow,true)==0;
     Env.GVN.iter(GVNGCM.Mode.Parse);
   }
 

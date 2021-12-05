@@ -183,7 +183,7 @@ public class GVNGCM {
         ITER_CNT_NOOP++;      // No progress
       } else {
         // VERY EXPENSIVE ASSERT
-        //assert W==_work_dead || Env.START.more_flow(_work_flow,true)==0; // Initial conditions are correct
+        //assert W==_work_dead || Env.START.more_work(_work_flow,true)==0; // Initial conditions are correct
         ITER_CNT++; assert ITER_CNT < 35000; // Catch infinite ideal-loops
         if( x==n ) x=m;       // Keep track of the replacement for x, if any
       }
@@ -229,7 +229,7 @@ public class GVNGCM {
 
       WORK_RETYPE.add(wrk._uses);
     }
-    assert Env.START.more_flow(Env.GVN._work_flow,true)==0;
+    assert Env.START.more_work(Env.GVN._work_flow,true)==0;
   }
 
   public class Build<N extends Node> implements AutoCloseable {

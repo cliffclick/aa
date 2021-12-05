@@ -549,9 +549,6 @@ public abstract class Node implements Cloneable, IntSupplier {
   // HM changes; push related neighbors
   public void add_work_hm(WorkNode work) { tvar().add_deps_work(work); }
 
-  // Support for resolving ambiguous calls during GCP/Combo
-  public boolean remove_ambi(Ary<Node> oldfdx) {return false;}
-
   // Do One Step of forwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
   public void combo_forwards(WorkNode work) {
@@ -773,9 +770,18 @@ public abstract class Node implements Cloneable, IntSupplier {
   public final void walk_initype( WorkNode work ) {
     if( work.on(this) ) return;    // Been there, done that
     work.add(this);                // On worklist and mark visited
-    _val = Type.ANY;               // Highest value
-    _live = TypeMem.DEAD;          // Not alive
-    _tvar = new_tvar("Combo");
+    if( AA.DO_GCP ) {
+      _val = Type.ANY;               // Highest value
+      _live = TypeMem.DEAD;          // Not alive
+    } else {                         // Not doing optimistic GCP...
+      Type oval = _val, oliv = _live;// ...but during Combo many types can lift
+      _val = value(Env.GVN._opt_mode);
+      _live = live(Env.GVN._opt_mode);
+      if( oval!=_val || oliv != _live )
+        Env.GVN.add_flow(this);      // Track liftable Nodes
+    }
+    if( AA.DO_HMT )
+      _tvar = new_tvar("Combo");
     // Walk reachable graph
     for( Node use : _uses )                   use.walk_initype(work);
     for( Node def : _defs ) if( def != null ) def.walk_initype(work);
@@ -866,29 +872,42 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Assert all value and liveness calls only go forwards.  Returns >0 for failures.
   private static final VBitSet FLOW_VISIT = new VBitSet();
-  public  final int more_flow(WorkNode work,boolean lifting) { FLOW_VISIT.clear();  return more_flow(work,lifting,0);  }
-  private int more_flow( WorkNode work, boolean lifting, int errs ) {
+  public  final int more_work( WorkNode work, boolean lifting ) { FLOW_VISIT.clear();  return more_work(work,lifting,0);  }
+  private int more_work( WorkNode work, boolean lifting, int errs ) {
     if( FLOW_VISIT.tset(_uid) ) return errs; // Been there, done that
     if( Env.GVN.on_dead(this) ) return errs; // Do not check dying nodes
-    // If on worklist or partially built, do not check
-    if( !work.on(this) && _keep==0 ) {
+    if( _keep == 0 ) {
+      // Check for GCP progress
       Type    oval= _val, nval = value(Env.GVN._opt_mode); // Forwards flow
       TypeMem oliv=_live, nliv = live (Env.GVN._opt_mode); // Backwards flow
-      boolean hm = Combo.DO_HM && !lifting && oliv!=TypeMem.DEAD && _tvar!=null && !tvar().is_err() && _val!=Type.ANY && unify(null);  // HM unification if alive
-      if( nval != oval || nliv != oliv || hm ) { // Check for progress
-        boolean ok = lifting
-          ? nval.isa(oval) && nliv.isa(oliv)
-          : oval.isa(nval) && oliv.isa(nliv);
-        FLOW_VISIT.clear(_uid); // Pop-frame & re-run in debugger
-        System.err.println(ok ? "Progress bug" : "Monotonicity bug");
-        System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
-        errs++;
+      if( oval!=nval || oliv!=nliv ) {
+        if( !(lifting
+              ? nval.isa(oval) && nliv.isa(oliv)
+              : oval.isa(nval) && oliv.isa(nliv)) )
+          errs += _report_bug("Monotonicity bug");
+        if( !work.on(this) &&
+            (lifting || AA.DO_GCP) )
+          errs += _report_bug("Progress bug");
+      }
+      // Check for HMT progress
+      if( AA.DO_HMT && oliv!=TypeMem.DEAD && _tvar!=null && Env.GVN._opt_mode==GVNGCM.Mode.Opto ) {
+        if( unify(null) ) {
+          if( Combo.HM_FREEZE ) errs += _report_bug("Progress after freezing");
+          if( !work.on(this) ) errs += _report_bug("Progress bug");
+        }
       }
     }
-    for( Node def : _defs ) if( def != null ) errs = def.more_flow(work,lifting,errs);
-    for( Node use : _uses ) if( use != null ) errs = use.more_flow(work,lifting,errs);
+    for( Node def : _defs ) if( def != null ) errs = def.more_work(work,lifting,errs);
+    for( Node use : _uses ) if( use != null ) errs = use.more_work(work,lifting,errs);
     return errs;
   }
+  private int _report_bug(String msg) {
+    FLOW_VISIT.clear(_uid); // Pop-frame & re-run in debugger
+    System.err.println(msg);
+    System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
+    return 1;
+  }
+
 
   // Gather errors, walking from Scope to START.
   public void walkerr_def( HashSet<ErrMsg> errs, VBitSet bs ) {

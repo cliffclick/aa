@@ -81,9 +81,9 @@ public class Env implements AutoCloseable {
     TOP = new Env();
     SCP_0 = TOP._scope;
     STK_0 = SCP_0.stk();
-    // Parse PRIM_SOURCE for the primitives
     PrimNode.PRIMS();           // Initialize
 
+    // Parse PRIM_SOURCE for the primitives
     try {
       // Loading from a file is a Bad Idea in the long run
       byte[] encoded = Files.readAllBytes(Paths.get("./src/main/java/com/cliffc/aa/_prims.aa"));
@@ -193,7 +193,8 @@ public class Env implements AutoCloseable {
   static void pre_combo() {
     // Remove any Env.TOP hooks to function pointers, only kept alive until we
     // can compute a real Call Graph.
-    while( !SCP_0._defs.last().is_prim() )
+    Node n;
+    while( (n=SCP_0._defs.last())!=null && !n.is_prim() )
       SCP_0.pop();
     // Replace the default memory into unknown caller functions, with the
     // matching display.
@@ -251,6 +252,7 @@ public class Env implements AutoCloseable {
     BitsAlias .reset_to_init0();
     BitsFun   .reset_to_init0();
     BitsRPC   .reset_to_init0();
+    Combo.reset();
     // Reset aliases declared as Displays
     ALL_DISPLAYS = LEX_DISPLAYS = BitsAlias.make0(STK_0._alias);
   }

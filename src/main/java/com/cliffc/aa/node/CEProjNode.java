@@ -43,7 +43,7 @@ public class CEProjNode extends CProjNode {
     // arguments).
 
     // Argument count mismatch
-    return ttcall.len()-1/*tfp*/-1/*esc*/ == fun.formals().nargs();
+    return ttcall.len()-1/*tfp*/-1/*esc*/ == fun.nargs();
   }
 
   @Override public TV2 new_tvar( String alloc_site) { return null; }

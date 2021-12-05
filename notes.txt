@@ -1,4 +1,82 @@
 =======================================
+12/5/2021
+
+Getting better testing alive.
+
+Upon the mode-flip to GCP - a bunch of things can LIFT.
+
+- DEFMEM goes "dead", unused.  DEFMEM had-been-used to give minimal "shape" to unknown memory.
+- This means i lift, until Combo... then i can lift some MORE.
+- Can I get rid of DEFMEM?  Or nuke it immediately after Parse?
+- Problem may have been solving the loss of Parser precision after an unknown call - which
+  was just some primitive:
+    - "x+y"
+    - assumption is the unknown call "_+_(x,y)" side-effects "x".  At least until call resolution & inlining.
+
+
+- Unresolved goes "high".  But probably need to leave them low?
+- Unresolved has no plan in the HMT+GCP world.
+- I DO have a plan where I drop unresolved, and just convert all to a simple field-load of some choices,
+- plus a full-arg choice selector.  Require all these choices to be unambiguious overloads,
+- resolvable to a single-target (or not resolved at-all if in error).
+- Better answer: Unresolved *demands* choices are unambiguous, and supports selecting the correct one.
+
+
+
+
+=======================================
+12/4/2021
+
+Holy Moly: prototype "core" HMT+GCP passes in all modes, with 32 rseeds, and
+produces the desired improved results.
+
+Now looking at integrating back into the main AA code base.
+
+Along the way, re-thinking primitives-as-full-objects.
+Still require the good cost-model.
+
+But would like, e.g.
+
+// integer as a struct type
+int =: @{
+  // has a '_val' field which is a TypeInt.INT64
+  _val:$$com.cliffc.aa.type.TypeInt#INT64;
+
+  // All final fields in the type constructor moved to a "class" object.
+  
+
+  // Hidden final field, which is a type-flag.  Demands that the "this"
+  // object fully inline, leaving its mutable fields as bare scalars.  
+  _default_must_object_inline = 1; 
+
+  // Unary operators
+  -_   = {       -> $$com.cliffc.aa.node.PrimNode$MinusI64(_val) }
+  !_   = {       -> $$com.cliffc.aa.node.PrimNode$Not     (_val) };
+  // Binary operators  
+  _-_  = { y:int -> $$com.cliffc.aa.node.PrimNode$SubI64(_val,y._val) };
+  _*_  = { y:int -> $$com.cliffc.aa.node.PrimNode$MulI64(_val,y._val) };
+  _/_  = { y:int -> $$com.cliffc.aa.node.PrimNode$DivI64(_val,y._val) };
+  _%_  = { y:int -> $$com.cliffc.aa.node.PrimNode$ModI64(_val,y._val) };
+  _&_  = { y:int -> $$com.cliffc.aa.node.PrimNode$AndI64(_val,y._val) };
+  _|_  = { y:int -> $$com.cliffc.aa.node.PrimNode$OrI64 (_val,y._val) };
+  // Binary relations
+  _<_  = { y:int -> $$com.cliffc.aa.node.PrimNode$LT_I64(_val,y._val) };
+  _<=_ = { y:int -> $$com.cliffc.aa.node.PrimNode$LE_I64(_val,y._val) };
+  _>_  = { y:int -> $$com.cliffc.aa.node.PrimNode$GT_I64(_val,y._val) };
+  _>=_ = { y:int -> $$com.cliffc.aa.node.PrimNode$GE_I64(_val,y._val) };
+  _==_ = { y:int -> $$com.cliffc.aa.node.PrimNode$EQ_I64(_val,y._val) };
+  _!=_ = { y:int -> $$com.cliffc.aa.node.PrimNode$NE_I64(_val,y._val) };
+  // Non-operators
+  str = { -> $$com.cliffc.aa.node.NewStrNode$ConvertI64Str(_val) };
+  // Hashable
+  hash= { -> . }
+  eq  = { y:int -> . == y }
+
+}
+
+
+
+=======================================
 11/29/2021
 
 And now i need a monotonic Apply-Lift for the combo HM+GCP.

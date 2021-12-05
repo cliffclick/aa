@@ -17,10 +17,10 @@ public class TestHM {
     if( frez_gcp!=null )  assertEquals(frez_gcp.get(),syn.flow_type());
   }
 
-  private static final int[] rseeds = new int[]{0,1,2,3,4,5,6,7};
+  private static final int[] rseeds = new int[]{0,1,2,3};
   private void _run1( String prog, String rez_hm, Supplier<Type> frez_gcp ) {
-    //for( int rseed : rseeds )
-    for( int rseed=0; rseed<32; rseed++ )
+    for( int rseed : rseeds )
+    //for( int rseed=0; rseed<32; rseed++ )
       _run0(prog,rez_hm,frez_gcp,rseed);
   }
 

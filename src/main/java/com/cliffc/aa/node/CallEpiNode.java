@@ -4,7 +4,6 @@ import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMap;
-import com.cliffc.aa.util.Work;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.Env.GVN;
@@ -371,7 +370,7 @@ public final class CallEpiNode extends Node {
     // and GCP flow type in parallel and create a mapping.  Then walk the
     // output HM type and CCP flow type in parallel, and join output CCP types
     // with the matching input CCP type.
-    if( Combo.DO_HM && opt_mode._CG && err==null ) {
+    if( AA.DO_HMT && opt_mode._CG && err==null ) {
       // Walk the inputs, building a mapping
       TV2.T2MAP.clear();
       // Walk the display first, skipping through the function pointer to the display

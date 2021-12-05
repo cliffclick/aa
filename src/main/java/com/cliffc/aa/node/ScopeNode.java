@@ -236,10 +236,6 @@ public class ScopeNode extends Node {
     Type tmem = mem()._val;
     if( _escache_trez == trez &&  _escache_tmem == tmem ) return _escache_escs; // Cache hit
     // Cache miss, compute the hard way
-    if( trez.above_center() )
-      if( Combo.HM_IS_HIGH ) return BitsFun.EMPTY;
-      else if( trez instanceof TypeFunPtr )
-        trez = trez.dual();   // Bring the escaping unresolved functions down low
     if( TypeFunPtr.GENERIC_FUNPTR.isa(trez) ) return BitsFun.FULL; // Can lift to any function
     tmem = tmem instanceof TypeMem ? (TypeMem)tmem : tmem.oob(TypeMem.ALLMEM);
     BitsFun fidxs = trez.all_reaching_fidxs((TypeMem)tmem);

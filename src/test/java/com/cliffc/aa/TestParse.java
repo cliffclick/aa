@@ -2,8 +2,6 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -12,7 +10,7 @@ import java.util.function.Supplier;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 public class TestParse {
   private static final BitsFun TEST_FUNBITS = BitsFun.make0(43);
@@ -64,58 +62,57 @@ public class TestParse {
     test("noinline_inc={x -> x&1}; noinline_p={x -> noinline_inc(x)*2}; noinline_p",
       (()->TypeFunPtr.make(29,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.INT64)),
       ( () -> TypeStruct.args(Type.SCALAR)),
-      "[29]{ int64 -> int64 }" );
+         "[29]{ int64 -> int64 }" );
     // id accepts and returns both ints and reference types (arrays).
     test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
       (() -> TypeMemPtr.make(9,TypeStruct.tupsD(TypeInt.INT8,TypeInt.con(3)))),
       null,
-      "(int64, 3)");
+         "(int64, 3)");
   }
 
   @Test public void testParse00() {
-    test("-1",  TypeInt.con( -1));
-    test("1",   TypeInt.TRUE);
+    test("1",   TypeInt.TRUE, "1");
     // Unary operator
-    test("-1",  TypeInt.con( -1));
-    test("!1",  Type.XNIL);
+    test("-1",  TypeInt.con(-1), "-1");
+    test("!1",  Type.NIL, "nil");
     // Binary operators
-    test("1+2", TypeInt.con(  3));
-    test("1-2", TypeInt.con( -1));
-    test("1+2*3", TypeInt.con(  7));
-    test("1  < 2", TypeInt.TRUE );
-    test("1  <=2", TypeInt.TRUE );
-    test("1  > 2", TypeInt.FALSE);
-    test("1  >=2", TypeInt.FALSE);
-    test("1  ==2", TypeInt.FALSE);
-    test("1  !=2", TypeInt.TRUE );
-    test("1.2< 2", TypeInt.TRUE );
-    test("1.2<=2", TypeInt.TRUE );
-    test("1.2> 2", TypeInt.FALSE);
-    test("1.2>=2", TypeInt.FALSE);
-    test("1.2==2", TypeInt.FALSE);
-    test("1.2!=2", TypeInt.TRUE );
+    test("1+2", TypeInt.con(3), "3");
+    test("1-2", TypeInt.con(-1), "-1");
+    test("1+2*3", TypeInt.con(7), "7");
+    test("1  < 2", TypeInt.TRUE , "1");
+    test("1  <=2", TypeInt.TRUE , "1");
+    test("1  > 2", TypeInt.FALSE, "0");
+    test("1  >=2", TypeInt.FALSE, "0");
+    test("1  ==2", TypeInt.FALSE, "0");
+    test("1  !=2", TypeInt.TRUE , "1");
+    test("1.2< 2", TypeInt.TRUE , "1");
+    test("1.2<=2", TypeInt.TRUE , "1");
+    test("1.2> 2", TypeInt.FALSE, "0");
+    test("1.2>=2", TypeInt.FALSE, "0");
+    test("1.2==2", TypeInt.FALSE, "0");
+    test("1.2!=2", TypeInt.TRUE , "1");
 
     // Binary with precedence check
-    test(" 1+2 * 3+4 *5", TypeInt.con( 27));
-    test("(1+2)*(3+4)*5", TypeInt.con(105));
-    test("1// some comment\n+2", TypeInt.con(3)); // With bad comment
-    test("-1-2*3-4*5", TypeInt.con(-1-(2*3)-(4*5)));
-    test("1&3|1&2", TypeInt.con(1));
+    test(" 1+2 * 3+4 *5", TypeInt.con( 27), "27");
+    test("(1+2)*(3+4)*5", TypeInt.con(105), "105");
+    test("1// some comment\n+2", TypeInt.con(3), "3"); // With bad comment
+    test("-1-2*3-4*5", TypeInt.con(-1-(2*3)-(4*5)), "-27");
+    test("1&3|1&2", TypeInt.con(1), "1");
 
     // Float
-    test("1.2+3.4", TypeFlt.make(0,64,4.6));
+    test("1.2+3.4", TypeFlt.make(0,64,4.6), "4.6");
     // Mixed int/float with conversion
-    test("1+2.3",   TypeFlt.make(0,64,3.3));
+    test("1+2.3",   TypeFlt.make(0,64,3.3), "3.3");
 
     // Simple strings
-    test_obj("\"Hello, world\"", TypeStr.con("Hello, world"));
-    test_obj("str(3.14)"       , TypeStr.con("3.14"));
-    test_obj("str(3)"          , TypeStr.con("3"   ));
-    test_obj("str(\"abc\")"    , TypeStr.ABC);
-    test("\"abc\"==\"abc\"",TypeInt.TRUE); // Constant strings intern
+    test("\"Hello, world\"", TypeStr.con("Hello, world"), "");
+    test("str(3.14)"       , TypeStr.con("3.14"), "");
+    test("str(3)"          , TypeStr.con("3"   ), "");
+    test("str(\"abc\")"    , TypeStr.ABC, "");
+    test("\"abc\"==\"abc\"",TypeInt.TRUE, ""); // Constant strings intern
 
     // Variable lookup
-    test("math.pi", TypeFlt.PI);
+    test("math.pi", TypeFlt.PI, "");
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk",0);
     testerr("!", "Syntax error; trailing junk",0);
@@ -188,7 +185,7 @@ public class TestParse {
     test   ("math.rand(1)?1",TypeInt.BOOL); // Missing optional else defaults to nil
     test("math.rand(1)?\"abc\"",
       (()->TypeMemPtr.make_nil(17,TypeStr.ABC)),
-      null, "*\"abc\"?" );
+         null, "*\"abc\"?" );
     test   ("x:=0;math.rand(1)?(x:=1);x",TypeInt.BOOL);
     testerr("a.b.c();","Unknown ref 'a'",0);
   }
@@ -219,7 +216,7 @@ public class TestParse {
     test("{x -> x&1}",
          (() -> TypeFunPtr.make(78,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.BOOL)),
          ( () -> TypeStruct.make(TypeFld.make("x",Type.SCALAR,ARG_IDX))),
-           "[78]{ int64 -> int64 }");
+         "[78]{ int64 -> int64 }");
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
     testerr("{x y -> x+y}", "Scalar is none of (flt64,int64,*str?)",8); // {Scalar Scalar -> Scalar}
 
@@ -308,10 +305,10 @@ public class TestParse {
 
     test("A= :(str?, int); A( \"abc\",2 )",
       (()-> TypeMemPtr.make(29,TypeStruct.tupsD(TypeMemPtr.make(17,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
-      null, "(*\"abc\",2)");
+         null, "(*\"abc\",2)");
     test("A= :(str?, int); A( (\"abc\",2) )",
       (()-> TypeMemPtr.make(18,TypeStruct.tupsD(TypeMemPtr.make(17,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
-      null, "(*\"abc\",2)");
+         null, "(*\"abc\",2)");
     testerr("A= :(str?, int)?","Named types are never nil",16);
   }
 
@@ -900,70 +897,101 @@ HashTable = {@{
    */
 
 
-  static private TypeEnv run( String program ) {
-    TypeEnv te = Exec.file("test",program);
-    if( te._errs != null ) System.err.println(te._errs.toString());
-    assertNull(te._errs);
-    return te;
+  static private void test( String program, Type expected ) {
+    throw unimpl(); // replace with full test
   }
 
-  static private void test( String program, Type expected ) {
-    TypeEnv te = run(program);
-    assertEquals(expected,te._t);
-  }
-  static private void test( String program, Supplier<Type> expect_maker, Supplier<TypeStruct> expect_formal_maker, String hm_expect ) {
-    TypeEnv te = run(program);
-    Type actual_flow = te._tmem.sharptr(te._t);
-    TV2 actual_hm = te._hmt;
-    String hm_actual = actual_hm.p();
-    Type expect = expect_maker.get();
-    assertEquals(expect,actual_flow);
-    if( expect instanceof TypeFunPtr ) {
-      TypeStruct actual_formals = te._formals;
-      TypeStruct expect_formals = expect_formal_maker.get();
-      assertEquals(expect_formals,actual_formals);
-    } else
-      assert expect_formal_maker==null;
-    if( Combo.DO_HM )
-      assertEquals(stripIndent(hm_expect),stripIndent(hm_actual));
+  // Run a program once, with a given seed and typing flags
+  static private void _test0( String program, Supplier<Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect, int rseed ) {
+    TypeEnv te = Exec.file("test",program,rseed,gcp_maker!=null,hmt_expect!=null);
+    if( gcp_maker != null ) {
+      Type expect = gcp_maker.get();
+      Type actual = te._tmem.sharptr(te._t);
+      assertEquals(expect,actual);
+      // Also check GCP formals.
+      if( expect instanceof TypeFunPtr ) {
+        TypeStruct actual_formals = te._formals;
+        TypeStruct expect_formals = formals_maker.get();
+        assertEquals(expect_formals,actual_formals);
+      } else
+        assert formals_maker==null;
+    }
+    if( hmt_expect != null ) {
+      TV2 actual = te._hmt;
+      String actual_str = actual.p();
+      assertEquals(stripIndent(hmt_expect),stripIndent(actual_str));
+    }
   }
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
 
+  // Run a program once-per-rseed
+  private static final int[] rseeds = new int[]{0,1,2,3};
+  private void _test1( String program, Supplier<Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect ) {
+    for( int rseed : rseeds )
+    //for( int rseed=0; rseed<32; rseed++ )
+      _test0(program,gcp_maker,formals_maker,hmt_expect,rseed);
+  }
+
+  // Run a program in all 3 modes, with all rseeds
+  private void test( String program, Supplier<Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect ) {
+    _test1(program,gcp_maker,formals_maker,null);
+    _test1(program,null      ,null          ,hmt_expect);
+    _test1(program,gcp_maker,formals_maker,hmt_expect);
+  }
+
+  // Short form test: simple GCP, no formal args
+  private void test( String program, Type gcp_maker, String hmt_expect ) {
+    test(program,()->gcp_maker,null,hmt_expect);
+  }
+
+  static void testerr( String program, String err, int cur_off ) {
+    //TypeEnv te = Exec.file("test",program);
+    //assertTrue(te._errs != null && te._errs.size()>=1);
+    //String cursor = new String(new char[cur_off]).replace('\0', ' ');
+    //String err2 = new SB().p("test:1:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
+    //assertEquals(err2,strip_alias_numbers(te._errs.get(0).toString()));
+    throw unimpl();
+  }
+
   static private void test( String program, String flow_expect, String hm_expect ) {
-    TypeEnv te = run(program);
-    Type flow_actual = te._tmem.sharptr(te._t);
-    String flow_str = flow_actual.str(new SB(),new VBitSet(),null,false).toString(); // Print what we see
-    TV2 hm_actual = te._hmt;
-    String hm_str = hm_actual.p();
-    assertEquals(flow_expect,flow_str);
-    if( Combo.DO_HM )
-      assertEquals(stripIndent(hm_expect),stripIndent(hm_str));
+    //TypeEnv te = run(program);
+    //Type flow_actual = te._tmem.sharptr(te._t);
+    //String flow_str = flow_actual.str(new SB(),new VBitSet(),null,false).toString(); // Print what we see
+    //TV2 hm_actual = te._hmt;
+    //String hm_str = hm_actual.p();
+    //assertEquals(flow_expect,flow_str);
+    //if( Combo.DO_HM )
+    //  assertEquals(stripIndent(hm_expect),stripIndent(hm_str));
+    throw unimpl();
   }
 
 
   static private void test_prim( String program, String prim ) {
-    Type expected = Env.TOP.lookup_valtype(prim);
-    TypeEnv te = run(program);
-    if( te._errs != null ) System.err.println(te._errs);
-    assertNull(te._errs);
-    assertEquals(expected,te._t);
+    //Type expected = Env.TOP.lookup_valtype(prim);
+    //TypeEnv te = run(program);
+    //if( te._errs != null ) System.err.println(te._errs);
+    //assertNull(te._errs);
+    //assertEquals(expected,te._t);
+    throw unimpl();
   }
   static private void test_named_tuple( String program, Type... args ) {
-    TypeEnv te = run(program);
-    assertTrue(te._t instanceof TypeFunPtr);
-    TypeFunPtr actual = (TypeFunPtr)te._t;
-    assertEquals(ARG_IDX+args.length,actual.nargs());
-    assertTrue(actual._ret instanceof TypeMemPtr && actual._ret.simple_ptr()==actual._ret);
-    if( te._formals.is_tup() )
-      for( TypeFld fld : te._formals.flds() )
-        assertEquals(args[fld._order-ARG_IDX],fld._t);
+    //TypeEnv te = run(program);
+    //assertTrue(te._t instanceof TypeFunPtr);
+    //TypeFunPtr actual = (TypeFunPtr)te._t;
+    //assertEquals(ARG_IDX+args.length,actual.nargs());
+    //assertTrue(actual._ret instanceof TypeMemPtr && actual._ret.simple_ptr()==actual._ret);
+    //if( te._formals.is_tup() )
+    //  for( TypeFld fld : te._formals.flds() )
+    //    assertEquals(args[fld._order-ARG_IDX],fld._t);
+    throw unimpl();
   }
 
   static private void test_obj( String program, TypeObj expected) {
-    TypeEnv te = run(program);
-    assertTrue(te._t instanceof TypeMemPtr);
-    TypeObj actual = te._tmem.ld((TypeMemPtr)te._t);
-    assertEquals(expected,actual);
+    //TypeEnv te = run(program);
+    //assertTrue(te._t instanceof TypeMemPtr);
+    //TypeObj actual = te._tmem.ld((TypeMemPtr)te._t);
+    //assertEquals(expected,actual);
+    throw unimpl();
   }
   static private void test_struct( String program, TypeStruct expected) {
     //TypeEnv te = run(program);
@@ -998,17 +1026,6 @@ HashTable = {@{
     //Type actual = te._tmem.sharptr(te._t);
     //assertTrue(actual.isa(expected));
     throw unimpl();
-  }
-  static private void testerr( String program, String err, String cursor ) {
-    System.out.println("fix test, cur_off="+cursor.length());
-    fail();
-  }
-  static void testerr( String program, String err, int cur_off ) {
-    TypeEnv te = Exec.file("test",program);
-    assertTrue(te._errs != null && te._errs.size()>=1);
-    String cursor = new String(new char[cur_off]).replace('\0', ' ');
-    String err2 = new SB().p("test:1:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
-    assertEquals(err2,strip_alias_numbers(te._errs.get(0).toString()));
   }
   private static String strip_alias_numbers( String err ) {
     // Remove alias#s from the result string: *[123]@{x=1,y=2} ==> *[$]@{x=1,y=2}

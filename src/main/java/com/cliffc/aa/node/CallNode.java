@@ -607,6 +607,7 @@ public class CallNode extends Node {
     return cepi != null && fidxs.bitCount() <= cepi.nwired();
   }
 
+  // TODO: Yank all this, do 1st-arg lookups only.
   // Resolve choice calls based on the left arg.
   public BitsFun least_cost2(BitsFun choices) {
     if( choices==BitsFun.EMPTY || choices==BitsFun.FULL|| choices==BitsFun.ANY  || choices.abit() != -1 )
@@ -639,8 +640,10 @@ public class CallNode extends Node {
       }
     }
 
-    if( (!hi || !Combo.HM_IS_HIGH ) && fi!=0 && ff!=0 && fx==0 ) {
-      fdxs = fdxs.clear(ff);
+    // Have an int-choice and a float-choice and no unknown choices.
+    // Toss the float choice.
+    if( fi!=0 && ff!=0 && fx==0 ) {
+      if( !hi ) fdxs = fdxs.clear(ff);
     }
     if( hi && fdxs.abit()== -1 )
       fdxs = fdxs.dual();
@@ -655,7 +658,7 @@ public class CallNode extends Node {
       if( nformal.isa(formal) )
         return fidxs.clear(fidx).set(nidx); // Keep the tighter bounds
       if( formal.isa(nformal) )
-        return fidxs;           // Keep the tigher bounds
+        return fidxs;           // Keep the tighter bounds
     }
     return fidxs.set(nidx);     // Extend
   }
@@ -733,22 +736,6 @@ public class CallNode extends Node {
   }
 
   @Override public TV2 new_tvar( String alloc_site) { return null; }
-
-  // Resolve a call, removing ambiguity during the GCP/Combo pass.
-  @Override public boolean remove_ambi(Ary<Node> oldfdx) {
-    BitsFun fidxs = ttfp(_val).fidxs();
-    if( !fidxs.above_center() ) return true ; // Resolved after all
-    if( fidxs == BitsFun.ANY )  return false; // Too many choices, no progress
-    return false;
-    // TODO Yank this whole method
-    //// Pick least-cost among choices
-    //Node fdx = fdx();
-    //FunPtrNode fptr = least_cost(fidxs,fdx);
-    //if( fptr==null ) return false; // Not resolved, no progress
-    //oldfdx.push(fdx.keep());       // Keep current liveness until the end of Combo
-    //set_fdx(fptr);                 // Set resolved edge
-    //return true;                   // Progress
-  }
 
   // See if we can resolve an unresolved Call
   @Override public void combo_resolve(WorkNode ambi) {

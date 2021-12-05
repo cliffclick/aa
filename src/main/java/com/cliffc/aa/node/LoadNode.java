@@ -195,8 +195,9 @@ public class LoadNode extends Node {
   @Override public Type value(GVNGCM.Mode opt_mode) {
     Type tx = _value();
     if( _hm_lift ) {
-      Type th = tvar().as_flow(opt_mode == GVNGCM.Mode.Opto && Combo.HM_IS_HIGH);
-      tx = tx.join(th).simple_ptr();
+      //Type th = tvar().as_flow(opt_mode == GVNGCM.Mode.Opto && Combo.HM_IS_HIGH);
+      //tx = tx.join(th).simple_ptr();
+      throw unimpl();
     }
     return tx;
   }

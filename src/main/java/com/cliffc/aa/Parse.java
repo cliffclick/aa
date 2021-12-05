@@ -1228,7 +1228,7 @@ public class Parse implements Comparable<Parse> {
     return typeq(tmp);          // And check for null-ness
   }
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
-  private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil(Type.XNIL) : t; }
+  private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil(Type.NIL) : t; }
 
   // No mod is r/w.  ':=' is read-write, '=' is final.
   // Currently '-' is ambiguous with function arrow ->.

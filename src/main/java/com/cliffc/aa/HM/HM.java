@@ -135,7 +135,6 @@ public class HM {
 
     // Pass 2: Give up on the Root GCP arg types.  Drop them to the best Root
     // approximation and never lift again.
-    // TODO: Combine pass2 & pass3
     prog.update_root_args(work);
     work_cnt+=main_work_loop(prog,work);
     assert prog.more_work(work);

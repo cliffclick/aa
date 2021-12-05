@@ -1,7 +1,8 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.node.*;
-import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.node.FunNode;
+import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.WorkNode;
 import com.cliffc.aa.util.VBitSet;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -133,119 +134,80 @@ only after that recursively calls itself.
 
  */
 public abstract class Combo {
-  public static final boolean DO_HM=true;
-  public static boolean HM_IS_HIGH;
-
-  // If true, H-M "may be nil" errors from Loads and Stores are tolerated.
-  // This allows FreshNodes used once by an if-test and again by some Loads
-  // and Stores to get the same H-M type.  With the same H-M type its legit
-  // to CSE the Freshs together... which enables the following Cast to detect
-  // that the Load/Store address was indeed nil-checked.
-
-  // During the 2nd Combo pass this is turned off, and all "may be nil"
-  // errors are correctly checked for.
-
-  // TODO: Probably needs a more robust and less kludgey handling.  I could
-  // argue that at the time the Cast is inserted into the graph it guaranteed
-  // can lift the address - I just want to be able to prove it from Combo.
-  public static boolean CHECK_FOR_NOT_NIL = false;
+  static public boolean HM_FREEZE;
 
   public static void opto() {
     Env.GVN._opt_mode = GVNGCM.Mode.Opto;
 
     // General worklist algorithm
     WorkNode work = new WorkNode("Combo",false) { @Override public Node apply(Node n) { throw unimpl(); } };
-    // Collect unresolved calls, and verify they get resolved.
-    WorkNode ambi = new WorkNode("Ambi" ,false) { @Override public Node apply(Node n) { throw unimpl(); } };
-    // Collect old fdx of resolved calls; during resolution they go unused
-    // changing their liveness in a not-monotonic way.  Force them to be
-    // remain live until the of Combo.
-    Ary<Node> oldfdx = new Ary<>(Node.class);
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
     Env.START.walk_initype(work);
+    // The mode-flip to Opto allows some Nodes to lift.
+    // If not doing GCP, lift them now (pessimistically)
+    if( !AA.DO_GCP ) Env.GVN.iter(GVNGCM.Mode.Opto);
+
     // Make the non-gen set in a pre-pass
     for( FunNode fun : FunNode.FUNS ) if( fun!=null ) fun._nongen=null; // Clear old stuff
     for( FunNode fun : FunNode.FUNS ) if( fun!=null && !fun.is_dead() ) fun.prep_nongen();// Make new
-    assert Env.START.more_flow(work,false)==0; // Initial conditions are correct
-    HM_IS_HIGH=true;
+    assert Env.START.more_work(work,false)==0; // Initial conditions are correct
 
-    // Repeat; if we remove some ambiguous choices, and keep falling until the
-    // graph stabilizes without ambiguity.
+    // Init
+    HM_FREEZE = false;
+    int work_cnt=0;
+
+    // Pass 1: Everything starts high/top/leaf and falls; escaping function args are assumed high
+    work_cnt += main_work_loop(work);
+    assert Env.START.more_work(work,false)==0;
+
+    // Pass 2: Give up on the Root GCP arg types.  Drop them to the best Root
+    // approximation and never lift again.
+    Node.RESET_VISIT.clear();
+    Env.START.walk_combo_phase2(work,Env.FILE._scope.top_escapes());
+    work_cnt += main_work_loop(work);
+    assert Env.START.more_work(work,false)==0;
+
+    // Pass 3: H-M types freeze, escaping function args are assumed lowest H-M compatible and
+    // GCP types continue to run downhill.
+    HM_FREEZE = true;
+    ////prog.visit((syn) -> { syn.add_val_work(null,work); return work.add(syn); }, (a,b)->null);
+    work_cnt += main_work_loop(work);
+    assert Env.START.more_work(work,false)==0;
+
+    Node.VALS.clear();
+    Env.START.walk_opt(new VBitSet());
+  }
+
+  static int main_work_loop( WorkNode work ) {
+
     int cnt=0;                  // Debug counter
-    while( !work.isEmpty() || HM_IS_HIGH ) {
 
-      // Analysis phase.
-      // Work down list until all reachable nodes types quit falling
-      Node n;
-      while( (n=work.pop()) != null ) {
-        cnt++; assert cnt < 100000; // Infinite loop check
-        if( n.is_dead() ) continue; // Can be dead functions after removing ambiguous calls
+    // Analysis phase.
+    // Work down list until all reachable nodes types quit falling
+    Node n;
+    while( (n=work.pop()) != null ) {
+      cnt++; assert cnt < 100000; // Infinite loop check
 
+      if( AA.DO_GCP ) {
         // Forwards flow
         n.combo_forwards(work);
 
         // Backwards flow
         n.combo_backwards(work);
 
-        // H-M unification
-        if( DO_HM )
-          n.combo_unify(work);
-
-        // Check for resolving an unresolved call
-        n.combo_resolve(ambi);
-
-        // Very expensive assert: everything that can make progress is on worklist
-        //assert Env.START.more_flow(work,false)==0;
       }
 
-      // Remove CallNode ambiguity after worklist runs dry.  This makes a
-      // 'least_cost' choice on unresolved Calls, and lowers them in the
-      // lattice... allowing more GCP progress.
-      remove_ambi(ambi,work,oldfdx);
+      // H-M unification
+      if( AA.DO_HMT )
+        n.combo_unify(work);
 
-      // Combo Phase 2: HM has fallen (and picked up structure) as far as it
-      // will go.  Nodes depending on being called from top-level escaped
-      // functions will have been lifted by an optimistic HM.  HM leaves were
-      // pinned to Type.XNSCALR to keep the GCP values from falling too soon.
-      // Now that we have a valid HM computed, we allow the top-level escaped
-      // functions to all be called by the most conservative callers who also
-      // are at least HM correct: no fair calling an escaped function with
-      // type-unsafe arguments.
-      if( work.isEmpty() && HM_IS_HIGH ) {
-        assert Env.START.more_flow(work,false)==0; // Final conditions are correct
-        HM_IS_HIGH=false;
-        // All escaping fcn parms to worklist
-        Node.RESET_VISIT.clear();
-        Env.START.walk_combo_phase2(work,Env.FILE._scope.top_escapes());
-        assert Env.START.more_flow(work,false)==0; // Final conditions are correct
-      }
-      // If nothing resolved and there are still ambiguous calls, the program
-      // is in error.  Force them to act as-if called by all choices and finish
-      // off the combined algorithm.
-      if( work.isEmpty() && !HM_IS_HIGH )
-        for( int i=0; i<ambi.len(); i++ )
-          if( !((CallNode)ambi.at(i))._not_resolved_by_gcp )
-            ((CallNode)work.add(ambi.at(i)))._not_resolved_by_gcp = true;
+      // Very expensive assert: everything that can make progress is on worklist
+      //assert Env.START.more_work(work,false)==0;
     }
-
-    assert Env.START.more_flow(work,false)==0; // Final conditions are correct
-    while( !oldfdx.isEmpty() ) oldfdx.pop().unhook();
-    Node.VALS.clear();
-    Env.START.walk_opt(new VBitSet());
+    return cnt;
   }
 
-  // Resolve ambiguous calls, and put on the worklist to make more progress.
-  private static void remove_ambi(WorkNode ambi, WorkNode work, Ary<Node> oldfdx) {
-    assert work.isEmpty();
-    for( int i=0; i<ambi.len(); i++ ) {
-      CallNode call = (CallNode)ambi.at(i);
-      if( call.remove_ambi(oldfdx) ) {
-        ambi.del(i--);
-        work.add(call);
-        work.add(call.cepi());
-      }
-    }
-  }
+  static void reset() { HM_FREEZE=false; }
 }

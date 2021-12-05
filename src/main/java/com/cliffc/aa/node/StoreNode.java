@@ -210,14 +210,6 @@ public class StoreNode extends Node {
   // the fld, which unifies with the value.  If the fld is missing, then if the
   // ptr is open, add the field else missing field error.
   public static boolean unify( String name, Node ldst, TV2 ptr, Type tptr, TV2 tval, String id, WorkNode work ) {
-    // Check for nil address
-    if( Combo.CHECK_FOR_NOT_NIL )
-      if( ptr.is_nil() || (tptr instanceof TypeMemPtr && tptr.must_nil()) )
-        return work==null || ldst.tvar().unify(TV2.make_err(ldst,"May be nil when accessing field "+id,"Store_update"),work);
-
-    // If the Load/Store is in flow-type error
-    if( Combo.CHECK_FOR_NOT_NIL && ldst.err(true)!=null )
-      return work==null || ptr.unify(TV2.make_err(ldst,ldst.err(false)._msg,"Store_update"),work);
 
     // Matching fields unify
     TV2 fld = ptr.get(id);
