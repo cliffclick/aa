@@ -1,48 +1,47 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.Env;
+import com.cliffc.aa.ErrMsg;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
-import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Util;
+import com.cliffc.aa.type.Type;
 
-import java.util.Arrays;
+import static com.cliffc.aa.AA.unimpl;
 
-import static com.cliffc.aa.AA.ARG_IDX;
-
-public class UnresolvedNode extends UnOrFunPtrNode {
+/** A collection of functions that can be unambiguously called (no virtual, no
+ *  table-lookup) from all call sites.  The arguments have no overlap ("tile"
+ *  the argument space), and so once a calls arguments are sufficiently
+ *  resolved only a single FunPtr ever applies.
+ *
+ *  
+ */
+public class UnresolvedNode extends Node {
+  private final String _name;   // Name of unresolved function
   private final Parse _bad;
-  UnresolvedNode( Parse bad, Node... funs ) { super(OP_UNR,funs); _bad = bad; }
+  // Unresolved moves through 3-states:
+  // - 0 forward-ref; scope is not known; can add_fun
+  // - 1 scoped; scope is known; can add_fun
+  // - 2 defined; scope is known and complete, no more add_fun.
+  // If no inputs, then remains an undefined forward-ref.
+  private byte _fref;
+  UnresolvedNode( String name, Parse bad ) { super(OP_UNR); _name = name; _bad=bad; }
   @Override public String xstr() {
     if( is_dead() ) return "DEAD";
-    if( in(0) instanceof FunPtrNode ) {
-      FunPtrNode fptr = (FunPtrNode)in(0);
-      FunNode fun = fptr.xfun();
-      return "Unr:"+(fun==null ? "null" : fun.xstr());
-    }
-    return "Unr???";
+    if( _defs._len==0 ) return "???"+_name;
+    String s = switch( _fref ) {
+    case 0 -> "???";
+    case 1 -> "?";
+    default -> "";
+    };
+    return s+_name;
   }
   @Override public Node ideal_reduce() {
-    if( _defs._len < 2 )               // One function, consumer should treat as a copy
-      return in(0);                    // Collapse
-    // Back-to-back Unresolved collapse (happens due to inlining)
-    boolean progress=false;
-    for( int i=0; i<_defs._len; i++ ) {
-      if( in(i) instanceof UnresolvedNode ) {
-        progress = true;
-        Node u = in(i);
-// TODO: folding a primitive Unresolved, instead probably need to make a new one...
-        for( int j=0; j<u._defs._len; j++ )
-          add_def(u.in(j));
-        set_def(i,pop());
-      }
-      assert in(i) instanceof FunPtrNode;
-      if( in(i).in(0)==null )
-        { progress = true; remove(i--); }
-    }
-    return progress ? this : null;
+    // Defined with only 1, nuke it
+    return is_defined() && _defs._len == 1 ? in(0) : null;
   }
-
+  
   @Override public Type value() {
+    if( is_forward_ref() ) return Type.ALL;
     Type t = Type.ANY;
     for( Node fptr : _defs )
       t = t.meet(fptr._val);
@@ -61,31 +60,30 @@ public class UnresolvedNode extends UnOrFunPtrNode {
     return false;
   }
 
-  // Validate same name, operator-precedence
-  private void add_def_unresolved( FunPtrNode ptr ) {
-    if( _defs._len>0 ) {
-      FunPtrNode ptr0 = (FunPtrNode) in(0);
-      assert Util.eq(ptr0._name, ptr._name);
-      // Actually, equal op_prec only for binary ops
-      assert ptr0.fun()._op_prec == ptr.fun()._op_prec || ptr0.nargs()== AA.ARG_IDX+1; // Either a uniop, or same precedence
-    }
-    add_def(ptr);
+  // A forward-ref is an assumed unknown-function being used before being
+  // declared.  Hence, we want a callable function pointer, but have no defined
+  // body (yet).  Make a function pointer that takes/ignores all args, and
+  // returns a scalar.
+  public static UnresolvedNode forward_ref( String name, Parse unkref ) {
+    return new UnresolvedNode(name,unkref);
   }
 
-  // Filter out all the wrong-arg-count functions from Parser.
-  @Override public UnOrFunPtrNode filter( int nargs ) {
-    UnOrFunPtrNode x = null;
-    for( Node epi : _defs ) {
-      FunPtrNode fptr = (FunPtrNode)epi;
-      // User-nargs are user-visible #arguments.
-      // Fun-nargs include the ctrl, display & memory, hence the +ARG_IDX.
-      if( fptr.nargs() != ARG_IDX+nargs ) continue;
-      if( fptr.op_prec()==0 ) continue; // Balanced op
-      if( x == null ) x = fptr.keep();
-      else if( x instanceof UnresolvedNode ) ((UnresolvedNode)x).add_def_unresolved(fptr);
-      else x = new UnresolvedNode(_bad,x.unkeep(),fptr).keep();
-    }
-    return x==null ? null : (UnOrFunPtrNode)Env.GVN.xform(x.unkeep());
+  // True if this is a forward_ref
+  public boolean is_forward_ref() { return _defs._len==0 || _fref<=1; }
+  // One-time flip _fref, no longer a forward ref
+  public UnresolvedNode scoped() { assert _fref==0; _fref=1; return this; }
+  public UnresolvedNode define() { assert _fref==1; _fref=2; return this; }
+  boolean is_scoped() { return _fref==1; }
+  boolean is_defined() { return _fref==2; }
+
+  // Add Another function to an Unresolved and return null, or return an ErrMsg
+  // if this would add an ambiguous signature.
+  public ErrMsg add_fun(FunPtrNode fun) {
+    for( Node n : _defs )
+      if( ((FunPtrNode)n).nargs()==fun.nargs() )
+        throw unimpl();         // Check ambiguous against all other signatures
+    add_def(fun);
+    return null;
   }
 
   // Return a funptr for this fidx.
@@ -97,9 +95,9 @@ public class UnresolvedNode extends UnOrFunPtrNode {
   }
 
   // Same NARGS across all defs
-  @Override public int nargs() { return funptr().nargs(); }
-  @Override public FunPtrNode funptr() { return (FunPtrNode)_defs.at(0); }
-  @Override public UnresolvedNode unk() { return this; }
+  //public int nargs() { return funptr().nargs(); }
+  //public FunPtrNode funptr() { return (FunPtrNode)_defs.at(0); }
+  //public UnresolvedNode unk() { return this; }
 
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.  Should be the same across all defs.
@@ -111,7 +109,8 @@ public class UnresolvedNode extends UnOrFunPtrNode {
   }
   // Make a copy with an error message
   public UnresolvedNode copy(Parse bad) {
-    return new UnresolvedNode(bad,Arrays.copyOf(_defs._es,_defs._len));
+    //return new UnresolvedNode(bad,Arrays.copyOf(_defs._es,_defs._len));
+    throw unimpl();
   }
 
   // Choice of typically primitives, all of which are pure.
@@ -122,4 +121,10 @@ public class UnresolvedNode extends UnOrFunPtrNode {
         return null;
     return this;                // Yes, all choices are pure
   }
+
+  // Assigning the forward-ref removes the error
+  @Override public ErrMsg err( boolean fast ) {
+    throw unimpl();
+  }
+
 }

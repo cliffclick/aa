@@ -59,9 +59,6 @@ public class Env implements AutoCloseable {
 
   // Set of all display aliases, used to track escaped displays at call sites for asserts.
   public static BitsAlias ALL_DISPLAYS = BitsAlias.EMPTY;
-  // Set of lexically active display aliases, used for a conservative display
-  // approx for forward references.
-  public static BitsAlias LEX_DISPLAYS = BitsAlias.EMPTY;
 
   // Add a permanent edge use to all these Nodes, keeping them alive forever.
   @SuppressWarnings("unchecked")
@@ -128,7 +125,6 @@ public class Env implements AutoCloseable {
     _scope.set_rez (ALL_PARM);
     KEEP_ALIVE.add_def(_scope);
     ALL_DISPLAYS = ALL_DISPLAYS.set(nnn._alias);   // Displays for all time
-    LEX_DISPLAYS = LEX_DISPLAYS.set(nnn._alias);   // Lexically active displays
     GVN.do_iter();
   }
 
@@ -184,8 +180,6 @@ public class Env implements AutoCloseable {
       stk.promote_forward(pscope.stk());
 
     Node ptr = _scope.ptr();
-    //if( ptr == null ) return;   // Already done
-    LEX_DISPLAYS = LEX_DISPLAYS.clear(stk._alias);
     stk.no_more_fields();
     GVN.add_flow(stk);          // Scope object going dead, trigger following projs to cleanup
     _scope.set_ptr(null);       // Clear pointer to display
@@ -267,7 +261,7 @@ public class Env implements AutoCloseable {
     BitsRPC   .reset_to_init0();
     Combo.reset();
     // Reset aliases declared as Displays
-    ALL_DISPLAYS = LEX_DISPLAYS = BitsAlias.make0(STK_0._alias);
+    ALL_DISPLAYS = BitsAlias.make0(STK_0._alias);
   }
 
   // Return Scope for a name, so can be used to determine e.g. mutability
@@ -298,36 +292,38 @@ public class Env implements AutoCloseable {
   // Prefix uniop lookup.  The '_' follows the uniop name.
   // Note that "!_var" parses as "! _var" and not as "!_ var".
   // Also "[_]" is a balanced uni-op.
-  UnOrFunPtrNode lookup_filter_uni( String name ) {
+  Node lookup_filter_uni( String name ) {
     if( !Parse.isOp(name) ) return null; // Limit to operators
-    UnOrFunPtrNode n = _lookup_filter(1,    name,1);     // Lookup unbalanced uni-op
-    return  n==null ?  _lookup_filter(0," "+name,1) : n; // Try again for a balanced uni-op
+    //UnOrFunPtrNode n = _lookup_filter(1,    name,1);     // Lookup unbalanced uni-op
+    //return  n==null ?  _lookup_filter(0," "+name,1) : n; // Try again for a balanced uni-op
+    throw unimpl();
   }
 
   // Infix binop lookup
   // _+_       - Normal binop, looks up "_+_"
-  UnOrFunPtrNode lookup_filter_bin( String name ) {
+  Node lookup_filter_bin( String name ) {
     if( !Parse.isOp(name) ) return null; // Limit to operators
     return _lookup_filter(1,"_"+name,2);
   }
   // Infix balanced operators, including 3 argument
   // _[_]      - array-lookup     balanced op, looks up " _[_"
   // _[_]=_    - array-assignment balanced op, looks up " _[_"
-  UnOrFunPtrNode lookup_filter_bal( String name ) {
+  Node lookup_filter_bal( String name ) {
     if( !Parse.isOp(name) ) return null; // Limit to operators
     return _lookup_filter(0," _"+name,2);
   }
 
-  private UnOrFunPtrNode _lookup_filter( int op_prec_test, String name, int nargs ) {
+  private Node _lookup_filter( int op_prec_test, String name, int nargs ) {
     for( int i=name.length(); i>0; i-- ) { // First name found will return
       // Prepare the name from the token
       String name2 = name.substring(0,i)+"_";
-      UnOrFunPtrNode n = (UnOrFunPtrNode)lookup(name2.intern());
-      if( n != null && n.op_prec() >= op_prec_test ) {
-        UnOrFunPtrNode m = n.filter(nargs); // Filter for args
-        if( m!=null )
-          return (UnOrFunPtrNode)Env.GVN.xform(new FreshNode(_fun,m));
-      }
+      //Node n = lookup(name2.intern());
+      //if( n != null && n.op_prec() >= op_prec_test ) {
+      //  UnOrFunPtrNode m = n.filter(nargs); // Filter for args
+      //  if( m!=null )
+      //    return (UnOrFunPtrNode)Env.GVN.xform(new FreshNode(_fun,m));
+      //}
+      throw unimpl();
     }
     return null;
   }

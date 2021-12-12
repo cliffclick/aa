@@ -864,8 +864,8 @@ public abstract class Node implements Cloneable, IntSupplier {
     for( int i=0; i<_defs._len; i++ ) {
       Node def = _defs.at(i);   // Walk data defs for more errors
       if( def == null || def._val == Type.XCTRL ) continue;
-      // Walk function bodies that are wired, but not bare FunPtrs.
-      if( def instanceof FunPtrNode && !def.is_forward_ref() && !(this instanceof ScopeNode) )
+      // Walk function bodies that are wired
+      if( def instanceof FunPtrNode && !(this instanceof ScopeNode) )
         continue;
       def.walkerr_def(errs,bs);
     }
@@ -902,7 +902,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // on the ProjNode index
   public Node is_copy(int idx) { return null; }
 
-  // Only true for some RetNodes and FunNodes
+  // Only true for Unresolved
   public boolean is_forward_ref() { return false; }
 
   // True if this Call/CallEpi pair does not read or write memory.

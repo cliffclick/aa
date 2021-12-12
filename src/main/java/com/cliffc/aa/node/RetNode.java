@@ -200,5 +200,4 @@ public final class RetNode extends Node {
 
   @Override public Node is_copy(int idx) { throw com.cliffc.aa.AA.unimpl(); }
   boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }
-  @Override public boolean is_forward_ref() { return fun().is_forward_ref(); }
 }

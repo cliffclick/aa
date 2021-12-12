@@ -207,9 +207,9 @@ public class Parse implements Comparable<Parse> {
     Type t = typev();
     if( t==null ) return err_ctrl2("Missing type after ':'");
     if( peek('?') ) return err_ctrl2("Named types are never nil");
-    // TODO: stronger check; ok to see a fref of a type constructor here
     Node val = lookup(tvar);
-    if( val != null && !val.is_forward_ref() ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
+    if( !val.is_forward_ref() )
+      return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
     Parse bad = errMsg();
     // Single-inheritance & vtables & RTTI:
     //            "Objects know thy Class"
@@ -240,8 +240,8 @@ public class Parse implements Comparable<Parse> {
     _e.add_type(tvar,tn); // Add a type mapping
     // Back door return ptr-to-NewObj
     ProjNode ptr = (ProjNode)GVNGCM.KEEP_ALIVE.pop();
-    // Unlink the constructed object; it only exists for the type-domain and is
-    // never actually allocated "in real life".
+    // Unlink the constructed sample object; it only exists for the type-domain
+    // and is never actually allocated "in real life".
     Node omem = mem();
     int midx = omem.push();     // Keep around
     set_mem(((MrgProjNode)omem).mem()); // Unlink from memory
@@ -258,19 +258,17 @@ public class Parse implements Comparable<Parse> {
     // does not change, but a TypeMem[alias#] would now map to the Named
     // variant.
     TypeStruct ts = (TypeStruct)((TypeMemPtr)tn._val)._obj;
+    int pidx = ptr.push();
     FunPtrNode epi1 = IntrinsicNode.convertTypeName(ts,bad,ptr);
     do_store(lookup_scope(tvar,false),epi1,Access.Final,tvar,bad);
     // Add a second constructor taking an expanded arg list
-    FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(ts, tn.alias(), errMsg(), _e, ptr);
+    FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(ts, tn.alias(), errMsg(), _e, (ProjNode)Node.pop(pidx));
+    Node.pop(midx);             // No longer keeping the sample struct around
     do_store(scope(),epi2,Access.Final,tvar,bad);
-    // TODO:
-    // Node.pop(midx);
-    // TODO:
-    // Swap the sample object for a ConNode of just a TMP#alias.
-    // After the 2nd convertTypeName, should have extracted all the final-fields inits'
-    // so let the omem go dead.
-    throw unimpl();
-    //return _e.lookup(tvar); // Returns an Unresolved of constructors
+    UnresolvedNode unr = (UnresolvedNode)_e.lookup(tvar); // Returns an Unresolved of constructors
+    // TODO: Ponder just being scoped and not defined - which will allow more
+    // constructors in the same scope.
+    return unr.scoped().define();
   }
 
   /** A statement is a list of variables to final-assign or re-assign, and an
@@ -381,7 +379,7 @@ public class Parse implements Comparable<Parse> {
 
   // Assign into display, changing an existing def
   private Node do_store(ScopeNode scope, Node ifex, Access mutable, String tok, Parse bad) {
-    if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
+    if( ifex instanceof FunPtrNode )
       ((FunPtrNode)ifex).bind(tok); // Debug only: give name to function
     final int iidx = ifex.push();
     // Find scope for token.  If not defining struct fields, look for any
@@ -395,22 +393,11 @@ public class Parse implements Comparable<Parse> {
       scope().replace_mem(st);
       return Node.pop(iidx);
     }
-    // Handle re-assignments and forward referenced function definitions.
-    Node n = scope.stk().get(tok); // Get prior direct binding
-    if( n.is_forward_ref() ) {     // Prior is a f-ref
-      assert !scope.stk().is_mutable(tok) && scope == scope();
-      if( ifex instanceof UnresolvedNode ) throw unimpl();
-      if( ifex instanceof FunPtrNode )
-        ((FunPtrNode)n).merge_ref_def(tok,(FunPtrNode)ifex,scope.stk());
-      // Can be here if already in-error
-
-    } else {
-      // Store into scope/NewObjNode/display
-      Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
-      StoreNode st = new StoreNode(mem(),ptr,Node.peek(iidx),mutable,tok,bad);
-      scope().replace_mem(st);
-      scope.def_if(tok,mutable,false); // Note 1-side-of-if update
-    }
+    // Store into scope/NewObjNode/display
+    Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
+    StoreNode st = new StoreNode(mem(),ptr,Node.peek(iidx),mutable,tok,bad);
+    scope().replace_mem(st);
+    scope.def_if(tok,mutable,false); // Note 1-side-of-if update
     return Node.pop(iidx);
   }
 
@@ -519,16 +506,17 @@ public class Parse implements Comparable<Parse> {
       lhs.keep();
       // Get the matching FunPtr (or Unresolved).
       // This is a primitive lookup and always returns a FRESH copy (see HM.Ident).
-      UnOrFunPtrNode op = _e.lookup_filter_bin(bintok); // BinOp, or null
-      assert op!=null;          // Since found valid token, must find matching primnode
-      FunNode sfun = op.funptr().fun();
-      assert sfun._op_prec == prec;
-      op.keep();
-      Node rhs = _expr_higher_require(prec,bintok,lhs);
-      // Emit the call to both terms
-      // LHS in unhooked prior to optimizing/replacing.
-      lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op.unkeep(),lhs.unkeep(),rhs));
-      // Invariant: LHS is unhooked
+      //UnOrFunPtrNode op = _e.lookup_filter_bin(bintok); // BinOp, or null
+      //assert op!=null;          // Since found valid token, must find matching primnode
+      //FunNode sfun = op.funptr().fun();
+      //assert sfun._op_prec == prec;
+      //op.keep();
+      //Node rhs = _expr_higher_require(prec,bintok,lhs);
+      //// Emit the call to both terms
+      //// LHS in unhooked prior to optimizing/replacing.
+      //lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op.unkeep(),lhs.unkeep(),rhs));
+      //// Invariant: LHS is unhooked
+      throw unimpl();
     }
   }
 
@@ -629,26 +617,27 @@ public class Parse implements Comparable<Parse> {
     // Check for uniops.  These are normal identifiers with a trailing '_'
     // flagged as an operator.
     if( tok != null ) {
-      UnOrFunPtrNode unifun = _e.lookup_filter_uni(tok); // UniOp, or null
+      Node unifun = _e.lookup_filter_uni(tok); // UniOp, or null
       if( unifun != null ) {
-        FunPtrNode ptr = unifun.funptr();
-        // Token might have been longer than the filtered name; happens if a
-        // bunch of operator characters are adjacent, but we can make an
-        // operator out of the first few.  The name also ends in '_' to
-        // indicate it's a prefix operator.
-        _x = oldx+ptr._name.length()-1;
-        // Balanced ops also need to subtract the unparsed trailing balanced close
-        String bal_close = ptr.fun()._bal_close;
-        if( bal_close !=null )
-          _x = _x - bal_close.length();
-        unifun.keep();
-        Node term = term();
-        if( term!=null ) {
-          if( bal_close != null )
-            require(bal_close,oldx);
-          return do_call(errMsgs(0,oldx),args(unifun.unkeep(),term));
-        }
-        unifun.unhook();        // Unwind and try normal term
+      //  FunPtrNode ptr = unifun.funptr();
+      //  // Token might have been longer than the filtered name; happens if a
+      //  // bunch of operator characters are adjacent, but we can make an
+      //  // operator out of the first few.  The name also ends in '_' to
+      //  // indicate it's a prefix operator.
+      //  _x = oldx+ptr._name.length()-1;
+      //  // Balanced ops also need to subtract the unparsed trailing balanced close
+      //  String bal_close = ptr.fun()._bal_close;
+      //  if( bal_close !=null )
+      //    _x = _x - bal_close.length();
+      //  unifun.keep();
+      //  Node term = term();
+      //  if( term!=null ) {
+      //    if( bal_close != null )
+      //      require(bal_close,oldx);
+      //    return do_call(errMsgs(0,oldx),args(unifun.unkeep(),term));
+      //  }
+      //  unifun.unhook();        // Unwind and try normal term
+        throw unimpl();
       }
     }
 
@@ -850,7 +839,7 @@ public class Parse implements Comparable<Parse> {
       // tail-half of a balanced-op, which is parsed by term() above.
       if( isOp(tok) ) { _x = oldx; return null; }
       // Must be a forward reference
-      Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,errMsg(oldx)));
+      Node fref = gvn(UnresolvedNode.forward_ref(tok,errMsg(oldx)));
       // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
       _e._scope.stk().create(tok,fref,Access.Final);
       return fref;
@@ -933,8 +922,8 @@ public class Parse implements Comparable<Parse> {
     // Push an extra hidden display argument.  Similar to java inner-class ptr
     // or when inside of a struct definition: 'this'.
     Node parent_display = scope().ptr();
-    TypeMemPtr tpar_disp = (TypeMemPtr) parent_display._val; // Just a TMP of the right alias
-    int dsp_idx = parent_display.push();
+    Type tpar_disp = parent_display._val; // Just a TMP of the right alias
+    Node dcon = con(tpar_disp);
 
     // Incrementally build up the formals
     TypeStruct formals = TypeStruct.make("",false,true,
@@ -981,9 +970,8 @@ public class Parse implements Comparable<Parse> {
     //fun.set_nongens(_e._nongen.compact());
     // Build Parms for system incoming values
     int rpc_idx = init(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null)).push();
-    int clo_idx = init(new ParmNode(DSP_IDX,"^"   ,fun,tpar_disp,parent_display,null)).push();
+    int clo_idx = init(new ParmNode(DSP_IDX,"^"   ,fun,tpar_disp,dcon,null)).push();
     Node mem    = init(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.ALL_MEM,null));
-    assert Node.peek(dsp_idx) == parent_display;
 
     // Increase scope depth for function body.
     int fidx;
@@ -1018,8 +1006,7 @@ public class Parse implements Comparable<Parse> {
       Node xfun = Node.pop(fun_idx); assert xfun == fun;
       RetNode ret = init(new RetNode(ctrl(),mem(),rez,xrpc,fun));
       // The FunPtr builds a real display; any up-scope references are passed in now.
-      Node xdsp = Node.pop(dsp_idx); assert xdsp == parent_display;
-      Node fptr = gvn(new FunPtrNode(null,ret,parent_display));
+      Node fptr = gvn(new FunPtrNode(null,ret,dcon));
       // Hook function at the TOP scope, in case it escapes all current
       // enclosing scopes.  This hook is removed as part of doing the Combo
       // pass which computes a real Call Graph and all escapes.
@@ -1075,7 +1062,7 @@ public class Parse implements Comparable<Parse> {
    *  bterm = [ stmts ]              // size  constructor
    *  bterm = [ stmts, [stmts,]* ]   // tuple constructor
    */
-  Node bfact(int oldx, UnOrFunPtrNode bfun) {
+  Node bfact(int oldx, Node bfun) {
     skipWS();
     int oldx2 = _x;             // Start of stmts
     Node s = stmts();
@@ -1084,8 +1071,9 @@ public class Parse implements Comparable<Parse> {
       _x --;                    // Reparse the ',' in tuple
       throw unimpl();
     }
-    require(bfun.funptr().fun()._bal_close,oldx);
-    return do_call(errMsgs(oldx,oldx2),args(bfun,s));
+    //require(bfun.funptr().fun()._bal_close,oldx);
+    //return do_call(errMsgs(oldx,oldx2),args(bfun,s));
+    throw unimpl();
   }
 
   // If this token can be a balanced-operator open token
@@ -1093,9 +1081,9 @@ public class Parse implements Comparable<Parse> {
     int oldx = _x;
     String bal = token();
     if( bal==null ) return null;
-    UnOrFunPtrNode xbal = _e.lookup_filter_bal(bal);
-    if( xbal==null || xbal.funptr().fun()._bal_close==null )
-      { _x=oldx; return null; } // Not a balanced operator
+    //UnOrFunPtrNode xbal = _e.lookup_filter_bal(bal);
+    //if( xbal==null || xbal.funptr().fun()._bal_close==null )
+    //  { _x=oldx; return null; } // Not a balanced operator
     //// Actual minimal length op might be smaller than the parsed token
     //// (greedy algo vs not-greed)
     //_x = oldx+xbal.length();

@@ -268,16 +268,14 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   }
   @Override public boolean may_be_con()   {
     return _dsp.may_be_con() &&
-      _fidxs.abit() != -1 &&
-      !is_forward_ref();
+      _fidxs.abit() != -1;
   }
   @Override public boolean is_con()       {
     return _dsp==TypeMemPtr.NO_DISP && // No display (could be constant display?)
       // Single bit covers all functions (no new children added, but new splits
       // can appear).  Currently, not tracking this at the top-level, so instead
       // just triggering off of a simple heuristic: a single bit above BitsFun.FULL.
-      _fidxs.abit() > 1 &&
-      !is_forward_ref();
+      _fidxs.abit() > 1 ;
   }
   @Override public boolean must_nil() { return _fidxs.test(0) && !_fidxs.above_center(); }
   @Override public boolean may_nil() { return _fidxs.may_nil(); }
@@ -315,11 +313,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   @Override public void walk( Predicate<Type> p ) { if( p.test(this) ) { _dsp.walk(p); _ret.walk(p); } }
 
   // Generic functions
-  public boolean is_forward_ref() {
-    if( _fidxs.abit() <= 1 ) return false; // Multiple fidxs, or generic fcn ptr
-    FunNode fun = FunNode.find_fidx(Math.abs(fidx()));
-    return fun != null && fun.is_forward_ref();
-  }
   TypeFunPtr _sharpen_clone(TypeMemPtr dsp) {
     TypeFunPtr tf = copy();
     tf._dsp = dsp;

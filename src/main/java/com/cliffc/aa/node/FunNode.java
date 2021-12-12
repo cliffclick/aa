@@ -112,7 +112,7 @@ public class FunNode extends RegionNode {
   // Name from fidx alone
   private static String name( int fidx, boolean debug) {
     FunNode fun = find_fidx(fidx);
-    return fun==null ? name(null,null,fidx,-1,false,debug) : fun.name(debug);
+    return fun==null ? name(null,null,fidx,-1,debug) : fun.name(debug);
   }
   // Name from FunNode
   String name() { return name(true); }
@@ -122,13 +122,13 @@ public class FunNode extends RegionNode {
       FunPtrNode fptr = fptr();
       name=fptr==null ? null : fptr._name;
     }
-    return name(name,_bal_close,fidx(),_op_prec,is_forward_ref(),debug);
+    return name(name,_bal_close,fidx(),_op_prec,debug);
   }
-  static String name(String name, String bal, int fidx, int op_prec, boolean fref, boolean debug) {
+  static String name(String name, String bal, int fidx, int op_prec, boolean debug) {
     if( op_prec >= 0 && name != null && bal!=null ) name = name+bal; // Primitives wrap
     if( name==null ) name="";
     if( debug ) name = name + "["+fidx+"]"; // FIDX in debug
-    return fref ? "?"+name : name;          // Leading '?'
+    return name;
   }
 
   // Can return nothing, or "name" or "[name0,name1,name2...]" or "[35]"
@@ -228,7 +228,6 @@ public class FunNode extends RegionNode {
     if( has_unknown_callers() && ret == null ) // Dead after construction?
       return null;
 
-    if( is_forward_ref() ) return null; // No mods on a forward ref
     Node[] parms = parms();
     Node rpc_parm = parms[0];
     if( rpc_parm == null ) return null; // Single caller const-folds the RPC, but also inlines in CallNode
@@ -522,7 +521,7 @@ public class FunNode extends RegionNode {
     // Count function body size.  Requires walking the function body and
     // counting opcodes.  Some opcodes are ignored, because they manage
     // dependencies but make no code.
-    int call_indirect=0, call_thunk=0; // Count of calls to e.g. loads/args/parms
+    int call_indirect=0; // Count of calls to e.g. loads/args/parms
     int[] cnts = new int[OP_MAX];
     for( Node n : body ) {
       int op = n._op;           // opcode
@@ -531,15 +530,14 @@ public class FunNode extends RegionNode {
         if( !(n1._val instanceof TypeFunPtr) ) return -1; // Calling an unknown function, await GCP
         TypeFunPtr tfp = (TypeFunPtr)n1._val;
         if( tfp._fidxs.test(_fidx) ) self_recursive = true; // May be self-recursive
-        Node n2 = n1 instanceof UnOrFunPtrNode ? ((UnOrFunPtrNode)n1).funptr() : n1;
-        if( n2 instanceof FunPtrNode ) {
-          FunPtrNode fpn = (FunPtrNode) n2;
-          if( fpn.ret().rez() instanceof PrimNode )
-            op = OP_PRIM;       // Treat as primitive for inlining purposes
-        } else if( n2!=null && n2._val==TypeTuple.RET ) { // Thunks are encouraged to inline
-          call_thunk++;
-        } else
-          call_indirect++;
+        //Node n2 = n1 instanceof UnOrFunPtrNode ? ((UnOrFunPtrNode)n1).funptr() : n1;
+        //if( n2 instanceof FunPtrNode ) {
+        //  FunPtrNode fpn = (FunPtrNode) n2;
+        //  if( fpn.ret().rez() instanceof PrimNode )
+        //    op = OP_PRIM;       // Treat as primitive for inlining purposes
+        //} else
+        //  call_indirect++;
+        throw unimpl();
       }
       cnts[op]++;               // Histogram ops
     }
@@ -712,10 +710,11 @@ public class FunNode extends RegionNode {
           Node new_funptr = map.get(old_funptr);
           new_funptr.insert(old_funptr);
           new_funptr.xval(); // Build type so Unresolved can compute type
-          UnresolvedNode new_unr = new UnresolvedNode(null,new_funptr);
-          old_funptr.insert(new_unr);
-          new_unr.add_def(old_funptr);
-          new_unr._val = new_unr.value();
+          //UnresolvedNode new_unr = new UnresolvedNode(null,new_funptr);
+          //old_funptr.insert(new_unr);
+          //new_unr.add_def(old_funptr);
+          //new_unr._val = new_unr.value();
+          throw unimpl();
         }
     } else {                         // Path split
       Node old_funptr = fptr();      // Find the funptr for the path split
@@ -865,7 +864,6 @@ public class FunNode extends RegionNode {
   @Override public Type value() {
     // Will be an error eventually, but act like its executed so the trailing
     // EpilogNode gets visited during GCP
-    if( is_forward_ref() ) return Type.CTRL;
     if( is_prim() ) return Type.CTRL;
     if( in(0)==this ) return _defs._len>=2 ? val(1) : Type.XCTRL; // is_copy
     if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
@@ -894,7 +892,6 @@ public class FunNode extends RegionNode {
   }
 
   // True if this is a forward_ref
-  @Override public boolean is_forward_ref() { return _op_prec==-2; }
   public ParmNode parm( int idx ) {
     for( Node use : _uses )
       if( use instanceof ParmNode && ((ParmNode)use)._idx==idx )

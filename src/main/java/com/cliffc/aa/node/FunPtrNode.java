@@ -35,9 +35,8 @@ import static com.cliffc.aa.AA.*;
 // covering all instances of [+15,+12].  Also may impact mixed +15 and other
 // FIDXs with unrelated DISPs.  Instead a dead display just flips to ANY.
 
-public final class FunPtrNode extends UnOrFunPtrNode {
+public final class FunPtrNode extends Node {
   public String _name;          // Optional for debug only
-  private ErrMsg _referr;       // Forward-ref error, cleared after defining
 
   // Every var use that results in a function, so actually only these FunPtrs,
   // needs to make a "fresh" copy before unification.  "Fresh" makes a
@@ -46,29 +45,26 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   // interesting thing is when an out-of-scope TVar uses the same TVar
   // internally in different parts - the copy replicates this structure.  When
   // unified, it forces equivalence in the same places.
-  public  FunPtrNode( String name, RetNode ret, Node display ) { this(name,null,ret,display ); }
-  // Explicitly, no display
-  public  FunPtrNode( String name, RetNode ret ) { this(name,null,ret, Env.ANY ); }
-  // Display (already fresh-loaded) but no name.
-  public  FunPtrNode( RetNode ret, Node display ) { this(null,null,ret,display); }
-  // For forward-refs only; super weak display & function.
-  private FunPtrNode( String name, ErrMsg referr, RetNode ret, Node display ) {
+  public  FunPtrNode( String name, RetNode ret, Node display ) {
     super(OP_FUNPTR,ret,display);
     _name = name;
-    _referr = referr;
   }
+  // Explicitly, no display
+  public  FunPtrNode( String name, RetNode ret ) { this(name,ret, Env.ANY ); }
+  // Display (already fresh-loaded) but no name.
+  public  FunPtrNode( RetNode ret, Node display ) { this(null,ret,display); }
   public RetNode ret() { return in(0)==null ? null : (RetNode)in(0); }
   public Node display(){ return in(1); }
   public FunNode fun() { return ret().fun(); }
   public FunNode xfun() { RetNode ret = ret(); return ret !=null && ret.in(4) instanceof FunNode ? ret.fun() : null; }
-  @Override public int nargs() { return ret()._nargs; }
-  @Override public FunPtrNode funptr() { return this; }
-  @Override public UnresolvedNode unk() { return null; }
+  public int nargs() { return ret()._nargs; }
+  //@Override public FunPtrNode funptr() { return this; }
+  //@Override public UnresolvedNode unk() { return null; }
   // Self short name
   @Override public String xstr() {
+    if( is_dead() || _defs._len==0 ) return "*fun";
     RetNode ret = ret();
-    if( is_dead() || _defs._len==0 || ret==null) return "*fun";
-    return "*"+_name;
+    return ret==null ? "*fun" : "*"+_name;
   }
   // Inline longer name
   @Override String str() {
@@ -87,7 +83,6 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   }
 
   @Override public Node ideal_reduce() {
-    if( is_forward_ref() ) return null;
 
     Node dsp = display();
     if( dsp!=Env.ANY ) {
@@ -155,8 +150,6 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   @Override public boolean unify( boolean test ) {
     TV2 self = tvar();
     if( self.is_err() ) return false;
-    if( is_forward_ref() )
-      return test || self.unify(TV2.make_err(this,"A forward reference is not a function","FunPtr_unify"),test);
     RetNode ret = ret();
     if( ret.is_copy() ) return false; // GENSYM
     FunNode fun = ret.fun();
@@ -192,13 +185,6 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     return progress;
   }
 
-  // Filter out all the wrong-arg-count functions from Parser.
-  @Override public FunPtrNode filter( int nargs ) {
-    // User-nargs are user-visible #arguments.
-    // Fun-nargs include ctrl, memory & the display, hence the +ARG_IDX.
-    return nargs() == ARG_IDX+nargs ? this : null;
-  }
-
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
   @Override public byte op_prec() { return fun()._op_prec; }
@@ -216,61 +202,4 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     return null;
   }
 
-  // A forward-ref is an assumed unknown-function being used before being
-  // declared.  Hence, we want a callable function pointer, but have no defined
-  // body (yet).  Make a function pointer that takes/ignores all args, and
-  // returns a scalar.
-  public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
-    FunNode fun = gvn.init(new FunNode(name));
-    RetNode ret = gvn.init(new RetNode(fun,Node.con(TypeMem.MEM),Env.ALL,Node.con(TypeRPC.ALL_CALL),fun));
-    gvn.add_flow(fun);
-    gvn.add_flow(ret);
-    // Display is limited to any one of the current lexical scopes.
-    TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS,TypeObj.ISUSED);
-    return new FunPtrNode( name, ErrMsg.forward_ref(unkref,name),ret,Node.con(tdisp));
-  }
-
-  // True if this is a forward_ref
-  @Override public boolean is_forward_ref() { return _referr!=null; }
-
-  // 'this' is a forward reference, probably with multiple uses (and no inlined
-  // callers).  Passed in the matching function definition, which is brand new
-  // and has no uses.  Merge the two.
-  public void merge_ref_def( String tok, FunPtrNode def, NewObjNode dsp ) {
-    FunNode rfun = fun();
-    FunNode dfun = def.fun();
-    assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.SCP_0; // Forward ref has no callers
-    assert dfun._defs._len==2 && dfun.in(0)==null;
-    assert def ._uses._len==1 && def._uses.at(0) instanceof KeepNode;  // Def is brand new, no uses
-
-    // Make a function pointer based on the original forward-ref fidx, but with
-    // the known types.
-    FunNode.FUNS.setX(dfun._fidx,null); // Untrack dfun by old fidx
-    dfun._fidx = rfun._fidx;
-    FunNode.FUNS.setX(dfun._fidx,dfun); // Track FunNode by new fidx
-    ret().unelock();
-    ret()._fidx = 0; // No longer killing def fidx when dying
-
-    // Update the fidx
-    RetNode dret = def.ret();
-    dret.set_fidx(rfun._fidx);
-    assert dret.funptr()==def;
-    def.xval();
-    Env.GVN.add_flow_uses(this);
-
-    // The existing forward-ref becomes a normal (not f-ref) but internal
-    // FunPtr; the H-M type is NOT Fresh, and forces alignment amongst the
-    // recursive uses.  Make a new FunPtr which IS Fresh for future external
-    // uses.
-    _referr = null;             // No longer a forward ref
-    set_def(0,def.in(0));       // Same inputs
-    set_def(1,def.in(1));
-    // Field at def point, points directly now.
-    dsp.update(tok,dsp.access(tok),def);
-    def.bind(tok);         // Debug only, associate variable name with function
-    assert Env.START.more_work(true)==0;
-    Env.GVN.iter();
-  }
-
-  @Override public ErrMsg err( boolean fast ) { return is_forward_ref() ? _referr : null; }
 }

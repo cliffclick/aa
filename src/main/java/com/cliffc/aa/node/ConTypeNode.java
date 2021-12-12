@@ -20,8 +20,6 @@ public class ConTypeNode extends Node {
     _tname = tname;
     _t = t;
   }
-  public boolean is_forward_ref() { return is_forward_ref(_t); }
-  public static boolean is_forward_ref(Type t) { return t instanceof TypeMemPtr && !(((TypeMemPtr)t)._obj instanceof TypeStruct); }
   public int alias() { return ((TypeMemPtr)_t).getbit0(); }
   public BitsAlias aliases() { return ((TypeMemPtr)_t)._aliases; }
 

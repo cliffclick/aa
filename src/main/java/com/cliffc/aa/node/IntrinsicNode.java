@@ -39,7 +39,7 @@ public class IntrinsicNode extends Node {
 
     FunNode fun = (FunNode)Env.GVN.init(new FunNode(AA.DSP_IDX+1).add_def(Env.ALL_CTRL));
     Node rpc    = Env.GVN.init(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
-    Node dsp    = Env.GVN.init(new ParmNode(DSP_IDX,"^"   ,fun,((NewObjNode)ptr.in(0))._tptr,ptr,null));
+    Node dsp    = Env.GVN.init(new ParmNode(DSP_IDX,"^"   ,fun,((NewObjNode)ptr.in(0))._tptr,Node.con(ptr._val),null));
     Node mem    = Env.GVN.init(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.ALL_MEM,null));
     Node cvt    = Env.GVN.init(new IntrinsicNode(tn,badargs,fun,mem,dsp));
     RetNode ret = Env.GVN.init(new RetNode(fun,cvt,dsp,rpc,fun));

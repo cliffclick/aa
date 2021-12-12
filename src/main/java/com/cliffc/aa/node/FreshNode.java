@@ -6,7 +6,7 @@ import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
 // "fresh" the incoming TVar: make a fresh instance before unifying
-public class FreshNode extends UnOrFunPtrNode {
+public class FreshNode extends Node {
   public FreshNode( FunNode fun, Node ld ) { super(OP_FRESH, fun, ld); }
 
   // The lexical scope, or null for top-level
@@ -90,12 +90,12 @@ public class FreshNode extends UnOrFunPtrNode {
   @Override public byte op_prec() { return id().op_prec(); }
   @Override Node is_pure_call() { return id().is_pure_call(); }
 
-  @Override public UnresolvedNode unk() { return id() instanceof UnresolvedNode ? (UnresolvedNode)id() : null; }
-  @Override int nargs() { return ((UnOrFunPtrNode)id()).nargs(); }
-  @Override public UnOrFunPtrNode filter(int nargs) { return ((UnOrFunPtrNode)id()).filter(nargs); }
-  @Override public FunPtrNode funptr() {
-    return id() instanceof UnOrFunPtrNode ? ((UnOrFunPtrNode)id()).funptr() : null;
-  }
+  //@Override public UnresolvedNode unk() { return id() instanceof UnresolvedNode ? (UnresolvedNode)id() : null; }
+  //@Override int nargs() { return ((UnOrFunPtrNode)id()).nargs(); }
+  //@Override public UnOrFunPtrNode filter(int nargs) { return ((UnOrFunPtrNode)id()).filter(nargs); }
+  //@Override public FunPtrNode funptr() {
+  //  return id() instanceof UnOrFunPtrNode ? ((UnOrFunPtrNode)id()).funptr() : null;
+  //}
 
   // Two FreshNodes are only equal, if they have compatible TVars
   @Override public boolean equals(Object o) {

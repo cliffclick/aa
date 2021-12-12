@@ -60,8 +60,6 @@ public class StoreNode extends Node {
     if( mem instanceof MrgProjNode &&
         // Store into a NewObjNode, same memory and address
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
-        // Do not fold (or hide) errors
-        !rez().is_forward_ref() &&
         // Do not bypass a parallel writer
         mem.check_solo_mem_writer(this) && // Use is by self
         (tfld=nnn._ts.get(_fld))!= null ) {

@@ -408,23 +408,8 @@ public class CallNode extends Node {
     BitsFun fidxs2 = least_cost2(fidxs);
     if( fidxs != fidxs2 ) {
       Type tret = tfp._ret;
-      // Cannot match Unresolved, because fidxs flow infinitely far, and
-      // if the FunPtr sharpens return type, this is not a neighbor.
-      //for( int fidx : fidxs2 ) { // Code matches UnresolvedNode
-      //  Type rez = ((TypeFunPtr)FunNode.find_fidx(fidx).fptr()._val)._ret;
-      //  tret = fidxs2.above_center() ? tret.join(rez) : tret.meet(rez);
-      //}
       tfp = TypeFunPtr.make(fidxs2,tfp.nargs(),tfp._dsp,tret);
     }
-    //if( fidxs.above_center() && tfp!=TypeFunPtr.GENERIC_FUNPTR.dual() ) {
-    //  if( _not_resolved_by_gcp ) { // If overloads not resolvable, then take them all, and we are in-error
-    //    tfp = tfp.make_from(fidxs.dual()); // Force FIDXS low (take all), and we are in-error
-    //  } else {
-    //    FunPtrNode fptr = least_cost(fidxs,fdx());
-    //    if( fptr!=null )
-    //      tfp = (TypeFunPtr)fptr._val;
-    //  }
-    //}
 
     // Copy args for called functions.  FIDX is already refined.
     // Also gather all aliases from all args.
@@ -436,13 +421,6 @@ public class CallNode extends Node {
     // Recursively search memory for aliases; compute escaping aliases
     //BitsAlias as2 = tmem.all_reaching_aliases(as);
     ts[_defs._len  ] = tfp;
-    //ts[_defs._len+1] = TypeMemPtr.make(as2,TypeObj.ISUSED); // Set escapes as last type
-    // Only pass along escaping aliases; others are not available to the call
-    // body.  In the case of recursive calls, aliases made new in the body may
-    // not be passed into the recursive calls, and thus not into the call head
-    // and thus avoids self-merging.  Once we decide to inline, keep the entire
-    // alias set since this filtering by the CallNode goes away as we inline.
-    //if( !_is_copy ) ts[MEM_IDX] = tmem.slice_reaching_aliases(as2);
     ts[MEM_IDX] = tmem;
 
     return TypeTuple.make(ts);
@@ -691,18 +669,15 @@ public class CallNode extends Node {
   @Override public ErrMsg err( boolean fast ) {
     // Fail for passed-in unknown references directly.
     for( int j=ARG_IDX; j<nargs(); j++ )
-      if( arg(j)!=null && arg(j).is_forward_ref() )
+      if( arg(j) instanceof UnresolvedNode && arg(j)._defs._len==0 )
         return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[j-ARG_IDX+1], FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx).fptr());
+
     // Expect a function pointer
     TypeFunPtr tfp = ttfp(_val);
     if( tfp._fidxs==BitsFun.FULL ) {
       if( fast ) return ErrMsg.FAST;
       return ErrMsg.unresolved(_badargs[0],"A function is being called, but "+fdx()._val+" is not a function type");
     }
-
-    // Indirectly, forward-ref for function type
-    if( tfp.is_forward_ref() ) // Forward ref on incoming function
-      return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[0], FunNode.find_fidx(tfp.fidx()).fptr());
 
     BitsFun fidxs = tfp.fidxs();
     if( fidxs.above_center() ) return null; // Not resolved (yet)

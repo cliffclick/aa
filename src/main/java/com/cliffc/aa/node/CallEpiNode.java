@@ -90,13 +90,8 @@ public final class CallEpiNode extends Node {
     if( nwired()==1 && fidxs.abit() != -1 ) { // Wired to 1 target
       RetNode ret = wired(0);                 // One wired return
       FunNode fun = ret.fun();
-      //Type tdef = Env.DEFMEM._uses._len==0 || fun._java_fun ? null : Env.DEFMEM._val;
-      //TypeTuple tret = ret._val instanceof TypeTuple ? (TypeTuple) ret._val : (TypeTuple)ret._val.oob(TypeTuple.RET);
-      //Type tretmem = tret.at(1);
       if( fun != null && fun._defs._len==2 && // Function is only called by 1 (and not the unknown caller)
           call.err(true)==null &&             // And args are ok
-      //    (tdef==null || GVN._opt_mode._CG || CallNode.emem(tcall).isa(tdef)) && // Pre-GCP, call memory has to be as good as the default
-      //    (tdef==null || GVN._opt_mode._CG || tretmem.isa(tdef) ) &&  // Call and return memory at least as good as default
           call.mem().in(0) != call &&   // Dead self-recursive
           fun.in(1)._uses._len==1 &&    // And only calling fun
           ret._live.isa(_live) &&       // Call and return liveness compatible
@@ -106,14 +101,6 @@ public final class CallEpiNode extends Node {
         if( idx!=-1 ) Env.SCP_0.del(idx);
         fun.set_is_copy();              // Collapse the FunNode into the Call
         Env.GVN.add_flow(call.fdx());   // FunPtr probably goes dead
-      //  if( fun._name!=null && fun._name.charAt(0)=='$' ) { // Inlining a primitive into a wrapper from _prims.aa
-      //    FunNode outer_fun = (FunNode)call.ctl();
-      //    // Copy the op_prec up 1 layer
-      //    // TODO: Make an official user-mode operator syntax, and put it in _prims.aa
-      //    outer_fun._op_prec = fun._op_prec;
-      //    outer_fun._thunk_rhs = fun._thunk_rhs;
-      //    outer_fun._bal_close = fun._bal_close;
-      //  }
         return set_is_copy(ret.ctl(), ret.mem(), ret.rez()); // Collapse the CallEpi into the Ret
       }
     }
@@ -130,8 +117,7 @@ public final class CallEpiNode extends Node {
     // Call allows 1 function not yet inlined, sanity check it.
     int cnargs = call.nargs();
     FunNode fun = FunNode.find_fidx(fidx);
-    assert !fun.is_forward_ref() && !fun.is_dead()
-      && fun.nargs() == cnargs; // All checked by call.err
+    assert !fun.is_dead() && fun.nargs() == cnargs; // All checked by call.err
     if( fun._val != Type.CTRL || fun._java_fun ) return null;
     RetNode ret = fun.ret();    // Return from function
     if( ret==null ) return null;
@@ -199,7 +185,6 @@ public final class CallEpiNode extends Node {
       if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
       FunNode fun = FunNode.find_fidx(fidx);  // Lookup, even if not wired
       if( fun==null || fun.is_dead() ) continue; // Already dead, stale fidx
-      if( fun.is_forward_ref() ) continue;    // Not forward refs, which at GCP just means a syntax error
       RetNode ret = fun.ret();
       if( ret==null ) continue;               // Mid-death
       if( _defs.find(ret) != -1 ) continue;   // Wired already
@@ -412,10 +397,6 @@ public final class CallEpiNode extends Node {
     if( mem instanceof IntrinsicNode ) // Better error message for Intrinsic if Call args are bad
       ((IntrinsicNode)mem)._badargs = call._badargs[1];
     call._is_copy=_is_copy=true;
-    //// Memory was split at the Call, according to the escapes aliases, and
-    //// rejoined at the CallEpi.  We need to make that explicit here.
-    //GVNGCM.retype_mem(null,call,this,false);
-
     Env.GVN.add_reduce_uses(call);
     Env.GVN.add_reduce_uses(this);
     while( _defs._len>0 ) pop();

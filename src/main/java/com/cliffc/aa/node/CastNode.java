@@ -48,7 +48,6 @@ public class CastNode extends Node {
     Type c = val(0);
     if( c != Type.CTRL ) return c.oob();
     Type t = val(1);
-    if( t.is_forward_ref() ) return Type.SCALAR;
 
     // If the cast is in-error, we cannot lift.
     Node n1 = in(1);

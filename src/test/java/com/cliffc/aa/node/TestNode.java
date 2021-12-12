@@ -261,8 +261,6 @@ public class TestNode {
     test1monotonic(new AssertNode(_ins[1],_ins[2],TypeInt.FALSE    ,null, null));
     test1monotonic(new AssertNode(_ins[1],_ins[2],TypeMemPtr.STRPTR,null, null));
     test1monotonic(new AssertNode(_ins[1],_ins[2],TypeFlt.FLT64    ,null, null));
-    test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));
-    test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));
 
     assertEquals(0,_errs);
   }

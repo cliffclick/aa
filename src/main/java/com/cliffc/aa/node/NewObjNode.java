@@ -73,19 +73,19 @@ public class NewObjNode extends NewNode<TypeStruct> {
 
 
   // Add a named FunPtr to a New.  Auto-inflates to a Unresolved as needed.
-  public FunPtrNode add_fun( Parse bad, String name, FunPtrNode ptr ) {
+  public void add_fun( Parse bad, String name, FunPtrNode ptr ) {
     TypeFld fld = _ts.get(name);
     if( fld == null ) {
       create_active(name,ptr,Access.Final);
     } else {
+      // TODO: Problem: keep taking stores until scope closes, and tpye keeps falling
       Node n = in(fld._order);
-      if( n==Env.XNIL ) n = ptr;
-      else if( n instanceof UnresolvedNode ) n.add_def(ptr);
-      else n = new UnresolvedNode(bad,n,ptr);
-      n.xval(); // Update the input type, so the _ts field updates
-      update(fld,Access.Final,n);
+      UnresolvedNode unr = n==Env.XNIL
+        ? new UnresolvedNode(name,bad).scoped()
+        : (UnresolvedNode)n;
+      unr.add_fun(ptr);
+      update(fld,Access.Final,unr);
     }
-    return ptr;
   }
 
   // The current local scope ends, no more names will appear.  Forward refs
@@ -96,18 +96,20 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert parent != null;
     for( TypeFld fld : _ts.flds() ) {
       Node n = in(fld._order);
-      if( n != null && n.is_forward_ref() ) {
-        // Remove current display from forward-refs display choices.
-        assert Env.LEX_DISPLAYS.test(_alias);
-        TypeMemPtr tdisp = TypeMemPtr.make(Env.LEX_DISPLAYS.clear(_alias),TypeObj.ISUSED);
-        n.set_def(1,Node.con(tdisp)); // TODO: BUGGY?  NEEDS TO CRAWL THE DISPLAY 1 LEVEL?
-        n.xval();
-        // Make field in the parent
-        parent.create(fld._fld,n,fld._access);
-        // Stomp field locally to ANY
-        set_def(fld._order,Env.ANY);
-        setsm(_ts.replace_fld(fld.make_from(Type.ANY,Access.Final)));
-        Env.GVN.add_flow_uses(n);
+      if( n.is_forward_ref() ) {
+        // Is this Unresolved defined in this scope, or some outer scope?
+        if( ((UnresolvedNode)n).is_scoped() ) {
+          // Definitely defined here, and all stores are complete; all fcns added
+          ((UnresolvedNode)n).define();
+          Env.GVN.add_unuse(n);
+        } else {
+          // Make field in the parent
+          parent.create(fld._fld,n,fld._access);
+          // Stomp field locally to ANY
+          set_def(fld._order,Env.ANY);
+          setsm(_ts.replace_fld(fld.make_from(Type.ANY,Access.Final)));
+          Env.GVN.add_flow_uses(n);
+        }
       }
     }
   }

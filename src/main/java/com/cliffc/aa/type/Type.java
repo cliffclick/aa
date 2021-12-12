@@ -757,9 +757,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   }
   public Type high() { return above_center() ? this : dual(); }
 
-  // Return true if this is a forward-ref function pointer (return type from EpilogNode)
-  public boolean is_forward_ref() { return false; }
-
   // Return a long   from a TypeInt constant; assert otherwise.
   public long   getl() { if( _type==TNIL || _type==TXNIL ) return 0; throw typerr(null); }
   // Return a double from a TypeFlt constant; assert otherwise.

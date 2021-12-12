@@ -46,7 +46,8 @@ public class TestNodeSmall {
     FunPtrNode aint = (FunPtrNode)uadd.in(1);
     FunPtrNode astr = (FunPtrNode)uadd.in(2);
     // Make a flt/int combo, drops off string.
-    UnresolvedNode anum = (UnresolvedNode)gvn.xform(new UnresolvedNode(null,aflt,aint));
+    //UnresolvedNode anum = (UnresolvedNode)gvn.xform(new UnresolvedNode(null,aflt,aint));
+    UnresolvedNode anum = null; // TODO
 
     // All nodes have this property: START >= {ALL.dual(),value(START)} >= value(ALL.dual()) >= value(ALL) >= ALL
     // Holds for both ITER and GCP.
@@ -280,7 +281,8 @@ public class TestNodeSmall {
     TypeFunPtr tmul1 = v(fp_mul,gvn), tmul1X = tmul1.dual();
     TypeFunPtr tadd1 = v(fp_add,gvn), tadd1X = tadd1.dual();
 
-    UnresolvedNode anum = gvn.init(new UnresolvedNode(null,aflt,aint));
+    //UnresolvedNode anum = gvn.init(new UnresolvedNode(null,aflt,aint));
+    UnresolvedNode anum = null; // TODO
     TypeFunPtr tnum1 = v(anum,gvn), tnum1X = tnum1.dual();
     TypeFunPtr tflt1 = v(aflt,gvn), tflt1X = tflt1.dual();
     TypeFunPtr tint1 = v(aint,gvn), tint1X = tint1.dual();
