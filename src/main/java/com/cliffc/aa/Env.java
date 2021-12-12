@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.HashSet;
 
 import static com.cliffc.aa.AA.DSP_IDX;
+import static com.cliffc.aa.AA.unimpl;
 
 // An "environment", a lexical Scope tracking mechanism that runs 1-for-1 in
 // parallel with a ScopeNode.
@@ -38,11 +39,15 @@ public class Env implements AutoCloseable {
   public static Env TOP,FILE;
   public final static GVNGCM GVN = new GVNGCM(); // Initial GVN
 
+  public static final KeepNode KEEP_ALIVE = new KeepNode();
   public static      ConNode ANY;   // Common ANY / used for dead
   public static      ConNode ALL;   // Common ALL / used for errors
   public static      ConNode XCTRL; // Always dead control
   public static      ConNode XNIL;  // Default 0
   public static      ConNode XUSE;  // Unused objects (dead displays)
+  public static      ConNode XMEM;  // Unused whole memory
+  public static      ConNode ALL_CTRL;  // Always alive control
+  public static      ConNode ALL_MEM;   // Conservative all memory
   public static      ConNode ALL_PARM; // Default parameter
   public static      ConNode ALL_CALL; // Common during function call construction
 
@@ -52,30 +57,36 @@ public class Env implements AutoCloseable {
   public static   NewObjNode STK_0; // Program start stack frame (has primitives)
   public static    ScopeNode SCP_0; // Program start scope
 
-  public static   DefMemNode DEFMEM;// Default memory (all structure types)
-  public static final Node[] DEFMEM_RESET;
-
   // Set of all display aliases, used to track escaped displays at call sites for asserts.
   public static BitsAlias ALL_DISPLAYS = BitsAlias.EMPTY;
   // Set of lexically active display aliases, used for a conservative display
   // approx for forward references.
   public static BitsAlias LEX_DISPLAYS = BitsAlias.EMPTY;
 
+  // Add a permanent edge use to all these Nodes, keeping them alive forever.
+  @SuppressWarnings("unchecked")
+  private static <N extends Node> N keep(N n) {
+    N xn = GVN.init(n);
+    KEEP_ALIVE.add_def(xn);
+    return xn;
+  }
 
   static {
     // Top-level or common default values
-    START   = GVN.init (new StartNode());
-    ANY     = GVN.xform(new ConNode<>(Type.ANY   )).keep();
-    ALL     = GVN.xform(new ConNode<>(Type.ALL   )).keep();
-    XCTRL   = GVN.xform(new ConNode<>(Type.XCTRL )).keep();
-    XNIL    = GVN.xform(new ConNode<>(Type.XNIL  )).keep();
-    XUSE    = GVN.xform(new ConNode<>(TypeObj.UNUSED)).keep();
-    ALL_PARM= GVN.xform(new ConNode<>(Type.SCALAR)).keep();
-    ALL_CALL= GVN.xform(new ConNode<>(TypeRPC.ALL_CALL)).keep();
+    START   = keep(new StartNode());
+    ANY     = keep(new ConNode<>(Type.ANY   ));
+    ALL     = keep(new ConNode<>(Type.ALL   ));
+    XCTRL   = keep(new ConNode<>(Type.XCTRL ));
+    XNIL    = keep(new ConNode<>(Type.XNIL  ));
+    XUSE    = keep(new ConNode<>(TypeObj.UNUSED));
+    XMEM    = keep(new ConNode<>(TypeMem.ANYMEM));
+    ALL_CTRL= keep(new ConNode<>(Type.CTRL  ));
+    ALL_MEM = keep(new ConNode<>(TypeMem.ALLMEM));
+    ALL_PARM= keep(new ConNode<>(Type.SCALAR));
+    ALL_CALL= keep(new ConNode<>(TypeRPC.ALL_CALL));
     // Initial control & memory
-    CTL_0  = GVN.init(new    CProjNode(START,0));
-    MEM_0  = GVN.init(new StartMemNode(START  ));
-    DEFMEM = GVN.init(new   DefMemNode(CTL_0));
+    CTL_0  = keep(new    CProjNode(START,0));
+    MEM_0  = keep(new StartMemNode(START  ));
 
     // The Top-Level environment; holds the primitives.
     TOP = new Env();
@@ -90,12 +101,10 @@ public class Env implements AutoCloseable {
       String prog = new String(encoded);
       ErrMsg err = new Parse("PRIMS",true,TOP,prog).prog();
       TOP._scope.set_rez(Node.con(Type.SCALAR));
-      while( DEFMEM._defs.last()==null ) DEFMEM.pop(); // Remove temp unused aliases
-      Env.GVN.iter(GVNGCM.Mode.PesiNoCG);
+      Env.GVN.iter();
       TypeEnv te = TOP.gather_errors(err);
       assert te._errs==null && te._t==Type.SCALAR; // Primitives parsed fine
     } catch( Exception e ) { throw new RuntimeException(e); }; // Unrecoverable
-    DEFMEM_RESET = DEFMEM._defs.asAry();
     record_for_reset();
   }
 
@@ -108,18 +117,19 @@ public class Env implements AutoCloseable {
   private Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr ) {
     _par = par;
     _fun = fun;
-    mem.keep(2);
     TypeStruct ts = TypeStruct.make("",false,true,TypeFld.make("^",dsp_ptr._val, DSP_IDX));
-    NewObjNode nnn = GVN.xform(new NewObjNode(is_closure,ts,dsp_ptr)).keep(2);
-    MrgProjNode frm = DEFMEM.make_mem_proj(nnn,mem.unkeep(2));
-    Node ptr = GVN.xform(new ProjNode(nnn.unkeep(2),AA.REZ_IDX));
-    _scope = new ScopeNode(is_closure);
+    NewObjNode nnn = GVN.init(new NewObjNode(is_closure,ts,dsp_ptr));
+    Node frm = GVN.init(new MrgProjNode(nnn,mem));
+    Node ptr = GVN.init(new ProjNode(nnn,AA.REZ_IDX));
+    _scope = GVN.init(new ScopeNode(is_closure));
     _scope.set_ctrl(ctrl);
     _scope.set_ptr (ptr);  // Address for 'nnn', the local stack frame
     _scope.set_mem (frm);  // Memory includes local stack frame
-    _scope.set_rez (Node.con(Type.SCALAR));
+    _scope.set_rez (ALL_PARM);
+    KEEP_ALIVE.add_def(_scope);
     ALL_DISPLAYS = ALL_DISPLAYS.set(nnn._alias);   // Displays for all time
     LEX_DISPLAYS = LEX_DISPLAYS.set(nnn._alias);   // Lexically active displays
+    GVN.do_iter();
   }
 
   // Top-level Env.  Contains, e.g. the primitives.
@@ -146,10 +156,11 @@ public class Env implements AutoCloseable {
     Type mem = _scope.mem()._val;
     TypeStruct formals = null;
     if( rez._val instanceof TypeFunPtr ) {
-      int fidx2 = -1;
-      for( int fidx : ((TypeFunPtr)rez._val)._fidxs )
-        { fidx2 = fidx; break; }
-      formals = FunNode.FUNS.at(fidx2).formals();
+      //int fidx2 = -1;
+      //for( int fidx : ((TypeFunPtr)rez._val)._fidxs )
+      //  { fidx2 = fidx; break; }
+      //formals = FunNode.FUNS.at(fidx2).formals();
+      throw unimpl();
     }
     return new TypeEnv(_scope,
                        rez._val,
@@ -169,7 +180,7 @@ public class Env implements AutoCloseable {
     // Promote forward refs to the next outer scope
     NewObjNode stk = _scope.stk();
     ScopeNode pscope = _par._scope;
-    if( pscope != null && _par._par != null )
+    if( pscope != null )
       stk.promote_forward(pscope.stk());
 
     Node ptr = _scope.ptr();
@@ -179,9 +190,11 @@ public class Env implements AutoCloseable {
     GVN.add_flow(stk);          // Scope object going dead, trigger following projs to cleanup
     _scope.set_ptr(null);       // Clear pointer to display
     GVN.add_flow(ptr);          // Clearing pointer changes liveness
-    GVN.add_work_all(_scope.unkeep());
+    Node xscope = KEEP_ALIVE.pop();
+    assert _scope==xscope;
+    GVN.add_work_new(_scope);
     GVN.add_dead(_scope);
-    GVN.iter(GVN._opt_mode);
+    GVN.iter();
   }
 
   // Wire up an early function exit
@@ -196,26 +209,27 @@ public class Env implements AutoCloseable {
     Node n;
     while( (n=SCP_0._defs.last())!=null && !n.is_prim() )
       SCP_0.pop();
-    // Replace the default memory into unknown caller functions, with the
-    // matching display.
-    for( Node use : DEFMEM._uses ) {
-      FunNode fun;
-      if( use instanceof ParmNode && !use.is_prim() && use.in(1)==DEFMEM && (fun=((ParmNode)use).fun()).has_unknown_callers() ) {
-        ParmNode mem = (ParmNode)use, dsp = fun.parm(DSP_IDX);
-        if( dsp !=null ) {
-          Node display = dsp.in(1).in(0);
-          if( display instanceof NewObjNode ) {
-            MrgProjNode defmem = ((NewObjNode)display).mem();
-            mem.set_def(1,defmem);
-          }
-        }
-      }
-    }
-
-    // Kill all extra objects hooked by DEFMEM.
-    while( DEFMEM.len() > DEFMEM_RESET.length ) DEFMEM.pop();
-    for( int i=0; i<DEFMEM_RESET.length; i++ )
-      DEFMEM.set_def(i,DEFMEM_RESET[i]);
+//// Replace the default memory into unknown caller functions, with the
+//// matching display.
+//for( Node use : DEFMEM._uses ) {
+//  FunNode fun;
+//  if( use instanceof ParmNode && !use.is_prim() && use.in(1)==DEFMEM && (fun=((ParmNode)use).fun()).has_unknown_callers() ) {
+//    ParmNode mem = (ParmNode)use, dsp = fun.parm(DSP_IDX);
+//    if( dsp !=null ) {
+//      Node display = dsp.in(1).in(0);
+//      if( display instanceof NewObjNode ) {
+//        MrgProjNode defmem = ((NewObjNode)display).mem();
+//        mem.set_def(1,defmem);
+//      }
+//    }
+//  }
+//}
+//
+//// Kill all extra objects hooked by DEFMEM.
+//while( DEFMEM.len() > DEFMEM_RESET.length ) DEFMEM.pop();
+//for( int i=0; i<DEFMEM_RESET.length; i++ )
+//  DEFMEM.set_def(i,DEFMEM_RESET[i]);
+    throw unimpl();
   }
 
   // Record global static state for reset
@@ -240,10 +254,9 @@ public class Env implements AutoCloseable {
     // Clear out the dead before clearing VALS, since they may not be reachable and will blow the elock assert
     Env.GVN.iter_dead();
     TV2.reset_to_init0();
-    Node.VALS.clear();                         // Clean out hashtable
-    Node.RESET_VISIT.clear();
-    Env.START.walk_reset(Env.GVN._work_flow);  // Clean out any wired prim calls
-    Env.GVN.iter(GVNGCM.Mode.Parse);   // Clean out any dead; reset prim types
+    Node.VALS.clear();          // Clean out hashtable
+    Env.START.walk_reset();     // Clean out any wired prim calls
+    Env.GVN.iter();             // Clean out any dead; reset prim types
     for( Node n : Node.VALS.keySet() ) // Assert no leftover bits from the prior compilation
       assert n._uid < Node._INIT0_CNT; //
     Node      .reset_to_init0();
@@ -276,7 +289,7 @@ public class Env implements AutoCloseable {
     Node n = lookup(name);
     if( !(n instanceof UnresolvedNode) ) return n._val;
     // For unresolved, use the ambiguous type
-    return n.value(GVNGCM.Mode.Opto);
+    return n.value();
   }
 
   // Lookup the operator name.  Use the longest name that's found, so that long

@@ -42,47 +42,17 @@ public class UnresolvedNode extends UnOrFunPtrNode {
     return progress ? this : null;
   }
 
-  // Required property for value():
-  // ANY >= value(ANY) >= value(other) >= value(ALL) >= ALL
-  @Override public Type value(GVNGCM.Mode opt_mode) {
-    switch( opt_mode ) {
-    case PesiCG:
-      return _val; // Freeze after GVN - only still around for errors
-    case Parse:
-    case PesiNoCG:
-      Type t = Type.ANY;
-      for( Node def : _defs ) {
-        Type td = def._val;
-        if( !(td instanceof TypeFunPtr) ) return td.oob();
-        t = t.meet(td);
-      }
-      return t;
-    case Opto:
-      // If all inputs are TFPs, result is a high choice of TFPs, plus the
-      // normal join over displays.
-      BitsFun fidxs = BitsFun.EMPTY;
-      Type tdsp = Type.ALL, tret = Type.ALL;
-      int nargs = -1;
-      for( Node fptr : _defs ) {
-        Type td = fptr._val;
-        if( !(td instanceof TypeFunPtr) ) return td.oob();
-        TypeFunPtr tfp = (TypeFunPtr)td;
-        fidxs = fidxs.meet((tfp.above_center() ? tfp.dual() : tfp)._fidxs);
-        tdsp = tdsp.join(tfp._dsp);
-        tret = tret.join(tfp._ret);
-        nargs = tfp.nargs();
-      }
-      if( fidxs.abit()!= -1 )
-        return TypeFunPtr.make(fidxs,nargs,tdsp,tret);
-      return TypeFunPtr.make(fidxs.dual(),nargs,tdsp,tret);
-    default: throw com.cliffc.aa.AA.unimpl();
-    }
+  @Override public Type value() {
+    Type t = Type.ANY;
+    for( Node fptr : _defs )
+      t = t.meet(fptr._val);
+    return t;
   }
 
   // An UnresolvedNode is its own Leaf, because it might gather fairly unrelated
   // functions - such as integer-add vs string-add, or the 1-argument leading
   // '+' operator vs the more expected binop.
-  @Override public boolean unify( WorkNode work ) {
+  @Override public boolean unify( boolean test ) {
     // Giant assert that all inputs are all Fun, ignoring errors.
     for( Node n : _defs ) {
       TV2 tv = n.tvar();
@@ -91,14 +61,13 @@ public class UnresolvedNode extends UnOrFunPtrNode {
     return false;
   }
 
-  // Validate same name, operator-precedence and thunking
+  // Validate same name, operator-precedence
   private void add_def_unresolved( FunPtrNode ptr ) {
     if( _defs._len>0 ) {
       FunPtrNode ptr0 = (FunPtrNode) in(0);
       assert Util.eq(ptr0._name, ptr._name);
-      // Actually, equal op_prec & thunk only for binary ops
+      // Actually, equal op_prec only for binary ops
       assert ptr0.fun()._op_prec == ptr.fun()._op_prec || ptr0.nargs()== AA.ARG_IDX+1; // Either a uniop, or same precedence
-      assert ptr0.fun()._thunk_rhs == ptr.fun()._thunk_rhs;
     }
     add_def(ptr);
   }

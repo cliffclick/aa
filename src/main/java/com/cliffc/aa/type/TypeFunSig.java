@@ -73,7 +73,6 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     case TARY:
     case TFLT:
     case TINT:
-    case TLIVE:
     case TMEM:
     case TMEMPTR:
     case TOBJ:

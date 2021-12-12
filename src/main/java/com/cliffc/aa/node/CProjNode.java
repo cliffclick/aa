@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
@@ -15,25 +16,24 @@ public class CProjNode extends ProjNode {
       return _idx==0 ? "False" : "True";
     return "CProj"+_idx;
   }
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     // Normal projection, except pinch to CTRL.
-    Type x = super.value(opt_mode);
+    Type x = super.value();
     if( x==Type.ANY ) return Type.XCTRL;
     if( x==Type.ALL ) return Type. CTRL;
     return x;
   }
-  @Override public void add_work_use_extra(WorkNode work, Node chg) {
+  @Override public void add_flow_use_extra(Node chg) {
     // Control from Calls
     if( chg instanceof CallNode ) {
       // if the Call changes val the function might be callable
       for( Node fun : _uses )
         if( fun instanceof FunNode )
-          work.add(fun);
+          Env.GVN.add_flow(fun);
     }
   }
 
-  @Override public TypeMem all_live() { return TypeMem.ALIVE; }
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
+  @Override public TypeMem live_use(Node def ) { return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
 
   @Override public TV2 new_tvar(String alloc_site) { return null; }
 

@@ -14,33 +14,21 @@ import static com.cliffc.aa.AA.unimpl;
 
 // Global Value Numbering, Global Code Motion
 public class GVNGCM {
-
-  public enum Mode {
-    Parse   (false),          // Parsing
-    PesiNoCG(false),          // Lifting, unknown Call Graph
-    Opto    (true ),          // Falling, Call Graph discovery, no more code
-    PesiCG  (true );          // Lifting,   known Call Graph
-    public final boolean _CG; // True if full CG is known or being discovered.  Only for whole programs during or after Opto.
-    Mode(boolean CG) { _CG=CG; }
-  }
-  public Mode _opt_mode=Mode.Parse;
+  public static final KeepNode KEEP_ALIVE = new KeepNode();
 
   // Iterative worklists.
-  private final WorkNode  _work_dead   = new WorkNode("dead"  , false) { @Override public Node apply(Node n) { return n._keep==0 && n._uses._len == 0 ? n.kill() : null; } };
-  private final WorkNode  _work_reduce = new WorkNode("reduce", true ) { @Override public Node apply(Node n) { return n.do_reduce(); } };
-  public  final WorkNode  _work_flow   = new WorkNode("flow"  , false) { @Override public Node apply(Node n) { return n.do_flow  (); } };
-  private final WorkNode  _work_mono   = new WorkNode("mono"  , true ) { @Override public Node apply(Node n) { return n.do_mono  (); } };
-  private final WorkNode  _work_grow   = new WorkNode("grow"  , true ) { @Override public Node apply(Node n) { return n.do_grow  (); } };
-  private final WorkNode  _work_inline = new WorkNode("inline", false) { @Override public Node apply(Node n) { return ((FunNode)n).ideal_inline(false); } };
-  public  final WorkNode  _work_dom    = new WorkNode("dom"   , false) { @Override public Node apply(Node n) { return n.do_mono  (); } };
-  private final WorkNode []    _new_works = new WorkNode[]{           _work_flow,_work_reduce,_work_mono,_work_grow             };
-  private final WorkNode []    _all_works = new WorkNode[]{_work_dead,_work_flow,_work_reduce,_work_mono,_work_grow,_work_inline};
-  static private boolean HAS_WORK;
-  public boolean on_dead  ( Node n ) { return _work_dead  .on(n); }
+  private final WorkNode _work_dead   = new WorkNode("dead"  );
+  private final WorkNode _work_flow   = new WorkNode("flow"  );
+  private final WorkNode _work_reduce = new WorkNode("reduce");
+  private final WorkNode _work_mono   = new WorkNode("mono"  );
+  private final WorkNode _work_grow   = new WorkNode("grow"  );
+  private final WorkNode _work_inline = new WorkNode("inline");
+  private final WorkNode _work_dom    = new WorkNode("dom"   );
+  public boolean on_dead( Node n ) { return _work_dead.on(n); }
+  public boolean on_flow( Node n ) { return _work_flow.on(n); }
 
   static public <N extends Node> N add_work( WorkNode work, N n ) {
     if( n==null || n.is_dead() ) return n;
-    if( !HAS_WORK ) HAS_WORK = true; // Filtered set
     work.add(n);
     return n;
   }
@@ -53,11 +41,12 @@ public class GVNGCM {
   public void add_flow_defs  ( Node n ) { add_work_defs(_work_flow  ,n); }
   public void add_flow_uses  ( Node n ) { add_work_uses(_work_flow  ,n); }
   public void add_flow( UQNodes deps ) { if( deps != null ) for( Node dep : deps.values() ) add_flow(dep); }
+  public void add_dom(Node n) { add_work(_work_dom,n); }
   public void add_reduce_uses( Node n ) { add_work_uses(_work_reduce,n); }
   // n goes unused
   public void add_unuse( Node n ) {
-    if( n._uses._len==0 && n._keep==0 ) { add_dead(n); return; } // might be dead
-    add_reduce(add_flow(n));
+    if( n._uses._len==0 ) add_dead(n); // might be dead
+    else add_reduce(add_flow(n));
   }
   static public void add_work_defs( WorkNode work, Node n ) {
     for( Node def : n._defs )
@@ -69,14 +58,18 @@ public class GVNGCM {
       if( use != n )
         add_work(work,use);
   }
-  public Node add_work_all( Node n ) {
+  public Node add_work_new( Node n ) {
     if( n.is_dead() ) return n;
-    if( !HAS_WORK ) HAS_WORK = true; // Filtered set
-    for( WorkNode work : _new_works ) work.add(n);
+    add_flow(n);
+    add_reduce(n);
+    add_mono(n);
+    add_grow(n);
     if( n instanceof FunNode )
-      add_work(_work_inline,(FunNode)n);
+      _work_inline.add((FunNode)n);
     return n;
   }
+
+  public Node pop_flow() { return _work_flow.pop(); }
 
   // Initial state after loading e.g. primitives.
   void init0() {
@@ -85,24 +78,103 @@ public class GVNGCM {
   // state left alive.  NOT called after a line in the REPL or a user-call to
   // "eval" as user state carries on.
   void reset_to_init0() {
-    for( WorkNode work : _all_works ) work.clear();
-    _work_dom.clear();
-    HAS_WORK = true;
-    _opt_mode = Mode.Parse;
+    _work_dead  .clear();
+    _work_flow  .clear();
+    _work_reduce.clear();
+    _work_mono  .clear();
+    _work_grow  .clear();
+    _work_inline.clear();
+    _work_dom   .clear();
     ITER_CNT = ITER_CNT_NOOP = 0;
   }
+
+  // Keep a Node reference alive for later.  Strongly asserted as a stack
+  public static int push( Node n ) { KEEP_ALIVE.add_def(n); return KEEP_ALIVE._defs._len; }
+  // Return the pushed Node
+  public static Node pop( int idx ) { assert KEEP_ALIVE._defs._len==idx; return KEEP_ALIVE.pop(); }
 
   // Record a Node, but do not optimize it for value and ideal calls, as it is
   // mid-construction from the parser.  Any function call with yet-to-be-parsed
   // call sites, and any loop top with an unparsed backedge needs to use this.
-  public <N extends Node> N init( N n ) { return add_flow(add_reduce(n.keep(2))); }
+  public <N extends Node> N init( N n ) {
+    assert n._uses._len==0;     // New to GVN
+    add_work_new(n);
+    return n;
+  }
+
+  // Apply graph-rewrite rules on new nodes (those with no users and kept alive
+  // for the parser).  Return a node registered with GVN that is possibly "more
+  // ideal" than what was before.
+  public Node xform( Node n ) {
+    int idx = push(init(n));
+    do_iter();
+    return pop(idx);
+  }
+
+  // Any time anything is on any worklist we can always conservatively iterate on it.
+  // Empties the worklists, attempting to do every possible thing.
+  static int ITER_CNT;
+  static int ITER_CNT_NOOP;
+  void do_iter() {
+    while( true ) {
+      Node n, m;
+      if( false ) ;
+      else if( (n=_work_dead  .pop())!=null ) m = n._uses._len == 0 ? n.kill() : null;
+      else if( (n=_work_flow  .pop())!=null ) m = n.do_flow  ();
+      else if( (n=_work_reduce.pop())!=null ) m = n.do_reduce();
+      else if( (n=_work_mono  .pop())!=null ) m = n.do_mono  ();
+      else if( (n=_work_grow  .pop())!=null ) m = n.do_grow  ();
+      else if( (n=_work_inline.pop())!=null ) m = ((FunNode)n).ideal_inline(false);
+      else break;
+      ITER_CNT++; assert ITER_CNT < 35000; // Catch infinite ideal-loops
+      if( m == null ) {
+        ITER_CNT_NOOP++; // No progress profiling
+        assert Env.START==null || Env.START.more_work(true)==0; // Initial conditions are correct
+      }
+      else
+        // VERY EXPENSIVE ASSERT
+        assert Env.START==null || Env.START.more_work(true)==0 // Initial conditions are correct
+        ;
+    }
+  }
+
+  // Top-level iter cleanout.  Empties all queues & aggressively checks
+  // no-more-progress.
+  private static final VBitSet IDEAL_VISIT = new VBitSet();
+  public void iter() {
+    while( true ) {
+      do_iter();
+      // Only a very few nodes can make progress via dominance relations, and
+      // these can make progress "very far" in the graph.  So instead of using
+      // a neighbors list, we bulk revisit them here.
+      boolean progress=false;
+      for( int i=0; i<_work_dom.len(); i++ ) {
+        Node dom = _work_dom.at(i);
+        if( dom.is_dead() ) _work_dom.del(i--);
+        else progress |= dom.do_mono()!=null;
+      }
+      if( !progress ) break;
+    };
+    // Expensive assert
+    assert Env.START.more_work(true)==0;
+    IDEAL_VISIT.clear();
+    assert !Env.START.more_ideal(IDEAL_VISIT);
+  }
+
+  // Clear the dead worklist only
+  public void iter_dead() {
+    //Node n;
+    //while( (n=_work_dead.pop()) != null )
+    //  _work_dead.apply(n);
+    throw unimpl();
+  }
 
   // Did a bulk not-monotonic update.  Forcibly update the entire region at
   // once; restores monotonicity over the whole region when done.
   public void revalive(Node... ns) {
     for( Node n : ns ) {
       if( n == null ) continue;
-      Type t = n.value(_opt_mode);
+      Type t = n.value();
       if( t != n._val ) {
         n._val = t;
         add_flow_uses(n);
@@ -111,7 +183,7 @@ public class GVNGCM {
     for( int i=ns.length-1; i>=0; i-- ) {
       Node n = ns[i];
       if( n==null ) continue;
-      TypeMem t = n.live(_opt_mode);
+      TypeMem t = n.live();
       if( t != n._live ) {
         n._live=t;
         add_flow_defs(n);
@@ -119,92 +191,11 @@ public class GVNGCM {
     }
   }
 
-  // Apply graph-rewrite rules on new nodes (those with no users and kept alive
-  // for the parser).  Return a node registered with GVN that is possibly "more
-  // ideal" than what was before.
-  public Node xform( Node n ) {
-    assert n._uses._len==0 && n._keep==0; // New to GVN
-    Node x = iter(add_work_all(n),_all_works);
-    assert !x.is_dead();
-    return add_flow(x);         // No liveness (yet), since uses not known
-  }
-
-  // Apply graph-rewrite rules, up to the ideal_reduce calls.  Return a node
-  // that is possibly "more ideal" than what was before.
-  public Node xreduce( Node n ) {
-    assert n._uses._len==0 && n._keep==0; // New to GVN
-    n.do_flow();                // Compute _val (for finding constants)
-    Node x = n.do_reduce();     // Maybe find a more ideal Node
-    if( x==null ) x=n;          // Ignore lack-of-progress
-    return add_flow(x);         // No liveness (yet), since uses not known
-  }
-
-
-  // Top-level iter cleanout.  Changes GVN modes & empties all queues &
-  // aggressively checks no-more-progress.
-  private static final VBitSet IDEAL_VISIT = new VBitSet();
-  public void iter(Mode opt_mode) {
-    _opt_mode = opt_mode;
-    boolean progress=true;
-    while( progress ) {
-      progress = false;
-      iter(null,_all_works);
-      // Only a very few nodes can make progress via dominance relations, and
-      // these can make progress "very far" in the graph.  So instead of using
-      // a neighbors list, we bulk revisit them here.
-      for( int i=0; i<_work_dom.len(); i++ ) {
-        Node dom = _work_dom.at(i);
-        if( dom.is_dead() ) _work_dom.del(i--);
-        else progress |= _work_dom.apply(dom)!=null;
-      }
-    }
-    IDEAL_VISIT.clear();
-    // Expensive assert
-    assert !Env.START.more_ideal(IDEAL_VISIT);
-  }
-
-  // Any time anything is on any worklist we can always conservatively iterate on it.
-  // Empties the worklist, attempting to do every possible thing.
-  // Returns 'x' or a replacement for 'x'.
-  static int ITER_CNT;
-  static int ITER_CNT_NOOP;
-  public Node iter(Node x, WorkNode[] works) {
-    if( !HAS_WORK ) return x;
-    if( x!=null ) x.keep();
-    while( true ) {
-      WorkNode W=null;
-      for( WorkNode work : works )
-        if( !(W = work).isEmpty() )
-          break;
-      if( W.isEmpty() ) break;      // All worklists empty
-      Node n = W.pop();
-      Node m = n.is_dead() ? null : W.apply(n);
-      if( m == null ) {       // not-null is progress
-        ITER_CNT_NOOP++;      // No progress
-      } else {
-        // VERY EXPENSIVE ASSERT
-        //assert W==_work_dead || Env.START.more_work(_work_flow,true)==0; // Initial conditions are correct
-        ITER_CNT++; assert ITER_CNT < 35000; // Catch infinite ideal-loops
-        if( x==n ) x=m;       // Keep track of the replacement for x, if any
-      }
-    }
-    HAS_WORK=false;
-    Node.roll_back_CNT();       // Can reclaim node numbers
-    if( x==null ) return null;  // No special node to track
-    return x.unkeep();
-  }
-
-  public void iter_dead() {
-    Node n;
-    while( (n=_work_dead.pop()) != null )
-      _work_dead.apply(n);
-  }
-
   // Walk all memory edges, and 'retype' them, probably DOWN (counter to
   // 'iter').  Used when inlining, and the inlined body needs to acknowledge
   // bypasses aliases.  Used during code-clone, to lift the split alias parent
   // up & out.
-  private static final WorkNode WORK_RETYPE = new WorkNode("retype",false) { @Override public Node apply( Node n) { throw unimpl(); } };
+  private static final WorkNode WORK_RETYPE = new WorkNode("retype");
   public static void retype_mem( BitSet aliases, Node mem, Node exit, boolean skip_calls ) {
     WORK_RETYPE.add(mem);
     // Update all memory ops
@@ -219,17 +210,17 @@ public class GVNGCM {
         CallEpiNode cepi = ((CallNode)wrk).cepi();
         if( cepi != null ) WORK_RETYPE.add(cepi);
       }
-      Type tval = wrk.value(Env.GVN._opt_mode); // Recompute memory value
-      if( twrk == tval ) continue;              // No change
-      wrk._val = tval;                          // Progress!!!
-      Env.GVN.add_flow_uses(wrk);               // Forwards flow the update
-      if( wrk==exit ) continue;                 // Stop at end
+      Type tval = wrk.value();     // Recompute memory value
+      if( twrk == tval ) continue; // No change
+      wrk._val = tval;             // Progress!!!
+      Env.GVN.add_flow_uses(wrk);  // Forwards flow the update
+      if( wrk==exit ) continue;    // Stop at end
       if( skip_calls && wrk instanceof MProjNode && wrk.in(0) instanceof CallNode )
         continue;               // Skip the inside of calls
 
       WORK_RETYPE.add(wrk._uses);
     }
-    assert Env.START.more_work(Env.GVN._work_flow,true)==0;
+    assert Env.START.more_work(true)==0;
   }
 
   public class Build<N extends Node> implements AutoCloseable {

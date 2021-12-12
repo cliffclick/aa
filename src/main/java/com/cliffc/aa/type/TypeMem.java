@@ -7,6 +7,7 @@ import java.util.BitSet;
 import java.util.HashMap;
 
 import static com.cliffc.aa.type.TypeFld.Access;
+import static com.cliffc.aa.AA.unimpl;
 
 /**
    Memory type; the state of all memory; memory edges order memory ops.
@@ -72,11 +73,9 @@ public class TypeMem extends Type<TypeMem> {
   // False if not 'tight' (no trailing null pairs) or any matching pairs (should
   // collapse to their parent) or any mixed parent/child.
   private static boolean check(TypeObj[] as) {
-    if( !(as[0] instanceof TypeLive) ) return false; // Slot 0 reserved for live-ness
     if( as.length == 1 ) return true;
     if( as[1]!=TypeObj.OBJ    && as[1]!=TypeObj.XOBJ   &&
         as[1]!=TypeObj.ISUSED && as[1]!=TypeObj.UNUSED &&
-        !(as[1] instanceof TypeLive) &&
         as[1] != null )
       return false;             // Only 2 choices
     if( as[0].above_center()!=as[1].above_center() ) return false;
@@ -115,11 +114,14 @@ public class TypeMem extends Type<TypeMem> {
     if( this==EMPTY) return sb.p("[_____]");
     if( this== MEM ) return sb.p("[ mem ]");
     if( this==XMEM ) return sb.p("[~mem ]");
+    if( this==ALIVE) return sb.p("[ALIVE]");
+    if( this==DEAD ) return sb.p("[DEAD ]");
+    if( this==LNO_DISP ) return sb.p("[NODSP]");
 
     if( _pubs.length==1 )
       return _pubs[0].str(sb.p('['),dups,mem,debug).p(']');
 
-    if( _pubs[0]==TypeLive.DEAD ) sb.p('!');
+    if( _pubs[0]==TypeObj.DEAD ) sb.p('!');
     else _pubs[0].str(sb,dups,mem,debug);
 
     sb.p('[');
@@ -167,7 +169,7 @@ public class TypeMem extends Type<TypeMem> {
   // Canonicalize memory before making.  Unless specified, the default memory is "do not care"
   public static TypeMem make0( TypeObj[] as ) {
     assert as.length==1 || as[0]==null;
-    if( as.length> 1 ) as[0] = as[1].oob(TypeLive.LIVE);
+    if( as.length> 1 ) as[0] = as[1].oob(TypeObj.ALIVE);
     TypeObj[] tos = _make1(as);
     if( tos==null ) return DEAD; // All things are dead, so dead
     return make(tos);
@@ -215,16 +217,17 @@ public class TypeMem extends Type<TypeMem> {
     return make0(as);
   }
 
-  public static TypeMem make_live(TypeLive live) { return make0(new TypeObj[]{live}); }
+  public static TypeMem make_live(TypeObj live) { return make0(new TypeObj[]{live}); }
 
   public static final TypeMem FULL; // Every alias filled with something
   public static final TypeMem EMPTY;// Every alias filled with anything
   public static final TypeMem  MEM; // FULL, except lifts REC, arrays, STR
   public static final TypeMem XMEM; //
-  public static final TypeMem DEAD, ALIVE, LNO_DISP, LESC_NO_DISP, LIVE_BOT; // Sentinel for liveness flow; not part of lattice
-  public static final TypeMem ESCAPE; // Sentinel for liveness, where the value "escapes" the local scope
   public static final TypeMem ANYMEM,ALLMEM; // Every alias is unused (so above XOBJ or below OBJ)
   public static final TypeMem MEM_ABC, MEM_STR;
+  public static final TypeMem DEAD, ALIVE; // Sentinel for liveness flow; not part of lattice
+  public static final TypeMem LNO_DISP;    // Liveness: a code ptr is alive, but not the display
+  
   static {
     // Every alias is unused
     ANYMEM = make0(new TypeObj[]{null,TypeObj.UNUSED});
@@ -248,15 +251,13 @@ public class TypeMem extends Type<TypeMem> {
     MEM_STR = make(BitsAlias.STR,TypeStr.STR.dual()).dual(); // [1:use,4:str]
     MEM_ABC = make(BitsAlias.ABC,TypeStr.ABC.dual());
 
-    // Sentinel for liveness flow; not part of lattice
-    DEAD   = make_live(TypeLive.DEAD    );
-    ALIVE  = make_live(TypeLive.LIVE    ); // Basic alive for all time
-    LNO_DISP = make_live(TypeLive.NO_DISP);  // Basic alive, no display pointers
-    LESC_NO_DISP = make_live(TypeLive.ESC_DISP);  // Basic alive, no display pointers, and escapes.
-    ESCAPE = make_live(TypeLive.ESCAPE  ); // Alive, plus escapes some call/memory
-    LIVE_BOT=make_live(TypeLive.LIVE_BOT);
+    // Sentinels for liveness flow; not part of lattice
+    DEAD    = make_live(TypeObj.DEAD);
+    ALIVE   = DEAD.dual();
+    assert TypeObj.ALIVE == ALIVE._pubs[0];
+    LNO_DISP= make_live(TypeObj.LNO_DISP); // Of a code/disp pair, the code is alive and the disp is dead
   }
-  static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC.dual(),ALLMEM,ESCAPE};
+  static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC.dual(),ALLMEM,ALIVE};
 
   // All mapped memories remain, but each memory flips internally.
   @Override protected TypeMem xdual() {
@@ -312,11 +313,6 @@ public class TypeMem extends Type<TypeMem> {
       if( at(alias)!= TypeObj.UNUSED )
         return true;            // Has a not-unused (some used) type
     return false;
-  }
-
-  // True if this is a liveness value that is NO_DISP, ESC_NO_DISP or DEAD
-  public boolean live_no_disp() {
-    return this==TypeMem.LNO_DISP || this==TypeMem.LESC_NO_DISP || this==TypeMem.DEAD;
   }
 
   // Shallow meet of all possible loadable values.  Used in Node.value calls, so must be monotonic.
@@ -568,8 +564,8 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean must_nil() { return false; } // never a nil
   @Override Type not_nil() { return this; }
 
-  public TypeLive live() { return (TypeLive)_pubs[0]; }
-  public boolean is_live() { return _pubs.length>1 || (live()!=TypeLive.DEAD && live()!=TypeLive.LIVE.dual()); }
+  //public TypeObj live() { return _pubs[0]; }
+  //public boolean is_live() { return _pubs.length>1 || live()!=TypeObj.UNUSED; }
   public boolean basic_live() { return _pubs.length==1; }
 
 }

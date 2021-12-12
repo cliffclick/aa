@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
@@ -12,10 +11,11 @@ public class CEProjNode extends CProjNode {
   public CEProjNode( Node call ) { super(call); }
   @Override public String xstr() { return "CEProj"; }
 
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     if( _uses._len<1 ) return Type.CTRL; // Dead
     assert !(in(0) instanceof ScopeNode);
     if( in(0).is_copy(0) != null ) return Type.CTRL;
+    if( is_keep() ) return Type.CTRL;
     // Expect a call here
     return good_call(val(0),_uses.at(0)) ? Type.CTRL : Type.XCTRL;
   }
@@ -27,9 +27,7 @@ public class CEProjNode extends CProjNode {
     if( !(tcall instanceof TypeTuple) ) return !tcall.above_center();
     TypeTuple ttcall = (TypeTuple)tcall; // Call type tuple
     if( ttcall.at(0)!=Type.CTRL ) return false; // Call not executing
-    if( ftun instanceof ThunkNode ) return true; // Thunk call is OK by design
     FunNode fun = (FunNode)ftun;
-    if( fun._thunk_rhs ) return true; // Thunk call is OK by design
     TypeFunPtr tfp = CallNode.ttfp(ttcall);
     if( tfp.fidxs().above_center() ) return false; // Call not executing yet
     if( !tfp.fidxs().test_recur(fun._fidx) )
@@ -43,7 +41,7 @@ public class CEProjNode extends CProjNode {
     // arguments).
 
     // Argument count mismatch
-    return ttcall.len()-1/*tfp*/-1/*esc*/ == fun.nargs();
+    return ttcall.len()-1/*tfp*//*-1 tesc turned off*/ == fun.nargs();
   }
 
   @Override public TV2 new_tvar( String alloc_site) { return null; }

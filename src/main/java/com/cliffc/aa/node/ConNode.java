@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
@@ -19,33 +18,23 @@ public class ConNode<T extends Type> extends Node {
     _t=t;
     _live = all_live();
   }
-  // Allows ANY type with a normal unification, used for uninitialized variables
-  // (as opposed to dead ones).
-  public ConNode( T t, double dummy ) {
-    super(OP_CON,Env.START);
-    _t=t;
-  }
-  // Used by FunPtrNode
-  ConNode( byte type, T tfp, RetNode ret, Node closure ) { super(type,ret,closure); _t = tfp; }
+  //// Allows ANY type with a normal unification, used for uninitialized variables
+  //// (as opposed to dead ones).
+  //public ConNode( T t, double dummy ) {
+  //  super(OP_CON,Env.START);
+  //  _t=t;
+  //}
+  //// Used by FunPtrNode
+  //ConNode( byte type, T tfp, RetNode ret, Node closure ) { super(type,ret,closure); _t = tfp; }
   @Override public String xstr() {
     if( Env.ALL_PARM == this ) return "ALL_PARM";
     if( Env.ALL_CALL == this ) return "ALL_CALL";
     return _t==null ? "(null)" : _t.toString();
   }
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     return _t.simple_ptr();
   }
-  @Override public TypeMem live(GVNGCM.Mode opt_mode) {
-    // If any use is alive, the Con is alive... but it never demands memory.
-    // Indeed, it may supply memory.
-    if( _keep>0 ) return all_live();
-    TypeLive live = TypeLive.DEAD; // Start at lattice top
-    for( Node use : _uses )
-      if( use.live_uses() )
-        live = live.lmeet(use.live_use(opt_mode,this).live());
-    return TypeMem.make_live(live);
-  }
-  @Override public TypeMem all_live() { return _t==Type.CTRL ? TypeMem.ALIVE : (_t instanceof TypeMem ? TypeMem.ALIVE : TypeMem.LIVE_BOT); }
+  @Override public TypeMem all_live() { return _t instanceof TypeMem ? TypeMem.ALLMEM : TypeMem.ALIVE; }
 
   @Override public TV2 new_tvar(String alloc_site) {
     if( _t==Type.CTRL || _t==Type.XCTRL || _t instanceof TypeRPC )
@@ -55,11 +44,11 @@ public class ConNode<T extends Type> extends Node {
     return TV2.make_base(this,_t,alloc_site);
   }
 
-  @Override public boolean unify( WorkNode work ) {
+  @Override public boolean unify( boolean test ) {
     if( _tvar==null ) return false;
     TV2 self = tvar();
     if( self.is_base() || self.is_nil() || self.is_struct() || self.isa("Str") ) return false;
-    if( work==null ) return true;
+    if( test ) return true;
     //assert self.is_leaf();
     //_set_tvar();
     //return true;
@@ -76,8 +65,6 @@ public class ConNode<T extends Type> extends Node {
     if( this==o ) return true;
     if( !(o instanceof ConNode) ) return false;
     ConNode con = (ConNode)o;
-    if( this== Env.ALL_PARM || con == Env.ALL_PARM ) return false; // Only equal to itself
-    if( this== Env.ALL_CALL || con == Env.ALL_CALL ) return false; // Only equal to itself
     if( _t==Type.XNIL && con._t==Type.XNIL /*&& tvar()!=con.tvar()*/ )
       return false;             // Different versions of TV2 NotNil
     return _t==con._t;

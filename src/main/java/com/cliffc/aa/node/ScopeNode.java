@@ -25,12 +25,10 @@ public class ScopeNode extends Node {
     if( closure ) { add_def(null); add_def(null); add_def(null); } // Wire up an early-function-exit path
     _types = new HashMap<>();
     _ifs = null;
-    keep();
   }
   public ScopeNode(HashMap<String,ConTypeNode> types,  Node ctl, Node mem, Node ptr, Node rez) {
     super(OP_SCOPE,ctl,mem,ptr,rez);
     _types = types;
-    keep();
   }
 
   public   Node  ctrl() { return in(CTL_IDX); }
@@ -48,20 +46,20 @@ public class ScopeNode extends Node {
     Node old = mem();
     set_def(MEM_IDX,n);
     if( old!=null ) {
-      Env.GVN.add_work_all(old);
-      if( old._uses._len <= 2 ) // DEFMEM and a MemSplit
-        for( Node use : old._uses )
-          if( use instanceof MemSplitNode )
-            Env.GVN.add_mono(((MemSplitNode)use).join());
-      old.add_work_def_extra(Env.GVN._work_flow,n); // old loses a use, triggers extra
-      Env.GVN.add_work_all(n);
+      Env.GVN.add_work_new(old);
+      if( old._uses._len == 1 && // Only a MemSplit
+          old._uses.at(0) instanceof MemSplitNode )
+        Env.GVN.add_mono(((MemSplitNode)old._uses.at(0)).join());
+      //old.add_flow_def_extra(n); // old loses a use, triggers extra
+      //Env.GVN.add_work_new(n);
     }
     return this;
   }
   public void replace_mem(Node st) {
+    // Remove the scope use of old memory, so the store becomes the ONLY use of
+    // old memory, allowing the store to fold immediately.
     set_def(MEM_IDX,null);
-    Node mem = Env.GVN.xform(st);
-    set_def(MEM_IDX,mem);
+    set_def(MEM_IDX,Env.GVN.xform(st));
   }
   @Override public boolean is_mem() { return true; }
 
@@ -105,12 +103,7 @@ public class ScopeNode extends Node {
 
     Node mem = mem();
     Node rez = rez();
-    Type trez = rez==null ? null : rez._val;
-    if( this!=Env.SCP_0 &&      // Not the top-level, which is always alive
-        Env.GVN._opt_mode != GVNGCM.Mode.Parse &&   // Past parsing
-        //rez != null &&          // Have a return result
-        // And not already wiped it out
-        !(mem instanceof ConNode && mem._val ==TypeMem.ANYMEM) &&
+    if( mem!=null && mem!=Env.XMEM &&  // Not already wiped it out
         // And used memory is dead
         compute_live_mem(this,mem,rez)==TypeMem.ANYMEM ) {
       // All default mem-Parms of escaping functions update.
@@ -120,24 +113,24 @@ public class ScopeNode extends Node {
             if( parm instanceof ParmNode && ((ParmNode)parm)._idx==MEM_IDX )
               Env.GVN.add_flow(parm);
       // Wipe out return memory
-      return set_mem(Node.con(TypeMem.ANYMEM));
+      return set_mem(Env.XMEM);
     }
 
     // If the result is never a function
     int progress = _defs._len;
-    if( Env.GVN._opt_mode._CG &&
-        !TypeFunPtr.GENERIC_FUNPTR.dual().isa(trez) || trez==Type.XNIL )
+    if( !TypeFunPtr.GENERIC_FUNPTR.dual().isa(rez._val) || rez._val==Type.XNIL )
       // Wipe out extra function edges.  They are there to act "as if" the
       // exit-scope calls them; effectively an extra wired call use with the
       // most conservative caller.
-      while( _defs._len > RET_IDX ) pop();
+      while( _defs._len > RET_IDX ) throw unimpl(); // pop();
     // If the result is a function, wipe out wrong fidxs
-    if( Env.GVN._opt_mode._CG &&
-        trez instanceof TypeFunPtr ) {
-      BitsFun fidxs = ((TypeFunPtr)trez)._fidxs;
-      for( int i=RET_IDX; i<_defs._len; i++ )
-        if( !fidxs.test(((RetNode)in(i))._fidx) )
-          remove(i--);
+    if( rez._val instanceof TypeFunPtr ) {
+      BitsFun fidxs = ((TypeFunPtr)rez._val)._fidxs;
+      if( fidxs != BitsFun.FULL )
+        for( int i=RET_IDX; i<_defs._len; i++ )
+          if( !fidxs.test(((RetNode)in(i))._fidx) )
+            //remove(i--);
+            throw unimpl();
     }
 
     return progress == _defs._len ? null : this;
@@ -145,21 +138,22 @@ public class ScopeNode extends Node {
 
   // Produce a tuple of the return result and a summary of all escaping
   // functions, on behalf of the following CEProjs.
-  @Override public Type value(GVNGCM.Mode opt_mode) { return Type.CTRL; }
+  @Override public Type value() { return Type.CTRL; }
 
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
-  @Override public void add_work_use_extra(WorkNode work, Node chg) {
+  @Override public void add_flow_use_extra(Node chg) {
     if( chg==rez() ) {          // If the result changed
       for( Node use : _uses ) {
-        if( use != this ) work.add(use);
+        if( use != this ) Env.GVN.add_flow(use);
         if( use instanceof FunNode ) // If escaping functions, their parms now take the default path
-          work.add(use._uses);
+          for( Node useuse : use._uses )
+            Env.GVN.add_flow(useuse);
       }
     }
     if( chg==mem() )            // If the memory changed
       for( Node use : _uses )
         if( use instanceof FunNode ) // If escaping functions, their parms now take the default path
-          work.add(((FunNode)use).parm(MEM_IDX));
+          Env.GVN.add_flow(((FunNode)use).parm(MEM_IDX));
   }
 
   // From a memory and a possible pointer-to-memory, find all the reachable
@@ -186,8 +180,9 @@ public class ScopeNode extends Node {
           TypeTuple tret = (TypeTuple)ret._val;
           TypeMem post_call = (TypeMem)tret.at(MEM_IDX);
           Type trez2 = tret.at(REZ_IDX);
-          TypeMem cepi_out = CallEpiNode.live_out(tmem0, post_call, trez2, esc_in, null);
-          tmem3 = (TypeMem)tmem3.meet(cepi_out);
+          //TypeMem cepi_out = CallEpiNode.live_out(tmem0, post_call, trez2, esc_in, null);
+          //tmem3 = (TypeMem)tmem3.meet(cepi_out);
+          throw unimpl();
         }
       }
       return tmem3.flatten_fields();
@@ -199,29 +194,23 @@ public class ScopeNode extends Node {
     return tmem0.slice_reaching_aliases(aliases).flatten_fields();
   }
 
-  @Override public TypeMem live(GVNGCM.Mode opt_mode) {
-    // Primitive scope does not demand any memory
-    if( this==Env.SCP_0 )  return TypeMem.ANYMEM;
-    if( opt_mode == GVNGCM.Mode.Parse ) return TypeMem.MEM;
+  @Override public TypeMem live() {
+    if( is_keep() ) return TypeMem.ALLMEM;
     // All fields in all reachable pointers from rez() will be marked live
     return compute_live_mem(this,mem(),rez());
   }
 
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+  @Override public TypeMem live_use(Node def ) {
     // Basic liveness ("You are Alive!") for control and returned value
     if( def == ctrl() ) return TypeMem.ALIVE;
-    if( def == rez () ) return def.all_live().basic_live() ? TypeMem.LIVE_BOT : TypeMem.ANYMEM;
-    // Returned display is dead in a whole program.
-    // In a partial-program, what's in the display is exported to the next step.
-    if( def == ptr () ) return opt_mode._CG ? TypeMem.DEAD : TypeMem.LIVE_BOT; // Returned display is dead after CG
+    if( def == rez () ) return TypeMem.ALIVE; // Returning a Scalar, including e.g. a mem ptr
+    if( def == ptr () ) return TypeMem.ALIVE; // Display must be kept-alive during e.g. parsing.
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.
-    if( def == mem() )
-      return opt_mode==GVNGCM.Mode.Parse ? TypeMem.ALLMEM : _live.flatten_fields();
+    if( def == mem() ) return _uses._len>0 && _uses.at(0)==Env.KEEP_ALIVE ? TypeMem.ALLMEM : _live;
     // Top-level function pointer escape
-    if( def instanceof RetNode )
-      return _live;
-    // Merging exit path
+    if( def instanceof RetNode ) return _live;
+    // Merging exit path, or ConType
     return def._live;
   }
 
@@ -231,18 +220,19 @@ public class ScopeNode extends Node {
   public BitsFun top_escapes() {
     if( _val.above_center() ) return BitsFun.EMPTY;
     if( is_prim() ) return BitsFun.FULL; // All the primitives escape
-    if( !Env.GVN._opt_mode._CG ) return BitsFun.FULL; // Not run Opto yet
-    Type trez = rez()._val;
-    Type tmem = mem()._val;
-    if( _escache_trez == trez &&  _escache_tmem == tmem ) return _escache_escs; // Cache hit
-    // Cache miss, compute the hard way
-    if( TypeFunPtr.GENERIC_FUNPTR.isa(trez) ) return BitsFun.FULL; // Can lift to any function
-    tmem = tmem instanceof TypeMem ? (TypeMem)tmem : tmem.oob(TypeMem.ALLMEM);
-    BitsFun fidxs = trez.all_reaching_fidxs((TypeMem)tmem);
-    _escache_trez = trez;
-    _escache_tmem = tmem;
-    _escache_escs = fidxs;
-    return fidxs;
+    //if( !Env.GVN._opt_mode._CG ) return BitsFun.FULL; // Not run Opto yet
+    //Type trez = rez()._val;
+    //Type tmem = mem()._val;
+    //if( _escache_trez == trez &&  _escache_tmem == tmem ) return _escache_escs; // Cache hit
+    //// Cache miss, compute the hard way
+    //if( TypeFunPtr.GENERIC_FUNPTR.isa(trez) ) return BitsFun.FULL; // Can lift to any function
+    //tmem = tmem instanceof TypeMem ? (TypeMem)tmem : tmem.oob(TypeMem.ALLMEM);
+    //BitsFun fidxs = trez.all_reaching_fidxs((TypeMem)tmem);
+    //_escache_trez = trez;
+    //_escache_tmem = tmem;
+    //_escache_escs = fidxs;
+    //return fidxs;
+    throw unimpl();
   }
 
   // GCP discovers functions which escape at the top-most level, and wires the

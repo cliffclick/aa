@@ -22,13 +22,13 @@ public abstract class Node implements Cloneable, IntSupplier {
   static final byte OP_CON    = 4;
   static final byte OP_CONTYPE= 5;
   static final byte OP_CPROJ  = 6;
-  static final byte OP_DEFMEM = 7;
-  static final byte OP_ERR    = 8;
-  static final byte OP_FRESH  = 9;
-  static final byte OP_FUN    =10;
-  static final byte OP_FUNPTR =11;
-  static final byte OP_IF     =12;
-  static final byte OP_JOIN   =13;
+  static final byte OP_ERR    = 7;
+  static final byte OP_FRESH  = 8;
+  static final byte OP_FUN    = 9;
+  static final byte OP_FUNPTR =10;
+  static final byte OP_IF     =11;
+  static final byte OP_JOIN   =12;
+  static final byte OP_KEEP   =13;
   static final byte OP_LOAD   =14;
   static final byte OP_LOOP   =15;
   static final byte OP_NAME   =16; // Cast a prior NewObj to have a runtime Name
@@ -46,31 +46,26 @@ public abstract class Node implements Cloneable, IntSupplier {
   static final byte OP_START  =28;
   static final byte OP_STMEM  =29;
   static final byte OP_STORE  =30;
-  static final byte OP_THRET  =31;
-  static final byte OP_THUNK  =32;
-  static final byte OP_TYPE   =33;
-  static final byte OP_UNR    =34;
-  static final byte OP_MAX    =35;
+  static final byte OP_TYPE   =31;
+  static final byte OP_UNR    =32;
+  static final byte OP_MAX    =33;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "DefMem", "Err", "Fresh", "Fun", "FunPtr", "If", "Join", "Load", "Loop", "Name", "NewObj", "NewAry", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Thret", "Thunk", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Fresh", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "Loop", "Name", "NewObj", "NewAry", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Type", "Unresolved" };
   static { assert STRS.length==OP_MAX; }
 
   // Unique dense node-numbering
   public  static int _INIT0_CNT;
   private static int CNT=1; // Do not hand out UID 0
-  private static final VBitSet LIVE = new VBitSet();  // Conservative approximation of live; due to loops some things may be marked live, but are dead
   int newuid() {
     assert CNT < 100000 : "infinite node create loop";
     if( CNT==AA.UID )
       System.out.print("");
-    LIVE.set(CNT);
     return CNT++;
   }
   @Override public int getAsInt() { return _uid; }
 
   // Initial state after loading e.g. primitives.
   public static void init0() {
-    assert LIVE.get(CNT-1) && !LIVE.get(CNT);
     _INIT0_CNT=CNT;
   }
   // Reset is called after a top-level exec exits (e.g. junits) with no parse
@@ -78,14 +73,11 @@ public abstract class Node implements Cloneable, IntSupplier {
   // "eval" as user state carries on.
   public static void reset_to_init0() {
     CNT = _INIT0_CNT;
-    LIVE.clear();
-    LIVE.set(0,CNT);
   }
 
 
   public int _uid;      // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;       // Opcode (besides the object class), used to avoid v-calls in some places
-  public byte _keep;    // Keep-alive in parser, even as last use goes away
   public boolean _elock;// Edge-lock: cannot modify edges because messes up hashCode & GVN
   public Type _val;     // Value; starts at ALL and lifts towards ANY.
   public TypeMem _live; // Liveness; assumed live in gvn.iter(), assumed dead in gvn.gcp().
@@ -183,7 +175,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     old._uses.del(this);
     // Either last use of old & goes dead, or at least 1 fewer uses & changes liveness
     Env.GVN.add_unuse(old);
-    if( old._uses._len!=0 && old._keep ==0 ) old.add_work_def_extra(Env.GVN._work_flow,this);
+    if( old._uses._len!=0 ) old.add_flow_def_extra(this);
     return this;
   }
 
@@ -201,52 +193,50 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
 
   // Complete replacement; point uses to 'nnn' and removes 'this'.
-  public Node subsume( Node nnn ) {
+  public void subsume( Node nnn ) {
     assert !nnn.is_dead();
     insert(nnn);                // Change graph shape
-    nnn.keep();                 // Keep-alive
     kill();                     // Delete the old, and anything it uses
-    return nnn.unkeep();        // Remove keep-alive
   }
 
   // Kill a node; all inputs are null'd out; this may put more dead Nodes on
   // the dead worklist.  Return this for progress, null for no-progress.
   public Node kill( ) {
     if( is_dead() ) return null;
-    assert _uses._len==0 && _keep==0;
+    assert _uses._len==0;
     // Similar to unelock(), except do not put on any worklist
     if( _elock ) { _elock = false; Node x = VALS.remove(this); assert x == this; }
     while( _defs._len > 0 ) unuse(_defs.pop());
     _defs = _uses = null;       // TODO: Poor-man's indication of a dead node, probably needs to recycle these...
-    LIVE.clear(_uid);           // Off the LIVE set.  CNT cannot roll back unless the GVN work lists are also clear
     if( this instanceof RetNode ) ((RetNode)this).free();
     if( this instanceof NewNode ) ((NewNode)this).free();
     return this;
   }
   public boolean is_dead() { return _uses == null; }
 
-  // Called when GVN work lists are empty
-  public static void roll_back_CNT() { while( !LIVE.get(CNT-1) ) CNT--; }
-
   // "keep" a Node during all optimizations because it is somehow unfinished.
   // Typically, used when needing to build several Nodes before building the
   // typically using Node; during construction the earlier Nodes have no users
   // (yet) and are not dead.  Acts "as if" there is an unknown user.
-  public <N extends Node> N keep() { return keep(1); }
-  @SuppressWarnings("unchecked")
-  public <N extends Node> N keep(int d) { _keep+=d;  return (N)this; }
+  public <N extends Node> N keep() { throw unimpl(); }
+  public <N extends Node> N keep(int d) { throw unimpl(); }
   // Remove the keep flag, but do not delete.
-  public <N extends Node> N unkeep() { return unkeep(1); }
-  @SuppressWarnings("unchecked")
-  public <N extends Node> N unkeep(int d) {
-    assert _keep >= d; _keep-=d;
-    return (N)this;
-  }
+  public <N extends Node> N unkeep() { throw unimpl(); }
+  public <N extends Node> N unkeep(int d) { throw unimpl(); }
   // Remove the keep flag, and immediately allow optimizations.
-  public <N extends Node> N unhook() {
-    if( _keep==1 ) Env.GVN.add_work_all(this);
-    if( _keep==1 && _uses.isEmpty() ) Env.GVN.add_dead(this);
-    return unkeep();
+  public <N extends Node> N unhook() { throw unimpl(); }
+
+  // Keep a Node alive during all optimizations, because future direct uses
+  // will yet appear.  The Node can otherwise be fully optimized and replaced
+  // with equivalents.  The push/pop sequences are strongly asserted for stack
+  // order.
+  public int push() { GVNGCM.KEEP_ALIVE.add_def(this); return GVNGCM.KEEP_ALIVE._defs._len-1; }
+  public static Node pop (int idx) { assert idx==GVNGCM.KEEP_ALIVE._defs._len-1;  return GVNGCM.KEEP_ALIVE.pop(); }
+  public static Node peek(int idx) { assert idx<GVNGCM.KEEP_ALIVE._defs._len;  return GVNGCM.KEEP_ALIVE.in(idx); }
+  public static void pops(int nargs) { for( int i=0; i<nargs; i++ ) GVNGCM.KEEP_ALIVE.pop(); }
+  public boolean is_keep() {
+    for( Node use : _uses ) if( use instanceof KeepNode )  return true;
+    return false;
   }
 
   // Uses.  Generally variable length; unordered, no nulls, compressed, unused trailing space
@@ -275,12 +265,11 @@ public abstract class Node implements Cloneable, IntSupplier {
       n._uid = newuid();                  // A new UID
       n._defs = new Ary<>(new Node[1],0); // New empty defs
       n._uses = new Ary<>(new Node[1],0); // New empty uses
-      n._keep = 0;              // Not keeping, even if cloning a mid-keeper operation
       n._elock=false;           // Not in GVN
       if( copy_edges )
         for( Node def : _defs )
           n.add_def(def);
-      Env.GVN.add_work_all(n);
+      Env.GVN.add_work_new(n);
       return n;
     } catch( CloneNotSupportedException cns ) { throw new RuntimeException(cns); }
   }
@@ -459,14 +448,14 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Compute the current best Type for this Node, based on the types of its
   // inputs.  May return Type.ALL, especially if its inputs are in error.  It
   // must be monotonic.  This is a forwards-flow transfer-function computation.
-  abstract public Type value(GVNGCM.Mode opt_mode);
+  abstract public Type value();
 
   // Shortcut to update self-value.  Typically, used in contexts where it is NOT
   // locally monotonic - hence we cannot run any monotonicity asserts until the
   // invariant is restored over the entire region.
   public Type xval( ) {
-    Type oval = _val;                     // Get old type
-    Type nval = value(Env.GVN._opt_mode); // Get best type
+    Type oval = _val;    // Get old type
+    Type nval = value(); // Get best type
     if( nval!=oval ) {
       _val = nval;
       Env.GVN.add_flow_uses(this); // Put uses on worklist... values flows downhill
@@ -484,17 +473,15 @@ public abstract class Node implements Cloneable, IntSupplier {
   // TypeMem.FULL, especially if its uses are of unwired functions.
   // It must be monotonic.
   // This is a reverse-flow transfer-function computation.
-  public TypeMem live( GVNGCM.Mode opt_mode ) {
-    if( _keep>0 ) return all_live();
+  public TypeMem live( ) {
     // Compute meet/union of all use livenesses
     TypeMem live = TypeMem.DEAD; // Start at lattice top
     for( Node use : _uses )      // Computed across all uses
       if( use.live_uses() ) {
-        TypeMem ulive = use.live_use(opt_mode, this);
+        TypeMem ulive = use.live_use(this);
         live = (TypeMem)live.meet(ulive); // Make alive used fields
       }
     assert live==TypeMem.DEAD || live.basic_live()==all_live().basic_live();
-    assert live!=TypeMem.LIVE_BOT || (_val !=Type.CTRL && _val !=Type.XCTRL);
     return live;
   }
   public boolean live_uses() {
@@ -502,9 +489,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       (!_live.basic_live() ||   // Complex alive always counts
        !may_be_con_live(_val) ||// Use might be replaced with a constant (and not have this input)
        is_prim() ||             // Always live prims
-       err(true)!=null ||       // Always live errors
-       // FunPtrs still use their Rets, even if constant
-       (this instanceof FunPtrNode) );
+       err(true)!=null);        // Always live errors
   }
 
   // True if 't' may_be_con AND is not a TypeFunPtr.  If a Node computes a
@@ -520,40 +505,37 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
 
   // Shortcut to update self-live
-  public Node xliv( GVNGCM.Mode opt_mode ) { _live = live(opt_mode); return this; }
+  public Node xliv( ) { throw unimpl(); }
   // Compute local contribution of use liveness to this def.
   // Overridden in subclasses that do per-def liveness.
-  public TypeMem live_use( GVNGCM.Mode opt_mode, Node def ) {
-    return _keep>0 ? all_live() : _live;
-  }
+  public TypeMem live_use( Node def ) { return _live; }
 
   // Default lower-bound liveness.  For control, its always "ALIVE" and for
   // memory opts (and tuples with memory) its "ALLMEM".
-  public TypeMem all_live() { return TypeMem.LIVE_BOT; }
+  public TypeMem all_live() { return TypeMem.ALIVE; }
 
-  // The _val changed here, and more than the immediate _neighbors might change
-  // value/live
-  public void add_work_defs(WorkNode work) { for( Node def : _defs ) work.add(def); }
-  public void add_work_extra(WorkNode work, Type old) { }
-  public void add_work_use_extra(WorkNode work, Node chg) { }
-  public void add_work_def_extra(WorkNode work, Node chg) { }
-  // Inputs changed here, and more than the immediate _neighbors might reduce
+  // The _val changed here, and more than the immediate neighbors might change value/live
+  public void add_flow_defs() { Env.GVN.add_flow_defs(this); }
+  public void add_flow_extra(Type old) { }
+  public void add_flow_use_extra(Node chg) { }
+  public void add_flow_def_extra(Node chg) { }
+  // Inputs changed here, and more than the immediate neighbors might reduce
   public void add_reduce_extra() { }
 
   // Unifies this Node with others; Call/CallEpi with Fun/Parm/Ret.  NewNodes &
   // Load/Stores, etc.  Returns true if progressed, and puts neighbors back on
   // the worklist.  If work==null then make no changes, but return if progress
   // would be made.
-  public boolean unify( WorkNode work ) { return false; }
+  public boolean unify( boolean test ) { return false; }
 
   // HM changes; push related neighbors
-  public void add_work_hm(WorkNode work) { tvar().add_deps_work(work); }
+  public void add_work_hm() { tvar().add_deps_flow(); }
 
   // Do One Step of forwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
-  public void combo_forwards(WorkNode work) {
+  public void combo_forwards() {
     Type oval = _val;           // Old local type
-    Type nval = value(GVNGCM.Mode.Opto);// New type
+    Type nval = value();        // New type
     if( oval == nval ) return;  // No progress
     assert nval==nval.simple_ptr() || this instanceof ConTypeNode; // Only simple pointers in node types
     assert oval.isa(nval);      // Monotonic
@@ -561,12 +543,12 @@ public abstract class Node implements Cloneable, IntSupplier {
 
     // Classic forwards flow on change.  Also wire Call Graph edges.
     for( Node use : _uses ) {
-      work.add(use).add_work_use_extra(work,this);
-      if( use instanceof CallEpiNode ) ((CallEpiNode)use).check_and_wire(work);
+      Env.GVN.add_flow(use).add_flow_use_extra(this);
+      if( use instanceof CallEpiNode ) ((CallEpiNode)use).check_and_wire(true);
       if( use instanceof   ScopeNode ) ((  ScopeNode)use).check_and_wire();
     }
-    add_work_extra(work,oval);
-    if( this instanceof CallEpiNode ) ((CallEpiNode)this).check_and_wire(work);
+    add_flow_extra(oval);
+    if( this instanceof CallEpiNode ) ((CallEpiNode)this).check_and_wire(true);
     // All liveness is skipped if may_be_con, since the possible constant has
     // no inputs.  If values drop from being possible constants to not being a
     // constant, liveness must be revisited.
@@ -577,27 +559,27 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Do One Step of backwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
-  public void combo_backwards(WorkNode work) {
+  public void combo_backwards() {
     TypeMem oliv = _live;
-    TypeMem nliv = live(GVNGCM.Mode.Opto);
+    TypeMem nliv = live();
     if( oliv == nliv ) return;  // No progress
     assert oliv.isa(nliv);      // Monotonic
     _live = nliv;               // Record progress
-    add_work_extra(work,oliv);
+    add_flow_extra(oliv);
     for( Node def : _defs )     // Classic reverse flow on change
-      if( def!=null ) work.add(def).add_work_def_extra(work,this);
+      if( def!=null ) Env.GVN.add_flow(def).add_flow_def_extra(this);
   }
 
   // Do One Step of Hindley-Milner unification.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
-  public void combo_unify(WorkNode work) {
+  public void combo_unify() {
     if( _live==TypeMem.DEAD )  return; // No HM progress on dead code
     if( _val == Type.ANY ) return;     // No HM progress on untyped code
     TV2 old = _tvar==null ? null : tvar();
     if( old!=null && old.is_err() ) return;  // No unifications with error
-    if( unify(work) ) {
-      assert old==null || !_tvar.debug_find().unify(old.debug_find(),null);// monotonic: unifying with the result is no-progress
-      add_work_hm(work);        // Neighbors on worklist
+    if( unify(false) ) {
+      assert old==null || !_tvar.debug_find().unify(old.debug_find(),true);// monotonic: unifying with the result is no-progress
+      add_work_hm();            // Neighbors on worklist
     }
   }
 
@@ -621,22 +603,17 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Reducing xforms, strictly fewer Nodes or Edges.  n may be either in or out
   // of VALS.  If a replacement is found, replace.  In any case, put in the
   // VALS table.  Return null if no progress, or this or the replacement.
-  // If keep is 0, there are no hidden users and can hack away.
-  // If keep is 1, there is exactly one hidden user, which will use the returned replacement.
-  // If keep is 2+, there are many hidden users and the Node cannot be replaced.
   public Node do_reduce() {
     assert check_vals();
     Node nnn = _do_reduce();
     if( nnn!=null ) {                   // Something happened
       if( nnn!=this ) {                 // Replacement
-        assert _keep<=1;                // Can only replace if zero or one
         Env.GVN.add_flow_uses(this);    // Visit users
         add_reduce_extra();
-        if( _keep==1 ) { _keep--; nnn._keep++; } // Move keep bits over
         subsume(nnn);                   // Replace
         for( Node use : nnn._uses ) {
           use.add_reduce_extra();
-          use.add_work_use_extra(Env.GVN._work_flow,nnn);
+          use.add_flow_use_extra(nnn);
         }
       }
       Env.GVN.add_reduce(nnn);  // Rerun the replacement
@@ -655,7 +632,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       return con(_val);
 
     // Try CSE
-    if( !_elock && _keep <=1 ) {// Not in VALS and can still replace
+    if( !_elock ) {             // Not in VALS and can still replace
       Node x = VALS.get(this);  // Try VALS
       if( x != null )           // Hit
         return merge(x);        // Graph replace with x
@@ -675,23 +652,21 @@ public abstract class Node implements Cloneable, IntSupplier {
     Node progress=null;
     // Compute live bits.  If progressing, push the defs on the flow worklist.
     // This is a reverse flow computation.  Always assumed live if keep.
-    if( _keep==0 ) {
-      TypeMem oliv = _live;
-      TypeMem nliv = live(Env.GVN._opt_mode);
-      if( oliv != nliv ) {        // Progress?
-        progress = this;          // Progress!
-        assert nliv.isa(oliv);    // Monotonically improving
-        _live = nliv;             // Record progress
-        for( Node def : _defs )   // Put defs on worklist... liveness flows uphill
-          if( def != null ) Env.GVN.add_flow(def).add_work_def_extra(Env.GVN._work_flow,this);
-        add_work_extra(Env.GVN._work_flow,oliv);
-      }
+    TypeMem oliv = _live;
+    TypeMem nliv = live();
+    if( oliv != nliv ) {        // Progress?
+      progress = this;          // Progress!
+      assert nliv.isa(oliv);    // Monotonically improving
+      _live = nliv;             // Record progress
+      for( Node def : _defs )   // Put defs on worklist... liveness flows uphill
+        if( def != null ) Env.GVN.add_flow(def).add_flow_def_extra(this);
+      add_flow_extra(oliv);
     }
 
     // Compute best value.  If progressing, push uses on the flow worklist.
     // This is a forward flow computation.
     Type oval = _val; // Get old type
-    Type nval = value(Env.GVN._opt_mode);// Get best type
+    Type nval = value();// Get best type
     if( nval!=oval ) {
       progress = this;          // Progress!
       assert nval.isa(oval);    // Monotonically improving
@@ -703,10 +678,10 @@ public abstract class Node implements Cloneable, IntSupplier {
       }
       // Put uses on worklist... values flows downhill
       for( Node use : _uses )
-        Env.GVN.add_flow(use).add_work_use_extra(Env.GVN._work_flow,this);
+        Env.GVN.add_flow(use).add_flow_use_extra(this);
       // Progressing on CFG can mean CFG paths go dead
       if( is_CFG() ) for( Node use : _uses ) if( use.is_CFG() ) Env.GVN.add_reduce(use);
-      add_work_extra(Env.GVN._work_flow,oval);
+      add_flow_extra(oval);
     }
     return progress;
   }
@@ -721,9 +696,10 @@ public abstract class Node implements Cloneable, IntSupplier {
   public Node do_grow() {
     Node nnn = ideal_grow();
     if( nnn==null || nnn==this || is_dead() ) return nnn;
-    assert _keep<=1;
-    if( _keep==1 ) { _keep--; nnn._keep++; Env.GVN.add_dead(this); } // Doing an arbitrary replacement
-    return Env.GVN.add_flow(Env.GVN.add_reduce(nnn));
+    //assert _keep<=1;
+    //if( _keep==1 ) { _keep--; nnn._keep++; Env.GVN.add_dead(this); } // Doing an arbitrary replacement
+    //return Env.GVN.add_flow(Env.GVN.add_reduce(nnn));
+    throw unimpl();
   }
 
   // Replace with a ConNode iff
@@ -757,9 +733,9 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( con2 != null ) {        // Found a prior constant
       con.kill();               // Kill the just-made one
       con = con2;
-      con._live = TypeMem.LIVE_BOT; // Adding more liveness
-    } else {                        // New constant
-      con._val = t;                 // Typed
+      con._live = TypeMem.ALIVE;// Adding more liveness
+    } else {                    // New constant
+      con._val = t;             // Typed
       con._elock(); // Put in VALS, since if Con appears once, probably appears again in the same XFORM call
     }
     Env.GVN.add_flow(con);      // Updated live flows
@@ -767,24 +743,20 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
 
   // Forward reachable walk, setting types to ANY and making all dead.
-  public final void walk_initype( WorkNode work ) {
-    if( work.on(this) ) return;    // Been there, done that
-    work.add(this);                // On worklist and mark visited
+  public final void walk_initype(  ) {
+    if( Env.GVN.on_flow(this) ) return; // Been there, done that
+    Env.GVN.add_flow(this);             // On worklist and mark visited
     if( AA.DO_GCP ) {
-      _val = Type.ANY;               // Highest value
-      _live = TypeMem.DEAD;          // Not alive
-    } else {                         // Not doing optimistic GCP...
-      Type oval = _val, oliv = _live;// ...but during Combo many types can lift
-      _val = value(Env.GVN._opt_mode);
-      _live = live(Env.GVN._opt_mode);
-      if( oval!=_val || oliv != _live )
-        Env.GVN.add_flow(this);      // Track liftable Nodes
+      _val = Type.ANY;          // Highest value
+      _live = TypeMem.DEAD;     // Not alive
+    } else {                    // Not doing optimistic GCP...
+      assert _val==value() && _live==live();
     }
     if( AA.DO_HMT )
       _tvar = new_tvar("Combo");
     // Walk reachable graph
-    for( Node use : _uses )                   use.walk_initype(work);
-    for( Node def : _defs ) if( def != null ) def.walk_initype(work);
+    for( Node use : _uses )                   use.walk_initype();
+    for( Node def : _defs ) if( def != null ) def.walk_initype();
     if( this instanceof CallNode ) (( CallNode)this)._not_resolved_by_gcp = false; // Try again
     if( this instanceof FreshNode) ((FreshNode)this).id().tvar().push_dep(this);
     if( this instanceof LoadNode ) (( LoadNode)this)._hm_lift = true;
@@ -792,33 +764,17 @@ public abstract class Node implements Cloneable, IntSupplier {
       ((CallNode)in(0)).fdx().tvar().push_dep(this);
   }
 
-  // Combo phase 2: all nodes previously lifted by HM go back on the worklist,
-  // as the default HM will no longer lift to Type.XNSCALR.
-  public final void walk_combo_phase2( WorkNode work, BitsFun top_escapes ) {
-    if( RESET_VISIT.tset(_uid) ) return; // Been there, done that
-    if( this instanceof LoadNode ) { work.add(this); ((LoadNode)this)._hm_lift = false; } // Loads are lifted.
-    if( this instanceof FunNode  && top_escapes.test_recur(((FunNode)this)._fidx) ) work.add(this);
-    if( this instanceof ParmNode && has_tvar() && tvar().is_leaf() &&
-        top_escapes.test_recur(((ParmNode)this).fun()._fidx ))
-      work.add(this); // External parms are lifted.
-    if( this instanceof CallNode && CallNode.ttfp(_val)._fidxs.above_center() ) work.add(this);
-    // Walk reachable graph
-    for( Node use : _uses )                   use.walk_combo_phase2(work,top_escapes);
-    for( Node def : _defs ) if( def != null ) def.walk_combo_phase2(work,top_escapes);
-  }
-
   // Reset
-  public static final VBitSet RESET_VISIT = new VBitSet();
-  public final void walk_reset( WorkNode work ) {
-    if( RESET_VISIT.tset(_uid) ) return; // Been there, done that
-    work.add(this);                // On worklist and mark visited
-    _val = Type.ALL;               // Lowest value
-    _live = all_live();            // Full alive
-    _elock = false;                // Clear elock if reset_to_init0
+  public final void walk_reset( ) {
+    if( Env.GVN.on_flow(this) ) return; // Been there, done that
+    Env.GVN.add_flow(this);             // On worklist and mark visited
+    _val = Type.ALL;                    // Lowest value
+    _live = all_live();                 // Full alive
+    _elock = false;                     // Clear elock if reset_to_init0
     _tvar = new_tvar("reset");
     // Walk reachable graph
-    for( Node use : _uses )                   use.walk_reset(work);
-    for( Node def : _defs ) if( def != null ) def.walk_reset(work);
+    for( Node use : _uses )                   use.walk_reset();
+    for( Node def : _defs ) if( def != null ) def.walk_reset();
     if( this instanceof CallNode ) ((CallNode)this)._not_resolved_by_gcp = false; // Try again
     if( this instanceof RegionNode || this instanceof PhiNode ) {
       while( len()>1 && !in(len()-1).is_prim() ) pop(); // Kill wired primitive inputs
@@ -832,37 +788,32 @@ public abstract class Node implements Cloneable, IntSupplier {
     return Env.GVN.add_flow(x);
   }
 
-  // Node n is new, but cannot call GVN.iter() so cannot call the general xform.
+  // Node n is new in Combo (NOT GCP), cannot do most graph-reshape but
+  // commonly hit in VALS and this is OK.
   public Node init1( ) {
     Node x = VALS.get(this);
-    if( Env.GVN._opt_mode == GVNGCM.Mode.Opto ) _live = TypeMem.DEAD;
     if( x!=null ) {             // Hit in GVN table
-      merge(x);
-      kill();                                 // Kill just-init'd
-      return x;                               // Return old
+      //kill();                   // Kill just-init'd
+      //return x;                 // Return old, which will add uses
+      throw unimpl("untested");
     }
-    _elock();
-    _val = value(Env.GVN._opt_mode);
-    return Env.GVN.add_work_all(this);
+    _elock();                   // Install in GVN
+    _val = Type.ANY;            // Super optimistic types
+    _live = TypeMem.DEAD;
+    return Env.GVN.add_flow(this);
   }
 
   // Assert all ideal, value and liveness calls are done
   public final boolean more_ideal(VBitSet bs) {
     if( bs.tset(_uid) ) return false; // Been there, done that
-    if( _keep == 0 && _live.is_live() ) { // Only non-keeps, which is just top-level scope and prims
-      Type t = value(Env.GVN._opt_mode);
-      if( _val != t )
-        return true;            // Found a value improvement
-      TypeMem live = live(Env.GVN._opt_mode);
-      if( _live != live )
-        return true;            // Found a liveness improvement
+    if( !is_keep() ) { // Only non-keeps, which is just top-level scope and prims
       Node x;
       x = do_reduce(); if( x != null )
                          return true; // Found an ideal call
-      x = do_mono(); if( x != null )
-                       return true; // Found an ideal call
-      x = do_grow(); if( x != null )
-                       return true; // Found an ideal call
+      x = do_mono  (); if( x != null )
+                         return true; // Found an ideal call
+      x = do_grow  (); if( x != null )
+                         return true; // Found an ideal call
       if( this instanceof FunNode ) ((FunNode)this).ideal_inline(true);
     }
     for( Node def : _defs ) if( def != null && def.more_ideal(bs) ) return true;
@@ -872,33 +823,31 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Assert all value and liveness calls only go forwards.  Returns >0 for failures.
   private static final VBitSet FLOW_VISIT = new VBitSet();
-  public  final int more_work( WorkNode work, boolean lifting ) { FLOW_VISIT.clear();  return more_work(work,lifting,0);  }
-  private int more_work( WorkNode work, boolean lifting, int errs ) {
+  public  final int more_work( boolean lifting ) { FLOW_VISIT.clear();  return more_work(lifting,0);  }
+  private int more_work( boolean lifting, int errs ) {
     if( FLOW_VISIT.tset(_uid) ) return errs; // Been there, done that
     if( Env.GVN.on_dead(this) ) return errs; // Do not check dying nodes
-    if( _keep == 0 ) {
-      // Check for GCP progress
-      Type    oval= _val, nval = value(Env.GVN._opt_mode); // Forwards flow
-      TypeMem oliv=_live, nliv = live (Env.GVN._opt_mode); // Backwards flow
-      if( oval!=nval || oliv!=nliv ) {
-        if( !(lifting
-              ? nval.isa(oval) && nliv.isa(oliv)
-              : oval.isa(nval) && oliv.isa(nliv)) )
-          errs += _report_bug("Monotonicity bug");
-        if( !work.on(this) &&
-            (lifting || AA.DO_GCP) )
-          errs += _report_bug("Progress bug");
-      }
-      // Check for HMT progress
-      if( AA.DO_HMT && oliv!=TypeMem.DEAD && _tvar!=null && Env.GVN._opt_mode==GVNGCM.Mode.Opto ) {
-        if( unify(null) ) {
-          if( Combo.HM_FREEZE ) errs += _report_bug("Progress after freezing");
-          if( !work.on(this) ) errs += _report_bug("Progress bug");
-        }
+    // Check for GCP progress
+    Type    oval= _val, nval = value(); // Forwards flow
+    TypeMem oliv=_live, nliv = live (); // Backwards flow
+    if( oval!=nval || oliv!=nliv ) {
+      if( !(lifting
+            ? nval.isa(oval) && nliv.isa(oliv)
+            : oval.isa(nval) && oliv.isa(nliv)) )
+        errs += _report_bug("Monotonicity bug");
+      if( !Env.GVN.on_flow(this) &&
+          (lifting || AA.DO_GCP) )
+        errs += _report_bug("Progress bug");
+    }
+    // Check for HMT progress
+    if( AA.DO_HMT && oliv!=TypeMem.DEAD && _tvar!=null ) {
+      if( unify(true) ) {
+        if( Combo.HM_FREEZE ) errs += _report_bug("Progress after freezing");
+        if( !Env.GVN.on_flow(this) ) errs += _report_bug("Progress bug");
       }
     }
-    for( Node def : _defs ) if( def != null ) errs = def.more_work(work,lifting,errs);
-    for( Node use : _uses ) if( use != null ) errs = use.more_work(work,lifting,errs);
+    for( Node def : _defs ) if( def != null ) errs = def.more_work(lifting,errs);
+    for( Node use : _uses ) if( use != null ) errs = use.more_work(lifting,errs);
     return errs;
   }
   private int _report_bug(String msg) {
@@ -942,37 +891,9 @@ public abstract class Node implements Cloneable, IntSupplier {
     _elock = false;                // Removed from VALS
     // Walk reachable graph
     if( is_dead() ) return;
-    Env.GVN.add_work_all(this);
+    Env.GVN.add_work_new(this);
     for( Node def : _defs )  if( def != null )  def.walk_opt(visit);
     for( Node use : _uses )                     use.walk_opt(visit);
-
-    // If a Call takes in from e.g. an Unknown, but computes a single target
-    // after Combo, replace its FDX with a constant FunPtr.
-    Type t = _val;
-    if( this instanceof CallNode && t instanceof TypeTuple ) {
-      TypeFunPtr tfp = CallNode.ttfp(_val);
-      Type tfdx = ((CallNode)this).fdx()._val;
-      if( tfp._fidxs.abit()!=-1 && tfdx instanceof TypeFunPtr && ((TypeFunPtr)tfdx).fidxs() != tfp.fidxs() ) {
-        if( tfp._dsp!=Type.ANY ) throw unimpl();
-        Node fptr = FunNode.find_fidx(tfp.fidx()).fptr();
-        ((CallNode)this).set_fdx(fptr);
-      }
-    }
-
-    // Yank any constant values and replace with a constant node.
-    TypeFunPtr tfp=null;
-    if( t instanceof TypeFunPtr &&
-        (tfp=(TypeFunPtr)t)._dsp!=TypeMemPtr.NO_DISP &&
-        _live.live_no_disp() )
-      t = tfp.make_no_disp();
-    if( should_con(t) ) {
-      Node con = t instanceof TypeFunPtr
-        ? new FunPtrNode(FunNode.find_fidx(tfp.fidx()).ret(),Env.ANY)
-        : new ConNode<>(t);
-      con._tvar = _tvar;
-      Env.GVN.revalive(subsume(con));
-    }
-
   }
 
   // Overridden in subclasses that return TypeTuple value types.  Such nodes

@@ -7,13 +7,13 @@ import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.ARG_IDX;
+import static com.cliffc.aa.AA.unimpl;
 
 // Split control
 public class IfNode extends Node {
   public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); }
 
   @Override public Node ideal_reduce() {
-    if( _keep>0 ) return null;
     Node ctl = in(0);
     Node tst = in(1);
     if( ctl._val == Type.XCTRL && in(1)!=Env.ANY )
@@ -33,33 +33,35 @@ public class IfNode extends Node {
     }
 
     if( tst instanceof PrimNode.Not && tst._uses._len==1 )
-      return flip(Env.GVN.xreduce(new IfNode(ctl,tst.in(ARG_IDX))));
+      //return flip(Env.GVN.xreduce(new IfNode(ctl,tst.in(ARG_IDX))));
+      throw unimpl();
 
     return null;
   }
   Node flip(Node that) {
     ProjNode p0 = (ProjNode)_uses.atX(0);
     ProjNode p1 = (ProjNode)_uses.atX(1);
-    if( p0==null || p0._keep>0 || p1==null || p1._keep>0 ) return null; // Not well formed
+    if( p0==null || p1==null ) return null; // Not well formed
     if( p0._idx==1 ) { ProjNode tmp=p0; p0=p1; p1=tmp; }
-    Node x0 = Env.GVN.xreduce(new CProjNode(that,0));
-    Node x1 = Env.GVN.xreduce(new CProjNode(that,1));
-    p0.subsume(x1);
-    p1.subsume(x0);
-    x0._live = x1._live = that._live = this._live;
-    return that;
+    //Node x0 = Env.GVN.xreduce(new CProjNode(that,0));
+    //Node x1 = Env.GVN.xreduce(new CProjNode(that,1));
+    //p0.subsume(x1);
+    //p1.subsume(x0);
+    //x0._live = x1._live = that._live = this._live;
+    //return that;
+    throw unimpl();
   }
 
   // Some CSE folded my input, extra Casts might optimize
-  @Override public void add_work_use_extra(WorkNode work, Node chg) {
+  @Override public void add_flow_use_extra(Node chg) {
     if( in(1)==chg )
       for( Node uctl : _uses )
         for( Node cast : uctl._uses )
           if( cast instanceof CastNode )
-            work.add(cast);
+            Env.GVN.add_flow(cast);
   }
 
-  @Override public TypeTuple value(GVNGCM.Mode opt_mode) {
+  @Override public TypeTuple value() {
     // If the input is exactly zero, we can return false: {ANY,CONTROL}
     // If the input excludes   zero, we can return true : {CONTROL,ANY}
     // If the input excludes   both, we can return ANY:   {ANY,ANY}
@@ -78,7 +80,6 @@ public class IfNode extends Node {
     
     return TypeTuple.IF_ALL;
   }
-  @Override public TypeMem all_live() { return TypeMem.ALIVE; }
 
   @Override public TV2 new_tvar(String alloc_site) { return null; }
 

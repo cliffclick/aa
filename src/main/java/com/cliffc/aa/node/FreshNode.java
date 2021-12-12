@@ -27,16 +27,14 @@ public class FreshNode extends UnOrFunPtrNode {
     return null;
   }
 
-  @Override public Type value(GVNGCM.Mode opt_mode) { return id()._val; }
-  @Override public void add_work_extra(WorkNode work,Type old) {
+  @Override public Type value() { return id()._val; }
+  @Override public void add_flow_extra(Type old) {
     // Types changed, now might collapse
     if( !no_tvar_structure(old) && no_tvar_structure(_val) )
       Env.GVN.add_reduce(this);
   }
 
-  @Override public TypeMem all_live() { return TypeMem.LIVE_BOT; }
-
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+  @Override public TypeMem live_use(Node def ) {
     if( def==id() ) return _live; // Pass full liveness along
     return TypeMem.ALIVE;         // Basic aliveness for control
   }
@@ -46,7 +44,7 @@ public class FreshNode extends UnOrFunPtrNode {
     return t.isa(TypeInt.INT64) || t.isa(TypeFlt.FLT64);
   }
 
-  @Override public boolean unify( WorkNode work ) {
+  @Override public boolean unify( boolean test ) {
 
     // If the Fresh is an above-center TypeFunPtr, then it is a function choice
     // and actually expects a following Call selecting which function.
@@ -69,7 +67,7 @@ public class FreshNode extends UnOrFunPtrNode {
               // If the FunPtr is called
               if( cfidxs.test_recur(((TypeFunPtr)fptr._val).fidx()) ) {
                 // Fresh unify against it
-                progress |= fptr.tvar().fresh_unify(tvar(), nongen, work);
+                progress |= fptr.tvar().fresh_unify(tvar(), nongen,test);
                 fptr.tvar().push_dep(this);
               }
             }
@@ -79,14 +77,14 @@ public class FreshNode extends UnOrFunPtrNode {
       }
     }
 
-    return id().tvar().fresh_unify(tvar(),nongen,work);
+    return id().tvar().fresh_unify(tvar(),nongen,test);
   }
-  @Override public void add_work_hm(WorkNode work) {
-    super.add_work_hm(work);
-    work.add(id());
+  @Override public void add_work_hm() {
+    super.add_work_hm();
+    Env.GVN.add_flow(id());
     TV2 t = id().tvar();
     if( t.nongen_in(nongen()) )
-      t.add_deps_work(work); // recursive work.add(_deps)
+      t.add_deps_flow(); // recursive work.add(_deps)
   }
 
   @Override public byte op_prec() { return id().op_prec(); }

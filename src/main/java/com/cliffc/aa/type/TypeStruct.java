@@ -400,7 +400,6 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     switch( t._type ) {
     case TSTRUCT:break;
     case TARY:
-    case TLIVE:
     case TSTR:   return OBJ;
     case TOBJ:   return t.xmeet(this);
     case TFUNSIG:

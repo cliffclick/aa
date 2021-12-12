@@ -57,22 +57,20 @@ public class StoreNode extends Node {
 
     // If Store is by a New and no other Stores, fold into the New.
     NewObjNode nnn;  TypeFld tfld;
-    if( mem instanceof MrgProjNode && mem._keep==0 &&
-        _keep <= 1 &&
+    if( mem instanceof MrgProjNode &&
         // Store into a NewObjNode, same memory and address
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
         // Do not fold (or hide) errors
         !rez().is_forward_ref() &&
         // Do not bypass a parallel writer
-        mem.check_solo_mem_writer(this) && // Use is by DefMem and self
+        mem.check_solo_mem_writer(this) && // Use is by self
         (tfld=nnn._ts.get(_fld))!= null ) {
       // Have to be allowed to directly update NewObjNode
       if( tfld._access==Access.RW || rez() instanceof FunPtrNode ) {
         // Field is modifiable; update New directly.
-        if( tfld._access==Access.RW ) nnn.update(_fld,_fin,rez()); // Update the value, and perhaps the final field
-        else                          nnn.add_fun(_bad,_fld,(FunPtrNode)rez()); // Stacked FunPtrs into an Unresolved
+        if( rez() instanceof FunPtrNode ) nnn.add_fun(_bad,_fld,(FunPtrNode)rez()); // Stacked FunPtrs into an Unresolved
+        else                              nnn.update(_fld,_fin,rez()); // Update the value, and perhaps the final field
         mem.xval();             // Update memory state
-        Env.DEFMEM.xval();      // Update default memory state
         Env.GVN.add_flow_uses(this);
         add_reduce_extra();     // Folding in allows store followers to fold in
         return mem;             // Store is replaced by using the New directly.
@@ -82,7 +80,7 @@ public class StoreNode extends Node {
     // If Store is of a MemJoin and it can enter the split region, do so.
     // Requires no other memory *reader* (or writer), as the reader will
     // now see the Store effects as part of the Join.
-    if( _keep<=1 && tmp != null && mem._keep==0 && mem instanceof MemJoinNode && mem._uses._len==1 ) {
+    if( tmp != null && mem instanceof MemJoinNode && mem._uses._len==1 ) {
       Node memw = _uses._len==0 ? this : get_mem_writer(); // Zero or 1 mem-writer
       // Check the address does not have a memory dependence on the Join.
       // TODO: This is super conservative
@@ -119,7 +117,7 @@ public class StoreNode extends Node {
     return null;
   }
   // Liveness changes, check if reduce
-  @Override public void add_work_extra(WorkNode work,Type old) {
+  @Override public void add_flow_extra(Type old) {
     Env.GVN.add_reduce(this); // Args can be more-alive
   }
   // If changing an input or value allows the store to no longer be in-error,
@@ -131,7 +129,7 @@ public class StoreNode extends Node {
   }
 
   // StoreNode needs to return a TypeObj for the Parser.
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     Node mem = mem(), adr = adr(), rez = rez();
     Type tmem = mem._val;
     Type tadr = adr._val;
@@ -154,10 +152,10 @@ public class StoreNode extends Node {
   // Compute the liveness local contribution to def's liveness.  Ignores the
   // incoming memory types, as this is a backwards propagation of demanded
   // memory.
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+  @Override public TypeMem live_use( Node def ) {
     if( def==mem() ) return _live; // Pass full liveness along
     if( def==adr() ) return TypeMem.ALIVE; // Basic aliveness
-    if( def==rez() ) return TypeMem.ESCAPE;// Value escapes
+    if( def==rez() ) return TypeMem.ALIVE; // Value escapes
     throw unimpl();       // Should not reach here
   }
 
@@ -200,46 +198,46 @@ public class StoreNode extends Node {
   }
 
   @Override public TV2 new_tvar( String alloc_site) { return null; }
-  @Override public boolean unify( WorkNode work ) {
+  @Override public boolean unify( boolean test ) {
     TV2 ptr = adr().tvar();
     if( ptr.is_err() ) return false;
-    return unify("@{}",this,ptr,adr()._val,rez().tvar(),_fld,work);
+    return unify("@{}",this,ptr,adr()._val,rez().tvar(),_fld,test);
   }
 
   // Common memory-update unification.  The ptr has to be not-nilable and have
   // the fld, which unifies with the value.  If the fld is missing, then if the
   // ptr is open, add the field else missing field error.
-  public static boolean unify( String name, Node ldst, TV2 ptr, Type tptr, TV2 tval, String id, WorkNode work ) {
+  public static boolean unify( String name, Node ldst, TV2 ptr, Type tptr, TV2 tval, String id, boolean test ) {
 
     // Matching fields unify
     TV2 fld = ptr.get(id);
     if( fld!=null )             // Unify against pre-existing field
-      return fld.unify(tval, work);
+      return fld.unify(tval,test);
 
     if( !(tptr instanceof TypeMemPtr) )
       return false;
 
     // The remaining cases all make progress and return true
-    if( work==null ) return true;
+    if( test ) return true;
 
     // Add field if open
     if( ptr.is_struct() && ptr.open() ) // Effectively unify with an extended struct.
-      return ptr.add_fld(id,tval,work);
+      return ptr.add_fld(id,tval,test);
 
     // Unify against an open struct with the named field
     if( ptr.is_leaf() || ptr.is_fun() ) {
       TV2 tv2 = TV2.make_open_struct(name,ldst,tptr,"Store_update", new NonBlockingHashMap<>());
       tv2.args_put(id,tval);
-      return tv2.unify(ptr,work);
+      return tv2.unify(ptr,test);
     }
 
     // Closed record, field is missing
-    return tval.unify(ptr.miss_field(ldst,id,"Store_update"),work);
+    return tval.unify(ptr.miss_field(ldst,id,"Store_update"),test);
   }
 
-  @Override public void add_work_hm(WorkNode work) {
-    work.add(adr());
-    work.add(rez());
+  @Override public void add_work_hm() {
+    Env.GVN.add_flow(adr());
+    Env.GVN.add_flow(rez());
   }
 
 }

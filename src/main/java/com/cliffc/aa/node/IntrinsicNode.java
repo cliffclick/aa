@@ -1,11 +1,7 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
-import com.cliffc.aa.ErrMsg;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
 
@@ -32,27 +28,23 @@ public class IntrinsicNode extends Node {
   // vtable name type in memory.  Unaliased, so the same memory cannot be
   // referred to without the Name.  Error if the memory cannot be proven
   // unaliased.  The Ideal call collapses the Name into the unaliased NewNode.
-  public static FunPtrNode convertTypeName( TypeObj tn, Parse badargs, FunNode parfun ) {
+
+  // Very similar to a Java '<init>' function.
+  public static FunPtrNode convertTypeName( TypeObj tn, Parse badargs, ProjNode ptr ) {
     // The incoming memory type is *exact* and does not have any extra fields.
     // The usual duck typing is "this-or-below", which allows and ignores extra
     // fields.  For Naming - which involves installing a v-table (or any other
     // RTTI) the type is exact at that moment.  Super-type constructors are
     // possible but here the type is exact.
 
-    // This function call takes in and returns a plain ptr-to-object.
-    // Only after folding together does the name become apparent.
-    try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
-      TypeStruct formals = TypeStruct.args(TypeMemPtr.STRUCT);
-      TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(BitsAlias.RECORD_BITS,tn));
-      FunNode fun = X.init2((FunNode)new FunNode(tn._name,sig,-1,false,parfun).add_def(Env.FILE._scope));
-      assert !fun.is_prim(); // prims use Env.SCP_0 not FILE scope
-      Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
-      Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-      Node ptr = X.xform(new ParmNode(ARG_IDX,"x",fun,(ConNode)Node.con(TypeMemPtr.make(BitsAlias.RECORD_BITS,TypeObj.ISUSED)),badargs));
-      Node cvt = X.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
-      RetNode ret = (RetNode)X.xform(new RetNode(fun,cvt,ptr,rpc,fun));
-      return (X._ret = X.init2(new FunPtrNode(tn._name,ret)));
-    }
+    FunNode fun = (FunNode)Env.GVN.init(new FunNode(AA.DSP_IDX+1).add_def(Env.ALL_CTRL));
+    Node rpc    = Env.GVN.init(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
+    Node dsp    = Env.GVN.init(new ParmNode(DSP_IDX,"^"   ,fun,((NewObjNode)ptr.in(0))._tptr,ptr,null));
+    Node mem    = Env.GVN.init(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.ALL_MEM,null));
+    Node cvt    = Env.GVN.init(new IntrinsicNode(tn,badargs,fun,mem,dsp));
+    RetNode ret = Env.GVN.init(new RetNode(fun,cvt,dsp,rpc,fun));
+    FunPtrNode fptr = Env.GVN.init(new FunPtrNode(tn._name,ret));
+    return fptr;
   }
 
   // If the input memory is unaliased, fold into the NewNode.
@@ -83,7 +75,7 @@ public class IntrinsicNode extends Node {
     }
 
     // If is of a MemJoin and it can enter the split region, do so.
-    if( _keep==0 && ptr._val instanceof TypeMemPtr && mem instanceof MemJoinNode && mem._uses._len==1 &&
+    if( ptr._val instanceof TypeMemPtr && mem instanceof MemJoinNode && mem._uses._len==1 &&
         ptr instanceof ProjNode && ptr.in(0) instanceof NewNode )
       return ((MemJoinNode)mem).add_alias_below_new(new IntrinsicNode(_tn,_badargs,null,mem,ptr),this);
 
@@ -97,7 +89,7 @@ public class IntrinsicNode extends Node {
   // The inputs are a TypeMem and a TypeMemPtr to an unnamed TypeObj.  If the
   // ptr is of the "from" type, we cast a Name to it and produce a pointer to
   // the "to" type, otherwise we get the most conservative "to" type.
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     Type mem = mem()._val;
     Type ptr = ptr()._val;
     if( !(mem instanceof TypeMem   ) ) return mem.oob(); // Inputs are confused
@@ -114,7 +106,7 @@ public class IntrinsicNode extends Node {
     return tmem.set(alias,rez);
   }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+  @Override public TypeMem live_use(Node def ) {
     if( def==mem() ) return _live;
     return TypeMem.ALIVE;
   }
@@ -133,29 +125,41 @@ public class IntrinsicNode extends Node {
   // Default name constructor using expanded args list.  Just a NewObjNode but the
   // result is a named type.  Same as convertTypeName on an unaliased NewObjNode.
   // Passed in a named TypeStruct, and the parent alias.
-  public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, Parse bad, FunNode parfun ) {
+  public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, Parse bad, Env e, ProjNode ptr ) {
     assert to.has_name() && to.get("^").is_display_ptr(); // Display already
-    // Upgrade the type to one with no display for nnn.
-    to = to.replace_fld(TypeFld.NO_DISP);
-    TypeFunSig sig = TypeFunSig.make(to.remove_name(),to);
+    NewObjNode proto = (NewObjNode)ptr.in(0);
 
-    try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
-      FunNode fun = (FunNode) X.xform(new FunNode(to._name,sig,-1,false,parfun).add_def(Env.FILE._scope));
-      assert !fun.is_prim(); // prims use Env.SCP_0 not FILE scope
-      Node rpc = X.xform(new ParmNode(  0    ," rpc",fun,Env.ALL_CALL,null));
-      Node memp= X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-      // Add input edges to the NewNode
-      Node nodisp = Env.ANY;
-      NewObjNode nnn = (NewObjNode)X.add(new NewObjNode(false,alias,to,nodisp));
-      while( nnn.len() < to.nargs() ) nnn.add_def(null);
-      for( TypeFld fld : to.flds() )
-        if( !Util.eq(fld._fld,"^") ) // Display already handled
-          nnn.set_def(fld._order,(X.xform(new ParmNode(fld,fun, (ConNode)Node.con(fld._t.simple_ptr()),bad))));
-      Node mmem = Env.DEFMEM.make_mem_proj(nnn,memp);
-      Node ptr = X.xform(new ProjNode(REZ_IDX, nnn));
-      RetNode ret = (RetNode)X.xform(new RetNode(fun,mmem,ptr,rpc,fun));
-      return (X._ret=X.init2(new FunPtrNode(to._name,ret)));
+    // Count fields needing an argument.  Final fields are assigned from the
+    // prototype object.  Scalar fields get an argument.  TODO: Gather
+    // initializers and use them instead of an explicit argument.
+    int nargs = AA.ARG_IDX;
+    for( TypeFld fld : to.flds() )
+      if( fld._t==Type.SCALAR )
+        nargs++;
+
+    // Function header
+    FunNode fun = (FunNode)Env.GVN.init(new FunNode(nargs).add_def(Env.ALL_CTRL));
+    Node rpc    = Env.GVN.init(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
+    Node mem    = Env.GVN.init(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.ALL_MEM,null));
+
+    // Object being constructed
+    NewObjNode nnn = Env.GVN.init(new NewObjNode(false,alias,to,null));
+    nnn.pop();                  // Drop the display, will be added below
+    int nargs2 = AA.ARG_IDX;    // Renumber required params, since some fields will not need a param
+
+    // Fill in the fields
+    for( int i=AA.DSP_IDX; i<proto._defs._len; i++ ) {
+      TypeFld fld = to.fld_idx(i);
+      nnn.add_def( fld._t==Type.SCALAR
+                   ? Env.GVN.init(new ParmNode(nargs2++,fld._fld,fun,Env.ALL_PARM,bad))
+                   : proto.in(i));
     }
+    // Finish and return
+    MrgProjNode mrg = Env.GVN.init(new MrgProjNode(nnn,mem));
+    ProjNode pnnn   = Env.GVN.init(new ProjNode(REZ_IDX,nnn));
+    RetNode ret     = Env.GVN.init(new RetNode(fun,mrg,pnnn,rpc,fun));
+    FunPtrNode fptr = Env.GVN.init(new FunPtrNode(to._name,ret));
+    return (FunPtrNode)Env.GVN.xform(fptr);
   }
 
 }

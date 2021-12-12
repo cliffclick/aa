@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
@@ -15,7 +16,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
 
   @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Str",this,alloc_site); }
 
-  @Override public boolean unify(WorkNode work) {
+  @Override public boolean unify(boolean test) {
     TV2 tv = tvar();
     if( tv._type==null ) { tv._type = _tptr; return true; }
     return false;
@@ -27,7 +28,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   public static class ConStr extends NewStrNode {
     public ConStr( String str ) { super(TypeStr.con(str),"con",false,-1,TypeFld.MEM); }
     @Override TypeStr valueobj() { return _ts; }
-    @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { throw unimpl(); } // No inputs
+    @Override public TypeMem live_use( Node def ) { throw unimpl(); } // No inputs
     // Constant Strings intern
     @Override public int hashCode() { return is_unused() ? super.hashCode() : _ts._hash; }
     @Override public boolean equals(Object o) { return o instanceof ConStr && _ts==((ConStr)o)._ts; }
@@ -42,7 +43,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       if( !t.is_con() ) return TypeStr.STR;
       return TypeStr.make(false,Long.toString(t.getl()).intern());
     }
-    @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ALIVE; }
+    @Override public TypeMem live_use( Node def ) { return TypeMem.ALIVE; }
   }
 
   public static class ConvertF64Str extends NewStrNode {
@@ -53,7 +54,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       if( !t.is_con() ) return TypeStr.STR;
       return TypeStr.make(false,Double.toString(t.getd()).intern());
     }
-    @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ALIVE; }
+    @Override public TypeMem live_use( Node def ) { return TypeMem.ALIVE; }
   }
 
   // String concat.  NIL values are treated "as-if" the empty string.
@@ -65,7 +66,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
     public AddStrStr( ) { super(TypeStr.STR,"$+",true,OP_PREC,
                                 TypeFld.make_arg(TypeMemPtr.STR0,ARG_IDX  ),
                                 TypeFld.make_arg(TypeMemPtr.STR0,ARG_IDX+1)); }
-    @Override public Type value(GVNGCM.Mode opt_mode) {
+    @Override public Type value() {
       if( is_unused() ) return Type.ANY;
       Type m   = val(MEM_IDX);
       Type sp0 = val(ARG_IDX);
@@ -94,7 +95,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
     }
     @Override TypeObj valueobj() { throw unimpl(); }
     @Override public byte op_prec() { return (byte)OP_PREC; }
-    @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+    @Override public TypeMem live_use(Node def ) {
       if( def==in(ARG_IDX) || def==in(ARG_IDX+1) ) return TypeMem.ALIVE;
       assert def==in(MEM_IDX);
       // Memory for aliases is alive, as-if a READ/LOAD
@@ -108,8 +109,8 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       TypeMem esc1 = ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr1)._aliases,"",Type.SCALAR);
       return (TypeMem)esc0.meet(esc1);
     }
-    @Override public void add_work_use_extra(WorkNode work,Node chg) {
-      if( chg==in(ARG_IDX) || chg==in(ARG_IDX+1) ) work.add(in(MEM_IDX));  // Address into a Load changes, the Memory can be more alive.
+    @Override public void add_flow_use_extra(Node chg) {
+      if( chg==in(ARG_IDX) || chg==in(ARG_IDX+1) ) Env.GVN.add_flow(in(MEM_IDX));  // Address into a Load changes, the Memory can be more alive.
     }
   }
 }

@@ -100,7 +100,7 @@ public class LoadNode extends Node {
     if( mem._op == OP_PHI && mem.in(0)._op != OP_LOOP && adr.in(0) instanceof NewNode ) {
       Node lphi = new PhiNode(Type.SCALAR,((PhiNode)mem)._badgc,mem.in(0));
       for( int i=1; i<mem._defs._len; i++ )
-        lphi.add_def(Env.GVN.add_work_all(new LoadNode(mem.in(i),adr,_fld,_bad)));
+        lphi.add_def(Env.GVN.add_work_new(new LoadNode(mem.in(i),adr,_fld,_bad)));
       return lphi;
     }
 
@@ -192,7 +192,7 @@ public class LoadNode extends Node {
   }
 
 
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     Type tx = _value();
     if( _hm_lift ) {
       //Type th = tvar().as_flow(opt_mode == GVNGCM.Mode.Opto && Combo.HM_IS_HIGH);
@@ -227,10 +227,10 @@ public class LoadNode extends Node {
     return fld._t;          // Field type
   }
 
-  @Override public void add_work_use_extra(WorkNode work, Node chg) {
-    if( chg==adr() ) { work.add(mem()); Env.GVN.add_reduce(this); } // Address into a Load changes, the Memory can be more alive, or this not in Error
-    if( chg==mem() ) work.add(mem());  // Memory value lifts to ANY, memory live lifts also.
-    if( chg==mem() ) work.add(adr());  // Memory value lifts to an alias, address is more alive
+  @Override public void add_flow_use_extra(Node chg) {
+    if( chg==adr() ) { Env.GVN.add_flow(mem()); Env.GVN.add_reduce(this); } // Address into a Load changes, the Memory can be more alive, or this not in Error
+    if( chg==mem() ) Env.GVN.add_flow(mem());  // Memory value lifts to ANY, memory live lifts also.
+    if( chg==mem() ) Env.GVN.add_flow(adr());  // Memory value lifts to an alias, address is more alive
     // Memory improves, perhaps Load can bypass Call
     if( chg==mem() && mem().in(0) instanceof CallEpiNode ) Env.GVN.add_reduce(this);
     // Memory becomes a MrgProj, maybe Load can bypass MrgProj
@@ -242,7 +242,7 @@ public class LoadNode extends Node {
 
   // If the Load computes a constant, the address live-ness is determined how
   // Combo deals with constants, and not here.
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+  @Override public TypeMem live_use(Node def ) {
     if( def==adr() ) return TypeMem.ALIVE;
     Type tmem = mem()._val;
     Type tptr = adr()._val;
@@ -250,23 +250,23 @@ public class LoadNode extends Node {
     if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
     if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
     // Only named the named field from the named aliases is live.
-    Type ldef = _live.live_no_disp() ? Type.NSCALR : Type.SCALAR;
+    TypeObj ldef = _live==TypeMem.LNO_DISP ? TypeObj.LNO_DISP : TypeObj.ALIVE;
     return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld, ldef);
   }
 
   // Standard memory unification; the Load unifies with the loaded field.
-  @Override public boolean unify( WorkNode work ) {
+  @Override public boolean unify( boolean test ) {
     if( tvar().is_err() ) return false; // Already an error, no progress
     // Propagate an error
     TV2 ptr = adr().tvar();
-    if( ptr.is_err() ) return tvar().unify(ptr,work);
+    if( ptr.is_err() ) return tvar().unify(ptr,test);
     ptr.push_dep(this);
 
-    return StoreNode.unify("@{}",this,ptr,adr()._val,tvar(),_fld,work);
+    return StoreNode.unify("@{}",this,ptr,adr()._val,tvar(),_fld,test);
   }
-  public void add_work_hm(WorkNode work) {
-    super.add_work_hm(work);
-    work.add(adr());
+  public void add_work_hm() {
+    super.add_work_hm();
+    Env.GVN.add_flow(adr());
   }
 
   @Override public boolean is_display_ptr() { return Util.eq("^",_fld); }
@@ -289,9 +289,10 @@ public class LoadNode extends Node {
     // Both type systems know about the field
     if( !(objs instanceof TypeStruct) || ((TypeStruct)objs).get(_fld)==null )
       return bad(fast,objs);
-    if( Env.GVN._opt_mode == GVNGCM.Mode.PesiCG && adr().has_tvar() && adr().tvar().get(_fld)==null )
-      return bad(fast,objs);
-    return null;
+    //if( Env.GVN._opt_mode == GVNGCM.Mode.PesiCG && adr().has_tvar() && adr().tvar().get(_fld)==null )
+    //  return bad(fast,objs);
+    //return null;
+    throw unimpl();
   }
   private ErrMsg bad( boolean fast, TypeObj to ) {
     boolean is_closure = adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure;

@@ -1,12 +1,9 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
-
-import static com.cliffc.aa.AA.unimpl;
 
 // Naming names is hard, and I dont like this name.
 
@@ -29,14 +26,9 @@ public class ConTypeNode extends Node {
   public BitsAlias aliases() { return ((TypeMemPtr)_t)._aliases; }
 
   // Define a forward-ref Type
-  public void def_fref(Type t, Env e) {
-    if( !(t instanceof TypeStruct) ) {
-      throw unimpl();
-    }
-    assert t._name.equals(_tname+":");
-
+  public void def_fref(TypeStruct tc, Env e) {
+    assert tc._name.equals(_tname+":");
     // Close, and set an initial value
-    TypeStruct tc = ((TypeStruct)t).close();
     _t = ((TypeMemPtr)_t).make_from(tc);
 
     // Inspect the struct for aliases matching other ConTypes.  Force those as inputs.
@@ -58,7 +50,7 @@ public class ConTypeNode extends Node {
   }
 
   @SuppressWarnings("unchecked")
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     // Simple (non-recursive) constants have no inputs and already have their named type
     if( _defs._len==1 ) return _t;
     assert _t instanceof TypeMemPtr;
@@ -80,7 +72,6 @@ public class ConTypeNode extends Node {
     TypeMemPtr t3 = t1.make_from(t2);
     return t3;
   }
-  @Override public TypeMem all_live() { return TypeMem.ALIVE; }
   @Override public int hashCode() { return super.hashCode()+ _tname.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

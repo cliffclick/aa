@@ -275,8 +275,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   static final byte TMEMPTR =21; // Memory pointer type; a collection of Alias#s
   static final byte TFUNPTR =22; // Function pointer, refers to a collection of concrete functions
   static final byte TFUNSIG =23; // Function signature; formals & ret.  Not any concrete function.
-  static final byte TLIVE   =24; // Liveness; backwards flow of TypeObj
-  static final byte TLAST   =25; // Type check
+  static final byte TLAST   =24; // Type check
 
   // Object Pooling to handle frequent (re)construction of temp objects being
   // interned.  This is a performance hack and a big one: big because its
@@ -373,7 +372,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   private boolean is_ptr() { byte t = _type;  return t == TFUNPTR || t == TMEMPTR; }
   private boolean is_num() { byte t = _type;  return t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TSIMPLE-10*/0, 1,1,1,0,0,0,0,0,0,0,1,1,/*TFUNSIG-23*/0,/*TLIVE-24*/0}/*TLAST=25*/;
+  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TSIMPLE-10*/0, 1,1,1,0,0,0,0,0,0,0,1,1,/*TFUNSIG-23*/0}/*TLAST=24*/;
   public final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
   // Simplify pointers (lose what they point at).
   public Type simple_ptr() { return this; }
@@ -627,7 +626,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   public Type meet_loop(Type t2) { return meet(t2); }
 
   // Report OOB based on shallowest OOB component.
-  public Type oop_deep_impl(Type t) { return oob(); }
   public Type       oob( ) { return oob(ALL); }
   public Type       oob(Type       e) { return above_center() ? e.dual() : e; }
   public TypeObj    oob(TypeObj    e) { return above_center() ? (TypeObj)e.dual() : e; }
@@ -652,7 +650,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     concat(ts,TypeFunPtr.TYPES);
     concat(ts,TypeFunSig.TYPES);
     concat(ts,TypeInt   .TYPES);
-    concat(ts,TypeLive  .TYPES);
     concat(ts,TypeMem   .TYPES);
     concat(ts,TypeMemPtr.TYPES);
     concat(ts,TypeObj   .TYPES);
@@ -796,7 +793,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   public Type widen() {
     return switch( _type ) {
     case TSCALAR, TNSCALR -> SCALAR;
-    case TXSCALAR, TXNSCALR -> this; // Too high 
+    case TXSCALAR, TXNSCALR -> this; // Too high
     case TANY, TALL, TNIL, TXNIL -> this;
     case TCTRL, TXCTRL -> Type.CTRL;
     default -> throw typerr(null); // Overridden in subclass

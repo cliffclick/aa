@@ -64,7 +64,6 @@ public class TypeStr extends TypeObj<TypeStr> {
     switch( t._type ) {
     case TSTR:   break;
     case TARY:
-    case TLIVE:
     case TSTRUCT:return OBJ;
     case TOBJ:   return t.xmeet(this);
     case TFUNSIG:

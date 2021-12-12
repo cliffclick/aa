@@ -7,7 +7,7 @@ import com.cliffc.aa.type.*;
 import org.jetbrains.annotations.NotNull;
 
 import static com.cliffc.aa.AA.MEM_IDX;
-import static com.cliffc.aa.AA.REZ_IDX;
+import static com.cliffc.aa.AA.unimpl;
 
 // Allocates a TypeObj and produces a Tuple with the TypeObj and a TypeMemPtr.
 //
@@ -78,30 +78,21 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     return null;
   }
 
-  @Override public void add_work_def_extra(WorkNode work, Node chg) {
+  @Override public void add_flow_def_extra(Node chg) {
     if( chg instanceof MrgProjNode && chg._live.at(_alias)==TypeObj.UNUSED )
       Env.GVN.add_reduce(chg);
   }
-  // Reducing a NewNode to 'any' changes DEFMEM
-  @Override public void add_reduce_extra() {  Env.GVN.add_flow(Env.DEFMEM);  }
 
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     return TypeTuple.make(Type.CTRL, is_unused() ? TypeObj.UNUSED : valueobj(),_tptr);   // Complex obj, simple ptr.
   }
   abstract TypeObj valueobj();
 
-  // Flow typing a NewNode to 'any' changes DEFMEM
-  @Override public void add_work_extra(WorkNode work, Type oval) {
-    if( _val==Type.ANY || oval==Type.ANY || _live==TypeMem.DEAD || oval==TypeMem.DEAD )  work.add(Env.DEFMEM);
-  }
-
-
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 
   // Only alive fields in the MrgProj escape
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    TypeObj to = _live.at(_alias);
-    return to.above_center() ? TypeMem.DEAD : TypeMem.ESCAPE;
+  @Override public TypeMem live_use(Node def ) {
+    return _live.at(_alias).oob(TypeMem.ALIVE);
   }
 
   abstract public TV2 new_tvar(String alloc_site);
@@ -116,17 +107,14 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       pop();                    // Kill all fields except memory
     _crushed = _ts = dead_type();
     _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeObj.UNUSED);
-    if( !Env.GVN._opt_mode._CG ) // If pre-Combo, also kill in DEFMEM
-      Env.DEFMEM.set_def(_alias,Env.XUSE);
-    Env.GVN.revalive(this,ProjNode.proj(this,0),Env.DEFMEM);
+    Env.GVN.revalive(this,ProjNode.proj(this,0));
     if( is_dead() ) return;
     for( Node use : _uses )
-      Env.GVN.add_flow_uses(use); // Get FPtrs from MrgProj, and dead Ptrs into New
+      Env.GVN.add_flow_uses(Env.GVN.add_reduce(use)); // Get FPtrs from MrgProj, and dead Ptrs into New
   }
 
   // Basic escape analysis.  If no escapes and no loads this object is dead.
   private boolean captured( ) {
-    if( _keep > 0 ) return false;
     if( _uses._len==0 ) return false; // Dead or being created
     Node mem = _uses.at(0);
     // If only either address or memory remains, then memory contents are dead
@@ -134,7 +122,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       return mem instanceof MrgProjNode; // No pointer, just dead memory
     Node ptr = _uses.at(1);
     if( ptr instanceof MrgProjNode ) ptr = _uses.at(0); // Get ptr not mem
-    if( ptr._keep>0 ) return false;
 
     // Scan for memory contents being unreachable.
     // Really stupid!
@@ -161,11 +148,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // to a mapping for the old alias (all TypeMems), but it allows the alias to
   // be immediately recycled.
   void free() {
-    if( Env.DEFMEM.len() > _alias ) {
-      Env.DEFMEM.set_def(_alias, null);
-      GVNGCM.retype_mem(null, Env.DEFMEM, null, false);
-    }
-    BitsAlias.free(_alias);
+    // TODO: premature opt?
   }
 
   @Override public int hashCode() { return super.hashCode()+ _alias; }
@@ -210,11 +193,12 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
           if( arg._order==MEM_IDX ) continue; // Already handled MEM_IDX
           set_def(arg._order,X.xform(new ParmNode(arg._t.simple_ptr(), null, fun, arg._order, arg._fld)));
         }
-        NewNode nnn = (NewNode)X.xform(this);
-        Node mem = Env.DEFMEM.make_mem_proj(nnn,memp);
-        Node ptr = X.xform(new ProjNode(nnn,REZ_IDX));
-        RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,ptr,rpc,fun));
-        return (X._ret = (FunPtrNode)X.xform(new FunPtrNode(_name,ret)));
+        //NewNode nnn = (NewNode)X.xform(this);
+        //Node mem = Env.DEFMEM.make_mem_proj(nnn,memp);
+        //Node ptr = X.xform(new ProjNode(nnn,REZ_IDX));
+        //RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,ptr,rpc,fun));
+        //return (X._ret = (FunPtrNode)X.xform(new FunPtrNode(_name,ret)));
+        throw unimpl();
       }
     }
   }

@@ -2,15 +2,16 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 import java.util.BitSet;
+
+import static com.cliffc.aa.AA.unimpl;
 
 // TODO: Parse12 gen test, seeing many back-to-back identical split/join.
 
@@ -38,7 +39,7 @@ public class MemSplitNode extends Node {
     return sb.unchar().p(')').toString();
   }
 
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     Type t = mem()._val;
     if( !(t instanceof TypeMem) ) return t.oob();
     TypeMem tmem = (TypeMem)t;
@@ -131,7 +132,7 @@ public class MemSplitNode extends Node {
   // New/Mrg pairs are just the Mrg; the New is not part of the SESE region.
   // Call/CallEpi pairs are: MProj->{CallEpi}->Call.
   static Node insert_split(Node tail1, BitsAlias head1_escs, Node head1, Node tail2, Node head2) {
-    assert Env.START.more_work(Env.GVN._work_flow,true)==0;
+    assert Env.START.more_work(true)==0;
     assert tail1.is_mem() && head1.is_mem() && tail2.is_mem() && head2.is_mem();
     BitsAlias head2_escs = head2.escapees();
     assert check_split(head1,head1_escs,head1.in(1));
@@ -147,29 +148,30 @@ public class MemSplitNode extends Node {
     if( mprj.is_dead() ) Env.GVN.revalive(msp);
     else Env.GVN.revalive(msp,mprj,mjn);
     if( tail1 instanceof ProjNode ) Env.GVN.add_flow(tail1.in(0));
-    assert Env.START.more_work(Env.GVN._work_flow,true)==0;
+    assert Env.START.more_work(true)==0;
     Env.GVN.add_mono(mjn);       // See if other defs can move into the Join
     for( Node use : mjn.unkeep(2)._uses )
-      Env.GVN.add_work_all(use); // See if other uses can move into the Join
+      Env.GVN.add_work_new(use); // See if other uses can move into the Join
     return head1;
   }
 
   static boolean check_split( Node head1, BitsAlias head1_escs, Node tail2 ) {
-    if( head1._keep > 1 || tail2._keep > 1 ) return false; // Still being constructed
-    // Must have only 1 mem-writer (this can fail if used by different control paths)
-    if( !tail2.check_solo_mem_writer(head1) ) return false;
-    // No alias overlaps
-    if( head1_escs.overlaps(tail2.escapees()) ) return false;
-    // TODO: This is too strong.
-    // Cannot have any Loads following head1; because after the split
-    // they will not see the effects of previous stores that also move
-    // into the split.
-    // Allow exactly 1 use (and an optional DEFMEM)
-    if(  tail2._uses._len!=1 &&
-        (tail2._uses._len!=2 || tail2._uses.find(Env.DEFMEM)== -1 ) )
-      return false;
-    
-    return true;
+    //if( head1._keep > 1 || tail2._keep > 1 ) return false; // Still being constructed
+    //// Must have only 1 mem-writer (this can fail if used by different control paths)
+    //if( !tail2.check_solo_mem_writer(head1) ) return false;
+    //// No alias overlaps
+    //if( head1_escs.overlaps(tail2.escapees()) ) return false;
+    //// TODO: This is too strong.
+    //// Cannot have any Loads following head1; because after the split
+    //// they will not see the effects of previous stores that also move
+    //// into the split.
+    //// Allow exactly 1 use (and an optional DEFMEM)
+    //if(  tail2._uses._len!=1 &&
+    //    (tail2._uses._len!=2 || tail2._uses.find(Env.DEFMEM)== -1 ) )
+    //  return false;
+    //
+    //return true;
+    throw unimpl();
   }
 
 

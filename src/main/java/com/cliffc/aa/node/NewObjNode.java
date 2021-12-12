@@ -1,14 +1,13 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Util;
 
-import static com.cliffc.aa.AA.*;
+import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 
@@ -80,7 +79,8 @@ public class NewObjNode extends NewNode<TypeStruct> {
       create_active(name,ptr,Access.Final);
     } else {
       Node n = in(fld._order);
-      if( n instanceof UnresolvedNode ) n.add_def(ptr);
+      if( n==Env.XNIL ) n = ptr;
+      else if( n instanceof UnresolvedNode ) n.add_def(ptr);
       else n = new UnresolvedNode(bad,n,ptr);
       n.xval(); // Update the input type, so the _ts field updates
       update(fld,Access.Final,n);
@@ -142,15 +142,14 @@ public class NewObjNode extends NewNode<TypeStruct> {
         assert ts4.isa(ts5);
         if( ts5 != _crushed && ts5.isa(_crushed) ) {
           setsm(ts4);
-          Env.GVN.add_flow(Env.DEFMEM);
           return this;
         }
       }
     }
     return null;
   }
-  @Override public void add_work_extra(WorkNode work,Type old) {
-    super.add_work_extra(work,old);
+  @Override public void add_flow_extra(Type old) {
+    super.add_flow_extra(old);
     Env.GVN.add_mono(this); // Can update crushed
   }
 
@@ -170,27 +169,27 @@ public class NewObjNode extends NewNode<TypeStruct> {
   @Override TypeStruct dead_type() { return TypeStruct.ANYSTRUCT; }
 
   // Only alive fields in the MrgProj escape
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+  @Override public TypeMem live_use(Node def ) {
     TypeObj to = _live.at(_alias);
-    if( !(to instanceof TypeStruct) ) return to.above_center() ? TypeMem.DEAD : TypeMem.ESCAPE;
+    if( !(to instanceof TypeStruct) ) return to.oob(TypeMem.ALIVE);
     int idx=0;  while( in(idx)!=def ) idx++; // Index of node
     TypeFld fld = ((TypeStruct)to).fld_idx(idx);
     if( fld==null ) return TypeMem.DEAD; // No such field is alive
     Type t = fld._t;
-    return t.above_center() ? TypeMem.DEAD : (t==Type.NSCALR ? TypeMem.LESC_NO_DISP : TypeMem.ESCAPE);
+    return t.oob(TypeMem.ALIVE);
   }
 
   @Override public TV2 new_tvar(String alloc_site) { return TV2.make_struct(this,alloc_site); }
 
-  @Override public boolean unify( WorkNode work ) {
+  @Override public boolean unify( boolean test ) {
     TV2 rec = tvar();
     if( rec.is_err() ) return false;
     assert rec.is_struct();
 
     // One time (post parse) pick up the complete field list.
     if( rec.open() )
-      return work==null ||      // Cutout before allocation if testing
-        rec.unify(TV2.make_struct(this,"NewObj_unify",_ts,_defs),work);
+      return test ||            // Cutout before allocation if testing
+        rec.unify(TV2.make_struct(this,"NewObj_unify",_ts,_defs),test);
 
     // Extra fields are unified as Error since they are not created here:
     // error to load from a non-existing field.
@@ -198,8 +197,8 @@ public class NewObjNode extends NewNode<TypeStruct> {
     if( !is_unused() )
       for( String key : rec.args() )
         if( _ts.get(key)==null && !rec.get(key).is_err() ) {
-          if( work==null ) return true;
-          progress |= rec.get(key).unify(rec.miss_field(this,key,"NewObj_err"),work);
+          if( test ) return true;
+          progress |= rec.get(key).unify(rec.miss_field(this,key,"NewObj_err"),test);
           if( (rec=rec.find()).is_err() ) return true;
         }
 
@@ -207,8 +206,8 @@ public class NewObjNode extends NewNode<TypeStruct> {
     for( TypeFld fld : _ts.flds() ) {
       TV2 tvfld = rec.get(fld._fld);
       if( tvfld != null &&      // Limit to matching fields
-          (progress |= tvfld.unify(tvar(fld._order),work)) &&
-          work==null )
+          (progress |= tvfld.unify(tvar(fld._order),test)) &&
+          test )
         return true; // Fast cutout if testing
     }
     rec.push_dep(this);

@@ -69,7 +69,6 @@ public class TypeAry extends TypeObj<TypeAry> implements Cyclic {
     switch( t._type ) {
     case TARY:   break;
     case TSTR:
-    case TLIVE:
     case TSTRUCT:return OBJ;
     case TOBJ:   return t.xmeet(this);
     case TFUNSIG:

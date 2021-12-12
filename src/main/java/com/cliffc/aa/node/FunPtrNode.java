@@ -1,14 +1,10 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
-import com.cliffc.aa.ErrMsg;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
-import static com.cliffc.aa.Env.GVN;
 
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
 // TypeFunPtr with a constant fidx and variable displays.  Used to allow first
@@ -102,17 +98,14 @@ public final class FunPtrNode extends UnOrFunPtrNode {
           // Collapsing to a gensym, no need for display
           ret().is_copy() ||
           // Also unused if function has no display parm.
-          ((fun=xfun())!=null && fun.is_copy(0)==null && fun.parm(DSP_IDX)==null) ||
-          // Remove unused displays.  Track uses; Calling with no display is OK.
-          // Uses storing the FPTR and passing it along still require a display.
-          (GVN._opt_mode._CG && !display_used())
-          )
-        return set_def(1,Env.ANY); // No display needed
+          ((fun=xfun())!=null && fun.is_copy(0)==null && fun.parm(DSP_IDX)==null)  )
+        //  return set_def(1,Env.ANY); // No display needed
+        throw unimpl();
     }
     return null;
   }
   // Called if Display goes unused
-  @Override public void add_work_use_extra(WorkNode work, Node chg) {
+  @Override public void add_flow_use_extra(Node chg) {
     Type tdsp = display()._val;
     if( tdsp instanceof TypeMemPtr && ((TypeMemPtr)tdsp)._obj==TypeObj.UNUSED )
       Env.GVN.add_reduce(this);
@@ -132,16 +125,16 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   }
 
 
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
     TypeTuple tret = (TypeTuple)(ret._val instanceof TypeTuple ? ret._val : ret._val.oob(TypeTuple.RET));
     return TypeFunPtr.make(ret._fidx,nargs(),display()._val,tret.at(REZ_IDX));
   }
-  @Override public void add_work_extra(WorkNode work, Type old) {
+  @Override public void add_flow_extra(Type old) {
     if( old==_live )            // live impacts value
-      work.add(this);
+      Env.GVN.add_flow(this);
     if( old instanceof TypeFunPtr )
       for( Node use : _uses )
         if( use instanceof UnresolvedNode )
@@ -149,36 +142,34 @@ public final class FunPtrNode extends UnOrFunPtrNode {
             if( call instanceof CallNode ) {
               TypeFunPtr tfp = CallNode.ttfp(call._val);
               if( tfp.fidxs()==((TypeFunPtr)old).fidxs() )
-                work.add(call);
+                Env.GVN.add_flow(call);
             }
   }
 
-  @Override public TypeMem live(GVNGCM.Mode opt_mode) {
-    // Pre-GCP, might be used anywhere (still finding the CFG)
-    return !opt_mode._CG ? TypeMem.ESCAPE : super.live(opt_mode);
-  }
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    return def==in(0) ? TypeMem.ANYMEM : (_live==TypeMem.LNO_DISP ? TypeMem.DEAD : TypeMem.ESCAPE);
+  @Override public TypeMem live_use(Node def ) {
+    return def==in(0)
+      ? TypeMem.ALLMEM          // Returns are complex-alive
+      : (_live==TypeMem.LNO_DISP ? TypeMem.DEAD : TypeMem.ALIVE); // Display is alive or dead
   }
 
-  @Override public boolean unify( WorkNode work ) {
+  @Override public boolean unify( boolean test ) {
     TV2 self = tvar();
     if( self.is_err() ) return false;
     if( is_forward_ref() )
-      return work==null || self.unify(TV2.make_err(this,"A forward reference is not a function","FunPtr_unify"),work);
+      return test || self.unify(TV2.make_err(this,"A forward reference is not a function","FunPtr_unify"),test);
     RetNode ret = ret();
     if( ret.is_copy() ) return false; // GENSYM
     FunNode fun = ret.fun();
 
     boolean progress = false;
     if( !self.is_fun() ) {      // Force a function if not already
-      if( work==null ) return true;
-      progress = self.unify(TV2.make_fun(ret.rez(),((TypeFunPtr)_val).make_no_disp(),"FunPtr_unify"),work);
+      if( test ) return true;
+      progress = self.unify(TV2.make_fun(ret.rez(),((TypeFunPtr)_val).make_no_disp(),"FunPtr_unify"),test);
       self = self.find();
     }
 
     // Return
-    progress |= self.unify_at(ret.rez()," ret",ret.rez().tvar(),work);
+    progress |= self.unify_at(ret.rez()," ret",ret.rez().tvar(),test);
 
     // Each normal argument from the parms directly
     Node[] parms = fun.parms();
@@ -189,13 +180,13 @@ public final class FunPtrNode extends UnOrFunPtrNode {
       TV2 arg = parms[i].tvar();
       assert arg!=null;//if( arg==null )  arg = TV2.make_leaf(fun,"FunPtr_unify"); // null on 1st visit to a missing (unused) parm
       if( old==arg ) continue;      // No progress
-      if( work==null ) return true; // Early cutout
-      progress |= self.unify_at(parms[i],key,arg,work);
+      if( test ) return true; // Early cutout
+      progress |= self.unify_at(parms[i],key,arg,test);
       // The display is part of the fat function-pointer.  Here we act like an
       // HM.Apply or a CallEpi.unify.
       if( i==DSP_IDX && display()!=Env.ANY ) {
         TV2 tdsp = display().tvar();
-        progress |= tdsp.unify(arg,work);
+        progress |= tdsp.unify(arg,test);
       }
     }
     return progress;
@@ -226,12 +217,12 @@ public final class FunPtrNode extends UnOrFunPtrNode {
   }
 
   // A forward-ref is an assumed unknown-function being used before being
-  // declared.  Hence we want a callable function pointer, but have no defined
+  // declared.  Hence, we want a callable function pointer, but have no defined
   // body (yet).  Make a function pointer that takes/ignores all args, and
   // returns a scalar.
   public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
-    FunNode fun = gvn.init(new FunNode(name)).unkeep(2);
-    RetNode ret = gvn.init(new RetNode(fun,Node.con(TypeMem.MEM),Env.ALL,Node.con(TypeRPC.ALL_CALL),fun)).unkeep(2);
+    FunNode fun = gvn.init(new FunNode(name));
+    RetNode ret = gvn.init(new RetNode(fun,Node.con(TypeMem.MEM),Env.ALL,Node.con(TypeRPC.ALL_CALL),fun));
     gvn.add_flow(fun);
     gvn.add_flow(ret);
     // Display is limited to any one of the current lexical scopes.
@@ -250,7 +241,7 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     FunNode dfun = def.fun();
     assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.SCP_0; // Forward ref has no callers
     assert dfun._defs._len==2 && dfun.in(0)==null;
-    assert def ._uses._len==0;  // Def is brand new, no uses
+    assert def ._uses._len==1 && def._uses.at(0) instanceof KeepNode;  // Def is brand new, no uses
 
     // Make a function pointer based on the original forward-ref fidx, but with
     // the known types.
@@ -277,8 +268,8 @@ public final class FunPtrNode extends UnOrFunPtrNode {
     // Field at def point, points directly now.
     dsp.update(tok,dsp.access(tok),def);
     def.bind(tok);         // Debug only, associate variable name with function
-    assert Env.START.more_work(Env.GVN._work_flow,true)==0;
-    Env.GVN.iter(GVNGCM.Mode.Parse);
+    assert Env.START.more_work(true)==0;
+    Env.GVN.iter();
   }
 
   @Override public ErrMsg err( boolean fast ) { return is_forward_ref() ? _referr : null; }

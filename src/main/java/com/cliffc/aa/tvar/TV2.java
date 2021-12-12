@@ -1,5 +1,6 @@
 package com.cliffc.aa.tvar;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
@@ -167,15 +168,15 @@ public class TV2 {
   }
 
   // Unify-at a key.  Expect caller already has args
-  public boolean unify_at(Node n, String key, TV2 tv2, WorkNode work ) {
-    if( is_err() ) return unify(tv2,work);// if i am dead, all my parts are dead, so tv2 is unifying with a dead part
+  public boolean unify_at(Node n, String key, TV2 tv2, boolean test ) {
+    if( is_err() ) return unify(tv2,test);// if i am dead, all my parts are dead, so tv2 is unifying with a dead part
     assert is_tvar() && !tv2.is_unified();
     TV2 old = get(key);
     if( old!=null )
-      return old.unify(tv2,work); // This old becomes that
-    if( work==null ) return true; // Would add part
+      return old.unify(tv2,test); // This old becomes that
+    if( test ) return true; // Would add part
     args_put(key,tv2);
-    work.add(_deps);
+    Env.GVN.add_flow(_deps);
     _ns = _ns.add(n);
     return true;
   }
@@ -387,19 +388,19 @@ public class TV2 {
 
   // U-F union; 'this' becomes 'that'.  No change if only testing, and reports
   // progress.  If progress and not testing, adds _deps to worklist.
-  public boolean union(TV2 that, WorkNode work) {
+  public boolean union(TV2 that, boolean test) {
     assert !is_unified() && !that.is_unified() && !is_err();
     assert !is_err() || that.is_err(); // Become the error, not error become that
     if( this==that ) return false;
-    if( work==null ) return true; // All remaining paths make progress
+    if( test ) return true; // All remaining paths make progress
     // Keep the merge of all base types, and add _deps.
     if( !that.is_err() ) {
       if( that._type==null ) that._type = _type;
       else if( _type!=null ) {
         Type mt = meet(that);
         if( mt==null ) {
-          union(make_err(null,"Cannot unify "+this.p()+" and "+that.p(),"union"),work);
-          return that.union(find(),work);
+          union(make_err(null,"Cannot unify "+this.p()+" and "+that.p(),"union"),test);
+          return that.union(find(),test);
         }
         that._type = mt;
         that._open &= _open;
@@ -407,8 +408,8 @@ public class TV2 {
     }
 
     // Work all the deps
-    that.add_deps_work(work);
-    this.add_deps_work(work);      // Any progress, revisit deps
+    that.add_deps_flow();
+    this.add_deps_flow();      // Any progress, revisit deps
     // Hard union this into that, no more testing.
     return _union(that);
   }
@@ -433,9 +434,9 @@ public class TV2 {
   // U-F union; this is nilable and becomes that.
   // No change if only testing, and reports progress.
   @SuppressWarnings("unchecked")
-  boolean unify_nil(TV2 that, WorkNode work) {
+  boolean unify_nil(TV2 that, boolean test) {
     assert is_nil() && !that.is_nil();
-    if( work==null ) return true; // Will make progress
+    if( test ) return true; // Will make progress
     // Clone the top-level struct and make this nilable point to the clone;
     // this will collapse into the clone at the next find() call.
     // Unify the nilable leaf into that.
@@ -526,17 +527,17 @@ public class TV2 {
 
   // Structural unification.  Both 'this' and that' are the same afterwards.
   // Returns True if progressed.
-  public boolean unify(TV2 that, WorkNode work) {
+  public boolean unify(TV2 that, boolean test) {
     if( this==that ) return false;
     assert DUPS.isEmpty();
-    boolean progress = _unify(that,work);
+    boolean progress = _unify(that,test);
     DUPS.clear();
     return progress;
   }
 
   // Classic structural unification, no "fresh".  Unifies 'this' into 'that'.
   // Both 'this' and 'that' are the same afterwards.  Returns true if progress.
-  private boolean _unify(TV2 that, WorkNode work) {
+  private boolean _unify(TV2 that, boolean test) {
     assert !is_unified() && !that.is_unified();
     if( this==that ) return false;
 
@@ -549,14 +550,14 @@ public class TV2 {
         { rhs=this; lhs=that; }            // Swap
       // If tied, keep lower uid
       if( Util.eq(lhs._name,rhs._name) && _uid<that._uid ) { rhs=this; lhs=that; }
-      return lhs.union(rhs,work);
+      return lhs.union(rhs,test);
     }
     // Any leaf immediately unifies with any non-leaf
-    if( this.is_leaf() || that.is_err() ) return this.union(that,work);
-    if( that.is_leaf() || this.is_err() ) return that.union(this,work);
+    if( this.is_leaf() || that.is_err() ) return this.union(that,test);
+    if( that.is_leaf() || this.is_err() ) return that.union(this,test);
     // Special case for nilable union something
-    if( this.is_nil() && !that.is_nil() ) return this.unify_nil(that,work);
-    if( that.is_nil() && !this.is_nil() ) return that.unify_nil(this,work);
+    if( this.is_nil() && !that.is_nil() ) return this.unify_nil(that,test);
+    if( that.is_nil() && !this.is_nil() ) return that.unify_nil(this,test);
 
     // Cycle check.
     long luid = dbl_uid(that);  // long-unique-id formed from this and that
@@ -565,12 +566,12 @@ public class TV2 {
     if( rez!=null ) return false; // Been there, done that
     DUPS.put(luid,that);          // Close cycles
 
-    if( work==null ) return true; // Here we definitely make progress; bail out early if just testing
+    if( test ) return true; // Here we definitely make progress; bail out early if just testing
 
     // Check for mismatched, cannot unify
     if( !Util.eq(_name,that._name) ) {
       TV2 err = make_err(null,"Cannot unify "+this+" and "+that,"unify_fail");
-      return union(err,work) & that.union(err,work);
+      return union(err,test) & that.union(err,test);
     }
     assert _args!=that._args; // Not expecting to share _args and not 'this'
 
@@ -583,38 +584,38 @@ public class TV2 {
       TV2 vthis = thsi.get(key); assert vthis!=null;
       TV2 vthat = that.get(key);
       if( vthat==null ) {
-        if( that.open() ) that.add_fld(key,vthis,work);
-      } else vthis._unify(vthat,work); // Matching fields unify
+        if( that.open() ) that.add_fld(key,vthis,test);
+      } else vthis._unify(vthat,test); // Matching fields unify
       thsi = thsi.find();
       that = that.find();
     }
     // Fields on the RHS are aligned with the LHS also
     for( String key : that._args.keySet() )
       if( args.get(key)==null )
-        if( thsi.open() )  thsi.add_fld(key,that.get(key),work); // Add to LHS
-        else               that.del_fld(key, work);              // Drop from RHS
+        if( thsi.open() )  thsi.add_fld(key,that.get(key),test); // Add to LHS
+        else               that.del_fld(key,test);               // Drop from RHS
 
     if( thsi.is_err() && !that.is_err() )
       throw unimpl(); // TODO: Check for being equal, cyclic-ly, and return a prior if possible.
-    return thsi.union(that,work);
+    return thsi.union(that,test);
   }
 
   // Insert a new field
-  public boolean add_fld( String id, TV2 fld, WorkNode work) {
+  public boolean add_fld( String id, TV2 fld, boolean test) {
     assert is_struct();
     if( _args==null ) _args = new NonBlockingHashMap<>();
     args_put(id,fld);
     fld.push_deps(_deps);
-    add_deps_work(work);
+    add_deps_flow();
     return true;
   }
   // Delete a field
-  private void del_fld( String fld, WorkNode work) {
+  private void del_fld( String fld, boolean test) {
     assert is_struct() || is_ary() ||
       (is_fun() && Util.eq("2",fld));
     _args.remove(fld);
     if( _args.size()==0 )  _args=null;
-    add_deps_work(work);
+    add_deps_flow();
   }
 
   // Used in the recursive unification process.  During fresh_unify tracks the
@@ -626,11 +627,11 @@ public class TV2 {
   // The TV2[] is used when making the 'fresh' copy for the occurs_check.
 
   // Returns progress.
-  // If work==null, we are testing only and make no changes.
+  // If test, we are testing only and make no changes.
   private static int FCNT;
-  public boolean fresh_unify(TV2 that, TV2[] nongen, WorkNode work) {
+  public boolean fresh_unify(TV2 that, TV2[] nongen, boolean test) {
     assert VARS.isEmpty() && DUPS.isEmpty() && FCNT==0;
-    boolean progress = _fresh_unify(that,nongen,work);
+    boolean progress = _fresh_unify(that,nongen,test);
     VARS.clear();  DUPS.clear();  FCNT=0;
     return progress;
   }
@@ -638,33 +639,33 @@ public class TV2 {
   // Apply 'this' structure on 'that'; no modifications to 'this'.  VARS maps
   // from the cloned LHS to the RHS replacement.
   @SuppressWarnings("unchecked")
-  private boolean _fresh_unify(TV2 that, TV2[] nongen, WorkNode work ) {
+  private boolean _fresh_unify(TV2 that, TV2[] nongen, boolean test ) {
     assert !is_unified() && !that.is_unified();
 
     // Check for cycles
     TV2 prior = VARS.get(this);
     if( prior!=null )         // Been there, done that
-      return prior.find()._unify(that,work);  // Also 'prior' needs unification with 'that'
+      return prior.find()._unify(that,test);  // Also 'prior' needs unification with 'that'
     // Check for equals (internally checks this==that)
     if( eq(that) ) return vput(that,false);
 
     // Several trivial cases that do not really do any work
     if( that.is_err() ) return vput(that,false); // That is an error, ignore 'this' and no progress
-    if( this.is_err() ) return vput(that,_unify(that,work));
+    if( this.is_err() ) return vput(that,_unify(that,test));
 
     // Famous 'occurs-check', switch to normal unify
-    if( nongen_in( nongen ) ) return vput(that,_unify(that,work));
+    if( nongen_in( nongen ) ) return vput(that,_unify(that,test));
 
     // LHS leaf, RHS is unchanged but goes in the VARS
     if( this.is_leaf() ) return vput(that,false);
     if( that.is_leaf() )  // RHS is a tvar; union with a deep copy of LHS
-      return work==null || vput(that,that.union(_fresh(nongen),work));
+      return test || vput(that,that.union(_fresh(nongen),test));
 
     // Bases MEET cons in RHS
     if( is_base() && that.is_base() ) {
       Type mt = _type.meet(that._type);
       if( mt==that._type ) return vput(that,false);
-      if( work == null ) return true;
+      if( test ) return true;
       that._type = mt;
       return vput(that,true);
     }
@@ -673,14 +674,14 @@ public class TV2 {
     if( this.is_nil() && !that.is_nil() ) {
       Type mt = that._type.meet_nil(Type.XNIL);
       if( mt == that._type ) return false;
-      if( work==null ) return true;
+      if( test ) return true;
       throw unimpl();
     }
 
     // That is nilable and this is not
     if( that.is_nil() && !this.is_nil() ) {
       assert is_base() || is_struct();
-      if( work==null ) return true;
+      if( test ) return true;
       TV2 copy = this;
       if( _type.must_nil() ) { // Make a not-nil version
         copy = copy("fresh_unify_vs_nil");
@@ -688,7 +689,7 @@ public class TV2 {
         if( _args!=null )
           copy._args = (NonBlockingHashMap<String, TV2>) _args.clone(); // shallow copy
       }
-      boolean progress = copy._fresh_unify(that.get("?"),nongen,work);
+      boolean progress = copy._fresh_unify(that.get("?"),nongen,test);
       return _type.must_nil() ? vput(that,progress) : progress;
     }
 
@@ -707,14 +708,14 @@ public class TV2 {
       TV2 rhs = that.get(key);
       if( rhs==null ) {         // No RHS to unify against
         if( that.open() ) {     // If RHS is open, copy field into it
-          if( work==null ) return true; // Will definitely make progress
-          progress |= that.add_fld(key,lhs._fresh(nongen), work);
+          if( test ) return true; // Will definitely make progress
+          progress |= that.add_fld(key,lhs._fresh(nongen),test);
         } // If closed, no copy
       } else {
-        progress |= lhs._fresh_unify(rhs,nongen,work);
+        progress |= lhs._fresh_unify(rhs,nongen,test);
       }
       if( (that=that.find()).is_err() ) return true;
-      if( progress && work==null ) return true;
+      if( progress && test ) return true;
     }
     FCNT--;
     // Fields in RHS and not the LHS are also merged; if the LHS is open we'd
@@ -724,13 +725,13 @@ public class TV2 {
     if( !open() )
       for( String id : that.args() )      // For all fields in RHS
         if( get(id)==null ) {             // Missing in LHS
-          if( work == null ) return true; // Will definitely make progress
+          if( test ) return true;         // Will definitely make progress
           { that._args.remove(id); progress=true; } // Extra fields on both sides are dropped
         }
     Type mt = that._type.meet(_type);   // All aliases
     boolean open = that._open & _open;
     if( that._open != open || that._type != mt ) progress = true;
-    if( work==null && progress ) return true;
+    if( test && progress ) return true;
     that._open = open; // Pick up open stat
     that._type = mt;   // Pick up all aliases
 
@@ -1016,13 +1017,13 @@ public class TV2 {
   }
 
   // Recursively add-deps to worklist
-  public void add_deps_work( WorkNode work ) { assert DEPS_VISIT.isEmpty(); add_deps_work_impl(work); DEPS_VISIT.clear(); }
-  private void add_deps_work_impl( WorkNode work ) {
-    work.add(_deps);
+  public void add_deps_flow( ) { assert DEPS_VISIT.isEmpty(); add_deps_flow_impl(); DEPS_VISIT.clear(); }
+  private void add_deps_flow_impl( ) {
+    Env.GVN.add_flow(_deps);
     if( DEPS_VISIT.tset(_uid) ) return;
     if( _args != null )
       for( TV2 tv2 : _args.values() )
-        tv2.add_deps_work_impl(work);
+        tv2.add_deps_flow_impl();
   }
 
   // Merge Dependent Node lists, 'this' into 'that'.  Required to trigger

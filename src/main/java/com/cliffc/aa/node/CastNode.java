@@ -15,7 +15,7 @@ public class CastNode extends Node {
   public final Type _t;
   public CastNode( Node ctrl, Node ret, Type t ) {
     super(OP_CAST,ctrl,ret); _t=t;
-    Env.GVN._work_dom.add(this);
+    Env.GVN.add_dom(this);
   }
   @Override public String xstr() { return "("+_t+")"; }
 
@@ -44,7 +44,7 @@ public class CastNode extends Node {
     return this;
   }
 
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     Type c = val(0);
     if( c != Type.CTRL ) return c.oob();
     Type t = val(1);
@@ -57,18 +57,18 @@ public class CastNode extends Node {
     // Lift result.
     return _t.join(t);
   }
-  @Override public void add_work_extra(WorkNode work, Type old) {
+  @Override public void add_flow_extra(Type old) {
     // If address sharpens, Cast can go dead because all Load uses make constants.
     if( _val!=old )
-      work.add(this);
+      Env.GVN.add_flow(this);
   }
   
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+  @Override public TypeMem live_use(Node def ) {
     return def==in(0) ? TypeMem.ALIVE : _live;
   }
 
   // Unifies the input to '(Nil ?:self)'
-  @Override public boolean unify( WorkNode work ) {
+  @Override public boolean unify( boolean test ) {
     TV2 maynil = tvar(1); // arg in HM
     TV2 notnil = tvar();  // ret in HM
     if( maynil.is_err() ) return false;
@@ -103,19 +103,19 @@ public class CastNode extends Node {
     }
 
     // All other paths may progress
-    if( work == null ) return true;
+    if( test ) return true;
 
     // Can be nilable of nilable; fold the layer
     if( maynil.is_nil() && notnil.is_nil() )
       throw unimpl(); // return maynil.unify(notnil,work);
 
     // Unify the maynil with a nilable version of notnil
-    return TV2.make_nil(notnil,"Cast_unify").find().unify(maynil, work);
+    return TV2.make_nil(notnil,"Cast_unify").find().unify(maynil,test);
   }
 
   @Override public @NotNull CastNode copy( boolean copy_edges) {
     @NotNull CastNode nnn = (CastNode)super.copy(copy_edges);
-    Env.GVN._work_dom.add(nnn);
+    Env.GVN.add_dom(nnn);
     return nnn;
   }
 

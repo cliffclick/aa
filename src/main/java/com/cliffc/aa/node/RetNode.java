@@ -21,7 +21,6 @@ public final class RetNode extends Node {
     super(OP_RET,ctrl,mem,val,rpc,fun);
     _fidx = fun._fidx;
     _nargs=fun.nargs();
-    fun.unkeep();         // Unkeep the extra, now that a Ret completes the Fun
   }
   public Node ctl() { return in(0); }
   public Node mem() { return in(1); }
@@ -176,7 +175,7 @@ public final class RetNode extends Node {
   }
 
 
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     if( ctl()==null ) return _val; // No change if a copy
     Type ctl = ctl()._val;
     if( ctl != Type.CTRL ) return ctl.oob(TypeTuple.RET);
@@ -185,25 +184,19 @@ public final class RetNode extends Node {
     Type val = rez()._val;
     return TypeTuple.make(ctl,mem,val);
   }
-  @Override public void add_work_extra(WorkNode work, Type old) {
+  @Override public void add_flow_extra(Type old) {
     // Return type changed, so Fun._sig changes.
     if( !is_copy() ) Env.GVN.add_reduce(fun());
   }
 
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
-  @Override public TypeMem live(GVNGCM.Mode opt_mode) {
-    // Pre-GCP, might be used anywhere (still finding CFG)
-    return !is_copy() && (fun()._java_fun || fun().has_unknown_callers()) && !opt_mode._CG ? TypeMem.ALLMEM : super.live(opt_mode);
-  }
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
-    if( def==mem() ) return _live;
-    if( def==rez() ) return TypeMem.ESCAPE;
-    return TypeMem.ALIVE;       // Basic aliveness
+  @Override public TypeMem live_use(Node def ) {
+    return def==mem() ? _live : TypeMem.ALIVE;
   }
 
   // Funs get special treatment by the H-M algo.
   @Override public TV2 new_tvar( String alloc_site) { return null; }
-  @Override public boolean unify( WorkNode work ) { return false; }
+  @Override public boolean unify( boolean test ) { return false; }
 
   @Override public Node is_copy(int idx) { throw com.cliffc.aa.AA.unimpl(); }
   boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }

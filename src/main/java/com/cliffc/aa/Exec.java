@@ -39,12 +39,12 @@ public abstract class Exec {
     e.close();                // No more fields added to the parse scope
     
     // Pessimistic optimizations; might improve error situation
-    Env.GVN.iter(GVNGCM.Mode.PesiNoCG);
+    Env.GVN.iter();
     
     Env.pre_combo();   // Remove all the things kept alive until Combo runs
     Combo.opto();      // Global Constant Propagation and Hindley-Milner Typing
     
-    Env.GVN.iter(GVNGCM.Mode.PesiCG);// Re-check all ideal calls now that types have been maximally lifted
+    Env.GVN.iter(); // Re-check all ideal calls now that types have been maximally lifted
     
     Env.FILE=null;
 

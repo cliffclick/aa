@@ -201,7 +201,6 @@ public class TestNode {
     Node mem = new ConNode<Type>(TypeMem.MEM);
     mem._val = TypeMem.MEM;
     FunNode fun_forward_ref = new FunNode("some_fcn");
-    Env.DEFMEM._val = TypeMem.MEM;
 
     Node unr = Env.TOP.lookup("+"); // All the "+" functions
     FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
@@ -212,13 +211,13 @@ public class TestNode {
 
     // Testing 1 set of types into a value call.
     // Comment out when not debugging.
-    CallEpiNode cepi = new CallEpiNode(call,Env.DEFMEM,_ins[2]);
+    CallEpiNode cepi = new CallEpiNode(call,_ins[2]);
     Type rez0 = test1jig(cepi, TypeTuple.TEST0,TypeTuple.RET, Type.ANY, Type.ANY);
 
     // All the Nodes, all Values, all Types
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
-    test1monotonic(new CallEpiNode(call,Env.DEFMEM,_ins[2])); // CallNode, then some count of RetNode, not flowing
+    test1monotonic(new CallEpiNode(call,_ins[2])); // CallNode, then some count of RetNode, not flowing
     test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
     test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));
     test1monotonic(new    ConNode<Type>(          TypeFlt.FLT64));
@@ -230,7 +229,7 @@ public class TestNode {
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STR0));
     test1monotonic(new  CProjNode(_ins[0],0));
     test1monotonic(new    ErrNode(_ins[0],null,"\nerr\n"));
-    test1monotonic(new    FunNode(TypeStruct.INT64,null));
+    test1monotonic(new    FunNode(TypeStruct.INT64.nargs()));
     test1monotonic(new FunPtrNode("anon",ret,null));
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     test1monotonic_intrinsic(new NewAryNode.NewAry());
@@ -262,8 +261,8 @@ public class TestNode {
     test1monotonic(new AssertNode(_ins[1],_ins[2],TypeInt.FALSE    ,null, null));
     test1monotonic(new AssertNode(_ins[1],_ins[2],TypeMemPtr.STRPTR,null, null));
     test1monotonic(new AssertNode(_ins[1],_ins[2],TypeFlt.FLT64    ,null, null));
-    _gvn._opt_mode=GVNGCM.Mode.PesiNoCG;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=GVNGCM.Mode.Parse;
-    _gvn._opt_mode=GVNGCM.Mode.PesiCG  ;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=GVNGCM.Mode.Parse;
+    test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));
+    test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));
 
     assertEquals(0,_errs);
   }
@@ -275,7 +274,7 @@ public class TestNode {
     _ins[1]._val = ((ConNode)_ins[1])._t = t1;
     _ins[2]._val = ((ConNode)_ins[2])._t = t2;
     _ins[3]._val = ((ConNode)_ins[3])._t = t3;
-    return n.value(_gvn._opt_mode);
+    return n.value();
   }
 
   private void test1monotonic(Node n) {
@@ -365,7 +364,7 @@ public class TestNode {
     Type vm = get(xxx);
     if( vm == null ) {
       set_type(idx,all[yx]);
-      vm = n.value(_gvn._opt_mode);
+      vm = n.value();
       Type old = put(xxx,vm);
       assert old==null;
       push(xxx);            // Now visit all children
@@ -384,10 +383,10 @@ public class TestNode {
   // Stop in debugger and repeat as needed to debug
   private void redo_(Node n, int idx, int xidx, int yx, Type[] all) {
     set_type(idx,all[xidx]);
-    Type err_n = n.value(_gvn._opt_mode);
+    Type err_n = n.value();
 
     set_type(idx,all[yx]);
-    Type err_m = n.value(_gvn._opt_mode);
+    Type err_m = n.value();
 
     assert err_n.isa(err_m);
   }

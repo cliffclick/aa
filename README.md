@@ -93,9 +93,9 @@ BNF                           | Comment
 `type = tcon OR tvar OR tfun[?] OR tstruct[?] OR ttuple[?]` | // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nilable'
 `tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]` | Primitive types
 `tfun = { [[type]* ->]? type }` | Function types mirror func decls
-`ttuple = ( [[type],]* )`     | Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length.  Tuples are always final.
-`tmod = := ! = ! ==`          | ':=' or (missing) is r/w, '=' is final, '==' is r/w
-`tstruct = @{ [id [tmod [type?]];]* }` | Struct types are field names with optional access and optional types.
+`ttuple = ( [[type],]* )`     | Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length.  Tuple fields are always final.
+`tstruct = @{ [id [tfld];]* }` | Struct types are field names with optional types or values.
+`tfld = ! : type ! = ifex`    | Fields are untyped or typed or final-assigned (with computed expression type)
 `tvar = id`                   | Type variable lookup
 
 SIMPLE EXAMPLES

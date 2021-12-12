@@ -1,13 +1,13 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.tvar.TV2;
-import com.cliffc.aa.util.Work;
 
 import java.util.function.Predicate;
+
+import static com.cliffc.aa.AA.unimpl;
 
 // Merge results.  Supports many merging paths; used by FunNode and LoopNode.
 public class RegionNode extends Node {
@@ -17,32 +17,35 @@ public class RegionNode extends Node {
   @Override public Node ideal_reduce() {
     // TODO: The unzip xform, especially for funnodes doing type-specialization
     // TODO: treat _cidx like U/F and skip_dead it also
-    if( _keep >= 2 ) return null; // Mid-construction in parser
-    int dlen = _defs.len();
-    for( int i=1; i<dlen; i++ ) {
+
+    // Fold control-folded paths
+    for( int i=1; i<_defs._len; i++ ) {
       Node cc = in(i).is_copy(0);
       if( cc!=null && cc != this ) return set_def(i,cc);
     }
 
     // Look for dead paths.  If found, cut dead path out of all Phis and this
     // Node, and return-for-progress.
-    for( int i=1; i<dlen; i++ )
-      if( kill_path(i) ) {
-        for( Node phi : _uses )
-          if( phi instanceof PhiNode )
-            Env.GVN.add_flow(phi.remove(i));
-        unwire(i);
-        remove(i);
-        if( this instanceof FunNode && _defs._len==2 && in(1).in(0) instanceof CallNode ) {
-          Node cepi = ((CallNode)in(1).in(0)).cepi();
-          if( cepi!=null ) Env.GVN.add_reduce(cepi);
-        }
-        return this; // Progress
+    for( int i=1; i<_defs._len; i++ )
+      if( val(i)==Type.XCTRL ) {
+        assert !is_prim();
+        assert in(i)!=Env.ALL_CTRL;
+    //    for( Node phi : _uses )
+    //      if( phi instanceof PhiNode )
+    //        Env.GVN.add_flow(phi.remove(i));
+    //    unwire(i);
+    //    remove(i);
+    //    if( this instanceof FunNode && _defs._len==2 && in(1).in(0) instanceof CallNode ) {
+    //      Node cepi = ((CallNode)in(1).in(0)).cepi();
+    //      if( cepi!=null ) Env.GVN.add_reduce(cepi);
+    //    }
+    //    return this; // Progress
+        throw unimpl();
       }
 
-    if( dlen == 1 ) return null; // No live inputs; dead in value() call
+    if( _defs._len == 1 ) return null; // No live inputs; dead in value() call
     if( this instanceof FunNode && ((FunNode)this).has_unknown_callers() ) return null; // Alive from unknown caller
-    if( dlen==2 ) {                          // Exactly 1 live path
+    if( _defs._len==2 ) {              // Exactly 1 live path
       // If only 1 live path and no Phis then return 1 live path.
       for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;
       // Single input FunNodes can NOT inline to their one caller,
@@ -53,35 +56,25 @@ public class RegionNode extends Node {
       // Self-dead-cycle is dead in value() call
       return in(1)==this ? null : in(1);
     }
-    // Check for empty diamond
-    if( dlen==3 ) {             // Exactly 2 live paths
-      Node nif = in(1).in(0);
-      if( in(1) instanceof CProjNode && nif==in(2).in(0) && nif instanceof IfNode ) {
-        // Must have no phi uses
-        for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;
-        return nif.in(0);
-      }
-    }
-
-    // Check for stacked Region (not Fun) and collapse.
-    Node stack = stacked_region();
-    if( stack != null ) return stack;
-
-    return null;
-  }
-  private boolean kill_path(int i) {
-    if( val(i)==Type.XCTRL && // Found dead path; cut out
-        // Remove wired dead calls into primitives, but not the guts of
-        // primitives with control flow (&&,||)
-        (!is_prim() || in(i)!=Env.SCP_0 ) )
-      return true;
-    // The unknown-caller path cannot be taken
-    if( in(i) instanceof ScopeNode && !((FunNode)this).is_unknown_alive() )
-      return true;
-    return false;
+    //// Check for empty diamond
+    //if( dlen==3 ) {             // Exactly 2 live paths
+    //  Node nif = in(1).in(0);
+    //  if( in(1) instanceof CProjNode && nif==in(2).in(0) && nif instanceof IfNode ) {
+    //    // Must have no phi uses
+    //    for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;
+    //    return nif.in(0);
+    //  }
+    //}
+    //
+    //// Check for stacked Region (not Fun) and collapse.
+    //Node stack = stacked_region();
+    //if( stack != null ) return stack;
+    //
+    //return null;
+    throw unimpl();
   }
 
-  @Override public void add_work_def_extra(WorkNode work, Node chg) {
+  @Override public void add_flow_def_extra(Node chg) {
     if( chg.is_CFG() ) {           // If losing an extra CFG user
       for( Node use : _uses )
         if( use._op == OP_REGION ) // Then stacked regions can fold
@@ -132,7 +125,7 @@ public class RegionNode extends Node {
 
   void unwire(int idx) { }
 
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
     for( int i=1; i<_defs._len; i++ ) {
       Type c = val(i);
@@ -142,17 +135,16 @@ public class RegionNode extends Node {
     return Type.XCTRL;
   }
   // Control into a Region allows Phis to make progress
-  @Override public void add_work_use_extra(WorkNode work, Node chg) {
+  @Override public void add_flow_use_extra(Node chg) {
     Env.GVN.add_reduce(this);
     for( Node phi : _uses )
       if( phi instanceof PhiNode ) {
-        work.add(phi);
-        phi.add_work_defs(work); // Inputs to Phi change liveness
+        Env.GVN.add_flow(phi);
+        phi.add_flow_defs(); // Inputs to Phi change liveness
       }
   }
 
-  @Override public TypeMem all_live() { return TypeMem.ALIVE; }
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ALIVE; }
+  @Override public TypeMem live_use(Node def ) { return TypeMem.ALIVE; }
 
   @Override public TV2 new_tvar(String alloc_site) { return null; }
 

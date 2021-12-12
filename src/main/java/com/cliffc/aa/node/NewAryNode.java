@@ -36,15 +36,15 @@ public abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
     return TV2.make("Ary",this,_tptr,alloc_site,args);
   }
 
-  @Override public boolean unify( WorkNode work ) {
+  @Override public boolean unify( boolean test ) {
     assert _tvar.isa("Ary");     // Self should always should be a Ary
     if( is_unused() ) return false;
     // Length is an int
     TV2 len = tvar(ARG_IDX);
     if( len.is_base() && len._type.isa(TypeInt.INT64) )
       return false;
-    return work==null ||        // Fast cutout
-      len.unify(TV2.make_base(in(ARG_IDX),TypeInt.INT64,"NewAry"),work);
+    return test ||              // Fast cutout
+      len.unify(TV2.make_base(in(ARG_IDX),TypeInt.INT64,"NewAry"),test);
   }
 
 }

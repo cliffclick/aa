@@ -59,9 +59,9 @@ import static com.cliffc.aa.type.TypeFld.Access;
  *  tfun = {[[type]* ->]? type }   // Function types mirror func declarations
  *  ttuple = ( [[type],]* )        // Tuple types are just a list of optional types;
                                    // the count of commas dictates the length, zero commas is zero length.
-                                   // Tuples are always final.
- *  tmod = := | = | ==             // ':=' or '' is r/w, '=' is final, '==' is r/o
- *  tstruct = @{ [id [tmod [type?]];]*}  // Struct types are field names with optional types.
+                                   // Tuple fields are always final.
+ *  tstruct = @{ [id [tfld];]* }   // Struct types are field names with optional types or values.
+ *  tfld = ! : type ! =: type ! = ifex  // Fields are untyped or typed (both modifiable and final) or final-assigned (with computed expression type)
  *  tvar = id                      // Type variable lookup
 
 
@@ -160,7 +160,6 @@ public class Parse implements Comparable<Parse> {
   /** Parse a top-level:
    *  prog = stmts END */
   public ErrMsg prog() {
-    _gvn._opt_mode = GVNGCM.Mode.Parse;
     Node res = stmts();
     if( res == null ) res = Env.ANY;
     scope().set_rez(res);  // Hook result
@@ -168,19 +167,19 @@ public class Parse implements Comparable<Parse> {
     return null;
   }
 
-  /** Parse a list of statements; final semi-colon is optional.
+  /** Parse a list of statements; final semicolon is optional.
    *  stmts= [tstmt or stmt] [; stmts]*[;]?
    */
   private Node stmts() { return stmts(false); }
   private Node stmts(boolean lookup_current_scope_only) {
-    Node stmt = tstmt(), last = null;
+    Node stmt = tstmt(), last=null;
     if( stmt == null ) stmt = stmt(lookup_current_scope_only);
     while( stmt != null ) {
       if( !peek(';') ) return stmt;
-      last = stmt.keep();
+      int idx = stmt.push();
       stmt = tstmt();
       if( stmt == null ) stmt = stmt(lookup_current_scope_only);
-      Env.GVN.add_flow(last.unkeep());
+      last = Node.pop(idx);
       if( stmt == null ) {
         if( peek(';') ) { _x--; stmt=last; }   // Ignore empty statement
       } else if( !last.is_dead() && stmt != last) kill(last); // prior expression result no longer alive in parser
@@ -208,38 +207,48 @@ public class Parse implements Comparable<Parse> {
     Type t = typev();
     if( t==null ) return err_ctrl2("Missing type after ':'");
     if( peek('?') ) return err_ctrl2("Named types are never nil");
-    if( lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
+    // TODO: stronger check; ok to see a fref of a type constructor here
+    Node val = lookup(tvar);
+    if( val != null && !val.is_forward_ref() ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
     Parse bad = errMsg();
     // Single-inheritance & vtables & RTTI:
     //            "Objects know thy Class"
     // Which means a TypeObj knows its Name.  It's baked into the vtable.
     // Which means TypeObj is named and not the pointer-to-TypeObj.
     // "Point= :@{x,y}" declares "Point" to be a type Name for "@{x,y}".
-    Type named = _prims ? t : t.set_name((tvar+":").intern()); // Add a name
+    Type named = t.set_name((tvar+":").intern()); // Add a name
     ConTypeNode tn = _e.lookup_type(tvar);
-    if( tn == null ) {
-      // If this is a primitive type, there is no recursion and
-      // no special issues.  Make a constructor and be done.
-      if( !(t instanceof TypeObj) ) {
-        // Make a ConType with a named Type
-        tn = (ConTypeNode)gvn(new ConTypeNode(tvar,named,scope()));
-        _e.add_type(tvar,tn); // Add a type mapping
-        if( _prims ) return tn;
-        // Make a trivial constructor
-        FunPtrNode fptr = PrimNode.convertTypeName(t,named,bad,_e._fun);
-        do_store(null,fptr,Access.Final,tvar,bad);
-        return fptr;
-      }
-
-      // Always wrap Objs with a TypeMemPtr and a unique alias.
-      TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.type_alias(BitsAlias.REC),(TypeObj)named);
+    if( tn != null )
+      throw unimpl(); // Trying to re-assign the same tvar?
+    // If this is a primitive type, there is no recursion and
+    // no special issues.  Make a constructor and be done.
+    if( !(t instanceof TypeObj) ) {
       // Make a ConType with a named Type
-      tn = (ConTypeNode)gvn(new ConTypeNode(tvar,tmp,scope()));
+      tn = (ConTypeNode)gvn(new ConTypeNode(tvar,named,scope()));
       _e.add_type(tvar,tn); // Add a type mapping
+      if( _prims ) return tn;
+      // Make a trivial constructor
+      FunPtrNode fptr = PrimNode.convertTypeName(t,named,bad);
+      fptr = (FunPtrNode)do_store(null,fptr,Access.Final,tvar,bad);
+      return fptr;
     }
 
+    // Always wrap Objs with a TypeMemPtr and a unique alias.
+    TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.type_alias(BitsAlias.REC),(TypeObj)named);
+    // Make a ConType with a named Type
+    tn = (ConTypeNode)gvn(new ConTypeNode(tvar,tmp,scope()));
+    _e.add_type(tvar,tn); // Add a type mapping
+    // Back door return ptr-to-NewObj
+    ProjNode ptr = (ProjNode)GVNGCM.KEEP_ALIVE.pop();
+    // Unlink the constructed object; it only exists for the type-domain and is
+    // never actually allocated "in real life".
+    Node omem = mem();
+    int midx = omem.push();     // Keep around
+    set_mem(((MrgProjNode)omem).mem()); // Unlink from memory
+    omem.set_def(1,Env.XMEM);           // Unlink from memory
+
     // A forward-ref ConTypeNode.  Close the cycle.
-    tn.def_fref(named,_e);
+    tn.def_fref((TypeStruct)named,_e);
 
     // Add a copy of constructor functions.
 
@@ -249,12 +258,19 @@ public class Parse implements Comparable<Parse> {
     // does not change, but a TypeMem[alias#] would now map to the Named
     // variant.
     TypeStruct ts = (TypeStruct)((TypeMemPtr)tn._val)._obj;
-    FunPtrNode epi1 = IntrinsicNode.convertTypeName(ts,bad,_e._fun);
-    do_store(null,epi1,Access.Final,tvar,bad);
+    FunPtrNode epi1 = IntrinsicNode.convertTypeName(ts,bad,ptr);
+    do_store(lookup_scope(tvar,false),epi1,Access.Final,tvar,bad);
     // Add a second constructor taking an expanded arg list
-    FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(ts, tn.alias(), errMsg(),_e._fun);
+    FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(ts, tn.alias(), errMsg(), _e, ptr);
     do_store(scope(),epi2,Access.Final,tvar,bad);
-    return _e.lookup(tvar); // Returns an Unresolved of constructors
+    // TODO:
+    // Node.pop(midx);
+    // TODO:
+    // Swap the sample object for a ConNode of just a TMP#alias.
+    // After the 2nd convertTypeName, should have extracted all the final-fields inits'
+    // so let the omem go dead.
+    throw unimpl();
+    //return _e.lookup(tvar); // Returns an Unresolved of constructors
   }
 
   /** A statement is a list of variables to final-assign or re-assign, and an
@@ -334,7 +350,7 @@ public class Parse implements Comparable<Parse> {
     }
 
     // Normal statement value parse
-    Node ifex = default_nil ? con(Type.XNIL) : ifex(); // Parse an expression for the statement value
+    Node ifex = default_nil ? con(Type.NIL) : ifex(); // Parse an expression for the statement value
     // Check for no-statement after start of assignment, e.g. "x = ;"
     if( ifex == null ) {        // No statement?
       if( toks._len == 0 ) return null;
@@ -343,7 +359,6 @@ public class Parse implements Comparable<Parse> {
     // Honor all type requests, all at once, by inserting type checks on the ifex.
     for( int i=0; i<ts._len; i++ )
       ifex = typechk(ifex,ts.at(i),mem(),badts.at(i));
-    ifex.keep();
 
     // Assign tokens to value
     for( int i=0; i<toks._len; i++ ) {
@@ -355,42 +370,48 @@ public class Parse implements Comparable<Parse> {
       String bal_close;
       if( ifex instanceof FunPtrNode && (bal_close=((FunPtrNode)ifex).fun()._bal_close) != null ) {
         String btok = (" "+tok.substring(0,bal_close.length()+1)).intern();
-        do_store(scope,ifex,mutable,btok,badfs.at(i));
+        ifex = do_store(scope,ifex,mutable,btok,badfs.at(i));
       }
       // Store down the full name 2nd, to overwrite the short bal-op name
-      do_store(scope,ifex,mutable,tok,badfs.at(i));
+      ifex = do_store(scope,ifex,mutable,tok,badfs.at(i));
     }
 
-    return ifex.unkeep();
+    return ifex;
   }
 
   // Assign into display, changing an existing def
-  private void do_store(ScopeNode scope, Node ifex, Access mutable, String tok, Parse bad) {
+  private Node do_store(ScopeNode scope, Node ifex, Access mutable, String tok, Parse bad) {
     if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
       ((FunPtrNode)ifex).bind(tok); // Debug only: give name to function
+    final int iidx = ifex.push();
     // Find scope for token.  If not defining struct fields, look for any
     // prior def.  If defining a struct, tokens define a new field in this scope.
-    if( scope==null ) {                    // Token not already bound at any scope
-      create(tok,con(Type.XNIL),Access.RW);  // Create at top of scope as undefined
+    if( scope==null ) {               // Token not already bound at any scope
+      create(tok,Env.XNIL,Access.RW); // Create at top of scope as undefined
       scope = scope();                // Scope is the current one
       scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
+      Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
+      StoreNode st = new StoreNode(mem(),ptr,Node.peek(iidx),mutable,tok,bad);
+      scope().replace_mem(st);
+      return Node.pop(iidx);
     }
     // Handle re-assignments and forward referenced function definitions.
     Node n = scope.stk().get(tok); // Get prior direct binding
     if( n.is_forward_ref() ) {     // Prior is a f-ref
       assert !scope.stk().is_mutable(tok) && scope == scope();
+      if( ifex instanceof UnresolvedNode ) throw unimpl();
       if( ifex instanceof FunPtrNode )
         ((FunPtrNode)n).merge_ref_def(tok,(FunPtrNode)ifex,scope.stk());
       // Can be here if already in-error
 
     } else {
       // Store into scope/NewObjNode/display
-      ifex.keep(2);
       Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
-      StoreNode st = new StoreNode(mem(),ptr,ifex.unkeep(2),mutable,tok,bad);
+      StoreNode st = new StoreNode(mem(),ptr,Node.peek(iidx),mutable,tok,bad);
       scope().replace_mem(st);
       scope.def_if(tok,mutable,false); // Note 1-side-of-if update
     }
+    return Node.pop(iidx);
   }
 
   /** Parse an if-expression, with lazy eval on the branches.  Assignments to
@@ -414,7 +435,7 @@ public class Parse implements Comparable<Parse> {
     Node t_mem = mem ().keep(2);   // Keep until merge point
 
     scope().flip_if();          // Flip side of tracking new defs
-    Env.GVN.add_work_all(ifex.unkeep(2));
+    Env.GVN.add_work_new(ifex.unkeep(2));
     set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch
     Env.GVN.add_reduce(ifex);
     set_mem(old_mem.unkeep(2));    // Reset memory to before the IF
@@ -436,7 +457,7 @@ public class Parse implements Comparable<Parse> {
     if( f_ctrl._val==Type.XCTRL ) _gvn.add_flow(f_mem);
     set_mem(   gvn(new PhiNode(TypeMem.FULL,bad,r        ,t_mem.unkeep(2),f_mem.unkeep(2))));
     Node rez = gvn(new PhiNode(Type.SCALAR ,bad,r.unkeep(2),tex.unkeep(2),  fex.unkeep(2))) ; // Ifex result
-    _gvn.add_work_all(r);
+    _gvn.add_work_new(r);
     return rez;
   }
 
@@ -452,9 +473,9 @@ public class Parse implements Comparable<Parse> {
       skipWS();
       int oldx = _x;
       int old_last = _lastNWS;
-      expr.keep(2);             // Keep alive across argument parse
+      int eidx = expr.push();   // Keep alive across argument parse
       Node arg = expr();
-      if( arg==null ) return expr.unkeep(2);
+      if( arg==null ) return Node.pop(eidx);
       // To avoid the common bug of forgetting a ';', these must be on the same line.
       int line_last = _lines.binary_search(old_last);
       int line_now  = _lines.binary_search(_x);
@@ -462,7 +483,7 @@ public class Parse implements Comparable<Parse> {
         _x = oldx;  _lastNWS = old_last;  expr.unhook();
         return err_ctrl2("Lisp-like function application split between lines "+line_last+" and "+line_now+", but must be on the same line; possible missing semicolon?");
       }
-      expr = do_call(errMsgs(oldx,oldx),args(expr.unkeep(2),arg)); // Pass the 1 arg
+      expr = do_call(errMsgs(oldx,oldx),args(Node.pop(eidx),arg)); // Pass the 1 arg
     }
   }
 
@@ -502,16 +523,11 @@ public class Parse implements Comparable<Parse> {
       assert op!=null;          // Since found valid token, must find matching primnode
       FunNode sfun = op.funptr().fun();
       assert sfun._op_prec == prec;
-      // Check for Thunking the RHS
-      if( sfun._thunk_rhs ) {
-        lhs = _short_circuit_expr(lhs.unkeep(),prec,bintok,op,opx,lhsx,rhsx);
-      } else {                  // Not a thunk!  Eager evaluation of RHS
-        op.keep();
-        Node rhs = _expr_higher_require(prec,bintok,lhs);
-        // Emit the call to both terms
-        // LHS in unhooked prior to optimizing/replacing.
-        lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op.unkeep(),lhs.unkeep(),rhs));
-      }
+      op.keep();
+      Node rhs = _expr_higher_require(prec,bintok,lhs);
+      // Emit the call to both terms
+      // LHS in unhooked prior to optimizing/replacing.
+      lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op.unkeep(),lhs.unkeep(),rhs));
       // Invariant: LHS is unhooked
     }
   }
@@ -549,41 +565,44 @@ public class Parse implements Comparable<Parse> {
     Ary<Node> old_defs = stk._defs.deepCopy();
     lhs.keep(2);
 
+    // TODO: Drop thunk/thret.  Use "lazy arg" flag model.  Normal calls.
+
     // Insert a thunk header to capture the delayed execution
-    ThunkNode thunk = (ThunkNode)gvn(new ThunkNode(mem()));
-    set_ctrl(thunk);
-    set_mem (gvn(new ParmNode(MEM_IDX,"mem",thunk.keep(2),TypeMem.MEM,Env.DEFMEM,null)));
-
-    // Delayed execution parse of RHS
-    Node rhs = _expr_higher_require(prec,bintok,lhs);
-
-    // Insert thunk tail, unwind memory state
-    ThretNode thet = gvn(new ThretNode(ctrl(),mem(),rhs,Env.GVN.add_flow(thunk.unkeep(2)))).keep(2);
-    set_ctrl(old_ctrl.unkeep(2));
-    set_mem (old_mem .unkeep(2));
-    for( int i=0; i<old_defs._len; i++ )
-      assert old_defs.at(i)==stk._defs.at(i); // Nothing peeked thru the Thunk & updated outside
-
-    // Emit the call to both terms.  Both the emitted call and the thunk MUST
-    // inline right now.
-    lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op.unkeep(2),lhs.unkeep(2),thet.unkeep(2)));
-    assert thunk.is_dead() && thet.is_dead(); // Thunk, in fact, inlined
-
-    // Extra variables in the thunk not available after the thunk.
-    // Set them to Err.
-    if( stk._ts != old_ts ) {
-      lhs.keep(2);
-      for( int i=old_defs._len; i<stk._defs._len; i++ ) {
-        // TODO: alignment between old_defs and struct fields
-        String fname = stk._ts.fld_idx(i)._fld;
-        String msg = "'"+fname+"' not defined prior to the short-circuit";
-        Parse bad = errMsg(rhsx);
-        Node err = gvn(new ErrNode(ctrl(),bad,msg));
-        set_mem(gvn(new StoreNode(mem(),scope().ptr(),err,Access.Final,fname,bad)));
-      }
-      lhs.unkeep(2);
-    }
-    return lhs;
+    //ThunkNode thunk = (ThunkNode)gvn(new ThunkNode(mem()));
+    //set_ctrl(thunk);
+    //set_mem (gvn(new ParmNode(MEM_IDX,"mem",thunk.keep(2),TypeMem.MEM,Env.DEFMEM,null)));
+    //
+    //// Delayed execution parse of RHS
+    //Node rhs = _expr_higher_require(prec,bintok,lhs);
+    //
+    //// Insert thunk tail, unwind memory state
+    //ThretNode thet = gvn(new ThretNode(ctrl(),mem(),rhs,Env.GVN.add_flow(thunk.unkeep(2)))).keep(2);
+    //set_ctrl(old_ctrl.unkeep(2));
+    //set_mem (old_mem .unkeep(2));
+    //for( int i=0; i<old_defs._len; i++ )
+    //  assert old_defs.at(i)==stk._defs.at(i); // Nothing peeked thru the Thunk & updated outside
+    //
+    //// Emit the call to both terms.  Both the emitted call and the thunk MUST
+    //// inline right now.
+    //lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op.unkeep(2),lhs.unkeep(2),thet.unkeep(2)));
+    //assert thunk.is_dead() && thet.is_dead(); // Thunk, in fact, inlined
+    //
+    //// Extra variables in the thunk not available after the thunk.
+    //// Set them to Err.
+    //if( stk._ts != old_ts ) {
+    //  lhs.keep(2);
+    //  for( int i=old_defs._len; i<stk._defs._len; i++ ) {
+    //    // TODO: alignment between old_defs and struct fields
+    //    String fname = stk._ts.fld_idx(i)._fld;
+    //    String msg = "'"+fname+"' not defined prior to the short-circuit";
+    //    Parse bad = errMsg(rhsx);
+    //    Node err = gvn(new ErrNode(ctrl(),bad,msg));
+    //    set_mem(gvn(new StoreNode(mem(),scope().ptr(),err,Access.Final,fname,bad)));
+    //  }
+    //  lhs.unkeep(2);
+    //}
+    //return lhs;
+    throw unimpl();
   }
 
   /** Any number field-lookups or function applications, then an optional assignment
@@ -670,31 +689,15 @@ public class Parse implements Comparable<Parse> {
       } else if( peek('(') ) {  // Attempt a function-call
         oldx = _x;              // Just past paren
         skipWS();               // Skip to start of 1st arg
-        n.keep();               // Keep alive across arg parse
         int first_arg_start = _x;
+        int nidx = n.push();    // Keep alive across arg parse
         Node arg = tuple(oldx-1,stmts(),first_arg_start); // Parse argument list
-        if( arg == null )       // tfact but no arg is just the tfact
-          { _x = oldx; return n.unkeep(); }
-        Type tn = n._val;
-        boolean may_fun = tn.isa(TypeFunPtr.GENERIC_FUNPTR);
-        if( !may_fun && arg.op_prec() >= 0 ) { _x=oldx; return n.unkeep(); }
-        if( !may_fun &&
-            // Notice the backwards condition: n was already tested for !(tn instanceof TypeFun).
-            // Now we test the other way: the generic function can never be an 'n'.
-            // Only if we cannot 'isa' in either direction do we bail out early
-            // here.  Otherwise, e.g. 'n' might be an unknown function argument
-            // and during GCP be 'lifted' to a function; if we bail out now we
-            // may disallow a legal program with function arguments.  However,
-            // if 'n' is a e.g. Float there's no way it can 'lift' to a function.
-            !TypeFunPtr.GENERIC_FUNPTR.isa(tn) ) {
-          kill(arg);
-          n.unhook();
-          n = err_ctrl2("A function is being called, but "+tn+" is not a function");
-        } else {
-          Parse[] badargs = ((NewObjNode)arg.in(0))._fld_starts; // Args from tuple
-          badargs[0] = errMsg(oldx-1); // Base call error reported at the opening paren
-          n = do_call0(false,badargs,args(n.unkeep(),arg)); // Pass the tuple
-        }
+        n = Node.pop(nidx);
+        if( arg == null )       // tfact but no arg is just the tfact not a function call
+          { _x = oldx; return n; }
+        Parse[] badargs = ((NewObjNode)arg.in(0))._fld_starts; // Args from tuple
+        badargs[0] = errMsg(oldx-1); // Base call error reported at the opening paren
+        n = do_call0(false,badargs,args(n,arg)); // Pass the tuple
 
       } else {
         // Check for balanced op
@@ -869,10 +872,11 @@ public class Parse implements Comparable<Parse> {
   private Node tuple(int oldx, Node s, int first_arg_start) {
     Parse bad = errMsg(first_arg_start);
     Ary<Parse> bads = new Ary<>(new Parse[1],1);
-    Ary<Node > args = new Ary<>(new Node [1],0);
+    int nargs=0;
     while( s!= null ) {         // More args
       bads.push(bad);           // Collect arg & arg start
-      args.push(s.keep());
+      s.push();                 // Store on keepalive
+      nargs++;
       if( !peek(',') ) break;   // Final comma is optional
       skipWS();                 // Skip to arg start before recording arg start
       bad = errMsg();           // Record arg start
@@ -880,18 +884,19 @@ public class Parse implements Comparable<Parse> {
     }
     require(')',oldx);          // Balanced closing paren
 
-    // Build the tuple from gathered args
+    // Build the tuple from gathered args.
+    // Walk them in-order and not stack-like
     NewObjNode nn = new NewObjNode(false,TypeStruct.open(TypeMemPtr.NO_DISP),Env.ANY);
-    for( int i=0; i<args._len; i++ )
-      nn.create_active((""+i).intern(),args.at(i).unkeep(),Access.Final);
+    for( int i=0; i < nargs; i++ )
+      nn.create_active((""+i).intern(),Node.peek(GVNGCM.KEEP_ALIVE._defs._len-nargs+i),Access.Final);
+    Node.pops(nargs);
     nn._fld_starts = bads.asAry();
     nn.no_more_fields();
-    init(nn);
-    nn.xval();
+    int nidx = init(nn).push();
 
     // NewNode returns a TypeMem and a TypeMemPtr (the reference).
-    set_mem( Env.DEFMEM.make_mem_proj(nn,mem()) );
-    return gvn(new ProjNode(nn.unkeep(2),REZ_IDX));
+    set_mem(gvn(new MrgProjNode(nn,mem())));
+    return gvn(new ProjNode(Node.pop(nidx),REZ_IDX));
   }
 
 
@@ -901,19 +906,19 @@ public class Parse implements Comparable<Parse> {
    *  struct = \@{ stmts }
    */
   private Node struct() {
-    int oldx = _x-1; Node ptr;  // Opening @{
+    int oldx = _x-1, pidx;      // Opening @{
     try( Env e = new Env(_e, null, false, ctrl(), mem()) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
       assert ctrl() != e._scope;
       e._scope.stk().update("^",Access.Final,Env.ANY);
-      ptr = e._scope.ptr().keep();    // A pointer to the constructed object
+      pidx = e._scope.ptr().push();   // A pointer to the constructed object
       e._par._scope.set_ctrl(ctrl()); // Carry any control changes back to outer scope
       e._par._scope.set_mem (mem ()); // Carry any memory  changes back to outer scope
       _e = e._par;                    // Pop nested environment
     } // Pop lexical scope around struct
-    return ptr.unkeep();
+    return Node.pop(pidx);
   }
 
   /** Parse an anonymous function; the opening '{' already parsed.  After the
@@ -929,7 +934,7 @@ public class Parse implements Comparable<Parse> {
     // or when inside of a struct definition: 'this'.
     Node parent_display = scope().ptr();
     TypeMemPtr tpar_disp = (TypeMemPtr) parent_display._val; // Just a TMP of the right alias
-    Node fresh_disp = parent_display; // gvn(new FreshNode(_e._fun,parent_display)).keep();
+    int dsp_idx = parent_display.push();
 
     // Incrementally build up the formals
     TypeStruct formals = TypeStruct.make("",false,true,
@@ -967,65 +972,73 @@ public class Parse implements Comparable<Parse> {
     // If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
     // args, and then reset.  Also reset to just the mem & display args.
     if( _x == oldx ) { formals = no_args_formals;  bads.set_len(ARG_IDX); }
+    formals = formals.close();
 
-    try( GVNGCM.Build<Node> X = _gvn.new Build<>()) { // Nest an environment for the local vars
-      // Build the FunNode header
-      FunNode fun = (FunNode)X.xform(new FunNode(formals.close(),_e._fun).add_def(_prims ? Env.SCP_0 : Env.FILE._scope));
-      // Record H-M VStack in case we clone
-      //fun.set_nongens(_e._nongen.compact());
-      // Build Parms for system incoming values
-      Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
-      Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-      Node clo = X.xform(new ParmNode(DSP_IDX,"^"   ,fun,tpar_disp,fresh_disp,null));
+    // Build the FunNode header
+    FunNode fun = (FunNode)init(new FunNode(formals.nargs()).add_def(Env.ALL_CTRL));
+    int fun_idx = fun.push();
+    // Record H-M VStack in case we clone
+    //fun.set_nongens(_e._nongen.compact());
+    // Build Parms for system incoming values
+    int rpc_idx = init(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null)).push();
+    int clo_idx = init(new ParmNode(DSP_IDX,"^"   ,fun,tpar_disp,parent_display,null)).push();
+    Node mem    = init(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.ALL_MEM,null));
+    assert Node.peek(dsp_idx) == parent_display;
 
-      // Increase scope depth for function body.
-      try( Env e = new Env(_e, fun, true, fun, mem) ) { // Nest an environment for the local vars
-        _e = e;                   // Push nested environment
-        // Display is special: the default is simply the outer lexical scope.
-        // But here, in a function, the display is actually passed in as a hidden
-        // extra argument and replaces the default.
-        NewObjNode stk = e._scope.stk();
-        if( !_prims ) stk.update("^",Access.Final,clo);
+    // Increase scope depth for function body.
+    int fidx;
+    try( Env e = new Env(_e, fun, true, fun, mem) ) { // Nest an environment for the local vars
+      _e = e;                   // Push nested environment
+      // Display is special: the default is simply the outer lexical scope.
+      // But here, in a function, the display is actually passed in as a hidden
+      // extra argument and replaces the default.
+      NewObjNode stk = e._scope.stk();
+      stk.update("^",Access.Final,Node.pop(clo_idx));
 
-        // Parms for all arguments
-        Parse errmsg = errMsg();  // Lazy error message
-        for( TypeFld fld : formals.flds() ) { // User parms start
-          if( fld._order <= DSP_IDX ) continue;// Already handled
-          Node parm = X.xform(new ParmNode(fld,fun,Env.ALL_PARM,errmsg));
-          create(fld._fld,parm, args_are_mutable);
-        }
-
-        // Parse function body
-        Node rez = stmts();       // Parse function body
-        if( rez == null ) rez = err_ctrl2("Missing function body");
-        require('}',oldx-1);      // Matched with opening {}
-
-        // Merge normal exit into all early-exit paths
-        if( e._scope.is_closure() ) rez = merge_exits(rez);
-        // Standard return; function control, memory, result, RPC.  Plus a hook
-        // to the function for faster access.
-        RetNode ret = (RetNode)X.xform(new RetNode(ctrl(),mem(),rez,rpc,fun));
-        // The FunPtr builds a real display; any up-scope references are passed in now.
-        Node fptr = X.xform(new FunPtrNode(null,ret,fresh_disp));
-        // Hook function at the TOP scope, in case it escapes all current
-        // enclosing scopes.  This hook is removed as part of doing the Combo
-        // pass which computes a real Call Graph and all escapes.
-        Env.TOP._scope.add_def(ret);
-
-        _e = e._par;            // Pop nested environment; pops nongen also
-        return (X._ret=fptr);   // Return function; close-out and DCE 'e'
+      // Parms for all arguments
+      Parse errmsg = errMsg();  // Lazy error message
+      for( TypeFld fld : formals.flds() ) { // User parms start
+        if( fld._order <= DSP_IDX ) continue;// Already handled
+        assert fun==_e._fun && fun==_e._scope.ctrl();
+        Node parm = gvn(new ParmNode(fld,fun,Env.ALL_PARM,errmsg));
+        create(fld._fld,parm, args_are_mutable);
       }
+
+      // Parse function body
+      Node rez = stmts();       // Parse function body
+      if( rez == null ) rez = err_ctrl2("Missing function body");
+      require('}',oldx-1);      // Matched with opening {}
+
+      // Merge normal exit into all early-exit paths
+      assert e._scope.is_closure();
+      rez = merge_exits(rez);
+      // Standard return; function control, memory, result, RPC.  Plus a hook
+      // to the function for faster access.
+      Node xrpc = Node.pop(rpc_idx);
+      Node xfun = Node.pop(fun_idx); assert xfun == fun;
+      RetNode ret = init(new RetNode(ctrl(),mem(),rez,xrpc,fun));
+      // The FunPtr builds a real display; any up-scope references are passed in now.
+      Node xdsp = Node.pop(dsp_idx); assert xdsp == parent_display;
+      Node fptr = gvn(new FunPtrNode(null,ret,parent_display));
+      // Hook function at the TOP scope, in case it escapes all current
+      // enclosing scopes.  This hook is removed as part of doing the Combo
+      // pass which computes a real Call Graph and all escapes.
+      Env.TOP._scope.add_def(ret);
+
+      _e = e._par;            // Pop nested environment; pops nongen also
+      fidx = fptr.push();     // Return function; close-out and DCE 'e'
     }
+    return Node.pop(fidx);
   }
 
   private Node merge_exits(Node rez) {
-    rez.keep();
+    int ridx = rez.push();
     ScopeNode s = scope();
     Node ctrl = s.early_ctrl();
     Node mem  = s.early_mem ();
     Node val  = s.early_val ();
     s.early_kill();
-    if( ctrl == null ) return rez.unkeep(); // No other exits to merge into
+    if( ctrl == null ) return Node.pop(ridx); // No other exits to merge into
     try(GVNGCM.Build<Node> X = _gvn.new Build<>()) {
       ctrl = ctrl.add_def(ctrl()).unkeep();
       ctrl._val = Type.CTRL;
@@ -1190,9 +1203,10 @@ public class Parse implements Comparable<Parse> {
     String str = new String(_buf,oldx,_x-oldx-1).intern();
     // Convert to ptr-to-constant-memory-string
     NewNode nnn = (NewNode)gvn( new NewStrNode.ConStr(str) );
-    if( Env.DEFMEM._defs.atX(nnn._alias)==null )
-      set_mem(Env.DEFMEM.make_mem_proj(nnn,mem()));
-    return gvn( new ProjNode(nnn,REZ_IDX));
+    //if( Env.DEFMEM._defs.atX(nnn._alias)==null )
+    //  set_mem(Env.DEFMEM.make_mem_proj(nnn,mem()));
+    //return gvn( new ProjNode(nnn,REZ_IDX));
+    throw unimpl();
   }
 
   /** Parse a type or return null
@@ -1200,8 +1214,8 @@ public class Parse implements Comparable<Parse> {
    *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
    *  tary = '[' type? ']'                 // Cannot specify type for array size
    *  tfun = {[[type]* ->]? type }         // Function types mirror func decls
-   *  tmod = = | := | ==                   // '=' is r/final, ':=' is r/w, '==' is read-only
-   *  tstruct = @{ [id [tmod [type?]];]*}  // Struct types are field names with optional types.
+   *  tstruct = @{ [id [tfld];]* }   // Struct types are field names with optional types or values.
+   *  tfld = ! : type ! = ifex       // Fields are untyped or typed or final-assigned (with computed expression type)
    *  ttuple = ([type?] [,[type?]]*)       // List of types, trailing comma optional
    *  tvar = A previously declared type variable
    *
@@ -1230,16 +1244,6 @@ public class Parse implements Comparable<Parse> {
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
   private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil(Type.NIL) : t; }
 
-  // No mod is r/w.  ':=' is read-write, '=' is final.
-  // Currently '-' is ambiguous with function arrow ->.
-  private Access tmod() {
-    if( peek_not('=','=') ) { _x--; return Access.Final   ; } // final     , leaving trailing '='
-    if( peek(":="       ) ) { _x--; return Access.RW      ; } // read-write, leaving trailing '='
-    if( peek("=="       ) ) { _x--; return Access.ReadOnly; } // read-only , leaving trailing '='
-    // Default for unnamed field mod
-    return Access.RW;
-  }
-
   // Type or null or Type.ANY for '->' token
   private Type type0(boolean type_var) {
     if( peek('{') ) {           // Function type
@@ -1261,23 +1265,8 @@ public class Parse implements Comparable<Parse> {
       return typeq(TypeFunSig.make(formals,ret));
     }
 
-    if( peek("@{") ) {          // Struct type
-      Ary<TypeFld> flds = new Ary<>(new TypeFld[]{TypeMemPtr.DISP_FLD});
-      while( true ) {
-        String tok = token();            // Scan for 'id'
-        if( tok == null ) break;         // end-of-struct-def
-        final String itok = tok.intern(); // Only 1 copy
-        Type t = Type.SCALAR;            // Untyped, most generic field type
-        Access tmodf = tmod();           // Field access mod; trailing '=' left for us
-        if( peek('=') &&                 // Has type annotation?
-            (t=typep(type_var)) == null) // Parse type, wrap ptrs
-          t = Type.SCALAR;               // No type found, assume default
-        if( flds.find(fld -> Util.eq(fld._fld,itok) ) != -1 ) throw unimpl(); // cannot use same field name twice
-        flds.add(TypeFld.make(itok,t,tmodf,flds._len-1+ARG_IDX));
-        if( !peek(';') ) break; // Final semi-colon is optional
-      }
-      return peek('}') ? TypeStruct.make("",false,true,flds) : null;
-    }
+    if( peek("@{") )            // Struct type
+      return type_var ? tclass() : tstruct();
 
     // "()" is the zero-entry tuple
     // "(   ,)" is a 1-entry tuple
@@ -1330,6 +1319,37 @@ public class Parse implements Comparable<Parse> {
     return t._val;
   }
 
+  // Parse an anonymous struct.  Simple types only, no embedded code.
+  private TypeStruct tstruct() {
+    Ary<TypeFld> flds = new Ary<>(new TypeFld[]{TypeMemPtr.DISP_FLD});
+    while( true ) {
+      String tok = token();            // Scan for 'id'
+      if( tok == null ) break;         // end-of-struct-def
+      final String itok = tok.intern(); // Only 1 copy
+      Type t = Type.SCALAR;
+      if( peek(':') ) {
+        if( (t=typep(false)) == null ) // Parse type, wrap ptrs
+          throw unimpl();
+      }
+      if( peek('=') &&                 // Has type annotation?
+          (t=typep(false)) == null)    // Parse type, wrap ptrs
+        t = Type.SCALAR;               // No type found, assume default
+      if( flds.find(fld -> Util.eq(fld._fld,itok) ) != -1 ) throw unimpl(); // cannot use same field name twice
+      flds.add(TypeFld.make(itok,t,Access.RW,flds._len-1+ARG_IDX));
+      if( !peek(';') ) break; // Final semi-colon is optional
+    }
+    return peek('}') ? TypeStruct.make("",false,true,flds) : null;
+  }
+
+  // Parse an anonymous "class".  Code is allowed for field defs.
+  private TypeStruct tclass() {
+    ProjNode ptr = (ProjNode)struct();
+    ptr.push();                 // KEEP around; no index, just pop next level up
+    NewObjNode nnn = (NewObjNode)ptr.in(0);
+    return nnn._ts;
+  }
+
+  // --------------------------------------------------------------------------
   // Require a closing character (after skipping WS) or polite error
   private void require( char c, int oldx ) {
     if( peek(c) ) return;
@@ -1470,29 +1490,22 @@ public class Parse implements Comparable<Parse> {
   // is wired it picks up projections to merge at the Fun & Parm nodes.
   private Node do_call( Parse[] bads, Node... args ) { return do_call0(true,bads,args); }
   private Node do_call0( boolean unpack, Parse[] bads, Node... args ) {
-    CallNode call0 = new CallNode(unpack,bads,args);
-    CallNode call = (CallNode)gvn(call0);
-    // Call Epilog takes in the call which it uses to track wireable functions.
-    // CallEpi internally tracks all wired functions.
-
-    CallEpiNode cepi = (CallEpiNode)gvn(new CallEpiNode(call,Env.DEFMEM));
-    Node ctrl = gvn(new CProjNode(cepi.keep()));
-    if( ctrl.is_copy(0)!=null ) ctrl = ctrl.is_copy(0); // More aggressively fold, so Thunks can more aggressively assert
+    CallNode call = (CallNode)gvn(new CallNode(unpack,bads,args));
+    CallEpiNode cepi = (CallEpiNode)gvn(new CallEpiNode(call));
+    int cidx = cepi.push();
+    Node ctrl = gvn(new CProjNode(cepi));
     set_ctrl(ctrl);
-    set_mem(gvn(new MProjNode(cepi))); // Return memory from all called functions
+    set_mem(gvn(new MProjNode(Node.peek(cidx)))); // Return memory from all called functions
     // As soon as CEPI is unkeep, a whole lotta things are allowed, including
     // e.g. inlining
-    if( !cepi._is_copy ) {
-      Env.GVN.add_work_all(cepi);
-      for( int i = 0; i < cepi.nwired(); i++ )
-        Env.GVN.add_inline(cepi.wired(i).fun());
-    } else Env.GVN.add_flow(cepi);
-    return gvn(new ProjNode(cepi.unkeep(),REZ_IDX));
+    if( cepi._is_copy ) Env.GVN.add_flow(cepi);
+
+    return gvn(new ProjNode(Node.pop(cidx),REZ_IDX));
   }
 
   // Whack current control with a syntax error
   private ErrNode err_ctrl1( ErrMsg msg ) { return init(new ErrNode(Env.START,msg)); }
-  private ErrNode err_ctrl2( String msg ) { return init(new ErrNode(ctrl(),errMsg(),msg)).unkeep(2); }
+  private ErrNode err_ctrl2( String msg ) { return init(new ErrNode(ctrl(),errMsg(),msg)); }
   private void err_ctrl0(String s) { err_ctrl3(s,errMsg()); }
   private void err_ctrl3(String s, Parse open) {
     set_ctrl(gvn(new ErrNode(ctrl(),open,s)));

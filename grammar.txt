@@ -1,27 +1,67 @@
-/* A BNF grammar for AA suitable for https://smlweb.cpsc.ucalgary.ca/start.html */
+/* A simplified BNF grammar for AA suitable for https://smlweb.cpsc.ucalgary.ca/start.html */
 
 Prog  -> Stmts.
-Stmts -> Stmt  ; Stmts  /* multiple statements */
-       | Stmt           /* final ; is optional */
-       | .
-Id    -> x | y | z.
-Stmt  -> Id # Ifex     /* variable assignment */
-       | ret Ifex.
-Ifex  -> Apply.
+
+Stmts ->
+/* multiple statements */
+  Stmt  ; Stmts
+/* final ; is optional */
+| Stmt
+/* type expression */
+| TStmt          
+| .
+
+/* 3 variables x,y,z */
+Id -> x | y | z.
+
+/* variable assignment; '#' stands in for 'equals' which is part of the meta-grammar */
+Stmt -> Id # Ifex
+      | ret Ifex.
+
+/* type variable assignment */
+TStmt -> Id # Type.
+
+/* Ternary logic.  A missing ':Stmt' defaults to nil */
+Ifex -> Apply
+      | Apply ? Stmt
+      | Apply ? Stmt : Stmt.
+
+/* Functional adjecency call goes here, but not implemented in this grammar */
 Apply -> Expr.
-Expr  -> Term
-       | Term + Term.
-Term  -> Id ++
-       | Fact Post.
-Post  -> _ Id   Post   /* .field lookup, but cannot use '.' */
-       | ( Id ) Post   /* function call */
-       | (( Stmts )) Post /* array lookup */
-       | _ Id ++
-       | _ Id # Stmt   /* .field assignment */
+
+/* Any collection of binary ops */
+Expr -> Term
+      | Term + Term.
+
+/* Unary ops, both pre and post; also balanced ops. */
+Term -> Id ++
+      | Fact Post.
+       
+Post  ->
+/* .field lookup, using '_' because cannot use '.' */
+         _ Id   Post
+/* function call, args in parens followed by another Post */         
+       | ( Id ) Post
+/* array lookup the double parens hint at square brackets */       
+       | (( Stmts )) Post       
+       | _ Id ++       
+/* .field assignment, , using '_' and '#' because cannot use '.' and '=' */
+       | _ Id # Stmt
        | .
-Fact  -> Id
-       | 3
-       | (( Stmts )) /* Array allocation: [ Stmts ] */
-       | ( Stmts ).
+       
+Fact ->
+  Id
+  /* Any integer, float, string constant */
+| 3
+| (( Stmts ))
+/* Nested grouped statements */
+| ( Stmts ) .
 
+Type -> TCon | TVar | TFun .
 
+TVar -> Id .
+
+TCon -> int | flt | str .
+
+TFun ->
+  (( Id * #~ Type )) .

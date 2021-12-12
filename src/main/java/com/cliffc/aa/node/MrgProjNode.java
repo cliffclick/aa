@@ -1,11 +1,11 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.AA.unimpl;
 
 // Proj memory
 public class MrgProjNode extends ProjNode {
@@ -13,11 +13,10 @@ public class MrgProjNode extends ProjNode {
   @Override public String xstr() { return "MrgProj"+_idx; }
   @Override public boolean is_mem() { return true; }
   NewNode nnn() { return (NewNode)in(0); }
-  Node    mem() { return          in(1); }
+  public Node mem() { return in(1); }
 
 
   @Override public Node ideal_reduce() {
-    if( _keep >= 2 ) return null;
     if( !is_prim() && val(0).above_center() )
       return mem();
     NewNode nnn = nnn();
@@ -28,17 +27,18 @@ public class MrgProjNode extends ProjNode {
       return mem;                // Kill MrgNode when it no longer lifts values
 
     // New is dead from below.
-    if( _live.at(nnn._alias)==TypeObj.UNUSED && nnn._keep==0 && !nnn.is_unused() && !is_prim() ) {
+    if( _live.at(nnn._alias)==TypeObj.UNUSED && !nnn.is_unused() && !is_prim() ) {
       nnn.kill2();      // Killing a NewNode has to do more updates than normal
       return this;
     }
 
     // If is of a MemJoin, and it can enter the split region, do so.
-    if( _keep==0 && mem instanceof MemJoinNode && mem._uses._len==1 ) {
+    if( mem instanceof MemJoinNode && mem._uses._len==1 ) {
       MrgProjNode mprj = new MrgProjNode(nnn,mem);
       MemJoinNode mjn = ((MemJoinNode)mem).add_alias_below_new(mprj,this);
-      Env.DEFMEM.set_def(nnn._alias,mprj);
-      return mjn;
+      //Env.DEFMEM.set_def(nnn._alias,mprj);
+      //return mjn;
+      throw unimpl();
     }
 
     return null;
@@ -57,7 +57,7 @@ public class MrgProjNode extends ProjNode {
     }
     return null;
   }
-  @Override public void add_work_def_extra(WorkNode work, Node chg) {
+  @Override public void add_flow_def_extra(Node chg) {
     for( Node use : _uses ) {          // Lost a use, could be a 2nd mem writer
       if( use instanceof MrgProjNode ) // Look for back-to-back MrgProj
         Env.GVN.add_grow(use);
@@ -71,7 +71,7 @@ public class MrgProjNode extends ProjNode {
         Env.GVN.add_grow(use); // Swap Call & New
     }
   }
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     if( !(in(0) instanceof NewNode) ) return mem()._val;
     NewNode nnn = nnn();
     Type tn = nnn._val;
@@ -88,7 +88,7 @@ public class MrgProjNode extends ProjNode {
   @Override BitsAlias escapees() { return in(0).escapees(); }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // Only called here if alive, and input is more-than-basic-alive
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+  @Override public TypeMem live_use(Node def ) {
     if( def==in(0) && in(0) instanceof NewNode && _live.at(nnn()._alias).above_center() )
       return TypeMem.DEAD;
     return _live;

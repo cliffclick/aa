@@ -1,9 +1,10 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeTuple;
 
 import static com.cliffc.aa.AA.*;
 
@@ -24,7 +25,7 @@ public class ProjNode extends Node {
     if( c != null ) return c==this ? Env.ANY : c; // Happens in dying loops
     return null;
   }
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     Type c = val(0);
     if( c instanceof TypeTuple ) {
       TypeTuple ct = (TypeTuple)c;
@@ -34,31 +35,31 @@ public class ProjNode extends Node {
     return c.oob();
   }
   // Only called here if alive, and input is more-than-basic-alive
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+  @Override public TypeMem live_use(Node def ) {
     return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM;
   }
 
   // Unify with the parent TVar sub-part
-  @Override public boolean unify( WorkNode work ) {
+  @Override public boolean unify( boolean test ) {
     if( _tvar==null ) return false;
     TV2 tv = tvar();
     if( in(0) instanceof NewNode ) // TODO: Not really a proper use of Proj
-      return tv.unify(tvar(0),work);
+      return tv.unify(tvar(0),test);
     if( in(0) instanceof CallEpiNode ) { // Only DProj#2 and it's the return value
       assert _idx==REZ_IDX;
-      return tv.unify(tvar(0),work);
+      return tv.unify(tvar(0),test);
     }
     if( in(0) instanceof CallNode ) {
       TV2 tv2 = in(0).tvar(_idx);
       if( _idx==DSP_IDX ) {     // Specifically for the function/display, only unify on the display part.
         if( tv2.is_fun() ) {    // Expecting the call input to be a function
           TV2 tdsp = tv2.get("2"); // Unify against the function display
-          return tdsp != null && tv.unify(tdsp, work);
+          return tdsp != null && tv.unify(tdsp,test);
         }
         else if( tv2.is_err() ) return false;
         else throw unimpl();
       }
-      return tv.unify(tv2,work); // Unify with Call arguments
+      return tv.unify(tv2,test); // Unify with Call arguments
     }
     throw unimpl();
   }

@@ -53,7 +53,7 @@ public class PhiNode extends Node {
 
     return null;
   }
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     if( in(0)==null ) return Type.ALL; // Conservative, mid-construction
     Type ctl = val(0);
     if( ctl != Type.CTRL ) return ctl.oob();
@@ -75,15 +75,15 @@ public class PhiNode extends Node {
     return _t instanceof TypeMem || _t instanceof TypeRPC ? null : super.new_tvar(alloc_site);
   }
   // All inputs unify
-  @Override public boolean unify( WorkNode work ) {
+  @Override public boolean unify( boolean test ) {
     if( !(in(0) instanceof RegionNode) ) return false; // Dying
     if( _tvar==null ) return false; // Memory not part of HM
     RegionNode r = (RegionNode) in(0);
     boolean progress = false;
     for( int i=1; i<_defs._len; i++ ) {
       if( r.val(i)!=Type.XCTRL && r.val(i)!=Type.ANY ) { // Only unify alive paths
-        progress |= tvar().unify(tvar(i), work);
-        if( progress && work==null ) return true; // Fast cutout
+        progress |= tvar().unify(tvar(i),test);
+        if( progress && test ) return true; // Fast cutout
       }
     }
     return progress;
@@ -91,9 +91,9 @@ public class PhiNode extends Node {
 
   @Override BitsAlias escapees() { return BitsAlias.FULL; }
   @Override public TypeMem all_live() {
-    return _t==Type.SCALAR || _t instanceof TypeFunPtr || _t instanceof TypeRPC ? TypeMem.LIVE_BOT : TypeMem.ALLMEM;
+    return _t==Type.SCALAR || _t instanceof TypeFunPtr || _t instanceof TypeRPC ? TypeMem.ALIVE : TypeMem.ALLMEM;
   }
-  @Override public TypeMem live_use(GVNGCM.Mode opt_mode, Node def ) {
+  @Override public TypeMem live_use(Node def ) {
     Node r = in(0);
     if( r==def ) return TypeMem.ALIVE;
     if( r!=null ) {

@@ -45,7 +45,6 @@ public class TypeRPC extends Type<TypeRPC> {
     case TFUNSIG:
     case TTUPLE:
     case TARY:
-    case TLIVE:
     case TOBJ:
     case TSTR:
     case TSTRUCT:

@@ -225,7 +225,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
     case TARY:
-    case TLIVE:
     case TOBJ:
     case TSTR:
     case TSTRUCT:

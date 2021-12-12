@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.ErrMsg;
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
@@ -14,16 +13,16 @@ public final class ErrNode extends Node {
   public ErrNode( Node ctrl, ErrMsg err ) {
     super(OP_ERR,ctrl);
     _err = err;
-    _live= TypeMem.LIVE_BOT;
+    _live= TypeMem.ALIVE;
   }
   @Override public String xstr() { return _err._msg; }
   @Override String str() { return "Err"; }
   @Override public Node ideal_reduce() {  Node cc = in(0).is_copy(0);  return cc==null ? null : set_def(0,cc); }
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     Type t = val(0);
     return t == Type.ANY || t == Type.XCTRL ? Type.ANY : Type.ALL; // For dead data errors return ANY (no error)
   }
-  @Override public TypeMem live_use( GVNGCM.Mode opt_mode, Node def ) { return TypeMem.ALIVE; }
+  @Override public TypeMem live_use( Node def ) { return TypeMem.ALIVE; }
   @Override public ErrMsg err( boolean fast ) {
     // While you might think we should ALWAYS report these, as their existence
     // means the program is in-error - the program may have other earlier

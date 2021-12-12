@@ -167,7 +167,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     case TRPC:   return cross_nil(t);
     case TFUNSIG:
     case TARY:
-    case TLIVE:
     case TOBJ:
     case TSTR:
     case TSTRUCT:
@@ -187,15 +186,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     return make(_aliases,_aliases.above_center() ? TypeObj.UNUSED : TypeObj.ISUSED);
   }
   @Override public boolean above_center() { return _aliases.above_center(); }
-  @Override public Type oop_deep_impl(Type t) {
-    if( !(t instanceof TypeMemPtr) ) return oob();
-    TypeMemPtr tmp = (TypeMemPtr)t;
-    // Deep bounds; keep the in-bounds _aliases but bound the _obj.
-    if( tmp._aliases.dual().isa(_aliases) && _aliases.isa(tmp._aliases) )
-      return _obj.oop_deep_impl(tmp._obj);
-    // Aliases OOB
-    return oob();
-  }
   // Aliases represent *classes* of pointers and are thus never constants.
   // nil is a constant.
   @Override public boolean may_be_con()   { return may_nil(); }

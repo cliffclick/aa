@@ -26,7 +26,7 @@ public class MemJoinNode extends Node {
   @Override public Node ideal_reduce() {
     MemSplitNode msp = msp();
     // If the split count is lower than 2, then the split serves no purpose
-    if( _defs._len == 2 && val(1).isa(_val) && _keep==0 ) {
+    if( _defs._len == 2 && val(1).isa(_val) ) {
       msp._is_copy=true;
       GVNGCM.retype_mem(null,msp(),in(1), false);
       for( Node use : msp()._uses ) GVN.add_reduce(use);
@@ -44,7 +44,7 @@ public class MemJoinNode extends Node {
 
     return null;
   }
-  @Override public void add_work_def_extra(WorkNode work, Node chg) {
+  @Override public void add_flow_def_extra(Node chg) {
     if( _uses._len==1 ) {
       Node u = _uses.at(0);
       if( u instanceof StoreNode ||
@@ -126,7 +126,7 @@ public class MemJoinNode extends Node {
     return this;
   }
 
-  @Override public Type value(GVNGCM.Mode opt_mode) {
+  @Override public Type value() {
     MemSplitNode msp = msp();
     if( msp==null ) return TypeMem.ANYMEM;
 
@@ -143,37 +143,34 @@ public class MemJoinNode extends Node {
     }
     if( !diff ) return mems[0]; // All memories the same
 
-    if( opt_mode._CG ) {
-      // During or after Combo, the memory types are complete.  Simply MEET.
-      Type t = Type.ANY;
-      for( TypeMem tmem : mems )
-        t = t.meet(tmem);
-      return t;
-    } else {
-      // Pre Call-Graph, we must rely on Env.DEFMEM.
-      // Walk all aliases and take from matching escape set in the Split.  Since
-      // nothing overlaps this is unambiguous.
-      Ary<BitsAlias> escs = msp()._escs;
-      TypeObj[] pubs = new TypeObj[Env.DEFMEM._defs._len];
-      for( int alias=1, i; alias<Env.DEFMEM._defs._len; alias++ ) {
-        if( escs.at(0).test_recur(alias) ) { // In some RHS set
-          for( i=1; i<_defs._len; i++ )
-            if( escs.at(i).test_recur(alias) )
-              break;
-        } else i=0;                     // In the base memory
-        if( alias == 1 || Env.DEFMEM.in(alias) != null ) // Check never-made aliases
-          pubs[alias] = mems[i].at(alias); // Merge alias
-      }
-      return TypeMem.make0(pubs);
-    }
+    //if( opt_mode._CG ) {
+    //  // During or after Combo, the memory types are complete.  Simply MEET.
+    //  Type t = Type.ANY;
+    //  for( TypeMem tmem : mems )
+    //    t = t.meet(tmem);
+    //  return t;
+    //} else {
+    //  // Pre Call-Graph, we must rely on Env.DEFMEM.
+    //  // Walk all aliases and take from matching escape set in the Split.  Since
+    //  // nothing overlaps this is unambiguous.
+    //  Ary<BitsAlias> escs = msp()._escs;
+    //  TypeObj[] pubs = new TypeObj[Env.DEFMEM._defs._len];
+    //  for( int alias=1, i; alias<Env.DEFMEM._defs._len; alias++ ) {
+    //    if( escs.at(0).test_recur(alias) ) { // In some RHS set
+    //      for( i=1; i<_defs._len; i++ )
+    //        if( escs.at(i).test_recur(alias) )
+    //          break;
+    //    } else i=0;                     // In the base memory
+    //    if( alias == 1 || Env.DEFMEM.in(alias) != null ) // Check never-made aliases
+    //      pubs[alias] = mems[i].at(alias); // Merge alias
+    //  }
+    //  return TypeMem.make0(pubs);
+    //}
+    throw unimpl();
   }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 
-  @Override public TypeMem live_use( GVNGCM.Mode opt_mode, Node def ) { return _live; }
-  @Override public TypeMem live( GVNGCM.Mode opt_mode ) {
-    if( _keep>0 ) return _live;
-    return super.live(opt_mode);
-  }
+  @Override public TypeMem live_use( Node def ) { return _live; }
 
   @Override public TV2 new_tvar(String alloc_site) { return null; }
 
@@ -227,18 +224,19 @@ public class MemJoinNode extends Node {
     base.insert(this);
     set_def(idx,base);
     // Move any accidental refs to DefMem back to base
-    int didx = Env.DEFMEM._defs.find(this);
-    if( didx != -1 ) Env.DEFMEM.set_def(didx,base);
-    GVN.revalive(mspj,head,base);
+    //int didx = Env.DEFMEM._defs.find(this);
+    //if( didx != -1 ) Env.DEFMEM.set_def(didx,base);
+    //GVN.revalive(mspj,head,base);
+    throw unimpl();
   }
 
   MemJoinNode add_alias_below_new(Node nnn, Node old ) {
     old.keep();                 // Called from inside old.ideal(), must keep alive until exit
-    add_alias_below(GVN.add_work_all(nnn),nnn.escapees(),nnn);
+    add_alias_below(GVN.add_work_new(nnn),nnn.escapees(),nnn);
     old.unkeep();               // Alive, but keep==0
     nnn.xval();  xval();        // Force update, since not locally monotonic
     GVN.add_flow_defs(this);
-    assert Env.START.more_work(Env.GVN._work_flow,true)==0;
+    assert Env.START.more_work(true)==0;
     return this;
   }
 

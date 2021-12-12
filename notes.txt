@@ -12,6 +12,9 @@ Upon the mode-flip to GCP - a bunch of things can LIFT.
   was just some primitive:
     - "x+y"
     - assumption is the unknown call "_+_(x,y)" side-effects "x".  At least until call resolution & inlining.
+- Making a (nested) fcn-call needs a state-of-memory as sharp as the parser already knows,
+  so the parser can do name-lookup.  Using e.g. an TypeMem.ALLMEM memory argument is very weak.
+  But maybe legit?  No (real) folding is possible until Combo.
 
 
 - Unresolved goes "high".  But probably need to leave them low?
@@ -20,8 +23,29 @@ Upon the mode-flip to GCP - a bunch of things can LIFT.
 - plus a full-arg choice selector.  Require all these choices to be unambiguious overloads,
 - resolvable to a single-target (or not resolved at-all if in error).
 - Better answer: Unresolved *demands* choices are unambiguous, and supports selecting the correct one.
+- Drop extra arg to value() calls, only used for Unresolved being high/low.
 
+- Operator lookup uses an op table to decide precedence, arity, arg placement.
+- Replaces "x op y" with "x._op_(y)" using the instanceof syntax calls
+  (so "x" is the Display) in the code impl.
+  
+- Struct type decls split into a static (final-field inline assigns) and dynamic part.
 
+- All calls of the form "x.final_field(args)" use "x" as the display inside the code for final_field.
+
+- Swap && || to the lazy-args model
+
+- Drop TypeLive
+
+- WorkNode + PriorityWork queues
+
+- Drop 'keep' for a Parser "tmp" to keep-alive, and allow any mutations as long
+  as i can keep a pointer to the replacement.
+- Simplify the Iter loop, dropping the 'x' keeper.
+- Add KeepNode
+- Scopes drop the internal keep(); hook onto the Env KEEP_ALIVE
+- New pattern: use GVN.init instead of GVN.xform when dealing with sets of Node setups
+- invariant: NOT { on_worklist, elocked, calling iter }
 
 
 =======================================
