@@ -11,6 +11,7 @@ import java.util.function.Supplier;
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 public class TestParse {
   private static final BitsFun TEST_FUNBITS = BitsFun.make0(43);
@@ -71,10 +72,11 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
+    test("1",   TypeInt.TRUE, "1");
     test("-1",  TypeInt.con(-1), "-1");
     test("-2",  TypeInt.con(-2), "-2");
     test("-3",  TypeInt.con(-3), "-3");
-    
+
     test("1",   TypeInt.TRUE, "1");
     // Unary operator
     test("-1",  TypeInt.con(-1), "-1");
@@ -908,6 +910,7 @@ HashTable = {@{
   // Run a program once, with a given seed and typing flags
   static private void _test0( String program, Supplier<Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect, int rseed ) {
     TypeEnv te = Exec.file("test",program,rseed,gcp_maker!=null,hmt_expect!=null);
+    assertNull(te._errs);
     if( gcp_maker != null ) {
       Type expect = gcp_maker.get();
       Type actual = te._tmem.sharptr(te._t);

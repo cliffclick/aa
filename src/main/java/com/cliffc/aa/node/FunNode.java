@@ -573,20 +573,19 @@ public class FunNode extends RegionNode {
       if( fidx < 0 || BitsFun.is_parent(fidx) ) continue;    // Call must only target one fcn
       if( self_recursive && body.find(call)!=-1 ) continue; // Self-recursive; amounts to unrolling
       int ncon=0;
-      //// Count constant inputs on non-error paths
-      //for( TypeFld arg : _sig._formals.flds() ) {
-      //  Node parm = parms[arg._order];
-      //  if( parm != null ) {    // Some can be dead
-      //    Type actual = parm.in(i).sharptr(mem.in(i));
-      //    Type formal = arg._t;
-      //    if( !actual.isa(formal) ) // Path is in-error?
-      //      { ncon = -2; break; }   // This path is in-error, cannot inline even if small & constants
-      //    if( actual.is_con() ) ncon++; // Count constants along each path
-      //  }
-      //}
-      //if( ncon > mncons )
-      //  { mncons = ncon; m = i; } // Path with the most constants
-      throw unimpl();
+      // Count constant inputs on non-error paths
+      for( int j=DSP_IDX; j<parms.length; j++ ) {
+        ParmNode parm = (ParmNode)parms[j];
+        if( parm != null ) {    // Some can be dead
+          Type actual = parm.in(i).sharptr(mem.in(i));
+          Type formal = parm._t;
+          if( !actual.isa(formal) ) // Path is in-error?
+            { ncon = -2; break; }   // This path is in-error, cannot inline even if small & constants
+          if( actual.is_con() ) ncon++; // Count constants along each path
+        }
+      }
+      if( ncon > mncons )
+        { mncons = ncon; m = i; } // Path with the most constants
     }
     if( m == -1 )               // No paths are not in-error? (All paths have an error-parm)
       return -1;                // No inline
@@ -600,10 +599,9 @@ public class FunNode extends RegionNode {
   private FunNode make_new_fun(RetNode ret, int path) {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
-    FunNode fun = new FunNode(_name, BitsFun.new_fidx(oldfidx),_op_prec);
+    FunNode fun = new FunNode(_name, BitsFun.new_fidx(oldfidx),_op_prec,_nargs);
     fun._bal_close = _bal_close;
     fun.pop();                  // Remove null added by RegionNode, will be added later
-    fun.unkeep();               // Ret will clone and not construct
 
     // If type-splitting renumber the original as well; the original _fidx is
     // now a *class* of 2 fidxs.  Each FunNode fidx is only ever a constant, so
@@ -694,7 +692,7 @@ public class FunNode extends RegionNode {
     }
 
     // Keep around the old body, even as the FunPtrs get shuffled from Call to Call
-    for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) use.keep();
+    for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) use.push();
 
     // Collect the old/new returns and funptrs and add to map also.  The old
     // Ret has a set (not 1!) of FunPtrs, one per unique Display.
@@ -759,24 +757,22 @@ public class FunNode extends RegionNode {
     }
 
     // Put all new nodes into the GVN tables and worklist
-    boolean split_alias=false;
+    //boolean split_alias=false;
     for( Map.Entry<Node,Node> e : map.entrySet() ) {
       Node oo = e.getKey();     // Old node
       Node nn = e.getValue();   // New node
       Type nt = oo._val;        // Generally just copy type from original nodes
-      if( nn instanceof MrgProjNode ) { // Cloned allocations registers with default memory
-        MrgProjNode nnrg = (MrgProjNode)nn;
-        MrgProjNode oorg = (MrgProjNode)oo;
-        //Env.DEFMEM.make_mem(nnrg.nnn()._alias,nnrg);
-        //Env.DEFMEM.make_mem(oorg.nnn()._alias,oorg);
-        //int oldalias = BitsAlias.parent(oorg.nnn()._alias);
-        //Env.DEFMEM.set_def(oldalias,Env.XUSE); // Old alias is dead
-        //Env.GVN.add_mono(oorg.nnn());
-        //Env.GVN.add_flow_uses(oorg);
-        //split_alias=true;
-        throw unimpl();
-      }
-
+      //if( nn instanceof MrgProjNode ) { // Cloned allocations registers with default memory
+      //  MrgProjNode nnrg = (MrgProjNode)nn;
+      //  MrgProjNode oorg = (MrgProjNode)oo;
+      //  //Env.DEFMEM.make_mem(nnrg.nnn()._alias,nnrg);
+      //  //Env.DEFMEM.make_mem(oorg.nnn()._alias,oorg);
+      //  //int oldalias = BitsAlias.parent(oorg.nnn()._alias);
+      //  //Env.DEFMEM.set_def(oldalias,Env.XUSE); // Old alias is dead
+      //  //Env.GVN.add_mono(oorg.nnn());
+      //  //Env.GVN.add_flow_uses(oorg);
+      //  //split_alias=true;
+      //}
       if( nn instanceof FunPtrNode ) { // FunPtrs pick up the new fidx
         TypeFunPtr ofptr = (TypeFunPtr)nt;
         if( ofptr.fidx()==oldret._fidx )
@@ -785,19 +781,19 @@ public class FunNode extends RegionNode {
       nn._val = nt;             // Values
       nn._elock();              // In GVN table
     }
-    if( split_alias ) {
-      //Env.DEFMEM.xval();
-      throw unimpl();
-    }
+    //if( split_alias ) {
+    //  //Env.DEFMEM.xval();
+    //  throw unimpl();
+    //}
 
-    // Eagerly lift any Unresolved types, so they quit propagating the parent
-    // (and both children) to all targets.
-    for( Node fptr : oldret._uses )
-      if( fptr instanceof FunPtrNode )
-        for( Node unr : fptr._uses )
-          if( unr instanceof UnresolvedNode )
-            //unr._val = unr.value();
-            throw unimpl(); // Call xval?  But actually drop Unresolved?
+    //// Eagerly lift any Unresolved types, so they quit propagating the parent
+    //// (and both children) to all targets.
+    //for( Node fptr : oldret._uses )
+    //  if( fptr instanceof FunPtrNode )
+    //    for( Node unr : fptr._uses )
+    //      if( unr instanceof UnresolvedNode )
+    //        //unr._val = unr.value();
+    //        throw unimpl(); // Call xval?  But actually drop Unresolved?
 
     // Rewire all unwired calls.
     for( CallEpiNode cepi : unwireds ) {
@@ -857,7 +853,7 @@ public class FunNode extends RegionNode {
     GVNGCM.retype_mem(aliases,fun .parm(MEM_IDX), newret, true);
 
     // Unhook the hooked FunPtrs
-    for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) use.unhook();
+    for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) GVNGCM.pop(GVNGCM.KEEP_ALIVE._defs._len);
   }
 
   // Compute value from inputs.  Simple meet over inputs.

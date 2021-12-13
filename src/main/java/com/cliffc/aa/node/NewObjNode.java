@@ -26,14 +26,14 @@ public class NewObjNode extends NewNode<TypeStruct> {
   // closures so variable stores can more easily fold into them.
   public NewObjNode( boolean is_closure, TypeStruct disp, Node clo ) {
     super(OP_NEWOBJ,BitsAlias.REC,disp);
-    assert disp.get("^").is_display_ptr();
+    assert disp.get("^")!=null;
     _is_closure = is_closure;
     add_def(clo);
   }
   // Called by IntrinsicNode.convertTypeNameStruct
   public NewObjNode( boolean is_closure, int alias, TypeStruct ts, Node clo ) {
     super(OP_NEWOBJ,alias,ts,clo);
-    assert ts.get("^").is_display_ptr();
+    assert ts.get("^")!=null;
     _is_closure = is_closure;
   }
   public Node get(String name) { return in(_ts.get(name)._order); }
@@ -215,7 +215,4 @@ public class NewObjNode extends NewNode<TypeStruct> {
     rec.push_dep(this);
     return progress;
   }
-
-  // True if loading from a display/closure
-  @Override public boolean is_display_ptr() { return _is_closure; }
 }

@@ -135,7 +135,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     return this;
   }
 
-  private boolean check_vals( ) {
+  public boolean check_vals( ) {
     Node x = VALS.get(this), old=null;
     if( x == this ) old=this;   // Found in table quickly
     // Hunt the hard way
@@ -749,19 +749,19 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( AA.DO_GCP ) {
       _val = Type.ANY;          // Highest value
       _live = TypeMem.DEAD;     // Not alive
+      if( this instanceof CallNode ) (( CallNode)this)._not_resolved_by_gcp = false; // Try again
     } else {                    // Not doing optimistic GCP...
       assert _val==value() && _live==live();
     }
-    if( AA.DO_HMT )
+    if( AA.DO_HMT ) {
       _tvar = new_tvar("Combo");
+      if( this instanceof FreshNode) ((FreshNode)this).id().tvar().push_dep(this);
+      if( this instanceof ProjNode && ((ProjNode)this)._idx==DSP_IDX && in(0) instanceof CallNode )
+        ((CallNode)in(0)).fdx().tvar().push_dep(this);
+    }
     // Walk reachable graph
     for( Node use : _uses )                   use.walk_initype();
     for( Node def : _defs ) if( def != null ) def.walk_initype();
-    if( this instanceof CallNode ) (( CallNode)this)._not_resolved_by_gcp = false; // Try again
-    if( this instanceof FreshNode) ((FreshNode)this).id().tvar().push_dep(this);
-    if( this instanceof LoadNode ) (( LoadNode)this)._hm_lift = true;
-    if( this instanceof ProjNode && ((ProjNode)this)._idx==DSP_IDX && in(0) instanceof CallNode )
-      ((CallNode)in(0)).fdx().tvar().push_dep(this);
   }
 
   // Reset
@@ -905,10 +905,6 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Only true for Unresolved
   public boolean is_forward_ref() { return false; }
 
-  // True if this Call/CallEpi pair does not read or write memory.
-  // True for most primitives.  Returns the pre-call memory or null.
-  Node is_pure_call() { return null; }
-
   // True if normally (not in-error) produces a TypeMem value or a TypeTuple
   // with a TypeMem at(MEM_IDX).
   public boolean is_mem() { return false; }
@@ -925,9 +921,6 @@ public abstract class Node implements Cloneable, IntSupplier {
       else if( use.is_mem() ) return false; // Found a 2nd mem-writer
     return found;
   }
-
-  // Is a display pointer vs a struct pointer
-  public boolean is_display_ptr() { throw unimpl(); }
 
   // Shortcut
   public Type sharptr( Node mem ) { return mem._val.sharptr(_val); }

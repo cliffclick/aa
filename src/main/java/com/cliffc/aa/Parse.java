@@ -849,7 +849,7 @@ public class Parse implements Comparable<Parse> {
     // against.  This does a HM.Ident lookup, producing a FRESH tvar every time.
     Node ptr = get_display_ptr(scope);
     Node ld = gvn(new LoadNode(mem(),ptr,tok.intern(),null));
-    return ptr.is_display_ptr() || ld.is_forward_ref()
+    return /*ptr.is_display_ptr() ||*/ ld.is_forward_ref()
       ? ld                              // Inside a def, no fresh
       : gvn(new FreshNode(_e._fun,ld)); // After a field is defined, yes fresh
   }
@@ -1004,13 +1004,13 @@ public class Parse implements Comparable<Parse> {
       // to the function for faster access.
       Node xrpc = Node.pop(rpc_idx);
       Node xfun = Node.pop(fun_idx); assert xfun == fun;
-      RetNode ret = init(new RetNode(ctrl(),mem(),rez,xrpc,fun));
+      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
+      // Hook function at the TOP scope, because it may yet have unwired
+      // CallEpis which demand memory.  This hook is removed as part of doing
+      // the Combo pass which computes a real Call Graph and all escapes.
+      Env.TOP._scope.add_def(ret);
       // The FunPtr builds a real display; any up-scope references are passed in now.
       Node fptr = gvn(new FunPtrNode(null,ret,dcon));
-      // Hook function at the TOP scope, in case it escapes all current
-      // enclosing scopes.  This hook is removed as part of doing the Combo
-      // pass which computes a real Call Graph and all escapes.
-      Env.TOP._scope.add_def(ret);
 
       _e = e._par;            // Pop nested environment; pops nongen also
       fidx = fptr.push();     // Return function; close-out and DCE 'e'
@@ -1459,7 +1459,6 @@ public class Parse implements Comparable<Parse> {
     while( true ) {
       if( scope == e._scope ) return ptr;
       ptr = gvn(new LoadNode(mmem,ptr,"^",null)); // Gen linked-list walk code, walking display slot
-      assert ptr.sharptr(mmem).is_display_ptr();
       e = e._par;                                 // Walk linked-list in parser also
     }
   }

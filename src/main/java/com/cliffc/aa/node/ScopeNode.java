@@ -70,7 +70,7 @@ public class ScopeNode extends Node {
   public    PhiNode early_mem () { return (   PhiNode)in(5); }
   public    PhiNode early_val () { return (   PhiNode)in(6); }
   public void       early_kill() { set_def(4,null); set_def(5,null); set_def(6,null); }
-  static final int RET_IDX = 7;
+  public static final int RET_IDX = 7;
 
   // Name to type lookup, or null
   public ConTypeNode get_type(String name) { return _types.get(name);  }
@@ -208,7 +208,8 @@ public class ScopeNode extends Node {
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.
     if( def == mem() ) return _uses._len>0 && _uses.at(0)==Env.KEEP_ALIVE ? TypeMem.ALLMEM : _live;
-    // Top-level function pointer escape
+    // Any function which may yet have unwired CallEpis, and so needs full
+    // memory alive until all Calls are wired.
     if( def instanceof RetNode ) return _live;
     // Merging exit path, or ConType
     return def._live;
@@ -221,18 +222,17 @@ public class ScopeNode extends Node {
     if( _val.above_center() ) return BitsFun.EMPTY;
     if( is_prim() ) return BitsFun.FULL; // All the primitives escape
     //if( !Env.GVN._opt_mode._CG ) return BitsFun.FULL; // Not run Opto yet
-    //Type trez = rez()._val;
-    //Type tmem = mem()._val;
-    //if( _escache_trez == trez &&  _escache_tmem == tmem ) return _escache_escs; // Cache hit
-    //// Cache miss, compute the hard way
-    //if( TypeFunPtr.GENERIC_FUNPTR.isa(trez) ) return BitsFun.FULL; // Can lift to any function
-    //tmem = tmem instanceof TypeMem ? (TypeMem)tmem : tmem.oob(TypeMem.ALLMEM);
-    //BitsFun fidxs = trez.all_reaching_fidxs((TypeMem)tmem);
-    //_escache_trez = trez;
-    //_escache_tmem = tmem;
-    //_escache_escs = fidxs;
-    //return fidxs;
-    throw unimpl();
+    Type trez = rez()._val;
+    Type tmem = mem()._val;
+    if( _escache_trez == trez &&  _escache_tmem == tmem ) return _escache_escs; // Cache hit
+    // Cache miss, compute the hard way
+    if( TypeFunPtr.GENERIC_FUNPTR.isa(trez) ) return BitsFun.FULL; // Can lift to any function
+    tmem = tmem instanceof TypeMem ? (TypeMem)tmem : tmem.oob(TypeMem.ALLMEM);
+    BitsFun fidxs = trez.all_reaching_fidxs((TypeMem)tmem);
+    _escache_trez = trez;
+    _escache_tmem = tmem;
+    _escache_escs = fidxs;
+    return fidxs;
   }
 
   // GCP discovers functions which escape at the top-most level, and wires the

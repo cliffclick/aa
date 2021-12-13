@@ -7,9 +7,7 @@ import com.cliffc.aa.util.VBitSet;
 
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
+import java.util.*;
 
 import static com.cliffc.aa.AA.DSP_IDX;
 import static com.cliffc.aa.AA.unimpl;
@@ -109,11 +107,13 @@ public class Env implements AutoCloseable {
   final public Env _par;         // Parent environment
   public final ScopeNode _scope; // Lexical anchor; "end of display"; goes when this environment leaves scope
   public final FunNode _fun;     // Matching FunNode for this lexical environment
+  private final HashMap<String,Oper> _opers; // Lexically scoped operators
 
   // Shared Env constructor.
   private Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr ) {
     _par = par;
     _fun = fun;
+    _opers = new HashMap<>();
     TypeStruct ts = TypeStruct.make("",false,true,TypeFld.make("^",dsp_ptr._val, DSP_IDX));
     NewObjNode nnn = GVN.init(new NewObjNode(is_closure,ts,dsp_ptr));
     Node frm = GVN.init(new MrgProjNode(nnn,mem));
@@ -176,9 +176,12 @@ public class Env implements AutoCloseable {
     // Promote forward refs to the next outer scope
     NewObjNode stk = _scope.stk();
     ScopeNode pscope = _par._scope;
-    if( pscope != null )
+    if( pscope != null ) {
       stk.promote_forward(pscope.stk());
-
+      if( !_opers.isEmpty() )
+        throw unimpl();         // Promote operators
+    }
+    
     Node ptr = _scope.ptr();
     stk.no_more_fields();
     GVN.add_flow(stk);          // Scope object going dead, trigger following projs to cleanup
@@ -200,9 +203,10 @@ public class Env implements AutoCloseable {
   static void pre_combo() {
     // Remove any Env.TOP hooks to function pointers, only kept alive until we
     // can compute a real Call Graph.
-    Node n;
-    while( (n=SCP_0._defs.last())!=null && !n.is_prim() )
-      SCP_0.pop();
+    for( int i=ScopeNode.RET_IDX; i<SCP_0.len(); i++ )
+      if( SCP_0.in(i) instanceof RetNode && !SCP_0.in(i).is_prim() )
+        SCP_0.remove(i--);
+    Env.GVN.flow_clear();       // Will be used as a worklist
 //// Replace the default memory into unknown caller functions, with the
 //// matching display.
 //for( Node use : DEFMEM._uses ) {
@@ -223,7 +227,6 @@ public class Env implements AutoCloseable {
 //while( DEFMEM.len() > DEFMEM_RESET.length ) DEFMEM.pop();
 //for( int i=0; i<DEFMEM_RESET.length; i++ )
 //  DEFMEM.set_def(i,DEFMEM_RESET[i]);
-    throw unimpl();
   }
 
   // Record global static state for reset
@@ -287,47 +290,52 @@ public class Env implements AutoCloseable {
   }
 
   // Lookup the operator name.  Use the longest name that's found, so that long
-  // strings of operator characters are naturally broken by (greedy) strings.
+  // strings of operator characters are naturally broken by (greedy) strings.  
+  private Oper _lookup_oper(String tok) {
+    Oper o = _opers.get(tok);
+    return o==null ? (_par==null ? null : _par._lookup_oper(tok)) : o;
+  }
+ 
+  private UnresolvedNode _lookup_filter( int op_prec_test, String name, int nargs ) {
+    for( int i=name.length(); i>0; i-- ) { // First name found will return
+      // Prepare the name from the token
+      String name2 = name.substring(0,i)+"_";
+      Oper o = _lookup_oper(name2.intern());
+      if( o != null && o.op_prec() >= op_prec_test ) {
+        // TODO: Return a field load, so not a Unresolved?
+        // TODO: Return a string field name, and caller does the Load + Instance-Call
+      //  UnOrFunPtrNode m = n.filter(nargs); // Filter for args
+      //  if( m!=null )
+      //    return (UnOrFunPtrNode)Env.GVN.xform(new FreshNode(_fun,m));
+        throw unimpl();
+      }
+    }
+    return null;
+  }
+
+
 
   // Prefix uniop lookup.  The '_' follows the uniop name.
   // Note that "!_var" parses as "! _var" and not as "!_ var".
-  // Also "[_]" is a balanced uni-op.
-  Node lookup_filter_uni( String name ) {
+  // Also "[_]" is a balanced uni-op, and parses with the balanced ops.
+  UnresolvedNode lookup_filter_uni( String name ) {
     if( !Parse.isOp(name) ) return null; // Limit to operators
-    //UnOrFunPtrNode n = _lookup_filter(1,    name,1);     // Lookup unbalanced uni-op
-    //return  n==null ?  _lookup_filter(0," "+name,1) : n; // Try again for a balanced uni-op
-    throw unimpl();
+    return _lookup_filter(0,name,1);     // Lookup unbalanced uni-op
   }
 
   // Infix binop lookup
   // _+_       - Normal binop, looks up "_+_"
-  Node lookup_filter_bin( String name ) {
+  UnresolvedNode lookup_filter_bin( String name ) {
     if( !Parse.isOp(name) ) return null; // Limit to operators
     return _lookup_filter(1,"_"+name,2);
   }
   // Infix balanced operators, including 3 argument
   // _[_]      - array-lookup     balanced op, looks up " _[_"
   // _[_]=_    - array-assignment balanced op, looks up " _[_"
-  Node lookup_filter_bal( String name ) {
+  UnresolvedNode lookup_filter_bal( String name ) {
     if( !Parse.isOp(name) ) return null; // Limit to operators
     return _lookup_filter(0," _"+name,2);
   }
-
-  private Node _lookup_filter( int op_prec_test, String name, int nargs ) {
-    for( int i=name.length(); i>0; i-- ) { // First name found will return
-      // Prepare the name from the token
-      String name2 = name.substring(0,i)+"_";
-      //Node n = lookup(name2.intern());
-      //if( n != null && n.op_prec() >= op_prec_test ) {
-      //  UnOrFunPtrNode m = n.filter(nargs); // Filter for args
-      //  if( m!=null )
-      //    return (UnOrFunPtrNode)Env.GVN.xform(new FreshNode(_fun,m));
-      //}
-      throw unimpl();
-    }
-    return null;
-  }
-
 
   // Type lookup in any scope
   ConTypeNode lookup_type( String name ) {

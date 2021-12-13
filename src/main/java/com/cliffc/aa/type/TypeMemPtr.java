@@ -102,7 +102,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     DISPLAY.set_fld(DISP_FLD);                                     // Change field without changing hash
     TypeStruct.RECURSIVE_MEET--;
     TypeStruct ds = DISPLAY.install();
-    assert ds==DISPLAY && DISPLAY.is_display();
+    assert ds==DISPLAY;
   }
 
   public  static final TypeMemPtr ISUSED0= make(BitsAlias.FULL    ,TypeObj.ISUSED); // Includes nil
@@ -128,20 +128,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
                                                             TypeFld.make("val",Type.SCALAR      ,ARG_IDX+2));
 
   static final Type[] TYPES = new Type[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,EMTPTR,DISPLAY,DISPLAY_PTR,OOP_OOP,LVAL_LEN,LVAL_RD,LVAL_WR};
-
-  @Override public boolean is_display_ptr() {
-    BitsAlias x = _aliases.strip_nil();
-    if( x==BitsAlias.EMPTY ) return true; // Just a NIL
-    int alias1 = x.abit();                 // Just a single alias
-    // The GENERIC function allows the generic record, otherwise must be on the display list
-    if( alias1 != -1 )
-      return Math.abs(alias1)==BitsAlias.REC || com.cliffc.aa.Env.ALL_DISPLAYS.test_recur(Math.abs(alias1));
-    // If closures are being used, can be multiple valid displays
-    for( int alias : _aliases )
-      if( alias != 0 && !com.cliffc.aa.Env.ALL_DISPLAYS.test_recur(alias) )
-        return false;           // This alias is not on the DISPLAYS list
-    return true;
-  }
 
   @Override protected TypeMemPtr xdual() {
     BitsAlias ad = _aliases.dual();

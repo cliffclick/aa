@@ -28,19 +28,17 @@ public class RegionNode extends Node {
     // Node, and return-for-progress.
     for( int i=1; i<_defs._len; i++ )
       if( val(i)==Type.XCTRL ) {
-        assert !is_prim();
         assert in(i)!=Env.ALL_CTRL;
-    //    for( Node phi : _uses )
-    //      if( phi instanceof PhiNode )
-    //        Env.GVN.add_flow(phi.remove(i));
-    //    unwire(i);
-    //    remove(i);
+        for( Node phi : _uses )
+          if( phi instanceof PhiNode )
+            Env.GVN.add_flow(phi.remove(i));
+        unwire(i);
+        remove(i);
     //    if( this instanceof FunNode && _defs._len==2 && in(1).in(0) instanceof CallNode ) {
     //      Node cepi = ((CallNode)in(1).in(0)).cepi();
     //      if( cepi!=null ) Env.GVN.add_reduce(cepi);
     //    }
-    //    return this; // Progress
-        throw unimpl();
+        return this; // Progress
       }
 
     if( _defs._len == 1 ) return null; // No live inputs; dead in value() call

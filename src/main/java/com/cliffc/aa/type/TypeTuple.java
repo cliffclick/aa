@@ -75,7 +75,7 @@ public class TypeTuple extends Type<TypeTuple> {
     throw unimpl();
   }
   public static TypeTuple make_args(Type[] ts) {
-    assert ts[MEM_IDX] instanceof TypeMem && ts[DSP_IDX].is_display_ptr();
+    assert ts[MEM_IDX] instanceof TypeMem;
     return make(ts);
   }
 

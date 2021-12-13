@@ -111,7 +111,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
 
   // Make, without approximation, but test invariant holds
   public static TypeFunPtr make( BitsFun fidxs, int nargs, Type dsp, Type ret ) {
-    assert dsp.is_display_ptr(); // Simple display ptr.  Just the alias.
     assert check(fidxs,ret);
     return malloc(fidxs,nargs,dsp,ret).hashcons_free();
   }
@@ -328,8 +327,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     //return _dsp.repeats_in_cycles(head,bs);
     throw unimpl();
   }
-
-  @Override public boolean is_display_ptr() { return _dsp.is_display_ptr(); }
 
   // All reaching fidxs, including any function returns
   @Override BitsFun _all_reaching_fidxs( TypeMem tmem) {

@@ -1,10 +1,10 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFunPtr;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -13,7 +13,7 @@ import static com.cliffc.aa.AA.unimpl;
  *  the argument space), and so once a calls arguments are sufficiently
  *  resolved only a single FunPtr ever applies.
  *
- *  
+ *
  */
 public class UnresolvedNode extends Node {
   private final String _name;   // Name of unresolved function
@@ -39,7 +39,7 @@ public class UnresolvedNode extends Node {
     // Defined with only 1, nuke it
     return is_defined() && _defs._len == 1 ? in(0) : null;
   }
-  
+
   @Override public Type value() {
     if( is_forward_ref() ) return Type.ALL;
     Type t = Type.ANY;
@@ -47,6 +47,20 @@ public class UnresolvedNode extends Node {
       t = t.meet(fptr._val);
     return t;
   }
+
+  // Look at the arguments and resolve the call, if possible.
+  FunPtrNode resolve_value( Type[] tcall) {
+    FunPtrNode x=null;
+    for( Node n : _defs ) {
+      FunPtrNode ptr = (FunPtrNode)n;
+      if( ptr.nargs()==tcall.length-1 ) {
+        assert x==null;         // Exactly zero or one fptr resolves
+        x=ptr;
+      }
+    }
+    return x;
+  }
+
 
   // An UnresolvedNode is its own Leaf, because it might gather fairly unrelated
   // functions - such as integer-add vs string-add, or the 1-argument leading
@@ -86,19 +100,6 @@ public class UnresolvedNode extends Node {
     return null;
   }
 
-  // Return a funptr for this fidx.
-  FunPtrNode find_fidx( int fidx ) {
-    for( Node n : _defs )
-      if( ((FunPtrNode)n).ret()._fidx==fidx )
-        return (FunPtrNode)n;
-    return null;
-  }
-
-  // Same NARGS across all defs
-  //public int nargs() { return funptr().nargs(); }
-  //public FunPtrNode funptr() { return (FunPtrNode)_defs.at(0); }
-  //public UnresolvedNode unk() { return this; }
-
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.  Should be the same across all defs.
   @Override public byte op_prec() { return _defs.at(0).op_prec(); }
@@ -111,15 +112,6 @@ public class UnresolvedNode extends Node {
   public UnresolvedNode copy(Parse bad) {
     //return new UnresolvedNode(bad,Arrays.copyOf(_defs._es,_defs._len));
     throw unimpl();
-  }
-
-  // Choice of typically primitives, all of which are pure.
-  // Instead of returning the pre-call memory on true, returns self.
-  @Override Node is_pure_call() {
-    for( Node fun : _defs )
-      if( fun.is_pure_call() == null )
-        return null;
-    return this;                // Yes, all choices are pure
   }
 
   // Assigning the forward-ref removes the error

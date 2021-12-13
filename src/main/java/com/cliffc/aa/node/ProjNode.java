@@ -71,11 +71,6 @@ public class ProjNode extends Node {
     return null;
   }
 
-  @Override public boolean is_display_ptr() {
-    if( in(0) instanceof NewObjNode ) return in(0).is_display_ptr();
-    throw unimpl();
-  }
-
   void set_idx( int idx ) { unelock(); _idx=idx; } // Unlock before changing hash
   @Override public int hashCode() { return super.hashCode()+_idx; }
   @Override public boolean equals(Object o) {

@@ -135,7 +135,7 @@ public final class CallEpiNode extends Node {
     // Check that function return memory and post-call memory are compatible
     if( !(_val instanceof TypeTuple) ) return null;
     Type selfmem = ((TypeTuple) _val).at(MEM_IDX);
-    if( !rmem._val.isa( selfmem ) /*&& call.is_pure_call()==null*/ )
+    if( !rmem._val.isa( selfmem ) )
       return null;
 
     // Check for zero-op body (id function)
@@ -203,8 +203,8 @@ public final class CallEpiNode extends Node {
     wire0(call,fun,is_combo);
     // Wire self to the return
     add_def(ret);
-    Env.GVN.add_flow(this);
-    Env.GVN.add_flow(call);
+    GVN.add_flow(this);
+    GVN.add_flow(call);
     call.add_flow_defs();
   }
 
@@ -225,7 +225,7 @@ public final class CallEpiNode extends Node {
       ? Env.ALL  // Missing args, still wire (to keep FunNode neighbors) but will error out later.
       : new ProjNode(call, idx); // Normal args
       };
-      actual = is_combo ? actual.init1() : Env.GVN.xform(actual);
+      actual = is_combo ? actual.init1() : Env.GVN.init(actual);
       arg.add_def(actual);
       if( arg._val.is_con() ) // Added an edge, value may change or go in-error
         arg.add_flow_defs();  // So use-liveness changes
@@ -233,7 +233,7 @@ public final class CallEpiNode extends Node {
 
     // Add matching control to function via a CallGraph edge.
     Node cep = new CEProjNode(call);
-    cep  = is_combo ? cep.init1() : Env.GVN.xform(cep);
+    cep  = is_combo ? cep.init1() : Env.GVN.init(cep);
     fun.add_def(GVN.add_flow(cep));
     GVN.add_flow(fun);
     for( Node use : fun._uses ) GVN.add_flow(use);
@@ -521,7 +521,6 @@ public final class CallEpiNode extends Node {
     Env.GVN.add_flow(this);
   }
 
-  @Override Node is_pure_call() { return in(0) instanceof CallNode ? call().is_pure_call() : null; }
   // Return the set of updatable memory - including everything reachable from
   // every call argument (including the display), and any calls reachable from
   // there, transitively through memory.

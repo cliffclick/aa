@@ -45,42 +45,42 @@ public abstract class PrimNode extends Node {
   // TODO: Just build precedence table for ops; need a lookup that includes prec order, nargs, placement
   public static PrimNode[] PRIMS() {
     if( PRIMS!=null ) return PRIMS;
-    
+
     // Binary-operator primitives, sorted by precedence.
     PRECEDENCE = new PrimNode[][]{
-    
+
       {new MulF64(), new DivF64(), new MulI64(), new DivI64(), new ModI64(), },
-    
+
       {new AddF64(), new SubF64(), new AddI64(), new SubI64() },
-    
+
       {new LT_F64(), new LE_F64(), new GT_F64(), new GE_F64(),
        new LT_I64(), new LE_I64(), new GT_I64(), new GE_I64(),},
-    
+
       {new EQ_F64(), new NE_F64(), new EQ_I64(), new NE_I64(), new EQ_OOP(), new NE_OOP(), },
-    
+
       {new AndI64(), },
-    
+
       {new OrI64(), },
-    
+
       {new AndThen(), },
-    
+
       {new OrElse(), },
-    
+
     };
-    
+
     // Other primitives, not binary operators
     PrimNode[] others = new PrimNode[] {
       // These are called like a function, so do not have a precedence
       new RandI64(),
-    
+
       new ConvertInt64F64(),
-    
+
       // These are balanced-ops, called by Parse.term()
       new MemPrimNode.ReadPrimNode.LValueRead  (), // Read  an L-Value: (ary,idx) ==> elem
       new MemPrimNode.ReadPrimNode.LValueWrite (), // Write an L-Value: (ary,idx,elem) ==> elem
       new MemPrimNode.ReadPrimNode.LValueWriteFinal(), // Final Write an L-Value: (ary,idx,elem) ==> elem
     };
-    
+
     // These are unary ops, precedence determined outside 'Parse.expr'
     PrimNode[] uniops = new PrimNode[] {
       new MemPrimNode.ReadPrimNode.LValueLength(), // The other array ops are "balanced ops" and use term() for precedence
@@ -88,14 +88,14 @@ public abstract class PrimNode extends Node {
       new MinusI64(),
       new Not(),
     };
-    
+
     Ary<PrimNode> allprims = new Ary<>(others);
     for( PrimNode prim : uniops ) allprims.push(prim);
     for( PrimNode[] prims : PRECEDENCE )
       for( PrimNode prim : prims )
         allprims.push(prim);
     PRIMS = allprims.asAry();
-    
+
     // Compute precedence from table
     int max_prec = PRECEDENCE.length;
     for( int p=0; p<PRECEDENCE.length; p++ )
@@ -103,7 +103,7 @@ public abstract class PrimNode extends Node {
         n._op_prec = (byte)(max_prec-p);
     // Not used to determine precedence, just a uniop flag
     for( PrimNode prim : uniops ) prim._op_prec = (byte)max_prec;
-    
+
     // Compute greedy primitive names, without regard to precedence.
     // Example from Java: >,>=,>>,>>=,>>>,>>>= are all valid tokens.
     HashSet<String> hash = new HashSet<>(); // Remove dups
@@ -114,7 +114,7 @@ public abstract class PrimNode extends Node {
     Collections.sort(list);     // Longer strings on the right
     Collections.reverse(list);  // Longer strings on the left, match first.
     PRIM_TOKS = list.toArray(new String[0]);
-    
+
     // Compute precedence token groupings for parser
     PREC_TOKS = new String[max_prec+1][];
     for( int p=0; p<max_prec; p++ ) {
@@ -122,7 +122,7 @@ public abstract class PrimNode extends Node {
       for( int i=0; i<toks.length; i++ )
         toks[i] = PRECEDENCE[max_prec-1-p][i]._name;
     }
-    
+
     return PRIMS;
   }
 
@@ -238,7 +238,11 @@ public abstract class PrimNode extends Node {
     // Functions return the set of *modified* memory.  Most PrimNodes never
     // *modify* memory (see Intrinsic*Node for some primitives that *modify*
     // memory).  Thunking (short circuit) prims return both memory and a value.
-    RetNode ret = Env.GVN.init(new RetNode(ctl,mem,rez,rpc,fun));
+    RetNode ret = (RetNode)Env.GVN.xform(new RetNode(ctl,mem,rez,rpc,fun));
+    // Hook function at the TOP scope, because it may yet have unwired
+    // CallEpis which demand memory.  This hook is removed as part of doing
+    // the Combo pass which computes a real Call Graph and all escapes.
+    Env.TOP._scope.add_def(ret);
     // No closures are added to primitives
     FunPtrNode fptr = (FunPtrNode)Env.GVN.xform(new FunPtrNode(_name,ret));
     return fptr;

@@ -194,8 +194,8 @@ public class CallNode extends Node {
           pop(); // Pop off the NewNode tuple
           for( int i=ARG_IDX; i<nnn._defs._len; i++ ) // Push the args; unpacks the tuple
             add_def(nnn.in(i));
-          _unpacked = true;      // Only do it once
-          xval();         // Recompute value, this is not monotonic since replacing tuple with args
+          _unpacked = true;     // Only do it once
+          xval(); // Recompute value, this is not monotonic since replacing tuple with args
           GVN.add_work_new(this);// Revisit after unpacking
           return this;
         }
@@ -226,46 +226,10 @@ public class CallNode extends Node {
     if( fidxs==BitsFun.EMPTY ) // TODO: zap function to empty function constant
       return null;             // Zero choices
 
-
-    // If the function is unresolved, see if we can resolve it now.
-    // Fidxs are typically low during iter, but can be high during
-    // iter post-GCP on error calls where nothing resolves.
-    Node fdx = fdx();           // Function epilog/function pointer
-    int fidx = fidxs.abit();    // Check for single target
-    //if( fidx == -1 && !fidxs.above_center() && !fidxs.test(1)) {
-    //  FunPtrNode fptr = least_cost(fidxs, fdx); // Check for least-cost target
-    //  if( fptr != null ) {
-    //    if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
-    //    set_fdx(fptr);          // Resolve to 1 choice
-    //    xval();                 // Force value update; least-cost LOWERS types (by removing a choice)
-    //    add_work_use_extra(Env.GVN._work_flow,fptr);
-    //    if( cepi!=null ) Env.GVN.add_reduce(cepi); // Might unwire
-    //    return this;
-    //  }
-    //}
-
-    // If we have a single function allowed, force the function constant.
-    if( fidx != -1 && !(fdx instanceof FunPtrNode) ) {
-      // Check that the single target is well-formed
-      FunNode fun = FunNode.find_fidx(Math.abs(fidx));
-      if( fun != null && !fun.is_dead() ) {
-        RetNode ret = fun.ret();
-        if( ret != null ) {
-          // The same function might be called with different displays; make
-          // sure we get the right one.  See if there is a single un-escaped
-          // FunPtr.  Common for non-upwardsly exposed targets.
-          FunPtrNode fptr = ret.funptr();
-          if( fptr != null /*&& !fptr.display()._live.live().is_escape()*/ )
-            throw unimpl(); //return set_dsp(fptr);
-          // See if FunPtr is available just above an Unresolved.
-          if( fdx instanceof UnresolvedNode ) {
-            fptr = ((UnresolvedNode)fdx).find_fidx(fidx);
-            if( fptr != null ) { // Gonna improve
-              return set_fdx(fptr);
-            }
-          }
-        }
-      }
+    // Try to resolve to single-target
+    if( fdx() instanceof UnresolvedNode ) {
+      FunPtrNode fptr = ((UnresolvedNode)fdx()).resolve_value(((TypeTuple)_val)._ts);
+      throw unimpl();
     }
 
     // Wire valid targets.
@@ -388,6 +352,9 @@ public class CallNode extends Node {
     // Pinch to XCTRL/CTRL
     Type ctl = ctl()._val;
     if( ctl != Type.CTRL ) return ctl.oob();
+    // Not a function to call?
+    Type tfx = fdx()._val;
+    if( !(tfx instanceof TypeFunPtr) ) return tfx.oob();
 
     // Not a memory to the call?
     Type mem = mem()==null ? TypeMem.ANYMEM : mem()._val;
@@ -399,30 +366,16 @@ public class CallNode extends Node {
     ts[CTL_IDX] = Type.CTRL;
     ts[MEM_IDX] = tmem;         // Memory into the callee, not caller
 
-    // Not a function to call?
-    Type tfx = fdx()==null ? TypeFunPtr.GENERIC_FUNPTR : fdx()._val;
-    if( !(tfx instanceof TypeFunPtr) )
-      tfx = tfx.oob(TypeFunPtr.GENERIC_FUNPTR);
-    TypeFunPtr tfp = (TypeFunPtr)tfx;
-    BitsFun fidxs = tfp.fidxs();
-    BitsFun fidxs2 = least_cost2(fidxs);
-    if( fidxs != fidxs2 ) {
-      Type tret = tfp._ret;
-      tfp = TypeFunPtr.make(fidxs2,tfp.nargs(),tfp._dsp,tret);
-    }
-
     // Copy args for called functions.  FIDX is already refined.
     // Also gather all aliases from all args.
+    TypeFunPtr tfp = (TypeFunPtr)tfx;
     ts[DSP_IDX] = tfp._dsp;
     //BitsAlias as = get_alias(tfp._dsp);
     for( int i=ARG_IDX; i<nargs(); i++ )
-      //as = as.meet(get_alias(ts[i] = arg(i)==null ? Type.XSCALAR : arg(i)._val));
-      ts[i] = arg(i)==null ? Type.XSCALAR : arg(i)._val;
-    // Recursively search memory for aliases; compute escaping aliases
-    //BitsAlias as2 = tmem.all_reaching_aliases(as);
-    ts[_defs._len  ] = tfp;
-    ts[MEM_IDX] = tmem;
-
+      ts[i] = arg(i)==null ? Type.XSCALAR : arg(i)._val;    
+    if( !(fdx() instanceof FunPtrNode) )
+      tfp = (TypeFunPtr)((UnresolvedNode)fdx()).resolve_value(ts)._val;
+    ts[_defs._len] = tfp;
     return TypeTuple.make(ts);
   }
   // Get (shallow) aliases from the type
@@ -519,138 +472,6 @@ public class CallNode extends Node {
     return proj == null || proj._live == TypeMem.DEAD ? TypeMem.DEAD : TypeMem.ALIVE;
   }
 
-  // TODO: Yank all this, do 1st-arg lookups only.
-  // Resolve choice calls based on the left arg.
-  public BitsFun least_cost2(BitsFun choices) {
-    if( choices==BitsFun.EMPTY || choices==BitsFun.FULL|| choices==BitsFun.ANY  || choices.abit() != -1 )
-      return choices;  // Too many, zero or one choice - nothing to improve
-    Type actual = val(ARG_IDX);
-    BitsFun fdxs = BitsFun.EMPTY;
-    final boolean hi = choices.above_center();
-    // For low ties amongst int and float, always lift to int
-    int fi=0, ff=0, fx=0;
-    for( int fidx : choices ) {
-      // Parent/kids happen during inlining
-      for( int kidx=fidx; kidx!=0; kidx=BitsFun.next_kid(fidx,kidx) ) {
-        FunNode fun = FunNode.find_fidx(kidx);
-        if( fun==null || fun.is_dead() || fun.nargs()!=nargs() || fun.in(0)==fun ) continue; // BAD/dead
-        //Type formal = fun.formals().fld_idx(ARG_IDX)._t;
-        //boolean isa = actual.isa(formal);
-        //if( isa || (!hi && formal.isa(actual)) ) {
-        //  BitsFun fdxs0 = pairwise_above(fdxs,kidx,formal);
-        //  if( fdxs0 != fdxs ) { // Progress?
-        //    fdxs = fdxs0;       // Keep progress
-        //    if( isa ) {
-        //      if( formal instanceof TypeInt ) fi = kidx;
-        //      else if( formal instanceof TypeFlt ) ff = kidx;
-        //      else fx = kidx;   // Something else
-        //    } else {
-        //      fx = kidx;        // Something failed the isa test
-        //    }
-        //  }
-        //}
-        throw unimpl();
-      }
-    }
-
-    // Have an int-choice and a float-choice and no unknown choices.
-    // Toss the float choice.
-    if( fi!=0 && ff!=0 && fx==0 ) {
-      if( !hi ) fdxs = fdxs.clear(ff);
-    }
-    if( hi && fdxs.abit()== -1 )
-      fdxs = fdxs.dual();
-    return fdxs;
-  }
-
-  // Pairwise, toss out any fidx who's first formal is dominated by this formal
-  // or vice-versa, or toss this fidx in otherwise.
-  private static BitsFun pairwise_above(BitsFun fidxs, int nidx, Type nformal) {
-    //for( int fidx : fidxs ) {
-    //  Type formal = FunNode.find_fidx(fidx).formals().fld_idx(ARG_IDX)._t;
-    //  if( nformal.isa(formal) )
-    //    return fidxs.clear(fidx).set(nidx); // Keep the tighter bounds
-    //  if( formal.isa(nformal) )
-    //    return fidxs;           // Keep the tighter bounds
-    //}
-    //return fidxs.set(nidx);     // Extend
-    throw unimpl();
-  }
-
-
-  // Amongst these choices return the least-cost.  Some or all might be invalid.
-  public FunPtrNode least_cost(BitsFun choices, Node unk) {
-    if( choices==BitsFun.EMPTY ) return null;
-    assert choices.bitCount() > 0; // Must be some choices
-    //assert choices.abit()!= -1 || (choices.above_center() == (GVN._opt_mode==GVNGCM.Mode.Opto));
-    //int best_cvts=99999;           // Too expensive
-    //FunPtrNode best_fptr=null;     //
-    //TypeStruct best_formals=null;  //
-    //boolean tied=false;            // Ties not allowed
-    //for( int fidx : choices ) {
-    //  // Parent/kids happen during inlining
-    //  for( int kidx=fidx; kidx!=0; kidx=BitsFun.next_kid(fidx,kidx) ) {
-    //    if( BitsFun.is_parent(kidx) )
-    //      continue;
-    //
-    //    FunNode fun = FunNode.find_fidx(kidx);
-    //    if( fun==null || fun.is_dead() || fun.nargs()!=nargs() || fun.in(0)==fun ) continue; // BAD/dead
-    //    TypeStruct formals = fun.formals(); // Type of each argument
-    //    int cvts=0;                         // Arg conversion cost
-    //    for( TypeFld fld : formals.flds() ) {
-    //      Type formal = fld._t;
-    //      Type actual = arg(fld._order)._val;
-    //      if( fld.is_display_ptr() && actual instanceof TypeFunPtr )
-    //        actual = ((TypeFunPtr)actual)._dsp;
-    //      if( actual==formal ) continue;
-    //      if( fld._order <= MEM_IDX ) continue; // isBitShape not defined on memory
-    //      if( Type.ALL==formal ) continue; // Allows even error arguments
-    //      byte cvt = actual.isBitShape(formal); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
-    //      if( cvt == -1 ) return null; // Might be the best choice, or only choice, dunno
-    //      cvts += cvt;
-    //    }
-    //
-    //    if( cvts < 99 && cvts < best_cvts ) {
-    //      best_cvts = cvts;
-    //      best_fptr = get_fptr(fun,unk); // This can be null, if function is run-time computed & has multiple displays.
-    //      best_formals = formals;
-    //      tied=false;
-    //    } else if( cvts==best_cvts ) {
-    //      // Look for monotonic formals
-    //      int fcnt=0, bcnt=0;
-    //      for( TypeFld fld : formals.flds() ) {
-    //        TypeFld best_fld = best_formals.get(fld._fld);
-    //        if( best_fld==null ) { fcnt=bcnt=-1; break; } // Not monotonic, no obvious winner
-    //        Type ff = fld._t, bf = best_fld._t;
-    //        if( ff==bf ) continue;
-    //        Type mt = ff.meet(bf);
-    //        if( ff==mt ) bcnt++;       // Best formal is higher than new
-    //        else if( bf==mt ) fcnt++;  // New  formal is higher than best
-    //        else { fcnt=bcnt=-1; break; } // Not monotonic, no obvious winner
-    //      }
-    //      // If one is monotonically higher than the other, take it
-    //      if( fcnt > 0 && bcnt==0 ) { best_fptr = get_fptr(fun,unk); best_formals = formals; }
-    //      else if( fcnt != 0 || bcnt <= 0 ) tied = true; // Tied, ambiguous
-    //      // Keep current
-    //    }
-    //  }
-    //}
-    //if( best_cvts >= 99 ) return null; // No valid functions
-    //return tied ? null : best_fptr; // Ties need to have the ambiguity broken another way
-    // TODO: Rethink call resolution
-    throw unimpl();
-  }
-  static FunPtrNode get_fptr(FunNode fun, Node unk) {
-    RetNode ret = fun.ret();
-    FunPtrNode fptr = ret.funptr();
-    if( fptr != null ) return fptr; // Only one choice
-    if( !(unk instanceof UnresolvedNode) ) return null; // No selection of fptrs to pick from
-    for( Node def : unk._defs )
-      if( ((FunPtrNode)def).ret()== ret )
-        return (FunPtrNode)def;
-    return null;
-  }
-
   @Override public TV2 new_tvar( String alloc_site) { return null; }
 
   // See if we can resolve an unresolved Call
@@ -716,7 +537,6 @@ public class CallNode extends Node {
     CallNode call = (CallNode)o;
     return _rpc==call._rpc;
   }
-  @Override Node is_pure_call() { return fdx().is_pure_call()==null ? null : mem(); }
   public Node[] parms() {
     return _defs._len>= DSP_IDX ? Arrays.copyOf(_defs._es,_defs._len-1) : new Node[0]; // All defs, except the FIDX.
   }

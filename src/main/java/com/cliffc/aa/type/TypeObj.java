@@ -51,7 +51,6 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   
   static final TypeObj[] TYPES = new TypeObj[]{OBJ,ISUSED};
 
-  @Override boolean is_display() { return false; }
   @SuppressWarnings("unchecked")
   @Override protected O xdual() { return POOLS[_type].<O>malloc().init(_name,!_any,!_use); }
   @Override protected Type xmeet( Type t ) {

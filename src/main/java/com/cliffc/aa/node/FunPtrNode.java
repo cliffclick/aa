@@ -94,8 +94,7 @@ public final class FunPtrNode extends Node {
           ret().is_copy() ||
           // Also unused if function has no display parm.
           ((fun=xfun())!=null && fun.is_copy(0)==null && fun.parm(DSP_IDX)==null)  )
-        //  return set_def(1,Env.ANY); // No display needed
-        throw unimpl();
+        return set_def(1,Env.ANY); // No display needed
     }
     return null;
   }
@@ -143,7 +142,7 @@ public final class FunPtrNode extends Node {
 
   @Override public TypeMem live_use(Node def ) {
     return def==in(0)
-      ? TypeMem.ALLMEM          // Returns are complex-alive
+      ? TypeMem.ANYMEM          // FunPtr does not demand any memory
       : (_live==TypeMem.LNO_DISP ? TypeMem.DEAD : TypeMem.ALIVE); // Display is alive or dead
   }
 
@@ -188,18 +187,4 @@ public final class FunPtrNode extends Node {
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
   @Override public byte op_prec() { return fun()._op_prec; }
-
-  // Instead of returning the pre-call memory on true, returns self.
-  // Changes as the graph changes, because works purely off of graph shape.
-  @Override Node is_pure_call() {
-    // See if the RetNode points to a Parm:mem (so no mods on memory).
-    RetNode ret = ret();
-    if( ret.is_copy() ) return null;
-    FunNode fun = ret.fun();
-    if( fun.noinline() ) return null; // Disallow if no-inline
-    Node mem = ret.mem();
-    if( mem.in(0)==fun && mem instanceof ParmNode ) return this; // Parm:mem on fun, no mods to memory
-    return null;
-  }
-
 }

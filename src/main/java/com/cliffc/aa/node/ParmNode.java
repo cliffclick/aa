@@ -89,10 +89,6 @@ public class ParmNode extends PhiNode {
   // "fresh" TVars for every input path.
   @Override public boolean unify( boolean test ) { return false; }
 
-  // True if loading from a display/closure
-  @Override public boolean is_display_ptr() { return _idx==DSP_IDX; }
-
-
   @Override public ErrMsg err( boolean fast ) {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere
     FunNode fun = fun();

@@ -228,9 +228,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     return this;
   }
 
-  // If this is a display field
-  @Override public boolean is_display_ptr() { return Util.eq(_fld,"^") && _order==DSP_IDX && _t.is_display_ptr(); }
-
   @Override public TypeFld simple_ptr() { return make_from(_t.simple_ptr()); }
   @SuppressWarnings("unchecked")
   @Override public void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }

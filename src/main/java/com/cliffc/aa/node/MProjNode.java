@@ -14,18 +14,6 @@ public class MProjNode extends ProjNode {
   @Override public String xstr() { return "MProj"+_idx; }
   @Override public boolean is_mem() { return true; }
 
-  @Override public Node ideal_reduce() {
-    Node x = super.ideal_reduce();
-    if( x!=null ) return x;
-    // TODO: Turn back on, as a local flow property
-    //if( in(0) instanceof CallEpiNode ) {
-    //  Node precall = in(0).is_pure_call(); // See if memory can bypass pure calls (most primitives)
-    //  if( precall != null && _val == precall._val )
-    //    return precall;
-    //}
-    return null;
-  }
-
   @Override public Type value() {
     Type c = val(0);
     if( c instanceof TypeTuple ) {
@@ -47,4 +35,5 @@ public class MProjNode extends ProjNode {
 
   @Override BitsAlias escapees() { return in(0).escapees(); }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
+  @Override public TypeMem live_use( Node def ) { return _live; }
 }

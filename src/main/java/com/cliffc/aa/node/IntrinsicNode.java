@@ -43,7 +43,11 @@ public class IntrinsicNode extends Node {
     Node mem    = Env.GVN.init(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.ALL_MEM,null));
     Node cvt    = Env.GVN.init(new IntrinsicNode(tn,badargs,fun,mem,dsp));
     RetNode ret = Env.GVN.init(new RetNode(fun,cvt,dsp,rpc,fun));
-    FunPtrNode fptr = Env.GVN.init(new FunPtrNode(tn._name,ret));
+    // Hook function at the TOP scope, because it may yet have unwired
+    // CallEpis which demand memory.  This hook is removed as part of doing
+    // the Combo pass which computes a real Call Graph and all escapes.
+    Env.TOP._scope.add_def(ret);
+    FunPtrNode fptr = (FunPtrNode)Env.GVN.xform(new FunPtrNode(tn._name,ret));
     return fptr;
   }
 
@@ -126,7 +130,7 @@ public class IntrinsicNode extends Node {
   // result is a named type.  Same as convertTypeName on an unaliased NewObjNode.
   // Passed in a named TypeStruct, and the parent alias.
   public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, Parse bad, Env e, ProjNode ptr ) {
-    assert to.has_name() && to.get("^").is_display_ptr(); // Display already
+    assert to.has_name();
     NewObjNode proto = (NewObjNode)ptr.in(0);
 
     // Count fields needing an argument.  Final fields are assigned from the
@@ -143,7 +147,7 @@ public class IntrinsicNode extends Node {
     Node mem    = Env.GVN.init(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.ALL_MEM,null));
 
     // Object being constructed
-    NewObjNode nnn = Env.GVN.init(new NewObjNode(false,alias,to,null));
+    NewObjNode nnn = new NewObjNode(false,alias,to,null);
     nnn.pop();                  // Drop the display, will be added below
     int nargs2 = AA.ARG_IDX;    // Renumber required params, since some fields will not need a param
 
@@ -155,11 +159,16 @@ public class IntrinsicNode extends Node {
                    : proto.in(i));
     }
     // Finish and return
+    nnn = Env.GVN.init(nnn);
     MrgProjNode mrg = Env.GVN.init(new MrgProjNode(nnn,mem));
     ProjNode pnnn   = Env.GVN.init(new ProjNode(REZ_IDX,nnn));
     RetNode ret     = Env.GVN.init(new RetNode(fun,mrg,pnnn,rpc,fun));
-    FunPtrNode fptr = Env.GVN.init(new FunPtrNode(to._name,ret));
-    return (FunPtrNode)Env.GVN.xform(fptr);
+    // Hook function at the TOP scope, because it may yet have unwired
+    // CallEpis which demand memory.  This hook is removed as part of doing
+    // the Combo pass which computes a real Call Graph and all escapes.
+    Env.TOP._scope.add_def(ret);
+    FunPtrNode fptr = (FunPtrNode)Env.GVN.xform(new FunPtrNode(to._name,ret));
+    return fptr;
   }
 
 }

@@ -332,12 +332,6 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
   }
 
 
-  @Override boolean is_display() {
-    TypeFld disp;
-    return
-      this==TypeMemPtr.DISPLAY || this==TypeMemPtr.DISPLAY._dual ||
-      ((disp=_flds.get("^"))!=null && disp.is_display_ptr());
-  }
   public int nargs() { return _max_arg+1; }
 
   // The lattice extreme values

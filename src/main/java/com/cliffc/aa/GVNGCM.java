@@ -10,8 +10,6 @@ import com.cliffc.aa.util.VBitSet;
 
 import java.util.BitSet;
 
-import static com.cliffc.aa.AA.unimpl;
-
 // Global Value Numbering, Global Code Motion
 public class GVNGCM {
   public static final KeepNode KEEP_ALIVE = new KeepNode();
@@ -87,6 +85,7 @@ public class GVNGCM {
     _work_dom   .clear();
     ITER_CNT = ITER_CNT_NOOP = 0;
   }
+  void flow_clear() { _work_flow.clear(); }
 
   // Keep a Node reference alive for later.  Strongly asserted as a stack
   public static int push( Node n ) { KEEP_ALIVE.add_def(n); return KEEP_ALIVE._defs._len; }
@@ -98,6 +97,7 @@ public class GVNGCM {
   // call sites, and any loop top with an unparsed backedge needs to use this.
   public <N extends Node> N init( N n ) {
     assert n._uses._len==0;     // New to GVN
+    n._val = n.value();
     add_work_new(n);
     return n;
   }
@@ -131,10 +131,11 @@ public class GVNGCM {
         ITER_CNT_NOOP++; // No progress profiling
         assert Env.START==null || Env.START.more_work(true)==0; // Initial conditions are correct
       }
-      else
+      else {
         // VERY EXPENSIVE ASSERT
-        assert Env.START==null || Env.START.more_work(true)==0 // Initial conditions are correct
-        ;
+        assert Env.START == null || Env.START.more_work(true) == 0 // Initial conditions are correct
+          ; assert m.is_dead() || m.check_vals();
+      }
     }
   }
 
@@ -161,12 +162,25 @@ public class GVNGCM {
     assert !Env.START.more_ideal(IDEAL_VISIT);
   }
 
-  // Clear the dead worklist only
+  // Clear the dead,flow,reduce worklists only
   public void iter_dead() {
-    //Node n;
-    //while( (n=_work_dead.pop()) != null )
-    //  _work_dead.apply(n);
-    throw unimpl();
+    while( true ) {
+      Node n, m;
+      if( false ) ;
+      else if( (n=_work_dead  .pop())!=null ) m = n._uses._len == 0 ? n.kill() : null;
+      else if( (n=_work_flow  .pop())!=null ) m = n.do_flow  ();
+      else if( (n=_work_reduce.pop())!=null ) m = n.do_reduce();
+      else break;
+      ITER_CNT++; assert ITER_CNT < 35000; // Catch infinite ideal-loops
+      if( m == null ) {
+        ITER_CNT_NOOP++; // No progress profiling
+        assert Env.START==null || Env.START.more_work(true)==0; // Initial conditions are correct
+      }
+      else
+        // VERY EXPENSIVE ASSERT
+        assert Env.START==null || Env.START.more_work(true)==0 // Initial conditions are correct
+        ;
+    }
   }
 
   // Did a bulk not-monotonic update.  Forcibly update the entire region at

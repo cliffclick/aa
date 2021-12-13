@@ -13,7 +13,6 @@ import static com.cliffc.aa.AA.*;
 public class LoadNode extends Node {
   private final String _fld;    // Field being loaded
   private final Parse _bad;
-  public boolean _hm_lift;     // Value type can be lifted by HM
 
   public LoadNode( Node mem, Node adr, String fld, Parse bad ) {
     super(OP_LOAD,null,mem,null,adr);
@@ -193,15 +192,6 @@ public class LoadNode extends Node {
 
 
   @Override public Type value() {
-    Type tx = _value();
-    if( _hm_lift ) {
-      //Type th = tvar().as_flow(opt_mode == GVNGCM.Mode.Opto && Combo.HM_IS_HIGH);
-      //tx = tx.join(th).simple_ptr();
-      throw unimpl();
-    }
-    return tx;
-  }
-  private Type _value() {
     Node adr = adr();
     Type tadr = adr._val;
     if( !(tadr instanceof TypeMemPtr) ) return tadr.oob();
@@ -268,9 +258,6 @@ public class LoadNode extends Node {
     super.add_work_hm();
     Env.GVN.add_flow(adr());
   }
-
-  @Override public boolean is_display_ptr() { return Util.eq("^",_fld); }
-
 
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;

@@ -2,7 +2,7 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.node.Node;
-import com.cliffc.aa.node.WorkNode;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.VBitSet;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -194,9 +194,48 @@ public abstract class Combo {
     return cnt;
   }
 
+  // Walk any escaping root functions, and claim they are called by the most
+  // conservative callers.
+  private static final VBitSet RVISIT = new VBitSet();
   static void update_root_args() {
-    throw unimpl();
+    if( AA.DO_HMT )
+      throw unimpl();
+    // If an argument changes type, adjust the lambda arg types
+    Node rez = Env.SCP_0.rez();
+    Type flow = rez._val;
+    if( AA.DO_GCP && !flow.above_center() ) {
+      RVISIT.clear();
+      _walk_root_funs(flow);
+    }
   }
-  
+  static private void _walk_root_funs(Type flow) {
+    if( RVISIT.tset(flow._uid) ) return;
+    // Find any functions
+    if( flow instanceof TypeFunPtr ) {
+      if( ((TypeFunPtr)flow)._fidxs.test(1) ) return; // All of them
+      //// Meet the actuals over the formals.
+      //for( int fidx : ((TypeFunPtr)flow)._fidxs ) {
+      //  Lambda fun = Lambda.FUNS.get(fidx);
+      //  for( int i=0; i<fun._types.length; i++ ) {
+      //    // GCP external argument limited to HM compatible type
+      //    Type aflow = DO_HM ? fun.targ(i).as_flow() : Type.SCALAR;
+      //    fun.arg_meet(i,aflow,work);
+      //  }
+      //  if( fun instanceof PrimSyn ) work.add(fun);
+      //}
+      throw unimpl();
+    }
+
+    // recursively walk structures for nested functions
+    if( flow instanceof TypeMemPtr ) {
+      TypeMemPtr tmp = (TypeMemPtr)flow;
+      if( tmp._obj instanceof TypeStr ) return;
+      TypeStruct ts = ((TypeStruct)tmp._obj);
+      for( TypeFld fld : ts.flds() )
+        _walk_root_funs(fld._t);
+    }
+
+  }
+
   static void reset() { HM_FREEZE=false; }
 }

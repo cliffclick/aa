@@ -1,5 +1,7 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.node.Node;
+
 /** an implementation of language AA
  */
 
@@ -14,9 +16,6 @@ public abstract class Exec {
     TypeEnv te = go(Env.TOP,src,str,rseed,do_gcp,do_hmt);
 
     // Kill, cleanup and reset for another parse
-    te._scope.unhook();   // The exiting scope is removed
-    // All edges removed, otherwise a self-cycle keeps alive
-    while( te._scope.len()>0 ) te._scope.pop();
     Env.top_reset();                   // Hard reset
 
     return te;
@@ -34,21 +33,29 @@ public abstract class Exec {
     ErrMsg err = new Parse(src,false,e,str).prog();
 
     // Close file scope; no program text in this file, so no more fields to add.
-    e._scope.keep();
-    Env.GVN.add_flow_uses(e._scope);// Post-parse, revisit top-level called functions
+    int sidx = e._scope.push();
+    //Env.GVN.add_flow_uses(e._scope);// Post-parse, revisit top-level called functions
     e.close();                // No more fields added to the parse scope
-    
+
     // Pessimistic optimizations; might improve error situation
     Env.GVN.iter();
-    
+
     Env.pre_combo();   // Remove all the things kept alive until Combo runs
     Combo.opto();      // Global Constant Propagation and Hindley-Milner Typing
-    
+
     Env.GVN.iter(); // Re-check all ideal calls now that types have been maximally lifted
-    
+
     Env.FILE=null;
 
-    return e.gather_errors(err);
+    TypeEnv rez = e.gather_errors(err);  // Gather errors and/or program typing
+
+    // Cleanup top (normal user) scope
+    Node scope = Node.pop(sidx);
+    assert scope==rez._scope;
+    // All edges removed, otherwise a self-cycle keeps alive
+    while( scope.len()>0 ) scope.pop();
+
+    return rez;
   }
 
 
