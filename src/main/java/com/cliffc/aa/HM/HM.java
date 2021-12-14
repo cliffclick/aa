@@ -1500,9 +1500,9 @@ public class HM {
     boolean is_leaf()  { return _args==null && _flow==null && _aliases==null; }
     boolean unified()  { return get(">>")!=null; }
     boolean is_nil()   { return get("?" )!=null; }
-    boolean is_base()  { return _flow   != null; } // Can be true with is_base, is_fun, is_struct
-    boolean is_fun ()  { return _fidxs  != null; } // Can be true with is_base, is_fun, is_struct
-    boolean is_struct(){ return _aliases!= null; } // Can be true with is_base, is_fun, is_struct
+    boolean is_base()  { return _flow   != null; } // 
+    boolean is_fun ()  { return _fidxs  != null; } // 
+    boolean is_struct(){ return _aliases!= null; } // 
     boolean is_open()  { return _open; }           // Struct-specific
     boolean is_err()   { return _err!=null || is_err2(); }
     boolean is_err2()  { return
@@ -1842,9 +1842,9 @@ public class HM {
     static private final HashMap<Long,T2> DUPS = new HashMap<>();
     boolean unify( T2 that, Work<Syntax> work ) {
       if( this==that ) return false;
-      assert VARS.isEmpty() && DUPS.isEmpty();
+      assert DUPS.isEmpty();
       boolean progress = _unify(that,work);
-      VARS.clear();  DUPS.clear();
+      DUPS.clear();
       return progress;
     }
 
@@ -2076,6 +2076,7 @@ public class HM {
         VARS.put(this,this);
         return this;
       }
+
       // Structure is deep-replicated
       T2 t = copy();
       if( is_leaf() ) t._deps=null;

@@ -120,11 +120,12 @@ public abstract class MemPrimNode extends PrimNode {
     @Override public boolean unify( boolean test ) {
       // The input is an array, but that's about all we can say
       TV2 tptr = tvar(ARG_IDX);
-      if( tptr.isa("Ary") ) return false;
-      if( test ) return true;
-      Type ptr = val(ARG_IDX);
-      tptr.unify(TV2.make("Ary",this,ptr,"array_len",new NonBlockingHashMap<>()),test);
-      return true;
+      //if( tptr.isa("Ary") ) return false;
+      //if( test ) return true;
+      //Type ptr = val(ARG_IDX);
+      //tptr.unify(TV2.make("Ary",this,ptr,"array_len",new NonBlockingHashMap<>()),test);
+      //return true;
+      throw unimpl();
     }
 
     @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
@@ -224,7 +225,7 @@ public abstract class MemPrimNode extends PrimNode {
     @Override public boolean unify( boolean test ) {
       boolean progress = false;
       TV2 idx = tvar(ARG_IDX+1);
-      if( !(idx.is_base() && idx._type.isa(TypeInt.INT64)) ) {
+      if( !(idx.is_base() && idx._flow.isa(TypeInt.INT64)) ) {
         if( test ) return true;
         progress = idx.unify(TV2.make_base(idx(), TypeInt.INT64, "[]:="),test);
       }
@@ -259,7 +260,7 @@ public abstract class MemPrimNode extends PrimNode {
     @Override public boolean unify( boolean test ) {
       boolean progress = false;
       TV2 idx = tvar(ARG_IDX+1);
-      if( !(idx.is_base() && idx._type.isa(TypeInt.INT64)) ) {
+      if( !(idx.is_base() && idx._flow.isa(TypeInt.INT64)) ) {
         if( test ) return true;
         progress = idx.unify(TV2.make_base(idx(), TypeInt.INT64, "[]:="),test);
       }

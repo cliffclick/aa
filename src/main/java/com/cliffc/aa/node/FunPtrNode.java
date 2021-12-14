@@ -152,36 +152,27 @@ public final class FunPtrNode extends Node {
     RetNode ret = ret();
     if( ret.is_copy() ) return false; // GENSYM
     FunNode fun = ret.fun();
+    int nargs = fun.nargs();
 
     boolean progress = false;
     if( !self.is_fun() ) {      // Force a function if not already
       if( test ) return true;
-      progress = self.unify(TV2.make_fun(ret.rez(),((TypeFunPtr)_val).make_no_disp(),"FunPtr_unify"),test);
+      TV2[] tv2s = new TV2[nargs];
+      for( Node parm : fun._uses )
+        if( parm instanceof ParmNode && parm.has_tvar() )
+          tv2s[((ParmNode)parm)._idx] = parm.tvar();
+      assert tv2s[0]==null;
+      tv2s[0] = ret.rez().tvar();
+      progress = self.unify(TV2.make_fun(ret.rez(),((TypeFunPtr)_val).make_no_disp(),"FunPtr_unify",tv2s),test);
       self = self.find();
     }
 
-    // Return
-    progress |= self.unify_at(ret.rez()," ret",ret.rez().tvar(),test);
-
     // Each normal argument from the parms directly
-    Node[] parms = fun.parms();
-    for( int i=DSP_IDX; i<parms.length; i++ ) {
-      if( parms[i]==null ) continue;
-      String key = (""+i).intern();
-      TV2 old = self.get(key);
-      TV2 arg = parms[i].tvar();
-      assert arg!=null;//if( arg==null )  arg = TV2.make_leaf(fun,"FunPtr_unify"); // null on 1st visit to a missing (unused) parm
-      if( old==arg ) continue;      // No progress
-      if( test ) return true; // Early cutout
-      progress |= self.unify_at(parms[i],key,arg,test);
-      // The display is part of the fat function-pointer.  Here we act like an
-      // HM.Apply or a CallEpi.unify.
-      if( i==DSP_IDX && display()!=Env.ANY ) {
-        TV2 tdsp = display().tvar();
-        progress |= tdsp.unify(arg,test);
-      }
-    }
-    return progress;
+    Node[] parms = fun.parms();  assert parms.length==nargs;
+    for( int i=DSP_IDX; i<nargs; i++ )
+      if( parms[i]!=null )
+        progress |= self.arg(TV2.argname(i)).unify(parms[i].tvar(),test);
+    return self.arg("ret").unify(ret.rez().tvar(),test) | progress;
   }
 
   // Return the op_prec of the returned value.  Not sensible except when called

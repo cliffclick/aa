@@ -3,15 +3,16 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Predicate;
 import java.util.function.IntSupplier;
+import java.util.function.Predicate;
 
-import static com.cliffc.aa.AA.DSP_IDX;
 import static com.cliffc.aa.AA.unimpl;
 
 // Sea-of-Nodes
@@ -755,9 +756,9 @@ public abstract class Node implements Cloneable, IntSupplier {
     }
     if( AA.DO_HMT ) {
       _tvar = new_tvar("Combo");
-      if( this instanceof FreshNode) ((FreshNode)this).id().tvar().push_dep(this);
-      if( this instanceof ProjNode && ((ProjNode)this)._idx==DSP_IDX && in(0) instanceof CallNode )
-        ((CallNode)in(0)).fdx().tvar().push_dep(this);
+      //if( this instanceof FreshNode) ((FreshNode)this).id().tvar().push_dep(this);
+      //if( this instanceof ProjNode && ((ProjNode)this)._idx==DSP_IDX && in(0) instanceof CallNode )
+      //  ((CallNode)in(0)).fdx().tvar().push_dep(this);
     }
     // Walk reachable graph
     for( Node use : _uses )                   use.walk_initype();
@@ -771,7 +772,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     _val = Type.ALL;                    // Lowest value
     _live = all_live();                 // Full alive
     _elock = false;                     // Clear elock if reset_to_init0
-    _tvar = new_tvar("reset");
+    _tvar = null;
     // Walk reachable graph
     for( Node use : _uses )                   use.walk_reset();
     for( Node def : _defs ) if( def != null ) def.walk_reset();

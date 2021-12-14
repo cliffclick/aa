@@ -181,7 +181,7 @@ public class Env implements AutoCloseable {
       if( !_opers.isEmpty() )
         throw unimpl();         // Promote operators
     }
-    
+
     Node ptr = _scope.ptr();
     stk.no_more_fields();
     GVN.add_flow(stk);          // Scope object going dead, trigger following projs to cleanup
@@ -246,14 +246,16 @@ public class Env implements AutoCloseable {
     Node c;
     while( !(c=START._uses.last()).is_prim() ) {
       while( c.len()>0 ) c.pop();
-      Env.GVN.add_dead(c);
+      GVN.add_dead(c);
     }
     // Clear out the dead before clearing VALS, since they may not be reachable and will blow the elock assert
-    Env.GVN.iter_dead();
+    GVN.iter_dead();
     TV2.reset_to_init0();
     Node.VALS.clear();          // Clean out hashtable
-    Env.START.walk_reset();     // Clean out any wired prim calls
-    Env.GVN.iter();             // Clean out any dead; reset prim types
+    START.walk_reset();         // Clean out any wired prim calls
+    KEEP_ALIVE.walk_reset();    // Clean out any wired prim calls
+    GVNGCM.KEEP_ALIVE.walk_reset();
+    GVN.iter();                 // Clean out any dead; reset prim types
     for( Node n : Node.VALS.keySet() ) // Assert no leftover bits from the prior compilation
       assert n._uid < Node._INIT0_CNT; //
     Node      .reset_to_init0();
@@ -290,12 +292,12 @@ public class Env implements AutoCloseable {
   }
 
   // Lookup the operator name.  Use the longest name that's found, so that long
-  // strings of operator characters are naturally broken by (greedy) strings.  
+  // strings of operator characters are naturally broken by (greedy) strings.
   private Oper _lookup_oper(String tok) {
     Oper o = _opers.get(tok);
     return o==null ? (_par==null ? null : _par._lookup_oper(tok)) : o;
   }
- 
+
   private UnresolvedNode _lookup_filter( int op_prec_test, String name, int nargs ) {
     for( int i=name.length(); i>0; i-- ) { // First name found will return
       // Prepare the name from the token

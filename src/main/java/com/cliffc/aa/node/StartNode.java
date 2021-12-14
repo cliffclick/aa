@@ -20,5 +20,5 @@ public class StartNode extends Node {
   @Override public int hashCode() { return 123456789+1; }
   @Override public boolean equals(Object o) { return this==o; }
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }
-  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Start",this,alloc_site); }
+  @Override public TV2 new_tvar(String alloc_site) { return TV2.make_leaf(this,alloc_site); }
 }

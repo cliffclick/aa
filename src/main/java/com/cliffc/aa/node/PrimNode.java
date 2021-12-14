@@ -135,10 +135,10 @@ public abstract class PrimNode extends Node {
     return progress;
   }
   private boolean prim_unify(TV2 arg, Type t, boolean test) {
-    if( arg.is_base() && t.isa(arg._type) ) return false;
+    if( arg.is_base() && t.isa(arg._flow) ) return false;
     if( arg.is_err() ) return false;
     if( test ) return true;
-    return arg.unify(TV2.make_base(this, arg._type==null ? t : t.meet(arg._type), "Prim_unify"),test);
+    return arg.unify(TV2.make_base(this, arg._flow==null ? t : t.meet(arg._flow), "Prim_unify"),test);
   }
 
 

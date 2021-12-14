@@ -1,9 +1,10 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
+
+import static com.cliffc.aa.AA.unimpl;
 
 // "fresh" the incoming TVar: make a fresh instance before unifying
 public class FreshNode extends Node {
@@ -93,6 +94,7 @@ public class FreshNode extends Node {
   @Override public boolean equals(Object o) {
     if( _tvar==null ) return this==o;
     if( !(o instanceof FreshNode) ) return false;
-    return tvar().compatible(((FreshNode) o).tvar());
+    //return tvar().compatible(((FreshNode) o).tvar());
+    throw unimpl();
   }
 }

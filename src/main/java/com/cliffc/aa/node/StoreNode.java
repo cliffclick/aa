@@ -1,9 +1,10 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.Env;
+import com.cliffc.aa.ErrMsg;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.NonBlockingHashMap;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -208,7 +209,7 @@ public class StoreNode extends Node {
   public static boolean unify( String name, Node ldst, TV2 ptr, Type tptr, TV2 tval, String id, boolean test ) {
 
     // Matching fields unify
-    TV2 fld = ptr.get(id);
+    TV2 fld = ptr.arg(id);
     if( fld!=null )             // Unify against pre-existing field
       return fld.unify(tval,test);
 
@@ -219,18 +220,20 @@ public class StoreNode extends Node {
     if( test ) return true;
 
     // Add field if open
-    if( ptr.is_struct() && ptr.open() ) // Effectively unify with an extended struct.
-      return ptr.add_fld(id,tval,test);
+    if( ptr.is_struct() && ptr.is_open() ) // Effectively unify with an extended struct.
+      return ptr.add_fld(id,tval);
 
     // Unify against an open struct with the named field
     if( ptr.is_leaf() || ptr.is_fun() ) {
-      TV2 tv2 = TV2.make_open_struct(name,ldst,tptr,"Store_update", new NonBlockingHashMap<>());
-      tv2.args_put(id,tval);
-      return tv2.unify(ptr,test);
+      //TV2 tv2 = TV2.make_open_struct(name,ldst,tptr,"Store_update", new NonBlockingHashMap<>());
+      //tv2._args.put(id,tval);
+      //return tv2.unify(ptr,test);
+      throw unimpl();
     }
 
     // Closed record, field is missing
-    return tval.unify(ptr.miss_field(ldst,id,"Store_update"),test);
+    //return tval.unify(ptr.miss_field(ldst,id,"Store_update"),test);
+    throw unimpl();
   }
 
   @Override public void add_work_hm() {

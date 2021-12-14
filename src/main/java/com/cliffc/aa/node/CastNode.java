@@ -76,7 +76,7 @@ public class CastNode extends Node {
     if( maynil==notnil ) throw unimpl(); // return false;
 
     // Already an expanded nilable
-    if( maynil.is_nil() && maynil.get("?") == notnil ) return false;
+    if( maynil.is_nil() && maynil.arg("?") == notnil ) return false;
 
     // Expand nilable to either base
     if( maynil.is_base() && notnil.is_base() )
@@ -84,21 +84,22 @@ public class CastNode extends Node {
 
     // Two structs, one nilable.  Nilable is moved into the alias, but also
     // need to align the fields.
-    if( maynil.is_struct() && notnil.is_struct() && maynil._type == maynil._type.meet_nil(Type.XNIL) ) {
+    if( maynil.is_struct() && notnil.is_struct() && maynil.has_nil() ) {
       boolean progress = false;
       // Also check that the fields align
-      for( String fld : maynil.args() ) {
-        TV2 mfld = maynil.get(fld);
-        TV2 nfld = notnil.get(fld);
-        if( nfld!=null && nfld!=mfld )
-          { progress = true; break; } // Unequal fields
-      }
-      // Find any extra fields
-      if( !progress && maynil.open() )
-        for( String fld : notnil.args() )
-          if( maynil.get(fld) == null )
-            { progress = true; break; }
-      if( !progress ) return false; // No progress
+      //for( String fld : maynil.args() ) {
+      //  TV2 mfld = maynil.arg(fld);
+      //  TV2 nfld = notnil.arg(fld);
+      //  if( nfld!=null && nfld!=mfld )
+      //    { progress = true; break; } // Unequal fields
+      //}
+      //// Find any extra fields
+      //if( !progress && maynil.is_open() )
+      //  for( String fld : notnil.args() )
+      //    if( maynil.arg(fld) == null )
+      //      { progress = true; break; }
+      //if( !progress ) return false; // No progress
+      throw unimpl();
     }
 
     // All other paths may progress

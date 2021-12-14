@@ -3,6 +3,8 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.node.Node;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.*;
+import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -197,17 +199,34 @@ public abstract class Combo {
   // Walk any escaping root functions, and claim they are called by the most
   // conservative callers.
   private static final VBitSet RVISIT = new VBitSet();
-  static void update_root_args() {
-    if( AA.DO_HMT )
-      throw unimpl();
-    // If an argument changes type, adjust the lambda arg types
+  private static void update_root_args() {
     Node rez = Env.SCP_0.rez();
     Type flow = rez._val;
+    if( AA.DO_HMT ) {
+      RVISIT.clear();
+      _widen_bases(false,rez.tvar());
+    }
+    // If an argument changes type, adjust the lambda arg types
     if( AA.DO_GCP && !flow.above_center() ) {
       RVISIT.clear();
       _walk_root_funs(flow);
     }
   }
+  // TODO: T2 walker
+  // If a root-escaping function has Base inputs, widen them to allow anything
+  // from that Base class.  E.g., typed as taking a "abc" input is widened to
+  // any string.
+  private static void _widen_bases(boolean funarg, TV2 t2) {
+    if( RVISIT.tset(t2._uid) ) return;
+    if( t2.is_base() && funarg ) t2._flow=t2._flow.widen();
+    if( t2._args != null ) {
+      funarg = t2.is_fun();
+      for( String arg : t2._args.keySet() )
+        if( !Util.eq(arg,"ret") ) // Do not walk function returns
+          _widen_bases(funarg,t2.arg(arg));
+    }
+  }
+
   static private void _walk_root_funs(Type flow) {
     if( RVISIT.tset(flow._uid) ) return;
     // Find any functions

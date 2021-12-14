@@ -5,6 +5,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMap;
 
 import static com.cliffc.aa.AA.ARG_IDX;
+import static com.cliffc.aa.AA.unimpl;
 
 // Allocates a TypeAry in memory.  Takes in the size and initial element value
 // produces the pointer.  Hence, liveness is odd.
@@ -33,18 +34,20 @@ public abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>() {{
       put("len" , TV2.make_base(null,TypeInt.INT64,alloc_site));
       put("elem", TV2.make_leaf(null, alloc_site));}};
-    return TV2.make("Ary",this,_tptr,alloc_site,args);
+    //return TV2.make("Ary",this,_tptr,alloc_site,args);
+    throw unimpl();
   }
 
   @Override public boolean unify( boolean test ) {
-    assert _tvar.isa("Ary");     // Self should always should be a Ary
-    if( is_unused() ) return false;
-    // Length is an int
-    TV2 len = tvar(ARG_IDX);
-    if( len.is_base() && len._type.isa(TypeInt.INT64) )
-      return false;
-    return test ||              // Fast cutout
-      len.unify(TV2.make_base(in(ARG_IDX),TypeInt.INT64,"NewAry"),test);
+    //assert _tvar.isa("Ary");     // Self should always should be a Ary
+    //if( is_unused() ) return false;
+    //// Length is an int
+    //TV2 len = tvar(ARG_IDX);
+    //if( len.is_base() && len._flow.isa(TypeInt.INT64) )
+    //  return false;
+    //return test ||              // Fast cutout
+    //  len.unify(TV2.make_base(in(ARG_IDX),TypeInt.INT64,"NewAry"),test);
+    throw unimpl();
   }
 
 }

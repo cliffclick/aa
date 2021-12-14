@@ -488,27 +488,29 @@ public final class CallEpiNode extends Node {
       // The display is extracted from the FunPtr and is not the function itself
       args.put("2",TV2.make_leaf(fdx,"CallEpi_unify"));
       for( int i=ARG_IDX; i<call._defs._len; i++ )
-        args.put((""+i).intern(),call.tvar(i));
+        args.put(TV2.argname(i),call.tvar(i));
       args.put(" ret",tvar());
-      TV2 nfun = TV2.make_fun(this, fdx._val, args, "CallEpi_unify");
-      progress = tfun.unify(nfun,test);
-      tfun = tfun.find();
+      //TV2 nfun = TV2.make_fun(this, (TypeFunPtr)fdx._val, args, "CallEpi_unify");
+      //progress = tfun.unify(nfun,test);
+      //tfun = tfun.find();
+      throw unimpl();
     }
     // TODO: Handle Thunks
 
     if( tfun.nargs() != call.nargs()-ARG_IDX ) //
-      return tvar().unify(TV2.make_err(this,"Mismatched argument lengths","CallEpi_unify"),test);
+      //return tvar().unify(TV2.make_err(this,"Mismatched argument lengths","CallEpi_unify"),test);
+      throw unimpl();
 
     // Check for progress amongst args
     for( int i=ARG_IDX; i<call._defs._len; i++ ) {
       TV2 actual = call.tvar(i);
-      TV2 formal = tfun.get((""+i).intern());
+      TV2 formal = tfun.arg(TV2.argname(i));
       progress |= actual.unify(formal,test);
       if( progress && test ) return true; // Early exit
       if( (tfun=tfun.find()).is_err() ) throw unimpl();
     }
     // Check for progress on the return
-    progress |= tvar().unify(tfun.get(" ret"),test);
+    progress |= tvar().unify(tfun.arg(" ret"),test);
     if( (tfun=tfun.find()).is_err() ) return tvar().unify(tfun,test);
 
     return progress;

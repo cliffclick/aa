@@ -39,7 +39,7 @@ public class ConNode<T extends Type> extends Node {
   @Override public boolean unify( boolean test ) {
     if( _tvar==null ) return false;
     TV2 self = tvar();
-    if( self.is_base() || self.is_nil() || self.is_struct() || self.isa("Str") ) return false;
+    if( self.is_base() || self.is_nil() || self.is_struct() ) return false;
     if( test ) return true;
     //assert self.is_leaf();
     //_set_tvar();

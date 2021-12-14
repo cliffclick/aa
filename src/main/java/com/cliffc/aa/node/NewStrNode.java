@@ -14,12 +14,16 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
     super(OP_NEWSTR,BitsAlias.STR,to,name,reads,TypeStr.STR,op_prec,args);
   }
 
-  @Override public TV2 new_tvar(String alloc_site) { return TV2.make("Str",this,alloc_site); }
+  @Override public TV2 new_tvar(String alloc_site) {
+    //return TV2.make("Str",this,alloc_site);
+    throw unimpl();
+  }
 
   @Override public boolean unify(boolean test) {
-    TV2 tv = tvar();
-    if( tv._type==null ) { tv._type = _tptr; return true; }
-    return false;
+    //TV2 tv = tvar();
+    //if( tv._type==null ) { tv._type = _tptr; return true; }
+    //return false;
+    throw unimpl();
   }
 
   @Override TypeStr dead_type() { return TypeStr.XSTR; }

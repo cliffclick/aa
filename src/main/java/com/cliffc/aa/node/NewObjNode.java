@@ -181,38 +181,35 @@ public class NewObjNode extends NewNode<TypeStruct> {
     return t.oob(TypeMem.ALIVE);
   }
 
-  @Override public TV2 new_tvar(String alloc_site) { return TV2.make_struct(this,alloc_site); }
+  @Override public TV2 new_tvar(String alloc_site) {
+    for( Node n : _defs )
+      if( n!=null )  n.walk_initype(); // Force tvar
+    return TV2.make_struct(this,alloc_site);
+  }
 
   @Override public boolean unify( boolean test ) {
     TV2 rec = tvar();
     if( rec.is_err() ) return false;
-    assert rec.is_struct();
-
-    // One time (post parse) pick up the complete field list.
-    if( rec.open() )
-      return test ||            // Cutout before allocation if testing
-        rec.unify(TV2.make_struct(this,"NewObj_unify",_ts,_defs),test);
-
-    // Extra fields are unified as Error since they are not created here:
-    // error to load from a non-existing field.
-    boolean progress = false;
-    if( !is_unused() )
-      for( String key : rec.args() )
-        if( _ts.get(key)==null && !rec.get(key).is_err() ) {
-          if( test ) return true;
-          progress |= rec.get(key).unify(rec.miss_field(this,key,"NewObj_err"),test);
-          if( (rec=rec.find()).is_err() ) return true;
-        }
+    assert rec.is_struct() && check_fields(rec);
 
     // Unify existing fields.  Ignore extras on either side.
+    boolean progress = false;
     for( TypeFld fld : _ts.flds() ) {
-      TV2 tvfld = rec.get(fld._fld);
-      if( tvfld != null &&      // Limit to matching fields
-          (progress |= tvfld.unify(tvar(fld._order),test)) &&
-          test )
-        return true; // Fast cutout if testing
+      TV2 tvfld = rec.arg(fld._fld);
+      if( tvfld != null ) progress |= tvfld.unify(tvar(fld._order),test);
+      if( test && progress ) return true; // Fast cutout if testing
     }
     rec.push_dep(this);
     return progress;
+  }
+
+  // Extra fields are unified with ERR since they are not created here:
+  // error to load from a non-existing field
+  private boolean check_fields(TV2 rec) {
+    if( rec._args != null )
+      for( String id : rec._args.keySet() )
+        if( _ts.get(id)==null && !rec.arg(id).is_err() )
+          return false;
+    return true;
   }
 }

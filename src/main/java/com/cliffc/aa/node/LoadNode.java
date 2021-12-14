@@ -246,13 +246,26 @@ public class LoadNode extends Node {
 
   // Standard memory unification; the Load unifies with the loaded field.
   @Override public boolean unify( boolean test ) {
-    if( tvar().is_err() ) return false; // Already an error, no progress
-    // Propagate an error
-    TV2 ptr = adr().tvar();
-    if( ptr.is_err() ) return tvar().unify(ptr,test);
-    ptr.push_dep(this);
+    TV2 self = tvar();
+    TV2 rec = adr().tvar();
+    rec.push_dep(this);
+    
+    TV2 fld = rec.arg(_fld);
+    if( fld!=null )           // Unify against a pre-existing field
+      return fld.unify(self, test);
 
-    return StoreNode.unify("@{}",this,ptr,adr()._val,tvar(),_fld,test);
+    // Add struct-ness if possible
+    if( !rec.is_struct() && !rec.is_nil() )
+      rec.make_open_struct();
+    // Add the field
+    if( rec.is_struct() && rec.is_open() ) {
+      rec.add_fld(_fld,self);
+      return true;
+    }
+    // Closed/non-record, field is missing
+    if( self._err!=null ) return false;
+    self._err = "Missing field "+_fld;
+    return true;
   }
   public void add_work_hm() {
     super.add_work_hm();
