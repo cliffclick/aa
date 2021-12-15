@@ -233,13 +233,14 @@ public class Parse implements Comparable<Parse> {
       return fptr;
     }
 
+    // Back door return ptr-to-NewObj
+    int pidx = GVNGCM.KEEP_ALIVE.len()-1;
+    ProjNode ptr = (ProjNode)Node.peek(pidx);
     // Always wrap Objs with a TypeMemPtr and a unique alias.
-    TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.type_alias(BitsAlias.REC),(TypeObj)named);
+    TypeMemPtr tmp = ((NewObjNode)ptr.in(0))._tptr;
     // Make a ConType with a named Type
     tn = (ConTypeNode)gvn(new ConTypeNode(tvar,tmp,scope()));
     _e.add_type(tvar,tn); // Add a type mapping
-    // Back door return ptr-to-NewObj
-    ProjNode ptr = (ProjNode)GVNGCM.KEEP_ALIVE.pop();
     // Unlink the constructed sample object; it only exists for the type-domain
     // and is never actually allocated "in real life".
     Node omem = mem();
@@ -257,13 +258,12 @@ public class Parse implements Comparable<Parse> {
     // Named:@{x,y}.  This stores a v-table ptr into an object.  The alias#
     // does not change, but a TypeMem[alias#] would now map to the Named
     // variant.
-    TypeStruct ts = (TypeStruct)((TypeMemPtr)tn._val)._obj;
-    int pidx = ptr.push();
+    TypeStruct ts = (TypeStruct)named;
     FunPtrNode epi1 = IntrinsicNode.convertTypeName(ts,bad,ptr);
     do_store(lookup_scope(tvar,false),epi1,Access.Final,tvar,bad);
     // Add a second constructor taking an expanded arg list
-    FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(ts, tn.alias(), errMsg(), _e, (ProjNode)Node.pop(pidx));
     Node.pop(midx);             // No longer keeping the sample struct around
+    FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(ts, tn.alias(), errMsg(), _e, (ProjNode)Node.pop(pidx));
     do_store(scope(),epi2,Access.Final,tvar,bad);
     UnresolvedNode unr = (UnresolvedNode)_e.lookup(tvar); // Returns an Unresolved of constructors
     // TODO: Ponder just being scoped and not defined - which will allow more
@@ -613,38 +613,30 @@ public class Parse implements Comparable<Parse> {
       if( peek("++") && (n=inc(tok, 1))!=null ) return n;
       if( peek("--") && (n=inc(tok,-1))!=null ) return n;
     }
+    _x = oldx;                  // Unwind failed ++/--
+    Node n;
 
-    // Check for uniops.  These are normal identifiers with a trailing '_'
-    // flagged as an operator.
-    if( tok != null ) {
-      Node unifun = _e.lookup_filter_uni(tok); // UniOp, or null
-      if( unifun != null ) {
-      //  FunPtrNode ptr = unifun.funptr();
-      //  // Token might have been longer than the filtered name; happens if a
-      //  // bunch of operator characters are adjacent, but we can make an
-      //  // operator out of the first few.  The name also ends in '_' to
-      //  // indicate it's a prefix operator.
-      //  _x = oldx+ptr._name.length()-1;
-      //  // Balanced ops also need to subtract the unparsed trailing balanced close
-      //  String bal_close = ptr.fun()._bal_close;
-      //  if( bal_close !=null )
-      //    _x = _x - bal_close.length();
-      //  unifun.keep();
-      //  Node term = term();
-      //  if( term!=null ) {
-      //    if( bal_close != null )
-      //      require(bal_close,oldx);
-      //    return do_call(errMsgs(0,oldx),args(unifun.unkeep(),term));
-      //  }
-      //  unifun.unhook();        // Unwind and try normal term
-        throw unimpl();
-      }
+    // Check for prefix ops; these start with "!~-+" and require a trailing
+    // expr; balanced ops require a trailing balanced close.
+    Oper op = pre_bal();
+    if( op != null ) {
+      Node e0 = term();
+      if( e0 == null ) throw unimpl();  // Parsed a valid leading op but missing trailing expr
+      Oper op2 = bal_close(op);         // Returns old op if not balanced, new fuller op if balanced
+      if( op2 == null ) throw unimpl(); // Missing close to balanced op
+      if( op2._nargs!=1 ) throw unimpl(); // No binary/trinary allowed here
+      // Load field e0.op2_ as TFP, and instance call.
+      int e0alias = ((NewObjNode)e0.in(0))._alias;
+      Node fun  = gvn(new LoadNode(mem(),e0,op2._name,errMsg(oldx)));
+      assert ((TypeMemPtr)((TypeFunPtr)fun._val)._dsp)._aliases.test_recur(e0alias);
+      n = do_call(errMsgs(0,oldx),args(fun));
+      throw unimpl();
     }
 
-    _x = oldx;
+
 
     // Normal term expansion
-    Node n = tfact();
+    n = tfact();
     if( n == null ) return null;
     while( true ) {             // Repeated application or field lookup is fine
       if( peek('.') ) {         // Field?
@@ -802,7 +794,7 @@ public class Parse implements Comparable<Parse> {
   private Node fact() {
     if( skipWS() == -1 ) return null;
     byte c = _buf[_x];
-    if( isDigit(c) ) return con(number());
+    if( isDigit(c) ) return number();
     if( '"' == c ) {
       Node str = string();
       return str==null ? err_ctrl2("Unterminated string") : str;
@@ -1153,14 +1145,42 @@ public class Parse implements Comparable<Parse> {
     return true;
   }
 
+  // Prefix or leading balanced op
+  Oper pre_bal() {
+    byte c = skipWS();
+    if( !isOp0(c) ) return null;
+    if( _prims && c=='$' ) return null; // Disallow $$ operator during prim parsing; ambiguous with $$java_class_name
+    if( _x >= _buf.length ) return null;
+    int startx = _x;
+    while( _x < _buf.length && isOp1(_buf[_x]) ) _x++;
+    return new Oper(_buf,startx,_x);
+  }
+
+  // Parse an optional closing balanced op
+  Oper bal_close(Oper op) {
+    if( !op.is_open() ) return op;
+    // Parse a balanced token; any "[{" must appear in reverse order "}]"
+    throw unimpl();
+  }
+
+
   // Parse a number; WS already skipped and sitting at a digit.  Relies on
   // Javas number parsing.
-  private Type number() {
+  private Node number() {
     _pp.setIndex(_x);
     Number n = _nf.parse(_str,_pp);
     _x = _pp.getIndex();
-    if( n instanceof Long   ) return n.longValue()==0 ? Type.XNIL : TypeInt.con(n.  longValue());
-    if( n instanceof Double ) return TypeFlt.con(n.doubleValue());
+    if( n instanceof Long   ) {
+      long l = n.longValue();
+      if( l==0 ) throw unimpl(); // class for xnil
+      TypeInt ti = TypeInt.con(l);
+      Node unr = _e.lookup("int");
+      Node ni = do_call(null,ctrl(),mem(),unr,con(ti));
+      return ni;
+    }
+    if( n instanceof Double )
+      throw unimpl();
+      //return TypeFlt.con(n.doubleValue());
     throw new RuntimeException(n.getClass().toString()); // Should not happen
   }
   // Parse a small positive integer; WS already skipped and sitting at a digit.
@@ -1464,6 +1484,7 @@ public class Parse implements Comparable<Parse> {
   }
 
   // Wiring for call arguments
+  private Node[] args(Node a0                           ) { return _args(new Node[]{null,null,a0}); }
   private Node[] args(Node a0, Node a1                  ) { return _args(new Node[]{null,null,a0,a1}); }
   private Node[] args(Node a0, Node a1, Node a2         ) { return _args(new Node[]{null,null,a0,a1,a2}); }
   //private Node[] args(Node a0, Node a1, Node a2, Node a3) { return _args(new Node[]{null,null,a0,a1,a2,a3}); }

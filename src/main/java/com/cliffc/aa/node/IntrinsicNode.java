@@ -150,19 +150,36 @@ public class IntrinsicNode extends Node {
     NewObjNode nnn = new NewObjNode(false,alias,to,null);
     nnn.pop();                  // Drop the display, will be added below
     int nargs2 = AA.ARG_IDX;    // Renumber required params, since some fields will not need a param
+    int olduid = nnn._uid;
 
     // Fill in the fields
     for( int i=AA.DSP_IDX; i<proto._defs._len; i++ ) {
       TypeFld fld = to.fld_idx(i);
-      nnn.add_def( fld._t==Type.SCALAR
-                   ? Env.GVN.init(new ParmNode(nargs2++,fld._fld,fun,Env.ALL_PARM,bad))
-                   : proto.in(i));
+      Node val;   FunPtrNode fptr;
+      if( fld._t==Type.SCALAR ) {
+        val = Env.GVN.init(new ParmNode(nargs2++,fld._fld,fun,Env.ALL_PARM,bad));
+      } else {
+        // Instance-functions make new FunPtrs using 'nnn' as the display.
+        // TODO: Wildly inefficient graph IR; split out the "prototype class"
+        // from the "prototype object".  See "BoxInt" notion.
+        val = proto.in(i);
+        if( val instanceof FunPtrNode &&
+            ((TypeMemPtr)((TypeFunPtr)(fptr=(FunPtrNode)val)._val)._dsp)._aliases.test(alias) )
+          val = new FunPtrNode(fptr._name,fptr.ret());
+      }
+      nnn.add_def(val);
     }
     // Finish and return
     nnn = Env.GVN.init(nnn);
+    ProjNode  pnnn  = Env.GVN.init(new ProjNode(REZ_IDX,nnn));
     MrgProjNode mrg = Env.GVN.init(new MrgProjNode(nnn,mem));
-    ProjNode pnnn   = Env.GVN.init(new ProjNode(REZ_IDX,nnn));
     RetNode ret     = Env.GVN.init(new RetNode(fun,mrg,pnnn,rpc,fun));
+
+    // Making a funptr/display closed cycle, so needs a 2nd pass.
+    for( int i=AA.DSP_IDX; i<proto._defs._len; i++ )
+      if( nnn.in(i)._uid > olduid && nnn.in(i) instanceof FunPtrNode )
+        Env.GVN.add_work_new(nnn.in(i).set_def(1,pnnn)); // Make all FunPtrs use self as their display
+
     // Hook function at the TOP scope, because it may yet have unwired
     // CallEpis which demand memory.  This hook is removed as part of doing
     // the Combo pass which computes a real Call Graph and all escapes.

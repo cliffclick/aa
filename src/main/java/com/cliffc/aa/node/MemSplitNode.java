@@ -11,8 +11,6 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Arrays;
 import java.util.BitSet;
 
-import static com.cliffc.aa.AA.unimpl;
-
 // TODO: Parse12 gen test, seeing many back-to-back identical split/join.
 
 // Split a set of aliases into a SESE region, to be joined by a later MemJoin.
@@ -137,8 +135,8 @@ public class MemSplitNode extends Node {
     BitsAlias head2_escs = head2.escapees();
     assert check_split(head1,head1_escs,head1.in(1));
     // Insert empty split/join above head2
-    MemSplitNode msp = Env.GVN.init(new MemSplitNode(head2.in(1))).unkeep(2);
-    MProjNode    mprj= Env.GVN.init(new MProjNode   (msp,0      )).unkeep(2);
+    MemSplitNode msp = Env.GVN.init(new MemSplitNode(head2.in(1)));
+    MProjNode    mprj= Env.GVN.init(new MProjNode   (msp,0      ));
     MemJoinNode  mjn = Env.GVN.init(new MemJoinNode (mprj       ));
     head2.set_def(1,mjn);
     mjn._live = tail1._live;
@@ -150,28 +148,23 @@ public class MemSplitNode extends Node {
     if( tail1 instanceof ProjNode ) Env.GVN.add_flow(tail1.in(0));
     assert Env.START.more_work(true)==0;
     Env.GVN.add_mono(mjn);       // See if other defs can move into the Join
-    for( Node use : mjn.unkeep(2)._uses )
+    for( Node use : mjn._uses )
       Env.GVN.add_work_new(use); // See if other uses can move into the Join
     return head1;
   }
 
   static boolean check_split( Node head1, BitsAlias head1_escs, Node tail2 ) {
-    //if( head1._keep > 1 || tail2._keep > 1 ) return false; // Still being constructed
-    //// Must have only 1 mem-writer (this can fail if used by different control paths)
-    //if( !tail2.check_solo_mem_writer(head1) ) return false;
-    //// No alias overlaps
-    //if( head1_escs.overlaps(tail2.escapees()) ) return false;
-    //// TODO: This is too strong.
-    //// Cannot have any Loads following head1; because after the split
-    //// they will not see the effects of previous stores that also move
-    //// into the split.
-    //// Allow exactly 1 use (and an optional DEFMEM)
-    //if(  tail2._uses._len!=1 &&
-    //    (tail2._uses._len!=2 || tail2._uses.find(Env.DEFMEM)== -1 ) )
-    //  return false;
-    //
-    //return true;
-    throw unimpl();
+    if( head1.is_keep() || tail2.is_keep() ) return false; // Still being constructed
+    // Must have only 1 mem-writer (this can fail if used by different control paths)
+    if( !tail2.check_solo_mem_writer(head1) ) return false;
+    // No alias overlaps
+    if( head1_escs.overlaps(tail2.escapees()) ) return false;
+    // TODO: This is too strong.
+    // Cannot have any Loads following head1; because after the split
+    // they will not see the effects of previous stores that also move
+    // into the split.
+    // Allow exactly 1 use
+    return tail2._uses._len==1;
   }
 
 

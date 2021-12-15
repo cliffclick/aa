@@ -63,7 +63,7 @@ public class GVNGCM {
     add_mono(n);
     add_grow(n);
     if( n instanceof FunNode )
-      _work_inline.add((FunNode)n);
+      _work_inline.add(n);
     return n;
   }
 

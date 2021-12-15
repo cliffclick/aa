@@ -303,14 +303,14 @@ public class Env implements AutoCloseable {
       // Prepare the name from the token
       String name2 = name.substring(0,i)+"_";
       Oper o = _lookup_oper(name2.intern());
-      if( o != null && o.op_prec() >= op_prec_test ) {
-        // TODO: Return a field load, so not a Unresolved?
-        // TODO: Return a string field name, and caller does the Load + Instance-Call
+      //if( o != null && o.op_prec() >= op_prec_test ) {
+      // TODO: Return a field load, so not a Unresolved?
+      // TODO: Return a string field name, and caller does the Load + Instance-Call
       //  UnOrFunPtrNode m = n.filter(nargs); // Filter for args
       //  if( m!=null )
       //    return (UnOrFunPtrNode)Env.GVN.xform(new FreshNode(_fun,m));
-        throw unimpl();
-      }
+      // }
+      throw unimpl();
     }
     return null;
   }

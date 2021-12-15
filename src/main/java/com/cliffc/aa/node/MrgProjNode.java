@@ -5,7 +5,6 @@ import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.MEM_IDX;
-import static com.cliffc.aa.AA.unimpl;
 
 // Proj memory
 public class MrgProjNode extends ProjNode {
@@ -36,9 +35,7 @@ public class MrgProjNode extends ProjNode {
     if( mem instanceof MemJoinNode && mem._uses._len==1 ) {
       MrgProjNode mprj = new MrgProjNode(nnn,mem);
       MemJoinNode mjn = ((MemJoinNode)mem).add_alias_below_new(mprj,this);
-      //Env.DEFMEM.set_def(nnn._alias,mprj);
-      //return mjn;
-      throw unimpl();
+      return mjn;
     }
 
     return null;

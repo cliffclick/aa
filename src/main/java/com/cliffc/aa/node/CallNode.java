@@ -229,7 +229,8 @@ public class CallNode extends Node {
     // Try to resolve to single-target
     if( fdx() instanceof UnresolvedNode ) {
       FunPtrNode fptr = ((UnresolvedNode)fdx()).resolve_value(((TypeTuple)_val)._ts);
-      throw unimpl();
+      set_fdx(fptr);            // Resolve to 1 choice
+      return this;
     }
 
     // Wire valid targets.
@@ -372,7 +373,7 @@ public class CallNode extends Node {
     ts[DSP_IDX] = tfp._dsp;
     //BitsAlias as = get_alias(tfp._dsp);
     for( int i=ARG_IDX; i<nargs(); i++ )
-      ts[i] = arg(i)==null ? Type.XSCALAR : arg(i)._val;    
+      ts[i] = arg(i)==null ? Type.XSCALAR : arg(i)._val;
     if( !(fdx() instanceof FunPtrNode) )
       tfp = (TypeFunPtr)((UnresolvedNode)fdx()).resolve_value(ts)._val;
     ts[_defs._len] = tfp;
@@ -404,7 +405,7 @@ public class CallNode extends Node {
       if( def!=null && err(true)!=null )
         Env.GVN.add_flow(def);
     // If not resolved, might now resolve
-    if( _val instanceof TypeTuple && ttfp(_val)._fidxs.abit()==-1 )
+    if( _val instanceof TypeTuple && ttfp(_val)._fidxs.abit()!=-1 )
       Env.GVN.add_reduce(this);
     // If escapes lowers, can allow e.g. swapping with New
     //if( _val instanceof TypeTuple && tesc(old)!=tesc(_val) )

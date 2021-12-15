@@ -254,6 +254,9 @@ public class FunNode extends RegionNode {
       path = split_size(body,parms); // Forcible size-splitting first path
       if( path == -1 ) return null;
       assert CallNode.ttfp(in(path).val(0)).fidx()!=-1; // called by a single-target call
+      Node fdx = ((CallNode)in(path).in(0)).fdx();
+      assert fdx instanceof FunPtrNode; // Shoulda cleared out
+      body.add(fdx);
       if( !is_prim() ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
     }
 
@@ -487,9 +490,9 @@ public class FunNode extends RegionNode {
     // Backwards walk, trimmed to reachable from forwards
     VBitSet breached = new VBitSet(); // Backwards and forwards reached
     Ary<Node> body = new Ary<>(new Node[1],0);
-    for( Node use : ret._uses ) // Include all FunPtrs as part of body
-      if( use instanceof FunPtrNode )
-        body.push(use);
+    //for( Node use : ret._uses ) // Include all FunPtrs as part of body
+    //  if( use instanceof FunPtrNode )
+    //    body.push(use);
     work.add(ret);
     while( !work.isEmpty() ) {  // While have work
       Node n = work.pop();      // Get work
@@ -685,9 +688,18 @@ public class FunNode extends RegionNode {
     for( Node n : map.keySet() ) {
       Node c = map.get(n);
       assert c._defs._len==0;
-      for( Node def : n._defs ) {
-        Node newdef = map.get(def);// Map old to new
-        c.add_def(newdef==null ? def : newdef);
+      // FunPtr clones for path calls: always use the original Code, as the
+      // path clone will be going away.
+      if( n instanceof FunPtrNode && path >= 0 && path_call.fdx()!= n ) {
+        c.add_def(n.in(0)); //
+        Node dsp = map.get(n.in(1));
+        c.add_def(dsp==null ? n.in(1) : dsp );
+
+      } else {
+        for( Node def : n._defs ) {
+          Node newdef = map.get(def);// Map old to new
+          c.add_def(newdef==null ? def : newdef);
+        }
       }
     }
 
@@ -715,15 +727,15 @@ public class FunNode extends RegionNode {
           throw unimpl();
         }
     } else {                         // Path split
-      Node old_funptr = fptr();      // Find the funptr for the path split
+      Node old_funptr = fptr(path_call.fdx()); // Funptr for the path split
       Node new_funptr = map.get(old_funptr);
       new_funptr.insert(old_funptr); // Make cloned recursive calls, call the old version not the new version
       TypeFunPtr ofptr = (TypeFunPtr) old_funptr._val;
       path_call.set_fdx(new_funptr); // Force new_funptr, will re-wire later
       TypeFunPtr nfptr = ofptr.make_from(BitsFun.make0(newret._fidx));
       path_call._val = CallNode.set_ttfp((TypeTuple) path_call._val,nfptr);
-      for( Node use : oldret._uses ) // Check extra FunPtrs are dead
-        if( use instanceof FunPtrNode ) Env.GVN.add_dead(map.get(use));
+      //for( Node use : oldret._uses ) // Check extra FunPtrs are dead
+      //  if( use instanceof FunPtrNode ) Env.GVN.add_dead(map.get(use));
 
     } // Else other funptr/displays on unrelated path, dead, can be ignored
 
@@ -773,7 +785,7 @@ public class FunNode extends RegionNode {
       //  //Env.GVN.add_flow_uses(oorg);
       //  //split_alias=true;
       //}
-      if( nn instanceof FunPtrNode ) { // FunPtrs pick up the new fidx
+      if( nn instanceof FunPtrNode && (path==0 || path_call.fdx()==nn)) { // FunPtrs pick up the new fidx
         TypeFunPtr ofptr = (TypeFunPtr)nt;
         if( ofptr.fidx()==oldret._fidx )
           nt = ofptr.make_from(BitsFun.make0(newret._fidx));
@@ -916,6 +928,20 @@ public class FunNode extends RegionNode {
       if( fptr instanceof FunPtrNode )
         return (FunPtrNode)fptr;
     return null;
+  }
+  // Returns matching FunPtr for a Calls FDX
+  public FunPtrNode fptr(Node fdx) {
+    FunPtrNode fptr=null;
+    if( fdx instanceof FunPtrNode ) {
+      fptr = (FunPtrNode)fdx;
+    } else {
+      assert fdx instanceof UnresolvedNode;
+      for( Node fdx2 : fdx._defs )
+        if( (fptr=(FunPtrNode)fdx2).fun()==this )
+          break;
+    }
+    assert fptr.fun()==this;
+    return fptr;
   }
 
   @Override public boolean equals(Object o) { return this==o; } // Only one

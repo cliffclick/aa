@@ -130,7 +130,7 @@ public class MemJoinNode extends Node {
     MemSplitNode msp = msp();
     if( msp==null ) return TypeMem.ANYMEM;
 
-    // Gather all memories
+    // "Shortcut" is all memories are the same (or any/all)
     boolean diff=false;
     TypeMem[] mems = new TypeMem[_defs._len];
     for( int i=0; i<_defs._len; i++ ) {
@@ -143,30 +143,11 @@ public class MemJoinNode extends Node {
     }
     if( !diff ) return mems[0]; // All memories the same
 
-    //if( opt_mode._CG ) {
-    //  // During or after Combo, the memory types are complete.  Simply MEET.
-    //  Type t = Type.ANY;
-    //  for( TypeMem tmem : mems )
-    //    t = t.meet(tmem);
-    //  return t;
-    //} else {
-    //  // Pre Call-Graph, we must rely on Env.DEFMEM.
-    //  // Walk all aliases and take from matching escape set in the Split.  Since
-    //  // nothing overlaps this is unambiguous.
-    //  Ary<BitsAlias> escs = msp()._escs;
-    //  TypeObj[] pubs = new TypeObj[Env.DEFMEM._defs._len];
-    //  for( int alias=1, i; alias<Env.DEFMEM._defs._len; alias++ ) {
-    //    if( escs.at(0).test_recur(alias) ) { // In some RHS set
-    //      for( i=1; i<_defs._len; i++ )
-    //        if( escs.at(i).test_recur(alias) )
-    //          break;
-    //    } else i=0;                     // In the base memory
-    //    if( alias == 1 || Env.DEFMEM.in(alias) != null ) // Check never-made aliases
-    //      pubs[alias] = mems[i].at(alias); // Merge alias
-    //  }
-    //  return TypeMem.make0(pubs);
-    //}
-    throw unimpl();
+    // Simply MEET.
+    Type t = Type.ANY;
+    for( TypeMem tmem : mems )
+      t = t.meet(tmem);
+    return t;
   }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 
@@ -214,7 +195,7 @@ public class MemJoinNode extends Node {
     int idx = msp.add_alias(head1_escs); // Add escape set, find index
     Node mspj;
     if( idx == _defs._len ) {         // Escape set added at the end
-      add_def(mspj = GVN.init(new MProjNode(msp,idx)).unkeep(2));
+      add_def(mspj = GVN.init(new MProjNode(msp,idx)));
     } else {             // Inserted into prior region
       mspj = in(idx);
       assert idx!=0;     // No partial overlap; all escape sets are independent
@@ -223,17 +204,10 @@ public class MemJoinNode extends Node {
     head.set_def(MEM_IDX,in(idx));
     base.insert(this);
     set_def(idx,base);
-    // Move any accidental refs to DefMem back to base
-    //int didx = Env.DEFMEM._defs.find(this);
-    //if( didx != -1 ) Env.DEFMEM.set_def(didx,base);
-    //GVN.revalive(mspj,head,base);
-    throw unimpl();
   }
 
   MemJoinNode add_alias_below_new(Node nnn, Node old ) {
-    old.keep();                 // Called from inside old.ideal(), must keep alive until exit
     add_alias_below(GVN.add_work_new(nnn),nnn.escapees(),nnn);
-    old.unkeep();               // Alive, but keep==0
     nnn.xval();  xval();        // Force update, since not locally monotonic
     GVN.add_flow_defs(this);
     assert Env.START.more_work(true)==0;
