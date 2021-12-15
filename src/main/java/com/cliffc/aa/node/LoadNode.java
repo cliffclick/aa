@@ -249,7 +249,7 @@ public class LoadNode extends Node {
     TV2 self = tvar();
     TV2 rec = adr().tvar();
     rec.push_dep(this);
-    
+
     TV2 fld = rec.arg(_fld);
     if( fld!=null )           // Unify against a pre-existing field
       return fld.unify(self, test);
@@ -289,10 +289,7 @@ public class LoadNode extends Node {
     // Both type systems know about the field
     if( !(objs instanceof TypeStruct) || ((TypeStruct)objs).get(_fld)==null )
       return bad(fast,objs);
-    //if( Env.GVN._opt_mode == GVNGCM.Mode.PesiCG && adr().has_tvar() && adr().tvar().get(_fld)==null )
-    //  return bad(fast,objs);
-    //return null;
-    throw unimpl();
+    return null;
   }
   private ErrMsg bad( boolean fast, TypeObj to ) {
     boolean is_closure = adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure;

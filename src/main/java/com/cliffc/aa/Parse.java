@@ -614,10 +614,10 @@ public class Parse implements Comparable<Parse> {
       if( peek("--") && (n=inc(tok,-1))!=null ) return n;
     }
     _x = oldx;                  // Unwind failed ++/--
-    Node n;
 
-    // Check for prefix ops; these start with "!~-+" and require a trailing
-    // expr; balanced ops require a trailing balanced close.
+    // Check for prefix ops; no leading exptr and require a trailing expr;
+    // balanced ops require a trailing balanced close.
+    Node n;
     Oper op = pre_bal();
     if( op != null ) {
       Node e0 = term();
@@ -630,14 +630,13 @@ public class Parse implements Comparable<Parse> {
       Node fun  = gvn(new LoadNode(mem(),e0,op2._name,errMsg(oldx)));
       assert ((TypeMemPtr)((TypeFunPtr)fun._val)._dsp)._aliases.test_recur(e0alias);
       n = do_call(errMsgs(0,oldx),args(fun));
-      throw unimpl();
+    } else {
+      // Normal term expansion
+      n = tfact();
+      if( n == null ) return null;
     }
 
-
-
-    // Normal term expansion
-    n = tfact();
-    if( n == null ) return null;
+    // Repeat until not a term.  Binary expressions have precedence, parsed in expr()
     while( true ) {             // Repeated application or field lookup is fine
       if( peek('.') ) {         // Field?
         skipWS();               //

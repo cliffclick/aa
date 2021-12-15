@@ -83,13 +83,13 @@ public final class FunPtrNode extends Node {
   }
 
   @Override public Node ideal_reduce() {
-
     Node dsp = display();
     if( dsp!=Env.ANY ) {
       Type tdsp = dsp._val;
       FunNode fun;
       // Display is known dead?
-      if( (tdsp instanceof TypeMemPtr && ((TypeMemPtr)tdsp)._obj==TypeObj.UNUSED) ||
+      if( _live==TypeMem.DEAD ||
+          (tdsp instanceof TypeMemPtr && ((TypeMemPtr)tdsp)._obj==TypeObj.UNUSED) ||
           // Collapsing to a gensym, no need for display
           ret().is_copy() ||
           // Also unused if function has no display parm.
@@ -105,19 +105,6 @@ public final class FunPtrNode extends Node {
       Env.GVN.add_reduce(this);
   }
 
-  // Is the display used?  Calls may use the TFP portion but not the display.
-  private boolean display_used() {
-    for( Node call : _uses ) {
-      if( !(call instanceof CallNode) ) return true; // Anything other than a Call is using the display
-      for( int i=ARG_IDX; i<call.len(); i++ )
-        if( call.in(i)==this ) return true; // Call-use other than the last position is using the display portion of this FPTR
-      assert ((CallNode)call).fdx()==this;
-      if( ProjNode.proj(call,DSP_IDX)!=null )
-        return true;            // Call needs the display and fptr both
-    }
-    return false;               // Only uses are Calls needing the fptr but not the display
-  }
-
 
   @Override public Type value() {
     if( !(in(0) instanceof RetNode) )
@@ -129,6 +116,8 @@ public final class FunPtrNode extends Node {
   @Override public void add_flow_extra(Type old) {
     if( old==_live )            // live impacts value
       Env.GVN.add_flow(this);
+    if( _live==TypeMem.DEAD && display() != Env.ANY )
+      Env.GVN.add_reduce(this);
     if( old instanceof TypeFunPtr )
       for( Node use : _uses )
         if( use instanceof UnresolvedNode )

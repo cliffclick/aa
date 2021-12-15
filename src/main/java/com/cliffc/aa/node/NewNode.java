@@ -21,7 +21,7 @@ import static com.cliffc.aa.AA.unimpl;
 public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
-  public int _alias; // Alias class
+  public int _alias, _reset_alias; // Alias class
 
   // A list of field names and field-mods, folded into the initial state of
   // this NewObj.  These can come from initializers at parse-time, or stores
@@ -52,6 +52,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   }
   @Override public String xstr() { return "New"+"*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
+  @Override void record_for_reset() { _reset_alias=_alias; }
+  void reset() { assert is_prim(); _init(_reset_alias,_ts); }
 
   public MrgProjNode mem() {
     if( _uses._len < 1 ) return null;

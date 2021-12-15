@@ -72,10 +72,7 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
-    test("-1",  TypeInt.con(-1), "-1");
-    test("-2",  TypeInt.con(-2), "-2");
-    test("-3",  TypeInt.con(-3), "-3");
-
+    test("!1",  Type.NIL, "nil");
     test("1",   TypeInt.TRUE, "1");
     // Unary operator
     test("-1",  TypeInt.con(-1), "-1");
@@ -912,7 +909,7 @@ HashTable = {@{
     assertNull(te._errs);
     if( gcp_maker != null ) {
       Type expect = gcp_maker.get();
-      Type actual = te._tmem.sharptr(te._t);
+      Type actual = te._tmem.sharptr(te._t).unbox();
       assertEquals(expect,actual);
       // Also check GCP formals.
       if( expect instanceof TypeFunPtr ) {
@@ -924,7 +921,7 @@ HashTable = {@{
     }
     if( hmt_expect != null ) {
       TV2 actual = te._hmt;
-      String actual_str = actual.p();
+      String actual_str = actual.unbox().p();
       assertEquals(stripIndent(hmt_expect),stripIndent(actual_str));
     }
   }

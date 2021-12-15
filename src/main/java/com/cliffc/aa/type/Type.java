@@ -863,6 +863,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Sharpen pointer with memory
   public Type sharptr( Type ptr ) { return this==ANY ? TypeMem.ANYMEM.sharptr(ptr) : ptr; }
 
+  // Unbox any boxed primitives.
+  public Type unbox() { return this; }
+  
   // Apply the test(); if it returns true iterate over all nested child types.
   // If the test returns false, short-circuit the walk.  No attempt to guard
   // against recursive structure walks, so the 'test' must return false when

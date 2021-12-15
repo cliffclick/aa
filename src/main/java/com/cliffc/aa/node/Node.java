@@ -765,6 +765,15 @@ public abstract class Node implements Cloneable, IntSupplier {
     for( Node def : _defs ) if( def != null ) def.walk_initype();
   }
 
+  public final void walk_record_for_reset( ) {
+    if( Env.GVN.on_flow(this) ) return; // Been there, done that
+    Env.GVN.add_flow(this);
+    for( Node use : _uses )                   use.walk_record_for_reset();
+    for( Node def : _defs ) if( def != null ) def.walk_record_for_reset();
+    record_for_reset();
+  }
+  void record_for_reset() { }
+
   // Reset
   public final void walk_reset( ) {
     if( Env.GVN.on_flow(this) ) return; // Been there, done that
@@ -776,9 +785,11 @@ public abstract class Node implements Cloneable, IntSupplier {
     // Walk reachable graph
     for( Node use : _uses )                   use.walk_reset();
     for( Node def : _defs ) if( def != null ) def.walk_reset();
+    if( this instanceof NewNode ) ((NewNode)this).reset();
     if( this instanceof CallNode ) ((CallNode)this)._not_resolved_by_gcp = false; // Try again
     if( this instanceof RegionNode || this instanceof PhiNode ) {
-      while( len()>1 && !in(len()-1).is_prim() ) pop(); // Kill wired primitive inputs
+      while( len()>1 && !in(len()-1).is_prim() )
+        pop(); // Kill wired primitive inputs
     }
   }
 

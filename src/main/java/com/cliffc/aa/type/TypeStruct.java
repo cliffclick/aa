@@ -1111,6 +1111,10 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
       for( TypeFld fld : flds() ) fld.walk(p);
   }
 
+  @Override public Type unbox() {
+    throw unimpl();
+  }
+
   // Make a Type, replacing all dull pointers from the matching types in mem.
   @Override public TypeStruct make_from(Type head, TypeMem mem, VBitSet visit) {
     if( visit.tset(_uid) ) return null;

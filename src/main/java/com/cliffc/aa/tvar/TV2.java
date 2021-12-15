@@ -1015,6 +1015,25 @@ public class TV2 {
   private void merge_ns( TV2 that ) { that._ns = that._ns == null ? _ns : that._ns.addAll(_ns); }
 
   // --------------------------------------------
+  // Recursively unbox
+  public TV2 unbox() {
+    assert DUPS.isEmpty();
+    TV2 tv = _unbox();
+    DUPS.clear();
+    return tv;
+  }
+  private TV2 _unbox() {
+    TV2 tv = DUPS.get(_uid);
+    if( tv!=null ) return tv;
+    if( is_struct() ) {
+      if( arg("int")!=null )
+        return arg("_val");     // Unbox ints
+      throw unimpl();
+    }
+    throw unimpl();
+  }
+  
+  // --------------------------------------------
   // Pretty print
   boolean is_prim() { return is_struct() && _args!=null && _args.containsKey("!_"); }
   boolean is_math() { return is_struct() && _args!=null && _args.containsKey("pi"); }

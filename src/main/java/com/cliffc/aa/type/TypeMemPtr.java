@@ -260,6 +260,12 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   public int getbit() { return _aliases.getbit(); }
   public int getbit0() { return _aliases.strip_nil().getbit(); }
 
+  @Override public Type unbox() {
+    if( Util.eq(_obj._name,"int:") )
+      return ((TypeStruct)_obj).at("_val");
+    return make_from((TypeObj)_obj.unbox());
+  }
+  
   // Widen for primitive specialization and H-M unification.  H-M distinguishes
   // ptr-to-array (and string) from ptr-to-record.  Must keep types at the same
   // resolution as H-M, so pointers all permit nil (unless I track a H-M type
