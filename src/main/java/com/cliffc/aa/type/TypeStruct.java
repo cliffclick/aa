@@ -545,20 +545,20 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
 
   "Wrap-and-Approx" is not monotonic!  Can only happen if we have a nested
   instance of alias#12.  This can happen from an ordinary MEET.
-  
+
   [12]@{                               [12]@{
     pred=~scalar                         pred=~scalar
     succ= *[12]@{     >>> FALLS >>>      succ= scalar // Succ field falls
       pred=*[12]@{ something }         }
     }
   }
-  
+
   ----- Approx on [12] for both types: -----
   [12]@{                               [12]@{
-    pred= $recursive$  <<< LIFTS <<<     pred=~scalar 
+    pred= $recursive$  <<< LIFTS <<<     pred=~scalar
     succ= $recursive$                    succ= scalar
   }                                    }
-  
+
   */
 
   private static final IHashMap OLD2APX = new IHashMap();
@@ -1068,15 +1068,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
 
   // Keep field names and orders.  Widen all field contents, including finals.
   // Handles cycles
-  @Override public TypeStruct widen() {
-    assert WIDEN_HASH.isEmpty();
-    TypeStruct w = _widen();
-    WIDEN_HASH.clear();
-    return w;
-  }
-
-  private static final NonBlockingHashMapLong<TypeStruct> WIDEN_HASH = new NonBlockingHashMapLong<>();
-  @Override TypeStruct _widen() {
+  @Override TypeObj _widen() {
     TypeStruct ts = WIDEN_HASH.get(_uid);
     if( ts!=null ) { ts._cyclic=true; return ts; }
     RECURSIVE_MEET++;
@@ -1085,6 +1077,21 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     for( TypeFld fld : flds() ) ts.add_fld(fld.malloc_from());
     ts.set_hash();
     for( TypeFld fld : ts.flds() ) fld.setX(fld._t._widen());
+    if( --RECURSIVE_MEET == 0 )
+      ts = ts.install();
+    return ts;
+  }
+  @Override Type _unbox() {
+    if( Util.eq(_name,"int:") )
+      return at("_val");
+    TypeStruct ts = WIDEN_HASH.get(_uid);
+    if( ts!=null ) { ts._cyclic=true; return ts; }
+    RECURSIVE_MEET++;
+    ts = malloc(_name,_any,_open);
+    WIDEN_HASH.put(_uid,ts);
+    for( TypeFld fld : flds() ) ts.add_fld(fld.malloc_from());
+    ts.set_hash();
+    for( TypeFld fld : ts.flds() ) fld.setX(fld._t._unbox());
     if( --RECURSIVE_MEET == 0 )
       ts = ts.install();
     return ts;
@@ -1109,10 +1116,6 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
   @Override public void walk( Predicate<Type> p ) {
     if( p.test(this) )
       for( TypeFld fld : flds() ) fld.walk(p);
-  }
-
-  @Override public Type unbox() {
-    throw unimpl();
   }
 
   // Make a Type, replacing all dull pointers from the matching types in mem.

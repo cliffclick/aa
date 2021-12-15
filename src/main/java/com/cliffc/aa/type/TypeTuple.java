@@ -181,7 +181,7 @@ public class TypeTuple extends Type<TypeTuple> {
     return make0(_any,ts);
   }
 
-  @Override public TypeTuple widen() {
+  @Override TypeTuple _widen() {
     Type[] ts = Types.get(_ts.length);
     for( int i=0; i<ts.length; i++ )
       ts[i] = _ts[i].widen();

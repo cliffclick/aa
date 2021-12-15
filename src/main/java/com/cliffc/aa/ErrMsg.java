@@ -69,7 +69,7 @@ public class ErrMsg implements Comparable<ErrMsg> {
   }
   public static ErrMsg field(Parse loc, String msg, String fld, boolean closure, TypeObj to) {
     SB sb = new SB().p(msg).p(closure ? " val '" : " field '.").p(fld).p("'");
-    if( to != null && !closure ) to.str(sb.p(" in "),new VBitSet(),null,false);
+    if( to != null && !closure ) to.unbox().str(sb.p(" in "),new VBitSet(),null,false);
     return new ErrMsg(loc,sb.toString(),Level.Field);
   }
   public static ErrMsg niladr(Parse loc, String msg, String fld) {

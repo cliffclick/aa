@@ -626,9 +626,7 @@ public class Parse implements Comparable<Parse> {
       if( op2 == null ) throw unimpl(); // Missing close to balanced op
       if( op2._nargs!=1 ) throw unimpl(); // No binary/trinary allowed here
       // Load field e0.op2_ as TFP, and instance call.
-      int e0alias = ((NewObjNode)e0.in(0))._alias;
       Node fun  = gvn(new LoadNode(mem(),e0,op2._name,errMsg(oldx)));
-      assert ((TypeMemPtr)((TypeFunPtr)fun._val)._dsp)._aliases.test_recur(e0alias);
       n = do_call(errMsgs(0,oldx),args(fun));
     } else {
       // Normal term expansion

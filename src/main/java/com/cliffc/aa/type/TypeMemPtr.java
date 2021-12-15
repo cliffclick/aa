@@ -259,26 +259,21 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   @Override public void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
   public int getbit() { return _aliases.getbit(); }
   public int getbit0() { return _aliases.strip_nil().getbit(); }
-
-  @Override public Type unbox() {
-    if( Util.eq(_obj._name,"int:") )
-      return ((TypeStruct)_obj).at("_val");
-    return make_from((TypeObj)_obj.unbox());
-  }
   
   // Widen for primitive specialization and H-M unification.  H-M distinguishes
   // ptr-to-array (and string) from ptr-to-record.  Must keep types at the same
   // resolution as H-M, so pointers all permit nil (unless I track a H-M type
   // which disallows nil).
-  @Override public TypeMemPtr  widen() {
-    if( above_center() ) return this;
-    BitsAlias a = _obj instanceof TypeStr
-      ? BitsAlias.STRBITS
-      : (_obj instanceof TypeAry ? BitsAlias.ARYBITS : BitsAlias.RECORD_BITS);
-    if( _aliases.test(0) ) a = a.set(0);
-    return make(a,_obj. widen());
+  @Override TypeMemPtr _widen() {
+    //if( above_center() ) return this;
+    return make(_aliases.widen(),_obj._widen());
   }
-  @Override        TypeMemPtr _widen() { return make(_aliases.widen(),_obj._widen()); }
+
+  @Override Type _unbox() {
+    if( Util.eq(_obj._name,"int:") )
+      return ((TypeStruct)_obj).at("_val");
+    return make_from((TypeObj)_obj._unbox());
+  }
 
   // Make a Type, replacing all dull pointers from the matching types in mem.
   @Override public Type make_from(Type head, TypeMem mem, VBitSet visit) {

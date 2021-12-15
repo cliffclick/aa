@@ -533,12 +533,12 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Recursively widen fields
-  @Override public TypeMem widen() {
+  @Override public TypeMem _widen() {
     TypeObj[] tos = _pubs.clone();
     tos[0] = null;
     for( int i=1; i<tos.length; i++ )
       if( tos[i]!=null )
-        tos[i] = tos[i].widen();
+        tos[i] = tos[i]._widen();
     return make0(tos);
   }
 

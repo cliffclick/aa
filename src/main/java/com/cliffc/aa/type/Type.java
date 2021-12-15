@@ -787,7 +787,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Example:
   //   5.widen.meet(2.3f) == nint64.meet(2.3f) == nScalar
   //   5.meet(2.3f).widen == nflt32.widen      == nflt64
-  public Type widen() {
+  static final NonBlockingHashMapLong<TypeStruct> WIDEN_HASH = new NonBlockingHashMapLong<>();
+  public final Type widen() { WIDEN_HASH.clear(); return _widen(); }
+  Type _widen() {
     return switch( _type ) {
     case TSCALAR, TNSCALR -> SCALAR;
     case TXSCALAR, TXNSCALR -> this; // Too high
@@ -796,9 +798,10 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     default -> throw typerr(null); // Overridden in subclass
     };
   }
-  // Recursive version called from TypeStruct
-  Type _widen() { return widen(); }
-
+  // Unbox any boxed primitives.
+  public final Type unbox() { WIDEN_HASH.clear(); return _unbox(); }
+  Type _unbox() { return this; }
+  
   // True if type must include a nil (as opposed to may-nil, which means the
   // type can choose something other than nil).
   public boolean must_nil() {
@@ -863,9 +866,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Sharpen pointer with memory
   public Type sharptr( Type ptr ) { return this==ANY ? TypeMem.ANYMEM.sharptr(ptr) : ptr; }
 
-  // Unbox any boxed primitives.
-  public Type unbox() { return this; }
-  
   // Apply the test(); if it returns true iterate over all nested child types.
   // If the test returns false, short-circuit the walk.  No attempt to guard
   // against recursive structure walks, so the 'test' must return false when

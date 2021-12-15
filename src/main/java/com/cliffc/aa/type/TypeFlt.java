@@ -121,7 +121,7 @@ public class TypeFlt extends Type<TypeFlt> {
     if( t._type == TSCALAR ) return 9; // Might have to autobox
     throw com.cliffc.aa.AA.unimpl();
   }
-  @Override public Type widen() {
+  @Override public Type _widen() {
     if( _x> 0 ) return this;
     if( _x==0 ) return _con==0 ? FLT64 : NFLT64;
     return make(_x,64,0);

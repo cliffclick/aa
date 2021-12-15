@@ -317,7 +317,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     tf._dsp = dsp;
     return tf;
   }
-  @Override public TypeFunPtr widen() { return GENERIC_FUNPTR; }
+  @Override TypeFunPtr _widen() { return GENERIC_FUNPTR; }
 
   @Override public Type make_from(Type head, TypeMem map, VBitSet visit) {
     throw unimpl();

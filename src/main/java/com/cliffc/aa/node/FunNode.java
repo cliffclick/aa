@@ -366,7 +366,7 @@ public class FunNode extends RegionNode {
             tp = tp.join(def._val);
         formals = formals.add_fld(parm._name, TypeFld.Access.Final,tp,i);
         if( !(tp instanceof TypeMemPtr) ) continue; // Not a pointer
-        TypeObj to = ((TypeMem)tmem).ld((TypeMemPtr)tp).widen(); //
+        TypeObj to = (TypeObj)((TypeMem)tmem).ld((TypeMemPtr)tp).widen(); //
         // Are all the uses of parm compatible with this TMP?
         // Also, flag all used fields.
         if( bad_mem_use(parm, to) )

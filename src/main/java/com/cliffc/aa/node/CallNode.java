@@ -436,7 +436,7 @@ public class CallNode extends Node {
 
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live_use(Node def) {
-    TypeMem basic_live = def._live.basic_live() ? TypeMem.ALIVE : TypeMem.ALLMEM;
+    TypeMem basic_live = def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ALLMEM;
     if( is_keep() ) return basic_live; // Still under construction, all alive
     Type tcall = _val;
     if( !(tcall instanceof TypeTuple) ) // Call is has no value (yet)?

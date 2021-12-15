@@ -168,7 +168,7 @@ public class TypeInt extends Type<TypeInt> {
     if( t == NIL || t == XNIL ) return 99; // Cannot not-nil to nil
     throw unimpl();
   }
-  @Override public Type widen() {
+  @Override public Type _widen() {
     if( _x> 0 ) return this;
     if( _x==0 ) return _con==0 ? INT64 : NINT64;
     return make(_x,64,0);
