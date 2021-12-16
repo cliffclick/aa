@@ -834,11 +834,16 @@ public class Parse implements Comparable<Parse> {
       return fref;
     }
 
+    // If field is final, directly use the value instead of a lookup.
     // Else must load against most recent display update.  Get the display to load
-    // against.  This does a HM.Ident lookup, producing a FRESH tvar every time.
-    Node ptr = get_display_ptr(scope);
-    Node ld = gvn(new LoadNode(mem(),ptr,tok.intern(),null));
-    return /*ptr.is_display_ptr() ||*/ ld.is_forward_ref()
+    // against.  
+    TypeFld fld = scope.stk()._ts.get(tok);
+    Node ld = fld._access==Access.Final
+      ? scope.stk().get(tok)
+      : gvn(new LoadNode(mem(),get_display_ptr(scope),tok,null));
+    
+    // This does a HM.Ident lookup, producing a FRESH tvar every time.
+    return ld.is_forward_ref()
       ? ld                              // Inside a def, no fresh
       : gvn(new FreshNode(_e._fun,ld)); // After a field is defined, yes fresh
   }

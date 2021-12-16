@@ -6,7 +6,8 @@ int = : @{
   _val : $$com.cliffc.aa.type.TypeInt#INT64;
 
   // Unary ops
-  -_ = { -> int($$com.cliffc.aa.node.PrimNode$MinusI64(_val)) }  
+  -_ = { -> int($$com.cliffc.aa.node.PrimNode$MinusI64(_val)) };
+  !_ = { -> int($$com.cliffc.aa.node.PrimNode$Not(_val)) }  
 };
 
 //int1  =: $$com.cliffc.aa.type.TypeInt#BOOL;
