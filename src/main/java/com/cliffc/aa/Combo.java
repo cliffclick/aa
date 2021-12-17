@@ -154,14 +154,14 @@ public abstract class Combo {
     // approximation and never lift again.
     update_root_args();
     work_cnt += main_work_loop();
-    assert Env.START.more_work(false)==0;
+    //assert Env.START.more_work(false)==0;
 
     // Pass 3: H-M types freeze, escaping function args are assumed lowest H-M compatible and
     // GCP types continue to run downhill.
     HM_FREEZE = true;
     ////prog.visit((syn) -> { syn.add_val_work(null,work); return work.add(syn); }, (a,b)->null);
     work_cnt += main_work_loop();
-    assert Env.START.more_work(false)==0;
+    //assert Env.START.more_work(false)==0;
 
     Node.VALS.clear();
     Env.START.walk_opt(new VBitSet());

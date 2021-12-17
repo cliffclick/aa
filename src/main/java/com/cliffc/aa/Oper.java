@@ -61,15 +61,18 @@ public class Oper {
     _nargs=nargs;
   }
 
-  // Build a binary oper, compute prec
+  // Build a binary oper, compute precedence based on 1st not-underscore
+  // character.  Means, e.g. "<" and "<=" are forced to the same precedence.
   public Oper(String name) { this(name,prec(name.charAt(1))); }
 
-  public static final int MAX_PREC=3;
+  // Precedence is based on a single character
+  public static final int MAX_PREC=4;
   private static int prec(char c) {
     return switch( c ) {
-      case '*', '/', '%' -> 2;
-      case '+', '-'      -> 1;
-      default -> throw unimpl();
+    case '*', '/', '%'      -> 3;
+    case '+', '-'           -> 2;
+    case '<', '>', '=', '!' -> 1; // includes <, <=, >, >=, ==, !=
+    default -> throw unimpl();
     };
   }
 
@@ -77,7 +80,7 @@ public class Oper {
 
   // True if op has balanced-op openers
   public boolean is_open() {
-    return _name.indexOf('[')>=0 || _name.indexOf('{')>=1 || _name.indexOf('<')>=1;
+    return _name.indexOf('[')>=0 || _name.indexOf('{')>=2 || _name.indexOf('<')>=2;
   }
 
   // Parse a postfix op; update P or return null.

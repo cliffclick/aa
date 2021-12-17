@@ -8,16 +8,26 @@ int = : @{
   // Unary ops
   -_ = { -> int($$com.cliffc.aa.node.PrimNode$MinusI64(_val)) };
   !_ = { -> int($$com.cliffc.aa.node.PrimNode$Not(_val)) };
+  
   // Simple integer math
   _+_ = { y -> int($$com.cliffc.aa.node.PrimNode$AddI64(_val,y._val)) };
   _-_ = { y -> int($$com.cliffc.aa.node.PrimNode$SubI64(_val,y._val)) };
   _*_ = { y -> int($$com.cliffc.aa.node.PrimNode$MulI64(_val,y._val)) };
   _/_ = { y -> int($$com.cliffc.aa.node.PrimNode$DivI64(_val,y._val)) };
   _%_ = { y -> int($$com.cliffc.aa.node.PrimNode$ModI64(_val,y._val)) };
+  
+  // Integer relations
+  _<_  = { y -> int($$com.cliffc.aa.node.PrimNode$LT_I64(_val,y._val)) };
+  _<=_ = { y -> int($$com.cliffc.aa.node.PrimNode$LE_I64(_val,y._val)) };
+  _>_  = { y -> int($$com.cliffc.aa.node.PrimNode$GT_I64(_val,y._val)) };
+  _>=_ = { y -> int($$com.cliffc.aa.node.PrimNode$GE_I64(_val,y._val)) };
+  _==_ = { y -> int($$com.cliffc.aa.node.PrimNode$EQ_I64(_val,y._val)) };
+  _!=_ = { y -> int($$com.cliffc.aa.node.PrimNode$NE_I64(_val,y._val)) };
+  
 };
 
+
 //int1  =: $$com.cliffc.aa.type.TypeInt#BOOL;
-//int   =: $$com.cliffc.aa.type.TypeInt#INT64;
 //flt   =: $$com.cliffc.aa.type.TypeFlt#FLT64;
 //flt32 =: $$com.cliffc.aa.type.TypeFlt#FLT32;
 //flt64 =: $$com.cliffc.aa.type.TypeFlt#FLT64;
@@ -38,14 +48,6 @@ int = : @{
 //
 //// Unary negate; takes a Scalar
 //!_  = { x -> $$com.cliffc.aa.node.PrimNode$Not(x) };
-//
-//// Integer relations
-//_<_  = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$LT_I64(x,y) };
-//_<=_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$LE_I64(x,y) };
-//_>_  = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$GT_I64(x,y) };
-//_>=_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$GE_I64(x,y) };
-//_==_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$EQ_I64(x,y) };
-//_!=_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$NE_I64(x,y) };
 //
 //// Simple float math
 //_+_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$AddF64(x,y) };
