@@ -121,7 +121,21 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     // normal Type.INTERN check, we also get here during building of cyclic
     // structures for which we'll fall into the cyclic check - as the Type[]s
     // are not interned yet.
-    assert _hash!=0 && t._hash!=0; // Not comparable until both are hashable
+    // At least one of these is expected to be interned, and so the cycle bit
+    // is correct: it is set if the type is cyclic and cleared otherwise.  This
+    // means if 2 cyclic types are being checked, at least one will have the
+    // cycle bit set.  Which means that if both bits are cleared, at least one
+    // if these types is not cyclic, and a simple recursive-descent test works.
+    if( !_cyclic && !t._cyclic ) {
+      if( !super.equals(t) || _flds.size() != t._flds.size() || _open != t._open ) return false;
+      // All fields must be equals
+      for( TypeFld fld : flds() ) {
+        TypeFld fld1 = t._flds.get(fld._fld);
+        if( fld1==null || fld != fld1 ) return false;
+      }
+      return true;
+    }
+    
     int x = cmp(t);
     if( x != -1 ) return x == 1;
     // Unlike all other non-cyclic structures which are built bottom-up, cyclic
@@ -181,13 +195,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
     // Special shortcut for the all-prims display type
-    TypeFld bfld= get("!_");
-    if( bfld != null ) {
-      Type t1 = bfld._t;
-      sb.p(t1 instanceof TypeFunPtr
-           ? (((TypeFunPtr)t1)._fidxs.above_center() ? "PRIMS" : "LOW_PRIMS")
-           : "PRIMS_"+t1);
-    } else if( get("pi") != null ) {
+    if( get("pi") != null ) {
       sb.p("MATH");
     } else {
       boolean field_sep=false;

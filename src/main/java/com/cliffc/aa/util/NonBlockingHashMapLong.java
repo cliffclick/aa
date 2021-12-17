@@ -216,7 +216,7 @@ public class NonBlockingHashMapLong<TypeV>
     return sb.unchar(2).p("}").toString();
   }
 
-  
+
   // Count of reprobes
   private transient ConcurrentAutoTable _reprobes = new ConcurrentAutoTable();
   /** Get and clear the current count of reprobes.  Reprobes happen on key
@@ -387,7 +387,7 @@ public class NonBlockingHashMapLong<TypeV>
     if( _val_1 != TOMBSTONE ) throw new IllegalArgumentException("Cannot return key 0 and distinguish from no key");
     return _chm._getKey();
   }
-  
+
   // --- get -----------------------------------------------------------------
   /** Returns the value to which the specified key is mapped, or {@code null}
    *  if this map contains no mapping for the key.
@@ -446,7 +446,7 @@ public class NonBlockingHashMapLong<TypeV>
   // Helper function to spread lousy hashCodes Throws NPE for null Key, on
   // purpose - as the first place to conveniently toss the required NPE for a
   // null Key.
-  private static final int hash(long h) {
+  private static int hash( long h) {
     h ^= (h>>>20) ^ (h>>>12);
     h ^= (h>>> 7) ^ (h>>> 4);
     h += h<<7; // smear low bits up high, for hashcodes that only differ by 1
@@ -1060,8 +1060,8 @@ public class NonBlockingHashMapLong<TypeV>
         if( _keys[i] != NO_KEY && Prime.unbox(_vals[i])!=TOMBSTONE )
           return _keys[i];
       return _newchm == null ? 0 : _newchm._getKey();
-    } 
-   
+    }
+
   } // End of CHM
 
 

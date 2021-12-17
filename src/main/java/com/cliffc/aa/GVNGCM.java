@@ -234,7 +234,7 @@ public class GVNGCM {
 
       WORK_RETYPE.add(wrk._uses);
     }
-    assert Env.START.more_work(true)==0;
+    //assert Env.START.more_work(true)==0;
   }
 
   public class Build<N extends Node> implements AutoCloseable {

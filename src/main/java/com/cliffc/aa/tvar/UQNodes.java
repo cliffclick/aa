@@ -18,7 +18,7 @@ public class UQNodes extends NonBlockingHashMapLong<Node> {
       UQSETS.put(uqset=KEY,KEY);
       KEY=new UQNodes();
     } else {
-      KEY.clear();
+      KEY.clear(true);
       KEY._hash=0;
     }
     return uqset;

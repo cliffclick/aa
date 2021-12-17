@@ -35,7 +35,7 @@ public class Util {
       Integer ii = hashs.get(hash);
       hashs.put(hash,ii==null ? 1 : ii+1);
     }
-    int[] hist = new int[16];
+    int[] hist = new int[32];
     int maxval=0;
     long maxkey=-1;
     for( long l : hashs.keySet() ) {
@@ -48,6 +48,14 @@ public class Util {
       if( hist[i] > 0 )
         System.out.println("Number of hashes with "+i+" repeats: "+hist[i]);
     System.out.println("Max repeat key "+maxkey+" repeats: "+maxval);
+    int cnt=0;
+    for( Object k : map.keySet() ) {
+      int hash = k.hashCode();
+      if( hash==maxkey ) {
+        System.out.println("Sample: "+map.get(k));
+        if( cnt++>3 ) break;
+      }
+    }
   }
 
 

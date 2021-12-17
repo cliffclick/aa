@@ -168,10 +168,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   }
 
   // ----------------------------------------------------------
-  // Hash-Cons - all Types are interned in this hash table.  Thus an equality
+  // Hash-Cons - all Types are interned in this hash table.  Thus, an equality
   // check of a (possibly very large) Type is always a simple pointer-equality
   // check, except during construction and intern'ing.
-  private static final ConcurrentHashMap<Type,Type> INTERN = new ConcurrentHashMap<>();
+  //private static final ConcurrentHashMap<Type,Type> INTERN = new ConcurrentHashMap<>();
+  private static final NonBlockingHashMap<Type,Type> INTERN = new NonBlockingHashMap<>();
   public static int RECURSIVE_MEET;    // Count of recursive meet depth
   @SuppressWarnings("unchecked")
   private T hashcons() {
@@ -318,7 +319,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       return t;                 // Set breakpoints here to find a uid
     }
     <T extends Type> T free(T t1, T t2) {
-      assert !t1.interned();
+      //assert !t1.interned();
       if( t1 instanceof TypeMemPtr ) ((TypeMemPtr)t1)._aliases=null; // is-free tag for TMP
       if( t1 instanceof TypeFunPtr ) ((TypeFunPtr)t1)._fidxs  =null; // is-free tag for TFP
       t1._dual = null;   // Too easy to make mistakes, so zap now
@@ -801,7 +802,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Unbox any boxed primitives.
   public final Type unbox() { WIDEN_HASH.clear(); return _unbox(); }
   Type _unbox() { return this; }
-  
+
   // True if type must include a nil (as opposed to may-nil, which means the
   // type can choose something other than nil).
   public boolean must_nil() {

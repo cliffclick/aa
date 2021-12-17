@@ -18,14 +18,13 @@ import static com.cliffc.aa.AA.*;
  * type.  TV2 types fully support recursive types.
  *
  * TV2 Bases include anything from the GCP lattice, and are generally sharper
- * than e.g. 'int'.  Bases with values of '3' and "abc" are fine.  These are
- * widened to the normal HM types if passed to any function; they remain sharp
- * if returned or passed to primitives.  Functions include the set of FIDXs
- * used in the unification; this set is generally less precise than that from
- * GCP.  Function arguments that escape have their GCP type widened "as if"
- * called from the most HM-general legal call site; otherwise GCP assumes
- * escaping functions are never called and their arguments have unrealistic
- * high flow types.
+ * than e.g. 'int'.  Bases with values of '3' and "abc" are fine.
+ *
+ * Function bases include the set of FIDXs used in the unification; this set is
+ * generally less precise than that from GCP.  Function arguments that escape
+ * have their GCP type widened "as if" called from the most HM-general legal
+ * call site; otherwise GCP assumes escaping functions are never called and
+ * their arguments have unrealistic high flow types.
  *
  * Unification typically makes many temporary type-vars and immediately unifies
  * them.  For efficiency, this algorithm checks to see if unification requires
@@ -60,6 +59,12 @@ import static com.cliffc.aa.AA.*;
  * - NotNil: Cast of not-nil.  Cast is used for other operations but is only
  *   polymorphic for nil.
  */
+
+
+// This implementation of TV2 uses NBHM for the set of arguments, both field
+// names and values; it is conveniently mutable and actually fairly expensive
+// compared to e.g. a raw array.
+//
 
 
 public class TV2 {
@@ -153,14 +158,6 @@ public class TV2 {
   //
   //public Set<String> args() { return _args.keySet(); }
   //public int len() { return _args==null ? 0 : _args.size(); }
-  //public int nargs() {
-  //  assert is_fun();
-  //  int nargs = _args.size();
-  //  nargs--; assert _args.containsKey(" ret"); // Do not count return
-  //  if( _args.containsKey("2") ) nargs--; // Do not count display
-  //  assert !_args.containsKey("^"); // Canonical display name
-  //  return nargs;
-  //}
 
   public int nargs() {
     assert is_fun();
@@ -629,7 +626,7 @@ public class TV2 {
 //return thsi.union(that,test);
     throw unimpl();
   }
-  
+
   // Structural recursion unification.  Called nested, and called by NotNil
   // at the top-level directly.
   public static boolean unify_flds(TV2 thsi, TV2 that, boolean test, boolean top_level) {
@@ -657,7 +654,7 @@ public class TV2 {
           if( thsi.is_open() )  thsi.add_fld(key,that.arg(key)); // Add to LHS
           else                  that.del_fld(key, test);         // Drop from RHS
         }
-    
+
     if( that.debug_find() != that ) throw unimpl(); // Missing a find
     return progress;
   }
@@ -1007,11 +1004,10 @@ public class TV2 {
   // progress.
   static final VBitSet DEPS_VISIT  = new VBitSet();
   public void push_deps( UQNodes deps) { if( deps!=null ) for( Node dep : deps.values() ) push_dep(dep);}
-  public TV2 push_dep( Node dep ) {
+  public void push_dep( Node dep ) {
     assert DEPS_VISIT.isEmpty();
     _push_dep(dep);
     DEPS_VISIT.clear();
-    return this;
   }
   private void _push_dep(Node dep) {
     assert !is_unified();
@@ -1024,7 +1020,7 @@ public class TV2 {
     }
     if( _args!=null )
       for( TV2 arg : _args.values() ) // Structural recursion on a complex TV2
-        arg.debug_find()._push_dep(dep);
+        arg.find()._push_dep(dep);
   }
 
   // Recursively add-deps to worklist
@@ -1067,7 +1063,6 @@ public class TV2 {
 
   // --------------------------------------------
   // Pretty print
-  boolean is_prim() { return is_struct() && _args!=null && _args.containsKey("!_"); }
   boolean is_math() { return is_struct() && _args!=null && _args.containsKey("pi"); }
 
   // Look for dups, in a tree or even a forest (which Syntax.p() does)
@@ -1143,7 +1138,6 @@ public class TV2 {
   }
 
   private SB str_struct(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
-    if( is_prim() ) return sb.p("@{PRIMS}");
     if( is_math() ) return sb.p("@{MATH}");
     final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
     BitsAlias aliases = ((TypeMemPtr)_flow).aliases();
