@@ -47,24 +47,37 @@ public class Oper {
   public final byte _prec;      // Precedence.  Not set for uniops and balanced ops.  Always > 0 for infix binary ops.
   public final int _nargs;
 
-  private Oper(String name, byte prec) {
-    _name=name;
-    _prec=prec;
-    assert _name.charAt(0)!='{';
+  public Oper(String name, int prec) {
+    char c0 = name.charAt(0), c1 = name.charAt(0);
+    assert c0!='{' &&  (c0!='_' || c1!='{'); // Too confusing
     // Count '_' for nargs
     int nargs=0;
-    for( int i=0; (i = _name.indexOf('_',i)+1)!=0; )
+    for( int i=0; (i = name.indexOf('_',i)+1)!=0; )
       nargs++;
+    // Binary operators always have a precedence, other ops always have prec==0
+    //assert (c0=='_' && name.charAt(name.length()-1)=='_' && nargs==2) == (prec>0);
+    _name=name.intern();
+    _prec=(byte)prec;
     _nargs=nargs;
   }
-  // Parse a prefix or balanced-prefix op; update P or return null.  Required no leading expr.
-  public Oper(byte[] buf, int startx, int x) {
-    this((new String(buf,startx,x-startx)+"_").intern(),(byte)0);
+
+  // Build a binary oper, compute prec
+  public Oper(String name) { this(name,prec(name.charAt(1))); }
+
+  public static final int MAX_PREC=3;
+  private static int prec(char c) {
+    return switch( c ) {
+      case '*', '/', '%' -> 2;
+      case '+', '-'      -> 1;
+      default -> throw unimpl();
+    };
   }
 
-  // True if op has balanced-op openners
+  int len() { return _name.length(); }
+
+  // True if op has balanced-op openers
   public boolean is_open() {
-    return _name.indexOf('[')!=-1 || _name.indexOf('{')!= -1;
+    return _name.indexOf('[')>=0 || _name.indexOf('{')>=1 || _name.indexOf('<')>=1;
   }
 
   // Parse a postfix op; update P or return null.

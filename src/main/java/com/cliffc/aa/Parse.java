@@ -493,49 +493,33 @@ public class Parse implements Comparable<Parse> {
   // Invariant: WS already skipped before & after each _expr depth
   private Node _expr(int prec) {
     int lhsx = _x;              // Invariant: WS already skipped
-    Node lhs = _expr_higher(prec,null);
+    Node lhs = _expr_higher(prec);
     if( lhs==null ) return null;
     while( true ) {             // Kleene star at this precedence
       // Look for a binop at this precedence level
       int opx = _x;             // Invariant: WS already skipped
-      String bintok = peek(PrimNode.PRIM_TOKS);
-      if( !_good_prec_tok(prec,bintok) ) return lhs; // No token at this precedence
-      _x += bintok.length();
+      Oper binop = bin_op(token0());
+      if( binop==null ) { _x=opx; return lhs; }
       skipWS();
       int rhsx = _x;            // Invariant: WS already skipped
-      lhs.keep();
-      // Get the matching FunPtr (or Unresolved).
-      // This is a primitive lookup and always returns a FRESH copy (see HM.Ident).
-      //UnOrFunPtrNode op = _e.lookup_filter_bin(bintok); // BinOp, or null
-      //assert op!=null;          // Since found valid token, must find matching primnode
-      //FunNode sfun = op.funptr().fun();
-      //assert sfun._op_prec == prec;
-      //op.keep();
-      //Node rhs = _expr_higher_require(prec,bintok,lhs);
-      //// Emit the call to both terms
-      //// LHS in unhooked prior to optimizing/replacing.
-      //lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op.unkeep(),lhs.unkeep(),rhs));
-      //// Invariant: LHS is unhooked
-      throw unimpl();
+      // Get the oper function to call
+      Node opfun = gvn(new LoadNode(mem(),lhs,binop._name,errMsg(opx)));
+      int fidx = opfun.push();
+      Node rhs = _expr_higher_require(binop);
+      // Emit the call to both terms
+      // LHS in unhooked prior to optimizing/replacing.
+      lhs = do_call(errMsgs(opx,lhsx,rhsx), args(Node.pop(fidx),rhs));
+      // Invariant: LHS is unhooked
     }
   }
 
   // Get an expr at the next higher precedence, or a term, or null
-  private Node _expr_higher( int prec, Node lhs ) {
-    if( lhs != null ) lhs.keep();
-    Node rhs = prec+1 == PrimNode.PREC_TOKS.length ? term() : _expr(prec+1);
-    if( lhs != null ) lhs.unkeep();
-    return rhs;
+  private Node _expr_higher( int prec ) {
+    return prec+1 == Oper.MAX_PREC ? term() : _expr(prec+1);
   }
-  private Node _expr_higher_require( int prec, String bintok, Node lhs ) {
-    Node rhs = _expr_higher(prec,lhs);
-    return rhs==null ? err_ctrl2("Missing term after '"+bintok+"'") : rhs;
-  }
-  // Check that this token is valid for this precedence level
-  private boolean _good_prec_tok(int prec, String bintok) {
-    if( bintok==null ) return false;
-    for( String tok : PrimNode.PREC_TOKS[prec] ) if( Util.eq(bintok,tok) ) return true;
-    return false;
+  private Node _expr_higher_require( Oper op ) {
+    Node rhs = _expr_higher(op._prec);
+    return rhs==null ? err_ctrl2("Missing term after '"+op._name+"'") : rhs;
   }
 
   // Short-circuit 'thunks' the RHS operator and passes it to a thunk-aware
@@ -603,22 +587,20 @@ public class Parse implements Comparable<Parse> {
    */
   // Invariant: WS already skipped before & after term
   private Node term() {
+    Node n;
     int oldx = _x;
 
     // Check for id++ / id--
     // These are special forms (for now) because they side-effect.
     String tok = token();
     if( tok != null ) {
-      Node n;
       if( peek("++") && (n=inc(tok, 1))!=null ) return n;
       if( peek("--") && (n=inc(tok,-1))!=null ) return n;
     }
-    _x = oldx;                  // Unwind failed ++/--
 
     // Check for prefix ops; no leading exptr and require a trailing expr;
     // balanced ops require a trailing balanced close.
-    Node n;
-    Oper op = pre_bal();
+    Oper op = pre_bal(tok);
     if( op != null ) {
       Node e0 = term();
       if( e0 == null ) throw unimpl();  // Parsed a valid leading op but missing trailing expr
@@ -629,15 +611,16 @@ public class Parse implements Comparable<Parse> {
       Node fun  = gvn(new LoadNode(mem(),e0,op2._name,errMsg(oldx)));
       n = do_call(errMsgs(0,oldx),args(fun));
     } else {
-      // Normal term expansion
+      // Normal leading term
+      _x=oldx;
       n = tfact();
       if( n == null ) return null;
     }
 
     // Repeat until not a term.  Binary expressions have precedence, parsed in expr()
     while( true ) {             // Repeated application or field lookup is fine
+      skipWS();                 //
       if( peek('.') ) {         // Field?
-        skipWS();               //
         int fld_start=_x;       // Get field start
         String fld = token0();  // Field name
         if( fld == null ) {     // Not a token, check for a field number
@@ -678,17 +661,19 @@ public class Parse implements Comparable<Parse> {
         n = do_call0(false,badargs,args(n,arg)); // Pass the tuple
 
       } else {
-        // Check for balanced op
-        String bop = bal_open(); // Balanced op read
-        if( bop==null ) break;   // Not a balanced op
-        oldx = _x-bop.length();  // Token start
+        // Check for balanced op with a leading term, e.g. "ary [ idx ]" or
+        // "ary [ idx ]= val".
+        oldx = _x;                         // Token start
+        Oper bop = bal_open(token0());     // Balanced op read
+        if( bop==null ) { _x=oldx; break;} // Not a balanced op
 
-        n.keep();
-        skipWS();
-        int oldx2 = _x;
+        int nidx = n.push();    // Preserve leading expr
+        skipWS();               // Skip to start of stmts
+        int oldx2 = _x;         // Statement start
         Node idx = stmts();     // Index expression
-        if( idx==null ) { n.unhook(); return err_ctrl2("Missing stmts after '"+bop+"'"); }
-        tok = token();
+        if( idx==null ) { Node.pop(nidx); return err_ctrl2("Missing stmts after '"+bop+"'"); }
+
+        Oper bcl = bal_close(bop);
         if( tok==null ) { n.unhook(); return err_ctrl2("Missing close after '"+bop+"'"); }
 
         //// Need to find which balanced op close.  Find the longest matching name
@@ -836,12 +821,12 @@ public class Parse implements Comparable<Parse> {
 
     // If field is final, directly use the value instead of a lookup.
     // Else must load against most recent display update.  Get the display to load
-    // against.  
+    // against.
     TypeFld fld = scope.stk()._ts.get(tok);
     Node ld = fld._access==Access.Final
       ? scope.stk().get(tok)
       : gvn(new LoadNode(mem(),get_display_ptr(scope),tok,null));
-    
+
     // This does a HM.Ident lookup, producing a FRESH tvar every time.
     return ld.is_forward_ref()
       ? ld                              // Inside a def, no fresh
@@ -999,7 +984,7 @@ public class Parse implements Comparable<Parse> {
       Node xrpc = Node.pop(rpc_idx);
       Node xfun = Node.pop(fun_idx); assert xfun == fun;
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
-      // Hook function at the TOP scope, because it may yet have unwired
+      // Hook the function at the TOP scope, because it may yet have unwired
       // CallEpis which demand memory.  This hook is removed as part of doing
       // the Combo pass which computes a real Call Graph and all escapes.
       Env.TOP._scope.add_def(ret);
@@ -1070,21 +1055,6 @@ public class Parse implements Comparable<Parse> {
     throw unimpl();
   }
 
-  // If this token can be a balanced-operator open token
-  String bal_open() {
-    int oldx = _x;
-    String bal = token();
-    if( bal==null ) return null;
-    //UnOrFunPtrNode xbal = _e.lookup_filter_bal(bal);
-    //if( xbal==null || xbal.funptr().fun()._bal_close==null )
-    //  { _x=oldx; return null; } // Not a balanced operator
-    //// Actual minimal length op might be smaller than the parsed token
-    //// (greedy algo vs not-greed)
-    //_x = oldx+xbal.length();
-    //return xbal;
-    throw unimpl();
-  }
-
   // Add a typecheck into the graph, with a shortcut if trivially ok.
   private Node typechk(Node x, Type t, Node mem, Parse bad) {
     return t == null || x._val.isa(t) ? x : gvn(new AssertNode(mem,x,t,bad,_e));
@@ -1140,28 +1110,46 @@ public class Parse implements Comparable<Parse> {
       _x=x+2;                                // Just return the "->"
     return new String(_buf,x,_x-x);
   }
-  static boolean isOp(String s) {
-    if( !isOp0((byte)s.charAt(0)) ) return false;
+  boolean isOp(String s) { return isOp(s,_prims); }
+  static boolean isOp(String s, boolean prims) {
+    if( s==null ) return false;
+    byte c = (byte)s.charAt(0);
+    if( prims && c=='$' ) return false; // Disallow $$ operator during prim parsing; ambiguous with $$java_class_name
+    if( !isOp0(c) && (c!='_' || !isOp0((byte)s.charAt(1))) ) return false;
     for( int i=1; i<s.length(); i++ )
       if( !isOp1((byte)s.charAt(i)) ) return false;
     return true;
   }
 
-  // Prefix or leading balanced op
-  Oper pre_bal() {
-    byte c = skipWS();
-    if( !isOp0(c) ) return null;
-    if( _prims && c=='$' ) return null; // Disallow $$ operator during prim parsing; ambiguous with $$java_class_name
-    if( _x >= _buf.length ) return null;
-    int startx = _x;
-    while( _x < _buf.length && isOp1(_buf[_x]) ) _x++;
-    return new Oper(_buf,startx,_x);
+  // Unary/prefix op or leading balanced op, with no leading expression.
+  // Examples: -1, !pred, [size], %{% matrix_init %}%
+  // Adds trailing '_' for required trailing expression: -_  !_  [_  %{%_
+  Oper pre_bal(String tok) { return isOp(tok)? new Oper(tok+"_",0) : null;  }
+
+  // Parsed a leading expression; look for a binary op.  Requires no leading
+  // '[' or embedded '{' or '<'.  Requires a trailing expr.
+  // Examples:  x+y, x<<y,  x<=y,  x%y
+  // Adds '_' for required expressions: _+_  _<<_  _<=_  _%_
+  Oper bin_op(String tok) {
+    if( !isOp(tok) ) return null;
+    Oper bop = new Oper("_"+tok+"_");
+    return bop.is_open() ? null : bop;
+  }
+
+  // Parsed a leading expression; look for a balanced op.  Requires a leading
+  // '[' or an embedded '{' or '<'.  Requires a trailing expr.
+  // Examples:  ary[idx], ary[idx]=val, dict[key], %{% matrix %}%, ~<< "sql string" ~>>
+  // Adds '_' for required expressions: _[_  _[_  _[_  _%{%_  _~<<_
+  Oper bal_open(String tok) {
+    if( !isOp(tok) ) return null;
+    Oper bop = new Oper("_"+tok+"_",0);
+    return bop.is_open() ? bop : null;
   }
 
   // Parse an optional closing balanced op
   Oper bal_close(Oper op) {
     if( !op.is_open() ) return op;
-    // Parse a balanced token; any "[{" must appear in reverse order "}]"
+    // Parse a balanced token; any "[{<" must appear in reverse order ">}]"
     throw unimpl();
   }
 
@@ -1446,7 +1434,7 @@ public class Parse implements Comparable<Parse> {
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
   private static boolean isJava  (byte c) { return isAlpha1(c) || (c=='$') || (c=='.'); }
   private static boolean isOp0   (byte c) { return "!#$%*+-.=<>^[]~/&|".indexOf(c) != -1; }
-  private static boolean isOp1   (byte c) { return isOp0(c) || ":?_".indexOf(c) != -1; }
+  private static boolean isOp1   (byte c) { return isOp0(c) || ":?_{}".indexOf(c) != -1; }
   public  static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
 
   // Utilities to shorten code for common cases

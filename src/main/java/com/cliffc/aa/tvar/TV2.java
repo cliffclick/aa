@@ -297,18 +297,18 @@ public class TV2 {
     if( n.is_leaf() ) return this;
     _args.remove("?");  // No longer have the "?" key, not a nilable anymore
     // Nested nilable-and-not-leaf, need to fixup the nilable
-    if( n.is_base() ) {
-      _flow = n._flow.meet(Type.NIL);
-      if( n._eflow!=null ) _eflow = n._eflow.meet(Type.NIL);
-    }
+    _flow  = n. _flow;
+    _eflow = n._eflow;
+    if( n.is_base() ) add_nil();
     if( n.is_fun() ) {
       throw unimpl();
     }
     if( n.is_struct() ) {
+      _open = n._open;
+      add_nil();
       if( n._args!=null )     // Shallow copy fields
         for( String key : n._args.keySet() )
           _args.put(key,n.arg(key));
-      _open = n._open;
     }
     if( n.is_nil() ) {
       _args.put("?",n.arg("?"));
@@ -329,13 +329,13 @@ public class TV2 {
     return false;
   }
   // Strip off nil
-  TV2 strip_nil() {
+  public TV2 strip_nil() {
     if(  _flow!=null )  _flow =  _flow.join(Type.NSCALR);
     if( _eflow!=null ) _eflow = _eflow.join(Type.NSCALR);
     return this;
   }
   // Add nil
-  void add_nil() {
+  public void add_nil() {
     if(  _flow!=null )  _flow =  _flow.meet(Type.NIL);
     if( _eflow!=null ) _eflow = _eflow.meet(Type.NIL);
   }
@@ -628,6 +628,38 @@ public class TV2 {
 //  throw unimpl(); // TODO: Check for being equal, cyclic-ly, and return a prior if possible.
 //return thsi.union(that,test);
     throw unimpl();
+  }
+  
+  // Structural recursion unification.  Called nested, and called by NotNil
+  // at the top-level directly.
+  public static boolean unify_flds(TV2 thsi, TV2 that, boolean test, boolean top_level) {
+    if( thsi._args==that._args ) return false;  // Already equal (and probably both nil)
+    boolean progress = false;
+    for( String key : thsi._args.keySet() ) {
+      TV2 fthis = thsi.arg(key); // Field of this
+      TV2 fthat = that.arg(key); // Field of that
+      if( fthat==null ) {        // Missing field in that
+        progress = true;
+        if( that.is_open() ) that.add_fld(key,fthis); // Add to RHS
+        else                 thsi.del_fld(key, test); // Remove from LHS
+      } else progress |= top_level         // Matching fields unify directly
+               ? fthis. unify(fthat,test)  // Top-level requires some setup
+               : fthis._unify(fthat,test); // Recursive skips the setup
+      // Progress may require another find()
+      thsi=thsi.find();
+      that=that.find();
+    }
+    // Fields on the RHS are aligned with the LHS also
+    if( that._args!=null )
+      for( String key : that._args.keySet() )
+        if( thsi.arg(key)==null ) { // Missing field in this
+          progress = true;
+          if( thsi.is_open() )  thsi.add_fld(key,that.arg(key)); // Add to LHS
+          else                  that.del_fld(key, test);         // Drop from RHS
+        }
+    
+    if( that.debug_find() != that ) throw unimpl(); // Missing a find
+    return progress;
   }
 
   // Insert a new field
@@ -1032,7 +1064,7 @@ public class TV2 {
     }
     throw unimpl();
   }
-  
+
   // --------------------------------------------
   // Pretty print
   boolean is_prim() { return is_struct() && _args!=null && _args.containsKey("!_"); }

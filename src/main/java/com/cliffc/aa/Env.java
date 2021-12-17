@@ -322,22 +322,26 @@ public class Env implements AutoCloseable {
   // Note that "!_var" parses as "! _var" and not as "!_ var".
   // Also "[_]" is a balanced uni-op, and parses with the balanced ops.
   UnresolvedNode lookup_filter_uni( String name ) {
-    if( !Parse.isOp(name) ) return null; // Limit to operators
-    return _lookup_filter(0,name,1);     // Lookup unbalanced uni-op
+    //if( !Parse.isOp(name) ) return null; // Limit to operators
+    //return _lookup_filter(0,name,1);     // Lookup unbalanced uni-op
+    throw unimpl();
   }
 
   // Infix binop lookup
   // _+_       - Normal binop, looks up "_+_"
   UnresolvedNode lookup_filter_bin( String name ) {
-    if( !Parse.isOp(name) ) return null; // Limit to operators
-    return _lookup_filter(1,"_"+name,2);
+    //if( !Parse.isOp(name) ) return null; // Limit to operators
+    //return _lookup_filter(1,"_"+name,2);
+    throw unimpl();
   }
   // Infix balanced operators, including 3 argument
   // _[_]      - array-lookup     balanced op, looks up " _[_"
   // _[_]=_    - array-assignment balanced op, looks up " _[_"
   UnresolvedNode lookup_filter_bal( String name ) {
-    if( !Parse.isOp(name) ) return null; // Limit to operators
-    return _lookup_filter(0," _"+name,2);
+    //if( !Parse.isOp(name) ) return null; // Limit to operators
+    //return _lookup_filter(0," _"+name,2);
+    throw unimpl();
+    
   }
 
   // Type lookup in any scope

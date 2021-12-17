@@ -72,6 +72,7 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
+    test("1+2*3", TypeInt.con(7), "7");
     test("1",   TypeInt.TRUE, "1");
     // Unary operator
     test("-1",  TypeInt.con(-1), "-1");

@@ -19,16 +19,19 @@ public class ScopeNode extends Node {
   // Mapping from type-variables to Types.  Types have a scope lifetime like values.
   private final HashMap<String,ConTypeNode> _types; // user-typing type names
   private Ary<IfScope> _ifs;                 // Nested set of IF-exprs used to track balanced new-refs
+  private final boolean _closure;
 
   public ScopeNode(boolean closure) {
     super(OP_SCOPE,null,null,null,null);
-    if( closure ) { add_def(null); add_def(null); add_def(null); } // Wire up an early-function-exit path
+    add_def(null); add_def(null); add_def(null); // Wire up an early-function-exit path
+    _closure = closure;
     _types = new HashMap<>();
     _ifs = null;
   }
   public ScopeNode(HashMap<String,ConTypeNode> types,  Node ctl, Node mem, Node ptr, Node rez) {
     super(OP_SCOPE,ctl,mem,ptr,rez);
     _types = types;
+    _closure = false;
   }
 
   public   Node  ctrl() { return in(CTL_IDX); }
@@ -91,11 +94,7 @@ public class ScopeNode extends Node {
     add_def(t);                 // Hook constant so it does not die
   }
 
-  // If inputs 4,5,6 are early_ctrl, _mem and _val then you are a closure.
-  public boolean is_closure() {
-    if( len() < 7 ) return false;
-    return !(in(4) instanceof RetNode);
-  }
+  public boolean is_closure() { return _closure; }
 
   @Override public Node ideal_reduce() {
     Node ctrl = in(0).is_copy(0);
@@ -122,7 +121,7 @@ public class ScopeNode extends Node {
       // Wipe out extra function edges.  They are there to act "as if" the
       // exit-scope calls them; effectively an extra wired call use with the
       // most conservative caller.
-      while( _defs._len > RET_IDX ) throw unimpl(); // pop();
+      while( _defs._len > RET_IDX ) pop();
     // If the result is a function, wipe out wrong fidxs
     if( rez._val instanceof TypeFunPtr ) {
       BitsFun fidxs = ((TypeFunPtr)rez._val)._fidxs;

@@ -129,11 +129,11 @@ public class GVNGCM {
       ITER_CNT++; assert ITER_CNT < 35000; // Catch infinite ideal-loops
       if( m == null ) {
         ITER_CNT_NOOP++; // No progress profiling
-        assert Env.START==null || Env.START.more_work(true)==0; // Initial conditions are correct
+        //assert Env.START==null || Env.START.more_work(true)==0; // Initial conditions are correct
       }
       else {
         // VERY EXPENSIVE ASSERT
-        assert Env.START == null || Env.START.more_work(true) == 0 // Initial conditions are correct
+        //assert Env.START == null || Env.START.more_work(true) == 0 // Initial conditions are correct
           ; assert m.is_dead() || m.check_vals();
       }
     }

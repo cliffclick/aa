@@ -291,9 +291,10 @@ public class CallNode extends Node {
         return null;
       for( int i=1; i<mem._defs._len; i++ )
         if( mem.in(i) instanceof MrgProjNode ) {
+          // TODO: Renable this.  Requires escs-into-calls
           //Node x = _ideal_grow((MrgProjNode)mem.in(i),cepim,cepid,escs,i);
           //if( x!=null ) return x;
-          throw unimpl();
+          return null;
         }
     }
     return null;

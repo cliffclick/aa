@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
@@ -61,7 +60,7 @@ public class CastNode extends Node {
     if( _val!=old )
       Env.GVN.add_flow(this);
   }
-  
+
   @Override public TypeMem live_use(Node def ) {
     return def==in(0) ? TypeMem.ALIVE : _live;
   }
@@ -70,9 +69,8 @@ public class CastNode extends Node {
   @Override public boolean unify( boolean test ) {
     TV2 maynil = tvar(1); // arg in HM
     TV2 notnil = tvar();  // ret in HM
-    if( maynil.is_err() ) return false;
 
-    // Can already be nil-checked and will then unify to self
+    // If the maynil is already nil-checked, can be a nilable of a nilable.
     if( maynil==notnil ) throw unimpl(); // return false;
 
     // Already an expanded nilable
@@ -80,26 +78,34 @@ public class CastNode extends Node {
 
     // Expand nilable to either base
     if( maynil.is_base() && notnil.is_base() )
+      //assert !arg.is_open() && !ret.is_open();
+      //assert arg._flow == ret._flow.meet(Type.NIL);
+      //return false;
       throw unimpl(); //
 
     // Two structs, one nilable.  Nilable is moved into the alias, but also
     // need to align the fields.
-    if( maynil.is_struct() && notnil.is_struct() && maynil.has_nil() ) {
+    if( maynil.is_struct() && notnil.is_struct() ) {
       boolean progress = false;
+      Type omt = maynil._flow;
+      Type ont = notnil._flow;
+      Type mt = omt.meet(ont);
+      Type mt0 = mt.meet(Type.NIL);
+      Type nt0 = mt.join(Type.NSCALR);
+      if( mt0!=omt ) { maynil._flow = mt0; progress=true; }
+      if( nt0!=ont ) { notnil._flow = nt0; progress=true; }
+
+      Type ome = maynil._eflow;
+      Type one = notnil._eflow;
+      Type mte = ome==null ? one : (one==null ? ome : ome.meet(one));
+      if( mte!=null ) {
+        Type mt1 = mte.meet(Type.NIL);
+        Type nt1 = mte.join(Type.NSCALR);
+        if( mt1 != ome ) { maynil._eflow = mt1; progress = true; }
+        if( nt1 != one ) { notnil._eflow = nt1; progress = true; }
+      }
       // Also check that the fields align
-      //for( String fld : maynil.args() ) {
-      //  TV2 mfld = maynil.arg(fld);
-      //  TV2 nfld = notnil.arg(fld);
-      //  if( nfld!=null && nfld!=mfld )
-      //    { progress = true; break; } // Unequal fields
-      //}
-      //// Find any extra fields
-      //if( !progress && maynil.is_open() )
-      //  for( String fld : notnil.args() )
-      //    if( maynil.arg(fld) == null )
-      //      { progress = true; break; }
-      //if( !progress ) return false; // No progress
-      throw unimpl();
+      return TV2.unify_flds(maynil,notnil,test,true) | progress;
     }
 
     // All other paths may progress

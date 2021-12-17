@@ -7,7 +7,13 @@ int = : @{
 
   // Unary ops
   -_ = { -> int($$com.cliffc.aa.node.PrimNode$MinusI64(_val)) };
-  !_ = { -> int($$com.cliffc.aa.node.PrimNode$Not(_val)) }  
+  !_ = { -> int($$com.cliffc.aa.node.PrimNode$Not(_val)) };
+  // Simple integer math
+  _+_ = { y -> int($$com.cliffc.aa.node.PrimNode$AddI64(_val,y._val)) };
+  _-_ = { y -> int($$com.cliffc.aa.node.PrimNode$SubI64(_val,y._val)) };
+  _*_ = { y -> int($$com.cliffc.aa.node.PrimNode$MulI64(_val,y._val)) };
+  _/_ = { y -> int($$com.cliffc.aa.node.PrimNode$DivI64(_val,y._val)) };
+  _%_ = { y -> int($$com.cliffc.aa.node.PrimNode$ModI64(_val,y._val)) };
 };
 
 //int1  =: $$com.cliffc.aa.type.TypeInt#BOOL;
@@ -18,16 +24,6 @@ int = : @{
 //ptr   =: $$com.cliffc.aa.type.TypeMemPtr#ISUSED;
 //str   =: $$com.cliffc.aa.type.TypeMemPtr#STRPTR;
 //ary   =: $$com.cliffc.aa.type.TypeMemPtr#ARYPTR;
-//
-//// Simple integer math
-//_+_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$AddI64(x,y) };
-//_-_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$SubI64(x,y) };
-//_*_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$MulI64(x,y) };
-//_/_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$DivI64(x,y) };
-//_%_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$ModI64(x,y) };
-//
-//// Unary minus
-//-_  = { x:int -> $$com.cliffc.aa.node.PrimNode$MinusI64(x) };
 //
 //// Logical & bitwise
 //_&_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$AndI64(x,y) };
