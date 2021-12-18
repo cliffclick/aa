@@ -135,7 +135,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
       }
       return true;
     }
-    
+
     int x = cmp(t);
     if( x != -1 ) return x == 1;
     // Unlike all other non-cyclic structures which are built bottom-up, cyclic
@@ -334,7 +334,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
   // Set/replace a field to an open, under construction TypeStruct
   public TypeStruct set_fld( TypeFld fld ) {
     TypeFld old = _flds.put(fld._fld,fld);
-    assert !interned() && old!=null; // No accidental adding
+    assert un_interned() && old!=null; // No accidental adding
     //if( old._hash==0 ) old.free(); // TODO
     return this;
   }
@@ -1036,9 +1036,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     if( fin==Access.Final || fin==Access.ReadOnly ) precise=false;
     Type   pval = precise ? val : fld._t.meet(val);
     Access pfin = precise ? fin : fld._access.meet(fin);
-    TypeStruct ts = copy();
-    ts.set_fld(fld.make_from(pval,pfin));
-    return ts.hashcons_free();
+    return replace_fld(fld.make_from(pval,pfin));
   }
 
   @Override public TypeObj flatten_fields() {

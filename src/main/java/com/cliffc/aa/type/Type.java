@@ -3,9 +3,8 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Predicate;
 import java.util.function.IntSupplier;
+import java.util.function.Predicate;
 
 /** an implementation of language AA
  */
@@ -209,7 +208,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     assert INTERN.get(this)==this;
     return (T)this;
   }
-  boolean interned() { return _hash!=0 && INTERN.get(this)==this; }
+
+  // Fast, does not check the hash table, just the hash & dual
+  boolean interned() { return _hash!=0 && _dual!=null; }
+  // Slow, actually probes the hash table.
+  boolean un_interned() { return _hash == 0 || INTERN.get(this) != this; }
   Type intern_lookup() { return INTERN.get(this); }
   static int intern_size() { return INTERN.size(); }
   public static boolean intern_check() {

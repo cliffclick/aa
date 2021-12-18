@@ -86,7 +86,17 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   }
 
   @Override public Type value() {
-    return TypeTuple.make(Type.CTRL, is_unused() ? TypeObj.UNUSED : valueobj(),_tptr);   // Complex obj, simple ptr.
+    Type t0 = Type.CTRL;
+    Type t1 = is_unused() ? TypeObj.UNUSED : valueobj();
+    Type t2 = _tptr;
+    // Look for a hit with the existing value, cheaper than making and discovering the dup
+    TypeTuple tt;
+    if( _val instanceof TypeTuple ) {
+      Type[] ts = ((TypeTuple)_val)._ts;
+      if( !((TypeTuple)_val).above_center() && ts[0]==t0 && ts[1]==t1 && ts[2]==t2 )
+        return _val;
+    }
+    return TypeTuple.make(t0, t1, t2);   // Complex obj, simple ptr.
   }
   abstract TypeObj valueobj();
 

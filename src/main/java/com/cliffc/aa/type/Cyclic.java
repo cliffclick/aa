@@ -56,7 +56,7 @@ interface Cyclic {
     // Insert all members of the cycle into the hashcons.  If self-symmetric,
     // also replace entire cycle with self at each point.
     for( Type t : REACHABLE )
-      if( !t.interned() )
+      if( t.un_interned() )
         if( t.retern() != t._dual ) t._dual.retern();
     // Return new interned cycle
     return head;
