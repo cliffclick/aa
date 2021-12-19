@@ -387,6 +387,7 @@ public class FunNode extends RegionNode {
   private static boolean bad_mem_use( Node n, TypeObj to) {
     for( Node use : n._uses ) {
       switch( use._op ) {
+      case OP_TYPE: return true; // Unoptimized arg assert check, no type splitting
       case OP_NEWOBJ: break; // Field use is like store.value use
       case OP_IF: break;     // Zero check is ok
       case OP_CAST:          // Cast propagates check

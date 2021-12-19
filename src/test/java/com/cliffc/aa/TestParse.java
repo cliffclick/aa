@@ -72,6 +72,8 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
+    test("1.2+2", TypeFlt.con(3.2), "3.2"); // expect some type failure: no oper flt._+_(int)
+
     test("1",   TypeInt.TRUE, "1");
     // Unary operator
     test("-1",  TypeInt.con(-1), "-1");

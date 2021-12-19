@@ -93,7 +93,8 @@ public class ScopeNode extends Node {
     _types.put( name, t );
     add_def(t);                 // Hook constant so it does not die
   }
-
+  public void reset_type( String name, Type t ) { _types.get(name).reset_type(t); }
+  
   public boolean is_closure() { return _closure; }
 
   @Override public Node ideal_reduce() {

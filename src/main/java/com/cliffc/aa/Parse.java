@@ -203,13 +203,27 @@ public class Parse implements Comparable<Parse> {
     String tvar = token();      // Scan for tvar
     if( tvar == null || !peek('=') || !peek(':') ) { _x = oldx; return null; }
     tvar = tvar.intern();
-    // Must be a type-variable assignment
+    // Look for a prior assignment
+    ConTypeNode tn = _e.lookup_type(tvar);
+    if( tn != null )
+      throw unimpl(); // Trying to re-assign the same tvar?
+    Node val = lookup(tvar);
+    if( val!=null && !val.is_forward_ref() )
+      return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
+
+    // Make a ConType with a named Type, add a forward-ref type mapping
+    int alias = BitsAlias.type_alias(BitsAlias.REC);
+    TypeMemPtr tmp_fref = TypeMemPtr.make(alias,(TypeObj)TypeObj.ISUSED.set_name((tvar+":").intern()));
+    tn = (ConTypeNode)gvn(new ConTypeNode(tvar,tmp_fref,scope()));
+    _e.add_type(tvar,tn); // Add a type mapping
+
+    // Must be a type-variable assignment, so parse a type
     Type t = typev();
     if( t==null ) return err_ctrl2("Missing type after ':'");
     if( peek('?') ) return err_ctrl2("Named types are never nil");
-    Node val = lookup(tvar);
-    if( !val.is_forward_ref() )
-      return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
+    // Back door return ptr-to-NewObj
+    int pidx = GVNGCM.KEEP_ALIVE.len()-1;
+    ProjNode ptr = (ProjNode)Node.peek(pidx);
     Parse bad = errMsg();
     // Single-inheritance & vtables & RTTI:
     //            "Objects know thy Class"
@@ -217,30 +231,24 @@ public class Parse implements Comparable<Parse> {
     // Which means TypeObj is named and not the pointer-to-TypeObj.
     // "Point= :@{x,y}" declares "Point" to be a type Name for "@{x,y}".
     Type named = t.set_name((tvar+":").intern()); // Add a name
-    ConTypeNode tn = _e.lookup_type(tvar);
-    if( tn != null )
-      throw unimpl(); // Trying to re-assign the same tvar?
     // If this is a primitive type, there is no recursion and
     // no special issues.  Make a constructor and be done.
     if( !(t instanceof TypeObj) ) {
       // Make a ConType with a named Type
-      tn = (ConTypeNode)gvn(new ConTypeNode(tvar,named,scope()));
-      _e.add_type(tvar,tn); // Add a type mapping
-      if( _prims ) return tn;
-      // Make a trivial constructor
-      FunPtrNode fptr = PrimNode.convertTypeName(t,named,bad);
-      fptr = (FunPtrNode)do_store(null,fptr,Access.Final,tvar,bad);
-      return fptr;
+      _e.reset_type(tvar,named); // Correct the type mapping
+      //if( _prims ) return tn;
+      //// Make a trivial constructor
+      //FunPtrNode fptr = PrimNode.convertTypeName(t,named,bad);
+      //fptr = (FunPtrNode)do_store(null,fptr,Access.Final,tvar,bad);
+      //return fptr;
+      // TODO: wrap a name (and other final-field behaviors) over a prim struct
+      throw unimpl();
     }
 
-    // Back door return ptr-to-NewObj
-    int pidx = GVNGCM.KEEP_ALIVE.len()-1;
-    ProjNode ptr = (ProjNode)Node.peek(pidx);
     // Always wrap Objs with a TypeMemPtr and a unique alias.
     TypeMemPtr tmp = ((NewObjNode)ptr.in(0))._tptr;
     // Make a ConType with a named Type
-    tn = (ConTypeNode)gvn(new ConTypeNode(tvar,tmp,scope()));
-    _e.add_type(tvar,tn); // Add a type mapping
+    _e.reset_type(tvar,tmp); // Reset type mapping
     // Unlink the constructed sample object; it only exists for the type-domain
     // and is never actually allocated "in real life".
     Node omem = mem();
@@ -266,6 +274,7 @@ public class Parse implements Comparable<Parse> {
     FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(ts, tn.alias(), errMsg(), _e, (ProjNode)Node.pop(pidx));
     do_store(scope(),epi2,Access.Final,tvar,bad);
     UnresolvedNode unr = (UnresolvedNode)_e.lookup(tvar); // Returns an Unresolved of constructors
+    Env.GVN.add_flow(unr);
     // TODO: Ponder just being scoped and not defined - which will allow more
     // constructors in the same scope.
     return unr.scoped().define();
@@ -968,6 +977,8 @@ public class Parse implements Comparable<Parse> {
         if( fld._order <= DSP_IDX ) continue;// Already handled
         assert fun==_e._fun && fun==_e._scope.ctrl();
         Node parm = gvn(new ParmNode(fld,fun,Env.ALL_PARM,errmsg));
+        if( fld._t!=Type.SCALAR ) // Type-check any arg types
+          parm = typechk(parm,fld._t,mem,bads.at(fld._order-ARG_IDX));
         create(fld._fld,parm, args_are_mutable);
       }
 
@@ -1161,16 +1172,15 @@ public class Parse implements Comparable<Parse> {
     Number n = _nf.parse(_str,_pp);
     _x = _pp.getIndex();
     if( n instanceof Long   ) {
-      long l = n.longValue();
-      if( l==0 ) throw unimpl(); // class for xnil
-      TypeInt ti = TypeInt.con(l);
+      TypeInt ti = TypeInt.con(n.longValue());
       Node unr = _e.lookup("int");
-      Node ni = do_call(null,ctrl(),mem(),unr,con(ti));
-      return ni;
+      return do_call(null,ctrl(),mem(),unr,con(ti));
     }
-    if( n instanceof Double )
-      throw unimpl();
-      //return TypeFlt.con(n.doubleValue());
+    if( n instanceof Double ) {
+      TypeFlt tf = (TypeFlt)TypeFlt.con(n.doubleValue());
+      Node unr = _e.lookup("flt");
+      return do_call(null,ctrl(),mem(),unr,con(tf));
+    }
     throw new RuntimeException(n.getClass().toString()); // Should not happen
   }
   // Parse a small positive integer; WS already skipped and sitting at a digit.

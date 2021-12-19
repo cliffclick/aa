@@ -272,6 +272,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   @Override Type _unbox() {
     if( Util.eq(_obj._name,"int:") )
       return ((TypeStruct)_obj).at("_val");
+    if( Util.eq(_obj._name,"flt:") )
+      return ((TypeStruct)_obj).at("_val");
     return make_from((TypeObj)_obj._unbox());
   }
 

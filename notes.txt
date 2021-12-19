@@ -1,4 +1,27 @@
 =======================================
+12/18/2021
+
+"ints as structs" looks good in theory, wildly inefficient in making nodes & types.
+Seems to work fine doing math.
+
+Idea: same semantics as "ints as structs", same overhead as "primitive ints".
+"Named:" types have a class type with the same name somewhere.  (Fully qualified :'s to keep uniqueness).
+Named types can be in ConNodes and value-flowed.
+LoadNodes support them as the address;
+- the memory can be dropped
+- the fld is 100% matched (or error)
+- The contents are always foldable
+- - "_val" or similar just strips the "name:" off and gets the primitive
+- - ".hash" or "._+_" or similar just loads from the Class
+"Class" is just a NewObj, found from a global flat table of NewObjs.  Force keep-alive until Combo/GCP.
+No memory on a "Class"; its the immutable part of a primitive.
+
+Build "classes" via normal parsing of named types; detect "value type" via e.g.
+all-final-fields, or specific type keyword?
+
+
+
+=======================================
 12/5/2021
 
 Getting better testing alive.

@@ -375,8 +375,13 @@ public class CallNode extends Node {
     //BitsAlias as = get_alias(tfp._dsp);
     for( int i=ARG_IDX; i<nargs(); i++ )
       ts[i] = arg(i)==null ? Type.XSCALAR : arg(i)._val;
-    if( !(fdx() instanceof FunPtrNode) )
-      tfp = (TypeFunPtr)((UnresolvedNode)fdx()).resolve_value(ts)._val;
+    Node fdx = fdx();
+    if( fdx instanceof FreshNode ) fdx = ((FreshNode)fdx).id();
+    if( fdx instanceof UnresolvedNode )
+      fdx = ((UnresolvedNode)fdx).resolve_value(ts);
+    if( !(fdx instanceof FunPtrNode) )
+      throw unimpl();           // cannot resolve call yet
+    tfp = (TypeFunPtr)fdx._val;
     ts[_defs._len] = tfp;
     return TypeTuple.make(ts);
   }

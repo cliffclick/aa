@@ -1054,8 +1054,8 @@ public class TV2 {
     TV2 tv = DUPS.get(_uid);
     if( tv!=null ) return tv;
     if( is_struct() ) {
-      if( arg("int")!=null )
-        return arg("_val");     // Unbox ints
+      if( arg("int")!=null ) return arg("_val");     // Unbox ints
+      if( arg("flt")!=null ) return arg("_val");     // Unbox flts
       throw unimpl();
     }
     throw unimpl();

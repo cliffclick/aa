@@ -65,7 +65,7 @@ public class TypeInt extends Type<TypeInt> {
   }
   // Return a long from a TypeInt constant; assert otherwise.
   @Override public long   getl() { assert is_con(); return _con; }
-  @Override public double getd() { assert is_con() && (long)((double)_con)==_con; return _con; }
+  //@Override public double getd() { assert is_con() && (long)((double)_con)==_con; return _con; }
 
   @Override protected TypeInt xdual() { return _x==0 ? this : POOLS[TINT].<TypeInt>malloc().init(-_x,_z,_con); }
   @Override protected Type xmeet( Type t ) {

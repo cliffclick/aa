@@ -51,7 +51,7 @@ public class TypeFlt extends Type<TypeFlt> {
   }
   // Return a double from a TypeFlt constant; assert otherwise.
   @Override public double getd() { assert is_con(); return _con; }
-  @Override public long   getl() { assert is_con() && ((long)_con)==_con; return (long)_con; }
+  //@Override public long   getl() { assert is_con() && ((long)_con)==_con; return (long)_con; }
 
   @Override protected TypeFlt xdual() { return _x==0 ? this : POOLS[TFLT].<TypeFlt>malloc().init(-_x,_z,_con); }
   @Override protected Type xmeet( Type t ) {

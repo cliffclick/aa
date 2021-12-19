@@ -358,4 +358,5 @@ public class Env implements AutoCloseable {
   }
   // Update type name token to type mapping in the current scope
   void add_type( String name, ConTypeNode t ) { _scope.add_type(name,t); }
+  void reset_type( String name, Type t ) { _scope.reset_type(name,t); }
 }

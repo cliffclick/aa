@@ -49,6 +49,8 @@ public class UnresolvedNode extends Node {
   }
 
   // Look at the arguments and resolve the call, if possible.
+  // Returns null if not resolvable (yet).
+  // MUST resolve during Combo/GCP, or program has ambiguous calls.
   FunPtrNode resolve_value( Type[] tcall) {
     FunPtrNode x=null;
     for( Node n : _defs ) {

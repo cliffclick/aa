@@ -22,6 +22,7 @@ public class ConTypeNode extends Node {
   }
   public int alias() { return ((TypeMemPtr)_t).getbit0(); }
   public BitsAlias aliases() { return ((TypeMemPtr)_t)._aliases; }
+  void reset_type(Type t) { _t=t; }
 
   // Define a forward-ref Type
   public void def_fref(TypeStruct tc, Env e) {
