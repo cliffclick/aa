@@ -22,14 +22,15 @@ import static com.cliffc.aa.type.TypeFld.Access;
 public class NewObjNode extends NewNode<TypeStruct> {
   public final boolean _is_closure; // For error messages
   public       Parse[] _fld_starts; // Start of each tuple member; 0 for the display
-  // NewNodes do not really need a ctrl; useful to bind the upward motion of
-  // closures so variable stores can more easily fold into them.
-  public NewObjNode( boolean is_closure, TypeStruct disp, Node clo ) {
-    super(OP_NEWOBJ,BitsAlias.REC,disp);
-    assert disp.get("^")!=null;
-    _is_closure = is_closure;
-    add_def(clo);
-  }
+  public int _nargs;                // Function arguments (no FreshNode) vs local Let defines (yes Fresh)
+  //// NewNodes do not really need a ctrl; useful to bind the upward motion of
+  //// closures so variable stores can more easily fold into them.
+  //public NewObjNode( boolean is_closure, TypeStruct disp, Node clo ) {
+  //  super(OP_NEWOBJ,BitsAlias.REC,disp);
+  //  assert disp.get("^")!=null;
+  //  _is_closure = is_closure;
+  //  add_def(clo);
+  //}
   // Called by IntrinsicNode.convertTypeNameStruct
   public NewObjNode( boolean is_closure, int alias, TypeStruct ts, Node clo ) {
     super(OP_NEWOBJ,alias,ts,clo);
@@ -42,8 +43,10 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public Access access(String name) { return _ts.get(name)._access; }
 
   // Called when folding a Named Constructor into this allocation site
-  void set_name( TypeStruct name ) { assert !name.above_center();  setsm(name); }
+  public void set_name( TypeStruct name ) { assert !name.above_center();  setsm(name); }
 
+  // More fields are local vars; prior fields are function args
+  public void set_nargs() { _nargs = _defs._len; }
   // No more fields
   public void no_more_fields() { setsm(_ts.close()); }
 

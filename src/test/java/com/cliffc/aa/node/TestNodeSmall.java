@@ -496,7 +496,8 @@ public class TestNodeSmall {
     ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISP_SIMPLE));
     // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
     // yet built.
-    NewObjNode dsp_file = (NewObjNode)gvn.xform(new NewObjNode(true,TypeMemPtr.DISPLAY,dsp_prims));
+    int alias = BitsAlias.new_alias(BitsAlias.REC);
+    NewObjNode dsp_file = (NewObjNode)gvn.xform(new NewObjNode(true,alias,TypeMemPtr.DISPLAY,dsp_prims));
     //MrgProjNode dsp_file_obj = Env.DEFMEM.make_mem_proj(dsp_file,mem);
     //ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(DSP_IDX, dsp_file)).keep();
     //Env.ALL_DISPLAYS = Env.ALL_DISPLAYS.set(dsp_file._alias);

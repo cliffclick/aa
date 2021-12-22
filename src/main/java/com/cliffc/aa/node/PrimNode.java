@@ -1,13 +1,9 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
 
 import static com.cliffc.aa.AA.*;
 
@@ -21,33 +17,27 @@ import static com.cliffc.aa.AA.*;
 public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
   final TypeFunSig _sig;        // Argument types; ctrl, mem, disp, normal args
-  final TypeFunPtr _tfp;        // FIDX, nargs, display argument, return type
+  public final TypeFunPtr _tfp; // FIDX, nargs, display argument, return type
   Parse[] _badargs;             // Filled in when inlined in CallNode
-  byte _op_prec;                // Operator precedence, computed from table.  Generally 1-9.
   public boolean _thunk_rhs;    // Thunk (delay) right-hand-argument.
   public PrimNode( String name, TypeStruct formals, Type ret ) {
     super(OP_PRIM);
     _name = name;
-    assert formals.get("^")==null; // No display
     int fidx = BitsFun.new_fidx();
     _sig=TypeFunSig.make(formals,ret);
     _tfp=TypeFunPtr.make(BitsFun.make0(fidx),formals.nargs(),TypeMemPtr.NO_DISP,ret);
     _badargs=null;
-    _op_prec = -1;              // Not set yet
     _thunk_rhs=false;
   }
 
   private static PrimNode[] PRIMS = null; // All primitives
-  public static PrimNode[][] PRECEDENCE = null;  // Just the binary operators, grouped by precedence
-  public static String  [][] PREC_TOKS  = null;  // Just the binary op tokens, grouped by precedence
-  public static String  []   PRIM_TOKS  = null;  // Primitive tokens, longer first for greedy token search
 
   // TODO: Just build precedence table for ops; need a lookup that includes prec order, nargs, placement
   public static PrimNode[] PRIMS() {
     if( PRIMS!=null ) return PRIMS;
 
     // Binary-operator primitives, sorted by precedence.
-    PRECEDENCE = new PrimNode[][]{
+    PrimNode[][] PRECEDENCE = new PrimNode[][]{
 
       {new MulF64(), new DivF64(), new MulI64(), new DivI64(), new ModI64(), },
 
@@ -73,7 +63,7 @@ public abstract class PrimNode extends Node {
       // These are called like a function, so do not have a precedence
       new RandI64(),
 
-      new ConvertInt64F64(),
+      new ConvertI64F64(),
 
       // These are balanced-ops, called by Parse.term()
       new MemPrimNode.ReadPrimNode.LValueRead  (), // Read  an L-Value: (ary,idx) ==> elem
@@ -95,33 +85,6 @@ public abstract class PrimNode extends Node {
       for( PrimNode prim : prims )
         allprims.push(prim);
     PRIMS = allprims.asAry();
-
-    // Compute precedence from table
-    int max_prec = PRECEDENCE.length;
-    for( int p=0; p<PRECEDENCE.length; p++ )
-      for( PrimNode n : PRECEDENCE[p] )
-        n._op_prec = (byte)(max_prec-p);
-    // Not used to determine precedence, just a uniop flag
-    for( PrimNode prim : uniops ) prim._op_prec = (byte)max_prec;
-
-    // Compute greedy primitive names, without regard to precedence.
-    // Example from Java: >,>=,>>,>>=,>>>,>>>= are all valid tokens.
-    HashSet<String> hash = new HashSet<>(); // Remove dups
-    for( PrimNode[] prims : PRECEDENCE )
-      for( PrimNode prim : prims )
-        hash.add(prim._name);
-    ArrayList<String> list = new ArrayList<>(hash);
-    Collections.sort(list);     // Longer strings on the right
-    Collections.reverse(list);  // Longer strings on the left, match first.
-    PRIM_TOKS = list.toArray(new String[0]);
-
-    // Compute precedence token groupings for parser
-    PREC_TOKS = new String[max_prec+1][];
-    for( int p=0; p<max_prec; p++ ) {
-      String[] toks = PREC_TOKS[p+1] = new String[PRECEDENCE[max_prec-1-p].length];
-      for( int i=0; i<toks.length; i++ )
-        toks[i] = PRECEDENCE[max_prec-1-p][i]._name;
-    }
 
     return PRIMS;
   }
@@ -152,8 +115,9 @@ public abstract class PrimNode extends Node {
   // str:{int     -> str }  ==>>  str:int
   // str:{flt     -> str }  ==>>  str:flt
   // == :{ptr ptr -> int1}  ==>>  == :ptr
-  @Override public String xstr() { return _name+":"+_sig._formals.fld_idx(ARG_IDX)._t; }
+  @Override public String xstr() { return _name+":"+_sig._formals.fld_idx(DSP_IDX)._t; }
   @Override public Type value() {
+    if( is_keep() ) return Type.ALL;
     Type[] ts = Types.get(_defs._len); // 1-based
     // If all inputs are constants we constant-fold.  If any input is high, we
     // return high otherwise we return low.
@@ -212,7 +176,6 @@ public abstract class PrimNode extends Node {
     for( PrimNode p : PRIMS() )
       if( p.getClass() == getClass() )
         { that=p; break; }      // Found an original PrimNode with op_prec set
-    assert that != null && that._defs._len==0 && that._uses._len==0;
     kill(); // Kill self, use one from primitive table that has op_prec set
     // Extra '$' in name copies the op_prec one inlining level from clazz_node into the _prim.aa
     FunNode fun = Env.GVN.init(new FunNode(("$"+_name).intern(),that)); // No callers (yet)
@@ -249,66 +212,65 @@ public abstract class PrimNode extends Node {
   }
 
 
-  // --------------------
-  // Default name constructor using a single tuple type
-  static class ConvertTypeName extends PrimNode {
-    ConvertTypeName(Type from, Type to, Parse badargs, Node p) {
-      super(to._name,TypeStruct.args(from),to);
-      _badargs = new Parse[]{badargs};
-      add_def(null);
-      add_def(null);
-      add_def(null);
-      add_def(p);
-    }
-    @Override public Type value() {
-      Type[] ts = Types.get(_defs._len);
-      for( int i=ARG_IDX; i<_defs._len; i++ )
-        ts[i] = _defs.at(i)._val;
-      Type t = apply(ts);     // Apply (convert) even if some args are not constant
-      Types.free(ts);
-      return t;
-    }
-    @Override public Type apply( Type[] args ) {
-      Type actual = args[ARG_IDX];
-      if( actual==Type.ANY || actual==Type.ALL ) return actual;
-      Type formal = _sig.arg(ARG_IDX)._t;
-      // Wrapping function will not inline if args are in-error
-      assert actual.isa(formal);
-      return actual.set_name(_tfp._ret._name);
-    }
-    @Override public ErrMsg err( boolean fast ) {
-      Type actual = val(ARG_IDX);
-      Type formal = _sig.arg(ARG_IDX)._t;
-      if( !actual.isa(formal) ) // Actual is not a formal
-        return ErrMsg.typerr(_badargs[0],actual,null,formal);
-      return null;
-    }
-  }
+  //// --------------------
+  //// Default name constructor using a single tuple type
+  //static class ConvertTypeName extends PrimNode {
+  //  ConvertTypeName(Type from, Type to, Parse badargs, Node p) {
+  //    super(to._name,TypeStruct.args(from),to);
+  //    _badargs = new Parse[]{badargs};
+  //    add_def(null);
+  //    add_def(null);
+  //    add_def(null);
+  //    add_def(p);
+  //  }
+  //  @Override public Type value() {
+  //    Type[] ts = Types.get(_defs._len);
+  //    for( int i=ARG_IDX; i<_defs._len; i++ )
+  //      ts[i] = _defs.at(i)._val;
+  //    Type t = apply(ts);     // Apply (convert) even if some args are not constant
+  //    Types.free(ts);
+  //    return t;
+  //  }
+  //  @Override public Type apply( Type[] args ) {
+  //    Type actual = args[ARG_IDX];
+  //    if( actual==Type.ANY || actual==Type.ALL ) return actual;
+  //    Type formal = _sig.arg(ARG_IDX)._t;
+  //    // Wrapping function will not inline if args are in-error
+  //    assert actual.isa(formal);
+  //    return actual.set_name(_tfp._ret._name);
+  //  }
+  //  @Override public ErrMsg err( boolean fast ) {
+  //    Type actual = val(ARG_IDX);
+  //    Type formal = _sig.arg(ARG_IDX)._t;
+  //    if( !actual.isa(formal) ) // Actual is not a formal
+  //      return ErrMsg.typerr(_badargs[0],actual,null,formal);
+  //    return null;
+  //  }
+  //}
 
-  static class ConvertInt64F64 extends PrimNode {
-    ConvertInt64F64() { super("flt64",TypeStruct.INT64,TypeFlt.FLT64); }
+  public static class ConvertI64F64 extends PrimNode {
+    public ConvertI64F64() { super("flt64",TypeStruct.INT64,TypeFlt.FLT64); }
     @Override public Type apply( Type[] args ) { return TypeFlt.con((double)args[1].getl()); }
   }
 
 
-  // Takes in a Scalar and Names it.
-  public static FunPtrNode convertTypeName( Type from, Type to, Parse badargs ) {
-    //try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
-    //  TypeStruct formals = TypeStruct.args(from);
-    //  TypeFunSig sig = TypeFunSig.make(formals,to);
-    //  Node ctl = Env.FILE._scope;
-    //  FunNode fun = X.init2((FunNode)new FunNode(to._name,-1).add_def(ctl));
-    //  Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
-    //  Node ptr = X.xform(new ParmNode(ARG_IDX,"x",fun,(ConNode)Node.con(from),badargs));
-    //  Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-    //  Node cvt = X.xform(new ConvertTypeName(from,to,badargs,ptr));
-    //  RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,cvt,rpc,fun));
-    //  Env.SCP_0.add_def(ret);
-    //  return (X._ret = X.init2(new FunPtrNode(to._name,ret)));
-    //}
-    throw unimpl();
-  }
-
+//// Takes in a Scalar and Names it.
+//public static FunPtrNode convertTypeName( Type from, Type to, Parse badargs ) {
+//  try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
+//    TypeStruct formals = TypeStruct.args(from);
+//    TypeFunSig sig = TypeFunSig.make(formals,to);
+//    Node ctl = Env.FILE._scope;
+//    FunNode fun = X.init2((FunNode)new FunNode(to._name,-1).add_def(ctl));
+//    Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
+//    Node ptr = X.xform(new ParmNode(ARG_IDX,"x",fun,(ConNode)Node.con(from),badargs));
+//    Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+//    Node cvt = X.xform(new ConvertTypeName(from,to,badargs,ptr));
+//    RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,cvt,rpc,fun));
+//    Env.SCP_0.add_def(ret);
+//    return (X._ret = X.init2(new FunPtrNode(to._name,ret)));
+//  }
+//}
+//
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpF64 extends PrimNode {

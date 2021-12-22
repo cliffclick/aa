@@ -227,8 +227,8 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
   // Make a collection of fields, with no display and all with default names and final fields.
   private static TypeStruct make0() { return malloc("",false,false); }
   private TypeStruct add_arg(Type t, int n) { return add_fld(TypeFld.make_arg(t,n)); }
-  public static TypeStruct args(Type t1         ) { return make0().add_arg(t1,ARG_IDX)                      .hashcons_free(); }
-  public static TypeStruct args(Type t1, Type t2) { return make0().add_arg(t1,ARG_IDX).add_arg(t2,ARG_IDX+1).hashcons_free(); }
+  public static TypeStruct args(Type t1         ) { return make0().add_arg(t1,DSP_IDX)                    .hashcons_free(); }
+  public static TypeStruct args(Type t1, Type t2) { return make0().add_arg(t1,DSP_IDX).add_arg(t2,ARG_IDX).hashcons_free(); }
   // Used by tests only, so ... is ok.
   public static TypeStruct tups(Type... ts ) {
     TypeStruct st = make0();
@@ -1103,6 +1103,15 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     return ts;
   }
 
+  // Used to detect e.g. immutable or value objects
+  public boolean is_all_final_fields() {
+    for( TypeFld fld : flds() )
+      if( fld._access != Access.Final )
+        return false;
+    return true;
+  }
+  
+  
   // True if isBitShape on all bits
   @Override public byte isBitShape(Type t) {
     if( isa(t) ) return 0; // Can choose compatible format

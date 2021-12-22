@@ -64,7 +64,7 @@ public class FunNode extends RegionNode {
   public int _nargs;        // Number of arguments
   // Operator precedence; only set on top-level primitive wrappers.
   // -1 for normal non-operator functions and -2 for forward_decls.
-  public byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
+  private byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
   // Function is generated from whole-cloth via classForName.clazz__node.  Gets
   // to keep-alive and have default types until inlined once, then gets
   // removed.
@@ -79,21 +79,20 @@ public class FunNode extends RegionNode {
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
-  public FunNode(String name,           PrimNode prim) { this(name, prim._tfp.fidx(),prim._op_prec,prim._tfp.nargs()); }
-  public FunNode(String name,NewNode.NewPrimNode prim) { this(name, prim._tfp.fidx(),prim._op_prec,prim._tfp.nargs()); }
+  public FunNode(String name,           PrimNode prim) { this(name, prim._tfp.fidx(),prim._tfp.nargs()); }
+  public FunNode(String name,NewNode.NewPrimNode prim) { this(name, prim._tfp.fidx(),prim._tfp.nargs()); }
   // Used to start an anonymous function in the Parser
-  public FunNode(int nargs) { this(null,-1, nargs); }
+  public FunNode(int nargs) { this(null, nargs); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(name,-2, 0); add_def(Env.SCP_0); }
+  FunNode(String name) { this(name, 0); add_def(Env.SCP_0); }
   // Shared common constructor for Named type constructors
-  FunNode(String name, int op_prec, int nargs ) { this(name, BitsFun.new_fidx(),op_prec, nargs); }
+  FunNode(String name, int nargs ) { this(name, BitsFun.new_fidx(), nargs); }
   // Shared common constructor
-  private FunNode( String name, int fidx, int op_prec, int nargs ) {
+  private FunNode( String name, int fidx, int nargs ) {
     super(OP_FUN);
     _name = name;
     _fidx = fidx;
     _nargs = nargs;
-    _op_prec = (byte)op_prec;
     FUNS.setX(fidx(),this); // Track FunNode by fidx; assert single-bit fidxs
   }
 
@@ -603,7 +602,7 @@ public class FunNode extends RegionNode {
   private FunNode make_new_fun(RetNode ret, int path) {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
-    FunNode fun = new FunNode(_name, BitsFun.new_fidx(oldfidx),_op_prec,_nargs);
+    FunNode fun = new FunNode(_name, BitsFun.new_fidx(oldfidx),_nargs);
     fun._bal_close = _bal_close;
     fun.pop();                  // Remove null added by RegionNode, will be added later
 

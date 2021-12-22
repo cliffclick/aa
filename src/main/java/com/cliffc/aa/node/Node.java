@@ -49,9 +49,10 @@ public abstract class Node implements Cloneable, IntSupplier {
   static final byte OP_STORE  =30;
   static final byte OP_TYPE   =31;
   static final byte OP_UNR    =32;
-  static final byte OP_MAX    =33;
+  static final byte OP_VAL    =33;
+  static final byte OP_MAX    =34;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Fresh", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "Loop", "Name", "NewObj", "NewAry", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Fresh", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "Loop", "Name", "NewObj", "NewAry", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Type", "Unresolved", "Val" };
   static { assert STRS.length==OP_MAX; }
 
   // Unique dense node-numbering
@@ -538,7 +539,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     Type oval = _val;           // Old local type
     Type nval = value();        // New type
     if( oval == nval ) return;  // No progress
-    assert nval==nval.simple_ptr() || this instanceof ConTypeNode; // Only simple pointers in node types
+    assert nval==nval.simple_ptr(); // Only simple pointers in node types
     assert oval.isa(nval);      // Monotonic
     _val = nval;                // Record progress
 

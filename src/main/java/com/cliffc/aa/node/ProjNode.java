@@ -21,11 +21,13 @@ public class ProjNode extends Node {
 
   // Strictly reducing
   @Override public Node ideal_reduce() {
+    if( in(0)==null ) return null;
     Node c = in(0).is_copy(_idx);
     if( c != null ) return c==this ? Env.ANY : c; // Happens in dying loops
     return null;
   }
   @Override public Type value() {
+    if( in(0)==null ) return _val; // Partially built; freeze in place
     Type c = val(0);
     if( c instanceof TypeTuple ) {
       TypeTuple ct = (TypeTuple)c;

@@ -10,11 +10,7 @@ public class PhiNode extends Node {
   final Type _t;                // Just a flag to signify scalar vs memory vs object
   PhiNode( byte op, Type t, Parse badgc, Node... vals ) {
     super(op,vals);
-    if( t instanceof TypeMem ) _t = TypeMem.ALLMEM;
-    else if( t instanceof TypeObj ) _t = TypeObj.OBJ; // Need to check liveness
-    else if( t instanceof TypeFunPtr ) _t = TypeFunPtr.GENERIC_FUNPTR;
-    else if( t instanceof TypeRPC ) _t = TypeRPC.ALL_CALL;
-    else _t = Type.SCALAR;
+    _t = t;
     _badgc = badgc;
     _live = all_live();         // Recompute starting live after setting t
     if( t instanceof TypeMem || t instanceof TypeRPC ) _tvar=null;  // No HM for memory
@@ -91,7 +87,7 @@ public class PhiNode extends Node {
 
   @Override BitsAlias escapees() { return BitsAlias.FULL; }
   @Override public TypeMem all_live() {
-    return _t==Type.SCALAR || _t instanceof TypeFunPtr || _t instanceof TypeRPC ? TypeMem.ALIVE : TypeMem.ALLMEM;
+    return _t instanceof TypeMem ? TypeMem.ALLMEM : TypeMem.ALIVE;
   }
   @Override public TypeMem live_use(Node def ) {
     Node r = in(0);

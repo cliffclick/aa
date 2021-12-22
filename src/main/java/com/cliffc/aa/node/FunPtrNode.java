@@ -166,5 +166,5 @@ public final class FunPtrNode extends Node {
 
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
-  @Override public byte op_prec() { return fun()._op_prec; }
+  @Override public byte op_prec() { throw unimpl(); }
 }

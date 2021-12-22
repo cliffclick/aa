@@ -11,7 +11,7 @@ import static com.cliffc.aa.AA.*;
 
 // Memory-based primitives
 public abstract class MemPrimNode extends PrimNode {
-  MemPrimNode( String name, TypeStruct formals, Type ret ) { super(name,formals,ret); _op_prec = 0; }
+  MemPrimNode( String name, TypeStruct formals, Type ret ) { super(name,formals,ret); }
   Node mem() { return in(MEM_IDX); }
   Node adr() { return in(ARG_IDX); }
   Node idx() { return in(ARG_IDX+1); }
@@ -88,7 +88,7 @@ public abstract class MemPrimNode extends PrimNode {
 
   // Array length
   public static class LValueLength extends ReadPrimNode {
-    public LValueLength() { super("$#",TypeMemPtr.LVAL_LEN,TypeInt.INT64); _op_prec=1;}
+    public LValueLength() { super("$#",TypeMemPtr.LVAL_LEN,TypeInt.INT64); }
     @Override public String bal_close() { return null; } // Not a balanced op
     @Override public Type value() {
       Type mem = val(MEM_IDX);

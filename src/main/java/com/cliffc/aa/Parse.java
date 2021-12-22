@@ -54,17 +54,65 @@ import static com.cliffc.aa.type.TypeFld.Access;
  *                                 // Pattern matching: 1 arg is the arg; 2+ args break down a (required) tuple
  *  str  = [.\%]*                  // String contents; \t\n\r\% standard escapes
  *  str  = %[num]?[.num]?fact      // Percent escape embeds a 'fact' in a string; "name=%name\n"
- *  type = tcon | tvar | tfun[?] | tstruct[?] | ttuple[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nilable'
- *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
- *  tfun = {[[type]* ->]? type }   // Function types mirror func declarations
- *  ttuple = ( [[type],]* )        // Tuple types are just a list of optional types;
-                                   // the count of commas dictates the length, zero commas is zero length.
-                                   // Tuple fields are always final.
- *  tstruct = @{ [id [tfld];]* }   // Struct types are field names with optional types or values.
- *  tfld = ! : type ! =: type ! = ifex  // Fields are untyped or typed (both modifiable and final) or final-assigned (with computed expression type)
- *  tvar = id                      // Type variable lookup
-
-
+// *  type = tvar | tfun[?] | tstruct[?] | ttuple[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nilable'
+// *  tvar = id                      // Type variable lookup; includes primitive types 'int' 'flt' etc
+// *  tfun = {[[type]* ->]? type }   // Function types mirror func declarations
+// *  ttuple = ( [[type],]* )        // Tuple types are just a list of optional types;
+// *                                 // the count of commas dictates the length, zero commas is zero length.
+// *                                 // Tuple fields are always final.
+// *  tstruct = struct               // Struct types are field names with optional types or values.
+// *
+ *
+ * Structs and Types:
+ *
+ * Structs are a collection of fields; fields name other values.  All fields
+ * can be optionally typed; the types can be forward references.  Missing types
+ * are inferred.
+ *
+ * The same struct syntax is used in 4 cases: A normal object allocation, an
+ * anonymous type struct, a named value-type, and a named reference type.
+ *
+ * Normal values (e.g. primitives) have no memory identity, are not allocated
+ * and the "==" test is deep: each field is tested via "==" and this is a
+ * bitwise test.  Hence simple primitive ints and flts are just tested via a
+ * simple bit test.
+ *
+ * Value types (Vals) are a collection of normal values; the aggregate is
+ * itself a value; it has no memory identity (pointer), is not allocated, is
+ * not freed, is pass-by-value and does not allow side-effects on members.
+ * Under the hood optimizations may do, e.g. COW optimizations.
+ *
+ * Anonymous struct declarations have fields and field modifiers, but do not
+ * allow any exprs.  They are a type, not a value.
+ *
+ * Normal objects have a memory identity (pointer), require allocation and
+ * lifetime management.  The "==" test is via ref/pointer only.  They have
+ * mutable fields and allow side-effects.  The construction allows expressions
+ * which are executed as the struct is built.
+ *
+ * Vals and Refs (reference) types are top-level named type assignments.  They
+ * make a constructor; a Val constructor makes values and a Ref constructor
+ * makes normal objects.  Constructors are always automatically defined; if you
+ * want a classic C++ or Java constructor, make a factory function instead.
+ *
+ * All fields can be marked mutable or not; the default varies.
+ *
+ * All fields require initialization; if an expr is not provided either a 0 or
+ * an argument will be used in the constructor.  This varies from Vals vs Refs.
+ *
+ * If an expression is a constant, it is precomputed and moved into a prototype
+ * object (i.e. a C++ or Java "class" object), will be fetched on demand and
+ * takes no space in object instances.  This is the common case for instance
+ * functions and global constants.
+ *
+ *      Syntax             Obj         Val           Ref       Anon
+ *  fld [:type]     ;   r/w  ,  0   final, arg    r/w,    0    r/w     // arg in ValType, 0   elsewhere
+ *  fld [:type]  =  ;   final,  0   final, arg    final, arg   final   //  0  in ObjType, arg elsewhere
+ *  fld [:type] :=  ;   r/w  ,  0   error         r/w,    0    r/w     // err in ValType; no mutable fields
+ *  fld [:type]  =e0;   final, e0   final, e0     final, e0    error   //                                    error in Anon, no value
+ *  fld [:type] :=e0;   r/w  , e0   error         r/w,   e0    error   // err in ValType; no mutable fields; error in Anon, no value
+ *
+ *
  * The Display
  *
  * The Parser builds an IR presentation of the program semantics, which has
@@ -190,94 +238,123 @@ public class Parse implements Comparable<Parse> {
   /** A type-statement assigns a type to a type variable.  Type variable
    *  assignments are always final, and can not exist before assignment (hence
    *  a variable cannot have a normal value and be re-assigned as a type
-   *  variable).  In addition to allowing 'tvar' to appear in a type expression
-   *  a pair of type constructor functions are made: one taking the base type
-   *  and returning the same value as the named type, and the other for Structs
-   *  taking the unpacked struct fields and returning the named type.  The
-   *  ':type' is the type being assigned; a space is allowed between '= :type'.
+   *  variable).
    *
-   *  tstmt = tvar = :type
+   *  tstmt = tvar  = :type  // Value type
+
+   *  Value types are final-assigned; all fields are final and immutable.
+   *  Fields not otherwise assigned are required by the constructor.  The
+   *  constructor wraps the fields with a simple name; the result is not
+   *  allocated (compiler lifetime managed), has no identity, and uses bit-wise
+   *  comparisons.  Value types support field lookups on structs, with fields
+   *  set with constant expressions being moved to the prototype object (i.e.
+   *  "class" object).
+   *
+   *
+   *  tstmt = tvar := :type // Reference type
+   *
+   *  Reference types are mutable-assigned; fields are mutable by default and
+   *  mutable fields are not filled in by the constructor.  The constructors do
+   *  allocation; the result has an identity, an explicit lifetime needing
+   *  management, and uses pointer-comparison.  As with value types, fields set
+   *  with final constant expressions are moved to the prototype.
+   *
    */
   private Node tstmt() {
     int oldx = _x;
     String tvar = token();      // Scan for tvar
-    if( tvar == null || !peek('=') || !peek(':') ) { _x = oldx; return null; }
+    if( tvar == null ) return null;
     tvar = tvar.intern();
-    // Look for a prior assignment
-    ConTypeNode tn = _e.lookup_type(tvar);
-    if( tn != null )
-      throw unimpl(); // Trying to re-assign the same tvar?
-    Node val = lookup(tvar);
-    if( val!=null && !val.is_forward_ref() )
+    // Look for "= :type" for a val-type and ":= :type" for a ref-type.
+    boolean is_val;
+    if( peek(":=") ) is_val=false;    // Ref type
+    else if( peek('=') ) is_val=true; // Val type
+    else { _x=oldx; return null; }    // Not a type assignment
+    if( !peek(':') ) { _x=oldx; return null; } // Not a type assignment
+    if( skipWS() == -1 ) return null;
+
+    // Types are forward-defined in two contexts, so either or both might
+    // already have happened: as a type (in an type annotation) and as a
+    // standard fref in a fact (probably as a constructor call).
+    Node construct = _e.lookup(tvar);
+    ProjNode typenode  = _e.lookup_type(tvar);
+    // Make a forward-ref constructor, if not one already
+    if( construct==null ) construct = val_fref(tvar,errMsg());
+    else if( !construct.is_forward_ref() )
       return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
 
-    // Make a ConType with a named Type, add a forward-ref type mapping
-    int alias = BitsAlias.type_alias(BitsAlias.REC);
-    TypeMemPtr tmp_fref = TypeMemPtr.make(alias,(TypeObj)TypeObj.ISUSED.set_name((tvar+":").intern()));
-    tn = (ConTypeNode)gvn(new ConTypeNode(tvar,tmp_fref,scope()));
-    _e.add_type(tvar,tn); // Add a type mapping
+    // Look for a prior type assignment, from e.g. a type annotation
+    if( typenode == null ) typenode = type_fref(tvar); // None, so create
+    else if( !typenode.is_forward_ref() )
+      throw unimpl(); // Double-define error
 
-    // Must be a type-variable assignment, so parse a type
-    Type t = typev();
-    if( t==null ) return err_ctrl2("Missing type after ':'");
-    if( peek('?') ) return err_ctrl2("Named types are never nil");
-    // Back door return ptr-to-NewObj
-    int pidx = GVNGCM.KEEP_ALIVE.len()-1;
-    ProjNode ptr = (ProjNode)Node.peek(pidx);
-    Parse bad = errMsg();
-    // Single-inheritance & vtables & RTTI:
-    //            "Objects know thy Class"
-    // Which means a TypeObj knows its Name.  It's baked into the vtable.
-    // Which means TypeObj is named and not the pointer-to-TypeObj.
-    // "Point= :@{x,y}" declares "Point" to be a type Name for "@{x,y}".
-    Type named = t.set_name((tvar+":").intern()); // Add a name
-    // If this is a primitive type, there is no recursion and
-    // no special issues.  Make a constructor and be done.
-    if( !(t instanceof TypeObj) ) {
-      // Make a ConType with a named Type
-      _e.reset_type(tvar,named); // Correct the type mapping
-      //if( _prims ) return tn;
-      //// Make a trivial constructor
-      //FunPtrNode fptr = PrimNode.convertTypeName(t,named,bad);
-      //fptr = (FunPtrNode)do_store(null,fptr,Access.Final,tvar,bad);
-      //return fptr;
-      // TODO: wrap a name (and other final-field behaviors) over a prim struct
+    // Parse a 'fact' as a type.  Check for a 'struct' first, to pass along the
+    // pre-selected forward-ref alias.  Other 'fact's will not use the alias.
+    Node newtype = peek("@{") ? struct(typenode) : fact();
+    if( newtype==null ) return err_ctrl2("Missing type after ':'");
+    if( peek('?')     ) return err_ctrl2("Named types are never nil");
+    assert is_val || (newtype instanceof ProjNode && newtype.in(0) instanceof NewObjNode); // Ref types are only structs
+
+    // Build a constructor
+    if( newtype instanceof ProjNode && newtype.in(0) instanceof NewObjNode ) {
+      Node constructor;
+      if( is_val )
+        // TODO walk fields; if MUTABLE, make immut and put in constructor args.
+        // If IMMUT and const, exclude from constructor args; leave in proto.
+        // If IMMUT and not-const, put code in constructor.  Replace class with default pessimal correct.
+        // Constructor is a ValNode taking fields & ConNode/expr, plus hook to Proto.        
+        constructor = ValNode.make((NewObjNode)newtype.in(0));
+      // TODO: proto object forever hooked from default ValNode constructor.
+      // Should default constructor die, so the prototype dies.
+
+      else
+        throw unimpl();         // Reference type
+
+    } else {
+      // Other types?  e.g. defining a named function-type needs a breakdown of
+      // the returned function to make a TypeFunSig.  No constructor in this
+      // case, but can be used in type-checks.
       throw unimpl();
     }
+    // TODO: constructor stored in value name-space
+    //return do_store(lookup_scope(tvar,false),constructor,Access.Final,tvar,bad);
+    throw unimpl();         
 
-    // Always wrap Objs with a TypeMemPtr and a unique alias.
-    TypeMemPtr tmp = ((NewObjNode)ptr.in(0))._tptr;
-    // Make a ConType with a named Type
-    _e.reset_type(tvar,tmp); // Reset type mapping
-    // Unlink the constructed sample object; it only exists for the type-domain
-    // and is never actually allocated "in real life".
-    Node omem = mem();
-    int midx = omem.push();     // Keep around
-    set_mem(((MrgProjNode)omem).mem()); // Unlink from memory
-    omem.set_def(1,Env.XMEM);           // Unlink from memory
+    //// If this is a value type, we get a value-constructor
+    //if( nts.is_all_final_fields() ) {
+    //  ValNode val = ValNode.make(nts,bad);
+    //  // TODO: hook ptr so its alive until post-Combo can verify no uses
+    //  throw unimpl();
+    //  //return do_store(lookup_scope(tvar,false,val,Access.Final,tvar,bad);
+    //}
+    //
+    //// Type-as-named-TypeStruct with a NewObj per instance.
 
-    // A forward-ref ConTypeNode.  Close the cycle.
-    tn.def_fref((TypeStruct)named,_e);
-
-    // Add a copy of constructor functions.
-
-    // Build a constructor taking a pointer-to-TypeObj - and the associated
-    // memory state, i.e.  takes a ptr-to-@{x,y} and returns a ptr to
-    // Named:@{x,y}.  This stores a v-table ptr into an object.  The alias#
-    // does not change, but a TypeMem[alias#] would now map to the Named
-    // variant.
-    TypeStruct ts = (TypeStruct)named;
-    FunPtrNode epi1 = IntrinsicNode.convertTypeName(ts,bad,ptr);
-    do_store(lookup_scope(tvar,false),epi1,Access.Final,tvar,bad);
-    // Add a second constructor taking an expanded arg list
-    Node.pop(midx);             // No longer keeping the sample struct around
-    FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(ts, tn.alias(), errMsg(), _e, (ProjNode)Node.pop(pidx));
-    do_store(scope(),epi2,Access.Final,tvar,bad);
-    UnresolvedNode unr = (UnresolvedNode)_e.lookup(tvar); // Returns an Unresolved of constructors
-    Env.GVN.add_flow(unr);
-    // TODO: Ponder just being scoped and not defined - which will allow more
-    // constructors in the same scope.
-    return unr.scoped().define();
+    //// Unlink the constructed sample object; it only exists for the type-domain
+    //// and is never actually allocated "in real life".
+    //Node omem = mem();
+    //int midx = omem.push();     // Keep around
+    //set_mem(((MrgProjNode)omem).mem()); // Unlink from memory
+    //omem.set_def(1,Env.XMEM);           // Unlink from memory
+    //
+    //// Add a copy of constructor functions.
+    //
+    //// Build a constructor taking a pointer-to-TypeObj - and the associated
+    //// memory state, i.e.  takes a ptr-to-@{x,y} and returns a ptr to
+    //// Named:@{x,y}.  This stores a v-table ptr into an object.  The alias#
+    //// does not change, but a TypeMem[alias#] would now map to the Named
+    //// variant.
+    //FunPtrNode epi1 = IntrinsicNode.convertTypeName(nts,bad,ptr);
+    //do_store(lookup_scope(tvar,false),epi1,Access.Final,tvar,bad);
+    //// Add a second constructor taking an expanded arg list
+    //Node.pop(midx);             // No longer keeping the sample struct around
+    //FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(nts, tn.alias(), errMsg(), _e, (ProjNode)Node.pop(pidx));
+    //do_store(scope(),epi2,Access.Final,tvar,bad);
+    //UnresolvedNode unr = (UnresolvedNode)_e.lookup(tvar); // Returns an Unresolved of constructors
+    //Env.GVN.add_flow(unr);
+    //// TODO: Ponder just being scoped and not defined - which will allow more
+    //// constructors in the same scope.
+    //return unr.scoped().define();
   }
 
   /** A statement is a list of variables to final-assign or re-assign, and an
@@ -341,9 +418,9 @@ public class Parse implements Comparable<Parse> {
         // These next two tokens are syntactically invalid, but a semi-common error situation:
         //   @{ fld;fld;fld;...  fld );  // Incorrect closing paren.  Go ahead and allow a bare id.
                                                           peek(']') || peek(')' ))) {
-          _x--;                                        // Push back statement end
-          default_nil=true;                            // Shortcut def of nil
-          rs.set(toks._len);                           // Shortcut mutable
+          _x--;                 // Push back statement end
+          default_nil=true;     // Shortcut def of nil
+          rs.set(toks._len);    // Shortcut mutable
         } else {
           _x = oldx; // Unwind the token parse, and try an expression parse
           break;     // Done parsing assignment tokens
@@ -357,7 +434,7 @@ public class Parse implements Comparable<Parse> {
     }
 
     // Normal statement value parse
-    Node ifex = default_nil ? con(Type.NIL) : ifex(); // Parse an expression for the statement value
+    Node ifex = default_nil ? Env.XNIL : ifex(); // Parse an expression for the statement value
     // Check for no-statement after start of assignment, e.g. "x = ;"
     if( ifex == null ) {        // No statement?
       if( toks._len == 0 ) return null;
@@ -780,7 +857,9 @@ public class Parse implements Comparable<Parse> {
    *  fact = balop+ stmts[, stmts]* balop- // Constructor with initial elements
    *    Ex:    [      1   ,  2        ]    // Array constructor with initial elements'
    *  fact = {func}    // Anonymous function declaration
+   *  fact = @{ stmts }// Anonymous struct declaration, assignments define fields
    *  fact = id        // variable lookup
+   *  fact = $$java_class
    */
   private Node fact() {
     if( skipWS() == -1 ) return null;
@@ -804,7 +883,7 @@ public class Parse implements Comparable<Parse> {
     if( peek1(c,'{') ) return func();
 
     // Anonymous struct
-    if( peek2(c,"@{") ) return struct();
+    if( peek2(c,"@{") ) return struct(null);
 
     // Primitive parsing only, directly get a Java intrinsic implementation
     if( _prims && peek2(c,"$$") ) return java_class_node();
@@ -822,24 +901,23 @@ public class Parse implements Comparable<Parse> {
       // tail-half of a balanced-op, which is parsed by term() above.
       if( isOp(tok) ) { _x = oldx; return null; }
       // Must be a forward reference
-      Node fref = gvn(UnresolvedNode.forward_ref(tok,errMsg(oldx)));
-      // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
-      _e._scope.stk().create(tok,fref,Access.Final);
-      return fref;
+      return val_fref(tok,errMsg(oldx));
     }
 
-    // If field is final, directly use the value instead of a lookup.
-    // Else must load against most recent display update.  Get the display to load
-    // against.
-    TypeFld fld = scope.stk()._ts.get(tok);
+    // If field is final, directly use the value instead of a lookup.  Else
+    // must load against most recent display update.
+    NewObjNode dsp = scope.stk();
+    TypeFld fld = dsp._ts.get(tok);
     Node ld = fld._access==Access.Final
-      ? scope.stk().get(tok)
+      ? dsp.in(fld._order)      // Direct use
+      // Load against a varying display
       : gvn(new LoadNode(mem(),get_display_ptr(scope),tok,null));
-
-    // This does a HM.Ident lookup, producing a FRESH tvar every time.
-    return ld.is_forward_ref()
-      ? ld                              // Inside a def, no fresh
-      : gvn(new FreshNode(_e._fun,ld)); // After a field is defined, yes fresh
+    // If in the middle of a definition (e.g. a HM Let, or recursive assign)
+    // then no Fresh per normal HM rules.  If loading from a struct or from
+    // normal Lambda arguments, again no Fresh per normal HM rules.
+    return ld.is_forward_ref() || !dsp._is_closure || fld._order < dsp._nargs
+      ? ld
+      : gvn(new FreshNode(_e._fun,ld));
   }
 
 
@@ -863,7 +941,8 @@ public class Parse implements Comparable<Parse> {
 
     // Build the tuple from gathered args.
     // Walk them in-order and not stack-like
-    NewObjNode nn = new NewObjNode(false,TypeStruct.open(TypeMemPtr.NO_DISP),Env.ANY);
+    int alias = BitsAlias.new_alias(BitsAlias.REC);
+    NewObjNode nn = new NewObjNode(false,alias,TypeStruct.open(TypeMemPtr.NO_DISP),Env.ANY);
     for( int i=0; i < nargs; i++ )
       nn.create_active((""+i).intern(),Node.peek(GVNGCM.KEEP_ALIVE._defs._len-nargs+i),Access.Final);
     Node.pops(nargs);
@@ -879,12 +958,16 @@ public class Parse implements Comparable<Parse> {
 
   /** Parse anonymous struct; the opening "@{" already parsed.  A lexical scope
    *  is made and new variables are defined here.  Next comes statements, with
-   *  each assigned value becoming a struct member, then the closing "}".
-   *  struct = \@{ stmts }
+   *  each assigned value becoming a struct member, then the closing "}".  This
+   *  call is ALSO used to parse tstruct(), where the field semantics are
+   *  slightly different.
+   *    struct = \@{ stmts }
+   *  Field syntax:
+   *    id [:type] [amod [expr]]  // missing amod defaults to "id := 0"; missing expr defaults to "0"
    */
-  private Node struct() {
+  private Node struct(ProjNode fref) {
     int oldx = _x-1, pidx;      // Opening @{
-    try( Env e = new Env(_e, null, false, ctrl(), mem()) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e, null, false, ctrl(), mem(), _e._scope.ptr(), fref) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
@@ -908,10 +991,11 @@ public class Parse implements Comparable<Parse> {
     int oldx = _x;              // Past opening '{'
 
     // Push an extra hidden display argument.  Similar to java inner-class ptr
-    // or when inside of a struct definition: 'this'.
+    // or when inside a struct definition: 'this'.
     Node parent_display = scope().ptr();
     Type tpar_disp = parent_display._val; // Just a TMP of the right alias
     Node dcon = con(tpar_disp);
+    int didx = dcon.push();
 
     // Incrementally build up the formals
     TypeStruct formals = TypeStruct.make("",false,true,
@@ -950,6 +1034,7 @@ public class Parse implements Comparable<Parse> {
     // args, and then reset.  Also reset to just the mem & display args.
     if( _x == oldx ) { formals = no_args_formals;  bads.set_len(ARG_IDX); }
     formals = formals.close();
+    dcon = Node.pop(didx);
 
     // Build the FunNode header
     FunNode fun = (FunNode)init(new FunNode(formals.nargs()).add_def(Env.ALL_CTRL));
@@ -963,7 +1048,7 @@ public class Parse implements Comparable<Parse> {
 
     // Increase scope depth for function body.
     int fidx;
-    try( Env e = new Env(_e, fun, true, fun, mem) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e, fun, true, fun, mem, parent_display, null) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
@@ -981,6 +1066,7 @@ public class Parse implements Comparable<Parse> {
           parm = typechk(parm,fld._t,mem,bads.at(fld._order-ARG_IDX));
         create(fld._fld,parm, args_are_mutable);
       }
+      stk.set_nargs();
 
       // Parse function body
       Node rez = stmts();       // Parse function body
@@ -1081,22 +1167,48 @@ public class Parse implements Comparable<Parse> {
     String str = new String(_buf,x,_x-x);
     try {
       Class clazz = Class.forName(str);
-      Node n = (Node)clazz.getConstructor().newInstance();
+      PrimNode n = (PrimNode)clazz.getConstructor().newInstance();
+
+      // Common primitive shortcut: if followed by a '(' assume a full normal
+      // function call, which will just normally inlines to a direct prim use.
+      // Go ahead and directly build the primitive.  Only works if the
+      // primitive does return memory.
+      skipWS();
+      int oldx = _x;
+      if( peek('(') ) {
+        int nidx = n.push();
+        n.add_def(null);        // No control
+        n.add_def(null);        // No memory; TODO: pass in memory & opt away
+        for( int i=DSP_IDX; i<n._tfp.nargs(); i++ ) {
+          n.add_def(stmts());
+          if( i<n._tfp.nargs()-1 ) require(',',oldx);
+        }
+        Node xn = Node.pop(nidx);
+        assert xn==n;
+        require(')',oldx);
+        return Env.GVN.add_flow(n);
+      }
+
+      // Else build a function which calls the primitive, and return a
+      // FunPtrNode - which must be in a valid aa context for a fptr.
       return n.clazz_node();
-    } catch( Exception e ) { throw new RuntimeException(e); } // Unrecoverable
+    } catch( Exception e ) {
+      System.err.println("Did not find a public no-arg constructor in a public class for "+str);
+      throw new RuntimeException(e); // Unrecoverable
+    }
   }
 
+  // Must be a valid java class name on the current class path with the named
+  // Field of type "Type".  Returns the field contents.
   private Type java_class_type() throws RuntimeException {
     int x = _x;
     while( isJava(_buf[_x]) ) _x++;
-    String str = new String(_buf,x,_x-x);
-    require('#',x);
-    x = _x;
-    while( isJava(_buf[_x]) ) _x++;
-    String field = new String(_buf,x,_x-x);
+    String[] strs = new String(_buf,x,_x-x).split("\\$");
+    String sclz = strs[0];
+    String sfld = strs[1];
     try {
-      Class clazz = Class.forName(str);
-      Field f = clazz.getDeclaredField(field);
+      Class clazz = Class.forName(sclz);
+      Field f = clazz.getDeclaredField(sfld);
       return (Type)f.get(null);
     } catch( Exception e ) { throw new RuntimeException(e); } // Unrecoverable
   }
@@ -1217,145 +1329,175 @@ public class Parse implements Comparable<Parse> {
     throw unimpl();
   }
 
-  /** Parse a type or return null
-   *  type = tcon | tfun | tary | tstruct | ttuple | tvar  // Type choices
-   *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
-   *  tary = '[' type? ']'                 // Cannot specify type for array size
-   *  tfun = {[[type]* ->]? type }         // Function types mirror func decls
-   *  tstruct = @{ [id [tfld];]* }   // Struct types are field names with optional types or values.
-   *  tfld = ! : type ! = ifex       // Fields are untyped or typed or final-assigned (with computed expression type)
-   *  ttuple = ([type?] [,[type?]]*)       // List of types, trailing comma optional
-   *  tvar = A previously declared type variable
-   *
-   *  Unknown tokens when type_var is false are treated as not-a-type.  When
-   *  true, unknown tokens are treated as a forward-ref new type.
-   */
-  private Type type() { return typep(false); }
-  // Returning a type variable assignment result or null.  Flag to allow
-  // unknown type variables as forward-refs.
-  private Type typev() {
-    Type t = type0(true);
-    // Type.ANY is a flag for '->' which is not a type.
-    return t==Type.ANY ? null : t;
-  }
-  // TypeObjs get wrapped in a pointer, and the pointer is returned instead.
-  private Type typep(boolean type_var) {
-    Type t = type0(type_var);
-    if( t instanceof TypeMemPtr ) return typeq(t); // Named type is already a TMP
-    if( !(t instanceof TypeObj) ) return t; // Primitives are not wrapped
-    // Automatically convert unnamed structs to refs.
-    // Make a reasonably precise alias.
-    int type_alias = t instanceof TypeStruct ? BitsAlias.REC : (t instanceof TypeStr ? BitsAlias.STR : BitsAlias.AARY);
-    TypeMemPtr tmp = TypeMemPtr.make(type_alias,(TypeObj)t);
-    return typeq(tmp);          // And check for null-ness
-  }
-  // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
-  private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil(Type.NIL) : t; }
+  ///** Parse a type or return null
+  // *  type = tvar | tfun[?] | tstruct[?] | ttuple[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nilable'
+  // *  tvar = id                      // Type variable lookup; includes primitive types 'int' 'flt' etc
+  // *  tfun = {[[type]* ->]? type }   // Function types mirror func declarations
+  // *  ttuple = ( [[type],]* )        // Tuple types are just a list of optional types;
+  // *                                 // the count of commas dictates the length, zero commas is zero length.
+  // *                                 // Tuple fields are always final.
+  // *  tstruct = struct               // semantics depends on val-type vs ref-type
+  // *  Unknown tokens when type_var is false are treated as not-a-type.  When
+  // *  true, unknown tokens are treated as a forward-ref new type.
+  // */
+  private Type type() {
+    if( _prims && peek("$#") ) return java_class_type();
 
-  // Type or null or Type.ANY for '->' token
-  private Type type0(boolean type_var) {
-    if( peek('{') ) {           // Function type
-      TypeStruct formals = TypeStruct.make("",false,true,
-                                           TypeFld.make_tup(TypeMemPtr.DISP_SIMPLE,DSP_IDX));
-      TypeStruct no_args_formals = formals;  Type t; // Collect arg types
-      while( (t=typep(type_var)) != null && t != Type.ANY  )
-        formals = formals.add_tup(t,formals.len()-1+ARG_IDX);
-      Type ret;
-      if( t==Type.ANY ) {       // Found ->, expect return type
-        ret = typep(type_var);
-        if( ret == null ) return null; // should return TypeErr missing type after ->
-      } else {                  // Allow no-args and simple return type
-        if( formals.len()-2 != 1 ) return null; // should return TypeErr missing -> in tfun
-        ret = formals.fld_idx(ARG_IDX); // e.g. { int } Get single return type
-        formals = no_args_formals;
-      }
-      if( !peek('}') ) return null;
-      return typeq(TypeFunSig.make(formals,ret));
+    // Parse a type as a 'fact'
+    Node nt = fact();
+
+    // Check for type
+    if( nt instanceof UnresolvedNode ) {
+      String tvar = ((UnresolvedNode)nt)._name;
+      ProjNode typenode = _e.lookup_type(tvar);
+      if( typenode==null ) typenode=type_fref(tvar); // Must be a forward-ref type
+      return typenode._val;
     }
 
-    if( peek("@{") )            // Struct type
-      return type_var ? tclass() : tstruct();
+    //return typep(false);
+    throw unimpl();
+    // TODO: NO TYPE SYNTAX
+    // Just call 'fact' and look at the result.
+    // Must be a Node of the correct flavor:
+    //   structs,tuples turned into anon type structs; keeps fields, Access, given types.
+    //   arrays very similar
+    //   funcs are weird yet: { x:int y:flt -> :MyCoolType } ; args all unused but types are collected out
+    //   ConTypes are OK, just a named wrapper
+    //   Unresolved: fref to a type?
+    //   other Nodes are Exprs, Not a Type, so an Error.
+    //     Wrap with constructor, but include error test for post-GCP
+  }
+  //// Returning a type variable assignment result or null.  Flag to allow
+  //// unknown type variables as forward-refs.
+  //private Type typev() {
+  //  Type t = type0(true);
+  //  // Type.ANY is a flag for '->' which is not a type.
+  //  return t==Type.ANY ? null : t;
+  //}
+  //// TypeObjs get wrapped in a pointer, and the pointer is returned instead.
+  //private Type typep(boolean type_var, boolean top) {
+  //  Type t = type0(type_var);
+  //  if( t instanceof TypeMemPtr ) return typeq(t); // Named type is already a TMP
+  //  if( !(t instanceof TypeObj) ) return t; // Primitives are not wrapped
+  //  // Automatically convert unnamed structs to refs.
+  //  // Make a reasonably precise alias.
+  //  int type_alias = t instanceof TypeStruct ? BitsAlias.REC : (t instanceof TypeStr ? BitsAlias.STR : BitsAlias.AARY);
+  //  TypeMemPtr tmp = TypeMemPtr.make(type_alias,(TypeObj)t);
+  //  return typeq(tmp);          // And check for null-ness
+  //}
+  //// Wrap in a nullable if there is a trailing '?'.  No spaces allowed
+  //private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil(Type.NIL) : t; }
+  //
+  //// Type or null or Type.ANY for '->' token
+  //private Type type0(boolean type_var) {
+  //  if( peek( '{') ) return tfun   (type_var);
+  //  if( peek("@{") ) return tstruct(type_var);
+  //  if( peek( '(') ) return ttuple (type_var);
+  //  if( peek( '[') ) return tarray (type_var);
+  //  if( peek("$$") && _prims ) return java_class_type();
+  //  return tid();
+  //}
 
-    // "()" is the zero-entry tuple
-    // "(   ,)" is a 1-entry tuple
-    // "(int )" is a 1-entry tuple (optional trailing comma)
-    // "(int,)" is a 1-entry tuple (optional trailing comma)
-    // "(,int)" is a 2-entry tuple
-    // "(, , )" is a 2-entry tuple
-    if( peek('(') ) { // Tuple type
-      Ary<TypeFld> flds = new Ary<>(new TypeFld[]{TypeMemPtr.DISP_FLD});
-      byte c;
-      while( (c=skipWS()) != ')' ) { // No more types...
-        Type t = Type.SCALAR;    // Untyped, most generic field type
-        if( c!=',' &&            // Has type annotation?
-            (t=typep(type_var)) == null) // Parse type, wrap ptrs
-          return null;                   // not a type
-        flds.add(TypeFld.make_tup(t,ARG_IDX+flds._len-1));
-        if( !peek(',') ) break; // Final comma is optional
-      }
-      return peek(')') ? TypeStruct.make("",false,true,flds) : null;
-    }
-
-    if( peek('[') ) {
-      Type e = typep(type_var);
-      if( e==null ) e=Type.SCALAR;
-      return peek(']') ? TypeAry.make(TypeInt.INT64,e,TypeObj.OBJ) : null;
-    }
-
-    // Check for a $$java_class
-    if( _x < _buf.length && peek2(_buf[_x],"$$") ) return java_class_type();
-
-    // Primitive type
-    int oldx = _x;
-    String tok = token();
-    if( tok==null ) return null;
-    tok = tok.intern();
-    if( Util.eq(tok,"->") ) return Type.ANY; // Found -> return sentinel
-    ConTypeNode t = _e.lookup_type(tok);
-    if( t==null ) {              // Not a known type var
-      if( lookup(tok) != null || // Yes a known normal var; resolve as a normal var
-          !type_var ) {          // Or not inside a type-var assignment
-        _x = oldx;               // Unwind if not a known type var
-        return null;             // Not a type
-      }
-      // Make a forward-ref ConType and return its type
-      int alias = BitsAlias.type_alias(BitsAlias.REC);
-      TypeMemPtr tmp = TypeMemPtr.make(alias,(TypeObj)TypeObj.ISUSED.set_name((tok+":").intern()));
-      _e.add_type(tok,(ConTypeNode)gvn(new ConTypeNode(tok,tmp,scope())));
-      return tmp;
-    }
-    return t._val;
+  // Create a value forward-reference.  Must turn into a function call later.
+  private Node val_fref(String tok, Parse bad) {
+    Node fref = gvn(UnresolvedNode.forward_ref(tok,bad));
+    // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
+    _e._scope.stk().create(tok,fref,Access.Final);
+    return fref;
+  }
+  // Create a type forward-reference.  Must be type-defined later.
+  private ProjNode type_fref(String tok) {
+    ProjNode tn = init(new ProjNode(null,REZ_IDX));
+    int alias = BitsAlias.type_alias(BitsAlias.REC);
+    TypeMemPtr tmp = TypeMemPtr.make(alias,(TypeObj)TypeObj.ISUSED.set_name((tok+":").intern()));
+    tn._val = tmp;              // Only valid until the def for this fref appears
+    assert tn.value()==tmp;
+    _e.add_type(tok,tn);
+    return tn;
   }
 
-  // Parse an anonymous struct.  Simple types only, no embedded code.
-  private TypeStruct tstruct() {
-    Ary<TypeFld> flds = new Ary<>(new TypeFld[]{TypeMemPtr.DISP_FLD});
-    while( true ) {
-      String tok = token();            // Scan for 'id'
-      if( tok == null ) break;         // end-of-struct-def
-      final String itok = tok.intern(); // Only 1 copy
-      Type t = Type.SCALAR;
-      if( peek(':') ) {
-        if( (t=typep(false)) == null ) // Parse type, wrap ptrs
-          throw unimpl();
-      }
-      if( peek('=') &&                 // Has type annotation?
-          (t=typep(false)) == null)    // Parse type, wrap ptrs
-        t = Type.SCALAR;               // No type found, assume default
-      if( flds.find(fld -> Util.eq(fld._fld,itok) ) != -1 ) throw unimpl(); // cannot use same field name twice
-      flds.add(TypeFld.make(itok,t,Access.RW,flds._len-1+ARG_IDX));
-      if( !peek(';') ) break; // Final semi-colon is optional
-    }
-    return peek('}') ? TypeStruct.make("",false,true,flds) : null;
-  }
-
-  // Parse an anonymous "class".  Code is allowed for field defs.
-  private TypeStruct tclass() {
-    ProjNode ptr = (ProjNode)struct();
-    ptr.push();                 // KEEP around; no index, just pop next level up
-    NewObjNode nnn = (NewObjNode)ptr.in(0);
-    return nnn._ts;
-  }
+  //private Type tid() {
+  //  int oldx = _x;
+  //  String tok = token();
+  //  if( tok==null ) return null; // No id
+  //  tok = tok.intern();
+  //  if( Util.eq(tok,"->") ) return Type.ANY; // Found -> return sentinel
+  //  ConTypeNode t = _e.lookup_type(tok);
+  //  if( t!=null ) return t._val; // Prior defined type
+  //  //if( lookup(tok) != null || // Yes a known normal var; resolve as a normal var
+  //  //    !type_var ) {          // Or not inside a type-var assignment
+  //  //  _x = oldx;               // Unwind if not a known type var
+  //  //  return null;             // Not a type
+  //  //}
+  //  // Make a forward-ref ConType and return its type
+  //  return type_fref(tok);
+  //}
+  //
+  //// Parse an anonymous function type.
+  //private Type tfun(boolean type_var) {
+  //  TypeStruct formals = TypeStruct.make("",false,true,
+  //                                       TypeFld.make_tup(TypeMemPtr.DISP_SIMPLE,DSP_IDX));
+  //  TypeStruct no_args_formals = formals;  Type t; // Collect arg types
+  //  while( (t=typep(type_var)) != null && t != Type.ANY  )
+  //    formals = formals.add_tup(t,formals.len()-1+ARG_IDX);
+  //  Type ret;
+  //  if( t==Type.ANY ) {       // Found ->, expect return type
+  //    ret = typep(type_var);
+  //    if( ret == null ) return null; // should return TypeErr missing type after ->
+  //  } else {                  // Allow no-args and simple return type
+  //    if( formals.len()-2 != 1 ) return null; // should return TypeErr missing -> in tfun
+  //    ret = formals.fld_idx(ARG_IDX); // e.g. { int } Get single return type
+  //    formals = no_args_formals;
+  //  }
+  //  return peek('}') ? typeq(TypeFunSig.make(formals,ret)) : null;
+  //}
+  //
+  //  // "()" is the zero-entry tuple
+  //  // "(   ,)" is a 1-entry tuple
+  //  // "(int )" is a 1-entry tuple (optional trailing comma)
+  //  // "(int,)" is a 1-entry tuple (optional trailing comma)
+  //  // "(,int)" is a 2-entry tuple
+  //  // "(, , )" is a 2-entry tuple
+  //private TypeStruct ttuple(boolean type_var) {
+  //  Ary<TypeFld> flds = new Ary<>(new TypeFld[]{TypeMemPtr.DISP_FLD});
+  //  byte c;
+  //  while( (c=skipWS()) != ')' ) { // No more types...
+  //    Type t = Type.SCALAR;    // Untyped, most generic field type
+  //    if( c!=',' &&            // Has type annotation?
+  //        (t=typep(type_var)) == null) // Parse type, wrap ptrs
+  //      return null;                   // not a type
+  //    flds.add(TypeFld.make_tup(t,ARG_IDX+flds._len-1));
+  //    if( !peek(',') ) break; // Final comma is optional
+  //  }
+  //  return peek(')') ? TypeStruct.make("",false,true,flds) : null;
+  //}
+  //
+  //private TypeAry tarray(boolean type_var) {
+  //  Type e = typep(type_var);
+  //  if( e==null ) e=Type.SCALAR;
+  //  return peek(']') ? TypeAry.make(TypeInt.INT64,e,TypeObj.OBJ) : null;
+  //}
+  //
+  ///*
+  // *  Syntax        Obj         Val           Ref       Anon
+  // *  fld    ;   r/w  ,  0   final, arg    r/w,    0    r/w     // arg in ValType, 0   elsewhere
+  // *  fld =  ;   final,  0   final, arg    final, arg   final   //  0  in ObjType, arg elsewhere
+  // *  fld:=  ;   r/w  ,  0   error         r/w,    0    r/w     // err in ValType; no mutable fields
+  // *  fld =e0;   final, e0   final, e0     final, e0    error   //                                    error in Anon, no value
+  // *  fld:=e0;   r/w  , e0   error         r/w,   e0    error   // err in ValType; no mutable fields; error in Anon, no value
+  // */
+  //private TypeStruct tstruct(boolean type_var) {
+  //  ProjNode ptr = (ProjNode)struct();
+  //  NewObjNode nnn = (NewObjNode)ptr.in(0);
+  //  if( type_var ) {
+  //    ptr.push();                 // KEEP around; no index, just pop next level up
+  //    throw unimpl();
+  //    //return nnn._ts;
+  //  } else {
+  //    // Not a type_var; anonymous type only.  No exprs allowed, so always a zero.
+  //    throw unimpl();
+  //  }
+  //}
 
   // --------------------------------------------------------------------------
   // Require a closing character (after skipping WS) or polite error

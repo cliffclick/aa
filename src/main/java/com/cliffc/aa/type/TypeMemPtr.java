@@ -168,7 +168,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   }
   // Widens, not lowers.
   @Override public TypeMemPtr simple_ptr() {
-    if( _obj==TypeObj.ISUSED || _obj==TypeObj.UNUSED ) return this;
+    if( _obj.getClass()==TypeObj.class ) return this;
     return make(_aliases,_aliases.above_center() ? TypeObj.UNUSED : TypeObj.ISUSED);
   }
   @Override public boolean above_center() { return _aliases.above_center(); }

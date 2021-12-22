@@ -3,7 +3,7 @@
 // Typically used in the call position, with a FunPtrNode returned.
 
 int = : @{
-  _val : $$com.cliffc.aa.type.TypeInt#INT64;
+  _val : $#com.cliffc.aa.type.TypeInt$INT64;
 
   //// Unary ops
   //-_ = { -> int($$com.cliffc.aa.node.PrimNode$MinusI64(_val)) };
@@ -11,6 +11,7 @@ int = : @{
   
   // Simple integer math
   _+_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$AddI64(_val,y._val)) };
+  _+_  = { y:flt -> flt($$com.cliffc.aa.node.PrimNode$AddF64($$com.cliffc.aa.node.PrimNode$ConvertI64F64(_val),y._val)) };
   //_-_  = { y -> int($$com.cliffc.aa.node.PrimNode$SubI64(_val,y._val)) };
   //_*_  = { y -> int($$com.cliffc.aa.node.PrimNode$MulI64(_val,y._val)) };
   //_/_  = { y -> int($$com.cliffc.aa.node.PrimNode$DivI64(_val,y._val)) };
@@ -27,11 +28,10 @@ int = : @{
 };
 
 flt = : @{
-  _val : $$com.cliffc.aa.type.TypeFlt#FLT64;
+  _val : $#com.cliffc.aa.type.TypeFlt$FLT64;
 
   _+_  = { y:flt -> flt($$com.cliffc.aa.node.PrimNode$AddF64(_val,y._val)) };
-  // want a int->flt prim
-  //_+_  = { y:int -> flt($$com.cliffc.aa.node.PrimNode$AddF64(_val,$Int2Flt(y._val))) };
+  _+_  = { y:int -> flt($$com.cliffc.aa.node.PrimNode$AddF64(_val,$$com.cliffc.aa.node.PrimNode$ConvertI64F64(y._val))) };
   
   //_<_  = { y -> int($$com.cliffc.aa.node.PrimNode$LT_F64(_val,y._val)) };
 

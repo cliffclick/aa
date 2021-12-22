@@ -4,8 +4,9 @@ import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFunPtr;
 
+import static com.cliffc.aa.AA.ARG_IDX;
+import static com.cliffc.aa.AA.DSP_IDX;
 import static com.cliffc.aa.AA.unimpl;
 
 /** A collection of functions that can be unambiguously called (no virtual, no
@@ -16,7 +17,7 @@ import static com.cliffc.aa.AA.unimpl;
  *
  */
 public class UnresolvedNode extends Node {
-  private final String _name;   // Name of unresolved function
+  public final String _name;   // Name of unresolved function
   private final Parse _bad;
   // Unresolved moves through 3-states:
   // - 0 forward-ref; scope is not known; can add_fun
@@ -30,8 +31,8 @@ public class UnresolvedNode extends Node {
     if( _defs._len==0 ) return "???"+_name;
     String s = switch( _fref ) {
     case 0 -> "???";
-    case 1 -> "?";
-    default -> "";
+    case 1 -> "??";
+    default -> "?";
     };
     return s+_name;
   }
@@ -93,12 +94,20 @@ public class UnresolvedNode extends Node {
   boolean is_defined() { return _fref==2; }
 
   // Add Another function to an Unresolved and return null, or return an ErrMsg
-  // if this would add an ambiguous signature.
-  public ErrMsg add_fun(FunPtrNode fun) {
-    for( Node n : _defs )
-      if( ((FunPtrNode)n).nargs()==fun.nargs() )
-        throw unimpl();         // Check ambiguous against all other signatures
-    add_def(fun);
+  // if this would add an ambiguous signature.  Different nargs are different.
+  // Within functions with the same nargs
+  public ErrMsg add_fun(FunPtrNode fptr) {
+    for( Node n : _defs ) {
+      FunPtrNode f0 = (FunPtrNode)n;
+      if( f0.nargs()==fptr.nargs() ) {
+        assert f0.fun().parm(DSP_IDX)._val == fptr.fun().parm(DSP_IDX)._val; // Same displays
+        Type t0a = f0  .fun().parm(ARG_IDX)._t; // f0   arg type
+        Type tfa = fptr.fun().parm(ARG_IDX)._t; // fptr arg type
+        if( t0a.isa(tfa) || tfa.isa(t0a) ) // First arg is neither isa the other
+          throw unimpl();         // Check ambiguous against all other signatures
+      }
+    }
+    add_def(fptr);
     return null;
   }
 

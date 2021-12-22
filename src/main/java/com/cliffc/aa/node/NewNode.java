@@ -68,6 +68,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   public final void sets( T ts ) {
     _ts = ts;
     _crushed = ts.crush();
+    _tptr = _tptr.make_from((TypeObj)TypeObj.ISUSED.set_name(ts._name));
   }
   // Recompute default memory, expecting it to monotonically lift.
   public final void setsm( T ts ) { assert ts.isa(_ts); sets(ts); }

@@ -17,7 +17,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
 public class ScopeNode extends Node {
 
   // Mapping from type-variables to Types.  Types have a scope lifetime like values.
-  private final HashMap<String,ConTypeNode> _types; // user-typing type names
+  private final HashMap<String,ProjNode> _types; // user-typing type names
   private Ary<IfScope> _ifs;                 // Nested set of IF-exprs used to track balanced new-refs
   private final boolean _closure;
 
@@ -28,7 +28,7 @@ public class ScopeNode extends Node {
     _types = new HashMap<>();
     _ifs = null;
   }
-  public ScopeNode(HashMap<String,ConTypeNode> types,  Node ctl, Node mem, Node ptr, Node rez) {
+  public ScopeNode(HashMap<String,ProjNode> types,  Node ctl, Node mem, Node ptr, Node rez) {
     super(OP_SCOPE,ctl,mem,ptr,rez);
     _types = types;
     _closure = false;
@@ -76,24 +76,24 @@ public class ScopeNode extends Node {
   public static final int RET_IDX = 7;
 
   // Name to type lookup, or null
-  public ConTypeNode get_type(String name) { return _types.get(name);  }
+  public ProjNode get_type(String name) { return _types.get(name);  }
 
   // Alias to TypeMemPtr lookup, or null
-  public ConTypeNode get_type(int alias) {
-    for( ConTypeNode ctn : _types.values() )
-      if( ctn._t instanceof TypeMemPtr &&
-          ((TypeMemPtr)ctn._t)._aliases.test(alias) )
-        return ctn;
-    return null;
+  public Node get_type(int alias) {
+    //for( ConTypeNode ctn : _types.values() )
+    //  if( ctn._t instanceof TypeMemPtr &&
+    //      ((TypeMemPtr)ctn._t)._aliases.test(alias) )
+    //    return ctn;
+    //return null;
+    throw unimpl();
   }
 
   // Extend the current Scope with a new type; cannot override existing name.
-  public void add_type( String name, ConTypeNode t ) {
+  public void add_type( String name, ProjNode t ) {
     assert _types.get(name)==null;
     _types.put( name, t );
-    add_def(t);                 // Hook constant so it does not die
+    add_def(t);                 // Hook so it does not die
   }
-  public void reset_type( String name, Type t ) { _types.get(name).reset_type(t); }
   
   public boolean is_closure() { return _closure; }
 

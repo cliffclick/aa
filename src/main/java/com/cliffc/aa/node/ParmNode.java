@@ -70,7 +70,7 @@ public class ParmNode extends PhiNode {
     for( int i=1; i<_defs._len; i++ )
       if( fun.val(i)!=Type.XCTRL && fun.val(i)!=Type.ANY ) // Only meet alive paths
         t = t.meet(val(i));
-    return t;
+    return t.join(_t);
   }
 
   // If an input to a Mem Parm changes, the flow results of other Parms can change

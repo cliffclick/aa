@@ -111,33 +111,30 @@ public class Env implements AutoCloseable {
   private final HashMap<String,Oper> _opers; // Lexically scoped operators
 
   // Shared Env constructor.
-  private Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr ) {
+  Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr, ProjNode fref ) {
     _par = par;
     _fun = fun;
     _opers = new HashMap<>();
     TypeStruct ts = TypeStruct.make("",false,true,TypeFld.make("^",dsp_ptr._val, DSP_IDX));
-    NewObjNode nnn = GVN.init(new NewObjNode(is_closure,ts,dsp_ptr));
+    TypeMemPtr tmp = fref==null ? null : (TypeMemPtr)fref._val;
+    int alias      = fref==null ? BitsAlias.new_alias(BitsAlias.REC) : tmp.aliases().getbit();
+    NewObjNode nnn = GVN.init(new NewObjNode(is_closure,alias,ts,dsp_ptr));
+    if( fref!=null ) nnn.set_name(ts.set_name(tmp._obj._name));
+    Node ptr       = fref==null ? GVN.init(new ProjNode(nnn,AA.REZ_IDX)) : fref.set_def(0,nnn);      
     Node frm = GVN.init(new MrgProjNode(nnn,mem));
-    Node ptr = GVN.init(new ProjNode(nnn,AA.REZ_IDX));
     _scope = GVN.init(new ScopeNode(is_closure));
     _scope.set_ctrl(ctrl);
     _scope.set_ptr (ptr);  // Address for 'nnn', the local stack frame
     _scope.set_mem (frm);  // Memory includes local stack frame
     _scope.set_rez (ALL_PARM);
     KEEP_ALIVE.add_def(_scope);
-    ALL_DISPLAYS = ALL_DISPLAYS.set(nnn._alias);   // Displays for all time
+    if( is_closure ) ALL_DISPLAYS = ALL_DISPLAYS.set(alias);   // Displays for all time
     GVN.do_iter();
   }
 
   // Top-level Env.  Contains, e.g. the primitives.
   // Above any file-scope level Env.
-  private Env( ) { this(null,null,true,CTL_0,MEM_0,XNIL); }
-
-
-  // A file-level Env, or below.  Contains user written code as opposed to primitives.
-  Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem ) {
-    this(par,fun,is_closure,ctrl,mem, par._scope.ptr());
-  }
+  private Env( ) { this(null,null,true,CTL_0,MEM_0,XNIL,null); }
 
   // Gather and report errors and typing
   TypeEnv gather_errors(ErrMsg err) {
@@ -341,22 +338,22 @@ public class Env implements AutoCloseable {
     //if( !Parse.isOp(name) ) return null; // Limit to operators
     //return _lookup_filter(0," _"+name,2);
     throw unimpl();
-    
+
   }
 
   // Type lookup in any scope
-  ConTypeNode lookup_type( String name ) {
-    ConTypeNode t = _scope.get_type(name);
+  ProjNode lookup_type( String name ) {
+    ProjNode t = _scope.get_type(name);
     if( t != null ) return t;
     return _par == null ? null : _par.lookup_type(name);
   }
   // Lookup by alias
-  public ConTypeNode lookup_type( int alias ) {
-    ConTypeNode t = _scope.get_type(alias);
+  public Node lookup_type( int alias ) {
+    Node t = _scope.get_type(alias);
     if( t != null ) return t;
     return _par == null ? null : _par.lookup_type(alias);
   }
   // Update type name token to type mapping in the current scope
-  void add_type( String name, ConTypeNode t ) { _scope.add_type(name,t); }
-  void reset_type( String name, Type t ) { _scope.reset_type(name,t); }
+  void add_type( String name, ProjNode t ) { _scope.add_type(name,t); }
+  //void reset_type( String name, Type t ) { _scope.reset_type(name,t); }
 }

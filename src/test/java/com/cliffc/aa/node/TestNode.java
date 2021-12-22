@@ -238,11 +238,13 @@ public class TestNode {
     test1monotonic_intrinsic(new NewStrNode.AddStrStr());
     test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
-    NewObjNode nnn1 = new NewObjNode(false,TypeMemPtr.DISPLAY,Node.con(Type.NIL));
+    int alias1 = BitsAlias.new_alias(BitsAlias.REC);
+    NewObjNode nnn1 = new NewObjNode(false,alias1,TypeMemPtr.DISPLAY,Node.con(Type.NIL));
     set_type(1,Type.SCALAR);  nnn1.create_active("x",_ins[1],Access.Final);
     set_type(2,Type.SCALAR);  nnn1.create_active("y",_ins[2],Access.Final);
     test1monotonic(nnn1);
-    NewObjNode nnn2 = new NewObjNode(false,TypeMemPtr.DISPLAY,Node.con(Type.NIL));
+    int alias2 = BitsAlias.new_alias(BitsAlias.REC);
+    NewObjNode nnn2 = new NewObjNode(false,alias2,TypeMemPtr.DISPLAY,Node.con(Type.NIL));
     set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[1],Access.Final);
     set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[2],Access.Final);
     nnn2.sets(tname);

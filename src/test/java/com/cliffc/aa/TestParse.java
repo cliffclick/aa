@@ -58,7 +58,7 @@ public class TestParse {
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(1)",TypeInt.con(1));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
-    //test("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
+    test("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(0);(1,);(1,).0;@{x;y];","Expected closing '}' but found ']' instead",63);
     test("noinline_inc={x -> x&1}; noinline_p={x -> noinline_inc(x)*2}; noinline_p",
       (()->TypeFunPtr.make(29,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.INT64)),
@@ -72,7 +72,11 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
-    test("1.2+2", TypeFlt.con(3.2), "3.2"); // expect some type failure: no oper flt._+_(int)
+    test("1", TypeInt.con(1), "1");
+    test("1+2", TypeInt.con(3), "3");
+    test("1.2+3", TypeFlt.con(4.2), "4.2"); 
+    test("1+2.3", TypeFlt.con(3.3), "3.3"); 
+    test("1.2+3.4", TypeFlt.con(4.6), "4.6"); 
 
     test("1",   TypeInt.TRUE, "1");
     // Unary operator

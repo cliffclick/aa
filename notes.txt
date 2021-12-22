@@ -19,6 +19,18 @@ No memory on a "Class"; its the immutable part of a primitive.
 Build "classes" via normal parsing of named types; detect "value type" via e.g.
 all-final-fields, or specific type keyword?
 
+Instance-field loads make a TFP, with the display being the named prim.
+int = : @{
+  _val=$$java_int;
+  _+_ = { y:int -> $$prim_add_int(_val,y._val) }
+  _+_ = { y:flt -> $$prim_add_flt($$prim_flt(_val),y._val) }
+}
+flt = : @{
+  _val=$$java_flt;
+  _+_ = { y:flt -> $$prim_add_flt(_val,y._val) }
+  _+_ = { y:int -> $$prim_add_flt(_val,$$prim_flt(y._val)) }
+}
+1.2+3 // Parse makes: (flt:1.2)._+_(int:3)  ==>> call flt._+_ with display flt.1.2 and arg int:3
 
 
 =======================================
