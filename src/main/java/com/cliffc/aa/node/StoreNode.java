@@ -65,10 +65,12 @@ public class StoreNode extends Node {
         mem.check_solo_mem_writer(this) && // Use is by self
         (tfld=nnn._ts.get(_fld))!= null ) {
       // Have to be allowed to directly update NewObjNode
-      if( tfld._access==Access.RW || rez() instanceof FunPtrNode ) {
+      if( tfld._access==Access.RW || rez() instanceof ValFunNode || rez() instanceof UnresolvedNode ) {
         // Field is modifiable; update New directly.
-        if( rez() instanceof FunPtrNode ) nnn.add_fun(_bad,_fld,(FunPtrNode)rez()); // Stacked FunPtrs into an Unresolved
-        else                              nnn.update(_fld,_fin,rez()); // Update the value, and perhaps the final field
+        if( rez() instanceof ValFunNode ) nnn.add_fun(_bad,_fld,(ValFunNode)rez()); // Stacked FunPtrs into an Unresolved
+        else if( rez() instanceof UnresolvedNode ) {
+          for( Node n : rez()._defs )       nnn.add_fun(_bad,_fld,(ValFunNode)n);
+        } else                              nnn.update(_fld,_fin,rez()); // Update the value, and perhaps the final field
         mem.xval();             // Update memory state
         Env.GVN.add_flow_uses(this);
         add_reduce_extra();     // Folding in allows store followers to fold in

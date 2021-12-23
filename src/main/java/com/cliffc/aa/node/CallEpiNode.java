@@ -106,7 +106,6 @@ public final class CallEpiNode extends Node {
     }
 
     // Only inline wired single-target function with valid args.  CallNode wires.
-    if( nwired()!=1 ) return null; // More than 1 wired, inline only via FunNode
     int fidx = fidxs.abit();       // Could be 1 or multi
     if( fidx == -1 ) return null;  // Multi choices, only 1 wired at the moment.
     if( fidxs.above_center() ) return null; // Can be unresolved yet
@@ -114,11 +113,20 @@ public final class CallEpiNode extends Node {
 
     if( call.err(true)!=null ) return null; // CallNode claims args in-error, do not inline
 
+    // Inlining a ValNode constructor
+    if( call.fdx() instanceof ValNode ) {
+      ValNode val = (ValNode)call.fdx().copy(true);
+      assert val.nargs()==call.nargs();
+      val.set_def(1,call.arg(ARG_IDX));
+      return set_is_copy(call.ctl(),call.mem(),val);
+    }
+
     // Call allows 1 function not yet inlined, sanity check it.
+    if( nwired()!=1 ) return null; // More than 1 wired, inline only via FunNode
     int cnargs = call.nargs();
     FunNode fun = FunNode.find_fidx(fidx);
     assert !fun.is_dead() && fun.nargs() == cnargs; // All checked by call.err
-    if( fun._val != Type.CTRL || fun._java_fun ) return null;
+    if( fun._val != Type.CTRL ) return null;
     RetNode ret = fun.ret();    // Return from function
     if( ret==null ) return null;
 

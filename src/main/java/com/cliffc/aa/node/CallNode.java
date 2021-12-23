@@ -228,7 +228,8 @@ public class CallNode extends Node {
 
     // Try to resolve to single-target
     if( fdx() instanceof UnresolvedNode ) {
-      FunPtrNode fptr = ((UnresolvedNode)fdx()).resolve_value(((TypeTuple)_val)._ts);
+      ValFunNode fptr = ((UnresolvedNode)fdx()).resolve_value(((TypeTuple)_val)._ts);
+      if( fptr==null )  throw unimpl(); // TODO: not time yet
       set_fdx(fptr);            // Resolve to 1 choice
       return this;
     }
@@ -244,7 +245,7 @@ public class CallNode extends Node {
     // alive args still need to resolve.  Constants are an issue, because they
     // fold into the Parm and the Call can lose the matching DProj while the
     // arg is still alive.
-    if( !is_keep() && err(true)==null ) {
+    if( !is_keep() && err(true)==null && cepi!=null && cepi.is_all_wired() ) {
       Node progress = null;
       for( int i=ARG_IDX; i<nargs(); i++ )
         if( ProjNode.proj(this,i)==null &&
@@ -355,34 +356,30 @@ public class CallNode extends Node {
     Type ctl = ctl()._val;
     if( ctl != Type.CTRL ) return ctl.oob();
     // Not a function to call?
-    Type tfx = fdx()._val;
+    Node fdx = fdx();
+    Type tfx = fdx instanceof ValFunNode ? ((ValFunNode)fdx).funtype() : fdx._val;
     if( !(tfx instanceof TypeFunPtr) ) return tfx.oob();
 
     // Not a memory to the call?
     Type mem = mem()==null ? TypeMem.ANYMEM : mem()._val;
     TypeMem tmem = mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM);
 
-    // Result type includes a type-per-input and an extra roll-up type of all
-    // escaping aliases.
+    // Result type includes a type-per-input
     final Type[] ts = Types.get(_defs._len+1/*+1 tescs turned off*/);
     ts[CTL_IDX] = Type.CTRL;
     ts[MEM_IDX] = tmem;         // Memory into the callee, not caller
 
     // Copy args for called functions.  FIDX is already refined.
     // Also gather all aliases from all args.
-    TypeFunPtr tfp = (TypeFunPtr)tfx;
-    ts[DSP_IDX] = tfp._dsp;
-    //BitsAlias as = get_alias(tfp._dsp);
+    ts[DSP_IDX] = ((TypeFunPtr)tfx)._dsp;
     for( int i=ARG_IDX; i<nargs(); i++ )
       ts[i] = arg(i)==null ? Type.XSCALAR : arg(i)._val;
-    Node fdx = fdx();
     if( fdx instanceof FreshNode ) fdx = ((FreshNode)fdx).id();
     if( fdx instanceof UnresolvedNode )
       fdx = ((UnresolvedNode)fdx).resolve_value(ts);
-    if( !(fdx instanceof FunPtrNode) )
-      throw unimpl();           // cannot resolve call yet
-    tfp = (TypeFunPtr)fdx._val;
-    ts[_defs._len] = tfp;
+    if( !(fdx instanceof ValFunNode) )
+      return tfx.oob(); // Cannot resolve yet
+    ts[_defs._len] = ((ValFunNode)fdx).funtype();
     return TypeTuple.make(ts);
   }
   // Get (shallow) aliases from the type

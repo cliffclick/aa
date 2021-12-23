@@ -11,7 +11,7 @@ public class MrgProjNode extends ProjNode {
   public MrgProjNode( NewNode nnn, Node mem ) { super(MEM_IDX,nnn,mem); }
   @Override public String xstr() { return "MrgProj"+_idx; }
   @Override public boolean is_mem() { return true; }
-  NewNode nnn() { return (NewNode)in(0); }
+  public NewNode nnn() { return (NewNode)in(0); }
   public Node mem() { return in(1); }
 
 

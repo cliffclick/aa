@@ -53,8 +53,8 @@ public class TestLive {
     // New object, fields x,y holding ints
     int alias = BitsAlias.new_alias(BitsAlias.REC);
     NewObjNode nnn = new NewObjNode(false,alias,TypeMemPtr.DISPLAY,Node.con(Type.NIL));
-    nnn.create_active("x",fdx,Access.Final);
-    nnn.create_active("y",fdy,Access.Final);
+    nnn.create_active("x",fdx,Access.Final,Type.SCALAR,null);
+    nnn.create_active("y",fdy,Access.Final,Type.SCALAR,null);
     nnn._val = Type.ANY;
     nnn.no_more_fields();
     nnn.xval();

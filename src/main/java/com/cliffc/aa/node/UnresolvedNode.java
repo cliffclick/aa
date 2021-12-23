@@ -4,6 +4,7 @@ import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFunPtr;
 
 import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.DSP_IDX;
@@ -25,7 +26,7 @@ public class UnresolvedNode extends Node {
   // - 2 defined; scope is known and complete, no more add_fun.
   // If no inputs, then remains an undefined forward-ref.
   private byte _fref;
-  UnresolvedNode( String name, Parse bad ) { super(OP_UNR); _name = name; _bad=bad; }
+  UnresolvedNode( String name, Parse bad ) { super(OP_UNR); _name = name; _bad=bad; _val = TypeFunPtr.GENERIC_FUNPTR; }
   @Override public String xstr() {
     if( is_dead() ) return "DEAD";
     if( _defs._len==0 ) return "???"+_name;
@@ -38,24 +39,26 @@ public class UnresolvedNode extends Node {
   }
   @Override public Node ideal_reduce() {
     // Defined with only 1, nuke it
-    return is_defined() && _defs._len == 1 ? in(0) : null;
+    return is_defined() && _defs._len == 1 && in(0) instanceof FunPtrNode ? in(0) : null;
   }
 
   @Override public Type value() {
-    if( is_forward_ref() ) return Type.ALL;
+    if( is_forward_ref() ) return TypeFunPtr.GENERIC_FUNPTR;
     Type t = Type.ANY;
-    for( Node fptr : _defs )
-      t = t.meet(fptr._val);
+    for( Node fptr : _defs ) {
+      Type tf = ((ValFunNode)fptr).funtype();
+      t = t.meet(tf);
+    }
     return t;
   }
 
   // Look at the arguments and resolve the call, if possible.
   // Returns null if not resolvable (yet).
   // MUST resolve during Combo/GCP, or program has ambiguous calls.
-  FunPtrNode resolve_value( Type[] tcall) {
-    FunPtrNode x=null;
+  ValFunNode resolve_value( Type[] tcall) {
+    ValFunNode x=null;
     for( Node n : _defs ) {
-      FunPtrNode ptr = (FunPtrNode)n;
+      ValFunNode ptr = (ValFunNode)n;
       if( ptr.nargs()==tcall.length-1 ) {
         assert x==null;         // Exactly zero or one fptr resolves
         x=ptr;
@@ -96,15 +99,15 @@ public class UnresolvedNode extends Node {
   // Add Another function to an Unresolved and return null, or return an ErrMsg
   // if this would add an ambiguous signature.  Different nargs are different.
   // Within functions with the same nargs
-  public ErrMsg add_fun(FunPtrNode fptr) {
+  public ErrMsg add_fun(ValFunNode fptr) {
     for( Node n : _defs ) {
-      FunPtrNode f0 = (FunPtrNode)n;
+      ValFunNode f0 = (ValFunNode)n;
       if( f0.nargs()==fptr.nargs() ) {
-        assert f0.fun().parm(DSP_IDX)._val == fptr.fun().parm(DSP_IDX)._val; // Same displays
-        Type t0a = f0  .fun().parm(ARG_IDX)._t; // f0   arg type
-        Type tfa = fptr.fun().parm(ARG_IDX)._t; // fptr arg type
+        assert f0.argtype(DSP_IDX) == fptr.argtype(DSP_IDX); // Same displays
+        Type t0a = f0  .argtype(ARG_IDX);  // f0   arg type
+        Type tfa = fptr.argtype(ARG_IDX);  // fptr arg type
         if( t0a.isa(tfa) || tfa.isa(t0a) ) // First arg is neither isa the other
-          throw unimpl();         // Check ambiguous against all other signatures
+          throw unimpl();       // Check ambiguous against all other signatures
       }
     }
     add_def(fptr);

@@ -62,7 +62,6 @@ public class ParmNode extends PhiNode {
     Node in0 = in(0);
     if( !(in0 instanceof FunNode) )  return ctl.oob();
     FunNode fun = (FunNode)in0;
-    if( fun._java_fun ) return _t;
     if( fun.len()!=len() ) return Type.ALL; // Collapsing
 
     // Merge all live paths

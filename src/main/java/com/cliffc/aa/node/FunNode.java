@@ -65,10 +65,6 @@ public class FunNode extends RegionNode {
   // Operator precedence; only set on top-level primitive wrappers.
   // -1 for normal non-operator functions and -2 for forward_decls.
   private byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
-  // Function is generated from whole-cloth via classForName.clazz__node.  Gets
-  // to keep-alive and have default types until inlined once, then gets
-  // removed.
-  public boolean _java_fun;
 
   // H-M non-generative set, only active during Combo.
   public TV2[] _nongen;

@@ -2,13 +2,14 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
+import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Util;
 
-import static com.cliffc.aa.AA.MEM_IDX;
 import static com.cliffc.aa.type.TypeFld.Access;
+import static com.cliffc.aa.AA.unimpl;
 
 
 // Allocates a TypeStruct and produces a Tuple with the TypeStruct and a TypeMemPtr.
@@ -51,13 +52,14 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public void no_more_fields() { setsm(_ts.close()); }
 
   // Create a field from parser for an inactive this
-  public void create( String name, Node val, Access mutable ) {
+  public void create( String name, Node val, Access mutable, Type t, Parse badt ) {
     assert !Util.eq(name,"^") && !Util.eq(name,TypeFld.fldBot); // Closure field created on init
-    create_active(name,val,mutable);
+    create_active(name,val,mutable,t,badt);
   }
   // Create a field from parser for an active this
-  public void create_active( String name, Node val, Access mutable ) {
-    setsm(_ts.add_fld(name,mutable,mutable==Access.Final ? val._val : Type.SCALAR,_defs._len));
+  public void create_active( String name, Node val, Access mutable, Type t, Parse badt ) {
+    setsm(_ts.add_fld(name,mutable,t,_defs._len));
+    // TODO: Save badt and report it if fields do not type
     create_edge(val);
   }
   // Used by IntrinsicNode
@@ -69,26 +71,25 @@ public class NewObjNode extends NewNode<TypeStruct> {
   // Update the field & mod
   private void update( TypeFld fld, Access mutable, Node val ) {
      set_def(fld._order,val);
-     sets(_ts.replace_fld(fld.make_from(mutable==Access.Final ? val._val : Type.SCALAR,mutable)));
+     sets(_ts.replace_fld(fld.make_from(fld._t,mutable)));
      xval();
      Env.GVN.add_flow_uses(this);
   }
 
 
   // Add a named FunPtr to a New.  Auto-inflates to a Unresolved as needed.
-  public void add_fun( Parse bad, String name, FunPtrNode ptr ) {
+  public void add_fun( Parse bad, String name, ValFunNode ptr ) {
     TypeFld fld = _ts.get(name);
-    if( fld == null ) {
-      create_active(name,ptr,Access.Final);
-    } else {
-      // TODO: Problem: keep taking stores until scope closes, and tpye keeps falling
+    //if( fld == null ) {
+    //  create_active(name,ptr,Access.Final);
+    //} else {
       Node n = in(fld._order);
       UnresolvedNode unr = n==Env.XNIL
         ? new UnresolvedNode(name,bad).scoped()
         : (UnresolvedNode)n;
       unr.add_fun(ptr);
       update(fld,Access.Final,unr);
-    }
+    //}
   }
 
   // The current local scope ends, no more names will appear.  Forward refs
@@ -107,7 +108,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
           Env.GVN.add_unuse(n);
         } else {
           // Make field in the parent
-          parent.create(fld._fld,n,fld._access);
+          parent.create(fld._fld,n,fld._access,fld._t,null/*TODO: Copy forward the error*/);
           // Stomp field locally to ANY
           set_def(fld._order,Env.ANY);
           setsm(_ts.replace_fld(fld.make_from(Type.ANY,Access.Final)));
@@ -137,22 +138,22 @@ public class NewObjNode extends NewNode<TypeStruct> {
     return progress;
   }
 
-  @Override public Node ideal_mono() {
-    // If the value lifts a final field, so does the default lift.
-    if( _val instanceof TypeTuple ) {
-      TypeObj ts3 = (TypeObj)((TypeTuple)_val).at(MEM_IDX);
-      if( ts3 != TypeObj.UNUSED ) {
-        TypeStruct ts4 = _ts.make_from((TypeStruct)ts3);
-        TypeStruct ts5 = ts4.crush();
-        assert ts4.isa(ts5);
-        if( ts5 != _crushed && ts5.isa(_crushed) ) {
-          setsm(ts4);
-          return this;
-        }
-      }
-    }
-    return null;
-  }
+//  @Override public Node ideal_mono() {
+//    // If the value lifts a final field, so does the default lift.
+//    if( _val instanceof TypeTuple ) {
+//      TypeObj ts3 = (TypeObj)((TypeTuple)_val).at(MEM_IDX);
+//      if( ts3 != TypeObj.UNUSED ) {
+//        TypeStruct ts4 = _ts.make_from((TypeStruct)ts3);
+//        TypeStruct ts5 = ts4.crush();
+//        assert ts4.isa(ts5);
+//        if( ts5 != _crushed && ts5.isa(_crushed) ) {
+//          setsm(ts4);
+//          return this;
+//        }
+//      }
+//    }
+//    return null;
+//  }
   @Override public void add_flow_extra(Type old) {
     super.add_flow_extra(old);
     Env.GVN.add_mono(this); // Can update crushed
@@ -215,4 +216,9 @@ public class NewObjNode extends NewNode<TypeStruct> {
           return false;
     return true;
   }
+  
+  @Override public ErrMsg err( boolean fast ) {
+    // Check input vals vs ts
+    throw unimpl();
+  }  
 }

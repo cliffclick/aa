@@ -179,7 +179,6 @@ public abstract class PrimNode extends Node {
     kill(); // Kill self, use one from primitive table that has op_prec set
     // Extra '$' in name copies the op_prec one inlining level from clazz_node into the _prim.aa
     FunNode fun = Env.GVN.init(new FunNode(("$"+_name).intern(),that)); // No callers (yet)
-    fun._java_fun = true;
     ParmNode rpc = Env.GVN.init(new ParmNode(TypeRPC.ALL_CALL,null,fun,0,"rpc"));
     that.add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
     Node mem = Env.GVN.init(new ParmNode(TypeMem.MEM,null,fun,MEM_IDX," mem"));

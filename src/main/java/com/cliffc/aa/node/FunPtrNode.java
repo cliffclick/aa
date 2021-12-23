@@ -35,7 +35,7 @@ import static com.cliffc.aa.AA.*;
 // covering all instances of [+15,+12].  Also may impact mixed +15 and other
 // FIDXs with unrelated DISPs.  Instead a dead display just flips to ANY.
 
-public final class FunPtrNode extends Node {
+public final class FunPtrNode extends ValFunNode {
   public String _name;          // Optional for debug only
 
   // Every var use that results in a function, so actually only these FunPtrs,
@@ -57,7 +57,11 @@ public final class FunPtrNode extends Node {
   public Node display(){ return in(1); }
   public FunNode fun() { return ret().fun(); }
   public FunNode xfun() { RetNode ret = ret(); return ret !=null && ret.in(4) instanceof FunNode ? ret.fun() : null; }
-  public int nargs() { return ret()._nargs; }
+  @Override int nargs() { return ret()._nargs; }
+  // The *declared* type, not analyzed type
+  @Override Type argtype(int idx) { return fun().parm(idx)._t; }
+  @Override Type funtype() { return _val; }
+  
   //@Override public FunPtrNode funptr() { return this; }
   //@Override public UnresolvedNode unk() { return null; }
   // Self short name

@@ -1017,7 +1017,10 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     return ts.hashcons_free();
   }
   // Replace an existing field in the current struct.
-  public TypeStruct replace_fld( TypeFld fld ) { return copy().set_fld(fld).hashcons_free(); }
+  public TypeStruct replace_fld( TypeFld fld ) {
+    if( get(fld._fld)==fld ) return this;
+    return copy().set_fld(fld).hashcons_free();
+  }
   public TypeStruct del_fld( String name ) {
     TypeStruct ts = copy();
     ts._flds.remove(name);
@@ -1110,8 +1113,8 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
         return false;
     return true;
   }
-  
-  
+
+
   // True if isBitShape on all bits
   @Override public byte isBitShape(Type t) {
     if( isa(t) ) return 0; // Can choose compatible format

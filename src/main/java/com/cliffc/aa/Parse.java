@@ -276,12 +276,13 @@ public class Parse implements Comparable<Parse> {
     // Types are forward-defined in two contexts, so either or both might
     // already have happened: as a type (in an type annotation) and as a
     // standard fref in a fact (probably as a constructor call).
-    Node construct = _e.lookup(tvar);
+    UnresolvedNode construct = (UnresolvedNode)_e.lookup(tvar);
     ProjNode typenode  = _e.lookup_type(tvar);
     // Make a forward-ref constructor, if not one already
     if( construct==null ) construct = val_fref(tvar,errMsg());
     else if( !construct.is_forward_ref() )
       return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
+    construct.scoped();
 
     // Look for a prior type assignment, from e.g. a type annotation
     if( typenode == null ) typenode = type_fref(tvar); // None, so create
@@ -290,6 +291,7 @@ public class Parse implements Comparable<Parse> {
 
     // Parse a 'fact' as a type.  Check for a 'struct' first, to pass along the
     // pre-selected forward-ref alias.  Other 'fact's will not use the alias.
+    Parse badt = errMsg();
     Node newtype = peek("@{") ? struct(typenode) : fact();
     if( newtype==null ) return err_ctrl2("Missing type after ':'");
     if( peek('?')     ) return err_ctrl2("Named types are never nil");
@@ -297,18 +299,11 @@ public class Parse implements Comparable<Parse> {
 
     // Build a constructor
     if( newtype instanceof ProjNode && newtype.in(0) instanceof NewObjNode ) {
-      Node constructor;
-      if( is_val )
-        // TODO walk fields; if MUTABLE, make immut and put in constructor args.
-        // If IMMUT and const, exclude from constructor args; leave in proto.
-        // If IMMUT and not-const, put code in constructor.  Replace class with default pessimal correct.
-        // Constructor is a ValNode taking fields & ConNode/expr, plus hook to Proto.        
-        constructor = ValNode.make((NewObjNode)newtype.in(0));
-      // TODO: proto object forever hooked from default ValNode constructor.
-      // Should default constructor die, so the prototype dies.
-
-      else
-        throw unimpl();         // Reference type
+      if( is_val ) construct.add_fun((ValFunNode)gvn(ValNode.make(newtype)));
+      else         throw unimpl();         // Reference type
+      assert  ((MrgProjNode)mem()).nnn()==newtype.in(0);
+      set_mem(((MrgProjNode)mem()).mem()); // Unlink prototype from mem; its just around loading constants
+      return construct.define();
 
     } else {
       // Other types?  e.g. defining a named function-type needs a breakdown of
@@ -316,9 +311,6 @@ public class Parse implements Comparable<Parse> {
       // case, but can be used in type-checks.
       throw unimpl();
     }
-    // TODO: constructor stored in value name-space
-    //return do_store(lookup_scope(tvar,false),constructor,Access.Final,tvar,bad);
-    throw unimpl();         
 
     //// If this is a value type, we get a value-constructor
     //if( nts.is_all_final_fields() ) {
@@ -397,7 +389,7 @@ public class Parse implements Comparable<Parse> {
       String tok = token();     // Scan for 'id = ...'
       if( tok == null ) break;  // Out of ids
       int oldx2 = _x;           // Unwind assignment flavor point
-      Type t = null;
+      Type t = Type.SCALAR;
       // x  =: ... type  assignment, handled before we get here
       // x  =  ... final assignment
       // x :=  ... var   assignment
@@ -440,48 +432,37 @@ public class Parse implements Comparable<Parse> {
       if( toks._len == 0 ) return null;
       ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
     }
-    // Honor all type requests, all at once, by inserting type checks on the ifex.
-    for( int i=0; i<ts._len; i++ )
-      ifex = typechk(ifex,ts.at(i),mem(),badts.at(i));
 
     // Assign tokens to value
     for( int i=0; i<toks._len; i++ ) {
       String tok = toks.at(i);               // Token being assigned
       Access mutable = rs.get(i) ? Access.RW : Access.Final;  // Assignment is mutable or final
       ScopeNode scope = lookup_scope(tok,lookup_current_scope_only);
-      // Balanced operators are ALSO stored in the same scope under a special unparseable name.
-      // The term() call, when it does balanced op lookups, uses the same special name.
-      String bal_close;
-      if( ifex instanceof FunPtrNode && (bal_close=((FunPtrNode)ifex).fun()._bal_close) != null ) {
-        String btok = (" "+tok.substring(0,bal_close.length()+1)).intern();
-        ifex = do_store(scope,ifex,mutable,btok,badfs.at(i));
-      }
-      // Store down the full name 2nd, to overwrite the short bal-op name
-      ifex = do_store(scope,ifex,mutable,tok,badfs.at(i));
+      ifex = do_store(scope,ifex,mutable,tok,badfs.at(i),ts.at(i),badts.at(i));
     }
 
     return ifex;
   }
 
   // Assign into display, changing an existing def
-  private Node do_store(ScopeNode scope, Node ifex, Access mutable, String tok, Parse bad) {
+  private Node do_store(ScopeNode scope, Node ifex, Access mutable, String tok, Parse badf, Type t, Parse badt ) {
     if( ifex instanceof FunPtrNode )
       ((FunPtrNode)ifex).bind(tok); // Debug only: give name to function
     final int iidx = ifex.push();
     // Find scope for token.  If not defining struct fields, look for any
     // prior def.  If defining a struct, tokens define a new field in this scope.
     if( scope==null ) {               // Token not already bound at any scope
-      create(tok,Env.XNIL,Access.RW); // Create at top of scope as undefined
       scope = scope();                // Scope is the current one
+      scope.stk().create(tok,Env.XNIL,Access.RW,t,badt); // Create at top of scope as undefined
       scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
       Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
-      StoreNode st = new StoreNode(mem(),ptr,Node.peek(iidx),mutable,tok,bad);
+      StoreNode st = new StoreNode(mem(),ptr,Node.peek(iidx),mutable,tok,badf);
       scope().replace_mem(st);
       return Node.pop(iidx);
     }
     // Store into scope/NewObjNode/display
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
-    StoreNode st = new StoreNode(mem(),ptr,Node.peek(iidx),mutable,tok,bad);
+    StoreNode st = new StoreNode(mem(),ptr,Node.peek(iidx),mutable,tok,badf);
     scope().replace_mem(st);
     scope.def_if(tok,mutable,false); // Note 1-side-of-if update
     return Node.pop(iidx);
@@ -807,8 +788,9 @@ public class Parse implements Comparable<Parse> {
     // Need a load/call/store sensible options
     Node n;
     if( scope==null ) {         // Token not already bound to a value
-      create(tok,con(Type.XNIL),Access.RW);
-      scope = scope();
+      //create(tok,con(Type.XNIL),Access.RW);
+      //scope = scope();
+      throw unimpl();
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
         return err_ctrl2("Cannot re-assign final val '"+tok+"'");
@@ -845,6 +827,11 @@ public class Parse implements Comparable<Parse> {
     if( t==null ) { _x = oldx; return fact; } // No error for missing type, because can be ?: instead
     return typechk(fact,t,mem(),bad);
   }
+  // Add a typecheck into the graph, with a shortcut if trivially ok.
+  private Node typechk(Node x, Type t, Node mem, Parse bad) {
+    return t == null || x._val.isa(t) ? x : gvn(new AssertNode(mem,x,t,bad,_e));
+  }
+
 
 
   /** Parse a factor, a leaf grammar token
@@ -944,7 +931,7 @@ public class Parse implements Comparable<Parse> {
     int alias = BitsAlias.new_alias(BitsAlias.REC);
     NewObjNode nn = new NewObjNode(false,alias,TypeStruct.open(TypeMemPtr.NO_DISP),Env.ANY);
     for( int i=0; i < nargs; i++ )
-      nn.create_active((""+i).intern(),Node.peek(GVNGCM.KEEP_ALIVE._defs._len-nargs+i),Access.Final);
+      nn.create_active((""+i).intern(),Node.peek(GVNGCM.KEEP_ALIVE._defs._len-nargs+i),Access.Final,Type.SCALAR,null);
     Node.pops(nargs);
     nn._fld_starts = bads.asAry();
     nn.no_more_fields();
@@ -1062,9 +1049,7 @@ public class Parse implements Comparable<Parse> {
         if( fld._order <= DSP_IDX ) continue;// Already handled
         assert fun==_e._fun && fun==_e._scope.ctrl();
         Node parm = gvn(new ParmNode(fld,fun,Env.ALL_PARM,errmsg));
-        if( fld._t!=Type.SCALAR ) // Type-check any arg types
-          parm = typechk(parm,fld._t,mem,bads.at(fld._order-ARG_IDX));
-        create(fld._fld,parm, args_are_mutable);
+        _e._scope.stk().create(fld._fld,parm, args_are_mutable,fld._t,bads.at(fld._order-ARG_IDX));
       }
       stk.set_nargs();
 
@@ -1150,11 +1135,6 @@ public class Parse implements Comparable<Parse> {
     //require(bfun.funptr().fun()._bal_close,oldx);
     //return do_call(errMsgs(oldx,oldx2),args(bfun,s));
     throw unimpl();
-  }
-
-  // Add a typecheck into the graph, with a shortcut if trivially ok.
-  private Node typechk(Node x, Type t, Node mem, Parse bad) {
-    return t == null || x._val.isa(t) ? x : gvn(new AssertNode(mem,x,t,bad,_e));
   }
 
   // Must be a valid java class name on the current class path that subclasses
@@ -1347,6 +1327,7 @@ public class Parse implements Comparable<Parse> {
     Node nt = fact();
 
     // Check for type
+    if( nt instanceof FreshNode ) nt = ((FreshNode)nt).id();
     if( nt instanceof UnresolvedNode ) {
       String tvar = ((UnresolvedNode)nt)._name;
       ProjNode typenode = _e.lookup_type(tvar);
@@ -1367,42 +1348,12 @@ public class Parse implements Comparable<Parse> {
     //   other Nodes are Exprs, Not a Type, so an Error.
     //     Wrap with constructor, but include error test for post-GCP
   }
-  //// Returning a type variable assignment result or null.  Flag to allow
-  //// unknown type variables as forward-refs.
-  //private Type typev() {
-  //  Type t = type0(true);
-  //  // Type.ANY is a flag for '->' which is not a type.
-  //  return t==Type.ANY ? null : t;
-  //}
-  //// TypeObjs get wrapped in a pointer, and the pointer is returned instead.
-  //private Type typep(boolean type_var, boolean top) {
-  //  Type t = type0(type_var);
-  //  if( t instanceof TypeMemPtr ) return typeq(t); // Named type is already a TMP
-  //  if( !(t instanceof TypeObj) ) return t; // Primitives are not wrapped
-  //  // Automatically convert unnamed structs to refs.
-  //  // Make a reasonably precise alias.
-  //  int type_alias = t instanceof TypeStruct ? BitsAlias.REC : (t instanceof TypeStr ? BitsAlias.STR : BitsAlias.AARY);
-  //  TypeMemPtr tmp = TypeMemPtr.make(type_alias,(TypeObj)t);
-  //  return typeq(tmp);          // And check for null-ness
-  //}
-  //// Wrap in a nullable if there is a trailing '?'.  No spaces allowed
-  //private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil(Type.NIL) : t; }
-  //
-  //// Type or null or Type.ANY for '->' token
-  //private Type type0(boolean type_var) {
-  //  if( peek( '{') ) return tfun   (type_var);
-  //  if( peek("@{") ) return tstruct(type_var);
-  //  if( peek( '(') ) return ttuple (type_var);
-  //  if( peek( '[') ) return tarray (type_var);
-  //  if( peek("$$") && _prims ) return java_class_type();
-  //  return tid();
-  //}
 
   // Create a value forward-reference.  Must turn into a function call later.
-  private Node val_fref(String tok, Parse bad) {
-    Node fref = gvn(UnresolvedNode.forward_ref(tok,bad));
+  private UnresolvedNode val_fref(String tok, Parse bad) {
+    UnresolvedNode fref = (UnresolvedNode)gvn(UnresolvedNode.forward_ref(tok,bad));
     // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
-    _e._scope.stk().create(tok,fref,Access.Final);
+    _e._scope.stk().create(tok,fref,Access.Final,Type.SCALAR,null);
     return fref;
   }
   // Create a type forward-reference.  Must be type-defined later.
@@ -1415,89 +1366,6 @@ public class Parse implements Comparable<Parse> {
     _e.add_type(tok,tn);
     return tn;
   }
-
-  //private Type tid() {
-  //  int oldx = _x;
-  //  String tok = token();
-  //  if( tok==null ) return null; // No id
-  //  tok = tok.intern();
-  //  if( Util.eq(tok,"->") ) return Type.ANY; // Found -> return sentinel
-  //  ConTypeNode t = _e.lookup_type(tok);
-  //  if( t!=null ) return t._val; // Prior defined type
-  //  //if( lookup(tok) != null || // Yes a known normal var; resolve as a normal var
-  //  //    !type_var ) {          // Or not inside a type-var assignment
-  //  //  _x = oldx;               // Unwind if not a known type var
-  //  //  return null;             // Not a type
-  //  //}
-  //  // Make a forward-ref ConType and return its type
-  //  return type_fref(tok);
-  //}
-  //
-  //// Parse an anonymous function type.
-  //private Type tfun(boolean type_var) {
-  //  TypeStruct formals = TypeStruct.make("",false,true,
-  //                                       TypeFld.make_tup(TypeMemPtr.DISP_SIMPLE,DSP_IDX));
-  //  TypeStruct no_args_formals = formals;  Type t; // Collect arg types
-  //  while( (t=typep(type_var)) != null && t != Type.ANY  )
-  //    formals = formals.add_tup(t,formals.len()-1+ARG_IDX);
-  //  Type ret;
-  //  if( t==Type.ANY ) {       // Found ->, expect return type
-  //    ret = typep(type_var);
-  //    if( ret == null ) return null; // should return TypeErr missing type after ->
-  //  } else {                  // Allow no-args and simple return type
-  //    if( formals.len()-2 != 1 ) return null; // should return TypeErr missing -> in tfun
-  //    ret = formals.fld_idx(ARG_IDX); // e.g. { int } Get single return type
-  //    formals = no_args_formals;
-  //  }
-  //  return peek('}') ? typeq(TypeFunSig.make(formals,ret)) : null;
-  //}
-  //
-  //  // "()" is the zero-entry tuple
-  //  // "(   ,)" is a 1-entry tuple
-  //  // "(int )" is a 1-entry tuple (optional trailing comma)
-  //  // "(int,)" is a 1-entry tuple (optional trailing comma)
-  //  // "(,int)" is a 2-entry tuple
-  //  // "(, , )" is a 2-entry tuple
-  //private TypeStruct ttuple(boolean type_var) {
-  //  Ary<TypeFld> flds = new Ary<>(new TypeFld[]{TypeMemPtr.DISP_FLD});
-  //  byte c;
-  //  while( (c=skipWS()) != ')' ) { // No more types...
-  //    Type t = Type.SCALAR;    // Untyped, most generic field type
-  //    if( c!=',' &&            // Has type annotation?
-  //        (t=typep(type_var)) == null) // Parse type, wrap ptrs
-  //      return null;                   // not a type
-  //    flds.add(TypeFld.make_tup(t,ARG_IDX+flds._len-1));
-  //    if( !peek(',') ) break; // Final comma is optional
-  //  }
-  //  return peek(')') ? TypeStruct.make("",false,true,flds) : null;
-  //}
-  //
-  //private TypeAry tarray(boolean type_var) {
-  //  Type e = typep(type_var);
-  //  if( e==null ) e=Type.SCALAR;
-  //  return peek(']') ? TypeAry.make(TypeInt.INT64,e,TypeObj.OBJ) : null;
-  //}
-  //
-  ///*
-  // *  Syntax        Obj         Val           Ref       Anon
-  // *  fld    ;   r/w  ,  0   final, arg    r/w,    0    r/w     // arg in ValType, 0   elsewhere
-  // *  fld =  ;   final,  0   final, arg    final, arg   final   //  0  in ObjType, arg elsewhere
-  // *  fld:=  ;   r/w  ,  0   error         r/w,    0    r/w     // err in ValType; no mutable fields
-  // *  fld =e0;   final, e0   final, e0     final, e0    error   //                                    error in Anon, no value
-  // *  fld:=e0;   r/w  , e0   error         r/w,   e0    error   // err in ValType; no mutable fields; error in Anon, no value
-  // */
-  //private TypeStruct tstruct(boolean type_var) {
-  //  ProjNode ptr = (ProjNode)struct();
-  //  NewObjNode nnn = (NewObjNode)ptr.in(0);
-  //  if( type_var ) {
-  //    ptr.push();                 // KEEP around; no index, just pop next level up
-  //    throw unimpl();
-  //    //return nnn._ts;
-  //  } else {
-  //    // Not a type_var; anonymous type only.  No exprs allowed, so always a zero.
-  //    throw unimpl();
-  //  }
-  //}
 
   // --------------------------------------------------------------------------
   // Require a closing character (after skipping WS) or polite error
@@ -1607,7 +1475,7 @@ public class Parse implements Comparable<Parse> {
   public  Node lookup( String tok ) { return _e.lookup(tok); }
   private ScopeNode lookup_scope( String tok, boolean lookup_current_scope_only ) { return _e.lookup_scope(tok,lookup_current_scope_only); }
   public  ScopeNode scope( ) { return _e._scope; }
-  private void create( String tok, Node n, Access mutable ) { scope().stk().create(tok,n,mutable); }
+  //private void create( String tok, Node n, Access mutable ) { scope().stk().create(tok,n,mutable); }
 
   // Get the display pointer.  The function call
   // passed in the display as a hidden argument which we return here.

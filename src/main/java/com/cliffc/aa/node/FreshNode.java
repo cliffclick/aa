@@ -14,7 +14,7 @@ public class FreshNode extends Node {
   FunNode fun() {
     return in(0)==Env.CTL_0 ? null : (FunNode)in(0);
   }
-  Node id() { return in(1); }       // The HM identifier
+  public Node id() { return in(1); } // The HM identifier
   TV2[] nongen() { return fun()==null ? null : fun()._nongen; }
   @Override public Node ideal_reduce() {
     if( id()==this ) return null; // Dead self-cycle

@@ -194,7 +194,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
         assert in(0)==null && _uses._len==0;
         FunNode  fun = ( FunNode) X.xform(new  FunNode(_name,this));
-        fun._java_fun = true;
         ParmNode rpc = (ParmNode) X.xform(new ParmNode(TypeRPC.ALL_CALL,null,fun,0,"rpc"));
         Node memp= X.xform(new ParmNode(TypeMem.MEM,null,fun,MEM_IDX," mem"));
         fun._bal_close = bal_close();

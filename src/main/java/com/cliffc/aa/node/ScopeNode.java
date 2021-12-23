@@ -243,7 +243,7 @@ public class ScopeNode extends Node {
     if( escs==BitsFun.FULL ) return; // Error exit
     for( int fidx : escs ) {
       boolean found=false;
-      for( int i=ARG_IDX+1; i<len(); i++ )
+      for( int i=RET_IDX; i<len(); i++ )
         if( in(i) instanceof RetNode && ((RetNode)in(i))._fidx==fidx )
           {found=true; break; };
       if( !found )

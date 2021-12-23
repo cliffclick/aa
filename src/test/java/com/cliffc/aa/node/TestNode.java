@@ -240,13 +240,13 @@ public class TestNode {
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
     int alias1 = BitsAlias.new_alias(BitsAlias.REC);
     NewObjNode nnn1 = new NewObjNode(false,alias1,TypeMemPtr.DISPLAY,Node.con(Type.NIL));
-    set_type(1,Type.SCALAR);  nnn1.create_active("x",_ins[1],Access.Final);
-    set_type(2,Type.SCALAR);  nnn1.create_active("y",_ins[2],Access.Final);
+    set_type(1,Type.SCALAR);  nnn1.create_active("x",_ins[1],Access.Final,Type.SCALAR,null);
+    set_type(2,Type.SCALAR);  nnn1.create_active("y",_ins[2],Access.Final,Type.SCALAR,null);
     test1monotonic(nnn1);
     int alias2 = BitsAlias.new_alias(BitsAlias.REC);
     NewObjNode nnn2 = new NewObjNode(false,alias2,TypeMemPtr.DISPLAY,Node.con(Type.NIL));
-    set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[1],Access.Final);
-    set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[2],Access.Final);
+    set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[1],Access.Final,Type.SCALAR,null);
+    set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[2],Access.Final,Type.SCALAR,null);
     nnn2.sets(tname);
     test1monotonic(nnn2);
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype

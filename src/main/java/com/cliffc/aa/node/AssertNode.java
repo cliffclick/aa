@@ -11,7 +11,7 @@ import static com.cliffc.aa.AA.*;
 // program is type-correct.  A CastNode is always correct from local semantics,
 // and the join is non-trivial.
 public class AssertNode extends Node {
-  private final Type _t;            // Asserted type
+  final Type _t;                    // Asserted type
   private final Parse _error_parse; // Used for error messages
   private final Env _env;           // Lexical scope
   public AssertNode( Node mem, Node a, Type t, Parse P, Env e ) {
