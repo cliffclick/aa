@@ -769,12 +769,13 @@ public class Parse implements Comparable<Parse> {
       return err_ctrl1(ErrMsg.forward_ref(this,((FunPtrNode)n)));
     // Do a full lookup on "+", and execute the function
     n.keep();
-    // This is a primitive lookup and always returns a FRESH copy (see HM.Ident).
-    Node plus = _e.lookup_filter_bin("+");
-    Node sum = do_call(errMsgs(0,_x,_x),args(plus,n,con(TypeInt.con(d))));
-    // Active memory for the chosen scope, after the call to plus
-    scope().replace_mem(new StoreNode(mem(),ptr,sum,Access.RW,tok,errMsg()));
-    return n.unkeep();          // Return pre-increment value
+//    // This is a primitive lookup and always returns a FRESH copy (see HM.Ident).
+//    Node plus = _e.lookup_filter_bin("+");
+//    Node sum = do_call(errMsgs(0,_x,_x),args(plus,n,con(TypeInt.con(d))));
+//    // Active memory for the chosen scope, after the call to plus
+//    scope().replace_mem(new StoreNode(mem(),ptr,sum,Access.RW,tok,errMsg()));
+//    return n.unkeep();          // Return pre-increment value
+    throw unimpl();
   }
 
 

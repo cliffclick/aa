@@ -35,25 +35,31 @@ import static com.cliffc.aa.AA.unimpl;
 
 public class Env implements AutoCloseable {
   public static Env TOP,FILE;
-  public final static GVNGCM GVN = new GVNGCM(); // Initial GVN
+  public static final GVNGCM GVN = new GVNGCM(); // Initial GVN
 
   public static final KeepNode KEEP_ALIVE = new KeepNode();
-  public static      ConNode ANY;   // Common ANY / used for dead
-  public static      ConNode ALL;   // Common ALL / used for errors
-  public static      ConNode XCTRL; // Always dead control
-  public static      ConNode XNIL;  // Default 0
-  public static      ConNode XUSE;  // Unused objects (dead displays)
-  public static      ConNode XMEM;  // Unused whole memory
-  public static      ConNode ALL_CTRL;  // Always alive control
-  public static      ConNode ALL_MEM;   // Conservative all memory
-  public static      ConNode ALL_PARM; // Default parameter
-  public static      ConNode ALL_CALL; // Common during function call construction
+  public static final ConNode ANY;   // Common ANY / used for dead
+  public static final ConNode ALL;   // Common ALL / used for errors
+  public static final ConNode XCTRL; // Always dead control
+  public static final ConNode XNIL;  // Default 0
+  public static final ConNode XUSE;  // Unused objects (dead displays)
+  public static final ConNode XMEM;  // Unused whole memory
+  public static final ConNode ALL_CTRL;  // Always alive control
+  public static final ConNode ALL_MEM;   // Conservative all memory
+  public static final ConNode ALL_PARM; // Default parameter
+  public static final ConNode ALL_CALL; // Common during function call construction
 
-  public static    StartNode START; // Program start values (control, empty memory, cmd-line args)
-  public static    CProjNode CTL_0; // Program start value control
-  public static StartMemNode MEM_0; // Program start value memory
-  public static   NewObjNode STK_0; // Program start stack frame (has primitives)
-  public static    ScopeNode SCP_0; // Program start scope
+  public static final    StartNode START; // Program start values (control, empty memory, cmd-line args)
+  public static final    CProjNode CTL_0; // Program start value control
+  public static final StartMemNode MEM_0; // Program start value memory
+  public static final   NewObjNode STK_0; // Program start stack frame (has primitives)
+  public static final    ScopeNode SCP_0; // Program start scope
+
+  // Global named types.  Type names are ALSO lexically scoped during parsing
+  // (dictates visibility of a name).  During semantic analysis a named type
+  // can be Loaded from as a class obj, requiring Loads reverse the type name
+  // to the prototype obj.
+  public static final HashMap<String,NewObjNode> PROTOS;
 
   // Add a permanent edge use to all these Nodes, keeping them alive forever.
   @SuppressWarnings("unchecked")
@@ -79,6 +85,7 @@ public class Env implements AutoCloseable {
     // Initial control & memory
     CTL_0  = keep(new    CProjNode(START,0));
     MEM_0  = keep(new StartMemNode(START  ));
+    PROTOS = new HashMap<>();
 
     // The Top-Level environment; holds the primitives.
     TOP = new Env();
@@ -97,7 +104,7 @@ public class Env implements AutoCloseable {
       TOP._scope.walk_record_for_reset();  Env.GVN.flow_clear();
       TypeEnv te = TOP.gather_errors(err);
       assert te._errs==null && te._t==Type.SCALAR; // Primitives parsed fine
-    } catch( Exception e ) { throw new RuntimeException(e); }; // Unrecoverable
+    } catch( Exception e ) { throw new RuntimeException(e); } // Unrecoverable
     record_for_reset();
   }
 
@@ -105,19 +112,17 @@ public class Env implements AutoCloseable {
   final public Env _par;         // Parent environment
   public final ScopeNode _scope; // Lexical anchor; "end of display"; goes when this environment leaves scope
   public final FunNode _fun;     // Matching FunNode for this lexical environment
-  private final HashMap<String,Oper> _opers; // Lexically scoped operators
 
   // Shared Env constructor.
   Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr, ProjNode fref ) {
     _par = par;
     _fun = fun;
-    _opers = new HashMap<>();
     TypeStruct ts = TypeStruct.make("",false,true,TypeFld.make("^",dsp_ptr._val, DSP_IDX));
     TypeMemPtr tmp = fref==null ? null : (TypeMemPtr)fref._val;
     int alias      = fref==null ? BitsAlias.new_alias(BitsAlias.REC) : tmp.aliases().getbit();
     NewObjNode nnn = GVN.init(new NewObjNode(is_closure,alias,ts,dsp_ptr));
     if( fref!=null ) nnn.set_name(ts.set_name(tmp._obj._name));
-    Node ptr       = fref==null ? GVN.init(new ProjNode(nnn,AA.REZ_IDX)) : fref.set_def(0,nnn);      
+    Node ptr       = fref==null ? GVN.init(new ProjNode(nnn,AA.REZ_IDX)) : fref.set_def(0,nnn);
     Node frm = GVN.init(new MrgProjNode(nnn,mem));
     _scope = GVN.init(new ScopeNode(is_closure));
     _scope.set_ctrl(ctrl);
@@ -170,11 +175,8 @@ public class Env implements AutoCloseable {
     // Promote forward refs to the next outer scope
     NewObjNode stk = _scope.stk();
     ScopeNode pscope = _par._scope;
-    if( pscope != null ) {
+    if( pscope != null )
       stk.promote_forward(pscope.stk());
-      if( !_opers.isEmpty() )
-        throw unimpl();         // Promote operators
-    }
 
     Node ptr = _scope.ptr();
     stk.no_more_fields();
@@ -255,65 +257,6 @@ public class Env implements AutoCloseable {
     ScopeNode scope = lookup_scope(name,false);
     return scope==null ? null : scope.get(name);
   }
-  // Test support, return top-level name type
-  Type lookup_valtype( String name ) {
-    Node n = lookup(name);
-    if( !(n instanceof UnresolvedNode) ) return n._val;
-    // For unresolved, use the ambiguous type
-    return n.value();
-  }
-
-  // Lookup the operator name.  Use the longest name that's found, so that long
-  // strings of operator characters are naturally broken by (greedy) strings.
-  private Oper _lookup_oper(String tok) {
-    Oper o = _opers.get(tok);
-    return o==null ? (_par==null ? null : _par._lookup_oper(tok)) : o;
-  }
-
-  private UnresolvedNode _lookup_filter( int op_prec_test, String name, int nargs ) {
-    for( int i=name.length(); i>0; i-- ) { // First name found will return
-      // Prepare the name from the token
-      String name2 = name.substring(0,i)+"_";
-      Oper o = _lookup_oper(name2.intern());
-      //if( o != null && o.op_prec() >= op_prec_test ) {
-      // TODO: Return a field load, so not a Unresolved?
-      // TODO: Return a string field name, and caller does the Load + Instance-Call
-      //  UnOrFunPtrNode m = n.filter(nargs); // Filter for args
-      //  if( m!=null )
-      //    return (UnOrFunPtrNode)Env.GVN.xform(new FreshNode(_fun,m));
-      // }
-      throw unimpl();
-    }
-    return null;
-  }
-
-
-
-  // Prefix uniop lookup.  The '_' follows the uniop name.
-  // Note that "!_var" parses as "! _var" and not as "!_ var".
-  // Also "[_]" is a balanced uni-op, and parses with the balanced ops.
-  UnresolvedNode lookup_filter_uni( String name ) {
-    //if( !Parse.isOp(name) ) return null; // Limit to operators
-    //return _lookup_filter(0,name,1);     // Lookup unbalanced uni-op
-    throw unimpl();
-  }
-
-  // Infix binop lookup
-  // _+_       - Normal binop, looks up "_+_"
-  UnresolvedNode lookup_filter_bin( String name ) {
-    //if( !Parse.isOp(name) ) return null; // Limit to operators
-    //return _lookup_filter(1,"_"+name,2);
-    throw unimpl();
-  }
-  // Infix balanced operators, including 3 argument
-  // _[_]      - array-lookup     balanced op, looks up " _[_"
-  // _[_]=_    - array-assignment balanced op, looks up " _[_"
-  UnresolvedNode lookup_filter_bal( String name ) {
-    //if( !Parse.isOp(name) ) return null; // Limit to operators
-    //return _lookup_filter(0," _"+name,2);
-    throw unimpl();
-
-  }
 
   // Type lookup in any scope
   ProjNode lookup_type( String name ) {
@@ -321,13 +264,6 @@ public class Env implements AutoCloseable {
     if( t != null ) return t;
     return _par == null ? null : _par.lookup_type(name);
   }
-  // Lookup by alias
-  public Node lookup_type( int alias ) {
-    Node t = _scope.get_type(alias);
-    if( t != null ) return t;
-    return _par == null ? null : _par.lookup_type(alias);
-  }
   // Update type name token to type mapping in the current scope
   void add_type( String name, ProjNode t ) { _scope.add_type(name,t); }
-  //void reset_type( String name, Type t ) { _scope.reset_type(name,t); }
 }
