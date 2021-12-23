@@ -32,8 +32,18 @@ public class LoadNode extends Node {
     Type tadr = adr._val;
     BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
 
+    // Named structs are ValType instances.
+    TypeFld fld;
+    if( tadr instanceof TypeStruct && !Util.eq(tadr._name,"") && (fld=((TypeStruct)tadr).get(_fld))!=null ) {
+      // TODO: fetch prototype using tadr._name or tadr.^ alias
+      // TODO: decide fld is local or prototype from prototype nargs
+      // TODO: fetch from local or prototype
+
+      throw unimpl();
+    }
+
     // If we can find an exact previous store, fold immediately to the value.
-    Node st = find_previous_store(mem(),adr(),aliases,_fld,true);
+    Node st = find_previous_store(mem(),adr,aliases,_fld,true);
     if( st!=null ) {
       Node rez = st instanceof StoreNode
         ? (( StoreNode)st).rez()

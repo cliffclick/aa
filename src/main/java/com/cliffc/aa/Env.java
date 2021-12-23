@@ -55,9 +55,6 @@ public class Env implements AutoCloseable {
   public static   NewObjNode STK_0; // Program start stack frame (has primitives)
   public static    ScopeNode SCP_0; // Program start scope
 
-  // Set of all display aliases, used to track escaped displays at call sites for asserts.
-  public static BitsAlias ALL_DISPLAYS = BitsAlias.EMPTY;
-
   // Add a permanent edge use to all these Nodes, keeping them alive forever.
   @SuppressWarnings("unchecked")
   private static <N extends Node> N keep(N n) {
@@ -128,7 +125,6 @@ public class Env implements AutoCloseable {
     _scope.set_mem (frm);  // Memory includes local stack frame
     _scope.set_rez (ALL_PARM);
     KEEP_ALIVE.add_def(_scope);
-    if( is_closure ) ALL_DISPLAYS = ALL_DISPLAYS.set(alias);   // Displays for all time
     GVN.do_iter();
   }
 
@@ -205,26 +201,6 @@ public class Env implements AutoCloseable {
       if( SCP_0.in(i) instanceof RetNode && !SCP_0.in(i).is_prim() )
         SCP_0.remove(i--);
     Env.GVN.flow_clear();       // Will be used as a worklist
-//// Replace the default memory into unknown caller functions, with the
-//// matching display.
-//for( Node use : DEFMEM._uses ) {
-//  FunNode fun;
-//  if( use instanceof ParmNode && !use.is_prim() && use.in(1)==DEFMEM && (fun=((ParmNode)use).fun()).has_unknown_callers() ) {
-//    ParmNode mem = (ParmNode)use, dsp = fun.parm(DSP_IDX);
-//    if( dsp !=null ) {
-//      Node display = dsp.in(1).in(0);
-//      if( display instanceof NewObjNode ) {
-//        MrgProjNode defmem = ((NewObjNode)display).mem();
-//        mem.set_def(1,defmem);
-//      }
-//    }
-//  }
-//}
-//
-//// Kill all extra objects hooked by DEFMEM.
-//while( DEFMEM.len() > DEFMEM_RESET.length ) DEFMEM.pop();
-//for( int i=0; i<DEFMEM_RESET.length; i++ )
-//  DEFMEM.set_def(i,DEFMEM_RESET[i]);
   }
 
   // Record global static state for reset
@@ -263,8 +239,6 @@ public class Env implements AutoCloseable {
     BitsFun   .reset_to_init0();
     BitsRPC   .reset_to_init0();
     Combo.reset();
-    // Reset aliases declared as Displays
-    ALL_DISPLAYS = BitsAlias.make0(STK_0._alias);
   }
 
   // Return Scope for a name, so can be used to determine e.g. mutability

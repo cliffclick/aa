@@ -306,10 +306,8 @@ public class CallNode extends Node {
     // No alias overlaps
     int alias = mem.nnn()._alias;
     if( escs.test_recur(alias) ) return null;
-    // No other readers or writers.  Expect the Call (or Join) and optionally DEFMEM
+    // No other readers or writers.  Expect the Call (or Join)
     if( mem._uses._len>2 ) return null;
-    //if( mem._uses._len==2 && mem._uses.find(Env.DEFMEM)==-1 ) return null; // Something other than DEFMEM
-    //
     //// If call returns same as new (via recursion), cannot split, but CAN swap.
     //TypeMem tmcepi = (TypeMem) cepim._val;
     //BitsAlias esc_out = CallEpiNode.esc_out(tmcepi,cepid==null ? Type.XNIL : cepid._val);

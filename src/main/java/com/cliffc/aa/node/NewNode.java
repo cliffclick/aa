@@ -28,12 +28,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // folded in.  There are no types stored here; types come from the inputs.
   public T _ts;             // Base object type, representing all possible future values
 
-  // The memory state for Env.DEFMEM, the default memory.  All non-final fields
-  // are ALL; final fields keep their value.  All field flags are moved to
-  // bottom, e.g. as-if all fields are now final-stored.  Will be set to
-  // TypeObj.UNUSED for never-allocated (e.g. dead allocations)
-  TypeObj _crushed;
-
   // Just TMP.make(_alias,OBJ)
   public TypeMemPtr _tptr;
 
@@ -67,7 +61,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // e.g. during Node create, or folding a Store.
   public final void sets( T ts ) {
     _ts = ts;
-    _crushed = ts.crush();
     _tptr = _tptr.make_from((TypeObj)TypeObj.ISUSED.set_name(ts._name));
   }
   // Recompute default memory, expecting it to monotonically lift.
@@ -117,13 +110,12 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   void kill2() {
     unelock();
     while( !is_dead() && _defs._len > 1 )
-      pop();                    // Kill all fields except memory
-    _crushed = _ts = dead_type();
+      pop();                    // Kill all fields
     _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeObj.UNUSED);
     Env.GVN.revalive(this,ProjNode.proj(this,0));
     if( is_dead() ) return;
-    for( Node use : _uses )
-      Env.GVN.add_flow_uses(Env.GVN.add_reduce(use)); // Get FPtrs from MrgProj, and dead Ptrs into New
+    //for( Node use : _uses )
+    //  Env.GVN.add_flow_uses(Env.GVN.add_reduce(use)); // Get FPtrs from MrgProj, and dead Ptrs into New
   }
 
   // Basic escape analysis.  If no escapes and no loads this object is dead.

@@ -24,15 +24,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public final boolean _is_closure; // For error messages
   public       Parse[] _fld_starts; // Start of each tuple member; 0 for the display
   public int _nargs;                // Function arguments (no FreshNode) vs local Let defines (yes Fresh)
-  //// NewNodes do not really need a ctrl; useful to bind the upward motion of
-  //// closures so variable stores can more easily fold into them.
-  //public NewObjNode( boolean is_closure, TypeStruct disp, Node clo ) {
-  //  super(OP_NEWOBJ,BitsAlias.REC,disp);
-  //  assert disp.get("^")!=null;
-  //  _is_closure = is_closure;
-  //  add_def(clo);
-  //}
-  // Called by IntrinsicNode.convertTypeNameStruct
   public NewObjNode( boolean is_closure, int alias, TypeStruct ts, Node clo ) {
     super(OP_NEWOBJ,alias,ts,clo);
     assert ts.get("^")!=null;
@@ -80,16 +71,12 @@ public class NewObjNode extends NewNode<TypeStruct> {
   // Add a named FunPtr to a New.  Auto-inflates to a Unresolved as needed.
   public void add_fun( Parse bad, String name, ValFunNode ptr ) {
     TypeFld fld = _ts.get(name);
-    //if( fld == null ) {
-    //  create_active(name,ptr,Access.Final);
-    //} else {
-      Node n = in(fld._order);
-      UnresolvedNode unr = n==Env.XNIL
-        ? new UnresolvedNode(name,bad).scoped()
-        : (UnresolvedNode)n;
-      unr.add_fun(ptr);
-      update(fld,Access.Final,unr);
-    //}
+    Node n = in(fld._order);
+    UnresolvedNode unr = n==Env.XNIL
+      ? new UnresolvedNode(name,bad).scoped()
+      : (UnresolvedNode)n;
+    unr.add_fun(ptr);
+    update(fld,Access.Final,unr);
   }
 
   // The current local scope ends, no more names will appear.  Forward refs
@@ -138,22 +125,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
     return progress;
   }
 
-//  @Override public Node ideal_mono() {
-//    // If the value lifts a final field, so does the default lift.
-//    if( _val instanceof TypeTuple ) {
-//      TypeObj ts3 = (TypeObj)((TypeTuple)_val).at(MEM_IDX);
-//      if( ts3 != TypeObj.UNUSED ) {
-//        TypeStruct ts4 = _ts.make_from((TypeStruct)ts3);
-//        TypeStruct ts5 = ts4.crush();
-//        assert ts4.isa(ts5);
-//        if( ts5 != _crushed && ts5.isa(_crushed) ) {
-//          setsm(ts4);
-//          return this;
-//        }
-//      }
-//    }
-//    return null;
-//  }
   @Override public void add_flow_extra(Type old) {
     super.add_flow_extra(old);
     Env.GVN.add_mono(this); // Can update crushed
@@ -162,6 +133,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   private static final Ary<TypeFld> FLDS = new Ary<>(TypeFld.class);
   @Override TypeObj valueobj() {
     assert FLDS.isEmpty();
+    if( _defs._len==1 ) return _ts; // Killed
     // Gather args and produce a TypeStruct
     for( TypeFld fld : _ts.flds() ) {
       // TODO: why assume crushed to error?  primitive scope is open and do not want it crushed
@@ -216,9 +188,9 @@ public class NewObjNode extends NewNode<TypeStruct> {
           return false;
     return true;
   }
-  
+
   @Override public ErrMsg err( boolean fast ) {
     // Check input vals vs ts
     throw unimpl();
-  }  
+  }
 }

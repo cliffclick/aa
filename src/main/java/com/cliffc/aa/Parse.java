@@ -302,7 +302,7 @@ public class Parse implements Comparable<Parse> {
       if( is_val ) construct.add_fun((ValFunNode)gvn(ValNode.make(newtype)));
       else         throw unimpl();         // Reference type
       assert  ((MrgProjNode)mem()).nnn()==newtype.in(0);
-      set_mem(((MrgProjNode)mem()).mem()); // Unlink prototype from mem; its just around loading constants
+      set_mem(((MrgProjNode)mem()).mem()); // Unlink prototype from mem; its just around for loading constants
       return construct.define();
 
     } else {
@@ -311,42 +311,6 @@ public class Parse implements Comparable<Parse> {
       // case, but can be used in type-checks.
       throw unimpl();
     }
-
-    //// If this is a value type, we get a value-constructor
-    //if( nts.is_all_final_fields() ) {
-    //  ValNode val = ValNode.make(nts,bad);
-    //  // TODO: hook ptr so its alive until post-Combo can verify no uses
-    //  throw unimpl();
-    //  //return do_store(lookup_scope(tvar,false,val,Access.Final,tvar,bad);
-    //}
-    //
-    //// Type-as-named-TypeStruct with a NewObj per instance.
-
-    //// Unlink the constructed sample object; it only exists for the type-domain
-    //// and is never actually allocated "in real life".
-    //Node omem = mem();
-    //int midx = omem.push();     // Keep around
-    //set_mem(((MrgProjNode)omem).mem()); // Unlink from memory
-    //omem.set_def(1,Env.XMEM);           // Unlink from memory
-    //
-    //// Add a copy of constructor functions.
-    //
-    //// Build a constructor taking a pointer-to-TypeObj - and the associated
-    //// memory state, i.e.  takes a ptr-to-@{x,y} and returns a ptr to
-    //// Named:@{x,y}.  This stores a v-table ptr into an object.  The alias#
-    //// does not change, but a TypeMem[alias#] would now map to the Named
-    //// variant.
-    //FunPtrNode epi1 = IntrinsicNode.convertTypeName(nts,bad,ptr);
-    //do_store(lookup_scope(tvar,false),epi1,Access.Final,tvar,bad);
-    //// Add a second constructor taking an expanded arg list
-    //Node.pop(midx);             // No longer keeping the sample struct around
-    //FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(nts, tn.alias(), errMsg(), _e, (ProjNode)Node.pop(pidx));
-    //do_store(scope(),epi2,Access.Final,tvar,bad);
-    //UnresolvedNode unr = (UnresolvedNode)_e.lookup(tvar); // Returns an Unresolved of constructors
-    //Env.GVN.add_flow(unr);
-    //// TODO: Ponder just being scoped and not defined - which will allow more
-    //// constructors in the same scope.
-    //return unr.scoped().define();
   }
 
   /** A statement is a list of variables to final-assign or re-assign, and an

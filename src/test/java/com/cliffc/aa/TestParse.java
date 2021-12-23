@@ -72,8 +72,8 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
-    test("1", TypeInt.con(1), "1");
     test("1+2", TypeInt.con(3), "3");
+    test("1", TypeInt.con(1), "1");
     test("1.2+3", TypeFlt.con(4.2), "4.2"); 
     test("1+2.3", TypeFlt.con(3.3), "3.3"); 
     test("1.2+3.4", TypeFlt.con(4.6), "4.6"); 
