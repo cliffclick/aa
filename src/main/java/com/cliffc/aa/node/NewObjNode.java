@@ -35,7 +35,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public Access access(String name) { return _ts.get(name)._access; }
 
   // Called when folding a Named Constructor into this allocation site
-  public void set_name( TypeStruct name ) { assert !name.above_center();  setsm(name); }
+  //public void set_name( TypeStruct name ) { assert !name.above_center();  setsm(name); }
 
   // More fields are local vars; prior fields are function args
   public void set_nargs() { _nargs = _defs._len; }
@@ -145,6 +145,13 @@ public class NewObjNode extends NewNode<TypeStruct> {
     return ts;
   }
   @Override TypeStruct dead_type() { return TypeStruct.ANYSTRUCT; }
+
+  // kept alive as prototype, until Combo resolves all Load-uses.
+  @Override public TypeMem live() {
+    if( Env.PROTOS.containsKey(_ts._name) )
+      return TypeMem.ALLMEM;
+    return super.live();
+  }
 
   // Only alive fields in the MrgProj escape
   @Override public TypeMem live_use(Node def ) {

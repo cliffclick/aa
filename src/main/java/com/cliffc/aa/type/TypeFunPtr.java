@@ -1,9 +1,12 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.node.FunNode;
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
+import com.cliffc.aa.util.VBitSet;
 
-import java.util.function.*;
+import java.util.function.BiFunction;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -91,8 +94,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     _ret.str(sb,dups,mem,debug).p(' ');
     return sb.p('}');
   }
-
-  public String names(boolean debug) { return FunNode.names(_fidxs,new SB(),debug).toString(); }
 
   static { new Pool(TFUNPTR,new TypeFunPtr()); }
 
@@ -243,7 +244,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     //TypeFunPtr max_nargs = _nargs < tf._nargs ? tf : this;
     //int nargs = min_nargs.above_center() ? max_nargs._nargs : min_nargs._nargs;
     //int nargs = fidxs.above_center() ? Math.max(_nargs,tf._nargs) : Math.min(_nargs,tf._nargs);
-    int nargs = Math.min(_nargs,tf._nargs);
+    int nargs = (_nargs ^ tf._nargs) > 0 ? Math.min(_nargs,tf._nargs) : Math.max(_nargs,tf._nargs);
     Type dsp = _dsp.meet(tf._dsp);
     // Otherwise, recursively find the return
     Type ret = _ret.meet(tf._ret);

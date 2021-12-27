@@ -47,16 +47,12 @@ public final class RetNode extends Node {
     if( !super.equals(o) ) return false;
     return _fidx==((RetNode)o)._fidx;
   }
-  public void free() {
-    FunNode.FUNS.clear(_fidx);
-    BitsFun.free(_fidx);
-  }
 
   // Short self name
   @Override public String xstr() {
-    if( is_dead() ) return "Ret";
-    FunNode fun = FunNode.find_fidx(_fidx);
-    return "Ret_"+(is_copy() ? "!copy!" : (fun==null ? ""+_fidx : fun.name()));
+    if( is_dead() ) return "Ret!";
+    FunNode fun = fun();
+    return "Ret"+(is_copy() ? "!copy!" : (fun==null ? "["+_fidx+"]" : fun.name()));
   }
 
   @Override public Node ideal_reduce() {

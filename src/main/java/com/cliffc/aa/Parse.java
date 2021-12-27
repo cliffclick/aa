@@ -291,7 +291,6 @@ public class Parse implements Comparable<Parse> {
 
     // Parse a 'fact' as a type.  Check for a 'struct' first, to pass along the
     // pre-selected forward-ref alias.  Other 'fact's will not use the alias.
-    Parse badt = errMsg();
     Node newtype = peek("@{") ? struct(typenode) : fact();
     if( newtype==null ) return err_ctrl2("Missing type after ':'");
     if( peek('?')     ) return err_ctrl2("Named types are never nil");

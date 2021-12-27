@@ -69,11 +69,12 @@ public class IntrinsicNode extends Node {
         if( actual instanceof TypeMemPtr ) actual = ((TypeMemPtr)actual)._obj; // Get the struct
         Type formal = _tn.remove_name();
         if( actual.isa(formal) ) { // Actual struct isa formal struct?
-          TypeStruct tn = nnn._ts.make_from(_tn._name);
-          nnn.set_name(tn);
-          nnn.xval(); // Update immediately to preserve monotonicity
-          mem.xval();
-          return mem;
+          //TypeStruct tn = nnn._ts.make_from(_tn._name);
+          //nnn.set_name(tn);
+          //nnn.xval(); // Update immediately to preserve monotonicity
+          //mem.xval();
+          //return mem;
+          throw unimpl();
         }
       }
     }

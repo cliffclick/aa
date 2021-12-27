@@ -1,9 +1,8 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.node.Node;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.*;
 import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
 
@@ -137,9 +136,9 @@ public abstract class Combo {
     // Set all type-vars to Leafs.
     Env.START.walk_initype();
 
-    // Make the non-gen set in a pre-pass
-    for( FunNode fun : FunNode.FUNS ) if( fun!=null ) fun._nongen=null; // Clear old stuff
-    for( FunNode fun : FunNode.FUNS ) if( fun!=null && !fun.is_dead() ) fun.prep_nongen();// Make new
+    //// Make the non-gen set in a pre-pass
+    //for( FunNode fun : FunNode.FUNS ) if( fun!=null ) fun._nongen=null; // Clear old stuff
+    //for( FunNode fun : FunNode.FUNS ) if( fun!=null && !fun.is_dead() ) fun.prep_nongen();// Make new
     assert Env.START.more_work(false)==0; // Initial conditions are correct
 
     // Init

@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.node.ValFunNode;
 import com.cliffc.aa.util.*;
 
 import java.util.Arrays;
@@ -7,7 +8,6 @@ import java.util.BitSet;
 import java.util.HashMap;
 
 import static com.cliffc.aa.type.TypeFld.Access;
-import static com.cliffc.aa.AA.unimpl;
 
 /**
    Memory type; the state of all memory; memory edges order memory ops.
@@ -227,7 +227,7 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem MEM_ABC, MEM_STR;
   public static final TypeMem DEAD, ALIVE; // Sentinel for liveness flow; not part of lattice
   public static final TypeMem LNO_DISP;    // Liveness: a code ptr is alive, but not the display
-  
+
   static {
     // Every alias is unused
     ANYMEM = make0(new TypeObj[]{null,TypeObj.UNUSED});
@@ -394,6 +394,7 @@ public class TypeMem extends Type<TypeMem> {
 
   // Sharpen a dull pointer against this memory.
   public TypeMemPtr sharpen( TypeMemPtr dull ) {
+    if( ValFunNode.valtype(dull)!=null ) return dull;
     assert dull==dull.simple_ptr();
     if( _sharp_cache != null ) { // Check the cache first
       TypeMemPtr sharp = _sharp_cache.get(dull);

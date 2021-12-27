@@ -571,7 +571,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
 
   private static final IHashMap OLD2APX = new IHashMap();
   private static final Ary<TypeMemPtr> CUTOFFS = new Ary<>(TypeMemPtr.class);
-  public TypeStruct approx1( int cutoff, BitsAlias aliases ) {
+  public TypeObj approx1( int cutoff, BitsAlias aliases ) {
     // Fast-path cutout for boring structs
     boolean shallow=true;
     for( TypeFld fld : flds() )
@@ -584,7 +584,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     while( true ) {
       int max = ptr.max(ptr.depth());
       if( max < cutoff )
-        return (TypeStruct)ptr._obj;
+        return ptr._obj;
       // Scan the old copy for elements that are too deep.
       // 'Meet' those into the clone at one layer up.
       RECURSIVE_MEET++;
@@ -597,7 +597,8 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
       // original aliases do not
       BitsAlias aliases2 = apxptr._aliases;
       // Remove any leftover internal duplication.
-      TypeStruct rez = ((TypeStruct)apxptr._obj).install();
+      TypeObj rez = apxptr._obj;
+      if( rez instanceof TypeStruct ) rez = ((TypeStruct)rez).install();
       assert this.isa(rez);
       ptr = TypeMemPtr.make(aliases2,rez);
     }
@@ -679,24 +680,22 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     if( nt != null ) return nt;
     if( old._dsp!=Type.ANY && old._dsp!=ALL ) {
       // Walk internal structure, meeting into the approximation
-      TypeFunPtr nmp = old.copy();
-      OLD2APX.put(old,nmp);
-      nmp._dsp = ax_impl_ptr(aliases,cutoff,d,dold,(TypeMemPtr)old._dsp);
+      nt = old.copy();
+      OLD2APX.put(old,nt);
+      nt._dsp = ax_impl_ptr(aliases,cutoff,d,dold,(TypeMemPtr)old._dsp);
       OLD2APX.put(old,null);      // Do not keep sharing the "tails"
-      old = nmp;
     }
     if( old._ret instanceof TypeMemPtr || old._ret instanceof TypeFunPtr ) {
       // Walk internal structure, meeting into the approximation
-      TypeFunPtr nmp = old.copy();
-      OLD2APX.put(old,nmp);
+      if( nt==null ) nt = old.copy();
+      OLD2APX.put(old,nt);
       if( old._ret instanceof TypeMemPtr )
-        nmp._ret = ax_impl_ptr (aliases,cutoff,d,dold,(TypeMemPtr)old._ret);
+        nt._ret = ax_impl_ptr (aliases,cutoff,d,dold,(TypeMemPtr)old._ret);
       else
-        nmp._ret = ax_impl_fptr(aliases,cutoff,d,dold,(TypeFunPtr)old._ret);
+        nt._ret = ax_impl_fptr(aliases,cutoff,d,dold,(TypeFunPtr)old._ret);
       OLD2APX.put(old,null);      // Do not keep sharing the "tails"
-      old = nmp;
     }
-    return old;
+    return nt==null ? old : nt;
   }
 
   // Update-in-place 'meet' of pre-allocated new types.  Walk all the old type
@@ -748,8 +747,10 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
       break;
     }
     case TSTRUCT:
-      if( old == TypeObj. OBJ || old == TypeObj.ISUSED ) { nt = old; break; }
-      if( old == TypeObj.XOBJ || old == TypeObj.UNUSED ) break; // No changes, take nt as it is
+      if( old._type==TOBJ ) {
+        if( !old.above_center() ) nt=old;  // nt becomes old
+        break;  // No changes, take nt as it is
+      }
       if( !(old instanceof TypeStruct) ) throw AA.unimpl();
       TypeStruct ots = (TypeStruct)old, nts = (TypeStruct)nt;
       // Meet all the non-recursive parts

@@ -228,10 +228,9 @@ public class CallNode extends Node {
 
     // Try to resolve to single-target
     if( fdx() instanceof UnresolvedNode ) {
-      ValFunNode fptr = ((UnresolvedNode)fdx()).resolve_value(((TypeTuple)_val)._ts);
-      if( fptr==null )  throw unimpl(); // TODO: not time yet
-      set_fdx(fptr);            // Resolve to 1 choice
-      return this;
+      Node fdx = ((UnresolvedNode)fdx()).resolve_node(tcall._ts);
+      if( fdx!=null )
+        return set_fdx(fdx);
     }
 
     // Wire valid targets.
@@ -353,11 +352,9 @@ public class CallNode extends Node {
     // Pinch to XCTRL/CTRL
     Type ctl = ctl()._val;
     if( ctl != Type.CTRL ) return ctl.oob();
-    // Not a function to call?
+    // Function pointer.
     Node fdx = fdx();
-    Type tfx = fdx instanceof ValFunNode ? ((ValFunNode)fdx).funtype() : fdx._val;
-    if( !(tfx instanceof TypeFunPtr) ) return tfx.oob();
-
+    TypeFunPtr tfx = ValFunNode.as_tfp(fdx._val);
     // Not a memory to the call?
     Type mem = mem()==null ? TypeMem.ANYMEM : mem()._val;
     TypeMem tmem = mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM);
@@ -369,15 +366,12 @@ public class CallNode extends Node {
 
     // Copy args for called functions.  FIDX is already refined.
     // Also gather all aliases from all args.
-    ts[DSP_IDX] = ((TypeFunPtr)tfx)._dsp;
+    ts[DSP_IDX] = tfx._dsp;
     for( int i=ARG_IDX; i<nargs(); i++ )
       ts[i] = arg(i)==null ? Type.XSCALAR : arg(i)._val;
-    if( fdx instanceof FreshNode ) fdx = ((FreshNode)fdx).id();
-    if( fdx instanceof UnresolvedNode )
-      fdx = ((UnresolvedNode)fdx).resolve_value(ts);
-    if( !(fdx instanceof ValFunNode) )
-      return tfx.oob(); // Cannot resolve yet
-    ts[_defs._len] = ((ValFunNode)fdx).funtype();
+    ts[_defs._len] = tfx;
+    // Resolve if possible, based on argument types and formals
+    ts[_defs._len] = UnresolvedNode.resolve_value(ts);
     return TypeTuple.make(ts);
   }
   // Get (shallow) aliases from the type
@@ -490,16 +484,10 @@ public class CallNode extends Node {
   }
 
   @Override public ErrMsg err( boolean fast ) {
-    // Fail for passed-in unknown references directly.
-    for( int j=ARG_IDX; j<nargs(); j++ )
-      if( arg(j) instanceof UnresolvedNode && arg(j)._defs._len==0 )
-        return fast ? ErrMsg.FAST : ErrMsg.forward_ref(_badargs[j-ARG_IDX+1], FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx).fptr());
-
     // Expect a function pointer
     TypeFunPtr tfp = ttfp(_val);
     if( tfp._fidxs==BitsFun.FULL ) {
-      if( fast ) return ErrMsg.FAST;
-      return ErrMsg.unresolved(_badargs[0],"A function is being called, but "+fdx()._val+" is not a function type");
+      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"A function is being called, but "+fdx()._val+" is not a function type");
     }
 
     BitsFun fidxs = tfp.fidxs();
@@ -508,8 +496,11 @@ public class CallNode extends Node {
       throw unimpl();
 
     // bad-arg-count
-    if( tfp.nargs() != nargs() )
-      return fast ? ErrMsg.FAST : ErrMsg.syntax(_badargs[0],"Passing "+(nargs()-ARG_IDX)+" arguments to "+tfp.names(false)+" which takes "+(tfp.nargs()-ARG_IDX)+" arguments");
+    if( tfp.nargs() != nargs() ) {
+      if( fast ) return ErrMsg.FAST;
+      ValFunNode vfn = ValFunNode.get(tfp._fidxs);
+      return ErrMsg.syntax(_badargs[0],"Passing "+(nargs()-ARG_IDX)+" arguments to "+vfn.name()+" which takes "+(tfp.nargs()-ARG_IDX)+" arguments");
+    }
 
     return null;
   }

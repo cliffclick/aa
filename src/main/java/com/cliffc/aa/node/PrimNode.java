@@ -340,7 +340,7 @@ public abstract class PrimNode extends Node {
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpI64 extends PrimNode {
     Prim2OpI64( String name ) { super(name,TypeStruct.INT64_INT64,TypeInt.INT64); }
-    @Override public Type apply( Type[] args ) { return TypeInt.con(op(args[ARG_IDX].getl(),args[ARG_IDX+1].getl())); }
+    @Override public Type apply( Type[] args ) { return TypeInt.con(op(args[DSP_IDX].getl(),args[ARG_IDX].getl())); }
     abstract long op( long x, long y );
   }
 

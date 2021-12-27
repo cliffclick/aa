@@ -89,26 +89,18 @@ public class FunNode extends RegionNode {
     _name = name;
     _fidx = fidx;
     _nargs = nargs;
-    FUNS.setX(fidx(),this); // Track FunNode by fidx; assert single-bit fidxs
   }
-
-  // Find FunNodes by fidx
-  private static int FLEN;
-  public static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
-  public static void init0() { FLEN = FUNS.len(); }
-  public static void reset_to_init0() { FUNS.set_len(FLEN); _must_inline=0; }
-  public static FunNode find_fidx( int fidx ) { return FUNS.atX(fidx); }
-  int fidx() { return _fidx; }
+  public static void reset_to_init0() { _must_inline=0; }
 
   // Short self name
   @Override public String xstr() { return name(); }
   // Inline longer info
   @Override public String str() { return name(); }
-  // Name from fidx alone
-  private static String name( int fidx, boolean debug) {
-    FunNode fun = find_fidx(fidx);
-    return fun==null ? name(null,null,fidx,-1,debug) : fun.name(debug);
-  }
+  //// Name from fidx alone
+  //private static String name( int fidx, boolean debug) {
+  //  FunNode fun = find_fidx(fidx);
+  //  return fun==null ? name(null,null,fidx,-1,debug) : fun.name(debug);
+  //}
   // Name from FunNode
   String name() { return name(true); }
   public String name(boolean debug) {
@@ -117,53 +109,54 @@ public class FunNode extends RegionNode {
       FunPtrNode fptr = fptr();
       name=fptr==null ? null : fptr._name;
     }
-    return name(name,_bal_close,fidx(),_op_prec,debug);
-  }
-  static String name(String name, String bal, int fidx, int op_prec, boolean debug) {
-    if( op_prec >= 0 && name != null && bal!=null ) name = name+bal; // Primitives wrap
-    if( name==null ) name="";
-    if( debug ) name = name + "["+fidx+"]"; // FIDX in debug
+    if( debug ) name = name + "["+_fidx+"]"; // FIDX in debug
     return name;
   }
-
-  // Can return nothing, or "name" or "[name0,name1,name2...]" or "[35]"
-  public static SB names(BitsFun fidxs, SB sb, boolean debug ) {
-    int fidx = fidxs.abit();
-    if( fidx >= 0 ) return sb.p(name(fidx,debug));
-    if( fidxs==BitsFun.EMPTY ) return sb.p("[]");
-    // See if this is just one common name, common for overloaded functions
-    String s=null;
-    for( Integer ii : fidxs ) {
-      FunNode fun = find_fidx(ii);
-      if( fun!=null ) {
-        if( fun._name != null ) s = fun._name;
-        else if( !fun.is_dead() )
-          for( Node fptr : fun.ret()._uses ) // For all displays for this fun
-            if( fptr instanceof FunPtrNode ) {
-              String name = ((FunPtrNode)fptr)._name; // Get debug name
-              if( s==null ) s=name;                   // Capture debug name
-              else if( !Util.eq(s,name) )             // Same name is OK
-                { s=null; break; } // Too many different names
-            }
-        if( s==null ) break; // Unnamed fidx
-      }
-    }
-    if( s!=null )
-      sb.p(s);
-    // Make a list of the fidxs
-    if( debug ) {
-      int cnt = 0;
-      sb.p('[');
-      for( Integer ii : fidxs ) {
-        if( ++cnt == 5 ) break;
-        sb.p(ii).p(fidxs.above_center() ? '+' : ',');
-      }
-      if( cnt >= 5 ) sb.p("...");
-      else sb.unchar();
-      sb.p(']');
-    }
-    return sb;
-  }
+  //static String name(String name, String bal, int fidx, int op_prec, boolean debug) {
+  //  if( op_prec >= 0 && name != null && bal!=null ) name = name+bal; // Primitives wrap
+  //  if( name==null ) name="";
+  //  if( debug ) name = name + "["+fidx+"]"; // FIDX in debug
+  //  return name;
+  //}
+  //
+  //// Can return nothing, or "name" or "[name0,name1,name2...]" or "[35]"
+  //public static SB names(BitsFun fidxs, SB sb, boolean debug ) {
+  //  int fidx = fidxs.abit();
+  //  if( fidx >= 0 ) return sb.p(name(fidx,debug));
+  //  if( fidxs==BitsFun.EMPTY ) return sb.p("[]");
+  //  // See if this is just one common name, common for overloaded functions
+  //  String s=null;
+  //  for( Integer ii : fidxs ) {
+  //    FunNode fun = find_fidx(ii);
+  //    if( fun!=null ) {
+  //      if( fun._name != null ) s = fun._name;
+  //      else if( !fun.is_dead() )
+  //        for( Node fptr : fun.ret()._uses ) // For all displays for this fun
+  //          if( fptr instanceof FunPtrNode ) {
+  //            String name = ((FunPtrNode)fptr)._name; // Get debug name
+  //            if( s==null ) s=name;                   // Capture debug name
+  //            else if( !Util.eq(s,name) )             // Same name is OK
+  //              { s=null; break; } // Too many different names
+  //          }
+  //      if( s==null ) break; // Unnamed fidx
+  //    }
+  //  }
+  //  if( s!=null )
+  //    sb.p(s);
+  //  // Make a list of the fidxs
+  //  if( debug ) {
+  //    int cnt = 0;
+  //    sb.p('[');
+  //    for( Integer ii : fidxs ) {
+  //      if( ++cnt == 5 ) break;
+  //      sb.p(ii).p(fidxs.above_center() ? '+' : ',');
+  //    }
+  //    if( cnt >= 5 ) sb.p("...");
+  //    else sb.unchar();
+  //    sb.p(']');
+  //  }
+  //  return sb;
+  //}
 
   // Debug only: make an attempt to bind name to a function
   public void bind( String tok ) {
@@ -560,7 +553,6 @@ public class FunNode extends RegionNode {
 
     // Pick which input to inline.  Only based on having some constant inputs
     // right now.
-    Node mem = parms[MEM_IDX];  // Memory, used to sharpen input ptrs
     int m=-1, mncons = -1;
     for( int i=has_unknown_callers() ? 2 : 1; i<_defs._len; i++ ) {
       Node call = in(i).in(0);
@@ -576,7 +568,7 @@ public class FunNode extends RegionNode {
       for( int j=DSP_IDX; j<parms.length; j++ ) {
         ParmNode parm = (ParmNode)parms[j];
         if( parm != null ) {    // Some can be dead
-          Type actual = parm.in(i).sharptr(mem.in(i));
+          Type actual = parm.val(i);
           Type formal = parm._t;
           if( !actual.isa(formal) ) // Path is in-error?
             { ncon = -2; break; }   // This path is in-error, cannot inline even if small & constants
@@ -597,7 +589,7 @@ public class FunNode extends RegionNode {
 
   private FunNode make_new_fun(RetNode ret, int path) {
     // Make a prototype new function header split from the original.
-    int oldfidx = fidx();
+    int oldfidx = _fidx;
     FunNode fun = new FunNode(_name, BitsFun.new_fidx(oldfidx),_nargs);
     fun._bal_close = _bal_close;
     fun.pop();                  // Remove null added by RegionNode, will be added later
@@ -608,8 +600,6 @@ public class FunNode extends RegionNode {
     // are no callers of the new fidx other than the call site.
     if( path == -1 ) {
       int newfidx = _fidx = BitsFun.new_fidx(oldfidx);
-      FUNS.setX(newfidx,this);    // Track FunNode by fidx
-      FUNS.clear(oldfidx);        // Old fidx no longer refers to a single FunNode
       ret.set_fidx(newfidx);      // Renumber in the old RetNode
       // Right now, force the type upgrade on old_fptr.  old_fptr carries the old
       // parent FIDX and is on the worklist.  Eventually, it comes off and the
@@ -705,7 +695,7 @@ public class FunNode extends RegionNode {
     // Collect the old/new returns and funptrs and add to map also.  The old
     // Ret has a set (not 1!) of FunPtrs, one per unique Display.
     RetNode newret = (RetNode)map.get(oldret);
-    newret._fidx = fun.fidx();
+    newret._fidx = fun._fidx;
     if( path < 0 ) {            // Type split
       for( Node use : oldret._uses )
         if( use instanceof FunPtrNode ) { // Old-return FunPtrs; varies by Display & by internal/external
@@ -784,16 +774,16 @@ public class FunNode extends RegionNode {
       CallEpiNode cepi2 = (CallEpiNode)map.get(cepi);
       if( path < 0 ) {          // Type-split, wire both & resolve later
         BitsFun call_fidxs = ((TypeFunPtr) call.fdx()._val).fidxs();
-        assert call_fidxs.test_recur(    fidx()) ;  cepi.wire1(call,this,oldret,false);
-        if(    call_fidxs.test_recur(fun.fidx()) )  cepi.wire1(call, fun,newret,false);
+        assert call_fidxs.test_recur(    _fidx) ;  cepi.wire1(call,this,oldret,false);
+        if(    call_fidxs.test_recur(fun._fidx) )  cepi.wire1(call, fun,newret,false);
         if( cepi2!=null ) {
           // Found an unwired call in original: musta been a recursive self-
           // call.  wire the clone, same as the original was wired, so the
           // clone keeps knowledge about its return type.
           CallNode call2 = cepi2.call();
           BitsFun call_fidxs2 = ((TypeFunPtr) call2.fdx()._val).fidxs();
-          if(    call_fidxs2.test_recur(    fidx()) )  cepi2.wire1(call2,this,oldret,false);
-          assert call_fidxs2.test_recur(fun.fidx()) ;  cepi2.wire1(call2, fun,newret,false);
+          if(    call_fidxs2.test_recur(    _fidx) )  cepi2.wire1(call2,this,oldret,false);
+          assert call_fidxs2.test_recur(fun._fidx) ;  cepi2.wire1(call2, fun,newret,false);
         }
       } else {                  // Non-type split, wire left or right
         if( call==path_call ) cepi.wire1(call, fun,newret,false);

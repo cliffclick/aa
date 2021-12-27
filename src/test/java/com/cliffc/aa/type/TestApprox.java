@@ -43,11 +43,11 @@ public class TestApprox {
     TypeStruct tsb = TypeStruct.make(pb);
     TypeMemPtr ptrb = TypeMemPtr.make(BitsAlias.EMPTY,tsb);
 
-    TypeStruct ax  = tsa.approx1(1,ba14);
-    TypeStruct axb = (TypeStruct)ax.meet(tsb);
+    TypeObj ax  = tsa.approx1(1,ba14);
+    TypeObj axb = (TypeObj)ax.meet(tsb);
 
     TypeStruct ab = (TypeStruct)tsa.meet(tsb);
-    TypeStruct abx = ab.approx1(1,ba14);
+    TypeObj abx = ab.approx1(1,ba14);
 
     assertNotEquals(axb,abx); // Would like this to be equals!!!!
   }

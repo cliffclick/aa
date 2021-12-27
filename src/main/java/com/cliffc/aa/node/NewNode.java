@@ -7,6 +7,7 @@ import com.cliffc.aa.type.*;
 import org.jetbrains.annotations.NotNull;
 
 import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.AA.DSP_IDX;
 import static com.cliffc.aa.AA.unimpl;
 
 // Allocates a TypeObj and produces a Tuple with the TypeObj and a TypeMemPtr.
@@ -49,13 +50,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   @Override void record_for_reset() { _reset_alias=_alias; }
   void reset() { assert is_prim(); _init(_reset_alias,_ts); }
 
-  public MrgProjNode mem() {
-    if( _uses._len < 1 ) return null;
-    if( _uses.at(0) instanceof MrgProjNode ) return (MrgProjNode)_uses.at(0);
-    if( _uses._len < 2 ) return null;
-    if( _uses.at(1) instanceof MrgProjNode ) return (MrgProjNode)_uses.at(1);
-    return null;
-  }
+  public    ProjNode ptr() { return              ProjNode.proj(this,DSP_IDX); }
+  public MrgProjNode mem() { return (MrgProjNode)ProjNode.proj(this,MEM_IDX); }
 
   // Recompute default memory cache on a change.  Might not be monotonic,
   // e.g. during Node create, or folding a Store.
@@ -112,10 +108,11 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     while( !is_dead() && _defs._len > 1 )
       pop();                    // Kill all fields
     _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeObj.UNUSED);
-    Env.GVN.revalive(this,ProjNode.proj(this,0));
+    //Env.GVN.revalive(this,ProjNode.proj(this,0));
+    xval();
     if( is_dead() ) return;
-    //for( Node use : _uses )
-    //  Env.GVN.add_flow_uses(Env.GVN.add_reduce(use)); // Get FPtrs from MrgProj, and dead Ptrs into New
+    for( Node use : _uses )
+      Env.GVN.add_flow_uses(Env.GVN.add_reduce(use)); // Get FPtrs from MrgProj, and dead Ptrs into New
   }
 
   // Basic escape analysis.  If no escapes and no loads this object is dead.

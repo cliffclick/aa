@@ -1,4 +1,30 @@
 =======================================
+12/24/2021
+
+issue:
+  need to resolve based on *types* not *graph-shape*.
+  Graph-shape is an optimization, but the default base behavior needs to work with *just types*.
+
+Which means at a Call fdx, I see may a TFP with multiple fidxs.
+Need to map the fidxs to a formals.
+- Some fidxs refer to Vals (Value type constructors).  Formals from prototype.
+- Some fidxs refer to Fun/FunPtrs.  Formals from Parms.
+
+FunNode.FUNS:
+- Combo inits nongen set.  One pass, no init needed?  Prims shoulda reset at the top-level reset.
+- FunNode.<init> stuffs on FIDXS, but need FunPtr.  Move the insert to FunPtr create.
+- RetNode.clear for dead?
+- Call inlines single-fidx single-callee FunNode.
+- Call wires all fidxs to FunNodes.
+- Call inlines ValNode.
+- Call error reporting
+- Fun, Ret, FunPtr, Val name by fidx
+- Node.con probably should allow no-disp FunPtrNode, default ValNode constructor
+- - These should be directly in FunNode.FUNS, so Node.con does not need to create.
+- Scope finds ValFunNode for escapes.
+
+
+=======================================
 12/18/2021
 
 "ints as structs" looks good in theory, wildly inefficient in making nodes & types.

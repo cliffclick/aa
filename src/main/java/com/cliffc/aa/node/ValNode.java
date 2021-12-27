@@ -5,8 +5,7 @@ import com.cliffc.aa.util.Ary;
 
 import java.util.Collection;
 
-import static com.cliffc.aa.AA.ARG_IDX;
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.*;
 
 
 // Values.  Values mimic a NewObj for a "class" wrapper around some primitives.
@@ -18,35 +17,46 @@ import static com.cliffc.aa.AA.unimpl;
 // Load repeats against those fields.
 public class ValNode extends ValFunNode {
   final String[] _flds;         // Map from node inputs to local field names
-  final int _fidx;
-  final TypeFunPtr _tfp;
+  final int _alias;             // Alias as a prototype object
+  final int _fidx;              // FIDX as a constructor function
+  final TypeFunPtr _tfp;        // Type as a constructor function
 
-  private ValNode(String[] flds, TypeStruct ret) {
+  private ValNode(String[] flds, TypeStruct ret, int alias) {
     super(OP_VAL);
     _flds=flds;
+    _alias = alias;
     _fidx = BitsFun.new_fidx(BitsFun.ALL);
     _tfp = TypeFunPtr.make(BitsFun.make0(_fidx),nargs(),TypeMemPtr.NO_DISP,ret);
+    FUNS.setX(_fidx,this);
   }
   @Override public String xstr() { return proto()._ts._name; }
+  @Override int nargs() { return _flds.length-1+ARG_IDX; }
+  @Override int fidx() { return _fidx; }
+  @Override Type formal(int idx) {
+    Node formal = in(idx-DSP_IDX);
+    assert formal instanceof ConNode && !((ConNode)formal)._t.is_con();
+    return ((ConNode)formal)._t;
+  }
+  @Override String name() { throw unimpl(); }
+
   @Override public Type value() {
     // Wrap a name over a TypeStruct
-    TypeStruct ts = proto()._ts;
+    Type tproto = proto()._val;
+    if( !(tproto instanceof TypeTuple) ) return tproto.oob();
+    TypeStruct ts = ((TypeStruct)((TypeTuple)proto()._val).at(1));
     for( int i=1; i<len(); i++ ) {
       TypeFld fld = ts.get(_flds[i]);
       TypeFld fld2 = fld.make_from(val(i), TypeFld.Access.Final);
       ts = ts.replace_fld(fld2);
     }
-    return ts;
+    //TypeObj ts1 = ts.approx1(2,BitsAlias.make0(_alias)); // approx1 is nicer, makes cycles, and is not monotonic with meet
+    TypeObj ts2 = ts.approx2(2,BitsAlias.make0(_alias));
+    return TypeMemPtr.make(_alias,ts2);
   }
   @Override public TypeMem all_live() { return TypeMem.ALIVE; }
   NewObjNode proto() { return (NewObjNode)in(0).in(0); }
-  @Override int nargs() { return _flds.length-1+ARG_IDX; }
-  // Declared argument type
-  @Override Type argtype(int idx) {
-    throw unimpl();
-  }
   // Actual type, as a constructor function
-  @Override TypeFunPtr funtype() { return _tfp; }
+  //@Override TypeFunPtr funtype() { return _tfp; }
 
   // Build a ValNode default constructor from the NewObj.  Walk all fields.
   // If the field is ANY (dead f-ref), ignore it.
@@ -74,11 +84,12 @@ public class ValNode extends ValFunNode {
     }
 
 
-    ValNode val = new ValNode(flds.asAry(),proto._ts);
+    ValNode val = new ValNode(flds.asAry(),proto._ts,proto._alias);
     val.add_def(proj);          // Prototype in slot 0
     for( TypeFld fld : oflds )  // Gather remaining RW fields for constructor
       if( fld._access==TypeFld.Access.RW )
         val.add_def(con(fld._t));
+    proto._nargs = flds._len-1+ARG_IDX;
     return val;
   }
 

@@ -22,11 +22,11 @@ public class MrgProjNode extends ProjNode {
     Node mem = mem();
     // Alias is dead-on-entry.  Then this MrgPrj no longer lifts
     //Type t = mem._val;
-    if( /*t instanceof TypeMem && ((TypeMem)t).at(nnn._alias)==TypeObj.UNUSED &&*/ nnn.is_unused() ) // New is dead for no pointers
+    if( nnn.is_unused() || nnn.len()==1 ) // New is dead for no pointers
       return mem;                // Kill MrgNode when it no longer lifts values
 
     // New is dead from below.
-    if( _live.at(nnn._alias)==TypeObj.UNUSED && !nnn.is_unused() && !is_prim() ) {
+    if( _live.at(nnn._alias)==TypeObj.UNUSED && !nnn.is_unused() ) {
       nnn.kill2();      // Killing a NewNode has to do more updates than normal
       return this;
     }

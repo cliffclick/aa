@@ -30,25 +30,44 @@ public class LoadNode extends Node {
   @Override public Node ideal_reduce() {
     Node adr = adr();
     Type tadr = adr._val;
-    BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
 
-    // Named structs are ValType instances.
-    TypeFld fld;
-    if( tadr instanceof TypeStruct && !Util.eq(tadr._name,"") && (fld=((TypeStruct)tadr).get(_fld))!=null ) {
-      // TODO: fetch prototype using tadr._name or tadr.^ alias
-      // TODO: decide fld is local or prototype from prototype nargs
-      // TODO: fetch from local or prototype
-
-      throw unimpl();
+    // See if this is a named object as a ptr, with a prototype.
+    String tname = ValFunNode.valtype(tadr);
+    if( tname!=null ) {
+      NewObjNode nnn = Env.PROTOS.get(tname);
+      if( nnn!=null ) {
+        TypeFld fld = nnn._ts.get(_fld);
+        if( fld._access==TypeFld.Access.Final ) { // Final fields: all in the prototype
+          // Load from the prototype
+          Node p = nnn.in(fld._order);
+          if( p._val==Type.ALL ) return null;
+          // Instance call; move the adr into Unresolved/FunPtr
+          if( p._val instanceof TypeFunPtr ) {
+            TypeFunPtr tfp = (TypeFunPtr)p._val;
+            if( tfp._dsp==TypeMemPtr.NO_DISP ) return p; // No display ("static" prototype call)
+            if( p instanceof UnresolvedNode ) return ((UnresolvedNode)p).bind(adr());
+            assert p instanceof FunPtrNode; // clone, inject adr() as display
+            throw unimpl();
+          }
+          // Other prototype constants
+          throw unimpl();
+          //return nnn.in(fld._order);
+        }
+        // fetch directly from local
+        if( adr instanceof ValNode )
+          throw unimpl();
+      }
     }
 
     // If we can find an exact previous store, fold immediately to the value.
-    Node st = find_previous_store(mem(),adr,aliases,_fld,true);
-    if( st!=null ) {
-      Node rez = st instanceof StoreNode
-        ? (( StoreNode)st).rez()
-        : ((NewObjNode)st).get(_fld);
-      return rez==this ? null : rez;
+    if( tadr instanceof TypeMemPtr ) {
+      Node st = find_previous_store(mem(),adr,((TypeMemPtr)tadr)._aliases,_fld,true);
+      if( st!=null ) {
+        Node rez = st instanceof StoreNode
+          ? (( StoreNode)st).rez()
+          : ((NewObjNode)st).get(_fld);
+        return rez==this ? null : rez;
+      }
     }
     return null;
   }
@@ -205,12 +224,18 @@ public class LoadNode extends Node {
     Node adr = adr();
     Type tadr = adr._val;
     if( !(tadr instanceof TypeMemPtr) ) return tadr.oob();
+    TypeMemPtr tmp = (TypeMemPtr)tadr;
+    // Loading from a Value type?
+    if( tmp._obj._name.length()>0 ) {
+      if( !(tmp._obj instanceof TypeStruct) ) return tmp._obj.oob(Type.SCALAR);
+      return ((TypeStruct)tmp._obj).get(_fld)._t;
+    }
 
     // Loading from TypeMem - will get a TypeObj out.
     Node mem = mem();
     Type tmem = mem._val;       // Memory
     if( !(tmem instanceof TypeMem) ) return tmem.oob(); // Nothing sane
-    TypeObj tobj = ((TypeMem)tmem).ld((TypeMemPtr)tadr);
+    TypeObj tobj = ((TypeMem)tmem).ld(tmp);
     if( tobj instanceof TypeStruct )
       return get_fld(tobj);
     return tobj.oob();          // No loading from e.g. Strings

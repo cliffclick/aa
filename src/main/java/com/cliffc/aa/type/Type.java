@@ -464,7 +464,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       if( mt.interned() ) // recursive type creation?
         mt = mt.dual();   // Force low
     }
-    if( mt._type==TOBJ ) n=""; // OBJ splits into strings (arrays) and structs, which can keep their names
+    if( t._type!=_type && t._type!=TOBJ && _type!=TOBJ && mt._type==TOBJ )
+      n=""; // OBJ splits into strings (arrays) and structs, which can keep their names
 
     // Inject the name
     if( !Util.eq(mt._name,n) )  // Fast path cutout

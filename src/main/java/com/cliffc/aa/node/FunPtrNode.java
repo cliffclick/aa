@@ -48,6 +48,7 @@ public final class FunPtrNode extends ValFunNode {
   public  FunPtrNode( String name, RetNode ret, Node display ) {
     super(OP_FUNPTR,ret,display);
     _name = name;
+    FUNS.setX(fun()._fidx,this);
   }
   // Explicitly, no display
   public  FunPtrNode( String name, RetNode ret ) { this(name,ret, Env.ANY ); }
@@ -58,10 +59,13 @@ public final class FunPtrNode extends ValFunNode {
   public FunNode fun() { return ret().fun(); }
   public FunNode xfun() { RetNode ret = ret(); return ret !=null && ret.in(4) instanceof FunNode ? ret.fun() : null; }
   @Override int nargs() { return ret()._nargs; }
-  // The *declared* type, not analyzed type
-  @Override Type argtype(int idx) { return fun().parm(idx)._t; }
-  @Override Type funtype() { return _val; }
-  
+  // Formals from the function parms.
+  // TODO: needs to come from both Combo and _t
+  @Override Type formal(int idx) { return fun().parm(idx)._t; }
+  //@Override Type funtype() { return _val; }
+  @Override int fidx() { return fun()._fidx; }
+  @Override String name() { return _name; } // Debug name, might be empty string
+
   //@Override public FunPtrNode funptr() { return this; }
   //@Override public UnresolvedNode unk() { return null; }
   // Self short name

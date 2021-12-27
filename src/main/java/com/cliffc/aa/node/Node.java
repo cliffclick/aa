@@ -210,7 +210,6 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( _elock ) { _elock = false; Node x = VALS.remove(this); assert x == this; }
     while( _defs._len > 0 ) unuse(_defs.pop());
     _defs = _uses = null;       // TODO: Poor-man's indication of a dead node, probably needs to recycle these...
-    if( this instanceof RetNode ) ((RetNode)this).free();
     if( this instanceof NewNode ) ((NewNode)this).free();
     return this;
   }
@@ -539,7 +538,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     Type oval = _val;           // Old local type
     Type nval = value();        // New type
     if( oval == nval ) return;  // No progress
-    assert nval==nval.simple_ptr(); // Only simple pointers in node types
+    //assert nval==nval.simple_ptr(); // Only simple pointers in node types
     assert oval.isa(nval);      // Monotonic
     _val = nval;                // Record progress
 
@@ -726,11 +725,9 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Make globally shared common ConNode for this type.
   public static @NotNull Node con( Type t ) {
     assert t==t.simple_ptr();
-    Node con;
     if( t instanceof TypeFunPtr && ((TypeFunPtr)t)._fidxs.abit()!=-1 )
-      con = new FunPtrNode(FunNode.find_fidx(((TypeFunPtr)t).fidx()).ret(),Env.ANY);
-    else
-      con = new ConNode<>(t);
+      return ValFunNode.get(((TypeFunPtr)t)._fidxs.getbit()); // Pre-existing function constant
+    Node con = new ConNode<>(t);
     Node con2 = VALS.get(con);
     if( con2 != null ) {        // Found a prior constant
       con.kill();               // Kill the just-made one
@@ -740,8 +737,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       con._val = t;             // Typed
       con._elock(); // Put in VALS, since if Con appears once, probably appears again in the same XFORM call
     }
-    Env.GVN.add_flow(con);      // Updated live flows
-    return con;
+    return Env.GVN.add_flow(con); // Updated live flows
   }
 
   // Forward reachable walk, setting types to ANY and making all dead.

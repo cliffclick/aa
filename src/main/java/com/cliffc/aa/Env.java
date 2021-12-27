@@ -120,8 +120,8 @@ public class Env implements AutoCloseable {
     TypeStruct ts = TypeStruct.make("",false,true,TypeFld.make("^",dsp_ptr._val, DSP_IDX));
     TypeMemPtr tmp = fref==null ? null : (TypeMemPtr)fref._val;
     int alias      = fref==null ? BitsAlias.new_alias(BitsAlias.REC) : tmp.aliases().getbit();
+    if( fref!=null ) ts = ts.set_name(tmp._obj._name);
     NewObjNode nnn = GVN.init(new NewObjNode(is_closure,alias,ts,dsp_ptr));
-    if( fref!=null ) nnn.set_name(ts.set_name(tmp._obj._name));
     Node ptr       = fref==null ? GVN.init(new ProjNode(nnn,AA.REZ_IDX)) : fref.set_def(0,nnn);
     Node frm = GVN.init(new MrgProjNode(nnn,mem));
     _scope = GVN.init(new ScopeNode(is_closure));
@@ -130,6 +130,11 @@ public class Env implements AutoCloseable {
     _scope.set_mem (frm);  // Memory includes local stack frame
     _scope.set_rez (ALL_PARM);
     KEEP_ALIVE.add_def(_scope);
+    if( tmp!=null ) {           // Install a top-level prototype mapping
+      String tname = tmp._obj._name;
+      assert !PROTOS.containsKey(tname); // All top-level type names are globally unique
+      PROTOS.put(tname,nnn);
+    }
     GVN.do_iter();
   }
 

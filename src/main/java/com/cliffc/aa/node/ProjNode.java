@@ -36,6 +36,13 @@ public class ProjNode extends Node {
     }
     return c.oob();
   }
+  @Override public void add_flow_use_extra(Node chg) {
+    if( chg instanceof NewObjNode ) // Changing prototype object
+      for( Node use : _uses )
+        if( use instanceof ValNode ) // All ValNodes update
+          Env.GVN.add_flow(use);
+  }
+  
   // Only called here if alive, and input is more-than-basic-alive
   @Override public TypeMem live_use(Node def ) {
     return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM;

@@ -105,30 +105,38 @@ public final class CallEpiNode extends Node {
       }
     }
 
-    // Only inline wired single-target function with valid args.  CallNode wires.
-    int fidx = fidxs.abit();       // Could be 1 or multi
-    if( fidx == -1 ) return null;  // Multi choices, only 1 wired at the moment.
-    if( fidxs.above_center() ) return null; // Can be unresolved yet
-    if( BitsFun.is_parent(fidx) ) return null; // Parent, only 1 child wired
-
     if( call.err(true)!=null ) return null; // CallNode claims args in-error, do not inline
 
+    // Replace a resolved
+    Node fdx = call.fdx();
+    if( fdx instanceof UnresolvedNode ) {
+      ValFunNode vfn = ((UnresolvedNode)fdx).resolve_node(tcall._ts);
+      if( vfn !=null ) call.set_fdx(fdx=vfn);
+    }
     // Inlining a ValNode constructor
-    if( call.fdx() instanceof ValNode ) {
-      ValNode val = (ValNode)call.fdx().copy(true);
+    if( fdx instanceof ValNode ) {
+      ValNode val = (ValNode)fdx.copy(true);
       assert val.nargs()==call.nargs();
-      val.set_def(1,call.arg(ARG_IDX));
+      for( int i=ARG_IDX; i<val.nargs(); i++ )
+        val.set_def(i-DSP_IDX, call.in(i) );
       return set_is_copy(call.ctl(),call.mem(),val);
     }
+
+    // Only inline wired single-target function with valid args.  CallNode wires.
+    if( !is_all_wired() ) return null;
+    int fidx = fidxs.abit();
+    if( fidx <= 1 ) return null; // More than one choice
 
     // Call allows 1 function not yet inlined, sanity check it.
     if( nwired()!=1 ) return null; // More than 1 wired, inline only via FunNode
     int cnargs = call.nargs();
-    FunNode fun = FunNode.find_fidx(fidx);
-    assert !fun.is_dead() && fun.nargs() == cnargs; // All checked by call.err
-    if( fun._val != Type.CTRL ) return null;
-    RetNode ret = fun.ret();    // Return from function
+    FunPtrNode fptr = ValFunNode.get_fptr(fidx);
+    if( fptr==null ) return null;
+    RetNode ret = fptr.ret();    // Return from function
     if( ret==null ) return null;
+    FunNode fun = ret.fun();
+    if( fun._val != Type.CTRL ) return null;
+    assert !fun.is_dead() && fun.nargs() == cnargs; // All checked by call.err
 
     // Check for several trivial cases that can be fully inlined immediately.
     Node cctl = call.ctl();
@@ -191,11 +199,11 @@ public final class CallEpiNode extends Node {
     boolean progress = false;
     for( int fidx : fidxs ) {                 // For all fidxs
       if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
-      FunNode fun = FunNode.find_fidx(fidx);  // Lookup, even if not wired
-      if( fun==null || fun.is_dead() ) continue; // Already dead, stale fidx
-      RetNode ret = fun.ret();
-      if( ret==null ) continue;               // Mid-death
+      FunPtrNode fptr = ValFunNode.get_fptr(fidx);  // Lookup, even if not wired
+      if( fptr==null ) continue;
+      RetNode ret = fptr.ret();
       if( _defs.find(ret) != -1 ) continue;   // Wired already
+      FunNode fun = ret.fun();
       if( !CEProjNode.good_call(tcall,fun) ) continue; // Args fail basic sanity
       progress=true;
       wire1(call,fun,ret,is_combo); // Wire Call->Fun, Ret->CallEpi
