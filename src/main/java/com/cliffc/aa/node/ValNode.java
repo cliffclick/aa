@@ -42,31 +42,11 @@ public class ValNode extends ValFunNode {
   @Override String name() { throw unimpl(); }
 
   @Override public Type value() {
-    // Wrap a name over a TypeStruct
-    Type tproto = proto()._val;
-    if( !(tproto instanceof TypeTuple) ) return tproto.oob();
-    TypeStruct ts = ((TypeStruct)((TypeTuple)proto()._val).at(1));
-    // See if anything changes
-    boolean progress = false;
-    for( int i=1; i<len(); i++ ) {
-      TypeFld fld = ts.get(_flds[i]);
-      if( fld._t!=val(i) || fld._access != TypeFld.Access.Final )
-        { progress = true;  break; }
-    }
-    if( !progress )
-      return TypeMemPtr.make(_alias,ts);
-
-    if( len()!=2 )
-      throw unimpl();
-    TypeStruct ts2 = ts;
-    for( int i=1; i<len(); i++ ) {          // Update all fields
-      TypeFld fld = ts.get(_flds[i]);
-      TypeFld fld2 = fld.make_from(val(i), TypeFld.Access.Final);
-      if( fld!=fld2 ) ts2 = ts2.replace_fld(fld2);
-    }
-    //TypeObj ts1 = ts.approx1(2,BitsAlias.make0(_alias)); // approx1 is nicer, makes cycles, and is not monotonic with meet
-    TypeStruct ts3 = ts2.approx2(2,BitsAlias.make0(_alias));
-    return TypeMemPtr.make(_alias,ts3);
+    TypeStruct ts = TypeStruct.malloc(proto()._ts._name,false,false);
+    for( int i=1; i<_flds.length; i++ )
+      ts.add_fld( TypeFld.make(_flds[i],val(i),TypeFld.Access.Final,i-1+ARG_IDX) );
+    ts = ts.hashcons_free();
+    return TypeMemPtr.make(_alias,ts);
   }
   @Override public TypeMem all_live() { return TypeMem.ALIVE; }
 
