@@ -194,7 +194,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   public static TypeFunPtr make( BitsFun fidxs, int nargs) { return make(fidxs,nargs,TypeMemPtr.NO_DISP,Type.SCALAR); }
   public        TypeFunPtr make_from( TypeMemPtr dsp ) { return make(_fidxs,_nargs, dsp,_ret); }
   public        TypeFunPtr make_from( BitsFun fidxs  ) { return fidxs==_fidxs ? this : make( fidxs,_nargs,_dsp,_ret); }
-  public        TypeFunPtr make_from( Type dsp, Type ret ) { return make(_fidxs,_nargs, dsp,ret); }
+  public        TypeFunPtr make_from( Type dsp, Type ret ) { return dsp==_dsp && ret==_ret ? this : make(_fidxs,_nargs, dsp,ret); }
   public        TypeFunPtr make_no_disp( ) { return make(_fidxs,_nargs,TypeMemPtr.NO_DISP,_ret); }
   public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR; // Open display, allows more fields
 

@@ -5,26 +5,34 @@
 int = : @{
   _val : $#com.cliffc.aa.type.TypeInt$INT64;
 
-  //// Unary ops
-  //-_ = { -> int($$com.cliffc.aa.node.PrimNode$MinusI64(_val)) };
-  //!_ = { -> int($$com.cliffc.aa.node.PrimNode$Not(_val)) };
+  // Unary ops
+  -_ = { -> int($$com.cliffc.aa.node.PrimNode$MinusI64(_val)) };
+  !_ = { -> int($$com.cliffc.aa.node.PrimNode$Not(_val)) };
   
   // Simple integer math
   _+_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$AddI64(_val,y._val)) };
-  _+_  = { y:flt -> flt($$com.cliffc.aa.node.PrimNode$AddF64($$com.cliffc.aa.node.PrimNode$ConvertI64F64(_val),y._val)) };
-  //_-_  = { y -> int($$com.cliffc.aa.node.PrimNode$SubI64(_val,y._val)) };
-  //_*_  = { y -> int($$com.cliffc.aa.node.PrimNode$MulI64(_val,y._val)) };
-  //_/_  = { y -> int($$com.cliffc.aa.node.PrimNode$DivI64(_val,y._val)) };
-  //_%_  = { y -> int($$com.cliffc.aa.node.PrimNode$ModI64(_val,y._val)) };
-  //
-  //// Integer relations
-  //_<_  = { y -> int($$com.cliffc.aa.node.PrimNode$LT_I64(_val,y._val)) };
-  //_<=_ = { y -> int($$com.cliffc.aa.node.PrimNode$LE_I64(_val,y._val)) };
-  //_>_  = { y -> int($$com.cliffc.aa.node.PrimNode$GT_I64(_val,y._val)) };
-  //_>=_ = { y -> int($$com.cliffc.aa.node.PrimNode$GE_I64(_val,y._val)) };
-  //_==_ = { y -> int($$com.cliffc.aa.node.PrimNode$EQ_I64(_val,y._val)) };
-  //_!=_ = { y -> int($$com.cliffc.aa.node.PrimNode$NE_I64(_val,y._val)) };
+  _-_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$SubI64(_val,y._val)) };
+  _*_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$MulI64(_val,y._val)) };
+  //_/_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$DivI64(_val,y._val)) };
+  //_%_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$ModI64(_val,y._val)) };
   
+  _+_  = { y:flt -> flt($$com.cliffc.aa.node.PrimNode$AddF64($$com.cliffc.aa.node.PrimNode$ConvertI64F64(_val),y._val)) };
+
+  // Integer relations
+  _<_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$LT_I64(_val,y._val)) };
+  _<=_ = { y:int -> int($$com.cliffc.aa.node.PrimNode$LE_I64(_val,y._val)) };
+  _>_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$GT_I64(_val,y._val)) };
+  _>=_ = { y:int -> int($$com.cliffc.aa.node.PrimNode$GE_I64(_val,y._val)) };
+  _==_ = { y:int -> int($$com.cliffc.aa.node.PrimNode$EQ_I64(_val,y._val)) };
+  _!=_ = { y:int -> int($$com.cliffc.aa.node.PrimNode$NE_I64(_val,y._val)) };
+
+  //_<_  = { y:flt -> int($$com.cliffc.aa.node.PrimNode$LT_F64($$com.cliffc.aa.node.PrimNode$ConvertI64F64(_val),y._val)) };
+  //_<=_ = { y:flt -> int($$com.cliffc.aa.node.PrimNode$LE_F64($$com.cliffc.aa.node.PrimNode$ConvertI64F64(_val),y._val)) };
+  //_>_  = { y:flt -> int($$com.cliffc.aa.node.PrimNode$GT_F64($$com.cliffc.aa.node.PrimNode$ConvertI64F64(_val),y._val)) };
+  //_>=_ = { y:flt -> int($$com.cliffc.aa.node.PrimNode$GE_F64($$com.cliffc.aa.node.PrimNode$ConvertI64F64(_val),y._val)) };
+  //_==_ = { y:flt -> int($$com.cliffc.aa.node.PrimNode$EQ_F64($$com.cliffc.aa.node.PrimNode$ConvertI64F64(_val),y._val)) };
+  //_!=_ = { y:flt -> int($$com.cliffc.aa.node.PrimNode$NE_F64($$com.cliffc.aa.node.PrimNode$ConvertI64F64(_val),y._val)) };
+
 };
 
 flt = : @{
@@ -33,7 +41,20 @@ flt = : @{
   _+_  = { y:flt -> flt($$com.cliffc.aa.node.PrimNode$AddF64(_val,y._val)) };
   _+_  = { y:int -> flt($$com.cliffc.aa.node.PrimNode$AddF64(_val,$$com.cliffc.aa.node.PrimNode$ConvertI64F64(y._val))) };
   
-  //_<_  = { y -> int($$com.cliffc.aa.node.PrimNode$LT_F64(_val,y._val)) };
+  // Float relations
+  _<_  = { y:flt -> int($$com.cliffc.aa.node.PrimNode$LT_F64(_val,y._val)) };
+  //_<=_ = { y:flt -> int($$com.cliffc.aa.node.PrimNode$LE_F64(_val,y._val)) };
+  //_>_  = { y:flt -> int($$com.cliffc.aa.node.PrimNode$GT_F64(_val,y._val)) };
+  //_>=_ = { y:flt -> int($$com.cliffc.aa.node.PrimNode$GE_F64(_val,y._val)) };
+  //_==_ = { y:flt -> int($$com.cliffc.aa.node.PrimNode$EQ_F64(_val,y._val)) };
+  //_!=_ = { y:flt -> int($$com.cliffc.aa.node.PrimNode$NE_F64(_val,y._val)) };
+
+  _<_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$LT_F64(_val,$$com.cliffc.aa.node.PrimNode$ConvertI64F64(y._val))) };
+  //_<=_ = { y:int -> int($$com.cliffc.aa.node.PrimNode$LE_F64(_val,$$com.cliffc.aa.node.PrimNode$ConvertI64F64(y._val))) };
+  //_>_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$GT_F64(_val,$$com.cliffc.aa.node.PrimNode$ConvertI64F64(y._val))) };
+  //_>=_ = { y:int -> int($$com.cliffc.aa.node.PrimNode$GE_F64(_val,$$com.cliffc.aa.node.PrimNode$ConvertI64F64(y._val))) };
+  //_==_ = { y:int -> int($$com.cliffc.aa.node.PrimNode$EQ_F64(_val,$$com.cliffc.aa.node.PrimNode$ConvertI64F64(y._val))) };
+  //_!=_ = { y:int -> int($$com.cliffc.aa.node.PrimNode$NE_F64(_val,$$com.cliffc.aa.node.PrimNode$ConvertI64F64(y._val))) };
 
 };
   
@@ -43,34 +64,12 @@ flt = : @{
 //ptr   =: $$com.cliffc.aa.type.TypeMemPtr#ISUSED;
 //str   =: $$com.cliffc.aa.type.TypeMemPtr#STRPTR;
 //ary   =: $$com.cliffc.aa.type.TypeMemPtr#ARYPTR;
-//
-//// Logical & bitwise
-//_&_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$AndI64(x,y) };
-//_|_ = { x:int y:int -> $$com.cliffc.aa.node.PrimNode$OrI64 (x,y) };
-//
 //// TODO: Some way in the parser to specify RHS should be thunked.
 //// Then can drop the primitives and write:
 ////_&&_ = { pred thunk:lazy -> pred ? thunk() : 0    }
 ////_||_ = { pred thunk:lazy -> pred ? pred : thunk() }
 //_&&_ = { pred thunk -> $$com.cliffc.aa.node.PrimNode$AndThen(pred,thunk); };
 //_||_ = { pred thunk -> $$com.cliffc.aa.node.PrimNode$OrElse (pred,thunk); };
-//
-//// Unary negate; takes a Scalar
-//!_  = { x -> $$com.cliffc.aa.node.PrimNode$Not(x) };
-//
-//// Simple float math
-//_+_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$AddF64(x,y) };
-//_-_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$SubF64(x,y) };
-//_*_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$MulF64(x,y) };
-//_/_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$DivF64(x,y) };
-//
-//// Float relations
-//_<=_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$LE_F64(x,y) };
-//_>_  = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$GT_F64(x,y) };
-//_>=_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$GE_F64(x,y) };
-//_==_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$EQ_F64(x,y) };
-//_!=_ = { x:flt y:flt -> $$com.cliffc.aa.node.PrimNode$NE_F64(x,y) };
-//
 //// Pointer ==
 //_==_ = { x:ptr? y:ptr? -> $$com.cliffc.aa.node.PrimNode$EQ_OOP(x,y) };
 //_!=_ = { x:ptr? y:ptr? -> $$com.cliffc.aa.node.PrimNode$NE_OOP(x,y) };

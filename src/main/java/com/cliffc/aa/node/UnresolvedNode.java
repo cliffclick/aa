@@ -53,40 +53,22 @@ public class UnresolvedNode extends Node {
     }
     // If we have a display, then it replaces the input FunPtr displays.
     if( in(0)!=null ) {         // Overwrite display
-      TypeMemPtr dsp = (TypeMemPtr)in(0)._val;
-      t = ((TypeFunPtr) t).make_from(dsp);
+      TypeFunPtr tfp = (TypeFunPtr)t;
+      Type dsp = in(0)._val;
+      t = tfp.make_from(dsp,tfp._ret);
     }
     return t;
   }
-
-  // Look at the arguments and resolve the call, if possible.
-  // Returns null if not resolvable (yet).
-  // MUST resolve during Combo/GCP, or program has ambiguous calls.
-  //ValFunNode resolve_value( Type[] tcall) {
-  //  ValFunNode x=null;
-  //  for( int i=1; i<len(); i++ ) {
-  //    ValFunNode ptr = (ValFunNode)in(i);
-  //    if( ptr.nargs()==tcall.length-1 ) {
-  //      Type formal = ptr.arg(ARG_IDX)._val;// formal
-  //      Type actual = tcall  [ARG_IDX];     // actual
-  //      if( actual.isa(formal) ) {
-  //        assert x == null;      // Exactly zero or one fptr resolves
-  //        x = ptr;               // Resolved choice
-  //        if( in(0)!=null )      // Instance call: pre-bind 'self' from slot 0
-  //          throw unimpl(); //x = ((TypeFunPtr)ptr._val).make_from((TypeMemPtr)in(0)._val);
-  //      }
-  //    }
-  //  }
-  //  return x;
-  //}
 
   // Looks at the fidxs in TFP, and the arguments given and tries to resolve
   // the call.  Returns TFP if it cannot be further resolved.
   static TypeFunPtr resolve_value( Type[] tcall ) {
     ValFunNode choice=null;
     TypeFunPtr tfp = (TypeFunPtr)tcall[tcall.length-1];
-    if( tfp._fidxs==BitsFun.FULL ) return tfp;
-    if( tfp._fidxs.abit() != -1 ) return tfp;
+    if( tfp._fidxs==BitsFun.FULL || // Too low , will not resolve.  Might lift to OK
+        tfp.above_center() ||       // Too high, will not resolve.  Might fall to OK
+        tfp._fidxs.abit() != -1 )   // Already resolved to single target
+      return tfp;
     for( int fidx : tfp._fidxs ) {
       ValFunNode vfn = ValFunNode.get(fidx);
       if( vfn.nargs() == tcall.length-1 ) {
@@ -129,7 +111,7 @@ public class UnresolvedNode extends Node {
 
   // Bind to a display
   UnresolvedNode bind( Node dsp ) {
-    assert in(0)==null && ((TypeMemPtr)dsp._val)._obj._name.length()>0;
+    assert in(0)==null && ValFunNode.valtype(dsp._val)!=null;
     return (UnresolvedNode)copy(true).set_def(0,dsp);
   }
 
@@ -138,10 +120,10 @@ public class UnresolvedNode extends Node {
   // functions - such as integer-add vs string-add, or the 1-argument leading
   // '+' operator vs the more expected binop.
   @Override public boolean unify( boolean test ) {
-    // Giant assert that all inputs are all Fun, ignoring errors.
+    // Giant assert that all inputs are all Fun or Val constructors, ignoring errors.
     for( int i=1; i<len(); i++ ) {
-      TV2 tv = in(i).tvar();
-      assert tv.is_err() || tv.is_fun() || tv.is_leaf();
+      TV2 tv = tvar(i);
+      assert tv.is_err() || tv.is_fun() || tv.is_leaf() || tv.is_struct();
     }
     return false;
   }

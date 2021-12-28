@@ -37,6 +37,7 @@ public class LoadNode extends Node {
       NewObjNode nnn = Env.PROTOS.get(tname);
       if( nnn!=null ) {
         TypeFld fld = nnn._ts.get(_fld);
+        if( fld==null ) return null;              // No such field
         if( fld._access==TypeFld.Access.Final ) { // Final fields: all in the prototype
           // Load from the prototype
           Node p = nnn.in(fld._order);
@@ -47,7 +48,7 @@ public class LoadNode extends Node {
             if( tfp._dsp==TypeMemPtr.NO_DISP ) return p; // No display ("static" prototype call)
             if( p instanceof UnresolvedNode ) return ((UnresolvedNode)p).bind(adr());
             assert p instanceof FunPtrNode; // clone, inject adr() as display
-            throw unimpl();
+            return p.copy(true).set_def(1,adr());
           }
           // Other prototype constants
           throw unimpl();
@@ -226,9 +227,10 @@ public class LoadNode extends Node {
     if( !(tadr instanceof TypeMemPtr) ) return tadr.oob();
     TypeMemPtr tmp = (TypeMemPtr)tadr;
     // Loading from a Value type?
-    if( tmp._obj._name.length()>0 ) {
+    if( ValFunNode.valtype(tmp)!=null ) {
       if( !(tmp._obj instanceof TypeStruct) ) return tmp._obj.oob(Type.SCALAR);
-      return ((TypeStruct)tmp._obj).get(_fld)._t;
+      TypeFld fld = ((TypeStruct)tmp._obj).get(_fld);
+      return fld==null ? Type.SCALAR : fld._t; // Check no-such-field
     }
 
     // Loading from TypeMem - will get a TypeObj out.
@@ -314,6 +316,8 @@ public class LoadNode extends Node {
     if( !(tadr instanceof TypeMemPtr) )
       return bad(fast,null); // Not a pointer nor memory, cannot load a field
     TypeMemPtr ptr = (TypeMemPtr)tadr;
+    if( ValFunNode.valtype(tadr)!=null ) // These should always fold
+      return bad(fast,ptr._obj);
     Type tmem = mem()._val;
     if( tmem==Type.ALL ) return bad(fast,null);
     if( tmem==Type.ANY ) return null; // No error

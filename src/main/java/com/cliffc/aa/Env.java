@@ -180,8 +180,14 @@ public class Env implements AutoCloseable {
     // Promote forward refs to the next outer scope
     NewObjNode stk = _scope.stk();
     ScopeNode pscope = _par._scope;
-    if( pscope != null )
+    if( pscope != null ) {
       stk.promote_forward(pscope.stk());
+      for( String tname : _scope.typeNames() ) {
+        ProjNode n = _scope.get_type(tname);
+        if( n.is_forward_type() )
+          pscope.add_type(tname,n);
+      }
+    }
 
     Node ptr = _scope.ptr();
     stk.no_more_fields();

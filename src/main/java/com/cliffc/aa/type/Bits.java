@@ -6,6 +6,8 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Arrays;
 import java.util.Iterator;
 
+import static com.cliffc.aa.AA.unimpl;
+
 // Bits supporting a lattice; immutable; hash-cons'd.  Bits can be *split* in
 // twain, basically a single Bit is really set of all possible future splits.
 //
@@ -377,8 +379,10 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
           bs0 = bs0.clear(kid);
     return bs0;
   }
+  // Two bitmaps overlap, including parent/child overlaps.
   public boolean overlaps(Bits<B> bs) {
-    for( int alias : this )
+    if( this==bs ) return true;
+    for( int alias=init_bit(); alias!=-1; alias=next_bit(alias) )
       for( int kid=alias; kid!=0; kid = tree().next_kid(alias,kid) )
         if( bs.test_recur(kid) )
           return true;
@@ -544,5 +548,16 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       if( idx(_i) < _bits.length ) return _i;
       throw new java.util.NoSuchElementException();
     }
+  }
+
+  // Iterate all bits in-order
+  // Usage: for( int i=init_bit(); i!=-1; i=next_bit(i) ) ...
+  int init_bit() {
+    if( _bits==null ) return _con==0 ? -1 : _con;
+    return 1;
+  }
+  int next_bit(int i) {
+    if( _bits==null ) return -1;
+    throw unimpl();    
   }
 }

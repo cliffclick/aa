@@ -34,10 +34,38 @@ interface Cyclic {
   // (possibly cyclic) graph of not-interned Types.  Minimize the graph, set
   // the hashes everywhere, check for a prior existing Type.  Return a prior,
   // or else set all the duals and intern the entire graph.
+  static class Prof {
+    long cnt=0, time=0;
+    int clarge_sum=0, clarge_cnt=0; int [] chisto = new int[  4];
+    int ilarge_sum=0, ilarge_cnt=0; int [] ihisto = new int[ 16];
+    int rlarge_sum=0, rlarge_cnt=0; int [] rhisto = new int[128];
+    void gather() {
+      if( (cnt&1023)==0 ) print();
+      int icnt=0, ccnt=0;
+      for( Type t : REACHABLE ) {
+        if( t.interned() ) icnt++;
+        if( t instanceof Cyclic && ((Cyclic)t).cyclic() ) ccnt++;
+      }
+      if( icnt<ihisto.length ) ihisto[icnt]++;
+      else { ilarge_sum += icnt; ilarge_cnt++; }
+      if( ccnt<chisto.length ) chisto[ccnt]++;
+      else { clarge_sum += icnt; clarge_cnt++; }
+      int rcnt = REACHABLE._len;
+      if( rcnt<rhisto.length ) rhisto[rcnt]++;
+      else { rlarge_sum += rcnt; rlarge_cnt++; }
+    }
+    void print() {
+      // TODO
+    }
+  }
+  static final Prof P = new Prof();
+
   @SuppressWarnings("unchecked")
   static <T extends Type> T install( T head ) {
+    long t0 = System.currentTimeMillis();
     Type.RECURSIVE_MEET++;
     _reachable(head,true);      // Compute 1st-cut reachable
+    //P.gather();
     head = _dfa_min(head);
     _reachable(head,false);     // Recompute reachable; skip interned; probably shrinks
     Type.RECURSIVE_MEET--;
@@ -59,6 +87,8 @@ interface Cyclic {
       if( t.un_interned() )
         if( t.retern() != t._dual ) t._dual.retern();
     // Return new interned cycle
+    long t1 = System.currentTimeMillis();
+    P.time += (t1-t0);  P.cnt++;
     return head;
   }
 
@@ -71,8 +101,8 @@ interface Cyclic {
   // out-edges (with field names), we can have multiple output edges from the
   // same node (struct) to the same TypeMemPtr.  The classic cycle-finders do
   // not work with multi-edges.
-  Ary<Type> CSTACK = new Ary<>(Type.class);
-  VBitSet CVISIT = new VBitSet();
+  final Ary<Type> CSTACK = new Ary<>(Type.class);
+  final VBitSet CVISIT = new VBitSet();
   static void _set_cyclic(Type t ) {
     assert t._hash==t.compute_hash(); // Hashes already set by shrink
     if( t.interned() ) return;  // Already interned (so hashed, cyclic set, etc)
@@ -141,7 +171,7 @@ interface Cyclic {
 
     // Reset for another round of minimization
     static void clear() {
-      TYPE2PART.clear();
+      TYPE2PART.clear(true);
       for( Partition P : PARTS )  P.clear0();
       PARTS.clear();            // Does not delete any Parts
     }
@@ -163,7 +193,7 @@ interface Cyclic {
       _ts.clear();
       _numnew=0;
       assert _touched.cardinality()==0;
-      _edges.clear();
+      _edges.clear(true);
     }
 
     // Number of Types in partition

@@ -190,9 +190,14 @@ public class NewObjNode extends NewNode<TypeStruct> {
   // error to load from a non-existing field
   private boolean check_fields(TV2 rec) {
     if( rec._args != null )
-      for( String id : rec._args.keySet() )
+      for( String id : rec._args.keySet() ) {
+        // Field is the class prototype name
+        if( id.charAt(id.length()-1)==':' && Util.eq(id,_tptr._obj._name) )
+          continue;             // This is fine
+        // Field is missing and not in error
         if( _ts.get(id)==null && !rec.arg(id).is_err() )
           return false;
+      }
     return true;
   }
 

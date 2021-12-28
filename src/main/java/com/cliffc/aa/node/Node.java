@@ -913,6 +913,8 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Only true for Unresolved
   public boolean is_forward_ref() { return false; }
+  // Only true for a bare ProjNode
+  public boolean is_forward_type() { return false; }
 
   // True if normally (not in-error) produces a TypeMem value or a TypeTuple
   // with a TypeMem at(MEM_IDX).

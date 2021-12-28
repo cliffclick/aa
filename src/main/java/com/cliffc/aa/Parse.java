@@ -286,7 +286,7 @@ public class Parse implements Comparable<Parse> {
 
     // Look for a prior type assignment, from e.g. a type annotation
     if( typenode == null ) typenode = type_fref(tvar); // None, so create
-    else if( !typenode.is_forward_ref() )
+    else if( !typenode.is_forward_type() )
       throw unimpl(); // Double-define error
 
     // Parse a 'fact' as a type.  Check for a 'struct' first, to pass along the
@@ -1327,6 +1327,7 @@ public class Parse implements Comparable<Parse> {
     TypeMemPtr tmp = TypeMemPtr.make(alias,(TypeObj)TypeObj.ISUSED.set_name((tok+":").intern()));
     tn._val = tmp;              // Only valid until the def for this fref appears
     assert tn.value()==tmp;
+    assert tn.is_forward_type();
     _e.add_type(tok,tn);
     return tn;
   }

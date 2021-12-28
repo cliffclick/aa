@@ -5,6 +5,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
 import java.util.HashMap;
+import java.util.Set;
 import java.util.function.Predicate;
 
 import static com.cliffc.aa.AA.*;
@@ -78,22 +79,14 @@ public class ScopeNode extends Node {
   // Name to type lookup, or null
   public ProjNode get_type(String name) { return _types.get(name);  }
 
-  // Alias to TypeMemPtr lookup, or null
-  public Node get_type(int alias) {
-    //for( ConTypeNode ctn : _types.values() )
-    //  if( ctn._t instanceof TypeMemPtr &&
-    //      ((TypeMemPtr)ctn._t)._aliases.test(alias) )
-    //    return ctn;
-    //return null;
-    throw unimpl();
-  }
-
   // Extend the current Scope with a new type; cannot override existing name.
   public void add_type( String name, ProjNode t ) {
     assert _types.get(name)==null;
     _types.put( name, t );
     add_def(t);                 // Hook so it does not die
   }
+
+  public Set<String> typeNames() { return _types.keySet(); }
   
   public boolean is_closure() { return _closure; }
 

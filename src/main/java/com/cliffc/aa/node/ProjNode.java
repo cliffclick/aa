@@ -18,6 +18,7 @@ public class ProjNode extends Node {
     _idx=idx;
   }
   @Override public String xstr() { return "DProj"+_idx; }
+  @Override public boolean is_forward_type() { return in(0)==null; }
 
   // Strictly reducing
   @Override public Node ideal_reduce() {

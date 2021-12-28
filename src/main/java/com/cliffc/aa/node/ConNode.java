@@ -41,9 +41,6 @@ public class ConNode<T extends Type> extends Node {
     TV2 self = tvar();
     if( self.is_base() || self.is_nil() || self.is_struct() ) return false;
     if( test ) return true;
-    //assert self.is_leaf();
-    //_set_tvar();
-    //return true;
     throw unimpl();
   }
 

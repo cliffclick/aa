@@ -1,6 +1,7 @@
-package com.cliffc.aa.node;
+ package com.cliffc.aa.node;
 
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.util.Ary;
 
 import java.util.Collection;
@@ -16,7 +17,7 @@ import static com.cliffc.aa.AA.*;
 // use the Type name to get the class via a global flat lookup table; then the
 // Load repeats against those fields.
 public class ValNode extends ValFunNode {
-  final String[] _flds;         // Map from node inputs to local field names
+  final String[] _flds;         // Map from node inputs to local field names; slot 0 is null for the prototype
   final int _alias;             // Alias as a prototype object
   final int _fidx;              // FIDX as a constructor function
   final TypeFunPtr _tfp;        // Type as a constructor function
@@ -31,6 +32,7 @@ public class ValNode extends ValFunNode {
   }
   @Override public String xstr() { return proto()._ts._name; }
   @Override int nargs() { return _flds.length-1+ARG_IDX; }
+  NewObjNode proto() { return (NewObjNode)in(0).in(0); }
   @Override int fidx() { return _fidx; }
   @Override Type formal(int idx) {
     Node formal = in(idx-DSP_IDX);
@@ -44,19 +46,51 @@ public class ValNode extends ValFunNode {
     Type tproto = proto()._val;
     if( !(tproto instanceof TypeTuple) ) return tproto.oob();
     TypeStruct ts = ((TypeStruct)((TypeTuple)proto()._val).at(1));
+    // See if anything changes
+    boolean progress = false;
     for( int i=1; i<len(); i++ ) {
       TypeFld fld = ts.get(_flds[i]);
+      if( fld._t!=val(i) || fld._access != TypeFld.Access.Final )
+        { progress = true;  break; }
+    }
+    if( !progress )
+      return TypeMemPtr.make(_alias,ts);
+
+    if( len()!=2 )
+      throw unimpl();
+    TypeStruct ts2 = ts;
+    for( int i=1; i<len(); i++ ) {          // Update all fields
+      TypeFld fld = ts.get(_flds[i]);
       TypeFld fld2 = fld.make_from(val(i), TypeFld.Access.Final);
-      ts = ts.replace_fld(fld2);
+      if( fld!=fld2 ) ts2 = ts2.replace_fld(fld2);
     }
     //TypeObj ts1 = ts.approx1(2,BitsAlias.make0(_alias)); // approx1 is nicer, makes cycles, and is not monotonic with meet
-    TypeObj ts2 = ts.approx2(2,BitsAlias.make0(_alias));
-    return TypeMemPtr.make(_alias,ts2);
+    TypeStruct ts3 = ts2.approx2(2,BitsAlias.make0(_alias));
+    return TypeMemPtr.make(_alias,ts3);
   }
   @Override public TypeMem all_live() { return TypeMem.ALIVE; }
-  NewObjNode proto() { return (NewObjNode)in(0).in(0); }
-  // Actual type, as a constructor function
-  //@Override TypeFunPtr funtype() { return _tfp; }
+
+  @Override public boolean unify( boolean test ) {
+    TV2 self = tvar();
+    TV2 proto = proto().tvar();
+    if( proto.is_leaf() ) return false; // Wait for proto to advance
+    if( self.is_leaf() ) {              // Become a copy of proto
+      if( test ) return true;
+      TV2 tv2 = TV2.make_struct(proto(),"ValNode_unify");
+      for( int i=1; i<_flds.length; i++ )
+        tv2._args.put(_flds[i],tvar(i));
+      return self.unify(tv2,test);
+    }
+
+    // Unify existing fields.  Ignore extras on either side.
+    boolean progress=false;
+    for( int i=1; i<_flds.length; i++ ) {
+      TV2 tvfld = self.arg(_flds[i]);
+      if( tvfld != null ) progress |= tvfld.unify(tvar(i),test);
+      if( test && progress ) return true; // Fast cutout if testing
+    }
+    return progress;
+  }
 
   // Build a ValNode default constructor from the NewObj.  Walk all fields.
   // If the field is ANY (dead f-ref), ignore it.

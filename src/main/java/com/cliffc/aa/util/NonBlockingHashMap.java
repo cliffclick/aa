@@ -383,6 +383,11 @@ public class NonBlockingHashMap<TypeK, TypeV>
     while( !CAS_kvs(_kvs,newkvs) ) // Spin until the clear works
       ;
   }
+  // Non-atomic clear, preserving existing large arrays
+  public void clear(boolean large) {         // Smack a new empty table down
+    for( int i=2; i<_kvs.length; i++ ) _kvs[i]=null;
+    Arrays.fill(hashes(_kvs),0);
+  }
 
   /** Returns <tt>true</tt> if this Map maps one or more keys to the specified
    *  value.  <em>Note</em>: This method requires a full internal traversal of the

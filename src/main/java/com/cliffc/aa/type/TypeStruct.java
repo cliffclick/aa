@@ -153,12 +153,12 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
     if( this==o ) return true;
     if( !(o instanceof TypeStruct) ) return false;
     TypeStruct t = (TypeStruct)o;
+    int x = cmp(t);
+    if( x != -1 ) return x == 1;
     TypeStruct t2 = find_other();
     if( t2 !=null ) return t2==t   ; // Already in cycle report equals or not
     TypeStruct t3 = t.find_other();
     if( t3 !=null ) return t3==this;// Already in cycle report equals or not
-    int x = cmp(t);
-    if( x != -1 ) return x == 1;
 
     int len = CYCLES._len;
     CYCLES.add(this).add(t);
@@ -625,7 +625,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
       else if( t instanceof TypeFunPtr )
         nts.get(fld._fld).setX(ax_impl_fptr(aliases,cutoff,d,dold,(TypeFunPtr)t));
     }
-    OLD2APX.put(old,null); // Do not keep sharing the "tails"
+    OLD2APX.remove(old); // Do not keep sharing the "tails"
     return nts;
   }
 
@@ -667,7 +667,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
         assert mt==nmp;
       }
     }
-    OLD2APX.put(old,null);      // Do not keep sharing the "tails"
+    OLD2APX.remove(old);      // Do not keep sharing the "tails"
     return nmp;
   }
   private static Type ax_impl_fptr( BitsAlias aliases, int cutoff, int d, TypeMemPtr dold, TypeFunPtr old ) {
@@ -693,7 +693,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
         nt._ret = ax_impl_ptr (aliases,cutoff,d,dold,(TypeMemPtr)old._ret);
       else
         nt._ret = ax_impl_fptr(aliases,cutoff,d,dold,(TypeFunPtr)old._ret);
-      OLD2APX.put(old,null);      // Do not keep sharing the "tails"
+      OLD2APX.remove(old);      // Do not keep sharing the "tails"
     }
     return nt==null ? old : nt;
   }
@@ -798,11 +798,16 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
       if( i>= AXCYCLICS._len ) AXCYCLICS.push(new IHashMap());
       else AXCYCLICS.at(i).clear();
     Type apx = _apx(cutoff-1,aliases,this);
-    apx = apx.install();
     return (TypeStruct)apx;
   }
 
-  // deep clone, lowering cutoff at TMP, chopping off when cutoff hits 0
+  // Walk recursively, at cutoff return SCALAR otherwise return self.
+  // Clone incrementally, as needed.  
+  // - If the return is self, then no code-clone happened.
+  // - If the return is NOT self, then clone self and return the clone.
+  // If cyclic, walk all once looking for a not-self.
+  // - If all returns are self, then no code-clone happened.
+  // - If even one return is NOT self, then clone self and revisit.
   private static Type _apx( int cutoff, BitsAlias aliases, Type t ) {
     if( !(t instanceof Cyclic) ) return t;
     if( t instanceof TypeMemPtr && aliases.overlaps(((TypeMemPtr)t)._aliases) ) {
@@ -810,12 +815,57 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic {
         return Type.SCALAR;     // Cutoff to Scalar
       cutoff--;                 // Lower cutoff
     }
-    Type c = AXCYCLICS.at(cutoff).get(t);     // Check for cycles
+    IHashMap axmap = AXCYCLICS.at(cutoff);
+    Type c = axmap.get(t);     // Check for cycles
     if( c!=null ) return c;                   // Return prior
-    AXCYCLICS.at(cutoff).put(t,c = t.copy()); // Stop cycles
+
     // Recursively apply
-    final int fcutoff = cutoff;
-    ((Cyclic)c).walk_update(fld -> _apx(fcutoff,aliases,fld));
+    switch( t ) {
+    case TypeMemPtr tmp ->  {
+      TypeObj xobj = (TypeObj)_apx(cutoff,aliases,tmp._obj);
+      c = tmp.make_from(xobj);
+    }
+    case TypeFunPtr tfp -> {
+      Type xdsp = _apx(cutoff,aliases,tfp._dsp);
+      Type xret = _apx(cutoff,aliases,tfp._ret);
+      c = tfp.make_from(xdsp,xret);
+    }
+    case TypeFld fld    -> {
+      Type xt = _apx(cutoff,aliases,fld._t);
+      c = fld.make_from(xt);
+    }
+    case TypeStruct ts -> {
+      TypeStruct ts2 = ts;
+      // Easy case: no changes to a cycle.  Walk fields, if no changes, then no
+      // change.  If a field changes, clone and change that field (prior work
+      // is still valid).
+      for( TypeFld fld : ts.flds() ) {
+        TypeFld xf = (TypeFld)_apx(cutoff,aliases,fld);
+        if( xf!=fld ) {               // Change in field?
+          if( ts==ts2 ) ts2 = ts.copy(); // Shallow copy, fields not cloned
+          else assert ts2._hash==0;
+          if( ts.cyclic() ) break; // Ugh, all prior visits are busted, must revisit
+          ts2._flds.put(fld._fld,xf);
+        }
+      }
+      // Hard case: changing an entry in a cycle.  Need to clone the entire
+      // cycle, taking the change in all the new types.
+      if( ts2!=ts && ts.cyclic() ) { // Ugh, cyclic, must repeat prior unchanging fields into the cycle
+        axmap.put(t,ts2);            // Stop cycles
+        RECURSIVE_MEET++;            // No intern until cycle completes
+        ts2.set_hash();              // Pre-cook hash
+        for( TypeFld fld : ts2.flds() ) // Repeat all the work, but in the new cycle
+          ts2._flds.put(fld._fld,(TypeFld)_apx(cutoff,aliases,fld));
+        if( --Type.RECURSIVE_MEET == 0 )
+          ts2 = ts2.install();  // Intern and install
+        return ts2;
+      }
+      // Easy case continued: hashcons as needed.
+      c = (ts==ts2 ? ts : ts2.hashcons_free());
+    }
+    default -> throw unimpl();
+    }
+    axmap.put(t,c);             // Install the updated instance
     return c;
   }
 

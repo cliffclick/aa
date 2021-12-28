@@ -227,10 +227,12 @@ public class CallNode extends Node {
       return null;             // Zero choices
 
     // Try to resolve to single-target
-    if( fdx() instanceof UnresolvedNode ) {
-      Node fdx = ((UnresolvedNode)fdx()).resolve_node(tcall._ts);
-      if( fdx!=null )
-        return set_fdx(fdx);
+    Node fdx = fdx();
+    if( fdx instanceof FreshNode ) fdx = ((FreshNode)fdx).id();
+    if( fdx instanceof UnresolvedNode ) {
+      Node fdx2 = ((UnresolvedNode)fdx).resolve_node(tcall._ts);
+      if( fdx2!=null )
+        return set_fdx(fdx2);
     }
 
     // Wire valid targets.

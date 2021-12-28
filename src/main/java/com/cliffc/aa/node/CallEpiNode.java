@@ -109,6 +109,7 @@ public final class CallEpiNode extends Node {
 
     // Replace a resolved
     Node fdx = call.fdx();
+    if( fdx instanceof FreshNode ) fdx = ((FreshNode)fdx).id();    
     if( fdx instanceof UnresolvedNode ) {
       ValFunNode vfn = ((UnresolvedNode)fdx).resolve_node(tcall._ts);
       if( vfn !=null ) call.set_fdx(fdx=vfn);
