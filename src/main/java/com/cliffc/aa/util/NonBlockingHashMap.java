@@ -387,6 +387,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
   public void clear(boolean large) {         // Smack a new empty table down
     for( int i=2; i<_kvs.length; i++ ) _kvs[i]=null;
     Arrays.fill(hashes(_kvs),0);
+    chm(_kvs).clear();
   }
 
   /** Returns <tt>true</tt> if this Map maps one or more keys to the specified
@@ -862,6 +863,9 @@ public class NonBlockingHashMap<TypeK, TypeV>
       _size = size;
       _slots= new ConcurrentAutoTable();
     }
+
+    // Fast, not-atomic clear
+    public void clear() { _size.clear(); _slots.clear(); }
 
     // --- tableFull ---------------------------------------------------------
     // Heuristic to decide if this table is too full, and we should start a

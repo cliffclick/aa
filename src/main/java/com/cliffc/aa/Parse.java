@@ -1009,7 +1009,7 @@ public class Parse implements Comparable<Parse> {
 
       // Parms for all arguments
       Parse errmsg = errMsg();  // Lazy error message
-      for( TypeFld fld : formals.flds() ) { // User parms start
+      for( TypeFld fld : formals ) { // User parms start
         if( fld._order <= DSP_IDX ) continue;// Already handled
         assert fun==_e._fun && fun==_e._scope.ctrl();
         Node parm = gvn(new ParmNode(fld,fun,Env.ALL_PARM,errmsg));

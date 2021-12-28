@@ -92,7 +92,7 @@ public abstract class PrimNode extends Node {
   // All primitives are effectively H-M Applies with a hidden internal Lambda.
   @Override public boolean unify( boolean test ) {
     boolean progress = false;
-    for( TypeFld fld : _sig._formals.flds() )
+    for( TypeFld fld : _sig._formals )
       progress |= prim_unify(tvar(fld._order),fld._t,test);
     progress |= prim_unify(tvar(),_tfp._ret,test);
     return progress;
@@ -115,14 +115,14 @@ public abstract class PrimNode extends Node {
   // str:{int     -> str }  ==>>  str:int
   // str:{flt     -> str }  ==>>  str:flt
   // == :{ptr ptr -> int1}  ==>>  == :ptr
-  @Override public String xstr() { return _name+":"+_sig._formals.fld_idx(DSP_IDX)._t; }
+  @Override public String xstr() { return _name+":"+_sig._formals.get("^")._t; }
   @Override public Type value() {
     if( is_keep() ) return Type.ALL;
     Type[] ts = Types.get(_defs._len); // 1-based
     // If all inputs are constants we constant-fold.  If any input is high, we
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
-    for( TypeFld fld : _sig._formals.flds() ) {
+    for( TypeFld fld : _sig._formals ) {
       Type tactual = ts[fld._order] = val(fld._order);
       Type tformal = fld._t;
       Type t = tformal.dual().meet(tactual);
@@ -147,7 +147,7 @@ public abstract class PrimNode extends Node {
 
 
   @Override public ErrMsg err( boolean fast ) {
-    for( TypeFld fld : _sig._formals.flds() ) {
+    for( TypeFld fld : _sig._formals ) {
       Type tactual = val(fld._order);
       Type tformal = fld._t;
       if( !tactual.isa(tformal) )
@@ -184,7 +184,7 @@ public abstract class PrimNode extends Node {
     Node mem = Env.GVN.init(new ParmNode(TypeMem.MEM,null,fun,MEM_IDX," mem"));
     if( _thunk_rhs ) that.add_def(mem);  // Memory if thunking
     while( that.len() < _sig._formals.nargs() ) that.add_def(null);
-    for( TypeFld fld : _sig._formals.flds() )
+    for( TypeFld fld : _sig._formals )
       that.set_def(fld._order,Env.GVN.init(new ParmNode(fld._t,null,fun,fld._order,fld._fld)));
     that = Env.GVN.init(that);
     Node ctl,rez;

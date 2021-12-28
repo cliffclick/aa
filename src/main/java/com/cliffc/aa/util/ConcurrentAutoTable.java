@@ -2,6 +2,7 @@ package com.cliffc.aa.util;
 
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater; 
+import java.util.Arrays; 
 
 import sun.misc.Unsafe;
 
@@ -42,6 +43,10 @@ public class ConcurrentAutoTable implements Serializable {
     while( !CAS_cat(_cat,newcat) ) {/*empty*/}
   }
 
+  /** 
+   * Not-atomic clear
+   */
+  public void clear() {  Arrays.fill(_cat._t,0); }
   /**
    * Current value of the counter.  Since other threads are updating furiously
    * the value is only approximate, but it includes all counts made by the
@@ -82,7 +87,7 @@ public class ConcurrentAutoTable implements Serializable {
   private long add_if( long x ) { return _cat.add_if(x,hash(),this); }
 
   // The underlying array of concurrently updated long counters
-  private volatile CAT _cat = new CAT(null,16/*Start Small, Think Big!*/,0L);
+  private volatile CAT _cat = new CAT(null,1/*Start Small, Think Big!*/,0L);
   private static AtomicReferenceFieldUpdater<ConcurrentAutoTable,CAT> _catUpdater =
     AtomicReferenceFieldUpdater.newUpdater(ConcurrentAutoTable.class,CAT.class, "_cat");
   private boolean CAS_cat( CAT oldcat, CAT newcat ) { return _catUpdater.compareAndSet(this,oldcat,newcat); }

@@ -122,7 +122,7 @@ interface Cyclic {
     case Type.TMEMPTR ->   _set_cyclic(((TypeMemPtr) t)._obj);
     case Type.TFUNPTR -> { _set_cyclic(((TypeFunPtr) t)._dsp); _set_cyclic(((TypeFunPtr) t)._ret); }
     case Type.TFLD    ->   _set_cyclic(((TypeFld   ) t)._t  );
-    case Type.TSTRUCT -> { CVISIT.set(t._uid);  for( TypeFld fld : ((TypeStruct) t).flds() ) _set_cyclic(fld);  }
+    case Type.TSTRUCT -> { CVISIT.set(t._uid);  for( TypeFld fld : ((TypeStruct) t) ) _set_cyclic(fld);  }
     default -> throw AA.unimpl();
     }
     CSTACK.pop();               // Pop, not part of another's cycle
@@ -145,7 +145,7 @@ interface Cyclic {
       if( !t.interned() ||      // If not interned, include all children, interned or not
           // Or all of an interned cycle
           (also_interned && t instanceof Cyclic && ((Cyclic)t).cyclic()) )
-        ((Cyclic)t).walk1((tc,label) -> !ON_REACH.tset(tc._uid) ? REACHABLE.push(tc) : tc);
+        ((Cyclic)t).walk1((tc,ignore) -> !ON_REACH.tset(tc._uid) ? REACHABLE.push(tc) : tc);
     }
   }
 

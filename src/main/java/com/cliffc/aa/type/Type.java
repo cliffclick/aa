@@ -627,9 +627,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // True if 'this' isa 't' but is not equal to 't'
   public boolean above( Type t ) { return t != this && meet(t)==t; }
 
-  // MEET at a Loop; optimize no-final-updates on backedges.
-  public Type meet_loop(Type t2) { return meet(t2); }
-
   // Report OOB based on shallowest OOB component.
   public Type       oob( ) { return oob(ALL); }
   public Type       oob(Type       e) { return above_center() ? e.dual() : e; }

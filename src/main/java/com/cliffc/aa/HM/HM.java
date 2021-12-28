@@ -939,7 +939,7 @@ public class HM {
         TypeMemPtr tmp = (TypeMemPtr)flow;
         if( tmp._obj instanceof TypeStr ) return;
         TypeStruct ts = ((TypeStruct)tmp._obj);
-        for( TypeFld fld : ts.flds() )
+        for( TypeFld fld : ts )
           _walk_root_funs(fld._t,work);
       }
     }
@@ -2253,7 +2253,7 @@ public class HM {
             if( ts0.get(id)!=null )         // and in GCP
               ts.add_fld( TypeFld.malloc(id,null,Access.Final,TypeFld.oBot) );
         if( is_open() && !HM_FREEZE )     // If can add fields to HM
-          for( TypeFld fld : ts0.flds() ) // Forall fields in GCP
+          for( TypeFld fld : ts0 ) // Forall fields in GCP
             if( get(fld._fld)==null )     // Solo in GCP
               ts.add_fld( fld.copy() );   // Add a copy
         if( ts.get("^")==null ) ts.add_fld(TypeFld.NO_DISP);
@@ -2270,7 +2270,7 @@ public class HM {
         // Now do the other side.  Missing on HM side might later appear and
         // lift to anything.
         if( is_open() && !HM_FREEZE )       // If can add fields to HM
-          for( TypeFld fld : ts0.flds() )   // Forall fields in GCP
+          for( TypeFld fld : ts0 )   // Forall fields in GCP
             if( get(fld._fld)==null && !Util.eq(fld._fld,"^") ) // Solo in GCP
               ts.get(fld._fld).setX( Type.XSCALAR, fld._order );
         // Close off the recursion

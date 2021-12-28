@@ -51,10 +51,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public void create_active( String name, Node val, Access mutable, Type t, Parse badt ) {
     setsm(_ts.add_fld(name,mutable,t,_defs._len));
     // TODO: Save badt and report it if fields do not type
-    create_edge(val);
-  }
-  // Used by IntrinsicNode
-  public void create_edge( Node val ) {
     add_def(val);
     Env.GVN.add_flow(this);
   }
@@ -85,7 +81,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   // according to use.
   public void promote_forward( NewObjNode parent ) {
     assert parent != null;
-    for( TypeFld fld : _ts.flds() ) {
+    for( TypeFld fld : _ts ) {
       Node n = in(fld._order);
       if( n.is_forward_ref() ) {
         // Is this Unresolved defined in this scope, or some outer scope?
@@ -114,7 +110,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     if( !(to instanceof TypeStruct) ) return null;
     TypeStruct ts = (TypeStruct)to;
     Node progress = null;
-    for( TypeFld tfld : _ts.flds() ) {
+    for( TypeFld tfld : _ts ) {
       TypeFld lfld = ts.get(tfld._fld);
       if( lfld !=null && lfld._t==Type.XSCALAR ) {
         int idx = lfld._order;
@@ -135,7 +131,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert FLDS.isEmpty();
     if( _defs._len==1 ) return _ts; // Killed
     // Gather args and produce a TypeStruct
-    for( TypeFld fld : _ts.flds() ) {
+    for( TypeFld fld : _ts ) {
       // TODO: why assume crushed to error?  primitive scope is open and do not want it crushed
       Type t = val(fld._order);
       FLDS.push(fld.make_from(t));
@@ -177,7 +173,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
 
     // Unify existing fields.  Ignore extras on either side.
     boolean progress = false;
-    for( TypeFld fld : _ts.flds() ) {
+    for( TypeFld fld : _ts ) {
       TV2 tvfld = rec.arg(fld._fld);
       if( tvfld != null ) progress |= tvfld.unify(tvar(fld._order),test);
       if( test && progress ) return true; // Fast cutout if testing

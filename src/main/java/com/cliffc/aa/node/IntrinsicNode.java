@@ -138,7 +138,7 @@ public class IntrinsicNode extends Node {
     // prototype object.  Scalar fields get an argument.  TODO: Gather
     // initializers and use them instead of an explicit argument.
     int nargs = AA.ARG_IDX;
-    for( TypeFld fld : to.flds() )
+    for( TypeFld fld : to )
       if( fld._t==Type.SCALAR )
         nargs++;
 

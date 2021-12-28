@@ -198,7 +198,7 @@ public class TV2 {
   // A struct with fields
   public static TV2 make_struct( NewObjNode n, String alloc_site ) {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
-    for( TypeFld fld : n._ts.flds() )
+    for( TypeFld fld : n._ts )
       args.put(fld._fld,n.in(fld._order).tvar());
     // Value types have a class name field
     if( ValFunNode.valtype(n._tptr)!=null )

@@ -529,8 +529,8 @@ public class NonBlockingHashMapLong<TypeV>
     }
     // Non-atomic clear
     void clear() {
-      _size = new ConcurrentAutoTable();
-      _slots= new ConcurrentAutoTable();
+      _size.clear();
+      _slots.clear();
       Arrays.fill(_keys,0);
       Arrays.fill(_vals,null);
     }

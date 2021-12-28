@@ -58,7 +58,7 @@ public class PhiNode extends Node {
     if( r instanceof LoopNode &&
         r.val(1)!=Type.XCTRL && r.val(1)!=Type.ANY &&
         r.val(2)!=Type.XCTRL && r.val(2)!=Type.ANY )
-      return val(1).meet_loop(val(2)); // Optimize for backedges: no final-field updates.
+      return val(1).meet(val(2)); // Optimize for backedges: no final-field updates.
     Type t = Type.ANY;
     for( int i=1; i<_defs._len; i++ )
       if( r.val(i)!=Type.XCTRL && r.val(i)!=Type.ANY ) // Only meet alive paths

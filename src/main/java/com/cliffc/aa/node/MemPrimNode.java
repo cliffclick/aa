@@ -61,7 +61,7 @@ public abstract class MemPrimNode extends PrimNode {
         add_def(null);              // Control for the primitive in slot 0
         add_def(mem );              // Memory  for the primitive in slot 1
         while( len() < _sig._formals.nargs() ) add_def(null);
-        for( TypeFld arg : _sig._formals.flds() )
+        for( TypeFld arg : _sig._formals )
           if( arg._order!=MEM_IDX ) // Already handled MEM_IDX
             set_def(arg._order,X.xform(new ParmNode(arg._t.simple_ptr(), null, fun, arg._order, arg._fld)));
         Node nnn = X.xform(this);

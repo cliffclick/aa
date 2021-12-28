@@ -755,7 +755,7 @@ public class TestApprox {
     assertEquals(dsp3,mt);
 
     // Build the approx
-    TypeStruct rez = dsp2.approx(CUTOFF,BitsAlias.make0(alias));
+    TypeStruct rez = (TypeStruct)dsp2.approx1(CUTOFF,BitsAlias.make0(alias));
     assertEquals(dsp3,rez);
   }
 

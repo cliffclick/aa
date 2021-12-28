@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
 
+import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 /**
@@ -294,17 +295,8 @@ public class TypeMem extends Type<TypeMem> {
     return objs;
   }
   private static TypeObj _meet(TypeObj a, TypeObj b, boolean is_loop) {
-    return (TypeObj)(is_loop ? a.meet_loop(b) : a.meet(b));
-  }
-
-  // MEET at a Loop; optimize no-final-updates on backedges.
-  @Override public Type meet_loop(Type t2) {
-    if( t2._type != TMEM ) return ALL;
-    TypeMem tf = (TypeMem)t2;
-    // Meet of default values, meet of element-by-element.
-    TypeObj[] as = _meet(_pubs,tf._pubs,true);
-    TypeObj[] tos = _make1(as);
-    return tos==null ? DEAD : make(tos); // All things are dead, so dead
+    if( is_loop ) throw unimpl();
+    return (TypeObj)(a.meet(b));
   }
 
   // Any alias is not UNUSED?
@@ -361,7 +353,7 @@ public class TypeMem extends Type<TypeMem> {
       // fields may be added which we assume is a pointer to all.
       if( ts._open )
         return BitsAlias.FULL;  // Generic open struct points to all
-      for( TypeFld tfld : ts.flds() ) {
+      for( TypeFld tfld : ts ) {
         Type fld = tfld._t;
         if( TypeMemPtr.OOP.isa(fld) )
           fld = TypeMemPtr.OOP;                      // All possible pointers

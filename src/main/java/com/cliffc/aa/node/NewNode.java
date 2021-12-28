@@ -190,7 +190,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
         // Add input edges to the intrinsic
         if( _reads ) set_def(MEM_IDX, memp); // Memory is already null by default
         while( len() < _formals.nargs() ) add_def(null);
-        for( TypeFld arg : _formals.flds() ) {
+        for( TypeFld arg : _formals ) {
           if( arg._order==MEM_IDX ) continue; // Already handled MEM_IDX
           set_def(arg._order,X.xform(new ParmNode(arg._t.simple_ptr(), null, fun, arg._order, arg._fld)));
         }

@@ -249,7 +249,7 @@ public abstract class Combo {
       TypeMemPtr tmp = (TypeMemPtr)flow;
       if( tmp._obj instanceof TypeStr ) return;
       TypeStruct ts = ((TypeStruct)tmp._obj);
-      for( TypeFld fld : ts.flds() )
+      for( TypeFld fld : ts )
         _walk_root_funs(fld._t);
     }
 
