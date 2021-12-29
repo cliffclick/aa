@@ -69,10 +69,8 @@ public abstract class PrimNode extends Node {
       new MemPrimNode.ReadPrimNode.LValueRead  (), // Read  an L-Value: (ary,idx) ==> elem
       new MemPrimNode.ReadPrimNode.LValueWrite (), // Write an L-Value: (ary,idx,elem) ==> elem
       new MemPrimNode.ReadPrimNode.LValueWriteFinal(), // Final Write an L-Value: (ary,idx,elem) ==> elem
-    };
-
-    // These are unary ops, precedence determined outside 'Parse.expr'
-    PrimNode[] uniops = new PrimNode[] {
+      
+      // These are unary ops, precedence determined outside 'Parse.expr'
       new MemPrimNode.ReadPrimNode.LValueLength(), // The other array ops are "balanced ops" and use term() for precedence
       new MinusF64(),
       new MinusI64(),
@@ -80,7 +78,7 @@ public abstract class PrimNode extends Node {
     };
 
     Ary<PrimNode> allprims = new Ary<>(others);
-    for( PrimNode prim : uniops ) allprims.push(prim);
+    for( PrimNode prim : others ) allprims.push(prim);
     for( PrimNode[] prims : PRECEDENCE )
       for( PrimNode prim : prims )
         allprims.push(prim);
@@ -167,109 +165,10 @@ public abstract class PrimNode extends Node {
     return _name.equals(p._name) && _sig==p._sig;
   }
 
-  // Called during basic Env creation and making of type constructors, this
-  // wraps a PrimNode as a full 1st-class function to be passed about or
-  // assigned to variables.
-  @Override public FunPtrNode clazz_node( ) {
-    // Find the same clazz node with op_prec set
-    PrimNode that=null;
-    for( PrimNode p : PRIMS() )
-      if( p.getClass() == getClass() )
-        { that=p; break; }      // Found an original PrimNode with op_prec set
-    kill(); // Kill self, use one from primitive table that has op_prec set
-    // Extra '$' in name copies the op_prec one inlining level from clazz_node into the _prim.aa
-    FunNode fun = Env.GVN.init(new FunNode(("$"+_name).intern(),that)); // No callers (yet)
-    ParmNode rpc = Env.GVN.init(new ParmNode(TypeRPC.ALL_CALL,null,fun,0,"rpc"));
-    that.add_def(_thunk_rhs ? fun : null);   // Control for the primitive in slot 0
-    Node mem = Env.GVN.init(new ParmNode(TypeMem.MEM,null,fun,MEM_IDX," mem"));
-    if( _thunk_rhs ) that.add_def(mem);  // Memory if thunking
-    while( that.len() < _sig._formals.nargs() ) that.add_def(null);
-    for( TypeFld fld : _sig._formals )
-      that.set_def(fld._order,Env.GVN.init(new ParmNode(fld._t,null,fun,fld._order,fld._fld)));
-    that = Env.GVN.init(that);
-    Node ctl,rez;
-    if( _thunk_rhs ) {
-      ctl = Env.GVN.init(new CProjNode(that));
-      mem = Env.GVN.init(new MProjNode(that));
-      rez = Env.GVN.init(new  ProjNode(that,AA.REZ_IDX));
-      Env.GVN.add_grow(that);
-    } else {
-      ctl = fun;
-      rez = that;
-    }
-    // Functions return the set of *modified* memory.  Most PrimNodes never
-    // *modify* memory (see Intrinsic*Node for some primitives that *modify*
-    // memory).  Thunking (short circuit) prims return both memory and a value.
-    RetNode ret = (RetNode)Env.GVN.xform(new RetNode(ctl,mem,rez,rpc,fun));
-    // Hook function at the TOP scope, because it may yet have unwired
-    // CallEpis which demand memory.  This hook is removed as part of doing
-    // the Combo pass which computes a real Call Graph and all escapes.
-    Env.TOP._scope.add_def(ret);
-    // No closures are added to primitives
-    FunPtrNode fptr = (FunPtrNode)Env.GVN.xform(new FunPtrNode(_name,ret));
-    return fptr;
-  }
-
-
-  //// --------------------
-  //// Default name constructor using a single tuple type
-  //static class ConvertTypeName extends PrimNode {
-  //  ConvertTypeName(Type from, Type to, Parse badargs, Node p) {
-  //    super(to._name,TypeStruct.args(from),to);
-  //    _badargs = new Parse[]{badargs};
-  //    add_def(null);
-  //    add_def(null);
-  //    add_def(null);
-  //    add_def(p);
-  //  }
-  //  @Override public Type value() {
-  //    Type[] ts = Types.get(_defs._len);
-  //    for( int i=ARG_IDX; i<_defs._len; i++ )
-  //      ts[i] = _defs.at(i)._val;
-  //    Type t = apply(ts);     // Apply (convert) even if some args are not constant
-  //    Types.free(ts);
-  //    return t;
-  //  }
-  //  @Override public Type apply( Type[] args ) {
-  //    Type actual = args[ARG_IDX];
-  //    if( actual==Type.ANY || actual==Type.ALL ) return actual;
-  //    Type formal = _sig.arg(ARG_IDX)._t;
-  //    // Wrapping function will not inline if args are in-error
-  //    assert actual.isa(formal);
-  //    return actual.set_name(_tfp._ret._name);
-  //  }
-  //  @Override public ErrMsg err( boolean fast ) {
-  //    Type actual = val(ARG_IDX);
-  //    Type formal = _sig.arg(ARG_IDX)._t;
-  //    if( !actual.isa(formal) ) // Actual is not a formal
-  //      return ErrMsg.typerr(_badargs[0],actual,null,formal);
-  //    return null;
-  //  }
-  //}
-
   public static class ConvertI64F64 extends PrimNode {
     public ConvertI64F64() { super("flt64",TypeStruct.INT64,TypeFlt.FLT64); }
     @Override public Type apply( Type[] args ) { return TypeFlt.con((double)args[DSP_IDX].getl()); }
   }
-
-
-//// Takes in a Scalar and Names it.
-//public static FunPtrNode convertTypeName( Type from, Type to, Parse badargs ) {
-//  try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
-//    TypeStruct formals = TypeStruct.args(from);
-//    TypeFunSig sig = TypeFunSig.make(formals,to);
-//    Node ctl = Env.FILE._scope;
-//    FunNode fun = X.init2((FunNode)new FunNode(to._name,-1).add_def(ctl));
-//    Node rpc = X.xform(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
-//    Node ptr = X.xform(new ParmNode(ARG_IDX,"x",fun,(ConNode)Node.con(from),badargs));
-//    Node mem = X.xform(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-//    Node cvt = X.xform(new ConvertTypeName(from,to,badargs,ptr));
-//    RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,cvt,rpc,fun));
-//    Env.SCP_0.add_def(ret);
-//    return (X._ret = X.init2(new FunPtrNode(to._name,ret)));
-//  }
-//}
-//
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpF64 extends PrimNode {

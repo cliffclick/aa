@@ -47,7 +47,7 @@ public class Oper {
   public final byte _prec;      // Precedence.  Not set for uniops and balanced ops.  Always > 0 for infix binary ops.
   public final int _nargs;
 
-  public Oper(String name, int prec) {
+  private Oper(String name, int prec) {
     char c0 = name.charAt(0), c1 = name.charAt(0);
     assert c0!='{' &&  (c0!='_' || c1!='{'); // Too confusing
     // Count '_' for nargs
@@ -61,27 +61,39 @@ public class Oper {
     _nargs=nargs;
   }
 
+  @Override public String toString() { return _name; }
+
+  // Build a unary oper.
+  public static Oper make(String name) { return new Oper(name,0); }
+  
   // Build a binary oper, compute precedence based on 1st not-underscore
   // character.  Means, e.g. "<" and "<=" are forced to the same precedence.
-  public Oper(String name) { this(name,prec(name.charAt(1))); }
+  public static Oper make(String name, int prec) {
+    int oprec = prec(name.charAt(1));
+    if( prec > oprec ) return null;
+    return new Oper(name,oprec);    
+  }
 
-  // Precedence is based on a single character
-  public static final int MAX_PREC=4;
+  // Build a balanced open oper.
+  public static Oper make_open(String name) { return is_open(name) ? new Oper(name,0) : null; }
+  // True if op has balanced-op openers
+  static boolean is_open( String name ) { return name.indexOf('[')>=0 || name.indexOf('{')>=2 || name.indexOf('<')>=2; }
+  public boolean is_open() { return is_open(_name); }
+  
+  // Precedence is based on the single first non-'_' character
+  public static final int MAX_PREC=6;
   private static int prec(char c) {
     return switch( c ) {
-    case '*', '/', '%'      -> 3;
-    case '+', '-'           -> 2;
-    case '<', '>', '=', '!' -> 1; // includes <, <=, >, >=, ==, !=
+    case '*', '/', '%'      -> 5;
+    case '+', '-'           -> 4;
+    case '<', '>', '=', '!' -> 3; // includes <, <=, >, >=, ==, !=
+    case '&'                -> 2;
+    case '|'                -> 1;
     default -> throw unimpl();
     };
   }
 
   int len() { return _name.length(); }
-
-  // True if op has balanced-op openers
-  public boolean is_open() {
-    return _name.indexOf('[')>=0 || _name.indexOf('{')>=2 || _name.indexOf('<')>=2;
-  }
 
   // Parse a postfix op; update P or return null.
   // If the required trailing expr is not found, caller must unwind P.

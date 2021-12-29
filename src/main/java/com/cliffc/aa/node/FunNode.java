@@ -590,7 +590,7 @@ public class FunNode extends RegionNode {
   private FunNode make_new_fun(RetNode ret, int path) {
     // Make a prototype new function header split from the original.
     int oldfidx = _fidx;
-    FunNode fun = new FunNode(_name, BitsFun.new_fidx(oldfidx),_nargs);
+    FunNode fun = new FunNode(_name, BitsFun.new_fidx(path==-1 ? oldfidx : BitsFun.parent(oldfidx)),_nargs);
     fun._bal_close = _bal_close;
     fun.pop();                  // Remove null added by RegionNode, will be added later
 

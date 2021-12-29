@@ -3,96 +3,118 @@
 // Typically used in the call position, with a FunPtrNode returned.
 
 int = : @{
-  _val : $#com.cliffc.aa.type.TypeInt$INT64;
+  _val : $#TypeInt$INT64;
 
   // Unary ops
-  -_ = { -> int($$com.cliffc.aa.node.PrimNode$MinusI64(_val)) };
-  !_ = { -> int($$com.cliffc.aa.node.PrimNode$Not(_val)) };
+  -_ = { -> int($$PrimNode$MinusI64(_val)) };
+  !_ = { -> int($$PrimNode$Not(_val)) };
   
   // Simple integer math
-  _+_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$AddI64(_val,y._val)) };
-  _-_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$SubI64(_val,y._val)) };
-  _*_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$MulI64(_val,y._val)) };
-  //_/_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$DivI64(_val,y._val)) };
-  //_%_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$ModI64(_val,y._val)) };
+  _+_  = { y:int -> int($$PrimNode$AddI64(_val,y._val)) };
+  _-_  = { y:int -> int($$PrimNode$SubI64(_val,y._val)) };
+  _*_  = { y:int -> int($$PrimNode$MulI64(_val,y._val)) };
+  _/_  = { y:int -> int($$PrimNode$DivI64(_val,y._val)) };
+  _%_  = { y:int -> int($$PrimNode$ModI64(_val,y._val)) };
+  // Bitwise ops
+  _&_  = { y:int -> int($$PrimNode$AndI64(_val,y._val)) };
+  _|_  = { y:int -> int($$PrimNode$OrI64 (_val,y._val)) };
   
-  _+_  = { y:flt -> flt($$com.cliffc.aa.node.PrimNode$AddF64($$com.cliffc.aa.node.PrimNode$ConvertI64F64(_val),y._val)) };
+
+  // Int-vs-Float
+  _+_  = { y:flt -> flt($$PrimNode$AddF64($$PrimNode$ConvertI64F64(_val),y._val)) };
+  _-_  = { y:flt -> flt($$PrimNode$SubF64($$PrimNode$ConvertI64F64(_val),y._val)) };
+  _*_  = { y:flt -> flt($$PrimNode$MulF64($$PrimNode$ConvertI64F64(_val),y._val)) };
+  _/_  = { y:flt -> flt($$PrimNode$DivF64($$PrimNode$ConvertI64F64(_val),y._val)) };
 
   // Integer relations
-  _<_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$LT_I64(_val,y._val)) };
-  _<=_ = { y:int -> int($$com.cliffc.aa.node.PrimNode$LE_I64(_val,y._val)) };
-  _>_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$GT_I64(_val,y._val)) };
-  _>=_ = { y:int -> int($$com.cliffc.aa.node.PrimNode$GE_I64(_val,y._val)) };
-  _==_ = { y:int -> int($$com.cliffc.aa.node.PrimNode$EQ_I64(_val,y._val)) };
-  _!=_ = { y:int -> int($$com.cliffc.aa.node.PrimNode$NE_I64(_val,y._val)) };
+  _<_  = { y:int -> int($$PrimNode$LT_I64(_val,y._val)) };
+  _<=_ = { y:int -> int($$PrimNode$LE_I64(_val,y._val)) };
+  _>_  = { y:int -> int($$PrimNode$GT_I64(_val,y._val)) };
+  _>=_ = { y:int -> int($$PrimNode$GE_I64(_val,y._val)) };
+  _==_ = { y:int -> int($$PrimNode$EQ_I64(_val,y._val)) };
+  _!=_ = { y:int -> int($$PrimNode$NE_I64(_val,y._val)) };
 
-  //_<_  = { y:flt -> int($$com.cliffc.aa.node.PrimNode$LT_F64($$com.cliffc.aa.node.PrimNode$ConvertI64F64(_val),y._val)) };
-  //_<=_ = { y:flt -> int($$com.cliffc.aa.node.PrimNode$LE_F64($$com.cliffc.aa.node.PrimNode$ConvertI64F64(_val),y._val)) };
-  //_>_  = { y:flt -> int($$com.cliffc.aa.node.PrimNode$GT_F64($$com.cliffc.aa.node.PrimNode$ConvertI64F64(_val),y._val)) };
-  //_>=_ = { y:flt -> int($$com.cliffc.aa.node.PrimNode$GE_F64($$com.cliffc.aa.node.PrimNode$ConvertI64F64(_val),y._val)) };
-  //_==_ = { y:flt -> int($$com.cliffc.aa.node.PrimNode$EQ_F64($$com.cliffc.aa.node.PrimNode$ConvertI64F64(_val),y._val)) };
-  //_!=_ = { y:flt -> int($$com.cliffc.aa.node.PrimNode$NE_F64($$com.cliffc.aa.node.PrimNode$ConvertI64F64(_val),y._val)) };
+  // Int-vs-Float
+  _<_  = { y:flt -> int($$PrimNode$LT_F64($$PrimNode$ConvertI64F64(_val),y._val)) };
+  _<=_ = { y:flt -> int($$PrimNode$LE_F64($$PrimNode$ConvertI64F64(_val),y._val)) };
+  _>_  = { y:flt -> int($$PrimNode$GT_F64($$PrimNode$ConvertI64F64(_val),y._val)) };
+  _>=_ = { y:flt -> int($$PrimNode$GE_F64($$PrimNode$ConvertI64F64(_val),y._val)) };
+  _==_ = { y:flt -> int($$PrimNode$EQ_F64($$PrimNode$ConvertI64F64(_val),y._val)) };
+  _!=_ = { y:flt -> int($$PrimNode$NE_F64($$PrimNode$ConvertI64F64(_val),y._val)) };
 
+  // Conversions.  Got a problem using "1.flt()" because this overloads 'flt'
+  // as a type and a instance function.  
+  f = { -> $$PrimNode$ConvertI64F64(_val) };
+  
 };
 
 flt = : @{
-  _val : $#com.cliffc.aa.type.TypeFlt$FLT64;
+  _val : $#TypeFlt$FLT64;
 
-  _+_  = { y:flt -> flt($$com.cliffc.aa.node.PrimNode$AddF64(_val,y._val)) };
-  _+_  = { y:int -> flt($$com.cliffc.aa.node.PrimNode$AddF64(_val,$$com.cliffc.aa.node.PrimNode$ConvertI64F64(y._val))) };
+  // Simple float math
+  _+_  = { y:flt -> flt($$PrimNode$AddF64(_val,y._val)) };
+  _-_  = { y:flt -> flt($$PrimNode$SubF64(_val,y._val)) };
+  _*_  = { y:flt -> flt($$PrimNode$MulF64(_val,y._val)) };
+  _/_  = { y:flt -> flt($$PrimNode$DivF64(_val,y._val)) };
+  
+  _+_  = { y:int -> flt($$PrimNode$AddF64(_val,$$PrimNode$ConvertI64F64(y._val))) };
+  _-_  = { y:int -> flt($$PrimNode$SubF64(_val,$$PrimNode$ConvertI64F64(y._val))) };
+  _*_  = { y:int -> flt($$PrimNode$MulF64(_val,$$PrimNode$ConvertI64F64(y._val))) };
+  _/_  = { y:int -> flt($$PrimNode$DivF64(_val,$$PrimNode$ConvertI64F64(y._val))) };
   
   // Float relations
-  _<_  = { y:flt -> int($$com.cliffc.aa.node.PrimNode$LT_F64(_val,y._val)) };
-  //_<=_ = { y:flt -> int($$com.cliffc.aa.node.PrimNode$LE_F64(_val,y._val)) };
-  //_>_  = { y:flt -> int($$com.cliffc.aa.node.PrimNode$GT_F64(_val,y._val)) };
-  //_>=_ = { y:flt -> int($$com.cliffc.aa.node.PrimNode$GE_F64(_val,y._val)) };
-  //_==_ = { y:flt -> int($$com.cliffc.aa.node.PrimNode$EQ_F64(_val,y._val)) };
-  //_!=_ = { y:flt -> int($$com.cliffc.aa.node.PrimNode$NE_F64(_val,y._val)) };
+  _<_  = { y:flt -> int($$PrimNode$LT_F64(_val,y._val)) };
+  _<=_ = { y:flt -> int($$PrimNode$LE_F64(_val,y._val)) };
+  _>_  = { y:flt -> int($$PrimNode$GT_F64(_val,y._val)) };
+  _>=_ = { y:flt -> int($$PrimNode$GE_F64(_val,y._val)) };
+  _==_ = { y:flt -> int($$PrimNode$EQ_F64(_val,y._val)) };
+  _!=_ = { y:flt -> int($$PrimNode$NE_F64(_val,y._val)) };
 
-  _<_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$LT_F64(_val,$$com.cliffc.aa.node.PrimNode$ConvertI64F64(y._val))) };
-  //_<=_ = { y:int -> int($$com.cliffc.aa.node.PrimNode$LE_F64(_val,$$com.cliffc.aa.node.PrimNode$ConvertI64F64(y._val))) };
-  //_>_  = { y:int -> int($$com.cliffc.aa.node.PrimNode$GT_F64(_val,$$com.cliffc.aa.node.PrimNode$ConvertI64F64(y._val))) };
-  //_>=_ = { y:int -> int($$com.cliffc.aa.node.PrimNode$GE_F64(_val,$$com.cliffc.aa.node.PrimNode$ConvertI64F64(y._val))) };
-  //_==_ = { y:int -> int($$com.cliffc.aa.node.PrimNode$EQ_F64(_val,$$com.cliffc.aa.node.PrimNode$ConvertI64F64(y._val))) };
-  //_!=_ = { y:int -> int($$com.cliffc.aa.node.PrimNode$NE_F64(_val,$$com.cliffc.aa.node.PrimNode$ConvertI64F64(y._val))) };
+  // Float vs int
+  _<_  = { y:int -> int($$PrimNode$LT_F64(_val,$$PrimNode$ConvertI64F64(y._val))) };
+  _<=_ = { y:int -> int($$PrimNode$LE_F64(_val,$$PrimNode$ConvertI64F64(y._val))) };
+  _>_  = { y:int -> int($$PrimNode$GT_F64(_val,$$PrimNode$ConvertI64F64(y._val))) };
+  _>=_ = { y:int -> int($$PrimNode$GE_F64(_val,$$PrimNode$ConvertI64F64(y._val))) };
+  _==_ = { y:int -> int($$PrimNode$EQ_F64(_val,$$PrimNode$ConvertI64F64(y._val))) };
+  _!=_ = { y:int -> int($$PrimNode$NE_F64(_val,$$PrimNode$ConvertI64F64(y._val))) };
 
 };
   
-//int1  =: $$com.cliffc.aa.type.TypeInt#BOOL;
-//flt32 =: $$com.cliffc.aa.type.TypeFlt#FLT32;
-//flt64 =: $$com.cliffc.aa.type.TypeFlt#FLT64;
-//ptr   =: $$com.cliffc.aa.type.TypeMemPtr#ISUSED;
-//str   =: $$com.cliffc.aa.type.TypeMemPtr#STRPTR;
-//ary   =: $$com.cliffc.aa.type.TypeMemPtr#ARYPTR;
+//int1  =: $$TypeInt#BOOL;
+//flt32 =: $$TypeFlt#FLT32;
+//flt64 =: $$TypeFlt#FLT64;
+//ptr   =: $$TypeMemPtr#ISUSED;
+//str   =: $$TypeMemPtr#STRPTR;
+//ary   =: $$TypeMemPtr#ARYPTR;
 //// TODO: Some way in the parser to specify RHS should be thunked.
 //// Then can drop the primitives and write:
 ////_&&_ = { pred thunk:lazy -> pred ? thunk() : 0    }
 ////_||_ = { pred thunk:lazy -> pred ? pred : thunk() }
-//_&&_ = { pred thunk -> $$com.cliffc.aa.node.PrimNode$AndThen(pred,thunk); };
-//_||_ = { pred thunk -> $$com.cliffc.aa.node.PrimNode$OrElse (pred,thunk); };
+//_&&_ = { pred thunk -> $$PrimNode$AndThen(pred,thunk); };
+//_||_ = { pred thunk -> $$PrimNode$OrElse (pred,thunk); };
 //// Pointer ==
-//_==_ = { x:ptr? y:ptr? -> $$com.cliffc.aa.node.PrimNode$EQ_OOP(x,y) };
-//_!=_ = { x:ptr? y:ptr? -> $$com.cliffc.aa.node.PrimNode$NE_OOP(x,y) };
+//_==_ = { x:ptr? y:ptr? -> $$PrimNode$EQ_OOP(x,y) };
+//_!=_ = { x:ptr? y:ptr? -> $$PrimNode$NE_OOP(x,y) };
 //
 //// Convert to str
-//str = { x:int -> $$com.cliffc.aa.node.NewStrNode$ConvertI64Str(x) };
-//str = { x:flt -> $$com.cliffc.aa.node.NewStrNode$ConvertF64Str(x) };
+//str = { x:int -> $$NewStrNode$ConvertI64Str(x) };
+//str = { x:flt -> $$NewStrNode$ConvertF64Str(x) };
 //str = { x:str? -> x };
 //
 //// String concat
-//_+_ = { x:str? y:str? -> $$com.cliffc.aa.node.NewStrNode$AddStrStr(x,y) };
+//_+_ = { x:str? y:str? -> $$NewStrNode$AddStrStr(x,y) };
 //
 //
 //// --------------
 //// Arrays
-//#_  = { ary:ary -> $$com.cliffc.aa.node.MemPrimNode$LValueLength(ary) };
-//[_] = { len:int -> $$com.cliffc.aa.node.NewAryNode$NewAry(len) };
+//#_  = { ary:ary -> $$MemPrimNode$LValueLength(ary) };
+//[_] = { len:int -> $$NewAryNode$NewAry(len) };
 //
 //// --------------
 //// Math
 //math = @{
-//  pi = $$com.cliffc.aa.node.ConNode$PI;
-//  rand = { x:int -> $$com.cliffc.aa.node.PrimNode$RandI64(x) };
+//  pi = $$ConNode$PI;
+//  rand = { x:int -> $$PrimNode$RandI64(x) };
 //};
 
 // end of file

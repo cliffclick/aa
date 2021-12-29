@@ -528,7 +528,7 @@ public class Parse implements Comparable<Parse> {
     while( true ) {             // Kleene star at this precedence
       // Look for a binop at this precedence level
       int opx = _x;             // Invariant: WS already skipped
-      Oper binop = bin_op(token0());
+      Oper binop = bin_op(token0(),prec);
       if( binop==null ) { _x=opx; return lhs; }
       skipWS();
       int rhsx = _x;            // Invariant: WS already skipped
@@ -628,7 +628,7 @@ public class Parse implements Comparable<Parse> {
       if( peek("--") && (n=inc(tok,-1))!=null ) return n;
     }
 
-    // Check for prefix ops; no leading exptr and require a trailing expr;
+    // Check for prefix ops; no leading expr and require a trailing expr;
     // balanced ops require a trailing balanced close.
     Oper op = pre_bal(tok);
     if( op != null ) {
@@ -1108,7 +1108,7 @@ public class Parse implements Comparable<Parse> {
   private Node java_class_node() throws RuntimeException {
     int x = _x;
     while( isJava(_buf[_x]) ) _x++;
-    String str = new String(_buf,x,_x-x);
+    String str = "com.cliffc.aa.node."+new String(_buf,x,_x-x);
     try {
       Class clazz = Class.forName(str);
       PrimNode n = (PrimNode)clazz.getConstructor().newInstance();
@@ -1148,7 +1148,7 @@ public class Parse implements Comparable<Parse> {
     int x = _x;
     while( isJava(_buf[_x]) ) _x++;
     String[] strs = new String(_buf,x,_x-x).split("\\$");
-    String sclz = strs[0];
+    String sclz = "com.cliffc.aa.type."+strs[0];
     String sfld = strs[1];
     try {
       Class clazz = Class.forName(sclz);
@@ -1191,27 +1191,21 @@ public class Parse implements Comparable<Parse> {
   // Unary/prefix op or leading balanced op, with no leading expression.
   // Examples: -1, !pred, [size], %{% matrix_init %}%
   // Adds trailing '_' for required trailing expression: -_  !_  [_  %{%_
-  Oper pre_bal(String tok) { return isOp(tok)? new Oper(tok+"_",0) : null;  }
+  Oper pre_bal(String tok) { return isOp(tok)? Oper.make(tok+"_") : null; }
 
   // Parsed a leading expression; look for a binary op.  Requires no leading
   // '[' or embedded '{' or '<'.  Requires a trailing expr.
   // Examples:  x+y, x<<y,  x<=y,  x%y
   // Adds '_' for required expressions: _+_  _<<_  _<=_  _%_
-  Oper bin_op(String tok) {
-    if( !isOp(tok) ) return null;
-    Oper bop = new Oper("_"+tok+"_");
-    return bop.is_open() ? null : bop;
+  Oper bin_op(String tok, int prec) {
+    return isOp(tok) ? Oper.make("_"+tok+"_",prec) : null;
   }
 
   // Parsed a leading expression; look for a balanced op.  Requires a leading
   // '[' or an embedded '{' or '<'.  Requires a trailing expr.
   // Examples:  ary[idx], ary[idx]=val, dict[key], %{% matrix %}%, ~<< "sql string" ~>>
   // Adds '_' for required expressions: _[_  _[_  _[_  _%{%_  _~<<_
-  Oper bal_open(String tok) {
-    if( !isOp(tok) ) return null;
-    Oper bop = new Oper("_"+tok+"_",0);
-    return bop.is_open() ? bop : null;
-  }
+  Oper bal_open(String tok) { return Oper.make_open("_"+tok+"_"); }
 
   // Parse an optional closing balanced op
   Oper bal_close(Oper op) {
