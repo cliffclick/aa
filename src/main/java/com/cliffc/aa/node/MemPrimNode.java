@@ -5,7 +5,6 @@ import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.NonBlockingHashMap;
 
 import static com.cliffc.aa.AA.*;
 
@@ -57,7 +56,6 @@ public abstract class MemPrimNode extends PrimNode {
         FunNode  fun = ( FunNode) X.xform(new  FunNode(_name,this));
         ParmNode rpc = (ParmNode) X.xform(new ParmNode(TypeRPC.ALL_CALL,null,fun,0      ,"rpc"));
         Node mem     =            X.xform(new ParmNode(TypeMem.MEM     ,null,fun,MEM_IDX," mem"));
-        fun._bal_close = bal_close();
         add_def(null);              // Control for the primitive in slot 0
         add_def(mem );              // Memory  for the primitive in slot 1
         while( len() < _sig._formals.nargs() ) add_def(null);
@@ -135,7 +133,6 @@ public abstract class MemPrimNode extends PrimNode {
   static class LValueRead extends ReadPrimNode {
     LValueRead() { super("[",TypeMemPtr.LVAL_RD,Type.SCALAR); }
     @Override public String bal_close() { return "]"; } // Balanced op
-    @Override public byte op_prec() { return 0; } // Balanced op
     @Override public Type value() {
       Type mem = val(MEM_IDX);
       Type adr = val(ARG_IDX);
@@ -205,7 +202,6 @@ public abstract class MemPrimNode extends PrimNode {
   static class LValueWrite extends WritePrimNode {
     LValueWrite() { super("[",TypeMemPtr.LVAL_WR,Type.SCALAR); }
     @Override public String bal_close() { return "]:="; } // Balanced op
-    @Override public byte op_prec() { return 0; }
     @Override public Type value() {
       Type mem = val(MEM_IDX);
       Type ary = val(ARG_IDX  );
@@ -238,7 +234,6 @@ public abstract class MemPrimNode extends PrimNode {
   static class LValueWriteFinal extends WritePrimNode {
     LValueWriteFinal() { super("[",TypeMemPtr.LVAL_WR,Type.SCALAR); }
     @Override public String bal_close() { return "]="; } // Balanced op
-    @Override public byte op_prec() { return 0; }
     @Override public Type value() {
       Type mem = val(MEM_IDX);
       Type ary = val(ARG_IDX  );

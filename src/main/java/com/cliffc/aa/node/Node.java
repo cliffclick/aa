@@ -590,14 +590,6 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Return any type error message, or null if no error
   public ErrMsg err( boolean fast ) { return null; }
 
-  // Operator precedence is only valid for binary functions.
-  // 1-9: Normal precedence
-  // 0  : Balanced op; precedence is from Parse.term() and not expr().
-  // -1 : Invalid
-  // -2 : Forward ref.
-  public byte op_prec() { return -1; }
-
-
   // Global expressions, to remove redundant Nodes
   public static final ConcurrentHashMap<Node,Node> VALS = new ConcurrentHashMap<>();
 

@@ -1111,7 +1111,7 @@ public class Parse implements Comparable<Parse> {
     String str = "com.cliffc.aa.node."+new String(_buf,x,_x-x);
     try {
       Class clazz = Class.forName(str);
-      PrimNode n = (PrimNode)clazz.getConstructor().newInstance();
+      Node n = (Node)clazz.getConstructor().newInstance();
 
       // Common primitive shortcut: if followed by a '(' assume a full normal
       // function call, which will just normally inlines to a direct prim use.
@@ -1120,17 +1120,27 @@ public class Parse implements Comparable<Parse> {
       skipWS();
       int oldx = _x;
       if( peek('(') ) {
-        int nidx = n.push();
+        PrimNode p = n instanceof PrimNode p2 ? p2 : null;
+        NewNode.NewPrimNode np = n instanceof NewNode.NewPrimNode p2 ? p2 : null;
+        int nargs = p==null ? np._tfp.nargs() : p._tfp.nargs();
+        boolean  read_mem = np != null && np._reads;
+        boolean write_mem = np!=null;
+
+        int nidx = Env.GVN.add_flow(n).push();
         n.add_def(null);        // No control
-        n.add_def(null);        // No memory; TODO: pass in memory & opt away
-        for( int i=DSP_IDX; i<n._tfp.nargs(); i++ ) {
+        n.add_def(read_mem ? mem() : null);
+        for( int i=DSP_IDX; i<nargs; i++ ) {
           n.add_def(stmts());
-          if( i<n._tfp.nargs()-1 ) require(',',oldx);
+          if( i<nargs-1 ) require(',',oldx);
         }
-        Node xn = Node.pop(nidx);
+        Node xn = Env.GVN.add_flow(Node.pop(nidx));
         assert xn==n;
+        if( write_mem ) {
+          set_mem(init(new MrgProjNode((NewNode)n,mem())));
+          n = init(new ProjNode(n,REZ_IDX));
+        }
         require(')',oldx);
-        return Env.GVN.add_flow(n);
+        return n;
       }
 
       // Else build a function which calls the primitive, and return a
@@ -1222,6 +1232,7 @@ public class Parse implements Comparable<Parse> {
     Number n = _nf.parse(_str,_pp);
     _x = _pp.getIndex();
     if( n instanceof Long   ) {
+      if( _buf[_x-1]=='.' ) _x--; // Java default parser allows "1." as an integer; pushback the '.'
       TypeInt ti = TypeInt.con(n.longValue());
       Node unr = _e.lookup("int");
       return do_call(null,ctrl(),mem(),unr,con(ti));
@@ -1261,10 +1272,8 @@ public class Parse implements Comparable<Parse> {
     String str = new String(_buf,oldx,_x-oldx-1).intern();
     // Convert to ptr-to-constant-memory-string
     NewNode nnn = (NewNode)gvn( new NewStrNode.ConStr(str) );
-    //if( Env.DEFMEM._defs.atX(nnn._alias)==null )
-    //  set_mem(Env.DEFMEM.make_mem_proj(nnn,mem()));
-    //return gvn( new ProjNode(nnn,REZ_IDX));
-    throw unimpl();
+    set_mem(gvn(new MrgProjNode(nnn,mem())));
+    return gvn( new ProjNode(nnn,REZ_IDX));
   }
 
   ///** Parse a type or return null

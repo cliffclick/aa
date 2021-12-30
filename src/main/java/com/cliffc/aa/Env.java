@@ -235,10 +235,17 @@ public class Env implements AutoCloseable {
       while( c.len()>0 ) c.pop();
       GVN.add_dead(c);
     }
+    // Kill all undefined values, which promote up to the top level
+    while( !(c=STK_0._defs.last()).is_prim() ) {
+      while( c.len()>0 ) c.pop();
+      STK_0.pop_fld();
+      GVN.add_dead(c);
+    }
     // Clear out the dead before clearing VALS, since they may not be reachable and will blow the elock assert
     GVN.iter_dead();
     TV2.reset_to_init0();
     Node.VALS.clear();          // Clean out hashtable
+    GVN.flow_clear();
     START.walk_reset();         // Clean out any wired prim calls
     KEEP_ALIVE.walk_reset();    // Clean out any wired prim calls
     GVNGCM.KEEP_ALIVE.walk_reset();

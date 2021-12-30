@@ -1064,11 +1064,11 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
     if( get(fld._fld)==fld ) return this;
     return copy().set_fld(fld).hashcons_free();
   }
-  public TypeStruct del_fld( String name ) {
-    //TypeStruct ts = copy();
-    //ts._flds.remove(name);
-    //return ts.hashcons_free();
-    throw unimpl();
+  public TypeStruct pop_fld(int idx) {
+    TypeStruct ts = copy();
+    TypeFld fld = ts._flds.pop();
+    assert fld._order==idx;
+    return ts.hashcons_free();
   }
 
   // Update (approximately) the current TypeObj.  Updates the named field.

@@ -85,6 +85,12 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   public static TypeMemPtr make_nil( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
   public TypeMemPtr make_from( TypeObj obj ) { return _obj==obj ? this : make(_aliases,obj); }
   public TypeMemPtr make_from( BitsAlias aliases ) { return _aliases==aliases ? this : make(aliases,_obj); }
+  public TypeMemPtr make_from_nil( BitsAlias aliases ) {
+    if( _aliases==aliases ) return this;
+    if( _aliases.test(0) != aliases.test(0) )
+      aliases = _aliases.test(0) ? aliases.clear(0) : aliases.set(0);
+    return make(aliases,_obj);
+  }
 
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.
   // To break class-init cycle, this is made here, now.

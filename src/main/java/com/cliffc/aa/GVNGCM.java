@@ -127,15 +127,10 @@ public class GVNGCM {
       else if( (n=_work_inline.pop())!=null ) m = ((FunNode)n).ideal_inline(false);
       else break;
       ITER_CNT++; assert ITER_CNT < 35000; // Catch infinite ideal-loops
-      if( m == null ) {
-        ITER_CNT_NOOP++; // No progress profiling
-        //assert Env.START==null || Env.START.more_work(true)==0; // Initial conditions are correct
-      }
-      else {
-        // VERY EXPENSIVE ASSERT
-        //assert Env.START == null || Env.START.more_work(true) == 0 // Initial conditions are correct
-          ; assert m.is_dead() || m.check_vals();
-      }
+      if( m == null ) ITER_CNT_NOOP++;     // No progress profiling
+      else assert m.is_dead() || m.check_vals();
+      // VERY EXPENSIVE ASSERT
+      //assert Env.START == null || Env.START.more_work(true) == 0; // Initial conditions are correct
     }
   }
 
@@ -162,25 +157,12 @@ public class GVNGCM {
     assert !Env.START.more_ideal(IDEAL_VISIT);
   }
 
-  // Clear the dead,flow,reduce worklists only
+  // Clear the dead worklist only
   public void iter_dead() {
-    while( true ) {
-      Node n, m;
-      if( false ) ;
-      else if( (n=_work_dead  .pop())!=null ) m = n._uses._len == 0 ? n.kill() : null;
-      else if( (n=_work_flow  .pop())!=null ) m = n.do_flow  ();
-      else if( (n=_work_reduce.pop())!=null ) m = n.do_reduce();
-      else break;
-      ITER_CNT++; assert ITER_CNT < 35000; // Catch infinite ideal-loops
-      if( m == null ) {
-        ITER_CNT_NOOP++; // No progress profiling
-        //assert Env.START==null || Env.START.more_work(true)==0; // Initial conditions are correct
-      }
-      else
-        // VERY EXPENSIVE ASSERT
-        //assert Env.START==null || Env.START.more_work(true)==0 // Initial conditions are correct
-        ;
-    }
+    Node n;
+    while( (n=_work_dead.pop()) != null )
+      if( n._uses._len == 0 )
+        n.kill();
   }
 
   // Did a bulk not-monotonic update.  Forcibly update the entire region at

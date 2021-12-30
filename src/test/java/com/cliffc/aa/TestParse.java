@@ -61,17 +61,21 @@ public class TestParse {
     test("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(0);(1,);(1,).0;@{x;y];","Expected closing '}' but found ']' instead",63);
     test("noinline_inc={x -> x&1}; noinline_p={x -> noinline_inc(x)*2}; noinline_p",
-      (()->TypeFunPtr.make(29,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.INT64)),
+      (ignore->TypeFunPtr.make(29,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.INT64)),
       ( () -> TypeStruct.args(Type.SCALAR)),
          "[29]{ int64 -> int64 }" );
     // id accepts and returns both ints and reference types (arrays).
     test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
-      (() -> TypeMemPtr.make(9,TypeStruct.tupsD(TypeInt.INT8,TypeInt.con(3)))),
+      (ignore -> TypeMemPtr.make(9,TypeStruct.tupsD(TypeInt.INT8,TypeInt.con(3)))),
       null,
          "(int64, 3)");
   }
 
   @Test public void testParse00() {
+    test_ptr("3.14.str()"      , TypeStr.con("3.14"), "3.14");
+    test_ptr("3.str()"         , TypeStr.con("3"   ), "3");
+    test_ptr("str(\"abc\")"    , TypeStr.ABC, "\"abc\"");
+    test("\"abc\"==\"abc\"",TypeInt.TRUE, "1"); // Constant strings intern
     test("1",   TypeInt.TRUE, "1");
     // Unary operator
     test("-1",  TypeInt.con(-1), "-1");
@@ -106,11 +110,11 @@ public class TestParse {
     test("1+2.3",   TypeFlt.make(0,64,3.3), "3.3");
 
     // Simple strings
-    test("\"Hello, world\"", TypeStr.con("Hello, world"), "");
-    test("str(3.14)"       , TypeStr.con("3.14"), "");
-    test("str(3)"          , TypeStr.con("3"   ), "");
-    test("str(\"abc\")"    , TypeStr.ABC, "");
-    test("\"abc\"==\"abc\"",TypeInt.TRUE, ""); // Constant strings intern
+    test_ptr("\"Hello, world\"", TypeStr.con("Hello, world"), "\"Hello, world\"");
+    test_ptr("str(3.14)"       , TypeStr.con("3.14"), "\"3.14\"");
+    test_ptr("str(3)"          , TypeStr.con("3"   ), "\"3\"");
+    test_ptr("str(\"abc\")"    , TypeStr.ABC, "\"abc\"");
+    test("\"abc\"==\"abc\"",TypeInt.TRUE, "1"); // Constant strings intern
 
     // Variable lookup
     test("math.pi", TypeFlt.PI, "");
@@ -185,7 +189,7 @@ public class TestParse {
     testerr("math.rand(1)?1:\"a\"", "Cannot mix GC and non-GC types",18);
     test   ("math.rand(1)?1",TypeInt.BOOL); // Missing optional else defaults to nil
     test("math.rand(1)?\"abc\"",
-      (()->TypeMemPtr.make_nil(17,TypeStr.ABC)),
+      (ignore->TypeMemPtr.make_nil(17,TypeStr.ABC)),
          null, "*\"abc\"?" );
     test   ("x:=0;math.rand(1)?(x:=1);x",TypeInt.BOOL);
     testerr("a.b.c();","Unknown ref 'a'",0);
@@ -215,8 +219,8 @@ public class TestParse {
   @Test public void testParse02() {
     // Anonymous function definition
     test("{x -> x&1}",
-         (() -> TypeFunPtr.make(78,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.BOOL)),
-         ( () -> TypeStruct.make(TypeFld.make("x",Type.SCALAR,ARG_IDX))),
+         (ignore -> TypeFunPtr.make(78,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.BOOL)),
+         ( ()-> TypeStruct.make(TypeFld.make("x",Type.SCALAR,ARG_IDX))),
          "[78]{ int64 -> int64 }");
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
     testerr("{x y -> x+y}", "Scalar is none of (flt64,int64,*str?)",8); // {Scalar Scalar -> Scalar}
@@ -305,10 +309,10 @@ public class TestParse {
     test_named_tuple("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
 
     test("A= :(str?, int); A( \"abc\",2 )",
-      (()-> TypeMemPtr.make(29,TypeStruct.tupsD(TypeMemPtr.make(17,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
+      (ignore-> TypeMemPtr.make(29,TypeStruct.tupsD(TypeMemPtr.make(17,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
          null, "(*\"abc\",2)");
     test("A= :(str?, int); A( (\"abc\",2) )",
-      (()-> TypeMemPtr.make(18,TypeStruct.tupsD(TypeMemPtr.make(17,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
+      (ignore-> TypeMemPtr.make(18,TypeStruct.tupsD(TypeMemPtr.make(17,TypeStr.ABC),TypeInt.con(2)).make_from("A:"))),
          null, "(*\"abc\",2)");
     testerr("A= :(str?, int)?","Named types are never nil",16);
   }
@@ -366,7 +370,7 @@ public class TestParse {
     testerr ("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
-    test("x=@{n}",(()->TypeMemPtr.make(14,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,Access.RW,ARG_IDX)))),
+    test("x=@{n}",(ignore->TypeMemPtr.make(14,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,Access.RW,ARG_IDX)))),
          null,"@{n=0}");
   }
 
@@ -444,7 +448,7 @@ c= C(b,"abc");
     // Test does loads after recursive call, which should be allowed to bypass.
     test("sum={x -> x ? sum(x.n) + x.v : 0};"+
          "sum(@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
-         (() ->TypeInt.INT64), null, "int64");
+         (ignore ->TypeInt.INT64), null, "int64");
 
     // User-defined linked list.
     String ll_def = "List=:@{next;val};";
@@ -757,41 +761,41 @@ map(tmp)
   // Combined H-M and GCP Typing
   @Ignore
   @Test public void testParse15() {
-    test("-1", (()->TypeInt.con(-1)), null, "-1");
-    test("(1,2)", (() -> TypeMemPtr.make(13,TypeStruct.tupsD(TypeInt.con(1),TypeInt.con(2)))), null, "[13]( 1,2)");
+    test("-1", (ignore->TypeInt.con(-1)), null, "-1");
+    test("(1,2)", (ignore -> TypeMemPtr.make(13,TypeStruct.tupsD(TypeInt.con(1),TypeInt.con(2)))), null, "[13]( 1,2)");
 
     test("@{ n=0; v=1.2 }",
-         (() -> TypeMemPtr.make(13, TypeStruct.make2fldsD("n",Type.XNIL,"v",TypeFlt.con(1.2)))),
+         (ignore -> TypeMemPtr.make(13, TypeStruct.make2fldsD("n",Type.XNIL,"v",TypeFlt.con(1.2)))),
          null,
          "[13]@{ n = 0, v = 1.2}");
 
     test("{&}",
-         (() -> TypeFunPtr.make(BitsFun.make0(35),5, TypeMemPtr.NO_DISP,TypeInt.INT64)),
+         (ignore -> TypeFunPtr.make(BitsFun.make0(35),5, TypeMemPtr.NO_DISP,TypeInt.INT64)),
          (() -> TypeStruct.make2flds("x",TypeInt.INT64,"y",TypeInt.INT64)),
          "[35]{ int64 int64 -> int64 }");
 
     test("{ g -> (g,3)}",
-         (() -> TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP,
+         (ignore -> TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP,
                                 // TODO: how do i express the expected return state of memory
                                 //TypeMem.make(14,TypeStruct.make2fldsD("0",Type.SCALAR,"1",TypeInt.con(3))),
                                 TypeMemPtr.make(14,TypeObj.ISUSED))),
-         ( () -> TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
+         (() -> TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
                                  TypeFld.make("^",Type.ALL,DSP_IDX),
                                  TypeFld.make("g",Type.SCALAR,ARG_IDX))),
          "[43]{ A -> [14]( A, 3) }");
 
     test("{ g -> f = { ignore -> g }; ( f(3), f(\"abc\"))}",
-         (() -> TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.make(12,TypeObj.ISUSED),
+         (ignore -> TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.make(12,TypeObj.ISUSED),
                                 // TODO: how do i express the expected return state of memory
                                 //TypeMem.make(18,TypeStruct.make2fldsD("0",Type.SCALAR,"1",Type.SCALAR)),
                                 TypeMemPtr.make(18,TypeObj.ISUSED))),
-         ( () -> TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
+         (() -> TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
                                  TypeFld.make("^",TypeMemPtr.make(12,TypeObj.ISUSED),DSP_IDX),
                                  TypeFld.make("g",Type.SCALAR,ARG_IDX))),
          "[43]{ A -> [18]( A, A) }");
     // id accepts and returns all types and keeps precision
     test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
-         (() -> TypeMemPtr.make(18,TypeStruct.tupsD(TypeInt.INT8,TypeInt.con(3)))),
+         (ignore -> TypeMemPtr.make(18,TypeStruct.tupsD(TypeInt.INT8,TypeInt.con(3)))),
          null,
          "[99](int8, 3)");
 
@@ -903,13 +907,14 @@ HashTable = {@{
   }
 
   // Run a program once, with a given seed and typing flags
-  static private void _test0( String program, Supplier<Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect, int rseed ) {
+  static private void _test0( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect, int rseed ) {
     TypeEnv te = Exec.file("test",program,rseed,gcp_maker!=null,hmt_expect!=null);
     assertNull(te._errs);
     if( gcp_maker != null ) {
-      Type expect = gcp_maker.get();
-      Type actual = te._tmem.sharptr(te._t).unbox();
-      assertEquals(expect,actual);
+      Type actual = te._tmem.sharptr(te._t); // Sharpen any memory pointers
+      Type expect = gcp_maker.apply(actual);
+      Type actual_unbox = actual.unbox(); // As a testing convenience, unbox any wrapped primitives
+      assertEquals(expect,actual_unbox);
       // Also check GCP formals.
       if( expect instanceof TypeFunPtr ) {
         TypeStruct actual_formals = te._formals;
@@ -928,22 +933,37 @@ HashTable = {@{
 
   // Run a program once-per-rseed
   private static final int[] rseeds = new int[]{0,1,2,3};
-  private void _test1( String program, Supplier<Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect ) {
+  private void _test1( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect ) {
     for( int rseed : rseeds )
     //for( int rseed=0; rseed<32; rseed++ )
       _test0(program,gcp_maker,formals_maker,hmt_expect,rseed);
   }
 
   // Run a program in all 3 modes, with all rseeds
-  private void test( String program, Supplier<Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect ) {
-    _test1(program,gcp_maker,formals_maker,null);
-    _test1(program,null      ,null          ,hmt_expect);
+  private void test( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect ) {
+    _test1(program,gcp_maker,formals_maker,null      );
+    _test1(program,null     ,null         ,hmt_expect);
     _test1(program,gcp_maker,formals_maker,hmt_expect);
   }
 
   // Short form test: simple GCP, no formal args
   private void test( String program, Type gcp_maker, String hmt_expect ) {
-    test(program,()->gcp_maker,null,hmt_expect);
+    test(program,ignore->gcp_maker,null,hmt_expect);
+  }
+
+  // Result is expected to be a pointer, with an uninteresting alias.  The
+  // expected ptr._obj is passed.
+  private void test_ptr( String program, TypeObj gcp_expect, String hmt_expect ) {
+    test(program,
+         actual -> actual instanceof TypeMemPtr ? ((TypeMemPtr)actual).make_from(gcp_expect) : gcp_expect,
+         null,hmt_expect);
+  }
+  // Result is expected to be a pointer, with an uninteresting alias and an
+  // interesting nil.  The expected nil-ness and _obj is passed.
+  private void test_ptr0( String program, TypeMemPtr gcp_expect, String hmt_expect ) {
+    test(program,
+         actual -> actual instanceof TypeMemPtr ? gcp_expect.make_from_nil(((TypeMemPtr)actual)._aliases) : gcp_expect,
+         null,hmt_expect);
   }
 
   static void testerr( String program, String err, int cur_off ) {
@@ -1029,7 +1049,7 @@ HashTable = {@{
     //assertTrue(actual.isa(expected));
     throw unimpl();
   }
-  private static String strip_alias_numbers( String err ) {
+  //private static String strip_alias_numbers( String err ) {
     // Remove alias#s from the result string: *[123]@{x=1,y=2} ==> *[$]@{x=1,y=2}
     //     \\      Must use two \\ because of String escaping for every 1 in the regex.
     // Thus replacing: \[[,0-9]*  with:  \[\$
@@ -1039,8 +1059,8 @@ HashTable = {@{
     //     *       matches all the digits and commas
     //     \\[     Replacement [ because the first one got matched and replaced.
     //     \\$     Prevent $ being interpreted as a regex group start
-    return err.replaceAll("\\[[,0-9]*", "\\[\\$");
-  }
+  //  return err.replaceAll("\\[[,0-9]*", "\\[\\$");
+  //}
   static private void testary( String program, String err, int cur_off ) {
     //TypeEnv te = Exec.go(Env.file_scope(new Env()),"args",program);
     //assertTrue(te._errs != null && te._errs.size()>=1);

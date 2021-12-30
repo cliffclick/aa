@@ -85,7 +85,7 @@ public class CastNode extends Node {
 
     // Two structs, one nilable.  Nilable is moved into the alias, but also
     // need to align the fields.
-    if( maynil.is_struct() && notnil.is_struct() ) {
+    if( maynil.is_obj() && notnil.is_obj() ) {
       boolean progress = false;
       Type omt = maynil._flow;
       Type ont = notnil._flow;

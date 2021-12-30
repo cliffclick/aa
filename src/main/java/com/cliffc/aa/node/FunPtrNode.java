@@ -171,8 +171,4 @@ public final class FunPtrNode extends ValFunNode {
         progress |= self.arg(TV2.argname(i)).unify(parms[i].tvar(),test);
     return self.arg("ret").unify(ret.rez().tvar(),test) | progress;
   }
-
-  // Return the op_prec of the returned value.  Not sensible except when called
-  // on primitives.
-  @Override public byte op_prec() { throw unimpl(); }
 }

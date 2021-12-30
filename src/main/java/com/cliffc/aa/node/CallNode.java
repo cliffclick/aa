@@ -444,7 +444,7 @@ public class CallNode extends Node {
 
     CallEpiNode cepi = cepi();
     if( def==fdx() ) {          // Function argument
-      if( _is_copy ) return TypeMem.DEAD;
+      if( _is_copy ) return TypeMem.ALIVE;
       TypeFunPtr tfp = ttfp(tcall);
       BitsFun fidxs = tfp.fidxs();
       // If using a specific FunPtr and its in the resolved set, test more precisely
@@ -518,10 +518,8 @@ public class CallNode extends Node {
     if( !_is_copy ) return null;
     if( _val==Type.ANY ) return Env.ANY;
     if( idx!=DSP_IDX ) return in(idx);
-    // The display out of a Call is the FunPtr in to the Call.
-    // Map to the FunPtr to the Display.
-    if( fdx() instanceof FunPtrNode )  return ((FunPtrNode)fdx()).display();
-    else throw unimpl(); // Need a FP2DISP
+    if( fdx() instanceof FunPtrNode fptr ) return fptr.display();
+    throw unimpl(); // Need a FP2DISP
   }
   void set_rpc(int rpc) { unelock(); _rpc=rpc; } // Unlock before changing hash
   @Override public int hashCode() { return super.hashCode()+_rpc; }

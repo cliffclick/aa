@@ -59,7 +59,6 @@ import static com.cliffc.aa.AA.*;
 
 public class FunNode extends RegionNode {
   public String _name;      // Debug-only name
-  public String _bal_close; // null for everything except "balanced oper functions", e.g. "[]"
   public int _fidx;         // Unique number for this piece of code
   public int _nargs;        // Number of arguments
   // Operator precedence; only set on top-level primitive wrappers.
@@ -522,14 +521,11 @@ public class FunNode extends RegionNode {
         if( !(n1._val instanceof TypeFunPtr) ) return -1; // Calling an unknown function, await GCP
         TypeFunPtr tfp = (TypeFunPtr)n1._val;
         if( tfp._fidxs.test(_fidx) ) self_recursive = true; // May be self-recursive
-        //Node n2 = n1 instanceof UnOrFunPtrNode ? ((UnOrFunPtrNode)n1).funptr() : n1;
-        //if( n2 instanceof FunPtrNode ) {
-        //  FunPtrNode fpn = (FunPtrNode) n2;
-        //  if( fpn.ret().rez() instanceof PrimNode )
-        //    op = OP_PRIM;       // Treat as primitive for inlining purposes
-        //} else
-        //  call_indirect++;
-        throw unimpl();
+        if( n1 instanceof FunPtrNode fpn ) {
+          if( fpn.ret().rez() instanceof PrimNode )
+            op = OP_PRIM;       // Treat as primitive for inlining purposes
+        } else
+          call_indirect++;
       }
       cnts[op]++;               // Histogram ops
     }
@@ -591,7 +587,6 @@ public class FunNode extends RegionNode {
     // Make a prototype new function header split from the original.
     int oldfidx = _fidx;
     FunNode fun = new FunNode(_name, BitsFun.new_fidx(path==-1 ? oldfidx : BitsFun.parent(oldfidx)),_nargs);
-    fun._bal_close = _bal_close;
     fun.pop();                  // Remove null added by RegionNode, will be added later
 
     // If type-splitting renumber the original as well; the original _fidx is

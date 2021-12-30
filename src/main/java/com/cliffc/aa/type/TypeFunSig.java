@@ -55,7 +55,6 @@ public final class TypeFunSig extends Type<TypeFunSig> {
   public static TypeFunSig make2( Type arg1, Type arg2 ) { return make(TypeStruct.args(arg1,arg2),Type.SCALAR); }
   public TypeFunSig make_from( TypeStruct formals ) { return make(formals,_ret); }
   public TypeFunSig make_from_arg( TypeFld arg ) { return make(_formals.replace_fld(arg),_ret); }
-  public TypeFunSig make_from_remove( String fld ) { return make(_formals.del_fld(fld),_ret); }
 
   public static final TypeFunSig II_I = make(TypeStruct.INT64_INT64,TypeInt.INT64);
   static final TypeFunSig[] TYPES = new TypeFunSig[]{II_I};

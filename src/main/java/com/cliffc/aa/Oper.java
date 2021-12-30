@@ -65,13 +65,13 @@ public class Oper {
 
   // Build a unary oper.
   public static Oper make(String name) { return new Oper(name,0); }
-  
+
   // Build a binary oper, compute precedence based on 1st not-underscore
   // character.  Means, e.g. "<" and "<=" are forced to the same precedence.
   public static Oper make(String name, int prec) {
     int oprec = prec(name.charAt(1));
     if( prec > oprec ) return null;
-    return new Oper(name,oprec);    
+    return new Oper(name,oprec);
   }
 
   // Build a balanced open oper.
@@ -79,7 +79,7 @@ public class Oper {
   // True if op has balanced-op openers
   static boolean is_open( String name ) { return name.indexOf('[')>=0 || name.indexOf('{')>=2 || name.indexOf('<')>=2; }
   public boolean is_open() { return is_open(_name); }
-  
+
   // Precedence is based on the single first non-'_' character
   public static final int MAX_PREC=6;
   private static int prec(char c) {
@@ -92,8 +92,6 @@ public class Oper {
     default -> throw unimpl();
     };
   }
-
-  int len() { return _name.length(); }
 
   // Parse a postfix op; update P or return null.
   // If the required trailing expr is not found, caller must unwind P.

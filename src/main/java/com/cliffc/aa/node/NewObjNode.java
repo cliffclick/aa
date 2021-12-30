@@ -62,7 +62,14 @@ public class NewObjNode extends NewNode<TypeStruct> {
      xval();
      Env.GVN.add_flow_uses(this);
   }
-
+  // Used during reset
+  public void pop_fld() {
+    int idx = _defs._len-1;
+    sets(_ts.pop_fld(idx));
+    pop();
+    xval();
+    _tvar = null;
+  }
 
   // Add a named FunPtr to a New.  Auto-inflates to a Unresolved as needed.
   public void add_fun( Parse bad, String name, ValFunNode ptr ) {
@@ -169,7 +176,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   @Override public boolean unify( boolean test ) {
     TV2 rec = tvar();
     if( rec.is_err() ) return false;
-    assert rec.is_struct() && check_fields(rec);
+    assert rec.is_obj() && check_fields(rec);
 
     // Unify existing fields.  Ignore extras on either side.
     boolean progress = false;

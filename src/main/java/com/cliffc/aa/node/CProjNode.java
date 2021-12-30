@@ -36,8 +36,4 @@ public class CProjNode extends ProjNode {
   @Override public TypeMem live_use(Node def ) { return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
 
   @Override public TV2 new_tvar(String alloc_site) { return null; }
-
-  // Return the op_prec of the returned value.  Not sensible except
-  // when call on primitives.
-  @Override public byte op_prec() { return _defs.at(0).op_prec(); }
 }

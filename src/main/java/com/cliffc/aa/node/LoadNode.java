@@ -43,8 +43,7 @@ public class LoadNode extends Node {
           Node p = nnn.in(fld._order);
           if( p._val==Type.ALL ) return null;
           // Instance call; move the adr into Unresolved/FunPtr
-          if( p._val instanceof TypeFunPtr ) {
-            TypeFunPtr tfp = (TypeFunPtr)p._val;
+          if( p._val instanceof TypeFunPtr tfp ) {
             if( tfp._dsp==TypeMemPtr.NO_DISP ) return p; // No display ("static" prototype call)
             if( p instanceof UnresolvedNode ) return ((UnresolvedNode)p).bind(adr());
             assert p instanceof FunPtrNode; // clone, inject adr() as display
@@ -55,8 +54,8 @@ public class LoadNode extends Node {
           //return nnn.in(fld._order);
         }
         // fetch directly from local
-        if( adr instanceof ValNode )
-          throw unimpl();
+        if( adr instanceof ValNode val )
+          return val.in(Util.find(val._flds,_fld));
       }
     }
 
@@ -292,10 +291,10 @@ public class LoadNode extends Node {
       return fld.unify(self, test);
 
     // Add struct-ness if possible
-    if( !rec.is_struct() && !rec.is_nil() )
+    if( !rec.is_obj() && !rec.is_nil() )
       rec.make_open_struct();
     // Add the field
-    if( rec.is_struct() && rec.is_open() ) {
+    if( rec.is_obj() && rec.is_open() ) {
       rec.add_fld(_fld,self);
       return true;
     }

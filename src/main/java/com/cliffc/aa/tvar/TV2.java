@@ -126,15 +126,15 @@ public class TV2 {
   }
 
   // Accessors
-  public boolean is_leaf()  { return _args==null && _flow==null; }
   public boolean is_unified(){return arg(">>")!=null; }
-  public boolean is_nil()   { return arg("?" )!=null; }
-  public boolean is_base()  { return _flow != null && !(_flow instanceof TypeFunPtr) && !(_flow instanceof TypeMemPtr) ; }
-  public boolean is_fun ()  { return _flow instanceof TypeFunPtr; }
-  public boolean is_struct(){ return _flow instanceof TypeMemPtr; }
-  public boolean is_open()  { return _open; }           // Struct-specific
-  public boolean is_err()   { return _err!=null || is_err2(); }
-  public boolean is_err2()  { return _eflow!=null; }
+  public boolean is_leaf() { return _args==null && _flow==null; }
+  public boolean is_nil () { return arg("?" )!=null; }
+  public boolean is_base() { return _flow != null && !is_fun() && !is_obj(); }
+  public boolean is_fun () { return _flow instanceof TypeFunPtr; }
+  public boolean is_obj () { return _flow instanceof TypeMemPtr tmp && tmp._obj.getClass() != TypeObj.class; }
+  public boolean is_open() { return _open; }           // Struct-specific
+  public boolean is_err () { return _err!=null || is_err2(); }
+  public boolean is_err2() { return _eflow!=null; }
   public int size() { return _args==null ? 0 : _args.size(); }
 
   //// Unify-at a key.  Expect caller already has args
@@ -183,6 +183,7 @@ public class TV2 {
     assert !(flow instanceof TypeStruct) && !(flow instanceof TypeFunPtr);
     TV2 t2 = new TV2(null,UQNodes.make(n),alloc_site);
     t2._flow=flow;
+    assert t2.is_base() && !t2.is_obj();
     return t2;
   }
   public static TV2 make_fun(Node n, TypeFunPtr fptr, @NotNull String alloc_site, TV2... t2s) {
@@ -201,10 +202,11 @@ public class TV2 {
     for( TypeFld fld : n._ts )
       args.put(fld._fld,n.in(fld._order).tvar());
     // Value types have a class name field
-    if( ValFunNode.valtype(n._tptr)!=null )
-      args.put(n._tptr._obj._name,make_leaf(n,alloc_site));
+    String clz_name = ValFunNode.valtype(n._tptr);
+    if( clz_name!=null )
+      args.put(clz_name,make_leaf(n,alloc_site));
     TV2 t2 = new TV2(args,UQNodes.make(n),alloc_site);
-    t2._flow = n._tptr;
+    t2._flow = n._tptr.make_from(n._ts);
     t2._open = false;
     return t2;
   }
@@ -212,9 +214,20 @@ public class TV2 {
   public void make_open_struct() {
     assert is_leaf();
     _open = true;
-    _flow = TypeMemPtr.make(BitsAlias.EMPTY,TypeObj.UNUSED);
+    _flow = TypeMemPtr.make(BitsAlias.EMPTY,TypeStruct.EMPTY);
     _args = new NonBlockingHashMap<>();
-    assert is_struct();
+    assert is_obj();
+  }
+
+  // An array, with int length and an element type
+  public static TV2 make_ary(NewNode n, Node elem, String alloc_site) {
+    NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
+    args.put(" len",  make_leaf(n,alloc_site));
+    args.put(" elem", elem.tvar());
+    TV2 t2 = new TV2(args,UQNodes.make(n),alloc_site);
+    t2._flow = n._tptr;
+    assert t2.is_obj();
+    return t2;
   }
 
   public static void reset_to_init0() {
@@ -303,7 +316,7 @@ public class TV2 {
     if( n.is_fun() ) {
       throw unimpl();
     }
-    if( n.is_struct() ) {
+    if( n.is_obj() ) {
       _open = n._open;
       add_nil();
       if( n._args!=null )     // Shallow copy fields
@@ -379,7 +392,7 @@ public class TV2 {
 
   // -----------------
   // Recursively build a conservative flow type from an HM type.  The HM
-  // is_struct wants to be a TypeMemPtr, but the recursive builder is built
+  // is_obj wants to be a TypeMemPtr, but the recursive builder is built
   // around TypeStruct.
 
   // No function arguments, just function returns.
@@ -402,7 +415,7 @@ public class TV2 {
       Type rez = arg("ret")._as_flow();
       return TypeFunPtr.make(BitsFun.NZERO,size()-1,Type.ANY,rez);
     }
-    if( is_struct() ) {
+    if( is_obj() ) {
       TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);
       if( tstr==null ) {
         // Returning a high version of struct
@@ -437,8 +450,8 @@ public class TV2 {
     if( test ) return true; // Report progress without changing
 
     // Merge open
-    if( is_struct() )
-      that._open = that.is_struct() ? that._open & _open : _open;
+    if( is_obj() )
+      that._open = that.is_obj() ? that._open & _open : _open;
     // Merge all the hard bits
     if( _flow != null ) {       // Nothing to merge
       if( that._flow==null ) {
@@ -496,7 +509,7 @@ public class TV2 {
     //TV2 leaf = get("?");  assert leaf.is_leaf();
     //TV2 copy = that.copy("unify_nil");
     //if( that.is_base() ||
-    //    that.is_struct() ||
+    //    that.is_obj() ||
     //    that.isa("Str") ) {
     //  copy._type = copy._type.join(Type.NSCALR);
     //  copy._args = that._args==null ? null : (NonBlockingHashMap<String, TV2>)that._args.clone();
@@ -664,7 +677,7 @@ public class TV2 {
 
   // Insert a new field
   public boolean add_fld( String id, TV2 fld) {
-    assert is_struct();
+    assert is_obj();
     if( _args==null ) _args = new NonBlockingHashMap<>();
     fld.push_deps(_deps);
     _args.put(id,fld);
@@ -741,7 +754,7 @@ public class TV2 {
     //
     //// That is nilable and this is not
     //if( that.is_nil() && !this.is_nil() ) {
-    //  assert is_base() || is_struct();
+    //  assert is_base() || is_obj();
     //  if( test ) return true;
     //  TV2 copy = this;
     //  if( _type.must_nil() ) { // Make a not-nil version
@@ -903,7 +916,7 @@ public class TV2 {
     //  return t;
     //}
     //
-    //if( is_struct() ) {
+    //if( is_obj() ) {
     //  fput(t);                // Recursive types need to put themselves first
     //  if( !(t instanceof TypeMemPtr) )  return t;
     //  TypeMemPtr tptr = (TypeMemPtr)(t.simple_ptr()==t ? tmem.sharptr(t) : t);
@@ -951,7 +964,7 @@ public class TV2 {
     //if( is_base() ) return tmap==null ? _type : tmap.join(t);
     //if( is_nil() ) return t; // nil is a function wrapping a leaf which is not-nil
     //if( is_fun() ) return t; // No change, already known as a function (and no TFS in the flow types)
-    //if( is_struct() ) {
+    //if( is_obj() ) {
     //  if( !(t instanceof TypeMemPtr) && tmap!=null )
     //    t = tmap;
     //  if( !(t instanceof TypeMemPtr) )
@@ -1056,17 +1069,17 @@ public class TV2 {
   private TV2 _unbox() {
     TV2 tv = DUPS.get(_uid);
     if( tv!=null ) return tv;
-    if( is_struct() ) {
+    if( is_obj() ) {
       if( arg("int:")!=null ) return arg("_val");     // Unbox ints
       if( arg("flt:")!=null ) return arg("_val");     // Unbox flts
       throw unimpl();
     }
-    throw unimpl();
+    return this;
   }
 
   // --------------------------------------------
   // Pretty print
-  boolean is_math() { return is_struct() && _args!=null && _args.containsKey("pi"); }
+  boolean is_math() { return is_obj() && _args!=null && _args.containsKey("pi"); }
 
   // Look for dups, in a tree or even a forest (which Syntax.p() does)
   public VBitSet get_dups() { return _get_dups(new VBitSet(),new VBitSet()); }
@@ -1110,16 +1123,16 @@ public class TV2 {
         if( is_fun   () ) str_fun   (sb,visit,dups,debug).p(" and ");
         if( is_base  () ) str_base  (sb)                 .p(" and ");
         if( _eflow!=null) sb.p(_eflow)                   .p(" and ");
-        if( is_struct() ) str_struct(sb,visit,dups,debug).p(" and ");
+        if( is_obj() ) str_struct(sb,visit,dups,debug).p(" and ");
         return sb.unchar(5);
       }
       return sb.p(_err);      // Just a simple error
     }
 
-    if( is_base  () ) return str_base(sb);
-    if( is_struct() ) return str_struct(sb,visit,dups,debug);
-    if( is_fun   () ) return str_fun(sb,visit,dups,debug);
-    if( is_nil   () ) return str0(sb,visit,arg("?"),dups,debug).p('?');
+    if( is_base() ) return str_base(sb);
+    if( is_obj () ) return str_struct(sb,visit,dups,debug);
+    if( is_fun () ) return str_fun(sb,visit,dups,debug);
+    if( is_nil () ) return str0(sb,visit,arg("?"),dups,debug).p('?');
 
     // Generic structural TV2
     sb.p("( ");

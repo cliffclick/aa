@@ -272,6 +272,7 @@ public abstract class PrimNode extends Node {
     public AndI64() { super("&"); }
     // And can preserve bit-width
     @Override public Type value() {
+      if( is_keep() ) return Type.ALL;
       Type t1 = val(DSP_IDX), t2 = val(ARG_IDX);
       // 0 AND anything is 0
       if( t1 == Type. NIL || t2 == Type. NIL ) return Type. NIL;
@@ -297,6 +298,7 @@ public abstract class PrimNode extends Node {
     public OrI64() { super("|"); }
     // And can preserve bit-width
     @Override public Type value() {
+      if( is_keep() ) return Type.ALL;
       Type t1 = val(DSP_IDX), t2 = val(ARG_IDX);
       // 0 OR anything is that thing
       if( t1 == Type.NIL || t1 == Type.XNIL ) return t2;
@@ -336,6 +338,7 @@ public abstract class PrimNode extends Node {
   public static class EQ_OOP extends PrimNode {
     public EQ_OOP() { super("==",TypeMemPtr.OOP_OOP,TypeInt.BOOL); }
     @Override public Type value() {
+      if( is_keep() ) return Type.ALL;
       // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
       // Probably need a java-like "eq" vs "==" to mean deep-equals.  You are
       // equals if your inputs are the same node, and you are unequals if your
@@ -368,6 +371,7 @@ public abstract class PrimNode extends Node {
   public static class NE_OOP extends PrimNode {
     public NE_OOP() { super("!=",TypeMemPtr.OOP_OOP,TypeInt.BOOL); }
     @Override public Type value() {
+      if( is_keep() ) return Type.ALL;
       // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
       // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
       // equals if your inputs are the same node, and you are unequals if your
@@ -397,6 +401,7 @@ public abstract class PrimNode extends Node {
     // Rare function which takes a Scalar (works for both ints and ptrs)
     public Not() { super("!",TypeStruct.SCALAR1,TypeInt.BOOL); }
     @Override public Type value() {
+      if( is_keep() ) return Type.ALL;
       Type t = val(DSP_IDX);
       if( t== Type.XNIL ||
           t== Type. NIL ||
@@ -412,6 +417,7 @@ public abstract class PrimNode extends Node {
   public static class RandI64 extends PrimNode {
     public RandI64() { super("rand",TypeStruct.INT64,TypeInt.INT64); }
     @Override public Type value() {
+      if( is_keep() ) return Type.ALL;
       Type t = val(DSP_IDX);
       if( t.above_center() ) return TypeInt.BOOL.dual();
       if( TypeInt.INT64.dual().isa(t) && t.isa(TypeInt.INT64) )

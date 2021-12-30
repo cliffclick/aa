@@ -88,8 +88,6 @@ public class FreshNode extends Node {
       t.add_deps_flow(); // recursive work.add(_deps)
   }
 
-  @Override public byte op_prec() { return id().op_prec(); }
-
   // Two FreshNodes are only equal, if they have compatible TVars
   @Override public boolean equals(Object o) {
     if( _tvar==null ) return this==o;

@@ -10,8 +10,8 @@ import static com.cliffc.aa.AA.unimpl;
 // Allocates a TypeAry in memory.  Takes in the size and initial element value
 // produces the pointer.  Hence, liveness is odd.
 public abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
-  public NewAryNode( TypeAry tary, String name, int op_prec, TypeInt sz ) {
-    super(OP_NEWARY,BitsAlias.AARY,tary,name,false,TypeAry.ARY,op_prec,TypeFld.make("len",sz,ARG_IDX));
+  public NewAryNode( TypeAry tary, String name, TypeInt sz ) {
+    super(OP_NEWARY,BitsAlias.AARY,tary,name,false,TypeAry.ARY,TypeFld.make("len",sz,ARG_IDX));
   }
   @Override TypeAry dead_type() { return TypeAry.ARY.dual(); }
 
@@ -19,9 +19,8 @@ public abstract class NewAryNode extends NewNode.NewPrimNode<TypeAry> {
   // "[" defines a new array, and expects an integer size.  Produces
   // partial-alloc type which is consumed by "]" to produce the array.
   public static class NewAry extends NewAryNode {
-    public NewAry( ) { super(TypeAry.ARY,"$[",0,TypeInt.INT64); }
+    public NewAry( ) { super(TypeAry.ARY,"$[",TypeInt.INT64); }
     @Override public String bal_close() { return "]"; } // Balanced op
-    @Override public byte op_prec() { return 0; } // Balanced op
     @Override TypeObj valueobj() {
       Type sz = val(ARG_IDX);
       if( !(sz instanceof TypeInt) ) return sz.oob(TypeObj.ISUSED);

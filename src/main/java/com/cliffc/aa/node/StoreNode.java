@@ -222,7 +222,7 @@ public class StoreNode extends Node {
     if( test ) return true;
 
     // Add field if open
-    if( ptr.is_struct() && ptr.is_open() ) // Effectively unify with an extended struct.
+    if( ptr.is_obj() && ptr.is_open() ) // Effectively unify with an extended struct.
       return ptr.add_fld(id,tval);
 
     // Unify against an open struct with the named field

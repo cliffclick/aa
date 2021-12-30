@@ -91,5 +91,4 @@ public class ProjNode extends Node {
     ProjNode proj = (ProjNode)o;
     return _idx==proj._idx;
   }
-  @Override public byte op_prec() { return in(0).op_prec(); }
 }

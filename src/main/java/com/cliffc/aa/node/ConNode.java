@@ -6,8 +6,6 @@ import com.cliffc.aa.type.*;
 
 import java.util.function.Predicate;
 
-import static com.cliffc.aa.AA.unimpl;
-
 // Constant value nodes; no computation needed.  Hashconsed for unique
 // constants, except for XNIL.  XNIL allows for a TV2 typevar Nilable-Leaf with
 // each Leaf unifying on its own.
@@ -39,9 +37,8 @@ public class ConNode<T extends Type> extends Node {
   @Override public boolean unify( boolean test ) {
     if( _tvar==null ) return false;
     TV2 self = tvar();
-    if( self.is_base() || self.is_nil() || self.is_struct() ) return false;
-    if( test ) return true;
-    throw unimpl();
+    assert self.is_base() || self.is_nil() || self.is_obj();
+    return false;
   }
 
   @Override public String toString() { return str(); }
@@ -52,8 +49,7 @@ public class ConNode<T extends Type> extends Node {
   }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
-    if( !(o instanceof ConNode) ) return false;
-    ConNode con = (ConNode)o;
+    if( !(o instanceof ConNode con) ) return false;
     if( _t==Type.XNIL && con._t==Type.XNIL /*&& tvar()!=con.tvar()*/ )
       return false;             // Different versions of TV2 NotNil
     return _t==con._t;

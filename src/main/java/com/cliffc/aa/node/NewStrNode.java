@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
@@ -10,55 +9,55 @@ import static com.cliffc.aa.AA.*;
 // Allocates a TypeStr in memory.  Weirdly takes a string OBJECT (not pointer),
 // and produces the pointer.  Hence, liveness is odd.
 public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
-  public NewStrNode( TypeStr to, String name, boolean reads, int op_prec, TypeFld... args) {
-    super(OP_NEWSTR,BitsAlias.STR,to,name,reads,TypeStr.STR,op_prec,args);
+  public NewStrNode( TypeStr to, String name, boolean reads, TypeFld... args) {
+    super(OP_NEWSTR,BitsAlias.STR,to,name,reads,TypeStr.STR,args);
   }
 
-  @Override public TV2 new_tvar(String alloc_site) {
-    //return TV2.make("Str",this,alloc_site);
-    throw unimpl();
-  }
-
-  @Override public boolean unify(boolean test) {
-    //TV2 tv = tvar();
-    //if( tv._type==null ) { tv._type = _tptr; return true; }
-    //return false;
-    throw unimpl();
-  }
-
+  @Override public TV2 new_tvar(String alloc_site) { return TV2.make_leaf(this,alloc_site); }
   @Override TypeStr dead_type() { return TypeStr.XSTR; }
 
   // --------------------------------------------------------------------------
   public static class ConStr extends NewStrNode {
-    public ConStr( String str ) { super(TypeStr.con(str),"con",false,-1,TypeFld.MEM); }
+    public ConStr( String str ) { super(TypeStr.con(str),"con",false); }
     @Override TypeStr valueobj() { return _ts; }
     @Override public TypeMem live_use( Node def ) { throw unimpl(); } // No inputs
     // Constant Strings intern
     @Override public int hashCode() { return is_unused() ? super.hashCode() : _ts._hash; }
     @Override public boolean equals(Object o) { return o instanceof ConStr && _ts==((ConStr)o)._ts; }
-    @Override public TV2 new_tvar(String alloc_site) { return TV2.make_base(this,_tptr==null ? null : _tptr.make_from(_ts),alloc_site); }
+    @Override public TV2 new_tvar(String alloc_site) { return TV2.make_base(this,_ts,alloc_site); }
   }
 
   public static class ConvertI64Str extends NewStrNode {
-    public ConvertI64Str( ) { super(TypeStr.STR,"str",false,-1,TypeFld.make_arg(TypeInt.INT64,ARG_IDX)); }
+    public ConvertI64Str( ) { super(TypeStr.STR,"str",false,TypeFld.make_arg(TypeInt.INT64,DSP_IDX)); }
     @Override TypeObj valueobj() {
-      Type t = val(ARG_IDX);
+      if( is_keep() ) return TypeObj.ISUSED;
+      Type t = val(DSP_IDX);
       if( t.above_center() || !(t instanceof TypeInt) ) return t.oob(TypeStr.STR);
       if( !t.is_con() ) return TypeStr.STR;
       return TypeStr.make(false,Long.toString(t.getl()).intern());
     }
     @Override public TypeMem live_use( Node def ) { return TypeMem.ALIVE; }
+    @Override public boolean unify(boolean test) {
+      if( tvar(DSP_IDX).is_base() ) return tvar().unify(tvar(DSP_IDX),test);
+      return false;
+    }
+
   }
 
   public static class ConvertF64Str extends NewStrNode {
-    public ConvertF64Str( ) { super(TypeStr.STR,"str",false,-1,TypeFld.make_arg(TypeFlt.FLT64,ARG_IDX)); }
+    public ConvertF64Str( ) { super(TypeStr.STR,"str",false,TypeFld.make_arg(TypeFlt.FLT64,DSP_IDX)); }
     @Override TypeObj valueobj() {
-      Type t = val(ARG_IDX);
+      if( is_keep() ) return TypeObj.ISUSED;
+      Type t = val(DSP_IDX);
       if( t.above_center() || !(t instanceof TypeFlt) ) return t.oob(TypeStr.STR);
       if( !t.is_con() ) return TypeStr.STR;
       return TypeStr.make(false,Double.toString(t.getd()).intern());
     }
     @Override public TypeMem live_use( Node def ) { return TypeMem.ALIVE; }
+    @Override public boolean unify(boolean test) {
+      if( tvar(DSP_IDX).is_base() ) return tvar().unify(tvar(DSP_IDX),test);
+      return false;
+    }
   }
 
   // String concat.  NIL values are treated "as-if" the empty string.
@@ -66,8 +65,7 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
   // If one  argument  is  NIL, the other non-nil argument is returned.
   // If neither argument is NIL, the two strings are concatenated into a new third string.
   public static class AddStrStr extends NewStrNode {
-    private static final int OP_PREC=7;
-    public AddStrStr( ) { super(TypeStr.STR,"$+",true,OP_PREC,
+    public AddStrStr( ) { super(TypeStr.STR,"$+",true,
                                 TypeFld.make_arg(TypeMemPtr.STR0,ARG_IDX  ),
                                 TypeFld.make_arg(TypeMemPtr.STR0,ARG_IDX+1)); }
     @Override public Type value() {
@@ -98,7 +96,6 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
       return TypeTuple.make(Type.CTRL,tobj,tp);
     }
     @Override TypeObj valueobj() { throw unimpl(); }
-    @Override public byte op_prec() { return (byte)OP_PREC; }
     @Override public TypeMem live_use(Node def ) {
       if( def==in(ARG_IDX) || def==in(ARG_IDX+1) ) return TypeMem.ALIVE;
       assert def==in(MEM_IDX);
@@ -116,5 +113,6 @@ public abstract class NewStrNode extends NewNode.NewPrimNode<TypeStr> {
     @Override public void add_flow_use_extra(Node chg) {
       if( chg==in(ARG_IDX) || chg==in(ARG_IDX+1) ) Env.GVN.add_flow(in(MEM_IDX));  // Address into a Load changes, the Memory can be more alive.
     }
+    @Override public TV2 new_tvar(String alloc_site) { throw unimpl(); }
   }
 }

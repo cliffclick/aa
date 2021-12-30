@@ -44,7 +44,7 @@ int = : @{
 
   // Conversions.  Got a problem using "1.flt()" because this overloads 'flt'
   // as a type and a instance function.  
-  f = { -> $$PrimNode$ConvertI64F64(_val) };
+  str = { -> $$NewStrNode$ConvertI64Str(_val) };
   
 };
 
@@ -77,6 +77,10 @@ flt = : @{
   _>=_ = { y:int -> int($$PrimNode$GE_F64(_val,$$PrimNode$ConvertI64F64(y._val))) };
   _==_ = { y:int -> int($$PrimNode$EQ_F64(_val,$$PrimNode$ConvertI64F64(y._val))) };
   _!=_ = { y:int -> int($$PrimNode$NE_F64(_val,$$PrimNode$ConvertI64F64(y._val))) };
+
+  // Conversions.  Got a problem using "1.flt()" because this overloads 'flt'
+  // as a type and a instance function.  
+  str = { -> $$NewStrNode$ConvertF64Str(_val) };
 
 };
   

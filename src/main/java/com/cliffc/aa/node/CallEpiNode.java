@@ -109,7 +109,7 @@ public final class CallEpiNode extends Node {
 
     // Replace a resolved
     Node fdx = call.fdx();
-    if( fdx instanceof FreshNode ) fdx = ((FreshNode)fdx).id();    
+    if( fdx instanceof FreshNode ) fdx = ((FreshNode)fdx).id();
     if( fdx instanceof UnresolvedNode ) {
       ValFunNode vfn = ((UnresolvedNode)fdx).resolve_node(tcall._ts);
       if( vfn !=null ) call.set_fdx(fdx=vfn);
@@ -473,7 +473,10 @@ public final class CallEpiNode extends Node {
     BitsFun fidxs = CallNode.ttfp(call._val)._fidxs;
     if( fidxs.above_center() )
       return false; // No unification until call resolves, same as dead code does not unify
+    if( fidxs==BitsFun.FULL )
+      return false; // Call is in-error, nothing to do
 
+    throw unimpl();
     //boolean progress = false;
     //if( ((TypeFunPtr)fdx._val)._fidxs.above_center() ) {
     //  FreshNode fresh = (FreshNode)fdx;
@@ -489,7 +492,7 @@ public final class CallEpiNode extends Node {
     //  progress |= unify_fun(fdx.tvar(),test);
     //}
     //return progress;
-    return unify_fun(fdx.tvar(),test);
+    //return unify_fun(fdx.tvar(),test);
   }
 
   private boolean unify_fun(TV2 tfun, boolean test) {

@@ -75,6 +75,7 @@ public class UnresolvedNode extends Node {
         Type formal = vfn.formal(ARG_IDX);
         Type actual = tcall[ARG_IDX];
         if( actual.isa(formal) ) {
+          // TODO: If high, many choices be resolvable until args fall.
           assert choice == null; // Exactly zero or one fptr resolves
           choice = vfn;          // Resolved choice
           tfp = ((TypeFunPtr)vfn._val).make_from((TypeMemPtr)tcall[DSP_IDX]);
@@ -115,7 +116,6 @@ public class UnresolvedNode extends Node {
     return (UnresolvedNode)copy(true).set_def(0,dsp);
   }
 
-
   // An UnresolvedNode is its own Leaf, because it might gather fairly unrelated
   // functions - such as integer-add vs string-add, or the 1-argument leading
   // '+' operator vs the more expected binop.
@@ -123,7 +123,7 @@ public class UnresolvedNode extends Node {
     // Giant assert that all inputs are all Fun or Val constructors, ignoring errors.
     for( int i=1; i<len(); i++ ) {
       TV2 tv = tvar(i);
-      assert tv.is_err() || tv.is_fun() || tv.is_leaf() || tv.is_struct();
+      assert tv.is_err() || tv.is_fun() || tv.is_leaf() || tv.is_obj();
     }
     return false;
   }
@@ -164,9 +164,6 @@ public class UnresolvedNode extends Node {
     return null;
   }
 
-  // Return the op_prec of the returned value.  Not sensible except when called
-  // on primitives.  Should be the same across all defs.
-  @Override public byte op_prec() { return _defs.at(0).op_prec(); }
   @Override public int hashCode() { return super.hashCode()+(_bad==null ? 0 : _bad.hashCode()); }
   @Override public boolean equals(Object o) {
     if( !super.equals(o) ) return false;
@@ -180,7 +177,8 @@ public class UnresolvedNode extends Node {
 
   // Assigning the forward-ref removes the error
   @Override public ErrMsg err( boolean fast ) {
-    throw unimpl();
+    if( is_defined() ) throw unimpl(); // Ambiguous, should have resolved
+    return ErrMsg.forward_ref(_bad,_name);
   }
 
 }

@@ -1,14 +1,11 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import org.jetbrains.annotations.NotNull;
 
-import static com.cliffc.aa.AA.MEM_IDX;
-import static com.cliffc.aa.AA.DSP_IDX;
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.*;
 
 // Allocates a TypeObj and produces a Tuple with the TypeObj and a TypeMemPtr.
 //
@@ -36,7 +33,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // closures so variable stores can more easily fold into them.
 
   // Takes a parent alias, and splits a child out from it.
-  public NewNode( byte type, int par_alias, T to         ) { super(type,null,null); _init(BitsAlias.new_alias(par_alias),to); }
+  public NewNode( byte type, int par_alias, T to         ) { super(type); _init(BitsAlias.new_alias(par_alias),to); }
   // Takes a alias and a field and uses them directly
   public NewNode( byte type, int     alias, T to,Node fld) { super(type, null, null, fld); _init( alias, to); }
   private void _init(int alias, T ts) {
@@ -83,7 +80,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     TypeTuple tt;
     if( _val instanceof TypeTuple ) {
       Type[] ts = ((TypeTuple)_val)._ts;
-      if( !((TypeTuple)_val).above_center() && ts[0]==t0 && ts[1]==t1 && ts[2]==t2 )
+      if( !_val.above_center() && ts[0]==t0 && ts[1]==t1 && ts[2]==t2 )
         return _val;
     }
     return TypeTuple.make(t0, t1, t2);   // Complex obj, simple ptr.
@@ -107,6 +104,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     unelock();
     while( !is_dead() && _defs._len > 1 )
       pop();                    // Kill all fields
+    _ts = dead_type();
     _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeObj.UNUSED);
     //Env.GVN.revalive(this,ProjNode.proj(this,0));
     xval();
@@ -164,43 +162,41 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   public static abstract class NewPrimNode<T extends TypeObj<T>> extends NewNode<T> {
     public final String _name;    // Unique library call name
     final TypeStruct _formals;    // Arguments
-    final TypeFunPtr _tfp;        // Fidx, nargs, return
-    final boolean _reads;         // Reads old memory (all of these ops *make* new memory, none *write* old memory)
-    final int _op_prec;
-    NewPrimNode(byte op, int parent_alias, T to, String name, boolean reads, Type ret, int op_prec, TypeFld... args) {
+    public final TypeFunPtr _tfp; // Fidx, nargs, return
+    public final boolean _reads;  // Reads old memory (all of these ops *make* new memory, none *write* old memory)
+    NewPrimNode(byte op, int parent_alias, T to, String name, boolean reads, Type ret, TypeFld... args) {
       super(op,parent_alias,to);
       _name = name;
       _reads = reads;
       _formals = TypeStruct.make(args);
       int fidx = BitsFun.new_fidx();
       _tfp=TypeFunPtr.make(BitsFun.make0(fidx),_formals.nargs(),TypeMemPtr.NO_DISP,ret);
-      _op_prec = op_prec;
     }
     String bal_close() { return null; }
 
-    // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
-    @Override public FunPtrNode clazz_node( ) {
-      try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
-        assert in(0)==null && _uses._len==0;
-        FunNode  fun = ( FunNode) X.xform(new  FunNode(_name,this));
-        ParmNode rpc = (ParmNode) X.xform(new ParmNode(TypeRPC.ALL_CALL,null,fun,0,"rpc"));
-        Node memp= X.xform(new ParmNode(TypeMem.MEM,null,fun,MEM_IDX," mem"));
-        fun._bal_close = bal_close();
-
-        // Add input edges to the intrinsic
-        if( _reads ) set_def(MEM_IDX, memp); // Memory is already null by default
-        while( len() < _formals.nargs() ) add_def(null);
-        for( TypeFld arg : _formals ) {
-          if( arg._order==MEM_IDX ) continue; // Already handled MEM_IDX
-          set_def(arg._order,X.xform(new ParmNode(arg._t.simple_ptr(), null, fun, arg._order, arg._fld)));
-        }
-        //NewNode nnn = (NewNode)X.xform(this);
-        //Node mem = Env.DEFMEM.make_mem_proj(nnn,memp);
-        //Node ptr = X.xform(new ProjNode(nnn,REZ_IDX));
-        //RetNode ret = (RetNode)X.xform(new RetNode(fun,mem,ptr,rpc,fun));
-        //return (X._ret = (FunPtrNode)X.xform(new FunPtrNode(_name,ret)));
-        throw unimpl();
-      }
-    }
+    //// Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
+    //@Override public FunPtrNode clazz_node( ) {
+    //  assert in(0)==null && _uses._len==0;
+    //  FunNode  fun = (FunNode)Env.GVN.init(new FunNode(_name,this).add_def(Env.ALL_CTRL));
+    //  ParmNode rpc = Env.GVN.init(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null));
+    //  ParmNode mem = Env.GVN.init(new ParmNode(MEM_IDX," mem",fun,Env.ALL_MEM ,null));
+    //
+    //  // Add input edges to the intrinsic
+    //  if( _reads ) set_def(MEM_IDX, mem); // Memory is already null by default
+    //  while( len() < _formals.nargs() ) add_def(null);
+    //  for( TypeFld arg : _formals ) {
+    //    ConNode defalt = (ConNode)Node.con(arg._t);
+    //    set_def(arg._order,Env.GVN.init(new ParmNode(arg,fun, defalt, null)));
+    //  }
+    //  Env.GVN.init(this);
+    //  ProjNode mrg = Env.GVN.init(new MrgProjNode(this,mem));
+    //  ProjNode ptr = Env.GVN.init(new ProjNode(this,REZ_IDX));
+    //  RetNode  ret = Env.GVN.init(new RetNode(fun,mrg,ptr,rpc,fun));
+    //  // Hook the function at the TOP scope, because it may yet have unwired
+    //  // CallEpis which demand memory.  This hook is removed as part of doing
+    //  // the Combo pass which computes a real Call Graph and all escapes.
+    //  Env.TOP._scope.add_def(ret);
+    //  return (FunPtrNode)Env.GVN.xform(new FunPtrNode(_name,ret));
+    //}
   }
 }
