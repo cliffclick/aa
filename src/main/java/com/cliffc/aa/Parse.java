@@ -633,7 +633,7 @@ public class Parse implements Comparable<Parse> {
     Oper op = pre_bal(tok);
     if( op != null ) {
       Node e0 = term();
-      if( e0 == null ) throw unimpl();  // Parsed a valid leading op but missing trailing expr
+      if( e0 == null ) { _x=oldx; return err_ctrl2("Missing term after operator '"+tok+"'"); } // Parsed a valid leading op but missing trailing expr
       Oper op2 = bal_close(op);         // Returns old op if not balanced, new fuller op if balanced
       if( op2 == null ) throw unimpl(); // Missing close to balanced op
       if( op2._nargs!=1 ) throw unimpl(); // No binary/trinary allowed here
@@ -1187,7 +1187,6 @@ public class Parse implements Comparable<Parse> {
       _x=x+2;                                // Just return the "->"
     return new String(_buf,x,_x-x);
   }
-  boolean isOp(String s) { return isOp(s,_prims); }
   static boolean isOp(String s, boolean prims) {
     if( s==null ) return false;
     byte c = (byte)s.charAt(0);
@@ -1197,18 +1196,25 @@ public class Parse implements Comparable<Parse> {
       if( !isOp1((byte)s.charAt(i)) ) return false;
     return true;
   }
+  // Allows '+' and includes '_+_'
+  boolean isOp(String s) { return isOp(s,_prims); }
+  // Allows '+' and excludes '_+_'
+  boolean isBareOp(String tok) {
+    return isOp(tok) && tok.charAt(0)!='_' && tok.charAt(tok.length()-1)!='_';
+  }
+
 
   // Unary/prefix op or leading balanced op, with no leading expression.
   // Examples: -1, !pred, [size], %{% matrix_init %}%
   // Adds trailing '_' for required trailing expression: -_  !_  [_  %{%_
-  Oper pre_bal(String tok) { return isOp(tok)? Oper.make(tok+"_") : null; }
+  Oper pre_bal(String tok) { return isBareOp(tok)? Oper.make(tok+"_") : null; }
 
   // Parsed a leading expression; look for a binary op.  Requires no leading
   // '[' or embedded '{' or '<'.  Requires a trailing expr.
   // Examples:  x+y, x<<y,  x<=y,  x%y
   // Adds '_' for required expressions: _+_  _<<_  _<=_  _%_
   Oper bin_op(String tok, int prec) {
-    return isOp(tok) ? Oper.make("_"+tok+"_",prec) : null;
+    return isBareOp(tok) ? Oper.make("_"+tok+"_",prec) : null;
   }
 
   // Parsed a leading expression; look for a balanced op.  Requires a leading

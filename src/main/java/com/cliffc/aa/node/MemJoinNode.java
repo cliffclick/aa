@@ -162,28 +162,22 @@ public class MemJoinNode extends Node {
     Node base = msp.mem();                  // Base of SESE region
     assert base.check_solo_mem_writer(msp); // msp is only memory writer after base
     assert head.in(1).check_solo_mem_writer(head);   // head is the 1 memory writer after head.in
-    try( GVNGCM.Build<MemJoinNode> X = GVN.new Build<>() ) {
-      int idx = msp.add_alias(head.escapees()); // Add escape set, find index
-      Node mprj;
-      if( idx == _defs._len ) {         // Escape set added at the end
-        add_def(mprj = X.xform(new MProjNode(msp,idx))); // Add a new MProj from MemSplit
-      } else {
-        assert idx!=0;     // No partial overlap; all escape sets are independent
-        mprj = ProjNode.proj(msp,idx); // Find match MProj
-      }
-      // Resort edges to move SESE region inside
-      msp.set_def(1,head.in(1)); // Move Split->base edge to Split->head.in(1)
-      mprj.insert(base);         // Move split mprj users to base
-      head.set_def(1,mprj);      // Move head->head.in(1) to head->MProj
-      X.add(msp);
-      X.add(mprj);
-      X.add(base);
-      X.add(head);
-      base.unkeep();  mprj.unkeep();
-      GVN.revalive(mprj,base);
-      base.keep();  mprj.keep();
-      return (X._ret=this);
+
+    int idx = msp.add_alias(head.escapees()); // Add escape set, find index
+    Node mprj;
+    if( idx == _defs._len ) {         // Escape set added at the end
+      add_def(mprj = GVN.init(new MProjNode(msp,idx))); // Add a new MProj from MemSplit
+    } else {
+      assert idx!=0;     // No partial overlap; all escape sets are independent
+      mprj = ProjNode.proj(msp,idx); // Find match MProj
     }
+    // Resort edges to move SESE region inside
+    msp.set_def(1,head.in(1)); // Move Split->base edge to Split->head.in(1)
+    mprj.insert(base);         // Move split mprj users to base
+    head.set_def(1,mprj);      // Move head->head.in(1) to head->MProj
+    // Must retype, since split memory
+    GVN.revalive(head,msp,mprj,base);
+    return this;
   }
 
   // Move the given SESE region just behind of the join into the join/split

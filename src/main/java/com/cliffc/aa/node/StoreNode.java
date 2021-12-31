@@ -137,10 +137,8 @@ public class StoreNode extends Node {
     Type tval = rez._val;  // Value
     if( tmem==Type.ALL || tadr==Type.ALL ) return Type.ALL;
 
-    if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM);
-    if( !(tadr instanceof TypeMemPtr) ) return tadr.above_center() ? tmem : TypeMem.ALLMEM;
-    TypeMem    tm  = (TypeMem   )tmem;
-    TypeMemPtr tmp = (TypeMemPtr)tadr;
+    if( !(tmem instanceof TypeMem    tm ) ) return tmem.oob(TypeMem.ALLMEM);
+    if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.above_center() ? tmem : TypeMem.ALLMEM;
     return tm.update(tmp._aliases,_fin,_fld,tval);
   }
   @Override BitsAlias escapees() {

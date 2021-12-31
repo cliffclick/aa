@@ -444,7 +444,6 @@ public class CallNode extends Node {
 
     CallEpiNode cepi = cepi();
     if( def==fdx() ) {          // Function argument
-      if( _is_copy ) return TypeMem.ALIVE;
       TypeFunPtr tfp = ttfp(tcall);
       BitsFun fidxs = tfp.fidxs();
       // If using a specific FunPtr and its in the resolved set, test more precisely
@@ -456,7 +455,7 @@ public class CallNode extends Node {
         throw unimpl();    // premature optimization?
       // Otherwise, the FIDX is alive.  Check the display.
       ProjNode dsp = ProjNode.proj(this,DSP_IDX);
-      return (cepi==null || !cepi.is_all_wired() || // Unwired calls remain, dsp could be alive yet
+      return ((!_is_copy && !cepi.is_all_wired()) || // Unwired calls remain, dsp could be alive yet
               (dsp!=null && dsp._live==TypeMem.ALIVE)) ? TypeMem.ALIVE : TypeMem.LNO_DISP;
     }
 
@@ -489,7 +488,7 @@ public class CallNode extends Node {
     // Expect a function pointer
     TypeFunPtr tfp = ttfp(_val);
     if( tfp._fidxs==BitsFun.FULL ) {
-      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"A function is being called, but "+fdx()._val+" is not a function type");
+      return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"A function is being called, but "+fdx()._val+" is not a function");
     }
 
     BitsFun fidxs = tfp.fidxs();

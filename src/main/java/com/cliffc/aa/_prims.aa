@@ -2,8 +2,10 @@
 // $$JavaClassName; the Java class function "clazz_node" returns a Node.
 // Typically used in the call position, with a FunPtrNode returned.
 
+// ============================================================================
+// Parse automatically uses this type and constructor when parsing integers
 int = : @{
-  _val : $#TypeInt$INT64;
+  _val : $#TypeInt$INT64;       // The Payload
 
   // Unary ops
   -_ = { -> int($$PrimNode$MinusI64(_val)) };
@@ -42,14 +44,20 @@ int = : @{
   _==_ = { y:flt -> int($$PrimNode$EQ_F64($$PrimNode$ConvertI64F64(_val),y._val)) };
   _!=_ = { y:flt -> int($$PrimNode$NE_F64($$PrimNode$ConvertI64F64(_val),y._val)) };
 
+// TODO: Some way in the parser to specify RHS should be thunked.
+//_&&_ = { thunk:lazy -> _val ? thunk() : _val }
+//_||_ = { thunk:lazy -> _val ? _val : thunk() }
+
   // Conversions.  Got a problem using "1.flt()" because this overloads 'flt'
   // as a type and a instance function.  
   str = { -> $$NewStrNode$ConvertI64Str(_val) };
   
 };
 
+// ============================================================================
+// Parse automatically uses this type and constructor when parsing floats
 flt = : @{
-  _val : $#TypeFlt$FLT64;
+  _val : $#TypeFlt$FLT64;       // The Payload
 
   // Simple float math
   _+_  = { y:flt -> flt($$PrimNode$AddF64(_val,y._val)) };
@@ -81,44 +89,75 @@ flt = : @{
   // Conversions.  Got a problem using "1.flt()" because this overloads 'flt'
   // as a type and a instance function.  
   str = { -> $$NewStrNode$ConvertF64Str(_val) };
-
 };
+
+// ============================================================================
+// Parse automatically uses this type and constructor when parsing all top
+// level reference types.
+
+// THINK: 'LoadNode' does a v-table lookup / instance call; replace with an instance-lookup.
+
+// THINK: typing behavior bug: when does a Load from a final-field of a
+// function, bind the 'this' or not?
+// -- only when followed by an arg list e.g. "x.fld(args)", no escaping fat-function ptrs.
+// -- always, which allows: "x.fun := some_other_fcn; ... y = x.fun; .... y(args)".  Here some_other_fcn gets 'x' as a display, so must type that way.
+// -- -- Means typer has to tell loading plain code vs loading scalar; always binds skinny code to fat fcn.
+// -- -- Means typer has variant load behavior if field sometimes holds code, sometimes holds float.
+// -- special syntax, but escaping fat-function ptrs.  Sometimes bound, sometimes not.  User can see fat-or-not.  JS model, I found confusing.
+// 
+// OBSERVE: I am blending (on purpose) normal stack-frames ala nested functions
+// & 1st-class functions with the normal Java-like class heirarchy.
+
+// EXECUTION MODEL: When entering a normal function scope, I push a 'display' of
+// the local frame on the stack.  When making an instance-call, I push the local
+// instance as a frame on the stack, then the local function frame.  Returns
+// have to unwind this.
+
+// THINK: No code-pointers, only function-ptrs: the display is ALWAYS pre-bound
+// from the users point-of-view.  Including in ValNodes.  Optmization (NOT
+// typing) is to get rid of the display back-link.  Can enforce this with a
+// post-typing perf-typing bit.
+
+  // Which implies: when a ValNode is made, it acts "as if" all included final-fcn
+  // ptrs are pre-bound.  This is lazily deferred until we load from a ValNode.
   
-//int1  =: $$TypeInt#BOOL;
-//flt32 =: $$TypeFlt#FLT32;
-//flt64 =: $$TypeFlt#FLT64;
-//ptr   =: $$TypeMemPtr#ISUSED;
-//str   =: $$TypeMemPtr#STRPTR;
-//ary   =: $$TypeMemPtr#ARYPTR;
-//// TODO: Some way in the parser to specify RHS should be thunked.
-//// Then can drop the primitives and write:
-////_&&_ = { pred thunk:lazy -> pred ? thunk() : 0    }
-////_||_ = { pred thunk:lazy -> pred ? pred : thunk() }
-//_&&_ = { pred thunk -> $$PrimNode$AndThen(pred,thunk); };
-//_||_ = { pred thunk -> $$PrimNode$OrElse (pred,thunk); };
-//// Pointer ==
-//_==_ = { x:ptr? y:ptr? -> $$PrimNode$EQ_OOP(x,y) };
-//_!=_ = { x:ptr? y:ptr? -> $$PrimNode$NE_OOP(x,y) };
-//
-//// Convert to str
-//str = { x:int -> $$NewStrNode$ConvertI64Str(x) };
-//str = { x:flt -> $$NewStrNode$ConvertF64Str(x) };
-//str = { x:str? -> x };
-//
-//// String concat
-//_+_ = { x:str? y:str? -> $$NewStrNode$AddStrStr(x,y) };
-//
-//
-//// --------------
-//// Arrays
-//#_  = { ary:ary -> $$MemPrimNode$LValueLength(ary) };
-//[_] = { len:int -> $$NewAryNode$NewAry(len) };
-//
-//// --------------
-//// Math
-//math = @{
-//  pi = $$ConNode$PI;
-//  rand = { x:int -> $$PrimNode$RandI64(x) };
+  // Which implies: you can store pre-bound fptrs in normal fields, and load them
+  // normally.
+  
+  // Which implies: moving to a lazy/late-binding is an optimization; we can start
+  // with pre-bound and use an optimization to delay the binding point.
+  
+  // Which implies: might want a binding operator, seperate from LoadNode (which
+  // is just a FunPtrNode?) and migrate it about to delay things on ValNodes.
+
+
+
+// New behavior: all type-level ref-types get " ref:" (hidden name) as a base type name.
+// TODO: move "ref:" into Java code.  make "ref" an aa Type, with a no-arg constructor.
+
+// New behavior: ref types are forced a no-arg constructor.
+
+// New behavior: sweep the type-constructor body, for defs with the same
+// type-name and are final-functions.  Promote them as new constructors.
+
+// New behavior: structs+arrays: structs allow a special " elem" field which is
+// an infinite collection of some homogenous scalar, has to have a " len" field,
+// subtyped TypeInt, to hold the length.  Both appear or not together; missing
+// counts as zero-length.  Drop TypeAry and TypeStr.  TypeObj is only subtyped
+// by TypeStruct.
+
+//ref := : @{
+//  // no hash, no eq, no locking calls in base ref
+//  _==_ = { y:ref -> int($$PrimNode$EQ_OOP(_val,y._val)) };
+//  _!=_ = { y:ref -> int($$PrimNode$NE_OOP(_val,y._val)) };
 //};
+
+
+// ============================================================================
+// Math
+math = @{
+  pi = $$ConNode$PI;
+  rand = { x:int -> int($$PrimNode$RandI64(x._val)) };
+};
 
 // end of file

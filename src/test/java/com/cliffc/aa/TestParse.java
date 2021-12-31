@@ -1,5 +1,6 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.util.SB;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import org.junit.Ignore;
@@ -12,6 +13,7 @@ import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class TestParse {
   private static final BitsFun TEST_FUNBITS = BitsFun.make0(43);
@@ -72,10 +74,6 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
-    test_ptr("3.14.str()"      , TypeStr.con("3.14"), "3.14");
-    test_ptr("3.str()"         , TypeStr.con("3"   ), "3");
-    test_ptr("str(\"abc\")"    , TypeStr.ABC, "\"abc\"");
-    test("\"abc\"==\"abc\"",TypeInt.TRUE, "1"); // Constant strings intern
     test("1",   TypeInt.TRUE, "1");
     // Unary operator
     test("-1",  TypeInt.con(-1), "-1");
@@ -111,33 +109,28 @@ public class TestParse {
 
     // Simple strings
     test_ptr("\"Hello, world\"", TypeStr.con("Hello, world"), "\"Hello, world\"");
-    test_ptr("str(3.14)"       , TypeStr.con("3.14"), "\"3.14\"");
-    test_ptr("str(3)"          , TypeStr.con("3"   ), "\"3\"");
-    test_ptr("str(\"abc\")"    , TypeStr.ABC, "\"abc\"");
-    test("\"abc\"==\"abc\"",TypeInt.TRUE, "1"); // Constant strings intern
+    test_ptr("3.14.str()"      , TypeStr.con("3.14"), "3.14");
+    test_ptr("3.str()"         , TypeStr.con("3"   ), "3");
 
     // Variable lookup
-    test("math.pi", TypeFlt.PI, "");
+    test("math.pi", TypeFlt.PI, "3.141592653589793");
     // bare function lookup; returns a union of '+' functions
-    testerr("+", "Syntax error; trailing junk",0);
-    testerr("!", "Syntax error; trailing junk",0);
-    test_prim("_+_", "_+_");
-    // "!_var" parses as "! _var" and not "!_ var".  If you want the "!" operator,
-    // must use the wrapping syntax.
-    test_prim("!_", "!_"); // uniops are just like normal functions
+    testerr("+", "Missing term after operator '+'",0);
+    testerr("!", "Missing term after operator '!'",0);
+    testerr("_+_", "Syntax error; trailing junk",0);
+    testerr("!_", "Syntax error; trailing junk",0);
     // Function application, traditional paren/comma args
-    test("_+_(1,2)", TypeInt.con( 3));
-    test("_-_(1,2)", TypeInt.con(-1)); // binary version
-    test(" - (1  )", TypeInt.con(-1)); // unary version
+    test("1._+_(2)", TypeInt.con( 3),"3" );
+    test("1._-_(2)", TypeInt.con(-1),"-1"); // binary version
+    test("1.-_()"  , TypeInt.con(-1),"-1"); // unary version
     // error; mismatch arg count
-    testerr("!_() ", "Passing 0 arguments to !_ which takes 1 arguments",2);
-    testerr("math.pi(1)", "A function is being called, but 3.141592653589793 is not a function",10);
-    testerr("_+_(1,2,3)", "Passing 3 arguments to _+_ which takes 2 arguments",3);
+    testerr("math.pi(1)", "A function is being called, but 3.141592653589793 is not a function",7);
+    testerr("1._+_(2,3)", "Passing 3 arguments to _+_ which takes 2 arguments",3);
 
     // Parsed as +(1,(2*3))
-    test("_+_(1, 2 * 3) ", TypeInt.con(7));
-    // Parsed as +( (1+2*3) , (4*5+6) )
-    test("_+_(1 + 2 * 3, 4 * 5 + 6) ", TypeInt.con(33));
+    test("1._+_(2 * 3) ", TypeInt.con(7));
+    // Parsed as (1+2*3)+(4*5+6)
+    test("(1 + 2 * 3)._+_(4 * 5 + 6) ", TypeInt.con(33));
     // Statements
     test("(1;2 )", TypeInt.con(2));
     test("(1;2;)", TypeInt.con(2)); // final semicolon is optional
@@ -757,10 +750,14 @@ map(tmp)
     // ary.{e -> f(e)}.{e0 e1 -> f(e0,e1) } // map/reduce over array elements
   }
 
+  // Strings
+  @Test public void testParse15() {
+    test("\"abc\"==\"abc\"",TypeInt.TRUE, "1"); // Constant strings intern
+  }
 
   // Combined H-M and GCP Typing
   @Ignore
-  @Test public void testParse15() {
+  @Test public void testParse16() {
     test("-1", (ignore->TypeInt.con(-1)), null, "-1");
     test("(1,2)", (ignore -> TypeMemPtr.make(13,TypeStruct.tupsD(TypeInt.con(1),TypeInt.con(2)))), null, "[13]( 1,2)");
 
@@ -907,73 +904,83 @@ HashTable = {@{
   }
 
   // Run a program once, with a given seed and typing flags
-  static private void _test0( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect, int rseed ) {
+  static private void _test0( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect, String err, int cur_off, int rseed ) {
     TypeEnv te = Exec.file("test",program,rseed,gcp_maker!=null,hmt_expect!=null);
-    assertNull(te._errs);
-    if( gcp_maker != null ) {
-      Type actual = te._tmem.sharptr(te._t); // Sharpen any memory pointers
-      Type expect = gcp_maker.apply(actual);
-      Type actual_unbox = actual.unbox(); // As a testing convenience, unbox any wrapped primitives
-      assertEquals(expect,actual_unbox);
-      // Also check GCP formals.
-      if( expect instanceof TypeFunPtr ) {
-        TypeStruct actual_formals = te._formals;
-        TypeStruct expect_formals = formals_maker.get();
-        assertEquals(expect_formals,actual_formals);
-      } else
-        assert formals_maker==null;
-    }
-    if( hmt_expect != null ) {
-      TV2 actual = te._hmt;
-      String actual_str = actual.unbox().p();
-      assertEquals(stripIndent(hmt_expect),stripIndent(actual_str));
+    if( err != null ) {
+      assertTrue(te._errs != null && te._errs.size()>=1);
+      String cursor = new String(new char[cur_off]).replace('\0', ' ');
+      String err2 = new SB().p("test:1:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
+      assertEquals(err2,te._errs.get(0).toString());
+
+    } else {
+      assertNull(te._errs);
+      if( gcp_maker != null ) {
+        Type actual = te._tmem.sharptr(te._t); // Sharpen any memory pointers
+        Type expect = gcp_maker.apply(actual);
+        Type actual_unbox = actual.unbox(); // As a testing convenience, unbox any wrapped primitives
+        assertEquals(expect,actual_unbox);
+        // Also check GCP formals.
+        if( expect instanceof TypeFunPtr ) {
+          TypeStruct actual_formals = te._formals;
+          TypeStruct expect_formals = formals_maker.get();
+          assertEquals(expect_formals,actual_formals);
+        } else
+          assert formals_maker==null;
+      }
+      if( hmt_expect != null ) {
+        TV2 actual = te._hmt;
+        String actual_str = actual.unbox().p();
+        assertEquals(stripIndent(hmt_expect),stripIndent(actual_str));
+      }
     }
   }
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
 
   // Run a program once-per-rseed
   private static final int[] rseeds = new int[]{0,1,2,3};
-  private void _test1( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect ) {
+  static private void _test1( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect, String err, int cur_off ) {
     for( int rseed : rseeds )
     //for( int rseed=0; rseed<32; rseed++ )
-      _test0(program,gcp_maker,formals_maker,hmt_expect,rseed);
+      _test0(program,gcp_maker,formals_maker,hmt_expect,err,cur_off,rseed);
   }
 
   // Run a program in all 3 modes, with all rseeds
+  static private void _test2( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect, String err, int cur_off ) {
+    _test1(program,gcp_maker,formals_maker,null      ,err,cur_off);
+    _test1(program,null     ,null         ,hmt_expect,err,cur_off);
+    _test1(program,gcp_maker,formals_maker,hmt_expect,err,cur_off);
+  }
+
+  // Run a program in all 3 modes, yes function returns, no errors
   private void test( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect ) {
-    _test1(program,gcp_maker,formals_maker,null      );
-    _test1(program,null     ,null         ,hmt_expect);
-    _test1(program,gcp_maker,formals_maker,hmt_expect);
+    _test2(program,gcp_maker,formals_maker,hmt_expect,null,0);
   }
 
   // Short form test: simple GCP, no formal args
   private void test( String program, Type gcp_maker, String hmt_expect ) {
-    test(program,ignore->gcp_maker,null,hmt_expect);
+    _test2(program,ignore->gcp_maker,null,hmt_expect,null,0);
   }
 
   // Result is expected to be a pointer, with an uninteresting alias.  The
   // expected ptr._obj is passed.
   private void test_ptr( String program, TypeObj gcp_expect, String hmt_expect ) {
-    test(program,
-         actual -> actual instanceof TypeMemPtr ? ((TypeMemPtr)actual).make_from(gcp_expect) : gcp_expect,
-         null,hmt_expect);
+    _test2(program,
+           actual -> actual instanceof TypeMemPtr ? ((TypeMemPtr)actual).make_from(gcp_expect) : gcp_expect,
+           null,hmt_expect,null,0);
   }
   // Result is expected to be a pointer, with an uninteresting alias and an
   // interesting nil.  The expected nil-ness and _obj is passed.
   private void test_ptr0( String program, TypeMemPtr gcp_expect, String hmt_expect ) {
-    test(program,
-         actual -> actual instanceof TypeMemPtr ? gcp_expect.make_from_nil(((TypeMemPtr)actual)._aliases) : gcp_expect,
-         null,hmt_expect);
+    _test2(program,
+           actual -> actual instanceof TypeMemPtr ? gcp_expect.make_from_nil(((TypeMemPtr)actual)._aliases) : gcp_expect,
+           null,hmt_expect,null,0);
   }
 
   static void testerr( String program, String err, int cur_off ) {
-    //TypeEnv te = Exec.file("test",program);
-    //assertTrue(te._errs != null && te._errs.size()>=1);
-    //String cursor = new String(new char[cur_off]).replace('\0', ' ');
-    //String err2 = new SB().p("test:1:").p(err).nl().p(program).nl().p(cursor).p('^').nl().toString();
-    //assertEquals(err2,strip_alias_numbers(te._errs.get(0).toString()));
-    throw unimpl();
+    _test2(program,ignore->Type.ALL,null,"",err,cur_off);
   }
+
+
 
   static private void test( String program, String flow_expect, String hm_expect ) {
     //TypeEnv te = run(program);

@@ -689,10 +689,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   public Node do_grow() {
     Node nnn = ideal_grow();
     if( nnn==null || nnn==this || is_dead() ) return nnn;
-    //assert _keep<=1;
-    //if( _keep==1 ) { _keep--; nnn._keep++; Env.GVN.add_dead(this); } // Doing an arbitrary replacement
-    //return Env.GVN.add_flow(Env.GVN.add_reduce(nnn));
-    throw unimpl();
+    return Env.GVN.add_flow(Env.GVN.add_reduce(nnn));
   }
 
   // Replace with a ConNode iff
