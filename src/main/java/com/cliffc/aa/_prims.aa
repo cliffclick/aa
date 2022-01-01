@@ -95,16 +95,6 @@ flt = : @{
 // Parse automatically uses this type and constructor when parsing all top
 // level reference types.
 
-// THINK: 'LoadNode' does a v-table lookup / instance call; replace with an instance-lookup.
-
-// THINK: typing behavior bug: when does a Load from a final-field of a
-// function, bind the 'this' or not?
-// -- only when followed by an arg list e.g. "x.fld(args)", no escaping fat-function ptrs.
-// -- always, which allows: "x.fun := some_other_fcn; ... y = x.fun; .... y(args)".  Here some_other_fcn gets 'x' as a display, so must type that way.
-// -- -- Means typer has to tell loading plain code vs loading scalar; always binds skinny code to fat fcn.
-// -- -- Means typer has variant load behavior if field sometimes holds code, sometimes holds float.
-// -- special syntax, but escaping fat-function ptrs.  Sometimes bound, sometimes not.  User can see fat-or-not.  JS model, I found confusing.
-// 
 // OBSERVE: I am blending (on purpose) normal stack-frames ala nested functions
 // & 1st-class functions with the normal Java-like class heirarchy.
 
@@ -113,24 +103,38 @@ flt = : @{
 // instance as a frame on the stack, then the local function frame.  Returns
 // have to unwind this.
 
-// THINK: No code-pointers, only function-ptrs: the display is ALWAYS pre-bound
-// from the users point-of-view.  Including in ValNodes.  Optmization (NOT
-// typing) is to get rid of the display back-link.  Can enforce this with a
-// post-typing perf-typing bit.
+// THINK: Binding the 1st arg is optional, according to context.
 
-  // Which implies: when a ValNode is made, it acts "as if" all included final-fcn
-  // ptrs are pre-bound.  This is lazily deferred until we load from a ValNode.
-  
-  // Which implies: you can store pre-bound fptrs in normal fields, and load them
-  // normally.
-  
-  // Which implies: moving to a lazy/late-binding is an optimization; we can start
-  // with pre-bound and use an optimization to delay the binding point.
-  
-  // Which implies: might want a binding operator, seperate from LoadNode (which
-  // is just a FunPtrNode?) and migrate it about to delay things on ValNodes.
+//   -- pers.billable( proj ) is: "pers is a record with field billable" and
+//      "billable(pers,proj)" is a function and this is a 2-arg call, AND uses
+//      the instance-method syntax.
+//      Example with ints: 1._+_(2)
+//   -- pers.billable is: "pers is a record with field billable"; the field is
+//      loaded but no binding happens.  Since all final function fields are
+//      pre-bound, this loads a bound (curried on this) function.
+//      Example: 1._+_ is a 1-arg function which increments.
+//   -- pers = Person() is "pers is a new record of Person; all final function
+//      fields are pre-bound so 'this' is arg 0.
+//      Example: 1 has a _+_ final field pre-bound to '1' on arg 0.
+//   -- Person.billable is "an unbound function, arg 0 must be a Person"
+//      Example with ints: int._+_
+//   -- fcn= Person.billable; fcn(pers) is "bind the first arg of fcn to pers".
+//      Example with ints: int._+_(1)
+//   -- fcn= Person.billable; fcn(pers)(proj) is "bind the first arg of fcn to pers
+//      and then call again with argument proj.
+//      Example with ints: int._+_(1)(2)
+//   -- fcn= Person.billable; fcn(pers,proj) is "call 2 arg fcn with pers and proj"
+//      Example with ints: int._+_(1,2)
 
+// THINK: 'LoadNode' semantics does a plain field lookup.  If the address is a
+// value type, LoadNode does the "delayed binding of self" so that the ValNode
+// constructor does NOT have to produce a type where all final function fields
+// are pre-bound.
 
+// New behavior: TFPs carry a full signature, especially args and their orders.
+// New behavior: TFPs indicate which args are *curried*, and the display arg
+// is curried (or not) according to how the TFP is obtained.  TFPs at call sites
+// remain strongly typed on nargs, and on the display is curried-or-not.  
 
 // New behavior: all type-level ref-types get " ref:" (hidden name) as a base type name.
 // TODO: move "ref:" into Java code.  make "ref" an aa Type, with a no-arg constructor.
@@ -140,11 +144,16 @@ flt = : @{
 // New behavior: sweep the type-constructor body, for defs with the same
 // type-name and are final-functions.  Promote them as new constructors.
 
-// New behavior: structs+arrays: structs allow a special " elem" field which is
-// an infinite collection of some homogenous scalar, has to have a " len" field,
-// subtyped TypeInt, to hold the length.  Both appear or not together; missing
-// counts as zero-length.  Drop TypeAry and TypeStr.  TypeObj is only subtyped
-// by TypeStruct.
+// New behavior: structs+arrays: structs allow a special " ary" field which is
+// an infinite collection of some homogenous scalar, has to have a " len"
+// field, subtyped TypeInt, to hold the length.  Both appear or not together;
+// missing counts as zero-length.  Drop TypeAry and TypeStr.  TypeObj is only
+// subtyped by TypeStruct.
+
+// Could also allow fixed-sized internal arrays, indexed by ary name and
+// offset.  Value types as fixed-arrays can do this.
+
+
 
 //ref := : @{
 //  // no hash, no eq, no locking calls in base ref
