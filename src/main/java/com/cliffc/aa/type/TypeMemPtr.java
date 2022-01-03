@@ -145,6 +145,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     case TINT:
     case TFUNPTR:
     case TRPC:   return cross_nil(t);
+    case TARY:
+    case TFLD:
     case TSTRUCT:
     case TTUPLE:
     case TMEM:   return ALL;

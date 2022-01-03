@@ -14,7 +14,7 @@ import static com.cliffc.aa.AA.unimpl;
 // possible aliased function pointers.  Function pointers can be executed, are
 // not GC'd, and cannot be Loaded or Stored through (although they can be
 // loaded & stored).
-// 
+//
 // A function pointer includes a display (a back pointer to the enclosing
 // environment); i.e. function pointers are "fat".  The display is typed as
 // a TMP to a TypeStruct, or e.g. ANY (not live, nobody uses or cares) or XNIL.
@@ -56,7 +56,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   public boolean has_dsp() { return _has_dsp; }
   public Type dsp() { assert _has_dsp; return _dsp; }
   void set_dsp(Type dsp) { assert un_interned() && _has_dsp; _dsp=dsp; }
-  
+
 
   // Static properties hashcode, no edge hashes
   @Override int static_hash() {
@@ -236,6 +236,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     case TINT:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
+    case TARY:
+    case TFLD:
     case TSTRUCT:
     case TTUPLE:
     case TMEM:   return ALL;

@@ -99,7 +99,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public TypeFld make_from(Type t, Access a) { return (t==_t && a==_access) ? this : make(_fld,t,a,_order); }
 
   public static final TypeFld NO_DSP = TypeFld.make_dsp(TypeMemPtr.NO_DISP);
-  static final TypeFld[] TYPES = new TypeFld[]{NO_DSP};
 
   @Override protected TypeFld xdual() {
     if( _fld==sdual(_fld) && _t==_t._dual && _order==odual(_order) && _access==_access.dual() )
@@ -235,6 +234,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     return this;
   }
 
+  @Override public boolean above_center() { return _t.above_center(); }
   @Override public TypeFld simple_ptr() { return make_from(_t.simple_ptr()); }
   @SuppressWarnings("unchecked")
   @Override public void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }

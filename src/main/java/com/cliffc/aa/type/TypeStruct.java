@@ -41,14 +41,14 @@ import static com.cliffc.aa.type.TypeFld.Access;
  */
 public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<TypeFld> {
   private boolean _any;         // True=choice/join/high; False=all/meet/low
-  
+
   // The fields indexed by field name.  Effectively final.
   private Ary<TypeFld> _flds;
   // Type is cyclic.  This is a summary property, not a part of the type, hence
   // is not in the equals nor hash.  Used to optimize non-cyclic access.
   private boolean _cyclic;
   // Max field order number.  This is a summary property not part of the type.
-  private short _max_arg; 
+  private short _max_arg;
 
   TypeStruct init( String name, boolean any ) {
     super.init(name);
@@ -68,7 +68,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   // --------------------------------------------------------------------------
   // Hash code computation and (cycle) Equals
-  
+
   // Fairly subtle, because the typical hash code is built up from the hashes of
   // its parts, but the parts are not available during construction of a cyclic type.
   // We can count on the field names and accesses but not field order nor type.
@@ -189,7 +189,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   // --------------------------------------------------------------------------
   // Factories
-  
+
   // Unlike other types, TypeStruct might make cyclic types for which a
   // DAG-like bottom-up-remove-dups approach cannot work.
   static { new Pool(TSTRUCT,new TypeStruct()); }
@@ -208,7 +208,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     _flds.push(fld);
     return this;
   }
-  
+
   // Set/replace a field to an under construction TypeStruct
   public TypeStruct set_fld( TypeFld fld ) {
     assert un_interned();       // No mutation if interned
@@ -231,7 +231,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     for( TypeFld fld : flds ) ts.add_fld(fld);
     return ts.hashcons_free();
   }
-  
+
   // Make a collection of fields, with no display and all with default names and final fields.
   private static TypeStruct _malloc() { return malloc("",false); }
   private TypeStruct add_arg(Type t, int n) { return add_fld(TypeFld.make_arg(t,n)); }
@@ -247,7 +247,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   // Used to make a few testing constants
   public static TypeStruct make_test( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a,ARG_IDX)); }
-  
+
   // Add fields from a Type[].  Will auto-allocate the Type[], if not already
   // allocated - which is a perf-hit in high usage points.  Typically used this
   // way in tests.
@@ -264,7 +264,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     return TypeStruct.make("",false,TypeFld.make(f1,t1,ARG_IDX),TypeFld.make(f2,t2,ARG_IDX+1));
   }
 
-  
+
   // Used to make a few (larger and recursive) testing constants.  Some of the
   // fields are interned and some are recursive and without a type.
   public static TypeStruct malloc_test( TypeFld... flds ) { return malloc_test("",flds); }
@@ -322,7 +322,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public int nargs() { return _max_arg+1; }
 
   // The lattice extreme values.
-  
+
   // Possibly allocated.  No fields specified.  All fields are possible and
   // might be ALL (error).  The worst possible result.
   public static final TypeStruct ISUSED = make("",false);
@@ -330,9 +330,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // All fields are available as ANY.
   public static final TypeStruct UNUSED = ISUSED.dual();
 
-  // Types for Liveness in slot 0 of TypeMem
-  public static final TypeStruct ALIVE = ISUSED, DEAD = UNUSED, LNO_DISP = null;
-  
   // A bunch of types for tests
   public  static final TypeStruct POINT = args(TypeFlt.FLT64,TypeFlt.FLT64);
   public  static final TypeStruct NAMEPT= POINT.set_name("Point:");
@@ -346,6 +343,9 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public  static final TypeStruct SCALAR1=args(SCALAR);            // { scalar -> }
   public  static final TypeStruct INT64_INT64= args(TypeInt.INT64,TypeInt.INT64); // { int int -> }
   public  static final TypeStruct FLT64_FLT64= args(TypeFlt.FLT64,TypeFlt.FLT64); // { flt flt -> }
+
+  // Types for Liveness in slot 0 of TypeMem
+  public static final TypeStruct ALIVE = ISUSED, DEAD = UNUSED, LNO_DISP = A;
 
   // Pile of sample structs for testing
   static final TypeStruct[] TYPES = new TypeStruct[]{ISUSED,POINT,NAMEPT,A,C0,D1,ARW,INT64_INT64,SCALAR1};
@@ -388,6 +388,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTRUCT:break;
+    case TARY:
+    case TFLD:
     case TFLT:
     case TINT:
     case TTUPLE :

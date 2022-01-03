@@ -515,7 +515,7 @@ public class TypeMem extends Type<TypeMem> {
 
   @Override public boolean above_center() {
     for( TypeStruct alias : _pubs )
-      if( alias != null && !alias.above_center() && !alias.is_con() )
+      if( alias != null && !alias.above_center() )
         return false;
     return true;
   }

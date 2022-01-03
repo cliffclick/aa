@@ -42,8 +42,9 @@ public class TypeRPC extends Type<TypeRPC> {
     case TMEMPTR:
     case TFLT:
     case TINT:   return cross_nil(t);
-    case TTUPLE:
     case TARY:
+    case TFLD:
+    case TTUPLE:
     case TSTRUCT:
     case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen
@@ -73,7 +74,7 @@ public class TypeRPC extends Type<TypeRPC> {
     // See testLattice15.
     if( nil==XNIL )
       return _rpcs.test(0) ? (_rpcs.above_center() ? XNIL : SCALAR) : NSCALR;
-    if( _rpcs.above_center() ) return make(BitsRPC.NIL);   
+    if( _rpcs.above_center() ) return make(BitsRPC.NIL);
     BitsRPC rpcs = _rpcs.above_center() ? _rpcs.dual() : _rpcs;
     return make(rpcs.set(0));
   }

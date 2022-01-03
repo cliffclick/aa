@@ -641,7 +641,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     if( ALL_TYPES != null ) return ALL_TYPES;
     Ary<Type> ts = new Ary<>(new Type[1],0);
     concat(ts,Type      .TYPES);
-    concat(ts,TypeFld   .TYPES);
+    concat(ts,TypeAry   .TYPES);
     concat(ts,TypeFlt   .TYPES);
     concat(ts,TypeFunPtr.TYPES);
     concat(ts,TypeInt   .TYPES);
@@ -650,7 +650,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     concat(ts,TypeRPC   .TYPES);
     concat(ts,TypeStruct.TYPES);
     concat(ts,TypeTuple .TYPES);
-    concat(ts,TypeAry   .TYPES);
     // Partial order Sort, makes for easier tests later.  Arrays.sort requires
     // a total order (i.e., the obvious Comparator breaks the sort contract),
     // so we hand-roll a simple bubble sort.
