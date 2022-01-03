@@ -178,19 +178,17 @@ public class CallNode extends Node {
       assert nargs()==ARG_IDX+1;// Memory, Display plus the arg tuple
       Node arg = arg(ARG_IDX);
       Type tadr = arg._val;
-      if( tadr instanceof TypeMemPtr && arg instanceof ProjNode ) {
-        int alias = ((TypeMemPtr)tadr)._aliases.abit();
-        if( alias == -1 ) throw unimpl(); // Handle multiple aliases, handle all/empty
+      if( tadr instanceof TypeMemPtr tmp && arg instanceof NewNode nnn ) {
+        int alias = tmp._aliases.getbit();
         Node mem = mem();
-        if( mem instanceof FreshNode ) mem = ((FreshNode)mem).id();
+        if( mem instanceof FreshNode fresh) mem = fresh.id();
         // Bypass a MemJoin
-        if( mem instanceof MemJoinNode ) {
-          int jdx = ((MemJoinNode)mem).msp().find_alias_index(alias);
+        if( mem instanceof MemJoinNode join) {
+          int jdx = join.msp().find_alias_index(alias);
           if( jdx!=0 ) mem = mem.in(jdx);
         }
         // Find a tuple being passed in directly; unpack
-        if( mem instanceof MrgProjNode && mem.in(0)==arg.in(0) ) {
-          NewNode nnn = (NewNode)arg.in(0);
+        if( mem instanceof MrgProjNode mrg && mrg.nnn() == nnn ) {
           pop(); // Pop off the NewNode tuple
           for( int i=ARG_IDX; i<nnn._defs._len; i++ ) // Push the args; unpacks the tuple
             add_def(nnn.in(i));

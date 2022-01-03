@@ -7,8 +7,10 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 import org.jetbrains.annotations.NotNull;
 
-import static com.cliffc.aa.type.TypeFld.Access;
-import static com.cliffc.aa.AA.*;
+import java.util.Arrays;
+
+import static com.cliffc.aa.AA.DSP_IDX;
+import static com.cliffc.aa.AA.unimpl;
 
 // Allocates a TypeStruct
 //
@@ -22,7 +24,7 @@ import static com.cliffc.aa.AA.*;
 public class NewNode extends Node {
   public final boolean _is_closure; // For error messages
   public       Parse[] _fld_starts; // Start of each tuple member; 0 for the display
-  
+
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
   public int _alias, _reset_alias; // Alias class
@@ -31,7 +33,7 @@ public class NewNode extends Node {
   // (Lambda args) vs local assignments (Let bound args).  Effectively final
   // AFTER all the args are added.
   public int _nargs;
-  
+
   // A list of field names and field-mods, folded into the initial state of
   // this NewObj.  These can come from initializers at parse-time, or stores
   // folded in.  There are no types stored here; types come from the inputs.
@@ -42,15 +44,15 @@ public class NewNode extends Node {
 
   // Still adding fields or not
   private boolean _closed;
-  
-  
+
+
   // Takes an alias only
   public NewNode( boolean closure, int alias ) {
     super(OP_NEW, null, null);
     _is_closure = closure;
     _init( alias, TypeStruct.EMPTY);
   }
-  
+
   private void _init(int alias, TypeStruct ts) {
     if( _elock ) unelock();    // Unlock before changing hash
     _alias = alias;
@@ -62,10 +64,13 @@ public class NewNode extends Node {
   @Override void record_for_reset() { _reset_alias=_alias; }
   void reset() { assert is_prim(); _init(_reset_alias,_ts); }
 
-  public MrgProjNode mem() { throw unimpl(); }
-  public void set_nargs() { throw unimpl(); }
+  public MrgProjNode mem() {
+    for( Node use : _uses ) if( use instanceof MrgProjNode mrg ) return mrg;
+    return null;
+  }
+  public void set_nargs() { assert _nargs==0; _nargs=len(); }
   public void set_type_name(String name) {
-    assert _ts._name=="";
+    assert _ts._name.isEmpty();
     _ts = _ts.set_name(name);
     _tptr = TypeMemPtr.make(_tptr._aliases,TypeStruct.ISUSED.set_name(name));
   }
@@ -78,18 +83,20 @@ public class NewNode extends Node {
   public void add_fld( TypeFld fld, Node val, Parse badt ) {
     assert !Util.eq(fld._fld,TypeFld.fldBot);
     assert !_closed;
-    _ts = _ts.add_fld(fld);     // Will also assert no-dup field names
-    //_tptr = _tptr.make_from(TypeStruct.ISUSED.set_name(ts._name));
-    // _fld_starts[idx]=badt; // TODO: Save badt and report it if fields do not type
-    //add_def(val);
-    //Env.GVN.add_flow(this);    
-    throw unimpl();
+    assert _ts.len()+DSP_IDX==len();
+    if( _fld_starts==null ) _fld_starts = new Parse[1];
+    while( _fld_starts.length <= _ts.len() ) _fld_starts = Arrays.copyOf(_fld_starts,_fld_starts.length<<1);
+    _fld_starts[_ts.len()]=badt;
+    _ts = _ts.add_fldx(fld);     // Will also assert no-dup field names
+    add_def(val);
+    Env.GVN.add_flow(this);
+    Env.GVN.add_flow_uses(this);
   }
 
   // Add a named FunPtr to a New.  Auto-inflates to a Unresolved as needed.
   public void add_fun( Parse bad, String name, ValFunNode ptr ) {
+    assert !_closed;
     TypeFld fld = _ts.get(name);
-    assert fld._t instanceof TypeFunPtr; // TODO: not sure when this gets set
     Node n = in(fld._order);
     UnresolvedNode unr = n==Env.XNIL
       ? new UnresolvedNode(name,bad).scoped()
@@ -97,13 +104,13 @@ public class NewNode extends Node {
     unr.add_fun(ptr);           // Checks all formals are unambiguous
     set_fld(fld,unr);
   }
-  
+
   public void set_fld( TypeFld fld, Node n ) {
-    assert !_closed;
-    throw unimpl();
+    _ts = _ts.replace_fld(fld);
+    set_def(fld._order,n);
   }
   public void pop_fld() { throw unimpl(); }
-  
+
   public void close() { assert !_closed; _closed=true; }
 
     // The current local scope ends, no more names will appear.  Forward refs
@@ -113,8 +120,8 @@ public class NewNode extends Node {
   public void promote_forward( NewNode parent ) {
     assert parent != null;
     for( TypeFld fld : _ts ) {
-      //Node n = in(fld._order);
-      //if( n.is_forward_ref() ) {
+      Node n = in(fld._order);
+      if( n.is_forward_ref() ) {
       //  // Is this Unresolved defined in this scope, or some outer scope?
       //  if( ((UnresolvedNode)n).is_scoped() ) {
       //    // Definitely defined here, and all stores are complete; all fcns added
@@ -127,20 +134,46 @@ public class NewNode extends Node {
       //    set_def(fld._order,Env.ANY);
       //    setsm(_ts.replace_fld(fld.make_from(Type.ANY,Access.Final)));
       //    Env.GVN.add_flow_uses(n);
-      //  }
-      //}
-      throw unimpl();
+        throw unimpl();
+      }
     }
   }
 
-  @Override public Node ideal_reduce() {
-    //// If either the address or memory is not looked at then the memory
-    //// contents are dead.  The object might remain as a 'gensym' or 'sentinel'
-    //// for identity tests.
-    //if( _defs._len > 1 && captured() ) { kill2(); return this; }
-    //return null;
-    // Simpler capture notion
-    throw unimpl();
+
+  @Override public Type value() { return _tptr; }
+  // Used by MrgProj
+  TypeStruct valueobj() { return _ts.make_from(this::val); }
+
+  // Uses Full memory liveness, to track field liveness.
+  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
+
+  @Override public TypeMem live() {
+    // Kept alive as prototype, until Combo resolves all Load-uses.
+    if( Env.PROTOS.containsKey(_ts._name) )
+      return TypeMem.ALLMEM;
+
+    MrgProjNode mrg=null; boolean has_ptr=false;
+    for( Node use : _uses ) {
+      if( use instanceof MrgProjNode mrg2 ) { assert mrg==null; mrg=mrg2; }
+      else has_ptr=true;            // Pointer usage
+    }
+    // No pointers, so entire thing is dead
+    if( !has_ptr ) return TypeMem.DEAD;
+    // No memory uses, so GENSYM usage only.
+    if( mrg==null ) return TypeMem.ANYMEM;
+    // Has pointers and memory uses; use memory aliveness.
+    return mrg._live;
+  }
+
+  // Only alive fields in the MrgProj escape
+  @Override public TypeMem live_use(Node def ) {
+    TypeStruct ts = _live.at(_alias);
+    if( ts==TypeStruct.ISUSED ) return TypeMem.ALIVE;
+    if( ts==TypeStruct.UNUSED ) return TypeMem.DEAD ;
+    int idx=DSP_IDX;  while( in(idx)!=def ) idx++; // Index of node
+    TypeFld fld = ts.fld_idx(idx-DSP_IDX);
+    if( fld==null )  return TypeMem.DEAD; // No such field is alive
+    return fld._t.oob(TypeMem.ALIVE);
   }
 
   @Override public void add_flow_def_extra(Node chg) {
@@ -148,34 +181,6 @@ public class NewNode extends Node {
       Env.GVN.add_reduce(chg);
   }
 
-
-  @Override public Type value() {
-    //return _tptr;
-    // TODO: MrgProj has to compute struct type, has the neighbor problem.
-    // TODO: dead NewNodes can kill all fields, have _tptr goto TMP of UNUSED
-    throw unimpl();
-  }
-
-  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
-
-  // kept alive as prototype, until Combo resolves all Load-uses.
-  @Override public TypeMem live() {
-    if( Env.PROTOS.containsKey(_ts._name) )
-      return TypeMem.ALLMEM;
-    return super.live();
-  }
-
-  // Only alive fields in the MrgProj escape
-  @Override public TypeMem live_use(Node def ) {
-    //TypeObj to = _live.at(_alias);
-    //if( !(to instanceof TypeStruct) ) return to.oob(TypeMem.ALIVE);
-    //int idx=0;  while( in(idx)!=def ) idx++; // Index of node
-    //TypeFld fld = ((TypeStruct)to).fld_idx(idx);
-    //if( fld==null ) return TypeMem.DEAD; // No such field is alive
-    //Type t = fld._t;
-    //return t.oob(TypeMem.ALIVE);
-    throw unimpl();
-  }
   @Override public boolean unify( boolean test ) {
     TV2 rec = tvar();
     if( rec.is_err() ) return false;
@@ -206,6 +211,26 @@ public class NewNode extends Node {
     //  }
     //return true;
     throw unimpl();
+  }
+
+  @Override public Node ideal_reduce() {
+    // If either the address or memory is not looked at then the memory
+    // contents are dead.  The object might remain as a 'gensym' or 'sentinel'
+    // for identity tests.
+    if( mem()==null || _uses._len==1 ) {
+      // only memory (no pointers) or no memory (perhaps pointers)
+      if( len() <= 1 ) return null; /// Already killed
+      // KILL!
+      while( !is_dead() && len() > 1 )  pop(); // Kill all fields
+      _ts = TypeStruct.UNUSED.set_name(_ts._name);
+      _tptr = _tptr.make_from(_ts);
+      xval();
+      if( is_dead() ) return this;
+      for( Node use : _uses )
+        Env.GVN.add_flow_uses(Env.GVN.add_reduce(use)); // Get FPtrs from MrgProj, and dead Ptrs into New
+      return this;
+    }
+    return null;
   }
 
   //@Override BitsAlias escapees() { return _tptr._aliases; }

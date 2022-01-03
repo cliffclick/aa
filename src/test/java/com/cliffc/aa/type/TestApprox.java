@@ -378,7 +378,7 @@ public class TestApprox {
     TypeMemPtr zpa23= (TypeMemPtr)zsx2.at("a");
 
     TypeStruct zsa23=             zpa23._obj;
-    assertSame(TypeInt.con(22),   zsa23.at("v"));
+    assertSame(TypeInt.con(2),    zsa23.at("v"));
     TypeMemPtr zpx35= (TypeMemPtr)zsa23.at("x");
 
     TypeStruct zsx35=             zpx35._obj;

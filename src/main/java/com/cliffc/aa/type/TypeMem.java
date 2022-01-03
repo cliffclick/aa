@@ -36,7 +36,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
 
    We use an "all-memory" notion to handle the worse-case from e.g. all unknown
    calls.  Really the worse a Call can be is to "leak" all aliases that come in
-   to the the call (and are reachable from those) - but we need a convenient
+   to the call (and are reachable from those) - but we need a convenient
    Bottom type.  Missing aliases default to TypeObj.
 
    The representation is a collection of TypeObjs indexed by alias#.  Missing
@@ -46,7 +46,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
    is removed (since an ask will yield the correct value from the parent).
 
    There is no meet/join relationship between parent and child; a child can be
-   precisely updated independently from the parent and other siblings.
+   precisely updated independently of the parent and other siblings.
 
    CNC - Observe that the alias Trees on Fields applies to Indices on arrays as
    well - if we can group indices in a tree-like access pattern (obvious one
@@ -215,6 +215,13 @@ public class TypeMem extends Type<TypeMem> {
         as[alias] = oop;
     return make0(as);
   }
+  public TypeMem make_from(int alias, TypeStruct oop) {
+    TypeStruct[] as = Arrays.copyOf(_pubs,Math.max(_pubs.length,alias+1));
+    as[0] = null;
+    as[alias] = oop;
+    return make0(as);
+  }
+
 
   public static TypeMem make_live(TypeStruct live) { return make0(new TypeStruct[]{live}); }
 

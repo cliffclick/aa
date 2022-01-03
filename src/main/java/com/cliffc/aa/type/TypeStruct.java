@@ -305,13 +305,13 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   //}
   //// Make a named TypeStruct from an unnamed one
   //public TypeStruct make_from( String name ) { return make_from(name,_any);  }
-  //// Used by NewObj
-  //public TypeStruct make_from( Ary<TypeFld> flds ) {
-  //  TypeStruct ts = malloc(_name,_any);
-  //  for( TypeFld fld : flds ) ts.add_fld(fld);
-  //  return ts.hashcons_free();
-  //}
 
+  // Used by NewNode
+  public TypeStruct make_from( IntFunction<Type> gen ) {
+    TypeStruct ts = malloc(_name,_any);
+    for( TypeFld fld : _flds ) ts._flds.push(fld.make_from(gen.apply(fld._order)));
+    return ts.hashcons_free();
+  }
 
   //// Make an "open" struct with an initial display field.
   //public static TypeStruct open(Type tdisp) { return make("",false,true,TypeFld.make_arg(tdisp,DSP_IDX)); }
@@ -976,7 +976,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public Type at( String name ) { return get(name)._t; }
   // Field by index.  Error if not unique.
   public TypeFld fld_idx( int idx ) {
-    TypeFld fld = _flds.at(idx);
+    TypeFld fld = _flds.atX(idx);
+    if( fld==null ) return null;
     assert fld._order==idx || fld._order==TypeFld.oTop || fld._order==TypeFld.oBot;
     return fld;
   }
@@ -1049,15 +1050,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   @Override public void set_cyclic() { _cyclic = true; }
 
   // Extend the current struct with a new named field, making a new struct
-  public TypeStruct add_tup( Type t, int order ) { return add_fld(TypeFld.TUPS[order],Access.Final,t,order); }
-  public TypeStruct add_fld( String name, Access mutable, int order ) { return add_fld(name,mutable,Type.SCALAR,order); }
-  public TypeStruct add_fld( String name, Access mutable, Type tfld, int order ) {
-    assert name==null || Util.eq(name,TypeFld.fldBot) || get(name)==null;
-    assert !_any;
-    TypeStruct ts = copy();
-    ts.add_fld(TypeFld.make(name,tfld,mutable,order));
-    return ts.hashcons_free();
-  }
+  public TypeStruct add_tup( Type t, int order ) { return add_fldx(TypeFld.make(TypeFld.TUPS[order],t,Access.Final,order)); }
+  public TypeStruct add_fldx( TypeFld fld ) { return copy().add_fld(fld).hashcons_free(); }
   // Replace an existing field in the current struct.
   public TypeStruct replace_fld( TypeFld fld ) {
     if( get(fld._fld)==fld ) return this;

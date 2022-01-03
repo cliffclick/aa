@@ -45,6 +45,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     super.init("");
     _cyclic = false;
     _fidxs = fidxs; _nargs=nargs; _dsp=dsp; _ret=ret;
+    _has_dsp=dsp!=null;
     return this;
   }
   @Override TypeFunPtr copy() { return _copy().init(_fidxs,_nargs,_dsp,_ret); }

@@ -427,7 +427,7 @@ public class Parse implements Comparable<Parse> {
     StoreNode st = new StoreNode(mem(),ptr,Node.peek(iidx),mutable,tok,badf);
     scope().replace_mem(st);
     if( !create )               // Note 1-side-of-if update
-      scope.def_if(tok,mutable,false); 
+      scope.def_if(tok,mutable,false);
     return Node.pop(iidx);
   }
 
@@ -882,7 +882,7 @@ public class Parse implements Comparable<Parse> {
     nn.add_fld(TypeFld.NO_DISP,Env.ANY,null);
     // First stmt is parsed already
     Parse bad = errMsg(first_arg_start);
-    while( s!= null ) {         // More args      
+    while( s!= null ) {         // More args
       TypeFld fld = TypeFld.make((""+(nn.len()-DSP_IDX)).intern(),Type.SCALAR,Access.Final,nn.len());
       nn.add_fld(fld,s,bad);
       if( !peek(',') ) break;   // Final comma is optional
@@ -968,7 +968,7 @@ public class Parse implements Comparable<Parse> {
         }
       }
       if( formals.get(tok) != null ) err_ctrl3("Duplicate parameter name '" + tok + "'", badp);
-      else formals = formals.add_fld(tok,Access.Final,t,ARG_IDX+bads._len); // Accumulate args
+      else formals = formals.add_fldx(TypeFld.make(tok,t,Access.Final,ARG_IDX+bads._len)); // Accumulate args
       bads.add(bad);
     }
     // If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
@@ -1108,28 +1108,25 @@ public class Parse implements Comparable<Parse> {
       skipWS();
       int oldx = _x;
       if( peek('(') ) {
-        PrimNode p = n instanceof PrimNode p2 ? p2 : null;
-        throw unimpl();
-        //NewNode.NewPrimNode np = n instanceof NewNode.NewPrimNode p2 ? p2 : null;
-        //int nargs = p==null ? np._tfp.nargs() : p._tfp.nargs();
-        //boolean  read_mem = np != null && np._reads;
-        //boolean write_mem = np!=null;
-        //
-        //int nidx = Env.GVN.add_flow(n).push();
-        //n.add_def(null);        // No control
-        //n.add_def(read_mem ? mem() : null);
-        //for( int i=DSP_IDX; i<nargs; i++ ) {
-        //  n.add_def(stmts());
-        //  if( i<nargs-1 ) require(',',oldx);
-        //}
-        //Node xn = Env.GVN.add_flow(Node.pop(nidx));
-        //assert xn==n;
-        //if( write_mem ) {
-        //  set_mem(init(new MrgProjNode((NewNode)n,mem())));
-        //  n = init(new ProjNode(n,REZ_IDX));
-        //}
-        //require(')',oldx);
-        //return n;
+        PrimNode p = (PrimNode)n;
+        int nargs = p._tfp.nargs();
+        boolean  read_mem = false; //np != null && np._reads;
+        boolean write_mem = false; //np!=null;
+        int nidx = Env.GVN.add_flow(n).push();
+        n.add_def(null);        // No control
+        n.add_def(read_mem ? mem() : null);
+        for( int i=DSP_IDX; i<nargs; i++ ) {
+          n.add_def(stmts());
+          if( i<nargs-1 ) require(',',oldx);
+        }
+        Node xn = Env.GVN.add_flow(Node.pop(nidx));
+        assert xn==n;
+        if( write_mem ) {
+          set_mem(init(new MrgProjNode((NewNode)n,mem())));
+          n = init(new ProjNode(n,REZ_IDX));
+        }
+        require(')',oldx);
+        return n;
       }
 
       // Else build a function which calls the primitive, and return a
