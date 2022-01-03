@@ -210,7 +210,7 @@ public class CallNode extends Node {
     if( tctl(tcall)!=Type.CTRL ) { // Dead control (NOT dead self-type, which happens if we do not resolve)
       if( (ctl() instanceof ConNode) ) return null;
       // Kill all inputs with type-safe dead constants
-      set_mem(Node.con(TypeMem.XMEM));
+      //set_mem(Node.con(TypeMem.XMEM));
       //set_dsp(Node.con(TypeFunPtr.GENERIC_FUNPTR.dual()));
       //if( is_dead() ) return this;
       //for( int i=ARG_IDX; i<_defs._len; i++ )
@@ -368,7 +368,7 @@ public class CallNode extends Node {
 
     // Copy args for called functions.  FIDX is already refined.
     // Also gather all aliases from all args.
-    ts[DSP_IDX] = tfx._dsp;
+    ts[DSP_IDX] = tfx.dsp();
     for( int i=ARG_IDX; i<nargs(); i++ )
       ts[i] = arg(i)==null ? Type.XSCALAR : arg(i)._val;
     ts[_defs._len] = tfx;
@@ -379,11 +379,11 @@ public class CallNode extends Node {
   // Get (shallow) aliases from the type
   private BitsAlias get_alias( Type t ) {
     if( t instanceof TypeMemPtr ) return ((TypeMemPtr)t)._aliases;
-    if( TypeMemPtr.OOP.isa(t)   ) return BitsAlias.FULL;
+    if( TypeMemPtr.ISUSED.isa(t)   ) return BitsAlias.NALL;
     return BitsAlias.EMPTY;
   }
 
-  @Override BitsAlias escapees() {
+  //@Override BitsAlias escapees() {
     //BitsAlias esc_in  = tesc(_val)._aliases;
     //CallEpiNode cepi = cepi();
     //TypeTuple tcepi = cepi._val instanceof TypeTuple ? (TypeTuple) cepi._val : (TypeTuple) cepi._val.oob(TypeTuple.CALLE);
@@ -391,8 +391,8 @@ public class CallNode extends Node {
     //TypeMem precall = (TypeMem) mem()._val;
     //BitsAlias esc_out2 = precall.and_unused(esc_out); // Filter by unused pre-call
     //return esc_out2.meet(esc_in);
-    throw unimpl();
-  }
+  //  throw unimpl();
+  //}
   @Override public void add_flow_extra(Type old) {
     if( old==Type.ANY || _val==Type.ANY ||
         (old instanceof TypeTuple && ttfp(old).above_center()) )

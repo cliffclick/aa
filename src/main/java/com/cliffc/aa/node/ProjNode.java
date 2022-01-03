@@ -38,7 +38,7 @@ public class ProjNode extends Node {
     return c.oob();
   }
   @Override public void add_flow_use_extra(Node chg) {
-    if( chg instanceof NewObjNode ) // Changing prototype object
+    if( chg instanceof NewNode ) // Changing prototype object
       for( Node use : _uses )
         if( use instanceof ValNode ) // All ValNodes update
           Env.GVN.add_flow(use);

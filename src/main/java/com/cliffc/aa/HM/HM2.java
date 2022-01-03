@@ -72,7 +72,7 @@ public class HM2 {
     HMVar bool  = new HMVar(TypeInt.BOOL);
     HMVar int64 = new HMVar(TypeInt.INT64);
     HMVar flt64 = new HMVar(TypeFlt.FLT64);
-    HMVar strp  = new HMVar(TypeMemPtr.STRPTR);
+    HMVar strp  = null; //new HMVar(TypeMemPtr.STRPTR);
 
     // Primitives
     HMVar var1 = new HMVar();

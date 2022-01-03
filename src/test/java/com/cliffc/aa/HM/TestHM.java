@@ -2,6 +2,8 @@ package com.cliffc.aa.HM;
 
 import com.cliffc.aa.HM.HM.Root;
 import com.cliffc.aa.type.*;
+import static com.cliffc.aa.AA.unimpl;
+
 import org.junit.Test;
 
 import java.util.function.Supplier;
@@ -45,25 +47,28 @@ public class TestHM {
   }
 
   // Simple no-arg signature returning the type
-  private static TypeFunSig tfs(Type ret) { return TypeFunSig.make(TypeStruct.EMPTY,ret); }
+  private static TypeFunPtr tfs(Type ret) {
+    //return TypeFunSig.make(TypeStruct.EMPTY,ret);
+    throw unimpl();
+  }
 
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
 
   // Helpers to build complex Golden types
   private static final TypeFld NO_DSP = TypeFld.NO_DISP;
   private static final Type PTR_NDSP = TypeMemPtr.NO_DISP;
-  private static TypeStruct make_tups(Type t0, Type t1         ) { return TypeStruct.maket(t0,t1   ); }
-  private static TypeStruct make_tups(Type t0, Type t1, Type t2) { return TypeStruct.maket(t0,t1,t2); }
+  private static TypeStruct make_tups(Type t0, Type t1         ) { return TypeStruct.make_test(t0,t1   ); }
+  private static TypeStruct make_tups(Type t0, Type t1, Type t2) { return TypeStruct.make_test(t0,t1,t2); }
   private static final TypeMemPtr tuple2  = TypeMemPtr.make(7,make_tups(Type.SCALAR,   Type.SCALAR   ));
   private static final TypeMemPtr tuplen2 = TypeMemPtr.make(7,make_tups(Type.NSCALR,   Type.NSCALR   ));
   private static final TypeMemPtr tuple82 = TypeMemPtr.make(7,make_tups(TypeInt.NINT8, TypeInt.NINT8 ));
   private static final TypeMemPtr tuple55 = TypeMemPtr.make(7,make_tups(TypeInt.con(5),TypeInt.con(5)));
-  private static final TypeFunSig ret_tuple2 = tfs(tuple2);
+  private static final TypeFunPtr ret_tuple2 = tfs(tuple2);
   private static final TypeMemPtr tuple9  = TypeMemPtr.make(9,TypeStruct.make(NO_DSP,
                                                                               TypeFld.make("x",Type.SCALAR),
                                                                               TypeFld.make("y",Type.SCALAR)));
-  private static BitsAlias ptr90  () { return BitsAlias.FULL.make( 9,10); }
-  private static BitsAlias ptr1011() { return BitsAlias.FULL.make(10,11); }
+  private static BitsAlias ptr90  () { return BitsAlias.ALL.make( 9,10); }
+  private static BitsAlias ptr1011() { return BitsAlias.ALL.make(10,11); }
 
   // Make field holding a pointer to a struct
   private static TypeFld mptr( String fld, int alias, TypeStruct ts ) {
@@ -129,7 +134,7 @@ public class TestHM {
         "( 3, *[4]\"abc\")",
         // GCP with HM
         // With lift ON
-        TypeMemPtr.make(7,make_tups(TypeInt.NINT64,TypeMemPtr.make(4,TypeStr.STR))),
+        TypeMemPtr.make(7,make_tups(TypeInt.NINT64,TypeMemPtr.make(4,TypeStruct.EMPTY))),
         // With lift OFF
         //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
         // GCP is weaker without HM
@@ -174,7 +179,7 @@ public class TestHM {
         "( *[4]str, flt64)",
         "( *[4]str, flt64)",
         // With lift ON
-        TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeFlt.FLT64)),
+        TypeMemPtr.make(7,make_tups(TypeMemPtr.ISUSED,TypeFlt.FLT64)),
         // With lift OFF
         //TypeMemPtr.make(7,make_tups(Type.SCALAR,Type.SCALAR)),
         tuple2);
@@ -242,7 +247,7 @@ map ={fun parg -> (fun (cdr parg))};
         "( *[4]str, int1)",
         "( *[4]str, int1)",
         // With Lift ON
-        TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeInt.INT64)),
+        TypeMemPtr.make(7,make_tups(TypeMemPtr.ISUSED,TypeInt.INT64)),
         // With Lift OFF
         //tuple2,
         tuple2);
@@ -286,7 +291,7 @@ all = @{
         "( 3, *[4]\"abc\")",
         "( 3, *[4]\"abc\")",
         // With lift On
-        TypeMemPtr.make(7,make_tups(TypeInt.NINT64,TypeMemPtr.make(4,TypeStr.STR))),
+        TypeMemPtr.make(7,make_tups(TypeInt.NINT64,TypeMemPtr.make(4,TypeStruct.ISUSED))),
         // With lift Off
         //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
         tuplen2);
@@ -388,7 +393,7 @@ all = @{
         "{ A:@{ n0 = @{ n0 = A; v0 = int64; ...}?; v0 = int64; ...}? -> B:@{ n1 = @{ n1 = B; v1 = *[4]str}?; v1 = *[4]str}? }",
         // _9567{ -> *[0,10]@{^=any; n1=*[0,9]@{^$; n1=; v1=*[4]str}; v1=*[4]str}}}
         ()-> {
-          TypeFld v1 = TypeFld.make("v1",TypeMemPtr.STRPTR);
+          TypeFld v1 = TypeFld.make("v1",TypeMemPtr.ISUSED);
           TypeStruct ts0 = TypeStruct.make(NO_DSP,TypeFld.make("n1",Type.SCALAR),v1);
           TypeStruct ts1 = TypeStruct.make(NO_DSP,TypeFld.make("n1",TypeMemPtr.make_nil(9,ts0)),v1);
           return tfs(TypeMemPtr.make_nil(10,ts1));
@@ -443,7 +448,7 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
         "( *[4]str, int1)",
         "( *[4]str, int1)",
         // With lift ON
-        TypeMemPtr.make(7,make_tups(TypeMemPtr.STRPTR,TypeInt.INT64)),
+        TypeMemPtr.make(7,make_tups(TypeMemPtr.ISUSED,TypeInt.INT64)),
         // With lift OFF
         //tuple2,
         tuple2);
@@ -491,7 +496,7 @@ loop = { name cnt ->
         "*[0,4]str?",  // Both HM and GCP
         "Cannot unify int8 and *[0,4]str?", // HM alone cannot do this one
         // With lift ON
-        TypeMemPtr.make(4,TypeStr.STR), // Both HM and GCP
+        TypeMemPtr.make(4,TypeStruct.ISUSED), // Both HM and GCP
         // With lift OFF
         //Type.NSCALR,
         Type.NSCALR);                   // GCP alone gets a very weak answer
@@ -899,7 +904,7 @@ three =(n.s two);     // Three is the successor of two
         "}",
         () -> {
           //*[13]@{^=any; f=[15]{any }; res1=*[9,10,11,12]($); res2=$}
-          Type tmp = TypeMemPtr.make(BitsAlias.FULL.make(9,10,11,12),TypeStruct.make(NO_DSP));
+          Type tmp = TypeMemPtr.make(BitsAlias.ALL.make(9,10,11,12),TypeStruct.make(NO_DSP));
           return TypeMemPtr.make(13, TypeStruct.make(NO_DSP,mfun(2,"f",tmp,15),TypeFld.make("res1",tmp),TypeFld.make("res2",tmp)));
         },
         () -> {
@@ -1036,8 +1041,8 @@ maybepet = petcage.get;
         "(nflt32,nflt32,*[4]str)",
         "(nflt32,nflt32,*[4]str)",
         // With lift ON
-        //TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.STRPTR)),
-        //TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.STRPTR)));
+        //TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.ISUSED)),
+        //TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.ISUSED)));
         // With lift OFF
         TypeMemPtr.make(8, make_tups(Type.SCALAR  , Type.SCALAR  , Type.SCALAR)),
         // Needs cutoff==2 or HM to discover .name field is a string

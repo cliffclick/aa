@@ -31,7 +31,7 @@ public class HM6 {
     T2 bool  = T2.make_base(TypeInt.BOOL);
     T2 int64 = T2.make_base(TypeInt.INT64);
     T2 flt64 = T2.make_base(TypeFlt.FLT64);
-    T2 strp  = T2.make_base(TypeMemPtr.STRPTR);
+    T2 strp  = null; //T2.make_base(TypeMemPtr.STRPTR);
 
     // Primitives
     T2 var1 = T2.make_leaf();
@@ -151,7 +151,8 @@ public class HM6 {
   private static Syntax string() {
     int start = ++X;
     while( X<BUF.length && BUF[X]!='"' ) X++;
-    return require('"', new Con(TypeStr.con(new String(BUF,start,X-start).intern())));
+    //return require('"', new Con(TypeStr.con(new String(BUF,start,X-start).intern())));
+    throw unimpl();
   }
   private static byte skipWS() {
     while( X<BUF.length && isWS(BUF[X]) ) X++;

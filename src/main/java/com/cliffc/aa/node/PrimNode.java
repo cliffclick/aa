@@ -16,15 +16,15 @@ import static com.cliffc.aa.AA.*;
 //
 public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
-  final TypeFunSig _sig;        // Argument types; ctrl, mem, disp, normal args
   public final TypeFunPtr _tfp; // FIDX, nargs, display argument, return type
+  public final TypeStruct _formals;
   Parse[] _badargs;             // Filled in when inlined in CallNode
   public boolean _thunk_rhs;    // Thunk (delay) right-hand-argument.
   public PrimNode( String name, TypeStruct formals, Type ret ) {
     super(OP_PRIM);
     _name = name;
     int fidx = BitsFun.new_fidx();
-    _sig=TypeFunSig.make(formals,ret);
+    _formals = formals;
     _tfp=TypeFunPtr.make(BitsFun.make0(fidx),formals.nargs(),TypeMemPtr.NO_DISP,ret);
     _badargs=null;
     _thunk_rhs=false;
@@ -52,9 +52,9 @@ public abstract class PrimNode extends Node {
 
       {new OrI64(), },
 
-      {new AndThen(), },
-
-      {new OrElse(), },
+      //{new AndThen(), },
+      //
+      //{new OrElse(), },
 
     };
 
@@ -65,13 +65,13 @@ public abstract class PrimNode extends Node {
 
       new ConvertI64F64(),
 
-      // These are balanced-ops, called by Parse.term()
-      new MemPrimNode.ReadPrimNode.LValueRead  (), // Read  an L-Value: (ary,idx) ==> elem
-      new MemPrimNode.ReadPrimNode.LValueWrite (), // Write an L-Value: (ary,idx,elem) ==> elem
-      new MemPrimNode.ReadPrimNode.LValueWriteFinal(), // Final Write an L-Value: (ary,idx,elem) ==> elem
+      //// These are balanced-ops, called by Parse.term()
+      //new MemPrimNode.ReadPrimNode.LValueRead  (), // Read  an L-Value: (ary,idx) ==> elem
+      //new MemPrimNode.ReadPrimNode.LValueWrite (), // Write an L-Value: (ary,idx,elem) ==> elem
+      //new MemPrimNode.ReadPrimNode.LValueWriteFinal(), // Final Write an L-Value: (ary,idx,elem) ==> elem
       
       // These are unary ops, precedence determined outside 'Parse.expr'
-      new MemPrimNode.ReadPrimNode.LValueLength(), // The other array ops are "balanced ops" and use term() for precedence
+      //new MemPrimNode.ReadPrimNode.LValueLength(), // The other array ops are "balanced ops" and use term() for precedence
       new MinusF64(),
       new MinusI64(),
       new Not(),
@@ -90,7 +90,7 @@ public abstract class PrimNode extends Node {
   // All primitives are effectively H-M Applies with a hidden internal Lambda.
   @Override public boolean unify( boolean test ) {
     boolean progress = false;
-    for( TypeFld fld : _sig._formals )
+    for( TypeFld fld : _formals )
       progress |= prim_unify(tvar(fld._order),fld._t,test);
     progress |= prim_unify(tvar(),_tfp._ret,test);
     return progress;
@@ -113,14 +113,14 @@ public abstract class PrimNode extends Node {
   // str:{int     -> str }  ==>>  str:int
   // str:{flt     -> str }  ==>>  str:flt
   // == :{ptr ptr -> int1}  ==>>  == :ptr
-  @Override public String xstr() { return _name+":"+_sig._formals.get("^")._t; }
+  @Override public String xstr() { return _name+":"+_formals.get("^")._t; }
   @Override public Type value() {
     if( is_keep() ) return Type.ALL;
     Type[] ts = Types.get(_defs._len); // 1-based
     // If all inputs are constants we constant-fold.  If any input is high, we
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
-    for( TypeFld fld : _sig._formals ) {
+    for( TypeFld fld : _formals ) {
       Type tactual = ts[fld._order] = val(fld._order);
       Type tformal = fld._t;
       Type t = tformal.dual().meet(tactual);
@@ -145,7 +145,7 @@ public abstract class PrimNode extends Node {
 
 
   @Override public ErrMsg err( boolean fast ) {
-    for( TypeFld fld : _sig._formals ) {
+    for( TypeFld fld : _formals ) {
       Type tactual = val(fld._order);
       Type tformal = fld._t;
       if( !tactual.isa(tformal) )
@@ -156,13 +156,13 @@ public abstract class PrimNode extends Node {
   // Prims are equal for same-name-same-signature (and same inputs).
   // E.g. float-minus of x and y is NOT the same as int-minus of x and y
   // despite both names being '-'.
-  @Override public int hashCode() { return super.hashCode()+_name.hashCode()+_sig._hash; }
+  @Override public int hashCode() { return super.hashCode()+_name.hashCode()+_formals._hash; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
     if( !(o instanceof PrimNode) ) return false;
     PrimNode p = (PrimNode)o;
-    return _name.equals(p._name) && _sig==p._sig;
+    return _name.equals(p._name) && _formals==p._formals;
   }
 
   public static class ConvertI64F64 extends PrimNode {
@@ -429,114 +429,114 @@ public abstract class PrimNode extends Node {
     @Override public boolean equals(Object o) { return this==o; }
   }
 
-  // Classic '&&' short-circuit.  The RHS is a *Thunk* not a value.  Inlines
-  // immediate into the operators' wrapper function, which in turn aggressively
-  // inlines during parsing.
-  public static class AndThen extends PrimNode {
-    private static final TypeStruct ANDTHEN = TypeStruct.make2flds("pred",Type.SCALAR,"thunk",Type.SCALAR);
-    // Takes a value on the LHS, and a THUNK on the RHS.
-    public AndThen() { super("&&",ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
-    // Expect this to inline everytime
-    @Override public Node ideal_grow() {
-      if( _defs._len != ARG_IDX+1 ) return null; // Already did this
-      try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
-        Node ctl = in(CTL_IDX);
-        Node mem = in(MEM_IDX);
-        Node lhs = in(DSP_IDX);
-        Node rhs = in(ARG_IDX);
-        // Expand to if/then/else
-        Node iff = X.xform(new IfNode(ctl,lhs));
-        Node fal = X.xform(new CProjNode(iff,0));
-        Node tru = X.xform(new CProjNode(iff,1));
-        // Call on true branch; if false do not call.
-        Node cal = X.xform(new CallNode(true,_badargs,tru,mem,rhs));
-        //Node cep = X.xform(new CallEpiNode(cal,Env.DEFMEM));
-        //Node ccc = X.xform(new CProjNode(cep));
-        //Node memc= X.xform(new MProjNode(cep));
-        //Node rez = X.xform(new  ProjNode(cep,AA.REZ_IDX));
-        //// Region merging results
-        //Node reg = X.xform(new RegionNode(null,fal,ccc));
-        //Node phi = X.xform(new PhiNode(Type.SCALAR,null,reg,Node.con(Type.XNIL),rez ));
-        //Node phim= X.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
-        //// Plug into self & trigger is_copy
-        //set_def(0,reg );
-        //set_def(1,phim);
-        //set_def(2,phi );
-        //pop();   pop();     // Remove args, trigger is_copy
-        //X.add(this);
-        //for( Node use : _uses ) X.add(use);
-        //return null;
-        throw unimpl();
-      }
-    }
-    @Override public Type value() {
-      return TypeTuple.RET;
-    }
-    @Override public TypeMem live_use(Node def ) {
-      if( def==in(0) ) return TypeMem.ALIVE; // Control
-      if( def==in(1) ) return TypeMem.ALLMEM; // Force maximal liveness, since will inline
-      return TypeMem.ALIVE; // Force maximal liveness, since will inline
-    }
-    //@Override public TV2 new_tvar(String alloc_site) { return TV2.make("Thunk",this,alloc_site); }
-    @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
-    @Override public Node is_copy(int idx) {
-      return _defs._len==ARG_IDX+2 ? null : in(idx);
-    }
-  }
-
-  // Classic '||' short-circuit.  The RHS is a *Thunk* not a value.  Inlines
-  // immediate into the operators' wrapper function, which in turn aggressively
-  // inlines during parsing.
-  public static class OrElse extends PrimNode {
-    private static final TypeStruct ORELSE = TypeStruct.make2flds("pred",Type.SCALAR,"thunk",Type.SCALAR);
-    // Takes a value on the LHS, and a THUNK on the RHS.
-    public OrElse() { super("||",ORELSE,Type.SCALAR); _thunk_rhs=true; }
-    // Expect this to inline everytime
-    @Override public Node ideal_grow() {
-      if( _defs._len != ARG_IDX+1 ) return null; // Already did this
-      try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
-        Node ctl = in(CTL_IDX);
-        Node mem = in(MEM_IDX);
-        Node lhs = in(DSP_IDX);
-        Node rhs = in(ARG_IDX);
-        // Expand to if/then/else
-        Node iff = X.xform(new IfNode(ctl,lhs));
-        Node fal = X.xform(new CProjNode(iff,0));
-        Node tru = X.xform(new CProjNode(iff,1));
-        // Call on false branch; if true do not call.
-        Node cal = X.xform(new CallNode(true,_badargs,fal,mem,rhs));
-        //Node cep = X.xform(new CallEpiNode(cal,Env.DEFMEM));
-        //Node ccc = X.xform(new CProjNode(cep));
-        //Node memc= X.xform(new MProjNode(cep));
-        //Node rez = X.xform(new  ProjNode(cep,AA.REZ_IDX));
-        //// Region merging results
-        //Node reg = X.xform(new RegionNode(null,tru,ccc));
-        //Node phi = X.xform(new PhiNode(Type.SCALAR,null,reg,lhs,rez ));
-        //Node phim= X.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
-        //// Plug into self & trigger is_copy
-        //set_def(0,reg );
-        //set_def(1,phim);
-        //set_def(2,phi );
-        //pop();   pop();     // Remove args, trigger is_copy
-        //X.add(this);
-        //for( Node use : _uses ) X.add(use);
-        //return null;
-        throw unimpl();
-      }
-    }
-    @Override public Type value() {
-      return TypeTuple.RET;
-    }
-    @Override public TypeMem live_use(Node def ) {
-      if( def==in(0) ) return TypeMem.ALIVE; // Control
-      if( def==in(1) ) return TypeMem.ALLMEM; // Force maximal liveness, since will inline
-      return TypeMem.ALIVE; // Force maximal liveness, since will inline
-    }
-    //@Override public TV2 new_tvar(String alloc_site) { return TV2.make("Thunk",this,alloc_site); }
-    @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
-    @Override public Node is_copy(int idx) {
-      return _defs._len==ARG_IDX+2 ? null : in(idx);
-    }
-  }
+  //// Classic '&&' short-circuit.  The RHS is a *Thunk* not a value.  Inlines
+  //// immediate into the operators' wrapper function, which in turn aggressively
+  //// inlines during parsing.
+  //public static class AndThen extends PrimNode {
+  //  private static final TypeStruct ANDTHEN = TypeStruct.make2flds("pred",Type.SCALAR,"thunk",Type.SCALAR);
+  //  // Takes a value on the LHS, and a THUNK on the RHS.
+  //  public AndThen() { super("&&",ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
+  //  // Expect this to inline everytime
+  //  @Override public Node ideal_grow() {
+  //    if( _defs._len != ARG_IDX+1 ) return null; // Already did this
+  //    try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
+  //      Node ctl = in(CTL_IDX);
+  //      Node mem = in(MEM_IDX);
+  //      Node lhs = in(DSP_IDX);
+  //      Node rhs = in(ARG_IDX);
+  //      // Expand to if/then/else
+  //      Node iff = X.xform(new IfNode(ctl,lhs));
+  //      Node fal = X.xform(new CProjNode(iff,0));
+  //      Node tru = X.xform(new CProjNode(iff,1));
+  //      // Call on true branch; if false do not call.
+  //      Node cal = X.xform(new CallNode(true,_badargs,tru,mem,rhs));
+  //      //Node cep = X.xform(new CallEpiNode(cal,Env.DEFMEM));
+  //      //Node ccc = X.xform(new CProjNode(cep));
+  //      //Node memc= X.xform(new MProjNode(cep));
+  //      //Node rez = X.xform(new  ProjNode(cep,AA.REZ_IDX));
+  //      //// Region merging results
+  //      //Node reg = X.xform(new RegionNode(null,fal,ccc));
+  //      //Node phi = X.xform(new PhiNode(Type.SCALAR,null,reg,Node.con(Type.XNIL),rez ));
+  //      //Node phim= X.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
+  //      //// Plug into self & trigger is_copy
+  //      //set_def(0,reg );
+  //      //set_def(1,phim);
+  //      //set_def(2,phi );
+  //      //pop();   pop();     // Remove args, trigger is_copy
+  //      //X.add(this);
+  //      //for( Node use : _uses ) X.add(use);
+  //      //return null;
+  //      throw unimpl();
+  //    }
+  //  }
+  //  @Override public Type value() {
+  //    return TypeTuple.RET;
+  //  }
+  //  @Override public TypeMem live_use(Node def ) {
+  //    if( def==in(0) ) return TypeMem.ALIVE; // Control
+  //    if( def==in(1) ) return TypeMem.ALLMEM; // Force maximal liveness, since will inline
+  //    return TypeMem.ALIVE; // Force maximal liveness, since will inline
+  //  }
+  //  //@Override public TV2 new_tvar(String alloc_site) { return TV2.make("Thunk",this,alloc_site); }
+  //  @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
+  //  @Override public Node is_copy(int idx) {
+  //    return _defs._len==ARG_IDX+2 ? null : in(idx);
+  //  }
+  //}
+  //
+  //// Classic '||' short-circuit.  The RHS is a *Thunk* not a value.  Inlines
+  //// immediate into the operators' wrapper function, which in turn aggressively
+  //// inlines during parsing.
+  //public static class OrElse extends PrimNode {
+  //  private static final TypeStruct ORELSE = TypeStruct.make2flds("pred",Type.SCALAR,"thunk",Type.SCALAR);
+  //  // Takes a value on the LHS, and a THUNK on the RHS.
+  //  public OrElse() { super("||",ORELSE,Type.SCALAR); _thunk_rhs=true; }
+  //  // Expect this to inline everytime
+  //  @Override public Node ideal_grow() {
+  //    if( _defs._len != ARG_IDX+1 ) return null; // Already did this
+  //    try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
+  //      Node ctl = in(CTL_IDX);
+  //      Node mem = in(MEM_IDX);
+  //      Node lhs = in(DSP_IDX);
+  //      Node rhs = in(ARG_IDX);
+  //      // Expand to if/then/else
+  //      Node iff = X.xform(new IfNode(ctl,lhs));
+  //      Node fal = X.xform(new CProjNode(iff,0));
+  //      Node tru = X.xform(new CProjNode(iff,1));
+  //      // Call on false branch; if true do not call.
+  //      Node cal = X.xform(new CallNode(true,_badargs,fal,mem,rhs));
+  //      //Node cep = X.xform(new CallEpiNode(cal,Env.DEFMEM));
+  //      //Node ccc = X.xform(new CProjNode(cep));
+  //      //Node memc= X.xform(new MProjNode(cep));
+  //      //Node rez = X.xform(new  ProjNode(cep,AA.REZ_IDX));
+  //      //// Region merging results
+  //      //Node reg = X.xform(new RegionNode(null,tru,ccc));
+  //      //Node phi = X.xform(new PhiNode(Type.SCALAR,null,reg,lhs,rez ));
+  //      //Node phim= X.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
+  //      //// Plug into self & trigger is_copy
+  //      //set_def(0,reg );
+  //      //set_def(1,phim);
+  //      //set_def(2,phi );
+  //      //pop();   pop();     // Remove args, trigger is_copy
+  //      //X.add(this);
+  //      //for( Node use : _uses ) X.add(use);
+  //      //return null;
+  //      throw unimpl();
+  //    }
+  //  }
+  //  @Override public Type value() {
+  //    return TypeTuple.RET;
+  //  }
+  //  @Override public TypeMem live_use(Node def ) {
+  //    if( def==in(0) ) return TypeMem.ALIVE; // Control
+  //    if( def==in(1) ) return TypeMem.ALLMEM; // Force maximal liveness, since will inline
+  //    return TypeMem.ALIVE; // Force maximal liveness, since will inline
+  //  }
+  //  //@Override public TV2 new_tvar(String alloc_site) { return TV2.make("Thunk",this,alloc_site); }
+  //  @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
+  //  @Override public Node is_copy(int idx) {
+  //    return _defs._len==ARG_IDX+2 ? null : in(idx);
+  //  }
+  //}
 
 }

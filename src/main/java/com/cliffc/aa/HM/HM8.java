@@ -33,7 +33,7 @@ public class HM8 {
     T2 bool  = T2.make_base(TypeInt.BOOL);
     T2 int64 = T2.make_base(TypeInt.INT64);
     T2 flt64 = T2.make_base(TypeFlt.FLT64);
-    T2 strp  = T2.make_base(TypeMemPtr.STRPTR);
+    T2 strp  = null; //T2.make_base(TypeMemPtr.STRPTR);
 
     // Primitives
     PRIMS.put("nil",T2.make_nil());
@@ -173,7 +173,8 @@ public class HM8 {
   private static Syntax string() {
     int start = ++X;
     while( X<BUF.length && BUF[X]!='"' ) X++;
-    return require('"', new Con(TypeStr.con(new String(BUF,start,X-start).intern())));
+    //return require('"', new Con(TypeStr.con(new String(BUF,start,X-start).intern())));
+    throw unimpl();
   }
   private static byte skipWS() {
     while( X<BUF.length && isWS(BUF[X]) ) X++;
@@ -577,7 +578,7 @@ public class HM8 {
     final BitsAlias _alias;
     final String[]  _ids;
     final Syntax[] _flds;
-    Struct( String[] ids, Syntax[] flds ) { _ids=ids; _flds=flds; _alias = BitsAlias.make0(BitsAlias.new_alias(BitsAlias.REC)); }
+    Struct( String[] ids, Syntax[] flds ) { _ids=ids; _flds=flds; _alias = BitsAlias.make0(BitsAlias.new_alias(BitsAlias.ALLX)); }
     @Override SB str(SB sb) {
       _alias.str(sb.p('*')).p("@{");
       for( int i=0; i<_ids.length; i++ ) {
@@ -686,7 +687,7 @@ public class HM8 {
         if( find().is_err() ) return false;
         if( work==null ) return true;
         if( rec.is_err() ) return find().unify(rec,work);
-        progress |= T2.make_struct(new String[]{_id}, BitsAlias.RECORD_BITS.dual(),new T2[]{find().push_update(rec._deps)}).unify(rec, work);
+        progress |= T2.make_struct(new String[]{_id}, BitsAlias.NALL.dual(),new T2[]{find().push_update(rec._deps)}).unify(rec, work);
       } else {
         // Unify the field
         progress |= rec.args(idx).unify(find(), work);
@@ -749,7 +750,7 @@ public class HM8 {
     static T2 make_nil() { return new T2("Nil",null,null,null); }
     static T2 make_struct( String[] ids, BitsAlias aliases, T2[] flds ) { return new T2("@{}", null,ids,aliases,flds); }
     static T2 make_mem() { return new T2("[]" ,null,null,null,new T2[1]); }
-    static T2 make_err(String s) { return new T2("Err",TypeStr.con(s.intern()),null,null); }
+    static T2 make_err(String s) { throw unimpl(); } //return new T2("Err",TypeStr.con(s.intern()),null,null); }
     static T2 prim(String name, T2... args) { return new T2(name,null,null,null,args); }
     T2 copy() { return new T2(_name,_con,_ids,_aliases,new T2[_args.length]); }
 
@@ -1207,7 +1208,7 @@ public class HM8 {
     // Does NOT roll-up U-F, has no side-effects.
     @Override public String toString() { return str(new SB(), new VBitSet(), get_dups(new VBitSet()) ).toString(); }
     SB str(SB sb, VBitSet visit, VBitSet dups) {
-      if( is_err() ) return sb.p(_con.getstr());
+      if( is_err() ) throw unimpl(); //return sb.p(_con.getstr());
       if( is_leaf() || is_base() ) {
         if( is_base() ) sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString()); else sb.p(_name);
         return _args.length==0 || _args[0]==null ? sb : _args[0].str(sb.p(">>"), visit, dups);
@@ -1258,7 +1259,7 @@ public class HM8 {
     String p(VBitSet dups) { VCNT=0; VNAMES.clear(); return find()._p(new SB(), new VBitSet(), dups).toString(); }
     private SB _p(SB sb, VBitSet visit, VBitSet dups) {
       assert no_uf();
-      if( is_err () ) return sb.p( _con.getstr() );
+      if( is_err () ) throw unimpl(); //return sb.p( _con.getstr() );
       if( is_base() ) return sb.p(_con instanceof TypeMemPtr ? "str" : _con.toString() );
       if( is_leaf() || dups.get(_uid) ) { // Leafs or Duplicates?  Take some effort to pretty-print cycles
         Integer ii = VNAMES.get(this);

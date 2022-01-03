@@ -26,7 +26,7 @@ public class HM4 {
     T2 bool  = T2.base(TypeInt.BOOL);
     T2 int64 = T2.base(TypeInt.INT64);
     T2 flt64 = T2.base(TypeFlt.FLT64);
-    T2 strp  = T2.base(TypeMemPtr.STRPTR);
+    T2 strp  = null; //T2.base(TypeMemPtr.STRPTR);
 
     // Primitives
     T2 var1 = T2.tnew();

@@ -6,6 +6,7 @@ import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.AA.unimpl;
 
 // See CallNode comments.  The RetNode gathers {control (function exits or
 // not), memory, value, rpc, fun}, and sits at the end of a function.  The RPC
@@ -82,7 +83,7 @@ public final class RetNode extends Node {
     // Collapsed to a constant?  Remove any control interior.
     Node ctl = ctl();
     if( rez()._val.is_con() && ctl!=fun() && // Profit: can change control and delete function interior
-        (mem()._val ==TypeMem.EMPTY || (mem() instanceof ParmNode && mem().in(0)==fun())) ) // Memory has to be trivial also
+        (mem()._val ==TypeMem.ANYMEM || (mem() instanceof ParmNode && mem().in(0)==fun())) ) // Memory has to be trivial also
       return set_def(0,fun());  // Gut function body
     return progress;
   }
@@ -137,29 +138,30 @@ public final class RetNode extends Node {
         { assert cuse==null; cuse = use; }
     assert cuse!=null;
     int cidx = cuse._defs.find(fun);
-    // Insert loop in-the-middle
-    try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
-      LoopNode loop = new LoopNode();
-      loop.add_def(fun);
-      loop.add_def(call.ctl());
-      X.xform(loop);
-      cuse.set_def(cidx,loop);
-      // Insert loop phis in-the-middle
-      for( int argn=MEM_IDX; argn<call.nargs(); argn++ ) {
-        ParmNode parm = fun.parm(argn);
-        if( parm==null ) continue; // arg/parm might be dead
-        Node phi = new PhiNode(parm._t,parm._badgc,loop,null,call.arg(argn));
-        phi._val  = parm._val ; // Inserting inside a loop, take optimistic values
-        phi._live = parm._live; // Inserting inside a loop, take optimistic lives
-        parm.insert(phi);
-        phi.set_def(1,parm);
-        X.add(phi);
-      }
-      // Cut the Call control
-      call.set_def(0, Env.XCTRL);
-      Env.GVN.add_unuse(call);
-      return this;
-    }
+    //// Insert loop in-the-middle
+    //try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
+    //  LoopNode loop = new LoopNode();
+    //  loop.add_def(fun);
+    //  loop.add_def(call.ctl());
+    //  X.xform(loop);
+    //  cuse.set_def(cidx,loop);
+    //  // Insert loop phis in-the-middle
+    //  for( int argn=MEM_IDX; argn<call.nargs(); argn++ ) {
+    //    ParmNode parm = fun.parm(argn);
+    //    if( parm==null ) continue; // arg/parm might be dead
+    //    Node phi = new PhiNode(parm._t,parm._badgc,loop,null,call.arg(argn));
+    //    phi._val  = parm._val ; // Inserting inside a loop, take optimistic values
+    //    phi._live = parm._live; // Inserting inside a loop, take optimistic lives
+    //    parm.insert(phi);
+    //    phi.set_def(1,parm);
+    //    X.add(phi);
+    //  }
+    //  // Cut the Call control
+    //  call.set_def(0, Env.XCTRL);
+    //  Env.GVN.add_unuse(call);
+    //  return this;
+    //}
+    throw unimpl();
   }
 
   private static boolean check_phi_type( FunNode fun, CallNode call, int argn ) {

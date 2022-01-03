@@ -131,7 +131,7 @@ public class TV2 {
   public boolean is_nil () { return arg("?" )!=null; }
   public boolean is_base() { return _flow != null && !is_fun() && !is_obj(); }
   public boolean is_fun () { return _flow instanceof TypeFunPtr; }
-  public boolean is_obj () { return _flow instanceof TypeMemPtr tmp && tmp._obj.getClass() != TypeObj.class; }
+  public boolean is_obj () { return _flow instanceof TypeMemPtr; }
   public boolean is_open() { return _open; }           // Struct-specific
   public boolean is_err () { return _err!=null || is_err2(); }
   public boolean is_err2() { return _eflow!=null; }
@@ -197,7 +197,7 @@ public class TV2 {
     return t2;
   }
   // A struct with fields
-  public static TV2 make_struct( NewObjNode n, String alloc_site ) {
+  public static TV2 make_struct( NewNode n, String alloc_site ) {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
     for( TypeFld fld : n._ts )
       args.put(fld._fld,n.in(fld._order).tvar());
@@ -420,7 +420,7 @@ public class TV2 {
       if( tstr==null ) {
         // Returning a high version of struct
         Type.RECURSIVE_MEET++;
-        tstr = TypeStruct.malloc("",is_open(),false).add_fld(TypeFld.NO_DISP);
+        tstr = TypeStruct.malloc("",false).add_fld(TypeFld.NO_DISP);
         if( _args!=null )
           for( String id : _args.keySet() )
             tstr.add_fld(TypeFld.malloc(id));

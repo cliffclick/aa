@@ -38,7 +38,7 @@ public class TestHM1 {
       new Lambda("x",
                  new Apply(new Apply(new Ident("pair"),
                                      new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
-                           new Apply(new Ident("x"), new Con(TypeStr.ABC))));
+                           new Apply(new Ident("x"), new Con(TypeStruct.ISUSED))));
     HMType t1 = HM1.HM(x);
     assertEquals("{ { v11:all -> v9 } -> pair(v9$,v9$) }",t1.str());
   }
@@ -68,7 +68,7 @@ public class TestHM1 {
       new Apply(new Lambda("x",
                            new Apply(new Apply(new Ident("pair"),
                                                new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
-                                     new Apply(new Ident("x"), new Con(TypeStr.ABC)))),
+                                     new Apply(new Ident("x"), new Con(TypeStruct.ISUSED)))),
                 new Lambda("y", new Ident("y")));
 
     HMType t1 = HM1.HM(x);

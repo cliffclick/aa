@@ -120,7 +120,7 @@ interface Cyclic {
     CSTACK.push(t);              // Push on stack, in case a cycle is found
     switch( t._type ) {
     case Type.TMEMPTR ->   _set_cyclic(((TypeMemPtr) t)._obj);
-    case Type.TFUNPTR -> { _set_cyclic(((TypeFunPtr) t)._dsp); _set_cyclic(((TypeFunPtr) t)._ret); }
+    case Type.TFUNPTR -> { _set_cyclic(((TypeFunPtr) t).dsp()); _set_cyclic(((TypeFunPtr) t)._ret); }
     case Type.TFLD    ->   _set_cyclic(((TypeFld   ) t)._t  );
     case Type.TSTRUCT -> { CVISIT.set(t._uid);  for( TypeFld fld : ((TypeStruct) t) ) _set_cyclic(fld);  }
     default -> throw AA.unimpl();
@@ -317,7 +317,7 @@ interface Cyclic {
       case Type.TMEMPTR -> _uid((((TypeMemPtr) h)._aliases.str(sb.p('*')).p(": ")), ((TypeMemPtr) h)._obj);
       case Type.TFUNPTR -> {
         TypeFunPtr tfp = (TypeFunPtr) h;
-        _uid(_uid(tfp._fidxs.str(sb).p("{ "), tfp._dsp).p(" -> "), tfp._ret).p(" }");
+        _uid(_uid(tfp._fidxs.str(sb).p("{ "), tfp.dsp()).p(" -> "), tfp._ret).p(" }");
       }
       case Type.TARY -> throw unimpl();
       default -> h.str(sb,null,null,false);

@@ -56,7 +56,7 @@ public class TestHM3 {
       new Lambda("x",
                  new Apply(new Apply(new Ident("pair"),
                                      new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
-                           new Apply(new Ident("x"), new Con(TypeStr.ABC))));
+                           new Apply(new Ident("x"), new Con(TypeStruct.ISUSED))));
     HMType t1 = HM3.hm(x);
     assertEquals("{ { v22:all -> v23 } -> pair(v23$,v23$) }",t1.str());
   }
@@ -68,7 +68,7 @@ public class TestHM3 {
       new Apply(new Lambda("x",
                            new Apply(new Apply(new Ident("pair"),
                                                new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
-                                     new Apply(new Ident("x"), new Con(TypeStr.ABC)))),
+                                     new Apply(new Ident("x"), new Con(TypeStruct.ISUSED)))),
                 new Lambda("y", new Ident("y")));
 
     HMType t1 = HM3.hm(x);
@@ -84,7 +84,7 @@ public class TestHM3 {
               new Lambda("y", new Ident("y")),
               new Apply(new Apply(new Ident("pair"),
                                   new Apply(new Ident("x"), new Con(TypeInt.con(3)))),
-                        new Apply(new Ident("x"), new Con(TypeStr.ABC))));
+                        new Apply(new Ident("x"), new Con(TypeStruct.ISUSED))));
 
     HMType t1 = HM3.hm(x);
     assertEquals("pair(v27:3,v23:\"abc\")",t1.str());

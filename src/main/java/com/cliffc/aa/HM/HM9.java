@@ -244,7 +244,8 @@ public class HM9 {
   private static Syntax string() {
     int start = ++X;
     while( X<BUF.length && BUF[X]!='"' ) X++;
-    return require('"', new Con(TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(new String(BUF,start,X-start).intern()))));
+    //return require('"', new Con(TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(new String(BUF,start,X-start).intern()))));
+    throw unimpl();
   }
   private static byte skipWS() {
     while( X<BUF.length && isWS(BUF[X]) ) X++;
@@ -759,7 +760,8 @@ public class HM9 {
     private static Type add_sig(Type t) {
       if( t instanceof TypeFunPtr ) {
         Type rez = add_sig(xval((TypeFunPtr)t));
-        return TypeFunSig.make1(TypeTuple.make_args());
+        //return TypeFunSig.make1(TypeTuple.make_args());
+        throw unimpl();
       } else {
         return t;
       }
@@ -776,7 +778,7 @@ public class HM9 {
       _ids=ids;
       _flds=flds;
       // Make a TMP
-      _alias = BitsAlias.new_alias(BitsAlias.REC);
+      _alias = BitsAlias.new_alias(BitsAlias.ALLX);
     }
     @Override SB str(SB sb) {
       sb.p("@{").p(_alias);
@@ -930,12 +932,12 @@ public class HM9 {
     static Worklist WORK;
     static int PAIR_ALIAS, TRIPLE_ALIAS;
     static void reset() {
-      PAIR_ALIAS   = BitsAlias.new_alias(BitsAlias.REC);
-      TRIPLE_ALIAS = BitsAlias.new_alias(BitsAlias.REC);
+      PAIR_ALIAS   = BitsAlias.new_alias(BitsAlias.ALLX);
+      TRIPLE_ALIAS = BitsAlias.new_alias(BitsAlias.ALLX);
       BOOL  = T2.make_base(TypeInt.BOOL);
       INT64 = T2.make_base(TypeInt.INT64);
       FLT64 = T2.make_base(TypeFlt.FLT64);
-      STRP  = T2.make_base(TypeMemPtr.STRPTR);
+      STRP  = null; //T2.make_base(TypeMemPtr.STRPTR);
     }
     abstract String name();
     private static final String[][] IDS = new String[][] {
@@ -1005,7 +1007,8 @@ public class HM9 {
       @Override Type apply(Syntax[] args) {
         T2 tcon = find().args(1).args(0);
         assert tcon.is_base();
-        return TypeMemPtr.make(PAIR_ALIAS,TypeStruct.maket(tcon._flow,args.length==0 ? Root.widen(_targs[0]) : args[0]._flow));
+        //return TypeMemPtr.make(PAIR_ALIAS,TypeStruct.maket(tcon._flow,args.length==0 ? Root.widen(_targs[0]) : args[0]._flow));
+        throw unimpl();
       }
     }
   }
@@ -1123,10 +1126,11 @@ public class HM9 {
     @Override Type apply( Syntax[] args) {
       Type pred = args[0]._flow;
       if( pred.above_center() ) return TypeInt.BOOL.dual();
-      TypeObj to;
-      if( pred instanceof TypeMemPtr && (to=((TypeMemPtr)pred)._obj) instanceof TypeStr && to.is_con() )
-        return TypeInt.con(to.getstr().isEmpty() ? 1 : 0);
-      return TypeInt.BOOL;
+      //TypeObj to;
+      //if( pred instanceof TypeMemPtr && (to=((TypeMemPtr)pred)._obj) instanceof TypeStr && to.is_con() )
+      //  return TypeInt.con(to.getstr().isEmpty() ? 1 : 0);
+      //return TypeInt.BOOL;
+      throw unimpl();
     }
   }
 
@@ -1248,10 +1252,11 @@ public class HM9 {
     @Override PrimSyn make() { return new Str(); }
     @Override Type apply( Syntax[] args) {
       Type i = args[0]._flow;
-      if( i.above_center() ) return TypeMemPtr.STRPTR.dual();
-      if( i instanceof TypeInt && i.is_con() )
-        return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(String.valueOf(i.getl()).intern()));
-      return TypeMemPtr.STRPTR;
+      //if( i.above_center() ) return TypeMemPtr.STRPTR.dual();
+      //if( i instanceof TypeInt && i.is_con() )
+      //  return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(String.valueOf(i.getl()).intern()));
+      //return TypeMemPtr.STRPTR;
+      throw unimpl();
     }
   }
 
@@ -1387,7 +1392,7 @@ public class HM9 {
       assert no_uf();
       if( is_base() ) return _flow;
       if( is_leaf() ) return Type.SCALAR;
-      if( is_err()  ) return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(_err));
+      if( is_err()  ) throw unimpl(); //return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(_err));
       if( is_fun()  ) return _flow;
       if( is_struct() ) {
         TypeStruct tstr = ADUPS.get(_uid);
@@ -1939,7 +1944,7 @@ public class HM9 {
         if( !(t instanceof TypeMemPtr) )  return t;
         TypeMemPtr tmp = (TypeMemPtr)t;
         if( !(tmp._obj instanceof TypeStruct) ) return t;
-        TypeStruct ts = (TypeStruct)tmp._obj;
+        TypeStruct ts = tmp._obj;
         for( int i=0; i<_args.length; i++ ) {
           //int idx = ts.fld_find(_ids[i]);
           //// Missing fields are walked as SCALAR
@@ -1968,7 +1973,7 @@ public class HM9 {
         if( !(t instanceof TypeMemPtr) ) throw unimpl();
         TypeMemPtr tmp = (TypeMemPtr)t;
         if( !(tmp._obj instanceof TypeStruct) ) throw unimpl();
-        TypeStruct ts = (TypeStruct)tmp._obj;
+        TypeStruct ts = tmp._obj;
         boolean progress=false;
         //for( int i=0; i<_args.length; i++ ) {
         //  int idx = ts.fld_find(_ids[i]);

@@ -1,4 +1,31 @@
 =======================================
+1/1/2022
+
+More type decisions:
+
+- TFP can have no display (code ptr only), 1-shot binds to a 'self'.  'self'
+  can be a closure, or a enclosing struct.  Basically implies TFP curry the
+  display, and there are binding syntax steps which bind the display.
+- - Loading a fcn ptr from a Value type binds the value as the display.
+- - Loading a fcn ptr from a static method binds the curr env as display.
+- - Loading a fcn ptr from a prototype does NOT bind; gives a code ptr.
+- - If not bound, the 1st arg given is always the display.
+- Drop TFS.  Formal args are just a TS where needed for call resolution.
+- - Other use AssertNode to force types.
+- Drop TypeObj, TypeStr
+- TMP pts to a TS
+- TypeAry becomes a Scalar, suitable as a field in a TS.
+- - TypeAry can be fixed-size
+- - Exactly 1 TypeAry field can appear in TS, as the endless extent after a TS.
+
+- After parsing prims, all ref parses pick up the interal prim name 'ref:'
+  which includes the == and != opers.
+
+- Currently lacking syntax to make a anonymous value type.  Maybe this is OK.
+
+
+
+=======================================
 12/24/2021
 
 issue:

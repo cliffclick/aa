@@ -116,7 +116,7 @@ public class HM {
     DO_HM  = do_hm ;
     DO_GCP = do_gcp;
 
-    for( PrimSyn prim : new PrimSyn[]{new If(), new Pair(), new EQ(), new EQ0(), new Mul(), new Add(), new Dec(), new Str(), new Triple(), new Factor(), new IsEmpty(), new NotNil()} )
+    for( PrimSyn prim : new PrimSyn[]{new If(), new Pair(), new EQ(), new EQ0(), new Mul(), new Add(), new Dec(), new Str(), new Triple(), new Factor(), new NotNil()} )
       PRIMSYNS.put(prim.name(),prim);
 
     // Parse
@@ -339,7 +339,8 @@ public class HM {
   private static Syntax string() {
     int start = ++X;
     while( X<BUF.length && BUF[X]!='"' ) X++;
-    return require('"', new Con(TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(new String(BUF,start,X-start).intern()))));
+    //return require('"', new Con(TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(new String(BUF,start,X-start).intern()))));
+    throw unimpl();
   }
   private static byte skipWS() {
     while(true) {
@@ -937,9 +938,7 @@ public class HM {
       // recursively walk structures for nested functions
       if( flow instanceof TypeMemPtr ) {
         TypeMemPtr tmp = (TypeMemPtr)flow;
-        if( tmp._obj instanceof TypeStr ) return;
-        TypeStruct ts = ((TypeStruct)tmp._obj);
-        for( TypeFld fld : ts )
+        for( TypeFld fld : tmp._obj )
           _walk_root_funs(fld._t,work);
       }
     }
@@ -972,7 +971,8 @@ public class HM {
           for( int fidx : fun._fidxs )
             rez = rez.meet(Lambda.FUNS.get(fidx).apply(FLOWS));
         Type rez2 = add_sig(rez);
-        return TypeFunSig.make(TypeStruct.EMPTY,rez2);
+        //return TypeFunSig.make(TypeStruct.EMPTY,rez2);
+        throw unimpl();
       } else {
         return t;
       }
@@ -989,7 +989,7 @@ public class HM {
       _ids=ids;
       _flds=flds;
       // Make a TMP
-      _alias = BitsAlias.new_alias(BitsAlias.REC);
+      _alias = BitsAlias.new_alias(BitsAlias.ALLX);
     }
     @Override SB str(SB sb) {
       sb.p("@{").p(_alias);
@@ -1118,11 +1118,8 @@ public class HM {
       if( trec.above_center() || trec==Type.NIL ) return Type.XSCALAR;
       if( trec instanceof TypeMemPtr ) {
         TypeMemPtr tmp = (TypeMemPtr)trec;
-        if( tmp._obj instanceof TypeStruct ) {
-          TypeStruct tstr = (TypeStruct)tmp._obj;
-          TypeFld fld = tstr.get(_id);
-          if( fld!=null ) return fld._t; // Field type
-        }
+        TypeFld fld = tmp._obj.get(_id);
+        if( fld!=null ) return fld._t; // Field type
         if( tmp._obj.above_center() ) return Type.XSCALAR;
       }
       return Type.SCALAR;
@@ -1146,12 +1143,12 @@ public class HM {
   abstract static class PrimSyn extends Lambda {
     static int PAIR_ALIAS, TRIPLE_ALIAS;
     static void reset() {
-      PAIR_ALIAS   = BitsAlias.new_alias(BitsAlias.REC);
-      TRIPLE_ALIAS = BitsAlias.new_alias(BitsAlias.REC);
+      PAIR_ALIAS   = BitsAlias.new_alias(BitsAlias.ALLX);
+      TRIPLE_ALIAS = BitsAlias.new_alias(BitsAlias.ALLX);
     }
     static T2 BOOL (){ return T2.make_base(TypeInt.BOOL); }
     static T2 INT64(){ return T2.make_base(TypeInt.INT64); }
-    static T2 STRP (){ return T2.make_base(TypeMemPtr.STRPTR); }
+    static T2 STRP (){ return null/*T2.make_base(TypeMemPtr.STRPTR)*/; }
     static T2 FLT64(){ return T2.make_base(TypeFlt.FLT64); }
     abstract String name();
     private static final String[][] IDS = new String[][] {
@@ -1300,20 +1297,6 @@ public class HM {
     }
   }
 
-  static class IsEmpty extends PrimSyn {
-    @Override String name() { return "isempty"; }
-    public IsEmpty() { super(STRP(),BOOL()); }
-    @Override PrimSyn make() { return new IsEmpty(); }
-    @Override Type apply( Type[] flows) {
-      Type pred = flows[0];
-      if( pred.above_center() ) return TypeInt.BOOL.dual();
-      TypeObj to;
-      if( pred instanceof TypeMemPtr && (to=((TypeMemPtr)pred)._obj) instanceof TypeStr && to.is_con() )
-        return TypeInt.con(to.getstr().isEmpty() ? 1 : 0);
-      return TypeInt.BOOL;
-    }
-  }
-
   // Remove a nil from a struct after a guarding if-test
   static class NotNil extends PrimSyn {
     @Override String name() { return " notnil"; }
@@ -1416,10 +1399,11 @@ public class HM {
     @Override PrimSyn make() { return new Str(); }
     @Override Type apply( Type[] flows) {
       Type i = flows[0];
-      if( i.above_center() ) return TypeMemPtr.STRPTR.dual();
-      if( i instanceof TypeInt && i.is_con() )
-        return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(String.valueOf(i.getl()).intern()));
-      return TypeMemPtr.STRPTR;
+      //if( i.above_center() ) return TypeMemPtr.STRPTR.dual();
+      //if( i instanceof TypeInt && i.is_con() )
+      //  return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(String.valueOf(i.getl()).intern()));
+      //return TypeMemPtr.STRPTR;
+      throw unimpl();
     }
   }
 
@@ -1707,7 +1691,7 @@ public class HM {
         if( tstr==null ) {
           // Returning a high version of struct
           Type.RECURSIVE_MEET++;
-          tstr = TypeStruct.malloc("",is_open(),false).add_fld(TypeFld.NO_DISP);
+          tstr = TypeStruct.malloc("",false).add_fld(TypeFld.NO_DISP);
           if( _args!=null )
             for( String id : _args.keySet() )
               tstr.add_fld(TypeFld.malloc(id));
@@ -2160,7 +2144,7 @@ public class HM {
     // monotonic because the result is JOINd with GCP types.
     Type walk_types_in(Type t, Apply apply) {     //noinspection UnusedReturnValue
       long duid = dbl_uid(t._uid);
-      if( WDUPS.putIfAbsent(duid,TypeStruct.ALLSTRUCT)!=null ) return t;
+      if( WDUPS.putIfAbsent(duid,TypeStruct.ISUSED)!=null ) return t;
       assert !unified();
       // Free variables keep the input flow type.
       // Bases can (sorta) act like a leaf: they can keep their polymorphic "shape" and induce it on the result
@@ -2194,9 +2178,8 @@ public class HM {
       if( !(t instanceof TypeMemPtr) ) return t.oob(Type.SCALAR);
       TypeMemPtr tmp = (TypeMemPtr)t;
       if( !(tmp._obj instanceof TypeStruct) ) return t.oob(Type.SCALAR);
-      TypeStruct ts = (TypeStruct)tmp._obj;
-      TypeFld fld = ts.get(id);
-      if( fld==null ) return ts.oob(Type.SCALAR);
+      TypeFld fld = tmp._obj.get(id);
+      if( fld==null ) return tmp._obj.oob(Type.SCALAR);
       return fld._t;
     }
 
@@ -2224,7 +2207,7 @@ public class HM {
           for( int fidx : tfp._fidxs ) WBS.set(fidx);                // Guard against recursive functions
           Type tret = tfp._ret;
           Type trlift = arg("ret").walk_types_out(tret, apply);
-          Type rez = TypeFunPtr.makex( tfp._fidxs,tfp.nargs(),tfp._dsp,trlift);
+          Type rez = TypeFunPtr.makex( tfp._fidxs,tfp.nargs(),tfp.dsp(),trlift);
           for( int fidx : tfp._fidxs ) WBS.clear(fidx); // Clear fidxs
           return record_lift(apply,t,rez);
         }
@@ -2236,13 +2219,13 @@ public class HM {
         if( !(t instanceof TypeMemPtr ) ) // Flow will not lift to a TMP->Struct?
           return record_lift(apply,t,t.must_nil() ? Type.SCALAR : Type.NSCALR);
         TypeMemPtr tmp = (TypeMemPtr)t;
-        TypeStruct ts0 = (TypeStruct)tmp._obj;
+        TypeStruct ts0 = tmp._obj;
         // Can be made to work above_center, but no sensible lifting so don't bother
         if( ts0.above_center() )  return record_lift(apply,t,Type.SCALAR);
         TypeStruct ts = WDUPS.get(_uid);
         if( ts != null ) return t; // Recursive, stop cycles
         Type.RECURSIVE_MEET++;
-        ts = TypeStruct.malloc("",false,false);
+        ts = TypeStruct.malloc("",false);
 
         // Add fields.  Common to both are easy, and will be walked (recursive,
         // cyclic).  Solo fields in GCP are kept, and lifted "as if" an HM

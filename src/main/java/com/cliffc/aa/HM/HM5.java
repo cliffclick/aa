@@ -31,7 +31,7 @@ public class HM5 {
     T2 bool  = T2.make_base(TypeInt.BOOL);
     T2 int64 = T2.make_base(TypeInt.INT64);
     T2 flt64 = T2.make_base(TypeFlt.FLT64);
-    T2 strp  = T2.make_base(TypeMemPtr.STRPTR);
+    T2 strp  = null; //T2.make_base(TypeMemPtr.STRPTR);
 
     // Primitives
     T2 var1 = T2.make_leaf();

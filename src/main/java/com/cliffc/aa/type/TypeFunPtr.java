@@ -10,14 +10,22 @@ import java.util.function.UnaryOperator;
 
 import static com.cliffc.aa.AA.unimpl;
 
-
 // Function indices or function pointers; a single instance can include all
 // possible aliased function pointers.  Function pointers can be executed, are
 // not GC'd, and cannot be Loaded or Stored through (although they can be
 // loaded & stored).
+// 
+// A function pointer includes a display (a back pointer to the enclosing
+// environment); i.e. function pointers are "fat".  The display is typed as
+// a TMP to a TypeStruct, or e.g. ANY (not live, nobody uses or cares) or XNIL.
 //
-// A TypeFunPtr includes a set of function indices and the display and NOT
-// e.g. the function arguments nor formals.  Formals are stored in the FunNode.
+// The TFP indicates if it carries a display or not; a TFP without a display
+// cannot be called and has to be bound to a display first.  The TFP instead is
+// bound to the prototype object for a type class, and requires a one-time
+// binding to an actual object before being called.  For "static" functions,
+// the prototype object is just the enclosing display and binds immediately.
+//
+// Other arguments are not currently curried in the TFP itself, only nargs.
 //
 // Each function index (or fidx) is a constant value, a classic code pointer.
 // Cloning the code immediately also splits the fidx with a new fidx bit for
@@ -27,9 +35,10 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   // List of known functions in set, or 'flip' for choice-of-functions.
   // A single bit is a classic code pointer.
   public BitsFun _fidxs;        // Known function bits
-  private int _nargs;           // Number of formals, including the display
-  public Type _dsp;             // Display; is_display_ptr
+  private int _nargs;           // Number of formals, including the ctrl, mem, display
   public Type _ret;             // Return scalar type
+  private Type _dsp;            // Display; often a TMP to a TS; ANY is dead (not live, nobody uses).
+  private boolean _has_dsp;     // Has a display bound
   boolean _cyclic; // Type is cyclic with a struct.  This is a summary property, not a part of the type, hence is not in the equals nor hash
 
   private TypeFunPtr init(BitsFun fidxs, int nargs, Type dsp, Type ret ) {
@@ -44,6 +53,10 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_dsp,"dsp");  map.apply(_ret,"ret"); }
   @Override public void walk_update( UnaryOperator<Type> map ) { _dsp = map.apply(_dsp); _ret = map.apply(_ret); }
 
+  public boolean has_dsp() { return _has_dsp; }
+  public Type dsp() { assert _has_dsp; return _dsp; }
+  void set_dsp(Type dsp) { assert un_interned() && _has_dsp; _dsp=dsp; }
+  
 
   // Static properties hashcode, no edge hashes
   @Override int static_hash() {
@@ -128,7 +141,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     return true;
   }
 
-  // Make and approximate and endlessly growing chain.
+  // Make and approximate an endlessly growing chain.
   static public TypeFunPtr makex( BitsFun fidxs, int nargs, Type dsp, Type ret ) {
     return make(fidxs,nargs,dsp,makey(fidxs,ret));
   }
@@ -159,7 +172,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     if( tfp._ret!=tfp )
       gather_cycle(tfp._ret);
   }
-
 
   // Install a cyclic $:TFP->...-> $
   private TypeFunPtr tfp_install() {
@@ -196,6 +208,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   public        TypeFunPtr make_from( BitsFun fidxs  ) { return fidxs==_fidxs ? this : make( fidxs,_nargs,_dsp,_ret); }
   public        TypeFunPtr make_from( Type dsp, Type ret ) { return dsp==_dsp && ret==_ret ? this : make(_fidxs,_nargs, dsp,ret); }
   public        TypeFunPtr make_no_disp( ) { return make(_fidxs,_nargs,TypeMemPtr.NO_DISP,_ret); }
+  public static TypeFunPtr make_sig(TypeStruct formals,Type ret) { throw unimpl(); }
   public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR; // Open display, allows more fields
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL ,1,Type.ALL,Type.ALL);
@@ -219,14 +232,10 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUNPTR:break;
-    case TFUNSIG: return t.xmeet(this);
     case TFLT:
     case TINT:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
-    case TARY:
-    case TOBJ:
-    case TSTR:
     case TSTRUCT:
     case TTUPLE:
     case TMEM:   return ALL;
@@ -298,17 +307,17 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     throw com.cliffc.aa.AA.unimpl();
   }
 
-  // Lattice of conversions:
-  // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
-  //    to e.g. Float and require a user-provided rounding conversion from F64->Int.
-  //  0 requires no/free conversion (Int8->Int64, F32->F64)
-  // +1 requires a bit-changing conversion (Int->Flt)
-  // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
-  @Override public byte isBitShape(Type t) {
-    if( t._type == TNIL ) return 0;                  // Dead arg is free
-    if( t._type == TSCALAR ) return 0;               // Scalar is OK
-    return (byte)(t instanceof TypeFunPtr ? 0 : 99); // Mixing TFP and a non-ptr
-  }
+  //// Lattice of conversions:
+  //// -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
+  ////    to e.g. Float and require a user-provided rounding conversion from F64->Int.
+  ////  0 requires no/free conversion (Int8->Int64, F32->F64)
+  //// +1 requires a bit-changing conversion (Int->Flt)
+  //// 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
+  //@Override public byte isBitShape(Type t) {
+  //  if( t._type == TNIL ) return 0;                  // Dead arg is free
+  //  if( t._type == TSCALAR ) return 0;               // Scalar is OK
+  //  return (byte)(t instanceof TypeFunPtr ? 0 : 99); // Mixing TFP and a non-ptr
+  //}
   @SuppressWarnings("unchecked")
   @Override public void walk( Predicate<Type> p ) { if( p.test(this) ) { _dsp.walk(p); _ret.walk(p); } }
 

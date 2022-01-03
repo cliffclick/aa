@@ -38,7 +38,7 @@ public class TestHM5 {
       new Lambda("z",
                  new Apply(new Ident("pair"),
                            new Apply(new Ident("z"), new Con(TypeInt.con(3))),
-                           new Apply(new Ident("z"), new Con(TypeStr.ABC))));
+                           new Apply(new Ident("z"), new Con(TypeStruct.ISUSED))));
     T2 t = HM5.hm(x);
     assertEquals("{ { all -> V23 } -> (pair V23 V23) }",t.p());
   }
@@ -70,7 +70,7 @@ public class TestHM5 {
       new Apply(new Lambda("x",
                            new Apply(new Ident("pair"),
                                      new Apply(new Ident("x"), new Con(TypeInt.con(3))),
-                                     new Apply(new Ident("x"), new Con(TypeStr.ABC)))),
+                                     new Apply(new Ident("x"), new Con(TypeStruct.ISUSED)))),
                 new Lambda("y", new Ident("y")));
 
     T2 t1 = HM5.hm(x);
@@ -325,7 +325,7 @@ public class TestHM5 {
                               // in pair(map(),map())
                               new Apply(new Ident("pair"),
                                         new Apply(new Ident("map"), new Ident("str"    ), (new Apply(new Ident("cons"),new Con(TypeInt.BOOL),new Con(TypeInt.con(5))))),
-                                        new Apply(new Ident("map"), new Ident("isempty"), (new Apply(new Ident("cons"),new Con(TypeInt.BOOL),new Con(TypeStr.ABC   ))))
+                                        new Apply(new Ident("map"), new Ident("isempty"), (new Apply(new Ident("cons"),new Con(TypeInt.BOOL),new Con(TypeStruct.ISUSED   ))))
                                         ))));
     T2 t1 = HM5.hm(syn);
     assertEquals("(pair str int1)",t1.p());

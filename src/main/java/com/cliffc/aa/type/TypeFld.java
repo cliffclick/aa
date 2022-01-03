@@ -1,12 +1,15 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
+import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.function.*;
+import java.util.function.BiFunction;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 import static com.cliffc.aa.AA.DSP_IDX;
-import static com.cliffc.aa.AA.MEM_IDX;
 
 
 // A field in a TypeStruct, with a type and a name and an Access.  Field
@@ -27,7 +30,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     return this;
   }
   @Override public TypeFld copy() { return _copy().init(_fld,_t,_access,_order); }
-  
+
   @Override public boolean cyclic() { return _cyclic; }
   @Override public void set_cyclic() { _cyclic = true; }
   @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_t,"t"); }
@@ -82,6 +85,8 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public static TypeFld make( String fld, Type t, Access access, int order ) { return malloc(fld,t,access,order).hashcons_free(); }
   public static TypeFld make( String fld, Type t, int order ) { return make(fld,t,Access.Final,order); }
   public static TypeFld make( String fld, Type t ) { return make(fld,t,Access.Final,oBot); }
+  public static TypeFld make( String fld ) { return make(fld,Type.SCALAR,Access.Final,oBot); }
+  public static TypeFld make_dsp(Type t) { return make("^",t,Access.Final,DSP_IDX); }
   // Make a not-interned version for building cyclic types
   public TypeFld malloc_from() { return malloc(_fld,_t,_access,_order); }
 
@@ -92,6 +97,9 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public static TypeFld make_tup( Type t, int order ) { return make(TUPS[order],t,Access.Final,order);  }
   public TypeFld make_from(Type t) { return t==_t ? this : make(_fld,t,_access,_order); }
   public TypeFld make_from(Type t, Access a) { return (t==_t && a==_access) ? this : make(_fld,t,a,_order); }
+
+  public static final TypeFld NO_DSP = TypeFld.make_dsp(TypeMemPtr.NO_DISP);
+  static final TypeFld[] TYPES = new TypeFld[]{NO_DSP};
 
   @Override protected TypeFld xdual() {
     if( _fld==sdual(_fld) && _t==_t._dual && _order==odual(_order) && _access==_access.dual() )
@@ -204,7 +212,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   }
 
   public static final TypeFld NO_DISP = make("^",Type.ANY,Access.Final,DSP_IDX);
-  public static final TypeFld MEM = make(" mem",TypeMem.ALLMEM,Access.Final,MEM_IDX);
 
   // Setting the type during recursive construction.
   public TypeFld setX(Type t) {

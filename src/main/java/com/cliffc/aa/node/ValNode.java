@@ -32,7 +32,7 @@ public class ValNode extends ValFunNode {
   }
   @Override public String xstr() { return proto()._ts._name; }
   @Override int nargs() { return _flds.length-1+ARG_IDX; }
-  NewObjNode proto() { return (NewObjNode)in(0).in(0); }
+  NewNode proto() { return (NewNode)in(0); }
   @Override int fidx() { return _fidx; }
   @Override Type formal(int idx) {
     Node formal = in(idx-DSP_IDX);
@@ -42,7 +42,7 @@ public class ValNode extends ValFunNode {
   @Override String name() { throw unimpl(); }
 
   @Override public Type value() {
-    TypeStruct ts = TypeStruct.malloc(proto()._ts._name,false,false);
+    TypeStruct ts = TypeStruct.malloc(proto()._ts._name,false);
     for( int i=1; i<_flds.length; i++ )
       ts.add_fld( TypeFld.make(_flds[i],val(i),TypeFld.Access.Final,i-1+ARG_IDX) );
     ts = ts.hashcons_free();
@@ -72,14 +72,13 @@ public class ValNode extends ValFunNode {
     return progress;
   }
 
-  // Build a ValNode default constructor from the NewObj.  Walk all fields.
+  // Build a ValNode default constructor from the NewNode.  Walk all fields.
   // If the field is ANY (dead f-ref), ignore it.
   // If the field is MUTABLE, it was a default set; make it immutable and a
   // required constructor arg.
   // If the final field  is_con, leave it in the prototype object.
   // If the final field !is_con, need a normal function constructor NOT a ValNode.
-  public static ValNode make(Node proj) {
-    NewObjNode proto = (NewObjNode)proj.in(0);
+  public static ValNode make(NewNode proto) {
     Ary<String> flds = new Ary<>(new String[1],0);
     flds.push(null);            // Prototype in slot 0
 
@@ -99,7 +98,7 @@ public class ValNode extends ValFunNode {
 
 
     ValNode val = new ValNode(flds.asAry(),proto._ts,proto._alias);
-    val.add_def(proj);          // Prototype in slot 0
+    val.add_def(proto);         // Prototype in slot 0
     for( TypeFld fld : oflds )  // Gather remaining RW fields for constructor
       if( fld._access==TypeFld.Access.RW )
         val.add_def(con(fld._t));

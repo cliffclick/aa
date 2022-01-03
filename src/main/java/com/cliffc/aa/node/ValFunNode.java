@@ -33,11 +33,10 @@ public abstract class ValFunNode extends Node {
     String tname = valtype(t);
     if( tname==null) return (TypeFunPtr)t.oob(TypeFunPtr.GENERIC_FUNPTR);
     // Convert value type to the constructor function
-    NewObjNode nnn = Env.PROTOS.get(tname);
+    NewNode nnn = Env.PROTOS.get(tname);
     assert ((TypeMemPtr)t)._aliases.getbit()==nnn._alias;
     assert nnn._nargs>0;
-    ProjNode ptr = nnn.ptr();
-    for( Node use : ptr._uses )
+    for( Node use : nnn._uses )
       if( use instanceof ValNode )
         return TypeFunPtr.make(((ValNode)use)._fidx,nnn._nargs,TypeMemPtr.NO_DISP,t);
     throw unimpl();             // Do not understand the situation

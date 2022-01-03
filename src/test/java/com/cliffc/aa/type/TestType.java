@@ -7,6 +7,7 @@ import org.junit.Test;
 import java.util.HashMap;
 
 import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
+import static com.cliffc.aa.AA.unimpl;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -72,11 +73,8 @@ public class TestType {
     //
     // nil.isa(*rec?) so nil.join(*str) isa (*rec?).join(*str)
     Type t0 = Type.NIL;          // [0  ] -> obj
-    Type t1 = TypeMemPtr.STRUCT0;// [0,2] -> rec
+    Type t1 = TypeMemPtr.ISUSED0;// [0,2] -> rec
     assertTrue(t0.isa(t1));      // [0,2] -> obj -- meet is not t1
-    Type t2 = TypeMemPtr.OOP0;   // [0,2] -> obj
-    assertTrue(t0.isa(t2));      //
-
   }
 
   // Want Bits to support meet/join of fidxs for Unresolved:
@@ -97,9 +95,14 @@ public class TestType {
     // t1 = *[4] -> str
     // t2 = *[2] -> ()
     // Since t0.isa(t1) then   t0.join(t2) .isa(   t1.join(t2) )
-    TypeMemPtr t0 = TypeMemPtr.ABCPTR;
-    TypeMemPtr t1 = TypeMemPtr.STRPTR;
-    TypeMemPtr t2 = TypeMemPtr.STRUCT;
+
+    int alias0 = BitsAlias.ALLX;
+    int alias1 = BitsAlias.new_alias(alias0);
+    int alias2 = BitsAlias.new_alias(alias1);
+    
+    TypeMemPtr t0 = TypeMemPtr.make(alias2,TypeStruct.NAMEPT);
+    TypeMemPtr t1 = TypeMemPtr.make(alias1,TypeStruct.POINT );
+    TypeMemPtr t2 = TypeMemPtr.make(alias0,TypeStruct.ISUSED);
     assertTrue(t0.isa(t1));
     Type t02,t12,mt;
 
@@ -111,8 +114,8 @@ public class TestType {
     // but since t0 isa t1,
     // also:  t1.join(t2) ==  mt
     //       [4] join [2] ==> [~2 + ~4]
-
-    t1 = TypeMemPtr.STR0;     // Same with nil
+    
+    t1 = TypeMemPtr.make_nil(alias1,TypeStruct.POINT);  // Same with nil
     t02 = t0.join(t2);        // join of unrelated bits2&5 []
     t12 = t1.join(t2);        // join of unrelated bits2&4 []
     mt  = t02.meet(t12);
@@ -172,110 +175,111 @@ public class TestType {
   @Test public void testOOPsNulls() {
     Type bot = Type      .ALL;
 
-    Type mem = TypeMem   .MEM;  // All memory
-    Type str = TypeStr   .STR;  // All Strings
-    Type tup = TypeStruct.ALLSTRUCT; // All Structs
-
-    Type abc = TypeStr  .ABC;   // String constant
-    Type zer = TypeInt  .FALSE;
-    Type tp0 = TypeStruct.maket(zer);  // tuple of a '0'
-
-    Type tupX= tup.dual();
-    Type strX= str.dual();
-    Type memX= mem.dual();
-
-    Type top = Type.ANY;
-
-    assertTrue( top.isa(memX));
-
-    //assertTrue(memX.isa(strX)); // mem is a CONTAINER for memory objects, e.g. Struct,Str
-    //assertTrue(memX.isa(tupX));
-
-    assertTrue( strX.isa(abc));
-    assertTrue( tupX.isa(tp0));
-    assertTrue(!strX.isa(zer));
-    assertTrue(!tupX.isa(zer));
-
-    assertTrue( abc .isa(str));
-    assertTrue( tp0 .isa(tup));
-    assertTrue(!zer .isa(str));
-    assertTrue(!zer .isa(tup));
-
-    //assertTrue( str .isa(mem)); // mem is a CONTAINER for memory objects, e.g. Struct,Str
-    //assertTrue( tup .isa(mem));
-
-    assertTrue( mem .isa(bot));
-
-    // ---
-    Type pmem0= TypeMemPtr.OOP0;    // *[ALL]?
-    Type pmem = TypeMemPtr.OOP ;    // *[ALL]
-    Type pstr0= TypeMemPtr.STR0;    // *[str]?
-    TypeMemPtr pstr = TypeMemPtr.STRPTR; // *[str]
-    Type ptup0= TypeMemPtr.STRUCT0; // *[tup]?
-    Type ptup = TypeMemPtr.STRUCT;  // *[tup]
-
-    Type pabc0= TypeMemPtr.ABC0;    // *["abc"]?
-    TypeMemPtr pabc = TypeMemPtr.ABCPTR; // *["abc"]
-    TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.type_alias(BitsAlias.REC),TypeStruct.ALLSTRUCT);// *[(0)]
-    TypeMemPtr pzer0= TypeMemPtr.make(pzer._aliases.meet_nil(),TypeStruct.ALLSTRUCT);  // *[(0)]?
-    Type nil  = Type.NIL, xnil=Type.XNIL;
-
-    Type xtup = ptup .dual();
-    Type xtup0= ptup0.dual();
-    TypeMemPtr xstr = pstr.dual();
-    Type xstr0= pstr0.dual();
-    Type xmem = pmem .dual();
-    Type xmem0= pmem0.dual();
-
-    assertTrue( top .isa(xmem0));
-    assertTrue(xmem0.isa(xmem ));
-
-    assertTrue(xmem0.isa(xstr0));
-    assertTrue(xmem .isa(xstr ));
-    assertTrue(xmem0.isa(xtup0));
-    assertTrue(xmem .isa(xtup ));
-
-    // "~str?" or "*[~0+4+]~str?" includes a nil, but nothing can fall to a nil
-    // (breaks lattice)... instead they fall to their appropriate nil-type.
-    assertEquals(Type.XNIL,xstr0.meet( xnil ));
-
-    // This is a choice ptr-to-alias#1, vs a nil-able ptr-to-alias#2.  Since
-    // they are from different alias classes, they are NEVER equal (unless both
-    // nil).  We cannot tell what they point-to, so we do not know if the
-    // memory pointed-at is compatible or not.
-    assertTrue (xstr0.isa(pabc0)); // ~*[1]+0 vs ~*[2]?
-    assertTrue (xstr .isa(pabc ));
-    // We can instead assert that values loaded are compatible:
-    assertTrue (TypeMem.MEM.dual().ld(xstr).isa(TypeMem.MEM_ABC.ld(pabc)));
-
-    // "~@{}?" or "*[~0+2+]~@{}?" includes a nil, but nothing can fall to a nil
-    // (breaks lattice)... instead they fall to their appropriate nil-type.
-    assertEquals(Type.XNIL,xtup0.meet( xnil ));
-    assertTrue (xtup0.isa(pzer0));
-    assertTrue (xtup .isa(pzer ));
-    //assertTrue(TypeMem.MEM_TUP.dual().ld(xstr).isa(TypeMem.MEM_ZER.ld(pabc)));
-
-    assertTrue(nil .isa(pabc0)); // nil expands as [0]->obj so !isa [2]->"abc"
-    assertTrue(nil .isa(pstr0)); // nil expands as [0]->obj so !isa [4]->str
-    assertTrue(nil .isa(ptup0)); // nil expands as [0]->obj so !isa [2]->()
-    assertTrue(nil .isa(pzer0)); // nil expands as [0]->obj so !isa [2]->@{}
-
-    assertTrue (pabc0.isa(pstr0));
-    assertTrue (pabc .isa(pstr ));
-    assertTrue (TypeMem.MEM_ABC.ld(pabc).isa(TypeMem.MEM.ld(pstr)));
-    assertTrue (pzer0.isa(ptup0));
-    assertTrue (pzer .isa(ptup ));
-    assertTrue (ptup0.isa(pmem0));
-    assertTrue (ptup .isa(pmem ));
-
-    assertTrue (pmem .isa(pmem0));
-    assertTrue (pmem0.isa( bot ));
-
-
-    // Crossing ints and *[ALL]+null
-    Type  i8 = TypeInt.INT8;
-    Type xi8 = i8.dual();
-    assertEquals( Type.XNIL, xi8.meet(xmem0)); // ~OOP+0 & ~i8 -> 0
+    Type mem = TypeMem   .ALLMEM; // All memory
+    //Type str = TypeStr   .STR;    // All Strings
+    //Type tup = TypeStruct.ISUSED; // All Structs
+    //
+    //Type abc = TypeStr  .ABC;   // String constant
+    //Type zer = TypeInt  .FALSE;
+    //Type tp0 = TypeStruct.maket(zer);  // tuple of a '0'
+    //
+    //Type tupX= tup.dual();
+    //Type strX= str.dual();
+    //Type memX= mem.dual();
+    //
+    //Type top = Type.ANY;
+    //
+    //assertTrue( top.isa(memX));
+    //
+    ////assertTrue(memX.isa(strX)); // mem is a CONTAINER for memory objects, e.g. Struct,Str
+    ////assertTrue(memX.isa(tupX));
+    //
+    //assertTrue( strX.isa(abc));
+    //assertTrue( tupX.isa(tp0));
+    //assertTrue(!strX.isa(zer));
+    //assertTrue(!tupX.isa(zer));
+    //
+    //assertTrue( abc .isa(str));
+    //assertTrue( tp0 .isa(tup));
+    //assertTrue(!zer .isa(str));
+    //assertTrue(!zer .isa(tup));
+    //
+    ////assertTrue( str .isa(mem)); // mem is a CONTAINER for memory objects, e.g. Struct,Str
+    ////assertTrue( tup .isa(mem));
+    //
+    //assertTrue( mem .isa(bot));
+    //
+    //// ---
+    //Type pmem0= TypeMemPtr.OOP0;    // *[ALL]?
+    //Type pmem = TypeMemPtr.OOP ;    // *[ALL]
+    //Type pstr0= TypeMemPtr.STR0;    // *[str]?
+    //TypeMemPtr pstr = TypeMemPtr.STRPTR; // *[str]
+    //Type ptup0= TypeMemPtr.STRUCT0; // *[tup]?
+    //Type ptup = TypeMemPtr.STRUCT;  // *[tup]
+    //
+    //Type pabc0= TypeMemPtr.ABC0;    // *["abc"]?
+    //TypeMemPtr pabc = TypeMemPtr.ABCPTR; // *["abc"]
+    //TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.type_alias(BitsAlias.REC),TypeStruct.ALLSTRUCT);// *[(0)]
+    //TypeMemPtr pzer0= TypeMemPtr.make(pzer._aliases.meet_nil(),TypeStruct.ALLSTRUCT);  // *[(0)]?
+    //Type nil  = Type.NIL, xnil=Type.XNIL;
+    //
+    //Type xtup = ptup .dual();
+    //Type xtup0= ptup0.dual();
+    //TypeMemPtr xstr = pstr.dual();
+    //Type xstr0= pstr0.dual();
+    //Type xmem = pmem .dual();
+    //Type xmem0= pmem0.dual();
+    //
+    //assertTrue( top .isa(xmem0));
+    //assertTrue(xmem0.isa(xmem ));
+    //
+    //assertTrue(xmem0.isa(xstr0));
+    //assertTrue(xmem .isa(xstr ));
+    //assertTrue(xmem0.isa(xtup0));
+    //assertTrue(xmem .isa(xtup ));
+    //
+    //// "~str?" or "*[~0+4+]~str?" includes a nil, but nothing can fall to a nil
+    //// (breaks lattice)... instead they fall to their appropriate nil-type.
+    //assertEquals(Type.XNIL,xstr0.meet( xnil ));
+    //
+    //// This is a choice ptr-to-alias#1, vs a nil-able ptr-to-alias#2.  Since
+    //// they are from different alias classes, they are NEVER equal (unless both
+    //// nil).  We cannot tell what they point-to, so we do not know if the
+    //// memory pointed-at is compatible or not.
+    //assertTrue (xstr0.isa(pabc0)); // ~*[1]+0 vs ~*[2]?
+    //assertTrue (xstr .isa(pabc ));
+    //// We can instead assert that values loaded are compatible:
+    //assertTrue (TypeMem.MEM.dual().ld(xstr).isa(TypeMem.MEM_ABC.ld(pabc)));
+    //
+    //// "~@{}?" or "*[~0+2+]~@{}?" includes a nil, but nothing can fall to a nil
+    //// (breaks lattice)... instead they fall to their appropriate nil-type.
+    //assertEquals(Type.XNIL,xtup0.meet( xnil ));
+    //assertTrue (xtup0.isa(pzer0));
+    //assertTrue (xtup .isa(pzer ));
+    ////assertTrue(TypeMem.MEM_TUP.dual().ld(xstr).isa(TypeMem.MEM_ZER.ld(pabc)));
+    //
+    //assertTrue(nil .isa(pabc0)); // nil expands as [0]->obj so !isa [2]->"abc"
+    //assertTrue(nil .isa(pstr0)); // nil expands as [0]->obj so !isa [4]->str
+    //assertTrue(nil .isa(ptup0)); // nil expands as [0]->obj so !isa [2]->()
+    //assertTrue(nil .isa(pzer0)); // nil expands as [0]->obj so !isa [2]->@{}
+    //
+    //assertTrue (pabc0.isa(pstr0));
+    //assertTrue (pabc .isa(pstr ));
+    //assertTrue (TypeMem.MEM_ABC.ld(pabc).isa(TypeMem.MEM.ld(pstr)));
+    //assertTrue (pzer0.isa(ptup0));
+    //assertTrue (pzer .isa(ptup ));
+    //assertTrue (ptup0.isa(pmem0));
+    //assertTrue (ptup .isa(pmem ));
+    //
+    //assertTrue (pmem .isa(pmem0));
+    //assertTrue (pmem0.isa( bot ));
+    //
+    //
+    //// Crossing ints and *[ALL]+null
+    //Type  i8 = TypeInt.INT8;
+    //Type xi8 = i8.dual();
+    //assertEquals( Type.XNIL, xi8.meet(xmem0)); // ~OOP+0 & ~i8 -> 0
+    throw unimpl();
   }
 
   // Old model: fields are ordered, and are MEETd in order.  If fields at the
@@ -292,26 +296,26 @@ public class TestType {
   // names, and will commonly have no names in common.
   @Test public void testStructTuple() {
     // meet @{c:0}? and @{c:@{x:1}?,}
-    int alias0 = BitsAlias.type_alias(BitsAlias.REC);
+    int alias0 = BitsAlias.type_alias(BitsAlias.ALLX);
     int alias1 = BitsAlias.type_alias(alias0);
-    int alias2 = BitsAlias.type_alias(BitsAlias.REC);
+    int alias2 = BitsAlias.type_alias(BitsAlias.ALLX);
     int alias3 = BitsAlias.type_alias(alias0);
-    TypeObj a1 = TypeStruct.make("c",Type.NIL, TypeFld.Access.Final); // @{c:nil}
-    TypeObj a3 = TypeStruct.make("x",TypeInt.TRUE, TypeFld.Access.Final); // @{x: 1 }
-    TypeObj a2 = TypeStruct.make("c",TypeMemPtr.make_nil(alias3,a3), TypeFld.Access.Final); // @{c:*{3#}?}
-    Ary<TypeObj> tos = new Ary<>(TypeObj.class);
-    tos.setX(BitsAlias.ALL,TypeObj.OBJ);
+    TypeStruct a1 = TypeStruct.make_test("c",Type.NIL, TypeFld.Access.Final); // @{c:nil}
+    TypeStruct a3 = TypeStruct.make_test("x",TypeInt.TRUE, TypeFld.Access.Final); // @{x: 1 }
+    TypeStruct a2 = TypeStruct.make_test("c",TypeMemPtr.make_nil(alias3,a3), TypeFld.Access.Final); // @{c:*{3#}?}
+    Ary<TypeStruct> tos = new Ary<>(TypeStruct.class);
+    tos.setX(BitsAlias.ALLX,TypeStruct.ISUSED);
     tos.setX(alias1,a1);
     tos.setX(alias2,a2);
     tos.setX(alias3,a3);
     TypeMem mem = TypeMem.make0(tos.asAry()); // [7:@{c==nil},8:{c=*[0,9]},9:@{x==1}]
     // *[1]? join *[2] ==> *[1+2]?
     // {~0+7+8} -> @{ c== [~0] -> @{x==1}} // Retain precision after nil
-    Type ptr12 = Type.XNIL.join(TypeMemPtr.make(-alias1,(TypeObj)a1.dual())).join( TypeMemPtr.make(-alias2,(TypeObj)a2.dual()));
+    Type ptr12 = Type.XNIL.join(TypeMemPtr.make(-alias1,a1.dual())).join( TypeMemPtr.make(-alias2,a2.dual()));
     // mem.ld(*[1+2]?) ==> @{c:0}
     // Currently retaining precision after nil: [~0] -> @{ x==1}
     Type ld = mem.ld((TypeMemPtr)ptr12);
-    TypeObj ax = TypeStruct.make(TypeFld.make("c",Type.NIL)); // @{c:nil}
+    TypeStruct ax = TypeStruct.make(TypeFld.make("c",Type.NIL)); // @{c:nil}
     assertTrue(ld.isa(ax));
   }
 
@@ -354,14 +358,14 @@ public class TestType {
   // structures caps out in the type system at some reasonable limit.
   @Test public void testRecursive() {
     Object dummy0 = TypeMemPtr.DISPLAY_PTR; // Must <clinit> out of RECURSIVE_MEET
-    final int alias1 = BitsAlias.new_alias(BitsAlias.REC);
+    final int alias1 = BitsAlias.new_alias(BitsAlias.ALLX);
 
     // Anonymous recursive structs -
     // - struct with pointer to self
     TypeFld fldv = TypeFld.make("v",TypeInt.INT64);
     Type.RECURSIVE_MEET++;
     TypeFld fldn0 = TypeFld.malloc("n");
-    TypeStruct ts0 = TypeStruct.malloc("",false,true,fldn0,fldv).set_hash();
+    TypeStruct ts0 = TypeStruct.malloc_test(fldn0,fldv);
     final TypeMemPtr ts0ptr = TypeMemPtr.make(alias1,ts0);
     fldn0.setX(ts0ptr);
     Type.RECURSIVE_MEET--;
@@ -371,7 +375,7 @@ public class TestType {
     // - struct with pointer to self or nil
     Type.RECURSIVE_MEET++;
     TypeFld fldn1 = TypeFld.malloc("n");
-    TypeStruct ts1 = TypeStruct.malloc("",false,true,fldn1,fldv).set_hash();
+    TypeStruct ts1 = TypeStruct.malloc_test(fldn1,fldv);
     final TypeMemPtr ts1ptr0 = TypeMemPtr.make_nil(alias1,ts1);
     fldn1.setX(ts1ptr0);
     Type.RECURSIVE_MEET--;
@@ -386,21 +390,21 @@ public class TestType {
     // Cyclic named struct: Memory#2 :A:@{n:*[0,2],v:int}
     // If we unrolled this (and used S for Struct and 0 for Nil) we'd get:
     // AS0AS0AS0AS0AS0AS0...
-    final int alias2 = BitsAlias.new_alias(BitsAlias.REC);
-    TypeMemPtr tptr2= TypeMemPtr.make_nil(alias2,TypeObj.OBJ); // *[0,2]
+    final int alias2 = BitsAlias.new_alias(BitsAlias.ALLX);
+    TypeMemPtr tptr2= TypeMemPtr.make_nil(alias2,TypeStruct.ISUSED); // *[0,2]
     TypeStruct ts2 = TypeStruct.make(TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
     TypeStruct ta2 = ts2.set_name("A:");
 
     // Peel A once without the nil: Memory#3: A:@{n:*[2],v:int}
     // ASAS0AS0AS0AS0AS0AS0...
-    final int alias3 = BitsAlias.new_alias(BitsAlias.REC);
-    TypeMemPtr tptr3= TypeMemPtr.make(alias3,TypeObj.OBJ); // *[3]
+    final int alias3 = BitsAlias.new_alias(BitsAlias.ALLX);
+    TypeMemPtr tptr3= TypeMemPtr.make(alias3,TypeStruct.ISUSED); // *[3]
     TypeStruct ts3 = TypeStruct.make(TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
     TypeStruct ta3 = ts3.set_name("A:");
 
     // Peel A twice without the nil: Memory#4: A:@{n:*[3],v:int}
     // ASASAS0AS0AS0AS0AS0AS0...
-    final int alias4 = BitsAlias.new_alias(BitsAlias.REC);
+    final int alias4 = BitsAlias.new_alias(BitsAlias.ALLX);
     TypeStruct ts4 = TypeStruct.make(TypeFld.make("n",tptr3),fldv); // @{n:*[3],v:int}
     TypeStruct ta4 = ts4.set_name("A:");
 
@@ -410,25 +414,25 @@ public class TestType {
     // Twice: SAS AS0AS0AS0AS0AS0...
     // Meet:  SAS0AS0AS0AS0AS0AS0...
     // which is the Once yet again
-    TypeObj[] tos = new TypeObj[alias4+1];
-    tos[1]=TypeObj.XOBJ;
+    TypeStruct[] tos = new TypeStruct[alias4+1];
+    tos[1]=TypeStruct.UNUSED;
     tos[alias2]=ta2;
     tos[alias3]=ta3;
     tos[alias4]=ta4;
     TypeMem mem234 = TypeMem.make0(tos);
-    TypeMemPtr ptr34 = (TypeMemPtr)TypeMemPtr.make(alias3,TypeObj.OBJ).meet(TypeMemPtr.make(alias4,TypeObj.OBJ));
+    TypeMemPtr ptr34 = (TypeMemPtr)TypeMemPtr.make(alias3,TypeStruct.ISUSED).meet(TypeMemPtr.make(alias4,TypeStruct.ISUSED));
 
     // Since hacking ptrs about from mem values, no cycles so instead...
     Type mta = mem234.ld(ptr34);
     //assertEquals(ta3,mta);
-    TypeMemPtr ptr023 = (TypeMemPtr)TypeMemPtr.make_nil(alias2,TypeObj.OBJ).meet(TypeMemPtr.make(alias3,TypeObj.OBJ));
+    TypeMemPtr ptr023 = (TypeMemPtr)TypeMemPtr.make_nil(alias2,TypeStruct.ISUSED).meet(TypeMemPtr.make(alias3,TypeStruct.ISUSED));
     TypeStruct xts = TypeStruct.make(TypeFld.make("n",ptr023),fldv);
     Type xta = xts.set_name("A:");
     assertEquals(xta,mta);
 
     // Mismatched Names in a cycle; force a new cyclic type to appear
-    final int alias5 = BitsAlias.new_alias(BitsAlias.REC);
-    TypeStruct tsnb = TypeStruct.make(TypeFld.make("n",TypeMemPtr.make_nil(alias5,TypeObj.OBJ)),TypeFld.make("v",TypeFlt.FLT64));
+    final int alias5 = BitsAlias.new_alias(BitsAlias.ALLX);
+    TypeStruct tsnb = TypeStruct.make(TypeFld.make("n",TypeMemPtr.make_nil(alias5,TypeStruct.ISUSED)),TypeFld.make("v",TypeFlt.FLT64));
     TypeStruct tfb = tsnb.set_name("B:");
     Type mtab = ta2.meet(tfb);
 
@@ -448,7 +452,7 @@ public class TestType {
     // Nest a linked-list style tuple 10 deep; verify actual depth is capped at
     // less than 5.  Any data loop must contain a Phi; if structures are
     // nesting infinitely deep, then it must contain a NewNode also.
-    int alias = BitsAlias.new_alias(BitsAlias.REC);
+    int alias = BitsAlias.new_alias(BitsAlias.ALLX);
     TypeStruct ts = TypeStruct.make(TypeFld.make("ptr",Type.NIL),TypeFld.make("cnt",TypeInt.con(0)));
     TypeMemPtr phi = TypeMemPtr.make(alias,ts);
     for( int i=1; i<20; i++ ) {
@@ -466,17 +470,15 @@ public class TestType {
     Object dummy0 = TypeMemPtr.DISPLAY_PTR; // Must <clinit> out of RECURSIVE_MEET
     // Make a cycle: 0_A: -> 1_(n=*,v=i64) -> 2_TMP -> 3_B: -> 4_(n=*,v=f64) -> 5_TMP ->
     // Dual; then meet ~4_() and ~0_A
-    final int alias = BitsAlias.REC;
+    final int alias = BitsAlias.ALLX;
 
     TypeFld fldvi = TypeFld.make("v",TypeInt.INT64);
     TypeFld fldvf = TypeFld.make("v",TypeFlt.FLT64);
     Type.RECURSIVE_MEET++;
     TypeFld fldn1 = TypeFld.malloc("n");
     TypeFld fldn4 = TypeFld.malloc("n");
-    TypeStruct as1 = TypeStruct.malloc("A:",false,true,fldn1,fldvi);
-    TypeStruct bs4 = TypeStruct.malloc("B:",false,true,fldn4,fldvf);
-    as1.set_hash();
-    bs4.set_hash();
+    TypeStruct as1 = TypeStruct.malloc_test("A:",fldn1,fldvi);
+    TypeStruct bs4 = TypeStruct.malloc_test("B:",fldn4,fldvf);
     TypeMemPtr ap5 = TypeMemPtr.make(alias,as1);
     TypeMemPtr bp2 = TypeMemPtr.make(alias,bs4);
     fldn1.setX(bp2);
@@ -484,7 +486,7 @@ public class TestType {
     Type.RECURSIVE_MEET--;
     as1 = as1.install();
     bp2 = (TypeMemPtr)as1.at("n");
-    bs4 = (TypeStruct)bp2._obj;
+    bs4 =             bp2._obj;
     ap5 = (TypeMemPtr)bs4.at("n");
 
     Type das1 = as1.dual();     // ~A:@{b,int}
@@ -495,7 +497,7 @@ public class TestType {
     assertEquals(TypeInt.INT32,smt.at("v"));
     TypeMemPtr smp = (TypeMemPtr)smt.at("n");
     assertEquals(smt,smp._obj);
-    assertEquals(BitsAlias.RECORD_BITS,smp._aliases);
+    assertEquals(BitsAlias.NALL,smp._aliases);
 
     Type mx = as1.dual().meet(dbs4);
     assertEquals(smt,mx);
@@ -503,53 +505,52 @@ public class TestType {
 
   @Test public void testLoad() {
     Object dummy0 = TypeStruct.TYPES;
-    // All are ISA
-    TypeMemPtr[] tmps = new TypeMemPtr[]{
-      TypeMemPtr.STRPTR.dual(),
-      TypeMemPtr.ABCPTR,
-      TypeMemPtr.STRPTR,
-    };
-    TypeMemPtr[] tmps1 = new TypeMemPtr[]{
-      TypeMemPtr.make(-4,TypeObj.XOBJ),
-      TypeMemPtr.make(-5,TypeObj.XOBJ),
-      TypeMemPtr.make(5,TypeObj. OBJ), // testing 5-obj & ISUSED [1....:use] vs MEM_ABC
-      TypeMemPtr.make(4,TypeObj. OBJ),
-    };
-    for( int i=0; i<tmps.length-1; i++ )
-      assertTrue(tmps[i].isa(tmps[i+1]));
-
-    // All are ISA
-    TypeMem[] tmems = new TypeMem[]{
-      TypeMem.ANYMEM,             // [1:~obj,3:~obj,5:~obj ]
-      TypeMem.MEM_ABC,            // [1:~obj,3:~obj,5:"abc"]
-      TypeMem.MEM.dual(),         // [1:~obj,3:~str,5:"abc"]
-      TypeMem.MEM,                // [1: obj,3: str,5:"abc"]
-      TypeMem.MEM_ABC.dual(),     // [1: obj,3: obj,5:"abc"]
-      TypeMem.ALLMEM,             // [1: obj,3: obj,5: obj ]
-    };
-    for( int j=0; j<tmems.length-1; j++ )
-      assertTrue(tmems[j].isa(tmems[j+1]));
-
-    TypeObj[][] rez = new TypeObj[tmps.length][tmems.length];
-    for( int i=0; i<tmps.length; i++ )
-      for( int j=0; j<tmems.length; j++ )
-        rez[i][j] = tmems[j].ld(tmps[i]);
-
-    for( int i0=0; i0<tmps.length; i0++ )
-      for( int j0=0; j0<tmems.length; j0++ )
-        for( int i1=i0; i1<tmps.length; i1++ )
-          for( int j1=j0; j1<tmems.length; j1++ )
-            assertTrue( rez[i0][j0].isa(rez[i1][j1]) );
+ABCPTR -> TMP of NAMED POINT    
+STRPTR -> TMP of POINT    
+    //// All are ISA
+    //TypeMemPtr[] tmps = new TypeMemPtr[]{
+    //  TypeMemPtr.STRPTR.dual(),
+    //  TypeMemPtr.ABCPTR,
+    //  TypeMemPtr.STRPTR,
+    //};
+    //TypeMemPtr[] tmps1 = new TypeMemPtr[]{
+    //  TypeMemPtr.make(-4,TypeStruct.XOBJ),
+    //  TypeMemPtr.make(-5,TypeStruct.XOBJ),
+    //  TypeMemPtr.make(5,TypeStruct. OBJ), // testing 5-obj & ISUSED [1....:use] vs MEM_ABC
+    //  TypeMemPtr.make(4,TypeStruct. OBJ),
+    //};
+    //for( int i=0; i<tmps.length-1; i++ )
+    //  assertTrue(tmps[i].isa(tmps[i+1]));
+    //
+    //// All are ISA
+    //TypeMem[] tmems = new TypeMem[]{
+    //  TypeMem.ANYMEM,             // [1:~obj,3:~obj,5:~obj ]
+    //  TypeMem.MEM_ABC,            // [1:~obj,3:~obj,5:"abc"]
+    //  TypeMem.MEM.dual(),         // [1:~obj,3:~str,5:"abc"]
+    //  TypeMem.MEM,                // [1: obj,3: str,5:"abc"]
+    //  TypeMem.MEM_ABC.dual(),     // [1: obj,3: obj,5:"abc"]
+    //  TypeMem.ALLMEM,             // [1: obj,3: obj,5: obj ]
+    //};
+    //for( int j=0; j<tmems.length-1; j++ )
+    //  assertTrue(tmems[j].isa(tmems[j+1]));
+    //
+    //TypeStruct[][] rez = new TypeStruct[tmps.length][tmems.length];
+    //for( int i=0; i<tmps.length; i++ )
+    //  for( int j=0; j<tmems.length; j++ )
+    //    rez[i][j] = tmems[j].ld(tmps[i]);
+    //
+    //for( int i0=0; i0<tmps.length; i0++ )
+    //  for( int j0=0; j0<tmems.length; j0++ )
+    //    for( int i1=i0; i1<tmps.length; i1++ )
+    //      for( int j1=j0; j1<tmems.length; j1++ )
+    //        assertTrue( rez[i0][j0].isa(rez[i1][j1]) );
+    throw unimpl();
   }
 
   // Validate crush is monotonic
   @Test public void testCrush() {
-    TypeObj[] objs = new TypeObj[]{
-      TypeObj.ISUSED,
-      TypeObj.OBJ,
-      TypeStr.STR,
-      TypeStr.ABC,
-      TypeStruct.ALLSTRUCT,
+    TypeStruct[] objs = new TypeStruct[]{
+      TypeStruct.ISUSED,
       TypeStruct.INT64_INT64,
       TypeStruct.NAMEPT,
       TypeStruct.POINT,
@@ -557,23 +558,23 @@ public class TestType {
       TypeStruct.A,
       TypeStruct.ARW,
     };
-
+    
     for( int i=0; i<objs.length; i++ ) {
-      TypeObj toi = objs[i];
+      TypeStruct toi = objs[i];
       for( int j=i; j<objs.length; j++ ) {
-        TypeObj toj = objs[j];
-        testCrush0(         toi       ,         toj       );
-        testCrush0((TypeObj)toi.dual(),         toj       );
-        testCrush0(         toi       ,(TypeObj)toj.dual());
-        testCrush0((TypeObj)toi.dual(),(TypeObj)toj.dual());
+        TypeStruct toj = objs[j];
+        testCrush0(toi       ,toj       );
+        testCrush0(toi.dual(),toj       );
+        testCrush0(toi       ,toj.dual());
+        testCrush0(toi.dual(),toj.dual());
       }
     }
   }
 
-  private void testCrush0( TypeObj ti, TypeObj tj ) {
+  private void testCrush0( TypeStruct ti, TypeStruct tj ) {
     if( ti.isa(tj) ) {
-      TypeObj tic = ti.crush();
-      TypeObj tjc = tj.crush();
+      TypeStruct tic = ti.crush();
+      TypeStruct tjc = tj.crush();
       assertTrue(tic.isa(tjc));
     }
   }

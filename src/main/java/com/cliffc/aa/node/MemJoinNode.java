@@ -73,7 +73,7 @@ public class MemJoinNode extends Node {
   static Node find_sese_head(Node mem) {
     if( mem instanceof MemJoinNode ) return ((MemJoinNode)mem).msp(); // Merge Split with prior Join
     if( mem instanceof StoreNode ) return mem;   // Move Store into Split/Join
-    if( mem instanceof MemPrimNode.LValueWrite ) return mem; // Array store
+    //if( mem instanceof MemPrimNode.LValueWrite ) return mem; // Array store
     if( mem instanceof MProjNode ) {
       Node head = mem.in(0);
       if( head instanceof CallNode ) return null; // Do not swallow a Call/CallEpi into a Split/Join
@@ -163,21 +163,22 @@ public class MemJoinNode extends Node {
     assert base.check_solo_mem_writer(msp); // msp is only memory writer after base
     assert head.in(1).check_solo_mem_writer(head);   // head is the 1 memory writer after head.in
 
-    int idx = msp.add_alias(head.escapees()); // Add escape set, find index
-    Node mprj;
-    if( idx == _defs._len ) {         // Escape set added at the end
-      add_def(mprj = GVN.init(new MProjNode(msp,idx))); // Add a new MProj from MemSplit
-    } else {
-      assert idx!=0;     // No partial overlap; all escape sets are independent
-      mprj = ProjNode.proj(msp,idx); // Find match MProj
-    }
-    // Resort edges to move SESE region inside
-    msp.set_def(1,head.in(1)); // Move Split->base edge to Split->head.in(1)
-    mprj.insert(base);         // Move split mprj users to base
-    head.set_def(1,mprj);      // Move head->head.in(1) to head->MProj
-    // Must retype, since split memory
-    GVN.revalive(head,msp,mprj,base);
-    return this;
+    //int idx = msp.add_alias(head.escapees()); // Add escape set, find index
+    //Node mprj;
+    //if( idx == _defs._len ) {         // Escape set added at the end
+    //  add_def(mprj = GVN.init(new MProjNode(msp,idx))); // Add a new MProj from MemSplit
+    //} else {
+    //  assert idx!=0;     // No partial overlap; all escape sets are independent
+    //  mprj = ProjNode.proj(msp,idx); // Find match MProj
+    //}
+    //// Resort edges to move SESE region inside
+    //msp.set_def(1,head.in(1)); // Move Split->base edge to Split->head.in(1)
+    //mprj.insert(base);         // Move split mprj users to base
+    //head.set_def(1,mprj);      // Move head->head.in(1) to head->MProj
+    //// Must retype, since split memory
+    //GVN.revalive(head,msp,mprj,base);
+    //return this;
+    throw unimpl();
   }
 
   // Move the given SESE region just behind of the join into the join/split
@@ -201,11 +202,12 @@ public class MemJoinNode extends Node {
   }
 
   MemJoinNode add_alias_below_new(Node nnn, Node old ) {
-    add_alias_below(GVN.add_work_new(nnn),nnn.escapees(),nnn);
-    nnn.xval();  xval();        // Force update, since not locally monotonic
-    GVN.add_flow_defs(this);
-    assert Env.START.more_work(true)==0;
-    return this;
+    //add_alias_below(GVN.add_work_new(nnn),nnn.escapees(),nnn);
+    //nnn.xval();  xval();        // Force update, since not locally monotonic
+    //GVN.add_flow_defs(this);
+    //assert Env.START.more_work(true)==0;
+    //return this;
+    throw unimpl();
   }
 
   // Find a compatible alias edge, including base memory if nothing overlaps.
@@ -221,5 +223,5 @@ public class MemJoinNode extends Node {
     return null;                // Not fully contained within any 1 alias set
   }
   // Modifies all of memory
-  @Override BitsAlias escapees() { return BitsAlias.FULL; }
+  //@Override BitsAlias escapees() { return BitsAlias.FULL; }
 }

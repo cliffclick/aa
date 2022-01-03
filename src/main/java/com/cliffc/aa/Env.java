@@ -52,14 +52,14 @@ public class Env implements AutoCloseable {
   public static final    StartNode START; // Program start values (control, empty memory, cmd-line args)
   public static final    CProjNode CTL_0; // Program start value control
   public static final StartMemNode MEM_0; // Program start value memory
-  public static final   NewObjNode STK_0; // Program start stack frame (has primitives)
+  public static final      NewNode STK_0; // Program start stack frame (has primitives)
   public static final    ScopeNode SCP_0; // Program start scope
 
   // Global named types.  Type names are ALSO lexically scoped during parsing
   // (dictates visibility of a name).  During semantic analysis a named type
   // can be Loaded from as a class obj, requiring Loads reverse the type name
   // to the prototype obj.
-  public static final HashMap<String,NewObjNode> PROTOS;
+  public static final HashMap<String,NewNode> PROTOS;
 
   // Add a permanent edge use to all these Nodes, keeping them alive forever.
   @SuppressWarnings("unchecked")
@@ -76,7 +76,7 @@ public class Env implements AutoCloseable {
     ALL     = keep(new ConNode<>(Type.ALL   ));
     XCTRL   = keep(new ConNode<>(Type.XCTRL ));
     XNIL    = keep(new ConNode<>(Type.XNIL  ));
-    XUSE    = keep(new ConNode<>(TypeObj.UNUSED));
+    XUSE    = keep(new ConNode<>(TypeStruct.UNUSED));
     XMEM    = keep(new ConNode<>(TypeMem.ANYMEM));
     ALL_CTRL= keep(new ConNode<>(Type.CTRL  ));
     ALL_MEM = keep(new ConNode<>(TypeMem.ALLMEM));
@@ -117,24 +117,24 @@ public class Env implements AutoCloseable {
   Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr, ProjNode fref ) {
     _par = par;
     _fun = fun;
-    TypeStruct ts = TypeStruct.make("",false,true,TypeFld.make("^",dsp_ptr._val, DSP_IDX));
-    TypeMemPtr tmp = fref==null ? null : (TypeMemPtr)fref._val;
-    int alias      = fref==null ? BitsAlias.new_alias(BitsAlias.REC) : tmp.aliases().getbit();
-    if( fref!=null ) ts = ts.set_name(tmp._obj._name);
-    NewObjNode nnn = GVN.init(new NewObjNode(is_closure,alias,ts,dsp_ptr));
-    Node ptr       = fref==null ? GVN.init(new ProjNode(nnn,AA.REZ_IDX)) : fref.set_def(0,nnn);
+    int alias = fref==null ? BitsAlias.new_alias(BitsAlias.ALLX) : ((TypeMemPtr)fref._val).aliases().getbit();
+    NewNode nnn  = GVN.init(new NewNode(is_closure,alias));
+    nnn.add_fld(TypeFld.make_dsp(dsp_ptr._val),dsp_ptr,null);
+    // Install a top-level prototype mapping
+    if( fref!=null ) {          // Forward ref?
+      String fname = ((TypeMemPtr)fref._val)._obj._name;
+      nnn.set_type_name(fname);
+      assert !PROTOS.containsKey(fname); // All top-level type names are globally unique
+      PROTOS.put(fname,nnn);
+    }
+    
     Node frm = GVN.init(new MrgProjNode(nnn,mem));
     _scope = GVN.init(new ScopeNode(is_closure));
     _scope.set_ctrl(ctrl);
-    _scope.set_ptr (ptr);  // Address for 'nnn', the local stack frame
+    _scope.set_stk (nnn);  // Address for 'nnn', the local stack frame
     _scope.set_mem (frm);  // Memory includes local stack frame
     _scope.set_rez (ALL_PARM);
     KEEP_ALIVE.add_def(_scope);
-    if( tmp!=null ) {           // Install a top-level prototype mapping
-      String tname = tmp._obj._name;
-      assert !PROTOS.containsKey(tname); // All top-level type names are globally unique
-      PROTOS.put(tname,nnn);
-    }
     GVN.do_iter();
   }
 
@@ -178,7 +178,7 @@ public class Env implements AutoCloseable {
   // definitions getting parsed).
   @Override public void close() {
     // Promote forward refs to the next outer scope
-    NewObjNode stk = _scope.stk();
+    NewNode stk = _scope.stk();
     ScopeNode pscope = _par._scope;
     if( pscope != null ) {
       stk.promote_forward(pscope.stk());
@@ -189,11 +189,9 @@ public class Env implements AutoCloseable {
       }
     }
 
-    Node ptr = _scope.ptr();
-    stk.no_more_fields();
+    stk.close();
     GVN.add_flow(stk);          // Scope object going dead, trigger following projs to cleanup
-    _scope.set_ptr(null);       // Clear pointer to display
-    GVN.add_flow(ptr);          // Clearing pointer changes liveness
+    _scope.set_stk(null);       // Clear pointer to display
     Node xscope = KEEP_ALIVE.pop();
     assert _scope==xscope;
     GVN.add_work_new(_scope);

@@ -31,28 +31,24 @@ public abstract class Node implements Cloneable, IntSupplier {
   static final byte OP_JOIN   =12;
   static final byte OP_KEEP   =13;
   static final byte OP_LOAD   =14;
-  static final byte OP_LOOP   =15;
-  static final byte OP_NAME   =16; // Cast a prior NewObj to have a runtime Name
-  static final byte OP_NEWOBJ =17; // Allocate a new struct
-  static final byte OP_NEWARY =18; // Allocate a new array
-  static final byte OP_NEWSTR =19; // Allocate a new string
-  static final byte OP_PARM   =20;
-  static final byte OP_PHI    =21;
-  static final byte OP_PRIM   =22;
-  static final byte OP_PROJ   =23;
-  static final byte OP_REGION =24;
-  static final byte OP_RET    =25;
-  static final byte OP_SCOPE  =26;
-  static final byte OP_SPLIT  =27;
-  static final byte OP_START  =28;
-  static final byte OP_STMEM  =29;
-  static final byte OP_STORE  =30;
-  static final byte OP_TYPE   =31;
-  static final byte OP_UNR    =32;
-  static final byte OP_VAL    =33;
-  static final byte OP_MAX    =34;
+  static final byte OP_NEW    =15; // Allocate a new struct
+  static final byte OP_PARM   =16;
+  static final byte OP_PHI    =17;
+  static final byte OP_PRIM   =18;
+  static final byte OP_PROJ   =19;
+  static final byte OP_REGION =20;
+  static final byte OP_RET    =21;
+  static final byte OP_SCOPE  =22;
+  static final byte OP_SPLIT  =23;
+  static final byte OP_START  =24;
+  static final byte OP_STMEM  =25;
+  static final byte OP_STORE  =26;
+  static final byte OP_TYPE   =27;
+  static final byte OP_UNR    =28;
+  static final byte OP_VAL    =29;
+  static final byte OP_MAX    =30;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Fresh", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "Loop", "Name", "NewObj", "NewAry", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Type", "Unresolved", "Val" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Fresh", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Type", "Unresolved", "Val" };
   static { assert STRS.length==OP_MAX; }
 
   // Unique dense node-numbering
@@ -348,9 +344,9 @@ public abstract class Node implements Cloneable, IntSupplier {
       return dump(d,sb,plive).nl();
     }
   }
-  public boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_LOOP || _op==OP_NEWOBJ || _op==OP_NEWSTR || _op==OP_REGION || _op==OP_SPLIT || _op==OP_START; }
+  public boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_NEW || _op==OP_REGION || _op==OP_SPLIT || _op==OP_START; }
   private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ || _op==OP_CPROJ; }
-  boolean is_CFG() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_LOOP || _op==OP_REGION || _op==OP_START || _op==OP_CPROJ || _op==OP_SCOPE; }
+  boolean is_CFG() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_REGION || _op==OP_START || _op==OP_CPROJ || _op==OP_SCOPE; }
 
   public String dumprpo( boolean prims, boolean plive ) {
     Ary<Node> nodes = new Ary<>(new Node[1],0);
@@ -927,7 +923,7 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Aliases that a MemJoin might choose between.  Not valid for nodes which do
   // not manipulate memory.
-  BitsAlias escapees() { throw unimpl("graph error"); }
+  //BitsAlias escapees() { throw unimpl("graph error"); }
 
   // Return a node for a java Class.  Used by the primitives.
   public Node clazz_node() { throw unimpl(); }

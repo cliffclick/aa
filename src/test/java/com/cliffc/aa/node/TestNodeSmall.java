@@ -253,7 +253,7 @@ public class TestNodeSmall {
     FunPtrNode aint = (FunPtrNode)fp_add.in(1);
     FunPtrNode astr = (FunPtrNode)fp_add.in(2);
     // Make a flt/int combo, drops off string.
-    ConNode mem  = gvn.init(new ConNode<>(TypeMem.MEM));
+    ConNode mem  = gvn.init(new ConNode<>(TypeMem.ALLMEM));
     ConNode arg1 = gvn.init(new ConNode<>(Type.SCALAR));
     ConNode arg2 = gvn.init(new ConNode<>(Type.SCALAR));
     Node dsp = gvn.xform(new ConNode<>(TypeMemPtr.NO_DISP));
@@ -267,12 +267,12 @@ public class TestNodeSmall {
     Type tctl = Type.CTRL, txctl = Type.XCTRL;
     Type tscl = Type.SCALAR, txscl = Type.XSCALAR;
     Type tnil = Type.XNIL;
-    TypeMem tfull = TypeMem.MEM;
+    TypeMem tfull = TypeMem.ALLMEM;
     Type t2 = TypeInt.con(2);   // Small ints are ambiguously either ints or floats
     Type t3 = TypeInt.con(3);
     Type tint=TypeInt.INT64;
     Type tflt=TypeFlt.FLT64;
-    Type tabc=TypeMemPtr.ABCPTR.simple_ptr();
+    //Type tabc=TypeMemPtr.ABCPTR.simple_ptr();
 
     // iter(), not gcp().  Types always rise.  Very low types might lift to be
     // valid, but e.g. a 2:int will never lift to a str.
@@ -305,9 +305,9 @@ public class TestNodeSmall {
       TypeTuple.make( tctl, tfull, tmul1, t2   , tscl , tmul1 ), //   2     S   [ int,flt] ; low+good
       TypeTuple.make( tctl, tfull, tmul1, tscl , tscl , tmul1 ), //   S     S   [ int,flt] ; low
       TypeTuple.make( tctl, tfull, tmul1, txscl, tscl , tmul1 ), //  ~S     S   [ int,flt] ; low     +high
-      TypeTuple.make( tctl, tfull, tmul1, txscl, tabc , tmul1X), //  ~S    str  [+int+flt] ; bad      high
-      TypeTuple.make( tctl, tfull, tmul1, tabc , tabc , tmul1 ), //  str   str  [        ] ; bad
-      TypeTuple.make( tctl, tfull, tmul1, t2   , tabc , tmul1 ), //   2    str  [+int+flt] ; bad+good
+      //TypeTuple.make( tctl, tfull, tmul1, txscl, tabc , tmul1X), //  ~S    str  [+int+flt] ; bad      high
+      //TypeTuple.make( tctl, tfull, tmul1, tabc , tabc , tmul1 ), //  str   str  [        ] ; bad
+      //TypeTuple.make( tctl, tfull, tmul1, t2   , tabc , tmul1 ), //   2    str  [+int+flt] ; bad+good
     };
     _testMonotonicChain(ins,call,argss_mul1);
 
@@ -321,18 +321,18 @@ public class TestNodeSmall {
     call.set_fdx(ins[2]=fp_add);
     TypeTuple[] argss_add1 = new TypeTuple[] {
       TypeTuple.make( tctl, tfull, tadd1, txscl, txscl, tadd1X), //  ~S    ~S   [+int+flt+str] (__H,__H,__H) ; All  high, keep all, join
-      TypeTuple.make( tctl, tfull, tadd1, txscl, tabc , tadd1X), //  ~S    str  [+int+flt+str] (B_H,B_H,_GH) ; Some high, keep all, join
+      //TypeTuple.make( tctl, tfull, tadd1, txscl, tabc , tadd1X), //  ~S    str  [+int+flt+str] (B_H,B_H,_GH) ; Some high, keep all, join
       TypeTuple.make( tctl, tfull, tadd1, txscl, tscl , tadd1 ), //  ~S     S   [ int,flt,str] (L_H,L_H,L_H) ; Mix H/L no Good, fidx/meet
       TypeTuple.make( tctl, tfull, tadd1, tnil , txscl, tadd1X), //   0    ~S   [+int+flt+str] (_GH,_GH,_GH) ; Some high, keep all, join
       TypeTuple.make( tctl, tfull, tadd1, tnil , t3   , tnum1X), //   0     3   [+int+flt    ] (_G_,_G_,BG_) ; Some good, drop bad, fidx/meet
-      TypeTuple.make( tctl, tfull, tadd1, tnil , tabc , tstr1X), //   0    str  [        +str] (BG_,BG_,_G_) ; Some good, drop bad, fidx/meet
+      //TypeTuple.make( tctl, tfull, tadd1, tnil , tabc , tstr1X), //   0    str  [        +str] (BG_,BG_,_G_) ; Some good, drop bad, fidx/meet
       TypeTuple.make( tctl, tfull, tadd1, tnil , tint , tint1X), //   0     3   [+int        ] (_G_,_G_,_G_) ; All good
       TypeTuple.make( tctl, tfull, tadd1, tnil , tscl , tadd1 ), //   0     S   [ int,flt,str] (LG_,LG_,LG_) ; Some low , keep all, meet
       TypeTuple.make( tctl, tfull, tadd1, t2   , txscl, tadd1X), //   2    ~S   [+int+flt+str] (_GH,_GH,B_H) ; Some high, keep all, join
       TypeTuple.make( tctl, tfull, tadd1, t2   , t3   , tnum1X), //   2     3   [+int+flt    ] (_G_,_G_,B__) ; Some good, drop bad, fidx/meet
-      TypeTuple.make( tctl, tfull, tadd1, t2   , tabc , tadd1 ), //   2    str  [ int,flt,str] (BG_,BG_,BG_) ; All  bad , keep all, meet
+      //TypeTuple.make( tctl, tfull, tadd1, t2   , tabc , tadd1 ), //   2    str  [ int,flt,str] (BG_,BG_,BG_) ; All  bad , keep all, meet
       TypeTuple.make( tctl, tfull, tadd1, t2   , tscl , tadd1 ), //   2     S   [ int,flt,str] (LG_,LG_,B__) ; Some low , keep all, meet
-      TypeTuple.make( tctl, tfull, tadd1, tabc , tabc , tstr1X), //  str   str  [        +str] (B__,B__,_G_) ; Some good, drop bad, fidx/meet
+      //TypeTuple.make( tctl, tfull, tadd1, tabc , tabc , tstr1X), //  str   str  [        +str] (B__,B__,_G_) ; Some good, drop bad, fidx/meet
       TypeTuple.make( tctl, tfull, tadd1, tscl , tscl , tadd1 ), //   S     S   [ int,flt,str] (L__,L__,L__) ; All  low , keep all, meet
     };
     _testMonotonicChain(ins,call,argss_add1);
@@ -362,8 +362,8 @@ public class TestNodeSmall {
       TypeTuple.make( tctl, tfull, tmul2X, t2   , tscl , tmul2 ), //   2     S   [ int,flt]
       TypeTuple.make( tctl, tfull, tmul2X, tscl , tscl , tmul2 ), //   S     S   [ int,flt]
       TypeTuple.make( tctl, tfull, tmul2X, txscl, tscl , tmul2X), //  ~S     S   [ int,flt]
-      TypeTuple.make( tctl, tfull, tmul2X, txscl, tabc , tmul2X), //  ~S    str  [ int,flt]
-      TypeTuple.make( tctl, tfull, tmul2X, t2   , tabc , tmul2 ), //   2    str  [ int,flt]
+      //TypeTuple.make( tctl, tfull, tmul2X, txscl, tabc , tmul2X), //  ~S    str  [ int,flt]
+      //TypeTuple.make( tctl, tfull, tmul2X, t2   , tabc , tmul2 ), //   2    str  [ int,flt]
     };
     _testMonotonicChain(ins,call,argss_mul2);
 
@@ -371,17 +371,17 @@ public class TestNodeSmall {
     call.set_fdx(ins[2]=fp_add);
     TypeTuple[] argss_add2 = new TypeTuple[] {
       TypeTuple.make( tctl, tfull, tadd2X, txscl, txscl, tadd2X), //  ~S    ~S   [+int+flt+str] (__H,__H,__H) ; All  high, keep all, join
-      TypeTuple.make( tctl, tfull, tadd2X, txscl, tabc , tadd2X), //  ~S    str  [+int+flt+str] (B_H,B_H,_GH) ; Some high, keep all, join
+      //TypeTuple.make( tctl, tfull, tadd2X, txscl, tabc , tadd2X), //  ~S    str  [+int+flt+str] (B_H,B_H,_GH) ; Some high, keep all, join
       TypeTuple.make( tctl, tfull, tadd2X, txscl, tscl , tadd2X), //  ~S     S   [+int+flt+str] (L_H,L_H,L_H) ; Mix H/L, no good, keep all, fidx/join
       TypeTuple.make( tctl, tfull, tadd2X, tnil , txscl, tadd2X), //   0    ~S   [+int+flt+str] (_GH,_GH,_GH) ; Some high, keep all, join
       TypeTuple.make( tctl, tfull, tadd2X, tnil , t3   , tnum2X), //   0     3   [+int+flt    ] (_G_,_G_,BG_) ; Some good, drop bad, fidx/join
-      TypeTuple.make( tctl, tfull, tadd2X, tnil , tabc , tstr2X), //   0    str  [        +str] (BG_,BG_,_G_) ; Some good, drop bad, fidx/join
+      //TypeTuple.make( tctl, tfull, tadd2X, tnil , tabc , tstr2X), //   0    str  [        +str] (BG_,BG_,_G_) ; Some good, drop bad, fidx/join
       TypeTuple.make( tctl, tfull, tadd2X, tnil , tscl , tadd2 ), //   0     S   [ int,flt,str] (LG_,LG_,LG_) ; Some low , keep all, meet
       TypeTuple.make( tctl, tfull, tadd2X, t2   , txscl, tadd2X), //   2    ~S   [+int+flt+str] (_GH,_GH,B_H) ; Some high, keep all, join
       TypeTuple.make( tctl, tfull, tadd2X, t2   , t3   , tnum2X), //   2     3   [+int+flt    ] (_G_,_G_,B__) ; Some good, drop bad, fidx/join
-      TypeTuple.make( tctl, tfull, tadd2X, t2   , tabc , tadd2 ), //   2    str  [ int,flt,str] (BG_,BG_,BG_) ; All  bad , keep all, meet
+      //TypeTuple.make( tctl, tfull, tadd2X, t2   , tabc , tadd2 ), //   2    str  [ int,flt,str] (BG_,BG_,BG_) ; All  bad , keep all, meet
       TypeTuple.make( tctl, tfull, tadd2X, t2   , tscl , tadd2 ), //   2     S   [ int,flt,str] (LG_,LG_,B__) ; Some low , keep all, meet
-      TypeTuple.make( tctl, tfull, tadd2X, tabc , tabc , tstr2X), //  str   str  [        +str] (B__,B__,_G_) ; Some good, drop bad, fidx/join
+      //TypeTuple.make( tctl, tfull, tadd2X, tabc , tabc , tstr2X), //  str   str  [        +str] (B__,B__,_G_) ; Some good, drop bad, fidx/join
       TypeTuple.make( tctl, tfull, tadd2X, tscl , tscl , tadd2 ), //   S     S   [ int,flt,str] (L__,L__,L__) ; All  low , keep all, meet
     };
     _testMonotonicChain(ins,call,argss_add2);
@@ -399,7 +399,7 @@ public class TestNodeSmall {
 
     // Make a Unknown/CallNode/CallEpi combo.  Unwired.
     ConNode ctrl = (ConNode)gvn.xform(new ConNode<>(Type.CTRL));
-    ConNode mem  = (ConNode)gvn.xform(new ConNode<>(TypeMem.MEM));
+    ConNode mem  = (ConNode)gvn.xform(new ConNode<>(TypeMem.ALLMEM));
     ConNode dsp  = (ConNode)gvn.xform(new ConNode<>(TypeMemPtr.NO_DISP));
     ConNode arg3 = gvn.init(new ConNode<>(Type.SCALAR));
     ConNode arg4 = gvn.init(new ConNode<>(Type.SCALAR));
@@ -412,8 +412,8 @@ public class TestNodeSmall {
     Type i64 = TypeInt.INT64;
     Type f64 = TypeFlt.FLT64;
     Type scl = Type.SCALAR;
-    Type abc = TypeMemPtr.ABCPTR.simple_ptr(); // Constant string
-    Type tup = TypeMemPtr.STRUCT.simple_ptr(); // Tuple pointer (always wrong)
+    //Type abc = TypeMemPtr.ABCPTR.simple_ptr(); // Constant string
+    Type tup = TypeMemPtr.ISUSED.simple_ptr(); // Tuple pointer (always wrong)
     // All args, including duals
     Type[] targs = new Type[]{i64,i64.dual(),
                               f64,f64.dual(),
@@ -496,8 +496,9 @@ public class TestNodeSmall {
     ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISP_SIMPLE));
     // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
     // yet built.
-    int alias = BitsAlias.new_alias(BitsAlias.REC);
-    NewObjNode dsp_file = (NewObjNode)gvn.xform(new NewObjNode(true,alias,TypeMemPtr.DISPLAY,dsp_prims));
+    int alias = BitsAlias.new_alias(BitsAlias.ALLX);
+    NewNode dsp_file = (NewNode)gvn.xform(new NewNode(true,alias));
+    dsp_file.add_fld(TypeMemPtr.DISP_FLD,dsp_prims,null);
     //MrgProjNode dsp_file_obj = Env.DEFMEM.make_mem_proj(dsp_file,mem);
     //ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(DSP_IDX, dsp_file)).keep();
     //Env.ALL_DISPLAYS = Env.ALL_DISPLAYS.set(dsp_file._alias);
@@ -562,6 +563,7 @@ public class TestNodeSmall {
     //ret.unkeep(2);
     //fptr.unkeep(2); fptr.pop(); fptr.pop();
     //Env.top_reset();                   // Hard reset
+    throw unimpl();
   }
 
 
@@ -594,29 +596,29 @@ public class TestNodeSmall {
     // including memory args.
 
     // Build a bunch of aliases.
-    int a1 = BitsAlias.new_alias(BitsAlias.REC);
-    int a2 = BitsAlias.new_alias(BitsAlias.STR);
-    int a3 = BitsAlias.new_alias(BitsAlias.REC);
-    TypeFld fmem = TypeFld.make(" mem",TypeMem.MEM,Access.Final,MEM_IDX);
+    int a1 = BitsAlias.new_alias(BitsAlias.ALLX);
+    int a2 = BitsAlias.new_alias(BitsAlias.ALLX);
+    int a3 = BitsAlias.new_alias(BitsAlias.ALLX);
+    TypeFld fmem = TypeFld.make(" mem",TypeMem.ALLMEM,Access.Final,MEM_IDX);
     TypeFld fint = TypeFld.make_arg(TypeInt.INT64,ARG_IDX);
     TypeStruct ts_int_flt = TypeStruct.make(fmem,fint,TypeFld.make_arg(TypeFlt.FLT64,ARG_IDX+1));
-    TypeStruct ts_int_abc = TypeStruct.make(fmem,fint,TypeFld.make_arg(TypeMemPtr.ABCPTR,ARG_IDX+1));
+    TypeStruct ts_int_abc = TypeStruct.make(fmem,fint,TypeFld.make_arg(TypeMemPtr.ISUSED,ARG_IDX+1));
     // @{ a:int; b:"abc" }
-    TypeStruct a_int_b_abc = TypeStruct.make2flds("a",TypeInt.INT64,"b",TypeMemPtr.ABCPTR);
-    TypeStruct ts_flt_str = TypeStruct.make(fmem,TypeFld.make_arg(TypeFlt.FLT64,ARG_IDX),TypeFld.make_arg(TypeMemPtr.make(BitsAlias.REC,a_int_b_abc),ARG_IDX+1));
+    TypeStruct a_int_b_abc = TypeStruct.make_test("a",TypeInt.INT64,"b",TypeMemPtr.ISUSED);
+    TypeStruct ts_flt_str = TypeStruct.make(fmem,TypeFld.make_arg(TypeFlt.FLT64,ARG_IDX),TypeFld.make_arg(TypeMemPtr.make(BitsAlias.ALLX,a_int_b_abc),ARG_IDX+1));
 
     // Build a bunch of function type signatures
-    TypeFunSig[] sigs = new TypeFunSig[] {
-      TypeFunSig.make(ts_int_flt,TypeTuple.RET), // {int flt   -> }
-      TypeFunSig.make(ts_int_abc,TypeTuple.RET), // {int "abc" -> }
-      TypeFunSig.make(ts_flt_str,TypeTuple.RET), // { flt @{a:int; b:"abc"} -> }
+    TypeFunPtr[] sigs = new TypeFunPtr[] {
+      TypeFunPtr.make_sig(ts_int_flt,TypeTuple.RET), // {int flt   -> }
+      TypeFunPtr.make_sig(ts_int_abc,TypeTuple.RET), // {int "abc" -> }
+      TypeFunPtr.make_sig(ts_flt_str,TypeTuple.RET), // { flt @{a:int; b:"abc"} -> }
     };
 
     // Build a bunch of memory parm types
     TypeMem[] mems = new TypeMem[] {
       tmem(null),
       tmem(null).dual(),
-      tmem(new int[]{a2},TypeStr.STR),
+      tmem(new int[]{a2},TypeStruct.ISUSED),
       tmem(new int[]{a1},a_int_b_abc),
     };
 
@@ -627,10 +629,10 @@ public class TestNodeSmall {
       TypeInt.INT64,
       TypeInt.INT64.dual(),
       TypeInt.NINT64,
-      TypeMemPtr.ABCPTR.simple_ptr(),
-      TypeMemPtr.ABCPTR.dual().simple_ptr(),
-      TypeMemPtr.make(a1,TypeObj.OBJ).simple_ptr(),
-      TypeMemPtr.make(a1,TypeObj.OBJ).dual().simple_ptr(),
+      //TypeMemPtr.ABCPTR.simple_ptr(),
+      //TypeMemPtr.ABCPTR.dual().simple_ptr(),
+      TypeMemPtr.make(a1,TypeStruct.ISUSED).simple_ptr(),
+      TypeMemPtr.make(a1,TypeStruct.ISUSED).dual().simple_ptr(),
     };
 
     // One-off jig for testing single combo
@@ -677,7 +679,7 @@ public class TestNodeSmall {
 
   // Check that the Parm.value calls for these incoming args are monotonic, and
   // within the sig bounds.
-  private static Type[] check( GVNGCM gvn, TypeFunSig tsig, TypeMem tmem, Type targ1, Type targ2 ) {
+  private static Type[] check( GVNGCM gvn, TypeFunPtr tsig, TypeMem tmem, Type targ1, Type targ2 ) {
     assert targ1.simple_ptr()==targ1;
     assert targ2.simple_ptr()==targ2;
     ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
@@ -732,19 +734,20 @@ public class TestNodeSmall {
 
 
   // Helper to make memory
-  private static TypeMem tmem(int[] as, TypeObj... ts) {
-    int max = BitsAlias.AARY;
-    if( as !=null && as.length> 0 ) max = Math.max(max,as[as.length-1]);
-    TypeObj[] tos = new TypeObj[max+1];
-    tos[BitsAlias.ALL] = TypeObj.OBJ;
-    tos[BitsAlias.REC]=TypeStruct.ALLSTRUCT;
-    tos[BitsAlias.ABC] = TypeStr.ABC; //
-    tos[BitsAlias.STR] = TypeStr.STR;
-    tos[BitsAlias.AARY] = TypeAry.ARY;
-    if( as != null )
-      for( int i=0; i<as.length; i++ )
-        tos[as[i]] = ts[i];
-    return TypeMem.make0(tos);
+  private static TypeMem tmem(int[] as, TypeStruct... ts) {
+    //int max = BitsAlias.AARY;
+    //if( as !=null && as.length> 0 ) max = Math.max(max,as[as.length-1]);
+    //TypeObj[] tos = new TypeObj[max+1];
+    //tos[BitsAlias.ALL] = TypeObj.OBJ;
+    //tos[BitsAlias.REC]=TypeStruct.ALLSTRUCT;
+    //tos[BitsAlias.ABC] = TypeStr.ABC; //
+    //tos[BitsAlias.STR] = TypeStr.STR;
+    //tos[BitsAlias.AARY] = TypeAry.ARY;
+    //if( as != null )
+    //  for( int i=0; i<as.length; i++ )
+    //    tos[as[i]] = ts[i];
+    //return TypeMem.make0(tos);
+    throw unimpl();
   }
 }
 

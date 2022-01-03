@@ -34,11 +34,11 @@ public class AssertNode extends Node {
     // If TypeNode check is for a function, it will wrap any incoming function
     // with a new function which does the right arg-checks.  This happens
     // immediately in the Parser and is here to declutter the Parser.
-    if( _t instanceof TypeFunSig ) {
-      TypeFunSig sig = (TypeFunSig)_t;
-      try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
-        X.add(this);
-        Node[] args = new Node[sig._formals.nargs()];
+    if( _t instanceof TypeFunPtr ) {
+      //TypeFunSig sig = (TypeFunSig)_t;
+      //try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
+      //  X.add(this);
+      //  Node[] args = new Node[sig._formals.nargs()];
         //FunNode fun = (FunNode)X.init(new FunNode(null,sig,-1).add_def(Env.FILE._scope));
         //fun._val = Type.CTRL;
         //args[CTL_IDX] = fun;            // Call control
@@ -62,7 +62,7 @@ public class AssertNode extends Node {
         //// Just the same Closure when we make a new TFP
         //return (X._ret=X.xform(new FunPtrNode(ret,arg)));
         throw unimpl();
-      }
+      //}
     }
 
     // Push TypeNodes 'up' to widen the space they apply to, and hopefully push

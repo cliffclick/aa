@@ -76,11 +76,6 @@ public class TypeInt extends Type<TypeInt> {
     case TFUNPTR:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
-    case TFUNSIG:
-    case TARY:
-    case TOBJ:
-    case TSTR:
-    case TSTRUCT:
     case TTUPLE:
     case TMEM:   return ALL;
     default: throw typerr(t);
@@ -149,25 +144,24 @@ public class TypeInt extends Type<TypeInt> {
     return _z<tf._z && tf._z==32 ? TypeFlt.make(nz,32,0) : (_z<64 ? TypeFlt.make(nz,64,0) : (nz==-1 ? Type.NSCALR : Type.SCALAR));
   }
 
-  // Lattice of conversions:
-  // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
-  //    to e.g. Float and require a user-provided rounding conversion from F64->Int.
-  //  0 requires no/free conversion (Int8->Int64, F32->F64)
-  // +1 requires a bit-changing conversion (Int->Flt)
-  // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
-  @Override public byte isBitShape(Type t) {
-    // TODO: Allow loss-less conversions (e.g. small float integer constants convert to ints just fine)
-    if( t._type == TXSCALAR ) return 0;
-    if( t._type == TINT ) return (byte)(_z<=((TypeInt)t)._z ? 0 : 99);
-    if( t._type == TFLT ) return 2; // Int->Flt ignores large int overflow issues
-    if( t._type == Type.TMEMPTR ) return 99; // No flt->ptr conversion
-    if( t._type == Type.TFUNPTR ) return 99; // No flt->ptr conversion
-    if( t._type == Type.TALL ) return 99;
-    if( t._type == TSCALAR ) return 9; // Might have to autobox
-    if( t._type == TSTR ) return 99;
-    if( t == NIL || t == XNIL ) return 99; // Cannot not-nil to nil
-    throw unimpl();
-  }
+  //// Lattice of conversions:
+  //// -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
+  ////    to e.g. Float and require a user-provided rounding conversion from F64->Int.
+  ////  0 requires no/free conversion (Int8->Int64, F32->F64)
+  //// +1 requires a bit-changing conversion (Int->Flt)
+  //// 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
+  //@Override public byte isBitShape(Type t) {
+  //  // TODO: Allow loss-less conversions (e.g. small float integer constants convert to ints just fine)
+  //  if( t._type == TXSCALAR ) return 0;
+  //  if( t._type == TINT ) return (byte)(_z<=((TypeInt)t)._z ? 0 : 99);
+  //  if( t._type == TFLT ) return 2; // Int->Flt ignores large int overflow issues
+  //  if( t._type == Type.TMEMPTR ) return 99; // No flt->ptr conversion
+  //  if( t._type == Type.TFUNPTR ) return 99; // No flt->ptr conversion
+  //  if( t._type == Type.TALL ) return 99;
+  //  if( t._type == TSCALAR ) return 9; // Might have to autobox
+  //  if( t == NIL || t == XNIL ) return 99; // Cannot not-nil to nil
+  //  throw unimpl();
+  //}
   @Override public Type _widen() {
     if( _x> 0 ) return this;
     if( _x==0 ) return _con==0 ? INT64 : NINT64;

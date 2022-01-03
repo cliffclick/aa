@@ -147,7 +147,7 @@ public final class CallEpiNode extends Node {
     Node rrez = ret.rez();      // Result  being returned
     boolean inline = !fun.noinline();
     // If the function does nothing with memory, then use the call memory directly.
-    if( (rmem instanceof ParmNode && rmem.in(CTL_IDX) == fun) || rmem._val ==TypeMem.XMEM )
+    if( (rmem instanceof ParmNode && rmem.in(CTL_IDX) == fun) || rmem._val ==TypeMem.ANYMEM )
       rmem = cmem;
     // Check that function return memory and post-call memory are compatible
     if( !(_val instanceof TypeTuple) ) return null;
@@ -411,8 +411,6 @@ public final class CallEpiNode extends Node {
     CallNode call = call();
     if( FunNode._must_inline == call._uid ) // Assert an expected inlining happens
       FunNode._must_inline = 0;
-    if( mem instanceof IntrinsicNode ) // Better error message for Intrinsic if Call args are bad
-      ((IntrinsicNode)mem)._badargs = call._badargs[1];
     call._is_copy=_is_copy=true;
     Env.GVN.add_reduce_uses(call);
     Env.GVN.add_reduce_uses(this);
@@ -548,5 +546,5 @@ public final class CallEpiNode extends Node {
   // there, transitively through memory.
   //
   // In practice, just the no-escape aliases
-  @Override BitsAlias escapees() { return BitsAlias.FULL; }
+  //@Override BitsAlias escapees() { return BitsAlias.FULL; }
 }

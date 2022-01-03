@@ -30,7 +30,7 @@ public class TestApprox {
     // A.B.X : *[7]@{ x = nint; fld = ALL; }
 
 
-    int a14 = BitsAlias.new_alias(BitsAlias.REC);
+    int a14 = BitsAlias.new_alias(BitsAlias.ALLX);
     BitsAlias ba14 = BitsAlias.make0(a14);
     BitsFun f25 = BitsFun.make_new_fidx(BitsFun.ALL);
     TypeFld p0 = make(BitsFun.NZERO,Type.SCALAR);
@@ -43,11 +43,11 @@ public class TestApprox {
     TypeStruct tsb = TypeStruct.make(pb);
     TypeMemPtr ptrb = TypeMemPtr.make(BitsAlias.EMPTY,tsb);
 
-    TypeObj ax  = tsa.approx1(1,ba14);
-    TypeObj axb = (TypeObj)ax.meet(tsb);
+    TypeStruct ax  = tsa.approx1(1,ba14);
+    TypeStruct axb = (TypeStruct)ax.meet(tsb);
 
     TypeStruct ab = (TypeStruct)tsa.meet(tsb);
-    TypeObj abx = ab.approx1(1,ba14);
+    TypeStruct abx = ab.approx1(1,ba14);
 
     assertNotEquals(axb,abx); // Would like this to be equals!!!!
   }
@@ -55,7 +55,7 @@ public class TestApprox {
   // Check TypeStruct.meet for a more complex recursive case
   @Test public void testTSMeet() {
     Object dummy = TypeMemPtr.TYPES; // <clinit> before RECURSIVE_MEET
-    int alias0 = BitsAlias.new_alias(BitsAlias.REC);
+    int alias0 = BitsAlias.new_alias(BitsAlias.ALLX);
 
     // Build two structs pointing to each other.
     //   -> [,int] -> * -> [,flt] -> * ->
@@ -64,8 +64,8 @@ public class TestApprox {
     Type.RECURSIVE_MEET++;
     TypeFld f01 = TypeFld.malloc("a");
     TypeFld f10 = TypeFld.malloc("a");
-    TypeStruct t0 = TypeStruct.malloc("",false,true,f01,fbint);
-    TypeStruct t1 = TypeStruct.malloc("",false,true,f10,fbflt);
+    TypeStruct t0 = TypeStruct.malloc_test(f01,fbint);
+    TypeStruct t1 = TypeStruct.malloc_test(f10,fbflt);
     TypeMemPtr p0 = TypeMemPtr.make(alias0,t0);
     TypeMemPtr p1 = TypeMemPtr.make(alias0,t1);
     f01.setX(p1);
@@ -87,7 +87,7 @@ public class TestApprox {
   // single linked-list chain of depth == CUTOFF.
   @Test public void testApprox1() {
     final int CUTOFF = 3;
-    int alias0 = BitsAlias.new_alias(BitsAlias.REC);
+    int alias0 = BitsAlias.new_alias(BitsAlias.ALLX);
 
     // Build a depth-CUTOFF linked list chain
     TypeStruct t0 = TypeStruct.make(TypeFld.make("a",Type.XNIL      ,TypeFld.oBot),
@@ -137,18 +137,18 @@ public class TestApprox {
     assertEquals(CUTOFF-1,p3.max(ds2));
     TypeMemPtr txp1 = (TypeMemPtr)tax.at("a");
     assertEquals(1,(int)ds2.get(txp1));
-    TypeStruct txs1 = (TypeStruct)txp1._obj;
+    TypeStruct txs1 = txp1._obj;
     assertEquals(1,(int)ds2.get(txs1));
     TypeMemPtr txp2 = (TypeMemPtr)txs1.at("a");
     assertEquals(2,(int)ds2.get(txp2));
-    TypeStruct txs2 = (TypeStruct)txp2._obj;
+    TypeStruct txs2 = txp2._obj;
     assertEquals(2,(int)ds2.get(txs2));
     assertEquals(TypeInt.con(98),txs2.at("b"));
     Type txp3 = txs2.at("a");
     //assertEquals(2,(int)ds2.get(txp3));
     //// Weakened expected results after NIL expands to [0]->obj
     //assertEquals(txs2,txp3._obj);
-    ////assertEquals(TypeObj.OBJ,txp3._obj);
+    ////assertEquals(TypeStruct.OBJ,txp3._obj);
     //
     assertTrue(t3.isa(tax));
   }
@@ -158,15 +158,15 @@ public class TestApprox {
   @Test public void testApprox2() {
     Object dummy = TypeMemPtr.TYPES; // <clinit> before RECURSIVE_MEET
     final int CUTOFF = 3;
-    int alias0 = BitsAlias.new_alias(BitsAlias.REC);
+    int alias0 = BitsAlias.new_alias(BitsAlias.ALLX);
     BitsAlias alias = BitsAlias.make0(alias0);
 
     // p3 -> t3[,99] -> p2 -> t2[,99] -> p1 -> t1[,flt] -> p0 -> t0[,int] -> p1*
 
     // Build two structs pointing to each other
     Type.RECURSIVE_MEET++;
-    TypeStruct t0 = TypeStruct.malloc("",false,true,TypeFld.malloc("a"),TypeFld.malloc("b")).set_hash();
-    TypeStruct t1 = TypeStruct.malloc("",false,true,TypeFld.malloc("a"),TypeFld.malloc("b")).set_hash();
+    TypeStruct t0 = TypeStruct.malloc_test(TypeFld.malloc("a"),TypeFld.malloc("b"));
+    TypeStruct t1 = TypeStruct.malloc_test(TypeFld.malloc("a"),TypeFld.malloc("b"));
     TypeMemPtr p0 = TypeMemPtr.make(alias0,t0);
     TypeMemPtr p1 = TypeMemPtr.make(alias0,t1);
     t0.get("a").setX(p1           );
@@ -217,11 +217,11 @@ public class TestApprox {
     assertEquals(CUTOFF-1,p3.max(ds2));
     TypeMemPtr txp1 = (TypeMemPtr)tax.at("a");
     assertEquals(1,(int)ds2.get(txp1));
-    TypeStruct txs1 = (TypeStruct)txp1._obj;
+    TypeStruct txs1 = txp1._obj;
     assertEquals(1,(int)ds2.get(txs1));
     TypeMemPtr txp2 = (TypeMemPtr)txs1.at("a");
     assertEquals(2,(int)ds2.get(txp2));
-    TypeStruct txs2 = (TypeStruct)txp2._obj;
+    TypeStruct txs2 = txp2._obj;
     assertEquals(CUTOFF-1,(int)ds2.get(txs2));
     assertEquals(TypeFlt.FLT64,txs2.at("b"));
     Type txp3 = txs2.at("a");
@@ -242,11 +242,11 @@ public class TestApprox {
     assertEquals(CUTOFF-1,p3.max(ds2));
     TypeMemPtr t4p1 = (TypeMemPtr)tax4.at("a");
     assertEquals(1,(int)ds2.get(t4p1));
-    TypeStruct t4s1 = (TypeStruct)t4p1._obj;
+    TypeStruct t4s1 = t4p1._obj;
     assertEquals(1,(int)ds2.get(t4s1));
     TypeMemPtr t4p2 = (TypeMemPtr)t4s1.at("a");
     assertEquals(2,(int)ds2.get(t4p2));
-    TypeStruct t4s2 = (TypeStruct)t4p2._obj;
+    TypeStruct t4s2 = t4p2._obj;
     assertEquals(CUTOFF-1,(int)ds2.get(t4s2));
     assertEquals(TypeInt.con(99),t4s2.at("b"));
     Type t4p3 = t4s2.at("a");
@@ -260,32 +260,32 @@ public class TestApprox {
   // Approx:
   // A0 -> (X0 <-> X1) -> A1 -> X2 -> A23-> (X35<-> X45) -> A23
   @Test public void testApprox3() {
-    int alias0 = BitsAlias.new_alias(BitsAlias.REC);
-    int alias1 = BitsAlias.new_alias(BitsAlias.REC);
+    int alias0 = BitsAlias.new_alias(BitsAlias.ALLX);
+    int alias1 = BitsAlias.new_alias(BitsAlias.ALLX);
 
     // ......................................................... -> X5
-    Type str_x5 = TypeStr.con("X5");
+    Type str_x5 = TypeInt.con(55);
     TypeStruct  x5 = TypeStruct.make(TypeFld.make("v",str_x5   ),
                                      TypeFld.make("x",Type.XNIL),
                                      TypeFld.make("a",Type.XNIL));
     TypeMemPtr px5 = TypeMemPtr.make(alias1,x5);
 
     // ................................................... -> A3 -> X5
-    TypeStr str_a3 = TypeStr.con("A3");
+    TypeInt str_a3 = TypeInt.con(3);
     TypeStruct  a3 = TypeStruct.make(TypeFld.make("v",str_a3),
                                      TypeFld.make("x",px5   ));
     TypeMemPtr pa3 = TypeMemPtr.make(alias0,a3);
 
     // Build two structs pointing to each other
     // ...................................... (X3 <-> X4 ) -> A3 -> X5
-    Type i13 = TypeStr.con("X3");
-    Type i14 = TypeStr.con("X4");
+    Type i13 = TypeInt.con(33);
+    Type i14 = TypeInt.con(44);
     TypeFld fi13 = TypeFld.make("v",i13);
     TypeFld fi14 = TypeFld.make("v",i14);
     TypeFld fpa3 = TypeFld.make("a",pa3);
     Type.RECURSIVE_MEET++;
-    TypeStruct x3 = TypeStruct.malloc("",false,true,fi13,TypeFld.malloc("x"),fpa3).set_hash();
-    TypeStruct x4 = TypeStruct.malloc("",false,true,fi14,TypeFld.malloc("x"),fpa3).set_hash();
+    TypeStruct x3 = TypeStruct.malloc_test(fi13,TypeFld.malloc("x"),fpa3);
+    TypeStruct x4 = TypeStruct.malloc_test(fi14,TypeFld.malloc("x"),fpa3);
     TypeMemPtr px3 = TypeMemPtr.make(alias1,x3);
     TypeMemPtr px4 = TypeMemPtr.make(alias1,x4);
     x3.get("x").setX(px4);
@@ -295,7 +295,7 @@ public class TestApprox {
     px3 = (TypeMemPtr)x4.at("x");
 
     // ................................ A2 -> (X3 <-> X4 ) -> A3 -> X5
-    TypeStr str_a2 = TypeStr.con("A2");
+    TypeInt str_a2 = TypeInt.con(2);
     TypeStruct  a2 = TypeStruct.make(TypeFld.make("v",str_a2),
                                      TypeFld.make("x",px3   ));
     TypeMemPtr pa2 = TypeMemPtr.make(alias0,a2);
@@ -307,26 +307,26 @@ public class TestApprox {
     assertEquals(1,(int)depths.get(a3));
 
     // .......................... X2 -> A2 -> (X3 <-> X4 ) -> A3 -> X5
-    TypeStruct  x2 = TypeStruct.make(TypeFld.make("v",TypeStr.con("X2")),
+    TypeStruct  x2 = TypeStruct.make(TypeFld.make("v",TypeInt.con(22)),
                                      TypeFld.make("x",Type.NIL),
                                      TypeFld.make("a",pa2));
     TypeMemPtr px2 = TypeMemPtr.make(alias1,x2);
 
     // .................... A1 -> X2 -> A2 -> (X3 <-> X4 ) -> A3 -> X5
-    TypeStruct  a1 = TypeStruct.make(TypeFld.make("v",TypeStr.con("A1")),
+    TypeStruct  a1 = TypeStruct.make(TypeFld.make("v",TypeInt.con(1)),
                                      TypeFld.make("x",px2));
     TypeMemPtr pa1 = TypeMemPtr.make(alias0,a1);
 
     // Build two structs pointing to each other
     // ..... (X0 <-> X1) -> A1 -> X2 -> A2 -> (X3 <-> X4 ) -> A3 -> X5
-    Type i10 = TypeStr.con("X0");
-    Type i11 = TypeStr.con("X1");
+    Type i10 = TypeInt.con(-100);
+    Type i11 = TypeInt.con(11);
     TypeFld fil0 = TypeFld.make("v",i10);
     TypeFld fil1 = TypeFld.make("v",i11);
     TypeFld fpa1 = TypeFld.make("a",pa1);
     Type.RECURSIVE_MEET++;
-    TypeStruct x0 = TypeStruct.malloc("",false,true,fil0, TypeFld.malloc("x"), fpa1).set_hash();
-    TypeStruct x1 = TypeStruct.malloc("",false,true,fil1, TypeFld.malloc("x"), fpa1).set_hash();
+    TypeStruct x0 = TypeStruct.malloc_test(fil0, TypeFld.malloc("x"), fpa1);
+    TypeStruct x1 = TypeStruct.malloc_test(fil1, TypeFld.malloc("x"), fpa1);
     TypeMemPtr px0 = TypeMemPtr.make(alias1,x0);
     TypeMemPtr px1 = TypeMemPtr.make(alias1,x1);
     x0.get("x").setX(px1);
@@ -336,7 +336,7 @@ public class TestApprox {
     px0 = (TypeMemPtr)x1.at("x");
 
     // A0 -> (X0 <-> X1) -> A1 -> X2 -> A2 -> (X3 <-> X4 ) -> A3 -> X5
-    TypeStruct  a0 = TypeStruct.make(TypeFld.make("v",TypeStr.con("A0")),
+    TypeStruct  a0 = TypeStruct.make(TypeFld.make("v",TypeInt.con(-101)),
                                      TypeFld.make("x",px0));
     TypeMemPtr pa0 = TypeMemPtr.make(alias0,a0);
 
@@ -355,40 +355,40 @@ public class TestApprox {
     // Check sanity!
     // Was: A0 -> (X0 <-> X1) -> A1 -> X2 -> A2 -> (X3 <->  X4) -> A3 -> X5
     // Apx: A0 -> (X0 <-> X1) -> A1 -> X2 -> A23->  X35 -> (X4 <-> X3) -> A23
-    assertSame(TypeStr.con("A0"), zsa0.at("v"));
+    assertSame(TypeInt.con(-101), zsa0.at("v"));
     TypeMemPtr zpx0 = (TypeMemPtr)zsa0.at("x");
 
-    TypeStruct zsx0 = (TypeStruct)zpx0._obj;
+    TypeStruct zsx0 =             zpx0._obj;
     assertSame  (i10 ,            zsx0.at("v"));
     TypeMemPtr zpx1 = (TypeMemPtr)zsx0.at("x");
     TypeMemPtr zpa1 = (TypeMemPtr)zsx0.at("a");
 
-    TypeStruct zsx1 = (TypeStruct)zpx1._obj;
+    TypeStruct zsx1 =             zpx1._obj;
     assertSame  (i11 ,            zsx1.at("v"));
     assertSame  (zpx0,            zsx1.at("x"));
     assertSame  (zpa1,            zsx1.at("a"));
 
-    TypeStruct zsa1 = (TypeStruct)zpa1._obj;
-    assertSame(TypeStr.con("A1"), zsa1.at("v"));
+    TypeStruct zsa1 =             zpa1._obj;
+    assertSame(TypeInt.con(1),    zsa1.at("v"));
     TypeMemPtr zpx2 = (TypeMemPtr)zsa1.at("x");
 
-    TypeStruct zsx2 = (TypeStruct)zpx2._obj;
-    assertSame(TypeStr.con("X2"), zsx2.at("v"));
+    TypeStruct zsx2 =             zpx2._obj;
+    assertSame(TypeInt.con(22),   zsx2.at("v"));
     assertSame(Type.NIL,          zsx2.at("x"));
     TypeMemPtr zpa23= (TypeMemPtr)zsx2.at("a");
 
-    TypeStruct zsa23= (TypeStruct)zpa23._obj;
-    assertSame(TypeStr.con("A2"), zsa23.at("v"));
+    TypeStruct zsa23=             zpa23._obj;
+    assertSame(TypeInt.con(22),   zsa23.at("v"));
     TypeMemPtr zpx35= (TypeMemPtr)zsa23.at("x");
 
-    TypeStruct zsx35= (TypeStruct)zpx35._obj;
-    assertSame(TypeStr.con("X3"), zsx35.at("v"));
+    TypeStruct zsx35=             zpx35._obj;
+    assertSame(TypeInt.con(33),   zsx35.at("v"));
     TypeMemPtr zpa4 = (TypeMemPtr)zsx35.at("x") ;
     Type zpa23q=zsx35.at("a") ;
     // Weakened expected results after NIL expands to [0]->obj
     //assertSame(zsa23,             zpa23q._obj);
-    //assertSame(TypeObj.OBJ,       zpa23q._obj);
-    TypeStruct zsx4 = (TypeStruct)zpa4._obj;
+    //assertSame(TypeStruct.OBJ,       zpa23q._obj);
+    TypeStruct zsx4 =             zpa4._obj;
     assertSame(i14,               zsx4.at("v"));
     assertSame(zpx35,             zsx4.at("x"));
     assertSame(Type.SCALAR,       zsx4.at("a"));
@@ -421,7 +421,7 @@ public class TestApprox {
   // The first few tree layers remain expanded, but the tree tail collapses.
   @Test public void testApprox4() {
     final int CUTOFF = 3;
-    int alias = BitsAlias.new_alias(BitsAlias.REC);
+    int alias = BitsAlias.new_alias(BitsAlias.ALLX);
     TypeFld lnil = TypeFld.make("l",Type.NIL);
     TypeFld rnil = TypeFld.make("r",Type.NIL);
 
@@ -480,12 +480,12 @@ public class TestApprox {
     TypeMemPtr p2 = (TypeMemPtr)z1.at("l") ;
     TypeMemPtr p3 = (TypeMemPtr)z1.at("r") ;
 
-    TypeStruct z2 = (TypeStruct)p2._obj   ;
+    TypeStruct z2 =             p2._obj   ;
     assertSame( TypeInt.con(2), z2.at("v"));
     TypeMemPtr p4 = (TypeMemPtr)z2.at("l") ;
     TypeMemPtr p5 = (TypeMemPtr)z2.at("r") ;
 
-    TypeStruct z3 = (TypeStruct)p3._obj   ;
+    TypeStruct z3 =             p3._obj   ;
     assertSame( TypeInt.con(3), z3.at("v"));
     TypeMemPtr p6 = (TypeMemPtr)z3.at("l") ;
     TypeMemPtr p7 = (TypeMemPtr)z3.at("r") ;
@@ -502,7 +502,7 @@ public class TestApprox {
   // Leaf is a TypeInt.NINT8, and both pointer fields are either NIL or contain
   // alias 8 (and optionally nil) and point to a leaf type.
   private void check_leaf( TypeMemPtr p, int alias, TypeInt vt ) {
-    TypeStruct z = (TypeStruct)p._obj;
+    TypeStruct z = p._obj;
     assertSame( vt, z.at("v"));
     Type x1 = z.at("l");
     if( x1 != Type.NIL && x1!=Type.SCALAR) {
@@ -525,7 +525,7 @@ public class TestApprox {
   // Z1 -> {l=A1,r=A1,v} depth=2, and Z1=A3
   @Test public void testApprox5() {
     final int CUTOFF = 2;
-    int alias = BitsAlias.new_alias(BitsAlias.REC);
+    int alias = BitsAlias.new_alias(BitsAlias.ALLX);
 
     TypeStruct  x1= TypeStruct.make(TypeFld.make("l",Type.SCALAR),TypeFld.make("r",Type.SCALAR),TypeFld.make("v",Type.SCALAR));
     TypeMemPtr px1= TypeMemPtr.make(alias,x1);
@@ -562,10 +562,10 @@ public class TestApprox {
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
     final int CUTOFF = 2;
-    int alias = BitsAlias.new_alias(BitsAlias.REC);
+    int alias = BitsAlias.new_alias(BitsAlias.ALLX);
 
     Type.RECURSIVE_MEET++;
-    TypeStruct  x1 = TypeStruct.malloc("",false,true,TypeFld.malloc("l"), TypeFld.malloc("r"), TypeFld.malloc("v")).set_hash();
+    TypeStruct  x1 = TypeStruct.malloc_test(TypeFld.malloc("l"), TypeFld.malloc("r"), TypeFld.malloc("v"));
     TypeMemPtr px1 = TypeMemPtr.make_nil(alias,x1);
     x1.get("l").setX(Type.XNIL  );
     x1.get("r").setX(px1        );
@@ -582,9 +582,9 @@ public class TestApprox {
     TypeStruct z1 = z0.approx(CUTOFF,BitsAlias.make0(alias));
 
     Type.RECURSIVE_MEET++;
-    TypeStruct  x3 = TypeStruct.malloc("",false,true,TypeFld.malloc("l"), TypeFld.malloc("r"), TypeFld.malloc("v")).set_hash();
+    TypeStruct  x3 = TypeStruct.malloc_test(TypeFld.malloc("l"), TypeFld.malloc("r"), TypeFld.malloc("v"));
     TypeMemPtr px3 = TypeMemPtr.make_nil(alias,x3);
-    x3.get("l").setX(px3);//TypeMemPtr.make_nil(alias,TypeObj.OBJ);
+    x3.get("l").setX(px3);//TypeMemPtr.make_nil(alias,TypeStruct.OBJ);
     x3.get("r").setX(px3);
     x3.get("v").setX(Type.SCALAR);
     Type.RECURSIVE_MEET--;
@@ -606,14 +606,14 @@ public class TestApprox {
     // until fixed point.
     final int CUTOFF=3;
     TypeStruct ts0 = TypeStruct.make(TypeFld.NO_DISP);
-    TypeMemPtr tmp0 = TypeMemPtr.make(BitsAlias.RECORD_BITS0,ts0), tmp1=null;
+    TypeMemPtr tmp0 = TypeMemPtr.make(BitsAlias.ALL,ts0), tmp1=null;
 
     int cnt=0;
     while( tmp0 != tmp1 && cnt < 100 ) {
       TypeStruct ts1 = TypeStruct.make(TypeFld.make("^",tmp1=tmp0));
-      TypeStruct ts1x = ts1.approx(CUTOFF-1,BitsAlias.RECORD_BITS);
+      TypeStruct ts1x = ts1.approx(CUTOFF-1,BitsAlias.NALL);
       // Extend with nil-or-not endlessly.
-      tmp0 = TypeMemPtr.make(BitsAlias.RECORD_BITS0,ts1x);
+      tmp0 = TypeMemPtr.make(BitsAlias.ALL,ts1x);
       cnt++;
     }
     // End result has no prefix, since NIL is allowed at every step.  i.e., we
@@ -623,9 +623,9 @@ public class TestApprox {
 
 
     // Make some child aliases.
-    final int alias6 = BitsAlias.new_alias(BitsAlias.REC);
-    final int alias7 = BitsAlias.new_alias(BitsAlias.REC);
-    final int alias8 = BitsAlias.new_alias(BitsAlias.REC);
+    final int alias6 = BitsAlias.new_alias(BitsAlias.ALLX);
+    final int alias7 = BitsAlias.new_alias(BitsAlias.ALLX);
+    final int alias8 = BitsAlias.new_alias(BitsAlias.ALLX);
     final BitsAlias ba6 = BitsAlias.make0(alias6);
     final BitsAlias ba7 = BitsAlias.make0(alias7);
     final BitsAlias ba8 = BitsAlias.make0(alias8);
@@ -705,12 +705,12 @@ public class TestApprox {
     final int CUTOFF=2;
     final int fidx = BitsFun.new_fidx(1), fidx0 = BitsFun.new_fidx(fidx), fidx1 = BitsFun.new_fidx(fidx);
     final BitsFun fidxs = BitsFun.make0(fidx0,fidx1).dual();
-    final int alias = BitsAlias.new_alias(BitsAlias.REC);
+    final int alias = BitsAlias.new_alias(BitsAlias.ALLX);
 
     // Args for the forward-ref fib(^ ->Scalar).  This has to start as hi-args
     // for this test, as the cyclic approx is supposed to be low - and it has
     // args known post-parse but not pre-parse.
-    TypeStruct tfp0_args = TypeStruct.make("", true, false, TypeMemPtr.DISP_FLD);
+    TypeStruct tfp0_args = TypeStruct.make("", true, TypeMemPtr.DISP_FLD);
 
     TypeFunPtr tfp0 = TypeFunPtr.make(BitsFun.ANY,2,TypeFunPtr.DISP.simple_ptr(),Type.SCALAR); // fib with generic display
     TypeStruct dsp0 = TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("fib",tfp0));// The display with weak fib-type
@@ -733,7 +733,7 @@ public class TestApprox {
 
     // The approx that gets built: fib3->dsp3->fib3->dsp3->...
     Type.RECURSIVE_MEET++;
-    TypeStruct dsp3 = TypeStruct.malloc("",false,false,TypeFld.malloc("^",null, TypeFld.Access.Final,DSP_IDX), TypeFld.malloc("fib")).set_hash();
+    TypeStruct dsp3 = TypeStruct.malloc_test(TypeFld.malloc("^",null, TypeFld.Access.Final,DSP_IDX), TypeFld.malloc("fib"));
     TypeMemPtr ptr3 = TypeMemPtr.make(alias,dsp3);
     TypeStruct arg3 = TypeStruct.make(TypeFld.make("->",Type.SCALAR),
                                       TypeFld.make("^",ptr3.simple_ptr()),
@@ -755,7 +755,7 @@ public class TestApprox {
     assertEquals(dsp3,mt);
 
     // Build the approx
-    TypeStruct rez = (TypeStruct)dsp2.approx1(CUTOFF,BitsAlias.make0(alias));
+    TypeStruct rez = dsp2.approx1(CUTOFF,BitsAlias.make0(alias));
     assertEquals(dsp3,rez);
   }
 
@@ -768,10 +768,10 @@ public class TestApprox {
   @Test public void testApprox9() {
     Object dummy0 = TypeStruct.TYPES;
 
-    int alias13 = BitsAlias.new_alias(BitsAlias.REC);
-    int alias14 = BitsAlias.new_alias(BitsAlias.REC);
-    BitsAlias a14   = BitsAlias.FULL.make(        alias14);
-    BitsAlias a1314 = BitsAlias.FULL.make(alias13,alias14);
+    int alias13 = BitsAlias.new_alias(BitsAlias.ALLX);
+    int alias14 = BitsAlias.new_alias(BitsAlias.ALLX);
+    BitsAlias a14   = BitsAlias.ALL.make(        alias14);
+    BitsAlias a1314 = BitsAlias.ALL.make(alias13,alias14);
     int fidx14 = BitsFun.new_fidx();
     int fidx25 = BitsFun.new_fidx();
     BitsFun f1425 = BitsFun.make0(fidx14,fidx25);

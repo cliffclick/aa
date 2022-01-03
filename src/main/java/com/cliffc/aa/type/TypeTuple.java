@@ -91,17 +91,16 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple IF_FALSE= make(CTRL ,XCTRL);
 
   // This is the starting state of the program; CTRL is active and memory is empty.
-  public  static final TypeTuple START_STATE = make(CTRL, TypeMem.EMPTY);
+  public  static final TypeTuple START_STATE = make(CTRL, TypeMem.ANYMEM);
   public  static final TypeTuple EXIT_STATE = make(Type.SCALAR,TypeFunPtr.GENERIC_FUNPTR);
   public  static final TypeTuple  RET = make(CTRL, TypeMem.ALLMEM, ALL); // Type of RetNodes
   public  static final TypeTuple CALLE= make(CTRL, TypeMem.ALLMEM, ALL); // Type of CallEpiNodes
-  public  static final TypeTuple TEST0= make(CTRL, TypeMem.MEM  , TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
-  public  static final TypeTuple TEST1= make(CTRL, TypeMem.EMPTY, TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
+  public  static final TypeTuple TEST0= make(CTRL, TypeMem.ALLMEM, TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
+  public  static final TypeTuple TEST1= make(CTRL, TypeMem.ANYMEM, TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
   // Arguments
   public  static final TypeTuple NO_ARGS    = make_args();
   public  static final TypeTuple INT64      = make_args(TypeInt.INT64); // {int->flt}
   public  static final TypeTuple FLT64      = make_args(TypeFlt.FLT64); // {flt->flt}
-  public  static final TypeTuple STRPTR     = make_args(TypeMemPtr.STRPTR);
   public  static final TypeTuple INT64_INT64= make_args(TypeInt.INT64,TypeInt.INT64); // {int int->int }
   public  static final TypeTuple FLT64_FLT64= make_args(TypeFlt.FLT64,TypeFlt.FLT64); // {flt flt->flt }
   public  static final TypeTuple OOP_OOP    = make_args(TypeMemPtr.ISUSED0,TypeMemPtr.ISUSED0);
@@ -110,7 +109,7 @@ public class TypeTuple extends Type<TypeTuple> {
   //
   static final TypeTuple[] TYPES = new TypeTuple[]{
     CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE, TEST0, TEST1,
-    NO_ARGS, INT64, FLT64, STRPTR, INT64_INT64, FLT64_FLT64, OOP_OOP
+    NO_ARGS, INT64, FLT64, INT64_INT64, FLT64_FLT64, OOP_OOP
   };
 
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
@@ -188,18 +187,18 @@ public class TypeTuple extends Type<TypeTuple> {
     return make(ts);
   }
 
-  // True if isBitShape on all bits
-  @Override public byte isBitShape(Type t) {
-    if( isa(t) ) return 0; // Can choose compatible format
-    if( t instanceof TypeTuple ) {
-      TypeTuple tt = (TypeTuple)t;
-      if( tt._ts.length != _ts.length ) return 99;
-      byte x;
-      for( int i=0; i<_ts.length; i++ )
-        if( (x=_ts[i].isBitShape(tt._ts[i])) != 0 )
-          return x;
-      return 0;
-    }
-    return 99;
-  }
+  //// True if isBitShape on all bits
+  //@Override public byte isBitShape(Type t) {
+  //  if( isa(t) ) return 0; // Can choose compatible format
+  //  if( t instanceof TypeTuple ) {
+  //    TypeTuple tt = (TypeTuple)t;
+  //    if( tt._ts.length != _ts.length ) return 99;
+  //    byte x;
+  //    for( int i=0; i<_ts.length; i++ )
+  //      if( (x=_ts[i].isBitShape(tt._ts[i])) != 0 )
+  //        return x;
+  //    return 0;
+  //  }
+  //  return 99;
+  //}
 }

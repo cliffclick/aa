@@ -27,7 +27,7 @@ public abstract class Exec {
     AA.RSEED = rseed;
     AA.DO_GCP = do_gcp;
     AA.DO_HMT = do_hmt;
-    Env e = Env.FILE = new Env(top,null,false,top._scope.ctrl(),top._scope.mem(),top._scope.ptr(),null);
+    Env e = Env.FILE = new Env(top,null,false,top._scope.ctrl(),top._scope.mem(),top._scope.stk(),null);
 
     // Parse a program
     ErrMsg err = new Parse(src,false,e,str).prog();

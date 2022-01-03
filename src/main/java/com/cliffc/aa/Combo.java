@@ -247,9 +247,7 @@ public abstract class Combo {
     // recursively walk structures for nested functions
     if( flow instanceof TypeMemPtr ) {
       TypeMemPtr tmp = (TypeMemPtr)flow;
-      if( tmp._obj instanceof TypeStr ) return;
-      TypeStruct ts = ((TypeStruct)tmp._obj);
-      for( TypeFld fld : ts )
+      for( TypeFld fld : tmp._obj )
         _walk_root_funs(fld._t);
     }
 

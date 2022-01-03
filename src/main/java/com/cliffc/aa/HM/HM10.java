@@ -360,7 +360,8 @@ public class HM10 {
   private static Syntax string() {
     int start = ++X;
     while( X<BUF.length && BUF[X]!='"' ) X++;
-    return require('"', new Con(TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(new String(BUF,start,X-start).intern()))));
+    //return require('"', new Con(TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(new String(BUF,start,X-start).intern()))));
+    throw unimpl();
   }
   private static byte skipWS() {
     while(true) {
@@ -881,8 +882,7 @@ public class HM10 {
       // For Root, recursively walk structures
       if( flow instanceof TypeMemPtr ) {
         TypeMemPtr tmp = (TypeMemPtr)flow;
-        if( tmp._obj instanceof TypeStr ) return false;
-        TypeStruct ts = ((TypeStruct)tmp._obj);
+        TypeStruct ts = tmp._obj;
         for( TypeFld fld : ts )
           progress |= walk(fld._t,work);
         return progress;
@@ -960,7 +960,8 @@ public class HM10 {
           for( int fidx : fun._fidxs )
             rez = rez.meet(Lambda.FUNS.get(fidx).apply(FLOWS));
         Type rez2 = add_sig(rez);
-        return TypeFunSig.make(TypeStruct.EMPTY,rez2);
+        //return TypeFunSig.make(TypeStruct.EMPTY,rez2);
+        throw unimpl();
       } else {
         return t;
       }
@@ -977,7 +978,7 @@ public class HM10 {
       _ids=ids;
       _flds=flds;
       // Make a TMP
-      _alias = BitsAlias.new_alias(BitsAlias.REC);
+      _alias = BitsAlias.new_alias(BitsAlias.ALLX);
     }
     @Override SB str(SB sb) {
       sb.p("@{").p(_alias);
@@ -1107,8 +1108,7 @@ public class HM10 {
       if( trec instanceof TypeMemPtr ) {
         TypeMemPtr tmp = (TypeMemPtr)trec;
         if( tmp._obj instanceof TypeStruct ) {
-          TypeStruct tstr = (TypeStruct)tmp._obj;
-          TypeFld fld = tstr.get(_id);
+          TypeFld fld = tmp._obj.get(_id);
           if( fld!=null ) return fld._t; // Field type
         }
         if( tmp._obj.above_center() ) return Type.XSCALAR;
@@ -1133,12 +1133,12 @@ public class HM10 {
   abstract static class PrimSyn extends Lambda {
     static int PAIR_ALIAS, TRIPLE_ALIAS;
     static void reset() {
-      PAIR_ALIAS   = BitsAlias.new_alias(BitsAlias.REC);
-      TRIPLE_ALIAS = BitsAlias.new_alias(BitsAlias.REC);
+      PAIR_ALIAS   = BitsAlias.new_alias(BitsAlias.ALLX);
+      TRIPLE_ALIAS = BitsAlias.new_alias(BitsAlias.ALLX);
     }
     static T2 BOOL (){ return T2.make_base(TypeInt.BOOL); }
     static T2 INT64(){ return T2.make_base(TypeInt.INT64); }
-    static T2 STRP (){ return T2.make_base(TypeMemPtr.STRPTR); }
+    static T2 STRP (){ return null/*T2.make_base(TypeMemPtr.STRPTR)*/; }
     static T2 FLT64(){ return T2.make_base(TypeFlt.FLT64); }
     abstract String name();
     private static final String[][] IDS = new String[][] {
@@ -1294,10 +1294,11 @@ public class HM10 {
     @Override Type apply( Type[] flows) {
       Type pred = flows[0];
       if( pred.above_center() ) return TypeInt.BOOL.dual();
-      TypeObj to;
-      if( pred instanceof TypeMemPtr && (to=((TypeMemPtr)pred)._obj) instanceof TypeStr && to.is_con() )
-        return TypeInt.con(to.getstr().isEmpty() ? 1 : 0);
-      return TypeInt.BOOL;
+      //TypeObj to;
+      //if( pred instanceof TypeMemPtr && (to=((TypeMemPtr)pred)._obj) instanceof TypeStr && to.is_con() )
+      //  return TypeInt.con(to.getstr().isEmpty() ? 1 : 0);
+      //return TypeInt.BOOL;
+      throw unimpl();
     }
   }
 
@@ -1408,10 +1409,11 @@ public class HM10 {
     @Override PrimSyn make() { return new Str(); }
     @Override Type apply( Type[] flows) {
       Type i = flows[0];
-      if( i.above_center() ) return TypeMemPtr.STRPTR.dual();
-      if( i instanceof TypeInt && i.is_con() )
-        return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(String.valueOf(i.getl()).intern()));
-      return TypeMemPtr.STRPTR;
+      //if( i.above_center() ) return TypeMemPtr.STRPTR.dual();
+      //if( i instanceof TypeInt && i.is_con() )
+      //  return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(String.valueOf(i.getl()).intern()));
+      //return TypeMemPtr.STRPTR;
+      throw unimpl();
     }
   }
 
@@ -1631,7 +1633,7 @@ public class HM10 {
           // Returning a high version of struct
           if( !ROOT_FREEZE ) return Type.XNSCALR;
           Type.RECURSIVE_MEET++;
-          tstr = TypeStruct.malloc("",is_open(),false).add_fld(TypeFld.NO_DISP);
+          tstr = TypeStruct.malloc("",false).add_fld(TypeFld.NO_DISP);
           if( _args!=null )
             for( String id : _args.keySet() )
               tstr.add_fld(TypeFld.malloc(id));
@@ -2078,7 +2080,7 @@ public class HM10 {
     // monotonic because the result is JOINd with GCP types.
     Type walk_types_in(Type t) {     //noinspection UnusedReturnValue
       long duid = dbl_uid(t._uid);
-      if( WDUPS.putIfAbsent(duid,TypeStruct.ALLSTRUCT)!=null ) return t;
+      if( WDUPS.putIfAbsent(duid,TypeStruct.ISUSED)!=null ) return t;
       assert !unified();
       // Free variables keep the input flow type.
       // Bases can (sorta) act like a leaf: they can keep their polymorphic "shape" and induce it on the result
@@ -2109,7 +2111,7 @@ public class HM10 {
       if( !(t instanceof TypeMemPtr) ) return t.oob(Type.SCALAR);
       TypeMemPtr tmp = (TypeMemPtr)t;
       if( !(tmp._obj instanceof TypeStruct) ) return t.oob(Type.SCALAR);
-      TypeStruct ts = (TypeStruct)tmp._obj;
+      TypeStruct ts = tmp._obj;
       TypeFld fld = ts.get(id);
       if( fld==null ) return ts.oob(Type.SCALAR);
       return fld._t;
@@ -2159,7 +2161,7 @@ public class HM10 {
           for( int fidx : tfp._fidxs ) WBS.set(fidx);                // Guard against recursive functions
           Type tret = tfp._ret;
           Type trlift = arg("ret").walk_types_out(tret, jt, apply);
-          Type rez = TypeFunPtr.makex( tfp._fidxs,tfp.nargs(),tfp._dsp,trlift);
+          Type rez = TypeFunPtr.makex( tfp._fidxs,tfp.nargs(),tfp.dsp(),trlift);
           for( int fidx : tfp._fidxs ) WBS.clear(fidx); // Clear fidxs
           return rez;
         }
@@ -2171,13 +2173,13 @@ public class HM10 {
         if( !(t instanceof TypeMemPtr ) ) // Flow will not lift to a TMP->Struct?
           return t.must_nil() ? Type.SCALAR : Type.NSCALR;
         TypeMemPtr tmp = (TypeMemPtr)t;
-        TypeStruct ts0 = (TypeStruct)tmp._obj;
+        TypeStruct ts0 = tmp._obj;
         // Can be made to work above_center, but no sensible lifting so don't bother
         if( ts0.above_center() )  return Type.SCALAR;
         TypeStruct ts = WDUPS.get(_uid);
         if( ts != null ) return t; // Recursive, stop cycles
         Type.RECURSIVE_MEET++;
-        ts = TypeStruct.malloc("",false,false);
+        ts = TypeStruct.malloc("",false);
 
         // Add fields.  Common to both are easy, and will be walked (recursive,
         // cyclic).  Solo fields in GCP are kept, and lifted "as if" an HM

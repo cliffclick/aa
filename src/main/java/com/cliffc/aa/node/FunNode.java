@@ -74,8 +74,7 @@ public class FunNode extends RegionNode {
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
-  public FunNode(String name,           PrimNode prim) { this(name, prim._tfp.fidx(),prim._tfp.nargs()); }
-  public FunNode(String name,NewNode.NewPrimNode prim) { this(name, prim._tfp.fidx(),prim._tfp.nargs()); }
+  public FunNode(String name, PrimNode prim) { this(name, prim._tfp.fidx(),prim._tfp.nargs()); }
   // Used to start an anonymous function in the Parser
   public FunNode(int nargs) { this(null, nargs); }
   // Used to forward-decl anon functions
@@ -339,31 +338,34 @@ public class FunNode extends RegionNode {
     // Look for splitting to help a pointer from an unspecialized type
     Type tmem = parms[MEM_IDX]._val;
     if( tmem instanceof TypeMem ) {
-      boolean progress = false;
-      TypeStruct formals = TypeStruct.ALLSTRUCT;
-      for( int i=DSP_IDX; i<parms.length; i++ ) { // For all parms
-        if( i==DSP_IDX ) continue; // No split on the display
-        ParmNode parm = (ParmNode)parms[i];
-        if( parm == null ) continue;            // (some can be dead)
-        if( parm._val==Type.ALL ) return null;  // No split with error args
-        // Best possible type
-        Type tp = Type.ALL;
-        for( Node def : parm._defs )
-          if( def != this )
-            tp = tp.join(def._val);
-        formals = formals.add_fld(parm._name, TypeFld.Access.Final,tp,i);
-        if( !(tp instanceof TypeMemPtr) ) continue; // Not a pointer
-        TypeObj to = (TypeObj)((TypeMem)tmem).ld((TypeMemPtr)tp).widen(); //
-        // Are all the uses of parm compatible with this TMP?
-        // Also, flag all used fields.
-        if( bad_mem_use(parm, to) )
-          continue;               // So bad usage
+      //boolean progress = false;
+      //TypeStruct formals = TypeStruct.UNUSED;
+      //for( int i=DSP_IDX; i<parms.length; i++ ) { // For all parms
+      //  if( i==DSP_IDX ) continue; // No split on the display
+      //  ParmNode parm = (ParmNode)parms[i];
+      //  if( parm == null ) continue;            // (some can be dead)
+      //  if( parm._val==Type.ALL ) return null;  // No split with error args
+      //  // Best possible type
+      //  Type tp = Type.ALL;
+      //  for( Node def : parm._defs )
+      //    if( def != this )
+      //      tp = tp.join(def._val);
+      //  formals = formals.add_fld(parm._name, TypeFld.Access.Final,tp,i);
+      //  if( !(tp instanceof TypeMemPtr) ) continue; // Not a pointer
+      //  TypeObj to = (TypeObj)((TypeMem)tmem).ld((TypeMemPtr)tp).widen(); //
+      //  // Are all the uses of parm compatible with this TMP?
+      //  // Also, flag all used fields.
+      //  if( bad_mem_use(parm, to) )
+      //    continue;               // So bad usage
+      //
+      //  TypeMemPtr arg = TypeMemPtr.make(BitsAlias.FULL,to); // Signature takes any alias but has sharper guts
+      //  formals = formals.replace_fld(TypeFld.make(parm._name,arg,i));
+      //  progress = true;
+      //}
+      //if( progress ) return formals;
 
-        TypeMemPtr arg = TypeMemPtr.make(BitsAlias.FULL,to); // Signature takes any alias but has sharper guts
-        formals = formals.replace_fld(TypeFld.make(parm._name,arg,i));
-        progress = true;
-      }
-      if( progress ) return formals;
+      // Turn off type-splitting until we have a better heuristic
+      throw unimpl();
     }
 
     return null;
@@ -371,58 +373,59 @@ public class FunNode extends RegionNode {
 
   // Check all uses are compatible with sharpening to a pointer.
   // TODO: Really should be a virtual call
-  private static boolean bad_mem_use( Node n, TypeObj to) {
-    for( Node use : n._uses ) {
-      switch( use._op ) {
-      case OP_TYPE: return true; // Unoptimized arg assert check, no type splitting
-      case OP_NEWOBJ: break; // Field use is like store.value use
-      case OP_IF: break;     // Zero check is ok
-      case OP_CAST:          // Cast propagates check
-      case OP_FRESH:         // No value change
-        if( bad_mem_use(use, to) ) return true;
-        break;
-      case OP_LOAD:
-        if( !(to instanceof TypeStruct) ||
-            ((LoadNode)use).find((TypeStruct)to)== null )
-          return true;          // Did not find field
-        break;
-      case OP_STORE:
-        if( ((StoreNode)use).rez()==n) break; // Storing as value is ok
-        if( !(to instanceof TypeStruct) ||    // Address needs to find field
-            ((StoreNode)use).find((TypeStruct)to)== null )
-          return true;          // Did not find field
-        break;
-      case OP_CALL: break; // Argument pass-thru probably needs to check formals
-      case OP_RET: break;  // Return pass-thru should be ok
-      case OP_NEWSTR:
-        TypeStruct formals = ((NewStrNode)use)._formals;
-        Type formal = formals.fld_idx(use._defs.find(n))._t;
-        if( !TypeMemPtr.OOP0.dual().isa(formal) )
-          return true;
-        break;
-      case OP_NAME: break; // Pointer to a nameable struct
-      case OP_PRIM:
-        if( use instanceof PrimNode.EQ_OOP ) break;
-        if( use instanceof PrimNode.NE_OOP ) break;
-        if( use instanceof MemPrimNode.LValueLength ) break;
-        if( use instanceof MemPrimNode.LValueRead )
-          if( ((MemPrimNode)use).idx() == n ) return true; // Use as index is broken
-          else break;   // Use for array base is fine
-        if( use instanceof MemPrimNode.LValueWrite || use instanceof MemPrimNode.LValueWriteFinal )
-          if( ((MemPrimNode)use).idx() == n ) return true; // Use as index is broken
-          else break;   // Use for array base or value is fine
-        if( use instanceof PrimNode.AddF64 ) return true;
-        if( use instanceof PrimNode.AddI64 ) return true;
-        if( use instanceof PrimNode.MulF64 ) return true;
-        if( use instanceof PrimNode.MulI64 ) return true;
-        if( use instanceof PrimNode.AndI64 ) return true;
-        if( use instanceof PrimNode.EQ_F64 ) return true;
-        if( use instanceof PrimNode.EQ_I64 ) return true;
-        throw unimpl();
-      default: throw unimpl();
-      }
-    }
-    return false;
+  private static boolean bad_mem_use( Node n, TypeStruct to) {
+    //for( Node use : n._uses ) {
+    //  switch( use._op ) {
+    //  case OP_TYPE: return true; // Unoptimized arg assert check, no type splitting
+    //  case OP_NEWOBJ: break; // Field use is like store.value use
+    //  case OP_IF: break;     // Zero check is ok
+    //  case OP_CAST:          // Cast propagates check
+    //  case OP_FRESH:         // No value change
+    //    if( bad_mem_use(use, to) ) return true;
+    //    break;
+    //  case OP_LOAD:
+    //    if( !(to instanceof TypeStruct) ||
+    //        ((LoadNode)use).find((TypeStruct)to)== null )
+    //      return true;          // Did not find field
+    //    break;
+    //  case OP_STORE:
+    //    if( ((StoreNode)use).rez()==n) break; // Storing as value is ok
+    //    if( !(to instanceof TypeStruct) ||    // Address needs to find field
+    //        ((StoreNode)use).find((TypeStruct)to)== null )
+    //      return true;          // Did not find field
+    //    break;
+    //  case OP_CALL: break; // Argument pass-thru probably needs to check formals
+    //  case OP_RET: break;  // Return pass-thru should be ok
+    //  case OP_NEWSTR:
+    //    TypeStruct formals = ((NewStrNode)use)._formals;
+    //    Type formal = formals.fld_idx(use._defs.find(n))._t;
+    //    if( !TypeMemPtr.OOP0.dual().isa(formal) )
+    //      return true;
+    //    break;
+    //  case OP_NAME: break; // Pointer to a nameable struct
+    //  case OP_PRIM:
+    //    if( use instanceof PrimNode.EQ_OOP ) break;
+    //    if( use instanceof PrimNode.NE_OOP ) break;
+    //    if( use instanceof MemPrimNode.LValueLength ) break;
+    //    if( use instanceof MemPrimNode.LValueRead )
+    //      if( ((MemPrimNode)use).idx() == n ) return true; // Use as index is broken
+    //      else break;   // Use for array base is fine
+    //    if( use instanceof MemPrimNode.LValueWrite || use instanceof MemPrimNode.LValueWriteFinal )
+    //      if( ((MemPrimNode)use).idx() == n ) return true; // Use as index is broken
+    //      else break;   // Use for array base or value is fine
+    //    if( use instanceof PrimNode.AddF64 ) return true;
+    //    if( use instanceof PrimNode.AddI64 ) return true;
+    //    if( use instanceof PrimNode.MulF64 ) return true;
+    //    if( use instanceof PrimNode.MulI64 ) return true;
+    //    if( use instanceof PrimNode.AndI64 ) return true;
+    //    if( use instanceof PrimNode.EQ_F64 ) return true;
+    //    if( use instanceof PrimNode.EQ_I64 ) return true;
+    //    throw unimpl();
+    //  default: throw unimpl();
+    //  }
+    //}
+    //return false;
+    throw unimpl();
   }
 
 
@@ -540,8 +543,8 @@ public class FunNode extends RegionNode {
         cnts[OP_LOAD] > 4 ||
         cnts[OP_STORE]> 2 ||
         cnts[OP_PRIM] > 6 ||   // Allow small-ish primitive counts to inline
-        cnts[OP_NEWOBJ]>2 ||   // Display and return is OK
-        (cnts[OP_NEWOBJ]>1 && self_recursive) ||
+        cnts[OP_NEW]>2 ||      // Display and return is OK
+        (cnts[OP_NEW]>1 && self_recursive) ||
         call_indirect > 0 )
       return -1;
 
@@ -658,10 +661,8 @@ public class FunNode extends RegionNode {
       if( old_alias != -1 )       // Was a NewNode?
         aliases.set(old_alias);   // Record old alias before copy/split
       // Slightly better error message when cloning constructors
-      if( path > 0 ) {
-        if( n instanceof IntrinsicNode ) ((IntrinsicNode)c)._badargs = path_call._badargs[1];
-        if( n instanceof   MemPrimNode ) ((  MemPrimNode)c)._badargs = path_call._badargs;
-      }
+      if( path > 0 )
+        if( n instanceof MemPrimNode mpn ) mpn._badargs = path_call._badargs;
     }
 
     // Fill in edges.  New Nodes point to New instead of Old; everybody

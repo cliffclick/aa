@@ -39,37 +39,41 @@ import static com.cliffc.aa.type.TypeFld.Access;
  *  element... but when both types have looped, we can stop and the discovered
  *  cycle is the Meet's cycle.
  */
-public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<TypeFld> {
-  public boolean _open;   // Extra fields are treated as ALL (or ANY)
-  private short _max_arg; // Max field number
+public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<TypeFld> {
+  private boolean _any;         // True=choice/join/high; False=all/meet/low
+  
   // The fields indexed by field name.  Effectively final.
   private Ary<TypeFld> _flds;
   // Type is cyclic.  This is a summary property, not a part of the type, hence
   // is not in the equals nor hash.  Used to optimize non-cyclic access.
-  boolean _cyclic;
+  private boolean _cyclic;
+  // Max field order number.  This is a summary property not part of the type.
+  private short _max_arg; 
 
-  TypeStruct init( String name, boolean any, boolean open ) {
-    super.init(name, any, any);
-    _cyclic = false;
-    _open  = open;
+  TypeStruct init( String name, boolean any ) {
+    super.init(name);
+    _any = any;
     if( _flds==null ) _flds = new Ary<>(TypeFld.class);
     else _flds.clear();         // No leftover fields from pool
+    _cyclic = false;
     _max_arg = DSP_IDX;         // Min of the max
     return this;
   }
   // Shallow clone, not interned.  Fields are referenced, not cloned
   @Override TypeStruct copy() {
-    TypeStruct ts = _copy().init(_name,_any,_open);
+    TypeStruct ts = _copy().init(_name,_any);
     for( TypeFld fld : this ) ts.add_fld(fld);
     return ts;
   }
 
-  // Hash code computation.
+  // --------------------------------------------------------------------------
+  // Hash code computation and (cycle) Equals
+  
   // Fairly subtle, because the typical hash code is built up from the hashes of
   // its parts, but the parts are not available during construction of a cyclic type.
-  // We can count on the field names and accesses but not field order, nor field type.
+  // We can count on the field names and accesses but not field order nor type.
   @Override int static_hash() {
-    final int hash0 = (super.static_hash() + 0xcafebabe) ^ (_open?1023:0);
+    final int hash0 = (super.static_hash() + 0xcafebabe) ^ (_any?1023:0);
     int hash = hash0;
     for( TypeFld fld : this ) {
       // Can depend on the field name and access, but NOT the type - because recursion.
@@ -86,7 +90,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
   // Returns 1 for definitely equals, 0 for definitely unequals, and -1 if
   // needing the cyclic test.
   private int cmp( TypeStruct t ) {
-    if( !super.equals(t) || len() != t.len() || _open != t._open ) return 0;
+    if( !super.equals(t) || len() != t.len() || _any != t._any ) return 0;
     // All fields must be equals
     for( int i=0; i<_flds._len; i++ ) {
       TypeFld fld = _flds._es[i];     // Get in order
@@ -98,11 +102,10 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
     return 1;                   // Everything is equals, right now
   }
 
-
   // Static properties equals, no edges.  Already known to be the same class
   // and not-equals.  May-equal fields are treated as equals
   @Override boolean static_eq( TypeStruct t ) {
-    if( !super.equals(t) || len() != t.len() || _open != t._open ) return false;
+    if( !super.equals(t) || len() != t.len() || _any != t._any ) return false;
     for( int i=0; i<_flds._len; i++ ) {
       TypeFld fld1 = _flds._es[i];     // Get in order
       TypeFld fld2 = t.get(fld1._fld); // Get by name, not order
@@ -126,7 +129,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
     // cycle bit set.  Which means that if both bits are cleared, at least one
     // if these types is not cyclic, and a simple recursive-descent test works.
     if( !_cyclic && !t._cyclic ) {
-      if( !super.equals(t) || len() != t.len() || _open != t._open ) return false;
+      if( !super.equals(t) || len() != t.len() || _any != t._any ) return false;
       // All fields must be equals
       for( int i=0; i<_flds._len; i++ ) {
         TypeFld fld = _flds._es[i];     // Get in order
@@ -184,11 +187,14 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
     return true;
   }
 
+  // --------------------------------------------------------------------------
+  // Factories
+  
   // Unlike other types, TypeStruct might make cyclic types for which a
   // DAG-like bottom-up-remove-dups approach cannot work.
   static { new Pool(TSTRUCT,new TypeStruct()); }
-  public static TypeStruct malloc( String name, boolean any, boolean open ) {
-    return POOLS[TSTRUCT].<TypeStruct>malloc().init(name,any,open);
+  public static TypeStruct malloc( String name, boolean any ) {
+    return POOLS[TSTRUCT].<TypeStruct>malloc().init(name,any);
   }
   public TypeStruct hashcons_free() {
     // All subparts already interned
@@ -196,136 +202,145 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
     return super.hashcons_free();
   }
 
-  // Make a collection of fields, with no display and all with default names and final fields.
-  private static TypeStruct make0() { return malloc("",false,false); }
-  private TypeStruct add_arg(Type t, int n) { return add_fld(TypeFld.make_arg(t,n)); }
-  public static TypeStruct args(Type t1         ) { return make0().add_arg(t1,DSP_IDX)                    .hashcons_free(); }
-  public static TypeStruct args(Type t1, Type t2) { return make0().add_arg(t1,DSP_IDX).add_arg(t2,ARG_IDX).hashcons_free(); }
-  // Used by tests only, so ... is ok.
-  public static TypeStruct tups(Type... ts ) {
-    TypeStruct st = make0();
-    for( int i=0; i<ts.length; i++ )
-      st.add_fld(TypeFld.make_tup(ts[i],ARG_IDX+i));
-    return st.hashcons_free();
+  // Add a field to an under construction TypeStruct
+  public TypeStruct add_fld( TypeFld fld ) {
+    assert find(fld._fld)==-1;  // No accidental replacing
+    _flds.push(fld);
+    return this;
   }
-  public static TypeStruct tupsD(Type... ts ) {
-    TypeStruct st = make0();
-    st.add_fld(TypeFld.NO_DISP);
-    for( int i=0; i<ts.length; i++ )
-      st.add_fld(TypeFld.make_tup(ts[i],ARG_IDX+i));
-    return st.hashcons_free();
-  }
-
-  // Arys are used by the parser
-  public static TypeStruct make( String name, boolean any, boolean open, Ary<TypeFld> flds ) {
-    TypeStruct ts = malloc(name,any,open);
-    for( TypeFld fld : flds ) ts.add_fld(fld);
-    return ts.hashcons_free();
-  }
-  // Used to make a few testing constants
-  public static TypeStruct make( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a,ARG_IDX)); }
-  // Used to make a few (larger and recursive) testing constants.  Some of the
-  // fields are interned and some are recursive and without a type.
-  public static TypeStruct malloc( String name, boolean any, boolean open, TypeFld... flds ) {
-    TypeStruct ts = malloc(name,any,open);
-    for( TypeFld fld : flds ) ts.add_fld(fld);
-    return ts.set_hash();
-  }
-  public static TypeStruct mallocD( TypeFld... flds ) {
-    TypeStruct ts = malloc("",false,false);
-    ts.add_fld(TypeFld.NO_DISP);
-    for( TypeFld fld : flds ) ts.add_fld(fld);
-    return ts.set_hash();
+  
+  // Set/replace a field to an under construction TypeStruct
+  public TypeStruct set_fld( TypeFld fld ) {
+    assert un_interned();       // No mutation if interned
+    _flds.set(find(fld._fld),fld);
+    return this;
   }
 
   // Make using the fields, with no struct name, low and closed; typical for a
   // well-known structure.  Might auto-allocate a TypeFld[] - which is a
   // perf-hit in high usage points.  Typically used this way in tests.
-  public static TypeStruct make( TypeFld... flds ) { return make("",false,false,flds); }
-  public static TypeStruct make( String name, boolean any, boolean open, TypeFld... flds ) {
-    TypeStruct ts = malloc(name,any,open);
+  public static TypeStruct make( TypeFld... flds ) { return make("",false,flds); }
+  public static TypeStruct make( String name, boolean any, TypeFld... flds ) {
+    TypeStruct ts = malloc(name,any);
     for( TypeFld fld : flds ) ts.add_fld(fld);
     return ts.hashcons_free();
   }
-  // Without NO_DISP
-  public static TypeStruct make2flds( String f1, Type t1, String f2, Type t2 ) {
-    return make("",false,false,TypeFld.make(f1,t1,ARG_IDX),TypeFld.make(f2,t2,ARG_IDX+1));
+  // Arys are used by the parser
+  public static TypeStruct make( String name, boolean any, Ary<TypeFld> flds ) {
+    TypeStruct ts = malloc(name,any);
+    for( TypeFld fld : flds ) ts.add_fld(fld);
+    return ts.hashcons_free();
   }
-  // With NO_DISP
-  public static TypeStruct make2fldsD( String f1, Type t1, String f2, Type t2 ) {
-    return make("",false,false,TypeFld.NO_DISP,TypeFld.make(f1,t1,ARG_IDX),TypeFld.make(f2,t2,ARG_IDX+1));
-  }
+  
+  // Make a collection of fields, with no display and all with default names and final fields.
+  private static TypeStruct _malloc() { return malloc("",false); }
+  private TypeStruct add_arg(Type t, int n) { return add_fld(TypeFld.make_arg(t,n)); }
+  public static TypeStruct args(Type t1         ) { return _malloc().add_arg(t1,DSP_IDX)                    .hashcons_free(); }
+  public static TypeStruct args(Type t1, Type t2) { return _malloc().add_arg(t1,DSP_IDX).add_arg(t2,ARG_IDX).hashcons_free(); }
+  //// Used by tests only, so ... is ok.
+  //public static TypeStruct tups(Type... ts ) {
+  //  TypeStruct st = make0();
+  //  for( int i=0; i<ts.length; i++ )
+  //    st.add_fld(TypeFld.make_tup(ts[i],ARG_IDX+i));
+  //  return st.hashcons_free();
+  //}
 
+  // Used to make a few testing constants
+  public static TypeStruct make_test( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a,ARG_IDX)); }
+  
   // Add fields from a Type[].  Will auto-allocate the Type[], if not already
   // allocated - which is a perf-hit in high usage points.  Typically used this
   // way in tests.
-  public static TypeStruct maket( Type... ts ) { return make("",false,false,ts); }
-  public static TypeStruct make( String name, boolean any, boolean open, Type... ts ) {
-    TypeStruct st = malloc(name,any,open);
+  public static TypeStruct make_test( Type... ts ) { return make_test("",ts); }
+  public static TypeStruct make_test( String name, Type... ts ) {
+    TypeStruct st = malloc(name,false);
     st.add_fld(TypeFld.NO_DISP);
     for( int i=0; i<ts.length; i++ )
       st.add_fld(TypeFld.make_tup(ts[i],ARG_IDX+i));
     return st.hashcons_free();
   }
+  // Make 2 fields directly
+  public static TypeStruct make_test( String f1, Type t1, String f2, Type t2 ) {
+    return TypeStruct.make("",false,TypeFld.make(f1,t1,ARG_IDX),TypeFld.make(f2,t2,ARG_IDX+1));
+  }
 
-  // Keep the fields but change name,any,open
-  public TypeStruct make_from(String name, boolean any, boolean open ) {
-    assert interned();
-    TypeStruct ts = malloc(name,any,open);
-    for( TypeFld fld : this ) ts.add_fld(fld);
-    return ts.hashcons_free();
-  }
-  // Keep the name,any,open but change the fields
-  public TypeStruct make_from(TypeStruct ts ) {
-    assert interned() && ts.interned();
-    TypeStruct st = malloc(_name,_any,_open);
-    for( TypeFld fld : ts ) st.add_fld(fld);
-    return st.hashcons_free();
-  }
-  // Make a named TypeStruct from an unnamed one
-  public TypeStruct make_from( String name ) { return make_from(name,_any,_open);  }
-  // Used by NewObj
-  public TypeStruct make_from( Ary<TypeFld> flds ) {
-    TypeStruct ts = malloc(_name,_any,_open);
+  
+  // Used to make a few (larger and recursive) testing constants.  Some of the
+  // fields are interned and some are recursive and without a type.
+  public static TypeStruct malloc_test( TypeFld... flds ) { return malloc_test("",flds); }
+  public static TypeStruct malloc_test( String name, TypeFld... flds ) {
+    TypeStruct ts = malloc(name,false);
     for( TypeFld fld : flds ) ts.add_fld(fld);
-    return ts.hashcons_free();
+    return ts.set_hash();
   }
+  //public static TypeStruct mallocD( TypeFld... flds ) {
+  //  TypeStruct ts = malloc("",false);
+  //  ts.add_fld(TypeFld.NO_DISP);
+  //  for( TypeFld fld : flds ) ts.add_fld(fld);
+  //  return ts.set_hash();
+  //}
+  //
+  //// Without NO_DISP
+  //public static TypeStruct make2flds( String f1, Type t1, String f2, Type t2 ) {
+  //  return make("",false,false,TypeFld.make(f1,t1,ARG_IDX),TypeFld.make(f2,t2,ARG_IDX+1));
+  //}
+  //// With NO_DISP
+  //public static TypeStruct make2fldsD( String f1, Type t1, String f2, Type t2 ) {
+  //  return make("",false,false,TypeFld.NO_DISP,TypeFld.make(f1,t1,ARG_IDX),TypeFld.make(f2,t2,ARG_IDX+1));
+  //}
+
+  //// Keep the fields but change name,any,open
+  //public TypeStruct make_from(String name, boolean any, boolean open ) {
+  //  assert interned();
+  //  TypeStruct ts = malloc(name,any,open);
+  //  for( TypeFld fld : this ) ts.add_fld(fld);
+  //  return ts.hashcons_free();
+  //}
+  //// Keep the name,any,open but change the fields
+  //public TypeStruct make_from(TypeStruct ts ) {
+  //  assert interned() && ts.interned();
+  //  TypeStruct st = malloc(_name,_any);
+  //  for( TypeFld fld : ts ) st.add_fld(fld);
+  //  return st.hashcons_free();
+  //}
+  //// Make a named TypeStruct from an unnamed one
+  //public TypeStruct make_from( String name ) { return make_from(name,_any);  }
+  //// Used by NewObj
+  //public TypeStruct make_from( Ary<TypeFld> flds ) {
+  //  TypeStruct ts = malloc(_name,_any);
+  //  for( TypeFld fld : flds ) ts.add_fld(fld);
+  //  return ts.hashcons_free();
+  //}
 
 
-  // Make an "open" struct with an initial display field.
-  public static TypeStruct open(Type tdisp) { return make("",false,true,TypeFld.make_arg(tdisp,DSP_IDX)); }
-  // Make a closed struct from an open one
-  public TypeStruct close() { assert _open; return make_from(_name,_any,false); } // Mark as no-more-fields
-
-  // Add a field to an open, under construction TypeStruct
-  public TypeStruct add_fld( TypeFld fld ) {
-    TypeFld old = put(fld);
-    assert old==null && _hash==0; // No accidental replacing
-    return this;
-  }
-  // Set/replace a field to an open, under construction TypeStruct
-  public TypeStruct set_fld( TypeFld fld ) {
-    TypeFld old = put(fld);
-    assert un_interned() && old!=null; // No accidental adding
-    //if( old._hash==0 ) old.free(); // TODO
-    return this;
-  }
+  //// Make an "open" struct with an initial display field.
+  //public static TypeStruct open(Type tdisp) { return make("",false,true,TypeFld.make_arg(tdisp,DSP_IDX)); }
+  //// Make a closed struct from an open one
+  //public TypeStruct close() { assert _open; return make_from(_name,_any,false); } // Mark as no-more-fields
 
 
   public int nargs() { return _max_arg+1; }
 
-  // The lattice extreme values
-  public  static final TypeStruct ANYSTRUCT = make("",true ,false);
-  public  static final TypeStruct ALLSTRUCT = make("",false,true );
+  // The lattice extreme values.
+  
+  // Possibly allocated.  No fields specified.  All fields are possible and
+  // might be ALL (error).  The worst possible result.
+  public static final TypeStruct ISUSED = make("",false);
+  // Unused by anybody, perhaps not even allocated.  No fields specified.
+  // All fields are available as ANY.
+  public static final TypeStruct UNUSED = ISUSED.dual();
 
+  // Types for Liveness in slot 0 of TypeMem
+  public static final TypeStruct ALIVE = ISUSED, DEAD = UNUSED, LNO_DISP = null;
+  
   // A bunch of types for tests
   public  static final TypeStruct POINT = args(TypeFlt.FLT64,TypeFlt.FLT64);
-  public  static final TypeStruct NAMEPT= POINT.make_from("Point:",false,false);
-  public  static final TypeStruct A     = make("a",TypeFlt.FLT64,Access.Final);
-  private static final TypeStruct C0    = make("c",TypeInt.FALSE,Access.Final); // @{c:0}
-  private static final TypeStruct D1    = make("d",TypeInt.TRUE ,Access.Final); // @{d:1}
-  public  static final TypeStruct ARW   = make("a",TypeFlt.FLT64,Access.RW   );
-  public  static final TypeStruct EMPTY = make0().hashcons_free();
+  public  static final TypeStruct NAMEPT= POINT.set_name("Point:");
+  public  static final TypeStruct A     = make_test("a",TypeFlt.FLT64,Access.Final);
+  private static final TypeStruct C0    = make_test("c",TypeInt.FALSE,Access.Final); // @{c:0}
+  private static final TypeStruct D1    = make_test("d",TypeInt.TRUE ,Access.Final); // @{d:1}
+  public  static final TypeStruct ARW   = make_test("a",TypeFlt.FLT64,Access.RW   );
+  public  static final TypeStruct EMPTY = make();
   public  static final TypeStruct FLT64 = args(TypeFlt.FLT64);     // { flt -> }
   public  static final TypeStruct INT64 = args(TypeInt.INT64);     // { int -> }
   public  static final TypeStruct SCALAR1=args(SCALAR);            // { scalar -> }
@@ -333,11 +348,11 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
   public  static final TypeStruct FLT64_FLT64= args(TypeFlt.FLT64,TypeFlt.FLT64); // { flt flt -> }
 
   // Pile of sample structs for testing
-  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,POINT,NAMEPT,A,C0,D1,ARW,INT64_INT64,SCALAR1};
+  static final TypeStruct[] TYPES = new TypeStruct[]{ISUSED,POINT,NAMEPT,A,C0,D1,ARW,INT64_INT64,SCALAR1};
 
   // Dual the flds, dual the tuple.  Return a not-interned thing.
   @Override protected TypeStruct xdual() {
-    TypeStruct ts = malloc(_name,!_any,!_open);
+    TypeStruct ts = malloc(_name,!_any);
     for( TypeFld fld : this ) ts.add_fld(fld.dual());
     return ts;
   }
@@ -347,7 +362,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
     assert _hash == compute_hash();
     if( _dual != null ) return _dual;
     assert !interned();
-    TypeStruct dual = _dual = malloc(_name,!_any,!_open);
+    TypeStruct dual = _dual = malloc(_name,!_any);
     dual._dual = this;          // Stop the recursion
     dual._cyclic = _cyclic;     // Only here for recursive structs
     // Have to add the fields first, then set the hash, then loop over the fields recursing.
@@ -373,10 +388,6 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTRUCT:break;
-    case TARY:
-    case TSTR:   return OBJ;
-    case TOBJ:   return t.xmeet(this);
-    case TFUNSIG:
     case TFLT:
     case TINT:
     case TTUPLE :
@@ -410,7 +421,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
   // high copies of all fields.  Do not (yet) recursive meet the types.
   // This code is common to both the normal and recursive meet codes.
   private TypeStruct ymeet( TypeStruct that, boolean cyclic ) {
-    TypeStruct ts = malloc("",_any&that._any,_open|that._open);
+    TypeStruct ts = malloc("",_any&that._any);
     // Fields in both
     for( TypeFld fld : this ) {
       TypeFld tfld = that.get(fld._fld);
@@ -504,7 +515,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
   // Shallow clone, not interned.  Fields are also cloned, but not deeper.
   private TypeStruct _clone() {
     assert interned();
-    TypeStruct ts = malloc(_name,_any,_open);
+    TypeStruct ts = malloc(_name,_any);
     for( TypeFld fld : this )
       ts.add_fld(fld.malloc_from()); // Shallow field clone
     return ts;
@@ -543,7 +554,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
 
   private static final IHashMap OLD2APX = new IHashMap();
   private static final Ary<TypeMemPtr> CUTOFFS = new Ary<>(TypeMemPtr.class);
-  public TypeObj approx1( int cutoff, BitsAlias aliases ) {
+  public TypeStruct approx1( int cutoff, BitsAlias aliases ) {
     // Fast-path cutout for boring structs
     boolean shallow=true;
     for( TypeFld fld : this )
@@ -569,8 +580,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
       // original aliases do not
       BitsAlias aliases2 = apxptr._aliases;
       // Remove any leftover internal duplication.
-      TypeObj rez = apxptr._obj;
-      if( rez instanceof TypeStruct ) rez = ((TypeStruct)rez).install();
+      TypeStruct rez = apxptr._obj.install();
       assert this.isa(rez);
       ptr = TypeMemPtr.make(aliases2,rez);
     }
@@ -625,14 +635,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
     // Walk internal structure, meeting into the approximation
     TypeMemPtr nmp = old.copy();
     OLD2APX.put(old,nmp);
-    if( old._obj instanceof TypeStruct )
-      nmp._obj = ax_impl_struct(aliases, cutoff,d,dold,(TypeStruct)old._obj);
-    else if( old._obj == TypeObj.XOBJ || old._obj==nmp._obj )
-      ; // No change to nmp._obj
-    else if( old._obj == TypeObj.OBJ )
-      nmp._obj = TypeObj.OBJ;   // Falls hard
-    else
-      throw unimpl();
+    nmp._obj = ax_impl_struct(aliases, cutoff,d,dold,old._obj);
     if( news && d==cutoff ) {
       while( !CUTOFFS.isEmpty() ) { // At depth limit, meet with cutoff to make the approximation
         Type mt = ax_meet(new BitSetSparse(), nmp, CUTOFFS.pop());
@@ -650,11 +653,11 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
     // folding up.  Otherwise unrelated types might expand endlessly.
     TypeFunPtr nt = OLD2APX.get(old);
     if( nt != null ) return nt;
-    if( old._dsp!=Type.ANY && old._dsp!=ALL ) {
+    if( old.dsp()!=Type.ANY && old.dsp()!=ALL ) {
       // Walk internal structure, meeting into the approximation
       nt = old.copy();
       OLD2APX.put(old,nt);
-      nt._dsp = ax_impl_ptr(aliases,cutoff,d,dold,(TypeMemPtr)old._dsp);
+      nt.set_dsp(ax_impl_ptr(aliases,cutoff,d,dold,(TypeMemPtr)old.dsp()));
       OLD2APX.put(old,null);      // Do not keep sharing the "tails"
     }
     if( old._ret instanceof TypeMemPtr || old._ret instanceof TypeFunPtr ) {
@@ -700,8 +703,8 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
       TypeFunPtr optr = (TypeFunPtr)old;
       nptr._fidxs = nptr._fidxs.meet(optr._fidxs);
       // While structs normally meet, function args *join*, although the return still meets.
-      nptr._dsp = ax_meet(bs,nptr._dsp,optr._dsp);
-      nptr._ret = ax_meet(bs,nptr._ret,optr._ret);
+      nptr.set_dsp(ax_meet(bs,nptr.dsp(),optr.dsp()));
+      nptr._ret  = ax_meet(bs,nptr._ret ,optr._ret ) ;
       break;
     }
     case TMEMPTR: {
@@ -715,19 +718,13 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
       }
       TypeMemPtr optr = (TypeMemPtr)old;
       nptr._aliases = nptr._aliases.meet(optr._aliases);
-      nptr._obj = (TypeObj)ax_meet(bs,nptr._obj,optr._obj);
+      nptr._obj = (TypeStruct)ax_meet(bs,nptr._obj,optr._obj);
       break;
     }
-    case TSTRUCT:
-      if( old._type==TOBJ ) {
-        if( !old.above_center() ) nt=old;  // nt becomes old
-        break;  // No changes, take nt as it is
-      }
-      if( !(old instanceof TypeStruct) ) throw AA.unimpl();
+    case TSTRUCT: {
       TypeStruct ots = (TypeStruct)old, nts = (TypeStruct)nt;
       // Meet all the non-recursive parts
-      nts._any &= ots._any ;  nts._use = nts._any;
-      nts._open|= ots._open;
+      nts._any &= ots._any;
       for( TypeFld ofld : ots ) {
         TypeFld nfld = nts.get(ofld._fld);
         if( nfld == null ) {
@@ -748,6 +745,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
           nfld.setX(ax_meet(bs,nfld._t,ofld._t));
       }
       break;
+    }
     default: throw AA.unimpl();
     }
     return nt;
@@ -799,17 +797,17 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
     axmap.put(t,c = t.copy());
     //((Cyclic)c).walk_update(fld -> _apx(fcutoff,aliases,fld));
     // Recursively apply
-    switch( c ) {
-    case TypeMemPtr tmp -> tmp._obj = (TypeObj)_apx(cutoff,aliases,tmp._obj);
-    case TypeFld fld    -> fld._t = _apx(cutoff,aliases,fld._t);
-    case TypeStruct ts  -> {
+    switch( c._type ) {
+    case TMEMPTR: ((TypeMemPtr)c)._obj = (TypeStruct)_apx(cutoff,aliases,((TypeMemPtr)c)._obj ) ; break;
+    case TFLD:    ((TypeFld   )c)._t   =             _apx(cutoff,aliases,((TypeFld   )c)._t   ) ; break;
+    case TFUNPTR: ((TypeFunPtr)c).set_dsp(           _apx(cutoff,aliases,((TypeFunPtr)c).dsp()));
+                  ((TypeFunPtr)c)._ret =             _apx(cutoff,aliases,((TypeFunPtr)c)._ret ) ; break;
+    case TSTRUCT: {
+      TypeStruct ts = (TypeStruct)c;
       for( int i=0; i<ts._flds._len; i++ ) ts._flds._es[i] = (TypeFld)_apx(cutoff,aliases,ts._flds._es[i]);
+      break;
     }
-    case TypeFunPtr tfp -> {
-      tfp._dsp = _apx(cutoff,aliases,tfp._dsp);
-      tfp._ret = _apx(cutoff,aliases,tfp._ret);
-    }
-    default -> throw unimpl();
+    default: throw unimpl();
     }
     return c;
   }
@@ -836,7 +834,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
     if( dull_cache.isEmpty() )
       return sharp;
     // On exit, cyclic-intern all cyclic things; remove from dull cache.
-    TypeStruct mt = ((TypeStruct)sharp._obj).install();
+    TypeStruct mt = sharp._obj.install();
     sharp = sharp.make_from(mt);
     return mem.sharput(dull,sharp);
   }
@@ -856,14 +854,14 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
     if( dull==TypeMemPtr.NO_DISP || dull==TypeMemPtr.NO_DISP.dual() ) { mem.sharput(dull,dull); return; }
     // Walk and meet "dull" fields; all TMPs will point to ISUSED (hence are dull).
     boolean any = dull._aliases.above_center();
-    Type t = any ? TypeObj.ISUSED : TypeObj.UNUSED;
+    Type t = any ? ISUSED : UNUSED;
     for( int alias : dull._aliases )
       if( alias != 0 )
         for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) ) {
-          TypeObj x = mem.at(kid);
+          TypeStruct x = mem.at(kid);
           t = any ? t.join(x) : t.meet(x);
         }
-    TypeMemPtr dptr = dull.make_from((TypeObj)t);
+    TypeMemPtr dptr = dull.make_from((TypeStruct)t);
     if( _is_sharp(t) ) {        // If sharp, install and return
       mem.sharput(dull,dptr);
       return;
@@ -874,7 +872,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
     // Visit all dull pointers and recursively collect
     for( TypeFld fld : ((TypeStruct)t) ) {
       Type tt = fld._t;
-      if( tt instanceof TypeFunPtr ) tt = ((TypeFunPtr)tt)._dsp; //TODO Handle ret also?
+      if( tt instanceof TypeFunPtr ) tt = ((TypeFunPtr)tt).dsp(); //TODO Handle ret also?
       if( tt instanceof TypeMemPtr )
         _dull(mem,(TypeMemPtr)tt,dull_cache);
     }
@@ -888,7 +886,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
       assert fld.interned()==tt.interned();
       if( !tt.interned() ||     // Not interned internal, then this is not finished
           (tt instanceof TypeMemPtr && // Or has internal dull pointers
-           ((TypeMemPtr)tt)._obj == TypeObj.ISUSED) )
+           ((TypeMemPtr)tt)._obj == ISUSED) )
         return false;
     }
     return true;
@@ -910,7 +908,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
     if( !dptr.interned() )      // Closed a cycle
       return dptr; // Not-yet-sharp and not interned; return the work-in-progress
     // Copy, replace dull with not-interned dull clone.  Fields are also cloned, not interned.
-    TypeStruct dts2 = ((TypeStruct)dptr._obj)._clone().set_hash();
+    TypeStruct dts2 = dptr._obj._clone().set_hash();
     TypeMemPtr dptr2 = dptr.copy();
     dptr2._obj = dts2;
     dull_cache.put(dull._aliases,dptr2);
@@ -921,8 +919,8 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
       if( fld._t instanceof TypeFunPtr ) {
         TypeFunPtr tf = (TypeFunPtr) fld._t;
         // TODO: Sharpen ret as well
-        if( tf._dsp instanceof TypeMemPtr ) { // Need  a pointer to sharpen
-          TypeMemPtr dptr3 = _sharp(mem, (TypeMemPtr) tf._dsp, dull_cache);
+        if( tf.dsp() instanceof TypeMemPtr ) { // Need  a pointer to sharpen
+          TypeMemPtr dptr3 = _sharp(mem, (TypeMemPtr) tf.dsp(), dull_cache);
           fld.setX(dptr3.interned()             // Sharp return?
                    ? tf.make_from(dptr3)        // Make sharp TFP field
                    : tf._sharpen_clone(dptr3)); // Make dull  TFP field
@@ -943,7 +941,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
   }
 
   @Override public TypeStruct simple_ptr() {
-    TypeStruct ts = malloc(_name,_any,_open);
+    TypeStruct ts = malloc(_name,_any);
     for( TypeFld fld : this ) {
       Type t = fld._t.simple_ptr();
       ts.add_fld(t==fld._t ? fld : fld.make_from(t));
@@ -1026,8 +1024,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
         sb.p(is_tup ? ", " : "; "); // Between fields
         field_sep=true;
       }
-      if( _open ) sb.p("...");    // More fields allowed
-      else if( field_sep ) sb.unchar().unchar();
+      if( field_sep ) sb.unchar().unchar();
     }
     sb.p(!is_tup ? "}" : ")");
     return sb;
@@ -1054,7 +1051,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
   public TypeStruct add_fld( String name, Access mutable, int order ) { return add_fld(name,mutable,Type.SCALAR,order); }
   public TypeStruct add_fld( String name, Access mutable, Type tfld, int order ) {
     assert name==null || Util.eq(name,TypeFld.fldBot) || get(name)==null;
-    assert !_any && _open;
+    assert !_any;
     TypeStruct ts = copy();
     ts.add_fld(TypeFld.make(name,tfld,mutable,order));
     return ts.hashcons_free();
@@ -1072,7 +1069,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
   }
 
   // Update (approximately) the current TypeObj.  Updates the named field.
-  @Override public TypeStruct update(Access fin, String fld, Type val) { return update(fin,fld,val,false); }
+  public TypeStruct update(Access fin, String fld, Type val) { return update(fin,fld,val,false); }
 
   TypeStruct update(Access fin, String name, Type val, boolean precise) {
     TypeFld fld = get(name);
@@ -1086,8 +1083,8 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
     return replace_fld(fld.make_from(pval,pfin));
   }
 
-  @Override public TypeObj flatten_fields() {
-    TypeStruct ts = malloc(_name,_any,_open);
+  public TypeStruct flatten_fields() {
+    TypeStruct ts = malloc(_name,_any);
     for( TypeFld fld : this )
       ts.add_fld(fld.make_from(fld._t==Type.XSCALAR||fld._t==Type.ANY ? Type.XSCALAR : Type.SCALAR,Access.bot()));
     return ts.hashcons_free();
@@ -1095,7 +1092,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
 
   // Used during liveness propagation from Loads.
   // Fields not-loaded are not-live.
-  @Override TypeObj remove_other_flds(String name, Type live) {
+  TypeStruct remove_other_flds(String name, Type live) {
     TypeFld nfld = get(name);
     if( nfld == null ) return UNUSED; // No such field, so all fields will be XSCALAR so UNUSED instead
     TypeStruct ts = _clone();
@@ -1107,9 +1104,9 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
   // Widen (lose info), to make it suitable as the default function memory.
   // All fields are widened to ALL (assuming a future error Store); field flags
   // set to bottom; only the field names are kept.
-  @Override public TypeStruct crush() {
+  public TypeStruct crush() {
     if( _any ) return this;     // No crush on high structs
-    TypeStruct st = malloc(_name,false,_open);
+    TypeStruct st = malloc(_name,false);
     // Widen all fields, as-if crushed by errors, even finals.
     for( TypeFld fld : this )
       // Keep only the display pointer, as it cannot be stomped even with error code
@@ -1119,11 +1116,11 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
 
   // Keep field names and orders.  Widen all field contents, including finals.
   // Handles cycles
-  @Override TypeObj _widen() {
+  @Override TypeStruct _widen() {
     TypeStruct ts = WIDEN_HASH.get(_uid);
     if( ts!=null ) { ts._cyclic=true; return ts; }
     RECURSIVE_MEET++;
-    ts = malloc(_name,_any,_open);
+    ts = malloc(_name,_any);
     WIDEN_HASH.put(_uid,ts);
     for( TypeFld fld : this ) ts.add_fld(fld.malloc_from());
     ts.set_hash();
@@ -1138,7 +1135,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
     TypeStruct ts = WIDEN_HASH.get(_uid);
     if( ts!=null ) { ts._cyclic=true; return ts; }
     RECURSIVE_MEET++;
-    ts = malloc(_name,_any,_open);
+    ts = malloc(_name,_any);
     WIDEN_HASH.put(_uid,ts);
     for( TypeFld fld : this ) ts.add_fld(fld.malloc_from());
     ts.set_hash();
@@ -1157,12 +1154,13 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
   }
 
 
-  // True if isBitShape on all bits
-  @Override public byte isBitShape(Type t) {
-    if( isa(t) ) return 0; // Can choose compatible format
-    if( t.isa(this) ) return 0; // TODO: really: test same flds, each fld isBitShape
-    return 99;
-  }
+  //// True if isBitShape on all bits
+  //@Override public byte isBitShape(Type t) {
+  //  if( isa(t) ) return 0; // Can choose compatible format
+  //  if( t.isa(this) ) return 0; // TODO: really: test same flds, each fld isBitShape
+  //  return 99;
+  //}
+  @Override public boolean above_center() { return _any; }
 
   @Override public Type meet_nil(Type nil) { return this; }
 
@@ -1181,7 +1179,7 @@ public class TypeStruct extends TypeObj<TypeStruct> implements Cyclic, Iterable<
   // Make a Type, replacing all dull pointers from the matching types in mem.
   @Override public TypeStruct make_from(Type head, TypeMem mem, VBitSet visit) {
     if( visit.tset(_uid) ) return null;
-    TypeStruct ts = malloc(_name,_any,_open);
+    TypeStruct ts = malloc(_name,_any);
     for( TypeFld fld : this )
       ts.add_fld(fld.make_from(head,mem,visit));
     return ts.hashcons_free();

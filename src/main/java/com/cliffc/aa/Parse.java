@@ -294,22 +294,24 @@ public class Parse implements Comparable<Parse> {
     Node newtype = peek("@{") ? struct(typenode) : fact();
     if( newtype==null ) return err_ctrl2("Missing type after ':'");
     if( peek('?')     ) return err_ctrl2("Named types are never nil");
-    assert is_val || (newtype instanceof ProjNode && newtype.in(0) instanceof NewObjNode); // Ref types are only structs
-
-    // Build a constructor
-    if( newtype instanceof ProjNode && newtype.in(0) instanceof NewObjNode ) {
-      if( is_val ) construct.add_fun((ValFunNode)gvn(ValNode.make(newtype)));
-      else         throw unimpl();         // Reference type
-      assert  ((MrgProjNode)mem()).nnn()==newtype.in(0);
-      set_mem(((MrgProjNode)mem()).mem()); // Unlink prototype from mem; its just around for loading constants
-      return construct.define();
-
-    } else {
-      // Other types?  e.g. defining a named function-type needs a breakdown of
-      // the returned function to make a TypeFunSig.  No constructor in this
-      // case, but can be used in type-checks.
-      throw unimpl();
-    }
+    // TODO: pattern changes, returns NewNode directly and updates MrgProjNode
+    //assert is_val || (newtype instanceof ProjNode && newtype.in(0) instanceof NewObjNode); // Ref types are only structs
+    //
+    //// Build a constructor
+    //if( newtype instanceof ProjNode && newtype.in(0) instanceof NewObjNode ) {
+    //  if( is_val ) construct.add_fun((ValFunNode)gvn(ValNode.make(newtype)));
+    //  else         throw unimpl();         // Reference type
+    //  assert  ((MrgProjNode)mem()).nnn()==newtype.in(0);
+    //  set_mem(((MrgProjNode)mem()).mem()); // Unlink prototype from mem; its just around for loading constants
+    //  return construct.define();
+    //
+    //} else {
+    //  // Other types?  e.g. defining a named function-type needs a breakdown of
+    //  // the returned function to make a TypeFunSig.  No constructor in this
+    //  // case, but can be used in type-checks.
+    //  throw unimpl();
+    //}
+    throw unimpl();
   }
 
   /** A statement is a list of variables to final-assign or re-assign, and an
@@ -414,20 +416,18 @@ public class Parse implements Comparable<Parse> {
     final int iidx = ifex.push();
     // Find scope for token.  If not defining struct fields, look for any
     // prior def.  If defining a struct, tokens define a new field in this scope.
-    if( scope==null ) {               // Token not already bound at any scope
-      scope = scope();                // Scope is the current one
-      scope.stk().create(tok,Env.XNIL,Access.RW,t,badt); // Create at top of scope as undefined
+    boolean create = scope==null;
+    if( create ) {              // Token not already bound at any scope
+      scope = scope();          // Create in the current scope
+      TypeFld fld = TypeFld.make(tok,t,Access.RW,scope.stk().len());
+      scope.stk().add_fld(fld,Env.XNIL,badf); // Create at top of scope as undefined
       scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
-      Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
-      StoreNode st = new StoreNode(mem(),ptr,Node.peek(iidx),mutable,tok,badf);
-      scope().replace_mem(st);
-      return Node.pop(iidx);
     }
-    // Store into scope/NewObjNode/display
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
     StoreNode st = new StoreNode(mem(),ptr,Node.peek(iidx),mutable,tok,badf);
     scope().replace_mem(st);
-    scope.def_if(tok,mutable,false); // Note 1-side-of-if update
+    if( !create )               // Note 1-side-of-if update
+      scope.def_if(tok,mutable,false); 
     return Node.pop(iidx);
   }
 
@@ -472,8 +472,8 @@ public class Parse implements Comparable<Parse> {
     _gvn.add_reduce(f_ctrl);
     if( t_ctrl._val==Type.XCTRL ) _gvn.add_flow(t_mem);
     if( f_ctrl._val==Type.XCTRL ) _gvn.add_flow(f_mem);
-    set_mem(   gvn(new PhiNode(TypeMem.FULL,bad,r        ,t_mem.unkeep(2),f_mem.unkeep(2))));
-    Node rez = gvn(new PhiNode(Type.SCALAR ,bad,r.unkeep(2),tex.unkeep(2),  fex.unkeep(2))) ; // Ifex result
+    set_mem(   gvn(new PhiNode(TypeMem.ALLMEM,bad,r        ,t_mem.unkeep(2),f_mem.unkeep(2))));
+    Node rez = gvn(new PhiNode(Type.SCALAR   ,bad,r.unkeep(2),tex.unkeep(2),  fex.unkeep(2))) ; // Ifex result
     _gvn.add_work_new(r);
     return rez;
   }
@@ -559,7 +559,7 @@ public class Parse implements Comparable<Parse> {
   // thunk).
   private Node _short_circuit_expr(Node lhs, int prec, String bintok, Node op, int opx, int lhsx, int rhsx) {
     // Capture state so we can unwind after parsing delayed execution
-    NewObjNode stk = scope().stk(); // Display
+    NewNode stk = scope().stk(); // Display
     Node old_ctrl = ctrl().keep(2);
     Node old_mem  = mem ().keep(2);
     op.keep(2);
@@ -682,11 +682,11 @@ public class Parse implements Comparable<Parse> {
         skipWS();               // Skip to start of 1st arg
         int first_arg_start = _x;
         int nidx = n.push();    // Keep alive across arg parse
-        Node arg = tuple(oldx-1,stmts(),first_arg_start); // Parse argument list
+        NewNode arg = tuple(oldx-1,stmts(),first_arg_start); // Parse argument list
         n = Node.pop(nidx);
         if( arg == null )       // tfact but no arg is just the tfact not a function call
           { _x = oldx; return n; }
-        Parse[] badargs = ((NewObjNode)arg.in(0))._fld_starts; // Args from tuple
+        Parse[] badargs = arg._fld_starts; // Args from tuple
         badargs[0] = errMsg(oldx-1); // Base call error reported at the opening paren
         n = do_call0(false,badargs,args(n,arg)); // Pass the tuple
 
@@ -857,7 +857,7 @@ public class Parse implements Comparable<Parse> {
 
     // If field is final, directly use the value instead of a lookup.  Else
     // must load against most recent display update.
-    NewObjNode dsp = scope.stk();
+    NewNode dsp = scope.stk();
     TypeFld fld = dsp._ts.get(tok);
     Node ld = fld._access==Access.Final
       ? dsp.in(fld._order)      // Direct use
@@ -875,35 +875,27 @@ public class Parse implements Comparable<Parse> {
   /** Parse a tuple; first stmt but not the ',' parsed.
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
-  private Node tuple(int oldx, Node s, int first_arg_start) {
+  private NewNode tuple(int oldx, Node s, int first_arg_start) {
+    int alias = BitsAlias.new_alias(BitsAlias.ALLX);
+    NewNode nn = new NewNode(false,alias);
+    // No display for tuples
+    nn.add_fld(TypeFld.NO_DISP,Env.ANY,null);
+    // First stmt is parsed already
     Parse bad = errMsg(first_arg_start);
-    Ary<Parse> bads = new Ary<>(new Parse[1],1);
-    int nargs=0;
-    while( s!= null ) {         // More args
-      bads.push(bad);           // Collect arg & arg start
-      s.push();                 // Store on keepalive
-      nargs++;
+    while( s!= null ) {         // More args      
+      TypeFld fld = TypeFld.make((""+(nn.len()-DSP_IDX)).intern(),Type.SCALAR,Access.Final,nn.len());
+      nn.add_fld(fld,s,bad);
       if( !peek(',') ) break;   // Final comma is optional
       skipWS();                 // Skip to arg start before recording arg start
       bad = errMsg();           // Record arg start
-      s=stmts();                // Parse arg
+      s = stmts();              // Parse arg
     }
     require(')',oldx);          // Balanced closing paren
-
-    // Build the tuple from gathered args.
-    // Walk them in-order and not stack-like
-    int alias = BitsAlias.new_alias(BitsAlias.REC);
-    NewObjNode nn = new NewObjNode(false,alias,TypeStruct.open(TypeMemPtr.NO_DISP),Env.ANY);
-    for( int i=0; i < nargs; i++ )
-      nn.create_active((""+i).intern(),Node.peek(GVNGCM.KEEP_ALIVE._defs._len-nargs+i),Access.Final,Type.SCALAR,null);
-    Node.pops(nargs);
-    nn._fld_starts = bads.asAry();
-    nn.no_more_fields();
-    int nidx = init(nn).push();
-
-    // NewNode returns a TypeMem and a TypeMemPtr (the reference).
+    nn.close();                 // No more fields
+    int nidx = init(nn).push(); // Init, save across MrgProj
+    // NewNode changes memory
     set_mem(gvn(new MrgProjNode(nn,mem())));
-    return gvn(new ProjNode(Node.pop(nidx),REZ_IDX));
+    return (NewNode)Node.pop(nidx);
   }
 
 
@@ -918,16 +910,18 @@ public class Parse implements Comparable<Parse> {
    */
   private Node struct(ProjNode fref) {
     int oldx = _x-1, pidx;      // Opening @{
-    try( Env e = new Env(_e, null, false, ctrl(), mem(), _e._scope.ptr(), fref) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e, null, false, ctrl(), mem(), _e._scope.stk(), fref) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
       assert ctrl() != e._scope;
-      e._scope.stk().update("^",Access.Final,Env.ANY);
-      pidx = e._scope.ptr().push();   // A pointer to the constructed object
+      NewNode stk = e._scope.stk();
+      stk.set_fld(TypeFld.NO_DSP,Env.ANY);
+      stk.close();
       e._par._scope.set_ctrl(ctrl()); // Carry any control changes back to outer scope
       e._par._scope.set_mem (mem ()); // Carry any memory  changes back to outer scope
       _e = e._par;                    // Pop nested environment
+      pidx = stk.push();              // A pointer to the constructed object
     } // Pop lexical scope around struct
     return Node.pop(pidx);
   }
@@ -943,14 +937,10 @@ public class Parse implements Comparable<Parse> {
 
     // Push an extra hidden display argument.  Similar to java inner-class ptr
     // or when inside a struct definition: 'this'.
-    Node parent_display = scope().ptr();
-    Type tpar_disp = parent_display._val; // Just a TMP of the right alias
-    Node dcon = con(tpar_disp);
-    int didx = dcon.push();
+    NewNode par_stk = scope().stk();
 
     // Incrementally build up the formals
-    TypeStruct formals = TypeStruct.make("",false,true,
-                                         TypeFld.make("^",tpar_disp,DSP_IDX));
+    TypeStruct formals = TypeStruct.make("",false, TypeFld.make_dsp(par_stk._tptr));
     TypeStruct no_args_formals = formals;
     Ary<Parse> bads= new Ary<>(new Parse[1],0);
 
@@ -984,8 +974,6 @@ public class Parse implements Comparable<Parse> {
     // If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
     // args, and then reset.  Also reset to just the mem & display args.
     if( _x == oldx ) { formals = no_args_formals;  bads.set_len(ARG_IDX); }
-    formals = formals.close();
-    dcon = Node.pop(didx);
 
     // Build the FunNode header
     FunNode fun = (FunNode)init(new FunNode(formals.nargs()).add_def(Env.ALL_CTRL));
@@ -993,19 +981,19 @@ public class Parse implements Comparable<Parse> {
     // Record H-M VStack in case we clone
     //fun.set_nongens(_e._nongen.compact());
     // Build Parms for system incoming values
-    int rpc_idx = init(new ParmNode(CTL_IDX," rpc",fun,Env.ALL_CALL,null)).push();
-    int clo_idx = init(new ParmNode(DSP_IDX,"^"   ,fun,tpar_disp,dcon,null)).push();
-    Node mem    = init(new ParmNode(MEM_IDX," mem",fun,TypeMem.MEM,Env.ALL_MEM,null));
+    int rpc_idx = init(new ParmNode(CTL_IDX," rpc",fun,TypeRPC.ALL   ,Env.ALL_CALL      ,null)).push();
+    int clo_idx = init(new ParmNode(DSP_IDX,"^"   ,fun,par_stk._tptr ,con(par_stk._tptr),null)).push();
+    Node mem    = init(new ParmNode(MEM_IDX," mem",fun,TypeMem.ALLMEM,Env.ALL_MEM       , null));
 
     // Increase scope depth for function body.
     int fidx;
-    try( Env e = new Env(_e, fun, true, fun, mem, parent_display, null) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e, fun, true, fun, mem, par_stk, null) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
-      NewObjNode stk = e._scope.stk();
-      stk.update("^",Access.Final,Node.pop(clo_idx));
+      NewNode stk = e._scope.stk();
+      stk.set_fld(TypeFld.make_dsp(par_stk._tptr),Node.pop(clo_idx));
 
       // Parms for all arguments
       Parse errmsg = errMsg();  // Lazy error message
@@ -1013,7 +1001,7 @@ public class Parse implements Comparable<Parse> {
         if( fld._order <= DSP_IDX ) continue;// Already handled
         assert fun==_e._fun && fun==_e._scope.ctrl();
         Node parm = gvn(new ParmNode(fld,fun,Env.ALL_PARM,errmsg));
-        _e._scope.stk().create(fld._fld,parm, args_are_mutable,fld._t,bads.at(fld._order-ARG_IDX));
+        scope().stk().add_fld(fld,parm,bads.at(fld._order-ARG_IDX));
       }
       stk.set_nargs();
 
@@ -1035,7 +1023,7 @@ public class Parse implements Comparable<Parse> {
       // the Combo pass which computes a real Call Graph and all escapes.
       Env.TOP._scope.add_def(ret);
       // The FunPtr builds a real display; any up-scope references are passed in now.
-      Node fptr = gvn(new FunPtrNode(null,ret,dcon));
+      Node fptr = gvn(new FunPtrNode(null,ret,con(par_stk._tptr)));
 
       _e = e._par;            // Pop nested environment; pops nongen also
       fidx = fptr.push();     // Return function; close-out and DCE 'e'
@@ -1072,14 +1060,14 @@ public class Parse implements Comparable<Parse> {
     Node val  = s.early_val ();
     if( ctrl == null ) {
       s.set_def(4,ctrl=new RegionNode((Node)null).keep()); ctrl._val=Type.CTRL;
-      s.set_def(5,mem =new PhiNode(TypeMem.MEM, null,(Node)null).keep());
-      s.set_def(6,val =new PhiNode(Type.SCALAR, null,(Node)null).keep());
+      s.set_def(5,mem =new PhiNode(TypeMem.ALLMEM, null,(Node)null).keep());
+      s.set_def(6,val =new PhiNode(Type.SCALAR   , null,(Node)null).keep());
     }
     ctrl.add_def(ctrl());
     mem .add_def(mem ());
     val .add_def(rez   );
     set_ctrl(Env.XCTRL);
-    set_mem (con(TypeMem.XMEM));
+    set_mem (con(TypeMem.ANYMEM));
     return con(Type.XNIL);
   }
 
@@ -1121,26 +1109,27 @@ public class Parse implements Comparable<Parse> {
       int oldx = _x;
       if( peek('(') ) {
         PrimNode p = n instanceof PrimNode p2 ? p2 : null;
-        NewNode.NewPrimNode np = n instanceof NewNode.NewPrimNode p2 ? p2 : null;
-        int nargs = p==null ? np._tfp.nargs() : p._tfp.nargs();
-        boolean  read_mem = np != null && np._reads;
-        boolean write_mem = np!=null;
-
-        int nidx = Env.GVN.add_flow(n).push();
-        n.add_def(null);        // No control
-        n.add_def(read_mem ? mem() : null);
-        for( int i=DSP_IDX; i<nargs; i++ ) {
-          n.add_def(stmts());
-          if( i<nargs-1 ) require(',',oldx);
-        }
-        Node xn = Env.GVN.add_flow(Node.pop(nidx));
-        assert xn==n;
-        if( write_mem ) {
-          set_mem(init(new MrgProjNode((NewNode)n,mem())));
-          n = init(new ProjNode(n,REZ_IDX));
-        }
-        require(')',oldx);
-        return n;
+        throw unimpl();
+        //NewNode.NewPrimNode np = n instanceof NewNode.NewPrimNode p2 ? p2 : null;
+        //int nargs = p==null ? np._tfp.nargs() : p._tfp.nargs();
+        //boolean  read_mem = np != null && np._reads;
+        //boolean write_mem = np!=null;
+        //
+        //int nidx = Env.GVN.add_flow(n).push();
+        //n.add_def(null);        // No control
+        //n.add_def(read_mem ? mem() : null);
+        //for( int i=DSP_IDX; i<nargs; i++ ) {
+        //  n.add_def(stmts());
+        //  if( i<nargs-1 ) require(',',oldx);
+        //}
+        //Node xn = Env.GVN.add_flow(Node.pop(nidx));
+        //assert xn==n;
+        //if( write_mem ) {
+        //  set_mem(init(new MrgProjNode((NewNode)n,mem())));
+        //  n = init(new ProjNode(n,REZ_IDX));
+        //}
+        //require(')',oldx);
+        //return n;
       }
 
       // Else build a function which calls the primitive, and return a
@@ -1277,9 +1266,10 @@ public class Parse implements Comparable<Parse> {
     }
     String str = new String(_buf,oldx,_x-oldx-1).intern();
     // Convert to ptr-to-constant-memory-string
-    NewNode nnn = (NewNode)gvn( new NewStrNode.ConStr(str) );
-    set_mem(gvn(new MrgProjNode(nnn,mem())));
-    return gvn( new ProjNode(nnn,REZ_IDX));
+    //NewNode nnn = (NewNode)gvn( new NewStrNode.ConStr(str) );
+    //set_mem(gvn(new MrgProjNode(nnn,mem())));
+    //return gvn( new ProjNode(nnn,REZ_IDX));
+    throw unimpl();
   }
 
   ///** Parse a type or return null
@@ -1326,14 +1316,16 @@ public class Parse implements Comparable<Parse> {
   private UnresolvedNode val_fref(String tok, Parse bad) {
     UnresolvedNode fref = (UnresolvedNode)gvn(UnresolvedNode.forward_ref(tok,bad));
     // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
-    _e._scope.stk().create(tok,fref,Access.Final,Type.SCALAR,null);
+    NewNode stk = scope().stk();
+    TypeFld fld = TypeFld.make(tok,Type.SCALAR,Access.Final,stk.len());
+    stk.add_fld(fld,fref,null);
     return fref;
   }
   // Create a type forward-reference.  Must be type-defined later.
   private ProjNode type_fref(String tok) {
     ProjNode tn = init(new ProjNode(null,REZ_IDX));
-    int alias = BitsAlias.type_alias(BitsAlias.REC);
-    TypeMemPtr tmp = TypeMemPtr.make(alias,(TypeObj)TypeObj.ISUSED.set_name((tok+":").intern()));
+    int alias = BitsAlias.type_alias(BitsAlias.ALLX);
+    TypeMemPtr tmp = TypeMemPtr.make(alias,TypeStruct.ISUSED.set_name((tok+":").intern()));
     tn._val = tmp;              // Only valid until the def for this fref appears
     assert tn.value()==tmp;
     assert tn.is_forward_type();
@@ -1458,11 +1450,11 @@ public class Parse implements Comparable<Parse> {
     // Display is a linked list of displays, and we already checked that token
     // exists at scope up in the display.
     Env e = _e;
-    Node ptr = e._scope.ptr();
+    Node stk = e._scope.stk();
     Node mmem = mem();
     while( true ) {
-      if( scope == e._scope ) return ptr;
-      ptr = gvn(new LoadNode(mmem,ptr,"^",null)); // Gen linked-list walk code, walking display slot
+      if( scope == e._scope ) return stk;
+      stk = gvn(new LoadNode(mmem,stk,"^",null)); // Gen linked-list walk code, walking display slot
       e = e._par;                                 // Walk linked-list in parser also
     }
   }

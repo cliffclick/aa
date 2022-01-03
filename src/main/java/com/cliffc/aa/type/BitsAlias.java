@@ -22,34 +22,18 @@ public class BitsAlias extends Bits<BitsAlias> {
 
   static final Bits.Tree<BitsAlias> TREE = new Bits.Tree<>();
   @Override public Tree<BitsAlias> tree() { return TREE; }
-  public static final int ALL, ARY, STR, REC, ABC, AARY;
-  public static BitsAlias RECORD_BITS, STRBITS0, ARYBITS0;
-  public static BitsAlias FULL, NZERO, ANY, EMPTY, NIL, XNIL, STRBITS, RECORD_BITS0, ARYBITS;
+  public static final int ALLX;
+  public static BitsAlias ALL, ANY, NALL, NIL, XNIL, EMPTY;
 
   static {
     // The All-Memory alias class
-    ALL = TREE.split(0);        // Split from 0
-    NZERO = new BitsAlias().make_impl(ALL,null);
-    FULL = NZERO.meet_nil();    // All aliases, with a low nil
-    ANY = FULL.dual();          // Precompute dual
-    NIL = make0(0);             // Ugly but NIL has a dual, and this is "low" NIL
-    XNIL = NIL.dual();          //
-    EMPTY = NZERO.make();       // No bits; its its own dual
-    // Split All-Memory into Records/Tuples/Structs and Arrays (including Strings).
-    // Everything falls into one of these two camps.
-    RECORD_BITS = make0(REC = type_alias(ALL));
-    RECORD_BITS0 = RECORD_BITS.meet_nil();
-
-    // Arrays
-    ARY = type_alias(ALL);
-    // Split Arrays into Strings (vs other arrays)
-    STRBITS = make0(STR = type_alias(ARY));
-    STRBITS0 = STRBITS.meet_nil();
-    ABC = type_alias(STR);
-
-    AARY = type_alias(ARY);
-    ARYBITS = make0(AARY);
-    ARYBITS0 = ARYBITS.meet_nil();
+    ALLX = TREE.split(0);        // Split from 0
+    NALL = new BitsAlias().make_impl(ALLX,null); // All aliases, no nil
+    ALL  = NALL.meet_nil();      // All aliases, with a low nil
+    ANY  = ALL.dual();           // Precompute dual
+    NIL  = make0(0);             // Ugly but NIL has a dual, and this is "low" NIL
+    XNIL = NIL.dual();           //
+    EMPTY= new BitsAlias().make(); // No bits; its its own dual
   }
   // True if kid is a child or equal to parent
   public static boolean is_parent( int par, int kid ) { return TREE.is_parent(par,kid); }
@@ -65,11 +49,11 @@ public class BitsAlias extends Bits<BitsAlias> {
   // Iterate over children
   public static int next_kid( int alias, int kid ) { return TREE.next_kid(alias,kid); }
 
-  @Override public BitsAlias ALL() { return FULL; }
+  @Override public BitsAlias ALL() { return ALL; }
   @Override public BitsAlias ANY() { return ANY ; }
   @Override public BitsAlias EMPTY() { return EMPTY ; }
 
-  public static BitsAlias make0( int bit ) { return NZERO.make(bit); }
+  public static BitsAlias make0( int bit ) { return NALL.make(bit); }
   public BitsAlias or( int bit ) { return set(bit); }
 
   public static int  new_alias(int par) { return set_alias(par); }
@@ -77,13 +61,5 @@ public class BitsAlias extends Bits<BitsAlias> {
   private static int set_alias(int par) { return TREE.split(par); }
   public static void free(int fidx) { TREE.free(fidx); }
 
-  BitsAlias widen() {
-    if( isa(RECORD_BITS ) ) return BitsAlias.RECORD_BITS ;
-    if( isa(STRBITS     ) ) return BitsAlias.STRBITS     ;
-    if( isa(ARYBITS     ) ) return BitsAlias.ARYBITS     ;
-    if( isa(RECORD_BITS0) ) return BitsAlias.RECORD_BITS0;
-    if( isa(STRBITS0    ) ) return BitsAlias.STRBITS0    ;
-    if( isa(ARYBITS0    ) ) return BitsAlias.ARYBITS0    ;
-    return FULL;
-  }
+  BitsAlias widen() { return NALL; }
 }

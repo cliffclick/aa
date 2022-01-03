@@ -62,10 +62,6 @@ public class TypeFlt extends Type<TypeFlt> {
     case TFUNPTR:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
-    case TFUNSIG:
-    case TARY:
-    case TOBJ:
-    case TSTR:
     case TSTRUCT:
     case TTUPLE:
     case TMEM:   return ALL;
@@ -105,22 +101,22 @@ public class TypeFlt extends Type<TypeFlt> {
     return _z==32 ? FLT32 : FLT64;   // Constant or low, just keeps size
   }
 
-  // Lattice of conversions:
-  // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
-  //    to e.g. Float and require a user-provided rounding conversion from F64->Int.
-  //  0 requires no/free conversion (Int8->Int64, F32->F64)
-  // +1 requires a bit-changing conversion (Int->Flt)
-  // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
-  @Override public byte isBitShape(Type t) {
-    // TODO: Allow loss-less conversions (e.g. small float integer constants convert to ints just fine)
-    if( t._type == Type.TFLT ) return (byte)(_z<=((TypeFlt)t)._z ? 0 : 99);
-    if( t._type == Type.TINT ) return 99; // Flt->Int always requires user intervention
-    if( t._type == Type.TMEMPTR ) return 99; // No flt->ptr conversion
-    if( t._type == Type.TFUNPTR ) return 99; // No flt->ptr conversion
-    if( t._type == Type.TALL ) return 99;
-    if( t._type == TSCALAR ) return 9; // Might have to autobox
-    throw com.cliffc.aa.AA.unimpl();
-  }
+  //// Lattice of conversions:
+  //// -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
+  ////    to e.g. Float and require a user-provided rounding conversion from F64->Int.
+  ////  0 requires no/free conversion (Int8->Int64, F32->F64)
+  //// +1 requires a bit-changing conversion (Int->Flt)
+  //// 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
+  //@Override public byte isBitShape(Type t) {
+  //  // TODO: Allow loss-less conversions (e.g. small float integer constants convert to ints just fine)
+  //  if( t._type == Type.TFLT ) return (byte)(_z<=((TypeFlt)t)._z ? 0 : 99);
+  //  if( t._type == Type.TINT ) return 99; // Flt->Int always requires user intervention
+  //  if( t._type == Type.TMEMPTR ) return 99; // No flt->ptr conversion
+  //  if( t._type == Type.TFUNPTR ) return 99; // No flt->ptr conversion
+  //  if( t._type == Type.TALL ) return 99;
+  //  if( t._type == TSCALAR ) return 9; // Might have to autobox
+  //  throw com.cliffc.aa.AA.unimpl();
+  //}
   @Override public Type _widen() {
     if( _x> 0 ) return this;
     if( _x==0 ) return _con==0 ? FLT64 : NFLT64;

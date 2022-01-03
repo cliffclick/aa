@@ -42,7 +42,7 @@ public class StoreNode extends Node {
     // Is this Store dead from below?
     if( mem==this ) return null;
     if( ta.above_center() ) return mem;
-    if( tmp!=null && _live.ld(tmp)==TypeObj.UNUSED )  return mem;
+    if( tmp!=null && _live.ld(tmp)==TypeStruct.UNUSED )  return mem;
 
     // No need for 'Fresh' address, as Stores have no TVar (produce memory not a scalar)
     if( adr() instanceof FreshNode )
@@ -57,24 +57,27 @@ public class StoreNode extends Node {
     }
 
     // If Store is by a New and no other Stores, fold into the New.
-    NewObjNode nnn;  TypeFld tfld;
-    if( mem instanceof MrgProjNode &&
-        // Store into a NewObjNode, same memory and address
-        mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
+    if( mem instanceof MrgProjNode mrg &&
+        // Store into a NewNode, same memory and address
+        mrg.nnn() == adr &&
         // Do not bypass a parallel writer
-        mem.check_solo_mem_writer(this) && // Use is by self
-        (tfld=nnn._ts.get(_fld))!= null ) {
-      // Have to be allowed to directly update NewObjNode
-      if( tfld._access==Access.RW || rez() instanceof ValFunNode || rez() instanceof UnresolvedNode ) {
-        // Field is modifiable; update New directly.
-        if( rez() instanceof ValFunNode ) nnn.add_fun(_bad,_fld,(ValFunNode)rez()); // Stacked FunPtrs into an Unresolved
-        else if( rez() instanceof UnresolvedNode ) {
-          for( Node n : rez()._defs )       nnn.add_fun(_bad,_fld,(ValFunNode)n);
-        } else                              nnn.update(_fld,_fin,rez()); // Update the value, and perhaps the final field
-        mem.xval();             // Update memory state
-        Env.GVN.add_flow_uses(this);
-        add_reduce_extra();     // Folding in allows store followers to fold in
-        return mem;             // Store is replaced by using the New directly.
+        mem.check_solo_mem_writer(this) ) { // Use is by self
+        // Find the field being updated
+      NewNode nnn = mrg.nnn();
+      TypeFld tfld = nnn.fld(_fld);
+      if( tfld!= null ) {
+        // Have to be allowed to directly update NewNode
+        if( tfld._access==Access.RW || rez() instanceof ValFunNode || rez() instanceof UnresolvedNode ) {
+          // Field is modifiable; update New directly.
+          if( rez() instanceof ValFunNode || rez() instanceof UnresolvedNode )
+            nnn.add_fun(_bad,_fld,(ValFunNode)rez()); // Stacked FunPtrs into an Unresolved
+          else
+            nnn.set_fld(tfld.make_from(tfld._t,_fin),rez()); // Update the value, and perhaps the final field
+          mem.xval();             // Update memory state
+          Env.GVN.add_flow_uses(this);
+          add_reduce_extra();     // Folding in allows store followers to fold in
+          return mem;             // Store is replaced by using the New directly.
+        }
       }
     }
 
@@ -109,11 +112,12 @@ public class StoreNode extends Node {
       else if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) head2 = mem.in(0).in(0);
       else head2 = null;
       // Check no extra readers/writers at the split point
-      if( head2 != null && MemSplitNode.check_split(this,escapees(),mem) ) {
-        MemSplitNode.insert_split(this, escapees(), this, mem, head2);
-        assert _uses._len==1 && _uses.at(0) instanceof MemJoinNode;
-        return _uses.at(0); // Return the mem join
-      }
+      //if( head2 != null && MemSplitNode.check_split(this,escapees(),mem) ) {
+      //  MemSplitNode.insert_split(this, escapees(), this, mem, head2);
+      //  assert _uses._len==1 && _uses.at(0) instanceof MemJoinNode;
+      //  return _uses.at(0); // Return the mem join
+      //}
+      throw unimpl();
     }
     return null;
   }
@@ -141,11 +145,11 @@ public class StoreNode extends Node {
     if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.above_center() ? tmem : TypeMem.ALLMEM;
     return tm.update(tmp._aliases,_fin,_fld,tval);
   }
-  @Override BitsAlias escapees() {
-    Type adr = adr()._val;
-    if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? BitsAlias.EMPTY : BitsAlias.FULL;
-    return ((TypeMemPtr)adr)._aliases;
-  }
+  //@Override BitsAlias escapees() {
+  //  Type adr = adr()._val;
+  //  if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? BitsAlias.EMPTY : BitsAlias.FULL;
+  //  return ((TypeMemPtr)adr)._aliases;
+  //}
 
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // Compute the liveness local contribution to def's liveness.  Ignores the
@@ -167,12 +171,11 @@ public class StoreNode extends Node {
     Type tmem = mem()._val;
     if( tmem==Type.ALL ) return bad("Unknown",fast,null);
     if( tmem==Type.ANY ) return null; // No error
-    TypeObj objs = tmem instanceof TypeMem
+    TypeStruct objs = tmem instanceof TypeMem
       ? ((TypeMem)tmem).ld(ptr) // General load from memory
-      : ((TypeObj)tmem);
-    if( objs==TypeObj.UNUSED ) return null; // No error, too high yet
-    if( !(objs instanceof TypeStruct) ) return bad("No such",fast,objs);
-    TypeStruct ts = (TypeStruct)objs;
+      : ((TypeStruct)tmem);
+    if( objs==TypeStruct.UNUSED ) return null; // No error, too high yet
+    TypeStruct ts = objs;
     TypeFld fld = ts.get(_fld);
     if( fld==null ) return bad("No such",fast,objs);
     Access access = fld._access;
@@ -180,9 +183,9 @@ public class StoreNode extends Node {
       return bad("Cannot re-assign "+access,fast,ts);
     return null;
   }
-  private ErrMsg bad( String msg, boolean fast, TypeObj to ) {
+  private ErrMsg bad( String msg, boolean fast, TypeStruct to ) {
     if( fast ) return ErrMsg.FAST;
-    boolean is_closure = adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure;
+    boolean is_closure = adr() instanceof NewNode nnn && nnn._is_closure;
     return ErrMsg.field(_bad,msg,_fld,is_closure,to);
   }
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode()+_fin.hashCode(); }

@@ -270,16 +270,13 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   static final byte TFLT    =12; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
   static final byte TRPC    =13; // Return PCs; Continuations; call-site return points; see TypeRPC
   static final byte TTUPLE  =14; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TOBJ    =15; // Memory objects; arrays and structs and strings
-  static final byte TSTRUCT =16; // Memory Structs; tuples with named fields
-  static final byte TARY    =17; // Memory Array type
-  static final byte TSTR    =18; // Memory String type; an array of chars
-  static final byte TFLD    =19; // Fields in structs
-  static final byte TMEM    =20; // Memory type; a map of Alias#s to TOBJs
-  static final byte TMEMPTR =21; // Memory pointer type; a collection of Alias#s
-  static final byte TFUNPTR =22; // Function pointer, refers to a collection of concrete functions
-  static final byte TFUNSIG =23; // Function signature; formals & ret.  Not any concrete function.
-  static final byte TLAST   =24; // Type check
+  static final byte TSTRUCT =15; // Memory Structs; tuples with named fields
+  static final byte TARY    =16; // Tuple of indexed fields; only appears in a TSTRUCT
+  static final byte TFLD    =17; // Fields in structs
+  static final byte TMEM    =18; // Memory type; a map of Alias#s to TOBJs
+  static final byte TMEMPTR =19; // Memory pointer type; a collection of Alias#s
+  static final byte TFUNPTR =20; // Function pointer, refers to a collection of concrete functions
+  static final byte TLAST   =21; // Type check
 
   // Object Pooling to handle frequent (re)construction of temp objects being
   // interned.  This is a performance hack and a big one: big because its
@@ -376,7 +373,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   private boolean is_ptr() { byte t = _type;  return t == TFUNPTR || t == TMEMPTR; }
   private boolean is_num() { byte t = _type;  return t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TSIMPLE-10*/0, 1,1,1,0,0,0,0,0,0,0,1,1,/*TFUNSIG-23*/0}/*TLAST=24*/;
+  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TSIMPLE-10*/0, 1,1,1,0,0,0,0,0,1,/*TFUNPTR-20*/1}/*TLAST=21*/;
   public final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
   // Simplify pointers (lose what they point at).
   public Type simple_ptr() { return this; }
@@ -464,8 +461,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       if( mt.interned() ) // recursive type creation?
         mt = mt.dual();   // Force low
     }
-    if( t._type!=_type && t._type!=TOBJ && _type!=TOBJ && mt._type==TOBJ )
-      n=""; // OBJ splits into strings (arrays) and structs, which can keep their names
 
     // Inject the name
     if( !Util.eq(mt._name,n) )  // Fast path cutout
@@ -630,7 +625,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Report OOB based on shallowest OOB component.
   public Type       oob( ) { return oob(ALL); }
   public Type       oob(Type       e) { return above_center() ? e.dual() : e; }
-  public TypeObj    oob(TypeObj    e) { return above_center() ? (TypeObj)e.dual() : e; }
   public TypeStruct oob(TypeStruct e) { return above_center() ? e.dual() : e; }
   public TypeMem    oob(TypeMem    e) { return above_center() ? e.dual() : e; }
   public TypeMemPtr oob(TypeMemPtr e) { return above_center() ? e.dual() : e; }
@@ -639,7 +633,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     types.put("scalar",SCALAR);
     TypeInt.init1(types);
     TypeFlt.init1(types);
-    TypeStr.init1(types);
     TypeStruct.RECURSIVE_MEET=0;
   }
 
@@ -648,15 +641,13 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     if( ALL_TYPES != null ) return ALL_TYPES;
     Ary<Type> ts = new Ary<>(new Type[1],0);
     concat(ts,Type      .TYPES);
+    concat(ts,TypeFld   .TYPES);
     concat(ts,TypeFlt   .TYPES);
     concat(ts,TypeFunPtr.TYPES);
-    concat(ts,TypeFunSig.TYPES);
     concat(ts,TypeInt   .TYPES);
     concat(ts,TypeMem   .TYPES);
     concat(ts,TypeMemPtr.TYPES);
-    concat(ts,TypeObj   .TYPES);
     concat(ts,TypeRPC   .TYPES);
-    concat(ts,TypeStr   .TYPES);
     concat(ts,TypeStruct.TYPES);
     concat(ts,TypeTuple .TYPES);
     concat(ts,TypeAry   .TYPES);
@@ -724,7 +715,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     assert errs==0 : "Found "+errs+" non-join-type errors";
 
     // Check scalar primitives; all are SCALARS and none sub-type each other.
-    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, TypeMemPtr.OOP0, TypeFunPtr.GENERIC_FUNPTR, TypeRPC.ALL_CALL };
+    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, TypeMemPtr.ISUSED0, TypeFunPtr.GENERIC_FUNPTR, TypeRPC.ALL_CALL };
     for( Type t : SCALAR_PRIMS ) assert t.isa(SCALAR);
     for( int i=0; i<SCALAR_PRIMS.length; i++ )
       for( int j=i+1; j<SCALAR_PRIMS.length; j++ )
@@ -763,26 +754,26 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   public long   getl() { if( _type==TNIL || _type==TXNIL ) return 0; throw typerr(null); }
   // Return a double from a TypeFlt constant; assert otherwise.
   public double getd() { if( _type==TNIL || _type==TXNIL ) return 0.0; throw typerr(null); }
-  // Return a String from a TypeStr constant; assert otherwise.
-  public String getstr() { throw typerr(null); }
+  //// Return a String from a TypeStr constant; assert otherwise.
+  //public String getstr() { throw typerr(null); }
 
-  // Lattice of conversions:
-  // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
-  //    to e.g. Float and require a user-provided rounding conversion from F64->Int.
-  //  0 requires no/free conversion (Int8->Int64, F32->F64)
-  // +1 requires a bit-changing conversion (Int->Flt)
-  // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
-  public byte isBitShape(Type t) {
-    if( has_name() || t.has_name() ) throw com.cliffc.aa.AA.unimpl();
-    if( _type == TNIL || _type==TXNIL ) return 0; // Nil is free to convert always
-    if( above_center() && isa(t) ) return 0; // Can choose compatible format
-    if( _type == t._type ) return 0; // Same type is OK
-    if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion
-    if( _type == TALL || t._type==TALL || _type == TSCALAR || _type == TNSCALR ) return -1; // Scalar has to resolve
-    if( t._type == TNIL || t._type == TXNIL ) return (byte)(may_nil() ? -1 : 99); // Must resolve to a NIL first
-
-    throw typerr(t);  // Overridden in subtypes
-  }
+  //// Lattice of conversions:
+  //// -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
+  ////    to e.g. Float and require a user-provided rounding conversion from F64->Int.
+  ////  0 requires no/free conversion (Int8->Int64, F32->F64)
+  //// +1 requires a bit-changing conversion (Int->Flt)
+  //// 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
+  //public byte isBitShape(Type t) {
+  //  if( has_name() || t.has_name() ) throw com.cliffc.aa.AA.unimpl();
+  //  if( _type == TNIL || _type==TXNIL ) return 0; // Nil is free to convert always
+  //  if( above_center() && isa(t) ) return 0; // Can choose compatible format
+  //  if( _type == t._type ) return 0; // Same type is OK
+  //  if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion
+  //  if( _type == TALL || t._type==TALL || _type == TSCALAR || _type == TNSCALR ) return -1; // Scalar has to resolve
+  //  if( t._type == TNIL || t._type == TXNIL ) return (byte)(may_nil() ? -1 : 99); // Must resolve to a NIL first
+  //
+  //  throw typerr(t);  // Overridden in subtypes
+  //}
   // "widen" a narrow type for primitive type-specialization and H-M
   // unification.  e.g. "3" becomes "int64".
   // TODO: This is NOT associative with MEET.
@@ -855,7 +846,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     assert nil==NIL || nil==XNIL;
     return switch( _type ) {
     case TXNIL, TNIL -> SCALAR; // Mix of XNIL and NIL
-    case TOBJ, TSTR, TSTRUCT, TMEM -> ALL; // Objects and Memory do not mix with any simple type
+    case TSTRUCT, TMEM -> ALL; // Objects and Memory do not mix with any simple type
     // Scalar flavors already handled in XMEET.
     default -> throw typerr(null); // Overridden in subclass or already handled
     };

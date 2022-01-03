@@ -6,6 +6,7 @@ import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
+import static com.cliffc.aa.AA.unimpl;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
@@ -132,25 +133,26 @@ public class MemSplitNode extends Node {
   static Node insert_split(Node tail1, BitsAlias head1_escs, Node head1, Node tail2, Node head2) {
     assert Env.START.more_work(true)==0;
     assert tail1.is_mem() && head1.is_mem() && tail2.is_mem() && head2.is_mem();
-    BitsAlias head2_escs = head2.escapees();
-    assert check_split(head1,head1_escs,head1.in(1));
-    // Insert empty split/join above head2
-    MemSplitNode msp = Env.GVN.init(new MemSplitNode(head2.in(1)));
-    MProjNode    mprj= Env.GVN.init(new MProjNode   (msp,0      ));
-    MemJoinNode  mjn = Env.GVN.init(new MemJoinNode (mprj       ));
-    head2.set_def(1,mjn);
-    mjn._live = tail1._live;
-    // Pull the SESE regions in parallel from below
-    mjn.add_alias_below(head2,head2_escs,tail2);
-    mjn.add_alias_below(head1,head1_escs,tail1);
-    if( mprj.is_dead() ) Env.GVN.revalive(msp);
-    else Env.GVN.revalive(msp,mprj,mjn);
-    if( tail1 instanceof ProjNode ) Env.GVN.add_flow(tail1.in(0));
-    assert Env.START.more_work(true)==0;
-    Env.GVN.add_mono(mjn);       // See if other defs can move into the Join
-    for( Node use : mjn._uses )
-      Env.GVN.add_work_new(use); // See if other uses can move into the Join
-    return head1;
+    //BitsAlias head2_escs = head2.escapees();
+    //assert check_split(head1,head1_escs,head1.in(1));
+    //// Insert empty split/join above head2
+    //MemSplitNode msp = Env.GVN.init(new MemSplitNode(head2.in(1)));
+    //MProjNode    mprj= Env.GVN.init(new MProjNode   (msp,0      ));
+    //MemJoinNode  mjn = Env.GVN.init(new MemJoinNode (mprj       ));
+    //head2.set_def(1,mjn);
+    //mjn._live = tail1._live;
+    //// Pull the SESE regions in parallel from below
+    //mjn.add_alias_below(head2,head2_escs,tail2);
+    //mjn.add_alias_below(head1,head1_escs,tail1);
+    //if( mprj.is_dead() ) Env.GVN.revalive(msp);
+    //else Env.GVN.revalive(msp,mprj,mjn);
+    //if( tail1 instanceof ProjNode ) Env.GVN.add_flow(tail1.in(0));
+    //assert Env.START.more_work(true)==0;
+    //Env.GVN.add_mono(mjn);       // See if other defs can move into the Join
+    //for( Node use : mjn._uses )
+    //  Env.GVN.add_work_new(use); // See if other uses can move into the Join
+    //return head1;
+    throw unimpl();
   }
 
   static boolean check_split( Node head1, BitsAlias head1_escs, Node tail2 ) {
@@ -158,13 +160,14 @@ public class MemSplitNode extends Node {
     // Must have only 1 mem-writer (this can fail if used by different control paths)
     if( !tail2.check_solo_mem_writer(head1) ) return false;
     // No alias overlaps
-    if( head1_escs.overlaps(tail2.escapees()) ) return false;
-    // TODO: This is too strong.
-    // Cannot have any Loads following head1; because after the split
-    // they will not see the effects of previous stores that also move
-    // into the split.
-    // Allow exactly 1 use
-    return tail2._uses._len==1;
+    //if( head1_escs.overlaps(tail2.escapees()) ) return false;
+    //// TODO: This is too strong.
+    //// Cannot have any Loads following head1; because after the split
+    //// they will not see the effects of previous stores that also move
+    //// into the split.
+    //// Allow exactly 1 use
+    //return tail2._uses._len==1;
+    throw unimpl();
   }
 
 
@@ -180,5 +183,5 @@ public class MemSplitNode extends Node {
     return null;
   }
     // Modifies all of memory - just does it in parts
-  @Override BitsAlias escapees() { return BitsAlias.FULL; }
+  //@Override BitsAlias escapees() { return BitsAlias.FULL; }
 }

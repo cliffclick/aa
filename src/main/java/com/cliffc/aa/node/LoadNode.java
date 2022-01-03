@@ -34,9 +34,9 @@ public class LoadNode extends Node {
     // See if this is a named object as a ptr, with a prototype.
     String tname = ValFunNode.valtype(tadr);
     if( tname!=null ) {
-      NewObjNode nnn = Env.PROTOS.get(tname);
+      NewNode nnn = Env.PROTOS.get(tname);
       if( nnn!=null ) {
-        TypeFld fld = nnn._ts.get(_fld);
+        TypeFld fld = nnn.fld(_fld);
         if( fld==null ) return null;              // No such field
         if( fld._access==TypeFld.Access.Final ) { // Final fields: all in the prototype
           // Load from the prototype
@@ -44,7 +44,7 @@ public class LoadNode extends Node {
           if( p._val==Type.ALL ) return null;
           // Instance call; move the adr into Unresolved/FunPtr
           if( p._val instanceof TypeFunPtr tfp ) {
-            if( tfp._dsp==TypeMemPtr.NO_DISP ) return p; // No display ("static" prototype call)
+            if( tfp.dsp()==TypeMemPtr.NO_DISP ) return p; // No display ("static" prototype call)
             if( p instanceof UnresolvedNode ) return ((UnresolvedNode)p).bind(adr());
             assert p instanceof FunPtrNode; // clone, inject adr() as display
             return p.copy(true).set_def(1,adr());
@@ -64,8 +64,8 @@ public class LoadNode extends Node {
       Node st = find_previous_store(mem(),adr,((TypeMemPtr)tadr)._aliases,_fld,true);
       if( st!=null ) {
         Node rez = st instanceof StoreNode
-          ? (( StoreNode)st).rez()
-          : ((NewObjNode)st).get(_fld);
+          ? ((StoreNode)st).rez()
+          : ((  NewNode)st).get(_fld);
         return rez==this ? null : rez;
       }
     }
@@ -125,7 +125,7 @@ public class LoadNode extends Node {
     // Load from a memory Phi; split through in an effort to sharpen the memory.
     // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
     // TODO: Hoist out of loops.
-    if( mem._op == OP_PHI && mem.in(0)._op != OP_LOOP && adr.in(0) instanceof NewNode ) {
+    if( mem._op == OP_PHI && adr.in(0) instanceof NewNode ) {
       Node lphi = new PhiNode(Type.SCALAR,((PhiNode)mem)._badgc,mem.in(0));
       for( int i=1; i<mem._defs._len; i++ )
         lphi.add_def(Env.GVN.add_work_new(new LoadNode(mem.in(i),adr,_fld,_bad)));
@@ -158,9 +158,9 @@ public class LoadNode extends Node {
         if( mem == st.mem() ) return null;
         mem = st.mem(); // Advance past
 
-      } else if( mem instanceof MemPrimNode.LValueWrite ) {
-        // Array stores and field loads never alias
-        mem = ((MemPrimNode)mem).mem();
+      //} else if( mem instanceof MemPrimNode.LValueWrite ) {
+      //  // Array stores and field loads never alias
+      //  mem = ((MemPrimNode)mem).mem();
 
       } else if( mem instanceof MProjNode ) {
         Node mem0 = mem.in(0);
@@ -181,10 +181,9 @@ public class LoadNode extends Node {
       } else if( mem instanceof MrgProjNode ) {
         MrgProjNode mrg = (MrgProjNode)mem;
         NewNode nnn = mrg.nnn();
-        if( nnn instanceof NewObjNode ) {
-          TypeFld tfld = ((NewObjNode)nnn)._ts.get(fld);
-          if( tfld!=null && adr instanceof ProjNode && adr.in(0) == nnn ) return nnn; // Direct hit
-        }  // wrong field name or wrong alias, cannot match
+        TypeFld tfld = nnn._ts.get(fld);
+        if( tfld!=null && adr == nnn ) return nnn; // Direct hit
+        // wrong field name or wrong alias, cannot match
         if( aliases.test_recur(nnn._alias) ) return null; // Overlapping, but wrong address - dunno, so must fail
         mem = mrg.mem(); // Advance past
       } else if( mem instanceof MemJoinNode ) {
@@ -228,7 +227,7 @@ public class LoadNode extends Node {
     // Loading from a Value type?
     if( ValFunNode.valtype(tmp)!=null ) {
       if( !(tmp._obj instanceof TypeStruct) ) return tmp._obj.oob(Type.SCALAR);
-      TypeFld fld = ((TypeStruct)tmp._obj).get(_fld);
+      TypeFld fld = tmp._obj.get(_fld);
       return fld==null ? Type.SCALAR : fld._t; // Check no-such-field
     }
 
@@ -236,20 +235,14 @@ public class LoadNode extends Node {
     Node mem = mem();
     Type tmem = mem._val;       // Memory
     if( !(tmem instanceof TypeMem) ) return tmem.oob(); // Nothing sane
-    TypeObj tobj = ((TypeMem)tmem).ld(tmp);
-    if( tobj instanceof TypeStruct )
-      return get_fld(tobj);
-    return tobj.oob();          // No loading from e.g. Strings
+    TypeStruct tobj = ((TypeMem)tmem).ld(tmp);
+    return get_fld(tobj);
   }
 
   // Load the value
-  private @NotNull Type get_fld( TypeObj tobj ) {
-    if( !(tobj instanceof TypeStruct) )
-      return tobj.oob();
-    // Struct; check for field
-    TypeStruct ts = (TypeStruct)tobj;
+  private @NotNull Type get_fld( TypeStruct ts ) {
     TypeFld fld = ts.get(_fld);  // Find the named field
-    if( fld==null ) return tobj.oob();
+    if( fld==null ) return ts.oob();
     return fld._t;          // Field type
   }
 
@@ -276,7 +269,7 @@ public class LoadNode extends Node {
     if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
     if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
     // Only named the named field from the named aliases is live.
-    TypeObj ldef = _live==TypeMem.LNO_DISP ? TypeObj.LNO_DISP : TypeObj.ALIVE;
+    TypeStruct ldef = _live==TypeMem.LNO_DISP ? TypeStruct.LNO_DISP : TypeStruct.ALIVE;
     return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld, ldef);
   }
 
@@ -320,17 +313,17 @@ public class LoadNode extends Node {
     Type tmem = mem()._val;
     if( tmem==Type.ALL ) return bad(fast,null);
     if( tmem==Type.ANY ) return null; // No error
-    TypeObj objs = tmem instanceof TypeMem
-      ? ((TypeMem)tmem).ld(ptr) // General load from memory
-      : ((TypeObj)tmem);
-    if( objs==TypeObj.UNUSED ) return null; // No error, since might fall to anything
+    TypeStruct objs = tmem instanceof TypeMem
+      ? ((TypeMem   )tmem).ld(ptr) // General load from memory
+      : ((TypeStruct)tmem);
+    if( objs==TypeStruct.UNUSED ) return null; // No error, since might fall to anything
     // Both type systems know about the field
-    if( !(objs instanceof TypeStruct) || ((TypeStruct)objs).get(_fld)==null )
+    if( objs.get(_fld)==null )
       return bad(fast,objs);
     return null;
   }
-  private ErrMsg bad( boolean fast, TypeObj to ) {
-    boolean is_closure = adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure;
+  private ErrMsg bad( boolean fast, TypeStruct to ) {
+    boolean is_closure = adr() instanceof NewNode nnn && nnn._is_closure;
     return fast ? ErrMsg.FAST : ErrMsg.field(_bad,"Unknown",_fld,is_closure,to);
   }
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }

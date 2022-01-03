@@ -16,8 +16,8 @@ public class TestLive {
     // Liveness is a backwards flow.  Scope always demands all return results.
     ScopeNode scope = new ScopeNode(false);
 
-    Node fullmem = new ConNode<>(TypeMem.FULL);
-    fullmem._val = TypeMem.FULL;
+    Node fullmem = new ConNode<>(TypeMem.ALLMEM);
+    fullmem._val = TypeMem.ALLMEM;
     scope.set_mem(fullmem);
 
     // Return the number '5' - should be alive with no special memory.
@@ -35,10 +35,10 @@ public class TestLive {
   }
 
   @SuppressWarnings("unchecked")
-  @Test public void testNewObj() {
+  @Test public void testNewNode() {
     GVNGCM gvn = Env.GVN;
     Node._INIT0_CNT = 1; // No prims
-    // Always memory for the NewObj
+    // Always memory for the NewNode
     Node mmm = new ConNode<>(TypeMem.ANYMEM).keep();
     mmm._val = TypeMem.ANYMEM;
 
@@ -51,31 +51,30 @@ public class TestLive {
     fdy._val = ti9;
 
     // New object, fields x,y holding ints
-    int alias = BitsAlias.new_alias(BitsAlias.REC);
-    NewObjNode nnn = new NewObjNode(false,alias,TypeMemPtr.DISPLAY,Node.con(Type.NIL));
-    nnn.create_active("x",fdx,Access.Final,Type.SCALAR,null);
-    nnn.create_active("y",fdy,Access.Final,Type.SCALAR,null);
+    int alias = BitsAlias.new_alias(BitsAlias.ALLX);
+    NewNode nnn = new NewNode(false,alias);
+    nnn.add_fld(TypeMemPtr.DISP_FLD,Node.con(Type.NIL),null);
+    nnn.add_fld(TypeFld.make("x"),fdx,null);
+    nnn.add_fld(TypeFld.make("y"),fdy,null);
+    nnn.close();
     nnn._val = Type.ANY;
-    nnn.no_more_fields();
     nnn.xval();
     nnn._live = TypeMem.ALIVE;
 
-    // Proj, OProj
+    // Mrg
     Node mem = new MrgProjNode(nnn,mmm);
     mem.xval();
-    Node ptr = new  ProjNode(REZ_IDX, nnn);
-    ptr.xval();
 
     // Use the object for scope exit
     ScopeNode scope = new ScopeNode(false);
     scope.set_mem(mem);
-    scope.set_rez(ptr);
+    scope.set_rez(nnn);
     scope._val = TypeTuple.EXIT_STATE;
 
     // Check 'live' is stable on creation, except for mem & scope
     // which are 'turning around' liveness.
     // Value was computed in a forwards flow.
-    for( Node n : new Node[]{mmm,fdx,fdy,nnn,mem,ptr,scope} ) {
+    for( Node n : new Node[]{mmm,fdx,fdy,nnn,mem,scope} ) {
       if( n != mem && n != scope )
         assertTrue(n.live().isa(n._live));
       assertEquals(n._val,n.value());
@@ -89,8 +88,6 @@ public class TestLive {
     assertEquals(scope._live,expected_live);
 
     // Check liveness recursive back one step
-    ptr.xliv();
-    assertEquals(TypeMem.ALIVE,ptr._live); // Ptr is all_type, conservative so all memory alive
     mem.xliv();
     assertEquals(mem._live,expected_live); // Object demands of OProj, but OProj passes along request to NewObj
     nnn.xliv();

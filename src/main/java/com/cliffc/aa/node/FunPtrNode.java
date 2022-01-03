@@ -97,7 +97,7 @@ public final class FunPtrNode extends ValFunNode {
       FunNode fun;
       // Display is known dead?
       if( _live==TypeMem.DEAD ||
-          (tdsp instanceof TypeMemPtr && ((TypeMemPtr)tdsp)._obj==TypeObj.UNUSED) ||
+          (tdsp instanceof TypeMemPtr tmp && tmp._obj==TypeStruct.UNUSED) ||
           // Collapsing to a gensym, no need for display
           ret().is_copy() ||
           // Also unused if function has no display parm.
@@ -109,7 +109,7 @@ public final class FunPtrNode extends ValFunNode {
   // Called if Display goes unused
   @Override public void add_flow_use_extra(Node chg) {
     Type tdsp = display()._val;
-    if( tdsp instanceof TypeMemPtr && ((TypeMemPtr)tdsp)._obj==TypeObj.UNUSED )
+    if( tdsp instanceof TypeMemPtr tmp && tmp._obj==TypeStruct.UNUSED )
       Env.GVN.add_reduce(this);
   }
 

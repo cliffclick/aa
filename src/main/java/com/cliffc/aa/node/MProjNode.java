@@ -33,7 +33,7 @@ public class MProjNode extends ProjNode {
     }
   }
 
-  @Override BitsAlias escapees() { return in(0).escapees(); }
+  //@Override BitsAlias escapees() { return in(0).escapees(); }
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public TypeMem live_use( Node def ) { return _live; }
 }

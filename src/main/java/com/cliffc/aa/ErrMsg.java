@@ -67,9 +67,9 @@ public class ErrMsg implements Comparable<ErrMsg> {
   public static ErrMsg asserterr( Parse loc, Type actual, Type t0mem, Type expected ) {
     return typerr(loc,actual,t0mem,expected,Level.Assert);
   }
-  public static ErrMsg field(Parse loc, String msg, String fld, boolean closure, TypeObj to) {
+  public static ErrMsg field(Parse loc, String msg, String fld, boolean closure, TypeStruct ts) {
     SB sb = new SB().p(msg).p(Parse.isOp(fld,false) ? " operator '" : (closure ? " val '" : " field '.")).p(fld).p("'");
-    if( to != null && !closure ) to.unbox().str(sb.p(" in "),new VBitSet(),null,false);
+    if( ts != null && !closure ) ts.unbox().str(sb.p(" in "),new VBitSet(),null,false);
     return new ErrMsg(loc,sb.toString(),Level.Field);
   }
   public static ErrMsg niladr(Parse loc, String msg, String fld) {

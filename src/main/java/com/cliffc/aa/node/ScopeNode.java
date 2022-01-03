@@ -35,14 +35,13 @@ public class ScopeNode extends Node {
     _closure = false;
   }
 
-  public   Node  ctrl() { return in(CTL_IDX); }
-  public   Node  mem () { return in(MEM_IDX); }
-  public   Node  ptr () { return in(DSP_IDX); }
-  public   Node  rez () { return in(ARG_IDX); }
-  public NewObjNode stk () { return (NewObjNode)ptr().in(0); }
-  public <N extends Node> N set_ctrl( N n ) { set_def(CTL_IDX,n); return n; }
-  public void set_ptr ( Node n) { set_def(DSP_IDX,n); }
-  public void set_rez ( Node n) { set_def(ARG_IDX,n); }
+  public    Node ctrl() { return in(CTL_IDX); }
+  public    Node mem () { return in(MEM_IDX); }
+  public NewNode stk () { return (NewNode)in(DSP_IDX); }
+  public    Node rez () { return in(ARG_IDX); }
+  public <N extends Node> N set_ctrl(    N    n) { set_def(CTL_IDX,n); return n; }
+  public void               set_stk ( NewNode n) { set_def(DSP_IDX,n);           }
+  public void               set_rez (    Node n) { set_def(ARG_IDX,n);           }
 
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
   public Node set_mem( Node n) {
@@ -68,8 +67,8 @@ public class ScopeNode extends Node {
   @Override public boolean is_mem() { return true; }
 
   public Node get(String name) { return stk().get(name); }
-  public boolean is_mutable(String name) { return stk().is_mutable(name); }
-
+  public boolean is_mutable(String name) { return stk().fld(name)._access==Access.RW; }
+  
   public RegionNode early_ctrl() { return (RegionNode)in(4); }
   public    PhiNode early_mem () { return (   PhiNode)in(5); }
   public    PhiNode early_val () { return (   PhiNode)in(6); }
@@ -158,11 +157,11 @@ public class ScopeNode extends Node {
     Type trez = rez._val;
     if( !(tmem instanceof TypeMem ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
     TypeMem tmem0 = (TypeMem)tmem;
-    if( TypeMemPtr.OOP.isa(trez) ) return tmem0.flatten_fields(); // All possible pointers, so all memory is alive
+    if( TypeMemPtr.ISUSED.isa(trez) ) return tmem0.flatten_fields(); // All possible pointers, so all memory is alive
     // For function pointers, all memory returnable from any function is live.
     if( trez instanceof TypeFunPtr && scope != null ) {
       BitsFun fidxs = ((TypeFunPtr)trez)._fidxs;
-      Type disp = ((TypeFunPtr)trez)._dsp;
+      Type disp = ((TypeFunPtr)trez).dsp();
       BitsAlias esc_in = disp instanceof TypeMemPtr ? ((TypeMemPtr)disp)._aliases : BitsAlias.EMPTY;
       TypeMem tmem3 = TypeMem.ANYMEM;
       for( int i=ARG_IDX+1 ; i<scope._defs._len; i++ ) {
@@ -197,7 +196,7 @@ public class ScopeNode extends Node {
     // Basic liveness ("You are Alive!") for control and returned value
     if( def == ctrl() ) return TypeMem.ALIVE;
     if( def == rez () ) return TypeMem.ALIVE; // Returning a Scalar, including e.g. a mem ptr
-    if( def == ptr () ) return TypeMem.ALIVE; // Display must be kept-alive during e.g. parsing.
+    if( def == stk () ) return TypeMem.ALIVE; // Display must be kept-alive during e.g. parsing.
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.
     if( def == mem() ) return _uses._len>0 && _uses.at(0)==Env.KEEP_ALIVE ? TypeMem.ALLMEM : _live;
@@ -308,7 +307,7 @@ public class ScopeNode extends Node {
         String msg = "'"+name+"' not defined on "+arm+" arm of trinary";
         Node err = gvn.xform(new ErrNode(ctrl,bad,msg));
         // Exactly like a parser store of an error, on the missing side
-        mem = gvn.xform(new StoreNode(mem,scope.ptr(),err,Access.Final,name,bad));
+        mem = gvn.xform(new StoreNode(mem,scope.stk(),err,Access.Final,name,bad));
       }
       return mem.keep(2);        // Return 'hooked' memory
     }
