@@ -15,8 +15,9 @@ public class ParmNode extends PhiNode {
     this(defalt._t,badgc,fun,idx,name);
     add_def(defalt);
   }
-  public ParmNode( TypeFld fld, Node fun, ConNode defalt, Parse badgc) {
-    this(fld._t.simple_ptr(),badgc,fun,fld._order,fld._fld);
+  // Used by Parser to make function headers
+  public ParmNode( TypeFld fld, Node fun, Node defalt, Parse badgc) {
+    this(fld._t,badgc,fun,fld._order,fld._fld);
     add_def(defalt);
   }
   public ParmNode( int idx, String name, Node fun, Type tdef, Node defalt, Parse badgc) {

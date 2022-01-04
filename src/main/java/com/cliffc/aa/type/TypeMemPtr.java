@@ -163,6 +163,14 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     if( _obj.len()==0 ) return this;
     return make_from(_obj.oob(TypeStruct.ISUSED).set_name(_obj._name));
   }
+  // Value types have a named prototype, and locally carry their fields in the
+  // Type, i.e. are not a simple_ptr.  Reference types also have a named
+  // prototype, but locally carry their fields in memory and so always use a
+  // simple ptr.
+  public boolean is_valtype() {
+    return _obj.len()>0 && _obj._name.length()>0;
+  }
+  
   @Override public boolean above_center() { return _aliases.above_center(); }
   // Aliases represent *classes* of pointers and are thus never constants.
   // nil is a constant.

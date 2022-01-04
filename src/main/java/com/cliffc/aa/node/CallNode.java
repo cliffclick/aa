@@ -174,30 +174,17 @@ public class CallNode extends Node {
     if( cc!=null ) return set_def(0,cc);
     // When do I do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
-    if( !_unpacked ) {          // Not yet unpacked a tuple
-      assert nargs()==ARG_IDX+1;// Memory, Display plus the arg tuple
-      Node arg = arg(ARG_IDX);
-      Type tadr = arg._val;
-      if( tadr instanceof TypeMemPtr tmp && arg instanceof NewNode nnn ) {
-        int alias = tmp._aliases.getbit();
-        Node mem = mem();
-        if( mem instanceof FreshNode fresh) mem = fresh.id();
-        // Bypass a MemJoin
-        if( mem instanceof MemJoinNode join) {
-          int jdx = join.msp().find_alias_index(alias);
-          if( jdx!=0 ) mem = mem.in(jdx);
-        }
-        // Find a tuple being passed in directly; unpack
-        if( mem instanceof MrgProjNode mrg && mrg.nnn() == nnn ) {
-          pop(); // Pop off the NewNode tuple
-          for( int i=ARG_IDX; i<nnn._defs._len; i++ ) // Push the args; unpacks the tuple
-            add_def(nnn.in(i));
-          _unpacked = true;     // Only do it once
-          xval(); // Recompute value, this is not monotonic since replacing tuple with args
-          GVN.add_work_new(this);// Revisit after unpacking
-          return this;
-        }
-      }
+    if( !_unpacked &&           // Not yet unpacked a tuple
+        arg(ARG_IDX) instanceof NewNode nnn && // An allocation
+        nnn._is_val ) {                        // A tuple
+      // Find a tuple being passed in directly; unpack
+      pop(); // Pop off the NewNode tuple
+      for( int i=ARG_IDX; i<nnn._defs._len; i++ ) // Push the args; unpacks the tuple
+        add_def(nnn.in(i));
+      _unpacked = true;     // Only do it once
+      xval(); // Recompute value, this is not monotonic since replacing tuple with args
+      GVN.add_work_new(this);// Revisit after unpacking
+      return this;
     }
 
     Type tc = _val;

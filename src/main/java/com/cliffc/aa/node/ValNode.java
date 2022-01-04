@@ -86,8 +86,10 @@ public class ValNode extends ValFunNode {
     for( TypeFld fld : oflds ) {
       Type pt = proto.val(fld._order);
       if( fld._access==TypeFld.Access.RW ) {
-        if( pt != Type.XNIL  ) throw unimpl();   // Default constructed; "fld := init" mutable not allowed in Val
+        if( !(proto.in(fld._order) instanceof ConNode) )
+          throw unimpl();   // Not a default constructed; "fld := init" mutable not allowed in Val
         flds.push(fld._fld);
+        continue;
       }
       if( (pt==Type.ANY ||            // Dead
            pt.is_con() ||             // Find class constants in the prototype

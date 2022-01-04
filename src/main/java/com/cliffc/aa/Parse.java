@@ -277,7 +277,8 @@ public class Parse implements Comparable<Parse> {
     // already have happened: as a type (in an type annotation) and as a
     // standard fref in a fact (probably as a constructor call).
     UnresolvedNode construct = (UnresolvedNode)_e.lookup(tok);
-    NewNode typenode  = _e.lookup_type(tok);
+    String tvar = (tok+":").intern();
+    NewNode typenode  = _e.lookup_type(tvar);
     // Make a forward-ref constructor, if not one already
     if( construct==null ) construct = val_fref(tok,errMsg());
     else if( !construct.is_forward_ref() )
@@ -285,9 +286,9 @@ public class Parse implements Comparable<Parse> {
     construct.scoped();
 
     // Look for a prior type assignment, from e.g. a type annotation
-    if( typenode == null ) typenode = type_fref(tok); // None, so create
-    else if( !typenode.is_forward_type() )
-      throw unimpl(); // Double-define error
+    if( typenode == null ) typenode = type_fref(tvar,is_val); // None, so create
+    else if( typenode.is_forward_type() ) typenode._is_val = is_val;
+    else throw unimpl(); // Double-define error
 
     // Parse a 'fact' as a type.  Check for a 'struct' first, to pass along the
     // pre-selected forward-ref alias.  Other 'fact's will not use the alias.
@@ -296,14 +297,15 @@ public class Parse implements Comparable<Parse> {
     if( peek('?')     ) return err_ctrl2("Named types are never nil");
     // TODO: pattern changes, returns NewNode directly and updates MrgProjNode
     assert is_val || newtype instanceof NewNode; // Ref types are only structs
+    typenode.define();                           // No longer a forward ref
 
     // Build a constructor
     if( newtype instanceof NewNode nnn ) {
-      if( is_val ) construct.add_fun((ValFunNode)gvn(ValNode.make(nnn)));
-      else         throw unimpl();         // Reference type
-      assert  ((MrgProjNode)mem()).nnn()==nnn;
-      set_mem(((MrgProjNode)mem()).mem()); // Unlink prototype from mem; it is just around for loading constants
-      return construct.define();
+      if( is_val ) {
+        construct.add_fun((ValFunNode)gvn(ValNode.make(nnn)));
+        return construct.define(); // Value type is defined
+      } else
+        throw unimpl();         // Reference type
 
     } else {
       // Other types?  e.g. defining a named function-type needs a breakdown of
@@ -390,7 +392,7 @@ public class Parse implements Comparable<Parse> {
     }
 
     // Normal statement value parse
-    Node ifex = default_nil ? Env.XNIL : ifex(); // Parse an expression for the statement value
+    Node ifex = default_nil ? (scope().stk()._is_val ? con(ts.at(0)) : Env.XNIL) : ifex(); // Parse an expression for the statement value
     // Check for no-statement after start of assignment, e.g. "x = ;"
     if( ifex == null ) {        // No statement?
       if( toks._len == 0 ) return null;
@@ -418,8 +420,9 @@ public class Parse implements Comparable<Parse> {
     boolean create = scope==null;
     if( create ) {              // Token not already bound at any scope
       scope = scope();          // Create in the current scope
-      TypeFld fld = TypeFld.make(tok,t,Access.RW,scope.stk().len());
-      scope.stk().add_fld(fld,Env.XNIL,badf); // Create at top of scope as undefined
+      NewNode stk = scope.stk();
+      TypeFld fld = TypeFld.make(tok,t,stk._is_val ? mutable : Access.RW,stk.len());
+      stk.add_fld(fld, stk._is_val ? con(t) : Env.ALL,badf); // Create at top of scope as undefined
       scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
     }
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
@@ -876,7 +879,7 @@ public class Parse implements Comparable<Parse> {
    */
   private NewNode tuple(int oldx, Node s, int first_arg_start) {
     int alias = Env.new_alias();
-    NewNode nn = new NewNode(false,false,alias);
+    NewNode nn = new NewNode(false,true,false,alias);
     // No display for tuples
     nn.add_fld(TypeFld.NO_DISP,Env.ANY,null);
     // First stmt is parsed already
@@ -890,11 +893,7 @@ public class Parse implements Comparable<Parse> {
       s = stmts();              // Parse arg
     }
     require(')',oldx);          // Balanced closing paren
-    nn.close();                 // No more fields
-    int nidx = init(nn).push(); // Init, save across MrgProj
-    // NewNode changes memory
-    set_mem(gvn(new MrgProjNode(nn,mem())));
-    return (NewNode)Node.pop(nidx);
+    return init(nn.close());    // No more field, init and return
   }
 
 
@@ -980,9 +979,9 @@ public class Parse implements Comparable<Parse> {
     // Record H-M VStack in case we clone
     //fun.set_nongens(_e._nongen.compact());
     // Build Parms for system incoming values
-    int rpc_idx = init(new ParmNode(CTL_IDX," rpc",fun,TypeRPC.ALL   ,Env.ALL_CALL      ,null)).push();
-    int clo_idx = init(new ParmNode(DSP_IDX,"^"   ,fun,par_stk._tptr ,con(par_stk._tptr),null)).push();
-    Node mem    = init(new ParmNode(MEM_IDX," mem",fun,TypeMem.ALLMEM,Env.DEF_MEM       , null));
+    int rpc_idx = init(new ParmNode(CTL_IDX," rpc",fun,TypeRPC.ALL   ,Env.ALL_CALL,null)).push();
+    int clo_idx = init(new ParmNode(DSP_IDX,"^"   ,fun,par_stk._tptr ,par_stk     ,null)).push();
+    Node mem    = init(new ParmNode(MEM_IDX," mem",fun,TypeMem.ALLMEM,Env.DEF_MEM ,null));
 
     // Increase scope depth for function body.
     int fidx;
@@ -999,7 +998,9 @@ public class Parse implements Comparable<Parse> {
       for( TypeFld fld : formals ) { // User parms start
         if( fld._order <= DSP_IDX ) continue;// Already handled
         assert fun==_e._fun && fun==_e._scope.ctrl();
-        Node parm = gvn(new ParmNode(fld,fun,Env.ALL_PARM,errmsg));
+        String tvar = ValFunNode.valtype(fld._t);
+        Node defalt = tvar==null ? Env.ALL_PARM : e.lookup_type(tvar);
+        Node parm = gvn(new ParmNode(fld,fun,defalt,errmsg));
         scope().stk().add_fld(fld,parm,bads.at(fld._order-ARG_IDX));
       }
       stk.set_nargs();
@@ -1290,8 +1291,9 @@ public class Parse implements Comparable<Parse> {
     if( nt instanceof FreshNode ) nt = ((FreshNode)nt).id();
     if( nt instanceof UnresolvedNode ) {
       String tvar = ((UnresolvedNode)nt)._name;
+      tvar = (tvar+":").intern();
       NewNode typenode = _e.lookup_type(tvar);
-      if( typenode==null ) typenode=type_fref(tvar); // Must be a forward-ref type
+      if( typenode==null ) typenode=type_fref(tvar,false); // Must be a forward-ref type
       return typenode._val;
     }
 
@@ -1319,10 +1321,11 @@ public class Parse implements Comparable<Parse> {
     return fref;
   }
   // Create a type forward-reference.  Must be type-defined later.
-  private NewNode type_fref(String tok) {
-    NewNode tn = init(new NewNode(true,true,Env.new_alias()).set_type_name((tok+":").intern()));
+  private NewNode type_fref(String tvar, boolean is_val) {
+    assert tvar.charAt(tvar.length()-1)==':';
+    NewNode tn = init(new NewNode(false,is_val,true,Env.new_alias()).set_type_name(tvar));
     assert tn.is_forward_type();
-    _e.add_type(tok,tn);
+    _e.add_type(tvar,tn);
     return tn;
   }
 

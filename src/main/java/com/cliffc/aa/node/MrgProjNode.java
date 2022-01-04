@@ -11,7 +11,10 @@ import static com.cliffc.aa.AA.unimpl;
 
 // Not really a ProjNode; merges memory from a NewNode into the main memory.
 public class MrgProjNode extends ProjNode {
-  public MrgProjNode( NewNode nnn, Node mem ) { super(MEM_IDX,nnn,mem); }
+  public MrgProjNode( NewNode nnn, Node mem ) {
+    super(MEM_IDX,nnn,mem);
+    assert !nnn._is_val;        // Do not make after a Value type
+  }
   @Override public String xstr() { return "MrgProj"+_idx; }
   @Override public boolean is_mem() { return true; }
   public NewNode nnn() { return (NewNode)in(0); }

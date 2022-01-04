@@ -118,7 +118,7 @@ public class Env implements AutoCloseable {
   Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr, NewNode fref ) {
     _par = par;
     _fun = fun;
-    NewNode nnn = fref==null ? GVN.init(new NewNode(is_closure,false,new_alias())) : fref;
+    NewNode nnn = fref==null ? GVN.init(new NewNode(is_closure,false,false,new_alias())) : fref;
     nnn.add_fld(TypeFld.make_dsp(dsp_ptr._val),dsp_ptr,null);
     // Install a top-level prototype mapping
     if( fref!=null ) {          // Forward ref?
@@ -126,12 +126,12 @@ public class Env implements AutoCloseable {
       assert !PROTOS.containsKey(fname); // All top-level type names are globally unique
       PROTOS.put(fname,nnn);
     }
-
-    Node frm = GVN.init(new MrgProjNode(nnn,mem));
+    if( !nnn._is_val )          // Non-value update memory
+      mem = GVN.init(new MrgProjNode(nnn,mem));
     _scope = GVN.init(new ScopeNode(is_closure));
     _scope.set_ctrl(ctrl);
+    _scope.set_mem (mem);  // Memory includes local stack frame
     _scope.set_stk (nnn);  // Address for 'nnn', the local stack frame
-    _scope.set_mem (frm);  // Memory includes local stack frame
     _scope.set_rez (ALL_PARM);
     KEEP_ALIVE.add_def(_scope);
     GVN.do_iter();
@@ -282,10 +282,11 @@ public class Env implements AutoCloseable {
   }
 
   // Type lookup in any scope
-  NewNode lookup_type( String name ) {
-    NewNode t = _scope.get_type(name);
+  NewNode lookup_type( String tvar ) {
+    assert tvar.charAt(tvar.length()-1)==':';
+    NewNode t = _scope.get_type(tvar);
     if( t != null ) return t;
-    return _par == null ? null : _par.lookup_type(name);
+    return _par == null ? null : _par.lookup_type(tvar);
   }
   // Update type name token to type mapping in the current scope
   void add_type( String name, NewNode t ) { _scope.add_type(name,t); }

@@ -30,15 +30,22 @@ public class LoadNode extends Node {
   @Override public Node ideal_reduce() {
     Node adr = adr();
     Type tadr = adr._val;
+    if( !(tadr instanceof TypeMemPtr tmp) ) return null;
+    // Loads from value types do not need the memory edge
+    if( tmp.is_valtype() && mem()!=null )
+      return set_def(MEM_IDX,null);
 
     // See if this is a named object as a ptr, with a prototype.
-    String tname = ValFunNode.valtype(tadr);
+    // Can be either a reference or value type.
+    String tname = ValFunNode.valtype(tmp);
     if( tname!=null ) {
-      NewNode nnn = Env.PROTOS.get(tname);
+      NewNode nnn = Env.PROTOS.get(tname); // Get the prototype
       if( nnn!=null ) {
+        // Is either a reference or a value type
         TypeFld fld = nnn.fld(_fld);
-        if( fld==null ) return null;              // No such field
-        if( fld._access==TypeFld.Access.Final ) { // Final fields: all in the prototype
+        if( fld==null ) return null; // No such field in prototype
+        // For both, eager final fields are moved to the prototype.
+        if( fld._access==TypeFld.Access.Final ) { // Final fields: might be in the prototype
           // Load from the prototype
           Node p = nnn.in(fld._order);
           if( p._val==Type.ALL ) return null;
@@ -60,15 +67,14 @@ public class LoadNode extends Node {
     }
 
     // If we can find an exact previous store, fold immediately to the value.
-    if( tadr instanceof TypeMemPtr ) {
-      Node st = find_previous_store(mem(),adr,((TypeMemPtr)tadr)._aliases,_fld,true);
-      if( st!=null ) {
-        Node rez = st instanceof StoreNode
-          ? ((StoreNode)st).rez()
-          : ((  NewNode)st).get(_fld);
-        return rez==this ? null : rez;
-      }
+    Node st = find_previous_store(mem(),adr,tmp._aliases,_fld,true);
+    if( st!=null ) {
+      Node rez = st instanceof StoreNode
+        ? ((StoreNode)st).rez()
+        : ((  NewNode)st).get(_fld);
+      return rez==this ? null : rez;
     }
+
     return null;
   }
 
@@ -125,7 +131,7 @@ public class LoadNode extends Node {
     // Load from a memory Phi; split through in an effort to sharpen the memory.
     // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
     // TODO: Hoist out of loops.
-    if( mem._op == OP_PHI && adr.in(0) instanceof NewNode ) {
+    if( mem!=null && mem._op == OP_PHI && adr.in(0) instanceof NewNode ) {
       Node lphi = new PhiNode(Type.SCALAR,((PhiNode)mem)._badgc,mem.in(0));
       for( int i=1; i<mem._defs._len; i++ )
         lphi.add_def(Env.GVN.add_work_new(new LoadNode(mem.in(i),adr,_fld,_bad)));
@@ -138,6 +144,7 @@ public class LoadNode extends Node {
   // Find a matching prior Store or NewObj - matching field name and address.
   // Returns null if highest available memory does not match name & address.
   static Node find_previous_store(Node mem, Node adr, BitsAlias aliases, String fld, boolean is_load ) {
+    if( mem==null ) return null;
     Type tmem = mem._val;
     if( !(tmem instanceof TypeMem) || aliases==null ) return null;
     // Walk up the memory chain looking for an exact matching Store or New
@@ -222,8 +229,7 @@ public class LoadNode extends Node {
   @Override public Type value() {
     Node adr = adr();
     Type tadr = adr._val;
-    if( !(tadr instanceof TypeMemPtr) ) return tadr.oob();
-    TypeMemPtr tmp = (TypeMemPtr)tadr;
+    if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.oob();
     // Loading from a Value type?
     if( ValFunNode.valtype(tmp)!=null ) {
       if( !(tmp._obj instanceof TypeStruct) ) return tmp._obj.oob(Type.SCALAR);

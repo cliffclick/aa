@@ -23,6 +23,13 @@ public final class RetNode extends Node {
     _fidx = fun._fidx;
     _nargs=fun.nargs();
   }
+
+  // Short self name
+  @Override public String xstr() {
+    if( is_dead() ) return "Ret!";
+    FunNode fun = fun();
+    return "Ret"+(is_copy() ? "!copy!" : (fun==null ? "["+_fidx+"]" : fun.name()));
+  }
   public Node ctl() { return in(0); }
   public Node mem() { return in(1); }
   public Node rez() { return in(2); }
@@ -48,13 +55,29 @@ public final class RetNode extends Node {
     if( !super.equals(o) ) return false;
     return _fidx==((RetNode)o)._fidx;
   }
-
-  // Short self name
-  @Override public String xstr() {
-    if( is_dead() ) return "Ret!";
-    FunNode fun = fun();
-    return "Ret"+(is_copy() ? "!copy!" : (fun==null ? "["+_fidx+"]" : fun.name()));
+  
+  @Override public Type value() {
+    if( ctl()==null ) return _val; // No change if a copy
+    Type ctl = ctl()._val;
+    if( ctl != Type.CTRL ) return ctl.oob(TypeTuple.RET);
+    Type mem = mem()==null ? TypeMem.ANYMEM : mem()._val;
+    if( !(mem instanceof TypeMem) ) mem = mem.oob(TypeMem.ALLMEM);
+    Type val = rez()._val;
+    return TypeTuple.make(ctl,mem,val);
   }
+  @Override public void add_flow_extra(Type old) {
+    // Return type changed, so Fun._sig changes.
+    if( !is_copy() ) Env.GVN.add_reduce(fun());
+  }
+
+  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
+  @Override public TypeMem live_use(Node def ) {
+    return def==mem() ? _live : TypeMem.ALIVE;
+  }
+
+  // Funs get special treatment by the H-M algo.
+  @Override public TV2 new_tvar( String alloc_site) { return null; }
+  @Override public boolean unify( boolean test ) { return false; }
 
   @Override public Node ideal_reduce() {
     // If control is dead, but the Ret is alive, we're probably only using the
@@ -80,11 +103,18 @@ public final class RetNode extends Node {
       }
     }
     if( is_copy() ) return progress;
+
+    // Function is 'pure', nuke memory edge.
+    Node mem = mem();
+    if( mem instanceof ParmNode && mem.in(0)==fun() )
+      return set_def(1,null);
+    
     // Collapsed to a constant?  Remove any control interior.
     Node ctl = ctl();
     if( rez()._val.is_con() && ctl!=fun() && // Profit: can change control and delete function interior
-        (mem()._val ==TypeMem.ANYMEM || (mem() instanceof ParmNode && mem().in(0)==fun())) ) // Memory has to be trivial also
+        (mem==null || mem._val ==TypeMem.ANYMEM) ) // Memory has to be trivial also
       return set_def(0,fun());  // Gut function body
+    
     return progress;
   }
 
@@ -172,29 +202,6 @@ public final class RetNode extends Node {
     return tback.isa(tenter);
   }
 
-
-  @Override public Type value() {
-    if( ctl()==null ) return _val; // No change if a copy
-    Type ctl = ctl()._val;
-    if( ctl != Type.CTRL ) return ctl.oob(TypeTuple.RET);
-    Type mem = mem()._val;
-    if( !(mem instanceof TypeMem) ) mem = mem.oob(TypeMem.ALLMEM);
-    Type val = rez()._val;
-    return TypeTuple.make(ctl,mem,val);
-  }
-  @Override public void add_flow_extra(Type old) {
-    // Return type changed, so Fun._sig changes.
-    if( !is_copy() ) Env.GVN.add_reduce(fun());
-  }
-
-  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
-  @Override public TypeMem live_use(Node def ) {
-    return def==mem() ? _live : TypeMem.ALIVE;
-  }
-
-  // Funs get special treatment by the H-M algo.
-  @Override public TV2 new_tvar( String alloc_site) { return null; }
-  @Override public boolean unify( boolean test ) { return false; }
 
   @Override public Node is_copy(int idx) { throw com.cliffc.aa.AA.unimpl(); }
   boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }

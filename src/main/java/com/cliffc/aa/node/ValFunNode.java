@@ -22,8 +22,8 @@ public abstract class ValFunNode extends Node {
 
   // Value types also appear in TypeFunPtr contexts and in TypeMemPtr otherwise.
   public static String valtype( Type t ) {
-    if( !(t instanceof TypeMemPtr) ) return null;
-    String tname = ((TypeMemPtr)t)._obj._name;
+    if( !(t instanceof TypeMemPtr tmp) ) return null;
+    String tname = tmp._obj._name;
     return tname.length() > 0 ? tname : null;
   }
 

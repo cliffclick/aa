@@ -69,7 +69,7 @@ public abstract class PrimNode extends Node {
       //new MemPrimNode.ReadPrimNode.LValueRead  (), // Read  an L-Value: (ary,idx) ==> elem
       //new MemPrimNode.ReadPrimNode.LValueWrite (), // Write an L-Value: (ary,idx,elem) ==> elem
       //new MemPrimNode.ReadPrimNode.LValueWriteFinal(), // Final Write an L-Value: (ary,idx,elem) ==> elem
-      
+
       // These are unary ops, precedence determined outside 'Parse.expr'
       //new MemPrimNode.ReadPrimNode.LValueLength(), // The other array ops are "balanced ops" and use term() for precedence
       new MinusF64(),
@@ -218,7 +218,7 @@ public abstract class PrimNode extends Node {
 
   public static class DivF64 extends Prim2OpF64 {
     public DivF64() { super("/"); }
-    @Override double op( double l, double r ) { return l/r; }
+    @Override double op( double l, double r ) { return r==0 ? 0 : l/r; }
   }
 
   // 2RelOps have uniform input types, and bool output
@@ -260,12 +260,12 @@ public abstract class PrimNode extends Node {
 
   public static class DivI64 extends Prim2OpI64 {
     public DivI64() { super("/"); }
-    @Override long op( long l, long r ) { return l/r; } // Long division
+    @Override long op( long l, long r ) { return r==0 ? 0 : l/r; } // Long division
   }
 
   public static class ModI64 extends Prim2OpI64 {
     public ModI64() { super("%"); }
-    @Override long op( long l, long r ) { return l%r; }
+    @Override long op( long l, long r ) { return r==0 ? 0 : l%r; }
   }
 
   public static class AndI64 extends Prim2OpI64 {

@@ -20,9 +20,34 @@ import static com.cliffc.aa.AA.unimpl;
 //
 // The inputs mirror the standard input pattern; CTL_IDX is null, MEM_IDX is
 // null, DSP_IDX is the display field, and the other fields follow.
+//
+// NewNodes can be forward_refs; this is temporary until the definition is
+// complete.
+//
+// NewNodes can be used as "stack frames" for closures.  All fields up until
+// nargs are incoming parameters (and HM treats as lambda arguments).  All
+// fields after nargs are treated as normal let-bound definitions.
+//
+// NewNodes can be used as "records" or "class instances".  All the fields are
+// treated by HM as record fields.  These can be named or unnamed; unnamed
+// records are basically C-style structs.
+//
+// NewNodes can further be broken into value types vs reference types.
+// Value types have ONLY final fields, and are copied by value.  They have no
+// memory state, no unique memory id, no "pointer" nor "address".  Reference
+// types DO have memory state, and a unique pointer (memory id).
+//
+// Named NewNodes have their globally unique mangled name in Env.PROTOS.  All
+// eager-final-fields are moved into the prototype, and non-final fields are in
+// the local instances.  In particular, locally defined function assignments
+// are all eager-final and moved into the PROTOS and take no local space.
+// Loads against an instance check to see if the field is eager-final or not,
+// and load against either the local instance or the prototype as needed.  No
+// runtime check needed for local vs PROTOs.
 
 public class NewNode extends Node {
   public final boolean _is_closure; // For error messages
+  public       boolean _is_val;     // Value type (no memory)
   public       Parse[] _fld_starts; // Start of each tuple member; 0 for the display
 
   // Unique alias class, one class per unique memory allocation site.
@@ -35,23 +60,24 @@ public class NewNode extends Node {
   public int _nargs;
 
   // A list of field names and field-mods, folded into the initial state of
-  // this NewObj.  These can come from initializers at parse-time, or stores
+  // this New.  These can come from initializers at parse-time, or stores
   // folded in.  There are no types stored here; types come from the inputs.
   public TypeStruct _ts; // Base object type, representing all possible future values
 
-  // Just TMP.make(_alias,OBJ)
+  // Just TMP.make(_alias,ISUSED)
   public TypeMemPtr _tptr;
 
-  // Still adding fields or not
+  // Still adding fields or not.
   private boolean _closed;
 
   // True if forward-ref
   private boolean _forward_ref;
 
   // Takes an alias only
-  public NewNode( boolean closure, boolean forward_ref, int alias ) {
+  public NewNode( boolean closure, boolean is_val, boolean forward_ref, int alias ) {
     super(OP_NEW, null, null);
     _is_closure = closure;
+    _is_val = is_val;
     _forward_ref = forward_ref;
     _init( alias, TypeStruct.EMPTY);
   }
@@ -67,6 +93,7 @@ public class NewNode extends Node {
   @Override void record_for_reset() { _reset_alias=_alias; }
   void reset() { assert is_prim(); _init(_reset_alias,_ts); }
   @Override public boolean is_forward_type() { return _forward_ref; }
+  public void define() { assert _forward_ref && _closed; _forward_ref=false; }
 
   public MrgProjNode mem() {
     for( Node use : _uses ) if( use instanceof MrgProjNode mrg ) return mrg;
@@ -94,6 +121,7 @@ public class NewNode extends Node {
     _fld_starts[_ts.len()]=badt;
     _ts = _ts.add_fldx(fld);     // Will also assert no-dup field names
     add_def(val);
+    xval(); // Eagerly update the type
     Env.GVN.add_flow(this);
     Env.GVN.add_flow_uses(this);
   }
@@ -103,9 +131,9 @@ public class NewNode extends Node {
     assert !_closed;
     TypeFld fld = _ts.get(name);
     Node n = in(fld._order);
-    UnresolvedNode unr = n==Env.XNIL
-      ? new UnresolvedNode(name,bad).scoped()
-      : (UnresolvedNode)n;
+    UnresolvedNode unr = n instanceof UnresolvedNode
+      ? (UnresolvedNode)n
+      : new UnresolvedNode(name,bad).scoped();
     unr.add_fun(ptr);           // Checks all formals are unambiguous
     set_fld(fld.make_from(fld._t,TypeFld.Access.Final),unr);
   }
@@ -118,7 +146,7 @@ public class NewNode extends Node {
   public void pop_fld() { throw unimpl(); }
 
   public boolean is_closed() { return _closed; }
-  public void close() { assert !_closed; _closed=true; }
+  public NewNode close() { assert !_closed; _closed=true; return this; }
 
     // The current local scope ends, no more names will appear.  Forward refs
   // first found in this scope are assumed to be defined in some outer scope
@@ -146,7 +174,7 @@ public class NewNode extends Node {
   }
 
 
-  @Override public Type value() { return _tptr; }
+  @Override public Type value() { return _is_val ? _tptr.make_from(valueobj()) : _tptr; }
   // Used by MrgProj
   TypeStruct valueobj() { return _ts.make_from(this::val); }
 
@@ -160,7 +188,7 @@ public class NewNode extends Node {
 
   @Override public TypeMem live() {
     // Kept alive as prototype, until Combo resolves all Load-uses.
-    if( Env.PROTOS.containsKey(_ts._name) || _forward_ref )
+    if( Env.PROTOS.containsKey(_ts._name) || _forward_ref || _is_val )
       return TypeMem.ALLMEM;
 
     MrgProjNode mrg=null; boolean has_ptr=false;
@@ -226,6 +254,7 @@ public class NewNode extends Node {
 
   @Override public Node ideal_reduce() {
     if( _forward_ref ) return null; // Not defined yet
+    if( _is_val ) return null; // will die with no pointers as normal
     // If either the address or memory is not looked at then the memory
     // contents are dead.  The object might remain as a 'gensym' or 'sentinel'
     // for identity tests.

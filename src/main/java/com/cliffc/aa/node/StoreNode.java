@@ -56,29 +56,19 @@ public class StoreNode extends Node {
       return this;
     }
 
-    // If Store is by a New and no other Stores, fold into the New.
-    if( mem instanceof MrgProjNode mrg &&
-        // Store into a NewNode, same memory and address
-        mrg.nnn() == adr &&
+    // If Store is into a value New, fold into the New.
+    // Happens inside value constructors.
+    if( adr instanceof NewNode nnn && nnn._is_val && _fold(nnn) )
+      return mem;
+
+    // Store into a NewNode, same memory and address
+    if( mem instanceof MrgProjNode mrg && mrg.nnn() == adr &&
         // Do not bypass a parallel writer
-        mem.check_solo_mem_writer(this) ) { // Use is by self
-        // Find the field being updated
-      NewNode nnn = mrg.nnn();
-      TypeFld tfld = nnn.fld(_fld);
-      if( tfld!= null ) {
-        // Have to be allowed to directly update NewNode
-        if( tfld._access==Access.RW || rez() instanceof ValFunNode || rez() instanceof UnresolvedNode ) {
-          // Field is modifiable; update New directly.
-          if( rez() instanceof ValFunNode || rez() instanceof UnresolvedNode )
-            nnn.add_fun(_bad,_fld,(ValFunNode)rez()); // Stacked FunPtrs into an Unresolved
-          else
-            nnn.set_fld(tfld.make_from(tfld._t,_fin),rez()); // Update the value, and perhaps the final field
-          mem.xval();             // Update memory state
-          Env.GVN.add_flow_uses(this);
-          add_reduce_extra();     // Folding in allows store followers to fold in
-          return mem;             // Store is replaced by using the New directly.
-        }
-      }
+        mem.check_solo_mem_writer(this) &&
+        // Test for folding
+        _fold(mrg.nnn()) ) {
+      mem.xval();
+      return mem;
     }
 
     // If Store is of a MemJoin and it can enter the split region, do so.
@@ -95,6 +85,25 @@ public class StoreNode extends Node {
 
     return null;
   }
+
+  // See if we can fold this Store into this New.
+  private boolean _fold( NewNode nnn ) {
+    // Find the field being updated
+    TypeFld tfld = nnn.fld(_fld);
+    if( tfld== null ) return false;
+    // Folding unambiguous functions?
+    if( rez() instanceof ValFunNode || rez() instanceof UnresolvedNode )
+      nnn.add_fun(_bad,_fld,(ValFunNode)rez()); // Stacked FunPtrs into an Unresolved
+    // Field is modifiable; update New directly.
+    else if( tfld._access==Access.RW )
+      nnn.set_fld(tfld.make_from(tfld._t,_fin),rez()); // Update the value, and perhaps the final field
+    else  return false;      // Cannot fold
+    nnn.xval();
+    Env.GVN.add_flow_uses(this);
+    add_reduce_extra();     // Folding in allows store followers to fold in
+    return true;            // Folded.
+  }
+
 
   @Override public Node ideal_mono() { return null; }
   @Override public Node ideal_grow() {

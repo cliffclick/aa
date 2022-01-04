@@ -2,16 +2,16 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Combo;
 import com.cliffc.aa.type.*;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Set;
 
 import static com.cliffc.aa.AA.*;
-import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 import static com.cliffc.aa.type.TypeFld.Access;
+import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -497,7 +497,7 @@ public class TestNodeSmall {
     // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
     // yet built.
     int alias = BitsAlias.new_alias(BitsAlias.ALLX);
-    NewNode dsp_file = (NewNode)gvn.xform(new NewNode(true,false,alias));
+    NewNode dsp_file = (NewNode)gvn.xform(new NewNode(true,false,false,alias));
     dsp_file.add_fld(TypeMemPtr.DISP_FLD,dsp_prims,null);
     //MrgProjNode dsp_file_obj = Env.DEFMEM.make_mem_proj(dsp_file,mem);
     //ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(DSP_IDX, dsp_file)).keep();
