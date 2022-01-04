@@ -50,7 +50,7 @@ int = : @{
 
   // Conversions.  Got a problem using "1.flt()" because this overloads 'flt'
   // as a type and a instance function.  
-  str = { -> $$NewStrNode$ConvertI64Str(_val) };
+  //str = { -> $$NewStrNode$ConvertI64Str(_val) };
   
 };
 
@@ -88,7 +88,7 @@ flt = : @{
 
   // Conversions.  Got a problem using "1.flt()" because this overloads 'flt'
   // as a type and a instance function.  
-  str = { -> $$NewStrNode$ConvertF64Str(_val) };
+  //str = { -> $$NewStrNode$ConvertF64Str(_val) };
 };
 
 // ============================================================================

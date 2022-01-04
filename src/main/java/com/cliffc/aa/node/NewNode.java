@@ -45,11 +45,14 @@ public class NewNode extends Node {
   // Still adding fields or not
   private boolean _closed;
 
+  // True if forward-ref
+  private boolean _forward_ref;
 
   // Takes an alias only
-  public NewNode( boolean closure, int alias ) {
+  public NewNode( boolean closure, boolean forward_ref, int alias ) {
     super(OP_NEW, null, null);
     _is_closure = closure;
+    _forward_ref = forward_ref;
     _init( alias, TypeStruct.EMPTY);
   }
 
@@ -63,16 +66,18 @@ public class NewNode extends Node {
   String  str() { return "New"+_ts; } // Inline less-short name
   @Override void record_for_reset() { _reset_alias=_alias; }
   void reset() { assert is_prim(); _init(_reset_alias,_ts); }
+  @Override public boolean is_forward_type() { return _forward_ref; }
 
   public MrgProjNode mem() {
     for( Node use : _uses ) if( use instanceof MrgProjNode mrg ) return mrg;
     return null;
   }
   public void set_nargs() { assert _nargs==0; _nargs=len(); }
-  public void set_type_name(String name) {
+  public NewNode set_type_name(String name) {
     assert _ts._name.isEmpty();
     _ts = _ts.set_name(name);
     _tptr = TypeMemPtr.make(_tptr._aliases,TypeStruct.ISUSED.set_name(name));
+    return this;
   }
   public int find(String name) { int idx = _ts.find(name); return idx==-1 ? -1 : idx+DSP_IDX; }
   public Node get(String name) { return in(find(name)); } // Error if not found
@@ -102,15 +107,17 @@ public class NewNode extends Node {
       ? new UnresolvedNode(name,bad).scoped()
       : (UnresolvedNode)n;
     unr.add_fun(ptr);           // Checks all formals are unambiguous
-    set_fld(fld,unr);
+    set_fld(fld.make_from(fld._t,TypeFld.Access.Final),unr);
   }
 
   public void set_fld( TypeFld fld, Node n ) {
     _ts = _ts.replace_fld(fld);
     set_def(fld._order,n);
+    Env.GVN.add_flow(mem());
   }
   public void pop_fld() { throw unimpl(); }
 
+  public boolean is_closed() { return _closed; }
   public void close() { assert !_closed; _closed=true; }
 
     // The current local scope ends, no more names will appear.  Forward refs
@@ -122,19 +129,18 @@ public class NewNode extends Node {
     for( TypeFld fld : _ts ) {
       Node n = in(fld._order);
       if( n.is_forward_ref() ) {
-      //  // Is this Unresolved defined in this scope, or some outer scope?
-      //  if( ((UnresolvedNode)n).is_scoped() ) {
-      //    // Definitely defined here, and all stores are complete; all fcns added
-      //    ((UnresolvedNode)n).define();
-      //    Env.GVN.add_unuse(n);
-      //  } else {
-      //    // Make field in the parent
-      //    parent.create(fld._fld,n,fld._access,fld._t,null/*TODO: Copy forward the error*/);
-      //    // Stomp field locally to ANY
-      //    set_def(fld._order,Env.ANY);
-      //    setsm(_ts.replace_fld(fld.make_from(Type.ANY,Access.Final)));
-      //    Env.GVN.add_flow_uses(n);
-        throw unimpl();
+        // Is this Unresolved defined in this scope, or some outer scope?
+        if( ((UnresolvedNode)n).is_scoped() ) {
+          // Definitely defined here, and all stores are complete; all fcns added
+          ((UnresolvedNode)n).define();
+          Env.GVN.add_unuse(n);
+        } else {
+          // Make field in the parent
+          parent.add_fld(TypeFld.make(fld._fld,fld._t,parent.len()), n, null /*TODO: Copy forward the error*/);
+          // Stomp field locally to ANY
+          set_fld(fld.make_from(Type.ANY, TypeFld.Access.Final),Env.ANY);
+          Env.GVN.add_flow_uses(this);
+        }
       }
     }
   }
@@ -144,12 +150,17 @@ public class NewNode extends Node {
   // Used by MrgProj
   TypeStruct valueobj() { return _ts.make_from(this::val); }
 
+  // Some input changed, so the struct in MrgProj changes
+  @Override public void add_flow_use_extra(Node chg) {
+    Env.GVN.add_flow(mem());
+  }
+
   // Uses Full memory liveness, to track field liveness.
   @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 
   @Override public TypeMem live() {
     // Kept alive as prototype, until Combo resolves all Load-uses.
-    if( Env.PROTOS.containsKey(_ts._name) )
+    if( Env.PROTOS.containsKey(_ts._name) || _forward_ref )
       return TypeMem.ALLMEM;
 
     MrgProjNode mrg=null; boolean has_ptr=false;
@@ -214,6 +225,7 @@ public class NewNode extends Node {
   }
 
   @Override public Node ideal_reduce() {
+    if( _forward_ref ) return null; // Not defined yet
     // If either the address or memory is not looked at then the memory
     // contents are dead.  The object might remain as a 'gensym' or 'sentinel'
     // for identity tests.
@@ -274,8 +286,8 @@ public class NewNode extends Node {
   @Override @NotNull public NewNode copy( boolean copy_edges) {
     // Split the original '_alias' class into 2 sub-aliases
     NewNode nnn = (NewNode)super.copy(copy_edges);
-    nnn._init(BitsAlias.new_alias(_alias),_ts);      // Children alias classes, split from parent
-    _init(BitsAlias.new_alias(_alias),_ts); // The original NewNode also splits from the parent alias
+    nnn._init(Env.new_alias(_alias),_ts);      // Children alias classes, split from parent
+    _init(Env.new_alias(_alias),_ts); // The original NewNode also splits from the parent alias
     Env.GVN.add_flow(this);     // Alias changes flow
     return nnn;
   }

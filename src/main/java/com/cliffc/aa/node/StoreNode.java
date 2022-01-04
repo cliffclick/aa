@@ -117,7 +117,7 @@ public class StoreNode extends Node {
       //  assert _uses._len==1 && _uses.at(0) instanceof MemJoinNode;
       //  return _uses.at(0); // Return the mem join
       //}
-      throw unimpl();
+      return null; // TODO: Turn back on
     }
     return null;
   }

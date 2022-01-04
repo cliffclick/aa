@@ -126,7 +126,7 @@ public class GVNGCM {
       else if( (n=_work_grow  .pop())!=null ) m = n.do_grow  ();
       else if( (n=_work_inline.pop())!=null ) m = ((FunNode)n).ideal_inline(false);
       else break;
-      ITER_CNT++; assert ITER_CNT < 35000; // Catch infinite ideal-loops
+      ITER_CNT++; assert ITER_CNT < 50000; // Catch infinite ideal-loops
       if( m == null ) ITER_CNT_NOOP++;     // No progress profiling
       else assert m.is_dead() || m.check_vals();
       // VERY EXPENSIVE ASSERT

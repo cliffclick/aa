@@ -7,8 +7,6 @@ import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
-import static com.cliffc.aa.AA.unimpl;
-
 // Pointers-to-memory; these can be both the address and the value part of
 // Loads and Stores.  They carry a set of aliased TypeObjs.
 public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
@@ -163,8 +161,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   // Widens, not lowers.
   @Override public TypeMemPtr simple_ptr() {
     if( _obj.len()==0 ) return this;
-    //return make_from();
-    throw unimpl();
+    return make_from(_obj.oob(TypeStruct.ISUSED).set_name(_obj._name));
   }
   @Override public boolean above_center() { return _aliases.above_center(); }
   // Aliases represent *classes* of pointers and are thus never constants.

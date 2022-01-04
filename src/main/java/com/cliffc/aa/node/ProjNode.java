@@ -18,17 +18,14 @@ public class ProjNode extends Node {
     _idx=idx;
   }
   @Override public String xstr() { return "DProj"+_idx; }
-  @Override public boolean is_forward_type() { return in(0)==null; }
 
   // Strictly reducing
   @Override public Node ideal_reduce() {
-    if( in(0)==null ) return null;
     Node c = in(0).is_copy(_idx);
     if( c != null ) return c==this ? Env.ANY : c; // Happens in dying loops
     return null;
   }
   @Override public Type value() {
-    if( in(0)==null ) return _val; // Partially built; freeze in place
     Type c = val(0);
     if( c instanceof TypeTuple ) {
       TypeTuple ct = (TypeTuple)c;
@@ -37,13 +34,7 @@ public class ProjNode extends Node {
     }
     return c.oob();
   }
-  @Override public void add_flow_use_extra(Node chg) {
-    if( chg instanceof NewNode ) // Changing prototype object
-      for( Node use : _uses )
-        if( use instanceof ValNode ) // All ValNodes update
-          Env.GVN.add_flow(use);
-  }
-  
+
   // Only called here if alive, and input is more-than-basic-alive
   @Override public TypeMem live_use(Node def ) {
     return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM;

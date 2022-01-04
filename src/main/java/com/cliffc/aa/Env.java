@@ -9,7 +9,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 
-import static com.cliffc.aa.AA.DSP_IDX;
 import static com.cliffc.aa.AA.unimpl;
 
 // An "environment", a lexical Scope tracking mechanism that runs 1-for-1 in
@@ -44,10 +43,11 @@ public class Env implements AutoCloseable {
   public static final ConNode XNIL;  // Default 0
   public static final ConNode XUSE;  // Unused objects (dead displays)
   public static final ConNode XMEM;  // Unused whole memory
-  public static final ConNode ALL_CTRL;  // Always alive control
-  public static final ConNode ALL_MEM;   // Conservative all memory
+  public static final ConNode ALL_CTRL; // Always alive control
+  public static final ConNode ALL_MEM;  // Conservative all memory
   public static final ConNode ALL_PARM; // Default parameter
   public static final ConNode ALL_CALL; // Common during function call construction
+  public static final ConNode<TypeMem> DEF_MEM;  // Default memory for function calls
 
   public static final    StartNode START; // Program start values (control, empty memory, cmd-line args)
   public static final    CProjNode CTL_0; // Program start value control
@@ -82,6 +82,7 @@ public class Env implements AutoCloseable {
     ALL_MEM = keep(new ConNode<>(TypeMem.ALLMEM));
     ALL_PARM= keep(new ConNode<>(Type.SCALAR));
     ALL_CALL= keep(new ConNode<>(TypeRPC.ALL_CALL));
+    DEF_MEM = keep(new ConNode<>(TypeMem.ALLMEM));
     // Initial control & memory
     CTL_0  = keep(new    CProjNode(START,0));
     MEM_0  = keep(new StartMemNode(START  ));
@@ -114,20 +115,18 @@ public class Env implements AutoCloseable {
   public final FunNode _fun;     // Matching FunNode for this lexical environment
 
   // Shared Env constructor.
-  Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr, ProjNode fref ) {
+  Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr, NewNode fref ) {
     _par = par;
     _fun = fun;
-    int alias = fref==null ? BitsAlias.new_alias(BitsAlias.ALLX) : ((TypeMemPtr)fref._val).aliases().getbit();
-    NewNode nnn  = GVN.init(new NewNode(is_closure,alias));
+    NewNode nnn = fref==null ? GVN.init(new NewNode(is_closure,false,new_alias())) : fref;
     nnn.add_fld(TypeFld.make_dsp(dsp_ptr._val),dsp_ptr,null);
     // Install a top-level prototype mapping
     if( fref!=null ) {          // Forward ref?
-      String fname = ((TypeMemPtr)fref._val)._obj._name;
-      nnn.set_type_name(fname);
+      String fname = fref._ts._name;
       assert !PROTOS.containsKey(fname); // All top-level type names are globally unique
       PROTOS.put(fname,nnn);
     }
-    
+
     Node frm = GVN.init(new MrgProjNode(nnn,mem));
     _scope = GVN.init(new ScopeNode(is_closure));
     _scope.set_ctrl(ctrl);
@@ -179,17 +178,17 @@ public class Env implements AutoCloseable {
   @Override public void close() {
     // Promote forward refs to the next outer scope
     NewNode stk = _scope.stk();
+    assert stk.is_closed();
     ScopeNode pscope = _par._scope;
     if( pscope != null ) {
       stk.promote_forward(pscope.stk());
       for( String tname : _scope.typeNames() ) {
-        ProjNode n = _scope.get_type(tname);
+        NewNode n = _scope.get_type(tname);
         if( n.is_forward_type() )
           pscope.add_type(tname,n);
       }
     }
 
-    stk.close();
     GVN.add_flow(stk);          // Scope object going dead, trigger following projs to cleanup
     _scope.set_stk(null);       // Clear pointer to display
     Node xscope = KEEP_ALIVE.pop();
@@ -259,6 +258,14 @@ public class Env implements AutoCloseable {
     Combo.reset();
   }
 
+  // Return a new alias, and update default memory to exclude it
+  public static int new_alias() { return new_alias(BitsAlias.ALLX); }
+  public static int new_alias(int par) {
+    int alias = BitsAlias.new_alias(par);
+    DEF_MEM.exclude_alias(alias);
+    return alias;
+  }
+
   // Return Scope for a name, so can be used to determine e.g. mutability
   ScopeNode lookup_scope( String name, boolean lookup_current_scope_only ) {
     if( name == null ) return null; // Handle null here, easier on parser
@@ -275,11 +282,11 @@ public class Env implements AutoCloseable {
   }
 
   // Type lookup in any scope
-  ProjNode lookup_type( String name ) {
-    ProjNode t = _scope.get_type(name);
+  NewNode lookup_type( String name ) {
+    NewNode t = _scope.get_type(name);
     if( t != null ) return t;
     return _par == null ? null : _par.lookup_type(name);
   }
   // Update type name token to type mapping in the current scope
-  void add_type( String name, ProjNode t ) { _scope.add_type(name,t); }
+  void add_type( String name, NewNode t ) { _scope.add_type(name,t); }
 }

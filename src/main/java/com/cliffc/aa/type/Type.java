@@ -547,6 +547,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   static boolean check_name( String n ) { return n.isEmpty() || n.charAt(n.length()-1)==':'; }
   public boolean has_name() { return !_name.isEmpty(); }
   // Make a named variant of any type, by just adding a name.
+  @SuppressWarnings("unchecked")
   public final T set_name(String name) {
     if( Util.eq(_name,name) ) return (T)this;
     assert check_name(name);

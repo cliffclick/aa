@@ -19,11 +19,18 @@ public class ConNode<T extends Type> extends Node {
   @Override public String xstr() {
     if( Env.ALL_PARM == this ) return "ALL_PARM";
     if( Env.ALL_CALL == this ) return "ALL_CALL";
+    if( Env.DEF_MEM  == this ) return "DEF_MEM";
     return _t==null ? "(null)" : _t.toString();
   }
-  @Override public Type value() {
-    return _t.simple_ptr();
+
+  @SuppressWarnings("unchecked")
+  public void exclude_alias(int alias) {
+    unelock();                  // Changing hash
+    _t = (T)((TypeMem)_t).make_from(alias,TypeStruct.UNUSED);
+    Env.GVN.add_flow(this);    
   }
+  
+  @Override public Type value() { return _t.simple_ptr(); }
   @Override public TypeMem all_live() { return _t instanceof TypeMem ? TypeMem.ALLMEM : TypeMem.ALIVE; }
 
   @Override public TV2 new_tvar(String alloc_site) {
@@ -50,6 +57,7 @@ public class ConNode<T extends Type> extends Node {
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof ConNode con) ) return false;
+    if( this==Env.DEF_MEM || o==Env.DEF_MEM ) return false;
     if( _t==Type.XNIL && con._t==Type.XNIL /*&& tvar()!=con.tvar()*/ )
       return false;             // Different versions of TV2 NotNil
     return _t==con._t;
@@ -58,7 +66,7 @@ public class ConNode<T extends Type> extends Node {
   @SuppressWarnings("unchecked")
   public static class PI extends ConNode {
     public PI() { super(TypeFlt.PI); }
-    @Override public Node clazz_node( ) { return this; }
+    @Override public Node clazz_node( ) { return Env.GVN.init(this); }
   }
 }
 

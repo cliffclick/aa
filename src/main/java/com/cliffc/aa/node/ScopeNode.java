@@ -18,7 +18,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
 public class ScopeNode extends Node {
 
   // Mapping from type-variables to Types.  Types have a scope lifetime like values.
-  private final HashMap<String,ProjNode> _types; // user-typing type names
+  private final HashMap<String,NewNode> _types; // user-typing type names
   private Ary<IfScope> _ifs;                 // Nested set of IF-exprs used to track balanced new-refs
   private final boolean _closure;
 
@@ -29,7 +29,7 @@ public class ScopeNode extends Node {
     _types = new HashMap<>();
     _ifs = null;
   }
-  public ScopeNode(HashMap<String,ProjNode> types,  Node ctl, Node mem, Node ptr, Node rez) {
+  public ScopeNode(HashMap<String,NewNode> types,  Node ctl, Node mem, Node ptr, Node rez) {
     super(OP_SCOPE,ctl,mem,ptr,rez);
     _types = types;
     _closure = false;
@@ -76,10 +76,10 @@ public class ScopeNode extends Node {
   public static final int RET_IDX = 7;
 
   // Name to type lookup, or null
-  public ProjNode get_type(String name) { return _types.get(name);  }
+  public NewNode get_type(String name) { return _types.get(name);  }
 
   // Extend the current Scope with a new type; cannot override existing name.
-  public void add_type( String name, ProjNode t ) {
+  public void add_type( String name, NewNode t ) {
     assert _types.get(name)==null;
     _types.put( name, t );
     add_def(t);                 // Hook so it does not die

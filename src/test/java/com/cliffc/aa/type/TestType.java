@@ -222,7 +222,7 @@ public class TestType {
 
     TypeMemPtr pabc0= TypeMemPtr.make_nil(alias2,TypeStruct.NAMEPT); // *["abc"]?
     TypeMemPtr pabc = TypeMemPtr.make    (alias2,TypeStruct.NAMEPT); // *["abc"]?
-    TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.type_alias(BitsAlias.ALLX),TypeStruct.ISUSED);// *[(0)]
+    TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.ALLX),TypeStruct.ISUSED);// *[(0)]
     TypeMemPtr pzer0= TypeMemPtr.make(pzer._aliases.meet_nil(),TypeStruct.ISUSED);  // *[(0)]?
     Type nil  = Type.NIL, xnil=Type.XNIL;
 
@@ -305,10 +305,10 @@ public class TestType {
   // names, and will commonly have no names in common.
   @Test public void testStructTuple() {
     // meet @{c:0}? and @{c:@{x:1}?,}
-    int alias0 = BitsAlias.type_alias(BitsAlias.ALLX);
-    int alias1 = BitsAlias.type_alias(alias0);
-    int alias2 = BitsAlias.type_alias(BitsAlias.ALLX);
-    int alias3 = BitsAlias.type_alias(alias0);
+    int alias0 = BitsAlias.new_alias(BitsAlias.ALLX);
+    int alias1 = BitsAlias.new_alias(alias0);
+    int alias2 = BitsAlias.new_alias(BitsAlias.ALLX);
+    int alias3 = BitsAlias.new_alias(alias0);
     TypeStruct a1 = TypeStruct.make_test("c",Type.NIL, TypeFld.Access.Final); // @{c:nil}
     TypeStruct a3 = TypeStruct.make_test("x",TypeInt.TRUE, TypeFld.Access.Final); // @{x: 1 }
     TypeStruct a2 = TypeStruct.make_test("c",TypeMemPtr.make_nil(alias3,a3), TypeFld.Access.Final); // @{c:*{3#}?}
