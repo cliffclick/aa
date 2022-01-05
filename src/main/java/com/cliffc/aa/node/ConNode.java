@@ -36,7 +36,7 @@ public class ConNode<T extends Type> extends Node {
   @Override public TV2 new_tvar(String alloc_site) {
     if( _t==Type.CTRL || _t==Type.XCTRL || _t instanceof TypeRPC )
       return null;
-    if( this == Env.XUSE ) return null;
+    if( this == Env.XUSE || this == Env.ALL ) return null;
     if( _t == Type.XNIL )
       return TV2.make_nil(TV2.make_leaf(this,alloc_site),alloc_site);
     // Bare TMP over a prototype; shows up as the default ParmNode 'self' input.
@@ -63,7 +63,7 @@ public class ConNode<T extends Type> extends Node {
     return _t==con._t;
   }
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }
-  @SuppressWarnings("unused")
+  @SuppressWarnings({"unused","unchecked"}) // Found as java_class_node in _prims.aa
   public static class PI extends ConNode {
     public PI() { super(TypeFlt.PI); }
     @Override public Node clazz_node( ) { return Env.GVN.init(this); }

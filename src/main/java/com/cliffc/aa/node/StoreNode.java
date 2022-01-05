@@ -49,9 +49,9 @@ public class StoreNode extends Node {
       return set_def(2,((FreshNode)adr()).id());
 
     // Escape a dead MemSplit
-    if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode &&
-        ((MemSplitNode)mem.in(0)).join()==null ) {
-      set_def(1,mem.in(0).in(1));
+    if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode msp &&
+        msp.join()==null ) {
+      set_def(1,msp.mem());
       xval();                   // Update memory state to include all the default memory
       return this;
     }

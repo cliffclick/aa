@@ -422,7 +422,7 @@ public class Parse implements Comparable<Parse> {
       scope = scope();          // Create in the current scope
       NewNode stk = scope.stk();
       TypeFld fld = TypeFld.make(tok,t,stk._is_val ? mutable : Access.RW,stk.len());
-      stk.add_fld(fld, stk._is_val ? con(t) : Env.ALL,badf); // Create at top of scope as undefined
+      stk.add_fld(fld, stk._is_val ? con(t) : Env.XNIL,badf); // Create at top of scope as undefined
       scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
     }
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display

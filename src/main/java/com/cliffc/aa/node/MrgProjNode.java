@@ -67,10 +67,10 @@ public class MrgProjNode extends ProjNode {
       return ((TypeMem)mem._val).at(nnn._alias) ==TypeStruct.UNUSED ? mem : null;
 
     // If is of a MemJoin, and it can enter the split region, do so.
-    if( mem instanceof MemJoinNode && mem._uses._len==1 ) {
+    if( mem instanceof MemJoinNode mjn && mem._uses._len==1 ) {
       MrgProjNode mprj = new MrgProjNode(nnn,mem);
-      MemJoinNode mjn = ((MemJoinNode)mem).add_alias_below_new(mprj,this);
-      return mjn;
+      MemJoinNode mjn2 = mjn.add_alias_below_new(mprj,this);
+      return mjn2;
     }
 
     return null;

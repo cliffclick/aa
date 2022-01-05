@@ -453,9 +453,9 @@ public class TV2 {
     if( is_obj() )
       that._open = that.is_obj() ? that._open & _open : _open;
     // Merge all the hard bits
-    if( _flow != null ) {       // Nothing to merge
-      if( that._flow==null ) {
-        that. _flow =  _flow;
+    if( _flow != null ) {       // Something to merge
+      if( that._flow==null ) {  // Nothing to merge into
+        that. _flow =  _flow;   // So just copy
         that._eflow = _eflow;
       } else {
         throw unimpl();
@@ -499,28 +499,19 @@ public class TV2 {
 
   // U-F union; this is nilable and becomes that.
   // No change if only testing, and reports progress.
-  @SuppressWarnings("unchecked")
   boolean unify_nil(TV2 that, boolean test) {
-    //assert is_nil() && !that.is_nil();
-    //if( test ) return true; // Will make progress
-    //// Clone the top-level struct and make this nilable point to the clone;
-    //// this will collapse into the clone at the next find() call.
-    //// Unify the nilable leaf into that.
-    //TV2 leaf = get("?");  assert leaf.is_leaf();
-    //TV2 copy = that.copy("unify_nil");
-    //if( that.is_base() ||
-    //    that.is_obj() ||
-    //    that.isa("Str") ) {
-    //  copy._type = copy._type.join(Type.NSCALR);
-    //  copy._args = that._args==null ? null : (NonBlockingHashMap<String, TV2>)that._args.clone();
-    //} else
-    //  throw unimpl();
-    //return leaf._union(copy) | that._union(find());
-    throw unimpl();
+    assert !is_nil() && that.is_nil();
+    if( test ) return true; // Will make progress
+    TV2 leaf = that.arg("?");  assert leaf.is_leaf();
+    leaf.add_deps_flow();
+    // Clone the top-level struct and make this nilable point to the clone;
+    // this will collapse into the clone at the next find() call.
+    TV2 copy = copy("unify_nil").strip_nil();
+    // Unify the nilable leaf into that.
+    return leaf.union(copy,test) | _union(that);
   }
 
-  // Unify-at a key.  Expect caller already has args
-  public boolean unify_at(Node n, String key, TV2 tv2, boolean test ) {
+  boolean unify_nil(TV2 that, boolean test, TV2[] nongen) {
     throw unimpl();
   }
 
@@ -582,65 +573,28 @@ public class TV2 {
     if( this.is_leaf() ) return this.union(that,test);
     if( that.is_leaf() ) return that.union(this,test);
 
-//
-//// Check for simple, non-recursive, unification.
-//if( this._args==null && that._args==null ) {
-//  TV2 lhs=this, rhs=that;
-//  // Err beats Base beats Leaf
-//  if(        is_err () ||              // Error beats Base
-//      (!that.is_err () && is_base()) ) // Base  beats Leaf
-//    { rhs=this; lhs=that; }            // Swap
-//  // If tied, keep lower uid
-//  if( Util.eq(lhs._name,rhs._name) && _uid<that._uid ) { rhs=this; lhs=that; }
-//  return lhs.union(rhs,test);
-//}
-//// Any leaf immediately unifies with any non-leaf
-//if( this.is_leaf() || that.is_err() ) return this.union(that,test);
-//if( that.is_leaf() || this.is_err() ) return that.union(this,test);
-//// Special case for nilable union something
-//if( this.is_nil() && !that.is_nil() ) return this.unify_nil(that,test);
-//if( that.is_nil() && !this.is_nil() ) return that.unify_nil(this,test);
-//
-//// Cycle check.
-//long luid = dbl_uid(that);  // long-unique-id formed from this and that
-//TV2 rez = DUPS.get(luid);
-//assert rez==null || rez==that;
-//if( rez!=null ) return false; // Been there, done that
-//DUPS.put(luid,that);          // Close cycles
-//
-//if( test ) return true; // Here we definitely make progress; bail out early if just testing
-//
-//// Check for mismatched, cannot unify
-//if( !Util.eq(_name,that._name) ) {
-//  TV2 err = make_err(null,"Cannot unify "+this+" and "+that,"unify_fail");
-//  return union(err,test) & that.union(err,test);
-//}
-//assert _args!=that._args; // Not expecting to share _args and not 'this'
-//
-//// Structural recursion unification, this into that.  Aligned keys unify
-//// directly.  Fields in one TV2 and not in the other are put in the result
-//// if the other is open, and dropped otherwise.
-//NonBlockingHashMap<String,TV2> args = _args;
-//TV2 thsi = this;
-//for( String key : args.keySet() ) {
-//  TV2 vthis = thsi.get(key); assert vthis!=null;
-//  TV2 vthat = that.get(key);
-//  if( vthat==null ) {
-//    if( that.open() ) that.add_fld(key,vthis);
-//  } else vthis._unify(vthat,test); // Matching fields unify
-//  thsi = thsi.find();
-//  that = that.find();
-//}
-//// Fields on the RHS are aligned with the LHS also
-//for( String key : that._args.keySet() )
-//  if( args.get(key)==null )
-//    if( thsi.open() )  thsi.add_fld(key,that.get(key)); // Add to LHS
-//    else               that.del_fld(key,test);          // Drop from RHS
-//
-//if( thsi.is_err() && !that.is_err() )
-//  throw unimpl(); // TODO: Check for being equal, cyclic-ly, and return a prior if possible.
-//return thsi.union(that,test);
-    throw unimpl();
+    // Two bases unify by smaller uid
+    if( is_base() && that.is_base() )
+      return _uid<that._uid ? that.union(this,test) : this.union(that,test);
+
+    // Special case for nilable union something
+    if( this.is_nil() && !that.is_nil() ) return that.unify_nil(this,test);
+    if( that.is_nil() && !this.is_nil() ) return this.unify_nil(that,test);
+
+    // Cycle check.
+    long luid = dbl_uid(that);  // long-unique-id formed from this and that
+    TV2 rez = DUPS.get(luid);
+    assert rez==null || rez==that;
+    if( rez!=null ) return false; // Been there, done that
+    DUPS.put(luid,that);          // Close cycles
+
+    if( test ) return true; // Here we definitely make progress; bail out early if just testing
+
+    // Structural recursion unification.
+    if( (is_obj() && that.is_obj()) ||
+        (is_fun() && that.is_fun()) )
+      unify_flds(this,that,test,false);
+    return find().union(that.find(),test);
   }
 
   // Structural recursion unification.  Called nested, and called by NotNil
@@ -1070,8 +1024,9 @@ public class TV2 {
     TV2 tv = DUPS.get(_uid);
     if( tv!=null ) return tv;
     if( is_obj() ) {
-      if( arg("int:")!=null ) return arg("_val");     // Unbox ints
-      if( arg("flt:")!=null ) return arg("_val");     // Unbox flts
+      String tname = ValFunNode.valtype(_flow);
+      if( tname!=null )
+        return arg("_val");     // Unbox ints and flts
       throw unimpl();
     }
     return this;

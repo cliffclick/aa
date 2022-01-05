@@ -1,9 +1,10 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.BitsAlias;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.MEM_IDX;
@@ -71,7 +72,7 @@ public class MemJoinNode extends Node {
 
 
   static Node find_sese_head(Node mem) {
-    if( mem instanceof MemJoinNode ) return ((MemJoinNode)mem).msp(); // Merge Split with prior Join
+    if( mem instanceof MemJoinNode mjn ) return mjn.msp(); // Merge Split with prior Join
     if( mem instanceof StoreNode ) return mem;   // Move Store into Split/Join
     //if( mem instanceof MemPrimNode.LValueWrite ) return mem; // Array store
     if( mem instanceof MProjNode ) {
