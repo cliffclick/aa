@@ -236,17 +236,16 @@ public class TestNode {
     //test1monotonic_intrinsic(new NewStrNode.AddStrStr());
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
     int alias1 = BitsAlias.new_alias(BitsAlias.ALLX);
-    NewNode nnn1 = new NewNode(false,false,false,alias1);
+    NewNode nnn1 = new NewNode(false,false,false,null,alias1);
     nnn1.add_fld(TypeFld.NO_DSP,Env.XNIL,null);
     set_type(1,Type.SCALAR);  nnn1.add_fld(TypeFld.make("x"),_ins[1],null);
     set_type(2,Type.SCALAR);  nnn1.add_fld(TypeFld.make("y"),_ins[2],null);
     test1monotonic(nnn1);
     int alias2 = BitsAlias.new_alias(BitsAlias.ALLX);
-    NewNode nnn2 = new NewNode(false,false,false,alias2);
+    NewNode nnn2 = new NewNode(false,false,false,tname._name,alias2);
     nnn2.add_fld(TypeFld.NO_DSP,Env.XNIL,null);
     set_type(1,Type.SCALAR);  nnn2.add_fld(TypeFld.make("x"),_ins[1],null);
     set_type(2,Type.SCALAR);  nnn2.add_fld(TypeFld.make("y"),_ins[2],null);
-    nnn2.set_type_name(tname._name);
     test1monotonic(nnn2);
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],null).add_def(_ins[2]));

@@ -55,6 +55,7 @@ public abstract class Exec {
     assert scope==rez._scope;
     // All edges removed, otherwise a self-cycle keeps alive
     while( scope.len()>0 ) scope.pop();
+    Env.GVN.add_dead(scope);
 
     return rez;
   }

@@ -409,7 +409,7 @@ public class CallNode extends Node {
         Env.GVN.add_flow_defs(cepi); // Wired Rets might no longer be alive (might unwire)
       }
     } else if( chg == mem() ) {
-      if( cepi != null ) Env.GVN.add_flow(cepi);
+      //if( cepi != null ) Env.GVN.add_flow(cepi);
     } else {                    // Args lifted, may resolve
       if( fdx() instanceof UnresolvedNode )
         Env.GVN.add_reduce(this);

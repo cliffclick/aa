@@ -147,7 +147,7 @@ public final class CallEpiNode extends Node {
     Node rrez = ret.rez();      // Result  being returned
     boolean inline = !fun.noinline();
     // If the function does nothing with memory, then use the call memory directly.
-    if( (rmem instanceof ParmNode && rmem.in(CTL_IDX) == fun) || rmem._val ==TypeMem.ANYMEM )
+    if( rmem==null || (rmem instanceof ParmNode && rmem.in(CTL_IDX) == fun) || rmem._val ==TypeMem.ANYMEM )
       rmem = cmem;
     // Check that function return memory and post-call memory are compatible
     if( !(_val instanceof TypeTuple) ) return null;

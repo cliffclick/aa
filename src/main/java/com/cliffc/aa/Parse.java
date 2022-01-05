@@ -272,21 +272,23 @@ public class Parse implements Comparable<Parse> {
     else { _x=oldx; return null; }    // Not a type assignment
     if( !peek(':') ) { _x=oldx; return null; } // Not a type assignment
     if( skipWS() == -1 ) return null;
+    String tname = (tok+":").intern(); // As a type name
 
     // Types are forward-defined in two contexts, so either or both might
-    // already have happened: as a type (in an type annotation) and as a
-    // standard fref in a fact (probably as a constructor call).
-    UnresolvedNode construct = (UnresolvedNode)_e.lookup(tok);
-    String tvar = (tok+":").intern();
-    NewNode typenode  = _e.lookup_type(tvar);
+    // already have happened: as a type (in a type annotation) and as a
+    // standard fref in a fact() (probably as a constructor call).
+    // Look for a prior type assignment, from e.g. a type annotation
+
     // Make a forward-ref constructor, if not one already
+    UnresolvedNode construct = (UnresolvedNode)_e.lookup(tok);
     if( construct==null ) construct = val_fref(tok,errMsg());
     else if( !construct.is_forward_ref() )
       return err_ctrl2("Cannot re-assign val '"+tok+"' as a type");
     construct.scoped();
 
-    // Look for a prior type assignment, from e.g. a type annotation
-    if( typenode == null ) typenode = type_fref(tvar,is_val); // None, so create
+    // Make a forward-ref type, if not one already
+    NewNode typenode  = _e.lookup_type(tname);
+    if( typenode == null ) typenode = type_fref(construct,is_val); // None, so create
     else if( typenode.is_forward_type() ) typenode._is_val = is_val;
     else throw unimpl(); // Double-define error
 
@@ -302,8 +304,11 @@ public class Parse implements Comparable<Parse> {
     // Build a constructor
     if( newtype instanceof NewNode nnn ) {
       if( is_val ) {
-        construct.add_fun((ValFunNode)gvn(ValNode.make(nnn)));
-        return construct.define(); // Value type is defined
+        // replace the displays from instance-fcns, from the 'nnn' prototype
+        // to the default constructor-as-a-TMP.
+        ((ValNode)construct.in(1)).fill_default(nnn);
+        construct.define();     // Value type is defined
+        return Env.GVN.add_flow(construct);
       } else
         throw unimpl();         // Reference type
 
@@ -879,7 +884,7 @@ public class Parse implements Comparable<Parse> {
    */
   private NewNode tuple(int oldx, Node s, int first_arg_start) {
     int alias = Env.new_alias();
-    NewNode nn = new NewNode(false,true,false,alias);
+    NewNode nn = new NewNode(false,true,false,null,alias);
     // No display for tuples
     nn.add_fld(TypeFld.NO_DISP,Env.ANY,null);
     // First stmt is parsed already
@@ -936,6 +941,7 @@ public class Parse implements Comparable<Parse> {
     // Push an extra hidden display argument.  Similar to java inner-class ptr
     // or when inside a struct definition: 'this'.
     NewNode par_stk = scope().stk();
+    Node dsp = par_stk;
 
     // Incrementally build up the formals
     TypeStruct formals = TypeStruct.make("",false, TypeFld.make_dsp(par_stk._tptr));
@@ -976,11 +982,18 @@ public class Parse implements Comparable<Parse> {
     // Build the FunNode header
     FunNode fun = (FunNode)init(new FunNode(formals.nargs()).add_def(Env.ALL_CTRL));
     int fun_idx = fun.push();
+    // If this is an instance function, get the default instance for the
+    // display instead of the enclosing lexical scope.
+    if( par_stk._tname!=null ) {
+      Node unr = _e.lookup(par_stk.as_valname());
+      dsp = unr.in(1);
+    }
+
     // Record H-M VStack in case we clone
     //fun.set_nongens(_e._nongen.compact());
     // Build Parms for system incoming values
     int rpc_idx = init(new ParmNode(CTL_IDX," rpc",fun,TypeRPC.ALL_CALL,Env.ALL_CALL,null)).push();
-    int clo_idx = init(new ParmNode(DSP_IDX,"^"   ,fun,par_stk._tptr   ,par_stk     ,null)).push();
+    int clo_idx = init(new ParmNode(DSP_IDX,"^"   ,fun,par_stk._tptr   ,dsp         ,null)).push();
     Node mem    = init(new ParmNode(MEM_IDX," mem",fun,TypeMem.ALLMEM  ,Env.DEF_MEM ,null));
 
     // Increase scope depth for function body.
@@ -992,14 +1005,17 @@ public class Parse implements Comparable<Parse> {
       // extra argument and replaces the default.
       NewNode stk = e._scope.stk();
       stk.set_fld(TypeFld.make_dsp(par_stk._tptr),Node.pop(clo_idx));
+      Env.GVN.revalive(stk,stk.mem());
 
       // Parms for all arguments
       Parse errmsg = errMsg();  // Lazy error message
       for( TypeFld fld : formals ) { // User parms start
         if( fld._order <= DSP_IDX ) continue;// Already handled
         assert fun==_e._fun && fun==_e._scope.ctrl();
+        // If we find a named tvar, use the default prototype for the default input.
         String tvar = ValFunNode.valtype(fld._t);
-        Node defalt = tvar==null ? Env.ALL_PARM : e.lookup_type(tvar);
+        Node defalt = tvar==null ? Env.ALL_PARM : e.lookup(tvar.substring(0,tvar.length()-1).intern()).in(1);
+        if( tvar!=null ) fld = fld.make_from(defalt._val);
         Node parm = gvn(new ParmNode(fld,fun,defalt,errmsg));
         scope().stk().add_fld(fld,parm,bads.at(fld._order-ARG_IDX));
       }
@@ -1288,12 +1304,12 @@ public class Parse implements Comparable<Parse> {
     Node nt = fact();
 
     // Check for type
-    if( nt instanceof FreshNode ) nt = ((FreshNode)nt).id();
-    if( nt instanceof UnresolvedNode ) {
-      String tvar = ((UnresolvedNode)nt)._name;
+    if( nt instanceof FreshNode frsh ) { nt = frsh.id(); Env.GVN.add_dead(frsh); }
+    if( nt instanceof UnresolvedNode unr ) {
+      String tvar = unr._name;
       tvar = (tvar+":").intern();
       NewNode typenode = _e.lookup_type(tvar);
-      if( typenode==null ) typenode=type_fref(tvar,false); // Must be a forward-ref type
+      if( typenode==null ) typenode=type_fref(unr,false); // Must be a forward-ref type
       return typenode._val;
     }
 
@@ -1321,11 +1337,14 @@ public class Parse implements Comparable<Parse> {
     return fref;
   }
   // Create a type forward-reference.  Must be type-defined later.
-  private NewNode type_fref(String tvar, boolean is_val) {
-    assert tvar.charAt(tvar.length()-1)==':';
-    NewNode tn = init(new NewNode(false,is_val,true,Env.new_alias()).set_type_name(tvar));
+  private NewNode type_fref(UnresolvedNode construct, boolean is_val) {
+    String tname = (construct._name+":").intern();
+    NewNode tn = init(new NewNode(false,is_val,true,tname,Env.new_alias()));
     assert tn.is_forward_type();
-    _e.add_type(tvar,tn);
+    _e.add_type(tname,tn);
+    assert construct.len()==1; // do not already have a default
+    ValNode vdef = init(ValNode.make_default(construct._name,tn._alias));
+    construct.add_def(vdef); // Add a display default
     return tn;
   }
 

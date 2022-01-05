@@ -16,9 +16,6 @@ public abstract class ValFunNode extends Node {
   abstract String name();       // Debug name, might be empty string
   // The formals.  Comes from FunPtr->Fun->Parms._t or from ValNode->proto->_ts[idx]
   abstract Type formal(int idx);
-  // The actual value, as a TypeFunPtr (or OOB).
-  // For ValNodes, it is the constructor signature.
-  //abstract TypeFunPtr funtype();
 
   // Value types also appear in TypeFunPtr contexts and in TypeMemPtr otherwise.
   public static String valtype( Type t ) {

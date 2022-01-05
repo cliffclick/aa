@@ -90,7 +90,10 @@ public class GVNGCM {
   // Keep a Node reference alive for later.  Strongly asserted as a stack
   public static int push( Node n ) { KEEP_ALIVE.add_def(n); return KEEP_ALIVE._defs._len; }
   // Return the pushed Node
-  public static Node pop( int idx ) { assert KEEP_ALIVE._defs._len==idx; return KEEP_ALIVE.pop(); }
+  public static Node pop( int idx ) {
+    assert KEEP_ALIVE._defs._len==idx;
+    return KEEP_ALIVE.del(idx-1);
+  }
 
   // Record a Node, but do not optimize it for value and ideal calls, as it is
   // mid-construction from the parser.  Any function call with yet-to-be-parsed

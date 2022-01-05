@@ -336,7 +336,9 @@ public class FunNode extends RegionNode {
     }
 
     // Look for splitting to help a pointer from an unspecialized type
-    Type tmem = parms[MEM_IDX]._val;
+    Node mem = parms[MEM_IDX];
+    if( mem==null ) return null; // Pure function, has no memory read/write
+    Type tmem = mem._val;
     if( tmem instanceof TypeMem ) {
       //boolean progress = false;
       //TypeStruct formals = TypeStruct.UNUSED;
@@ -822,7 +824,7 @@ public class FunNode extends RegionNode {
     GVNGCM.retype_mem(aliases,fun .parm(MEM_IDX), newret, true);
 
     // Unhook the hooked FunPtrs
-    for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) GVNGCM.pop(GVNGCM.KEEP_ALIVE._defs._len);
+    for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) Env.GVN.add_unuse(GVNGCM.pop(GVNGCM.KEEP_ALIVE._defs._len));
   }
 
   // Compute value from inputs.  Simple meet over inputs.

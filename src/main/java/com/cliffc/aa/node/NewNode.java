@@ -66,6 +66,8 @@ public class NewNode extends Node {
 
   // Just TMP.make(_alias,ISUSED)
   public TypeMemPtr _tptr;
+  // Prototype name (with the ':') or null
+  public final String _tname;
 
   // Still adding fields or not.
   private boolean _closed;
@@ -74,19 +76,25 @@ public class NewNode extends Node {
   private boolean _forward_ref;
 
   // Takes an alias only
-  public NewNode( boolean closure, boolean is_val, boolean forward_ref, int alias ) {
+  public NewNode( boolean closure, boolean is_val, boolean forward_ref, String tname, int alias ) {
     super(OP_NEW, null, null);
+    assert !closure || tname==null;
     _is_closure = closure;
     _is_val = is_val;
     _forward_ref = forward_ref;
+    _tname=tname;
     _init( alias, TypeStruct.EMPTY);
   }
 
   private void _init(int alias, TypeStruct ts) {
     if( _elock ) unelock();    // Unlock before changing hash
     _alias = alias;
+    assert ts._name.isEmpty() || Util.eq(ts._name,_tname);
+    if( ts._name.isEmpty() && _tname!=null ) ts = ts.set_name(_tname);
     _ts = ts;
-    _tptr = TypeMemPtr.make(BitsAlias.make0(alias),TypeStruct.ISUSED);
+    TypeStruct flat = TypeStruct.ISUSED;
+    if( _tname!=null ) flat = flat.set_name(_tname);
+    _tptr = TypeMemPtr.make(BitsAlias.make0(alias),flat);
   }
   @Override public String xstr() { return "New"+"*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
@@ -94,18 +102,18 @@ public class NewNode extends Node {
   void reset() { assert is_prim(); _init(_reset_alias,_ts); }
   @Override public boolean is_forward_type() { return _forward_ref; }
   public void define() { assert _forward_ref && _closed; _forward_ref=false; }
+  public boolean is_closed() { return _closed; }
+  public NewNode close() { assert !_closed; _closed=true; return this; }
+  // Strip the ':' off to make a value name from a type name.
+  // Error if not a named NewNode.
+  public String as_valname() { return _tname.substring(0,_tname.length()-1).intern(); }
 
   public MrgProjNode mem() {
     for( Node use : _uses ) if( use instanceof MrgProjNode mrg ) return mrg;
     return null;
   }
   public void set_nargs() { assert _nargs==0; _nargs=len(); }
-  public NewNode set_type_name(String name) {
-    assert _ts._name.isEmpty();
-    _ts = _ts.set_name(name);
-    _tptr = TypeMemPtr.make(_tptr._aliases,TypeStruct.ISUSED.set_name(name));
-    return this;
-  }
+
   public int find(String name) { int idx = _ts.find(name); return idx==-1 ? -1 : idx+DSP_IDX; }
   public Node get(String name) { return in(find(name)); } // Error if not found
   public TypeFld fld(String name) { return _ts.get(name); }
@@ -145,10 +153,7 @@ public class NewNode extends Node {
   }
   public void pop_fld() { throw unimpl(); }
 
-  public boolean is_closed() { return _closed; }
-  public NewNode close() { assert !_closed; _closed=true; return this; }
-
-    // The current local scope ends, no more names will appear.  Forward refs
+  // The current local scope ends, no more names will appear.  Forward refs
   // first found in this scope are assumed to be defined in some outer scope
   // and get promoted.  Other locals are no longer kept alive, but live or die
   // according to use.
@@ -248,8 +253,8 @@ public class NewNode extends Node {
     if( rec._args == null ) return true;
     for( String id : rec._args.keySet() ) {
       // Field is the class prototype name
-      //   if( id.charAt(id.length()-1)==':' && Util.eq(id,_tptr._obj._name) )
-      //      continue;             // This is fine
+      if( id.charAt(id.length()-1)==':' && Util.eq(id,_tptr._obj._name) )
+         continue;             // This is fine
       // Field is missing and not in error
       if( _ts.get(id)==null && !rec.arg(id).is_err() )
         return false;

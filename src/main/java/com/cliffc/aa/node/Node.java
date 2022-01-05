@@ -159,10 +159,11 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Return Node at idx, withOUT auto-deleting it, even if this is the last
   // use.  Used by the parser to retrieve final Nodes from tmp holders.  Does
   // NOT preserve order.
-  public void del( int idx ) {
+  public Node del( int idx ) {
     unelock();
     Node n = _defs.del(idx);
     if( n != null ) n._uses.del(this);
+    return n;
   }
   public Node pop( ) { unelock(); Node n = _defs.pop(); unuse(n); return n; }
   // Remove Node at idx, auto-delete and preserve order.
@@ -228,7 +229,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // with equivalents.  The push/pop sequences are strongly asserted for stack
   // order.
   public int push() { GVNGCM.KEEP_ALIVE.add_def(this); return GVNGCM.KEEP_ALIVE._defs._len-1; }
-  public static Node pop (int idx) { assert idx==GVNGCM.KEEP_ALIVE._defs._len-1;  return GVNGCM.KEEP_ALIVE.pop(); }
+  public static Node pop (int idx) { assert idx==GVNGCM.KEEP_ALIVE._defs._len-1;  return GVNGCM.pop(idx+1); }
   public static Node peek(int idx) { assert idx<GVNGCM.KEEP_ALIVE._defs._len;  return GVNGCM.KEEP_ALIVE.in(idx); }
   public static void pops(int nargs) { for( int i=0; i<nargs; i++ ) GVNGCM.KEEP_ALIVE.pop(); }
   public boolean is_keep() {

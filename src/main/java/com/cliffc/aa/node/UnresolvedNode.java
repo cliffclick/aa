@@ -25,6 +25,7 @@ public class UnresolvedNode extends Node {
   // If no inputs, then remains an undefined forward-ref.
   private byte _fref;
   UnresolvedNode( String name, Parse bad ) { super(OP_UNR); _name = name; _bad=bad; _val = TypeFunPtr.GENERIC_FUNPTR; add_def(null); }
+
   @Override public String xstr() {
     if( is_dead() ) return "DEAD";
     if( _defs._len==0 ) return "???"+_name;
@@ -34,14 +35,6 @@ public class UnresolvedNode extends Node {
     default -> "?";
     };
     return s+_name;
-  }
-  @Override public Node ideal_reduce() {
-    if( !is_defined() || _defs._len > 2 ) return null;
-    // Defined with only 1, remove for a single FunPtr
-    // ValNodes stay to keep producing a TFP.
-    if( in(0)==null ) return in(1) instanceof FunPtrNode ? in(1) : null;
-    // Move the display in slot(0) to the FunPtr before returning it
-    throw unimpl();
   }
 
   @Override public Type value() {
@@ -58,6 +51,14 @@ public class UnresolvedNode extends Node {
       t = tfp.make_from(dsp,tfp._ret);
     }
     return t;
+  }
+  @Override public Node ideal_reduce() {
+    if( !is_defined() || _defs._len > 2 ) return null;
+    // Defined with only 1, remove for a single FunPtr
+    // ValNodes stay to keep producing a TFP.
+    if( in(0)==null ) return in(1) instanceof FunPtrNode ? in(1) : null;
+    // Move the display in slot(0) to the FunPtr before returning it
+    throw unimpl();
   }
 
   // Looks at the fidxs in TFP, and the arguments given and tries to resolve
@@ -109,13 +110,6 @@ public class UnresolvedNode extends Node {
     return choice;
   }
 
-
-  // Bind to a display
-  UnresolvedNode bind( Node dsp ) {
-    assert in(0)==null && ValFunNode.valtype(dsp._val)!=null;
-    return (UnresolvedNode)copy(true).set_def(0,dsp);
-  }
-
   // An UnresolvedNode is its own Leaf, because it might gather fairly unrelated
   // functions - such as integer-add vs string-add, or the 1-argument leading
   // '+' operator vs the more expected binop.
@@ -134,6 +128,12 @@ public class UnresolvedNode extends Node {
   // returns a scalar.
   public static UnresolvedNode forward_ref( String name, Parse unkref ) {
     return new UnresolvedNode(name,unkref);
+  }
+
+  // Bind to a display
+  UnresolvedNode bind( Node dsp ) {
+    assert in(0)==null && ValFunNode.valtype(dsp._val)!=null;
+    return (UnresolvedNode)copy(true).set_def(0,dsp);
   }
 
   // True if this is a forward_ref

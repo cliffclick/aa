@@ -118,7 +118,7 @@ public class Env implements AutoCloseable {
   Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr, NewNode fref ) {
     _par = par;
     _fun = fun;
-    NewNode nnn = fref==null ? GVN.init(new NewNode(is_closure,false,false,new_alias())) : fref;
+    NewNode nnn = fref==null ? GVN.init(new NewNode(is_closure,false,false,null,new_alias())) : fref;
     nnn.add_fld(TypeFld.make_dsp(dsp_ptr._val),dsp_ptr,null);
     // Install a top-level prototype mapping
     if( fref!=null ) {          // Forward ref?

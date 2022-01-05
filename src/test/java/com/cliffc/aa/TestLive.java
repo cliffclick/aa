@@ -52,7 +52,7 @@ public class TestLive {
 
     // New object, fields x,y holding ints
     int alias = BitsAlias.new_alias(BitsAlias.ALLX);
-    NewNode nnn = new NewNode(false,false,false,alias);
+    NewNode nnn = new NewNode(false,false,false,null,alias);
     nnn.add_fld(TypeMemPtr.DISP_FLD,Node.con(Type.NIL),null);
     nnn.add_fld(TypeFld.make("x"),fdx,null);
     nnn.add_fld(TypeFld.make("y"),fdy,null);
