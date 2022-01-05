@@ -220,6 +220,12 @@ public class NewNode extends Node {
       Env.GVN.add_reduce(chg);
   }
 
+  @Override public TV2 new_tvar(String alloc_site) {
+    for( Node n : _defs )
+      if( n!=null )  n.walk_initype(); // Force tvar
+    return TV2.make_struct(this,alloc_site);
+  }
+
   @Override public boolean unify( boolean test ) {
     TV2 rec = tvar();
     if( rec.is_err() ) return false;
@@ -239,17 +245,16 @@ public class NewNode extends Node {
   // Extra fields are unified with ERR since they are not created here:
   // error to load from a non-existing field
   private boolean check_fields(TV2 rec) {
-    //if( rec._args != null )
-    //  for( String id : rec._args.keySet() ) {
-    //    // Field is the class prototype name
-    //    if( id.charAt(id.length()-1)==':' && Util.eq(id,_tptr._obj._name) )
-    //      continue;             // This is fine
-    //    // Field is missing and not in error
-    //    if( _ts.get(id)==null && !rec.arg(id).is_err() )
-    //      return false;
-    //  }
-    //return true;
-    throw unimpl();
+    if( rec._args == null ) return true;
+    for( String id : rec._args.keySet() ) {
+      // Field is the class prototype name
+      //   if( id.charAt(id.length()-1)==':' && Util.eq(id,_tptr._obj._name) )
+      //      continue;             // This is fine
+      // Field is missing and not in error
+      if( _ts.get(id)==null && !rec.arg(id).is_err() )
+        return false;
+    }
+    return true;
   }
 
   @Override public Node ideal_reduce() {

@@ -979,9 +979,9 @@ public class Parse implements Comparable<Parse> {
     // Record H-M VStack in case we clone
     //fun.set_nongens(_e._nongen.compact());
     // Build Parms for system incoming values
-    int rpc_idx = init(new ParmNode(CTL_IDX," rpc",fun,TypeRPC.ALL   ,Env.ALL_CALL,null)).push();
-    int clo_idx = init(new ParmNode(DSP_IDX,"^"   ,fun,par_stk._tptr ,par_stk     ,null)).push();
-    Node mem    = init(new ParmNode(MEM_IDX," mem",fun,TypeMem.ALLMEM,Env.DEF_MEM ,null));
+    int rpc_idx = init(new ParmNode(CTL_IDX," rpc",fun,TypeRPC.ALL_CALL,Env.ALL_CALL,null)).push();
+    int clo_idx = init(new ParmNode(DSP_IDX,"^"   ,fun,par_stk._tptr   ,par_stk     ,null)).push();
+    Node mem    = init(new ParmNode(MEM_IDX," mem",fun,TypeMem.ALLMEM  ,Env.DEF_MEM ,null));
 
     // Increase scope depth for function body.
     int fidx;

@@ -155,9 +155,9 @@ public final class FunPtrNode extends ValFunNode {
     if( !self.is_fun() ) {      // Force a function if not already
       if( test ) return true;
       TV2[] tv2s = new TV2[nargs];
-      for( Node parm : fun._uses )
-        if( parm instanceof ParmNode && parm.has_tvar() )
-          tv2s[((ParmNode)parm)._idx] = parm.tvar();
+      for( Node use : fun._uses )
+        if( use instanceof ParmNode parm && parm.has_tvar() )
+          tv2s[parm._idx] = parm.tvar();
       assert tv2s[0]==null;
       tv2s[0] = ret.rez().tvar();
       progress = self.unify(TV2.make_fun(ret.rez(),((TypeFunPtr)_val).make_no_disp(),"FunPtr_unify",tv2s),test);

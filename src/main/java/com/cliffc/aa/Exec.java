@@ -33,6 +33,7 @@ public abstract class Exec {
     ErrMsg err = new Parse(src,false,e,str).prog();
 
     // Close file scope; no program text in this file, so no more fields to add.
+    e._scope.stk().close();
     int sidx = e._scope.push();
     //Env.GVN.add_flow_uses(e._scope);// Post-parse, revisit top-level called functions
     e.close();                // No more fields added to the parse scope

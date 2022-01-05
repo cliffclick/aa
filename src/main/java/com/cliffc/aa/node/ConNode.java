@@ -27,26 +27,26 @@ public class ConNode<T extends Type> extends Node {
   public void exclude_alias(int alias) {
     unelock();                  // Changing hash
     _t = (T)((TypeMem)_t).make_from(alias,TypeStruct.UNUSED);
-    Env.GVN.add_flow(this);    
+    Env.GVN.add_flow(this);
   }
-  
+
   @Override public Type value() { return _t.simple_ptr(); }
   @Override public TypeMem all_live() { return _t instanceof TypeMem ? TypeMem.ALLMEM : TypeMem.ALIVE; }
 
   @Override public TV2 new_tvar(String alloc_site) {
     if( _t==Type.CTRL || _t==Type.XCTRL || _t instanceof TypeRPC )
       return null;
+    if( this == Env.XUSE ) return null;
     if( _t == Type.XNIL )
       return TV2.make_nil(TV2.make_leaf(this,alloc_site),alloc_site);
+    // Bare TMP over a prototype; shows up as the default ParmNode 'self' input.
+    // Should unify with the prototype itself.
+    if( _t instanceof TypeMemPtr tmp && ValFunNode.valtype(tmp)!=null )
+      return TV2.make_leaf(this,alloc_site);
     return TV2.make_base(this,_t,alloc_site);
   }
 
-  @Override public boolean unify( boolean test ) {
-    if( _tvar==null ) return false;
-    TV2 self = tvar();
-    assert self.is_base() || self.is_nil() || self.is_obj();
-    return false;
-  }
+  @Override public boolean unify( boolean test ) { return false; }
 
   @Override public String toString() { return str(); }
   @Override public int hashCode() {
@@ -63,7 +63,7 @@ public class ConNode<T extends Type> extends Node {
     return _t==con._t;
   }
   @Override Node walk_dom_last( Predicate<Node> P) { return null; }
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings("unused")
   public static class PI extends ConNode {
     public PI() { super(TypeFlt.PI); }
     @Override public Node clazz_node( ) { return Env.GVN.init(this); }
