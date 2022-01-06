@@ -758,14 +758,14 @@ public class HM {
         if( progress && work==null ) return true; // Will-progress & just-testing early exit
         tfun=tfun.find();
       }
-      if( (tfun.size()-1)-(_args.length-miss) > 0 )
+      if( (tfun.size()-1)-(_args.length-miss) > 0 && !tfun.is_err() )
         progress |= bad_arg_cnt(work);
       // Check for progress on the return
       progress |= find().unify(tfun.arg("ret"),work);
       return progress;
     }
     private boolean bad_arg_cnt(Work<Syntax> work) {
-      if( find()._err != null ) return false;
+      if( find().is_err() ) return false;
       if( work!=null ) find()._err = "Bad argument count";
       return true;
     }
