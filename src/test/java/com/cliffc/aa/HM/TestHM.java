@@ -36,8 +36,8 @@ public class TestHM {
 
   // Run same program in all 3 combinations, but answers vary across combos
   private void run( String prog, String rez_hm_gcp, String rez_hm_alone, Supplier<Type> frez_gcp_hm, Supplier<Type> frez_gcp_alone ) {
-    //_run1(prog,rez_hm_gcp  ,frez_gcp_hm   );
-    //_run1(prog,rez_hm_alone,null          );
+    _run1(prog,rez_hm_gcp  ,frez_gcp_hm   );
+    _run1(prog,rez_hm_alone,null          );
     _run1(prog,null        ,frez_gcp_alone);
   }
   private void run( String prog, String rez_hm_gcp, String rez_hm_alone, Type rez_gcp_hm, Type rez_gcp_alone ) {
@@ -127,11 +127,11 @@ public class TestHM {
   @Test public void test06() {
     run("id={x->x}; (pair (id 3) (id \"abc\"))",
         // HM is sharper here than in test05, because id is generalized per each use site
-        "( 3, *[2]str:(97))",
-        "( 3, *[2]str:(97))",
+        "( 3, *[4]str:(97))",
+        "( 3, *[4]str:(97))",
         // GCP with HM
         // With lift ON
-        TypeMemPtr.make(2,make_tups(TypeInt.NINT8,TypeMemPtr.make_str(TypeInt.NINT64))),
+        TypeMemPtr.make(2,make_tups(TypeInt.NINT64,TypeMemPtr.make_str(BitsAlias.NALL,TypeInt.NINT64))),
         // With lift OFF
         //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
         // GCP is weaker without HM
@@ -173,8 +173,8 @@ public class TestHM {
   @Test public void test14() {
     run("map = { fun -> { x -> (fun x)}};"+
         "(pair ((map str) 5) ((map factor) 2.3))",
-        "( *[2]str:(), flt64)",
-        "( *[4]str, flt64)",
+        "( *[4]str:(), flt64)",
+        "( *[4]str:(), flt64)",
         // With lift ON
         TypeMemPtr.make(2,make_tups(TypeMemPtr.make(BitsAlias.ALLX,TypeStruct.ISUSED.set_name("str:")),TypeFlt.FLT64)),
         // With lift OFF
@@ -241,10 +241,10 @@ cdr ={mycons -> (mycons { p q -> q})};
 map ={fun parg -> (fun (cdr parg))};
 (pair (map str (cons 0 5)) (map isempty (cons 0 "abc")))
 """,
-        "( *[4]str, int1)",
-        "( *[4]str, int1)",
+        "( *[4]str:(), int1)",
+        "( *[4]str:(), int1)",
         // With Lift ON
-        TypeMemPtr.make(7,make_tups(TypeMemPtr.ISUSED,TypeInt.INT64)),
+        TypeMemPtr.make(2,make_tups(TypeMemPtr.STRPTR.widen(),TypeInt.INT64)),
         // With Lift OFF
         //tuple2,
         tuple2);
@@ -270,28 +270,6 @@ map ={fun parg -> (fun (cdr parg))};
         "     { n -> (if (eq0 n) 1 (is_odd (dec n)))};"+
         "(is_even 3)" ,
         "int1", TypeInt.BOOL);
-  }
-
-  @Test public void test67() {
-    run("""
-all = @{
-  is_even = { dsp n -> (if (eq0 n) 0 (dsp.is_odd  dsp (dec n)))},
-  is_odd  = { dsp n -> (if (eq0 n) 1 (dsp.is_even dsp (dec n)))}
-};
-{ x -> (all.is_even all x)}
-""",
-        "{int64 -> int1}", tfs(TypeInt.BOOL));
-  }
-
-  @Test public void test68() {
-    run("dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp \"abc\"))",
-        "( 3, *[4]\"abc\")",
-        "( 3, *[4]\"abc\")",
-        // With lift On
-        TypeMemPtr.make(7,make_tups(TypeInt.NINT64,TypeMemPtr.make(4,TypeStruct.ISUSED))),
-        // With lift Off
-        //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
-        tuplen2);
   }
 
   // Toss a function into a pair & pull it back out
@@ -442,10 +420,10 @@ out_str = (map in_int str);
 out_bool= (map in_str { xstr -> (eq xstr "def")});
 (pair out_str out_bool)
 """,
-        "( *[4]str, int1)",
-        "( *[4]str, int1)",
+        "( *[4]str:(), int1)",
+        "( *[4]str:(), int1)",
         // With lift ON
-        TypeMemPtr.make(7,make_tups(TypeMemPtr.ISUSED,TypeInt.INT64)),
+        TypeMemPtr.make(2,make_tups(TypeMemPtr.STRPTR.widen(),TypeInt.INT64)),
         // With lift OFF
         //tuple2,
         tuple2);
@@ -490,10 +468,10 @@ loop = { name cnt ->
 };
 (loop "def" (id 2))
 """,
-        "*[0,4]str?",  // Both HM and GCP
-        "Cannot unify int8 and *[0,4]str?", // HM alone cannot do this one
+        "*[0,4]str:(nint8)?",  // Both HM and GCP
+        "Cannot unify int8 and *[0,4]str:(nint8)?", // HM alone cannot do this one
         // With lift ON
-        TypeMemPtr.make(4,TypeStruct.ISUSED), // Both HM and GCP
+        TypeMemPtr.make_str(BitsAlias.NALL,TypeInt.NINT64), // Both HM and GCP
         // With lift OFF
         //Type.NSCALR,
         Type.NSCALR);                   // GCP alone gets a very weak answer
@@ -901,7 +879,7 @@ three =(n.s two);     // Three is the successor of two
         "}",
         () -> {
           //*[13]@{^=any; f=[15]{any }; res1=*[9,10,11,12]($); res2=$}
-          Type tmp = TypeMemPtr.make(BitsAlias.ALL.make(9,10,11,12),TypeStruct.make(NO_DSP));
+          Type tmp = TypeMemPtr.make(BitsAlias.ALL.make(5,6,7,8),TypeStruct.make(NO_DSP));
           return TypeMemPtr.make(9, TypeStruct.make(NO_DSP,mfun(2,"f",tmp,15),TypeFld.make("res1",tmp),TypeFld.make("res2",tmp)));
         },
         () -> {
@@ -1035,8 +1013,8 @@ maybepet = petcage.get;
         (if maybepet maybepet.name "no_name")
 )
 """,
-        "(nflt32,nflt32,*[4]str)",
-        "(nflt32,nflt32,*[4]str)",
+        "(nflt32,nflt32,*[4]str:(nint8))",
+        "(nflt32,nflt32,*[4]str:(nint8))",
         // With lift ON
         //TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.ISUSED)),
         //TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.ISUSED)));
@@ -1044,6 +1022,38 @@ maybepet = petcage.get;
         TypeMemPtr.make(3, make_tups(Type.SCALAR  , Type.SCALAR  , Type.SCALAR)),
         // Needs cutoff==2 or HM to discover .name field is a string
         TypeMemPtr.make(3, make_tups(Type.SCALAR  , Type.SCALAR  , Type.SCALAR)) );
+  }
+
+  @Test public void test67() {
+    run("""
+all = @{
+  is_even = { dsp n -> (if (eq0 n) 0 (dsp.is_odd  dsp (dec n)))},
+  is_odd  = { dsp n -> (if (eq0 n) 1 (dsp.is_even dsp (dec n)))}
+};
+{ x -> (all.is_even all x)}
+""",
+        "{int64 -> int1}", tfs(TypeInt.BOOL));
+  }
+
+  @Test public void test68() {
+    run("dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp \"abc\"))",
+        "( 3, *[4]str:(97))",
+        "( 3, *[4]str:(97))",
+        // With lift On
+        TypeMemPtr.make(2,make_tups(TypeInt.NINT64,TypeMemPtr.make_str(BitsAlias.NALL,TypeInt.NINT64))),
+        // With lift Off
+        //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
+        tuplen2);
+  }
+
+  // Test incorrect argument count
+  @Test public void test69() {
+    run("({x y -> (pair x y) } 1 2 3)","Bad argument count",TypeMemPtr.make(2,make_tups(TypeInt.con(1),TypeInt.con(2))));
+  }
+
+  // Test incorrect argument count
+  @Test public void test70() {
+    run("({x y -> (pair x y) } 1 )","Bad argument count",TypeMemPtr.make(2,make_tups(TypeInt.con(1),Type.XSCALAR)));
   }
 
 }

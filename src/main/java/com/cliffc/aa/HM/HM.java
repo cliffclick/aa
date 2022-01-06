@@ -191,8 +191,7 @@ public class HM {
   static void pass4(Root prog) {
     prog.visit( syn -> {
         T2 self = syn.find();
-        if( syn instanceof Field ) {
-          Field fld = (Field)syn;
+        if( syn instanceof Field fld ) {
           T2 rec = fld._rec.find();
           if( !self.is_err() && rec.is_err2() && rec.is_struct() && rec.is_open() ) {
             rec._aliases=null;  // Turn off struct-ness for print
@@ -253,11 +252,9 @@ public class HM {
       require(')');
       // Guarding if-nil test inserts an upcast.  This is a syntactic transform only.
       if( fun instanceof If &&
-          args.at(0) instanceof Ident ) {
-        Ident id = (Ident)args.at(0);
+          args.at(0) instanceof Ident id )
         args.set(1,new Apply(new Lambda(args.at(1), id._name),
                              new Apply(new NotNil(),new Ident(id._name))));
-      }
       return new Apply(fun,args.asAry());
     }
 
@@ -531,12 +528,11 @@ public class HM {
 
       // Lookup, and get the T2 type var and a pointer to the flow type.
       for( Syntax syn = _par; syn!=null; syn = syn._par ) {
-        if( syn instanceof Lambda ) {
-          Lambda lam = (Lambda)syn;
+        if( syn instanceof Lambda lam ) {
           if( (_idx = Util.find(lam._args,_name)) != -1 )
             return _init(lam,lam.targ(_idx),false);
-        } else if( syn instanceof Let ) {
-          Let let = (Let)syn;  _idx=-1;
+        } else if( syn instanceof Let let ) {
+          _idx=-1;
           if( Util.eq(let._arg0,_name) )
             return _init(let,let._targ, !let._targ.nongen_in(nongen));
         }
@@ -611,6 +607,7 @@ public class HM {
     }
     // Meet the formal argument# with a new Apply callsite actual arg.
     void arg_meet(int argn, Type cflow, Work<Syntax> work) {
+      if( argn >= _types.length ) return; // Bad argument count
       Type old = _types[argn];
       Type mt = old.meet(cflow);
       if( mt==old ) return;     // No change
@@ -751,14 +748,26 @@ public class HM {
 
       // Check for progress amongst arg pairs
       boolean progress = false;
+      int miss=0;
       for( int i=0; i<_args.length; i++ ) {
-        progress |= tfun.arg(Lambda.ARGNAMES[i]).unify(_args[i].find(),work);
+        T2 farg = tfun.arg(Lambda.ARGNAMES[i]);
+        if( farg==null ) {
+          miss++;
+          progress |= bad_arg_cnt(work);
+        } else progress |= farg.unify(_args[i].find(),work);
         if( progress && work==null ) return true; // Will-progress & just-testing early exit
         tfun=tfun.find();
       }
+      if( (tfun.size()-1)-(_args.length-miss) > 0 )
+        progress |= bad_arg_cnt(work);
       // Check for progress on the return
       progress |= find().unify(tfun.arg("ret"),work);
       return progress;
+    }
+    private boolean bad_arg_cnt(Work<Syntax> work) {
+      if( find()._err != null ) return false;
+      if( work!=null ) find()._err = "Bad argument count";
+      return true;
     }
     @Override void add_hm_work( @NotNull Work<Syntax> work) {
       work.add(_par);
@@ -768,8 +777,7 @@ public class HM {
     // Record call-site actual arguments on lambda formals
     Type _val( Work<Syntax> work ) {
       Type flow = _fun._flow;
-      if( !(flow instanceof TypeFunPtr) ) return flow.oob(Type.SCALAR);
-      TypeFunPtr tfp = (TypeFunPtr)flow;
+      if( !(flow instanceof TypeFunPtr tfp) ) return flow.oob(Type.SCALAR);
       if( tfp._fidxs == BitsFun.EMPTY || (DO_HM && !_fun.find().is_fun()) )
         return Type.XSCALAR; // Nothing being called, stay high
       if( work!=null &&
@@ -792,8 +800,7 @@ public class HM {
 
     @Override Type val(Work<Syntax> work) {
       Type flow = _val(work);
-      if( !(flow instanceof TypeFunPtr) ) return flow;
-      TypeFunPtr tfp = (TypeFunPtr)flow;
+      if( !(flow instanceof TypeFunPtr tfp) ) return flow;
       // Have some functions, meet over their returns.
       Type ret = tfp._ret;
       // Attempt to lift the result, based on HM types.
@@ -834,8 +841,7 @@ public class HM {
 
       // Check for some Lambdas present
       Type flow = _fun._flow;
-      if( !(flow instanceof TypeFunPtr) ) return;
-      TypeFunPtr tfp = (TypeFunPtr)flow;
+      if( !(flow instanceof TypeFunPtr tfp) ) return;
       if( tfp._fidxs == BitsFun.EMPTY ) return;
 
       // child arg to a call-site changed; find the arg#;
@@ -887,8 +893,7 @@ public class HM {
       Type flow = _fun._flow;
       T2 fun = _fun.find();
       if( !fun.is_fun() ) return flow;
-      if( !(flow instanceof TypeFunPtr) ) return flow;
-      TypeFunPtr tfp = (TypeFunPtr)flow;
+      if( !(flow instanceof TypeFunPtr tfp) ) return flow;
 
       // Have some functions, meet over their returns.
       Type ret = tfp._ret;
@@ -936,11 +941,9 @@ public class HM {
       }
 
       // recursively walk structures for nested functions
-      if( flow instanceof TypeMemPtr ) {
-        TypeMemPtr tmp = (TypeMemPtr)flow;
+      if( flow instanceof TypeMemPtr tmp )
         for( TypeFld fld : tmp._obj )
           _walk_root_funs(fld._t,work);
-      }
     }
     // TODO: T2 walker
     // If a root-escaping function has Base inputs, widen them to allow
@@ -963,8 +966,7 @@ public class HM {
     Type flow_type() { ADD_SIG.clear(); return add_sig(_flow); }
     private static Type add_sig(Type t) {
       if( ADD_SIG.tset(t._uid) ) return t;
-      if( t instanceof TypeFunPtr ) {
-        TypeFunPtr fun = (TypeFunPtr)t;
+      if( t instanceof TypeFunPtr fun ) {
         Type rez = Type.XSCALAR;
         if( fun._fidxs.test(1) ) rez = Type.SCALAR;
         else
@@ -1115,8 +1117,7 @@ public class HM {
     @Override Type val(Work<Syntax> work) {
       Type trec = _rec._flow;
       if( trec.above_center() || trec==Type.NIL ) return Type.XSCALAR;
-      if( trec instanceof TypeMemPtr ) {
-        TypeMemPtr tmp = (TypeMemPtr)trec;
+      if( trec instanceof TypeMemPtr tmp ) {
         TypeFld fld = tmp._obj.get(_id);
         if( fld!=null ) return fld._t; // Field type
         if( tmp._obj.above_center() ) return Type.XSCALAR;
@@ -1303,8 +1304,10 @@ public class HM {
     @Override Type apply( Type[] flows) {
       Type pred = flows[0];
       if( pred.above_center() ) return TypeInt.BOOL.dual();
-      if( pred instanceof TypeMemPtr tmp && Util.eq(tmp._obj._name,"str:") )
-        return TypeInt.con(tmp._obj.at("0")==Type.XNIL ? 1 : 0);
+      if( pred instanceof TypeMemPtr tmp && Util.eq(tmp._obj._name,"str:") ) {
+        TypeFld fld = tmp._obj.get("0");
+        if( fld!=null ) return TypeInt.con(fld._t==Type.XNIL ? 1 : 0);
+      }
       return TypeInt.BOOL;
     }
   }
@@ -2027,7 +2030,7 @@ public class HM {
             if( work==null ) return true; // Will definitely make progress
             T2 nrhs = lhs._fresh(nongen); // New RHS value
             if( !that.is_open() )
-              nrhs._err = "Missing field "+key;   // TODO: Stamp "missing field" into nrhs
+              nrhs._err = "Missing field "+key; // TODO: merge errors
             progress |= that.add_fld(key,nrhs,work);
           } // Else neither side is open, field is not needed in RHS
         } else {
@@ -2210,8 +2213,7 @@ public class HM {
 
       if( is_fun() ) {
         if( t==Type.SCALAR || t==Type.ALL ) t = TypeFunPtr.GENERIC_FUNPTR;
-        if( t instanceof TypeFunPtr ) {
-          TypeFunPtr tfp = (TypeFunPtr)t;
+        if( t instanceof TypeFunPtr tfp ) {
           for( int fidx : tfp._fidxs ) if( WBS.get(fidx) ) return t; // Recursive function return, no more lifting
           for( int fidx : tfp._fidxs ) WBS.set(fidx);                // Guard against recursive functions
           Type tret = tfp._ret;
@@ -2330,8 +2332,7 @@ public class HM {
         return _apply==lf._apply && _t.isa(lf._t) && _t2.isa(lf._t2);
       }
       @Override public boolean equals( Object o ) {
-        if( !(o instanceof LiftSet) ) return false;
-        LiftSet lf = (LiftSet)o;
+        if( !(o instanceof LiftSet lf) ) return false;
         if( _apply != lf._apply ) return false;
         if( _t2.is_leaf() && lf._t2.is_leaf() ) return true;
         return _t2.cycle_equals(lf._t2);
