@@ -6,12 +6,12 @@ import static com.cliffc.aa.AA.unimpl;
 
 No leading expr, but required trailing expr e1:
 
-  - Normal op parse
-  - Examples:  ~e1     ;  +3     ;  -2     ; !@@##e1
-    Called as:  e1.~_();   3.+_();   2.-_();      e1.!@@##_()
+  - Normal uni-op parse; limit of single character
+  - Examples:  ~e1     ;  +3     ;  -2
+    Called as:  e1.~_();   3.+_();   2.-_();
 
-  - First char is "[" or 2nd or later is "{"; trailing op chars allowed.
-    Requires a closing "}" or "]" op token, without an '='.
+  - First char is "[" or 2nd or later is "{" or "<"; trailing op chars allowed.
+    Requires a closing ">" or "}" or "]" op token, without an '='.
   - Examples:   [3]    ;  [% e1 %]
     Called as:  3.[_]();     e1.[%_%]()
 
@@ -33,8 +33,8 @@ Leading expr, and trailing expr
   - Called as:  ary._[_](idx);  e0._%{_}%(e1);
 
 Trinary, 3 exprs
-  - Op token with '[' (leading position ok) or '{' (2nd or later position)
-  - Requires trailing op token with matching '}' or ']'.
+  - Op token with '[' (leading position ok) or '{' '<'(2nd or later position)
+  - Requires trailing op token with matching '>', '}' or ']'.
   - Yes '=' in trailing op
   - Examples:   ary[idx]=val      ;  dict["key"]=val      ;  e0 %{% e1 %}=% e2
     Called as:  ary._[_]=(idx,val);  dict._[_]=("key",val);  e0._%{%_%}=%_(e1,e2)

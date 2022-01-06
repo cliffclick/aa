@@ -530,17 +530,29 @@ public class Parse implements Comparable<Parse> {
   // Invariant: WS already skipped before & after each _expr depth
   private Node _expr(int prec) {
     int lhsx = _x;              // Invariant: WS already skipped
-    Node lhs = _expr_higher(prec);
+    Node lhs = _expr_higher(prec), opfun;
     if( lhs==null ) return null;
     while( true ) {             // Kleene star at this precedence
       // Look for a binop at this precedence level
       int opx = _x;             // Invariant: WS already skipped
-      Oper binop = bin_op(token0(),prec);
-      if( binop==null ) { _x=opx; return lhs; }
+      String tok = token0();
+      Oper binop;
+      while( true ) {
+        binop = bin_op(tok,prec);
+        if( binop==null ) { _x=opx; return lhs; }
+        // Get the oper function to call
+        LoadNode ld = new LoadNode(mem(),lhs,binop._name,errMsg(opx));
+        // Lookup the oper.  Requires LHS be known precise enuf
+        opfun = gvn(ld);
+        // Oper lookup succeeded?
+        if( opfun != ld ) break; // Oper lookup succeeded
+        // Oper lookup failed.  Shrink oper and try again.
+        ld.kill();              // Kill failed lookup
+        tok = tok.substring(0,tok.length()-1); // Shrink token
+        _x--;                                  // Pushback un-parsed char
+      }
       skipWS();
       int rhsx = _x;            // Invariant: WS already skipped
-      // Get the oper function to call
-      Node opfun = gvn(new LoadNode(mem(),lhs,binop._name,errMsg(opx)));
       int fidx = opfun.push();
       Node rhs = _expr_higher_require(binop);
       // Emit the call to both terms
@@ -640,7 +652,7 @@ public class Parse implements Comparable<Parse> {
     Oper op = pre_bal(tok);
     if( op != null ) {
       Node e0 = term();
-      if( e0 == null ) { _x=oldx; return err_ctrl2("Missing term after operator '"+tok+"'"); } // Parsed a valid leading op but missing trailing expr
+      if( e0 == null ) { return err_ctrl2("Missing term after operator '"+op+"'"); } // Parsed a valid leading op but missing trailing expr
       Oper op2 = bal_close(op);         // Returns old op if not balanced, new fuller op if balanced
       if( op2 == null ) throw unimpl(); // Missing close to balanced op
       if( op2._nargs!=1 ) throw unimpl(); // No binary/trinary allowed here
@@ -1191,7 +1203,7 @@ public class Parse implements Comparable<Parse> {
     return new String(_buf,x,_x-x);
   }
   static boolean isOp(String s, boolean prims) {
-    if( s==null ) return false;
+    if( s==null || s.isEmpty() ) return false;
     byte c = (byte)s.charAt(0);
     if( prims && c=='$' ) return false; // Disallow $$ operator during prim parsing; ambiguous with $$java_class_name
     if( !isOp0(c) && (c!='_' || !isOp0((byte)s.charAt(1))) ) return false;
@@ -1199,18 +1211,27 @@ public class Parse implements Comparable<Parse> {
       if( !isOp1((byte)s.charAt(i)) ) return false;
     return true;
   }
+
   // Allows '+' and includes '_+_'
   boolean isOp(String s) { return isOp(s,_prims); }
+
   // Allows '+' and excludes '_+_'
   boolean isBareOp(String tok) {
     return isOp(tok) && tok.charAt(0)!='_' && tok.charAt(tok.length()-1)!='_';
   }
 
-
   // Unary/prefix op or leading balanced op, with no leading expression.
-  // Examples: -1, !pred, [size], %{% matrix_init %}%
+  // Unbalanced unary ops are limited to 1 character.
+  // Unbalanced unary op examples: -1, !pred, +2
+  //   Balanced unary op examples: [size], %{% matrix_init %}%
   // Adds trailing '_' for required trailing expression: -_  !_  [_  %{%_
-  Oper pre_bal(String tok) { return isBareOp(tok)? Oper.make(tok+"_") : null; }
+  Oper pre_bal(String tok) {
+    if( !isBareOp(tok) ) return null;
+    if( Oper.is_open(tok) || tok.length()==1 ) // Balanced unary oper, or 1-char unbalanced
+      return Oper.make(tok+"_");
+    _x -= (tok.length()-1);                   // Unparse all the extra characters
+    return Oper.make(tok.charAt(0)+"_"); // Unbalanced unary oper, limited to 1 char
+  }
 
   // Parsed a leading expression; look for a binary op.  Requires no leading
   // '[' or embedded '{' or '<'.  Requires a trailing expr.

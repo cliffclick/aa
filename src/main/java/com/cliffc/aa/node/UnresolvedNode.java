@@ -147,7 +147,7 @@ public class UnresolvedNode extends Node {
   // Add Another function to an Unresolved and return null, or return an ErrMsg
   // if this would add an ambiguous signature.  Different nargs are different.
   // Within functions with the same nargs
-  public ErrMsg add_fun(ValFunNode fptr) {
+  public void add_fun( ValFunNode fptr) {
     assert in(0)==null;         // No display if we are adding fptrs
     for( int i=1; i<len(); i++ ) {
       ValFunNode f0 = (ValFunNode)in(i);
@@ -161,7 +161,6 @@ public class UnresolvedNode extends Node {
     }
     add_def(fptr);
     Env.GVN.add_flow_uses(this); // Some calls can resolve
-    return null;
   }
 
   @Override public int hashCode() { return super.hashCode()+(_bad==null ? 0 : _bad.hashCode()); }
@@ -177,7 +176,7 @@ public class UnresolvedNode extends Node {
 
   // Assigning the forward-ref removes the error
   @Override public ErrMsg err( boolean fast ) {
-    if( is_defined() ) throw unimpl(); // Ambiguous, should have resolved
+    if( is_defined() ) return ErrMsg.unresolved(_bad,"Unresolved"); // Ambiguous, should have resolved
     return ErrMsg.forward_ref(_bad,_name);
   }
 

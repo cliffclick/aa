@@ -20,6 +20,7 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
+    test("int._+_(1;2;,3)", TypeInt.con(5), "5"); // loading an unbind fptr; statements in arguments
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
     // The Meet loses precision to fast.  This is a typing bug.
@@ -109,8 +110,8 @@ public class TestParse {
     // Variable lookup
     test("math.pi", TypeFlt.PI, "3.141592653589793");
     // bare function lookup; returns a union of '+' functions
-    testerr("+", "Missing term after operator '+'",0);
-    testerr("!", "Missing term after operator '!'",0);
+    testerr("+", "Missing term after operator '+_'",1);
+    testerr("!", "Missing term after operator '!_'",1);
     testerr("_+_", "Syntax error; trailing junk",0);
     testerr("!_", "Syntax error; trailing junk",0);
     // Function application, traditional paren/comma args
@@ -119,24 +120,23 @@ public class TestParse {
     test("1.-_()"  , TypeInt.con(-1),"-1"); // unary version
     // error; mismatch arg count
     testerr("math.pi(1)", "A function is being called, but 3.141592653589793 is not a function",7);
-    testerr("1._+_(2,3)", "Passing 3 arguments to _+_ which takes 2 arguments",3);
+    testerr("1._+_(2,3)", "Passing 3 arguments to _+_ which takes 2 arguments",5);
 
     // Parsed as +(1,(2*3))
-    test("1._+_(2 * 3) ", TypeInt.con(7));
+    test("1._+_(2 * 3) ", TypeInt.con(7), "7");
     // Parsed as (1+2*3)+(4*5+6)
-    test("(1 + 2 * 3)._+_(4 * 5 + 6) ", TypeInt.con(33));
+    test("(1 + 2 * 3)._+_(4 * 5 + 6) ", TypeInt.con(33), "33");
     // Statements
-    test("(1;2 )", TypeInt.con(2));
-    test("(1;2;)", TypeInt.con(2)); // final semicolon is optional
-    test("_+_(1;2 ,3)", TypeInt.con(5)); // statements in arguments
-    test("_+_(1;2;,3)", TypeInt.con(5)); // statements in arguments
+    test("(1;2 )", TypeInt.con(2), "2");
+    test("(1;2;)", TypeInt.con(2), "2"); // final semicolon is optional
+    test("1._+_(2;3)", TypeInt.con(4), "4"); // statements in arguments
     // Operators squished together
-    test("-1== -1",  TypeInt.TRUE);
-    test("0== !!1",  TypeInt.FALSE);
-    test("2==-1",    TypeInt.FALSE);
-    test("-1== --1", TypeInt.FALSE);
-    test("-1== ---1",TypeInt.TRUE);
-    testerr("-1== --", "Missing term after '=='",5);
+    test("-1== -1",  TypeInt.TRUE, "1");
+    test("0== !!1",  TypeInt.FALSE, "0");
+    test("2==-1",    TypeInt.FALSE, "0");
+    test("-1==--1",  TypeInt.FALSE, "0");
+    test("-1==---1", TypeInt.TRUE, "1");
+    testerr("-1== --", "Missing term after operator '-_'",7);
   }
 
   @Test public void testParse01() {
@@ -759,7 +759,7 @@ map(tmp)
   private static TypeStruct make2fldsD( String f1, Type t1, String f2, Type t2 ) {
     return TypeStruct.make("",false,TypeFld.NO_DISP,TypeFld.make(f1,t1,ARG_IDX),TypeFld.make(f2,t2,ARG_IDX+1));
   }
-  
+
   // Combined H-M and GCP Typing
   @Ignore
   @Test public void testParse16() {

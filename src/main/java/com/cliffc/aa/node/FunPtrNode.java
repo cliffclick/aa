@@ -169,6 +169,6 @@ public final class FunPtrNode extends ValFunNode {
     for( int i=DSP_IDX; i<nargs; i++ )
       if( parms[i]!=null )
         progress |= self.arg(TV2.argname(i)).unify(parms[i].tvar(),test);
-    return self.arg("ret").unify(ret.rez().tvar(),test) | progress;
+    return self.arg(" ret").unify(ret.rez().tvar(),test) | progress;
   }
 }

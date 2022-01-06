@@ -830,12 +830,11 @@ public abstract class Node implements Cloneable, IntSupplier {
             ? nval.isa(oval) && nliv.isa(oliv)
             : oval.isa(nval) && oliv.isa(nliv)) )
         errs += _report_bug("Monotonicity bug");
-      if( !Env.GVN.on_flow(this) &&
-          (lifting || AA.DO_GCP) )
+      if( !Env.GVN.on_flow(this) && (lifting || AA.DO_GCP) )
         errs += _report_bug("Progress bug");
     }
     // Check for HMT progress
-    if( AA.DO_HMT && oliv!=TypeMem.DEAD && _tvar!=null ) {
+    if( AA.DO_HMT && oliv!=TypeMem.DEAD && oval!=Type.ANY && _tvar!=null ) {
       if( unify(true) ) {
         if( Combo.HM_FREEZE ) errs += _report_bug("Progress after freezing");
         if( !Env.GVN.on_flow(this) ) errs += _report_bug("Progress bug");

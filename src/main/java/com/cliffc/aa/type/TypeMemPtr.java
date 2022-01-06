@@ -93,15 +93,12 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   }
 
   // Legacy constructor for legacy HM tests
-  public static TypeMemPtr make_str(String s) {
-    TypeFld c0 = TypeFld.make_tup(TypeInt.con(s.charAt(0)),ARG_IDX);
-    TypeStruct ts = TypeStruct.make("str:",false,c0);
-    return TypeMemPtr.make(4,ts);
-  }
-  public static TypeMemPtr make_str(Type t) {
+  public static TypeMemPtr make_str(String s) { return make_str(TypeInt.con(s.charAt(0))); }
+  public static TypeMemPtr make_str(Type t) { return make_str(BitsAlias.make0(4),t); }
+  public static TypeMemPtr make_str(BitsAlias aliases, Type t) {
     TypeFld c0 = TypeFld.make_tup(t,ARG_IDX);
     TypeStruct ts = TypeStruct.make("str:",false,c0);
-    return TypeMemPtr.make(4,ts);
+    return TypeMemPtr.make(aliases,ts);
   }
 
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.

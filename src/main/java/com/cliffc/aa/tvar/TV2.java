@@ -191,7 +191,7 @@ public class TV2 {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
     for( int i=DSP_IDX; i<t2s.length; i++ )
       if( t2s[i]!=null ) args.put(argname(i), t2s[i]);
-    args.put("ret",t2s[0]); // Backdoor the return in slot 0
+    args.put(" ret",t2s[0]); // Backdoor the return in slot 0
     TV2 t2 = new TV2(args,UQNodes.make(n),alloc_site);
     t2._flow = fptr;
     return t2;
@@ -248,7 +248,7 @@ public class TV2 {
   // Functions have argument names, but call sites do not and might also be
   // mixing up different functions with different arg names.  Use these
   // arg-names.
-  public static final String[] ARGS = new String[] {"bad0","bad1","dsp","x","y","z"};
+  public static final String[] ARGS = new String[] {"bad0","bad1","2","3","4","5"};
   public static String argname(int i) {
     if( i < ARGS.length ) return ARGS[i];
     throw unimpl();
@@ -412,7 +412,7 @@ public class TV2 {
       Type tfun = ADUPS.get(_uid);
       if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
       ADUPS.put(_uid, Type.XSCALAR);
-      Type rez = arg("ret")._as_flow();
+      Type rez = arg(" ret")._as_flow();
       return TypeFunPtr.make(BitsFun.NZERO,size()-1,Type.ANY,rez);
     }
     if( is_obj() ) {
@@ -1102,10 +1102,10 @@ public class TV2 {
     if( debug ) ((TypeFunPtr)_flow)._fidxs.clear(0).str(sb);
     sb.p("{ ");
     for( String fld : sorted_flds() ) {
-      if( !Util.eq("ret",fld) )
+      if( !Util.eq(" ret",fld) )
         str0(sb,visit,_args.get(fld),dups,debug).p(' ');
     }
-    return str0(sb.p("-> "),visit,_args.get("ret"),dups,debug).p(" }");
+    return str0(sb.p("-> "),visit,_args.get(" ret"),dups,debug).p(" }");
   }
 
   private SB str_struct(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
@@ -1120,7 +1120,7 @@ public class TV2 {
       for( String fld : sorted_flds() ) {
         // Skip fields from functions
         if( fld.charAt(0)==' ' ) continue;
-        if( Util.eq(fld,"ret") ) continue;
+        if( Util.eq(fld," ret") ) continue;
         // Skip field names in a tuple
         str0(is_tup ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,_args.get(fld),dups,debug).p(is_tup ? ',' : ';');
       }

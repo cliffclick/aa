@@ -485,10 +485,13 @@ public class CallNode extends Node {
     if( tfp.nargs() != nargs() ) {
       if( fast ) return ErrMsg.FAST;
       ValFunNode vfn = ValFunNode.get(tfp._fidxs);
-      return ErrMsg.syntax(_badargs[0],"Passing "+(nargs()-ARG_IDX)+" arguments to "+vfn.name()+" which takes "+(tfp.nargs()-ARG_IDX)+" arguments");
+      return ErrMsg.syntax(_badargs[0],err_arg_cnt(vfn.name(),tfp));
     }
 
     return null;
+  }
+  public String err_arg_cnt(String fname, TypeFunPtr tfp) {
+    return "Passing "+(nargs()-DSP_IDX)+" arguments to "+fname+" which takes "+(tfp.nargs()-DSP_IDX)+" arguments";
   }
 
   public CallEpiNode cepi() {

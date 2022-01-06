@@ -44,9 +44,7 @@ public class ProjNode extends Node {
   @Override public boolean unify( boolean test ) {
     if( _tvar==null ) return false;
     TV2 tv = tvar();
-    if( in(0) instanceof NewNode ) // TODO: Not really a proper use of Proj
-      return tv.unify(tvar(0),test);
-    if( in(0) instanceof CallEpiNode ) { // Only DProj#2 and it's the return value
+    if( in(0) instanceof CallEpiNode ) { // Only DProj#2 and it is the return value
       assert _idx==REZ_IDX;
       return tv.unify(tvar(0),test);
     }

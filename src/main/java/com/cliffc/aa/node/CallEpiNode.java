@@ -1,9 +1,9 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.AA;
+import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.NonBlockingHashMap;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.Env.GVN;
@@ -99,9 +99,11 @@ public final class CallEpiNode extends Node {
         assert fun.in(1).in(0)==call;   // Just called by us
         int idx = Env.SCP_0._defs.find(ret);
         if( idx!=-1 ) Env.SCP_0.del(idx);
+        Node rmem = ret.mem();
+        if( rmem==null ) rmem = call.mem();  // Pure function memory is a copy of call
         fun.set_is_copy();              // Collapse the FunNode into the Call
         Env.GVN.add_flow(call.fdx());   // FunPtr probably goes dead
-        return set_is_copy(ret.ctl(), ret.mem(), ret.rez()); // Collapse the CallEpi into the Ret
+        return set_is_copy(ret.ctl(), rmem, ret.rez()); // Collapse the CallEpi into the Ret
       }
     }
 
@@ -205,7 +207,7 @@ public final class CallEpiNode extends Node {
       RetNode ret = fptr.ret();
       if( _defs.find(ret) != -1 ) continue;   // Wired already
       FunNode fun = ret.fun();
-      if( !CEProjNode.good_call(tcall,fun) ) continue; // Args fail basic sanity
+      if( !CEProjNode.wired_arg_check(tcall,fun,fidx) ) continue; // Args fail basic sanity
       progress=true;
       wire1(call,fun,ret,is_combo); // Wire Call->Fun, Ret->CallEpi
     }
@@ -286,13 +288,21 @@ public final class CallEpiNode extends Node {
     // Compute call-return value from all callee returns
     Type trez = Type.ANY;
     Type tmem = TypeMem.ANYMEM;
-    for( int i=0; i<nwired(); i++ ) { // For all wired calls
-      Type tret0 = wired(i)._val;     // Get the called function return
-      TypeTuple tret = (TypeTuple)(tret0 instanceof TypeTuple ? tret0 : tret0.oob(TypeTuple.RET));
-      tmem = tmem.meet(tret.at(MEM_IDX));
-      trez = trez.meet(tret.at(REZ_IDX));
-      // TODO: HM had neighbor-issues here, when using meet-of-returns instead
-      // of tfptr._ret
+    if( !is_all_wired() ) {
+      throw unimpl();           // Worse-case return from future unwired called fcns
+    } else {
+      for( int i=0; i<nwired(); i++ ) { // For all wired calls
+        RetNode ret = wired(i);
+        Type tret0 = ret._val;     // Get the called function return
+        TypeTuple tret = (TypeTuple)(tret0 instanceof TypeTuple ? tret0 : tret0.oob(TypeTuple.RET));
+        Type rmem = tret.at(MEM_IDX);
+        if( ret.mem()==null )
+          rmem = CallNode.emem(tcall);
+        tmem = tmem.meet(rmem);
+        trez = trez.meet(tret.at(REZ_IDX));
+        // TODO: HM had neighbor-issues here, when using meet-of-returns instead
+        // of tfptr._ret
+      }
     }
 
     // Attempt to lift the result, based on HM types.  Walk the input HM type
@@ -460,77 +470,45 @@ public final class CallEpiNode extends Node {
     return _live;
   }
 
+  // Same as HM.Apply.unify
   @Override public boolean unify( boolean test ) {
     assert !_is_copy;
-    if( tvar().is_err() ) return false; // Already sick, nothing to do
     CallNode call = call();
     Node fdx = call.fdx();
-    if( !(fdx._val instanceof TypeFunPtr) ) return false;
-
-    // Call selected fidxs
-    BitsFun fidxs = CallNode.ttfp(call._val)._fidxs;
-    if( fidxs.above_center() )
-      return false; // No unification until call resolves, same as dead code does not unify
-    if( fidxs==BitsFun.FULL )
-      return false; // Call is in-error, nothing to do
-
-    throw unimpl();
-    //boolean progress = false;
-    //if( ((TypeFunPtr)fdx._val)._fidxs.above_center() ) {
-    //  FreshNode fresh = (FreshNode)fdx;
-    //  // Unify against the selected fidxs only
-    //  for( int fidx : fidxs ) {
-    //    FunPtrNode fptr = FunNode.find_fidx(fidx).fptr();
-    //    progress |= unify_fun(fptr.tvar().fresh(fresh.nongen()),test);
-    //  }
-    //
-    //} else {
-    //  // Unify against the input... should be the same as unifying against the
-    //  // selected fidxs?
-    //  progress |= unify_fun(fdx.tvar(),test);
-    //}
-    //return progress;
-    //return unify_fun(fdx.tvar(),test);
-  }
-
-  private boolean unify_fun(TV2 tfun, boolean test) {
-    if( tfun.is_err() )         // Unify with function error
-      return tvar().unify(tfun,test);
-    // If the function is not a function, make it a function
+    if( !(fdx._val instanceof TypeFunPtr tfp) ) return false; // Wait till executable
+    if( tfp._fidxs.above_center() ) return false;             // Wait till executable
+    int nargs = tfp .nargs();
+    int cargs = call.nargs();
+    int margs = Math.min(nargs,cargs);
+    TV2 tfun = fdx.tvar();
     boolean progress = false;
-    CallNode call = call();
-    Node fdx = call.fdx();
     if( !tfun.is_fun() ) {
       if( test ) return true;
-      NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
-      // The display is extracted from the FunPtr and is not the function itself
-      args.put("2",TV2.make_leaf(fdx,"CallEpi_unify"));
-      for( int i=ARG_IDX; i<call._defs._len; i++ )
-        args.put(TV2.argname(i),call.tvar(i));
-      args.put(" ret",tvar());
-      //TV2 nfun = TV2.make_fun(this, (TypeFunPtr)fdx._val, args, "CallEpi_unify");
-      //progress = tfun.unify(nfun,test);
-      //tfun = tfun.find();
-      throw unimpl();
+      TV2[] tv2s = new TV2[nargs];
+      for( int i=DSP_IDX; i<margs; i++ ) tv2s[i] = call.tvar(i);
+      for( int i=margs; i<nargs; i++ ) throw unimpl(); // TODO: expand with leafs
+      tv2s[0] = tvar();         // Backdoor the return in slot 0
+      TV2 nfun = TV2.make_fun(this, tfp, "CallEpi_unify", tv2s);
+      progress = tfun.unify(nfun,test);
+      tfun = nfun;
     }
-    // TODO: Handle Thunks
-
-    if( tfun.nargs() != call.nargs()-ARG_IDX ) //
-      //return tvar().unify(TV2.make_err(this,"Mismatched argument lengths","CallEpi_unify"),test);
-      throw unimpl();
 
     // Check for progress amongst args
-    for( int i=ARG_IDX; i<call._defs._len; i++ ) {
+    for( int i=DSP_IDX; i<margs; i++ ) {
       TV2 actual = call.tvar(i);
       TV2 formal = tfun.arg(TV2.argname(i));
       progress |= actual.unify(formal,test);
       if( progress && test ) return true; // Early exit
-      if( (tfun=tfun.find()).is_err() ) throw unimpl();
     }
-    // Check for progress on the return
-    progress |= tvar().unify(tfun.arg(" ret"),test);
-    if( (tfun=tfun.find()).is_err() ) return tvar().unify(tfun,test);
+    TV2 self = tvar();
+    if( nargs != cargs && !tfun.is_err() && self._err==null ) { //
+      if( test ) return true;
+      progress = true;
+      self._err = call.err_arg_cnt(ValFunNode.get(tfp._fidxs).name(),tfp);
+    }
 
+    // Check for progress on the return
+    progress |= self.unify(tfun.arg(" ret"),test);
     return progress;
   }
 
