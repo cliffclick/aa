@@ -7,6 +7,8 @@ import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
+import static com.cliffc.aa.AA.ARG_IDX;
+
 // Pointers-to-memory; these can be both the address and the value part of
 // Loads and Stores.  They carry a set of aliased TypeObjs.
 public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
@@ -90,6 +92,18 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     return make(aliases,_obj);
   }
 
+  // Legacy constructor for legacy HM tests
+  public static TypeMemPtr make_str(String s) {
+    TypeFld c0 = TypeFld.make_tup(TypeInt.con(s.charAt(0)),ARG_IDX);
+    TypeStruct ts = TypeStruct.make("str:",false,c0);
+    return TypeMemPtr.make(4,ts);
+  }
+  public static TypeMemPtr make_str(Type t) {
+    TypeFld c0 = TypeFld.make_tup(t,ARG_IDX);
+    TypeStruct ts = TypeStruct.make("str:",false,c0);
+    return TypeMemPtr.make(4,ts);
+  }
+
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.
   // To break class-init cycle, this is made here, now.
   public static final TypeStruct DISPLAY;
@@ -113,7 +127,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   public  static final TypeMemPtr ISUSED = make(BitsAlias.NALL ,TypeStruct.ISUSED); // Excludes nil
   public  static final TypeMemPtr EMTPTR = make(BitsAlias.EMPTY,TypeStruct.UNUSED);
   public  static final TypeMemPtr DISP_SIMPLE= make(BitsAlias.NALL,TypeStruct.ISUSED); // closed display
-
+  public  static final TypeMemPtr STRPTR = make(4,TypeStruct.ISUSED.set_name("str:")); // For legacy HM tests
   public  static final TypeStruct OOP_OOP = TypeStruct.args(ISUSED0,ISUSED0); // { ptr? ptr? -> }
   //public  static final TypeStruct LVAL_LEN= TypeStruct.make("ary",TypeMemPtr.ARYPTR,Access.Final); // Array length
   //public  static final TypeStruct LVAL_RD = TypeStruct.make2flds("ary",TypeMemPtr.ARYPTR,"idx",TypeInt.INT64); // Array & index
@@ -170,7 +184,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   public boolean is_valtype() {
     return _obj.len()>0 && _obj._name.length()>0;
   }
-  
+
   @Override public boolean above_center() { return _aliases.above_center(); }
   // Aliases represent *classes* of pointers and are thus never constants.
   // nil is a constant.

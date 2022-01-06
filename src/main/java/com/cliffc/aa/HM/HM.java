@@ -116,8 +116,9 @@ public class HM {
     DO_HM  = do_hm ;
     DO_GCP = do_gcp;
 
-    for( PrimSyn prim : new PrimSyn[]{new If(), new Pair(), new EQ(), new EQ0(), new Mul(), new Add(), new Dec(), new Str(), new Triple(), new Factor(), new NotNil()} )
+    for( PrimSyn prim : new PrimSyn[]{new If(), new Pair(), new EQ(), new EQ0(), new Mul(), new Add(), new Dec(), new Str(), new Triple(), new Factor(), new IsEmpty(), new NotNil()} )
       PRIMSYNS.put(prim.name(),prim);
+    int str_alias = BitsAlias.new_alias((BitsAlias.ALLX));
 
     // Parse
     Root prog = parse( sprog );
@@ -339,8 +340,7 @@ public class HM {
   private static Syntax string() {
     int start = ++X;
     while( X<BUF.length && BUF[X]!='"' ) X++;
-    //return require('"', new Con(TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(new String(BUF,start,X-start).intern()))));
-    throw unimpl();
+    return require('"', new Con(TypeMemPtr.make_str(new String(BUF,start,X-start).intern())));
   }
   private static byte skipWS() {
     while(true) {
@@ -971,8 +971,7 @@ public class HM {
           for( int fidx : fun._fidxs )
             rez = rez.meet(Lambda.FUNS.get(fidx).apply(FLOWS));
         Type rez2 = add_sig(rez);
-        //return TypeFunSig.make(TypeStruct.EMPTY,rez2);
-        throw unimpl();
+        return TypeFunPtr.makex(BitsFun.FULL,1,Type.ALL,rez2);
       } else {
         return t;
       }
@@ -1148,7 +1147,7 @@ public class HM {
     }
     static T2 BOOL (){ return T2.make_base(TypeInt.BOOL); }
     static T2 INT64(){ return T2.make_base(TypeInt.INT64); }
-    static T2 STRP (){ return null/*T2.make_base(TypeMemPtr.STRPTR)*/; }
+    static T2 STRP (){ return T2.make_base(TypeMemPtr.STRPTR); }
     static T2 FLT64(){ return T2.make_base(TypeFlt.FLT64); }
     abstract String name();
     private static final String[][] IDS = new String[][] {
@@ -1297,6 +1296,19 @@ public class HM {
     }
   }
 
+  static class IsEmpty extends PrimSyn {
+    @Override String name() { return "isempty"; }
+    public IsEmpty() { super(STRP(),BOOL()); }
+    @Override PrimSyn make() { return new IsEmpty(); }
+    @Override Type apply( Type[] flows) {
+      Type pred = flows[0];
+      if( pred.above_center() ) return TypeInt.BOOL.dual();
+      if( pred instanceof TypeMemPtr tmp && Util.eq(tmp._obj._name,"str:") )
+        return TypeInt.con(tmp._obj.at("0")==Type.XNIL ? 1 : 0);
+      return TypeInt.BOOL;
+    }
+  }
+
   // Remove a nil from a struct after a guarding if-test
   static class NotNil extends PrimSyn {
     @Override String name() { return " notnil"; }
@@ -1399,11 +1411,10 @@ public class HM {
     @Override PrimSyn make() { return new Str(); }
     @Override Type apply( Type[] flows) {
       Type i = flows[0];
-      //if( i.above_center() ) return TypeMemPtr.STRPTR.dual();
-      //if( i instanceof TypeInt && i.is_con() )
-      //  return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(String.valueOf(i.getl()).intern()));
-      //return TypeMemPtr.STRPTR;
-      throw unimpl();
+      if( i.above_center() ) return TypeMemPtr.STRPTR.dual();
+      if( i instanceof TypeInt && i.is_con() )
+        return TypeMemPtr.make_str(String.valueOf(i.getl()).intern());
+      return TypeMemPtr.STRPTR;
     }
   }
 
@@ -1484,9 +1495,9 @@ public class HM {
     boolean is_leaf()  { return _args==null && _flow==null && _aliases==null; }
     boolean unified()  { return get(">>")!=null; }
     boolean is_nil()   { return get("?" )!=null; }
-    boolean is_base()  { return _flow   != null; } // 
-    boolean is_fun ()  { return _fidxs  != null; } // 
-    boolean is_struct(){ return _aliases!= null; } // 
+    boolean is_base()  { return _flow   != null; } //
+    boolean is_fun ()  { return _fidxs  != null; } //
+    boolean is_struct(){ return _aliases!= null; } //
     boolean is_open()  { return _open; }           // Struct-specific
     boolean is_err()   { return _err!=null || is_err2(); }
     boolean is_err2()  { return
@@ -2175,9 +2186,7 @@ public class HM {
     }
 
     private static Type at_fld(Type t, String id) {
-      if( !(t instanceof TypeMemPtr) ) return t.oob(Type.SCALAR);
-      TypeMemPtr tmp = (TypeMemPtr)t;
-      if( !(tmp._obj instanceof TypeStruct) ) return t.oob(Type.SCALAR);
+      if( !(t instanceof TypeMemPtr tmp) ) return t.oob(Type.SCALAR);
       TypeFld fld = tmp._obj.get(id);
       if( fld==null ) return tmp._obj.oob(Type.SCALAR);
       return fld._t;
