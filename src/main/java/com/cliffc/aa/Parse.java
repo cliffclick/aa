@@ -435,6 +435,7 @@ public class Parse implements Comparable<Parse> {
     scope().replace_mem(st);
     if( !create )               // Note 1-side-of-if update
       scope.def_if(tok,mutable,false);
+    if( mutable==Access.Final ) Oper.make(tok);
     return Node.pop(iidx);
   }
 
@@ -530,29 +531,19 @@ public class Parse implements Comparable<Parse> {
   // Invariant: WS already skipped before & after each _expr depth
   private Node _expr(int prec) {
     int lhsx = _x;              // Invariant: WS already skipped
-    Node lhs = _expr_higher(prec), opfun;
+    Node lhs = _expr_higher(prec);
     if( lhs==null ) return null;
     while( true ) {             // Kleene star at this precedence
       // Look for a binop at this precedence level
       int opx = _x;             // Invariant: WS already skipped
       String tok = token0();
-      Oper binop;
-      while( true ) {
-        binop = bin_op(tok,prec);
-        if( binop==null ) { _x=opx; return lhs; }
-        // Get the oper function to call
-        LoadNode ld = new LoadNode(mem(),lhs,binop._name,errMsg(opx));
-        // Lookup the oper.  Requires LHS be known precise enuf
-        opfun = gvn(ld);
-        // Oper lookup succeeded?
-        if( opfun != ld ) break; // Oper lookup succeeded
-        // Oper lookup failed.  Shrink oper and try again.
-        ld.kill();              // Kill failed lookup
-        tok = tok.substring(0,tok.length()-1); // Shrink token
-        _x--;                                  // Pushback un-parsed char
-      }
+      Oper binop = Oper.bin_op(tok,prec);
+      if( binop==null ) { _x=opx; return lhs; }
+      _x -= binop.adjustx(tok); // Chosen op can be shorter than tok
       skipWS();
       int rhsx = _x;            // Invariant: WS already skipped
+      // Get the oper function to call
+      Node opfun = gvn(new LoadNode(mem(),lhs,binop._name,errMsg(opx)));
       int fidx = opfun.push();
       Node rhs = _expr_higher_require(binop);
       // Emit the call to both terms
@@ -649,15 +640,15 @@ public class Parse implements Comparable<Parse> {
 
     // Check for prefix ops; no leading expr and require a trailing expr;
     // balanced ops require a trailing balanced close.
-    Oper op = pre_bal(tok);
+    Oper op = Oper.pre_bal(tok,_prims);
     if( op != null ) {
+      _x -= op.adjustx(tok); // Chosen op can be shorter than tok
       Node e0 = term();
       if( e0 == null ) { return err_ctrl2("Missing term after operator '"+op+"'"); } // Parsed a valid leading op but missing trailing expr
-      Oper op2 = bal_close(op);         // Returns old op if not balanced, new fuller op if balanced
-      if( op2 == null ) throw unimpl(); // Missing close to balanced op
-      if( op2._nargs!=1 ) throw unimpl(); // No binary/trinary allowed here
+      if( op.is_open() ) throw unimpl(); // Parse the close
+      if( op._nargs!=1 ) throw unimpl(); // No binary/trinary allowed here
       // Load field e0.op2_ as TFP, and instance call.
-      Node fun  = gvn(new LoadNode(mem(),e0,op2._name,errMsg(oldx)));
+      Node fun  = gvn(new LoadNode(mem(),e0,op._name,errMsg(oldx)));
       n = do_call(errMsgs(0,oldx),args(fun));
     } else {
       // Normal leading term
@@ -713,36 +704,19 @@ public class Parse implements Comparable<Parse> {
         // Check for balanced op with a leading term, e.g. "ary [ idx ]" or
         // "ary [ idx ]= val".
         oldx = _x;                         // Token start
-        Oper bop = bal_open(token0());     // Balanced op read
-        if( bop==null ) { _x=oldx; break;} // Not a balanced op
+        String tok0 = token0();
+        if( tok0==null || !Oper.is_open(tok0) ) { _x=oldx; break;} // Not a balanced op
 
         int nidx = n.push();    // Preserve leading expr
         skipWS();               // Skip to start of stmts
         int oldx2 = _x;         // Statement start
         Node idx = stmts();     // Index expression
-        if( idx==null ) { Node.pop(nidx); return err_ctrl2("Missing stmts after '"+bop+"'"); }
+        if( idx==null ) { Node.pop(nidx); return err_ctrl2("Missing stmts after '"+tok0+"'"); }
 
-        Oper bcl = bal_close(bop);
-        if( tok==null ) { n.unhook(); return err_ctrl2("Missing close after '"+bop+"'"); }
+        String tok1 = token0();
+        Oper bcl = Oper.balanced(tok0,tok1);
+        if( bcl==null ) { n.unhook(); return err_ctrl2("Missing close after '"+tok0+"'"); }
 
-        //// Need to find which balanced op close.  Find the longest matching name
-        //UnOrFunPtrNode unr = _e.lookup_filter_bal(bop,tok);
-        //if( unr==null ) { n.unhook(); return err_ctrl2("No such operation '_"+bop+"_"+tok+"'"); }
-        //
-        //FunPtrNode fptr=null;
-        //UnresolvedNode unr = ((UnOrFunPtrNode)bfun.unkeep()).unk();
-        //if( unr!=null ) {       // Unresolved of balanced ops?
-        //  for( Node def : unr._defs ) {
-        //    FunPtrNode def0 = (FunPtrNode)def;
-        //    if( tok.startsWith(def0.fun()._bal_close) &&
-        //        (fptr==null || fptr.fun()._bal_close.length() < def0.fun()._bal_close.length()) )
-        //      fptr = def0;      // Found best match
-        //  }
-        //  Env.GVN.add_dead(Env.GVN.add_reduce(bfun)); // Dropping any new FreshNode, and replacing with this one
-        //  idx.keep();
-        //  bfun = (UnOrFunPtrNode)gvn(new FreshNode(_e._nongen,fptr));
-        //} else fptr = bfun.funptr(); // Just the one balanced op
-        //FunNode fun = fptr.fun();
         //require(fun._bal_close,oldx);
         //if( fun.nargs()==ARG_IDX+2 ) { // array, index
         //  n = do_call(errMsgs(0,oldx,oldx2),args(bfun,n.unkeep(),idx.unkeep()));
@@ -1191,8 +1165,8 @@ public class Parse implements Comparable<Parse> {
   private String token0() {
     if( _x >= _buf.length ) return null;
     byte c=_buf[_x];  int x = _x;
-    if( isOp0(c) || (c=='_' && _x+1 < _buf.length && isOp0(_buf[_x+1])) )
-      while( _x < _buf.length && isOp1   (_buf[_x]) ) _x++;
+    if( Oper.isOp0(c) || (c=='_' && _x+1 < _buf.length && Oper.isOp0(_buf[_x+1])) )
+      while( _x < _buf.length && Oper.isOp1(_buf[_x]) ) _x++;
     else if( isAlpha0(c) )
       while( _x < _buf.length && isAlpha1(_buf[_x]) ) _x++;
     else return null; // Not a token; specifically excludes e.g. all bytes >= 128, or most bytes < 32
@@ -1206,54 +1180,14 @@ public class Parse implements Comparable<Parse> {
     if( s==null || s.isEmpty() ) return false;
     byte c = (byte)s.charAt(0);
     if( prims && c=='$' ) return false; // Disallow $$ operator during prim parsing; ambiguous with $$java_class_name
-    if( !isOp0(c) && (c!='_' || !isOp0((byte)s.charAt(1))) ) return false;
+    if( !Oper.isOp0(c) && (c!='_' || !Oper.isOp0((byte)s.charAt(1))) ) return false;
     for( int i=1; i<s.length(); i++ )
-      if( !isOp1((byte)s.charAt(i)) ) return false;
+      if( !Oper.isOp1((byte)s.charAt(i)) ) return false;
     return true;
   }
 
   // Allows '+' and includes '_+_'
   boolean isOp(String s) { return isOp(s,_prims); }
-
-  // Allows '+' and excludes '_+_'
-  boolean isBareOp(String tok) {
-    return isOp(tok) && tok.charAt(0)!='_' && tok.charAt(tok.length()-1)!='_';
-  }
-
-  // Unary/prefix op or leading balanced op, with no leading expression.
-  // Unbalanced unary ops are limited to 1 character.
-  // Unbalanced unary op examples: -1, !pred, +2
-  //   Balanced unary op examples: [size], %{% matrix_init %}%
-  // Adds trailing '_' for required trailing expression: -_  !_  [_  %{%_
-  Oper pre_bal(String tok) {
-    if( !isBareOp(tok) ) return null;
-    if( Oper.is_open(tok) || tok.length()==1 ) // Balanced unary oper, or 1-char unbalanced
-      return Oper.make(tok+"_");
-    _x -= (tok.length()-1);                   // Unparse all the extra characters
-    return Oper.make(tok.charAt(0)+"_"); // Unbalanced unary oper, limited to 1 char
-  }
-
-  // Parsed a leading expression; look for a binary op.  Requires no leading
-  // '[' or embedded '{' or '<'.  Requires a trailing expr.
-  // Examples:  x+y, x<<y,  x<=y,  x%y
-  // Adds '_' for required expressions: _+_  _<<_  _<=_  _%_
-  Oper bin_op(String tok, int prec) {
-    return isBareOp(tok) ? Oper.make("_"+tok+"_",prec) : null;
-  }
-
-  // Parsed a leading expression; look for a balanced op.  Requires a leading
-  // '[' or an embedded '{' or '<'.  Requires a trailing expr.
-  // Examples:  ary[idx], ary[idx]=val, dict[key], %{% matrix %}%, ~<< "sql string" ~>>
-  // Adds '_' for required expressions: _[_  _[_  _[_  _%{%_  _~<<_
-  Oper bal_open(String tok) { return Oper.make_open("_"+tok+"_"); }
-
-  // Parse an optional closing balanced op
-  Oper bal_close(Oper op) {
-    if( !op.is_open() ) return op;
-    // Parse a balanced token; any "[{<" must appear in reverse order ">}]"
-    throw unimpl();
-  }
-
 
   // Parse a number; WS already skipped and sitting at a digit.  Relies on
   // Javas number parsing.
@@ -1455,8 +1389,6 @@ public class Parse implements Comparable<Parse> {
   private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
   private static boolean isJava  (byte c) { return isAlpha1(c) || (c=='$') || (c=='.'); }
-  private static boolean isOp0   (byte c) { return "!#$%*+-.=<>^[]~/&|".indexOf(c) != -1; }
-  private static boolean isOp1   (byte c) { return isOp0(c) || ":?_{}".indexOf(c) != -1; }
   public  static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
 
   // Utilities to shorten code for common cases

@@ -110,10 +110,10 @@ public class TestParse {
     // Variable lookup
     test("math.pi", TypeFlt.PI, "3.141592653589793");
     // bare function lookup; returns a union of '+' functions
-    testerr("+", "Missing term after operator '+_'",1);
+    testerr("+", "Syntax error; trailing junk",0);
     testerr("!", "Missing term after operator '!_'",1);
     testerr("_+_", "Syntax error; trailing junk",0);
-    testerr("!_", "Syntax error; trailing junk",0);
+    testerr("!_", "Missing term after operator '!_'",1);
     // Function application, traditional paren/comma args
     test("1._+_(2)", TypeInt.con( 3),"3" );
     test("1._-_(2)", TypeInt.con(-1),"-1"); // binary version

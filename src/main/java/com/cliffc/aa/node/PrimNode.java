@@ -124,7 +124,7 @@ public abstract class PrimNode extends Node {
       Type tactual = ts[fld._order] = val(fld._order);
       Type tformal = fld._t;
       Type t = tformal.dual().meet(tactual);
-      if( !t.is_con() ) {
+      if( !t.is_con() && tactual!=Type.NIL ) {
         is_con = false;         // Some non-constant
         if( t.above_center() ) has_high=true;
       }
@@ -160,8 +160,7 @@ public abstract class PrimNode extends Node {
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
-    if( !(o instanceof PrimNode) ) return false;
-    PrimNode p = (PrimNode)o;
+    if( !(o instanceof PrimNode p) ) return false;
     return _name.equals(p._name) && _formals==p._formals;
   }
 
