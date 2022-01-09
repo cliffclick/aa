@@ -20,7 +20,6 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    test("int._+_(1;2;,3)", TypeInt.con(5), "5"); // loading an unbind fptr; statements in arguments
     // TODO:
     // TEST for merging str:[7+43+44] and another concrete fcn, such as {&}.
     // The Meet loses precision to fast.  This is a typing bug.
@@ -141,15 +140,15 @@ public class TestParse {
 
   @Test public void testParse01() {
     // Syntax for variable assignment
-    test("x=1", TypeInt.TRUE);
-    test("x=y=1", TypeInt.TRUE);
+    test("x=1", TypeInt.TRUE, "1");
+    test("x=y=1", TypeInt.TRUE, "1");
     testerr("x=y=", "Missing ifex after assignment of 'y'",4);
     testerr("x=z" , "Unknown ref 'z'",2);
     testerr("x=1+y","Unknown ref 'y'",4);
     testerr("x=y; x=y","Unknown ref 'y'",2);
-    test("x=2; y=x+1; x*y", TypeInt.con(6));
+    test("x=2; y=x+1; x*y", TypeInt.con(6), "6");
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
-    test("1+(x=2*3)+x*x", TypeInt.con(1+6+6*6));
+    test("1+(x=2*3)+x*x", TypeInt.con(1+6+6*6), "43");
     testerr("x=(1+(x=2)+x); x", "Cannot re-assign final field '.x' in @{x=2}",0);
     test("x:=1;x++"  ,TypeInt.con(1));
     test("x:=1;x++;x",TypeInt.con(2));

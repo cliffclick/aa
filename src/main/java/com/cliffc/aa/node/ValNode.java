@@ -1,5 +1,6 @@
  package com.cliffc.aa.node;
 
+ import com.cliffc.aa.Env;
  import com.cliffc.aa.tvar.TV2;
  import com.cliffc.aa.type.*;
  import com.cliffc.aa.util.Ary;
@@ -8,7 +9,6 @@
 
  import static com.cliffc.aa.AA.*;
 
-
 // Values.  Values mimic a NewObj for a "class" wrapper around some primitives.
 // All fields are final, so no Stores and no need to track memory.  Values have
 // no identity (e.g. a "3" is a "3" is a "3").  Named types can be passed to
@@ -16,46 +16,22 @@
 // both a pointer and a memory.  Loads against fields not in the core ValNode
 // use the Type name to get the class via a global flat lookup table; then the
 // Load repeats against those fields.
-public class ValNode extends ValFunNode {
-  final String _tname;          // Type name
-  final int _alias;             // Alias as a prototype object
+public class ValNode extends Node {
   String[] _flds;  // Map from node inputs to local field names; slot 0 is null for the prototype
-  int _fidx;       // FIDX as a constructor function
-  TypeFunPtr _tfp; // Type as a constructor function
 
-  private ValNode(String tname, int alias) {
-    super(OP_VAL);
-    _tname= tname;
-    _alias= alias;
-    _flds = null;
-    _fidx = 0;
-    _tfp  = null;
-  }
+  ValNode(String[] flds) { super(OP_VAL); _flds = flds; }
 
-  @Override public String xstr() { return _defs._len==0 ? "fref_default_"+_tname : proto()._ts._name; }
-  @Override int nargs() { return _flds==null ? -1 : _flds.length-1+ARG_IDX; }
+  @Override public String xstr() { return proto()._ts._name; }
   NewNode proto() { return (NewNode)in(0); }
-  @Override int fidx() { return _fidx; }
-  @Override Type formal(int idx) {
-    Node formal = in(idx-DSP_IDX);
-    assert formal instanceof ConNode && !((ConNode)formal)._t.is_con();
-    return ((ConNode)formal)._t;
-  }
-  @Override String name() { throw unimpl(); }
-
-  @Override public boolean equals(Object o) {
-    if( this==o ) return true;
-    if( _flds==null ) return false; // Forward-ref defaults never CSE
-    return super.equals(o);
-  }
 
   @Override public Type value() {
-    if( _flds==null ) return TypeMemPtr.make(_alias,TypeStruct.ISUSED.set_name(_tname));
+    if( _flds==null )
+      return proto()._tptr;
     TypeStruct ts = TypeStruct.malloc(proto()._ts._name,false);
     for( int i=1; i<_flds.length; i++ )
       ts.add_fld( TypeFld.make(_flds[i],val(i),TypeFld.Access.Final,i-1+ARG_IDX) );
     ts = ts.hashcons_free();
-    return TypeMemPtr.make(_alias,ts);
+    return TypeMemPtr.make(proto()._alias,ts);
   }
   @Override public TypeMem all_live() { return TypeMem.ALIVE; }
 
@@ -81,11 +57,6 @@ public class ValNode extends ValFunNode {
     return progress;
   }
 
-  // Make a 'blank' forward-ref ValNode.  This will eventually become a default
-  // ValNode for this entire class of ValNodes.
-  public static ValNode make_default(String tok, int alias) {
-    return new ValNode((tok+":").intern(),alias);
-  }
   // Build a ValNode default constructor from the NewNode.  Walk all fields.
   // If the field is ANY (dead f-ref), ignore it.
   // If the field is MUTABLE, it was a default set; make it immutable and a
@@ -97,8 +68,10 @@ public class ValNode extends ValFunNode {
   // and reset their displays from the prototype (with full type info) to the
   // default ValNode (which is ALSO the default constructor) (with a limited
   // set of type info).  Goal: remove O(n^2) pattern of extra type info.
-  public void fill_default(NewNode proto) {
-    assert _flds==null && _fidx==0 && _tfp==null; // One-time fill in
+  public FunPtrNode fill() {
+    NewNode proto = proto();
+    assert _flds==null && proto.defalt()==this; // One-time fill-in of the defalt
+    // Determine the fields for the ValNode, the variant part.
     Ary<String> flds = new Ary<>(new String[1],0);
     flds.push(null);            // Prototype in slot 0
     // Walk fields looking for RW; these require a constructor argument.
@@ -112,24 +85,34 @@ public class ValNode extends ValFunNode {
         continue;
       }
       // Final field set by a constant value
-      if( (pt==Type.ANY ||            // Dead
-           pt.is_con() ||             // Find class constants in the prototype
+      if( (pt==Type.ANY ||      // Dead
+           pt.is_con() ||       // Find class constants in the prototype
            pt instanceof TypeFunPtr ) )// Includes e.g. instance methods
-        continue;                    // Leave in prototype
-      throw unimpl();      // Non-constant field, needs a full constructor function to compute
+        continue;               // Leave in prototype
+      throw unimpl();           // Non-constant field, needs a full constructor function to compute
     }
 
-    // Fill in the constructor shortcut.  Just sets the non-constant fields.
-    add_def(proto);         // Prototype in slot 0
-    for( TypeFld fld : oflds )  // Gather remaining RW fields for constructor
-      if( fld._access==TypeFld.Access.RW )
-        add_def(con(fld._t));
-    proto._nargs = flds._len-1+ARG_IDX;
-    // Fill in a constructor function type
-    _flds = flds.asAry();   //
-    _fidx = BitsFun.new_fidx(BitsFun.ALL);
-    _tfp = TypeFunPtr.make(BitsFun.make0(_fidx),nargs(),TypeMemPtr.NO_DISP,proto._ts);
-    FUNS.setX(_fidx,this);
+    // Build a default constructor while filling in the defalt:
+    // Build a Fun, Parm<per fld>, Parm<RPC>, ValNode, Ret, FunPtr
+    int nargs = flds._len-1+ARG_IDX;
+    FunNode fun = (FunNode)init(new FunNode(proto._ts._name,nargs).add_def(Env.ALL_CTRL));
+    Node rpc = init(new ParmNode(CTL_IDX," rpc",fun,TypeRPC.ALL_CALL,Env.ALL_CALL,null));
+    ValNode val = new ValNode(_flds = flds.asAry());
+    val.add_def(proto);
+    for( int i=1; i<flds._len; i++ ) {
+      TypeFld fld = proto._ts.get(flds.at(i));
+      Node defalt = con(fld._t);
+      add_def(defalt);
+      val.add_def(init(new ParmNode(fld,fun,defalt,null)));
+    }
+    RetNode ret = init(new RetNode(fun,null,init(val),rpc,fun));
+    // Hook the function at the TOP scope, because it may yet have unwired
+    // CallEpis which demand memory.  This hook is removed as part of doing
+    // the Combo pass which computes a real Call Graph and all escapes.
+    Env.TOP._scope.add_def(ret);
+    FunPtrNode fptr = init(new FunPtrNode(proto._ts._name,ret,Env.ANY));
+    return fptr;
   }
+  private static <N extends Node> N init(N n) { n.xval(); Env.GVN.add_reduce(Env.GVN.add_flow(n)); return n; }
 
 }

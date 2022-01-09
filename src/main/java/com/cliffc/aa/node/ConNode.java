@@ -41,7 +41,7 @@ public class ConNode<T extends Type> extends Node {
       return TV2.make_nil(TV2.make_leaf(this,alloc_site),alloc_site);
     // Bare TMP over a prototype; shows up as the default ParmNode 'self' input.
     // Should unify with the prototype itself.
-    if( _t instanceof TypeMemPtr tmp && ValFunNode.valtype(tmp)!=null )
+    if( _t instanceof TypeMemPtr tmp && tmp._obj._name.length()>0 )
       return TV2.make_leaf(this,alloc_site);
     return TV2.make_base(this,_t,alloc_site);
   }

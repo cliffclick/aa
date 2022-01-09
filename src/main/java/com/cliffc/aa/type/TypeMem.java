@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.node.ValFunNode;
 import com.cliffc.aa.util.*;
 
 import java.util.Arrays;
@@ -362,7 +361,7 @@ public class TypeMem extends Type<TypeMem> {
 
   // Sharpen a dull pointer against this memory.
   public TypeMemPtr sharpen( TypeMemPtr dull ) {
-    if( ValFunNode.valtype(dull)!=null ) return dull;
+    if( dull.is_valtype() ) return dull;
     assert dull==dull.simple_ptr();
     if( _sharp_cache != null ) { // Check the cache first
       TypeMemPtr sharp = _sharp_cache.get(dull);

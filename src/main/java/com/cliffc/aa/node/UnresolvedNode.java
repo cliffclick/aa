@@ -40,13 +40,10 @@ public class UnresolvedNode extends Node {
   @Override public Type value() {
     if( is_forward_ref() ) return TypeFunPtr.GENERIC_FUNPTR;
     Type t = Type.ANY;
-    for( int i=1; i<len(); i++ ) {
-      TypeFunPtr tf = ValFunNode.as_tfp(val(i));
-      t = t.meet(tf);
-    }
+    for( int i=1; i<len(); i++ )
+      t = t.meet(val(i));
     // If we have a display, then it replaces the input FunPtr displays.
-    if( in(0)!=null ) {         // Overwrite display
-      TypeFunPtr tfp = (TypeFunPtr)t;
+    if( in(0)!=null && t instanceof TypeFunPtr tfp ) {         // Overwrite display
       Type dsp = in(0)._val;
       t = tfp.make_from(dsp,tfp._ret);
     }
@@ -64,22 +61,22 @@ public class UnresolvedNode extends Node {
   // Looks at the fidxs in TFP, and the arguments given and tries to resolve
   // the call.  Returns TFP if it cannot be further resolved.
   static TypeFunPtr resolve_value( Type[] tcall ) {
-    ValFunNode choice=null;
+    FunPtrNode choice=null;
     TypeFunPtr tfp = (TypeFunPtr)tcall[tcall.length-1];
     if( tfp._fidxs==BitsFun.FULL || // Too low , will not resolve.  Might lift to OK
         tfp.above_center() ||       // Too high, will not resolve.  Might fall to OK
         tfp._fidxs.abit() != -1 )   // Already resolved to single target
       return tfp;
     for( int fidx : tfp._fidxs ) {
-      ValFunNode vfn = ValFunNode.get(fidx);
-      if( vfn.nargs() == tcall.length-1 ) {
-        Type formal = vfn.formal(ARG_IDX);
+      FunPtrNode fptr = FunPtrNode.get(fidx);
+      if( fptr.nargs() == tcall.length-1 ) {
+        Type formal = fptr.formal(ARG_IDX);
         Type actual = tcall[ARG_IDX];
         if( actual.isa(formal) ) {
           // TODO: If high, many choices be resolvable until args fall.
           assert choice == null; // Exactly zero or one fptr resolves
-          choice = vfn;          // Resolved choice
-          tfp = ((TypeFunPtr)vfn._val).make_from((TypeMemPtr)tcall[DSP_IDX]);
+          choice = fptr;          // Resolved choice
+          tfp = ((TypeFunPtr)fptr._val).make_from((TypeMemPtr)tcall[DSP_IDX]);
         }
       }
     }
@@ -87,11 +84,12 @@ public class UnresolvedNode extends Node {
   }
 
   // Looks at this Unresolved and the arg types, and tries to resolve the call.
-  // Returns null if no resolve, or a ValFunNode if resolved.
-  ValFunNode resolve_node( Type[] tcall ) {
-    ValFunNode choice=null;
+  // Returns null if no resolve, or a FunPtrNode if resolved.
+  FunPtrNode resolve_node( Type[] tcall ) {
+    if( !is_defined() ) return null; // More choices to be added later
+    FunPtrNode choice=null;
     for( int i=1; i<len(); i++ ) {
-      ValFunNode ptr = (ValFunNode)in(i);
+      FunPtrNode ptr = (FunPtrNode)in(i);
       if( ptr.nargs()==tcall.length-1 ) {
         Type formal = ptr.formal(ARG_IDX); // formal
         Type actual = tcall     [ARG_IDX]; // actual
@@ -99,7 +97,6 @@ public class UnresolvedNode extends Node {
           assert choice == null; // Exactly zero or one fptr resolves
           choice = ptr;          // Resolved choice
           if( in(0)!=null ) {    // Has custom display
-            assert ptr instanceof FunPtrNode;
             choice = (FunPtrNode)ptr.copy(true);
             choice.set_def(1,in(0));
             choice.xval();
@@ -132,7 +129,7 @@ public class UnresolvedNode extends Node {
 
   // Bind to a display
   UnresolvedNode bind( Node dsp ) {
-    assert in(0)==null && ValFunNode.valtype(dsp._val)!=null;
+    assert in(0)==null && dsp._val instanceof TypeMemPtr tmp && tmp.is_valtype();
     return (UnresolvedNode)copy(true).set_def(0,dsp);
   }
 
@@ -147,10 +144,10 @@ public class UnresolvedNode extends Node {
   // Add Another function to an Unresolved and return null, or return an ErrMsg
   // if this would add an ambiguous signature.  Different nargs are different.
   // Within functions with the same nargs
-  public void add_fun( ValFunNode fptr) {
+  public void add_fun( FunPtrNode fptr) {
     assert in(0)==null;         // No display if we are adding fptrs
     for( int i=1; i<len(); i++ ) {
-      ValFunNode f0 = (ValFunNode)in(i);
+      FunPtrNode f0 = (FunPtrNode)in(i);
       if( f0.nargs()==fptr.nargs() ) {
         assert f0.formal(DSP_IDX) == fptr.formal(DSP_IDX); // Same displays
         Type t0a = f0  .formal(ARG_IDX);  // f0   arg type

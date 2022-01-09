@@ -16,17 +16,6 @@ public class FreshNode extends Node {
   }
   public Node id() { return in(1); } // The HM identifier
   TV2[] nongen() { return fun()==null ? null : fun()._nongen; }
-  @Override public Node ideal_reduce() {
-    if( id()==this ) return null; // Dead self-cycle
-    // Remove Fresh of base type values: things that can never have structure.
-    if( no_tvar_structure(_val) )
-      return id();
-    // Remove if TVar has already unified with the input.
-    if( _tvar!=null && tvar()==id().tvar() )
-     return id();
-
-    return null;
-  }
 
   @Override public Type value() { return id()._val; }
   @Override public void add_flow_extra(Type old) {
@@ -42,7 +31,7 @@ public class FreshNode extends Node {
 
   // Things that can never have type-variable internal structure.
   private static boolean no_tvar_structure(Type t) {
-    return t.isa(TypeInt.INT64) || t.isa(TypeFlt.FLT64);
+    return t instanceof TypeMemPtr tmp && tmp.is_valtype();
   }
 
   @Override public boolean unify( boolean test ) {
@@ -86,6 +75,18 @@ public class FreshNode extends Node {
     TV2 t = id().tvar();
     if( t.nongen_in(nongen()) )
       t.add_deps_flow(); // recursive work.add(_deps)
+  }
+
+  @Override public Node ideal_reduce() {
+    if( id()==this ) return null; // Dead self-cycle
+    // Remove Fresh of base type values: things that can never have structure.
+    if( no_tvar_structure(_val) )
+      return id();
+    // Remove if TVar has already unified with the input.
+    if( _tvar!=null && tvar()==id().tvar() )
+     return id();
+
+    return null;
   }
 
   // Two FreshNodes are only equal, if they have compatible TVars

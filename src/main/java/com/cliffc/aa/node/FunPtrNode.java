@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.*;
 
@@ -35,7 +36,7 @@ import static com.cliffc.aa.AA.*;
 // covering all instances of [+15,+12].  Also may impact mixed +15 and other
 // FIDXs with unrelated DISPs.  Instead a dead display just flips to ANY.
 
-public final class FunPtrNode extends ValFunNode {
+public final class FunPtrNode extends Node {
   public String _name;          // Optional for debug only
 
   // Every var use that results in a function, so actually only these FunPtrs,
@@ -58,13 +59,15 @@ public final class FunPtrNode extends ValFunNode {
   public Node display(){ return in(1); }
   public FunNode fun() { return ret().fun(); }
   public FunNode xfun() { RetNode ret = ret(); return ret !=null && ret.in(4) instanceof FunNode ? ret.fun() : null; }
-  @Override int nargs() { return ret()._nargs; }
+  int nargs() { return ret()._nargs; }
   // Formals from the function parms.
   // TODO: needs to come from both Combo and _t
-  @Override Type formal(int idx) { return fun().parm(idx)._t; }
-  //@Override Type funtype() { return _val; }
-  @Override int fidx() { return fun()._fidx; }
-  @Override String name() { return _name; } // Debug name, might be empty string
+  Type formal(int idx) { return fun().parm(idx)._t; }
+  int fidx() { return fun()._fidx; }
+  String name() { return _name; } // Debug name, might be empty string
+  public TypeStruct formals() {
+    throw unimpl();
+  }
 
   //@Override public FunPtrNode funptr() { return this; }
   //@Override public UnresolvedNode unk() { return null; }
@@ -171,4 +174,29 @@ public final class FunPtrNode extends ValFunNode {
         progress |= self.arg(TV2.argname(i)).unify(parms[i].tvar(),test);
     return self.arg(" ret").unify(ret.rez().tvar(),test) | progress;
   }
+
+  
+  // Find FunPtrNode by fidx
+  private static int FLEN;      // Primitives length; reset amount
+  static Ary<FunPtrNode> FUNS = new Ary<>(new FunPtrNode[]{null,});
+  public static void init0() { FLEN = FUNS.len(); }
+  public static void reset_to_init0() { FUNS.set_len(FLEN); }
+
+  // Null if not a FunPtr to a Fun.
+  public static FunPtrNode get( int fidx ) {
+    FunPtrNode fptr = FUNS.atX(fidx);
+    if( fptr==null || fptr.is_dead() ) return null;
+    if( fptr.fidx()==fidx ) return fptr;
+    // Split & renumbered FunNode, fixup in FUNS.
+    throw unimpl();
+  }
+  // First match from fidxs
+  public static FunPtrNode get( BitsFun fidxs ) {
+    for( int fidx : fidxs ) {
+      FunPtrNode fptr = get(fidx);
+      if( fptr!=null ) return fptr;
+    }
+    return null;
+  }
+
 }

@@ -113,16 +113,8 @@ public final class CallEpiNode extends Node {
     Node fdx = call.fdx();
     if( fdx instanceof FreshNode ) fdx = ((FreshNode)fdx).id();
     if( fdx instanceof UnresolvedNode ) {
-      ValFunNode vfn = ((UnresolvedNode)fdx).resolve_node(tcall._ts);
+      FunPtrNode vfn = ((UnresolvedNode)fdx).resolve_node(tcall._ts);
       if( vfn !=null ) call.set_fdx(fdx=vfn);
-    }
-    // Inlining a ValNode constructor
-    if( fdx instanceof ValNode ) {
-      ValNode val = (ValNode)fdx.copy(true);
-      assert val.nargs()==call.nargs();
-      for( int i=ARG_IDX; i<val.nargs(); i++ )
-        val.set_def(i-DSP_IDX, call.in(i) );
-      return set_is_copy(call.ctl(),call.mem(),val);
     }
 
     // Only inline wired single-target function with valid args.  CallNode wires.
@@ -133,7 +125,7 @@ public final class CallEpiNode extends Node {
     // Call allows 1 function not yet inlined, sanity check it.
     if( nwired()!=1 ) return null; // More than 1 wired, inline only via FunNode
     int cnargs = call.nargs();
-    FunPtrNode fptr = ValFunNode.get_fptr(fidx);
+    FunPtrNode fptr = FunPtrNode.get(fidx);
     if( fptr==null ) return null;
     RetNode ret = fptr.ret();    // Return from function
     if( ret==null ) return null;
@@ -171,6 +163,7 @@ public final class CallEpiNode extends Node {
     for( Node parm : rrez._defs )
       if( parm != null && parm != fun &&
           !(parm instanceof ParmNode && parm.in(0) == fun) &&
+          !(parm instanceof NewNode nnn && nnn._is_val) &&  // Prototype is OK
           !(parm instanceof ConNode) )
         can_inline=false;       // Not trivial
     if( can_inline ) {
@@ -202,7 +195,7 @@ public final class CallEpiNode extends Node {
     boolean progress = false;
     for( int fidx : fidxs ) {                 // For all fidxs
       if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
-      FunPtrNode fptr = ValFunNode.get_fptr(fidx);  // Lookup, even if not wired
+      FunPtrNode fptr = FunPtrNode.get(fidx); // Lookup, even if not wired
       if( fptr==null ) continue;
       RetNode ret = fptr.ret();
       if( _defs.find(ret) != -1 ) continue;   // Wired already
@@ -504,7 +497,7 @@ public final class CallEpiNode extends Node {
     if( nargs != cargs && !tfun.is_err() && self._err==null ) { //
       if( test ) return true;
       progress = true;
-      self._err = call.err_arg_cnt(ValFunNode.get(tfp._fidxs).name(),tfp);
+      self._err = call.err_arg_cnt(FunPtrNode.get(tfp._fidxs).name(),tfp);
     }
 
     // Check for progress on the return

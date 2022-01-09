@@ -202,9 +202,8 @@ public class TV2 {
     for( TypeFld fld : n._ts )
       args.put(fld._fld,n.in(fld._order).tvar());
     // Value types have a class name field
-    String clz_name = ValFunNode.valtype(n._tptr);
-    if( clz_name!=null )
-      args.put(clz_name,make_leaf(n,alloc_site));
+    if( n._tptr.is_valtype() )
+      args.put(n._ts._name,make_leaf(n,alloc_site));
     TV2 t2 = new TV2(args,UQNodes.make(n),alloc_site);
     t2._flow = n._tptr.make_from(n._ts);
     t2._open = false;
@@ -1024,7 +1023,7 @@ public class TV2 {
     TV2 tv = DUPS.get(_uid);
     if( tv!=null ) return tv;
     if( is_obj() ) {
-      String tname = ValFunNode.valtype(_flow);
+      String tname = ((TypeMemPtr)_flow)._obj._name;
       if( tname!=null )
         return arg("_val");     // Unbox ints and flts
       throw unimpl();

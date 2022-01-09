@@ -56,6 +56,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static BitsAlias make0( int bit ) { return NALL.make(bit); }
   public BitsAlias or( int bit ) { return set(bit); }
 
+  public static int  new_alias() { return new_alias(ALLX); }
   public static int  new_alias(int par) { return set_alias(par); }
   private static int set_alias(int par) { return TREE.split(par); }
   public static void free(int fidx) { TREE.free(fidx); }

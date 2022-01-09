@@ -17,13 +17,12 @@ import static com.cliffc.aa.AA.unimpl;
 //
 // A function pointer includes a display (a back pointer to the enclosing
 // environment); i.e. function pointers are "fat".  The display is typed as
-// a TMP to a TypeStruct, or e.g. ANY (not live, nobody uses or cares) or XNIL.
+// a TMP to a TypeStruct, or e.g. ANY (not live, nobody uses or cares or XNIL).
 //
 // The TFP indicates if it carries a display or not; a TFP without a display
-// cannot be called and has to be bound to a display first.  The TFP instead is
-// bound to the prototype object for a type class, and requires a one-time
-// binding to an actual object before being called.  For "static" functions,
-// the prototype object is just the enclosing display and binds immediately.
+// cannot be called and has to be bound to a display first.  An unbound TFP
+// uses ANY.  For "static" functions, the display is bound to the prototype
+// object immediately.
 //
 // Other arguments are not currently curried in the TFP itself, only nargs.
 //
@@ -38,14 +37,12 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   private int _nargs;           // Number of formals, including the ctrl, mem, display
   public Type _ret;             // Return scalar type
   private Type _dsp;            // Display; often a TMP to a TS; ANY is dead (not live, nobody uses).
-  private boolean _has_dsp;     // Has a display bound
   boolean _cyclic; // Type is cyclic with a struct.  This is a summary property, not a part of the type, hence is not in the equals nor hash
 
   private TypeFunPtr init(BitsFun fidxs, int nargs, Type dsp, Type ret ) {
     super.init("");
     _cyclic = false;
     _fidxs = fidxs; _nargs=nargs; _dsp=dsp; _ret=ret;
-    _has_dsp=dsp!=null;
     return this;
   }
   @Override TypeFunPtr copy() { return _copy().init(_fidxs,_nargs,_dsp,_ret); }
@@ -54,10 +51,9 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_dsp,"dsp");  map.apply(_ret,"ret"); }
   @Override public void walk_update( UnaryOperator<Type> map ) { _dsp = map.apply(_dsp); _ret = map.apply(_ret); }
 
-  public boolean has_dsp() { return _has_dsp; }
-  public Type dsp() { assert _has_dsp; return _dsp; }
-  void set_dsp(Type dsp) { assert un_interned() && _has_dsp; _dsp=dsp; }
-
+  public boolean has_dsp() { return _dsp!=ALL; }
+  public Type dsp() { return _dsp; }
+  void set_dsp(Type dsp) { assert un_interned() && has_dsp(); _dsp=dsp; }
 
   // Static properties hashcode, no edge hashes
   @Override int static_hash() {

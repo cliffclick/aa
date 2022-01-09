@@ -42,6 +42,7 @@ public class CEProjNode extends CProjNode {
     // Check that args are monotonic before wiring
     Node[] parms = fun.parms();
     for( int i=DSP_IDX; i<parms.length; i++ ) {
+      if( parms[i]==null ) continue; // Unused args always good
       Type actual = CallNode.targ(tcall,i);
       Type formal = ((ParmNode)parms[i])._t;
       if( !actual.isa(formal) )

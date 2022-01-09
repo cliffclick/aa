@@ -1,10 +1,11 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.Env;
+import com.cliffc.aa.ErrMsg;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
-import org.jetbrains.annotations.NotNull;
 
 import static com.cliffc.aa.AA.*;
 
@@ -26,43 +27,120 @@ public class LoadNode extends Node {
   private Node set_mem(Node a) { return set_def(MEM_IDX,a); }
   public TypeFld find(TypeStruct ts) { return ts.get(_fld); }
 
+  @Override public Type value() {
+    Node adr = adr();
+    Type tadr = adr._val;
+    if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.oob();
+    // Loading from a Value type?
+    if( tmp._obj._name.length()>0 ) {
+      TypeFld fld = tmp._obj.get(_fld); // Local field?
+      return fld==null ? Type.SCALAR : fld._t;
+    }
+
+    // Loading from TypeMem - will get a TypeObj out.
+    Node mem = mem();
+    Type tmem = mem._val;       // Memory
+    if( !(tmem instanceof TypeMem tm) ) return tmem.oob(); // Nothing sane
+    TypeStruct ts = tm.ld(tmp);           // Get struct from memory
+    TypeFld fld = ts.get(_fld);           // Find the named field
+    return fld==null ? ts.oob() : fld._t; // Field type
+  }
+
+  @Override public void add_flow_use_extra(Node chg) {
+    if( chg==adr() ) { Env.GVN.add_flow(mem()); Env.GVN.add_reduce(this); } // Address into a Load changes, the Memory can be more alive, or this not in Error
+    if( chg==mem() ) Env.GVN.add_flow(mem());  // Memory value lifts to ANY, memory live lifts also.
+    if( chg==mem() ) Env.GVN.add_flow(adr());  // Memory value lifts to an alias, address is more alive
+    // Memory improves, perhaps Load can bypass Call
+    if( chg==mem() && mem().in(0) instanceof CallEpiNode ) Env.GVN.add_reduce(this);
+    // Memory becomes a MrgProj, maybe Load can bypass MrgProj
+    if( chg==mem() && chg instanceof MrgProjNode ) Env.GVN.add_mono(this);
+  }
+
+  // The only memory required here is what is needed to support the Load.
+  // If the Load is alive, so is the address.
+
+  // If the Load computes a constant, the address live-ness is determined how
+  // Combo deals with constants, and not here.
+  @Override public TypeMem live_use(Node def ) {
+    if( def==adr() ) return TypeMem.ALIVE;
+    Type tmem = mem()._val;
+    Type tptr = adr()._val;
+    if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
+    if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
+    if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
+    // Only named the named field from the named aliases is live.
+    TypeStruct ldef = _live==TypeMem.LNO_DISP ? TypeStruct.LNO_DISP : TypeStruct.ALIVE;
+    return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld, ldef);
+  }
+
+  // Standard memory unification; the Load unifies with the loaded field.
+  @Override public boolean unify( boolean test ) {
+    TV2 self = tvar();
+    TV2 rec = adr().tvar();
+    rec.push_dep(this);
+
+    TV2 fld = rec.arg(_fld);
+    if( fld!=null )           // Unify against a pre-existing field
+      return fld.unify(self, test);
+
+    // Add struct-ness if possible
+    if( !rec.is_obj() && !rec.is_nil() )
+      rec.make_open_struct();
+    // Add the field
+    if( rec.is_obj() && rec.is_open() ) {
+      rec.add_fld(_fld,self);
+      return true;
+    }
+    // Closed/non-record, field is missing
+    if( self._err!=null ) return false;
+    self._err = "Missing field "+_fld;
+    return true;
+  }
+  public void add_work_hm() {
+    super.add_work_hm();
+    Env.GVN.add_flow(adr());
+  }
+
   // Strictly reducing optimizations
   @Override public Node ideal_reduce() {
     Node adr = adr();
     Type tadr = adr._val;
-    if( !(tadr instanceof TypeMemPtr tmp) ) return null;
-    // Loads from value types do not need the memory edge
-    if( tmp.is_valtype() && mem()!=null )
-      return set_def(MEM_IDX,null);
 
-    // See if this is a named object as a ptr, with a prototype.
-    // Can be either a reference or value type.
-    String tname = ValFunNode.valtype(tmp);
-    if( tname!=null ) {
-      NewNode nnn = Env.PROTOS.get(tname); // Get the prototype
-      if( nnn!=null ) {
-        // Is either a reference or a value type
-        TypeFld fld = nnn.fld(_fld);
-        if( fld==null ) return null; // No such field in prototype
-        // For both, eager final fields are moved to the prototype.
-        if( fld._access==TypeFld.Access.Final ) { // Final fields: might be in the prototype
-          // Load from the prototype
-          Node p = nnn.in(fld._order);
-          if( p._val==Type.ALL ) return null;
-          // Instance call; move the adr into Unresolved/FunPtr
-          if( p._val instanceof TypeFunPtr tfp ) {
-            if( tfp.dsp()==TypeMemPtr.NO_DISP ) return p; // No display ("static" prototype call)
-            if( p instanceof UnresolvedNode ) return ((UnresolvedNode)p).bind(adr());
-            assert p instanceof FunPtrNode; // clone, inject adr() as display
-            return p.copy(true).set_def(1,adr());
-          }
-          // Other prototype constants
-          throw unimpl();
-          //return nnn.in(fld._order);
-        }
-        // fetch directly from local
-        if( adr instanceof ValNode val )
-          return val.in(Util.find(val._flds,_fld));
+    // Loading from a type constructor directly?
+    // Remap to the prototype.
+    // Not allowed to load from generic functions.
+    if( tadr instanceof TypeFunPtr tfp && tfp._ret instanceof TypeMemPtr tmp && tmp.is_valtype() ) {
+      NewNode proto = Env.PROTOS.get(tmp._obj._name); // Get the prototype
+      Node p = _proto_load(proto);
+      if( p!=null ) {
+        if( p._val instanceof TypeFunPtr ) throw unimpl(); // Produces an unbound bare code ptr, needs syntax to bind it
+        return p; // Normal field load
+      }
+    }
+
+    if( !(tadr instanceof TypeMemPtr tmp) ) return null;
+
+    // Loads from value types do not need the memory edge
+    if( tmp.is_valtype() ) {
+      if( mem()!=null ) return set_def(MEM_IDX,null);
+
+      // Instance load.  TFPs bind the address as the display.
+      NewNode proto = Env.PROTOS.get(tmp._obj._name); // Get the prototype
+      Node p = _proto_load(proto);
+      if( p!=null ) {           // Found a matching prototype field
+        assert proto != adr;    // Loading from type constructor handled above
+        // Instance calls get the address bound as the display
+        if( p._val instanceof TypeFunPtr ) {
+          int didx = switch( p ) {
+          case UnresolvedNode ignore1 -> 0;
+          case FunPtrNode ignore2 -> 1;
+          default -> throw unimpl();
+          };
+          if( p.in(didx) != null && p.in(didx)!=Env.ALL ) throw unimpl(); // Already bound?
+          return p.copy(true).set_def(didx,adr);
+        } else
+          // Some other prototype constant field
+          throw unimpl(); //return p;
       }
     }
 
@@ -77,6 +155,18 @@ public class LoadNode extends Node {
 
     return null;
   }
+
+  private Node _proto_load(NewNode proto) {
+    if( proto==null ) return null;         // Not a prototype
+    // Is either a reference or a value type
+    TypeFld fld = proto.fld(_fld);
+    if( fld==null ) return null; // No such field in prototype
+    // For both, eager final fields are moved to the prototype.
+    if( fld._access!=TypeFld.Access.Final ) return null; // Not a final field in the prototype
+    // Load from the prototype
+    return proto.in(fld._order);
+  }
+
 
   // Changing edges to bypass, but typically not removing nodes nor edges
   @Override public Node ideal_mono() {
@@ -225,96 +315,13 @@ public class LoadNode extends Node {
     return null;         // Stuck behind call
   }
 
-
-  @Override public Type value() {
-    Node adr = adr();
-    Type tadr = adr._val;
-    if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.oob();
-    // Loading from a Value type?
-    if( ValFunNode.valtype(tmp)!=null ) {
-      if( !(tmp._obj instanceof TypeStruct) ) return tmp._obj.oob(Type.SCALAR);
-      TypeFld fld = tmp._obj.get(_fld);
-      return fld==null ? Type.SCALAR : fld._t; // Check no-such-field
-    }
-
-    // Loading from TypeMem - will get a TypeObj out.
-    Node mem = mem();
-    Type tmem = mem._val;       // Memory
-    if( !(tmem instanceof TypeMem) ) return tmem.oob(); // Nothing sane
-    TypeStruct tobj = ((TypeMem)tmem).ld(tmp);
-    return get_fld(tobj);
-  }
-
-  // Load the value
-  private @NotNull Type get_fld( TypeStruct ts ) {
-    TypeFld fld = ts.get(_fld);  // Find the named field
-    if( fld==null ) return ts.oob();
-    return fld._t;          // Field type
-  }
-
-  @Override public void add_flow_use_extra(Node chg) {
-    if( chg==adr() ) { Env.GVN.add_flow(mem()); Env.GVN.add_reduce(this); } // Address into a Load changes, the Memory can be more alive, or this not in Error
-    if( chg==mem() ) Env.GVN.add_flow(mem());  // Memory value lifts to ANY, memory live lifts also.
-    if( chg==mem() ) Env.GVN.add_flow(adr());  // Memory value lifts to an alias, address is more alive
-    // Memory improves, perhaps Load can bypass Call
-    if( chg==mem() && mem().in(0) instanceof CallEpiNode ) Env.GVN.add_reduce(this);
-    // Memory becomes a MrgProj, maybe Load can bypass MrgProj
-    if( chg==mem() && chg instanceof MrgProjNode ) Env.GVN.add_mono(this);
-  }
-
-  // The only memory required here is what is needed to support the Load.
-  // If the Load is alive, so is the address.
-
-  // If the Load computes a constant, the address live-ness is determined how
-  // Combo deals with constants, and not here.
-  @Override public TypeMem live_use(Node def ) {
-    if( def==adr() ) return TypeMem.ALIVE;
-    Type tmem = mem()._val;
-    Type tptr = adr()._val;
-    if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
-    if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
-    if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
-    // Only named the named field from the named aliases is live.
-    TypeStruct ldef = _live==TypeMem.LNO_DISP ? TypeStruct.LNO_DISP : TypeStruct.ALIVE;
-    return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld, ldef);
-  }
-
-  // Standard memory unification; the Load unifies with the loaded field.
-  @Override public boolean unify( boolean test ) {
-    TV2 self = tvar();
-    TV2 rec = adr().tvar();
-    rec.push_dep(this);
-
-    TV2 fld = rec.arg(_fld);
-    if( fld!=null )           // Unify against a pre-existing field
-      return fld.unify(self, test);
-
-    // Add struct-ness if possible
-    if( !rec.is_obj() && !rec.is_nil() )
-      rec.make_open_struct();
-    // Add the field
-    if( rec.is_obj() && rec.is_open() ) {
-      rec.add_fld(_fld,self);
-      return true;
-    }
-    // Closed/non-record, field is missing
-    if( self._err!=null ) return false;
-    self._err = "Missing field "+_fld;
-    return true;
-  }
-  public void add_work_hm() {
-    super.add_work_hm();
-    Env.GVN.add_flow(adr());
-  }
-
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;
     if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when reading",_fld);
     if( tadr==Type.ANY ) return null; // No error, since might fall to any valid thing
-    if( !(tadr instanceof TypeMemPtr) )
+    if( !(tadr instanceof TypeMemPtr ptr) )
       return bad(fast,null); // Not a pointer nor memory, cannot load a field
-    TypeMemPtr ptr = (TypeMemPtr)tadr;
-    if( ValFunNode.valtype(tadr)!=null ) // These should always fold
+    if( ptr.is_valtype() )   // These should always fold
       return bad(fast,ptr._obj);
     Type tmem = mem()._val;
     if( tmem==Type.ALL ) return bad(fast,null);

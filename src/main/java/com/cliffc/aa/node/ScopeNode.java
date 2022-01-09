@@ -236,10 +236,10 @@ public class ScopeNode extends Node {
     for( int fidx : escs ) {
       boolean found=false;
       for( int i=RET_IDX; i<len(); i++ )
-        if( in(i) instanceof ValFunNode && ((ValFunNode)in(i)).fidx()==fidx )
+        if( in(i) instanceof FunPtrNode fptr && fptr.fidx()==fidx )
           { found=true; break; };
       if( !found )
-        add_def(ValFunNode.get(fidx));
+        add_def(FunPtrNode.get(fidx));
     }
   }
 

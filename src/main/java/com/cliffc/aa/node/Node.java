@@ -711,7 +711,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Make globally shared common ConNode for this type.
   public static @NotNull Node con( Type t ) {
     if( t instanceof TypeFunPtr && ((TypeFunPtr)t)._fidxs.abit()!=-1 )
-      return ValFunNode.get(((TypeFunPtr)t)._fidxs.getbit()); // Pre-existing function constant
+      return FunPtrNode.get(((TypeFunPtr)t)._fidxs.getbit()); // Pre-existing function constant
     Node con = new ConNode<>(t);
     Node con2 = VALS.get(con);
     if( con2 != null ) {        // Found a prior constant

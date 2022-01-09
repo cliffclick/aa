@@ -10,7 +10,6 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Arrays;
 
 import static com.cliffc.aa.AA.DSP_IDX;
-import static com.cliffc.aa.AA.unimpl;
 
 // Allocates a TypeStruct
 //
@@ -57,6 +56,9 @@ public class NewNode extends Node {
   // For closures, the number of fields which are initial incoming arguments
   // (Lambda args) vs local assignments (Let bound args).  Effectively final
   // AFTER all the args are added.
+
+  // For non-closure value objects, is the default argment count to the
+  // constructor.
   public int _nargs;
 
   // A list of field names and field-mods, folded into the initial state of
@@ -84,6 +86,11 @@ public class NewNode extends Node {
     _forward_ref = forward_ref;
     _tname=tname;
     _init( alias, TypeStruct.EMPTY);
+    if( tname!=null ) {    // Named type?
+      Node defalt = new ValNode(null);
+      defalt.add_def(this);
+      set_def(1,defalt);
+    }
   }
 
   private void _init(int alias, TypeStruct ts) {
@@ -107,12 +114,17 @@ public class NewNode extends Node {
   // Strip the ':' off to make a value name from a type name.
   // Error if not a named NewNode.
   public String as_valname() { return _tname.substring(0,_tname.length()-1).intern(); }
+  // Default ValNode for this prototype.
+  public ValNode defalt() {
+    assert _tname!=null;
+    return (ValNode)in(1);
+  }
 
   public MrgProjNode mem() {
     for( Node use : _uses ) if( use instanceof MrgProjNode mrg ) return mrg;
     return null;
   }
-  public void set_nargs() { assert _nargs==0; _nargs=len(); }
+  public void set_nargs(int nargs) { assert _nargs==0; assert _is_closure || _is_val; _nargs=nargs; }
 
   public int find(String name) { int idx = _ts.find(name); return idx==-1 ? -1 : idx+DSP_IDX; }
   public Node get(String name) { return in(find(name)); } // Error if not found
@@ -135,7 +147,7 @@ public class NewNode extends Node {
   }
 
   // Add a named FunPtr to a New.  Auto-inflates to a Unresolved as needed.
-  public void add_fun( Parse bad, String name, ValFunNode ptr ) {
+  public void add_fun( Parse bad, String name, FunPtrNode ptr ) {
     assert !_closed;
     TypeFld fld = _ts.get(name);
     Node n = in(fld._order);
@@ -151,7 +163,11 @@ public class NewNode extends Node {
     set_def(fld._order,n);
     Env.GVN.add_flow(mem());
   }
-  public void pop_fld() { throw unimpl(); }
+  public void pop_fld() {
+    _ts = _ts.pop_fld(len()-1);
+    pop();
+    xval();
+  }
 
   // The current local scope ends, no more names will appear.  Forward refs
   // first found in this scope are assumed to be defined in some outer scope
@@ -275,6 +291,7 @@ public class NewNode extends Node {
       while( !is_dead() && len() > 1 )  pop(); // Kill all fields
       _ts = TypeStruct.UNUSED.set_name(_ts._name);
       _tptr = _tptr.make_from(_ts);
+      Env.DEF_MEM.exclude_alias(_alias); // Alias not default reachable
       xval();
       if( is_dead() ) return this;
       for( Node use : _uses )
@@ -325,8 +342,8 @@ public class NewNode extends Node {
   @Override @NotNull public NewNode copy( boolean copy_edges) {
     // Split the original '_alias' class into 2 sub-aliases
     NewNode nnn = (NewNode)super.copy(copy_edges);
-    nnn._init(Env.new_alias(_alias),_ts);      // Children alias classes, split from parent
-    _init(Env.new_alias(_alias),_ts); // The original NewNode also splits from the parent alias
+    nnn._init(BitsAlias.new_alias(_alias),_ts);      // Children alias classes, split from parent
+    _init(BitsAlias.new_alias(_alias),_ts); // The original NewNode also splits from the parent alias
     Env.GVN.add_flow(this);     // Alias changes flow
     return nnn;
   }

@@ -341,7 +341,7 @@ public class CallNode extends Node {
     if( ctl != Type.CTRL ) return ctl.oob();
     // Function pointer.
     Node fdx = fdx();
-    TypeFunPtr tfx = ValFunNode.as_tfp(fdx._val);
+    if( !(fdx._val instanceof TypeFunPtr tfx) ) return fdx._val.oob();
     // Not a memory to the call?
     Type mem = mem()==null ? TypeMem.ANYMEM : mem()._val;
     TypeMem tmem = mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM);
@@ -484,8 +484,8 @@ public class CallNode extends Node {
     // bad-arg-count
     if( tfp.nargs() != nargs() ) {
       if( fast ) return ErrMsg.FAST;
-      ValFunNode vfn = ValFunNode.get(tfp._fidxs);
-      return ErrMsg.syntax(_badargs[0],err_arg_cnt(vfn.name(),tfp));
+      FunPtrNode fptr = FunPtrNode.get(tfp._fidxs);
+      return ErrMsg.syntax(_badargs[0],err_arg_cnt(fptr.name(),tfp));
     }
 
     return null;

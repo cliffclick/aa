@@ -92,10 +92,11 @@ public class StoreNode extends Node {
     TypeFld tfld = nnn.fld(_fld);
     if( tfld== null ) return false;
     // Folding unambiguous functions?
-    if( rez() instanceof ValFunNode || rez() instanceof UnresolvedNode )
-      nnn.add_fun(_bad,_fld,(ValFunNode)rez()); // Stacked FunPtrs into an Unresolved
-    // Field is modifiable; update New directly.
-    else if( tfld._access==Access.RW )
+    if( rez() instanceof FunPtrNode || rez() instanceof UnresolvedNode ) {
+      if( rez().is_forward_ref() ) return false;
+      nnn.add_fun(_bad, _fld, (FunPtrNode) rez()); // Stacked FunPtrs into an Unresolved
+      // Field is modifiable; update New directly.
+    } else if( tfld._access==Access.RW )
       nnn.set_fld(tfld.make_from(tfld._t,_fin),rez()); // Update the value, and perhaps the final field
     else  return false;      // Cannot fold
     nnn.xval();
