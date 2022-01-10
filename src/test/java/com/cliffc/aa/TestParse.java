@@ -139,7 +139,7 @@ public class TestParse {
   }
 
   @Test public void testParse01() {
-    test("x++;x",TypeInt.con(1), "1");
+    test   ("0 ?    2  : 3", TypeInt.con(3), "3"); // false
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE, "1");
     test("x=y=1", TypeInt.TRUE, "1");

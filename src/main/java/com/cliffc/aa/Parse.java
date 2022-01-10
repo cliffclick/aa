@@ -449,39 +449,41 @@ public class Parse implements Comparable<Parse> {
     if( !peek('?') ) return expr;   // No if-expression
 
     scope().push_if();            // Start if-expression tracking new defs
+    int omem_x = mem().push();  // Keep until parse false-side    
     Node ifex = init(new IfNode(ctrl(),expr));
+    int ifex_x = ifex.push();   // Keep until parse false-side
     set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch
-    Node old_mem = mem().keep(2);         // Keep until parse false-side
-    Node tex = stmt(false);               // Parse true expression
-    if( tex == null ) tex = err_ctrl2("missing expr after '?'");
-    tex.keep(2);                   // Keep until merge point
-    Node t_ctrl= ctrl().keep(2);   // Keep until merge point
-    Node t_mem = mem ().keep(2);   // Keep until merge point
+    Node t_exp = stmt(false);               // Parse true expression
+    if( t_exp == null ) t_exp = err_ctrl2("missing expr after '?'");
+    Node omem = Node.pop(omem_x);  // Unstack the two 
+    ifex      = Node.pop(ifex_x);
+    int t_exp_x = t_exp .push();  // Keep until merge point
+    int t_ctl_x = ctrl().push();  // Keep until merge point
+    int t_mem_x = mem ().push();  // Keep until merge point
 
     scope().flip_if();          // Flip side of tracking new defs
-    Env.GVN.add_work_new(ifex.unkeep(2));
     set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch
-    Env.GVN.add_reduce(ifex);
-    set_mem(old_mem.unkeep(2));    // Reset memory to before the IF
-    Node fex = peek(':') ? stmt(false) : con(Type.XNIL);
-    if( fex == null ) fex = err_ctrl2("missing expr after ':'");
-    fex.keep(2);                   // Keep until merge point
-    Node f_ctrl= ctrl().keep(2);   // Keep until merge point
-    Node f_mem = mem ().keep(2);   // Keep until merge point
-
+    set_mem(omem);           // Reset memory to before the IF for the other arm
+    Node f_exp = peek(':') ? stmt(false) : con(Type.XNIL);
+    if( f_exp == null ) f_exp = err_ctrl2("missing expr after ':'");
+    Node f_ctl = ctrl();
+    Node f_mem = mem ();
+    
+    Node t_mem = Node.pop(t_mem_x);
+    Node t_ctl = Node.pop(t_ctl_x);
+    t_exp      = Node.pop(t_exp_x);
+    
     Parse bad = errMsg();
-    t_mem = scope().check_if(true ,bad,_gvn,t_ctrl,t_mem); // Insert errors if created only 1 side
-    f_mem = scope().check_if(false,bad,_gvn,f_ctrl,f_mem); // Insert errors if created only 1 side
+    t_mem = scope().check_if(true ,bad,_gvn,t_ctl,t_mem); // Insert errors if created only 1 side
+    f_mem = scope().check_if(false,bad,_gvn,f_ctl,f_mem); // Insert errors if created only 1 side    
     scope().pop_if();         // Pop the if-scope
-    RegionNode r = set_ctrl(init(new RegionNode(null,t_ctrl.unkeep(2),f_ctrl.unkeep(2))));
-    r._val = Type.CTRL;
-    _gvn.add_reduce(t_ctrl);
-    _gvn.add_reduce(f_ctrl);
-    if( t_ctrl._val==Type.XCTRL ) _gvn.add_flow(t_mem);
-    if( f_ctrl._val==Type.XCTRL ) _gvn.add_flow(f_mem);
-    set_mem(   gvn(new PhiNode(TypeMem.ALLMEM,bad,r        ,t_mem.unkeep(2),f_mem.unkeep(2))));
-    Node rez = gvn(new PhiNode(Type.SCALAR   ,bad,r.unkeep(2),tex.unkeep(2),  fex.unkeep(2))) ; // Ifex result
-    _gvn.add_work_new(r);
+    
+    // Merge results
+    RegionNode r = set_ctrl(init(new RegionNode(null,t_ctl,f_ctl)));    
+    set_mem(   init(new PhiNode(TypeMem.ALLMEM,bad,r,t_mem,f_mem)));
+    Node rez = init(new PhiNode(Type.SCALAR   ,bad,r,t_exp,f_exp)) ; // Ifex result
+    
+    assert Env.START.more_work(true) == 0; // Initial conditions are correct
     return rez;
   }
 

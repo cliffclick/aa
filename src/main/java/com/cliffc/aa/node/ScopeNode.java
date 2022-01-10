@@ -302,14 +302,13 @@ public class ScopeNode extends Node {
       // Everything in this set is a partially-created variable error
       HashMap<String,Access> vars = arm ? _fvars : _tvars;
       if( vars.isEmpty() ) return mem;
-      mem.unkeep(2);             // Passed-in 'hooked' memory
       for( String name : vars.keySet() ) {
         String msg = "'"+name+"' not defined on "+arm+" arm of trinary";
-        Node err = gvn.xform(new ErrNode(ctrl,bad,msg));
+        Node err = gvn.init(new ErrNode(ctrl,bad,msg));
         // Exactly like a parser store of an error, on the missing side
-        mem = gvn.xform(new StoreNode(mem,scope.stk(),err,Access.Final,name,bad));
+        mem = gvn.init(new StoreNode(mem,scope.stk(),err,Access.Final,name,bad));
       }
-      return mem.keep(2);        // Return 'hooked' memory
+      return mem;
     }
   }
 }
