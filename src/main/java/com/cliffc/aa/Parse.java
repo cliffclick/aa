@@ -741,12 +741,12 @@ public class Parse implements Comparable<Parse> {
   private Node inc(String tok, int d) {
     skipWS();
     ScopeNode scope = lookup_scope(tok=tok.intern(),false); // Find prior scope of token
+    Node unr = _e.lookup("int");
     // Need a load/call/store sensible options
-    Node n;
     if( scope==null ) {         // Token not already bound to a value
-      //create(tok,con(Type.XNIL),Access.RW);
-      //scope = scope();
-      throw unimpl();
+      Node zero = do_call(null,ctrl(),mem(),unr,con(TypeInt.ZERO));
+      do_store(scope,zero,Access.RW,tok,null,Type.SCALAR,null);
+      scope = scope();
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
         return err_ctrl2("Cannot re-assign final val '"+tok+"'");
@@ -756,18 +756,17 @@ public class Parse implements Comparable<Parse> {
     // Pointer to the proper display is found via ptr-walking live display stack.
     // Now properly load from the display.
     Node ptr = get_display_ptr(scope);
-    n = gvn(new LoadNode(mem(),ptr,tok,null));
+    Node n = gvn(new LoadNode(mem(),ptr,tok,null));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl1(ErrMsg.forward_ref(this,((FunPtrNode)n)));
     // Do a full lookup on "+", and execute the function
-    n.keep();
-//    // This is a primitive lookup and always returns a FRESH copy (see HM.Ident).
-//    Node plus = _e.lookup_filter_bin("+");
-//    Node sum = do_call(errMsgs(0,_x,_x),args(plus,n,con(TypeInt.con(d))));
-//    // Active memory for the chosen scope, after the call to plus
-//    scope().replace_mem(new StoreNode(mem(),ptr,sum,Access.RW,tok,errMsg()));
-//    return n.unkeep();          // Return pre-increment value
-    throw unimpl();
+    int nidx = n.push();
+    Node plus = gvn(new LoadNode(mem(),n,"_+_",null));
+    Node inc = do_call(null,ctrl(),mem(),unr,con(TypeInt.con(d)));
+    Node sum = do_call(errMsgs(0,_x,_x), args(plus,inc));
+    // Active memory for the chosen scope, after the call to plus
+    scope().replace_mem(new StoreNode(mem(),ptr,sum,Access.RW,tok,errMsg()));
+    return Node.pop(nidx);      // Return pre-increment value
   }
 
 
@@ -852,7 +851,7 @@ public class Parse implements Comparable<Parse> {
     // must load against most recent display update.
     NewNode dsp = scope.stk();
     TypeFld fld = dsp._ts.get(tok);
-    Node ld = fld._access==Access.Final
+    Node ld = fld._access==Access.Final && mem().err(true)==null
       ? dsp.in(fld._order)      // Direct use
       // Load against a varying display
       : gvn(new LoadNode(mem(),get_display_ptr(scope),tok,null));

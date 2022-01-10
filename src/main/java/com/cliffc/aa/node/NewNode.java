@@ -226,12 +226,12 @@ public class NewNode extends Node {
   }
 
   // Only alive fields in the MrgProj escape
-  @Override public TypeMem live_use(Node def ) {
+  @Override public TypeMem live_use( Node def ) {
     TypeStruct ts = _live.at(_alias);
     if( ts==TypeStruct.ISUSED ) return TypeMem.ALIVE;
     if( ts==TypeStruct.UNUSED ) return TypeMem.DEAD ;
     int idx=DSP_IDX;  while( in(idx)!=def ) idx++; // Index of node
-    TypeFld fld = ts.fld_idx(idx-DSP_IDX);
+    TypeFld fld = ts.fld_idx(idx-DSP_IDX,idx);
     if( fld==null )  return TypeMem.DEAD; // No such field is alive
     return fld._t.oob(TypeMem.ALIVE);
   }

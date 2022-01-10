@@ -452,14 +452,8 @@ public class TV2 {
     if( is_obj() )
       that._open = that.is_obj() ? that._open & _open : _open;
     // Merge all the hard bits
-    if( _flow != null ) {       // Something to merge
-      if( that._flow==null ) {  // Nothing to merge into
-        that. _flow =  _flow;   // So just copy
-        that._eflow = _eflow;
-      } else {
-        throw unimpl();
-      }
-    }
+    that.union_flow(_flow);
+    that.union_flow(_eflow);
 
     // Merge arguments
     if( _args!=null ) {
@@ -477,6 +471,17 @@ public class TV2 {
     // Hard union this into that, no more testing.
     return _union(that);
   }
+
+  private void union_flow( Type t0 ) {
+    if( t0==null ) return;      // Nothing to merge into
+    if( _flow==null ) _flow = t0;
+    else if( t0.getClass()== _flow.getClass() ) _flow = t0.meet( _flow);
+    else if( _eflow==null ) _eflow = t0;
+    else if( t0.getClass()==_eflow.getClass() ) _eflow = t0.meet(_eflow);
+    // Else have both _flow and _eflow AND t0: have 3 unique type classes so
+    // drop t0, and only report the first two.
+  }
+
   // Union this into that; this can already be unified (if rolling up).
   // Crush all the extra fields in this, to avoid accidental usage.
   private boolean _union(TV2 that) {

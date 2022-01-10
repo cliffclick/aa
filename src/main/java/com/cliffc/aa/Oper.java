@@ -168,6 +168,10 @@ public class Oper {
     }
     return null;
   }
+  // Lookup the tok as a unbalanced binary operator.  Return NULL if no match,
+  // or the Oper with the longest matching name and any prec.  Adds '_' as the
+  // first and last characters.
+  public static Oper bin_op( String tok ) { return bin_op(tok,prec(tok.charAt(0))); }
 
   // Lookup a balanced operator, either binary or trinary.  Returns NULL if no
   // match, or the Oper with the longest matching name and prec.  Adds '_' as

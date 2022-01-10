@@ -38,9 +38,6 @@ public abstract class Exec {
     //Env.GVN.add_flow_uses(e._scope);// Post-parse, revisit top-level called functions
     e.close();                // No more fields added to the parse scope
 
-    // Pessimistic optimizations; might improve error situation
-    Env.GVN.iter();
-
     Env.pre_combo();   // Remove all the things kept alive until Combo runs
     Combo.opto();      // Global Constant Propagation and Hindley-Milner Typing
 

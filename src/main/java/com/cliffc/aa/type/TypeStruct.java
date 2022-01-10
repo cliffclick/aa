@@ -981,6 +981,13 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     assert fld._order==idx || fld._order==TypeFld.oTop || fld._order==TypeFld.oBot;
     return fld;
   }
+  public TypeFld fld_idx( int idx, int aidx ) {
+    TypeFld fld = _flds.atX(idx);
+    if( fld==null ) return null;
+    assert fld._order==aidx;
+    return fld;
+  }
+
   // Non-allocating iterator; pulls iterators from a pool.  The hard part is
   // telling when an iterator ends early, to avoid leaking.  This is not
   // exactly asserted for, so some leaks may happen.
@@ -994,8 +1001,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
       if( POOL.isEmpty() ) { assert CNT<20; CNT++; new Iter().end(); }
       return POOL.pop().init(ts);
     }
-    boolean end() {
-      _i=-99; _flds=null; POOL.push(this); return false; }
+    boolean end() { _i=-99; _flds=null; POOL.push(this); return false; }
     private Iter init(TypeStruct ts) { assert _i==-99; _i=0; _flds=ts._flds; return this; }
     @Override public boolean hasNext() {  assert _i>=0; return _i < _flds._len || end(); }
     @Override public TypeFld next() { return _flds._es[_i++]; }
