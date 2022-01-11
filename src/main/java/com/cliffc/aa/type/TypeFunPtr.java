@@ -279,7 +279,9 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
       _fidxs.abit() != -1;
   }
   @Override public boolean is_con()       {
-    return _dsp==TypeMemPtr.NO_DISP && // No display (could be constant display?)
+    // No display (could be constant display?)
+    // Or the unbound display
+    return (_dsp==TypeMemPtr.NO_DISP || _dsp==Type.ALL) && 
       // Single bit covers all functions (no new children added, but new splits
       // can appear).  Currently, not tracking this at the top-level, so instead
       // just triggering off of a simple heuristic: a single bit above BitsFun.FULL.

@@ -153,7 +153,7 @@ public class StoreNode extends Node {
 
     if( !(tmem instanceof TypeMem    tm ) ) return tmem.oob(TypeMem.ALLMEM);
     if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.above_center() ? tmem : TypeMem.ALLMEM;
-    return tm.update(tmp._aliases,_fin,_fld,tval);
+    return tm.update(tmp._aliases,_fin,_fld,tval, mem instanceof MrgProjNode mprj && mprj.nnn()==adr );
   }
   //@Override BitsAlias escapees() {
   //  Type adr = adr()._val;

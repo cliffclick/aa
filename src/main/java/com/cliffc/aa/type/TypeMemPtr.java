@@ -179,7 +179,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   // prototype, but locally carry their fields in memory and so always use a
   // simple ptr.
   public boolean is_valtype() {
-    return _obj.len()>0 && _obj._name.length()>0;
+    return _obj._name.length()>0;
   }
 
   @Override public boolean above_center() { return _aliases.above_center(); }

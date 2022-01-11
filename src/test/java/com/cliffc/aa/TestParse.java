@@ -139,7 +139,6 @@ public class TestParse {
   }
 
   @Test public void testParse01() {
-    test   ("0 ?    2  : 3", TypeInt.con(3), "3"); // false
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE, "1");
     test("x=y=1", TypeInt.TRUE, "1");
@@ -160,7 +159,7 @@ public class TestParse {
     // Conditional:
     test   ("0 ?    2  : 3", TypeInt.con(3), "3"); // false
     test   ("2 ?    2  : 3", TypeInt.con(2), "2"); // true
-    test   ("math.rand(1)?x=4:x=3;x", TypeInt.NINT8); // x defined on both arms, so available after
+    test   ("math.rand(1)?x=4:x=3;x", TypeInt.NINT8, "nint8"); // x defined on both arms, so available after
     test   ("math.rand(1)?x=2:  3;4", TypeInt.con(4)); // x-defined on 1 side only, but not used thereafter
     test   ("math.rand(1)?(y=2;x=y*y):x=3;x", TypeInt.NINT8); // x defined on both arms, so available after, while y is not
     testerr("math.rand(1)?x=2: 3 ;x", "'x' not defined on false arm of trinary",20);

@@ -418,12 +418,12 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Field store into a conservative set of aliases.
-  public TypeMem update( BitsAlias aliases, Access fin, String fld, Type val ) {
+  public TypeMem update( BitsAlias aliases, Access fin, String fld, Type val, boolean precise ) {
     Ary<TypeStruct> pubs  = new Ary<>(_pubs .clone());
     for( int alias : aliases )
       if( alias != 0 )
         for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
-          pubs.setX(kid,at(_pubs,kid).update(fin,fld,val)); // imprecise
+          pubs.setX(kid,at(_pubs,kid).update(fin,fld,val,precise)); // imprecise
     return make(_make1(pubs.asAry()));
   }
 

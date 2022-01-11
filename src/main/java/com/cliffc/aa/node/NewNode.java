@@ -146,7 +146,7 @@ public class NewNode extends Node {
     Env.GVN.add_flow_uses(this);
   }
 
-  // Add a named FunPtr to a New.  Auto-inflates to a Unresolved as needed.
+  // Add a named FunPtr to a New.  Auto-inflates to an Unresolved as needed.
   public void add_fun( Parse bad, String name, FunPtrNode ptr ) {
     assert !_closed;
     TypeFld fld = _ts.get(name);
@@ -155,7 +155,8 @@ public class NewNode extends Node {
       ? (UnresolvedNode)n
       : new UnresolvedNode(name,bad).scoped();
     unr.add_fun(ptr);           // Checks all formals are unambiguous
-    set_fld(fld.make_from(fld._t,TypeFld.Access.Final),unr);
+    set_fld(fld.make_from(unr._val,fld._access),unr);
+    xval();
   }
 
   public void set_fld( TypeFld fld, Node n ) {

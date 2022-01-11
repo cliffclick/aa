@@ -110,4 +110,11 @@ public class Util {
     while((r=(a % b)) != 0) { a = b;  b = r; }
     return b;
   }
+
+  static public boolean isUpperCase( String s ) {
+    for( int i=0; i<s.length() ; i++ )
+      if( !Character.isUpperCase(s.charAt(i)) )
+        return false;
+    return true;
+  }
 }

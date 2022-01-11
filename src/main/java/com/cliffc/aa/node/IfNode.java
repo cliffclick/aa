@@ -2,11 +2,9 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
-import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.unimpl;
 
 // Split control
@@ -71,13 +69,15 @@ public class IfNode extends Node {
     if( in(0) instanceof ProjNode && in(0).in(0)==this )
       return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
     Type pred = val(1);
+    if( pred instanceof TypeMemPtr tmp && tmp.is_valtype()  )
+      pred = pred.unbox(); // Unwrap a primitive box
     if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
       return TypeTuple.IF_FALSE;   // False only
     if( pred.above_center() ? !pred.may_nil() : !pred.must_nil() )
       return TypeTuple.IF_TRUE;   // True only
     if( pred.above_center() ) // Wait until predicate falls
       return TypeTuple.IF_ANY;
-    
+
     return TypeTuple.IF_ALL;
   }
 

@@ -273,38 +273,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     for( TypeFld fld : flds ) ts.add_fld(fld);
     return ts.set_hash();
   }
-  //public static TypeStruct mallocD( TypeFld... flds ) {
-  //  TypeStruct ts = malloc("",false);
-  //  ts.add_fld(TypeFld.NO_DISP);
-  //  for( TypeFld fld : flds ) ts.add_fld(fld);
-  //  return ts.set_hash();
-  //}
-  //
-  //// Without NO_DISP
-  //public static TypeStruct make2flds( String f1, Type t1, String f2, Type t2 ) {
-  //  return make("",false,false,TypeFld.make(f1,t1,ARG_IDX),TypeFld.make(f2,t2,ARG_IDX+1));
-  //}
-  //// With NO_DISP
-  //public static TypeStruct make2fldsD( String f1, Type t1, String f2, Type t2 ) {
-  //  return make("",false,false,TypeFld.NO_DISP,TypeFld.make(f1,t1,ARG_IDX),TypeFld.make(f2,t2,ARG_IDX+1));
-  //}
-
-  //// Keep the fields but change name,any,open
-  //public TypeStruct make_from(String name, boolean any, boolean open ) {
-  //  assert interned();
-  //  TypeStruct ts = malloc(name,any,open);
-  //  for( TypeFld fld : this ) ts.add_fld(fld);
-  //  return ts.hashcons_free();
-  //}
-  //// Keep the name,any,open but change the fields
-  //public TypeStruct make_from(TypeStruct ts ) {
-  //  assert interned() && ts.interned();
-  //  TypeStruct st = malloc(_name,_any);
-  //  for( TypeFld fld : ts ) st.add_fld(fld);
-  //  return st.hashcons_free();
-  //}
-  //// Make a named TypeStruct from an unnamed one
-  //public TypeStruct make_from( String name ) { return make_from(name,_any);  }
 
   // Used by NewNode
   public TypeStruct make_from( IntFunction<Type> gen ) {
@@ -312,12 +280,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     for( TypeFld fld : _flds ) ts._flds.push(fld.make_from(gen.apply(fld._order)));
     return ts.hashcons_free();
   }
-
-  //// Make an "open" struct with an initial display field.
-  //public static TypeStruct open(Type tdisp) { return make("",false,true,TypeFld.make_arg(tdisp,DSP_IDX)); }
-  //// Make a closed struct from an open one
-  //public TypeStruct close() { assert _open; return make_from(_name,_any,false); } // Mark as no-more-fields
-
 
   public int nargs() { return _max_arg+1; }
 
@@ -1079,7 +1041,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     // Pointers & Memory to a Store can fall during GCP, and go from r/w to r/o
     // and the StoreNode output must remain monotonic.  This means store
     // updates are allowed to proceed even if in-error.
-    if( fin==Access.Final || fin==Access.ReadOnly ) precise=false;
+    //if( fin==Access.Final || fin==Access.ReadOnly ) precise=false;
     Type   pval = precise ? val : fld._t.meet(val);
     Access pfin = precise ? fin : fld._access.meet(fin);
     return replace_fld(fld.make_from(pval,pfin));

@@ -26,8 +26,8 @@ public class CEProjNode extends CProjNode {
   @Override public boolean equals(Object o) { return this==o; }
 
   static boolean good_call(Type tcall, FunNode fun ) {
-    if( !(tcall instanceof TypeTuple) ) return !tcall.above_center();
-    TypeTuple ttcall = (TypeTuple)tcall; // Call type tuple
+    if( !(tcall instanceof TypeTuple ttcall) ) return !tcall.above_center();
+    // Call type tuple
     if( ttcall.at(0)!=Type.CTRL ) return false; // Call not executing
     TypeFunPtr tfp = CallNode.ttfp(ttcall);
     if( tfp.fidxs().above_center() ) return false; // Call not executing yet
@@ -37,7 +37,7 @@ public class CEProjNode extends CProjNode {
     return ttcall.len()-1/*tfp*//*-1 tesc turned off*/ == fun.nargs();
   }
 
-  static boolean wired_arg_check(Type tcall, FunNode fun, int fidx) {
+  static boolean wired_arg_check( Type tcall, FunNode fun ) {
     if( !good_call(tcall,fun) ) return false;
     // Check that args are monotonic before wiring
     Node[] parms = fun.parms();

@@ -58,8 +58,7 @@ public final class CallEpiNode extends Node {
     if( _is_copy ) return null;
     CallNode call = call();
     Type tc = call._val;
-    if( !(tc instanceof TypeTuple) ) return null;
-    TypeTuple tcall = (TypeTuple)tc;
+    if( !(tc instanceof TypeTuple tcall) ) return null;
     if( CallNode.tctl(tcall) != Type.CTRL ) return null; // Call not executable
     // Get calls resolved function.
     BitsFun fidxs = CallNode.ttfp(tcall).fidxs();
@@ -200,7 +199,7 @@ public final class CallEpiNode extends Node {
       RetNode ret = fptr.ret();
       if( _defs.find(ret) != -1 ) continue;   // Wired already
       FunNode fun = ret.fun();
-      if( !CEProjNode.wired_arg_check(tcall,fun,fidx) ) continue; // Args fail basic sanity
+      if( !CEProjNode.wired_arg_check(tcall,fun) ) continue; // Args fail basic sanity
       progress=true;
       wire1(call,fun,ret,is_combo); // Wire Call->Fun, Ret->CallEpi
     }
@@ -259,9 +258,8 @@ public final class CallEpiNode extends Node {
   @Override public Type value() {
     if( _is_copy ) return _val; // A copy
     Type tin0 = val(0);
-    if( !(tin0 instanceof TypeTuple) )
+    if( !(tin0 instanceof TypeTuple tcall) )
       return tin0.oob(TypeTuple.CALLE); // Weird stuff?
-    TypeTuple tcall = (TypeTuple)tin0;
     if( tcall._ts.length < ARG_IDX ) return tcall.oob(); // Weird stuff
 
     // Get Call result.  If the Call args are in-error, then the Call is called

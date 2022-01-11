@@ -141,6 +141,12 @@ public class LoadNode extends Node {
         } else
           // Some other prototype constant field
           throw unimpl(); //return p;
+
+      } else if( adr instanceof ValNode val ) {
+        // Load direct from a Val
+        int idx = Util.find(val._flds,_fld);
+        assert idx!=-1; // Else type error, but maybe caught elsewhere
+        return val.in(idx);
       }
     }
 

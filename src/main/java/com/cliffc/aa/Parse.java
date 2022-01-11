@@ -18,7 +18,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
  *  GRAMMAR:
  *  prog = stmts END
  *  stmts= [tstmt|stmt][; stmts]*[;]? // multiple statements; final ';' is optional
- *  tstmt= tvar = :type            // type variable assignment
+ *  tstmt= tid = :type             // type identifier assignment
  *  stmt = [id[:type] [:]=]* ifex  // ids are (re-)assigned, and are available in later statements
  *  stmt = ^ifex                   // Early function exit
  *  ifex = apply [? stmt [: stmt]] // trinary short-circuit logic; missing ":stmt" will default to 0
@@ -54,14 +54,21 @@ import static com.cliffc.aa.type.TypeFld.Access;
  *                                 // Pattern matching: 1 arg is the arg; 2+ args break down a (required) tuple
  *  str  = [.\%]*                  // String contents; \t\n\r\% standard escapes
  *  str  = %[num]?[.num]?fact      // Percent escape embeds a 'fact' in a string; "name=%name\n"
-// *  type = tvar | tfun[?] | tstruct[?] | ttuple[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nilable'
-// *  tvar = id                      // Type variable lookup; includes primitive types 'int' 'flt' etc
-// *  tfun = {[[type]* ->]? type }   // Function types mirror func declarations
-// *  ttuple = ( [[type],]* )        // Tuple types are just a list of optional types;
-// *                                 // the count of commas dictates the length, zero commas is zero length.
-// *                                 // Tuple fields are always final.
-// *  tstruct = struct               // Struct types are field names with optional types or values.
-// *
+ *
+ *  type = tcon | tid | tvar | [?!]tptr | [?]tfun // "?" is nilable-ref, "!" is not-nil ref, missing is value-type
+ *  tptr = tary | tstruct | ttuple
+ *  tid  = type identifier         // NOT all-upper-case; LHS of type assignment
+ *  tvar = HM type variable        // ALL upper-case; scoped this type expr only
+ *  tcon = = ifex                  // Noticed extra '=', must bake down to a constant; usually for fcns
+ *  tfun = { [[type]* -> ]? type } // Mirrors func decls; ie. map=: {{A->B} [A] -> [B]}
+ *  tary = [type]                  // Array types
+ *  ttuple = ( [[type],]* )        // Tuple types are just a list of optional types;
+ *                                 // the count of commas dictates the length, zero commas is zero length.
+ *                                 // Tuple fields are always final.
+ *  tstruct= [tid:]@{ [tfld;]* };  // Optional named type to extend, list of fields
+ *  tfld = id [:type | tcon]       // Field name, option type or const-expr
+ *
+
  *
  * Structs and Types:
  *
@@ -240,8 +247,8 @@ public class Parse implements Comparable<Parse> {
    *  a variable cannot have a normal value and be re-assigned as a type
    *  variable).
    *
-   *  tstmt = tvar  = :type  // Value type
-
+   *  tstmt = tvar = : type  // Value type
+   *
    *  Value types are final-assigned; all fields are final and immutable.
    *  Fields not otherwise assigned are required by the constructor.  The
    *  constructor wraps the fields with a simple name; the result is not
@@ -251,28 +258,24 @@ public class Parse implements Comparable<Parse> {
    *  "class" object).
    *
    *
-   *  tstmt = tvar := :type // Reference type
+   *  tstmt = tvar = : [?!]type // Reference type
    *
    *  Reference types are mutable-assigned; fields are mutable by default and
    *  mutable fields are not filled in by the constructor.  The constructors do
    *  allocation; the result has an identity, an explicit lifetime needing
    *  management, and uses pointer-comparison.  As with value types, fields set
    *  with final constant expressions are moved to the prototype.
-   *
    */
   private Node tstmt() {
     int oldx = _x;
     String tok = token();      // Scan for tvar
-    if( tok == null ) return null;
+    if( tok == null || !peek('=') || !peek(':') )
+      { _x=oldx; return null; } // Not a type assignment
+    byte c = skipWS();
+    if( c == -1 ) return null;  // No next character
     tok = tok.intern();
-    // Look for "= :type" for a val-type and ":= :type" for a ref-type.
-    boolean is_val;
-    if( peek(":=") ) is_val=false;    // Ref type
-    else if( peek('=') ) is_val=true; // Val type
-    else { _x=oldx; return null; }    // Not a type assignment
-    if( !peek(':') ) { _x=oldx; return null; } // Not a type assignment
-    if( skipWS() == -1 ) return null;
     String tname = (tok+":").intern(); // As a type name
+    boolean is_val = !(c=='?' || c=='!'); // Value vs reference type
 
     // Types are forward-defined in two contexts, so either or both might
     // already have happened: as a type (in a type annotation) and as a
@@ -292,31 +295,42 @@ public class Parse implements Comparable<Parse> {
     else if( typenode.is_forward_type() ) typenode._is_val = is_val;
     else throw unimpl(); // Double-define error
 
-    // Parse a 'fact' as a type.  Check for a 'struct' first, to pass along the
-    // pre-selected forward-ref alias.  Other 'fact's will not use the alias.
-    Node newtype = peek("@{") ? struct(typenode) : fact();
-    if( newtype==null ) return err_ctrl2("Missing type after ':'");
-    if( peek('?')     ) return err_ctrl2("Named types are never nil");
-    // TODO: pattern changes, returns NewNode directly and updates MrgProjNode
-    assert is_val || newtype instanceof NewNode; // Ref types are only structs
-    typenode.define();                           // No longer a forward ref
+    // Nest an environment for parsing named type contents, usually const-expr initializers
+    int pidx;
+    try( Env e = new Env(_e, null, false, ctrl(), mem(), _e._scope.stk(), typenode) ) {
+      _e = e;                   // Push nested environment
 
-    // Build a constructor
-    if( newtype instanceof NewNode nnn ) {
-      if( is_val ) {
-        // Build a default constructor, add to the pile of constructors
-        construct.add_def(nnn.defalt().fill());
-        construct.define();     // Value type is defined
-        return Env.GVN.add_flow(construct);
-      } else
-        throw unimpl();         // Reference type
+      Type newtype = type(false,typenode);
+      if( newtype==null ) return err_ctrl2("Missing type after ':'");
 
-    } else {
-      // Other types?  e.g. defining a named function-type needs a breakdown of
-      // the returned function to make a TypeFunSig.  No constructor in this
-      // case, but can be used in type-checks.
-      throw unimpl();
-    }
+      // Value or reference type
+      if( newtype instanceof TypeMemPtr ) {
+        typenode.set_fld(TypeFld.NO_DSP,Env.ANY);
+        typenode.close();
+        typenode.define();                           // No longer a forward ref
+        if( is_val ) {
+          // Build a default constructor, add to the pile of constructors
+          construct.add_def(typenode.defalt().fill());
+          construct.define();     // Value type is defined
+          Env.GVN.add_flow(construct);
+        } else
+          throw unimpl();         // Reference type
+
+      } else {
+        // Other types?  e.g. defining a named function-type needs a breakdown of
+        // the returned function to make a TypeFunSig.  No constructor in this
+        // case, but can be used in type-checks.
+        // TODO: Need to toss the un-needed typenodeb
+        throw unimpl();
+      }
+
+      e._par._scope.set_ctrl(ctrl()); // Carry any control changes back to outer scope
+      e._par._scope.set_mem (mem ()); // Carry any memory  changes back to outer scope
+      _e = e._par;                    // Pop nested environment
+      pidx = construct.push();        // A pointer to the constructed object
+    } // Pop lexical scope around type parse
+
+    return Node.pop(pidx);
   }
 
   /** A statement is a list of variables to final-assign or re-assign, and an
@@ -369,7 +383,7 @@ public class Parse implements Comparable<Parse> {
       // p? x : nontype ... part of trinary
       Parse badt = errMsg();    // Capture location in case of type error
       if( peek(":=") ) _x=oldx2; // Avoid confusion with typed assignment test
-      else if( peek(':') && (t=type())==null ) { // Check for typed assignment
+      else if( peek(':') && (t=type(true,null))==null ) { // Check for typed assignment
         if( scope().test_if() ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
         else err_ctrl0("Missing type after ':'");
       }
@@ -448,42 +462,43 @@ public class Parse implements Comparable<Parse> {
     if( expr == null ) return null; // Expr is required, so missing expr implies not any ifex
     if( !peek('?') ) return expr;   // No if-expression
 
-    scope().push_if();            // Start if-expression tracking new defs
-    int omem_x = mem().push();  // Keep until parse false-side    
+    scope().push_if();          // Start if-expression tracking new defs
+    int omem_x = mem().push();  // Keep until parse false-side
     Node ifex = init(new IfNode(ctrl(),expr));
     int ifex_x = ifex.push();   // Keep until parse false-side
     set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch
     Node t_exp = stmt(false);               // Parse true expression
     if( t_exp == null ) t_exp = err_ctrl2("missing expr after '?'");
-    Node omem = Node.pop(omem_x);  // Unstack the two 
     ifex      = Node.pop(ifex_x);
+    Node omem = Node.pop(omem_x); // Unstack the two
     int t_exp_x = t_exp .push();  // Keep until merge point
     int t_ctl_x = ctrl().push();  // Keep until merge point
     int t_mem_x = mem ().push();  // Keep until merge point
 
-    scope().flip_if();          // Flip side of tracking new defs
-    set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch
+    scope().flip_if();       // Flip side of tracking new defs
     set_mem(omem);           // Reset memory to before the IF for the other arm
+    set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch
     Node f_exp = peek(':') ? stmt(false) : con(Type.XNIL);
     if( f_exp == null ) f_exp = err_ctrl2("missing expr after ':'");
     Node f_ctl = ctrl();
     Node f_mem = mem ();
-    
+
     Node t_mem = Node.pop(t_mem_x);
     Node t_ctl = Node.pop(t_ctl_x);
     t_exp      = Node.pop(t_exp_x);
-    
+
     Parse bad = errMsg();
     t_mem = scope().check_if(true ,bad,_gvn,t_ctl,t_mem); // Insert errors if created only 1 side
-    f_mem = scope().check_if(false,bad,_gvn,f_ctl,f_mem); // Insert errors if created only 1 side    
+    f_mem = scope().check_if(false,bad,_gvn,f_ctl,f_mem); // Insert errors if created only 1 side
     scope().pop_if();         // Pop the if-scope
-    
+
     // Merge results
-    RegionNode r = set_ctrl(init(new RegionNode(null,t_ctl,f_ctl)));    
+    RegionNode r = set_ctrl(init(new RegionNode(null,t_ctl,f_ctl)));
     set_mem(   init(new PhiNode(TypeMem.ALLMEM,bad,r,t_mem,f_mem)));
     Node rez = init(new PhiNode(Type.SCALAR   ,bad,r,t_exp,f_exp)) ; // Ifex result
-    
-    assert Env.START.more_work(true) == 0; // Initial conditions are correct
+
+    Env.GVN.add_work_new(f_exp);
+    Env.GVN.add_work_new(t_exp);
     return rez;
   }
 
@@ -781,7 +796,7 @@ public class Parse implements Comparable<Parse> {
     int oldx = _x;
     Parse bad = errMsg();
     if( !peek(':') ) { _x = oldx; return fact; }
-    Type t = type();
+    Type t = type(false,null);
     if( t==null ) { _x = oldx; return fact; } // No error for missing type, because can be ?: instead
     return typechk(fact,t,mem(),bad);
   }
@@ -789,7 +804,6 @@ public class Parse implements Comparable<Parse> {
   private Node typechk(Node x, Type t, Node mem, Parse bad) {
     return t == null || x._val.isa(t) ? x : gvn(new AssertNode(mem,x,t,bad,_e));
   }
-
 
 
   /** Parse a factor, a leaf grammar token
@@ -828,7 +842,7 @@ public class Parse implements Comparable<Parse> {
     if( peek1(c,'{') ) return func();
 
     // Anonymous struct
-    if( peek2(c,"@{") ) return struct(null);
+    if( peek2(c,"@{") ) return struct();
 
     // Primitive parsing only, directly get a Java intrinsic implementation
     if( _prims && peek2(c,"$$") ) return java_class_node();
@@ -898,9 +912,9 @@ public class Parse implements Comparable<Parse> {
    *  Field syntax:
    *    id [:type] [amod [expr]]  // missing amod defaults to "id := 0"; missing expr defaults to "0"
    */
-  private Node struct(NewNode fref) {
+  private Node struct() {
     int oldx = _x-1, pidx;      // Opening @{
-    try( Env e = new Env(_e, null, false, ctrl(), mem(), _e._scope.stk(), fref) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e, null, false, ctrl(), mem(), _e._scope.stk(), null) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
@@ -948,7 +962,7 @@ public class Parse implements Comparable<Parse> {
       Type t = Type.SCALAR;    // Untyped, most generic type
       Parse bad = errMsg();    // Capture location in case of type error
       if( peek(':') &&         // Has type annotation?
-          (t=type())==null ) { // Get type
+          (t=type(true,null))==null ) { // Get type
         // If no type, might be "{ x := ...}" or "{ fun arg := ...}" which can
         // be valid stmts, hence this may be a no-arg function.
         if( bads._len-1 <= 2 ) { _x=oldx; break; }
@@ -1240,48 +1254,97 @@ public class Parse implements Comparable<Parse> {
     throw unimpl();
   }
 
-  ///** Parse a type or return null
-  // *  type = tvar | tfun[?] | tstruct[?] | ttuple[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nilable'
-  // *  tvar = id                      // Type variable lookup; includes primitive types 'int' 'flt' etc
-  // *  tfun = {[[type]* ->]? type }   // Function types mirror func declarations
-  // *  ttuple = ( [[type],]* )        // Tuple types are just a list of optional types;
-  // *                                 // the count of commas dictates the length, zero commas is zero length.
-  // *                                 // Tuple fields are always final.
-  // *  tstruct = struct               // semantics depends on val-type vs ref-type
-  // *  Unknown tokens when type_var is false are treated as not-a-type.  When
-  // *  true, unknown tokens are treated as a forward-ref new type.
-  // */
-  private Type type() {
+  /*
+   *  type = tcon | tid | tvar | [?!]tptr | [?]tfun // "?" is nilable-ref, "!" is not-nil ref, missing is value-type
+   *  tptr = tary | tstruct | ttuple
+   *  tid  = type identifier         // NOT all-upper-case; LHS of type assignment
+   *  tvar = HM type variable        // ALL upper-case; scoped this type expr only
+   *  tcon = = ifex                  // Noticed extra '=', must bake down to a constant; usually for fcns
+   *  tfun = { [[type]* -> ]? type } // Mirrors func decls; ie. map=: {{A->B} [A] -> [B]}
+   *  tary = [type]                  // Array types
+   *  ttuple = ( [[type],]* )        // Tuple types are just a list of optional types;
+   *                                 // the count of commas dictates the length, zero commas is zero length.
+   *                                 // Tuple fields are always final.
+   *  tstruct= [tid:]@{ [tfld;]* };  // Optional named type to extend, list of fields
+   *  tfld = id [:type | tcon]       // Field name, option type or const-expr
+   */
+  private Type type(boolean allow_fref, NewNode proto) {
     if( _prims && peek("$#") ) return java_class_type();
 
-    // Parse a type as a 'fact'
-    Node nt = fact();
+    // First character to split type out:
+    return switch( skipWS() ) {
+    case '{' -> throw unimpl(); // Function parse
+    case '@' -> tstruct(proto); // Struct parse
+    case '[' -> throw unimpl(); // Array parse
+    case '(' -> throw unimpl(); // Tuple parse
+    case '=' -> throw unimpl(); // Const ifex parse
+    case '?' -> throw unimpl(); //     Nilable-ref parse
+    case '!' -> throw unimpl(); // Not-nilable-ref parse
+    default  -> tid(allow_fref);// TID/TVAR parse
+    };
+  }
 
-    // Check for named type
-    if( nt instanceof FreshNode frsh ) { nt = frsh.id(); Env.GVN.add_dead(frsh); }
-    if( nt instanceof UnresolvedNode unr ) { // Unresolved/forward-ref constructor for named type
-      String tname = (unr._name+":").intern();
-      NewNode typenode = _e.lookup_type(tname);
-      if( typenode==null ) typenode=type_fref(tname,false); // Must be a forward-ref type
-      return typenode.defalt()._val;
+  // Parse a struct type.  Side-effect constant fields into proto.
+  private TypeMemPtr tstruct(NewNode proto) {
+    if( !peek("@{") ) return null;
+    // Parse fields
+    while( true ) {
+      // Parse a field token
+      String tok = token();
+      if( tok==null ) break;
+      tok = tok.intern();
+      // Parse the field type
+      Node val;  Type t;   Access access;
+      if( peek('=') ) {
+        access = Access.Final;
+        val = tcon();           // Arbitrary AA const-expr, not a type
+        t = val._val;           // Type from the parse-time node type.
+        Oper.make(tok);
+        if( val instanceof FunPtrNode fptr )
+          fptr.bind(tok);       // Debug only: give name to function
+      } else {
+        access = Access.RW;     // Arbitrary AA type, not const-expr
+        t = peek(':') ? type(true,null) : Type.SCALAR;
+        val = con(t);
+      }
+      // Insert the field into the structure.
+      // FunPtrs are allowed to stack, if the signatures do not overlap.
+      TypeFld tfld = TypeFld.make(tok.intern(),t,access,proto.len());
+      if( val instanceof FunPtrNode fptr ) {
+        if( proto.fld(tok)==null ) proto.add_fld(tfld,val,null);
+        proto.add_fun(null,tok,fptr);
+      } else {
+        proto.add_fld(tfld,val,null);
+      }
+      if(  peek('}') ) break;          // End of struct,  no trailing semicolon?
+      if( !peek(';') ) throw unimpl(); // Not a type
+      if(  peek('}') ) break;          // End of struct, yes trailing semicolon?
     }
-    if( nt instanceof FunPtrNode fptr ) { // Constructor for named type
-      String tvar = fptr._name;
-      return _e.lookup_type(tvar).defalt()._val;
-    }
+    return (TypeMemPtr)proto._val;
+  }
 
-    //return typep(false);
-    throw unimpl();
-    // TODO: NO TYPE SYNTAX
-    // Just call 'fact' and look at the result.
-    // Must be a Node of the correct flavor:
-    //   structs,tuples turned into anon type structs; keeps fields, Access, given types.
-    //   arrays very similar
-    //   funcs are weird yet: { x:int y:flt -> :MyCoolType } ; args all unused but types are collected out
-    //   ConTypes are OK, just a named wrapper
-    //   Unresolved: fref to a type?
-    //   other Nodes are Exprs, Not a Type, so an Error.
-    //     Wrap with constructor, but include error test for post-GCP
+  // Parse an const ifex.
+  private Node tcon() {
+    Node n = ifex();
+    if( n==null ) throw unimpl(); // Missing ifex expecting a const-expr
+    if( !n._val.is_con() ) throw unimpl(); // Not a const expr
+    return n;
+  }
+
+  // Type-id or type-var parse
+  private Type tid(boolean allow_fref) {
+    String tok = token();
+    if( tok==null ) return null;
+    if( Util.isUpperCase(tok) )
+      throw unimpl();           // Reserved for type variables
+    String tname = (tok+":").intern();
+    NewNode nnn = _e.lookup_type(tname);
+    if( nnn == null ) {
+      if( !allow_fref )
+        return null;
+      nnn = type_fref(tname,false); // None, so create
+    }
+    return nnn.defalt()._val;
   }
 
   // Create a value forward-reference.  Must turn into a function call later.

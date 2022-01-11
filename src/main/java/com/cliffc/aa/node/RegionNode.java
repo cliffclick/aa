@@ -7,8 +7,6 @@ import com.cliffc.aa.type.TypeMem;
 
 import java.util.function.Predicate;
 
-import static com.cliffc.aa.AA.unimpl;
-
 // Merge results.  Supports many merging paths; used by FunNode and LoopNode.
 public class RegionNode extends Node {
   public RegionNode( Node... ctrls) { super(OP_REGION,ctrls); }
@@ -54,22 +52,21 @@ public class RegionNode extends Node {
       // Self-dead-cycle is dead in value() call
       return in(1)==this ? null : in(1);
     }
-    //// Check for empty diamond
-    //if( dlen==3 ) {             // Exactly 2 live paths
-    //  Node nif = in(1).in(0);
-    //  if( in(1) instanceof CProjNode && nif==in(2).in(0) && nif instanceof IfNode ) {
-    //    // Must have no phi uses
-    //    for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;
-    //    return nif.in(0);
-    //  }
-    //}
-    //
-    //// Check for stacked Region (not Fun) and collapse.
-    //Node stack = stacked_region();
-    //if( stack != null ) return stack;
-    //
-    //return null;
-    throw unimpl();
+    // Check for empty diamond
+    if( _defs._len==3 ) {             // Exactly 2 live paths
+      Node nif = in(1).in(0);
+      if( in(1) instanceof CProjNode && nif==in(2).in(0) && nif instanceof IfNode ) {
+        // Must have no phi uses
+        for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;
+        return nif.in(0);
+      }
+    }
+
+    // Check for stacked Region (not Fun) and collapse.
+    Node stack = stacked_region();
+    if( stack != null ) return stack;
+
+    return null;
   }
 
   @Override public void add_flow_def_extra(Node chg) {
