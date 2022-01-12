@@ -495,9 +495,9 @@ public class CallNode extends Node {
   }
 
   public CallEpiNode cepi() {
-    for( Node cepi : _uses )    // Find CallEpi for bypass aliases
-      if( cepi instanceof CallEpiNode )
-        return (CallEpiNode)cepi;
+    for( Node xcepi : _uses )    // Find CallEpi for bypass aliases
+      if( xcepi instanceof CallEpiNode cepi )
+        return cepi;
     return null;
   }
 
@@ -505,7 +505,10 @@ public class CallNode extends Node {
     if( !_is_copy ) return null;
     if( _val==Type.ANY ) return Env.ANY;
     if( idx!=DSP_IDX ) return in(idx);
-    if( fdx() instanceof FunPtrNode fptr ) return fptr.display();
+    if( fdx() instanceof FunPtrNode fptr ) {
+      Env.GVN.add_flow(fptr);   // Probably goes unused
+      return fptr.display();
+    }
     throw unimpl(); // Need a FP2DISP
   }
   void set_rpc(int rpc) { unelock(); _rpc=rpc; } // Unlock before changing hash
@@ -513,8 +516,7 @@ public class CallNode extends Node {
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
-    if( !(o instanceof CallNode) ) return false;
-    CallNode call = (CallNode)o;
+    if( !(o instanceof CallNode call) ) return false;
     return _rpc==call._rpc;
   }
   public Node[] parms() {

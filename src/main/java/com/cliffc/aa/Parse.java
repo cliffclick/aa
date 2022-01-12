@@ -309,10 +309,11 @@ public class Parse implements Comparable<Parse> {
         typenode.close();
         typenode.define();                           // No longer a forward ref
         if( is_val ) {
-          // Build a default constructor, add to the pile of constructors
-          construct.add_def(typenode.defalt().fill());
-          construct.define();     // Value type is defined
-          Env.GVN.add_flow(construct);
+          //// Build a default constructor, add to the pile of constructors
+          //construct.add_def(typenode.defalt().fill());
+          //construct.define();     // Value type is defined
+          //Env.GVN.add_flow(construct);
+          if( true ) throw unimpl();
         } else
           throw unimpl();         // Reference type
 
@@ -942,9 +943,7 @@ public class Parse implements Comparable<Parse> {
     // Push an extra hidden display argument.  Similar to java inner-class ptr
     // or when inside a struct definition: 'this'.
     NewNode par_stk = scope().stk();
-    // If this is an instance function, get the default instance for the
-    // display instead of the enclosing lexical scope.
-    Node dsp = par_stk._tname==null ? par_stk : par_stk.defalt();
+    Node dsp = par_stk;
 
     // Incrementally build up the formals
     TypeStruct formals = TypeStruct.make("",false, TypeFld.make_dsp(par_stk._tptr));
@@ -1009,13 +1008,7 @@ public class Parse implements Comparable<Parse> {
       for( TypeFld fld : formals ) { // User parms start
         if( fld._order <= DSP_IDX ) continue;// Already handled
         assert fun==_e._fun && fun==_e._scope.ctrl();
-        Node defalt = Env.ALL_PARM;
-        // If we find a named tvar, use the default prototype for the default input.
-        if( fld._t instanceof TypeMemPtr tmp && tmp._obj._name.length()>0 ) {
-          defalt = e.lookup_type(tmp._obj._name).defalt();
-          assert fld._t==defalt._val;
-        }
-        Node parm = gvn(new ParmNode(fld,fun,defalt,errmsg));
+        Node parm = gvn(new ParmNode(fld,fun,Env.ALL_PARM,errmsg));
         scope().stk().add_fld(fld,parm,bads.at(fld._order-ARG_IDX));
       }
       stk.set_nargs(formals.len());
@@ -1210,15 +1203,9 @@ public class Parse implements Comparable<Parse> {
     _x = _pp.getIndex();
     if( n instanceof Long   ) {
       if( _buf[_x-1]=='.' ) _x--; // Java default parser allows "1." as an integer; pushback the '.'
-      TypeInt ti = TypeInt.con(n.longValue());
-      Node unr = _e.lookup("int");
-      return do_call(null,ctrl(),mem(),unr,con(ti));
+      return con(TypeInt.con(n.longValue()));
     }
-    if( n instanceof Double ) {
-      TypeFlt tf = (TypeFlt)TypeFlt.con(n.doubleValue());
-      Node unr = _e.lookup("flt");
-      return do_call(null,ctrl(),mem(),unr,con(tf));
-    }
+    if( n instanceof Double ) return con(TypeFlt.con(n.doubleValue()));
     throw new RuntimeException(n.getClass().toString()); // Should not happen
   }
   // Parse a small positive integer; WS already skipped and sitting at a digit.
@@ -1310,12 +1297,8 @@ public class Parse implements Comparable<Parse> {
       // Insert the field into the structure.
       // FunPtrs are allowed to stack, if the signatures do not overlap.
       TypeFld tfld = TypeFld.make(tok.intern(),t,access,proto.len());
-      if( val instanceof FunPtrNode fptr ) {
-        if( proto.fld(tok)==null ) proto.add_fld(tfld,val,null);
-        proto.add_fun(null,tok,fptr);
-      } else {
-        proto.add_fld(tfld,val,null);
-      }
+      if( val instanceof FunPtrNode fptr ) proto.add_fun(tok ,fptr,null);
+      else                                 proto.add_fld(tfld, val,null);
       if(  peek('}') ) break;          // End of struct,  no trailing semicolon?
       if( !peek(';') ) throw unimpl(); // Not a type
       if(  peek('}') ) break;          // End of struct, yes trailing semicolon?
@@ -1344,7 +1327,8 @@ public class Parse implements Comparable<Parse> {
         return null;
       nnn = type_fref(tname,false); // None, so create
     }
-    return nnn.defalt()._val;
+    //return nnn.defalt()._val;
+    throw unimpl(); // todo: just nnn?
   }
 
   // Create a value forward-reference.  Must turn into a function call later.
@@ -1367,11 +1351,8 @@ public class Parse implements Comparable<Parse> {
     NewNode tn = new NewNode(false,is_val,true,tname,BitsAlias.new_alias());
     tn._val = tn.value();
     _gvn.add_work_new(tn);
-    ValNode def = tn.defalt();
-    def._val = def.value();
-    _gvn.add_work_new(def);
-    assert tn.is_forward_type();
     _e.add_type(tname,tn);
+    assert tn.is_forward_type();
     return tn;
   }
 

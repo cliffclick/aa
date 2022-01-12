@@ -5,8 +5,6 @@ import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.VBitSet;
 
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.*;
 
 // An "environment", a lexical Scope tracking mechanism that runs 1-for-1 in
@@ -91,20 +89,7 @@ public class Env implements AutoCloseable {
     SCP_0 = TOP._scope;
     STK_0 = SCP_0.stk();
     PrimNode.PRIMS();           // Initialize
-
-    // Parse PRIM_SOURCE for the primitives
-    try {
-      // Loading from a file is a Bad Idea in the long run
-      byte[] encoded = Files.readAllBytes(Paths.get("./src/main/java/com/cliffc/aa/_prims.aa"));
-      String prog = new String(encoded);
-      ErrMsg err = new Parse("PRIMS",true,TOP,prog).prog();
-      TOP._scope.set_rez(Node.con(Type.SCALAR));
-      Env.GVN.iter();
-      TOP._scope.walk_record_for_reset();  Env.GVN.flow_clear();
-      TypeEnv te = TOP.gather_errors(err);
-      assert te._errs==null && te._t==Type.SCALAR; // Primitives parsed fine
-    } catch( Exception e ) { throw new RuntimeException(e); } // Unrecoverable
-    record_for_reset();
+    record_for_reset();         // Record for reset between tests
   }
 
 

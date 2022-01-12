@@ -174,7 +174,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     old._uses.del(this);
     // Either last use of old & goes dead, or at least 1 fewer uses & changes liveness
     Env.GVN.add_unuse(old);
-    if( old._uses._len!=0 ) old.add_flow_def_extra(this);
+    old.add_flow_def_extra(this);
     return this;
   }
 
@@ -746,15 +746,6 @@ public abstract class Node implements Cloneable, IntSupplier {
     for( Node use : _uses )                   use.walk_initype();
     for( Node def : _defs ) if( def != null ) def.walk_initype();
   }
-
-  public final void walk_record_for_reset( ) {
-    if( Env.GVN.on_flow(this) ) return; // Been there, done that
-    Env.GVN.add_flow(this);
-    for( Node use : _uses )                   use.walk_record_for_reset();
-    for( Node def : _defs ) if( def != null ) def.walk_record_for_reset();
-    record_for_reset();
-  }
-  void record_for_reset() { }
 
   // Reset
   public final void walk_reset( ) {

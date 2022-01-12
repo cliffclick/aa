@@ -8,14 +8,16 @@ import static com.cliffc.aa.AA.unimpl;
 
 No leading expr, but required trailing expr e1:
 
-  - Normal uni-op parse; no other uni-op chars allowed.
+  - Normal uni-op parse; no other uni-op chars allowed.  No trailing suffix can
+    match another uniop.  Disallowed: "#!" as a uniop because suffix "!" is
+    already a uniop.  Similarly disallowed: "++", "--", "!!", etc.   
   - Examples:  ~e1     ;  +3     ;  -2     ;  !7    ;  ~##e1
     Called as:  e1.~_();   3.+_();   2.-_();  7.!_();  e1.~##_()
 
   - First char is "[" or 2nd or later is "{" or "<"; trailing op chars allowed.
     No other uni-op chars allowed.
     Requires a closing ">" or "}" or "]" op token, without an '='.
-  - Examples:   [3]    ;  [% e1 %]
+  - Examples:  [3]     ;  [% e1 %]
     Called as:  3.[_]();     e1.[%_%]()
 
 Leading expr, required no trailing expr
@@ -58,14 +60,15 @@ public class Oper {
   static boolean isOp1(byte c) { return isOp0(c) || ":?_{}".indexOf(c) != -1; }
 
   // Precedence is based on the single first non-'_' character
-  public static final int MAX_PREC=6; // Max level is used by recursive-descent Parser
+  public static final int MAX_PREC=7; // Max level is used by recursive-descent Parser
   private static int prec(char c) {
     return switch( c ) {
-    case '*', '/', '%'      -> 5; // includes //
-    case '+', '-'           -> 4; // includes ++, --
-    case '<', '>', '=', '!' -> 3; // includes <, <=, >, >=, ==, !=, <<, >>, etc.
-    case '&'                -> 2; // includes &&
-    case '|'                -> 1; // includes ||
+    case '*', '/', '%' -> 6; // includes //
+    case '+', '-'      -> 5; // includes ++, --
+    case '<', '>'      -> 4; // includes <, <=, >, >=, <<, >>, etc.
+    case '=', '!'      -> 3; // includes ==, !=
+    case '&'           -> 2; // includes &&
+    case '|'           -> 1; // includes ||
     default -> throw unimpl();
     };
   }

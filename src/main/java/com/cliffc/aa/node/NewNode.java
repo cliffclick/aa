@@ -10,6 +10,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Arrays;
 
 import static com.cliffc.aa.AA.DSP_IDX;
+import static com.cliffc.aa.type.TypeFld.Access;
 
 // Allocates a TypeStruct
 //
@@ -81,16 +82,12 @@ public class NewNode extends Node {
   public NewNode( boolean closure, boolean is_val, boolean forward_ref, String tname, int alias ) {
     super(OP_NEW, null, null);
     assert !closure || tname==null;
+    _reset_alias = alias;
     _is_closure = closure;
     _is_val = is_val;
     _forward_ref = forward_ref;
     _tname=tname;
     _init( alias, TypeStruct.EMPTY);
-    if( tname!=null ) {    // Named type?
-      Node defalt = new ValNode(null);
-      defalt.add_def(this);
-      set_def(1,defalt);
-    }
   }
 
   private void _init(int alias, TypeStruct ts) {
@@ -105,7 +102,6 @@ public class NewNode extends Node {
   }
   @Override public String xstr() { return "New"+"*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
-  @Override void record_for_reset() { _reset_alias=_alias; }
   void reset() { assert is_prim(); _init(_reset_alias,_ts); }
   @Override public boolean is_forward_type() { return _forward_ref; }
   public void define() { assert _forward_ref && _closed; _forward_ref=false; }
@@ -114,11 +110,6 @@ public class NewNode extends Node {
   // Strip the ':' off to make a value name from a type name.
   // Error if not a named NewNode.
   public String as_valname() { return _tname.substring(0,_tname.length()-1).intern(); }
-  // Default ValNode for this prototype.
-  public ValNode defalt() {
-    assert _tname!=null;
-    return (ValNode)in(1);
-  }
 
   public MrgProjNode mem() {
     for( Node use : _uses ) if( use instanceof MrgProjNode mrg ) return mrg;
@@ -142,19 +133,23 @@ public class NewNode extends Node {
     _ts = _ts.add_fldx(fld);     // Will also assert no-dup field names
     add_def(val);
     xval(); // Eagerly update the type
-    Env.GVN.add_flow(this);
     Env.GVN.add_flow_uses(this);
   }
 
   // Add a named FunPtr to a New.  Auto-inflates to an Unresolved as needed.
-  public void add_fun( Parse bad, String name, FunPtrNode ptr ) {
+  public void add_fun( String name, FunPtrNode fptr, Parse bad ) {
     assert !_closed;
+    if( _ts.get(name)==null ) {
+      TypeFld fld = TypeFld.make(name,fptr._val,Access.Final,len());
+      add_fld(fld,fptr,bad);
+      return;
+    }
     TypeFld fld = _ts.get(name);
     Node n = in(fld._order);
     UnresolvedNode unr = n instanceof UnresolvedNode
       ? (UnresolvedNode)n
       : new UnresolvedNode(name,bad).scoped();
-    unr.add_fun(ptr);           // Checks all formals are unambiguous
+    unr.add_fun(fptr);          // Checks all formals are unambiguous
     set_fld(fld.make_from(unr._val,fld._access),unr);
     xval();
   }

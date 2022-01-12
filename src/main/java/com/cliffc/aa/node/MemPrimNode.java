@@ -54,7 +54,7 @@ public abstract class MemPrimNode extends PrimNode {
     @Override public FunPtrNode clazz_node( ) {
       try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
         assert _defs._len==0 && _uses._len==0;
-        FunNode  fun = ( FunNode) X.xform(new  FunNode(_name,this));
+        FunNode  fun = ( FunNode) X.xform(new  FunNode(this));
         //ParmNode rpc = (ParmNode) X.xform(new ParmNode(TypeRPC.ALL_CALL,null,fun,0      ,"rpc"));
         //Node mem     =            X.xform(new ParmNode(TypeMem.MEM     ,null,fun,MEM_IDX," mem"));
         //add_def(null);              // Control for the primitive in slot 0

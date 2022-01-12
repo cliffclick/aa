@@ -168,10 +168,10 @@ public final class CallEpiNode extends Node {
     if( can_inline ) {
       Node irez = rrez.copy(false); // Copy the entire function body
       ProjNode proj = ProjNode.proj(this,REZ_IDX);
-      irez._live = proj==null ? TypeMem.ALIVE : proj._live;
-      for( Node parm : rrez._defs )
-        irez.add_def((parm instanceof ParmNode && parm.in(CTL_IDX) == fun) ? call.arg(((ParmNode)parm)._idx) : parm);
-      if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
+      irez._live = proj==null ? TypeMem.ALIVE : proj._live; // sharpen liveness to the call-site liveness
+      for( Node in : rrez._defs )
+        irez.add_def((in instanceof ParmNode parm && parm.in(CTL_IDX) == fun) ? ProjNode.proj(call,parm._idx) : in);
+      if( irez instanceof PrimNode prim ) prim._badargs = call._badargs;
       GVN.add_work_new(irez);
       return unwire(call,ret).set_is_copy(cctl,cmem,irez);
     }
@@ -456,7 +456,7 @@ public final class CallEpiNode extends Node {
     if( !(tcall instanceof TypeTuple) ) return tcall.above_center() ? TypeMem.DEAD : _live;
     BitsFun fidxs = CallNode.ttfp(tcall).fidxs();
     int fidx = ((RetNode)def).fidx();
-    if( fidxs.above_center() || !fidxs.test_recur(fidx) )
+    if( fidxs.above_center() || !fidxs.test_recur(fidx) || ((RetNode)def).mem()==null )
       return TypeMem.DEAD;    // Call does not call this, so not alive.
     return _live;
   }

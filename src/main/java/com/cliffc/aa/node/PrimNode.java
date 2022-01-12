@@ -19,7 +19,6 @@ public abstract class PrimNode extends Node {
   public final TypeFunPtr _tfp; // FIDX, nargs, display argument, return type
   public final TypeStruct _formals;
   Parse[] _badargs;             // Filled in when inlined in CallNode
-  public boolean _thunk_rhs;    // Thunk (delay) right-hand-argument.
   public PrimNode( String name, TypeStruct formals, Type ret ) {
     super(OP_PRIM);
     _name = name;
@@ -27,7 +26,6 @@ public abstract class PrimNode extends Node {
     _formals = formals;
     _tfp=TypeFunPtr.make(BitsFun.make0(fidx),formals.nargs(),TypeMemPtr.NO_DISP,ret);
     _badargs=null;
-    _thunk_rhs=false;
   }
 
   private static PrimNode[] PRIMS = null; // All primitives
@@ -36,35 +34,31 @@ public abstract class PrimNode extends Node {
   public static PrimNode[] PRIMS() {
     if( PRIMS!=null ) return PRIMS;
 
-    // Binary-operator primitives, sorted by precedence.
-    PrimNode[][] PRECEDENCE = new PrimNode[][]{
-
-      {new MulF64(), new DivF64(), new MulI64(), new DivI64(), new ModI64(), },
-
-      {new AddF64(), new SubF64(), new AddI64(), new SubI64() },
-
-      {new LT_F64(), new LE_F64(), new GT_F64(), new GE_F64(),
-       new LT_I64(), new LE_I64(), new GT_I64(), new GE_I64(),},
-
-      {new EQ_F64(), new NE_F64(), new EQ_I64(), new NE_I64(), new EQ_OOP(), new NE_OOP(), },
-
-      {new AndI64(), },
-
-      {new OrI64(), },
-
-      //{new AndThen(), },
-      //
-      //{new OrElse(), },
-
+    // int opers
+    PrimNode[] INTS = new PrimNode[]{
+      new MinusI64(), new Not(),
+      new MulI64(), new DivI64(), new ModI64(),
+      new AddI64(), new SubI64(),
+      new LT_I64(), new LE_I64(), new GT_I64(), new GE_I64(),
+      new EQ_I64(), new NE_I64(),
+      new AndI64(),
+      new OrI64 (),
     };
 
+    PrimNode[] FLTS = new PrimNode[]{
+      new MinusF64(),
+      new MulF64(), new DivF64(),
+      new AddF64(), new SubF64(),
+      new LT_F64(), new LE_F64(), new GT_F64(), new GE_F64(),
+      new EQ_F64(), new NE_F64()
+    };
     // Other primitives, not binary operators
     PrimNode[] others = new PrimNode[] {
       // These are called like a function, so do not have a precedence
       new RandI64(),
-
       new ConvertI64F64(),
 
+      //new EQ_OOP(), new NE_OOP(), new Not(),
       //// These are balanced-ops, called by Parse.term()
       //new MemPrimNode.ReadPrimNode.LValueRead  (), // Read  an L-Value: (ary,idx) ==> elem
       //new MemPrimNode.ReadPrimNode.LValueWrite (), // Write an L-Value: (ary,idx,elem) ==> elem
@@ -72,37 +66,58 @@ public abstract class PrimNode extends Node {
 
       // These are unary ops, precedence determined outside 'Parse.expr'
       //new MemPrimNode.ReadPrimNode.LValueLength(), // The other array ops are "balanced ops" and use term() for precedence
-      new MinusF64(),
-      new MinusI64(),
-      new Not(),
     };
 
+    // Gather
     Ary<PrimNode> allprims = new Ary<>(others);
     for( PrimNode prim : others ) allprims.push(prim);
-    for( PrimNode[] prims : PRECEDENCE )
-      for( PrimNode prim : prims )
-        allprims.push(prim);
+    for( PrimNode prim : INTS   ) allprims.push(prim);
+    for( PrimNode prim : FLTS   ) allprims.push(prim);
     PRIMS = allprims.asAry();
 
+    // Build the int and float types and prototypes
+    install("int",TypeInt.INT64,INTS);
+    install("flt",TypeFlt.FLT64,FLTS);
+    
     return PRIMS;
   }
 
-  // All primitives are effectively H-M Applies with a hidden internal Lambda.
-  @Override public boolean unify( boolean test ) {
-    boolean progress = false;
-    for( TypeFld fld : _formals )
-      progress |= prim_unify(tvar(fld._order),fld._t,test);
-    progress |= prim_unify(tvar(),_tfp._ret,test);
-    return progress;
+  private static void install( String s, Type t, PrimNode[] PRIMS ) {
+    String tname = (s+":").intern();
+    ConNode defalt = (ConNode)Node.con(t);
+    NewNode nnn = new NewNode(false,true,false,tname,BitsAlias.new_alias());
+    for( PrimNode prim : PRIMS ) prim.as_fun(nnn,defalt);
+    Env.GVN.init(nnn);
+    nnn.close();
+    Env.PROTOS.put(s,nnn);
+    Env.TOP._scope.add_type(tname,nnn);    
   }
-  private boolean prim_unify(TV2 arg, Type t, boolean test) {
-    if( arg.is_base() && t.isa(arg._flow) ) return false;
-    if( arg.is_err() ) return false;
-    if( test ) return true;
-    return arg.unify(TV2.make_base(this, arg._flow==null ? t : t.meet(arg._flow), "Prim_unify"),test);
+  
+  // Primitive wrapped as a simple function.
+  // Fun Parm_dsp [Parm_y] prim Ret
+  // No memory, no RPC.  Display is first arg.
+  private void as_fun( NewNode nnn, ConNode defalt ) {
+    String op = (switch( _tfp.nargs() ) {
+      case 4 -> "_";
+      case 3 -> "";
+      default -> throw unimpl();
+      }+_name+"_").intern();
+    Oper.make(op);
+      
+    Type tdef = _formals.get("^");
+    FunNode fun = (FunNode)Env.GVN.init(new FunNode(this).add_def(Env.ALL_CTRL));
+    add_def(null);              // No control
+    add_def(null);              // No memory
+    add_def(Env.GVN.init(new ParmNode(DSP_IDX,"^",fun,defalt,null)));
+    if( _tfp.nargs()==4 )
+      add_def(Env.GVN.init(new ParmNode(ARG_IDX,"y",fun,defalt,null)));
+    Env.GVN.init(this);
+    RetNode ret = Env.GVN.init(new RetNode(fun,null,this,null,fun));
+    FunPtrNode fptr =  Env.GVN.init(new FunPtrNode(_name,ret,Env.ALL));
+    nnn.add_fun(op,fptr,null);
   }
 
-
+  
   // Apply types are 1-based (same as the incoming node index), and not
   // zero-based (not same as the _formals and _args fields).
   public abstract Type apply( Type[] args ); // Execute primitive
@@ -143,6 +158,21 @@ public abstract class PrimNode extends Node {
     return progress;
   }
 
+  // All primitives are effectively H-M Applies with a hidden internal Lambda.
+  @Override public boolean unify( boolean test ) {
+    boolean progress = false;
+    for( TypeFld fld : _formals )
+      progress |= prim_unify(tvar(fld._order),fld._t,test);
+    progress |= prim_unify(tvar(),_tfp._ret,test);
+    return progress;
+  }
+  private boolean prim_unify(TV2 arg, Type t, boolean test) {
+    if( arg.is_base() && t.isa(arg._flow) ) return false;
+    if( arg.is_err() ) return false;
+    if( test ) return true;
+    return arg.unify(TV2.make_base(this, arg._flow==null ? t : t.meet(arg._flow), "Prim_unify"),test);
+  }
+
 
   @Override public ErrMsg err( boolean fast ) {
     for( TypeFld fld : _formals ) {
@@ -165,7 +195,7 @@ public abstract class PrimNode extends Node {
   }
 
   public static class ConvertI64F64 extends PrimNode {
-    public ConvertI64F64() { super("flt64",TypeStruct.INT64,TypeFlt.FLT64); }
+    public ConvertI64F64() { super("flt",TypeStruct.INT64,TypeFlt.FLT64); }
     @Override public Type apply( Type[] args ) { return TypeFlt.con((double)args[DSP_IDX].getl()); }
   }
 

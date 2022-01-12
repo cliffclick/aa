@@ -28,14 +28,25 @@ public class LoadNode extends Node {
   public TypeFld find(TypeStruct ts) { return ts.get(_fld); }
 
   @Override public Type value() {
-    Node adr = adr();
-    Type tadr = adr._val;
-    if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.oob();
-    // Loading from a Value type?
-    if( tmp._obj._name.length()>0 ) {
-      TypeFld fld = tmp._obj.get(_fld); // Local field?
-      return fld==null ? Type.SCALAR : fld._t;
+    Type tadr = adr()._val;
+    // Loading an operator from a primitive
+    NewNode proto = null;
+    if( tadr instanceof TypeInt ) proto = Env.PROTOS.get("int");
+    if( tadr instanceof TypeFlt ) proto = Env.PROTOS.get("flt");
+    if( tadr instanceof TypeFunPtr tfp && tfp._ret instanceof TypeMemPtr tmp && tmp.is_valtype() )
+      proto = Env.PROTOS.get(tmp._obj._name); // Get the prototype
+    // Load from the prototype
+    if( proto!=null ) {
+      int idx = proto.find(_fld);
+      if( idx!= -1 ) {
+        // Loading a unbound funptr, binds it to the address
+        Type t = proto.val(idx);
+        if( t instanceof TypeFunPtr tfp )
+          return tfp.make_from(tadr,tfp._ret); // Bind display to tadr
+      }
     }
+
+    if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.oob();
 
     // Loading from TypeMem - will get a TypeObj out.
     Node mem = mem();
@@ -105,50 +116,27 @@ public class LoadNode extends Node {
   @Override public Node ideal_reduce() {
     Node adr = adr();
     Type tadr = adr._val;
-
-    // Loading from a type constructor directly?
-    // Remap to the prototype.
-    // Not allowed to load from generic functions.
-    if( tadr instanceof TypeFunPtr tfp && tfp._ret instanceof TypeMemPtr tmp && tmp.is_valtype() ) {
-      NewNode proto = Env.PROTOS.get(tmp._obj._name); // Get the prototype
-      Node p = _proto_load(proto);
-      if( p!=null ) {
-        if( p._val instanceof TypeFunPtr ) throw unimpl(); // Produces an unbound bare code ptr, needs syntax to bind it
-        return p; // Normal field load
+    NewNode proto = null;
+    // Loading from a primitive?  Remap to the prototype
+    if( tadr instanceof TypeInt ) proto = Env.PROTOS.get("int");
+    if( tadr instanceof TypeFlt ) proto = Env.PROTOS.get("flt");
+    if( tadr instanceof TypeFunPtr tfp && tfp._ret instanceof TypeMemPtr tmp && tmp.is_valtype() )
+      proto = Env.PROTOS.get(tmp._obj._name); // Get the prototype
+    // Loading from the prototype
+    if( proto!=null ) {
+      int idx = proto.find(_fld);
+      if( idx!= -1 ) {
+        // Loading a unbound funptr, binds it to the address
+        Node n = proto.in(idx);
+        if( n instanceof FunPtrNode fptr )
+          return new FunPtrNode(fptr._name,fptr.ret(),adr);
+        else if( n instanceof UnresolvedNode unr )
+          throw unimpl();
+        return n;
       }
     }
 
     if( !(tadr instanceof TypeMemPtr tmp) ) return null;
-
-    // Loads from value types do not need the memory edge
-    if( tmp.is_valtype() ) {
-      if( mem()!=null ) return set_def(MEM_IDX,null);
-
-      // Instance load.  TFPs bind the address as the display.
-      NewNode proto = Env.PROTOS.get(tmp._obj._name); // Get the prototype
-      Node p = _proto_load(proto);
-      if( p!=null ) {           // Found a matching prototype field
-        assert proto != adr;    // Loading from type constructor handled above
-        // Instance calls get the address bound as the display
-        if( p._val instanceof TypeFunPtr ) {
-          int didx = switch( p ) {
-          case UnresolvedNode ignore1 -> 0;
-          case FunPtrNode ignore2 -> 1;
-          default -> throw unimpl();
-          };
-          if( p.in(didx) != null && p.in(didx)!=Env.ALL ) throw unimpl(); // Already bound?
-          return p.copy(true).set_def(didx,adr);
-        } else
-          // Some other prototype constant field
-          throw unimpl(); //return p;
-
-      } else if( adr instanceof ValNode val ) {
-        // Load direct from a Val
-        int idx = Util.find(val._flds,_fld);
-        assert idx!=-1; // Else type error, but maybe caught elsewhere
-        return val.in(idx);
-      }
-    }
 
     // If we can find an exact previous store, fold immediately to the value.
     Node st = find_previous_store(mem(),adr,tmp._aliases,_fld,true);
@@ -160,17 +148,6 @@ public class LoadNode extends Node {
     }
 
     return null;
-  }
-
-  private Node _proto_load(NewNode proto) {
-    if( proto==null ) return null;         // Not a prototype
-    // Is either a reference or a value type
-    TypeFld fld = proto.fld(_fld);
-    if( fld==null ) return null; // No such field in prototype
-    // For both, eager final fields are moved to the prototype.
-    if( fld._access!=TypeFld.Access.Final ) return null; // Not a final field in the prototype
-    // Load from the prototype
-    return proto.in(fld._order);
   }
 
 
