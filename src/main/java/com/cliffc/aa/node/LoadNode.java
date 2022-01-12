@@ -31,7 +31,8 @@ public class LoadNode extends Node {
     Type tadr = adr()._val;
     // Loading an operator from a primitive
     NewNode proto = null;
-    if( tadr instanceof TypeInt ) proto = Env.PROTOS.get("int");
+    if( tadr == Type.NIL || tadr == Type.XNIL ||
+        tadr instanceof TypeInt ) proto = Env.PROTOS.get("int");
     if( tadr instanceof TypeFlt ) proto = Env.PROTOS.get("flt");
     if( tadr instanceof TypeFunPtr tfp && tfp._ret instanceof TypeMemPtr tmp && tmp.is_valtype() )
       proto = Env.PROTOS.get(tmp._obj._name); // Get the prototype
@@ -118,7 +119,8 @@ public class LoadNode extends Node {
     Type tadr = adr._val;
     NewNode proto = null;
     // Loading from a primitive?  Remap to the prototype
-    if( tadr instanceof TypeInt ) proto = Env.PROTOS.get("int");
+    if( tadr == Type.NIL || tadr == Type.XNIL ||
+        tadr instanceof TypeInt ) proto = Env.PROTOS.get("int");
     if( tadr instanceof TypeFlt ) proto = Env.PROTOS.get("flt");
     if( tadr instanceof TypeFunPtr tfp && tfp._ret instanceof TypeMemPtr tmp && tmp.is_valtype() )
       proto = Env.PROTOS.get(tmp._obj._name); // Get the prototype
@@ -131,7 +133,7 @@ public class LoadNode extends Node {
         if( n instanceof FunPtrNode fptr )
           return new FunPtrNode(fptr._name,fptr.ret(),adr);
         else if( n instanceof UnresolvedNode unr )
-          throw unimpl();
+          return unr.copy(true).set_def(0,adr);
         return n;
       }
     }

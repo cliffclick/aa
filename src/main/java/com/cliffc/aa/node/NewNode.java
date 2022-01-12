@@ -148,7 +148,7 @@ public class NewNode extends Node {
     Node n = in(fld._order);
     UnresolvedNode unr = n instanceof UnresolvedNode
       ? (UnresolvedNode)n
-      : new UnresolvedNode(name,bad).scoped();
+      : new UnresolvedNode(name,bad).scoped().add_fun((FunPtrNode)n);
     unr.add_fun(fptr);          // Checks all formals are unambiguous
     set_fld(fld.make_from(unr._val,fld._access),unr);
     xval();

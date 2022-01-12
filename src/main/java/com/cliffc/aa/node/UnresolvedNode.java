@@ -70,13 +70,14 @@ public class UnresolvedNode extends Node {
     for( int fidx : tfp._fidxs ) {
       FunPtrNode fptr = FunPtrNode.get(fidx);
       if( fptr.nargs() == tcall.length-1 ) {
-        Type formal = fptr.formal(ARG_IDX);
         Type actual = tcall[ARG_IDX];
-        if( actual.isa(formal) ) {
-          // TODO: If high, many choices be resolvable until args fall.
+        Type formal = fptr.formal(ARG_IDX);
+        if( actual.isa(formal) &&
+            !(actual.getClass()==TypeInt.class && formal.getClass()==TypeFlt.class) ) {
           assert choice == null; // Exactly zero or one fptr resolves
-          choice = fptr;          // Resolved choice
-          tfp = ((TypeFunPtr)fptr._val).make_from((TypeMemPtr)tcall[DSP_IDX]);
+          choice = fptr;         // Resolved choice
+          TypeFunPtr tfp2 = (TypeFunPtr)fptr._val;
+          tfp = tfp2.make_from(tcall[DSP_IDX],tfp2._ret);
         }
       }
     }
@@ -91,9 +92,10 @@ public class UnresolvedNode extends Node {
     for( int i=1; i<len(); i++ ) {
       FunPtrNode ptr = (FunPtrNode)in(i);
       if( ptr.nargs()==tcall.length-1 ) {
-        Type formal = ptr.formal(ARG_IDX); // formal
         Type actual = tcall     [ARG_IDX]; // actual
-        if( actual.isa(formal) ) {
+        Type formal = ptr.formal(ARG_IDX); // formal
+        if( actual.isa(formal) &&
+            !(actual.getClass()==TypeInt.class && formal.getClass()==TypeFlt.class) ) {
           assert choice == null; // Exactly zero or one fptr resolves
           choice = ptr;          // Resolved choice
           if( in(0)!=null ) {    // Has custom display
@@ -144,7 +146,7 @@ public class UnresolvedNode extends Node {
   // Add Another function to an Unresolved and return null, or return an ErrMsg
   // if this would add an ambiguous signature.  Different nargs are different.
   // Within functions with the same nargs
-  public void add_fun( FunPtrNode fptr) {
+  public UnresolvedNode add_fun( FunPtrNode fptr) {
     assert in(0)==null;         // No display if we are adding fptrs
     for( int i=1; i<len(); i++ ) {
       FunPtrNode f0 = (FunPtrNode)in(i);
@@ -158,6 +160,7 @@ public class UnresolvedNode extends Node {
     }
     add_def(fptr);
     Env.GVN.add_flow_uses(this); // Some calls can resolve
+    return this;
   }
 
   @Override public int hashCode() { return super.hashCode()+(_bad==null ? 0 : _bad.hashCode()); }

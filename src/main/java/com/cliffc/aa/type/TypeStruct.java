@@ -304,6 +304,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public  static final TypeStruct INT64 = args(TypeInt.INT64);     // { int -> }
   public  static final TypeStruct SCALAR1=args(SCALAR);            // { scalar -> }
   public  static final TypeStruct INT64_INT64= args(TypeInt.INT64,TypeInt.INT64); // { int int -> }
+  public  static final TypeStruct INT64_FLT64= args(TypeInt.INT64,TypeFlt.FLT64); // { int flt -> }
+  public  static final TypeStruct FLT64_INT64= args(TypeFlt.FLT64,TypeInt.INT64); // { flt int -> }
   public  static final TypeStruct FLT64_FLT64= args(TypeFlt.FLT64,TypeFlt.FLT64); // { flt flt -> }
 
   // Types for Liveness in slot 0 of TypeMem

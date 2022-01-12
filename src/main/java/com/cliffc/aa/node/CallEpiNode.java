@@ -488,8 +488,11 @@ public final class CallEpiNode extends Node {
     for( int i=DSP_IDX; i<margs; i++ ) {
       TV2 actual = call.tvar(i);
       TV2 formal = tfun.arg(TV2.argname(i));
-      progress |= actual.unify(formal,test);
-      if( progress && test ) return true; // Early exit
+      if( actual.unify(formal,test) ) {
+        if( test ) return true; // Early exit
+        progress=true;
+        tfun=tfun.find();
+      }
     }
     TV2 self = tvar();
     if( nargs != cargs && !tfun.is_err() && self._err==null ) { //

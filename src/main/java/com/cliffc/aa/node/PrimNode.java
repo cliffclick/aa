@@ -37,8 +37,8 @@ public abstract class PrimNode extends Node {
     // int opers
     PrimNode[] INTS = new PrimNode[]{
       new MinusI64(), new Not(),
-      new MulI64(), new DivI64(), new ModI64(),
-      new AddI64(), new SubI64(),
+      new MulI64(), new DivI64(), new MulIF64(), new DivIF64(), new ModI64(),
+      new AddI64(), new SubI64(), new AddIF64(), new SubIF64(),
       new LT_I64(), new LE_I64(), new GT_I64(), new GE_I64(),
       new EQ_I64(), new NE_I64(),
       new AndI64(),
@@ -47,15 +47,16 @@ public abstract class PrimNode extends Node {
 
     PrimNode[] FLTS = new PrimNode[]{
       new MinusF64(),
-      new MulF64(), new DivF64(),
-      new AddF64(), new SubF64(),
+      new MulF64(), new DivF64(), new MulFI64(), new DivFI64(),
+      new AddF64(), new SubF64(), new AddFI64(), new SubFI64(),
       new LT_F64(), new LE_F64(), new GT_F64(), new GE_F64(),
       new EQ_F64(), new NE_F64()
     };
     // Other primitives, not binary operators
+    PrimNode rand = new RandI64();
     PrimNode[] others = new PrimNode[] {
       // These are called like a function, so do not have a precedence
-      new RandI64(),
+      rand,
       new ConvertI64F64(),
 
       //new EQ_OOP(), new NE_OOP(), new Not(),
@@ -78,7 +79,10 @@ public abstract class PrimNode extends Node {
     // Build the int and float types and prototypes
     install("int",TypeInt.INT64,INTS);
     install("flt",TypeFlt.FLT64,FLTS);
-    
+
+    // Math package
+    install_math(rand);
+
     return PRIMS;
   }
 
@@ -87,12 +91,15 @@ public abstract class PrimNode extends Node {
     ConNode defalt = (ConNode)Node.con(t);
     NewNode nnn = new NewNode(false,true,false,tname,BitsAlias.new_alias());
     for( PrimNode prim : PRIMS ) prim.as_fun(nnn,defalt);
+    for( Node n : nnn._defs )
+      if( n instanceof UnresolvedNode unr )
+        Env.GVN.add_work_new(unr.define());
     Env.GVN.init(nnn);
     nnn.close();
     Env.PROTOS.put(s,nnn);
-    Env.TOP._scope.add_type(tname,nnn);    
+    Env.TOP._scope.add_type(tname,nnn);
   }
-  
+
   // Primitive wrapped as a simple function.
   // Fun Parm_dsp [Parm_y] prim Ret
   // No memory, no RPC.  Display is first arg.
@@ -103,21 +110,31 @@ public abstract class PrimNode extends Node {
       default -> throw unimpl();
       }+_name+"_").intern();
     Oper.make(op);
-      
-    Type tdef = _formals.get("^");
+
     FunNode fun = (FunNode)Env.GVN.init(new FunNode(this).add_def(Env.ALL_CTRL));
     add_def(null);              // No control
     add_def(null);              // No memory
     add_def(Env.GVN.init(new ParmNode(DSP_IDX,"^",fun,defalt,null)));
     if( _tfp.nargs()==4 )
-      add_def(Env.GVN.init(new ParmNode(ARG_IDX,"y",fun,defalt,null)));
+      add_def(Env.GVN.init(new ParmNode(ARG_IDX,"y",fun,(ConNode)Node.con(_formals.fld_idx(1,ARG_IDX)._t),null)));
     Env.GVN.init(this);
     RetNode ret = Env.GVN.init(new RetNode(fun,null,this,null,fun));
-    FunPtrNode fptr =  Env.GVN.init(new FunPtrNode(_name,ret,Env.ALL));
+    FunPtrNode fptr =  Env.GVN.init(new FunPtrNode(op,ret,Env.ALL));
     nnn.add_fun(op,fptr,null);
   }
 
-  
+  // Build and install match package
+  private static void install_math(PrimNode rand) {
+    NewNode nnn = new NewNode(false,false,false,null,BitsAlias.new_alias());
+    rand.as_fun(nnn,(ConNode)Node.con(TypeInt.INT64));
+    nnn.add_fld(TypeFld.make("pi",TypeFlt.PI,nnn.len()),Node.con(TypeFlt.PI),null);
+    nnn.close();
+    Env.GVN.init(nnn);
+    Env.STK_0.add_fld(TypeFld.make("math",nnn._val,Env.STK_0.len()),nnn,null);
+    Env.SCP_0.set_mem(Env.GVN.init(new MrgProjNode(nnn,Env.SCP_0.mem())));
+  }
+
+
   // Apply types are 1-based (same as the incoming node index), and not
   // zero-based (not same as the _formals and _args fields).
   public abstract Type apply( Type[] args ); // Execute primitive
@@ -206,10 +223,7 @@ public abstract class PrimNode extends Node {
     abstract double op( double d );
   }
 
-  static class MinusF64 extends Prim1OpF64 {
-    MinusF64() { super("-"); }
-    @Override double op( double d ) { return -d; }
-  }
+  static class MinusF64 extends Prim1OpF64 { MinusF64() { super("-"); } double op( double d ) { return -d; } }
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpI64 extends PrimNode {
@@ -218,10 +232,7 @@ public abstract class PrimNode extends Node {
     abstract long op( long d );
   }
 
-  public static class MinusI64 extends Prim1OpI64 {
-    public MinusI64() { super("-"); }
-    @Override long op( long x ) { return -x; }
-  }
+  static class MinusI64 extends Prim1OpI64 { MinusI64() { super("-"); } long op( long x ) { return -x; } }
 
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpF64 extends PrimNode {
@@ -230,25 +241,10 @@ public abstract class PrimNode extends Node {
     abstract double op( double x, double y );
   }
 
-  public static class AddF64 extends Prim2OpF64 {
-    public AddF64() { super("+"); }
-    double op( double l, double r ) { return l+r; }
-  }
-
-  public static class SubF64 extends Prim2OpF64 {
-    public SubF64() { super("-"); }
-    double op( double l, double r ) { return l-r; }
-  }
-
-  public static class MulF64 extends Prim2OpF64 {
-    public MulF64() { super("*"); }
-    @Override double op( double l, double r ) { return l*r; }
-  }
-
-  public static class DivF64 extends Prim2OpF64 {
-    public DivF64() { super("/"); }
-    @Override double op( double l, double r ) { return r==0 ? 0 : l/r; }
-  }
+  static class AddF64 extends Prim2OpF64 { AddF64() { super("+"); } double op( double l, double r ) { return l+r; } }
+  static class SubF64 extends Prim2OpF64 { SubF64() { super("-"); } double op( double l, double r ) { return l-r; } }
+  static class MulF64 extends Prim2OpF64 { MulF64() { super("*"); } double op( double l, double r ) { return l*r; } }
+  static class DivF64 extends Prim2OpF64 { DivF64() { super("/"); } double op( double l, double r ) { return l/r; } }
 
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpF64 extends PrimNode {
@@ -272,30 +268,31 @@ public abstract class PrimNode extends Node {
     abstract long op( long x, long y );
   }
 
-  public static class AddI64 extends Prim2OpI64 {
-    public AddI64() { super("+"); }
-    @Override long op( long l, long r ) { return l+r; }
-  }
+  static class AddI64 extends Prim2OpI64 { AddI64() { super("+"); } long op( long l, long r ) { return l+r; } }
+  static class SubI64 extends Prim2OpI64 { SubI64() { super("-"); } long op( long l, long r ) { return l-r; } }
+  static class MulI64 extends Prim2OpI64 { MulI64() { super("*"); } long op( long l, long r ) { return l*r; } }
+  static class DivI64 extends Prim2OpI64 { DivI64() { super("/"); } long op( long l, long r ) { return r==0 ? 0 : l/r; } } // Long division
+  static class ModI64 extends Prim2OpI64 { ModI64() { super("%"); } long op( long l, long r ) { return r==0 ? 0 : l%r; } }
 
-  public static class SubI64 extends Prim2OpI64 {
-    public SubI64() { super("-"); }
-    @Override long op( long l, long r ) { return l-r; }
+  abstract static class Prim2OpIF64 extends PrimNode {
+    Prim2OpIF64( String name ) { super(name,TypeStruct.INT64_FLT64,TypeFlt.FLT64); }
+    @Override public Type apply( Type[] args ) { return TypeFlt.con(op(args[DSP_IDX].getl(),args[ARG_IDX].getd())); }
+    abstract double op( long x, double y );
   }
+  static class AddIF64 extends Prim2OpIF64 { AddIF64() { super("+"); } double op( long l, double r ) { return l+r; } }
+  static class SubIF64 extends Prim2OpIF64 { SubIF64() { super("-"); } double op( long l, double r ) { return l-r; } }
+  static class MulIF64 extends Prim2OpIF64 { MulIF64() { super("*"); } double op( long l, double r ) { return l*r; } }
+  static class DivIF64 extends Prim2OpIF64 { DivIF64() { super("/"); } double op( long l, double r ) { return l/r; } } // Float division, by 0 gives infinity
 
-  public static class MulI64 extends Prim2OpI64 {
-    public MulI64() { super("*"); }
-    @Override long op( long l, long r ) { return l*r; }
+  abstract static class Prim2OpFI64 extends PrimNode {
+    Prim2OpFI64( String name ) { super(name,TypeStruct.FLT64_INT64,TypeFlt.FLT64); }
+    @Override public Type apply( Type[] args ) { return TypeFlt.con(op(args[DSP_IDX].getd(),args[ARG_IDX].getl())); }
+    abstract double op( double x, long y );
   }
-
-  public static class DivI64 extends Prim2OpI64 {
-    public DivI64() { super("/"); }
-    @Override long op( long l, long r ) { return r==0 ? 0 : l/r; } // Long division
-  }
-
-  public static class ModI64 extends Prim2OpI64 {
-    public ModI64() { super("%"); }
-    @Override long op( long l, long r ) { return r==0 ? 0 : l%r; }
-  }
+  static class AddFI64 extends Prim2OpFI64 { AddFI64() { super("+"); } double op( double l, long r ) { return l+r; } }
+  static class SubFI64 extends Prim2OpFI64 { SubFI64() { super("-"); } double op( double l, long r ) { return l-r; } }
+  static class MulFI64 extends Prim2OpFI64 { MulFI64() { super("*"); } double op( double l, long r ) { return l*r; } }
+  static class DivFI64 extends Prim2OpFI64 { DivFI64() { super("/"); } double op( double l, long r ) { return l/r; } } // Float division, by 0 gives infinity
 
   public static class AndI64 extends Prim2OpI64 {
     public AndI64() { super("&"); }
