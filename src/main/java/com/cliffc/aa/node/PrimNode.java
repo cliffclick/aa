@@ -90,7 +90,7 @@ public abstract class PrimNode extends Node {
     String tname = (s+":").intern();
     ConNode defalt = (ConNode)Node.con(t);
     NewNode nnn = new NewNode(false,true,false,tname,BitsAlias.new_alias());
-    for( PrimNode prim : PRIMS ) prim.as_fun(nnn,defalt);
+    for( PrimNode prim : PRIMS ) prim.as_fun(nnn,defalt,true);
     for( Node n : nnn._defs )
       if( n instanceof UnresolvedNode unr )
         Env.GVN.add_work_new(unr.define());
@@ -103,13 +103,13 @@ public abstract class PrimNode extends Node {
   // Primitive wrapped as a simple function.
   // Fun Parm_dsp [Parm_y] prim Ret
   // No memory, no RPC.  Display is first arg.
-  private void as_fun( NewNode nnn, ConNode defalt ) {
-    String op = (switch( _tfp.nargs() ) {
+  private void as_fun( NewNode nnn, ConNode defalt, boolean is_oper ) {
+    String op = is_oper ? (switch( _tfp.nargs() ) {
       case 4 -> "_";
       case 3 -> "";
       default -> throw unimpl();
-      }+_name+"_").intern();
-    Oper.make(op);
+      }+_name+"_").intern() : _name;
+    if( is_oper ) Oper.make(op);
 
     FunNode fun = (FunNode)Env.GVN.init(new FunNode(this).add_def(Env.ALL_CTRL));
     add_def(null);              // No control
@@ -119,14 +119,14 @@ public abstract class PrimNode extends Node {
       add_def(Env.GVN.init(new ParmNode(ARG_IDX,"y",fun,(ConNode)Node.con(_formals.fld_idx(1,ARG_IDX)._t),null)));
     Env.GVN.init(this);
     RetNode ret = Env.GVN.init(new RetNode(fun,null,this,null,fun));
-    FunPtrNode fptr =  Env.GVN.init(new FunPtrNode(op,ret,Env.ALL));
+    FunPtrNode fptr =  Env.GVN.init(new FunPtrNode(op,ret,is_oper ? Env.ALL : defalt));
     nnn.add_fun(op,fptr,null);
   }
 
   // Build and install match package
   private static void install_math(PrimNode rand) {
     NewNode nnn = new NewNode(false,false,false,null,BitsAlias.new_alias());
-    rand.as_fun(nnn,(ConNode)Node.con(TypeInt.INT64));
+    rand.as_fun(nnn,Env.ANY,false);
     nnn.add_fld(TypeFld.make("pi",TypeFlt.PI,nnn.len()),Node.con(TypeFlt.PI),null);
     nnn.close();
     Env.GVN.init(nnn);
@@ -441,10 +441,9 @@ public abstract class PrimNode extends Node {
   }
 
   public static class RandI64 extends PrimNode {
-    public RandI64() { super("rand",TypeStruct.INT64,TypeInt.INT64); }
+    public RandI64() { super("rand",TypeStruct.args(Type.ANY,TypeInt.INT64),TypeInt.INT64); }
     @Override public Type value() {
-      if( is_keep() ) return Type.ALL;
-      Type t = val(DSP_IDX);
+      Type t = val(ARG_IDX);
       if( t.above_center() ) return TypeInt.BOOL.dual();
       if( TypeInt.INT64.dual().isa(t) && t.isa(TypeInt.INT64) )
         return t.meet(TypeInt.FALSE);

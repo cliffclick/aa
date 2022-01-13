@@ -33,6 +33,44 @@ public class StoreNode extends Node {
   Node rez() { return in(3); }
   public TypeFld find(TypeStruct ts) { return ts.get(_fld); }
 
+  @Override public Type value() {
+    Node mem = mem(), adr = adr(), rez = rez();
+    Type tmem = mem._val;
+    Type tadr = adr._val;
+    Type tval = rez._val;  // Value
+    if( tmem==Type.ALL || tadr==Type.ALL ) return Type.ALL;
+
+    if( !(tmem instanceof TypeMem    tm ) ) return tmem.oob(TypeMem.ALLMEM);
+    if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.above_center() ? tmem : TypeMem.ALLMEM;
+    Node nnn = LoadNode.find_previous_store(mem, adr, tmp._aliases, _fld, false );
+
+    // Field is dead from below?  Value is always ANY
+    TypeStruct ts0 = _live.ld(tmp); // Get the live memory for this alias
+    TypeFld fld = ts0.get(_fld);              // Get field
+    if( ((fld==null && ts0   .above_center()) ||
+         (fld!=null && fld._t.above_center())) )
+      tval = Type.ANY;
+
+    return tm.update(tmp._aliases,_fin,_fld,tval, nnn==adr && nnn instanceof NewNode );
+  }
+  //@Override BitsAlias escapees() {
+  //  Type adr = adr()._val;
+  //  if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? BitsAlias.EMPTY : BitsAlias.FULL;
+  //  return ((TypeMemPtr)adr)._aliases;
+  //}
+
+  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
+  // Compute the liveness local contribution to def's liveness.  Ignores the
+  // incoming memory types, as this is a backwards propagation of demanded
+  // memory.
+  @Override public TypeMem live_use( Node def ) {
+    if( def==mem() ) return _live; // Pass full liveness along
+    if( def==adr() ) return TypeMem.ALIVE; // Basic aliveness
+    if( def==rez() ) return TypeMem.ALIVE; // Value escapes
+    throw unimpl();       // Should not reach here
+  }
+
+
   @Override public Node ideal_reduce() {
     Node mem = mem();
     Node adr = adr();
@@ -40,9 +78,21 @@ public class StoreNode extends Node {
     TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
 
     // Is this Store dead from below?
-    if( mem==this ) return null;
-    if( ta.above_center() ) return mem;
-    if( tmp!=null && _live.ld(tmp)==TypeStruct.UNUSED )  return mem;
+    if( mem==this ) return null; // Dead self-cycle
+    if( ta.above_center() ) return mem; // All memory is high, so dead
+    if( tmp!=null ) {
+      TypeStruct ts0 = _live.ld(tmp); // Get the live memory for this alias
+      TypeFld fld = ts0.get(_fld);              // Get field
+      if( ((fld==null && ts0   .above_center()) ||
+           (fld!=null && fld._t.above_center())) &&
+          mem._val instanceof TypeMem tvm ) {
+        // The memory monotonically agrees, such that removing does not break things?
+        TypeStruct ts1 = tvm.ld(tmp);
+        TypeFld fld1 = ts1.get(_fld);
+        if( fld1._t==Type.ANY )  // Field is dead from above
+          return mem;
+      }
+    }
 
     // No need for 'Fresh' address, as Stores have no TVar (produce memory not a scalar)
     if( adr() instanceof FreshNode )
@@ -141,35 +191,6 @@ public class StoreNode extends Node {
     for( Node use : _uses )
       if( use instanceof LoadNode )
         Env.GVN.add_mono(Env.GVN.add_reduce(use));
-  }
-
-  // StoreNode needs to return a TypeObj for the Parser.
-  @Override public Type value() {
-    Node mem = mem(), adr = adr(), rez = rez();
-    Type tmem = mem._val;
-    Type tadr = adr._val;
-    Type tval = rez._val;  // Value
-    if( tmem==Type.ALL || tadr==Type.ALL ) return Type.ALL;
-
-    if( !(tmem instanceof TypeMem    tm ) ) return tmem.oob(TypeMem.ALLMEM);
-    if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.above_center() ? tmem : TypeMem.ALLMEM;
-    return tm.update(tmp._aliases,_fin,_fld,tval, mem instanceof MrgProjNode mprj && mprj.nnn()==adr );
-  }
-  //@Override BitsAlias escapees() {
-  //  Type adr = adr()._val;
-  //  if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? BitsAlias.EMPTY : BitsAlias.FULL;
-  //  return ((TypeMemPtr)adr)._aliases;
-  //}
-
-  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
-  // Compute the liveness local contribution to def's liveness.  Ignores the
-  // incoming memory types, as this is a backwards propagation of demanded
-  // memory.
-  @Override public TypeMem live_use( Node def ) {
-    if( def==mem() ) return _live; // Pass full liveness along
-    if( def==adr() ) return TypeMem.ALIVE; // Basic aliveness
-    if( def==rez() ) return TypeMem.ALIVE; // Value escapes
-    throw unimpl();       // Should not reach here
   }
 
   @Override public ErrMsg err( boolean fast ) {

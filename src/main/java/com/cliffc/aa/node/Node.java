@@ -743,8 +743,8 @@ public abstract class Node implements Cloneable, IntSupplier {
       //  ((CallNode)in(0)).fdx().tvar().push_dep(this);
     }
     // Walk reachable graph
-    for( Node use : _uses )                   use.walk_initype();
     for( Node def : _defs ) if( def != null ) def.walk_initype();
+    for( Node use : _uses )                   use.walk_initype();
   }
 
   // Reset

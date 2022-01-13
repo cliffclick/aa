@@ -1040,6 +1040,9 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   TypeStruct update(Access fin, String name, Type val, boolean precise) {
     TypeFld fld = get(name);
     if( fld == null ) return this; // Unknown field, assume changes no fields
+    // Double-final-stores, result is an error
+    if( fld._access==Access.Final || fld._access==Access.ReadOnly )
+      val = Type.ALL;
     // Pointers & Memory to a Store can fall during GCP, and go from r/w to r/o
     // and the StoreNode output must remain monotonic.  This means store
     // updates are allowed to proceed even if in-error.

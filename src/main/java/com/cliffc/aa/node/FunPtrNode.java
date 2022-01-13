@@ -146,6 +146,7 @@ public final class FunPtrNode extends Node {
       : (_live==TypeMem.LNO_DISP ? TypeMem.DEAD : TypeMem.ALIVE); // Display is alive or dead
   }
 
+  // Implements class HM.Lambda unification.
   @Override public boolean unify( boolean test ) {
     TV2 self = tvar();
     if( self.is_err() ) return false;
@@ -162,20 +163,25 @@ public final class FunPtrNode extends Node {
         if( use instanceof ParmNode parm && parm.has_tvar() )
           tv2s[parm._idx] = parm.tvar();
       assert tv2s[0]==null;
-      tv2s[0] = ret.rez().tvar();
+      tv2s[0] = ret.rez().tvar(); // Return in slot 0
       progress = self.unify(TV2.make_fun(ret.rez(),((TypeFunPtr)_val).make_no_disp(),"FunPtr_unify",tv2s),test);
       self = self.find();
     }
 
     // Each normal argument from the parms directly
     Node[] parms = fun.parms();  assert parms.length==nargs;
-    for( int i=DSP_IDX; i<nargs; i++ )
-      if( parms[i]!=null )
-        progress |= self.arg(TV2.argname(i)).unify(parms[i].tvar(),test);
+    for( int i=ARG_IDX; i<nargs; i++ )
+      if( parms[i]!=null ) {
+        if( self.arg(TV2.argname(i)).unify(parms[i].tvar(), test) ) {
+          if( test ) return true;
+          progress = true;
+          self = self.find();
+        }
+      }
     return self.arg(" ret").unify(ret.rez().tvar(),test) | progress;
   }
 
-  
+
   // Find FunPtrNode by fidx
   private static int FLEN;      // Primitives length; reset amount
   static Ary<FunPtrNode> FUNS = new Ary<>(new FunPtrNode[]{null,});

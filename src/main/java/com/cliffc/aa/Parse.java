@@ -441,7 +441,7 @@ public class Parse implements Comparable<Parse> {
       scope = scope();          // Create in the current scope
       NewNode stk = scope.stk();
       TypeFld fld = TypeFld.make(tok,t,stk._is_val ? mutable : Access.RW,stk.len());
-      stk.add_fld(fld, stk._is_val ? con(t) : Env.XNIL,badf); // Create at top of scope as undefined
+      stk.add_fld(fld, stk._is_val ? con(t) : con(Type.XNIL),badf); // Create at top of scope as undefined
       scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
     }
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
@@ -762,8 +762,7 @@ public class Parse implements Comparable<Parse> {
     Node unr = _e.lookup("int");
     // Need a load/call/store sensible options
     if( scope==null ) {         // Token not already bound to a value
-      Node zero = do_call(null,ctrl(),mem(),unr,con(TypeInt.ZERO));
-      do_store(scope,zero,Access.RW,tok,null,Type.SCALAR,null);
+      do_store(null,con(Type.NIL),Access.RW,tok,null,Type.SCALAR,null);
       scope = scope();
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
@@ -780,7 +779,7 @@ public class Parse implements Comparable<Parse> {
     // Do a full lookup on "+", and execute the function
     int nidx = n.push();
     Node plus = gvn(new LoadNode(mem(),n,"_+_",null));
-    Node inc = do_call(null,ctrl(),mem(),unr,con(TypeInt.con(d)));
+    Node inc = con(TypeInt.con(d));
     Node sum = do_call(errMsgs(0,_x,_x), args(plus,inc));
     // Active memory for the chosen scope, after the call to plus
     scope().replace_mem(new StoreNode(mem(),ptr,sum,Access.RW,tok,errMsg()));
