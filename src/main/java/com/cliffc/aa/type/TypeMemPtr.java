@@ -280,14 +280,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     return make(_aliases.widen(),_obj._widen());
   }
 
-  @Override Type _unbox() {
-    if( Util.eq(_obj._name,"int:") )
-      return _obj.at("_val");
-    if( Util.eq(_obj._name,"flt:") )
-      return _obj.at("_val");
-    return make_from((TypeStruct)_obj._unbox());
-  }
-
   // Make a Type, replacing all dull pointers from the matching types in mem.
   @Override public Type make_from(Type head, TypeMem mem, VBitSet visit) {
     if( this!=head ) {

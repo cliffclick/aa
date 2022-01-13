@@ -274,13 +274,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     return ts.set_hash();
   }
 
-  // Used by NewNode
-  public TypeStruct make_from( IntFunction<Type> gen ) {
-    TypeStruct ts = malloc(_name,_any);
-    for( TypeFld fld : _flds ) ts._flds.push(fld.make_from(gen.apply(fld._order)));
-    return ts.hashcons_free();
-  }
-
   public int nargs() { return _max_arg+1; }
 
   // The lattice extreme values.
@@ -1094,21 +1087,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     for( TypeFld fld : this ) ts.add_fld(fld.malloc_from());
     ts.set_hash();
     for( TypeFld fld : ts ) fld.setX(fld._t._widen());
-    if( --RECURSIVE_MEET == 0 )
-      ts = ts.install();
-    return ts;
-  }
-  @Override Type _unbox() {
-    if( Util.eq(_name,"int:") )
-      return at("_val");
-    TypeStruct ts = WIDEN_HASH.get(_uid);
-    if( ts!=null ) { ts._cyclic=true; return ts; }
-    RECURSIVE_MEET++;
-    ts = malloc(_name,_any);
-    WIDEN_HASH.put(_uid,ts);
-    for( TypeFld fld : this ) ts.add_fld(fld.malloc_from());
-    ts.set_hash();
-    for( TypeFld fld : ts ) fld.setX(fld._t._unbox());
     if( --RECURSIVE_MEET == 0 )
       ts = ts.install();
     return ts;

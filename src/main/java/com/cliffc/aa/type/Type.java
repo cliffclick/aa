@@ -160,7 +160,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Construct a simple type, possibly from a pool
   static Type make(byte type) { return POOLS[type].malloc().init("").hashcons_free(); }
   @SuppressWarnings("unchecked")
-  T free(T t2) { return (T)POOLS[_type].free(this,t2); }
+  public T free(T t2) { return (T)POOLS[_type].free(this,t2); }
   T hashcons_free() {
     T t2 = hashcons();
     return this==t2 ? t2 : free(t2);
@@ -792,9 +792,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     default -> throw typerr(null); // Overridden in subclass
     };
   }
-  // Unbox any boxed primitives.
-  public final Type unbox() { WIDEN_HASH.clear(); return _unbox(); }
-  Type _unbox() { return this; }
 
   // True if type must include a nil (as opposed to may-nil, which means the
   // type can choose something other than nil).

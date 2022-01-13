@@ -107,9 +107,6 @@ public class NewNode extends Node {
   public void define() { assert _forward_ref && _closed; _forward_ref=false; }
   public boolean is_closed() { return _closed; }
   public NewNode close() { assert !_closed; _closed=true; return this; }
-  // Strip the ':' off to make a value name from a type name.
-  // Error if not a named NewNode.
-  public String as_valname() { return _tname.substring(0,_tname.length()-1).intern(); }
 
   public MrgProjNode mem() {
     for( Node use : _uses ) if( use instanceof MrgProjNode mrg ) return mrg;
@@ -190,11 +187,26 @@ public class NewNode extends Node {
     }
   }
 
-
   @Override public Type value() { return _is_val ? _tptr.make_from(valueobj()) : _tptr; }
   // Used by MrgProj
-  TypeStruct valueobj() { return _ts.make_from(this::val); }
-
+  TypeStruct valueobj() {
+    TypeStruct lv = _live.ld(_tptr);
+    TypeStruct ts = TypeStruct.malloc(_ts._name,_ts.above_center());
+    for( TypeFld fld : _ts ) {
+      TypeFld lvfld = lv.get(fld._fld);
+      boolean alive = !(lvfld==null ? lv : lvfld).above_center();
+      ts.add_fld(fld.make_from(alive ? in(fld._order)._val : Type.ANY,alive ? fld._access : Access.NoAccess));
+    }
+    return ts.hashcons_free();
+  }
+  // Liveness changes in NewNode, impacts value in NewNode and MrgProj
+  @Override public void add_flow_extra(Type old) {
+    if( old instanceof TypeMem ) { // Must be a liveness change
+      Env.GVN.add_flow(this);      // Self value changes as fields become alive
+      Env.GVN.add_flow(mem());     // MrgProj updates values (dead values are ANY)
+      Env.GVN.add_reduce(this);    // Self might drop an input
+    }
+  }
   // Some input changed, so the struct in MrgProj changes
   @Override public void add_flow_use_extra(Node chg) {
     Env.GVN.add_flow(mem());
@@ -246,6 +258,7 @@ public class NewNode extends Node {
   @Override public boolean unify( boolean test ) {
     TV2 rec = tvar();
     if( rec.is_err() ) return false;
+    if( len()<=1 ) return false; // Killed NewNode, makes no HM changes
     assert rec.is_obj() && check_fields(rec);
 
     // Unify existing fields.  Ignore extras on either side.
@@ -294,6 +307,18 @@ public class NewNode extends Node {
         Env.GVN.add_flow_uses(Env.GVN.add_reduce(use)); // Get FPtrs from MrgProj, and dead Ptrs into New
       return this;
     }
+
+    // Field-by-field kill
+    TypeStruct lv = _live.ld(_tptr);
+    boolean progress=false;
+    for( TypeFld fld : _ts ) {
+      TypeFld lvfld = lv.get(fld._fld);
+      boolean alive = !(lvfld==null ? lv : lvfld).above_center();
+      if( !alive && in(fld._order)!=Env.ANY )
+        { set_fld(fld.make_from(Type.ANY,Access.NoAccess),Env.ANY); progress=true; }
+    }
+    if( progress ) return this;
+
     return null;
   }
 

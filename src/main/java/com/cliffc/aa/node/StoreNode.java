@@ -42,16 +42,17 @@ public class StoreNode extends Node {
 
     if( !(tmem instanceof TypeMem    tm ) ) return tmem.oob(TypeMem.ALLMEM);
     if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.above_center() ? tmem : TypeMem.ALLMEM;
-    Node nnn = LoadNode.find_previous_store(mem, adr, tmp._aliases, _fld, false );
 
     // Field is dead from below?  Value is always ANY
     TypeStruct ts0 = _live.ld(tmp); // Get the live memory for this alias
     TypeFld fld = ts0.get(_fld);              // Get field
-    if( ((fld==null && ts0   .above_center()) ||
-         (fld!=null && fld._t.above_center())) )
-      tval = Type.ANY;
-
-    return tm.update(tmp._aliases,_fin,_fld,tval, nnn==adr && nnn instanceof NewNode );
+    boolean alive = !(fld==null ? ts0 : fld._t).above_center();
+    Node nnn = LoadNode.find_previous_store(mem, adr, tmp._aliases, _fld, false );
+    return tm.update(tmp._aliases, // Update at aliases
+                     alive ? _fin : Access.NoAccess, // Alive is whatever, dead is store of Any
+                     _fld,                           // Field name
+                     alive ? tval : Type.ANY,        // Alive is whatever, dead is store of Any
+                     nnn==adr && nnn instanceof NewNode ); // Precise or not
   }
   //@Override BitsAlias escapees() {
   //  Type adr = adr()._val;
@@ -65,11 +66,26 @@ public class StoreNode extends Node {
   // memory.
   @Override public TypeMem live_use( Node def ) {
     if( def==mem() ) return _live; // Pass full liveness along
-    if( def==adr() ) return TypeMem.ALIVE; // Basic aliveness
-    if( def==rez() ) return TypeMem.ALIVE; // Value escapes
-    throw unimpl();       // Should not reach here
+    assert def==adr() || def==rez();
+    // If this field is not alive, then neither the address nor value are alive.
+    Type t = adr()._val;
+    if( t instanceof TypeMemPtr tmp ) {
+      TypeStruct ts = _live.ld(tmp);
+      TypeFld fld = ts.get(_fld);
+      t = fld==null ? ts : fld;
+    }
+    return t.oob(TypeMem.ALIVE);
   }
 
+  @Override public void add_flow_use_extra(Node chg) {
+    if( chg==adr() && !chg._val.above_center() ) // Address becomes alive, implies rez is more alive
+      Env.GVN.add_flow(rez());
+  }
+
+  // Liveness changes, check if reduce
+  @Override public void add_flow_extra(Type old) {
+    Env.GVN.add_reduce(this); // Args can be more-alive
+  }
 
   @Override public Node ideal_reduce() {
     Node mem = mem();
@@ -82,14 +98,13 @@ public class StoreNode extends Node {
     if( ta.above_center() ) return mem; // All memory is high, so dead
     if( tmp!=null ) {
       TypeStruct ts0 = _live.ld(tmp); // Get the live memory for this alias
-      TypeFld fld = ts0.get(_fld);              // Get field
-      if( ((fld==null && ts0   .above_center()) ||
-           (fld!=null && fld._t.above_center())) &&
-          mem._val instanceof TypeMem tvm ) {
+      TypeFld fld = ts0.get(_fld);    // Get field
+      boolean alive = !(fld==null ? ts0 : fld._t).above_center();
+      if( !alive && mem._val instanceof TypeMem tvm ) {
         // The memory monotonically agrees, such that removing does not break things?
         TypeStruct ts1 = tvm.ld(tmp);
         TypeFld fld1 = ts1.get(_fld);
-        if( fld1._t==Type.ANY )  // Field is dead from above
+        if( fld!=null && fld1._t==Type.ANY && fld1._access==Access.NoAccess )  // Field is dead from above
           return mem;
       }
     }
@@ -155,7 +170,6 @@ public class StoreNode extends Node {
     return true;            // Folded.
   }
 
-
   @Override public Node ideal_mono() { return null; }
   @Override public Node ideal_grow() {
     Node mem = mem();
@@ -180,10 +194,6 @@ public class StoreNode extends Node {
       return null; // TODO: Turn back on
     }
     return null;
-  }
-  // Liveness changes, check if reduce
-  @Override public void add_flow_extra(Type old) {
-    Env.GVN.add_reduce(this); // Args can be more-alive
   }
   // If changing an input or value allows the store to no longer be in-error,
   // following Loads can collapse

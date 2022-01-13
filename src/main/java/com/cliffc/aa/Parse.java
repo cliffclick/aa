@@ -479,7 +479,7 @@ public class Parse implements Comparable<Parse> {
     scope().flip_if();       // Flip side of tracking new defs
     set_mem(omem);           // Reset memory to before the IF for the other arm
     set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch
-    Node f_exp = peek(':') ? stmt(false) : con(Type.XNIL);
+    Node f_exp = peek(':') ? stmt(false) : con(Type.NIL);
     if( f_exp == null ) f_exp = err_ctrl2("missing expr after ':'");
     Node f_ctl = ctrl();
     Node f_mem = mem ();
@@ -863,14 +863,12 @@ public class Parse implements Comparable<Parse> {
       return val_fref(tok,errMsg(oldx));
     }
 
-    // If field is final, directly use the value instead of a lookup.  Else
-    // must load against most recent display update.
+    // Must load against most recent display update, in case some prior store
+    // is in-error.  Directly loading against the display would bypass the
+    // (otherwise alive) error store.
     NewNode dsp = scope.stk();
     TypeFld fld = dsp._ts.get(tok);
-    Node ld = fld._access==Access.Final && mem().err(true)==null
-      ? dsp.in(fld._order)      // Direct use
-      // Load against a varying display
-      : gvn(new LoadNode(mem(),get_display_ptr(scope),tok,null));
+    Node ld = gvn(new LoadNode(mem(),get_display_ptr(scope),tok,null));
     // If in the middle of a definition (e.g. a HM Let, or recursive assign)
     // then no Fresh per normal HM rules.  If loading from a struct or from
     // normal Lambda arguments, again no Fresh per normal HM rules.
@@ -1262,7 +1260,7 @@ public class Parse implements Comparable<Parse> {
     case '{' -> throw unimpl(); // Function parse
     case '@' -> tstruct(proto); // Struct parse
     case '[' -> throw unimpl(); // Array parse
-    case '(' -> throw unimpl(); // Tuple parse
+    case '(' -> ttuple();       // Tuple parse
     case '=' -> throw unimpl(); // Const ifex parse
     case '?' -> throw unimpl(); //     Nilable-ref parse
     case '!' -> throw unimpl(); // Not-nilable-ref parse
@@ -1313,21 +1311,38 @@ public class Parse implements Comparable<Parse> {
     return n;
   }
 
+  // Parse a tuple type.
+  private Type ttuple() {
+    int oldx = _x;
+    peek('(');
+    TypeStruct ts = TypeStruct.malloc("",false);
+    while(true) {
+      Type t = type(false,null);
+      if( t==null ) { _x=oldx; return ts.free(null); }
+        throw unimpl();
+    }
+  }
+
+
   // Type-id or type-var parse
   private Type tid(boolean allow_fref) {
     String tok = token();
     if( tok==null ) return null;
     if( Util.isUpperCase(tok) )
       throw unimpl();           // Reserved for type variables
+    // Shortcut for the two primitive types
     String tname = (tok+":").intern();
+    if( Util.eq(tname,"int:") ) return TypeInt.INT64;
+    if( Util.eq(tname,"flt:") ) return TypeFlt.FLT64;
     NewNode nnn = _e.lookup_type(tname);
     if( nnn == null ) {
       if( !allow_fref )
         return null;
       nnn = type_fref(tname,false); // None, so create
     }
-    //return nnn.defalt()._val;
-    throw unimpl(); // todo: just nnn?
+    //if( )
+    //return nnn._tptr;
+    throw unimpl();
   }
 
   // Create a value forward-reference.  Must turn into a function call later.

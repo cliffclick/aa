@@ -7,7 +7,6 @@ import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeStruct;
 
 import static com.cliffc.aa.AA.MEM_IDX;
-import static com.cliffc.aa.AA.unimpl;
 
 // Not really a ProjNode; merges memory from a NewNode into the main memory.
 public class MrgProjNode extends ProjNode {
@@ -79,15 +78,16 @@ public class MrgProjNode extends ProjNode {
   @Override public Node ideal_mono() { return null; }
 
   @Override public Node ideal_grow() {
-    Node mem = mem();
-    // Look for back-to-back unrelated aliases and Split/Join
-    Node head2 = MemJoinNode.find_sese_head(mem);
-    if( head2 != null && !head2.is_prim() ) {
-      //BitsAlias escs1 = escapees();
-      //if( MemSplitNode.check_split(this,escs1,mem) )
-      //  return MemSplitNode.insert_split(this,escs1,this,head2,mem);
-      throw unimpl();
-    }
+    //Node mem = mem();
+    // TODO: Turn this back on
+    //// Look for back-to-back unrelated aliases and Split/Join
+    //Node head2 = MemJoinNode.find_sese_head(mem);
+    //if( head2 != null && !head2.is_prim() ) {
+    //  //BitsAlias escs1 = escapees();
+    //  //if( MemSplitNode.check_split(this,escs1,mem) )
+    //  //  return MemSplitNode.insert_split(this,escs1,this,head2,mem);
+    //  throw unimpl();
+    //}
     return null;
   }
 

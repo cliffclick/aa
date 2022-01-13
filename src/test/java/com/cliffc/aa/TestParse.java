@@ -139,7 +139,6 @@ public class TestParse {
   }
 
   @Test public void testParse01() {
-    test   ("math.rand(1)?(y=2;x=y*y):x=3;x", TypeInt.NINT8, "int8"); // x defined on both arms, so available after, while y is not
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE, "1");
     test("x=y=1", TypeInt.TRUE, "1");
@@ -166,19 +165,18 @@ public class TestParse {
     testerr("math.rand(1)?x=2: 3 ;x", "'x' not defined on false arm of trinary",20);
     testerr("math.rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
     testerr("0 ? x=2 : 3;x", "'x' not defined on false arm of trinary",11);
-    test   ("2 ? x=2 : 3;x", TypeInt.con(2)); // off-side is constant-dead, so missing x-assign is ignored
-    test   ("2 ? x=2 : y  ", TypeInt.con(2)); // off-side is constant-dead, so missing 'y'      is ignored
+    test   ("2 ? x=2 : 3;x", TypeInt.con(2), "2"); // off-side is constant-dead, so missing x-assign is ignored
+    test   ("2 ? x=2 : y  ", TypeInt.con(2), "2"); // off-side is constant-dead, so missing 'y'      is ignored
     testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign final field '.x' in @{x=1}",7);
-    test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
-    test   ("math.rand(1)?1:int:2:int",TypeInt.NINT8); // no ambiguity between conditionals and type annotations
+    test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1), "1"); // Re-assigned allowed & ignored in dead branch
+    test   ("math.rand(1)?1:int:2:int",TypeInt.NINT8, "int64"); // no ambiguity between conditionals and type annotations
     testerr("math.rand(1)?1: :2:int","missing expr after ':'",16); // missing type
     testerr("math.rand(1)?1::2:int","missing expr after ':'",15); // missing type
-    testerr("math.rand(1)?1:\"a\"", "Cannot mix GC and non-GC types",18);
-    test   ("math.rand(1)?1",TypeInt.BOOL); // Missing optional else defaults to nil
-    test("math.rand(1)?@{}",
-      (ignore->TypeMemPtr.make_nil(17,TypeStruct.EMPTY)),
-         null, "*\"abc\"?" );
-    test   ("x:=0;math.rand(1)?(x:=1);x",TypeInt.BOOL);
+    test   ("math.rand(1)?1",TypeInt.BOOL,"int64"); // Missing optional else defaults to nil
+    test   ("math.rand(1)?@{}",
+      (ignore->TypeMemPtr.make_nil(8,TypeStruct.make(TypeFld.NO_DISP))),
+      null, "@{^=any;}?" );
+    test   ("x:=0;math.rand(1)?(x:=1);x",TypeInt.BOOL,"int64");
     testerr("a.b.c();","Unknown ref 'a'",0);
   }
 
@@ -753,6 +751,7 @@ map(tmp)
     //test_ptr("3.14.str()"      , TypeStr.con("3.14"), "3.14");
     //test_ptr("3.str()"         , TypeStr.con("3"   ), "3");
     test("\"abc\"==\"abc\"",TypeInt.TRUE, "1"); // Constant strings intern
+    //testerr("math.rand(1)?1:\"a\"", "Cannot mix GC and non-GC types",18);
     throw unimpl();
   }
 
@@ -922,8 +921,7 @@ HashTable = {@{
       if( gcp_maker != null ) {
         Type actual = te._tmem.sharptr(te._t); // Sharpen any memory pointers
         Type expect = gcp_maker.apply(actual);
-        Type actual_unbox = actual.unbox(); // As a testing convenience, unbox any wrapped primitives
-        assertEquals(expect,actual_unbox);
+        assertEquals(expect,actual);
         // Also check GCP formals.
         if( expect instanceof TypeFunPtr ) {
           TypeStruct actual_formals = te._formals;
@@ -934,7 +932,7 @@ HashTable = {@{
       }
       if( hmt_expect != null ) {
         TV2 actual = te._hmt;
-        String actual_str = actual.unbox().p();
+        String actual_str = actual.p();
         assertEquals(stripIndent(hmt_expect),stripIndent(actual_str));
       }
     }

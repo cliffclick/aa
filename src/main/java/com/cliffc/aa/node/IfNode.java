@@ -69,8 +69,6 @@ public class IfNode extends Node {
     if( in(0) instanceof ProjNode && in(0).in(0)==this )
       return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
     Type pred = val(1);
-    if( pred instanceof TypeMemPtr tmp && tmp.is_valtype()  )
-      pred = pred.unbox(); // Unwrap a primitive box
     if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
       return TypeTuple.IF_FALSE;   // False only
     if( pred.above_center() ? !pred.may_nil() : !pred.must_nil() )

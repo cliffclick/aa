@@ -475,7 +475,7 @@ public class TV2 {
   private void union_flow( Type t0 ) {
     if( t0==null ) return;      // Nothing to merge into
     if( _flow==null ) _flow = t0;
-    else if( t0.getClass()== _flow.getClass() ) _flow = t0.meet( _flow);
+    else if( t0.getClass()== _flow.getClass() || t0==Type.NIL || _flow==Type.NIL || t0==Type.XNIL || _flow==Type.XNIL ) _flow = t0.meet( _flow);
     else if( _eflow==null ) _eflow = t0;
     else if( t0.getClass()==_eflow.getClass() ) _eflow = t0.meet(_eflow);
     // Else have both _flow and _eflow AND t0: have 3 unique type classes so
