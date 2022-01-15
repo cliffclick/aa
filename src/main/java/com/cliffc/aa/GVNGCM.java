@@ -155,9 +155,9 @@ public class GVNGCM {
       if( !progress ) break;
     };
     // Expensive assert
-    assert Env.START.more_work(true)==0;
+    //assert Env.START.more_work(true)==0;
     IDEAL_VISIT.clear();
-    assert !Env.START.more_ideal(IDEAL_VISIT);
+    //assert !Env.START.more_ideal(IDEAL_VISIT);
   }
 
   // Clear the dead worklist only

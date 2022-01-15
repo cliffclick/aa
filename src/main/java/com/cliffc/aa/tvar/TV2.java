@@ -187,7 +187,7 @@ public class TV2 {
     return t2;
   }
   public static TV2 make_fun(Node n, TypeFunPtr fptr, @NotNull String alloc_site, TV2... t2s) {
-    assert fptr.nargs()==t2s.length;
+    //assert fptr.nargs()==t2s.length;
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
     for( int i=DSP_IDX; i<t2s.length; i++ )
       if( t2s[i]!=null ) args.put(argname(i), t2s[i]);
@@ -1038,7 +1038,6 @@ public class TV2 {
 
   // --------------------------------------------
   // Pretty print
-  boolean is_math() { return is_obj() && _args!=null && _args.containsKey("pi"); }
 
   // Look for dups, in a tree or even a forest (which Syntax.p() does)
   public VBitSet get_dups() { return _get_dups(new VBitSet(),new VBitSet()); }
@@ -1114,6 +1113,8 @@ public class TV2 {
 
   private SB str_struct(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     if( is_math() ) return sb.p("@{MATH}");
+    String clz = is_clz();
+    if( clz!=null ) return sb;
     final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
     BitsAlias aliases = ((TypeMemPtr)_flow).aliases();
     if( debug )
@@ -1136,9 +1137,28 @@ public class TV2 {
   }
 
   private void vname( SB sb, boolean debug) {
-    final boolean vuid = debug && (is_unified()||is_leaf());
-    sb.p(VNAMES.computeIfAbsent(this, (k -> vuid ? ((is_leaf() ? "V" : "X") + k._uid) : ((++VCNT) - 1 + 'A' < 'V' ? ("" + (char) ('A' + VCNT - 1)) : ("V" + VCNT)))));
+    String v = VNAMES.get(this);
+    if( v==null ) {
+      if( (v=is_clz())!=null ) ;
+      else if( debug && is_unified()) v= "X"+_uid;
+      else if( debug && is_leaf() )   v= "V"+_uid;
+      else if( (++VCNT)-1+'A' < 'V')  v= "" + (char) ('A' + VCNT - 1);
+      else                            v= "V"+_uid;
+      VNAMES.put(this,v);       // Remember for next time
+    }
+    sb.p(v);
   }
   private boolean is_tup() {  return _args==null || _args.isEmpty() || _args.containsKey("0"); }
+  boolean is_math() { return is_obj() && _args!=null && _args.containsKey("pi"); }
+  String is_clz() {
+    if( _args==null ) return null;
+    String clz=null;
+    for( String arg : _args.keySet() )
+      if( arg.indexOf(':')!=-1 ) // Is clazz marker field?
+        if( clz==null ) clz=arg; // Found clazz marker field
+        else return null;        // Tooo many marker fields
+    if( clz==null ) return null;
+    return clz.substring(0,clz.length()-1); // Found exactly 1 clazz marker field
+  }
   private Collection<String> sorted_flds() { return new TreeMap<>(_args).keySet(); }
 }

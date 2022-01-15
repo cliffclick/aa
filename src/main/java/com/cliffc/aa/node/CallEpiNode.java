@@ -300,12 +300,18 @@ public final class CallEpiNode extends Node {
     // and GCP flow type in parallel and create a mapping.  Then walk the
     // output HM type and CCP flow type in parallel, and join output CCP types
     // with the matching input CCP type.
-    if( AA.DO_HMT && _tvar!=null ) {
-    //  // Walk the inputs, building a mapping
-    //  TV2.T2MAP.clear();
-    //  // Walk the display first, skipping through the function pointer to the display
-    //  TV2.WDUPS.clear();
-    //  TV2 tfun = call.fdx().tvar();
+    if( false && AA.DO_HMT )
+      trez = hm_apply_lift(tvar(),trez);
+
+    return TypeTuple.make(Type.CTRL,tmem,trez);
+  }
+
+  Type hm_apply_lift(TV2 rezt2, Type ret) {
+    // Walk the inputs, building a mapping
+    TV2.T2MAP.clear();
+    // Walk the display first, skipping through the function pointer to the display
+    TV2.WDUPS.clear();
+    TV2 tfun = call().fdx().tvar();
     //  if( tfun.is_fun() ) {
     //    TV2 dsp = tfun.get("2");
     //    if( dsp!=null )  dsp.walk_types_in(caller_mem,tfptr._dsp);
@@ -321,9 +327,6 @@ public final class CallEpiNode extends Node {
     //    tmem3 = tmem3.lift_at((TypeMemPtr)trez_lift);  // Upgrade memory result
     //  trez = trez_lift_dull.join(trez);                // Upgrade scalar result
       throw unimpl();
-    }
-
-    return TypeTuple.make(Type.CTRL,tmem,trez);
   }
 
 
@@ -466,26 +469,24 @@ public final class CallEpiNode extends Node {
     assert !_is_copy;
     CallNode call = call();
     Node fdx = call.fdx();
-    if( !(fdx._val instanceof TypeFunPtr tfp) ) return false; // Wait till executable
-    if( tfp._fidxs.above_center() ) return false;             // Wait till executable
-    int nargs = tfp .nargs();
-    int cargs = call.nargs();
-    int margs = Math.min(nargs,cargs);
+    // TODO: Can i do this without GCP?  Will never get a TFP
+    int nargs = call.nargs();
     TV2 tfun = fdx.tvar();
     boolean progress = false;
     if( !tfun.is_fun() ) {
       if( test ) return true;
       TV2[] tv2s = new TV2[nargs];
-      for( int i=DSP_IDX; i<margs; i++ ) tv2s[i] = call.tvar(i);
-      for( int i=margs; i<nargs; i++ ) throw unimpl(); // TODO: expand with leafs
+      tv2s[DSP_IDX] = TV2.make_leaf(this,"CallEpi_unify");
+      for( int i=ARG_IDX; i<nargs; i++ ) tv2s[i] = call.tvar(i);
       tv2s[0] = tvar();         // Backdoor the return in slot 0
+      TypeFunPtr tfp = fdx._val instanceof TypeFunPtr tfp2 ? tfp2 : TypeFunPtr.GENERIC_FUNPTR;
       TV2 nfun = TV2.make_fun(this, tfp, "CallEpi_unify", tv2s);
       progress = tfun.unify(nfun,test);
       tfun = nfun;
     }
 
     // Check for progress amongst args
-    for( int i=DSP_IDX; i<margs; i++ ) {
+    for( int i=ARG_IDX; i<nargs; i++ ) {
       TV2 actual = call.tvar(i);
       TV2 formal = tfun.arg(TV2.argname(i));
       if( actual.unify(formal,test) ) {
@@ -495,11 +496,11 @@ public final class CallEpiNode extends Node {
       }
     }
     TV2 self = tvar();
-    if( nargs != cargs && !tfun.is_err() && self._err==null ) { //
-      if( test ) return true;
-      progress = true;
-      self._err = call.err_arg_cnt(FunPtrNode.get(tfp._fidxs).name(),tfp);
-    }
+    //if( nargs != cargs && !tfun.is_err() && self._err==null ) { //
+    //  if( test ) return true;
+    //  progress = true;
+    //  self._err = call.err_arg_cnt(FunPtrNode.get(tfp._fidxs).name(),tfp);
+    //}
 
     // Check for progress on the return
     progress |= self.unify(tfun.arg(" ret"),test);

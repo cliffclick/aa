@@ -164,10 +164,12 @@ public class FunNode extends RegionNode {
   }
 
   // This function has disabled inlining
-  public boolean noinline() { return in(0)==null && name(false).startsWith("noinline"); }
+  public boolean noinline() {
+    return in(0)==null && _name!=null && _name.startsWith("noinline");
+  }
 
   // Never inline with a nested function
-  @Override @NotNull public Node copy( boolean copy_edges) { throw unimpl(); }
+  @Override @NotNull public FunNode copy( boolean copy_edges) { throw unimpl(); }
 
   // True if may have future unknown callers.
   public boolean has_unknown_callers() {
@@ -175,7 +177,7 @@ public class FunNode extends RegionNode {
   }
   // True if this function escapes the top-level scope
   boolean is_unknown_alive() {
-    return _defs._len==1 || (in(1) instanceof ScopeNode && ((ScopeNode)in(1)).top_escapes().test_recur(_fidx));
+    return _defs._len==1 || in(1)==Env.ALL_CTRL || (in(1) instanceof ScopeNode && ((ScopeNode)in(1)).top_escapes().test_recur(_fidx));
   }
 
   public int nargs() { return _nargs; }
@@ -339,7 +341,7 @@ public class FunNode extends RegionNode {
     Node mem = parms[MEM_IDX];
     if( mem==null ) return null; // Pure function, has no memory read/write
     Type tmem = mem._val;
-    if( tmem instanceof TypeMem ) {
+    //if( tmem instanceof TypeMem ) {
       //boolean progress = false;
       //TypeStruct formals = TypeStruct.UNUSED;
       //for( int i=DSP_IDX; i<parms.length; i++ ) { // For all parms
@@ -366,9 +368,9 @@ public class FunNode extends RegionNode {
       //}
       //if( progress ) return formals;
 
-      // Turn off type-splitting until we have a better heuristic
-      throw unimpl();
-    }
+      // TODO: Turn off type-splitting until we have a better heuristic
+    //  throw unimpl();
+    //}
 
     return null;
   }

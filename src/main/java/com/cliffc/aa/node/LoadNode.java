@@ -131,9 +131,9 @@ public class LoadNode extends Node {
         // Loading a unbound funptr, binds it to the address
         Node n = proto.in(idx);
         if( n instanceof FunPtrNode fptr )
-          return new FunPtrNode(fptr._name,fptr.ret(),adr);
+          return Env.GVN.init(new FunPtrNode(fptr._name,fptr.ret(),adr));
         else if( n instanceof UnresolvedNode unr )
-          return unr.copy(true).set_def(0,adr);
+          return ((UnresolvedNode)unr.copy(true)).set_bad(_bad).set_def(0,adr);
         return n;
       }
     }

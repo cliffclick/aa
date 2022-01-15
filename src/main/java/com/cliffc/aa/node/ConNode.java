@@ -6,6 +6,8 @@ import com.cliffc.aa.type.*;
 
 import java.util.function.Predicate;
 
+import static com.cliffc.aa.AA.unimpl;
+
 // Constant value nodes; no computation needed.  Hashconsed for unique
 // constants, except for XNIL.  XNIL allows for a TV2 typevar Nilable-Leaf with
 // each Leaf unifying on its own.
@@ -22,6 +24,11 @@ public class ConNode<T extends Type> extends Node {
     if( Env.DEF_MEM  == this ) return "DEF_MEM";
     return _t==null ? "(null)" : _t.toString();
   }
+  @SuppressWarnings("unchecked")
+  @Override void walk_reset0() {
+    if( this==Env.DEF_MEM )
+      _t=(T)(_val=_live=TypeMem.ALLMEM);
+  }
 
   @SuppressWarnings("unchecked")
   public void exclude_alias(int alias) {
@@ -34,16 +41,21 @@ public class ConNode<T extends Type> extends Node {
   @Override public TypeMem all_live() { return _t instanceof TypeMem ? TypeMem.ALLMEM : TypeMem.ALIVE; }
 
   @Override public TV2 new_tvar(String alloc_site) {
-    if( _t==Type.CTRL || _t==Type.XCTRL || _t instanceof TypeRPC )
+    if( _t==Type.CTRL || _t==Type.XCTRL || _t instanceof TypeRPC || _t instanceof TypeMem )
       return null;
-    if( this == Env.XUSE || this == Env.ALL ) return null;
-    if( _t == Type.XNIL )
+    if( this == Env.XUSE || this == Env.ALL || this==Env.ALL_PARM ) return null;
+    if( _t == Type.XNIL || _t == Type.NIL )
       return TV2.make_nil(TV2.make_leaf(this,alloc_site),alloc_site);
-    // Bare TMP over a prototype; shows up as the default ParmNode 'self' input.
-    // Should unify with the prototype itself.
-    if( _t instanceof TypeMemPtr tmp && tmp._obj._name.length()>0 )
-      return TV2.make_leaf(this,alloc_site);
-    return TV2.make_base(this,_t,alloc_site);
+    if( _t == Type.ANY ) return TV2.make_leaf(this,alloc_site);
+    if( _t instanceof TypeInt ) {
+      NewNode nnn = Env.SCP_0.get_type("int:");
+      return nnn._tvar==null ? (nnn._tvar = TV2.make_leaf(nnn,alloc_site)) : nnn._tvar;
+    }
+    if( _t instanceof TypeFlt ) {
+      NewNode nnn = Env.SCP_0.get_type("flt:");
+      return nnn._tvar==null ? (nnn._tvar = TV2.make_leaf(nnn,alloc_site)) : nnn._tvar;
+    }
+    throw unimpl();
   }
 
   @Override public boolean unify( boolean test ) { return false; }

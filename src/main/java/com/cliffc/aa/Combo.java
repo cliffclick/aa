@@ -1,6 +1,6 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
@@ -132,6 +132,10 @@ public abstract class Combo {
   static public boolean HM_FREEZE;
 
   public static void opto() {
+    // Remove all the hooks keeping things alive until Combo sorts it out right.
+    if( AA.DO_GCP ) Env.unhook_rets();
+    Env.GVN.flow_clear();       // Will be used as a worklist
+
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
     Env.START.walk_initype();
@@ -199,9 +203,9 @@ public abstract class Combo {
   // conservative callers.
   private static final VBitSet RVISIT = new VBitSet();
   private static void update_root_args() {
-    Node rez = Env.SCP_0.rez();
+    Node rez = Env.FILE._scope.rez();
     Type flow = rez._val;
-    if( AA.DO_HMT ) {
+    if( AA.DO_HMT && rez.has_tvar() ) {
       RVISIT.clear();
       _widen_bases(false,rez.tvar());
     }

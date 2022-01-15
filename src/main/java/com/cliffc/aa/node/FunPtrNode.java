@@ -65,12 +65,17 @@ public final class FunPtrNode extends Node {
   Type formal(int idx) { return fun().parm(idx)._t; }
   int fidx() { return fun()._fidx; }
   String name() { return _name; } // Debug name, might be empty string
+  // Called by testing
   public TypeStruct formals() {
-    throw unimpl();
+    Node[] parms = fun().parms();
+    TypeStruct ts = TypeStruct.malloc("",false);
+    int nargs = nargs();
+    for( int i=DSP_IDX; i<nargs; i++ )
+      if( parms[i]!=null )
+        ts.add_fld(TypeFld.make(((ParmNode)parms[i])._name,((ParmNode)parms[i])._t,TypeFld.Access.Final,i));
+    return ts.hashcons_free();
   }
 
-  //@Override public FunPtrNode funptr() { return this; }
-  //@Override public UnresolvedNode unk() { return null; }
   // Self short name
   @Override public String xstr() {
     if( is_dead() || _defs._len==0 ) return "*fun";
@@ -166,11 +171,12 @@ public final class FunPtrNode extends Node {
       tv2s[0] = ret.rez().tvar(); // Return in slot 0
       progress = self.unify(TV2.make_fun(ret.rez(),((TypeFunPtr)_val).make_no_disp(),"FunPtr_unify",tv2s),test);
       self = self.find();
+      assert self.is_fun();
     }
 
     // Each normal argument from the parms directly
     Node[] parms = fun.parms();  assert parms.length==nargs;
-    for( int i=ARG_IDX; i<nargs; i++ )
+    for( int i=DSP_IDX; i<nargs; i++ )
       if( parms[i]!=null ) {
         if( self.arg(TV2.argname(i)).unify(parms[i].tvar(), test) ) {
           if( test ) return true;
@@ -178,7 +184,13 @@ public final class FunPtrNode extends Node {
           self = self.find();
         }
       }
-    return self.arg(" ret").unify(ret.rez().tvar(),test) | progress;
+    progress |= self.arg(" ret").unify(ret.rez().tvar(),test);
+
+    // FunPtr also does Apply unification, for JUST the display argument.
+    if( display().has_tvar() )
+      progress |= self.arg("2").unify(display().tvar(),test);
+
+    return progress;
   }
 
 

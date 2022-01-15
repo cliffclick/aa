@@ -183,16 +183,6 @@ public class Env implements AutoCloseable {
     return _scope.is_closure() ? P.do_exit(_scope,val) : _par.early_exit(P,val); // Hunt for an early-exit-enabled scope
   }
 
-  // Remove all the hooks keeping things alive until Combo sorts it out right.
-  static void pre_combo() {
-    // Remove any Env.TOP hooks to function pointers, only kept alive until we
-    // can compute a real Call Graph.
-    for( int i=ScopeNode.RET_IDX; i<SCP_0.len(); i++ )
-      if( SCP_0.in(i) instanceof RetNode && !SCP_0.in(i).is_prim() )
-        SCP_0.remove(i--);
-    Env.GVN.flow_clear();       // Will be used as a worklist
-  }
-
   // Record global static state for reset
   private static void record_for_reset() {
     Node.init0(); // Record end of primitives
@@ -207,17 +197,20 @@ public class Env implements AutoCloseable {
   // many top-level parses happen in a row.
   public static void top_reset() {
     // Kill all extra constants and cyclic ConTypeNodes hooked by Start
-    Node c;
-    while( !(c=START._uses.last()).is_prim() ) {
-      while( c.len()>0 ) c.pop();
-      GVN.add_dead(c);
-    }
+    unhook_last(START);
     // Kill all undefined values, which promote up to the top level
+    Node c;
     while( !(c=STK_0._defs.last()).is_prim() ) {
       while( c.len()>0 ) c.pop();
-      STK_0.pop_fld();
       GVN.add_dead(c);
+      STK_0.pop_fld();
     }
+    unhook_last(STK_0);
+    // Unhook all Returns, hooked prior to GCP in case they escape at the top level
+    unhook_rets();
+    // Top-level control and memory
+    unhook_last(CTL_0);
+    unhook_last(MEM_0);
     // Clear out the dead before clearing VALS, since they may not be reachable and will blow the elock assert
     GVN.iter_dead();
     TV2.reset_to_init0();
@@ -238,9 +231,24 @@ public class Env implements AutoCloseable {
     Combo.reset();
   }
 
-  //// Return a new alias, and update default memory to exclude it
-  //public static int new_alias() { return new_alias(BitsAlias.ALLX); }
-  //public static int new_alias(int par) { return BitsAlias.new_alias(par); }
+  static private void unhook_last(Node n) {
+    Node c;
+    while( !(c=n._uses.last()).is_prim() ) {
+      while( c.len()>0 ) c.pop();
+      GVN.add_dead(c);
+    }
+  }
+
+  // RetNodes are hooked by the top-level scope, in case they escape and have
+  // to be treated as-if called by the unknown caller.
+  static void unhook_rets() {
+    for( int i=ScopeNode.RET_IDX; i<SCP_0.len(); i++ ) {
+      if( SCP_0.in(i) instanceof RetNode ret && !ret.is_prim() ) {
+        ret.fun().set_def(1,Env.ANY); // Kill the default input
+        SCP_0.remove(i--);
+      }
+    }
+  }
 
   // Return Scope for a name, so can be used to determine e.g. mutability
   ScopeNode lookup_scope( String name, boolean lookup_current_scope_only ) {

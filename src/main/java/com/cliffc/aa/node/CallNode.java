@@ -123,6 +123,7 @@ public class CallNode extends Node {
   Node set_arg (int idx, Node arg) { assert idx>=DSP_IDX && idx <nargs(); return set_def(idx,arg); }
   public Node set_fdx( Node fun) { return set_def(DSP_IDX, fun);}
   public void set_mem( Node mem) { set_def(MEM_IDX, mem); }
+  @Override void walk_reset0() { assert is_prim(); _not_resolved_by_gcp = false; }
 
   // Add a bunch of utilities for breaking down a Call.value tuple:
   // takes a Type, upcasts to tuple, & slices by name.
@@ -336,6 +337,7 @@ public class CallNode extends Node {
   // the full arg set but if the call is not reachable the FunNode will not
   // merge from that path.  Result tuple type:
   @Override public Type value() {
+    if( _is_copy ) return _val; // Freeze until unwind
     // Pinch to XCTRL/CTRL
     Type ctl = ctl()._val;
     if( ctl != Type.CTRL ) return ctl.oob();
@@ -396,8 +398,8 @@ public class CallNode extends Node {
 
   @Override public void add_flow_def_extra(Node chg) {
     // Projections live after a call alter liveness of incoming args
-    if( chg instanceof ProjNode )
-      Env.GVN.add_flow(in(((ProjNode)chg)._idx));
+    if( chg instanceof ProjNode proj && proj._idx < len())
+      Env.GVN.add_flow(in(proj._idx));
   }
 
   @Override public void add_flow_use_extra(Node chg) {

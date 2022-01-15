@@ -73,110 +73,110 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
-    test("1",   TypeInt.TRUE, "1");
+    test("1",   TypeInt.TRUE, "int:");
     // Unary operator
-    test("-1",  TypeInt.con(-1), "-1");
-    test("!1",  Type.NIL, "nil");
+    test("-1",  TypeInt.con(-1), "int:");
+    test("!1",  Type.NIL, "A?");
     // Binary operators
-    test("1+2", TypeInt.con(3), "3");
-    test("1-2", TypeInt.con(-1), "-1");
-    test("1+2*3", TypeInt.con(7), "7");
-    test("1  < 2", TypeInt.TRUE , "1");
-    test("1  <=2", TypeInt.TRUE , "1");
-    test("1  > 2", TypeInt.FALSE, "0");
-    test("1  >=2", TypeInt.FALSE, "0");
-    test("1  ==2", TypeInt.FALSE, "0");
-    test("1  !=2", TypeInt.TRUE , "1");
-    test("1.2< 2", TypeInt.TRUE , "1");
-    test("1.2<=2", TypeInt.TRUE , "1");
-    test("1.2> 2", TypeInt.FALSE, "0");
-    test("1.2>=2", TypeInt.FALSE, "0");
-    test("1.2==2", TypeInt.FALSE, "0");
-    test("1.2!=2", TypeInt.TRUE , "1");
+    test("1+2", TypeInt.con(3), "int:");
+    test("1-2", TypeInt.con(-1),  "int:");
+    test("1+2*3", TypeInt.con(7), "int:");
+    test("1  < 2", TypeInt.TRUE , "int:");
+    test("1  <=2", TypeInt.TRUE , "int:");
+    test("1  > 2", TypeInt.FALSE, "int:");
+    test("1  >=2", TypeInt.FALSE, "int:");
+    test("1  ==2", TypeInt.FALSE, "int:");
+    test("1  !=2", TypeInt.TRUE , "int:");
+    test("1.2< 2", TypeInt.TRUE , "int:");
+    test("1.2<=2", TypeInt.TRUE , "int:");
+    test("1.2> 2", TypeInt.FALSE, "int:");
+    test("1.2>=2", TypeInt.FALSE, "int:");
+    test("1.2==2", TypeInt.FALSE, "int:");
+    test("1.2!=2", TypeInt.TRUE , "int:");
 
     // Binary with precedence check
-    test(" 1+2 * 3+4 *5", TypeInt.con( 27), "27");
-    test("(1+2)*(3+4)*5", TypeInt.con(105), "105");
-    test("1// some comment\n+2", TypeInt.con(3), "3"); // With bad comment
-    test("-1-2*3-4*5", TypeInt.con(-1-(2*3)-(4*5)), "-27");
-    test("1&3|1&2", TypeInt.con(1), "1");
+    test(" 1+2 * 3+4 *5", TypeInt.con( 27), "int:");
+    test("(1+2)*(3+4)*5", TypeInt.con(105), "int:");
+    test("1// some comment\n+2", TypeInt.con(3), "int:"); // With bad comment
+    test("-1-2*3-4*5", TypeInt.con(-1-(2*3)-(4*5)), "int:");
+    test("1&3|1&2", TypeInt.con(1), "int:");
 
     // Float
-    test("1.2+3.4", TypeFlt.make(0,64,4.6), "4.6");
+    test("1.2+3.4", TypeFlt.make(0,64,4.6), "flt:");
     // Mixed int/float with conversion
-    test("1+2.3",   TypeFlt.make(0,64,3.3), "3.3");
+    test("1+2.3",   TypeFlt.make(0,64,3.3), "flt:");
 
     // Variable lookup
-    test("math.pi", TypeFlt.PI, "3.141592653589793");
+    test("math.pi", TypeFlt.PI, "flt:");
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk",0);
     testerr("!", "Missing term after operator '!_'",1);
     testerr("_+_", "Syntax error; trailing junk",0);
     testerr("!_", "Missing term after operator '!_'",1);
     // Function application, traditional paren/comma args
-    test("1._+_(2)", TypeInt.con( 3),"3" );
-    test("1._-_(2)", TypeInt.con(-1),"-1"); // binary version
-    test("1.-_()"  , TypeInt.con(-1),"-1"); // unary version
+    test("1._+_(2)", TypeInt.con( 3),"int:" );
+    test("1._-_(2)", TypeInt.con(-1),"int:"); // binary version
+    test("1.-_()"  , TypeInt.con(-1),"int:"); // unary version
     // error; mismatch arg count
     testerr("math.pi(1)", "A function is being called, but 3.141592653589793 is not a function",7);
     testerr("1._+_(2,3)", "Passing 3 arguments to _+_ which takes 2 arguments",5);
 
     // Parsed as +(1,(2*3))
-    test("1._+_(2 * 3) ", TypeInt.con(7), "7");
+    test("1._+_(2 * 3) ", TypeInt.con(7), "int:");
     // Parsed as (1+2*3)+(4*5+6)
-    test("(1 + 2 * 3)._+_(4 * 5 + 6) ", TypeInt.con(33), "33");
+    test("(1 + 2 * 3)._+_(4 * 5 + 6) ", TypeInt.con(33), "int:");
     // Statements
-    test("(1;2 )", TypeInt.con(2), "2");
-    test("(1;2;)", TypeInt.con(2), "2"); // final semicolon is optional
-    test("1._+_(2;3)", TypeInt.con(4), "4"); // statements in arguments
+    test("(1;2 )", TypeInt.con(2), "int:");
+    test("(1;2;)", TypeInt.con(2), "int:"); // final semicolon is optional
+    test("1._+_(2;3)", TypeInt.con(4), "int:"); // statements in arguments
     // Operators squished together
-    test("-1== -1",  TypeInt.TRUE, "1");
-    test("0== !!1",  TypeInt.FALSE, "0");
-    test("2==-1",    TypeInt.FALSE, "0");
-    test("-1==--1",  TypeInt.FALSE, "0");
-    test("-1==---1", TypeInt.TRUE, "1");
+    test("-1== -1",  TypeInt.TRUE,  "int:");
+    test("0== !!1",  TypeInt.FALSE, "int:");
+    test("2==-1",    TypeInt.FALSE, "int:");
+    test("-1==--1",  TypeInt.FALSE, "int:");
+    test("-1==---1", TypeInt.TRUE,  "int:");
     testerr("-1== --", "Missing term after operator '-_'",7);
   }
 
   @Test public void testParse01() {
     // Syntax for variable assignment
-    test("x=1", TypeInt.TRUE, "1");
-    test("x=y=1", TypeInt.TRUE, "1");
+    test("x=1", TypeInt.TRUE, "int:");
+    test("x=y=1", TypeInt.TRUE, "int:");
     testerr("x=y=", "Missing ifex after assignment of 'y'",4);
     testerr("x=z" , "Unknown ref 'z'",2);
     testerr("x=1+y","Unknown ref 'y'",4);
     testerr("x=y; x=y","Unknown ref 'y'",2);
-    test("x=2; y=x+1; x*y", TypeInt.con(6), "6");
+    test("x=2; y=x+1; x*y", TypeInt.con(6), "int:");
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
-    test("1+(x=2*3)+x*x", TypeInt.con(1+6+6*6), "43");
+    test("1+(x=2*3)+x*x", TypeInt.con(1+6+6*6), "int:");
     testerr("x=(1+(x=2)+x); x", "Cannot re-assign final field '.x' in @{x=2}",0);
-    test("x:=1;x++"  ,TypeInt.con(1), "1");
-    test("x:=1;x++;x",TypeInt.con(2), "2");
-    test("x:=1;x++ + x--",TypeInt.con(3), "3");
-    test("x++",Type.NIL, "nil");
-    test("x++;x",TypeInt.con(1), "1");
+    test("x:=1;x++"  ,TypeInt.con(1), "int:");
+    test("x:=1;x++;x",TypeInt.con(2), "int:");
+    test("x:=1;x++ + x--",TypeInt.con(3), "int:");
+    test("x++",Type.NIL, "A?");
+    test("x++;x",TypeInt.con(1), "int:");
 
     // Conditional:
-    test   ("0 ?    2  : 3", TypeInt.con(3), "3"); // false
-    test   ("2 ?    2  : 3", TypeInt.con(2), "2"); // true
-    test   ("math.rand(1)?x=4:x=3;x", TypeInt.NINT8, "int8"); // x defined on both arms, so available after
-    test   ("math.rand(1)?x=2:  3;4", TypeInt.con(4), "4"); // x-defined on 1 side only, but not used thereafter
-    test   ("math.rand(1)?(y=2;x=y*y):x=3;x", TypeInt.NINT8, "int8"); // x defined on both arms, so available after, while y is not
+    test   ("0 ?    2  : 3", TypeInt.con(3), "int:"); // false
+    test   ("2 ?    2  : 3", TypeInt.con(2), "int:"); // true
+    test   ("math.rand(1)?x=4:x=3;x", TypeInt.NINT8, "int:"); // x defined on both arms, so available after
+    test   ("math.rand(1)?x=2:  3;4", TypeInt.con(4), "int:"); // x-defined on 1 side only, but not used thereafter
+    test   ("math.rand(1)?(y=2;x=y*y):x=3;x", TypeInt.NINT8, "int:"); // x defined on both arms, so available after, while y is not
     testerr("math.rand(1)?x=2: 3 ;x", "'x' not defined on false arm of trinary",20);
     testerr("math.rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
     testerr("0 ? x=2 : 3;x", "'x' not defined on false arm of trinary",11);
-    test   ("2 ? x=2 : 3;x", TypeInt.con(2), "2"); // off-side is constant-dead, so missing x-assign is ignored
-    test   ("2 ? x=2 : y  ", TypeInt.con(2), "2"); // off-side is constant-dead, so missing 'y'      is ignored
+    test   ("2 ? x=2 : 3;x", TypeInt.con(2), "int:"); // off-side is constant-dead, so missing x-assign is ignored
+    test   ("2 ? x=2 : y  ", TypeInt.con(2), "int:"); // off-side is constant-dead, so missing 'y'      is ignored
     testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign final field '.x' in @{x=1}",7);
-    test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1), "1"); // Re-assigned allowed & ignored in dead branch
-    test   ("math.rand(1)?1:int:2:int",TypeInt.NINT8, "int64"); // no ambiguity between conditionals and type annotations
+    test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1), "int:"); // Re-assigned allowed & ignored in dead branch
+    test   ("math.rand(1)?1:int:2:int",TypeInt.NINT8, "int:"); // no ambiguity between conditionals and type annotations
     testerr("math.rand(1)?1: :2:int","missing expr after ':'",16); // missing type
     testerr("math.rand(1)?1::2:int","missing expr after ':'",15); // missing type
-    test   ("math.rand(1)?1",TypeInt.BOOL,"int64"); // Missing optional else defaults to nil
+    test   ("math.rand(1)?1",TypeInt.BOOL,"int:"); // Missing optional else defaults to nil
     test   ("math.rand(1)?@{}",
       (ignore->TypeMemPtr.make_nil(8,TypeStruct.make(TypeFld.NO_DISP))),
-      null, "@{^=any;}?" );
-    test   ("x:=0;math.rand(1)?(x:=1);x",TypeInt.BOOL,"int64");
+      null, "@{^=A;}?" );
+    test   ("x:=0;math.rand(1)?(x:=1);x",TypeInt.BOOL,"int:");
     testerr("a.b.c();","Unknown ref 'a'",0);
   }
 
@@ -202,17 +202,20 @@ public class TestParse {
   }
 
   @Test public void testParse02() {
-    // Anonymous function definition
-    test("{x -> x&1}",
-         (ignore -> TypeFunPtr.make(78,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.BOOL)),
-         ( ()-> TypeStruct.make(TypeFld.make("x",Type.SCALAR,ARG_IDX))),
-         "[78]{ int64 -> int64 }");
-    test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
-    testerr("{x y -> x+y}", "Scalar is none of (flt64,int64,*str?)",8); // {Scalar Scalar -> Scalar}
+    test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2), "2"); // trivially inlined; capture external variable
+    // Anonymous function definition.  Note: { x -> x&1 }; 'x' can be either an
+    // int or any struct with an operator '_&_', which needs to be nil-checked
+    // before loading the operator field.
+    test("{x:int -> x&1}",
+         (ignore -> TypeFunPtr.make(38,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.BOOL)),
+         ( ()-> TypeStruct.make(TypeFld.make("x",TypeInt.INT64,ARG_IDX))),
+         "{ int64 -> int64 }");
+    test("{5}()", TypeInt.con(5), "5"); // No args nor -> required; this is simply a function returning 5, being executed
+    testerr("{x:flt y -> x+y}", "Unable to resolve _+_",13); // {Scalar Scalar -> Scalar}
 
     // Function execution and result typing
-    test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2)); // trivially inlined; capture external variable
-    test("x=3; and2={x -> x & 2}; and2(x)", TypeInt.con(2)); // trivially inlined; shadow  external variable
+    test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2), "2"); // trivially inlined; capture external variable
+    test("x=3; and2={x -> x & 2}; and2(x)", TypeInt.con(2), "2"); // trivially inlined; shadow  external variable
     testerr("plus2={x -> x+2}; x", "Unknown ref 'x'",18); // Scope exit ends lifetime
     testerr("fun={x -> }; fun(0)", "Missing function body",10);
     testerr("fun(2)", "Unknown ref 'fun'", 0);

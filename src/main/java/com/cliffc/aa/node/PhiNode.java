@@ -24,9 +24,13 @@ public class PhiNode extends Node {
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
-    if( !(o instanceof PhiNode) ) return false;
-    PhiNode phi = (PhiNode)o;
+    if( !(o instanceof PhiNode phi) ) return false;
     return _t==phi._t;
+  }
+  @Override void walk_reset0() {
+    assert is_prim();
+    while( len()>1 && !in(len()-1).is_prim() )
+      pop(); // Kill wired primitive inputs
   }
 
   @Override public Node ideal_reduce() {
@@ -35,9 +39,9 @@ public class PhiNode extends Node {
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
     if( r._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
-    if( r instanceof FunNode ) {
-      if( ((FunNode)r).has_unknown_callers() ) return null; // Still finding incoming edges
-      if( ((FunNode)r).noinline() )  return null; // Do not start peeling apart parameters to a no-inline function
+    if( r instanceof FunNode fun ) {
+      if( fun.has_unknown_callers() ) return null; // Still finding incoming edges
+      if( fun.noinline() )  return null; // Do not start peeling apart parameters to a no-inline function
     }
     // If only 1 unique live input, return that
     Node live=null;
@@ -104,10 +108,8 @@ public class PhiNode extends Node {
   }
 
   @Override public ErrMsg err( boolean fast ) {
-    if( !(in(0) instanceof FunNode && ((FunNode)in(0)).name(false).equals("!") ) && // Specifically "!" takes a Scalar
-        (_val !=null &&
-         (_val.contains(Type.SCALAR) ||
-          _val.contains(Type.NSCALR))) ) // Cannot have code that deals with unknown-GC-state
+    if( _val.contains(Type.SCALAR) ||
+        _val.contains(Type.NSCALR) ) // Cannot have code that deals with unknown-GC-state
       return ErrMsg.badGC(_badgc);
     return null;
   }

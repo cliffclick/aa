@@ -1008,7 +1008,7 @@ public class Parse implements Comparable<Parse> {
         Node parm = gvn(new ParmNode(fld,fun,Env.ALL_PARM,errmsg));
         scope().stk().add_fld(fld,parm,bads.at(fld._order-ARG_IDX));
       }
-      stk.set_nargs(formals.len());
+      stk.set_nargs(formals.nargs());
 
       // Parse function body
       Node rez = stmts();       // Parse function body
@@ -1027,7 +1027,7 @@ public class Parse implements Comparable<Parse> {
       // Hook the function at the TOP scope, because it may yet have unwired
       // CallEpis which demand memory.  This hook is removed as part of doing
       // the Combo pass which computes a real Call Graph and all escapes.
-      Env.TOP._scope.add_def(ret);
+      Env.SCP_0.add_def(ret);
       // The FunPtr builds a real display; any up-scope references are passed in now.
       Node fptr = gvn(new FunPtrNode(null,ret,par_stk._is_val ? Env.ALL : par_stk));
 

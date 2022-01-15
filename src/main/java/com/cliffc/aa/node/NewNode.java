@@ -102,7 +102,7 @@ public class NewNode extends Node {
   }
   @Override public String xstr() { return "New"+"*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
-  void reset() { assert is_prim(); _init(_reset_alias,_ts); }
+  @Override void walk_reset0() { assert is_prim(); _init(_reset_alias,_ts); }
   @Override public boolean is_forward_type() { return _forward_ref; }
   public void define() { assert _forward_ref && _closed; _forward_ref=false; }
   public boolean is_closed() { return _closed; }
@@ -120,7 +120,7 @@ public class NewNode extends Node {
 
   // True if field exists
   public boolean exists(String name) { return _ts.find(name)!=-1; }
-  public void add_fld( TypeFld fld, Node val, Parse badt ) {
+  public Node add_fld( TypeFld fld, Node val, Parse badt ) {
     assert !Util.eq(fld._fld,TypeFld.fldBot);
     assert !_closed;
     assert _ts.len()+DSP_IDX==len();
@@ -131,30 +131,34 @@ public class NewNode extends Node {
     add_def(val);
     xval(); // Eagerly update the type
     Env.GVN.add_flow_uses(this);
+    return this;
   }
 
   // Add a named FunPtr to a New.  Auto-inflates to an Unresolved as needed.
-  public void add_fun( String name, FunPtrNode fptr, Parse bad ) {
+  public Node add_fun( String name, FunPtrNode fptr, Parse bad ) {
     assert !_closed;
-    if( _ts.get(name)==null ) {
-      TypeFld fld = TypeFld.make(name,fptr._val,Access.Final,len());
-      add_fld(fld,fptr,bad);
-      return;
-    }
     TypeFld fld = _ts.get(name);
+    if( fld==null ) {
+      TypeFld fld2 = TypeFld.make(name,fptr._val,Access.Final,len());
+      return add_fld(fld2,fptr,bad);
+    }
     Node n = in(fld._order);
-    UnresolvedNode unr = n instanceof UnresolvedNode
-      ? (UnresolvedNode)n
+    if( n._val==Type.XNIL ) // Stomp over a nil field create
+      return set_fld(fld.make_from(fptr._val,fld._access),fptr);
+
+    UnresolvedNode unr = n instanceof UnresolvedNode unr2
+      ? unr2
       : new UnresolvedNode(name,bad).scoped().add_fun((FunPtrNode)n);
     unr.add_fun(fptr);          // Checks all formals are unambiguous
     set_fld(fld.make_from(unr._val,fld._access),unr);
     xval();
+    return this;
   }
 
-  public void set_fld( TypeFld fld, Node n ) {
+  public Node set_fld( TypeFld fld, Node n ) {
     _ts = _ts.replace_fld(fld);
     set_def(fld._order,n);
-    Env.GVN.add_flow(mem());
+    return Env.GVN.add_flow(mem());
   }
   public void pop_fld() {
     _ts = _ts.pop_fld(len()-1);
@@ -250,9 +254,12 @@ public class NewNode extends Node {
   }
 
   @Override public TV2 new_tvar(String alloc_site) {
+    TV2 old = _tvar;   // Stop recursive self-cycles
     for( Node n : _defs )
       if( n!=null )  n.walk_initype(); // Force tvar
-    return TV2.make_struct(this,alloc_site);
+    TV2 rez = TV2.make_struct(this,alloc_site);
+    if( old !=null ) old.unify(rez,false);
+    return rez;
   }
 
   @Override public boolean unify( boolean test ) {

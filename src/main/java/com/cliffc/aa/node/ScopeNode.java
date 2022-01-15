@@ -68,7 +68,7 @@ public class ScopeNode extends Node {
 
   public Node get(String name) { return stk().get(name); }
   public boolean is_mutable(String name) { return stk().fld(name)._access==Access.RW; }
-  
+
   public RegionNode early_ctrl() { return (RegionNode)in(4); }
   public    PhiNode early_mem () { return (   PhiNode)in(5); }
   public    PhiNode early_val () { return (   PhiNode)in(6); }
@@ -86,7 +86,7 @@ public class ScopeNode extends Node {
   }
 
   public Set<String> typeNames() { return _types.keySet(); }
-  
+
   public boolean is_closure() { return _closure; }
 
   @Override public Node ideal_reduce() {
@@ -236,10 +236,10 @@ public class ScopeNode extends Node {
     for( int fidx : escs ) {
       boolean found=false;
       for( int i=RET_IDX; i<len(); i++ )
-        if( in(i) instanceof FunPtrNode fptr && fptr.fidx()==fidx )
+        if( in(i) instanceof RetNode ret && ret._fidx==fidx )
           { found=true; break; };
       if( !found )
-        add_def(FunPtrNode.get(fidx));
+        add_def(FunPtrNode.get(fidx).ret());
     }
   }
 

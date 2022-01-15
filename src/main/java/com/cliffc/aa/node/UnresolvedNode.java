@@ -17,7 +17,7 @@ import static com.cliffc.aa.AA.*;
  */
 public class UnresolvedNode extends Node {
   public final String _name;   // Name of unresolved function
-  private final Parse _bad;
+  private Parse _bad;
   // Unresolved moves through 3-states:
   // - 0 forward-ref; scope is not known; can add_fun
   // - 1 scoped; scope is known; can add_fun
@@ -36,6 +36,7 @@ public class UnresolvedNode extends Node {
     };
     return s+_name;
   }
+  UnresolvedNode set_bad(Parse bad) { assert _bad==null; _bad=bad; return this; }
 
   @Override public Type value() {
     if( is_forward_ref() ) return TypeFunPtr.GENERIC_FUNPTR;
@@ -61,8 +62,7 @@ public class UnresolvedNode extends Node {
   // Looks at the fidxs in TFP, and the arguments given and tries to resolve
   // the call.  Returns TFP if it cannot be further resolved.
   static TypeFunPtr resolve_value( Type[] tcall ) {
-    FunPtrNode choice=null;
-    TypeFunPtr tfp = (TypeFunPtr)tcall[tcall.length-1];
+    TypeFunPtr tfp = (TypeFunPtr)tcall[tcall.length-1], tfp2=null;
     if( tfp._fidxs==BitsFun.FULL || // Too low , will not resolve.  Might lift to OK
         tfp.above_center() ||       // Too high, will not resolve.  Might fall to OK
         tfp._fidxs.abit() != -1 )   // Already resolved to single target
@@ -72,16 +72,16 @@ public class UnresolvedNode extends Node {
       if( fptr.nargs() == tcall.length-1 ) {
         Type actual = tcall[ARG_IDX];
         Type formal = fptr.formal(ARG_IDX);
-        if( actual.isa(formal) &&
+        if( !actual.above_center() &&
+            actual.isa(formal) &&
             !(actual.getClass()==TypeInt.class && formal.getClass()==TypeFlt.class) ) {
-          assert choice == null; // Exactly zero or one fptr resolves
-          choice = fptr;         // Resolved choice
-          TypeFunPtr tfp2 = (TypeFunPtr)fptr._val;
-          tfp = tfp2.make_from(tcall[DSP_IDX],tfp2._ret);
+          TypeFunPtr tfp3 = (TypeFunPtr)fptr._val;
+          TypeFunPtr tfp4 = tfp3.make_from(tcall[DSP_IDX],tfp3._ret);
+          tfp2 = tfp2==null ? tfp4 : (TypeFunPtr)tfp2.meet(tfp4);
         }
       }
     }
-    return tfp;
+    return tfp2==null ? tfp : tfp2;
   }
 
   // Looks at this Unresolved and the arg types, and tries to resolve the call.
@@ -176,7 +176,8 @@ public class UnresolvedNode extends Node {
 
   // Assigning the forward-ref removes the error
   @Override public ErrMsg err( boolean fast ) {
-    if( is_defined() ) return ErrMsg.unresolved(_bad,"Unresolved"); // Ambiguous, should have resolved
+    if( is_defined() )
+      return ErrMsg.unresolved(_bad,"Unable to resolve "+_name); // Ambiguous, should have resolved
     return ErrMsg.forward_ref(_bad,_name);
   }
 

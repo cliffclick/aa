@@ -133,12 +133,18 @@ public abstract class Node implements Cloneable, IntSupplier {
     return this;
   }
 
+  static long NANO=0;
   public boolean check_vals( ) {
-    Node x = VALS.get(this), old=null;
-    if( x == this ) old=this;   // Found in table quickly
-    // Hunt the hard way
-    else for( Node o : VALS.keySet() ) if( o._uid == _uid ) { old=o; break; }
-    return (old!=null) == _elock;
+    return true; // VERY EXPENSIVE ASSERT
+//    Node x = VALS.get(this), old=null;
+//    if( x == this ) old=this;   // Found in table quickly
+//    // Hunt the hard way
+//    else {
+//      long t = System.nanoTime();
+//      for( Node o : VALS.keySet() ) if( o._uid == _uid ) { old=o; break; }
+//      NANO += System.nanoTime()-t;
+//    }
+//    return (old!=null) == _elock;
   }
 
   // Add def/use edge
@@ -710,8 +716,8 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Make globally shared common ConNode for this type.
   public static @NotNull Node con( Type t ) {
-    if( t instanceof TypeFunPtr && ((TypeFunPtr)t)._fidxs.abit()!=-1 )
-      return FunPtrNode.get(((TypeFunPtr)t)._fidxs.getbit()); // Pre-existing function constant
+    if( t instanceof TypeFunPtr tfp && tfp._fidxs.abit()!=-1 )
+      return FunPtrNode.get(tfp._fidxs.getbit()); // Pre-existing function constant
     Node con = new ConNode<>(t);
     Node con2 = VALS.get(con);
     if( con2 != null ) {        // Found a prior constant
@@ -732,7 +738,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( AA.DO_GCP ) {
       _val = Type.ANY;          // Highest value
       _live = TypeMem.DEAD;     // Not alive
-      if( this instanceof CallNode ) (( CallNode)this)._not_resolved_by_gcp = false; // Try again
+      if( this instanceof CallNode call ) call._not_resolved_by_gcp = false; // Try again
     } else {                    // Not doing optimistic GCP...
       assert _val==value() && _live==live();
     }
@@ -751,6 +757,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   public final void walk_reset( ) {
     if( Env.GVN.on_flow(this) ) return; // Been there, done that
     Env.GVN.add_flow(this);             // On worklist and mark visited
+    Env.GVN.add_reduce(this);           // Trigger adding to VALS at next ITER
     _val = Type.ALL;                    // Lowest value
     _live = all_live();                 // Full alive
     _elock = false;                     // Clear elock if reset_to_init0
@@ -758,13 +765,10 @@ public abstract class Node implements Cloneable, IntSupplier {
     // Walk reachable graph
     for( Node use : _uses )                   use.walk_reset();
     for( Node def : _defs ) if( def != null ) def.walk_reset();
-    if( this instanceof NewNode ) ((NewNode)this).reset();
-    if( this instanceof CallNode ) ((CallNode)this)._not_resolved_by_gcp = false; // Try again
-    if( this instanceof RegionNode || this instanceof PhiNode ) {
-      while( len()>1 && !in(len()-1).is_prim() )
-        pop(); // Kill wired primitive inputs
-    }
+    walk_reset0();              // Per-node special reset
   }
+  // Non-recursive specialized version
+  void walk_reset0( ) {}
 
 
   // At least as alive
@@ -778,9 +782,8 @@ public abstract class Node implements Cloneable, IntSupplier {
   public Node init1( ) {
     Node x = VALS.get(this);
     if( x!=null ) {             // Hit in GVN table
-      //kill();                   // Kill just-init'd
-      //return x;                 // Return old, which will add uses
-      throw unimpl("untested");
+      kill();                   // Kill just-init'd
+      return x;                 // Return old, which will add uses
     }
     _elock();                   // Install in GVN
     _val = Type.ANY;            // Super optimistic types

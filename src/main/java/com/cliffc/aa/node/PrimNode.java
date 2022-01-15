@@ -4,6 +4,7 @@ import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
 
@@ -97,7 +98,7 @@ public abstract class PrimNode extends Node {
     Env.GVN.init(nnn);
     nnn.close();
     Env.PROTOS.put(s,nnn);
-    Env.TOP._scope.add_type(tname,nnn);
+    Env.SCP_0.add_type(tname,nnn);
   }
 
   // Primitive wrapped as a simple function.
@@ -184,12 +185,14 @@ public abstract class PrimNode extends Node {
     return progress;
   }
   private boolean prim_unify(TV2 arg, Type t, boolean test) {
-    if( arg.is_base() && t.isa(arg._flow) ) return false;
-    if( arg.is_err() ) return false;
-    if( test ) return true;
-    return arg.unify(TV2.make_base(this, arg._flow==null ? t : t.meet(arg._flow), "Prim_unify"),test);
+    if( t==Type.SCALAR || t==Type.ANY ) return false; // No binding on input
+    NewNode nnn = Env.SCP_0.get_type(switch( t ) {
+    case TypeInt ti -> "int:";
+    case TypeFlt tf -> "flt:";
+    default -> throw unimpl();
+      });
+    return arg.unify(nnn.tvar(),test);
   }
-
 
   @Override public ErrMsg err( boolean fast ) {
     for( TypeFld fld : _formals ) {
@@ -208,7 +211,7 @@ public abstract class PrimNode extends Node {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
     if( !(o instanceof PrimNode p) ) return false;
-    return _name.equals(p._name) && _formals==p._formals;
+    return Util.eq(_name,p._name) && _formals==p._formals;
   }
 
   public static class ConvertI64F64 extends PrimNode {
@@ -298,7 +301,6 @@ public abstract class PrimNode extends Node {
     public AndI64() { super("&"); }
     // And can preserve bit-width
     @Override public Type value() {
-      if( is_keep() ) return Type.ALL;
       Type t1 = val(DSP_IDX), t2 = val(ARG_IDX);
       // 0 AND anything is 0
       if( t1 == Type. NIL || t2 == Type. NIL ) return Type. NIL;

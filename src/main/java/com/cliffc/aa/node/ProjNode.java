@@ -48,16 +48,14 @@ public class ProjNode extends Node {
       assert _idx==REZ_IDX;
       return tv.unify(tvar(0),test);
     }
-    if( in(0) instanceof CallNode ) {
-      TV2 tv2 = in(0).tvar(_idx);
+    if( in(0) instanceof CallNode call ) {
+      TV2 tv2 = call.tvar(_idx);
       if( _idx==DSP_IDX ) {     // Specifically for the function/display, only unify on the display part.
-        //if( tv2.is_fun() ) {    // Expecting the call input to be a function
-        //  TV2 tdsp = tv2.arg("2"); // Unify against the function display
-        //  return tdsp != null && tv.unify(tdsp,test);
-        //}
-        //else if( tv2.is_err() ) return false;
-        //else throw unimpl();
-        throw unimpl();
+        if( tv2.is_fun() ) {    // Expecting the call input to be a function
+          TV2 tdsp = tv2.arg("2"); // Unify against the function display
+          return tdsp != null && tv.unify(tdsp,test);
+        }
+        else return false;
       }
       return tv.unify(tv2,test); // Unify with Call arguments
     }
@@ -66,8 +64,8 @@ public class ProjNode extends Node {
 
   public static ProjNode proj( Node head, int idx ) {
     for( Node use : head._uses )
-      if( use instanceof ProjNode && ((ProjNode)use)._idx==idx )
-        return (ProjNode)use;
+      if( use instanceof ProjNode proj && proj._idx==idx )
+        return proj;
     return null;
   }
 
@@ -76,8 +74,7 @@ public class ProjNode extends Node {
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
-    if( !(o instanceof ProjNode) ) return false;
-    ProjNode proj = (ProjNode)o;
+    if( !(o instanceof ProjNode proj) ) return false;
     return _idx==proj._idx;
   }
 }
