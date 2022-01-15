@@ -78,7 +78,7 @@ public class Oper {
   public boolean is_open() { return is_open(_name); }
 
   private Oper(String name, int prec) {
-    char c0 = name.charAt(0), c1 = name.charAt(0);
+    char c0 = name.charAt(0), c1 = name.charAt(1);
     assert c0!='{' &&  (c0!='_' || c1!='{'); // Too confusing
     // Count '_' for nargs
     int nargs=0;
