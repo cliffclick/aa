@@ -95,10 +95,15 @@ public class NewNode extends Node {
     _alias = alias;
     assert ts._name.isEmpty() || Util.eq(ts._name,_tname);
     if( ts._name.isEmpty() && _tname!=null ) ts = ts.set_name(_tname);
-    _ts = ts;
     TypeStruct flat = TypeStruct.ISUSED;
     if( _tname!=null ) flat = flat.set_name(_tname);
     _tptr = TypeMemPtr.make(BitsAlias.make0(alias),flat);
+    sets(ts);
+  }
+  private void sets(TypeStruct ts) {
+    _ts = ts;
+    Env.DEF_MEM.set_alias(_alias,ts.oob(TypeStruct.ISUSED));
+    xval();
   }
   @Override public String xstr() { return "New"+"*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
@@ -127,24 +132,23 @@ public class NewNode extends Node {
     if( _fld_starts==null ) _fld_starts = new Parse[1];
     while( _fld_starts.length <= _ts.len() ) _fld_starts = Arrays.copyOf(_fld_starts,_fld_starts.length<<1);
     _fld_starts[_ts.len()]=badt;
-    _ts = _ts.add_fldx(fld);     // Will also assert no-dup field names
     add_def(val);
-    xval(); // Eagerly update the type
+    sets(_ts.add_fldx(fld));     // Will also assert no-dup field names
     Env.GVN.add_flow_uses(this);
     return this;
   }
 
   // Add a named FunPtr to a New.  Auto-inflates to an Unresolved as needed.
-  public Node add_fun( String name, FunPtrNode fptr, Parse bad ) {
+  public Node add_fun( String name, Access fin, FunPtrNode fptr, Parse bad ) {
     assert !_closed;
     TypeFld fld = _ts.get(name);
     if( fld==null ) {
-      TypeFld fld2 = TypeFld.make(name,fptr._val,Access.Final,len());
+      TypeFld fld2 = TypeFld.make(name,fptr._val,fin,len());
       return add_fld(fld2,fptr,bad);
     }
     Node n = in(fld._order);
     if( n._val==Type.XNIL ) // Stomp over a nil field create
-      return set_fld(fld.make_from(fptr._val,fld._access),fptr);
+      return set_fld(fld.make_from(fptr._val,fin),fptr);
 
     UnresolvedNode unr = n instanceof UnresolvedNode unr2
       ? unr2
@@ -156,14 +160,13 @@ public class NewNode extends Node {
   }
 
   public Node set_fld( TypeFld fld, Node n ) {
-    _ts = _ts.replace_fld(fld);
+    sets(_ts.replace_fld(fld));
     set_def(fld._order,n);
     return Env.GVN.add_flow(mem());
   }
   public void pop_fld() {
-    _ts = _ts.pop_fld(len()-1);
     pop();
-    xval();
+    sets(_ts.pop_fld(len()));
   }
 
   // The current local scope ends, no more names will appear.  Forward refs
@@ -305,9 +308,8 @@ public class NewNode extends Node {
       if( len() <= 1 ) return null; /// Already killed
       // KILL!
       while( !is_dead() && len() > 1 )  pop(); // Kill all fields
-      _ts = TypeStruct.UNUSED.set_name(_ts._name);
       _tptr = _tptr.make_from(_ts);
-      Env.DEF_MEM.exclude_alias(_alias); // Alias not default reachable
+      sets(TypeStruct.UNUSED.set_name(_ts._name));
       xval();
       if( is_dead() ) return this;
       for( Node use : _uses )

@@ -783,7 +783,7 @@ public class HM {
       if( work!=null &&
           // 'ALL' happens from functions being passed in via Root (top-level
           // arguments), and are not any local function being analyzed.
-          tfp._fidxs != BitsFun.NZERO )
+          tfp._fidxs != BitsFun.ALL )
         for( int fidx : tfp._fidxs ) {
           Lambda lambda = Lambda.FUNS.get(fidx);
           if( lambda._applys.find(this) == -1 ) {
@@ -848,7 +848,7 @@ public class HM {
       int argn = Util.find(_args,child);
 
       // visit all Lambdas; meet the child flow into the Lambda arg#
-      if( argn != -1 && tfp._fidxs != BitsFun.NZERO )
+      if( argn != -1 && tfp._fidxs != BitsFun.ALL )
         for( int fidx : tfp._fidxs )
           Lambda.FUNS.get(fidx).arg_meet(argn,child._flow,work);
     }
@@ -973,7 +973,7 @@ public class HM {
           for( int fidx : fun._fidxs )
             rez = rez.meet(Lambda.FUNS.get(fidx).apply(FLOWS));
         Type rez2 = add_sig(rez);
-        return TypeFunPtr.makex(BitsFun.FULL,1,Type.ALL,rez2);
+        return TypeFunPtr.makex(BitsFun.ALL0,1,Type.ALL,rez2);
       } else {
         return t;
       }
@@ -1698,7 +1698,7 @@ public class HM {
         if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
         ADUPS.put(_uid, Type.XSCALAR);
         Type rez = arg("ret")._as_flow();
-        return TypeFunPtr.make(BitsFun.NZERO,size()-1,Type.ANY,rez);
+        return TypeFunPtr.make(BitsFun.ALL,size()-1,Type.ANY,rez);
       }
       if( is_struct() ) {
         TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);

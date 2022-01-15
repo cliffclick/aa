@@ -628,7 +628,7 @@ public class HM9 {
         for( int i=0; i<_args.length; i++ )
           targs[i] = _args[i].find();
         targs[_args.length] = find(); // Return
-        T2 nfun = T2.make_fun(BitsFun.FULL,targs);
+        T2 nfun = T2.make_fun(BitsFun.ALL0,targs);
         progress = tfun.unify(nfun,work);
         return tfun.find().is_err() ? find().unify(tfun.find(),work) : progress;
       }
@@ -660,7 +660,7 @@ public class HM9 {
       TypeFunPtr tfp = (TypeFunPtr)flow;
       // Have some functions, meet over their returns.
       Type rez = Type.XSCALAR;
-      if( tfp._fidxs==BitsFun.FULL ) rez = Type.SCALAR;
+      if( tfp._fidxs==BitsFun.ALL0 ) rez = Type.SCALAR;
       else
         for( int fidx : tfp._fidxs )
           rez = rez.meet(Lambda.FUNS.get(fidx).apply(_args));
@@ -984,7 +984,7 @@ public class HM9 {
     static private T2 var1,var2;
     static HashMap<Type,Pair1X> PAIR1S = new HashMap<>();
     public Pair1() {
-      super(var1=T2.make_leaf(),T2.make_fun(BitsFun.ANY,var2=T2.make_leaf(),T2.make_struct(BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{var1,var2})));
+      super(var1=T2.make_leaf(),T2.make_fun(BitsFun.ANY0,var2=T2.make_leaf(),T2.make_struct(BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{var1,var2})));
     }
     @Override PrimSyn make() { return new Pair1(); }
     @Override Type apply(Syntax[] args) {
@@ -1925,8 +1925,8 @@ public class HM9 {
         // TODO: PAIR1 should report better
         TypeFunPtr tfp = (TypeFunPtr)t;
         T2 ret = args(_args.length-1);
-        if( tfp._fidxs==BitsFun.FULL        ) return ret.walk_types_in(Type. SCALAR);
-        if( tfp._fidxs==BitsFun.FULL.dual() ) return ret.walk_types_in(Type.XSCALAR);
+        if( tfp._fidxs==BitsFun.ALL0        ) return ret.walk_types_in(Type. SCALAR);
+        if( tfp._fidxs==BitsFun.ALL0.dual() ) return ret.walk_types_in(Type.XSCALAR);
         for( int fidx : ((TypeFunPtr)t)._fidxs ) {
           Lambda lambda = Lambda.FUNS.get(fidx);
           Type body = lambda.find().is_err()

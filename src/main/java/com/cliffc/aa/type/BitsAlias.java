@@ -23,14 +23,14 @@ public class BitsAlias extends Bits<BitsAlias> {
   static final Bits.Tree<BitsAlias> TREE = new Bits.Tree<>();
   @Override public Tree<BitsAlias> tree() { return TREE; }
   public static final int ALLX;
-  public static BitsAlias ALL, ANY, NALL, NIL, XNIL, EMPTY;
+  public static BitsAlias ALL0, ANY0, NALL, NIL, XNIL, EMPTY;
 
   static {
     // The All-Memory alias class
     ALLX = TREE.split(0);        // Split from 0
     NALL = new BitsAlias().make_impl(ALLX,null); // All aliases, no nil
-    ALL  = NALL.meet_nil();      // All aliases, with a low nil
-    ANY  = ALL.dual();           // Precompute dual
+    ALL0 = NALL.meet_nil();      // All aliases, with a low nil
+    ANY0 = ALL0.dual();          // Precompute dual
     NIL  = make0(0);             // Ugly but NIL has a dual, and this is "low" NIL
     XNIL = NIL.dual();           //
     EMPTY= new BitsAlias().make(); // No bits; its its own dual
@@ -49,8 +49,8 @@ public class BitsAlias extends Bits<BitsAlias> {
   // Iterate over children
   public static int next_kid( int alias, int kid ) { return TREE.next_kid(alias,kid); }
 
-  @Override public BitsAlias ALL() { return ALL; }
-  @Override public BitsAlias ANY() { return ANY ; }
+  @Override public BitsAlias ALL0() { return ALL0; }
+  @Override public BitsAlias ANY0() { return ANY0; }
   @Override public BitsAlias EMPTY() { return EMPTY ; }
 
   public static BitsAlias make0( int bit ) { return NALL.make(bit); }

@@ -314,18 +314,18 @@ public class TestHM9 {
       if( true ) {
         // Unrolled, known to only produce results where either other nested
         // struct is from a different allocation site.
-        TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.ALL.make(0,10),TypeStruct.UNUSED);
+        TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.ALL0.make(0,10),TypeStruct.UNUSED);
         TypeStruct cycle_str1 = TypeStruct.make_test("n1",cycle_ptr0,"v1",TypeMemPtr.ISUSED);
-        TypeMemPtr cycle_ptr1 = TypeMemPtr.make(BitsAlias.ALL.make(0, 9),cycle_str1);
+        TypeMemPtr cycle_ptr1 = TypeMemPtr.make(BitsAlias.ALL0.make(0, 9),cycle_str1);
         TypeStruct cycle_str2 = TypeStruct.make_test("n1",cycle_ptr1,"v1",TypeMemPtr.ISUSED);
-        TypeMemPtr cycle_ptr2 = TypeMemPtr.make(BitsAlias.ALL.make(0,10),cycle_str2);
+        TypeMemPtr cycle_ptr2 = TypeMemPtr.make(BitsAlias.ALL0.make(0,10),cycle_str2);
         TypeStruct cycle_str3 = TypeStruct.make_test("n1",cycle_ptr2,"v1",TypeMemPtr.ISUSED);
         cycle_strX = cycle_str3;
       } else {
         // Not unrolled, both structs are folded
-        TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.ALL.make(0,7, 8),TypeStruct.UNUSED);
+        TypeMemPtr cycle_ptr0 = TypeMemPtr.make(BitsAlias.ALL0.make(0,7, 8),TypeStruct.UNUSED);
         TypeStruct cycle_str1 = TypeStruct.make_test("n1",cycle_ptr0,"v1",TypeMemPtr.ISUSED);
-        TypeMemPtr cycle_ptr1 = TypeMemPtr.make(BitsAlias.ALL.make(0,7, 8),cycle_str1);
+        TypeMemPtr cycle_ptr1 = TypeMemPtr.make(BitsAlias.ALL0.make(0,7, 8),cycle_str1);
         TypeStruct cycle_str2 = TypeStruct.make_test("n1",cycle_ptr1,"v1",TypeMemPtr.ISUSED);
         cycle_strX = cycle_str2;
       }

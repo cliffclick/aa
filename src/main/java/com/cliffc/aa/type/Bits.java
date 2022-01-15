@@ -72,10 +72,10 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
   abstract B make_impl(int con, long[] bits );
   abstract Tree<B> tree();
-  public abstract B ALL();
-  public abstract B ANY();
+  public abstract B ALL0();
+  public abstract B ANY0();
   public abstract B EMPTY();
-
+  
   // Common init
   void init(int con, long[] bits ) {
     _con = con;
@@ -297,9 +297,9 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   @SuppressWarnings("unchecked")
   public B meet( final B bs ) {
     if( this==bs ) return (B)this;
-    B full = ALL();             // Subclass-specific version of full
+    B full = ALL0();             // Subclass-specific version of full
     if( this==full || bs==full ) return full;
-    B any  = ANY();             // Subclass-specific version of any
+    B any  = ANY0();             // Subclass-specific version of any
     if( this==any ) return bs;
     if( bs  ==any ) return (B)this;
     // Empty is a little odd; similar to meeting two JOIN sets with nothing in

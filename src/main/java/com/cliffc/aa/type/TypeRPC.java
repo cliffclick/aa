@@ -27,8 +27,8 @@ public class TypeRPC extends Type<TypeRPC> {
   }
 
   public static TypeRPC make( int rpc ) { return make(BitsRPC.make0(rpc)); }
-  public static final TypeRPC ALL_CALL = make(BitsRPC.FULL);
-  private static final TypeRPC RPC1 = make(BitsRPC.new_rpc(BitsRPC.ALL));
+  public static final TypeRPC ALL_CALL = make(BitsRPC.ALL0);
+  private static final TypeRPC RPC1 = make(BitsRPC.new_rpc(BitsRPC.ALLX));
   private static final TypeRPC EMPTY = make(BitsRPC.EMPTY);
   static final TypeRPC[] TYPES = new TypeRPC[]{RPC1,ALL_CALL,EMPTY};
 

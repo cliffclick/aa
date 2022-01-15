@@ -1269,6 +1269,7 @@ public class Parse implements Comparable<Parse> {
   }
 
   // Parse a struct type.  Side-effect constant fields into proto.
+  // Disallows 'x := expr'
   private TypeMemPtr tstruct(NewNode proto) {
     if( !peek("@{") ) return null;
     // Parse fields
@@ -1294,8 +1295,8 @@ public class Parse implements Comparable<Parse> {
       // Insert the field into the structure.
       // FunPtrs are allowed to stack, if the signatures do not overlap.
       TypeFld tfld = TypeFld.make(tok.intern(),t,access,proto.len());
-      if( val instanceof FunPtrNode fptr ) proto.add_fun(tok ,fptr,null);
-      else                                 proto.add_fld(tfld, val,null);
+      if( val instanceof FunPtrNode fptr ) proto.add_fun(tok ,access,fptr,null);
+      else                                 proto.add_fld(tfld       , val,null);
       if(  peek('}') ) break;          // End of struct,  no trailing semicolon?
       if( !peek(';') ) throw unimpl(); // Not a type
       if(  peek('}') ) break;          // End of struct, yes trailing semicolon?

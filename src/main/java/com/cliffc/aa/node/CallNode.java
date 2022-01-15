@@ -93,7 +93,7 @@ public class CallNode extends Node {
   Parse[] _badargs;         // Errors for e.g. wrong arg counts or incompatible args; one error point per arg.
   public CallNode( boolean unpacked, Parse[] badargs, Node... defs ) {
     super(OP_CALL,defs);
-    _rpc = BitsRPC.new_rpc(BitsRPC.ALL); // Unique call-site index
+    _rpc = BitsRPC.new_rpc(BitsRPC.ALLX); // Unique call-site index
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
     _badargs = badargs;
   }
@@ -474,7 +474,7 @@ public class CallNode extends Node {
   @Override public ErrMsg err( boolean fast ) {
     // Expect a function pointer
     TypeFunPtr tfp = ttfp(_val);
-    if( tfp._fidxs==BitsFun.FULL ) {
+    if( tfp._fidxs==BitsFun.ALL0 ) {
       return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"A function is being called, but "+fdx()._val+" is not a function");
     }
 

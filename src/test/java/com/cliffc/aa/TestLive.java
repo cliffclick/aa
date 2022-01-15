@@ -4,8 +4,6 @@ import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import org.junit.Test;
 
-import static com.cliffc.aa.AA.REZ_IDX;
-import static com.cliffc.aa.type.TypeFld.Access;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -26,11 +24,11 @@ public class TestLive {
     scope.set_rez(rez);
 
     // Check liveness base case
-    scope.xliv();
+    scope._live = scope.live();
     assertEquals(TypeMem.ANYMEM,scope._live);
 
     // Check liveness recursive back one step
-    rez.xliv();
+    rez._live = rez.live();
     assertEquals(TypeMem.ALIVE,rez._live);
   }
 

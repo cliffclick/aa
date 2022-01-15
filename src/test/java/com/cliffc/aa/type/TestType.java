@@ -337,7 +337,7 @@ public class TestType {
 
     // TypeTuple structure demands the shortest Tuple wins the "length
     // war" (determines the length of the result based on short's any/all flag).
-    TypeFunPtr f1i2i = TypeFunPtr.make_new_fidx(BitsFun.ALL,2,NO_DISP,TypeInt.INT64);
+    TypeFunPtr f1i2i = TypeFunPtr.make_new_fidx(BitsFun.ALLX,2,NO_DISP,TypeInt.INT64);
     // To be a GF result, GF has to be shorter and high; the isa does a meet of
     // TypeFunPtrs which does a *join* of args, which duals the GF args down
     // low.  GF is zero length and low, and wins the meet.
@@ -347,7 +347,7 @@ public class TestType {
     //assertTrue(gf.dual().isa(f1i2i)); // To be short result, short must be low
 
     assertTrue(f1i2i.isa(gf));
-    TypeFunPtr f1f2f = TypeFunPtr.make_new_fidx(BitsFun.ALL,2,NO_DISP,TypeFlt.FLT64);
+    TypeFunPtr f1f2f = TypeFunPtr.make_new_fidx(BitsFun.ALLX,2,NO_DISP,TypeFlt.FLT64);
     assertTrue(f1f2f.isa(gf));
     TypeFunPtr mt = (TypeFunPtr)f1i2i.meet(f1f2f);
     int fidx0 = f1i2i.fidx();

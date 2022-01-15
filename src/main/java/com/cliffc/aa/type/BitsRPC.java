@@ -22,7 +22,7 @@ public class BitsRPC extends Bits<BitsRPC> {
 
   private static final Bits.Tree<BitsRPC> TREE = new Bits.Tree<>();
   @Override Tree<BitsRPC> tree() { return TREE; } 
-  public static final int ALL = new_rpc(0);
+  public static final int ALLX = new_rpc(0);
   public static int new_rpc( int par ) { return TREE.split(par); }
   // Fast reset of parser state between calls to Exec
   public static void init0() { TREE.init0(); }
@@ -30,13 +30,13 @@ public class BitsRPC extends Bits<BitsRPC> {
   
   // Have to make a first BitsRPC here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
-  static final BitsRPC FULL = new BitsRPC().make_impl(1,new long[]{1L | (1L<<ALL)});
-  private static final BitsRPC ANY = FULL.dual();
+  static final BitsRPC ALL0 = new BitsRPC().make_impl(1,new long[]{1L | (1L<<ALLX)});
+  private static final BitsRPC ANY0 = ALL0.dual();
   public  static final BitsRPC NIL = make0(0);
-  static final BitsRPC EMPTY = FULL.make(); // No bits
-  @Override public BitsRPC ALL() { return FULL; }
-  @Override public BitsRPC ANY() { return ANY ; }
+  static final BitsRPC EMPTY = ALL0.make(); // No bits
+  @Override public BitsRPC ALL0() { return ALL0; }
+  @Override public BitsRPC ANY0() { return ANY0; }
   @Override public BitsRPC EMPTY() { return EMPTY ; }
 
-  static BitsRPC make0( int bit ) { return FULL.make(bit); }
+  static BitsRPC make0( int bit ) { return ALL0.make(bit); }
 }

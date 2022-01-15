@@ -118,7 +118,7 @@ public class ScopeNode extends Node {
     // If the result is a function, wipe out wrong fidxs
     if( rez._val instanceof TypeFunPtr ) {
       BitsFun fidxs = ((TypeFunPtr)rez._val)._fidxs;
-      if( fidxs != BitsFun.FULL )
+      if( fidxs != BitsFun.ALL0 )
         for( int i=RET_IDX; i<_defs._len; i++ )
           if( !fidxs.test(((RetNode)in(i))._fidx) )
             //remove(i--);
@@ -212,13 +212,13 @@ public class ScopeNode extends Node {
   private BitsFun _escache_escs;
   public BitsFun top_escapes() {
     if( _val.above_center() ) return BitsFun.EMPTY;
-    if( is_prim() ) return BitsFun.FULL; // All the primitives escape
-    //if( !Env.GVN._opt_mode._CG ) return BitsFun.FULL; // Not run Opto yet
+    if( is_prim() ) return BitsFun.ALL0; // All the primitives escape
+    //if( !Env.GVN._opt_mode._CG ) return BitsFun.ALL0; // Not run Opto yet
     Type trez = rez()._val;
     Type tmem = mem()._val;
     if( _escache_trez == trez &&  _escache_tmem == tmem ) return _escache_escs; // Cache hit
     // Cache miss, compute the hard way
-    if( TypeFunPtr.GENERIC_FUNPTR.isa(trez) ) return BitsFun.FULL; // Can lift to any function
+    if( TypeFunPtr.GENERIC_FUNPTR.isa(trez) ) return BitsFun.ALL0; // Can lift to any function
     tmem = tmem instanceof TypeMem ? (TypeMem)tmem : tmem.oob(TypeMem.ALLMEM);
     BitsFun fidxs = trez.all_reaching_fidxs((TypeMem)tmem);
     _escache_trez = trez;
@@ -232,7 +232,7 @@ public class ScopeNode extends Node {
   void check_and_wire() {
     if( this==Env.SCP_0 ) return; // Do not wire the escaping primitives?
     BitsFun escs = top_escapes();
-    if( escs==BitsFun.FULL ) return; // Error exit
+    if( escs==BitsFun.ALL0 ) return; // Error exit
     for( int fidx : escs ) {
       boolean found=false;
       for( int i=RET_IDX; i<len(); i++ )

@@ -66,8 +66,8 @@ public class TestHM10 {
   private static final TypeMemPtr tuple9  = TypeMemPtr.make(9,TypeStruct.make(NO_DSP,
                                                                               TypeFld.make("x",Type.SCALAR),
                                                                               TypeFld.make("y",Type.SCALAR)));
-  private static BitsAlias ptr90  () { return BitsAlias.ALL.make( 9,10); }
-  private static BitsAlias ptr1011() { return BitsAlias.ALL.make(10,11); }
+  private static BitsAlias ptr90  () { return BitsAlias.ALL0.make( 9,10); }
+  private static BitsAlias ptr1011() { return BitsAlias.ALL0.make(10,11); }
 
   // Make field holding a pointer to a struct
   private static TypeFld mptr( String fld, int alias, TypeStruct ts ) {
@@ -910,7 +910,7 @@ three =(n.s two);     // Three is the successor of two
         "}",
         () -> {
           //*[13]@{^=any; f=[15]{any }; res1=*[9,10,11,12]($); res2=$}
-          Type tmp = TypeMemPtr.make(BitsAlias.ALL.make(9,10,11,12),TypeStruct.make(NO_DSP));
+          Type tmp = TypeMemPtr.make(BitsAlias.ALL0.make(9,10,11,12),TypeStruct.make(NO_DSP));
           return TypeMemPtr.make(13, TypeStruct.make(NO_DSP,mfun(2,"f",tmp,15),TypeFld.make("res1",tmp),TypeFld.make("res2",tmp)));
         },
         () -> {

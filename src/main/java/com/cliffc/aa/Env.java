@@ -216,6 +216,7 @@ public class Env implements AutoCloseable {
     TV2.reset_to_init0();
     Node.VALS.clear();          // Clean out hashtable
     GVN.flow_clear();
+    DEF_MEM.walk_reset();
     START.walk_reset();         // Clean out any wired prim calls
     KEEP_ALIVE.walk_reset();    // Clean out any wired prim calls
     GVNGCM.KEEP_ALIVE.walk_reset();

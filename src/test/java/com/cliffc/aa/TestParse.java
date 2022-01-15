@@ -587,7 +587,7 @@ map(tmp)
     // After inlining once, we become pair-aware.
 
     TypeStruct xts_int = TypeStruct.make_test(TypeMemPtr.ISUSED0,TypeInt.INT64);
-    TypeMemPtr xpt_int = TypeMemPtr.make (BitsAlias.ALL,xts_int);
+    TypeMemPtr xpt_int = TypeMemPtr.make (BitsAlias.ALLX,xts_int);
     //TypeStruct xts_str = TypeStruct.make_test(xpt_int,TypeMemPtr.STRPTR);
     //TypeMemPtr xtmp = TypeMemPtr.make(BitsAlias.ALL,xts_str);
     //

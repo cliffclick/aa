@@ -31,9 +31,9 @@ public class ConNode<T extends Type> extends Node {
   }
 
   @SuppressWarnings("unchecked")
-  public void exclude_alias(int alias) {
+  public void set_alias(int alias,TypeStruct ts) {
     unelock();                  // Changing hash
-    _t = (T)((TypeMem)_t).make_from(alias,TypeStruct.UNUSED);
+    _t = (T)((TypeMem)_t).make_from(alias,ts);
     Env.GVN.add_flow(this);
   }
 

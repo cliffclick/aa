@@ -34,9 +34,8 @@ public abstract class Exec {
 
     // Close file scope; no program text in this file, so no more fields to add.
     e._scope.stk().close();
-    int sidx = e._scope.push();
-    //Env.GVN.add_flow_uses(e._scope);// Post-parse, revisit top-level called functions
-    e.close();                // No more fields added to the parse scope
+    int sidx = e._scope.push();// Hook result, not dead
+    e.close();                // No more fields added to the parse scope; finish off Iter
 
     Combo.opto();      // Global Constant Propagation and Hindley-Milner Typing
 

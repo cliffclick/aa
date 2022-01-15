@@ -159,7 +159,7 @@ public class StoreNode extends Node {
     // Folding unambiguous functions?
     if( rez() instanceof FunPtrNode || rez() instanceof UnresolvedNode ) {
       if( rez().is_forward_ref() ) return false;
-      nnn.add_fun(_fld, (FunPtrNode) rez(), _bad); // Stacked FunPtrs into an Unresolved
+      nnn.add_fun(_fld, _fin, (FunPtrNode) rez(), _bad); // Stacked FunPtrs into an Unresolved
       // Field is modifiable; update New directly.
     } else if( tfld._access==Access.RW )
       nnn.set_fld(tfld.make_from(tfld._t,_fin),rez()); // Update the value, and perhaps the final field

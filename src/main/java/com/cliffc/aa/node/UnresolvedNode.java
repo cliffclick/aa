@@ -63,7 +63,7 @@ public class UnresolvedNode extends Node {
   // the call.  Returns TFP if it cannot be further resolved.
   static TypeFunPtr resolve_value( Type[] tcall ) {
     TypeFunPtr tfp = (TypeFunPtr)tcall[tcall.length-1], tfp2=null;
-    if( tfp._fidxs==BitsFun.FULL || // Too low , will not resolve.  Might lift to OK
+    if( tfp._fidxs==BitsFun.ALL0 || // Too low , will not resolve.  Might lift to OK
         tfp.above_center() ||       // Too high, will not resolve.  Might fall to OK
         tfp._fidxs.abit() != -1 )   // Already resolved to single target
       return tfp;

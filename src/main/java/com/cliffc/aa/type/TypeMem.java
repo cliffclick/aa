@@ -314,8 +314,8 @@ public class TypeMem extends Type<TypeMem> {
   // Transitively walk all reachable aliases from this set of aliases, and
   // return the complete set.
   public BitsAlias all_reaching_aliases(BitsAlias aliases) {
-    if( aliases==BitsAlias.NIL || aliases==BitsAlias.EMPTY ) return BitsAlias.EMPTY;
-    if( aliases==BitsAlias.ALL || aliases==BitsAlias.NALL  ) return aliases;
+    if( aliases==BitsAlias.NIL  || aliases==BitsAlias.EMPTY ) return BitsAlias.EMPTY;
+    if( aliases==BitsAlias.ALL0 || aliases==BitsAlias.NALL  ) return aliases;
     AryInt work = new AryInt();
     VBitSet visit = new VBitSet();
     for( int alias : aliases )

@@ -32,8 +32,8 @@ public class TestApprox {
 
     int a14 = BitsAlias.new_alias(BitsAlias.ALLX);
     BitsAlias ba14 = BitsAlias.make0(a14);
-    BitsFun f25 = BitsFun.make_new_fidx(BitsFun.ALL);
-    TypeFld p0 = make(BitsFun.NZERO,Type.SCALAR);
+    BitsFun f25 = BitsFun.make_new_fidx(BitsFun.ALLX);
+    TypeFld p0 = make(BitsFun.ALL,Type.SCALAR);
     TypeMemPtr ptr0 = TypeMemPtr.make(ba14,TypeStruct.make(p0));
     TypeFld p1 = make(f25,ptr0);
     TypeStruct tsa = TypeStruct.make(p1);
@@ -606,14 +606,14 @@ public class TestApprox {
     // until fixed point.
     final int CUTOFF=3;
     TypeStruct ts0 = TypeStruct.make(TypeFld.NO_DISP);
-    TypeMemPtr tmp0 = TypeMemPtr.make(BitsAlias.ALL,ts0), tmp1=null;
+    TypeMemPtr tmp0 = TypeMemPtr.make(BitsAlias.ALL0,ts0), tmp1=null;
 
     int cnt=0;
     while( tmp0 != tmp1 && cnt < 100 ) {
       TypeStruct ts1 = TypeStruct.make(TypeFld.make("^",tmp1=tmp0));
       TypeStruct ts1x = ts1.approx(CUTOFF-1,BitsAlias.NALL);
       // Extend with nil-or-not endlessly.
-      tmp0 = TypeMemPtr.make(BitsAlias.ALL,ts1x);
+      tmp0 = TypeMemPtr.make(BitsAlias.ALL0,ts1x);
       cnt++;
     }
     // End result has no prefix, since NIL is allowed at every step.  i.e., we
@@ -712,7 +712,7 @@ public class TestApprox {
     // args known post-parse but not pre-parse.
     TypeStruct tfp0_args = TypeStruct.make("", true, TypeMemPtr.DISP_FLD);
 
-    TypeFunPtr tfp0 = TypeFunPtr.make(BitsFun.ANY,2,TypeFunPtr.DISP.simple_ptr(),Type.SCALAR); // fib with generic display
+    TypeFunPtr tfp0 = TypeFunPtr.make(BitsFun.ANY0,2,TypeFunPtr.DISP.simple_ptr(),Type.SCALAR); // fib with generic display
     TypeStruct dsp0 = TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("fib",tfp0));// The display with weak fib-type
     TypeMemPtr ptr0 = TypeMemPtr.make(alias,dsp0);
     // Args for a strong fib: { ^:ptr0 x:int64 -> ~Scalar } // LOW
@@ -770,8 +770,8 @@ public class TestApprox {
 
     int alias13 = BitsAlias.new_alias(BitsAlias.ALLX);
     int alias14 = BitsAlias.new_alias(BitsAlias.ALLX);
-    BitsAlias a14   = BitsAlias.ALL.make(        alias14);
-    BitsAlias a1314 = BitsAlias.ALL.make(alias13,alias14);
+    BitsAlias a14   = BitsAlias.ALL0.make(        alias14);
+    BitsAlias a1314 = BitsAlias.ALL0.make(alias13,alias14);
     int fidx14 = BitsFun.new_fidx();
     int fidx25 = BitsFun.new_fidx();
     BitsFun f1425 = BitsFun.make0(fidx14,fidx25);

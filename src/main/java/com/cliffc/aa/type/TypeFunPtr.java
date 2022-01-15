@@ -208,8 +208,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   public static TypeFunPtr make_sig(TypeStruct formals,Type ret) { throw unimpl(); }
   public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR; // Open display, allows more fields
 
-  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL ,1,Type.ALL,Type.ALL);
-  public  static final TypeFunPtr ARG2   =         make(BitsFun.FULL ,2,Type.ALL,Type.ALL);
+  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.ALL0 ,1,Type.ALL,Type.ALL);
+  public  static final TypeFunPtr ARG2   =         make(BitsFun.ALL0 ,2,Type.ALL,Type.ALL);
   public  static final TypeFunPtr EMPTY  =         make(BitsFun.EMPTY,0,Type.ANY,Type.ANY);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,ARG2/*,EMPTY.dual()*/};
 
@@ -284,7 +284,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     return (_dsp==TypeMemPtr.NO_DISP || _dsp==Type.ALL) && 
       // Single bit covers all functions (no new children added, but new splits
       // can appear).  Currently, not tracking this at the top-level, so instead
-      // just triggering off of a simple heuristic: a single bit above BitsFun.FULL.
+      // just triggering off of a simple heuristic: a single bit above BitsFun.ALL0.
       _fidxs.abit() > 1 ;
   }
   @Override public boolean must_nil() { return _fidxs.test(0) && !_fidxs.above_center(); }

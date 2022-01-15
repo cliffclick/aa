@@ -45,7 +45,7 @@ public final class CallEpiNode extends Node {
     Type tc = call()._val;
     BitsFun fidxs = CallNode.ttfp(tc).fidxs();
     if( fidxs.above_center() ) return true; // No path is taken
-    if( fidxs==BitsFun.FULL ) return false; // Some unknown path is unwired
+    if( fidxs==BitsFun.ALL0 ) return false; // Some unknown path is unwired
     int ncall=0;
     for( int i=0; i<nwired(); i++ )
       if( fidxs.test(wired(i)._fidx) ) // Verify each fidx is wired
@@ -64,7 +64,7 @@ public final class CallEpiNode extends Node {
     BitsFun fidxs = CallNode.ttfp(tcall).fidxs();
 
     // If the call's allowed functions excludes any wired, remove the extras
-    if( !fidxs.test(BitsFun.ALL) ) { // Shortcut
+    if( !fidxs.test(BitsFun.ALLX) ) { // Shortcut
       for( int i = 0; i < nwired(); i++ ) {
         RetNode ret = wired(i);
         if( !fidxs.test_recur(ret.fidx()) ) { // Wired call not in execution set?
@@ -187,7 +187,7 @@ public final class CallEpiNode extends Node {
     Type tcall = call._val;
     if( !(tcall instanceof TypeTuple) ) return false;
     BitsFun fidxs = CallNode.ttfp(tcall)._fidxs;
-    if( fidxs==BitsFun.FULL ) return false; // Error call
+    if( fidxs==BitsFun.ALL0 ) return false; // Error call
     if( fidxs.above_center() )  return false; // Still choices to be made during GCP.
 
     // Check all fidxs for being wirable

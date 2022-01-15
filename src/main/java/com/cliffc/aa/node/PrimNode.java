@@ -7,6 +7,7 @@ import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
+import static com.cliffc.aa.type.TypeFld.Access;
 
 // Primitives can be used as an internal operator (their apply() call does the
 // primitive operation).  Primitives are wrapped as functions when returned
@@ -121,7 +122,7 @@ public abstract class PrimNode extends Node {
     Env.GVN.init(this);
     RetNode ret = Env.GVN.init(new RetNode(fun,null,this,null,fun));
     FunPtrNode fptr =  Env.GVN.init(new FunPtrNode(op,ret,is_oper ? Env.ALL : defalt));
-    nnn.add_fun(op,fptr,null);
+    nnn.add_fun(op,Access.Final,fptr,null);
   }
 
   // Build and install match package
@@ -186,11 +187,11 @@ public abstract class PrimNode extends Node {
   }
   private boolean prim_unify(TV2 arg, Type t, boolean test) {
     if( t==Type.SCALAR || t==Type.ANY ) return false; // No binding on input
-    NewNode nnn = Env.SCP_0.get_type(switch( t ) {
-    case TypeInt ti -> "int:";
-    case TypeFlt tf -> "flt:";
-    default -> throw unimpl();
-      });
+    String s;
+    if( t instanceof TypeInt ) s="int:";
+    else if( t instanceof TypeFlt ) s="flt:";
+    else throw unimpl();
+    NewNode nnn = Env.SCP_0.get_type(s);
     return arg.unify(nnn.tvar(),test);
   }
 

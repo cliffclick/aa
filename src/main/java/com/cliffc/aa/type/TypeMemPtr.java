@@ -120,7 +120,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     assert ds==DISPLAY;
   }
 
-  public  static final TypeMemPtr ISUSED0= make(BitsAlias.ALL  ,TypeStruct.ISUSED); // Includes nil
+  public  static final TypeMemPtr ISUSED0= make(BitsAlias.ALL0 ,TypeStruct.ISUSED); // Includes nil
   public  static final TypeMemPtr ISUSED = make(BitsAlias.NALL ,TypeStruct.ISUSED); // Excludes nil
   public  static final TypeMemPtr EMTPTR = make(BitsAlias.EMPTY,TypeStruct.UNUSED);
   public  static final TypeMemPtr DISP_SIMPLE= make(BitsAlias.NALL,TypeStruct.ISUSED); // closed display
