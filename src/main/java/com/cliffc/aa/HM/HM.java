@@ -2351,8 +2351,12 @@ public class HM {
     private Type _lift_leaf(Type jt) {
       Type tx = T2MAP.get(this);
       if( tx==null ) return jt;
-      if( is_base() )           // Weaken base-lifts by the HMT base
-        tx = tx.meet(_flow);
+      if( is_base() ) {         // Weaken base-lifts by the HMT base
+        Type tw = _flow instanceof TypeMemPtr tmp && tmp.is_str()
+          ? tmp.make_from((TypeStruct)tmp._obj.widen())
+          : _flow.widen();
+        tx = tx.meet(tw);
+      }
       return jt.join(tx);       // Join of possibilities
     }
 

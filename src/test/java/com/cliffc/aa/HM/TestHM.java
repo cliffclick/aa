@@ -131,7 +131,7 @@ public class TestHM {
         "( 3, *[4]str:(97))",
         // GCP with HM
         // With lift ON
-        TypeMemPtr.make(2,make_tups(TypeInt.con(3),TypeMemPtr.make_str("abc"))),
+        TypeMemPtr.make(2,make_tups(TypeInt.NINT64,TypeMemPtr.make_str(TypeInt.NINT64))),
         // With lift OFF
         //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
         // GCP is weaker without HM
@@ -244,7 +244,7 @@ map ={fun parg -> (fun (cdr parg))};
         "( *[4]str:(), int1)",
         "( *[4]str:(), int1)",
         // With Lift ON
-        TypeMemPtr.make(2,make_tups(TypeMemPtr.STRPTR,TypeInt.BOOL)),
+        TypeMemPtr.make(2,make_tups(TypeMemPtr.STRPTR,TypeInt.INT64)),
         // With Lift OFF
         //tuple2,
         tuple2);
@@ -254,7 +254,7 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void test21() {
     run("f0 = { f x -> (if (eq0 x) 1 (f (f0 f (dec x)) 2))}; (f0 * 99)",
         "int64","int64",
-         TypeInt.NINT64,TypeInt.NINT64);
+         TypeInt.NINT64,TypeInt.INT64);
   }
 
   // Obscure factorial-like
@@ -423,7 +423,7 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
         "( *[4]str:(), int1)",
         "( *[4]str:(), int1)",
         // With lift ON
-        TypeMemPtr.make(2,make_tups(TypeMemPtr.STRPTR,TypeInt.BOOL)),
+        TypeMemPtr.make(2,make_tups(TypeMemPtr.STRPTR,TypeInt.INT64)),
         // With lift OFF
         //tuple2,
         tuple2);
@@ -471,7 +471,7 @@ loop = { name cnt ->
         "*[0,4]str:(nint8)?",  // Both HM and GCP
         "Cannot unify int8 and *[0,4]str:(nint8)?", // HM alone cannot do this one
         // With lift ON
-        TypeMemPtr.make_str(TypeInt.NINT8), // Both HM and GCP
+        TypeMemPtr.make_str(TypeInt.NINT64), // Both HM and GCP
         // With lift OFF
         //Type.NSCALR,
         Type.NSCALR);                   // GCP alone gets a very weak answer
@@ -585,7 +585,7 @@ loop = { name cnt ->
                                                          mfun(1,"force",tf,25)));
           TypeStruct rez = TypeStruct.make(NO_DSP,
                                            // With lift ON
-                                           TypeFld.make("a", HM.DO_HM ? TypeInt.NINT8 : Type.SCALAR),
+                                           TypeFld.make("a", HM.DO_HM ? TypeInt.NINT64 : Type.SCALAR),
                                            // With lift OFF
                                            //TypeFld.make("a", Type.SCALAR),
                                            TypeFld.make("b", Type.SCALAR),
@@ -1040,7 +1040,7 @@ all = @{
         "( 3, *[4]str:(97))",
         "( 3, *[4]str:(97))",
         // With lift On
-        TypeMemPtr.make(2,make_tups(TypeInt.con(3),TypeMemPtr.make_str("abc"))),
+        TypeMemPtr.make(2,make_tups(TypeInt.NINT64,TypeMemPtr.make_str(TypeInt.NINT64))),
         // With lift Off
         //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
         tuplen2);
