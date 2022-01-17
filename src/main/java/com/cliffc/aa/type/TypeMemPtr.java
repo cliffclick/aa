@@ -100,6 +100,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     TypeStruct ts = TypeStruct.make("str:",false,c0);
     return TypeMemPtr.make(aliases,ts);
   }
+  public boolean is_str() { return Util.eq(_obj._name,"str:"); }
 
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.
   // To break class-init cycle, this is made here, now.
@@ -230,10 +231,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     ds.put(this,d);             //
     while( !t0.isEmpty() ) {
       for( Type t=t0.pop(); t!=null; t=t0.pop() )
-        if( t instanceof Cyclic &&
+        if( t instanceof Cyclic cyc &&
             ds.putIfAbsent(t,d) ==null ) {
           final Work<Type> ft0=t0, ft1=t1;
-          ((Cyclic)t).walk1((tc,label)->(tc instanceof TypeMemPtr && ((TypeMemPtr)tc)._aliases.overlaps(_aliases) ? ft1 : ft0).add(tc));
+          cyc.walk1((tc,label)->(tc instanceof TypeMemPtr tmp && tmp._aliases.overlaps(_aliases) ? ft1 : ft0).add(tc));
         }
       // Swap worklists, raise depth
       Work<Type> tmp = t0; t0 = t1; t1 = tmp; // Swap t0,t1

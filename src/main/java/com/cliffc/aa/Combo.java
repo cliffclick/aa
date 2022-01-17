@@ -132,8 +132,9 @@ public abstract class Combo {
   static public boolean HM_FREEZE;
 
   public static void opto() {
-    // Remove all the hooks keeping things alive until Combo sorts it out right.
-    if( AA.DO_GCP ) Env.unhook_rets();
+    if( AA.DO_GCP )
+      CallNode.ALL_CALLS = BitsRPC.EMPTY;
+
     Env.GVN.flow_clear();       // Will be used as a worklist
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.

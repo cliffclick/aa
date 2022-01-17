@@ -45,7 +45,6 @@ public class RegionNode extends Node {
       }
 
     if( _defs._len == 1 ) return null; // No live inputs; dead in value() call
-    if( this instanceof FunNode && ((FunNode)this).has_unknown_callers() ) return null; // Alive from unknown caller
     if( _defs._len==2 ) {              // Exactly 1 live path
       // If only 1 live path and no Phis then return 1 live path.
       for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;

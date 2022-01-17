@@ -494,7 +494,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
    This version is NOT associative with meet: A.apx.B != A.B.apx
 
   "Wrap-and-Approx" is not monotonic!  Can only happen if we have a nested
-  instance of alias#12.  This can happen from an ordinary MEET.
+  instance of e.g. alias#12.  This can happen from an ordinary MEET.
 
   [12]@{                               [12]@{
     pred=~scalar                         pred=~scalar
@@ -516,10 +516,12 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public TypeStruct approx1( int cutoff, BitsAlias aliases ) {
     // Fast-path cutout for boring structs
     boolean shallow=true;
-    for( TypeFld fld : this )
+    for( int i=0; i<_flds._len; i++ ) {
+      TypeFld fld = _flds.at(i);
       if( fld._t instanceof TypeMemPtr ||
-          (fld._t instanceof TypeFunPtr && !((TypeFunPtr)fld._t)._ret.is_simple()) )
+          (fld._t instanceof TypeFunPtr tfp && !tfp._ret.is_simple()) )
         { shallow=false; break; }
+    }
     if( shallow ) return this;  // Fast cutout for boring structs
     TypeMemPtr ptr = TypeMemPtr.make(aliases,this);
 
@@ -561,10 +563,10 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     OLD2APX.put(old,nts);
     for( TypeFld fld : old ) {
       Type t = fld._t;
-      if( t instanceof TypeMemPtr )
-        nts.get(fld._fld).setX(ax_impl_ptr (aliases,cutoff,d,dold,(TypeMemPtr)t));
-      else if( t instanceof TypeFunPtr )
-        nts.get(fld._fld).setX(ax_impl_fptr(aliases,cutoff,d,dold,(TypeFunPtr)t));
+      if( t instanceof TypeMemPtr tmp )
+        nts.get(fld._fld).setX(ax_impl_ptr (aliases,cutoff,d,dold,tmp));
+      else if( t instanceof TypeFunPtr tfp )
+        nts.get(fld._fld).setX(ax_impl_fptr(aliases,cutoff,d,dold,tfp));
     }
     OLD2APX.remove(old); // Do not keep sharing the "tails"
     return nts;
@@ -646,7 +648,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     }
     assert nt._hash==0;         // Not definable yet, as nt may yet pick up fields
     if( nt == old ) return old;
-    if( old instanceof Cyclic && ((Cyclic)old).cyclic() && bs.tset(nt._uid,old._uid) )
+    if( old instanceof Cyclic cyc && cyc.cyclic() && bs.tset(nt._uid,old._uid) )
       return nt; // Been there, done that
 
     // TODO: Make a non-recursive "meet into".
@@ -658,8 +660,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
       if( old == Type.NIL || old == Type.XNIL ) return nptr.ax_meet_nil(old);
       if( old == Type.SCALAR ) return old;
       if( old == Type.XSCALAR || old == Type.XNSCALR ) break; // Result is the nt unchanged
-      if( !(old instanceof TypeFunPtr) ) throw AA.unimpl(); // Not a xscalar, not a funptr, probably falls to scalar
-      TypeFunPtr optr = (TypeFunPtr)old;
+      if( !(old instanceof TypeFunPtr optr) ) throw AA.unimpl(); // Not a xscalar, not a funptr, probably falls to scalar
       nptr._fidxs = nptr._fidxs.meet(optr._fidxs);
       // While structs normally meet, function args *join*, although the return still meets.
       nptr.set_dsp(ax_meet(bs,nptr.dsp(),optr.dsp()));
@@ -671,11 +672,10 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
       if( old == Type.NIL || old == Type.XNIL ) return nptr.ax_meet_nil(old);
       if( old == Type.SCALAR ) return old;
       if( old == Type.XSCALAR || old == Type.ANY ) break; // Result is the nt unchanged
-      if( !(old instanceof TypeMemPtr) ) {
-        if( old instanceof Cyclic && ((Cyclic)old).cyclic() ) bs.clr(nt._uid,old._uid);
+      if( !(old instanceof TypeMemPtr optr) ) {
+        if( old instanceof Cyclic cyc && cyc.cyclic() ) bs.clr(nt._uid,old._uid);
         return Type.SCALAR; // Not a TMP
       }
-      TypeMemPtr optr = (TypeMemPtr)old;
       nptr._aliases = nptr._aliases.meet(optr._aliases);
       nptr._obj = (TypeStruct)ax_meet(bs,nptr._obj,optr._obj);
       break;
@@ -953,16 +953,21 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     private static final Ary<Iter> POOL = new Ary<>(Iter.class);
     private static int CNT=0; // Number of Iters made, helps to track leaks
     Ary<TypeFld> _flds;
+    boolean _has_hash;
     int _i;
     static Iter get(TypeStruct ts) {
       if( POOL.isEmpty() ) { assert CNT<20; CNT++; new Iter().end(); }
       return POOL.pop().init(ts);
     }
     boolean end() { _i=-99; _flds=null; POOL.push(this); return false; }
-    private Iter init(TypeStruct ts) { assert _i==-99; _i=0; _flds=ts._flds; return this; }
+    private Iter init(TypeStruct ts) { assert _i==-99; _i=0; _flds=ts._flds; _has_hash = ts._hash!=0; return this; }
     @Override public boolean hasNext() {  assert _i>=0; return _i < _flds._len || end(); }
     @Override public TypeFld next() { return _flds._es[_i++]; }
-    @Override public void remove() { throw unimpl(); }
+    @Override public void remove() {
+      // i was pre-advanced, so remove field i-1
+      assert !_has_hash;          // Changing, so underlying struct is mid-construction
+      _flds.remove(_i-1);
+    }
   }
 
   @Override public void walk1( BiFunction<Type,String,Type> map ) { for( TypeFld fld : this ) map.apply(fld,fld._fld); }

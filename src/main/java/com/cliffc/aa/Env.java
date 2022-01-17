@@ -138,8 +138,8 @@ public class Env implements AutoCloseable {
     Type mem = _scope.mem()._val;
     TypeStruct formals = null;
     if( rez._val instanceof TypeFunPtr tfp ) {
-      FunPtrNode fptr = FunPtrNode.get(tfp._fidxs);
-      if( fptr != null ) formals = fptr.formals();
+      RetNode ret = RetNode.get(tfp._fidxs);
+      if( ret != null ) formals = ret.formals();
     }
     return new TypeEnv(_scope,
                        rez._val,
@@ -220,6 +220,7 @@ public class Env implements AutoCloseable {
     START.walk_reset();         // Clean out any wired prim calls
     KEEP_ALIVE.walk_reset();    // Clean out any wired prim calls
     GVNGCM.KEEP_ALIVE.walk_reset();
+    CallNode  .reset_to_init0();
     GVN.iter();                 // Clean out any dead; reset prim types
     for( Node n : Node.VALS.keySet() ) // Assert no leftover bits from the prior compilation
       assert n._uid < Node._INIT0_CNT; //
@@ -242,7 +243,7 @@ public class Env implements AutoCloseable {
 
   // RetNodes are hooked by the top-level scope, in case they escape and have
   // to be treated as-if called by the unknown caller.
-  static void unhook_rets() {
+  public static void unhook_rets() {
     for( int i=ScopeNode.RET_IDX; i<SCP_0.len(); i++ ) {
       if( SCP_0.in(i) instanceof RetNode ret && !ret.is_prim() ) {
         ret.fun().set_def(1,Env.ANY); // Kill the default input

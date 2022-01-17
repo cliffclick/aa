@@ -905,14 +905,18 @@ public class HM {
       return tfp.make_from(Type.ANY,ret);
     }
 
-    // After GCP stability, we guess (badly) that all escaping functions
-    // are called by folks outside of Root with the worst possible args.
-    // TODO: Force programmer type annotations for module entry points.
+    // After GCP stability, we guess (badly) that all escaping functions are
+    // called by folks outside of Root with the worst possible args - that are
+    // acceptable to HMT.  Basically, the HM types become a module type,
+    // guarding the GCP types that can be passed in.
     private static final VBitSet RVISIT = new VBitSet();
+    private static final Ary<T2> RESCS = new Ary<>(T2.class);
     void update_root_args(Work<Syntax> work) {
       if( DO_HM ) {
+        RVISIT.clear();  RESCS.clear();
+        _find_root_escs(_hmt);
         RVISIT.clear();
-        _widen_bases(false,find());
+        _widen_inputs(false,find());
       }
       // If an argument changes type, adjust the lambda arg types
       Type flow = _fun._flow;
@@ -921,6 +925,19 @@ public class HM {
         _walk_root_funs(flow,work);
       }
 
+    }
+    // TODO: Type walker
+    private static void _find_root_escs( T2 t2 ) {
+      if( RVISIT.tset(t2._uid) ) return;
+      if( t2.is_fun() ) {
+        RESCS.push(t2);
+        _find_root_escs(t2.arg("ret"));
+      } else if( t2.is_struct() ) {
+        RESCS.push(t2);
+        if( t2._args!=null )
+          for( T2 ft : t2._args.values() )
+            _find_root_escs(ft);
+      }
     }
     // TODO: Type walker
     private static void _walk_root_funs( Type flow, Work<Syntax> work) {
@@ -946,17 +963,31 @@ public class HM {
           _walk_root_funs(fld._t,work);
     }
     // TODO: T2 walker
-    // If a root-escaping function has Base inputs, widen them to allow
-    // anything from that Base class.  E.g., typed as taking a "abc" input is
-    // widened to any string.
-    private static void _widen_bases(boolean funarg, T2 t2) {
+    //
+    private static void _widen_inputs(boolean funarg, T2 t2) {
       if( RVISIT.tset(t2._uid) ) return;
-      if( t2.is_base() && funarg ) t2._flow=t2._flow.widen();
+      //if( t2.is_base() && funarg ) t2._flow=t2._flow.widen();
+      if( funarg ) {
+        if( t2.is_struct() )
+          for( T2 rt2 : RESCS )
+            if( rt2.is_struct() && rt2.isa_deep(t2) )
+              // If the structs are compatible, the escaping alias is allowed on input
+              t2._aliases = t2._aliases.meet(rt2._aliases);
+        if( t2.is_fun   () ) ; // TODO: if this t2 matches any escaping arg structure, then escaping FIDX allowed on input
+        if( t2.is_base  () ) {
+          for( T2 rt2 : RESCS )
+            if( rt2.is_base() )
+              throw unimpl();
+          // Special hack for strings, which are special hacked already
+          if( t2._flow instanceof TypeMemPtr tmp && tmp.is_str() )
+            t2._flow = tmp.make_from((TypeStruct)tmp._obj.widen()); // String widen
+        }
+      }
       if( t2._args != null ) {
         funarg = t2.is_fun();
         for( String arg : t2._args.keySet() )
           if( !Util.eq(arg,"ret") ) // Do not walk function returns
-            _widen_bases(funarg,t2.arg(arg));
+            _widen_inputs(funarg,t2.arg(arg));
       }
     }
 
@@ -1077,7 +1108,7 @@ public class HM {
 
   static Type do_apx(int alias, Type oldtmp, TypeStruct nts) {
     TypeMemPtr nnntmp = TypeMemPtr.make(alias,nts);
-    TypeStruct xts = nts.approx1(CUTOFF,BitsAlias.make0(alias));
+    TypeStruct xts = nts.approx(CUTOFF,BitsAlias.make0(alias));
     TypeMemPtr xtmp = TypeMemPtr.make(alias,xts);
     assert oldtmp.isa(xtmp);
     assert nnntmp.isa(xtmp);
@@ -1667,6 +1698,16 @@ public class HM {
     @SuppressWarnings("unchecked")
     private static boolean not_isa( Bits t0, Bits t1 ) {
       return (t0 != null || t1 != null) && (t0 == null || t1 == null || !t0.isa(t1));
+    }
+    // Check all named fields in t2 are in 'this', recursively deep.
+    // TODO: handle cycles
+    private boolean isa_deep( T2 t2 ) {
+      if( t2.size() > size() ) return false;
+      if( t2._args!=null )
+        for( String arg : t2._args.keySet() )
+          if( !_args.containsKey(arg) )
+            return false;
+      return true;
     }
 
     // Varies as unification happens; not suitable for a HashMap/HashSet unless
@@ -2311,7 +2352,7 @@ public class HM {
       Type tx = T2MAP.get(this);
       if( tx==null ) return jt;
       if( is_base() )           // Weaken base-lifts by the HMT base
-        tx = tx.meet(_flow.widen());
+        tx = tx.meet(_flow);
       return jt.join(tx);       // Join of possibilities
     }
 

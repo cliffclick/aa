@@ -33,7 +33,7 @@ public class BitsRPC extends Bits<BitsRPC> {
   static final BitsRPC ALL0 = new BitsRPC().make_impl(1,new long[]{1L | (1L<<ALLX)});
   private static final BitsRPC ANY0 = ALL0.dual();
   public  static final BitsRPC NIL = make0(0);
-  static final BitsRPC EMPTY = ALL0.make(); // No bits
+  public static final BitsRPC EMPTY = ALL0.make(); // No bits
   @Override public BitsRPC ALL0() { return ALL0; }
   @Override public BitsRPC ANY0() { return ANY0; }
   @Override public BitsRPC EMPTY() { return EMPTY ; }

@@ -113,7 +113,7 @@ public abstract class PrimNode extends Node {
       }+_name+"_").intern() : _name;
     if( is_oper ) Oper.make(op);
 
-    FunNode fun = (FunNode)Env.GVN.init(new FunNode(this).add_def(Env.ALL_CTRL));
+    FunNode fun = (FunNode)Env.GVN.init(new FunNode(this,is_oper ? op : _name).add_def(Env.ALL_CTRL));
     add_def(null);              // No control
     add_def(null);              // No memory
     add_def(Env.GVN.init(new ParmNode(DSP_IDX,"^",fun,defalt,null)));

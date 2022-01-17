@@ -68,16 +68,15 @@ public class UnresolvedNode extends Node {
         tfp._fidxs.abit() != -1 )   // Already resolved to single target
       return tfp;
     for( int fidx : tfp._fidxs ) {
-      FunPtrNode fptr = FunPtrNode.get(fidx);
-      if( fptr.nargs() == tcall.length-1 ) {
+      RetNode ret = RetNode.get(fidx);
+      if( ret._nargs == tcall.length-1 ) {
         Type actual = tcall[ARG_IDX];
-        Type formal = fptr.formal(ARG_IDX);
+        Type formal = ret.formal(ARG_IDX);
         if( !actual.above_center() &&
             actual.isa(formal) &&
             !(actual.getClass()==TypeInt.class && formal.getClass()==TypeFlt.class) ) {
-          TypeFunPtr tfp3 = (TypeFunPtr)fptr._val;
-          TypeFunPtr tfp4 = tfp3.make_from(tcall[DSP_IDX],tfp3._ret);
-          tfp2 = tfp2==null ? tfp4 : (TypeFunPtr)tfp2.meet(tfp4);
+          TypeFunPtr tfp3 = TypeFunPtr.make(fidx,ret._nargs,tcall[DSP_IDX],ret.rez()._val);
+          tfp2 = tfp2==null ? tfp3 : (TypeFunPtr)tfp2.meet(tfp3);
         }
       }
     }

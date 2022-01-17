@@ -465,6 +465,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       Env.GVN.add_flow_uses(this); // Put uses on worklist... values flows downhill
       if( !may_be_con_live(oval) && may_be_con_live(nval) )
         Env.GVN.add_flow_defs(this); // If computing a constant
+      add_flow_extra(oval);
     }
     return nval;
   }
@@ -548,11 +549,11 @@ public abstract class Node implements Cloneable, IntSupplier {
     // Classic forwards flow on change.  Also wire Call Graph edges.
     for( Node use : _uses ) {
       Env.GVN.add_flow(use).add_flow_use_extra(this);
-      if( use instanceof CallEpiNode ) ((CallEpiNode)use).check_and_wire(true);
-      if( use instanceof   ScopeNode ) ((  ScopeNode)use).check_and_wire();
+      if( use instanceof CallEpiNode cepi ) cepi.check_and_wire(true);
+      if( use instanceof   ScopeNode scop ) scop.check_and_wire();
     }
     add_flow_extra(oval);
-    if( this instanceof CallEpiNode ) ((CallEpiNode)this).check_and_wire(true);
+    if( this instanceof CallEpiNode cepi ) cepi.check_and_wire(true);
     // All liveness is skipped if may_be_con, since the possible constant has
     // no inputs.  If values drop from being possible constants to not being a
     // constant, liveness must be revisited.
@@ -716,9 +717,9 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Make globally shared common ConNode for this type.
   public static @NotNull Node con( Type t ) {
-    if( t instanceof TypeFunPtr tfp && tfp._fidxs.abit()!=-1 )
-      return FunPtrNode.get(tfp._fidxs.getbit()); // Pre-existing function constant
-    Node con = new ConNode<>(t);
+    Node con = t instanceof TypeFunPtr tfp && tfp._fidxs.abit()!=-1
+      ? new FunPtrNode(RetNode.get(tfp._fidxs.abit()),con(tfp.dsp()))
+      : new ConNode<>(t);
     Node con2 = VALS.get(con);
     if( con2 != null ) {        // Found a prior constant
       con.kill();               // Kill the just-made one
@@ -930,4 +931,5 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( n != null ) return n;   // Take last answer first
     return P.test(this) ? this : null;
   }
+
 }

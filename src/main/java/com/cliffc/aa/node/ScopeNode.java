@@ -108,13 +108,19 @@ public class ScopeNode extends Node {
       return set_mem(Env.XMEM);
     }
 
-    // If the result is never a function
     int progress = _defs._len;
+    // If the result is never a function
     if( !TypeFunPtr.GENERIC_FUNPTR.dual().isa(rez._val) || rez._val==Type.XNIL )
       // Wipe out extra function edges.  They are there to act "as if" the
       // exit-scope calls them; effectively an extra wired call use with the
       // most conservative caller.
       while( _defs._len > RET_IDX ) pop();
+
+    // Some escaping functions are dead
+    for( int i=RET_IDX; i<len(); i++ )
+      if( in(i) instanceof RetNode ret && ret.is_copy() )
+        remove(i--);
+
     // If the result is a function, wipe out wrong fidxs
     if( rez._val instanceof TypeFunPtr ) {
       BitsFun fidxs = ((TypeFunPtr)rez._val)._fidxs;
@@ -213,14 +219,13 @@ public class ScopeNode extends Node {
   public BitsFun top_escapes() {
     if( _val.above_center() ) return BitsFun.EMPTY;
     if( is_prim() ) return BitsFun.ALL0; // All the primitives escape
-    //if( !Env.GVN._opt_mode._CG ) return BitsFun.ALL0; // Not run Opto yet
     Type trez = rez()._val;
     Type tmem = mem()._val;
     if( _escache_trez == trez &&  _escache_tmem == tmem ) return _escache_escs; // Cache hit
     // Cache miss, compute the hard way
     if( TypeFunPtr.GENERIC_FUNPTR.isa(trez) ) return BitsFun.ALL0; // Can lift to any function
-    tmem = tmem instanceof TypeMem ? (TypeMem)tmem : tmem.oob(TypeMem.ALLMEM);
-    BitsFun fidxs = trez.all_reaching_fidxs((TypeMem)tmem);
+    TypeMem tmem2 = tmem instanceof TypeMem tmem3 ? tmem3 : tmem.oob(TypeMem.ALLMEM);
+    BitsFun fidxs = trez.all_reaching_fidxs(tmem2);
     _escache_trez = trez;
     _escache_tmem = tmem;
     _escache_escs = fidxs;
@@ -239,7 +244,7 @@ public class ScopeNode extends Node {
         if( in(i) instanceof RetNode ret && ret._fidx==fidx )
           { found=true; break; };
       if( !found )
-        add_def(FunPtrNode.get(fidx).ret());
+        add_def(RetNode.get(fidx));
     }
   }
 

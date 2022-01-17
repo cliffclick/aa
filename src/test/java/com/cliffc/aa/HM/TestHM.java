@@ -107,7 +107,7 @@ public class TestHM {
                                     "{ A -> ( 3, A) }", tfs(TypeMemPtr.make(2,make_tups(TypeInt.con(3),Type.SCALAR)))); }
 
   @Test public void test03() { run( "{ z -> (pair (z 0) (z \"abc\")) }" ,
-                                    "{ { *[0,ALL]str:(nint64)? -> A } -> ( A, A) }", tfs(tuple2)); }
+                                    "{ { *[0,4]str:(nint64)? -> A } -> ( A, A) }", tfs(tuple2)); }
 
   @Test public void test04() {
     run( "fact = { n -> (if (eq0 n) 1 (* n (fact (dec n))))}; fact",
@@ -131,7 +131,7 @@ public class TestHM {
         "( 3, *[4]str:(97))",
         // GCP with HM
         // With lift ON
-        TypeMemPtr.make(2,make_tups(TypeInt.NINT64,TypeMemPtr.make_str(BitsAlias.NALL,TypeInt.NINT64))),
+        TypeMemPtr.make(2,make_tups(TypeInt.con(3),TypeMemPtr.make_str("abc"))),
         // With lift OFF
         //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
         // GCP is weaker without HM
@@ -176,7 +176,7 @@ public class TestHM {
         "( *[4]str:(), flt64)",
         "( *[4]str:(), flt64)",
         // With lift ON
-        TypeMemPtr.make(2,make_tups(TypeMemPtr.make(BitsAlias.ALLX,TypeStruct.ISUSED.set_name("str:")),TypeFlt.FLT64)),
+        TypeMemPtr.make(2,make_tups(TypeMemPtr.STRPTR,TypeFlt.FLT64)),
         // With lift OFF
         //TypeMemPtr.make(7,make_tups(Type.SCALAR,Type.SCALAR)),
         tuple2);
@@ -244,7 +244,7 @@ map ={fun parg -> (fun (cdr parg))};
         "( *[4]str:(), int1)",
         "( *[4]str:(), int1)",
         // With Lift ON
-        TypeMemPtr.make(2,make_tups(TypeMemPtr.STRPTR.widen(),TypeInt.INT64)),
+        TypeMemPtr.make(2,make_tups(TypeMemPtr.STRPTR,TypeInt.BOOL)),
         // With Lift OFF
         //tuple2,
         tuple2);
@@ -254,7 +254,7 @@ map ={fun parg -> (fun (cdr parg))};
   @Test public void test21() {
     run("f0 = { f x -> (if (eq0 x) 1 (f (f0 f (dec x)) 2))}; (f0 * 99)",
         "int64","int64",
-         TypeInt.NINT64,TypeInt.INT64);
+         TypeInt.NINT64,TypeInt.NINT64);
   }
 
   // Obscure factorial-like
@@ -282,7 +282,7 @@ map ={fun parg -> (fun (cdr parg))};
       (pair (fgz 3) (fgz 5))
 }
 """,
-        "{ { nint64 -> A } -> ( A, A) }", tfs(tuple2));
+        "{ { nint8 -> A } -> ( A, A) }", tfs(tuple2));
   }
 
   // Basic structure test
@@ -423,7 +423,7 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
         "( *[4]str:(), int1)",
         "( *[4]str:(), int1)",
         // With lift ON
-        TypeMemPtr.make(2,make_tups(TypeMemPtr.STRPTR.widen(),TypeInt.INT64)),
+        TypeMemPtr.make(2,make_tups(TypeMemPtr.STRPTR,TypeInt.BOOL)),
         // With lift OFF
         //tuple2,
         tuple2);
@@ -471,7 +471,7 @@ loop = { name cnt ->
         "*[0,4]str:(nint8)?",  // Both HM and GCP
         "Cannot unify int8 and *[0,4]str:(nint8)?", // HM alone cannot do this one
         // With lift ON
-        TypeMemPtr.make_str(BitsAlias.NALL,TypeInt.NINT64), // Both HM and GCP
+        TypeMemPtr.make_str(TypeInt.NINT8), // Both HM and GCP
         // With lift OFF
         //Type.NSCALR,
         Type.NSCALR);                   // GCP alone gets a very weak answer
@@ -585,7 +585,7 @@ loop = { name cnt ->
                                                          mfun(1,"force",tf,25)));
           TypeStruct rez = TypeStruct.make(NO_DSP,
                                            // With lift ON
-                                           TypeFld.make("a", HM.DO_HM ? TypeInt.NINT64 : Type.SCALAR),
+                                           TypeFld.make("a", HM.DO_HM ? TypeInt.NINT8 : Type.SCALAR),
                                            // With lift OFF
                                            //TypeFld.make("a", Type.SCALAR),
                                            TypeFld.make("b", Type.SCALAR),
@@ -681,7 +681,7 @@ boolSub ={b ->(if b true false)};
 @{true=true, false=false, boolSub=boolSub};
 all
 """,
-        "@{ boolSub = { A? -> @{ not = { B -> C:@{ not = { D -> C }; then = { { nint64 -> E } { nint64 -> E } -> E }} }; then = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
+        "@{ boolSub = { A? -> @{ not = { B -> C:@{ not = { D -> C }; then = { { 7 -> E } { 7 -> E } -> E }} }; then = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
         () -> {
           /*
            *[11]@{^=any;
@@ -1040,7 +1040,7 @@ all = @{
         "( 3, *[4]str:(97))",
         "( 3, *[4]str:(97))",
         // With lift On
-        TypeMemPtr.make(2,make_tups(TypeInt.NINT64,TypeMemPtr.make_str(BitsAlias.NALL,TypeInt.NINT64))),
+        TypeMemPtr.make(2,make_tups(TypeInt.con(3),TypeMemPtr.make_str("abc"))),
         // With lift Off
         //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
         tuplen2);

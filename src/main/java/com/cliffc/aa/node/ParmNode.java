@@ -61,13 +61,12 @@ public class ParmNode extends PhiNode {
     Type ctl = val(0);
     if( ctl != Type.CTRL && ctl != Type.ALL ) return ctl.oob();
     Node in0 = in(0);
-    if( !(in0 instanceof FunNode) )  return ctl.oob();
-    FunNode fun = (FunNode)in0;
+    if( !(in0 instanceof FunNode fun) )  return ctl.oob();
     if( fun.len()!=len() ) return Type.ALL; // Collapsing
 
     // Merge all live paths
     Type t = Type.ANY;
-    for( int i=1; i<_defs._len; i++ )
+    for( int i=fun.is_path1_dead() ? 2 : 1; i<_defs._len; i++ )
       if( fun.val(i)!=Type.XCTRL && fun.val(i)!=Type.ANY ) // Only meet alive paths
         t = t.meet(val(i));
     return t.join(_t);

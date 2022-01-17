@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
@@ -54,7 +53,7 @@ public abstract class MemPrimNode extends PrimNode {
     @Override public FunPtrNode clazz_node( ) {
       try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {
         assert _defs._len==0 && _uses._len==0;
-        FunNode  fun = ( FunNode) X.xform(new  FunNode(this));
+        FunNode  fun = ( FunNode) X.xform(new  FunNode(this,"TODO"));
         //ParmNode rpc = (ParmNode) X.xform(new ParmNode(TypeRPC.ALL_CALL,null,fun,0      ,"rpc"));
         //Node mem     =            X.xform(new ParmNode(TypeMem.MEM     ,null,fun,MEM_IDX," mem"));
         //add_def(null);              // Control for the primitive in slot 0
@@ -130,7 +129,7 @@ public abstract class MemPrimNode extends PrimNode {
   //
   //  @Override public TypeInt apply( Type[] args ) { throw unimpl(); }
   //}
-  
+
   //// Produces a binop LValue, where the leading TMP is a non-zero array
   //static class LValueRead extends ReadPrimNode {
   //  LValueRead() { super("[",TypeMemPtr.LVAL_RD,Type.SCALAR); }

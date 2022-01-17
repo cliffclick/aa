@@ -579,7 +579,7 @@ public class TestApprox {
 
     TypeStruct  z0= TypeStruct.make(TypeFld.make("l",px1),TypeFld.make("r",px2),TypeFld.make("v",Type.SCALAR));
     // Approximate
-    TypeStruct z1 = z0.approx(CUTOFF,BitsAlias.make0(alias));
+    TypeStruct z1 = z0.approx1(CUTOFF,BitsAlias.make0(alias));
 
     Type.RECURSIVE_MEET++;
     TypeStruct  x3 = TypeStruct.malloc_test(TypeFld.malloc("l"), TypeFld.malloc("r"), TypeFld.malloc("v"));

@@ -1,5 +1,6 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.node.CallNode;
 import com.cliffc.aa.node.Node;
 
 /** an implementation of language AA
@@ -32,10 +33,11 @@ public abstract class Exec {
     // Parse a program
     ErrMsg err = new Parse(src,false,e,str).prog();
 
-    // Close file scope; no program text in this file, so no more fields to add.
+    // Close file scope; no more program text in this file, so no more fields to add.
+    CallNode.uncall_all(false,0); // Remove the more-unknown-callers hook
     e._scope.stk().close();
     int sidx = e._scope.push();// Hook result, not dead
-    e.close();                // No more fields added to the parse scope; finish off Iter
+    e.close();      // No more fields added to the parse scope
 
     Combo.opto();      // Global Constant Propagation and Hindley-Milner Typing
 

@@ -124,9 +124,7 @@ public final class CallEpiNode extends Node {
     // Call allows 1 function not yet inlined, sanity check it.
     if( nwired()!=1 ) return null; // More than 1 wired, inline only via FunNode
     int cnargs = call.nargs();
-    FunPtrNode fptr = FunPtrNode.get(fidx);
-    if( fptr==null ) return null;
-    RetNode ret = fptr.ret();    // Return from function
+    RetNode ret = RetNode.get(fidx);
     if( ret==null ) return null;
     FunNode fun = ret.fun();
     if( fun._val != Type.CTRL ) return null;
@@ -187,16 +185,14 @@ public final class CallEpiNode extends Node {
     Type tcall = call._val;
     if( !(tcall instanceof TypeTuple) ) return false;
     BitsFun fidxs = CallNode.ttfp(tcall)._fidxs;
-    if( fidxs==BitsFun.ALL0 ) return false; // Error call
+    if( fidxs.test(BitsFun.ALLX) ) return false; // Error call
     if( fidxs.above_center() )  return false; // Still choices to be made during GCP.
 
     // Check all fidxs for being wirable
     boolean progress = false;
     for( int fidx : fidxs ) {                 // For all fidxs
       if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
-      FunPtrNode fptr = FunPtrNode.get(fidx); // Lookup, even if not wired
-      if( fptr==null ) continue;
-      RetNode ret = fptr.ret();
+      RetNode ret = RetNode.get(fidx);       // Lookup, even if not wired
       if( _defs.find(ret) != -1 ) continue;   // Wired already
       FunNode fun = ret.fun();
       if( !CEProjNode.wired_arg_check(tcall,fun) ) continue; // Args fail basic sanity

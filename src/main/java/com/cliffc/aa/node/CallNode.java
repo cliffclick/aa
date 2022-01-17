@@ -83,6 +83,7 @@ import static com.cliffc.aa.Env.GVN;
 // wired_not_typed bits.
 
 public class CallNode extends Node {
+  public static BitsRPC ALL_CALLS = BitsRPC.NIL;
   int _rpc;                 // Call-site return PC
   boolean _unpacked;        // One-shot flag; call site allows unpacking a tuple
   boolean _is_copy;         // One-shot flag; Call will collapse
@@ -91,12 +92,15 @@ public class CallNode extends Node {
   // _badargs[0] points to the opening paren.
   // _badargs[1] points to the start of arg1, same for arg2, etc.
   Parse[] _badargs;         // Errors for e.g. wrong arg counts or incompatible args; one error point per arg.
+
   public CallNode( boolean unpacked, Parse[] badargs, Node... defs ) {
     super(OP_CALL,defs);
     _rpc = BitsRPC.new_rpc(BitsRPC.ALLX); // Unique call-site index
+    ALL_CALLS = ALL_CALLS.set(_rpc);      // Calls ALL
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
     _badargs = badargs;
   }
+  public static void reset_to_init0() { ALL_CALLS = BitsRPC.NIL; }
 
   @Override public String xstr() { return (_is_copy ? "CopyCall" : (is_dead() ? "Xall" : "Call"))+(_not_resolved_by_gcp?"_UNRESOLVED":""); } // Self short name
   String  str() { return xstr(); }       // Inline short name
@@ -146,8 +150,7 @@ public class CallNode extends Node {
   }
   // No-check must-be-correct get TFP
   static public TypeFunPtr ttfp( Type t ) {
-    if( !(t instanceof TypeTuple) ) return (TypeFunPtr)t.oob(TypeFunPtr.GENERIC_FUNPTR);
-    TypeTuple tcall = (TypeTuple)t;
+    if( !(t instanceof TypeTuple tcall) ) return (TypeFunPtr)t.oob(TypeFunPtr.GENERIC_FUNPTR);
     return (TypeFunPtr)tcall.at(tcall.len()-1/*-1 tescs turned off*/);
   }
   static TypeTuple set_ttfp( TypeTuple tcall, TypeFunPtr nfptr ) { return tcall.set(tcall.len()-1/*-1 tescs turned off*/,nfptr); }
@@ -385,15 +388,36 @@ public class CallNode extends Node {
         (old instanceof TypeTuple && ttfp(old).above_center()) )
       add_flow_defs();      // Args can be more-alive or more-dead
     // If Call flips to being in-error, all incoming args forced live/escape
+    boolean err = err(true)!=null;
     for( Node def : _defs )
-      if( def!=null && err(true)!=null )
+      if( def!=null && err )
         Env.GVN.add_flow(def);
     // If not resolved, might now resolve
-    if( _val instanceof TypeTuple && ttfp(_val)._fidxs.abit()!=-1 )
-      Env.GVN.add_reduce(this);
+    if( _val instanceof TypeTuple ) {
+      BitsFun fidxs = ttfp(_val)._fidxs;
+      if( fidxs.abit()!=-1 ) Env.GVN.add_reduce(this);
+      // Check that "calls any INTX fidx" matches "rpc in ALL_CALLS".
+      if( fidxs.test_recur(BitsFun.INTX) != ALL_CALLS.test_recur(_rpc) )
+        uncall_all(fidxs.test_recur(BitsFun.INTX),_rpc);
+    }
     // If escapes lowers, can allow e.g. swapping with New
     //if( _val instanceof TypeTuple && tesc(old)!=tesc(_val) )
     //  Env.GVN.add_grow(this);
+  }
+
+  // Flip the ALL_CALLS set membership
+  public static void uncall_all(boolean do_set, int rpc) {
+    BitsRPC oldrpc = ALL_CALLS;
+    // Add or remove the bit
+    ALL_CALLS = do_set ? ALL_CALLS.set(rpc) : ALL_CALLS.clear(rpc);
+    // If flipping BitsRPC from empty or not, all FunNodes default inputs
+    // will change.
+    if(( oldrpc==BitsRPC.EMPTY) != (ALL_CALLS==BitsRPC.EMPTY) ) {
+      Env.unhook_rets();// All FunNodes can drop their unknown input
+      for( Node use : Env.ALL_CTRL._uses )
+        if( use instanceof FunNode )      // Prims included can recompute
+          Env.GVN.add_flow_uses(Env.GVN.add_flow(use)); // Parms on prims
+    }
   }
 
   @Override public void add_flow_def_extra(Node chg) {
@@ -486,8 +510,8 @@ public class CallNode extends Node {
     // bad-arg-count
     if( tfp.nargs() != nargs() ) {
       if( fast ) return ErrMsg.FAST;
-      FunPtrNode fptr = FunPtrNode.get(tfp._fidxs);
-      return ErrMsg.syntax(_badargs[0],err_arg_cnt(fptr.name(),tfp));
+      RetNode ret = RetNode.get(tfp._fidxs);
+      return ErrMsg.syntax(_badargs[0],err_arg_cnt(ret.fun()._name,tfp));
     }
 
     return null;

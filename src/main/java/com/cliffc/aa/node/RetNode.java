@@ -4,8 +4,10 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.MEM_IDX;
+import static com.cliffc.aa.AA.DSP_IDX;
 import static com.cliffc.aa.AA.unimpl;
 
 // See CallNode comments.  The RetNode gathers {control (function exits or
@@ -22,7 +24,7 @@ public final class RetNode extends Node {
     super(OP_RET,ctrl,mem,val,rpc,fun);
     _fidx = fun._fidx;
     _nargs=fun.nargs();
-  }
+    FUNS.setX(_fidx,this);  }
 
   // Short self name
   @Override public String xstr() {
@@ -55,6 +57,19 @@ public final class RetNode extends Node {
     if( !super.equals(o) ) return false;
     return _fidx==((RetNode)o)._fidx;
   }
+  // Formals from the function parms.
+  // TODO: needs to come from both Combo and _t
+  Type formal(int idx) { return fun().parm(idx)._t; }  
+  // Called by testing
+  public TypeStruct formals() {
+    Node[] parms = fun().parms();
+    TypeStruct ts = TypeStruct.malloc("",false);
+    for( int i=DSP_IDX; i<_nargs; i++ )
+      if( parms[i]!=null )
+        ts.add_fld(TypeFld.make(((ParmNode)parms[i])._name,((ParmNode)parms[i])._t,TypeFld.Access.Final,i));
+    return ts.hashcons_free();
+  }
+
   
   @Override public Type value() {
     if( ctl()==null ) return _val; // No change if a copy
@@ -205,4 +220,28 @@ public final class RetNode extends Node {
 
   @Override public Node is_copy(int idx) { throw com.cliffc.aa.AA.unimpl(); }
   boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }
+
+  // Find RetNode by fidx
+  private static int FLEN;      // Primitives length; reset amount
+  static Ary<RetNode> FUNS = new Ary<>(new RetNode[]{null,});
+  public static void init0() { FLEN = FUNS.len(); }
+  public static void reset_to_init0() { FUNS.set_len(FLEN); }
+
+  // Null if not a FunPtr to a Fun.
+  public static RetNode get( int fidx ) {
+    RetNode ret = FUNS.atX(fidx);
+    if( ret==null || ret.is_dead() ) return null;
+    if( ret.fidx()==fidx ) return ret;
+    // Split & renumbered FunNode, fixup in FUNS.
+    throw unimpl();
+  }
+  // First match from fidxs
+  public static RetNode get( BitsFun fidxs ) {
+    for( int fidx : fidxs ) {
+      RetNode ret = get(fidx);
+      if( ret!=null ) return ret;
+    }
+    return null;
+  }
+  
 }

@@ -74,7 +74,7 @@ public class FunNode extends RegionNode {
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
-  public FunNode(PrimNode prim) { this(prim._name, prim._tfp.fidx(),prim._tfp.nargs()); }
+  public FunNode(PrimNode prim, String name) { this(name, prim._tfp.fidx(),prim._tfp.nargs()); }
   // Used to start an anonymous function in the Parser
   public FunNode(int nargs) { this(null, nargs); }
   // Used to forward-decl anon functions
@@ -171,13 +171,20 @@ public class FunNode extends RegionNode {
   // Never inline with a nested function
   @Override @NotNull public FunNode copy( boolean copy_edges) { throw unimpl(); }
 
-  // True if may have future unknown callers.
-  public boolean has_unknown_callers() {
-    return _defs._len >= 2 && in(1)==Env.ALL_CTRL;
-  }
-  // True if this function escapes the top-level scope
-  boolean is_unknown_alive() {
-    return _defs._len==1 || in(1)==Env.ALL_CTRL || (in(1) instanceof ScopeNode && ((ScopeNode)in(1)).top_escapes().test_recur(_fidx));
+  boolean has_unknown_callers() { return len()>1 && in(1)==Env.ALL_CTRL; }
+
+  // True if path1 exists, but is dead because it is an unknown caller and dead,
+  // OR is just normal dead.
+  boolean is_path1_dead() {
+    if( len() <= 1 ) return true; // Actually, not well-defined
+    if( !has_unknown_callers() ) return val(1)!=Type.ANY && val(1)!=Type.CTRL; // Already killed, will never have unknown callers.
+    // True if ANY Call has a fidx INTX/ALL,
+    // OR   if escapes the top Scope.
+    if( CallNode.ALL_CALLS!=BitsRPC.EMPTY ) return false;
+    if( Env.FILE==null ) return true;
+    BitsFun fidxs = Env.FILE._scope.top_escapes();
+    if( fidxs.test_recur(_fidx) ) return false; // Escapes the top scope
+    return true;
   }
 
   public int nargs() { return _nargs; }
@@ -192,14 +199,20 @@ public class FunNode extends RegionNode {
     if( is_keep() ) return null; // FunNode still under construction
     // Check for FunPtr/Ret dead/gone, and the function is no longer callable
     // from anybody.
-    if( has_unknown_callers() && ret()==null ) {
-      assert !is_prim();
-      if( _defs._len<= 1 ) return null;
-      for( Node use : _uses ) { // All parms can lift
-        Env.GVN.add_flow(use);
-        Env.GVN.add_flow_defs(use); //
+    if( has_unknown_callers() ) {
+      if( ret()==null ) {
+        assert !is_prim();
+        if( _defs._len<= 1 ) return null;
+        for( Node use : _uses ) { // All parms can lift
+          Env.GVN.add_flow(use);
+          Env.GVN.add_flow_defs(use); //
+        }
+        return set_def(1,Env.XCTRL);
       }
-      return set_def(1,Env.XCTRL);
+      // Unknown call edge exists, but can never be taken
+      if( !is_prim() && is_path1_dead() ) {
+        throw unimpl();
+      }
     }
     // Backdoor hook to trigger FunPtr dropping a unused display
     FunPtrNode fptr = fptr();
@@ -836,8 +849,7 @@ public class FunNode extends RegionNode {
     if( is_prim() ) return Type.CTRL;
     if( in(0)==this ) return _defs._len>=2 ? val(1) : Type.XCTRL; // is_copy
     if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
-    int i = has_unknown_callers() && !is_unknown_alive() ? 2 : 1;
-    for( ; i<_defs._len; i++ ) {
+    for( int i = is_path1_dead() ? 2 : 1; i<_defs._len; i++ ) {
       Type c = val(i);
       if( c == Type.CTRL || c == Type.ALL ) return Type.CTRL; // Valid path
     }

@@ -1,12 +1,12 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.IBitSet;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 import java.util.Iterator;
-
-import static com.cliffc.aa.AA.unimpl;
 
 // Bits supporting a lattice; immutable; hash-cons'd.  Bits can be *split* in
 // twain, basically a single Bit is really set of all possible future splits.
@@ -75,7 +75,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   public abstract B ALL0();
   public abstract B ANY0();
   public abstract B EMPTY();
-  
+
   // Common init
   void init(int con, long[] bits ) {
     _con = con;
@@ -554,10 +554,20 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Usage: for( int i=init_bit(); i!=-1; i=next_bit(i) ) ...
   int init_bit() {
     if( _bits==null ) return _con==0 ? -1 : _con;
-    return 1;
+    return next_bit(0);
   }
   int next_bit(int i) {
     if( _bits==null ) return -1;
-    throw unimpl();    
+    int x = idx(i+1);
+    int y = (i+1)&63;
+    while( true ) {
+      if( x >= _bits.length ) return -1; // past end
+      long l = _bits[x];
+      for( ; y<64; y++ )
+        if( (l&mask(y))!=0 )
+          return y;
+      x++;
+      y=0;
+    }
   }
 }

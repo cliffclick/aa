@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.*;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
 
 import static com.cliffc.aa.AA.*;
 
@@ -49,7 +48,6 @@ public final class FunPtrNode extends Node {
   public  FunPtrNode( String name, RetNode ret, Node display ) {
     super(OP_FUNPTR,ret,display);
     _name = name;
-    FUNS.setX(fun()._fidx,this);
   }
   // Explicitly, no display
   public  FunPtrNode( String name, RetNode ret ) { this(name,ret, Env.ANY ); }
@@ -60,21 +58,11 @@ public final class FunPtrNode extends Node {
   public FunNode fun() { return ret().fun(); }
   public FunNode xfun() { RetNode ret = ret(); return ret !=null && ret.in(4) instanceof FunNode ? ret.fun() : null; }
   int nargs() { return ret()._nargs; }
-  // Formals from the function parms.
-  // TODO: needs to come from both Combo and _t
-  Type formal(int idx) { return fun().parm(idx)._t; }
   int fidx() { return fun()._fidx; }
   String name() { return _name; } // Debug name, might be empty string
-  // Called by testing
-  public TypeStruct formals() {
-    Node[] parms = fun().parms();
-    TypeStruct ts = TypeStruct.malloc("",false);
-    int nargs = nargs();
-    for( int i=DSP_IDX; i<nargs; i++ )
-      if( parms[i]!=null )
-        ts.add_fld(TypeFld.make(((ParmNode)parms[i])._name,((ParmNode)parms[i])._t,TypeFld.Access.Final,i));
-    return ts.hashcons_free();
-  }
+  // Formals from the function parms.
+  // TODO: needs to come from both Combo and _t
+  Type formal(int idx) { return ret().formal(idx); }  
 
   // Self short name
   @Override public String xstr() {
@@ -192,29 +180,4 @@ public final class FunPtrNode extends Node {
 
     return progress;
   }
-
-
-  // Find FunPtrNode by fidx
-  private static int FLEN;      // Primitives length; reset amount
-  static Ary<FunPtrNode> FUNS = new Ary<>(new FunPtrNode[]{null,});
-  public static void init0() { FLEN = FUNS.len(); }
-  public static void reset_to_init0() { FUNS.set_len(FLEN); }
-
-  // Null if not a FunPtr to a Fun.
-  public static FunPtrNode get( int fidx ) {
-    FunPtrNode fptr = FUNS.atX(fidx);
-    if( fptr==null || fptr.is_dead() ) return null;
-    if( fptr.fidx()==fidx ) return fptr;
-    // Split & renumbered FunNode, fixup in FUNS.
-    throw unimpl();
-  }
-  // First match from fidxs
-  public static FunPtrNode get( BitsFun fidxs ) {
-    for( int fidx : fidxs ) {
-      FunPtrNode fptr = get(fidx);
-      if( fptr!=null ) return fptr;
-    }
-    return null;
-  }
-
 }
