@@ -926,10 +926,10 @@ public class HM {
     private static void _walk_root_funs( Type flow, Work<Syntax> work) {
       if( RVISIT.tset(flow._uid) ) return;
         // Find any functions
-      if( flow instanceof TypeFunPtr ) {
-        if( ((TypeFunPtr)flow)._fidxs.test(1) ) return; // All of them
+      if( flow instanceof TypeFunPtr tfp ) {
+        if( tfp._fidxs.test(1) ) return; // All of them
         // Meet the actuals over the formals.
-        for( int fidx : ((TypeFunPtr)flow)._fidxs ) {
+        for( int fidx : tfp._fidxs ) {
           Lambda fun = Lambda.FUNS.get(fidx);
           for( int i=0; i<fun._types.length; i++ ) {
             // GCP external argument limited to HM compatible type
@@ -1043,8 +1043,7 @@ public class HM {
       for( int i=0; i<_flds.length; i++ )
         flds[i+1] = TypeFld.make(_ids[i],_flds[i]._flow);
       TypeStruct tstr = TypeStruct.make(flds);
-      TypeStruct t2 = tstr.approx(CUTOFF,BitsAlias.make0(_alias));
-      return TypeMemPtr.make(_alias,t2);
+      return do_apx(_alias,_flow,tstr);
     }
     @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) { work.add(this); }
 
@@ -1074,6 +1073,15 @@ public class HM {
         rez = reduce.apply(rez,fld.visit(map,reduce));
       return rez;
     }
+  }
+
+  static Type do_apx(int alias, Type oldtmp, TypeStruct nts) {
+    TypeMemPtr nnntmp = TypeMemPtr.make(alias,nts);
+    TypeStruct xts = nts.approx1(CUTOFF,BitsAlias.make0(alias));
+    TypeMemPtr xtmp = TypeMemPtr.make(alias,xts);
+    assert oldtmp.isa(xtmp);
+    assert nnntmp.isa(xtmp);
+    return xtmp;
   }
 
   // Field lookup in a Struct
@@ -1201,8 +1209,8 @@ public class HM {
       ts[0] = TypeFld.NO_DISP;  // Display
       for( int i=0; i<flows.length; i++ ) ts[i+1] = TypeFld.make_tup(flows[i],ARG_IDX+i);
       TypeStruct tstr = TypeStruct.make(ts);
-      TypeStruct ts2 = tstr.approx(CUTOFF,BitsAlias.make0(PAIR_ALIAS));
-      return TypeMemPtr.make(PAIR_ALIAS,ts2);
+      Type val = _flow instanceof TypeFunPtr tfp ? tfp._ret : _flow;
+      return do_apx(PAIR_ALIAS, val, tstr);
     }
   }
 
@@ -1218,8 +1226,8 @@ public class HM {
       ts[0] = TypeFld.NO_DISP;  // Display
       for( int i=0; i<flows.length; i++ ) ts[i+1] = TypeFld.make_tup(flows[i],ARG_IDX+i);
       TypeStruct tstr = TypeStruct.make(ts);
-      TypeStruct ts2 = tstr.approx(CUTOFF,BitsAlias.make0(TRIPLE_ALIAS));
-      return TypeMemPtr.make(TRIPLE_ALIAS,ts2);
+      Type val = _flow instanceof TypeFunPtr tfp ? tfp._ret : _flow;
+      return do_apx(TRIPLE_ALIAS, val, tstr);
     }
   }
 

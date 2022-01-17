@@ -61,5 +61,5 @@ public class BitsAlias extends Bits<BitsAlias> {
   private static int set_alias(int par) { return TREE.split(par); }
   public static void free(int fidx) { TREE.free(fidx); }
 
-  BitsAlias widen() { return NALL; }
+  BitsAlias widen() { return test(0) ? ALL0 : NALL; }
 }

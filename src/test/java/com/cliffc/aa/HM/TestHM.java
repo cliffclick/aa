@@ -107,7 +107,7 @@ public class TestHM {
                                     "{ A -> ( 3, A) }", tfs(TypeMemPtr.make(2,make_tups(TypeInt.con(3),Type.SCALAR)))); }
 
   @Test public void test03() { run( "{ z -> (pair (z 0) (z \"abc\")) }" ,
-                                    "{ { *[ALL]str:(nint64) -> A } -> ( A, A) }", tfs(tuple2)); }
+                                    "{ { *[0,ALL]str:(nint64)? -> A } -> ( A, A) }", tfs(tuple2)); }
 
   @Test public void test04() {
     run( "fact = { n -> (if (eq0 n) 1 (* n (fact (dec n))))}; fact",
@@ -1054,6 +1054,22 @@ all = @{
   // Test incorrect argument count
   @Test public void test70() {
     run("({x y -> (pair x y) } 1 )","Bad argument count",TypeMemPtr.make(2,make_tups(TypeInt.con(1),Type.XSCALAR)));
+  }
+
+  // Test example from AA with expanded ints
+  @Test public void test71() {
+    run("int = { i -> @{ i=i, add={ x y -> (int (+ x.i y.i))} } }; x=(int 3); y=(int 4); (x.add x y)",
+        """
+A:@{
+  add={
+     B:@{ add={ @{i=int64;...} @{i=int64;...} -> B };i=int64}
+     C:@{ add={ @{i=int64;...} @{i=int64;...} -> C };i=int64}
+     -> A};
+  i=int64
+}
+""",
+        Type.SCALAR
+        );
   }
 
 }
