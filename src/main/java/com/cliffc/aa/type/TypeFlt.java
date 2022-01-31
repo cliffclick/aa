@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
@@ -10,7 +11,7 @@ public class TypeFlt extends Type<TypeFlt> {
   byte _x;                // -2 bot, -1 not-null, 0 con, +1 not-null-top +2 top
   byte _z;                // bitsiZe, one of: 32,64
   double _con;
-  private TypeFlt init(int x, int z, double con ) { _x=(byte)x; _z=(byte)z; _con = con; return this; }
+  private TypeFlt init(int x, int z, double con ) { _x=(byte)x; _z=(byte)z; _con = con; _name=""; return this; }
   @Override TypeFlt copy() { return _copy().init(_x,_z,_con); }
   // Hash does not depend on other types
   @Override int compute_hash() { return super.compute_hash()+_x+_z+(int)_con; }
@@ -21,7 +22,7 @@ public class TypeFlt extends Type<TypeFlt> {
     return super.equals(o) && _x==t2._x && _z==t2._z && _con==t2._con;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
     sb.p(_name);
     if( _x==0 )
       return ((float)_con)==_con ? sb.p((float)_con).p('f') : sb.p(_con);

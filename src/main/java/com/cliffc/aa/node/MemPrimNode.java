@@ -26,7 +26,7 @@ public abstract class MemPrimNode extends PrimNode {
     if( tidx==Type.ANY ) return null; // No error
     if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_badargs[1],"Array might be nil when reading",null);
     if( !(tadr instanceof TypeMemPtr) )
-      return fast ? ErrMsg.FAST : ErrMsg.typerr(_badargs[1],tadr,tmem,TypeMemPtr.ISUSED);
+      return fast ? ErrMsg.FAST : ErrMsg.typerr(_badargs[1],tadr, TypeMemPtr.ISUSED);
     TypeMemPtr ptr = (TypeMemPtr)tadr;
     TypeStruct objs = ((TypeMem)tmem).ld(ptr); // General load from memory
     if( objs==TypeStruct.UNUSED ) return null; // Can fall to valid array

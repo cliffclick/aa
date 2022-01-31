@@ -7,7 +7,6 @@ import org.jetbrains.annotations.NotNull;
 import java.util.*;
 
 import static com.cliffc.aa.AA.unimpl;
-import static com.cliffc.aa.type.TypeFld.Access;
 
 // Combined Hindley-Milner and Global Constant Propagation typing.
 
@@ -378,7 +377,7 @@ public class HM9 {
       VBitSet visit = new VBitSet();
       p1(sb.i());
       if( DO_HM  ) _hmt .str(sb.p(", HM="), visit,dups);
-      if( DO_GCP ) _flow.str(sb.p(", CCP="),visit.clr(),null,false);
+      if( DO_GCP ) _flow.str(sb.p(", CCP="), false);
       sb.nl();
       return p2(sb.ii(1),dups).di(1);
     }
@@ -1026,7 +1025,7 @@ public class HM9 {
       //ts[0] = TypeFld.NO_DISP;       // Display
       //for( int i=0; i<args.length; i++ ) ts[i+1] = TypeFld.make_tup(args[i]._flow,i);
       //return TypeMemPtr.make(PAIR_ALIAS,TypeStruct.make(ts));
-      throw unimpl();      
+      throw unimpl();
     }
   }
 
@@ -1079,7 +1078,7 @@ public class HM9 {
       if( pred.above_center() ) // Delay any values
         return Type.XSCALAR;    // t1.join(t2);     // Join of either
       if( !pred.must_nil() )    // True only
-        return t1;           
+        return t1;
       // Could be either, so meet
       return t1.meet(t2);
     }

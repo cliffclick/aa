@@ -125,8 +125,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Is anything equals to this?
   @Override public boolean equals( Object o ) {
     if( this == o ) return true;
-    if( !(o instanceof Type) ) return false;
-    Type t = (Type)o;
+    if( !(o instanceof Type t) ) return false;
     return _type==t._type && Util.eq(_name,t._name);
   }
   public boolean cycle_equals( Type t ) {
@@ -138,11 +137,42 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // the Type hierarchy.  Instead, subtypes override 'str(...)' where the extra
   // args stop cycles (VBitSet) or sharpen pointers (TypeMem), or optimize
   // printing strings (SB).
-  @Override public final String toString() { return str(new SB(),new VBitSet(),null,true).toString(); }
-  // Nice, REPL-friendly and error-friendly dump.
-  // Debug flag dumps, e.g. raw aliases and raw fidxs.
-  // This is the 'base' printer, as changing this changes behavior.
-  public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) { return sb.p(_name).p(STRS[_type]); }
+
+  // toString is called on a single Type in the debugger, and prints debug-info.
+  @Override public final String toString() { return str(new SB(), true).toString(); }
+  // Nice, REPL-friendly and error-friendly dump.  Debug flag dumps, e.g. raw
+  // aliases and raw fidxs.  None-debug dumps are used in ErrMsg.  Many debug
+  // dumps use this version, and intersperse types with other printouts in the
+  // same SB.  This is the 'base' printer, as changing this changes behavior.
+  public final SB str(SB sb, boolean debug) {
+    NonBlockingHashMapLong<String> dups = new NonBlockingHashMapLong<>();
+    VBitSet bs = new VBitSet();
+    _str_dups(bs, dups, new UCnt());
+    return _str(bs.clr(), dups, sb, debug);
+  }
+  static class UCnt { int _fld, _tmp, _tfp, _ts; }
+
+  // The debug printer must have good handling of dups and cycles - on
+  // partially-built types.  It can depend on the UID but not on, e.g., all
+  // fields being filled, or the types being interned or having their hash.
+  // Walk the entire reachable set of types and gather the dups, and come up
+  // with a nice name for each dup.
+  void _str_dups(VBitSet visit, NonBlockingHashMapLong<String> ignore, UCnt ucnt) { visit.tset(_uid); }
+
+  // Internal tick of tick-tock printing
+  final SB _str( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
+    if( Util.eq(_name," FREE:") ) return sb.p(" FREE:");
+    String s = dups.get(_uid);
+    if( s!=null ) {
+      sb.p(s);                  // Pretty name
+      if( visit.tset(_uid) ) return sb; // Pretty name got defined before
+      sb.p(':');                // pretty name is defined here
+    }
+    return _str0(visit,dups,sb,debug);
+  }
+
+  // Internal tock of tick-tock printing
+  SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) { return sb.p(_name).p(STRS[_type]); }
 
   // Shallow array compare, using '==' instead of 'equals'.  Since elements are
   // interned, this is the same as 'equals' except asymptotically faster unless
@@ -227,7 +257,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     return errs==0;
   }
   private boolean intern_check0(Type v) {
-    if( this != v || _dual==null || _dual._dual!=this || compute_hash()!=_hash ) return false;
+    if( this != v || _dual==null || _dual._dual!=this || compute_hash()!=_hash )
+      return false;
     return intern_check1();
   }
   boolean intern_check1() { return true; }
@@ -238,10 +269,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         return k;
     return null;
   }
-
-  // Cyclic (complex/slow) interning
-  @SuppressWarnings("unchecked")
-  public T install() { return Cyclic.install((T)this); }
 
   // ----------------------------------------------------------
   // Simple types are implemented fully here.  "Simple" means: the code and
@@ -319,15 +346,12 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       return t;                 // Set breakpoints here to find a uid
     }
     <T extends Type> T free(T t1, T t2) {
-      //assert !t1.interned();
-      if( t1 instanceof TypeMemPtr ) ((TypeMemPtr)t1)._aliases=null; // is-free tag for TMP
-      if( t1 instanceof TypeFunPtr ) ((TypeFunPtr)t1)._fidxs  =null; // is-free tag for TFP
       t1._dual = null;   // Too easy to make mistakes, so zap now
       t1._hash = 0;      // Too easy to make mistakes, so zap now
-      t1._name = "";     // Too easy to make mistakes, so zap now
+      t1._name = " FREE:"; // "is free" tag
       _frees.push(t1);   // On the free list
       _free++;
-      assert _frees._len<200; // Basically asserting we get Types from Pool.malloc and not by normal allocation
+      assert _frees._len<1000; // Basically asserting we get Types from Pool.malloc and not by normal allocation
       return t2;
     }
   }

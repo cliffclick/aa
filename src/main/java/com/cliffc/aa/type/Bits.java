@@ -2,7 +2,6 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.IBitSet;
 import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
@@ -54,9 +53,6 @@ import java.util.Iterator;
 // TODO: FIDXS which can be Unresolved probably need to be under the same
 // parent (as opposed to the meet of 2 unrelated FIDXS going immediately to the
 // Most General FIDX).
-//
-// TODO: Ponder a Plan C: Bits are independent, always 'MEET', always all-up or
-// all-down.  Meet of [-2] and [-5] is [-2,-5]???
 
 public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Holds a set of bits meet'd together, or join'd together, along
@@ -120,8 +116,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   @Override public int hashCode( ) { return _hash; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    if( !(o instanceof Bits) ) return false;
-    Bits bs = (Bits)o;
+    if( !(o instanceof Bits bs) ) return false;
     if( _con != bs._con || _hash != bs._hash ) return false;
     if( _bits == bs._bits ) return true;
     if( _bits ==null || bs._bits==null ) return false;
@@ -479,7 +474,6 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
         if( _kids[i] != null )
           _kids[i][0] = i<_init.length ? _init[i] : 1;
     }
-    int peek() { return _kids[1][_kids[1][0]]; } // for testing
     void free(int b) {
       if( is_parent(b) ) return; // Too hard to compress
       int par = parent(b), idx=-1;
@@ -488,21 +482,6 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       _kids[par][idx] = _kids[par][cnt]; // Shuffle last element over removed
       _kids[par][cnt] = b;      // Put last bit at end, for reuse
       _kids[par][0] = cnt;    // Lower count
-    }
-    // Smear out the kids in a non-canonical representation, to allow the caller
-    // to iterate more easily.
-    public VBitSet plus_kids( Bits<B> bits) {
-      VBitSet bs = new VBitSet();
-      for( int i : bits )
-        if( i != 0 )
-          _plus_kids(bs,i);
-      return bs;
-    }
-    void _plus_kids(VBitSet bs, int i) {
-      bs.set(i);
-      int nkids = i >= _kids.length || _kids[i]==null ? 0 : _kids[i][0];
-      for( int kid=1; kid<nkids; kid++ )
-        _plus_kids(bs,_kids[i][kid]);
     }
 
     // Return next child of alias; repeated calls iterate over all the children
@@ -553,7 +532,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Iterate all bits in-order
   // Usage: for( int i=init_bit(); i!=-1; i=next_bit(i) ) ...
   int init_bit() {
-    if( _bits==null ) return _con==0 ? -1 : _con;
+    if( _bits==null ) return _con==0 ? -1 : Math.abs(_con);
     return next_bit(0);
   }
   int next_bit(int i) {

@@ -35,10 +35,6 @@ public class BitsAlias extends Bits<BitsAlias> {
     XNIL = NIL.dual();           //
     EMPTY= new BitsAlias().make(); // No bits; its its own dual
   }
-  // True if kid is a child or equal to parent
-  public static boolean is_parent( int par, int kid ) { return TREE.is_parent(par,kid); }
-  // True if this alias has been split thus has children
-  public static boolean is_parent( int idx ) { return TREE.is_parent(idx); }
   // Return parent alias from child alias.
   public static int parent( int kid ) { return TREE.parent(kid); }
   // Return two child aliases from the one parent at ary[1] and ary[2]

@@ -1,10 +1,12 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.util.Ary;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.HashMap;
+import java.util.Random;
 
 import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.DSP_IDX;
@@ -14,6 +16,92 @@ import static org.junit.Assert.*;
 public class TestApprox {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
+    // ND = ^=any,   D = ^=Scalar
+    // XS = ~Scalar, S =   Scalar
+    // XA = [17]{any,3 ->*[3](XS, XS) }
+    // XB = [17]{any,3 ->*[3](XS,  S) }
+    //
+    //
+    // TS0:  *[3]( XA, [17]{any,3 ->*[3](S,XS) } )
+    // APX2: *[3]( XB, [17]{any,3 ->*[3](S, S) } )
+    //
+    // TS1:  *[3]( XA, [17]{any,3 ->*[3](S, S) } )
+    // APX2: *[3]( XA, [17]{any,3 ->*[3](S, S) } )
+    //
+    // TS0>>TS1, because last 'XS' falls to 'S'
+    // TS0>>TS0.apx
+    // TS1>>TS1.apx
+
+    int a3 = BitsAlias.new_alias(BitsAlias.ALLX);
+    int f7 = BitsFun.new_fidx(BitsFun.ALLX);
+    int f2 = BitsFun.new_fidx(BitsFun.ALLX);
+    Type ND = TypeMemPtr.NO_DISP;
+    TypeFld S0 = TypeFld.make_tup(Type. SCALAR,ARG_IDX+0);
+    TypeFld X0 = TypeFld.make_tup(Type.XSCALAR,ARG_IDX+0);
+    TypeFld S1 = TypeFld.make_tup(Type. SCALAR,ARG_IDX+1);
+    TypeFld X1 = TypeFld.make_tup(Type.XSCALAR,ARG_IDX+1);
+    TypeFld S2 = TypeFld.make_tup(Type. SCALAR,ARG_IDX+2);
+    TypeFld X2 = TypeFld.make_tup(Type.XSCALAR,ARG_IDX+2);
+    TypeMemPtr tmpa = TypeMemPtr.make(a3,TypeStruct.make(X0,X1));
+    TypeFunPtr tfpa = TypeFunPtr.make(f7,3,ND,tmpa);
+
+    TypeMemPtr tmp0 = TypeMemPtr.make(a3,TypeStruct.make(S0,X1));
+    TypeFunPtr tfp0 = TypeFunPtr.make(f7,3,ND,tmp0);
+    TypeMemPtr ts0  = TypeMemPtr.make(a3,TypeStruct.make(TypeFld.make_tup(tfpa,ARG_IDX+1),TypeFld.make_tup(tfp0,ARG_IDX+2)));
+
+    TypeMemPtr tmp1 = TypeMemPtr.make(a3,TypeStruct.make(S0,S1));
+    TypeFunPtr tfp1 = TypeFunPtr.make(f7,3,ND,tmp1);
+    TypeMemPtr ts1  = TypeMemPtr.make(a3,TypeStruct.make(TypeFld.make_tup(tfpa,ARG_IDX+1),TypeFld.make_tup(tfp1,ARG_IDX+2)));
+
+    assertTrue(tmp0.isa(tmp1));
+    TypeStruct ax0 = ts0._obj.approx2(2,ts0._aliases);
+    TypeStruct ax1 = ts1._obj.approx2(2,ts1._aliases);
+    assertTrue(ts0._obj.isa(ax0));
+    assertTrue(ts1._obj.isa(ax1));
+
+    assertTrue(ax0.isa(ax1));
+
+
+    // Make a collection of probably function-to-functions
+    Ary<TypeFunPtr> tfps = new Ary<>(TypeFunPtr.class);
+    tfps.push(tfpa);
+    tfps.push(tfp0);
+    tfps.push(tfp1);
+    tfps.push(TypeFunPtr.make(f2,1,ND,Type.XSCALAR));
+    tfps.push(TypeFunPtr.make(f2,1,ND,Type. SCALAR));
+    tfps.push(TypeFunPtr.make(f7,1,ND,Type.XSCALAR));
+    tfps.push(TypeFunPtr.make(f7,1,ND,Type. SCALAR));
+    BitsFun bf2  = BitsFun.make0(f2);
+    BitsFun bf7  = BitsFun.make0(f7);
+    BitsFun bf27 = BitsFun.make0(f2,f7);
+    tfps.push(TypeFunPtr.make_cycle(bf2 ,1,ND,tfpa));
+    tfps.push(TypeFunPtr.make_cycle(bf7 ,1,ND,tfpa));
+    tfps.push(TypeFunPtr.make_cycle(bf27,1,ND,tfpa));
+    tfps.push(TypeFunPtr.make(f2,1,ND,TypeFunPtr.make(f7,1,ND,Type.XSCALAR)));
+    tfps.push(TypeFunPtr.make(f2,1,ND,TypeFunPtr.make(f7,1,ND,Type. SCALAR)));
+    tfps.push(TypeFunPtr.make(f7,1,ND,TypeFunPtr.make(f2,1,ND,Type.XSCALAR)));
+    tfps.push(TypeFunPtr.make(f7,1,ND,TypeFunPtr.make(f2,1,ND,Type. SCALAR)));
+
+    // Check that we can wrap sanely
+    for( int i=0; i<tfps._len; i++ ) {
+      TypeFunPtr tfpi = tfps.at(i);
+      for( int j=i+1; j<tfps._len; j++ ) {
+        TypeFunPtr tfpj = tfps.at(j);
+        assert tfpi!=tfpj;      // No dups
+        if( tfpi.isa(tfpj) ) {
+          TypeFunPtr tfpi2  = TypeFunPtr.makex(bf2 ,1,ND,tfpi);
+          TypeFunPtr tfpj2  = TypeFunPtr.makex(bf2 ,1,ND,tfpj);
+          assert tfpi2 .isa(tfpj2 );
+          TypeFunPtr tfpi7  = TypeFunPtr.makex(bf7 ,1,ND,tfpi);
+          TypeFunPtr tfpj7  = TypeFunPtr.makex(bf7 ,1,ND,tfpj);
+          assert tfpi7 .isa(tfpj7 );
+          TypeFunPtr tfpi27 = TypeFunPtr.makex(bf27,1,ND,tfpi);
+          TypeFunPtr tfpj27 = TypeFunPtr.makex(bf27,1,ND,tfpj);
+          assert tfpi27.isa(tfpj27);
+        }
+      }
+    }
+
   }
 
   private TypeFld make(BitsFun fidxs,Type ret) { return TypeFld.make("pred",TypeFunPtr.make(fidxs,1,TypeMemPtr.NO_DISP,ret)); }
@@ -43,13 +131,30 @@ public class TestApprox {
     TypeStruct tsb = TypeStruct.make(pb);
     TypeMemPtr ptrb = TypeMemPtr.make(BitsAlias.EMPTY,tsb);
 
-    TypeStruct ax  = tsa.approx1(1,ba14);
+    TypeStruct ax  = tsa.approx2(1,ba14);
     TypeStruct axb = (TypeStruct)ax.meet(tsb);
 
     TypeStruct ab = (TypeStruct)tsa.meet(tsb);
-    TypeStruct abx = ab.approx1(1,ba14);
+    TypeStruct abx = ab.approx2(1,ba14);
 
     assertNotEquals(axb,abx); // Would like this to be equals!!!!
+  }
+
+  // Test of a cutoff=1 for a depth=1 cycle
+  @Test public void testCycle1() {
+    Object dummy = TypeMemPtr.TYPES; // <clinit> before RECURSIVE_MEET
+    int alias = BitsAlias.new_alias(BitsAlias.ALLX);
+    TypeFld dummy2 = TypeFld.make("dummy",Type.SCALAR);
+    Type.RECURSIVE_MEET++;
+    TypeFld fld = TypeFld.malloc("fld");
+    TypeStruct ts = TypeStruct.malloc_test(fld);
+    TypeMemPtr p = TypeMemPtr.make(alias,ts);
+    fld.setX(p);
+    Type.RECURSIVE_MEET--;
+    ts = ts.install();
+
+    TypeStruct t2 = ts.approx2(1,p._aliases);
+    assertEquals(ts,t2);
   }
 
   // Check TypeStruct.meet for a more complex recursive case
@@ -90,7 +195,7 @@ public class TestApprox {
     int alias0 = BitsAlias.new_alias(BitsAlias.ALLX);
 
     // Build a depth-CUTOFF linked list chain
-    TypeStruct t0 = TypeStruct.make(TypeFld.make("a",Type.XNIL      ,TypeFld.oBot),
+    TypeStruct t0 = TypeStruct.make(TypeFld.make("a",Type.NIL       ,TypeFld.oBot),
                                     TypeFld.make("b",TypeInt.con(99),TypeFld.oBot));
     TypeMemPtr p0 = TypeMemPtr.make(alias0,t0);
     HashMap<Type,Integer> ds = p0.depth();
@@ -143,7 +248,7 @@ public class TestApprox {
     assertEquals(2,(int)ds2.get(txp2));
     TypeStruct txs2 = txp2._obj;
     assertEquals(2,(int)ds2.get(txs2));
-    assertEquals(TypeInt.con(98),txs2.at("b"));
+    assertEquals(TypeInt.NINT8,txs2.at("b"));
     Type txp3 = txs2.at("a");
     //assertEquals(2,(int)ds2.get(txp3));
     //// Weakened expected results after NIL expands to [0]->obj
@@ -223,11 +328,11 @@ public class TestApprox {
     assertEquals(2,(int)ds2.get(txp2));
     TypeStruct txs2 = txp2._obj;
     assertEquals(CUTOFF-1,(int)ds2.get(txs2));
-    assertEquals(TypeFlt.FLT64,txs2.at("b"));
+    assertEquals(Type.SCALAR,txs2.at("b"));
     Type txp3 = txs2.at("a");
     // Pointer-equals; 'equals()' is not good enough
-    //assertSame(txp2, txp3);
-    //assertSame(txs2, txp3._obj);
+    assertSame(txp2, txp3);
+    assertSame(txs2, ((TypeMemPtr)txp3)._obj);
     assertTrue(t3.isa(tax));
 
     // Add another layer, and approx again
@@ -248,10 +353,10 @@ public class TestApprox {
     assertEquals(2,(int)ds2.get(t4p2));
     TypeStruct t4s2 = t4p2._obj;
     assertEquals(CUTOFF-1,(int)ds2.get(t4s2));
-    assertEquals(TypeInt.con(99),t4s2.at("b"));
+    assertEquals(Type.SCALAR,t4s2.at("b"));
     Type t4p3 = t4s2.at("a");
-    //assertEquals(2,(int)ds2.get(t4p3));
-    //assertEquals(t4s2,t4p3._obj);
+    assertEquals(2,(int)ds2.get(t4p3));
+    assertEquals(t4s2,((TypeMemPtr)t4p3)._obj);
     assertTrue(t4.isa(tax4));
   }
 
@@ -266,8 +371,8 @@ public class TestApprox {
     // ......................................................... -> X5
     Type str_x5 = TypeInt.con(55);
     TypeStruct  x5 = TypeStruct.make(TypeFld.make("v",str_x5   ),
-                                     TypeFld.make("x",Type.XNIL),
-                                     TypeFld.make("a",Type.XNIL));
+                                     TypeFld.make("x",Type.NIL),
+                                     TypeFld.make("a",Type.NIL));
     TypeMemPtr px5 = TypeMemPtr.make(alias1,x5);
 
     // ................................................... -> A3 -> X5
@@ -378,20 +483,20 @@ public class TestApprox {
     TypeMemPtr zpa23= (TypeMemPtr)zsx2.at("a");
 
     TypeStruct zsa23=             zpa23._obj;
-    assertSame(TypeInt.con(2),    zsa23.at("v"));
+    assertSame(TypeInt.NINT8,     zsa23.at("v"));
     TypeMemPtr zpx35= (TypeMemPtr)zsa23.at("x");
 
     TypeStruct zsx35=             zpx35._obj;
-    assertSame(TypeInt.con(33),   zsx35.at("v"));
+    assertSame(TypeInt.NINT8,     zsx35.at("v"));
     TypeMemPtr zpa4 = (TypeMemPtr)zsx35.at("x") ;
-    Type zpa23q=zsx35.at("a") ;
+    TypeMemPtr zpa23q= (TypeMemPtr)zsx35.at("a") ;
     // Weakened expected results after NIL expands to [0]->obj
-    //assertSame(zsa23,             zpa23q._obj);
-    //assertSame(TypeStruct.OBJ,       zpa23q._obj);
+    assertSame(zsa23,             zpa23q._obj);
+    //assertSame(TypeStruct.ISUSED, zpa23q._obj);
     TypeStruct zsx4 =             zpa4._obj;
     assertSame(i14,               zsx4.at("v"));
     assertSame(zpx35,             zsx4.at("x"));
-    assertSame(Type.SCALAR,       zsx4.at("a"));
+    assertSame(zpa23,             zsx4.at("a"));
 
     depths = pzsa0.depth();
     assertEquals(0,(int)depths.get(zsa0));
@@ -490,9 +595,9 @@ public class TestApprox {
     TypeMemPtr p6 = (TypeMemPtr)z3.at("l") ;
     TypeMemPtr p7 = (TypeMemPtr)z3.at("r") ;
 
-    check_leaf(p4,alias,TypeInt.con(4));
-    check_leaf(p5,alias,TypeInt.con(5));
-    check_leaf(p6,alias,TypeInt.con(6));
+    check_leaf(p4,alias,TypeInt.NINT8);
+    check_leaf(p5,alias,TypeInt.NINT8);
+    check_leaf(p6,alias,TypeInt.NINT8);
     check_leaf(p7,alias,TypeInt.con(7));
 
     depths = pz1.depth();
@@ -567,7 +672,7 @@ public class TestApprox {
     Type.RECURSIVE_MEET++;
     TypeStruct  x1 = TypeStruct.malloc_test(TypeFld.malloc("l"), TypeFld.malloc("r"), TypeFld.malloc("v"));
     TypeMemPtr px1 = TypeMemPtr.make_nil(alias,x1);
-    x1.get("l").setX(Type.XNIL  );
+    x1.get("l").setX(Type.NIL   );
     x1.get("r").setX(px1        );
     x1.get("v").setX(Type.SCALAR);
     Type.RECURSIVE_MEET--;
@@ -579,19 +684,27 @@ public class TestApprox {
 
     TypeStruct  z0= TypeStruct.make(TypeFld.make("l",px1),TypeFld.make("r",px2),TypeFld.make("v",Type.SCALAR));
     // Approximate
-    TypeStruct z1 = z0.approx1(CUTOFF,BitsAlias.make0(alias));
+    TypeStruct z1 = z0.approx2(CUTOFF,BitsAlias.make0(alias));
 
+    //Type.RECURSIVE_MEET++;
+    //TypeStruct  x3 = TypeStruct.malloc_test(TypeFld.malloc("l"), TypeFld.malloc("r"), TypeFld.malloc("v"));
+    //TypeMemPtr px3 = TypeMemPtr.make_nil(alias,x3);
+    //x3.get("l").setX(px3);//TypeMemPtr.make_nil(alias,TypeStruct.OBJ);
+    //x3.get("r").setX(px3);
+    //x3.get("v").setX(Type.SCALAR);
+    //Type.RECURSIVE_MEET--;
+    //x3 = x3.install();
+    //px3 = (TypeMemPtr)x3.at("l");
+    TypeFld frs = TypeFld.make("r"), fvs = TypeFld.make("v");
+    TypeStruct axl = TypeStruct.make(TypeFld.make("l"),frs,fvs);
     Type.RECURSIVE_MEET++;
-    TypeStruct  x3 = TypeStruct.malloc_test(TypeFld.malloc("l"), TypeFld.malloc("r"), TypeFld.malloc("v"));
-    TypeMemPtr px3 = TypeMemPtr.make_nil(alias,x3);
-    x3.get("l").setX(px3);//TypeMemPtr.make_nil(alias,TypeStruct.OBJ);
-    x3.get("r").setX(px3);
-    x3.get("v").setX(Type.SCALAR);
+    TypeFld flx = TypeFld.malloc("l");
+    TypeStruct  axr = TypeStruct.malloc_test(flx,frs,fvs);
+    TypeMemPtr paxr = TypeMemPtr.make_nil(alias,axr);
+    flx.setX(paxr);
     Type.RECURSIVE_MEET--;
-    x3 = x3.install();
-    px3 = (TypeMemPtr)x3.at("l");
 
-    TypeStruct x4= TypeStruct.make(TypeFld.make("l",px1),TypeFld.make("r",px3),TypeFld.make("v",Type.SCALAR));
+    TypeStruct x4= TypeStruct.make(TypeFld.make("l",TypeMemPtr.make_nil(alias,axl)),TypeFld.make("r",paxr),fvs);
     assertSame(x4,z1);
   }
 
@@ -695,12 +808,10 @@ public class TestApprox {
       tmpC1 = tmpC2;
       cnt++;
     }
-    assertEquals(CUTOFF,cnt);
+    assertEquals(CUTOFF-1,cnt);
   }
 
   @Test public void testApprox8() {
-    Object dummy0 = TypeStruct.TYPES;
-    Object dummy1 = TypeFunPtr.TYPES;
     Object dummy2 = Env.GVN;
     final int CUTOFF=2;
     final int fidx = BitsFun.new_fidx(1), fidx0 = BitsFun.new_fidx(fidx), fidx1 = BitsFun.new_fidx(fidx);
@@ -755,7 +866,7 @@ public class TestApprox {
     assertEquals(dsp3,mt);
 
     // Build the approx
-    TypeStruct rez = dsp2.approx1(CUTOFF,BitsAlias.make0(alias));
+    TypeStruct rez = dsp2.approx2(CUTOFF,BitsAlias.make0(alias));
     assertEquals(dsp3,rez);
   }
 
@@ -819,4 +930,190 @@ public class TestApprox {
     fld.setX(TypeFunPtr.make(fidx,1,TypeMemPtr.NO_DISP,ptr));
   }
 
+
+  // The following case the tstr0 >> tstr1, BUT !(tstr0.apx >. tstr1.apx)
+  @Test public void testApprox10() {
+    Object dummy0 = TypeStruct.TYPES;
+
+    BitsAlias a6 = BitsAlias.make0(BitsAlias.new_alias());
+    BitsFun f16 = BitsFun.make_new_fidx(BitsFun.ALLX);
+    BitsFun f17 = BitsFun.make_new_fidx(BitsFun.ALLX);
+    BitsFun f18 = BitsFun.make_new_fidx(BitsFun.ALLX);
+    BitsFun f19 = BitsFun.make_new_fidx(BitsFun.ALLX);
+
+    TypeFld fand = TypeFld.make("and",TypeFunPtr.make(f16,1,TypeMemPtr.NO_DISP,Type.SCALAR));
+    TypeFld fthn = TypeFld.make("thn",TypeFunPtr.make(f19,2,TypeMemPtr.NO_DISP,Type.SCALAR));
+    TypeFld fthx = TypeFld.make("thn",TypeFunPtr.make(f19,2,TypeMemPtr.NO_DISP,Type.XSCALAR));
+    Type.RECURSIVE_MEET++;
+    TypeFld fnot0 = TypeFld.malloc("not");
+    TypeFld ffor0 = TypeFld.malloc("or_");
+
+    TypeFld fnot1 = TypeFld.malloc("not");
+    TypeFld ffor1 = TypeFld.malloc("or_");
+
+    TypeStruct sa2 = TypeStruct.make(TypeFld.NO_DISP,fand,fnot1,ffor1,fthx);
+    _help0(fnot1,f18,a6,sa2);
+    _help0(ffor1,f17,a6,sa2);
+
+    TypeStruct sa1 = TypeStruct.make(TypeFld.NO_DISP,fand,fnot1,ffor1,fthn);
+    _help0(ffor0,f17,a6,sa1);
+
+    TypeStruct sa0 = TypeStruct.make(TypeFld.NO_DISP,fand,fnot0,ffor0,fthn);
+    _help0(fnot0,f18,a6,sa0);
+    Type.RECURSIVE_MEET--;
+    sa0 = sa0.install();
+
+    TypeStruct apx = sa0.approx(1,a6);
+    assertTrue(sa0.isa(apx));
+  }
+
+//@{ f0=~Scalar,
+//   f1=*[2]@{
+//     f0=3,
+//     f1=*[2]@{f0=3, f1=~Scalar}
+//   }
+//}
+//
+  @Test public void testApprox11() {
+    Object dummy0 = TypeStruct.TYPES;
+
+    BitsAlias a2 = BitsAlias.make0(BitsAlias.new_alias());
+
+    TypeFld    f0c = TypeFld.make("f0",TypeInt.con(3));
+    TypeFld    f1x = TypeFld.make("f1",Type.XSCALAR);
+    TypeStruct s2  = TypeStruct.make(f0c,f1x);
+
+    TypeFld    f1p = TypeFld.make("f1",TypeMemPtr.make(a2,s2));
+    TypeStruct s1  = TypeStruct.make(f0c,f1x);
+
+    TypeFld    f0x = TypeFld.make("f0",Type.XSCALAR);
+    TypeFld    f1q = TypeFld.make("f1",TypeMemPtr.make(a2,s1));
+    TypeStruct s0  = TypeStruct.make(f0x,f1q);
+
+    TypeStruct apx = s0.approx(1,a2);
+    assertTrue(s0.isa(apx));
+  }
+
+  // Make a psuedo-random selection of types, and verify that approx is
+  // monotonic.
+  private static final long RSEED = 1234L;
+  private static final int NRAND = 99;       // Number of random types.  Raise this to test more.
+  private static final int NSTRUCTS = 2;     // Number of structs per type.  Raise this to test larger type nests
+  @Test public void testApproxRand() {
+    Object dummy = TypeMemPtr.TYPES; // <clinit> before RECURSIVE_MEET
+
+    final Random R=new Random(RSEED);
+
+    int a0 = BitsAlias.new_alias();
+    int a1 = BitsAlias.new_alias();
+    int f0 = BitsFun.new_fidx();
+    int f1 = BitsFun.new_fidx();
+    // Pre-build some random small integers
+    for( int i=0; i<10; i++ ) TypeInt.con(i);
+
+    // Make NRAND random types, without dups
+    TypeStruct[] ts = new TypeStruct[NRAND];
+    for( int i=0; i<NRAND; i++ ) {
+      ts[i] = make_rand(R,a0,a1,f0,f1);
+      for( int j=0; j<i; j++ ) if( ts[j]==ts[i] ) { i--; break; } // Dup, try again
+    }
+
+    // Make NRAND approximation types
+    TypeStruct[] ax1s = new TypeStruct[NRAND];
+    for( int i=0; i<NRAND; i++ ) {
+      ax1s[i] = ts[i].approx2(2,BitsAlias.make0(a0));
+      assertTrue(ts[i].isa(ax1s[i])); // Verify self-monotonic
+    }
+
+    int cnt=0, ecnt=0;
+    for( int i=0; i<NRAND; i++ ) {
+      for( int j=0; j<i; j++ ) {
+        Type mt = ts[i].meet(ts[j]);
+        if( mt==ts[i] ) ecnt = _check_apx( ax1s[j], ax1s[i], ecnt, cnt++, j, i );
+        if( mt==ts[j] ) ecnt = _check_apx( ax1s[i], ax1s[j], ecnt, cnt++, i, j );
+      }
+    }
+
+    assertTrue( cnt>0 ); // Nothing tested!
+    assertEquals(0, ecnt);
+  }
+
+  private static final Ary<TypeStruct> TSRANDS = new Ary<>(TypeStruct.class);
+  private static TypeStruct rand_struct( Random R) { return TSRANDS.at(R.nextInt(TSRANDS.len())); }
+  private static TypeMemPtr rand_tmp( int ax, Random R) { return TypeMemPtr.make(ax,rand_struct(R)); }
+
+  private static TypeStruct make_rand(Random R, int a0, int a1, int f0, int f1) {
+    TSRANDS.clear();
+    int nts = Math.min(NSTRUCTS,R.nextInt(NSTRUCTS)+R.nextInt(NSTRUCTS)+1); // random from 1-NSTRUCTS, but favoring larger counts
+    Type.RECURSIVE_MEET++;
+    for( int i=0; i<nts; i++ )
+      TSRANDS.push(TypeStruct.malloc_test(TypeFld.malloc("f0"),TypeFld.malloc("f1"),TypeFld.malloc("f2")));
+    for( int i=0; i<nts; i++ ) {
+      TypeStruct ts = TSRANDS.at(i);
+      ts._fld_idx(0).setX(_make_rand_fld(R,a0,a1,f0,f1,true));
+      ts._fld_idx(1).setX(_make_rand_fld(R,a0,a1,f0,f1,true));
+      ts._fld_idx(2).setX(_make_rand_fld(R,a0,a1,f0,f1,true));
+    }
+    Type.RECURSIVE_MEET--;
+    return TSRANDS.at(0).install();
+  }
+  private static Type _make_rand_fld(Random R, int a0, int a1, int f0, int f1, boolean fptrs) {
+    return switch( R.nextInt(fptrs ? 11 : 8) ) {
+    case 0 -> Type. SCALAR;
+    case 1 -> Type. NSCALR;
+    case 2 -> Type.XSCALAR;
+    case 3 -> Type.XNSCALR;
+    case 4 -> Type.XSCALAR;
+    case 5 -> Type.XNSCALR;
+    case 6 -> rand_tmp(a0,R);  // *[a0] rand
+    case 7 -> rand_tmp(a1,R);  // *[a1] rand
+    case 8 -> TypeFunPtr.make(f0,2, _make_rand_fld(R,a0,a1,f0,f1,false), _make_rand_fld(R,a0,a1,f0,f1,false));
+    case 9 -> TypeFunPtr.make(f1,2, _make_rand_fld(R,a0,a1,f0,f1,false), _make_rand_fld(R,a0,a1,f0,f1,false));
+    default -> TypeInt.con(2+R.nextInt(2));
+    };
+  }
+
+  private static int _check_apx( Type ax0, Type ax1, int ecnt, int ignore, int i, int j ) {
+    if( ax0.isa(ax1) )
+      return ecnt;
+    System.out.println("Failed approx for seeds "+i+" and "+j+", use testJig to repro");
+    System.out.println(ax0);
+    System.out.println("is not isa ");
+    System.out.println(ax1);
+    System.out.println();
+    return ecnt+1;
+  }
+
+  // Use this to make a quick test from the two failed test numbers given
+  @Test public void testJig() {
+    Object dummy = TypeMemPtr.TYPES; // <clinit> before RECURSIVE_MEET
+    Object dumm2 = TypeFunPtr.GENERIC_FUNPTR;
+    int a0 = BitsAlias.new_alias();
+    int a1 = BitsAlias.new_alias();
+    int f0 = BitsFun.new_fidx();
+    int f1 = BitsFun.new_fidx();
+    BitsAlias b0 = BitsAlias.make0(a0);
+    // Pre-build some random small integers
+    for( int k=0; k<10; k++ ) TypeInt.con(k);
+
+    final Random R=new Random(RSEED);
+    TypeStruct[] ts = new TypeStruct[NRAND];
+    for( int i=0; i<NRAND; i++ ) {
+      ts[i] = make_rand(R,a0,a1,f0,f1);
+      for( int j=0; j<i; j++ ) if( ts[j]==ts[i] ) { i--; break; } // Dup, try again
+    }
+
+    // HACK IN THE FAILED TEST NUMBERS HERE
+    TypeStruct ts0 = ts[2];
+    TypeStruct ts1 = ts[0];
+
+    TypeStruct ax0 = ts0.approx2(1,b0);
+    TypeStruct ax1 = ts1.approx2(1,b0);
+
+    assertTrue( ts0.isa(ts1) );
+    assertTrue( ts0.isa(ax0) );
+    assertTrue( ts1.isa(ax1) );
+
+    assertTrue( ax0.isa(ax1) );
+  }
 }

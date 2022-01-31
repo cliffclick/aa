@@ -26,7 +26,6 @@ public class TestType {
     // scalar           ==>> [2]{-> scalar          } ==>> $[2  ]{->scalar } /
 
     // And fails monotonicity for the last row.
-
     int a2 = BitsFun.new_fidx();
     int a3 = BitsFun.new_fidx();
     BitsFun b2  = BitsFun.make0(a2);

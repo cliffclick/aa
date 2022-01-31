@@ -8,7 +8,8 @@ public class BitSetSparse {
   public boolean tset(long b) { return _set.put(b,"")!=null; }
   public boolean clr (long b) { return _set.remove(b)!=null; }
   public boolean test(long b) { return _set.get(b)!=null; }
-  public void clear() { _set.clear(true); }
+  public BitSetSparse clear() { _set.clear(true); return this; }
+  public int size() { return _set.size(); }
   public int cardinality() { return _set.size(); }
   @Override public String toString() {
     if( _set.size()==0 ) return "[]";

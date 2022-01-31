@@ -232,7 +232,7 @@ public class HM2 {
     }
     @Override public String _str() {
       String s = "v"+_uid;
-      if( _t!=Type.ANY ) s += ":"+_t.str(new SB(),new VBitSet(),null,false);
+      if( _t!=Type.ANY ) s += ":"+_t.str(new SB(), false);
       return s;
     }
 

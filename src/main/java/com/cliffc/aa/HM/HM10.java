@@ -509,7 +509,7 @@ public class HM10 {
       VBitSet visit = new VBitSet();
       p1(sb.i(),dups);
       if( DO_HM  ) _hmt .str(sb.p(", HMT="), visit,dups,true);
-      if( DO_GCP ) _flow.str(sb.p(", GCP="),visit.clr(),null,true);
+      if( DO_GCP ) _flow.str(sb.p(", GCP="), true);
       sb.nl();
       return p2(sb.ii(2),dups).di(2);
     }
@@ -788,13 +788,13 @@ public class HM10 {
       // Have some functions, meet over their returns.
       Type rez = tfp._ret;
 
-      // Attempt to lift the result, based on HM types.  
+      // Attempt to lift the result, based on HM types.
       if( DO_HM ) {
 
         // Walk the input HM type and CCP flow type in parallel and create a
         // mapping.  Then walk the output HM type and CCP flow type in parallel,
         // and join output CCP types with the matching input CCP type.
-          
+
         // Walk the input types, finding all the Leafs.  Repeats of the same Leaf
         // has its flow Types MEETed.  If HM_FREEZE, then these are the exact
         // Leafs.  If !HM_FREEZE, then all Leafs are assumed unified and all their
@@ -805,7 +805,7 @@ public class HM10 {
         T2.T2MAP.clear();
         for( Syntax arg : _args )
           { T2.WDUPS.clear(true); arg.find().walk_types_in(arg._flow); }
-        
+
         // If !HM_FREEZE, pre-compute a monolithic JOIN.
         // Any leaf or base may unify with any other.
         Type jt = null;

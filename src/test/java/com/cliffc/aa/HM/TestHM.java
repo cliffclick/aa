@@ -107,7 +107,7 @@ public class TestHM {
                                     "{ A -> ( 3, A) }", tfs(TypeMemPtr.make(2,make_tups(TypeInt.con(3),Type.SCALAR)))); }
 
   @Test public void test03() { run( "{ z -> (pair (z 0) (z \"abc\")) }" ,
-                                    "{ { *[0,4]str:(nint64)? -> A } -> ( A, A) }", tfs(tuple2)); }
+                                    "{ { *[0,4]str:(nint64) -> A } -> ( A, A) }", tfs(tuple2)); }
 
   @Test public void test04() {
     run( "fact = { n -> (if (eq0 n) 1 (* n (fact (dec n))))}; fact",
@@ -325,7 +325,7 @@ map ={fun parg -> (fun (cdr parg))};
 
 
   // Recursive linked-list discovery, with no end clause.  Since this code has
-  // no exit (its an infinite loop, endlessly reading from an infinite input
+  // no exit (it is an infinite loop, endlessly reading from an infinite input
   // and writing an infinite output), gcp gets a cyclic approximation.
   @Test public void test32() {
     run("map = { fcn lst -> @{ n1 = (map fcn lst.n0), v1 = (fcn lst.v0) } }; map",
@@ -468,8 +468,8 @@ loop = { name cnt ->
 };
 (loop "def" (id 2))
 """,
-        "*[0,4]str:(nint8)?",  // Both HM and GCP
-        "Cannot unify int8 and *[0,4]str:(nint8)?", // HM alone cannot do this one
+        "*[0,4]str:(nint8)",  // Both HM and GCP
+        "Cannot unify int8 and *[0,4]str:(nint8)", // HM alone cannot do this one
         // With lift ON
         TypeMemPtr.make_str(TypeInt.NINT64), // Both HM and GCP
         // With lift OFF
@@ -1019,9 +1019,9 @@ maybepet = petcage.get;
         //TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.ISUSED)),
         //TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.ISUSED)));
         // With lift OFF
-        TypeMemPtr.make(3, make_tups(Type.SCALAR  , Type.SCALAR  , Type.SCALAR)),
+        TypeMemPtr.make(3, make_tups(Type.SCALAR  , Type.SCALAR  , TypeMemPtr.make_str(TypeInt.NINT8))),
         // Needs cutoff==2 or HM to discover .name field is a string
-        TypeMemPtr.make(3, make_tups(Type.SCALAR  , Type.SCALAR  , Type.SCALAR)) );
+        TypeMemPtr.make(3, make_tups(Type.SCALAR  , Type.SCALAR  , TypeMemPtr.make_str(TypeInt.NINT8))) );
   }
 
   @Test public void test67() {
@@ -1071,5 +1071,4 @@ A:@{
         Type.SCALAR
         );
   }
-
 }

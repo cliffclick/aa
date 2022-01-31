@@ -1,8 +1,6 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.Util;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.function.BiFunction;
@@ -25,6 +23,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
 
   private TypeFld init( @NotNull String fld, Type t, Access access, int order ) {
     assert !(t instanceof TypeFld);
+    _name="";
     _cyclic = false;
     _fld=fld; _t=t; _access=access; _order=order;
     return this;
@@ -35,9 +34,12 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   @Override public void set_cyclic() { _cyclic = true; }
   @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_t,"t"); }
   @Override public void walk_update( UnaryOperator<Type> map ) { _t = map.apply(_t); }
+  @Override public Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth) {
+    return _t instanceof Cyclic cyc ? make_from(cyc.walk_apx(cutoff,depth)) : this;
+  }
 
   // Ignore edges hash
-  int _hash() { return Util.hash_spread(super.static_hash() + _fld.hashCode() + _access.hashCode( ) + _order); };
+  int _hash() { return Util.hash_spread(super.static_hash() + _fld.hashCode() + _access.hashCode( ) + _order); }
   @Override int  static_hash() { return _hash(); } // No edges
   @Override int compute_hash() { assert _t._hash!=0; return _hash() + _t._hash; } // Always edges
 
@@ -72,11 +74,20 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     return _t.cycle_equals(((TypeFld)o)._t);
   }
 
-  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
-    if( dups.tset(_uid) ) return sb.p(_fld).p('$'); // Break recursive printing cycle
+  @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
+    if( visit.tset(_uid) ) {
+      if( !dups.containsKey(_uid) )
+        dups.put(_uid,"F"+(char)('A'+ucnt._fld++));
+      return;
+    }
+    if( _t!=null ) _t._str_dups(visit,dups,ucnt);
+  }
+
+  @SuppressWarnings("unchecked")
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
     if( !TypeStruct.isDigit(_fld.charAt(0)) ) // Do not print number-named fields for tuples
       _access.str(sb.p(_fld));
-    return _t==null ? sb.p('!') : (_t==Type.SCALAR ? sb : _t.str(sb,dups,mem,debug));
+    return _t==null ? sb.p('!') : (_t==Type.SCALAR ? sb : _t._str(visit, dups, sb, debug));
   }
 
   static { new Pool(TFLD,new TypeFld()); }
@@ -101,9 +112,9 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public static final TypeFld NO_DSP = TypeFld.make_dsp(TypeMemPtr.NO_DISP);
 
   @Override protected TypeFld xdual() {
-    if( _fld==sdual(_fld) && _t==_t._dual && _order==odual(_order) && _access==_access.dual() )
+    if( Util.eq(_fld,sdual(_fld)) && _t==_t.dual() && _order==odual(_order) && _access==_access.dual() )
       return this;              // Self symmetric
-    return POOLS[TFLD].<TypeFld>malloc().init(sdual(_fld),_t._dual,_access.dual(),odual(_order));
+    return POOLS[TFLD].<TypeFld>malloc().init(sdual(_fld),_t.dual(),_access.dual(),odual(_order));
   }
   @Override protected TypeFld rdual() {
     assert _hash!=0;

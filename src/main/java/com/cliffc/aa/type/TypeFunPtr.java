@@ -1,8 +1,6 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.Util;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
@@ -42,6 +40,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   private TypeFunPtr init(BitsFun fidxs, int nargs, Type dsp, Type ret ) {
     super.init("");
     _cyclic = false;
+    assert !(dsp instanceof TypeFld);
     _fidxs = fidxs; _nargs=nargs; _dsp=dsp; _ret=ret;
     return this;
   }
@@ -50,22 +49,26 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   @Override public void set_cyclic() { _cyclic = true; }
   @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_dsp,"dsp");  map.apply(_ret,"ret"); }
   @Override public void walk_update( UnaryOperator<Type> map ) { _dsp = map.apply(_dsp); _ret = map.apply(_ret); }
+  @Override public Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth) {
+    if( depth.get(-_uid)!=null ) return this; // Self-cycle, no approx
+    depth.put(-_uid,1);                       // Stop self-cycle
+    return make_from(_dsp instanceof Cyclic cyc ? cyc.walk_apx(cutoff, depth) : _dsp,
+                     _ret instanceof Cyclic cyc ? cyc.walk_apx(cutoff, depth) : _ret);
+  }
 
   public boolean has_dsp() { return _dsp!=ALL; }
   public Type dsp() { return _dsp; }
-  void set_dsp(Type dsp) { assert un_interned() && has_dsp(); _dsp=dsp; }
+  void set_dsp( Type dsp) { assert un_interned() && (has_dsp() || _dsp==dsp); _dsp = dsp; }
 
   // Static properties hashcode, no edge hashes
   @Override int static_hash() {
     Util.add_hash(super.static_hash()+_nargs);
     Util.add_hash(_fidxs._hash);
-    Util.add_hash(_dsp._type);
     return Util.get_hash();
   }
   // Excludes _ret._hash, which is part of cyclic hashes
   @Override int compute_hash() {
-    assert _dsp._hash != 0;
-    return Util.hash_spread(static_hash()+_dsp._hash);
+    return Util.hash_spread(static_hash());
   }
 
   // Static properties equals, no edges.  Already known to be the same class
@@ -76,33 +79,58 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
 
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    if( !(o instanceof TypeFunPtr) ) return false;
-    TypeFunPtr tf = (TypeFunPtr)o;
+    if( !(o instanceof TypeFunPtr tf) ) return false;
     if( _fidxs!=tf._fidxs || _nargs != tf._nargs || _dsp!=tf._dsp ) return false;
     if( _ret==tf._ret ) return true;
-    // Allow 2 closed 1-long return cycles to be equal.
-    return _ret==this && tf._ret==tf;
+    // Must check for cycle-equals, in case its a self-returning function
+    return _ret.cycle_equals(tf._ret);
   }
+
+  private static final Ary<Type> CYCLES = new Ary<>(new Type[0]);
+  private Type find_other() {
+    int idx = CYCLES.find(this);
+    return idx != -1 ? CYCLES.at(idx^1) : null;
+  }
+
   // Structs can contain TFPs in fields and TFPs contain a Struct in a cycle.
   @Override public boolean cycle_equals( Type o ) {
     if( this==o ) return true;
-    if( !(o instanceof TypeFunPtr) ) return false;
-    TypeFunPtr tf = (TypeFunPtr)o;
+    if( !(o instanceof TypeFunPtr tf) ) return false;
     if( _fidxs!=tf._fidxs || _nargs != tf._nargs ) return false;
     if( _dsp!=tf._dsp && !_dsp.cycle_equals(tf._dsp) ) return false;
-    if( _ret!=tf._ret && (_ret==null || !_ret.cycle_equals(tf._ret)) ) return false;
-    return true;
+    if( _ret==tf._ret ) return true;
+    if( _ret==null ) return false; // One if partially built, the other is fully built
+    Type t2 =    find_other();
+    if( t2 !=null ) return t2==tf  ; // Already in cycle report equals or not
+    Type t3 = tf.find_other();
+    if( t3 !=null ) return t3==this; // Already in cycle report equals or not
+
+    int len = CYCLES._len;
+    CYCLES.add(this).add(tf);
+    boolean eq=_ret.cycle_equals(tf._ret);
+    assert CYCLES._len==len+2;
+    CYCLES._len=len;
+    return eq;
   }
 
-  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
-    if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
-    if( _fidxs==null ) return sb.p("[free]");
+  @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
+    if( visit.tset(_uid) ) {
+      if( !dups.containsKey(_uid) )
+        dups.put(_uid,"X"+(char)('A'+ucnt._tfp++));
+      return;
+    }
+    _dsp._str_dups(visit,dups,ucnt);
+    _ret._str_dups(visit,dups,ucnt);
+  }
+
+
+  @SuppressWarnings("unchecked")
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
     _fidxs.str(sb);
-    sb.p('{');                  // Collection (even of 1) start
-    if( debug ) _dsp.str(sb,dups,mem,true).p(",");
+    sb.p('{');                  // Arg list start
+    if( debug ) _dsp._str(visit,dups, sb, true).p(",");
     sb.p(_nargs).p(" ->");
-    _ret.str(sb,dups,mem,debug).p(' ');
-    return sb.p('}');
+    return _ret._str(visit,dups, sb, debug).p(' ').p('}');
   }
 
   static { new Pool(TFUNPTR,new TypeFunPtr()); }
@@ -120,82 +148,102 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   // As the input falls from a $[2,3]{->$} cycle to scalar, the output (after
   // wrap-and-approximate) is not monotonic.
 
-  // Make, without approximation, but test invariant holds
-  public static TypeFunPtr make( BitsFun fidxs, int nargs, Type dsp, Type ret ) {
-    assert check(fidxs,ret);
-    return malloc(fidxs,nargs,dsp,ret).hashcons_free();
-  }
-
-  // Invariant: FIDXS can appear in the length-1 cycle, but not in any prefix.
-  private static boolean check(BitsFun fidxs, Type ret) {
+  // Invariant: the fidxes can appear in the return-chain only if they strictly
+  // grow, otherwise we should have approximated.  This check stops at end end
+  // or a matching fidx, but does not check after any match.
+  private static boolean check(TypeFunPtr tfp) {
     // Scan for a dup or the cycle
-    while( ret instanceof TypeFunPtr) {
-      TypeFunPtr tfp = (TypeFunPtr)ret;
-      ret = tfp._ret;
+    BitsFun fidxs = tfp._fidxs;
+    while( tfp._ret instanceof TypeFunPtr ret ) {
       if( ret==tfp ) return true; // Found the ending cycle
-      if( fidxs.overlaps(tfp._fidxs) ) return false; // Found a dup before the cycle
+      if( fidxs.isa(ret._fidxs) && fidxs!=ret._fidxs ) return true; // Strict increase in bits is OK
+      if( fidxs.overlaps(ret._fidxs) ) return false; // Partial overlap is NOT ok
+      tfp = ret;
     }
     return true;
   }
 
+  // Functions can grow indefinitely, if being built in a recursive loop.
+  // We check that fidx return invariant holds.
+  public static TypeFunPtr make ( BitsFun fidxs, int nargs, Type dsp, Type ret ) { return _makex(fidxs,nargs,dsp,ret,false); }
   // Make and approximate an endlessly growing chain.
-  static public TypeFunPtr makex( BitsFun fidxs, int nargs, Type dsp, Type ret ) {
-    return make(fidxs,nargs,dsp,makey(fidxs,ret));
+  public static TypeFunPtr makex( BitsFun fidxs, int nargs, Type dsp, Type ret ) { return _makex(fidxs,nargs,dsp,ret,true ); }
+
+  // Walk the TFP return chain.  If we find the end or a TFP with strictly
+  // increasing fidxs, we can wrap and return.  If we have fidx overlap, but
+  // not strictly increasing, we need to chop the TFP return chain here.
+  static private TypeFunPtr _makex( BitsFun fidxs, int nargs, Type dsp, Type ret, boolean apx ) {
+    assert !(ret instanceof TypeFunPtr rtfp) || check(rtfp);
+    TypeFunPtr tfp = malloc(fidxs,nargs,dsp,ret).hashcons_free();
+    TypeFunPtr tfp2 = apx ? tfp._makex(fidxs) : tfp;
+    assert check(tfp2);
+    return tfp2;
   }
-  // Dunno if another fidx up ahead or not
-  static private Type makey( BitsFun fidxs, Type ret ) {
-    if( !(ret instanceof TypeFunPtr) )
-      return ret;               // End of chain, correct as-is
-    TypeFunPtr tfp = (TypeFunPtr)ret;
-    // Overlaps; this becomes the new cycle.
-    if( fidxs.overlaps(tfp._fidxs) ) {
-      TypeFunPtr cyc = tfp.malloc_from();
-      cyc.gather_cycle(tfp);
-      cyc._ret=cyc;
-      return cyc.tfp_install();
+
+  // Walk to the end, looking for the need to approximate or not.
+  // Returns either self or an approxed value.  Caller can wrap-and-return.
+  private TypeFunPtr _makex( BitsFun fidxs ) {
+    if( _ret==this || !(_ret instanceof TypeFunPtr tfp) )
+      return this;              // Always OK.
+    // Overlaps, without strictly increasing.
+    if( sideways(fidxs,tfp._fidxs,tfp._ret!=XSCALAR) ) {
+      Type ret = tfp._make_apx(); // Must approx
+      if( ret instanceof TypeFunPtr tfp2 && sideways(fidxs,tfp2._fidxs,tfp2._ret!=XSCALAR) )
+        return add_cycle(tfp2);   // Cycle keeps rolling up
+      // Wrap and return
+      return make(fidxs.meet(_fidxs),_nargs,_dsp,ret);
     }
-    if( tfp._ret==tfp ) return ret;
-    Type rez = makey(fidxs,tfp._ret);
-    return rez==tfp._ret ? ret : tfp.make_from(tfp._dsp,rez);
+    Type ret = tfp._makex(fidxs); // Continue checking to the end
+    if( ret==_ret ) return this;  // No change
+    return make_from(_dsp,ret);   // Wrap and return
   }
 
-  // Gather all the fidxs from here to the end of the ret-chain
-  private void gather_cycle(Type x) {
-    if( !(x instanceof TypeFunPtr) ) return;
-    TypeFunPtr tfp = (TypeFunPtr)x;
-    _fidxs = _fidxs.meet(tfp._fidxs);
-    _nargs = Math.min(_nargs,tfp._nargs);
-    _dsp   = _dsp.meet(tfp._dsp);
-    if( tfp._ret!=tfp )
-      gather_cycle(tfp._ret);
+  // True if the fidxs overlap and are NOT strictly increasing.
+  private boolean sideways(BitsFun f0, BitsFun f1, boolean lo) {
+    return f0.overlaps(f1) &&    // Overlap
+      (!(f0!=f1 && f0.isa(f1)) || // NOT strictly increasing
+       !lo); // or strictly increasing into hi
   }
 
-  // Install a cyclic $:TFP->...-> $
-  private TypeFunPtr tfp_install() {
-    TypeFunPtr old = (TypeFunPtr)intern_lookup();
-    if( old!=null ) {           // Return prior hit
-      for( TypeFunPtr tfp = (TypeFunPtr)_ret; tfp!=this; tfp = (TypeFunPtr)tfp._ret )
-        POOLS[TFUNPTR].free(tfp,null);
-      return POOLS[TFUNPTR].free(this,old);
-    }
-    // RDUAL is recursive, one call does the cycle
-    rdual();
-    for( TypeFunPtr tfp = (TypeFunPtr)_ret; tfp!=this; tfp = (TypeFunPtr)tfp._ret )
-      tfp.retern();
-    retern();
-    return this;
+  // MUST approx 'this'.  Recurses to the end.  Returns either SCALAR or ALL or
+  // an interned-self-cycle.
+  private Type _make_apx() {
+    if( _ret==this ) return this; // Already a self-cycle
+    if( _ret==XSCALAR || _ret==ANY ) // Approx self as a self-cycle
+      return make_cycle(_fidxs,_nargs,_dsp,this);
+    if( !(_ret instanceof TypeFunPtr tfp) )
+      return _ret==ALL ? ALL : SCALAR; // Approx self as SCALAR
+    Type ret = tfp._make_apx();        // Recursive walk to the end
+    if( !(ret instanceof TypeFunPtr tfp2) ) return ret; // Approx self as a SCALAR
+    return add_cycle(tfp2);    // Approx self as a self-cycle merged into the returned self-cycle
   }
 
+  // Merge into the self-cycle
+  private TypeFunPtr add_cycle(TypeFunPtr cyc) {
+    assert cyc._ret==cyc;
+    BitsFun fidxs = _fidxs.meet(cyc._fidxs);
+    int nargs = Math.min(_nargs,cyc._nargs);
+    Type dsp = _dsp.meet(cyc._dsp);
+    return make_cycle(fidxs,nargs,dsp,cyc);
+  }
+
+  // Install a length-1 self-cycle (if 'ret' is a TFP or high) or a short
+  // normal TFP if 'ret' is not a TFP.
+  static TypeFunPtr make_cycle(BitsFun fidxs, int nargs, Type dsp, Type ret ) {
+    TypeFunPtr tfp = malloc(fidxs,nargs,dsp,ret);
+    if( ret instanceof TypeFunPtr ) tfp._ret = tfp; // Make a self-cycle of length 1
+    tfp.set_hash();
+    TypeFunPtr old = (TypeFunPtr)tfp.intern_lookup(); // Intern check
+    if( old!=null )                                   // Return prior hit
+      return POOLS[TFUNPTR].free(tfp,old);            // Return prior
+    tfp.rdual();                                      // Install dual in a self-cycle
+    return tfp.retern()._dual.retern().dual();        // Install self-cycle
+  }
 
   // Allocate and init
   private static TypeFunPtr malloc(BitsFun fidxs, int nargs, Type dsp, Type ret ) {
     TypeFunPtr t1 = POOLS[TFUNPTR].malloc();
     return t1.init(fidxs,nargs,dsp,ret);
-  }
-  private TypeFunPtr malloc_from() {
-    var tfp = malloc(_fidxs,_nargs,_dsp,null);
-    tfp._hash = _hash;
-    return tfp;
   }
 
   public static TypeFunPtr make( int fidx, int nargs, Type dsp, Type ret ) { return make(BitsFun.make0(fidx),nargs,dsp,ret); }
@@ -221,8 +269,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     if( _dual != null ) return _dual;
     TypeFunPtr dual = _dual = malloc(_fidxs.dual(),-_nargs,null,null);
     dual._dual = this;          // Stop the recursion
-    dual._dsp = _dsp.rdual();
     dual._hash = dual.compute_hash();
+    dual._dsp = _dsp.rdual();
     dual._ret = _ret.rdual();
     return dual;
   }
@@ -242,8 +290,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     }
     TypeFunPtr tf = (TypeFunPtr)t;
     BitsFun fidxs = _fidxs.meet(tf._fidxs);
-    // If both are short cycles, the result is a short cycle
-    if( _ret==this && tf._ret==tf )  return makey(fidxs,tf);
 
     // TODO: renable this
     // If unequal length; then if short is low it "wins" (result is short) else
@@ -254,9 +300,19 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     //int nargs = fidxs.above_center() ? Math.max(_nargs,tf._nargs) : Math.min(_nargs,tf._nargs);
     int nargs = (_nargs ^ tf._nargs) > 0 ? Math.min(_nargs,tf._nargs) : Math.max(_nargs,tf._nargs);
     Type dsp = _dsp.meet(tf._dsp);
+
+    // If both are short cycles, the result is a short cycle
+    if( _ret==this && tf._ret==tf )
+      return make_cycle(fidxs,nargs,dsp,this);
+
     // Otherwise, recursively find the return
     Type ret = _ret.meet(tf._ret);
     return makex(fidxs,nargs,dsp,ret);
+  }
+  // Meet the non-cyclic parts of a TFP
+  void cmeet(TypeFunPtr tfp) {
+    _fidxs = _fidxs.meet(tfp._fidxs);
+    _nargs = Math.min(_nargs,tfp._nargs);
   }
 
   public BitsFun fidxs() { return _fidxs; }
@@ -281,7 +337,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   @Override public boolean is_con()       {
     // No display (could be constant display?)
     // Or the unbound display
-    return (_dsp==TypeMemPtr.NO_DISP || _dsp==Type.ALL) && 
+    return (_dsp==TypeMemPtr.NO_DISP || _dsp==Type.ALL) &&
       // Single bit covers all functions (no new children added, but new splits
       // can appear).  Currently, not tracking this at the top-level, so instead
       // just triggering off of a simple heuristic: a single bit above BitsFun.ALL0.
@@ -308,17 +364,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     throw com.cliffc.aa.AA.unimpl();
   }
 
-  //// Lattice of conversions:
-  //// -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
-  ////    to e.g. Float and require a user-provided rounding conversion from F64->Int.
-  ////  0 requires no/free conversion (Int8->Int64, F32->F64)
-  //// +1 requires a bit-changing conversion (Int->Flt)
-  //// 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
-  //@Override public byte isBitShape(Type t) {
-  //  if( t._type == TNIL ) return 0;                  // Dead arg is free
-  //  if( t._type == TSCALAR ) return 0;               // Scalar is OK
-  //  return (byte)(t instanceof TypeFunPtr ? 0 : 99); // Mixing TFP and a non-ptr
-  //}
   @SuppressWarnings("unchecked")
   @Override public void walk( Predicate<Type> p ) { if( p.test(this) ) { _dsp.walk(p); _ret.walk(p); } }
 

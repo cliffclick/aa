@@ -76,7 +76,7 @@ public class HM1 {
       return f;
     }
   }
-  
+
   public static class Lambda extends Syntax {
     final String _arg0;
     final Syntax _body;
@@ -134,7 +134,7 @@ public class HM1 {
       return trez;
     }
   }
-  
+
   public static class Apply extends Syntax {
     final Syntax _fun;
     final Syntax[] _args;
@@ -214,7 +214,7 @@ public class HM1 {
       if( _u!=null && !debug ) return _u._str(sb,dups,debug);
       sb.p("v").p(_uid);
       if( dups.tset(_uid) ) return sb.p("$");
-      if( _t!=Type.ANY ) _t.str(sb.p(":"),dups,null,false);
+      if( _t!=Type.ANY ) _t.str(sb.p(":"), false);
       if( _u!=null ) _u._str(sb.p(">>"),dups,debug);
       return sb;
      }

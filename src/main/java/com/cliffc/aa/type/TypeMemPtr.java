@@ -27,6 +27,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   private boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
 
   private TypeMemPtr init(BitsAlias aliases, TypeStruct obj ) {
+    _name="";
     _cyclic = false;
     _aliases = aliases;
     _obj=obj;
@@ -38,6 +39,18 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   @Override public void set_cyclic() { _cyclic = true; }
   @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_obj,"obj"); }
   @Override public void walk_update( UnaryOperator<Type> update ) { _obj = (TypeStruct)update.apply(_obj); }
+  @Override public Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth) {
+    depth2(depth);
+    TypeStruct obj = _obj;
+    for( long alias : depth.keySetLong() )
+      if( alias >0 && depth.get(alias) > cutoff ) {
+        // approx1 assumes alias==_alias, and adds 1 to depth internally.
+        // if this is not so, need to add 1 depth
+        int cut2 = _aliases.test((int)alias) ? cutoff : cutoff+1;
+        obj = obj.approx2(cut2,BitsAlias.make0((int)alias));
+      }
+    return make_from(obj);
+  }
 
   int _hash() { return Util.hash_spread(super.static_hash() + _aliases._hash + _obj._type); }
   @Override int  static_hash() { return _hash(); } // No edges
@@ -48,31 +61,29 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
 
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    if( !(o instanceof TypeMemPtr) ) return false;
-    TypeMemPtr tf = (TypeMemPtr)o;
+    if( !(o instanceof TypeMemPtr tf) ) return false;
     return cycle_equals(tf);
   }
   @Override public boolean cycle_equals( Type o ) {
     if( this==o ) return true;
-    if( !(o instanceof TypeMemPtr) ) return false;
-    TypeMemPtr t2 = (TypeMemPtr)o;
+    if( !(o instanceof TypeMemPtr t2) ) return false;
     if( _aliases != t2._aliases ) return false;
     return _obj == t2._obj || _obj.cycle_equals(t2._obj);
   }
 
-  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
-    if( dups.tset(_uid) ) {
-      if( debug ) sb.p('_').p(_uid);
-      return sb.p('$'); // Break recursive printing cycle
+  @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
+    if( visit.tset(_uid) ) {
+      if( !dups.containsKey(_uid) )
+        dups.put(_uid,"P"+(char)('A'+ucnt._tmp++));
+      return;
     }
-    if( _aliases==null ) return sb.p("*[free]");
-    TypeStruct to = (mem == null || _aliases==BitsAlias.NALL) ? _obj : mem.ld(this);
-    if( to == TypeStruct.UNUSED ) to = _obj;
+    _obj._str_dups(visit,dups,ucnt);
+  }
+
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
     sb.p('*');
     if( debug ) _aliases.str(sb);
-    to.str(sb,dups,mem,debug);
-    if( _aliases.test(0) ) sb.p('?');
-    return sb;
+    return _obj._str(visit,dups, sb, debug);
   }
 
   static { new Pool(TMEMPTR,new TypeMemPtr()); }
@@ -81,6 +92,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     return t1.init(aliases,obj).hashcons_free();
   }
 
+  static TypeMemPtr malloc(BitsAlias aliases, TypeStruct ts ) {  TypeMemPtr t1 = POOLS[TMEMPTR].malloc(); return t1.init(aliases,ts); }
   public static TypeMemPtr make( int alias, TypeStruct obj ) { return make(BitsAlias.make0(alias),obj); }
   public static TypeMemPtr make_nil( int alias, TypeStruct obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
   public TypeMemPtr make_from( TypeStruct obj ) { return _obj==obj ? this : make(_aliases,obj); }
@@ -127,11 +139,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   public  static final TypeMemPtr DISP_SIMPLE= make(BitsAlias.NALL,TypeStruct.ISUSED); // closed display
   public  static final TypeMemPtr STRPTR = make(4,TypeStruct.ISUSED.set_name("str:")); // For legacy HM tests
   public  static final TypeStruct OOP_OOP = TypeStruct.args(ISUSED0,ISUSED0); // { ptr? ptr? -> }
-  //public  static final TypeStruct LVAL_LEN= TypeStruct.make("ary",TypeMemPtr.ARYPTR,Access.Final); // Array length
-  //public  static final TypeStruct LVAL_RD = TypeStruct.make2flds("ary",TypeMemPtr.ARYPTR,"idx",TypeInt.INT64); // Array & index
-  //public  static final TypeStruct LVAL_WR = TypeStruct.make(TypeFld.make("ary",TypeMemPtr.ARYPTR,ARG_IDX  ),
-  //                                                          TypeFld.make("idx",TypeInt.INT64    ,ARG_IDX+1),
-  //                                                          TypeFld.make("val",Type.SCALAR      ,ARG_IDX+2));
 
   static final Type[] TYPES = new Type[]{ISUSED0,EMTPTR,DISPLAY,DISPLAY_PTR,OOP_OOP};
 
@@ -170,6 +177,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     TypeStruct to = (TypeStruct)_obj.meet(ptr._obj);
     return make(aliases, to);
   }
+
   // Widens, not lowers.
   @Override public TypeMemPtr simple_ptr() {
     if( _obj.len()==0 ) return this;
@@ -220,9 +228,9 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
 
   public BitsAlias aliases() { return _aliases; }
 
-  // Only used for testing.  Build a mapping from types to their depth in a
-  // shortest-path walk from the root.  Only counts depth on TypeStructs with
-  // the matching alias.  Does not bump the depth of a backedge.
+  // Build a mapping from types to their depth in a shortest-path walk from the
+  // root.  Only counts depth on TypeStructs with the matching alias.  Does not
+  // bump the depth of a backedge.
   public HashMap<Type,Integer> depth() {
     HashMap<Type,Integer> ds = new HashMap<>();
     Work<Type> t0 = new Work<>(), t1 = new Work<>();
@@ -243,34 +251,50 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     return ds;
   }
 
+  // Build a mapping from aliases to their max repeats in a shortest-path walk
+  // from the root.  Does a breadth-first search.
+  public void depth2(NonBlockingHashMapLong<Integer> ds) {
+    VBitSet bs0 = new VBitSet(), bs1 = new VBitSet();
+    Work<Type> t0 = new Work<>(), t1 = new Work<>();
+    t0.add(this);
+    while( !t0.isEmpty() ) {
+      // Once per depth, bump all the aliases' depths
+      bs1.clr();
+      for( int i=0; i<t0.len(); i++ )
+        if( t0.at(i) instanceof TypeMemPtr tmp )
+          for( int alias : tmp._aliases )
+            if( !bs1.tset(alias) ) { // Once per depth
+              Integer ii = ds.get(alias);
+              ds.put(alias,(ii==null ? 0 : ii)+1);
+            }
+
+      // Populate the next depth in the breadth-first search
+      final Work<Type> ft1=t1; Type t;
+      while( (t=t0.pop())!=null )
+        if( t instanceof Cyclic cyc )
+          cyc.walk1((tc,ignore)-> bs0.tset(tc._uid) ? null : ft1.add(tc) );
+
+      // Swap worklists, raise depth
+      Work<Type> tmp = t0; t0 = t1; t1 = tmp; // Swap t0,t1
+    }
+  }
+
   // Only used for testing.  Max depth of struct, with a matching alias TMP
   // that is not a backedge.
   public int max(HashMap<Type,Integer> ds) {
     int max = -1;
     for( Type t : ds.keySet() )
-      if( (t instanceof TypeMemPtr) && ((TypeMemPtr)t)._aliases.overlaps(_aliases) ) {
+      if( t instanceof TypeMemPtr tmp && tmp._aliases.overlaps(_aliases) ) {
         int dtmp = ds.get(t);
-        Integer dstr = ds.get(((TypeMemPtr)t)._obj);
+        Integer dstr = ds.get(tmp._obj);
         if( dstr==null || dtmp<=dstr ) // Disallow backedge
           max = Math.max(max,dtmp);
       }
     return max;
   }
 
-  //// Lattice of conversions:
-  //// -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
-  ////    to e.g. Float and require a user-provided rounding conversion from F64->Int.
-  ////  0 requires no/free conversion (Int8->Int64, F32->F64)
-  //// +1 requires a bit-changing conversion (Int->Flt)
-  //// 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
-  //@Override public byte isBitShape(Type t) {
-  //  if( t == Type.SCALAR ) return 0; // Scalar function arg; generally dead or just passed along blindly.
-  //  return (byte)(t instanceof TypeMemPtr ? 0 : 99);  // Mixing TMP and a non-ptr
-  //}
   @SuppressWarnings("unchecked")
   @Override public void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
-  public int getbit() { return _aliases.getbit(); }
-  public int getbit0() { return _aliases.strip_nil().getbit(); }
 
   // Widen for primitive specialization and H-M unification.  H-M distinguishes
   // ptr-to-array (and string) from ptr-to-record.  Must keep types at the same

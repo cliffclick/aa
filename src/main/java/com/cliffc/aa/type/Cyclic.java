@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.util.*;
 
 import java.util.Set;
@@ -12,7 +11,7 @@ import static com.cliffc.aa.AA.unimpl;
 
 
 // Algorithm for minimizing a not-yet-interned graph of Types
-interface Cyclic {
+public interface Cyclic {
 
   // Type is cyclic
   boolean cyclic();
@@ -30,21 +29,25 @@ interface Cyclic {
   //          [fidx]{map(dsp) -> map(ret) }
   void walk_update( UnaryOperator<Type> map );
 
+  // Approx all aliases > CUTOFF
+  Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth);
+
   // Install a cyclic structure.  'head' is not interned and points to a
   // (possibly cyclic) graph of not-interned Types.  Minimize the graph, set
   // the hashes everywhere, check for a prior existing Type.  Return a prior,
   // or else set all the duals and intern the entire graph.
-  static class Prof {
+  class Prof {
     long cnt=0, time=0;
-    int clarge_sum=0, clarge_cnt=0; int [] chisto = new int[  4];
-    int ilarge_sum=0, ilarge_cnt=0; int [] ihisto = new int[ 16];
+    int hit;                    // Hit on prior cycle type
+    int clarge_sum=0, clarge_cnt=0; int [] chisto = new int[ 32];
+    int ilarge_sum=0, ilarge_cnt=0; int [] ihisto = new int[ 32];
     int rlarge_sum=0, rlarge_cnt=0; int [] rhisto = new int[128];
     void gather() {
-      if( (cnt&1023)==0 ) print();
+      if( (cnt&63)==0 ) print();
       int icnt=0, ccnt=0;
       for( Type t : REACHABLE ) {
         if( t.interned() ) icnt++;
-        if( t instanceof Cyclic && ((Cyclic)t).cyclic() ) ccnt++;
+        if( t instanceof Cyclic cyc && cyc.cyclic() ) ccnt++;
       }
       if( icnt<ihisto.length ) ihisto[icnt]++;
       else { ilarge_sum += icnt; ilarge_cnt++; }
@@ -55,17 +58,36 @@ interface Cyclic {
       else { rlarge_sum += rcnt; rlarge_cnt++; }
     }
     void print() {
-      // TODO
+      SB sb = new SB();
+      sb.p("Prof DFA; ");
+      sb.p("Avg time ").p((double)time/cnt).p("msec").nl();
+      sb.p("Cyclic, #large:").p(clarge_cnt).p(" ");
+      for( int i=0; i<chisto.length; i++ )
+        if( chisto[i]!=0 )
+          sb.p("hist["+i+"]="+chisto[i]+",");
+      sb.unchar().nl();
+      sb.p("Intern, #large:").p(ilarge_cnt).p(" ");
+      for( int i=0; i<ihisto.length; i++ )
+        if( ihisto[i]!=0 )
+          sb.p("hist["+i+"]="+ihisto[i]+",");
+      sb.unchar().nl();
+      sb.p("REACH, #large:").p(rlarge_cnt).p(" ");
+      for( int i=0; i<rhisto.length; i++ )
+        if( rhisto[i]!=0 )
+          sb.p("hist["+i+"]="+rhisto[i]+",");
+      sb.unchar().nl();
+      System.out.println(sb);
     }
   }
-  static final Prof P = new Prof();
+  Prof P = new Prof();
 
   @SuppressWarnings("unchecked")
-  static <T extends Type> T install( T head ) {
+  static TypeStruct install( TypeStruct head ) {
     long t0 = System.currentTimeMillis();
+    TypeStruct.MEETS0.clear();
     Type.RECURSIVE_MEET++;
     _reachable(head,true);      // Compute 1st-cut reachable
-    //P.gather();
+    // P.gather(); // Turn off detail profiling
     head = _dfa_min(head);
     _reachable(head,false);     // Recompute reachable; skip interned; probably shrinks
     Type.RECURSIVE_MEET--;
@@ -76,17 +98,23 @@ interface Cyclic {
     assert CSTACK.isEmpty();   CVISIT.clear();
 
     // Check for dups.
-    T old = (T)head.intern_lookup();
-    if( old != null ) return old; // Found prior interned cycle
+    TypeStruct old = (TypeStruct)head.intern_lookup();
+    if( old != null ) {         // Found prior interned cycle
+      head = old;  P.hit++;
+      // Free all not-interned
+      for( Type t : REACHABLE )  if( !t.interned() )  t.free(null);
+    } else {
 
-    // Complete cyclic dual
-    head.rdual();
-    // Insert all members of the cycle into the hashcons.  If self-symmetric,
-    // also replace entire cycle with self at each point.
-    for( Type t : REACHABLE )
-      if( t.un_interned() )
-        if( t.retern() != t._dual ) t._dual.retern();
-    // Return new interned cycle
+      // Complete cyclic dual
+      head.rdual();
+      // Insert all members of the cycle into the hashcons.  If self-symmetric,
+      // also replace entire cycle with self at each point.
+      for( Type t : REACHABLE )
+        if( t.un_interned() )
+          if( t.retern() != t._dual ) t._dual.retern();
+    }
+
+    // Profile; return new interned cycle
     long t1 = System.currentTimeMillis();
     P.time += (t1-t0);  P.cnt++;
     return head;
@@ -101,8 +129,8 @@ interface Cyclic {
   // out-edges (with field names), we can have multiple output edges from the
   // same node (struct) to the same TypeMemPtr.  The classic cycle-finders do
   // not work with multi-edges.
-  final Ary<Type> CSTACK = new Ary<>(Type.class);
-  final VBitSet CVISIT = new VBitSet();
+  Ary<Type> CSTACK = new Ary<>(Type.class);
+  VBitSet CVISIT = new VBitSet();
   static void _set_cyclic(Type t ) {
     assert t._hash==t.compute_hash(); // Hashes already set by shrink
     if( t.interned() ) return;  // Already interned (so hashed, cyclic set, etc)
@@ -123,7 +151,7 @@ interface Cyclic {
     case Type.TFUNPTR -> { _set_cyclic(((TypeFunPtr) t).dsp()); _set_cyclic(((TypeFunPtr) t)._ret); }
     case Type.TFLD    ->   _set_cyclic(((TypeFld   ) t)._t  );
     case Type.TSTRUCT -> { CVISIT.set(t._uid);  for( TypeFld fld : ((TypeStruct) t) ) _set_cyclic(fld);  }
-    default -> throw AA.unimpl();
+    default -> throw unimpl();
     }
     CSTACK.pop();               // Pop, not part of another's cycle
   }
@@ -142,10 +170,8 @@ interface Cyclic {
     ON_REACH.tset(head._uid);
     for( int idx=0; idx < REACHABLE._len; idx++ ) {
       Type t = REACHABLE.at(idx);
-      if( !t.interned() ||      // If not interned, include all children, interned or not
-          // Or all of an interned cycle
-          (also_interned && t instanceof Cyclic && ((Cyclic)t).cyclic()) )
-        ((Cyclic)t).walk1((tc,ignore) -> !ON_REACH.tset(tc._uid) ? REACHABLE.push(tc) : tc);
+      if( (also_interned || !t.interned()) && t instanceof Cyclic cyc )
+        cyc.walk1((tc,ignore) -> !ON_REACH.tset(tc._uid) ? REACHABLE.push(tc) : tc);
     }
   }
 
@@ -320,7 +346,7 @@ interface Cyclic {
         _uid(_uid(tfp._fidxs.str(sb).p("{ "), tfp.dsp()).p(" -> "), tfp._ret).p(" }");
       }
       case Type.TARY -> throw unimpl();
-      default -> h.str(sb,null,null,false);
+      default -> h.str(sb, false);
       }
       return sb;
     }
@@ -370,8 +396,8 @@ interface Cyclic {
     @SuppressWarnings("unchecked")
     @Override public boolean equals(Object o) {
       if( this==o ) return true;
-      if( !(o instanceof SType) ) return false;
-      Type t2 = ((SType)o)._t;
+      if( !(o instanceof SType st) ) return false;
+      Type t2 = st._t;
       return _t._type == t2._type && _t.static_eq(t2);
     }
   }
@@ -437,8 +463,8 @@ interface Cyclic {
     for( Type t : REACHABLE )  {
       if( t._hash!=0 && !t.interned() )
         t._hash=0;              // Invariant: not-interned has no hash
-      if( t instanceof Cyclic )
-        ((Cyclic)t).walk1( (t2,label) -> DefUse.add_def_use(t,label,t2) );
+      if( t instanceof Cyclic cyc )
+        cyc.walk1( (t2,label) -> DefUse.add_def_use(t,label,t2) );
     }
 
     // Pick initial Partitions for every reachable Type
@@ -456,8 +482,8 @@ interface Cyclic {
     // Walk through the Partitions, picking a head and mapping all edges from
     // head to head.
     for( Partition P : Partition.PARTS )
-      if( P.head() instanceof Cyclic )
-        ((Cyclic)P.head()).walk_update(Partition::head);
+      if( P.head() instanceof Cyclic cyc )
+        cyc.walk_update(Partition::head);
 
     // Edges are fixed, compute hash
     for( Partition P : Partition.PARTS ) if( P.head() instanceof TypeStruct ) P.head().set_hash();
@@ -473,19 +499,19 @@ interface Cyclic {
       done = true;
       for( Partition P : Partition.PARTS ) {
         Type head = P.head();
-        if( head instanceof Cyclic )
-          ((Cyclic)head).walk_update(Partition::head);
+        if( head instanceof Cyclic cyc )
+          cyc.walk_update(Partition::head);
         Type i = head.intern_lookup();
         if( i!=null && head!=i ) { done=false; P.set_head(i,head); }
       }
     }
 
-    for( Partition P : Partition.PARTS ) {
+    for( Partition P : Partition.PARTS )
       for( int i=1; i<P.len(); i++ )
         P._ts.at(i).free(null);
-    }
 
     // Return the input types Partition head
+    // Reset statics for the next call.
     T rez = (T)Partition.TYPE2PART.get(nt._uid).head();
     Partition.clear();
     SType.clear();
@@ -494,4 +520,19 @@ interface Cyclic {
     return rez;
   }
 
+  // Everything that is cycle-equals is in the same partition
+  static boolean check() {
+    int err=0;
+    for( int i=0; i<REACHABLE._len; i++ ) {
+      Type t1 = REACHABLE.at(i);
+      Partition p1 = Partition.TYPE2PART.get(t1._uid);
+      for( int j=i+1; j<REACHABLE._len; j++ ) {
+        Type t2 = REACHABLE.at(j);
+        Partition p2 = Partition.TYPE2PART.get(t2._uid);
+        if( p1!=p2 && t1.cycle_equals(t2) )
+          System.err.println("Err "+(err++)+" T"+t1._uid+p1+" != T"+t2._uid+p2);
+      }
+    }
+    return err==0;
+  }
 }

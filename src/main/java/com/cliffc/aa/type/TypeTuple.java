@@ -26,24 +26,27 @@ public class TypeTuple extends Type<TypeTuple> {
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    if( !(o instanceof TypeTuple) ) return false;
-    TypeTuple t = (TypeTuple)o;
+    if( !(o instanceof TypeTuple t) ) return false;
     return _any==t._any && _hash == t._hash && Types.eq(_ts,t._ts);
   }
   // Never part of a cycle so the normal equals works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
+
+  @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) { throw unimpl(); }
+
+  @SuppressWarnings("unchecked")
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
     if( _any ) sb.p('~');
     sb.p('(');
     if( _ts!=null && _ts.length>0 ) { // No commas for zero-length
       int j = _ts.length-1;     // Find length of trailing equal parts
       Type last = _ts[j];       // Last type
       for( j--; j>0; j-- ) if( _ts[j] != last )  break;
-      _ts[0].str(sb,dups,mem,debug);    // First type
+      _ts[0]._str(visit,dups, sb, debug); // First type
       for( int i=1; i<=j+1; i++ ) // All types up to trailing equal parts
-        _ts[i].str(sb.p(','),dups,mem,debug);
+        _ts[i]._str(visit,dups, sb.p(','), debug);
       if( j+2<_ts.length-1 )  sb.p("..."); // Abbreviate tail
-      if( _ts.length> j+2 ) last.str(sb.p(','),dups,mem,debug);
+      if( _ts.length> j+2 ) last._str(visit,dups, sb.p(','), debug);
     }
     return sb.p(')');
   }
@@ -74,15 +77,10 @@ public class TypeTuple extends Type<TypeTuple> {
     //return make(ts2);
     throw unimpl();
   }
-  public static TypeTuple make_args(Type[] ts) {
-    assert ts[MEM_IDX] instanceof TypeMem;
-    return make(ts);
-  }
 
   public static TypeTuple make_args(                       ) { return make(Type.CTRL,TypeMem.ALLMEM,Type.ALL ); }
   public static TypeTuple make_args(Type t2                ) { return make(Type.CTRL,TypeMem.ALLMEM,Type.ALL,t2); }
   public static TypeTuple make_args(Type t2,Type t3        ) { return make(Type.CTRL,TypeMem.ALLMEM,Type.ALL,t2,t3); }
-  public static TypeTuple make_ret(Type trez) { return make(Type.CTRL,TypeMem.ANYMEM,trez); }
 
 
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
@@ -104,7 +102,6 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple INT64_INT64= make_args(TypeInt.INT64,TypeInt.INT64); // {int int->int }
   public  static final TypeTuple FLT64_FLT64= make_args(TypeFlt.FLT64,TypeFlt.FLT64); // {flt flt->flt }
   public  static final TypeTuple OOP_OOP    = make_args(TypeMemPtr.ISUSED0,TypeMemPtr.ISUSED0);
-  public  static final TypeTuple SCALAR1    = make_args(SCALAR);
 
   //
   static final TypeTuple[] TYPES = new TypeTuple[]{
@@ -186,19 +183,4 @@ public class TypeTuple extends Type<TypeTuple> {
       ts[i] = _ts[i].widen();
     return make(ts);
   }
-
-  //// True if isBitShape on all bits
-  //@Override public byte isBitShape(Type t) {
-  //  if( isa(t) ) return 0; // Can choose compatible format
-  //  if( t instanceof TypeTuple ) {
-  //    TypeTuple tt = (TypeTuple)t;
-  //    if( tt._ts.length != _ts.length ) return 99;
-  //    byte x;
-  //    for( int i=0; i<_ts.length; i++ )
-  //      if( (x=_ts[i].isBitShape(tt._ts[i])) != 0 )
-  //        return x;
-  //    return 0;
-  //  }
-  //  return 99;
-  //}
 }

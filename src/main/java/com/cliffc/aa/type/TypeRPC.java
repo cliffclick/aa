@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
@@ -17,9 +18,8 @@ public class TypeRPC extends Type<TypeRPC> {
   }
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
-    return _rpcs.str(sb.p("#"));
-  }
+
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) { return _rpcs.str(sb.p("#")); }
 
   static { new Pool(TRPC,new TypeRPC()); }
   public static TypeRPC make( BitsRPC rpcs ) {

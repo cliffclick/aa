@@ -200,7 +200,7 @@ public abstract class PrimNode extends Node {
       Type tactual = val(fld._order);
       Type tformal = fld._t;
       if( !tactual.isa(tformal) )
-        return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[fld._order-DSP_IDX],tactual,null,tformal);
+        return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[fld._order-DSP_IDX],tactual, tformal);
     }
     return null;
   }

@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
@@ -26,9 +27,10 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
   @Override public void set_cyclic() { _cyclic = true; }
   @Override public void walk1( BiFunction<Type,String,Type> map ) {
     //return map.apply(_t);
-    throw com.cliffc.aa.AA.unimpl();
+    throw unimpl();
   }
-  @Override public void walk_update( UnaryOperator<Type> update ) { throw com.cliffc.aa.AA.unimpl(); }
+  @Override public void walk_update( UnaryOperator<Type> update ) { throw unimpl(); }
+  @Override public Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth) { throw unimpl(); }
 
   @Override int compute_hash() { return super.compute_hash() + _len._hash + _elem._hash + _stor._hash;  }
   @Override public boolean equals( Object o ) {
@@ -38,7 +40,8 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
     return _len == ta._len && _elem == ta._elem && _stor == ta._stor;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
+
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
     sb.p('[');
     if( _len!=null && _len != TypeInt.INT64 ) sb.p(_len);
     sb.p(']');

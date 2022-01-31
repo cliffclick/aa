@@ -1,11 +1,10 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.FunPtrNode;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeStruct;
 import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
-
-import java.lang.Comparable;
 
 // Error messages
 public class ErrMsg implements Comparable<ErrMsg> {
@@ -26,7 +25,7 @@ public class ErrMsg implements Comparable<ErrMsg> {
     MixedPrimGC,              // Mixed primitives & GC
   }
 
-    
+
   public       Parse _loc;    // Point in code to blame
   public final String _msg;   // Printable error message, minus code context
   public final Level _lvl;    // Priority for printing
@@ -44,32 +43,27 @@ public class ErrMsg implements Comparable<ErrMsg> {
   public static ErrMsg unresolved(Parse loc, String msg) {
     return new ErrMsg(loc,msg,Level.UnresolvedCall);
   }
-  public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type expected ) { return typerr(loc,actual,t0mem,expected,Level.TypeErr); }
-  public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type expected, Level lvl ) {
-    TypeMem tmem = t0mem instanceof TypeMem ? (TypeMem)t0mem : null;
-    VBitSet vb = new VBitSet();
-    SB sb = actual.str(new SB(),vb, tmem, false).p(" is not a ");
-    vb.clear();
-    expected.str(sb,vb,null,false); // Expected is already a complex ptr, does not depend on memory
+  public static ErrMsg typerr( Parse loc, Type actual, Type expected ) { return typerr(loc,actual, expected,Level.TypeErr); }
+  public static ErrMsg typerr( Parse loc, Type actual, Type expected, Level lvl ) {
+    SB sb = actual.str(new SB(), false).p(" is not a ");
+    expected.str(sb, false); // Expected is already a complex ptr, does not depend on memory
     if( actual==Type.ALL && lvl==Level.TypeErr ) lvl=Level.AllTypeErr; // ALLs have failed earlier, so this is a lower priority error report
     return new ErrMsg(loc,sb.toString(),lvl);
   }
   public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type[] expecteds ) {
     TypeMem tmem = t0mem instanceof TypeMem ? (TypeMem)t0mem : null;
-    VBitSet vb = new VBitSet();
-    SB sb = actual.str(new SB(),vb, tmem,false);
+    SB sb = actual.str(new SB(), false);
     sb.p( expecteds.length==1 ? " is not a " : " is none of (");
-    vb.clear();
-    for( Type expect : expecteds ) expect.str(sb,vb,null,false).p(',');
+    for( Type expect : expecteds ) expect.str(sb, false).p(',');
     sb.unchar().p(expecteds.length==1 ? "" : ")");
     return new ErrMsg(loc,sb.toString(),Level.TypeErr);
   }
-  public static ErrMsg asserterr( Parse loc, Type actual, Type t0mem, Type expected ) {
-    return typerr(loc,actual,t0mem,expected,Level.Assert);
+  public static ErrMsg asserterr( Parse loc, Type actual, Type expected ) {
+    return typerr(loc,actual, expected,Level.Assert);
   }
   public static ErrMsg field(Parse loc, String msg, String fld, boolean closure, TypeStruct ts) {
     SB sb = new SB().p(msg).p(Parse.isOp(fld,false) ? " operator '" : (closure ? " val '" : " field '.")).p(fld).p("'");
-    if( ts != null && !closure ) ts.str(sb.p(" in "),new VBitSet(),null,false);
+    if( ts != null && !closure ) ts.str(sb.p(" in "), false);
     return new ErrMsg(loc,sb.toString(),Level.Field);
   }
   public static ErrMsg niladr(Parse loc, String msg, String fld) {

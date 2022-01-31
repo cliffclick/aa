@@ -185,7 +185,7 @@ public class HM3 {
       add_work(work);
     }
   }
-  
+
   public static class Lambda extends Syntax {
     final String _arg0;
     Lambda(String arg0, Syntax body) { _kids=new Syntax[]{body}; body._par=this; _arg0=arg0; }
@@ -329,7 +329,7 @@ public class HM3 {
       if( _u!=null && !debug ) return _u._str(sb,dups,debug); // Clean print; skip to U-F root & print
       sb.p("v").p(_uid);
       if( dups.tset(_uid) ) return sb.p("$");  // Stop infinite print loops
-      if( _t!=Type.ANY ) _t.str(sb.p(":"),dups,null,false);
+      if( _t!=Type.ANY ) _t.str(sb.p(":"), false);
       if( _u!=null ) _u._str(sb.p(">>"),dups,debug);
       return sb;
      }

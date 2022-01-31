@@ -1,7 +1,6 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
 import java.util.function.Predicate;
@@ -12,7 +11,7 @@ public class TypeInt extends Type<TypeInt> {
   private byte _x;        // -2 bot, -1 not-null, 0 con, +1 not-null-top +2 top
   public  byte _z;        // bitsiZe, one of: 1,8,16,32,64
   private long _con;      // hi or lo according to _x
-  private TypeInt init(int x, int z, long con ) { _x=(byte)x; _z=(byte)z; _con = con; return this; }
+  private TypeInt init(int x, int z, long con ) { _x=(byte)x; _z=(byte)z; _con = con; _name=""; return this; }
   @Override TypeInt copy() { return _copy().init(_x,_z,_con); }
   // Hash does not depend on other types
   @Override int compute_hash() { return super.compute_hash()+_x+_z+(int)_con; }
@@ -23,7 +22,8 @@ public class TypeInt extends Type<TypeInt> {
     return super.equals(o) && _x==t2._x && _z==t2._z && _con==t2._con;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override public SB str( SB sb, VBitSet dups, TypeMem mem, boolean debug ) {
+
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
     sb.p(_name);
     if( _con != 0 ) return sb.p(_x<0 ? "&" : (_x>0 ? "+" : "")).p(_con);
     if( _x==0 ) return _con==0 ? sb.p("0") : sb.p(_con);

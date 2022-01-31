@@ -415,6 +415,7 @@ public class TV2 {
       return TypeFunPtr.make(BitsFun.ALL,size()-1,Type.ANY,rez);
     }
     if( is_obj() ) {
+      TypeMemPtr tmp = (TypeMemPtr)_flow;
       TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);
       if( tstr==null ) {
         // Returning a high version of struct
@@ -433,7 +434,7 @@ public class TV2 {
           // TypeStructs, so keep RECURSIVE_MEET enabled.
           tstr = tstr.install();
       }
-      return TypeMemPtr.make(((TypeMemPtr)_flow).aliases(),tstr);
+      return TypeMemPtr.make(tmp.aliases(),tstr);
     }
 
     throw unimpl();
