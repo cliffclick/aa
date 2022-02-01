@@ -25,6 +25,7 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
   boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
   @Override public boolean cyclic() { return _cyclic; }
   @Override public void set_cyclic() { _cyclic = true; }
+  @Override public void clr_cyclic() { _cyclic = false; }
   @Override public void walk1( BiFunction<Type,String,Type> map ) {
     //return map.apply(_t);
     throw unimpl();

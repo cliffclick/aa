@@ -571,7 +571,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   private static Type _apx( int cutoff, BitsAlias aliases, Type t, TypeMemPtr ptmp, TypeMemPtr ctmp ) {
     if( !(t instanceof Cyclic) ) {
       // If 't' might be an aliasing TMP in some other type, that other types' approx
-      // will crush all the
+      // will crush all the fields in t
       if( TypeMemPtr.ISUSED.isa(t) && cutoff==0 )
         CUTOFFS.push(null);     // Sentinel: just crush all fields
       return t;
@@ -983,6 +983,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   @Override public boolean cyclic() { return _cyclic; }
   @Override public void set_cyclic() { _cyclic = true; }
+  @Override public void clr_cyclic() { _cyclic = false; }
 
   // Extend the current struct with a new named field, making a new struct
   public TypeStruct add_fldx( TypeFld fld ) { return copy().add_fld(fld).hashcons_free(); }

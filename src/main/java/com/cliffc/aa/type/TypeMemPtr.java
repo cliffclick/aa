@@ -37,6 +37,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
 
   @Override public boolean cyclic() { return _cyclic; }
   @Override public void set_cyclic() { _cyclic = true; }
+  @Override public void clr_cyclic() { _cyclic = false; }
   @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_obj,"obj"); }
   @Override public void walk_update( UnaryOperator<Type> update ) { _obj = (TypeStruct)update.apply(_obj); }
   @Override public Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth) {

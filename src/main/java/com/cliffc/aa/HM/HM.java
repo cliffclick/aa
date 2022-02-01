@@ -2228,20 +2228,28 @@ public class HM {
       if( is_base() ) return _lift_leaf(apply,t,false);
 
       if( is_nil() ) { // The wrapped leaf gets lifted, then nil is added
-        Type tnil = arg("?").walk_types_out(null/*t.remove_nil()*/,apply);
+        Type tnil = arg("?").walk_types_out(t.remove_nil(),apply);
         return tnil.meet(Type.NIL);
       }
 
-      if( is_fun() ) {
-        int nargs = size()-1;
-        return TypeFunPtr.make(_fidxs,nargs,Type.SCALAR,Type.SCALAR);
+      if( is_fun() ) {          // Walk returns not arguments
+        Type tret = t instanceof TypeFunPtr tfp ? tfp._ret  : t.oob(Type.SCALAR);
+        Type tdsp = t instanceof TypeFunPtr tfp ? tfp.dsp() : t.oob(Type.SCALAR);
+        if( WDUPS.get(_uid)!=null ) return t;
+        WDUPS.put(_uid,t);
+        Type trlift = arg("ret").walk_types_out(tret, apply);
+        WDUPS.remove(_uid);
+        return TypeFunPtr.makex( _fidxs,size()-1, tdsp, trlift);
       }
 
       if( is_struct() ) {
         TypeMemPtr tmp2 = (TypeMemPtr)WDUPS.get(_uid);
-        if( tmp2 != null ) return tmp2; // Recursive, stop cycles
+        if( tmp2 != null ) return t; // Recursive, stop cycles
         Type.RECURSIVE_MEET++;
-        TypeStruct ts = TypeStruct.malloc("",is_open());
+        TypeStruct ts = TypeStruct.malloc("",is_open());  TypeFld dfld;
+        ts.add_fld( t instanceof TypeMemPtr tmp && (dfld=tmp._obj.get("^"))!=null
+                    ? dfld
+                    : (t.above_center() ? TypeFld.NO_DSP : TypeFld.make_dsp(Type.SCALAR)) );
 
         // Add fields.  Common to both are easy, and will be walked (recursive,
         // cyclic).  Solo fields in GCP are kept, and lifted "as if" an HM
@@ -2255,8 +2263,11 @@ public class HM {
 
         // Walk fields common to both, setting (cyclic, recursive) the lifted type
         if( _args!=null )
-          for( String id : _args.keySet() ) // Forall fields in HM
-            ts.get(id).setX( arg(id).walk_types_out(null,apply));
+          for( String id : _args.keySet() ) { // Forall fields in HM
+            TypeFld ifld=null;
+            Type tfld = t instanceof TypeMemPtr itmp && (ifld=itmp._obj.get(id))!=null ? ifld._t : t.oob(Type.SCALAR);
+            ts.get(id).setX( arg(id).walk_types_out(tfld,apply));
+          }
         // Close off the recursion
         if( --Type.RECURSIVE_MEET == 0 )
           ts = ts.install();

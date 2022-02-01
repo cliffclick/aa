@@ -1068,7 +1068,18 @@ A:@{
   i=int64
 }
 """,
-        Type.SCALAR
-        );
+        // PA:*[5]@{^=any; add=[17]{any,2 ->PA }; i=int64}
+        () -> {
+          TypeFld ifld = TypeFld.make("i",TypeInt.INT64);
+          Type.RECURSIVE_MEET++;
+          TypeFld tfld = TypeFld.malloc("add");
+          TypeStruct ts = TypeStruct.malloc_test(TypeFld.NO_DSP,tfld,ifld);
+          TypeMemPtr tmp = TypeMemPtr.make(5,ts);
+          TypeFunPtr tfp = TypeFunPtr.make(17,2,Type.ANY,tmp);
+          tfld.setX(tfp);
+          Type.RECURSIVE_MEET--;
+          ts = ts.install();
+          return TypeMemPtr.make(5,ts);
+        });
   }
 }

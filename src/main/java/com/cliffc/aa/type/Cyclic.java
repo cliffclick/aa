@@ -16,6 +16,7 @@ public interface Cyclic {
   // Type is cyclic
   boolean cyclic();
   void set_cyclic();
+  void clr_cyclic();
 
   // Walk and apply a map.  No return, so just for side-effects.
   // Does not recurse.  Does not guard against cycles.
@@ -94,6 +95,9 @@ public interface Cyclic {
 
     // Set cyclic bits for faster equals/meets.
     assert CSTACK.isEmpty() && CVISIT.cardinality()==0;
+    for( Type t : REACHABLE )
+      if( t instanceof Cyclic cyc && !t.interned() )
+        cyc.clr_cyclic();
     _set_cyclic(head);
     assert CSTACK.isEmpty();   CVISIT.clear();
 
@@ -141,7 +145,7 @@ public interface Cyclic {
       if( i== -1 ) return;  // Due to multi-edges, we might not find if dupped, so just ignore
       for( ; i < CSTACK._len; i++ ) { // Set cyclic bit
         Type t2 = CSTACK.at(i);
-        if( t2 instanceof Cyclic ) ((Cyclic)t2).set_cyclic();
+        if( t2 instanceof Cyclic cyc ) cyc.set_cyclic();
       }
       return;
     }

@@ -47,6 +47,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   @Override TypeFunPtr copy() { return _copy().init(_fidxs,_nargs,_dsp,_ret); }
   @Override public boolean cyclic() { return _cyclic; }
   @Override public void set_cyclic() { _cyclic = true; }
+  @Override public void clr_cyclic() { _cyclic = false; }
   @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_dsp,"dsp");  map.apply(_ret,"ret"); }
   @Override public void walk_update( UnaryOperator<Type> map ) { _dsp = map.apply(_dsp); _ret = map.apply(_ret); }
   @Override public Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth) {
