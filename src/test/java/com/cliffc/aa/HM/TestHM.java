@@ -129,10 +129,7 @@ public class TestHM {
         "( 3, *[4]str:(97))",
         "( 3, *[4]str:(97))",
         // GCP with HM
-        // With lift ON
         TypeMemPtr.make(2,make_tups(TypeInt.NINT64,TypeMemPtr.make_str(TypeInt.NINT64))),
-        // With lift OFF
-        //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
         // GCP is weaker without HM
         tuplen2);
   }
@@ -174,10 +171,7 @@ public class TestHM {
         "(pair ((map str) 5) ((map factor) 2.3))",
         "( *[4]str:(), flt64)",
         "( *[4]str:(), flt64)",
-        // With lift ON
         TypeMemPtr.make(2,make_tups(TypeMemPtr.STRPTR,TypeFlt.FLT64)),
-        // With lift OFF
-        //TypeMemPtr.make(7,make_tups(Type.SCALAR,Type.SCALAR)),
         tuple2);
   }
 
@@ -213,11 +207,7 @@ map = { fun x -> (fun x)};
         "{ A? -> ( B:Cannot unify 5 and ( 3, B), B) }",
         "{ A? -> ( B:Cannot unify 5 and ( 3, B), B) }",
         // tfs(*[7](^=any, ~nScalar, *[7]($, 3, ~nScalar)))
-        // With Lift ON
         tfs(TypeMemPtr.make(2,make_tups(TypeInt.con(5),TypeMemPtr.make(2,make_tups(TypeInt.con(3),TypeInt.con(5)))))),
-        // With Lift OFF
-        //tfs(TypeMemPtr.make(2,make_tups(TypeInt.con(5),Type.SCALAR))),
-        // tfs(*[7](^=any, 5, nScalar))
         tfs(TypeMemPtr.make(2,make_tups(TypeInt.con(5),Type.NSCALR))));
   }
 
@@ -242,10 +232,7 @@ map ={fun parg -> (fun (cdr parg))};
 """,
         "( *[4]str:(), int1)",
         "( *[4]str:(), int1)",
-        // With Lift ON
         TypeMemPtr.make(2,make_tups(TypeMemPtr.STRPTR,TypeInt.INT64)),
-        // With Lift OFF
-        //tuple2,
         tuple2);
   }
 
@@ -456,10 +443,7 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
 """,
         "( *[4]str:(), int1)",
         "( *[4]str:(), int1)",
-        // With lift ON
         TypeMemPtr.make(2,make_tups(TypeMemPtr.STRPTR,TypeInt.INT64)),
-        // With lift OFF
-        //tuple2,
         tuple2);
   }
 
@@ -504,10 +488,7 @@ loop = { name cnt ->
 """,
         "*[0,4]str:(nint8)",  // Both HM and GCP
         "Cannot unify int8 and *[0,4]str:(nint8)", // HM alone cannot do this one
-        // With lift ON
         TypeMemPtr.make_str(TypeInt.NINT64), // Both HM and GCP
-        // With lift OFF
-        //Type.NSCALR,
         Type.NSCALR);                   // GCP alone gets a very weak answer
   }
 
@@ -550,11 +531,6 @@ loop = { name cnt ->
 }
 """,
         "{ A? -> ( 3, May be nil when loading field x ) }",
-        "{ A? -> ( 3, May be nil when loading field x ) }",
-        // With lift ON
-        // tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(3), TypeInt.con(5) ))),
-        tfs(TypeMemPtr.make(2,make_tups(TypeInt.NINT8 , TypeInt.NINT8 ))),
-        // With lift OFF
         tfs(TypeMemPtr.make(2,make_tups(TypeInt.NINT8 , TypeInt.NINT8 ))));
   }
 
@@ -618,10 +594,7 @@ loop = { name cnt ->
                                                          TypeFld.make("false",tf),
                                                          mfun(1,"force",tf,25)));
           TypeStruct rez = TypeStruct.make(NO_DSP,
-                                           // With lift ON
                                            TypeFld.make("a", HM.DO_HM ? TypeInt.NINT64 : Type.SCALAR),
-                                           // With lift OFF
-                                           //TypeFld.make("a", Type.SCALAR),
                                            TypeFld.make("b", HM.DO_HM ? TypeMemPtr.make(ptr90(),TypeStruct.make(SC_DSP)) : Type.SCALAR),
                                            TypeFld.make("bool",xbool));
           return TypeMemPtr.make(11,rez);
@@ -1079,10 +1052,7 @@ all = @{
     run("dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp \"abc\"))",
         "( 3, *[4]str:(97))",
         "( 3, *[4]str:(97))",
-        // With lift On
         TypeMemPtr.make(2,make_tups(TypeInt.NINT64,TypeMemPtr.make_str(TypeInt.NINT64))),
-        // With lift Off
-        //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
         tuplen2);
   }
 

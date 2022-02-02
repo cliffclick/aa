@@ -540,14 +540,14 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // This version IS associative with meet: A.apx.B == A.B.apx
   public TypeStruct approx2( int cutoff, BitsAlias aliases ) {
     // Fast-path cutout for boring structs
-    //boolean shallow=true;
-    //for( int i=0; i<_flds._len; i++ ) {
-    //  TypeFld fld = _flds._es[i];
-    //  if( fld._t instanceof TypeMemPtr ||
-    //      (fld._t instanceof TypeFunPtr tfp && !tfp._ret.is_simple()) )
-    //    { shallow=false; break; }
-    //}
-    //if( shallow ) return this;  // Fast cutout for boring structs
+    boolean shallow=true;
+    for( int i=0; i<_flds._len; i++ ) {
+      TypeFld fld = _flds._es[i];
+      if( fld._t instanceof TypeMemPtr ||
+          (fld._t instanceof TypeFunPtr tfp && !tfp._ret.is_simple()) )
+        { shallow=false; break; }
+    }
+    if( shallow ) return this; // Fast cutout for boring structs
 
     for( int i=0; i<cutoff; i++ ) // Reset the statics
       if( i>= AXCYCLICS._len ) AXCYCLICS.push(new IHashMap());
