@@ -507,6 +507,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   private static final IHashMap OLD2APX = new IHashMap();
   private static final Ary<TypeMemPtr> CUTOFFS = new Ary<>(TypeMemPtr.class);
   private static final Ary<IHashMap> AXCYCLICS = new Ary<>(IHashMap.class);
+  private static BitsAlias AXALIAS;
 
   /**
   Simply meeting a lower [12] over an upper [12] is not sufficient.  Since the
@@ -555,7 +556,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     assert RECURSIVE_MEET==0;
     RECURSIVE_MEET++;
     assert OLD2APX.isEmpty() && MEETS0.isEmpty() && CUTOFFS.isEmpty();
-    TypeStruct apx = (TypeStruct)_apx(cutoff-1,aliases,this,TypeMemPtr.make(aliases,this),null);
+    AXALIAS = aliases;
+    TypeStruct apx = (TypeStruct)_apx(cutoff-1,this,TypeMemPtr.make(aliases,this),null);
     if( cutoff==1 && !CUTOFFS.isEmpty() )
       _apx_cut_meet(TypeMemPtr.malloc(aliases,apx));
     assert CUTOFFS.isEmpty();
@@ -568,7 +570,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     return apx;
   }
 
-  private static Type _apx( int cutoff, BitsAlias aliases, Type t, TypeMemPtr ptmp, TypeMemPtr ctmp ) {
+  private static Type _apx( int cutoff, Type t, TypeMemPtr ptmp, TypeMemPtr ctmp ) {
     if( !(t instanceof Cyclic) ) {
       // If 't' might be an aliasing TMP in some other type, that other types' approx
       // will crush all the fields in t
@@ -576,7 +578,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
         CUTOFFS.push(null);     // Sentinel: just crush all fields
       return t;
     }
-    if( t instanceof TypeMemPtr tmp && aliases.overlaps(tmp._aliases) ) {
+    if( t instanceof TypeMemPtr tmp && AXALIAS.overlaps(tmp._aliases) ) {
       if( cutoff == 0 ) {
         CUTOFFS.push(tmp);      // Push the point at cutoff for a later meet
         ctmp.set_cyclic();
@@ -591,14 +593,14 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     if( c!=null ) return c; // Dup check: been here, done that.  Not allowed at lowest level, to prevent cross-level sharing
     axmap.put(t,c = t.copy());  // Copy is NOT interned.
     if( ptmp==t ) ctmp=(TypeMemPtr)c;
-    else if( ctmp==null ) ctmp = TypeMemPtr.malloc(aliases,(TypeStruct)c);
+    else if( ctmp==null ) ctmp = TypeMemPtr.malloc(AXALIAS,(TypeStruct)c);
     final int fcutoff = cutoff;  final TypeMemPtr fptmp=ptmp, fctmp=ctmp;
-    ((Cyclic)c).walk_update(fld -> _apx(fcutoff,aliases,fld,fptmp,fctmp));
+    ((Cyclic)c).walk_update(fld -> _apx(fcutoff,fld,fptmp,fctmp));
 
     if( cutoff==0 && !CUTOFFS.isEmpty() ) { // Unwinding from a cut-off point, will be cyclic
       ((Cyclic)c).set_cyclic(); // Flag everything in the middle as cyclic
-      if( c instanceof TypeMemPtr tmp && aliases.overlaps(tmp._aliases) )
-        _apx_cut_meet(tmp);     // Meet any cutoffs if we cycled
+      if( c instanceof TypeMemPtr cutmp && AXALIAS.overlaps(cutmp._aliases) )
+        _apx_cut_meet(cutmp);   // Meet any cutoffs if we cycled
     }
     axmap.remove(t);
     return c;
@@ -634,8 +636,11 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     switch( told ) {
     case TypeMemPtr tmpold -> {
       TypeMemPtr tmpntx = (TypeMemPtr) ntx;
+      boolean wraps =
+        !tmpntx._aliases.overlaps(AXALIAS) &&
+         tmpold._aliases.overlaps(AXALIAS);
       tmpntx._aliases = tmpntx._aliases.meet(tmpold._aliases);
-      tmpntx._obj = (TypeStruct) _ax_meet_fld(tmpntx._obj, tmpold._obj);
+      tmpntx._obj = (TypeStruct) _ax_meet_fld((wraps ? AXROOT : tmpntx)._obj, tmpold._obj);
     }
     case TypeStruct tsold -> {
       TypeStruct tsntx = (TypeStruct) ntx;
@@ -644,7 +649,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
         if( fntx == null ) {      // Missing field in LHS
           if( !tsntx.above_center() && !AXOPEN.test(tsntx._uid) ) continue; // Low LHS, drop the field
           tsntx.add_fld(fntx = fold.copy());    // High LHS, copy the field high
-          fntx._t = Type.XSCALAR;
+          fntx._t = fold._t==Type.ANY ? Type.ANY : Type.XSCALAR;
         }
         Type x = _ax_meet_fld(fntx, fold);
         assert x == fntx;
@@ -689,7 +694,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
       if( old==XSCALAR || old==ANY    ) return ntx; // Preserve ntx
       if( ntx==XSCALAR || ntx==ANY || ntx==XNSCALR ) {
         // If old is a tmp that overlaps aliases, cycle it back to the root.
-        if( old instanceof TypeMemPtr otmp && otmp._aliases.overlaps(AXROOT._aliases) )
+        if( old instanceof TypeMemPtr otmp && otmp._aliases.overlaps(AXALIAS) )
           return _ax_meet_fld(AXROOT,old);
         else if( old instanceof Cyclic ) {
           // make a high-copy of old, with XSCALAR fields (basically triggering
@@ -703,7 +708,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
             throw unimpl();     // Strip nil out
           switch( c ) {
           case TypeMemPtr tmp -> { tmp._obj = ISUSED.copy(); AXOPEN.tset(tmp._obj._uid); }
-          case TypeFunPtr tfp -> tfp.set_dsp(tfp._ret = XSCALAR);
+          case TypeFunPtr tfp -> { tfp._ret = XSCALAR; tfp.set_dsp(Type.ANY); }
           default -> throw unimpl();
           }
           Type rez = _ax_meet_fld(c,old);

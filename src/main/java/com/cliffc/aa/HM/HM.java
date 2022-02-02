@@ -2234,7 +2234,7 @@ public class HM {
 
       if( is_fun() ) {          // Walk returns not arguments
         Type tret = t instanceof TypeFunPtr tfp ? tfp._ret  : t.oob(Type.SCALAR);
-        Type tdsp = t instanceof TypeFunPtr tfp ? tfp.dsp() : t.oob(Type.SCALAR);
+        Type tdsp = t instanceof TypeFunPtr tfp ? tfp.dsp() : (t.above_center() ? Type.ANY : Type.SCALAR);
         if( WDUPS.get(_uid)!=null ) return t;
         WDUPS.put(_uid,t);
         Type trlift = arg("ret").walk_types_out(tret, apply);

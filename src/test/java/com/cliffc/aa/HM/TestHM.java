@@ -833,27 +833,29 @@ three =(n.s two);     // Three is the successor of two
         "}"+
         "",
         () -> {
-         //     return mptr(fld,alias,TypeStruct.make(NO_DSP,mfun("and_",afidx),mfun("or__",ofidx),mfun("then",tfidx,2) ) );
+         Type xss = HM.DO_HM ? Type.XSCALAR : Type.SCALAR;
          TypeStruct sa = TypeStruct.make(SC_DSP,TypeFld.make("and_"),TypeFld.make("or__"),TypeFld.make("then"));
          TypeFld fc = TypeFld.make("and_",TypeFunPtr.make(20,1,Type.ANY,TypeMemPtr.make(7,sa)));
          TypeFld fd = mfun(1,"or__",Type.SCALAR,21);
          TypeMemPtr pa = TypeMemPtr.make(7,TypeStruct.make(NO_DSP,fc,fd,mfun("then",22,2) ));
-         TypeMemPtr pc = TypeMemPtr.make(6,TypeStruct.make(NO_DSP,mfun("and_",17),mfun(1,"or__",TypeMemPtr.make(6,sa),18),mfun("then",19,2) ) );
+         TypeMemPtr pe = TypeMemPtr.make(7,TypeStruct.make(NO_DSP,fc,fd,mfun(2,"then",Type.XSCALAR,22) ));
+         TypeMemPtr pb = TypeMemPtr.make(6,TypeStruct.make(NO_DSP,mfun("and_",17),mfun(1,"or__",TypeMemPtr.make(6,sa),18),mfun("then",19,2) ) );
+         TypeMemPtr pd = TypeMemPtr.make(ptr90(),TypeStruct.make(SC_DSP,TypeFld.make("add_"),TypeFld.make("pred"),TypeFld.make("succ"),TypeFld.make("zero")));
+         TypeFld fe = mfun(1,"pred",HM.DO_HM ? pd : Type.SCALAR,27);
+         TypeFld ff = mfun(1,"succ",pd,28);
+         TypeFld fg = mfun(1,"add_",xss,29);
+         TypeMemPtr pc = TypeMemPtr.make(10,TypeStruct.make(NO_DSP,fg,fe,ff,mfun(1,"zero",pa,26)));
+         TypeMemPtr pz = TypeMemPtr.make( 9,TypeStruct.make(NO_DSP,mfun("add_",25),mfun(1,"pred",Type.XSCALAR,16),mfun(1,"succ",pc,24),mfun(1,"zero",pb,23)));
+         TypeMemPtr pf = TypeMemPtr.make(10,TypeStruct.make(NO_DSP,fg,fe,ff,mfun(1,"zero",HM.DO_HM ? pe : pa,26)));
+
          TypeFld bf = TypeFld.make("false",pa);
-         TypeFld bt = TypeFld.make("true" ,pc);
+         TypeFld bt = TypeFld.make("true" ,pb);
          TypeFld b = mptr("b", 8,TypeStruct.make(NO_DSP,bf,bt));
 
-         TypeFld fg = mfun(1,"add_",Type.XSCALAR,29);
-         TypeMemPtr pb = TypeMemPtr.make(ptr90(),TypeStruct.make(SC_DSP,TypeFld.make("add_"),TypeFld.make("pred"),TypeFld.make("succ"),TypeFld.make("zero")));
-         TypeFld fe = mfun(1,"pred",pb,27);
-         TypeFld ff = mfun(1,"succ",pb,28);
-         TypeMemPtr pd = TypeMemPtr.make(10,TypeStruct.make(NO_DSP,fg,fe,ff,mfun(1,"zero",pa,26)));
-         
-         TypeMemPtr z   = TypeMemPtr.make( 9,TypeStruct.make(NO_DSP,mfun("add_",25),mfun(1,"pred",Type.XSCALAR,16),mfun(1,"succ",pd,24),mfun(1,"zero",pc,23)));
-         TypeFld n      = mptr("n",11,TypeStruct.make(NO_DSP,mfun(1,"s",pd,30),TypeFld.make("z",z)));
-         TypeFld one    = TypeFld.make("one"  ,pd);
-         TypeFld two    = TypeFld.make("two"  ,Type.XSCALAR);
-         TypeFld three  = TypeFld.make("three",TypeMemPtr.make(10,TypeStruct.make(NO_DSP,fg,fe,ff,TypeFld.make("zero",mfun(1,TypeMemPtr.make(7,TypeStruct.make(NO_DSP,fc,fd,mfun(2,"then",Type.XSCALAR,22))),26)))));
+         TypeFld n      = mptr("n",11,TypeStruct.make(NO_DSP,mfun(1,"s",pc,30),TypeFld.make("z",pz)));
+         TypeFld one    = TypeFld.make("one"  ,pc);
+         TypeFld two    = TypeFld.make("two"  ,xss);
+         TypeFld three  = TypeFld.make("three",HM.DO_HM ? pf : pc);
          Type rez = TypeMemPtr.make(12,TypeStruct.make(NO_DSP,b,n,one,two,three));
          return rez;
         });
@@ -879,7 +881,16 @@ three =(n.s two);     // Three is the successor of two
         "(sx self1)"+
         "",
         "A:@{ succ=A}",
-        TypeMemPtr.make(5,TypeStruct.make(NO_DSP,TypeFld.make("succ",Type.SCALAR))));
+        () -> {          
+          Type.RECURSIVE_MEET++;
+          TypeFld fld  = TypeFld.malloc("succ");
+          TypeStruct ts = TypeStruct.malloc_test(NO_DSP,fld);
+          TypeMemPtr tmp= TypeMemPtr.make(5,ts);
+          fld.setX(tmp);
+          Type.RECURSIVE_MEET--;
+          ts = ts.install();
+          return TypeMemPtr.make(5,ts);
+        });
   }
 
   // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
@@ -887,8 +898,9 @@ three =(n.s two);     // Three is the successor of two
   @Test public void test61() {
     run("f = { p1 p2 -> (if p2.a p1 p2)};"+"(f @{a=2}   @{b=2.3})",
         "@{ a= Missing field a }",
-        () -> TypeMemPtr.make(ptr56(),
-                              TypeStruct.make(NO_DSP)));
+        "@{ a= Missing field a }",
+        () -> TypeMemPtr.make(BitsAlias.EMPTY, TypeStruct.make("",true,NO_DSP, TypeFld.make("a"))),
+        () -> TypeMemPtr.make(ptr56(), TypeStruct.make(NO_DSP)));
   }
 
   // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
@@ -924,12 +936,12 @@ three =(n.s two);     // Three is the successor of two
         "   res2 = @{ a=nint8; b=nflt32 }"+
         "}",
         () -> {
-          //*[13]@{^=any; f=[15]{any }; res1=*[9,10,11,12]($); res2=$}
-          Type tmp = TypeMemPtr.make(BitsAlias.ALL0.make(5,6,7,8),TypeStruct.make(NO_DSP));
-          return TypeMemPtr.make(9, TypeStruct.make(NO_DSP,mfun(2,"f",tmp,17),TypeFld.make("res1",tmp),TypeFld.make("res2",tmp)));
+          // *[9]@{FA:^=any; f=[17]{any,2 ->PA:*[       ]~@{FA; a=} }; res1=PA; res2=*[]~@{FA; a=nint64}}
+          Type pa = TypeMemPtr.make(BitsAlias.EMPTY,TypeStruct.make("",true,NO_DSP,TypeFld.make("a")));
+          Type pb = TypeMemPtr.make(BitsAlias.EMPTY,TypeStruct.make("",true,NO_DSP,TypeFld.make("a",TypeInt.NINT64)));
+          return TypeMemPtr.make(9, TypeStruct.make(NO_DSP,mfun(2,"f",pa,17),TypeFld.make("res1",pa),TypeFld.make("res2",pb)));
         },
         () -> {
-          //*[13]@{^=any; f=[15]{any }; res1=*[9,10,11,12]($); res2=$}
           return TypeMemPtr.make(9, TypeStruct.make(NO_DSP,mfun(2,"f",Type.SCALAR,17),TypeFld.make("res1",Type.SCALAR),TypeFld.make("res2",Type.SCALAR)));
         });
   }
@@ -1061,13 +1073,8 @@ maybepet = petcage.get;
 """,
         "(nflt32,nflt32,*[4]str:(nint8))",
         "(nflt32,nflt32,*[4]str:(nint8))",
-        // With lift ON
-        //TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.ISUSED)),
-        //TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.ISUSED)));
-        // With lift OFF
-        TypeMemPtr.make(3, make_tups(Type.SCALAR  , Type.SCALAR  , TypeMemPtr.make_str(TypeInt.NINT8))),
-        // Needs cutoff==2 or HM to discover .name field is a string
-        TypeMemPtr.make(3, make_tups(Type.SCALAR  , Type.SCALAR  , TypeMemPtr.make_str(TypeInt.NINT8))) );
+        TypeMemPtr.make(3, make_tups(TypeFlt.NFLT64, TypeFlt.NFLT64, TypeMemPtr.make_str(TypeInt.NINT8))),
+        TypeMemPtr.make(3, make_tups(Type.SCALAR   , Type.SCALAR   , TypeMemPtr.make_str(TypeInt.NINT8))));
   }
 
   @Test public void test67() {

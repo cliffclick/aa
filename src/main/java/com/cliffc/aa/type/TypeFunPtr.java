@@ -83,7 +83,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     if( !(o instanceof TypeFunPtr tf) ) return false;
     if( _fidxs!=tf._fidxs || _nargs != tf._nargs || _dsp!=tf._dsp ) return false;
     if( _ret==tf._ret ) return true;
-    // Must check for cycle-equals, in case its a self-returning function
+    // Must check for cycle-equals, in case it's a self-returning function
     return _ret.cycle_equals(tf._ret);
   }
 
