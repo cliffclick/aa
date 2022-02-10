@@ -38,6 +38,9 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   @Override public Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth) {
     return _t instanceof Cyclic cyc ? make_from(cyc.walk_apx(cutoff,depth)) : this;
   }
+  @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {
+    return Cyclic._path_diff(_t,((TypeFld)t)._t,links);
+  }
 
   // Ignore edges hash
   int _hash() { return Util.hash_spread(super.static_hash() + _fld.hashCode() + _access.hashCode( ) + _order); }
@@ -75,6 +78,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     return _t.cycle_equals(((TypeFld)o)._t);
   }
 
+  @SuppressWarnings("unchecked")
   @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
     if( visit.tset(_uid) ) {
       if( !dups.containsKey(_uid) )
@@ -85,10 +89,10 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   }
 
   @SuppressWarnings("unchecked")
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( !TypeStruct.isDigit(_fld.charAt(0)) ) // Do not print number-named fields for tuples
       _access.str(sb.p(_fld));
-    return _t==null ? sb.p('!') : (_t==Type.SCALAR ? sb : _t._str(visit, dups, sb, debug));
+    return _t==null ? sb.p('!') : (_t==Type.SCALAR ? sb : _t._str(visit, dups, sb, debug, indent));
   }
 
   static { new Pool(TFLD,new TypeFld()); }

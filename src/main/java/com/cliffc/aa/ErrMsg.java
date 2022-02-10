@@ -45,16 +45,16 @@ public class ErrMsg implements Comparable<ErrMsg> {
   }
   public static ErrMsg typerr( Parse loc, Type actual, Type expected ) { return typerr(loc,actual, expected,Level.TypeErr); }
   public static ErrMsg typerr( Parse loc, Type actual, Type expected, Level lvl ) {
-    SB sb = actual.str(new SB(), false).p(" is not a ");
-    expected.str(sb, false); // Expected is already a complex ptr, does not depend on memory
+    SB sb = actual.str(new SB(), false, false).p(" is not a ");
+    expected.str(sb, false, false); // Expected is already a complex ptr, does not depend on memory
     if( actual==Type.ALL && lvl==Level.TypeErr ) lvl=Level.AllTypeErr; // ALLs have failed earlier, so this is a lower priority error report
     return new ErrMsg(loc,sb.toString(),lvl);
   }
   public static ErrMsg typerr( Parse loc, Type actual, Type t0mem, Type[] expecteds ) {
     TypeMem tmem = t0mem instanceof TypeMem ? (TypeMem)t0mem : null;
-    SB sb = actual.str(new SB(), false);
+    SB sb = actual.str(new SB(), false, false);
     sb.p( expecteds.length==1 ? " is not a " : " is none of (");
-    for( Type expect : expecteds ) expect.str(sb, false).p(',');
+    for( Type expect : expecteds ) expect.str(sb, false, false).p(',');
     sb.unchar().p(expecteds.length==1 ? "" : ")");
     return new ErrMsg(loc,sb.toString(),Level.TypeErr);
   }
@@ -63,7 +63,7 @@ public class ErrMsg implements Comparable<ErrMsg> {
   }
   public static ErrMsg field(Parse loc, String msg, String fld, boolean closure, TypeStruct ts) {
     SB sb = new SB().p(msg).p(Parse.isOp(fld,false) ? " operator '" : (closure ? " val '" : " field '.")).p(fld).p("'");
-    if( ts != null && !closure ) ts.str(sb.p(" in "), false);
+    if( ts != null && !closure ) ts.str(sb.p(" in "), false, false);
     return new ErrMsg(loc,sb.toString(),Level.Field);
   }
   public static ErrMsg niladr(Parse loc, String msg, String fld) {

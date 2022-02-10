@@ -214,7 +214,7 @@ public class HM1 {
       if( _u!=null && !debug ) return _u._str(sb,dups,debug);
       sb.p("v").p(_uid);
       if( dups.tset(_uid) ) return sb.p("$");
-      if( _t!=Type.ANY ) _t.str(sb.p(":"), false);
+      if( _t!=Type.ANY ) _t.str(sb.p(":"), false, false );
       if( _u!=null ) _u._str(sb.p(">>"),dups,debug);
       return sb;
      }

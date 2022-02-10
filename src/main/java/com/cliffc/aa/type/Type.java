@@ -139,16 +139,16 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // printing strings (SB).
 
   // toString is called on a single Type in the debugger, and prints debug-info.
-  @Override public final String toString() { return str(new SB(), true).toString(); }
+  @Override public final String toString() { return str(new SB(), true, false).toString(); }
   // Nice, REPL-friendly and error-friendly dump.  Debug flag dumps, e.g. raw
-  // aliases and raw fidxs.  None-debug dumps are used in ErrMsg.  Many debug
+  // aliases and raw fidxs.  Non-debug dumps are used in ErrMsg.  Many debug
   // dumps use this version, and intersperse types with other printouts in the
   // same SB.  This is the 'base' printer, as changing this changes behavior.
-  public final SB str(SB sb, boolean debug) {
+  public final SB str( SB sb, boolean debug, boolean indent ) {
     NonBlockingHashMapLong<String> dups = new NonBlockingHashMapLong<>();
     VBitSet bs = new VBitSet();
     _str_dups(bs, dups, new UCnt());
-    return _str(bs.clr(), dups, sb, debug);
+    return _str(bs.clr(), dups, sb, debug, indent );
   }
   static class UCnt { int _fld, _tmp, _tfp, _ts; }
 
@@ -160,7 +160,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   void _str_dups(VBitSet visit, NonBlockingHashMapLong<String> ignore, UCnt ucnt) { visit.tset(_uid); }
 
   // Internal tick of tick-tock printing
-  final SB _str( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
+  final SB _str( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( Util.eq(_name," FREE:") ) return sb.p(" FREE:");
     String s = dups.get(_uid);
     if( s!=null ) {
@@ -168,12 +168,19 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       if( visit.tset(_uid) ) return sb; // Pretty name got defined before
       sb.p(':');                // pretty name is defined here
     }
-    return _str0(visit,dups,sb,debug);
+    return _str0(visit,dups,sb,debug,indent);
   }
 
   // Internal tock of tick-tock printing
-  SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) { return sb.p(_name).p(STRS[_type]); }
+  SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) { return sb.p(_name).p(STRS[_type]); }
 
+  // True if type is complex to print, and should indent when printing a Type
+  final boolean _str_complex(VBitSet visit, NonBlockingHashMapLong<String> dups) {
+    if( visit.test(_uid) && dups.containsKey(_uid) ) return false;
+    return _str_complex0(visit,dups);
+  }
+  boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return false; }
+  
   // Shallow array compare, using '==' instead of 'equals'.  Since elements are
   // interned, this is the same as 'equals' except asymptotically faster unless
   // there is a type-cycle, then infinitely faster.

@@ -111,7 +111,7 @@ public class TypeMem extends Type<TypeMem> {
 
   @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) { throw unimpl(); }
 
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( this==ALLMEM  ) return sb.p("[ all ]");
     if( this==ANYMEM  ) return sb.p("[_____]");
     if( this==ALIVE   ) return sb.p("[ALIVE]");
@@ -119,15 +119,15 @@ public class TypeMem extends Type<TypeMem> {
     if( this==LNO_DISP) return sb.p("[NODSP]");
 
     if( _pubs.length==1 )
-      return _pubs[0]._str(visit,dups, sb.p('['), debug).p(']');
+      return _pubs[0]._str(visit,dups, sb.p('['), debug, indent).p(']');
 
     if( _pubs[0]==TypeStruct.DEAD ) sb.p('!');
-    else _pubs[0]._str(visit,dups,sb,debug);
+    else _pubs[0]._str(visit,dups,sb,debug, indent);
 
     sb.p('[');
     for( int i = 1; i< _pubs.length; i++ )
       if( _pubs[i] != null )
-        _pubs[i]._str(visit,dups, sb.p(i).p(':'), debug).p(",");
+        _pubs[i]._str(visit,dups, sb.p(i).p(':'), debug, indent).p(",");
     return sb.unchar().p(']');
   }
 

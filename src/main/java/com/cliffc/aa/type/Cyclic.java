@@ -25,13 +25,63 @@ public interface Cyclic {
 
   // Map and replace all child_types.  Does not recurse.  Does not guard
   // against cycles.  Example:
-  //          [fidx]{    dsp ->     ret   }
-  //          cyclic.walk_update( child_type ->  map(child_type) );
+  //          [fidx]{    dsp  ->     ret   }
+  //          cyclic.walk_update( child_type -> map(child_type) );
   //          [fidx]{map(dsp) -> map(ret) }
   void walk_update( UnaryOperator<Type> map );
 
   // Approx all aliases > CUTOFF
   Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth);
+
+  // Report a path-difference between two Types.
+  final class Link { Link _nxt; int _d; Type _t0,_t1;
+    static Link min(Link l0, Link l1) {
+      if( l0==null ) return l1;
+      if( l1==null ) return l0;
+      return l0._d<l1._d ? l0 : l1;
+    }
+    SB str(SB sb) {
+      if( _t0==null ) return sb.p('_');
+      throw unimpl();
+    }
+    static SB str(SB sb, NonBlockingHashMapLong<Link> links) {
+      for( long key : links.keySetLong() ) {
+        sb.p("{").p(key>>32).p(',').p(key&0xFFFFFFFFL).p("} = ");
+        links.get(key).str(sb).nl();
+      }
+      return sb;
+    }
+  }
+  static Link path_diff(Type t0, Type t1) {
+    NonBlockingHashMapLong<Link> links = new NonBlockingHashMapLong<>();
+    Link best = _path_diff(t0,t1,links);
+    return best;
+  }
+  static long duid(Type t0, Type t1) { return (((long)t0._uid)<<32)|t1._uid; }
+
+  // Returns null if no diff, otherwise returns the shortest path to a diff.
+  @SuppressWarnings("unchecked")
+  static Link _path_diff(Type t0, Type t1, NonBlockingHashMapLong<Link> links) {
+    if( t0==t1 ) return null;
+    long duid = duid(t0,t1);
+    Link lk = links.get(duid), diff=null;
+    if( lk!=null ) return lk;   // Been there, done that
+    lk = new Link();            // Placeholder
+    links.put(duid,lk);         // Stop recursion
+    if( t0.getClass() == t1.getClass() && t0 instanceof Cyclic cyc &&
+        t0.static_eq(t1) ) {
+      // Must recursively ask the question again
+      diff = cyc._path_diff0(t1,links);
+      if( diff==null || diff._t0==null ) return lk; // No difference
+    }
+    lk._nxt = diff;
+    lk._d = diff==null ? 0 : diff._d+1;
+    lk._t0=t0;
+    lk._t1=t1;
+    return lk;
+  }
+
+  Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links);
 
   // Install a cyclic structure.  'head' is not interned and points to a
   // (possibly cyclic) graph of not-interned Types.  Minimize the graph, set
@@ -350,7 +400,7 @@ public interface Cyclic {
         _uid(_uid(tfp._fidxs.str(sb).p("{ "), tfp.dsp()).p(" -> "), tfp._ret).p(" }");
       }
       case Type.TARY -> throw unimpl();
-      default -> h.str(sb, false);
+      default -> h.str(sb, false, false);
       }
       return sb;
     }

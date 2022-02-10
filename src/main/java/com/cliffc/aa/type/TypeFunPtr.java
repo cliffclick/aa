@@ -56,6 +56,12 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     return make_from(_dsp instanceof Cyclic cyc ? cyc.walk_apx(cutoff, depth) : _dsp,
                      _ret instanceof Cyclic cyc ? cyc.walk_apx(cutoff, depth) : _ret);
   }
+  @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {
+    TypeFunPtr tfp = (TypeFunPtr)t;
+    Cyclic.Link dsplk = Cyclic._path_diff(_dsp,tfp._dsp,links);
+    Cyclic.Link retlk = Cyclic._path_diff(_ret,tfp._ret,links);
+    return Cyclic.Link.min(dsplk,retlk);
+  }
 
   public boolean has_dsp() { return _dsp!=ALL; }
   public Type dsp() { return _dsp; }
@@ -114,6 +120,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     return eq;
   }
 
+  @SuppressWarnings("unchecked")
   @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
     if( visit.tset(_uid) ) {
       if( !dups.containsKey(_uid) )
@@ -126,14 +133,22 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
 
 
   @SuppressWarnings("unchecked")
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     _fidxs.str(sb);
     sb.p('{');                  // Arg list start
-    if( debug ) _dsp._str(visit,dups, sb, true).p(",");
+    if( debug ) _dsp._str(visit,dups, sb, true, indent).p(",");
     sb.p(_nargs).p(" ->");
-    return _ret._str(visit,dups, sb, debug).p(' ').p('}');
+    boolean ind = indent && _ret._str_complex(visit,dups);
+    if( ind ) sb.nl().ii(1).i();
+    _ret._str(visit,dups, sb, debug, indent).p(' ');
+    if( ind ) sb.nl().di(1).i();
+    return sb.p('}');
   }
 
+  @SuppressWarnings("unchecked")
+  @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return _ret._str_complex(visit,dups); }
+
+  
   static { new Pool(TFUNPTR,new TypeFunPtr()); }
 
   // Lambda/FunPtr transfer functions wrap a TFP/FIDX around a return, possibly
@@ -348,6 +363,10 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   @Override public boolean may_nil() { return _fidxs.may_nil(); }
   @Override Type not_nil() {
     BitsFun bits = _fidxs.not_nil();
+    return bits==_fidxs ? this : make_from(bits);
+  }
+  @Override public Type remove_nil() {
+    BitsFun bits = _fidxs.clear(0);
     return bits==_fidxs ? this : make_from(bits);
   }
   @Override public Type meet_nil(Type nil) {

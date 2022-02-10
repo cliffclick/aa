@@ -249,7 +249,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public static TypeStruct make_test( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a,ARG_IDX)); }
 
   // Add fields from a Type[].  Will auto-allocate the Type[], if not already
-  // allocated - which is a perf-hit in high usage points.  Typically used this
+  // allocated - which is a perf-hit in high usage points.  Typically, used this
   // way in tests.
   public static TypeStruct make_test( Type... ts ) { return make_test("",ts); }
   public static TypeStruct make_test( String name, Type... ts ) {
@@ -265,7 +265,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   }
 
 
-  // Used to make a few (larger and recursive) testing constants.  Some of the
+  // Used to make a few (larger and recursive) testing constants.  Some
   // fields are interned and some are recursive and without a type.
   public static TypeStruct malloc_test( TypeFld... flds ) { return malloc_test("",flds); }
   public static TypeStruct malloc_test( String name, TypeFld... flds ) {
@@ -367,7 +367,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     if( _cyclic && that._cyclic )
       return cyclic_meet(that);
     // Recursive but not cyclic; since at least one of these types is
-    // non-cyclic normal recursion will bottom-out.
+    // non-cyclic.  Normal recursion will bottom-out.
 
     // Meet the non-recursive parts.
     TypeStruct ts = ymeet(that,false);
@@ -504,9 +504,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   //     returns Scalar but this gives lousy results.  We'd like endless cyclic
   //     approximations to produce finite cyclic types.
   public TypeStruct approx( int cutoff, BitsAlias aliases ) { return approx2(cutoff,aliases); }
-  private static final IHashMap OLD2APX = new IHashMap();
-  private static final Ary<TypeMemPtr> CUTOFFS = new Ary<>(TypeMemPtr.class);
-  private static final Ary<IHashMap> AXCYCLICS = new Ary<>(IHashMap.class);
+  //private static final IHashMap OLD2APX = new IHashMap();
+  private static final IHashMap AXCYCLIC = new IHashMap();
   private static BitsAlias AXALIAS;
 
   /**
@@ -515,9 +514,9 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   That same path going down and going to the right has to monotonically fall.
 
   [12]@{                               [12]@{
-    pred=~scalar                         pred=~scalar
-    succ= *[12]@{     >>> ISA >>>        succ= scalar // Succ field falls
-      pred=*[12]@{ succ=scalar }       }
+    vpred=~scalar                         pred=~scalar
+    nsucc= *[12]@{     >>> ISA >>>        succ= scalar // Succ field falls
+      vpred=*[12]@{ nsucc=scalar }       }
     }
   }
   .succ.pred.succ=scalar               .succ[.pred.succ] = scalar
@@ -539,115 +538,171 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   // This version IS associative with meet: A.apx.B == A.B.apx
   public TypeStruct approx2( int cutoff, BitsAlias aliases ) {
-    // Fast-path cutout for boring structs
-    boolean shallow=true;
-    for( int i=0; i<_flds._len; i++ ) {
-      TypeFld fld = _flds._es[i];
-      if( fld._t instanceof TypeMemPtr ||
-          (fld._t instanceof TypeFunPtr tfp && !tfp._ret.is_simple()) )
-        { shallow=false; break; }
-    }
-    if( shallow ) return this; // Fast cutout for boring structs
-
-    for( int i=0; i<cutoff; i++ ) // Reset the statics
-      if( i>= AXCYCLICS._len ) AXCYCLICS.push(new IHashMap());
-      else AXCYCLICS.at(i).clear();
+    //assert cutoff==1;
+    //// Fast-path cutout for boring structs
+    //boolean shallow=true;
+    //for( int i=0; i<_flds._len; i++ ) {
+    //  TypeFld fld = _flds._es[i];
+    //  if( fld._t instanceof TypeMemPtr ||
+    //      (fld._t instanceof TypeFunPtr tfp && !tfp._ret.is_simple()) )
+    //    { shallow=false; break; }
+    //}
+    //if( shallow ) return this; // Fast cutout for boring structs
 
     assert RECURSIVE_MEET==0;
-    RECURSIVE_MEET++;
-    assert OLD2APX.isEmpty() && MEETS0.isEmpty() && CUTOFFS.isEmpty();
+    //assert OLD2APX.isEmpty();
+    assert MEETS0.isEmpty() && AXCYCLIC.isEmpty();
     AXALIAS = aliases;
-    TypeStruct apx = (TypeStruct)_apx(cutoff-1,this,TypeMemPtr.make(aliases,this),null);
-    if( cutoff==1 && !CUTOFFS.isEmpty() )
-      _apx_cut_meet(TypeMemPtr.malloc(aliases,apx));
-    assert CUTOFFS.isEmpty();
-    OLD2APX.clear();  MEETS0.clear();
-    RECURSIVE_MEET--;
+    TypeMemPtr ptmp = TypeMemPtr.make(aliases,this);
+    TypeMemPtr ctmp = (TypeMemPtr)_deep_clone(ptmp);
+    TypeMemPtr ctmp2= (TypeMemPtr)_apx(new VBitSet(), ptmp,ctmp,null,null,0);
+    assert ctmp==ctmp2;
+
+    TypeStruct apx = ctmp._obj, mtx;
+    //OLD2APX.clear();
+    MEETS0.clear();  AXCYCLIC.clear();
     apx = apx.install();
+    if( (mtx=(TypeStruct)this.meet(apx)) != apx ) {
+      System.out.println(apx.str(new SB(),true,true).toString());
+      Cyclic.Link fail = Cyclic.path_diff(apx,mtx);
+      throw unimpl();
+    }
     assert this.isa(apx);       // Self monotonic
-    TypeMemPtr tmx = TypeMemPtr.make(aliases,apx);
-    assert tmx.max(tmx.depth()) < cutoff; // Actually shrank
     return apx;
   }
 
-  private static Type _apx( int cutoff, Type t, TypeMemPtr ptmp, TypeMemPtr ctmp ) {
-    if( !(t instanceof Cyclic) ) {
-      // If 't' might be an aliasing TMP in some other type, that other types' approx
-      // will crush all the fields in t
-      if( TypeMemPtr.ISUSED.isa(t) && cutoff==0 )
-        CUTOFFS.push(null);     // Sentinel: just crush all fields
-      return t;
-    }
-    if( t instanceof TypeMemPtr tmp && AXALIAS.overlaps(tmp._aliases) ) {
-      if( cutoff == 0 ) {
-        CUTOFFS.push(tmp);      // Push the point at cutoff for a later meet
-        ctmp.set_cyclic();
-        return ctmp;            // Return cloned original, will force a cycle
-      }
-      cutoff--;                 // Lower cutoff
-      ptmp=tmp;                 // Track prior
-    }
-    IHashMap axmap = AXCYCLICS.at(cutoff);
-    // Dup check: been here, done that.  Not allowed at lowest level, to prevent cross-level sharing
-    Type c = axmap.get(t);      // Check for cycles
-    if( c!=null ) return c; // Dup check: been here, done that.  Not allowed at lowest level, to prevent cross-level sharing
-    axmap.put(t,c = t.copy());  // Copy is NOT interned.
-    if( ptmp==t ) ctmp=(TypeMemPtr)c;
-    else if( ctmp==null ) ctmp = TypeMemPtr.malloc(AXALIAS,(TypeStruct)c);
-    final int fcutoff = cutoff;  final TypeMemPtr fptmp=ptmp, fctmp=ctmp;
-    ((Cyclic)c).walk_update(fld -> _apx(fcutoff,fld,fptmp,fctmp));
-
-    if( cutoff==0 && !CUTOFFS.isEmpty() ) { // Unwinding from a cut-off point, will be cyclic
-      ((Cyclic)c).set_cyclic(); // Flag everything in the middle as cyclic
-      if( c instanceof TypeMemPtr cutmp && AXALIAS.overlaps(cutmp._aliases) )
-        _apx_cut_meet(cutmp);   // Meet any cutoffs if we cycled
-    }
-    axmap.remove(t);
+  // Deep clone with structure.  Unrolls TypeFld= to a TMP one step so that all
+  // cycles are at a TMP.
+  private static Type _deep_clone( Type t ) {
+    if( !(t instanceof Cyclic) ) return t;
+    // Dup check: been here, done that.
+    Type c = AXCYCLIC.get(t);     // Check for cycles
+    if( c!=null ) return c;       // Dup check: been here, done that.
+    c = t.copy();
+    if( !(t instanceof TypeFld) ) AXCYCLIC.put(t,c); // Stop cycles
+    ((Cyclic)c).walk_update(TypeStruct::_deep_clone);
     return c;
   }
 
-  private static TypeMemPtr AXROOT;
-  private static final BitSetSparse AXVISIT = new BitSetSparse(), AXOPEN = new BitSetSparse();
-  private static void _apx_cut_meet( TypeMemPtr tx ) {
-    AXROOT = tx;
-    if( CUTOFFS.find((TypeMemPtr)null)!=-1 ) {  // Special sentinel: crush all fields to Scalar as a shortcut
-      for( TypeMemPtr t : CUTOFFS )
-        if( t!=null && t._aliases!=AXROOT._aliases )
-          AXROOT._aliases = AXROOT._aliases.meet(t._aliases); // Pick up any missing aliases
-      for( TypeFld fld : AXROOT._obj ) // Crush all fields to Scalar, do not do expensive ax_meet2
-        fld.setX(SCALAR);
-      CUTOFFS.clear();
-      return;
+
+
+  // Read the old Type and clone into a new Type.  Along the way look for
+  // overlapping instances of AXALIAS.  If the new deep overlap point ISA the
+  // old shallow overlap point, make a closed cycle in the new clone.
+  // Otherwise, MEET the prior shallow overlap point into the new deep point, in
+  // addition to the cloning.  Handle cycles in the old code (by stopping
+  // cloning).  As part of a normal MEET-into, if the new code ISA a high type,
+  // the old code will effectively be cloned.
+  //
+  // As a result of this step, all AXALIAS instances will be ISA the prior
+  // shallower AXALIAS instance (Types go downhill the deeper into the
+  // structure we go).
+  private static Type _apx( VBitSet visit, Type old, Type nnn, TypeMemPtr optmp, TypeMemPtr nptmp, int depth ) {
+    assert depth<20;  // Stop stack overflow early, much easier debugging
+    if( !(old instanceof Cyclic) ) {
+      if( nnn.interned() ) return nnn.meet(old);
+      return switch( old._type ) {
+      case TSCALAR  -> SCALAR;
+      case TNSCALR  -> throw unimpl();
+      case TXNSCALR -> nnn;
+      case TXSCALAR -> nnn;
+      default -> throw unimpl();
+      };
     }
-    // Normal meet of cutoffs over the cut point
-    while( !CUTOFFS.isEmpty() ) { // TODO: replace CUTOFFS Ary<> with Work<> instead
-      AXVISIT.clear(); AXOPEN.clear();
-      _ax_meet2(tx,CUTOFFS.pop());
+    assert !nnn.interned() && old.interned() && nnn.getClass()==old.getClass();
+    TypeMemPtr pptmp = null;
+    if( old instanceof TypeMemPtr tmp && AXALIAS.overlaps(tmp._aliases) ) {
+      if( tmp==optmp ) return nptmp; // Already cycled
+      if( optmp!=null ) {
+        // If tmp.isa(optmp) then going UP as we go DEEPER; must CUT and WRAP.
+        // Else meet optmp over tmp.
+        if( tmp.isa(optmp) ) { // Going UP as we go deeper (or same), so cut-n-wrap
+          return nptmp;        // Return cloned original, will force a cycle
+        } else {       // Else will need to MEET graph-earlier (prior tmp or optmp) over here (tmp)
+          pptmp=optmp; // Going DOWN as we go deeper, force all fields down in case we HAD wrapped and stopped wrapping
+        }
+      }
+      optmp=tmp;                // Track new merge point
+      nptmp = (TypeMemPtr)nnn;
     }
+    if( old instanceof TypeMemPtr && visit.tset(old._uid) )
+      return nnn; // Been there, done that
+
+    // Parallel recursion
+    switch( old ) {
+    case TypeMemPtr otmp -> {
+      TypeMemPtr ntmp = (TypeMemPtr)nnn;
+      TypeStruct ts = (TypeStruct)_apx(visit,otmp._obj,ntmp._obj,optmp,nptmp,depth+1);
+      ntmp._obj = ts;
+    }
+    case TypeFld ofld -> {
+      TypeFld nfld = (TypeFld)nnn;
+      Type x = _apx(visit,ofld._t,nfld._t,optmp,nptmp,depth+1);
+      nfld._t = x;
+    }
+    case TypeFunPtr otfp -> {
+      TypeFunPtr ntfp = (TypeFunPtr)nnn;
+      ntfp.set_dsp(_apx(visit,otfp. dsp(),ntfp. dsp(),optmp,nptmp,depth+1));
+      ntfp._ret =  _apx(visit,otfp._ret  ,ntfp._ret  ,optmp,nptmp,depth+1) ;
+    }
+    case TypeStruct ots -> {
+      TypeStruct nts = (TypeStruct)nnn;
+      for( TypeFld ofld : ots ) {
+        TypeFld nfld = nts.get(ofld._fld);
+        if( nfld == null ) { // Missing field in LHS
+          if( !nts.above_center() ) continue; // Low LHS, drop the field
+          throw unimpl();                     // High LHS, clone field into LHS
+        }
+        Type nfld2 = _apx(visit,ofld,nfld,optmp,nptmp,depth+1);
+        assert nfld2==nfld;
+      }
+      // Field missing in RHS, so remove from LHS
+      for( TypeFld nfld : nts )
+        if( ots.get(nfld._fld)==null )
+          throw unimpl();
+    }
+    default -> throw unimpl();
+    }
+
+    if( pptmp!=null ) {
+      AXVISIT.clear(); AXROOT=nptmp;
+      _ax_meet2(nnn, pptmp);
+    }
+    return nnn;
   }
 
-  // Meet interned told into new (not interned) tx.
-  // Walk told, repeating tx as needed.
-  private static void _ax_meet2(Type ntx, Type told) {
-    // invariant: ntx is Cyclic and not interned; told is same-class and interned.
-    assert !ntx.interned() && told.interned() && ntx.getClass()==told.getClass() && ntx instanceof Cyclic && told instanceof Cyclic;
-    if( AXVISIT.tset(ntx._uid,told._uid) ) return; // Been there, done that
+  private static TypeMemPtr AXROOT;
+  private static final BitSetSparse AXVISIT = new BitSetSparse();
+
+  // Meet interned old into new (not interned) tx.
+  // Walk old, repeating tx as needed.
+  @SuppressWarnings("preview")
+  private static void _ax_meet2(Type nnn, Type old) {
+    // invariant: nnn is Cyclic and not interned; old is same-class and interned.
+    assert !nnn.interned() && old.interned() && nnn.getClass()==old.getClass() && nnn instanceof Cyclic && old instanceof Cyclic;
+    if( AXVISIT.tset(nnn._uid,old._uid) ) return; // Been there, done that
     // since both same class, walk fields in parallel
-    switch( told ) {
+    switch( old ) {
     case TypeMemPtr tmpold -> {
-      TypeMemPtr tmpntx = (TypeMemPtr) ntx;
-      boolean wraps =
-        !tmpntx._aliases.overlaps(AXALIAS) &&
-         tmpold._aliases.overlaps(AXALIAS);
+      TypeMemPtr tmpntx = (TypeMemPtr) nnn;
       tmpntx._aliases = tmpntx._aliases.meet(tmpold._aliases);
-      tmpntx._obj = (TypeStruct) _ax_meet_fld((wraps ? AXROOT : tmpntx)._obj, tmpold._obj);
+      tmpntx._obj = (TypeStruct) _ax_meet_fld(tmpntx._obj, tmpold._obj);
+      if( AXROOT != tmpntx && tmpold._aliases.overlaps(AXALIAS) ) {
+        TypeStruct ts = (TypeStruct)_ax_meet_fld(AXROOT._obj, tmpold._obj);
+        throw unimpl(); // TODO: No sure we still need this?
+        //if( ts != tmpntx._obj )
+        //  throw unimpl();
+        //tmpntx._obj = ts;
+      }
     }
     case TypeStruct tsold -> {
-      TypeStruct tsntx = (TypeStruct) ntx;
+      TypeStruct tsntx = (TypeStruct) nnn;
+      tsntx._any &= tsold._any;
+      tsntx._name = tsntx.mtname(tsold,tsntx); // Set name
       for( TypeFld fold : tsold ) {
         TypeFld fntx = tsntx.get(fold._fld);
         if( fntx == null ) {      // Missing field in LHS
-          if( !tsntx.above_center() && !AXOPEN.test(tsntx._uid) ) continue; // Low LHS, drop the field
+          if( !tsntx.above_center() ) continue; // Low LHS, drop the field
           tsntx.add_fld(fntx = fold.copy());    // High LHS, copy the field high
           fntx._t = fold._t==Type.ANY ? Type.ANY : Type.XSCALAR;
         }
@@ -660,12 +715,21 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
           tsntx._flds.del(i--);
     }
     case TypeFld fold -> {
-      TypeFld fntx = (TypeFld) ntx;
+      TypeFld fntx = (TypeFld) nnn;
       fntx.cmeet(fold);
-      fntx.setX(_ax_meet_fld(fntx._t, fold._t));
+      Type nold = fntx._t;
+      Type rez = _ax_meet_fld(nold, fold._t);
+      if( nold!=fntx._t ) {
+        // weird 3-way merge.
+        // Test.approx5 nold   ==rez; fntx._t==Scalar
+        // Test.approx4 fntx._t==rez; nold=nil
+        rez = _ax_meet_fld(rez,nold==rez ? fntx._t : nold); // Must meet again
+        throw unimpl(); // TODO: clean this up
+      }
+      fntx.setX(rez);
     }
     case TypeFunPtr tfp -> {
-      TypeFunPtr fntx = (TypeFunPtr) ntx;
+      TypeFunPtr fntx = (TypeFunPtr) nnn;
       fntx.cmeet(tfp);
       fntx.set_dsp(_ax_meet_fld(fntx.dsp(), tfp.dsp()));
       fntx._ret = _ax_meet_fld(fntx._ret, tfp._ret);
@@ -691,47 +755,32 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
       if( ntx==SCALAR  || old==SCALAR ) return SCALAR;
       if( ntx==NSCALR ) return old.must_nil() ? SCALAR : NSCALR;
       if( old==NSCALR ) return ntx.must_nil() ? SCALAR : NSCALR;
-      if( old==XSCALAR || old==ANY    ) return ntx; // Preserve ntx
-      if( ntx==XSCALAR || ntx==ANY || ntx==XNSCALR ) {
+      if( old==XSCALAR || old==ANY || old==XNSCALR ) return ntx; // Preserve ntx
+      if( ntx==XSCALAR || ntx==ANY || ntx==XNSCALR || ntx==NIL || ntx==XNIL ) {
+        if( !(old instanceof Cyclic) ) return ntx.meet(old);
         // If old is a tmp that overlaps aliases, cycle it back to the root.
-        if( old instanceof TypeMemPtr otmp && otmp._aliases.overlaps(AXALIAS) )
-          return _ax_meet_fld(AXROOT,old);
-        else if( old instanceof Cyclic ) {
+        Type c = old instanceof TypeMemPtr otmp && otmp._aliases.overlaps(AXALIAS)
+          ? _ax_meet_fld(AXROOT,old)
           // make a high-copy of old, with XSCALAR fields (basically triggering
           // a deep copy of old as we see the XSCALAR fields again) except that
           // an overlap alias in OLD will cycle.
-          Type c = OLD2APX.get(old);
-          if( c!=null ) return c; // Stop cycles in the CUT
-          c = old.copy();
-          OLD2APX.put(old,c); // Stop cycles in the cut
-          if( ntx==XNSCALR && c.must_nil() )
-            throw unimpl();     // Strip nil out
-          switch( c ) {
-          case TypeMemPtr tmp -> { tmp._obj = ISUSED.copy(); AXOPEN.tset(tmp._obj._uid); }
-          case TypeFunPtr tfp -> { tfp._ret = XSCALAR; tfp.set_dsp(Type.ANY); }
-          default -> throw unimpl();
-          }
-          Type rez = _ax_meet_fld(c,old);
-          OLD2APX.remove(old);
-          return rez;
-        } else {
-          return ntx.meet(old);
-        }
+          : _deep_clone(old);
+        return ntx==NIL || ntx==XNIL ? _with_nil(c,ntx) : c;
       }
       if( ntx.above_center() ) throw unimpl(); // May pick up the old RHS
       if( ntx.interned() ) return ntx.meet(old); // Both interned, just update the LHS
-
-      if( old==XNSCALR )
-        return ntx.above_center() ? ntx.not_nil() : ntx.remove_nil();
-      if( old==XNIL || old==NIL ) {
-        if( ntx instanceof TypeMemPtr tmp ) return tmp.ax_meet_nil(old);
-        if( ntx instanceof TypeFunPtr tfp ) return tfp.ax_meet_nil(old);
-        throw unimpl();
-      }
+      if( old==XNIL || old==NIL ) return _with_nil(ntx,old);
 
       // ntx is not interned and low, will get lower
-      return SCALAR;
+      return !ntx.must_nil() && !old.must_nil() ? NSCALR : SCALAR;
     }
+  }
+
+  private static Type _with_nil(Type ntx, Type old) {
+    assert old==XNIL || old==NIL;
+    if( ntx instanceof TypeMemPtr tmp ) return tmp.ax_meet_nil(old);
+    if( ntx instanceof TypeFunPtr tfp ) return tfp.ax_meet_nil(old);
+    throw unimpl();
   }
 
   // -------------------------------------------------------------------------
@@ -932,6 +981,18 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   @Override public Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth) {
     throw unimpl();
   }
+  @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {
+    TypeStruct ts = (TypeStruct)t;
+    Cyclic.Link lk = null;
+    for( TypeFld fld0 : this ) {
+      TypeFld fld1 = ts.get(fld0._fld);
+      if( fld1==null ) throw unimpl(); // different here
+      Cyclic.Link dlk = Cyclic._path_diff(fld0,fld1,links);
+      if( dlk==null || dlk._t0==null ) continue; // No difference
+      lk = Cyclic.Link.min(lk,dlk); // Min depth
+    }
+    return lk;
+  }
 
   static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
   public boolean is_tup() {
@@ -950,8 +1011,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
         fld._str_dups(visit,dups,ucnt);
   }
 
-
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
+  @SuppressWarnings("unchecked")
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( _any ) sb.p('~');
     sb.p(_name);
     boolean is_tup = is_tup();
@@ -960,18 +1021,28 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     if( get("pi") != null ) {
       sb.p("MATH");
     } else {
+      // Set the indent flag once for the entire struct.  Indent if any field is complex.
+      boolean ind = false;
+      for( TypeFld fld : this )
+        if( (debug || !Util.eq(fld._fld,"^")) && (fld._t!=null && fld._t._str_complex(visit,dups)) )
+          ind=indent;           // Field is complex, indent if asked to do so
+      if( ind ) sb.ii(1);
       boolean field_sep=false;
-      for( TypeFld fld : is_tup() ? osorted_flds() : asorted_flds() ) {
+      for( TypeFld fld : indent ? _flds : (is_tup() ? osorted_flds() : asorted_flds()) ) {
         if( !debug && Util.eq(fld._fld,"^") ) continue; // Do not print the ever-present display
-        fld._str(visit,dups, sb, debug); // Field name, access mod, type
+        if( ind ) sb.nl().i();
+        fld._str(visit,dups, sb, debug, indent ); // Field name, access mod, type
         sb.p(is_tup ? ", " : "; "); // Between fields
         field_sep=true;
       }
       if( field_sep ) sb.unchar().unchar();
+      if( ind ) sb.nl().di(1).i();
     }
     sb.p(!is_tup ? "}" : ")");
     return sb;
   }
+
+  @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return true; }
 
   // Alpha sorted
   public Collection<TypeFld> asorted_flds() {

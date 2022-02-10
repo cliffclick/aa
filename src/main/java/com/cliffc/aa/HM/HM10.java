@@ -509,7 +509,7 @@ public class HM10 {
       VBitSet visit = new VBitSet();
       p1(sb.i(),dups);
       if( DO_HM  ) _hmt .str(sb.p(", HMT="), visit,dups,true);
-      if( DO_GCP ) _flow.str(sb.p(", GCP="), true);
+      if( DO_GCP ) _flow.str(sb.p(", GCP="), true, false);
       sb.nl();
       return p2(sb.ii(2),dups).di(2);
     }

@@ -35,18 +35,18 @@ public class TypeTuple extends Type<TypeTuple> {
   @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) { throw unimpl(); }
 
   @SuppressWarnings("unchecked")
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( _any ) sb.p('~');
     sb.p('(');
     if( _ts!=null && _ts.length>0 ) { // No commas for zero-length
       int j = _ts.length-1;     // Find length of trailing equal parts
       Type last = _ts[j];       // Last type
       for( j--; j>0; j-- ) if( _ts[j] != last )  break;
-      _ts[0]._str(visit,dups, sb, debug); // First type
+      _ts[0]._str(visit,dups, sb, debug, indent ); // First type
       for( int i=1; i<=j+1; i++ ) // All types up to trailing equal parts
-        _ts[i]._str(visit,dups, sb.p(','), debug);
+        _ts[i]._str(visit,dups, sb.p(','), debug, indent );
       if( j+2<_ts.length-1 )  sb.p("..."); // Abbreviate tail
-      if( _ts.length> j+2 ) last._str(visit,dups, sb.p(','), debug);
+      if( _ts.length> j+2 ) last._str(visit,dups, sb.p(','), debug, indent);
     }
     return sb.p(')');
   }

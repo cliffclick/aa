@@ -2,7 +2,6 @@ package com.cliffc.aa.HM;
 
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -232,7 +231,7 @@ public class HM2 {
     }
     @Override public String _str() {
       String s = "v"+_uid;
-      if( _t!=Type.ANY ) s += ":"+_t.str(new SB(), false);
+      if( _t!=Type.ANY ) s += ":"+_t.str(new SB(), false, false);
       return s;
     }
 

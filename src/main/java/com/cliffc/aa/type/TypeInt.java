@@ -23,7 +23,7 @@ public class TypeInt extends Type<TypeInt> {
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     sb.p(_name);
     if( _con != 0 ) return sb.p(_x<0 ? "&" : (_x>0 ? "+" : "")).p(_con);
     if( _x==0 ) return _con==0 ? sb.p("0") : sb.p(_con);

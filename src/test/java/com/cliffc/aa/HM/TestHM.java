@@ -18,7 +18,7 @@ public class TestHM {
     if( frez_gcp!=null )  assertEquals(frez_gcp.get(),syn.flow_type());
   }
 
-  private static final int[] rseeds = new int[]{0,1,2,3};
+  private static final int[] rseeds = new int[]{1,0,1,2,3};
   private void _run1( String prog, String rez_hm, Supplier<Type> frez_gcp ) {
     for( int rseed : rseeds )
     //for( int rseed=0; rseed<32; rseed++ )
@@ -27,8 +27,8 @@ public class TestHM {
 
   // Run same program in all 3 combinations
   private void run( String prog, String rez_hm, Supplier<Type> frez_gcp ) {
-    _run1(prog,rez_hm,frez_gcp);
-    _run1(prog,rez_hm,null    );
+    //_run1(prog,rez_hm,frez_gcp);
+    //_run1(prog,rez_hm,null    );
     _run1(prog,null  ,frez_gcp);
   }
   private void run( String prog, String rez_hm, Type rez_gcp ) {
@@ -137,9 +137,17 @@ public class TestHM {
   // recursive unification; normal H-M fails here.
   @Test public void test07() {
     run( "{ f -> (f f) }",
-         // We can argue the pretty-print should print:
-         // "  A:{ A -> B }"
-         "{ A:{ A -> B } -> B }", tfs(Type.SCALAR) ); }
+      // We can argue the pretty-print should print:
+      // "  A:{ A -> B }"
+      "{ A:{ A -> B } -> B }", tfs(Type.SCALAR) ); }
+
+  @Test public void testYcombo() {
+    run( "{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}",
+      "{{ A -> A } -> A }",
+      "{{ A -> A } -> A }",
+      tfs(Type.XSCALAR),
+      tfs(Type. SCALAR) );
+  }
 
   @Test public void test08() { run( "g = {f -> 5}; (g g)",
                                     "5", TypeInt.con(5)); }
@@ -643,8 +651,16 @@ boolSub ={b ->(if b true false)};
             "}"+
         "}",
         () -> {
-          TypeMemPtr tmp = TypeMemPtr.make(6,TypeStruct.make(SC_DSP,TypeFld.make("and"),TypeFld.make("not"),TypeFld.make("or"),TypeFld.make("then")));
-          TypeFld not = TypeFld.make("not",TypeFunPtr.make(BitsFun.make0(18,22),1,Type.ANY,tmp));
+          Type.RECURSIVE_MEET++;
+          TypeFld FN = TypeFld.malloc("not");
+          TypeFld FO = TypeFld.malloc("or");
+          TypeStruct SA = TypeStruct.malloc_test(NO_DSP,mfun("and",16),FN,FO,mfun("then",19,2));
+          TypeMemPtr PA = TypeMemPtr.make(6,SA);
+          FN.setX(mfun(1,PA,18));
+          FO.setX(mfun(1,PA,17));
+          Type.RECURSIVE_MEET--;
+          SA = SA.install();
+          TypeFld not = mfun(1,"not",TypeMemPtr.make(6,SA),18,22);
           TypeMemPtr com = TypeMemPtr.make(ptr67(),TypeStruct.make(NO_DSP,bfun2("and",16,20,1),not,bfun2("or" ,17,21,1),bfun2("then",19,23,2)));
           return TypeMemPtr.make(8,TypeStruct.make(NO_DSP,TypeFld.make("false",com),TypeFld.make("true",com)));
         } );

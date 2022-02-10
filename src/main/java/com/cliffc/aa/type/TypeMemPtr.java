@@ -48,9 +48,12 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
         // approx1 assumes alias==_alias, and adds 1 to depth internally.
         // if this is not so, need to add 1 depth
         int cut2 = _aliases.test((int)alias) ? cutoff : cutoff+1;
-        obj = obj.approx2(cut2,BitsAlias.make0((int)alias));
+        obj = obj.approx2(1,BitsAlias.make0((int)alias));
       }
     return make_from(obj);
+  }
+  @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {
+    return Cyclic._path_diff(_obj,((TypeMemPtr)t)._obj,links);
   }
 
   int _hash() { return Util.hash_spread(super.static_hash() + _aliases._hash + _obj._type); }
@@ -81,11 +84,13 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     _obj._str_dups(visit,dups,ucnt);
   }
 
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     sb.p('*');
     if( debug ) _aliases.str(sb);
-    return _obj._str(visit,dups, sb, debug);
+    return _obj._str(visit,dups, sb, debug, indent);
   }
+
+  @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return _obj._str_complex(visit,dups); }
 
   static { new Pool(TMEMPTR,new TypeMemPtr()); }
   public static TypeMemPtr make(BitsAlias aliases, TypeStruct obj ) {

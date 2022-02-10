@@ -297,7 +297,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     sb.p("]]  ");
     sb.p(str()).s();
     if( _val==null ) sb.p("----");
-    else _val.str(sb, true);
+    else _val.str(sb, true, false);
 
     return sb;
   }

@@ -104,7 +104,7 @@ public class HM {
   // Mapping from primitive name to PrimSyn
   static final HashMap<String,PrimSyn> PRIMSYNS = new HashMap<>();
   // Precision of cyclic GCP types
-  static final int CUTOFF=2;
+  static final int CUTOFF=1;
 
   static { BitsAlias.init0(); BitsFun.init0(); }
 
@@ -467,7 +467,7 @@ public class HM {
       VBitSet visit = new VBitSet();
       p1(sb.i(),dups);
       if( DO_HM  ) _hmt .str(sb.p(", HMT="), visit,dups,true);
-      if( DO_GCP ) _flow.str(sb.p(", GCP="), true);
+      if( DO_GCP ) _flow.str(sb.p(", GCP="), true, false );
       sb.nl();
       return p2(sb.ii(2),dups).di(2);
     }
@@ -614,8 +614,8 @@ public class HM {
       Type mt = old.meet(cflow);
       if( mt==old ) return;     // No change
       // Approximate all growing aliases
-      if( mt instanceof Cyclic cyc)
-        mt = cyc.walk_apx(CUTOFF,new NonBlockingHashMapLong<>());
+      //if( mt instanceof Cyclic cyc)
+      //  mt = cyc.walk_apx(CUTOFF,new NonBlockingHashMapLong<>());
       _types[argn]=mt;          // Yes change, update
       work.add(_refs[argn]);    // And revisit referrers
       if( this instanceof PrimSyn ) work.add(this); // Primitives recompute
@@ -829,10 +829,32 @@ public class HM {
       for( Syntax arg : _args )
         { T2.WDUPS.clear(true); arg.find().walk_types_in(arg._flow,this); }
 
+      // Pre-freeze, compute the JOIN of possibilities - any two leafs might
+      // unify and GCP has to be able to fall from either one.  Any two bases
+      // might unify as well, as long as they are compatible.  Cannot compute
+      // this one-the-fly, since cannot call JOIN while inside a recursive
+      // structure definition.
+      if( HM_FREEZE ) T2.HM_FREEZE_LEAFS=null; // Do not use, use direct hits only
+      else if( T2.HAS_OPEN ) T2.HM_FREEZE_LEAFS = Type.XSCALAR; // Somebody might make anything
+      else {
+        Type t = Type.SCALAR;
+        for( T2 t2 : T2.T2MAP.keySet() ) {
+          if( t2.is_leaf() || t2.is_base() ) {
+            Type tx = T2.T2MAP.get(t2);
+            if( t2.is_base() ) {
+              Type tw = t2.widen();
+              tx = tx.meet(tw);
+            }
+            t = t.join(tx);
+          }
+        }
+        T2.HM_FREEZE_LEAFS = t;
+      }
+
       // Then walk the output types, building a corresponding flow Type, but
       // matching against input Leafs.  If HM_FREEZE Leafs must match
       // exactly, replacing the input flow Type with the corresponding flow
-      // Type.  If !HM_FREEZE, replace with a meet of flow types.
+      // Type.  If !HM_FREEZE, replace with a join of flow types.
       T2.WDUPS.clear(true);
       Type lift = rezt2.walk_types_out(ret, this);
       return ret.join(lift);      // Lifted result
@@ -1273,7 +1295,10 @@ public class HM {
       // GCP helps HM: do not unify dead control paths
       if( DO_GCP ) {            // Doing GCP during HM
         Type pred = _types[0];
-        if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
+        if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL
+            //|| (pred instanceof TypeMemPtr tmp && tmp._aliases.is_nil() )  // TODO
+            //|| (pred instanceof TypeFunPtr tfp && tfp._fidxs  .is_nil() )
+            )
           return rez.unify(targ(2),work); // Unify only the false side
         if( pred.above_center() ? !pred.may_nil() : !pred.must_nil() )
           return rez.unify(targ(1),work);
@@ -2168,6 +2193,7 @@ public class HM {
     // -----------------
     static private final HashMap<T2,Type> T2MAP = new HashMap<>();
     static private boolean HAS_OPEN;
+    static private Type HM_FREEZE_LEAFS;
     static final NonBlockingHashMapLong<Type> WDUPS = new NonBlockingHashMapLong<>();
 
     // Lift the flow Type of an Apply, according to its inputs.  This is to
@@ -2184,9 +2210,9 @@ public class HM {
       if( WDUPS.putIfAbsent(duid,TypeStruct.ISUSED)!=null ) return t;
       assert !unified();
       // Free variables keep the input flow type.
+      if( is_leaf() ) { T2MAP.merge(this, t, Type::meet); return t; }
       // Bases can (sorta) act like a leaf: they can keep their polymorphic "shape" and induce it on the result
-      if( is_leaf() || is_base() )
-        { T2MAP.merge(this, t, Type::meet); return t; }
+      if( is_base() ) return t;
       // Nilable
       if( is_nil() )
         return arg("?").walk_types_in(t.join(Type.NSCALR),apply);
@@ -2199,8 +2225,8 @@ public class HM {
       }
 
       if( is_struct() ) {       // Walk all fields
-        if( is_open() ) {       // Open structs MAY add a new XSCALAR field at any time
-          HAS_OPEN=true;        // So assume we added an XSCALAR, and no need to walk other fields
+        if( is_open() /*|| t==Type.NIL*/ ) { // Open structs MAY add a new XSCALAR field at any time
+          HAS_OPEN = true;      // So assume we added an XSCALAR, and no need to walk other fields
           push_update(apply);   // Depends on being open
         } else if( _args!=null )
           for( String id : _args.keySet() )
@@ -2221,11 +2247,26 @@ public class HM {
     // stronger flow types from the matching input types.
     Type walk_types_out( Type t, Apply apply ) {
       assert !unified();
+      if( t==Type.XSCALAR ) return Type.XSCALAR;
 
       if( is_err() ) return Type.SCALAR; // Do not attempt lift
 
-      if( is_leaf() ) return _lift_leaf(apply,t,true );
-      if( is_base() ) return _lift_leaf(apply,t,false);
+      if( is_leaf() ) {
+        // Pre-freeze, take the union of mappings.
+        // Post-freeze, take direct hits only.
+        Type tx = T2MAP.get(this);
+        if( HM_FREEZE && tx==null ) return Type.SCALAR;
+        Type lt = HM_FREEZE ? tx : HM_FREEZE_LEAFS;
+        if( lt==Type.SCALAR || lt==t ) return t; // No mapping, no lift
+        if( HM_FREEZE ) push_update(apply); // Apply depends on this leaf
+        else                                // Apply depends on ALL leafs
+          for( T2 t2 : T2.T2MAP.keySet() )
+            if( t2.is_leaf() || t2.is_base() )
+              t2.push_update(apply);
+        return lt;
+      }
+
+      if( is_base() ) return widen();
 
       if( is_nil() ) { // The wrapped leaf gets lifted, then nil is added
         Type tnil = arg("?").walk_types_out(t.remove_nil(),apply);
@@ -2244,12 +2285,15 @@ public class HM {
 
       if( is_struct() ) {
         TypeMemPtr tmp2 = (TypeMemPtr)WDUPS.get(_uid);
-        if( tmp2 != null ) return t; // Recursive, stop cycles
+        if( tmp2 != null )
+          return tmp2; // Recursive, stop cycles
+        //if( _aliases.is_nil() )
+        //  throw unimpl();
         Type.RECURSIVE_MEET++;
         TypeStruct ts = TypeStruct.malloc("",is_open());  TypeFld dfld;
         ts.add_fld( t instanceof TypeMemPtr tmp && (dfld=tmp._obj.get("^"))!=null
                     ? dfld
-                    : (t.above_center() ? TypeFld.NO_DSP : TypeFld.make_dsp(Type.SCALAR)) );
+                    : TypeFld.NO_DSP);//(t.above_center() ? TypeFld.NO_DSP : TypeFld.make_dsp(Type.SCALAR)) );
 
         // Add fields.  Common to both are easy, and will be walked (recursive,
         // cyclic).  Solo fields in GCP are kept, and lifted "as if" an HM
@@ -2275,41 +2319,6 @@ public class HM {
       }
 
       throw unimpl();           // Handled all cases
-    }
-
-    private Type _lift_leaf(Apply apply, Type t, boolean base) {
-      Type jt = Type.SCALAR;
-      if( HM_FREEZE ) {         // Post-freeze, be exact
-        // Post-freeze, match direct hit only
-        jt = _lift_leaf(jt);
-        if( jt==Type.SCALAR || jt==t ) return jt; // No mapping, no lift
-        push_update(apply);    // Apply depends on this leaf
-      } else {
-        // Pre-freeze: join of possibilities
-        if( HAS_OPEN ) jt = Type.XSCALAR;
-        else {
-          for( T2 t2 : T2.T2MAP.keySet() )
-            if( t2.is_leaf() || (t2.is_base() && (base || _flow==t2._flow)) )
-              jt = t2._lift_leaf(jt);
-          if( jt ==Type.SCALAR ) return jt; // No lift
-          // Using all these leafs to lift, so depend on them still being leafs.
-          for( T2 t2 : T2.T2MAP.keySet() )
-            if( t2.is_leaf() || (t2.is_base() && (base || _flow==t2._flow)) )
-              t2.push_update(apply);
-        }
-      }
-      return jt;
-    }
-    private Type _lift_leaf(Type jt) {
-      Type tx = T2MAP.get(this);
-      if( tx==null ) return jt;
-      if( is_base() ) {         // Weaken base-lifts by the HMT base
-        Type tw = _flow instanceof TypeMemPtr tmp && tmp.is_str()
-          ? tmp.make_from((TypeStruct)tmp._obj.widen())
-          : _flow.widen();
-        tx = tx.meet(tw);
-      }
-      return jt.join(tx);       // Join of possibilities
     }
 
     // -----------------
@@ -2458,6 +2467,12 @@ public class HM {
     private boolean is_tup() { return _args==null || _args.isEmpty() || _args.containsKey("0"); }
     private Collection<String> sorted_flds() { return new TreeMap<>(_args).keySet(); }
     boolean is_prim() { return is_struct() && _args!=null && _args.containsKey("!"); }
+    // Return a widened base type, preserving the special string hack
+    private Type widen() {
+      return _flow instanceof TypeMemPtr tmp && tmp.is_str()
+          ? tmp.make_from((TypeStruct)tmp._obj.widen())
+          : _flow.widen();
+    }
 
     // Debugging tool
     T2 find(int uid) { return _find(uid,new VBitSet()); }

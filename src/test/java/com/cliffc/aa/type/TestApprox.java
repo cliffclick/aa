@@ -16,6 +16,40 @@ import static org.junit.Assert.*;
 public class TestApprox {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
+    Object ignore = TypeMemPtr.TYPES; // <clinit> before RECURSIVE_MEET
+    // BASE TYPE:
+    // *[3]@{n1=*[0,3]@{FA:n1=*[0,2]@{n1=*[0,3]@{FA; v1=~str}; v1=~str}; v1=~Scalar}; v1=~Scalar}
+    int a5 = BitsAlias.new_alias();
+    int a6 = BitsAlias.new_alias();
+    int astr = BitsAlias.new_alias(); assert astr==TypeMemPtr.STRPTR._aliases.abit();
+
+    TypeFld FC = TypeFld.make("v1",TypeMemPtr.STRPTR.dual());
+    TypeFld FD = TypeFld.make("v1",Type.XSCALAR);
+
+    Type.RECURSIVE_MEET++;
+    TypeFld FB = TypeFld.malloc("n1");
+    TypeMemPtr P60 = TypeMemPtr.make_nil(a6,TypeStruct.malloc_test(FB,FC));
+    TypeStruct SB  = TypeStruct.malloc_test(TypeFld.make("n1",P60),FC);
+    TypeMemPtr P50 = TypeMemPtr.make_nil(a5,SB);
+    FB.setX(P50);
+    Type.RECURSIVE_MEET--;
+    SB = SB.install();
+
+    TypeMemPtr P6X = TypeMemPtr.make_nil(a6,TypeStruct.make(FB,FD));
+    TypeMemPtr P6 = TypeMemPtr.make(a6,TypeStruct.make(TypeFld.make("n1",P6X),FD));
+
+    TypeStruct ts = P6._obj.approx(1,P6._aliases);
+
+    // APPROX IS:
+    //*[3]@{n1=*[0,3]SA:@{n1=*[0,2,3]SA; v1=~Scalar}; v1=~Scalar}
+    // Which fails internally for v1=~Scalar being too high.
+    // Path: *[3]@{n1=*[0,3]@{n1=*[0,2,3]@{v1=???}}}
+
+
+    
+  }
+  // Test approx of fcns-returning-fcns
+  @Test public void testFunctionReturn() {
     // ND = ^=any,   D = ^=Scalar
     // XS = ~Scalar, S =   Scalar
     // XA = [17]{any,3 ->*[3](XS, XS) }
@@ -632,19 +666,19 @@ public class TestApprox {
     final int CUTOFF = 2;
     int alias = BitsAlias.new_alias(BitsAlias.ALLX);
 
-    TypeStruct  x1= TypeStruct.make(TypeFld.make("l",Type.SCALAR),TypeFld.make("r",Type.SCALAR),TypeFld.make("v",Type.SCALAR));
+    TypeStruct  x1= TypeStruct.make(TypeFld.make("l",Type.SCALAR),TypeFld.make("r",Type.SCALAR));
     TypeMemPtr px1= TypeMemPtr.make(alias,x1);
     assertEquals(0,px1.max(px1.depth()));
 
-    TypeStruct  x2= TypeStruct.make(TypeFld.make("l",   px1     ),TypeFld.make("r",Type.SCALAR),TypeFld.make("v",Type.SCALAR));
+    TypeStruct  x2= TypeStruct.make(TypeFld.make("l",   px1     ),TypeFld.make("r",Type.SCALAR));
     TypeMemPtr px2= TypeMemPtr.make(alias,x2);
     assertEquals(1,px1.max(px2.depth()));
 
-    TypeStruct  x3= TypeStruct.make(TypeFld.make("l",   px1     ),TypeFld.make("r",     px1   ),TypeFld.make("v",Type.SCALAR));
+    TypeStruct  x3= TypeStruct.make(TypeFld.make("l",   px1     ),TypeFld.make("r",     px1   ));
     TypeMemPtr px3= TypeMemPtr.make(alias,x3);
     assertEquals(1,px1.max(px3.depth()));
 
-    TypeStruct  x4= TypeStruct.make(TypeFld.make("l",   px2     ),TypeFld.make("r",     px3   ),TypeFld.make("v",Type.SCALAR));
+    TypeStruct  x4= TypeStruct.make(TypeFld.make("l",   px2     ),TypeFld.make("r",     px3   ));
     TypeMemPtr px4= TypeMemPtr.make(alias,x4);
     assertEquals(2,px1.max(px4.depth()));
 
@@ -994,6 +1028,39 @@ public class TestApprox {
     assertTrue(s0.isa(apx));
   }
 
+  @Test public void testRegression1() {
+    int a6 = BitsAlias.new_alias();
+    TypeFld FG = TypeFld.make("or_",TypeFunPtr.make(17,1,Type.ANY,Type.XSCALAR));
+    Type.RECURSIVE_MEET++;
+    TypeFld FF = TypeFld.malloc("not");
+    TypeFld FO = TypeFld.malloc("or_");
+    TypeStruct SB = TypeStruct.malloc_test(FO,FF);
+    TypeMemPtr PB = TypeMemPtr.make(a6,SB);
+    FO.setX(TypeFunPtr.make(17,1,Type.ANY,PB));
+    FF.setX(TypeFunPtr.make(18,1,Type.ANY,PB));
+    Type.RECURSIVE_MEET--;
+    SB.install();
+
+    Type.RECURSIVE_MEET++;
+    TypeFld FC = TypeFld.malloc("not");
+    TypeStruct SA = TypeStruct.malloc_test(FG,FC);
+    TypeMemPtr PA = TypeMemPtr.make(a6,SA);
+    FC.setX(TypeFunPtr.make(18,1,Type.ANY,PA));
+    Type.RECURSIVE_MEET--;
+    SA.install();
+
+    TypeFld FE = TypeFld.make("or_",TypeFunPtr.make(17,1,Type.ANY,PA));
+    TypeMemPtr PN = TypeMemPtr.make(a6,TypeStruct.make(FE,FF));
+    TypeFld FN = TypeFld.make("not",TypeFunPtr.make(18,1,Type.ANY,PN));
+    TypeMemPtr PM = TypeMemPtr.make(a6,TypeStruct.make(FE,FC));
+    TypeFld FM = TypeFld.make("or_",TypeFunPtr.make(17,1,Type.ANY,PM));
+    TypeMemPtr PZ = TypeMemPtr.make(a6,TypeStruct.make(FM,FN));
+
+    TypeStruct apx = PZ._obj.approx(2,PZ._aliases);
+    assertTrue(PZ._obj.isa(apx));
+  }
+
+
   // Make a psuedo-random selection of types, and verify that approx is
   // monotonic.
   private static final long RSEED = 1234L;
@@ -1021,7 +1088,7 @@ public class TestApprox {
     // Make NRAND approximation types
     TypeStruct[] ax1s = new TypeStruct[NRAND];
     for( int i=0; i<NRAND; i++ ) {
-      ax1s[i] = ts[i].approx2(2,BitsAlias.make0(a0));
+      ax1s[i] = ts[i].approx2(1,BitsAlias.make0(a0));
       assertTrue(ts[i].isa(ax1s[i])); // Verify self-monotonic
     }
 
@@ -1104,8 +1171,8 @@ public class TestApprox {
     }
 
     // HACK IN THE FAILED TEST NUMBERS HERE
-    TypeStruct ts0 = ts[2];
-    TypeStruct ts1 = ts[0];
+    TypeStruct ts0 = ts[33];
+    TypeStruct ts1 = ts[33];
 
     TypeStruct ax0 = ts0.approx2(1,b0);
     TypeStruct ax1 = ts1.approx2(1,b0);

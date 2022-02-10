@@ -32,6 +32,7 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
   }
   @Override public void walk_update( UnaryOperator<Type> update ) { throw unimpl(); }
   @Override public Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth) { throw unimpl(); }
+  @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) { throw unimpl(); }
 
   @Override int compute_hash() { return super.compute_hash() + _len._hash + _elem._hash + _stor._hash;  }
   @Override public boolean equals( Object o ) {
@@ -42,7 +43,7 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug ) {
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     sb.p('[');
     if( _len!=null && _len != TypeInt.INT64 ) sb.p(_len);
     sb.p(']');
