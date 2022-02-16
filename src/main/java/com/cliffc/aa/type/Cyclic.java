@@ -3,9 +3,7 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.*;
 
 import java.util.Set;
-import java.util.function.BiFunction;
-import java.util.function.IntSupplier;
-import java.util.function.UnaryOperator;
+import java.util.function.*;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -20,8 +18,7 @@ public interface Cyclic {
 
   // Walk and apply a map.  No return, so just for side-effects.
   // Does not recurse.  Does not guard against cycles.
-  // TODO: Useful to make a reducing version for side-effect-free summary over a type?
-  void walk1( BiFunction<Type,String,Type> map );
+  <T> T walk1( BiFunction<Type,String,T> map, BinaryOperator<T> reduce );
 
   // Map and replace all child_types.  Does not recurse.  Does not guard
   // against cycles.  Example:
@@ -225,7 +222,7 @@ public interface Cyclic {
     for( int idx=0; idx < REACHABLE._len; idx++ ) {
       Type t = REACHABLE.at(idx);
       if( (also_interned || !t.interned()) && t instanceof Cyclic cyc )
-        cyc.walk1((tc,ignore) -> !ON_REACH.tset(tc._uid) ? REACHABLE.push(tc) : tc);
+        cyc.walk1((tc,ignore) -> ON_REACH.tset(tc._uid) ? tc : REACHABLE.push(tc), (x,y)->null);
     }
   }
 
@@ -518,7 +515,7 @@ public interface Cyclic {
       if( t._hash!=0 && !t.interned() )
         t._hash=0;              // Invariant: not-interned has no hash
       if( t instanceof Cyclic cyc )
-        cyc.walk1( (t2,label) -> DefUse.add_def_use(t,label,t2) );
+        cyc.walk1( (t2,label) -> DefUse.add_def_use(t,label,t2), (x,y)->null );
     }
 
     // Pick initial Partitions for every reachable Type
@@ -562,7 +559,8 @@ public interface Cyclic {
 
     for( Partition P : Partition.PARTS )
       for( int i=1; i<P.len(); i++ )
-        P._ts.at(i).free(null);
+        if( !P._ts.at(i).interned() )
+          P._ts.at(i).free(null);
 
     // Return the input types Partition head
     // Reset statics for the next call.
