@@ -103,8 +103,6 @@ import static com.cliffc.aa.type.TypeFld.Access;
 public class HM {
   // Mapping from primitive name to PrimSyn
   static final HashMap<String,PrimSyn> PRIMSYNS = new HashMap<>();
-  // Precision of cyclic GCP types
-  static final int CUTOFF=1;
 
   static { BitsAlias.init0(); BitsFun.init0(); }
 
@@ -613,9 +611,6 @@ public class HM {
       Type old = _types[argn];
       Type mt = old.meet(cflow);
       if( mt==old ) return;     // No change
-      // Approximate all growing aliases
-      //if( mt instanceof Cyclic cyc)
-      //  mt = cyc.walk_apx(CUTOFF,new NonBlockingHashMapLong<>());
       _types[argn]=mt;          // Yes change, update
       work.add(_refs[argn]);    // And revisit referrers
       if( this instanceof PrimSyn ) work.add(this); // Primitives recompute
@@ -1131,7 +1126,7 @@ public class HM {
   }
 
   static Type do_apx(int alias, Type oldtmp, TypeStruct nts) {
-    TypeStruct xts = nts.approx2(CUTOFF,BitsAlias.make0(alias));
+    TypeStruct xts = nts.approx2(BitsAlias.make0(alias));
     TypeMemPtr xtmp = TypeMemPtr.make(alias,xts);
     assert oldtmp.isa(xtmp);
     return xtmp;

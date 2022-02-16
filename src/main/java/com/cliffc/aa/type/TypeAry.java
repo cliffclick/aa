@@ -4,8 +4,7 @@ import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
-import java.util.function.BiFunction;
-import java.util.function.UnaryOperator;
+import java.util.function.*;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -26,7 +25,7 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
   @Override public boolean cyclic() { return _cyclic; }
   @Override public void set_cyclic() { _cyclic = true; }
   @Override public void clr_cyclic() { _cyclic = false; }
-  @Override public void walk1( BiFunction<Type,String,Type> map ) {
+  @Override public <T> T walk1( BiFunction<Type,String,T> map, BinaryOperator<T> reduce ) {
     //return map.apply(_t);
     throw unimpl();
   }

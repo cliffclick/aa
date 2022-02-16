@@ -3,9 +3,7 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
-import java.util.function.BiFunction;
-import java.util.function.Predicate;
-import java.util.function.UnaryOperator;
+import java.util.function.*;
 
 import static com.cliffc.aa.AA.ARG_IDX;
 
@@ -38,7 +36,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   @Override public boolean cyclic() { return _cyclic; }
   @Override public void set_cyclic() { _cyclic = true; }
   @Override public void clr_cyclic() { _cyclic = false; }
-  @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_obj,"obj"); }
+  @Override public <T> T walk1( BiFunction<Type,String,T> map, BinaryOperator<T> reduce ) { return map.apply(_obj,"obj"); }
   @Override public void walk_update( UnaryOperator<Type> update ) { _obj = (TypeStruct)update.apply(_obj); }
   @Override public Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth) {
     depth2(depth);
@@ -48,7 +46,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
         // approx1 assumes alias==_alias, and adds 1 to depth internally.
         // if this is not so, need to add 1 depth
         int cut2 = _aliases.test((int)alias) ? cutoff : cutoff+1;
-        obj = obj.approx2(1,BitsAlias.make0((int)alias));
+        obj = obj.approx2(BitsAlias.make0((int)alias));
       }
     return make_from(obj);
   }
@@ -99,6 +97,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   }
 
   static TypeMemPtr malloc(BitsAlias aliases, TypeStruct ts ) {  TypeMemPtr t1 = POOLS[TMEMPTR].malloc(); return t1.init(aliases,ts); }
+  TypeMemPtr malloc_from(TypeStruct ts) {  TypeMemPtr t1 = POOLS[TMEMPTR].malloc(); return t1.init(_aliases,ts); }
   public static TypeMemPtr make( int alias, TypeStruct obj ) { return make(BitsAlias.make0(alias),obj); }
   public static TypeMemPtr make_nil( int alias, TypeStruct obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
   public TypeMemPtr make_from( TypeStruct obj ) { return _obj==obj ? this : make(_aliases,obj); }
@@ -248,7 +247,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
         if( t instanceof Cyclic cyc &&
             ds.putIfAbsent(t,d) ==null ) {
           final Work<Type> ft0=t0, ft1=t1;
-          cyc.walk1((tc,label)->(tc instanceof TypeMemPtr tmp && tmp._aliases.overlaps(_aliases) ? ft1 : ft0).add(tc));
+          cyc.walk1((tc,label)->(tc instanceof TypeMemPtr tmp && tmp._aliases.overlaps(_aliases) ? ft1 : ft0).add(tc), (x,y)->null);
         }
       // Swap worklists, raise depth
       Work<Type> tmp = t0; t0 = t1; t1 = tmp; // Swap t0,t1
@@ -278,7 +277,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
       final Work<Type> ft1=t1; Type t;
       while( (t=t0.pop())!=null )
         if( t instanceof Cyclic cyc )
-          cyc.walk1((tc,ignore)-> bs0.tset(tc._uid) ? null : ft1.add(tc) );
+          cyc.walk1((tc,ignore)-> bs0.tset(tc._uid) ? null : ft1.add(tc), (x,y)->null );
 
       // Swap worklists, raise depth
       Work<Type> tmp = t0; t0 = t1; t1 = tmp; // Swap t0,t1

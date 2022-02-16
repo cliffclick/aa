@@ -3,9 +3,7 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.function.BiFunction;
-import java.util.function.Predicate;
-import java.util.function.UnaryOperator;
+import java.util.function.*;
 
 import static com.cliffc.aa.AA.DSP_IDX;
 
@@ -33,7 +31,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   @Override public boolean cyclic() { return _cyclic; }
   @Override public void set_cyclic() { _cyclic = true; }
   @Override public void clr_cyclic() { _cyclic = false; }
-  @Override public void walk1( BiFunction<Type,String,Type> map ) { map.apply(_t,"t"); }
+  @Override public <T> T walk1( BiFunction<Type,String,T> map, BinaryOperator<T> reduce ) { return map.apply(_t,"t"); }
   @Override public void walk_update( UnaryOperator<Type> map ) { _t = map.apply(_t); }
   @Override public Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth) {
     return _t instanceof Cyclic cyc ? make_from(cyc.walk_apx(cutoff,depth)) : this;
