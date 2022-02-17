@@ -532,50 +532,54 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     //    { shallow=false; break; }
     //}
     //if( shallow ) return this; // Fast cutout for boring structs
+
+    // Repeat until every instance of alias ISA the next instance of alias.
     TypeStruct ts=this;
     while(true) {
       assert RECURSIVE_MEET==0;
-      assert MEETS0.isEmpty() && AXOLD2NEW.isEmpty() && AXVISIT.size()==0 && AXMEET.isEmpty();
+      assert MEETS0.isEmpty() && AXOLD2NEW.isEmpty();
       AXALIAS = aliases;
-      TypeMemPtr ptmp = TypeMemPtr.make(aliases,ts), ax_chk;
-      TypeMemPtr ctmp = (TypeMemPtr)_apx2(ptmp,null,null,0);
-
-      TypeStruct apx = ctmp._obj;
-      assert AXMEET.isEmpty();
-      MEETS0.clear();  AXOLD2NEW.clear(true);  AXVISIT.clear();
+      TypeMemPtr ptmp = TypeMemPtr.make(aliases,ts);
+      TypeStruct apx = ((TypeMemPtr)_apx2(ptmp,null,null,0))._obj;
+      MEETS0.clear();  AXOLD2NEW.clear(true);
       apx = apx.install();
       assert ts.isa(apx);       // Self monotonic
-      ctmp = TypeMemPtr.make(aliases,apx);
-      ax_chk=_ax_chk(new VBitSet(),ctmp,null,aliases);
-      if( ax_chk==null ) return apx;
       ts = apx;
+      TypeMemPtr ctmp = TypeMemPtr.make(aliases,apx);
+      Type ax_chk=_ax_chk(new VBitSet(),ctmp,null,aliases);
+      if( ax_chk==null ) break; // Repeat until invariant holds
     }
+    // Now limit depth of the approx.
+
+    // - At CUTOFF, gather all matching old TMPs (no clone).
+    // - - If none, then use OLD directly in NEW.
+    // - - Else MEET them all in old-space.
+    // - - Walk old-space, cloning...
+    // - - At a match, always back-cycle to NAX.
+    final int CUTOFF=1;
+    TypeMemPtr ctmp = TypeMemPtr.make(aliases,ts);
+    HashMap<Type,Integer> ds = ctmp.depth();
+    int max = ctmp.max(ds);
+    assert max <= CUTOFF;
+
+    return ts;
   }
 
-  // Read the old Type and clone into a new Type.  Along the way look for
-  // overlapping instances of AXALIAS.  If the new deep overlap point ISA the
-  // old shallow overlap point, make a closed cycle in the new clone.
-  // Otherwise, MEET the prior shallow overlap point into the new deep point, in
-  // addition to the cloning.  Handle cycles in the old code (by stopping
-  // cloning).  As part of a normal MEET-into, if the new code ISA a high type,
-  // the old code will effectively be cloned.
-  //
-  // As a result of this step, all AXALIAS instances will be ISA the prior
-  // shallower AXALIAS instance (Types go downhill the deeper into the
-  // structure we go).
-  //
-  // Passed in an old Type to clone, an old prior alias point, and a safety
-  // depth.  Also passed as globals are a map from old to new and the overlap
-  // alias.  The mapping 'unwinds' as the recursion unwinds, because the same
-  // old Type might be visited several times making unique new instances of new
-  // Types and the mapping is used both to catch cycles and to find the
-  // matching new Type (on this instance of walking old).
+  // Algo theory:
+  // - Track prior TMP with alias, called PAX, and perhaps a new TMP with alias called TMP.
+  // - Walk the type, constructing (recursively) a new type in parallel with the old.
+  // - If no TMP with alias, just recursively 'make'; Else
+  // - If PAX isa TMP, then invariant already holds, just recursively 'make'; Else
+  // - If TMP isa PAX, then use NAX instead of TMP and immediately return making a cycle; Else
+  // - Meet PAX with TMP (all interned), and begin walking this as the new OLD side.
 
-  private static final BitSetSparse AXVISIT = new BitSetSparse();
+  // At the end of apx2, one-nested-depth of instances of alias have the isa
+  // property, but perhaps not deeper instances if the original type had
+  // several out-of-order.
+
   private static final NonBlockingHashMapLong<Type> AXOLD2NEW = new NonBlockingHashMapLong<>();
-  private static final Ary<Type> AXMEET = new Ary<>(Type.class);
   private static BitsAlias AXALIAS;
-  private static Type _apx2( Type old, TypeMemPtr pax, TypeMemPtr nax, final int depth ) {
+  private static Type _apx2( Type old, TypeMemPtr pax, TypeMemPtr nax, int depth ) {
     assert depth<100;  // Stop stack overflow early, much easier debugging
 
     if( !(old instanceof Cyclic) ) return old;
@@ -585,11 +589,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
       Type mt = tmp.meet(pax);
       if( mt==pax/*tmp.isa.pax*/ ) return nax; // Push new version of pax, no need to meet-over since ISA means no progress
       if( mt!=tmp/*pax.isa.tmp*/ ) // Missing invariant
-        old = mt; // Force invariant in old-side before walking
+        old = tmp = (TypeMemPtr)mt; // Force invariant in old-side before walking
     }
-    // todo: must clone TS to avoid infinite loops on TMP+TS with unrelated alias
-    // todo: otherwise must PEEL TS because reached with a TMP with related alias plus random other aliases
-    // so probabaly need to pass a prior alias along in the recursion, or a boolean tmp==null
     if( old instanceof TypeMemPtr ) {
       Type nnn = AXOLD2NEW.get(old._uid);
       if( nnn!=null ) return nnn; // Dup check: been here, done that.
@@ -600,9 +601,10 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
       AXOLD2NEW.put(old._uid, fnnn );  // Make a copy; copy is NOT interned and IS in the dup check.
 
     // Recurse; If new overlap point swap pax/nax
+    final TypeMemPtr ftmp = tmp;
     ((Cyclic)fnnn).walk_update(fld -> _apx2(fld,
-                                            tmp==null ? pax : tmp,
-                                            tmp==null ? nax : (TypeMemPtr)fnnn,depth+1));
+                                            ftmp==null ? pax : ftmp,
+                                            ftmp==null ? nax : (TypeMemPtr)fnnn,depth+1));
     return fnnn;
   }
 
