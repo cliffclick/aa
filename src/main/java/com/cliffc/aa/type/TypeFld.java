@@ -33,9 +33,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   @Override public void clr_cyclic() { _cyclic = false; }
   @Override public <T> T walk1( BiFunction<Type,String,T> map, BinaryOperator<T> reduce ) { return map.apply(_t,"t"); }
   @Override public void walk_update( UnaryOperator<Type> map ) { _t = map.apply(_t); }
-  @Override public Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth) {
-    return _t instanceof Cyclic cyc ? make_from(cyc.walk_apx(cutoff,depth)) : this;
-  }
   @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {
     return Cyclic._path_diff(_t,((TypeFld)t)._t,links);
   }

@@ -494,35 +494,17 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // (4) The result does not suck.  An easy answer is that approx always
   //     returns Scalar but this gives lousy results.  We'd like endless cyclic
   //     approximations to produce finite cyclic types.
-  public TypeStruct approx( int cutoff, BitsAlias aliases ) { return approx2(aliases); }
-
-  /**
-  Simply meeting a lower [12] over an upper [12] is not sufficient.  Since the
-  lower [12] also includes a 'succ=scalar' the PATH .succ.pred.succ is Scalar.
-  That same path going down and going to the right has to monotonically fall.
-
-  [12]@{                               [12]@{
-    vpred=~scalar                         pred=~scalar
-    nsucc= *[12]@{     >>> ISA >>>        succ= scalar // Succ field falls
-      vpred=*[12]@{ nsucc=scalar }       }
-    }
-  }
-  .succ.pred.succ=scalar               .succ[.pred.succ] = scalar
-
-  --- approx ---                       --- approx ---
-  [12]@{                               [12]@{
-    pred= $recursive$  >>> NOT ISA >>>   pred=~scalar
-    succ= $recursive$                    succ= scalar
-  }                                    }
-  .succ.pred.succ=[12]...              .succ[.pred.succ] = scalar
-    and this path LIFTS.
-  */
+  public TypeStruct approx( BitsAlias aliases ) { return approx2(aliases); }
 
   // -------------------------------------------------------------------------
-  // Approximate an otherwise endless unrolled sequence of:
-  //    ...TMP[alias] -> Struct -> [FunPtr]* -> TMP[alias] -> Struct -> ...
-
-  public TypeStruct approx2( BitsAlias aliases ) {
+  public TypeStruct approx3( BitsAlias aliases ) {
+    throw unimpl();
+  }
+  
+  
+  // -------------------------------------------------------------------------
+  // Has properties 2,3,4 but not #1: does not limit depth to some finite amount.
+  private TypeStruct approx2( BitsAlias aliases ) {
     //// Fast-path cutout for boring structs
     //boolean shallow=true;
     //for( int i=0; i<_flds._len; i++ ) {
@@ -556,7 +538,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   }
 
   // Algo theory:
-  // - Track prior TMP with alias, called PAX, and perhaps a new TMP with alias called TMP.
+  // - Track prior TMP with alias, called PAX, and perhaps a new TMP with alias called NAX.
   // - Walk the type, constructing (recursively) a new type in parallel with the old.
   // - If no TMP with alias, just recursively 'make'; Else
   // - If PAX isa TMP, then invariant already holds, just recursively 'make'; Else
@@ -815,9 +797,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     return rez;
   }
   @Override public void walk_update(    UnaryOperator<Type> map ) { for( int i=0; i<_flds._len; i++ ) _flds._es[i] = (TypeFld)map.apply(_flds._es[i]); }
-  @Override public Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth) {
-    throw unimpl();
-  }
   @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {
     TypeStruct ts = (TypeStruct)t;
     Cyclic.Link lk = null;

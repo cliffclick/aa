@@ -30,7 +30,6 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
     throw unimpl();
   }
   @Override public void walk_update( UnaryOperator<Type> update ) { throw unimpl(); }
-  @Override public Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth) { throw unimpl(); }
   @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) { throw unimpl(); }
 
   @Override int compute_hash() { return super.compute_hash() + _len._hash + _elem._hash + _stor._hash;  }

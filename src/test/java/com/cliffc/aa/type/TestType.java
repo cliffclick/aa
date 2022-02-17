@@ -465,7 +465,7 @@ public class TestType {
     TypeMemPtr phi = TypeMemPtr.make(alias,ts);
     for( int i=1; i<20; i++ ) {
       TypeStruct newt = TypeStruct.make(TypeFld.make("ptr",phi),TypeFld.make("cnt",TypeInt.con(i)));
-      TypeStruct approx = newt.approx(2/*CUTOFF*/,BitsAlias.make0(alias));
+      TypeStruct approx = newt.approx(BitsAlias.make0(alias));
       phi = TypeMemPtr.make(alias,approx);
     }
     HashMap<Type,Integer> ds = phi.depth();

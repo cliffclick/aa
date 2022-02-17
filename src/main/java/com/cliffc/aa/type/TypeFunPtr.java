@@ -48,12 +48,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   @Override public void clr_cyclic() { _cyclic = false; }
   @Override public <T> T walk1( BiFunction<Type,String,T> map, BinaryOperator<T> reduce ) { return reduce.apply(map.apply(_dsp,"dsp"), map.apply(_ret,"ret")); }
   @Override public void walk_update( UnaryOperator<Type> map ) { _dsp = map.apply(_dsp); _ret = map.apply(_ret); }
-  @Override public Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth) {
-    if( depth.get(-_uid)!=null ) return this; // Self-cycle, no approx
-    depth.put(-_uid,1);                       // Stop self-cycle
-    return make_from(_dsp instanceof Cyclic cyc ? cyc.walk_apx(cutoff, depth) : _dsp,
-                     _ret instanceof Cyclic cyc ? cyc.walk_apx(cutoff, depth) : _ret);
-  }
   @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {
     TypeFunPtr tfp = (TypeFunPtr)t;
     Cyclic.Link dsplk = Cyclic._path_diff(_dsp,tfp._dsp,links);

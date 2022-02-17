@@ -27,9 +27,6 @@ public interface Cyclic {
   //          [fidx]{map(dsp) -> map(ret) }
   void walk_update( UnaryOperator<Type> map );
 
-  // Approx all aliases > CUTOFF
-  Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth);
-
   // Report a path-difference between two Types.
   final class Link { Link _nxt; int _d; Type _t0,_t1;
     static Link min(Link l0, Link l1) {

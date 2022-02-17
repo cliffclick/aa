@@ -39,7 +39,7 @@ public class TestApprox {
     TypeMemPtr P6X = TypeMemPtr.make_nil(a6,TypeStruct.make(FB,FD));
     TypeMemPtr P6 = TypeMemPtr.make(a6,TypeStruct.make(TypeFld.make("n1",P6X),FD));
 
-    TypeStruct ts = P6._obj.approx(1,P6._aliases);
+    TypeStruct ts = P6._obj.approx(P6._aliases);
 
     // APPROX IS:
     //*[3]@{n1=*[0,3]SA:@{n1=*[0,2,3]SA; v1=~Scalar}; v1=~Scalar}
@@ -89,8 +89,8 @@ public class TestApprox {
     TypeMemPtr ts1  = TypeMemPtr.make(a3,TypeStruct.make(TypeFld.make_tup(tfpa,ARG_IDX+1),TypeFld.make_tup(tfp1,ARG_IDX+2)));
 
     assertTrue(tmp0.isa(tmp1));
-    TypeStruct ax0 = ts0._obj.approx2(ts0._aliases);
-    TypeStruct ax1 = ts1._obj.approx2(ts1._aliases);
+    TypeStruct ax0 = ts0._obj.approx(ts0._aliases);
+    TypeStruct ax1 = ts1._obj.approx(ts1._aliases);
     assertTrue(ts0._obj.isa(ax0));
     assertTrue(ts1._obj.isa(ax1));
 
@@ -171,11 +171,11 @@ public class TestApprox {
     TypeStruct tsb = TypeStruct.make(pb);
     TypeMemPtr ptrb = TypeMemPtr.make(BitsAlias.EMPTY,tsb);
 
-    TypeStruct ax  = tsa.approx2(ba14);
+    TypeStruct ax  = tsa.approx(ba14);
     TypeStruct axb = (TypeStruct)ax.meet(tsb);
 
     TypeStruct ab = (TypeStruct)tsa.meet(tsb);
-    TypeStruct abx = ab.approx2(ba14);
+    TypeStruct abx = ab.approx(ba14);
 
     assertEquals(axb,abx); // Would like this to be equals!!!!
   }
@@ -193,7 +193,7 @@ public class TestApprox {
     Type.RECURSIVE_MEET--;
     ts = ts.install();
 
-    TypeStruct t2 = ts.approx2(p._aliases);
+    TypeStruct t2 = ts.approx(p._aliases);
     assertEquals(ts,t2);
   }
 
@@ -276,7 +276,7 @@ public class TestApprox {
     // collapse redundant ptrs to t1, and MEET t0-tail and t1-tail
     // t3[,99] -> p2 -> t2[,99] -> {p0,p1} -> t1[,{flt&int}] -> {p0,p1}
 
-    TypeStruct tax = t3.approx(CUTOFF,p3._aliases);
+    TypeStruct tax = t3.approx(p3._aliases);
     TypeMemPtr pax = TypeMemPtr.make(alias0,tax);
     HashMap<Type,Integer> ds2 = pax.depth();
     // CNC, as of 2/14/2022 approx chops at any point where the alias is seen
@@ -358,7 +358,7 @@ public class TestApprox {
     // collapse redundant ptrs to t1, and MEET t0-tail and t1-tail
     // t3[,98] -> p2 -> t2[,99] -> {p0,p1} -> t1[,{flt&int}] -> {p0,p1}
 
-    TypeStruct tax = t3.approx(CUTOFF,alias);
+    TypeStruct tax = t3.approx(alias);
     TypeMemPtr pax = TypeMemPtr.make(alias0,tax);
 
     HashMap<Type,Integer> ds2 = pax.depth();
@@ -383,7 +383,7 @@ public class TestApprox {
     TypeMemPtr p4 = TypeMemPtr.make(alias0,t4);
     ds = p4.depth();
     assertEquals(CUTOFF,(int)ds.get(txs2)); // Structure too deep
-    TypeStruct tax4 = t4.approx(CUTOFF,alias);
+    TypeStruct tax4 = t4.approx(alias);
     TypeMemPtr pax4 = TypeMemPtr.make(alias0,tax4);
 
     ds2 = pax4.depth();
@@ -497,7 +497,7 @@ public class TestApprox {
     assertEquals(3,pa0.max(depths));
 
     // Approximate
-    TypeStruct  zsa0 = a0.approx(3,BitsAlias.make0(alias0));
+    TypeStruct  zsa0 = a0.approx(BitsAlias.make0(alias0));
     TypeMemPtr pzsa0 = TypeMemPtr.make(alias0,zsa0);
 
     // Check sanity!
@@ -622,7 +622,7 @@ public class TestApprox {
     assertEquals(3,px1.max(depths));
 
     // Approximate
-    TypeStruct z1 = x1.approx(CUTOFF,BitsAlias.make0(alias));
+    TypeStruct z1 = x1.approx(BitsAlias.make0(alias));
     TypeMemPtr pz1 = TypeMemPtr.make(alias,z1);
     assertSame( TypeInt.con(1), z1.at("v"));
     TypeMemPtr p2 = (TypeMemPtr)z1.at("l") ;
@@ -692,7 +692,7 @@ public class TestApprox {
     assertEquals(2,px1.max(px4.depth()));
 
     // Approximate
-    TypeStruct z1 = x4.approx(CUTOFF,BitsAlias.make0(alias));
+    TypeStruct z1 = x4.approx(BitsAlias.make0(alias));
     TypeMemPtr pz1 = TypeMemPtr.make(alias,z1);
     assertEquals(1,pz1.max(pz1.depth()));
     assertSame(x3,z1);
@@ -727,7 +727,7 @@ public class TestApprox {
 
     TypeStruct  z0= TypeStruct.make(TypeFld.make("l",px1),TypeFld.make("r",px2),TypeFld.make("v",Type.SCALAR));
     // Approximate
-    TypeStruct z1 = z0.approx2(BitsAlias.make0(alias));
+    TypeStruct z1 = z0.approx(BitsAlias.make0(alias));
 
     //Type.RECURSIVE_MEET++;
     //TypeStruct  x3 = TypeStruct.malloc_test(TypeFld.malloc("l"), TypeFld.malloc("r"), TypeFld.malloc("v"));
@@ -769,7 +769,7 @@ public class TestApprox {
     int cnt=0;
     while( tmp0 != tmp1 && cnt < 100 ) {
       TypeStruct ts1 = TypeStruct.make(TypeFld.make("^",tmp1=tmp0));
-      TypeStruct ts1x = ts1.approx(CUTOFF-1,BitsAlias.NALL);
+      TypeStruct ts1x = ts1.approx(BitsAlias.NALL);
       // Extend with nil-or-not endlessly.
       tmp0 = TypeMemPtr.make(BitsAlias.ALL0,ts1x);
       cnt++;
@@ -794,17 +794,17 @@ public class TestApprox {
     // Add a struct with alias6 & approx.  Expect no change, despite alias6
     // being a child of RECORD.
     TypeStruct ts6 = TypeStruct.make(TypeFld.make("^",tmp0));
-    TypeStruct ts6x = ts6.approx(CUTOFF,ba6);
+    TypeStruct ts6x = ts6.approx(ba6);
     assertEquals(ts6,ts6x);
     TypeMemPtr tmp6 = TypeMemPtr.make(ba60,ts6);
     // Again with alias7
     TypeStruct ts7 = TypeStruct.make(TypeFld.make("^",tmp6));
-    TypeStruct ts7x = ts7.approx(CUTOFF,ba7);
+    TypeStruct ts7x = ts7.approx(ba7);
     assertEquals(ts7,ts7x);
     TypeMemPtr tmp7 = TypeMemPtr.make(ba70,ts7);
     // Again with alias8
     TypeStruct ts8 = TypeStruct.make(TypeFld.make("^",tmp7));
-    TypeStruct ts8x = ts8.approx(CUTOFF,ba8);
+    TypeStruct ts8x = ts8.approx(ba8);
     assertEquals(ts8,ts8x);
 
 
@@ -825,11 +825,11 @@ public class TestApprox {
     // Add (alternating the repeating field left and right):
     //   B1 = ( A , 99 )
     TypeStruct tsB1 = TypeStruct.make(TypeFld.make("^",tmp0,DSP_IDX),TypeFld.make_tup(TypeInt.con(99),ARG_IDX));
-    assertEquals(tsB1,tsB1.approx(CUTOFF,ba6));
+    assertEquals(tsB1,tsB1.approx(ba6));
     TypeMemPtr tmpB1= TypeMemPtr.make(ba6,tsB1); // Note not nil
     //   C1 = ( D , B1 )
     TypeStruct tsC1 = TypeStruct.make(TypeFld.make("^",tmpD,DSP_IDX),TypeFld.make_tup(tmpB1,ARG_IDX));
-    assertEquals(tsC1,tsC1.approx(CUTOFF,ba7));
+    assertEquals(tsC1,tsC1.approx(ba7));
     TypeMemPtr tmpC1= TypeMemPtr.make(ba7,tsC1); // Note not nil
 
     // Add repeatedly until stable:
@@ -843,12 +843,12 @@ public class TestApprox {
       tmp1 = tmpC1;
       //   B2 = ( C1, 99 )
       TypeStruct tsB2 = TypeStruct.make(TypeFld.make("^",tmpC1,DSP_IDX),TypeFld.make_tup(TypeInt.con(99),ARG_IDX));
-      TypeStruct tsB2x = tsB2.approx(CUTOFF,ba6);
+      TypeStruct tsB2x = tsB2.approx(ba6);
       TypeMemPtr tmpB2= TypeMemPtr.make(ba6,tsB2x); // Note not nil
 
       //   C2 = ( D , B2 )
       TypeStruct tsC2 = TypeStruct.make(TypeFld.make("^",tmpD,DSP_IDX),TypeFld.make_tup(tmpB2,ARG_IDX));
-      TypeStruct tsC2x = tsC2.approx(CUTOFF,ba7);
+      TypeStruct tsC2x = tsC2.approx(ba7);
       TypeMemPtr tmpC2= TypeMemPtr.make(ba7,tsC2x); // Note not nil
       tmpC1 = tmpC2;
       cnt++;
@@ -911,7 +911,7 @@ public class TestApprox {
     assertEquals(dsp3,mt);
 
     // Build the approx
-    TypeStruct rez = dsp2.approx2(BitsAlias.make0(alias));
+    TypeStruct rez = dsp2.approx(BitsAlias.make0(alias));
     assertEquals(dsp3,rez);
   }
 
@@ -1008,7 +1008,7 @@ public class TestApprox {
     Type.RECURSIVE_MEET--;
     sa0 = sa0.install();
 
-    TypeStruct apx = sa0.approx(1,a6);
+    TypeStruct apx = sa0.approx(a6);
     assertTrue(sa0.isa(apx));
   }
 
@@ -1035,7 +1035,7 @@ public class TestApprox {
     TypeFld    f1q = TypeFld.make("f1",TypeMemPtr.make(a2,s1));
     TypeStruct s0  = TypeStruct.make(f0x,f1q);
 
-    TypeStruct apx = s0.approx(1,a2);
+    TypeStruct apx = s0.approx(a2);
     assertTrue(s0.isa(apx));
   }
 
@@ -1067,7 +1067,7 @@ public class TestApprox {
     TypeFld FM = TypeFld.make("or_",TypeFunPtr.make(17,1,Type.ANY,PM));
     TypeMemPtr PZ = TypeMemPtr.make(a6,TypeStruct.make(FM,FN));
 
-    TypeStruct apx = PZ._obj.approx(2,PZ._aliases);
+    TypeStruct apx = PZ._obj.approx(PZ._aliases);
     assertTrue(PZ._obj.isa(apx));
   }
 
@@ -1099,7 +1099,7 @@ public class TestApprox {
     // Make NRAND approximation types
     TypeStruct[] ax1s = new TypeStruct[NRAND];
     for( int i=0; i<NRAND; i++ ) {
-      ax1s[i] = ts[i].approx2(BitsAlias.make0(a0));
+      ax1s[i] = ts[i].approx(BitsAlias.make0(a0));
       assertTrue(ts[i].isa(ax1s[i])); // Verify self-monotonic
     }
 
@@ -1187,8 +1187,8 @@ public class TestApprox {
     TypeStruct ts0 = ts[163];
     TypeStruct ts1 = ts[162];
 
-    TypeStruct ax1 = ts1.approx2(b0);
-    TypeStruct ax0 = ts0.approx2(b0);
+    TypeStruct ax1 = ts1.approx(b0);
+    TypeStruct ax0 = ts0.approx(b0);
 
     assertTrue( ts0.isa(ts1) );
     assertTrue( ts0.isa(ax0) );
@@ -1198,10 +1198,10 @@ public class TestApprox {
 
     // Some regression tests, but dependent on the rand function
     TypeStruct ts2 = ts[15];    // Problems with infinite growth
-    TypeStruct ax2 = ts2.approx2(b0);
+    TypeStruct ax2 = ts2.approx(b0);
 
     TypeStruct ts3 = ts[73];
-    TypeStruct ax3 = ts3.approx2(b0);
+    TypeStruct ax3 = ts3.approx(b0);
 
     TypeStruct ts4 = ts[154];
     TypeStruct ts5 = ts[197];
@@ -1214,8 +1214,8 @@ public class TestApprox {
     ts4_p0 = ts4_p0.make_from(ts4_s0);
     ts4 = ts4.replace_fld(TypeFld.make("f0",ts4_p0));
 
-    TypeStruct ax4 = ts4.approx2(b0);
-    TypeStruct ax5 = ts5.approx2(b0);
+    TypeStruct ax4 = ts4.approx(b0);
+    TypeStruct ax5 = ts5.approx(b0);
 
     assertTrue( ts4.isa(ts5) );
     assertTrue( ts4.isa(ax4) );

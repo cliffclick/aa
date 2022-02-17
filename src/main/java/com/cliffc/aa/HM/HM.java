@@ -1126,7 +1126,7 @@ public class HM {
   }
 
   static Type do_apx(int alias, Type oldtmp, TypeStruct nts) {
-    TypeStruct xts = nts.approx2(BitsAlias.make0(alias));
+    TypeStruct xts = nts.approx(BitsAlias.make0(alias));
     TypeMemPtr xtmp = TypeMemPtr.make(alias,xts);
     assert oldtmp.isa(xtmp);
     return xtmp;

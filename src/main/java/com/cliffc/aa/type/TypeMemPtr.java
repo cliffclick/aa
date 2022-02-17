@@ -38,18 +38,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   @Override public void clr_cyclic() { _cyclic = false; }
   @Override public <T> T walk1( BiFunction<Type,String,T> map, BinaryOperator<T> reduce ) { return map.apply(_obj,"obj"); }
   @Override public void walk_update( UnaryOperator<Type> update ) { _obj = (TypeStruct)update.apply(_obj); }
-  @Override public Type walk_apx(int cutoff, NonBlockingHashMapLong<Integer> depth) {
-    depth2(depth);
-    TypeStruct obj = _obj;
-    for( long alias : depth.keySetLong() )
-      if( alias >0 && depth.get(alias) > cutoff ) {
-        // approx1 assumes alias==_alias, and adds 1 to depth internally.
-        // if this is not so, need to add 1 depth
-        int cut2 = _aliases.test((int)alias) ? cutoff : cutoff+1;
-        obj = obj.approx2(BitsAlias.make0((int)alias));
-      }
-    return make_from(obj);
-  }
   @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {
     return Cyclic._path_diff(_obj,((TypeMemPtr)t)._obj,links);
   }
