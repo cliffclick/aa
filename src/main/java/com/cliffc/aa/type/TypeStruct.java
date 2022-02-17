@@ -549,19 +549,9 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
       Type ax_chk=_ax_chk(new VBitSet(),ctmp,null,aliases);
       if( ax_chk==null ) break; // Repeat until invariant holds
     }
-    // Now limit depth of the approx.
 
-    // - At CUTOFF, gather all matching old TMPs (no clone).
-    // - - If none, then use OLD directly in NEW.
-    // - - Else MEET them all in old-space.
-    // - - Walk old-space, cloning...
-    // - - At a match, always back-cycle to NAX.
-    final int CUTOFF=1;
-    TypeMemPtr ctmp = TypeMemPtr.make(aliases,ts);
-    HashMap<Type,Integer> ds = ctmp.depth();
-    int max = ctmp.max(ds);
-    assert max <= CUTOFF;
-
+    // This version fails to limit the depth.  I.e., it fails to approximate.
+    
     return ts;
   }
 
