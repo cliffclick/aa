@@ -469,18 +469,18 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     return ts;
   }
 
-  // -------------------------------------------------------------------------
   // Cyclic (complex/slow) interning
   public TypeStruct install() { return Cyclic.install(this); }
 
+  // -------------------------------------------------------------------------
   // Approximate an otherwise endless unrolled sequence of:
   //    ...TMP[alias] -> Struct -> [FunPtr]* -> TMP[alias] -> Struct -> ...
   //
   // We can get endless type growth with recursive types and recursive
   // functions.  Not morally equivalent to HotSpot int-range 'widening', which
-  // specifically widens at each Loop Phi, and limits the number of widenings.
-  // Here we get 'widened' at each HM application of class Struct, or at each
-  // Lambda.arg_meet.
+  // specifically widens at each Loop Phi (eqv: Lambda.arg_meet), and limits
+  // the number of widenings.  Here we get 'widened' at each HM application of
+  // class Struct.
   //
   // Approx has 3 main properties, and is heavily asserted for.  I spent
   // several months on various versions of approx which got some, but not all,
@@ -494,14 +494,131 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // (4) The result does not suck.  An easy answer is that approx always
   //     returns Scalar but this gives lousy results.  We'd like endless cyclic
   //     approximations to produce finite cyclic types.
-  public TypeStruct approx( BitsAlias aliases ) { return approx2(aliases); }
+
+  // CNC 02/18/2022.
+  
+  // As of this writing I do not know how to make an approx with all 4
+  // properties and I tried really hard.  Here is a test case which is both
+  // broken and common: MEETing the 2nd instance of an alias over the first
+  // instance (MEET-uphill):
+  //
+  //   T0:  *[2]@{f0=HI ; f1=*[2]@{f0=LOW; f1=HI}}.  AX0: *[2]@{f0=LOW; f1=AX0$}
+  //   T1:  *[2]@{f0=MED; f1=LOW}                    AX1: *[2]@{f0=MED; f1=LOW }
+  //
+  // We can see that T0 >> T1, and T0 >> AX0 and T1 >> AX1 but AX0 !>>! AX1.
+  // In fact the types for f0 only need to be HI >> MED, with LOW being
+  // sideways to MED and HI.  Fails property (3).  It is safe to MEET-uphill if
+  // the nested f1 field >> T0, and can make a cycle.
+  //
+  // Another attempt I tried is to MEET-downhill and reach the property that at
+  // each instanceof the alias, the preceding type >> the following types.
+  // This is relatively easy to do with MEET-downhill, BUT it does not make a
+  // finite list: you can have tied repeats indefinitely (fails property (1)).
+  // I have simple test cases to demonstrate this in TestApprox.
+  //
+  // Another attempt is to "chop" off the depth below some distance.  This
+  // leads to structures briefly exceeding the length getting chopped and this
+  // fails property #4.
+  //
+  // Most approximations not involving MEET also fail (2) or (3) at some point.
+  //
+  // Not attempted yet:
+  // - HS Widening count: each use of MEET keeps a perfect answer, and a
+  //   widening count.  Upon the count being exceeded, the MEET changes flavor,
+  //   and all instances of an alias are lumped together.
+  // - The HM theory only uses the simple pointers, and all TypeStructs are
+  //   MEETd in some kind of TypeMemory.  Without side-effects in the HM theory
+  //   this Memory can be trivially global.  With side-effects I'd have to
+  //   thread a hidden Memory edge through the HM AST.
+  
+  public TypeStruct approx( BitsAlias aliases ) { return approx3(aliases); }
+  private static BitsAlias AXALIAS;
+  private static final Ary<TypeStruct> AXTS = new Ary<>(TypeStruct.class);
 
   // -------------------------------------------------------------------------
+  // Extend-and-approx.  Assert that there is some prefix (the extend) ahead
+  // of instances of 'aliases', and that alias instances have the right
+  // property: there are 0 or 1 structs targeted by alias.
   public TypeStruct approx3( BitsAlias aliases ) {
-    throw unimpl();
+    AXALIAS=aliases;
+
+    // Hunt instances of aliases reachable from this struct.
+    TypeStruct ts = this;
+    while( true ) {
+      AXVISIT3.clear();  AXTS.clear();
+      ts._apx3a(ts,0);
+      // Meet all the deep instances with this shallow instance.
+      TypeStruct apx = ts;
+      while( AXTS._len>0 ) {
+        TypeStruct axts = AXTS.pop();
+        TypeMemPtr fail=axts.ax_chk3(axts);
+        if( fail!=null )
+          return null;            // Lacks the crucial invariant already
+        apx = (TypeStruct)apx.meet(axts);
+      }
+
+      // Assert all the right properties hold.
+      if( ts==apx ) break;
+      ts=apx;
+      TypeMemPtr fail = ts.ax_chk3(ts);
+      if( fail==null ) {
+        assert this.isa(apx);   // Self monotonic
+        return ts;
+      }
+    }
+    
+    assert RECURSIVE_MEET==0 && MEETS0.isEmpty() && AXOLD2NEW.isEmpty() && AXTS.isEmpty();
+    TypeStruct apx = (TypeStruct)ts._apx3b(ts,0);
+    MEETS0.clear();  AXOLD2NEW.clear(true);
+    apx = apx.install();
+
+    assert this.isa(apx);   // Self monotonic
+    return apx;
   }
-  
-  
+
+  private Type _apx3a( Type t, int depth ) {
+    assert depth<100;       // Stop stack overflow early, much easier debugging
+    if( !(t instanceof Cyclic cyc) ) return null;
+    if( AXVISIT3.tset(t._uid) ) return null;
+    if( t instanceof TypeMemPtr tmp && tmp._aliases.overlaps(AXALIAS) && tmp._obj!=this )
+      AXTS.push(tmp._obj);      // Record other guy for later meet
+    return cyc.walk1((fld,ignore) -> _apx3a(fld,depth+1), (x,y)-> null);
+  }
+
+  private Type _apx3b( Type old, int depth ) {
+    assert depth<100;  // Stop stack overflow early, much easier debugging
+    if( !(old instanceof Cyclic) ) return old;
+    if( old instanceof TypeMemPtr tmp ) {
+      Type dup = AXOLD2NEW.get(old._uid);
+      if( dup!=null ) return dup; // Dup check: been here, done that.
+
+      if( AXALIAS.overlaps(tmp._aliases) ) {
+        TypeMemPtr nnn = tmp.copy();
+        AXOLD2NEW.put(old._uid, nnn);  // Make a copy; copy is NOT interned and IS in the dup check.
+        nnn._obj = (TypeStruct)AXOLD2NEW.get(_uid);// Make a self-cycle
+        return nnn;
+      }
+    }
+    Type nnn = old.copy();
+    AXOLD2NEW.put(old._uid, nnn);  // Make a copy; copy is NOT interned and IS in the dup check.
+
+    // Recurse
+    ((Cyclic)nnn).walk_update(fld -> _apx3b(fld,depth+1));
+    return nnn;
+  }
+
+
+  // Check for invariant: there are no ptrs-of-alias except to *this*
+  private static final VBitSet AXVISIT3 = new VBitSet();
+  private TypeMemPtr ax_chk3(Type t) {  AXVISIT3.clear();  return _ax_chk3(t); }
+  private TypeMemPtr _ax_chk3(Type t) {
+    if( !(t instanceof Cyclic cyc) ) return null;
+    if( AXVISIT3.tset(t._uid) ) return null;
+    if( t instanceof TypeMemPtr tmp && tmp._aliases.overlaps(AXALIAS) && tmp._obj!=this )   return tmp;
+    return cyc.walk1((fld,ignore) -> _ax_chk3(fld), (x,y)-> x==null ? y : x);
+  }
+
+
   // -------------------------------------------------------------------------
   // Has properties 2,3,4 but not #1: does not limit depth to some finite amount.
   private TypeStruct approx2( BitsAlias aliases ) {
@@ -517,10 +634,9 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
     // Repeat until every instance of alias ISA the next instance of alias.
     TypeStruct ts=this;
+    AXALIAS = aliases;
     while(true) {
-      assert RECURSIVE_MEET==0;
-      assert MEETS0.isEmpty() && AXOLD2NEW.isEmpty();
-      AXALIAS = aliases;
+      assert RECURSIVE_MEET==0 && MEETS0.isEmpty() && AXOLD2NEW.isEmpty();
       TypeMemPtr ptmp = TypeMemPtr.make(aliases,ts);
       TypeStruct apx = ((TypeMemPtr)_apx2(ptmp,null,null,0))._obj;
       MEETS0.clear();  AXOLD2NEW.clear(true);
@@ -533,7 +649,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     }
 
     // This version fails to limit the depth.  I.e., it fails to approximate.
-    
+
     return ts;
   }
 
@@ -550,7 +666,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // several out-of-order.
 
   private static final NonBlockingHashMapLong<Type> AXOLD2NEW = new NonBlockingHashMapLong<>();
-  private static BitsAlias AXALIAS;
   private static Type _apx2( Type old, TypeMemPtr pax, TypeMemPtr nax, int depth ) {
     assert depth<100;  // Stop stack overflow early, much easier debugging
 
