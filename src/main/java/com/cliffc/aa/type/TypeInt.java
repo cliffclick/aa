@@ -26,8 +26,18 @@ public class TypeInt extends Type<TypeInt> {
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     sb.p(_name);
     if( _con != 0 ) return sb.p(_x<0 ? "&" : (_x>0 ? "+" : "")).p(_con);
-    if( _x==0 ) return _con==0 ? sb.p("0") : sb.p(_con);
+    if( _x==0 ) return sb.p("0");
     return sb.p(_x>0?"~":"").p(Math.abs(_x)==1?"n":"").p("int").p(_z);
+  }
+
+  static Type valueOfInt(String cid) {
+    return switch(cid) {
+    case  "int64" ->  INT64;
+    case "nint64" -> NINT64;
+    case "nint8"  -> NINT8 ;
+    case  "int1"  -> BOOL;
+    default       -> null;
+    };
   }
 
   static { new Pool(TINT,new TypeInt()); }

@@ -87,9 +87,22 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( !TypeStruct.isDigit(_fld.charAt(0)) ) // Do not print number-named fields for tuples
       _access.str(sb.p(_fld));
-    return _t==null ? sb.p('!') : (_t==Type.SCALAR ? sb : _t._str(visit, dups, sb, debug, indent));
+    return _t==null ? sb.p('!') : (_t._str(visit, dups, sb, debug, indent));
   }
 
+  static TypeFld valueOfArg(Parse P, int order, String fid) {
+    int oldx=P._x;
+    String id = P.id();
+    if( !P.peek('=') ) { assert fid==null; P._x=oldx; return null; } // No such field
+    return _valueOf(P,order,fid,id);
+  }
+  static TypeFld valueOfTup(Parse P, int order, String fid) {  return _valueOf(P,order,fid,TUPS[order]);  }
+  static TypeFld _valueOf(Parse P, int order, String fid, String fname) {
+    TypeFld fld = TypeFld.malloc(fname,null,Access.Final,order);
+    if( fid!=null ) P._dups.put(fid,fld);
+    return fld.setX(P.type());
+  }
+  
   static { new Pool(TFLD,new TypeFld()); }
   public static TypeFld malloc( String fld, Type t, Access access, int order ) { return POOLS[TFLD].<TypeFld>malloc().init(fld,t,access,order); }
   public static TypeFld malloc( String fld ) { return POOLS[TFLD].<TypeFld>malloc().init(fld,null,Access.Final,oBot); }

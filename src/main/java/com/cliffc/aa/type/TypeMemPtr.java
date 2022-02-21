@@ -78,6 +78,16 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
 
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return _obj._str_complex(visit,dups); }
 
+  static TypeMemPtr valueOf(Parse P, String cid) {
+    P.require('*');
+    var aliases = P.bits(BitsAlias.EMPTY);
+    TypeMemPtr tmp = malloc(aliases,null);
+    if( cid!=null ) P._dups.put(cid,tmp);
+    tmp._obj = (TypeStruct)P.type();
+    return tmp;
+  }
+
+
   static { new Pool(TMEMPTR,new TypeMemPtr()); }
   public static TypeMemPtr make(BitsAlias aliases, TypeStruct obj ) {
     TypeMemPtr t1 = POOLS[TMEMPTR].malloc();
@@ -122,7 +132,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     DISP_FLD = TypeFld.make_dsp(DISPLAY_PTR);              // Normal create
     DISPLAY.set_fld(DISP_FLD);                             // Change field without changing hash
     TypeStruct.RECURSIVE_MEET--;
-    TypeStruct ds = DISPLAY.install();
+    TypeStruct ds = Cyclic.install(DISPLAY);
     assert ds==DISPLAY;
   }
 

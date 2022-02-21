@@ -50,6 +50,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   @Override public BitsAlias EMPTY() { return EMPTY ; }
 
   public static BitsAlias make0( int bit ) { return NALL.make(bit); }
+  public static BitsAlias make0( int... bits ) { return NALL.make(bits); }
   public BitsAlias or( int bit ) { return set(bit); }
 
   public static int  new_alias() { return new_alias(ALLX); }

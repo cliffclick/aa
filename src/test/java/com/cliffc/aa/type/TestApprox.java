@@ -12,7 +12,14 @@ import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.DSP_IDX;
 import static org.junit.Assert.*;
 
+// CNC: As of 02/20/2022 I have dropped approx from the whole Type analysis
+// algorithm.  Mostly dropped because I could not "make it work", see more
+// notes in TypeStruct.  Either the approx was not monotonic, or it "sucked" -
+// had to produce extremely conservative values.  These tests still exist for
+// documentation but are all turned off.
 
+
+@Ignore
 public class TestApprox {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
@@ -34,7 +41,7 @@ public class TestApprox {
     TypeMemPtr P50 = TypeMemPtr.make_nil(a5,SB);
     FB.setX(P50);
     Type.RECURSIVE_MEET--;
-    SB = SB.install();
+    SB = Cyclic.install(SB);
 
     TypeMemPtr P6X = TypeMemPtr.make_nil(a6,TypeStruct.make(FB,FD));
     TypeMemPtr P6 = TypeMemPtr.make(a6,TypeStruct.make(TypeFld.make("n1",P6X),FD));
@@ -50,6 +57,7 @@ public class TestApprox {
 
   }
   // Test approx of fcns-returning-fcns
+  @Ignore
   @Test public void testFunctionReturn() {
     // ND = ^=any,   D = ^=Scalar
     // XS = ~Scalar, S =   Scalar
@@ -140,6 +148,7 @@ public class TestApprox {
   }
 
   private TypeFld make(BitsFun fidxs,Type ret) { return TypeFld.make("pred",TypeFunPtr.make(fidxs,1,TypeMemPtr.NO_DISP,ret)); }
+  @Ignore
   @Test public void testApproxAssociative() {
     // Proof approx is not associative with meet.
     // E.g. A.approx.meet(B) != A.meet(B).approx
@@ -181,6 +190,7 @@ public class TestApprox {
   }
 
   // Test of a cutoff=1 for a depth=1 cycle
+  @Ignore
   @Test public void testCycle1() {
     Object dummy = TypeMemPtr.TYPES; // <clinit> before RECURSIVE_MEET
     int alias = BitsAlias.new_alias(BitsAlias.ALLX);
@@ -191,7 +201,7 @@ public class TestApprox {
     TypeMemPtr p = TypeMemPtr.make(alias,ts);
     fld.setX(p);
     Type.RECURSIVE_MEET--;
-    ts = ts.install();
+    ts = Cyclic.install(ts);
 
     TypeStruct t2 = ts.approx(p._aliases);
     assertEquals(ts,t2);
@@ -216,7 +226,7 @@ public class TestApprox {
     f01.setX(p1);
     f10.setX(p0);
     Type.RECURSIVE_MEET--;
-    t0 = t0.install();
+    t0 = Cyclic.install(t0);
 
     // Meet them
     TypeStruct mt = (TypeStruct)t0.meet(t1);
@@ -230,6 +240,7 @@ public class TestApprox {
 
   // Test approximating infinite recursive types.  Most simple test case: a
   // single linked-list chain of depth == CUTOFF.
+  @Ignore
   @Test public void testApprox1() {
     final int CUTOFF = 3;
     int alias0 = BitsAlias.new_alias(BitsAlias.ALLX);
@@ -303,6 +314,7 @@ public class TestApprox {
 
   // Test approximating infinite recursive types.  End of chain is already
   // cyclic, and we add a few more depth.
+  @Ignore
   @Test public void testApprox2() {
     Object dummy = TypeMemPtr.TYPES; // <clinit> before RECURSIVE_MEET
     final int CUTOFF = 3;
@@ -322,7 +334,7 @@ public class TestApprox {
     t1.get("a").setX(p0           );
     t1.get("b").setX(TypeFlt.FLT64);
     Type.RECURSIVE_MEET--;
-    t0 = t0.install();
+    t0 = Cyclic.install(t0);
     p1 = (TypeMemPtr)t0.at("a");
 
     HashMap<Type,Integer> ds = p1.depth();
@@ -407,6 +419,7 @@ public class TestApprox {
   // A0 -> (X0 <-> X1) -> A1 -> X2 -> A2 -> (X3 <-> X4 ) -> A3 -> X5
   // Approx:
   // A0 -> (X0 <-> X1) -> A1 -> X2 -> A23-> (X35<-> X45) -> A23
+  @Ignore
   @Test public void testApprox3() {
     int alias0 = BitsAlias.new_alias(BitsAlias.ALLX);
     int alias1 = BitsAlias.new_alias(BitsAlias.ALLX);
@@ -439,7 +452,7 @@ public class TestApprox {
     x3.get("x").setX(px4);
     x4.get("x").setX(px3);
     Type.RECURSIVE_MEET--;
-    x3 = x3.install();
+    x3 = Cyclic.install(x3);
     px3 = (TypeMemPtr)x4.at("x");
 
     // ................................ A2 -> (X3 <-> X4 ) -> A3 -> X5
@@ -480,7 +493,7 @@ public class TestApprox {
     x0.get("x").setX(px1);
     x1.get("x").setX(px0);
     Type.RECURSIVE_MEET--;
-    x0 = x0.install();
+    x0 = Cyclic.install(x0);
     px0 = (TypeMemPtr)x1.at("x");
 
     // A0 -> (X0 <-> X1) -> A1 -> X2 -> A2 -> (X3 <-> X4 ) -> A3 -> X5
@@ -567,6 +580,7 @@ public class TestApprox {
   //          -> A7               -> A3.r -> (nint8, nil, nil)
   // ... and so forth.
   // The first few tree layers remain expanded, but the tree tail collapses.
+  @Ignore
   @Test public void testApprox4() {
     final int CUTOFF = 3;
     int alias = BitsAlias.new_alias(BitsAlias.ALLX);
@@ -671,6 +685,7 @@ public class TestApprox {
   // A4 -> {l=A2,r=A3,v} depth=3
   // Should approx to:
   // Z1 -> {l=A1,r=A1,v} depth=2, and Z1=A3
+  @Ignore
   @Test public void testApprox5() {
     final int CUTOFF = 2;
     int alias = BitsAlias.new_alias(BitsAlias.ALLX);
@@ -719,7 +734,7 @@ public class TestApprox {
     x1.get("r").setX(px1        );
     x1.get("v").setX(Type.SCALAR);
     Type.RECURSIVE_MEET--;
-    x1 = x1.install();
+    x1 = Cyclic.install(x1);
     assertSame(px1,x1.at("r"));
 
     TypeStruct  x2= TypeStruct.make(TypeFld.make("l",px1),TypeFld.make("r",px1),TypeFld.make("v",Type.SCALAR));
@@ -746,7 +761,7 @@ public class TestApprox {
     TypeMemPtr paxr = TypeMemPtr.make_nil(alias,axr);
     flx.setX(paxr);
     Type.RECURSIVE_MEET--;
-    axr = axr.install();
+    axr = Cyclic.install(axr);
     paxr = TypeMemPtr.make_nil(alias,axr);
 
     TypeStruct x4= TypeStruct.make(TypeFld.make("l",TypeMemPtr.make_nil(alias,axl)),TypeFld.make("r",paxr),fvs);
@@ -758,6 +773,7 @@ public class TestApprox {
   // NewObj (as happens when making simple cyclic structures via storing fields
   // from one into the other) ends with a simple cyclic graph and not an
   // endlessly growing or endlessly "ping ponging" result.
+  @Ignore
   @Test public void testApprox7() {
 
     // Make a short cycle using alias RECORD.  Repeated add instances & approx,
@@ -856,6 +872,7 @@ public class TestApprox {
     assertEquals(CUTOFF-1,cnt);
   }
 
+  @Ignore
   @Test public void testApprox8() {
     Object dummy2 = Env.GVN;
     final int CUTOFF=2;
@@ -898,7 +915,7 @@ public class TestApprox {
     dsp3.get("^").setX(TypeMemPtr.DISPLAY_PTR);
     dsp3.get("fib").setX(tfp3);
     Type.RECURSIVE_MEET--;
-    dsp3 = dsp3.install();
+    dsp3 = Cyclic.install(dsp3);
 
     // This should pass an isa-test (was crashing)
     Type mt0 = dsp0.meet(dsp3);
@@ -949,7 +966,7 @@ public class TestApprox {
       _help0(pred,f1425,a1314,rez);
       _help0(succ,f2226,a14  ,rez);
       Type.RECURSIVE_MEET--;
-      rez = rez.install();
+      rez = Cyclic.install(rez);
     }
 
     TypeStruct thismeetrez;
@@ -962,7 +979,7 @@ public class TestApprox {
       _help0(pred2,f1425,a1314,str1);
       _help0(succ1,f2226,a14  ,str2);
       Type.RECURSIVE_MEET--;
-      thismeetrez = str2.install();
+      thismeetrez = Cyclic.install(str2);
     }
 
     // Install shrinks
@@ -977,6 +994,7 @@ public class TestApprox {
 
 
   // The following case the tstr0 >> tstr1, BUT !(tstr0.apx >. tstr1.apx)
+  @Ignore
   @Test public void testApprox10() {
     Object dummy0 = TypeStruct.TYPES;
 
@@ -1006,7 +1024,7 @@ public class TestApprox {
     TypeStruct sa0 = TypeStruct.make(TypeFld.NO_DISP,fand,fnot0,ffor0,fthn);
     _help0(fnot0,f18,a6,sa0);
     Type.RECURSIVE_MEET--;
-    sa0 = sa0.install();
+    sa0 = Cyclic.install(sa0);
 
     TypeStruct apx = sa0.approx(a6);
     assertTrue(sa0.isa(apx));
@@ -1019,6 +1037,7 @@ public class TestApprox {
 //   }
 //}
 //
+  @Ignore
   @Test public void testApprox11() {
     Object dummy0 = TypeStruct.TYPES;
 
@@ -1039,6 +1058,7 @@ public class TestApprox {
     assertTrue(s0.isa(apx));
   }
 
+  @Ignore
   @Test public void testRegression1() {
     int a6 = BitsAlias.new_alias();
     TypeFld FG = TypeFld.make("or_",TypeFunPtr.make(17,1,Type.ANY,Type.XSCALAR));
@@ -1050,7 +1070,7 @@ public class TestApprox {
     FO.setX(TypeFunPtr.make(17,1,Type.ANY,PB));
     FF.setX(TypeFunPtr.make(18,1,Type.ANY,PB));
     Type.RECURSIVE_MEET--;
-    SB.install();
+    Cyclic.install(SB);
 
     Type.RECURSIVE_MEET++;
     TypeFld FC = TypeFld.malloc("not");
@@ -1058,7 +1078,7 @@ public class TestApprox {
     TypeMemPtr PA = TypeMemPtr.make(a6,SA);
     FC.setX(TypeFunPtr.make(18,1,Type.ANY,PA));
     Type.RECURSIVE_MEET--;
-    SA.install();
+    Cyclic.install(SA);
 
     TypeFld FE = TypeFld.make("or_",TypeFunPtr.make(17,1,Type.ANY,PA));
     TypeMemPtr PN = TypeMemPtr.make(a6,TypeStruct.make(FE,FF));
@@ -1077,6 +1097,7 @@ public class TestApprox {
   private static final long RSEED = 1234L;
   private static final int NRAND = 199;      // Number of random types.  Raise this to test more.
   private static final int NSTRUCTS = 3;     // Number of structs per type.  Raise this to test larger type nests
+  @Ignore
   @Test public void testApproxRand() {
     Object dummy = TypeMemPtr.TYPES; // <clinit> before RECURSIVE_MEET
 
@@ -1136,7 +1157,7 @@ public class TestApprox {
       ts._fld_idx(2).setX(_make_rand_fld(R,a0,a1,f0,f1,true));
     }
     Type.RECURSIVE_MEET--;
-    return TSRANDS.at(0).install();
+    return Cyclic.install(TSRANDS.at(0));
   }
   private static Type _make_rand_fld(Random R, int a0, int a1, int f0, int f1, boolean fptrs) {
     return switch( R.nextInt(fptrs ? 13 : 10) ) {
@@ -1168,6 +1189,7 @@ public class TestApprox {
   }
 
   // Use this to make a quick test from the two failed test numbers given
+  @Ignore
   @Test public void testJig() {
     Object dummy = TypeMemPtr.TYPES; // <clinit> before RECURSIVE_MEET
     Object dumm2 = TypeFunPtr.GENERIC_FUNPTR;

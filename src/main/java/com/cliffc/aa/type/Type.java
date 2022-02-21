@@ -6,6 +6,8 @@ import java.util.HashMap;
 import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 
+import static com.cliffc.aa.AA.unimpl;
+
 /** an implementation of language AA
  */
 
@@ -180,7 +182,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     return _str_complex0(visit,dups);
   }
   boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return false; }
-  
+
   // Shallow array compare, using '==' instead of 'equals'.  Since elements are
   // interned, this is the same as 'equals' except asymptotically faster unless
   // there is a type-cycle, then infinitely faster.
@@ -909,6 +911,113 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   }
   BitsFun _all_reaching_fidxs( TypeMem tmem ) { return BitsFun.EMPTY; }
 
+  // Parse an indented string to get a Type back.  Handles cyclic types (and
+  // very inefficiently calls Cyclic.install many many times).
+  // Example: "[0,ALL]{all,1 ->PA:*[0,5]@{^=any; n1=PA; v1=Scalar} }"
+  static class Parse {
+    final String _str;
+    int _x;
+    final NonBlockingHashMap<String,Type> _dups=new NonBlockingHashMap<>();
+    Parse(String str) { _str = str; }
+    Type type() { return type(null); }
+    Type type(String cid) {
+      return switch( skipWS() ) {
+      case '*' -> cyc(TypeMemPtr.valueOf(this,cid));
+      case '[' -> cyc(TypeFunPtr.valueOf(this,cid));
+      case '(' -> cyc(TypeStruct.valueOf(this,cid,true ));
+      case '@' -> cyc(TypeStruct.valueOf(this,cid,false));
+      case '0','1','2','3','4','5','6','7','8','9' -> {
+        double d = num();
+        yield ((long)d)==d ? TypeInt.con((long)d) : TypeFlt.con(d);
+      }
+      default -> {
+        // A simple type
+        for( int i=0; i<STRS.length; i++ )
+          if( _str.startsWith(STRS[i], _x) ) {
+            _x += STRS[i].length();
+            yield (Type.make((byte)i));
+          }
+        // Various names for integer
+        assert cid==null;
+        cid = id();
+        Type t = TypeInt.valueOfInt(cid);
+        if( t!=null ) yield t;
+        // Recursive type name
+        t = _dups.get(cid);
+        if( t!=null ) yield t;  // Hit a cyclic name
+        if( peek(':') ) {       // Starting a recursive type
+          if( Util.eq(cid,"str") ) // Special string hack until I get real strings
+            yield type(null).set_name("str:");
+          RECURSIVE_MEET++;     // Ok, really start a recursive type
+          t = type(cid);
+          if( --RECURSIVE_MEET == 0)
+            t = Cyclic.install(t,_dups);
+          yield t;
+        }
+        throw unimpl();
+      }
+      };
+    }
+    <T extends Type> T cyc(T t) { return RECURSIVE_MEET==0 ? Cyclic.install(t,_dups) : t; }
+    char at(int x) { return _str.charAt(x); }
+    char skipWS() { while( at(_x) <= ' ' ) _x++; return at(_x); }
+    // If find 'c', advance cursor and true.
+    boolean peek(char c) {
+      if( skipWS()==c ) { _x++; return true; }
+      else return false;
+    }
+    boolean eos() { return _x >= _str.length(); }
+    // A number.  Either a pure integer, or contains a '.' and a double.
+    // Possibly followed by a 'f' for a float.
+    double num() {
+      int i=0, d;
+      while( !eos() &&  (d=at(_x)-'0') >= 0 && d<=9 )
+        { i = i*10+d; _x++; }
+      if( eos() || !peek('.') ) return i; // Pure integer
+      double dd = i, frac=10;
+      while( !eos() &&  (d=at(_x)-'0') >= 0 && d<=9 )
+        { dd += d/frac; frac *= 10; _x++; }
+      if( peek('f') ) dd = (float)dd; // A float
+      return dd;                // A double
+    }
+    // Skip whitespace and parse an identifier.
+    String id() {
+      skipWS();
+      int oldx=_x;
+      while( _x < _str.length() && isId(at(_x)) ) _x++;
+      return _str.substring(oldx,_x).intern();
+    }
+    // Rules for an ID character
+    private static boolean isId(char c) {
+      return c=='^' || c=='_' ||
+        ('0' <= c && c <= '9') ||
+        ('A' <= c && c <= 'Z') ||
+        ('a' <= c && c <= 'z');
+    }
+
+    // Examples: [], [0], [5], [2,3,4], [0,ALL]
+    <B extends Bits<B>> B bits( B b ) {
+      require('[');
+      if( peek(']') ) return b; // Empty
+      do b = b.set(is_all() ? 1 : (int)num());
+      while( peek(',') );
+      require(']');
+      return b;
+    }
+    private boolean is_all() { if( _str.startsWith("ALL", _x) ) { _x +=3; return true; } else return false; }
+    // Demand
+    void require(char c) {
+      if( peek(c) ) return;
+      System.err.println(_str);
+      for( int i = 0; i< _x; i++ ) System.err.print(' ');
+      System.err.println('^');
+      System.err.println("Expected '"+c+"' but found '"+at(_x)+"', unable to parse a Type");
+      throw unimpl();
+    }
+    @Override public String toString() { return _str.substring(_x); }
+  }
+  public static Type valueOf( String str ) { return new Parse(str).type(); }
+  
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }

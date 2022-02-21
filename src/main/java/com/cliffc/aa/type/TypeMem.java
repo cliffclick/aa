@@ -63,7 +63,7 @@ public class TypeMem extends Type<TypeMem> {
   // recursive and "deeply" sharpens pointers, and is somewhat expensive.
   // Maintain a cache of prior results.  Not related to the object's Type, so
   // not part of the hash/equals checks.  Optional.  Lazily filled in.
-  private HashMap<TypeMemPtr,TypeMemPtr> _sharp_cache;
+  private HashMap<BitsAlias,TypeMemPtr> _sharp_cache;
 
   private TypeMem init(TypeStruct[] pubs) {
     assert check(pubs);    // Caller has canonicalized arrays already
@@ -98,8 +98,7 @@ public class TypeMem extends Type<TypeMem> {
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    if( !(o instanceof TypeMem) ) return false;
-    TypeMem tf = (TypeMem)o;
+    if( !(o instanceof TypeMem tf) ) return false;
     if( _pubs .length != tf._pubs .length ) return false;
     for( int i = 0; i< _pubs.length; i++ )
       if( _pubs[i] != tf._pubs[i] ) // note '==' and NOT '.equals()'
@@ -108,8 +107,6 @@ public class TypeMem extends Type<TypeMem> {
   }
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-
-  @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) { throw unimpl(); }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( this==ALLMEM  ) return sb.p("[ all ]");
@@ -362,29 +359,117 @@ public class TypeMem extends Type<TypeMem> {
     return make0(tos);
   }
 
+  // --------------------------------------------------------------------------
   // Sharpen a dull pointer against this memory.
   public TypeMemPtr sharpen( TypeMemPtr dull ) {
     if( dull.is_valtype() ) return dull;
     assert dull==dull.simple_ptr();
     if( _sharp_cache != null ) { // Check the cache first
-      TypeMemPtr sharp = _sharp_cache.get(dull);
+      TypeMemPtr sharp = _sharp_cache.get(dull._aliases);
       if( sharp != null ) return sharp;
     }
-    // Switch to TypeStruct for building recursive structures.
-    return TypeStruct.sharpen(this,dull);
+    
+    // Build a (recursively) sharpened pointer from memory.  Alias sets can be
+    // looked-up directly in a map from BitsAlias to TypeObjs.  This is useful
+    // for resolving all the deep pointer structures at a point in the program
+    // (i.e., error checking arguments).  Given a TypeMem and a BitsAlias it
+    // returns a TypeObj (and extends the HashMap for future calls).  The TypeObj
+    // may contain deep pointers to other deep TypeObjs, including cyclic types.
+    // This function is monotonic in its arguments.
+
+    // Pass 1:  fill "dull" cache
+    HashMap<BitsAlias,TypeMemPtr> dull_cache = new HashMap<>();
+    _dull(dull,dull_cache);
+
+    // Pass 2: Stitch together structs with dull pointers to make a possibly cyclic result.
+    TypeMemPtr sharp = (TypeMemPtr)_sharp(dull,dull_cache,new VBitSet());
+    assert sharp.interned() == dull_cache.isEmpty();
+    // See if we need to cycle-install any cyclic types
+    if( dull_cache.isEmpty() )
+      return sharp;
+    // On exit, cyclic-intern all cyclic things; remove from dull cache.
+    TypeStruct mt = Cyclic.install(sharp._obj);
+    sharp = dull.make_from(mt);
+    return sharput(dull._aliases,sharp);
   }
-  TypeMemPtr sharp_get( TypeMemPtr tmp ) { return _sharp_cache==null ? null : _sharp_cache.get(tmp); }
-  TypeMemPtr sharput( TypeMemPtr dull, TypeMemPtr sharp ) {
-    assert dull.interned() && sharp.interned();
+  TypeMemPtr sharp_get( BitsAlias aliases ) { return _sharp_cache==null ? null : _sharp_cache.get(aliases); }
+  TypeMemPtr sharput( BitsAlias aliases, TypeMemPtr sharp ) {
+    assert sharp.interned();
     if( _sharp_cache==null ) _sharp_cache = new HashMap<>();
-    _sharp_cache.put(dull,sharp);
+    _sharp_cache.put(aliases,sharp);
     return sharp;               // return new not old
   }
   // Sharpen if a maybe-pointer
   @Override public Type sharptr( Type ptr ) {
-    return ptr instanceof TypeMemPtr ? sharpen((TypeMemPtr)ptr) :
-      (ptr instanceof TypeTuple ? ((TypeTuple)ptr).sharptr(this) : ptr);
+    return ptr instanceof TypeMemPtr tmp ? sharpen(tmp) :
+      (ptr instanceof TypeTuple tt ? tt.sharptr(this) : ptr);
   }
+
+
+  // Pass 1:  fill "dull" cache
+  //   Check "dull" & "sharp" cache for hit; if so return.
+  //   Walk all aliases;
+  //     Get obj from mem; it is "dull".
+  //     MEET "dull" objs.
+  //   If meet is sharp, put in sharp cache & return.
+  //   Put dull ptr to dull meet in dull cache.
+  //   Walk dull fields; for all dull TMPs, recurse.
+  Type _dull( Type dull, final HashMap<BitsAlias,TypeMemPtr> dull_cache ) {
+    if( !(dull instanceof Cyclic cyc) ) return null; // Nothing to sharpen
+    // Check caches and return
+    if( dull instanceof TypeMemPtr tmp ) {
+      BitsAlias aliases = tmp._aliases;
+      if( sharp_get(aliases) != null ) return null;
+      if( dull_cache.get(aliases) != null ) return null;
+      // Walk and meet "dull" fields; all TMPs will point to ISUSED (hence are dull).
+      if( aliases.above_center() ) throw unimpl();
+      TypeStruct t = TypeStruct.UNUSED;
+      for( int alias : aliases )
+        for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
+          t = (TypeStruct)t.meet(at(kid));
+      t = t.set_name(tmp._obj._name);
+
+      if( _is_sharp(t)==null )        // If sharp, install and return
+        return sharput(aliases,tmp.make_from(t));
+      // Install in dull result in dull cache BEFORE recursing.  We might see
+      // it again if cyclic types.
+      TypeMemPtr dptr = tmp.malloc_from(t);
+      dull_cache.put(tmp._aliases,dptr);
+      cyc = (Cyclic)t;
+    }
+    // Visit all dull pointers and recursively collect
+    return cyc.walk1((fld,ignore) -> _dull(fld,dull_cache), (x,y)->null);
+  }
+  // Not-null if found a dull ptr, null if all ptrs sharp
+  private static Type _is_sharp(Type t) {
+    if( !(t instanceof Cyclic cyc) ) return null;
+    if( t instanceof TypeMemPtr tmp && tmp._obj==TypeStruct.ISUSED ) return t;
+    return cyc.walk1((fld,ignore) -> _is_sharp(fld), (x,y)-> x==null ? y : x);
+  }
+
+
+  // Pass 2: stitch together structs of dull pointers to make a possibly cyclic type.
+  //  Check for hit in sharp cache; if so return it.
+  //  Get from dull cache; if not interned, flag as cyclic & return it.
+  //  Put not-interned dull clone in dull cache.
+  //    Walk all fields.
+  //  If not cyclic, all fields already interned; standard intern, put in sharp; remove dull; & return.
+  //  If cyclic, then some field is not interned, put on cyclic list?
+  //  Return not-interned value.
+  Type _sharp(Type dull, final HashMap<BitsAlias,TypeMemPtr> dull_cache, final VBitSet visit ) {
+    if( !(dull instanceof Cyclic cyc) ) return dull; // Nothing to sharpen
+    Type t;
+    if( dull instanceof TypeMemPtr tmp ) {
+      t = sharp_get(tmp._aliases);
+      if( t !=null ) return t;
+      t = dull_cache.get(tmp._aliases);
+      if( visit.tset(t._uid) ) return t;
+    } else t = dull.copy();
+    assert !t.interned();
+    ((Cyclic)t).walk_update(fld->_sharp(fld,dull_cache,visit));
+    return t;
+  }
+
 
   // Widen (lose info), to make it suitable as the default memory.
   public TypeMem crush() {

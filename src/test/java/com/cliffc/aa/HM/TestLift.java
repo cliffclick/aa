@@ -20,7 +20,7 @@ public class TestLift {
     HM.reset();
     Apply apply = null;
     Triple triple = new Triple();
-    int alias3 = PrimSyn.TRIPLE_ALIAS;
+    int alias3 = triple._alias;
     B3 = BitsAlias.make0(alias3);
     T2 fr3 = triple._hmt;
     BitsFun fx = fr3._fidxs;
@@ -37,7 +37,7 @@ public class TestLift {
     fld1.setX(ret1);
     fld2.setX(ret1);
     Type.RECURSIVE_MEET--;
-    ts = ts.install();
+    ts = Cyclic.install(ts);
     ret1 = TypeMemPtr.make(B3,ts);
 
     // 917: *[3](^=any, _917$, SCALR, SCALR)
@@ -49,7 +49,7 @@ public class TestLift {
     TypeMemPtr ret2 = TypeMemPtr.make(B3,ts2);
     fld20.setX(ret2);
     Type.RECURSIVE_MEET--;
-    ts2 = ts2.install();
+    ts2 = Cyclic.install(ts2);
     ret2 = TypeMemPtr.make(B3,ts2);
 
     // Build rezt2 from HM.apply_lift
@@ -107,7 +107,7 @@ public class TestLift {
     HM.reset();
     Apply apply = null;
     Triple triple = new Triple();
-    int alias3 = PrimSyn.TRIPLE_ALIAS;
+    int alias3 = triple._alias;
     B3 = BitsAlias.make0(alias3);
     T2 fr3 = triple._hmt;
     BitsFun fx = fr3._fidxs;
@@ -120,7 +120,7 @@ public class TestLift {
     TypeMemPtr ret1 = TypeMemPtr.make(B3,ts1);
     fld1.setX(ret1);
     Type.RECURSIVE_MEET--;
-    ts1 = ts1.install();
+    ts1 = Cyclic.install(ts1);
     ret1 = TypeMemPtr.make(B3,ts1);
 
     // 917: *[3](^=any, 0=SCALR)

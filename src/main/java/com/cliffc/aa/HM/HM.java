@@ -103,6 +103,8 @@ import static com.cliffc.aa.type.TypeFld.Access;
 public class HM {
   // Mapping from primitive name to PrimSyn
   static final HashMap<String,PrimSyn> PRIMSYNS = new HashMap<>();
+  // Mapping from alias#s to either Struct, Pair or Triple
+  static final Ary<Alloc> ALIASES = new Ary<>(Alloc.class);
 
   static { BitsAlias.init0(); BitsFun.init0(); }
 
@@ -221,9 +223,9 @@ public class HM {
     BitsAlias.reset_to_init0();
     BitsFun.reset_to_init0();
     PRIMSYNS.clear();
+    ALIASES.clear();
     Lambda.FUNS.clear();
     T2.reset();
-    PrimSyn.reset();
   }
 
   // ---------------------------------------------------------------------
@@ -1013,7 +1015,18 @@ public class HM {
     // Expand functions to full signatures, recursively.
     // Used by testing.
     private static final VBitSet ADD_SIG = new VBitSet();
-    Type flow_type() { ADD_SIG.clear(); return add_sig(_flow); }
+    private static TypeMem ASIG_MEM;
+    Type flow_type() {
+      ADD_SIG.clear();
+      TypeStruct[] ts = new TypeStruct[ALIASES._len];
+      ts[1] = TypeStruct.ISUSED;
+      for( int i=2; i<ALIASES._len; i++ ) {
+        Alloc a = ALIASES.at(i);
+        if( a!= null ) ts[i] = a.tmp()._obj;
+      }
+      ASIG_MEM = TypeMem.make0(ts);
+      return add_sig(_flow);
+    }
     private static Type add_sig(Type t) {
       if( ADD_SIG.tset(t._uid) ) return t;
       if( t instanceof TypeFunPtr fun ) {
@@ -1024,6 +1037,8 @@ public class HM {
             rez = rez.meet(Lambda.FUNS.get(fidx).apply(FLOWS));
         Type rez2 = add_sig(rez);
         return TypeFunPtr.makex(BitsFun.ALL0,1,Type.ALL,rez2);
+      } else if( t instanceof TypeMemPtr tmp ) {
+        return ASIG_MEM.sharpen(tmp);
       } else {
         return t;
       }
@@ -1032,15 +1047,17 @@ public class HM {
 
 
   // Structure or Records.
-  static class Struct extends Syntax {
+  static class Struct extends Syntax implements Alloc {
     final int _alias;
     final String[]  _ids;
     final Syntax[] _flds;
+    final Ary<Syntax> _rflds = new Ary<>(Syntax.class);
     Struct( String[] ids, Syntax[] flds ) {
       _ids=ids;
       _flds=flds;
       // Make a TMP
       _alias = BitsAlias.new_alias(BitsAlias.ALLX);
+      ALIASES.setX(_alias,this);
     }
     @Override SB str(SB sb) {
       sb.p("@{").p(_alias);
@@ -1057,6 +1074,17 @@ public class HM {
         _flds[i].p0(sb.i().p(_ids[i]).p(" = ").nl(),dups);
       return sb;
     }
+    @Override public TypeMemPtr tmp() {
+      Type[] ts = new Type[_flds.length];
+      for( int i=0; i<_flds.length; i++ )
+        ts[i] =_flds[i]._flow;
+      return _tmp(_alias,_ids,ts);
+    }
+    @Override public Type fld(String id) {
+      int idx = Util.find(_ids,id);
+      return idx==-1 ? null : _flds[idx]._flow;
+    }
+    @Override public void push(Field f) { if( _rflds.find(f)==-1 ) _rflds.push(f);  }
     @Override boolean hm(Work<Syntax> work) {
       // Force result to be a struct with at least these fields.
       // Do not allocate a T2 unless we need to pick up fields.
@@ -1088,14 +1116,11 @@ public class HM {
       work.add(_flds);
     }
     @Override Type val(Work<Syntax> work) {
-      TypeFld[] flds = new TypeFld[_flds.length+1];
-      flds[0] = TypeFld.NO_DISP;
-      for( int i=0; i<_flds.length; i++ )
-        flds[i+1] = TypeFld.make(_ids[i],_flds[i]._flow);
-      TypeStruct tstr = TypeStruct.make(flds);
-      return do_apx(_alias,_flow,tstr);
+      return TypeMemPtr.make(_alias,TypeStruct.ISUSED);
     }
-    @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) { work.add(this); }
+    @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) {
+      work.add(_rflds.asAry());
+    }
 
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
       prep_tree_impl(par, nongen, work, T2.make_open_struct(BitsAlias.make0(_alias),null,null));
@@ -1123,13 +1148,6 @@ public class HM {
         rez = reduce.apply(rez,fld.visit(map,reduce));
       return rez;
     }
-  }
-
-  static Type do_apx(int alias, Type oldtmp, TypeStruct nts) {
-    TypeStruct xts = nts.approx(BitsAlias.make0(alias));
-    TypeMemPtr xtmp = TypeMemPtr.make(alias,xts);
-    assert oldtmp.isa(xtmp);
-    return xtmp;
   }
 
   // Field lookup in a Struct
@@ -1173,12 +1191,18 @@ public class HM {
     @Override Type val(Work<Syntax> work) {
       Type trec = _rec._flow;
       if( trec.above_center() || trec==Type.NIL ) return Type.XSCALAR;
-      if( trec instanceof TypeMemPtr tmp ) {
-        TypeFld fld = tmp._obj.get(_id);
-        if( fld!=null ) return fld._t; // Field type
-        if( tmp._obj.above_center() ) return Type.XSCALAR;
+      if( !(trec instanceof TypeMemPtr tmp) ) return Type.SCALAR;
+      Type t=Type.ANY;
+      for( int alias : tmp._aliases ) {
+        if( alias==0 ) continue; // May be nil error
+        Alloc alloc = ALIASES.at(alias);
+        Type tf = alloc.fld(_id);
+        if( tf==null ) tf = tmp._obj.oob(Type.SCALAR);
+        Type t2 = t.meet(tf);
+        if( t2 != t ) alloc.push(this);
+        t = t2;
       }
-      return Type.SCALAR;
+      return t;
     }
     @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) { work.add(this); }
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
@@ -1197,11 +1221,6 @@ public class HM {
 
 
   abstract static class PrimSyn extends Lambda {
-    static int PAIR_ALIAS, TRIPLE_ALIAS;
-    static void reset() {
-      PAIR_ALIAS   = BitsAlias.new_alias(BitsAlias.ALLX);
-      TRIPLE_ALIAS = BitsAlias.new_alias(BitsAlias.ALLX);
-    }
     static T2 BOOL (){ return T2.make_base(TypeInt.BOOL); }
     static T2 INT64(){ return T2.make_base(TypeInt.INT64); }
     static T2 STRP (){ return T2.make_base(TypeMemPtr.STRPTR); }
@@ -1243,40 +1262,50 @@ public class HM {
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
   }
 
-
   // Pair
-  static class Pair extends PrimSyn {
+  static class Pair extends PrimSyn implements Alloc {
+    static final private String[] FLDS = new String[]{"0","1"};
+    final int _alias;
+    final Ary<Syntax> _rflds = new Ary<>(Syntax.class);
     @Override String name() { return "pair"; }
+    static private int a;
     static private T2 var1,var2;
     public Pair() {
-      super(var1=T2.make_leaf(),var2=T2.make_leaf(),T2.make_open_struct(BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{var1,var2}));
+      super(var1=T2.make_leaf(),var2=T2.make_leaf(),T2.make_open_struct(BitsAlias.make0(a=BitsAlias.new_alias(BitsAlias.ALLX)),FLDS,new T2[]{var1,var2}));
+      _alias = a;
+      ALIASES.setX(_alias,this);
     }
+    @Override public TypeMemPtr tmp() { return _tmp(_alias,FLDS,_types); }
+    @Override public Type fld(String id) {
+      int idx = Util.find(FLDS,id);
+      return idx==-1 ? null : _types[idx];
+    }
+    @Override public void push(Field f) { if( _rflds.find(f)==-1 ) _rflds.push(f);  }
     @Override PrimSyn make() { return new Pair(); }
-    @Override Type apply(Type[] flows) {
-      TypeFld[] ts = new TypeFld[flows.length+1];
-      ts[0] = TypeFld.NO_DISP;  // Display
-      for( int i=0; i<flows.length; i++ ) ts[i+1] = TypeFld.make_tup(flows[i],ARG_IDX+i);
-      TypeStruct tstr = TypeStruct.make(ts);
-      Type val = _flow instanceof TypeFunPtr tfp ? tfp._ret : _flow;
-      return do_apx(PAIR_ALIAS, val, tstr);
-    }
+    @Override Type apply(Type[] flows) { return TypeMemPtr.make(_alias,TypeStruct.ISUSED); }
   }
 
-
   // Triple
-  static class Triple extends PrimSyn {
+  static class Triple extends PrimSyn implements Alloc {
+    static final private String[] FLDS = new String[]{"0","1","2"};
+    final int _alias;
+    final Ary<Syntax> _rflds = new Ary<>(Syntax.class);
     @Override String name() { return "triple"; }
+    static private int a;
     static private T2 var1,var2,var3;
-    public Triple() { super(var1=T2.make_leaf(),var2=T2.make_leaf(),var3=T2.make_leaf(),T2.make_open_struct(BitsAlias.make0(TRIPLE_ALIAS),new String[]{"0","1","2"},new T2[]{var1,var2,var3})); }
-    @Override PrimSyn make() { return new Triple(); }
-    @Override Type apply(Type[] flows) {
-      TypeFld[] ts = new TypeFld[flows.length+1];
-      ts[0] = TypeFld.NO_DISP;  // Display
-      for( int i=0; i<flows.length; i++ ) ts[i+1] = TypeFld.make_tup(flows[i],ARG_IDX+i);
-      TypeStruct tstr = TypeStruct.make(ts);
-      Type val = _flow instanceof TypeFunPtr tfp ? tfp._ret : _flow;
-      return do_apx(TRIPLE_ALIAS, val, tstr);
+    public Triple() {
+      super(var1=T2.make_leaf(),var2=T2.make_leaf(),var3=T2.make_leaf(),T2.make_open_struct(BitsAlias.make0(a=BitsAlias.new_alias(BitsAlias.ALLX)),FLDS,new T2[]{var1,var2,var3}));
+      _alias = a;
+      ALIASES.setX(_alias,this);
     }
+    @Override public TypeMemPtr tmp() { return _tmp(_alias,FLDS,_types); }
+    @Override public Type fld(String id) {
+      int idx = Util.find(FLDS,id);
+      return idx==-1 ? null : _types[idx];
+    }
+    @Override public void push(Field f) { if( _rflds.find(f)==-1 ) _rflds.push(f);  }
+    @Override PrimSyn make() { return new Triple(); }
+    @Override Type apply(Type[] flows) { return TypeMemPtr.make(_alias,TypeStruct.ISUSED);  }
   }
 
   // Special form of a Lambda body for IF which changes the H-M rules.
@@ -1491,6 +1520,18 @@ public class HM {
       if( flt.above_center() ) return TypeFlt.FLT64.dual();
       return TypeFlt.FLT64;
     }
+  }
+
+  static interface Alloc {
+    abstract TypeMemPtr tmp();
+    default TypeMemPtr _tmp(int alias, String[] ids, Type[] ts) {
+      TypeFld[] tfs = new TypeFld[ts.length+1];
+      tfs[0] = TypeFld.NO_DISP;  // Display
+      for( int i=0; i<ts.length; i++ ) tfs[i+1] = TypeFld.make(ids[i],ts[i],ARG_IDX+i);
+      return TypeMemPtr.make(alias,TypeStruct.make(tfs));
+    }
+    abstract Type fld(String id);
+    abstract void push(Field fld);
   }
 
   // ---------------------------------------------------------------------
@@ -1761,7 +1802,7 @@ public class HM {
           if( --Type.RECURSIVE_MEET == 0 )
             // Shrink / remove cycle dups.  Might make new (smaller)
             // TypeStructs, so keep RECURSIVE_MEET enabled.
-            tstr = tstr.install();
+            tstr = Cyclic.install(tstr);
         }
         // The HM is_struct wants to be a TypeMemPtr, but the recursive builder
         // is built around TypeStruct.
@@ -2309,7 +2350,7 @@ public class HM {
           }
         // Close off the recursion
         if( --Type.RECURSIVE_MEET == 0 )
-          ts = ts.install();
+          ts = Cyclic.install(ts);
         return TypeMemPtr.make(_aliases,ts);
       }
 

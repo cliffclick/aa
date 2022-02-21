@@ -1645,7 +1645,7 @@ public class HM10 {
           if( --Type.RECURSIVE_MEET == 0 )
             // Shrink / remove cycle dups.  Might make new (smaller)
             // TypeStructs, so keep RECURSIVE_MEET enabled.
-            tstr = tstr.install();
+            tstr = Cyclic.install(tstr);
         }
         return TypeMemPtr.make(_aliases,tstr);
       }
@@ -2211,7 +2211,7 @@ public class HM10 {
               ts.get(fld._fld).setX( jt, fld._order );
         // Close off the recursion
         if( --Type.RECURSIVE_MEET == 0 )
-          ts = ts.install();
+          ts = Cyclic.install(ts);
         return tmp.make_from(ts);
       }
 

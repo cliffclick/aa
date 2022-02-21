@@ -1,7 +1,6 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.*;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.function.*;
@@ -216,7 +215,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   // Make using the fields, with no struct name, low and closed; typical for a
   // well-known structure.  Might auto-allocate a TypeFld[] - which is a
-  // perf-hit in high usage points.  Typically used this way in tests.
+  // perf-hit in high usage points.  Typically, used this way in tests.
   public static TypeStruct make( TypeFld... flds ) { return make("",false,flds); }
   public static TypeStruct make( String name, boolean any, TypeFld... flds ) {
     TypeStruct ts = malloc(name,any);
@@ -457,7 +456,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     if( --RECURSIVE_MEET > 0 )
       return mt;                // And, if not yet done, just exit with it
     // Minimize and intern the cyclic result
-    return mt.install();
+    return Cyclic.install(mt);
   }
 
   // Shallow clone, not interned.  Fields are also cloned, but not deeper.
@@ -470,7 +469,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   }
 
   // Cyclic (complex/slow) interning
-  public TypeStruct install() { return Cyclic.install(this); }
 
   // -------------------------------------------------------------------------
   // Approximate an otherwise endless unrolled sequence of:
@@ -496,7 +494,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   //     approximations to produce finite cyclic types.
 
   // CNC 02/18/2022.
-  
+
   // As of this writing I do not know how to make an approx with all 4
   // properties and I tried really hard.  Here is a test case which is both
   // broken and common: MEETing the 2nd instance of an alias over the first
@@ -530,7 +528,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   //   MEETd in some kind of TypeMemory.  Without side-effects in the HM theory
   //   this Memory can be trivially global.  With side-effects I'd have to
   //   thread a hidden Memory edge through the HM AST.
-  
+
   public TypeStruct approx( BitsAlias aliases ) { return approx3(aliases); }
   private static BitsAlias AXALIAS;
   private static final Ary<TypeStruct> AXTS = new Ary<>(TypeStruct.class);
@@ -566,11 +564,11 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
         return ts;
       }
     }
-    
+
     assert RECURSIVE_MEET==0 && MEETS0.isEmpty() && AXOLD2NEW.isEmpty() && AXTS.isEmpty();
     TypeStruct apx = (TypeStruct)ts._apx3b(ts,0);
     MEETS0.clear();  AXOLD2NEW.clear(true);
-    apx = apx.install();
+    apx = Cyclic.install(apx);
 
     assert this.isa(apx);   // Self monotonic
     return apx;
@@ -640,7 +638,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
       TypeMemPtr ptmp = TypeMemPtr.make(aliases,ts);
       TypeStruct apx = ((TypeMemPtr)_apx2(ptmp,null,null,0))._obj;
       MEETS0.clear();  AXOLD2NEW.clear(true);
-      apx = apx.install();
+      apx = Cyclic.install(apx);
       assert ts.isa(apx);       // Self monotonic
       ts = apx;
       TypeMemPtr ctmp = TypeMemPtr.make(aliases,apx);
@@ -709,132 +707,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     return cyc.walk1((fld,ignore) -> _ax_chk(visit,fld,fprior,aliases), (x,y)-> x==null ? y : x);
   }
 
-
-  // -------------------------------------------------------------------------
-  // Build a (recursively) sharpened pointer from memory.  Alias sets can be
-  // looked-up directly in a map from BitsAlias to TypeObjs.  This is useful
-  // for resolving all the deep pointer structures at a point in the program
-  // (i.e., error checking arguments).  Given a TypeMem and a BitsAlias it
-  // returns a TypeObj (and extends the HashMap for future calls).  The TypeObj
-  // may contain deep pointers to other deep TypeObjs, including cyclic types.
-  // This function is monotonic in its arguments.
-  static TypeMemPtr sharpen( TypeMem mem, TypeMemPtr dull ) {
-    assert dull==dull.simple_ptr() && mem.sharp_get(dull)==null;
-
-    // Pass 1:  fill "dull" cache
-    HashMap<BitsAlias,TypeMemPtr> dull_cache = new HashMap<>();
-    _dull(mem,dull,dull_cache);
-
-    // Pass 2: Stitch together structs with dull pointers to make a possibly cyclic result.
-    TypeMemPtr sharp = _sharp(mem,dull,dull_cache);
-    assert sharp.interned() == dull_cache.isEmpty();
-    // See if we need to cycle-install any cyclic types
-    if( dull_cache.isEmpty() )
-      return sharp;
-    // On exit, cyclic-intern all cyclic things; remove from dull cache.
-    TypeStruct mt = sharp._obj.install();
-    sharp = sharp.make_from(mt);
-    return mem.sharput(dull,sharp);
-  }
-
-  // Pass 1:  fill "dull" cache
-  //   Check "dull" & "sharp" cache for hit; if so return.
-  //   Walk all aliases;
-  //     Get obj from mem; it is "dull".
-  //     MEET "dull" objs.
-  //   If meet is sharp, put in sharp cache & return.
-  //   Put dull ptr to dull meet in dull cache.
-  //   Walk dull fields; for all dull TMPs, recurse.
-  private static void _dull( TypeMem mem, TypeMemPtr dull, HashMap<BitsAlias,TypeMemPtr> dull_cache ) {
-    // Check caches and return
-    if( mem.sharp_get(dull) != null ) return;
-    if( dull_cache.get(dull._aliases) != null ) return;
-    if( dull==TypeMemPtr.NO_DISP || dull==TypeMemPtr.NO_DISP.dual() ) { mem.sharput(dull,dull); return; }
-    // Walk and meet "dull" fields; all TMPs will point to ISUSED (hence are dull).
-    boolean any = dull._aliases.above_center();
-    Type t = any ? ISUSED : UNUSED;
-    for( int alias : dull._aliases )
-      if( alias != 0 )
-        for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) ) {
-          TypeStruct x = mem.at(kid);
-          t = any ? t.join(x) : t.meet(x);
-        }
-    TypeMemPtr dptr = dull.make_from((TypeStruct)t);
-    if( _is_sharp(t) ) {        // If sharp, install and return
-      mem.sharput(dull,dptr);
-      return;
-    }
-    // Install in dull result in dull cache BEFORE recursing.  We might see it
-    // again if cyclic types.
-    dull_cache.put(dull._aliases,dptr);
-    // Visit all dull pointers and recursively collect
-    for( TypeFld fld : ((TypeStruct)t) ) {
-      Type tt = fld._t;
-      if( tt instanceof TypeFunPtr ) tt = ((TypeFunPtr)tt).dsp(); //TODO Handle ret also?
-      if( tt instanceof TypeMemPtr )
-        _dull(mem,(TypeMemPtr)tt,dull_cache);
-    }
-  }
-  // No dull pointers?
-  private static boolean _is_sharp(Type t) {
-    if( !(t instanceof TypeStruct ts) ) return true;
-    for( TypeFld fld : ts ) {
-      Type tt = fld._t;
-      assert fld.interned()==tt.interned();
-      if( !tt.interned() ||     // Not interned internal, then this is not finished
-          (tt instanceof TypeMemPtr && // Or has internal dull pointers
-           ((TypeMemPtr)tt)._obj == ISUSED) )
-        return false;
-    }
-    return true;
-  }
-
-  // Pass 2: stitch together structs of dull pointers to make a possibly cyclic type.
-  //  Check for hit in sharp cache; if so return it.
-  //  Get from dull cache; if not interned, flag as cyclic & return it.
-  //  Put not-interned dull clone in dull cache.
-  //    Walk all fields.
-  //    Copy unless TMP; recurse TMP for field.
-  //  If not cyclic, all fields already interned; standard intern, put in sharp; remove dull; & return.
-  //  If cyclic, then some field is not interned, put on cyclic list?
-  //  Return not-interned value.
-  private static @NotNull TypeMemPtr _sharp( TypeMem mem, TypeMemPtr dull, HashMap<BitsAlias,TypeMemPtr> dull_cache ) {
-    TypeMemPtr sharp = mem.sharp_get(dull);
-    if( sharp != null ) return sharp; // Value returned is sharp and interned
-    TypeMemPtr dptr = dull_cache.get(dull._aliases);
-    if( !dptr.interned() )      // Closed a cycle
-      return dptr; // Not-yet-sharp and not interned; return the work-in-progress
-    // Copy, replace dull with not-interned dull clone.  Fields are also cloned, not interned.
-    TypeStruct dts2 = dptr._obj._clone().set_hash();
-    TypeMemPtr dptr2 = dptr.copy();
-    dptr2._obj = dts2;
-    dull_cache.put(dull._aliases,dptr2);
-    // walk all fields, copy unless TMP.
-    for( TypeFld fld : dts2 ) {
-      if( fld._t instanceof TypeMemPtr ) // For TMP, recurse on dull pointers.
-        fld.setX(_sharp(mem,((TypeMemPtr)fld._t),dull_cache));
-      if( fld._t instanceof TypeFunPtr tf ) {
-        // TODO: Sharpen ret as well
-        if( tf.dsp() instanceof TypeMemPtr ) { // Need  a pointer to sharpen
-          TypeMemPtr dptr3 = _sharp(mem, (TypeMemPtr) tf.dsp(), dull_cache);
-          fld.setX(dptr3.interned()             // Sharp return?
-                   ? tf.make_from(dptr3)        // Make sharp TFP field
-                   : tf._sharpen_clone(dptr3)); // Make dull  TFP field
-        }
-      }
-      if( fld._t.interned() )
-        dts2.put(fld.hashcons_free());
-    }
-    if( !_is_sharp(dts2) ) return dptr2; // Return the work-in-progress
-    // Then copied field types are all sharp and interned.
-    // Intern the fields themselves.
-    for( TypeFld fld : dts2 )
-      if( !fld._t.interned() )
-        dts2.put(fld.hashcons_free());
-    dull_cache.remove(dull._aliases);// Move the entry from dull cache to sharp cache
-    TypeStruct sts = dts2.hashcons_free();
-    return mem.sharput(dull,dull.make_from(sts));
-  }
 
   @Override public TypeStruct simple_ptr() {
     TypeStruct ts = malloc(_name,_any);
@@ -975,6 +847,49 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return true; }
 
+  // e.g. (), (^=any), (^=any,"abc"), (3.14), (3.14,"abc"), (,,)
+  static TypeStruct valueOf(Parse P, String cid, boolean is_tup ) {
+    if( is_tup ) P.require('(');
+    else { P.require('@');  P.require('{'); }
+    TypeStruct ts = malloc("",false);
+    if( cid!=null ) P._dups.put(cid,ts);
+    if( P.peek(!is_tup ? '}' : ')') ) return ts;
+
+    int aidx=DSP_IDX;
+    do {
+      TypeFld fld=null;
+      int oldx = P._x;
+      String fid = P.id();
+      Type dup = P._dups.get(fid);
+      if( dup==null ) {
+        // Check for a leading repeat name, even on a tuple: "FA:^=any"
+        if( fid.length()!=0 && P.peek(':') && (!is_tup || aidx==DSP_IDX) )
+          RECURSIVE_MEET++;     // Start a cyclic field type
+        else { P._x = oldx; fid=null; }
+        // Check for "^=any" on *tuples* which do not normally print field names
+        if( aidx==DSP_IDX ) {
+          fld = TypeFld.valueOfArg(P, aidx, fid);
+          if( fld==null ) aidx++; // Parse "(int64)" correct; tuple with leading id not field name
+        }
+        if( fld==null )         // Parse a field
+          fld = is_tup ? TypeFld.valueOfTup(P,aidx,fid) : TypeFld.valueOfArg(P,aidx,fid);
+
+        if( fid!=null ) --RECURSIVE_MEET; // End cyclic field type
+        fld = P.cyc(fld);                 // Install as needed
+      } else {                  // Hit a duplicate
+        // Ambiguous with un-named tuple fields
+        fld = dup instanceof TypeFld dup2 ? dup2
+          : TypeFld.malloc(TypeFld.TUPS[aidx],dup,Access.Final,aidx);
+      }
+
+      aidx++;
+      ts.add_fld(fld);
+
+    } while( P.peek(is_tup ? ',' : ';') );
+    P.require(is_tup ? ')' : '}');
+    return ts;
+  }
+
   // Alpha sorted
   public Collection<TypeFld> asorted_flds() {
     TreeMap<String, TypeFld> sorted = new TreeMap<>();
@@ -1067,7 +982,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     ts.set_hash();
     for( TypeFld fld : ts ) fld.setX(fld._t._widen());
     if( --RECURSIVE_MEET == 0 )
-      ts = ts.install();
+      ts = Cyclic.install(ts);
     return ts;
   }
 

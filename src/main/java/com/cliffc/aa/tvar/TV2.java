@@ -432,7 +432,7 @@ public class TV2 {
         if( --Type.RECURSIVE_MEET == 0 )
           // Shrink / remove cycle dups.  Might make new (smaller)
           // TypeStructs, so keep RECURSIVE_MEET enabled.
-          tstr = tstr.install();
+          tstr = Cyclic.install(tstr);
       }
       return TypeMemPtr.make(tmp.aliases(),tstr);
     }

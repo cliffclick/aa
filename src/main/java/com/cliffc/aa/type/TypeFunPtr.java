@@ -140,6 +140,20 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   @SuppressWarnings("unchecked")
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return _ret._str_complex(visit,dups); }
 
+  static TypeFunPtr valueOf(Parse P, String cid) {
+    BitsFun fidxs = P.bits(BitsFun.EMPTY);
+    P.require('{');
+    TypeFunPtr tfp = malloc(fidxs,0,null,null);
+    if( cid!=null ) P._dups.put(cid,tfp);
+    tfp.set_dsp(P.type());
+    P.require(',');
+    tfp._nargs = (int)P.num();
+    P.require('-');  P.require('>');
+    tfp._ret = P.type();
+    P.require('}');
+    return tfp;
+  }
+
   
   static { new Pool(TFUNPTR,new TypeFunPtr()); }
 
@@ -383,6 +397,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   TypeFunPtr _sharpen_clone(TypeMemPtr dsp) {
     TypeFunPtr tf = copy();
     tf._dsp = dsp;
+    return tf;
+  }
+  TypeFunPtr _sharpen_clone_ret(Type ret) {
+    TypeFunPtr tf = copy();
+    tf._ret = ret;
     return tf;
   }
   @Override TypeFunPtr _widen() { return GENERIC_FUNPTR; }

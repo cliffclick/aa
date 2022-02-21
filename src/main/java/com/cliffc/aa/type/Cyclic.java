@@ -2,6 +2,7 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.*;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.function.*;
 
@@ -53,6 +54,7 @@ public interface Cyclic {
   }
   static long duid(Type t0, Type t1) { return (((long)t0._uid)<<32)|t1._uid; }
 
+  // --------------------------------------------------------------------------
   // Returns null if no diff, otherwise returns the shortest path to a diff.
   @SuppressWarnings("unchecked")
   static Link _path_diff(Type t0, Type t1, NonBlockingHashMapLong<Link> links) {
@@ -77,10 +79,7 @@ public interface Cyclic {
 
   Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links);
 
-  // Install a cyclic structure.  'head' is not interned and points to a
-  // (possibly cyclic) graph of not-interned Types.  Minimize the graph, set
-  // the hashes everywhere, check for a prior existing Type.  Return a prior,
-  // or else set all the duals and intern the entire graph.
+  // --------------------------------------------------------------------------
   class Prof {
     long cnt=0, time=0;
     int hit;                    // Hit on prior cycle type
@@ -126,14 +125,26 @@ public interface Cyclic {
   }
   Prof P = new Prof();
 
+
+  // --------------------------------------------------------------------------
+  // Install a cyclic structure.  'head' is not interned and points to a
+  // (possibly cyclic) graph of not-interned Types.  Minimize the graph, set
+  // the hashes everywhere, check for a prior existing Type.  Return a prior,
+  // or else set all the duals and intern the entire graph.
+
+  // Also takes a Map of Types, and updates them all.  I hate this, as it
+  // breaks an otherwise very clean API.  Used by cyclic type parsing.
+
+  static <T extends Type> T install( T head ) { return install(head,null); }
+
   @SuppressWarnings("unchecked")
-  static TypeStruct install( TypeStruct head ) {
+  static <T extends Type> T install( T head, Map<String,Type> map ) {
     long t0 = System.currentTimeMillis();
     TypeStruct.MEETS0.clear();
     Type.RECURSIVE_MEET++;
     _reachable(head,true);      // Compute 1st-cut reachable
     // P.gather(); // Turn off detail profiling
-    head = _dfa_min(head);
+    head = _dfa_min(head, map);
     _reachable(head,false);     // Recompute reachable; skip interned; probably shrinks
     Type.RECURSIVE_MEET--;
 
@@ -146,7 +157,7 @@ public interface Cyclic {
     assert CSTACK.isEmpty();   CVISIT.clear();
 
     // Check for dups.
-    TypeStruct old = (TypeStruct)head.intern_lookup();
+    T old = (T)head.intern_lookup();
     if( old != null ) {         // Found prior interned cycle
       head = old;  P.hit++;
       // Free all not-interned
@@ -165,6 +176,7 @@ public interface Cyclic {
     // Profile; return new interned cycle
     long t1 = System.currentTimeMillis();
     P.time += (t1-t0);  P.cnt++;
+    assert Type.intern_check();
     return head;
   }
 
@@ -506,7 +518,7 @@ public interface Cyclic {
 
 
   @SuppressWarnings("unchecked")
-  private static <T extends Type> T _dfa_min(T nt) {
+  private static <T extends Type> T _dfa_min(T nt, Map<String,Type> map) {
     // Walk the reachable set and all forward edges, building a reverse-edge set.
     for( Type t : REACHABLE )  {
       if( t._hash!=0 && !t.interned() )
@@ -554,8 +566,18 @@ public interface Cyclic {
       }
     }
 
+    // Update a mapping of interned types as well
+    if( map!=null )
+      for( String key : map.keySet() ) {
+        Type t = map.get(key);
+        Partition P = Partition.TYPE2PART.get(t._uid);
+        if( P!=null && P.head()!=t )
+          map.put(key,P.head());
+      }
+
+    // Free all the Types declared as replicas
     for( Partition P : Partition.PARTS )
-      for( int i=1; i<P.len(); i++ )
+      for( int i=1; i<P.len(); i++ ) // Skip the head in slot 0
         if( !P._ts.at(i).interned() )
           P._ts.at(i).free(null);
 

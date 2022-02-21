@@ -377,7 +377,7 @@ public class TestType {
     final TypeMemPtr ts0ptr = TypeMemPtr.make(alias1,ts0);
     fldn0.setX(ts0ptr);
     Type.RECURSIVE_MEET--;
-    ts0 = ts0.install();
+    ts0 = Cyclic.install(ts0);
     TypeMem ts0mem = TypeMem.make(alias1,ts0); // {1:@{n:*[1],v:int} }
 
     // - struct with pointer to self or nil
@@ -387,7 +387,7 @@ public class TestType {
     final TypeMemPtr ts1ptr0 = TypeMemPtr.make_nil(alias1,ts1);
     fldn1.setX(ts1ptr0);
     Type.RECURSIVE_MEET--;
-    ts1 = ts1.install();
+    ts1 = Cyclic.install(ts1);
     TypeMem ts1mem = TypeMem.make(alias1,ts1); // {1:@{n:*[1],v:int} }
 
     Type tsmt = ts0.meet(ts1);
@@ -492,7 +492,7 @@ public class TestType {
     fldn1.setX(bp2);
     fldn4.setX(ap5);
     Type.RECURSIVE_MEET--;
-    as1 = as1.install();
+    as1 = Cyclic.install(as1);
     bp2 = (TypeMemPtr)as1.at("n");
     bs4 =             bp2._obj;
     ap5 = (TypeMemPtr)bs4.at("n");
