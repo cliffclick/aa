@@ -141,9 +141,9 @@ public interface Cyclic {
   static <T extends Type> T install( T head, Map<String,Type> map ) {
     long t0 = System.currentTimeMillis();
     TypeStruct.MEETS0.clear();
-    Type.RECURSIVE_MEET++;
     _reachable(head,true);      // Compute 1st-cut reachable
     // P.gather(); // Turn off detail profiling
+    Type.RECURSIVE_MEET++;
     head = _dfa_min(head, map);
     _reachable(head,false);     // Recompute reachable; skip interned; probably shrinks
     Type.RECURSIVE_MEET--;
@@ -211,7 +211,7 @@ public interface Cyclic {
     case Type.TFUNPTR -> { _set_cyclic(((TypeFunPtr) t).dsp()); _set_cyclic(((TypeFunPtr) t)._ret); }
     case Type.TFLD    ->   _set_cyclic(((TypeFld   ) t)._t  );
     case Type.TSTRUCT -> { CVISIT.set(t._uid);  for( TypeFld fld : ((TypeStruct) t) ) _set_cyclic(fld);  }
-    default -> throw unimpl();
+    default -> {}
     }
     CSTACK.pop();               // Pop, not part of another's cycle
   }
@@ -230,6 +230,8 @@ public interface Cyclic {
     ON_REACH.tset(head._uid);
     for( int idx=0; idx < REACHABLE._len; idx++ ) {
       Type t = REACHABLE.at(idx);
+      if( !t.interned() && !(t instanceof Cyclic) )
+        t.hashcons_free();      // Not cyclic, not interned: just intern it now
       if( (also_interned || !t.interned()) && t instanceof Cyclic cyc )
         cyc.walk1((tc,ignore) -> ON_REACH.tset(tc._uid) ? tc : REACHABLE.push(tc), (x,y)->null);
     }
@@ -546,6 +548,7 @@ public interface Cyclic {
         cyc.walk_update(Partition::head);
 
     // Edges are fixed, compute hash
+    //for( Partition P : Partition.PARTS ) if( !(P.head() instanceof Cyclic)  ) P.head().set_hash();
     for( Partition P : Partition.PARTS ) if( P.head() instanceof TypeStruct ) P.head().set_hash();
     for( Partition P : Partition.PARTS ) if( P.head() instanceof TypeMemPtr ) P.head().set_hash();
     for( Partition P : Partition.PARTS ) if( P.head() instanceof TypeFunPtr ) P.head().set_hash();

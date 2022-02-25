@@ -28,6 +28,15 @@ public class TypeFlt extends Type<TypeFlt> {
       return ((float)_con)==_con ? sb.p((float)_con).p('f') : sb.p(_con);
     return sb.p(_x>0?"~":"").p(Math.abs(_x)==1?"n":"").p("flt").p(_z);
   }
+  
+  static Type valueOfFlt(String cid) {
+    return switch(cid) {
+    case "flt64"  ->  FLT64;
+    case "nflt32" -> NFLT32;
+    case "nflt64" -> NFLT64;
+    default       -> null;
+    };
+  }
 
   static { new Pool(TFLT,new TypeFlt()); }
   public static Type make( int x, int z, double con ) {

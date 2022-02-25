@@ -800,7 +800,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
   public boolean is_tup() {
     if( len()==0 || (len()==1 && get("^")!=null) ) return true;
-    return get("0")!=null && get("0")._order==ARG_IDX;
+    return get("0")!=null;
   }
 
   @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
@@ -831,7 +831,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
           ind=indent;           // Field is complex, indent if asked to do so
       if( ind ) sb.ii(1);
       boolean field_sep=false;
-      for( TypeFld fld : indent ? _flds : (is_tup() ? osorted_flds() : asorted_flds()) ) {
+      for( TypeFld fld : indent ? _flds : asorted_flds() ) {
         if( !debug && Util.eq(fld._fld,"^") ) continue; // Do not print the ever-present display
         if( ind ) sb.nl().i();
         fld._str(visit,dups, sb, debug, indent ); // Field name, access mod, type
@@ -848,10 +848,10 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return true; }
 
   // e.g. (), (^=any), (^=any,"abc"), (3.14), (3.14,"abc"), (,,)
-  static TypeStruct valueOf(Parse P, String cid, boolean is_tup ) {
+  static TypeStruct valueOf(Parse P, String cid, boolean is_tup, boolean any ) {
     if( is_tup ) P.require('(');
     else { P.require('@');  P.require('{'); }
-    TypeStruct ts = malloc("",false);
+    TypeStruct ts = malloc("",any);
     if( cid!=null ) P._dups.put(cid,ts);
     if( P.peek(!is_tup ? '}' : ')') ) return ts;
 
@@ -879,7 +879,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
       } else {                  // Hit a duplicate
         // Ambiguous with un-named tuple fields
         fld = dup instanceof TypeFld dup2 ? dup2
-          : TypeFld.malloc(TypeFld.TUPS[aidx],dup,Access.Final,aidx);
+          : TypeFld.malloc(TypeFld.TUPS[aidx==DSP_IDX ? ARG_IDX : aidx],dup,Access.Final,aidx==DSP_IDX ? ARG_IDX : aidx);
       }
 
       aidx++;

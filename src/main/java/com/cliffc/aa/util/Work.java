@@ -31,6 +31,12 @@ public class Work<E extends IntSupplier> extends BitSetSparse {
     clr(e.getAsInt());
     return e;
   }
+  public E pop_last() {
+    if( _work._len==0 ) return null;
+    E e = (E)_work.pop();
+    clr(e.getAsInt());
+    return e;
+  }
   // Get/delete "idx"th elements; error if OOB.
   public E at(int idx) { return (E)_work.at(idx); }
   public void del(int idx) { clr(((E)_work.del(idx)).getAsInt()); }

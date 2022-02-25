@@ -924,43 +924,60 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       return switch( skipWS() ) {
       case '*' -> cyc(TypeMemPtr.valueOf(this,cid));
       case '[' -> cyc(TypeFunPtr.valueOf(this,cid));
-      case '(' -> cyc(TypeStruct.valueOf(this,cid,true ));
-      case '@' -> cyc(TypeStruct.valueOf(this,cid,false));
+      case '(' -> cyc(TypeStruct.valueOf(this,cid,true ,false));
+      case '@' -> cyc(TypeStruct.valueOf(this,cid,false,false));
+      case '~' -> {
+        if( at(_x+1)=='@' )
+          { _x++; yield cyc(TypeStruct.valueOf(this,cid,false,true)); }
+        yield simple_type(id());
+      }
       case '0','1','2','3','4','5','6','7','8','9' -> {
         double d = num();
-        yield ((long)d)==d ? TypeInt.con((long)d) : TypeFlt.con(d);
+        Type t = ((long)d)==d ? TypeInt.con((long)d) : TypeFlt.con(d);
+        if( cid!=null ) _dups.put(cid,t);
+        yield t;
       }
       default -> {
-        // A simple type
-        for( int i=0; i<STRS.length; i++ )
-          if( _str.startsWith(STRS[i], _x) ) {
-            _x += STRS[i].length();
-            yield (Type.make((byte)i));
-          }
-        // Various names for integer
-        assert cid==null;
-        cid = id();
-        Type t = TypeInt.valueOfInt(cid);
-        if( t!=null ) yield t;
-        // Recursive type name
-        t = _dups.get(cid);
-        if( t!=null ) yield t;  // Hit a cyclic name
-        if( peek(':') ) {       // Starting a recursive type
-          if( Util.eq(cid,"str") ) // Special string hack until I get real strings
-            yield type(null).set_name("str:");
-          RECURSIVE_MEET++;     // Ok, really start a recursive type
-          t = type(cid);
-          if( --RECURSIVE_MEET == 0)
-            t = Cyclic.install(t,_dups);
+        // Simple types or recursive type names
+        String id = id();
+        if( !peek(':') ) {      // Either a pre-defined name "FA" or a simple type "int64"
+          Type t = _dups.get(id);
+          if( t!=null ) { assert cid==null; yield t; } // Hit a pre-defined cyclic name
+          t = simple_type(id); // Something like { int64, any, ~Scalar, nil }
+          if( cid!=null ) _dups.put(cid,t);
           yield t;
         }
-        throw unimpl();
+        assert cid==null;       // No doing things like "FA:XB:"
+        if( Util.eq(id,"str") ) // Special string hack until I get real strings
+          yield type(null).set_name("str:");
+
+        RECURSIVE_MEET++;   // Ok, really start a recursive type
+        Type t = type(id);
+        if( --RECURSIVE_MEET == 0)
+          t = Cyclic.install(t,_dups);
+        yield t;
       }
       };
     }
+    // Something like { int64, any, ~Scalar, nil }
+    Type simple_type(String id) {
+      // A simple type
+      for( int i=0; i<STRS.length; i++ )
+        if( Util.eq(id,STRS[i]) )
+          return Type.make((byte)i);
+      // Various names for integer and float
+      Type t = TypeInt.valueOfInt(id);
+      if( t!=null ) return t;
+      t = TypeFlt.valueOfFlt(id);
+      if( t!=null ) return t;
+      throw unimpl();
+    }
     <T extends Type> T cyc(T t) { return RECURSIVE_MEET==0 ? Cyclic.install(t,_dups) : t; }
     char at(int x) { return _str.charAt(x); }
-    char skipWS() { while( at(_x) <= ' ' ) _x++; return at(_x); }
+    char skipWS() {
+      while( !eos() && at(_x) <= ' ' ) _x++;
+      return eos() ? (char)-1 : at(_x);
+    }
     // If find 'c', advance cursor and true.
     boolean peek(char c) {
       if( skipWS()==c ) { _x++; return true; }
@@ -989,7 +1006,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     }
     // Rules for an ID character
     private static boolean isId(char c) {
-      return c=='^' || c=='_' ||
+      return c=='^' || c=='_' || c=='~' ||
         ('0' <= c && c <= '9') ||
         ('A' <= c && c <= 'Z') ||
         ('a' <= c && c <= 'z');
@@ -1017,7 +1034,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     @Override public String toString() { return _str.substring(_x); }
   }
   public static Type valueOf( String str ) { return new Parse(str).type(); }
-  
+
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }

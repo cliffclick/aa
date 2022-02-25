@@ -25,7 +25,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   private boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
 
   private TypeMemPtr init(BitsAlias aliases, TypeStruct obj ) {
-    _name="";
+    super.init("");
     _cyclic = false;
     _aliases = aliases;
     _obj=obj;

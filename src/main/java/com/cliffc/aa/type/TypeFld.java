@@ -21,9 +21,10 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
 
   private TypeFld init( @NotNull String fld, Type t, Access access, int order ) {
     assert !(t instanceof TypeFld);
-    _name="";
+    super.init("");
     _cyclic = false;
-    _fld=fld; _t=t; _access=access; _order=order;
+    _fld=fld; _t=t; _access=access;
+    _order=oBot;//order; // Claim 'order' is not a property of types; instead field layout is a backend property.
     return this;
   }
   @Override public TypeFld copy() { return _copy().init(_fld,_t,_access,_order); }
