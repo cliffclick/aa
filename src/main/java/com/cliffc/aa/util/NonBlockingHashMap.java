@@ -225,13 +225,21 @@ public class NonBlockingHashMap<TypeK, TypeV>
   }
 
   // Count of reprobes
-  private transient ConcurrentAutoTable _reprobes = new ConcurrentAutoTable();
+  private transient AryInt _reprobes = null;
+
   /** Get and clear the current count of reprobes.  Reprobes happen on key
    *  collisions, and a high reprobe rate may indicate a poor hash function or
    *  weaknesses in the table resizing function.
    *  @return the count of reprobes since the last call to {@link #reprobes}
    *  or since the table was created.   */
-  public long reprobes() { long r = _reprobes.get(); _reprobes = new ConcurrentAutoTable(); return r; }
+  public AryInt reprobes() {
+    AryInt p = _reprobes;
+    _reprobes = new AryInt();
+    return p;
+  }
+  public int len() { return len(_kvs); }
+  private void  record( int ps ) { if( _reprobes!=null ) _record(ps); }
+  private void _record( int ps ) { _reprobes.setX(ps,_reprobes.atX(ps)+1); }
 
 
   // --- reprobe_limit -----------------------------------------------------
@@ -544,6 +552,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
 
     // Main spin/reprobe loop, looking for a Key hit
     int reprobe_cnt=0;
+    try {
     while( true ) {
       // Probe table.  Each read of 'val' probably misses in cache in a big
       // table; hopefully the read of 'key' then hits in cache.
@@ -578,7 +587,10 @@ public class NonBlockingHashMap<TypeK, TypeV>
           K == TOMBSTONE ) // found a TOMBSTONE key, means no more keys in this table
         return newkvs == null ? null : get_impl(topmap,topmap.help_copy(newkvs),key); // Retry in the new table
 
-      idx = (idx+1)&(len-1);    // Reprobe by 1!  (could now prefetch)
+      idx = (idx+(fullhash|1))&(len-1); // Divergent reprobe chain
+    }
+    } finally {
+      topmap.record(reprobe_cnt);
     }
   }
 
@@ -602,6 +614,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
 
     // Main spin/reprobe loop, looking for a Key hit
     int reprobe_cnt=0;
+    try {
     while( true ) {
       // Probe table.
       final Object K = key(kvs,idx); // Get key before volatile read, could be null
@@ -620,7 +633,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
 
       // Key-compare
       if( keyeq(K,key,hashes,idx,fullhash) )
-        return K;              // Return existing Key!
+        return K;               // Return existing Key!
 
       // get and put must have the same key lookup logic!  But only 'put'
       // needs to force a table-resize for a too-long key-reprobe sequence.
@@ -630,7 +643,10 @@ public class NonBlockingHashMap<TypeK, TypeV>
         return newkvs == null ? null : getk_impl(topmap,topmap.help_copy(newkvs),key); // Retry in the new table
       }
 
-      idx = (idx+1)&(len-1);    // Reprobe by 1!  (could now prefetch)
+      idx = (idx+(fullhash|1))&(len-1); // Divergent reprobe chain
+    }
+    } finally {
+      topmap.record(reprobe_cnt);
     }
   }
 
@@ -656,6 +672,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
     int reprobe_cnt=0;
     Object K=null, V=null;
     Object[] newkvs=null;
+    try {
     while( true ) {             // Spin till we get a Key slot
       V = val(kvs,idx);         // Get old value (before volatile read below!)
       K = key(kvs,idx);         // Get current key
@@ -714,8 +731,11 @@ public class NonBlockingHashMap<TypeK, TypeV>
         return putIfMatch(topmap,newkvs,key,putval,expVal);
       }
 
-      idx = (idx+1)&(len-1); // Reprobe!
+      idx = (idx+(fullhash|1))&(len-1); // Divergent reprobe chain
     } // End of spinning till we get a Key slot
+    } finally {
+      topmap.record(reprobe_cnt);
+    }
 
     // ---
     // Found the proper Key slot, now update the matching Value slot.  We

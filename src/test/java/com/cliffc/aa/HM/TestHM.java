@@ -493,8 +493,8 @@ loop = { name cnt ->
          */
         "@{ a = nint8; b = ( ); bool = @{ false = A:@{ and = { A -> A }; or = { A -> A }; then = { { ( ) -> B } { ( ) -> B } -> B }}; force = { C? -> D:@{ and = { D -> D }; or = { D -> D }; then = { { ( ) -> E } { ( ) -> E } -> E }} }; true = F:@{ and = { F -> F }; or = { F -> F }; then = { { ( ) -> G } { ( ) -> G } -> G }}}}",
         "@{ a = nint8; b = ( ); bool = @{ false = A:@{ and = { A -> A }; or = { A -> A }; then = { { ( ) -> B } { ( ) -> B } -> B }}; force = { C? -> D:@{ and = { D -> D }; or = { D -> D }; then = { { ( ) -> E } { ( ) -> E } -> E }} }; true = F:@{ and = { F -> F }; or = { F -> F }; then = { { ( ) -> G } { ( ) -> G } -> G }}}}",
-        "*[11]@{ FA:^=any; a=nint64; b=*[9,10](FA); bool=*[8]@{ FA; true=PA:*[6,7]@{FA; then=[19,22]{any,2 ->nScalar }; or=[18,21]{any,1 ->PA }; and=[17,20]{any,1 ->PA }}; false=PA; force=[26]{any,1 ->PA } } }",
-        "*[11]@{FA:^=any; a=nScalar; b=nScalar; bool=*[8]@{FA; true=PC:*[6,7]@{FA; and=[17,20]{any,1 ->PA:*[7]@{FA; and=[20]{any,1 ->PA }; or=[21]{any,1 ->~Scalar }; then=[22]{any,2 ->nScalar }} }; or=[18,21]{any,1 ->PB:*[6]@{FA; and=[17]{any,1 ->~Scalar }; or=[18]{any,1 ->PB }; then=[19]{any,2 ->nScalar }} }; then=[19,22]{any,2 ->nScalar }}; false=PC; force=[26]{any,1 ->PC }}}");
+        "*[11]@{FA:^=any; a=int64 ; b=*[9,10](FA); bool=*[8]@{ FA; true=PA:*[6,7]@{FA; and=[17,20]{any,1 ->PA     }; or=[18,21]{any,1 ->PA     }; then=[19,22]{any,2 ->Scalar }}; false=PA; force=[26]{any,1 ->PA }}}",
+        "*[11]@{FA:^=any; a=Scalar; b=Scalar;      bool=*[8]@{ FA; true=PA:*[6,7]@{FA; and=[17,20]{any,1 ->Scalar }; or=[18,21]{any,1 ->Scalar }; then=[19,22]{any,2 ->Scalar }}; false=PA; force=[26]{any,1 ->PA }}}");
   }
 
 
@@ -548,10 +548,8 @@ boolSub ={b ->(if b true false)};
               "then = { { ( ) -> F } { ( ) -> F } -> F }"+
             "}"+
         "}",
-        "*[8]@{ FA:^=any; true=PA:*[6,7]@{FA; not=[19,23]{any,1 ->PA }; and=[17,21]{any,1 ->PA }; or=[18,22]{any,1 ->PA }; then=[20,24]{any,2 ->~Scalar }}; false=PA }",
-        // TODO: TOO HIGH
-        "*[8]@{ FA:^=any; true=PC:*[6,7]@{FA; and=[17,21]{any,1 ->PB:*[7]@{FA; not=[23]{any,1 -> PA:*[6]@{FA; not=[19]{any,1 ->PA }; and=[17]{any,1 ->~Scalar }; or=[18]{any,1 ->PA }; then=[20]{any,2 ->~Scalar }} }; and=[21]{any,1 ->PB }; or=[22]{any,1 ->~Scalar }; then=[24]{any,2 ->~Scalar } } }; or=[18,22]{any,1 ->PA }; not=[19,23]{any,1 ->PA }; then=[20,24]{any,2 ->~Scalar } }; false=PC}");
-
+        "*[8]@{ FA:^=any; true=PA:*[6,7]@{FA; not=[19,23]{any,1 ->PA }; and=[17,21]{any,1 ->PA }; or=[18,22]{any,1 ->PA }; then=[20,24]{any,2 -> Scalar }}; false=PA }",
+        "*[8]@{ FA:^=any; true=PB:*[6,7]@{FA; and=[17,21]{any,1 ->Scalar }; or=[18,22]{any,1 ->Scalar }; not=[19,23]{any,1 -> PA:*[6]@{FA; and=[17]{any,1 ->Scalar }; or=[18]{any,1 ->PA }; not=[19]{any,1 ->PA }; then=[20]{any,2 ->Scalar }} }; then=[20,24]{any,2 ->Scalar } }; false=PB}");
   }
 
   // Regression test.  Was unexpectedly large type result.  Cut down version of
@@ -591,12 +589,14 @@ all
   true=PA:*[5]@{
     FA;
     not=[17]{any,1 ->
-      PB:*[6]@{FA; not=[19]{any,1 ->PA }; then=[20]{any,2 ->~Scalar }}
+      PB:*[6]@{FA; not=[19]{any,1 ->PA }; then=[20]{any,2 ->Scalar }}
     };
-    then=[18]{any,2 ->~Scalar }
+    then=[18]{any,2 ->Scalar }
   };
   false=PB;
-  boolSub=[24]{any,1 ->~Scalar }
+  boolSub=[24]{any,1 ->
+    PC:*[5,6]@{FA; not=[17,19]{any,1 ->PC }; then=[18,20]{any,2 ->Scalar }}
+  }
 }
 """);
   }
@@ -632,10 +632,10 @@ n=
   };
 // Successor, is a function taking a natural number and returning the successor
 // (which is just a struct supporting the functions of natural numbers).
-  s = {pred ->
+  s = { pred ->
     self=@{
       zero = {unused ->b.false},  // zero is always false for anything other than zero
-      pred = {unused->pred},      // careful! 'pred=' is a label, the returned 'pred' was given as the argument
+      pred = {unused -> pred },   // careful! 'pred=' is a label, the returned 'pred' was given as the argument 'pred->'
       succ = {unused -> (n.s self)},
       add_ = {m -> ((pred.add_ m).succ void)} // a little odd, but really this counts down (via recursion) on the LHS and applies that many succ on the RHS
     };
@@ -741,70 +741,62 @@ three =(n.s two);     // Three is the successor of two
   FA:^=any;
   b=*[8]@{
     FA;
-    true=PA:*[6]@{FA; and_=[18]{any,1 ->~Scalar }; or__=[19]{any,1 ->PA }; then=[20]{any,2 ->~Scalar }};
-    false=PB:*[7]@{FA; and_=[21]{any,1 ->PB }; or__=[22]{any,1 ->~Scalar }; then=[23]{any,2 ->~Scalar }}
-  }; 
+    true=PA:*[6]@{FA; and_=[18]{any,1 ->Scalar }; or__=[19]{any,1 ->PA }; then=[20]{any,2 ->Scalar }};
+    false=PB:*[7]@{FA; and_=[21]{any,1 ->PB }; or__=[22]{any,1 ->Scalar }; then=[23]{any,2 ->Scalar }}
+  };
   n=*[11]@{
-    FA; 
+    FA;
     s=[31]{any,1 ->
-      PD:*[10]@{
-        FA; 
-        zero=[27]{any,1 ->PB }; 
+      PC:*[10]@{
+        FA;
+        zero=[27]{any,1 ->PB };
         pred=[28]{any,1 ->
-          PC:*[9,10]@{
-            FA; 
-            zero=[24,27]{any,1 ->
-              *[6,7]@{FA; and_=[18,21]{any,1 ->PB }; or__=[19,22]{any,1 ->PA }; then=[20,23]{any,2 ->~Scalar }} 
-            }; 
-            pred=[17,28]{any,1 ->PC }; 
-            succ=[25,29]{any,1 ->PD }; 
-            add_=[26,30]{any,1 ->PD }
-          } 
-        }; 
-        succ=[29]{any,1 ->PD }; 
-        add_=[30]{any,1 ->~Scalar }
-      } 
-    }; 
-    z=*[9]@{FA; zero=[24]{any,1 ->PA }; pred=[17]{any,1 ->~Scalar }; succ=[25]{any,1 ->PD }; add_=[26]{any,1 ->PD }}
-  }; 
-  one=PD; 
-  two=~Scalar; 
-  three=PD
+          *[ALL]()
+        };
+        succ=[29]{any,1 ->PC };
+        add_=[30]{any,1 ->Scalar }
+      }
+    };
+    z=*[9]@{FA; zero=[24]{any,1 ->PA }; pred=[17]{any,1 ->~Scalar }; succ=[25]{any,1 ->PC }; add_=[26]{any,1 ->Scalar }}
+  };
+  one=PC;
+  two=*[]~();
+  three=PC
 }
 """,
        """
 *[12]@{
-  FA:^=any; 
+  FA:^=any;
   b=*[8]@{
-    FA; 
-    true=PA:*[6]@{FA; and_=[18]{any,1 ->~Scalar }; or__=[19]{any,1 ->PA }; then=[20]{any,2 ->~Scalar }}; 
+    FA;
+    true=PA:*[6]@{FA; and_=[18]{any,1 ->~Scalar }; or__=[19]{any,1 ->PA }; then=[20]{any,2 ->~Scalar }};
     false=PB:*[7]@{FA; and_=[21]{any,1 ->PB }; or__=[22]{any,1 ->~Scalar }; then=[23]{any,2 ->~Scalar }}
-  }; 
+  };
   n=*[11]@{
-    FA; 
+    FA;
     s=[31]{any,1 ->
       PD:*[10]@{
-        FA; 
-        zero=[27]{any,1 ->PB }; 
+        FA;
+        zero=[27]{any,1 ->PB };
         pred=[28]{any,1 ->
           PC:*[9,10]@{
-            FA; 
+            FA;
             zero=[24,27]{any,1 ->
-              *[6,7]@{FA; and_=[18,21]{any,1 ->PB }; or__=[19,22]{any,1 ->PA }; then=[20,23]{any,2 ->~Scalar }} 
-            }; 
-            pred=[17,28]{any,1 ->PC }; 
-            succ=[25,29]{any,1 ->PD }; 
+              *[6,7]@{FA; and_=[18,21]{any,1 ->PB }; or__=[19,22]{any,1 ->PA }; then=[20,23]{any,2 ->~Scalar }}
+            };
+            pred=[17,28]{any,1 ->PC };
+            succ=[25,29]{any,1 ->PD };
             add_=[26,30]{any,1 ->PD }
-          } 
-        }; 
-        succ=[29]{any,1 ->PD }; 
+          }
+        };
+        succ=[29]{any,1 ->PD };
         add_=[30]{any,1 ->PD }
-      } 
-    }; 
+      }
+    };
     z=*[9]@{FA; zero=[24]{any,1 ->PA }; pred=[17]{any,1 ->~Scalar }; succ=[25]{any,1 ->PD }; add_=[26]{any,1 ->PD }}
-  }; 
-  one=PD; 
-  two=PD; 
+  };
+  one=PD;
+  two=PD;
   three=PD
 }""");
   }
@@ -874,8 +866,8 @@ three =(n.s two);     // Three is the successor of two
         "   res1 = @{ a = Missing field a };"+
         "   res2 = @{ a=nint8; b=nflt32 }"+
         "}",
-        "*[9]@{FA:^=any; f=[18]{any,2 ->PA:*[5,6,7,8]~@{FA; a=Scalar} }; res1=PA; res2=*[5,6,7,8]~@{FA; a=nint8} }",
-        "*[9]@{FA:^=any; f=[18]{any,2 ->PA:*[5,6,7,8](FA) }; res1=PA; res2=PA}");
+        "*[9]@{FA:^=any; f=[18]{any,2 ->PA:*[ALL    ]~@{FA; a=Scalar} }; res1=PA; res2=*[ALL    ]~@{FA; a=nint8} }",
+        "*[9]@{^=any; f=[18]{any,2 ->Scalar }; res1=Scalar; res2=Scalar}");
   }
 
 

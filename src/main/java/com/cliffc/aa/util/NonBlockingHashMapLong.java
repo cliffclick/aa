@@ -218,13 +218,20 @@ public class NonBlockingHashMapLong<TypeV>
 
 
   // Count of reprobes
-  private transient ConcurrentAutoTable _reprobes = new ConcurrentAutoTable();
+  private transient AryInt _reprobes = null;
+
   /** Get and clear the current count of reprobes.  Reprobes happen on key
    *  collisions, and a high reprobe rate may indicate a poor hash function or
    *  weaknesses in the table resizing function.
    *  @return the count of reprobes since the last call to {@link #reprobes}
    *  or since the table was created.   */
-  public long reprobes() { long r = _reprobes.get(); _reprobes = new ConcurrentAutoTable(); return r; }
+  public AryInt reprobes() {
+    AryInt p = _reprobes;
+    _reprobes = new AryInt();
+    return p;
+  }
+  private void  record( int ps ) { if( _reprobes!=null ) _record(ps); }
+  private void _record( int ps ) { _reprobes.setX(ps,_reprobes.atX(ps)+1); }
 
 
   // --- reprobe_limit -----------------------------------------------------
@@ -572,6 +579,7 @@ public class NonBlockingHashMapLong<TypeV>
 
       // Main spin/reprobe loop, looking for a Key hit
       int reprobe_cnt=0;
+      try {
       while( true ) {
         final long   K = _keys[idx]; // Get key   before volatile read, could be NO_KEY
         final Object V = _vals[idx]; // Get value before volatile read, could be null or Tombstone or Prime
@@ -600,7 +608,10 @@ public class NonBlockingHashMapLong<TypeV>
             ? null               // Nope!  A clear miss
             : copy_slot_and_check(idx,key).get_impl(key); // Retry in the new table
 
-        idx = (idx+1)&(len-1);    // Reprobe by 1!  (could now prefetch)
+        idx = (idx+(hash|1))&(len-1); // Divergent reprobe chain
+      }
+      } finally {
+        _nbhml.record(reprobe_cnt);
       }
     }
 
@@ -624,6 +635,7 @@ public class NonBlockingHashMapLong<TypeV>
       int reprobe_cnt=0;
       long   K;
       Object V;
+      try {
       while( true ) {           // Spin till we get a Key slot
         V = _vals[idx];         // Get old value
         K = _keys[idx];         // Get current key
@@ -669,8 +681,11 @@ public class NonBlockingHashMapLong<TypeV>
           return newchm.putIfMatch(key,putval,expVal);
         }
 
-        idx = (idx+1)&(len-1); // Reprobe!
+        idx = (idx+(hash|1))&(len-1); // Divergent reprobe chain
       } // End of spinning till we get a Key slot
+      } finally {
+        _nbhml.record(reprobe_cnt);
+      }
 
       while ( true ) {              // Spin till we insert a value
         // ---

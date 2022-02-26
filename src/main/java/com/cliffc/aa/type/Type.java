@@ -253,7 +253,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Slow, actually probes the hash table.
   boolean un_interned() { return _hash == 0 || INTERN.get(this) != this; }
   Type intern_lookup() { return INTERN.get(this); }
-  static int intern_size() { return INTERN.size(); }
+  public static int intern_size() { return INTERN.size(); }
+  public static int intern_capacity() { return INTERN.len(); }
+  public static AryInt reprobes() { return INTERN.reprobes(); }
   public static boolean intern_check() {
     int errs=0;
     for( Type k : INTERN.keySet() ) {
