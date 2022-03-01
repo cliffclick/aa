@@ -140,7 +140,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   public  static final TypeMemPtr ISUSED = make(BitsAlias.NALL ,TypeStruct.ISUSED); // Excludes nil
   public  static final TypeMemPtr EMTPTR = make(BitsAlias.EMPTY,TypeStruct.UNUSED);
   public  static final TypeMemPtr DISP_SIMPLE= make(BitsAlias.NALL,TypeStruct.ISUSED); // closed display
-  public  static final TypeMemPtr STRPTR = make(4,TypeStruct.ISUSED.set_name("str:")); // For legacy HM tests
+  public  static final TypeMemPtr STRPTR = make(BitsAlias.STR,TypeStruct.ISUSED.set_name("str:")); // For legacy HM tests
   public  static final TypeStruct OOP_OOP = TypeStruct.args(ISUSED0,ISUSED0); // { ptr? ptr? -> }
 
   static final Type[] TYPES = new Type[]{ISUSED0,EMTPTR,DISPLAY,DISPLAY_PTR,OOP_OOP};

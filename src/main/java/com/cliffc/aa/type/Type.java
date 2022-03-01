@@ -871,7 +871,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     return switch( _type ) {
       case TNIL -> XNSCALR;
       case TSCALAR -> NSCALR;
-      case TNSCALR -> this; // No nil already
+      case TXNSCALR -> this;  // No nil already
+      case TNSCALR  -> this;  // No nil already
       case TXSCALAR -> XNSCALR;
       default -> throw typerr(null);         // Overridden in subclass
     };

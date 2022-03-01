@@ -11,7 +11,6 @@ import java.util.function.IntSupplier;
 
 import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.unimpl;
-import static com.cliffc.aa.type.TypeFld.Access;
 
 // Combined Hindley-Milner and Global Constant Propagation typing.
 
@@ -118,9 +117,9 @@ public class HM {
     DO_HM  = do_hm ;
     DO_GCP = do_gcp;
 
-    for( PrimSyn prim : new PrimSyn[]{new If(), new Pair(), new EQ(), new EQ0(), new Mul(), new Add(), new Dec(), new IRand(), new Str(), new Triple(), new Factor(), new IsEmpty(), new NotNil()} )
+    for( PrimSyn prim : new PrimSyn[]{new Universe(), new If(), new Pair(), new EQ(), new EQ0(), new Mul(), new Add(), new Dec(), new IRand(), new Str(), new Triple(), new Factor(), new IsEmpty(), new NotNil()} )
       PRIMSYNS.put(prim.name(),prim);
-    BitsAlias.new_alias((BitsAlias.ALLX)); // Force string alias to exist
+    BitsAlias.new_alias((BitsAlias.INTX)); // Force string alias to exist
 
     // Parse
     Root prog = parse( sprog );
@@ -146,7 +145,6 @@ public class HM {
     // GCP types continue to run downhill.
     HM_FREEZE = true;
     prog.visit((syn) -> { syn.add_val_work(null,work); return work.add(syn); }, (a,b)->null);
-    assert prog.more_work(work);
     work_cnt+=main_work_loop(prog,work);
     assert prog.more_work(work);
 
@@ -212,8 +210,8 @@ public class HM {
         if( self.is_err2() && self.has_nil() )
           // If any contain nil, then we may have folded in a not-nil.
           // To preserve monotonicity, we make them all nil.
-          // Example: (3.unify(notnil)).unify("abc") ==       int8     .unify("abc")  == (Error int8,"abc" ) <<-- Should be "abc"?
-          // Example:  3.unify("abc")).unify(notnil) == (Error 3,"abc").unify(notnil) == (Error int8,"abc"?)
+          // Example: (3.unify(notnil)).unify("abc" ) ==       int8     .unify("abc")  == (Error int8,"abc" ) <<-- Should be "abc"?
+          // Example: (3.unify("abc" )).unify(notnil) == (Error 3,"abc").unify(notnil) == (Error int8,"abc"?)
           self.add_nil();
         return null;
       }, (a,b)->null);
@@ -221,8 +219,16 @@ public class HM {
 
   // Reset global statics between tests
   static void reset() {
+    //System.out.println("Type.INTERN reprobes");
+    //AryInt rps = Type.reprobes();
+    //System.out.println(rps);
+    //long sum=0, cnt=0;
+    //if( rps!=null )
+    //  for( int i=0; i<rps._len; i++ ) { sum += (long)i*rps.at(i); cnt += rps.at(i); }
+    //System.out.println("Accesses: "+cnt+", total reprobes: "+sum+", size: "+Type.intern_size()+", cap: "+Type.intern_capacity());
     BitsAlias.reset_to_init0();
     BitsFun.reset_to_init0();
+    Universe.reset();
     PRIMSYNS.clear();
     ALIASES.clear();
     Lambda.FUNS.clear();
@@ -574,7 +580,7 @@ public class HM {
       _refs = new Ident[args.length][];
       _applys = new Ary<>(Apply.class);
       // A unique FIDX for this Lambda
-      _fidx = BitsFun.new_fidx();
+      _fidx = this instanceof Universe ? BitsAlias.EXTX : BitsFun.new_fidx();
       FUNS.put(_fidx,this);
       _flow = TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length,Type.ANY,Type.XSCALAR);
     }
@@ -637,8 +643,6 @@ public class HM {
       // Go ahead and pre-unify with a required function
       T2[] targs = Arrays.copyOf(_targs,_targs.length+1);
       targs[_targs.length] = _body.find();
-      // Widen all constant base inputs for normal functions, but not for the
-      // hidden internal one made for not-nil.
       find().unify(T2.make_fun(BitsFun.make0(_fidx), targs),work);
       return cnt;
     }
@@ -777,33 +781,20 @@ public class HM {
       work.add(_args);
     }
 
-    // Record call-site actual arguments on lambda formals
-    Type _val( Work<Syntax> work ) {
+    @Override Type val(Work<Syntax> work) {
       Type flow = _fun._flow;
       if( !(flow instanceof TypeFunPtr tfp) ) return flow.oob(Type.SCALAR);
-      if( tfp._fidxs == BitsFun.EMPTY || (DO_HM && !_fun.find().is_fun()) )
-        return Type.XSCALAR; // Nothing being called, stay high
-      if( work!=null &&
-          // 'ALL' happens from functions being passed in via Root (top-level
-          // arguments), and are not any local function being analyzed.
-          !tfp._fidxs.test(BitsFun.ALLX) )
+      if( tfp._fidxs == BitsFun.EMPTY )   return Type.XSCALAR;    // Nothing being called, stay high
+      // Meet all calling arguments over all called function args.
+      if( work!=null )
         for( int fidx : tfp._fidxs ) {
           Lambda lambda = Lambda.FUNS.get(fidx);
-          if( lambda._applys.find(this) == -1 ) {
-            // new call site for lambda; all args must meet into this lambda;
-            lambda._applys.push(this);
-            for( int i=0; i<_args.length; i++ )
-              lambda.arg_meet(i,_args[i]._flow,work);
-            if( lambda instanceof PrimSyn ) // Normal lambdas update from their _body alone
-              work.add(lambda);             // But primitives re-apply arguments
-          }
-      }
-      return flow;
-    }
+          // new call site for lambda; all args must meet into this lambda;
+          if( lambda._applys.find(this) == -1 ) lambda._applys.push(this);
+          for( int i=0; i<_args.length; i++ )
+            lambda.arg_meet(i,_args[i]._flow,work);
+        }
 
-    @Override Type val(Work<Syntax> work) {
-      Type flow = _val(work);
-      if( !(flow instanceof TypeFunPtr tfp) ) return flow;
       // Attempt to lift the result, based on HM types.
       Type lifted = do_apply_lift(find(),tfp._ret);
       assert _flow.isa(lifted) ; // Monotonic...
@@ -813,7 +804,6 @@ public class HM {
     Type do_apply_lift(T2 rezt2, Type ret) {
       if( !DO_LIFT || !DO_HM ) return ret;
       if( ret==Type.XSCALAR ) return ret; // Nothing to lift
-      // TODO: Sharpen ret before calling apply_lift
       Type lift = hm_apply_lift(rezt2,ret);
       if( lift==ret ) return ret; // No change
       rezt2.push_update(this);
@@ -913,24 +903,66 @@ public class HM {
   static class Root extends Apply {
     Root(Syntax body) { super(body); }
     @Override SB str(SB sb) { return _fun.str(sb); }
+    // Just unify input and output
     @Override boolean hm(final Work<Syntax> work) {
-      boolean progress = find().unify(_fun.find(),work);
       RVISIT.clear();
-      _widen_inputs(false,find());
+      boolean progress = find().unify(_fun.find(),work);
+      progress |= _widen_inputs(false,find(),work);
       return progress;
     }
 
+    // TODO: T2 walker
+    private boolean _widen_inputs(boolean funarg, T2 t2, Work<Syntax> work) {
+      boolean progress = false;
+      if( funarg ) {
+        // All possible fidxs / aliases can be passed in
+        if( t2.is_fun   () ) { var fidxs = t2._fidxs  .set(BitsFun  .EXTX);  if( fidxs!=t2._fidxs  ) { if( work==null ) return true; progress=true; t2._fidxs  =fidxs; } }
+        if( t2.is_struct() ) { var alias = t2._aliases.set(BitsAlias.EXTX);  if( alias!=t2._aliases) { if( work==null ) return true; progress=true; t2._aliases=alias; } }
+      }
+      if( RVISIT.tset(t2._uid) ) return progress;
+      if( t2._args != null ) {
+        funarg = t2.is_fun();
+        for( String arg : t2._args.keySet() )
+          if( !Util.eq(arg,"ret") ) { // Do not walk function returns
+            progress |= _widen_inputs(funarg,t2.arg(arg),work);
+            if( work==null && progress ) return true;
+          }
+      }
+      return progress;
+    }
+
+
     @Override void add_hm_work( @NotNull Work<Syntax> work) { }
+
+    // The Root acts as-if the rest of the Universe: all possible future
+    // programs can call here, with all possible (but valid arguments).  Any
+    // alias or fidx which escapes to the Universe can be passed back in as any
+    // valid argument - but if alias/fidx does not escape then it cannot be
+    // passed back.
     @Override Type val(Work<Syntax> work) {
-      _val(work);
+      // Attempt to lift the result, based on HM types.
       Type flow = _fun._flow;
       if( !(flow instanceof TypeFunPtr tfp) ) return flow;
-      T2 fun = _fun.find();
-      if( !fun.is_fun() ) return flow;
+      if( tfp._fidxs == BitsFun.EMPTY )
+        return Type.XSCALAR;    // Nothing being called, stay high
+      if( work!=null )
+        for( int fidx : tfp._fidxs ) {
+          Lambda lambda = Lambda.FUNS.get(fidx);
+          // root call site for lambda; all external args must meet into this lambda;
+          if( lambda._applys.find(this) == -1 ) lambda._applys.push(this);
+          for( int i=0; i<lambda._args.length; i++ ) {
+            T2 t2arg = lambda.targ(i);
+            Type tfarg = t2arg.as_flow(HM_FREEZE);
+            lambda.arg_meet(i,tfarg,work);
+          }
+        }
+      return flow;
+    }
 
-      // Attempt to lift the result, based on HM types.
-      Type ret = do_apply_lift(fun.arg("ret"),tfp._ret);
-      return tfp.make_from(tfp.dsp(),ret);
+    @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
+      int cnt = super.prep_tree(par,nongen,work);
+      find().push_update(this);
+      return cnt;
     }
 
     // After GCP stability, we guess (badly) that all escaping functions are
@@ -938,46 +970,28 @@ public class HM {
     // acceptable to HMT.  Basically, the HM types become a module type,
     // guarding the GCP types that can be passed in.
     private static final VBitSet RVISIT = new VBitSet();
-    private static final Ary<T2> RESCS = new Ary<>(T2.class);
     void update_root_args(Work<Syntax> work) {
-      if( DO_HM ) {
-        RVISIT.clear();  RESCS.clear();
-        _find_root_escs(_hmt);
-      }
       // If an argument changes type, adjust the lambda arg types
       Type flow = _fun._flow;
       if( DO_GCP && !flow.above_center() ) {
+        Type sflow = sharpen(flow); // Sharpen
         RVISIT.clear();
         T2.T2MAP.clear();
-        _walk_root_funs(flow,work);
+        _walk_root_funs(sflow,work);
       }
 
-    }
-    // TODO: Type walker
-    private static void _find_root_escs( T2 t2 ) {
-      if( RVISIT.tset(t2._uid) ) return;
-      if( t2.is_fun() ) {
-        RESCS.push(t2);
-        _find_root_escs(t2.arg("ret"));
-      } else if( t2.is_struct() ) {
-        RESCS.push(t2);
-        if( t2._args!=null )
-          for( T2 ft : t2._args.values() )
-            _find_root_escs(ft);
-      }
     }
     // TODO: Type walker
     private static void _walk_root_funs( Type flow, Work<Syntax> work) {
       if( RVISIT.tset(flow._uid) ) return;
         // Find any functions
       if( flow instanceof TypeFunPtr tfp ) {
-        if( tfp._fidxs.test(1) ) return; // All of them
         // Meet the actuals over the formals.
         for( int fidx : tfp._fidxs ) {
           Lambda fun = Lambda.FUNS.get(fidx);
           for( int i=0; i<fun._types.length; i++ ) {
             // GCP external argument limited to HM compatible type
-            Type aflow = DO_HM ? fun.targ(i).as_flow() : Type.SCALAR;
+            Type aflow = DO_HM ? fun.targ(i).as_flow(true) : Type.SCALAR;
             fun.arg_meet(i,aflow,work);
           }
           if( fun instanceof PrimSyn ) work.add(fun);
@@ -989,27 +1003,8 @@ public class HM {
         for( TypeFld fld : tmp._obj )
           _walk_root_funs(fld._t,work);
     }
-    // TODO: T2 walker
-    //
-    private static void _widen_inputs(boolean funarg, T2 t2) {
-      if( funarg ) {
-        // All possible fidxs / aliases can be passed in
-        if( t2.is_fun   () ) t2._fidxs   = t2._fidxs  .test(0) ? BitsFun  .ALL0: BitsFun  . ALL;
-        if( t2.is_struct() ) t2._aliases = t2._aliases.test(0) ? BitsAlias.ALL0: BitsAlias.NALL;
-        // Special hack for strings, which are special hacked already
-        if( t2.is_base() && t2._flow instanceof TypeMemPtr tmp && tmp.is_str() )
-          t2._flow = tmp.make_from((TypeStruct)tmp._obj.widen()); // String widen
-      }
-      if( RVISIT.tset(t2._uid) ) return;
-      if( t2._args != null ) {
-        funarg = t2.is_fun();
-        for( String arg : t2._args.keySet() )
-          if( !Util.eq(arg,"ret") ) // Do not walk function returns
-            _widen_inputs(funarg,t2.arg(arg));
-      }
-    }
 
-    Type flow_type() { return _add_sig(_flow); }
+    Type flow_type() { return sharpen(_flow); }
   }
 
   // Expand functions to full signatures, recursively.
@@ -1017,7 +1012,7 @@ public class HM {
   private static final VBitSet ADD_SIG = new VBitSet();
   private static TypeMem ASIG_MEM;
   private static final Type[] FLOWS = new Type[0];
-  static Type _add_sig(Type t) {
+  static Type sharpen(Type t) {
     ADD_SIG.clear();
     TypeStruct[] ts = new TypeStruct[ALIASES._len];
     ts[1] = TypeStruct.ISUSED;
@@ -1030,24 +1025,11 @@ public class HM {
   }
   private static Type add_sig(Type t) {
     if( ADD_SIG.tset(t._uid) ) return t;
-    if( t instanceof TypeFunPtr fun ) {
-      Type rez = Type.XSCALAR;
-      if( fun._fidxs.test(1) ) rez = Type.SCALAR;
-      else
-        for( int fidx : fun._fidxs )
-          rez = rez.meet(Lambda.FUNS.get(fidx).apply(FLOWS));
-      if( rez != fun._ret )
-        System.out.println("why");
-      Type rez2 = add_sig(rez);
-      return fun.make_from(fun.dsp(),rez2);
-    } else if( t instanceof TypeMemPtr tmp ) {
-      if( tmp.is_str() ) return t; // Special string hack
-      TypeMemPtr tmp2 = tmp.make_from(TypeStruct.UNUSED);
-      TypeMemPtr tmp3 = ASIG_MEM.sharpen(tmp2);
-      return tmp3.join(tmp); // GCP is monotonically stronger, unless the program is in error
-    } else {
-      return t;
-    }
+    if( t instanceof TypeFunPtr fun )
+      return fun.make_from(fun.dsp(),add_sig(fun._ret));
+    if( t instanceof TypeMemPtr tmp )
+      return tmp.is_str() ? t : ASIG_MEM.sharpen(tmp); // Special string hack
+    return t;
   }
 
 
@@ -1175,7 +1157,7 @@ public class HM {
       // Add struct-ness if possible
       if( !rec.is_struct() && !rec.is_nil() ) {
         rec._open = true;
-        rec._aliases = BitsAlias.EMPTY;
+        rec._aliases = BitsAlias.NALL;
         if( rec._args==null ) rec._args = new NonBlockingHashMap<>();
         assert rec.is_struct();
       }
@@ -1199,24 +1181,21 @@ public class HM {
       if( trec==Type.NIL ) return Type.XSCALAR; // Field from nil
       if( !(trec instanceof TypeMemPtr tmp) ) return trec.oob(Type.SCALAR);
       Type t=Type.XSCALAR;
-      if( tmp._aliases.test(1) ) {
-        assert DO_HM;
-        TypeFld tf = tmp._obj.get(_id);
-        if( tf!=null ) return tf._t; // Help from HM
-        return tmp.oob(Type.SCALAR);
-      }
       // GCP takes meet of aliased fields
-      for( int alias : tmp._aliases ) {
-        if( alias==0 ) continue; // May be nil error
-        Alloc alloc = ALIASES.at(alias);
-        Type afld = alloc.fld(_id);
-        if( afld==null ) afld = tmp._obj.oob(Type.SCALAR);
-        t = t.meet(afld);
-        alloc.push(this);
-      }
+      if( tmp._aliases.test(BitsAlias.ALLX) ) t=Type.SCALAR;
+      else
+        for( int alias : tmp._aliases ) {
+          if( alias==0 ) continue; // May be nil error
+          Alloc alloc = ALIASES.at(alias);
+          Type afld = alloc.fld(_id);
+          if( afld==null ) afld = tmp._obj.oob(Type.SCALAR);
+          t = t.meet(afld);
+          alloc.push(this);
+        }
       if( DO_HM ) {
         TypeFld tf = tmp._obj.get(_id);
-        if( tf!=null ) t = t.join(tf._t); // Help from HM
+        Type tx = tf==null ? tmp._obj.oob(Type.SCALAR) : tf._t;
+        t = t.join(tx); // Help from HM
       }
       return t;
     }
@@ -1242,14 +1221,14 @@ public class HM {
     static T2  STRP (){ return T2.make_base(TypeMemPtr.STRPTR); }
     static T2  FLT64(){ return T2.make_base(TypeFlt.FLT64); }
     abstract String name();
-    private static final String[][] IDS = new String[][] {
+    static final String[][] IDS = new String[][] {
       {},
       {"x"},
       {"x","y"},
       {"x","y","z"},
     };
-    PrimSyn(T2 ...t2s) {
-      super(null,IDS[t2s.length-1]);
+    PrimSyn(String[] ids, T2 ...t2s) {
+      super(null,ids);
       _hmt = T2.make_fun(BitsFun.make0(_fidx), t2s).fresh();
       for( int i=0; i<_targs.length; i++ )
         _targs[i] = _hmt.arg(Lambda.ARGNAMES[i]).push_update(this);
@@ -1287,7 +1266,7 @@ public class HM {
     static private int a;
     static private T2 var1,var2;
     public Pair() {
-      super(var1=T2.make_leaf(),var2=T2.make_leaf(),T2.make_open_struct(BitsAlias.make0(a=BitsAlias.new_alias(BitsAlias.ALLX)),FLDS,new T2[]{var1,var2}));
+      super(FLDS,var1=T2.make_leaf(),var2=T2.make_leaf(),T2.make_open_struct(BitsAlias.make0(a=BitsAlias.new_alias(BitsAlias.ALLX)),FLDS,new T2[]{var1,var2}));
       _alias = a;
       ALIASES.setX(_alias,this);
     }
@@ -1310,7 +1289,7 @@ public class HM {
     static private int a;
     static private T2 var1,var2,var3;
     public Triple() {
-      super(var1=T2.make_leaf(),var2=T2.make_leaf(),var3=T2.make_leaf(),T2.make_open_struct(BitsAlias.make0(a=BitsAlias.new_alias(BitsAlias.ALLX)),FLDS,new T2[]{var1,var2,var3}));
+      super(FLDS,var1=T2.make_leaf(),var2=T2.make_leaf(),var3=T2.make_leaf(),T2.make_open_struct(BitsAlias.make0(a=BitsAlias.new_alias(BitsAlias.ALLX)),FLDS,new T2[]{var1,var2,var3}));
       _alias = a;
       ALIASES.setX(_alias,this);
     }
@@ -1328,7 +1307,7 @@ public class HM {
   // None-executing paths do not unify args.
   static class If extends PrimSyn {
     @Override String name() { return "if"; }
-    public If() { super(T2.make_leaf(),T2.make_leaf(),T2.make_leaf(),T2.make_leaf()); }
+    public If() { super(IDS[3],T2.make_leaf(),T2.make_leaf(),T2.make_leaf(),T2.make_leaf()); }
     @Override PrimSyn make() { return new If(); }
     @Override boolean hm(Work<Syntax> work) {
       T2 rez = find().arg("ret");
@@ -1370,7 +1349,7 @@ public class HM {
   static class EQ extends PrimSyn {
     @Override String name() { return "eq"; }
     static private T2 var1;
-    public EQ() { super(var1=T2.make_leaf(),var1,BOOL()); }
+    public EQ() { super(IDS[2],var1=T2.make_leaf(),var1,BOOL()); }
     @Override PrimSyn make() { return new EQ(); }
     @Override Type apply( Type[] flows) {
       Type x0 = flows[0];
@@ -1386,7 +1365,7 @@ public class HM {
   // EQ0
   static class EQ0 extends PrimSyn {
     @Override String name() { return "eq0"; }
-    public EQ0() { super(INT64(),BOOL()); }
+    public EQ0() { super(IDS[1],INT64(),BOOL()); }
     @Override PrimSyn make() { return new EQ0(); }
     @Override Type apply( Type[] flows) {
       Type pred = flows[0];
@@ -1403,7 +1382,7 @@ public class HM {
 
   static class IsEmpty extends PrimSyn {
     @Override String name() { return "isempty"; }
-    public IsEmpty() { super(STRP(),BOOL()); }
+    public IsEmpty() { super(IDS[1],STRP(),BOOL()); }
     @Override PrimSyn make() { return new IsEmpty(); }
     @Override Type apply( Type[] flows) {
       Type pred = flows[0];
@@ -1419,7 +1398,7 @@ public class HM {
   // Remove a nil from a struct after a guarding if-test
   static class NotNil extends PrimSyn {
     @Override String name() { return " notnil"; }
-    public NotNil() { super(T2.make_leaf(),T2.make_leaf()); }
+    public NotNil() { super(IDS[1],T2.make_leaf(),T2.make_leaf()); }
     @Override PrimSyn make() { throw unimpl(); /*return new NotNil(); */}
     @Override boolean hm(Work<Syntax> work) {
       T2 arg = targ(0);
@@ -1462,7 +1441,7 @@ public class HM {
   // multiply
   static class Mul extends PrimSyn {
     @Override String name() { return "*"; }
-    public Mul() { super(INT64(),INT64(),INT64()); }
+    public Mul() { super(IDS[2],INT64(),INT64(),INT64()); }
     @Override PrimSyn make() { return new Mul(); }
     @Override Type apply( Type[] flows) {
       Type t0 = flows[0];
@@ -1482,7 +1461,7 @@ public class HM {
   // add integers
   static class Add extends PrimSyn {
     @Override String name() { return "+"; }
-    public Add() { super(INT64(),INT64(),INT64()); }
+    public Add() { super(IDS[2],INT64(),INT64(),INT64()); }
     @Override PrimSyn make() { return new Add(); }
     @Override Type apply( Type[] flows) {
       Type t0 = flows[0];
@@ -1500,7 +1479,7 @@ public class HM {
   // decrement
   static class Dec extends PrimSyn {
     @Override String name() { return "dec"; }
-    public Dec() { super(INT64(),INT64()); }
+    public Dec() { super(IDS[1],INT64(),INT64()); }
     @Override PrimSyn make() { return new Dec(); }
     @Override Type apply( Type[] flows) {
       Type t0 = flows[0];
@@ -1512,7 +1491,7 @@ public class HM {
   }
   static class IRand extends PrimSyn {
     @Override String name() { return "rand"; }
-    public IRand() { super(INT64()); }
+    public IRand() { super(IDS[0],INT64()); }
     @Override PrimSyn make() { return new IRand(); }
     @Override Type apply( Type[] flows) {  return TypeInt.INT64;  }
   }
@@ -1520,7 +1499,7 @@ public class HM {
   // int->str
   static class Str extends PrimSyn {
     @Override String name() { return "str"; }
-    public Str() { super(INT64(),STRP()); }
+    public Str() { super(IDS[1],INT64(),STRP()); }
     @Override PrimSyn make() { return new Str(); }
     @Override Type apply( Type[] flows) {
       Type i = flows[0];
@@ -1535,7 +1514,7 @@ public class HM {
   // flt->(factor flt flt)
   static class Factor extends PrimSyn {
     @Override String name() { return "factor"; }
-    public Factor() { super(FLT64(),FLT64()); }
+    public Factor() { super(IDS[1],FLT64(),FLT64()); }
     @Override PrimSyn make() { return new Factor(); }
     @Override Type apply( Type[] flows) {
       Type flt = flows[0];
@@ -1544,16 +1523,57 @@ public class HM {
     }
   }
 
-  static interface Alloc {
-    abstract TypeMemPtr tmp();
+  // All the Functions and Structs in the Universe, called with the Program
+  // result as the argument.  The result of this is used by Root as the
+  // possible arguments.
+  //   while( !fixedpoint ) {
+  //     prog_result = Root(external_args);
+  //     external_args = (External prog_result);
+  //   }
+  static class Universe extends PrimSyn implements Alloc {
+    static BitsAlias EXT_ALIASES;
+    static BitsFun   EXT_FIDXS  ;
+    static void reset() { EXT_ALIASES = BitsAlias.EXT;  EXT_FIDXS = BitsFun.EXT; }
+    static T2 SCALAR(){ return T2.make_base(Type.SCALAR); }
+    @Override String name() { return "Universe"; }
+    public Universe() {
+      super(IDS[0],SCALAR());
+      ALIASES.setX(BitsAlias.EXTX,this);
+    }
+    @Override PrimSyn make() { return new Universe(); }
+    @Override SB str(SB sb) { return sb.p("{->}"); }
+    @Override SB p1(SB sb, VBitSet dups) { return sb.p("{->}"); }
+    @Override SB p2(SB sb, VBitSet dups) { return sb; }
+    @Override Type apply( Type[] flows) { return Type.SCALAR; }
+    @Override boolean hm(Work<Syntax> work) { return false; }
+    @Override void add_hm_work( @NotNull Work<Syntax> work) { throw unimpl(); }
+    @Override Type val(Work<Syntax> work) { return Type.SCALAR; }
+    // Meet the formal argument# with a new Apply call site actual arg.
+    // For Universe, we collect escaping internal fidxs and aliases.
+    @Override void arg_meet(int argn, Type cflow, Work<Syntax> work) {
+      if( cflow instanceof TypeMemPtr tmp ) EXT_ALIASES = EXT_ALIASES.meet(tmp._aliases);
+      if( cflow instanceof TypeFunPtr tfp ) EXT_FIDXS   = EXT_FIDXS  .meet(tfp._fidxs  );
+    }
+
+    @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) {
+      throw unimpl();
+    }
+    @Override public TypeMemPtr tmp() { return TypeMemPtr.make(EXT_ALIASES,TypeStruct.ISUSED); }
+    @Override public Type fld(String id) { return Type.SCALAR; }
+    @Override public void push(Syntax fld) { }
+  }
+
+
+  interface Alloc {
+    TypeMemPtr tmp();
     default TypeMemPtr _tmp(int alias, String[] ids, Type[] ts) {
       TypeFld[] tfs = new TypeFld[ts.length+1];
       tfs[0] = TypeFld.NO_DISP;  // Display
       for( int i=0; i<ts.length; i++ ) tfs[i+1] = TypeFld.make(ids[i],ts[i],ARG_IDX+i);
       return TypeMemPtr.make(alias,TypeStruct.make(tfs));
     }
-    abstract Type fld(String id);
-    abstract void push(Syntax fld);
+    Type fld(String id);
+    void push(Syntax fld);
   }
 
   // ---------------------------------------------------------------------
@@ -1769,20 +1789,6 @@ public class HM {
       if( _aliases!=null ) _aliases =_aliases.set(0);
     }
 
-    private static boolean not_isa( Type t0, Type t1 ) {
-      return (t0 != null || t1 != null) && (t0 == null || t1 == null || !t0.isa(t1));
-    }
-    // Check all named fields in t2 are in 'this', recursively deep.
-    // TODO: handle cycles
-    private boolean isa_deep( T2 t2 ) {
-      if( t2.size() > size() ) return false;
-      if( t2._args!=null )
-        for( String arg : t2._args.keySet() )
-          if( !_args.containsKey(arg) )
-            return false;
-      return true;
-    }
-
     // Varies as unification happens; not suitable for a HashMap/HashSet unless
     // unchanging (e.g. defensive clone)
     @Override public int hashCode() {
@@ -1802,23 +1808,24 @@ public class HM {
 
     // No function arguments, just function returns.
     static final NonBlockingHashMapLong<Type> ADUPS = new NonBlockingHashMapLong<>();
-    Type as_flow() {
+    Type as_flow(boolean root_args) {
       assert ADUPS.isEmpty();
-      Type t = _as_flow();
+      Type t = _as_flow(root_args);
       ADUPS.clear();
       return t;
     }
-    Type _as_flow() {
+    Type _as_flow(boolean root_args) {
       assert !unified();
-      if( is_leaf() ) return Type.SCALAR;
+      if( is_leaf() ) return root_args ? Type.SCALAR : Type.XSCALAR;
       if( is_base() ) return _flow;
-      if( is_nil()  ) return Type.SCALAR;
+      if( is_nil()  )
+        return arg("?")._as_flow(root_args).meet(Type.NIL);
       if( is_fun()  ) {
         Type tfun = ADUPS.get(_uid);
         if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
         ADUPS.put(_uid, Type.XSCALAR);
-        Type rez = arg("ret")._as_flow();
-        return TypeFunPtr.make(_fidxs==BitsFun.EMPTY ? BitsFun.ALL : _fidxs,size()-1,Type.ANY,rez);
+        Type rez = arg("ret")._as_flow(root_args);
+        return TypeFunPtr.make(_fidxs.meet(Universe.EXT_FIDXS),size()-1,Type.ANY,rez);
       }
       if( is_struct() ) {
         TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);
@@ -1833,7 +1840,7 @@ public class HM {
           ADUPS.put(_uid,tstr); // Stop cycles
           if( _args!=null )
             for( String id : _args.keySet() )
-              tstr.get(id).setX(arg(id)._as_flow()); // Recursive
+              tstr.get(id).setX(arg(id)._as_flow(root_args)); // Recursive
           // update root args of an open HM struct, needs a type-flow type
           // that allows fields to be added
           if( --Type.RECURSIVE_MEET == 0 )
@@ -1845,7 +1852,9 @@ public class HM {
         // is built around TypeStruct, hence the TMP wrap.
 
         // This is a Root passed-in struct which can have all aliases
-        return TypeMemPtr.make(_aliases.test(0) ? BitsAlias.ALL0 : BitsAlias.NALL,tstr);
+        BitsAlias aliases = _aliases;
+        if( root_args ) aliases = aliases.meet(Universe.EXT_ALIASES);
+        return TypeMemPtr.make(aliases,tstr);
       }
 
       throw unimpl();
@@ -1905,14 +1914,8 @@ public class HM {
     // range 0-3.  Returns progress.
     boolean unify_base(T2 that, Work<Syntax> work) {
       boolean progress = false;
-      if( !that._is_ret  ) {
-        progress = that._is_ret =
-          //// Set _is_ret because fidxs become full/empty
-          //(that._fidxs != null && (that._fidxs== BitsFun.EMPTY || that._fidxs.test(1)))
-          //// Set because LHS was set
-          //? true : _is_ret;
-          _is_ret;
-      }
+      if( !that._is_ret  )  // Progress if setting is_ret
+        progress = that._is_ret = _is_ret;
       Type sf = _flow , hf = that._flow ;     // Flow of self and that.
       Type se = _eflow, he = that._eflow;     // Error flow of self and that.
       Type of = that._flow, oe = that._eflow; // Old versions, to check for progress
@@ -2334,8 +2337,6 @@ public class HM {
           HAS_OPEN = true;      // So assume we added an XSCALAR, and no need to walk other fields
           push_update(apply);   // Depends on being open
         } else if( _args!=null ) {
-          if( t instanceof TypeMemPtr tmp && tmp._obj == TypeStruct.ISUSED )
-            t = _add_sig(t); // Sharpen
           for( String id : _args.keySet() )
             arg(id).walk_types_in(at_fld(t, id), apply);
         }
@@ -2355,7 +2356,6 @@ public class HM {
     // stronger flow types from the matching input types.
     Type walk_types_out( Type t, Apply apply ) {
       assert !unified();
-      //if( t==Type.XSCALAR ) return Type.XSCALAR;
 
       if( is_err() ) return Type.SCALAR; // Do not attempt lift
 
@@ -2392,59 +2392,10 @@ public class HM {
         return TypeFunPtr.makex( _fidxs,size()-1, tdsp, trlift);
       }
 
-      if( is_struct() ) {
-        TypeMemPtr tmp2 = (TypeMemPtr)WDUPS.get(_uid);
-        if( tmp2 != null )
-          return tmp2; // Recursive, stop cycles
-        if( t.isa(TypeMemPtr.ISUSED.dual()) ) return t; // Above any pointer; stall till aliases appear
-        Type.RECURSIVE_MEET++;
-        TypeStruct ts = TypeStruct.malloc("",is_open());  TypeFld dfld;
-        ts.add_fld( t instanceof TypeMemPtr tmp && (dfld=tmp._obj.get("^"))!=null
-                    ? dfld
-                    : TypeFld.NO_DSP);//(t.above_center() ? TypeFld.NO_DSP : TypeFld.make_dsp(Type.SCALAR)) );
-
-        // Add fields without walking inside, and add to cyclic cache
-        if( _args!=null )
-          for( String id : _args.keySet() ) // Forall fields in HM
-            ts.add_fld( TypeFld.malloc(id,null,Access.Final,TypeFld.oBot) );
-        tmp2 = TypeMemPtr.make(_aliases,ts.set_hash());
-        WDUPS.put(_uid,tmp2);    // Stop cycles
-
-        // Walk fields, setting the (cyclic, recursive) lifted type
-        BitsAlias aliases = t instanceof TypeMemPtr tmp ? tmp._aliases : _aliases;
-        if( !aliases.test(1) )
-          for( int alias : aliases ) // Uplift at this apply depends on the Alloc changing
-            if( alias!=0 ) ALIASES.at(alias).push(apply);
-        if( _args!=null )
-          for( String id : _args.keySet() ) { // Forall fields in HM
-            //TypeFld ifld=null;
-            //Type tfld = t instanceof TypeMemPtr itmp && (ifld=itmp._obj.get(id))!=null ? ifld._t : t.oob(Type.SCALAR);
-            Type xfld = get_fld(aliases,id);
-            //if( tfld!=xfld )
-            //  throw unimpl();
-            ts.get(id).setX( arg(id).walk_types_out(xfld,apply));
-          }
-        // Close off the recursion
-        if( --Type.RECURSIVE_MEET == 0 )
-          ts = Cyclic.install(ts);
-        // todo: join of 't' aliases and hmt._aliases. Also, making an open HMT should use ALL aliases?
-        // HMT is bidirection and will not have seen all possible HMT aliases yet.
-        return TypeMemPtr.make(aliases,ts);
-      }
+      if( is_struct() )
+        return TypeMemPtr.make(_aliases,TypeStruct.ISUSED);
 
       throw unimpl();           // Handled all cases
-    }
-    Type get_fld( BitsAlias aliases, String id ) {
-      if( aliases.test(1) ) return Type.SCALAR;
-      Type t = Type.XSCALAR;
-      for( int alias : aliases ) {
-        if( alias==0 ) continue;
-        Alloc alloc = ALIASES.at(alias);
-        Type fld = alloc.fld(id);
-        if( fld==null ) return Type.SCALAR; // Missing field
-        t = t.meet(fld);
-      }
-      return t;
     }
 
     // -----------------

@@ -25,6 +25,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static final int ALLX = TREE.split(0);   // Split from 0
   public static final int EXTX = new_alias(ALLX); // External aliases
   public static final int INTX = new_alias(ALLX); // Internal aliases
+  public static final int STRX = new_alias(INTX); // String alias
   // The All-Memory alias class
   public static BitsAlias NALL = new BitsAlias().make_impl(ALLX,null); // All aliases, no nil
   public static BitsAlias ALL0 = NALL.meet_nil(); // All aliases, with a low nil
@@ -32,6 +33,7 @@ public class BitsAlias extends Bits<BitsAlias> {
 
   public static final BitsAlias EXT = make0(EXTX);
   public static final BitsAlias INT = make0(INTX);
+  public static final BitsAlias STR = make0(STRX);
 
   public static final BitsAlias NIL = make0(0); // Ugly but NIL has a dual, and this is "low" NIL
   public static final BitsAlias XNIL = NIL.dual();
