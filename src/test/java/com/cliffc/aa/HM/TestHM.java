@@ -6,6 +6,12 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
+/*
+  Still failing progress on many tests.
+
+  Theory: can move the update_root_args back into root._val, and remove pass#2
+  Theory: HMT fidxs carry No Useful Info, other than the "is_fun" bit & nil bit.
+ */
 
 public class TestHM {
 
@@ -19,7 +25,7 @@ public class TestHM {
   private static final int[] rseeds = new int[]{0,1,2,3};
   private void _run1s( String prog, String rez_hm, String frez_gcp ) {
     for( int rseed : rseeds )
-    //for( int rseed=0; rseed<32; rseed++ )
+      //for( int rseed=0; rseed<32; rseed++ )
       _run0s(prog,rez_hm,frez_gcp,rseed);
   }
 
@@ -73,7 +79,7 @@ public class TestHM {
         "( 3, *[4]str:(97))",
         "( 3, *[4]str:(97))",
         // GCP with HM
-        "*[8](^=any, nint64, *[4]str:(int64))",
+        "*[8](^=any, 3, *[4]str:(97))",
         // GCP is weaker without HM
         "*[8](^=any, nScalar, nScalar)");
   }
@@ -395,8 +401,8 @@ loop = { name cnt ->
 """,
         "*[0,4]str:(nint8)",  // Both HM and GCP
         "Cannot unify int8 and *[0,4]str:(nint8)", // HM alone cannot do this one
-        "*[4]str:(int64)",      // Both HM and GCP
-        "nScalar");             // GCP alone gets a very weak answer
+        "*[4]str:(97)",       // Both HM and GCP
+        "nScalar");           // GCP alone gets a very weak answer
   }
 
 
@@ -424,6 +430,8 @@ loop = { name cnt ->
 }
 """,
         "{ A? -> ( 3, nint8) }",
+        "{ A? -> ( 3, nint8) }",
+        "[27]{any,1 ->*[8](^=any,     3, nint8) }",
         "[27]{any,1 ->*[8](^=any, nint8, nint8) }");
   }
 
@@ -438,6 +446,8 @@ loop = { name cnt ->
 }
 """,
         "{ A? -> ( 3, May be nil when loading field x ) }",
+        "{ A? -> ( 3, May be nil when loading field x ) }",
+        "[24]{any,1 ->*[8](^=any,     3,     5) }",
         "[24]{any,1 ->*[8](^=any, nint8, nint8) }");
   }
 
@@ -480,8 +490,8 @@ loop = { name cnt ->
         "",
         "@{ a = nint8; b = ( ); bool = @{ false = A:@{ and = { A -> A }; or = { A -> A }; then = { { ( ) -> B } { ( ) -> B } -> B }}; force = { C? -> D:@{ and = { D -> D }; or = { D -> D }; then = { { ( ) -> E } { ( ) -> E } -> E }} }; true = F:@{ and = { F -> F }; or = { F -> F }; then = { { ( ) -> G } { ( ) -> G } -> G }}}}",
         "@{ a = nint8; b = ( ); bool = @{ false = A:@{ and = { A -> A }; or = { A -> A }; then = { { ( ) -> B } { ( ) -> B } -> B }}; force = { C? -> D:@{ and = { D -> D }; or = { D -> D }; then = { { ( ) -> E } { ( ) -> E } -> E }} }; true = F:@{ and = { F -> F }; or = { F -> F }; then = { { ( ) -> G } { ( ) -> G } -> G }}}}",
-        "*[14]@{FA:^=any; a=int64 ; b=*[12,13](FA); bool=*[11]@{ FA; true=PA:*[9,10]@{FA; and=[17,20]{any,1 ->Scalar }; or=[18,21]{any,1 ->Scalar }; then=[19,22]{any,2 ->Scalar }}; false=PA; force=[26]{any,1 ->PA }}}",
-        "*[14]@{FA:^=any; a=Scalar; b=Scalar;       bool=*[11]@{ FA; true=PA:*[9,10]@{FA; and=[17,20]{any,1 ->Scalar }; or=[18,21]{any,1 ->Scalar }; then=[19,22]{any,2 ->Scalar }}; false=PA; force=[26]{any,1 ->PA }}}");
+        "*[14]@{FA:^=any; a=int64 ; b=*[ALL](); bool=*[11]@{ FA; true=PA:*[9,10]@{FA; and=[17,20]{any,1 ->Scalar }; or=[18,21]{any,1 ->Scalar }; then=[19,22]{any,2 ->Scalar }}; false=PA; force=[26]{any,1 ->PA }}}",
+        "*[14]@{FA:^=any; a=Scalar; b=Scalar  ; bool=*[11]@{ FA; true=PA:*[9,10]@{FA; and=[17,20]{any,1 ->Scalar }; or=[18,21]{any,1 ->Scalar }; then=[19,22]{any,2 ->Scalar }}; false=PA; force=[26]{any,1 ->PA }}}");
   }
 
 
@@ -822,7 +832,7 @@ three =(n.s two);     // Three is the successor of two
         "   res1 = @{ a = Missing field a };"+
         "   res2 = @{ a=nint8; b=nflt32 }"+
         "}",
-        "*[12]@{^=any; f=[18]{any,2 ->PA:*[ALL]() }; res1=PA; res2=PA}",
+        "*[12]@{^=any; f=[18]{any,2 ->PA:*[2,8,9,10,11]() }; res1=PA; res2=PA}",
         "*[12]@{^=any; f=[18]{any,2 ->Scalar }; res1=Scalar; res2=Scalar}");
   }
 
@@ -923,7 +933,9 @@ all
     FA;
     zero=[28]{any,1 ->PA };
     pred=[17]{any,1 ->~Scalar };
-    succ=[29]{any,1 -> PB:*[ALL]() };
+    succ=[29]{any,1 ->
+      PB:*[ALL]()
+    };
     add_=[30]{any,1 ->Scalar }
   };
   s=[38]{any,1 ->PB }
@@ -970,7 +982,7 @@ maybepet = petcage.get;
 """,
         "(nflt32,nflt32,*[4]str:(nint8))",
         "(nflt32,nflt32,*[4]str:(nint8))",
-        "*[11](^=any, nflt64, nflt64, *[4]str:(nint8))",
+        "*[11](^=any, nflt32, nflt32, *[4]str:(nint8))",
         "*[11](^=any, Scalar, Scalar, *[4]str:(nint8))");
   }
 
@@ -989,7 +1001,7 @@ all = @{
     run("dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp \"abc\"))",
         "( 3, *[4]str:(97))",
         "( 3, *[4]str:(97))",
-        "*[9](^=any, nint64 , *[4]str:(int64))",
+        "*[9](^=any, 3 , *[4]str:(97))",
         "*[9](^=any, nScalar, nScalar)");
   }
 

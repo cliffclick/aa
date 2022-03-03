@@ -404,7 +404,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // exactly 1 value.
   private static Type[] SCALAR_PRIMS;
 
-  boolean is_simple() { return _type < TSIMPLE; }
+  public boolean is_simple() { return _type < TSIMPLE; }
   private boolean is_ptr() { byte t = _type;  return t == TFUNPTR || t == TMEMPTR; }
   private boolean is_num() { byte t = _type;  return t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
@@ -821,7 +821,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   Type _widen() {
     return switch( _type ) {
     case TSCALAR, TNSCALR -> SCALAR;
-    case TXSCALAR, TXNSCALR -> this; // Too high
+    case TXSCALAR, TXNSCALR -> SCALAR; // Too high
     case TANY, TALL, TNIL, TXNIL -> this;
     case TCTRL, TXCTRL -> Type.CTRL;
     default -> throw typerr(null); // Overridden in subclass
