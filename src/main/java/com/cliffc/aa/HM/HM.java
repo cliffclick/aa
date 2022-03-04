@@ -454,12 +454,8 @@ public class HM {
     // Giant Assert: True if OK; all Syntaxs off worklist do not make progress
     abstract boolean more_work(Work<Syntax> work);
     final boolean more_work_impl(Work<Syntax> work) {
-      if( DO_HM && (!work.on(this) || HM_FREEZE) && hm(null) ) {  // Any more HM work?
-        if( HM_FREEZE )
-          return false;           // Found HM work not on worklist or when frozen
-        System.out.println("progress bug");
-        work.add(this);
-      }
+      if( DO_HM && (!work.on(this) || HM_FREEZE) && hm(null) ) // Any more HM work?
+        return false;           // Found HM work not on worklist or when frozen
       if( DO_GCP ) {            // Doing GCP AND
         Type t = val(null);
         assert _flow.isa(t);    // Flow is not monotonically falling
@@ -648,6 +644,7 @@ public class HM {
       // Go ahead and pre-unify with a required function
       T2[] targs = Arrays.copyOf(_targs,_targs.length+1);
       targs[_targs.length] = _body.find();
+      targs[_targs.length].push_update(this); // Return has a dep on Lambda to support spreading _is_copy
       find().unify(T2.make_fun(BitsFun.make0(_fidx), targs),work);
       return cnt;
     }
@@ -778,12 +775,11 @@ public class HM {
 
       // Flag HMT result as widening, if GCP falls to a TFP which widens in HMT.
       T2 tret = tfun.find().arg("ret");
-      if( !tret._is_prt && _fun._flow instanceof TypeFunPtr tfp ) {
+      if( tret._is_copy && _fun._flow instanceof TypeFunPtr tfp ) {
         for( int fidx : tfp._fidxs )
-          if( fidx!=0 && Lambda.FUNS.get(fidx).find().arg("ret")._is_prt ) {
-            if( work==null ) return true;
-            progress = tret._is_prt = true; // TODO: Push PRT down into leafs
-            break;
+          if( fidx!=0 && !Lambda.FUNS.get(fidx).find().arg("ret")._is_copy ) {
+            if( work!=null ) tret.clr_cp();
+            return true;
           }
       }
 
@@ -822,7 +818,7 @@ public class HM {
     Type do_apply_lift(T2 rezt2, Type ret, boolean test) {
       if( !DO_LIFT || !DO_HM ) return ret;
       if( ret==Type.XSCALAR ) return ret; // Nothing to lift
-      Type lift = hm_apply_lift(rezt2,ret,rezt2._is_prt, test);
+      Type lift = hm_apply_lift(rezt2,ret, !rezt2._is_copy, test);
       if( lift != _old_lift ) {
         assert _old_lift.isa(lift);   // Lift is monotonic
         if( !test ) _old_lift=lift;
@@ -946,9 +942,10 @@ public class HM {
           Lambda fun = Lambda.FUNS.get(fidx);
           for( int i=0; i<fun._types.length; i++ ) {
             // GCP external argument limited to HM compatible type
-            Type aflow = DO_HM ? fun.targ(i).as_flow() : Type.SCALAR;
+            T2 targ = fun.targ(i);
+            Type aflow = DO_HM ? targ.as_flow() : Type.SCALAR;
             fun.arg_meet(i,aflow,work);
-            fun.targ(i)._is_prt = true; // TODO: Push PRT down into leafs
+            targ.clr_cp();
           }
           if( fun instanceof PrimSyn ) work.add(fun);
         }
@@ -1192,6 +1189,7 @@ public class HM {
     abstract PrimSyn make();
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
       prep_tree_impl(par,nongen,work, _hmt);
+      _hmt.arg("ret").push_update(this); // Return has a dep on Lambda to support spreading _is_copy
       return 1;
     }
     @Override boolean hm(Work<Syntax> work) {
@@ -1308,7 +1306,7 @@ public class HM {
     static private T2 var1;
     public EQ() {
       super(IDS[2],var1=T2.make_leaf(),var1,BOOL());
-      _hmt.arg("ret")._is_prt=true;
+      _hmt.arg("ret").clr_cp();
     }
     @Override PrimSyn make() { return new EQ(); }
     @Override Type apply( Type[] flows) {
@@ -1327,7 +1325,7 @@ public class HM {
     @Override String name() { return "eq0"; }
     public EQ0() {
       super(IDS[1],INT64(),BOOL());
-      _hmt.arg("ret")._is_prt=true;
+      _hmt.arg("ret").clr_cp();
     }
     @Override PrimSyn make() { return new EQ0(); }
     @Override Type apply( Type[] flows) {
@@ -1347,7 +1345,7 @@ public class HM {
     @Override String name() { return "isempty"; }
     public IsEmpty() {
       super(IDS[1],STRP(),BOOL());
-      _hmt.arg("ret")._is_prt=true;
+      _hmt.arg("ret").clr_cp();
     }
     @Override PrimSyn make() { return new IsEmpty(); }
     @Override Type apply( Type[] flows) {
@@ -1409,7 +1407,7 @@ public class HM {
     @Override String name() { return "*"; }
     public Mul() {
       super(IDS[2],INT64(),INT64(),INT64());
-      _hmt.arg("ret")._is_prt=true;
+      _hmt.arg("ret").clr_cp();
     }
     @Override PrimSyn make() { return new Mul(); }
     @Override Type apply( Type[] flows) {
@@ -1432,7 +1430,7 @@ public class HM {
     @Override String name() { return "+"; }
     public Add() {
       super(IDS[2],INT64(),INT64(),INT64());
-      _hmt.arg("ret")._is_prt=true;
+      _hmt.arg("ret").clr_cp();
     }
     @Override PrimSyn make() { return new Add(); }
     @Override Type apply( Type[] flows) {
@@ -1453,7 +1451,7 @@ public class HM {
     @Override String name() { return "dec"; }
     public Dec() {
       super(IDS[1],INT64(),INT64());
-      _hmt.arg("ret")._is_prt=true;
+      _hmt.arg("ret").clr_cp();
     }
     @Override PrimSyn make() { return new Dec(); }
     @Override Type apply( Type[] flows) {
@@ -1468,7 +1466,7 @@ public class HM {
     @Override String name() { return "rand"; }
     public IRand() {
       super(IDS[0],INT64());
-      _hmt.arg("ret")._is_prt=true;
+      _hmt.arg("ret").clr_cp();
     }
     @Override PrimSyn make() { return new IRand(); }
     @Override Type apply( Type[] flows) {  return TypeInt.INT64;  }
@@ -1479,7 +1477,7 @@ public class HM {
     @Override String name() { return "str"; }
     public Str() {
       super(IDS[1],INT64(),STRP());
-      _hmt.arg("ret")._is_prt=true;
+      _hmt.arg("ret").clr_cp();
     }
     @Override PrimSyn make() { return new Str(); }
     @Override Type apply( Type[] flows) {
@@ -1497,7 +1495,7 @@ public class HM {
     @Override String name() { return "factor"; }
     public Factor() {
       super(IDS[1],FLT64(),FLT64());
-      _hmt.arg("ret")._is_prt=true;
+      _hmt.arg("ret").clr_cp();
     }
     @Override PrimSyn make() { return new Factor(); }
     @Override Type apply( Type[] flows) {
@@ -1523,7 +1521,7 @@ public class HM {
     public Universe() {
       super(IDS[0],SCALAR());
       ALIASES.setX(BitsAlias.EXTX,this);
-      _hmt.arg("ret")._is_prt=true;
+      _hmt.arg("ret").clr_cp();
     }
     @Override PrimSyn make() { return new Universe(); }
     @Override SB str(SB sb) { return sb.p("{->}"); }
@@ -1590,15 +1588,17 @@ public class HM {
 
     // Contains the set of Lambdas, or null if not a Lambda.
     // If set, then keys x,y,z,ret may appear.
+    // TODO: only really tracks _is_fun or not, plus _is_nil.
     BitsFun _fidxs;
     // True for T2 returns from any primitive which might widen its result or
-    // root args.  Otherwise in cases like:
+    // root args.  Otherwise, in cases like:
     //       "f0 = { f -> (if (rand) 1 (f (f0 f) 2))}; f0"
     // f's inputs and outputs gets bound to a '1': f = { 1 2 -> 1 }
-    boolean _is_prt;
+    boolean _is_copy = true;
 
     // Contains the set of aliased Structs, or null if not a Struct.
     // If set, then keys for field names may appear.
+    // TODO: only really tracks _is_struct or not, plus _is_nil.
     BitsAlias _aliases;
     // Structs allow more fields.  Not quite the same as TypeStruct._open field.
     boolean _open;
@@ -1621,7 +1621,7 @@ public class HM {
       t._fidxs = _fidxs;
       t._aliases = _aliases;
       t._open = _open;
-      t._is_prt = _is_prt;
+      t._is_copy = _is_copy;
       // TODO: stop sharing _deps
       t._deps = _deps;
       t._err = _err;
@@ -1719,7 +1719,7 @@ public class HM {
       if( n.is_base() ) {
         _flow = n._flow.meet(Type.NIL);
         if( n._eflow!=null ) _eflow = n._eflow.meet(Type.NIL);
-        _is_prt = n._is_prt;
+        if( !n._is_copy ) clr_cp();
       }
       if( n.is_fun() ) {
         throw unimpl();
@@ -1735,7 +1735,7 @@ public class HM {
         _args.put("?",n.arg("?"));
       }
       if( _args.size()==0 ) _args=null;
-      n.merge_deps(this);
+      n.merge_deps(this,null);
       return this;
     }
 
@@ -1864,20 +1864,20 @@ public class HM {
       that.add_deps_work(work);
       this.add_deps_work(work);      // Any progress, revisit deps
       // Hard union this into that, no more testing.
-      return _union(that);
+      return _union(that,work);
     }
 
     // Hard unify this into that, no testing for progress.
-    private boolean _union( T2 that ) {
+    private boolean _union( T2 that, Work<Syntax> work ) {
       assert !unified() && !that.unified(); // Cannot union twice
       // Work<Syntax>: put updates on the worklist for revisiting
-      merge_deps(that);    // Merge update lists, for future unions
+      merge_deps(that,work);    // Merge update lists, for future unions
       // Kill extra information, to prevent accidentally using it
       _args = new NonBlockingHashMap<>() {{put(">>", that);}};
       _flow = _eflow = null;
       _fidxs= null;
       _aliases=null;
-      _open = _is_prt = false;
+      _open = _is_copy = false;
       _deps = null;
       _err  = null;
       assert unified();
@@ -1890,8 +1890,11 @@ public class HM {
     // range 0-3.  Returns progress.
     boolean unify_base(T2 that, Work<Syntax> work) {
       boolean progress = false;
-      if( !that._is_prt  )  // Progress if setting is_prt
-        progress = that._is_prt = _is_prt;
+      if( that._is_copy && !_is_copy )  { // Progress if setting is_prt
+        if( work==null ) return true;
+        progress = true;
+        that.clr_cp();
+      }
       Type sf = _flow , hf = that._flow ;     // Flow of self and that.
       Type se = _eflow, he = that._eflow;     // Error flow of self and that.
       Type of = that._flow, oe = that._eflow; // Old versions, to check for progress
@@ -1928,7 +1931,7 @@ public class HM {
       T2 leaf = that.arg("?");  assert leaf.is_leaf();
       leaf.add_deps_work(work);
       T2 copy = copy().strip_nil();
-      return leaf.union(copy,work) | _union(that);
+      return leaf.union(copy,work) | _union(that,work);
     }
     // U-F union; that is nilable and a fresh copy of this becomes that.
     // No change if only testing, and reports progress.
@@ -2133,24 +2136,25 @@ public class HM {
 
       // Structural recursion unification, lazy on LHS
       boolean missing = size()!= that.size();
-      for( String key : _args.keySet() ) {
-        T2 lhs = this.arg(key);
-        T2 rhs = that.arg(key);
-        if( rhs==null ) {         // No RHS to unify against
-          missing = true;         // Might be missing RHS
-          if( is_open() || that.is_open() || lhs.is_err() ) {
-            if( work==null ) return true; // Will definitely make progress
-            T2 nrhs = lhs._fresh(nongen); // New RHS value
-            if( !that.is_open() )
-              nrhs._err = "Missing field "+key; // TODO: merge errors
-            progress |= that.add_fld(key,nrhs,work);
-          } // Else neither side is open, field is not needed in RHS
-        } else {
-          progress |= lhs._fresh_unify(rhs,nongen,work);
+      if( _args != null )
+        for( String key : _args.keySet() ) {
+          T2 lhs = this.arg(key);
+          T2 rhs = that.arg(key);
+          if( rhs==null ) {         // No RHS to unify against
+            missing = true;         // Might be missing RHS
+            if( is_open() || that.is_open() || lhs.is_err() ) {
+              if( work==null ) return true; // Will definitely make progress
+              T2 nrhs = lhs._fresh(nongen); // New RHS value
+              if( !that.is_open() )
+                nrhs._err = "Missing field "+key; // TODO: merge errors
+              progress |= that.add_fld(key,nrhs,work);
+            } // Else neither side is open, field is not needed in RHS
+          } else {
+            progress |= lhs._fresh_unify(rhs,nongen,work);
+          }
+          that=that.find();
+          if( progress && work==null ) return true;
         }
-        that=that.find();
-        if( progress && work==null ) return true;
-      }
       // Fields in RHS and not the LHS are also merged; if the LHS is open we'd
       // just copy the missing fields into it, then unify the structs (shortcut:
       // just skip the copy).  If the LHS is closed, then the extra RHS fields
@@ -2335,7 +2339,7 @@ public class HM {
         return lt;
       }
 
-      if( is_base() ) return _is_prt ? widen() : _flow;
+      if( is_base() ) return _is_copy ? _flow : widen();
 
       if( is_nil() ) { // The wrapped leaf gets lifted, then nil is added
         Type tnil = arg("?").walk_types_out(t.remove_nil(),apply);
@@ -2354,7 +2358,10 @@ public class HM {
       }
 
       if( is_struct() ) {
-        BitsAlias aliases = t instanceof TypeMemPtr tmp ? tmp._aliases  : (t.above_center() ? BitsAlias.EMPTY : BitsAlias.NALL);
+        BitsAlias aliases;
+        if( t instanceof TypeMemPtr tmp ) aliases = tmp._aliases;
+        else if( t==Type.NIL || t==Type.XNIL ) aliases = BitsAlias.NIL;
+        else aliases = t.above_center() ? BitsAlias.EMPTY : BitsAlias.NALL;
         return TypeMemPtr.make(aliases,TypeStruct.ISUSED);
       }
 
@@ -2362,13 +2369,30 @@ public class HM {
     }
 
     // -----------------
+    static final VBitSet UPDATE_VISIT  = new VBitSet();
+    void clr_cp() { UPDATE_VISIT.clear(); _clr_cp();}
+    private void _clr_cp() {
+      T2 ret;
+      if( !_is_copy || UPDATE_VISIT.tset(_uid) ) return;
+      _is_copy = false;
+      if( _deps!=null )
+        for( Syntax syn : _deps )
+          if( syn instanceof Lambda lam && lam.find().arg("ret")==this )
+            for( Apply apply : lam._applys )
+              if( (ret=apply._fun.find().arg("ret"))!=null )
+                ret._clr_cp();
+      if( _args != null )
+        for( T2 t2 : _args.values() )
+          t2._clr_cp();
+    }
+
+    // -----------------
     // This is a T2 function that is the target of 'fresh', i.e., this function
     // might be fresh-unified with some other function.  Push the application
     // down the function parts; if any changes the fresh-application may make
     // progress.
-    static final VBitSet UPDATE_VISIT  = new VBitSet();
     void push_update( Ary<Syntax> as ) { if( as != null ) for( Syntax a : as ) push_update(a); }
-    T2 push_update( Syntax a) { assert UPDATE_VISIT.isEmpty(); push_update_impl(a); UPDATE_VISIT.clear(); return this; }
+    T2 push_update( Syntax a) { UPDATE_VISIT.clear(); push_update_impl(a); return this; }
     private void push_update_impl(Syntax a) {
       assert !unified();
       if( UPDATE_VISIT.tset(_uid) ) return;
@@ -2380,7 +2404,7 @@ public class HM {
     }
 
     // Recursively add-deps to worklist
-    void add_deps_work( Work<Syntax> work ) { assert UPDATE_VISIT.isEmpty(); add_deps_work_impl(work); UPDATE_VISIT.clear(); }
+    void add_deps_work( Work<Syntax> work ) { UPDATE_VISIT.clear(); add_deps_work_impl(work); }
     private void add_deps_work_impl( Work<Syntax> work ) {
       work.addAll(_deps);
       if( _deps!=null )
@@ -2394,9 +2418,14 @@ public class HM {
     }
 
     // Merge this._deps into that
-    void merge_deps( T2 that ) {
-      if( _deps != null )
+    void merge_deps( T2 that, Work<Syntax> work ) {
+      if( _deps != null ) {
         that.push_update(_deps);
+        if( !that._is_copy && _is_copy && work!=null )
+          for( Syntax dep : _deps )
+            if( dep instanceof Lambda lam )
+              work.addAll(lam._applys);
+      }
     }
 
 
@@ -2427,7 +2456,7 @@ public class HM {
     SB str(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
       boolean dup = dups.get(_uid);
       if( !debug && unified() ) return find().str(sb,visit,dups,false);
-      if( debug && _is_prt ) sb.p('%');
+      if( debug && !_is_copy ) sb.p('%');
       if( unified() || (is_leaf() && _err==null) ) {
         vname(sb,debug);
         return unified() ? _args.get(">>").str(sb.p(">>"), visit, dups, debug) : sb;

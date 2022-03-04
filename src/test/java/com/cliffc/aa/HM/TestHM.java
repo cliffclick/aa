@@ -7,10 +7,8 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 /*
-  Still failing progress on many tests.
-
   Theory: can move the update_root_args back into root._val, and remove pass#2
-  Theory: HMT fidxs carry No Useful Info, other than the "is_fun" bit & nil bit.
+  Theory: HMT fidxs/aliases carry No Useful Info, other than the "is_fun" bit & nil bit.
  */
 
 public class TestHM {
@@ -25,7 +23,7 @@ public class TestHM {
   private static final int[] rseeds = new int[]{0,1,2,3};
   private void _run1s( String prog, String rez_hm, String frez_gcp ) {
     for( int rseed : rseeds )
-      //for( int rseed=0; rseed<32; rseed++ )
+      //for( int rseed=0; rseed<64; rseed++ )
       _run0s(prog,rez_hm,frez_gcp,rseed);
   }
 
