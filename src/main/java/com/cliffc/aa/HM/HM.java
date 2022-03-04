@@ -637,7 +637,7 @@ public class HM {
     }
 
     // Ignore arguments, and return body type for a particular call site.  Very conservative.
-    Type apply(Type[] flows) { return _body._flow; }
+    Type apply(Type[] flows) { throw unimpl(); }
     @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) {
       work.add(this);
       // Body changed, all Apply sites need to recompute
@@ -1543,9 +1543,7 @@ public class HM {
       if( cflow instanceof TypeFunPtr tfp ) EXT_FIDXS   = EXT_FIDXS  .meet(tfp._fidxs  );
     }
 
-    @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) {
-      throw unimpl();
-    }
+    @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) { throw unimpl(); }
     @Override public TypeMemPtr tmp() { return TypeMemPtr.make(EXT_ALIASES,TypeStruct.ISUSED); }
     @Override public Type fld(String id) { return Type.SCALAR; }
     @Override public void push(Syntax fld) { }
@@ -1734,9 +1732,7 @@ public class HM {
         if( n._eflow!=null ) _eflow = n._eflow.meet(Type.NIL);
         if( !n._is_copy ) clr_cp();
       }
-      if( n.is_fun() ) {
-        throw unimpl();
-      }
+      if( n.is_fun() ) { throw unimpl(); }
       if( n.is_struct() ) {
         if( n._args!=null )     // Shallow copy fields
           for( String key : n._args.keySet() )
@@ -1915,7 +1911,7 @@ public class HM {
       if( cmp  > 0 ) { that._flow = sf;          sf = se;          } // Pick winner, advance
       if( cmp  < 0 ) {                           hf = he;          } // Pick winner, advance
       if( !(sf==null && hf==null) ) {                                // If there is an error flow
-        int cmp2 =  _fpriority(sf) - _fpriority(hf);
+        int cmp2 =  _fpriority(sf) - _fpriority(hf); // In a triple-error, pick best two
         if( cmp2 == 0 ) that._eflow = sf.meet(hf);
         if( cmp2  > 0 ) that._eflow = sf;
         if( cmp2  < 0 ) that._eflow = hf;
@@ -2108,15 +2104,15 @@ public class HM {
         return unify_nil(that,work,nongen);
 
       // Progress on the parts
-      if( is_fun() && !that.is_fun() ) {
+      if( _flow!=null ) progress = unify_base(that, work);
+      that._may_nil |= _may_nil;
+      if( is_fun() && !that.is_fun() ) { // Error, fresh_unify a fun into a non-fun non-leaf
         if( work==null ) return true;
         progress = that._is_fun = true;
         if( that._args==null )
           that._args = (NonBlockingHashMap<String,T2>)_args.clone(); // Error case; bring over the function args
       }
-      if( _flow!=null ) progress = unify_base(that, work);
-      that._may_nil |= _may_nil;
-      if( is_struct() && !that.is_struct() ) {
+      if( is_struct() && !that.is_struct() ) { // Error, fresh_unify a struct into a non-struct non-leaf
         if( work==null ) return true;
         progress = that._is_struct = true;
         if( that._args==null )
@@ -2124,7 +2120,7 @@ public class HM {
       }
       if( _err!=null && !_err.equals(that._err) ) {
         if( that._err!=null ) throw unimpl(); // TODO: Combine single error messages
-        else {
+        else { // Error, fresh_unify an error into a non-leaf non-error
            if( work==null ) return true;
            progress = true;
            that._err = _err;
