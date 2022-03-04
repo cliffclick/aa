@@ -8,7 +8,6 @@ import static org.junit.Assert.assertEquals;
 
 /*
   Theory: can move the update_root_args back into root._val, and remove pass#2
-  Theory: HMT fidxs/aliases carry No Useful Info, other than the "is_fun" bit & nil bit.
  */
 
 public class TestHM {

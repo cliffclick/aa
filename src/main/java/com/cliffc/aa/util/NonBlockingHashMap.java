@@ -587,7 +587,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
           K == TOMBSTONE ) // found a TOMBSTONE key, means no more keys in this table
         return newkvs == null ? null : get_impl(topmap,topmap.help_copy(newkvs),key); // Retry in the new table
 
-      idx = (idx+(fullhash|1))&(len-1); // Divergent reprobe chain
+      idx = (idx+((fullhash>>16)|1))&(len-1); // Divergent reprobe chain
     }
     } finally {
       topmap.record(reprobe_cnt);
@@ -643,7 +643,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
         return newkvs == null ? null : getk_impl(topmap,topmap.help_copy(newkvs),key); // Retry in the new table
       }
 
-      idx = (idx+(fullhash|1))&(len-1); // Divergent reprobe chain
+      idx = (idx+((fullhash>>16)|1))&(len-1); // Divergent reprobe chain
     }
     } finally {
       topmap.record(reprobe_cnt);
@@ -731,7 +731,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
         return putIfMatch(topmap,newkvs,key,putval,expVal);
       }
 
-      idx = (idx+(fullhash|1))&(len-1); // Divergent reprobe chain
+      idx = (idx+((fullhash>>16)|1))&(len-1); // Divergent reprobe chain
     } // End of spinning till we get a Key slot
     } finally {
       topmap.record(reprobe_cnt);

@@ -33,17 +33,15 @@ import static com.cliffc.aa.AA.unimpl;
 //
 // HM Bases include anything from the GCP lattice, and are generally sharper
 // than e.g. 'int'.  Bases with values of '3' and "abc" are fine.  These are
-// widened to the normal HM types if passed to any HM function; they remain
-// sharp if returned or passed to primitives.  HM functions include the set of
-// FIDXs used in the unification; this set is generally less precise than that
-// from GCP.  HM function arguments that escape had their GCP type widened "as
-// if" called from the most HM-general legal call site; otherwise GCP assumes
-// escaping functions are never called and their arguments have unrealistic
-// high flow types.
+// widened to the normal HM types if returned from any primitive; they remain
+// sharp if returned or passed to primitives.  HM functions that escape have
+// their GCP type widened "as if" called from the most HM-general legal call
+// site; otherwise GCP assumes escaping functions are never called and their
+// arguments have unrealistic high flow types.
 //
 // HM includes polymorphic structures and fields (structural typing not duck
-// typing), polymorphic nil-checking and an error type-var.  Both HM and GCP
-// types fully support recursive types.
+// typing), polymorphic nil-checking, constant bases and an error type-var.
+// Both HM and GCP types fully support recursive/cyclic types.
 //
 // HM errors keep all the not-unifiable types, all at once.  Further unifications
 // with the error either add a new not-unifiable type, or unify with one of the
@@ -58,14 +56,21 @@ import static com.cliffc.aa.AA.unimpl;
 // type-var, then unify.  I use a combined "make-fresh-and-unify" unification
 // algorithm there.  It is a structural clone of the normal unify, except that
 // it lazily makes a fresh-copy of the left-hand-side on demand only; typically
-// discovering that no fresh-copy is required.
+// discovering that no fresh-copy is required.  This appears to reduce some
+// worse-case examples to near-linear time.
 //
 // To engineer and debug the algorithm, the unification step includes a flag to
 // mean "actually unify, and report a progress flag" vs "report if progress".
 // The report-only mode is aggressively asserted for in the main loop; all
 // Syntax elements that can make progress are asserted as on the worklist.
 //
-// GCP gets the normal MAF treatment, no surprises there.
+// GCP gets the normal MAF treatment, no surprises there except perhaps the
+// size of the GCP lattice.  The GCP lattice includes the obvious int and float
+// ranges and constants, structs, aliases broken into equivalence classes,
+// function indices (fidxs) also broken into equivalence classes (and this
+// allows GCP to compute a reasonably precise Call Graph), contents of memory,
+// and Return Program Counters ala continuations (no real use is made of these
+// yet).
 //
 // The combined algorithm includes transfer functions taking facts from both
 // MAF lattices, producing results in the other lattice.
@@ -76,7 +81,8 @@ import static com.cliffc.aa.AA.unimpl;
 // allows HM to avoid picking up constraints from dead code.
 //
 // Also for GCP->HM, the HM ground terms or base terms include anything from
-// the GCP lattice.
+// the GCP lattice.  The GCP fidxs / Call Graph is used to track HM terms that
+// might come from a primitive or a escaped input.
 //
 // For the HM->GCP direction, the GCP 'apply' has a customer transfer function
 // where the result from a call gets lifted (JOINed) based on the matching GCP
@@ -84,6 +90,10 @@ import static com.cliffc.aa.AA.unimpl;
 // and outputs.  This allows e.g. "map" calls which typically merge many GCP
 // values at many applies (call sites) and thus end up typed as a Scalar to
 // Scalar, to improve the GCP type on a per-call-site basis.
+//
+// Also for HM->GCP, the HM types are used to constrain the GCP types that can
+// call any escaped function.  You can think of this as using HM "module types"
+// to derive the GCP calling types.
 //
 // Test case 45 demonstrates this combined algorithm, with a program which can
 // only be typed using the combination of GCP and HM.
@@ -184,7 +194,7 @@ public class HM {
       }
 
       // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
-      assert prog.more_work(work);
+      //assert prog.more_work(work);
     }
     return cnt;
   }
@@ -195,7 +205,7 @@ public class HM {
         if( syn instanceof Field fld ) {
           T2 rec = fld._rec.find();
           if( !self.is_err() && rec.is_err2() && rec.is_struct() && rec.is_open() ) {
-            rec._aliases=null;  // Turn off struct-ness for print
+            rec._is_struct=false;  // Turn off struct-ness for print
             self._err = "Missing field "+fld._id+" in "+rec.p();
           }
           String err = self._err;
@@ -204,7 +214,7 @@ public class HM {
             if( fldt2!=null ) rec._args.remove(fld._id);
             self._err = err+" in "+rec.p();
           }
-          if( rec.is_nil() || (rec._aliases != null && rec._aliases.test(0)) )
+          if( rec.is_nil() || rec._may_nil )
             self._err = "May be nil when loading field "+fld._id;
         }
         if( self.is_err2() && self.has_nil() )
@@ -645,7 +655,7 @@ public class HM {
       T2[] targs = Arrays.copyOf(_targs,_targs.length+1);
       targs[_targs.length] = _body.find();
       targs[_targs.length].push_update(this); // Return has a dep on Lambda to support spreading _is_copy
-      find().unify(T2.make_fun(BitsFun.make0(_fidx), targs),work);
+      find().unify(T2.make_fun(targs),work);
       return cnt;
     }
     @Override void prep_lookup_deps(Ident id) {
@@ -752,7 +762,7 @@ public class HM {
         for( int i=0; i<_args.length; i++ )
           targs[i] = _args[i].find();
         targs[_args.length] = find(); // Return
-        T2 nfun = T2.make_fun(BitsFun.EMPTY, targs);
+        T2 nfun = T2.make_fun(targs);
         return tfun.unify(nfun,work);
       }
 
@@ -1064,7 +1074,7 @@ public class HM {
     }
 
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
-      prep_tree_impl(par, nongen, work, T2.make_open_struct(BitsAlias.make0(_alias),null,null));
+      prep_tree_impl(par, nongen, work, T2.make_open_struct(null,null));
       int cnt = 1;              // One for self
       T2[] t2s = new T2[_ids.length];
       if( _ids.length!=0 ) _hmt._args = new NonBlockingHashMap<>();
@@ -1110,7 +1120,7 @@ public class HM {
       // Add struct-ness if possible
       if( !rec.is_struct() && !rec.is_nil() ) {
         rec._open = true;
-        rec._aliases = BitsAlias.EMPTY;
+        rec._is_struct = true;
         if( rec._args==null ) rec._args = new NonBlockingHashMap<>();
         assert rec.is_struct();
       }
@@ -1182,7 +1192,7 @@ public class HM {
     };
     PrimSyn(String[] ids, T2 ...t2s) {
       super(null,ids);
-      _hmt = T2.make_fun(BitsFun.make0(_fidx), t2s).fresh();
+      _hmt = T2.make_fun(t2s).fresh();
       for( int i=0; i<_targs.length; i++ )
         _targs[i] = _hmt.arg(Lambda.ARGNAMES[i]).push_update(this);
     }
@@ -1218,11 +1228,10 @@ public class HM {
     final int _alias;
     final Ary<Syntax> _rflds = new Ary<>(Syntax.class);
     @Override String name() { return "pair"; }
-    static private int a;
     static private T2 var1,var2;
     public Pair() {
-      super(FLDS,var1=T2.make_leaf(),var2=T2.make_leaf(),T2.make_open_struct(BitsAlias.make0(a=BitsAlias.new_alias(BitsAlias.INTX)),FLDS,new T2[]{var1,var2}));
-      _alias = a;
+      super(FLDS,var1=T2.make_leaf(),var2=T2.make_leaf(),T2.make_open_struct(FLDS,new T2[]{var1,var2}));
+      _alias = BitsAlias.new_alias(BitsAlias.INTX);
       ALIASES.setX(_alias,this);
     }
     @Override public TypeMemPtr tmp() { return _tmp(_alias,FLDS,_types); }
@@ -1241,11 +1250,10 @@ public class HM {
     final int _alias;
     final Ary<Syntax> _rflds = new Ary<>(Syntax.class);
     @Override String name() { return "triple"; }
-    static private int a;
     static private T2 var1,var2,var3;
     public Triple() {
-      super(FLDS,var1=T2.make_leaf(),var2=T2.make_leaf(),var3=T2.make_leaf(),T2.make_open_struct(BitsAlias.make0(a=BitsAlias.new_alias(BitsAlias.INTX)),FLDS,new T2[]{var1,var2,var3}));
-      _alias = a;
+      super(FLDS,var1=T2.make_leaf(),var2=T2.make_leaf(),var3=T2.make_leaf(),T2.make_open_struct(FLDS,new T2[]{var1,var2,var3}));
+      _alias = BitsAlias.new_alias(BitsAlias.INTX);
       ALIASES.setX(_alias,this);
     }
     @Override public TypeMemPtr tmp() { return _tmp(_alias,FLDS,_types); }
@@ -1381,11 +1389,8 @@ public class HM {
       // Already an expanded nilable with struct
       if( arg.is_struct() && ret.is_struct() ) {
         boolean progress=false;
-        BitsAlias mt = arg._aliases.meet(ret._aliases);
-        BitsAlias amt = mt.set(0);
-        BitsAlias rmt = mt.clear(0);
-        if( amt != arg._aliases ) { if( work==null ) return true; arg._aliases=amt; progress=true; }
-        if( rmt != ret._aliases ) { if( work==null ) return true; ret._aliases=rmt; progress=true; }
+        if( !arg._may_nil ) { if( work==null ) return true; progress = true; arg._may_nil = true ; }
+        if(  ret._may_nil ) { if( work==null ) return true; progress = true; ret._may_nil = false; }
         return T2.unify_flds(arg,ret,work,true) | progress;
       }
       if( work==null ) return true;
@@ -1586,10 +1591,12 @@ public class HM {
     Type _flow;
     Type _eflow;                // Error flow; incompatible with _flow
 
-    // Contains the set of Lambdas, or null if not a Lambda.
-    // If set, then keys x,y,z,ret may appear.
-    // TODO: only really tracks _is_fun or not, plus _is_nil.
-    BitsFun _fidxs;
+    // Can be nil
+    boolean _may_nil;
+
+    // Is a Lambda; keys x,y,z,ret may appear.
+    boolean _is_fun;
+
     // True for T2 returns from any primitive which might widen its result or
     // root args.  Otherwise, in cases like:
     //       "f0 = { f -> (if (rand) 1 (f (f0 f) 2))}; f0"
@@ -1598,8 +1605,7 @@ public class HM {
 
     // Contains the set of aliased Structs, or null if not a Struct.
     // If set, then keys for field names may appear.
-    // TODO: only really tracks _is_struct or not, plus _is_nil.
-    BitsAlias _aliases;
+    boolean _is_struct;
     // Structs allow more fields.  Not quite the same as TypeStruct._open field.
     boolean _open;
 
@@ -1618,8 +1624,9 @@ public class HM {
       T2 t = new T2(_args==null ? null : (NonBlockingHashMap<String,T2>)_args.clone());
       t._flow = _flow;
       t._eflow = _eflow;
-      t._fidxs = _fidxs;
-      t._aliases = _aliases;
+      t._may_nil = _may_nil;
+      t._is_fun = _is_fun;
+      t._is_struct = _is_struct;
       t._open = _open;
       t._is_copy = _is_copy;
       // TODO: stop sharing _deps
@@ -1628,19 +1635,19 @@ public class HM {
       return t;
     }
 
-    boolean is_leaf()  { return _args==null && _flow==null && _aliases==null; }
+    boolean is_leaf()  { return _args==null && _flow==null && !_is_struct && !_is_fun; }
     boolean unified()  { return get(">>")!=null; }
     boolean is_nil()   { return get("?" )!=null; }
-    boolean is_base()  { return _flow   != null; } //
-    boolean is_fun ()  { return _fidxs  != null; } //
-    boolean is_struct(){ return _aliases!= null; } //
+    boolean is_base()  { return _flow   != null; }
+    boolean is_fun ()  { return _is_fun; }
+    boolean is_struct(){ return _is_struct; }
     boolean is_open()  { return _open; }           // Struct-specific
     boolean is_err()   { return _err!=null || is_err2(); }
     boolean is_err2()  { return
-        (_flow   ==null ? 0 : 1) +                 // Any 2 or more set of _flow,_fidxs,_aliases
-        (_eflow  ==null ? 0 : 1) +                 // Any 2 or more set of _flow,_fidxs,_aliases
-        (_fidxs  ==null ? 0 : 1) +
-        (_aliases==null ? 0 : 1) >= 2;
+        (_flow   ==null ? 0 : 1) +                 // Any 2 or more set of _flow,_is_fun,_is_struct
+        (_eflow  ==null ? 0 : 1) +                 // Any 2 or more set of _flow,_is_fun,_is_struct
+        (_is_fun        ? 1 : 0) +
+        (_is_struct     ? 1 : 0) >= 2;
     }
     int size() { return _args==null ? 0 : _args.size(); }
     // A faster debug not-UF lookup
@@ -1656,31 +1663,37 @@ public class HM {
 
     // Constructor factories.
     static T2 make_leaf() { return new T2(null); }
-    static T2 make_nil (T2 leaf) { return new T2(new NonBlockingHashMap<>(){{put("?",leaf);}}); }
+    static T2 make_nil (T2 leaf) {
+      T2 t2 = new T2(new NonBlockingHashMap<>(){{put("?",leaf);}});
+      t2._may_nil = true;
+      return t2;
+    }
     static T2 make_base(Type flow) {
       assert !(flow instanceof TypeStruct) && !(flow instanceof TypeFunPtr);
       T2 t2 = new T2(null);
       t2._flow=flow;
       return t2;
     }
-    static T2 make_fun( BitsFun fidxs, T2... t2s ) {
+    static T2 make_fun( T2... t2s ) {
       NonBlockingHashMap<String,T2> args = new NonBlockingHashMap<>();
       for( int i=0; i<t2s.length-1; i++ )
         args.put(Lambda.ARGNAMES[i], t2s[i]);
       T2 last = t2s[t2s.length-1];
       args.put("ret",last);
       T2 t2 = new T2(args);
-      t2._fidxs = fidxs;
+      t2._is_fun = true;
+      t2._may_nil = false;
       return t2;
     }
     // A struct with fields
-    static T2 make_open_struct( BitsAlias aliases, String[] ids, T2[] flds ) {
+    static T2 make_open_struct( String[] ids, T2[] flds ) {
       NonBlockingHashMap<String,T2> args = ids==null ? null : new NonBlockingHashMap<>();
       if( ids!=null )
         for( int i=0; i<ids.length; i++ )
           args.put(ids[i],flds[i]);
       T2 t2 = new T2(args);
-      t2._aliases = aliases;
+      t2._is_struct = true;
+      t2._may_nil = false;
       t2._open = false;
       return t2;
     }
@@ -1728,10 +1741,11 @@ public class HM {
         if( n._args!=null )     // Shallow copy fields
           for( String key : n._args.keySet() )
             _args.put(key,n.get(key));
-        _aliases = n._aliases.meet_nil();
+        _is_struct = true;
+        _may_nil = true;
         _open = n._open;
       }
-      if( n.is_nil() ) {
+      if( n.is_nil() ) {        // Peel nested is_nil
         _args.put("?",n.arg("?"));
       }
       if( _args.size()==0 ) _args=null;
@@ -1746,8 +1760,7 @@ public class HM {
     boolean has_nil() {
       if(  _flow  !=null &&  _flow.must_nil() ) return true;
       if( _eflow  !=null && _eflow.must_nil() ) return true;
-      if( _fidxs  !=null && _fidxs   .test(0) ) return true;
-      if( _aliases!=null && _aliases .test(0) ) return true;
+      if( _may_nil                            ) return true;
       return false;
     }
 
@@ -1755,16 +1768,14 @@ public class HM {
     T2 strip_nil() {
       if(    _flow!=null )    _flow =   _flow.join(Type.NSCALR);
       if(   _eflow!=null )   _eflow =  _eflow.join(Type.NSCALR);
-      if(   _fidxs!=null )   _fidxs =  _fidxs.clear(0);
-      if( _aliases!=null ) _aliases =_aliases.clear(0);
+      _may_nil = false;
       return this;
     }
     // Add nil
     void add_nil() {
       if(    _flow!=null )    _flow =   _flow.meet(Type.NIL);
       if(   _eflow!=null )   _eflow =  _eflow.meet(Type.NIL);
-      if(   _fidxs!=null )   _fidxs =  _fidxs.set(0);
-      if( _aliases!=null ) _aliases =_aliases.set(0);
+      _may_nil = true;
     }
 
     // Varies as unification happens; not suitable for a HashMap/HashSet unless
@@ -1773,8 +1784,9 @@ public class HM {
       int hash = 0;
       if(    _flow!=null ) hash+=    _flow._hash;
       if(   _eflow!=null ) hash+=   _eflow._hash;
-      if(   _fidxs!=null ) hash+=   _fidxs._hash;
-      if( _aliases!=null ) hash+= _aliases._hash;
+      if( _is_fun ) hash = (hash+ 7)*13;
+      if( _may_nil) hash = (hash+13)*23;
+      if( _is_struct ) hash = (hash+23)*29;
       if( _args!=null )
         for( String key : _args.keySet() )
           hash += key.hashCode();
@@ -1830,7 +1842,7 @@ public class HM {
         // is built around TypeStruct, hence the TMP wrap.
 
         // This is a Root passed-in struct which can have all aliases
-        return TypeMemPtr.make(_aliases.test(0) ? Universe.EXT_ALIASES.meet_nil() : Universe.EXT_ALIASES,tstr);
+        return TypeMemPtr.make(_may_nil ? Universe.EXT_ALIASES.meet_nil() : Universe.EXT_ALIASES,tstr);
       }
 
       throw unimpl();
@@ -1846,12 +1858,13 @@ public class HM {
       if( work==null ) return true; // Report progress without changing
 
       // Merge all the hard bits
-      if( _fidxs !=null ) that._fidxs = that._fidxs==null ? _fidxs : that._fidxs.meet(_fidxs);
-      unify_base(that, work);
-      if( _aliases!=null ) {
-        if( that._aliases==null ) { that._aliases = _aliases; that._open  = _open; }
-        else {  that._aliases = that._aliases.meet(_aliases); that._open &= _open; }
+      that._is_fun  |= _is_fun;
+      that._may_nil |= _may_nil;
+      if( _is_struct ) {
+        that._open = that._is_struct ? (that._open & _open) : _open;
+        that._is_struct = true;
       }
+      unify_base(that, work);
       if( _args!=null ) {
         if( that._args==null ) { that._args = _args; _args=null; }
         else that._args.putAll(_args);
@@ -1875,9 +1888,7 @@ public class HM {
       // Kill extra information, to prevent accidentally using it
       _args = new NonBlockingHashMap<>() {{put(">>", that);}};
       _flow = _eflow = null;
-      _fidxs= null;
-      _aliases=null;
-      _open = _is_copy = false;
+      _is_fun = _is_struct = _may_nil = _open = _is_copy = false;
       _deps = null;
       _err  = null;
       assert unified();
@@ -2085,13 +2096,10 @@ public class HM {
       boolean progress = false;
       if( this.is_nil() && !that.is_nil() ) {
         Type mt  = that. _flow==null ? null : that. _flow.meet(Type.NIL);
-        if(  mt!=that. _flow ) { if( work==null ) return true; progress = true; that._flow   =mt; }
+        if(  mt!=that. _flow ) { if( work==null ) return true; progress = true; that._flow  = mt; }
         Type emt = that._eflow==null ? null : that._eflow.meet_nil(Type.XNIL);
-        if( emt!=that._eflow ) { if( work==null ) return true; progress = true; that._eflow  =emt;}
-        BitsFun bf = that._fidxs==null ? null : that._fidxs.set(0);
-        if( bf!=that._fidxs  ) { if( work==null ) return true; progress = true; that._fidxs  =bf; }
-        BitsAlias bs = that._aliases==null ? null : that._aliases.set(0);
-        if( bs!=that._aliases) { if( work==null ) return true; progress = true; that._aliases=bs; }
+        if( emt!=that._eflow ) { if( work==null ) return true; progress = true; that._eflow =emt; }
+        if( !that._may_nil )   { if( work==null ) return true; progress = that._may_nil = true; }
         if( progress ) that.add_deps_work(work);
         return vput(that,progress);
       }
@@ -2100,26 +2108,19 @@ public class HM {
         return unify_nil(that,work,nongen);
 
       // Progress on the parts
-      if( _fidxs!=null ) {
-        BitsFun mt = that._fidxs==null ? _fidxs : _fidxs.meet(that._fidxs);
-        if( mt!=that._fidxs ) {
-          if( work==null ) return true;
-          progress = true;
-          if( !that.is_fun() && that._args==null )
-            that._args = (NonBlockingHashMap<String,T2>)_args.clone(); // Error case; bring over the function args
-          that._fidxs=mt;
-        }
+      if( is_fun() && !that.is_fun() ) {
+        if( work==null ) return true;
+        progress = that._is_fun = true;
+        if( that._args==null )
+          that._args = (NonBlockingHashMap<String,T2>)_args.clone(); // Error case; bring over the function args
       }
       if( _flow!=null ) progress = unify_base(that, work);
-      if( _aliases!=null ) {
-        BitsAlias mt = that._aliases==null ? _aliases : _aliases.meet(that._aliases);
-        if( mt!=that._aliases ) {
-          if( work==null ) return true;
-          progress = true;
-          if( !that.is_struct() && that._args==null )
-            that._args = (NonBlockingHashMap<String,T2>)_args.clone(); // Error case; bring over the function args
-          that._aliases=mt;
-        }
+      that._may_nil |= _may_nil;
+      if( is_struct() && !that.is_struct() ) {
+        if( work==null ) return true;
+        progress = that._is_struct = true;
+        if( that._args==null )
+          that._args = (NonBlockingHashMap<String,T2>)_args.clone(); // Error case; bring over the function args
       }
       if( _err!=null && !_err.equals(that._err) ) {
         if( that._err!=null ) throw unimpl(); // TODO: Combine single error messages
@@ -2165,7 +2166,7 @@ public class HM {
             if( work == null ) return true;    // Will definitely make progress
             progress |= that.del_fld(id,work);
           }
-      if( _aliases!=null && that._open && !_open) { progress = true; that._open = false; }
+      if( is_struct() && that._open && !_open) { progress = true; that._open = false; }
       if( progress ) that.add_deps_work(work);
       return progress;
     }
@@ -2239,8 +2240,9 @@ public class HM {
       if( this==t ) return true;
       if( _flow   !=t._flow    ) return false; // Base-cases have to be completely identical
       if( _eflow  !=t._eflow   ) return false;
-      if( _fidxs  !=t._fidxs   ) return false; // Base-cases have to be completely identical
-      if( _aliases!=t._aliases ) return false; // Base-cases have to be completely identical
+      if( _may_nil!=t._may_nil ) return false; // Base-cases have to be completely identical
+      if( _is_fun !=t._is_fun  ) return false; // Base-cases have to be completely identical
+      if( _is_struct!=t._is_struct ) return false; // Base-cases have to be completely identical
       if( _err!=null && !_err.equals(t._err) ) return false; // Base-cases have to be completely identical
       if( is_leaf() ) return false;               // Two leaves must be the same leaf, already checked for above
       if( size() != t.size() ) return false;      // Mismatched sizes
@@ -2497,20 +2499,17 @@ public class HM {
     static private SB str0(SB sb, VBitSet visit, T2 t, VBitSet dups, boolean debug) { return t==null ? sb.p("_") : t.str(sb,visit,dups,debug); }
     private SB str_base(SB sb) { return sb.p(_flow); }
     private SB str_fun(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
-      if( debug ) _fidxs.clear(0).str(sb);
       sb.p("{ ");
       for( String fld : sorted_flds() ) {
         if( fld.charAt(0)!=' ' ) continue; // Ignore struct field
         if( !Util.eq("ret",fld) )
           str0(sb,visit,_args.get(fld),dups,debug).p(' ');
       }
-      return str0(sb.p("-> "),visit,_args.get("ret"),dups,debug).p(" }");
+      return str0(sb.p("-> "),visit,_args.get("ret"),dups,debug).p(" }").p(_may_nil ? "?" : "");
     }
     private SB str_struct(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
       if( is_prim() ) return sb.p("@{PRIMS}");
       final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
-      if( debug )
-        _aliases.clear(0).str(sb);
       sb.p(is_tup ? "(" : "@{");
       if( _args==null ) sb.p(" ");
       else {
@@ -2525,7 +2524,7 @@ public class HM {
       if( is_open() ) sb.p(" ...,");
       if( _args!=null && _args.size() > 0 ) sb.unchar();
       sb.p(!is_tup ? "}" : ")");
-      if( _aliases.test(0) ) sb.p("?");
+      if( _may_nil ) sb.p("?");
       return sb;
     }
 

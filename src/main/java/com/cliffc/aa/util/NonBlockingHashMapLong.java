@@ -608,7 +608,7 @@ public class NonBlockingHashMapLong<TypeV>
             ? null               // Nope!  A clear miss
             : copy_slot_and_check(idx,key).get_impl(key); // Retry in the new table
 
-        idx = (idx+(hash|1))&(len-1); // Divergent reprobe chain
+        idx = (idx+((hash>>16)|1))&(len-1); // Divergent reprobe chain
       }
       } finally {
         _nbhml.record(reprobe_cnt);
@@ -681,7 +681,7 @@ public class NonBlockingHashMapLong<TypeV>
           return newchm.putIfMatch(key,putval,expVal);
         }
 
-        idx = (idx+(hash|1))&(len-1); // Divergent reprobe chain
+        idx = (idx+((hash>>16)|1))&(len-1); // Divergent reprobe chain
       } // End of spinning till we get a Key slot
       } finally {
         _nbhml.record(reprobe_cnt);
