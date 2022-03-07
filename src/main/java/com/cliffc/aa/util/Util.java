@@ -24,20 +24,31 @@ public class Util {
 
   // Call per every get
   private static int REPROBE_CHK_CNT;
-  public static void reprobe_quality_check_per(NonBlockingHashMap map) {
+  public static void reprobe_quality_check_per(NonBlockingHashMap map, String msg) {
     if( (REPROBE_CHK_CNT++ & ((1L<<16)-1)) == 0 ) // Reports every 2^16 == 65536 gets
-      reprobe_quality_check(map);
+      reprobe_quality_check(map,msg);
   }
-  public static void reprobe_quality_check(NonBlockingHashMap map) {
-    System.out.println("Reprobe histogram: "+map.reprobes());
+  public static void reprobe_quality_check(NonBlockingHashMap map, String msg) {
+    System.out.print("--- Reprobe histogram "+msg+": ");
+    AryInt ps = map.reprobes();
+    long sum=0, ssum=0;
+    for( int i=0; i<ps._len; i++ ) {
+      System.out.print(""+i+":"+ps.at(i)+", ");
+      long l = (long)ps.at(i);
+      sum  += l;
+      ssum += l*(i+1);
+    }
+    System.out.println();
+    System.out.println("--- Reprobe rate "+msg+": ("+ssum+"/"+sum+") = "+((double)ssum/sum));
   }
   // Call per every put
-  public static void hash_quality_check_per(ConcurrentMap map) {
+  public static void hash_quality_check_per(ConcurrentMap map, String msg) {
     if( (map.size() & ((1L<<10)-1)) == 0 ) // Reports every 2^16 == 65536 puts
-      hash_quality_check(map);
+      hash_quality_check(map,msg);
   }
   // Call for a report
-  public static void hash_quality_check(ConcurrentMap map) {
+  public static void hash_quality_check(ConcurrentMap map, String msg) {
+    System.out.println("--- Hash quality check for "+msg+" ---");
     NonBlockingHashMapLong<Integer> hashs = new NonBlockingHashMapLong<>();
     for( Object k : map.keySet() ) {
       int hash = k.hashCode();
@@ -47,7 +58,7 @@ public class Util {
     int[] hist = new int[32];
     int maxval=0;
     long maxkey=-1;
-    for( long l : hashs.keySet() ) {
+    for( long l : hashs.keySetLong() ) {
       int reps = hashs.get(l);
       if( reps > maxval ) { maxval=reps; maxkey=l; }
       if( reps < hist.length ) hist[reps]++;
@@ -59,9 +70,8 @@ public class Util {
     System.out.println("Max repeat key "+maxkey+" repeats: "+maxval);
     int cnt=0;
     for( Object k : map.keySet() ) {
-      int hash = k.hashCode();
-      if( hash==maxkey ) {
-        System.out.println("Sample: "+map.get(k));
+      if( k.hashCode()==maxkey ) {
+        System.out.println("Sample: "+k);
         if( cnt++>3 ) break;
       }
     }
@@ -71,7 +81,7 @@ public class Util {
   // Copied from http://burtleburtle.net/bob/c/lookup3.c
   // Call add_hash as many times as you like, then get_hash at the end.
   // Uses global statics, does not nest.
-  private static int rot(int x, int k) { return (x<<k) | (x>>(32-k)); }
+  public static int rot(int x, int k) { return (x<<k) | (x>>(32-k)); }
   private static int a,b,c,x;
   static public void add_hash( int h ) {
     switch( x ) {

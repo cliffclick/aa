@@ -42,7 +42,11 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     return Cyclic._path_diff(_obj,((TypeMemPtr)t)._obj,links);
   }
 
-  int _hash() { return Util.hash_spread(super.static_hash() + _aliases._hash + _obj._type); }
+  int _hash() {
+    Util.add_hash(super.static_hash() + _aliases._hash);
+    Util.add_hash(_obj._type);
+    return Util.get_hash();
+  }
   @Override int  static_hash() { return _hash(); } // No edges
   @Override int compute_hash() { assert  _obj._hash!=0;  return _hash() + _obj._hash; } // Always edges
   // Static properties equals.  Already known to be the same class and

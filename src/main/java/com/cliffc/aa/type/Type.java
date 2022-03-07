@@ -226,7 +226,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     // Not in type table
     _dual = null;                // No dual yet
     INTERN.put(this,this);       // Put in table without dual
-    Util.hash_quality_check_per(INTERN);
+    //Util.hash_quality_check_per(INTERN,"INTERN");
     T d = xdual();               // Compute dual without requiring table lookup, and not setting name
     d._name = _name;             // xdual does not set name either
     d._hash = d.compute_hash();  // Set dual hash
@@ -254,12 +254,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Slow, actually probes the hash table.
   boolean un_interned() { return _hash == 0 || intern_get() != this; }
   Type intern_get() {
-    //Util.reprobe_quality_check_per(INTERN);
+    //Util.reprobe_quality_check_per(INTERN,"INTERN");
     return INTERN.get(this);
   }
   public static int intern_size() { return INTERN.size(); }
   public static int intern_capacity() { return INTERN.len(); }
-  public static AryInt reprobes() { return INTERN.reprobes(); }
   public static boolean intern_check() {
     int errs=0;
     for( Type k : INTERN.keySet() ) {
@@ -431,40 +430,20 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     static NonBlockingHashMap<Key,Type> INTERN_MEET = new NonBlockingHashMap<>();
     Key(Type a, Type b) { _a=a; _b=b; }
     Type _a, _b;
-    @Override public int hashCode() { return ((_a._hash<<17)|(_a._hash>>>15))^_b._hash; }
+    @Override public int hashCode() { return Util.rot(_a._hash,15)^_b._hash; }
     @Override public boolean equals(Object o) { return _a==((Key)o)._a && _b==((Key)o)._b; }
+    @Override public String toString() { return "("+_a+","+_b+")"; }
     static Type get(Type a, Type b) {
       K._a=a;
       K._b=b;
+      //Util.reprobe_quality_check_per(INTERN_MEET,"INTERN_MEET");
       return INTERN_MEET.get(K);
     }
     static void put(Type a, Type b, Type mt) {
       INTERN_MEET.put(new Key(a,b),mt);
       // Uncomment to check hash quality.
-      //Util.hash_quality_check_per(INTERN_MEET);
+      //Util.hash_quality_check_per(INTERN_MEET,"INTERN_MEET");
     }
-    static void intern_meet_quality_check() {
-      NonBlockingHashMapLong<Integer> hashs = new NonBlockingHashMapLong<>();
-      for( Key k : INTERN_MEET.keySet() ) {
-        int hash = k.hashCode();
-        Integer ii = hashs.get(hash);
-        hashs.put(hash,ii==null ? 1 : ii+1);
-      }
-      int[] hist = new int[16];
-      int maxval=0;
-      long maxkey=-1;
-      for( long l : hashs.keySet() ) {
-        int reps = hashs.get(l);
-        if( reps > maxval ) { maxval=reps; maxkey=l; }
-        if( reps < hist.length ) hist[reps]++;
-        else System.out.println("hash "+l+" repeats "+reps);
-      }
-      for( int i=0; i<hist.length; i++ )
-        if( hist[i] > 0 )
-          System.out.println("Number of hashes with "+i+" repeats: "+hist[i]);
-      System.out.println("Max repeat key "+maxkey+" repeats: "+maxval);
-    }
-
   }
 
   // Compute the meet

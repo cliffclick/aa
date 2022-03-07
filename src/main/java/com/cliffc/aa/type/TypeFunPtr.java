@@ -66,9 +66,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     return Util.get_hash();
   }
   // Excludes _ret._hash, which is part of cyclic hashes
-  @Override int compute_hash() {
-    return Util.hash_spread(static_hash());
-  }
+  @Override int compute_hash() { return static_hash(); }
 
   // Static properties equals, no edges.  Already known to be the same class
   // and not-equals.

@@ -225,11 +225,7 @@ public class NonBlockingHashMapLong<TypeV>
    *  weaknesses in the table resizing function.
    *  @return the count of reprobes since the last call to {@link #reprobes}
    *  or since the table was created.   */
-  public AryInt reprobes() {
-    AryInt p = _reprobes;
-    _reprobes = new AryInt();
-    return p;
-  }
+  public AryInt reprobes() { return _reprobes==null ? (_reprobes = new AryInt()) : _reprobes; }
   private void  record( int ps ) { if( _reprobes!=null ) _record(ps); }
   private void _record( int ps ) { _reprobes.setX(ps,_reprobes.atX(ps)+1); }
 

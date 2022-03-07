@@ -72,17 +72,15 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // its parts, but the parts are not available during construction of a cyclic type.
   // We can count on the field names and accesses but not field order nor type.
   @Override int static_hash() {
-    final int hash0 = (super.static_hash() + 0xcafebabe) ^ (_any?1023:0);
-    int hash = hash0;
+    Util.add_hash(super.static_hash() ^ (_any?1023:0));
     for( TypeFld fld : this ) {
       // Can depend on the field name and access, but NOT the type - because recursion.
       // Same hash independent of field visitation order, because the iterator does
       // not make order guarantees.
-      hash += (fld._fld.hashCode() + fld._access.hashCode());
+      Util.add_hash(fld._fld.hashCode() ^ fld._access.hashCode());
       _max_arg = (short)Math.max(_max_arg,fld._order);
     }
-    if( hash==0 ) hash = Util.hash_spread(hash0);
-    return hash;
+    return Util.get_hash();
   }
   @Override public int compute_hash() { return static_hash(); }
 

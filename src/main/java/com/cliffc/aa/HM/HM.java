@@ -162,7 +162,7 @@ public class HM {
     pass4(prog);
 
     // Profiling print
-    System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+work_cnt+", T2s: "+(T2.CNT-init_T2s));
+    //System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+work_cnt+", T2s: "+(T2.CNT-init_T2s));
     return prog;
   }
 
