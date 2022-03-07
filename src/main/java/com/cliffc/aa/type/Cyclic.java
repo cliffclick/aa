@@ -157,7 +157,7 @@ public interface Cyclic {
     assert CSTACK.isEmpty();   CVISIT.clear();
 
     // Check for dups.
-    T old = (T)head.intern_lookup();
+    T old = (T)head.intern_get();
     if( old != null ) {         // Found prior interned cycle
       head = old;  P.hit++;
       // Free all not-interned
@@ -564,7 +564,7 @@ public interface Cyclic {
         Type head = P.head();
         if( head instanceof Cyclic cyc )
           cyc.walk_update(Partition::head);
-        Type i = head.intern_lookup();
+        Type i = head.intern_get();
         if( i!=null && head!=i ) { done=false; P.set_head(i,head); }
       }
     }

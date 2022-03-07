@@ -215,7 +215,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   @SuppressWarnings("unchecked")
   private T hashcons() {
     _hash = compute_hash();     // Set hash
-    T t2 = (T)INTERN.get(this); // Lookup
+    T t2 = (T)intern_get();     // Lookup
     if( t2!=null ) {            // Found prior
       assert t2._dual != null;  // Prior is complete with dual
       assert this != t2;        // Do not hashcons twice, should not get self back
@@ -226,6 +226,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     // Not in type table
     _dual = null;                // No dual yet
     INTERN.put(this,this);       // Put in table without dual
+    Util.hash_quality_check_per(INTERN);
     T d = xdual();               // Compute dual without requiring table lookup, and not setting name
     d._name = _name;             // xdual does not set name either
     d._hash = d.compute_hash();  // Set dual hash
@@ -233,7 +234,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     if( this==d ) return d;      // Self-symmetric?  Dual is self
     assert !equals(d);           // Self-symmetric is handled by caller
     assert d._dual==null;        // Else dual-dual not computed yet
-    assert INTERN.get(d)==null;
+    assert d.intern_get()==null;
     d._dual = (T)this;
     INTERN.put(d,d);
     return (T)this;
@@ -242,17 +243,20 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   final T retern( ) {
     assert _dual._dual == this;
     assert _hash != 0;
-    assert INTERN.get(this)==null;
+    assert intern_get()==null;
     INTERN.put(this,this);
-    assert INTERN.get(this)==this;
+    assert intern_get()==this;
     return (T)this;
   }
 
   // Fast, does not check the hash table, just the hash & dual
   boolean interned() { return _hash!=0 && _dual!=null; }
   // Slow, actually probes the hash table.
-  boolean un_interned() { return _hash == 0 || INTERN.get(this) != this; }
-  Type intern_lookup() { return INTERN.get(this); }
+  boolean un_interned() { return _hash == 0 || intern_get() != this; }
+  Type intern_get() {
+    //Util.reprobe_quality_check_per(INTERN);
+    return INTERN.get(this);
+  }
   public static int intern_size() { return INTERN.size(); }
   public static int intern_capacity() { return INTERN.len(); }
   public static AryInt reprobes() { return INTERN.reprobes(); }

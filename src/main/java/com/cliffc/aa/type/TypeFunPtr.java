@@ -255,11 +255,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     TypeFunPtr tfp = malloc(fidxs,nargs,dsp,ret);
     if( ret instanceof TypeFunPtr ) tfp._ret = tfp; // Make a self-cycle of length 1
     tfp.set_hash();
-    TypeFunPtr old = (TypeFunPtr)tfp.intern_lookup(); // Intern check
-    if( old!=null )                                   // Return prior hit
-      return POOLS[TFUNPTR].free(tfp,old);            // Return prior
-    tfp.rdual();                                      // Install dual in a self-cycle
-    return tfp.retern()._dual.retern().dual();        // Install self-cycle
+    TypeFunPtr old = (TypeFunPtr)tfp.intern_get(); // Intern check
+    if( old!=null )                                // Return prior hit
+      return POOLS[TFUNPTR].free(tfp,old);         // Return prior
+    tfp.rdual();                                   // Install dual in a self-cycle
+    return tfp.retern()._dual.retern().dual();     // Install self-cycle
   }
 
   // Allocate and init

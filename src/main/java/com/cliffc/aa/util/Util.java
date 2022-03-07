@@ -22,9 +22,18 @@ public class Util {
     return false;
   }
 
+  // Call per every get
+  private static int REPROBE_CHK_CNT;
+  public static void reprobe_quality_check_per(NonBlockingHashMap map) {
+    if( (REPROBE_CHK_CNT++ & ((1L<<16)-1)) == 0 ) // Reports every 2^16 == 65536 gets
+      reprobe_quality_check(map);
+  }
+  public static void reprobe_quality_check(NonBlockingHashMap map) {
+    System.out.println("Reprobe histogram: "+map.reprobes());
+  }
   // Call per every put
   public static void hash_quality_check_per(ConcurrentMap map) {
-    if( (map.size() & ((1L<<16)-1)) == 0 ) // Reports every 2^16 == 65536 puts
+    if( (map.size() & ((1L<<10)-1)) == 0 ) // Reports every 2^16 == 65536 puts
       hash_quality_check(map);
   }
   // Call for a report
@@ -67,8 +76,8 @@ public class Util {
   static public void add_hash( int h ) {
     switch( x ) {
     case 0: a+=h; x++; return;
-    case 1: a+=h; x++; return;
-    case 2: a+=h; x++; return;
+    case 1: b+=h; x++; return;
+    case 2: c+=h; x++; return;
     case 3:
       a -= c;  a ^= rot(c, 4);  c += b;
       b -= a;  b ^= rot(a, 6);  a += c;

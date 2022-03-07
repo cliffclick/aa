@@ -71,11 +71,11 @@ public class TestLift {
 
     // Call walk_types_out with ret1
     T2.WDUPS.clear(true);
-    Type lift1 = x3_.walk_types_out(ret1,apply);
+    Type lift1 = x3_.walk_types_out(ret1,apply,true);
 
     // Call walk_types_out with ret2
     T2.WDUPS.clear(true);
-    Type lift2 = x3_.walk_types_out(ret2,apply);
+    Type lift2 = x3_.walk_types_out(ret2,apply,true);
 
     // Check monotonic
     assertTrue(ret1 .isa(ret2 ));
@@ -131,11 +131,11 @@ public class TestLift {
 
     // Call walk_types_out with ret1
     T2.WDUPS.clear(true);
-    Type lift1 = x00.walk_types_out(ret1,apply);
+    Type lift1 = x00.walk_types_out(ret1,apply,true);
 
     // Call walk_types_out with ret2
     T2.WDUPS.clear(true);
-    Type lift2 = x00.walk_types_out(ret2,apply);
+    Type lift2 = x00.walk_types_out(ret2,apply,true);
 
     // Check monotonic
     assertTrue(ret1 .isa(ret2 ));

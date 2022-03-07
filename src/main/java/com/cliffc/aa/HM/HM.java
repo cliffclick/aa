@@ -194,7 +194,7 @@ public class HM {
       }
 
       // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
-      //assert prog.more_work(work);
+      assert prog.more_work(work);
     }
     return cnt;
   }
@@ -751,6 +751,7 @@ public class HM {
     // Unifiying these: make_fun(this.arg0 this.arg1 -> new     )
     //                      _fun{_fun.arg0 _fun.arg1 -> _fun.rez}
     @Override boolean hm(Work<Syntax> work) {
+      boolean progress = false;
       // Progress if:
       //   _fun is not a function
       //   any arg-pair-unifies make progress
@@ -763,26 +764,26 @@ public class HM {
           targs[i] = _args[i].find();
         targs[_args.length] = find(); // Return
         T2 nfun = T2.make_fun(targs);
-        return tfun.unify(nfun,work);
-      }
-
-      // Check for progress amongst arg pairs
-      boolean progress = false;
-      int miss=0;
-      for( int i=0; i<_args.length; i++ ) {
-        T2 farg = tfun.arg(Lambda.ARGNAMES[i]);
-        if( farg==null ) {
-          miss++;
+        progress = tfun.unify(nfun,work);
+        
+      } else {
+        // Check for progress amongst arg pairs
+        int miss=0;
+        for( int i=0; i<_args.length; i++ ) {
+          T2 farg = tfun.arg(Lambda.ARGNAMES[i]);
+          if( farg==null ) {
+            miss++;
+            progress |= bad_arg_cnt(work);
+          } else progress |= farg.unify(_args[i].find(),work);
+          if( progress && work==null ) return true; // Will-progress & just-testing early exit
+          tfun=tfun.find();
+        }
+        if( (tfun.size()-1)-(_args.length-miss) > 0 && !tfun.is_err() )
           progress |= bad_arg_cnt(work);
-        } else progress |= farg.unify(_args[i].find(),work);
-        if( progress && work==null ) return true; // Will-progress & just-testing early exit
-        tfun=tfun.find();
+        // Check for progress on the return
+        progress |= find().unify(tfun.arg("ret"),work);
       }
-      if( (tfun.size()-1)-(_args.length-miss) > 0 && !tfun.is_err() )
-        progress |= bad_arg_cnt(work);
-      // Check for progress on the return
-      progress |= find().unify(tfun.arg("ret"),work);
-
+      
       // Flag HMT result as widening, if GCP falls to a TFP which widens in HMT.
       T2 tret = tfun.find().arg("ret");
       if( tret._is_copy && _fun._flow instanceof TypeFunPtr tfp ) {
@@ -834,7 +835,7 @@ public class HM {
         if( !test ) _old_lift=lift;
       }
       if( lift==ret ) return ret; // No change
-      rezt2.push_update(this);
+      if( !test ) rezt2.push_update(this);
       return ret.join(lift);    // Lifted result
     }
 
@@ -855,7 +856,7 @@ public class HM {
       // exactly, replacing the input flow Type with the corresponding flow
       // Type.  If !HM_FREEZE, replace with a join of flow types.
       T2.WDUPS.clear(true);
-      return rezt2.walk_types_out(ret, this);
+      return rezt2.walk_types_out(ret, this, test);
     }
 
     @Override void add_val_work( Syntax child, @NotNull Work<Syntax> work) {
@@ -1112,7 +1113,7 @@ public class HM {
     @Override boolean hm(Work<Syntax> work) {
       T2 self = find();
       T2 rec = _rec.find();
-      rec.push_update(this);
+      if( work!=null ) rec.push_update(this);
       T2 fld = rec.arg(_id);
       if( fld!=null )           // Unify against a pre-existing field
         return fld.unify(self, work);
@@ -1153,7 +1154,7 @@ public class HM {
           Type afld = alloc.fld(_id);
           if( afld==null ) afld = tmp._obj.oob(Type.SCALAR);
           t = t.meet(afld);
-          alloc.push(this);
+          if( work!=null ) alloc.push(this);
         }
       if( DO_HM ) {
         TypeFld tf = tmp._obj.get(_id);
@@ -2317,7 +2318,7 @@ public class HM {
 
     // Walk an Apply output flow type, and attempt to replace parts of it with
     // stronger flow types from the matching input types.
-    Type walk_types_out( Type t, Apply apply ) {
+    Type walk_types_out( Type t, Apply apply, boolean test ) {
       assert !unified();
 
       if( is_err() ) return Type.SCALAR; // Do not attempt lift
@@ -2329,18 +2330,19 @@ public class HM {
         if( HM_FREEZE && tx==null ) return Type.SCALAR;
         Type lt = HM_FREEZE ? tx : Type.XSCALAR;
         if( lt==Type.SCALAR || lt==t ) return lt; // No mapping, no lift
-        if( HM_FREEZE ) push_update(apply); // Apply depends on this leaf
-        else                                // Apply depends on ALL leafs
-          for( T2 t2 : T2.T2MAP.keySet() )
-            if( t2.is_leaf() || t2.is_base() )
-              t2.push_update(apply);
+        if( !test )
+          if( HM_FREEZE ) push_update(apply); // Apply depends on this leaf
+          else                                // Apply depends on ALL leafs
+            for( T2 t2 : T2.T2MAP.keySet() )
+              if( t2.is_leaf() || t2.is_base() )
+                t2.push_update(apply);
         return lt;
       }
 
       if( is_base() ) return _is_copy ? _flow : widen();
 
       if( is_nil() ) { // The wrapped leaf gets lifted, then nil is added
-        Type tnil = arg("?").walk_types_out(t.remove_nil(),apply);
+        Type tnil = arg("?").walk_types_out(t.remove_nil(),apply, test);
         return tnil.meet(Type.NIL);
       }
 
@@ -2350,7 +2352,7 @@ public class HM {
         Type tdsp = Type.ANY;
         if( WDUPS.get(_uid)!=null ) return t;
         WDUPS.put(_uid,t);
-        Type trlift = arg("ret").walk_types_out(tret, apply);
+        Type trlift = arg("ret").walk_types_out(tret, apply, test);
         WDUPS.remove(_uid);
         return TypeFunPtr.makex( fidxs,size()-1, tdsp, trlift);
       }

@@ -272,6 +272,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _t.repeats_in_cycles(head,bs); }
 
   // Used for assertions
-  @Override boolean intern_check1() { return _t.intern_lookup()!=null; }
+  @Override boolean intern_check1() { return _t.intern_get()!=null; }
 }
 

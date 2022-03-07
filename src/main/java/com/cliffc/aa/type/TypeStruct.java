@@ -1021,7 +1021,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Used for assertions
   @Override boolean intern_check1() {
     for( TypeFld fld : this )
-      if( fld.intern_lookup()==null )
+      if( fld.intern_get()==null )
         return false;
     return true;
   }

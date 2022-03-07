@@ -339,5 +339,5 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   }
 
   // Used for assertions
-  @Override boolean intern_check1() { return _obj.intern_lookup()!=null; }
+  @Override boolean intern_check1() { return _obj.intern_get()!=null; }
 }
