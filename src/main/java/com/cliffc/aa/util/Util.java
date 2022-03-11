@@ -81,14 +81,14 @@ public class Util {
   // Copied from http://burtleburtle.net/bob/c/lookup3.c
   // Call add_hash as many times as you like, then get_hash at the end.
   // Uses global statics, does not nest.
-  public static int rot(int x, int k) { return (x<<k) | (x>>(32-k)); }
-  private static int a,b,c,x;
-  static public void add_hash( int h ) {
+  public static long rot(long x, int k) { return (x<<k) | (x>>>(64-k)); }
+  private static long a,b,c;
+  private static int x;
+  static public void add_hash( long h ) {
     switch( x ) {
     case 0: a+=h; x++; return;
     case 1: b+=h; x++; return;
-    case 2: c+=h; x++; return;
-    case 3:
+    case 2: c+=h;
       a -= c;  a ^= rot(c, 4);  c += b;
       b -= a;  b ^= rot(a, 6);  a += c;
       c -= b;  c ^= rot(b, 8);  b += a;
@@ -99,7 +99,7 @@ public class Util {
     }
   }
   // Return the resulting hash, which is never 0
-  static public int get_hash() {
+  static public long get_hash() {
     if( x!=0 ) {
       c ^= b; c -= rot(b,14);
       a ^= c; a -= rot(c,11);
@@ -109,7 +109,7 @@ public class Util {
       b ^= a; b -= rot(a,14);
       c ^= b; c -= rot(b,24);
     }
-    int hash=c;
+    long hash=c;
     if( hash==0 ) hash=b;
     if( hash==0 ) hash=a;
     if( hash==0 ) hash=0xcafebabe;
@@ -117,9 +117,27 @@ public class Util {
     return hash;
   }
   // Single-use hash spreader
-  static public int hash_spread(int hash) {
-    Util.add_hash(hash);
-    return Util.get_hash();
+  static public long mix_hash(long h0) {
+    add_hash(h0);
+    return get_hash();
+  }
+  static public long mix_hash( long h0, long h1 ) {
+    add_hash(h0);
+    add_hash(h1);
+    return get_hash();
+  }
+  static public long mix_hash( long h0, long h1, long h2 ) {
+    add_hash(h0);
+    add_hash(h1);
+    add_hash(h2);
+    return get_hash();
+  }
+  static public long mix_hash( long h0, long h1, long h2, long h3 ) {
+    add_hash(h0);
+    add_hash(h1);
+    add_hash(h2);
+    add_hash(h3);
+    return get_hash();
   }
 
   static public int gcd(int x, int y) {

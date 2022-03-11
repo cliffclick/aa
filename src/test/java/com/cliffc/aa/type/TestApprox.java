@@ -57,7 +57,6 @@ public class TestApprox {
 
   }
   // Test approx of fcns-returning-fcns
-  @Ignore
   @Test public void testFunctionReturn() {
     // ND = ^=any,   D = ^=Scalar
     // XS = ~Scalar, S =   Scalar
@@ -97,12 +96,12 @@ public class TestApprox {
     TypeMemPtr ts1  = TypeMemPtr.make(a3,TypeStruct.make(TypeFld.make_tup(tfpa,ARG_IDX+1),TypeFld.make_tup(tfp1,ARG_IDX+2)));
 
     assertTrue(tmp0.isa(tmp1));
-    TypeStruct ax0 = ts0._obj.approx(ts0._aliases);
-    TypeStruct ax1 = ts1._obj.approx(ts1._aliases);
-    assertTrue(ts0._obj.isa(ax0));
-    assertTrue(ts1._obj.isa(ax1));
-
-    assertTrue(ax0.isa(ax1));
+    //TypeStruct ax0 = ts0._obj.approx(ts0._aliases);
+    //TypeStruct ax1 = ts1._obj.approx(ts1._aliases);
+    //assertTrue(ts0._obj.isa(ax0));
+    //assertTrue(ts1._obj.isa(ax1));
+    //
+    //assertTrue(ax0.isa(ax1));
 
 
     // Make a collection of probably function-to-functions
@@ -117,9 +116,9 @@ public class TestApprox {
     BitsFun bf2  = BitsFun.make0(f2);
     BitsFun bf7  = BitsFun.make0(f7);
     BitsFun bf27 = BitsFun.make0(f2,f7);
-    tfps.push(TypeFunPtr.make_cycle(bf2 ,1,ND,tfpa));
-    tfps.push(TypeFunPtr.make_cycle(bf7 ,1,ND,tfpa));
-    tfps.push(TypeFunPtr.make_cycle(bf27,1,ND,tfpa));
+    tfps.push(TypeFunPtr.make_cycle(bf2 ,1,ND));
+    tfps.push(TypeFunPtr.make_cycle(bf7 ,1,ND));
+    tfps.push(TypeFunPtr.make_cycle(bf27,1,ND));
     tfps.push(TypeFunPtr.make(f2,1,ND,TypeFunPtr.make(f7,1,ND,Type.XSCALAR)));
     tfps.push(TypeFunPtr.make(f2,1,ND,TypeFunPtr.make(f7,1,ND,Type. SCALAR)));
     tfps.push(TypeFunPtr.make(f7,1,ND,TypeFunPtr.make(f2,1,ND,Type.XSCALAR)));
@@ -962,7 +961,7 @@ public class TestApprox {
       Type.RECURSIVE_MEET++;
       TypeFld pred = TypeFld.malloc("pred");
       TypeFld succ = TypeFld.malloc("succ");
-      rez = TypeStruct.make(pred,succ).set_hash();
+      rez = TypeStruct.make(pred,succ);
       _help0(pred,f1425,a1314,rez);
       _help0(succ,f2226,a14  ,rez);
       Type.RECURSIVE_MEET--;
@@ -974,8 +973,8 @@ public class TestApprox {
       Type.RECURSIVE_MEET++;
       TypeFld pred2 = TypeFld.malloc("pred");
       TypeFld succ1 = TypeFld.malloc("succ");
-      TypeStruct str1 = TypeStruct.make(rez.get("pred"),succ1).set_hash();
-      TypeStruct str2 = TypeStruct.make(pred2,rez.get("succ")).set_hash();
+      TypeStruct str1 = TypeStruct.make(rez.get("pred"),succ1);
+      TypeStruct str2 = TypeStruct.make(pred2,rez.get("succ"));
       _help0(pred2,f1425,a1314,str1);
       _help0(succ1,f2226,a14  ,str2);
       Type.RECURSIVE_MEET--;

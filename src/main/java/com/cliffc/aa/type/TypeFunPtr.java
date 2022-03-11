@@ -33,21 +33,18 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   private int _nargs;           // Number of formals, including the ctrl, mem, display
   public Type _ret;             // Return scalar type
   private Type _dsp;            // Display; often a TMP to a TS; ANY is dead (not live, nobody uses).
-  boolean _cyclic; // Type is cyclic with a struct.  This is a summary property, not a part of the type, hence is not in the equals nor hash
 
   private TypeFunPtr init(BitsFun fidxs, int nargs, Type dsp, Type ret ) {
     super.init("");
-    _cyclic = false;
     assert !(dsp instanceof TypeFld);
     _fidxs = fidxs; _nargs=nargs; _dsp=dsp; _ret=ret;
     return this;
   }
   @Override TypeFunPtr copy() { return _copy().init(_fidxs,_nargs,_dsp,_ret); }
-  @Override public boolean cyclic() { return _cyclic; }
-  @Override public void set_cyclic() { _cyclic = true; }
-  @Override public void clr_cyclic() { _cyclic = false; }
-  @Override public <T> T walk1( BiFunction<Type,String,T> map, BinaryOperator<T> reduce ) { return reduce.apply(map.apply(_dsp,"dsp"), map.apply(_ret,"ret")); }
-  @Override public void walk_update( UnaryOperator<Type> map ) { _dsp = map.apply(_dsp); _ret = map.apply(_ret); }
+  @Override public TypeMemPtr walk( TypeStrMap map, BinaryOperator<TypeMemPtr> reduce ) { return reduce.apply(map.map(_dsp,"dsp"), map.map(_ret,"ret")); }
+  @Override public long lwalk( LongStringFunc map, LongOp reduce ) { return reduce.run(map.run(_dsp,"dsp"), map.run(_ret,"ret")); }
+  @Override public void walk( TypeStrRun map ) { map.run(_dsp,"dsp"); map.run(_ret,"ret"); }
+  @Override public void walk_update( TypeMap map ) { _dsp = map.map(_dsp); _ret = map.map(_ret); }
   @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {
     TypeFunPtr tfp = (TypeFunPtr)t;
     Cyclic.Link dsplk = Cyclic._path_diff(_dsp,tfp._dsp,links);
@@ -60,13 +57,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   void set_dsp( Type dsp) { assert un_interned() && (has_dsp() || _dsp==dsp); _dsp = dsp; }
 
   // Static properties hashcode, no edge hashes
-  @Override int static_hash() {
-    Util.add_hash(super.static_hash()+_nargs);
-    Util.add_hash(_fidxs._hash);
-    return Util.get_hash();
-  }
-  // Excludes _ret._hash, which is part of cyclic hashes
-  @Override int compute_hash() { return static_hash(); }
+  @Override long static_hash() { return Util.mix_hash(super.static_hash(),_fidxs._hash,_nargs^_dsp._type^_ret._type); }
 
   // Static properties equals, no edges.  Already known to be the same class
   // and not-equals.
@@ -110,7 +101,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     return eq;
   }
 
-  @SuppressWarnings("unchecked")
   @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
     if( visit.tset(_uid) ) {
       if( !dups.containsKey(_uid) )
@@ -122,7 +112,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   }
 
 
-  @SuppressWarnings("unchecked")
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     _fidxs.str(sb);
     sb.p('{');                  // Arg list start
@@ -135,7 +124,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     return sb.p('}');
   }
 
-  @SuppressWarnings("unchecked")
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return _ret._str_complex(visit,dups); }
 
   static TypeFunPtr valueOf(Parse P, String cid) {
@@ -152,7 +140,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     return tfp;
   }
 
-  
+
   static { new Pool(TFUNPTR,new TypeFunPtr()); }
 
   // Lambda/FunPtr transfer functions wrap a TFP/FIDX around a return, possibly
@@ -230,7 +218,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   private Type _make_apx() {
     if( _ret==this ) return this; // Already a self-cycle
     if( _ret==XSCALAR || _ret==ANY ) // Approx self as a self-cycle
-      return make_cycle(_fidxs,_nargs,_dsp,this);
+      return make_cycle(_fidxs,_nargs,_dsp);
     if( !(_ret instanceof TypeFunPtr tfp) )
       return _ret==ALL ? ALL : SCALAR; // Approx self as SCALAR
     Type ret = tfp._make_apx();        // Recursive walk to the end
@@ -244,19 +232,23 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     BitsFun fidxs = _fidxs.meet(cyc._fidxs);
     int nargs = Math.min(_nargs,cyc._nargs);
     Type dsp = _dsp.meet(cyc._dsp);
-    return make_cycle(fidxs,nargs,dsp,cyc);
+    return make_cycle(fidxs,nargs,dsp);
   }
 
   // Install a length-1 self-cycle (if 'ret' is a TFP or high) or a short
   // normal TFP if 'ret' is not a TFP.
-  static TypeFunPtr make_cycle(BitsFun fidxs, int nargs, Type dsp, Type ret ) {
-    TypeFunPtr tfp = malloc(fidxs,nargs,dsp,ret);
-    if( ret instanceof TypeFunPtr ) tfp._ret = tfp; // Make a self-cycle of length 1
-    tfp.set_hash();
+  static TypeFunPtr make_cycle(BitsFun fidxs, int nargs, Type dsp ) {
+    TypeFunPtr tfp = malloc(fidxs,nargs,dsp,null);
+    tfp._ret = tfp;             // Make a self-cycle of length 1
+    assert dsp._hash!=0;        // Can be 'compute_hash'
+    tfp._hash = Util.mix_hash(dsp._hash,fidxs._hash,nargs);
     TypeFunPtr old = (TypeFunPtr)tfp.intern_get(); // Intern check
     if( old!=null )                                // Return prior hit
       return POOLS[TFUNPTR].free(tfp,old);         // Return prior
-    tfp.rdual();                                   // Install dual in a self-cycle
+    tfp._dual = tfp.xdual();                       // Install dual in a self-cycle
+    tfp._dual._dual = tfp;
+    tfp._dual._ret = tfp._dual;
+    tfp._dual._hash = ~tfp._hash;
     return tfp.retern()._dual.retern().dual();     // Install self-cycle
   }
 
@@ -284,16 +276,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   @Override protected TypeFunPtr xdual() {
     return malloc(_fidxs.dual(),-_nargs,_dsp.dual(),_ret.dual());
   }
-  @Override protected TypeFunPtr rdual() {
-    assert _hash==compute_hash();
-    if( _dual != null ) return _dual;
-    TypeFunPtr dual = _dual = malloc(_fidxs.dual(),-_nargs,null,null);
-    dual._dual = this;          // Stop the recursion
-    dual._hash = dual.compute_hash();
-    dual._dsp = _dsp.rdual();
-    dual._ret = _ret.rdual();
-    return dual;
-  }
+  @Override void rdual() { _dual._dsp = _dsp._dual;  _dual._ret = _ret._dual; }
+
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUNPTR:break;
@@ -323,16 +307,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
 
     // If both are short cycles, the result is a short cycle
     if( _ret==this && tf._ret==tf )
-      return make_cycle(fidxs,nargs,dsp,this);
+      return make_cycle(fidxs,nargs,dsp);
 
     // Otherwise, recursively find the return
     Type ret = _ret.meet(tf._ret);
     return makex(fidxs,nargs,dsp,ret);
-  }
-  // Meet the non-cyclic parts of a TFP
-  void cmeet(TypeFunPtr tfp) {
-    _fidxs = _fidxs.meet(tfp._fidxs);
-    _nargs = Math.min(_nargs,tfp._nargs);
   }
 
   public BitsFun fidxs() { return _fidxs; }
@@ -382,34 +361,9 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     BitsFun fidxs = _fidxs.above_center() ? _fidxs.dual() : _fidxs;
     return make_from(fidxs.set(0));
   }
-  // Used during approximations, with a not-interned 'this'.
-  // Updates-in-place.
-  public Type ax_meet_nil(Type nil) {
-    throw com.cliffc.aa.AA.unimpl();
-  }
-
-  @SuppressWarnings("unchecked")
-  @Override public void walk( Predicate<Type> p ) { if( p.test(this) ) { _dsp.walk(p); _ret.walk(p); } }
-
-  // Generic functions
-  TypeFunPtr _sharpen_clone(TypeMemPtr dsp) {
-    TypeFunPtr tf = copy();
-    tf._dsp = dsp;
-    return tf;
-  }
-  TypeFunPtr _sharpen_clone_ret(Type ret) {
-    TypeFunPtr tf = copy();
-    tf._ret = ret;
-    return tf;
-  }
   @Override TypeFunPtr _widen() { return GENERIC_FUNPTR; }
 
   @Override public Type make_from(Type head, TypeMem map, VBitSet visit) {
-    throw unimpl();
-  }
-
-  @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) {
-    //return _dsp.repeats_in_cycles(head,bs);
     throw unimpl();
   }
 

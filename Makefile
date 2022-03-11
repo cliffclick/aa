@@ -34,7 +34,7 @@ endif
 
 # Fun Args to javac.  Mostly limit to java8 source definitions, and fairly
 # aggressive lint warnings.
-JAVAC_ARGS = -g --enable-preview -source 17 -target 17 -XDignore.symbol.file -Xlint:all -Xlint:-preview -Xlint:-deprecation -Xlint:-serial -Xlint:-rawtypes -Xlint:unchecked
+JAVAC_ARGS = -g --enable-preview -source 17 -target 17 -XDignore.symbol.file -Xlint:all -Xlint:-unchecked -Xlint:-preview -Xlint:-deprecation -Xlint:-serial -Xlint:-rawtypes
 
 # Source code
 # Note that BuildVersion is not forced to be rebuilt here - so incremental

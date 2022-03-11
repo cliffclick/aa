@@ -17,31 +17,26 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public Type _t;               // Field type.  Usually some type of Scalar, or ANY or ALL.
   public Access _access;        // Field access type: read/write, final, read/only
   public int _order;            // Field order in the struct, or -1 for undefined (Bot) or -2 for conforming (top)
-  boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
 
   private TypeFld init( @NotNull String fld, Type t, Access access, int order ) {
     assert !(t instanceof TypeFld);
     super.init("");
-    _cyclic = false;
     _fld=fld; _t=t; _access=access;
     _order=oBot;//order; // Claim 'order' is not a property of types; instead field layout is a backend property.
     return this;
   }
   @Override public TypeFld copy() { return _copy().init(_fld,_t,_access,_order); }
 
-  @Override public boolean cyclic() { return _cyclic; }
-  @Override public void set_cyclic() { _cyclic = true; }
-  @Override public void clr_cyclic() { _cyclic = false; }
-  @Override public <T> T walk1( BiFunction<Type,String,T> map, BinaryOperator<T> reduce ) { return map.apply(_t,"t"); }
-  @Override public void walk_update( UnaryOperator<Type> map ) { _t = map.apply(_t); }
+  @Override public TypeMemPtr walk( TypeStrMap map, BinaryOperator<TypeMemPtr> reduce ) { return map.map(_t,"t"); }
+  @Override public long lwalk( LongStringFunc map, LongOp reduce ) { return map.run(_t,"t"); }
+  @Override public void walk( TypeStrRun map ) { map.run(_t,"t"); }
+  @Override public void walk_update( TypeMap map ) { _t = map.map(_t); }
   @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {
     return Cyclic._path_diff(_t,((TypeFld)t)._t,links);
   }
 
   // Ignore edges hash
-  int _hash() { return Util.hash_spread(super.static_hash() + _fld.hashCode() + _access.hashCode( ) + _order); }
-  @Override int  static_hash() { return _hash(); } // No edges
-  @Override int compute_hash() { assert _t._hash!=0; return _hash() + _t._hash; } // Always edges
+  @Override long static_hash() { return Util.mix_hash(super.static_hash(),_fld.hashCode(),_access.hashCode(),_order); }
 
   // Returns 1 for definitely equals, 0 for definitely unequals and -1 for needing the circular test.
   int cmp(TypeFld t) {
@@ -74,7 +69,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     return _t.cycle_equals(((TypeFld)o)._t);
   }
 
-  @SuppressWarnings("unchecked")
   @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
     if( visit.tset(_uid) ) {
       if( !dups.containsKey(_uid) )
@@ -84,7 +78,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     if( _t!=null ) _t._str_dups(visit,dups,ucnt);
   }
 
-  @SuppressWarnings("unchecked")
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( !TypeStruct.isDigit(_fld.charAt(0)) ) // Do not print number-named fields for tuples
       _access.str(sb.p(_fld));
@@ -103,7 +96,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     if( fid!=null ) P._dups.put(fid,fld);
     return fld.setX(P.type());
   }
-  
+
   static { new Pool(TFLD,new TypeFld()); }
   public static TypeFld malloc( String fld, Type t, Access access, int order ) { return POOLS[TFLD].<TypeFld>malloc().init(fld,t,access,order); }
   public static TypeFld malloc( String fld ) { return POOLS[TFLD].<TypeFld>malloc().init(fld,null,Access.Final,oBot); }
@@ -130,14 +123,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
       return this;              // Self symmetric
     return POOLS[TFLD].<TypeFld>malloc().init(sdual(_fld),_t.dual(),_access.dual(),odual(_order));
   }
-  @Override protected TypeFld rdual() {
-    assert _hash!=0;
-    if( _dual != null ) return _dual;
-    TypeFld dual = _dual = POOLS[TFLD].<TypeFld>malloc().init(sdual(_fld),_t==null ? null : _t.rdual(),_access.dual(),odual(_order));
-    dual._dual = this;
-    dual._hash = dual.compute_hash();
-    return dual;
-  }
+  @Override protected void rdual() { _dual._t = _t._dual; }
 
   @Override protected TypeFld xmeet( Type tf ) {
     if( this==tf ) return this;
@@ -165,14 +151,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     Access access= f0._access.meet(f1._access);
     int    order = omeet(f0._order,f1._order);
     return malloc(fld,access,order);
-  }
-  // Used during cyclic struct meets.  The LHS is meeted into directly.
-  // The _t field is not filled in.
-  void cmeet(TypeFld f) {
-    assert _hash==0; // Not interned, hash is changing
-    _fld    = smeet(_fld,f._fld);
-    _access = _access.meet(f._access);
-    _order  = omeet(_order,f._order);
   }
 
   public enum Access {
@@ -261,15 +239,11 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
 
   @Override public boolean above_center() { return _t.above_center(); }
   @Override public TypeFld simple_ptr() { return make_from(_t.simple_ptr()); }
-  @SuppressWarnings("unchecked")
-  @Override public void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }
 
   // Make a Type, replacing all dull pointers from the matching types in mem.
   @Override public TypeFld make_from(Type head, TypeMem mem, VBitSet visit) {
     return make_from(_t.make_from(head,mem,visit));
   }
-
-  @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _t.repeats_in_cycles(head,bs); }
 
   // Used for assertions
   @Override boolean intern_check1() { return _t.intern_get()!=null; }

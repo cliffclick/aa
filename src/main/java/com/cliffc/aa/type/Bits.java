@@ -2,6 +2,7 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.IBitSet;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
@@ -76,9 +77,10 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   void init(int con, long[] bits ) {
     _con = con;
     _bits=bits;
-    long sum=_con;
-    if( _bits != null ) for( long l : _bits ) sum += l;
-    _hash = (int)((sum>>32)+sum);
+    Util.add_hash(_con);
+    if( _bits != null ) for( long l : _bits ) Util.add_hash(l);
+    long hash = Util.get_hash();
+    _hash = (int)((hash>>32)+hash);
     if( _hash==0 ) _hash=1;
     assert check();
   }

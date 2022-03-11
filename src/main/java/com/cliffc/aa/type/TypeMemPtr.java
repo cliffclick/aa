@@ -22,33 +22,25 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   // and is used to e.g. check pointer types at type assertions (including
   // function call args).
   public TypeStruct _obj; // Meet/join of aliases.  Unused in simple_ptrs in graph nodes.
-  private boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
 
   private TypeMemPtr init(BitsAlias aliases, TypeStruct obj ) {
     super.init("");
-    _cyclic = false;
     _aliases = aliases;
     _obj=obj;
     return this;
   }
   @Override TypeMemPtr copy() { return _copy().init(_aliases,_obj); }
 
-  @Override public boolean cyclic() { return _cyclic; }
-  @Override public void set_cyclic() { _cyclic = true; }
-  @Override public void clr_cyclic() { _cyclic = false; }
-  @Override public <T> T walk1( BiFunction<Type,String,T> map, BinaryOperator<T> reduce ) { return map.apply(_obj,"obj"); }
-  @Override public void walk_update( UnaryOperator<Type> update ) { _obj = (TypeStruct)update.apply(_obj); }
+  @Override public TypeMemPtr walk( TypeStrMap map, BinaryOperator<TypeMemPtr> reduce ) { return map.map(_obj,"obj"); }
+  @Override public long lwalk( LongStringFunc map, LongOp reduce ) { return map.run(_obj,"obj"); }
+  @Override public void walk( TypeStrRun map ) { map.run(_obj,"obj"); }
+  @Override public void walk_update( TypeMap map ) { _obj = (TypeStruct)map.map(_obj); }
   @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {
     return Cyclic._path_diff(_obj,((TypeMemPtr)t)._obj,links);
   }
 
-  int _hash() {
-    Util.add_hash(super.static_hash() + _aliases._hash);
-    Util.add_hash(_obj._type);
-    return Util.get_hash();
-  }
-  @Override int  static_hash() { return _hash(); } // No edges
-  @Override int compute_hash() { assert  _obj._hash!=0;  return _hash() + _obj._hash; } // Always edges
+  @Override long static_hash() { return Util.mix_hash(super.static_hash(),_aliases._hash,_obj._type); }
+
   // Static properties equals.  Already known to be the same class and
   // not-equals.  Ignore edges.
   @Override boolean static_eq(TypeMemPtr t) { return _aliases == t._aliases && _obj._type == t._obj._type; }
@@ -98,7 +90,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     return t1.init(aliases,obj).hashcons_free();
   }
 
-  static TypeMemPtr malloc(BitsAlias aliases, TypeStruct ts ) {  TypeMemPtr t1 = POOLS[TMEMPTR].malloc(); return t1.init(aliases,ts); }
+  public static TypeMemPtr malloc(BitsAlias aliases, TypeStruct ts ) {  TypeMemPtr t1 = POOLS[TMEMPTR].malloc(); return t1.init(aliases,ts); }
   TypeMemPtr malloc_from(TypeStruct ts) {  TypeMemPtr t1 = POOLS[TMEMPTR].malloc(); return t1.init(_aliases,ts); }
   public static TypeMemPtr make( int alias, TypeStruct obj ) { return make(BitsAlias.make0(alias),obj); }
   public static TypeMemPtr make_nil( int alias, TypeStruct obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
@@ -132,9 +124,9 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     // we cannot build the cycle all at once.
     DISPLAY = TypeStruct.malloc_test(TypeFld.make_dsp(Type.ANY));
     TypeStruct.RECURSIVE_MEET++;
-    DISPLAY_PTR = TypeMemPtr.make(BitsAlias.NALL,DISPLAY); // Normal create
-    DISP_FLD = TypeFld.make_dsp(DISPLAY_PTR);              // Normal create
-    DISPLAY.set_fld(DISP_FLD);                             // Change field without changing hash
+    DISPLAY_PTR = TypeMemPtr.malloc(BitsAlias.NALL,DISPLAY);
+    DISP_FLD = TypeFld.malloc("^",DISPLAY_PTR,TypeFld.Access.Final,TypeFld.oBot);
+    DISPLAY.set_fld(DISP_FLD);
     TypeStruct.RECURSIVE_MEET--;
     TypeStruct ds = Cyclic.install(DISPLAY);
     assert ds==DISPLAY;
@@ -156,14 +148,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
       return this;              // Centerline TMP
     return POOLS[TMEMPTR].<TypeMemPtr>malloc().init(ad,od);
   }
-  @Override TypeMemPtr rdual() {
-    assert _hash!=0;
-    if( _dual != null ) return _dual;
-    TypeMemPtr dual = _dual = POOLS[TMEMPTR].<TypeMemPtr>malloc().init(_aliases.dual(),_obj.rdual());
-    dual._dual = this;
-    dual._hash = dual.compute_hash();
-    return dual;
-  }
+  @Override void rdual() { _dual._obj = _obj._dual; }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TMEMPTR:break;
@@ -222,16 +207,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     BitsAlias aliases = _aliases.above_center() ? _aliases.dual() : _aliases;
     return make(aliases.set(0),_obj);
   }
-  // Used during approximations, with a not-interned 'this'.
-  // Updates-in-place.
-  public Type ax_meet_nil(Type nil) {
-    if( _aliases.isa(BitsAlias.XNIL) ) {
-      if( _obj.above_center() && nil==XNIL )  return XNIL;
-      if( nil==NIL ) return NIL;
-    }
-    _aliases = _aliases.meet(BitsAlias.NIL);
-    return this;
-  }
 
   public BitsAlias aliases() { return _aliases; }
 
@@ -246,10 +221,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     ds.put(this,d);             //
     while( !t0.isEmpty() ) {
       for( Type t=t0.pop(); t!=null; t=t0.pop() )
-        if( t instanceof Cyclic cyc &&
+        if( t instanceof Cyclic &&
             ds.putIfAbsent(t,d) ==null ) {
           final Work<Type> ft0=t0, ft1=t1;
-          cyc.walk1((tc,label)->(tc instanceof TypeMemPtr tmp && tmp._aliases.overlaps(_aliases) ? ft1 : ft0).add(tc), (x,y)->null);
+          t.walk((tc,label)->(tc instanceof TypeMemPtr tmp && tmp._aliases.overlaps(_aliases) ? ft1 : ft0).add(tc));
         }
       // Swap worklists, raise depth
       Work<Type> tmp = t0; t0 = t1; t1 = tmp; // Swap t0,t1
@@ -278,8 +253,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
       // Populate the next depth in the breadth-first search
       final Work<Type> ft1=t1; Type t;
       while( (t=t0.pop())!=null )
-        if( t instanceof Cyclic cyc )
-          cyc.walk1((tc,ignore)-> bs0.tset(tc._uid) ? null : ft1.add(tc), (x,y)->null );
+        if( t instanceof Cyclic )
+          t.walk((tc,ignore)-> { if( !bs0.tset(tc._uid) ) ft1.add(tc);} );
 
       // Swap worklists, raise depth
       Work<Type> tmp = t0; t0 = t1; t1 = tmp; // Swap t0,t1
@@ -299,9 +274,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
       }
     return max;
   }
-
-  @SuppressWarnings("unchecked")
-  @Override public void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
 
   // Widen for primitive specialization and H-M unification.  H-M distinguishes
   // ptr-to-array (and string) from ptr-to-record.  Must keep types at the same
@@ -330,8 +302,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     return obj == null ? this : make_from(obj);
   }
 
-
-  @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _obj.repeats_in_cycles(head,bs); }
 
   @Override BitsFun _all_reaching_fidxs( TypeMem tmem) {
     BitsFun fidxs = BitsFun.EMPTY;

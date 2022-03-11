@@ -5,6 +5,7 @@ import com.cliffc.aa.util.*;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
+import java.util.function.*;
 
 import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeFld.Access;
@@ -92,11 +93,21 @@ public class TypeMem extends Type<TypeMem> {
           }
     return true;
   }
-  @Override int compute_hash() {
-    int sum=TMEM;
-    for( TypeStruct obj : _pubs ) sum += obj==null ? 0 : obj._hash;
-    return sum;
+  @Override public long static_hash( ) { throw unimpl(); }
+
+  // ----------
+  @Override public TypeMemPtr walk( TypeStrMap map, BinaryOperator<TypeMemPtr> reduce ) { throw unimpl(); }
+  @Override public void walk( TypeStrRun map ) {throw unimpl(); }
+  @Override public void walk_update( TypeMap map ) { throw unimpl(); }
+  @Override public long lwalk( LongStringFunc map, LongOp reduce ) { throw unimpl(); }
+  @Override long compute_hash() {
+    Util.add_hash(super.static_hash() ^ ((long) _pubs.length <<2));
+    for( TypeStruct ts : _pubs )
+      if( ts!=null )
+        Util.add_hash(ts._hash);
+    return Util.get_hash();
   }
+
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeMem tf) ) return false;
@@ -428,13 +439,13 @@ public class TypeMem extends Type<TypeMem> {
   //   Put dull ptr to dull meet in dull cache.
   //   Walk dull fields; for all dull TMPs, recurse.
   private static final BitSetSparse DULLV = new BitSetSparse();
-  Type _dull( Type dull, final HashMap<BitsAlias,TypeMemPtr> dull_cache ) {
-    if( !(dull instanceof Cyclic cyc) ) return null; // Nothing to sharpen
+  void _dull( Type dull, final HashMap<BitsAlias,TypeMemPtr> dull_cache ) {
+    if( !(dull instanceof Cyclic) ) return; // Nothing to sharpen
     // Check caches and return
     if( dull instanceof TypeMemPtr tmp ) {
       BitsAlias aliases = tmp._aliases;
-      if( sharp_get(aliases) != null ) return null;
-      if( dull_cache.get(aliases) != null ) return null;
+      if( sharp_get(aliases) != null ) return;
+      if( dull_cache.get(aliases) != null ) return;
       // Walk and meet "dull" fields; all TMPs will point to ISUSED (hence are dull).
       if( aliases.above_center() ) throw unimpl();
       TypeStruct t = TypeStruct.UNUSED;
@@ -444,23 +455,23 @@ public class TypeMem extends Type<TypeMem> {
       t = t.set_name(tmp._obj._name);
 
       DULLV.clear();
-      if( _is_sharp(t)==null )        // If sharp, install and return
-        return sharput(aliases,tmp.make_from(t));
+      if( _is_sharp(t)==null )       // If sharp, install and return
+        { sharput(aliases, tmp.make_from(t)); return; }
       // Install in dull result in dull cache BEFORE recursing.  We might see
       // it again if cyclic types.
       TypeMemPtr dptr = tmp.malloc_from(t);
       dull_cache.put(tmp._aliases,dptr);
-      cyc = t;
+      dull = t;
     }
     // Visit all dull pointers and recursively collect
-    return cyc.walk1((fld,ignore) -> _dull(fld,dull_cache), (x,y)->null);
+    dull.walk((fld,ignore) -> _dull(fld,dull_cache));
   }
   // Not-null if found a dull ptr, null if all ptrs sharp
-  private static Type _is_sharp(Type t) {
+  private static TypeMemPtr _is_sharp(Type t) {
     if( DULLV.tset(t._uid) ) return null;
     if( !(t instanceof Cyclic cyc) ) return null;
-    if( t instanceof TypeMemPtr tmp && tmp._obj==TypeStruct.ISUSED ) return t;
-    return cyc.walk1((fld,ignore) -> _is_sharp(fld), (x,y)-> x==null ? y : x);
+    if( t instanceof TypeMemPtr tmp && tmp._obj==TypeStruct.ISUSED ) return tmp;
+    return t.walk((fld,ignore) -> _is_sharp(fld), (x,y)-> x==null ? y : x);
   }
 
 
@@ -473,7 +484,7 @@ public class TypeMem extends Type<TypeMem> {
   //  If cyclic, then some field is not interned, put on cyclic list?
   //  Return not-interned value.
   Type _sharp(Type dull, final HashMap<BitsAlias,TypeMemPtr> dull_cache, final VBitSet visit ) {
-    if( !(dull instanceof Cyclic cyc) ) return dull; // Nothing to sharpen
+    if( !(dull instanceof Cyclic) ) return dull; // Nothing to sharpen
     Type t;
     if( dull instanceof TypeMemPtr tmp ) {
       t = sharp_get(tmp._aliases);
@@ -482,19 +493,10 @@ public class TypeMem extends Type<TypeMem> {
       if( visit.tset(t._uid) ) return t;
     } else t = dull.copy();
     assert !t.interned();
-    ((Cyclic)t).walk_update(fld->_sharp(fld,dull_cache,visit));
+    t.walk_update( fld -> _sharp(fld,dull_cache,visit));
     return t;
   }
 
-
-  // Widen (lose info), to make it suitable as the default memory.
-  public TypeMem crush() {
-    TypeStruct[] oops = _pubs.clone();
-    oops[0] = null;
-    for( int i=1; i<oops.length; i++ )
-      if( oops[i]!=null ) oops[i] = oops[i].crush();
-    return TypeMem.make0(oops);
-  }
 
   // Whole object Set at an alias.
   public TypeMem set( int alias, TypeStruct obj ) {
@@ -506,20 +508,6 @@ public class TypeMem extends Type<TypeMem> {
     return make0(tos);
   }
 
-  // Whole object Store of a New at an alias.
-  // Sets the private type.
-  // Lifts/sets the public type, and meets fields.
-  public TypeMem st_new( int alias, TypeStruct obj ) {
-    TypeStruct[] pubs  = _pubs ;
-    TypeStruct pub  = at(pubs ,alias); // Current value for alias
-    if( pub==obj ) return this;     // Shortcut
-    (pubs = _st_new(_pubs,pubs,alias))[alias] = (TypeStruct)pub.meet(obj);
-    pubs[0] = null;
-    return make0(pubs);
-  }
-  private static TypeStruct[] _st_new( TypeStruct[] base, TypeStruct[] as, int alias ) {
-    return base==as ? Arrays.copyOf(base,Math.max(base.length,alias+1)) : as;
-  }
 
   // Field store into a conservative set of aliases.
   public TypeMem update( BitsAlias aliases, Access fin, String fld, Type val, boolean precise ) {
@@ -562,16 +550,6 @@ public class TypeMem extends Type<TypeMem> {
     return make0(tos);
   }
 
-  // Report back only those aliases that are also UNUSED
-  public BitsAlias and_unused(BitsAlias escs) {
-    int len = Math.max(_pubs.length,escs.max()+1);
-    BitsAlias bs = BitsAlias.EMPTY;
-    for( int i=1; i<len; i++ )
-      if( at(i)==TypeStruct.UNUSED && escs.test_recur(i) )
-        bs = bs.set(i);
-    return bs;
-  }
-
   // False if field is modifiable across any alias
   public boolean fld_not_mod( BitsAlias aliases, String name) {
     for( int alias : aliases ) {
@@ -612,17 +590,6 @@ public class TypeMem extends Type<TypeMem> {
     return make0(tos);
   }
 
-  // Lift (join) memory contents based on the sharp pointer
-  public TypeMem lift_at( TypeMemPtr ptr ) {
-    TypeStruct[] tos = _pubs.clone();
-    tos[0] = null;
-    for( int i=1; i< _pubs.length; i++ )
-      if( ptr._aliases.test_recur(i) )
-        tos[i] = (TypeStruct)at(i).join(ptr._obj).simple_ptr();
-    return make0(tos);
-  }
-
-
   @Override public boolean above_center() {
     for( TypeStruct alias : _pubs )
       if( alias != null && !alias.above_center() )
@@ -634,8 +601,6 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean must_nil() { return false; } // never a nil
   @Override Type not_nil() { return this; }
 
-  //public TypeStruct live() { return _pubs[0]; }
-  //public boolean is_live() { return _pubs.length>1 || live()!=TypeStruct.UNUSED; }
   public boolean basic_live() { return _pubs.length==1; }
 
 }

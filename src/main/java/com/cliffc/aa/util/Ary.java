@@ -319,8 +319,7 @@ public class Ary<E> implements Iterable<E> {
   // HashMap) and the then the array changes, the hashCode() will change also.
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    if( !(o instanceof Ary) ) return false;
-    Ary ary = (Ary)o;
+    if( !(o instanceof Ary ary) ) return false;
     if( _len != ary._len ) return false;
     if( _es == ary._es ) return true;
     for( int i=0; i<_len; i++ )

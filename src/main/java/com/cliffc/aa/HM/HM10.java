@@ -1637,7 +1637,6 @@ public class HM10 {
           if( _args!=null )
             for( String id : _args.keySet() )
               tstr.add_fld(TypeFld.malloc(id));
-          tstr.set_hash();
           ADUPS.put(_uid,tstr); // Stop cycles
           if( _args!=null )
             for( String id : _args.keySet() )
@@ -2193,7 +2192,7 @@ public class HM10 {
           for( TypeFld fld : ts0 ) // Forall fields in GCP
             if( get(fld._fld)==null )     // Solo in GCP
               ts.add_fld( fld.copy() );   // Add a copy
-        WDUPS.put(_uid,ts.set_hash());    // Stop cycles
+        WDUPS.put(_uid,ts);               // Stop cycles
 
         // Walk fields common to both, setting (cyclic, recursive) the lifted type
         if( _args!=null )

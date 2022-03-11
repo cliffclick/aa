@@ -1416,11 +1416,11 @@ public class HM9 {
           //  // Walk the final cyclic structure and intern everything.
           //  tstr.install_cyclic(tstr.reachable());
           //}
-          throw unimpl();
         } else {
-          tstr.set_cyclic();    // Been there, done that, just mark it cyclic
+          //tstr.set_cyclic();    // Been there, done that, just mark it cyclic
         }
-        return TypeMemPtr.make(_alias,tstr);
+        throw unimpl();
+        //return TypeMemPtr.make(_alias,tstr);
       }
 
       throw unimpl();

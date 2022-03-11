@@ -3,7 +3,6 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
-import java.util.function.Predicate;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -14,11 +13,10 @@ public class TypeInt extends Type<TypeInt> {
   private TypeInt init(int x, int z, long con ) { _x=(byte)x; _z=(byte)z; _con = con; _name=""; return this; }
   @Override TypeInt copy() { return _copy().init(_x,_z,_con); }
   // Hash does not depend on other types
-  @Override int compute_hash() { return super.compute_hash()+_x+_z+(int)_con; }
+  @Override long static_hash() { return Util.mix_hash(super.static_hash(),_x,_z,(int)_con); }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    if( !(o instanceof TypeInt) ) return false;
-    TypeInt t2 = (TypeInt)o;
+    if( !(o instanceof TypeInt t2) ) return false;
     return super.equals(o) && _x==t2._x && _z==t2._z && _con==t2._con;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
@@ -58,7 +56,6 @@ public class TypeInt extends Type<TypeInt> {
   static public  final TypeInt TRUE   = make( 0, 1,1);
   static public  final TypeInt FALSE  = make( 0, 1,0);
   static public  final TypeInt NINT8  = make(-1, 8,0);
-  static public  final TypeInt NINT32 = make(-1,32,0);
   static public  final TypeInt NINT64 = make(-1,64,0);
   static public  final TypeInt ZERO   = FALSE;
   static public  final TypeInt C3     = make( 0, 8,3);
@@ -184,7 +181,6 @@ public class TypeInt extends Type<TypeInt> {
       return _x==2 ? Type.XNIL : (_x==-2 || (_x==0&&_con==0)? Type.SCALAR : Type.NSCALR);
     return TypeInt.make(-2,_x<=0?_z:1,0);
   }
-  @Override public void walk( Predicate<Type> p ) { p.test(this); }
   public TypeInt minsize(TypeInt ti) { return make(-2,Math.min(_z,ti._z),0);  }
   public TypeInt maxsize(TypeInt ti) { return make(-2,Math.max(_z,ti._z),0);  }
 }

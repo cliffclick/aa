@@ -207,7 +207,7 @@ public abstract class PrimNode extends Node {
   // Prims are equal for same-name-same-signature (and same inputs).
   // E.g. float-minus of x and y is NOT the same as int-minus of x and y
   // despite both names being '-'.
-  @Override public int hashCode() { return super.hashCode()+_name.hashCode()+_formals._hash; }
+  @Override public int hashCode() { return super.hashCode()+_name.hashCode()+(int)_formals._hash; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;

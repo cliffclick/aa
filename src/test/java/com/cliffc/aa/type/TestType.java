@@ -564,39 +564,6 @@ public class TestType {
             assertTrue( rez[i0][j0].isa(rez[i1][j1]) );
   }
 
-  // Validate crush is monotonic
-  @Test public void testCrush() {
-    TypeStruct[] objs = new TypeStruct[]{
-      TypeStruct.ISUSED,
-      TypeStruct.INT64_INT64,
-      TypeStruct.NAMEPT,
-      TypeStruct.POINT,
-      TypeMemPtr.DISPLAY,
-      TypeStruct.A,
-      TypeStruct.ARW,
-    };
-
-    for( int i=0; i<objs.length; i++ ) {
-      TypeStruct toi = objs[i];
-      for( int j=i; j<objs.length; j++ ) {
-        TypeStruct toj = objs[j];
-        testCrush0(toi       ,toj       );
-        testCrush0(toi.dual(),toj       );
-        testCrush0(toi       ,toj.dual());
-        testCrush0(toi.dual(),toj.dual());
-      }
-    }
-  }
-
-  private void testCrush0( TypeStruct ti, TypeStruct tj ) {
-    if( ti.isa(tj) ) {
-      TypeStruct tic = ti.crush();
-      TypeStruct tjc = tj.crush();
-      assertTrue(tic.isa(tjc));
-    }
-  }
-
-
   @Test public void testCommuteSymmetricAssociative() {
     assertTrue(Type.check_startup());
   }

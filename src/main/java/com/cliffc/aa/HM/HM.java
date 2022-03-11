@@ -765,7 +765,7 @@ public class HM {
         targs[_args.length] = find(); // Return
         T2 nfun = T2.make_fun(targs);
         progress = tfun.unify(nfun,work);
-        
+
       } else {
         // Check for progress amongst arg pairs
         int miss=0;
@@ -783,7 +783,7 @@ public class HM {
         // Check for progress on the return
         progress |= find().unify(tfun.arg("ret"),work);
       }
-      
+
       // Flag HMT result as widening, if GCP falls to a TFP which widens in HMT.
       T2 tret = tfun.find().arg("ret");
       if( tret._is_copy && _fun._flow instanceof TypeFunPtr tfp ) {
@@ -1823,7 +1823,6 @@ public class HM {
           if( _args!=null )
             for( String id : _args.keySet() )
               tstr.add_fld(TypeFld.malloc(id));
-          tstr.set_hash();
           ADUPS.put(_uid,tstr); // Stop cycles
           if( _args!=null )
             for( String id : _args.keySet() )

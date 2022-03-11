@@ -43,9 +43,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   // The fields indexed by field name.  Effectively final.
   private Ary<TypeFld> _flds;
-  // Type is cyclic.  This is a summary property, not a part of the type, hence
-  // is not in the equals nor hash.  Used to optimize non-cyclic access.
-  private boolean _cyclic;
   // Max field order number.  This is a summary property not part of the type.
   private short _max_arg;
 
@@ -54,7 +51,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     _any = any;
     if( _flds==null ) _flds = new Ary<>(TypeFld.class);
     else _flds.clear();         // No leftover fields from pool
-    _cyclic = false;
     _max_arg = DSP_IDX;         // Min of the max
     return this;
   }
@@ -71,18 +67,17 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Fairly subtle, because the typical hash code is built up from the hashes of
   // its parts, but the parts are not available during construction of a cyclic type.
   // We can count on the field names and accesses but not field order nor type.
-  @Override int static_hash() {
-    Util.add_hash(super.static_hash() ^ (_any?1023:0));
+  @Override long static_hash() {
+    long hash = 0;
     for( TypeFld fld : this ) {
       // Can depend on the field name and access, but NOT the type - because recursion.
       // Same hash independent of field visitation order, because the iterator does
       // not make order guarantees.
-      Util.add_hash(fld._fld.hashCode() ^ fld._access.hashCode());
+      hash ^= fld._fld.hashCode() ^ fld._access.hashCode();
       _max_arg = (short)Math.max(_max_arg,fld._order);
     }
-    return Util.get_hash();
+    return Util.mix_hash(super.static_hash() ^ (_any?1023:0),hash);
   }
-  @Override public int compute_hash() { return static_hash(); }
 
   // Returns 1 for definitely equals, 0 for definitely unequals, and -1 if
   // needing the cyclic test.
@@ -124,7 +119,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     // means if 2 cyclic types are being checked, at least one will have the
     // cycle bit set.  Which means that if both bits are cleared, at least one
     // if these types is not cyclic, and a simple recursive-descent test works.
-    if( !_cyclic && !t._cyclic ) {
+    if( cyclic()==null && t.cyclic()==null ) {
       if( !super.equals(t) || len() != t.len() || _any != t._any ) return false;
       // All fields must be equals
       for( int i=0; i<_flds._len; i++ ) {
@@ -259,7 +254,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public static TypeStruct malloc_test( String name, TypeFld... flds ) {
     TypeStruct ts = malloc(name,false);
     for( TypeFld fld : flds ) ts.add_fld(fld);
-    return ts.set_hash();
+    return ts;
   }
 
   public int nargs() { return _max_arg+1; }
@@ -298,28 +293,15 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Dual the flds, dual the tuple.  Return a not-interned thing.
   @Override protected TypeStruct xdual() {
     TypeStruct ts = malloc(_name,!_any);
-    for( TypeFld fld : this ) ts.add_fld(fld.dual());
+    ts._max_arg = _max_arg;
+    for( TypeFld fld : this ) ts._flds.push(fld.dual());
     return ts;
   }
 
   // Recursive dual
-  @Override TypeStruct rdual() {
-    assert _hash == compute_hash();
-    if( _dual != null ) return _dual;
-    assert !interned();
-    TypeStruct dual = _dual = malloc(_name,!_any);
-    dual._dual = this;          // Stop the recursion
-    dual._cyclic = _cyclic;     // Only here for recursive structs
-    // Have to add the fields first, then set the hash, then loop over the
-    // fields recursing.  xdual'd fields are only shallow.
-    for( TypeFld fld : this )
-      // Some fields are interned already, some are not.
-      dual.add_fld(fld.interned() ? fld._dual : fld.xdual());
-    dual._hash = dual.compute_hash();
-    // Now set the dual fields properly (using the deep rdual)
+  @Override void rdual() {
     for( int i=0; i<_flds._len; i++ )
-      dual._flds.setX(i,_flds.at(i).rdual());
-    return dual;
+      _dual._flds.set(i,_flds.at(i)._dual);
   }
 
   // Standard Meet.  Types-meet-Types and fld-meet-fld.  Fld strings can be
@@ -352,7 +334,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     assert RECURSIVE_MEET > 0 || (MEETS0.isEmpty());
 
     // If both are cyclic, we have to do the complicated cyclic-aware meet
-    if( _cyclic && that._cyclic )
+    if( cyclic()!=null && that.cyclic()!=null )
       return cyclic_meet(that);
     // Recursive but not cyclic; since at least one of these types is
     // non-cyclic.  Normal recursion will bottom-out.
@@ -395,7 +377,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     private static final TPair KEY = new TPair(null,null);
     static TPair set(TypeStruct ts0, TypeStruct ts1) {KEY._ts0=ts0; KEY._ts1=ts1; return KEY; }
     TPair(TypeStruct ts0, TypeStruct ts1) { _ts0=ts0; _ts1=ts1; }
-    @Override public int hashCode() { return (_ts0.hashCode()<<17) | _ts1.hashCode(); }
+    @Override public int hashCode() { return (int)((Util.rot(_ts0.static_hash(),17)) ^ _ts1.static_hash()); }
     @Override public boolean equals(Object o) {
       return _ts0.equals(((TPair)o)._ts0) && _ts1.equals(((TPair)o)._ts1);
     }
@@ -422,7 +404,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     // Do a shallow MEET: meet of field names and _any and all things that can
     // be computed without the cycle.  Some fld._t not filled in yet.
     mt = ymeet(that,true);
-    mt._hash = mt.compute_hash(); // Hash is now stable; compute
     MEETS0.put(new TPair(this,that),mt);
 
     // Since the result is cyclic, we cannot test the cyclic parts for
@@ -572,13 +553,13 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     return apx;
   }
 
-  private Type _apx3a( Type t, int depth ) {
+  private void _apx3a( Type t, int depth ) {
     assert depth<100;       // Stop stack overflow early, much easier debugging
-    if( !(t instanceof Cyclic cyc) ) return null;
-    if( AXVISIT3.tset(t._uid) ) return null;
+    if( !(t instanceof Cyclic cyc) ) return;
+    if( AXVISIT3.tset(t._uid) ) return;
     if( t instanceof TypeMemPtr tmp && tmp._aliases.overlaps(AXALIAS) && tmp._obj!=this )
       AXTS.push(tmp._obj);      // Record other guy for later meet
-    return cyc.walk1((fld,ignore) -> _apx3a(fld,depth+1), (x,y)-> null);
+    t.walk((fld,ignore) -> _apx3a(fld,depth+1));
   }
 
   private Type _apx3b( Type old, int depth ) {
@@ -599,7 +580,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     AXOLD2NEW.put(old._uid, nnn);  // Make a copy; copy is NOT interned and IS in the dup check.
 
     // Recurse
-    ((Cyclic)nnn).walk_update(fld -> _apx3b(fld,depth+1));
+    nnn.walk_update(fld -> _apx3b(fld,depth+1));
     return nnn;
   }
 
@@ -608,10 +589,10 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   private static final VBitSet AXVISIT3 = new VBitSet();
   private TypeMemPtr ax_chk3(Type t) {  AXVISIT3.clear();  return _ax_chk3(t); }
   private TypeMemPtr _ax_chk3(Type t) {
-    if( !(t instanceof Cyclic cyc) ) return null;
+    if( !(t instanceof Cyclic) ) return null;
     if( AXVISIT3.tset(t._uid) ) return null;
     if( t instanceof TypeMemPtr tmp && tmp._aliases.overlaps(AXALIAS) && tmp._obj!=this )   return tmp;
-    return cyc.walk1((fld,ignore) -> _ax_chk3(fld), (x,y)-> x==null ? y : x);
+    return t.walk((fld,ignore) -> _ax_chk3(fld), (x,y)-> x==null ? y : x);
   }
 
 
@@ -685,16 +666,16 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
     // Recurse; If new overlap point swap pax/nax
     final TypeMemPtr ftmp = tmp;
-    ((Cyclic)fnnn).walk_update(fld -> _apx2(fld,
-                                            ftmp==null ? pax : ftmp,
-                                            ftmp==null ? nax : (TypeMemPtr)fnnn,depth+1));
+    fnnn.walk_update(fld -> _apx2(fld,
+                                  ftmp==null ? pax : ftmp,
+                                  ftmp==null ? nax : (TypeMemPtr)fnnn,depth+1));
     return fnnn;
   }
 
   // Check that the invariant holds: if T is a TMP_aliases.overlaps(aliases),
   // (and prior is also), then prior.isa(T).
   private static TypeMemPtr _ax_chk(VBitSet visit, Type t, TypeMemPtr prior, BitsAlias aliases) {
-    if( !(t instanceof Cyclic cyc) ) return null; // No fail
+    if( !(t instanceof Cyclic) ) return null; // No fail
     final TypeMemPtr fprior;
     if( t instanceof TypeMemPtr tmp && tmp._aliases.overlaps(aliases) ) {
       if( prior!=null && !prior.isa(tmp) )
@@ -702,7 +683,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
       else fprior = tmp;
     } else fprior = prior;
     if( t instanceof TypeStruct && visit.tset(t._uid) ) return null; // Cycled; no fail
-    return cyc.walk1((fld,ignore) -> _ax_chk(visit,fld,fprior,aliases), (x,y)-> x==null ? y : x);
+    return t.walk((fld,ignore) -> _ax_chk(visit,fld,fprior,aliases), (x,y)-> x==null ? y : x);
   }
 
 
@@ -773,15 +754,29 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     }
   }
 
-  @Override public <T> T walk1( BiFunction<Type,String,T> map, BinaryOperator<T> reduce ) {
-    T rez=null;
+  @Override public TypeMemPtr walk( TypeStrMap map, BinaryOperator<TypeMemPtr> reduce ) {
+    TypeMemPtr rez=null;
     for( TypeFld fld : this ) {
-      T rez2 = map.apply(fld,fld._fld);
+      TypeMemPtr rez2 = map.map(fld,fld._fld);
       rez = rez==null ? rez2 : reduce.apply(rez,rez2);
     }
     return rez;
   }
-  @Override public void walk_update(    UnaryOperator<Type> map ) { for( int i=0; i<_flds._len; i++ ) _flds._es[i] = (TypeFld)map.apply(_flds._es[i]); }
+  @Override public long lwalk( LongStringFunc map, LongOp reduce ) {
+    long rez=0xdeadbeefcafebabeL;
+    for( TypeFld fld : this )
+      rez = reduce.run(rez,map.run(fld,fld._fld));
+    return rez;
+  }
+
+  @Override public void walk( TypeStrRun map ) {
+    for( TypeFld fld : this )
+      map.run(fld,fld._fld);
+  }
+  @Override public void walk_update( TypeMap map ) {
+    for( int i=0; i<_flds._len; i++ )
+      _flds._es[i] = (TypeFld)map.map(_flds._es[i]);
+  }
   @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) {
     TypeStruct ts = (TypeStruct)t;
     Cyclic.Link lk = null;
@@ -812,7 +807,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
         fld._str_dups(visit,dups,ucnt);
   }
 
-  @SuppressWarnings("unchecked")
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( _any ) sb.p('~');
     sb.p(_name);
@@ -873,7 +867,10 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
           fld = is_tup ? TypeFld.valueOfTup(P,aidx,fid) : TypeFld.valueOfArg(P,aidx,fid);
 
         if( fid!=null ) --RECURSIVE_MEET; // End cyclic field type
+        TypeFld ofld = fld;
         fld = P.cyc(fld);                 // Install as needed
+        if( fid!=null && fld!=ofld )
+          P._dups.put(fid,fld); // Update dups if we early-interned
       } else {                  // Hit a duplicate
         // Ambiguous with un-named tuple fields
         fld = dup instanceof TypeFld dup2 ? dup2
@@ -900,10 +897,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     for( TypeFld fld : this ) sorted.put(fld._fld,fld);
     return sorted.values();
   }
-
-  @Override public boolean cyclic() { return _cyclic; }
-  @Override public void set_cyclic() { _cyclic = true; }
-  @Override public void clr_cyclic() { _cyclic = false; }
 
   // Extend the current struct with a new named field, making a new struct
   public TypeStruct add_fldx( TypeFld fld ) { return copy().add_fld(fld).hashcons_free(); }
@@ -955,29 +948,15 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     return ts.hashcons_free();
   }
 
-  // Widen (lose info), to make it suitable as the default function memory.
-  // All fields are widened to ALL (assuming a future error Store); field flags
-  // set to bottom; only the field names are kept.
-  public TypeStruct crush() {
-    if( _any ) return this;     // No crush on high structs
-    TypeStruct st = malloc(_name,false);
-    // Widen all fields, as-if crushed by errors, even finals.
-    for( TypeFld fld : this )
-      // Keep only the display pointer, as it cannot be stomped even with error code
-      st.add_fld( Util.eq("^",fld._fld) ? fld : fld.make_from(Type.ALL,Access.bot()));
-    return st.hashcons_free();
-  }
-
   // Keep field names and orders.  Widen all field contents, including finals.
   // Handles cycles
   @Override TypeStruct _widen() {
     TypeStruct ts = WIDEN_HASH.get(_uid);
-    if( ts!=null ) { ts._cyclic=true; return ts; }
+    if( ts!=null ) throw unimpl(); // { ts.set_cyclic(); return ts; }
     RECURSIVE_MEET++;
     ts = malloc(_name,_any);
     WIDEN_HASH.put(_uid,ts);
     for( TypeFld fld : this ) ts.add_fld(fld.malloc_from());
-    ts.set_hash();
     for( TypeFld fld : ts ) fld.setX(fld._t._widen());
     if( --RECURSIVE_MEET == 0 )
       ts = Cyclic.install(ts);
@@ -993,11 +972,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     if( bs.tset(_uid) ) return false;
     for( TypeFld fld : this ) if( fld._t==t || fld._t.contains(t,bs) ) return true;
     return false;
-  }
-
-  @Override public void walk( Predicate<Type> p ) {
-    if( p.test(this) )
-      for( TypeFld fld : this ) fld.walk(p);
   }
 
   // Make a Type, replacing all dull pointers from the matching types in mem.

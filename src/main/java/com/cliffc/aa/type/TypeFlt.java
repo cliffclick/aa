@@ -1,24 +1,20 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.NonBlockingHashMapLong;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
-import java.util.function.Predicate;
 
 public class TypeFlt extends Type<TypeFlt> {
   byte _x;                // -2 bot, -1 not-null, 0 con, +1 not-null-top +2 top
   byte _z;                // bitsiZe, one of: 32,64
   double _con;
-  private TypeFlt init(int x, int z, double con ) { _x=(byte)x; _z=(byte)z; _con = con; _name=""; return this; }
+  private TypeFlt init(int x, int z, double con ) { super.init(""); _x=(byte)x; _z=(byte)z; _con = con; return this; }
   @Override TypeFlt copy() { return _copy().init(_x,_z,_con); }
   // Hash does not depend on other types
-  @Override int compute_hash() { return super.compute_hash()+_x+_z+(int)_con; }
+  @Override long static_hash() { return Util.mix_hash(super.static_hash(),_x,_z,(int)_con); }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    if( !(o instanceof TypeFlt) ) return false;
-    TypeFlt t2 = (TypeFlt)o;
+    if( !(o instanceof TypeFlt t2) ) return false;
     return super.equals(o) && _x==t2._x && _z==t2._z && _con==t2._con;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
@@ -28,7 +24,7 @@ public class TypeFlt extends Type<TypeFlt> {
       return ((float)_con)==_con ? sb.p((float)_con).p('f') : sb.p(_con);
     return sb.p(_x>0?"~":"").p(Math.abs(_x)==1?"n":"").p("flt").p(_z);
   }
-  
+
   static Type valueOfFlt(String cid) {
     return switch(cid) {
     case "flt64"  ->  FLT64;
@@ -113,26 +109,9 @@ public class TypeFlt extends Type<TypeFlt> {
     return _z==32 ? FLT32 : FLT64;   // Constant or low, just keeps size
   }
 
-  //// Lattice of conversions:
-  //// -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
-  ////    to e.g. Float and require a user-provided rounding conversion from F64->Int.
-  ////  0 requires no/free conversion (Int8->Int64, F32->F64)
-  //// +1 requires a bit-changing conversion (Int->Flt)
-  //// 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
-  //@Override public byte isBitShape(Type t) {
-  //  // TODO: Allow loss-less conversions (e.g. small float integer constants convert to ints just fine)
-  //  if( t._type == Type.TFLT ) return (byte)(_z<=((TypeFlt)t)._z ? 0 : 99);
-  //  if( t._type == Type.TINT ) return 99; // Flt->Int always requires user intervention
-  //  if( t._type == Type.TMEMPTR ) return 99; // No flt->ptr conversion
-  //  if( t._type == Type.TFUNPTR ) return 99; // No flt->ptr conversion
-  //  if( t._type == Type.TALL ) return 99;
-  //  if( t._type == TSCALAR ) return 9; // Might have to autobox
-  //  throw com.cliffc.aa.AA.unimpl();
-  //}
   @Override public Type _widen() {
     if( _x> 0 ) return this;
     if( _x==0 ) return _con==0 ? FLT64 : NFLT64;
     return make(_x,64,0);
   }
-  @Override public void walk( Predicate<Type> p ) { p.test(this); }
 }

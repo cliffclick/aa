@@ -4,127 +4,12 @@ import com.cliffc.aa.util.*;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.function.*;
+import java.util.function.IntSupplier;
 
 import static com.cliffc.aa.AA.unimpl;
 
-
 // Algorithm for minimizing a not-yet-interned graph of Types
 public interface Cyclic {
-
-  // Type is cyclic
-  boolean cyclic();
-  void set_cyclic();
-  void clr_cyclic();
-
-  // Walk and apply a map.  No return, so just for side-effects.
-  // Does not recurse.  Does not guard against cycles.
-  <T> T walk1( BiFunction<Type,String,T> map, BinaryOperator<T> reduce );
-
-  // Map and replace all child_types.  Does not recurse.  Does not guard
-  // against cycles.  Example:
-  //          [fidx]{    dsp  ->     ret   }
-  //          cyclic.walk_update( child_type -> map(child_type) );
-  //          [fidx]{map(dsp) -> map(ret) }
-  void walk_update( UnaryOperator<Type> map );
-
-  // Report a path-difference between two Types.
-  final class Link { Link _nxt; int _d; Type _t0,_t1;
-    static Link min(Link l0, Link l1) {
-      if( l0==null ) return l1;
-      if( l1==null ) return l0;
-      return l0._d<l1._d ? l0 : l1;
-    }
-    SB str(SB sb) {
-      if( _t0==null ) return sb.p('_');
-      throw unimpl();
-    }
-    static SB str(SB sb, NonBlockingHashMapLong<Link> links) {
-      for( long key : links.keySetLong() ) {
-        sb.p("{").p(key>>32).p(',').p(key&0xFFFFFFFFL).p("} = ");
-        links.get(key).str(sb).nl();
-      }
-      return sb;
-    }
-  }
-  static Link path_diff(Type t0, Type t1) {
-    NonBlockingHashMapLong<Link> links = new NonBlockingHashMapLong<>();
-    Link best = _path_diff(t0,t1,links);
-    return best;
-  }
-  static long duid(Type t0, Type t1) { return (((long)t0._uid)<<32)|t1._uid; }
-
-  // --------------------------------------------------------------------------
-  // Returns null if no diff, otherwise returns the shortest path to a diff.
-  @SuppressWarnings("unchecked")
-  static Link _path_diff(Type t0, Type t1, NonBlockingHashMapLong<Link> links) {
-    if( t0==t1 ) return null;
-    long duid = duid(t0,t1);
-    Link lk = links.get(duid), diff=null;
-    if( lk!=null ) return lk;   // Been there, done that
-    lk = new Link();            // Placeholder
-    links.put(duid,lk);         // Stop recursion
-    if( t0.getClass() == t1.getClass() && t0 instanceof Cyclic cyc &&
-        t0.static_eq(t1) ) {
-      // Must recursively ask the question again
-      diff = cyc._path_diff0(t1,links);
-      if( diff==null || diff._t0==null ) return lk; // No difference
-    }
-    lk._nxt = diff;
-    lk._d = diff==null ? 0 : diff._d+1;
-    lk._t0=t0;
-    lk._t1=t1;
-    return lk;
-  }
-
-  Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links);
-
-  // --------------------------------------------------------------------------
-  class Prof {
-    long cnt=0, time=0;
-    int hit;                    // Hit on prior cycle type
-    int clarge_sum=0, clarge_cnt=0; int [] chisto = new int[ 32];
-    int ilarge_sum=0, ilarge_cnt=0; int [] ihisto = new int[ 32];
-    int rlarge_sum=0, rlarge_cnt=0; int [] rhisto = new int[128];
-    void gather() {
-      if( (cnt&63)==0 ) print();
-      int icnt=0, ccnt=0;
-      for( Type t : REACHABLE ) {
-        if( t.interned() ) icnt++;
-        if( t instanceof Cyclic cyc && cyc.cyclic() ) ccnt++;
-      }
-      if( icnt<ihisto.length ) ihisto[icnt]++;
-      else { ilarge_sum += icnt; ilarge_cnt++; }
-      if( ccnt<chisto.length ) chisto[ccnt]++;
-      else { clarge_sum += icnt; clarge_cnt++; }
-      int rcnt = REACHABLE._len;
-      if( rcnt<rhisto.length ) rhisto[rcnt]++;
-      else { rlarge_sum += rcnt; rlarge_cnt++; }
-    }
-    void print() {
-      SB sb = new SB();
-      sb.p("Prof DFA; ");
-      sb.p("Avg time ").p((double)time/cnt).p("msec").nl();
-      sb.p("Cyclic, #large:").p(clarge_cnt).p(" ");
-      for( int i=0; i<chisto.length; i++ )
-        if( chisto[i]!=0 )
-          sb.p("hist["+i+"]="+chisto[i]+",");
-      sb.unchar().nl();
-      sb.p("Intern, #large:").p(ilarge_cnt).p(" ");
-      for( int i=0; i<ihisto.length; i++ )
-        if( ihisto[i]!=0 )
-          sb.p("hist["+i+"]="+ihisto[i]+",");
-      sb.unchar().nl();
-      sb.p("REACH, #large:").p(rlarge_cnt).p(" ");
-      for( int i=0; i<rhisto.length; i++ )
-        if( rhisto[i]!=0 )
-          sb.p("hist["+i+"]="+rhisto[i]+",");
-      sb.unchar().nl();
-      System.out.println(sb);
-    }
-  }
-  Prof P = new Prof();
-
 
   // --------------------------------------------------------------------------
   // Install a cyclic structure.  'head' is not interned and points to a
@@ -137,49 +22,109 @@ public interface Cyclic {
 
   static <T extends Type> T install( T head ) { return install(head,null); }
 
-  @SuppressWarnings("unchecked")
   static <T extends Type> T install( T head, Map<String,Type> map ) {
     long t0 = System.currentTimeMillis();
     TypeStruct.MEETS0.clear();
     _reachable(head,true);      // Compute 1st-cut reachable
     // P.gather(); // Turn off detail profiling
-    Type.RECURSIVE_MEET++;
     head = _dfa_min(head, map);
     _reachable(head,false);     // Recompute reachable; skip interned; probably shrinks
-    Type.RECURSIVE_MEET--;
 
-    // Set cyclic bits for faster equals/meets.
-    assert CSTACK.isEmpty() && CVISIT.cardinality()==0;
-    for( Type t : REACHABLE )
-      if( t instanceof Cyclic cyc && !t.interned() )
-        cyc.clr_cyclic();
+    // Set cyclic bits, to allow computing cyclic hashes and faster compares
+    CVISIT.clear();             // Reset globals
+    assert CSTACK.isEmpty();    // Reset globals
     _set_cyclic(head);
-    assert CSTACK.isEmpty();   CVISIT.clear();
 
-    // Check for dups.
-    T old = (T)head.intern_get();
-    if( old != null ) {         // Found prior interned cycle
-      head = old;  P.hit++;
-      // Free all not-interned
-      for( Type t : REACHABLE )  if( !t.interned() )  t.free(null);
-    } else {
-
-      // Complete cyclic dual
-      head.rdual();
-      // Insert all members of the cycle into the hashcons.  If self-symmetric,
-      // also replace entire cycle with self at each point.
-      for( Type t : REACHABLE )
-        if( t.un_interned() )
-          if( t.retern() != t._dual ) t._dual.retern();
-    }
+    // Install non-cyclics recursively with a DAG visit; install cyclics as a whole cycle
+    CVISIT.clear();             // Reset globals
+    SCC_MEMBERS.clear();        // Reset globals
+    head = dag_install(head, 0, null);
+    
+    // Update the mapping
+    if( map != null )
+      map.replaceAll((k,v) -> v.interned() ? v : v.intern_get());
+    // Free anything interned to a previous Type
+    while( SCC_FREE._len>0 )
+      SCC_FREE.pop().free(null);
 
     // Profile; return new interned cycle
     long t1 = System.currentTimeMillis();
     P.time += (t1-t0);  P.cnt++;
-    assert Type.intern_check();
     return head;
   }
 
+  // -----------------------------------------------------------------
+  // All SCCs are marked and colored (with leader color).
+  // Outside of SCCs, do a normal DAG recursive install.
+  // For an SCC, effectively do the whole SCC as a single lump.
+
+  // Passed-in the current SCC color, and SCC-in-progress number.
+  // The SCC depth points to an Ary of members.
+
+  Ary<Type> SCC_FREE = new Ary<>(Type.class);
+  Ary<Ary<Type>> SCC_MEMBERS = new Ary<Ary<Type>>(new Ary[1],0);
+  private static <T extends Type> T dag_install(T t, final int scc_depth, Type scc_leader) {
+    if( t.interned() ) return t; // No change to interned already
+    // Visited already?
+    if( CVISIT.tset(t._uid) ) {
+      // If hash==0, then this is a backedge of a cycle, just return.
+      // If dual!=null, then this is an old interned type, just return.
+      if( t._hash==0 || t._dual!=null ) return t;
+      // 't' is revisited, was interned to some old, marked freed already.  Use the old.
+      T old = (T)t.intern_get();
+      assert old!=null;
+      return old;
+    }
+    Type leader = t.cyclic();
+    // Increase depth if starting a new SCC
+    final int scc_depth2 = scc_depth + ((leader==null || scc_leader==leader) ? 0 : 1);
+    if( scc_depth2 != scc_depth ) { // Moved down to a new depth
+      Ary<Type> ts = SCC_MEMBERS. atX(scc_depth2);
+      if( ts==null ) SCC_MEMBERS.setX(scc_depth2,new Ary<>(Type.class));
+      else ts.clear();
+    }
+    // Walk all children first
+    t.walk_update( (fld)->dag_install(fld,scc_depth2,leader) );
+    // Add self to the SCC member list
+    if( leader != null )
+      SCC_MEMBERS.atX(scc_depth2).push(t);
+
+    // Not in any SCC, normal install
+    if( leader==null ) {
+      assert !t.interned();
+      T old = (T)t.hashcons();
+      if( t!=old ) SCC_FREE.push(t);
+      t=old;
+
+    // Detect an scc change; we just ended walking an entire SCC
+    } else if( scc_leader != leader ) {
+      // Just completed an entire SCC.  Hash it, install it.
+      // The hash has to be order-invariant, since we might visit the members
+      // in a different order on a later install.  Requires 2 passes.
+      Ary<Type> ts = SCC_MEMBERS.at(scc_depth2);
+      long cyc_hash=0;
+      for( Type c : ts )  cyc_hash ^= c.static_hash(); // Just XOR all the static hashs
+      if( cyc_hash==0 ) cyc_hash = 0xcafebabe;
+      for( Type c : ts )  c._cyc_hash = cyc_hash;
+      for( Type c : ts )  c._hash = c.compute_hash();
+
+      // Since all hashed (but no duals) can check for a prior intern
+      T old = (T)t.intern_get();
+      if( old!=null ) {
+        SCC_FREE.addAll(ts); // Free the old, return prior
+        t=old;
+      } else {
+        // Keep the entire cycle.  xdual/rdual/hash/retern
+        long dcyc_hash = Util.rot(cyc_hash,32);
+        for( Type c : ts ) { Type d = c._dual = c.xdual(); d._dual = c; d._cyc_hash = dcyc_hash; }
+        Type dleader = leader.dual();
+        dleader.set_cyclic(dleader);
+        for( Type c : ts ) { c.rdual(); c._dual.set_cyclic(dleader); c._dual._hash = c._dual.compute_hash(); }
+        for( Type c : ts ) c.retern()._dual.retern();
+      }
+    } // else same SCC, no change
+    return t;
+  }
 
   // -----------------------------------------------------------------
   // Set the cyclic bit on structs in cycles.  Can be handed an arbitrary
@@ -191,34 +136,29 @@ public interface Cyclic {
   // not work with multi-edges.
   Ary<Type> CSTACK = new Ary<>(Type.class);
   VBitSet CVISIT = new VBitSet();
-  static void _set_cyclic(Type t ) {
-    assert t._hash==t.compute_hash(); // Hashes already set by shrink
-    if( t.interned() ) return;  // Already interned (so hashed, cyclic set, etc)
-    if( CVISIT.test(t._uid) ) { // If visiting again... have found a cycle t->....->t
+  private static void _set_cyclic(Type t ) {
+    if( t.dual()!=null ) return; // Already interned
+    if( CVISIT.tset(t._uid) ) { // If visiting again... have found a cycle t->....->t
       // All on the stack are flagged as being part of a cycle
+      Type leader = t.cyclic();
       int i=CSTACK._len-1;
-      while( i >= 0 && CSTACK.at(i)!=t ) i--;
+      while( i >= 0 && CSTACK.at(i)!=t && !(leader!=null && CSTACK.at(i).cyclic()==leader) )
+        i--;
       if( i== -1 ) return;  // Due to multi-edges, we might not find if dupped, so just ignore
-      for( ; i < CSTACK._len; i++ ) { // Set cyclic bit
-        Type t2 = CSTACK.at(i);
-        if( t2 instanceof Cyclic cyc ) cyc.set_cyclic();
-      }
+      // Set the cyclic leader
+      leader = CSTACK.at(i);
+      for( int j=i; j < CSTACK._len; j++ )
+        CSTACK.at(j).set_cyclic(leader);
       return;
     }
-    CSTACK.push(t);              // Push on stack, in case a cycle is found
-    switch( t._type ) {
-    case Type.TMEMPTR ->   _set_cyclic(((TypeMemPtr) t)._obj);
-    case Type.TFUNPTR -> { _set_cyclic(((TypeFunPtr) t).dsp()); _set_cyclic(((TypeFunPtr) t)._ret); }
-    case Type.TFLD    ->   _set_cyclic(((TypeFld   ) t)._t  );
-    case Type.TSTRUCT -> { CVISIT.set(t._uid);  for( TypeFld fld : ((TypeStruct) t) ) _set_cyclic(fld);  }
-    default -> {}
-    }
+    CSTACK.push(t);             // Push on stack, in case a cycle is found
+    t.walk((fld,ignore) -> _set_cyclic(fld));
     CSTACK.pop();               // Pop, not part of another's cycle
   }
 
   // -----------------------------------------------------------------
-  // Reachable collection of Types that form cycles: TypeMemPtr, TypeFunPtr,
-  // TypeFld, TypeStruct, and anything not interned reachable from them.
+  // Reachable collection of not-interned Types, plus if also_interned
+  // an "edge" of interned Types to help the partition splitter.
   Ary<Type> REACHABLE = new Ary<>(new Type[1],0);
   BitSetSparse ON_REACH = new BitSetSparse();
   private static void _reachable(Type head, final boolean also_interned) {
@@ -231,9 +171,12 @@ public interface Cyclic {
     for( int idx=0; idx < REACHABLE._len; idx++ ) {
       Type t = REACHABLE.at(idx);
       if( !t.interned() && !(t instanceof Cyclic) )
-        t.hashcons_free();      // Not cyclic, not interned: just intern it now
-      if( (also_interned || !t.interned()) && t instanceof Cyclic cyc )
-        cyc.walk1((tc,ignore) -> ON_REACH.tset(tc._uid) ? tc : REACHABLE.push(tc), (x,y)->null);
+        throw unimpl();
+      if( !t.interned() && t instanceof Cyclic cyc )
+        t.walk((tc,ignore) -> {
+            if( !ON_REACH.tset(tc._uid) && (!tc.interned() || also_interned) )
+              REACHABLE.push(tc);
+          } );
     }
   }
 
@@ -401,7 +344,7 @@ public interface Cyclic {
           _uid(sb.p(fld._fld).p(":"), fld).p(' ');
         sb.unchar().p("}");
       }
-      case Type.TFLD -> _uid(sb.p('.').p(((TypeFld) h)._fld).p(": "), ((TypeFld) h)._t);
+      case Type.TFLD    -> _uid(sb.p('.').p(((TypeFld) h)._fld).p(": "), ((TypeFld) h)._t);
       case Type.TMEMPTR -> _uid((((TypeMemPtr) h)._aliases.str(sb.p('*')).p(": ")), ((TypeMemPtr) h)._obj);
       case Type.TFUNPTR -> {
         TypeFunPtr tfp = (TypeFunPtr) h;
@@ -454,7 +397,11 @@ public interface Cyclic {
 
     // Static hash
     private Type _t;          // A prototype Type, only looking at the static properties
-    @Override public int hashCode() { return _t.static_hash(); }
+    @Override public int hashCode() {
+      long hash = _t.static_hash();
+      assert hash!=0;
+      return (int)((hash>>32)|hash);
+    }
     @SuppressWarnings("unchecked")
     @Override public boolean equals(Object o) {
       if( this==o ) return true;
@@ -523,10 +470,9 @@ public interface Cyclic {
   private static <T extends Type> T _dfa_min(T nt, Map<String,Type> map) {
     // Walk the reachable set and all forward edges, building a reverse-edge set.
     for( Type t : REACHABLE )  {
-      if( t._hash!=0 && !t.interned() )
-        t._hash=0;              // Invariant: not-interned has no hash
-      if( t instanceof Cyclic cyc )
-        cyc.walk1( (t2,label) -> DefUse.add_def_use(t,label,t2), (x,y)->null );
+      assert (t._hash==0) == (t.dual()==null);  // Invariant: not-interned has no hash
+      if( t instanceof Cyclic )
+        t.walk( (t2,label) -> DefUse.add_def_use(t,label,t2) );
     }
 
     // Pick initial Partitions for every reachable Type
@@ -537,46 +483,22 @@ public interface Cyclic {
     for( Partition P : Partition.PARTS )
       WORK.add(P);
 
-    // Repeat until empty
+    // Repeat until empty, partition splitting.
     while( !WORK.isEmpty() )
       WORK.pop().do_split();
 
     // Walk through the Partitions, picking a head and mapping all edges from
     // head to head.
     for( Partition P : Partition.PARTS )
-      if( P.head() instanceof Cyclic cyc )
-        cyc.walk_update(Partition::head);
+      if( P.head() instanceof Cyclic )
+        P.head().walk_update(Partition::head);
 
-    // Edges are fixed, compute hash
-    //for( Partition P : Partition.PARTS ) if( !(P.head() instanceof Cyclic)  ) P.head().set_hash();
-    for( Partition P : Partition.PARTS ) if( P.head() instanceof TypeStruct ) P.head().set_hash();
-    for( Partition P : Partition.PARTS ) if( P.head() instanceof TypeMemPtr ) P.head().set_hash();
-    for( Partition P : Partition.PARTS ) if( P.head() instanceof TypeFunPtr ) P.head().set_hash();
-    for( Partition P : Partition.PARTS )                                      P.head().set_hash();
-
-    // Anything we make here might already be interned, at either the top-level
-    // or at any intermediate point (and we might have been passed new types
-    // with prior interned matches).  Replace any already interned parts.
-    boolean done=false;
-    while( !done ) {
-      done = true;
-      for( Partition P : Partition.PARTS ) {
-        Type head = P.head();
-        if( head instanceof Cyclic cyc )
-          cyc.walk_update(Partition::head);
-        Type i = head.intern_get();
-        if( i!=null && head!=i ) { done=false; P.set_head(i,head); }
-      }
-    }
-
-    // Update a mapping of interned types as well
+    // Update an unrelated mapping of types to their partition heads
     if( map!=null )
-      for( String key : map.keySet() ) {
-        Type t = map.get(key);
-        Partition P = Partition.TYPE2PART.get(t._uid);
-        if( P!=null && P.head()!=t )
-          map.put(key,P.head());
-      }
+      map.replaceAll((k,v) -> {
+          Partition P = Partition.TYPE2PART.get(v._uid);
+          return P==null ? v : P.head();
+        });
 
     // Free all the Types declared as replicas
     for( Partition P : Partition.PARTS )
@@ -609,4 +531,103 @@ public interface Cyclic {
     }
     return err==0;
   }
+
+  // Report a path-difference between two Types.  Usefule for debugging large types.
+  final class Link { Link _nxt; int _d; Type _t0,_t1;
+    static Link min(Link l0, Link l1) {
+      if( l0==null ) return l1;
+      if( l1==null ) return l0;
+      return l0._d<l1._d ? l0 : l1;
+    }
+    SB str(SB sb) {
+      if( _t0==null ) return sb.p('_');
+      throw unimpl();
+    }
+    static SB str(SB sb, NonBlockingHashMapLong<Link> links) {
+      for( long key : links.keySetLong() ) {
+        sb.p("{").p(key>>32).p(',').p(key&0xFFFFFFFFL).p("} = ");
+        links.get(key).str(sb).nl();
+      }
+      return sb;
+    }
+  }
+  static Link path_diff(Type t0, Type t1) {
+    NonBlockingHashMapLong<Link> links = new NonBlockingHashMapLong<>();
+    Link best = _path_diff(t0,t1,links);
+    return best;
+  }
+  static long duid(Type t0, Type t1) { return (((long)t0._uid)<<32)|t1._uid; }
+
+  // --------------------------------------------------------------------------
+  // Returns null if no diff, otherwise returns the shortest path to a diff.
+  @SuppressWarnings("unchecked")
+  static Link _path_diff(Type t0, Type t1, NonBlockingHashMapLong<Link> links) {
+    if( t0==t1 ) return null;
+    long duid = duid(t0,t1);
+    Link lk = links.get(duid), diff=null;
+    if( lk!=null ) return lk;   // Been there, done that
+    lk = new Link();            // Placeholder
+    links.put(duid,lk);         // Stop recursion
+    if( t0.getClass() == t1.getClass() && t0 instanceof Cyclic cyc &&
+        t0.static_eq(t1) ) {
+      // Must recursively ask the question again
+      diff = cyc._path_diff0(t1,links);
+      if( diff==null || diff._t0==null ) return lk; // No difference
+    }
+    lk._nxt = diff;
+    lk._d = diff==null ? 0 : diff._d+1;
+    lk._t0=t0;
+    lk._t1=t1;
+    return lk;
+  }
+
+  Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links);
+
+  // --------------------------------------------------------------------------
+  class Prof {
+    long cnt=0, time=0;
+    int hit;                    // Hit on prior cycle type
+    int clarge_sum=0, clarge_cnt=0; int [] chisto = new int[ 32];
+    int ilarge_sum=0, ilarge_cnt=0; int [] ihisto = new int[ 32];
+    int rlarge_sum=0, rlarge_cnt=0; int [] rhisto = new int[128];
+    void gather() {
+      if( (cnt&63)==0 ) print();
+      int icnt=0, ccnt=0;
+      for( Type t : REACHABLE ) {
+        if( t.interned() ) icnt++;
+        if( t.cyclic()!=null ) ccnt++;
+      }
+      if( icnt<ihisto.length ) ihisto[icnt]++;
+      else { ilarge_sum += icnt; ilarge_cnt++; }
+      if( ccnt<chisto.length ) chisto[ccnt]++;
+      else { clarge_sum += icnt; clarge_cnt++; }
+      int rcnt = REACHABLE._len;
+      if( rcnt<rhisto.length ) rhisto[rcnt]++;
+      else { rlarge_sum += rcnt; rlarge_cnt++; }
+    }
+    void print() {
+      SB sb = new SB();
+      sb.p("Prof DFA; ");
+      sb.p("Avg time ").p((double)time/cnt).p("msec").nl();
+      sb.p("Cyclic, #large:").p(clarge_cnt).p(" ");
+      for( int i=0; i<chisto.length; i++ )
+        if( chisto[i]!=0 )
+          sb.p("hist["+i+"]="+chisto[i]+",");
+      sb.unchar().nl();
+      sb.p("Intern, #large:").p(ilarge_cnt).p(" ");
+      for( int i=0; i<ihisto.length; i++ )
+        if( ihisto[i]!=0 )
+          sb.p("hist["+i+"]="+ihisto[i]+",");
+      sb.unchar().nl();
+      sb.p("REACH, #large:").p(rlarge_cnt).p(" ");
+      for( int i=0; i<rhisto.length; i++ )
+        if( rhisto[i]!=0 )
+          sb.p("hist["+i+"]="+rhisto[i]+",");
+      sb.unchar().nl();
+      System.out.println(sb);
+    }
+  }
+  Prof P = new Prof();
+
+
 }

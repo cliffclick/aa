@@ -424,7 +424,6 @@ public class TV2 {
         if( _args!=null )
           for( String id : _args.keySet() )
             tstr.add_fld(TypeFld.malloc(id));
-        tstr.set_hash();
         ADUPS.put(_uid,tstr); // Stop cycles
         if( _args!=null )
           for( String id : _args.keySet() )

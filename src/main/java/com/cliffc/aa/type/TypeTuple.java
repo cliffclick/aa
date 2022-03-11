@@ -19,11 +19,15 @@ public class TypeTuple extends Type<TypeTuple> {
 
   // If visit is null, children have had their hash already computed.
   // If visit is not null, children need to be recursively visited.
-  @Override public int compute_hash( ) {
-    Util.add_hash(TTUPLE+(_any?0:1)+0xdeadbeef + (_ts.length<<2));
-    for( Type t : _ts ) Util.add_hash(t._hash);
+  @Override public long static_hash( ) { throw unimpl(); }
+  @Override public long lwalk( LongStringFunc map, LongOp reduce ) { throw unimpl(); }
+  @Override long compute_hash() {
+    Util.add_hash(super.static_hash() ^ (_any?0:2047) ^ ((long) _ts.length <<2));
+    for( Type t : _ts )
+      Util.add_hash(t._hash);
     return Util.get_hash();
   }
+
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeTuple t) ) return false;
@@ -32,9 +36,12 @@ public class TypeTuple extends Type<TypeTuple> {
   // Never part of a cycle so the normal equals works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
-  @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) { throw unimpl(); }
+  @Override void _str_dups( VBitSet visit, NonBlockingHashMapLong<String> dups, UCnt ucnt ) {
+    for( Type t : _ts )
+      if( t!=null )
+        t._str_dups(visit,dups,ucnt);
+  }
 
-  @SuppressWarnings("unchecked")
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( _any ) sb.p('~');
     sb.p('(');

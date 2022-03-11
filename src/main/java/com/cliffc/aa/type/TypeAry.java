@@ -1,8 +1,6 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.NonBlockingHashMapLong;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 
 import java.util.function.*;
 
@@ -21,22 +19,19 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
     _stor = stor;
     return this;
   }
-  boolean _cyclic; // Type is cyclic.  This is a summary property, not a part of the type, hence is not in the equals nor hash
-  @Override public boolean cyclic() { return _cyclic; }
-  @Override public void set_cyclic() { _cyclic = true; }
-  @Override public void clr_cyclic() { _cyclic = false; }
-  @Override public <T> T walk1( BiFunction<Type,String,T> map, BinaryOperator<T> reduce ) {
+  @Override public TypeMemPtr walk( TypeStrMap map, BinaryOperator<TypeMemPtr> reduce ) {
     //return map.apply(_t);
     throw unimpl();
   }
-  @Override public void walk_update( UnaryOperator<Type> update ) { throw unimpl(); }
+  @Override public long lwalk( LongStringFunc map, LongOp reduce ) { return map.run(_elem,"elem"); }
+  @Override public void walk( TypeStrRun map ) { map.run(_elem,"elem"); }
+  @Override public void walk_update( TypeMap map ) { throw unimpl(); }
   @Override public Cyclic.Link _path_diff0(Type t, NonBlockingHashMapLong<Link> links) { throw unimpl(); }
 
-  @Override int compute_hash() { return super.compute_hash() + _len._hash + _elem._hash + _stor._hash;  }
+  @Override long static_hash() { return Util.mix_hash(super.static_hash(),_len._hash,_elem._type,_stor._type); }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    if( !(o instanceof TypeAry) || !super.equals(o) ) return false;
-    TypeAry ta = (TypeAry)o;
+    if( !(o instanceof TypeAry ta) || !super.equals(o) ) return false;
     return _len == ta._len && _elem == ta._elem && _stor == ta._stor;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
@@ -63,12 +58,10 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
   static final TypeAry[] TYPES = new TypeAry[]{ARY,ARY0.dual(),BYTES};
 
   @Override protected TypeAry xdual() { return POOLS[TARY].<TypeAry>malloc().init(_name,_len.dual(),_elem.dual(),_stor.dual()); }
-  @Override TypeAry rdual() {
-    if( _dual != null ) return _dual;
-    TypeAry dual = _dual = xdual();
-    dual._dual = this;
-    dual._hash = dual.compute_hash();
-    return dual;
+  @Override void rdual() {
+    _dual._len  = _len ._dual;
+    _dual._elem = _elem._dual;
+    _dual._stor = _stor._dual;
   }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
@@ -91,32 +84,11 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
     return make("",size,elem,stor);
   }
 
-  //// Widen (lose info), to make it suitable as the default function memory.
-  //// All elements widened to SCALAR.
-  //@Override public TypeAry crush() {
-  //  if( _any ) return this;     // No crush on high arrays
-  //  return make(_len,Type.SCALAR,_stor);
-  //}
-
   // Type at a specific index
   public Type ld(TypeInt idx) { return _elem; }
-  // Type over all elements
-  public Type elem() { return _elem; }
-  public Type stor() { return _stor; }
   public TypeAry update(TypeInt idx, Type val) {
-  //  if( idx.above_center() ) return this; // Nothing updates
-  //  if( val.isa(_elem) ) return this;     // No change
-  //  Type elem = _elem.meet(val);          // Worse-case
-  //  TypeInt size = _len; // TypeInt size = (TypeInt)_len.meet(idx); // CNC - Not inferring array size yet
-  //  return make(size,elem,TypeStruct.OBJ);
     throw unimpl();
   }
-  //// Used during liveness propagation from Loads.
-  //// Fields not-loaded are not-live.
-  //@Override TypeAry remove_other_flds(String fld, Type live) {
-  //  return ARY;
-  //}
-
   @Override BitsFun _all_reaching_fidxs( TypeMem tmem ) {
     return _elem._all_reaching_fidxs(tmem);
   }

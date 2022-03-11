@@ -22,7 +22,7 @@ public class TestHM {
   private static final int[] rseeds = new int[]{0,1,2,3};
   private void _run1s( String prog, String rez_hm, String frez_gcp ) {
     for( int rseed : rseeds )
-      //for( int rseed=0; rseed<64; rseed++ )
+    //for( int rseed=0; rseed<64; rseed++ )
       _run0s(prog,rez_hm,frez_gcp,rseed);
   }
 

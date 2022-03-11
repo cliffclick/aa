@@ -3,8 +3,7 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
-import java.util.function.IntSupplier;
-import java.util.function.Predicate;
+import java.util.function.*;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -95,46 +94,117 @@ import static com.cliffc.aa.AA.unimpl;
 
 public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   static private int CNT=1;
-  public int _uid;   // Unique ID, will have gaps, used to uniquely order Types
-  public int _hash;      // Hash for this Type; built recursively
+  public int _uid;       // Unique ID, will have gaps, used to uniquely order Types
+  public long _hash, _cyc_hash; // Hash for this Type; built recursively except around cycles
   byte _type;            // Simple types use a simple enum
+  private Type _cyclic;  // Type is cyclic, and this is the canonical cycle leader.
   public String _name;   // All types can be named
   T _dual; // All types support a dual notion, eagerly computed and cached here
 
   private static int _uid() { return CNT++; }
   @Override public int getAsInt() { return _uid; }
-  @SuppressWarnings("unchecked")
-  T init(String name) { _name=name; return (T)this; }
-  @Override public final int hashCode( ) { assert _hash!=0; return _hash; }
-  // Static properties hashcode, optionally edge hashs
-  int static_hash() { return (_type<<1)|1|_name.hashCode(); }
-  // Compute the hash and return it, with all child types already having their
-  // hash computed.  Subclasses override this.
-  int compute_hash() { return static_hash(); }
-  // Called during cyclic type construction, where much of the cycle has to be
-  // build before the hashes can be computed - and sometimes they are already
-  // computed (for e.g. hashing to look for interning to minimize).
-  @SuppressWarnings("unchecked")
-  public final T set_hash() {
-    if( _hash==0 ) _hash = compute_hash();
-    else    assert _hash== compute_hash();
-    return (T)this;
+  T init(String name) { _name=name; _cyclic=null; return (T)this; }
+
+  // ----------
+  // Type is cyclic.
+  // The leader of the Strongly Connected Component this Type is part of or
+  // null.  The head is always alive, and always uses the minimal Type UID, and
+  // is effectively the SCC "color".  Two SCCs might abut with only a pointer
+  // between them (no Type), and the "color" can be used to tell when its safe
+  // to stop a cyclic-equality check or limit a cycle-hash.
+  Type cyclic() {
+    Type c = _cyclic;
+    if( c==null ) return null;
+    if( c._cyclic == c ) return c;
+    // Perform a Union-Find rollup, required when lazy setting nested cycles
+    while( c._cyclic != c ) c = c._cyclic; // Find top
+    Type x = this;
+    while( x != c ) { Type old = x._cyclic; x._cyclic = c; x=old; } // Rollup
+    return c;
+  }
+  void set_cyclic(Type leader) {
+    // There are 3 UIDs here, pick the smallest.
+    // - this  ._uid  but only if _cyclic==null
+    // - leader._uid
+    // - cyclic._uid
+    if( _cyclic==null ) _cyclic = this;
+    // Now there are only two: _cyclic & leader
+    Type c = cyclic();          // UF fold
+    Type l = leader.cyclic();   // UF fold
+    if( c._uid < l._uid ) l._cyclic = c;
+    else                  c._cyclic = l;
   }
 
-  // Static properties equals; not-interned edges are ignored.  Already
-  // known to be the same class and not-equals
-  boolean static_eq(T t) { return equals(t); }
+  // ----------
+  // The hashcode.  Built recursively from static_hash() and parts, except at
+  // cycles.  In Strongly Connected Component, all members contribute their
+  // static_hash() in an order-independent way (because I've no idea which
+  // member will be the starting point of a random SCC) to produce a cyclic
+  // hash.  Then each member mixes the cyclic_hash with its own static_hash.
+  // Zero if not set.
+  @Override public final int hashCode( ) {
+    assert _hash!=0;
+    long hash = _hash;
+    int ihash = 0;              // Mix bits
+    while( ihash==0 ) { ihash = (int) ((hash >> 32) ^ hash); hash >>>= 1; }
+    return ihash;
+  }
+  // Static properties hashcode, no edges.
+  long static_hash() { return (_type<<1)|1|_name.hashCode(); }
+
+  // Compute the hash and return it.  Use a child hash, if they have one, or
+  // recursively compute the child's hash.  Expects all children to have a hash.
+  long compute_hash() {
+    // Mixing here has to be child-visit-order invariant, or I have to enforce
+    // a child-visit-order on TypeStruct (alpha-sorted field names).  Currently
+    // using XOR as an order-invariant mixer.
+    long hash = lwalk( (fld,str) -> fld._cyc_hash ^ str.hashCode(),
+                       (hash0,hash1) -> hash0 ^ hash1 );
+    return Util.mix_hash(hash,static_hash());
+  }
+
+  // ----------
   // Is anything equals to this?
   @Override public boolean equals( Object o ) {
     if( this == o ) return true;
     if( !(o instanceof Type t) ) return false;
     return _type==t._type && Util.eq(_name,t._name);
   }
+  // Static properties equals; edges are IGNORED.  Already known to be the same
+  // class and not-equals.
+  boolean static_eq(T t) { return equals(t); }
+  // Full cyclic equals.  For interned types can use simple ptr-equality (which
+  // is the whole point of interning).  During interning must walk both Types
+  // edges and confirm they have the same structure.
   public boolean cycle_equals( Type t ) {
     assert is_simple();         // Overridden in subclasses
     return _type==t._type && Util.eq(_name,t._name);
   }
 
+  // ----------
+  // Walk and apply a map and a reduce.
+  // Does not guard against cycles.
+  interface TypeStrMap { TypeMemPtr map(Type t, String s); }
+  public TypeMemPtr walk( TypeStrMap map, BinaryOperator<TypeMemPtr> reduce ) { /*No outgoing fields*/return null; }
+
+  // Walk and apply a map.  No return, just for side-effects.
+  // Does not guard against cycles.
+  interface TypeStrRun { void run(Type t, String s); }
+  public void walk( TypeStrRun map ) {/*No outgoing fields*/}
+
+  // Map and replace all child types.  Does not guard against cycles.
+  // Example:
+  //          [fidx]{    dsp  ->     ret   }
+  //          cyclic.walk_update( child_type -> map(child_type) );
+  //          [fidx]{map(dsp) -> map(ret) }
+  interface TypeMap { Type map(Type t); }
+  public void walk_update( TypeMap map ) {/*No outgoing fields*/}
+
+  interface LongStringFunc { long run(Type t, String s); }
+  interface LongOp { long run(long l0, long l1); }
+  public long lwalk( LongStringFunc map, LongOp reduce ) { return 0xcafebabedeadbeefL; }
+
+  // ----------
   // In order to handle recursive printing, this is the only toString call in
   // the Type hierarchy.  Instead, subtypes override 'str(...)' where the extra
   // args stop cycles (VBitSet) or sharpen pointers (TypeMem), or optimize
@@ -198,7 +268,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
 
   // Construct a simple type, possibly from a pool
   static Type make(byte type) { return POOLS[type].malloc().init("").hashcons_free(); }
-  @SuppressWarnings("unchecked")
   public T free(T t2) { return (T)POOLS[_type].free(this,t2); }
   T hashcons_free() {
     T t2 = hashcons();
@@ -212,24 +281,23 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   //private static final ConcurrentHashMap<Type,Type> INTERN = new ConcurrentHashMap<>();
   private static final NonBlockingHashMap<Type,Type> INTERN = new NonBlockingHashMap<>();
   public static int RECURSIVE_MEET;    // Count of recursive meet depth
-  @SuppressWarnings("unchecked")
-  private T hashcons() {
-    _hash = compute_hash();     // Set hash
+  T hashcons() {
+    if( RECURSIVE_MEET>0 && this instanceof Cyclic )
+      return (T)this; // Might be a cycle, requiring Cyclic.install.  Fail now.
+    _hash = _cyc_hash = compute_hash(); // Set hash
     T t2 = (T)intern_get();     // Lookup
     if( t2!=null ) {            // Found prior
       assert t2._dual != null;  // Prior is complete with dual
       assert this != t2;        // Do not hashcons twice, should not get self back
       return t2;                // Return prior
     }
-    if( RECURSIVE_MEET > 0 )    // Mid-building recursive types; do not intern
-      return (T)this;
     // Not in type table
     _dual = null;                // No dual yet
     INTERN.put(this,this);       // Put in table without dual
     //Util.hash_quality_check_per(INTERN,"INTERN");
     T d = xdual();               // Compute dual without requiring table lookup, and not setting name
     d._name = _name;             // xdual does not set name either
-    d._hash = d.compute_hash();  // Set dual hash
+    d._hash = d._cyc_hash = d.compute_hash();  // Set dual hash
     _dual = d;
     if( this==d ) return d;      // Self-symmetric?  Dual is self
     assert !equals(d);           // Self-symmetric is handled by caller
@@ -239,13 +307,13 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     INTERN.put(d,d);
     return (T)this;
   }
-  @SuppressWarnings("unchecked")
   final T retern( ) {
     assert _dual._dual == this;
     assert _hash != 0;
-    assert intern_get()==null;
+    assert INTERN.get(this)==null;
     INTERN.put(this,this);
-    assert intern_get()==this;
+    assert INTERN.get(this)==this;
+    //Util.hash_quality_check_per(INTERN,"INTERN");
     return (T)this;
   }
 
@@ -271,8 +339,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     return errs==0;
   }
   private boolean intern_check0(Type v) {
-    if( this != v || _dual==null || _dual._dual!=this || compute_hash()!=_hash )
-      return false;
+    if( this != v || _dual==null || _dual._dual!=this ) return false;
+    if( !(this instanceof Cyclic) && compute_hash()!=_hash ) return false;
     return intern_check1();
   }
   boolean intern_check1() { return true; }
@@ -334,7 +402,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // more than once) to close the cycle.  However, once a Type is interned, its
   // fields are forever more "final".
   static final Pool[] POOLS = new Pool[TLAST];
-  @SuppressWarnings("unchecked")
   static class Pool {
     private int _malloc, _free, _pool;
     int _clone;                 // Allow TypeStruct a personal copy
@@ -361,7 +428,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     }
     <T extends Type> T free(T t1, T t2) {
       t1._dual = null;   // Too easy to make mistakes, so zap now
-      t1._hash = 0;      // Too easy to make mistakes, so zap now
+      t1._hash = t1._cyc_hash = 0;      // Too easy to make mistakes, so zap now
       t1._name = " FREE:"; // "is free" tag
       _frees.push(t1);   // On the free list
       _free++;
@@ -421,7 +488,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
 
   // Compute dual right now.  Overridden in subclasses.
   T xdual() { return POOLS[_type^1].malloc(); }
-  T rdual() { assert _dual!=null; return _dual; }
+  void rdual() { assert _dual!=null; }
 
   // ----------------------------------------------------------
   // Memoize meet results
@@ -430,7 +497,10 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     static NonBlockingHashMap<Key,Type> INTERN_MEET = new NonBlockingHashMap<>();
     Key(Type a, Type b) { _a=a; _b=b; }
     Type _a, _b;
-    @Override public int hashCode() { return Util.rot(_a._hash,15)^_b._hash; }
+    @Override public int hashCode() {
+      long hash = (Util.rot(_a._hash,15)^_b._hash);
+      return (int)((hash>>32)^hash);
+    }
     @Override public boolean equals(Object o) { return _a==((Key)o)._a && _b==((Key)o)._b; }
     @Override public String toString() { return "("+_a+","+_b+")"; }
     static Type get(Type a, Type b) {
@@ -565,14 +635,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   static boolean check_name( String n ) { return n.isEmpty() || n.charAt(n.length()-1)==':'; }
   public boolean has_name() { return !_name.isEmpty(); }
   // Make a named variant of any type, by just adding a name.
-  @SuppressWarnings("unchecked")
   public final T set_name(String name) {
     if( Util.eq(_name,name) ) return (T)this;
     assert check_name(name);
     return _set_name(name);
   }
-  @SuppressWarnings("unchecked")
-  public final T remove_name() { return has_name() ? _set_name("") : (T)this; }
   private T _set_name(String name) {
     POOLS[_type]._clone++;
     T t1 = copy();
@@ -773,26 +840,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   public long   getl() { if( _type==TNIL || _type==TXNIL ) return 0; throw typerr(null); }
   // Return a double from a TypeFlt constant; assert otherwise.
   public double getd() { if( _type==TNIL || _type==TXNIL ) return 0.0; throw typerr(null); }
-  //// Return a String from a TypeStr constant; assert otherwise.
-  //public String getstr() { throw typerr(null); }
 
-  //// Lattice of conversions:
-  //// -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
-  ////    to e.g. Float and require a user-provided rounding conversion from F64->Int.
-  ////  0 requires no/free conversion (Int8->Int64, F32->F64)
-  //// +1 requires a bit-changing conversion (Int->Flt)
-  //// 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
-  //public byte isBitShape(Type t) {
-  //  if( has_name() || t.has_name() ) throw com.cliffc.aa.AA.unimpl();
-  //  if( _type == TNIL || _type==TXNIL ) return 0; // Nil is free to convert always
-  //  if( above_center() && isa(t) ) return 0; // Can choose compatible format
-  //  if( _type == t._type ) return 0; // Same type is OK
-  //  if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion
-  //  if( _type == TALL || t._type==TALL || _type == TSCALAR || _type == TNSCALR ) return -1; // Scalar has to resolve
-  //  if( t._type == TNIL || t._type == TXNIL ) return (byte)(may_nil() ? -1 : 99); // Must resolve to a NIL first
-  //
-  //  throw typerr(t);  // Overridden in subtypes
-  //}
   // "widen" a narrow type for primitive type-specialization and H-M
   // unification.  e.g. "3" becomes "int64".
   // TODO: This is NOT associative with MEET.
@@ -876,14 +924,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
 
   // Sharpen pointer with memory
   public Type sharptr( Type ptr ) { return this==ANY ? TypeMem.ANYMEM.sharptr(ptr) : ptr; }
-
-  // Apply the test(); if it returns true iterate over all nested child types.
-  // If the test returns false, short-circuit the walk.  No attempt to guard
-  // against recursive structure walks, so the 'test' must return false when
-  // visiting the same Type again.
-  public void walk( Predicate<Type> p ) { assert is_simple(); p.test(this); }
-
-  TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return null; }
 
   // Make from existing type, replacing TMPs with alias from the map
   public Type make_from(Type head, TypeMem map, VBitSet visit) { return this; }
