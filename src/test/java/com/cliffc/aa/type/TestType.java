@@ -6,6 +6,7 @@ import org.junit.Test;
 
 import java.util.HashMap;
 
+import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -460,17 +461,18 @@ public class TestType {
     // Nest a linked-list style tuple 10 deep; verify actual depth is capped at
     // less than 5.  Any data loop must contain a Phi; if structures are
     // nesting infinitely deep, then it must contain a NewNode also.
-    int alias = BitsAlias.new_alias(BitsAlias.ALLX);
-    TypeStruct ts = TypeStruct.make(TypeFld.make("ptr",Type.NIL),TypeFld.make("cnt",TypeInt.con(0)));
-    TypeMemPtr phi = TypeMemPtr.make(alias,ts);
-    for( int i=1; i<20; i++ ) {
-      TypeStruct newt = TypeStruct.make(TypeFld.make("ptr",phi),TypeFld.make("cnt",TypeInt.con(i)));
-      TypeStruct approx = newt.approx(BitsAlias.make0(alias));
-      phi = TypeMemPtr.make(alias,approx);
-    }
-    HashMap<Type,Integer> ds = phi.depth();
-    int d = phi.max(ds);
-    assertTrue(0 <= d && d <10);
+    //int alias = BitsAlias.new_alias(BitsAlias.ALLX);
+    //TypeStruct ts = TypeStruct.make(TypeFld.make("ptr",Type.NIL),TypeFld.make("cnt",TypeInt.con(0)));
+    //TypeMemPtr phi = TypeMemPtr.make(alias,ts);
+    //for( int i=1; i<20; i++ ) {
+    //  TypeStruct newt = TypeStruct.make(TypeFld.make("ptr",phi),TypeFld.make("cnt",TypeInt.con(i)));
+    //  TypeStruct approx = newt.approx(BitsAlias.make0(alias));
+    //  phi = TypeMemPtr.make(alias,approx);
+    //}
+    //HashMap<Type,Integer> ds = phi.depth();
+    //int d = phi.max(ds);
+    //assertTrue(0 <= d && d <10);
+    throw unimpl();
   }
 
   // Test a cycle with two names on mismatched cycle boundaries

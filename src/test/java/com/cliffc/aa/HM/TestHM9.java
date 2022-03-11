@@ -248,9 +248,10 @@ public class TestHM9 {
     TypeStruct cycle_str1 = TypeStruct.make_test("n1",cycle_ptr0,"v1",fld);
     TypeMemPtr cycle_ptr1 = TypeMemPtr.make(aliases,cycle_str1);
     TypeStruct cycle_str2 = TypeStruct.make_test("n1",cycle_ptr1,"v1",fld);
-    TypeStruct cycle_strn = cycle_str2.approx(aliases);
-    TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn.at("n1");
-    return cycle_ptrn;
+    //TypeStruct cycle_strn = cycle_str2.approx(aliases);
+    //TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn.at("n1");
+    //return cycle_ptrn;
+    throw unimpl();
   }
 
 
@@ -329,9 +330,10 @@ public class TestHM9 {
         TypeStruct cycle_str2 = TypeStruct.make_test("n1",cycle_ptr1,"v1",TypeMemPtr.ISUSED);
         cycle_strX = cycle_str2;
       }
-      TypeStruct cycle_strn = cycle_strX.approx(BitsAlias.make0(9));
-      TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn.at("n1");
-      assertEquals(tfs(cycle_ptrn),syn.flow_type());
+      //TypeStruct cycle_strn = cycle_strX.approx(BitsAlias.make0(9));
+      //TypeMemPtr cycle_ptrn = (TypeMemPtr)cycle_strn.at("n1");
+      //assertEquals(tfs(cycle_ptrn),syn.flow_type());
+      throw unimpl();
     }
   }
 

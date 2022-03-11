@@ -1032,8 +1032,9 @@ public class HM10 {
       for( int i=0; i<_flds.length; i++ )
         flds[i+1] = TypeFld.make(_ids[i],_flds[i]._flow);
       TypeStruct tstr = TypeStruct.make(flds);
-      TypeStruct t2 = tstr.approx(BitsAlias.make0(_alias));
-      return TypeMemPtr.make(_alias,t2);
+      //TypeStruct t2 = tstr.approx(BitsAlias.make0(_alias));
+      //return TypeMemPtr.make(_alias,t2);
+      throw unimpl();
     }
 
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
@@ -1191,8 +1192,9 @@ public class HM10 {
       ts[0] = TypeFld.NO_DISP;  // Display
       for( int i=0; i<flows.length; i++ ) ts[i+1] = TypeFld.make_tup(flows[i],ARG_IDX+i);
       TypeStruct tstr = TypeStruct.make(ts);
-      TypeStruct ts2 = tstr.approx(BitsAlias.make0(PAIR_ALIAS));
-      return TypeMemPtr.make(PAIR_ALIAS,ts2);
+      //TypeStruct ts2 = tstr.approx(BitsAlias.make0(PAIR_ALIAS));
+      //return TypeMemPtr.make(PAIR_ALIAS,ts2);
+      throw unimpl();
     }
   }
 
@@ -1208,8 +1210,9 @@ public class HM10 {
       ts[0] = TypeFld.NO_DISP;  // Display
       for( int i=0; i<flows.length; i++ ) ts[i+1] = TypeFld.make_tup(flows[i],ARG_IDX+i);
       TypeStruct tstr = TypeStruct.make(ts);
-      TypeStruct ts2 = tstr.approx(BitsAlias.make0(TRIPLE_ALIAS));
-      return TypeMemPtr.make(TRIPLE_ALIAS,ts2);
+      //TypeStruct ts2 = tstr.approx(BitsAlias.make0(TRIPLE_ALIAS));
+      //return TypeMemPtr.make(TRIPLE_ALIAS,ts2);
+      throw unimpl();
     }
   }
 
