@@ -4,9 +4,6 @@ import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.util.Ary;
 import org.junit.Test;
 
-import java.util.HashMap;
-
-import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeMemPtr.NO_DISP;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -472,7 +469,6 @@ public class TestType {
     //HashMap<Type,Integer> ds = phi.depth();
     //int d = phi.max(ds);
     //assertTrue(0 <= d && d <10);
-    throw unimpl();
   }
 
   // Test a cycle with two names on mismatched cycle boundaries

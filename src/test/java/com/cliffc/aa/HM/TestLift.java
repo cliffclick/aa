@@ -27,9 +27,9 @@ public class TestLift {
 
     // 289: *[3](^=any, _289$, _289$, _289$)
     Type.RECURSIVE_MEET++;
-    TypeFld fld0 = TypeFld.malloc("0",null,Access.Final,ARG_IDX+0);
-    TypeFld fld1 = TypeFld.malloc("1",null,Access.Final,ARG_IDX+1);
-    TypeFld fld2 = TypeFld.malloc("2",null,Access.Final,ARG_IDX+2);
+    TypeFld fld0 = TypeFld.malloc("0",null,Access.Final);
+    TypeFld fld1 = TypeFld.malloc("1",null,Access.Final);
+    TypeFld fld2 = TypeFld.malloc("2",null,Access.Final);
     TypeStruct ts = TypeStruct.malloc_test(TypeFld.NO_DSP,fld0,fld1,fld2);
     TypeMemPtr ret1 = TypeMemPtr.malloc(B3,ts);
     fld0.setX(ret1);
@@ -43,7 +43,7 @@ public class TestLift {
     TypeFld fld21 = TypeFld.make_tup(Type.SCALAR,ARG_IDX+1);
     TypeFld fld22 = TypeFld.make_tup(Type.SCALAR,ARG_IDX+2);
     Type.RECURSIVE_MEET++;
-    TypeFld fld20 = TypeFld.malloc("0",null,Access.Final,ARG_IDX+0);
+    TypeFld fld20 = TypeFld.malloc("0",null,Access.Final);
     TypeStruct ts2 = TypeStruct.malloc_test(TypeFld.NO_DSP,fld20,fld21,fld22);
     TypeMemPtr ret2 = TypeMemPtr.make(B3,ts2);
     fld20.setX(ret2);
@@ -113,7 +113,7 @@ public class TestLift {
 
     // 289: *[3](^=any, _289$)
     Type.RECURSIVE_MEET++;
-    TypeFld fld1 = TypeFld.malloc("0",null,Access.Final,ARG_IDX);
+    TypeFld fld1 = TypeFld.malloc("0",null,Access.Final);
     TypeStruct ts1 = TypeStruct.malloc_test(TypeFld.NO_DSP,fld1);
     TypeMemPtr ret1 = TypeMemPtr.make(B3,ts1);
     fld1.setX(ret1);

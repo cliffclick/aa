@@ -9,7 +9,6 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
 
-import static com.cliffc.aa.AA.ARG_IDX;
 import static com.cliffc.aa.AA.unimpl;
 
 // Combined Hindley-Milner and Global Constant Propagation typing.
@@ -1114,6 +1113,8 @@ public class HM {
       T2 self = find();
       T2 rec = _rec.find();
       if( work!=null ) rec.push_update(this);
+
+      // Look up field
       T2 fld = rec.arg(_id);
       if( fld!=null )           // Unify against a pre-existing field
         return fld.unify(self, work);
@@ -1556,7 +1557,7 @@ public class HM {
     default TypeMemPtr _tmp(int alias, String[] ids, Type[] ts) {
       TypeFld[] tfs = new TypeFld[ts.length+1];
       tfs[0] = TypeFld.NO_DISP;  // Display
-      for( int i=0; i<ts.length; i++ ) tfs[i+1] = TypeFld.make(ids[i],ts[i],ARG_IDX+i);
+      for( int i=0; i<ts.length; i++ ) tfs[i+1] = TypeFld.make(ids[i],ts[i]);
       return TypeMemPtr.make(alias,TypeStruct.make(tfs));
     }
     Type fld(String id);
@@ -1580,6 +1581,7 @@ public class HM {
     // If Nil    , contains the single key "?"  and all other fields are null.
     // If Lambda , contains keys "x","y","z" for args or "ret" for return.
     // If Struct , contains keys for the field labels.  No display & not-null.
+    // If Error  , _eflow may contain a 2nd flow type; also blends keys from all takers
     NonBlockingHashMap<String,T2> _args;
 
     // Any/all of Base,Lambda,Struct may appear at once.

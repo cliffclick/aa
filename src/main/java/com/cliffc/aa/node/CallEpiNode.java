@@ -155,26 +155,27 @@ public final class CallEpiNode extends Node {
     if( trez.is_con() && rctl==fun && cmem == rmem && inline )
       return unwire(call,ret).set_is_copy(cctl,cmem,Node.con(trez));
 
-    // Check for a 1-op body using only constants or parameters and no memory effects
-    boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem && inline;
-    for( Node parm : rrez._defs )
-      if( parm != null && parm != fun &&
-          !(parm instanceof ParmNode && parm.in(0) == fun) &&
-          !(parm instanceof NewNode nnn && nnn._is_val) &&  // Prototype is OK
-          !(parm instanceof ConNode) )
-        can_inline=false;       // Not trivial
-    if( can_inline ) {
-      Node irez = rrez.copy(false); // Copy the entire function body
-      ProjNode proj = ProjNode.proj(this,REZ_IDX);
-      irez._live = proj==null ? TypeMem.ALIVE : proj._live; // sharpen liveness to the call-site liveness
-      for( Node in : rrez._defs )
-        irez.add_def((in instanceof ParmNode parm && parm.in(CTL_IDX) == fun) ? ProjNode.proj(call,parm._idx) : in);
-      if( irez instanceof PrimNode prim ) prim._badargs = call._badargs;
-      GVN.add_work_new(irez);
-      return unwire(call,ret).set_is_copy(cctl,cmem,irez);
-    }
-
-    return null;
+    //// Check for a 1-op body using only constants or parameters and no memory effects
+    //boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem && inline;
+    //for( Node parm : rrez._defs )
+    //  if( parm != null && parm != fun &&
+    //      !(parm instanceof ParmNode && parm.in(0) == fun) &&
+    //      !(parm instanceof NewNode nnn && nnn._is_val) &&  // Prototype is OK
+    //      !(parm instanceof ConNode) )
+    //    can_inline=false;       // Not trivial
+    //if( can_inline ) {
+    //  Node irez = rrez.copy(false); // Copy the entire function body
+    //  ProjNode proj = ProjNode.proj(this,REZ_IDX);
+    //  irez._live = proj==null ? TypeMem.ALIVE : proj._live; // sharpen liveness to the call-site liveness
+    //  for( Node in : rrez._defs )
+    //    irez.add_def((in instanceof ParmNode parm && parm.in(CTL_IDX) == fun) ? ProjNode.proj(call,parm._idx) : in);
+    //  if( irez instanceof PrimNode prim ) prim._badargs = call._badargs;
+    //  GVN.add_work_new(irez);
+    //  return unwire(call,ret).set_is_copy(cctl,cmem,irez);
+    //}
+    //
+    //return null;
+    throw unimpl();
   }
 
   // Used during GCP and Ideal calls to see if wiring is possible.
@@ -326,13 +327,14 @@ public final class CallEpiNode extends Node {
   }
 
 
-  //static BitsAlias esc_out( TypeMem tmem, Type trez ) {
+  static BitsAlias esc_out( TypeMem tmem, Type trez ) {
   //  if( trez == Type.XNIL || trez == Type.NIL ) return BitsAlias.EMPTY;
   //  if( trez instanceof TypeFunPtr ) trez = ((TypeFunPtr)trez)._dsp;
   //  if( trez instanceof TypeMemPtr )
   //    return tmem.all_reaching_aliases(((TypeMemPtr)trez)._aliases);
   //  return TypeMemPtr.OOP0.dual().isa(trez) ? BitsAlias.NZERO : BitsAlias.EMPTY;
-  //}
+    throw unimpl();
+  }
   //
   //// Approximate "live out of call", includes things that are alive before
   //// the call but not flowing in.  Catches all the "new in call" returns.

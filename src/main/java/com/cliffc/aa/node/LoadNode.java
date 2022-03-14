@@ -28,34 +28,35 @@ public class LoadNode extends Node {
   public TypeFld find(TypeStruct ts) { return ts.get(_fld); }
 
   @Override public Type value() {
-    Type tadr = adr()._val;
-    // Loading an operator from a primitive
-    NewNode proto = null;
-    if( tadr == Type.NIL || tadr == Type.XNIL ||
-        tadr instanceof TypeInt ) proto = Env.PROTOS.get("int");
-    if( tadr instanceof TypeFlt ) proto = Env.PROTOS.get("flt");
-    if( tadr instanceof TypeFunPtr tfp && tfp._ret instanceof TypeMemPtr tmp && tmp.is_valtype() )
-      proto = Env.PROTOS.get(tmp._obj._name); // Get the prototype
-    // Load from the prototype
-    if( proto!=null ) {
-      int idx = proto.find(_fld);
-      if( idx!= -1 ) {
-        // Loading a unbound funptr, binds it to the address
-        Type t = proto.val(idx);
-        if( t instanceof TypeFunPtr tfp )
-          return tfp.make_from(tadr,tfp._ret); // Bind display to tadr
-      }
-    }
-
-    if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.oob();
-
-    // Loading from TypeMem - will get a TypeObj out.
-    Node mem = mem();
-    Type tmem = mem._val;       // Memory
-    if( !(tmem instanceof TypeMem tm) ) return tmem.oob(); // Nothing sane
-    TypeStruct ts = tm.ld(tmp);           // Get struct from memory
-    TypeFld fld = ts.get(_fld);           // Find the named field
-    return fld==null ? ts.oob() : fld._t; // Field type
+    //Type tadr = adr()._val;
+    //// Loading an operator from a primitive
+    //NewNode proto = null;
+    //if( tadr == Type.NIL || tadr == Type.XNIL ||
+    //    tadr instanceof TypeInt ) proto = Env.PROTOS.get("int");
+    //if( tadr instanceof TypeFlt ) proto = Env.PROTOS.get("flt");
+    //if( tadr instanceof TypeFunPtr tfp && tfp._ret instanceof TypeMemPtr tmp && tmp.is_valtype() )
+    //  proto = Env.PROTOS.get(tmp._obj._name); // Get the prototype
+    //// Load from the prototype
+    //if( proto!=null ) {
+    //  int idx = proto.find(_fld);
+    //  if( idx!= -1 ) {
+    //    // Loading a unbound funptr, binds it to the address
+    //    Type t = proto.val(idx);
+    //    if( t instanceof TypeFunPtr tfp )
+    //      return tfp.make_from(tadr,tfp._ret); // Bind display to tadr
+    //  }
+    //}
+    //
+    //if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.oob();
+    //
+    //// Loading from TypeMem - will get a TypeObj out.
+    //Node mem = mem();
+    //Type tmem = mem._val;       // Memory
+    //if( !(tmem instanceof TypeMem tm) ) return tmem.oob(); // Nothing sane
+    //TypeStruct ts = tm.ld(tmp);           // Get struct from memory
+    //TypeFld fld = ts.get(_fld);           // Find the named field
+    //return fld==null ? ts.oob() : fld._t; // Field type
+    throw unimpl();
   }
 
   @Override public void add_flow_use_extra(Node chg) {
@@ -87,26 +88,27 @@ public class LoadNode extends Node {
 
   // Standard memory unification; the Load unifies with the loaded field.
   @Override public boolean unify( boolean test ) {
-    TV2 self = tvar();
-    TV2 rec = adr().tvar();
-    rec.push_dep(this);
-
-    TV2 fld = rec.arg(_fld);
-    if( fld!=null )           // Unify against a pre-existing field
-      return fld.unify(self, test);
-
-    // Add struct-ness if possible
-    if( !rec.is_obj() && !rec.is_nil() )
-      rec.make_open_struct();
-    // Add the field
-    if( rec.is_obj() && rec.is_open() ) {
-      rec.add_fld(_fld,self);
-      return true;
-    }
-    // Closed/non-record, field is missing
-    if( self._err!=null ) return false;
-    self._err = "Missing field "+_fld;
-    return true;
+    //TV2 self = tvar();
+    //TV2 rec = adr().tvar();
+    //rec.push_dep(this);
+    //
+    //TV2 fld = rec.arg(_fld);
+    //if( fld!=null )           // Unify against a pre-existing field
+    //  return fld.unify(self, test);
+    //
+    //// Add struct-ness if possible
+    //if( !rec.is_obj() && !rec.is_nil() )
+    //  rec.make_open_struct();
+    //// Add the field
+    //if( rec.is_obj() && rec.is_open() ) {
+    //  rec.add_fld(_fld,self);
+    //  return true;
+    //}
+    //// Closed/non-record, field is missing
+    //if( self._err!=null ) return false;
+    //self._err = "Missing field "+_fld;
+    //return true;
+    throw unimpl();
   }
   public void add_work_hm() {
     super.add_work_hm();
@@ -115,105 +117,108 @@ public class LoadNode extends Node {
 
   // Strictly reducing optimizations
   @Override public Node ideal_reduce() {
-    Node adr = adr();
-    Type tadr = adr._val;
-    NewNode proto = null;
-    // Loading from a primitive?  Remap to the prototype
-    if( tadr == Type.NIL || tadr == Type.XNIL ||
-        tadr instanceof TypeInt ) proto = Env.PROTOS.get("int");
-    if( tadr instanceof TypeFlt ) proto = Env.PROTOS.get("flt");
-    if( tadr instanceof TypeFunPtr tfp && tfp._ret instanceof TypeMemPtr tmp && tmp.is_valtype() )
-      proto = Env.PROTOS.get(tmp._obj._name); // Get the prototype
-    // Loading from the prototype
-    if( proto!=null ) {
-      int idx = proto.find(_fld);
-      if( idx!= -1 ) {
-        // Loading a unbound funptr, binds it to the address
-        Node n = proto.in(idx);
-        if( n instanceof FunPtrNode fptr )
-          return Env.GVN.init(new FunPtrNode(fptr._name,fptr.ret(),adr));
-        else if( n instanceof UnresolvedNode unr )
-          return ((UnresolvedNode)unr.copy(true)).set_bad(_bad).set_def(0,adr);
-        return n;
-      }
-    }
-
-    if( !(tadr instanceof TypeMemPtr tmp) ) return null;
-
-    // If we can find an exact previous store, fold immediately to the value.
-    Node st = find_previous_store(mem(),adr,tmp._aliases,_fld,true);
-    if( st!=null ) {
-      Node rez = st instanceof StoreNode
-        ? ((StoreNode)st).rez()
-        : ((  NewNode)st).get(_fld);
-      return rez==this ? null : rez;
-    }
-
-    return null;
+    //Node adr = adr();
+    //Type tadr = adr._val;
+    //NewNode proto = null;
+    //// Loading from a primitive?  Remap to the prototype
+    //if( tadr == Type.NIL || tadr == Type.XNIL ||
+    //    tadr instanceof TypeInt ) proto = Env.PROTOS.get("int");
+    //if( tadr instanceof TypeFlt ) proto = Env.PROTOS.get("flt");
+    //if( tadr instanceof TypeFunPtr tfp && tfp._ret instanceof TypeMemPtr tmp && tmp.is_valtype() )
+    //  proto = Env.PROTOS.get(tmp._obj._name); // Get the prototype
+    //// Loading from the prototype
+    //if( proto!=null ) {
+    //  int idx = proto.find(_fld);
+    //  if( idx!= -1 ) {
+    //    // Loading a unbound funptr, binds it to the address
+    //    Node n = proto.in(idx);
+    //    if( n instanceof FunPtrNode fptr )
+    //      return Env.GVN.init(new FunPtrNode(fptr._name,fptr.ret(),adr));
+    //    else if( n instanceof UnresolvedNode unr )
+    //      return ((UnresolvedNode)unr.copy(true)).set_bad(_bad).set_def(0,adr);
+    //    return n;
+    //  }
+    //}
+    //
+    //if( !(tadr instanceof TypeMemPtr tmp) ) return null;
+    //
+    //// If we can find an exact previous store, fold immediately to the value.
+    //Node st = find_previous_store(mem(),adr,tmp._aliases,_fld,true);
+    //if( st!=null ) {
+    //  Node rez = st instanceof StoreNode
+    //    ? ((StoreNode)st).rez()
+    //    : ((  NewNode)st).in(_fld);
+    //  return rez==this ? null : rez;
+    //}
+    //
+    //return null;
+    throw unimpl();
   }
 
 
   // Changing edges to bypass, but typically not removing nodes nor edges
   @Override public Node ideal_mono() {
-    Node mem = mem();
-    // Bypass unrelated Stores, but only if the Address predates the Store.  If
-    // the Load address depends on the Store memory, then the Load cannot
-    // bypass the Store.
-    if( mem instanceof StoreNode ) {
-      StoreNode st2 = (StoreNode)mem;
-      if( st2.adr()==adr() && !Util.eq(st2._fld,_fld) ) // Very weak "Address must predate" test
-        return set_mem(st2.mem());
-    }
-
-    Node adr = adr();
-    Type tadr = adr._val;
-    BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
-
-    // Load can move past a Join if all aliases align.
-    if( mem instanceof MemJoinNode && aliases != null ) {
-      Node jmem = ((MemJoinNode)mem).can_bypass(aliases);
-      if( jmem != null ) {
-        jmem.xval();
-        return set_mem(jmem);
-      }
-    }
-
-    // Load can move out of a Call, if the function has no Parm:mem - happens
-    // for single target calls that do not (have not yet) inlined.
-    if( mem instanceof MProjNode && mem.in(0) instanceof CallNode )
-      return set_mem(((CallNode)mem.in(0)).mem());
-
-    // Load can bypass a New or Store if the address does not depend on the New/St.
-    if( aliases != null && mem instanceof MrgProjNode ) {
-      NewNode nnn = ((MrgProjNode)mem).nnn();
-      // Bypass if aliases do not overlap
-      if( !aliases.test_recur(nnn._alias) )
-        return set_mem(mem.in(1));
-      // Also bypass if address predates the allocation.  Here we just see that
-      // the address comes from the function Parm, and the New is made in the
-      // function.
-      Node adr2 = adr instanceof CastNode ? adr.in(1) : adr;
-      if( adr2 instanceof ParmNode )
-        return set_mem(mem.in(1));
-    }
-
-    return null;
+    //Node mem = mem();
+    //// Bypass unrelated Stores, but only if the Address predates the Store.  If
+    //// the Load address depends on the Store memory, then the Load cannot
+    //// bypass the Store.
+    //if( mem instanceof StoreNode ) {
+    //  StoreNode st2 = (StoreNode)mem;
+    //  if( st2.adr()==adr() && !Util.eq(st2._fld,_fld) ) // Very weak "Address must predate" test
+    //    return set_mem(st2.mem());
+    //}
+    //
+    //Node adr = adr();
+    //Type tadr = adr._val;
+    //BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
+    //
+    //// Load can move past a Join if all aliases align.
+    //if( mem instanceof MemJoinNode && aliases != null ) {
+    //  Node jmem = ((MemJoinNode)mem).can_bypass(aliases);
+    //  if( jmem != null ) {
+    //    jmem.xval();
+    //    return set_mem(jmem);
+    //  }
+    //}
+    //
+    //// Load can move out of a Call, if the function has no Parm:mem - happens
+    //// for single target calls that do not (have not yet) inlined.
+    //if( mem instanceof MProjNode && mem.in(0) instanceof CallNode )
+    //  return set_mem(((CallNode)mem.in(0)).mem());
+    //
+    //// Load can bypass a New or Store if the address does not depend on the New/St.
+    //if( aliases != null && mem instanceof MrgProjNode ) {
+    //  NewNode nnn = ((MrgProjNode)mem).nnn();
+    //  // Bypass if aliases do not overlap
+    //  if( !aliases.test_recur(nnn._alias) )
+    //    return set_mem(mem.in(1));
+    //  // Also bypass if address predates the allocation.  Here we just see that
+    //  // the address comes from the function Parm, and the New is made in the
+    //  // function.
+    //  Node adr2 = adr instanceof CastNode ? adr.in(1) : adr;
+    //  if( adr2 instanceof ParmNode )
+    //    return set_mem(mem.in(1));
+    //}
+    //
+    //return null;
+    throw unimpl();
   }
 
   @Override public Node ideal_grow() {
-    Node mem = mem();
-    Node adr = adr();
-    // Load from a memory Phi; split through in an effort to sharpen the memory.
-    // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
-    // TODO: Hoist out of loops.
-    if( mem!=null && mem._op == OP_PHI && adr.in(0) instanceof NewNode ) {
-      Node lphi = new PhiNode(Type.SCALAR,((PhiNode)mem)._badgc,mem.in(0));
-      for( int i=1; i<mem._defs._len; i++ )
-        lphi.add_def(Env.GVN.add_work_new(new LoadNode(mem.in(i),adr,_fld,_bad)));
-      return lphi;
-    }
-
-    return null;
+    //Node mem = mem();
+    //Node adr = adr();
+    //// Load from a memory Phi; split through in an effort to sharpen the memory.
+    //// TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
+    //// TODO: Hoist out of loops.
+    //if( mem!=null && mem._op == OP_PHI && adr.in(0) instanceof NewNode ) {
+    //  Node lphi = new PhiNode(Type.SCALAR,((PhiNode)mem)._badgc,mem.in(0));
+    //  for( int i=1; i<mem._defs._len; i++ )
+    //    lphi.add_def(Env.GVN.add_work_new(new LoadNode(mem.in(i),adr,_fld,_bad)));
+    //  return lphi;
+    //}
+    //
+    //return null;
+    throw unimpl();
   }
 
   // Find a matching prior Store or NewObj - matching field name and address.
@@ -263,11 +268,12 @@ public class LoadNode extends Node {
       } else if( mem instanceof MrgProjNode ) {
         MrgProjNode mrg = (MrgProjNode)mem;
         NewNode nnn = mrg.nnn();
-        TypeFld tfld = nnn._ts.get(fld);
-        if( tfld!=null && adr == nnn ) return nnn; // Direct hit
-        // wrong field name or wrong alias, cannot match
-        if( aliases.test_recur(nnn._alias) ) return null; // Overlapping, but wrong address - dunno, so must fail
-        mem = mrg.mem(); // Advance past
+        //TypeFld tfld = nnn._ts.get(fld);
+        //if( tfld!=null && adr == nnn ) return nnn; // Direct hit
+        //// wrong field name or wrong alias, cannot match
+        //if( aliases.test_recur(nnn._alias) ) return null; // Overlapping, but wrong address - dunno, so must fail
+        //mem = mrg.mem(); // Advance past
+        throw unimpl();
       } else if( mem instanceof MemJoinNode ) {
         Node jmem = ((MemJoinNode)mem).can_bypass(aliases);
         if( jmem == null ) return null;
@@ -321,8 +327,9 @@ public class LoadNode extends Node {
     return null;
   }
   private ErrMsg bad( boolean fast, TypeStruct to ) {
-    boolean is_closure = adr() instanceof NewNode nnn && nnn._is_closure;
-    return fast ? ErrMsg.FAST : ErrMsg.field(_bad,"Unknown",_fld,is_closure,to);
+    //boolean is_closure = adr() instanceof NewNode nnn && nnn._is_closure;
+    //return fast ? ErrMsg.FAST : ErrMsg.field(_bad,"Unknown",_fld,is_closure,to);
+    throw unimpl();
   }
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }
   @Override public boolean equals(Object o) {

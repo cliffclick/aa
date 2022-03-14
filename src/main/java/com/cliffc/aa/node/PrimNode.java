@@ -9,17 +9,32 @@ import com.cliffc.aa.util.Util;
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
 
-// Primitives can be used as an internal operator (their apply() call does the
-// primitive operation).  Primitives are wrapped as functions when returned
-// from Env lookup, although the immediate lookup+apply is optimized to just
-// make a new primitive.  See FunNode for function Node structure.
-//
-// Fun/Parm-per-arg/Prim/Ret
-//
+// Primitives are nodes to do primitive operations.  Internally they carry a
+// '_formals' to type their arguments.  Similar to functions and FunNodes and
+// unlike structs and NewNodes, the arguments are ordered.  The inputs to
+// the Node itself and the formals are numbered.  Example:
+// - index CTL_IDX, typically null
+// - index MEM_IDX, typically null except for e.g. Load/Store primitives
+// - index DSP_IDX, typically the left arg, NOT the Display nor 'self'
+// - index ARG_IDX, typically the right arg
+
+// Primitives use their apply() call as the transfer function and expect the
+// args in this order.
+
+// Primitives are wrapped as functions when returned from Env lookup, although
+// the immediate lookup+apply is optimized to just make a new primitive.  See
+// FunNode for function Node structure.  The wrapping function preserves the
+// order in the ParmNodes.
+
+// Both 'int' and 'flt' refer to internal Structs, built with a NewNode and
+// containing fields for each of the primitive operator function wrappers.  The
+// NewNode has a display field.
+
+
 public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
   public final TypeFunPtr _tfp; // FIDX, nargs, display argument, return type
-  public final TypeStruct _formals;
+  public final TypeStruct _formals; // Formals are indexed by order NOT name
   Parse[] _badargs;             // Filled in when inlined in CallNode
   public PrimNode( String name, TypeStruct formals, Type ret ) {
     super(OP_PRIM);
@@ -32,7 +47,6 @@ public abstract class PrimNode extends Node {
 
   private static PrimNode[] PRIMS = null; // All primitives
 
-  // TODO: Just build precedence table for ops; need a lookup that includes prec order, nargs, placement
   public static PrimNode[] PRIMS() {
     if( PRIMS!=null ) return PRIMS;
 
@@ -79,8 +93,8 @@ public abstract class PrimNode extends Node {
     PRIMS = allprims.asAry();
 
     // Build the int and float types and prototypes
-    install("int",TypeInt.INT64,INTS);
-    install("flt",TypeFlt.FLT64,FLTS);
+    install("int",INTS);
+    install("flt",FLTS);
 
     // Math package
     install_math(rand);
@@ -88,57 +102,55 @@ public abstract class PrimNode extends Node {
     return PRIMS;
   }
 
-  private static void install( String s, Type t, PrimNode[] PRIMS ) {
-    String tname = (s+":").intern();
-    ConNode defalt = (ConNode)Node.con(t);
-    NewNode nnn = new NewNode(false,true,false,tname,BitsAlias.new_alias());
-    for( PrimNode prim : PRIMS ) prim.as_fun(nnn,defalt,true);
+  private static void install( String s, PrimNode[] prims ) {
+    StructNode nnn = new StructNode(false,false);
+    for( PrimNode prim : prims ) prim.as_fun(nnn,true);
     for( Node n : nnn._defs )
       if( n instanceof UnresolvedNode unr )
         Env.GVN.add_work_new(unr.define());
-    Env.GVN.init(nnn);
+    nnn.init();
     nnn.close();
     Env.PROTOS.put(s,nnn);
-    Env.SCP_0.add_type(tname,nnn);
+    Env.SCP_0.add_type((s+":").intern(),nnn);
   }
 
   // Primitive wrapped as a simple function.
   // Fun Parm_dsp [Parm_y] prim Ret
   // No memory, no RPC.  Display is first arg.
-  private void as_fun( NewNode nnn, ConNode defalt, boolean is_oper ) {
+  private void as_fun( StructNode nnn, boolean is_oper ) {
     String op = is_oper ? (switch( _tfp.nargs() ) {
-      case 4 -> "_";
-      case 3 -> "";
+      case ARG_IDX+1 -> "_";
+      case ARG_IDX   -> "";
       default -> throw unimpl();
       }+_name+"_").intern() : _name;
     if( is_oper ) Oper.make(op);
 
     FunNode fun = (FunNode)Env.GVN.init(new FunNode(this,is_oper ? op : _name).add_def(Env.ALL_CTRL));
-    add_def(null);              // No control
-    add_def(null);              // No memory
-    add_def(Env.GVN.init(new ParmNode(DSP_IDX,"^",fun,defalt,null)));
-    if( _tfp.nargs()==4 )
-      add_def(Env.GVN.init(new ParmNode(ARG_IDX,"y",fun,(ConNode)Node.con(_formals.fld_idx(1,ARG_IDX)._t),null)));
-    Env.GVN.init(this);
-    RetNode ret = Env.GVN.init(new RetNode(fun,null,this,null,fun));
-    FunPtrNode fptr =  Env.GVN.init(new FunPtrNode(op,ret,is_oper ? Env.ALL : defalt));
+    for( int i=0; i<_formals.len(); i++ )
+      // Make a Parm for every formal, and unwrap it
+      add_def(_formals.get(i)==null ? null
+              : new FieldNode(new ParmNode(i,fun,(ConNode)Node.con(_formals.at(i))).init(),"x").init());
+    // The primitive, working on and producing raw prims
+    init();
+    // Re-wrap the result
+    Node val = new StructNode(false,false).add_fld(TypeFld.make("x",_tfp._ret),this,null).init();
+    RetNode ret = new RetNode(fun,null,val,null,fun).init();
+    FunPtrNode fptr =  new FunPtrNode(op,ret,is_oper ? Env.ALL : fun.parm(DSP_IDX)).init();
     nnn.add_fun(op,Access.Final,fptr,null);
   }
 
   // Build and install match package
   private static void install_math(PrimNode rand) {
-    NewNode nnn = new NewNode(false,false,false,null,BitsAlias.new_alias());
-    rand.as_fun(nnn,Env.ANY,false);
-    nnn.add_fld(TypeFld.make("pi",TypeFlt.PI,nnn.len()),Node.con(TypeFlt.PI),null);
+    StructNode nnn = new StructNode(false,false);
+    rand.as_fun(nnn,false);
+    nnn.add_fld(TypeFld.make("pi",TypeFlt.PI),Node.con(TypeFlt.PI),null);
     nnn.close();
     Env.GVN.init(nnn);
-    Env.STK_0.add_fld(TypeFld.make("math",nnn._val,Env.STK_0.len()),nnn,null);
-    Env.SCP_0.set_mem(Env.GVN.init(new MrgProjNode(nnn,Env.SCP_0.mem())));
+    Env.STK_0.add_fld(TypeFld.make("math",nnn._val),nnn,null);
   }
 
 
-  // Apply types are 1-based (same as the incoming node index), and not
-  // zero-based (not same as the _formals and _args fields).
+  // Apply uses the same alignment as the arguments, ParmNodes, _formals.
   public abstract Type apply( Type[] args ); // Execute primitive
   // Pretty print short primitive signature based on first argument:
   //  + :{int int -> int }  ==>>   + :int
@@ -154,9 +166,10 @@ public abstract class PrimNode extends Node {
     // If all inputs are constants we constant-fold.  If any input is high, we
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
-    for( TypeFld fld : _formals ) {
-      Type tactual = ts[fld._order] = val(fld._order);
-      Type tformal = fld._t;
+    for( int i=0; i<_formals.len(); i++ ) {
+      if( _formals.get(i)==null ) continue;
+      Type tactual = ts[i] = val(i);
+      Type tformal = _formals.at(i);
       Type t = tformal.dual().meet(tactual);
       if( !t.is_con() && tactual!=Type.NIL ) {
         is_con = false;         // Some non-constant
@@ -180,10 +193,11 @@ public abstract class PrimNode extends Node {
   // All primitives are effectively H-M Applies with a hidden internal Lambda.
   @Override public boolean unify( boolean test ) {
     boolean progress = false;
-    for( TypeFld fld : _formals )
-      progress |= prim_unify(tvar(fld._order),fld._t,test);
-    progress |= prim_unify(tvar(),_tfp._ret,test);
-    return progress;
+    //for( TypeFld fld : _formals )
+    //  progress |= prim_unify(tvar(fld._order),fld._t,test);
+    //progress |= prim_unify(tvar(),_tfp._ret,test);
+    //return progress;
+    throw unimpl();           // TODO: Access input by field name
   }
   private boolean prim_unify(TV2 arg, Type t, boolean test) {
     if( t==Type.SCALAR || t==Type.ANY ) return false; // No binding on input
@@ -191,16 +205,17 @@ public abstract class PrimNode extends Node {
     if( t instanceof TypeInt ) s="int:";
     else if( t instanceof TypeFlt ) s="flt:";
     else throw unimpl();
-    NewNode nnn = Env.SCP_0.get_type(s);
+    StructNode nnn = Env.SCP_0.get_type(s);
     return arg.unify(nnn.tvar(),test);
   }
 
   @Override public ErrMsg err( boolean fast ) {
     for( TypeFld fld : _formals ) {
-      Type tactual = val(fld._order);
-      Type tformal = fld._t;
-      if( !tactual.isa(tformal) )
-        return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[fld._order-DSP_IDX],tactual, tformal);
+      //Type tactual = val(fld._order);
+      //Type tformal = fld._t;
+      //if( !tactual.isa(tformal) )
+      //  return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[fld._order-DSP_IDX],tactual, tformal);
+      throw unimpl();           // TODO: Access input by field name
     }
     return null;
   }

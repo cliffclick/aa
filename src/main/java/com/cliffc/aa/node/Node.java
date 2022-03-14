@@ -25,30 +25,32 @@ public abstract class Node implements Cloneable, IntSupplier {
   static final byte OP_CPROJ  = 6;
   static final byte OP_ERR    = 7;
   static final byte OP_FRESH  = 8;
-  static final byte OP_FUN    = 9;
-  static final byte OP_FUNPTR =10;
-  static final byte OP_IF     =11;
-  static final byte OP_JOIN   =12;
-  static final byte OP_KEEP   =13;
-  static final byte OP_LOAD   =14;
-  static final byte OP_NEW    =15; // Allocate a new struct
-  static final byte OP_PARM   =16;
-  static final byte OP_PHI    =17;
-  static final byte OP_PRIM   =18;
-  static final byte OP_PROJ   =19;
-  static final byte OP_REGION =20;
-  static final byte OP_RET    =21;
-  static final byte OP_SCOPE  =22;
-  static final byte OP_SPLIT  =23;
-  static final byte OP_START  =24;
-  static final byte OP_STMEM  =25;
-  static final byte OP_STORE  =26;
-  static final byte OP_TYPE   =27;
-  static final byte OP_UNR    =28;
-  static final byte OP_VAL    =29;
-  static final byte OP_MAX    =30;
+  static final byte OP_FIELD  = 9;
+  static final byte OP_FUN    =10;
+  static final byte OP_FUNPTR =11;
+  static final byte OP_IF     =12;
+  static final byte OP_JOIN   =13;
+  static final byte OP_KEEP   =14;
+  static final byte OP_LOAD   =15;
+  static final byte OP_NEW    =16; // Allocate a new struct
+  static final byte OP_PARM   =17;
+  static final byte OP_PHI    =18;
+  static final byte OP_PRIM   =19;
+  static final byte OP_PROJ   =20;
+  static final byte OP_REGION =21;
+  static final byte OP_RET    =22;
+  static final byte OP_SCOPE  =23;
+  static final byte OP_SPLIT  =24;
+  static final byte OP_START  =25;
+  static final byte OP_STMEM  =26;
+  static final byte OP_STORE  =27;
+  static final byte OP_STRUCT =28;
+  static final byte OP_TYPE   =29;
+  static final byte OP_UNR    =30;
+  static final byte OP_VAL    =31;
+  static final byte OP_MAX    =32;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Fresh", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Type", "Unresolved", "Val" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Field", "Fresh", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Struct", "Type", "Unresolved", "Val" };
   static { assert STRS.length==OP_MAX; }
 
   // Unique dense node-numbering
@@ -213,7 +215,6 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( _elock ) { _elock = false; Node x = VALS.remove(this); assert x == this; }
     while( _defs._len > 0 ) unuse(_defs.pop());
     _defs = _uses = null;       // TODO: Poor-man's indication of a dead node, probably needs to recycle these...
-    if( this instanceof NewNode ) ((NewNode)this).free();
     return this;
   }
   public boolean is_dead() { return _uses == null; }
@@ -434,6 +435,10 @@ public abstract class Node implements Cloneable, IntSupplier {
     return null;
   }
 
+  // Initialize a Node in GVN.
+  final <N extends Node> N init() { return (N)Env.GVN.init(this); }
+
+  
   // Graph rewriting.  Strictly reducing Nodes or Edges.  Cannot make a new
   // Node, save that for the expanding ideal calls.
   // Returns null if no-progress or a better version of 'this'.  The

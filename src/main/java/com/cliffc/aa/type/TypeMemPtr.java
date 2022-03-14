@@ -125,7 +125,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
     DISPLAY = TypeStruct.malloc_test(TypeFld.make_dsp(Type.ANY));
     TypeStruct.RECURSIVE_MEET++;
     DISPLAY_PTR = TypeMemPtr.malloc(BitsAlias.NALL,DISPLAY);
-    DISP_FLD = TypeFld.malloc("^",DISPLAY_PTR,TypeFld.Access.Final,TypeFld.oBot);
+    DISP_FLD = TypeFld.malloc("^",DISPLAY_PTR,TypeFld.Access.Final);
     DISPLAY.set_fld(DISP_FLD);
     TypeStruct.RECURSIVE_MEET--;
     TypeStruct ds = Cyclic.install(DISPLAY);

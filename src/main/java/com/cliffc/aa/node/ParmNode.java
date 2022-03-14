@@ -5,34 +5,25 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFld;
 
-// Function parameter node; almost just a Phi with a name.  There is a dense
-// numbering matching function arguments, with -1 reserved for the RPC and 0
-// for memory.
+// Function parameter node; almost just a Phi with an order.  There is a dense
+// numbering matching function arguments, e.g. MEM_IDX for memory.
 public class ParmNode extends PhiNode {
-  public final int _idx; // Parameter index, MEM_IDX, FUN_IDX is display, ARGIDX+ normal args
-  final String _name;    // Parameter name
-  public ParmNode( int idx, String name, Node fun, ConNode defalt, Parse badgc) {
-    this(defalt._t,badgc,fun,idx,name);
-    add_def(defalt);
+  public final int _idx; // Parameter index, MEM_IDX, DSP_IDX is display, ARG_IDX+ normal args
+  public ParmNode( int idx, FunNode fun, ConNode defalt ) {
+    this(idx,fun,null,defalt._t,defalt);
   }
-  // Used by Parser to make function headers
-  public ParmNode( TypeFld fld, Node fun, Node defalt, Parse badgc) {
-    this(fld._t,badgc,fun,fld._order,fld._fld);
-    add_def(defalt);
-  }
-  public ParmNode( int idx, String name, Node fun, Type tdef, Node defalt, Parse badgc) {
-    this(tdef,badgc,fun,idx,name);
+  public ParmNode( int idx, FunNode fun, Parse badgc, Type t, Node defalt ) {
+    this(idx,fun,badgc,t);
     add_def(defalt);
   }
 
-  public ParmNode( Type tdef, Parse badgc, Node fun, int idx, String name ) {
-    super(OP_PARM,tdef,badgc,fun);
+  public ParmNode( int idx, FunNode fun, Parse badgc, Type t ) {
+    super(OP_PARM,t,badgc,fun);
     assert idx>=0;
     _idx=idx;
-    _name=name;
   }
   public FunNode fun() { return (FunNode) in(0); }
-  @Override public String xstr() { return "Parm:"+_name; }
+  @Override public String xstr() { return "Parm:"+_idx; }
   @Override public int hashCode() { return super.hashCode()+_idx; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
@@ -84,40 +75,4 @@ public class ParmNode extends PhiNode {
   // Parms are already treated by the H-M algo, and (via fresh_unify) get
   // "fresh" TVars for every input path.
   @Override public boolean unify( boolean test ) { return false; }
-
-  //@Override public ErrMsg err( boolean fast ) {
-  //  if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere
-  //  FunNode fun = fun();
-  //  if( fun.in(0)== fun ) return null;  // Dead, being inlined
-  //  if( fun.len()!=len() ) return null; // Broken, dying
-  //  if( _idx <= MEM_IDX ) return null;  // No arg check on RPC or memory
-  //  Node mem = fun.parm(MEM_IDX);
-  //  assert _name!=null;
-  //  TypeFld ffld = fun.formals().get(_name);
-  //  if( ffld==null ) return null; // dead display, because loading a high value
-  //  Type formal = ffld._t;
-  //  for( int i=1; i<_defs._len; i++ ) {
-  //    if( fun.val(i)==Type.XCTRL ) continue;// Ignore dead paths
-  //    Type argt = mem == null ? in(i)._val : in(i).sharptr(mem.in(i)); // Arg type for this incoming path
-  //    if( argt!=Type.ALL && !argt.above_center() && !argt.isa(formal) ) { // Argument is legal?  ALL args are in-error elsewhere
-  //      // The merge of all incoming calls for this argument is not legal.
-  //      // Find the call bringing the broken args, and use it for error
-  //      // reporting - it MUST exist, or we have a really weird situation
-  //      for( Node def : fun._defs ) {
-  //        if( def instanceof CProjNode && def.in(0) instanceof CallNode ) {
-  //          CallNode call = (CallNode)def.in(0);
-  //          if( call.nargs() != fun.nargs() )
-  //            return null;      // #args errors reported before bad-args
-  //          Type argc = call.arg(_idx).sharptr(call.mem()); // Call arg type
-  //          if( argc!=Type.ALL && !argc.isa(formal) ) // Check this call
-  //            return fast ? ErrMsg.FAST : ErrMsg.typerr(call._badargs[_idx-ARG_IDX+1],argc, call.mem()._val,formal);
-  //          // Must be a different call that is in-error
-  //        }
-  //      }
-  //      // meet of args is not the formal, but no single arg is not the formal?
-  //      return fast ? ErrMsg.FAST : ErrMsg.typerr(_badgc,argt,mem.val(i),formal); // Can be the default
-  //    }
-  //  }
-  //  return null;
-  //}
 }

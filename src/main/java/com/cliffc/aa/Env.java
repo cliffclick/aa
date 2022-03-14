@@ -7,6 +7,8 @@ import com.cliffc.aa.util.VBitSet;
 
 import java.util.*;
 
+import static com.cliffc.aa.AA.unimpl;
+
 // An "environment", a lexical Scope tracking mechanism that runs 1-for-1 in
 // parallel with a ScopeNode.
 //
@@ -48,14 +50,14 @@ public class Env implements AutoCloseable {
   public static final    StartNode START; // Program start values (control, empty memory, cmd-line args)
   public static final    CProjNode CTL_0; // Program start value control
   public static final StartMemNode MEM_0; // Program start value memory
-  public static final      NewNode STK_0; // Program start stack frame (has primitives)
+  public static final   StructNode STK_0; // Program start stack frame (has primitives)
   public static final    ScopeNode SCP_0; // Program start scope
 
   // Global named types.  Type names are ALSO lexically scoped during parsing
   // (dictates visibility of a name).  During semantic analysis a named type
   // can be Loaded from as a class obj, requiring Loads reverse the type name
   // to the prototype obj.
-  public static final HashMap<String,NewNode> PROTOS;
+  public static final HashMap<String,StructNode> PROTOS;
 
   // Add a permanent edge use to all these Nodes, keeping them alive forever.
   @SuppressWarnings("unchecked")
@@ -98,19 +100,18 @@ public class Env implements AutoCloseable {
   public final FunNode _fun;     // Matching FunNode for this lexical environment
 
   // Shared Env constructor.
-  Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr, NewNode fref ) {
+  Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr, StructNode fref ) {
     _par = par;
     _fun = fun;
-    NewNode nnn = fref==null ? GVN.init(new NewNode(is_closure,false,false,null,BitsAlias.new_alias())) : fref;
+    StructNode nnn = fref==null ? GVN.init(new StructNode(is_closure,false)) : fref;
     nnn.add_fld(TypeFld.make_dsp(dsp_ptr._val),dsp_ptr,null);
     // Install a top-level prototype mapping
     if( fref!=null ) {          // Forward ref?
-      String fname = fref._ts._name;
-      assert !PROTOS.containsKey(fname); // All top-level type names are globally unique
-      PROTOS.put(fname,nnn);
+      //String fname = fref._ts._name;
+      //assert !PROTOS.containsKey(fname); // All top-level type names are globally unique
+      //PROTOS.put(fname,nnn);
+      throw unimpl();
     }
-    if( !nnn._is_val )          // Non-value update memory
-      mem = GVN.init(new MrgProjNode(nnn,mem));
     _scope = GVN.init(new ScopeNode(is_closure));
     _scope.set_ctrl(ctrl);
     _scope.set_mem (mem);  // Memory includes local stack frame
@@ -157,13 +158,13 @@ public class Env implements AutoCloseable {
   // definitions getting parsed).
   @Override public void close() {
     // Promote forward refs to the next outer scope
-    NewNode stk = _scope.stk();
+    StructNode stk = _scope.stk();
     assert stk.is_closed();
     ScopeNode pscope = _par._scope;
     if( pscope != null ) {
       stk.promote_forward(pscope.stk());
       for( String tname : _scope.typeNames() ) {
-        NewNode n = _scope.get_type(tname);
+        StructNode n = _scope.get_type(tname);
         if( n.is_forward_type() )
           pscope.add_type(tname,n);
       }
@@ -178,7 +179,7 @@ public class Env implements AutoCloseable {
     GVN.iter();
   }
 
-  // Wire up an early function exit
+  // Wire up an early function exit.  Hunts through all scopes until it finds a closure.
   Node early_exit( Parse P, Node val ) {
     return _scope.is_closure() ? P.do_exit(_scope,val) : _par.early_exit(P,val); // Hunt for an early-exit-enabled scope
   }
@@ -255,7 +256,7 @@ public class Env implements AutoCloseable {
   // Return Scope for a name, so can be used to determine e.g. mutability
   ScopeNode lookup_scope( String name, boolean lookup_current_scope_only ) {
     if( name == null ) return null; // Handle null here, easier on parser
-    if( _scope.stk().exists(name) ) return _scope;
+    if( _scope.stk().find(name)!= -1 ) return _scope;
     return _par == null || lookup_current_scope_only ? null : _par.lookup_scope(name,false);
   }
 
@@ -268,12 +269,12 @@ public class Env implements AutoCloseable {
   }
 
   // Type lookup in any scope
-  NewNode lookup_type( String tvar ) {
+  StructNode lookup_type( String tvar ) {
     assert tvar.charAt(tvar.length()-1)==':';
-    NewNode t = _scope.get_type(tvar);
+    StructNode t = _scope.get_type(tvar);
     if( t != null ) return t;
     return _par == null ? null : _par.lookup_type(tvar);
   }
   // Update type name token to type mapping in the current scope
-  void add_type( String name, NewNode t ) { _scope.add_type(name,t); }
+  void add_type( String name, StructNode t ) { _scope.add_type(name,t); }
 }

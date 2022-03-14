@@ -5,7 +5,6 @@ import com.cliffc.aa.node.Node;
 /** an implementation of language AA
  */
 
-@SuppressWarnings("unchecked")
 public abstract class AA {
   public static RuntimeException unimpl() { return unimpl("unimplemented"); }
   public static RuntimeException unimpl(String msg) { throw new RuntimeException(msg); }
@@ -20,7 +19,7 @@ public abstract class AA {
   public static boolean DO_GCP, DO_HMT; // Global type-precision controllers
 
 
-  
+
   private static final AbstractBuildVersion ABV;
   static {
     AbstractBuildVersion abv = null;

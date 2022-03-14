@@ -34,6 +34,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
  *  post = .field post             // Field and tuple lookup
  *  post = .field [:]= stmt        // Field (re)assignment.  Plain '=' is a final assignment
  *  post = .field++ | .field--     // Allowed anytime a := is allowed
+ *  post = ->field                 // deref an alloc
  *  post = :type post              // TODO: Add this, remove 'tfact'
  *  tfact= fact[:type]             // Typed fact
  *  fact = id                      // variable lookup
@@ -44,8 +45,10 @@ import static com.cliffc.aa.type.TypeFld.Access;
  *  fact = (stmts)                 // General statements parsed recursively
  *  fact = (tuple)                 // Tuple builder
  *  fact = func                    // Anonymous function declaration
- *  fact = @{ stmts }              // Anonymous struct declaration, assignments define fields
+ *  struct=@{ stmts }              // Anonymous struct declaration, assignments define fields
+ *  fact = struct                  // A fact is also a struct
  *  tuple= (stmts,[stmts,])        // Tuple; final comma is optional, first comma is required
+ *  alloc= * [ tuple, struct ]     // Stuff a struct/tuple into memory and get a pointer
  *  binop= +-*%&|/<>!= [ ]=        // etc; primitive lookup; can determine infix binop at parse-time
  *  uniop= -!~# a                  // etc; primitive lookup; can determine infix uniop at parse-time
  *  bop+ = [                       // Balanced/split operator open
@@ -290,9 +293,8 @@ public class Parse implements Comparable<Parse> {
     construct.scoped();
 
     // Make a forward-ref type, if not one already
-    NewNode typenode  = _e.lookup_type(tname);
+    StructNode typenode  = _e.lookup_type(tname);
     if( typenode == null ) typenode = type_fref(tname,is_val); // None, so create
-    else if( typenode.is_forward_type() ) typenode._is_val = is_val;
     else throw unimpl(); // Double-define error
 
     // Nest an environment for parsing named type contents, usually const-expr initializers
@@ -305,7 +307,6 @@ public class Parse implements Comparable<Parse> {
 
       // Value or reference type
       if( newtype instanceof TypeMemPtr ) {
-        typenode.set_fld(TypeFld.NO_DSP,Env.ANY);
         typenode.close();
         typenode.define();                           // No longer a forward ref
         if( is_val ) {
@@ -410,23 +411,24 @@ public class Parse implements Comparable<Parse> {
       badts.add(badt);
     }
 
-    // Normal statement value parse
-    Node ifex = default_nil ? (scope().stk()._is_val ? con(ts.at(0)) : Env.XNIL) : ifex(); // Parse an expression for the statement value
-    // Check for no-statement after start of assignment, e.g. "x = ;"
-    if( ifex == null ) {        // No statement?
-      if( toks._len == 0 ) return null;
-      ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
-    }
-
-    // Assign tokens to value
-    for( int i=0; i<toks._len; i++ ) {
-      String tok = toks.at(i);               // Token being assigned
-      Access mutable = rs.get(i) ? Access.RW : Access.Final;  // Assignment is mutable or final
-      ScopeNode scope = lookup_scope(tok,lookup_current_scope_only);
-      ifex = do_store(scope,ifex,mutable,tok,badfs.at(i),ts.at(i),badts.at(i));
-    }
-
-    return ifex;
+    //// Normal statement value parse
+    //Node ifex = default_nil ? (scope().stk()._is_val ? con(ts.at(0)) : Env.XNIL) : ifex(); // Parse an expression for the statement value
+    //// Check for no-statement after start of assignment, e.g. "x = ;"
+    //if( ifex == null ) {        // No statement?
+    //  if( toks._len == 0 ) return null;
+    //  ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
+    //}
+    //
+    //// Assign tokens to value
+    //for( int i=0; i<toks._len; i++ ) {
+    //  String tok = toks.at(i);               // Token being assigned
+    //  Access mutable = rs.get(i) ? Access.RW : Access.Final;  // Assignment is mutable or final
+    //  ScopeNode scope = lookup_scope(tok,lookup_current_scope_only);
+    //  ifex = do_store(scope,ifex,mutable,tok,badfs.at(i),ts.at(i),badts.at(i));
+    //}
+    //
+    //return ifex;
+    throw unimpl();
   }
 
   // Assign into display, changing an existing def
@@ -439,10 +441,11 @@ public class Parse implements Comparable<Parse> {
     boolean create = scope==null;
     if( create ) {              // Token not already bound at any scope
       scope = scope();          // Create in the current scope
-      NewNode stk = scope.stk();
-      TypeFld fld = TypeFld.make(tok,t,stk._is_val ? mutable : Access.RW,stk.len());
-      stk.add_fld(fld, stk._is_val ? con(t) : con(Type.XNIL),badf); // Create at top of scope as undefined
-      scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
+      StructNode stk = scope.stk();
+      //TypeFld fld = TypeFld.make(tok,t,stk._is_val ? mutable : Access.RW);
+      //stk.add_fld(fld, stk._is_val ? con(t) : con(Type.XNIL),badf); // Create at top of scope as undefined
+      //scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
+      throw unimpl();
     }
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
     StoreNode st = new StoreNode(mem(),ptr,Node.peek(iidx),mutable,tok,badf);
@@ -586,13 +589,13 @@ public class Parse implements Comparable<Parse> {
   // thunk).
   private Node _short_circuit_expr(Node lhs, int prec, String bintok, Node op, int opx, int lhsx, int rhsx) {
     // Capture state so we can unwind after parsing delayed execution
-    NewNode stk = scope().stk(); // Display
+    StructNode stk = scope().stk(); // Display
     Node old_ctrl = ctrl().keep(2);
     Node old_mem  = mem ().keep(2);
     op.keep(2);
-    TypeStruct old_ts = stk._ts;
-    Ary<Node> old_defs = stk._defs.deepCopy();
-    lhs.keep(2);
+    //TypeStruct old_ts = stk._ts;
+    //Ary<Node> old_defs = stk._defs.deepCopy();
+    //lhs.keep(2);
 
     // TODO: Drop thunk/thret.  Use "lazy arg" flag model.  Normal calls.
 
@@ -710,11 +713,11 @@ public class Parse implements Comparable<Parse> {
         skipWS();               // Skip to start of 1st arg
         int first_arg_start = _x;
         int nidx = n.push();    // Keep alive across arg parse
-        NewNode arg = tuple(oldx-1,stmts(),first_arg_start); // Parse argument list
+        StructNode arg = tuple(oldx-1,stmts(),first_arg_start); // Parse argument list
         n = Node.pop(nidx);
         if( arg == null )       // tfact but no arg is just the tfact not a function call
           { _x = oldx; return n; }
-        Parse[] badargs = arg._fld_starts; // Args from tuple
+        Parse[] badargs = arg.fld_starts(); // Args from tuple
         badargs[0] = errMsg(oldx-1); // Base call error reported at the opening paren
         n = do_call0(false,badargs,args(n,arg)); // Pass the tuple
 
@@ -866,30 +869,28 @@ public class Parse implements Comparable<Parse> {
     // Must load against most recent display update, in case some prior store
     // is in-error.  Directly loading against the display would bypass the
     // (otherwise alive) error store.
-    NewNode dsp = scope.stk();
-    TypeFld fld = dsp._ts.get(tok);
-    Node ld = gvn(new LoadNode(mem(),get_display_ptr(scope),tok,null));
-    // If in the middle of a definition (e.g. a HM Let, or recursive assign)
-    // then no Fresh per normal HM rules.  If loading from a struct or from
-    // normal Lambda arguments, again no Fresh per normal HM rules.
-    return ld.is_forward_ref() || !dsp._is_closure || fld._order < dsp._nargs
-      ? ld
-      : gvn(new FreshNode(_e._fun,ld));
+    StructNode dsp = scope.stk();
+    //TypeFld fld = dsp._ts.get(tok);
+    //Node ld = gvn(new LoadNode(mem(),get_display_ptr(scope),tok,null));
+    //// If in the middle of a definition (e.g. a HM Let, or recursive assign)
+    //// then no Fresh per normal HM rules.  If loading from a struct or from
+    //// normal Lambda arguments, again no Fresh per normal HM rules.
+    //return ld.is_forward_ref() || !dsp._is_closure
+    //  ? ld
+    //  : gvn(new FreshNode(_e._fun,ld));
+    throw unimpl();
   }
 
 
   /** Parse a tuple; first stmt but not the ',' parsed.
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
-  private NewNode tuple(int oldx, Node s, int first_arg_start) {
-    int alias = BitsAlias.new_alias();
-    NewNode nn = new NewNode(false,true,false,null,alias);
-    // No display for tuples
-    nn.add_fld(TypeFld.NO_DISP,Env.ANY,null);
+  private StructNode tuple(int oldx, Node s, int first_arg_start) {
+    StructNode nn = new StructNode(false,false);
     // First stmt is parsed already
     Parse bad = errMsg(first_arg_start);
     while( s!= null ) {         // More args
-      TypeFld fld = TypeFld.make((""+(nn.len()-DSP_IDX)).intern(),Type.SCALAR,Access.Final,nn.len());
+      TypeFld fld = TypeFld.make((""+(nn.len()-DSP_IDX)).intern(),Type.SCALAR,Access.Final);
       nn.add_fld(fld,s,bad);
       if( !peek(',') ) break;   // Final comma is optional
       skipWS();                 // Skip to arg start before recording arg start
@@ -903,9 +904,7 @@ public class Parse implements Comparable<Parse> {
 
   /** Parse anonymous struct; the opening "@{" already parsed.  A lexical scope
    *  is made and new variables are defined here.  Next comes statements, with
-   *  each assigned value becoming a struct member, then the closing "}".  This
-   *  call is ALSO used to parse tstruct(), where the field semantics are
-   *  slightly different.
+   *  each assigned value becoming a struct member, then the closing "}".  
    *    struct = \@{ stmts }
    *  Field syntax:
    *    id [:type] [amod [expr]]  // missing amod defaults to "id := 0"; missing expr defaults to "0"
@@ -917,8 +916,7 @@ public class Parse implements Comparable<Parse> {
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
       assert ctrl() != e._scope;
-      NewNode stk = e._scope.stk();
-      stk.set_fld(TypeFld.NO_DSP,Env.ANY);
+      StructNode stk = e._scope.stk();
       stk.close();
       e._par._scope.set_ctrl(ctrl()); // Carry any control changes back to outer scope
       e._par._scope.set_mem (mem ()); // Carry any memory  changes back to outer scope
@@ -939,102 +937,104 @@ public class Parse implements Comparable<Parse> {
 
     // Push an extra hidden display argument.  Similar to java inner-class ptr
     // or when inside a struct definition: 'this'.
-    NewNode par_stk = scope().stk();
+    StructNode par_stk = scope().stk();
     Node dsp = par_stk;
 
-    // Incrementally build up the formals
-    TypeStruct formals = TypeStruct.make("",false, TypeFld.make_dsp(par_stk._tptr));
-    TypeStruct no_args_formals = formals;
-    Ary<Parse> bads= new Ary<>(new Parse[1],0);
-
-    // Parse arguments
-    while( true ) {
-      skipWS();
-      Parse badp = errMsg();   // Capture location in case of parameter error
-      String tok = token();
-      if( tok == null ) { _x=oldx; break; } // not a "[id]* ->"
-      if( Util.eq((tok=tok.intern()),"->") ) break; // End of argument list
-      if( !isAlpha0((byte)tok.charAt(0)) ) { _x=oldx; break; } // not a "[id]* ->"
-      Type t = Type.SCALAR;    // Untyped, most generic type
-      Parse bad = errMsg();    // Capture location in case of type error
-      if( peek(':') &&         // Has type annotation?
-          (t=type(true,null))==null ) { // Get type
-        // If no type, might be "{ x := ...}" or "{ fun arg := ...}" which can
-        // be valid stmts, hence this may be a no-arg function.
-        if( bads._len-1 <= 2 ) { _x=oldx; break; }
-        else {
-          // Might be: "{ x y z:bad -> body }" which cannot be any stmt.  This
-          // is an error in any case.  Treat as a bad type on a valid function.
-          err_ctrl0(peek(',') ? "Bad type arg, found a ',' did you mean to use a ';'?" : "Missing or bad type arg");
-          t = Type.SCALAR;
-          skipNonWS();         // Skip possible type sig, looking for next arg
-        }
-      }
-      if( formals.get(tok) != null ) err_ctrl3("Duplicate parameter name '" + tok + "'", badp);
-      else formals = formals.add_fldx(TypeFld.make(tok,t,args_are_mutable,ARG_IDX+bads._len)); // Accumulate args
-      bads.add(bad);
-    }
-    // If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
-    // args, and then reset.  Also reset to just the mem & display args.
-    if( _x == oldx ) { formals = no_args_formals;  bads.set_len(ARG_IDX); }
-
-    // Build the FunNode header
-    FunNode fun = (FunNode)init(new FunNode(formals.nargs()).add_def(Env.ALL_CTRL));
-    int fun_idx = fun.push();
-
-    // Record H-M VStack in case we clone
-    //fun.set_nongens(_e._nongen.compact());
-    // Build Parms for system incoming values
-    int rpc_idx = init(new ParmNode(CTL_IDX," rpc",fun,TypeRPC.ALL_CALL,Env.ALL_CALL,null)).push();
-    int clo_idx = init(new ParmNode(DSP_IDX,"^"   ,fun,par_stk._tptr   ,dsp         ,null)).push();
-    Node mem    = init(new ParmNode(MEM_IDX," mem",fun,TypeMem.ALLMEM  ,Env.DEF_MEM ,null));
-
-    // Increase scope depth for function body.
-    int fidx;
-    try( Env e = new Env(_e, fun, true, fun, mem, par_stk, null) ) { // Nest an environment for the local vars
-      _e = e;                   // Push nested environment
-      // Display is special: the default is simply the outer lexical scope.
-      // But here, in a function, the display is actually passed in as a hidden
-      // extra argument and replaces the default.
-      NewNode stk = e._scope.stk();
-      stk.set_fld(TypeFld.make_dsp(par_stk._tptr),Node.pop(clo_idx));
-      Env.GVN.revalive(stk,stk.mem());
-
-      // Parms for all arguments
-      Parse errmsg = errMsg();  // Lazy error message
-      for( TypeFld fld : formals ) { // User parms start
-        if( fld._order <= DSP_IDX ) continue;// Already handled
-        assert fun==_e._fun && fun==_e._scope.ctrl();
-        Node parm = gvn(new ParmNode(fld,fun,Env.ALL_PARM,errmsg));
-        scope().stk().add_fld(fld,parm,bads.at(fld._order-ARG_IDX));
-      }
-      stk.set_nargs(formals.nargs());
-
-      // Parse function body
-      Node rez = stmts();       // Parse function body
-      if( rez == null ) rez = err_ctrl2("Missing function body");
-      require('}',oldx-1);      // Matched with opening {}
-      stk.close();
-
-      // Merge normal exit into all early-exit paths
-      assert e._scope.is_closure();
-      rez = merge_exits(rez);
-      // Standard return; function control, memory, result, RPC.  Plus a hook
-      // to the function for faster access.
-      Node xrpc = Node.pop(rpc_idx);
-      Node xfun = Node.pop(fun_idx); assert xfun == fun;
-      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
-      // Hook the function at the TOP scope, because it may yet have unwired
-      // CallEpis which demand memory.  This hook is removed as part of doing
-      // the Combo pass which computes a real Call Graph and all escapes.
-      Env.SCP_0.add_def(ret);
-      // The FunPtr builds a real display; any up-scope references are passed in now.
-      Node fptr = gvn(new FunPtrNode(null,ret,par_stk._is_val ? Env.ALL : par_stk));
-
-      _e = e._par;            // Pop nested environment; pops nongen also
-      fidx = fptr.push();     // Return function; close-out and DCE 'e'
-    }
-    return Node.pop(fidx);
+    //// Incrementally build up the formals
+    //TypeStruct formals = TypeStruct.make("",false, TypeFld.make_dsp(par_stk._tptr));
+    //TypeStruct no_args_formals = formals;
+    //Ary<Parse> bads= new Ary<>(new Parse[1],0);
+    //
+    //// Parse arguments
+    //while( true ) {
+    //  skipWS();
+    //  Parse badp = errMsg();   // Capture location in case of parameter error
+    //  String tok = token();
+    //  if( tok == null ) { _x=oldx; break; } // not a "[id]* ->"
+    //  if( Util.eq((tok=tok.intern()),"->") ) break; // End of argument list
+    //  if( !isAlpha0((byte)tok.charAt(0)) ) { _x=oldx; break; } // not a "[id]* ->"
+    //  Type t = Type.SCALAR;    // Untyped, most generic type
+    //  Parse bad = errMsg();    // Capture location in case of type error
+    //  if( peek(':') &&         // Has type annotation?
+    //      (t=type(true,null))==null ) { // Get type
+    //    // If no type, might be "{ x := ...}" or "{ fun arg := ...}" which can
+    //    // be valid stmts, hence this may be a no-arg function.
+    //    if( bads._len-1 <= 2 ) { _x=oldx; break; }
+    //    else {
+    //      // Might be: "{ x y z:bad -> body }" which cannot be any stmt.  This
+    //      // is an error in any case.  Treat as a bad type on a valid function.
+    //      err_ctrl0(peek(',') ? "Bad type arg, found a ',' did you mean to use a ';'?" : "Missing or bad type arg");
+    //      t = Type.SCALAR;
+    //      skipNonWS();         // Skip possible type sig, looking for next arg
+    //    }
+    //  }
+    //  if( formals.get(tok) != null ) err_ctrl3("Duplicate parameter name '" + tok + "'", badp);
+    //  else formals = formals.add_fldx(TypeFld.make(tok,t,args_are_mutable)); // Accumulate args
+    //  bads.add(bad);
+    //}
+    //// If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
+    //// args, and then reset.  Also reset to just the mem & display args.
+    //if( _x == oldx ) { formals = no_args_formals;  bads.set_len(ARG_IDX); }
+    //
+    //// Build the FunNode header
+    //FunNode fun = (FunNode)init(new FunNode(formals.nargs()).add_def(Env.ALL_CTRL));
+    //int fun_idx = fun.push();
+    //
+    //// Record H-M VStack in case we clone
+    ////fun.set_nongens(_e._nongen.compact());
+    //// Build Parms for system incoming values
+    //int rpc_idx = init(new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL,Env.ALL_CALL)).push();
+    //int clo_idx = init(new ParmNode(DSP_IDX,fun,null,par_stk._tptr   ,dsp         )).push();
+    //Node mem    = init(new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM  ,Env.DEF_MEM ));
+    //
+    //// Increase scope depth for function body.
+    //int fidx;
+    //try( Env e = new Env(_e, fun, true, fun, mem, par_stk, null) ) { // Nest an environment for the local vars
+    //  _e = e;                   // Push nested environment
+    //  // Display is special: the default is simply the outer lexical scope.
+    //  // But here, in a function, the display is actually passed in as a hidden
+    //  // extra argument and replaces the default.
+    //  StructNode stk = e._scope.stk();
+    //  stk.set_fld(TypeFld.make_dsp(par_stk._tptr),Node.pop(clo_idx));
+    //  Env.GVN.revalive(stk,stk.mem());
+    //
+    //  // Parms for all arguments
+    //  Parse errmsg = errMsg();  // Lazy error message
+    //  assert fun==_e._fun && fun==_e._scope.ctrl(); 
+    //  for( int i=ARG_IDX; i<formals.len(); i++ ) { // User parms start
+    //    TypeFld fld = formals.get(i);
+    //    //Node parm = gvn(new ParmNode(i,fld,fun,Env.ALL_PARM,errmsg));
+    //    //scope().stk().add_fld(fld,parm,bads.at(i-ARG_IDX));
+    //    throw unimpl(); // TODO: TypeFld has no order but formals and Parms do
+    //  }
+    //  stk.set_nargs(formals.nargs());
+    //
+    //  // Parse function body
+    //  Node rez = stmts();       // Parse function body
+    //  if( rez == null ) rez = err_ctrl2("Missing function body");
+    //  require('}',oldx-1);      // Matched with opening {}
+    //  stk.close();
+    //
+    //  // Merge normal exit into all early-exit paths
+    //  assert e._scope.is_closure();
+    //  rez = merge_exits(rez);
+    //  // Standard return; function control, memory, result, RPC.  Plus a hook
+    //  // to the function for faster access.
+    //  Node xrpc = Node.pop(rpc_idx);
+    //  Node xfun = Node.pop(fun_idx); assert xfun == fun;
+    //  RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
+    //  // Hook the function at the TOP scope, because it may yet have unwired
+    //  // CallEpis which demand memory.  This hook is removed as part of doing
+    //  // the Combo pass which computes a real Call Graph and all escapes.
+    //  Env.SCP_0.add_def(ret);
+    //  // The FunPtr builds a real display; any up-scope references are passed in now.
+    //  //Node fptr = gvn(new FunPtrNode(null,ret,par_stk._is_val ? Env.ALL : par_stk));
+    //  //
+    //  //_e = e._par;            // Pop nested environment; pops nongen also
+    //  //fidx = fptr.push();     // Return function; close-out and DCE 'e'
+    //}
+    //return Node.pop(fidx);
+    throw unimpl();
   }
 
   private Node merge_exits(Node rez) {
@@ -1252,7 +1252,7 @@ public class Parse implements Comparable<Parse> {
    *  tstruct= [tid:]@{ [tfld;]* };  // Optional named type to extend, list of fields
    *  tfld = id [:type | tcon]       // Field name, option type or const-expr
    */
-  private Type type(boolean allow_fref, NewNode proto) {
+  private Type type(boolean allow_fref, StructNode proto) {
     if( _prims && peek("$#") ) return java_class_type();
 
     // First character to split type out:
@@ -1270,7 +1270,7 @@ public class Parse implements Comparable<Parse> {
 
   // Parse a struct type.  Side-effect constant fields into proto.
   // Disallows 'x := expr'
-  private TypeMemPtr tstruct(NewNode proto) {
+  private TypeMemPtr tstruct(StructNode proto) {
     if( !peek("@{") ) return null;
     // Parse fields
     while( true ) {
@@ -1294,7 +1294,7 @@ public class Parse implements Comparable<Parse> {
       }
       // Insert the field into the structure.
       // FunPtrs are allowed to stack, if the signatures do not overlap.
-      TypeFld tfld = TypeFld.make(tok.intern(),t,access,proto.len());
+      TypeFld tfld = TypeFld.make(tok.intern(),t,access);
       if( val instanceof FunPtrNode fptr ) proto.add_fun(tok ,access,fptr,null);
       else                                 proto.add_fld(tfld       , val,null);
       if(  peek('}') ) break;          // End of struct,  no trailing semicolon?
@@ -1333,9 +1333,7 @@ public class Parse implements Comparable<Parse> {
       throw unimpl();           // Reserved for type variables
     // Shortcut for the two primitive types
     String tname = (tok+":").intern();
-    if( Util.eq(tname,"int:") ) return TypeInt.INT64;
-    if( Util.eq(tname,"flt:") ) return TypeFlt.FLT64;
-    NewNode nnn = _e.lookup_type(tname);
+    StructNode nnn = _e.lookup_type(tname);
     if( nnn == null ) {
       if( !allow_fref )
         return null;
@@ -1354,21 +1352,22 @@ public class Parse implements Comparable<Parse> {
   private UnresolvedNode val_fref(String tok, Parse bad) {
     UnresolvedNode fref = init(UnresolvedNode.forward_ref(tok,bad));
     // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
-    NewNode stk = scope().stk();
-    TypeFld fld = TypeFld.make(tok,Type.SCALAR,Access.Final,stk.len());
+    StructNode stk = scope().stk();
+    TypeFld fld = TypeFld.make(tok,Type.SCALAR,Access.Final);
     stk.add_fld(fld,fref,null);
     return fref;
   }
   // Create a type forward-reference.  Must be type-defined later.  Called when
   // seeing a name in a type context for the first time.  Builds an empty type
   // NewNode and returns it.
-  private NewNode type_fref(String tname, boolean is_val) {
-    NewNode tn = new NewNode(false,is_val,true,tname,BitsAlias.new_alias());
-    tn._val = tn.value();
-    _gvn.add_work_new(tn);
-    _e.add_type(tname,tn);
-    assert tn.is_forward_type();
-    return tn;
+  private StructNode type_fref(String tname, boolean is_val) {
+    //NewNode tn = new NewNode(false,true,tname,BitsAlias.new_alias());
+    //tn._val = tn.value();
+    //_gvn.add_work_new(tn);
+    //_e.add_type(tname,tn);
+    //assert tn.is_forward_type();
+    //return tn;
+    throw unimpl(); // TODO: is_val
   }
 
   // --------------------------------------------------------------------------

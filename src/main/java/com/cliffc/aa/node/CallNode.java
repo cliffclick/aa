@@ -172,79 +172,80 @@ public class CallNode extends Node {
     else old_rpc.subsume(Node.con(TypeRPC.make(_rpc)));
     return call;
   }
-
+  
   @Override public Node ideal_reduce() {
     Node cc = in(0).is_copy(0);
     if( cc!=null ) return set_def(0,cc);
-    // When do I do 'pattern matching'?  For the moment, right here: if not
-    // already unpacked a tuple, and can see the NewNode, unpack it right now.
-    if( !_unpacked &&           // Not yet unpacked a tuple
-        arg(ARG_IDX) instanceof NewNode nnn && // An allocation
-        nnn._is_val ) {                        // A tuple
-      // Find a tuple being passed in directly; unpack
-      pop(); // Pop off the NewNode tuple
-      for( int i=ARG_IDX; i<nnn._defs._len; i++ ) // Push the args; unpacks the tuple
-        add_def(nnn.in(i));
-      _unpacked = true;     // Only do it once
-      xval(); // Recompute value, this is not monotonic since replacing tuple with args
-      GVN.add_work_new(this);// Revisit after unpacking
-      return this;
-    }
-
-    Type tc = _val;
-    if( !(tc instanceof TypeTuple) ) return null;
-    TypeTuple tcall = (TypeTuple)tc;
-
-    // Dead, do nothing
-    if( tctl(tcall)!=Type.CTRL ) { // Dead control (NOT dead self-type, which happens if we do not resolve)
-      if( (ctl() instanceof ConNode) ) return null;
-      // Kill all inputs with type-safe dead constants
-      //set_mem(Node.con(TypeMem.XMEM));
-      //set_dsp(Node.con(TypeFunPtr.GENERIC_FUNPTR.dual()));
-      //if( is_dead() ) return this;
-      //for( int i=ARG_IDX; i<_defs._len; i++ )
-      //  set_def(i,Env.ANY);
-      //gvn.add_work_defs(this);
-      //return set_def(0,Env.XCTRL,gvn);
-      throw unimpl();
-    }
-
-    // Have some sane function choices?
-    TypeFunPtr tfp  = ttfp(tcall);
-    BitsFun fidxs = tfp.fidxs();
-    if( fidxs==BitsFun.EMPTY ) // TODO: zap function to empty function constant
-      return null;             // Zero choices
-
-    // Try to resolve to single-target
-    Node fdx = fdx();
-    if( fdx instanceof FreshNode ) fdx = ((FreshNode)fdx).id();
-    if( fdx instanceof UnresolvedNode ) {
-      Node fdx2 = ((UnresolvedNode)fdx).resolve_node(tcall._ts);
-      if( fdx2!=null )
-        return set_fdx(fdx2);
-    }
-
-    // Wire valid targets.
-    CallEpiNode cepi = cepi();
-    if( cepi!=null && cepi.check_and_wire(false) )
-      return this;              // Some wiring happened
-
-    // Check for dead args and trim; must be after all wiring is done because
-    // unknown call targets can appear during GCP and use the args.  After GCP,
-    // still must verify all called functions have the arg as dead, because
-    // alive args still need to resolve.  Constants are an issue, because they
-    // fold into the Parm and the Call can lose the matching DProj while the
-    // arg is still alive.
-    if( !is_keep() && err(true)==null && cepi!=null && cepi.is_all_wired() ) {
-      Node progress = null;
-      for( int i=ARG_IDX; i<nargs(); i++ )
-        if( ProjNode.proj(this,i)==null &&
-            !(arg(i) instanceof ConNode) ) // Not already folded
-          progress = set_arg(i,Env.ANY);   // Kill dead arg
-      if( progress != null ) return this;
-    }
-    return null;
+    //// When do I do 'pattern matching'?  For the moment, right here: if not
+    //// already unpacked a tuple, and can see the NewNode, unpack it right now.
+    //if( !_unpacked &&           // Not yet unpacked a tuple
+    //    arg(ARG_IDX) instanceof NewNode nnn && // An allocation
+    //    nnn._is_val ) {                        // A tuple
+    //  // Find a tuple being passed in directly; unpack
+    //  pop(); // Pop off the NewNode tuple
+    //  for( int i=ARG_IDX; i<nnn._defs._len; i++ ) // Push the args; unpacks the tuple
+    //    add_def(nnn.in(i));
+    //  _unpacked = true;     // Only do it once
+    //  xval(); // Recompute value, this is not monotonic since replacing tuple with args
+    //  GVN.add_work_new(this);// Revisit after unpacking
+    //  return this;
+    //}
+    //
+    //Type tc = _val;
+    //if( !(tc instanceof TypeTuple) ) return null;
+    //TypeTuple tcall = (TypeTuple)tc;
+    //
+    //// Dead, do nothing
+    //if( tctl(tcall)!=Type.CTRL ) { // Dead control (NOT dead self-type, which happens if we do not resolve)
+    //  if( (ctl() instanceof ConNode) ) return null;
+    //   Kill all inputs with type-safe dead constants
+    //  set_mem(Node.con(TypeMem.XMEM));
+    //  set_dsp(Node.con(TypeFunPtr.GENERIC_FUNPTR.dual()));
+    //  if( is_dead() ) return this;
+    //  for( int i=ARG_IDX; i<_defs._len; i++ )
+    //    set_def(i,Env.ANY);
+    //  gvn.add_work_defs(this);
+    //  return set_def(0,Env.XCTRL,gvn);
+    //}
+    //
+    //// Have some sane function choices?
+    //TypeFunPtr tfp  = ttfp(tcall);
+    //BitsFun fidxs = tfp.fidxs();
+    //if( fidxs==BitsFun.EMPTY ) // TODO: zap function to empty function constant
+    //  return null;             // Zero choices
+    //
+    //// Try to resolve to single-target
+    //Node fdx = fdx();
+    //if( fdx instanceof FreshNode ) fdx = ((FreshNode)fdx).id();
+    //if( fdx instanceof UnresolvedNode ) {
+    //  Node fdx2 = ((UnresolvedNode)fdx).resolve_node(tcall._ts);
+    //  if( fdx2!=null )
+    //    return set_fdx(fdx2);
+    //}
+    //
+    //// Wire valid targets.
+    //CallEpiNode cepi = cepi();
+    //if( cepi!=null && cepi.check_and_wire(false) )
+    //  return this;              // Some wiring happened
+    //
+    //// Check for dead args and trim; must be after all wiring is done because
+    //// unknown call targets can appear during GCP and use the args.  After GCP,
+    //// still must verify all called functions have the arg as dead, because
+    //// alive args still need to resolve.  Constants are an issue, because they
+    //// fold into the Parm and the Call can lose the matching DProj while the
+    //// arg is still alive.
+    //if( !is_keep() && err(true)==null && cepi!=null && cepi.is_all_wired() ) {
+    //  Node progress = null;
+    //  for( int i=ARG_IDX; i<nargs(); i++ )
+    //    if( ProjNode.proj(this,i)==null &&
+    //        !(arg(i) instanceof ConNode) ) // Not already folded
+    //      progress = set_arg(i,Env.ANY);   // Kill dead arg
+    //  if( progress != null ) return this;
+    //}
+    //return null;
+    throw unimpl();
   }
+  
   // Call reduces, then check the CEPI for reducing
   @Override public void add_reduce_extra() {
     Node cepi = cepi();
@@ -298,27 +299,26 @@ public class CallNode extends Node {
     if( escs.test_recur(alias) ) return null;
     // No other readers or writers.  Expect the Call (or Join)
     if( mem._uses._len>2 ) return null;
-    //// If call returns same as new (via recursion), cannot split, but CAN swap.
-    //TypeMem tmcepi = (TypeMem) cepim._val;
-    //BitsAlias esc_out = CallEpiNode.esc_out(tmcepi,cepid==null ? Type.XNIL : cepid._val);
-    //BitsAlias escs2 = escs.meet(esc_out);
-    //Node jn = mem();
-    //if( !escs2.is_empty() && !esc_out.test_recur(alias) ) { // No return conflict, so parallelize memory
-    //  if( jn==mem )             // Bare Call/New; add a Split/Join.
-    //    return MemSplitNode.insert_split(cepim,escs2,this,mem,mem);
-    //  return null; // TODO: allow Call to move into existing JOIN
-    //} else {                    // Else move New below Call.
-    //  if( jn!=mem ) {           // Move New below Join
-    //    Node pre = mem.mem();
-    //    jn.set_def(i,pre);
-    //    mem.set_def(MEM_IDX,jn);
-    //    set_mem(mem);
-    //    Env.GVN.add_unuse(jn);
-    //    Env.GVN.add_unuse(mem);
-    //  }
-    //  return swap_new(cepim,mem); // Move New below Call
-    //}
-    throw unimpl();
+    // If call returns same as new (via recursion), cannot split, but CAN swap.
+    TypeMem tmcepi = (TypeMem) cepim._val;
+    BitsAlias esc_out = CallEpiNode.esc_out(tmcepi,cepid==null ? Type.XNIL : cepid._val);
+    BitsAlias escs2 = escs.meet(esc_out);
+    Node jn = mem();
+    if( !escs2.is_empty() && !esc_out.test_recur(alias) ) { // No return conflict, so parallelize memory
+      if( jn==mem )             // Bare Call/New; add a Split/Join.
+        return MemSplitNode.insert_split(cepim,escs2,this,mem,mem);
+      return null; // TODO: allow Call to move into existing JOIN
+    } else {                    // Else move New below Call.
+      if( jn!=mem ) {           // Move New below Join
+        Node pre = mem.mem();
+        jn.set_def(i,pre);
+        mem.set_def(MEM_IDX,jn);
+        set_mem(mem);
+        Env.GVN.add_unuse(jn);
+        Env.GVN.add_unuse(mem);
+      }
+      return swap_new(cepim,mem); // Move New below Call
+    }
   }
 
   // Swap a New and a Call, when we cannot use a Split/Join.

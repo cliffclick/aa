@@ -497,8 +497,8 @@ public class TestNodeSmall {
     // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
     // yet built.
     int alias = BitsAlias.new_alias(BitsAlias.ALLX);
-    NewNode dsp_file = (NewNode)gvn.xform(new NewNode(true,false,false,null,alias));
-    dsp_file.add_fld(TypeMemPtr.DISP_FLD,dsp_prims,null);
+    NewNode dsp_file = (NewNode)gvn.xform(new NewNode(true,false,null,alias));
+    //dsp_file.add_fld(TypeMemPtr.DISP_FLD,dsp_prims,null);
     //MrgProjNode dsp_file_obj = Env.DEFMEM.make_mem_proj(dsp_file,mem);
     //ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(DSP_IDX, dsp_file)).keep();
     //Env.ALL_DISPLAYS = Env.ALL_DISPLAYS.set(dsp_file._alias);
@@ -599,7 +599,7 @@ public class TestNodeSmall {
     int a1 = BitsAlias.new_alias(BitsAlias.ALLX);
     int a2 = BitsAlias.new_alias(BitsAlias.ALLX);
     int a3 = BitsAlias.new_alias(BitsAlias.ALLX);
-    TypeFld fmem = TypeFld.make(" mem",TypeMem.ALLMEM,Access.Final,MEM_IDX);
+    TypeFld fmem = TypeFld.make(" mem",TypeMem.ALLMEM,Access.Final);
     TypeFld fint = TypeFld.make_arg(TypeInt.INT64,ARG_IDX);
     TypeStruct ts_int_flt = TypeStruct.make(fmem,fint,TypeFld.make_arg(TypeFlt.FLT64,ARG_IDX+1));
     TypeStruct ts_int_abc = TypeStruct.make(fmem,fint,TypeFld.make_arg(TypeMemPtr.ISUSED,ARG_IDX+1));

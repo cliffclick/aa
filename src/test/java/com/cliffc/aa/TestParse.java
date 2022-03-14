@@ -208,7 +208,7 @@ public class TestParse {
     // before loading the operator field.
     test("{x:int -> x&1}",
          (ignore -> TypeFunPtr.make(38,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.BOOL)),
-         ( ()-> TypeStruct.make(TypeFld.make("x",TypeInt.INT64,ARG_IDX))),
+         ( ()-> TypeStruct.make(TypeFld.make("x",TypeInt.INT64))),
          "{ int64 -> int64 }");
     test("{5}()", TypeInt.con(5), "5"); // No args nor -> required; this is simply a function returning 5, being executed
     testerr("{x:flt y -> x+y}", "Unable to resolve _+_",13); // {Scalar Scalar -> Scalar}
@@ -358,7 +358,7 @@ public class TestParse {
     testerr ("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
-    test("x=@{n}",(ignore->TypeMemPtr.make(14,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,Access.RW,ARG_IDX)))),
+    test("x=@{n}",(ignore->TypeMemPtr.make(14,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,Access.RW)))),
          null,"@{n=0}");
   }
 
@@ -432,7 +432,7 @@ c= C(b,"abc");
     // interspersed with recursive computation calls.
     test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v&x.v} : 0};"+
                  "map(@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
-                 TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("nn",TypeMemPtr.ISUSED0,ARG_IDX),TypeFld.make("vv",TypeInt.INT8,ARG_IDX+1)));
+                 TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("nn",TypeMemPtr.ISUSED0),TypeFld.make("vv",TypeInt.INT8)));
     // Test does loads after recursive call, which should be allowed to bypass.
     test("sum={x -> x ? sum(x.n) + x.v : 0};"+
          "sum(@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
@@ -481,7 +481,7 @@ c= C(b,"abc");
     //test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0};"+
     //             "map(@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=0;v=1.2};v=2.3};v=3.4};v=4.5})",
     //            TypeStruct.make(TypeMemPtr.DISP_FLD,
-    //                            TypeFld.make("nn",TypeMemPtr.STRUCT0,ARG_IDX  ),
+    //                            TypeFld.make("nn",TypeMemPtr.STRUCT0  ),
     //                            TypeFld.make("vv",TypeFlt.FLT64     ,ARG_IDX+1)));
     //
     //// Test inferring a recursive tuple type, with less help.  This one
@@ -640,8 +640,8 @@ map(tmp)
   @Test public void testParse10() {
     // Test re-assignment in struct
     test_obj_isa("x=@{n:=1;v:=2}", TypeStruct.make(TypeMemPtr.DISP_FLD,
-                                                   TypeFld.make("n",TypeInt.con(1),Access.RW,ARG_IDX  ),
-                                                   TypeFld.make("v",TypeInt.con(2),Access.RW,ARG_IDX+1)));
+                                                   TypeFld.make("n",TypeInt.con(1),Access.RW),
+                                                   TypeFld.make("v",TypeInt.con(2),Access.RW)));
     testerr ("x=@{n =1;v:=2}; x.n  = 3; x.n", "Cannot re-assign final field '.n' in @{n=1; v:=2}",18);
     test    ("x=@{n:=1;v:=2}; x.n  = 3", TypeInt.con(3));
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3; v:=2}");
@@ -655,7 +655,7 @@ map(tmp)
     testerr ("ptr2rw = @{f:=1}; ptr2final:@{f=} = ptr2rw; ptr2final", "*@{f:=1} is not a *@{f=; ...}",27); // Cannot cast-to-final
 
     test_obj_isa("ptr2   = @{f =1}; ptr2final:@{f=} = ptr2  ; ptr2final", // Good cast
-                 TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("f",TypeInt.con(1),ARG_IDX)));
+                 TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("f",TypeInt.con(1))));
     testerr ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; ptr2rw", "*@{f=1} is not a *@{f:=; ...}", 18); // Cannot cast-away final
     test    ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; 2", TypeInt.con(2)); // Dead cast-away of final
     test    ("@{x:=1;y =2}:@{x;y=}.y", TypeInt.con(2)); // Allowed reading final field
@@ -759,7 +759,7 @@ map(tmp)
   }
 
   private static TypeStruct make2fldsD( String f1, Type t1, String f2, Type t2 ) {
-    return TypeStruct.make("",false,TypeFld.NO_DISP,TypeFld.make(f1,t1,ARG_IDX),TypeFld.make(f2,t2,ARG_IDX+1));
+    return TypeStruct.make("",false,TypeFld.NO_DISP,TypeFld.make(f1,t1),TypeFld.make(f2,t2));
   }
 
   // Combined H-M and GCP Typing
@@ -783,9 +783,9 @@ map(tmp)
                                 // TODO: how do i express the expected return state of memory
                                 //TypeMem.make(14,TypeStruct.make2fldsD("0",Type.SCALAR,"1",TypeInt.con(3))),
                                 TypeMemPtr.make(14,TypeStruct.ISUSED))),
-         (() -> TypeStruct.make(TypeFld.make(" mem",TypeMem.ALLMEM,MEM_IDX),
-                                 TypeFld.make("^",Type.ALL,DSP_IDX),
-                                 TypeFld.make("g",Type.SCALAR,ARG_IDX))),
+         (() -> TypeStruct.make(TypeFld.make(" mem",TypeMem.ALLMEM),
+                                 TypeFld.make("^",Type.ALL),
+                                 TypeFld.make("g",Type.SCALAR))),
          "[43]{ A -> [14]( A, 3) }");
 
     test("{ g -> f = { ignore -> g }; ( f(3), f(\"abc\"))}",
@@ -793,9 +793,9 @@ map(tmp)
                                 // TODO: how do i express the expected return state of memory
                                 //TypeMem.make(18,TypeStruct.make2fldsD("0",Type.SCALAR,"1",Type.SCALAR)),
                                 TypeMemPtr.make(18,TypeStruct.ISUSED))),
-         (() -> TypeStruct.make(TypeFld.make(" mem",TypeMem.ALLMEM,MEM_IDX),
-                                TypeFld.make("^",TypeMemPtr.make(12,TypeStruct.ISUSED),DSP_IDX),
-                                TypeFld.make("g",Type.SCALAR,ARG_IDX))),
+         (() -> TypeStruct.make(TypeFld.make(" mem",TypeMem.ALLMEM),
+                                TypeFld.make("^",TypeMemPtr.make(12,TypeStruct.ISUSED)),
+                                TypeFld.make("g",Type.SCALAR))),
          "[43]{ A -> [18]( A, A) }");
     // id accepts and returns all types and keeps precision
     test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
@@ -823,7 +823,7 @@ map(tmp)
 
     // Straight from TestHM.test08; types as {A -> (A,A)}.
     // Function is never called, so returns the uncalled-function type.
-    test("fun={ g -> f={x -> g}; (f 3,f 1)}", TypeFunPtr.make(BitsFun.make0(46),ARG_IDX+1,Type.ANY,null));
+    test("fun={ g -> f={x -> g}; (f 3,f 1)}", TypeFunPtr.make(BitsFun.make0(46),1,Type.ANY,null));
     // Called with different typevars A
     test_ptr("fun={ g -> f={x -> g}; (f 3,f 1)}; (fun \"abc\",fun 3.14)",
       "(*(*\"abc\", $), *(3.14, 3.14))");

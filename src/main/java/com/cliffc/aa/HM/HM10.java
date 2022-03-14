@@ -2190,7 +2190,7 @@ public class HM10 {
         if( _args!=null )
           for( String id : _args.keySet() ) // Forall fields in HM
             if( ts0.get(id)!=null )         // and in GCP
-              ts.add_fld( TypeFld.malloc(id,null,Access.Final,TypeFld.oBot) );
+              ts.add_fld( TypeFld.malloc(id,null,Access.Final) );
         if( is_open() && !HM_FREEZE )     // If can add fields to HM
           for( TypeFld fld : ts0 ) // Forall fields in GCP
             if( get(fld._fld)==null )     // Solo in GCP
@@ -2203,14 +2203,14 @@ public class HM10 {
             TypeFld fld0 = ts0.get(id);
             if( fld0 !=null )                 // and in GCP
               // Recursively walk and lift into the new ts struct
-              ts.get(id).setX( arg(id).walk_types_out(fld0._t,jt,apply), fld0._order);
+              ts.get(id).setX( arg(id).walk_types_out(fld0._t,jt,apply));
           }
         // Now do the other side.  Missing on HM side might later appear and
         // lift to anything.
         if( is_open() && !HM_FREEZE )       // If can add fields to HM
           for( TypeFld fld : ts0 )   // Forall fields in GCP
             if( get(fld._fld)==null )       // Solo in GCP
-              ts.get(fld._fld).setX( jt, fld._order );
+              ts.get(fld._fld).setX( jt );
         // Close off the recursion
         if( --Type.RECURSIVE_MEET == 0 )
           ts = Cyclic.install(ts);

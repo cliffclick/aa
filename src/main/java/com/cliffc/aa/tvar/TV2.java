@@ -198,16 +198,17 @@ public class TV2 {
   }
   // A struct with fields
   public static TV2 make_struct( NewNode n, String alloc_site ) {
-    NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
-    for( TypeFld fld : n._ts )
-      args.put(fld._fld,n.in(fld._order).tvar());
-    // Value types have a class name field
-    if( n._tptr.is_valtype() )
-      args.put(n._ts._name,make_leaf(n,alloc_site));
-    TV2 t2 = new TV2(args,UQNodes.make(n),alloc_site);
-    t2._flow = n._tptr.make_from(n._ts);
-    t2._open = false;
-    return t2;
+    //NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
+    //for( TypeFld fld : n._ts )
+    //  args.put(fld._fld,n.in(fld._order).tvar());
+    //// Value types have a class name field
+    //if( n._tptr.is_valtype() )
+    //  args.put(n._ts._name,make_leaf(n,alloc_site));
+    //TV2 t2 = new TV2(args,UQNodes.make(n),alloc_site);
+    //t2._flow = n._tptr.make_from(n._ts);
+    //t2._open = false;
+    //return t2;
+    throw unimpl(); // TODO lookup n index from struct
   }
   // Convert a leaf to an open struct
   public void make_open_struct() {

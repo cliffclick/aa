@@ -47,14 +47,14 @@ public class ConNode<T extends Type> extends Node {
     if( _t == Type.XNIL || _t == Type.NIL )
       return TV2.make_nil(TV2.make_leaf(this,alloc_site),alloc_site);
     if( _t == Type.ANY ) return TV2.make_leaf(this,alloc_site);
-    if( _t instanceof TypeInt ) {
-      NewNode nnn = Env.SCP_0.get_type("int:");
-      return nnn._tvar==null ? (nnn._tvar = TV2.make_leaf(nnn,alloc_site)) : nnn._tvar;
-    }
-    if( _t instanceof TypeFlt ) {
-      NewNode nnn = Env.SCP_0.get_type("flt:");
-      return nnn._tvar==null ? (nnn._tvar = TV2.make_leaf(nnn,alloc_site)) : nnn._tvar;
-    }
+    //if( _t instanceof TypeInt ) {
+    //  NewNode nnn = Env.SCP_0.get_type("int:");
+    //  return nnn._tvar==null ? (nnn._tvar = TV2.make_leaf(nnn,alloc_site)) : nnn._tvar;
+    //}
+    //if( _t instanceof TypeFlt ) {
+    //  NewNode nnn = Env.SCP_0.get_type("flt:");
+    //  return nnn._tvar==null ? (nnn._tvar = TV2.make_leaf(nnn,alloc_site)) : nnn._tvar;
+    //}
     throw unimpl();
   }
 

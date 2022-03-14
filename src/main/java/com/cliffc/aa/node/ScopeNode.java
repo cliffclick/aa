@@ -18,7 +18,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
 public class ScopeNode extends Node {
 
   // Mapping from type-variables to Types.  Types have a scope lifetime like values.
-  private final HashMap<String,NewNode> _types; // user-typing type names
+  private final HashMap<String,StructNode> _types; // user-typing type names
   private Ary<IfScope> _ifs;                 // Nested set of IF-exprs used to track balanced new-refs
   private final boolean _closure;
 
@@ -29,19 +29,19 @@ public class ScopeNode extends Node {
     _types = new HashMap<>();
     _ifs = null;
   }
-  public ScopeNode(HashMap<String,NewNode> types,  Node ctl, Node mem, Node ptr, Node rez) {
+  public ScopeNode(HashMap<String,StructNode> types,  Node ctl, Node mem, Node ptr, Node rez) {
     super(OP_SCOPE,ctl,mem,ptr,rez);
     _types = types;
     _closure = false;
   }
 
-  public    Node ctrl() { return in(CTL_IDX); }
-  public    Node mem () { return in(MEM_IDX); }
-  public NewNode stk () { return (NewNode)in(DSP_IDX); }
-  public    Node rez () { return in(ARG_IDX); }
-  public <N extends Node> N set_ctrl(    N    n) { set_def(CTL_IDX,n); return n; }
-  public void               set_stk ( NewNode n) { set_def(DSP_IDX,n);           }
-  public void               set_rez (    Node n) { set_def(ARG_IDX,n);           }
+  public       Node ctrl() { return in(CTL_IDX); }
+  public       Node mem () { return in(MEM_IDX); }
+  public StructNode stk () { return (StructNode)in(DSP_IDX); }
+  public       Node rez () { return in(ARG_IDX); }
+  public <N extends Node> N set_ctrl(    N       n) { set_def(CTL_IDX,n); return n; }
+  public void               set_stk ( StructNode n) { set_def(DSP_IDX,n);           }
+  public void               set_rez (       Node n) { set_def(ARG_IDX,n);           }
 
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
   public Node set_mem( Node n) {
@@ -66,8 +66,8 @@ public class ScopeNode extends Node {
   }
   @Override public boolean is_mem() { return true; }
 
-  public Node get(String name) { return stk().get(name); }
-  public boolean is_mutable(String name) { return stk().fld(name)._access==Access.RW; }
+  public Node get(String name) { return stk().in(name); }
+  public boolean is_mutable(String name) { return stk().get(name)._access==Access.RW; }
 
   public RegionNode early_ctrl() { return (RegionNode)in(4); }
   public    PhiNode early_mem () { return (   PhiNode)in(5); }
@@ -76,10 +76,10 @@ public class ScopeNode extends Node {
   public static final int RET_IDX = 7;
 
   // Name to type lookup, or null
-  public NewNode get_type(String name) { return _types.get(name);  }
+  public StructNode get_type(String name) { return _types.get(name);  }
 
   // Extend the current Scope with a new type; cannot override existing name.
-  public void add_type( String name, NewNode t ) {
+  public void add_type( String name, StructNode t ) {
     assert _types.get(name)==null;
     _types.put( name, t );
     add_def(t);                 // Hook so it does not die

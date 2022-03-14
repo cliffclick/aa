@@ -21,7 +21,9 @@ public class Ary<E> implements Iterable<E> {
   /** @return active list length */
   public int len() { return _len; }
   /** @param i element index
-   *  @return element being returned; throws if OOB */
+   *  @return element being returned; throws if OOB 
+   *  @exception AIOOBE if !(0 <= i < _len)
+   */
   public E at( int i ) {
     range_check(i);
     return _es[i];
@@ -111,7 +113,11 @@ public class Ary<E> implements Iterable<E> {
 
   public void fill( E e ) { Arrays.fill(_es,0,_len,e); }
 
-  // Extend and set
+  /** Extend and set.  null fills as needed and does not throw AIOOBE.
+   *  @param i element to set
+   *  @param e value to set
+   *  @return old value
+   */
   public E setX( int i, E e ) {
     if( i >= _len ) Arrays.fill(_es,_len,_es.length,null);
     while( i>= _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);
@@ -126,9 +132,10 @@ public class Ary<E> implements Iterable<E> {
   public void clear( int i ) {  if( i<_len ) _es[i]=null; }
 
   /** Set existing element
-   * @param i element to set
-   * @param e value to set
-   * @return old value
+   *  @param i element to set
+   *  @param e value to set
+   *  @return old value
+   *  @exception AIOOBE if !(0 <= i < _len)
    */
   public E set( int i, E e ) {
     range_check(i);

@@ -16,16 +16,16 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public String _fld;           // The field name
   public Type _t;               // Field type.  Usually some type of Scalar, or ANY or ALL.
   public Access _access;        // Field access type: read/write, final, read/only
-  public int _order;            // Field order in the struct, or -1 for undefined (Bot) or -2 for conforming (top)
 
-  private TypeFld init( @NotNull String fld, Type t, Access access, int order ) {
+  private TypeFld init( @NotNull String fld, Type t, Access access ) {
     assert !(t instanceof TypeFld);
     super.init("");
-    _fld=fld; _t=t; _access=access;
-    _order=oBot;//order; // Claim 'order' is not a property of types; instead field layout is a backend property.
+    _fld = fld;
+    _t = t;
+    _access = access;
     return this;
   }
-  @Override public TypeFld copy() { return _copy().init(_fld,_t,_access,_order); }
+  @Override public TypeFld copy() { return _copy().init(_fld,_t,_access); }
 
   @Override public TypeMemPtr walk( TypeStrMap map, BinaryOperator<TypeMemPtr> reduce ) { return map.map(_t,"t"); }
   @Override public long lwalk( LongStringFunc map, LongOp reduce ) { return map.run(_t,"t"); }
@@ -36,12 +36,12 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   }
 
   // Ignore edges hash
-  @Override long static_hash() { return Util.mix_hash(super.static_hash(),_fld.hashCode(),_access.hashCode(),_order); }
+  @Override long static_hash() { return Util.mix_hash(super.static_hash(),_fld.hashCode(),_access.hashCode()); }
 
   // Returns 1 for definitely equals, 0 for definitely unequals and -1 for needing the circular test.
   int cmp(TypeFld t) {
     if( this==t ) return 1;
-    if( !Util.eq(_fld,t._fld) || _access!=t._access || _order!=t._order ) return 0; // Definitely not equals without recursion
+    if( !Util.eq(_fld,t._fld) || _access!=t._access ) return 0; // Definitely not equals without recursion
     if( _t==t._t ) return 1;    // All fields bitwise equals.
     if( _t==null || t._t==null ) return 0; // Mid-construction (during cycle building), declare unequal
     if( _t._type!=t._t._type ) return 0; // Last chance to avoid cycle check; types have a chance of being equal
@@ -84,44 +84,43 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     return _t==null ? sb.p('!') : (_t._str(visit, dups, sb, debug, indent));
   }
 
-  static TypeFld valueOfArg(Parse P, int order, String fid) {
+  static TypeFld valueOfArg(Parse P, String fid) {
     int oldx=P._x;
     String id = P.id();
     if( !P.peek('=') ) { assert fid==null; P._x=oldx; return null; } // No such field
-    return _valueOf(P,order,fid,id);
+    return _valueOf(P,fid,id);
   }
-  static TypeFld valueOfTup(Parse P, int order, String fid) {  return _valueOf(P,order,fid,TUPS[order]);  }
-  static TypeFld _valueOf(Parse P, int order, String fid, String fname) {
-    TypeFld fld = TypeFld.malloc(fname,null,Access.Final,order);
+  static TypeFld valueOfTup(Parse P, String fid, int order) {  return _valueOf(P,fid,TUPS[order]);  }
+  static TypeFld _valueOf(Parse P, String fid, String fname) {
+    TypeFld fld = TypeFld.malloc(fname,null,Access.Final);
     if( fid!=null ) P._dups.put(fid,fld);
     return fld.setX(P.type());
   }
 
   static { new Pool(TFLD,new TypeFld()); }
-  public static TypeFld malloc( String fld, Type t, Access access, int order ) { return POOLS[TFLD].<TypeFld>malloc().init(fld,t,access,order); }
-  public static TypeFld malloc( String fld ) { return POOLS[TFLD].<TypeFld>malloc().init(fld,null,Access.Final,oBot); }
-  public static TypeFld make( String fld, Type t, Access access, int order ) { return malloc(fld,t,access,order).hashcons_free(); }
-  public static TypeFld make( String fld, Type t, int order ) { return make(fld,t,Access.Final,order); }
-  public static TypeFld make( String fld, Type t ) { return make(fld,t,Access.Final,oBot); }
-  public static TypeFld make( String fld ) { return make(fld,Type.SCALAR,Access.Final,oBot); }
-  public static TypeFld make_dsp(Type t) { return make("^",t,Access.Final,DSP_IDX); }
+  public static TypeFld malloc( String fld, Type t, Access access ) { return POOLS[TFLD].<TypeFld>malloc().init(fld,t,access); }
+  public static TypeFld malloc( String fld ) { return POOLS[TFLD].<TypeFld>malloc().init(fld,null,Access.Final); }
+  public static TypeFld make( String fld, Type t, Access access ) { return malloc(fld,t,access).hashcons_free(); }
+  public static TypeFld make( String fld, Type t ) { return make(fld,t,Access.Final); }
+  public static TypeFld make( String fld ) { return make(fld,Type.SCALAR,Access.Final); }
+  public static TypeFld make_dsp(Type t) { return make("^",t,Access.Final); }
   // Make a not-interned version for building cyclic types
-  public TypeFld malloc_from() { return malloc(_fld,_t,_access,_order); }
+  public TypeFld malloc_from() { return malloc(_fld,_t,_access); }
 
   // Some convenient default constructors
   static final String[] ARGS = new String[]{" ctl", " mem", "^","x","y","z"};
   static final String[] TUPS = new String[]{" ctl", " mem", "^","0","1","2"};
-  public static TypeFld make_arg( Type t, int order ) { return make(ARGS[order],t,Access.Final,order);  }
-  public static TypeFld make_tup( Type t, int order ) { return make(TUPS[order],t,Access.Final,order);  }
-  public TypeFld make_from(Type t) { return t==_t ? this : make(_fld,t,_access,_order); }
-  public TypeFld make_from(Type t, Access a) { return (t==_t && a==_access) ? this : make(_fld,t,a,_order); }
+  public static TypeFld make_arg( Type t, int order ) { return make(ARGS[order],t,Access.Final);  }
+  public static TypeFld make_tup( Type t, int order ) { return make(TUPS[order],t,Access.Final);  }
+  public TypeFld make_from(Type t) { return t==_t ? this : make(_fld,t,_access); }
+  public TypeFld make_from(Type t, Access a) { return (t==_t && a==_access) ? this : make(_fld,t,a); }
 
   public static final TypeFld NO_DSP = TypeFld.make_dsp(TypeMemPtr.NO_DISP);
 
   @Override protected TypeFld xdual() {
-    if( Util.eq(_fld,sdual(_fld)) && _t==_t.dual() && _order==odual(_order) && _access==_access.dual() )
+    if( Util.eq(_fld,sdual(_fld)) && _t==_t.dual() && _access==_access.dual() )
       return this;              // Self symmetric
-    return POOLS[TFLD].<TypeFld>malloc().init(sdual(_fld),_t.dual(),_access.dual(),odual(_order));
+    return POOLS[TFLD].<TypeFld>malloc().init(sdual(_fld),_t.dual(),_access.dual());
   }
   @Override protected void rdual() { _dual._t = _t._dual; }
 
@@ -132,25 +131,23 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     String fld   = smeet(_fld,  f._fld)  ;
     Type   t     = _t     .meet(f._t     );
     Access access= _access.meet(f._access);
-    int    order = omeet(_order,f._order );
-    return make(fld,t,access,order);
+    return make(fld,t,access);
   }
 
-  private static TypeFld malloc( String fld, Access a, int order ) {
+  private static TypeFld malloc( String fld, Access a ) {
     TypeFld tfld = POOLS[TFLD].malloc();
-    return tfld.init(fld,null,a,order);
+    return tfld.init(fld,null,a);
   }
 
 
   // Used during cyclic struct meets, either side (but not both) might be null,
   // and the _t field is not filled in.  A new TypeFld is returned.
   static TypeFld cmeet(TypeFld f0, TypeFld f1) {
-    if( f0==null ) return malloc(f1._fld,f1._access, f1._order);
-    if( f1==null ) return malloc(f0._fld,f0._access, f0._order);
+    if( f0==null ) return malloc(f1._fld,f1._access);
+    if( f1==null ) return malloc(f0._fld,f0._access);
     String fld   = smeet(f0._fld,  f1._fld);
     Access access= f0._access.meet(f1._access);
-    int    order = omeet(f0._order,f1._order);
-    return malloc(fld,access,order);
+    return malloc(fld,access);
   }
 
   public enum Access {
@@ -198,22 +195,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     return fldBot;
   }
 
-  // Field order, -1 is undefined (bot) and -2 is conforming (top)
-  public static final int oTop = -1;
-  public static final int oBot = -2;
-  private static int odual( int order ) {
-    if( order==oTop ) return oBot;
-    if( order==oBot ) return oTop;
-    return order;
-  }
-  private static int omeet( int o0, int o1 ) {
-    if( o0==o1 ) return o0;
-    if( o0==oTop ) return o1;
-    if( o1==oTop ) return o0;
-    return oBot;
-  }
-
-  public static final TypeFld NO_DISP = make("^",Type.ANY,Access.Final,DSP_IDX);
+  public static final TypeFld NO_DISP = make("^",Type.ANY,Access.Final);
 
   // Setting the type during recursive construction.
   public TypeFld setX(Type t) {
@@ -227,13 +209,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     assert _dual==null;     // Not interned
     _t = t;
     _access = access;
-    return this;
-  }
-  public TypeFld setX(Type t, int order) {
-    if( _t==t && _order==order ) return this; // No change
-    _t = t;
-    _order = order;
-    assert _hash==0;  // Not hashed, since hash just changed
     return this;
   }
 

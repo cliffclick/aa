@@ -8,11 +8,11 @@ import java.util.function.*;
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
 
-/** A memory-based collection of optionally named fields.  This is a recursive
- *  type, only produced by NewNode and structure or tuple constants.  Fields
- *  can be indexed by field name or numeric constant (i.e. tuples), but NOT by
- *  a general number - that's an Array.  Fields are matched on name and not
- *  index; field order is irrelevant to named fields.
+/** A memory-based collection of named fields.  This is a recursive type,
+ *  produced by NewNode and structure or tuple constants.  Fields can be
+ *  indexed by field name (which can be a digit string, e.g. tuples), but NOT
+ *  by a general number - that's an Array.  Fields can ALSO be accessed by
+ *  field order, which happens for function parameters.
  *
  *  Structs can be open or closed (and like all Types, high or low).  A struct
  *  acts as-if it has an all possible field names (except those explicitly
@@ -35,6 +35,10 @@ import static com.cliffc.aa.type.TypeFld.Access;
  *  Meet we conceptually unroll both types forever, compute the Meet element by
  *  element... but when both types have looped, we can stop and the discovered
  *  cycle is the Meet's cycle.
+ *
+ *  After computing a possibly-cyclic type (via Meet or from-whole-cloth) we
+ *  run a DFA minimization algorithm, then a cycle-aware hash and intern the
+ *  the result - possibly returning a previous cycle.
  */
 public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<TypeFld> {
   static final HashMap<TPair,TypeStruct> MEETS0 = new HashMap<>();
@@ -43,15 +47,12 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   // The fields indexed by field name.  Effectively final.
   private Ary<TypeFld> _flds;
-  // Max field order number.  This is a summary property not part of the type.
-  private short _max_arg;
 
   TypeStruct init( String name, boolean any ) {
     super.init(name);
     _any = any;
     if( _flds==null ) _flds = new Ary<>(TypeFld.class);
     else _flds.clear();         // No leftover fields from pool
-    _max_arg = DSP_IDX;         // Min of the max
     return this;
   }
   // Shallow clone, not interned.  Fields are referenced, not cloned
@@ -69,13 +70,11 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // We can count on the field names and accesses but not field order nor type.
   @Override long static_hash() {
     long hash = 0;
-    for( TypeFld fld : this ) {
+    for( TypeFld fld : this )
       // Can depend on the field name and access, but NOT the type - because recursion.
       // Same hash independent of field visitation order, because the iterator does
       // not make order guarantees.
       hash ^= fld._fld.hashCode() ^ fld._access.hashCode();
-      _max_arg = (short)Math.max(_max_arg,fld._order);
-    }
     return Util.mix_hash(super.static_hash() ^ (_any?1023:0),hash);
   }
 
@@ -224,12 +223,12 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   // Make a collection of fields, with no display and all with default names and final fields.
   private static TypeStruct _malloc() { return malloc("",false); }
-  private TypeStruct add_arg(Type t, int n) { return add_fld(TypeFld.make_arg(t,n)); }
-  public static TypeStruct args(Type t1         ) { return _malloc().add_arg(t1,DSP_IDX)                    .hashcons_free(); }
-  public static TypeStruct args(Type t1, Type t2) { return _malloc().add_arg(t1,DSP_IDX).add_arg(t2,ARG_IDX).hashcons_free(); }
+  private TypeStruct arg(Type t, int n) { _flds.push(TypeFld.make_arg(t,n)); return this; }
+  public static TypeStruct args(Type t1         ) { return _malloc().arg(CTRL,CTL_IDX).arg(ALL,MEM_IDX).arg(t1,DSP_IDX)                .hashcons_free(); }
+  public static TypeStruct args(Type t1, Type t2) { return _malloc().arg(CTRL,CTL_IDX).arg(ALL,MEM_IDX).arg(t1,DSP_IDX).arg(t2,ARG_IDX).hashcons_free(); }
 
   // Used to make a few testing constants
-  public static TypeStruct make_test( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a,ARG_IDX)); }
+  public static TypeStruct make_test( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a)); }
 
   // Add fields from a Type[].  Will auto-allocate the Type[], if not already
   // allocated - which is a perf-hit in high usage points.  Typically, used this
@@ -244,7 +243,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   }
   // Make 2 fields directly
   public static TypeStruct make_test( String f1, Type t1, String f2, Type t2 ) {
-    return TypeStruct.make("",false,TypeFld.make(f1,t1,ARG_IDX),TypeFld.make(f2,t2,ARG_IDX+1));
+    return TypeStruct.make("",false,TypeFld.make(f1,t1),TypeFld.make(f2,t2));
   }
 
 
@@ -257,7 +256,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     return ts;
   }
 
-  public int nargs() { return _max_arg+1; }
+  public int nargs() { return _flds._len; }
 
   // The lattice extreme values.
 
@@ -268,6 +267,10 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // All fields are available as ANY.
   public static final TypeStruct UNUSED = ISUSED.dual();
 
+  // Wrapped primitive prototypes
+  public static final TypeStruct INT = TypeStruct.make("int:",false,TypeFld.make("x",TypeInt.INT64));
+  public static final TypeStruct FLT = TypeStruct.make("flt:",false,TypeFld.make("x",TypeFlt.FLT64));
+  
   // A bunch of types for tests
   public  static final TypeStruct POINT = args(TypeFlt.FLT64,TypeFlt.FLT64);
   public  static final TypeStruct NAMEPT= POINT.set_name("Point:");
@@ -276,13 +279,13 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   private static final TypeStruct D1    = make_test("d",TypeInt.TRUE ,Access.Final); // @{d:1}
   public  static final TypeStruct ARW   = make_test("a",TypeFlt.FLT64,Access.RW   );
   public  static final TypeStruct EMPTY = make();
-  public  static final TypeStruct FLT64 = args(TypeFlt.FLT64);     // { flt -> }
-  public  static final TypeStruct INT64 = args(TypeInt.INT64);     // { int -> }
+  public  static final TypeStruct FLT64 = args(FLT);     // { flt -> }
+  public  static final TypeStruct INT64 = args(INT);     // { int -> }
   public  static final TypeStruct SCALAR1=args(SCALAR);            // { scalar -> }
-  public  static final TypeStruct INT64_INT64= args(TypeInt.INT64,TypeInt.INT64); // { int int -> }
-  public  static final TypeStruct INT64_FLT64= args(TypeInt.INT64,TypeFlt.FLT64); // { int flt -> }
-  public  static final TypeStruct FLT64_INT64= args(TypeFlt.FLT64,TypeInt.INT64); // { flt int -> }
-  public  static final TypeStruct FLT64_FLT64= args(TypeFlt.FLT64,TypeFlt.FLT64); // { flt flt -> }
+  public  static final TypeStruct INT64_INT64= args(INT,INT); // { int int -> }
+  public  static final TypeStruct INT64_FLT64= args(INT,FLT); // { int flt -> }
+  public  static final TypeStruct FLT64_INT64= args(FLT,INT); // { flt int -> }
+  public  static final TypeStruct FLT64_FLT64= args(FLT,FLT); // { flt flt -> }
 
   // Types for Liveness in slot 0 of TypeMem
   public static final TypeStruct ALIVE = ISUSED, DEAD = UNUSED, LNO_DISP = A;
@@ -293,7 +296,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Dual the flds, dual the tuple.  Return a not-interned thing.
   @Override protected TypeStruct xdual() {
     TypeStruct ts = malloc(_name,!_any);
-    ts._max_arg = _max_arg;
     for( TypeFld fld : this ) ts._flds.push(fld.dual());
     return ts;
   }
@@ -438,15 +440,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     return Cyclic.install(mt);
   }
 
-  // Shallow clone, not interned.  Fields are also cloned, but not deeper.
-  private TypeStruct _clone() {
-    assert interned();
-    TypeStruct ts = malloc(_name,_any);
-    for( TypeFld fld : this )
-      ts.add_fld(fld.malloc_from()); // Shallow field clone
-    return ts;
-  }
-
   @Override public TypeStruct simple_ptr() {
     TypeStruct ts = malloc(_name,_any);
     for( TypeFld fld : this ) {
@@ -472,20 +465,13 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     int idx = find(name);
     return idx==-1 ? null : _flds._es[idx];
   }
-  public TypeFld put( TypeFld fld ) {
-    int idx = find(fld._fld);
-    if( idx==-1 ) { _flds.push(fld); return null; }
-    return _flds.set(idx,fld);  // Return old value
-  }
-  // Field type.  NPE if field-not-found
+  // Field type byte name.  NPE if field-not-found
   public Type at( String name ) { return get(name)._t; }
 
-  public TypeFld fld_idx( int idx, int aidx ) {
-    TypeFld fld = _flds.atX(idx);
-    if( fld==null ) return null;
-    assert fld._order==aidx;
-    return fld;
-  }
+  // Field by index, null after end
+  public TypeFld get( int idx ) { return _flds.atX(idx); }
+  // Field type by index, AIOOBE if field not found
+  public Type at( int idx ) { return _flds.at(idx)._t; }
 
   // Non-allocating iterator; pulls iterators from a pool.  The hard part is
   // telling when an iterator ends early, to avoid leaking.  This is not
@@ -618,11 +604,11 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
         else { P._x = oldx; fid=null; }
         // Check for "^=any" on *tuples* which do not normally print field names
         if( aidx==DSP_IDX ) {
-          fld = TypeFld.valueOfArg(P, aidx, fid);
+          fld = TypeFld.valueOfArg(P, fid);
           if( fld==null ) aidx++; // Parse "(int64)" correct; tuple with leading id not field name
         }
         if( fld==null )         // Parse a field
-          fld = is_tup ? TypeFld.valueOfTup(P,aidx,fid) : TypeFld.valueOfArg(P,aidx,fid);
+          fld = is_tup ? TypeFld.valueOfTup(P,fid,aidx) : TypeFld.valueOfArg(P,fid);
 
         if( fid!=null ) --RECURSIVE_MEET; // End cyclic field type
         TypeFld ofld = fld;
@@ -632,7 +618,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
       } else {                  // Hit a duplicate
         // Ambiguous with un-named tuple fields
         fld = dup instanceof TypeFld dup2 ? dup2
-          : TypeFld.malloc(TypeFld.TUPS[aidx==DSP_IDX ? ARG_IDX : aidx],dup,Access.Final,aidx==DSP_IDX ? ARG_IDX : aidx);
+          : TypeFld.malloc(TypeFld.TUPS[aidx==DSP_IDX ? ARG_IDX : aidx],dup,Access.Final);
       }
 
       aidx++;
@@ -660,7 +646,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public TypeStruct pop_fld(int idx) {
     TypeStruct ts = copy();
     TypeFld fld = ts._flds.pop();
-    assert fld._order==idx;
     return ts.hashcons_free();
   }
 
@@ -694,9 +679,11 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   TypeStruct remove_other_flds(String name, Type live) {
     TypeFld nfld = get(name);
     if( nfld == null ) return UNUSED; // No such field, so all fields will be XSCALAR so UNUSED instead
-    TypeStruct ts = _clone();
-    for( TypeFld fld : ts )
-      ts.put(fld.setX( Util.eq(fld._fld,name) ? live : XSCALAR, Access.bot()).hashcons_free());
+    TypeStruct ts = malloc(_name,_any);
+    for( int i=0; i<_flds._len; i++ ) {
+      String fname = get(i)._fld;
+      ts._flds.push(TypeFld.make(fname,Util.eq(fname,name) ? live : XSCALAR, Access.bot()));
+    }
     return ts.hashcons_free();
   }
 

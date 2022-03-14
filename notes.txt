@@ -1,4 +1,80 @@
 =======================================
+3/14/2022
+
+Looking at primitives & prototypes.
+
+Theory: Value-types are a Thing.
+Value types are directly a TypeStruct instead of a TMP to a TS.
+Load from a Value type does the lookup in the TS fields first,
+then extracts a class name from the TS and repeats in the class.
+Always as-if all class members are part of every value TS.
+
+Non-value-types are a TMP, and a Load peeks thru the TMP first
+(plus a NPE check, plus any aliasing issues).
+
+Value constructors wrap args in a TS without using a NewNode: so need a StructNode
+again (which a NewNode might wrap?)
+
+
+User int/flt are value-types.  Are represented as a named TS with a "_val"
+field, and a prototype for the operators.  The "as_fun" expansion loads from
+the _val fields and inlines the constructor.
+
+
+So now I'm thinking Load/Store are used for memory ops and I always *know* so
+can strongly require Load/Store address be a TMP.  Load returns a TS not the
+field value (and Store takes a TS).  This feeds into a FieldNode which peels
+out the named field from a value-type (a plain TS).  Store node uses a
+StructNode to construct a whole TS, which then updates TypeMem.
+
+Parser for ints/flts inlines the correct StructNode with args.  So Integer
+StructNode takes 1 input in *slot 0* (no ctrl,mem inputs) and produces a named
+TS:  "int:@{_val=...}".  In the name of expediency rename "_val" to "i".
+
+
+So now I'm thinking to fold NewNode and MrgProj together, and feed a StructNode
+into a New/Mrg Proj.
+
+Summary:
+- Move field handling only, no alias ==>> StructNode
+- Keep alias handling ==>> NewNode
+- Move memory merge ==>> NewNode
+- Nuke MrgProj
+
+Most things become StructNode / value-objects.
+Need a syntax for allocation!!!
+E.g.  @{ x,y } // Point-like value struct, no   allocation; typed as a TS
+E.g. &@{ x,y } // Point-like       struct, with allocation; typed as a TMP
+E.g.  (1,2) // tuple value
+E.g. &(1,2) // tuple allocated
+
+Allows '->' as a post-fix operator converting a ptr to a value.
+Allows '*'  as a pre -fix operator converting a ptr to a value.
+
+" ptr = &@{x,y};   ptr->x "
+" ptr = &@{x,y}; (*ptr).x "
+" obj =  @{x,y};   obj .x "
+" ptr:*@{x,y} = ..." Var 'ptr' is typed as a "pointer to a struct with x,y fields"
+
+---------------
+
+StructNode - gathers inputs and has both ordered and named access.  Builds a TS.  No memory, no alias, no allocation
+FieldNode  - Selects a field from a TypeStruct.  Glorified ProjNode, since the input does not have to be a StructNode (can be Parm, Phi, etc).
+FieldUpdateNode - Takes a TypeStruct (eg StructNode), a field name, a Scalar, and produces a new TypeStruct.
+
+NewNode - takes a TypeStruct (e.g. StructNode), assigns an alias and produces it in memory.
+LoadNode - takes a Memory and an alias from a TMP and produces a TypeStruct.
+StoreNode - takes a Memory and an alias from a TMP and and a TypeStruct and produces a Memory updated.
+
+
+
+
+=======================================
+3/13/2022
+
+Got HM+GCP core theory stable.
+
+=======================================
 1/1/2022
 
 More type decisions:
