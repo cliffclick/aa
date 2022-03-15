@@ -26,15 +26,6 @@ public class MrgProjNode extends ProjNode {
   public Node mem() { return in(1); }
 
 //
-//  @Override public Type value() {
-//    Type tm = mem()._val;
-//    if( !(in(0) instanceof NewNode nnn) ) return tm;
-//    if( !(tm instanceof TypeMem tmem) ) return tm.oob();
-//    // Get the value at the alias slice from nnn
-//    TypeStruct ts = nnn.valueobj();
-//    return tmem.make_from(nnn._alias,ts);
-//  }
-//
 //  //@Override BitsAlias escapees() { return in(0).escapees(); }
 //  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
 //  // Only called here if alive, and input is more-than-basic-alive

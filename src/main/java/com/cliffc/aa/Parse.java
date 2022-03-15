@@ -1128,8 +1128,9 @@ public class Parse implements Comparable<Parse> {
         Node xn = Env.GVN.add_flow(Node.pop(nidx));
         assert xn==n;
         if( write_mem ) {
-          set_mem(init(new MrgProjNode((NewNode)n,mem())));
-          n = init(new ProjNode(n,REZ_IDX));
+          //set_mem(init(new MrgProjNode((NewNode)n,mem())));
+          //n = init(new ProjNode(n,REZ_IDX));
+          throw unimpl();
         }
         require(')',oldx);
         return n;

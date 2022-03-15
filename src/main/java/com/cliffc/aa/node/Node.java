@@ -436,7 +436,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
 
   // Initialize a Node in GVN.
-  final <N extends Node> N init() { return (N)Env.GVN.init(this); }
+  public final <N extends Node> N init() { return (N)Env.GVN.init(this); }
 
   
   // Graph rewriting.  Strictly reducing Nodes or Edges.  Cannot make a new
@@ -468,8 +468,6 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( nval!=oval ) {
       _val = nval;
       Env.GVN.add_flow_uses(this); // Put uses on worklist... values flows downhill
-      if( !may_be_con_live(oval) && may_be_con_live(nval) )
-        Env.GVN.add_flow_defs(this); // If computing a constant
       add_flow_extra(oval);
     }
     return nval;
@@ -497,21 +495,8 @@ public abstract class Node implements Cloneable, IntSupplier {
   public boolean live_uses() {
     return _live != TypeMem.DEAD &&    // Only live uses make more live
       (!_live.basic_live() ||   // Complex alive always counts
-       !may_be_con_live(_val) ||// Use might be replaced with a constant (and not have this input)
        is_prim() ||             // Always live prims
        err(true)!=null);        // Always live errors
-  }
-
-  // True if 't' may_be_con AND is not a TypeFunPtr.  If a Node computes a
-  // constant, it can be replaced with a constant Node and all inputs go dead
-  // and the corresponding ConNode gets flagged live.  However, this messes
-  // with Nodes computing a constant TypeFunPtr, since it allows the entire
-  // function to go dead.  Easy fix: disallow for TypeFunPtr.  Hard (better)
-  // fix: make the corresponding FunPtrNode go alive.
-  static boolean may_be_con_live(Type t) {
-    //return t.may_be_con() &&      // Use might be replaced with a constant (and not have this input)
-    //  !(t instanceof TypeFunPtr); // Always compute FunPtrs, as constants they keep function bodies alive
-    return false;
   }
 
   // Shortcut to update self-live
@@ -673,11 +658,6 @@ public abstract class Node implements Cloneable, IntSupplier {
       progress = this;          // Progress!
       assert nval.isa(oval);    // Monotonically improving
       _val = nval;
-      // If becoming a constant, check for replacing with a ConNode
-      if( !may_be_con_live(oval) && may_be_con_live(nval) ) {
-        Env.GVN.add_reduce(this);
-        Env.GVN.add_flow_defs(this); // Since a constant, inputs are no longer live
-      }
       // Put uses on worklist... values flows downhill
       for( Node use : _uses )
         Env.GVN.add_flow(use).add_flow_use_extra(this);

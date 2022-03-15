@@ -61,9 +61,6 @@ public class FunNode extends RegionNode {
   public String _name;      // Debug-only name
   public int _fidx;         // Unique number for this piece of code
   public int _nargs;        // Number of arguments
-  // Operator precedence; only set on top-level primitive wrappers.
-  // -1 for normal non-operator functions and -2 for forward_decls.
-  private byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
 
   // H-M non-generative set, only active during Combo.
   public TV2[] _nongen;

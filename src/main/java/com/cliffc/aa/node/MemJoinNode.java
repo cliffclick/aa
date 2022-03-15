@@ -48,9 +48,10 @@ public class MemJoinNode extends Node {
   @Override public void add_flow_def_extra(Node chg) {
     if( _uses._len==1 ) {
       Node u = _uses.at(0);
-      if( u instanceof StoreNode ||
-          u instanceof MrgProjNode )
-        GVN.add_reduce(u);
+      //if( u instanceof StoreNode ||
+      //    u instanceof MrgProjNode )
+      //  GVN.add_reduce(u);
+      throw unimpl();
     }
   }
 
@@ -82,7 +83,6 @@ public class MemJoinNode extends Node {
       if( head instanceof MemSplitNode ) return null; // TODO: Handle back-to-back split/join/split/join
       throw unimpl(); // Break out another SESE split
     }
-    if( mem instanceof MrgProjNode ) return mem;
     if( mem instanceof ParmNode ) return null;
     if( mem instanceof PhiNode ) return null;
     if( mem instanceof StartMemNode ) return null;

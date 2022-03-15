@@ -546,9 +546,9 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
         dups.put(_uid,"S"+(char)('A'+ucnt._ts++));
       return;
     }
-    for( TypeFld fld : this )
-      if( fld!=null )
-        fld._str_dups(visit,dups,ucnt);
+    for( int i=0; i<len(); i++ ) // DO NOT USE iter syntax, else toString fails when the iter pool exhausts during a debug session
+      if( get(i)!=null )
+        get(i)._str_dups(visit,dups,ucnt);
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
@@ -703,7 +703,12 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   }
 
   @Override public boolean above_center() { return _any; }
-
+  @Override public boolean is_con() {
+    for( int i=0; i<_flds._len; i++ )
+      if( !_flds._es[i].is_con() )
+        return false;
+    return true;    
+  }
   @Override public Type meet_nil(Type nil) { return this; }
 
   @Override boolean contains( Type t, VBitSet bs ) {

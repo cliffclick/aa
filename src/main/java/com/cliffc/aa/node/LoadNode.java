@@ -65,8 +65,9 @@ public class LoadNode extends Node {
     if( chg==mem() ) Env.GVN.add_flow(adr());  // Memory value lifts to an alias, address is more alive
     // Memory improves, perhaps Load can bypass Call
     if( chg==mem() && mem().in(0) instanceof CallEpiNode ) Env.GVN.add_reduce(this);
-    // Memory becomes a MrgProj, maybe Load can bypass MrgProj
-    if( chg==mem() && chg instanceof MrgProjNode ) Env.GVN.add_mono(this);
+    //// Memory becomes a MrgProj, maybe Load can bypass MrgProj
+    //if( chg==mem() && chg instanceof MrgProjNode ) Env.GVN.add_mono(this);
+    throw unimpl();
   }
 
   // The only memory required here is what is needed to support the Load.
@@ -265,27 +266,27 @@ public class LoadNode extends Node {
         } else {
           throw unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
         }
-      } else if( mem instanceof MrgProjNode ) {
-        MrgProjNode mrg = (MrgProjNode)mem;
-        NewNode nnn = mrg.nnn();
-        //TypeFld tfld = nnn._ts.get(fld);
-        //if( tfld!=null && adr == nnn ) return nnn; // Direct hit
-        //// wrong field name or wrong alias, cannot match
-        //if( aliases.test_recur(nnn._alias) ) return null; // Overlapping, but wrong address - dunno, so must fail
-        //mem = mrg.mem(); // Advance past
-        throw unimpl();
-      } else if( mem instanceof MemJoinNode ) {
-        Node jmem = ((MemJoinNode)mem).can_bypass(aliases);
-        if( jmem == null ) return null;
-        mem = jmem;
-      } else if( mem instanceof ParmNode ) {
-        if( mem.in(0) instanceof FunNode && mem.in(0).is_copy(1)!=null ) mem = mem.in(1); // FunNode is dying, copy, so ParmNode is also
-        else return null;
-
-      } else if( mem instanceof PhiNode || // Would have to match on both sides, and Phi the results
-                 mem instanceof StartMemNode ||
-                 mem instanceof ConNode) {
-        return null;
+      //} else if( mem instanceof MrgProjNode ) {
+      //  MrgProjNode mrg = (MrgProjNode)mem;
+      //  NewNode nnn = mrg.nnn();
+      //  //TypeFld tfld = nnn._ts.get(fld);
+      //  //if( tfld!=null && adr == nnn ) return nnn; // Direct hit
+      //  //// wrong field name or wrong alias, cannot match
+      //  //if( aliases.test_recur(nnn._alias) ) return null; // Overlapping, but wrong address - dunno, so must fail
+      //  //mem = mrg.mem(); // Advance past
+      //  throw unimpl();
+      //} else if( mem instanceof MemJoinNode ) {
+      //  Node jmem = ((MemJoinNode)mem).can_bypass(aliases);
+      //  if( jmem == null ) return null;
+      //  mem = jmem;
+      //} else if( mem instanceof ParmNode ) {
+      //  if( mem.in(0) instanceof FunNode && mem.in(0).is_copy(1)!=null ) mem = mem.in(1); // FunNode is dying, copy, so ParmNode is also
+      //  else return null;
+      //
+      //} else if( mem instanceof PhiNode || // Would have to match on both sides, and Phi the results
+      //           mem instanceof StartMemNode ||
+      //           mem instanceof ConNode) {
+      //  return null;
       } else {
         throw unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
       }

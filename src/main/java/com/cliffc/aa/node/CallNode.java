@@ -251,9 +251,10 @@ public class CallNode extends Node {
     Node cepi = cepi();
     if( !_is_copy && cepi!=null )
       Env.GVN.add_reduce(cepi);
-    if( mem() instanceof MrgProjNode )
-      Env.GVN.add_reduce(this);
-    Env.GVN.add_flow(mem()); // Dead pointer args reduced to ANY, so mem() liveness lifts
+    //if( mem() instanceof MrgProjNode )
+    //  Env.GVN.add_reduce(this);
+    //Env.GVN.add_flow(mem()); // Dead pointer args reduced to ANY, so mem() liveness lifts
+    throw unimpl();
   }
 
   @Override public Node ideal_grow() {
@@ -281,58 +282,59 @@ public class CallNode extends Node {
     if( mem instanceof MemJoinNode ) {
       if( !mem.check_solo_mem_writer(this) )
         return null;
-      for( int i=1; i<mem._defs._len; i++ )
-        if( mem.in(i) instanceof MrgProjNode ) {
-          // TODO: Renable this.  Requires escs-into-calls
-          //Node x = _ideal_grow((MrgProjNode)mem.in(i),cepim,cepid,escs,i);
-          //if( x!=null ) return x;
-          return null;
-        }
+      //for( int i=1; i<mem._defs._len; i++ )
+      //  if( mem.in(i) instanceof MrgProjNode ) {
+      //    // TODO: Renable this.  Requires escs-into-calls
+      //    //Node x = _ideal_grow((MrgProjNode)mem.in(i),cepim,cepid,escs,i);
+      //    //if( x!=null ) return x;
+      //    return null;
+      //  }
+      throw unimpl();
     }
     return null;
   }
 
-  // Check for a Call/New that can either bypass or be placed in parallel
-  private Node _ideal_grow(MrgProjNode mem, ProjNode cepim, ProjNode cepid, BitsAlias escs, int i) {
-    // No alias overlaps
-    int alias = mem.nnn()._alias;
-    if( escs.test_recur(alias) ) return null;
-    // No other readers or writers.  Expect the Call (or Join)
-    if( mem._uses._len>2 ) return null;
-    // If call returns same as new (via recursion), cannot split, but CAN swap.
-    TypeMem tmcepi = (TypeMem) cepim._val;
-    BitsAlias esc_out = CallEpiNode.esc_out(tmcepi,cepid==null ? Type.XNIL : cepid._val);
-    BitsAlias escs2 = escs.meet(esc_out);
-    Node jn = mem();
-    if( !escs2.is_empty() && !esc_out.test_recur(alias) ) { // No return conflict, so parallelize memory
-      if( jn==mem )             // Bare Call/New; add a Split/Join.
-        return MemSplitNode.insert_split(cepim,escs2,this,mem,mem);
-      return null; // TODO: allow Call to move into existing JOIN
-    } else {                    // Else move New below Call.
-      if( jn!=mem ) {           // Move New below Join
-        Node pre = mem.mem();
-        jn.set_def(i,pre);
-        mem.set_def(MEM_IDX,jn);
-        set_mem(mem);
-        Env.GVN.add_unuse(jn);
-        Env.GVN.add_unuse(mem);
-      }
-      return swap_new(cepim,mem); // Move New below Call
-    }
-  }
+  //// Check for a Call/New that can either bypass or be placed in parallel
+  //private Node _ideal_grow(MrgProjNode mem, ProjNode cepim, ProjNode cepid, BitsAlias escs, int i) {
+  //  // No alias overlaps
+  //  int alias = mem.nnn()._alias;
+  //  if( escs.test_recur(alias) ) return null;
+  //  // No other readers or writers.  Expect the Call (or Join)
+  //  if( mem._uses._len>2 ) return null;
+  //  // If call returns same as new (via recursion), cannot split, but CAN swap.
+  //  TypeMem tmcepi = (TypeMem) cepim._val;
+  //  BitsAlias esc_out = CallEpiNode.esc_out(tmcepi,cepid==null ? Type.XNIL : cepid._val);
+  //  BitsAlias escs2 = escs.meet(esc_out);
+  //  Node jn = mem();
+  //  if( !escs2.is_empty() && !esc_out.test_recur(alias) ) { // No return conflict, so parallelize memory
+  //    if( jn==mem )             // Bare Call/New; add a Split/Join.
+  //      return MemSplitNode.insert_split(cepim,escs2,this,mem,mem);
+  //    return null; // TODO: allow Call to move into existing JOIN
+  //  } else {                    // Else move New below Call.
+  //    if( jn!=mem ) {           // Move New below Join
+  //      Node pre = mem.mem();
+  //      jn.set_def(i,pre);
+  //      mem.set_def(MEM_IDX,jn);
+  //      set_mem(mem);
+  //      Env.GVN.add_unuse(jn);
+  //      Env.GVN.add_unuse(mem);
+  //    }
+  //    return swap_new(cepim,mem); // Move New below Call
+  //  }
+  //}
 
-  // Swap a New and a Call, when we cannot use a Split/Join.
-  private Node swap_new(Node cepim, MrgProjNode mrg ) {
-    cepim.keep();
-    cepim.insert(mrg);
-    set_def(1,mrg.mem());
-    mrg.set_def(1,cepim.unkeep());
-    Env.GVN.revalive(mrg);
-    Env.GVN.add_flow_uses(mrg);
-    Env.GVN.add_flow(this);
-    Env.GVN.add_flow(cepim.in(0));
-    return this;
-  }
+  //// Swap a New and a Call, when we cannot use a Split/Join.
+  //private Node swap_new(Node cepim, MrgProjNode mrg ) {
+  //  cepim.keep();
+  //  cepim.insert(mrg);
+  //  set_def(1,mrg.mem());
+  //  mrg.set_def(1,cepim.unkeep());
+  //  Env.GVN.revalive(mrg);
+  //  Env.GVN.add_flow_uses(mrg);
+  //  Env.GVN.add_flow(this);
+  //  Env.GVN.add_flow(cepim.in(0));
+  //  return this;
+  //}
 
   // Pass thru all inputs directly - just a direct gather/scatter.  The gather
   // enforces SESE which in turn allows more precise memory and aliasing.  The

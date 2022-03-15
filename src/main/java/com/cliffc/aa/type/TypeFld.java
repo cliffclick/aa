@@ -3,9 +3,7 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.function.*;
-
-import static com.cliffc.aa.AA.DSP_IDX;
+import java.util.function.BinaryOperator;
 
 
 // A field in a TypeStruct, with a type and a name and an Access.  Field
@@ -213,6 +211,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   }
 
   @Override public boolean above_center() { return _t.above_center(); }
+  @Override public boolean is_con() { return _t.is_con(); }
   @Override public TypeFld simple_ptr() { return make_from(_t.simple_ptr()); }
 
   // Make a Type, replacing all dull pointers from the matching types in mem.
