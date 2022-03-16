@@ -157,7 +157,7 @@ public final class FunPtrNode extends Node {
           tv2s[parm._idx] = parm.tvar();
       assert tv2s[0]==null;
       tv2s[0] = ret.rez().tvar(); // Return in slot 0
-      progress = self.unify(TV2.make_fun(ret.rez(),((TypeFunPtr)_val).make_no_disp(),"FunPtr_unify",tv2s),test);
+      progress = self.unify(TV2.make_fun("FunPtr_unify",tv2s),test);
       self = self.find();
       assert self.is_fun();
     }

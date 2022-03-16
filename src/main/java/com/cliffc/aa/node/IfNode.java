@@ -30,7 +30,7 @@ public class IfNode extends Node {
       if( tst instanceof PrimNode.NE_OOP ) throw AA.unimpl();
     }
 
-    if( tst instanceof PrimNode.Not && tst._uses._len==1 )
+    if( tst instanceof PrimNode.NotI64 && tst._uses._len==1 )
       //return flip(Env.GVN.xreduce(new IfNode(ctl,tst.in(ARG_IDX))));
       throw unimpl();
 

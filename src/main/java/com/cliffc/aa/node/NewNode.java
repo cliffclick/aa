@@ -51,6 +51,7 @@ public class NewNode extends Node {
     return tmem.make_from(_alias,ts);
   }
 
+ 
 //  // Liveness changes in NewNode, impacts value in NewNode and MrgProj
 //  @Override public void add_flow_extra(Type old) {
 //    if( old instanceof TypeMem ) { // Must be a liveness change
@@ -63,36 +64,24 @@ public class NewNode extends Node {
 //  @Override public void add_flow_use_extra(Node chg) {
 //    Env.GVN.add_flow(mem());
 //  }
-//
-//  @Override public TypeMem live() {
-//    // Kept alive as prototype, until Combo resolves all Load-uses.
-//    if( Env.PROTOS.containsKey(_ts._name) || _forward_ref || _is_val )
-//      return TypeMem.ALLMEM;
-//
-//    MrgProjNode mrg=null; boolean has_ptr=false;
-//    for( Node use : _uses ) {
-//      if( use instanceof MrgProjNode mrg2 ) { assert mrg==null; mrg=mrg2; }
-//      else has_ptr=true;            // Pointer usage
-//    }
-//    // No pointers, so entire thing is dead
-//    if( !has_ptr ) return TypeMem.DEAD;
-//    // No memory uses, so GENSYM usage only.
-//    if( mrg==null ) return TypeMem.ANYMEM;
-//    // Has pointers and memory uses; use memory aliveness.
-//    return mrg._live;
-//  }
-//
-//  // Only alive fields in the MrgProj escape
-//  @Override public TypeMem live_use( Node def ) {
-//    TypeStruct ts = _live.at(_alias);
-//    if( ts==TypeStruct.ISUSED ) return TypeMem.ALIVE;
-//    if( ts==TypeStruct.UNUSED ) return TypeMem.DEAD ;
-//    int idx=DSP_IDX;  while( in(idx)!=def ) idx++; // Index of node
-//    TypeFld fld = ts.get(idx-DSP_IDX);
-//    if( fld==null )  return TypeMem.DEAD; // No such field is alive
-//    return fld._t.oob(TypeMem.ALIVE);
-//  }
-//
+
+  // The MProj liveness is always passed along, if it exists.  The self alias
+  // is not excluded, because if recursion then the self alias can be alive
+  // recursively.
+  @Override public Type live() {
+    ProjNode mem = ProjNode.proj(this,MEM_IDX);
+    return mem==null ? Type.ANY : mem._live;
+  }
+
+  // Memory is full alive, include this alias in case of recursion.
+  @Override public Type live_use( Node def ) {
+    if( def==ctl() ) return Type.ALL;
+    if( def==mem() ) return _live; // All memory, including self alias
+    if( !(_live instanceof TypeMem tmem) ) return _live.oob();
+    // Struct-aliveness
+    return tmem.at(_alias);
+  }
+
 //  @Override public void add_flow_def_extra(Node chg) {
 //    if( chg instanceof MrgProjNode && chg._live.at(_alias)==TypeStruct.UNUSED )
 //      Env.GVN.add_reduce(chg);

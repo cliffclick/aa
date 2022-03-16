@@ -1619,7 +1619,6 @@ public class HM {
     // The only Constructor
     private T2(NonBlockingHashMap<String,T2> args) { _args = args; }
 
-    @SuppressWarnings("unchecked")
     T2 copy() {
       // Shallow clone of args
       T2 t = new T2(_args==null ? null : (NonBlockingHashMap<String,T2>)_args.clone());

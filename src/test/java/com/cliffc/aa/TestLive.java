@@ -79,7 +79,7 @@ public class TestLive {
     ptr.xliv();
     assertEquals(TypeMem.ALL,ptr._live);
     nnn.xliv();
-    assertEquals(expected_live,nnn._live); // NewObj supplies object, needs what its input needs
+    assertEquals(expected_live,nnn._live); // New supplies object, needs what its input needs
     mmm.xliv();
     assertEquals(expected_live,mmm._live); // Since ptr is scalar, all memory is alive
     fdx.xliv();

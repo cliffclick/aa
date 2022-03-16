@@ -476,11 +476,11 @@ public final class CallEpiNode extends Node {
     if( !tfun.is_fun() ) {
       if( test ) return true;
       TV2[] tv2s = new TV2[nargs];
-      tv2s[DSP_IDX] = TV2.make_leaf(this,"CallEpi_unify");
+      tv2s[DSP_IDX] = TV2.make_leaf("CallEpi_unify");
       for( int i=ARG_IDX; i<nargs; i++ ) tv2s[i] = call.tvar(i);
       tv2s[0] = tvar();         // Backdoor the return in slot 0
       TypeFunPtr tfp = fdx._val instanceof TypeFunPtr tfp2 ? tfp2 : TypeFunPtr.GENERIC_FUNPTR;
-      TV2 nfun = TV2.make_fun(this, tfp, "CallEpi_unify", tv2s);
+      TV2 nfun = TV2.make_fun("CallEpi_unify", tv2s);
       progress = tfun.unify(nfun,test);
       tfun = nfun;
     }

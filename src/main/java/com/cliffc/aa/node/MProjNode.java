@@ -14,16 +14,6 @@ public class MProjNode extends ProjNode {
   @Override public String xstr() { return "MProj"+_idx; }
   @Override public boolean is_mem() { return true; }
 
-  @Override public Type value() {
-    Type c = val(0);
-    if( c instanceof TypeTuple ) {
-      TypeTuple ct = (TypeTuple)c;
-      if( _idx < ct._ts.length )
-        return ct.at(_idx);
-    }
-    return c.oob();
-  }
-
   @Override public TV2 new_tvar( String alloc_site) { return null; }
 
   @Override public void add_flow_use_extra(Node chg) {

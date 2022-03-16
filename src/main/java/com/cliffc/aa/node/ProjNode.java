@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
 
 import static com.cliffc.aa.AA.*;
@@ -35,7 +34,7 @@ public class ProjNode extends Node {
     return c.oob();
   }
 
-  // Only called here if alive
+  // Only called here if alive.
   @Override public Type live_use(Node def ) { return Type.ALL; }
 
   // Unify with the parent TVar sub-part

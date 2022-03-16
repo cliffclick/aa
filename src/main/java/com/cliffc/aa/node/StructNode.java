@@ -51,7 +51,28 @@ public class StructNode extends Node {
     _ts = TypeStruct.EMPTY;
   }
 
-  @Override String str() { return "STRUCT:"+_ts.toString(); }
+  @Override String str() { return _ts.toString(); }
+
+  // Structs with the same inputs and same field names are the same.
+  @Override public int hashCode() {
+    return super.hashCode()+ (int)_ts._hash;
+  }
+  @Override public boolean equals(Object o) {
+    if( this==o ) return true;
+    if( !super.equals(o) ) return false;
+    if( !(o instanceof StructNode rec) ) return false;
+    return _ts==rec._ts;
+  }
+  private StructNode set_ts(TypeStruct ts) {
+    if( _elock ) unelock();    // Unlock before changing hash
+    _ts=ts;
+    return this;
+  }
+  StructNode name(String name) {
+    assert _ts._name.length()==0;
+    return set_ts(_ts.set_name(name));
+  }
+  public TypeStruct ts() { return _ts; }
 
   // String-to-index, both node index and TypeStruct index
   public int find(String name) { return _ts.find(name); }
@@ -82,8 +103,7 @@ public class StructNode extends Node {
       _fld_starts[len] = badt;
     }
     add_def(val);
-    _ts = _ts.add_fldx(fld);    // Will also assert no-dup field names
-    return this;
+    return set_ts(_ts.add_fldx(fld)); // Will also assert no-dup field names
   }
 
   // Add a named FunPtr to a Struct.  Auto-inflates to an Unresolved as needed.
@@ -104,7 +124,7 @@ public class StructNode extends Node {
       ? unr2
       : new UnresolvedNode(name,bad).scoped().add_fun((FunPtrNode)n);
     unr.add_fun(fptr);          // Checks all formals are unambiguous
-    _ts = _ts.replace_fld(_ts.get(idx).make_from(unr._val));
+    set_ts(_ts.replace_fld(_ts.get(idx).make_from(unr._val)));
     set_def(idx,unr);
     xval();
   }
@@ -112,7 +132,7 @@ public class StructNode extends Node {
   // For reseting primitives for multi-testing
   public void pop_fld() {
     pop();
-    _ts = _ts.pop_fld(len());
+    set_ts(_ts.pop_fld(len()));
   }
 
   // The current local scope ends, no more names will appear.  Forward refs
@@ -121,9 +141,9 @@ public class StructNode extends Node {
   // according to use.
   public void promote_forward( StructNode parent ) {
     assert parent != null;
-//    for( TypeFld fld : _ts ) {
-//      //Node n = in(fld._order);
-//      //if( n.is_forward_ref() ) {
+    for( int i=0; i<_defs._len; i++ ) {
+      Node n = in(i);
+      if( n.is_forward_ref() ) {
 //      //  // Is this Unresolved defined in this scope, or some outer scope?
 //      //  if( ((UnresolvedNode)n).is_scoped() ) {
 //      //    // Definitely defined here, and all stores are complete; all fcns added
@@ -136,10 +156,10 @@ public class StructNode extends Node {
 //      //    set_fld(fld.make_from(Type.ANY, TypeFld.Access.Final),Env.ANY);
 //      //    Env.GVN.add_flow_uses(this);
 //      //  }
-//      //}
-//      // TODO: Access input by field name
-//    }
-    throw com.cliffc.aa.AA.unimpl();
+        // TODO: Access input by field name
+        throw com.cliffc.aa.AA.unimpl();
+      }
+    }
   }
 
   @Override public Type value() {
@@ -150,20 +170,14 @@ public class StructNode extends Node {
     return ts.hashcons_free();
   }
 
-  // Only alive fields
+  // Return liveness for a field
   @Override public Type live_use( Node def ) {
-    if( _live==Type.ALL ) return Type.ALL;
+    if( !(_live instanceof TypeStruct ts) ) return _live.oob();
     // Get field name by Node index
     int idx = _defs.find(def);
-    TypeFld fld = _ts.get(idx);
-    
-    //TypeStruct ts = _live.at(1);
-    //if( ts==TypeStruct.ISUSED ) return TypeMem.ALIVE;
-    //if( ts==TypeStruct.UNUSED ) return TypeMem.DEAD ;
-    //return fld._t.oob(TypeMem.ALIVE);
-    // TODO: Lookup field name by name
-    throw unimpl();
+    TypeFld sfld = _ts.get(idx);      // Self field name, from index
+    TypeFld lfld = ts.get(sfld._fld); // Liveness for this name
+    return lfld==null ? ts.oob() : lfld._t.oob();
   }
-
 
 }

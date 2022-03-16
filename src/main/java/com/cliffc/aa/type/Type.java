@@ -936,6 +936,10 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     return arf;
   }
   BitsFun _all_reaching_fidxs( TypeMem tmem ) { return BitsFun.EMPTY; }
+  // Recursion strings are always 2 chars, all upper-case
+  private static boolean isRecur(String s) {
+    return s.length()==2 && Character.isUpperCase(s.charAt(0)) && Character.isUpperCase(s.charAt(1));
+  }
 
   // Parse an indented string to get a Type back.  Handles cyclic types (and
   // very inefficiently calls Cyclic.install many many times).
@@ -974,8 +978,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
           yield t;
         }
         assert cid==null;       // No doing things like "FA:XB:"
-        if( Util.eq(id,"str") ) // Special string hack until I get real strings
-          yield type(null).set_name("str:");
+        // Lower case types are simple named types: "int:@{x=1" or "Cat:@{legs=4}"        
+        if( !isRecur(id) )
+          yield type(null).set_name((id+':').intern());
 
         RECURSIVE_MEET++;   // Ok, really start a recursive type
         Type t = type(id);

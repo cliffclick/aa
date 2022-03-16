@@ -53,8 +53,9 @@ import static com.cliffc.aa.AA.*;
  * - Apply: CallEpiNodes (not CallNodes)
  * - Let: Strictly used to make new Displays at function headers and the parse
  *   start.  Normal 'aa' variables are field loads against the display.
- * - Struct: NewObjNode
- * - Field: Loads and Stores.
+ * - Struct: Struct
+ * - Field: Field
+ * - ??? : Loads and Stores directly modify memory state
  * - If: IfNode
  * - NotNil: Cast of not-nil.  Cast is used for other operations but is only
  *   polymorphic for nil.
@@ -68,6 +69,11 @@ import static com.cliffc.aa.AA.*;
 
 
 public class TV2 {
+  // All the aliases and fidxs that escape outside of Root, and might be called
+  // with anything or appear on any Root input.
+  private static BitsAlias EXT_ALIASES = BitsAlias.EXT;
+  private static BitsFun EXT_FIDXS = BitsFun.EXT;
+    
   // Unique ID
   private static int UID=1;
   public final int _uid=UID++;
@@ -80,26 +86,38 @@ public class TV2 {
   // If Nil    , contains the single key "?"  and all other fields are null.
   // If Lambda , contains keys "x","y","z" for args or "ret" for return.
   // If Struct , contains keys for the field labels.  No display & not-null.
+    // If Error  , _eflow may contain a 2nd flow type; also blends keys from all takers
   public NonBlockingHashMap<String,TV2> _args;
 
   // A dataflow type or null.  A 2nd dataflow type for errors.
   // If Leaf or unified or Nil or Apply, then null.
   // If Base, then the flow type.
-  // If Lambda, then a TFP and the BitsFun   matters.
-  // If Struct, then a TMP and the BitsAlias matters.
   public Type _flow, _eflow;
 
-  // Structs allow more fields.  Not quite the same as TypeStruct._open field.
-  public boolean _open;
+  // Can be nil
+  boolean _may_nil;
 
-  // Null for no-error, or else a single TV2 error
-  public String _err = null;
+  // Is a Lambda; keys x,y,z,ret may appear.
+  boolean _is_fun;
+
+  // True for T2 returns from any primitive which might widen its result or
+  // root args.  Otherwise, in cases like:
+  //       "f0 = { f -> (if (rand) 1 (f (f0 f) 2))}; f0"
+  // f's inputs and outputs gets bound to a '1': f = { 1 2 -> 1 }
+  boolean _is_copy = true;
+
+  // Contains the set of aliased Structs, or null if not a Struct.
+  // If set, then keys for field names may appear.
+  boolean _is_struct;
+  // Structs allow more fields.  Not quite the same as TypeStruct._open field.
+  boolean _open;
+
+  // Null for no-error, or else a single-T2 error
+  String _err = null;
 
   // Set of dependent CallEpiNodes, to be re-worklisted if the called function changes TV2.
   private UQNodes _deps;
 
-  // Debug only.  Set of unioned Nodes.  null for empty.  Helpful to track where TV2s come from.
-  private UQNodes _ns;     //
   private @NotNull final String _alloc_site; // Creation site; used to track excessive creation.
 
   // Track allocation statistics
@@ -107,133 +125,100 @@ public class TV2 {
   static private final HashMap<String,ACnts> ALLOCS = new HashMap<>(); // Counts at alloc sites
 
   // Common constructor
-  private TV2(NonBlockingHashMap<String,TV2> args, UQNodes ns, @NotNull String alloc_site) {
+  private TV2(NonBlockingHashMap<String,TV2> args, @NotNull String alloc_site) {
     _args = args;
-    _ns = ns;
-    _alloc_site = alloc_site;
-    ALLOCS.computeIfAbsent(alloc_site,e -> new ACnts())._malloc++;
+    ALLOCS.computeIfAbsent(_alloc_site=alloc_site,e -> new ACnts())._malloc++;
   }
-  @SuppressWarnings("unchecked")
+  
   TV2 copy(String alloc_site) {
     // Shallow clone of args
-    TV2 t = new TV2(_args==null ? null : (NonBlockingHashMap<String,TV2>)_args.clone(),_ns,alloc_site);
+    TV2 t = new TV2(_args==null ? null : (NonBlockingHashMap<String,TV2>)_args.clone(),_alloc_site);
     t._flow = _flow;
     t._eflow = _eflow;
+    t._may_nil = _may_nil;
+    t._is_fun = _is_fun;
+    t._is_struct = _is_struct;
     t._open = _open;
+    t._is_copy = _is_copy;
     t._deps = _deps;
     t._err = _err;
     return t;
   }
 
   // Accessors
+  public boolean is_leaf() { return _args==null && _flow==null && !_is_struct && !_is_fun; }
   public boolean is_unified(){return arg(">>")!=null; }
-  public boolean is_leaf() { return _args==null && _flow==null; }
   public boolean is_nil () { return arg("?" )!=null; }
-  public boolean is_base() { return _flow != null && !is_fun() && !is_obj(); }
-  public boolean is_fun () { return _flow instanceof TypeFunPtr; }
-  public boolean is_obj () { return _flow instanceof TypeMemPtr; }
+  public boolean is_base() { return _flow != null; }
+  public boolean is_fun () { return _is_fun; }
+  public boolean is_obj () { return _is_struct; }
   public boolean is_open() { return _open; }           // Struct-specific
   public boolean is_err () { return _err!=null || is_err2(); }
-  public boolean is_err2() { return _eflow!=null; }
-  public int size() { return _args==null ? 0 : _args.size(); }
-
-  //// Unify-at a key.  Expect caller already has args
-  //public boolean unify_at(Node n, String key, TV2 tv2, boolean test ) {
-  //  if( is_err() ) return unify(tv2,test);// if i am dead, all my parts are dead, so tv2 is unifying with a dead part
-  //  assert is_tvar() && !tv2.is_unified();
-  //  TV2 old = get(key);
-  //  if( old!=null )
-  //    return old.unify(tv2,test); // This old becomes that
-  //  if( test ) return true; // Would add part
-  //  args_put(key,tv2);
-  //  Env.GVN.add_flow(_deps);
-  //  _ns = _ns.add(n);
-  //  return true;
-  //}
-  //
-  //// Open to new fields or not
-  //public boolean open() {
-  //  return _open;
-  //}
-  //
-  //public Set<String> args() { return _args.keySet(); }
-  //public int len() { return _args==null ? 0 : _args.size(); }
-
-  public int nargs() {
-    assert is_fun();
-    int nargs = _args.size();
-    nargs--; assert _args.containsKey(" ret"); // Do not count return
-    if( _args.containsKey("2") ) nargs--; // Do not count display
-    assert !_args.containsKey("^"); // Canonical display name
-    return nargs;
+  boolean is_err2()  { return
+      (_flow   ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_is_struct
+      (_eflow  ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_is_struct
+      (_is_fun        ? 1 : 0) +
+      (_is_struct     ? 1 : 0) >= 2;
   }
+
+  public int size() { return _args==null ? 0 : _args.size(); }
 
   // --------------------------------------------
   // Public factories
   // Make a new TV2 attached to a Node.
-  public static TV2 make_leaf(Node n, @NotNull String alloc_site) {
-    return new TV2(null,UQNodes.make(n),alloc_site);
-  }
+  public static TV2 make_leaf(@NotNull String alloc_site) {  return new TV2(null,alloc_site); }
   // Make a nilable
   public static TV2 make_nil(TV2 notnil, @NotNull String alloc_site) {
-    return new TV2(new NonBlockingHashMap<>(){{put("?",notnil);}},notnil._ns,alloc_site);
-  }
-  // Make a new primitive base TV2
-  public static TV2 make_base(Node n, Type flow, @NotNull String alloc_site) {
-    assert !(flow instanceof TypeStruct) && !(flow instanceof TypeFunPtr);
-    TV2 t2 = new TV2(null,UQNodes.make(n),alloc_site);
-    t2._flow=flow;
-    assert t2.is_base() && !t2.is_obj();
+    TV2 t2 = new TV2(new NonBlockingHashMap<>(){{put("?",notnil);}},alloc_site);
+    t2._may_nil = true;
     return t2;
   }
-  public static TV2 make_fun(Node n, TypeFunPtr fptr, @NotNull String alloc_site, TV2... t2s) {
-    //assert fptr.nargs()==t2s.length;
+  // Make a new primitive base TV2
+  public static TV2 make_base(Type flow, @NotNull String alloc_site) {
+    assert !(flow instanceof TypeStruct) && !(flow instanceof TypeFunPtr);
+    TV2 t2 = new TV2(null,alloc_site);
+    t2._flow=flow;
+    return t2;
+  }
+  public static TV2 make_fun(@NotNull String alloc_site, TV2... t2s) {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
     for( int i=DSP_IDX; i<t2s.length; i++ )
       if( t2s[i]!=null ) args.put(argname(i), t2s[i]);
     args.put(" ret",t2s[0]); // Backdoor the return in slot 0
-    TV2 t2 = new TV2(args,UQNodes.make(n),alloc_site);
-    t2._flow = fptr;
+    TV2 t2 = new TV2(args,alloc_site);
+    t2._is_fun = true;
+    t2._may_nil = false;
     return t2;
   }
   // A struct with fields
-  public static TV2 make_struct( NewNode n, String alloc_site ) {
-    //NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
-    //for( TypeFld fld : n._ts )
-    //  args.put(fld._fld,n.in(fld._order).tvar());
-    //// Value types have a class name field
-    //if( n._tptr.is_valtype() )
-    //  args.put(n._ts._name,make_leaf(n,alloc_site));
-    //TV2 t2 = new TV2(args,UQNodes.make(n),alloc_site);
-    //t2._flow = n._tptr.make_from(n._ts);
-    //t2._open = false;
-    //return t2;
-    throw unimpl(); // TODO lookup n index from struct
-  }
-  // Convert a leaf to an open struct
-  public void make_open_struct() {
-    assert is_leaf();
-    _open = true;
-    _flow = TypeMemPtr.make(BitsAlias.EMPTY,TypeStruct.EMPTY);
-    _args = new NonBlockingHashMap<>();
-    assert is_obj();
+  public static TV2 make_struct( StructNode rec, String alloc_site ) {
+    NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
+    for( int i=0; i<rec._defs._len; i++ )
+      args.put(rec.ts().get(i)._fld,rec.tvar(i));
+    TV2 t2 = new TV2(args,alloc_site);
+    t2._is_struct = true;
+    t2._may_nil = false;
+    t2._open = false;
+    return t2;
   }
 
   // An array, with int length and an element type
   public static TV2 make_ary(NewNode n, Node elem, String alloc_site) {
-    NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
-    args.put(" len",  make_leaf(n,alloc_site));
-    args.put(" elem", elem.tvar());
-    TV2 t2 = new TV2(args,UQNodes.make(n),alloc_site);
-    t2._flow = n._tptr;
-    assert t2.is_obj();
-    return t2;
+    //NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
+    //args.put(" len",  make_leaf(n,alloc_site));
+    //args.put(" elem", elem.tvar());
+    //TV2 t2 = new TV2(args,UQNodes.make(n),alloc_site);
+    //t2._flow = n._tptr;
+    //assert t2.is_obj();
+    //return t2;
+    throw unimpl();
   }
 
   public static void reset_to_init0() {
     UID=1;
+    EXT_ALIASES = BitsAlias.EXT;
+    EXT_FIDXS = BitsFun.EXT;
   }
-  public void reset(Node n) { if( _ns!=null ) _ns.remove(n._uid); }
 
   public void free() {
     if( !is_unified() ) ALLOCS.get(_alloc_site)._free++;
@@ -241,7 +226,6 @@ public class TV2 {
     _flow = _eflow = null;
     _open = false;
     _deps = null;
-    _ns   = null;
     _err  = null;
   }
 
@@ -310,25 +294,25 @@ public class TV2 {
     if( n.is_leaf() ) return this;
     _args.remove("?");  // No longer have the "?" key, not a nilable anymore
     // Nested nilable-and-not-leaf, need to fixup the nilable
-    _flow  = n. _flow;
-    _eflow = n._eflow;
-    if( n.is_base() ) add_nil();
-    if( n.is_fun() ) {
-      throw unimpl();
+    if( n.is_base() ) {
+      _flow = n._flow.meet(Type.NIL);
+      if( n._eflow!=null ) _eflow = n._eflow.meet(Type.NIL);
+      if( !n._is_copy ) clr_cp();
     }
+    if( n.is_fun() ) throw unimpl();
     if( n.is_obj() ) {
-      _open = n._open;
-      add_nil();
       if( n._args!=null )     // Shallow copy fields
         for( String key : n._args.keySet() )
           _args.put(key,n.arg(key));
+      _is_struct = true;
+      _may_nil = true;
+      _open = n._open;
     }
     if( n.is_nil() ) {
       _args.put("?",n.arg("?"));
     }
     if( _args.size()==0 ) _args=null;
     n.merge_deps(this);
-    n.merge_ns  (this);
     return this;
   }
 
@@ -339,43 +323,45 @@ public class TV2 {
   public boolean has_nil() {
     if(  _flow !=null &&  _flow.must_nil() ) return true;
     if( _eflow !=null && _eflow.must_nil() ) return true;
+    if( _may_nil                           ) return true;
     return false;
   }
   // Strip off nil
   public TV2 strip_nil() {
     if(  _flow!=null )  _flow =  _flow.join(Type.NSCALR);
     if( _eflow!=null ) _eflow = _eflow.join(Type.NSCALR);
+    _may_nil = false;
     return this;
   }
   // Add nil
   public void add_nil() {
     if(  _flow!=null )  _flow =  _flow.meet(Type.NIL);
     if( _eflow!=null ) _eflow = _eflow.meet(Type.NIL);
+    _may_nil = true;
   }
 
-
-  // True if 'this isa t2'.  Must be monotonic.
-  boolean isa( TV2 t2 ) {
-    // Leaf can "fall" (unify, expand) into anything.
-    // Conversely, nothing can "fall" into a Leaf
-    if(    is_leaf() ) return true;
-    if( t2.is_leaf() ) return false;
-    // Structurally equal
-    if( eq(t2) ) return true;
-
-    // Structural breakdown
-    // Check base terms
-    if( not_isa( _flow, t2. _flow) ) return false;
-    if( not_isa(_eflow, t2._eflow) ) return false;
-    // Check argument names.  Defensive copy did not go deep, and the
-    // lifting does the recursion, so we only need to check shallow here.
-    if( _args!=null ) throw unimpl();
-    // All parts isa
-    return true;
-  }
-  private static boolean not_isa( Type t0, Type t1 ) {
-    return (t0 != null || t1 != null) && (t0 == null || t1 == null || !t0.isa(t1));
-  }
+  //// True if 'this isa t2'.  Must be monotonic.
+  //boolean isa( TV2 t2 ) {
+  //  // Leaf can "fall" (unify, expand) into anything.
+  //  // Conversely, nothing can "fall" into a Leaf
+  //  if(    is_leaf() ) return true;
+  //  if( t2.is_leaf() ) return false;
+  //  // Structurally equal
+  //  if( eq(t2) ) return true;
+  //
+  //  // Structural breakdown
+  //  // Check base terms
+  //  if( not_isa( _flow, t2. _flow) ) return false;
+  //  if( not_isa(_eflow, t2._eflow) ) return false;
+  //  // Check argument names.  Defensive copy did not go deep, and the
+  //  // lifting does the recursion, so we only need to check shallow here.
+  //  if( _args!=null ) throw unimpl();
+  //  // All parts isa
+  //  return true;
+  //}
+  //private static boolean not_isa( Type t0, Type t1 ) {
+  //  return (t0 != null || t1 != null) && (t0 == null || t1 == null || !t0.isa(t1));
+  //}
 
   // Varies as unification happens; not suitable for a HashMap/HashSet unless
   // unchanging (e.g. defensive clone)
@@ -383,9 +369,12 @@ public class TV2 {
     int hash = 0;
     if(    _flow!=null ) hash+=    _flow._hash;
     if(   _eflow!=null ) hash+=   _eflow._hash;
+    if( _is_fun ) hash = (hash+ 7)*13;
+    if( _may_nil) hash = (hash+13)*23;
+    if( _is_struct ) hash = (hash+23)*29;
     if( _args!=null )
       for( String key : _args.keySet() )
-        hash += key.hashCode();
+        hash ^= key.hashCode();
     return hash;
   }
 
@@ -407,21 +396,21 @@ public class TV2 {
     assert !is_unified();
     if( is_leaf() ) return Type.SCALAR;
     if( is_base() ) return _flow;
-    if( is_nil()  ) return Type.SCALAR;
+    if( is_nil()  ) 
+      return arg("?")._as_flow().meet(Type.NIL);
     if( is_fun()  ) {
       Type tfun = ADUPS.get(_uid);
       if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
       ADUPS.put(_uid, Type.XSCALAR);
       Type rez = arg(" ret")._as_flow();
-      return TypeFunPtr.make(BitsFun.ALL,size()-1,Type.ANY,rez);
+      return TypeFunPtr.make(EXT_FIDXS,size()-1,Type.ANY,rez);
     }
     if( is_obj() ) {
-      TypeMemPtr tmp = (TypeMemPtr)_flow;
       TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);
       if( tstr==null ) {
         // Returning a high version of struct
         Type.RECURSIVE_MEET++;
-        tstr = TypeStruct.malloc("",false).add_fld(TypeFld.NO_DISP);
+        tstr = TypeStruct.malloc("",is_open()).add_fld(TypeFld.NO_DISP);
         if( _args!=null )
           for( String id : _args.keySet() )
             tstr.add_fld(TypeFld.malloc(id));
@@ -434,7 +423,11 @@ public class TV2 {
           // TypeStructs, so keep RECURSIVE_MEET enabled.
           tstr = Cyclic.install(tstr);
       }
-      return TypeMemPtr.make(tmp.aliases(),tstr);
+      // The HM is_struct wants to be a TypeMemPtr, but the recursive builder
+      // is built around TypeStruct, hence the TMP wrap.
+
+      // This is a Root passed-in struct which can have all aliases
+      return TypeMemPtr.make(_may_nil ? EXT_ALIASES.meet_nil() : EXT_ALIASES,tstr);
     }
 
     throw unimpl();
@@ -489,14 +482,12 @@ public class TV2 {
     assert !is_unified() && !that.is_unified(); // Cannot union twice
     ALLOCS.get(_alloc_site)._unified++;
     merge_deps(that);           // Merge update lists, for future unions
-    merge_ns  (that);           // Merge Node list, for easier debugging
     if( _args!=null ) _args.clear();
     else _args = new NonBlockingHashMap<>();
     _args.put(">>", that);
     _flow = _eflow = null;
     _open = false;
     _deps = null;
-    _ns   = null;
     _err = null;
     assert is_unified();
     return true;
@@ -972,6 +963,25 @@ public class TV2 {
     throw unimpl();
   }
 
+  // -----------------
+  static final VBitSet UPDATE_VISIT  = new VBitSet();
+  void clr_cp() { UPDATE_VISIT.clear(); _clr_cp();}
+  private void _clr_cp() {
+    TV2 ret;
+    if( !_is_copy || UPDATE_VISIT.tset(_uid) ) return;
+    _is_copy = false;
+    if( _deps!=null )
+      //for( Syntax syn : _deps )
+      //  if( syn instanceof Lambda lam && lam.find().arg("ret")==this )
+      //    for( Apply apply : lam._applys )
+      //      if( (ret=apply._fun.find().arg("ret"))!=null )
+      //        ret._clr_cp();
+      throw unimpl();
+    if( _args != null )
+      for( TV2 t2 : _args.values() )
+        t2._clr_cp();
+  }
+
   // --------------------------------------------
   // This is a TV2 function that is the target of 'fresh', i.e., this function
   // might be fresh-unified with some other function.  Push the application
@@ -1013,9 +1023,6 @@ public class TV2 {
   // CEPI.unify_lift when types change structurally, or when structures are
   // unifing on field names.
   private void merge_deps( TV2 that ) { that.push_deps(_deps); }
-  // Merge Node lists, 'this' into 'that', for easier debugging.
-  // Lazily remove dead nodes on the fly.
-  private void merge_ns( TV2 that ) { that._ns = that._ns == null ? _ns : that._ns.addAll(_ns); }
 
   // --------------------------------------------
   // Recursively unbox

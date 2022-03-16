@@ -103,7 +103,7 @@ many call sites and thus end up typed as a Scalar to Scalar, to improve the GCP
 type on a per-call-site basis.
 
 Also for the HM->GCP direction, HM is used to lift external calls to escaped
-functions.  This probably needs more explaination: Functions which do not
+functions.  This probably needs more explanation: Functions which do not
 escape the borders of the compilation unit are treated as private, and all
 their callers are known (the Call Graph is found by GCP as explained above).
 Functions which DO escape are treated "as-if" called by an unknown caller with

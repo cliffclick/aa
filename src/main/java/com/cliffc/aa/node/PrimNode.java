@@ -52,7 +52,7 @@ public abstract class PrimNode extends Node {
 
     // int opers
     PrimNode[] INTS = new PrimNode[]{
-      new MinusI64(), new Not(),
+      new MinusI64(), new NotI64(),
       new MulI64(), new DivI64(), new MulIF64(), new DivIF64(), new ModI64(),
       new AddI64(), new SubI64(), new AddIF64(), new SubIF64(),
       new LT_I64(), new LE_I64(), new GT_I64(), new GE_I64(),
@@ -102,22 +102,33 @@ public abstract class PrimNode extends Node {
     return PRIMS;
   }
 
+  public static TypeStruct make_int(long i) {
+    return TypeStruct.make("int:",false,TypeFld.make("x",TypeInt.con(i)));
+  }
+  
+  public static TypeStruct make_flt(double d) {
+    return TypeStruct.make("flt:",false,TypeFld.make("x",TypeFlt.con(d)));
+  }
+  
   private static void install( String s, PrimNode[] prims ) {
-    StructNode nnn = new StructNode(false,false);
-    for( PrimNode prim : prims ) prim.as_fun(nnn,true);
-    for( Node n : nnn._defs )
+    String tname = (s+":").intern();
+    StructNode rec = new StructNode(false,false).name(tname);
+    for( PrimNode prim : prims ) prim.as_fun(rec,true);
+    for( Node n : rec._defs )
       if( n instanceof UnresolvedNode unr )
         Env.GVN.add_work_new(unr.define());
-    nnn.init();
-    nnn.close();
-    Env.PROTOS.put(s,nnn);
-    Env.SCP_0.add_type((s+":").intern(),nnn);
+    rec.init();
+    rec.close();
+    Env.PROTOS.put(s,rec);
+    Env.SCP_0.add_type(tname,rec);
+    // Inject the primitive class above top-level display
+    alloc_inject(rec,s);
   }
 
   // Primitive wrapped as a simple function.
   // Fun Parm_dsp [Parm_y] prim Ret
   // No memory, no RPC.  Display is first arg.
-  private void as_fun( StructNode nnn, boolean is_oper ) {
+  private void as_fun( StructNode rec, boolean is_oper ) {
     String op = is_oper ? (switch( _tfp.nargs() ) {
       case ARG_IDX+1 -> "_";
       case ARG_IDX   -> "";
@@ -126,7 +137,7 @@ public abstract class PrimNode extends Node {
     if( is_oper ) Oper.make(op);
 
     FunNode fun = (FunNode)Env.GVN.init(new FunNode(this,is_oper ? op : _name).add_def(Env.ALL_CTRL));
-    for( int i=0; i<_formals.len(); i++ )
+    for( int i=DSP_IDX; i<_formals.len(); i++ )
       // Make a Parm for every formal, and unwrap it
       add_def(_formals.get(i)==null ? null
               : new FieldNode(new ParmNode(i,fun,(ConNode)Node.con(_formals.at(i))).init(),"x").init());
@@ -135,18 +146,31 @@ public abstract class PrimNode extends Node {
     // Re-wrap the result
     Node val = new StructNode(false,false).add_fld(TypeFld.make("x",_tfp._ret),this,null).init();
     RetNode ret = new RetNode(fun,null,val,null,fun).init();
-    FunPtrNode fptr =  new FunPtrNode(op,ret,is_oper ? Env.ALL : fun.parm(DSP_IDX)).init();
-    nnn.add_fun(op,Access.Final,fptr,null);
+    FunPtrNode fptr =  new FunPtrNode(op,ret,fun.parm(DSP_IDX)).init();
+    rec.add_fun(op,Access.Final,fptr,null);
   }
 
   // Build and install match package
   private static void install_math(PrimNode rand) {
-    StructNode nnn = new StructNode(false,false);
-    rand.as_fun(nnn,false);
-    nnn.add_fld(TypeFld.make("pi",TypeFlt.PI),Node.con(TypeFlt.PI),null);
-    nnn.close();
-    Env.GVN.init(nnn);
-    Env.STK_0.add_fld(TypeFld.make("math",nnn._val),nnn,null);
+    StructNode rec = new StructNode(false,false).name("math:");
+    rand.as_fun(rec,false);
+    rec.add_fld(TypeFld.make("pi",TypeFlt.PI),Node.con(TypeFlt.PI),null);
+    rec.close();
+    Env.GVN.init(rec);
+    alloc_inject(rec,"math");
+  }
+
+  // Alloc and inject above top display
+  private static void alloc_inject(StructNode rec, String name) {
+    // Inject the primitive class above top-level display
+    Node mem = Env.SCP_0.mem();
+    NewNode dsp = (NewNode)mem.in(0);
+    NewNode nnn = new NewNode(dsp.mem(),rec).init();
+    dsp.set_def(MEM_IDX,new MProjNode(nnn).init());
+    Node ptr = new ProjNode(nnn,REZ_IDX).init();
+    Env.STK_0.add_fld(TypeFld.make(name,ptr._val),ptr,null);
+    dsp.xval();
+    mem.xval();
   }
 
 
@@ -160,15 +184,15 @@ public abstract class PrimNode extends Node {
   // str:{flt     -> str }  ==>>  str:flt
   // == :{ptr ptr -> int1}  ==>>  == :ptr
   @Override public String xstr() { return _name+":"+_formals.get("^")._t; }
+  private static final Type[] TS = new Type[ARG_IDX+1];
   @Override public Type value() {
     if( is_keep() ) return Type.ALL;
-    Type[] ts = Types.get(_defs._len); // 1-based
     // If all inputs are constants we constant-fold.  If any input is high, we
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
-    for( int i=0; i<_formals.len(); i++ ) {
+    for( int i=DSP_IDX; i<_formals.len(); i++ ) {
       if( _formals.get(i)==null ) continue;
-      Type tactual = ts[i] = val(i);
+      Type tactual = TS[i] = val(i-DSP_IDX);
       Type tformal = _formals.at(i);
       Type t = tformal.dual().meet(tactual);
       if( !t.is_con() && tactual!=Type.NIL ) {
@@ -177,8 +201,7 @@ public abstract class PrimNode extends Node {
       }
     }
     Type rez = _tfp._ret;
-    Type rez2 = is_con ? apply(ts) : (has_high ? rez.dual() : rez);
-    Types.free(ts);
+    Type rez2 = is_con ? apply(TS) : (has_high ? rez.dual() : rez);
     return rez2;
   }
 
@@ -188,7 +211,7 @@ public abstract class PrimNode extends Node {
     //for( int i=DSP_IDX; i<_defs._len; i++ )
     //  if( in(i)!=Env.ANY ) progress=set_def(i,Env.ANY);
     //return progress;
-    
+
     // Kill prim inputs if dead??? Expect this to be dead-from-below?
     throw unimpl();
   }
@@ -255,6 +278,22 @@ public abstract class PrimNode extends Node {
   }
 
   static class MinusI64 extends Prim1OpI64 { MinusI64() { super("-"); } long op( long x ) { return -x; } }
+  static class NotI64 extends PrimNode {
+    // Rare function which takes a Scalar (works for both ints and ptrs)
+    public NotI64() { super("!",TypeStruct.INT64,TypeInt.BOOL); }
+    @Override public Type value() {
+      Type t = val(0);
+      if( t== Type.XNIL ||
+          t== Type. NIL ||
+          t== TypeInt.ZERO )
+        return TypeInt.TRUE;
+      if( t. may_nil() ) return TypeInt.BOOL.dual();
+      if( t.must_nil() ) return TypeInt.BOOL;
+      return Type.NIL;          // Cannot be a nil, so return a nil
+    }
+    @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
+  }
+
 
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpF64 extends PrimNode {
@@ -320,7 +359,7 @@ public abstract class PrimNode extends Node {
     public AndI64() { super("&"); }
     // And can preserve bit-width
     @Override public Type value() {
-      Type t1 = val(DSP_IDX), t2 = val(ARG_IDX);
+      Type t1 = val(0), t2 = val(1);
       // 0 AND anything is 0
       if( t1 == Type. NIL || t2 == Type. NIL ) return Type. NIL;
       if( t1 == Type.XNIL || t2 == Type.XNIL ) return Type.XNIL;
@@ -346,7 +385,7 @@ public abstract class PrimNode extends Node {
     // And can preserve bit-width
     @Override public Type value() {
       if( is_keep() ) return Type.ALL;
-      Type t1 = val(DSP_IDX), t2 = val(ARG_IDX);
+      Type t1 = val(0), t2 = val(1);
       // 0 OR anything is that thing
       if( t1 == Type.NIL || t1 == Type.XNIL ) return t2;
       if( t2 == Type.NIL || t2 == Type.XNIL ) return t1;
@@ -391,7 +430,7 @@ public abstract class PrimNode extends Node {
       // equals if your inputs are the same node, and you are unequals if your
       // input is 2 different NewNodes (or casts of NewNodes).  Otherwise, you
       // have to do the runtime test.
-      Node in1 = in(DSP_IDX), in2 = in(ARG_IDX);
+      Node in1 = in(0), in2 = in(1);
       if( in1==in2 ) return TypeInt.TRUE;
       Node nn1 = in1.in(0), nn2 = in2.in(0);
       if( nn1 instanceof NewNode &&
@@ -424,7 +463,7 @@ public abstract class PrimNode extends Node {
       // equals if your inputs are the same node, and you are unequals if your
       // input is 2 different NewNodes (or casts of NewNodes).  Otherwise, you
       // have to do the runtime test.
-      Node in1 = in(DSP_IDX), in2 = in(ARG_IDX);
+      Node in1 = in(0), in2 = in(1);
       if( in1==in2 ) return TypeInt.FALSE;
       Node nn1 = in1.in(0), nn2 = in2.in(0);
       if( nn1 instanceof NewNode &&
@@ -444,27 +483,10 @@ public abstract class PrimNode extends Node {
   }
 
 
-  public static class Not extends PrimNode {
-    // Rare function which takes a Scalar (works for both ints and ptrs)
-    public Not() { super("!",TypeStruct.SCALAR1,TypeInt.BOOL); }
-    @Override public Type value() {
-      if( is_keep() ) return Type.ALL;
-      Type t = val(DSP_IDX);
-      if( t== Type.XNIL ||
-          t== Type. NIL ||
-          t== TypeInt.ZERO )
-        return TypeInt.TRUE;
-      if( t. may_nil() ) return TypeInt.BOOL.dual();
-      if( t.must_nil() ) return TypeInt.BOOL;
-      return Type.NIL;          // Cannot be a nil, so return a nil
-    }
-    @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
-  }
-
   public static class RandI64 extends PrimNode {
     public RandI64() { super("rand",TypeStruct.args(Type.ANY,TypeInt.INT64),TypeInt.INT64); }
     @Override public Type value() {
-      Type t = val(ARG_IDX);
+      Type t = val(0);
       if( t.above_center() ) return TypeInt.BOOL.dual();
       if( TypeInt.INT64.dual().isa(t) && t.isa(TypeInt.INT64) )
         return t.meet(TypeInt.FALSE);

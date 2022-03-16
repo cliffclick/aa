@@ -411,24 +411,23 @@ public class Parse implements Comparable<Parse> {
       badts.add(badt);
     }
 
-    //// Normal statement value parse
-    //Node ifex = default_nil ? (scope().stk()._is_val ? con(ts.at(0)) : Env.XNIL) : ifex(); // Parse an expression for the statement value
-    //// Check for no-statement after start of assignment, e.g. "x = ;"
-    //if( ifex == null ) {        // No statement?
-    //  if( toks._len == 0 ) return null;
-    //  ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
-    //}
-    //
-    //// Assign tokens to value
-    //for( int i=0; i<toks._len; i++ ) {
-    //  String tok = toks.at(i);               // Token being assigned
-    //  Access mutable = rs.get(i) ? Access.RW : Access.Final;  // Assignment is mutable or final
-    //  ScopeNode scope = lookup_scope(tok,lookup_current_scope_only);
-    //  ifex = do_store(scope,ifex,mutable,tok,badfs.at(i),ts.at(i),badts.at(i));
-    //}
-    //
-    //return ifex;
-    throw unimpl();
+    // Normal statement value parse
+    Node ifex = default_nil ? Env.XNIL : ifex(); // Parse an expression for the statement value
+    // Check for no-statement after start of assignment, e.g. "x = ;"
+    if( ifex == null ) {        // No statement?
+      if( toks._len == 0 ) return null;
+      ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
+    }
+
+    // Assign tokens to value
+    for( int i=0; i<toks._len; i++ ) {
+      String tok = toks.at(i);               // Token being assigned
+      Access mutable = rs.get(i) ? Access.RW : Access.Final;  // Assignment is mutable or final
+      ScopeNode scope = lookup_scope(tok,lookup_current_scope_only);
+      ifex = do_store(scope,ifex,mutable,tok,badfs.at(i),ts.at(i),badts.at(i));
+    }
+
+    return ifex;
   }
 
   // Assign into display, changing an existing def
@@ -904,7 +903,7 @@ public class Parse implements Comparable<Parse> {
 
   /** Parse anonymous struct; the opening "@{" already parsed.  A lexical scope
    *  is made and new variables are defined here.  Next comes statements, with
-   *  each assigned value becoming a struct member, then the closing "}".  
+   *  each assigned value becoming a struct member, then the closing "}".
    *    struct = \@{ stmts }
    *  Field syntax:
    *    id [:type] [amod [expr]]  // missing amod defaults to "id := 0"; missing expr defaults to "0"
@@ -1000,7 +999,7 @@ public class Parse implements Comparable<Parse> {
     //
     //  // Parms for all arguments
     //  Parse errmsg = errMsg();  // Lazy error message
-    //  assert fun==_e._fun && fun==_e._scope.ctrl(); 
+    //  assert fun==_e._fun && fun==_e._scope.ctrl();
     //  for( int i=ARG_IDX; i<formals.len(); i++ ) { // User parms start
     //    TypeFld fld = formals.get(i);
     //    //Node parm = gvn(new ParmNode(i,fld,fun,Env.ALL_PARM,errmsg));
@@ -1201,9 +1200,9 @@ public class Parse implements Comparable<Parse> {
     _x = _pp.getIndex();
     if( n instanceof Long   ) {
       if( _buf[_x-1]=='.' ) _x--; // Java default parser allows "1." as an integer; pushback the '.'
-      return con(TypeInt.con(n.longValue()));
+      return con(PrimNode.make_int(n.longValue()));
     }
-    if( n instanceof Double ) return con(TypeFlt.con(n.doubleValue()));
+    if( n instanceof Double ) return con(PrimNode.make_flt(n.doubleValue()));
     throw new RuntimeException(n.getClass().toString()); // Should not happen
   }
   // Parse a small positive integer; WS already skipped and sitting at a digit.

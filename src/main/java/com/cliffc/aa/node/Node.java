@@ -93,7 +93,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
   public boolean has_tvar() { return _tvar!=null; }
   public TV2 tvar(int x) { return in(x).tvar(); } // nth TV2
-  public TV2 new_tvar(String alloc_site) { return TV2.make_leaf(this,alloc_site); }
+  public TV2 new_tvar(String alloc_site) { return TV2.make_leaf(alloc_site); }
 
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)

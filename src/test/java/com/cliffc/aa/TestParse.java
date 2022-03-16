@@ -73,7 +73,7 @@ public class TestParse {
   }
 
   @Test public void testParse00() {
-    test("1",   TypeInt.TRUE, "int:");
+    test("1", "int:@{x=1}", "int:");
     // Unary operator
     test("-1",  TypeInt.con(-1), "int:");
     test("!1",  Type.NIL, "A?");
@@ -911,8 +911,8 @@ HashTable = {@{
   }
 
   // Run a program once, with a given seed and typing flags
-  static private void _test0( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect, String err, int cur_off, int rseed ) {
-    TypeEnv te = Exec.file("test",program,rseed,gcp_maker!=null,hmt_expect!=null);
+  static private void _test0( String program, String gcp, String formals, String hmt_expect, String err, int cur_off, int rseed ) {
+    TypeEnv te = Exec.file("test",program,rseed,gcp!=null,hmt_expect!=null);
     if( err != null ) {
       assertTrue(te._errs != null && te._errs.size()>=1);
       String cursor = new String(new char[cur_off]).replace('\0', ' ');
@@ -921,17 +921,17 @@ HashTable = {@{
 
     } else {
       assertNull(te._errs);
-      if( gcp_maker != null ) {
+      if( gcp != null ) {
         Type actual = te._tmem.sharptr(te._t); // Sharpen any memory pointers
-        Type expect = gcp_maker.apply(actual);
+        Type expect = Type.valueOf(gcp);
         assertEquals(expect,actual);
         // Also check GCP formals.
         if( expect instanceof TypeFunPtr ) {
           TypeStruct actual_formals = te._formals;
-          TypeStruct expect_formals = formals_maker.get();
+          TypeStruct expect_formals = (TypeStruct)Type.valueOf(formals);
           assertEquals(expect_formals,actual_formals);
         } else
-          assert formals_maker==null;
+          assert formals==null;
       }
       if( hmt_expect != null ) {
         TV2 actual = te._hmt;
@@ -944,60 +944,59 @@ HashTable = {@{
 
   // Run a program once-per-rseed
   private static final int[] rseeds = new int[]{0,1,2,3};
-  static private void _test1( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect, String err, int cur_off ) {
+  static private void _test1( String program, String gcp, String formals, String hmt_expect, String err, int cur_off ) {
     for( int rseed : rseeds )
     //for( int rseed=0; rseed<32; rseed++ )
-      _test0(program,gcp_maker,formals_maker,hmt_expect,err,cur_off,rseed);
+      _test0(program,gcp,formals,hmt_expect,err,cur_off,rseed);
   }
 
   // Run a program in all 3 modes, with all rseeds
-  static private void _test2( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect, String err, int cur_off ) {
-    _test1(program,gcp_maker,formals_maker,null      ,err,cur_off);
-    _test1(program,null     ,null         ,hmt_expect,err,cur_off);
-    _test1(program,gcp_maker,formals_maker,hmt_expect,err,cur_off);
+  static private void _test2( String program, String gcp, String formals, String hmt_expect, String err, int cur_off ) {
+    _test1(program,gcp ,formals,null      ,err,cur_off);
+    _test1(program,null,null   ,hmt_expect,err,cur_off);
+    _test1(program,gcp ,formals,hmt_expect,err,cur_off);
   }
 
   // Run a program in all 3 modes, yes function returns, no errors
+  private void test( String program, String gcp, String formals, String hmt_expect ) {
+    _test2(program,gcp,formals,hmt_expect,null,0);
+  }
+  // Run a program in all 3 modes, yes function returns, no errors
   private void test( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect ) {
-    _test2(program,gcp_maker,formals_maker,hmt_expect,null,0);
+    //_test2(program,gcp_maker,formals_maker,hmt_expect,null,0);
+    throw unimpl();
   }
 
   // Short form test: simple GCP, no formal args
-  private void test( String program, Type gcp_maker, String hmt_expect ) {
-    _test2(program,ignore->gcp_maker,null,hmt_expect,null,0);
+  private void test( String program, String gcp, String hmt_expect ) {
+    _test2(program,gcp,null,hmt_expect,null,0);
+  }
+  // Short form test: simple GCP, no formal args
+  private void test( String program, Type gcp, String hmt_expect ) {
+    //_test2(program,ignore->gcp,null,hmt_expect,null,0);
+    throw unimpl();
   }
 
   // Result is expected to be a pointer, with an uninteresting alias.  The
   // expected ptr._obj is passed.
   private void test_ptr( String program, TypeStruct gcp_expect, String hmt_expect ) {
-    _test2(program,
-           actual -> actual instanceof TypeMemPtr ? ((TypeMemPtr)actual).make_from(gcp_expect) : gcp_expect,
-           null,hmt_expect,null,0);
+    throw unimpl();
+    //_test2(program,
+    //       actual -> actual instanceof TypeMemPtr ? ((TypeMemPtr)actual).make_from(gcp_expect) : gcp_expect,
+    //       null,hmt_expect,null,0);
   }
   // Result is expected to be a pointer, with an uninteresting alias and an
   // interesting nil.  The expected nil-ness and _obj is passed.
   private void test_ptr0( String program, TypeMemPtr gcp_expect, String hmt_expect ) {
-    _test2(program,
-           actual -> actual instanceof TypeMemPtr ? gcp_expect.make_from_nil(((TypeMemPtr)actual)._aliases) : gcp_expect,
-           null,hmt_expect,null,0);
+    throw unimpl();
+    //_test2(program,
+    //       actual -> actual instanceof TypeMemPtr ? gcp_expect.make_from_nil(((TypeMemPtr)actual)._aliases) : gcp_expect,
+    //       null,hmt_expect,null,0);
   }
 
   static void testerr( String program, String err, int cur_off ) {
-    _test2(program,ignore->Type.ALL,null,"",err,cur_off);
-  }
-
-
-
-  static private void test( String program, String flow_expect, String hm_expect ) {
-    //TypeEnv te = run(program);
-    //Type flow_actual = te._tmem.sharptr(te._t);
-    //String flow_str = flow_actual.str(new SB(),new VBitSet(),null,false).toString(); // Print what we see
-    //TV2 hm_actual = te._hmt;
-    //String hm_str = hm_actual.p();
-    //assertEquals(flow_expect,flow_str);
-    //if( Combo.DO_HM )
-    //  assertEquals(stripIndent(hm_expect),stripIndent(hm_str));
     throw unimpl();
+    //_test2(program,ignore->Type.ALL,null,"",err,cur_off);
   }
 
 
@@ -1050,30 +1049,24 @@ HashTable = {@{
     //assertEquals(expected,strip_alias_numbers(sb.toString()));
     throw unimpl();
   }
-  static private void test( String program, Function<Integer,Type> expected ) {
-    //TypeEnv te = run(program);
-    //Type t_expected = expected.apply(-99); // unimpl
-    //assertEquals(t_expected,te._t);
-    throw unimpl();
-  }
   static private void test_isa( String program, Type expected ) {
     //TypeEnv te = run(program);
     //Type actual = te._tmem.sharptr(te._t);
     //assertTrue(actual.isa(expected));
     throw unimpl();
   }
-  //private static String strip_alias_numbers( String err ) {
-    // Remove alias#s from the result string: *[123]@{x=1,y=2} ==> *[$]@{x=1,y=2}
-    //     \\      Must use two \\ because of String escaping for every 1 in the regex.
-    // Thus replacing: \[[,0-9]*  with:  \[\$
-    // Regex breakdown:
-    //     \\[     prevents using '[' as the start of a regex character class
-    //     [,0-9]  matches digits and commas
-    //     *       matches all the digits and commas
-    //     \\[     Replacement [ because the first one got matched and replaced.
-    //     \\$     Prevent $ being interpreted as a regex group start
-  //  return err.replaceAll("\\[[,0-9]*", "\\[\\$");
-  //}
+  ////private static String strip_alias_numbers( String err ) {
+  //  // Remove alias#s from the result string: *[123]@{x=1,y=2} ==> *[$]@{x=1,y=2}
+  //  //     \\      Must use two \\ because of String escaping for every 1 in the regex.
+  //  // Thus replacing: \[[,0-9]*  with:  \[\$
+  //  // Regex breakdown:
+  //  //     \\[     prevents using '[' as the start of a regex character class
+  //  //     [,0-9]  matches digits and commas
+  //  //     *       matches all the digits and commas
+  //  //     \\[     Replacement [ because the first one got matched and replaced.
+  //  //     \\$     Prevent $ being interpreted as a regex group start
+  ////  return err.replaceAll("\\[[,0-9]*", "\\[\\$");
+  ////}
   static private void testary( String program, String err, int cur_off ) {
     //TypeEnv te = Exec.go(Env.file_scope(new Env()),"args",program);
     //assertTrue(te._errs != null && te._errs.size()>=1);
@@ -1082,5 +1075,4 @@ HashTable = {@{
     //assertEquals(err2,te._errs.get(0).toString());
     throw unimpl();
   }
-
 }
