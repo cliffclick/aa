@@ -444,21 +444,23 @@ public final class CallEpiNode extends Node {
     return this;
   }
 
-  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // Compute local contribution of use liveness to this def.  If the call is
   // Unresolved, then none of CallEpi targets are (yet) alive.
-  @Override public TypeMem live_use(Node def ) {
+  @Override public Type live_use(Node def ) {
     if( _is_copy ) return def._live; // A copy
     // Not a copy
     if( def==in(0) ) return _live; // The Call
+    if( ((RetNode)def).mem()==null ) return Type.ANY; // No memory input
     // Wired return.
     // The given function is alive, only if the Call will Call it.
+    // This is morally equivalent to a Phi with dead control input declaring the value also dead.
+    // It "turns around" value flow into liveness flow.
     Type tcall = call()._val;
-    if( !(tcall instanceof TypeTuple) ) return tcall.above_center() ? TypeMem.DEAD : _live;
+    if( !(tcall instanceof TypeTuple) ) return tcall.above_center() ? Type.ANY : _live;
     BitsFun fidxs = CallNode.ttfp(tcall).fidxs();
     int fidx = ((RetNode)def).fidx();
-    if( fidxs.above_center() || !fidxs.test_recur(fidx) || ((RetNode)def).mem()==null )
-      return TypeMem.DEAD;    // Call does not call this, so not alive.
+    if( fidxs.above_center() || !fidxs.test_recur(fidx) )
+      return Type.ANY;    // Call does not call this, so not alive.
     return _live;
   }
 

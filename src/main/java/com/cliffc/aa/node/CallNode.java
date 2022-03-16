@@ -444,49 +444,47 @@ public class CallNode extends Node {
     }
   }
 
-  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
-  @Override public TypeMem live_use(Node def) {
-    TypeMem basic_live = def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ALLMEM;
+  @Override public Type live_use(Node def) {
     Type tcall = _val;
     if( !(tcall instanceof TypeTuple) ) // Call is has no value (yet)?
-      return tcall.oob(basic_live);
-    if( is_keep() ) return basic_live; // Still under construction, all alive
-
-    if( def==ctl() ) return TypeMem.ALIVE;
+      return tcall.oob();
+    if( is_keep()  ) return Type.ALL; // Still under construction, all alive
+    if( def==ctl() ) return Type.ALL;
     if( def==mem() ) return _live;
 
-    CallEpiNode cepi = cepi();
-    if( def==fdx() ) {          // Function argument
-      TypeFunPtr tfp = ttfp(tcall);
-      BitsFun fidxs = tfp.fidxs();
-      // If using a specific FunPtr and its in the resolved set, test more precisely
-      RetNode ret;
-      if( def instanceof FunPtrNode &&           // Have a FunPtr
-          (ret=((FunPtrNode)def).ret())!=null && // Well-structured function
-          !fidxs.test_recur(ret._fidx) )         // FIDX directly not used
-        //return TypeMem.DEAD;                     // Not in the fidx set.
-        throw unimpl();    // premature optimization?
-      // Otherwise, the FIDX is alive.  Check the display.
-      ProjNode dsp = ProjNode.proj(this,DSP_IDX);
-      return ((!_is_copy && !cepi.is_all_wired()) || // Unwired calls remain, dsp could be alive yet
-              (dsp!=null && dsp._live==TypeMem.ALIVE)) ? TypeMem.ALIVE : TypeMem.LNO_DISP;
-    }
-
-    // Check that all fidxs are wired; an unwired fidx might be in-error
-    // and we want the argument alive for errors.  This is a value turn-
-    // around point (high fidxs need to fall)
-    if( !_is_copy && !cepi.is_all_wired() ) return TypeMem.ALIVE;
-    // All wired, the arg is dead if the matching projection is dead
-    int argn = _defs.find(def);
-    ProjNode proj = ProjNode.proj(this, argn);
-    return proj == null || proj._live == TypeMem.DEAD ? TypeMem.DEAD : TypeMem.ALIVE;
+    //CallEpiNode cepi = cepi();
+    //if( def==fdx() ) {          // Function argument
+    //  TypeFunPtr tfp = ttfp(tcall);
+    //  BitsFun fidxs = tfp.fidxs();
+    //  // If using a specific FunPtr and its in the resolved set, test more precisely
+    //  RetNode ret;
+    //  if( def instanceof FunPtrNode &&           // Have a FunPtr
+    //      (ret=((FunPtrNode)def).ret())!=null && // Well-structured function
+    //      !fidxs.test_recur(ret._fidx) )         // FIDX directly not used
+    //    //return TypeMem.DEAD;                     // Not in the fidx set.
+    //    throw unimpl();    // premature optimization?
+    //  // Otherwise, the FIDX is alive.  Check the display.
+    //  ProjNode dsp = ProjNode.proj(this,DSP_IDX);
+    //  return ((!_is_copy && !cepi.is_all_wired()) || // Unwired calls remain, dsp could be alive yet
+    //          (dsp!=null && dsp._live==TypeMem.ALIVE)) ? TypeMem.ALIVE : TypeMem.LNO_DISP;
+    //}
+    //
+    //// Check that all fidxs are wired; an unwired fidx might be in-error
+    //// and we want the argument alive for errors.  This is a value turn-
+    //// around point (high fidxs need to fall)
+    //if( !_is_copy && !cepi.is_all_wired() ) return TypeMem.ALIVE;
+    //// All wired, the arg is dead if the matching projection is dead
+    //int argn = _defs.find(def);
+    //ProjNode proj = ProjNode.proj(this, argn);
+    //return proj == null || proj._live == TypeMem.DEAD ? TypeMem.DEAD : TypeMem.ALIVE;
+    throw unimpl();
   }
 
   @Override public TV2 new_tvar( String alloc_site) { return null; }
 
   // See if we can resolve an unresolved Call
   @Override public void combo_resolve(WorkNode ambi) {
-    if( _live == TypeMem.DEAD ) return;
+    if( _live == Type.ANY ) return;
     // Wait until the Call is reachable
     if( ctl()._val != Type.CTRL || !(_val instanceof TypeTuple) ) return;
     // Only ambiguous if FIDXs are both above_center and there are more than one

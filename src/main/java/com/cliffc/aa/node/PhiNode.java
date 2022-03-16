@@ -15,7 +15,6 @@ public class PhiNode extends Node {
     super(op,vals);
     _t = t;
     _badgc = badgc;
-    _live = all_live();         // Recompute starting live after setting t
     if( t instanceof TypeMem || t instanceof TypeRPC ) _tvar=null;  // No HM for memory
   }
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
@@ -89,22 +88,19 @@ public class PhiNode extends Node {
   }
 
   //@Override BitsAlias escapees() { return BitsAlias.FULL; }
-  @Override public TypeMem all_live() {
-    return _t instanceof TypeMem ? TypeMem.ALLMEM : TypeMem.ALIVE;
-  }
-  @Override public TypeMem live_use(Node def ) {
+  @Override public Type live_use(Node def ) {
     Node r = in(0);
-    if( r==def ) return TypeMem.ALIVE;
+    if( r==def ) return Type.ALL;
     if( r!=null ) {
       if( r.len() != len() ) return _live;
       // The same def can appear on several inputs; check them all.
       int i; for( i=1; i<_defs._len; i++ )
         if( in(i)==def && !r.val(i).above_center() )
-          break;                               // This input is live
-      if( i==_defs._len ) return TypeMem.DEAD; // All matching defs are not live on any path
+          break;                           // This input is live
+      if( i==_defs._len ) return Type.ANY; // All matching defs are not live on any path
     }
     // Def is alive (on some path)
-    return all_live().basic_live() && !def.all_live().basic_live() ? TypeMem.ANYMEM : _live;
+    return _live;
   }
 
   @Override public ErrMsg err( boolean fast ) {

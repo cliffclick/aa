@@ -39,7 +39,7 @@ public abstract class Exec {
     int sidx = e._scope.push();// Hook result, not dead
     e.close();      // No more fields added to the parse scope
 
-    Combo.opto();      // Global Constant Propagation and Hindley-Milner Typing
+    Combo.opto(Env.FILE._scope); // Global Constant Propagation and Hindley-Milner Typing
 
     Env.GVN.iter(); // Re-check all ideal calls now that types have been maximally lifted
 

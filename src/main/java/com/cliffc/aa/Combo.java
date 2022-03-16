@@ -1,9 +1,7 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -131,7 +129,7 @@ their inputs, and so their inputs are treated as dead.
 public abstract class Combo {
   static public boolean HM_FREEZE;
 
-  public static void opto() {
+  public static void opto(ScopeNode scope) {
     if( AA.DO_GCP )
       CallNode.ALL_CALLS = BitsRPC.EMPTY;
 
@@ -156,14 +154,14 @@ public abstract class Combo {
 
     // Pass 2: Give up on the Root GCP arg types.  Drop them to the best Root
     // approximation and never lift again.
-    update_root_args();
+    update_root_args(scope);
     work_cnt += main_work_loop();
     //assert Env.START.more_work(false)==0;
 
     // Pass 3: H-M types freeze, escaping function args are assumed lowest H-M compatible and
     // GCP types continue to run downhill.
     HM_FREEZE = true;
-    ////prog.visit((syn) -> { syn.add_val_work(null,work); return work.add(syn); }, (a,b)->null);
+    //prog.visit((syn) -> { syn.add_val_work(null,work); return work.add(syn); }, (a,b)->null);
     work_cnt += main_work_loop();
     //assert Env.START.more_work(false)==0;
 
@@ -203,59 +201,51 @@ public abstract class Combo {
   // Walk any escaping root functions, and claim they are called by the most
   // conservative callers.
   private static final VBitSet RVISIT = new VBitSet();
-  private static void update_root_args() {
-    Node rez = Env.FILE._scope.rez();
-    Type flow = rez._val;
-    if( AA.DO_HMT && rez.has_tvar() ) {
-      RVISIT.clear();
-      _widen_bases(false,rez.tvar());
-    }
+  private static void update_root_args(ScopeNode scope) {
     // If an argument changes type, adjust the lambda arg types
+    Type flow = scope.rez()._val;
     if( AA.DO_GCP && !flow.above_center() ) {
+      ADD_SIG.clear();
+      Type sflow = add_sig((TypeMem)scope.mem()._val,flow); // Sharpen
       RVISIT.clear();
-      _walk_root_funs(flow);
+      _walk_root_funs(sflow);
     }
   }
-  // TODO: T2 walker
-  // If a root-escaping function has Base inputs, widen them to allow anything
-  // from that Base class.  E.g., typed as taking a "abc" input is widened to
-  // any string.
-  private static void _widen_bases(boolean funarg, TV2 t2) {
-    if( RVISIT.tset(t2._uid) ) return;
-    if( t2.is_base() && funarg ) t2._flow=t2._flow.widen();
-    if( t2._args != null ) {
-      funarg = t2.is_fun();
-      for( String arg : t2._args.keySet() )
-        if( !Util.eq(arg,"ret") ) // Do not walk function returns
-          _widen_bases(funarg,t2.arg(arg));
-    }
-  }
-
   static private void _walk_root_funs(Type flow) {
     if( RVISIT.tset(flow._uid) ) return;
     // Find any functions
-    if( flow instanceof TypeFunPtr ) {
-      if( ((TypeFunPtr)flow)._fidxs.test(1) ) return; // All of them
-      //// Meet the actuals over the formals.
-      //for( int fidx : ((TypeFunPtr)flow)._fidxs ) {
-      //  Lambda fun = Lambda.FUNS.get(fidx);
-      //  for( int i=0; i<fun._types.length; i++ ) {
-      //    // GCP external argument limited to HM compatible type
-      //    Type aflow = DO_HM ? fun.targ(i).as_flow() : Type.SCALAR;
-      //    fun.arg_meet(i,aflow,work);
-      //  }
-      //  if( fun instanceof PrimSyn ) work.add(fun);
-      //}
-      throw unimpl();
+    if( flow instanceof TypeFunPtr tfp ) {
+      // Walk all functions; these might be called by external callers
+      for( int fidx : tfp._fidxs ) {
+        RetNode ret = RetNode.get(fidx);
+        Node[] parms = ret.fun().parms();
+        for( int i=AA.ARG_IDX; i<parms.length; i++ ) {
+          ConNode defalt = (ConNode)parms[i].in(1);
+          Type aflow = AA.DO_HMT ? parms[i].tvar().as_flow() : Type.SCALAR;
+          Type bflow = aflow.meet(defalt._val);
+          if( bflow != defalt._val )
+            throw unimpl();            // fun.arg_meet(i,aflow,work);
+          if( AA.DO_HMT ) throw unimpl(); // targ.clr_cp()
+        }
+      }
     }
 
     // recursively walk structures for nested functions
-    if( flow instanceof TypeMemPtr ) {
-      TypeMemPtr tmp = (TypeMemPtr)flow;
+    if( flow instanceof TypeMemPtr tmp )
       for( TypeFld fld : tmp._obj )
         _walk_root_funs(fld._t);
-    }
 
+  }
+
+  // Expand functions to full signatures, recursively.
+  private static final VBitSet ADD_SIG = new VBitSet();
+  private static Type add_sig(TypeMem mem, Type t) {
+    if( ADD_SIG.tset(t._uid) ) return t;
+    if( t instanceof TypeFunPtr fun )
+      return fun.make_from(fun.dsp(),add_sig(mem,fun._ret));
+    if( t instanceof TypeMemPtr tmp )
+      return mem.sharpen(tmp);
+    return t;
   }
 
   static void reset() { HM_FREEZE=false; }

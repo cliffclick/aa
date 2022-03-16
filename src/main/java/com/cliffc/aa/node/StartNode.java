@@ -11,10 +11,7 @@ import java.util.function.Predicate;
 public class StartNode extends Node {
   public StartNode() { super(OP_START); }
   @Override public Type value() { return TypeTuple.START_STATE; }
-  // TODO: Since new constants can appear at any time, we must assume as bad as
-  // a new constant.  A better answer is to make new constants appear with the
-  // same liveness as their users.
-  @Override public TypeMem live() { return TypeMem.ALIVE; }
+  @Override public Type live() { return Type.ALL; }
   //@Override public TV2 new_tvar(String alloc_site) { return TV2.make("Start",this,alloc_site); }
   // StartNodes are never equal
   @Override public int hashCode() { return 123456789+1; }

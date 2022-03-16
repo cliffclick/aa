@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -17,7 +16,7 @@ import static org.junit.Assert.assertTrue;
 
 public class TestNodeSmall {
 
-  @Ignore
+  @Ignore  /* Ignored since changing call resolution strategy */
   @Test public void testUnresolvedAdd() {
     GVNGCM gvn = Env.GVN;
 
@@ -237,8 +236,7 @@ public class TestNodeSmall {
    *   2     ~S   [~int+flt]  [~int+flt]   Error args
    *   2     3    [ int,flt]  [ int,XXX]   Low, not high, for all good args
    */
-  @SuppressWarnings("unchecked")
-  @Ignore
+  @Ignore  /* Ignored since changing call resolution strategy */
   @Test public void testCallNodeResolve() {
     GVNGCM gvn = Env.GVN;
 
@@ -389,6 +387,7 @@ public class TestNodeSmall {
     cepi.kill();
   }
 
+  @Ignore /* Ignored since changing call resolution strategy */
   @Test public void testCallNodeResolve2() {
     GVNGCM gvn = Env.GVN;
 
@@ -480,90 +479,75 @@ public class TestNodeSmall {
   @Test public void testRecursiveDisplay() {
     GVNGCM gvn = Env.GVN;
 
-    // Build the graph for the "fact" example:
-    // NewObj (display); inputs are prior display and FunPtr
-    //   OProj
-    //   DProj
-    //   MemMerge; default mem and OProj
+    // Build the graph for a simple recursive function display.
+    // Struct (display); inputs are prior display and FunPtr
     // Fun (and Fun._tf) - Just default control and some other control
-    //   Parm:^ - Default display and DProj
-    //   Parm:mem - Default mem and the MemMerge of OProj
-    //   Ret - {Fun,Mem,Parm:^} - Not really fact() nor gen_ctr() code but upwards exposed closure
+    //   Parm:^   - Default display
+    //   Parm:mem - Default mem
+    //   Parm:rpc - Default
+    //   Ret - {Fun,Parm:mem,Parm:^} - Not really fact() nor gen_ctr() code but upwards exposed closure
     //   FunPtr - Ret
-    ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
-    ConNode mem = (ConNode)gvn.xform(new ConNode<>(TypeMem.ANYMEM)).keep();
-    ConNode rpc = (ConNode)gvn.xform(new ConNode<>(TypeRPC.ALL_CALL));
-    ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISP_SIMPLE));
+    ConNode ctl = new ConNode<>(Type.CTRL).init();
+    ConNode mem = new ConNode<>(TypeMem.ANYMEM).init();
+    ConNode rpc = new ConNode<>(TypeRPC.ALL_CALL).init();
     // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
     // yet built.
-    int alias = BitsAlias.new_alias(BitsAlias.ALLX);
-    NewNode dsp_file = (NewNode)gvn.xform(new NewNode(true,false,null,alias));
-    //dsp_file.add_fld(TypeMemPtr.DISP_FLD,dsp_prims,null);
-    //MrgProjNode dsp_file_obj = Env.DEFMEM.make_mem_proj(dsp_file,mem);
-    //ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(DSP_IDX, dsp_file)).keep();
-    //Env.ALL_DISPLAYS = Env.ALL_DISPLAYS.set(dsp_file._alias);
-    //// The Fun and Fun._tf:
-    //TypeStruct formals = TypeStruct.make(TypeFld.make(" mem",TypeMem.MEM,MEM_IDX),
-    //                                     TypeFld.make("^",dsp_file_ptr._val,DSP_IDX), // File-scope display as arg0
-    //                                     TypeFld.make("x",Type.SCALAR,ARG_IDX));  // Some scalar arg1
-    //TypeFunSig sig = TypeFunSig.make(formals,TypeTuple.RET);
-    //FunNode fun = new FunNode(null,sig,-1,false,null);
-    //gvn.init(fun.add_def(ctl).add_def(ctl)).unkeep();
-    //// Parms for the Fun.  Note that the default type is "weak" because the
-    //// file-level display can not yet know about "fact".
-    //ParmNode parm_mem = new ParmNode(MEM_IDX," mem",fun,mem,null);
-    //gvn.xform(parm_mem.add_def(dsp_file_obj));
-    //ParmNode parm_dsp = new ParmNode(DSP_IDX,"^"  ,fun,Type.SCALAR,Node.con(dsp_file_ptr._val),null);
-    //gvn.xform(parm_dsp.add_def(dsp_file_ptr));
-    //// Close the function up
-    //RetNode ret = gvn.init(new RetNode(fun,parm_mem,parm_dsp,rpc,fun));
-    //FunPtrNode fptr = gvn.init(new FunPtrNode(ret,dsp_file_ptr));
-    //// Close the cycle
-    //dsp_file.create("fact",fptr,Access.Final);
-    //dsp_file.no_more_fields();
-    //// Return the fptr to keep all alive
-    //ScopeNode env = new ScopeNode(true);
-    //env.set_ctrl(ctl);
-    //env.set_ptr (dsp_file_ptr);
-    //env.set_mem (dsp_file_obj);
-    //env.set_rez (fptr);
-    //gvn.init(env);
-    //
-    //Node[] nodes = new Node[]{ctl,mem,rpc,dsp_prims,dsp_file,dsp_file_obj,dsp_file_ptr,fun,parm_mem,parm_dsp,ret,fptr,env};
-    //
-    //// Validate graph initial conditions.  No optimizations, as this
-    //// pile-o-bits is all dead and will vaporize if the optimizer is turned
-    //// loose on it.  Just check the types flow correctly.
-    //gvn._opt_mode=GVNGCM.Mode.PesiNoCG;
-    //for( Node n : nodes ) {
-    //  Type old = n._val;
-    //  Type nnn = n.value(gvn._opt_mode);
-    //  assert nnn.isa(old);
-    //}
-    //
-    //// Now run GCP to closure.  This is the key call being tested.
-    //Combo.opto();
-    //
-    //// Validate cyclic display/function type
-    //TypeFunPtr tfptr0 = (TypeFunPtr) fptr._val;
-    //Type tdptr0 = tfptr0._dsp;
-    //Type tret = ((TypeTuple) ret._val).at(REZ_IDX);
-    //assertEquals(tdptr0,tret); // Returning the display
-    //// Display contains 'fact' pointing to self
-    //TypeMem tmem = (TypeMem) dsp_file_obj._val;
-    //TypeStruct tdisp0 = (TypeStruct)tmem.ld((TypeMemPtr)tdptr0);
-    //assertEquals(tfptr0,tdisp0.at("fact"));
-    //
-    //// Cleanup after test
-    //ctl.unkeep(2);
-    //mem.unhook();
-    //dsp_file_ptr.unhook();
-    //env.unkeep(2).unhook();
-    //fun.unhook();
-    //ret.unkeep(2);
-    //fptr.unkeep(2); fptr.pop(); fptr.pop();
-    //Env.top_reset();                   // Hard reset
-    throw unimpl();
+    ConNode dsp_prims = new ConNode<>(TypeMemPtr.DISP_SIMPLE).init();
+    StructNode dsp_file = new StructNode(true,false).add_fld(TypeMemPtr.DISP_FLD,dsp_prims,null).init();
+    NewNode dsp_file_new = new NewNode(mem,dsp_file).init();
+    ProjNode dsp_file_mem = new MProjNode(dsp_file_new).init();
+    ProjNode dsp_file_ptr = new ProjNode(REZ_IDX,dsp_file_new).init();
+    // Function header with nargs
+    FunNode fun = new FunNode("fact",ARG_IDX).add_def(ctl).add_def(ctl).init();
+    // Parms for the Fun.  Note that the default type is "weak" because the
+    // file-level display can not yet know about "fact".
+    ParmNode parm_mem     = new ParmNode(MEM_IDX,fun,mem).add_def(dsp_file_mem).init();
+    ParmNode parm_dsp_ptr = new ParmNode(DSP_IDX,fun,(ConNode)Node.con(dsp_file_ptr._val)).add_def(dsp_file_ptr).init();
+    // Close the function up
+    RetNode ret = new RetNode(fun,parm_mem,parm_dsp_ptr,rpc,fun).init();
+    FunPtrNode fptr = new FunPtrNode(ret,dsp_file_ptr).init();
+    fptr._name = "fact";
+    // Close the cycle
+    dsp_file.add_fld(TypeFld.make("fact",fptr._val),fptr,null);
+    dsp_file.close();
+    // Return the fptr to keep all alive
+    ScopeNode env = new ScopeNode(true);
+    env.set_ctrl(ctl);
+    env.set_ptr (dsp_file_ptr);
+    env.set_mem (mem);
+    env.set_rez (fptr);
+    env.init();
+
+    Node[] nodes = new Node[]{ctl,mem,rpc,dsp_prims,dsp_file,dsp_file_new,dsp_file_ptr,dsp_file_mem,fun,parm_mem,parm_dsp_ptr,ret,fptr,env};
+
+    // Validate graph initial conditions.  No optimizations, as this
+    // pile-o-bits is all dead and will vaporize if the optimizer is turned
+    // loose on it.  Just check the types flow correctly.
+    for( Node n : nodes ) {
+      Type old = n._val;
+      Type nnn = n.value();
+      assert nnn.isa(old);
+    }
+
+    // Now run GCP to closure.  This is the key call being tested.
+    DO_GCP=true;
+    DO_HMT=false;
+    Combo.opto(env);
+
+    // Validate cyclic display/function type
+    TypeFunPtr tfptr0 = (TypeFunPtr) fptr._val;
+    Type tdptr0 = tfptr0.dsp();
+    Type tret = ((TypeTuple) ret._val).at(REZ_IDX);
+    assertEquals(tdptr0,tret); // Returning the display
+    // Display contains 'fact' pointing to self
+    TypeMem tmem = (TypeMem) dsp_file_mem._val;
+    TypeStruct tdisp0 = tmem.ld((TypeMemPtr)tdptr0);
+    assertEquals(tfptr0,tdisp0.at("fact"));
+
+    // Cleanup after test
+    env.kill();
+    dsp_file.pop();
+    Env.top_reset();                   // Hard reset
   }
 
 
@@ -579,7 +563,7 @@ public class TestNodeSmall {
   // alias, may need new fake aliases.  If [13] lifts to a refinement with a
   // valid memory, no need to change memory.
   //
-  // Must be monotonic towards correctness, if theres any chance to lift (fall)
+  // Must be monotonic towards correctness, if there is any chance to lift (fall)
   // and be correct.  If always an error, can go sideways but still monotonic
   // on the side path.
   //
@@ -589,6 +573,7 @@ public class TestNodeSmall {
   // bounds, and always monotonic, and preserves shape if in-bounds.
 
   private static int ERR=0;
+  @Ignore /* Ignored since Parm correctness now from H-M and not from flow */
   @Test public void testMemoryArgs() {
     GVNGCM gvn = Env.GVN;
 
@@ -596,9 +581,9 @@ public class TestNodeSmall {
     // including memory args.
 
     // Build a bunch of aliases.
-    int a1 = BitsAlias.new_alias(BitsAlias.ALLX);
-    int a2 = BitsAlias.new_alias(BitsAlias.ALLX);
-    int a3 = BitsAlias.new_alias(BitsAlias.ALLX);
+    int a1 = BitsAlias.new_alias();
+    int a2 = BitsAlias.new_alias();
+    int a3 = BitsAlias.new_alias();
     TypeFld fmem = TypeFld.make(" mem",TypeMem.ALLMEM,Access.Final);
     TypeFld fint = TypeFld.make_arg(TypeInt.INT64,ARG_IDX);
     TypeStruct ts_int_flt = TypeStruct.make(fmem,fint,TypeFld.make_arg(TypeFlt.FLT64,ARG_IDX+1));

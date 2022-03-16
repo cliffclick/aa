@@ -128,15 +128,12 @@ public class TypeMem extends Type<TypeMem> {
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     if( this==ALLMEM  ) return sb.p("[ all ]");
-    if( this==ANYMEM  ) return sb.p("[_____]");
-    if( this==ALIVE   ) return sb.p("[ALIVE]");
-    if( this==DEAD    ) return sb.p("[DEAD ]");
-    if( this==LNO_DISP) return sb.p("[NODSP]");
+    if( this==ANYMEM  ) return sb.p("[_any_]");
 
     if( _pubs.length==1 )
       return _pubs[0]._str(visit,dups, sb.p('['), debug, indent).p(']');
 
-    if( _pubs[0]==TypeStruct.DEAD ) sb.p('!');
+    if( _pubs[0]==TypeStruct.UNUSED ) sb.p('!');
     else _pubs[0]._str(visit,dups,sb,debug, indent);
 
     sb.p('[');
@@ -169,18 +166,6 @@ public class TypeMem extends Type<TypeMem> {
   public TypeStruct[] alias2objs() { return _pubs; }
   public int len() { return _pubs.length; }
 
-  // Return set of aliases.  Not even sure if this is well-defined.
-  public BitsAlias aliases() {
-    //if( this==ALLMEM ) return BitsAlias.NZERO;
-    //if( this==ANYMEM ) return BitsAlias.EMPTY;
-    //BitsAlias bas = BitsAlias.EMPTY;
-    //for( int i = 0; i< _pubs.length; i++ )
-    //  if( _pubs[i]!=null && !_pubs[i].above_center() )
-    //    bas = bas.set(i);
-    //return bas;
-    throw unimpl();
-  }
-
   static { new Pool(TMEM,new TypeMem()); }
   private static TypeMem make(TypeStruct[] pubs) {
     Pool P = POOLS[TMEM];
@@ -191,10 +176,9 @@ public class TypeMem extends Type<TypeMem> {
   // Canonicalize memory before making.  Unless specified, the default memory is "do not care"
   public static TypeMem make0( TypeStruct[] as ) {
     assert as.length==1 || as[0]==null;
-    if( as.length> 1 ) as[0] = as[1].oob(TypeStruct.ALIVE);
+    if( as.length> 1 ) as[0] = as[1].oob(TypeStruct.ISUSED);
     TypeStruct[] tos = _make1(as);
-    if( tos==null ) return DEAD; // All things are dead, so dead
-    return make(tos);
+    return tos==null ? TypeMem.ALLMEM : make(tos);
   }
 
   // Canonicalize memory before making.  Unless specified, the default memory is "do not care"
@@ -249,21 +233,13 @@ public class TypeMem extends Type<TypeMem> {
   public static TypeMem make_live(TypeStruct live) { return make0(new TypeStruct[]{live}); }
 
   public static final TypeMem ANYMEM,ALLMEM; // Every alias is unused (so above XOBJ or below OBJ)
-  public static final TypeMem DEAD, ALIVE; // Sentinel for liveness flow; not part of lattice
-  public static final TypeMem LNO_DISP;    // Liveness: a code ptr is alive, but not the display
 
   static {
     // Every alias is used in the worst way
     ALLMEM = make0(new TypeStruct[]{null,TypeStruct.ISUSED});
     ANYMEM = ALLMEM.dual();
-
-    // Sentinels for liveness flow; not part of lattice
-    DEAD    = make_live(TypeStruct.DEAD);
-    ALIVE   = DEAD.dual();
-    assert TypeStruct.ALIVE == ALIVE._pubs[0];
-    LNO_DISP= make_live(TypeStruct.LNO_DISP); // Of a code/disp pair, the code is alive and the disp is dead
   }
-  static final TypeMem[] TYPES = new TypeMem[]{ALLMEM,ALIVE};
+  static final TypeMem[] TYPES = new TypeMem[]{ALLMEM};
 
   // All mapped memories remain, but each memory flips internally.
   @Override protected TypeMem xdual() {
@@ -279,7 +255,7 @@ public class TypeMem extends Type<TypeMem> {
     // Meet of default values, meet of element-by-element.
     TypeStruct[] as = _meet(_pubs,tf._pubs,false);
     TypeStruct[] tos = _make1(as);
-    return tos==null ? DEAD : make(tos); // All things are dead, so dead
+    return tos==null ? ALLMEM : make(tos); // All things are dead, so dead
   }
 
   private static TypeStruct[] _meet(TypeStruct[] as, TypeStruct[] bs, boolean is_loop) {

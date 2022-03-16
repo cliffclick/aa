@@ -12,7 +12,6 @@ public class StartMemNode extends Node {
   @Override public Type value() { return TypeMem.ANYMEM; }
   @Override public TV2 new_tvar(String alloc_site) { return null; }
   @Override public boolean unify( boolean test ) { return false; }
-  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // StartMemNodes are never equal
   @Override public int hashCode() { return 123456789+2; }
   @Override public boolean equals(Object o) { return this==o; }

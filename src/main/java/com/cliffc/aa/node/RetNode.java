@@ -1,14 +1,11 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
-import static com.cliffc.aa.AA.MEM_IDX;
-import static com.cliffc.aa.AA.DSP_IDX;
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.*;
 
 // See CallNode comments.  The RetNode gathers {control (function exits or
 // not), memory, value, rpc, fun}, and sits at the end of a function.  The RPC
@@ -59,7 +56,7 @@ public final class RetNode extends Node {
   }
   // Formals from the function parms.
   // TODO: needs to come from both Combo and _t
-  Type formal(int idx) { return fun().parm(idx)._t; }  
+  Type formal(int idx) { return fun().parm(idx)._t; }
   // Called by testing
   public TypeStruct formals() {
     Node[] parms = fun().parms();
@@ -71,7 +68,7 @@ public final class RetNode extends Node {
     return ts.hashcons_free();
   }
 
-  
+
   @Override public Type value() {
     if( ctl()==null ) return _val; // No change if a copy
     Type ctl = ctl()._val;
@@ -86,9 +83,8 @@ public final class RetNode extends Node {
     if( !is_copy() ) Env.GVN.add_reduce(fun());
   }
 
-  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
-  @Override public TypeMem live_use(Node def ) {
-    return def==mem() ? _live : TypeMem.ALIVE;
+  @Override public Type live_use(Node def ) {
+    return def==mem() ? _live : Type.ALL;
   }
 
   // Funs get special treatment by the H-M algo.
@@ -124,13 +120,13 @@ public final class RetNode extends Node {
     Node mem = mem();
     if( mem instanceof ParmNode && mem.in(0)==fun() )
       return set_def(1,null);
-    
+
     // Collapsed to a constant?  Remove any control interior.
     Node ctl = ctl();
     if( rez()._val.is_con() && ctl!=fun() && // Profit: can change control and delete function interior
         (mem==null || mem._val ==TypeMem.ANYMEM) ) // Memory has to be trivial also
       return set_def(0,fun());  // Gut function body
-    
+
     return progress;
   }
 
@@ -244,5 +240,5 @@ public final class RetNode extends Node {
     }
     return null;
   }
-  
+
 }

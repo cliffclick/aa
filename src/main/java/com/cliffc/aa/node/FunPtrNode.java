@@ -62,7 +62,7 @@ public final class FunPtrNode extends Node {
   String name() { return _name; } // Debug name, might be empty string
   // Formals from the function parms.
   // TODO: needs to come from both Combo and _t
-  Type formal(int idx) { return ret().formal(idx); }  
+  Type formal(int idx) { return ret().formal(idx); }
 
   // Self short name
   @Override public String xstr() {
@@ -92,8 +92,7 @@ public final class FunPtrNode extends Node {
       Type tdsp = dsp._val;
       FunNode fun;
       // Display is known dead?
-      if( _live==TypeMem.DEAD ||
-          (tdsp instanceof TypeMemPtr tmp && tmp._obj==TypeStruct.UNUSED) ||
+      if( _live==Type.ANY ||
           // Collapsing to a gensym, no need for display
           ret().is_copy() ||
           // Also unused if function has no display parm.
@@ -118,25 +117,26 @@ public final class FunPtrNode extends Node {
     return TypeFunPtr.make(ret._fidx,nargs(),display()._val,tret.at(REZ_IDX));
   }
   @Override public void add_flow_extra(Type old) {
-    if( old==_live )            // live impacts value
-      Env.GVN.add_flow(this);
-    if( _live==TypeMem.DEAD && display() != Env.ANY )
-      Env.GVN.add_reduce(this);
-    if( old instanceof TypeFunPtr )
-      for( Node use : _uses )
-        if( use instanceof UnresolvedNode )
-          for( Node call : use._uses )
-            if( call instanceof CallNode ) {
-              TypeFunPtr tfp = CallNode.ttfp(call._val);
-              if( tfp.fidxs()==((TypeFunPtr)old).fidxs() )
-                Env.GVN.add_flow(call);
-            }
+    //if( old==_live )            // live impacts value
+    //  Env.GVN.add_flow(this);
+    //if( _live==Type.ANY && display() != Env.ANY )
+    //  Env.GVN.add_reduce(this);
+    //if( old instanceof TypeFunPtr )
+    //  for( Node use : _uses )
+    //    if( use instanceof UnresolvedNode )
+    //      for( Node call : use._uses )
+    //        if( call instanceof CallNode ) {
+    //          TypeFunPtr tfp = CallNode.ttfp(call._val);
+    //          if( tfp.fidxs()==((TypeFunPtr)old).fidxs() )
+    //            Env.GVN.add_flow(call);
+    //        }
   }
 
-  @Override public TypeMem live_use(Node def ) {
-    return def==in(0)
-      ? TypeMem.ANYMEM          // FunPtr does not demand any memory
-      : (_live==TypeMem.LNO_DISP ? TypeMem.DEAD : TypeMem.ALIVE); // Display is alive or dead
+  @Override public Type live_use(Node def ) {
+    if( _live==Type.ALL ) return Type.ALL;
+    // Else must be a TS with no-display.  Display is dead, but the rest of the
+    // function is alive.
+    return def==display() ? Type.ANY : Type.ALL;
   }
 
   // Implements class HM.Lambda unification.

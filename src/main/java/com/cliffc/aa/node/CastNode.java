@@ -61,8 +61,8 @@ public class CastNode extends Node {
       Env.GVN.add_flow(this);
   }
 
-  @Override public TypeMem live_use(Node def ) {
-    return def==in(0) ? TypeMem.ALIVE : _live;
+  @Override public Type live_use(Node def ) {
+    return def==in(0) ? Type.ALL : _live;
   }
 
   // Unifies the input to '(Nil ?:self)'

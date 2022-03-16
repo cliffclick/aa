@@ -13,7 +13,7 @@ public final class ErrNode extends Node {
   public ErrNode( Node ctrl, ErrMsg err ) {
     super(OP_ERR,ctrl);
     _err = err;
-    _live= TypeMem.ALIVE;
+    _live= Type.ALL;
   }
   @Override public String xstr() { return _err._msg; }
   @Override String str() { return "Err"; }
@@ -22,7 +22,7 @@ public final class ErrNode extends Node {
     Type t = val(0);
     return t == Type.ANY || t == Type.XCTRL ? Type.ANY : Type.ALL; // For dead data errors return ANY (no error)
   }
-  @Override public TypeMem live_use( Node def ) { return TypeMem.ALIVE; }
+  @Override public Type live_use( Node def ) { return Type.ALL; }
   @Override public ErrMsg err( boolean fast ) {
     // While you might think we should ALWAYS report these, as their existence
     // means the program is in-error - the program may have other earlier

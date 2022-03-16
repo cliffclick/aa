@@ -143,7 +143,7 @@ public class RegionNode extends Node {
       }
   }
 
-  @Override public TypeMem live_use(Node def ) { return TypeMem.ALIVE; }
+  @Override public Type live_use(Node def ) { return Type.ALL; }
 
   @Override public TV2 new_tvar(String alloc_site) { return null; }
 

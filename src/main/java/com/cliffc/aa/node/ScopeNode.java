@@ -37,11 +37,12 @@ public class ScopeNode extends Node {
 
   public       Node ctrl() { return in(CTL_IDX); }
   public       Node mem () { return in(MEM_IDX); }
-  public StructNode stk () { return (StructNode)in(DSP_IDX); }
+  public StructNode stk () { return (StructNode)(((NewNode)in(DSP_IDX).in(0)).val()); }
+  public   ProjNode ptr () { return (ProjNode)in(DSP_IDX); }
   public       Node rez () { return in(ARG_IDX); }
-  public <N extends Node> N set_ctrl(    N       n) { set_def(CTL_IDX,n); return n; }
-  public void               set_stk ( StructNode n) { set_def(DSP_IDX,n);           }
-  public void               set_rez (       Node n) { set_def(ARG_IDX,n);           }
+  public <N extends Node> N set_ctrl( N    n) { set_def(CTL_IDX,n); return n; }
+  public void               set_ptr ( Node n) { set_def(DSP_IDX,n);           }
+  public void               set_rez ( Node n) { set_def(ARG_IDX,n);           }
 
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
   public Node set_mem( Node n) {
@@ -138,7 +139,6 @@ public class ScopeNode extends Node {
   // functions, on behalf of the following CEProjs.
   @Override public Type value() { return Type.CTRL; }
 
-  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public void add_flow_use_extra(Node chg) {
     if( chg==rez() ) {          // If the result changed
       for( Node use : _uses ) {
@@ -161,26 +161,26 @@ public class ScopeNode extends Node {
   static TypeMem compute_live_mem(ScopeNode scope, Node mem, Node rez) {
     Type tmem = mem._val;
     Type trez = rez._val;
-    if( !(tmem instanceof TypeMem ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
-    TypeMem tmem0 = (TypeMem)tmem;
+    if( !(tmem instanceof TypeMem tmem0) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
     if( TypeMemPtr.ISUSED.isa(trez) ) return tmem0.flatten_fields(); // All possible pointers, so all memory is alive
     // For function pointers, all memory returnable from any function is live.
-    if( trez instanceof TypeFunPtr && scope != null ) {
-      BitsFun fidxs = ((TypeFunPtr)trez)._fidxs;
-      Type disp = ((TypeFunPtr)trez).dsp();
-      BitsAlias esc_in = disp instanceof TypeMemPtr ? ((TypeMemPtr)disp)._aliases : BitsAlias.EMPTY;
+    if( trez instanceof TypeFunPtr tfp && scope != null ) {
       TypeMem tmem3 = TypeMem.ANYMEM;
       for( int i=ARG_IDX+1 ; i<scope._defs._len; i++ ) {
-        if( !(scope.in(i) instanceof RetNode) ) continue;
-        RetNode ret = (RetNode)scope.in(i);
+        if( !(scope.in(i) instanceof RetNode ret) ) continue;
         int fidx = ret.fidx();
-        if( ret._val instanceof TypeTuple && fidxs.test(fidx) ) {
-          TypeTuple tret = (TypeTuple)ret._val;
+        if( ret._val instanceof TypeTuple tret && tfp._fidxs.test(fidx) ) {
           TypeMem post_call = (TypeMem)tret.at(MEM_IDX);
-          Type trez2 = tret.at(REZ_IDX);
-          //TypeMem cepi_out = CallEpiNode.live_out(tmem0, post_call, trez2, esc_in, null);
-          //tmem3 = (TypeMem)tmem3.meet(cepi_out);
-          throw unimpl();
+          TypeMem cepi_out;
+          if( tmem0==post_call ) {
+            cepi_out = tmem0;
+          } else {
+            Type trez2 = tret.at(REZ_IDX);
+            BitsAlias esc_in = tfp.dsp() instanceof TypeMemPtr tmp ? tmp._aliases : BitsAlias.EMPTY;
+            //cepi_out = CallEpiNode.live_out(tmem0, post_call, trez2, esc_in, null);
+            throw unimpl();
+          }
+          tmem3 = (TypeMem)tmem3.meet(cepi_out);
         }
       }
       return tmem3.flatten_fields();
@@ -198,14 +198,14 @@ public class ScopeNode extends Node {
     return compute_live_mem(this,mem(),rez());
   }
 
-  @Override public TypeMem live_use(Node def ) {
+  @Override public Type live_use(Node def ) {
     // Basic liveness ("You are Alive!") for control and returned value
-    if( def == ctrl() ) return TypeMem.ALIVE;
-    if( def == rez () ) return TypeMem.ALIVE; // Returning a Scalar, including e.g. a mem ptr
-    if( def == stk () ) return TypeMem.ALIVE; // Display must be kept-alive during e.g. parsing.
+    if( def == ctrl() ) return Type.ALL;
+    if( def == rez () ) return Type.ALL; // Returning a Scalar, including e.g. a mem ptr
+    if( def == ptr () ) return Type.ALL; // Display must be kept-alive during e.g. parsing.
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.
-    if( def == mem() ) return _uses._len>0 && _uses.at(0)==Env.KEEP_ALIVE ? TypeMem.ALLMEM : _live;
+    if( def == mem() ) return _uses._len>0 && _uses.at(0)==Env.KEEP_ALIVE ? Type.ALL : _live;
     // Any function which may yet have unwired CallEpis, and so needs full
     // memory alive until all Calls are wired.
     if( def instanceof RetNode ) return _live;

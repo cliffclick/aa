@@ -73,14 +73,15 @@ public abstract class MemPrimNode extends PrimNode {
     }
 
     // The only memory required here is what is needed to support the Load
-    @Override public TypeMem live_use( Node def ) {
-      if( def==adr() ) return TypeMem.ALIVE;
-      if( _defs._len>3 && def==idx() ) return TypeMem.ALIVE;
-      Type tmem = mem()._val;
-      Type tptr = adr()._val;
-      if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
-      if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
-      return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,"", Type.SCALAR);
+    @Override public Type live_use( Node def ) {
+      //if( def==adr() ) return TypeMem.ALIVE;
+      //if( _defs._len>3 && def==idx() ) return TypeMem.ALIVE;
+      //Type tmem = mem()._val;
+      //Type tptr = adr()._val;
+      //if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
+      //if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
+      //return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,"", Type.SCALAR);
+      throw unimpl();
     }
 
   }

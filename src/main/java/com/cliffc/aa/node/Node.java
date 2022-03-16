@@ -80,7 +80,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   final byte _op;       // Opcode (besides the object class), used to avoid v-calls in some places
   public boolean _elock;// Edge-lock: cannot modify edges because messes up hashCode & GVN
   public Type _val;     // Value; starts at ALL and lifts towards ANY.
-  public TypeMem _live; // Liveness; assumed live in gvn.iter(), assumed dead in gvn.gcp().
+  public Type _live;    // Liveness; assumed live in gvn.iter(), assumed dead in gvn.gcp().
   // Hindley-Milner inspired typing, or CNC Thesis based congruence-class
   // typing.  This is a Type Variable which can unify with other TV2s forcing
   // Type-equivalence (JOIN of unified Types), and includes gross structure
@@ -254,8 +254,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     _defs = new Ary<>(defs);
     _uses = new Ary<>(new Node[1],0);
     for( Node def : defs ) if( def != null ) def._uses.add(this);
-    _val  = Type.ALL;
-    _live = all_live();
+    _val  = _live = Type.ALL;
     _tvar = null;
   }
 
@@ -438,7 +437,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Initialize a Node in GVN.
   public final <N extends Node> N init() { return (N)Env.GVN.init(this); }
 
-  
+
   // Graph rewriting.  Strictly reducing Nodes or Edges.  Cannot make a new
   // Node, save that for the expanding ideal calls.
   // Returns null if no-progress or a better version of 'this'.  The
@@ -481,33 +480,30 @@ public abstract class Node implements Cloneable, IntSupplier {
   // TypeMem.FULL, especially if its uses are of unwired functions.
   // It must be monotonic.
   // This is a reverse-flow transfer-function computation.
-  public TypeMem live( ) {
+  public Type live( ) {
     // Compute meet/union of all use livenesses
-    TypeMem live = TypeMem.DEAD; // Start at lattice top
-    for( Node use : _uses )      // Computed across all uses
-      if( use.live_uses() ) {
-        TypeMem ulive = use.live_use(this);
-        live = (TypeMem)live.meet(ulive); // Make alive used fields
+    Type live = Type.ANY;           // Start at lattice top
+    for( Node use : _uses )         // Computed across all uses
+      if( use._live != Type.ANY ) { // If use is alive, propagate liveness
+        Type ulive = use.live_use(this);
+        live = live.meet(ulive); // Make alive used fields
       }
-    assert live==TypeMem.DEAD || live.basic_live()==all_live().basic_live();
     return live;
-  }
-  public boolean live_uses() {
-    return _live != TypeMem.DEAD &&    // Only live uses make more live
-      (!_live.basic_live() ||   // Complex alive always counts
-       is_prim() ||             // Always live prims
-       err(true)!=null);        // Always live errors
   }
 
   // Shortcut to update self-live
-  public Node xliv( ) { throw unimpl(); }
+  public void xliv( ) {
+    Type oliv = _live;  // Get old live
+    Type nliv = live(); // Get new live
+    if( nliv!=oliv ) {
+      _live = nliv;
+      Env.GVN.add_flow_uses(this); // Put uses on worklist... values flows downhill
+      add_flow_extra(oliv);
+    }
+  }
   // Compute local contribution of use liveness to this def.
   // Overridden in subclasses that do per-def liveness.
-  public TypeMem live_use( Node def ) { return _live; }
-
-  // Default lower-bound liveness.  For control, its always "ALIVE" and for
-  // memory opts (and tuples with memory) its "ALLMEM".
-  public TypeMem all_live() { return TypeMem.ALIVE; }
+  public Type live_use( Node def ) { return _live; }
 
   // The _val changed here, and more than the immediate neighbors might change value/live
   public void add_flow_defs() { Env.GVN.add_flow_defs(this); }
@@ -555,8 +551,8 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Do One Step of backwards-dataflow analysis.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
   public void combo_backwards() {
-    TypeMem oliv = _live;
-    TypeMem nliv = live();
+    Type oliv = _live;
+    Type nliv = live();
     if( oliv == nliv ) return;  // No progress
     assert oliv.isa(nliv);      // Monotonic
     _live = nliv;               // Record progress
@@ -568,8 +564,8 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Do One Step of Hindley-Milner unification.  Assert monotonic progress.
   // If progressed, add neighbors on worklist.
   public void combo_unify() {
-    if( _live==TypeMem.DEAD )  return; // No HM progress on dead code
-    if( _val == Type.ANY ) return;     // No HM progress on untyped code
+    if( _live== Type.ANY ) return; // No HM progress on dead code
+    if( _val == Type.ANY ) return; // No HM progress on untyped code
     TV2 old = _tvar==null ? null : tvar();
     if( old!=null && old.is_err() ) return;  // No unifications with error
     if( unify(false) ) {
@@ -639,8 +635,8 @@ public abstract class Node implements Cloneable, IntSupplier {
     Node progress=null;
     // Compute live bits.  If progressing, push the defs on the flow worklist.
     // This is a reverse flow computation.  Always assumed live if keep.
-    TypeMem oliv = _live;
-    TypeMem nliv = live();
+    Type oliv = _live;
+    Type nliv = live();
     if( oliv != nliv ) {        // Progress?
       progress = this;          // Progress!
       assert nliv.isa(oliv);    // Monotonically improving
@@ -709,7 +705,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( con2 != null ) {        // Found a prior constant
       con.kill();               // Kill the just-made one
       con = con2;
-      con._live = TypeMem.ALIVE;// Adding more liveness
+      con._live = Type.ALL;     // Adding more liveness
     } else {                    // New constant
       con._val = t;             // Typed
       con._elock(); // Put in VALS, since if Con appears once, probably appears again in the same XFORM call
@@ -722,8 +718,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( Env.GVN.on_flow(this) ) return; // Been there, done that
     Env.GVN.add_flow(this);             // On worklist and mark visited
     if( AA.DO_GCP ) {
-      _val = Type.ANY;          // Highest value
-      _live = TypeMem.DEAD;     // Not alive
+      _val = _live = Type.ANY;  // Highest value
       if( this instanceof CallNode call ) call._not_resolved_by_gcp = false; // Try again
     } else {                    // Not doing optimistic GCP...
       assert _val==value() && _live==live();
@@ -744,8 +739,7 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( Env.GVN.on_flow(this) ) return; // Been there, done that
     Env.GVN.add_flow(this);             // On worklist and mark visited
     Env.GVN.add_reduce(this);           // Trigger adding to VALS at next ITER
-    _val = Type.ALL;                    // Lowest value
-    _live = all_live();                 // Full alive
+    _val = _live = Type.ALL;            // Lowest value
     _elock = false;                     // Clear elock if reset_to_init0
     _tvar = null;
     // Walk reachable graph
@@ -759,7 +753,7 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // At least as alive
   private Node merge(Node x) {
-    x._live = (TypeMem)x._live.meet(_live);
+    x._live = x._live.meet(_live);
     return Env.GVN.add_flow(x);
   }
 
@@ -772,8 +766,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       return x;                 // Return old, which will add uses
     }
     _elock();                   // Install in GVN
-    _val = Type.ANY;            // Super optimistic types
-    _live = TypeMem.DEAD;
+    _val = _live = Type.ANY;    // Super optimistic types
     return Env.GVN.add_flow(this);
   }
 
@@ -802,8 +795,8 @@ public abstract class Node implements Cloneable, IntSupplier {
     if( FLOW_VISIT.tset(_uid) ) return errs; // Been there, done that
     if( Env.GVN.on_dead(this) ) return errs; // Do not check dying nodes
     // Check for GCP progress
-    Type    oval= _val, nval = value(); // Forwards flow
-    TypeMem oliv=_live, nliv = live (); // Backwards flow
+    Type oval= _val, nval = value(); // Forwards flow
+    Type oliv=_live, nliv = live (); // Backwards flow
     if( oval!=nval || oliv!=nliv ) {
       if( !(lifting
             ? nval.isa(oval) && nliv.isa(oliv)
@@ -813,7 +806,7 @@ public abstract class Node implements Cloneable, IntSupplier {
         errs += _report_bug("Progress bug");
     }
     // Check for HMT progress
-    if( AA.DO_HMT && oliv!=TypeMem.DEAD && oval!=Type.ANY && _tvar!=null ) {
+    if( AA.DO_HMT && oliv!=Type.ANY && oval!=Type.ANY && _tvar!=null ) {
       if( unify(true) ) {
         if( Combo.HM_FREEZE ) errs += _report_bug("Progress after freezing");
         if( !Env.GVN.on_flow(this) ) errs += _report_bug("Progress bug");

@@ -7,7 +7,7 @@ import com.cliffc.aa.util.VBitSet;
 
 import java.util.*;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.AA.*;
 
 // An "environment", a lexical Scope tracking mechanism that runs 1-for-1 in
 // parallel with a ScopeNode.
@@ -103,19 +103,22 @@ public class Env implements AutoCloseable {
   Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr, StructNode fref ) {
     _par = par;
     _fun = fun;
-    StructNode nnn = fref==null ? GVN.init(new StructNode(is_closure,false)) : fref;
-    nnn.add_fld(TypeFld.make_dsp(dsp_ptr._val),dsp_ptr,null);
+    StructNode dsp = fref==null ? new StructNode(is_closure,false).init() : fref;
+    dsp.add_fld(TypeFld.make_dsp(dsp_ptr._val),dsp_ptr,null);
+    NewNode nnn = new NewNode(mem,dsp).init();
+    mem = new MProjNode(nnn).init();
+    Node ptr = new ProjNode(nnn,REZ_IDX).init();
     // Install a top-level prototype mapping
     if( fref!=null ) {          // Forward ref?
       //String fname = fref._ts._name;
       //assert !PROTOS.containsKey(fname); // All top-level type names are globally unique
-      //PROTOS.put(fname,nnn);
+      //PROTOS.put(fname,dsp);
       throw unimpl();
     }
     _scope = GVN.init(new ScopeNode(is_closure));
     _scope.set_ctrl(ctrl);
     _scope.set_mem (mem);  // Memory includes local stack frame
-    _scope.set_stk (nnn);  // Address for 'nnn', the local stack frame
+    _scope.set_ptr (ptr);  // Address for 'nnn', the local stack frame
     _scope.set_rez (ALL_PARM);
     KEEP_ALIVE.add_def(_scope);
     GVN.do_iter();
@@ -171,7 +174,7 @@ public class Env implements AutoCloseable {
     }
 
     GVN.add_flow(stk);          // Scope object going dead, trigger following projs to cleanup
-    _scope.set_stk(null);       // Clear pointer to display
+    _scope.set_ptr(null);       // Clear pointer to display
     Node xscope = KEEP_ALIVE.pop();
     assert _scope==xscope;
     GVN.add_work_new(_scope);

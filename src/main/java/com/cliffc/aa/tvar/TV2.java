@@ -397,7 +397,7 @@ public class TV2 {
 
   // No function arguments, just function returns.
   static final NonBlockingHashMapLong<Type> ADUPS = new NonBlockingHashMapLong<>();
-  Type as_flow() {
+  public Type as_flow() {
     assert ADUPS.isEmpty();
     Type t = _as_flow();
     ADUPS.clear();

@@ -33,7 +33,5 @@ public class CProjNode extends ProjNode {
     }
   }
 
-  @Override public TypeMem live_use(Node def ) { return def.all_live().basic_live() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
-
   @Override public TV2 new_tvar(String alloc_site) { return null; }
 }

@@ -55,27 +55,22 @@ public class StoreNode extends Node {
     //                 nnn==adr && nnn instanceof NewNode ); // Precise or not
     throw unimpl();
   }
-  //@Override BitsAlias escapees() {
-  //  Type adr = adr()._val;
-  //  if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? BitsAlias.EMPTY : BitsAlias.FULL;
-  //  return ((TypeMemPtr)adr)._aliases;
-  //}
 
-  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   // Compute the liveness local contribution to def's liveness.  Ignores the
   // incoming memory types, as this is a backwards propagation of demanded
   // memory.
-  @Override public TypeMem live_use( Node def ) {
+  @Override public Type live_use( Node def ) {
     if( def==mem() ) return _live; // Pass full liveness along
-    assert def==adr() || def==rez();
-    // If this field is not alive, then neither the address nor value are alive.
-    Type t = adr()._val;
-    if( t instanceof TypeMemPtr tmp ) {
-      TypeStruct ts = _live.ld(tmp);
-      TypeFld fld = ts.get(_fld);
-      t = fld==null ? ts : fld;
-    }
-    return t.oob(TypeMem.ALIVE);
+    //assert def==adr() || def==rez();
+    //// If this field is not alive, then neither the address nor value are alive.
+    //Type t = adr()._val;
+    //if( t instanceof TypeMemPtr tmp ) {
+    //  TypeStruct ts = _live.ld(tmp);
+    //  TypeFld fld = ts.get(_fld);
+    //  t = fld==null ? ts : fld;
+    //}
+    //return t.oob(TypeMem.ALIVE);
+    throw unimpl();
   }
 
   @Override public void add_flow_use_extra(Node chg) {

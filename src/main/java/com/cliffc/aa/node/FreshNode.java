@@ -24,9 +24,9 @@ public class FreshNode extends Node {
       Env.GVN.add_reduce(this);
   }
 
-  @Override public TypeMem live_use(Node def ) {
+  @Override public Type live_use(Node def ) {
     if( def==id() ) return _live; // Pass full liveness along
-    return TypeMem.ALIVE;         // Basic aliveness for control
+    return Type.ALL;              // Basic aliveness for control
   }
 
   // Things that can never have type-variable internal structure.

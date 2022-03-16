@@ -182,7 +182,7 @@ public class GVNGCM {
     for( int i=ns.length-1; i>=0; i-- ) {
       Node n = ns[i];
       if( n==null ) continue;
-      TypeMem t = n.live();
+      Type t = n.live();
       if( t != n._live ) {
         n._live=t;
         add_flow_defs(n);

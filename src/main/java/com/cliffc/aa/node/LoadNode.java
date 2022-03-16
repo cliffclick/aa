@@ -75,16 +75,17 @@ public class LoadNode extends Node {
 
   // If the Load computes a constant, the address live-ness is determined how
   // Combo deals with constants, and not here.
-  @Override public TypeMem live_use(Node def ) {
-    if( def==adr() ) return TypeMem.ALIVE;
+  @Override public Type live_use(Node def ) {
+    if( def==adr() ) return Type.ALL;
     Type tmem = mem()._val;
     Type tptr = adr()._val;
-    if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
-    if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
-    if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
-    // Only named the named field from the named aliases is live.
-    TypeStruct ldef = _live==TypeMem.LNO_DISP ? TypeStruct.LNO_DISP : TypeStruct.ALIVE;
-    return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld, ldef);
+    //if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
+    //if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
+    //if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
+    //// Only named the named field from the named aliases is live.
+    //TypeStruct ldef = _live==TypeMem.LNO_DISP ? TypeStruct.LNO_DISP : TypeStruct.ALIVE;
+    //return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld, ldef);
+    throw unimpl();
   }
 
   // Standard memory unification; the Load unifies with the loaded field.

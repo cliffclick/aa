@@ -183,11 +183,14 @@ public abstract class PrimNode extends Node {
   }
 
   @Override public Node ideal_reduce() {
-    if( _live != TypeMem.DEAD ) return null;
-    Node progress=null;
-    for( int i=DSP_IDX; i<_defs._len; i++ )
-      if( in(i)!=Env.ANY ) progress=set_def(i,Env.ANY);
-    return progress;
+    if( _live != Type.ANY ) return null;
+    //Node progress=null;
+    //for( int i=DSP_IDX; i<_defs._len; i++ )
+    //  if( in(i)!=Env.ANY ) progress=set_def(i,Env.ANY);
+    //return progress;
+    
+    // Kill prim inputs if dead??? Expect this to be dead-from-below?
+    throw unimpl();
   }
 
   // All primitives are effectively H-M Applies with a hidden internal Lambda.

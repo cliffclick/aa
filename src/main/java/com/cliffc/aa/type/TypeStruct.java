@@ -287,9 +287,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public  static final TypeStruct FLT64_INT64= args(FLT,INT); // { flt int -> }
   public  static final TypeStruct FLT64_FLT64= args(FLT,FLT); // { flt flt -> }
 
-  // Types for Liveness in slot 0 of TypeMem
-  public static final TypeStruct ALIVE = ISUSED, DEAD = UNUSED, LNO_DISP = A;
-
   // Pile of sample structs for testing
   static final TypeStruct[] TYPES = new TypeStruct[]{ISUSED,POINT,NAMEPT,A,C0,D1,ARW,INT64_INT64,SCALAR1};
 

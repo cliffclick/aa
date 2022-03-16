@@ -16,7 +16,6 @@ public class ConNode<T extends Type> extends Node {
   public ConNode( T t ) {
     super(OP_CON,Env.START);
     _t=t;
-    _live = all_live();
   }
   @Override public String xstr() {
     if( Env.ALL_PARM == this ) return "ALL_PARM";
@@ -24,10 +23,9 @@ public class ConNode<T extends Type> extends Node {
     if( Env.DEF_MEM  == this ) return "DEF_MEM";
     return _t==null ? "(null)" : _t.toString();
   }
-  @SuppressWarnings("unchecked")
   @Override void walk_reset0() {
     if( this==Env.DEF_MEM )
-      _t=(T)(_val=_live=TypeMem.ALLMEM);
+      _t=(T)(_val=_live=Type.ALL);
   }
 
   @SuppressWarnings("unchecked")
@@ -38,7 +36,6 @@ public class ConNode<T extends Type> extends Node {
   }
 
   @Override public Type value() { return _t.simple_ptr(); }
-  @Override public TypeMem all_live() { return _t instanceof TypeMem ? TypeMem.ALLMEM : TypeMem.ALIVE; }
 
   @Override public TV2 new_tvar(String alloc_site) {
     if( _t==Type.CTRL || _t==Type.XCTRL || _t instanceof TypeRPC || _t instanceof TypeMem )

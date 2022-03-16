@@ -104,7 +104,7 @@ public class AssertNode extends Node {
       Env.GVN.add_reduce(this);
   }
 
-  @Override public TypeMem live_use(Node def ) {
+  @Override public Type live_use(Node def ) {
     if( def==arg() ) return _live;                   // Alive as I am
     // Alive (like normal liveness), plus the address, plus whatever can be
     // reached from the address.

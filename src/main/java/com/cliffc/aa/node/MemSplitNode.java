@@ -52,7 +52,6 @@ public class MemSplitNode extends Node {
     }
     return TypeTuple.make(ts);
   }
-  @Override public TypeMem all_live() { return TypeMem.ALLMEM; }
   @Override public void add_reduce_extra() {
     Node join = join();         // MemSplit is dead, MemJoin changes value
     if( join!=null ) Env.GVN.add_flow(join);

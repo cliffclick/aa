@@ -1,9 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFld;
-import com.cliffc.aa.type.TypeStruct;
+import com.cliffc.aa.type.*;
 
 import java.util.Arrays;
 
@@ -15,9 +13,11 @@ import static com.cliffc.aa.type.TypeFld.Access;
 // A simple gather/builder node, with support for incremental field discovery
 // for the Parser.  Inputs are mapped 1-to-1 with the TypeStruct.  Does not
 // have control or memory edges.  This is an identity:
-
+//
 //       Scalar <- Struct[name] <- Field[name] <- Scalar
-
+//
+// Value is a TypeStruct.  Liveness a per-field TypeStruct in TypeMem.at[1].
+//
 // Does NOT support field updates directly.
 
 // Can be marked as a closure, which is mostly used for asserts.
@@ -148,6 +148,21 @@ public class StructNode extends Node {
     for( int i=0; i<len(); i++ )
       ts.add_fld(_ts.get(i).make_from(val(i)));
     return ts.hashcons_free();
+  }
+
+  // Only alive fields
+  @Override public Type live_use( Node def ) {
+    if( _live==Type.ALL ) return Type.ALL;
+    // Get field name by Node index
+    int idx = _defs.find(def);
+    TypeFld fld = _ts.get(idx);
+    
+    //TypeStruct ts = _live.at(1);
+    //if( ts==TypeStruct.ISUSED ) return TypeMem.ALIVE;
+    //if( ts==TypeStruct.UNUSED ) return TypeMem.DEAD ;
+    //return fld._t.oob(TypeMem.ALIVE);
+    // TODO: Lookup field name by name
+    throw unimpl();
   }
 
 
