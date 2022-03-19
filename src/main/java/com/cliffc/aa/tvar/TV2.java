@@ -73,7 +73,7 @@ public class TV2 {
   // with anything or appear on any Root input.
   private static BitsAlias EXT_ALIASES = BitsAlias.EXT;
   private static BitsFun EXT_FIDXS = BitsFun.EXT;
-    
+
   // Unique ID
   private static int UID=1;
   public final int _uid=UID++;
@@ -129,7 +129,7 @@ public class TV2 {
     _args = args;
     ALLOCS.computeIfAbsent(_alloc_site=alloc_site,e -> new ACnts())._malloc++;
   }
-  
+
   TV2 copy(String alloc_site) {
     // Shallow clone of args
     TV2 t = new TV2(_args==null ? null : (NonBlockingHashMap<String,TV2>)_args.clone(),_alloc_site);
@@ -195,6 +195,9 @@ public class TV2 {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
     for( int i=0; i<rec._defs._len; i++ )
       args.put(rec.ts().get(i)._fld,rec.tvar(i));
+    return make_struct(args,alloc_site);
+  }
+  private static TV2 make_struct( NonBlockingHashMap<String,TV2> args, String alloc_site ) {
     TV2 t2 = new TV2(args,alloc_site);
     t2._is_struct = true;
     t2._may_nil = false;
@@ -212,6 +215,26 @@ public class TV2 {
     //assert t2.is_obj();
     //return t2;
     throw unimpl();
+  }
+
+  public static TV2 make(Type t, String alloc_site) {
+    return switch( t ) {
+    case TypeStruct ts -> {
+      NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
+      for( TypeFld fld : ts )
+        args.put(fld._fld,make_leaf(alloc_site));
+      if( ts._name.length()>0 )
+        args.put(ts._name,make_leaf(alloc_site));
+      yield make_struct(args,alloc_site);
+    }
+    case TypeFlt flt -> make_base(t,alloc_site);
+    case Type tt -> {
+      if( t==Type.ANY ) yield make_leaf(alloc_site);
+      if( t == Type.XNIL || t == Type.NIL )
+        yield TV2.make_nil(TV2.make_leaf(alloc_site),alloc_site);
+      throw unimpl();
+    }
+    };
   }
 
   public static void reset_to_init0() {
@@ -396,7 +419,7 @@ public class TV2 {
     assert !is_unified();
     if( is_leaf() ) return Type.SCALAR;
     if( is_base() ) return _flow;
-    if( is_nil()  ) 
+    if( is_nil()  )
       return arg("?")._as_flow().meet(Type.NIL);
     if( is_fun()  ) {
       Type tfun = ADUPS.get(_uid);

@@ -45,7 +45,6 @@ public class Env implements AutoCloseable {
   public static final ConNode ALL_MEM;  // Conservative all memory
   public static final ConNode ALL_PARM; // Default parameter
   public static final ConNode ALL_CALL; // Common during function call construction
-  public static final ConNode<TypeMem> DEF_MEM;  // Default memory for function calls
 
   public static final    StartNode START; // Program start values (control, empty memory, cmd-line args)
   public static final    CProjNode CTL_0; // Program start value control
@@ -80,7 +79,6 @@ public class Env implements AutoCloseable {
     ALL_MEM = keep(new ConNode<>(TypeMem.ALLMEM));
     ALL_PARM= keep(new ConNode<>(Type.SCALAR));
     ALL_CALL= keep(new ConNode<>(TypeRPC.ALL_CALL));
-    DEF_MEM = keep(new ConNode<>(TypeMem.ALLMEM));
     // Initial control & memory
     CTL_0  = keep(new    CProjNode(START,0));
     MEM_0  = keep(new StartMemNode(START  ));
@@ -218,7 +216,6 @@ public class Env implements AutoCloseable {
     TV2.reset_to_init0();
     Node.VALS.clear();          // Clean out hashtable
     GVN.flow_clear();
-    DEF_MEM.walk_reset();
     START.walk_reset();         // Clean out any wired prim calls
     KEEP_ALIVE.walk_reset();    // Clean out any wired prim calls
     GVNGCM.KEEP_ALIVE.walk_reset();

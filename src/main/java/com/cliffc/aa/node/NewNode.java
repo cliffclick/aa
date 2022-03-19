@@ -39,13 +39,13 @@ public class NewNode extends Node {
 
   public Node ctl() { return in(CTL_IDX); }
   public Node mem() { return in(MEM_IDX); }
-  public Node val() { return in(REZ_IDX); }
+  public Node rec() { return in(REZ_IDX); }
   
   @Override public Type value() { return TypeTuple.make(Type.CTRL,memval(),_tptr); }
   // Construct the memory value
   private TypeMem memval() {
     Type tm = mem()._val;
-    Type t  = val()._val;
+    Type t  = rec()._val;
     if( !(tm instanceof TypeMem tmem ) ) return tm.oob(TypeMem.ALLMEM);
     if( !(t  instanceof TypeStruct ts) ) return t .oob(TypeMem.ALLMEM);
     return tmem.make_from(_alias,ts);

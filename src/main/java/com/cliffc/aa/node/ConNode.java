@@ -6,8 +6,6 @@ import com.cliffc.aa.type.*;
 
 import java.util.function.Predicate;
 
-import static com.cliffc.aa.AA.unimpl;
-
 // Constant value nodes; no computation needed.  Hashconsed for unique
 // constants, except for XNIL.  XNIL allows for a TV2 typevar Nilable-Leaf with
 // each Leaf unifying on its own.
@@ -20,12 +18,7 @@ public class ConNode<T extends Type> extends Node {
   @Override public String xstr() {
     if( Env.ALL_PARM == this ) return "ALL_PARM";
     if( Env.ALL_CALL == this ) return "ALL_CALL";
-    if( Env.DEF_MEM  == this ) return "DEF_MEM";
     return _t==null ? "(null)" : _t.toString();
-  }
-  @Override void walk_reset0() {
-    if( this==Env.DEF_MEM )
-      _t=(T)(_val=_live=Type.ALL);
   }
 
   @SuppressWarnings("unchecked")
@@ -41,18 +34,10 @@ public class ConNode<T extends Type> extends Node {
     if( _t==Type.CTRL || _t==Type.XCTRL || _t instanceof TypeRPC || _t instanceof TypeMem )
       return null;
     if( this == Env.XUSE || this == Env.ALL || this==Env.ALL_PARM ) return null;
-    if( _t == Type.XNIL || _t == Type.NIL )
-      return TV2.make_nil(TV2.make_leaf(alloc_site),alloc_site);
-    if( _t == Type.ANY ) return TV2.make_leaf(alloc_site);
-    //if( _t instanceof TypeInt ) {
-    //  NewNode nnn = Env.SCP_0.get_type("int:");
-    //  return nnn._tvar==null ? (nnn._tvar = TV2.make_leaf(nnn,alloc_site)) : nnn._tvar;
-    //}
-    //if( _t instanceof TypeFlt ) {
-    //  NewNode nnn = Env.SCP_0.get_type("flt:");
-    //  return nnn._tvar==null ? (nnn._tvar = TV2.make_leaf(nnn,alloc_site)) : nnn._tvar;
-    //}
-    throw unimpl();
+    //if( _t == Type.XNIL || _t == Type.NIL )
+    //  return TV2.make_nil(TV2.make_leaf(alloc_site),alloc_site);
+    //if( _t == Type.ANY ) return TV2.make_leaf(alloc_site);
+    return TV2.make(_t, "ConNode");
   }
 
   @Override public boolean unify( boolean test ) { return false; }
@@ -66,7 +51,6 @@ public class ConNode<T extends Type> extends Node {
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof ConNode con) ) return false;
-    if( this==Env.DEF_MEM || o==Env.DEF_MEM ) return false;
     if( _t==Type.XNIL && con._t==Type.XNIL /*&& tvar()!=con.tvar()*/ )
       return false;             // Different versions of TV2 NotNil
     return _t==con._t;

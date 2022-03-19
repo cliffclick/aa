@@ -26,11 +26,8 @@ public class ProjNode extends Node {
   }
   @Override public Type value() {
     Type c = val(0);
-    if( c instanceof TypeTuple ) {
-      TypeTuple ct = (TypeTuple)c;
-      if( _idx < ct._ts.length )
-        return ct._ts[_idx];
-    }
+    if( c instanceof TypeTuple ct && _idx < ct._ts.length )
+      return ct._ts[_idx];
     return c.oob();
   }
 
@@ -56,6 +53,8 @@ public class ProjNode extends Node {
       }
       return tv.unify(tv2,test); // Unify with Call arguments
     }
+    if( in(0) instanceof NewNode nnn )
+      return tv.unify(nnn.rec().tvar(),test);
     throw unimpl();
   }
 

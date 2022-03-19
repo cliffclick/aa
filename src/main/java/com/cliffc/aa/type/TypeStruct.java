@@ -270,6 +270,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Wrapped primitive prototypes
   public static final TypeStruct INT = TypeStruct.make("int:",false,TypeFld.make("x",TypeInt.INT64));
   public static final TypeStruct FLT = TypeStruct.make("flt:",false,TypeFld.make("x",TypeFlt.FLT64));
+  public static final TypeStruct BOOL= TypeStruct.make("int:",false,TypeFld.make("x",TypeInt.BOOL));
   
   // A bunch of types for tests
   public  static final TypeStruct POINT = args(TypeFlt.FLT64,TypeFlt.FLT64);
