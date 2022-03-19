@@ -979,8 +979,12 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         }
         assert cid==null;       // No doing things like "FA:XB:"
         // Lower case types are simple named types: "int:@{x=1" or "Cat:@{legs=4}"        
-        if( !isRecur(id) )
-          yield type(null).set_name((id+':').intern());
+        if( !isRecur(id) ) {
+          String tname = (id+':').intern();
+          if( Util.eq(id,"int") )
+            yield TypeStruct.make(tname,false,TypeFld.make("x",type(null)));
+          yield type(null).set_name(tname);
+        }
 
         RECURSIVE_MEET++;   // Ok, really start a recursive type
         Type t = type(id);

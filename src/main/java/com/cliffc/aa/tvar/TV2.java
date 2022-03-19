@@ -222,12 +222,13 @@ public class TV2 {
     case TypeStruct ts -> {
       NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
       for( TypeFld fld : ts )
-        args.put(fld._fld,make_leaf(alloc_site));
+        args.put(fld._fld,make(fld._t,alloc_site));
       if( ts._name.length()>0 )
         args.put(ts._name,make_leaf(alloc_site));
       yield make_struct(args,alloc_site);
     }
-    case TypeFlt flt -> make_base(t,alloc_site);
+    case TypeFlt f -> make_base(t,alloc_site);
+    case TypeInt i -> make_base(t,alloc_site);
     case Type tt -> {
       if( t==Type.ANY ) yield make_leaf(alloc_site);
       if( t == Type.XNIL || t == Type.NIL )
@@ -1144,16 +1145,22 @@ public class TV2 {
 
   private SB str_struct(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     if( is_math() ) return sb.p("@{MATH}");
-    //String clz = is_clz();
-    //if( clz!=null ) return sb;
+    // The struct contains a clz field, print as "klazz:@{fields}"
+    String clz = is_clz();
+    if( clz!=null )
+      sb.p(clz).p(':');
+    if( clz.equals("int") )
+      return sb.p(arg("x")._flow);
     final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
     sb.p(is_tup ? "(" : "@{");
     if( _args==null ) sb.p("_ ");
     else {
       for( String fld : sorted_flds() ) {
-        // Skip fields from functions
+        // Skip fields from functions; happens in error cases when mixing
+        // structs and functions
         if( fld.charAt(0)==' ' ) continue;
-        if( Util.eq(fld," ret") ) continue;
+        // Skip klazz name, already pre-printed ahead of struct
+        if( clz!=null && fld.charAt(fld.length()-1)==':' ) continue;
         // Skip field names in a tuple
         str0(is_tup ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,_args.get(fld),dups,debug).p(is_tup ? ',' : ';');
       }
