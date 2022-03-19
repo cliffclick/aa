@@ -220,13 +220,15 @@ public abstract class PrimNode extends Node {
   @Override public boolean unify( boolean test ) {
     boolean progress = false;
     for( int i=0; i<len(); i++ )
-      progress |= tvar(i).unify(atx(_formals.at(i+DSP_IDX)),test);
-    progress |= tvar().unify(atx(_tfp._ret),test);
+      progress |= atx(tvar(i),_formals.at(i+DSP_IDX),test);
+    progress |= atx(tvar(),_tfp._ret,test);
     return progress;
   }
-  private TV2 atx(Type t) {
-    assert t._name.length()>0; // All args are wrapped primitives
-    return TV2.make_base(((TypeStruct)t).at("x"),"PrimNode");
+  private static boolean atx(TV2 tv, Type tform, boolean test) {
+    assert tform._name.length()>0; // All args are wrapped primitives
+    Type tprim = ((TypeStruct)tform).at("x");
+    if( tv.is_base() && tv._flow==tprim ) return false;
+    return tv.unify(TV2.make_base(tprim,"PrimNode"),test);
   }
 
   @Override public ErrMsg err( boolean fast ) {

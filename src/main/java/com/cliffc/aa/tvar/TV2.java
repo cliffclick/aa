@@ -1144,12 +1144,9 @@ public class TV2 {
 
   private SB str_struct(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     if( is_math() ) return sb.p("@{MATH}");
-    String clz = is_clz();
-    if( clz!=null ) return sb;
+    //String clz = is_clz();
+    //if( clz!=null ) return sb;
     final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
-    BitsAlias aliases = ((TypeMemPtr)_flow).aliases();
-    if( debug )
-      aliases.clear(0).str(sb);
     sb.p(is_tup ? "(" : "@{");
     if( _args==null ) sb.p("_ ");
     else {
@@ -1163,7 +1160,7 @@ public class TV2 {
     }
     if( is_open() ) sb.p(" ...,");
     sb.p(!is_tup ? "}" : ")");
-    if( aliases.test(0) ) sb.p("?");
+    if( _may_nil ) sb.p("?");
     return sb;
   }
 
