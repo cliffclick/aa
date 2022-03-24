@@ -26,22 +26,25 @@ import static com.cliffc.aa.type.TypeFld.Access;
 // FunNode for function Node structure.  The wrapping function preserves the
 // order in the ParmNodes.
 
-// Both 'int' and 'flt' refer to internal Structs, built with a NewNode and
-// containing fields for each of the primitive operator function wrappers.  The
-// NewNode has a display field.
-
+// Both 'int' and 'flt' are clazzes, refer to internal Structs and containing
+// fields for each of the primitive operator function wrappers.  The normal
+// primitives are wrapped in a named Struct with a single field 'x', and the
+// Field lookup node checks the clazz after looking in the wrapper.
 
 public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
   public final TypeFunPtr _tfp; // FIDX, nargs, display argument, WRAPPED primitive return type
-  public final TypeStruct _formals; // Formals are indexed by order NOT name.  Formals are WRAPPED primitives
+  public final TypeStruct _formals; // Formals are indexed by order NOT name and are unwrapped prims.
+  public final Type _ret;       // Unwrapped primitive return
   Parse[] _badargs;             // Filled in when inlined in CallNode
   public PrimNode( String name, TypeStruct formals, Type ret ) {
     super(OP_PRIM);
     _name = name;
     int fidx = BitsFun.new_fidx();
     _formals = formals;
-    _tfp=TypeFunPtr.make(BitsFun.make0(fidx),formals.nargs(),TypeMemPtr.NO_DISP,ret);
+    _ret = ret;
+    _tfp=TypeFunPtr.make(BitsFun.make0(fidx),formals.nargs()+DSP_IDX,TypeMemPtr.NO_DISP,ret);
+
     _badargs=null;
   }
 
@@ -102,13 +105,16 @@ public abstract class PrimNode extends Node {
     return PRIMS;
   }
 
-  public static TypeStruct make_int(long i) {
-    return TypeStruct.make("int:",false,TypeFld.make("x",TypeInt.con(i)));
-  }
+  public static TypeStruct make_int(long   i) { return TypeStruct.make("int:",false,TypeFld.make("x",TypeInt.con(i))); }
+  public static TypeStruct make_flt(double d) { return TypeStruct.make("flt:",false,TypeFld.make("x",TypeFlt.con(d))); }
 
-  public static TypeStruct make_flt(double d) {
-    return TypeStruct.make("flt:",false,TypeFld.make("x",TypeFlt.con(d)));
+  public static TypeStruct make_wrap(Type t) {
+    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",false,TypeFld.make("x",t));
   }
+  public static TypeInt unwrap_i(Type t) { return (TypeInt)((TypeStruct)t).at("x"); }
+  public static TypeFlt unwrap_f(Type t) { return (TypeFlt)((TypeStruct)t).at("x"); }
+  public static long   unwrap_ii(Type t) { return unwrap_i(t).getl(); }
+  public static double unwrap_ff(Type t) { return unwrap_f(t).getd(); }
 
   private static void install( String s, PrimNode[] prims ) {
     String tname = (s+":").intern();
@@ -137,22 +143,23 @@ public abstract class PrimNode extends Node {
     if( is_oper ) Oper.make(op);
 
     FunNode fun = (FunNode)Env.GVN.init(new FunNode(this,is_oper ? op : _name).add_def(Env.ALL_CTRL));
-    for( int i=DSP_IDX; i<_formals.len(); i++ )
+    ParmNode rpc = new ParmNode(0,fun,Env.ALL_CALL).init();
+    for( int i=0; i<_formals.len(); i++ )
       // Make a Parm for every formal, and unwrap it
-      add_def(_formals.get(i)==null ? null
-              : new FieldNode(new ParmNode(i,fun,(ConNode)Node.con(_formals.at(i))).init(),"x").init());
+      add_def(_formals.get(i) == null ? null
+              : new ParmNode(i+DSP_IDX,fun,(ConNode)Node.con(_formals.at(i))).init());
     // The primitive, working on and producing raw prims
     init();
     // Re-wrap the result
-    Node val = new StructNode(false,false).name(_tfp._ret._name).add_fld(TypeFld.make("x",_tfp._ret),this,null).init();
-    RetNode ret = new RetNode(fun,null,val,null,fun).init();
-    FunPtrNode fptr =  new FunPtrNode(op,ret,fun.parm(DSP_IDX)).init();
+    RetNode ret = new RetNode(fun,null,this,rpc,fun).init();
+    // FunPtr is UNBOUND here, will be bound when loaded thru a named struct to the Clazz.
+    FunPtrNode fptr =  new FunPtrNode(op,ret,Env.ALL).init();
     rec.add_fun(op,Access.Final,fptr,null);
   }
 
   // Build and install match package
   private static void install_math(PrimNode rand) {
-    StructNode rec = new StructNode(false,false).name("math:");
+    StructNode rec = new StructNode(false,false);
     rand.as_fun(rec,false);
     rec.add_fld(TypeFld.make("pi",TypeFlt.PI),Node.con(TypeFlt.PI),null);
     rec.close();
@@ -190,9 +197,9 @@ public abstract class PrimNode extends Node {
     // If all inputs are constants we constant-fold.  If any input is high, we
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
-    for( int i=DSP_IDX; i<_formals.len(); i++ ) {
+    for( int i=0; i<_formals.len(); i++ ) {
       if( _formals.get(i)==null ) continue;
-      Type tactual = TS[i] = val(i-DSP_IDX);
+      Type tactual = TS[i] = val(i);
       Type tformal = _formals.at(i);
       Type t = tformal.dual().meet(tactual);
       if( !t.is_con() && tactual!=Type.NIL ) {
@@ -200,9 +207,7 @@ public abstract class PrimNode extends Node {
         if( t.above_center() ) has_high=true;
       }
     }
-    Type rez = _tfp._ret;
-    Type rez2 = is_con ? apply(TS) : (has_high ? rez.dual() : rez);
-    return rez2;
+    return is_con ? apply(TS) : (has_high ? _ret.dual() : _ret);
   }
 
   @Override public Node ideal_reduce() {
@@ -220,24 +225,21 @@ public abstract class PrimNode extends Node {
   @Override public boolean unify( boolean test ) {
     boolean progress = false;
     for( int i=0; i<len(); i++ )
-      progress |= atx(tvar(i),_formals.at(i+DSP_IDX),test);
-    progress |= atx(tvar(),_tfp._ret,test);
+      progress |= atx(tvar(i),_formals.at(i),test);
+    progress |= atx(tvar(),_ret,test);
     return progress;
   }
-  private static boolean atx(TV2 tv, Type tform, boolean test) {
-    assert tform._name.length()>0; // All args are wrapped primitives
-    Type tprim = ((TypeStruct)tform).at("x");
+  private static boolean atx(TV2 tv, Type tprim, boolean test) {
     if( tv.is_base() && tv._flow==tprim ) return false;
     return tv.unify(TV2.make_base(tprim,"PrimNode"),test);
   }
 
   @Override public ErrMsg err( boolean fast ) {
-    for( TypeFld fld : _formals ) {
-      //Type tactual = val(fld._order);
-      //Type tformal = fld._t;
-      //if( !tactual.isa(tformal) )
-      //  return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[fld._order-DSP_IDX],tactual, tformal);
-      throw unimpl();           // TODO: Access input by field name
+    for( int i=0; i<_defs._len; i++ ) {
+      Type tactual = val(i);
+      Type tformal = _formals.at(i);
+      if( !tactual.isa(tformal) )
+        return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[i],tactual, tformal);
     }
     return null;
   }
@@ -254,13 +256,13 @@ public abstract class PrimNode extends Node {
 
   public static class ConvertI64F64 extends PrimNode {
     public ConvertI64F64() { super("flt",TypeStruct.INT64,TypeStruct.FLT); }
-    @Override public Type apply( Type[] args ) { return TypeFlt.con((double)args[DSP_IDX].getl()); }
+    @Override public Type apply( Type[] args ) { return TypeFlt.con((double)args[0].getl()); }
   }
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpF64 extends PrimNode {
     Prim1OpF64( String name ) { super(name,TypeStruct.FLT64,TypeStruct.FLT); }
-    public Type apply( Type[] args ) { return TypeFlt.con(op(args[DSP_IDX].getd())); }
+    public Type apply( Type[] args ) { return make_flt(op(unwrap_ff(args[0]))); }
     abstract double op( double d );
   }
 
@@ -269,23 +271,22 @@ public abstract class PrimNode extends Node {
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpI64 extends PrimNode {
     Prim1OpI64( String name ) { super(name,TypeStruct.INT64,TypeStruct.INT); }
-    @Override public Type apply( Type[] args ) { return TypeInt.con(op(args[DSP_IDX].getl())); }
+    @Override public Type apply( Type[] args ) { return make_int(op(unwrap_ii(args[0]))); }
     abstract long op( long d );
   }
 
   static class MinusI64 extends Prim1OpI64 { MinusI64() { super("-"); } long op( long x ) { return -x; } }
   static class NotI64 extends PrimNode {
-    // Rare function which takes a Scalar (works for both ints and ptrs)
-    public NotI64() { super("!",TypeStruct.INT64,TypeStruct.BOOL); }
+    // Rare function which takes a Scalar (works for both ints and ptrs).
+    public NotI64() { super("!",TypeStruct.INT64,TypeInt.BOOL); }
     @Override public Type value() {
-      Type t = val(0);
-      if( t== Type.XNIL ||
-          t== Type. NIL ||
-          t== TypeInt.ZERO )
-        return TypeInt.TRUE;
-      if( t. may_nil() ) return TypeInt.BOOL.dual();
-      if( t.must_nil() ) return TypeInt.BOOL;
-      return Type.NIL;          // Cannot be a nil, so return a nil
+      Type t0 = val(0);
+      if( t0 == Type.XNIL || t0 == Type. NIL )
+        return make_int(1);     // !nil is 1
+      Type t1 = Util.eq(t0._name,"int:") ? unwrap_i(t0) : t0;
+      if( t1. may_nil() ) return make_wrap(TypeInt.BOOL.dual());
+      if( t1.must_nil() ) return make_wrap(TypeInt.BOOL);
+      return Type.XNIL;          // Cannot be a nil, so return a nil
     }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   }
@@ -294,7 +295,7 @@ public abstract class PrimNode extends Node {
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpF64 extends PrimNode {
     Prim2OpF64( String name ) { super(name,TypeStruct.FLT64_FLT64,TypeStruct.FLT); }
-    @Override public Type apply( Type[] args ) { return TypeFlt.con(op(args[DSP_IDX].getd(),args[ARG_IDX].getd())); }
+    @Override public Type apply( Type[] args ) { return TypeFlt.con(op(args[0].getd(),args[1].getd())); }
     abstract double op( double x, double y );
   }
 
@@ -305,8 +306,8 @@ public abstract class PrimNode extends Node {
 
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpF64 extends PrimNode {
-    Prim2RelOpF64( String name ) { super(name,TypeStruct.FLT64_FLT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(args[DSP_IDX].getd(),args[ARG_IDX].getd())?TypeInt.TRUE:TypeInt.FALSE; }
+    Prim2RelOpF64( String name ) { super(name,TypeStruct.FLT64_FLT64,TypeInt.BOOL); }
+    @Override public Type apply( Type[] args ) { return op(args[0].getd(),args[1].getd())?TypeInt.TRUE:TypeInt.FALSE; }
     abstract boolean op( double x, double y );
   }
 
@@ -321,7 +322,7 @@ public abstract class PrimNode extends Node {
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpI64 extends PrimNode {
     Prim2OpI64( String name ) { super(name,TypeStruct.INT64_INT64,TypeStruct.INT); }
-    @Override public Type apply( Type[] args ) { return TypeInt.con(op(args[DSP_IDX].getl(),args[ARG_IDX].getl())); }
+    @Override public Type apply( Type[] args ) { return TypeInt.con(op(args[0].getl(),args[1].getl())); }
     abstract long op( long x, long y );
   }
 
@@ -333,7 +334,7 @@ public abstract class PrimNode extends Node {
 
   abstract static class Prim2OpIF64 extends PrimNode {
     Prim2OpIF64( String name ) { super(name,TypeStruct.INT64_FLT64,TypeStruct.FLT); }
-    @Override public Type apply( Type[] args ) { return TypeFlt.con(op(args[DSP_IDX].getl(),args[ARG_IDX].getd())); }
+    @Override public Type apply( Type[] args ) { return TypeFlt.con(op(args[0].getl(),args[1].getd())); }
     abstract double op( long x, double y );
   }
   static class AddIF64 extends Prim2OpIF64 { AddIF64() { super("+"); } double op( long l, double r ) { return l+r; } }
@@ -343,7 +344,7 @@ public abstract class PrimNode extends Node {
 
   abstract static class Prim2OpFI64 extends PrimNode {
     Prim2OpFI64( String name ) { super(name,TypeStruct.FLT64_INT64,TypeStruct.FLT); }
-    @Override public Type apply( Type[] args ) { return TypeFlt.con(op(args[DSP_IDX].getd(),args[ARG_IDX].getl())); }
+    @Override public Type apply( Type[] args ) { return TypeFlt.con(op(args[0].getd(),args[1].getl())); }
     abstract double op( double x, long y );
   }
   static class AddFI64 extends Prim2OpFI64 { AddFI64() { super("+"); } double op( double l, long r ) { return l+r; } }
@@ -404,8 +405,8 @@ public abstract class PrimNode extends Node {
 
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpI64 extends PrimNode {
-    Prim2RelOpI64( String name ) { super(name,TypeStruct.INT64_INT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(args[DSP_IDX].getl(),args[ARG_IDX].getl())?TypeInt.TRUE:TypeInt.FALSE; }
+    Prim2RelOpI64( String name ) { super(name,TypeStruct.INT64_INT64,TypeInt.BOOL); }
+    @Override public Type apply( Type[] args ) { return op(args[0].getl(),args[1].getl())?TypeInt.TRUE:TypeInt.FALSE; }
     abstract boolean op( long x, long y );
   }
 
@@ -418,7 +419,7 @@ public abstract class PrimNode extends Node {
 
 
   public static class EQ_OOP extends PrimNode {
-    public EQ_OOP() { super("==",TypeMemPtr.OOP_OOP,TypeStruct.BOOL); }
+    public EQ_OOP() { super("==",TypeMemPtr.OOP_OOP,TypeInt.BOOL); }
     @Override public Type value() {
       if( is_keep() ) return Type.ALL;
       // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
@@ -451,7 +452,7 @@ public abstract class PrimNode extends Node {
   }
 
   public static class NE_OOP extends PrimNode {
-    public NE_OOP() { super("!=",TypeMemPtr.OOP_OOP,TypeStruct.BOOL); }
+    public NE_OOP() { super("!=",TypeMemPtr.OOP_OOP,TypeInt.BOOL); }
     @Override public Type value() {
       if( is_keep() ) return Type.ALL;
       // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".

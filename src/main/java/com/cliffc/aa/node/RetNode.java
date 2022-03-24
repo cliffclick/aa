@@ -19,10 +19,9 @@ public final class RetNode extends Node {
   int _nargs;                // Replicated from FunNode
   public RetNode( Node ctrl, Node mem, Node val, Node rpc, FunNode fun ) {
     super(OP_RET,ctrl,mem,val,rpc,fun);
-    _fidx = fun._fidx;
     _nargs=fun.nargs();
-    FUNS.setX(_fidx,this);  }
-
+    set_fidx(fun._fidx);
+  }
   // Short self name
   @Override public String xstr() {
     if( is_dead() ) return "Ret!";
@@ -48,7 +47,7 @@ public final class RetNode extends Node {
     return fpn;                 // Zero (null) or 1 display.
   }
   public int fidx() { return _fidx; }
-  void set_fidx(int fidx) { unelock(); _fidx = fidx; } // Unlock before changing hash
+  void set_fidx(int fidx) { unelock(); assert FUNS.at(_fidx)!=this; _fidx = fidx; FUNS.setX(fidx,this); } // Unlock before changing hash
   @Override public int hashCode() { return super.hashCode()+_fidx; }
   @Override public boolean equals(Object o) {
     if( !super.equals(o) ) return false;

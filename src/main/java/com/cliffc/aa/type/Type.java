@@ -374,7 +374,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   static final byte TNIL    = 8; // The Nil-type
   static final byte TXNIL   = 9; // NIL.dual
   static final byte TSIMPLE =10; // End of the Simple Types
-  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","nScalar","~nScalar","nil","0"};
+  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","nScalar","~nScalar","nil","xnil"};
   static final byte TINT    =11; // All Integers, including signed/unsigned and various sizes; see TypeInt
   static final byte TFLT    =12; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
   static final byte TRPC    =13; // Return PCs; Continuations; call-site return points; see TypeRPC
@@ -542,6 +542,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Meet the names.  Subclasses basically ignore the names as they have
   // their own complicated meets to perform, so we meet them here for all.
   private Type xmt_name(Type t, Type mt) {
+    if( this==Type.NIL || this==Type.XNIL ||
+        t   ==Type.NIL || t   ==Type.XNIL )
+      return mt;                // NIL is never named, and never removes a name
     String n = mtname(t,mt);    // Meet name strings
     // If the names are incompatible and the meet remained high then the
     // mismatched names force a drop.
@@ -570,6 +573,14 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     if(  type <= TXCTRL ) return _type==TXCTRL && t._type==TXCTRL ? XCTRL : CTRL;
     if( _type <= TXCTRL || t._type <= TXCTRL ) return ALL;
 
+    // Very specifically (and, we can argue very non-orthgonally) we can allow
+    // X/NIL to meet *inside* a single field TypeStruct.  There's another
+    // version where we can define the meet of NIL and a no-field struct or an
+    // N-field struct.
+
+    if(   _type == TNIL ||   _type == TXNIL ) return t.meet_nil(this);
+    if( t._type == TNIL || t._type == TXNIL ) return   meet_nil(t   );
+    
     // Meeting scalar and non-scalar falls to ALL.  Includes most Memory shapes.
     if( isa_scalar() ^ t.isa_scalar() ) return ALL;
 
@@ -589,9 +600,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     if( t._type == TNSCALR ) return   must_nil() ? SCALAR : NSCALR;
     if(   _type == TXNSCALR) return t.not_nil();
     if( t._type == TXNSCALR) return   not_nil();
-
-    if(   _type == TNIL ||   _type == TXNIL ) return t.meet_nil(this);
-    if( t._type == TNIL || t._type == TXNIL ) return   meet_nil(t   );
 
     // Scalar values break out into: nums(reals (int,flt)), GC-ptrs (structs(tuples), arrays(strings)), fun-ptrs, RPC
     if( t._type == TFUNPTR ||
@@ -911,8 +919,12 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   public Type meet_nil(Type nil) {
     assert nil==NIL || nil==XNIL;
     return switch( _type ) {
-    case TXNIL, TNIL -> SCALAR; // Mix of XNIL and NIL
-    case TSTRUCT, TMEM -> ALL; // Objects and Memory do not mix with any simple type
+    case TANY, TXSCALAR ->  nil;
+    case TXNSCALR -> nil==XNIL ? NSCALR : NIL;
+    case TXNIL, TNIL ->  this==nil ? this : SCALAR;
+    case TNSCALR -> nil==XNIL ? NSCALR : SCALAR;
+    case TSCALAR, TCTRL, TXCTRL -> SCALAR; // Mix of XNIL and NIL
+    case TSTRUCT, TARY, TMEM, TALL -> ALL; // Objects and Memory do not mix with any simple type
     // Scalar flavors already handled in XMEET.
     default -> throw typerr(null); // Overridden in subclass or already handled
     };
@@ -961,7 +973,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
           { _x++; yield cyc(TypeStruct.valueOf(this,cid,false,true)); }
         yield simple_type(id());
       }
-      case '0','1','2','3','4','5','6','7','8','9' -> {
+      case '0','1','2','3','4','5','6','7','8','9','-' -> {
         double d = num();
         Type t = ((long)d)==d ? TypeInt.con((long)d) : TypeFlt.con(d);
         if( cid!=null ) _dups.put(cid,t);
@@ -978,7 +990,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
           yield t;
         }
         assert cid==null;       // No doing things like "FA:XB:"
-        // Lower case types are simple named types: "int:@{x=1" or "Cat:@{legs=4}"        
+        // Lower case types are simple named types: "int:@{x=1" or "Cat:@{legs=4}"
         if( !isRecur(id) ) {
           String tname = (id+':').intern();
           if( Util.eq(id,"int") )
@@ -1023,14 +1035,15 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     // Possibly followed by a 'f' for a float.
     double num() {
       int i=0, d;
+      int neg = peek('-') ? -1 : 1;
       while( !eos() &&  (d=at(_x)-'0') >= 0 && d<=9 )
         { i = i*10+d; _x++; }
-      if( eos() || !peek('.') ) return i; // Pure integer
+      if( eos() || !peek('.') ) return i*neg; // Pure integer
       double dd = i, frac=10;
       while( !eos() &&  (d=at(_x)-'0') >= 0 && d<=9 )
         { dd += d/frac; frac *= 10; _x++; }
       if( peek('f') ) dd = (float)dd; // A float
-      return dd;                // A double
+      return dd*neg;                  // A double
     }
     // Skip whitespace and parse an identifier.
     String id() {

@@ -173,8 +173,7 @@ public class StructNode extends Node {
   // Return liveness for a field
   @Override public Type live_use( Node def ) {
     if( !(_live instanceof TypeStruct ts) ) return _live.oob();
-    // Get field name by Node index
-    int idx = _defs.find(def);
+    int idx = _defs.find(def);        // Get Node index
     TypeFld sfld = _ts.get(idx);      // Self field name, from index
     TypeFld lfld = ts.get(sfld._fld); // Liveness for this name
     return lfld==null ? ts.oob() : lfld._t.oob();

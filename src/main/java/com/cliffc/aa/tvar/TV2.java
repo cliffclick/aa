@@ -175,7 +175,7 @@ public class TV2 {
   }
   // Make a new primitive base TV2
   public static TV2 make_base(Type flow, @NotNull String alloc_site) {
-    assert !(flow instanceof TypeStruct) && !(flow instanceof TypeFunPtr);
+    assert !(flow instanceof TypeFunPtr);
     TV2 t2 = new TV2(null,alloc_site);
     t2._flow=flow;
     return t2;

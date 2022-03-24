@@ -667,7 +667,7 @@ public class Parse implements Comparable<Parse> {
       if( op.is_open() ) throw unimpl(); // Parse the close
       if( op._nargs!=1 ) throw unimpl(); // No binary/trinary allowed here
       // Load field e0.op2_ as TFP, and instance call.
-      Node fun  = gvn(new LoadNode(mem(),e0,op._name,errMsg(oldx)));
+      Node fun = gvn(new FieldNode(e0,op._name));
       n = do_call(errMsgs(0,oldx),args(fun));
     } else {
       // Normal leading term

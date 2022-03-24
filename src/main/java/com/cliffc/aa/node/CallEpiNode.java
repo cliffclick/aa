@@ -155,27 +155,28 @@ public final class CallEpiNode extends Node {
     if( trez.is_con() && rctl==fun && cmem == rmem && inline )
       return unwire(call,ret).set_is_copy(cctl,cmem,Node.con(trez));
 
-    //// Check for a 1-op body using only constants or parameters and no memory effects
+    // Check for a 1-op body using only constants or parameters and no memory effects.
+    // Ok to wrap and unwrap primitives.
+    // TODO: INLINE TRIVIAL PRIMITIVES
     //boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem && inline;
     //for( Node parm : rrez._defs )
     //  if( parm != null && parm != fun &&
     //      !(parm instanceof ParmNode && parm.in(0) == fun) &&
-    //      !(parm instanceof NewNode nnn && nnn._is_val) &&  // Prototype is OK
     //      !(parm instanceof ConNode) )
     //    can_inline=false;       // Not trivial
     //if( can_inline ) {
-    //  Node irez = rrez.copy(false); // Copy the entire function body
-    //  ProjNode proj = ProjNode.proj(this,REZ_IDX);
-    //  irez._live = proj==null ? TypeMem.ALIVE : proj._live; // sharpen liveness to the call-site liveness
-    //  for( Node in : rrez._defs )
-    //    irez.add_def((in instanceof ParmNode parm && parm.in(CTL_IDX) == fun) ? ProjNode.proj(call,parm._idx) : in);
-    //  if( irez instanceof PrimNode prim ) prim._badargs = call._badargs;
-    //  GVN.add_work_new(irez);
-    //  return unwire(call,ret).set_is_copy(cctl,cmem,irez);
+    ////  Node irez = rrez.copy(false); // Copy the entire function body
+    ////  ProjNode proj = ProjNode.proj(this,REZ_IDX);
+    ////  irez._live = proj==null ? TypeMem.ALIVE : proj._live; // sharpen liveness to the call-site liveness
+    ////  for( Node in : rrez._defs )
+    ////    irez.add_def((in instanceof ParmNode parm && parm.in(CTL_IDX) == fun) ? ProjNode.proj(call,parm._idx) : in);
+    ////  if( irez instanceof PrimNode prim ) prim._badargs = call._badargs;
+    ////  GVN.add_work_new(irez);
+    ////  return unwire(call,ret).set_is_copy(cctl,cmem,irez);
+    //  throw unimpl();
     //}
-    //
-    //return null;
-    throw unimpl();
+
+    return null;
   }
 
   // Used during GCP and Ideal calls to see if wiring is possible.
@@ -224,14 +225,13 @@ public final class CallEpiNode extends Node {
     // assert finding all args, because dead args may already be removed - and
     // so there's no Parm/Phi to attach the incoming arg to.
     for( Node arg : fun._uses ) {
-      if( arg.in(0) != fun || !(arg instanceof ParmNode) ) continue;
-      int idx = ((ParmNode)arg)._idx;
-      Node actual = switch( idx ) {
+      if( arg.in(0) != fun || !(arg instanceof ParmNode parm) ) continue;
+      Node actual = switch( parm._idx ) {
       case 0 -> new ConNode<>(TypeRPC.make(call._rpc)); // Always RPC is a constant
       case MEM_IDX -> new MProjNode(call); // Memory into the callee
-      default -> idx >= call.nargs()       // Check for args present
+      default -> parm._idx >= call.nargs() // Check for args present
       ? Env.ALL  // Missing args, still wire (to keep FunNode neighbors) but will error out later.
-      : new ProjNode(call, idx); // Normal args
+      : new ProjNode(call, parm._idx); // Normal args
       };
       actual = is_combo ? actual.init1() : Env.GVN.init(actual);
       arg.add_def(actual);

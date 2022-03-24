@@ -261,7 +261,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   public static TypeFunPtr make( int fidx, int nargs, Type dsp, Type ret ) { return make(BitsFun.make0(fidx),nargs,dsp,ret); }
   public static TypeFunPtr make_new_fidx( int parent, int nargs, Type dsp, Type ret ) { return make(BitsFun.make_new_fidx(parent),nargs,dsp,ret); }
   public static TypeFunPtr make( BitsFun fidxs, int nargs) { return make(fidxs,nargs,TypeMemPtr.NO_DISP,Type.SCALAR); }
-  public        TypeFunPtr make_from( TypeMemPtr dsp ) { return make(_fidxs,_nargs, dsp,_ret); }
+  public        TypeFunPtr make_from( Type dsp ) { return make(_fidxs,_nargs, dsp,_ret); }
   public        TypeFunPtr make_from( BitsFun fidxs  ) { return fidxs==_fidxs ? this : make( fidxs,_nargs,_dsp,_ret); }
   public        TypeFunPtr make_from( Type dsp, Type ret ) { return dsp==_dsp && ret==_ret ? this : make(_fidxs,_nargs, dsp,ret); }
   public        TypeFunPtr make_no_disp( ) { return make(_fidxs,_nargs,TypeMemPtr.NO_DISP,_ret); }
@@ -334,9 +334,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
       _fidxs.abit() != -1;
   }
   @Override public boolean is_con()       {
-    // No display (could be constant display?)
-    // Or the unbound display
-    return (_dsp==TypeMemPtr.NO_DISP || _dsp==Type.ALL) &&
+    // Constant display or unbound display
+    return (!has_dsp() || _dsp.is_con()) &&
       // Single bit covers all functions (no new children added, but new splits
       // can appear).  Currently, not tracking this at the top-level, so instead
       // just triggering off of a simple heuristic: a single bit above BitsFun.ALL0.

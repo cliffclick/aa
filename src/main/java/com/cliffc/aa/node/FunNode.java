@@ -235,8 +235,7 @@ public class FunNode extends RegionNode {
     // Every input path is wired to an output path
     for( int i=1+(has_unknown_callers() ? 1 : 0); i<_defs._len; i++ ) {
       Node c = in(i);
-      if( !(c.in(0) instanceof CallNode) ) return null; // If this is not a CallNode, just bail
-      CallNode call = (CallNode)c.in(0);
+      if( !(c.in(0) instanceof CallNode call) ) return null; // If this is not a CallNode, just bail
       CallEpiNode cepi = call.cepi();
       if( cepi==null ) return null;
       assert cepi._defs.find(ret)!= -1;  // If this is not wired, just bail
@@ -535,8 +534,7 @@ public class FunNode extends RegionNode {
       int op = n._op;           // opcode
       if( op == OP_CALL ) {     // Call-of-primitive?
         Node n1 = ((CallNode)n).fdx();
-        if( !(n1._val instanceof TypeFunPtr) ) return -1; // Calling an unknown function, await GCP
-        TypeFunPtr tfp = (TypeFunPtr)n1._val;
+        if( !(n1._val instanceof TypeFunPtr tfp) ) return -1; // Calling an unknown function, await GCP
         if( tfp._fidxs.test(_fidx) ) self_recursive = true; // May be self-recursive
         if( n1 instanceof FunPtrNode fpn ) {
           if( fpn.ret().rez() instanceof PrimNode )
@@ -705,7 +703,7 @@ public class FunNode extends RegionNode {
     // Collect the old/new returns and funptrs and add to map also.  The old
     // Ret has a set (not 1!) of FunPtrs, one per unique Display.
     RetNode newret = (RetNode)map.get(oldret);
-    newret._fidx = fun._fidx;
+    newret.set_fidx(fun._fidx);
     if( path < 0 ) {            // Type split
       for( Node use : oldret._uses )
         if( use instanceof FunPtrNode ) { // Old-return FunPtrs; varies by Display & by internal/external
@@ -738,8 +736,8 @@ public class FunNode extends RegionNode {
     // For all aliases split in this pass, update in-node both old and new.
     // This changes their hash, and afterwards the keys cannot be looked up.
     for( Map.Entry<Node,Node> e : map.entrySet() )
-      if( e.getKey() instanceof MemSplitNode )
-        ((MemSplitNode)e.getKey()).split_alias(e.getValue(),aliases);
+      if( e.getKey() instanceof MemSplitNode memsplit )
+        memsplit.split_alias(e.getValue(),aliases);
 
     // Wired Call Handling:
     if( zlen==2 ) {               // Not called by any unknown caller
@@ -748,8 +746,7 @@ public class FunNode extends RegionNode {
         // memory includes the other half of alias splits, which might be
         // passed in from recursive calls.
         for( Node p : fun._uses )
-          if( p instanceof ParmNode ) {
-            ParmNode parm = (ParmNode)p;
+          if( p instanceof ParmNode parm ) {
             Node defx;
             if( parm._idx==0 ) defx = Node.con(TypeRPC.ALL_CALL);
             else if( parm._idx==MEM_IDX ) throw unimpl();
@@ -815,8 +812,7 @@ public class FunNode extends RegionNode {
     // Look for wired new not-recursive CallEpis; these will have an outgoing
     // edge to some other RetNode, but the Call will not be wired.  Wire.
     for( Node nn : map.values() ) {
-      if( nn instanceof CallEpiNode ) {
-        CallEpiNode ncepi = (CallEpiNode)nn;
+      if( nn instanceof CallEpiNode ncepi ) {
         for( int i=0; i<ncepi.nwired(); i++ ) {
           RetNode xxxret = ncepi.wired(i); // Neither newret nor oldret
           if( xxxret != newret && xxxret != oldret ) { // Not self-recursive

@@ -224,8 +224,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Make a collection of fields, with no display and all with default names and final fields.
   private static TypeStruct _malloc() { return malloc("",false); }
   private TypeStruct arg(Type t, int n) { _flds.push(TypeFld.make_arg(t,n)); return this; }
-  public static TypeStruct args(Type t1         ) { return _malloc().arg(CTRL,CTL_IDX).arg(ALL,MEM_IDX).arg(t1,DSP_IDX)                .hashcons_free(); }
-  public static TypeStruct args(Type t1, Type t2) { return _malloc().arg(CTRL,CTL_IDX).arg(ALL,MEM_IDX).arg(t1,DSP_IDX).arg(t2,ARG_IDX).hashcons_free(); }
+  public static TypeStruct args(Type t1         ) { return _malloc().arg(t1,DSP_IDX)                .hashcons_free(); }
+  public static TypeStruct args(Type t1, Type t2) { return _malloc().arg(t1,DSP_IDX).arg(t2,ARG_IDX).hashcons_free(); }
 
   // Used to make a few testing constants
   public static TypeStruct make_test( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a)); }
@@ -271,7 +271,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public static final TypeStruct INT = TypeStruct.make("int:",false,TypeFld.make("x",TypeInt.INT64));
   public static final TypeStruct FLT = TypeStruct.make("flt:",false,TypeFld.make("x",TypeFlt.FLT64));
   public static final TypeStruct BOOL= TypeStruct.make("int:",false,TypeFld.make("x",TypeInt.BOOL));
-  
+
   // A bunch of types for tests
   public  static final TypeStruct POINT = args(TypeFlt.FLT64,TypeFlt.FLT64);
   public  static final TypeStruct NAMEPT= POINT.set_name("Point:");
@@ -555,9 +555,11 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
     // Special shortcut for the all-prims display type
-    if( get("pi") != null ) {
-      sb.p("MATH");
-    } else {
+    if(      is_math()    )  sb.p("MATH");
+    else if( is_file_dsp() ) sb.p("FILE_MEM");
+    else if( is_int_clz()  ) sb.p("INT");
+    else if( is_flt_clz()  ) sb.p("FLT");
+    else {
       // Set the indent flag once for the entire struct.  Indent if any field is complex.
       boolean ind = false;
       for( TypeFld fld : this )
@@ -580,6 +582,11 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   }
 
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return true; }
+
+  boolean is_math() { return has("pi"); }
+  boolean is_file_dsp() { return has("int") && has("flt") && has("math"); }
+  boolean is_int_clz() { return has("!_"); }
+  boolean is_flt_clz() { return has("_/_") && at("_/_") instanceof TypeFunPtr tfp && Util.eq(tfp._ret._name,"flt:"); }
 
   // e.g. (), (^=any), (^=any,"abc"), (3.14), (3.14,"abc"), (,,)
   static TypeStruct valueOf(Parse P, String cid, boolean is_tup, boolean any ) {
@@ -705,9 +712,19 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     for( int i=0; i<_flds._len; i++ )
       if( !_flds._es[i].is_con() )
         return false;
-    return true;    
+    return true;
   }
-  @Override public Type meet_nil(Type nil) { return this; }
+  @Override public Type meet_nil(Type nil) {
+    //if( nil==XNIL )
+    //  return above_center() ? XNIL : this;
+    //if( above_center() )
+    //  return NIL;
+    //TypeStruct ts = copy();
+    //for( int i=0; i<len(); i++ )
+    //  ts._flds.set(i,_flds.at(i).meet_nil(nil));
+    //return ts.hashcons_free();
+    return ALL;
+  }
 
   @Override boolean contains( Type t, VBitSet bs ) {
     if( bs==null ) bs=new VBitSet();

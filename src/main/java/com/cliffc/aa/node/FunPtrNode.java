@@ -52,7 +52,7 @@ public final class FunPtrNode extends Node {
   // Explicitly, no display
   public  FunPtrNode( String name, RetNode ret ) { this(name,ret, Env.ANY ); }
   // Display (already fresh-loaded) but no name.
-  public  FunPtrNode( RetNode ret, Node display ) { this(null,ret,display); }
+  public  FunPtrNode( RetNode ret, Node display ) { this(ret.fun()._name,ret,display); }
   public RetNode ret() { return in(0)==null ? null : (RetNode)in(0); }
   public Node display(){ return in(1); }
   public FunNode fun() { return ret().fun(); }
@@ -134,8 +134,8 @@ public final class FunPtrNode extends Node {
 
   @Override public Type live_use(Node def ) {
     if( _live==Type.ALL ) return Type.ALL;
-    // Else must be a TS with no-display.  Display is dead, but the rest of the
-    // function is alive.
+    // GENERIC_FUNPTR is a sentinal for "display is dead but function is alive"
+    assert _live==TypeFunPtr.GENERIC_FUNPTR;
     return def==display() ? Type.ANY : Type.ALL;
   }
 

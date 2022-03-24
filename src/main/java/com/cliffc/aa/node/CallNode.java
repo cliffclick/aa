@@ -10,7 +10,6 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Arrays;
 
 import static com.cliffc.aa.AA.*;
-import static com.cliffc.aa.Env.GVN;
 
 // Call/apply node.
 //
@@ -125,7 +124,7 @@ public class CallNode extends Node {
   Node arg ( int x ) { assert x>=0; return _defs.at(x); }
   // Set an argument.  Use 'set_fun' to set the Code.
   Node set_arg (int idx, Node arg) { assert idx>=DSP_IDX && idx <nargs(); return set_def(idx,arg); }
-  public Node set_fdx( Node fun) { return set_def(DSP_IDX, fun);}
+  public void set_fdx( Node fun) {set_def(DSP_IDX, fun);}
   public void set_mem( Node mem) { set_def(MEM_IDX, mem); }
   @Override void walk_reset0() { assert is_prim(); _not_resolved_by_gcp = false; }
 
@@ -172,13 +171,15 @@ public class CallNode extends Node {
     else old_rpc.subsume(Node.con(TypeRPC.make(_rpc)));
     return call;
   }
-  
+
   @Override public Node ideal_reduce() {
     Node cc = in(0).is_copy(0);
     if( cc!=null ) return set_def(0,cc);
-    //// When do I do 'pattern matching'?  For the moment, right here: if not
-    //// already unpacked a tuple, and can see the NewNode, unpack it right now.
-    //if( !_unpacked &&           // Not yet unpacked a tuple
+    // When do I do 'pattern matching'?  For the moment, right here: if not
+    // already unpacked a tuple, and can see the NewNode, unpack it right now.
+    if( !_unpacked &&           // Not yet unpacked a tuple
+        true )
+      throw unimpl();
     //    arg(ARG_IDX) instanceof NewNode nnn && // An allocation
     //    nnn._is_val ) {                        // A tuple
     //  // Find a tuple being passed in directly; unpack
@@ -190,13 +191,13 @@ public class CallNode extends Node {
     //  GVN.add_work_new(this);// Revisit after unpacking
     //  return this;
     //}
-    //
-    //Type tc = _val;
-    //if( !(tc instanceof TypeTuple) ) return null;
-    //TypeTuple tcall = (TypeTuple)tc;
-    //
-    //// Dead, do nothing
-    //if( tctl(tcall)!=Type.CTRL ) { // Dead control (NOT dead self-type, which happens if we do not resolve)
+
+    Type tc = _val;
+    if( !(tc instanceof TypeTuple) ) return null;
+    TypeTuple tcall = (TypeTuple)tc;
+
+    // Dead, do nothing
+    if( tctl(tcall)!=Type.CTRL ) { // Dead control (NOT dead self-type, which happens if we do not resolve)
     //  if( (ctl() instanceof ConNode) ) return null;
     //   Kill all inputs with type-safe dead constants
     //  set_mem(Node.con(TypeMem.XMEM));
@@ -206,55 +207,53 @@ public class CallNode extends Node {
     //    set_def(i,Env.ANY);
     //  gvn.add_work_defs(this);
     //  return set_def(0,Env.XCTRL,gvn);
-    //}
-    //
-    //// Have some sane function choices?
-    //TypeFunPtr tfp  = ttfp(tcall);
-    //BitsFun fidxs = tfp.fidxs();
-    //if( fidxs==BitsFun.EMPTY ) // TODO: zap function to empty function constant
-    //  return null;             // Zero choices
-    //
-    //// Try to resolve to single-target
-    //Node fdx = fdx();
-    //if( fdx instanceof FreshNode ) fdx = ((FreshNode)fdx).id();
-    //if( fdx instanceof UnresolvedNode ) {
+      throw unimpl();
+    }
+
+    // Have some sane function choices?
+    TypeFunPtr tfp  = ttfp(tcall);
+    BitsFun fidxs = tfp.fidxs();
+    if( fidxs==BitsFun.EMPTY ) // TODO: zap function to empty function constant
+      return null;             // Zero choices
+
+    // Try to resolve to single-target
+    Node fdx = fdx();
+    if( fdx instanceof FreshNode fresh ) fdx = fresh.id();
+    if( fdx instanceof UnresolvedNode ) {
     //  Node fdx2 = ((UnresolvedNode)fdx).resolve_node(tcall._ts);
     //  if( fdx2!=null )
     //    return set_fdx(fdx2);
-    //}
-    //
-    //// Wire valid targets.
-    //CallEpiNode cepi = cepi();
-    //if( cepi!=null && cepi.check_and_wire(false) )
-    //  return this;              // Some wiring happened
-    //
-    //// Check for dead args and trim; must be after all wiring is done because
-    //// unknown call targets can appear during GCP and use the args.  After GCP,
-    //// still must verify all called functions have the arg as dead, because
-    //// alive args still need to resolve.  Constants are an issue, because they
-    //// fold into the Parm and the Call can lose the matching DProj while the
-    //// arg is still alive.
-    //if( !is_keep() && err(true)==null && cepi!=null && cepi.is_all_wired() ) {
-    //  Node progress = null;
-    //  for( int i=ARG_IDX; i<nargs(); i++ )
-    //    if( ProjNode.proj(this,i)==null &&
-    //        !(arg(i) instanceof ConNode) ) // Not already folded
-    //      progress = set_arg(i,Env.ANY);   // Kill dead arg
-    //  if( progress != null ) return this;
-    //}
-    //return null;
-    throw unimpl();
+      throw unimpl();
+    }
+
+    // Wire valid targets.
+    CallEpiNode cepi = cepi();
+    if( cepi!=null && cepi.check_and_wire(false) )
+      return this;              // Some wiring happened
+
+    // Check for dead args and trim; must be after all wiring is done because
+    // unknown call targets can appear during GCP and use the args.  After GCP,
+    // still must verify all called functions have the arg as dead, because
+    // alive args still need to resolve.  Constants are an issue, because they
+    // fold into the Parm and the Call can lose the matching DProj while the
+    // arg is still alive.
+    if( !is_keep() && err(true)==null && cepi!=null && cepi.is_all_wired() ) {
+      Node progress = null;
+      for( int i=ARG_IDX; i<nargs(); i++ )
+        if( ProjNode.proj(this,i)==null &&
+            !(arg(i) instanceof ConNode) ) // Not already folded
+          progress = set_arg(i,Env.ANY);   // Kill dead arg
+      if( progress != null ) return this;
+    }
+    return null;
   }
-  
+
   // Call reduces, then check the CEPI for reducing
   @Override public void add_reduce_extra() {
     Node cepi = cepi();
     if( !_is_copy && cepi!=null )
       Env.GVN.add_reduce(cepi);
-    //if( mem() instanceof MrgProjNode )
-    //  Env.GVN.add_reduce(this);
-    //Env.GVN.add_flow(mem()); // Dead pointer args reduced to ANY, so mem() liveness lifts
-    throw unimpl();
+    Env.GVN.add_flow(mem()); // Dead pointer args reduced to ANY, so mem() liveness lifts
   }
 
   @Override public Node ideal_grow() {
@@ -452,22 +451,22 @@ public class CallNode extends Node {
     if( def==ctl() ) return Type.ALL;
     if( def==mem() ) return _live;
 
-    //CallEpiNode cepi = cepi();
-    //if( def==fdx() ) {          // Function argument
-    //  TypeFunPtr tfp = ttfp(tcall);
-    //  BitsFun fidxs = tfp.fidxs();
-    //  // If using a specific FunPtr and its in the resolved set, test more precisely
-    //  RetNode ret;
-    //  if( def instanceof FunPtrNode &&           // Have a FunPtr
-    //      (ret=((FunPtrNode)def).ret())!=null && // Well-structured function
-    //      !fidxs.test_recur(ret._fidx) )         // FIDX directly not used
-    //    //return TypeMem.DEAD;                     // Not in the fidx set.
-    //    throw unimpl();    // premature optimization?
-    //  // Otherwise, the FIDX is alive.  Check the display.
-    //  ProjNode dsp = ProjNode.proj(this,DSP_IDX);
-    //  return ((!_is_copy && !cepi.is_all_wired()) || // Unwired calls remain, dsp could be alive yet
-    //          (dsp!=null && dsp._live==TypeMem.ALIVE)) ? TypeMem.ALIVE : TypeMem.LNO_DISP;
-    //}
+    CallEpiNode cepi = cepi();
+    if( def==fdx() ) {          // Function argument
+      TypeFunPtr tfp = ttfp(tcall);
+      BitsFun fidxs = tfp.fidxs();
+      // If using a specific FunPtr and its in the resolved set, test more precisely
+      RetNode ret;
+      if( def instanceof FunPtrNode &&           // Have a FunPtr
+          (ret=((FunPtrNode)def).ret())!=null && // Well-structured function
+          !fidxs.test_recur(ret._fidx) )         // FIDX directly not used
+        //return TypeMem.DEAD;                     // Not in the fidx set.
+        throw unimpl();    // premature optimization?
+      // Otherwise, the FIDX is alive.  Check the display.
+      ProjNode dsp = ProjNode.proj(this,DSP_IDX);
+      return ((!_is_copy && !cepi.is_all_wired()) || // Unwired calls remain, dsp could be alive yet
+              (dsp!=null && dsp._live==Type.ALL)) ? Type.ALL : TypeFunPtr.GENERIC_FUNPTR;
+    }
     //
     //// Check that all fidxs are wired; an unwired fidx might be in-error
     //// and we want the argument alive for errors.  This is a value turn-

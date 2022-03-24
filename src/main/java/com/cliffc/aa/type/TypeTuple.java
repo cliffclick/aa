@@ -169,7 +169,7 @@ public class TypeTuple extends Type<TypeTuple> {
   }
   @Override public boolean must_nil() { return false; }
   @Override Type not_nil() { return this; }
-  @Override public Type meet_nil(Type t) { throw unimpl(); }
+  @Override public Type meet_nil(Type nil) { return ALL; }
 
   public TypeTuple sharptr( TypeMem mem ) {
     Type[] ts = Types.clone(_ts);
