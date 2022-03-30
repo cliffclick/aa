@@ -2,8 +2,9 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
-import org.junit.Test;
+import com.cliffc.aa.util.Util;
 import org.junit.Ignore;
+import org.junit.Test;
 
 import java.util.BitSet;
 
@@ -1045,7 +1046,7 @@ public class TestLattice {
   // Set {1} is the parent of {2,3}.
   // Using just a {+1} means: pick any of 2 or 3.
   // Using {2,3} means: pick any 2 AND pick any 3.
-  
+
   // Cannot collapse {+1,+2,+3} into {+1}, because this does not return both a
   // 2 and a 3.  Instead, since {+2,+3} "cover" {+1}, can remove the +1.
   // Assume all tree-splits are complete, and only the primitives & Parse have
@@ -1082,7 +1083,7 @@ public class TestLattice {
     N x34 = new N("{+3+4}",x3,x4);
 
     N x234= new N("{+2+3+4}",x23,x24,x34);
-    
+
     N x1  = new N("{+1}",x234);
 
     // Mark the non-centerline duals
@@ -1140,7 +1141,7 @@ public class TestLattice {
     N oor_23 = new N("+{ 2 3}",oor_2,oor_3);
     N oor_24 = new N("+{ 2 4}",oor_2,oor_4);
     N oor_34 = new N("+{ 3 4}",oor_3,oor_4);
-    
+
     N oor_234= new N("+{ 2 3 4}",oor_23,oor_24,oor_34);
 
     N andx234= new N("&{~2~3~4}",oor_234);
@@ -1160,12 +1161,12 @@ public class TestLattice {
     N oorx23 = new N("+{~2~3}",oorx2,oorx3);
     N oorx24 = new N("+{~2~4}",oorx2,oorx4);
     N oorx34 = new N("+{~3~4}",oorx3,oorx4);
-    
+
     N oorx234= new N("+{~2~3~4}",oorx23,oorx24,oorx34);
-    
+
     // Mark the non-centerline duals
     andx234.set_dual(oor_234);
-    
+
     andx23 .set_dual(oor_23 );
     andx24 .set_dual(oor_24 );
     andx34 .set_dual(oor_34 );
@@ -1177,13 +1178,13 @@ public class TestLattice {
     oorx2  .set_dual(and_2  );
     oorx3  .set_dual(and_3  );
     oorx4  .set_dual(and_4  );
-    
+
     oorx23 .set_dual(and_23 );
     oorx24 .set_dual(and_24 );
     oorx34 .set_dual(and_34 );
 
     oorx234.set_dual(and_234);
-    
+
     test(oorx234);
   }
 
@@ -1482,7 +1483,7 @@ public class TestLattice {
     n_mt_str.set_dual(n_mtxstr);
 
     NIL.set_dual(XNIL);
-    
+
     test(nx04xobj);
   }
 
@@ -1498,14 +1499,14 @@ public class TestLattice {
   //
   // This IS a lattice for a single name (and nested names), but not for
   // multiple names.
-  // 
+  //
   @Ignore @Test public void testLattice16() {
     N.reset();
 
     N __obj = new N("__obj");
     N A_obj = new N("A_obj",__obj);
     N B_obj = new N("B_obj",__obj);
-    
+
     N __ary =   new N("__ary",__obj);
     N A_ary =     new N("A_ary",__ary,A_obj);
     N B_ary =     new N("B_ary",__ary,B_obj);
@@ -1554,7 +1555,7 @@ public class TestLattice {
     B_tup    .set_dual(Bxtup);
     B_rec    .set_dual(Bxrec);
 
-    test(_xobj);    
+    test(_xobj);
   }
 
   // Named subtypes, plus array (subtype string), tuple (subtype rec).  Similar
@@ -1569,14 +1570,14 @@ public class TestLattice {
   //
   // This IS a lattice for a single name (and nested names), but not for
   // multiple names.
-  // 
+  //
   @Test public void testLattice17() {
     N.reset();
 
     N __obj = new N("__obj");
     N A_obj = new N("A_obj",__obj);
     N B_obj = new N("B_obj",__obj);
-    
+
     N __ary =   new N("__ary",__obj);
     N A_ary =     new N("A_ary",A_obj);
     N B_ary =     new N("B_ary",B_obj);
@@ -1626,7 +1627,7 @@ public class TestLattice {
     B_rec    .set_dual(Bxrec);
 
     test(_xobj);
-    
+
   }
 
   // Nil, not-nil, ints, floats, scalars
@@ -1634,32 +1635,32 @@ public class TestLattice {
     N.reset();
     N  sclr = new N(" sclr");
     N nsclr = new N("nsclr",sclr );
-    
+
     N int64 = new N("int64",sclr );
     N flt64 = new N("flt64",sclr );
     N obj40 = new N("obj*?",sclr );
-    
+
     N nint_ = new N("nint ",int64,nsclr);
     N nflt_ = new N("nflt ",flt64,nsclr);
     N obj4_ = new N("obj* ",obj40,nsclr);
 
     N int8  = new N("int8 ",int64,flt64);
     N nint8 = new N("nint8",int8 ,nint_, nflt_);
-    
+
     N lonil = new N("lonil",int8 ,obj40);
     N hinil = new N("hinil",nsclr);
 
     N xnit8 = new N("xnit8",nint8);
     N xint8 = new N("xint8",xnit8,hinil);
-    
+
     N xnint = new N("~nint",xnit8);
     N xnflt = new N("~nflt",xnit8);
     N xnobj = new N("~obj*",obj4_);
-    
+
     N xint_ = new N("~int6",xnint,xint8);
     N xflt_ = new N("~flt6",xnflt,xint8);
     N xobj4 = new N("~obj?",xnobj,hinil);
-    
+
     N xnscl = new N("~nscl",xnint,xnflt,xnobj,lonil);
     N xsclr = new N("~scal",xint_,xflt_,xobj4,xnscl);
 
@@ -1674,11 +1675,223 @@ public class TestLattice {
     nflt_.set_dual(xnflt);
     obj4_.set_dual(xnobj);
     lonil.set_dual(hinil);
-    
+
     test(xsclr);
   }
 
-  
+  // Test to figure out how to handle XSCALAR, XNSCALAR with EMPTY structs, in the
+  // world where structs are Scalars.
+  // Nil, not-nil, ints, scalars, empty struct, struct with a field.
+  @Test public void testLattice19() {
+    // There is a cube around field "c=???"
+
+    N.reset();
+    N  sclr  = new N(" scalar");
+    N nsclr  = new N("nscalar",sclr );
+
+    N int64  = new N(" int64 ",sclr );
+    N objmt  = new N(" ()    ",sclr );
+
+    N nint_  = new N(" nint  ",int64,nsclr);
+
+    N obj01  = new N(" (c=  int)",objmt);
+    N objni  = new N(" (c= nint)",obj01,nsclr);
+    N obj00  = new N(" (c= 0   )",obj01);
+    N obj11  = new N(" (c=~nint)",objni);
+    N obj10  = new N(" (c=~ int)",obj00,obj11);
+
+    N lonil  = new N("lonil",int64,obj01);
+    N zero   = new N(" zero",int64);
+    N hinil  = new N("hinil",nsclr);
+
+    N xobj10 = new N("~(c=  int)",obj01);
+    N xobjni = new N("~(c= nint)",xobj10,objni);
+    N xobj00 = new N("~(c= 0   )",obj00,xobj10);
+    N xobj11 = new N("~(c=~nint)",obj11,xobjni);
+    N xobj01 = new N("~(c=~ int)",obj10,xobj11,xobj00, hinil);
+
+    N xnint  = new N("~nint  ",nint_);
+
+    N xint_  = new N("~int64 ",xnint,hinil,zero);
+    N xobjmt = new N("~()    ",xobj01);
+
+    N xnscl  = new N("~nsclar",xnint,xobj11,lonil);
+    N xsclr  = new N("~scalar",xobjmt,xint_,xnscl);
+
+    sclr .set_dual(xsclr);
+    nsclr.set_dual(xnscl);
+    int64.set_dual(xint_);
+    objmt.set_dual(xobjmt);
+    nint_.set_dual(xnint);
+    obj01.set_dual(xobj01);
+    obj00.set_dual(xobj00);
+    objni.set_dual(xobj11);
+    obj10.set_dual(xobj10);
+    obj11.set_dual(xobjni);
+    lonil.set_dual(hinil);
+
+    test(xsclr);
+  }
+
+  // Build a lattice with a lattice-extender.
+  // I started with scalar -> nscalar -> ~nscalar -> ~scalar
+  // Added outside the extension lattice: () -> ~()
+  // Added:  int64 -> ~ int64
+  // Added: nint64 -> ~nint64
+  // Added: zero
+  // Added: nil, xnil
+  @Test public void testLattice20() {
+    N.reset();
+
+    // Base lattice, to be extended
+    N  sclr  = new N(" scalar");
+    N nsclr  = new N("nscalar", sclr);
+    N int64  = new N(" int64 ", sclr);
+    N nint6  = new N("nint64 ",nsclr,int64);
+    N  nil   = new N(" nil   ",int64);
+    N zero   = new N("zero   ",int64);
+    N two    = new N(" 2     ",nint6);
+    N three  = new N(" 3     ",nint6);
+    N xnil   = new N("xnil   ", sclr);
+    N xnint  = new N("~nint64",two,three);
+    N xint6  = new N("~int64 ",xnint,zero,xnil);
+    N xnscl  = new N("~nsclar",xnint);
+    N xsclr  = new N("~scalar",xnscl,xint6,nil);
+    xsclr.set_dual( sclr);
+    xnscl.set_dual(nsclr);
+    xnint.set_dual(nint6);
+    xnil .set_dual( nil );
+    xint6.set_dual(int64);
+    N[] ns = new N[]{sclr,nsclr,int64,nint6,nil,zero,two,three,xnil,xnint,xint6,xnscl,xsclr};
+    int len = ns.length;
+    // Test base lattice, and reset
+    test(xsclr);
+    for( N n : ns )
+      { n._cnt=0; n._reaches.clear(); n._sups.clear(); }
+
+    // Build the extended lattice
+    String lowrap0 = " (c=%s)", hiwrap0 = "~(c=%s)";
+    N[] xns0 = lattice_extender(ns,lowrap0,hiwrap0);
+    assert xns0[ 0     ]._t.equals(String.format(lowrap0, sclr._t));
+    assert xns0[len*2-1]._t.equals(String.format(hiwrap0,xsclr._t));
+
+    // Build the extended lattice
+    String lowrap1 = " (d=%s)", hiwrap1 = "~(d=%s)";
+    N[] xns1 = lattice_extender(ns,lowrap1,hiwrap1);
+    assert xns1[ 0     ]._t.equals(String.format(lowrap1, sclr._t));
+    assert xns1[len*2-1]._t.equals(String.format(hiwrap1,xsclr._t));
+
+    // NO: Plug "@{}" between the original and extended lattices
+    // Use Scalar directly, NO EMPTY STRUCT
+    xns0[0]._subs.push(sclr);
+    xns1[0]._subs.push(sclr);
+    xsclr._subs.push(xns0[len*2-1]);
+    xsclr._subs.push(xns1[len*2-1]);
+
+    // Edges for nscalar/xnscalar, same as Scalar
+    assert xns0[        1]._t.equals(String.format(lowrap0,nsclr._t));
+    assert xns0[len*2-1-1]._t.equals(String.format(hiwrap0,xnscl._t));
+    xns0[1]._subs.push( nsclr );
+    xns1[1]._subs.push( nsclr );
+    xnscl._subs.push(xns0[len*2-1-1]);
+    xnscl._subs.push(xns1[len*2-1-1]);
+
+    // Fails to add edges "going in" at the high side, out at the low side.  If
+    // adding ~int to ~@{c=~int} and ~@{d=~int}, and vice-versa @{c=int} and
+    // @{c=int} to int, we get two joins of int64 and nscalr as @{c=int64} and
+    // @{d=int64}.
+
+    // Try adding edges "going in" at the low side, and out at Scalar.  So
+    // adding int -> @{c=int},@{d=int}, and vice-versa ~@{c=~int}, ~@{d=~int}
+    // -> ~int.
+    assert xns0[        2]._t.equals(String.format(lowrap0,int64._t));
+    assert xns0[len*2-1-2]._t.equals(String.format(hiwrap0,xint6._t));
+    int64._subs.push( xns0[2] );
+    int64._subs.push( xns1[2] );
+    xns0[len*2-1-2]._subs.push(xint6);
+    xns1[len*2-1-2]._subs.push(xint6);
+
+    // Edges for nint/xnint
+    assert xns0[        3]._t.equals(String.format(lowrap0,nint6._t));
+    assert xns0[len*2-1-3]._t.equals(String.format(hiwrap0,xnint._t));
+    nint6._subs.push( xns0[3] );
+    nint6._subs.push( xns1[3] );
+    xns0[len*2-1-3]._subs.push(xnint);
+    xns1[len*2-1-3]._subs.push(xnint);
+
+    // Broken to add edges for NIL
+    //// Edges for nil/xnil
+    //assert xns0[        4]._t.equals(String.format(lowrap0, nil._t));
+    //assert xns0[len*2-1-4]._t.equals(String.format(hiwrap0,xnil._t));
+    //nil._subs.push( xns0[4] );
+    //nil._subs.push( xns1[4] );
+    //xns0[len*2-1-4]._subs.push(xnil);
+    //xns1[len*2-1-4]._subs.push(xnil);
+
+    // Remove redundant edge xnscl->xnint6
+    // Remove redundant edge nint6->nscalr
+    assert xnscl._subs.at(0)._t.equals("~nint64");
+    assert nint6._subs.at(0)._t.equals("nscalar");
+    xnscl._subs.del(0);
+    nint6._subs.del(0);
+
+    // Remove redundant edge xsclr->xint64
+    // Remove redundant edge int64->scalar
+    assert xsclr._subs.at(1)._t.equals("~int64 ");
+    assert int64._subs.at(0)._t.equals(" scalar");
+    xsclr._subs.del(1);
+    int64._subs.del(0);
+
+    test(xsclr);
+  }
+
+  // Lattice extender: take a set of N as a lattice with duals and edges.  Make
+  // 2 copies, declare one copy low and the other high.  Make the low copy have
+  // edges to the high.  Make hi/lo duals work inside-out.  Return the double-
+  // sized set of N.
+
+  // Example: ~A -> ~B -> C -> B -> A, extend with "%s1" and "%s2".
+  //  Make dups:
+  //   ~A1 -> ~B1 -> C1 -> B1 -> A1
+  //   ~A2 -> ~B2 -> C2 -> B2 -> A2
+  // Add edges low to high:
+  //   ~A2 -> ~A1,   ~B2 -> ~B1, C2  -> C1,  B2  ->  B1, A2  ->  A1
+  // Dual outside-in:
+  //   ~A1 <-> A2,   ~B1 <-> B2, C1 <-> C2,  B1 <-> ~B2, A1 <-> ~A2
+
+  private static N[] lattice_extender( N[] ns, String lowrap, String hiwrap) {
+
+    // Clone without edges, wrap names.
+    int len = ns.length;
+    N[] xns = new N[len*2];
+    for( int i=0; i<len; i++ ) {
+      xns[i    ] = new N(String.format(lowrap, ns[i]._t));
+      xns[i+len] = new N(String.format(hiwrap, ns[i]._t));
+    }
+    // Edges in clones
+    for( int i=0; i<len; i++ ) {
+      for( N edge : ns[i]._subs ) {
+        int idx = Util.find(ns,edge);
+        xns[i    ]._subs.push(xns[idx    ]);
+        xns[i+len]._subs.push(xns[idx+len]);
+      }
+    }
+
+    // Add edges low to high
+    for( int i=0; i<len; i++ )
+      xns[i+len]._subs.push(xns[i]);
+
+    // Dual, outside-in
+    for( int i=0; i<len; i++ ) {
+      int idx = ns[i]._dual==ns[i] // Self-dual?
+        ? len+i                 // Self-duals find their matching other half
+        : len*2-1-i;            // Other duals are symmetric in ns not xns, and so need the symmetric part in xns
+      xns[i].set_dual(xns[idx]);
+    }
+
+    return xns;
+  }
+
   // Open question for a future testLattice test:
   //
   //    Under what circumstances can 'meet' return a NIL?

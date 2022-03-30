@@ -76,7 +76,7 @@ public class TestParse {
     test("1", "int:1", "int:1");
     // Unary operator
     test("-1", "int:-1", "int:-1");
-    test("!1", "nil", "A?");
+    test("!1", "xnil", "A?");
     // Binary operators
     test("1+2", TypeInt.con(3), "int:");
     test("1-2", TypeInt.con(-1),  "int:");

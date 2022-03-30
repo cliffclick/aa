@@ -284,10 +284,10 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     case TFLT:
     case TINT:
     case TMEMPTR:
+    case TSTRUCT:
     case TRPC:   return cross_nil(t);
     case TARY:
     case TFLD:
-    case TSTRUCT:
     case TTUPLE:
     case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen

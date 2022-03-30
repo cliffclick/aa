@@ -214,6 +214,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   @Override public boolean is_con() { return _t.is_con(); }
   @Override public TypeFld simple_ptr() { return make_from(_t.simple_ptr()); }
   @Override public TypeFld meet_nil(Type nil) { return make_from(_t.meet_nil(nil)); }
+  @Override TypeFld not_nil() { return make_from(_t.not_nil()); }
 
   // Make a Type, replacing all dull pointers from the matching types in mem.
   @Override public TypeFld make_from(Type head, TypeMem mem, VBitSet visit) {

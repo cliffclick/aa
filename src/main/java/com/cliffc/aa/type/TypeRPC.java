@@ -41,11 +41,11 @@ public class TypeRPC extends Type<TypeRPC> {
     case TFUNPTR:
     case TMEMPTR:
     case TFLT:
+    case TSTRUCT:
     case TINT:   return cross_nil(t);
     case TARY:
     case TFLD:
     case TTUPLE:
-    case TSTRUCT:
     case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen
     }

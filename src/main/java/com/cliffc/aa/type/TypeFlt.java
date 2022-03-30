@@ -67,10 +67,10 @@ public class TypeFlt extends Type<TypeFlt> {
     case TINT:   return ((TypeInt)t).xmeetf(this);
     case TFUNPTR:
     case TMEMPTR:
+    case TSTRUCT:
     case TRPC:   return cross_nil(t);
     case TARY:
     case TFLD:
-    case TSTRUCT:
     case TTUPLE:
     case TMEM:   return ALL;
     default: throw typerr(t);
