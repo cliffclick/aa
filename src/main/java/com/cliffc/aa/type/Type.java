@@ -13,7 +13,7 @@ import static com.cliffc.aa.AA.unimpl;
 // C2-style type system, with Meet & Dual.
 
 // This is a symmetric complete bounded (ranked) lattice.
-// Also, the meet is commutative and associative.
+// Also the meet is commutative and associative.
 // The lattice has a dual (symmetric), and join is ~(~x meet ~y).
 // See https://en.wikipedia.org/wiki/Lattice_(order).
 
@@ -268,7 +268,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
 
   // Construct a simple type, possibly from a pool
   static Type make(byte type) { return POOLS[type].malloc().init("").hashcons_free(); }
-  public <X extends Type> X free(X t2) { return POOLS[_type].free(this,t2); }
+  public T free(T t2) { return (T)POOLS[_type].free(this,t2); }
   T hashcons_free() {
     T t2 = hashcons();
     return this==t2 ? t2 : free(t2);
@@ -426,7 +426,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       }
       return t;                 // Set breakpoints here to find a uid
     }
-    <X extends Type> X free(Type t1, X t2) {
+    <T extends Type> T free(T t1, T t2) {
       t1._dual = null;   // Too easy to make mistakes, so zap now
       t1._hash = t1._cyc_hash = 0;      // Too easy to make mistakes, so zap now
       t1._name = " FREE:"; // "is free" tag
@@ -478,7 +478,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   private boolean is_ptr() { byte t = _type;  return t == TFUNPTR || t == TMEMPTR; }
   private boolean is_num() { byte t = _type;  return t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/1,1,1,1,1,1,1,1,1,1,/*TSIMPLE-10*/0, 1,1,1,0,1,0,0,0,1,/*TFUNPTR-20*/1}/*TLAST=21*/;
+  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/1,1,1,1,1,1,1,1,1,1,/*TSIMPLE-10*/0, 1,1,1,0,0,0,0,0,1,/*TFUNPTR-20*/1}/*TLAST=21*/;
   public final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
   // Simplify pointers (lose what they point at).
   public Type simple_ptr() { return this; }
@@ -542,9 +542,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Meet the names.  Subclasses basically ignore the names as they have
   // their own complicated meets to perform, so we meet them here for all.
   private Type xmt_name(Type t, Type mt) {
-    if( t   ==Type.NIL || t  ==Type.XNIL ||
-        this==Type.NIL ||this==Type.XNIL ||
-        mt  ==Type.NIL || mt ==Type.XNIL )
+    if( this==Type.NIL || this==Type.XNIL ||
+        t   ==Type.NIL || t   ==Type.XNIL )
       return mt;                // NIL is never named, and never removes a name
     String n = mtname(t,mt);    // Meet name strings
     // If the names are incompatible and the meet remained high then the
@@ -581,7 +580,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
 
     if(   _type == TNIL ||   _type == TXNIL ) return t.meet_nil(this);
     if( t._type == TNIL || t._type == TXNIL ) return   meet_nil(t   );
-
+    
     // Meeting scalar and non-scalar falls to ALL.  Includes most Memory shapes.
     if( isa_scalar() ^ t.isa_scalar() ) return ALL;
 
@@ -860,7 +859,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   public final Type widen() { WIDEN_HASH.clear(); return _widen(); }
   Type _widen() {
     return switch( _type ) {
-    case TSCALAR, TNSCALR, TXSCALAR, TXNSCALR -> SCALAR;
+    case TSCALAR, TNSCALR -> SCALAR;
+    case TXSCALAR, TXNSCALR -> SCALAR; // Too high
     case TANY, TALL, TNIL, TXNIL -> this;
     case TCTRL, TXCTRL -> Type.CTRL;
     default -> throw typerr(null); // Overridden in subclass
@@ -887,7 +887,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   public boolean may_nil() {
     return switch( _type ) {
     case TALL, TSCALAR, TXNSCALR, TNSCALR, TTUPLE -> false;
-    case TANY, TXSCALAR, TXNIL, TCTRL, TXCTRL, TMEM -> true;
+    case TANY, TXSCALAR, TCTRL, TXCTRL, TMEM -> true;
     default -> throw typerr(null); // Overridden in subclass
     };
   }
@@ -900,7 +900,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     return switch( _type ) {
       case TXSCALAR -> XNSCALR;
       case TXNIL -> NSCALR;
-      case TSCALAR, TNSCALR, TXNSCALR, TNIL, TALL -> this;
+      case TSCALAR, TNSCALR, TXNSCALR, TNIL -> this;
       default -> throw typerr(null); // Overridden in subclass
     };
   }

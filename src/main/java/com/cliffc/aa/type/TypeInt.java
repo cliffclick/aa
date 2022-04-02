@@ -82,10 +82,10 @@ public class TypeInt extends Type<TypeInt> {
     case TFLT:   return xmeetf((TypeFlt)t);
     case TFUNPTR:
     case TMEMPTR:
-    case TSTRUCT:
     case TRPC:   return cross_nil(t);
     case TARY:
     case TFLD:
+    case TSTRUCT:
     case TTUPLE:
     case TMEM:   return ALL;
     default: throw typerr(t);
@@ -163,7 +163,7 @@ public class TypeInt extends Type<TypeInt> {
   @Override Type not_nil() {
     // Choice {+0+1} ==> {+1}, which is just {1}
     if( this==BOOL.dual() ) return TRUE;
-    // {0} ==> {0,1} // weird case of NO ints; basically a 'i0' int class
+    // {0} ==> {0,1}
     if( this==FALSE ) return BOOL;
     // Choice any-int ==> any-not-nil-int
     if( _x==2 ) return make(1,_z,_con);
@@ -178,13 +178,8 @@ public class TypeInt extends Type<TypeInt> {
   }
   @Override public Type meet_nil(Type nil) {
     if( nil==Type.XNIL )
-      return _x==2 ? Type.XNIL : (_x==-2 || (_x==0&&_con==0)? SCALAR : Type.NSCALR);
+      return _x==2 ? Type.XNIL : (_x==-2 || (_x==0&&_con==0)? Type.SCALAR : Type.NSCALR);
     return TypeInt.make(-2,_x<=0?_z:1,0);
-    //if( _x== 2 ) return NIL;
-    //if( _x== 1 ) return TypeInt.make(-2,_z,0);
-    //if( _x== 0 ) return _con==0 ? NIL : TypeInt.make(-2,log(_con),0);
-    //if( _x==-1 ) return TypeInt.make(-2,_z,0);
-    //return this;
   }
   public TypeInt minsize(TypeInt ti) { return make(-2,Math.min(_z,ti._z),0);  }
   public TypeInt maxsize(TypeInt ti) { return make(-2,Math.max(_z,ti._z),0);  }

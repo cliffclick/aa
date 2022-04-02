@@ -8,8 +8,7 @@ import org.junit.Test;
 
 import java.util.BitSet;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 // The core Type system is a distributive complete bounded lattice.
 // See: https://en.wikipedia.org/wiki/Lattice_(order)
@@ -71,8 +70,8 @@ import static org.junit.Assert.assertTrue;
 // E.g. java
 //    class Point2D { int x,y; };  class Point3D extends Point 2D { int z; }
 //
-// Short hand Point2D:@{x;y} is syntatic sugar for: @{ Point2D:x; Point2D:y }
-// Short hand Point3D:Point2D:@{z} is syntatic sugar for:
+// Short hand Point2D:@{x;y} is syntactic sugar for: @{ Point2D:x; Point2D:y }
+// Short hand Point3D:Point2D:@{z} is syntactic sugar for:
 //      @{ Point2D:x; Point2D:y; Point3D:z; }
 
 
@@ -89,13 +88,16 @@ public class TestLattice {
     final BitSet _reaches; // Who reaches this node, including self
     int _cnt;              // Reaches count
     N _dual;
-    N(String t, N... subs) {
-      _id = ID++;
+    N(int id, String t, N... subs) {
+      _id=id;
       _t=t;
       _subs = new Ary<>(subs);
       _sups = new Ary<>(new N[1],0); // Fill in later
       _reaches = new BitSet();
       _dual = this;
+    }
+    N(String t, N... subs) {
+      this(ID++,t,subs);
       NS.add(this);
     }
     void set_dual( N d ) {
@@ -113,7 +115,7 @@ public class TestLattice {
     void walk_print( BitSet bs, int indent ) {
       if( bs.get(_id) ) return;
       bs.set(_id);
-      System.out.println(new SB().i(indent).toString()+toString());
+      System.out.println(new SB().i(indent) +toString());
       for( N sub : _subs ) sub.walk_print(bs,indent+1);
     }
     @Override public String toString() {
@@ -125,11 +127,16 @@ public class TestLattice {
     boolean walk_min_edge( int[] vs, N sup ) {
       vs[_id]++;
       if( sup != null ) {
-        for( N sup0 : _sups )
+        for( int i=0; i<_sups._len; i++ ) {
+          N sup0 = _sups.at(i);
           if( sup._reaches.get(sup0._id) ) {
-            System.out.println("Edge "+sup0._t+" -> "+_t+" and also path "+sup0._t+" ... -> "+sup._t+" -> "+_t);
-            return false;
+            System.out.println("Edge " + sup0._t + " -> " + _t + " and also path " + sup0._t + " ... -> " + sup._t + " -> " + _t);
+            //return false;
+            _sups.del(i);
+            sup0._subs.del(this);
+            i--;
           }
+        }
         _reaches.or(sup._reaches);
       }
       if( vs[_id]<_sups._len ) return true; // Pre-order still; return
@@ -150,6 +157,27 @@ public class TestLattice {
       }
       for( N sub : _subs ) if( !sub.walk_dual(bs) ) x=false;
       return x;
+    }
+
+    // Compute meet of this and that
+    N meet(N b) {
+      if( this==b ) return this;
+      BitSet as =   _reaches;
+      BitSet bs = b._reaches;
+      forall_reaches:
+      for( int x=as.nextSetBit(0); x>=0; x=as.nextSetBit(x+1) )
+        if( bs.get(x) ) {
+          N mt = N.NS.at(x);
+          for( N sub : mt._subs )  // Common in both reaches sets
+            if( as.get(sub._id) && bs.get(sub._id) )
+              continue forall_reaches;
+          return mt;  // Not inside both reaches, must be a meet
+        }
+      // Correct already
+      throw com.cliffc.aa.AA.unimpl();
+    }
+    N join(N b) {
+      return _dual.meet(b._dual)._dual;
     }
   }
 
@@ -202,6 +230,8 @@ public class TestLattice {
     assertEquals("Found errors", 0, errs);
   }
 
+
+
   // Lattice!
   // This structure is tested to be a lattice:
 
@@ -217,7 +247,7 @@ public class TestLattice {
 
   // Notice NO {oop,~oop} as this makes the non-lattice issue; join of
   // {oop,null} is not well-defined, as it tops out as either ~str+? OR ~tup+?
-  // instead of being unique.  Similarly meet of {~oop,null} is not well
+  // instead of being unique.  Similarly, meet of {~oop,null} is not well-
   // defined, and bottoms out as either {str?} OR {tup?}.
   @Test public void testLattice0() {
     N.reset();
@@ -1891,6 +1921,158 @@ public class TestLattice {
 
     return xns;
   }
+
+
+  // More complete, simpler lattice.  Structs do not invert (so sit on the
+  // centerline), and must have at least 1 field.  In this lattice the notion
+  // of a struct @{c=_} is like the difference between int and flt.  nil falls
+  // to @{c=int}, so I can usefully meet nil and a struct.
+
+  // Maybe extend this is a 2nd field that "nests" inside @{c=_} so we can
+  // allow @{c=_,x=_} and @{c=_,y=_} both of which subtype @{c=_}.  Same
+  // as the old TypeStruct, all extra fields already exist at Top/Bot.
+  @Test public void testLattice21() {
+    N.reset();
+
+    // Lattice template.
+    N  b64 = new N(0,"  " );
+    N nb64 = new N(0," n", b64);
+    N zero = new N(0," 0", b64);
+    N two  = new N(0," 2",nb64);
+    N three= new N(0," 3",nb64);
+    N xnb  = new N(0,"~n",two,three);
+    N xb64 = new N(0," ~",xnb,zero);
+    xb64.set_dual(b64);
+    xnb.set_dual(nb64);
+    N[] ns = new N[]{b64,nb64,zero,two,three,xnb,xb64};
+    int len = ns.length;
+
+    // Build the int lattice
+    N[] ins = lattice_extender(ns,"%sint");
+
+    // Build the flt lattice
+    N[] fns = lattice_extender(ns,"%sflt");
+
+    // Build the @{c=_} lattice
+    N[] cns = lattice_extender(ns,"@{c=%sint}");
+
+    // Build the @{d=_} lattice
+    N[] dns = lattice_extender(ns,"@{d=%sflt}");
+
+    // Wrap with scalar, nscalr
+    N  sclr = new N("scalar");
+    N nsclr = new N("nscalr", sclr);
+    //N  mt   = new N(" @{  }", sclr);  // Empty struct
+    //N xmt   = new N("~@{  }"      );
+    N xnscl = new N("~nsclr"      );
+    N xsclr = new N("~scalr",xnscl/*,xmt*/);
+    nsclr.set_dual(xnscl);
+    xsclr.set_dual( sclr);
+    add_edge(0,  sclr, ins,fns,cns,dns);
+    add_edge(1, nsclr, ins,fns,cns,dns);
+
+    //xmt.set_dual(mt);
+    //add_edge(0,  mt, cns,dns);
+
+    // Split nil.  Feels odd to connect ~nScalar with nil and ~nil to nScalar,
+    // but required else not a lattice.
+    N  nil = new N(" nil");
+    N xnil = new N("~nil",nsclr);
+    xnil.set_dual(nil);
+    add_edge(len-1-0, xnil, ins,fns,cns,dns);
+    xnscl._subs.push(nil);
+
+    // Can I ~nil->0int->nil ?
+    // NO: Crossing Nil.
+    assert ins[2]._t.equals(" 0int");
+    //ins[2]._subs.push(nil);
+    //xnil._subs.push(ins[2]);
+    //fns[2]._subs.push(nil);
+    //xnil._subs.push(fns[2]);
+
+    test(xsclr);
+
+    // Check the lattice similar to main AA.
+    // Commutativity: true by definition in this case.
+    // Symmetry 1 : if A&B==MT, then ~A&~MT==~A and ~B&~MT==~B
+    assert check_symmetry1();
+    // Associative: (A&B)&C == A&(B&C)
+    assert check_associative();
+    // Symmetry 2 : if A isa B, then A.join(C) isa B.join(C)
+    //              if A&B ==B, then ~(~A&~C) & ~(~B&~C) == ~(~B&~C)
+    // After some algebra, this becomes: (A&B) + C == B + C; since A&B==B, this
+    // is a trivial condition, except that in practice it caught a lot of
+    // broken implementations.
+    assert check_symmetry2();
+  }
+
+  //
+  void add_edge( int idx, N n, N[]... nns ) {
+    int len = nns[0].length;
+    for( N[] ns : nns ) {
+      ns[idx]._subs.push(n);
+      n._dual._subs.push(ns[len-1-idx]);
+    }
+  }
+
+  // Clone and wrap the given lattice
+  private static N[] lattice_extender( N[] ns, String wrap) {
+    int len = ns.length;
+    N[] xns = new N[len];
+    for( int i=0; i<len; i++ )
+      xns[i] = new N(String.format(wrap, ns[i]._t));
+
+    // Edges in clones
+    for( int i=0; i<len; i++ )
+      for( N edge : ns[i]._subs )
+        xns[i]._subs.push(xns[Util.find(ns,edge)]);
+
+    // Duals
+    for( int i=0; i<len>>1; i++ )
+      xns[i].set_dual(xns[Util.find(ns,ns[i]._dual)]);
+
+    return xns;
+  }
+
+  // Check symmetry:  if A&B==MT, then ~A&~MT==~A and ~B&~MT==~B
+  static boolean check_symmetry1() {
+    for( N n : N.NS ) {
+      for( N m : N.NS ) {
+        N mt = n.meet(m);
+        assertSame(n._dual.meet(mt._dual), n._dual);
+        assertSame(m._dual.meet(mt._dual), m._dual);
+      }
+    }
+    return true;
+  }
+
+  static boolean check_associative() {
+    for( N a : N.NS )
+      for( N b : N.NS )
+        for( N c : N.NS )
+          assertSame(a.meet(b).meet(c),a.meet(b.meet(c)));
+    return true;
+  }
+
+  // Symmetry 2 : if A isa B, then A.join(C) isa B.join(C)
+  static boolean check_symmetry2() {
+    for( N a : N.NS ) {
+      for( N b : N.NS ) {
+        N mt = a.meet(b);
+        if( mt==b ) {
+          for( N c : N.NS ) {
+            N a_c = a.join(c);
+            N b_c = b.join(c);
+            assertSame(a_c.meet(b_c),b_c);
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+
+
 
   // Open question for a future testLattice test:
   //

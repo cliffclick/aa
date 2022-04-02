@@ -276,7 +276,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public  static final TypeStruct POINT = args(TypeFlt.FLT64,TypeFlt.FLT64);
   public  static final TypeStruct NAMEPT= POINT.set_name("Point:");
   public  static final TypeStruct A     = make_test("a",TypeFlt.FLT64,Access.Final);
-  public  static final TypeStruct C0    = make_test("c",TypeInt.FALSE,Access.Final); // @{c:0}
+  private static final TypeStruct C0    = make_test("c",TypeInt.FALSE,Access.Final); // @{c:0}
   private static final TypeStruct D1    = make_test("d",TypeInt.TRUE ,Access.Final); // @{d:1}
   public  static final TypeStruct ARW   = make_test("a",TypeFlt.FLT64,Access.RW   );
   public  static final TypeStruct EMPTY = make();
@@ -315,14 +315,14 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTRUCT:break;
-    case TFLT:
-    case TINT:
-    case TFUNPTR:
-    case TRPC:
-    case TMEMPTR:return cross_nil(t);
     case TARY:
     case TFLD:
+    case TFLT:
+    case TINT:
     case TTUPLE :
+    case TFUNPTR:
+    case TMEMPTR:
+    case TRPC:
     case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen
     }
@@ -715,64 +715,15 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     return true;
   }
   @Override public Type meet_nil(Type nil) {
-    // The empty struct acts as-if it vacuously has a nil.  It rides on the
-    // lower "has nil" lattice line, is below NIL, above Scalar, and alongside
-    // nScalar; invert this for the high empty struct.
-    // @{} &  NIL == @{}           ~@{} &  NIL == @{}
-    // @{} & XNIL == SCALAR        ~@{} & XNIL == XNIL
-    if( (nil==XNIL)!=_any ) return SCALAR;
-    if( nil==NIL ) return this;
-    else return XNIL;
-
-    //// Clone fields and meet_nil.  Check for all-NIL or -XNIL.
+    //if( nil==XNIL )
+    //  return above_center() ? XNIL : this;
+    //if( above_center() )
+    //  return NIL;
     //TypeStruct ts = copy();
-    //boolean all=true;
-    //for( int i=0; i<len(); i++ ) {
-    //  TypeFld fmeet = _flds.at(i).meet_nil(nil);
-    //  if( fmeet._t != nil ) all = false;
-    //  ts._flds.set(i,fmeet);
-    //}
-    //if( all ) {
-    //  if( nil==XNIL ) return ts.free(XNIL);
-    //}
+    //for( int i=0; i<len(); i++ )
+    //  ts._flds.set(i,_flds.at(i).meet_nil(nil));
     //return ts.hashcons_free();
-      // return SCALAR;
-  }
-
-  // Return the type without a nil-choice.  Only applies to above_center types,
-  // as these are the only types with a nil-choice.  Only called during meets
-  // with above-center types.  If called with below-center, there is no
-  // nil-choice (might be a must-nil but not a choice-nil), so can return this.
-
-  // The high empty struct vacuously has a nil choice, and I do not have a
-  // representation without the nil choice.
-  @Override Type not_nil() {
-    if( len()==0 ) return _any ? NSCALR : SCALAR;
-    TypeStruct ts = copy();
-    for( int i=0; i<len(); i++ )
-      ts._flds.set(i,_flds.at(i).not_nil());
-    return ts.hashcons_free();
-  }
-  @Override public boolean must_nil() {
-    // All must be !must_nil to be !must_nil.
-    // If any are must_nil, the whole is must_nil
-    for( int i=0; i<len(); i++ )
-      if( !at(i).must_nil() )
-        return false;
-    return true;
-  }
-  @Override public boolean may_nil() {
-    //if( _any ) {
-    //  for( int i=0; i<len(); i++ )
-    //    if( at(i).may_nil() )
-    //      return true;
-    //  return false;
-    //} else {
-      for( int i=0; i<len(); i++ )
-        if( at(i).may_nil() )
-          return true;
-      return false;
-    //}
+    return ALL;
   }
 
   @Override boolean contains( Type t, VBitSet bs ) {
