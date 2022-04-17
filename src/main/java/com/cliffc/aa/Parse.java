@@ -1316,12 +1316,13 @@ public class Parse implements Comparable<Parse> {
   private Type ttuple() {
     int oldx = _x;
     peek('(');
-    TypeStruct ts = TypeStruct.malloc("",false);
-    while(true) {
-      Type t = type(false,null);
-      if( t==null ) { _x=oldx; return ts.free(null); }
-        throw unimpl();
-    }
+    //TypeStruct ts = TypeStruct.malloc("",Type.ALL);
+    //while(true) {
+    //  Type t = type(false,null);
+    //  if( t==null ) { _x=oldx; return ts.free(null); }
+    //  throw unimpl();
+    //}
+    throw unimpl();
   }
 
 

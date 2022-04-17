@@ -223,8 +223,8 @@ public class TV2 {
       NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
       for( TypeFld fld : ts )
         args.put(fld._fld,make(fld._t,alloc_site));
-      if( ts._name.length()>0 )
-        args.put(ts._name,make_leaf(alloc_site));
+      if( ts._clz.length()>0 )
+        args.put(ts._clz,make_leaf(alloc_site));
       yield make_struct(args,alloc_site);
     }
     case TypeFlt f -> make_base(t,alloc_site);
@@ -432,20 +432,21 @@ public class TV2 {
     if( is_obj() ) {
       TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);
       if( tstr==null ) {
-        // Returning a high version of struct
-        Type.RECURSIVE_MEET++;
-        tstr = TypeStruct.malloc("",is_open()).add_fld(TypeFld.NO_DISP);
-        if( _args!=null )
-          for( String id : _args.keySet() )
-            tstr.add_fld(TypeFld.malloc(id));
-        ADUPS.put(_uid,tstr); // Stop cycles
-        if( _args!=null )
-          for( String id : _args.keySet() )
-            tstr.get(id).setX(arg(id)._as_flow()); // Recursive
-        if( --Type.RECURSIVE_MEET == 0 )
-          // Shrink / remove cycle dups.  Might make new (smaller)
-          // TypeStructs, so keep RECURSIVE_MEET enabled.
-          tstr = Cyclic.install(tstr);
+        //// Returning a high version of struct
+        //Type.RECURSIVE_MEET++;
+        //tstr = TypeStruct.malloc("",is_open() ? Type.ANY : Type.ALL).add_fld(TypeFld.NO_DISP);
+        //if( _args!=null )
+        //  for( String id : _args.keySet() )
+        //    tstr.add_fld(TypeFld.malloc(id));
+        //ADUPS.put(_uid,tstr); // Stop cycles
+        //if( _args!=null )
+        //  for( String id : _args.keySet() )
+        //    tstr.get(id).setX(arg(id)._as_flow()); // Recursive
+        //if( --Type.RECURSIVE_MEET == 0 )
+        //  // Shrink / remove cycle dups.  Might make new (smaller)
+        //  // TypeStructs, so keep RECURSIVE_MEET enabled.
+        //  tstr = Cyclic.install(tstr);
+        throw unimpl();
       }
       // The HM is_struct wants to be a TypeMemPtr, but the recursive builder
       // is built around TypeStruct, hence the TMP wrap.
@@ -1060,7 +1061,7 @@ public class TV2 {
     TV2 tv = DUPS.get(_uid);
     if( tv!=null ) return tv;
     if( is_obj() ) {
-      String tname = ((TypeMemPtr)_flow)._obj._name;
+      String tname = ((TypeMemPtr)_flow)._obj._clz;
       if( tname!=null )
         return arg("_val");     // Unbox ints and flts
       throw unimpl();

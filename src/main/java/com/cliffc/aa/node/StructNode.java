@@ -48,7 +48,7 @@ public class StructNode extends Node {
     super(OP_STRUCT);
     _is_closure = is_closure;
     _forward_ref = forward_ref;
-    _ts = TypeStruct.EMPTY;
+    _ts = TypeStruct.ISUSED;
   }
 
   @Override String str() { return _ts.toString(); }
@@ -69,7 +69,7 @@ public class StructNode extends Node {
     return this;
   }
   StructNode name(String name) {
-    assert _ts._name.length()==0;
+    assert _ts._clz.length()==0;
     return set_ts(_ts.set_name(name));
   }
   public TypeStruct ts() { return _ts; }
@@ -163,11 +163,11 @@ public class StructNode extends Node {
   }
 
   @Override public Type value() {
-    assert _defs._len==_ts.len();
-    TypeStruct ts = TypeStruct.malloc(_ts._name,_ts.above_center());
-    for( int i=0; i<len(); i++ )
-      ts.add_fld(_ts.get(i).make_from(val(i)));
-    return ts.hashcons_free();
+    assert _defs._len==_ts.len();    
+    TypeFld[] flds = TypeFlds.get(_ts.len());
+    for( int i=0; i<flds.length; i++ )
+      flds[i] = _ts.get(i).make_from(val(i));
+    return _ts.make_from(flds);
   }
 
   // Return liveness for a field

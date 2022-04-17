@@ -21,7 +21,7 @@ import static com.cliffc.aa.AA.unimpl;
 // count of Meet stabilizes; a unique All (Bottom; no known value) and due to
 // symmetry a unique Any (Top, all values simultaneously).  Supports function
 // types, various kinds of numeric ranges, nil, tuples and structs, objects,
-// memory and named subtypes of the above.
+// and memory.
 //
 // During program typing, always keeping the "loosest" possible program and if
 // this program still types as 'Any' then the program is ambiguous.  'All'
@@ -35,19 +35,13 @@ import static com.cliffc.aa.AA.unimpl;
 // int{1,8,16} all inject in flt32; int32 injects in flt64.  Small integer
 // constants as floats inject into the integers.
 //
-// Named ints and flts "subtype", except for 0 which is canonically the same
-// everywhere.  Example assuming a name "gal:flt32"
-// ~flt64 -> ~flt32 -> gal:~flt32 -> {... gal:-pi, gal:-0.1, 0, gal:0.1, gal:pi, ... } -> gal:flt32 -> flt32 -> flt64
+// Pointers are everywhere nullable; they always support a {oop+null, oop,
+// null, oop&null} set of choices, where oop+null and oop&null are duals.
+// Structs are OOPS with an infinite list of values and a delta-set of named
+// field exceptions.  The fields are dualed structurally.  High structs default
+// to ANY and low to ALL.  Tuples are structs with fields named "0", "1", etc.
 //
-// OOPs are everywhere nullable; they always support a {oop+null, oop, null,
-// oop&null} set of choices, where oop+null and oop&null are duals.
-// Tuples are OOPS with an infinite list of values; the values are dualed
-// structurally.
-// Structs are tuples with a set of named fields; the fields can be top, a
-// field name, or bottom.
-// Strings are OOPs which again can be top, a constant, or bottom.
-//
-// Because the meet is commutative, associative, distributive, the following holds:
+// Because the meet is commutative, associative, symmetric, the following holds:
 //
 //     (forall X, join X) === ~(forall X, meet ~X)
 //
@@ -98,19 +92,18 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   public long _hash, _cyc_hash; // Hash for this Type; built recursively except around cycles
   byte _type;            // Simple types use a simple enum
   private Type _cyclic;  // Type is cyclic, and this is the canonical cycle leader.
-  public String _name;   // All types can be named
   T _dual; // All types support a dual notion, eagerly computed and cached here
 
   private static int _uid() { return CNT++; }
   @Override public int getAsInt() { return _uid; }
-  T init(String name) { _name=name; _cyclic=null; return (T)this; }
+  T init() { _cyclic=null; return (T)this; }
 
   // ----------
   // Type is cyclic.
   // The leader of the Strongly Connected Component this Type is part of or
   // null.  The head is always alive, and always uses the minimal Type UID, and
   // is effectively the SCC "color".  Two SCCs might abut with only a pointer
-  // between them (no Type), and the "color" can be used to tell when its safe
+  // between them (no Type), and the "color" can be used to tell when it's safe
   // to stop a cyclic-equality check or limit a cycle-hash.
   Type cyclic() {
     Type c = _cyclic;
@@ -150,13 +143,13 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     return ihash;
   }
   // Static properties hashcode, no edges.
-  long static_hash() { return (_type<<1)|1|_name.hashCode(); }
+  long static_hash() { return (_type<<1)|1; }
 
   // Compute the hash and return it.  Use a child hash, if they have one, or
   // recursively compute the child's hash.  Expects all children to have a hash.
   long compute_hash() {
     // Mixing here has to be child-visit-order invariant, or I have to enforce
-    // a child-visit-order on TypeStruct (alpha-sorted field names).  Currently
+    // a child-visit-order on TypeStruct (alpha-sorted field names).  Currently,
     // using XOR as an order-invariant mixer.
     long hash = lwalk( (fld,str) -> fld._cyc_hash ^ str.hashCode(),
                        (hash0,hash1) -> hash0 ^ hash1 );
@@ -167,8 +160,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Is anything equals to this?
   @Override public boolean equals( Object o ) {
     if( this == o ) return true;
-    if( !(o instanceof Type t) ) return false;
-    return _type==t._type && Util.eq(_name,t._name);
+    return (o instanceof Type t) && _type==t._type;
   }
   // Static properties equals; edges are IGNORED.  Already known to be the same
   // class and not-equals.
@@ -178,7 +170,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // edges and confirm they have the same structure.
   public boolean cycle_equals( Type t ) {
     assert is_simple();         // Overridden in subclasses
-    return _type==t._type && Util.eq(_name,t._name);
+    return _type==t._type;
   }
 
   // ----------
@@ -233,7 +225,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
 
   // Internal tick of tick-tock printing
   final SB _str( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( Util.eq(_name," FREE:") ) return sb.p(" FREE:");
+    if( _hash==0 ) sb.p("!!!");
     String s = dups.get(_uid);
     if( s!=null ) {
       sb.p(s);                  // Pretty name
@@ -244,7 +236,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   }
 
   // Internal tock of tick-tock printing
-  SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) { return sb.p(_name).p(STRS[_type]); }
+  SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) { return sb.p(STRS[_type]); }
 
   // True if type is complex to print, and should indent when printing a Type
   final boolean _str_complex(VBitSet visit, NonBlockingHashMapLong<String> dups) {
@@ -267,7 +259,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   }
 
   // Construct a simple type, possibly from a pool
-  static Type make(byte type) { return POOLS[type].malloc().init("").hashcons_free(); }
+  static Type make(byte type) { return POOLS[type].malloc().init().hashcons_free(); }
   public T free(T t2) { return (T)POOLS[_type].free(this,t2); }
   T hashcons_free() {
     T t2 = hashcons();
@@ -296,7 +288,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     INTERN.put(this,this);       // Put in table without dual
     //Util.hash_quality_check_per(INTERN,"INTERN");
     T d = xdual();               // Compute dual without requiring table lookup, and not setting name
-    d._name = _name;             // xdual does not set name either
     d._hash = d._cyc_hash = d.compute_hash();  // Set dual hash
     _dual = d;
     if( this==d ) return d;      // Self-symmetric?  Dual is self
@@ -374,7 +365,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   static final byte TNIL    = 8; // The Nil-type
   static final byte TXNIL   = 9; // NIL.dual
   static final byte TSIMPLE =10; // End of the Simple Types
-  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","nScalar","~nScalar","nil","xnil"};
+  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","nScalar","~nScalar","nil","~nil"};
   static final byte TINT    =11; // All Integers, including signed/unsigned and various sizes; see TypeInt
   static final byte TFLT    =12; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
   static final byte TRPC    =13; // Return PCs; Continuations; call-site return points; see TypeRPC
@@ -409,7 +400,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     private final Type _gold;
     Pool(byte t, Type gold) {
       gold._type = t;
-      gold._name = "";
       _gold=gold;
       _frees= new Ary<>(new Type[1],0);
       POOLS[t] = this;
@@ -429,7 +419,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     <T extends Type> T free(T t1, T t2) {
       t1._dual = null;   // Too easy to make mistakes, so zap now
       t1._hash = t1._cyc_hash = 0;      // Too easy to make mistakes, so zap now
-      t1._name = " FREE:"; // "is free" tag
       _frees.push(t1);   // On the free list
       _free++;
       assert _frees._len<1000; // Basically asserting we get Types from Pool.malloc and not by normal allocation
@@ -478,7 +467,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   private boolean is_ptr() { byte t = _type;  return t == TFUNPTR || t == TMEMPTR; }
   private boolean is_num() { byte t = _type;  return t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/1,1,1,1,1,1,1,1,1,1,/*TSIMPLE-10*/0, 1,1,1,0,0,0,0,0,1,/*TFUNPTR-20*/1}/*TLAST=21*/;
+  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/1,1,1,1,1,1,1,1,1,1,/*TSIMPLE-10*/0, 1,1,1,0,1,0,0,0,1,/*TFUNPTR-20*/1}/*TLAST=21*/;
   public final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
   // Simplify pointers (lose what they point at).
   public Type simple_ptr() { return this; }
@@ -526,36 +515,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
 
     // "Triangulate" the matrix and cut in half the number of cases.
     // Reverse; xmeet 2nd arg is never "is_simple" and never equal to "this".
-    // This meet ignores the _name field, and can return any-old name it wants.
     mt = !is_simple() && t.is_simple() ? t.xmeet(this) : xmeet(t);
-
-    // Meet the names.  Subclasses basically ignore the names as they have
-    // their own complicated meets to perform, so we meet them here for all.
-    Type nmt = xmt_name(t,mt);
 
     // Record this meet, to short-cut next time
     if( RECURSIVE_MEET == 0 )   // Only not mid-building recursive types;
-      Key.put(this,t,nmt);
-    return nmt;
-  }
-
-  // Meet the names.  Subclasses basically ignore the names as they have
-  // their own complicated meets to perform, so we meet them here for all.
-  private Type xmt_name(Type t, Type mt) {
-    if( this==Type.NIL || this==Type.XNIL ||
-        t   ==Type.NIL || t   ==Type.XNIL )
-      return mt;                // NIL is never named, and never removes a name
-    String n = mtname(t,mt);    // Meet name strings
-    // If the names are incompatible and the meet remained high then the
-    // mismatched names force a drop.
-    if( n.length() < _name.length() && n.length() < t._name.length() && mt.above_center() ) {
-      if( mt.interned() ) // recursive type creation?
-        mt = mt.dual();   // Force low
-    }
-
-    // Inject the name
-    if( !Util.eq(mt._name,n) )  // Fast path cutout
-      mt = mt.set_name(n);
+      Key.put(this,t,mt);
     return mt;
   }
 
@@ -573,14 +537,10 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     if(  type <= TXCTRL ) return _type==TXCTRL && t._type==TXCTRL ? XCTRL : CTRL;
     if( _type <= TXCTRL || t._type <= TXCTRL ) return ALL;
 
-    // Very specifically (and, we can argue very non-orthgonally) we can allow
-    // X/NIL to meet *inside* a single field TypeStruct.  There's another
-    // version where we can define the meet of NIL and a no-field struct or an
-    // N-field struct.
-
+    // Meet NIL inside
     if(   _type == TNIL ||   _type == TXNIL ) return t.meet_nil(this);
     if( t._type == TNIL || t._type == TXNIL ) return   meet_nil(t   );
-    
+
     // Meeting scalar and non-scalar falls to ALL.  Includes most Memory shapes.
     if( isa_scalar() ^ t.isa_scalar() ) return ALL;
 
@@ -616,70 +576,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     throw typerr(t);
   }
 
-  // Named types are essentially a subclass of any type.
-  // Examples:
-  //   B:A:int << B:int << int   // Subtypes
-  //     B:int.isa (int)
-  //   B:A:int.isa (B:int)
-  //     C:int.meet(B:int) == int
-  //   B:A:int.meet(C:int) == int
-  //
-  //   B:A:~int.join(B:~int) == B:A:~int
-  //     C:~int.join(B:~int) ==     ~int
-  //
-  //   B: int.meet(  ~int) == B:   int.meet(B:~int) == B:int
-  //   B:~int.meet(   int) ==      int
-  //   B:~int.meet(C: int) ==      int
-  //   B:~int.meet(B: int) == B:   int
-  //   B:~int.meet(C:~int) ==      int // Nothing in common, fall to int
-  //   B:~int.meet(  ~int) == B:  ~int
-  // B:A:~int.meet(B:~int) == B:A:~int // both high, keep long; short guy high, keep long
-  // B:A:~int.meet(B: int) == B:   int // one low, keep low   ; short guy  low, keep short
-  // B:A: int.meet(B:~int) == B:A: int // one low, keep low   ; short guy high, keep long
-  // B:A: int.meet(B: int) == B:   int // both low, keep short; short guy  low, keep short
-  //
-  // B:A:~int.meet(B:D:~int) == B:int // Nothing in common, fall to int
-
-  static boolean check_name( String n ) { return n.isEmpty() || n.charAt(n.length()-1)==':'; }
-  public boolean has_name() { return !_name.isEmpty(); }
-  // Make a named variant of any type, by just adding a name.
-  public final T set_name(String name) {
-    if( Util.eq(_name,name) ) return (T)this;
-    assert check_name(name);
-    return _set_name(name);
-  }
-  private T _set_name(String name) {
-    POOLS[_type]._clone++;
-    T t1 = copy();
-    t1._name = name;
-    return t1.hashcons_free();
-  }
-
-  // TODO: will also need a unique lexical numbering, not just a name, to
-  // handle the case of the same name used in two different scopes.
-  final String mtname(Type t, Type mt) {
-    Type   t0 = this,  t1 = t;
-    String s0 = t0._name, s1 = t1._name;
-    assert check_name(s0) && check_name(s1);
-    if( Util.eq(s0,s1) ) return s0;
-    // Sort by name length
-    if( s0.length() > s1.length() ) { t1=this; t0=t; s0=t0._name; s1=t1._name; }
-    int x = 0, i;  char c;    // Last colon separator index
-    // Find split point
-    for( i = 0; i < s0.length(); i++ ) {
-      if( (c=s0.charAt(i)) != s1.charAt(i) )
-        break;
-      if( c==':' ) x=i;
-    }
-    // If s0 is a prefix of s1, and s0 is high then it can cover s1.
-    if( i==s0.length() && t0.above_center() && mt!=ALL && (!t1.above_center() || mt.above_center()) )
-      return s1;
-    // Keep the common prefix, which might be all of s0
-    String s2 = i==s0.length() ? s0 : s0.substring(0, x).intern();
-    assert check_name(s2);
-    return s2;
-  }
-
   // By design in meet, args are already flipped to order _type, which forces
   // symmetry for things with badly ordered _type fields.  The question is
   // still interesting for other orders.
@@ -688,11 +584,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     if( is_simple() && !t.is_simple() ) return true; // By design, flipped the only allowed order
     Type mt2 = t.xmeet(this);   // Reverse args and try again
 
-    // Also reverse names.
-    Type nmt2 = t.xmt_name(this,mt2);
-
-    if( mt==nmt2 ) return true;
-    System.out.println("Meet not commutative: "+this+".meet("+t+")="+mt+",\n but "+t+".meet("+this+")="+nmt2);
+    if( mt==mt2 ) return true;
+    System.out.println("Meet not commutative: "+this+".meet("+t+")="+mt+",\n but "+t+".meet("+this+")="+mt2);
     return false;
   }
   // A & B = MT
@@ -723,6 +616,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   public TypeStruct oob(TypeStruct e) { return above_center() ? e.dual() : e; }
   public TypeMem    oob(TypeMem    e) { return above_center() ? e.dual() : e; }
   public TypeMemPtr oob(TypeMemPtr e) { return above_center() ? e.dual() : e; }
+  public T oob(boolean b) { return b ? dual() : (T)this; }
 
   public static void init0( HashMap<String,Type> types ) {
     types.put("scalar",SCALAR);
@@ -755,7 +649,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   }
   static void concat( Ary<Type> ts, Type[] ts1 ) {
     for( Type t1 : ts1 ) {
-      assert !t1.above_center(); // Always below-center or equal, because we'll dual anyways
+      assert !t1.above_center(); // Always below-center or equal, because we will dual anyways
       ts.push(t1);
       if( t1!=t1.dual() ) ts.push(t1.dual());
     }
@@ -886,8 +780,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // True for many above-center or zero values.
   public boolean may_nil() {
     return switch( _type ) {
-    case TALL, TSCALAR, TXNSCALR, TNSCALR, TTUPLE -> false;
-    case TANY, TXSCALAR, TCTRL, TXCTRL, TMEM -> true;
+    case TALL, TSCALAR, TXNSCALR, TNSCALR, TTUPLE, TNIL -> false;
+    case TANY, TXSCALAR, TCTRL, TXCTRL, TMEM, TXNIL -> true;
     default -> throw typerr(null); // Overridden in subclass
     };
   }
@@ -896,11 +790,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // as these are the only types with a nil-choice.  Only called during meets
   // with above-center types.  If called with below-center, there is no
   // nil-choice (might be a must-nil but not a choice-nil), so can return this.
-  Type not_nil() {
-    return switch( _type ) {
-      case TXSCALAR -> XNSCALR;
+  T not_nil() {
+    return (T)switch( _type ) {
+      case TANY, TXSCALAR -> XNSCALR;
       case TXNIL -> NSCALR;
-      case TSCALAR, TNSCALR, TXNSCALR, TNIL -> this;
+      case TALL, TSCALAR, TNSCALR, TXNSCALR, TNIL -> this;
       default -> throw typerr(null); // Overridden in subclass
     };
   }
@@ -990,12 +884,12 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
           yield t;
         }
         assert cid==null;       // No doing things like "FA:XB:"
-        // Lower case types are simple named types: "int:@{x=1" or "Cat:@{legs=4}"
+        // Lower case types are simple named types: "int:@{x=1}" or "Cat:@{legs=4}"
         if( !isRecur(id) ) {
           String tname = (id+':').intern();
           if( Util.eq(id,"int") )
-            yield TypeStruct.make(tname,false,TypeFld.make("x",type(null)));
-          yield type(null).set_name(tname);
+            yield TypeStruct.make(tname,ALL,TypeFld.make("x",type(null)));
+          yield ((TypeStruct)type(null)).set_name(tname);
         }
 
         RECURSIVE_MEET++;   // Ok, really start a recursive type

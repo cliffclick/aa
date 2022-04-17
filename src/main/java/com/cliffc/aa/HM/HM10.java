@@ -1636,18 +1636,19 @@ public class HM10 {
           // Returning a high version of struct
           if( !ROOT_FREEZE ) return Type.XNSCALR;
           Type.RECURSIVE_MEET++;
-          tstr = TypeStruct.malloc("",false).add_fld(TypeFld.NO_DISP);
-          if( _args!=null )
-            for( String id : _args.keySet() )
-              tstr.add_fld(TypeFld.malloc(id));
-          ADUPS.put(_uid,tstr); // Stop cycles
-          if( _args!=null )
-            for( String id : _args.keySet() )
-              tstr.get(id).setX(arg(id)._as_flow()); // Recursive
-          if( --Type.RECURSIVE_MEET == 0 )
-            // Shrink / remove cycle dups.  Might make new (smaller)
-            // TypeStructs, so keep RECURSIVE_MEET enabled.
-            tstr = Cyclic.install(tstr);
+          //tstr = TypeStruct.malloc("",Type.ALL).add_fld(TypeFld.NO_DISP);
+          //if( _args!=null )
+          //  for( String id : _args.keySet() )
+          //    tstr.add_fld(TypeFld.malloc(id));
+          //ADUPS.put(_uid,tstr); // Stop cycles
+          //if( _args!=null )
+          //  for( String id : _args.keySet() )
+          //    tstr.get(id).setX(arg(id)._as_flow()); // Recursive
+          //if( --Type.RECURSIVE_MEET == 0 )
+          //  // Shrink / remove cycle dups.  Might make new (smaller)
+          //  // TypeStructs, so keep RECURSIVE_MEET enabled.
+          //  tstr = Cyclic.install(tstr);
+          throw unimpl();
         }
         return TypeMemPtr.make(_aliases,tstr);
       }
@@ -2181,7 +2182,7 @@ public class HM10 {
         TypeStruct ts = WDUPS.get(_uid);
         if( ts != null ) return t; // Recursive, stop cycles
         Type.RECURSIVE_MEET++;
-        ts = TypeStruct.malloc("",false);
+        ts = TypeStruct.malloc("",Type.ALL,TypeFlds.EMPTY);
 
         // Add fields.  Common to both are easy, and will be walked (recursive,
         // cyclic).  Solo fields in GCP are kept, and lifted "as if" an HM

@@ -227,7 +227,7 @@ public class TestNode {
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.ISUSED0));
     test1monotonic(new  CProjNode(_ins[0],0));
     test1monotonic(new    ErrNode(_ins[0],null,"\nerr\n"));
-    test1monotonic(new    FunNode(TypeStruct.INT64.nargs()));
+    test1monotonic(new    FunNode(TypeTuple.INT64.len()));
     test1monotonic(new FunPtrNode("anon",ret,null));
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     //test1monotonic_intrinsic(new NewAryNode.NewAry());
@@ -286,8 +286,8 @@ public class TestNode {
     n.add_def( null  );
     n.add_def(_ins[n._defs._len]);
     if( n instanceof MemPrimNode ) n.add_def(mem);
-    if( n._formals.nargs() >= 3 )  n.add_def(_ins[n._defs._len-1]);
-    if( n._formals.nargs() >= 4 )  n.add_def(_ins[n._defs._len-1]);
+    if( n._formals.len() >= 3 )  n.add_def(_ins[n._defs._len-1]);
+    if( n._formals.len() >= 4 )  n.add_def(_ins[n._defs._len-1]);
     test1monotonic_init(n);
   }
   //// Fill a Node with {null,edge,edge} and start the search

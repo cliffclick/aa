@@ -1,19 +1,16 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.util.SB;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.SB;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import static com.cliffc.aa.AA.*;
-import static com.cliffc.aa.type.TypeFld.Access;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static com.cliffc.aa.AA.unimpl;
+import static org.junit.Assert.*;
 
 public class TestParse {
   private static final BitsFun TEST_FUNBITS = BitsFun.make0(43);
@@ -61,15 +58,16 @@ public class TestParse {
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
     test("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(0);(1,);(1,).0;@{x;y];","Expected closing '}' but found ']' instead",63);
-    test("noinline_inc={x -> x&1}; noinline_p={x -> noinline_inc(x)*2}; noinline_p",
-      (ignore->TypeFunPtr.make(29,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.INT64)),
-      ( () -> TypeStruct.args(Type.SCALAR)),
-         "[29]{ int64 -> int64 }" );
-    // id accepts and returns both ints and reference types (arrays).
-    test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
-      (ignore -> TypeMemPtr.make(9,TypeStruct.make_test(TypeInt.INT8,TypeInt.con(3)))),
-      null,
-         "(int64, 3)");
+    //test("noinline_inc={x -> x&1}; noinline_p={x -> noinline_inc(x)*2}; noinline_p",
+    //  (ignore->TypeFunPtr.make(29,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.INT64)),
+    //  ( () -> TypeStruct.args(Type.SCALAR)),
+    //     "[29]{ int64 -> int64 }" );
+    //// id accepts and returns both ints and reference types (arrays).
+    //test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
+    //  (ignore -> TypeMemPtr.make(9,TypeStruct.make_test(TypeInt.INT8,TypeInt.con(3)))),
+    //  null,
+    //     "(int64, 3)");
+    throw unimpl();
   }
 
   @Test public void testParse00() {
@@ -173,11 +171,12 @@ public class TestParse {
     testerr("math.rand(1)?1: :2:int","missing expr after ':'",16); // missing type
     testerr("math.rand(1)?1::2:int","missing expr after ':'",15); // missing type
     test   ("math.rand(1)?1",TypeInt.BOOL,"int:"); // Missing optional else defaults to nil
-    test   ("math.rand(1)?@{}",
-      (ignore->TypeMemPtr.make_nil(8,TypeStruct.make(TypeFld.NO_DISP))),
-      null, "@{^=A;}?" );
     test   ("x:=0;math.rand(1)?(x:=1);x",TypeInt.BOOL,"int:");
     testerr("a.b.c();","Unknown ref 'a'",0);
+    //test   ("math.rand(1)?@{}",
+    //  (ignore->TypeMemPtr.make_nil(8,TypeStruct.make(TypeFld.NO_DISP))),
+    //  null, "@{^=A;}?" );
+    throw unimpl();
   }
 
   // Short-circuit tests
@@ -190,15 +189,16 @@ public class TestParse {
     test("1 || 2", TypeInt.con(1));
     test("0 && 1 || 2 && 3", TypeInt.con(3));    // Precedence
 
-    test_obj("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
-             TypeStruct.make_test(TypeInt.con(1),Type.XNIL,Type.XNIL));
-    test_obj("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
-             TypeStruct.make_test(TypeInt.con(2),TypeInt.con(1),Type.XNIL));
-    test("(x=1) && x+2", TypeInt.con(3)); // Def x in 1st position
-
-    testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
-    testerr("0 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x definitely not alive
-    test("math.rand(1) && (x=2;x*x) || 3 && 4", TypeInt.INT8); // local use of x in short-circuit; requires unzip to find 4
+    //test_obj("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
+    //         TypeStruct.make_test(TypeInt.con(1),Type.XNIL,Type.XNIL));
+    //test_obj("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
+    //         TypeStruct.make_test(TypeInt.con(2),TypeInt.con(1),Type.XNIL));
+    //test("(x=1) && x+2", TypeInt.con(3)); // Def x in 1st position
+    //
+    //testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
+    //testerr("0 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x definitely not alive
+    //test("math.rand(1) && (x=2;x*x) || 3 && 4", TypeInt.INT8); // local use of x in short-circuit; requires unzip to find 4
+    throw unimpl();
   }
 
   @Test public void testParse02() {
@@ -206,44 +206,45 @@ public class TestParse {
     // Anonymous function definition.  Note: { x -> x&1 }; 'x' can be either an
     // int or any struct with an operator '_&_', which needs to be nil-checked
     // before loading the operator field.
-    test("{x:int -> x&1}",
-         (ignore -> TypeFunPtr.make(38,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.BOOL)),
-         ( ()-> TypeStruct.make(TypeFld.make("x",TypeInt.INT64))),
-         "{ int64 -> int64 }");
-    test("{5}()", TypeInt.con(5), "5"); // No args nor -> required; this is simply a function returning 5, being executed
-    testerr("{x:flt y -> x+y}", "Unable to resolve _+_",13); // {Scalar Scalar -> Scalar}
-
-    // Function execution and result typing
-    test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2), "2"); // trivially inlined; capture external variable
-    test("x=3; and2={x -> x & 2}; and2(x)", TypeInt.con(2), "2"); // trivially inlined; shadow  external variable
-    testerr("plus2={x -> x+2}; x", "Unknown ref 'x'",18); // Scope exit ends lifetime
-    testerr("fun={x -> }; fun(0)", "Missing function body",10);
-    testerr("fun(2)", "Unknown ref 'fun'", 0);
-    test("mul3={x -> y=3; x*y}; mul3(2)", TypeInt.con(6)); // multiple statements in func body
-    // Needs overload cloning/inlining to resolve {+}
-    test("x=3; addx={y -> x+y}; addx(2)", TypeInt.con(5)); // must inline to resolve overload {+}:Int
-    test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
-    test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
-    test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
-    testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64",9);
-    testerr("sq={x -> x*x}; sq(\"abc\")", "*\"abc\" is none of (flt64,int64)",9);
-    testerr("f0 = { f x -> f0(x-1) }; f0(_+_,2)", "Passing 1 arguments to f0 which takes 2 arguments",16);
-    // Recursive:
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
-    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
-    test("f0 = { x -> x ? _+_(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
-    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
-    test_obj("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
-             TypeStruct.make_test(Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
-
-    // Co-recursion requires parallel assignment & type inference across a lexical scope
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.con(1) );
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
-
-    // This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
-    testerr("(math.rand(1) ? _+_ : _*_)(2,3)","Unable to resolve call",26); // either 2+3 or 2*3, or {5,6} which is INT8.
-    test("f = g = {-> 3}; f() == g();", TypeInt.TRUE);
-    testerr("add = {x:int x:int -> x + x}", "Duplicate parameter name 'x'", 13);
+    //test("{x:int -> x&1}",
+    //     (ignore -> TypeFunPtr.make(38,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.BOOL)),
+    //     ( ()-> TypeStruct.make(TypeFld.make("x",TypeInt.INT64))),
+    //     "{ int64 -> int64 }");
+    //test("{5}()", TypeInt.con(5), "5"); // No args nor -> required; this is simply a function returning 5, being executed
+    //testerr("{x:flt y -> x+y}", "Unable to resolve _+_",13); // {Scalar Scalar -> Scalar}
+    //
+    //// Function execution and result typing
+    //test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2), "2"); // trivially inlined; capture external variable
+    //test("x=3; and2={x -> x & 2}; and2(x)", TypeInt.con(2), "2"); // trivially inlined; shadow  external variable
+    //testerr("plus2={x -> x+2}; x", "Unknown ref 'x'",18); // Scope exit ends lifetime
+    //testerr("fun={x -> }; fun(0)", "Missing function body",10);
+    //testerr("fun(2)", "Unknown ref 'fun'", 0);
+    //test("mul3={x -> y=3; x*y}; mul3(2)", TypeInt.con(6)); // multiple statements in func body
+    //// Needs overload cloning/inlining to resolve {+}
+    //test("x=3; addx={y -> x+y}; addx(2)", TypeInt.con(5)); // must inline to resolve overload {+}:Int
+    //test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
+    //test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
+    //test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
+    //testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64",9);
+    //testerr("sq={x -> x*x}; sq(\"abc\")", "*\"abc\" is none of (flt64,int64)",9);
+    //testerr("f0 = { f x -> f0(x-1) }; f0(_+_,2)", "Passing 1 arguments to f0 which takes 2 arguments",16);
+    //// Recursive:
+    //test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
+    //test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
+    //test("f0 = { x -> x ? _+_(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
+    //testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
+    //test_obj("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
+    //         TypeStruct.make_test(Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
+    //
+    //// Co-recursion requires parallel assignment & type inference across a lexical scope
+    //test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.con(1) );
+    //test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
+    //
+    //// This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
+    //testerr("(math.rand(1) ? _+_ : _*_)(2,3)","Unable to resolve call",26); // either 2+3 or 2*3, or {5,6} which is INT8.
+    //test("f = g = {-> 3}; f() == g();", TypeInt.TRUE);
+    //testerr("add = {x:int x:int -> x + x}", "Duplicate parameter name 'x'", 13);
+    throw unimpl();
   }
 
   @Test public void testParse03() {
@@ -269,40 +270,41 @@ public class TestParse {
     test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
     testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *str",41);
     // Test that the type-check is on the variable and not the function.
-    test_obj("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
-             TypeStruct.make_test(TypeInt.con(4),TypeInt.con(4)));
-    testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
-            "3 is not a *@{x:=; y:=; ...}", 66);
-    testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",
-            "Unknown ref 'foo'", 41);
-    // This test failed because the inner fun does not inline until GCP,
-    // and then it resolves and lifts the DISPLAY (which after resolution
-    // is no longer needed).  Means: cannot resolve during GCP and preserve
-    // monotonicity.  Would like '.fun' to load BEFORE GCP.
-    testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> fun(x,y)}; (fun(2,3), baz(2,3))",
-            "3 is not a *@{x:=; y:=; ...}", 69);
-
-    testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",36);
-    test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
-    test("fun:{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
-    test("fun:{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
-    testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32",3);
-
-    // Named types
-    test_named_tuple("A= :(       )" ); // Zero-length tuple
-    test_named_tuple("A= :(   ,   )", Type.SCALAR); // One-length tuple
-    test_named_tuple("A= :(   ,  ,)", Type.SCALAR  ,Type.SCALAR  );
-    test_named_tuple("A= :(flt,   )", TypeFlt.FLT64 );
-    test_named_tuple("A= :(flt,int)", TypeFlt.FLT64,TypeInt.INT64);
-    test_named_tuple("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
-
-    test("A= :(str?, int); A( \"abc\",2 )",
-         (ignore-> TypeMemPtr.make(29,TypeStruct.make_test("A:",TypeMemPtr.make(17,TypeStruct.EMPTY),TypeInt.con(2)))),
-         null, "(*\"abc\",2)");
-    test("A= :(str?, int); A( (\"abc\",2) )",
-         (ignore-> TypeMemPtr.make(18,TypeStruct.make_test("A:",TypeMemPtr.make(17,TypeStruct.EMPTY),TypeInt.con(2)))),
-         null, "(*\"abc\",2)");
-    testerr("A= :(str?, int)?","Named types are never nil",16);
+    //test_obj("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
+    //         TypeStruct.make_test(TypeInt.con(4),TypeInt.con(4)));
+    //testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
+    //        "3 is not a *@{x:=; y:=; ...}", 66);
+    //testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",
+    //        "Unknown ref 'foo'", 41);
+    //// This test failed because the inner fun does not inline until GCP,
+    //// and then it resolves and lifts the DISPLAY (which after resolution
+    //// is no longer needed).  Means: cannot resolve during GCP and preserve
+    //// monotonicity.  Would like '.fun' to load BEFORE GCP.
+    //testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> fun(x,y)}; (fun(2,3), baz(2,3))",
+    //        "3 is not a *@{x:=; y:=; ...}", 69);
+    //
+    //testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",36);
+    //test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
+    //test("fun:{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
+    //test("fun:{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
+    //testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32",3);
+    //
+    //// Named types
+    //test_named_tuple("A= :(       )" ); // Zero-length tuple
+    //test_named_tuple("A= :(   ,   )", Type.SCALAR); // One-length tuple
+    //test_named_tuple("A= :(   ,  ,)", Type.SCALAR  ,Type.SCALAR  );
+    //test_named_tuple("A= :(flt,   )", TypeFlt.FLT64 );
+    //test_named_tuple("A= :(flt,int)", TypeFlt.FLT64,TypeInt.INT64);
+    //test_named_tuple("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
+    //
+    //test("A= :(str?, int); A( \"abc\",2 )",
+    //     (ignore-> TypeMemPtr.make(29,TypeStruct.make_test("A:",TypeMemPtr.make(17,TypeStruct.EMPTY),TypeInt.con(2)))),
+    //     null, "(*\"abc\",2)");
+    //test("A= :(str?, int); A( (\"abc\",2) )",
+    //     (ignore-> TypeMemPtr.make(18,TypeStruct.make_test("A:",TypeMemPtr.make(17,TypeStruct.EMPTY),TypeInt.con(2)))),
+    //     null, "(*\"abc\",2)");
+    //testerr("A= :(str?, int)?","Named types are never nil",16);
+    throw unimpl();
   }
 
   @Test public void testParse04() {
@@ -343,29 +345,30 @@ public class TestParse {
     // Tuple
     test("(0,\"abc\")","*(0, *\"abc\")","(0,*\"abc\")");
     test("(1,\"abc\").0", TypeInt.TRUE);
-    test("(1,\"abc\").1", TypeStruct.EMPTY);
+    test("(1,\"abc\").1", TypeStruct.ISUSED);
 
     // Named type variables
-    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(82),4, TypeMemPtr.NO_DISP, TypeFlt.FLT64.set_name("gal:")));
-    test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
-    test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
-    // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
-    testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",14);
-
-    test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*@{x=1; y=2} is not a *Point:@{x:=; y:=}",55);
-    testerr ("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
-    testerr("x=@{n: =1;}","Missing type after ':'",7);
-    testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
-    test("x=@{n}",(ignore->TypeMemPtr.make(14,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,Access.RW)))),
-         null,"@{n=0}");
+    //test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(82),4, TypeMemPtr.NO_DISP, TypeFlt.FLT64.set_name("gal:")));
+    //test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
+    //test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
+    //// test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
+    //testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",14);
+    //
+    //test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
+    //test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
+    //testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*@{x=1; y=2} is not a *Point:@{x:=; y:=}",55);
+    //testerr ("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
+    //testerr("x=@{n: =1;}","Missing type after ':'",7);
+    //testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
+    //test("x=@{n}",(ignore->TypeMemPtr.make(14,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,Access.RW)))),
+    //     null,"@{n=0}");
+    throw unimpl();
   }
 
   @Test public void testParse05() {
     // nilable and not-nil pointers
     test   ("x:str? = 0", Type.XNIL); // question-type allows nil or not; zero digit is nil
-    test_obj("x:str? = \"abc\"", TypeStruct.EMPTY); // question-type allows nil or not
+    test_obj("x:str? = \"abc\"", TypeStruct.ISUSED); // question-type allows nil or not
     testerr("x:str  = 0", "0 is not a *str", 1);
     test("math.rand(1)?0:\"abc\"", "*\"abc\"?","*\"abc\"?");
     testerr("(math.rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", 26);
@@ -381,36 +384,37 @@ public class TestParse {
   }
 
   @Test public void testParse06() {
-    // Building recursive types
-    test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
-    test("A= :(str?, int); A(0,2)","*A:(0, 2)","(0,2)"); // TODO: Named types in HM
-    // Named recursive types
-    test("A= :(A?, int); A(0,2)","*A:(0, 2)","(0,2)");
-    test("A= :(A?, int); A(0,2)","*A:(0, 2)","(0,2)");
-    test("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", "1.2","1.2");
-    test("A= :(A?, int); A(A(0,2),3)","*A:(*A:(0, 2), 3)","((0,2),3)");
-
-    test("A= :@{n=A?; v=int}; A(@{n=0;v=3})","*A:@{n=0; v=3}","@{n=0,v=3}");
-
-    // Missing type B is also never worked on.
-    test("A= :@{n=B?; v=int}", "[~78+88]{->*use }","A");
-    test("A= :@{n=B?; v=int}; a = A(0,2)", "*A:@{n=0; v=2}","@{n=0,v=2}");
-    test("A= :@{n=B?; v=int}; a = A(0,2); a.n", "0", "0");
-    // Mutually recursive types
-    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}; (A,B)", "*([~78+88]{->any }, [~29+82]{->any })", "(A,B)");
-    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}; (A,B)", "*([~29+82]{->any }, [~78+88]{->any })", "(A,B)");
-    test("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}; (A,B,C)", "*([~78+88]{->any }, [~29+82]{->any }, [~95+96]{->any })", "(A,B,C)");
-    // Mixed ABC's, making little abc's in-between.
-    test("""
-A= :@{n=B?; v=int};
-a= A(0,5);
-B= :@{n=A?; v=flt};
-b= B(a,3.14);
-C= :@{n=B?; v=str};
-c= C(b,"abc");
-(a,b,c)
-""",     "*(*A:@{n=0; v=5}, *B:@{n=$; v=3.14}, *C:@{n=$; v=*\"abc\"})",
-         "(@{n=0,v=5},@{n=@{n=0,v=5},v=3.14},@{n=@{n=@{n=0,v=5},v=3.14},v=*\"abc\"})");
+//    // Building recursive types
+//    test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
+//    test("A= :(str?, int); A(0,2)","*A:(0, 2)","(0,2)"); // TODO: Named types in HM
+//    // Named recursive types
+//    test("A= :(A?, int); A(0,2)","*A:(0, 2)","(0,2)");
+//    test("A= :(A?, int); A(0,2)","*A:(0, 2)","(0,2)");
+//    test("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", "1.2","1.2");
+//    test("A= :(A?, int); A(A(0,2),3)","*A:(*A:(0, 2), 3)","((0,2),3)");
+//
+//    test("A= :@{n=A?; v=int}; A(@{n=0;v=3})","*A:@{n=0; v=3}","@{n=0,v=3}");
+//
+//    // Missing type B is also never worked on.
+//    test("A= :@{n=B?; v=int}", "[~78+88]{->*use }","A");
+//    test("A= :@{n=B?; v=int}; a = A(0,2)", "*A:@{n=0; v=2}","@{n=0,v=2}");
+//    test("A= :@{n=B?; v=int}; a = A(0,2); a.n", "0", "0");
+//    // Mutually recursive types
+//    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}; (A,B)", "*([~78+88]{->any }, [~29+82]{->any })", "(A,B)");
+//    test("A= :@{n=B; v=int}; B= :@{n=A; v=flt}; (A,B)", "*([~29+82]{->any }, [~78+88]{->any })", "(A,B)");
+//    test("A= :@{n=C?; v=int}; B= :@{n=A?; v=flt}; C= :@{n=B?; v=str}; (A,B,C)", "*([~78+88]{->any }, [~29+82]{->any }, [~95+96]{->any })", "(A,B,C)");
+//    // Mixed ABC's, making little abc's in-between.
+//    test("""
+//A= :@{n=B?; v=int};
+//a= A(0,5);
+//B= :@{n=A?; v=flt};
+//b= B(a,3.14);
+//C= :@{n=B?; v=str};
+//c= C(b,"abc");
+//(a,b,c)
+//""",     "*(*A:@{n=0; v=5}, *B:@{n=$; v=3.14}, *C:@{n=$; v=*\"abc\"})",
+//         "(@{n=0,v=5},@{n=@{n=0,v=5},v=3.14},@{n=@{n=@{n=0,v=5},v=3.14},v=*\"abc\"})");
+    throw unimpl();
   }
 
   @Test public void testParse07() {
@@ -430,23 +434,23 @@ c= C(b,"abc");
     // Longer variable-length list (so no inline-to-trivial).  Pure integer
     // ops, no overload resolution.  Does final stores into new objects
     // interspersed with recursive computation calls.
-    test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v&x.v} : 0};"+
-                 "map(@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
-                 TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("nn",TypeMemPtr.ISUSED0),TypeFld.make("vv",TypeInt.INT8)));
-    // Test does loads after recursive call, which should be allowed to bypass.
-    test("sum={x -> x ? sum(x.n) + x.v : 0};"+
-         "sum(@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
-         (ignore ->TypeInt.INT64), null, "int64");
-
-    // User-defined linked list.
-    String ll_def = "List=:@{next;val};";
-    String ll_con = "tmp=List(List(0,1.2),2.3);";
-    String ll_map = "map = {fun list -> list ? List(map(fun,list.next),fun(list.val)) : 0};";
-    String ll_fun = "sq = {x -> x*x};";
-    String ll_apl = "map(sq,tmp);";
-
-    test_isa(ll_def, TypeFunPtr.GENERIC_FUNPTR);
-    test(ll_def+ll_con+"; tmp.next.val", TypeFlt.con(1.2));
+    //test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v&x.v} : 0};"+
+    //             "map(@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
+    //             TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("nn",TypeMemPtr.ISUSED0),TypeFld.make("vv",TypeInt.INT8)));
+    //// Test does loads after recursive call, which should be allowed to bypass.
+    //test("sum={x -> x ? sum(x.n) + x.v : 0};"+
+    //     "sum(@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=math.rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
+    //     (ignore ->TypeInt.INT64), null, "int64");
+    //
+    //// User-defined linked list.
+    //String ll_def = "List=:@{next;val};";
+    //String ll_con = "tmp=List(List(0,1.2),2.3);";
+    //String ll_map = "map = {fun list -> list ? List(map(fun,list.next),fun(list.val)) : 0};";
+    //String ll_fun = "sq = {x -> x*x};";
+    //String ll_apl = "map(sq,tmp);";
+    //
+    //test_isa(ll_def, TypeFunPtr.GENERIC_FUNPTR);
+    //test(ll_def+ll_con+"; tmp.next.val", TypeFlt.con(1.2));
     //test_isa(ll_def+ll_con+ll_map, TypeFunPtr.GENERIC_FUNPTR);
     //test_isa(ll_def+ll_con+ll_map+ll_fun, TypeFunPtr.GENERIC_FUNPTR);
 
@@ -586,8 +590,8 @@ map(tmp)
 
     // After inlining once, we become pair-aware.
 
-    TypeStruct xts_int = TypeStruct.make_test(TypeMemPtr.ISUSED0,TypeInt.INT64);
-    TypeMemPtr xpt_int = TypeMemPtr.make (BitsAlias.ALLX,xts_int);
+    //TypeStruct xts_int = TypeStruct.make_test(TypeMemPtr.ISUSED0,TypeInt.INT64);
+    //TypeMemPtr xpt_int = TypeMemPtr.make (BitsAlias.ALLX,xts_int);
     //TypeStruct xts_str = TypeStruct.make_test(xpt_int,TypeMemPtr.STRPTR);
     //TypeMemPtr xtmp = TypeMemPtr.make(BitsAlias.ALL,xts_str);
     //
@@ -604,20 +608,21 @@ map(tmp)
     testerr("x=1+y","Unknown ref 'y'",4);
 
     test("x:=1", TypeInt.TRUE);
-    test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make_test(Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
-
-    testerr("x=1; x:=2; x", "Cannot re-assign final field '.x' in @{x=1}", 5);
-    testerr("x=1; x =2; x", "Cannot re-assign final field '.x' in @{x=1}", 5);
-
-    test("math.rand(1)?(x=4):(x=3);x", TypeInt.NINT8); // x defined on both arms, so available after
-    test("math.rand(1)?(x:=4):(x:=3);x", TypeInt.NINT8); // x defined on both arms, so available after
-    test("math.rand(1)?(x:=4):(x:=3);x:=x+1", TypeInt.INT64); // x mutable on both arms, so mutable after
-    test   ("x:=0; 1 ? (x:=4):; x:=x+1", TypeInt.con(5)); // x mutable ahead; ok to mutate on 1 arm and later
-    test   ("x:=0; 1 ? (x =4):; x", TypeInt.con(4)); // x final on 1 arm, dead on other arm
-    testerr("x:=0; math.rand(1) ? (x =4):3; x=2; x", "Cannot re-assign read-only field '.x' in @{x==int8}",31);
-    // A final store, but defs of @{a} do not escape into nonline_x, hence do
-    // not merge and escape out.
-    test("noinline_x={@{a}}; noinline_x().a=2; noinline_x().a",  TypeInt.INT8);
+    //test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make_test(Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
+    //
+    //testerr("x=1; x:=2; x", "Cannot re-assign final field '.x' in @{x=1}", 5);
+    //testerr("x=1; x =2; x", "Cannot re-assign final field '.x' in @{x=1}", 5);
+    //
+    //test("math.rand(1)?(x=4):(x=3);x", TypeInt.NINT8); // x defined on both arms, so available after
+    //test("math.rand(1)?(x:=4):(x:=3);x", TypeInt.NINT8); // x defined on both arms, so available after
+    //test("math.rand(1)?(x:=4):(x:=3);x:=x+1", TypeInt.INT64); // x mutable on both arms, so mutable after
+    //test   ("x:=0; 1 ? (x:=4):; x:=x+1", TypeInt.con(5)); // x mutable ahead; ok to mutate on 1 arm and later
+    //test   ("x:=0; 1 ? (x =4):; x", TypeInt.con(4)); // x final on 1 arm, dead on other arm
+    //testerr("x:=0; math.rand(1) ? (x =4):3; x=2; x", "Cannot re-assign read-only field '.x' in @{x==int8}",31);
+    //// A final store, but defs of @{a} do not escape into nonline_x, hence do
+    //// not merge and escape out.
+    //test("noinline_x={@{a}}; noinline_x().a=2; noinline_x().a",  TypeInt.INT8);
+    throw unimpl();
   }
 
   // Ffnls are declared with an assignment.  This is to avoid the C++/Java
@@ -638,44 +643,45 @@ map(tmp)
   // object.  Hence, you cannot cast to "final", but you can cast to "read-only"
   // which only applies to you, and not to other r/w pointers.
   @Test public void testParse10() {
-    // Test re-assignment in struct
-    test_obj_isa("x=@{n:=1;v:=2}", TypeStruct.make(TypeMemPtr.DISP_FLD,
-                                                   TypeFld.make("n",TypeInt.con(1),Access.RW),
-                                                   TypeFld.make("v",TypeInt.con(2),Access.RW)));
-    testerr ("x=@{n =1;v:=2}; x.n  = 3; x.n", "Cannot re-assign final field '.n' in @{n=1; v:=2}",18);
-    test    ("x=@{n:=1;v:=2}; x.n  = 3", TypeInt.con(3));
-    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3; v:=2}");
-    testerr ("x=@{n:=1;v:=2}; x.n  = 3; x.v = 1; x.n = 4; x.n", "Cannot re-assign final field '.n' in @{n=3; v=1}",37);
-    test    ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math.rand(1) ? x : y; tmp.n", TypeInt.NINT8);
-    testerr ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math.rand(1) ? x : y; tmp.n = 5; tmp.n", "Cannot re-assign read-only field '.n' in @{n==nint8; v:=nint8}",63);
-    test    ("x=@{n:=1;v:=2}; foo={q -> q.n=3}; foo(x); x.n",TypeInt.con(3)); // Side effects persist out of functions
-    // Tuple assignment
-    testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0' in (1, 2)",11);
-    // Final-only and read-only type syntax.
-    testerr ("ptr2rw = @{f:=1}; ptr2final:@{f=} = ptr2rw; ptr2final", "*@{f:=1} is not a *@{f=; ...}",27); // Cannot cast-to-final
-
-    test_obj_isa("ptr2   = @{f =1}; ptr2final:@{f=} = ptr2  ; ptr2final", // Good cast
-                 TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("f",TypeInt.con(1))));
-    testerr ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; ptr2rw", "*@{f=1} is not a *@{f:=; ...}", 18); // Cannot cast-away final
-    test    ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; 2", TypeInt.con(2)); // Dead cast-away of final
-    test    ("@{x:=1;y =2}:@{x;y=}.y", TypeInt.con(2)); // Allowed reading final field
-    testerr ("f={ptr2final:@{x;y=} -> ptr2final.y  }; f(@{x:=1;y:=2})", "*@{x:=1; y:=2} is not a *@{x:=; y=; ...}",42); // Another version of casting-to-final
-    testerr ("f={ptr2final:@{x;y=} -> ptr2final.y=3; ptr2final}; f(@{x:=1;y =2})", "Cannot re-assign final field '.y' in @{x:=1; y=2}",34);
-    test    ("f={ptr:@{x==;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).y", TypeInt.con(3)); // On field x, cast-away r/w for r/o
-    test    ("f={ptr:@{x=;y:=} -> ptr.y=3; ptr}; f(@{x =1;y:=2}).y", TypeInt.con(3)); // On field x, cast-up r/o for final but did not read
-    testerr ("f={ptr:@{x=;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).x", "*@{x:=1; y:=2} is not a *@{x=; y:=; ...}",37); // On field x, cast-up r/w for final and read
-    test    ("f={ptr:@{x;y} -> ptr.y }; f(@{x:=1;y:=2}:@{x;y==})", TypeInt.con(2)); // cast r/w to r/o, and read
-    test    ("f={ptr:@{x==;y==} -> ptr }; f(@{x=1;y=2}).y", TypeInt.con(2)); // cast final to r/o and read
-    test    ("ptr=@{f:=1}; ptr:@{f=}.f=2",TypeInt.con(2)); // Checking that it is-a final does not make it final
-    // In general for these next two, want a 'MEET' style type assertion where
-    // locally at the function parm we "finalize" ptr.y, so the function body
-    // cannot modify it.  However, no final store occurs so after the function,
-    // ptr.y remains writable.
-    testerr ("f={ptr:@{x;y=} -> ptr.y=3}; f(@{x:=1;y:=2});", "*@{x:=1; y:=2} is not a *@{x:=; y=; ...}",30);
-    //testerr ("f={ptr:@{x;y} -> ptr.y=3}; f(@{x:=1;y:=2}:@{x;y=})", "*@{.==nScalar} is not a *@{x:=; y:=; ...}",29);
-    test    ("ptr=@{a:=1}; val=ptr.a; ptr.a=2; val",TypeInt.con(1));
-    // You are allowed to build final pointer cycles
-    test    ("ptr0=@{p:=0;v:=1}; ptr1=@{p=ptr0;v:=2}; ptr0.p=ptr1; ptr0.p.v+ptr1.p.v+(ptr0.p==ptr1)", TypeInt.con(4)); // final pointer-cycle is ok
+    //// Test re-assignment in struct
+    //test_obj_isa("x=@{n:=1;v:=2}", TypeStruct.make(TypeMemPtr.DISP_FLD,
+    //                                               TypeFld.make("n",TypeInt.con(1),Access.RW),
+    //                                               TypeFld.make("v",TypeInt.con(2),Access.RW)));
+    //testerr ("x=@{n =1;v:=2}; x.n  = 3; x.n", "Cannot re-assign final field '.n' in @{n=1; v:=2}",18);
+    //test    ("x=@{n:=1;v:=2}; x.n  = 3", TypeInt.con(3));
+    //test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3; v:=2}");
+    //testerr ("x=@{n:=1;v:=2}; x.n  = 3; x.v = 1; x.n = 4; x.n", "Cannot re-assign final field '.n' in @{n=3; v=1}",37);
+    //test    ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math.rand(1) ? x : y; tmp.n", TypeInt.NINT8);
+    //testerr ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math.rand(1) ? x : y; tmp.n = 5; tmp.n", "Cannot re-assign read-only field '.n' in @{n==nint8; v:=nint8}",63);
+    //test    ("x=@{n:=1;v:=2}; foo={q -> q.n=3}; foo(x); x.n",TypeInt.con(3)); // Side effects persist out of functions
+    //// Tuple assignment
+    //testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0' in (1, 2)",11);
+    //// Final-only and read-only type syntax.
+    //testerr ("ptr2rw = @{f:=1}; ptr2final:@{f=} = ptr2rw; ptr2final", "*@{f:=1} is not a *@{f=; ...}",27); // Cannot cast-to-final
+    //
+    //test_obj_isa("ptr2   = @{f =1}; ptr2final:@{f=} = ptr2  ; ptr2final", // Good cast
+    //             TypeStruct.make(TypeMemPtr.DISP_FLD,TypeFld.make("f",TypeInt.con(1))));
+    //testerr ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; ptr2rw", "*@{f=1} is not a *@{f:=; ...}", 18); // Cannot cast-away final
+    //test    ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; 2", TypeInt.con(2)); // Dead cast-away of final
+    //test    ("@{x:=1;y =2}:@{x;y=}.y", TypeInt.con(2)); // Allowed reading final field
+    //testerr ("f={ptr2final:@{x;y=} -> ptr2final.y  }; f(@{x:=1;y:=2})", "*@{x:=1; y:=2} is not a *@{x:=; y=; ...}",42); // Another version of casting-to-final
+    //testerr ("f={ptr2final:@{x;y=} -> ptr2final.y=3; ptr2final}; f(@{x:=1;y =2})", "Cannot re-assign final field '.y' in @{x:=1; y=2}",34);
+    //test    ("f={ptr:@{x==;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).y", TypeInt.con(3)); // On field x, cast-away r/w for r/o
+    //test    ("f={ptr:@{x=;y:=} -> ptr.y=3; ptr}; f(@{x =1;y:=2}).y", TypeInt.con(3)); // On field x, cast-up r/o for final but did not read
+    //testerr ("f={ptr:@{x=;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).x", "*@{x:=1; y:=2} is not a *@{x=; y:=; ...}",37); // On field x, cast-up r/w for final and read
+    //test    ("f={ptr:@{x;y} -> ptr.y }; f(@{x:=1;y:=2}:@{x;y==})", TypeInt.con(2)); // cast r/w to r/o, and read
+    //test    ("f={ptr:@{x==;y==} -> ptr }; f(@{x=1;y=2}).y", TypeInt.con(2)); // cast final to r/o and read
+    //test    ("ptr=@{f:=1}; ptr:@{f=}.f=2",TypeInt.con(2)); // Checking that it is-a final does not make it final
+    //// In general for these next two, want a 'MEET' style type assertion where
+    //// locally at the function parm we "finalize" ptr.y, so the function body
+    //// cannot modify it.  However, no final store occurs so after the function,
+    //// ptr.y remains writable.
+    //testerr ("f={ptr:@{x;y=} -> ptr.y=3}; f(@{x:=1;y:=2});", "*@{x:=1; y:=2} is not a *@{x:=; y=; ...}",30);
+    ////testerr ("f={ptr:@{x;y} -> ptr.y=3}; f(@{x:=1;y:=2}:@{x;y=})", "*@{.==nScalar} is not a *@{x:=; y:=; ...}",29);
+    //test    ("ptr=@{a:=1}; val=ptr.a; ptr.a=2; val",TypeInt.con(1));
+    //// You are allowed to build final pointer cycles
+    //test    ("ptr0=@{p:=0;v:=1}; ptr1=@{p=ptr0;v:=2}; ptr0.p=ptr1; ptr0.p.v+ptr1.p.v+(ptr0.p==ptr1)", TypeInt.con(4)); // final pointer-cycle is ok
+    throw unimpl();
   }
 
   // Early function exit
@@ -733,11 +739,11 @@ map(tmp)
     test    ("ary = [3]; ary[0]", Type.XNIL);
     test    ("[3][0]", Type.XNIL);
     test    ("ary = [3]; ary[0]:=2", TypeInt.con(2));
-    test_obj("ary = [3]; ary[0]:=0; ary[1]:=1; ary[2]:=2; (ary[0],ary[1],ary[2])", // array create, array storing
-             TypeStruct.make_test(TypeInt.INT8,TypeInt.INT8,TypeInt.INT8));
-    testary("0[0]","0 is not a *[]Scalar/obj",1);
-    testary("[3] [4]","Index must be out of bounds",5);
-    testary("[3] [-1]","Index must be out of bounds",5);
+    //test_obj("ary = [3]; ary[0]:=0; ary[1]:=1; ary[2]:=2; (ary[0],ary[1],ary[2])", // array create, array storing
+    //         TypeStruct.make_test(TypeInt.INT8,TypeInt.INT8,TypeInt.INT8));
+    //testary("0[0]","0 is not a *[]Scalar/obj",1);
+    //testary("[3] [4]","Index must be out of bounds",5);
+    //testary("[3] [-1]","Index must be out of bounds",5);
     //test_obj("[3]:[int]", TypeAry.make(TypeInt.con(3),Type.XNIL,TypeStruct.ISUSED)); // Array of 3 XNILs in INTs.
     ////test("[1,2,3]", TypeAry.make(TypeInt.con(1),TypeInt.con(3),TypeInt.INT8)); // Array of 3 elements
     //test("ary=[3];#ary",TypeInt.con(3)); // Array length
@@ -759,109 +765,111 @@ map(tmp)
   }
 
   private static TypeStruct make2fldsD( String f1, Type t1, String f2, Type t2 ) {
-    return TypeStruct.make("",false,TypeFld.NO_DISP,TypeFld.make(f1,t1),TypeFld.make(f2,t2));
+    //return TypeStruct.make("",false,TypeFld.NO_DISP,TypeFld.make(f1,t1),TypeFld.make(f2,t2));
+    throw unimpl();
   }
 
   // Combined H-M and GCP Typing
   @Ignore
   @Test public void testParse16() {
-    test("-1", (ignore->TypeInt.con(-1)), null, "-1");
-    test("(1,2)", (ignore -> TypeMemPtr.make(13,TypeStruct.make_test(TypeInt.con(1),TypeInt.con(2)))), null, "[13]( 1,2)");
-
-    test("@{ n=0; v=1.2 }",
-         (ignore -> TypeMemPtr.make(13, make2fldsD("n",Type.XNIL,"v",TypeFlt.con(1.2)))),
-         null,
-         "[13]@{ n = 0, v = 1.2}");
-
-    test("{&}",
-         (ignore -> TypeFunPtr.make(BitsFun.make0(35),5, TypeMemPtr.NO_DISP,TypeInt.INT64)),
-         (() -> TypeStruct.make_test("x",TypeInt.INT64,"y",TypeInt.INT64)),
-         "[35]{ int64 int64 -> int64 }");
-
-    test("{ g -> (g,3)}",
-         (ignore -> TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP,
-                                // TODO: how do i express the expected return state of memory
-                                //TypeMem.make(14,TypeStruct.make2fldsD("0",Type.SCALAR,"1",TypeInt.con(3))),
-                                TypeMemPtr.make(14,TypeStruct.ISUSED))),
-         (() -> TypeStruct.make(TypeFld.make(" mem",TypeMem.ALLMEM),
-                                 TypeFld.make("^",Type.ALL),
-                                 TypeFld.make("g",Type.SCALAR))),
-         "[43]{ A -> [14]( A, 3) }");
-
-    test("{ g -> f = { ignore -> g }; ( f(3), f(\"abc\"))}",
-         (ignore -> TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.make(12,TypeStruct.ISUSED),
-                                // TODO: how do i express the expected return state of memory
-                                //TypeMem.make(18,TypeStruct.make2fldsD("0",Type.SCALAR,"1",Type.SCALAR)),
-                                TypeMemPtr.make(18,TypeStruct.ISUSED))),
-         (() -> TypeStruct.make(TypeFld.make(" mem",TypeMem.ALLMEM),
-                                TypeFld.make("^",TypeMemPtr.make(12,TypeStruct.ISUSED)),
-                                TypeFld.make("g",Type.SCALAR))),
-         "[43]{ A -> [18]( A, A) }");
-    // id accepts and returns all types and keeps precision
-    test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
-         (ignore -> TypeMemPtr.make(18,TypeStruct.make_test(TypeInt.INT8,TypeInt.con(3)))),
-         null,
-         "[99](int8, 3)");
-
-
-
-    // Should be typable with H-M
-    test_ptr("noinline_map={lst fcn -> lst ? fcn lst.1};"+
-        "in_int=(0,2);"+       // List of ints
-        "in_str=(0,\"abc\");"+ // List of strings
-        "out_str =noinline_map(in_int,str:{int->str});"+        // Map over ints with int->str  conversion, returning a list of strings
-        "out_bool=noinline_map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
-        "(out_str,out_bool)",
-      "(*\"2\",int1)");
-
-    // ID in different contexts; in general requires a new TypeVar per use; for
-    // such a small function it is always inlined completely, has the same effect.
-    test("id={x->x};id(1)",TypeInt.con(1));
-    test("{x->x}(3.14)",TypeFlt.con(3.14));
-    test_prim("{x->x}({+})","+");
-    test("id={x->x};id({+})(id(1),id(math.pi))",TypeFlt.make(0,64,Math.PI+1));
-
-    // Straight from TestHM.test08; types as {A -> (A,A)}.
-    // Function is never called, so returns the uncalled-function type.
-    test("fun={ g -> f={x -> g}; (f 3,f 1)}", TypeFunPtr.make(BitsFun.make0(46),1,Type.ANY,null));
-    // Called with different typevars A
-    test_ptr("fun={ g -> f={x -> g}; (f 3,f 1)}; (fun \"abc\",fun 3.14)",
-      "(*(*\"abc\", $), *(3.14, 3.14))");
-
-    // recursive unification.  Trivially types as a dead fcn ptr.
-    test_isa("x={x -> x x}",TypeFunPtr.make(BitsFun.make0(46),3,TypeMemPtr.NO_DISP,null));
-    // recursive unification.  Passing an ID to x then passes ID to ID, returning ID.
-    test_isa("x={x -> x x}; x({y->y})",TypeFunPtr.make(BitsFun.make0(47),4,TypeMemPtr.NO_DISP,null));
-    // Looks like recursive unification, but x is a function of 0 arguments,
-    // being called with 1 argument.  Error to call it.
-    testerr("x={x x};x(1)","Passing 1 arguments to x which takes 0 arguments",9);
-    // id accepts and returns both ints and reference types (arrays).
-    test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
-                TypeStruct.make_test(TypeInt.INT8,TypeInt.con(3)));
-    // Should be typable with H-M
-    test_ptr("noinline_map={lst fcn -> lst ? fcn lst.1};"+
-             "in_int=(0,2);"+       // List of ints
-             "in_str=(0,\"abc\");"+ // List of strings
-             "out_str =noinline_map(in_int,str:{int->str});"+        // Map over ints with int->str  conversion, returning a list of strings
-             "out_bool=noinline_map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
-             "(out_str,out_bool)",
-             "(*\"2\",int1)");
-    // Only odd thing here is losing not-nil-ness on list_int.
-    test_ptr("noinline_map={tup fcn -> (0,fcn tup.1)};"+
-        "lst_int=(0,2      );"+ //
-        "lst_str=(0,\"abc\");"+ //
-        "lst_istr=noinline_map(lst_int,str);"+      // Map over ints with int->str conversion, returning a list of strings
-        "lst_bool=noinline_map(lst_str,{str-> str==\"abc\"});"+ // Map over strs with str->bool conversion, returns bools
-        "(lst_istr,lst_bool)",
-      "(*(0, *\"2\")?, *(0, int1))");
-    // map being called with 2 different functions & lists
-    test("noinline_map={lst fcn -> lst ? (noinline_map(lst.0,fcn),fcn lst.1)};"+
-         "in_int=(((0,2),3),5);"+ // List of 3 ints
-         "in_str= ((0,\"abc\"),\"def\");"+ // List of 2 strings
-         "out_istr=noinline_map(in_int,str);"+      // Map over ints with int->str conversion, returning a list of strings
-         "out_bool=noinline_map(in_str,{str:str ->str==\"abc\"});"+ // Map over strs with str->bool conversion, returns bools
-         "(out_istr,out_bool)",
-         Type.ANY);
+    //test("-1", (ignore->TypeInt.con(-1)), null, "-1");
+    //test("(1,2)", (ignore -> TypeMemPtr.make(13,TypeStruct.make_test(TypeInt.con(1),TypeInt.con(2)))), null, "[13]( 1,2)");
+    //
+    //test("@{ n=0; v=1.2 }",
+    //     (ignore -> TypeMemPtr.make(13, make2fldsD("n",Type.XNIL,"v",TypeFlt.con(1.2)))),
+    //     null,
+    //     "[13]@{ n = 0, v = 1.2}");
+    //
+    //test("{&}",
+    //     (ignore -> TypeFunPtr.make(BitsFun.make0(35),5, TypeMemPtr.NO_DISP,TypeInt.INT64)),
+    //     (() -> TypeStruct.make_test("x",TypeInt.INT64,"y",TypeInt.INT64)),
+    //     "[35]{ int64 int64 -> int64 }");
+    //
+    //test("{ g -> (g,3)}",
+    //     (ignore -> TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.NO_DISP,
+    //                            // TODO: how do i express the expected return state of memory
+    //                            //TypeMem.make(14,TypeStruct.make2fldsD("0",Type.SCALAR,"1",TypeInt.con(3))),
+    //                            TypeMemPtr.make(14,TypeStruct.ISUSED))),
+    //     (() -> TypeStruct.make(TypeFld.make(" mem",TypeMem.ALLMEM),
+    //                             TypeFld.make("^",Type.ALL),
+    //                             TypeFld.make("g",Type.SCALAR))),
+    //     "[43]{ A -> [14]( A, 3) }");
+    //
+    //test("{ g -> f = { ignore -> g }; ( f(3), f(\"abc\"))}",
+    //     (ignore -> TypeFunPtr.make(TEST_FUNBITS,4, TypeMemPtr.make(12,TypeStruct.ISUSED),
+    //                            // TODO: how do i express the expected return state of memory
+    //                            //TypeMem.make(18,TypeStruct.make2fldsD("0",Type.SCALAR,"1",Type.SCALAR)),
+    //                            TypeMemPtr.make(18,TypeStruct.ISUSED))),
+    //     (() -> TypeStruct.make(TypeFld.make(" mem",TypeMem.ALLMEM),
+    //                            TypeFld.make("^",TypeMemPtr.make(12,TypeStruct.ISUSED)),
+    //                            TypeFld.make("g",Type.SCALAR))),
+    //     "[43]{ A -> [18]( A, A) }");
+    //// id accepts and returns all types and keeps precision
+    //test("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
+    //     (ignore -> TypeMemPtr.make(18,TypeStruct.make_test(TypeInt.INT8,TypeInt.con(3)))),
+    //     null,
+    //     "[99](int8, 3)");
+    //
+    //
+    //
+    //// Should be typable with H-M
+    //test_ptr("noinline_map={lst fcn -> lst ? fcn lst.1};"+
+    //    "in_int=(0,2);"+       // List of ints
+    //    "in_str=(0,\"abc\");"+ // List of strings
+    //    "out_str =noinline_map(in_int,str:{int->str});"+        // Map over ints with int->str  conversion, returning a list of strings
+    //    "out_bool=noinline_map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
+    //    "(out_str,out_bool)",
+    //  "(*\"2\",int1)");
+    //
+    //// ID in different contexts; in general requires a new TypeVar per use; for
+    //// such a small function it is always inlined completely, has the same effect.
+    //test("id={x->x};id(1)",TypeInt.con(1));
+    //test("{x->x}(3.14)",TypeFlt.con(3.14));
+    //test_prim("{x->x}({+})","+");
+    //test("id={x->x};id({+})(id(1),id(math.pi))",TypeFlt.make(0,64,Math.PI+1));
+    //
+    //// Straight from TestHM.test08; types as {A -> (A,A)}.
+    //// Function is never called, so returns the uncalled-function type.
+    //test("fun={ g -> f={x -> g}; (f 3,f 1)}", TypeFunPtr.make(BitsFun.make0(46),1,Type.ANY,null));
+    //// Called with different typevars A
+    //test_ptr("fun={ g -> f={x -> g}; (f 3,f 1)}; (fun \"abc\",fun 3.14)",
+    //  "(*(*\"abc\", $), *(3.14, 3.14))");
+    //
+    //// recursive unification.  Trivially types as a dead fcn ptr.
+    //test_isa("x={x -> x x}",TypeFunPtr.make(BitsFun.make0(46),3,TypeMemPtr.NO_DISP,null));
+    //// recursive unification.  Passing an ID to x then passes ID to ID, returning ID.
+    //test_isa("x={x -> x x}; x({y->y})",TypeFunPtr.make(BitsFun.make0(47),4,TypeMemPtr.NO_DISP,null));
+    //// Looks like recursive unification, but x is a function of 0 arguments,
+    //// being called with 1 argument.  Error to call it.
+    //testerr("x={x x};x(1)","Passing 1 arguments to x which takes 0 arguments",9);
+    //// id accepts and returns both ints and reference types (arrays).
+    //test_struct("noinline_id = {x->x};(noinline_id(5)&7, #noinline_id([3]))",
+    //            TypeStruct.make_test(TypeInt.INT8,TypeInt.con(3)));
+    //// Should be typable with H-M
+    //test_ptr("noinline_map={lst fcn -> lst ? fcn lst.1};"+
+    //         "in_int=(0,2);"+       // List of ints
+    //         "in_str=(0,\"abc\");"+ // List of strings
+    //         "out_str =noinline_map(in_int,str:{int->str});"+        // Map over ints with int->str  conversion, returning a list of strings
+    //         "out_bool=noinline_map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
+    //         "(out_str,out_bool)",
+    //         "(*\"2\",int1)");
+    //// Only odd thing here is losing not-nil-ness on list_int.
+    //test_ptr("noinline_map={tup fcn -> (0,fcn tup.1)};"+
+    //    "lst_int=(0,2      );"+ //
+    //    "lst_str=(0,\"abc\");"+ //
+    //    "lst_istr=noinline_map(lst_int,str);"+      // Map over ints with int->str conversion, returning a list of strings
+    //    "lst_bool=noinline_map(lst_str,{str-> str==\"abc\"});"+ // Map over strs with str->bool conversion, returns bools
+    //    "(lst_istr,lst_bool)",
+    //  "(*(0, *\"2\")?, *(0, int1))");
+    //// map being called with 2 different functions & lists
+    //test("noinline_map={lst fcn -> lst ? (noinline_map(lst.0,fcn),fcn lst.1)};"+
+    //     "in_int=(((0,2),3),5);"+ // List of 3 ints
+    //     "in_str= ((0,\"abc\"),\"def\");"+ // List of 2 strings
+    //     "out_istr=noinline_map(in_int,str);"+      // Map over ints with int->str conversion, returning a list of strings
+    //     "out_bool=noinline_map(in_str,{str:str ->str==\"abc\"});"+ // Map over strs with str->bool conversion, returns bools
+    //     "(out_istr,out_bool)",
+    //     Type.ANY);
+    throw unimpl();
 
   }
 

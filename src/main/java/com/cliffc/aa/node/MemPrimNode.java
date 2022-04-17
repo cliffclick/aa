@@ -9,7 +9,7 @@ import static com.cliffc.aa.AA.*;
 
 // Memory-based primitives
 public abstract class MemPrimNode extends PrimNode {
-  MemPrimNode( String name, TypeStruct formals, Type ret ) { super(name,formals,ret); }
+  MemPrimNode( String name, TypeTuple formals, Type ret ) { super(name,formals,ret); }
   Node mem() { return in(MEM_IDX); }
   Node adr() { return in(ARG_IDX); }
   Node idx() { return in(ARG_IDX+1); }
@@ -48,7 +48,7 @@ public abstract class MemPrimNode extends PrimNode {
 
   // ------------------------------------------------------------
   public abstract static class ReadPrimNode extends MemPrimNode {
-    public ReadPrimNode( String name, TypeStruct formals, Type ret ) { super(name,formals,ret); }
+    public ReadPrimNode( String name, TypeTuple formals, Type ret ) { super(name,formals,ret); }
 
     @Override public FunPtrNode clazz_node( ) {
       try(GVNGCM.Build<FunPtrNode> X = Env.GVN.new Build<>()) {

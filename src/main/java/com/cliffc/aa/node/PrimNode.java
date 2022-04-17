@@ -34,17 +34,16 @@ import static com.cliffc.aa.type.TypeFld.Access;
 public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
   public final TypeFunPtr _tfp; // FIDX, nargs, display argument, WRAPPED primitive return type
-  public final TypeStruct _formals; // Formals are indexed by order NOT name and are unwrapped prims.
-  public final Type _ret;       // Unwrapped primitive return
+  public final TypeTuple _formals; // Formals are indexed by order NOT name and are wrapped prims.
+  public final Type _ret;       // Wrapped primitive return
   Parse[] _badargs;             // Filled in when inlined in CallNode
-  public PrimNode( String name, TypeStruct formals, Type ret ) {
+  public PrimNode( String name, TypeTuple formals, Type ret ) {
     super(OP_PRIM);
     _name = name;
     int fidx = BitsFun.new_fidx();
     _formals = formals;
     _ret = ret;
-    _tfp=TypeFunPtr.make(BitsFun.make0(fidx),formals.nargs()+DSP_IDX,TypeMemPtr.NO_DISP,ret);
-
+    _tfp=TypeFunPtr.make(BitsFun.make0(fidx),formals.len(),TypeMemPtr.NO_DISP,ret);
     _badargs=null;
   }
 
@@ -105,11 +104,11 @@ public abstract class PrimNode extends Node {
     return PRIMS;
   }
 
-  public static TypeStruct make_int(long   i) { return TypeStruct.make("int:",false,TypeFld.make("x",TypeInt.con(i))); }
-  public static TypeStruct make_flt(double d) { return TypeStruct.make("flt:",false,TypeFld.make("x",TypeFlt.con(d))); }
+  public static TypeStruct make_int(long   i) { return TypeStruct.make_int(TypeInt.con(i)); }
+  public static TypeStruct make_flt(double d) { return TypeStruct.make_flt(TypeFlt.con(d)); }
 
   public static TypeStruct make_wrap(Type t) {
-    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",false,TypeFld.make("x",t));
+    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",Type.ALL,TypeFld.make("x",t));
   }
   public static TypeInt unwrap_i(Type t) { return (TypeInt)((TypeStruct)t).at("x"); }
   public static TypeFlt unwrap_f(Type t) { return (TypeFlt)((TypeStruct)t).at("x"); }
@@ -144,16 +143,15 @@ public abstract class PrimNode extends Node {
 
     FunNode fun = (FunNode)Env.GVN.init(new FunNode(this,is_oper ? op : _name).add_def(Env.ALL_CTRL));
     ParmNode rpc = new ParmNode(0,fun,Env.ALL_CALL).init();
-    for( int i=0; i<_formals.len(); i++ )
-      // Make a Parm for every formal, and unwrap it
-      add_def(_formals.get(i) == null ? null
-              : new ParmNode(i+DSP_IDX,fun,(ConNode)Node.con(_formals.at(i))).init());
-    // The primitive, working on and producing raw prims
+    for( int i=DSP_IDX; i<_formals.len(); i++ )
+      // Make a Parm for every formal
+      add_def(new ParmNode(i,fun,(ConNode)Node.con(_formals.at(i))).init());
+    // The primitive, working on and producing wrapped prims
     init();
-    // Re-wrap the result
+    // Return the result
     RetNode ret = new RetNode(fun,null,this,rpc,fun).init();
     // FunPtr is UNBOUND here, will be bound when loaded thru a named struct to the Clazz.
-    FunPtrNode fptr =  new FunPtrNode(op,ret,Env.ALL).init();
+    FunPtrNode fptr = new FunPtrNode(op,ret,Env.ALL).init();
     rec.add_fun(op,Access.Final,fptr,null);
   }
 
@@ -190,16 +188,15 @@ public abstract class PrimNode extends Node {
   // str:{int     -> str }  ==>>  str:int
   // str:{flt     -> str }  ==>>  str:flt
   // == :{ptr ptr -> int1}  ==>>  == :ptr
-  @Override public String xstr() { return _name+":"+_formals.get("^")._t; }
+  @Override public String xstr() { return _name+":"+_formals.at(DSP_IDX); }
   private static final Type[] TS = new Type[ARG_IDX+1];
   @Override public Type value() {
     if( is_keep() ) return Type.ALL;
     // If all inputs are constants we constant-fold.  If any input is high, we
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
-    for( int i=0; i<_formals.len(); i++ ) {
-      if( _formals.get(i)==null ) continue;
-      Type tactual = TS[i] = val(i);
+    for( int i=DSP_IDX; i<_formals.len(); i++ ) {
+      Type tactual = TS[i] = val(i-DSP_IDX);
       Type tformal = _formals.at(i);
       Type t = tformal.dual().meet(tactual);
       if( !t.is_con() && tactual!=Type.NIL ) {
@@ -255,13 +252,13 @@ public abstract class PrimNode extends Node {
   }
 
   public static class ConvertI64F64 extends PrimNode {
-    public ConvertI64F64() { super("flt",TypeStruct.INT64,TypeStruct.FLT); }
+    public ConvertI64F64() { super("flt",TypeTuple.INT64,TypeStruct.FLT); }
     @Override public Type apply( Type[] args ) { return TypeFlt.con((double)args[0].getl()); }
   }
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpF64 extends PrimNode {
-    Prim1OpF64( String name ) { super(name,TypeStruct.FLT64,TypeStruct.FLT); }
+    Prim1OpF64( String name ) { super(name,TypeTuple.FLT64,TypeStruct.FLT); }
     public Type apply( Type[] args ) { return make_flt(op(unwrap_ff(args[0]))); }
     abstract double op( double d );
   }
@@ -270,7 +267,7 @@ public abstract class PrimNode extends Node {
 
   // 1Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim1OpI64 extends PrimNode {
-    Prim1OpI64( String name ) { super(name,TypeStruct.INT64,TypeStruct.INT); }
+    Prim1OpI64( String name ) { super(name,TypeTuple.INT64,TypeStruct.INT); }
     @Override public Type apply( Type[] args ) { return make_int(op(unwrap_ii(args[0]))); }
     abstract long op( long d );
   }
@@ -278,23 +275,23 @@ public abstract class PrimNode extends Node {
   static class MinusI64 extends Prim1OpI64 { MinusI64() { super("-"); } long op( long x ) { return -x; } }
   static class NotI64 extends PrimNode {
     // Rare function which takes a Scalar (works for both ints and ptrs).
-    public NotI64() { super("!",TypeStruct.INT64,TypeInt.BOOL); }
+    public NotI64() { super("!",TypeTuple.INT64,TypeStruct.BOOL); }
     @Override public Type value() {
       Type t0 = val(0);
       if( t0 == Type.XNIL || t0 == Type. NIL )
         return make_int(1);     // !nil is 1
-      Type t1 = Util.eq(t0._name,"int:") ? unwrap_i(t0) : t0;
-      if( t1. may_nil() ) return make_wrap(TypeInt.BOOL.dual());
-      if( t1.must_nil() ) return make_wrap(TypeInt.BOOL);
+      Type t1 = unwrap_i(t0);
+      if( t1. may_nil() ) return TypeStruct.BOOL.dual();
+      if( t1.must_nil() ) return TypeStruct.BOOL;
       return Type.XNIL;          // Cannot be a nil, so return a nil
     }
-    @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
+    @Override public Type apply( Type[] args ) { throw AA.unimpl(); }
   }
 
 
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpF64 extends PrimNode {
-    Prim2OpF64( String name ) { super(name,TypeStruct.FLT64_FLT64,TypeStruct.FLT); }
+    Prim2OpF64( String name ) { super(name,TypeTuple.FLT64_FLT64,TypeStruct.FLT); }
     @Override public Type apply( Type[] args ) { return TypeFlt.con(op(args[0].getd(),args[1].getd())); }
     abstract double op( double x, double y );
   }
@@ -306,8 +303,8 @@ public abstract class PrimNode extends Node {
 
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpF64 extends PrimNode {
-    Prim2RelOpF64( String name ) { super(name,TypeStruct.FLT64_FLT64,TypeInt.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(args[0].getd(),args[1].getd())?TypeInt.TRUE:TypeInt.FALSE; }
+    Prim2RelOpF64( String name ) { super(name,TypeTuple.FLT64_FLT64,TypeStruct.BOOL); }
+    @Override public Type apply( Type[] args ) { return op(args[0].getd(),args[1].getd())?make_int(1):Type.XNIL; }
     abstract boolean op( double x, double y );
   }
 
@@ -321,8 +318,8 @@ public abstract class PrimNode extends Node {
 
   // 2Ops have uniform input/output types, so take a shortcut on name printing
   abstract static class Prim2OpI64 extends PrimNode {
-    Prim2OpI64( String name ) { super(name,TypeStruct.INT64_INT64,TypeStruct.INT); }
-    @Override public Type apply( Type[] args ) { return TypeInt.con(op(args[0].getl(),args[1].getl())); }
+    Prim2OpI64( String name ) { super(name,TypeTuple.INT64_INT64,TypeStruct.INT); }
+    @Override public Type apply( Type[] args ) { return make_int(op(args[0].getl(),args[1].getl())); }
     abstract long op( long x, long y );
   }
 
@@ -333,7 +330,7 @@ public abstract class PrimNode extends Node {
   static class ModI64 extends Prim2OpI64 { ModI64() { super("%"); } long op( long l, long r ) { return r==0 ? 0 : l%r; } }
 
   abstract static class Prim2OpIF64 extends PrimNode {
-    Prim2OpIF64( String name ) { super(name,TypeStruct.INT64_FLT64,TypeStruct.FLT); }
+    Prim2OpIF64( String name ) { super(name,TypeTuple.INT64_FLT64,TypeStruct.FLT); }
     @Override public Type apply( Type[] args ) { return TypeFlt.con(op(args[0].getl(),args[1].getd())); }
     abstract double op( long x, double y );
   }
@@ -343,7 +340,7 @@ public abstract class PrimNode extends Node {
   static class DivIF64 extends Prim2OpIF64 { DivIF64() { super("/"); } double op( long l, double r ) { return l/r; } } // Float division, by 0 gives infinity
 
   abstract static class Prim2OpFI64 extends PrimNode {
-    Prim2OpFI64( String name ) { super(name,TypeStruct.FLT64_INT64,TypeStruct.FLT); }
+    Prim2OpFI64( String name ) { super(name,TypeTuple.FLT64_INT64,TypeStruct.FLT); }
     @Override public Type apply( Type[] args ) { return TypeFlt.con(op(args[0].getd(),args[1].getl())); }
     abstract double op( double x, long y );
   }
@@ -356,23 +353,25 @@ public abstract class PrimNode extends Node {
     public AndI64() { super("&"); }
     // And can preserve bit-width
     @Override public Type value() {
-      Type t1 = val(0), t2 = val(1);
+      Type t0 = val(0), t1 = val(1);
       // 0 AND anything is 0
-      if( t1 == Type. NIL || t2 == Type. NIL ) return Type. NIL;
-      if( t1 == Type.XNIL || t2 == Type.XNIL ) return Type.XNIL;
+      if( t0 == Type. NIL || t1 == Type. NIL ) return Type. NIL;
+      if( t0 == Type.XNIL || t1 == Type.XNIL ) return Type.XNIL;
       // If either is high - results might fall to something reasonable
-      if( t1.above_center() || t2.above_center() )
-        return TypeInt.INT64.dual();
+      t0 = unwrap_i(t0);
+      t1 = unwrap_i(t1);
+      if( t0.above_center() || t1.above_center() )
+        return TypeStruct.INT.dual();
       // Both are low-or-constant, and one is not valid - return bottom result
-      if( !t1.isa(TypeInt.INT64) || !t2.isa(TypeInt.INT64) )
-        return TypeInt.INT64;
+      if( !t0.isa(TypeInt.INT64) || !t1.isa(TypeInt.INT64) )
+        return TypeStruct.INT;
       // If both are constant ints, return the constant math.
-      if( t1.is_con() && t2.is_con() )
-        return TypeInt.con(t1.getl() & t2.getl());
-      if( !(t1 instanceof TypeInt) || !(t2 instanceof TypeInt) )
-        return TypeInt.INT64;
+      if( t0.is_con() && t1.is_con() )
+        return make_int(t0.getl() & t1.getl());
+      //if( !(t0 instanceof TypeInt) || !(t1 instanceof TypeInt) )
+      //  return TypeStruct.INT;
       // Preserve width
-      return ((TypeInt)t1).minsize((TypeInt)t2);
+      return make_wrap(((TypeInt)t0).minsize((TypeInt)t1));
     }
     @Override long op( long l, long r ) { return l&r; }
   }
@@ -382,31 +381,33 @@ public abstract class PrimNode extends Node {
     // And can preserve bit-width
     @Override public Type value() {
       if( is_keep() ) return Type.ALL;
-      Type t1 = val(0), t2 = val(1);
+      Type t0 = val(0), t1 = val(1);
       // 0 OR anything is that thing
-      if( t1 == Type.NIL || t1 == Type.XNIL ) return t2;
-      if( t2 == Type.NIL || t2 == Type.XNIL ) return t1;
+      if( t0 == Type.NIL || t0 == Type.XNIL ) return t1;
+      if( t1 == Type.NIL || t1 == Type.XNIL ) return t0;
+      t0 = unwrap_i(t0);
+      t1 = unwrap_i(t1);
       // If either is high - results might fall to something reasonable
-      if( t1.above_center() || t2.above_center() )
-        return TypeInt.INT64.dual();
+      if( t0.above_center() || t1.above_center() )
+        return TypeStruct.INT.dual();
       // Both are low-or-constant, and one is not valid - return bottom result
-      if( !t1.isa(TypeInt.INT64) || !t2.isa(TypeInt.INT64) )
-        return TypeInt.INT64;
+      if( !t0.isa(TypeInt.INT64) || !t1.isa(TypeInt.INT64) )
+        return TypeStruct.INT;
       // If both are constant ints, return the constant math.
-      if( t1.is_con() && t2.is_con() )
-        return TypeInt.con(t1.getl() | t2.getl());
-      if( !(t1 instanceof TypeInt) || !(t2 instanceof TypeInt) )
-        return TypeInt.INT64;
+      if( t0.is_con() && t1.is_con() )
+        return make_int(t0.getl() | t1.getl());
+      //if( !(t0 instanceof TypeInt) || !(t1 instanceof TypeInt) )
+      //  return TypeInt.INT64;
       // Preserve width
-      return ((TypeInt)t1).maxsize((TypeInt)t2);
+      return make_wrap(((TypeInt)t0).maxsize((TypeInt)t1));
     }
     @Override long op( long l, long r ) { return l&r; }
   }
 
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpI64 extends PrimNode {
-    Prim2RelOpI64( String name ) { super(name,TypeStruct.INT64_INT64,TypeInt.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(args[0].getl(),args[1].getl())?TypeInt.TRUE:TypeInt.FALSE; }
+    Prim2RelOpI64( String name ) { super(name,TypeTuple.INT64_INT64,TypeStruct.BOOL); }
+    @Override public Type apply( Type[] args ) { return op(args[0].getl(),args[1].getl())?make_int(1):Type.XNIL; }
     abstract boolean op( long x, long y );
   }
 
@@ -419,31 +420,32 @@ public abstract class PrimNode extends Node {
 
 
   public static class EQ_OOP extends PrimNode {
-    public EQ_OOP() { super("==",TypeMemPtr.OOP_OOP,TypeInt.BOOL); }
+    public EQ_OOP() { super("==",TypeTuple.OOP_OOP,TypeInt.BOOL); }
     @Override public Type value() {
       if( is_keep() ) return Type.ALL;
-      // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
-      // Probably need a java-like "eq" vs "==" to mean deep-equals.  You are
-      // equals if your inputs are the same node, and you are unequals if your
-      // input is 2 different NewNodes (or casts of NewNodes).  Otherwise, you
-      // have to do the runtime test.
-      Node in1 = in(0), in2 = in(1);
-      if( in1==in2 ) return TypeInt.TRUE;
-      Node nn1 = in1.in(0), nn2 = in2.in(0);
-      if( nn1 instanceof NewNode &&
-          nn2 instanceof NewNode &&
-          nn1 != nn2 ) return TypeInt.FALSE;
-      // Constants can only do nil-vs-not-nil, since e.g. two strings "abc" and
-      // "abc" are equal constants in the type system but can be two different
-      // string pointers.
-      Type t1 = in1._val;
-      Type t2 = in2._val;
-      if( t1==Type.NIL || t1==Type.XNIL ) return vs_nil(t2,TypeInt.TRUE,TypeInt.FALSE);
-      if( t2==Type.NIL || t2==Type.XNIL ) return vs_nil(t1,TypeInt.TRUE,TypeInt.FALSE);
-      if( t1.above_center() || t2.above_center() ) return TypeInt.BOOL.dual();
-      return TypeInt.BOOL;
+      //// Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
+      //// Probably need a java-like "eq" vs "==" to mean deep-equals.  You are
+      //// equals if your inputs are the same node, and you are unequals if your
+      //// input is 2 different NewNodes (or casts of NewNodes).  Otherwise, you
+      //// have to do the runtime test.
+      //Node in1 = in(0), in2 = in(1);
+      //if( in1==in2 ) return TypeInt.TRUE;
+      //Node nn1 = in1.in(0), nn2 = in2.in(0);
+      //if( nn1 instanceof NewNode &&
+      //    nn2 instanceof NewNode &&
+      //    nn1 != nn2 ) return TypeInt.FALSE;
+      //// Constants can only do nil-vs-not-nil, since e.g. two strings "abc" and
+      //// "abc" are equal constants in the type system but can be two different
+      //// string pointers.
+      //Type t1 = in1._val;
+      //Type t2 = in2._val;
+      //if( t1==Type.NIL || t1==Type.XNIL ) return vs_nil(t2,TypeInt.TRUE,TypeInt.FALSE);
+      //if( t2==Type.NIL || t2==Type.XNIL ) return vs_nil(t1,TypeInt.TRUE,TypeInt.FALSE);
+      //if( t1.above_center() || t2.above_center() ) return TypeInt.BOOL.dual();
+      //return TypeInt.BOOL;
+      throw unimpl();
     }
-    @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
+    @Override public Type apply( Type[] args ) { throw AA.unimpl(); }
     static Type vs_nil( Type tx, Type t, Type f ) {
       if( tx==Type.NIL || tx==Type.XNIL ) return t;
       if( tx.above_center() ) return tx.isa(Type.NIL) ? TypeInt.BOOL.dual() : f;
@@ -452,36 +454,37 @@ public abstract class PrimNode extends Node {
   }
 
   public static class NE_OOP extends PrimNode {
-    public NE_OOP() { super("!=",TypeMemPtr.OOP_OOP,TypeInt.BOOL); }
+    public NE_OOP() { super("!=",TypeTuple.OOP_OOP,TypeInt.BOOL); }
     @Override public Type value() {
       if( is_keep() ) return Type.ALL;
-      // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
-      // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
-      // equals if your inputs are the same node, and you are unequals if your
-      // input is 2 different NewNodes (or casts of NewNodes).  Otherwise, you
-      // have to do the runtime test.
-      Node in1 = in(0), in2 = in(1);
-      if( in1==in2 ) return TypeInt.FALSE;
-      Node nn1 = in1.in(0), nn2 = in2.in(0);
-      if( nn1 instanceof NewNode &&
-          nn2 instanceof NewNode &&
-          nn1 != nn2 ) return TypeInt.TRUE;
-      // Constants can only do nil-vs-not-nil, since e.g. two strings "abc" and
-      // "abc" are equal constants in the type system but can be two different
-      // string pointers.
-      Type t1 = in1._val;
-      Type t2 = in2._val;
-      if( t1==Type.NIL || t1==Type.XNIL ) return EQ_OOP.vs_nil(t2,TypeInt.FALSE,TypeInt.TRUE);
-      if( t2==Type.NIL || t2==Type.XNIL ) return EQ_OOP.vs_nil(t1,TypeInt.FALSE,TypeInt.TRUE);
-      if( t1.above_center() || t2.above_center() ) return TypeInt.BOOL.dual();
-      return TypeInt.BOOL;
+      //// Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
+      //// Probably need a java-like "===" vs "==" to mean deep-equals.  You are
+      //// equals if your inputs are the same node, and you are unequals if your
+      //// input is 2 different NewNodes (or casts of NewNodes).  Otherwise, you
+      //// have to do the runtime test.
+      //Node in1 = in(0), in2 = in(1);
+      //if( in1==in2 ) return TypeInt.FALSE;
+      //Node nn1 = in1.in(0), nn2 = in2.in(0);
+      //if( nn1 instanceof NewNode &&
+      //    nn2 instanceof NewNode &&
+      //    nn1 != nn2 ) return TypeInt.TRUE;
+      //// Constants can only do nil-vs-not-nil, since e.g. two strings "abc" and
+      //// "abc" are equal constants in the type system but can be two different
+      //// string pointers.
+      //Type t1 = in1._val;
+      //Type t2 = in2._val;
+      //if( t1==Type.NIL || t1==Type.XNIL ) return EQ_OOP.vs_nil(t2,TypeInt.FALSE,TypeInt.TRUE);
+      //if( t2==Type.NIL || t2==Type.XNIL ) return EQ_OOP.vs_nil(t1,TypeInt.FALSE,TypeInt.TRUE);
+      //if( t1.above_center() || t2.above_center() ) return TypeInt.BOOL.dual();
+      //return TypeInt.BOOL;
+      throw unimpl();
     }
-    @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
+    @Override public Type apply( Type[] args ) { throw AA.unimpl(); }
   }
 
 
   public static class RandI64 extends PrimNode {
-    public RandI64() { super("rand",TypeStruct.INT64,TypeStruct.INT); }
+    public RandI64() { super("rand",TypeTuple.INT64,TypeStruct.INT); }
     @Override public Type value() {
       Type t = val(0);
       if( t.above_center() ) return TypeInt.BOOL.dual();

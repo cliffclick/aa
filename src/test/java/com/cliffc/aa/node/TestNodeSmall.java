@@ -586,80 +586,81 @@ public class TestNodeSmall {
     int a3 = BitsAlias.new_alias();
     TypeFld fmem = TypeFld.make(" mem",TypeMem.ALLMEM,Access.Final);
     TypeFld fint = TypeFld.make_arg(TypeInt.INT64,ARG_IDX);
-    TypeStruct ts_int_flt = TypeStruct.make(fmem,fint,TypeFld.make_arg(TypeFlt.FLT64,ARG_IDX+1));
-    TypeStruct ts_int_abc = TypeStruct.make(fmem,fint,TypeFld.make_arg(TypeMemPtr.ISUSED,ARG_IDX+1));
-    // @{ a:int; b:"abc" }
-    TypeStruct a_int_b_abc = TypeStruct.make_test("a",TypeInt.INT64,"b",TypeMemPtr.ISUSED);
-    TypeStruct ts_flt_str = TypeStruct.make(fmem,TypeFld.make_arg(TypeFlt.FLT64,ARG_IDX),TypeFld.make_arg(TypeMemPtr.make(BitsAlias.ALLX,a_int_b_abc),ARG_IDX+1));
-
-    // Build a bunch of function type signatures
-    TypeFunPtr[] sigs = new TypeFunPtr[] {
-      TypeFunPtr.make_sig(ts_int_flt,TypeTuple.RET), // {int flt   -> }
-      TypeFunPtr.make_sig(ts_int_abc,TypeTuple.RET), // {int "abc" -> }
-      TypeFunPtr.make_sig(ts_flt_str,TypeTuple.RET), // { flt @{a:int; b:"abc"} -> }
-    };
-
-    // Build a bunch of memory parm types
-    TypeMem[] mems = new TypeMem[] {
-      tmem(null),
-      tmem(null).dual(),
-      tmem(new int[]{a2},TypeStruct.ISUSED),
-      tmem(new int[]{a1},a_int_b_abc),
-    };
-
-    // Build a bunch of parameter types
-    Type[] args = new Type[] {
-      Type.NIL,
-      Type.XNIL,
-      TypeInt.INT64,
-      TypeInt.INT64.dual(),
-      TypeInt.NINT64,
-      //TypeMemPtr.ABCPTR.simple_ptr(),
-      //TypeMemPtr.ABCPTR.dual().simple_ptr(),
-      TypeMemPtr.make(a1,TypeStruct.ISUSED).simple_ptr(),
-      TypeMemPtr.make(a1,TypeStruct.ISUSED).dual().simple_ptr(),
-    };
-
-    // One-off jig for testing single combo
-    // Known easy fail: 0,0,0,[6,5]
-    // Known easy fail: 2,1,0,[6,7]
-    // Known easy fail: 1,0,0,[8,5]
-    // Known easy fail: 2,[1,0],0,7
-    Type[] rez1 = check(gvn,sigs[2],mems[1],args[0],args[8]);
-    Type[] rez2 = check(gvn,sigs[2],mems[0],args[0],args[8]);
-    for( int k=0; k<rez1.length; k++ )
-      assertTrue(rez1[k].isa(rez2[k]));
-
-
-    // Call for all combos.
-    // Check results are isa-sig.
-    Type[][][][][] rezs = new Type[sigs.length][mems.length][args.length][args.length][];
-    for( int is = 0; is<sigs.length; is++ )
-      for( int im = 0; im<mems.length; im++ )
-        for( int ia0 = 0; ia0<args.length; ia0++ )
-          for( int ia1 = 0; ia1<args.length; ia1++ )
-            rezs[is][im][ia0][ia1] = check(gvn,sigs[is],mems[im],args[ia0],args[ia1]);
-
-    // Check results are monotonic:
-    for( int is = 0; is<sigs.length; is++ )
-      for( int js = 0; js<sigs.length; js++ )
-        if( sigs[is].isa(sigs[js]) )
-          for( int im = 0; im<mems.length; im++ )
-            for( int jm = 0; jm<mems.length; jm++ )
-              if( mems[im].isa(mems[jm]) )
-                for( int ia0 = 0; ia0<args.length; ia0++ )
-                  for( int ja0 = 0; ja0<args.length; ja0++ )
-                    if( args[ia0].isa(args[ja0]) )
-                      for( int ia1 = 0; ia1<args.length; ia1++ )
-                        for( int ja1 = 0; ja1<args.length; ja1++ )
-                          if( args[ia1].isa(args[ja1]) ) {
-                            Type[] rezi = rezs[is][im][ia0][ia1];
-                            Type[] rezj = rezs[js][jm][ja0][ja1];
-                            for( int k=0; k<rezi.length; k++ )
-                              if( !rezi[k].isa(rezj[k]) )
-                                perror("Not monotonic",rezi[k],rezj[k]);
-                          }
-    assertEquals(0,ERR);
+    //TypeStruct ts_int_flt = TypeStruct.make(fmem,fint,TypeFld.make_arg(TypeFlt.FLT64,ARG_IDX+1));
+    //TypeStruct ts_int_abc = TypeStruct.make(fmem,fint,TypeFld.make_arg(TypeMemPtr.ISUSED,ARG_IDX+1));
+    //// @{ a:int; b:"abc" }
+    //TypeStruct a_int_b_abc = TypeStruct.make_test("a",TypeInt.INT64,"b",TypeMemPtr.ISUSED);
+    //TypeStruct ts_flt_str = TypeStruct.make(fmem,TypeFld.make_arg(TypeFlt.FLT64,ARG_IDX),TypeFld.make_arg(TypeMemPtr.make(BitsAlias.ALLX,a_int_b_abc),ARG_IDX+1));
+    //
+    //// Build a bunch of function type signatures
+    //TypeFunPtr[] sigs = new TypeFunPtr[] {
+    //  TypeFunPtr.make_sig(ts_int_flt,TypeTuple.RET), // {int flt   -> }
+    //  TypeFunPtr.make_sig(ts_int_abc,TypeTuple.RET), // {int "abc" -> }
+    //  TypeFunPtr.make_sig(ts_flt_str,TypeTuple.RET), // { flt @{a:int; b:"abc"} -> }
+    //};
+    //
+    //// Build a bunch of memory parm types
+    //TypeMem[] mems = new TypeMem[] {
+    //  tmem(null),
+    //  tmem(null).dual(),
+    //  tmem(new int[]{a2},TypeStruct.ISUSED),
+    //  tmem(new int[]{a1},a_int_b_abc),
+    //};
+    //
+    //// Build a bunch of parameter types
+    //Type[] args = new Type[] {
+    //  Type.NIL,
+    //  Type.XNIL,
+    //  TypeInt.INT64,
+    //  TypeInt.INT64.dual(),
+    //  TypeInt.NINT64,
+    //  //TypeMemPtr.ABCPTR.simple_ptr(),
+    //  //TypeMemPtr.ABCPTR.dual().simple_ptr(),
+    //  TypeMemPtr.make(a1,TypeStruct.ISUSED).simple_ptr(),
+    //  TypeMemPtr.make(a1,TypeStruct.ISUSED).dual().simple_ptr(),
+    //};
+    //
+    //// One-off jig for testing single combo
+    //// Known easy fail: 0,0,0,[6,5]
+    //// Known easy fail: 2,1,0,[6,7]
+    //// Known easy fail: 1,0,0,[8,5]
+    //// Known easy fail: 2,[1,0],0,7
+    //Type[] rez1 = check(gvn,sigs[2],mems[1],args[0],args[8]);
+    //Type[] rez2 = check(gvn,sigs[2],mems[0],args[0],args[8]);
+    //for( int k=0; k<rez1.length; k++ )
+    //  assertTrue(rez1[k].isa(rez2[k]));
+    //
+    //
+    //// Call for all combos.
+    //// Check results are isa-sig.
+    //Type[][][][][] rezs = new Type[sigs.length][mems.length][args.length][args.length][];
+    //for( int is = 0; is<sigs.length; is++ )
+    //  for( int im = 0; im<mems.length; im++ )
+    //    for( int ia0 = 0; ia0<args.length; ia0++ )
+    //      for( int ia1 = 0; ia1<args.length; ia1++ )
+    //        rezs[is][im][ia0][ia1] = check(gvn,sigs[is],mems[im],args[ia0],args[ia1]);
+    //
+    //// Check results are monotonic:
+    //for( int is = 0; is<sigs.length; is++ )
+    //  for( int js = 0; js<sigs.length; js++ )
+    //    if( sigs[is].isa(sigs[js]) )
+    //      for( int im = 0; im<mems.length; im++ )
+    //        for( int jm = 0; jm<mems.length; jm++ )
+    //          if( mems[im].isa(mems[jm]) )
+    //            for( int ia0 = 0; ia0<args.length; ia0++ )
+    //              for( int ja0 = 0; ja0<args.length; ja0++ )
+    //                if( args[ia0].isa(args[ja0]) )
+    //                  for( int ia1 = 0; ia1<args.length; ia1++ )
+    //                    for( int ja1 = 0; ja1<args.length; ja1++ )
+    //                      if( args[ia1].isa(args[ja1]) ) {
+    //                        Type[] rezi = rezs[is][im][ia0][ia1];
+    //                        Type[] rezj = rezs[js][jm][ja0][ja1];
+    //                        for( int k=0; k<rezi.length; k++ )
+    //                          if( !rezi[k].isa(rezj[k]) )
+    //                            perror("Not monotonic",rezi[k],rezj[k]);
+    //                      }
+    //assertEquals(0,ERR);
+    throw unimpl();
   }
 
   // Check that the Parm.value calls for these incoming args are monotonic, and

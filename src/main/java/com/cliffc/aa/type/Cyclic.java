@@ -38,7 +38,15 @@ public interface Cyclic {
     // Install non-cyclics recursively with a DAG visit; install cyclics as a whole cycle
     CVISIT.clear();             // Reset globals
     SCC_MEMBERS.clear();        // Reset globals
-    head = dag_install(head, 0, null);
+    T head2 = dag_install(head, 0, null);
+
+    // Fix TypeFlds in TypeStructs, which are otherwise not part of the
+    // partitioning and minimization.  However, they cannot be interned
+    // until all TypeStructs have their final fields.
+    if( head==head2 )
+      for( Type t : REACHABLE )
+        if( t instanceof TypeStruct ts )
+          { ts.hashcons_flds(); ts._dual.hashcons_flds(); }
     
     // Update the mapping
     if( map != null )
@@ -50,7 +58,7 @@ public interface Cyclic {
     // Profile; return new interned cycle
     long t1 = System.currentTimeMillis();
     P.time += (t1-t0);  P.cnt++;
-    return head;
+    return head2;
   }
 
   // -----------------------------------------------------------------
@@ -115,12 +123,14 @@ public interface Cyclic {
         t=old;
       } else {
         // Keep the entire cycle.  xdual/rdual/hash/retern
+        Type.RECURSIVE_MEET++; // Stop xdual interning TypeFlds
         long dcyc_hash = Util.rot(cyc_hash,32);
         for( Type c : ts ) { Type d = c._dual = c.xdual(); d._dual = c; d._cyc_hash = dcyc_hash; }
         Type dleader = leader.dual();
         dleader.set_cyclic(dleader);
         for( Type c : ts ) { c.rdual(); c._dual.set_cyclic(dleader); c._dual._hash = c._dual.compute_hash(); }
         for( Type c : ts ) c.retern()._dual.retern();
+        Type.RECURSIVE_MEET--; // Allow xdual to intern TypeFlds
       }
     } // else same SCC, no change
     return t;

@@ -6,14 +6,15 @@ import java.util.function.*;
 
 import static com.cliffc.aa.AA.unimpl;
 
-// A TypeObj where fields are indexed by dynamic integer.
+// A Cyclic Type where fields are indexed by dynamic integer.  Probably becomes
+// a specialized field type for TypeStruct, allowed only as the last field.
 public class TypeAry extends Type<TypeAry> implements Cyclic {
   public  TypeInt _len;         // Count of elements
   private Type _elem;           // MEET over all elements.
   private Type _stor;           // Storage class; widened over elements.  Can be, e.g. bits or complex structs with embedded pointers
 
-  private TypeAry init(String name, TypeInt len, Type elem, Type stor ) {
-    super.init(name);
+  private TypeAry init(TypeInt len, Type elem, Type stor ) {
+    super.init();
     _len  = len;
     _elem = elem;
     _stor = stor;
@@ -46,18 +47,17 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
   }
 
   static { new Pool(TARY,new TypeAry()); }
-  public static TypeAry make( String name, TypeInt len, Type elem, Type stor ) {
+  public static TypeAry make( TypeInt len, Type elem, Type stor ) {
     TypeAry t1 = POOLS[TARY].malloc();
-    return t1.init(name,len,elem,stor).hashcons_free();
+    return t1.init(len,elem,stor).hashcons_free();
   }
 
-  public static TypeAry make( TypeInt len, Type elem, Type stor ) { return make("",len,elem,stor); }
-  public static final TypeAry ARY   = make("",TypeInt.INT64 ,Type.SCALAR ,TypeStruct.ISUSED );
-  public static final TypeAry ARY0  = make("",TypeInt.INT64 ,Type.XNIL   ,TypeStruct.ISUSED );
-  public static final TypeAry BYTES = make("",TypeInt.con(3),TypeInt.INT8,TypeStruct.ISUSED );
+  public static final TypeAry ARY   = make(TypeInt.INT64 ,Type.SCALAR ,TypeStruct.ISUSED );
+  public static final TypeAry ARY0  = make(TypeInt.INT64 ,Type.XNIL   ,TypeStruct.ISUSED );
+  public static final TypeAry BYTES = make(TypeInt.con(3),TypeInt.INT8,TypeStruct.ISUSED );
   static final TypeAry[] TYPES = new TypeAry[]{ARY,ARY0.dual(),BYTES};
 
-  @Override protected TypeAry xdual() { return POOLS[TARY].<TypeAry>malloc().init(_name,_len.dual(),_elem.dual(),_stor.dual()); }
+  @Override protected TypeAry xdual() { return POOLS[TARY].<TypeAry>malloc().init(_len.dual(),_elem.dual(),_stor.dual()); }
   @Override void rdual() {
     _dual._len  = _len ._dual;
     _dual._elem = _elem._dual;
@@ -81,7 +81,7 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
     TypeInt size = (TypeInt)_len.meet(ta._len);
     Type elem = _elem.meet(ta._elem);
     Type stor = _stor.meet(ta._stor);
-    return make("",size,elem,stor);
+    return make(size,elem,stor);
   }
 
   // Type at a specific index
