@@ -161,9 +161,10 @@ public class TypeFlds {
     return tfs;
   }
 
-  // Does not hash-cons
+  // Append a field.  Preserve alpha order.  Does not hash-cons.
   public static TypeFld[] add(TypeFld[] flds, TypeFld fld) {
     TypeFld[] fs = copyOf(flds,flds.length+1);
+    fs[flds.length]=fld;
     int i=0;
     while( i<flds.length && flds[i]._fld.compareTo(fld._fld) < 0 ) i++;
     fs[i]=fld;
