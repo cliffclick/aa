@@ -6,6 +6,7 @@ import java.util.*;
 import java.util.function.*;
 
 import static com.cliffc.aa.AA.*;
+import static com.cliffc.aa.type.TypeFlds.sbefore;
 import static com.cliffc.aa.type.TypeFld.Access;
 
 /** A memory-based collection of named fields.  This is a recursive type,
@@ -224,9 +225,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Add a field to an under construction TypeStruct
   public TypeStruct add_fld( TypeFld fld ) {
     assert find(fld._fld)==-1;  // No accidental replacing
-    //_flds.push(fld);
-    //return this;
-    throw unimpl();
+    _flds = TypeFlds.add(_flds,fld);
+    return this;
   }
 
   // Set/replace a field to an under construction TypeStruct
@@ -255,6 +255,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     TypeFlds.free(flds);
     return make(name,def,TypeFlds.hash_cons(fs));
   }
+  public TypeStruct make0() { return make0(_clz,_def,_flds); }
   public TypeStruct make_from(TypeFld[] flds) { return make0(_clz,_def,flds); }
 
   // Possibly allocated.  No fields specified.  All fields are possible and
@@ -349,10 +350,10 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     while( i<this.len() && j<that.len() ) {
       TypeFld fld0 = this._flds[i], fld1 = that._flds[j];
       String    s0 = fld0._fld    ,   s1 = fld1._fld;
-      if( fld0==fld1 )              { i++; j++; if( fld0._t!=def ) flds0[len0++] = fld0; } // Fast-path shortcut
-      else if( Util.eq(s0,s1)     ) { i++; j++; len0=add_fld(flds0,len0,s0,def,fld0._t.meet(fld1._t),fld0._access.meet(fld1._access)); }
-      else if( s0.compareTo(s1)<0 ) { i++;      len0=add_fld(flds0,len0,s0,def,fld0,that._def); }
-      else                          { j++;      len0=add_fld(flds0,len0,s1,def,fld1,this._def); }
+      if( fld0==fld1 )          { i++; j++; if( fld0._t!=def ) flds0[len0++] = fld0; } // Fast-path shortcut
+      else if( Util.eq(s0,s1) ) { i++; j++; len0=add_fld(flds0,len0,s0,def,fld0._t.meet(fld1._t),fld0._access.meet(fld1._access)); }
+      else if( sbefore(s0,s1) ) { i++;      len0=add_fld(flds0,len0,s0,def,fld0,that._def); }
+      else                      { j++;      len0=add_fld(flds0,len0,s1,def,fld1,this._def); }
     }
     for( ; i<this.len(); i++ )  len0=add_fld(flds0,len0,this._flds[i]._fld,def,this._flds[i],that._def);
     for( ; j<that.len(); j++ )  len0=add_fld(flds0,len0,that._flds[j]._fld,def,that._flds[j],this._def);
@@ -449,10 +450,10 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     while( i<this.len() && j<that.len() ) {
       TypeFld fld0 = this._flds[i], fld1 = that._flds[j];
       String    s0 = fld0._fld    ,   s1 = fld1._fld;
-      if( fld0==fld1 )              { i++; j++; FLDS.push(fld0); } // Fast-path shortcut
-      else if( Util.eq(s0,s1)     ) { i++; j++; add_fldc(s0,fld0._access.meet(fld1._access)); }
-      else if( s0.compareTo(s1)<0 ) { i++;      add_fldc(fld0); }
-      else                          { j++;      add_fldc(fld1); }
+      if( fld0==fld1 )          { i++; j++; FLDS.push(fld0); } // Fast-path shortcut
+      else if( Util.eq(s0,s1) ) { i++; j++; add_fldc(s0,fld0._access.meet(fld1._access)); }
+      else if( sbefore(s0,s1) ) { i++;      add_fldc(fld0); }
+      else                      { j++;      add_fldc(fld1); }
     }
     for( ; i<this.len(); i++ )  add_fldc(this._flds[i]);
     for( ; j<that.len(); j++ )  add_fldc(that._flds[j]);
@@ -626,14 +627,15 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
         if( (debug || !Util.eq(fld._fld,"^")) && (fld._t!=null && fld._t._str_complex(visit,dups)) )
           ind=indent;           // Field is complex, indent if asked to do so
       if( ind ) sb.ii(1);
-      _def._str(visit,dups,sb, debug,indent).p(is_tup ? ", " : "; "); // Between fields
+      if( _def!=ALL )
+        _def._str(visit,dups,sb, debug,indent).p(is_tup ? ", " : "; "); // Between fields
       for( TypeFld fld : _flds ) {
         if( !debug && Util.eq(fld._fld,"^") ) continue; // Do not print the ever-present display
         if( ind ) sb.nl().i();
         fld._str(visit,dups, sb, debug, indent ); // Field name, access mod, type
         sb.p(is_tup ? ", " : "; "); // Between fields
       }
-      sb.unchar().unchar();
+      if( _flds.length>0 || _def!=ALL )    sb.unchar().unchar();
       if( ind ) sb.nl().di(1).i();
     }
     sb.p(!is_tup ? "}" : ")");
@@ -762,14 +764,13 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     TypeStruct ts = WIDEN_HASH.get(_uid);
     if( ts!=null ) throw unimpl(); // { ts.set_cyclic(); return ts; }
     RECURSIVE_MEET++;
-    //ts = malloc(_clz,_def);
-    //WIDEN_HASH.put(_uid,ts);
-    //for( TypeFld fld : this ) ts.add_fld(fld.malloc_from());
-    //for( TypeFld fld : ts ) fld.setX(fld._t._widen());
-    //if( --RECURSIVE_MEET == 0 )
-    //  ts = Cyclic.install(ts);
-    //return ts;
-    throw unimpl();
+    ts = copy2();               // Struct cloned, _flds cloned, fields referenced
+    WIDEN_HASH.put(_uid,ts);
+    for( int i=0; i<_flds.length; i++ )  ts._flds[i] = _flds[i].malloc_from(); // Clone fields
+    for( TypeFld fld : ts._flds ) fld.setX(fld._t._widen());
+    if( --RECURSIVE_MEET == 0 )
+      ts = Cyclic.install(ts);
+    return ts;
   }
 
   @Override public boolean above_center() { return _def.above_center(); }

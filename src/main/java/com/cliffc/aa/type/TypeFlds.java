@@ -31,7 +31,7 @@ public class TypeFlds {
       // Only handed sorted fields
       if( ts!=null )
         for( int i=0; i<ts.length-1; i++ )
-          assert ts[i]._fld.compareTo(ts[i+1]._fld) < 0;
+          assert sbefore(ts[i]._fld,ts[i+1]._fld);
     }
     private static int hash( TypeFld[] ts ) {
       for( Type t : ts ) Util.add_hash( t._hash);
@@ -50,6 +50,12 @@ public class TypeFlds {
           return false;
       return true;
     }
+  }
+  // Are the fields in order?
+  public static boolean sbefore(String s0, String s1) {
+    if( Util.eq(s0,"^") ) return true;
+    if( Util.eq(s1,"^") ) return false;
+    return s0.compareTo(s1) < 0;
   }
 
   private int _cnt;             // Count of new allocations
@@ -166,7 +172,7 @@ public class TypeFlds {
     TypeFld[] fs = copyOf(flds,flds.length+1);
     fs[flds.length]=fld;
     int i=0;
-    while( i<flds.length && flds[i]._fld.compareTo(fld._fld) < 0 ) i++;
+    while( i<flds.length && sbefore(flds[i]._fld,fld._fld) ) i++;
     fs[i]=fld;
     System.arraycopy(flds,i,fs,i+1,flds.length-i);
     return fs;

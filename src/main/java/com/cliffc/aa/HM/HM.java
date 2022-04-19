@@ -1558,7 +1558,7 @@ public class HM {
       TypeFld[] tfs = new TypeFld[ts.length+1];
       tfs[0] = TypeFld.NO_DISP;  // Display
       for( int i=0; i<ts.length; i++ ) tfs[i+1] = TypeFld.make(ids[i],ts[i]);
-      return TypeMemPtr.make(alias,TypeStruct.make(tfs));
+      return TypeMemPtr.make(alias,TypeStruct.make(TypeFlds.hash_cons(tfs)));
     }
     Type fld(String id);
     void push(Syntax fld);
@@ -1820,21 +1820,20 @@ public class HM {
         if( tstr==null ) {
           // Returning a high version of struct
           Type.RECURSIVE_MEET++;
-          //tstr = TypeStruct.malloc("",TypeFld.oob(is_open())).add_fld(TypeFld.NO_DISP);
-          //if( _args!=null )
-          //  for( String id : _args.keySet() )
-          //    tstr.add_fld(TypeFld.malloc(id));
-          //ADUPS.put(_uid,tstr); // Stop cycles
-          //if( _args!=null )
-          //  for( String id : _args.keySet() )
-          //    tstr.get(id).setX(arg(id)._as_flow()); // Recursive
-          //// update root args of an open HM struct, needs a type-flow type
-          //// that allows fields to be added
-          //if( --Type.RECURSIVE_MEET == 0 )
-          //  // Shrink / remove cycle dups.  Might make new (smaller)
-          //  // TypeStructs, so keep RECURSIVE_MEET enabled.
-          //  tstr = Cyclic.install(tstr);
-          throw unimpl();
+          tstr = TypeStruct.malloc("",Type.ALL.oob(is_open()),TypeFlds.EMPTY).add_fld(TypeFld.NO_DISP);
+          if( _args!=null )
+            for( String id : _args.keySet() )
+              tstr.add_fld(TypeFld.malloc(id));
+          ADUPS.put(_uid,tstr); // Stop cycles
+          if( _args!=null )
+            for( String id : _args.keySet() )
+              tstr.get(id).setX(arg(id)._as_flow()); // Recursive
+          // update root args of an open HM struct, needs a type-flow type
+          // that allows fields to be added
+          if( --Type.RECURSIVE_MEET == 0 )
+            // Shrink / remove cycle dups.  Might make new (smaller)
+            // TypeStructs, so keep RECURSIVE_MEET enabled.
+            tstr = Cyclic.install(tstr);
         }
         // The HM is_struct wants to be a TypeMemPtr, but the recursive builder
         // is built around TypeStruct, hence the TMP wrap.

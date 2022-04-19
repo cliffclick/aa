@@ -47,7 +47,7 @@ public interface Cyclic {
       for( Type t : REACHABLE )
         if( t instanceof TypeStruct ts )
           { ts.hashcons_flds(); ts._dual.hashcons_flds(); }
-    
+
     // Update the mapping
     if( map != null )
       map.replaceAll((k,v) -> v.interned() ? v : v.intern_get());
@@ -100,7 +100,9 @@ public interface Cyclic {
     // Not in any SCC, normal install
     if( leader==null ) {
       assert !t.interned();
-      T old = (T)t.hashcons();
+      T old = t instanceof TypeStruct ts
+        ? (T)ts.make0()
+        : (T)t.hashcons();
       if( t!=old ) SCC_FREE.push(t);
       t=old;
 
