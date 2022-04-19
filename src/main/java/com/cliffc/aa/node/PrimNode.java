@@ -196,7 +196,7 @@ public abstract class PrimNode extends Node {
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
     for( int i=DSP_IDX; i<_formals.len(); i++ ) {
-      Type tactual = TS[i] = val(i-DSP_IDX);
+      Type tactual = TS[i-DSP_IDX] = val(i-DSP_IDX);
       Type tformal = _formals.at(i);
       Type t = tformal.dual().meet(tactual);
       if( !t.is_con() && tactual!=Type.NIL ) {
@@ -278,12 +278,14 @@ public abstract class PrimNode extends Node {
     public NotI64() { super("!",TypeTuple.INT64,TypeStruct.BOOL); }
     @Override public Type value() {
       Type t0 = val(0);
+      if( t0==Type.ANY ) return TypeStruct.BOOL.dual();
       if( t0 == Type.XNIL || t0 == Type. NIL )
         return make_int(1);     // !nil is 1
+      if( t0==Type.ALL ) return TypeStruct.BOOL;
       Type t1 = unwrap_i(t0);
       if( t1. may_nil() ) return TypeStruct.BOOL.dual();
       if( t1.must_nil() ) return TypeStruct.BOOL;
-      return Type.XNIL;          // Cannot be a nil, so return a nil
+      return Type.NIL;          // Cannot be a nil, so return a nil
     }
     @Override public Type apply( Type[] args ) { throw AA.unimpl(); }
   }
@@ -354,6 +356,8 @@ public abstract class PrimNode extends Node {
     // And can preserve bit-width
     @Override public Type value() {
       Type t0 = val(0), t1 = val(1);
+      if( t0==Type.ANY || t1==Type.ANY ) return TypeStruct.INT.dual();
+      if( t0==Type.ALL || t1==Type.ALL ) return TypeStruct.INT;
       // 0 AND anything is 0
       if( t0 == Type. NIL || t1 == Type. NIL ) return Type. NIL;
       if( t0 == Type.XNIL || t1 == Type.XNIL ) return Type.XNIL;
@@ -382,6 +386,8 @@ public abstract class PrimNode extends Node {
     @Override public Type value() {
       if( is_keep() ) return Type.ALL;
       Type t0 = val(0), t1 = val(1);
+      if( t0==Type.ANY || t1==Type.ANY ) return TypeStruct.INT.dual();
+      if( t0==Type.ALL || t1==Type.ALL ) return TypeStruct.INT;
       // 0 OR anything is that thing
       if( t0 == Type.NIL || t0 == Type.XNIL ) return t1;
       if( t1 == Type.NIL || t1 == Type.XNIL ) return t0;

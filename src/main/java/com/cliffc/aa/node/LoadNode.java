@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
@@ -28,7 +27,7 @@ public class LoadNode extends Node {
   public TypeFld find(TypeStruct ts) { return ts.get(_fld); }
 
   @Override public Type value() {
-    //Type tadr = adr()._val;
+    Type tadr = adr()._val;
     //// Loading an operator from a primitive
     //NewNode proto = null;
     //if( tadr == Type.NIL || tadr == Type.XNIL ||

@@ -97,7 +97,7 @@ public class TypeFlds {
   public static TypeFld[] get(int len) { return tary(len).get(); }
   public static void free(TypeFld[] ts) {
     Arrays.fill(ts,null);
-    ts[0] = DEAD;
+    if( ts.length>0 ) ts[0] = DEAD;
     tary(ts.length)._free.push(ts);
   }
   public static TypeFld[] hash_cons(TypeFld[] ts) { return tary(ts.length).hash_cons_(ts); }

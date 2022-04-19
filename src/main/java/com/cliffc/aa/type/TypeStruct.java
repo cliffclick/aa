@@ -344,30 +344,32 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Remove dups, remove defaults, sort.
   private static final Ary<TypeFld> FLDS = new Ary<>(new TypeFld[1],0);
   private TypeStruct flat_meet( TypeStruct that, String clz, Type def ) {
-    FLDS.clear();
-    int i=0, j=0;
+    TypeFld[] flds0 = TypeFlds.get(this.len()+that.len());
+    int i=0, j=0, len0=0;
     while( i<this.len() && j<that.len() ) {
       TypeFld fld0 = this._flds[i], fld1 = that._flds[j];
       String    s0 = fld0._fld    ,   s1 = fld1._fld;
-      if( fld0==fld1 )              { i++; j++; if( fld0._t!=def ) FLDS.push(fld0); } // Fast-path shortcut
-      else if( Util.eq(s0,s1)     ) { i++; j++; add_fld(s0,def,fld0._t.meet(fld1._t),fld0._access.meet(fld1._access)); }
-      else if( s0.compareTo(s1)<0 ) { i++;      add_fld(s0,def,fld0,that._def); }
-      else                          { j++;      add_fld(s1,def,fld1,this._def); }
+      if( fld0==fld1 )              { i++; j++; if( fld0._t!=def ) flds0[len0++] = fld0; } // Fast-path shortcut
+      else if( Util.eq(s0,s1)     ) { i++; j++; len0=add_fld(flds0,len0,s0,def,fld0._t.meet(fld1._t),fld0._access.meet(fld1._access)); }
+      else if( s0.compareTo(s1)<0 ) { i++;      len0=add_fld(flds0,len0,s0,def,fld0,that._def); }
+      else                          { j++;      len0=add_fld(flds0,len0,s1,def,fld1,this._def); }
     }
-    for( ; i<this.len(); i++ )  add_fld(this._flds[i]._fld,def,this._flds[i],that._def);
-    for( ; j<that.len(); j++ )  add_fld(that._flds[j]._fld,def,that._flds[j],this._def);
+    for( ; i<this.len(); i++ )  len0=add_fld(flds0,len0,this._flds[i]._fld,def,this._flds[i],that._def);
+    for( ; j<that.len(); j++ )  len0=add_fld(flds0,len0,that._flds[j]._fld,def,that._flds[j],this._def);
     // Sorted, dups and defaults removed.
-    TypeFld[] flds = TypeFlds.get(FLDS._len);
-    System.arraycopy(FLDS._es,0,flds,0,flds.length);
+    TypeFld[] flds = TypeFlds.get(len0);
+    System.arraycopy(flds0,0,flds,0,len0);
+    TypeFlds.free(flds0);
     return make(clz,def,TypeFlds.hash_cons(flds));
   }
 
-  private static void add_fld(String fld, Type def, TypeFld fld0, Type odef) {
-    add_fld(fld,def,fld0._t.meet(odef),fld0._access);
+  private static int add_fld(TypeFld[] flds0, int len0, String fld, Type def, TypeFld fld0, Type odef) {
+    return add_fld(flds0,len0,fld,def,fld0._t.meet(odef),fld0._access);
   }
-  private static void add_fld(String fld, Type def, Type t, Access access) {
+  private static int add_fld(TypeFld[] flds0, int len0, String fld, Type def, Type t, Access access) {
     if( t!=def )
-      FLDS.push(TypeFld.make(fld,t,access));
+      flds0[len0++] = TypeFld.make(fld,t,access);
+    return len0;
   }
   private static void add_fldc(TypeFld fld) { add_fldc(fld._fld,fld._access); }
   private static void add_fldc(String fld, Access access) { FLDS.push(TypeFld.malloc(fld,null,access)); }
@@ -502,6 +504,10 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   }
 
   // ------ Utilities -------
+  // Clazz name, without leading "~"
+  public String clz() {
+    return _clz.charAt(0)=='~' ? _dual._clz : _clz;
+  }
   // All fields for iterating.
   public int len() { return _flds.length; } // Count of fields
   // Find index by name
