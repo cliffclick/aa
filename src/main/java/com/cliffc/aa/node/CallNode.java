@@ -5,6 +5,7 @@ import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
@@ -124,7 +125,7 @@ public class CallNode extends Node {
   Node arg ( int x ) { assert x>=0; return _defs.at(x); }
   // Set an argument.  Use 'set_fun' to set the Code.
   Node set_arg (int idx, Node arg) { assert idx>=DSP_IDX && idx <nargs(); return set_def(idx,arg); }
-  public void set_fdx( Node fun) {set_def(DSP_IDX, fun);}
+  public CallNode set_fdx( Node fun) { set_def(DSP_IDX, fun); return this; }
   public void set_mem( Node mem) { set_def(MEM_IDX, mem); }
   @Override void walk_reset0() { assert is_prim(); _not_resolved_by_gcp = false; }
 
@@ -219,11 +220,10 @@ public class CallNode extends Node {
     // Try to resolve to single-target
     Node fdx = fdx();
     if( fdx instanceof FreshNode fresh ) fdx = fresh.id();
-    if( fdx instanceof UnresolvedNode ) {
-    //  Node fdx2 = ((UnresolvedNode)fdx).resolve_node(tcall._ts);
-    //  if( fdx2!=null )
-    //    return set_fdx(fdx2);
-      throw unimpl();
+    if( fdx instanceof UnresolvedNode unr ) {
+      Node fdx2 = unr.resolve_node(tcall._ts);
+      if( fdx2!=null )
+        return set_fdx(fdx2);
     }
 
     // Wire valid targets.
@@ -467,16 +467,15 @@ public class CallNode extends Node {
       return ((!_is_copy && !cepi.is_all_wired()) || // Unwired calls remain, dsp could be alive yet
               (dsp!=null && dsp._live==Type.ALL)) ? Type.ALL : TypeFunPtr.GENERIC_FUNPTR;
     }
-    //
-    //// Check that all fidxs are wired; an unwired fidx might be in-error
-    //// and we want the argument alive for errors.  This is a value turn-
-    //// around point (high fidxs need to fall)
-    //if( !_is_copy && !cepi.is_all_wired() ) return TypeMem.ALIVE;
-    //// All wired, the arg is dead if the matching projection is dead
-    //int argn = _defs.find(def);
-    //ProjNode proj = ProjNode.proj(this, argn);
-    //return proj == null || proj._live == TypeMem.DEAD ? TypeMem.DEAD : TypeMem.ALIVE;
-    throw unimpl();
+
+    // Check that all fidxs are wired; an unwired fidx might be in-error,
+    // and we want the argument alive for errors.  This is a value turn-
+    // around point (high fidxs need to fall)
+    if( !_is_copy && !cepi.is_all_wired() ) return Type.ALL;
+    // All wired, the arg is dead if the matching projection is dead
+    int argn = _defs.find(def);
+    ProjNode proj = ProjNode.proj(this, argn);
+    return proj == null || proj._live == TypeMem.ANYMEM ? TypeMem.ANYMEM : TypeMem.ALLMEM;
   }
 
   @Override public TV2 new_tvar( String alloc_site) { return null; }
@@ -512,7 +511,33 @@ public class CallNode extends Node {
       RetNode ret = RetNode.get(tfp._fidxs);
       return ErrMsg.syntax(_badargs[0],err_arg_cnt(ret.fun()._name,tfp));
     }
-
+    
+    // Now do an arg-check.  No more than 1 unresolved, so the error message is
+    // more sensible.
+    BitsFun.Tree<BitsFun> tree = fidxs.tree();
+    for( int j=ARG_IDX; j<nargs(); j++ ) {
+      Type actual = arg(j).sharptr(mem());
+      Ary<Type> ts=null;
+      for( int fidx : fidxs ) {
+        if( fidx==0 ) continue;
+        for( int kid=fidx; kid!=0; kid = tree.next_kid(fidx,kid) ) {
+          RetNode ret = RetNode.get(kid);
+          if( ret==null ) continue;
+          FunNode fun = ret.fun();
+          ParmNode parm = fun.parm(j);
+          if( parm==null ) continue;   // Formal is dead
+          Type formal = parm._t;
+          if( actual.isa(formal) ) continue; // Actual is a formal
+          if( fast ) return ErrMsg.FAST;     // Fail-fast
+          if( ts==null ) ts = new Ary<>(new Type[1],0);
+          if( ts.find(formal) == -1 ) // Dup filter
+            ts.push(formal);          // Add broken type
+        }
+      }
+      if( ts!=null )
+        return ErrMsg.typerr(_badargs[j-ARG_IDX+1],actual, mem()._val,ts.asAry());
+    }
+    
     return null;
   }
   public String err_arg_cnt(String fname, TypeFunPtr tfp) {

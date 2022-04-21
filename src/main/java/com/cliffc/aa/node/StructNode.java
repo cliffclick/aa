@@ -83,6 +83,22 @@ public class StructNode extends Node {
   // String to TypeFld
   public TypeFld get(String name) { return _ts.get(name); }
 
+  // String to a BOUND node: if field name maps to a FunPtrNode or an
+  // UnresolvedNode, return the bound version instead.  Otherwise
+  // return the Node as-is, or null if the name misses.
+  public Node in_bind( String fld, Node clz ) {
+    int idx = find(fld);
+    if( idx == -1 ) return null; // No name
+    Node n = in(idx);
+    if( n instanceof FunPtrNode fptr )
+      return new FunPtrNode(fptr._name,fptr.ret(),clz).init();
+    else if( n instanceof UnresolvedNode unr )
+      return ((UnresolvedNode)unr.copy(true)).set_bad(null).set_def(0,clz);
+    // No binding to address, e.g. loading a global constant
+    return n;
+  }
+
+
   // One-time transition when closing a Struct to new fields.
   public StructNode close() { assert !_closed; _closed=true; return this; }
   public boolean is_closed() { return _closed; }

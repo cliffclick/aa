@@ -13,12 +13,12 @@ import static com.cliffc.aa.type.TypeFld.Access;
  *  produced by NewNode and structure or tuple constants.  Fields can be
  *  indexed by field name (which can be a digit string, e.g. tuples), but NOT
  *  by a general number - that's an Array.
- *
+ *  <br>
  *  Structs represent a collection of ALL (infinitely many) fields, of which
  *  nearly all use the default field type.  The exceptions are explicitly
  *  listed.  Structs have a clazz name (by default empty) which is a colon
- *  seperated list; parent clazzes on the left and child clazzes to the right.
- *
+ *  separated list; parent clazzes on the left and child clazzes to the right.
+ *  <br>
  *  The recursive type poses some interesting challenges.  It is represented as
  *  literally a cycle of pointers which must include a TypeStruct (and not a
  *  TypeTuple which only roots Types), a TypeMemPtr (edge) or a TypeFunPtr
@@ -29,16 +29,16 @@ import static com.cliffc.aa.type.TypeFld.Access;
  *  we are NOT trying to solve the general problem of graph-equivalence (a
  *  known NP hard problem).  Instead, we can solve each field independently and
  *  also intersect across common fields.
- *
+ *  <br>
  *  When solving across a single field, we will find some prefix and then
  *  possibly a cycle - conceptually the type unrolls forever.  When doing the
  *  Meet we conceptually unroll both types forever, compute the Meet element by
  *  element... but when both types have looped, we can stop and the discovered
  *  cycle is the Meet's cycle.
- *
+ *  <br>
  *  After computing a possibly-cyclic type (via Meet or from-whole-cloth) we
  *  run a DFA minimization algorithm, then a cycle-aware hash and intern the
- *  the result - possibly returning a previous cycle.
+ *  result - possibly returning a previous cycle.
  */
 public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<TypeFld> {
   static final HashMap<TPair,TypeStruct> MEETS0 = new HashMap<>();

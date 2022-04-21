@@ -562,7 +562,7 @@ public class Parse implements Comparable<Parse> {
       skipWS();
       int rhsx = _x;            // Invariant: WS already skipped
       // Get the oper function to call
-      Node opfun = gvn(new LoadNode(mem(),lhs,binop._name,errMsg(opx)));
+      Node opfun = gvn(new FieldNode(lhs,binop._name));
       int fidx = opfun.push();
       Node rhs = _expr_higher_require(binop);
       // Emit the call to both terms
@@ -870,14 +870,13 @@ public class Parse implements Comparable<Parse> {
     // (otherwise alive) error store.
     StructNode dsp = scope.stk();
     //TypeFld fld = dsp._ts.get(tok);
-    //Node ld = gvn(new LoadNode(mem(),get_display_ptr(scope),tok,null));
-    //// If in the middle of a definition (e.g. a HM Let, or recursive assign)
-    //// then no Fresh per normal HM rules.  If loading from a struct or from
-    //// normal Lambda arguments, again no Fresh per normal HM rules.
-    //return ld.is_forward_ref() || !dsp._is_closure
-    //  ? ld
-    //  : gvn(new FreshNode(_e._fun,ld));
-    throw unimpl();
+    Node ld = gvn(new LoadNode(mem(),get_display_ptr(scope),tok,null));
+    // If in the middle of a definition (e.g. a HM Let, or recursive assign)
+    // then no Fresh per normal HM rules.  If loading from a struct or from
+    // normal Lambda arguments, again no Fresh per normal HM rules.
+    return ld.is_forward_ref() || !dsp._is_closure
+      ? ld
+      : gvn(new FreshNode(_e._fun,ld));
   }
 
 

@@ -76,36 +76,36 @@ public class TestParse {
     test("-1", "int:-1", "int:-1");
     test("!1", "nil", "A?");
     // Binary operators
-    test("1+2", "int:3", "int:");
-    test("1-2", TypeInt.con(-1),  "int:");
-    test("1+2*3", TypeInt.con(7), "int:");
-    test("1  < 2", TypeInt.TRUE , "int:");
-    test("1  <=2", TypeInt.TRUE , "int:");
-    test("1  > 2", TypeInt.FALSE, "int:");
-    test("1  >=2", TypeInt.FALSE, "int:");
-    test("1  ==2", TypeInt.FALSE, "int:");
-    test("1  !=2", TypeInt.TRUE , "int:");
-    test("1.2< 2", TypeInt.TRUE , "int:");
-    test("1.2<=2", TypeInt.TRUE , "int:");
-    test("1.2> 2", TypeInt.FALSE, "int:");
-    test("1.2>=2", TypeInt.FALSE, "int:");
-    test("1.2==2", TypeInt.FALSE, "int:");
-    test("1.2!=2", TypeInt.TRUE , "int:");
+    test("1+2", "int:3", "int:3");
+    test("1-2", "int:-1",  "int:-1");
+    test("1+2*3", "int:7", "int:7");
+    test("1  < 2", "int:1", "int:1");
+    test("1  <=2", "int:1", "int:1");
+    test("1  > 2", "nil", "A?");
+    test("1  >=2", "nil", "A?");
+    test("1  ==2", "nil", "A?");
+    test("1  !=2", "int:1", "int:1");
+    test("1.2< 2", "int:1", "int:1");
+    test("1.2<=2", "int:1", "int:1");
+    test("1.2> 2", "nil", "A?");
+    test("1.2>=2", "nil", "A?");
+    test("1.2==2", "nil", "A?");
+    test("1.2!=2", "int:1", "int:1");
 
     // Binary with precedence check
-    test(" 1+2 * 3+4 *5", TypeInt.con( 27), "int:");
-    test("(1+2)*(3+4)*5", TypeInt.con(105), "int:");
-    test("1// some comment\n+2", TypeInt.con(3), "int:"); // With bad comment
-    test("-1-2*3-4*5", TypeInt.con(-1-(2*3)-(4*5)), "int:");
-    test("1&3|1&2", TypeInt.con(1), "int:");
+    test(" 1+2 * 3+4 *5", "int:27", "int:27");
+    test("(1+2)*(3+4)*5", "int:105", "int:105");
+    test("1// some comment\n+2", "int:3", "int:3"); // With bad comment
+    test("-1-2*3-4*5", "int:-27", "int:-27");
+    test("1&3|1&2", "int:1", "int:1");
 
     // Float
-    test("1.2+3.4", TypeFlt.make(0,64,4.6), "flt:");
+    test("1.2+3.4", "flt:4.6", "flt:4.6");
     // Mixed int/float with conversion
-    test("1+2.3",   TypeFlt.make(0,64,3.3), "flt:");
+    test("1+2.3", "flt:3.3", "flt:3.3");
 
     // Variable lookup
-    test("math.pi", TypeFlt.PI, "flt:");
+    test("math.pi", "flt:3.14", "flt:");
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk",0);
     testerr("!", "Missing term after operator '!_'",1);
@@ -128,18 +128,18 @@ public class TestParse {
     test("(1;2;)", TypeInt.con(2), "int:"); // final semicolon is optional
     test("1._+_(2;3)", TypeInt.con(4), "int:"); // statements in arguments
     // Operators squished together
-    test("-1== -1",  TypeInt.TRUE,  "int:");
-    test("0== !!1",  TypeInt.FALSE, "int:");
-    test("2==-1",    TypeInt.FALSE, "int:");
-    test("-1==--1",  TypeInt.FALSE, "int:");
-    test("-1==---1", TypeInt.TRUE,  "int:");
+    test("-1== -1",  "int:1",  "int:");
+    test("0== !!1",  "nil", "int:");
+    test("2==-1",    "nil", "int:");
+    test("-1==--1",  "nil", "int:");
+    test("-1==---1", "int:1",  "int:");
     testerr("-1== --", "Missing term after operator '-_'",7);
   }
 
   @Test public void testParse01() {
     // Syntax for variable assignment
-    test("x=1", TypeInt.TRUE, "int:");
-    test("x=y=1", TypeInt.TRUE, "int:");
+    test("x=1", "int:1", "int:");
+    test("x=y=1", "int:1", "int:");
     testerr("x=y=", "Missing ifex after assignment of 'y'",4);
     testerr("x=z" , "Unknown ref 'z'",2);
     testerr("x=1+y","Unknown ref 'y'",4);
@@ -242,7 +242,7 @@ public class TestParse {
     //
     //// This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
     //testerr("(math.rand(1) ? _+_ : _*_)(2,3)","Unable to resolve call",26); // either 2+3 or 2*3, or {5,6} which is INT8.
-    //test("f = g = {-> 3}; f() == g();", TypeInt.TRUE);
+    //test("f = g = {-> 3}; f() == g();", "int:1");
     //testerr("add = {x:int x:int -> x + x}", "Duplicate parameter name 'x'", 13);
     throw unimpl();
   }
@@ -251,8 +251,8 @@ public class TestParse {
     // Type annotations
     test("-1:int", TypeInt.con( -1));
     test("(1+2.3):flt", TypeFlt.make(0,64,3.3));
-    test("x:int = 1", TypeInt.TRUE);
-    test("x:flt = 1", TypeInt.TRUE); // casts for free to a float
+    test("x:int = 1", "int:1", "int:1");
+    test("x:flt = 1", "int:1", "int:1"); // casts for free to a float
     testerr("x:flt32 = 123456789", "123456789 is not a flt32",1);
     testerr("1:","Syntax error; trailing junk",1); // missing type
     testerr("2:x", "Syntax error; trailing junk", 1);
@@ -344,12 +344,12 @@ public class TestParse {
 
     // Tuple
     test("(0,\"abc\")","*(0, *\"abc\")","(0,*\"abc\")");
-    test("(1,\"abc\").0", TypeInt.TRUE);
+    test("(1,\"abc\").0", "int:1", "int:1");
     test("(1,\"abc\").1", TypeStruct.ISUSED);
 
     // Named type variables
     //test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(82),4, TypeMemPtr.NO_DISP, TypeFlt.FLT64.set_name("gal:")));
-    //test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
+    //test("gal=:flt; 3==gal(2)+1", "int:1");
     //test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     //// test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
     //testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",14);
@@ -374,9 +374,9 @@ public class TestParse {
     testerr("(math.rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", 26);
     test   ("p=math.rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-nil-ness after a nil-check
     test   ("x:int = y:str? = z:flt = 0", Type.XNIL); // nil/0 freely recasts
-    test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not nil
-    test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not nil
-    test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name nil
+    test   ("\"abc\"==0", "int:0", "int:1"); // No type error, just not nil
+    test   ("\"abc\"!=0", "int:1", "int:1"); // No type error, just not nil
+    test   ("nil=0; \"abc\"!=nil", "int:1", "int:1"); // Another way to name nil
     test   ("""
       a = math.rand(1) ? 0 : @{x=1}; // a is nil or a struct
       b = math.rand(1) ? 0 : @{c=a}; // b is nil or a struct
@@ -385,7 +385,7 @@ public class TestParse {
 
   @Test public void testParse06() {
 //    // Building recursive types
-//    test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
+//    test("A= :int; A(1)", "int:1".set_name("A:"));
 //    test("A= :(str?, int); A(0,2)","*A:(0, 2)","(0,2)"); // TODO: Named types in HM
 //    // Named recursive types
 //    test("A= :(A?, int); A(0,2)","*A:(0, 2)","(0,2)");
@@ -601,13 +601,13 @@ map(tmp)
 
   @Test public void testParse09() {
     // Test re-assignment
-    test("x=1", TypeInt.TRUE);
-    test("x=y=1", TypeInt.TRUE);
+    test("x=1", "int:1", "int:1");
+    test("x=y=1", "int:1", "int:1");
     testerr("x=y=", "Missing ifex after assignment of 'y'",4);
     testerr("x=z" , "Unknown ref 'z'",2);
     testerr("x=1+y","Unknown ref 'y'",4);
 
-    test("x:=1", TypeInt.TRUE);
+    test("x:=1", "int:1", "int:1");
     //test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make_test(Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
     //
     //testerr("x=1; x:=2; x", "Cannot re-assign final field '.x' in @{x=1}", 5);
@@ -759,7 +759,7 @@ map(tmp)
     //test_ptr("\"Hello, world\"", TypeStr.con("Hello, world"), "\"Hello, world\"");
     //test_ptr("3.14.str()"      , TypeStr.con("3.14"), "3.14");
     //test_ptr("3.str()"         , TypeStr.con("3"   ), "3");
-    test("\"abc\"==\"abc\"",TypeInt.TRUE, "1"); // Constant strings intern
+    test("\"abc\"==\"abc\"","int:1", "1"); // Constant strings intern
     //testerr("math.rand(1)?1:\"a\"", "Cannot mix GC and non-GC types",18);
     throw unimpl();
   }

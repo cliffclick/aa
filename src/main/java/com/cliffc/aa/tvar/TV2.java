@@ -1150,7 +1150,7 @@ public class TV2 {
     String clz = is_clz();
     if( clz!=null )
       sb.p(clz).p(':');
-    if( clz.equals("int") )
+    if( clz.equals("int") || clz.equals("flt"))
       return sb.p(arg("x")._flow);
     final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
     sb.p(is_tup ? "(" : "@{");
