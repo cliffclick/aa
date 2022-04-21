@@ -39,7 +39,7 @@ public class NewNode extends Node {
 
   public Node ctl() { return in(CTL_IDX); }
   public Node mem() { return in(MEM_IDX); }
-  public Node rec() { return in(REZ_IDX); }
+  public StructNode rec() { return (StructNode)in(REZ_IDX); }
   
   @Override public Type value() { return TypeTuple.make(Type.CTRL,memval(),_tptr); }
   // Construct the memory value

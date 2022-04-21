@@ -29,7 +29,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
 // Holds argument-starts for argument tuples, for eventual error reporting.
 public class StructNode extends Node {
 
-  private Ary<String> _flds; // Field names per node index
+  private final Ary<String> _flds; // Field names per node index
   private TypeStruct _ts; // Field names and default types, alpha-sorted.
 
   // Used to distinguish closures from normal structs in the Parser (the "^"
@@ -51,6 +51,7 @@ public class StructNode extends Node {
     _forward_ref = forward_ref;
     _ts = TypeStruct.ISUSED;
     _flds = new Ary<>(String.class);
+    _fld_starts = new Parse[1];
   }
 
   @Override String str() { return _ts.toString(); }
@@ -116,7 +117,6 @@ public class StructNode extends Node {
     int len = len();
     assert _flds.len()==len;
     if( badt != null ) {
-      if( _fld_starts==null ) _fld_starts = new Parse[1];
       while( _fld_starts.length <= len ) _fld_starts = Arrays.copyOf(_fld_starts,_fld_starts.length<<1);
       _fld_starts[len] = badt;
     }

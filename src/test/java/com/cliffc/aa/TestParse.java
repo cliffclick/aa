@@ -105,34 +105,34 @@ public class TestParse {
     test("1+2.3", "flt:3.3", "flt:3.3");
 
     // Variable lookup
-    test("math.pi", "flt:3.14", "flt:");
+    test("math.pi", "flt:3.141592653589793", "flt:3.141592653589793");
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk",0);
     testerr("!", "Missing term after operator '!_'",1);
     testerr("_+_", "Syntax error; trailing junk",0);
     testerr("!_", "Missing term after operator '!_'",1);
     // Function application, traditional paren/comma args
-    test("1._+_(2)", TypeInt.con( 3),"int:" );
-    test("1._-_(2)", TypeInt.con(-1),"int:"); // binary version
-    test("1.-_()"  , TypeInt.con(-1),"int:"); // unary version
+    test("1._+_(2)", "int:3" ,"int:3" );
+    test("1._-_(2)", "int:-1","int:-1"); // binary version
+    test("1.-_()"  , "int:-1","int:-1"); // unary version
     // error; mismatch arg count
-    testerr("math.pi(1)", "A function is being called, but 3.141592653589793 is not a function",7);
+    testerr("math.pi(1)", "A function is being called, but flt:3.141592653589793 is not a function",7);
     testerr("1._+_(2,3)", "Passing 3 arguments to _+_ which takes 2 arguments",5);
 
     // Parsed as +(1,(2*3))
-    test("1._+_(2 * 3) ", TypeInt.con(7), "int:");
+    test("1._+_(2 * 3) ", "int:7", "int:7");
     // Parsed as (1+2*3)+(4*5+6)
-    test("(1 + 2 * 3)._+_(4 * 5 + 6) ", TypeInt.con(33), "int:");
+    test("(1 + 2 * 3)._+_(4 * 5 + 6) ", "int:33", "int:33");
     // Statements
-    test("(1;2 )", TypeInt.con(2), "int:");
-    test("(1;2;)", TypeInt.con(2), "int:"); // final semicolon is optional
-    test("1._+_(2;3)", TypeInt.con(4), "int:"); // statements in arguments
+    test("(1;2 )", "int:2", "int:2");
+    test("(1;2;)", "int:2", "int:2"); // final semicolon is optional
+    test("1._+_(2;3)", "int:4", "int:4"); // statements in arguments
     // Operators squished together
-    test("-1== -1",  "int:1",  "int:");
-    test("0== !!1",  "nil", "int:");
-    test("2==-1",    "nil", "int:");
-    test("-1==--1",  "nil", "int:");
-    test("-1==---1", "int:1",  "int:");
+    test("-1== -1",  "int:1",  "int:1");
+    test("0== !!1",  "nil", "A?");
+    test("2==-1",    "nil", "A?");
+    test("-1==--1",  "nil", "A?");
+    test("-1==---1", "int:1",  "int:1");
     testerr("-1== --", "Missing term after operator '-_'",7);
   }
 
@@ -1003,8 +1003,7 @@ HashTable = {@{
   }
 
   static void testerr( String program, String err, int cur_off ) {
-    throw unimpl();
-    //_test2(program,ignore->Type.ALL,null,"",err,cur_off);
+    _test2(program,null,null,"",err,cur_off);
   }
 
 

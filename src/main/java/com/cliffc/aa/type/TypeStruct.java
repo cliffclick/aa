@@ -273,6 +273,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public static final TypeStruct INT = make_int(TypeInt.INT64);
   public static final TypeStruct FLT = make_flt(TypeFlt.FLT64);
   public static final TypeStruct BOOL= make_int(TypeInt.BOOL );
+  public static final TypeStruct ZERO= make_int(TypeInt.ZERO );
 
   // A bunch of types for tests
   public  static final TypeStruct POINT = make(TypeFld.make("x",TypeFlt.FLT64),TypeFld.make("y",TypeFlt.FLT64));
@@ -616,6 +617,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
     sb.p(_clz);
+    if( Util.eq(_clz,"int:") ) return sb.p(at("x"));
+    if( Util.eq(_clz,"flt:") ) return sb.p(at("x"));
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
     // Special shortcut for the all-prims display type

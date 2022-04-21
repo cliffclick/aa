@@ -704,7 +704,8 @@ public class Parse implements Comparable<Parse> {
           skipWS();
           return n.unkeep();
         } else {
-          n = gvn(new LoadNode(mem(),castnn,fld,errMsg(fld_start)));
+          Node st = gvn(new LoadNode(mem(),castnn,errMsg(fld_start)));
+          n = gvn(new FieldNode(st,fld));
         }
 
       } else if( peek('(') ) {  // Attempt a function-call
@@ -713,7 +714,7 @@ public class Parse implements Comparable<Parse> {
         int first_arg_start = _x;
         int nidx = n.push();    // Keep alive across arg parse
         StructNode arg = tuple(oldx-1,stmts(),first_arg_start); // Parse argument list
-        n = Node.pop(nidx);
+        n = Node.pop(nidx);     // Function
         if( arg == null )       // tfact but no arg is just the tfact not a function call
           { _x = oldx; return n; }
         Parse[] badargs = arg.fld_starts(); // Args from tuple
@@ -775,17 +776,18 @@ public class Parse implements Comparable<Parse> {
     // Pointer to the proper display is found via ptr-walking live display stack.
     // Now properly load from the display.
     Node ptr = get_display_ptr(scope);
-    Node n = gvn(new LoadNode(mem(),ptr,tok,null));
-    if( n.is_forward_ref() )    // Prior is actually a forward-ref
-      return err_ctrl1(ErrMsg.forward_ref(this,((FunPtrNode)n)));
-    // Do a full lookup on "+", and execute the function
-    int nidx = n.push();
-    Node plus = gvn(new LoadNode(mem(),n,"_+_",null));
-    Node inc = con(TypeInt.con(d));
-    Node sum = do_call(errMsgs(0,_x,_x), args(plus,inc));
-    // Active memory for the chosen scope, after the call to plus
-    scope().replace_mem(new StoreNode(mem(),ptr,sum,Access.RW,tok,errMsg()));
-    return Node.pop(nidx);      // Return pre-increment value
+    throw unimpl(); // Fields before Loads
+    //Node n = gvn(new LoadNode(mem(),ptr,tok,null));
+    //if( n.is_forward_ref() )    // Prior is actually a forward-ref
+    //  return err_ctrl1(ErrMsg.forward_ref(this,((FunPtrNode)n)));
+    //// Do a full lookup on "+", and execute the function
+    //int nidx = n.push();
+    //Node plus = gvn(new LoadNode(mem(),n,"_+_",null));
+    //Node inc = con(TypeInt.con(d));
+    //Node sum = do_call(errMsgs(0,_x,_x), args(plus,inc));
+    //// Active memory for the chosen scope, after the call to plus
+    //scope().replace_mem(new StoreNode(mem(),ptr,sum,Access.RW,tok,errMsg()));
+    //return Node.pop(nidx);      // Return pre-increment value
   }
 
 
@@ -869,8 +871,7 @@ public class Parse implements Comparable<Parse> {
     // is in-error.  Directly loading against the display would bypass the
     // (otherwise alive) error store.
     StructNode dsp = scope.stk();
-    //TypeFld fld = dsp._ts.get(tok);
-    Node ld = gvn(new LoadNode(mem(),get_display_ptr(scope),tok,null));
+    Node ld = gvn(new FieldNode(get_display_ptr(scope),tok));
     // If in the middle of a definition (e.g. a HM Let, or recursive assign)
     // then no Fresh per normal HM rules.  If loading from a struct or from
     // normal Lambda arguments, again no Fresh per normal HM rules.
@@ -888,7 +889,7 @@ public class Parse implements Comparable<Parse> {
     // First stmt is parsed already
     Parse bad = errMsg(first_arg_start);
     while( s!= null ) {         // More args
-      TypeFld fld = TypeFld.make((""+(nn.len()-DSP_IDX)).intern(),Type.SCALAR,Access.Final);
+      TypeFld fld = TypeFld.make((""+(nn.len())).intern(),Type.SCALAR,Access.Final);
       nn.add_fld(fld,s,bad);
       if( !peek(',') ) break;   // Final comma is optional
       skipWS();                 // Skip to arg start before recording arg start
@@ -1476,16 +1477,17 @@ public class Parse implements Comparable<Parse> {
 
   // Get the display pointer.  The function call
   // passed in the display as a hidden argument which we return here.
-  private Node get_display_ptr( ScopeNode scope ) {
+  private StructNode get_display_ptr( ScopeNode scope ) {
     // Issue Loads against the Display, until we get the correct scope.  The
     // Display is a linked list of displays, and we already checked that token
     // exists at scope up in the display.
     Env e = _e;
-    Node stk = e._scope.stk();
+    StructNode stk = e._scope.stk();
     Node mmem = mem();
     while( true ) {
       if( scope == e._scope ) return stk;
-      stk = gvn(new LoadNode(mmem,stk,"^",null)); // Gen linked-list walk code, walking display slot
+      Node ptr = gvn(new FieldNode(stk,"^"));
+      stk = (StructNode)gvn(new LoadNode(mmem,ptr,null)); // Gen linked-list walk code, walking display slot
       e = e._par;                                 // Walk linked-list in parser also
     }
   }

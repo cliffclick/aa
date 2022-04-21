@@ -3,8 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.type.*;
 
-import static com.cliffc.aa.AA.unimpl;
-
 // Takes a static field name, a TypeStruct and returns the field value.
 // Basically a ProjNode except it does lookups by field name in TypeStruct
 // instead of by index in TypeTuple.
@@ -20,12 +18,12 @@ public class FieldNode extends Node {
   String  str() { return xstr(); } // Inline short name
 
   @Override public Node ideal_reduce() {
-    if( (in(0) instanceof StructNode clz) ) {
-      throw unimpl();
-    }
+    if( (in(0) instanceof StructNode clz) )
+      return clz.in_bind(_fld,in(0));
     // For named prototypes, if the field load fails, try again in the
     // prototype.  Only valid for final fields.
     Type t = val(0);
+    if( t==Type.NIL || t==Type.XNIL ) t = TypeStruct.ZERO;
     if( !(t instanceof TypeStruct ts) ) return null;
     String tname = ts.clz().substring(0,ts.clz().length()-1);
     StructNode clz = Env.PROTOS.get(tname);
@@ -36,6 +34,7 @@ public class FieldNode extends Node {
 
   @Override public Type value() {
     Type t = val(0);
+    if( t==Type.NIL || t==Type.XNIL ) t = TypeStruct.ZERO;
     if( !(t instanceof TypeStruct ts) )
       return t.oob(Type.SCALAR);
     TypeFld fld = ts.get(_fld);

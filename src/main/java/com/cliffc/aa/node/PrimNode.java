@@ -163,7 +163,8 @@ public abstract class PrimNode extends Node {
   private static void install_math(PrimNode rand) {
     StructNode rec = new StructNode(false,false);
     rand.as_fun(rec,false);
-    rec.add_fld(TypeFld.make("pi",TypeFlt.PI),Node.con(TypeFlt.PI),null);
+    Type pi = make_wrap(TypeFlt.PI);
+    rec.add_fld(TypeFld.make("pi",pi),Node.con(pi),null);
     rec.close();
     Env.GVN.init(rec);
     alloc_inject(rec,"math");
@@ -195,7 +196,7 @@ public abstract class PrimNode extends Node {
   @Override public String xstr() { return _name+":"+_formals.at(DSP_IDX); }
   private static final Type[] TS = new Type[ARG_IDX+1];
   @Override public Type value() {
-    if( is_keep() ) return Type.ALL;
+    if( is_keep() ) return _val;
     // If all inputs are constants we constant-fold.  If any input is high, we
     // return high otherwise we return low.
     boolean is_con = true, has_high = false;
@@ -287,6 +288,7 @@ public abstract class PrimNode extends Node {
         return make_int(1);     // !nil is 1
       if( t0==Type.ALL ) return TypeStruct.BOOL;
       Type t1 = unwrap_i(t0);
+      if( t1==TypeInt.ZERO ) return make_int(1);
       if( t1. may_nil() ) return TypeStruct.BOOL.dual();
       if( t1.must_nil() ) return TypeStruct.BOOL;
       return Type.NIL;          // Cannot be a nil, so return a nil
@@ -402,7 +404,7 @@ public abstract class PrimNode extends Node {
     public OrI64() { super("|"); }
     // And can preserve bit-width
     @Override public Type value() {
-      if( is_keep() ) return Type.ALL;
+      if( is_keep() ) return _val;
       Type t0 = val(0), t1 = val(1);
       if( t0==Type.ANY || t1==Type.ANY ) return TypeStruct.INT.dual();
       if( t0==Type.ALL || t1==Type.ALL ) return TypeStruct.INT;
@@ -441,13 +443,13 @@ public abstract class PrimNode extends Node {
   public static class GE_I64 extends Prim2RelOpI64 { public GE_I64() { super(">="); } boolean op( long l, long r ) { return l>=r; } }
   public static class EQ_I64 extends Prim2RelOpI64 { public EQ_I64() { super("=="); } boolean op( long l, long r ) { return l==r; } }
   public static class NE_I64 extends Prim2RelOpI64 { public NE_I64() { super("!="); } boolean op( long l, long r ) { return l!=r; } }
-  
+
   abstract static class Prim2RelOpIF64 extends PrimNode {
     Prim2RelOpIF64( String name ) { super(name,TypeTuple.INT64_FLT64,TypeStruct.BOOL); }
     @Override public Type apply( Type[] args ) { return op(unwrap_ii(args[0]),unwrap_ff(args[1]))?make_int(1):Type.NIL; }
     abstract boolean op( long x, double y );
   }
-  
+
   public static class LT_IF64 extends Prim2RelOpIF64 { public LT_IF64() { super("<" ); } boolean op( long l, double r ) { return l< r; } }
   public static class LE_IF64 extends Prim2RelOpIF64 { public LE_IF64() { super("<="); } boolean op( long l, double r ) { return l<=r; } }
   public static class GT_IF64 extends Prim2RelOpIF64 { public GT_IF64() { super(">" ); } boolean op( long l, double r ) { return l> r; } }
@@ -459,7 +461,7 @@ public abstract class PrimNode extends Node {
   public static class EQ_OOP extends PrimNode {
     public EQ_OOP() { super("==",TypeTuple.OOP_OOP,TypeInt.BOOL); }
     @Override public Type value() {
-      if( is_keep() ) return Type.ALL;
+      if( is_keep() ) return _val;
       //// Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
       //// Probably need a java-like "eq" vs "==" to mean deep-equals.  You are
       //// equals if your inputs are the same node, and you are unequals if your
@@ -493,7 +495,7 @@ public abstract class PrimNode extends Node {
   public static class NE_OOP extends PrimNode {
     public NE_OOP() { super("!=",TypeTuple.OOP_OOP,TypeInt.BOOL); }
     @Override public Type value() {
-      if( is_keep() ) return Type.ALL;
+      if( is_keep() ) return _val;
       //// Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
       //// Probably need a java-like "===" vs "==" to mean deep-equals.  You are
       //// equals if your inputs are the same node, and you are unequals if your
