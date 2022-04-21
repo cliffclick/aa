@@ -90,7 +90,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     Util.add_hash(_def._hash);
     for( TypeFld fld : _flds )
       // Can depend on the field name and access, but NOT the type - because recursion.
-      // Fields must be ordered, so alpha-sorted already.
+      // Fields must be ordered, so hash can depend on order, so alpha-sorted already.
       Util.add_hash(fld._fld.hashCode() ^ fld._access.hashCode());
     return Util.get_hash();
   }
@@ -99,6 +99,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // needing the cyclic test.
   private int cmp( TypeStruct t ) {
     if( !super.equals(t) || len() != t.len() || !Util.eq(_clz,t._clz) || _def!=t._def ) return 0;
+    if( _flds==t._flds ) return 1;
     // All fields must be equals
     for( int i=0; i<_flds.length; i++ ) {
       TypeFld fld0 =   _flds[i]; // Get in order
@@ -113,6 +114,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // and not-equals.  May-equal fields are treated as equals
   @Override boolean static_eq( TypeStruct t ) {
     if( !super.equals(t) || len() != t.len() || !Util.eq(_clz,t._clz) || _def!=t._def ) return false;
+    if( _flds==t._flds ) return true;
     // Fields are all alpha-sorted already
     for( int i=0; i<_flds.length; i++ ) {
       TypeFld fld1 =   _flds[i]; // Get in order
@@ -205,8 +207,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     return super.hashcons_free();
   }
 
-  public void hashcons_flds() { _flds = TypeFlds.hash_cons(_flds); }
-
   public static TypeStruct make( String clz, Type def, TypeFld[] flds ) { return malloc(clz,def,flds).hashcons_free(); }
   // Make using the fields, with no struct name, low and closed; typical for a
   // well-known structure.
@@ -245,18 +245,23 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     return ts.hashcons_free();
   }
 
-  // Remove default dups.  'flds' assumed not-interned
-  static TypeStruct make0(String name, Type def, TypeFld[] flds) {
+  // Remove default dups.  'flds' is not-interned.
+  static TypeFld[] remove_dups(Type def, TypeFld[] flds) {
     int cnt=0, i=0;
     for( TypeFld fld : flds )  if( fld._t == def )  cnt++;
-    if( cnt==0 ) return make(name,def,TypeFlds.hash_cons(flds));
+    if( cnt==0 ) return flds;
+    assert !TypeFlds.interned(flds);
     TypeFld[] fs = TypeFlds.get(flds.length-cnt);
     for( TypeFld fld : flds )  if( fld._t != def )  fs[i++]=fld;
     TypeFlds.free(flds);
-    return make(name,def,TypeFlds.hash_cons(fs));
+    return fs;
   }
-  public TypeStruct make0() { return make0(_clz,_def,_flds); }
+  static TypeStruct make0(String name, Type def, TypeFld[] flds) { return make(name,def,TypeFlds.hash_cons(remove_dups(def,flds))); }
   public TypeStruct make_from(TypeFld[] flds) { return make0(_clz,_def,flds); }
+  public void remove_dups() { _flds = remove_dups(_def,_flds); }
+  public void hashcons_flds() { _flds = TypeFlds.hash_cons(_flds); }
+  public void remove_dups_hashcons() { _flds = TypeFlds.hash_cons(remove_dups(_def,_flds)); }
+  public boolean flds_interned() { return TypeFlds.interned(_flds); }
 
   // Possibly allocated.  No fields specified.  All fields are possible and
   // might be ALL (error).  The worst possible result.
@@ -693,13 +698,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     } while( P.peek(is_tup ? ',' : ';') );
     P.require(is_tup ? ')' : '}');
     return ts;
-  }
-
-  // Alpha sorted
-  public Collection<TypeFld> asorted_flds() {
-    TreeMap<String, TypeFld> sorted = new TreeMap<>();
-    for( TypeFld fld : this ) sorted.put(fld._fld,fld);
-    return sorted.values();
   }
 
   // Extend the current struct with a new named field, making a new struct

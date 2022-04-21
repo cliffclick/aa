@@ -467,7 +467,11 @@ public class TypeMem extends Type<TypeMem> {
       if( t !=null ) return t;
       t = dull_cache.get(tmp._aliases);
       if( visit.tset(t._uid) ) return t;
-    } else t = dull.copy();
+    } else if( dull instanceof TypeStruct dullts ) {
+      t = dullts.copy2();
+    } else {
+      t = dull.copy();
+    }
     assert !t.interned();
     t.walk_update( fld -> _sharp(fld,dull_cache,visit));
     return t;

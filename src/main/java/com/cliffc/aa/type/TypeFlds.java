@@ -67,7 +67,7 @@ public class TypeFlds {
   // Return a free TypeFld[]
   private TypeFld[] get() {
     if( _free.isEmpty() ) {
-      _cnt++;  assert _cnt<200;
+      _cnt++;  assert _cnt<1000;
       _free.push(new TypeFld[_len]);
     }
     return _free.pop();
