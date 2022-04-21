@@ -16,7 +16,7 @@ Theory:
 - Structs include all possible (infinite) fields, with the default for most
 - Listed fields are as-is, neither up nor down, they are what they are
 - Structs have a clazz name, which can be up or down
-- The name up/down is seperate from the default
+- The name up/down is separate from the default
 
  */
 public class TestNames {
@@ -109,14 +109,14 @@ public class TestNames {
       flds.values().removeIf( t -> t==def );
 
       // If no common prefix, fall to low prefix.
-      // Else if prefix is high, keep low else high      
+      // Else if prefix is high, keep low else high
       String s0=_clz, s1=s._clz;
       String pre = prefix(s0,s1), clz;
       boolean b = _clzany & s._clzany;
       if(      pre.equals(  _clz) ) clz =   _clzany ? s1 : s0;
       else if( pre.equals(s._clz) ) clz = s._clzany ? s0 : s1;
       else { clz = pre; b=false; } // No common prefix, fall hard
-      
+
       return new S(clz,b,def,flds);
     }
 
@@ -236,13 +236,13 @@ public class TestNames {
       assert !ss0[i]._def.above_center() && !ss0[i]._clzany;
       ss[i+ss0.length] = ss0[i].dual();
     }
-    
+
     Type[] ts = Arrays.copyOf(ts0,ts0.length<<1);
     for( int i=0; i<ts0.length; i++ ) {
       assert !ts0[i].above_center();
       ts[i+ts0.length] = ts0[i].dual();
     }
-    
+
     int err=0;
     for( S s0 : ss )
       for( S s1 : ss )

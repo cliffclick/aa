@@ -1,12 +1,13 @@
 package com.cliffc.aa.HM;
 
-import com.cliffc.aa.HM.HM.*;
+import com.cliffc.aa.HM.HM.Apply;
+import com.cliffc.aa.HM.HM.T2;
+import com.cliffc.aa.HM.HM.Triple;
 import com.cliffc.aa.type.*;
 import org.junit.Test;
 
+import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
-import static com.cliffc.aa.AA.unimpl;
-import static com.cliffc.aa.AA.ARG_IDX;
 import static org.junit.Assert.assertTrue;
 
 public class TestLift {
@@ -28,60 +29,63 @@ public class TestLift {
 
     // 289: *[3](^=any, _289$, _289$, _289$)
     Type.RECURSIVE_MEET++;
-    TypeFld fld0 = TypeFld.malloc("0",null,Access.Final);
-    TypeFld fld1 = TypeFld.malloc("1",null,Access.Final);
-    TypeFld fld2 = TypeFld.malloc("2",null,Access.Final);
-    //TypeStruct ts = TypeStruct.malloc_test(TypeFld.NO_DSP,fld0,fld1,fld2);
-    //TypeMemPtr ret1 = TypeMemPtr.malloc(B3,ts);
-    //fld0.setX(ret1);
-    //fld1.setX(ret1);
-    //fld2.setX(ret1);
-    //Type.RECURSIVE_MEET--;
-    //ts = Cyclic.install(ts);
-    //ret1 = TypeMemPtr.make(B3,ts);
-    //
-    //// 917: *[3](^=any, _917$, SCALR, SCALR)
-    //TypeFld fld21 = TypeFld.make_tup(Type.SCALAR,ARG_IDX+1);
-    //TypeFld fld22 = TypeFld.make_tup(Type.SCALAR,ARG_IDX+2);
-    //Type.RECURSIVE_MEET++;
-    //TypeFld fld20 = TypeFld.malloc("0",null,Access.Final);
-    //TypeStruct ts2 = TypeStruct.malloc_test(TypeFld.NO_DSP,fld20,fld21,fld22);
-    //TypeMemPtr ret2 = TypeMemPtr.make(B3,ts2);
-    //fld20.setX(ret2);
-    //Type.RECURSIVE_MEET--;
-    //ts2 = Cyclic.install(ts2);
-    //ret2 = TypeMemPtr.make(B3,ts2);
-    //
-    //// Build rezt2 from HM.apply_lift
-    //T2 x00 = make3(frl,frl,fr3);
-    //T2 x01 = make3(frl,fr3,fr3);
-    //T2 x02 = make3(frl,frl,frl);
-    //T2 x0_ = make_(x00,x01,x02);
-    //
-    //T2 x10 = make3(frl,frl,fr3);
-    //T2 x11 = make3(frl,frl,frl);
-    //T2 x12 = make3(frl,frl,frl);
-    //T2 x1_ = make_(x10,x11,x12);
-    //
-    //T2 x20 = make3(frl,frl,fr3);
-    //T2 x21 = make3(frl,frl,frl);
-    //T2 x22 = make3(frl,frl,frl);
-    //T2 x2_ = make_(x20,x21,x22);
-    //
-    //T2 x3_ = make_(x0_,x1_,x2_);
-    //
-    //// Call walk_types_out with ret1
-    //T2.WDUPS.clear(true);
-    //Type lift1 = x3_.walk_types_out(ret1,apply,true);
-    //
-    //// Call walk_types_out with ret2
-    //T2.WDUPS.clear(true);
-    //Type lift2 = x3_.walk_types_out(ret2,apply,true);
-    //
-    //// Check monotonic
-    //assertTrue(ret1 .isa(ret2 ));
-    //assertTrue(lift1.isa(lift2));
-    throw unimpl();
+    TypeFld[] flds = TypeFlds.get(4);
+    flds[0]=TypeFld.NO_DSP;
+    TypeFld fld0 = flds[1] = TypeFld.malloc("0",null,Access.Final);
+    TypeFld fld1 = flds[2] = TypeFld.malloc("1",null,Access.Final);
+    TypeFld fld2 = flds[3] = TypeFld.malloc("2",null,Access.Final);
+    TypeStruct ts = TypeStruct.malloc("",Type.ALL,flds);
+    TypeMemPtr ret1 = TypeMemPtr.malloc(B3,ts);
+    fld0.setX(ret1);
+    fld1.setX(ret1);
+    fld2.setX(ret1);
+    Type.RECURSIVE_MEET--;
+    ts = Cyclic.install(ts);
+    ret1 = TypeMemPtr.make(B3,ts);
+
+    // 917: *[3](^=any, _917$, SCALR, SCALR)
+    TypeFld[] flds2 = TypeFlds.get(4);
+    flds2[0]=TypeFld.NO_DSP;
+    TypeFld fld21 = flds2[2] = TypeFld.make_tup(Type.SCALAR,ARG_IDX+1);
+    TypeFld fld22 = flds2[3] = TypeFld.make_tup(Type.SCALAR,ARG_IDX+2);
+    Type.RECURSIVE_MEET++;
+    TypeFld fld20 = flds2[1] = TypeFld.malloc("0",null,Access.Final);
+    TypeStruct ts2 = TypeStruct.malloc("",Type.ALL,flds2);
+    TypeMemPtr ret2 = TypeMemPtr.make(B3,ts2);
+    fld20.setX(ret2);
+    Type.RECURSIVE_MEET--;
+    ts2 = Cyclic.install(ts2);
+    ret2 = TypeMemPtr.make(B3,ts2);
+
+    // Build rezt2 from HM.apply_lift
+    T2 x00 = make3(frl,frl,fr3);
+    T2 x01 = make3(frl,fr3,fr3);
+    T2 x02 = make3(frl,frl,frl);
+    T2 x0_ = make_(x00,x01,x02);
+
+    T2 x10 = make3(frl,frl,fr3);
+    T2 x11 = make3(frl,frl,frl);
+    T2 x12 = make3(frl,frl,frl);
+    T2 x1_ = make_(x10,x11,x12);
+
+    T2 x20 = make3(frl,frl,fr3);
+    T2 x21 = make3(frl,frl,frl);
+    T2 x22 = make3(frl,frl,frl);
+    T2 x2_ = make_(x20,x21,x22);
+
+    T2 x3_ = make_(x0_,x1_,x2_);
+
+    // Call walk_types_out with ret1
+    T2.WDUPS.clear(true);
+    Type lift1 = x3_.walk_types_out(ret1,apply,true);
+
+    // Call walk_types_out with ret2
+    T2.WDUPS.clear(true);
+    Type lift2 = x3_.walk_types_out(ret2,apply,true);
+
+    // Check monotonic
+    assertTrue(ret1 .isa(ret2 ));
+    assertTrue(lift1.isa(lift2));
 
   };
 
@@ -116,34 +120,32 @@ public class TestLift {
     // 289: *[3](^=any, _289$)
     Type.RECURSIVE_MEET++;
     TypeFld fld1 = TypeFld.malloc("0",null,Access.Final);
-    //TypeStruct ts1 = TypeStruct.malloc_test(TypeFld.NO_DSP,fld1);
-    //TypeMemPtr ret1 = TypeMemPtr.make(B3,ts1);
-    //fld1.setX(ret1);
-    //Type.RECURSIVE_MEET--;
-    //ts1 = Cyclic.install(ts1);
-    //ret1 = TypeMemPtr.make(B3,ts1);
-    //
-    //// 917: *[3](^=any, 0=SCALR)
-    //TypeFld fld2 = TypeFld.make_tup(Type.SCALAR,ARG_IDX);
-    //TypeStruct ts2 = TypeStruct.make(TypeFld.NO_DSP,fld2);
-    //TypeMemPtr ret2 = TypeMemPtr.make(B3,ts2);
-    //
-    //// Build rezt2 from HM.apply_lift
-    //T2 x00 = T2.make_open_struct(FLDS1, new T2[]{frl.fresh()});
-    //
-    //// Call walk_types_out with ret1
-    //T2.WDUPS.clear(true);
-    //Type lift1 = x00.walk_types_out(ret1,apply,true);
-    //
-    //// Call walk_types_out with ret2
-    //T2.WDUPS.clear(true);
-    //Type lift2 = x00.walk_types_out(ret2,apply,true);
-    //
-    //// Check monotonic
-    //assertTrue(ret1 .isa(ret2 ));
-    //assertTrue(lift1.isa(lift2));
-    throw unimpl();
+    TypeStruct ts1 = TypeStruct.malloc_test("",TypeFld.NO_DSP,fld1);
+    TypeMemPtr ret1 = TypeMemPtr.make(B3,ts1);
+    fld1.setX(ret1);
+    Type.RECURSIVE_MEET--;
+    ts1 = Cyclic.install(ts1);
+    ret1 = TypeMemPtr.make(B3,ts1);
 
+    // 917: *[3](^=any, 0=SCALR)
+    TypeFld fld2 = TypeFld.make_tup(Type.SCALAR,ARG_IDX);
+    TypeStruct ts2 = TypeStruct.make(TypeFld.NO_DSP,fld2);
+    TypeMemPtr ret2 = TypeMemPtr.make(B3,ts2);
+    
+    // Build rezt2 from HM.apply_lift
+    T2 x00 = T2.make_open_struct(FLDS1, new T2[]{frl.fresh()});
+    
+    // Call walk_types_out with ret1
+    T2.WDUPS.clear(true);
+    Type lift1 = x00.walk_types_out(ret1,apply,true);
+    
+    // Call walk_types_out with ret2
+    T2.WDUPS.clear(true);
+    Type lift2 = x00.walk_types_out(ret2,apply,true);
+    
+    // Check monotonic
+    assertTrue(ret1 .isa(ret2 ));
+    assertTrue(lift1.isa(lift2));
   };
 
 

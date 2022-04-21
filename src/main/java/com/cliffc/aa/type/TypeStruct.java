@@ -41,8 +41,9 @@ import static com.cliffc.aa.type.TypeFld.Access;
  *  the result - possibly returning a previous cycle.
  */
 public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<TypeFld> {
+  static final HashMap<TPair,TypeStruct> MEETS0 = new HashMap<>();
 
-  // Roughly a tree-shaped clazz designation.  A colon-seperated list of clazz
+  // Roughly a tree-shaped clazz designation.  A colon-separated list of clazz
   // names, which may be empty.  Parent clazzes on the left, child on the
   // right.  Used by Field lookups for final constant fields kept in the clazz
   // and not here.  A leading '~' character means the clazz is high instead of
@@ -259,9 +260,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   static TypeStruct make0(String name, Type def, TypeFld[] flds) { return make(name,def,TypeFlds.hash_cons(remove_dups(def,flds))); }
   public TypeStruct make_from(TypeFld[] flds) { return make0(_clz,_def,flds); }
   public void remove_dups() { _flds = remove_dups(_def,_flds); }
-  public void hashcons_flds() { _flds = TypeFlds.hash_cons(_flds); }
   public void remove_dups_hashcons() { _flds = TypeFlds.hash_cons(remove_dups(_def,_flds)); }
-  public boolean flds_interned() { return TypeFlds.interned(_flds); }
 
   // Possibly allocated.  No fields specified.  All fields are possible and
   // might be ALL (error).  The worst possible result.
@@ -311,7 +310,6 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Types can be in cycles: See Large Comment Above.  We effectively unroll
   // each type infinitely until both sides are cycling and take the GCD of
   // cycles.  Different fields are Meet independently and unroll independently.
-  static final HashMap<TPair,TypeStruct> MEETS0 = new HashMap<>();
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTRUCT:break;
