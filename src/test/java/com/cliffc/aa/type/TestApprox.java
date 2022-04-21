@@ -5,6 +5,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import static com.cliffc.aa.AA.ARG_IDX;
+import static com.cliffc.aa.AA.unimpl;
 import static org.junit.Assert.assertTrue;
 
 // CNC: As of 02/20/2022 I have dropped approx from the whole Type analysis
@@ -79,65 +80,66 @@ public class TestApprox {
     TypeFld X1 = TypeFld.make_tup(Type.XSCALAR,ARG_IDX+1);
     TypeFld S2 = TypeFld.make_tup(Type. SCALAR,ARG_IDX+2);
     TypeFld X2 = TypeFld.make_tup(Type.XSCALAR,ARG_IDX+2);
-    TypeMemPtr tmpa = TypeMemPtr.make(a3,TypeStruct.make(X0,X1));
-    TypeFunPtr tfpa = TypeFunPtr.make(f7,3,ND,tmpa);
-
-    TypeMemPtr tmp0 = TypeMemPtr.make(a3,TypeStruct.make(S0,X1));
-    TypeFunPtr tfp0 = TypeFunPtr.make(f7,3,ND,tmp0);
-    TypeMemPtr ts0  = TypeMemPtr.make(a3,TypeStruct.make(TypeFld.make_tup(tfpa,ARG_IDX+1),TypeFld.make_tup(tfp0,ARG_IDX+2)));
-
-    TypeMemPtr tmp1 = TypeMemPtr.make(a3,TypeStruct.make(S0,S1));
-    TypeFunPtr tfp1 = TypeFunPtr.make(f7,3,ND,tmp1);
-    TypeMemPtr ts1  = TypeMemPtr.make(a3,TypeStruct.make(TypeFld.make_tup(tfpa,ARG_IDX+1),TypeFld.make_tup(tfp1,ARG_IDX+2)));
-
-    assertTrue(tmp0.isa(tmp1));
-    //TypeStruct ax0 = ts0._obj.approx(ts0._aliases);
-    //TypeStruct ax1 = ts1._obj.approx(ts1._aliases);
-    //assertTrue(ts0._obj.isa(ax0));
-    //assertTrue(ts1._obj.isa(ax1));
+    //TypeMemPtr tmpa = TypeMemPtr.make(a3,TypeStruct.make(X0,X1));
+    //TypeFunPtr tfpa = TypeFunPtr.make(f7,3,ND,tmpa);
     //
-    //assertTrue(ax0.isa(ax1));
-
-
-    // Make a collection of probably function-to-functions
-    Ary<TypeFunPtr> tfps = new Ary<>(TypeFunPtr.class);
-    tfps.push(tfpa);
-    tfps.push(tfp0);
-    tfps.push(tfp1);
-    tfps.push(TypeFunPtr.make(f2,1,ND,Type.XSCALAR));
-    tfps.push(TypeFunPtr.make(f2,1,ND,Type. SCALAR));
-    tfps.push(TypeFunPtr.make(f7,1,ND,Type.XSCALAR));
-    tfps.push(TypeFunPtr.make(f7,1,ND,Type. SCALAR));
-    BitsFun bf2  = BitsFun.make0(f2);
-    BitsFun bf7  = BitsFun.make0(f7);
-    BitsFun bf27 = BitsFun.make0(f2,f7);
-    tfps.push(TypeFunPtr.make_cycle(bf2 ,1,ND));
-    tfps.push(TypeFunPtr.make_cycle(bf7 ,1,ND));
-    tfps.push(TypeFunPtr.make_cycle(bf27,1,ND));
-    tfps.push(TypeFunPtr.make(f2,1,ND,TypeFunPtr.make(f7,1,ND,Type.XSCALAR)));
-    tfps.push(TypeFunPtr.make(f2,1,ND,TypeFunPtr.make(f7,1,ND,Type. SCALAR)));
-    tfps.push(TypeFunPtr.make(f7,1,ND,TypeFunPtr.make(f2,1,ND,Type.XSCALAR)));
-    tfps.push(TypeFunPtr.make(f7,1,ND,TypeFunPtr.make(f2,1,ND,Type. SCALAR)));
-
-    // Check that we can wrap sanely
-    for( int i=0; i<tfps._len; i++ ) {
-      TypeFunPtr tfpi = tfps.at(i);
-      for( int j=i+1; j<tfps._len; j++ ) {
-        TypeFunPtr tfpj = tfps.at(j);
-        assert tfpi!=tfpj;      // No dups
-        if( tfpi.isa(tfpj) ) {
-          TypeFunPtr tfpi2  = TypeFunPtr.makex(bf2 ,1,ND,tfpi);
-          TypeFunPtr tfpj2  = TypeFunPtr.makex(bf2 ,1,ND,tfpj);
-          assert tfpi2 .isa(tfpj2 );
-          TypeFunPtr tfpi7  = TypeFunPtr.makex(bf7 ,1,ND,tfpi);
-          TypeFunPtr tfpj7  = TypeFunPtr.makex(bf7 ,1,ND,tfpj);
-          assert tfpi7 .isa(tfpj7 );
-          TypeFunPtr tfpi27 = TypeFunPtr.makex(bf27,1,ND,tfpi);
-          TypeFunPtr tfpj27 = TypeFunPtr.makex(bf27,1,ND,tfpj);
-          assert tfpi27.isa(tfpj27);
-        }
-      }
-    }
+    //TypeMemPtr tmp0 = TypeMemPtr.make(a3,TypeStruct.make(S0,X1));
+    //TypeFunPtr tfp0 = TypeFunPtr.make(f7,3,ND,tmp0);
+    //TypeMemPtr ts0  = TypeMemPtr.make(a3,TypeStruct.make(TypeFld.make_tup(tfpa,ARG_IDX+1),TypeFld.make_tup(tfp0,ARG_IDX+2)));
+    //
+    //TypeMemPtr tmp1 = TypeMemPtr.make(a3,TypeStruct.make(S0,S1));
+    //TypeFunPtr tfp1 = TypeFunPtr.make(f7,3,ND,tmp1);
+    //TypeMemPtr ts1  = TypeMemPtr.make(a3,TypeStruct.make(TypeFld.make_tup(tfpa,ARG_IDX+1),TypeFld.make_tup(tfp1,ARG_IDX+2)));
+    //
+    //assertTrue(tmp0.isa(tmp1));
+    ////TypeStruct ax0 = ts0._obj.approx(ts0._aliases);
+    ////TypeStruct ax1 = ts1._obj.approx(ts1._aliases);
+    ////assertTrue(ts0._obj.isa(ax0));
+    ////assertTrue(ts1._obj.isa(ax1));
+    ////
+    ////assertTrue(ax0.isa(ax1));
+    //
+    //
+    //// Make a collection of probably function-to-functions
+    //Ary<TypeFunPtr> tfps = new Ary<>(TypeFunPtr.class);
+    //tfps.push(tfpa);
+    //tfps.push(tfp0);
+    //tfps.push(tfp1);
+    //tfps.push(TypeFunPtr.make(f2,1,ND,Type.XSCALAR));
+    //tfps.push(TypeFunPtr.make(f2,1,ND,Type. SCALAR));
+    //tfps.push(TypeFunPtr.make(f7,1,ND,Type.XSCALAR));
+    //tfps.push(TypeFunPtr.make(f7,1,ND,Type. SCALAR));
+    //BitsFun bf2  = BitsFun.make0(f2);
+    //BitsFun bf7  = BitsFun.make0(f7);
+    //BitsFun bf27 = BitsFun.make0(f2,f7);
+    //tfps.push(TypeFunPtr.make_cycle(bf2 ,1,ND));
+    //tfps.push(TypeFunPtr.make_cycle(bf7 ,1,ND));
+    //tfps.push(TypeFunPtr.make_cycle(bf27,1,ND));
+    //tfps.push(TypeFunPtr.make(f2,1,ND,TypeFunPtr.make(f7,1,ND,Type.XSCALAR)));
+    //tfps.push(TypeFunPtr.make(f2,1,ND,TypeFunPtr.make(f7,1,ND,Type. SCALAR)));
+    //tfps.push(TypeFunPtr.make(f7,1,ND,TypeFunPtr.make(f2,1,ND,Type.XSCALAR)));
+    //tfps.push(TypeFunPtr.make(f7,1,ND,TypeFunPtr.make(f2,1,ND,Type. SCALAR)));
+    //
+    //// Check that we can wrap sanely
+    //for( int i=0; i<tfps._len; i++ ) {
+    //  TypeFunPtr tfpi = tfps.at(i);
+    //  for( int j=i+1; j<tfps._len; j++ ) {
+    //    TypeFunPtr tfpj = tfps.at(j);
+    //    assert tfpi!=tfpj;      // No dups
+    //    if( tfpi.isa(tfpj) ) {
+    //      TypeFunPtr tfpi2  = TypeFunPtr.makex(bf2 ,1,ND,tfpi);
+    //      TypeFunPtr tfpj2  = TypeFunPtr.makex(bf2 ,1,ND,tfpj);
+    //      assert tfpi2 .isa(tfpj2 );
+    //      TypeFunPtr tfpi7  = TypeFunPtr.makex(bf7 ,1,ND,tfpi);
+    //      TypeFunPtr tfpj7  = TypeFunPtr.makex(bf7 ,1,ND,tfpj);
+    //      assert tfpi7 .isa(tfpj7 );
+    //      TypeFunPtr tfpi27 = TypeFunPtr.makex(bf27,1,ND,tfpi);
+    //      TypeFunPtr tfpj27 = TypeFunPtr.makex(bf27,1,ND,tfpj);
+    //      assert tfpi27.isa(tfpj27);
+    //    }
+    //  }
+    //}
+    throw unimpl();
 
   }
 

@@ -10,7 +10,7 @@ public class TypeInt extends Type<TypeInt> {
   private byte _x;        // -2 bot, -1 not-null, 0 con, +1 not-null-top +2 top
   public  byte _z;        // bitsiZe, one of: 1,8,16,32,64
   private long _con;      // hi or lo according to _x
-  private TypeInt init(int x, int z, long con ) { _x=(byte)x; _z=(byte)z; _con = con; _name=""; return this; }
+  private TypeInt init(int x, int z, long con ) { super.init(); _x=(byte)x; _z=(byte)z; _con = con; return this; }
   @Override TypeInt copy() { return _copy().init(_x,_z,_con); }
   // Hash does not depend on other types
   @Override long static_hash() { return Util.mix_hash(super.static_hash(),_x,_z,(int)_con); }
@@ -22,7 +22,6 @@ public class TypeInt extends Type<TypeInt> {
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    sb.p(_name);
     if( _con != 0 ) return sb.p(_x<0 ? "&" : (_x>0 ? "+" : "")).p(_con);
     if( _x==0 ) return sb.p("0");
     return sb.p(_x>0?"~":"").p(Math.abs(_x)==1?"n":"").p("int").p(_z);
@@ -79,13 +78,13 @@ public class TypeInt extends Type<TypeInt> {
     assert t != this;
     switch( t._type ) {
     case TINT:   break;
-    case TFLT:   return xmeetf((TypeFlt)t);
+    case TFLT:   // return xmeetf((TypeFlt)t); // Not a lattice?
     case TFUNPTR:
     case TMEMPTR:
+    case TSTRUCT:
     case TRPC:   return cross_nil(t);
     case TARY:
     case TFLD:
-    case TSTRUCT:
     case TTUPLE:
     case TMEM:   return ALL;
     default: throw typerr(t);
@@ -160,7 +159,7 @@ public class TypeInt extends Type<TypeInt> {
   @Override public boolean is_con()   { return _x==0; }
   @Override public boolean must_nil() { return _x==-2 || (_x==0 && _con==0); }
   @Override public boolean may_nil() { return _x==2; }
-  @Override Type not_nil() {
+  @Override TypeInt not_nil() {
     // Choice {+0+1} ==> {+1}, which is just {1}
     if( this==BOOL.dual() ) return TRUE;
     // {0} ==> {0,1}

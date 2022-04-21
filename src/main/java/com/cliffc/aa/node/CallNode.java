@@ -5,11 +5,13 @@ import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 
 import static com.cliffc.aa.AA.*;
+import static com.cliffc.aa.Env.GVN;
 
 // Call/apply node.
 //
@@ -124,7 +126,7 @@ public class CallNode extends Node {
   Node arg ( int x ) { assert x>=0; return _defs.at(x); }
   // Set an argument.  Use 'set_fun' to set the Code.
   Node set_arg (int idx, Node arg) { assert idx>=DSP_IDX && idx <nargs(); return set_def(idx,arg); }
-  public void set_fdx( Node fun) {set_def(DSP_IDX, fun);}
+  public CallNode set_fdx( Node fun) { set_def(DSP_IDX, fun); return this; }
   public void set_mem( Node mem) { set_def(MEM_IDX, mem); }
   @Override void walk_reset0() { assert is_prim(); _not_resolved_by_gcp = false; }
 
@@ -178,19 +180,23 @@ public class CallNode extends Node {
     // When do I do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked &&           // Not yet unpacked a tuple
-        true )
-      throw unimpl();
-    //    arg(ARG_IDX) instanceof NewNode nnn && // An allocation
-    //    nnn._is_val ) {                        // A tuple
-    //  // Find a tuple being passed in directly; unpack
-    //  pop(); // Pop off the NewNode tuple
-    //  for( int i=ARG_IDX; i<nnn._defs._len; i++ ) // Push the args; unpacks the tuple
-    //    add_def(nnn.in(i));
-    //  _unpacked = true;     // Only do it once
-    //  xval(); // Recompute value, this is not monotonic since replacing tuple with args
-    //  GVN.add_work_new(this);// Revisit after unpacking
-    //  return this;
-    //}
+        val(ARG_IDX) instanceof TypeStruct ts && // An arg collection
+        ts.is_tup() ) {                          // A tuple
+      // Find a tuple being passed in directly; unpack
+      Node nnn = pop(); // Pop off the tuple
+      if( nnn instanceof StructNode )
+        for( Node n : nnn._defs ) // Push the args; unpacks the tuple
+          add_def(n);
+      else {
+        assert nnn instanceof ConNode;
+        for( TypeFld fld : ts )
+          add_def(Node.con(fld._t));
+      }
+      _unpacked = true;     // Only do it once
+      xval(); // Recompute value, this is not monotonic since replacing tuple with args
+      GVN.add_work_new(this);// Revisit after unpacking
+      return this;
+    }
 
     Type tc = _val;
     if( !(tc instanceof TypeTuple) ) return null;
@@ -219,11 +225,10 @@ public class CallNode extends Node {
     // Try to resolve to single-target
     Node fdx = fdx();
     if( fdx instanceof FreshNode fresh ) fdx = fresh.id();
-    if( fdx instanceof UnresolvedNode ) {
-    //  Node fdx2 = ((UnresolvedNode)fdx).resolve_node(tcall._ts);
-    //  if( fdx2!=null )
-    //    return set_fdx(fdx2);
-      throw unimpl();
+    if( fdx instanceof UnresolvedNode unr ) {
+      Node fdx2 = unr.resolve_node(tcall._ts);
+      if( fdx2!=null )
+        return set_fdx(fdx2);
     }
 
     // Wire valid targets.
@@ -252,8 +257,8 @@ public class CallNode extends Node {
   @Override public void add_reduce_extra() {
     Node cepi = cepi();
     if( !_is_copy && cepi!=null )
-      Env.GVN.add_reduce(cepi);
-    Env.GVN.add_flow(mem()); // Dead pointer args reduced to ANY, so mem() liveness lifts
+      GVN.add_reduce(cepi);
+    GVN.add_flow(mem()); // Dead pointer args reduced to ANY, so mem() liveness lifts
   }
 
   @Override public Node ideal_grow() {
@@ -392,11 +397,11 @@ public class CallNode extends Node {
     boolean err = err(true)!=null;
     for( Node def : _defs )
       if( def!=null && err )
-        Env.GVN.add_flow(def);
+        GVN.add_flow(def);
     // If not resolved, might now resolve
     if( _val instanceof TypeTuple ) {
       BitsFun fidxs = ttfp(_val)._fidxs;
-      if( fidxs.abit()!=-1 ) Env.GVN.add_reduce(this);
+      if( fidxs.abit()!=-1 ) GVN.add_reduce(this);
       // Check that "calls any INTX fidx" matches "rpc in ALL_CALLS".
       if( fidxs.test_recur(BitsFun.INTX) != ALL_CALLS.test_recur(_rpc) )
         uncall_all(fidxs.test_recur(BitsFun.INTX),_rpc);
@@ -417,14 +422,14 @@ public class CallNode extends Node {
       Env.unhook_rets();// All FunNodes can drop their unknown input
       for( Node use : Env.ALL_CTRL._uses )
         if( use instanceof FunNode )      // Prims included can recompute
-          Env.GVN.add_flow_uses(Env.GVN.add_flow(use)); // Parms on prims
+          GVN.add_flow_uses(GVN.add_flow(use)); // Parms on prims
     }
   }
 
   @Override public void add_flow_def_extra(Node chg) {
     // Projections live after a call alter liveness of incoming args
     if( chg instanceof ProjNode proj && proj._idx < len())
-      Env.GVN.add_flow(in(proj._idx));
+      GVN.add_flow(in(proj._idx));
   }
 
   @Override public void add_flow_use_extra(Node chg) {
@@ -432,14 +437,14 @@ public class CallNode extends Node {
     if( chg == fdx() ) {           // FIDX falls to sane from too-high
       add_flow_defs();             // All args become alive
       if( cepi!=null ) {
-        Env.GVN.add_work_new (cepi); // FDX gets stable, might wire, might unify_lift
-        Env.GVN.add_flow_defs(cepi); // Wired Rets might no longer be alive (might unwire)
+        GVN.add_work_new (cepi); // FDX gets stable, might wire, might unify_lift
+        GVN.add_flow_defs(cepi); // Wired Rets might no longer be alive (might unwire)
       }
     } else if( chg == mem() ) {
       //if( cepi != null ) Env.GVN.add_flow(cepi);
     } else {                    // Args lifted, may resolve
       if( fdx() instanceof UnresolvedNode )
-        Env.GVN.add_reduce(this);
+        GVN.add_reduce(this);
     }
   }
 
@@ -467,16 +472,15 @@ public class CallNode extends Node {
       return ((!_is_copy && !cepi.is_all_wired()) || // Unwired calls remain, dsp could be alive yet
               (dsp!=null && dsp._live==Type.ALL)) ? Type.ALL : TypeFunPtr.GENERIC_FUNPTR;
     }
-    //
-    //// Check that all fidxs are wired; an unwired fidx might be in-error
-    //// and we want the argument alive for errors.  This is a value turn-
-    //// around point (high fidxs need to fall)
-    //if( !_is_copy && !cepi.is_all_wired() ) return TypeMem.ALIVE;
-    //// All wired, the arg is dead if the matching projection is dead
-    //int argn = _defs.find(def);
-    //ProjNode proj = ProjNode.proj(this, argn);
-    //return proj == null || proj._live == TypeMem.DEAD ? TypeMem.DEAD : TypeMem.ALIVE;
-    throw unimpl();
+
+    // Check that all fidxs are wired; an unwired fidx might be in-error,
+    // and we want the argument alive for errors.  This is a value turn-
+    // around point (high fidxs need to fall)
+    if( !_is_copy && !cepi.is_all_wired() ) return Type.ALL;
+    // All wired, the arg is dead if the matching projection is dead
+    int argn = _defs.find(def);
+    ProjNode proj = ProjNode.proj(this, argn);
+    return proj == null || proj._live == TypeMem.ANYMEM ? TypeMem.ANYMEM : TypeMem.ALLMEM;
   }
 
   @Override public TV2 new_tvar( String alloc_site) { return null; }
@@ -513,6 +517,32 @@ public class CallNode extends Node {
       return ErrMsg.syntax(_badargs[0],err_arg_cnt(ret.fun()._name,tfp));
     }
 
+    // Now do an arg-check.  No more than 1 unresolved, so the error message is
+    // more sensible.
+    BitsFun.Tree<BitsFun> tree = fidxs.tree();
+    for( int j=ARG_IDX; j<nargs(); j++ ) {
+      Type actual = arg(j).sharptr(mem());
+      Ary<Type> ts=null;
+      for( int fidx : fidxs ) {
+        if( fidx==0 ) continue;
+        for( int kid=fidx; kid!=0; kid = tree.next_kid(fidx,kid) ) {
+          RetNode ret = RetNode.get(kid);
+          if( ret==null ) continue;
+          FunNode fun = ret.fun();
+          ParmNode parm = fun.parm(j);
+          if( parm==null ) continue;   // Formal is dead
+          Type formal = parm._t;
+          if( actual.isa(formal) ) continue; // Actual is a formal
+          if( fast ) return ErrMsg.FAST;     // Fail-fast
+          if( ts==null ) ts = new Ary<>(new Type[1],0);
+          if( ts.find(formal) == -1 ) // Dup filter
+            ts.push(formal);          // Add broken type
+        }
+      }
+      if( ts!=null )
+        return ErrMsg.typerr(_badargs[j-ARG_IDX+1],actual, mem()._val,ts.asAry());
+    }
+
     return null;
   }
   public String err_arg_cnt(String fname, TypeFunPtr tfp) {
@@ -531,7 +561,7 @@ public class CallNode extends Node {
     if( _val==Type.ANY ) return Env.ANY;
     if( idx!=DSP_IDX ) return in(idx);
     if( fdx() instanceof FunPtrNode fptr ) {
-      Env.GVN.add_flow(fptr);   // Probably goes unused
+      GVN.add_flow(fptr);   // Probably goes unused
       return fptr.display();
     }
     throw unimpl(); // Need a FP2DISP

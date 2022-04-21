@@ -8,7 +8,7 @@ public class TypeFlt extends Type<TypeFlt> {
   byte _x;                // -2 bot, -1 not-null, 0 con, +1 not-null-top +2 top
   byte _z;                // bitsiZe, one of: 32,64
   double _con;
-  private TypeFlt init(int x, int z, double con ) { super.init(""); _x=(byte)x; _z=(byte)z; _con = con; return this; }
+  private TypeFlt init(int x, int z, double con ) { super.init(); _x=(byte)x; _z=(byte)z; _con = con; return this; }
   @Override TypeFlt copy() { return _copy().init(_x,_z,_con); }
   // Hash does not depend on other types
   @Override long static_hash() { return Util.mix_hash(super.static_hash(),_x,_z,(int)_con); }
@@ -19,7 +19,6 @@ public class TypeFlt extends Type<TypeFlt> {
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    sb.p(_name);
     if( _x==0 )
       return ((float)_con)==_con ? sb.p((float)_con).p('f') : sb.p(_con);
     return sb.p(_x>0?"~":"").p(Math.abs(_x)==1?"n":"").p("flt").p(_z);
@@ -35,20 +34,20 @@ public class TypeFlt extends Type<TypeFlt> {
   }
 
   static { new Pool(TFLT,new TypeFlt()); }
-  public static Type make( int x, int z, double con ) {
-    if( x==0 && (double)((long)con)==con ) return TypeInt.con((long)con);
+  public static TypeFlt make( int x, int z, double con ) {
+    //if( x==0 && (double)((long)con)==con ) return TypeInt.con((long)con);
     TypeFlt t1 = POOLS[TFLT].malloc();
     return t1.init(x,z,con).hashcons_free();
   }
 
-  public static Type con(double con) { return make(0,log(con),con); }
+  public static TypeFlt con(double con) { return make(0,log(con),con); }
 
-  public static final TypeFlt FLT64 = (TypeFlt)make(-2,64,0);
-  public static final TypeFlt FLT32 = (TypeFlt)make(-2,32,0);
-  public static final TypeFlt PI    = (TypeFlt)con(Math.PI);
-  public static final TypeFlt HALF  = (TypeFlt)con(0.5);
-  public static final TypeFlt NFLT64= (TypeFlt)make(-1,64,0);
-  public static final TypeFlt NFLT32= (TypeFlt)make(-1,32,0);
+  public static final TypeFlt FLT64 = make(-2,64,0);
+  public static final TypeFlt FLT32 = make(-2,32,0);
+  public static final TypeFlt PI    = con(Math.PI);
+  public static final TypeFlt HALF  = con(0.5);
+  public static final TypeFlt NFLT64= make(-1,64,0);
+  public static final TypeFlt NFLT32= make(-1,32,0);
   public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,NFLT64,PI,NFLT32,FLT32,HALF};
   static void init1( HashMap<String,Type> types ) {
     types.put("flt32",FLT32);
@@ -64,13 +63,13 @@ public class TypeFlt extends Type<TypeFlt> {
     assert t != this;
     switch( t._type ) {
     case TFLT:   break;
-    case TINT:   return ((TypeInt)t).xmeetf(this);
+    case TINT:   //return ((TypeInt)t).xmeetf(this); // Not a lattice?
     case TFUNPTR:
     case TMEMPTR:
+    case TSTRUCT:
     case TRPC:   return cross_nil(t);
     case TARY:
     case TFLD:
-    case TSTRUCT:
     case TTUPLE:
     case TMEM:   return ALL;
     default: throw typerr(t);
@@ -101,12 +100,11 @@ public class TypeFlt extends Type<TypeFlt> {
   @Override public boolean is_con()   { return _x==0; }
   @Override public boolean must_nil() { return _x==-2; }
   @Override public boolean  may_nil() { return _x== 2; }
-  @Override Type not_nil() { return _x==2 ? make(1,_z,_con) : this; }
+  @Override TypeFlt not_nil() { return _x==2 ? make(1,_z,_con) : this; }
   @Override public Type meet_nil(Type nil) {
     if( nil==Type.XNIL )
       return _x==2 ? Type.XNIL : (_x==-2 ? Type.SCALAR : Type.NSCALR);
-    if( _x >0 ) return TypeInt.BOOL; // High float picks '1', mixes nil to bool
-    return _z==32 ? FLT32 : FLT64;   // Constant or low, just keeps size
+    return TypeFlt.make(-2,_x<=0?_z:32,0);
   }
 
   @Override public Type _widen() {

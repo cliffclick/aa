@@ -1,7 +1,6 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.IHashMap;
+import com.cliffc.aa.util.*;
 import java.util.Arrays;
 
 // Class to make hashcons Type[].
@@ -24,9 +23,8 @@ public class Types {
     int _hash;
     private Key(Type[] ts, int hash) { _ts=ts; _hash = hash; }
     private static int hash( Type[] ts ) {
-      int hash = 0;
-      for( Type t : ts ) hash += t._hash;
-      return hash;
+      for( Type t : ts ) Util.add_hash( t._hash);
+      return (int)Util.get_hash();
     }
     @Override public int hashCode() { return _hash; }
     @Override public boolean equals(Object o) {

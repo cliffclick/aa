@@ -8,7 +8,7 @@ import com.cliffc.aa.util.VBitSet;
 public class TypeRPC extends Type<TypeRPC> {
   private BitsRPC _rpcs;         //
 
-  private TypeRPC init( BitsRPC rpcs ) { super.init(""); _rpcs = rpcs; return this; }
+  private TypeRPC init( BitsRPC rpcs ) { super.init(); _rpcs = rpcs; return this; }
   @Override public long static_hash( ) { return ((TRPC + _rpcs._hash)<<1)|1; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -41,11 +41,11 @@ public class TypeRPC extends Type<TypeRPC> {
     case TFUNPTR:
     case TMEMPTR:
     case TFLT:
+    case TSTRUCT:
     case TINT:   return cross_nil(t);
     case TARY:
     case TFLD:
     case TTUPLE:
-    case TSTRUCT:
     case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen
     }
@@ -66,7 +66,7 @@ public class TypeRPC extends Type<TypeRPC> {
   @Override public boolean is_con()       { return _rpcs.abit()==0; } // only nil
   @Override public boolean must_nil() { return _rpcs.test(0) && !above_center(); }
   @Override public boolean may_nil() { return _rpcs.may_nil(); }
-  @Override Type not_nil() {
+  @Override TypeRPC not_nil() {
     BitsRPC bits = _rpcs.not_nil();
     return bits==_rpcs ? this : make(bits);
   }

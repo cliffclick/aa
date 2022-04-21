@@ -35,7 +35,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   private Type _dsp;            // Display; often a TMP to a TS; ANY is dead (not live, nobody uses).
 
   private TypeFunPtr init(BitsFun fidxs, int nargs, Type dsp, Type ret ) {
-    super.init("");
+    super.init();
     assert !(dsp instanceof TypeFld);
     _fidxs = fidxs; _nargs=nargs; _dsp=dsp; _ret=ret;
     return this;
@@ -264,9 +264,9 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   public        TypeFunPtr make_from( Type dsp ) { return make(_fidxs,_nargs, dsp,_ret); }
   public        TypeFunPtr make_from( BitsFun fidxs  ) { return fidxs==_fidxs ? this : make( fidxs,_nargs,_dsp,_ret); }
   public        TypeFunPtr make_from( Type dsp, Type ret ) { return dsp==_dsp && ret==_ret ? this : make(_fidxs,_nargs, dsp,ret); }
-  public        TypeFunPtr make_no_disp( ) { return make(_fidxs,_nargs,TypeMemPtr.NO_DISP,_ret); }
-  public static TypeFunPtr make_sig(TypeStruct formals,Type ret) { throw unimpl(); }
-  public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR; // Open display, allows more fields
+  //public        TypeFunPtr make_no_disp( ) { return make(_fidxs,_nargs,TypeMemPtr.NO_DISP,_ret); }
+  //public static TypeFunPtr make_sig(TypeStruct formals,Type ret) { throw unimpl(); }
+  //public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR; // Open display, allows more fields
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.ALL0 ,1,Type.ALL,Type.ALL);
   public  static final TypeFunPtr ARG2   =         make(BitsFun.ALL0 ,2,Type.ALL,Type.ALL);
@@ -284,10 +284,10 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     case TFLT:
     case TINT:
     case TMEMPTR:
+    case TSTRUCT:
     case TRPC:   return cross_nil(t);
     case TARY:
     case TFLD:
-    case TSTRUCT:
     case TTUPLE:
     case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen
@@ -343,7 +343,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   }
   @Override public boolean must_nil() { return _fidxs.test(0) && !_fidxs.above_center(); }
   @Override public boolean may_nil() { return _fidxs.may_nil(); }
-  @Override Type not_nil() {
+  @Override TypeFunPtr not_nil() {
     BitsFun bits = _fidxs.not_nil();
     return bits==_fidxs ? this : make_from(bits);
   }

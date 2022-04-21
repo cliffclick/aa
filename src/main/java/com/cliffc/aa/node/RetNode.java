@@ -59,12 +59,13 @@ public final class RetNode extends Node {
   // Called by testing
   public TypeStruct formals() {
     Node[] parms = fun().parms();
-    TypeStruct ts = TypeStruct.malloc("",false);
-    for( int i=DSP_IDX; i<_nargs; i++ )
-      if( parms[i]!=null )
-        //ts.add_fld(TypeFld.make(((ParmNode)parms[i])._name,((ParmNode)parms[i])._t,TypeFld.Access.Final));
-        throw unimpl();
-    return ts.hashcons_free();
+    //TypeStruct ts = TypeStruct.malloc(TypeFld.DEF);
+    //for( int i=DSP_IDX; i<_nargs; i++ )
+    //  if( parms[i]!=null )
+    //    //ts.add_fld(TypeFld.make(((ParmNode)parms[i])._name,((ParmNode)parms[i])._t,TypeFld.Access.Final));
+    //    throw unimpl();
+    //return ts.hashcons_free();
+    throw unimpl();
   }
 
 

@@ -67,8 +67,8 @@ public class TypeMem extends Type<TypeMem> {
   private HashMap<BitsAlias,TypeMemPtr> _sharp_cache;
 
   private TypeMem init(TypeStruct[] pubs) {
+    super.init();
     assert check(pubs);    // Caller has canonicalized arrays already
-    super.init("");
     _pubs = pubs;
     return this;
   }
@@ -428,7 +428,7 @@ public class TypeMem extends Type<TypeMem> {
       for( int alias : aliases )
         for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
           t = (TypeStruct)t.meet(at(kid));
-      t = t.set_name(tmp._obj._name);
+      t = t.set_name(tmp._obj._clz);
 
       DULLV.clear();
       if( _is_sharp(t)==null )       // If sharp, install and return
@@ -467,7 +467,11 @@ public class TypeMem extends Type<TypeMem> {
       if( t !=null ) return t;
       t = dull_cache.get(tmp._aliases);
       if( visit.tset(t._uid) ) return t;
-    } else t = dull.copy();
+    } else if( dull instanceof TypeStruct dullts ) {
+      t = dullts.copy2();
+    } else {
+      t = dull.copy();
+    }
     assert !t.interned();
     t.walk_update( fld -> _sharp(fld,dull_cache,visit));
     return t;
@@ -575,7 +579,7 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean may_be_con()   { return false;}
   @Override public boolean is_con()       { return false;}
   @Override public boolean must_nil() { return false; } // never a nil
-  @Override Type not_nil() { return this; }
+  @Override TypeMem not_nil() { return this; }
 
   public boolean basic_live() { return _pubs.length==1; }
 

@@ -1003,6 +1003,10 @@ public class HM {
     final Syntax[] _flds;
     final Ary<Syntax> _rflds = new Ary<>(Syntax.class);
     Struct( String[] ids, Syntax[] flds ) {
+      TreeMap<String,Syntax> sort = new TreeMap<>();
+      for( int i=0; i<ids.length; i++ ) sort.put(ids[i], flds[i]);
+      int i=0; for( Map.Entry<String,Syntax> e : sort.entrySet() )
+                 { ids[i]=e.getKey(); flds[i]=e.getValue(); i++; }
       _ids=ids;
       _flds=flds;
       // Make a TMP
@@ -1555,10 +1559,10 @@ public class HM {
   interface Alloc {
     TypeMemPtr tmp();
     default TypeMemPtr _tmp(int alias, String[] ids, Type[] ts) {
-      TypeFld[] tfs = new TypeFld[ts.length+1];
+      TypeFld[] tfs = TypeFlds.get(ts.length+1);
       tfs[0] = TypeFld.NO_DISP;  // Display
       for( int i=0; i<ts.length; i++ ) tfs[i+1] = TypeFld.make(ids[i],ts[i]);
-      return TypeMemPtr.make(alias,TypeStruct.make(tfs));
+      return TypeMemPtr.make(alias,TypeStruct.make(TypeFlds.hash_cons(tfs)));
     }
     Type fld(String id);
     void push(Syntax fld);
@@ -1820,7 +1824,7 @@ public class HM {
         if( tstr==null ) {
           // Returning a high version of struct
           Type.RECURSIVE_MEET++;
-          tstr = TypeStruct.malloc("",is_open()).add_fld(TypeFld.NO_DISP);
+          tstr = TypeStruct.malloc("",Type.ALL.oob(is_open()),TypeFlds.EMPTY).add_fld(TypeFld.NO_DISP);
           if( _args!=null )
             for( String id : _args.keySet() )
               tstr.add_fld(TypeFld.malloc(id));

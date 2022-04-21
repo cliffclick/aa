@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Ary;
 
 import java.util.Arrays;
 
@@ -11,8 +12,7 @@ import static com.cliffc.aa.type.TypeFld.Access;
 // Makes a TypeStruct without allocation
 
 // A simple gather/builder node, with support for incremental field discovery
-// for the Parser.  Inputs are mapped 1-to-1 with the TypeStruct.  Does not
-// have control or memory edges.  This is an identity:
+// for the Parser.  Does not have control or memory edges.  This is an identity:
 //
 //       Scalar <- Struct[name] <- Field[name] <- Scalar
 //
@@ -29,7 +29,8 @@ import static com.cliffc.aa.type.TypeFld.Access;
 // Holds argument-starts for argument tuples, for eventual error reporting.
 public class StructNode extends Node {
 
-  private TypeStruct _ts; // Field names and default types, maps 1-to-1 with node inputs
+  private final Ary<String> _flds; // Field names per node index
+  private TypeStruct _ts; // Field names and default types, alpha-sorted.
 
   // Used to distinguish closures from normal structs in the Parser (the "^"
   // syntax escapes all nested struct scopes to the enclosing closure).
@@ -48,7 +49,9 @@ public class StructNode extends Node {
     super(OP_STRUCT);
     _is_closure = is_closure;
     _forward_ref = forward_ref;
-    _ts = TypeStruct.EMPTY;
+    _ts = TypeStruct.ISUSED;
+    _flds = new Ary<>(String.class);
+    _fld_starts = new Parse[1];
   }
 
   @Override String str() { return _ts.toString(); }
@@ -69,17 +72,33 @@ public class StructNode extends Node {
     return this;
   }
   StructNode name(String name) {
-    assert _ts._name.length()==0;
+    assert _ts._clz.length()==0;
     return set_ts(_ts.set_name(name));
   }
   public TypeStruct ts() { return _ts; }
 
-  // String-to-index, both node index and TypeStruct index
-  public int find(String name) { return _ts.find(name); }
+  // String-to-node-index, not _ts index
+  public int find(String name) { return _flds.find(name); }
   // String-to-Node
   public Node in(String name) { return in(find(name)); } // Error if not found
   // String to TypeFld
   public TypeFld get(String name) { return _ts.get(name); }
+
+  // String to a BOUND node: if field name maps to a FunPtrNode or an
+  // UnresolvedNode, return the bound version instead.  Otherwise
+  // return the Node as-is, or null if the name misses.
+  public Node in_bind( String fld, Node clz ) {
+    int idx = find(fld);
+    if( idx == -1 ) return null; // No name
+    Node n = in(idx);
+    if( n instanceof FunPtrNode fptr )
+      return new FunPtrNode(fptr._name,fptr.ret(),clz).init();
+    else if( n instanceof UnresolvedNode unr )
+      return ((UnresolvedNode)unr.copy(true)).set_bad(null).set_def(0,clz);
+    // No binding to address, e.g. loading a global constant
+    return n;
+  }
+
 
   // One-time transition when closing a Struct to new fields.
   public StructNode close() { assert !_closed; _closed=true; return this; }
@@ -96,20 +115,20 @@ public class StructNode extends Node {
   public Node add_fld( TypeFld fld, Node val, Parse badt ) {
     assert !_closed;
     int len = len();
-    assert _ts.len()==len;
+    assert _flds.len()==len;
     if( badt != null ) {
-      if( _fld_starts==null ) _fld_starts = new Parse[1];
       while( _fld_starts.length <= len ) _fld_starts = Arrays.copyOf(_fld_starts,_fld_starts.length<<1);
       _fld_starts[len] = badt;
     }
     add_def(val);
+    _flds.push(fld._fld);
     return set_ts(_ts.add_fldx(fld)); // Will also assert no-dup field names
   }
 
   // Add a named FunPtr to a Struct.  Auto-inflates to an Unresolved as needed.
   public void add_fun( String name, Access fin, FunPtrNode fptr, Parse bad ) {
     assert !_closed;
-    int idx = find(name);
+    int idx = find(name);       // Node index
     if( idx == -1 ) {
       TypeFld fld2 = TypeFld.make(name,fptr._val,fin);
       add_fld(fld2, fptr, bad);
@@ -124,14 +143,15 @@ public class StructNode extends Node {
       ? unr2
       : new UnresolvedNode(name,bad).scoped().add_fun((FunPtrNode)n);
     unr.add_fun(fptr);          // Checks all formals are unambiguous
-    set_ts(_ts.replace_fld(_ts.get(idx).make_from(unr._val)));
-    set_def(idx,unr);
+    set_ts(_ts.replace_fld(_ts.get(name).make_from(unr._val)));
+    set_def(idx,unr);           // No change to _flds
     xval();
   }
 
   // For reseting primitives for multi-testing
   public void pop_fld() {
     pop();
+    _flds.pop();
     set_ts(_ts.pop_fld(len()));
   }
 
@@ -164,18 +184,19 @@ public class StructNode extends Node {
 
   @Override public Type value() {
     assert _defs._len==_ts.len();
-    TypeStruct ts = TypeStruct.malloc(_ts._name,_ts.above_center());
-    for( int i=0; i<len(); i++ )
-      ts.add_fld(_ts.get(i).make_from(val(i)));
-    return ts.hashcons_free();
+    TypeFld[] flds = TypeFlds.get(_ts.len());
+    for( int i=0; i<flds.length; i++ ) {
+      TypeFld fld = _ts.get(i);
+      flds[i] = fld.make_from(in(fld._fld)._val);
+    }
+    return _ts.make_from(flds);
   }
 
   // Return liveness for a field
   @Override public Type live_use( Node def ) {
     if( !(_live instanceof TypeStruct ts) ) return _live.oob();
     int idx = _defs.find(def);        // Get Node index
-    TypeFld sfld = _ts.get(idx);      // Self field name, from index
-    TypeFld lfld = ts.get(sfld._fld); // Liveness for this name
+    TypeFld lfld = ts.get(_flds.at(idx)); // Liveness for this name
     return lfld==null ? ts.oob() : lfld._t.oob();
   }
 

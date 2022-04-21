@@ -1931,20 +1931,33 @@ public class TestLattice {
   // Maybe extend this is a 2nd field that "nests" inside @{c=_} so we can
   // allow @{c=_,x=_} and @{c=_,y=_} both of which subtype @{c=_}.  Same
   // as the old TypeStruct, all extra fields already exist at Top/Bot.
+
+  // CNC - next open question:  how do multi-fields stack.
+  // Theory: TS is "just" an infinite collection of fields, with defaults for most.
+  // now meet nil with this collection-
+  //  - which comes to: @{c=nint,d=scalar}
+  //
+  // CNC - cyclic struct types vs meet?
   @Test public void testLattice21() {
     N.reset();
 
     // Lattice template.
     N  b64 = new N(0,"  " );
-    N nb64 = new N(0," n", b64);
-    N zero = new N(0," 0", b64);
-    N two  = new N(0," 2",nb64);
-    N three= new N(0," 3",nb64);
-    N xnb  = new N(0,"~n",two,three);
-    N xb64 = new N(0," ~",xnb,zero);
+    N nb64 = new N(0," n",  b64);
+    N  b32 = new N(0,"32",  b64);
+    N nb32 = new N(0,"n32",nb64,b32);
+    N zero = new N(0," 0", b32);
+    N two  = new N(0," 2",nb32);
+    N three= new N(0," 3",nb32);
+    N xnb32= new N(0,"~n32",two,three);
+    N xb32 = new N(0,"~32",xnb32,zero);
+    N xnb  = new N(0,"~n",xnb32);
+    N xb64 = new N(0," ~",xnb,xb32);
     xb64.set_dual(b64);
-    xnb.set_dual(nb64);
-    N[] ns = new N[]{b64,nb64,zero,two,three,xnb,xb64};
+    xnb .set_dual(nb64);
+    xb32.set_dual(b32);
+    xnb32.set_dual(nb32);
+    N[] ns = new N[]{b64,nb64,b32,nb32,zero,two,three,xnb32,xb32,xnb,xb64};
     int len = ns.length;
 
     // Build the int lattice
@@ -1953,42 +1966,81 @@ public class TestLattice {
     // Build the flt lattice
     N[] fns = lattice_extender(ns,"%sflt");
 
-    // Build the @{c=_} lattice
-    N[] cns = lattice_extender(ns,"@{c=%sint}");
-
-    // Build the @{d=_} lattice
-    N[] dns = lattice_extender(ns,"@{d=%sflt}");
-
     // Wrap with scalar, nscalr
     N  sclr = new N("scalar");
     N nsclr = new N("nscalr", sclr);
-    //N  mt   = new N(" @{  }", sclr);  // Empty struct
-    //N xmt   = new N("~@{  }"      );
     N xnscl = new N("~nsclr"      );
-    N xsclr = new N("~scalr",xnscl/*,xmt*/);
+    N xsclr = new N("~scalr",xnscl);
     nsclr.set_dual(xnscl);
     xsclr.set_dual( sclr);
-    add_edge(0,  sclr, ins,fns,cns,dns);
-    add_edge(1, nsclr, ins,fns,cns,dns);
-
-    //xmt.set_dual(mt);
-    //add_edge(0,  mt, cns,dns);
+    add_edge(0,  sclr, ins);
+    add_edge(0,  sclr, fns);
+    add_edge(1, nsclr, ins);
+    add_edge(1, nsclr, fns);
 
     // Split nil.  Feels odd to connect ~nScalar with nil and ~nil to nScalar,
     // but required else not a lattice.
     N  nil = new N(" nil");
     N xnil = new N("~nil",nsclr);
     xnil.set_dual(nil);
-    add_edge(len-1-0, xnil, ins,fns,cns,dns);
+    add_edge(len-1-2, xnil, ins);
+    add_edge(len-1-2, xnil, fns);
     xnscl._subs.push(nil);
 
     // Can I ~nil->0int->nil ?
     // NO: Crossing Nil.
-    assert ins[2]._t.equals(" 0int");
-    //ins[2]._subs.push(nil);
-    //xnil._subs.push(ins[2]);
-    //fns[2]._subs.push(nil);
-    //xnil._subs.push(fns[2]);
+    assert ins[4]._t.equals(" 0int");
+    //ins[4]._subs.push(nil);
+    //xnil._subs.push(ins[4]);
+    //fns[4]._subs.push(nil);
+    //xnil._subs.push(fns[4]);
+
+    // Add edge from f64/i64 to i32
+    // NO: No valid join for eg int and nflt; both ~flt and ~nscalar
+    //add_edge(2, fns[0], ins);
+    
+    // Build larger lattice for structures
+    N b_scal = new N(0," SC");
+    b64._subs.push(b_scal);
+    N bnscal = new N(0," NS",b_scal);
+    nb64._subs.push(bnscal);
+    N b_nil = new N(0," NIL",b32);
+    N bxnil = new N(0,"~NIL",bnscal);
+    xb32._subs.push(bxnil);
+    N bxnscal = new N(0,"~NS",xnb,b_nil);
+    N bxscalr = new N(0,"~SC",xb64,bxnscal);
+    bxscalr.set_dual(b_scal);
+    bxnscal.set_dual(bnscal);
+    bxnil  .set_dual(b_nil );
+    N[] xns = new N[]{b_scal,bnscal,b64,nb64,b32,nb32,b_nil,zero,two,three,bxnil,xnb32,xb32,xnb,xb64,bxnscal,bxscalr};
+
+    // Empty signed struct surround all other structs ?
+    // Can I ~() -> @{c=~...} ->...-> @{c= ...} -> () ?
+    //       ~() -> @{d=~...} ->...-> @{d= ...} -> () ?
+    // NO: Crossing Nil through the ()->n()->C/D@{} path.
+    // Means directly above/below @{c=+/-Scalar} must be +/-Scalar.
+    //N   mt = new N("  ()",sclr);
+    //N  nmt = new N(" n()",nsclr,mt);
+    //N xnmt = new N("~n()");
+    //N x_mt = new N("~ ()",xnmt);
+    //xnscl._subs.push(xnmt);
+    //xsclr._subs.push(x_mt);
+    //x_mt.set_dual( mt);
+    //xnmt.set_dual(nmt);
+
+    // Build the @{c=_} lattice
+    N[] cns = lattice_extender(xns,"@{c=%sint}");
+    // Connect to outer lattice
+    add_edge(0,  sclr, cns);
+    add_edge(1, nsclr, cns);
+    add_edge(10,  xnil, cns);
+
+    // Build the @{d=_} lattice
+    N[] dns = lattice_extender(xns,"@{d=%sflt}");
+    // Connect to outer lattice
+    add_edge(0,  sclr, dns);
+    add_edge(1, nsclr, dns);
+    add_edge(10,  xnil, dns);
 
     test(xsclr);
 
@@ -2004,6 +2056,11 @@ public class TestLattice {
     // is a trivial condition, except that in practice it caught a lot of
     // broken implementations.
     assert check_symmetry2();
+  }
+
+  void add_edge( int idx, N n, N[] ns ) {
+    ns[idx]._subs.push(n);
+    n._dual._subs.push(ns[ns.length-1-idx]);
   }
 
   //
@@ -2055,6 +2112,8 @@ public class TestLattice {
   }
 
   // Symmetry 2 : if A isa B, then A.join(C) isa B.join(C)
+  // After some algebra, this is the same as (A&B)+ C === B+C
+  // Given a correct join (hence dual) this is trivial.
   static boolean check_symmetry2() {
     for( N a : N.NS ) {
       for( N b : N.NS ) {
@@ -2070,8 +2129,6 @@ public class TestLattice {
     }
     return true;
   }
-
-
 
 
   // Open question for a future testLattice test:

@@ -11,7 +11,7 @@ public class TypeTuple extends Type<TypeTuple> {
   boolean _any;
   public Type[] _ts; // The fixed known types
   protected TypeTuple init( boolean any, Type[] ts ) {
-    super.init("");
+    super.init();
     _any = any;
     _ts = ts;
     return this;
@@ -67,6 +67,7 @@ public class TypeTuple extends Type<TypeTuple> {
   public static TypeTuple make0( boolean any, Type[] ts ) { return make(any,Types.hash_cons(ts)); }
   public static TypeTuple make( Type[] ts ) { return make0(false,ts); }
   public static TypeTuple make( ) { return make0(false,Types.get(0)); }
+  public static TypeTuple make( Type t0 ) { return make0(false,Types.ts(t0)); }
   public static TypeTuple make( Type t0, Type t1 ) { return make0(false,Types.ts(t0,t1)); }
   public static TypeTuple make( Type t0, Type t1, Type t2 ) { return make0(false,Types.ts(t0,t1,t2)); }
   public static TypeTuple make( Type t0, Type t1, Type t2, Type t3 ) { return make0(false,Types.ts(t0,t1,t2,t3)); }
@@ -74,21 +75,15 @@ public class TypeTuple extends Type<TypeTuple> {
   public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4, Type t5 ) { return make0(false,Types.ts(t0,t1,t2,t3,t4,t5)); }
 
   // Make a Call args tuple from a Struct by adding Memory up front
-  public static TypeTuple make(TypeStruct ts) {
-    // TypeStruct includes a display/DSP_IDX, but what comes before
-    Type[] ts2 = Types.get(ts.len()+DSP_IDX);
-    ts2[CTL_IDX] = Type.CTRL;
-    ts2[MEM_IDX] = TypeMem.ALLMEM;
-    //for( int i=0; i<ts.len(); i++ )
-    //  ts2[DSP_IDX+i] = ts.at(i);
-    //return make(ts2);
-    throw unimpl();
-  }
-
-  public static TypeTuple make_args(                       ) { return make(Type.CTRL,TypeMem.ALLMEM,Type.ALL ); }
-  public static TypeTuple make_args(Type t2                ) { return make(Type.CTRL,TypeMem.ALLMEM,Type.ALL,t2); }
-  public static TypeTuple make_args(Type t2,Type t3        ) { return make(Type.CTRL,TypeMem.ALLMEM,Type.ALL,t2,t3); }
-
+  //public static TypeTuple make(TypeStruct ts) {
+  //  // TypeStruct includes a display/DSP_IDX, but what comes before
+  //  Type[] ts2 = Types.get(ts.len()+DSP_IDX);
+  //  ts2[CTL_IDX] = Type.CTRL;
+  //  ts2[MEM_IDX] = TypeMem.ALLMEM;
+  //  for( int i=0; i<ts.len(); i++ )
+  //    ts2[DSP_IDX+i] = ts.at(i);
+  //  return make(ts2);
+  //}
 
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
   public  static final TypeTuple IF_ANY  = IF_ALL.dual();
@@ -103,17 +98,18 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple TEST0= make(CTRL, TypeMem.ALLMEM, TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
   public  static final TypeTuple TEST1= make(CTRL, TypeMem.ANYMEM, TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
   // Arguments
-  public  static final TypeTuple NO_ARGS    = make_args();
-  public  static final TypeTuple INT64      = make_args(TypeInt.INT64); // {int->flt}
-  public  static final TypeTuple FLT64      = make_args(TypeFlt.FLT64); // {flt->flt}
-  public  static final TypeTuple INT64_INT64= make_args(TypeInt.INT64,TypeInt.INT64); // {int int->int }
-  public  static final TypeTuple FLT64_FLT64= make_args(TypeFlt.FLT64,TypeFlt.FLT64); // {flt flt->flt }
-  public  static final TypeTuple OOP_OOP    = make_args(TypeMemPtr.ISUSED0,TypeMemPtr.ISUSED0);
+  public  static final TypeTuple INT64      = make(CTRL, TypeMem.ALLMEM, TypeStruct.INT); // {int->flt}
+  public  static final TypeTuple FLT64      = make(CTRL, TypeMem.ALLMEM, TypeStruct.FLT); // {flt->flt}
+  public  static final TypeTuple INT64_INT64= make(CTRL, TypeMem.ALLMEM, TypeStruct.INT,TypeStruct.INT); // {int int->int }
+  public  static final TypeTuple INT64_FLT64= make(CTRL, TypeMem.ALLMEM, TypeStruct.INT,TypeStruct.FLT); // {int flt->flt }
+  public  static final TypeTuple FLT64_FLT64= make(CTRL, TypeMem.ALLMEM, TypeStruct.FLT,TypeStruct.FLT); // {flt flt->flt }
+  public  static final TypeTuple FLT64_INT64= make(CTRL, TypeMem.ALLMEM, TypeStruct.FLT,TypeStruct.INT); // {flt int->flt }
+  public  static final TypeTuple OOP_OOP    = make(CTRL, TypeMem.ALLMEM, TypeMemPtr.ISUSED0,TypeMemPtr.ISUSED0);
 
   //
   static final TypeTuple[] TYPES = new TypeTuple[]{
     CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE, TEST0, TEST1,
-    NO_ARGS, INT64, FLT64, INT64_INT64, FLT64_FLT64, OOP_OOP
+    INT64, FLT64, INT64_INT64, FLT64_FLT64, OOP_OOP
   };
 
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
@@ -168,7 +164,7 @@ public class TypeTuple extends Type<TypeTuple> {
     return true;
   }
   @Override public boolean must_nil() { return false; }
-  @Override Type not_nil() { return this; }
+  @Override TypeTuple not_nil() { return this; }
   @Override public Type meet_nil(Type nil) { return ALL; }
 
   public TypeTuple sharptr( TypeMem mem ) {

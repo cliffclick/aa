@@ -38,8 +38,8 @@ public interface Cyclic {
     // Install non-cyclics recursively with a DAG visit; install cyclics as a whole cycle
     CVISIT.clear();             // Reset globals
     SCC_MEMBERS.clear();        // Reset globals
-    head = dag_install(head, 0, null);
-    
+    T head2 = dag_install(head, 0, null);
+
     // Update the mapping
     if( map != null )
       map.replaceAll((k,v) -> v.interned() ? v : v.intern_get());
@@ -50,7 +50,7 @@ public interface Cyclic {
     // Profile; return new interned cycle
     long t1 = System.currentTimeMillis();
     P.time += (t1-t0);  P.cnt++;
-    return head;
+    return head2;
   }
 
   // -----------------------------------------------------------------
@@ -92,6 +92,7 @@ public interface Cyclic {
     // Not in any SCC, normal install
     if( leader==null ) {
       assert !t.interned();
+      if( t instanceof TypeStruct ts ) ts.remove_dups_hashcons();
       T old = (T)t.hashcons();
       if( t!=old ) SCC_FREE.push(t);
       t=old;
@@ -99,11 +100,18 @@ public interface Cyclic {
     // Detect an scc change; we just ended walking an entire SCC
     } else if( scc_leader != leader ) {
       // Just completed an entire SCC.  Hash it, install it.
+      Ary<Type> ts = SCC_MEMBERS.at(scc_depth2);
+
+      // Canonicalize TypeFlds in TypeStructs.  Changes hash so has to happen
+      // before hash calc.
+      for( Type c : ts )
+        if( c instanceof TypeStruct tst )
+          tst.remove_dups();
+
       // The hash has to be order-invariant, since we might visit the members
       // in a different order on a later install.  Requires 2 passes.
-      Ary<Type> ts = SCC_MEMBERS.at(scc_depth2);
       long cyc_hash=0;
-      for( Type c : ts )  cyc_hash ^= c.static_hash(); // Just XOR all the static hashs
+      for( Type c : ts )  cyc_hash ^= c.static_hash(); // Just XOR all the static hashes
       if( cyc_hash==0 ) cyc_hash = 0xcafebabe;
       for( Type c : ts )  c._cyc_hash = cyc_hash;
       for( Type c : ts )  c._hash = c.compute_hash();
@@ -115,12 +123,17 @@ public interface Cyclic {
         t=old;
       } else {
         // Keep the entire cycle.  xdual/rdual/hash/retern
+        Type.RECURSIVE_MEET++; // Stop xdual interning TypeFlds
         long dcyc_hash = Util.rot(cyc_hash,32);
         for( Type c : ts ) { Type d = c._dual = c.xdual(); d._dual = c; d._cyc_hash = dcyc_hash; }
         Type dleader = leader.dual();
         dleader.set_cyclic(dleader);
         for( Type c : ts ) { c.rdual(); c._dual.set_cyclic(dleader); c._dual._hash = c._dual.compute_hash(); }
         for( Type c : ts ) c.retern()._dual.retern();
+        Type.RECURSIVE_MEET--; // Allow xdual to intern TypeFlds
+        for( Type c : ts )     // Now that all fields are interned, we can intern the TypeFld[]
+          if( c instanceof TypeStruct tst )
+            tst.remove_dups_hashcons();
       }
     } // else same SCC, no change
     return t;
@@ -340,7 +353,7 @@ public interface Cyclic {
       switch( h._type ) {
       case Type.TSTRUCT -> {
         sb.p("@{ ");
-        for( TypeFld fld : ((TypeStruct) h).asorted_flds() )
+        for( TypeFld fld : ((TypeStruct) h) )
           _uid(sb.p(fld._fld).p(":"), fld).p(' ');
         sb.unchar().p("}");
       }

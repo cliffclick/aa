@@ -17,7 +17,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
 
   private TypeFld init( @NotNull String fld, Type t, Access access ) {
     assert !(t instanceof TypeFld);
-    super.init("");
+    super.init();
     _fld = fld;
     _t = t;
     _access = access;
@@ -101,6 +101,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public static TypeFld make( String fld, Type t, Access access ) { return malloc(fld,t,access).hashcons_free(); }
   public static TypeFld make( String fld, Type t ) { return make(fld,t,Access.Final); }
   public static TypeFld make( String fld ) { return make(fld,Type.SCALAR,Access.Final); }
+  public static TypeFld make( Type def ) { return make(fldBot,def,Access.Final); }
   public static TypeFld make_dsp(Type t) { return make("^",t,Access.Final); }
   // Make a not-interned version for building cyclic types
   public TypeFld malloc_from() { return malloc(_fld,_t,_access); }
@@ -112,7 +113,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public static TypeFld make_tup( Type t, int order ) { return make(TUPS[order],t,Access.Final);  }
   public TypeFld make_from(Type t) { return t==_t ? this : make(_fld,t,_access); }
   public TypeFld make_from(Type t, Access a) { return (t==_t && a==_access) ? this : make(_fld,t,a); }
-
+  // For some tests
   public static final TypeFld NO_DSP = TypeFld.make_dsp(TypeMemPtr.NO_DISP);
 
   @Override protected TypeFld xdual() {
@@ -137,7 +138,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     return tfld.init(fld,null,a);
   }
 
-
   // Used during cyclic struct meets, either side (but not both) might be null,
   // and the _t field is not filled in.  A new TypeFld is returned.
   static TypeFld cmeet(TypeFld f0, TypeFld f1) {
@@ -149,29 +149,19 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   }
 
   public enum Access {
-    ReadOnly,                   // Read-Only; other threads can Write
-    RW,                         // Read/Write
+    RW,                         // Read/Write; other threads can change, I can change
+    ReadOnly,                   // Read-Only ; other threads can change
     Final,                      // No future load will ever see a different value than any final store
     NoAccess,                   // Cannot access (either read or write)
-    HiReadWrite,
     HiFinal,
-    HiNoAccess;
+    HiReadOnly,
+    HiReadWrite;
     public static final Access[] values = values();
-    static Access bot() { return ReadOnly; }
-    public Access dual() { return values[("6453120".charAt(ordinal()))-'0']; }
-    private static final String[] FMEET = {
-      /*    0123456 */
-      /*0*/"0000000",
-      /*1*/"0101111",
-      /*2*/"0022222",
-      /*3*/"0123333",
-      /*4*/"0123434",
-      /*5*/"0123355",
-      /*6*/"0123456",
-    };
-    Access meet(Access a) { return values[FMEET[ordinal()].charAt(a.ordinal())-'0']; }
-    private static final String[] SHORTS = new String[]{"==",":=","=","~=","!:=!","!=!","!~=!"};
-    private static final String[] LONGS  = new String[]{"read-only","read/write","final","noaccess","!:=!","!=!","!~=!"};
+    static Access bot() { return RW; }
+    public Access dual() { return values[6-ordinal()]; }
+    Access meet(Access a) { return values[Math.min(ordinal(),a.ordinal())]; }
+    private static final String[] SHORTS = new String[]{":="        ,"=="       ,"="    ,"~="      ,"!=!","!==!","!:=!"};
+    private static final String[] LONGS  = new String[]{"read/write","read-only","final","noaccess","!=!","!==!","!:=!"};
     @Override public String toString() { return LONGS[ordinal()]; }
     public SB str(SB sb) { return sb.p(SHORTS[ordinal()]); }
   }
@@ -186,11 +176,21 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
     return s;
   }
   // String meet
-  private static String smeet( String s0, String s1 ) {
+  public static String smeet( String s0, String s1 ) {
     if( Util.eq(s0,s1) ) return s0;
     if( Util.eq(s0,fldTop) ) return s1;
     if( Util.eq(s1,fldTop) ) return s0;
     return fldBot;
+  }
+  // True if fld0 < fld1
+  static boolean sbefore(TypeFld fld0, TypeFld fld1) {
+    if( fld0==null ) return false;
+    if( fld1==null ) return true ;
+    if( Util.eq(fld0._fld,fldTop) ) return true;
+    if( Util.eq(fld0._fld,fldBot) ) return true;
+    if( Util.eq(fld1._fld,fldTop) ) return false;
+    if( Util.eq(fld1._fld,fldBot) ) return false;
+    return fld0._fld.compareTo(fld1._fld)<0;
   }
 
   public static final TypeFld NO_DISP = make("^",Type.ANY,Access.Final);
@@ -213,6 +213,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   @Override public boolean above_center() { return _t.above_center(); }
   @Override public boolean is_con() { return _t.is_con(); }
   @Override public TypeFld simple_ptr() { return make_from(_t.simple_ptr()); }
+  @Override        TypeFld not_nil() { return make_from(_t.not_nil()); }
   @Override public TypeFld meet_nil(Type nil) { return make_from(_t.meet_nil(nil)); }
 
   // Make a Type, replacing all dull pointers from the matching types in mem.

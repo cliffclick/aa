@@ -37,7 +37,7 @@ public class ScopeNode extends Node {
 
   public       Node ctrl() { return in(CTL_IDX); }
   public       Node mem () { return in(MEM_IDX); }
-  public StructNode stk () { return (StructNode)(((NewNode)in(DSP_IDX).in(0)).rec()); }
+  public StructNode stk () { return ((NewNode)in(DSP_IDX).in(0)).rec(); }
   public   ProjNode ptr () { return (ProjNode)in(DSP_IDX); }
   public       Node rez () { return in(ARG_IDX); }
   public <N extends Node> N set_ctrl( N    n) { set_def(CTL_IDX,n); return n; }
