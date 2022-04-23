@@ -104,7 +104,7 @@ public class LoadNode extends Node {
     }
     if( !(tadr instanceof TypeMemPtr tmp) ) return null;
     // If we can find an exact previous store, fold immediately to the value.
-    StructNode st = find_previous_struct(mem(),adr,tmp._aliases,true);
+    Node st = find_previous_struct(mem(),adr,tmp._aliases,true);
     if( st!=null ) return st;
     return null;
   }
@@ -180,7 +180,7 @@ public class LoadNode extends Node {
 
   // Find a matching prior Store - matching address.
   // Returns null if highest available memory does not match address.
-  static StructNode find_previous_struct(Node mem, Node adr, BitsAlias aliases, boolean is_load ) {
+  static Node find_previous_struct(Node mem, Node adr, BitsAlias aliases, boolean is_load ) {
     if( mem==null ) return null;
     Type tmem = mem._val;
     if( !(tmem instanceof TypeMem) || aliases==null ) return null;
@@ -188,17 +188,14 @@ public class LoadNode extends Node {
     int cnt=0;
     while(true) {
       cnt++; assert cnt < 100; // Infinite loop?
-      if( mem instanceof StoreNode ) {
-        StoreNode st = (StoreNode)mem;
-        //if( Util.eq(st._fld,fld) ) {
-        //  if( st.adr()==adr ) return st.err(true)== null ? st : null; // Exact matching store
-        //  // Matching field, wrong address.  Look for no-overlap in aliases
+      if( mem instanceof StoreNode st ) {
+        if( st.adr()==adr ) return st.err(true)== null ? st : null; // Exact matching store
+        //  // Wrong address.  Look for no-overlap in aliases
         //  Type tst = st.adr()._val;
         //  if( !(tst instanceof TypeMemPtr) ) return null; // Store has weird address
         //  BitsAlias st_alias = ((TypeMemPtr)tst)._aliases;
         //  if( aliases.join(st_alias) != BitsAlias.EMPTY )
         //    return null;        // Aliases not disjoint, might overlap but wrong address
-        //}               // Wrong field name, cannot match
         //if( mem == st.mem() ) return null;
         //mem = st.mem(); // Advance past
         throw unimpl();

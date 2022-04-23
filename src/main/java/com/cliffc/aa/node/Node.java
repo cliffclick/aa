@@ -40,17 +40,18 @@ public abstract class Node implements Cloneable, IntSupplier {
   static final byte OP_REGION =21;
   static final byte OP_RET    =22;
   static final byte OP_SCOPE  =23;
-  static final byte OP_SPLIT  =24;
-  static final byte OP_START  =25;
-  static final byte OP_STMEM  =26;
-  static final byte OP_STORE  =27;
-  static final byte OP_STRUCT =28;
-  static final byte OP_TYPE   =29;
-  static final byte OP_UNR    =30;
-  static final byte OP_VAL    =31;
-  static final byte OP_MAX    =32;
+  static final byte OP_SETFLD =24;
+  static final byte OP_SPLIT  =25;
+  static final byte OP_START  =26;
+  static final byte OP_STMEM  =27;
+  static final byte OP_STORE  =28;
+  static final byte OP_STRUCT =29;
+  static final byte OP_TYPE   =20;
+  static final byte OP_UNR    =31;
+  static final byte OP_VAL    =32;
+  static final byte OP_MAX    =33;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Field", "Fresh", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Struct", "Type", "Unresolved", "Val" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Field", "Fresh", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","SetFld","Split", "Start", "StartMem", "Store", "Struct", "Type", "Unresolved", "Val" };
   static { assert STRS.length==OP_MAX; }
 
   // Unique dense node-numbering
@@ -876,11 +877,6 @@ public abstract class Node implements Cloneable, IntSupplier {
   // True if normally (not in-error) produces a TypeMem value or a TypeTuple
   // with a TypeMem at(MEM_IDX).
   public boolean is_mem() { return false; }
-  // For most memory-producing Nodes, exactly 1 memory producer follows.
-  public Node get_mem_writer() {
-    for( Node use : _uses ) if( use.is_mem() ) return use;
-    return null;
-  }
   // Easy assertion check
   boolean check_solo_mem_writer(Node memw) {
     boolean found=false;

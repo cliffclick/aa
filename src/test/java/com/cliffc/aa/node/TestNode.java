@@ -10,9 +10,6 @@ import org.junit.Test;
 
 import java.util.Arrays;
 
-import static com.cliffc.aa.type.TypeFld.Access;
-import static org.junit.Assert.assertEquals;
-
 public class TestNode {
   // A private set of input nodes to feed into each tested Node - a hand-rolled
   // sub-graph.
@@ -247,8 +244,7 @@ public class TestNode {
     test1monotonic(new   ProjNode(1, _ins[0]));
     test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
     test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],fun_plus)); // ctl,mem,val,rpc,fun
-    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],Access.RW   ,"x",null));
-    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],Access.Final,"x",null));
+    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],null));
     //                  ScopeNode has no inputs, and value() call is monotonic
     test1monotonic(new AssertNode(_ins[1],_ins[2],TypeInt.FALSE    ,null, null));
     test1monotonic(new AssertNode(_ins[1],_ins[2],TypeFlt.FLT64    ,null, null));

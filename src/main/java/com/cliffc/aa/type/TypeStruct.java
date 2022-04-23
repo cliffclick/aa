@@ -716,23 +716,22 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     throw unimpl();
   }
 
-  // Update (approximately) the current TypeObj.  Updates the named field.
-  public TypeStruct update(Access fin, String fld, Type val) { return update(fin,fld,val,false); }
-
-  TypeStruct update(Access fin, String name, Type val, boolean precise) {
+  // Update (approximately) the current TypeStruct.  Updates the named field.
+  public TypeStruct update(Access fin, String name, Type val) {
     TypeFld fld = get(name);
     if( fld == null ) return this; // Unknown field, assume changes no fields
     // Double-final-stores, result is an error
     if( fld._access==Access.Final || fld._access==Access.ReadOnly )
       val = ALL;
-    // Pointers & Memory to a Store can fall during GCP, and go from r/w to r/o
-    // and the StoreNode output must remain monotonic.  This means store
-    // updates are allowed to proceed even if in-error.
-    //if( fin==Access.Final || fin==Access.ReadOnly ) precise=false;
-    //Type   pval = precise ? val : fld._t.meet(val);
-    //Access pfin = precise ? fin : fld._access.meet(fin);
-    //return replace_fld(fld.make_from(pval,pfin));
-    throw unimpl();
+    if( fld._t==ALL ) return this; // No changes if field is already in-error
+    return replace_fld(fld.make_from(val,fin));
+  }
+  
+  // Update (approximately) the whole current TypeStruct.
+  // 'precise' is replace, imprecise is MEET.
+  // 'live' tells if each field is alive or dead
+  public TypeStruct update(TypeStruct ts, boolean precise, TypeStruct live) {
+    return (TypeStruct)(precise ? ts : meet(ts)).join(live);
   }
 
   public TypeStruct flatten_fields() {

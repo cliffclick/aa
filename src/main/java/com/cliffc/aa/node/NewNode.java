@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
 
 import static com.cliffc.aa.AA.*;
 
@@ -86,50 +87,9 @@ public class NewNode extends Node {
 //    if( chg instanceof MrgProjNode && chg._live.at(_alias)==TypeStruct.UNUSED )
 //      Env.GVN.add_reduce(chg);
 //  }
-//
-//  @Override public TV2 new_tvar(String alloc_site) {
-//    TV2 old = _tvar;   // Stop recursive self-cycles
-//    for( Node n : _defs )
-//      if( n!=null )  n.walk_initype(); // Force tvar
-//    TV2 rez = TV2.make_struct(this,alloc_site);
-//    if( old !=null ) old.unify(rez,false);
-//    return rez;
-//  }
-//
-//  @Override public boolean unify( boolean test ) {
-//    TV2 rec = tvar();
-//    if( rec.is_err() ) return false;
-//    if( len()<=1 ) return false; // Killed NewNode, makes no HM changes
-//    assert rec.is_obj() && check_fields(rec);
-//
-//    // Unify existing fields.  Ignore extras on either side.
-//    boolean progress = false;
-//    for( TypeFld fld : _ts ) {
-//      TV2 tvfld = rec.arg(fld._fld);
-//      //if( tvfld != null ) progress |= tvfld.unify(tvar(fld._order),test);
-//      //if( test && progress ) return true; // Fast cutout if testing
-//      // TODO: Access input by field name
-//      throw com.cliffc.aa.AA.unimpl();
-//    }
-//    rec.push_dep(this);
-//    return progress;
-//  }
-//
-//  // Extra fields are unified with ERR since they are not created here:
-//  // error to load from a non-existing field
-//  private boolean check_fields(TV2 rec) {
-//    if( rec._args == null ) return true;
-//    for( String id : rec._args.keySet() ) {
-//      // Field is the class prototype name
-//      if( id.charAt(id.length()-1)==':' && Util.eq(id,_tptr._obj._name) )
-//         continue;             // This is fine
-//      // Field is missing and not in error
-//      if( _ts.get(id)==null && !rec.arg(id).is_err() )
-//        return false;
-//    }
-//    return true;
-//  }
-//
+
+  @Override public TV2 new_tvar( String alloc_site) { return null; }
+
 //  @Override public Node ideal_reduce() {
 //    if( _forward_ref ) return null; // Not defined yet
 //    if( _is_val ) return null; // will die with no pointers as normal

@@ -1,14 +1,79 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFld;
+import com.cliffc.aa.type.TypeStruct;
+import com.cliffc.aa.util.Util;
 
-import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.type.TypeFld.Access;
 
-// Takes a static field name, a TypeStruct, a field value and produces a new TypeStruct
+// Takes a static field name, a TypeStruct, a field value and produces a new TypeStruct.
 public class SetFieldNode extends Node {
+  final Access _fin;
+  final String _fld;
 
-  SetFieldNode(Node struct, String name, Node val) { super((byte)-1,struct,val); }
+  public SetFieldNode(String fld, Access fin, Node struct, Node val) {
+    super(OP_SETFLD,struct,val);
+    _fin = fin;
+    _fld = fld;
+  }
+  @Override public String xstr() { return "."+_fld+"="; } // Self short name
+  String  str() { return xstr(); }   // Inline short name
+  public TypeFld find(TypeStruct ts) { return ts.get(_fld); }
 
-  @Override public Type value() { throw unimpl(); }
+  @Override public Type value() {
+    Type t = val(0);
+    if( !(t instanceof TypeStruct ts) ) return t.oob();
+    return ts.update(_fin,_fld,val(1));
+  }
+
+  // Unify the named field against a TV2.is_obj same named field.
+  // Other fields are just passed through.
+  @Override public boolean unify( boolean test ) {
+    TV2 self = tvar();
+    TV2 rec = tvar(0);
+    TV2 tvf = tvar(1);
+
+    // Unify all other fields common to both
+    boolean progress = false;
+    if( self.is_obj() && rec.is_obj() )
+      for( String fld : self._args.keySet() )
+        if( !Util.eq(fld,_fld) ) { // All fields except the replaced one
+          TV2 rfld = rec.arg(fld);
+          progress |= rfld!=null && self.arg(fld).unify(rfld,test);
+          if( test && progress ) return true;
+        }
+
+    // Lookup field in self
+    TV2 fld = self.arg(_fld);
+    if( fld!=null )
+      return fld.unify(tvf,test) | progress;
+
+    // Add struct-ness if possible
+    if( !self.is_obj() && !self.is_nil() ) {
+      if( test ) return true;
+      self.make_struct_from();
+    }
+
+    // Add the field
+    if( self.is_obj() && self.is_open() ) {
+      if( !test ) self.add_fld(_fld,tvf);
+      return true;
+    }
+
+    // Closed/non-record, field is missing
+    return self.set_err(("Missing field "+_fld).intern(),test);
+  }
+
+  @Override public int hashCode() { return super.hashCode()+_fld.hashCode()+_fin.hashCode(); }
+  // Stores are can be CSE/equal, and we might force a partial execution to
+  // become a total execution (require a store on some path it didn't happen).
+  // This can be undone later with splitting.
+  @Override public boolean equals(Object o) {
+    if( this==o ) return true;
+    if( !(o instanceof SetFieldNode set) || !super.equals(o) ) return false;
+    return _fin==set._fin && Util.eq(_fld,set._fld);
+  }
 
 }

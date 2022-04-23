@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Parse;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
@@ -200,4 +201,30 @@ public class StructNode extends Node {
     return lfld==null ? ts.oob() : lfld._t.oob();
   }
 
+  @Override public boolean unify( boolean test ) {
+    // Force result to be a struct with at least these fields.
+    // Do not allocate a TV2 unless we need to pick up fields.
+    TV2 rec = tvar();
+    assert check_fields(rec);
+    rec.push_dep(this);
+
+    // Unify existing fields.  Ignore extras on either side.
+    boolean progress = false;
+    for( int i=0; i<_flds._len; i++ ) {
+      TV2 fld = rec.arg(_flds.at(i));
+      if( fld!=null ) progress |= fld.unify(tvar(i),test);
+      if( test && progress ) return true;
+    }
+
+    return progress;
+  }
+  // Extra fields are unified with ERR since they are not created here:
+  // error to load from a non-existing field
+  private boolean check_fields(TV2 rec) {
+    if( rec._args != null )
+      for( String id : rec._args.keySet() )
+        if( _flds.find(id)==-1 && !rec.arg(id).is_err() )
+          return false;
+    return true;
+  }
 }

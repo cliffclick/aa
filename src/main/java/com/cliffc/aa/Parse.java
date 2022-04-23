@@ -441,13 +441,13 @@ public class Parse implements Comparable<Parse> {
     if( create ) {              // Token not already bound at any scope
       scope = scope();          // Create in the current scope
       StructNode stk = scope.stk();
-      //TypeFld fld = TypeFld.make(tok,t,stk._is_val ? mutable : Access.RW);
-      //stk.add_fld(fld, stk._is_val ? con(t) : con(Type.XNIL),badf); // Create at top of scope as undefined
-      //scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
-      throw unimpl();
+      TypeFld fld = TypeFld.make(tok,t,Access.RW);
+      stk.add_fld(fld, con(Type.XNIL),badf); // Create at top of scope as undefined
+      scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
     }
+    Node dsp2 = gvn(new SetFieldNode(tok,mutable,scope.stk(),Node.peek(iidx)));
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
-    StoreNode st = new StoreNode(mem(),ptr,Node.peek(iidx),mutable,tok,badf);
+    StoreNode st = new StoreNode(mem(),ptr,dsp2,badf);
     scope().replace_mem(st);
     if( !create )               // Note 1-side-of-if update
       scope.def_if(tok,mutable,false);
@@ -700,9 +700,10 @@ public class Parse implements Comparable<Parse> {
           Access fin = _buf[_x-2]==':' ? Access.RW : Access.Final;
           Node stmt = stmt(false);
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
-          else scope().replace_mem( new StoreNode(mem(),castnn,n=stmt.keep(),fin,fld ,errMsg(fld_start)));
-          skipWS();
-          return n.unkeep();
+          //else scope().replace_mem( new StoreNode(mem(),castnn,n=stmt.keep(),fin,fld ,errMsg(fld_start)));
+          //skipWS();
+          //return n.unkeep();
+          throw unimpl();       // SetField before Store
         } else {
           Node st = gvn(new LoadNode(mem(),castnn,errMsg(fld_start)));
           n = gvn(new FieldNode(st,fld));
@@ -870,14 +871,14 @@ public class Parse implements Comparable<Parse> {
     // Must load against most recent display update, in case some prior store
     // is in-error.  Directly loading against the display would bypass the
     // (otherwise alive) error store.
-    StructNode dsp = scope.stk();
-    Node ld = gvn(new FieldNode(get_display_ptr(scope),tok));
+    Node ld = gvn(new LoadNode(mem(),get_display_ptr(scope),null));
+    Node fd = gvn(new FieldNode(ld,tok));
     // If in the middle of a definition (e.g. a HM Let, or recursive assign)
     // then no Fresh per normal HM rules.  If loading from a struct or from
     // normal Lambda arguments, again no Fresh per normal HM rules.
-    return ld.is_forward_ref() || !dsp._is_closure
-      ? ld
-      : gvn(new FreshNode(_e._fun,ld));
+    return ld.is_forward_ref() || !scope.stk()._is_closure
+      ? fd
+      : gvn(new FreshNode(_e._fun,fd));
   }
 
 
@@ -1475,19 +1476,19 @@ public class Parse implements Comparable<Parse> {
   public  ScopeNode scope( ) { return _e._scope; }
   //private void create( String tok, Node n, Access mutable ) { scope().stk().create(tok,n,mutable); }
 
-  // Get the display pointer.  The function call
-  // passed in the display as a hidden argument which we return here.
-  private StructNode get_display_ptr( ScopeNode scope ) {
+  // Get the display.  The function call passed in the display as a hidden
+  // argument which we return here.
+  private Node get_display_ptr( ScopeNode scope ) {
     // Issue Loads against the Display, until we get the correct scope.  The
     // Display is a linked list of displays, and we already checked that token
     // exists at scope up in the display.
     Env e = _e;
-    StructNode stk = e._scope.stk();
+    ProjNode ptr = e._scope.ptr();
     Node mmem = mem();
     while( true ) {
-      if( scope == e._scope ) return stk;
-      Node ptr = gvn(new FieldNode(stk,"^"));
-      stk = (StructNode)gvn(new LoadNode(mmem,ptr,null)); // Gen linked-list walk code, walking display slot
+      if( scope == e._scope ) return ptr;
+      StructNode dsp = (StructNode)gvn(new LoadNode(mmem,ptr,null)); // Gen linked-list walk code, walking display slot
+      ptr = (ProjNode)gvn(new FieldNode(dsp,"^"));
       e = e._par;                                 // Walk linked-list in parser also
     }
   }

@@ -204,6 +204,14 @@ public class TV2 {
     t2._open = false;
     return t2;
   }
+  public TV2 make_struct_from() {
+    assert !is_obj();           // If error, might also be is_fun or is_base
+    _is_struct = true;
+    _open = true;
+    if( _args==null ) _args = new NonBlockingHashMap<>();
+    assert is_obj();
+    return this;
+  }
 
   // An array, with int length and an element type
   public static TV2 make_ary(NewNode n, Node elem, String alloc_site) {
@@ -402,9 +410,17 @@ public class TV2 {
     return hash;
   }
 
-
+  // True if changes (or would change if testing)
+  public boolean set_err(String err, boolean test) {
+    if( err==null ) return false;
+    if( Util.eq(err,_err) ) return false;
+    if( _err !=null ) throw unimpl();  // Merge unrelated errors
+    if( !test ) _err = err;
+    return true;                // Changed
+  }
+  
   // -----------------
-  // Recursively build a conservative flow type from an HM type.  The HM
+  // recursively build a conservative flow type from an HM type.  The HM
   // is_obj wants to be a TypeMemPtr, but the recursive builder is built
   // around TypeStruct.
 
@@ -1135,7 +1151,6 @@ public class TV2 {
   static private SB str0(SB sb, VBitSet visit, TV2 t, VBitSet dups, boolean debug) { return t==null ? sb.p("_") : t.str(sb,visit,dups,debug); }
   private SB str_base(SB sb) { return sb.p(_flow); }
   private SB str_fun(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
-    if( debug ) ((TypeFunPtr)_flow)._fidxs.clear(0).str(sb);
     sb.p("{ ");
     for( String fld : sorted_flds() ) {
       if( !Util.eq(" ret",fld) )
@@ -1148,10 +1163,11 @@ public class TV2 {
     if( is_math() ) return sb.p("@{MATH}");
     // The struct contains a clz field, print as "klazz:@{fields}"
     String clz = is_clz();
-    if( clz!=null )
+    if( clz!=null ) {
       sb.p(clz).p(':');
-    if( clz.equals("int") || clz.equals("flt"))
-      return sb.p(arg("x")._flow);
+      if( clz.equals("int") || clz.equals("flt"))
+        return sb.p(arg("x")._flow);
+    }
     final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
     sb.p(is_tup ? "(" : "@{");
     if( _args==null ) sb.p("_ ");

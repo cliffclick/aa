@@ -311,7 +311,8 @@ public class ScopeNode extends Node {
         String msg = "'"+name+"' not defined on "+arm+" arm of trinary";
         Node err = gvn.init(new ErrNode(ctrl,bad,msg));
         // Exactly like a parser store of an error, on the missing side
-        mem = gvn.init(new StoreNode(mem,scope.stk(),err,Access.Final,name,bad));
+        //mem = gvn.init(new StoreNode(mem,scope.stk(),err,Access.Final,name,bad));
+        throw unimpl();         // SetField before Store
       }
       return mem;
     }

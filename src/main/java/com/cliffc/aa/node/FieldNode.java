@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 
 // Takes a static field name, a TypeStruct and returns the field value.
@@ -51,6 +52,30 @@ public class FieldNode extends Node {
     if( !(pfld._t instanceof TypeFunPtr tfp) || tfp.has_dsp() )
       return pfld._t;           // Clazz field type
     return tfp.make_from(t);
+  }
+
+  @Override public boolean unify( boolean test ) {
+    TV2 self = tvar();
+    TV2 rec = tvar(0);
+    if( test ) rec.push_dep(this);
+
+    // Look up field
+    TV2 fld = rec.arg(_fld);
+    if( fld!=null )           // Unify against a pre-existing field
+      return fld.unify(self, test);
+
+    // Add struct-ness if possible
+    if( !rec.is_obj() && !rec.is_nil() ) {
+      if( test ) return true;
+      rec.make_struct_from();
+    }
+    // Add the field
+    if( rec.is_obj() && rec.is_open() ) {
+      if( !test ) rec.add_fld(_fld,self);
+      return true;
+    }
+    // Closed/non-record, field is missing
+    return self.set_err(("Missing field "+_fld).intern(),test);
   }
 
 }

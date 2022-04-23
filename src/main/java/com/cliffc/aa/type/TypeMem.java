@@ -489,15 +489,24 @@ public class TypeMem extends Type<TypeMem> {
   }
 
 
-  // Field store into a conservative set of aliases.
-  public TypeMem update( BitsAlias aliases, Access fin, String fld, Type val, boolean precise ) {
-    Ary<TypeStruct> pubs  = new Ary<>(_pubs .clone());
+  // Struct store into a conservative set of aliases.
+  // 'precise' is replace, imprecise is MEET.
+  // 'live' tells if each field is alive or dead
+  public TypeMem update( BitsAlias aliases, TypeStruct tvs, boolean precise, TypeStruct live ) {
+    assert !precise || aliases.abit()!=-1;
+    if( live==TypeStruct.UNUSED )
+      tvs = TypeStruct.UNUSED;  // Since dead from below kill off all fields
+    // If precise, just replace whole struct
+    if( precise ) return set(aliases.getbit(),tvs);
+    // Must do struct-by-struct updates
+    Ary<TypeStruct> ss = new Ary<>(_pubs.clone());
     for( int alias : aliases )
       if( alias != 0 )
         for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
-          pubs.setX(kid,at(_pubs,kid).update(fin,fld,val,precise)); // imprecise
-    return make(_make1(pubs.asAry()));
+          ss.setX(kid,at(kid).update(tvs,precise,live));
+    return make(_make1(ss.asAry()));
   }
+
 
   // Array store into a conservative set of aliases.
   public TypeMem update( BitsAlias aliases, TypeInt idx, Type val ) {

@@ -5,55 +5,44 @@ import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.unimpl;
-import static com.cliffc.aa.type.TypeFld.Access;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
 // testing; also checks final field updates.
 public class StoreNode extends Node {
-  final String _fld;        // Field being updated
-  private final Access _fin; // TypeFld.Access.Final or TypeFld.Access.RW
   private final Parse _bad;
-  public StoreNode( Node mem, Node adr, Node val, Access fin, String fld, Parse bad ) {
+  public StoreNode( Node mem, Node adr, Node val, Parse bad ) {
     super(OP_STORE,null,mem,adr,val);
-    _fld = fld;
-    _fin = fin;
     _bad = bad;    // Tests can pass a null, but nobody else does
   }
-  private StoreNode( StoreNode st, Node mem, Node adr ) { this(mem,adr,st.rez(),st._fin,st._fld,st._bad); }
+  private StoreNode( StoreNode st, Node mem, Node adr ) { this(mem,adr,st.rez(),st._bad); }
 
-  @Override public String xstr() { return "."+_fld+"="; } // Self short name
-  String  str() { return xstr(); }   // Inline short name
   @Override public boolean is_mem() { return true; }
 
   Node mem() { return in(1); }
   Node adr() { return in(2); }
   Node rez() { return in(3); }
-  public TypeFld find(TypeStruct ts) { return ts.get(_fld); }
 
   @Override public Type value() {
-    //Node mem = mem(), adr = adr(), rez = rez();
-    //Type tmem = mem._val;
-    //Type tadr = adr._val;
-    //Type tval = rez._val;  // Value
-    //if( tmem==Type.ALL || tadr==Type.ALL ) return Type.ALL;
-    //
-    //if( !(tmem instanceof TypeMem    tm ) ) return tmem.oob(TypeMem.ALLMEM);
-    //if( !(tadr instanceof TypeMemPtr tmp) ) return tadr.above_center() ? tmem : TypeMem.ALLMEM;
-    //
-    //// Field is dead from below?  Value is always ANY
-    //TypeStruct ts0 = _live.ld(tmp); // Get the live memory for this alias
-    //TypeFld fld = ts0.get(_fld);              // Get field
-    //boolean alive = !(fld==null ? ts0 : fld._t).above_center();
-    //Node nnn = LoadNode.find_previous_store(mem, adr, tmp._aliases, _fld, false );
-    //return tm.update(tmp._aliases, // Update at aliases
-    //                 alive ? _fin : Access.NoAccess, // Alive is whatever, dead is store of Any
-    //                 _fld,                           // Field name
-    //                 alive ? tval : Type.ANY,        // Alive is whatever, dead is store of Any
-    //                 nnn==adr && nnn instanceof NewNode ); // Precise or not
-    throw unimpl();
+    Node mem = mem(), adr = adr(), rez = rez();
+    Type tmem = mem._val;
+    Type tadr = adr._val;
+    Type tval = rez._val;  // Value
+    if( !(tmem instanceof TypeMem    tm ) ) return tmem .oob(TypeMem.ALLMEM);
+    if( !(tadr instanceof TypeMemPtr tmp) ) return tadr .oob(TypeMem.ALLMEM);
+    TypeStruct tvs = tval instanceof TypeStruct ? (TypeStruct)tval : tval.oob(TypeStruct.ISUSED);
+
+    // Struct is dead from below?  Value is always ANY.
+    TypeStruct live = _live instanceof TypeMem tlive ? tlive.ld(tmp) : _live.oob(TypeStruct.ISUSED);
+    Node str = LoadNode.find_previous_struct(mem, adr, tmp._aliases, false );
+    boolean precise = adr.in(0) instanceof NewNode nnn && (nnn.rec()==str); // Precise is replace, imprecise is MEET
+    return tm.update(tmp._aliases,tvs,precise,live);
+  }
+  // For most memory-producing Nodes, exactly 1 memory producer follows.
+  private Node get_mem_writer() {
+    for( Node use : _uses ) if( use.is_mem() ) return use;
+    return null;
   }
 
   // Compute the liveness local contribution to def's liveness.  Ignores the
@@ -61,16 +50,14 @@ public class StoreNode extends Node {
   // memory.
   @Override public Type live_use( Node def ) {
     if( def==mem() ) return _live; // Pass full liveness along
-    //assert def==adr() || def==rez();
-    //// If this field is not alive, then neither the address nor value are alive.
-    //Type t = adr()._val;
-    //if( t instanceof TypeMemPtr tmp ) {
-    //  TypeStruct ts = _live.ld(tmp);
-    //  TypeFld fld = ts.get(_fld);
-    //  t = fld==null ? ts : fld;
-    //}
-    //return t.oob(TypeMem.ALIVE);
-    throw unimpl();
+    assert def==adr() || def==rez();
+    // If this alias is not alive, then neither the address nor value are alive.
+    if( !(_live instanceof TypeMem tmem) ) return _live.oob();
+    Type adr = adr()._val;
+    if( !(adr instanceof TypeMemPtr tmp ) ) return adr.oob();
+    TypeStruct ts = tmem.ld(tmp);
+    if( def==adr() ) return ts.oob(); // Live-use for the adr(), which is a Type.ANY/ALL
+    return ts;                  // Live-use for the rez() which is a TypeStruct liveness
   }
 
   @Override public void add_flow_use_extra(Node chg) {
@@ -81,42 +68,37 @@ public class StoreNode extends Node {
   // Liveness changes, check if reduce
   @Override public void add_flow_extra(Type old) {
     Env.GVN.add_reduce(this); // Args can be more-alive
+    if( old.above_center() && !_live.above_center() ) Env.GVN.add_flow(this);
   }
 
   @Override public Node ideal_reduce() {
-    //Node mem = mem();
-    //Node adr = adr();
-    //Type ta = adr._val;
-    //TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
-    //
-    //// Is this Store dead from below?
-    //if( mem==this ) return null; // Dead self-cycle
-    //if( ta.above_center() ) return mem; // All memory is high, so dead
-    //if( tmp!=null ) {
-    //  TypeStruct ts0 = _live.ld(tmp); // Get the live memory for this alias
-    //  TypeFld fld = ts0.get(_fld);    // Get field
-    //  boolean alive = !(fld==null ? ts0 : fld._t).above_center();
-    //  if( !alive && mem._val instanceof TypeMem tvm ) {
-    //    // The memory monotonically agrees, such that removing does not break things?
-    //    TypeStruct ts1 = tvm.ld(tmp);
-    //    TypeFld fld1 = ts1.get(_fld);
-    //    if( fld!=null && fld1._t==Type.ANY && fld1._access==Access.NoAccess )  // Field is dead from above
-    //      return mem;
-    //  }
-    //}
-    //
-    //// No need for 'Fresh' address, as Stores have no TVar (produce memory not a scalar)
-    //if( adr() instanceof FreshNode )
-    //  return set_def(2,((FreshNode)adr()).id());
-    //
-    //// Escape a dead MemSplit
-    //if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode msp &&
-    //    msp.join()==null ) {
-    //  set_def(1,msp.mem());
-    //  xval();                   // Update memory state to include all the default memory
-    //  return this;
-    //}
-    //
+    Node mem = mem();
+    Node adr = adr();
+    Type ta = adr._val;
+    TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
+
+    // Is this Store dead from below?
+    if( mem==this ) return null; // Dead self-cycle
+    if( ta.above_center() ) return mem; // All memory is high, so dead
+    if( tmp!=null && mem._val instanceof TypeMem tvm ) {
+      TypeStruct ts0 = (_live instanceof TypeMem tm ? tm : _live.oob(TypeMem.ALLMEM)).ld(tmp);
+      if( ts0.above_center() ) {
+        throw unimpl();         // Wholly dead
+      }
+    }
+
+    // No need for 'Fresh' address, as Stores have no TVar (produce memory not a scalar)
+    if( adr() instanceof FreshNode )
+      return set_def(2,((FreshNode)adr()).id());
+
+    // Escape a dead MemSplit
+    if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode msp &&
+        msp.join()==null ) {
+      set_def(1,msp.mem());
+      xval();                   // Update memory state to include all the default memory
+      return this;
+    }
+
     //// If Store is into a value New, fold into the New.
     //// Happens inside value constructors.
     //if( adr instanceof NewNode nnn && nnn._is_val && _fold(nnn) )
@@ -144,54 +126,53 @@ public class StoreNode extends Node {
     //    return ((MemJoinNode)mem).add_alias_below_new(new StoreNode(this,mem,adr()),this);
     //}
     //
-    //return null;
-    throw unimpl();
+    return null;
   }
 
   // See if we can fold this Store into this New.
   private boolean _fold( StructNode nnn ) {
     // Find the field being updated
-    TypeFld tfld = nnn.get(_fld);
-    if( tfld== null ) return false;
-    // Folding unambiguous functions?
-    if( rez() instanceof FunPtrNode || rez() instanceof UnresolvedNode ) {
-      if( rez().is_forward_ref() ) return false;
-      nnn.add_fun(_fld, _fin, (FunPtrNode) rez(), _bad); // Stacked FunPtrs into an Unresolved
-      // Field is modifiable; update New directly.
-    } else if( tfld._access==Access.RW )
-      //nnn.set_fld(tfld.make_from(tfld._t,_fin),rez()); // Update the value, and perhaps the final field
-      throw unimpl();
-    else  return false;      // Cannot fold
-    nnn.xval();
-    Env.GVN.add_flow_uses(this);
-    add_reduce_extra();     // Folding in allows store followers to fold in
-    return true;            // Folded.
+    //TypeFld tfld = nnn.get(_fld);
+    //if( tfld== null ) return false;
+    //// Folding unambiguous functions?
+    //if( rez() instanceof FunPtrNode || rez() instanceof UnresolvedNode ) {
+    //  if( rez().is_forward_ref() ) return false;
+    //  nnn.add_fun(_fld, _fin, (FunPtrNode) rez(), _bad); // Stacked FunPtrs into an Unresolved
+    //  // Field is modifiable; update New directly.
+    //} else if( tfld._access==Access.RW )
+    //  //nnn.set_fld(tfld.make_from(tfld._t,_fin),rez()); // Update the value, and perhaps the final field
+    //  throw unimpl();
+    //else  return false;      // Cannot fold
+    //nnn.xval();
+    //Env.GVN.add_flow_uses(this);
+    //add_reduce_extra();     // Folding in allows store followers to fold in
+    //return true;            // Folded.
+    throw unimpl();
   }
 
   @Override public Node ideal_grow() {
-    //Node mem = mem();
-    //Node adr = adr();
-    //Type ta = adr._val;
-    //TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
-    //
-    //// If Store is of a memory-writer, and the aliases do not overlap, make parallel with a Join
-    //if( tmp != null && (tmp._aliases!=BitsAlias.NIL.dual()) &&
-    //    mem.is_mem() && mem.check_solo_mem_writer(this) ) {
-    //  Node head2;
-    //  if( mem instanceof StoreNode ) head2=mem;
-    //  else if( mem instanceof MrgProjNode && ((MrgProjNode)mem).mem()!=this ) head2=mem;
-    //  else if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) head2 = mem.in(0).in(0);
-    //  else head2 = null;
-    //  // Check no extra readers/writers at the split point
-    //  //if( head2 != null && MemSplitNode.check_split(this,escapees(),mem) ) {
-    //  //  MemSplitNode.insert_split(this, escapees(), this, mem, head2);
-    //  //  assert _uses._len==1 && _uses.at(0) instanceof MemJoinNode;
-    //  //  return _uses.at(0); // Return the mem join
-    //  //}
-    //  return null; // TODO: Turn back on
-    //}
-    //return null;
-    throw unimpl();
+    Node mem = mem();
+    Node adr = adr();
+
+    // If Store is of a memory-writer, and the aliases do not overlap, make parallel with a Join
+    if( adr._val instanceof TypeMemPtr tmp && (tmp._aliases!=BitsAlias.NIL.dual()) &&
+        mem.is_mem() && mem.check_solo_mem_writer(this) ) {
+      Node head2=null;
+      if( mem instanceof StoreNode ) head2=mem;
+      else if( mem instanceof MProjNode ) {
+        if( mem.in(0) instanceof CallEpiNode cepi ) head2 = cepi.call();
+        else if( mem.in(0) instanceof NewNode nnn ) head2 = nnn;
+      }
+      // Check no extra readers/writers at the split point
+      if( head2 != null ) {
+        // && MemSplitNode.check_split(this,escapees(),mem) ) {
+      //  MemSplitNode.insert_split(this, escapees(), this, mem, head2);
+      //  assert _uses._len==1 && _uses.at(0) instanceof MemJoinNode;
+      //  return _uses.at(0); // Return the mem join
+        return null;  // TODO: Turn back on
+      }
+    }
+    return null;
   }
   // If changing an input or value allows the store to no longer be in-error,
   // following Loads can collapse
@@ -203,23 +184,12 @@ public class StoreNode extends Node {
 
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;
-    if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when writing",_fld);
-    if( !(tadr instanceof TypeMemPtr) )
+    if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when writing",null);
+    if( !(tadr instanceof TypeMemPtr ptr) )
       return bad("Unknown",fast,null); // Not a pointer nor memory, cannot store a field
-    TypeMemPtr ptr = (TypeMemPtr)tadr;
     Type tmem = mem()._val;
-    if( tmem==Type.ALL ) return bad("Unknown",fast,null);
-    if( tmem==Type.ANY ) return null; // No error
-    TypeStruct objs = tmem instanceof TypeMem
-      ? ((TypeMem)tmem).ld(ptr) // General load from memory
-      : ((TypeStruct)tmem);
-    if( objs==TypeStruct.UNUSED ) return null; // No error, too high yet
-    TypeStruct ts = objs;
-    TypeFld fld = ts.get(_fld);
-    if( fld==null ) return bad("No such",fast,objs);
-    Access access = fld._access;
-    if( access!=Access.RW )
-      return bad("Cannot re-assign "+access,fast,ts);
+    if( tmem.above_center() ) return null;
+    if( !(tmem instanceof TypeMem) ) return bad("Unknown",fast,null);
     return null;
   }
   private ErrMsg bad( String msg, boolean fast, TypeStruct to ) {
@@ -228,55 +198,12 @@ public class StoreNode extends Node {
     //return ErrMsg.field(_bad,msg,_fld,is_closure,to);
     throw unimpl();
   }
-  @Override public int hashCode() { return super.hashCode()+_fld.hashCode()+_fin.hashCode(); }
-  // Stores are can be CSE/equal, and we might force a partial execution to
-  // become a total execution (require a store on some path it didn't happen).
-  // This can be undone later with splitting.
-  @Override public boolean equals(Object o) {
-    if( this==o ) return true;
-    if( !(o instanceof StoreNode) || !super.equals(o) ) return false;
-    StoreNode st = (StoreNode)o;
-    return _fin==st._fin && Util.eq(_fld,st._fld);
-  }
 
   @Override public TV2 new_tvar( String alloc_site) { return null; }
   @Override public boolean unify( boolean test ) {
     TV2 ptr = adr().tvar();
-    if( ptr.is_err() ) return false;
-    return unify("@{}",this,ptr,adr()._val,rez().tvar(),_fld,test);
-  }
-
-  // Common memory-update unification.  The ptr has to be not-nilable and have
-  // the fld, which unifies with the value.  If the fld is missing, then if the
-  // ptr is open, add the field else missing field error.
-  public static boolean unify( String name, Node ldst, TV2 ptr, Type tptr, TV2 tval, String id, boolean test ) {
-    //
-    //// Matching fields unify
-    //TV2 fld = ptr.arg(id);
-    //if( fld!=null )             // Unify against pre-existing field
-    //  return fld.unify(tval,test);
-    //
-    //if( !(tptr instanceof TypeMemPtr) )
-    //  return false;
-    //
-    //// The remaining cases all make progress and return true
-    //if( test ) return true;
-    //
-    //// Add field if open
-    //if( ptr.is_obj() && ptr.is_open() ) // Effectively unify with an extended struct.
-    //  return ptr.add_fld(id,tval);
-    //
-    //// Unify against an open struct with the named field
-    //if( ptr.is_leaf() || ptr.is_fun() ) {
-    //  //TV2 tv2 = TV2.make_open_struct(name,ldst,tptr,"Store_update", new NonBlockingHashMap<>());
-    //  //tv2._args.put(id,tval);
-    //  //return tv2.unify(ptr,test);
-    //  throw unimpl();
-    //}
-
-    // Closed record, field is missing
-    //return tval.unify(ptr.miss_field(ldst,id,"Store_update"),test);
-    throw unimpl();
+    TV2 rez = rez().tvar();
+    return ptr.unify(rez,test);
   }
 
   @Override public void add_work_hm() {

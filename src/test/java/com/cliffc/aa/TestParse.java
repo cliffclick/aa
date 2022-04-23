@@ -138,8 +138,8 @@ public class TestParse {
 
   @Test public void testParse01() {
     // Syntax for variable assignment
-    test("x=1", "int:1", "int:");
-    test("x=y=1", "int:1", "int:");
+    test("x=1", "int:1", "int:1");
+    test("x=y=1", "int:1", "int:1");
     testerr("x=y=", "Missing ifex after assignment of 'y'",4);
     testerr("x=z" , "Unknown ref 'z'",2);
     testerr("x=1+y","Unknown ref 'y'",4);
@@ -1003,7 +1003,7 @@ HashTable = {@{
   }
 
   static void testerr( String program, String err, int cur_off ) {
-    _test2(program,null,null,"",err,cur_off);
+    _test2(program,"",null,"",err,cur_off);
   }
 
 
