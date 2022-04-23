@@ -116,7 +116,7 @@ public abstract class PrimNode extends Node {
   }
   public static TypeInt unwrap_i(Type t) { return (TypeInt)((TypeStruct)t).at("x"); }
   public static TypeFlt unwrap_f(Type t) { return (TypeFlt)((TypeStruct)t).at("x"); }
-  public static long   unwrap_ii(Type t) { return unwrap_i(t).getl(); }
+  public static long   unwrap_ii(Type t) { return t==Type.NIL ? 0 : unwrap_i(t).getl(); }
   public static double unwrap_ff(Type t) { return unwrap_f(t).getd(); }
 
   private static void install( String s, PrimNode[] prims ) {

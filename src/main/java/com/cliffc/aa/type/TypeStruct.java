@@ -511,6 +511,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // ------ Utilities -------
   // Clazz name, without leading "~"
   public String clz() {
+    if( _clz.isEmpty() ) return _clz;
     return _clz.charAt(0)=='~' ? _dual._clz : _clz;
   }
   // All fields for iterating.
@@ -616,9 +617,9 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    sb.p(_clz);
     if( Util.eq(_clz,"int:") ) return sb.p(at("x"));
     if( Util.eq(_clz,"flt:") ) return sb.p(at("x"));
+    sb.p(_clz);
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
     // Special shortcut for the all-prims display type
@@ -710,10 +711,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     return make_from(TypeFlds.make_from(_flds,idx,fld));
   }
   public TypeStruct pop_fld(int idx) {
-    TypeStruct ts = copy2();
-    //TypeFld fld = ts._flds.pop();
-    //return ts.hashcons_free();
-    throw unimpl();
+    assert idx==_flds.length-1;
+    return make_from(TypeFlds.pop(_flds));
   }
 
   // Update (approximately) the current TypeStruct.  Updates the named field.
@@ -726,7 +725,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     if( fld._t==ALL ) return this; // No changes if field is already in-error
     return replace_fld(fld.make_from(val,fin));
   }
-  
+
   // Update (approximately) the whole current TypeStruct.
   // 'precise' is replace, imprecise is MEET.
   // 'live' tells if each field is alive or dead

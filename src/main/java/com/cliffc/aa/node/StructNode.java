@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
@@ -165,20 +166,21 @@ public class StructNode extends Node {
     for( int i=0; i<_defs._len; i++ ) {
       Node n = in(i);
       if( n.is_forward_ref() ) {
-//      //  // Is this Unresolved defined in this scope, or some outer scope?
-//      //  if( ((UnresolvedNode)n).is_scoped() ) {
-//      //    // Definitely defined here, and all stores are complete; all fcns added
-//      //    ((UnresolvedNode)n).define();
-//      //    Env.GVN.add_unuse(n);
-//      //  } else {
-//      //    // Make field in the parent
-//      //    parent.add_fld(TypeFld.make(fld._fld,fld._t,parent.len()), n, null /*TODO: Copy forward the error*/);
-//      //    // Stomp field locally to ANY
-//      //    set_fld(fld.make_from(Type.ANY, TypeFld.Access.Final),Env.ANY);
-//      //    Env.GVN.add_flow_uses(this);
-//      //  }
-        // TODO: Access input by field name
-        throw com.cliffc.aa.AA.unimpl();
+        // Is this Unresolved defined in this scope, or some outer scope?
+        if( ((UnresolvedNode)n).is_scoped() ) {
+          // Definitely defined here, and all stores are complete; all fcns added
+        //    ((UnresolvedNode)n).define();
+        //    Env.GVN.add_unuse(n);
+          throw com.cliffc.aa.AA.unimpl();        // TODO: Access input by field name
+        } else {
+          // Make field in the parent
+          TypeFld fld = get(_flds.at(i));
+          parent.add_fld(fld, n, null /*TODO: Copy forward the error*/);
+          // Stomp field locally to ANY
+          set_def(i,Env.ANY);
+          _ts.replace_fld(TypeFld.make(fld._fld, Type.ANY, TypeFld.Access.Final));
+          Env.GVN.add_flow_uses(this);
+        }
       }
     }
   }

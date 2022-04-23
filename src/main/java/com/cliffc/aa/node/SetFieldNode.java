@@ -1,5 +1,7 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.ErrMsg;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFld;
@@ -12,11 +14,13 @@ import static com.cliffc.aa.type.TypeFld.Access;
 public class SetFieldNode extends Node {
   final Access _fin;
   final String _fld;
+  final Parse _badf;            // Bad field
 
-  public SetFieldNode(String fld, Access fin, Node struct, Node val) {
+  public SetFieldNode(String fld, Access fin, Node struct, Node val, Parse badf) {
     super(OP_SETFLD,struct,val);
     _fin = fin;
     _fld = fld;
+    _badf= badf;
   }
   @Override public String xstr() { return "."+_fld+"="; } // Self short name
   String  str() { return xstr(); }   // Inline short name
@@ -64,6 +68,22 @@ public class SetFieldNode extends Node {
 
     // Closed/non-record, field is missing
     return self.set_err(("Missing field "+_fld).intern(),test);
+  }
+
+  @Override public ErrMsg err( boolean fast ) {
+    if( !(_val instanceof TypeStruct ts) )
+      return _val.above_center() ? null : bad("Unknown",fast,null);
+    TypeFld fld = ts.get(_fld);
+    if( fld==null ) return bad("No such",fast,ts);
+    Access access = fld._access;
+    if( access!=Access.RW )
+      return bad("Cannot re-assign "+access,fast,ts);
+    return null;
+  }
+  private ErrMsg bad( String msg, boolean fast, TypeStruct to ) {
+    if( fast ) return ErrMsg.FAST;
+    // TODO: Detect closures
+    return ErrMsg.field(_badf,msg,_fld,false,to);
   }
 
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode()+_fin.hashCode(); }

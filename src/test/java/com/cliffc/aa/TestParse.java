@@ -116,7 +116,7 @@ public class TestParse {
     test("1._-_(2)", "int:-1","int:-1"); // binary version
     test("1.-_()"  , "int:-1","int:-1"); // unary version
     // error; mismatch arg count
-    testerr("math.pi(1)", "A function is being called, but flt:3.141592653589793 is not a function",7);
+    testerr("math.pi(1)", "A function is being called, but 3.141592653589793 is not a function",7);
     testerr("1._+_(2,3)", "Passing 3 arguments to _+_ which takes 2 arguments",5);
 
     // Parsed as +(1,(2*3))
@@ -144,13 +144,13 @@ public class TestParse {
     testerr("x=z" , "Unknown ref 'z'",2);
     testerr("x=1+y","Unknown ref 'y'",4);
     testerr("x=y; x=y","Unknown ref 'y'",2);
-    test("x=2; y=x+1; x*y", TypeInt.con(6), "int:");
+    test("x=2; y=x+1; x*y", "int:6", "int:6");
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
-    test("1+(x=2*3)+x*x", TypeInt.con(1+6+6*6), "int:");
-    testerr("x=(1+(x=2)+x); x", "Cannot re-assign final field '.x' in @{x=2}",0);
-    test("x:=1;x++"  ,TypeInt.con(1), "int:");
-    test("x:=1;x++;x",TypeInt.con(2), "int:");
-    test("x:=1;x++ + x--",TypeInt.con(3), "int:");
+    test("1+(x=2*3)+x*x", "int:43", "int:43");
+    testerr("x=(1+(x=2)+x); x", "Cannot re-assign final field '.x' in @{x=2}",6);
+    test("x:=1;x++"  ,"int:1", "int:1");
+    test("x:=1;x++;x","int:2", "int:2");
+    test("x:=1;x++ + x--","int:3", "int:3");
     test("x++",Type.NIL, "A?");
     test("x++;x",TypeInt.con(1), "int:");
 

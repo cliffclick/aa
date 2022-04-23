@@ -177,4 +177,8 @@ public class TypeFlds {
     System.arraycopy(flds,i,fs,i+1,flds.length-i);
     return fs;
   }
+
+  public static TypeFld[] pop( TypeFld[] flds ) {
+    return hash_cons(copyOf(flds,flds.length-1));
+  }
 }

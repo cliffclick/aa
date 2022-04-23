@@ -432,8 +432,8 @@ public class Parse implements Comparable<Parse> {
 
   // Assign into display, changing an existing def
   private Node do_store(ScopeNode scope, Node ifex, Access mutable, String tok, Parse badf, Type t, Parse badt ) {
-    if( ifex instanceof FunPtrNode )
-      ((FunPtrNode)ifex).bind(tok); // Debug only: give name to function
+    if( ifex instanceof FunPtrNode fptr )
+      fptr.bind(tok);           // Debug only: give name to function
     final int iidx = ifex.push();
     // Find scope for token.  If not defining struct fields, look for any
     // prior def.  If defining a struct, tokens define a new field in this scope.
@@ -442,12 +442,14 @@ public class Parse implements Comparable<Parse> {
       scope = scope();          // Create in the current scope
       StructNode stk = scope.stk();
       TypeFld fld = TypeFld.make(tok,t,Access.RW);
-      stk.add_fld(fld, con(Type.XNIL),badf); // Create at top of scope as undefined
+      stk.add_fld(fld, con(Type.NIL),badf); // Create at top of scope as undefined
       scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
     }
-    Node dsp2 = gvn(new SetFieldNode(tok,mutable,scope.stk(),Node.peek(iidx)));
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
-    StoreNode st = new StoreNode(mem(),ptr,dsp2,badf);
+    Node mem = mem();
+    Node stk = gvn(new LoadNode(mem,ptr,badf));
+    Node stk2 = gvn(new SetFieldNode(tok,mutable,stk,Node.peek(iidx),badf));
+    StoreNode st = new StoreNode(mem,ptr,stk2,badf);
     scope().replace_mem(st);
     if( !create )               // Note 1-side-of-if update
       scope.def_if(tok,mutable,false);

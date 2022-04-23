@@ -40,9 +40,6 @@ public class LoadNode extends Node {
     if( chg==mem() ) Env.GVN.add_flow(adr());  // Memory value lifts to an alias, address is more alive
     // Memory improves, perhaps Load can bypass Call
     if( chg==mem() && mem().in(0) instanceof CallEpiNode ) Env.GVN.add_reduce(this);
-    //// Memory becomes a MrgProj, maybe Load can bypass MrgProj
-    //if( chg==mem() && chg instanceof MrgProjNode ) Env.GVN.add_mono(this);
-    throw unimpl();
   }
 
   // The only memory required here is what is needed to support the Load.
@@ -52,16 +49,14 @@ public class LoadNode extends Node {
   // Combo deals with constants, and not here.
   @Override public Type live_use(Node def ) {
     if( def==adr() ) return Type.ALL;
-    Type tmem = mem()._val;
-    Type tptr = adr()._val;
-    if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
-    if( tptr instanceof TypeStruct ) return tptr.oob(TypeMem.ALLMEM);    // Loading from a clazz
-    if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
+    Type mem = mem()._val;
+    Type ptr = adr()._val;
+    if( !(mem instanceof TypeMem tmem) ) return mem.oob(TypeMem.ALLMEM); // Not a memory?
+    if( ptr instanceof TypeStruct ) return ptr.oob(TypeMem.ALLMEM); // Loading from a clazz
+    if( !(ptr instanceof TypeMemPtr tptr) ) return ptr.oob(TypeMem.ALLMEM); // Not a pointer?
     if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
-    //// Only named the named field from the named aliases is live.
-    //TypeStruct ldef = _live==TypeMem.LNO_DISP ? TypeStruct.LNO_DISP : TypeStruct.ALIVE;
-    //return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,_fld, ldef);
-    throw unimpl();
+    // Only the named aliases is live.
+    return tmem.remove_no_escapes(tptr._aliases);
   }
 
   // Standard memory unification; the Load unifies with the loaded field.
@@ -104,8 +99,12 @@ public class LoadNode extends Node {
     }
     if( !(tadr instanceof TypeMemPtr tmp) ) return null;
     // If we can find an exact previous store, fold immediately to the value.
-    Node st = find_previous_struct(mem(),adr,tmp._aliases,true);
-    if( st!=null ) return st;
+    Node ps = find_previous_struct(mem(),adr,tmp._aliases,true);
+    if( ps!=null ) {
+      if( ps instanceof StoreNode st ) return st.rez();
+      if( ps instanceof StructNode st ) return st;
+      throw unimpl();
+    }
     return null;
   }
 

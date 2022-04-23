@@ -26,8 +26,7 @@ public class FieldNode extends Node {
     Type t = val(0);
     if( t==Type.NIL || t==Type.XNIL ) t = TypeStruct.ZERO;
     if( !(t instanceof TypeStruct ts) ) return null;
-    String tname = ts.clz().substring(0,ts.clz().length()-1);
-    StructNode clz = Env.PROTOS.get(tname);
+    StructNode clz = proto(ts.clz());
     if( clz==null ) return null;
     return clz.in_bind(_fld,in(0));
   }
@@ -37,14 +36,13 @@ public class FieldNode extends Node {
     Type t = val(0);
     if( t==Type.NIL || t==Type.XNIL ) t = TypeStruct.ZERO;
     if( !(t instanceof TypeStruct ts) )
-      return t.oob(Type.SCALAR);
+      return t.oob();           // Input is not a Struct
     TypeFld fld = ts.get(_fld);
     if( fld!=null ) return fld._t;
     // For named prototypes, if the field load fails, try again in the
     // prototype.  Only valid for final fields.
-    String tname = ts.clz().substring(0,ts.clz().length()-1);
-    StructNode clz = Env.PROTOS.get(tname);
-    if( clz==null ) return t.oob(Type.SCALAR);
+    StructNode clz = proto(ts.clz());
+    if( clz==null ) return t.oob();
     TypeFld pfld = ((TypeStruct) clz._val).get(_fld);
     if( pfld == null ) return t.oob(Type.SCALAR);
     assert pfld._access == TypeFld.Access.Final;
@@ -54,6 +52,12 @@ public class FieldNode extends Node {
     return tfp.make_from(t);
   }
 
+  private static StructNode proto(String clz) {
+    if( clz.isEmpty() ) return null;
+    String tname = clz.substring(0,clz.length()-1);
+    return Env.PROTOS.get(tname);
+  }
+  
   @Override public boolean unify( boolean test ) {
     TV2 self = tvar();
     TV2 rec = tvar(0);

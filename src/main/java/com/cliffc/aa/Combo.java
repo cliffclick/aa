@@ -214,7 +214,7 @@ public abstract class Combo {
   static private void _walk_root_funs(Type flow) {
     if( RVISIT.tset(flow._uid) ) return;
     // Find any functions
-    if( flow instanceof TypeFunPtr tfp ) {
+    if( flow instanceof TypeFunPtr tfp && tfp._fidxs != BitsFun.ALL0 ) {
       // Walk all functions; these might be called by external callers
       for( int fidx : tfp._fidxs ) {
         RetNode ret = RetNode.get(fidx);

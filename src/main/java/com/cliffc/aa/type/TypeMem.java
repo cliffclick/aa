@@ -520,11 +520,11 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Everything NOT in the 'escs' is flattened to UNUSED.
-  // Everything YES in the 'escs' is flattened to SCALAR.
-  public TypeMem remove_no_escapes( BitsAlias escs, String fld, Type live ) {
+  // Everything YES in the 'escs' is passed along.
+  public TypeMem remove_no_escapes( BitsAlias escs ) {
     TypeStruct[] tos = new TypeStruct[Math.max(_pubs.length,escs.max()+1)];
     for( int i=1; i<tos.length; i++ )
-      tos[i] = escs.test_recur(i) ? at(i).remove_other_flds(fld,live) : TypeStruct.UNUSED;
+      tos[i] = escs.test_recur(i) ? at(i) : TypeStruct.UNUSED;
     return make0(tos);
   }
 
