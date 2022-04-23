@@ -765,7 +765,6 @@ public class Parse implements Comparable<Parse> {
   private Node inc(String tok, int d) {
     skipWS();
     ScopeNode scope = lookup_scope(tok=tok.intern(),false); // Find prior scope of token
-    Node unr = _e.lookup("int");
     // Need a load/call/store sensible options
     if( scope==null ) {         // Token not already bound to a value
       do_store(null,con(Type.NIL),Access.RW,tok,null,Type.SCALAR,null);
@@ -779,18 +778,20 @@ public class Parse implements Comparable<Parse> {
     // Pointer to the proper display is found via ptr-walking live display stack.
     // Now properly load from the display.
     Node ptr = get_display_ptr(scope);
-    throw unimpl(); // Fields before Loads
-    //Node n = gvn(new LoadNode(mem(),ptr,tok,null));
-    //if( n.is_forward_ref() )    // Prior is actually a forward-ref
-    //  return err_ctrl1(ErrMsg.forward_ref(this,((FunPtrNode)n)));
-    //// Do a full lookup on "+", and execute the function
-    //int nidx = n.push();
-    //Node plus = gvn(new LoadNode(mem(),n,"_+_",null));
-    //Node inc = con(TypeInt.con(d));
-    //Node sum = do_call(errMsgs(0,_x,_x), args(plus,inc));
-    //// Active memory for the chosen scope, after the call to plus
-    //scope().replace_mem(new StoreNode(mem(),ptr,sum,Access.RW,tok,errMsg()));
-    //return Node.pop(nidx);      // Return pre-increment value
+    Node ld = gvn(new LoadNode(mem(),ptr,null));
+    Node n = gvn(new FieldNode(ld,tok));
+    if( n.is_forward_ref() )    // Prior is actually a forward-ref
+      return err_ctrl1(ErrMsg.forward_ref(this,((FunPtrNode)n)));
+    // Do a full lookup on "+", and execute the function
+    int nidx = n.push();
+    Node plus = gvn(new FieldNode(n,"_+_"));
+    Node inc = con(TypeStruct.make_int(TypeInt.con(d)));
+    Node sum = do_call(errMsgs(0,_x,_x), args(plus,inc));
+    Parse bad = errMsg();
+    Node stf = gvn(new SetFieldNode(tok,Access.RW,ld,sum,bad));
+    // Active memory for the chosen scope, after the call to plus
+    scope().replace_mem(new StoreNode(mem(),ptr,stf,bad));
+    return Node.pop(nidx);      // Return pre-increment value
   }
 
 

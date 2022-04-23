@@ -69,7 +69,7 @@ public class IfNode extends Node {
     if( in(0) instanceof ProjNode && in(0).in(0)==this )
       return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
     Type pred = val(1);
-    if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
+    if( pred == TypeInt.FALSE || pred == TypeStruct.ZERO || pred == Type.NIL || pred==Type.XNIL )
       return TypeTuple.IF_FALSE;   // False only
     if( pred.above_center() ? !pred.may_nil() : !pred.must_nil() )
       return TypeTuple.IF_TRUE;   // True only
@@ -83,8 +83,7 @@ public class IfNode extends Node {
 
   @Override public Node is_copy(int idx) {
     if( is_prim() ) return null;
-    if( !(_val instanceof TypeTuple) ) return null;
-    TypeTuple tt = (TypeTuple) _val;
+    if( !(_val instanceof TypeTuple tt) ) return null;
     if( tt==TypeTuple.IF_ANY ) return Env.XCTRL;
     if( tt==TypeTuple.IF_TRUE  && idx==1 ) return in(0);
     if( tt==TypeTuple.IF_FALSE && idx==0 ) return in(0);

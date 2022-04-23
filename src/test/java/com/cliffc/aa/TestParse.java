@@ -151,12 +151,12 @@ public class TestParse {
     test("x:=1;x++"  ,"int:1", "int:1");
     test("x:=1;x++;x","int:2", "int:2");
     test("x:=1;x++ + x--","int:3", "int:3");
-    test("x++",Type.NIL, "A?");
-    test("x++;x",TypeInt.con(1), "int:");
+    test("x++","nil", "A?");
+    test("x++;x","int:1", "int:1");
 
     // Conditional:
-    test   ("0 ?    2  : 3", TypeInt.con(3), "int:"); // false
-    test   ("2 ?    2  : 3", TypeInt.con(2), "int:"); // true
+    test   ("0 ?    2  : 3", "int:3", "int:3"); // false
+    test   ("2 ?    2  : 3", "int:2", "int:2"); // true
     test   ("math.rand(1)?x=4:x=3;x", TypeInt.NINT8, "int:"); // x defined on both arms, so available after
     test   ("math.rand(1)?x=2:  3;4", TypeInt.con(4), "int:"); // x-defined on 1 side only, but not used thereafter
     test   ("math.rand(1)?(y=2;x=y*y):x=3;x", TypeInt.NINT8, "int:"); // x defined on both arms, so available after, while y is not

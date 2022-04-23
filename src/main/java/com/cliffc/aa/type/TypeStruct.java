@@ -529,7 +529,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     int idx = find(name);
     return idx==-1 ? null : _flds[idx];
   }
-  // Field type byte name.  NPE if field-not-found
+  // Field type by name.  NPE if field-not-found
   public Type at( String name ) { return get(name)._t; }
 
   // Field by index, null after end
@@ -617,8 +617,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( Util.eq(_clz,"int:") ) return sb.p(at("x"));
-    if( Util.eq(_clz,"flt:") ) return sb.p(at("x"));
+    if( Util.eq(_clz,"int:") && has("x") ) return sb.p(at("x"));
+    if( Util.eq(_clz,"flt:") && has("x") ) return sb.p(at("x"));
     sb.p(_clz);
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");

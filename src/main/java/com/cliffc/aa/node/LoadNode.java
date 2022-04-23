@@ -112,16 +112,6 @@ public class LoadNode extends Node {
   // Changing edges to bypass, but typically not removing nodes nor edges
   @Override public Node ideal_mono() {
     Node mem = mem();
-    // Bypass unrelated Stores, but only if the Address predates the Store.  If
-    // the Load address depends on the Store memory, then the Load cannot
-    // bypass the Store.
-    if( mem instanceof StoreNode ) {
-      throw unimpl();
-    //  StoreNode st2 = (StoreNode)mem;
-    //  if( st2.adr()==adr() && !Util.eq(st2._fld,_fld) ) // Very weak "Address must predate" test
-    //    return set_mem(st2.mem());
-    }
-
     Node adr = adr();
     Type tadr = adr._val;
     BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
@@ -257,7 +247,8 @@ public class LoadNode extends Node {
 
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;
-    if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when reading",null);
+    if( tadr.must_nil() )
+      return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when reading",null);
     if( tadr==Type.ANY ) return null; // No error, since might fall to any valid thing
     if( !(tadr instanceof TypeMemPtr ptr) )
       return bad(fast,null); // Not a pointer nor memory, cannot load a field
