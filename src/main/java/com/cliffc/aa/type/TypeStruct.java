@@ -52,7 +52,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   // Default field value.  Exceptions are listed below, all other (infinitely
   // many) fields are the default.
-  private Type _def;
+  public Type _def;
 
   // Interned field array.  Alpha-sorted.
   private TypeFld[] _flds;
@@ -220,8 +220,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Used to make a few testing constants
   public static TypeStruct make_test( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a)); }
 
-  public static TypeStruct make_int(TypeInt ti) { return TypeStruct.make("int:",ALL,TypeFld.make("x",ti)); }
-  public static TypeStruct make_flt(TypeFlt tf) { return TypeStruct.make("flt:",ALL,TypeFld.make("x",tf)); }
+  public static TypeStruct make_int(TypeInt ti) { return TypeStruct.make("int:",ti,TypeFlds.EMPTY); }
+  public static TypeStruct make_flt(TypeFlt tf) { return TypeStruct.make("flt:",tf,TypeFlds.EMPTY); }
 
   // Add a field to an under construction TypeStruct
   public TypeStruct add_fld( TypeFld fld ) {
@@ -505,7 +505,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
       Type t = fld._t.simple_ptr();
       flds[i] = fld._t==t ? fld : fld.make_from(t);
     }
-    return make0(_clz,_def.not_nil(),flds);
+    return make0(_clz,_def,flds);
   }
 
   // ------ Utilities -------
@@ -617,8 +617,9 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( Util.eq(_clz,"int:") && has("x") ) return sb.p(at("x"));
-    if( Util.eq(_clz,"flt:") && has("x") ) return sb.p(at("x"));
+    if( Util.eq(_clz,"int:") || Util.eq(_clz,"flt:") )
+      return _def._str(visit,dups,sb,debug,false);
+
     sb.p(_clz);
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
@@ -772,6 +773,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   @Override public boolean above_center() { return _def.above_center(); }
   @Override public boolean is_con() {
+    if( !_def.is_con() ) return false;
     for( TypeFld fld : _flds )
       if( !fld.is_con() )
         return false;

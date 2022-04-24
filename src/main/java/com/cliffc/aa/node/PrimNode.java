@@ -112,10 +112,10 @@ public abstract class PrimNode extends Node {
   public static TypeStruct make_flt(double d) { return TypeStruct.make_flt(TypeFlt.con(d)); }
 
   public static TypeStruct make_wrap(Type t) {
-    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",Type.ALL,TypeFld.make("x",t));
+    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",t,TypeFlds.EMPTY);
   }
-  public static TypeInt unwrap_i(Type t) { return (TypeInt)((TypeStruct)t).at("x"); }
-  public static TypeFlt unwrap_f(Type t) { return (TypeFlt)((TypeStruct)t).at("x"); }
+  public static TypeInt unwrap_i(Type t) { return (TypeInt)((TypeStruct)t)._def; }
+  public static TypeFlt unwrap_f(Type t) { return (TypeFlt)((TypeStruct)t)._def; }
   public static long   unwrap_ii(Type t) { return t==Type.NIL ? 0 : unwrap_i(t).getl(); }
   public static double unwrap_ff(Type t) { return unwrap_f(t).getd(); }
 

@@ -887,8 +887,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         // Lower case types are simple named types: "int:@{x=1}" or "Cat:@{legs=4}"
         if( !isRecur(id) ) {
           String tname = (id+':').intern();
-          if( Util.eq(id,"int") || Util.eq(id,"flt"))
-            yield TypeStruct.make(tname,ALL,TypeFld.make("x",type(null)));
+          if( Util.eq(id,"int") )  yield TypeStruct.make_int((TypeInt)type(null));
+          if( Util.eq(id,"flt") )  yield TypeStruct.make_flt((TypeFlt)type(null));
           yield ((TypeStruct)type(null)).set_name(tname);
         }
 

@@ -132,7 +132,7 @@ public class TV2 {
 
   TV2 copy(String alloc_site) {
     // Shallow clone of args
-    TV2 t = new TV2(_args==null ? null : (NonBlockingHashMap<String,TV2>)_args.clone(),_alloc_site);
+    TV2 t = new TV2(_args==null ? null : (NonBlockingHashMap<String,TV2>)_args.clone(),alloc_site);
     t._flow = _flow;
     t._eflow = _eflow;
     t._may_nil = _may_nil;
@@ -204,13 +204,12 @@ public class TV2 {
     t2._open = false;
     return t2;
   }
-  public TV2 make_struct_from() {
+  public void make_struct_from() {
     assert !is_obj();           // If error, might also be is_fun or is_base
     _is_struct = true;
     _open = true;
     if( _args==null ) _args = new NonBlockingHashMap<>();
     assert is_obj();
-    return this;
   }
 
   // An array, with int length and an element type
@@ -231,8 +230,10 @@ public class TV2 {
       NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
       for( TypeFld fld : ts )
         args.put(fld._fld,make(fld._t,alloc_site));
-      if( ts._clz.length()>0 )
-        args.put(ts._clz,make_leaf(alloc_site));
+      if( ts._clz.length()>0 ) {
+        args.put(ts._clz, make_leaf(alloc_site));
+        args.put(" x",make_base(ts._def,alloc_site));
+      }
       yield make_struct(args,alloc_site);
     }
     case TypeFlt f -> make_base(t,alloc_site);
@@ -418,7 +419,7 @@ public class TV2 {
     if( !test ) _err = err;
     return true;                // Changed
   }
-  
+
   // -----------------
   // recursively build a conservative flow type from an HM type.  The HM
   // is_obj wants to be a TypeMemPtr, but the recursive builder is built
@@ -1166,7 +1167,7 @@ public class TV2 {
     if( clz!=null ) {
       sb.p(clz).p(':');
       if( clz.equals("int") || clz.equals("flt"))
-        return sb.p(arg("x")._flow);
+        return sb.p(arg(" x")._flow);
     }
     final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
     sb.p(is_tup ? "(" : "@{");

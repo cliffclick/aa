@@ -4,6 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.tvar.TV2;
 
 import static com.cliffc.aa.AA.*;
 
@@ -61,27 +62,9 @@ public class LoadNode extends Node {
 
   // Standard memory unification; the Load unifies with the loaded field.
   @Override public boolean unify( boolean test ) {
-    //TV2 self = tvar();
-    //TV2 rec = adr().tvar();
-    //rec.push_dep(this);
-    //
-    //TV2 fld = rec.arg(_fld);
-    //if( fld!=null )           // Unify against a pre-existing field
-    //  return fld.unify(self, test);
-    //
-    //// Add struct-ness if possible
-    //if( !rec.is_obj() && !rec.is_nil() )
-    //  rec.make_open_struct();
-    //// Add the field
-    //if( rec.is_obj() && rec.is_open() ) {
-    //  rec.add_fld(_fld,self);
-    //  return true;
-    //}
-    //// Closed/non-record, field is missing
-    //if( self._err!=null ) return false;
-    //self._err = "Missing field "+_fld;
-    //return true;
-    throw unimpl();
+    TV2 self = tvar();
+    TV2 rec = adr().tvar();
+    return self.unify(rec,test);
   }
   public void add_work_hm() {
     super.add_work_hm();
@@ -133,7 +116,7 @@ public class LoadNode extends Node {
       throw unimpl();
 
     // Load can bypass a New or Store if the address does not depend on the New/St.
-    if( aliases != null && mem instanceof MProjNode ) {
+    if( mem instanceof MProjNode && mem.in(0) instanceof NewNode && aliases != null ) {
     //  NewNode nnn = ((MrgProjNode)mem).nnn();
     //  // Bypass if aliases do not overlap
     //  if( !aliases.test_recur(nnn._alias) )
