@@ -274,7 +274,7 @@ public class ScopeNode extends Node {
     _ifs.last().def(name,mutable,create);      // Var defined in arm of if
   }
 
-  public Node check_if( boolean arm, Parse bad, GVNGCM gvn, Node ctrl, Node mem ) { return _ifs.last().check(this,arm,bad,gvn,ctrl,mem); }
+  public Node check_if( boolean arm, Node ptr, Parse bad, Node ctrl, Node mem ) { return _ifs.last().check(this,arm,ptr,bad,ctrl,mem); }
 
   private static class IfScope {
     HashMap<String,Access> _tvars, _fvars;
@@ -294,7 +294,7 @@ public class ScopeNode extends Node {
       }
     }
     // Check for balanced creation, and insert errors on unbalanced
-    Node check(ScopeNode scope, boolean arm, Parse bad, GVNGCM gvn, Node ctrl, Node mem) {
+    Node check(ScopeNode scope, boolean arm, Node ptr, Parse bad, Node ctrl, Node mem) {
       if( _tvars == null ) return mem; // No new vars on either arm
       // Pull from both variable sets names that are common to both
       if( arm ) {               // Only do it first time
@@ -309,10 +309,11 @@ public class ScopeNode extends Node {
       if( vars.isEmpty() ) return mem;
       for( String name : vars.keySet() ) {
         String msg = "'"+name+"' not defined on "+arm+" arm of trinary";
-        Node err = gvn.init(new ErrNode(ctrl,bad,msg));
         // Exactly like a parser store of an error, on the missing side
-        //mem = gvn.init(new StoreNode(mem,scope.stk(),err,Access.Final,name,bad));
-        throw unimpl();         // SetField before Store
+        Node ld  = new LoadNode(mem,ptr,bad).init();
+        Node err = new ErrNode(ctrl,bad,msg).init();
+        Node setf= new SetFieldNode(name,Access.Final,ld,err,bad).init();
+        mem = new StoreNode(mem,ptr,setf,bad).init();
       }
       return mem;
     }

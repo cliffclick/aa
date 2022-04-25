@@ -71,8 +71,8 @@ public class SetFieldNode extends Node {
   }
 
   @Override public ErrMsg err( boolean fast ) {
-    if( !(_val instanceof TypeStruct ts) )
-      return _val.above_center() ? null : bad("Unknown",fast,null);
+    if( !(val(0) instanceof TypeStruct ts) )
+      return val(0).above_center() ? null : bad("Unknown",fast,null);
     TypeFld fld = ts.get(_fld);
     if( fld==null ) return bad("No such",fast,ts);
     Access access = fld._access;

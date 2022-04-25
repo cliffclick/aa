@@ -82,9 +82,8 @@ public class StoreNode extends Node {
     if( ta.above_center() ) return mem; // All memory is high, so dead
     if( tmp!=null && mem._val instanceof TypeMem tvm ) {
       TypeStruct ts0 = (_live instanceof TypeMem tm ? tm : _live.oob(TypeMem.ALLMEM)).ld(tmp);
-      if( ts0.above_center() ) {
-        throw unimpl();         // Wholly dead
-      }
+      if( ts0.above_center() )  // Dead from below
+        return mem;
     }
 
     // No need for 'Fresh' address, as Stores have no TVar (produce memory not a scalar)

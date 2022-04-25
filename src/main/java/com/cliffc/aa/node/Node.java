@@ -107,8 +107,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   // checks for input equality checks.
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
-    if( !(o instanceof Node) ) return false;
-    Node n = (Node)o;
+    if( !(o instanceof Node n) ) return false;
     if( _op != n._op ) return false;
     if( n._defs==null || _defs._len != n._defs._len ) return false;
     // Note pointer-equality

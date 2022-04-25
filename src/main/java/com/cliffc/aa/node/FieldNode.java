@@ -31,6 +31,26 @@ public class FieldNode extends Node {
     return clz.in_bind(_fld,in(0));
   }
 
+  @Override public Node ideal_grow() {
+    // Load from a memory Phi; split through in an effort to sharpen the memory.
+    // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
+    // TODO: Hoist out of loops.
+    if( in(0) instanceof PhiNode phi ) {
+      int fcnt=0;
+      for( int i=1; i<phi.len(); i++ )
+        if( phi.in(i)._op == OP_SETFLD ) fcnt++;
+      if( fcnt>0 ) {
+        Node lphi = new PhiNode(Type.SCALAR,phi._badgc,phi.in(0));
+        for( int i=1; i<phi.len(); i++ )
+          lphi.add_def(Env.GVN.add_work_new(new FieldNode(phi.in(i),_fld)));
+        subsume(lphi);
+        return lphi;
+      }
+    }
+
+    return null;
+  }
+
 
   @Override public Type value() {
     Type t = val(0);
@@ -57,11 +77,11 @@ public class FieldNode extends Node {
     String tname = clz.substring(0,clz.length()-1);
     return Env.PROTOS.get(tname);
   }
-  
+
   @Override public boolean unify( boolean test ) {
     TV2 self = tvar();
     TV2 rec = tvar(0);
-    if( test ) rec.push_dep(this);
+    if( !test ) rec.push_dep(this);
 
     // Look up field
     TV2 fld = rec.arg(_fld);

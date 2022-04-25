@@ -147,7 +147,7 @@ public class TestParse {
     test("x=2; y=x+1; x*y", "int:6", "int:6");
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
     test("1+(x=2*3)+x*x", "int:43", "int:43");
-    testerr("x=(1+(x=2)+x); x", "Cannot re-assign final field '.x' in @{x=2}",6);
+    testerr("x=(1+(x=2)+x); x", "Cannot re-assign final field '.x' in @{x=2}",0);
     test("x:=1;x++"  ,"int:1", "int:1");
     test("x:=1;x++;x","int:2", "int:2");
     test("x:=1;x++ + x--","int:3", "int:3");
@@ -157,21 +157,21 @@ public class TestParse {
     // Conditional:
     test   ("0 ?    2  : 3", "int:3", "int:3"); // false
     test   ("2 ?    2  : 3", "int:2", "int:2"); // true
-    test   ("math.rand(1)?x=4:x=3;x", TypeInt.NINT8, "int:"); // x defined on both arms, so available after
-    test   ("math.rand(1)?x=2:  3;4", TypeInt.con(4), "int:"); // x-defined on 1 side only, but not used thereafter
-    test   ("math.rand(1)?(y=2;x=y*y):x=3;x", TypeInt.NINT8, "int:"); // x defined on both arms, so available after, while y is not
+    test   ("math.rand(1)?x=4:x=3;x", "int:nint8", "int:nint8"); // x defined on both arms, so available after
+    test   ("math.rand(1)?x=2:  3;4", "int:4", "int:4"); // x-defined on 1 side only, but not used thereafter
+    test   ("math.rand(1)?(y=2;x=y*y):x=3;x", "int:nint8", "int:nint8"); // x defined on both arms, so available after, while y is not
     testerr("math.rand(1)?x=2: 3 ;x", "'x' not defined on false arm of trinary",20);
     testerr("math.rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
     testerr("0 ? x=2 : 3;x", "'x' not defined on false arm of trinary",11);
-    test   ("2 ? x=2 : 3;x", TypeInt.con(2), "int:"); // off-side is constant-dead, so missing x-assign is ignored
-    test   ("2 ? x=2 : y  ", TypeInt.con(2), "int:"); // off-side is constant-dead, so missing 'y'      is ignored
+    test   ("2 ? x=2 : 3;x", "int:2", "int:2"); // off-side is constant-dead, so missing x-assign is ignored
+    test   ("2 ? x=2 : y  ", "int:2", "int:2"); // off-side is constant-dead, so missing 'y'      is ignored
     testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign final field '.x' in @{x=1}",7);
-    test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1), "int:"); // Re-assigned allowed & ignored in dead branch
-    test   ("math.rand(1)?1:int:2:int",TypeInt.NINT8, "int:"); // no ambiguity between conditionals and type annotations
+    test   ("x=1;2?   2 :(x=3);x", "int:1", "int:1"); // Re-assigned allowed & ignored in dead branch
+    test   ("math.rand(1)?1:int:2:int","int:nint8", "int:nint8"); // no ambiguity between conditionals and type annotations
     testerr("math.rand(1)?1: :2:int","missing expr after ':'",16); // missing type
     testerr("math.rand(1)?1::2:int","missing expr after ':'",15); // missing type
-    test   ("math.rand(1)?1",TypeInt.BOOL,"int:"); // Missing optional else defaults to nil
-    test   ("x:=0;math.rand(1)?(x:=1);x",TypeInt.BOOL,"int:");
+    test   ("math.rand(1)?1","int:int1","int:int1"); // Missing optional else defaults to nil
+    test   ("x:=0;math.rand(1)?(x:=1);x",":int1","int:1");
     testerr("a.b.c();","Unknown ref 'a'",0);
     //test   ("math.rand(1)?@{}",
     //  (ignore->TypeMemPtr.make_nil(8,TypeStruct.make(TypeFld.NO_DISP))),

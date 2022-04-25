@@ -226,8 +226,9 @@ public abstract class PrimNode extends Node {
   // All primitives are effectively H-M Applies with a hidden internal Lambda.
   @Override public boolean unify( boolean test ) {
     boolean progress = false;
-    for( int i=0; i<len(); i++ )
-      progress |= atx(tvar(i),_formals.at(i),test);
+    int i = in(0)==Env.ALL ? 1 : 0; // Starting point; skip first arg for static calls, e.g. math.rand
+    for( ; i<len(); i++ )
+      progress |= atx(tvar(i),_formals.at(i+DSP_IDX),test);
     progress |= atx(tvar(),_ret,test);
     return progress;
   }
@@ -523,10 +524,10 @@ public abstract class PrimNode extends Node {
 
 
   public static class RandI64 extends PrimNode {
-    public RandI64() { super("rand",TypeTuple.INT64,TypeStruct.INT); }
+    public RandI64() { super("rand",TypeTuple.ALL_INT64,TypeStruct.INT); }
     @Override public Type value() {
-      Type t = val(0);
-      if( t.above_center() ) return TypeInt.BOOL.dual();
+      if( val(1).above_center() ) return TypeInt.BOOL.dual();
+      TypeInt t = unwrap_i(val(1));
       if( TypeInt.INT64.dual().isa(t) && t.isa(TypeInt.INT64) )
         return t.meet(TypeInt.FALSE);
       return t.oob(TypeInt.INT64);

@@ -450,7 +450,7 @@ public class Parse implements Comparable<Parse> {
     Node stk = gvn(new LoadNode(mem,ptr,badf));
     Node stk2 = gvn(new SetFieldNode(tok,mutable,stk,Node.peek(iidx),badf));
     StoreNode st = new StoreNode(mem,ptr,stk2,badf);
-    scope().replace_mem(st);
+    scope.replace_mem(st);
     if( !create )               // Note 1-side-of-if update
       scope.def_if(tok,mutable,false);
     if( mutable==Access.Final ) Oper.make(tok);
@@ -492,9 +492,10 @@ public class Parse implements Comparable<Parse> {
     Node t_ctl = Node.pop(t_ctl_x);
     t_exp      = Node.pop(t_exp_x);
 
+    Node ptr = get_display_ptr(scope()); // Pointer, possibly loaded up the display-display
     Parse bad = errMsg();
-    t_mem = scope().check_if(true ,bad,_gvn,t_ctl,t_mem); // Insert errors if created only 1 side
-    f_mem = scope().check_if(false,bad,_gvn,f_ctl,f_mem); // Insert errors if created only 1 side
+    t_mem = scope().check_if(true ,ptr,bad,t_ctl,t_mem); // Insert errors if created only 1 side
+    f_mem = scope().check_if(false,ptr,bad,f_ctl,f_mem); // Insert errors if created only 1 side
     scope().pop_if();         // Pop the if-scope
 
     // Merge results
@@ -1320,13 +1321,12 @@ public class Parse implements Comparable<Parse> {
   private Type ttuple() {
     int oldx = _x;
     peek('(');
-    //TypeStruct ts = TypeStruct.malloc("",Type.ALL);
-    //while(true) {
-    //  Type t = type(false,null);
-    //  if( t==null ) { _x=oldx; return ts.free(null); }
-    //  throw unimpl();
-    //}
-    throw unimpl();
+    TypeStruct ts = TypeStruct.malloc("",Type.ALL,TypeFlds.EMPTY);
+    while(true) {
+      Type t = type(false,null);
+      if( t==null ) { _x=oldx; return ts.free(null); }
+      throw unimpl();
+    }
   }
 
 

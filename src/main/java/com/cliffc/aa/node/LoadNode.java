@@ -140,11 +140,11 @@ public class LoadNode extends Node {
     // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
     // TODO: Hoist out of loops.
     if( mem!=null && mem._op == OP_PHI && adr.in(0) instanceof NewNode ) {
-    //  Node lphi = new PhiNode(Type.SCALAR,((PhiNode)mem)._badgc,mem.in(0));
-    //  for( int i=1; i<mem._defs._len; i++ )
-    //    lphi.add_def(Env.GVN.add_work_new(new LoadNode(mem.in(i),adr,_fld,_bad)));
-    //  return lphi;
-      throw unimpl();
+      Node lphi = new PhiNode(Type.SCALAR,((PhiNode)mem)._badgc,mem.in(0));
+      for( int i=1; i<mem._defs._len; i++ )
+        lphi.add_def(Env.GVN.add_work_new(new LoadNode(mem.in(i),adr,_bad)));
+      subsume(lphi);
+      return lphi;
     }
 
     return null;
@@ -204,10 +204,10 @@ public class LoadNode extends Node {
       //  if( mem.in(0) instanceof FunNode && mem.in(0).is_copy(1)!=null ) mem = mem.in(1); // FunNode is dying, copy, so ParmNode is also
       //  else return null;
       //
-      //} else if( mem instanceof PhiNode || // Would have to match on both sides, and Phi the results
-      //           mem instanceof StartMemNode ||
-      //           mem instanceof ConNode) {
-      //  return null;
+      } else if( mem instanceof PhiNode || // Would have to match on both sides, and Phi the results'
+                 mem instanceof StartMemNode ||
+                 mem instanceof ConNode) {
+        return null;
       } else {
         throw unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
       }
