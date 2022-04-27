@@ -112,10 +112,10 @@ public abstract class PrimNode extends Node {
   public static TypeStruct make_flt(double d) { return TypeStruct.make_flt(TypeFlt.con(d)); }
 
   public static TypeStruct make_wrap(Type t) {
-    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",t,TypeFlds.EMPTY);
+    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",Type.ALL,TypeFld.make("$",t));
   }
-  public static TypeInt unwrap_i(Type t) { return (TypeInt)((TypeStruct)t)._def; }
-  public static TypeFlt unwrap_f(Type t) { return (TypeFlt)((TypeStruct)t)._def; }
+  public static TypeInt unwrap_i(Type t) { return (TypeInt)((TypeStruct)t).at("$"); }
+  public static TypeFlt unwrap_f(Type t) { return (TypeFlt)((TypeStruct)t).at("$"); }
   public static long   unwrap_ii(Type t) { return t==Type.NIL ? 0 : unwrap_i(t).getl(); }
   public static double unwrap_ff(Type t) { return unwrap_f(t).getd(); }
 
@@ -529,8 +529,8 @@ public abstract class PrimNode extends Node {
       if( val(1).above_center() ) return TypeInt.BOOL.dual();
       TypeInt t = unwrap_i(val(1));
       if( TypeInt.INT64.dual().isa(t) && t.isa(TypeInt.INT64) )
-        return t.meet(TypeInt.FALSE);
-      return t.oob(TypeInt.INT64);
+        return make_wrap(t.meet(TypeInt.FALSE));
+      return t.oob(TypeStruct.INT);
     }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
     // Rands have hidden internal state; 2 Rands are never equal

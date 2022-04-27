@@ -770,11 +770,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       default -> throw typerr(null); // Overridden in subclass
     };
   }
-  // Mismatched scalar types that can only cross-nils
-  final Type cross_nil(Type t) {
-    if( may_nil() && t.may_nil() ) return Type.XNIL;
-    return must_nil() || t.must_nil() ? SCALAR : NSCALR;
-  }
 
   // True if type may include a nil (as opposed to must-nil).
   // True for many above-center or zero values.
@@ -784,6 +779,16 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     case TANY, TXSCALAR, TCTRL, TXCTRL, TMEM, TXNIL -> true;
     default -> throw typerr(null); // Overridden in subclass
     };
+  }
+  // True if all internal parts cannot have a nil.
+  // For simple types, just !must_nil
+  // For structs the question is slightly different.
+  public boolean all_not_nil() { return !must_nil(); }
+  
+  // Mismatched scalar types that can only cross-nils
+  final Type cross_nil(Type t) {
+    if( may_nil() && t.may_nil() ) return Type.XNIL;
+    return must_nil() || t.must_nil() ? SCALAR : NSCALR;
   }
 
   // Return the type without a nil-choice.  Only applies to above_center types,
@@ -887,8 +892,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         // Lower case types are simple named types: "int:@{x=1}" or "Cat:@{legs=4}"
         if( !isRecur(id) ) {
           String tname = (id+':').intern();
-          if( Util.eq(id,"int") )  yield TypeStruct.make_int((TypeInt)type(null));
-          if( Util.eq(id,"flt") )  yield TypeStruct.make_flt((TypeFlt)type(null));
+          if( Util.eq(id,"int") || Util.eq(id,"flt"))
+            yield TypeStruct.make(tname,ALL,TypeFld.make("$",type(null)));          
           yield ((TypeStruct)type(null)).set_name(tname);
         }
 

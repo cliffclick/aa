@@ -69,9 +69,9 @@ public class IfNode extends Node {
     if( in(0) instanceof ProjNode && in(0).in(0)==this )
       return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
     Type pred = val(1);
-    if( pred == TypeInt.FALSE || pred == TypeStruct.ZERO || pred == Type.NIL || pred==Type.XNIL )
+    if( pred == TypeStruct.ZERO || pred == Type.NIL || pred==Type.XNIL )
       return TypeTuple.IF_FALSE;   // False only
-    if( pred.above_center() ? !pred.may_nil() : !pred.must_nil() )
+    if( !pred.may_nil() )
       return TypeTuple.IF_TRUE;   // True only
     if( pred.above_center() ) // Wait until predicate falls
       return TypeTuple.IF_ANY;

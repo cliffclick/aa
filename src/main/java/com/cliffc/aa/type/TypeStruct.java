@@ -220,8 +220,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Used to make a few testing constants
   public static TypeStruct make_test( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a)); }
 
-  public static TypeStruct make_int(TypeInt ti) { return TypeStruct.make("int:",ti,TypeFlds.EMPTY); }
-  public static TypeStruct make_flt(TypeFlt tf) { return TypeStruct.make("flt:",tf,TypeFlds.EMPTY); }
+  public static TypeStruct make_int(TypeInt ti) { return TypeStruct.make("int:",ALL,TypeFld.make("$",ti)); }
+  public static TypeStruct make_flt(TypeFlt tf) { return TypeStruct.make("flt:",ALL,TypeFld.make("$",tf)); }
 
   // Add a field to an under construction TypeStruct
   public TypeStruct add_fld( TypeFld fld ) {
@@ -280,7 +280,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public  static final TypeStruct NAMEPT= POINT.set_name("Point:");
   public  static final TypeStruct A     = make_test("a",TypeFlt.FLT64,Access.Final);
   public  static final TypeStruct C0    = make_test("c",TypeInt.FALSE,Access.Final); // @{c:0}
-  private static final TypeStruct D1    = make_test("d",TypeInt.TRUE ,Access.Final); // @{d:1}
+  public  static final TypeStruct D1    = make_test("d",TypeInt.TRUE ,Access.Final); // @{d:1}
   public  static final TypeStruct ARW   = make_test("a",TypeFlt.FLT64,Access.RW   );
 
   // Pile of sample structs for testing
@@ -617,8 +617,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( Util.eq(_clz,"int:") || Util.eq(_clz,"flt:") )
-      return _def._str(visit,dups,sb,debug,false);
+    if( Util.eq(_clz,"int:") && has("$") ) return at("$")._str(visit,dups,sb,debug,false);
+    if( Util.eq(_clz,"flt:") && has("$") ) return at("$")._str(visit,dups,sb,debug,false);
 
     sb.p(_clz);
     boolean is_tup = is_tup();
@@ -773,7 +773,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   @Override public boolean above_center() { return _def.above_center(); }
   @Override public boolean is_con() {
-    if( !_def.is_con() ) return false;
+    //if( !_def.is_con() ) return false;
     for( TypeFld fld : _flds )
       if( !fld.is_con() )
         return false;
@@ -815,7 +815,13 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
         return true;
     return false;
   }
-  // CNC - is it: all-are-may_nil, or any-are-may_nil?
+  @Override public boolean all_not_nil() {
+    if( !_def.all_not_nil() ) return false;
+    for( int i=0; i<len(); i++ )
+      if( at(i).all_not_nil() )
+        return false;
+    return true;
+  }
   @Override public boolean may_nil() {
     if( !_def.may_nil() ) return false;
     for( int i=0; i<len(); i++ )
@@ -824,6 +830,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     return true;
   }
 
+
+  
   @Override boolean contains( Type t, VBitSet bs ) {
     if( bs==null ) bs=new VBitSet();
     if( bs.tset(_uid) ) return false;

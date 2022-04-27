@@ -137,6 +137,7 @@ public class TestParse {
   }
 
   @Test public void testParse01() {
+    test   ("math.rand(1)?x=4:x=3;x", "int:nint8", "int:nint8"); // x defined on both arms, so available after
     // Syntax for variable assignment
     test("x=1", "int:1", "int:1");
     test("x=y=1", "int:1", "int:1");

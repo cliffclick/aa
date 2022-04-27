@@ -232,7 +232,7 @@ public class TV2 {
         args.put(fld._fld,make(fld._t,alloc_site));
       if( ts._clz.length()>0 ) {
         args.put(ts._clz, make_leaf(alloc_site));
-        args.put(" x",make_base(ts._def,alloc_site));
+        //args.put("$",make_base(ts._def,alloc_site));
       }
       yield make_struct(args,alloc_site);
     }
@@ -1167,7 +1167,7 @@ public class TV2 {
     if( clz!=null ) {
       sb.p(clz).p(':');
       if( clz.equals("int") || clz.equals("flt"))
-        return sb.p(arg(" x")._flow);
+        return sb.p(arg("$")._flow);
     }
     final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
     sb.p(is_tup ? "(" : "@{");

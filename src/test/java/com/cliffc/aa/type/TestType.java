@@ -12,6 +12,16 @@ import static org.junit.Assert.assertTrue;
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
+    Type t0 = TypeFlt.FLT64.dual();
+    Type t1 = TypeStruct.D1;
+    Type mt = t0.meet(t1);
+    Type t0d = t0.dual();
+    Type t1d = t1.dual();
+    Type tmd = mt.dual();
+    Type t0x = t0d.meet(tmd);
+    Type t1x = t1d.meet(tmd);
+    assertEquals(t0d,t0x);
+    assertEquals(t1d,t1x);
   }
 
   @Test public void testTFPChain() {
