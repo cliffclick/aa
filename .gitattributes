@@ -1,3 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text eol=lf
 
+*.odg binary
+*.pdf binary
+
