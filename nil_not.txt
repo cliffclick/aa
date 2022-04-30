@@ -1,0 +1,130 @@
+Parse: "1:int"
+
+The ":int" looks up a Type and finds the Prototype StructNode.
+From Prototype StructNode, would like the "_ts" field to be basic type.
+
+So either:
+"int:@{_def=TypeInt.INT64}"
+
+OR:
+
+"int:@{_def=TypeInt.INT64, _+_ = { ...}, _*_ = {...}, _-_ = {...}}", etc
+
+How about user clazzes?
+
+
+
+Apparent user experience:
+
+"Animal:@{_def=ALL, legs:int, sound = { vol -> ... }}"
+
+Animal instance: Animal:@{_def=ALL; legs:int; fur:Color}
+Animal clazz   :        @{_def=ALL; sound={ vol -> ...}}
+
+
+Int user experience:
+instance: int:@{_def=3}     // Set _def for zero-overhead prim?
+clazz:        @{_def=ALL; _+_={...}; ...many int prims...} // All constants, so rides the centerline?
+Cast: e0:int returns Type int:@{_def=INT64}
+
+
+All them functions are unbound: fat-fcn-ptr missing the display.
+Which makes the display an ALL, which is LOW.
+
+Why did i flip INTs to using the _def field?
+Something to do with must/may nil, meeting NIL with INT.
+
+SO.... for uniformness
+
+EXAMPLE: int:@{_def=ALL; $=3}                 // some instance
+LOW:     int:@{_def=ALL; $=TypeInt.INT64}     // canonical low instance
+CLZ:         @{_def=ALL; $clz=LOW; _+_={...}; ...many int prims...}    // clazz
+Env.Protos maps "int:" -> CLZ
+CLZ._class maps to LOW; so can find all fields from a CLZ.
+
+Plan, unwind ints back to a field "$"
+Add a "$clz" field to all classes, including ints.
+
+
+
+------------------
+Issue is:
+  int:{_def=ALL; $=2}
+Claims MUST_NIL: since DEF=ALL, NIL IN SOME FUTURE FIELD IS ALLOWED
+  ~flt   - MUST_NIL is FALSE
+  @{d=1} - MUST_NIL is FALSE
+
+  MEET is nScalar - no nil allowed
+
+Expect:
+  ~@{any; d!=!1}  MEET   ~nScalar
+to stay high:
+  ~@{any; d!=!1}
+which requires not_nil to leave def
+
+
+~flt64  MEET {_def=ALL}   ===   ~nil
+ flt64  MEET nil          ===   flt64
+
+{_def=ANY} MEET nil ===  {_def=ANY} ???
+
+so...
+
+@{def=ALL, d=1} // Should report not-nil at IF tests
+
+
+Back to normal must_nil, may_nil, not_nil.
+
+Now checking monotonicity of IF NODE with any_not_nil
+
+
+Crushing lattice for single field
+
+              @{_def=ANY, $=~int64}  ANY
+  @{_def=ANY, $=~nint8}  TRUE
+  @{_def=---, $=2     }  TRUE       @{_def=---, $=0} FALSE?
+  @{_def=ALL, $= nint8}  TRUE
+              @{_def=ALL, $= int64}  BOTH
+
+
+              @{_def=ANY, $=~int64}  ANY
+  @{_def=ANY, $=~nint8; #=---}  TRUE
+  
+                                                   @{_def=ANY; $=0; #=~int }  ANY
+                                           @{_def=ANY; $=0; #=~nint } TRUE
+  @{_def=---, $=2     ; #=---}  TRUE       @{_def=ANY; $=0; #=2     } TRUE    @{_def=ANY; $=0; #=0  } FALSE 
+                                           @{_def=ANY; $=0; #= nint } TRUE
+                                                   @{_def=ANY; $=0; #= int }  BOTH
+
+  @{_def=ALL, $= nint8; #=---}  TRUE
+              @{_def=ALL; $= int64 #=---}  BOTH
+
+
+
+DEF=ANY,~INT
+       @{$= any, def=any} : ANY
+       @{$=~int, def=any} : ANY
+@{$=~nint, def=any} : 1
+@{$=  2  , def=any} : 1       @{$=  0  , def=any} : 0
+@{$= nint, def=any} : 1
+       @{$=  int, def=any} : ALL
+       @{$=  all, def=any} : ALL
+
+
+DEF=~NINT,2,NINT
+       @{$= any, def=~nint} : 1
+       @{$=~int, def=~nint} : 1
+@{$=~nint, def=~nint} : 1
+@{$=  2  , def=~nint} : 1       @{$=  0  , def=~nint} : ALL
+@{$= nint, def=~nint} : 1
+       @{$=  int, def=~nint} : ALL
+       @{$=  all, def=~nint} : ALL
+
+DEF=INT,ALL
+       @{$= any, def= int } : ALL
+       @{$=~int, def= int } : ALL
+@{$=~nint, def= int } : ALL
+@{$=  2  , def= int } : ALL      @{$=  0  , def= int } : ALL
+@{$= nint, def= int } : ALL
+       @{$=  int, def= int } : ALL
+       @{$=  all, def= int } : ALL
