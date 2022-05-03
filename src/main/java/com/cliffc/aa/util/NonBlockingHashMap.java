@@ -427,7 +427,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
   public Object clone() {
     try {
       // Must clone, to get the class right; NBHM might have been
-      // extended so it would be wrong to just make a new NBHM.
+      // extended, so it would be wrong to just make a new NBHM.
       NonBlockingHashMap<TypeK,TypeV> t = (NonBlockingHashMap<TypeK,TypeV>) super.clone();
       // But I don't have an atomic clone operation - the underlying _kvs
       // structure is undergoing rapid change.  If I just clone the _kvs

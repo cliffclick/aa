@@ -1476,7 +1476,7 @@ public class HM {
   static class IRand extends PrimSyn {
     @Override String name() { return "rand"; }
     public IRand() {
-      super(IDS[0],INT64());
+      super(IDS[1],INT64(),INT64());
       _hmt.arg("ret").clr_cp();
     }
     @Override PrimSyn make() { return new IRand(); }

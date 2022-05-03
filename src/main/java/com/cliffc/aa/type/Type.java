@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.function.*;
 
 import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.type.TypeStruct.CANONICAL_INSTANCE;
 
 /** an implementation of language AA
  */
@@ -784,7 +785,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // For simple types, just !must_nil
   // For structs the question is slightly different.
   public boolean all_not_nil() { return !must_nil(); }
-  
+
   // Mismatched scalar types that can only cross-nils
   final Type cross_nil(Type t) {
     if( may_nil() && t.may_nil() ) return Type.XNIL;
@@ -893,7 +894,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         if( !isRecur(id) ) {
           String tname = (id+':').intern();
           if( Util.eq(id,"int") || Util.eq(id,"flt"))
-            yield TypeStruct.make(tname,ALL,TypeFld.make("$",type(null)));          
+            yield TypeStruct.make(tname,ALL,TypeFld.make(CANONICAL_INSTANCE,type(null)));
           yield ((TypeStruct)type(null)).set_name(tname);
         }
 

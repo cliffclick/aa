@@ -9,6 +9,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.*;
 
 import static com.cliffc.aa.AA.*;
+import static com.cliffc.aa.type.TypeStruct.CANONICAL_INSTANCE;
 
 /** Hindley-Milner based type variables.
  *
@@ -147,8 +148,8 @@ public class TV2 {
 
   // Accessors
   public boolean is_leaf() { return _args==null && _flow==null && !_is_struct && !_is_fun; }
-  public boolean is_unified(){return arg(">>")!=null; }
-  public boolean is_nil () { return arg("?" )!=null; }
+  public boolean is_unified(){return _get(">>")!=null; }
+  public boolean is_nil () { return _get("?" )!=null; }
   public boolean is_base() { return _flow != null; }
   public boolean is_fun () { return _is_fun; }
   public boolean is_obj () { return _is_struct; }
@@ -157,6 +158,7 @@ public class TV2 {
   boolean is_err2()  { return
       (_flow   ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_is_struct
       (_eflow  ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_is_struct
+      (_flow!=null && _args!=null ? 1 : 0) + // Base (flow) and also args
       (_is_fun        ? 1 : 0) +
       (_is_struct     ? 1 : 0) >= 2;
   }
@@ -232,7 +234,7 @@ public class TV2 {
         args.put(fld._fld,make(fld._t,alloc_site));
       if( ts._clz.length()>0 ) {
         args.put(ts._clz, make_leaf(alloc_site));
-        //args.put("$",make_base(ts._def,alloc_site));
+        //args.put(PRIM_WRAP_FIELD_NAME,make_base(ts._def,alloc_site));
       }
       yield make_struct(args,alloc_site);
     }
@@ -240,6 +242,7 @@ public class TV2 {
     case TypeInt i -> make_base(t,alloc_site);
     case Type tt -> {
       if( t==Type.ANY ) yield make_leaf(alloc_site);
+      if( t==Type.ALL ) yield make_base(t,alloc_site);
       if( t == Type.XNIL || t == Type.NIL )
         yield TV2.make_nil(TV2.make_leaf(alloc_site),alloc_site);
       throw unimpl();
@@ -357,12 +360,16 @@ public class TV2 {
     if(  _flow !=null &&  _flow.must_nil() ) return true;
     if( _eflow !=null && _eflow.must_nil() ) return true;
     if( _may_nil                           ) return true;
-    return false;
+    throw unimpl();             // Prims are structs
+    //return false;
   }
   // Strip off nil
   public TV2 strip_nil() {
     if(  _flow!=null )  _flow =  _flow.join(Type.NSCALR);
     if( _eflow!=null ) _eflow = _eflow.join(Type.NSCALR);
+    if( _args!=null )
+      for( TV2 t2 : _args.values() )
+        t2.strip_nil();
     _may_nil = false;
     return this;
   }
@@ -371,6 +378,7 @@ public class TV2 {
     if(  _flow!=null )  _flow =  _flow.meet(Type.NIL);
     if( _eflow!=null ) _eflow = _eflow.meet(Type.NIL);
     _may_nil = true;
+    throw unimpl();             // Prims are structs
   }
 
   //// True if 'this isa t2'.  Must be monotonic.
@@ -1167,7 +1175,7 @@ public class TV2 {
     if( clz!=null ) {
       sb.p(clz).p(':');
       if( clz.equals("int") || clz.equals("flt"))
-        return sb.p(arg("$")._flow);
+        return sb.p(arg(CANONICAL_INSTANCE)._flow);
     }
     final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
     sb.p(is_tup ? "(" : "@{");

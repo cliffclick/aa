@@ -12,6 +12,7 @@ import java.util.BitSet;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
+import static com.cliffc.aa.type.TypeStruct.CANONICAL_INSTANCE;
 
 /*** an implementation of language AA
  *
@@ -1340,13 +1341,12 @@ public class Parse implements Comparable<Parse> {
     String tname = (tok+":").intern();
     StructNode nnn = _e.lookup_type(tname);
     if( nnn == null ) {
-      if( !allow_fref )
-        return null;
+      if( !allow_fref ) // Forward-refs not allowed in this context
+        return null;    // SO no type here
       nnn = type_fref(tname,false); // None, so create
     }
-    //if( )
-    //return nnn._tptr;
-    throw unimpl();
+    // Clazzes have a canonical worse-case instance
+    return nnn.get(CANONICAL_INSTANCE)._t;
   }
 
   // Create a value forward-reference.  Must turn into a function call later.

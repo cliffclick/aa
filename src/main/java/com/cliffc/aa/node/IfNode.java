@@ -69,14 +69,28 @@ public class IfNode extends Node {
     if( in(0) instanceof ProjNode && in(0).in(0)==this )
       return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
     Type pred = val(1);
-    if( pred == TypeStruct.ZERO || pred == Type.NIL || pred==Type.XNIL )
-      return TypeTuple.IF_FALSE;   // False only
-    if( !pred.may_nil() )
-      return TypeTuple.IF_TRUE;   // True only
-    if( pred.above_center() ) // Wait until predicate falls
+    if( pred.above_center() )   // Wait until predicate falls
       return TypeTuple.IF_ANY;
-
+    if( falsey(pred) )           // Simple falsey
+      return TypeTuple.IF_FALSE; // False only
+    // If no field is must_nil
+    if( pred instanceof TypeStruct ts ) {
+      boolean truthy = true, falsey=true;
+      for( TypeFld fld : ts ) if( fld._t.must_nil() ) truthy=false;
+      for( TypeFld fld : ts ) if( !falsey(fld._t) )   falsey=false;
+      if(  falsey && !truthy ) throw unimpl();
+      if( !falsey && truthy ) return TypeTuple.IF_TRUE;
+      if(  falsey && truthy ) throw unimpl();
+    } else {
+      if( !pred.must_nil() )
+        //return TypeTuple.IF_TRUE;   // True only
+        throw unimpl();
+    }
     return TypeTuple.IF_ALL;
+  }
+
+  private static boolean falsey( Type t ) {
+    return t == TypeStruct.ZERO || t == Type.NIL || t==Type.XNIL; // todo include TypeFlt.ZERO
   }
 
   @Override public TV2 new_tvar(String alloc_site) { return null; }

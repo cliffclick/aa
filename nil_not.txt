@@ -87,8 +87,8 @@ Crushing lattice for single field
               @{_def=ALL, $= int64}  BOTH
 
 
-              @{_def=ANY, $=~int64}  ANY
-  @{_def=ANY, $=~nint8; #=---}  TRUE
+              @{_def=ANY, $=~int64, #=_def}  ANY
+  @{_def=ANY, $=~nint8; #=_def}  TRUE                  
   
                                                    @{_def=ANY; $=0; #=~int }  ANY
                                            @{_def=ANY; $=0; #=~nint } TRUE
@@ -128,3 +128,24 @@ DEF=INT,ALL
 @{$= nint, def= int } : ALL
        @{$=  int, def= int } : ALL
        @{$=  all, def= int } : ALL
+
+
+Other Question:
+- Unbound uses e.g. ANY not ALL for DEF.
+- Clazz DEF is not related to the bound def?
+- Calling sequence: self is silently bound to unbound fcns.
+- Clazz has unbound functions, but is not itself an instanceof INT or ANIMAL.
+- Clazz DEF is unrelated to bound DEF.
+
+
+Looking at a INT struct,
+the DEF field is abbrev for all future fields...
+- so if you add non-constant fields to an INT,
+- - (1) you lose the zero-overhead form
+- - (2) the constant fields are ignored for the IF test
+- - (3)
+
+
+Says:
+- to be FALSE-y, all non-final-constant non-default fields have to allow a nil
+- to be TRUTH-y, all non-final-constant non-default fields have to allow a not-nil

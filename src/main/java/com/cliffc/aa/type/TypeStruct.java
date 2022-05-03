@@ -220,8 +220,10 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Used to make a few testing constants
   public static TypeStruct make_test( String fld_name, Type t, Access a ) { return make(TypeFld.make(fld_name,t,a)); }
 
-  public static TypeStruct make_int(TypeInt ti) { return TypeStruct.make("int:",ALL,TypeFld.make("$",ti)); }
-  public static TypeStruct make_flt(TypeFlt tf) { return TypeStruct.make("flt:",ALL,TypeFld.make("$",tf)); }
+  // Primitive wrapper field name
+  public static final String CANONICAL_INSTANCE = "$";
+  public static TypeStruct make_int(TypeInt ti) { return TypeStruct.make("int:",ALL,TypeFld.make(CANONICAL_INSTANCE,ti)); }
+  public static TypeStruct make_flt(TypeFlt tf) { return TypeStruct.make("flt:",ALL,TypeFld.make(CANONICAL_INSTANCE,tf)); }
 
   // Add a field to an under construction TypeStruct
   public TypeStruct add_fld( TypeFld fld ) {
@@ -617,8 +619,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( Util.eq(_clz,"int:") && has("$") ) return at("$")._str(visit,dups,sb,debug,false);
-    if( Util.eq(_clz,"flt:") && has("$") ) return at("$")._str(visit,dups,sb,debug,false);
+    if( Util.eq(_clz,"int:") && has(CANONICAL_INSTANCE) ) return at(CANONICAL_INSTANCE)._str(visit,dups,sb,debug,false);
+    if( Util.eq(_clz,"flt:") && has(CANONICAL_INSTANCE) ) return at(CANONICAL_INSTANCE)._str(visit,dups,sb,debug,false);
 
     sb.p(_clz);
     boolean is_tup = is_tup();
@@ -831,7 +833,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   }
 
 
-  
+
   @Override boolean contains( Type t, VBitSet bs ) {
     if( bs==null ) bs=new VBitSet();
     if( bs.tset(_uid) ) return false;
