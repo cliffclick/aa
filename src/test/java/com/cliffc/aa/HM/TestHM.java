@@ -1035,11 +1035,5 @@ A:@{
       "{ { 1 2 -> 1 } -> 1 }","{ { 1 2 -> 1 } -> 1 }",
       "[19]{any,1 ->1 }","[19]{any,1 ->Scalar }");
   }
-  @Test public void test76() {
-    run("(if (rand 1) 1 0)",
-      "nint8","nint8",
-      "nint8","nint8");
-  }
-
 }
 

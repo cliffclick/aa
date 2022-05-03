@@ -203,13 +203,13 @@ public class HM {
         T2 self = syn.find();
         if( syn instanceof Field fld ) {
           T2 rec = fld._rec.find();
-          if( !self.is_err() && rec.is_err2() && rec.is_struct() && rec.is_open() ) {
-            rec._is_struct=false;  // Turn off struct-ness for print
+          if( !self.is_err() && rec.is_err2() && rec.is_obj() && rec.is_open() ) {
+            rec._is_obj =false;  // Turn off struct-ness for print
             self._err = "Missing field "+fld._id+" in "+rec.p();
           }
           String err = self._err;
           T2 fldt2 = rec.get(fld._id);
-          if( err!=null && rec.is_struct() && !rec.is_open() && (fldt2==null || fldt2.is_err()) ) {
+          if( err!=null && rec.is_obj() && !rec.is_open() && (fldt2==null || fldt2.is_err()) ) {
             if( fldt2!=null ) rec._args.remove(fld._id);
             self._err = err+" in "+rec.p();
           }
@@ -1124,14 +1124,14 @@ public class HM {
         return fld.unify(self, work);
 
       // Add struct-ness if possible
-      if( !rec.is_struct() && !rec.is_nil() ) {
+      if( !rec.is_obj() && !rec.is_nil() ) {
         rec._open = true;
-        rec._is_struct = true;
+        rec._is_obj = true;
         if( rec._args==null ) rec._args = new NonBlockingHashMap<>();
-        assert rec.is_struct();
+        assert rec.is_obj();
       }
       // Add the field
-      if( rec.is_struct() && rec.is_open() ) {
+      if( rec.is_obj() && rec.is_open() ) {
         rec.add_fld(_id,self,work);
         return true;
       }
@@ -1393,7 +1393,7 @@ public class HM {
         return false;
       }
       // Already an expanded nilable with struct
-      if( arg.is_struct() && ret.is_struct() ) {
+      if( arg.is_obj() && ret.is_obj() ) {
         boolean progress=false;
         if( !arg._may_nil ) { if( work==null ) return true; progress = true; arg._may_nil = true ; }
         if(  ret._may_nil ) { if( work==null ) return true; progress = true; ret._may_nil = false; }
@@ -1610,7 +1610,7 @@ public class HM {
 
     // Contains the set of aliased Structs, or null if not a Struct.
     // If set, then keys for field names may appear.
-    boolean _is_struct;
+    boolean _is_obj;
     // Structs allow more fields.  Not quite the same as TypeStruct._open field.
     boolean _open;
 
@@ -1630,7 +1630,7 @@ public class HM {
       t._eflow = _eflow;
       t._may_nil = _may_nil;
       t._is_fun = _is_fun;
-      t._is_struct = _is_struct;
+      t._is_obj = _is_obj;
       t._open = _open;
       t._is_copy = _is_copy;
       // TODO: stop sharing _deps
@@ -1639,19 +1639,19 @@ public class HM {
       return t;
     }
 
-    boolean is_leaf()  { return _args==null && _flow==null && !_is_struct && !_is_fun; }
-    boolean unified()  { return get(">>")!=null; }
-    boolean is_nil()   { return get("?" )!=null; }
-    boolean is_base()  { return _flow   != null; }
-    boolean is_fun ()  { return _is_fun; }
-    boolean is_struct(){ return _is_struct; }
-    boolean is_open()  { return _open; }           // Struct-specific
-    boolean is_err()   { return _err!=null || is_err2(); }
-    boolean is_err2()  { return
+    boolean is_leaf() { return _args==null && _flow==null && !_is_obj && !_is_fun; }
+    boolean unified() { return get(">>")!=null; }
+    boolean is_nil () { return get("?" )!=null; }
+    boolean is_base() { return _flow   != null; }
+    boolean is_fun () { return _is_fun; }
+    boolean is_obj () { return _is_obj; }
+    boolean is_open() { return _open; }           // Struct-specific
+    boolean is_err () { return _err!=null || is_err2(); }
+    boolean is_err2() { return
         (_flow   ==null ? 0 : 1) +                 // Any 2 or more set of _flow,_is_fun,_is_struct
         (_eflow  ==null ? 0 : 1) +                 // Any 2 or more set of _flow,_is_fun,_is_struct
         (_is_fun        ? 1 : 0) +
-        (_is_struct     ? 1 : 0) >= 2;
+        (_is_obj ? 1 : 0) >= 2;
     }
     int size() { return _args==null ? 0 : _args.size(); }
     // A faster debug not-UF lookup
@@ -1696,7 +1696,7 @@ public class HM {
         for( int i=0; i<ids.length; i++ )
           args.put(ids[i],flds[i]);
       T2 t2 = new T2(args);
-      t2._is_struct = true;
+      t2._is_obj = true;
       t2._may_nil = false;
       t2._open = false;
       return t2;
@@ -1739,11 +1739,11 @@ public class HM {
         if( !n._is_copy ) clr_cp();
       }
       if( n.is_fun() ) { throw unimpl(); }
-      if( n.is_struct() ) {
+      if( n.is_obj() ) {
         if( n._args!=null )     // Shallow copy fields
           for( String key : n._args.keySet() )
             _args.put(key,n.get(key));
-        _is_struct = true;
+        _is_obj = true;
         _may_nil = true;
         _open = n._open;
       }
@@ -1788,7 +1788,7 @@ public class HM {
       if(   _eflow!=null ) hash+=   _eflow._hash;
       if( _is_fun ) hash = (hash+ 7)*13;
       if( _may_nil) hash = (hash+13)*23;
-      if( _is_struct ) hash = (hash+23)*29;
+      if( _is_obj ) hash = (hash+23)*29;
       if( _args!=null )
         for( String key : _args.keySet() )
           hash += key.hashCode();
@@ -1819,7 +1819,7 @@ public class HM {
         Type rez = arg("ret")._as_flow();
         return TypeFunPtr.make(Universe.EXT_FIDXS,size()-1,Type.ANY,rez);
       }
-      if( is_struct() ) {
+      if( is_obj() ) {
         TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);
         if( tstr==null ) {
           // Returning a high version of struct
@@ -1861,9 +1861,9 @@ public class HM {
       // Merge all the hard bits
       that._is_fun  |= _is_fun;
       that._may_nil |= _may_nil;
-      if( _is_struct ) {
-        that._open = that._is_struct ? (that._open & _open) : _open;
-        that._is_struct = true;
+      if( _is_obj ) {
+        that._open = that._is_obj ? (that._open & _open) : _open;
+        that._is_obj = true;
       }
       unify_base(that, work);
       if( _args!=null ) {
@@ -1889,7 +1889,7 @@ public class HM {
       // Kill extra information, to prevent accidentally using it
       _args = new NonBlockingHashMap<>() {{put(">>", that);}};
       _flow = _eflow = null;
-      _is_fun = _is_struct = _may_nil = _open = _is_copy = false;
+      _is_fun = _is_obj = _may_nil = _open = _is_copy = false;
       _deps = null;
       _err  = null;
       assert unified();
@@ -2004,7 +2004,7 @@ public class HM {
       if( work==null ) return true; // Here we definitely make progress; bail out early if just testing
 
       // Structural recursion unification.
-      if( is_struct() && that.is_struct() )  unify_flds(this,that,work,false);
+      if( is_obj() && that.is_obj() )  unify_flds(this,that,work,false);
       else if( is_fun() && that.is_fun()  )  unify_flds(this,that,work,false);
       return find().union(that.find(),work);
     }
@@ -2117,9 +2117,9 @@ public class HM {
         if( that._args==null )
           that._args = (NonBlockingHashMap<String,T2>)_args.clone(); // Error case; bring over the function args
       }
-      if( is_struct() && !that.is_struct() ) { // Error, fresh_unify a struct into a non-struct non-leaf
+      if( is_obj() && !that.is_obj() ) { // Error, fresh_unify a struct into a non-struct non-leaf
         if( work==null ) return true;
-        progress = that._is_struct = true;
+        progress = that._is_obj = true;
         if( that._args==null )
           that._args = (NonBlockingHashMap<String,T2>)_args.clone(); // Error case; bring over the function args
       }
@@ -2161,13 +2161,13 @@ public class HM {
       // just copy the missing fields into it, then unify the structs (shortcut:
       // just skip the copy).  If the LHS is closed, then the extra RHS fields
       // are removed.
-      if( missing && is_struct() && !is_open() && that._args!=null )
+      if( missing && is_obj() && !is_open() && that._args!=null )
         for( String id : that._args.keySet() ) // For all fields in RHS
           if( arg(id)==null ) {                // Missing in LHS
             if( work == null ) return true;    // Will definitely make progress
             progress |= that.del_fld(id,work);
           }
-      if( is_struct() && that._open && !_open) { progress = true; that._open = false; }
+      if( is_obj() && that._open && !_open) { progress = true; that._open = false; }
       if( progress ) that.add_deps_work(work);
       return progress;
     }
@@ -2243,7 +2243,7 @@ public class HM {
       if( _eflow  !=t._eflow   ) return false;
       if( _may_nil!=t._may_nil ) return false; // Base-cases have to be completely identical
       if( _is_fun !=t._is_fun  ) return false; // Base-cases have to be completely identical
-      if( _is_struct!=t._is_struct ) return false; // Base-cases have to be completely identical
+      if( _is_obj !=t._is_obj ) return false; // Base-cases have to be completely identical
       if( _err!=null && !_err.equals(t._err) ) return false; // Base-cases have to be completely identical
       if( is_leaf() ) return false;               // Two leaves must be the same leaf, already checked for above
       if( size() != t.size() ) return false;      // Mismatched sizes
@@ -2304,7 +2304,7 @@ public class HM {
         return t2ret.walk_types_in(fret,apply);
       }
 
-      if( is_struct() ) {       // Walk all fields
+      if( is_obj() ) {       // Walk all fields
         if( _args!=null )
           for( String id : _args.keySet() )
             arg(id).walk_types_in(at_fld(t, id), apply);
@@ -2361,7 +2361,7 @@ public class HM {
         return TypeFunPtr.makex( fidxs,size()-1, tdsp, trlift);
       }
 
-      if( is_struct() ) {
+      if( is_obj() ) {
         BitsAlias aliases;
         if( t instanceof TypeMemPtr tmp ) aliases = tmp._aliases;
         else if( t==Type.NIL || t==Type.XNIL ) aliases = BitsAlias.NIL;
@@ -2480,7 +2480,7 @@ public class HM {
           if( is_fun   () ) str_fun   (sb,visit,dups,debug).p(" and ");
           if( is_base  () ) str_base  (sb)                 .p(" and ");
           if( _eflow!=null) sb.p(_eflow)                   .p(" and ");
-          if( is_struct() ) str_struct(sb,visit,dups,debug).p(" and ");
+          if( is_obj() ) str_struct(sb,visit,dups,debug).p(" and ");
           return sb.unchar(5);
         }
         return sb.p(_err);      // Just a simple error
@@ -2488,7 +2488,7 @@ public class HM {
 
       if( is_base  () ) return str_base(sb);
       if( is_fun   () ) return str_fun(sb,visit,dups,debug);
-      if( is_struct() ) return str_struct(sb,visit,dups,debug);
+      if( is_obj() ) return str_struct(sb,visit,dups,debug);
       if( is_nil   () ) return str0(sb,visit,arg("?"),dups,debug).p('?');
 
       // Generic structural T2
@@ -2537,7 +2537,7 @@ public class HM {
     }
     private boolean is_tup() { return _args==null || _args.isEmpty() || _args.containsKey("0"); }
     private Collection<String> sorted_flds() { return new TreeMap<>(_args).keySet(); }
-    boolean is_prim() { return is_struct() && _args!=null && _args.containsKey("!"); }
+    boolean is_prim() { return is_obj() && _args!=null && _args.containsKey("!"); }
     // Return a widened base type, preserving the special string hack
     private static Type widen(Type t) {
       if( t==null ) return null;
