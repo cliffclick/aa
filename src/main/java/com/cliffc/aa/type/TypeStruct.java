@@ -207,6 +207,11 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     }
     return super.hashcons_free();
   }
+  void flds_free() {
+    assert !TypeFlds.interned(_flds);
+    TypeFlds.free(_flds);
+    _flds=null;
+  }
 
   public static TypeStruct make( String clz, Type def, TypeFld[] flds ) { return malloc(clz,def,flds).hashcons_free(); }
   // Make using the fields, with no struct name, low and closed; typical for a
@@ -762,7 +767,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Handles cycles.
   @Override TypeStruct _widen() {
     TypeStruct ts = WIDEN_HASH.get(_uid);
-    if( ts!=null ) throw unimpl(); // { ts.set_cyclic(); return ts; }
+    if( ts!=null ) { ts.set_cyclic(ts); return ts; }
     RECURSIVE_MEET++;
     ts = copy2();               // Struct cloned, _flds cloned, fields referenced
     WIDEN_HASH.put(_uid,ts);

@@ -44,6 +44,8 @@ public interface Cyclic {
     if( map != null )
       map.replaceAll((k,v) -> v.interned() ? v : v.intern_get());
     // Free anything interned to a previous Type
+    while( SCC_FREE_FLDS._len>0 )
+      SCC_FREE_FLDS.pop().flds_free();
     while( SCC_FREE._len>0 )
       SCC_FREE.pop().free(null);
 
@@ -55,13 +57,14 @@ public interface Cyclic {
 
   // -----------------------------------------------------------------
   // All SCCs are marked and colored (with leader color).
-  // Outside of SCCs, do a normal DAG recursive install.
+  // Outside SCCs, do a normal DAG recursive installation.
   // For an SCC, effectively do the whole SCC as a single lump.
 
   // Passed-in the current SCC color, and SCC-in-progress number.
   // The SCC depth points to an Ary of members.
 
   Ary<Type> SCC_FREE = new Ary<>(Type.class);
+  Ary<TypeStruct> SCC_FREE_FLDS = new Ary<>(TypeStruct.class);
   Ary<Ary<Type>> SCC_MEMBERS = new Ary<Ary<Type>>(new Ary[1],0);
   private static <T extends Type> T dag_install(T t, final int scc_depth, Type scc_leader) {
     if( t.interned() ) return t; // No change to interned already
@@ -120,6 +123,7 @@ public interface Cyclic {
       T old = (T)t.intern_get();
       if( old!=null ) {
         SCC_FREE.addAll(ts); // Free the old, return prior
+        for( Type t2 : ts ) if( t2 instanceof TypeStruct ts2 ) SCC_FREE_FLDS.add(ts2);
         t=old;
       } else {
         // Keep the entire cycle.  xdual/rdual/hash/retern

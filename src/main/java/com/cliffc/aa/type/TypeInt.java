@@ -32,6 +32,7 @@ public class TypeInt extends Type<TypeInt> {
     case  "int64" ->  INT64;
     case "nint64" -> NINT64;
     case "nint8"  -> NINT8 ;
+    case  "int8"  ->  INT8 ;
     case  "int1"  -> BOOL;
     default       -> null;
     };
