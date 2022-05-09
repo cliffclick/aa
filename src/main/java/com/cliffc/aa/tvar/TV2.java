@@ -150,7 +150,8 @@ public class TV2 {
   public boolean is_leaf() { return _args==null && _flow==null && !_is_struct && !_is_fun; }
   public boolean is_unified(){return _get(">>")!=null; }
   public boolean is_nil () { return _get("?" )!=null; }
-  public boolean is_base() { return _flow != null; }
+  public boolean is_base() { return _flow != null && !(_flow instanceof TypeMemPtr); }
+  public boolean is_ptr () { return _flow instanceof TypeMemPtr; }
   public boolean is_fun () { return _is_fun; }
   public boolean is_obj () { return _is_struct; }
   public boolean is_open() { return _open; }           // Struct-specific
@@ -177,9 +178,10 @@ public class TV2 {
   }
   // Make a new primitive base TV2
   public static TV2 make_base(Type flow, @NotNull String alloc_site) {
-    assert !(flow instanceof TypeFunPtr);
+    assert !(flow instanceof TypeFunPtr) && !(flow instanceof TypeMemPtr);
     TV2 t2 = new TV2(null,alloc_site);
     t2._flow=flow;
+    assert t2.is_base();
     return t2;
   }
   public static TV2 make_fun(@NotNull String alloc_site, TV2... t2s) {
@@ -212,6 +214,14 @@ public class TV2 {
     _open = true;
     if( _args==null ) _args = new NonBlockingHashMap<>();
     assert is_obj();
+  }
+  public static TV2 make_ptr( TypeMemPtr flow, String alloc_site ) {
+    NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>(){{put("*",make_leaf(alloc_site));}};
+    assert flow instanceof TypeMemPtr;
+    TV2 t2 = new TV2(args,alloc_site);
+    t2._flow=flow;
+    assert t2.is_ptr();
+    return t2;
   }
 
   // An array, with int length and an element type
@@ -1014,19 +1024,22 @@ public class TV2 {
   }
 
   // -----------------
+  // Recursively clear _is_copy, through cyclic types.  
   static final VBitSet UPDATE_VISIT  = new VBitSet();
   void clr_cp() { UPDATE_VISIT.clear(); _clr_cp();}
   private void _clr_cp() {
     TV2 ret;
     if( !_is_copy || UPDATE_VISIT.tset(_uid) ) return;
     _is_copy = false;
-    if( _deps!=null )
+    if( _deps!=null ) {
+      //add_deps_flow();
       //for( Syntax syn : _deps )
       //  if( syn instanceof Lambda lam && lam.find().arg("ret")==this )
       //    for( Apply apply : lam._applys )
       //      if( (ret=apply._fun.find().arg("ret"))!=null )
       //        ret._clr_cp();
       throw unimpl();
+    }
     if( _args != null )
       for( TV2 t2 : _args.values() )
         t2._clr_cp();
@@ -1114,6 +1127,7 @@ public class TV2 {
   // If debug is on, does NOT roll-up - no side effects.
   @Override public String toString() { return str(new SB(), new VBitSet(), get_dups(), true ).toString(); }
   public String p() { VCNT=0; VNAMES.clear(); return str(new SB(), new VBitSet(), get_dups(), false ).toString(); }
+  public SB str(SB sb) { VCNT=0; VNAMES.clear(); return str(sb, new VBitSet(), get_dups(), false ); }
   private static int VCNT;
   private static final HashMap<TV2,String> VNAMES = new HashMap<>();
   public SB str(SB sb, VBitSet visit, VBitSet dups, boolean debug) {

@@ -222,7 +222,9 @@ public class StructNode extends Node {
   }
   // Extra fields are unified with ERR since they are not created here:
   // error to load from a non-existing field
-  private boolean check_fields(TV2 rec) {
+  private boolean check_fields(TV2 ptr) {
+    TV2 rec = ptr._args.get("*").debug_find();
+    if( rec==null ) return true;
     if( rec._args != null )
       for( String id : rec._args.keySet() )
         if( _flds.find(id)==-1 && !rec.arg(id).is_err() )

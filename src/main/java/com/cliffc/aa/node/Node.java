@@ -281,13 +281,13 @@ public abstract class Node implements Cloneable, IntSupplier {
   // Short string name
   public String xstr() { return STRS[_op]; } // Self short name
   String  str() { return xstr(); }    // Inline longer name
-  @Override public String toString() { return dump(0,new SB(),false).toString(); }
+  @Override public String toString() { return dump(0,new SB(),false,false).toString(); }
   // Dump
-  public String dump( int max ) { return dump(max,is_prim(),false); }
+  public String dump( int max ) { return dump(max,is_prim(),false,false); }
   // Dump including primitives
-  public String dump( int max, boolean prims, boolean plive ) { return dump(0, new SB(),max,new VBitSet(),prims,plive).toString();  }
+  public String dump( int max, boolean prims, boolean plive, boolean ptvar ) { return dump(0, new SB(),max,new VBitSet(),prims,plive,ptvar).toString();  }
   // Dump one node, no recursion
-  private SB dump( int d, SB sb, boolean plive ) {
+  private SB dump( int d, SB sb, boolean plive, boolean ptvar ) {
     String xs = String.format("%s%4d: %-7.7s ",plive ? _live : "",_uid,xstr());
     sb.i(d).p(xs);
     if( is_dead() ) return sb.p("DEAD");
@@ -298,22 +298,23 @@ public abstract class Node implements Cloneable, IntSupplier {
     sb.p(str()).s();
     if( _val==null ) sb.p("----");
     else _val.str(sb, true, false);
+    if( ptvar && _tvar!=null ) _tvar.str(sb.p(" - "));
 
     return sb;
   }
   // Dump one node IF not already dumped, no recursion
-  private void dump(int d, SB sb, VBitSet bs, boolean plive) {
+  private void dump(int d, SB sb, VBitSet bs, boolean plive, boolean ptvar) {
     if( bs.tset(_uid) ) return;
-    dump(d,sb,plive).nl();
+    dump(d,sb,plive,ptvar).nl();
   }
   // Recursively print, up to depth
-  private SB dump( int d, SB sb, int max, VBitSet bs, boolean prims, boolean plive ) {
+  private SB dump( int d, SB sb, int max, VBitSet bs, boolean prims, boolean plive, boolean ptvar ) {
     if( bs.tset(_uid) ) return sb;
     if( d < max ) {    // Limit at depth
       // Print parser scopes first (deepest)
-      for( Node n : _defs ) if( n instanceof ScopeNode ) n.dump(d+1,sb,max,bs,prims,plive);
+      for( Node n : _defs ) if( n instanceof ScopeNode ) n.dump(d+1,sb,max,bs,prims,plive,ptvar);
       // Print constants early
-      for( Node n : _defs ) if( n instanceof ConNode ) n.dump(d+1,sb,max,bs,prims,plive);
+      for( Node n : _defs ) if( n instanceof ConNode ) n.dump(d+1,sb,max,bs,prims,plive,ptvar);
       // Do not recursively print root Scope, nor Unresolved of primitives.
       // These are too common, and uninteresting.
       for( Node n : _defs ) if( n != null && (!prims && n.is_prim() && n._defs._len > 3) ) bs.set(n._uid);
@@ -322,14 +323,14 @@ public abstract class Node implements Cloneable, IntSupplier {
       for( Node n : _defs )
         if( n != null && !n.is_multi_head() && !n.is_multi_tail() &&
             !(n instanceof UnresolvedNode) && !(n instanceof FunPtrNode) )
-          n.dump(d+1,sb,max,bs,prims,plive);
+          n.dump(d+1,sb,max,bs,prims,plive,ptvar);
       // Print Unresolved and FunPtrs, which typically catch whole functions.
       for( Node n : _defs )
         if( (n instanceof UnresolvedNode) || (n instanceof FunPtrNode) )
-          n.dump(d+1,sb,max,bs,prims,plive);
+          n.dump(d+1,sb,max,bs,prims,plive,ptvar);
       // Print anything not yet printed, including multi-node combos
-      for( Node n : _defs ) if( n != null && !n.is_multi_head() ) n.dump(d+1,sb,max,bs,prims,plive);
-      for( Node n : _defs ) if( n != null ) n.dump(d+1,sb,max,bs,prims,plive);
+      for( Node n : _defs ) if( n != null && !n.is_multi_head() ) n.dump(d+1,sb,max,bs,prims,plive,ptvar);
+      for( Node n : _defs ) if( n != null ) n.dump(d+1,sb,max,bs,prims,plive,ptvar);
     }
     // Print multi-node combos all-at-once, including all tails even if they
     // exceed the depth limit by 1.
@@ -340,22 +341,22 @@ public abstract class Node implements Cloneable, IntSupplier {
       for( Node n : x._uses )
         if( n.is_multi_tail() )
           for( Node m : n._defs )
-            if( dx<max) m.dump(dx+1,sb,max,bs,prims,plive);
+            if( dx<max) m.dump(dx+1,sb,max,bs,prims,plive,ptvar);
       if( x==this ) bs.clear(_uid); // Reset for self, so prints right now
-      x.dump(dx,sb,bs,plive); // Conditionally print head of combo
+      x.dump(dx,sb,bs,plive,ptvar); // Conditionally print head of combo
       // Print all combo tails, if not already printed
       if( x!=this ) bs.clear(_uid); // Reset for self, so prints in the mix below
-      for( Node n : x._uses ) if( n.is_multi_tail() ) n.dump(dx-1,sb,bs,plive);
+      for( Node n : x._uses ) if( n.is_multi_tail() ) n.dump(dx-1,sb,bs,plive,ptvar);
       return sb;
     } else { // Neither combo head nor tail, just print
-      return dump(d,sb,plive).nl();
+      return dump(d,sb,plive,ptvar).nl();
     }
   }
   public boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_NEW || _op==OP_REGION || _op==OP_SPLIT || _op==OP_START; }
   private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ || _op==OP_CPROJ; }
   boolean is_CFG() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_REGION || _op==OP_START || _op==OP_CPROJ || _op==OP_SCOPE; }
 
-  public String dumprpo( boolean prims, boolean plive ) {
+  public String dumprpo( boolean prims, boolean plive, boolean ptvar ) {
     Ary<Node> nodes = new Ary<>(new Node[1],0);
     postorder(nodes,new VBitSet());
     // Dump in reverse post order
@@ -371,7 +372,7 @@ public abstract class Node implements Cloneable, IntSupplier {
           n.is_multi_head() )
         sb.nl();
       if( n._op==OP_FUN ) _header((FunNode)n,sb);
-      n.dump(0,sb,plive).nl();
+      n.dump(0,sb,plive,ptvar).nl();
       if( n._op==OP_RET && n.in(4) instanceof FunNode ) _header((FunNode)n.in(4),sb);
       prior = n;
     }
@@ -819,7 +820,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   private int _report_bug(String msg) {
     FLOW_VISIT.clear(_uid); // Pop-frame & re-run in debugger
     System.err.println(msg);
-    System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
+    System.err.println(dump(0,new SB(),true,false)); // Rolling backwards not allowed
     return 1;
   }
 

@@ -204,10 +204,8 @@ public class HM {
         T2 self = syn.find();
         if( syn instanceof Field fld ) {
           T2 rec = fld._ptr.find();
-          if( !self.is_err() && rec.is_err2() && rec.is_ptr() ) {
-            rec._flow = null; // Turn off ptr-ness for print
-            self._err = "Missing field " + fld._id + " in " + rec.p();
-          }
+          //if( !self.is_err() && rec.is_err2() && rec.is_ptr() )
+           // self._err = "Missing field " + fld._id + " in " + rec.p();
           if( rec.is_nil() || rec._may_nil )
             self._err = "May be nil when loading field "+fld._id;
         }
@@ -1038,7 +1036,9 @@ public class HM {
     @Override boolean hm(Work<Syntax> work) {
       // Force result to be a struct with at least these fields.
       // Do not allocate a T2 unless we need to pick up fields.
-      T2 rec = find();
+      T2 ptr = find();
+      T2 rec = ptr.arg("*");
+      if( rec==null ) return true;
       assert check_fields(rec);
       rec.push_update(this);
 
@@ -1054,12 +1054,10 @@ public class HM {
     }
     // Extra fields are unified with ERR since they are not created here:
     // error to load from a non-existing field
-    private boolean check_fields(T2 ptr) {
-      T2 rec = ptr._args.get("*").debug_find();
-      if( rec==null ) return true;
+    private boolean check_fields(T2 rec) {
       if( rec._args != null )
         for( String id : rec._args.keySet() )
-          if( Util.find(_ids,id)==-1 && !rec._args.get(id).is_err() )
+          if( Util.find(_ids,id)==-1 && !rec._args.get(id).debug_find().is_err() )
             return false;
       return true;
     }
@@ -1077,7 +1075,7 @@ public class HM {
 
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
       T2 hmt = T2.make_open_struct(null,null);
-      prep_tree_impl(par, nongen, work, T2.make_ptr(_alias,hmt));
+      prep_tree_impl(par, nongen, work, T2.make_ptr(hmt));
       int cnt = 1;              // One for self
       T2[] t2s = new T2[_ids.length];
       if( _ids.length!=0 ) hmt._args = new NonBlockingHashMap<>();
@@ -1118,20 +1116,12 @@ public class HM {
       if( work!=null ) ptr.push_update(this);
 
       // If pointer, get the pointed-at struct
-      T2 rec = ptr.arg("*");
-      if( rec==null ) {
-        if( ptr._flow==null ) {
-          ptr._flow = TypeMemPtr.ISUSED.dual();
-          if( ptr._args==null ) ptr._args = new NonBlockingHashMap<>();
-          ptr._args.put("*",rec=T2.make_leaf());
-          assert ptr.is_ptr();
-        }
-      } else if( rec.is_nil() ) {
-        throw unimpl();
-      }
+      if( ptr.is_leaf() )
+        ptr._args = new NonBlockingHashMap<>(){{put("*", T2.make_leaf());}};
 
-      // Look up field
+      T2 rec = ptr.arg("*");
       if( rec!=null ) {
+        // Look up field
         T2 fld = rec.arg(_id);
         if( fld!=null )           // Unify against a pre-existing field
           return fld.unify(self, work);
@@ -1177,6 +1167,8 @@ public class HM {
           if( work!=null ) alloc.push(this);
         }
       if( DO_HM ) {
+        // TODO: DOES THIS HELP???  CAN IT POSSIBLY HELP?
+        // TODO: DOES NOT DEPEND ON DO_HM
         TypeFld tf = tmp._obj.get(_id);
         Type tx = tf==null ? tmp._obj.oob(Type.SCALAR) : tf._t;
         t = t.join(tx); // Help from HM
@@ -1255,9 +1247,8 @@ public class HM {
       super(FLDS,
             var1=T2.make_leaf(),
             var2=T2.make_leaf(),
-            T2.make_ptr(alias=BitsAlias.new_alias(BitsAlias.INTX),
-                        T2.make_open_struct(FLDS,new T2[]{var1,var2})));
-      _alias = alias;
+            T2.make_ptr(T2.make_open_struct(FLDS,new T2[]{var1,var2})));
+      _alias = BitsAlias.new_alias(BitsAlias.INTX);
       ALIASES.setX(_alias,this);
     }
     @Override public TypeMemPtr tmp() { return _tmp(_alias,FLDS,_types); }
@@ -1599,6 +1590,7 @@ public class HM {
     // If Base   , then null and _flow is set.
     // If unified, contains the single key ">>" and all other fields are null.
     // If Nil    , contains the single key "?"  and all other fields are null.
+    // If Ptr    , contains the single key "*"  and all other fields are null.
     // If Lambda , contains keys "x","y","z" for args or "ret" for return.
     // If Struct , contains keys for the field labels.  No display & not-null.
     // If Error  , _eflow may contain a 2nd flow type; also blends keys from all takers
@@ -1661,17 +1653,19 @@ public class HM {
     boolean is_leaf() { return _args==null && _flow==null && !_is_obj && !_is_fun; }
     boolean unified() { return get(">>")!=null; }
     boolean is_nil () { return get("?" )!=null; }
-    boolean is_base() { return _flow != null && !(_flow instanceof TypeMemPtr); }
-    boolean is_ptr () { return _flow instanceof TypeMemPtr; }
+    boolean is_ptr () { return get("*" )!=null; }
+    boolean is_base() { return _flow != null; }
     boolean is_fun () { return _is_fun; }
     boolean is_obj () { return _is_obj; }
     boolean is_open() { return _open; }           // Struct-specific
     boolean is_err () { return _err!=null || is_err2(); }
     boolean is_err2() { return
-        (_flow   ==null ? 0 : 1) +                 // Any 2 or more set of _flow,_is_fun,_is_struct
-        (_eflow  ==null ? 0 : 1) +                 // Any 2 or more set of _flow,_is_fun,_is_struct
-        (_is_fun        ? 1 : 0) +
-        (_is_obj ? 1 : 0) >= 2;
+        (is_base()      ? 1 : 0) +                 // Any 2 or more of base,ptr,fun,obj, or eflow
+        (_eflow  !=null ? 1 : 0) +
+        (is_ptr()       ? 1 : 0) +
+        (is_fun()       ? 1 : 0) +
+        (is_obj()       ? 1 : 0)
+        >= 2;                   // Two or more unrelated types is an error
     }
     int size() { return _args==null ? 0 : _args.size(); }
     // A faster debug not-UF lookup
@@ -1722,22 +1716,17 @@ public class HM {
       t2._open = false;
       return t2;
     }
-    static T2 make_ptr(int alias, T2 obj) {
+    static T2 make_ptr(T2 obj) {
       assert obj.is_obj();
       NonBlockingHashMap<String,T2> args = new NonBlockingHashMap<>(){{put("*",obj);}};
       T2 t2 = new T2(args);
-      t2._flow = TypeMemPtr.make(alias,TypeStruct.ISUSED);
       assert t2.is_ptr();
       return t2;
     }
     static T2 make_str(TypeMemPtr flow) {
       assert flow.is_str();
       T2 t2str = make_open_struct(new String[]{"str:","0"},new T2[]{make_leaf(),make_base(flow._obj.get("0")._t)});
-      NonBlockingHashMap<String,T2> args = new NonBlockingHashMap<>(){{put("*",t2str);}};
-      T2 t2 = new T2(args);
-      t2._flow=flow;
-      assert t2.is_ptr();
-      return t2;
+      return make_ptr(t2str);
     }
 
     T2 debug_find() {// Find, without the roll-up
@@ -1770,17 +1759,15 @@ public class HM {
       T2 n = arg("?");
       if( n.is_leaf() ) return this;
       _args.remove("?");  // No longer have the "?" key, not a nilable anymore
+      if( !n._is_copy ) clr_cp();
       // Nested nilable-and-not-leaf, need to fixup the nilable
-      if( n.is_base() || n.is_ptr() || (n._eflow instanceof TypeMemPtr) ) {
+      if( n.is_base() ) {
         _flow = n._flow.meet(Type.NIL);
         if( n._eflow!=null ) _eflow = n._eflow.meet(Type.NIL);
-        if( !n._is_copy ) clr_cp();
-        T2 ptr = n.get("*");
-        if( ptr!=null ) {
-          if( _args==null ) _args = new NonBlockingHashMap<>();
-          _args.put("*",ptr);
-        }
-        if( !n._is_copy ) clr_cp();
+      }
+      if( n.is_ptr() ) {
+        if( _args==null ) _args = new NonBlockingHashMap<>();
+        _args.put("*",n.get("*"));
       }
       if( n.is_fun() ) throw unimpl();
       if( n.is_obj() ) throw unimpl();
@@ -1850,8 +1837,7 @@ public class HM {
       if( is_ptr() ) {
         // This is a Root passed-in struct which can have all aliases
         TypeStruct tstr = (TypeStruct)arg("*")._as_flow();
-        BitsAlias aliases = ((TypeMemPtr)_flow)._aliases.meet(Universe.EXT_ALIASES);
-        return TypeMemPtr.make(aliases,tstr);
+        return TypeMemPtr.make(Universe.EXT_ALIASES.meet(_may_nil ? BitsAlias.NIL : BitsAlias.EMPTY),tstr);
       }
       if( is_nil()  )
         return arg("?")._as_flow().meet(Type.NIL);
@@ -2056,7 +2042,7 @@ public class HM {
       return find().union(that.find(),work);
     }
 
-    // Structural recursion unification.  
+    // Structural recursion unification.
     static void unify_flds( T2 thsi, T2 that, Work<Syntax> work ) {
       if( thsi._args==that._args ) return;  // Already equal (and probably both nil)
       for( String key : thsi._args.keySet() ) {
@@ -2091,8 +2077,7 @@ public class HM {
     }
     // Delete a field
     private boolean del_fld( String id, Work<Syntax> work) {
-      if( _flow instanceof TypeMemPtr && Util.eq("*",id) )
-        return false; // Do not break ptr-ness, instead keep field and will be an error
+      if( Util.eq("*",id) ) return false; // Do not break ptr-ness, instead keep field and will be an error
       add_deps_work(work);
       _args.remove(id);
       if( _args.size()==0 ) _args=null;
@@ -2393,7 +2378,10 @@ public class HM {
 
       if( is_base() ) return _is_copy ? _flow : widen();
       if( is_ptr() ) {
-        if( !(t instanceof TypeMemPtr tmp) ) return _flow;
+        if( !(t instanceof TypeMemPtr tmp) ) {
+          Type tx = T2MAP.get(this);
+          return tx!=null ? tx : t.oob(TypeMemPtr.ISUSED);
+        }
         return tmp.make_from((TypeStruct)arg("*").walk_types_out(tmp._obj,apply,test));
       }
 
@@ -2532,9 +2520,7 @@ public class HM {
           if( is_fun () ) str_fun (sb,visit,dups,debug).p(" and ");
           if( is_base() ) str_base(sb)                 .p(" and ");
           if( is_ptr () ) str_ptr (sb,visit,dups,debug,_flow).p(" and ");
-          if( _eflow!=null) {
-            (_eflow instanceof TypeMemPtr  ? str_ptr(sb,visit,dups,debug,_eflow) : sb.p(_eflow)).p(" and ");
-          }
+          if( _eflow!=null) sb.p(_eflow)               .p(" and ");
           if( is_obj () ) str_obj (sb,visit,dups,debug).p(" and ");
           return sb.unchar(5);
         }
@@ -2558,9 +2544,8 @@ public class HM {
     private SB str_base(SB sb) { return sb.p(_flow); }
     private SB str_ptr(SB sb, VBitSet visit, VBitSet dups, boolean debug, Type flow) {
       T2 obj = _args==null ? null : _args.get("*");
-      sb.p('*');
-      str0(sb,visit,obj,dups,debug);
-      if( flow.must_nil() ) sb.p('?');
+      str0(sb.p('*'),visit,obj,dups,debug);
+      if( _may_nil ) sb.p('?');
       return sb;
     }
     private SB str_fun(SB sb, VBitSet visit, VBitSet dups, boolean debug) {

@@ -765,18 +765,18 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   // Keep field names and orders.  Widen all field contents, including finals.
   // Handles cycles.
-  @Override TypeStruct _widen() {
-    TypeStruct ts = WIDEN_HASH.get(_uid);
-    if( ts!=null ) { ts.set_cyclic(ts); return ts; }
-    RECURSIVE_MEET++;
-    ts = copy2();               // Struct cloned, _flds cloned, fields referenced
-    WIDEN_HASH.put(_uid,ts);
-    for( int i=0; i<_flds.length; i++ )  ts._flds[i] = _flds[i].malloc_from(); // Clone fields
-    for( TypeFld fld : ts._flds ) fld.setX(fld._t._widen());
-    if( --RECURSIVE_MEET == 0 )
-      ts = Cyclic.install(ts);
-    return ts;
-  }
+  //@Override TypeStruct _widen() {
+  //  TypeStruct ts = WIDEN_HASH.get(_uid);
+  //  if( ts!=null ) { ts.set_cyclic(ts); return ts; }
+  //  RECURSIVE_MEET++;
+  //  ts = copy2();               // Struct cloned, _flds cloned, fields referenced
+  //  WIDEN_HASH.put(_uid,ts);
+  //  for( int i=0; i<_flds.length; i++ )  ts._flds[i] = _flds[i].malloc_from(); // Clone fields
+  //  for( TypeFld fld : ts._flds ) fld.setX(fld._t._widen());
+  //  if( --RECURSIVE_MEET == 0 )
+  //    ts = Cyclic.install(ts);
+  //  return ts;
+  //}
 
   @Override public boolean above_center() { return _def.above_center(); }
   @Override public boolean is_con() {

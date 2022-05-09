@@ -28,14 +28,14 @@ public class TestHM {
 
   // Run same program in all 3 combinations, but answers vary across combos
   private void run( String prog, String rez_hm_gcp, String rez_hm_alone, String frez_gcp_hm, String frez_gcp_alone ) {
-    _run1s(prog,rez_hm_gcp  ,frez_gcp_hm   );
     _run1s(prog,rez_hm_alone,null          );
     _run1s(prog,null        ,frez_gcp_alone);
+    _run1s(prog,rez_hm_gcp  ,frez_gcp_hm   );
   }
   private void run( String prog, String rez_hm, String frez_gcp ) {
-    _run1s(prog,rez_hm,frez_gcp);
     _run1s(prog,rez_hm,null    );
     _run1s(prog,null  ,frez_gcp);
+    _run1s(prog,rez_hm,frez_gcp);
   }
 
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
@@ -313,7 +313,7 @@ map ={fun parg -> (fun (cdr parg))};
   // Example from SimpleSub requiring 'x' to be both a struct with field
   // 'v', and also a function type - specifically disallowed in 'aa'.
   @Test public void test38() { run("{ x -> y = ( x x.v ); 0}",
-                                   "{ { A:Missing field v in {A->B} -> B } -> C? }",
+                                   "{ Cannot unify {A->B} and *@{ v=A; ...} -> C? }",
                                    "[17]{any,3 ->nil }"); }
 
   // Awful flow-type: function can be called from the REPL with any
@@ -662,14 +662,14 @@ three =(n.s two);     // Three is the successor of two
         "  three=V25:*@{ "+
         "    add_={ V26:*@{ succ={*()->V26}; ... }->V26  };"+
         "    pred={ V27 -> V25};"+
-        "    succ={ *()  -> V25};"+ // Note 'succ' only takes 'void', and not an 'unused'.
+        "    succ={ *() -> V25};"+ // Note 'succ' only takes 'void', and not an 'unused'.
         "    zero={ V28 -> V29:*@{ and_={V29->V29}; or__={V29->V29}; then={ {*()->V30} {*()->V30} -> V30}}}"+
         "  };"+
         // Has all the fields of a natural number.
         "  two=V31:*@{ "+
         "    add_={ V32:*@{succ={*()->V32}; ...} ->V32 };"+
         "    pred={ V33 -> V31};"+
-        "    succ={ *()  -> V31};"+ // Note 'succ' only takes a 'void', and not an 'unused'.
+        "    succ={ *() -> V31};"+ // Note 'succ' only takes a 'void', and not an 'unused'.
         "    zero={V34->V35:*@{and_={V35->V35};or__={V35->V35};then={{*()->V36}{*()->V36}->V36}}}"+
         "  }"+
         "}"+
@@ -706,14 +706,14 @@ three =(n.s two);     // Three is the successor of two
         "  three=V25:*@{ "+
         "    add_={ V26:*@{ succ={*()->V26}; ... }->V26  };"+
         "    pred={ V27 -> V25};"+
-        "    succ={ *()  -> V25};"+ // Note 'succ' only takes 'void', and not an 'unused'.
+        "    succ={ *() -> V25};"+ // Note 'succ' only takes 'void', and not an 'unused'.
         "    zero={ V28 -> V29:*@{ and_={V29->V29}; or__={V29->V29}; then={ {*()->V30} {*()->V30} -> V30}}}"+
         "  };"+
         // Has all the fields of a natural number.
         "  two=V31:*@{ "+
         "    add_={ V32:*@{succ={*()->V32}; ...} ->V32 };"+
         "    pred={ V33 -> V31};"+
-        "    succ={ *()  -> V31};"+ // Note 'succ' only takes a 'void', and not an 'unused'.
+        "    succ={ *() -> V31};"+ // Note 'succ' only takes a 'void', and not an 'unused'.
         "    zero={V34->V35:*@{and_={V35->V35};or__={V35->V35};then={{*()->V36}{*()->V36}->V36}}}"+
         "  }"+
         "}"+
@@ -924,18 +924,24 @@ all
         """
 *[13]@{
   FA:^=any;
-  true=PA:*[9,10]@{FA; and=[18,21]{any,3 ->Scalar }; or=[19,22]{any,3 ->Scalar }; then=[20,23]{any,4 ->Scalar }};
-  false=PA;
-  z=*[11]@{
-    FA;
-    zero=[28]{any,3 ->PA };
-    pred=[17]{any,3 ->~Scalar };
-    succ=[29]{any,3 ->
-      PB:*[ALL]()
-    };
-    add_=[30]{any,3 ->Scalar }
+  false=PB:*[9,10]@{FA; and=[18,21]{any,3 ->Scalar }; or=[19,22]{any,3 ->Scalar }; then=[20,23]{any,4 ->Scalar }};
+  true=PB;
+  s = [38]{any,3 ->
+    PA:*[12]@{
+      FA;
+      add_=[37]{any,3 ->PA };
+      pred=[35]{any,3 ->*[2,11,12]() };
+      succ=[36]{any,3 ->PA };
+      zero=[34]{any,3 ->PB }
+    }
   };
-  s=[38]{any,3 ->PB }
+  z =*[11]@{
+    FA;
+    add_=[30]{any,3 ->Scalar };
+    pred=[17]{any,3 ->~Scalar };
+    succ=[29]{any,3 ->PA };
+    zero=[28]{any,3 ->PB }
+  }
 }
 """,
         """

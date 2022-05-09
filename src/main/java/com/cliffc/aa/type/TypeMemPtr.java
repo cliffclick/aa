@@ -279,10 +279,9 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   // ptr-to-array (and string) from ptr-to-record.  Must keep types at the same
   // resolution as H-M, so pointers all permit nil (unless I track a H-M type
   // which disallows nil).
-  @Override TypeMemPtr _widen() {
-    //if( above_center() ) return this;
-    return make(_aliases.widen(),_obj._widen());
-  }
+  //@Override TypeMemPtr _widen() {
+  //  return make(_aliases.widen(),_obj._widen());
+  //}
 
   // Make a Type, replacing all dull pointers from the matching types in mem.
   @Override public Type make_from(Type head, TypeMem mem, VBitSet visit) {

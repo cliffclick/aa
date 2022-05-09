@@ -214,7 +214,7 @@ public class Parse implements Comparable<Parse> {
     _gvn = Env.GVN;       // Pessimistic during parsing
   }
   String dump() { return scope().dump(99); }// debugging hook
-  String dumprpo() { return Env.START.dumprpo(false,false); }// debugging hook
+  String dumprpo() { return Env.START.dumprpo(false,false,false); }// debugging hook
 
   /** Parse a top-level:
    *  prog = stmts END */

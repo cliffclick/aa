@@ -360,7 +360,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     BitsFun fidxs = _fidxs.above_center() ? _fidxs.dual() : _fidxs;
     return make_from(fidxs.set(0));
   }
-  @Override TypeFunPtr _widen() { return GENERIC_FUNPTR; }
+  //@Override TypeFunPtr _widen() { return GENERIC_FUNPTR; }
 
   @Override public Type make_from(Type head, TypeMem map, VBitSet visit) {
     throw unimpl();

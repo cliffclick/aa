@@ -571,12 +571,13 @@ public class TypeMem extends Type<TypeMem> {
 
   // Recursively widen fields
   @Override public TypeMem _widen() {
-    TypeStruct[] tos = _pubs.clone();
-    tos[0] = null;
-    for( int i=1; i<tos.length; i++ )
-      if( tos[i]!=null )
-        tos[i] = tos[i]._widen();
-    return make0(tos);
+    throw unimpl();
+    //TypeStruct[] tos = _pubs.clone();
+    //tos[0] = null;
+    //for( int i=1; i<tos.length; i++ )
+    //  if( tos[i]!=null )
+    //    tos[i] = tos[i]._widen();
+    //return make0(tos);
   }
 
   @Override public boolean above_center() {

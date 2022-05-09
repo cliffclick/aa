@@ -758,6 +758,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     case TXSCALAR, TXNSCALR -> SCALAR; // Too high
     case TANY, TALL, TNIL, TXNIL -> this;
     case TCTRL, TXCTRL -> Type.CTRL;
+    case TMEMPTR, TMEM, TFUNPTR, TTUPLE, TSTRUCT -> this; // Do not touch
     default -> throw typerr(null); // Overridden in subclass
     };
   }

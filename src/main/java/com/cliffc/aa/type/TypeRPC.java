@@ -55,7 +55,7 @@ public class TypeRPC extends Type<TypeRPC> {
 
   public int rpc() { return _rpcs.getbit(); }
   public boolean test(int rpc) { return _rpcs.test(rpc); }
-  @Override Type _widen() { return ALL_CALL; }
+  //@Override Type _widen() { return ALL_CALL; }
   @Override public boolean above_center() { return _rpcs.above_center(); }
   // RPCs represent *classes* of return pointers and are thus never constants.
   // TODO: This is weak, since call-sites are only rarely cloned so typically a
