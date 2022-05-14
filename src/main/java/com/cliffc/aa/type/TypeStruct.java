@@ -233,6 +233,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // Add a field to an under construction TypeStruct
   public TypeStruct add_fld( TypeFld fld ) {
     assert find(fld._fld)==-1;  // No accidental replacing
+    TypeFld[] old = _flds;
     _flds = TypeFlds.add(_flds,fld);
     return this;
   }
@@ -642,15 +643,16 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
         if( (debug || !Util.eq(fld._fld,"^")) && (fld._t!=null && fld._t._str_complex(visit,dups)) )
           ind=indent;           // Field is complex, indent if asked to do so
       if( ind ) sb.ii(1);
-      if( _def!=ALL )
-        _def._str(visit,dups,sb, debug,indent).p(is_tup ? ", " : "; "); // Between fields
       for( TypeFld fld : _flds ) {
         if( !debug && Util.eq(fld._fld,"^") ) continue; // Do not print the ever-present display
         if( ind ) sb.nl().i();
         fld._str(visit,dups, sb, debug, indent ); // Field name, access mod, type
         sb.p(is_tup ? ", " : "; "); // Between fields
       }
-      if( _flds.length>0 || _def!=ALL )    sb.unchar().unchar();
+      if( _flds.length>0 ) sb.unchar().unchar();
+      if( _def==ANY ) sb.p("..."); // Any extra fields are allowed
+      else if( _def!=ALL )
+        _def._str(visit,dups,sb, debug,indent); // Print default
       if( ind ) sb.nl().di(1).i();
     }
     sb.p(!is_tup ? "}" : ")");

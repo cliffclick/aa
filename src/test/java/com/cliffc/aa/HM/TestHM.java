@@ -1,7 +1,8 @@
 package com.cliffc.aa.HM;
 
 import com.cliffc.aa.HM.HM.Root;
-import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.*;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -12,30 +13,50 @@ import static org.junit.Assert.assertEquals;
 
 public class TestHM {
 
-  private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed ) {
+  private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
     HM.reset();
     Root syn = HM.hm(prog, rseed, rez_hm!=null, frez_gcp!=null );
     if(  rez_hm !=null )  assertEquals(stripIndent(rez_hm),stripIndent(syn._hmt.p()));
     if( frez_gcp!=null )  assertEquals(Type.valueOf(frez_gcp),syn.flow_type());
+    if( rez_hm!=null && frez_gcp!=null ) {
+      // Track expected Root escapes
+      String esc_ptrs2 = "*"+esc_ptrs+"()";
+      String esc_funs2 =     esc_funs+"{any,3->Scalar}";
+      BitsAlias aliases = esc_ptrs==null ? BitsAlias.EMPTY : ((TypeMemPtr)Type.valueOf(esc_ptrs2))._aliases;
+      BitsFun   fidxs   = esc_funs==null ? BitsFun  .EMPTY : ((TypeFunPtr)Type.valueOf(esc_funs2))._fidxs  ;
+      aliases = aliases.meet(TypeMemPtr.STRPTR._aliases); // Always string alias
+      assertEquals(aliases,Root.EXT_ALIASES);
+      assertEquals(fidxs  ,Root.EXT_FIDXS  );
+    }
   }
 
   private static final int[] rseeds = new int[]{0,1,2,3};
-  private void _run1s( String prog, String rez_hm, String frez_gcp ) {
-    for( int rseed : rseeds )
-    //for( int rseed=0; rseed<64; rseed++ )
-      _run0s(prog,rez_hm,frez_gcp,rseed);
+  private void _run1s( String prog, String rez_hm, String frez_gcp, String esc_ptrs, String esc_funs ) {
+    //for( int rseed : rseeds )
+    for( int rseed=0; rseed<64; rseed++ )
+      _run0s(prog,rez_hm,frez_gcp,rseed,esc_ptrs,esc_funs);
   }
 
   // Run same program in all 3 combinations, but answers vary across combos
   private void run( String prog, String rez_hm_gcp, String rez_hm_alone, String frez_gcp_hm, String frez_gcp_alone ) {
-    _run1s(prog,rez_hm_alone,null          );
-    _run1s(prog,null        ,frez_gcp_alone);
-    _run1s(prog,rez_hm_gcp  ,frez_gcp_hm   );
+    _run1s(prog,rez_hm_alone,null          , null, null);
+    _run1s(prog,null        ,frez_gcp_alone, null, null);
+    _run1s(prog,rez_hm_gcp  ,frez_gcp_hm   , null, null);
+  }
+  private void rune( String prog, String rez_hm_gcp, String rez_hm_alone, String frez_gcp_hm, String frez_gcp_alone, String esc_ptrs, String esc_funs ) {
+    _run1s(prog,rez_hm_alone,null          , esc_ptrs, esc_funs);
+    _run1s(prog,null        ,frez_gcp_alone, esc_ptrs, esc_funs);
+    _run1s(prog,rez_hm_gcp  ,frez_gcp_hm   , esc_ptrs, esc_funs);
   }
   private void run( String prog, String rez_hm, String frez_gcp ) {
-    _run1s(prog,rez_hm,null    );
-    _run1s(prog,null  ,frez_gcp);
-    _run1s(prog,rez_hm,frez_gcp);
+    _run1s(prog,rez_hm,null    , null, null);
+    _run1s(prog,null  ,frez_gcp, null, null);
+    _run1s(prog,rez_hm,frez_gcp, null, null);
+  }
+  private void rune( String prog, String rez_hm, String frez_gcp, String esc_ptrs, String esc_funs ) {
+    _run1s(prog,rez_hm,null    , esc_ptrs, esc_funs);
+    _run1s(prog,null  ,frez_gcp, esc_ptrs, esc_funs);
+    _run1s(prog,rez_hm,frez_gcp, esc_ptrs, esc_funs);
   }
 
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
@@ -46,106 +67,117 @@ public class TestHM {
 
   @Test public void test01() { run( "3", "3", "3");  }
 
-  @Test public void test02() { run( "{ x -> (pair 3 x) }" ,
-                                    "{ A -> *( 3, A) }",
-                                    "[18]{any,3 -> *[8](^=any,3,Scalar)}"); }
+  @Test public void test02() { rune( "{ x -> (pair 3 x) }" ,
+                                     "{ A -> *( 3, A) }",
+                                     "[18]{any,3 -> *[7](^=any,3,Scalar)}",
+                                     "[7]", "[18]" ); }
 
-  @Test public void test03() { run( "{ z -> (pair (z 0) (z \"abc\")) }" ,
+  @Test public void test03() { rune( "{ z -> (pair (z 0) (z \"abc\")) }" ,
                                     "{ { *str:(97)? -> A } -> *( A, A) }",
-                                    "[18]{any,3 ->*[8](^=any, Scalar, Scalar) }");
+                                    "[18]{any,3 ->*[7](^=any, Scalar, Scalar) }",
+                                    "[7]", "[18,19]" );
   }
 
   @Test public void test04() {
-    run( "fact = { n -> (if (eq0 n) 1 (* n (fact (dec n))))}; fact",
-         "{ int64 -> int64 }",
-         "[21]{any,3 -> int64 }"
-         );
+    rune( "fact = { n -> (if (eq0 n) 1 (* n (fact (dec n))))}; fact",
+          "{ int64 -> int64 }",
+          "[22]{any,3 -> int64 }",
+          null, "[22]" );
   }
 
   // Because {y->y} is passed in, all 'y' types must agree.
   // This unifies 3 and 5 which results in 'nint8'
   @Test public void test05() {
-    run("({ id -> (pair (id 3) (id 5)) } {x->x})",
-        "*( nint8, nint8)",
-        "*[8](^=any, nint8, nint8)");
+    rune("({ id -> (pair (id 3) (id 5)) } {x->x})",
+         "*( nint8, nint8)",
+         "*[7](^=any, nint8, nint8)",
+          "[7]",null);
   }
 
   @Test public void test06() {
-    run("id={x->x}; (pair (id 3) (id \"abc\"))",
-        // HM is sharper here than in test05, because id is generalized per each use site
-        "*( 3, *str:(97))",
-        "*( 3, *str:(97))",
-        // GCP with HM
-        "*[8](^=any, 3, *[4]str:(97))",
-        // GCP is weaker without HM
-        "*[8](^=any, nScalar, nScalar)");
+    rune("id={x->x}; (pair (id 3) (id \"abc\"))",
+         // HM is sharper here than in test05, because id is generalized per each use site
+         "*( 3, *str:(97))",
+         "*( 3, *str:(97))",
+         // GCP with HM
+         "*[7](^=any, 3, *[4]str:(97))",
+         // GCP is weaker without HM
+         "*[7](^=any, nScalar, nScalar)",
+         "[4,7]", null );
   }
 
   // recursive unification; normal H-M fails here.
   @Test public void test07() {
-    run( "{ f -> (f f) }",
-         // We can argue the pretty-print should print:
-         // "  A:{ A -> B }"
-         "{ A:{ A -> B } -> B }",
-         "[17]{any,3 ->Scalar }");
+    rune( "{ f -> (f f) }",
+          // We can argue the pretty-print should print:
+          // "  A:{ A -> B }"
+          "{ A:{ A -> B } -> B }",
+          "[17]{any,3 ->Scalar }",
+          null, "[17,19]" );
   }
 
   @Test public void testYcombo() {
     run( "{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}",
          "{{ A -> A } -> A }",
          "{{ A -> A } -> A }",
-         "[19]{any,3 -> Scalar }",
-         "[19]{any,3 -> Scalar }");
+         "[20]{any,3 -> Scalar }",
+         "[20]{any,3 -> Scalar }");
   }
 
   @Test public void test08() { run( "g = {f -> 5}; (g g)",  "5", "5"); }
 
   // example that demonstrates generic and non-generic variables:
-  @Test public void test09() { run( "{ g -> f = { ignore -> g }; (pair (f 3) (f \"abc\"))}",
-                                    "{ A -> *( A, A) }",
-                                    "[19]{any,3 ->*[8](^=any, Scalar, Scalar) }"); }
+  @Test public void test09() { rune( "{ g -> f = { ignore -> g }; (pair (f 3) (f \"abc\"))}",
+                                     "{ A -> *( A, A) }",
+                                     "[20]{any,3 ->*[7](^=any, Scalar, Scalar) }",
+                                     "[4,7]","[20]"); }
 
-  @Test public void test10() { run( "{ f g -> (f g)}",
-                                    "{ { A -> B } A -> B }",
-                                    "[17]{any,4 ->Scalar }"); }
+  @Test public void test10() { rune( "{ f g -> (f g)}",
+                                     "{ { A -> B } A -> B }",
+                                     "[17]{any,4 ->Scalar }",
+                                     null,"[17,19]"); }
 
   // Function composition
-  @Test public void test11() { run( "{ f g -> { arg -> (g (f arg))} }",
-                                    "{ { A -> B } { B -> C } -> { A -> C } }",
-                                    "[18]{any,4 ->[17]{any,3 ->Scalar } }"); }
+  @Test public void test11() { rune( "{ f g -> { arg -> (g (f arg))} }",
+                                     "{ { A -> B } { B -> C } -> { A -> C } }",
+                                     "[18]{any,4 ->[17]{any,3 ->Scalar } }",
+                                     null,"[17,18,19,23]"); }
 
   // Stacked functions ignoring all function arguments
   @Test public void test12() { run( "map = { fun -> { x -> 2 } }; ((map 3) 5)", "2", "2"); }
 
   // map takes a function and an element (collection?) and applies it (applies to collection?)
-  @Test public void test13() { run( "map = { fun -> { x -> (fun x)}}; { p -> 5 }",
-                                    "{ A -> 5 }",  "[19]{any,3 -> 5 }"); }
+  @Test public void test13() { rune( "map = { fun -> { x -> (fun x)}}; { p -> 5 }",
+                                     "{ A -> 5 }",  "[20]{any,3 -> 5 }",
+                                     null,"[20]"); }
 
 
   // Looking at when tvars are duplicated ("fresh" copies made).
   // This is the "map" problem with a scalar instead of a collection.
   // Takes a '{a->b}' and a 'a' for a couple of different prims.
   @Test public void test14() {
-    run("map = { fun -> { x -> (fun x)}};"+
-        "(pair ((map str) 5) ((map factor) 2.3))",
-        "*( *str:(int8), flt64)",
-        "*( *str:(int8), flt64)",
-        "*[8](^=any, *[4]str:(int8), flt64)",
-        "*[8](^=any, Scalar, Scalar)");
+    rune("map = { fun -> { x -> (fun x)}};"+
+         "(pair ((map str) 5) ((map factor) 2.3))",
+         "*( *str:(int8), flt64)",
+         "*( *str:(int8), flt64)",
+         "*[7](^=any, *[4]str:(int8), flt64)",
+         "*[7](^=any, Scalar, Scalar)",
+         "[4,7]",null);
   }
 
   // map takes a function and an element (collection?) and applies it (applies to collection?)
   @Test public void test15() { run("map = { fun x -> (fun x)}; (map {a->3} 5)", "3", "3"); }
 
   // map takes a function and an element (collection?) and applies it (applies to collection?)
-  @Test public void test16() { run("map = { fun x -> (fun x)}; (map { a-> (pair a a)} 5)", "*( 5, 5)", "*[8](^=any, 5, 5)"); }
+  @Test public void test16() { rune("map = { fun x -> (fun x)}; (map { a-> (pair a a)} 5)", "*( 5, 5)", "*[7](^=any, 5, 5)","[4,7]",null); }
 
-  @Test public void test17() { run("""
+  @Test public void test17() { rune("""
 fcn = { p -> { a -> (pair a a) }};
 map = { fun x -> (fun x)};
 { q -> (map (fcn q) 5)}
 """,
-                                   "{ A -> *( 5, 5) }", "[21]{any,3 ->*[8](^=any, 5, 5) }"); }
+                                    "{ A -> *( 5, 5) }", "[22]{any,3 ->*[7](^=any, 5, 5) }",
+                                    "[4,7]","[22]"); }
 
   // Checking behavior when using "if" to merge two functions with sufficiently
   // different signatures, then attempting to pass them to a map & calling internally.
@@ -158,11 +190,12 @@ map = { fun x -> (fun x)};
   // Should return { q -> q ? [7,5] : [7,[3,5]] }
   // Ultimately, unifies "a" with "pair[3,a]" which throws recursive unification.
   @Test public void test18() {
-    run("fcn = {p -> (if p {a -> (pair a a)} {b -> (pair b (pair 3 b))})};"+
-        "map = { fun x -> (fun x)};"+
-        "{ q -> (map (fcn q) 5)}",
-        "{ A? -> *( B:Cannot unify 5 and *( 3, B), B) }",
-        "[27]{any,3 -> *[8,9](^=any, 5, nScalar) }");
+    rune("fcn = {p -> (if p {a -> (pair a a)} {b -> (pair b (pair 3 b))})};"+
+         "map = { fun x -> (fun x)};"+
+         "{ q -> (map (fcn q) 5)}",
+         "{ A? -> *( B:Cannot unify 5 and *( 3, B), B) }",
+         "[29]{any,3 -> *[7,8](^=any, 5, nScalar) }",
+         "[4,7,8,9]","[29]" );
   }
 
   @Test public void test19() { run("cons ={x y-> {cadr -> (cadr x y)}};"+
@@ -178,16 +211,17 @@ map = { fun x -> (fun x)};
   // in pair(map(str,intz),map(isempty,strz))
   // Expects: ("2",false)
   @Test public void test20() {
-    run("""
+    rune("""
 cons ={x y-> {cadr -> (cadr x y)}};
 cdr ={mycons -> (mycons { p q -> q})};
 map ={fun parg -> (fun (cdr parg))};
 (pair (map str (cons 0 5)) (map isempty (cons 0 "abc")))
 """,
-        "*( *str:(int8), int1)",
-        "*( *str:(int8), int1)",
-        "*[8](^=any, *[4]str:(int8), int64)",
-        "*[8](^=any, Scalar, Scalar)");
+         "*( *str:(int8), int1)",
+         "*( *str:(int8), int1)",
+         "*[7](^=any, *[4]str:(int8), int64)",
+         "*[7](^=any, Scalar, Scalar)",
+         "[4,7]",null );
   }
 
   // Obscure factorial-like
@@ -214,7 +248,7 @@ map ={fun parg -> (fun (cdr parg))};
 
   // Toss a function into a pair & pull it back out
   @Test public void test24() {
-    run("""
+    rune("""
 { g -> fgz =
          cons = {x y -> {cadr -> (cadr x y)}};
          cdr = {mycons -> (mycons { p q -> q})};
@@ -222,15 +256,17 @@ map ={fun parg -> (fun (cdr parg))};
       (pair (fgz 3) (fgz 5))
 }
 """,
-        "{ { nint8 -> A } -> *( A, A) }",
-        "[23]{any,3 ->*[8](^=any, Scalar, Scalar) }");
+         "{ { nint8 -> A } -> *( A, A) }",
+         "[25]{any,3 ->*[7](^=any, Scalar, Scalar) }",
+         "[4,7]","[19,25]" );
   }
 
   // Basic structure test
   @Test public void test25() {
-    run("@{x=2, y=3}",
-        "*@{ x = 2; y = 3}",
-        "*[8]@{^=any; x=2; y=3}");
+    rune("@{x=2, y=3}",
+         "*@{ x = 2; y = 3}",
+         "*[7]@{^=any; x=2; y=3}",
+         "[4,7]",null);
   }
 
   // Basic field test
@@ -242,86 +278,98 @@ map ={fun parg -> (fun (cdr parg))};
   // Basic field test.
   @Test public void test28() { run("@{ y =3}.x", "Missing field x in *@{ y = 3}", "Scalar"); }
 
-  @Test public void test29() { run("{ g -> @{x=g, y=g}}",
-                                   "{ A -> *@{ x = A; y = A} }",
-                                   "[17]{any,3 ->*[8]@{^=any; x=Scalar; y=Scalar} }"); }
+  @Test public void test29() { rune("{ g -> @{x=g, y=g}}",
+                                    "{ A -> *@{ x = A; y = A} }",
+                                    "[17]{any,3 ->*[7]@{^=any; x=Scalar; y=Scalar} }",
+                                    "[4,7]","[17]"); }
 
   // Load common field 'x', ignoring mismatched fields y and z
   @Test public void test30() {
-    run("{ pred -> (if pred @{x=2,y=3} @{x=3,z= \"abc\"}) .x }",
-        "{ A? -> nint8 }",
-        "[20]{any,3 ->nint8 }"); }
+    rune("{ pred -> (if pred @{x=2,y=3} @{x=3,z= \"abc\"}) .x }",
+         "{ A? -> nint8 }",
+         "[21]{any,3 ->nint8 }",
+         null,"[21]"); }
 
   // Load some fields from an unknown struct: area of a rectangle.
   // Since no nil-check, correctly types as needing a not-nil input.
-  @Test public void test31() { run("{ sq -> (* sq.x sq.y) }", // { sq -> sq.x * sq.y }
-                                   "{ *@{ x = int64; y = int64; ...} -> int64 }",
-                                   "[18]{any,3 ->int64 }");
+  @Test public void test31() { rune("{ sq -> (* sq.x sq.y) }", // { sq -> sq.x * sq.y }
+                                    "{ *@{ x = int64; y = int64; ...} -> int64 }",
+                                    "[18]{any,3 ->int64 }",
+                                    "[4,10]","[18]" );
   }
 
   // Recursive linked-list discovery, with no end clause.  Since this code has
   // no exit (it is an infinite loop, endlessly reading from an infinite input
   // and writing an infinite output), gcp gets a cyclic approximation.
   @Test public void test32() {
-    run("map = { fcn lst -> @{ n1 = (map fcn lst.n0), v1 = (fcn lst.v0) } }; map",
-        "{ { A -> B } C:*@{ n0 = C; v0 = A; ...} -> D:*@{ n1 = D; v1 = B} }",
-        "[17]{any,4 ->PA:*[8]@{^=any; n1=PA; v1=Scalar} }");
+    rune("map = { fcn lst -> @{ n1 = (map fcn lst.n0), v1 = (fcn lst.v0) } }; map",
+         "{ { A -> B } C:*@{ n0 = C; v0 = A; ...} -> D:*@{ n1 = D; v1 = B} }",
+         "[17]{any,4 ->PA:*[7]@{^=any; n1=PA; v1=Scalar} }",
+         "[4,7,10]","[17,19]");
   }
 
   // Recursive linked-list discovery, with nil.  Note that the output memory
   // has the output memory alias, but not the input memory alias (which must be
   // made before calling 'map').
   @Test public void test33() {
-    run("map = { fcn lst -> (if lst @{ n1=(map fcn lst.n0), v1=(fcn lst.v0) } 0) }; map",
-        "{ { A -> B } C:*@{ n0 = C; v0 = A; ...}? -> D:*@{ n1 = D; v1 = B}? }",
-        "[20]{any,4 ->PA:*[0,8]@{^=any; n1=PA; v1=Scalar} }");
+    rune("map = { fcn lst -> (if lst @{ n1=(map fcn lst.n0), v1=(fcn lst.v0) } 0) }; map",
+         "{ { A -> B } C:*@{ n0 = C; v0 = A; ...}? -> D:*@{ n1 = D; v1 = B}? }",
+         "[21]{any,4 ->PA:*[0,7]@{^=any; n1=PA; v1=Scalar} }",
+         "[4,7,10]","[19,21]");
   }
 
   // Recursive linked-list discovery, applied
   @Test public void test34() {
-    run("map = { fcn lst -> (if lst @{ n1 = (map fcn lst.n0), v1 = (fcn lst.v0) } 0) }; (map dec @{n0 = 0, v0 = 5})",
-        "A:*@{ n1 = A; v1 = int64}?",
-        "PA:*[0,8]@{^=any; n1=PA; v1=4}");
+    rune("map = { fcn lst -> (if lst @{ n1 = (map fcn lst.n0), v1 = (fcn lst.v0) } 0) }; (map dec @{n0 = 0, v0 = 5})",
+         "A:*@{ n1 = A; v1 = int64}?",
+         "PA:*[0,7]@{^=any; n1=PA; v1=4}",
+         "[4,7]",null);
   }
 
   // try the worse-case expo blow-up test case from SO
+  @Ignore
   @Test public void test35() {
-    String rez_hm = "( ( ( { A B C -> ( A, B, C) }, { D E F -> ( D, E, F) }, { G H I -> ( G, H, I) }), ( { J K L -> ( J, K, L) }, { M N O -> ( M, N, O) }, { P Q R -> ( P, Q, R) }), ( { S T U -> ( S, T, U) }, { V22 V23 V24 -> ( V22, V23, V24) }, { V25 V26 V27 -> ( V25, V26, V27) })), ( ( { V28 V29 V30 -> ( V28, V29, V30) }, { V31 V32 V33 -> ( V31, V32, V33) }, { V34 V35 V36 -> ( V34, V35, V36) }), ( { V37 V38 V39 -> ( V37, V38, V39) }, { V40 V41 V42 -> ( V40, V41, V42) }, { V43 V44 V45 -> ( V43, V44, V45) }), ( { V46 V47 V48 -> ( V46, V47, V48) }, { V49 V50 V51 -> ( V49, V50, V51) }, { V52 V53 V54 -> ( V52, V53, V54) })), ( ( { V55 V56 V57 -> ( V55, V56, V57) }, { V58 V59 V60 -> ( V58, V59, V60) }, { V61 V62 V63 -> ( V61, V62, V63) }), ( { V64 V65 V66 -> ( V64, V65, V66) }, { V67 V68 V69 -> ( V67, V68, V69) }, { V70 V71 V72 -> ( V70, V71, V72) }), ( { V73 V74 V75 -> ( V73, V74, V75) }, { V76 V77 V78 -> ( V76, V77, V78) }, { V79 V80 V81 -> ( V79, V80, V81) })))";
-    run("p0 = { x y z -> (triple x y z) };"+
-        "p1 = (triple p0 p0 p0);"+
-        "p2 = (triple p1 p1 p1);"+
-        "p3 = (triple p2 p2 p2);"+
-        "p3",
+    String rez_hm = "*( *( *( { A B C -> *( A, B, C) }, { D E F -> *( D, E, F) }, { G H I -> *( G, H, I) }), *( { J K L -> *( J, K, L) }, { M N O -> *( M, N, O) }, { P Q R -> *( P, Q, R) }), *( { S T U -> *( S, T, U) }, { V22 V23 V24 -> *( V22, V23, V24) }, { V25 V26 V27 -> *( V25, V26, V27) })), *( *( { V28 V29 V30 -> *( V28, V29, V30) }, { V31 V32 V33 -> *( V31, V32, V33) }, { V34 V35 V36 -> *( V34, V35, V36) }), *( { V37 V38 V39 -> *( V37, V38, V39) }, { V40 V41 V42 -> *( V40, V41, V42) }, { V43 V44 V45 -> *( V43, V44, V45) }), *( { V46 V47 V48 -> *( V46, V47, V48) }, { V49 V50 V51 -> *( V49, V50, V51) }, { V52 V53 V54 -> *( V52, V53, V54) })), *( *( { V55 V56 V57 -> *( V55, V56, V57) }, { V58 V59 V60 -> *( V58, V59, V60) }, { V61 V62 V63 -> *( V61, V62, V63) }), *( { V64 V65 V66 -> *( V64, V65, V66) }, { V67 V68 V69 -> *( V67, V68, V69) }, { V70 V71 V72 -> *( V70, V71, V72) }), *( { V73 V74 V75 -> *( V73, V74, V75) }, { V76 V77 V78 -> *( V76, V77, V78) }, { V79 V80 V81 -> *( V79, V80, V81) })))";
+    rune("p0 = { x y z -> (triple x y z) };"+
+         "p1 = (triple p0 p0 p0);"+
+         "p2 = (triple p1 p1 p1);"+
+         "p3 = (triple p2 p2 p2);"+
+         "p3",
 
-        rez_hm, rez_hm,
-        // TODO: Losing in the combo, because need to field-expand during apply-lift
-        "*[11](FA:^=any, PB:*[10](FA, PA:*[9](FA, XA:[18]{any,5 ->*[8](FA, Scalar, Scalar, Scalar) }, XA, XA), PA, PA), PB, PB)",
-        "*[11](FA:^=any, PB:*[10](FA, PA:*[9](FA, XA:[18]{any,5 ->*[8](FA, Scalar, Scalar, Scalar) }, XA, XA), PA, PA), PB, PB)" );
+         rez_hm,
+         "*[11](FA:^=any, PB:*[9](FA, PA:*[8](FA, XA:[18]{any,5 ->*[7](FA, Scalar, Scalar, Scalar) }, XA, XA), PA, PA), PB, PB)",
+         "[4,7,8,9,11]","[18]");
   }
 
   // Need to see if a map call, inlined a few times, 'rolls up'.  Sometimes
   // rolls up, sometimes not; depends on worklist visitation order.
   @Test public void test36() {
-    run("map = { lst -> (if lst @{ n1= arg= lst.n0; (if arg @{ n1=(map arg.n0), v1=(str arg.v0)} 0), v1=(str lst.v0) } 0) }; map",
-        "{ A:*@{ n0 = *@{ n0 = A; v0 = int64; ...}?; v0 = int64; ...}? -> B:*@{ n1 = *@{ n1 = B; v1 = *str:(int8)}?; v1 = *str:(int8)}? }",
-        "[25]{any,3 ->PA:*[0,9]@{FA:^=any; n1=*[0,8]@{FA; n1=PA; FB:v1=*[4]str:()}; FB} }");
+    rune("map = { lst -> (if lst @{ n1= arg= lst.n0; (if arg @{ n1=(map arg.n0), v1=(str arg.v0)} 0), v1=(str lst.v0) } 0) }; map",
+         "{ A:*@{ n0 = *@{ n0 = A; v0 = int64; ...}?; v0 = int64; ...}? -> B:*@{ n1 = *@{ n1 = B; v1 = *str:(int8)}?; v1 = *str:(int8)}? }",
+         "[27]{any,3 ->PA:*[0,8]@{FA:^=any; n1=*[0,7]@{FA; n1=PA; FB:v1=*[4]str:(FA, int8)}; FB} }",
+         "[4,7,8,10]","[27]" );
   }
 
-  @Test public void test37() { run("x = { y -> (x (y y))}; x",
-                                   "{ A:{ A -> A } -> B }", "[17]{any,3 ->~Scalar }"); }
+  @Test public void test37() { rune("x = { y -> (x (y y))}; x",
+                                    "{ A:{ A -> A } -> B }", "[17]{any,3 ->~Scalar }",
+                                    null,"[17,19]");
+  }
 
   // Example from SimpleSub requiring 'x' to be both a struct with field
   // 'v', and also a function type - specifically disallowed in 'aa'.
-  @Test public void test38() { run("{ x -> y = ( x x.v ); 0}",
-                                   "{ Cannot unify {A->B} and *@{ v=A; ...} -> C? }",
-                                   "[17]{any,3 ->nil }"); }
+  @Test public void test38() { rune("{ x -> y = ( x x.v ); 0}",
+                                    "{ Cannot unify {A->B} and *@{ v=A; ...} -> C? }",
+                                    "[17]{any,3 ->nil }",
+                                    "[4,10]","[17,19]");
+  }
 
   // Awful flow-type: function can be called from the REPL with any
   // argument type - and the worse case will be an error.
   @Test public void test39() {
-    run("x = { z -> z}; (x { y -> y.u})",
-        "{ *@{ u = A; ...} -> A }",
-        "[18]{any,3 ->Scalar }");
+    rune("x = { z -> z}; (x { y -> y.u})",
+         "{ *@{ u = A; ...} -> A }",
+         "[18]{any,3 ->Scalar }",
+         "[4,10]","[18]");
   }
 
   // Example from SimpleSub requiring 'x' to be both:
@@ -329,11 +377,12 @@ map ={fun parg -> (fun (cdr parg))};
   // - a function which takes a struct with field 'u'
   // The first arg to x is two different kinds of functions, so fails unification.
   @Test public void test40() {
-    run("x = w = (x x); { z -> z}; (x { y -> y.u})",
-        "A:Cannot unify { A -> A } and *@{ u = A; ... }",
-        "A:Cannot unify { A -> A } and *@{ u = A; ... }",
-        "[2,17,18]{any,3 ->nScalar }",
-        "Scalar");
+    rune("x = w = (x x); { z -> z}; (x { y -> y.u})",
+         "A:Cannot unify { A -> A } and *@{ u = A; ... }",
+         "A:Cannot unify { A -> A } and *@{ u = A; ... }",
+         "[17,18,19,23]{any,3 ->Scalar }",
+         "Scalar",
+         "[4,10]","[17,18,19,23]");
   }
 
   // Example from TestParse.test15:
@@ -344,7 +393,7 @@ map ={fun parg -> (fun (cdr parg))};
   //   out_bool= map(in_str,{str -> str==\"abc\"});"+ // Map over strs with str->bool conversion, returning a list of bools
   //   (out_str,out_bool)",
   @Test public void test41() {
-    run("""
+    rune("""
 map={lst fcn -> (fcn lst.y) };
 in_int=@{ x=0 y=2};
 in_str=@{ x=0 y="abc"};
@@ -352,10 +401,11 @@ out_str = (map in_int str);
 out_bool= (map in_str { xstr -> (eq xstr "def")});
 (pair out_str out_bool)
 """,
-        "*( *str:(int8), int1)",
-        "*( *str:(int8), int1)",
-        "*[10](^=any, *[4]str:(int8), int64)",
-        "*[10](^=any, Scalar, Scalar)");
+         "*( *str:(int8), int1)",
+         "*( *str:(int8), int1)",
+         "*[9](^=any, *[4]str:(int8), int64)",
+         "*[9](^=any, Scalar, Scalar)",
+         "[4,9]",null);
   }
 
   // CCP Can help HM
@@ -408,17 +458,19 @@ loop = { name cnt ->
                                    "May be nil when loading field x", "~Scalar"); }
 
   // Basic nil test
-  @Test public void test47() { run("{ pred -> (if pred @{x=3} 0).x}",
-                                   "{ A? -> May be nil when loading field x }", "[20]{any,3 ->3 }"); }
+  @Test public void test47() { rune("{ pred -> (if pred @{x=3} 0).x}",
+                                    "{ A? -> May be nil when loading field x }", "[21]{any,3 ->3 }",
+                                    null,"[21]"  );
+  }
 
   // Basic uplifting after check
-  @Test public void test48() { run("{ pred -> tmp=(if pred @{x=3} 0); (if tmp tmp.x 4) }",
-                                   "{ A? -> nint8 }", "[23]{any,3 ->nint8 }"); }
+  @Test public void test48() { rune("{ pred -> tmp=(if pred @{x=3} 0); (if tmp tmp.x 4) }",
+                                    "{ A? -> nint8 }", "[25]{any,3 ->nint8 }",null,"[25]"); }
 
 
   // map is parametric in nil-ness
   @Test public void test49() {
-    run("""
+    rune("""
 { pred ->
   map = { fun x -> (fun x) };
   (pair (map {str0 ->          str0.x   }          @{x = 3}   )
@@ -426,15 +478,16 @@ loop = { name cnt ->
   )
 }
 """,
-        "{ A? -> *( 3, nint8) }",
-        "{ A? -> *( 3, nint8) }",
-        "[27]{any,3 ->*[8](^=any,     3, nint8) }",
-        "[27]{any,3 ->*[8](^=any, nint8, nint8) }");
+         "{ A? -> *( 3, nint8) }",
+         "{ A? -> *( 3, nint8) }",
+         "[29]{any,3 ->*[7](^=any,     3, nint8) }",
+         "[29]{any,3 ->*[7](^=any, nint8, nint8) }",
+         "[4,7]","[29]");
   }
 
   // map is parametric in nil-ness.  Verify still nil-checking.
   @Test public void test50() {
-    run("""
+    rune("""
 { pred ->
   map = { fun x -> (fun x) };
   (pair (map {str0 ->          str0.x   }          @{x = 3}   )
@@ -442,68 +495,73 @@ loop = { name cnt ->
   )
 }
 """,
-        "{ A? -> *( 3, May be nil when loading field x ) }",
-        "{ A? -> *( 3, May be nil when loading field x ) }",
-        "[24]{any,3 ->*[8](^=any,     3,     5) }",
-        "[24]{any,3 ->*[8](^=any, nint8, nint8) }");
+         "{ A? -> *( 3, May be nil when loading field x ) }",
+         "{ A? -> *( 3, May be nil when loading field x ) }",
+         "[26]{any,3 ->*[7](^=any,     3,     5) }",
+         "[26]{any,3 ->*[7](^=any, nint8, nint8) }",
+         "[4,7]","[26]");
   }
 
   @Test public void test51() {
-    run("total_size = { a as ->" +  // Total_size takes an 'a' and a list of 'as'
-        "  (if as "+                // If list is not empty then
-        "      (+ a.size "+         // Add the size of 'a' to
-        "         (total_size as.val as.next))" + // the size of the rest of the list
-        "      a.size"+             // Else the list is empty, just take the a.size
-        "  )"+                      // End of (if as...)
-        "};" +                      // End of total_size={...}
-        "total_size",               // What is this type?
-        "{ A:*@{ size = int64; ...} B:*@{ next = B; val = A; ...}? -> int64 }",
-        "{ A:*@{ size = int64; ...} B:*@{ next = B; val = A; ...}? -> int64 }",
-        "[21]{any,4 ->int64 }",
-        "[21]{any,4 ->Scalar }");
+    rune("total_size = { a as ->" +  // Total_size takes an 'a' and a list of 'as'
+         "  (if as "+                // If list is not empty then
+         "      (+ a.size "+         // Add the size of 'a' to
+         "         (total_size as.val as.next))" + // the size of the rest of the list
+         "      a.size"+             // Else the list is empty, just take the a.size
+         "  )"+                      // End of (if as...)
+         "};" +                      // End of total_size={...}
+         "total_size",               // What is this type?
+         "{ A:*@{ size = int64; ...} B:*@{ next = B; val = A; ...}? -> int64 }",
+         "{ A:*@{ size = int64; ...} B:*@{ next = B; val = A; ...}? -> int64 }",
+         "[22]{any,4 ->int64 }",
+         "[22]{any,4 ->Scalar }",
+         "[4,10,11]","[22]");
   }
 
   // Create a boolean-like structure, and unify.
   @Test public void test52() {
-    run("void = @{};"+              // Same as '()'; all empty structs are alike
-        "true = @{"+                // 'true' is a struct with and,or,then
-        "  and= {b -> b}"+
-        "  or = {b -> true}"+
-        "  then = {then else->(then void) }"+
-        "};"+
-        "false = @{"+               // 'false' is a struct with and,or,then
-        "  and= {b -> false}"+
-        "  or = {b -> b}"+
-        "  then = {then else->(else void) }"+
-        "};"+
-        "forceSubtyping ={b ->(if b true false)};"+ // A unified version
-        // Trying really hard here to unify 'true' and 'false'
-        "bool=@{true=(forceSubtyping 1), false=(forceSubtyping 0), force=forceSubtyping};"+
-        // Apply the unified 'false' to two different return contexts
-        "testa=(bool.false.then { x-> 3 } { y-> 4 });"+
-        "testb=(bool.false.then { z->@{}} { z->@{}});"+
-        // Look at the results
-        "@{a=testa, b=testb, bool=bool}"+
-        "",
-        "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
-        "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
-        "*[14]@{FA:^=any; a=int64 ; b=*[12,13](FA); bool=*[11]@{ FA; true=PA:*[9,10]@{FA; and=[17,20]{any,3 ->Scalar }; or=[18,21]{any,3 ->Scalar }; then=[19,22]{any,4 ->Scalar }}; false=PA; force=[26]{any,3 ->PA }}}",
-        "*[14]@{FA:^=any; a=Scalar; b=Scalar      ; bool=*[11]@{ FA; true=PA:*[9,10]@{FA; and=[17,20]{any,3 ->Scalar }; or=[18,21]{any,3 ->Scalar }; then=[19,22]{any,4 ->Scalar }}; false=PA; force=[26]{any,3 ->PA }}}");
+    rune("void = @{};"+              // Same as '()'; all empty structs are alike
+         "true = @{"+                // 'true' is a struct with and,or,then
+         "  and= {b -> b}"+
+         "  or = {b -> true}"+
+         "  then = {then else->(then void) }"+
+         "};"+
+         "false = @{"+               // 'false' is a struct with and,or,then
+         "  and= {b -> false}"+
+         "  or = {b -> b}"+
+         "  then = {then else->(else void) }"+
+         "};"+
+         "forceSubtyping ={b ->(if b true false)};"+ // A unified version
+         // Trying really hard here to unify 'true' and 'false'
+         "bool=@{true=(forceSubtyping 1), false=(forceSubtyping 0), force=forceSubtyping};"+
+         // Apply the unified 'false' to two different return contexts
+         "testa=(bool.false.then { x-> 3 } { y-> 4 });"+
+         "testb=(bool.false.then { z->@{}} { z->@{}});"+
+         // Look at the results
+         "@{a=testa, b=testb, bool=bool}"+
+         "",
+         "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
+         "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
+         "*[15]@{FA:^=any; a=nint8 ; b=*[13,14](FA); bool=*[12]@{FA; false=PA:*[8,9]@{FA; and=[17,21]{any,3 ->Scalar }; or=[18,22]{any,3 ->Scalar }; then=[20,24]{any,4 ->Scalar }}; force=[28]{any,3 ->PA }; true=PA}}",
+         "*[15]@{FA:^=any; a=Scalar; b=Scalar      ; bool=*[12]@{FA; false=PA:*[8,9]@{FA; and=[17,21]{any,3 ->Scalar }; or=[18,22]{any,3 ->Scalar }; then=[20,24]{any,4 ->Scalar }}; force=[28]{any,3 ->PA }; true=PA}}",
+         "[4,8,9,12,15]","[17,18,19,20,21,22,23,24,28]");
   }
 
 
   // Simple nil/default test; takes a nilable but does not return one.
-  @Test public void test53() { run( "{ x y -> (if x x y) }",
-                                    "{ A? A -> A }", "[20]{any,4 ->Scalar }");  }
+  @Test public void test53() { rune( "{ x y -> (if x x y) }",
+                                     "{ A? A -> A }", "[21]{any,4 ->Scalar }",
+                                     null,"[21]");  }
 
   // Regression test; double nested.  Failed to unify x and y.
-  @Test public void test54() { run( "{ x y -> (if x (if x x y) y) }",
-                                    "{ A? A -> A }", "[23]{any,4 ->Scalar }");  }
+  @Test public void test54() { rune( "{ x y -> (if x (if x x y) y) }",
+                                     "{ A? A -> A }", "[25]{any,4 ->Scalar }",
+                                     null,"[25]");  }
 
 
   // Regression test; was NPE.  Was testMyBoolsNullPException from marco.servetto@gmail.com.
   @Test public void test55() {
-    run("""
+    rune("""
 void = @{};
 true = @{
   and      = {b -> b}
@@ -531,7 +589,8 @@ boolSub ={b ->(if b true false)};
               "then = { { *( ) -> F } { *( ) -> F } -> F }"+
             "}"+
         "}",
-        "*[11]@{ FA:^=any; true=PB:*[9,10]@{FA; and=[17,21]{any,3 ->Scalar }; or=[18,22]{any,3 ->Scalar }; not=[19,23]{any,3 -> PA:*[9]@{FA; and=[17]{any,3 ->Scalar }; or=[18]{any,3 ->PA }; not=[19]{any,3 ->PA }; then=[20]{any,4 ->Scalar }} }; then=[20,24]{any,4 ->Scalar } }; false=PB}");
+         "*[12]@{FA:^=any; false=PB:*[8,9]@{FA; and=[17,22]{any,3 ->Scalar }; not=[20,25]{any,3 ->PA:*[8]@{FA; and=[17]{any,3 ->Scalar }; not=[20]{any,3 ->PA }; or=[18]{any,3 ->PA }; then=[21]{any,4 ->Scalar }} }; or=[18,24]{any,3 ->Scalar }; then=[21,26]{any,4 ->Scalar }}; true=PB}",
+           "[4,8,9,12]","[17,18,19,20,21,22,23,24,25,26]");
   }
 
   // Regression test.  Was unexpectedly large type result.  Cut down version of
@@ -540,17 +599,18 @@ boolSub ={b ->(if b true false)};
   // type has an unrolled instance of the 'true' type embedded in the 'false'
   // type.  Bug is actually a core HM algorithm change to handle cycles.
   @Test public void test56() {
-    run("left =     "+
-        "  rite = @{n1 = left v1 = 7 }; "+
-        "  @{ n1 = rite v1 = 7 };"+
-        "left"+
-        "",
-        "A:*@{ n1 = *@{ n1 = A; v1 = 7}; v1 = 7}",
-        "PA:*[9]@{FA:^=any; n1=*[8]@{FA; n1=PA; FB:v1=7}; FB}");
+    rune("left =     "+
+         "  rite = @{n1 = left v1 = 7 }; "+
+         "  @{ n1 = rite v1 = 7 };"+
+         "left"+
+         "",
+         "A:*@{ n1 = *@{ n1 = A; v1 = 7}; v1 = 7}",
+         "PA:*[8]@{FA:^=any; n1=*[7]@{FA; n1=PA; FB:v1=7}; FB}",
+         "[4,7,8]",null);
   }
 
   @Test public void test57() {
-    run("""
+    rune("""
 all =
 true = @{
   not = {unused -> all.false},
@@ -566,26 +626,21 @@ all
 """,
         "*@{ boolSub = { A? -> *@{ not = { B -> C:*@{ not = { D -> C }; then = { { 7 -> E } { 7 -> E } -> E }} }; then = { { 7 -> F } { 7 -> F } -> F }} }; false = C; true = C}",
         """
-*[10]@{
+*[9]@{
   FA:^=any;
-  true=PA:*[8]@{
-    FA;
-    not=[17]{any,3 ->
-      PB:*[9]@{FA; not=[19]{any,3 ->PA }; then=[20]{any,4 ->Scalar }}
-    };
-    then=[18]{any,4 ->Scalar }
+  boolSub=[26]{any,3 ->
+    PA:*[7,8]@{FA; not=[17,20]{any,3 ->PA }; then=[18,21]{any,4 ->Scalar }}
   };
-  false=PB;
-  boolSub=[24]{any,3 ->
-    PC:*[8,9]@{FA; not=[17,19]{any,3 ->PC }; then=[18,20]{any,4 ->Scalar }}
-  }
+  false=PB:*[8]@{FA; not=[20]{any,3 ->PC:*[7]@{FA; not=[17]{any,3 ->PB }; then=[18]{any,4 ->Scalar }} }; then=[21]{any,4 ->Scalar }};
+  true=PC
 }
-""");
+""",
+         "[4,7,8,9]","[17,18,19,20,21,23,26]");
   }
 
   // Full on Peano arithmetic.
   @Test public void test58() {
-   run("""
+   rune("""
 void = @{};
 err  = {unused->(err unused)};
 // Booleans, support AND, OR, THEN/ELSE.
@@ -719,51 +774,52 @@ three =(n.s two);     // Three is the successor of two
         "}"+
         "",
        """
-*[15]@{
+*[16]@{
   FA:^=any;
-  b=*[11]@{
+  b=*[12]@{
     FA;
-    true=PA:*[9]@{FA; and_=[18]{any,3 ->Scalar }; or__=[19]{any,3 ->PA }; then=[20]{any,4 ->Scalar }};
-    false=PB:*[10]@{FA; and_=[21]{any,3 ->PB }; or__=[22]{any,3 ->Scalar }; then=[23]{any,4 ->Scalar }}
+    false=PA:*[9]@{FA; and_=[22]{any,3 ->PA }; or__=[24]{any,3 ->Scalar }; then=[25]{any,4 ->Scalar }};
+    true =PB:*[8]@{FA; and_=[18]{any,3 ->Scalar }; or__=[20]{any,3 ->PB }; then=[21]{any,4 ->Scalar }}
   };
-  n=*[14]@{
+  n=*[15]@{
     FA;
-    s=[31]{any,3 ->
-      PC:*[13]@{
+    s=[33]{any,3 ->
+      PC:*[14]@{
         FA;
-        zero=[27]{any,3 ->PB };
-        pred=[28]{any,3 -> PD:*[2,12,13]() };
-        succ=[29]{any,3 ->PC };
-        add_=[30]{any,3 ->Scalar }
+        add_=[32]{any,3 ->Scalar };
+        pred=[30]{any,3 ->Scalar };
+        succ=[31]{any,3 ->PC };
+        zero=[29]{any,3 ->PA }
       }
     };
-    z=*[12]@{FA; zero=[24]{any,3 ->PA }; pred=[17]{any,3 ->~Scalar }; succ=[25]{any,3 ->PC }; add_=[26]{any,3 ->Scalar }}
+    z=*[13]@{FA; add_=[28]{any,3 ->Scalar }; pred=[17]{any,3 ->~Scalar }; succ=[27]{any,3 ->PC }; zero=[26]{any,3 ->PB }}
   };
   one=PC;
-  two=*[12,13]@{FA; add_=[26,30]{any,3 ->Scalar }; pred=[17,28]{any,3 ->PD }; succ=[25,29]{any,3 ->PC }; zero=[24,27]{any,3 ->*[9,10]@{FA; and_=[18,21]{any,3 ->Scalar }; or__=[19,22]{any,3 ->Scalar }; then=[20,23]{any,4 ->Scalar }} }};
-  three=PC
+  three=PC;
+  two=Scalar
 }
 """,
        """
-*[15]@{
+*[16]@{
   FA:^=any;
-  b=*[11]@{
+  b=*[12]@{
     FA;
-    true=PA:*[9]@{FA; and_=[18]{any,3 ->Scalar }; or__=[19]{any,3 ->PA }; then=[20]{any,4 ->Scalar }};
-    false=PB:*[10]@{FA; and_=[21]{any,3 ->PB }; or__=[22]{any,3 ->Scalar }; then=[23]{any,4 ->Scalar }}
+    false=PA:*[9]@{FA; and_=[22]{any,3 ->PA }; or__=[24]{any,3 ->Scalar }; then=[25]{any,4 ->Scalar }};
+    true =PB:*[8]@{FA; and_=[18]{any,3 ->Scalar }; or__=[20]{any,3 ->PB }; then=[21]{any,4 ->Scalar }}
   };
-  n=*[14]@{
+  n=*[15]@{
     FA;
-    s=[31]{any,3 ->
-      PC:*[13]@{FA; zero=[27]{any,3 ->PB }; pred=[28]{any,3 ->Scalar }; succ=[29]{any,3 ->PC }; add_=[30]{any,3 ->Scalar }}
+    s=[33]{any,3 ->
+      PC:*[14]@{FA; add_=[32]{any,3 ->Scalar }; pred=[30]{any,3 ->Scalar }; succ=[31]{any,3 ->PC }; zero=[29]{any,3 ->PA }}
     };
-    z=*[12]@{FA; zero=[24]{any,3 ->PA }; pred=[17]{any,3 ->~Scalar }; succ=[25]{any,3 ->PC }; add_=[26]{any,3 ->Scalar }}
+    z=*[13]@{FA; add_=[28]{any,3 ->Scalar }; pred=[17]{any,3 ->~Scalar }; succ=[27]{any,3 ->PC }; zero=[26]{any,3 ->PB }}
   };
   one=PC;
   two=Scalar;
   three=PC
 }
-""");
+""",
+        "[4,8,9,10,11,12,13,14,15,16]","[17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33]");
   }
 
 
@@ -778,23 +834,25 @@ three =(n.s two);     // Three is the successor of two
 
   // Unexpected restriction on extra fields.
   @Test public void test60() {
-    run("sx = { ignore -> "+
-        "  self0=@{ succ = (sx self0)}; "+
-        "  self0 "+
-        "};"+
-        "self1=@{ succ = self1, nope=7 };"+
-        "(sx self1)"+
-        "",
-        "A:*@{ succ=A}",
-        "PA:*[8]@{^=any; succ=PA}");
+    rune("sx = { ignore -> "+
+         "  self0=@{ succ = (sx self0)}; "+
+         "  self0 "+
+         "};"+
+         "self1=@{ succ = self1, nope=7 };"+
+         "(sx self1)"+
+         "",
+         "A:*@{ succ=A}",
+         "PA:*[7]@{^=any; succ=PA}",
+         "[4,7]",null);
   }
 
   // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
   // pass in a field 'a'... and still no error.  Fixed.
   @Test public void test61() {
-    run("f = { p1 p2 -> (if p2.a p1 p2)}; (f @{a=2} @{b=2.3})",
-        "*@{ a= Missing field a }",
-        "*[8,9](^=any)");
+    rune("f = { p1 p2 -> (if p2.a p1 p2)}; (f @{a=2} @{b=2.3})",
+         "*@{ a= Missing field a }",
+         "*[7,8](^=any)",
+         "[4,7,8]",null);
   }
 
   // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
@@ -804,33 +862,35 @@ three =(n.s two);     // Three is the successor of two
                                    "Scalar");  }
 
   @Test public void test63() {
-    run("A=@{x=3, y=3.2};"+
-        "B=@{x=4, z=\"abc\"};"+
-        "rez = { pred -> (if pred A B)};"+
-        "rez"+
-        "",
-        "{ A? -> *@{x=nint8} }",
-        "[20]{any,3 ->*[8,9]@{^=any; x=nint8} }");
+    rune("A=@{x=3, y=3.2};"+
+         "B=@{x=4, z=\"abc\"};"+
+         "rez = { pred -> (if pred A B)};"+
+         "rez"+
+         "",
+         "{ A? -> *@{x=nint8} }",
+         "[21]{any,3 ->*[7,8]@{^=any; x=nint8} }",
+         "[4,7,8]","[21]");
   }
 
   // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
   // pass in a field 'a'... and still no error.  Fixed.
   @Test public void test64() {
-    run("f = { p1 p2 -> (if p2.a p1 p2)};"+
-        "res1 = (f @{a=2,      c=\"def\"} @{    b=2.3,d=\"abc\"});"+
-        "res2 = (f @{a=2,b=1.2,c=\"def\"} @{a=3,b=2.3,d=\"abc\"});"+
-        "@{f=f,res1=res1,res2=res2}",
+    rune("f = { p1 p2 -> (if p2.a p1 p2)};"+
+         "res1 = (f @{a=2,      c=\"def\"} @{    b=2.3,d=\"abc\"});"+
+         "res2 = (f @{a=2,b=1.2,c=\"def\"} @{a=3,b=2.3,d=\"abc\"});"+
+         "@{f=f,res1=res1,res2=res2}",
 
-        "*@{ f    =  { A:*@{ a=B;... } A -> A };"+
-        "    res1 = *@{ a = Missing field a };"+
-        "    res2 = *@{ a=nint8; b=nflt32 }"+
-        "}",
-        "*@{ f    =  { A:*@{ a=B;... } A -> A };"+
-        "    res1 = *@{ a = Missing field a };"+
-        "    res2 = *@{ a=nint8; b=nflt32 }"+
-        "}",
-        "*[12]@{^=any; f=[18]{any,4 ->PA:*[2,8,9,10,11]() }; res1=PA; res2=PA}",
-        "*[12]@{^=any; f=[18]{any,4 ->Scalar }; res1=Scalar; res2=Scalar}");
+         "*@{ f    =  { A:*@{ a=B;... } A -> A };"+
+         "    res1 = *@{ a = Missing field a };"+
+         "    res2 = *@{ a=nint8; b=nflt32 }"+
+         "}",
+         "*@{ f    =  { A:*@{ a=B;... } A -> A };"+
+         "    res1 = *@{ a = Missing field a };"+
+         "    res2 = *@{ a=nint8; b=nflt32 }"+
+         "}",
+         "*[13]@{FA:^=any; f=[18]{any,4 ->PA:*[7,8,9,10,11,12](FA) }; res1=PA; res2=PA}",
+         "*[13]@{^=any; f=[18]{any,4 ->Scalar }; res1=Scalar; res2=Scalar}",
+         "[4,7,8,9,10,11,12,13]","[18]");
   }
 
 
@@ -945,12 +1005,13 @@ all
 }
 """,
         """
-*[13]@{
+*[14]@{
   FA:^=any;
-  true=PA:*[9,10]@{FA; and=[18,21]{any,3 ->Scalar }; or=[19,22]{any,3 ->Scalar }; then=[20,23]{any,4 ->Scalar }};
-  false=PA;
-  z=*[11]@{FA; zero=[28]{any,3 ->PA }; pred=[17]{any,3 ->~Scalar }; succ=[29]{any,3 ->Scalar }; add_=[30]{any,3 ->Scalar }};
-  s=[38]{any,3 ->Scalar }
+  false=PA:*[8,9]@{FA; and=[18,22]{any,3 ->Scalar }; or=[20,24]{any,3 ->Scalar }; then=[21,25]{any,4 ->Scalar }};
+  s=[40]{any,3 ->Scalar };
+  true=PA;
+  z=*[12]@{FA; add_=[32]{any,3 ->Scalar }; pred=[17]{any,3 ->~Scalar }; succ=[31]{any,3 ->Scalar }; zero=[30]{any,3 ->PA }}
+}
 }
 """);
   }
@@ -958,7 +1019,7 @@ all
 
   // Poster-child collection, larger example
   @Test public void test66() {
-    run("""
+    rune("""
 rand = (factor 1.2);
 cage = { ->
   put = { pet ->
@@ -983,44 +1044,47 @@ maybepet = petcage.get;
         (if maybepet maybepet.name "no_name")
 )
 """,
-        "(nflt32,nflt32,*str:(nint8))",
-        "(nflt32,nflt32,*str:(nint8))",
-        "*[11](^=any, nflt32, nflt32, *[4]str:(nint8))",
-        "*[11](^=any, Scalar, Scalar, *[4]str:(nint8))");
+         "*(nflt32,nflt32,*str:(nint8))",
+         "*(nflt32,nflt32,*str:(nint8))",
+         "*[12](^=any, nflt32, nflt32, *[4]str:(nint8))",
+         "*[12](^=any, Scalar, Scalar, *[4]str:(nint8))",
+         "[4,12]",null);
   }
 
   @Test public void test67() {
-    run("""
+    rune("""
 all = @{
   is_even = { dsp n -> (if (eq0 n) 0 (dsp.is_odd  dsp (dec n)))},
   is_odd  = { dsp n -> (if (eq0 n) 1 (dsp.is_even dsp (dec n)))}
 };
 { x -> (all.is_even all x)}
 """,
-        "{int64 -> int1}", "[25]{any,3 ->int1 }");
+         "{int64 -> int1}", "[27]{any,3 ->int1 }",
+         null,"[27]");
   }
 
   @Test public void test68() {
-    run("dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp \"abc\"))",
-        "*( 3, *str:(97))",
-        "*( 3, *str:(97))",
-        "*[9](^=any, 3 , *[4]str:(97))",
-        "*[9](^=any, nScalar, nScalar)");
+    rune("dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp \"abc\"))",
+         "*( 3, *str:(97))",
+         "*( 3, *str:(97))",
+         "*[8](^=any, 3 , *[4]str:(97))",
+         "*[8](^=any, nScalar, nScalar)",
+         "[4,8]",null);
   }
 
   // Test incorrect argument count
   @Test public void test69() {
-    run("({x y -> (pair x y) } 1 2 3)","Bad argument count","*[8](^=any, 1, 2)");
+    rune("({x y -> (pair x y) } 1 2 3)","Bad argument count","*[7](^=any, 1, 2)","[4,7]",null);
   }
 
   // Test incorrect argument count
   @Test public void test70() {
-    run("({x y -> (pair x y) } 1 )","Bad argument count","*[8](^=any, 1, ~Scalar)");
+    rune("({x y -> (pair x y) } 1 )","Bad argument count","*[7](^=any, 1, ~Scalar)","[4,7]",null);
   }
 
   // Test example from AA with expanded ints
   @Test public void test71() {
-    run("int = { i -> @{ i=i, add={ x y -> (int (+ x.i y.i))} } }; x=(int 3); y=(int 4); (x.add x y)",
+    rune("int = { i -> @{ i=i, add={ x y -> (int (+ x.i y.i))} } }; x=(int 3); y=(int 4); (x.add x y)",
         """
 A:*@{
   add={
@@ -1030,16 +1094,29 @@ A:*@{
   i=int64
 }
 """,
-        "PA:*[8]@{^=any; i=int64; add=[18]{any,4 ->PA }}");
+         "PA:*[7]@{^=any; i=int64; add=[18]{any,4 ->PA }}",
+           "[4,7,10,11]","[18]");
   }
 
-  @Test public void test72() { run( "fun = { ptr -> ptr.x }; fun", "{ *@{x=A; ... } -> A }", "[17]{any,3 -> Scalar}");  }
-  @Test public void test73() { run(       "{ ptr -> ptr.x }",      "{ *@{x=A; ... } -> A }", "[17]{any,3 -> Scalar}");  }
+  @Test public void test72() { rune( "fun = { ptr -> ptr.x }; fun", "{ *@{x=A; ... } -> A }", "[17]{any,3 -> Scalar}","[4,10]","[17]");  }
+  @Test public void test73() { rune(       "{ ptr -> ptr.x }",      "{ *@{x=A; ... } -> A }", "[17]{any,3 -> Scalar}","[4,10]","[17]");  }
   @Test public void test74() { run("(* 2 3)","int64","6");  }
   @Test public void test75() {
-    run("f0 = { f -> (if (rand) 1 (f (f0 f) 2))}; f0",
-      "{ { 1 2 -> 1 } -> 1 }","{ { 1 2 -> 1 } -> 1 }",
-      "[19]{any,3 ->1 }","[19]{any,3 ->Scalar }");
+    rune("f0 = { f -> (if (rand) 1 (f (f0 f) 2))}; f0",
+         "{ { 1 2 -> 1 } -> 1 }","{ { 1 2 -> 1 } -> 1 }",
+         "[20]{any,3 ->1 }","[20]{any,3 ->Scalar }",
+         null,"[19,20]");
+  }
+  // Shorter version of 35
+  @Test public void test76() {
+    String rez_hm = "*({A B C -> *(A,B,C)},{D E F -> *(D,E,F)},{GHI->*(G,H,I)})";
+    rune("p0 = { x y z -> (triple x y z) };"+
+         "p1 = (triple p0 p0 p0);"+
+         "p1",
+
+         rez_hm,
+         "*[8](FA:^=any, XA:[18]{any,5 ->*[7](FA, Scalar, Scalar, Scalar) }, XA, XA)",
+         "[4,7,8]","[18]"  );
   }
 }
 

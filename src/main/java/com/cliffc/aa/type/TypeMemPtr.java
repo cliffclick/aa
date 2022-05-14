@@ -104,8 +104,9 @@ public final class TypeMemPtr extends Type<TypeMemPtr> implements Cyclic {
   }
 
   // Legacy constructor for legacy HM tests
+  public static final int STR_ALIAS = 4; // Legacy str ptr value
   public static TypeMemPtr make_str(String s) { return make_str(TypeInt.con(s.charAt(0))); }
-  public static TypeMemPtr make_str(Type t) { return make_str(BitsAlias.make0(4),t); }
+  public static TypeMemPtr make_str(Type t) { return make_str(BitsAlias.make0(STR_ALIAS),t); }
   public static TypeMemPtr make_str(BitsAlias aliases, Type t) {
     TypeFld c0 = TypeFld.make_tup(t,ARG_IDX);
     TypeStruct ts = TypeStruct.make("str:",ALL,c0);

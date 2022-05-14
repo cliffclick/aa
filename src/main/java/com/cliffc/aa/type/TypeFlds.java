@@ -168,6 +168,8 @@ public class TypeFlds {
   }
 
   // Append a field.  Preserve alpha order.  Does not hash-cons.
+  // If old flds is zero length, it is interned,
+  // Else it is not interned and freed.
   public static TypeFld[] add(TypeFld[] flds, TypeFld fld) {
     TypeFld[] fs = copyOf(flds,flds.length+1);
     fs[flds.length]=fld;
@@ -175,6 +177,7 @@ public class TypeFlds {
     while( i<flds.length && sbefore(flds[i]._fld,fld._fld) ) i++;
     fs[i]=fld;
     System.arraycopy(flds,i,fs,i+1,flds.length-i);
+    if( flds.length>0 ) free(flds);
     return fs;
   }
 

@@ -982,7 +982,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     }
     @Override public String toString() { return _str.substring(_x); }
   }
-  public static Type valueOf( String str ) { return new Parse(str).type(); }
+  public static Type valueOf( String str ) { return str == null ? null : new Parse(str).type(); }
 
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
