@@ -51,7 +51,7 @@ public class ConNode<T extends Type> extends Node {
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof ConNode con) ) return false;
-    if( _t==Type.XNIL && con._t==Type.XNIL /*&& tvar()!=con.tvar()*/ )
+    if( _t==TypeNil.NIL && con._t==TypeNil.NIL )
       return false;             // Different versions of TV2 NotNil
     return _t==con._t;
   }

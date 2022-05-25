@@ -140,7 +140,7 @@ public class LoadNode extends Node {
     // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
     // TODO: Hoist out of loops.
     if( mem!=null && mem._op == OP_PHI && adr.in(0) instanceof NewNode ) {
-      Node lphi = new PhiNode(Type.SCALAR,((PhiNode)mem)._badgc,mem.in(0));
+      Node lphi = new PhiNode(TypeNil.SCALAR,((PhiNode)mem)._badgc,mem.in(0));
       for( int i=1; i<mem._defs._len; i++ )
         lphi.add_def(Env.GVN.add_work_new(new LoadNode(mem.in(i),adr,_bad)));
       subsume(lphi);
@@ -230,16 +230,17 @@ public class LoadNode extends Node {
 
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;
-    if( tadr.must_nil() )
-      return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when reading",null);
-    if( tadr==Type.ANY ) return null; // No error, since might fall to any valid thing
-    if( !(tadr instanceof TypeMemPtr ptr) )
-      return bad(fast,null); // Not a pointer nor memory, cannot load a field
-    if( ptr.is_valtype() )   // These should always fold
-      return bad(fast,ptr._obj);
-    Type tmem = mem()._val;
-    if( tmem==Type.ALL ) return bad(fast,null);
-    return null;
+    //if( tadr.must_nil() )
+    //  return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when reading",null);
+    //if( tadr==Type.ANY ) return null; // No error, since might fall to any valid thing
+    //if( !(tadr instanceof TypeMemPtr ptr) )
+    //  return bad(fast,null); // Not a pointer nor memory, cannot load a field
+    //if( ptr.is_valtype() )   // These should always fold
+    //  return bad(fast,ptr._obj);
+    //Type tmem = mem()._val;
+    //if( tmem==Type.ALL ) return bad(fast,null);
+    //return null;
+    throw unimpl();
   }
   private ErrMsg bad( boolean fast, TypeStruct to ) {
     //boolean is_closure = adr() instanceof NewNode nnn && nnn._is_closure;

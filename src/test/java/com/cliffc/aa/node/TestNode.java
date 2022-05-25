@@ -194,7 +194,7 @@ public class TestNode {
     _ins = new Node[4];
     _ins[0] = new RegionNode(null,new ConNode<>(Type.CTRL),new ConNode<>(Type.CTRL));
     for( int i=1; i<_ins.length; i++ )
-      _ins[i] = new ConNode<>(Type.SCALAR);
+      _ins[i] = new ConNode<>(TypeNil.SCALAR);
     Node mem = new ConNode<Type>(TypeMem.ALLMEM);
     mem._val = TypeMem.ALLMEM;
     FunNode fun_forward_ref = new FunNode("some_fcn");
@@ -219,7 +219,7 @@ public class TestNode {
     test1monotonic(new    ConNode<Type>(          TypeFlt.FLT64));
     // Cannot cast-to-NIL - can only move away from NIL
     //test1monotonic(new   CastNode(_ins[0],_ins[1],TypeInt.FALSE));
-    test1monotonic(new   CastNode(_ins[0],_ins[1],Type.NSCALR));
+    test1monotonic(new   CastNode(_ins[0],_ins[1],TypeNil.NSCALR));
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeFlt.FLT64));
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.ISUSED0));
     test1monotonic(new  CProjNode(_ins[0],0));
@@ -233,12 +233,12 @@ public class TestNode {
     //test1monotonic_intrinsic(new NewStrNode.AddStrStr());
     test1monotonic(new   LoadNode(_ins[1],_ins[2],null));
     StructNode nnn1 = new StructNode(false,false);
-    set_type(1,Type.SCALAR);  nnn1.add_fld(TypeFld.make("x"),_ins[1],null);
-    set_type(2,Type.SCALAR);  nnn1.add_fld(TypeFld.make("y"),_ins[2],null);
+    set_type(1,TypeNil.SCALAR);  nnn1.add_fld(TypeFld.make("x"),_ins[1],null);
+    set_type(2,TypeNil.SCALAR);  nnn1.add_fld(TypeFld.make("y"),_ins[2],null);
     test1monotonic(nnn1);
-    ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
+    ((ConNode<Type>)_ins[1])._t = TypeNil.SCALAR; // ParmNode reads this for _alltype
     test1monotonic(new   ParmNode( 1,(FunNode)_ins[0],(ConNode)_ins[1]).add_def(_ins[2]));
-    test1monotonic(new    PhiNode(Type.SCALAR,null,_ins[0],_ins[1],_ins[2]));
+    test1monotonic(new    PhiNode(TypeNil.SCALAR,null,_ins[0],_ins[1],_ins[2]));
     for( PrimNode prim : PrimNode.PRIMS() )
       test1monotonic_prim(prim,mem);
     test1monotonic(new   ProjNode(1, _ins[0]));
@@ -252,8 +252,8 @@ public class TestNode {
     // TODO: Needs a prototype name
     //StructNode nnn2 = new StructNode(false,false,tname._name);
     //nnn2.add_fld(TypeFld.NO_DSP,Env.XNIL,null);
-    //set_type(1,Type.SCALAR);  nnn2.add_fld(TypeFld.make("x"),_ins[1],null);
-    //set_type(2,Type.SCALAR);  nnn2.add_fld(TypeFld.make("y"),_ins[2],null);
+    //set_type(1,TypeNil.SCALAR);  nnn2.add_fld(TypeFld.make("x"),_ins[1],null);
+    //set_type(2,TypeNil.SCALAR);  nnn2.add_fld(TypeFld.make("y"),_ins[2],null);
     //test1monotonic(nnn2);
     //
     //assertEquals(0,_errs);

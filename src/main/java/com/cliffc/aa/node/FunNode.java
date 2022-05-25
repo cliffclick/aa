@@ -503,7 +503,7 @@ public class FunNode extends RegionNode {
       if( n==null ) continue;   // Defs can be null
       // As a special case for H-M, always clone uses of nil constants.
       // These need private H-M variables to support polymorphic nil-typing.
-      if( n instanceof ConNode && ((ConNode)n)._t==Type.XNIL ) freached.tset(n._uid);
+      if( n instanceof ConNode && ((ConNode)n)._t==TypeNil.NIL ) freached.tset(n._uid);
       if( !freached.get (n._uid) ) continue; // Not reached from fcn top
       if(  breached.tset(n._uid) ) continue; // Already visited?
       body.push(n);                          // Part of body

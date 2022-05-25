@@ -37,8 +37,8 @@ public class Env implements AutoCloseable {
   public static final KeepNode KEEP_ALIVE = new KeepNode();
   public static final ConNode ANY;   // Common ANY / used for dead
   public static final ConNode ALL;   // Common ALL / used for errors
+  public static final ConNode NIL;   // Default 0
   public static final ConNode XCTRL; // Always dead control
-  public static final ConNode XNIL;  // Default 0
   public static final ConNode XUSE;  // Unused objects (dead displays)
   public static final ConNode XMEM;  // Unused whole memory
   public static final ConNode ALL_CTRL; // Always alive control
@@ -71,13 +71,13 @@ public class Env implements AutoCloseable {
     START   = keep(new StartNode());
     ANY     = keep(new ConNode<>(Type.ANY   ));
     ALL     = keep(new ConNode<>(Type.ALL   ));
+    NIL     = keep(new ConNode<>(TypeNil.NIL));
     XCTRL   = keep(new ConNode<>(Type.XCTRL ));
-    XNIL    = keep(new ConNode<>(Type.XNIL  ));
     XUSE    = keep(new ConNode<>(TypeStruct.UNUSED));
     XMEM    = keep(new ConNode<>(TypeMem.ANYMEM));
     ALL_CTRL= keep(new ConNode<>(Type.CTRL  ));
     ALL_MEM = keep(new ConNode<>(TypeMem.ALLMEM));
-    ALL_PARM= keep(new ConNode<>(Type.SCALAR));
+    ALL_PARM= keep(new ConNode<>(TypeNil.SCALAR));
     ALL_CALL= keep(new ConNode<>(TypeRPC.ALL_CALL));
     // Initial control & memory
     CTL_0  = keep(new    CProjNode(START,0));
@@ -124,7 +124,7 @@ public class Env implements AutoCloseable {
 
   // Top-level Env.  Contains, e.g. the primitives.
   // Above any file-scope level Env.
-  private Env( ) { this(null,null,false,CTL_0,MEM_0,XNIL,null); }
+  private Env( ) { this(null,null,false,CTL_0,MEM_0,NIL,null); }
 
   // Gather and report errors and typing
   TypeEnv gather_errors(ErrMsg err) {

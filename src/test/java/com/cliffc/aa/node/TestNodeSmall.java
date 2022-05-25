@@ -252,8 +252,8 @@ public class TestNodeSmall {
     FunPtrNode astr = (FunPtrNode)fp_add.in(2);
     // Make a flt/int combo, drops off string.
     ConNode mem  = gvn.init(new ConNode<>(TypeMem.ALLMEM));
-    ConNode arg1 = gvn.init(new ConNode<>(Type.SCALAR));
-    ConNode arg2 = gvn.init(new ConNode<>(Type.SCALAR));
+    ConNode arg1 = gvn.init(new ConNode<>(TypeNil.SCALAR));
+    ConNode arg2 = gvn.init(new ConNode<>(TypeNil.SCALAR));
     Node dsp = gvn.xform(new ConNode<>(TypeMemPtr.NO_DISP));
     CallNode call = (CallNode)gvn.xform(new CallNode(true, null, ctrl, mem, dsp, arg1, arg2, fp_mul));
     CallEpiNode cepi = (CallEpiNode)gvn.xform(new CallEpiNode(call)); // Unwired
@@ -263,8 +263,8 @@ public class TestNodeSmall {
 
     // Args to calls
     Type tctl = Type.CTRL, txctl = Type.XCTRL;
-    Type tscl = Type.SCALAR, txscl = Type.XSCALAR;
-    Type tnil = Type.XNIL;
+    Type tscl = TypeNil.SCALAR, txscl = TypeNil.XSCALAR;
+    Type tnil = TypeNil.NIL;
     TypeMem tfull = TypeMem.ALLMEM;
     Type t2 = TypeInt.con(2);   // Small ints are ambiguously either ints or floats
     Type t3 = TypeInt.con(3);
@@ -400,8 +400,8 @@ public class TestNodeSmall {
     ConNode ctrl = (ConNode)gvn.xform(new ConNode<>(Type.CTRL));
     ConNode mem  = (ConNode)gvn.xform(new ConNode<>(TypeMem.ALLMEM));
     ConNode dsp  = (ConNode)gvn.xform(new ConNode<>(TypeMemPtr.NO_DISP));
-    ConNode arg3 = gvn.init(new ConNode<>(Type.SCALAR));
-    ConNode arg4 = gvn.init(new ConNode<>(Type.SCALAR));
+    ConNode arg3 = gvn.init(new ConNode<>(TypeNil.SCALAR));
+    ConNode arg4 = gvn.init(new ConNode<>(TypeNil.SCALAR));
     ConNode fdx  = gvn.init(new ConNode<>(fp_add._val));
     CallNode call = gvn.init(new CallNode(true, null, ctrl, mem, dsp, arg3, arg4, fdx));
     CallEpiNode cepi = gvn.init(new CallEpiNode(call)); // Unwired
@@ -410,7 +410,7 @@ public class TestNodeSmall {
     Type i32 = TypeInt.INT32;   // Subsets both int64 and flt64
     Type i64 = TypeInt.INT64;
     Type f64 = TypeFlt.FLT64;
-    Type scl = Type.SCALAR;
+    Type scl = TypeNil.SCALAR;
     //Type abc = TypeMemPtr.ABCPTR.simple_ptr(); // Constant string
     Type tup = TypeMemPtr.ISUSED.simple_ptr(); // Tuple pointer (always wrong)
     // All args, including duals

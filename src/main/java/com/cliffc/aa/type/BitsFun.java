@@ -34,25 +34,22 @@ public class BitsFun extends Bits<BitsFun> {
   // will make more on demand.  But need the first one to make a v-call.
 
   // Internal and external callers, not nil
-  public static final BitsFun ALL  = new BitsFun().make_impl(ALLX,null);
-  public static final BitsFun ALL0 = ALL.meet_nil();
-  public static final BitsFun ANY0 = ALL0.dual();
+  public static final BitsFun NALL  = new BitsFun().make_impl(ALLX,null);
+  public static final BitsFun NANY = NALL.dual();
 
   public static final BitsFun EXT = make0(EXTX);
   public static final BitsFun INT = make0(INTX);
   
-  public static final BitsFun NIL = make0(0);
-  public static final BitsFun XNIL = NIL.dual();
   public static final BitsFun EMPTY = make0();
-  @Override public BitsFun ALL0() { return ALL0; }
-  @Override public BitsFun ANY0() { return ANY0; }
+  @Override public BitsFun NALL () { return NALL; }
+  @Override public BitsFun NANY () { return NANY; }
   @Override public BitsFun EMPTY() { return EMPTY; }
 
   // Make a NEW fidx, with the given parent, and return the Bits with just it
   static BitsFun make_new_fidx( int parent_fidx ) { return make0(new_fidx(parent_fidx)); }
   public static void free(int fidx) { TREE.free(fidx); }
-  public static BitsFun make0( int bit ) { return ALL.make(bit); }
-  public static BitsFun make0( int... bits ) { return ALL.make(bits); }
+  public static BitsFun make0( int bit ) { return NALL.make(bit); }
+  public static BitsFun make0( int... bits ) { return NALL.make(bits); }
   // True if this fidx has been split thus has children
   public static boolean is_parent( int idx ) { return TREE.is_parent(idx); }
   // Return parent fidx from child fidx.

@@ -84,7 +84,7 @@ import static com.cliffc.aa.Env.GVN;
 // wired_not_typed bits.
 
 public class CallNode extends Node {
-  public static BitsRPC ALL_CALLS = BitsRPC.NIL;
+  public static BitsRPC ALL_CALLS = BitsRPC.EMPTY;
   int _rpc;                 // Call-site return PC
   boolean _unpacked;        // One-shot flag; call site allows unpacking a tuple
   boolean _is_copy;         // One-shot flag; Call will collapse
@@ -101,7 +101,7 @@ public class CallNode extends Node {
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
     _badargs = badargs;
   }
-  public static void reset_to_init0() { ALL_CALLS = BitsRPC.NIL; }
+  public static void reset_to_init0() { ALL_CALLS = BitsRPC.EMPTY; }
 
   @Override public String xstr() { return (_is_copy ? "CopyCall" : (is_dead() ? "Xall" : "Call"))+(_not_resolved_by_gcp?"_UNRESOLVED":""); } // Self short name
   String  str() { return xstr(); }       // Inline short name
@@ -366,7 +366,7 @@ public class CallNode extends Node {
     // Also gather all aliases from all args.
     ts[DSP_IDX] = tfx.dsp();
     for( int i=ARG_IDX; i<nargs(); i++ )
-      ts[i] = arg(i)==null ? Type.XSCALAR : arg(i)._val;
+      ts[i] = arg(i)==null ? TypeNil.XSCALAR : arg(i)._val;
     ts[_defs._len] = tfx;
     // Resolve if possible, based on argument types and formals
     ts[_defs._len] = UnresolvedNode.resolve_value(ts);
@@ -501,7 +501,7 @@ public class CallNode extends Node {
   @Override public ErrMsg err( boolean fast ) {
     // Expect a function pointer
     TypeFunPtr tfp = ttfp(_val);
-    if( tfp._fidxs==BitsFun.ALL0 ) {
+    if( tfp._fidxs==BitsFun.NALL ) {
       return fast ? ErrMsg.FAST : ErrMsg.unresolved(_badargs[0],"A function is being called, but "+fdx()._val+" is not a function");
     }
 

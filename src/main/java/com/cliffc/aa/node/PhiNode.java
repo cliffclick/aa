@@ -3,9 +3,9 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeRPC;
+import com.cliffc.aa.type.*;
+
+import static com.cliffc.aa.AA.unimpl;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
@@ -103,9 +103,10 @@ public class PhiNode extends Node {
   }
 
   @Override public ErrMsg err( boolean fast ) {
-    if( _val.contains(Type.SCALAR) ||
-        _val.contains(Type.NSCALR) ) // Cannot have code that deals with unknown-GC-state
-      return ErrMsg.badGC(_badgc);
-    return null;
+    //if( _val.contains(TypeNil.SCALAR) ||
+    //    _val.contains(TypeNil.NSCALR) ) // Cannot have code that deals with unknown-GC-state
+    //  return ErrMsg.badGC(_badgc);
+    //return null;
+    throw unimpl();
   }
 }

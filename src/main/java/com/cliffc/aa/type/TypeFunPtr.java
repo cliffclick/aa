@@ -26,7 +26,7 @@ import static com.cliffc.aa.AA.unimpl;
 // Cloning the code immediately also splits the fidx with a new fidx bit for
 // both the original and the new code.
 //
-public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
+public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   // List of known functions in set, or 'flip' for choice-of-functions.
   // A single bit is a classic code pointer.
   public BitsFun _fidxs;        // Known function bits
@@ -34,13 +34,21 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   public Type _ret;             // Return scalar type
   private Type _dsp;            // Display; often a TMP to a TS; ANY is dead (not live, nobody uses).
 
-  private TypeFunPtr init(BitsFun fidxs, int nargs, Type dsp, Type ret ) {
-    super.init();
+  private TypeFunPtr _init(BitsFun fidxs, int nargs, Type dsp, Type ret) {
+    assert !fidxs.test(0); // No nil in fidxs, use nil/sub instead
     assert !(dsp instanceof TypeFld);
     _fidxs = fidxs; _nargs=nargs; _dsp=dsp; _ret=ret;
     return this;
   }
-  @Override TypeFunPtr copy() { return _copy().init(_fidxs,_nargs,_dsp,_ret); }
+  private TypeFunPtr init(boolean any, boolean nil, BitsFun fidxs, int nargs, Type dsp, Type ret ) {
+    super.init(any,nil);
+    return _init(fidxs,nargs,dsp,ret);
+  }
+  private TypeFunPtr init(boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp, Type ret ) {
+    super.init(any,nil,sub);
+    return _init(fidxs,nargs,dsp,ret);
+  }
+  @Override TypeFunPtr copy() { return _copy().init(_any,_nil,_sub,_fidxs,_nargs,_dsp,_ret); }
   @Override public TypeMemPtr walk( TypeStrMap map, BinaryOperator<TypeMemPtr> reduce ) { return reduce.apply(map.map(_dsp,"dsp"), map.map(_ret,"ret")); }
   @Override public long lwalk( LongStringFunc map, LongOp reduce ) { return reduce.run(map.run(_dsp,"dsp"), map.run(_ret,"ret")); }
   @Override public void walk( TypeStrRun map ) { map.run(_dsp,"dsp"); map.run(_ret,"ret"); }
@@ -62,16 +70,13 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   // Static properties equals, no edges.  Already known to be the same class
   // and not-equals.
   @Override boolean static_eq(TypeFunPtr t) {
-    return _fidxs == t._fidxs &&  _nargs == t._nargs && _dsp._type == t._dsp._type && _ret._type == t._ret._type;
+    return super.static_eq(t) && _fidxs == t._fidxs && _nargs == t._nargs && _dsp._type == t._dsp._type && _ret._type == t._ret._type;
   }
 
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeFunPtr tf) ) return false;
-    if( _fidxs!=tf._fidxs || _nargs != tf._nargs || _dsp!=tf._dsp ) return false;
-    if( _ret==tf._ret ) return true;
-    // Must check for cycle-equals, in case it's a self-returning function
-    return _ret.cycle_equals(tf._ret);
+    return cycle_equals(tf);
   }
 
   private static final Ary<Type> CYCLES = new Ary<>(new Type[0]);
@@ -84,6 +89,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   @Override public boolean cycle_equals( Type o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeFunPtr tf) ) return false;
+    if( !super.equals(tf) ) return false;
     if( _fidxs!=tf._fidxs || _nargs != tf._nargs ) return false;
     if( _dsp!=tf._dsp && !_dsp.cycle_equals(tf._dsp) ) return false;
     if( _ret==tf._ret ) return true;
@@ -121,7 +127,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     if( ind ) sb.nl().ii(1).i();
     _ret._str(visit,dups, sb, debug, indent).p(' ');
     if( ind ) sb.nl().di(1).i();
-    return sb.p('}');
+    return _str_nil(sb.p('}'));
   }
 
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return _ret._str_complex(visit,dups); }
@@ -165,7 +171,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
     while( tfp._ret instanceof TypeFunPtr ret ) {
       if( ret==tfp ) return true; // Found the ending cycle
       if( fidxs.isa(ret._fidxs) && fidxs!=ret._fidxs ) return true; // Strict increase in bits is OK
-      if( fidxs.overlaps(ret._fidxs) ) return false; // Partial overlap is NOT ok
+      if( fidxs.overlaps(ret._fidxs) )
+        return false; // Partial overlap is NOT ok
       tfp = ret;
     }
     return true;
@@ -173,17 +180,17 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
 
   // Functions can grow indefinitely, if being built in a recursive loop.
   // We check that fidx return invariant holds.
-  public static TypeFunPtr make ( BitsFun fidxs, int nargs, Type dsp, Type ret ) { return _makex(fidxs,nargs,dsp,ret,false); }
+  public static TypeFunPtr make ( boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp, Type ret ) { return _makex(any, nil, sub, fidxs,nargs,dsp,ret,false); }
   // Make and approximate an endlessly growing chain.
-  public static TypeFunPtr makex( BitsFun fidxs, int nargs, Type dsp, Type ret ) { return _makex(fidxs,nargs,dsp,ret,true ); }
+  public static TypeFunPtr makex( boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp, Type ret ) { return _makex(any, nil, sub, fidxs,nargs,dsp,ret,true ); }
 
   // Walk the TFP return chain.  If we find the end or a TFP with strictly
   // increasing fidxs, we can wrap and return.  If we have fidx overlap, but
   // not strictly increasing, we need to chop the TFP return chain here.
-  static private TypeFunPtr _makex( BitsFun fidxs, int nargs, Type dsp, Type ret, boolean apx ) {
+  private static TypeFunPtr _makex( boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp, Type ret, boolean apx ) {
     assert !(ret instanceof TypeFunPtr rtfp) || check(rtfp);
-    TypeFunPtr tfp = malloc(fidxs,nargs,dsp,ret).hashcons_free();
-    TypeFunPtr tfp2 = apx ? tfp._makex(fidxs) : tfp;
+    TypeFunPtr tfp = malloc(any, nil, sub, fidxs,nargs,dsp,ret).hashcons_free();
+    TypeFunPtr tfp2 = apx ? tfp._makex( fidxs) : tfp;
     assert check(tfp2);
     return tfp2;
   }
@@ -195,15 +202,15 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
       return this;              // Always OK.
     // Overlaps, without strictly increasing.
     if( sideways(fidxs,tfp._fidxs,tfp._ret!=XSCALAR) ) {
-      Type ret = tfp._make_apx(); // Must approx
+      Type ret = tfp._make_apx( ); // Must approx
       if( ret instanceof TypeFunPtr tfp2 && sideways(fidxs,tfp2._fidxs,tfp2._ret!=XSCALAR) )
         return add_cycle(tfp2);   // Cycle keeps rolling up
       // Wrap and return
-      return make(fidxs.meet(_fidxs),_nargs,_dsp,ret);
+      return make( _any, _nil, _sub, fidxs.meet(_fidxs),_nargs,_dsp,ret);
     }
     Type ret = tfp._makex(fidxs); // Continue checking to the end
     if( ret==_ret ) return this;  // No change
-    return make_from(_dsp,ret);   // Wrap and return
+    return make( _any, _nil, _sub, _fidxs, _nargs, _dsp, ret);// Wrap and return
   }
 
   // True if the fidxs overlap and are NOT strictly increasing.
@@ -215,10 +222,10 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
 
   // MUST approx 'this'.  Recurses to the end.  Returns either SCALAR or ALL or
   // an interned-self-cycle.
-  private Type _make_apx() {
+  private Type _make_apx( ) {
     if( _ret==this ) return this; // Already a self-cycle
     if( _ret==XSCALAR || _ret==ANY ) // Approx self as a self-cycle
-      return make_cycle(_fidxs,_nargs,_dsp);
+      return make_cycle( _any, _nil, _sub, _fidxs,_nargs,_dsp);
     if( !(_ret instanceof TypeFunPtr tfp) )
       return _ret==ALL ? ALL : SCALAR; // Approx self as SCALAR
     Type ret = tfp._make_apx();        // Recursive walk to the end
@@ -227,21 +234,21 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   }
 
   // Merge into the self-cycle
-  private TypeFunPtr add_cycle(TypeFunPtr cyc) {
+  private TypeFunPtr add_cycle( TypeFunPtr cyc) {
     assert cyc._ret==cyc;
     BitsFun fidxs = _fidxs.meet(cyc._fidxs);
     int nargs = Math.min(_nargs,cyc._nargs);
     Type dsp = _dsp.meet(cyc._dsp);
-    return make_cycle(fidxs,nargs,dsp);
+    return make_cycle( _any, _nil, _sub, fidxs,nargs,dsp);
   }
 
   // Install a length-1 self-cycle (if 'ret' is a TFP or high) or a short
   // normal TFP if 'ret' is not a TFP.
-  static TypeFunPtr make_cycle(BitsFun fidxs, int nargs, Type dsp ) {
-    TypeFunPtr tfp = malloc(fidxs,nargs,dsp,null);
+  static TypeFunPtr make_cycle( boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp ) {
+    TypeFunPtr tfp = malloc(any,nil,sub,fidxs,nargs,dsp,null);
     tfp._ret = tfp;             // Make a self-cycle of length 1
     assert dsp._hash!=0;        // Can be 'compute_hash'
-    tfp._hash = Util.mix_hash(dsp._hash,fidxs._hash,nargs);
+    tfp._hash = tfp.compute_hash();
     TypeFunPtr old = (TypeFunPtr)tfp.intern_get(); // Intern check
     if( old!=null )                                // Return prior hit
       return POOLS[TFUNPTR].free(tfp,old);         // Return prior
@@ -253,65 +260,69 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   }
 
   // Allocate and init
+  private static TypeFunPtr malloc(boolean any, boolean nil, boolean sub, BitsFun fidxs, int nargs, Type dsp, Type ret ) {
+    TypeFunPtr t1 = POOLS[TFUNPTR].malloc();
+    return t1.init(any,nil,sub,fidxs,nargs,dsp,ret);
+  }
   private static TypeFunPtr malloc(BitsFun fidxs, int nargs, Type dsp, Type ret ) {
     TypeFunPtr t1 = POOLS[TFUNPTR].malloc();
-    return t1.init(fidxs,nargs,dsp,ret);
+    return t1.init(fidxs.above_center(),fidxs.test(0),fidxs.clear(0),nargs,dsp,ret);
   }
 
+  public static TypeFunPtr make ( BitsFun fidxs, int nargs, Type dsp, Type ret ) {
+    boolean haz_nil = fidxs.test(0);
+    boolean any = fidxs.above_center();
+    boolean nil = any &&  haz_nil;
+    boolean sub = any || !haz_nil;
+    return _makex(any, nil, sub, fidxs.clear(0),nargs,dsp,ret,false);
+  }
+  public static TypeFunPtr makex( BitsFun fidxs, int nargs, Type dsp, Type ret ) {
+    boolean haz_nil = fidxs.test(0);
+    boolean any = fidxs.above_center();
+    boolean nil = any &&  haz_nil;
+    boolean sub = any || !haz_nil;
+    return _makex(any, nil, sub, fidxs,nargs,dsp,ret,true );
+  }
   public static TypeFunPtr make( int fidx, int nargs, Type dsp, Type ret ) { return make(BitsFun.make0(fidx),nargs,dsp,ret); }
   public static TypeFunPtr make_new_fidx( int parent, int nargs, Type dsp, Type ret ) { return make(BitsFun.make_new_fidx(parent),nargs,dsp,ret); }
-  public static TypeFunPtr make( BitsFun fidxs, int nargs) { return make(fidxs,nargs,TypeMemPtr.NO_DISP,Type.SCALAR); }
+  public static TypeFunPtr make( BitsFun fidxs, int nargs) { return make(fidxs,nargs,TypeMemPtr.NO_DISP,TypeNil.SCALAR); }
   public        TypeFunPtr make_from( Type dsp ) { return make(_fidxs,_nargs, dsp,_ret); }
   public        TypeFunPtr make_from( BitsFun fidxs  ) { return fidxs==_fidxs ? this : make( fidxs,_nargs,_dsp,_ret); }
   public        TypeFunPtr make_from( Type dsp, Type ret ) { return dsp==_dsp && ret==_ret ? this : make(_fidxs,_nargs, dsp,ret); }
-  //public        TypeFunPtr make_no_disp( ) { return make(_fidxs,_nargs,TypeMemPtr.NO_DISP,_ret); }
-  //public static TypeFunPtr make_sig(TypeStruct formals,Type ret) { throw unimpl(); }
-  //public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR; // Open display, allows more fields
+  @Override TypeFunPtr make_from( boolean any, boolean nil, boolean sub ) {
+    return malloc(any,nil,sub,_fidxs,_nargs,_dsp,_ret).hashcons_free();
+  }
 
-  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.ALL0 ,1,Type.ALL,Type.ALL);
-  public  static final TypeFunPtr ARG2   =         make(BitsFun.ALL0 ,2,Type.ALL,Type.ALL);
+  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NALL ,1,Type.ALL,Type.ALL);
+  public  static final TypeFunPtr ARG2   =         make(BitsFun.NALL ,2,Type.ALL,Type.ALL);
   public  static final TypeFunPtr EMPTY  =         make(BitsFun.EMPTY,0,Type.ANY,Type.ANY);
-  static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,ARG2/*,EMPTY.dual()*/};
+  static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,ARG2};
 
   @Override protected TypeFunPtr xdual() {
-    return malloc(_fidxs.dual(),-_nargs,_dsp.dual(),_ret.dual());
+    boolean xor = _nil == _sub;
+    return malloc(!_any,_nil^xor,_sub^xor,_fidxs.dual(),-_nargs,_dsp.dual(),_ret.dual());
   }
   @Override void rdual() { _dual._dsp = _dsp._dual;  _dual._ret = _ret._dual; }
 
-  @Override protected Type xmeet( Type t ) {
-    switch( t._type ) {
-    case TFUNPTR:break;
-    case TFLT:
-    case TINT:
-    case TMEMPTR:
-    case TSTRUCT:
-    case TRPC:   return cross_nil(t);
-    case TARY:
-    case TFLD:
-    case TTUPLE:
-    case TMEM:   return ALL;
-    default: throw typerr(t);   // All else should not happen
-    }
+  @Override protected TypeFunPtr xmeet( Type t ) {
     TypeFunPtr tf = (TypeFunPtr)t;
+    // Meet of nilable parts
+    boolean any = _any & tf._any;
+    boolean nil = _nil & tf._nil;
+    boolean sub = _sub & tf._sub;
+    // Meet of non-return parts
     BitsFun fidxs = _fidxs.meet(tf._fidxs);
-
-    // TODO: renable this
-    // If unequal length; then if short is low it "wins" (result is short) else
-    // short is high and it "loses" (result is long).
-    //TypeFunPtr min_nargs = _nargs < tf._nargs ? this : tf;
-    //TypeFunPtr max_nargs = _nargs < tf._nargs ? tf : this;
-    //int nargs = min_nargs.above_center() ? max_nargs._nargs : min_nargs._nargs;
-    //int nargs = fidxs.above_center() ? Math.max(_nargs,tf._nargs) : Math.min(_nargs,tf._nargs);
     int nargs = (_nargs ^ tf._nargs) > 0 ? Math.min(_nargs,tf._nargs) : Math.max(_nargs,tf._nargs);
     Type dsp = _dsp.meet(tf._dsp);
 
     // If both are short cycles, the result is a short cycle
     if( _ret==this && tf._ret==tf )
-      return make_cycle(fidxs,nargs,dsp);
+      return make_cycle(any,nil,sub,fidxs,nargs,dsp);
 
     // Otherwise, recursively find the return
     Type ret = _ret.meet(tf._ret);
-    return makex(fidxs,nargs,dsp,ret);
+
+    return makex(any,nil,sub,fidxs,nargs,dsp,ret);
   }
 
   public BitsFun fidxs() { return _fidxs; }
@@ -329,38 +340,14 @@ public final class TypeFunPtr extends Type<TypeFunPtr> implements Cyclic {
   @Override public boolean above_center() {
     return _fidxs.above_center() || _fidxs.is_empty();
   }
-  @Override public boolean may_be_con()   {
-    return _dsp.may_be_con() &&
-      _fidxs.abit() != -1;
-  }
   @Override public boolean is_con()       {
     // Constant display or unbound display
     return (!has_dsp() || _dsp.is_con()) &&
       // Single bit covers all functions (no new children added, but new splits
       // can appear).  Currently, not tracking this at the top-level, so instead
-      // just triggering off of a simple heuristic: a single bit above BitsFun.ALL0.
+      // just triggering off of a simple heuristic: a single bit above BitsFun.ALL.
       _fidxs.abit() > 1 ;
   }
-  @Override public boolean must_nil() { return _fidxs.test(0) && !_fidxs.above_center(); }
-  @Override public boolean may_nil() { return _fidxs.may_nil(); }
-  @Override TypeFunPtr not_nil() {
-    BitsFun bits = _fidxs.not_nil();
-    return bits==_fidxs ? this : make_from(bits);
-  }
-  @Override public Type remove_nil() {
-    BitsFun bits = _fidxs.clear(0);
-    return bits==_fidxs ? this : make_from(bits);
-  }
-  @Override public Type meet_nil(Type nil) {
-    assert nil==NIL || nil==XNIL;
-    // See testLattice15.
-    if( nil==XNIL )
-      return _fidxs.test(0) ? (_fidxs.above_center() ? XNIL : SCALAR) : NSCALR;
-    if( _fidxs.above_center() ) return make_from(BitsFun.NIL);
-    BitsFun fidxs = _fidxs.above_center() ? _fidxs.dual() : _fidxs;
-    return make_from(fidxs.set(0));
-  }
-  //@Override TypeFunPtr _widen() { return GENERIC_FUNPTR; }
 
   @Override public Type make_from(Type head, TypeMem map, VBitSet visit) {
     throw unimpl();

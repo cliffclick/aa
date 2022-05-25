@@ -250,11 +250,14 @@ public class TV2 {
     }
     case TypeFlt f -> make_base(t,alloc_site);
     case TypeInt i -> make_base(t,alloc_site);
+    case TypeNil n -> {
+      if( t ==TypeNil.NIL )
+        yield TV2.make_nil(TV2.make_leaf(alloc_site),alloc_site);
+      throw unimpl();
+    }
     case Type tt -> {
       if( t==Type.ANY ) yield make_leaf(alloc_site);
       if( t==Type.ALL ) yield make_base(t,alloc_site);
-      if( t == Type.XNIL || t == Type.NIL )
-        yield TV2.make_nil(TV2.make_leaf(alloc_site),alloc_site);
       throw unimpl();
     }
     };
@@ -341,8 +344,8 @@ public class TV2 {
     _args.remove("?");  // No longer have the "?" key, not a nilable anymore
     // Nested nilable-and-not-leaf, need to fixup the nilable
     if( n.is_base() ) {
-      _flow = n._flow.meet(Type.NIL);
-      if( n._eflow!=null ) _eflow = n._eflow.meet(Type.NIL);
+      _flow = n._flow.meet(TypeNil.NIL);
+      if( n._eflow!=null ) _eflow = n._eflow.meet(TypeNil.NIL);
       if( !n._is_copy ) clr_cp();
     }
     if( n.is_fun() ) throw unimpl();
@@ -365,18 +368,10 @@ public class TV2 {
   private long dbl_uid(TV2 t) { return dbl_uid(t._uid); }
   private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
-  // True if any portion allows for nil
-  public boolean has_nil() {
-    if(  _flow !=null &&  _flow.must_nil() ) return true;
-    if( _eflow !=null && _eflow.must_nil() ) return true;
-    if( _may_nil                           ) return true;
-    throw unimpl();             // Prims are structs
-    //return false;
-  }
   // Strip off nil
   public TV2 strip_nil() {
-    if(  _flow!=null )  _flow =  _flow.join(Type.NSCALR);
-    if( _eflow!=null ) _eflow = _eflow.join(Type.NSCALR);
+    if(  _flow!=null )  _flow =  _flow.join(TypeNil.NSCALR);
+    if( _eflow!=null ) _eflow = _eflow.join(TypeNil.NSCALR);
     if( _args!=null )
       for( TV2 t2 : _args.values() )
         t2.strip_nil();
@@ -385,8 +380,8 @@ public class TV2 {
   }
   // Add nil
   public void add_nil() {
-    if(  _flow!=null )  _flow =  _flow.meet(Type.NIL);
-    if( _eflow!=null ) _eflow = _eflow.meet(Type.NIL);
+    if(  _flow!=null )  _flow =  _flow.meet(TypeNil.NIL);
+    if( _eflow!=null ) _eflow = _eflow.meet(TypeNil.NIL);
     _may_nil = true;
     throw unimpl();             // Prims are structs
   }
@@ -453,16 +448,17 @@ public class TV2 {
   }
   Type _as_flow() {
     assert !is_unified();
-    if( is_leaf() ) return Type.SCALAR;
+    if( is_leaf() ) return TypeNil.SCALAR;
     if( is_base() ) return _flow;
     if( is_nil()  )
-      return arg("?")._as_flow().meet(Type.NIL);
+      return arg("?")._as_flow().meet(TypeNil.NIL);
     if( is_fun()  ) {
       Type tfun = ADUPS.get(_uid);
       if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
-      ADUPS.put(_uid, Type.XSCALAR);
+      ADUPS.put(_uid, TypeNil.XSCALAR);
       Type rez = arg(" ret")._as_flow();
-      return TypeFunPtr.make(EXT_FIDXS,size()-1,Type.ANY,rez);
+      //return TypeFunPtr.make(EXT_FIDXS,size()-1,Type.ANY,rez);
+      throw unimpl();
     }
     if( is_obj() ) {
       TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);
@@ -487,7 +483,7 @@ public class TV2 {
       // is built around TypeStruct, hence the TMP wrap.
 
       // This is a Root passed-in struct which can have all aliases
-      return TypeMemPtr.make(_may_nil ? EXT_ALIASES.meet_nil() : EXT_ALIASES,tstr);
+      return TypeMemPtr.make(_may_nil,EXT_ALIASES,tstr);
     }
 
     throw unimpl();
@@ -529,7 +525,7 @@ public class TV2 {
   private void union_flow( Type t0 ) {
     if( t0==null ) return;      // Nothing to merge into
     if( _flow==null ) _flow = t0;
-    else if( t0.getClass()== _flow.getClass() || t0==Type.NIL || _flow==Type.NIL || t0==Type.XNIL || _flow==Type.XNIL ) _flow = t0.meet( _flow);
+    else if( t0.getClass()== _flow.getClass() || t0==TypeNil.NIL || _flow==TypeNil.NIL ) _flow = t0.meet( _flow);
     else if( _eflow==null ) _eflow = t0;
     else if( t0.getClass()==_eflow.getClass() ) _eflow = t0.meet(_eflow);
     // Else have both _flow and _eflow AND t0: have 3 unique type classes so
@@ -964,7 +960,7 @@ public class TV2 {
 
   public Type walk_types_out(Type t, CallEpiNode cepi) {
     assert !is_unified();
-    if( t == Type.XSCALAR ) return t;  // No lift possible
+    if( t == TypeNil.XSCALAR ) return t;  // No lift possible
     //Type tmap = T2MAP.get(this);
     //if( is_leaf() || is_err() ) { // If never mapped on input, leaf is unbound by input
     //  if( tmap==null ) return t;

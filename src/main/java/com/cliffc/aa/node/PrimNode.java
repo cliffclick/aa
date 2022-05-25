@@ -113,11 +113,11 @@ public abstract class PrimNode extends Node {
   public static TypeStruct make_flt(double d) { return TypeStruct.make_flt(TypeFlt.con(d)); }
 
   public static TypeStruct make_wrap(Type t) {
-    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",Type.ALL,TypeFld.make(CANONICAL_INSTANCE,t));
+    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",false,TypeFld.make(CANONICAL_INSTANCE,t));
   }
   public static TypeInt unwrap_i(Type t) { return (TypeInt)((TypeStruct)t).at(CANONICAL_INSTANCE); }
   public static TypeFlt unwrap_f(Type t) { return (TypeFlt)((TypeStruct)t).at(CANONICAL_INSTANCE); }
-  public static long   unwrap_ii(Type t) { return t==Type.NIL ? 0 : unwrap_i(t).getl(); }
+  public static long   unwrap_ii(Type t) { return t==TypeNil.NIL ? 0 : unwrap_i(t).getl(); }
   public static double unwrap_ff(Type t) { return unwrap_f(t).getd(); }
 
   // Make and install a primitive Clazz.
@@ -207,7 +207,7 @@ public abstract class PrimNode extends Node {
       Type tactual = TS[i-DSP_IDX] = val(i-DSP_IDX);
       Type tformal = _formals.at(i);
       Type t = tformal.dual().meet(tactual);
-      if( !t.is_con() && tactual!=Type.NIL ) {
+      if( !t.is_con() ) {
         is_con = false;         // Some non-constant
         if( t.above_center() ) has_high=true;
       }
@@ -291,14 +291,15 @@ public abstract class PrimNode extends Node {
     @Override public Type value() {
       Type t0 = val(0);
       if( t0==Type.ANY ) return TypeStruct.BOOL.dual();
-      if( t0 == Type.XNIL || t0 == Type. NIL )
+      if( t0 == TypeNil.NIL || t0 == TypeNil.XNIL )
         return make_int(1);     // !nil is 1
       if( t0==Type.ALL ) return TypeStruct.BOOL;
       Type t1 = unwrap_i(t0);
-      if( t1==TypeInt.ZERO ) return make_int(1);
-      if( t1. may_nil() ) return TypeStruct.BOOL.dual();
-      if( t1.must_nil() ) return TypeStruct.BOOL;
-      return Type.NIL;          // Cannot be a nil, so return a nil
+      //if( t1==TypeInt.ZERO ) return make_int(1);
+      //if( t1. may_nil() ) return TypeStruct.BOOL.dual();
+      //if( t1.must_nil() ) return TypeStruct.BOOL;
+      //return Type.NIL;          // Cannot be a nil, so return a nil
+      throw unimpl();
     }
     @Override public Type apply( Type[] args ) { throw AA.unimpl(); }
   }
@@ -319,7 +320,7 @@ public abstract class PrimNode extends Node {
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpF64 extends PrimNode {
     Prim2RelOpF64( String name ) { super(name,TypeTuple.FLT64_FLT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(unwrap_ff(args[0]),unwrap_ff(args[1]))?make_int(1):Type.NIL; }
+    @Override public Type apply( Type[] args ) { return op(unwrap_ff(args[0]),unwrap_ff(args[1]))?make_int(1):TypeNil.NIL; }
     abstract boolean op( double x, double y );
   }
 
@@ -333,7 +334,7 @@ public abstract class PrimNode extends Node {
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpFI64 extends PrimNode {
     Prim2RelOpFI64( String name ) { super(name,TypeTuple.FLT64_INT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(unwrap_ff(args[0]),unwrap_ii(args[1]))?make_int(1):Type.NIL; }
+    @Override public Type apply( Type[] args ) { return op(unwrap_ff(args[0]),unwrap_ii(args[1]))?make_int(1):TypeNil.NIL; }
     abstract boolean op( double x, long y );
   }
 
@@ -386,8 +387,7 @@ public abstract class PrimNode extends Node {
       if( t0==Type.ANY || t1==Type.ANY ) return TypeStruct.INT.dual();
       if( t0==Type.ALL || t1==Type.ALL ) return TypeStruct.INT;
       // 0 AND anything is 0
-      if( t0 == Type. NIL || t1 == Type. NIL ) return Type. NIL;
-      if( t0 == Type.XNIL || t1 == Type.XNIL ) return Type.XNIL;
+      if( t0 == TypeNil.NIL || t1 == TypeNil.NIL ) return TypeNil.NIL;
       // If either is high - results might fall to something reasonable
       t0 = unwrap_i(t0);
       t1 = unwrap_i(t1);
@@ -416,8 +416,8 @@ public abstract class PrimNode extends Node {
       if( t0==Type.ANY || t1==Type.ANY ) return TypeStruct.INT.dual();
       if( t0==Type.ALL || t1==Type.ALL ) return TypeStruct.INT;
       // 0 OR anything is that thing
-      if( t0 == Type.NIL || t0 == Type.XNIL ) return t1;
-      if( t1 == Type.NIL || t1 == Type.XNIL ) return t0;
+      if( t0 == TypeNil.NIL ) return t1;
+      if( t1 == TypeNil.NIL ) return t0;
       t0 = unwrap_i(t0);
       t1 = unwrap_i(t1);
       // If either is high - results might fall to something reasonable
@@ -440,7 +440,7 @@ public abstract class PrimNode extends Node {
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpI64 extends PrimNode {
     Prim2RelOpI64( String name ) { super(name,TypeTuple.INT64_INT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(unwrap_ii(args[0]),unwrap_ii(args[1]))?make_int(1):Type.NIL; }
+    @Override public Type apply( Type[] args ) { return op(unwrap_ii(args[0]),unwrap_ii(args[1]))?make_int(1):TypeNil.NIL; }
     abstract boolean op( long x, long y );
   }
 
@@ -453,7 +453,7 @@ public abstract class PrimNode extends Node {
 
   abstract static class Prim2RelOpIF64 extends PrimNode {
     Prim2RelOpIF64( String name ) { super(name,TypeTuple.INT64_FLT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(unwrap_ii(args[0]),unwrap_ff(args[1]))?make_int(1):Type.NIL; }
+    @Override public Type apply( Type[] args ) { return op(unwrap_ii(args[0]),unwrap_ff(args[1]))?make_int(1):TypeNil.NIL; }
     abstract boolean op( long x, double y );
   }
 
@@ -493,9 +493,10 @@ public abstract class PrimNode extends Node {
     }
     @Override public Type apply( Type[] args ) { throw AA.unimpl(); }
     static Type vs_nil( Type tx, Type t, Type f ) {
-      if( tx==Type.NIL || tx==Type.XNIL ) return t;
-      if( tx.above_center() ) return tx.isa(Type.NIL) ? TypeInt.BOOL.dual() : f;
-      return tx.must_nil() ? TypeInt.BOOL : f;
+      if( tx==TypeNil.NIL ) return t;
+      //if( tx.above_center() ) return tx.isa(TypeNil.NIL) ? TypeInt.BOOL.dual() : f;
+      //return tx.must_nil() ? TypeInt.BOOL : f;
+      throw unimpl();
     }
   }
 

@@ -2174,6 +2174,7 @@ public class TestLattice {
     add_edge(ons,nns);
     add_edge(ons,ens);
 
+    //----------------------------------
     // Big Single Nil is not a lattice
     //// Da Big Nil
     //N nil = new N("nil");
@@ -2182,6 +2183,7 @@ public class TestLattice {
     //ons[0]._subs.push(nil);
     //nil._subs.push(ans[len-1]);
     
+    //----------------------------------
     // Duals, outside-in for ORs and ANDs
     for( int i=0; i<len; i++ ) {
       N n = ans[len-1-i];
@@ -2231,6 +2233,106 @@ public class TestLattice {
     int len = ns0.length;
     for( int i=0; i<max; i++ )
       ns0[len-1-i].set_dual(ns1[i]);
+  }
+
+
+  // A wholly unrelated variant of NIL: every other lattice element is NOT-NIL,
+  // and has 2 bits/4 states: OR-NIL (choice of nil), AND-NIL (classic low with
+  // nil), NOT-NIL (classic low not-nil), IS-NIL (and the other element is
+  // ignored).  The new state is {NIL and [TypeMemPtr or TypeInt or TypeFlt]}.
+  // Shows up in HM tests, where an escaped function getting called worse
+  // possible external arguments knows it handles a NIL, but cannot (yet) pin
+  // down that the not-nil values are TypeMemPtr or TypeFunPtr or what.
+
+  // Using 2 versions of NIL instead of subclasses
+  @Test public void testLattice22_nil2() {
+    N.reset();
+
+    // Basic lattice, with ints and TypeMemPtr to some constant strings
+    N _scl = new N(0," scalr");
+
+    N _i64 = new N(0," int64",_scl);
+    N _i2  = new N(0," 2    ",_i64);
+    N _i3  = new N(0," 3    ",_i64);
+    N xi64 = new N(0,"~int64",_i2,_i3); // Has a dual
+
+    N _tmp = new N(0," tmp ",_scl);
+    N _abc = new N(0,"\"abc\"",_tmp);
+    N _def = new N(0,"\"def\"",_tmp);
+    N xtmp = new N(0,"~tmp ",_abc,_def); // Has a dual
+
+    N xscl = new N(0,"~scalr",xi64,xtmp);// Has a dual
+
+    N[] ns = new N[]{_scl,_i64,_tmp,_i2,_i3,_abc,_def,xtmp,xi64,xscl};
+    int nduals = 3; // xi64,xtmp,xscl
+    int len = ns.length;
+
+    N[] ans = lattice_extender0(ns,"%s&0"); // AND nil
+    N[] nns = lattice_extender0(ns,"%s  "); // NOT nil
+    N[] ons = lattice_extender0(ns,"%s+0"); // OR  nil
+
+    // Edges from corresponding elements AND is below NOT, NOT is below OR
+    add_edge(nns,ans);
+    add_edge(ons,nns);
+    
+    //----------------------------------
+    N  nil = new N( "nil");
+    N xnil = new N("~nil"); // NO Edge xnil->nil
+    nil.set_dual(xnil);
+
+    // Edge from xnil to AND-xscalar
+    xnil._subs.push(ans[len-1]);
+    // Edge from OR-scalar to YES-nil
+    ons[0]._subs.push(nil);
+    // This next set DOES work:
+    // Edge from OR-xscalar to YES-xnil.
+    ons[len-1]._subs.push(xnil);
+    // Edges from YES-nil to AND-scalar
+    nil._subs.push(ans[0]);
+    // This next set does not work: allowing ~tmp+0 and ~int+0 to fall to xnil
+    //ons[7]._subs.push(xnil);
+    //ons[8]._subs.push(xnil);
+    //nil._subs.push(ans[1]);
+    //nil._subs.push(ans[2]);
+    
+
+    //----------------------------------
+    // Duals, outside-in for ORs and ANDs
+    for( int i=0; i<len; i++ ) {
+      N n = ans[len-1-i];
+      if( n._t.charAt(0) == '~' )
+        n.set_dual(ons[i]);
+    }
+    for( int i=0; i<len; i++ ) {
+      N n = ons[len-1-i];
+      if( n._t.charAt(0) == '~' )
+        n.set_dual(ans[i]);
+    }
+    for( int i=0; i<len; i++ ) {
+      N n = ans[i];
+      if( n._dual==n )          // No dual yet, so dual to the matching ons
+        n.set_dual(ons[i]);
+    }
+    
+    // Duals outside-in for NOTs, YESs
+    for( int i=0; i<nduals; i++ )
+      nns[len-1-i].set_dual(nns[i]);
+
+    test(ons[len-1]);
+
+    // Check the lattice similar to main AA.
+    // Commutativity: true by definition in this case.
+    // Symmetry 1 : if A&B==MT, then ~A&~MT==~A and ~B&~MT==~B
+    assert check_symmetry1();
+    // Associative: (A&B)&C == A&(B&C)
+    assert check_associative();
+    // Symmetry 2 : if A isa B, then A.join(C) isa B.join(C)
+    //              if A&B ==B, then ~(~A&~C) & ~(~B&~C) == ~(~B&~C)
+    // After some algebra, this becomes: (A&B) + C == B + C; since A&B==B, this
+    // is a trivial condition, except that in practice it caught a lot of
+    // broken implementations.
+    assert check_symmetry2();
+
   }
 
   // Open question for a future testLattice test:

@@ -37,7 +37,7 @@ public class TestParse {
     test("-1",  TypeInt.con( -1));
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
     testerr("x=1+y","Unknown ref 'y'",4);
-    test("math.rand(1)?x=4:x=3;x", TypeInt.NINT8); // x defined on both arms, so available after
+    test("math.rand(1)?x=4:x=3;x", TypeInt.INT8); // x defined on both arms, so available after
     test("x=@{n:=1;v:=2}; x.n := 3; x", "*@{n:=3; v:=2}","@{n=3, v=2}");
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     testerr("sq={x -> x*x}; sq(\"abc\")", "*\"abc\" is none of (flt64,int64)",9);
@@ -48,9 +48,9 @@ public class TestParse {
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y' in @{x=1}",19);
     testerr("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
     test("x=@{a:=1;         b= {a=a+1;b=0}}; x.         b(); x.a",TypeInt.con(2));
-    test("x=@{a:=1;noinline_b= {a=a+1;b=0}}; x.noinline_b(); x.a",TypeInt.NINT8);
+    test("x=@{a:=1;noinline_b= {a=a+1;b=0}}; x.noinline_b(); x.a",TypeInt.INT8);
 
-    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(_&_,2)", Type.XNIL);
+    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(_&_,2)", TypeNil.NIL);
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(1)",TypeInt.con(1));
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(99)", TypeInt.BOOL );
@@ -182,18 +182,18 @@ public class TestParse {
 
   // Short-circuit tests
   @Test public void testParse01a() {
-    test("0 && 0", Type.XNIL);
+    test("0 && 0", TypeNil.NIL);
     test("1 && 2", TypeInt.con(2));
-    test("0 && 2", Type.XNIL);
-    test("0 || 0", Type.XNIL);
+    test("0 && 2", TypeNil.NIL);
+    test("0 || 0", TypeNil.NIL);
     test("0 || 2", TypeInt.con(2));
     test("1 || 2", TypeInt.con(1));
     test("0 && 1 || 2 && 3", TypeInt.con(3));    // Precedence
 
     //test_obj("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
-    //         TypeStruct.make_test(TypeInt.con(1),Type.XNIL,Type.XNIL));
+    //         TypeStruct.make_test(TypeInt.con(1),TypeNil.NIL,TypeNil.NIL));
     //test_obj("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
-    //         TypeStruct.make_test(TypeInt.con(2),TypeInt.con(1),Type.XNIL));
+    //         TypeStruct.make_test(TypeInt.con(2),TypeInt.con(1),TypeNil.NIL));
     //test("(x=1) && x+2", TypeInt.con(3)); // Def x in 1st position
     //
     //testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
@@ -235,7 +235,7 @@ public class TestParse {
     //test("f0 = { x -> x ? _+_(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
     //testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
     //test_obj("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
-    //         TypeStruct.make_test(Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
+    //         TypeStruct.make_test(TypeNil.NIL,TypeInt.con(1),TypeInt.con(2)));
     //
     //// Co-recursion requires parallel assignment & type inference across a lexical scope
     //test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.con(1) );
@@ -251,7 +251,7 @@ public class TestParse {
   @Test public void testParse03() {
     // Type annotations
     test("-1:int", TypeInt.con( -1));
-    test("(1+2.3):flt", TypeFlt.make(0,64,3.3));
+    test("(1+2.3):flt", TypeFlt.con(3.3));
     test("x:int = 1", "int:1", "int:1");
     test("x:flt = 1", "int:1", "int:1"); // casts for free to a float
     testerr("x:flt32 = 123456789", "123456789 is not a flt32",1);
@@ -325,7 +325,7 @@ public class TestParse {
     test   ("a=@{x=(b=1.2)*b;y=b}; a.y", TypeFlt.con(1.2 )); // ok to use temp defs
     test   ("a=@{x=(b=1.2)*b;y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
     testerr("a=@{x=(b=1.2)*b;y=b}; b", "Unknown ref 'b'",22);
-    test   ("t=@{n=0;val=1.2}; u=math.rand(1) ? t : @{n=t;val=2.3}; u.val", TypeFlt.NFLT64); // structs merge field-by-field
+    test   ("t=@{n=0;val=1.2}; u=math.rand(1) ? t : @{n=t;val=2.3}; u.val", TypeFlt.FLT64); // structs merge field-by-field
     // Comments in the middle of a struct decl
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1;y=2})", TypeInt.con(5));
     testerr("@{x;y]","Expected closing '}' but found ']' instead",1);
@@ -361,20 +361,20 @@ public class TestParse {
     //testerr ("Point=:@{x;y}; Point((0,1))", "*(0, 1) is not a *Point:@{x:=; y:=}",21);
     //testerr("x=@{n: =1;}","Missing type after ':'",7);
     //testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
-    //test("x=@{n}",(ignore->TypeMemPtr.make(14,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",Type.XNIL,Access.RW)))),
+    //test("x=@{n}",(ignore->TypeMemPtr.make(14,TypeStruct.make(TypeFld.NO_DISP,TypeFld.make("n",TypeNil.NIL,Access.RW)))),
     //     null,"@{n=0}");
     throw unimpl();
   }
 
   @Test public void testParse05() {
     // nilable and not-nil pointers
-    test   ("x:str? = 0", Type.XNIL); // question-type allows nil or not; zero digit is nil
+    test   ("x:str? = 0", TypeNil.NIL); // question-type allows nil or not; zero digit is nil
     test_obj("x:str? = \"abc\"", TypeStruct.ISUSED); // question-type allows nil or not
     testerr("x:str  = 0", "0 is not a *str", 1);
     test("math.rand(1)?0:\"abc\"", "*\"abc\"?","*\"abc\"?");
     testerr("(math.rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", 26);
     test   ("p=math.rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-nil-ness after a nil-check
-    test   ("x:int = y:str? = z:flt = 0", Type.XNIL); // nil/0 freely recasts
+    test   ("x:int = y:str? = z:flt = 0", TypeNil.NIL); // nil/0 freely recasts
     test   ("\"abc\"==0", "int:0", "int:1"); // No type error, just not nil
     test   ("\"abc\"!=0", "int:1", "int:1"); // No type error, just not nil
     test   ("nil=0; \"abc\"!=nil", "int:1", "int:1"); // Another way to name nil
@@ -471,14 +471,14 @@ public class TestParse {
     //// Test inferring a recursive struct type, with a little help
     //test_struct("map={x:@{n=;v=flt}? -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
     //            TypeStruct.make(TypeFld.NO_DISP,
-    //                            TypeFld.make("nn",Type.XNIL,           ARG_IDX  ),
+    //                            TypeFld.make("nn",TypeNil.NIL,           ARG_IDX  ),
     //                            TypeFld.make("vv",TypeFlt.con(1.2*1.2),ARG_IDX+1)));
     //
     //// Test inferring a recursive struct type, with less help.  This one
     //// inlines so doesn't actually test inferring a recursive type.
     //test_struct("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
     //            TypeStruct.make(TypeFld.NO_DISP,
-    //                            TypeFld.make("nn",Type.XNIL,           ARG_IDX  ),
+    //                            TypeFld.make("nn",TypeNil.NIL,           ARG_IDX  ),
     //                            TypeFld.make("vv",TypeFlt.con(1.2*1.2),ARG_IDX+1)));
     //
     //// Test inferring a recursive struct type, with less help. Too complex to
@@ -492,7 +492,7 @@ public class TestParse {
     //// Test inferring a recursive tuple type, with less help.  This one
     //// inlines so doesn't actually test inferring a recursive type.
     //test_ptr("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
-    //         (alias) -> TypeMemPtr.make(alias,TypeStruct.make_test(Type.XNIL,TypeFlt.con(1.2*1.2))));
+    //         (alias) -> TypeMemPtr.make(alias,TypeStruct.make_test(TypeNil.NIL,TypeFlt.con(1.2*1.2))));
     //
     //test_obj_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
     //             "map((math.rand(1)?0: (math.rand(1)?0: (math.rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
@@ -609,7 +609,7 @@ map(tmp)
     testerr("x=1+y","Unknown ref 'y'",4);
 
     test("x:=1", "int:1", "int:1");
-    //test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make_test(Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
+    //test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make_test(TypeNil.NIL,TypeInt.con(1),TypeInt.con(2)));
     //
     //testerr("x=1; x:=2; x", "Cannot re-assign final field '.x' in @{x=1}", 5);
     //testerr("x=1; x =2; x", "Cannot re-assign final field '.x' in @{x=1}", 5);
@@ -687,15 +687,15 @@ map(tmp)
 
   // Early function exit
   @Test public void testParse11() {
-    test("x:=0; {1 ? ^2; x=3}(); x",Type.XNIL);  // Following statement is ignored
+    test("x:=0; {1 ? ^2; x=3}(); x",TypeNil.NIL);  // Following statement is ignored
     test("{ ^3; 5}()",TypeInt.con(3)); // early exit
-    test("x:=0; {^3; x++}(); x",Type.XNIL);  // Following statement is ignored
+    test("x:=0; {^3; x++}(); x",TypeNil.NIL);  // Following statement is ignored
     test("x:=0; {^1 ? (x=1); x=3}(); x",TypeInt.con(1));  // Return of an ifex
     test("x:=0; {^1 ?  x=1 ; x=3}(); x",TypeInt.con(1));  // Return of an ifex
     test("f={0 ? ^0; 7}; f()", TypeInt.con(7));
     // Find: returns 0 if not found, or first element which passes predicate.
     test("find={list pred -> !list ? ^0; pred(list.1) ? ^list.1; find(list.0,pred)}; find(((0,3),2),{e -> e&1})", TypeInt.INT8);
-    test("x:=0; {1 ? ^2; x=3}(); x",Type.XNIL);  // Following statement is ignored
+    test("x:=0; {1 ? ^2; x=3}(); x",TypeNil.NIL);  // Following statement is ignored
     // Curried functions
     test("for={A->    A+3 }; for 2  ", TypeInt.con(5));
     test("for={A->{B->A+B}}; for 2 3", TypeInt.con(5));
@@ -706,7 +706,7 @@ map(tmp)
   @Test public void testParse12() {
     test("incA= {cnt:=0; {cnt++}       }(); incA();incA()",TypeInt.con(1));
     test("cnt:=0; incA={cnt++}; incA();incA()+cnt",TypeInt.con(1+2));
-    test("incA= {cnt:=0; {cnt++}       }();                      incA()       ",Type.XNIL);
+    test("incA= {cnt:=0; {cnt++}       }();                      incA()       ",TypeNil.NIL);
     test("incA= {cnt:=0; {cnt++}       }();                      incA();incA()",TypeInt.con(1));
     test("tmp = {cnt:=0;({cnt++},{cnt})}();incA=tmp.0;getA=tmp.1;incA();incA()+getA()",TypeInt.con(1+2));
     test("gen = {cnt:=0;({cnt++},{cnt})};" +
@@ -737,15 +737,15 @@ map(tmp)
   // Array syntax examples
   @Test public void testParse14() {
     test_ptr("[3]", "[$]0/obj");
-    test    ("ary = [3]; ary[0]", Type.XNIL);
-    test    ("[3][0]", Type.XNIL);
+    test    ("ary = [3]; ary[0]", TypeNil.NIL);
+    test    ("[3][0]", TypeNil.NIL);
     test    ("ary = [3]; ary[0]:=2", TypeInt.con(2));
     //test_obj("ary = [3]; ary[0]:=0; ary[1]:=1; ary[2]:=2; (ary[0],ary[1],ary[2])", // array create, array storing
     //         TypeStruct.make_test(TypeInt.INT8,TypeInt.INT8,TypeInt.INT8));
     //testary("0[0]","0 is not a *[]Scalar/obj",1);
     //testary("[3] [4]","Index must be out of bounds",5);
     //testary("[3] [-1]","Index must be out of bounds",5);
-    //test_obj("[3]:[int]", TypeAry.make(TypeInt.con(3),Type.XNIL,TypeStruct.ISUSED)); // Array of 3 XNILs in INTs.
+    //test_obj("[3]:[int]", TypeAry.make(TypeInt.con(3),TypeNil.NIL,TypeStruct.ISUSED)); // Array of 3 XNILs in INTs.
     ////test("[1,2,3]", TypeAry.make(TypeInt.con(1),TypeInt.con(3),TypeInt.INT8)); // Array of 3 elements
     //test("ary=[3];#ary",TypeInt.con(3)); // Array length
     //test_ptr(DO+"ary=[99]; i:=0; do {i++ < #ary} {ary[i]:=i*i};ary", "[$]int64/obj"); // sequential iteration over array
@@ -777,7 +777,7 @@ map(tmp)
     //test("(1,2)", (ignore -> TypeMemPtr.make(13,TypeStruct.make_test(TypeInt.con(1),TypeInt.con(2)))), null, "[13]( 1,2)");
     //
     //test("@{ n=0; v=1.2 }",
-    //     (ignore -> TypeMemPtr.make(13, make2fldsD("n",Type.XNIL,"v",TypeFlt.con(1.2)))),
+    //     (ignore -> TypeMemPtr.make(13, make2fldsD("n",TypeNil.NIL,"v",TypeFlt.con(1.2)))),
     //     null,
     //     "[13]@{ n = 0, v = 1.2}");
     //

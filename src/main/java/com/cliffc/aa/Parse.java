@@ -356,7 +356,7 @@ public class Parse implements Comparable<Parse> {
   private Node stmt(boolean lookup_current_scope_only) {
     if( peek('^') ) {           // Early function exit
       Node ifex = ifex();
-      if( ifex==null ) ifex=con(Type.XNIL);
+      if( ifex==null ) ifex=con(TypeNil.NIL);
       if( _e._par._par==null )
         return err_ctrl1(ErrMsg.syntax(this,"Function exit but outside any function"));
       return _e.early_exit(this,ifex);
@@ -376,7 +376,7 @@ public class Parse implements Comparable<Parse> {
       String tok = token();     // Scan for 'id = ...'
       if( tok == null ) break;  // Out of ids
       int oldx2 = _x;           // Unwind assignment flavor point
-      Type t = Type.SCALAR;
+      Type t = TypeNil.SCALAR;
       // x  =: ... type  assignment, handled before we get here
       // x  =  ... final assignment
       // x :=  ... var   assignment
@@ -413,7 +413,7 @@ public class Parse implements Comparable<Parse> {
     }
 
     // Normal statement value parse
-    Node ifex = default_nil ? Env.XNIL : ifex(); // Parse an expression for the statement value
+    Node ifex = default_nil ? Env.NIL : ifex(); // Parse an expression for the statement value
     // Check for no-statement after start of assignment, e.g. "x = ;"
     if( ifex == null ) {        // No statement?
       if( toks._len == 0 ) return null;
@@ -443,7 +443,7 @@ public class Parse implements Comparable<Parse> {
       scope = scope();          // Create in the current scope
       StructNode stk = scope.stk();
       TypeFld fld = TypeFld.make(tok,t,Access.RW);
-      stk.add_fld(fld, con(Type.NIL),badf); // Create at top of scope as undefined
+      stk.add_fld(fld, con(TypeNil.NIL),badf); // Create at top of scope as undefined
       scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
     }
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
@@ -484,7 +484,7 @@ public class Parse implements Comparable<Parse> {
     scope().flip_if();       // Flip side of tracking new defs
     set_mem(omem);           // Reset memory to before the IF for the other arm
     set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch
-    Node f_exp = peek(':') ? stmt(false) : con(Type.NIL);
+    Node f_exp = peek(':') ? stmt(false) : con(TypeNil.NIL);
     if( f_exp == null ) f_exp = err_ctrl2("missing expr after ':'");
     Node f_ctl = ctrl();
     Node f_mem = mem ();
@@ -502,7 +502,7 @@ public class Parse implements Comparable<Parse> {
     // Merge results
     RegionNode r = set_ctrl(init(new RegionNode(null,t_ctl,f_ctl)));
     set_mem(   init(new PhiNode(TypeMem.ALLMEM,bad,r,t_mem,f_mem)));
-    Node rez = init(new PhiNode(Type.SCALAR   ,bad,r,t_exp,f_exp)) ; // Ifex result
+    Node rez = init(new PhiNode(TypeNil.SCALAR,bad,r,t_exp,f_exp)) ; // Ifex result
 
     Env.GVN.add_work_new(f_exp);
     Env.GVN.add_work_new(t_exp);
@@ -769,7 +769,7 @@ public class Parse implements Comparable<Parse> {
     ScopeNode scope = lookup_scope(tok=tok.intern(),false); // Find prior scope of token
     // Need a load/call/store sensible options
     if( scope==null ) {         // Token not already bound to a value
-      do_store(null,con(Type.NIL),Access.RW,tok,null,Type.SCALAR,null);
+      do_store(null,con(TypeNil.NIL),Access.RW,tok,null,TypeNil.SCALAR,null);
       scope = scope();
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
@@ -895,7 +895,7 @@ public class Parse implements Comparable<Parse> {
     // First stmt is parsed already
     Parse bad = errMsg(first_arg_start);
     while( s!= null ) {         // More args
-      TypeFld fld = TypeFld.make((""+(nn.len())).intern(),Type.SCALAR,Access.Final);
+      TypeFld fld = TypeFld.make((""+(nn.len())).intern(),TypeNil.SCALAR,Access.Final);
       nn.add_fld(fld,s,bad);
       if( !peek(',') ) break;   // Final comma is optional
       skipWS();                 // Skip to arg start before recording arg start
@@ -1072,14 +1072,14 @@ public class Parse implements Comparable<Parse> {
     if( ctrl == null ) {
       s.set_def(4,ctrl=new RegionNode((Node)null).keep()); ctrl._val=Type.CTRL;
       s.set_def(5,mem =new PhiNode(TypeMem.ALLMEM, null,(Node)null).keep());
-      s.set_def(6,val =new PhiNode(Type.SCALAR   , null,(Node)null).keep());
+      s.set_def(6,val =new PhiNode(TypeNil.SCALAR, null,(Node)null).keep());
     }
     ctrl.add_def(ctrl());
     mem .add_def(mem ());
     val .add_def(rez   );
     set_ctrl(Env.XCTRL);
     set_mem (con(TypeMem.ANYMEM));
-    return con(Type.XNIL);
+    return con(TypeNil.NIL);
   }
 
   /** A balanced operator as a fact().  Any balancing token can be used.
@@ -1295,7 +1295,7 @@ public class Parse implements Comparable<Parse> {
           fptr.bind(tok);       // Debug only: give name to function
       } else {
         access = Access.RW;     // Arbitrary AA type, not const-expr
-        t = peek(':') ? type(true,null) : Type.SCALAR;
+        t = peek(':') ? type(true,null) : TypeNil.SCALAR;
         val = con(t);
       }
       // Insert the field into the structure.
@@ -1322,7 +1322,7 @@ public class Parse implements Comparable<Parse> {
   private Type ttuple() {
     int oldx = _x;
     peek('(');
-    TypeStruct ts = TypeStruct.malloc("",Type.ALL,TypeFlds.EMPTY);
+    TypeStruct ts = TypeStruct.malloc("",false,TypeFlds.EMPTY);
     while(true) {
       Type t = type(false,null);
       if( t==null ) { _x=oldx; return ts.free(null); }
@@ -1358,7 +1358,7 @@ public class Parse implements Comparable<Parse> {
     UnresolvedNode fref = init(UnresolvedNode.forward_ref(tok,bad));
     // Place in nearest enclosing closure scope, this will keep promoting until we find the actual scope
     StructNode stk = scope().stk();
-    TypeFld fld = TypeFld.make(tok,Type.SCALAR,Access.Final);
+    TypeFld fld = TypeFld.make(tok,TypeNil.SCALAR,Access.Final);
     stk.add_fld(fld,fref,null);
     return fref;
   }

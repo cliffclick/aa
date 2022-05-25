@@ -137,7 +137,7 @@ public class StructNode extends Node {
       return;
     }
     Node n = in(idx);
-    if( n._val==Type.XNIL ) // Stomp over a nil field create
+    if( n._val==TypeNil.NIL ) // Stomp over a nil field create
       //return set_fld(fld.make_from(fptr._val,fin),fptr);
       throw unimpl();
     // Inflate to unresolved as needed

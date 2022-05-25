@@ -74,12 +74,12 @@ public class TestApprox {
     int f7 = BitsFun.new_fidx(BitsFun.ALLX);
     int f2 = BitsFun.new_fidx(BitsFun.ALLX);
     Type ND = TypeMemPtr.NO_DISP;
-    TypeFld S0 = TypeFld.make_tup(Type. SCALAR,ARG_IDX+0);
-    TypeFld X0 = TypeFld.make_tup(Type.XSCALAR,ARG_IDX+0);
-    TypeFld S1 = TypeFld.make_tup(Type. SCALAR,ARG_IDX+1);
-    TypeFld X1 = TypeFld.make_tup(Type.XSCALAR,ARG_IDX+1);
-    TypeFld S2 = TypeFld.make_tup(Type. SCALAR,ARG_IDX+2);
-    TypeFld X2 = TypeFld.make_tup(Type.XSCALAR,ARG_IDX+2);
+    TypeFld S0 = TypeFld.make_tup(TypeNil. SCALAR,ARG_IDX+0);
+    TypeFld X0 = TypeFld.make_tup(TypeNil.XSCALAR,ARG_IDX+0);
+    TypeFld S1 = TypeFld.make_tup(TypeNil. SCALAR,ARG_IDX+1);
+    TypeFld X1 = TypeFld.make_tup(TypeNil.XSCALAR,ARG_IDX+1);
+    TypeFld S2 = TypeFld.make_tup(TypeNil. SCALAR,ARG_IDX+2);
+    TypeFld X2 = TypeFld.make_tup(TypeNil.XSCALAR,ARG_IDX+2);
     //TypeMemPtr tmpa = TypeMemPtr.make(a3,TypeStruct.make(X0,X1));
     //TypeFunPtr tfpa = TypeFunPtr.make(f7,3,ND,tmpa);
     //

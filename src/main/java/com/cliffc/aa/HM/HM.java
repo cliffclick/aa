@@ -328,7 +328,7 @@ public class HM {
     return s;
   }
   private static Syntax number() {
-    if( BUF[X]=='0' ) { X++; return new Con(Type.NIL); }
+    if( BUF[X]=='0' ) { X++; return new Con(TypeNil.NIL); }
     int sum=0;
     while( X<BUF.length && isDigit(BUF[X]) )
       sum = sum*10+BUF[X++]-'0';
@@ -444,7 +444,7 @@ public class HM {
     final void prep_tree_impl( Syntax par, VStack nongen, Work<Syntax> work, T2 t ) {
       _par = par;
       _hmt = t;
-      _flow= Type.XSCALAR;
+      _flow= TypeNil.XSCALAR;
       _nongen = nongen;
       work.add(this);
     }
@@ -493,7 +493,7 @@ public class HM {
     @Override void add_hm_work( @NotNull Work<Syntax> work) { }
     @Override int prep_tree( Syntax par, VStack nongen, Work<Syntax> work ) {
       // A '0' turns into a nilable leaf.
-      T2 base = _con==Type.NIL
+      T2 base = _con==TypeNil.NIL
         ? T2.make_nil(T2.make_leaf())
         : (_con instanceof TypeMemPtr cptr && cptr.is_str() ? T2.make_str(cptr) : T2.make_base(_con));
       prep_tree_impl(par, nongen, work, base);
@@ -588,7 +588,7 @@ public class HM {
       for( int i=0; i<args.length; i++ ) _targs[i] = T2.make_leaf();
       // Flow types for all arguments
       _types = new Type[args.length];
-      for( int i=0; i<args.length; i++ ) _types[i] = Type.XSCALAR;
+      for( int i=0; i<args.length; i++ ) _types[i] = TypeNil.XSCALAR;
       _extsetf = new boolean[args.length];
       _extsetp = new boolean[args.length];
       // Idents referring to this argument
@@ -597,7 +597,7 @@ public class HM {
       // A unique FIDX for this Lambda
       _fidx = BitsFun.new_fidx();
       FUNS.put(_fidx,this);
-      _flow = TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,Type.XSCALAR);
+      _flow = TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,TypeNil.XSCALAR);
     }
     @Override SB str(SB sb) {
       sb.p("{ ");
@@ -818,8 +818,8 @@ public class HM {
 
     @Override Type val(Work<Syntax> work) {
       Type flow = _fun._flow;
-      if( !(flow instanceof TypeFunPtr tfp) ) return flow.oob(Type.SCALAR);
-      if( tfp._fidxs == BitsFun.EMPTY )  return Type.XSCALAR;  // Nothing being called, stay high
+      if( !(flow instanceof TypeFunPtr tfp) ) return flow.oob(TypeNil.SCALAR);
+      if( tfp._fidxs == BitsFun.EMPTY )  return TypeNil.XSCALAR;  // Nothing being called, stay high
       // Meet all calling arguments over all called function args.
       if( work!=null )
         // TODO: REMOVE THIS ALREADY DONE IN ADD_VAL_WORK BEHIND PROGRESS FILTER
@@ -839,7 +839,7 @@ public class HM {
 
     Type do_apply_lift(T2 rezt2, Type ret, boolean test) {
       if( !DO_LIFT || !DO_HM ) return ret;
-      if( ret==Type.XSCALAR ) return ret; // Nothing to lift
+      if( ret==TypeNil.XSCALAR ) return ret; // Nothing to lift
       Type lift = hm_apply_lift(rezt2,ret, !rezt2._is_copy, test);
       if( lift != _old_lift ) {
         assert _old_lift.isa(lift);   // Lift is monotonic
@@ -884,7 +884,7 @@ public class HM {
       int argn = Util.find(_args,child);
 
       // visit all Lambdas; meet the child flow into the Lambda arg#
-      if( argn != -1 && tfp._fidxs != BitsFun.ALL )
+      if( argn != -1 && tfp._fidxs != BitsFun.NALL )
         for( int fidx : tfp._fidxs )
           Lambda.FUNS.get(fidx).arg_meet(argn,child._flow,work);
     }
@@ -984,7 +984,7 @@ public class HM {
               if( t2.is_ptr() && !lam.extsetp(i) ) new EXTStruct(t2); // Make a canonical external struct for args
               cflow = t2.as_flow(false);
             } else {
-              cflow = Type.SCALAR; // Most conservative args
+              cflow = TypeNil.SCALAR; // Most conservative args
             }
             fun.arg_meet(i,cflow,work); // Root / external-world calls this function with this arg
           }
@@ -1238,16 +1238,16 @@ public class HM {
     }
     @Override Type val(Work<Syntax> work) {
       Type trec = _ptr._flow;
-      if( trec==Type.NIL ) return Type.XSCALAR; // Field from nil
-      if( !(trec instanceof TypeMemPtr tmp) ) return trec.oob(Type.SCALAR);
-      Type t=Type.XSCALAR;
+      if( trec==TypeNil.NIL ) return TypeNil.XSCALAR; // Field from nil
+      if( !(trec instanceof TypeMemPtr tmp) ) return trec.oob(TypeNil.SCALAR);
+      Type t=TypeNil.XSCALAR;
       // GCP takes meet of aliased fields
       assert !tmp._aliases.test(BitsAlias.ALLX);
       for( int alias : tmp._aliases ) {
         if( alias==0 ) continue; // May be nil error
         Alloc alloc = ALIASES.at(alias);
         Type afld = alloc.fld(_id);
-        if( afld==null ) afld = tmp._obj.oob(Type.SCALAR);
+        if( afld==null ) afld = tmp._obj.oob(TypeNil.SCALAR);
         t = t.meet(afld);
         if( work!=null ) alloc.push(this);
       }
@@ -1377,12 +1377,13 @@ public class HM {
       // GCP helps HM: do not unify dead control paths
       if( DO_GCP ) {            // Doing GCP during HM
         Type pred = _types[0];
-        if( pred == TypeInt.FALSE || pred==Type.XNIL /*CNC || pred==Type.NIL*/ )
+        if( pred == TypeInt.FALSE || pred==TypeNil.NIL )
           return rez.unify(targ(2),work); // Unify only the false side
-        if( pred.above_center() ? !pred.may_nil() : !pred.must_nil() )
-          return rez.unify(targ(1),work);
-        if( pred.above_center() ) // Wait until predicate falls
-          return false;
+        //if( pred.above_center() ? !pred.may_nil() : !pred.must_nil() )
+        //  return rez.unify(targ(1),work);
+        //if( pred.above_center() ) // Wait until predicate falls
+        //  return false;
+        throw unimpl();
       }
       // Unify both sides with the result.
       
@@ -1398,14 +1399,15 @@ public class HM {
       Type t1  = flows[1];
       Type t2  = flows[2];
       // Conditional Constant Propagation: only prop types from executable sides
-      if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
+      if( pred == TypeInt.FALSE || pred == TypeNil.NIL )
         return t2;              // False only
       if( pred.above_center() ) // Delay any values
-        return Type.XSCALAR;    // t1.join(t2);     // Join of either
-      if( !pred.must_nil() )    // True only
-        return t1;
-      // Could be either, so meet
-      return t1.meet(t2);
+        return TypeNil.XSCALAR;    // t1.join(t2);     // Join of either
+      //if( !pred.must_nil() )    // True only
+      //  return t1;
+      //// Could be either, so meet
+      //return t1.meet(t2);
+      throw unimpl();
     }
   }
 
@@ -1440,11 +1442,12 @@ public class HM {
     @Override Type apply( Type[] flows) {
       Type pred = flows[0];
       if( pred.above_center() )
-        return pred.may_nil() ? TypeInt.BOOL.dual() : TypeInt.FALSE;
+        //return pred.may_nil() ? TypeInt.BOOL.dual() : TypeInt.FALSE;
+        throw unimpl();
       if( pred==Type.ALL ) return TypeInt.BOOL;
-      if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
+      if( pred == TypeInt.FALSE || pred == TypeNil.NIL )
         return TypeInt.TRUE;
-      if( pred.meet(Type.NIL)!=pred )
+      if( pred.meet(TypeNil.NIL)!=pred )
         return TypeInt.FALSE;
       return TypeInt.BOOL;
     }
@@ -1462,7 +1465,7 @@ public class HM {
       if( pred.above_center() ) return TypeInt.BOOL.dual();
       if( pred instanceof TypeMemPtr tmp && tmp.is_str() ) {
         TypeFld fld = tmp._obj.get("0");
-        if( fld!=null ) return TypeInt.con(fld._t==Type.XNIL ? 1 : 0);
+        if( fld!=null ) return TypeInt.con(fld._t==TypeNil.NIL ? 1 : 0);
       }
       return TypeInt.BOOL;
     }
@@ -1484,7 +1487,7 @@ public class HM {
       // Already an expanded nilable with base
       if( arg.is_base() && ret.is_base() ) {
         assert !arg.is_open() && !ret.is_open();
-        assert arg._flow == ret._flow.meet(Type.NIL);
+        assert arg._flow == ret._flow.meet(TypeNil.NIL);
         return false;
       }
       // Already an expanded nilable with ptr
@@ -1499,8 +1502,8 @@ public class HM {
     }
     @Override Type apply( Type[] flows) {
       Type val = flows[0];
-      if( val==Type.XNIL ) return Type.XSCALAR; // Weird case of not-nil nil
-      return val.join(Type.NSCALR);
+      if( val==TypeNil.NIL ) return TypeNil.XSCALAR; // Weird case of not-nil nil
+      return val.join(TypeNil.NSCALR);
     }
   }
 
@@ -1518,8 +1521,8 @@ public class HM {
       if( t0.above_center() || t1.above_center() )
         return TypeInt.INT64.dual();
       if( t0 instanceof TypeInt && t1 instanceof TypeInt ) {
-        if( t0.is_con() && t0.getl()==0 ) return TypeInt.ZERO;
-        if( t1.is_con() && t1.getl()==0 ) return TypeInt.ZERO;
+        if( t0.is_con() && t0.getl()==0 ) return TypeNil.XNIL;
+        if( t1.is_con() && t1.getl()==0 ) return TypeNil.XNIL;
         if( t0.is_con() && t1.is_con() )
           return TypeInt.con(t0.getl()*t1.getl());
       }
@@ -1826,8 +1829,8 @@ public class HM {
       // Nested nilable-and-not-leaf, need to fixup the nilable
       if( n.is_base() ) {
         _may_nil=false;
-        _flow = n._flow.meet(Type.NIL);
-        if( n._eflow!=null ) _eflow = n._eflow.meet(Type.NIL);
+        _flow = n._flow.meet(TypeNil.NIL);
+        if( n._eflow!=null ) _eflow = n._eflow.meet(TypeNil.NIL);
       }
       if( n.is_ptr() ) {
         if( _args==null ) _args = new NonBlockingHashMap<>();
@@ -1851,23 +1854,24 @@ public class HM {
 
     // True if any portion allows for nil
     boolean has_nil() {
-      if(  _flow  !=null &&  _flow.must_nil() ) return true;
-      if( _eflow  !=null && _eflow.must_nil() ) return true;
-      if( _may_nil                            ) return true;
-      return false;
+      //if(  _flow  !=null &&  _flow.must_nil() ) return true;
+      //if( _eflow  !=null && _eflow.must_nil() ) return true;
+      //if( _may_nil                            ) return true;
+      //return false;
+      throw unimpl();
     }
 
     // Strip off nil
     T2 strip_nil() {
-      if(    _flow!=null )    _flow =   _flow.join(Type.NSCALR);
-      if(   _eflow!=null )   _eflow =  _eflow.join(Type.NSCALR);
+      if(  _flow!=null )  _flow =  _flow.join(TypeNil.NSCALR);
+      if( _eflow!=null ) _eflow = _eflow.join(TypeNil.NSCALR);
       _may_nil = false;
       return this;
     }
     // Add nil
     void add_nil() {
-      if(    _flow!=null )    _flow =   _flow.meet(Type.NIL);
-      if(   _eflow!=null )   _eflow =  _eflow.meet(Type.NIL);
+      if(  _flow!=null ) _flow =  _flow.meet(TypeNil.NIL);
+      if( _eflow!=null ) _eflow = _eflow.meet(TypeNil.NIL);
       _may_nil = true;
     }
 
@@ -1899,8 +1903,8 @@ public class HM {
     }
     Type _as_flow(boolean deep) {
       assert !unified();
-      if( is_err() ) return Type.SCALAR;
-      if( is_leaf() ) return Type.SCALAR.oob(!HM_FREEZE);
+      if( is_err() ) return TypeNil.SCALAR;
+      if( is_leaf() ) return TypeNil.SCALAR.oob(!HM_FREEZE);
       if( is_base() ) return _flow;
       if( is_ptr() ) {
         // all escaping aliases that are compatible
@@ -1908,12 +1912,11 @@ public class HM {
         for( int alias : Root.EXT_ALIASES )
           if( !fresh_unify(ALIASES.at(alias).t2(),null,null) )
             aliases = aliases.set(alias); // Compatible escaping alias
-        if( _may_nil ) aliases = aliases.set(0);
         TypeStruct tstr = deep ? (TypeStruct)arg("*")._as_flow(deep) : TypeStruct.ISUSED;
-        return TypeMemPtr.make(aliases,tstr);
+        return TypeMemPtr.make(_may_nil,aliases,tstr);
       }
       if( is_nil() )
-        return arg("?")._as_flow(deep).meet(Type.NIL);
+        return arg("?")._as_flow(deep).meet(TypeNil.NIL);
       if( is_fun() ) {
         // all escaping fidxs that are compatible
         BitsFun fidxs = BitsFun.EMPTY;
@@ -1923,7 +1926,7 @@ public class HM {
         if( _may_nil ) fidxs = fidxs.set(0);
         Type tfun = ADUPS.get(_uid);
         if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
-        ADUPS.put(_uid, Type.XSCALAR);
+        ADUPS.put(_uid, TypeNil.XSCALAR);
         Type rez = arg("ret")._as_flow(deep);
         return TypeFunPtr.make(fidxs,size()-1+DSP_IDX,Type.ANY,rez);
       }
@@ -1933,7 +1936,7 @@ public class HM {
         if( tstr==null ) {
           // Returning a high version of struct
           Type.RECURSIVE_MEET++;
-          tstr = TypeStruct.malloc("",Type.ALL.oob(is_open()),TypeFlds.EMPTY).add_fld(TypeFld.NO_DISP);
+          tstr = TypeStruct.malloc("",is_open(),TypeFlds.EMPTY).add_fld(TypeFld.NO_DISP);
           if( _args!=null ) {
             for( String fld : _args.keySet() )
               if( fld.endsWith(":") ) tstr._clz = fld;
@@ -2204,9 +2207,9 @@ public class HM {
       // Special handling for nilable
       boolean progress = false;
       if( this.is_nil() && !that.is_nil() ) {
-        Type mt  = that. _flow==null ? null : that. _flow.meet(Type.NIL);
+        Type mt  = that. _flow==null ? null : that. _flow.meet(TypeNil.NIL);
         if(  mt!=that. _flow ) { if( work==null ) return true; progress = true; that._flow  = mt; }
-        Type emt = that._eflow==null ? null : that._eflow.meet_nil(Type.XNIL);
+        Type emt = that._eflow==null ? null : that._eflow.meet(TypeNil.NIL);
         if( emt!=that._eflow ) { if( work==null ) return true; progress = true; that._eflow =emt; }
         if( !that._may_nil && !that.is_base() ) { if( work==null ) return true; progress = that._may_nil = true; }
         if( progress ) that.add_deps_work(work);
@@ -2402,12 +2405,12 @@ public class HM {
       }
       // Nilable
       if( is_nil() )
-        return arg("?").walk_types_in(t.join(Type.NSCALR));
+        return arg("?").walk_types_in(t.join(TypeNil.NSCALR));
       if( is_fun() ) {          // Walk returns not arguments
         T2 t2ret = arg("ret");
-        Type fret = t instanceof TypeFunPtr tfp ? tfp._ret : t.oob(Type.SCALAR);
-        if( fret == Type.ANY ) fret = Type.XSCALAR;
-        if( fret == Type.ALL ) fret = Type.SCALAR;
+        Type fret = t instanceof TypeFunPtr tfp ? tfp._ret : t.oob(TypeNil.SCALAR);
+        if( fret == Type.ANY ) fret = TypeNil.XSCALAR;
+        if( fret == Type.ALL ) fret = TypeNil.SCALAR;
         // Cannot lift any function input, since the input will dominate the
         // replacement in a (possibly cyclic) type.  Could unroll the function
         // to get a tiny bit more precision.
@@ -2418,7 +2421,7 @@ public class HM {
         // slot 0.
         for( String id : _args.keySet() )
           if( !Util.eq(id,"ret") )
-            { T2MAP.merge(arg(id), Type.SCALAR, Type::meet); }
+            { T2MAP.merge(arg(id), TypeNil.SCALAR, Type::meet); }
 
         return t2ret.walk_types_in(fret);
       }
@@ -2434,26 +2437,26 @@ public class HM {
     }
 
     private static Type at_fld(Type t, String id) { // TODO: FAILURE TO SHARPEN
-      if( !(t instanceof TypeStruct ts) ) return t.oob(Type.SCALAR);
+      if( !(t instanceof TypeStruct ts) ) return t.oob(TypeNil.SCALAR);
       TypeFld fld = ts.get(id);
-      return fld==null ? ts.oob(Type.SCALAR) : fld._t;
+      return fld==null ? ts.oob(TypeNil.SCALAR) : fld._t;
     }
 
     // Walk an Apply output flow type, and attempt to replace parts of it with
     // stronger flow types from the matching input types.
     Type walk_types_out( Type t, Apply apply, boolean test ) {
       assert !unified();
-      if( t == Type.XSCALAR ) return t; // No lift, do not bother
+      if( t == TypeNil.XSCALAR ) return t; // No lift, do not bother
 
-      if( is_err() ) return Type.SCALAR; // Do not attempt lift
+      if( is_err() ) return TypeNil.SCALAR; // Do not attempt lift
 
       if( is_leaf() ) {
         // Pre-freeze, take the union of mappings.
         // Post-freeze, take direct hits only.
         Type tx = T2MAP.get(this);
-        if( HM_FREEZE && tx==null ) return Type.SCALAR;
-        Type lt = HM_FREEZE ? tx : Type.XSCALAR;
-        if( lt==Type.SCALAR || lt==t ) return lt; // No mapping, no lift
+        if( HM_FREEZE && tx==null ) return TypeNil.SCALAR;
+        Type lt = HM_FREEZE ? tx : TypeNil.XSCALAR;
+        if( lt==TypeNil.SCALAR || lt==t ) return lt; // No mapping, no lift
         if( !test )
           Root.EXT_DEPS.add(apply); //push_update(apply); // Apply depends on this leaf
           //if( !HM_FREEZE ) // Apply depends on ALL leafs
@@ -2465,7 +2468,7 @@ public class HM {
 
       if( is_base() ) return _is_copy ? _flow : widen();
       if( is_ptr() ) {
-        if( t==Type.NIL || t==Type.XNIL ) return t; // Keep a nil
+        if( t==TypeNil.NIL || t==TypeNil.NIL ) return t; // Keep a nil
         if( !(t instanceof TypeMemPtr tmp) ) {
           Type tx = T2MAP.get(this);
           return tx!=null ? tx : t.oob(TypeMemPtr.ISUSED);
@@ -2475,13 +2478,14 @@ public class HM {
       }
 
       if( is_nil() ) { // The wrapped leaf gets lifted, then nil is added
-        Type tnil = arg("?").walk_types_out(t.remove_nil(),apply, test);
-        return tnil.meet(Type.NIL);
+        //Type tnil = arg("?").walk_types_out(t.remove_nil(),apply, test);
+        //return tnil.meet(TypeNil.NIL);
+        throw unimpl();
       }
 
       if( is_fun() ) {          // Walk returns not arguments
-        Type tret = t instanceof TypeFunPtr tfp ? tfp._ret  : t.oob(Type.SCALAR);
-        BitsFun fidxs = t instanceof TypeFunPtr tfp ? tfp._fidxs  : (t.above_center() ? BitsFun.EMPTY : BitsFun.ALL);
+        Type tret = t instanceof TypeFunPtr tfp ? tfp._ret  : t.oob(TypeNil.SCALAR);
+        BitsFun fidxs = t instanceof TypeFunPtr tfp ? tfp._fidxs  : (t.above_center() ? BitsFun.EMPTY : BitsFun.NALL);
         Type tdsp = Type.ANY;
         if( WDUPS.get(_uid)!=null ) return t;
         WDUPS.put(_uid,t);

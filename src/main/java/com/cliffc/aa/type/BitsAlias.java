@@ -28,15 +28,12 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static final int STRX = new_alias(INTX); // String alias
   // The All-Memory alias class
   public static BitsAlias NALL = new BitsAlias().make_impl(ALLX,null); // All aliases, no nil
-  public static BitsAlias ALL0 = NALL.meet_nil(); // All aliases, with a low nil
-  public static BitsAlias ANY0 = ALL0.dual();
+  public static BitsAlias NANY = NALL.dual();
 
   public static final BitsAlias EXT = make0(EXTX);
   public static final BitsAlias INT = make0(INTX);
   public static final BitsAlias STR = make0(STRX);
 
-  public static final BitsAlias NIL = make0(0); // Ugly but NIL has a dual, and this is "low" NIL
-  public static final BitsAlias XNIL = NIL.dual();
   public static final BitsAlias EMPTY = new BitsAlias().make(); // No bits; its its own dual
 
   // Return parent alias from child alias.
@@ -49,8 +46,8 @@ public class BitsAlias extends Bits<BitsAlias> {
   // Iterate over children
   public static int next_kid( int alias, int kid ) { return TREE.next_kid(alias,kid); }
 
-  @Override public BitsAlias ALL0() { return ALL0; }
-  @Override public BitsAlias ANY0() { return ANY0; }
+  @Override public BitsAlias NALL() { return NALL; }
+  @Override public BitsAlias NANY() { return NANY; }
   @Override public BitsAlias EMPTY() { return EMPTY ; }
 
   public static BitsAlias make0( int bit ) { return NALL.make(bit); }
@@ -65,6 +62,6 @@ public class BitsAlias extends Bits<BitsAlias> {
   BitsAlias widen() {
     if( above_center() )
       return this;
-    return test(0) ? ALL0 : NALL;
+    return NALL;
   }
 }

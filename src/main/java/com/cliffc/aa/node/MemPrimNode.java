@@ -20,16 +20,16 @@ public abstract class MemPrimNode extends PrimNode {
   @Override public ErrMsg err(boolean fast) {
     Type tmem = mem()._val;
     Type tadr = adr()._val;
-    Type tidx = _defs._len <= ARG_IDX+1 ? Type.XNIL : idx()._val;
+    Type tidx = _defs._len <= ARG_IDX+1 ? TypeNil.NIL : idx()._val;
     if( tmem==Type.ANY ) return null; // No error
     if( tadr==Type.ANY ) return null; // No error
     if( tidx==Type.ANY ) return null; // No error
-    if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_badargs[1],"Array might be nil when reading",null);
-    if( !(tadr instanceof TypeMemPtr) )
-      return fast ? ErrMsg.FAST : ErrMsg.typerr(_badargs[1],tadr, TypeMemPtr.ISUSED);
-    TypeMemPtr ptr = (TypeMemPtr)tadr;
-    TypeStruct objs = ((TypeMem)tmem).ld(ptr); // General load from memory
-    if( objs==TypeStruct.UNUSED ) return null; // Can fall to valid array
+    //if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_badargs[1],"Array might be nil when reading",null);
+    //if( !(tadr instanceof TypeMemPtr) )
+    //  return fast ? ErrMsg.FAST : ErrMsg.typerr(_badargs[1],tadr, TypeMemPtr.ISUSED);
+    //TypeMemPtr ptr = (TypeMemPtr)tadr;
+    //TypeStruct objs = ((TypeMem)tmem).ld(ptr); // General load from memory
+    //if( objs==TypeStruct.UNUSED ) return null; // Can fall to valid array
     //if( !(objs instanceof TypeAry) )
     //  return fast ? ErrMsg.FAST : ErrMsg.typerr(_badargs[1],ptr,tmem,TypeMemPtr.ARYPTR);
     //TypeAry ary = (TypeAry)objs;
