@@ -1377,19 +1377,12 @@ public class HM {
       // GCP helps HM: do not unify dead control paths
       if( DO_GCP ) {            // Doing GCP during HM
         Type pred = _types[0];
-        if( pred == TypeInt.FALSE || pred==TypeNil.NIL )
-          return rez.unify(targ(2),work); // Unify only the false side
-        //if( pred.above_center() ? !pred.may_nil() : !pred.must_nil() )
-        //  return rez.unify(targ(1),work);
-        //if( pred.above_center() ) // Wait until predicate falls
-        //  return false;
-        throw unimpl();
+        if( pred instanceof TypeNil tn ) {
+          if( tn._nil ) return !tn._sub && rez.unify(targ(1), work);
+          if( tn._sub ) return rez.unify(targ(2),work);
+        } else if( pred.above_center() ) return false;
       }
       // Unify both sides with the result.
-      
-      // Includes NIL (and not XNIL), so that an external-NIL can later fall to
-      // an external-TMP or -TFP, while still acknowledging that external
-      // values are going to be not-nil
       return
         rez       .unify(targ(1),work) |
         rez.find().unify(targ(2),work);
@@ -1399,15 +1392,9 @@ public class HM {
       Type t1  = flows[1];
       Type t2  = flows[2];
       // Conditional Constant Propagation: only prop types from executable sides
-      if( pred == TypeInt.FALSE || pred == TypeNil.NIL )
-        return t2;              // False only
-      if( pred.above_center() ) // Delay any values
-        return TypeNil.XSCALAR;    // t1.join(t2);     // Join of either
-      //if( !pred.must_nil() )    // True only
-      //  return t1;
-      //// Could be either, so meet
-      //return t1.meet(t2);
-      throw unimpl();
+      if( !(pred instanceof TypeNil tn) ) return pred.oob(TypeNil.SCALAR);
+      if( tn._nil ) return tn._sub ? TypeNil.XSCALAR : t1; // OR, YES
+      else          return tn._sub ? t2              : t1.meet(t2); // NO, AND
     }
   }
 
@@ -1441,15 +1428,9 @@ public class HM {
     @Override PrimSyn make() { return new EQ0(); }
     @Override Type apply( Type[] flows) {
       Type pred = flows[0];
-      if( pred.above_center() )
-        //return pred.may_nil() ? TypeInt.BOOL.dual() : TypeInt.FALSE;
-        throw unimpl();
-      if( pred==Type.ALL ) return TypeInt.BOOL;
-      if( pred == TypeInt.FALSE || pred == TypeNil.NIL )
-        return TypeInt.TRUE;
-      if( pred.meet(TypeNil.NIL)!=pred )
-        return TypeInt.FALSE;
-      return TypeInt.BOOL;
+      if( !(pred instanceof TypeNil tn) ) return pred.oob();
+      if( tn._nil ) return tn._sub ? TypeInt.BOOL.dual() : TypeInt.TRUE; // OR, YES
+      else          return tn._sub ? TypeInt.FALSE       : TypeInt.BOOL; // NO, AND
     }
   }
 
@@ -1462,10 +1443,10 @@ public class HM {
     @Override PrimSyn make() { return new IsEmpty(); }
     @Override Type apply( Type[] flows) {
       Type pred = flows[0];
-      if( pred.above_center() ) return TypeInt.BOOL.dual();
+      if( pred.above_center() ) return TypeNil.XSCALAR;
       if( pred instanceof TypeMemPtr tmp && tmp.is_str() ) {
         TypeFld fld = tmp._obj.get("0");
-        if( fld!=null ) return TypeInt.con(fld._t==TypeNil.NIL ? 1 : 0);
+        if( fld!=null ) return fld._t==TypeNil.NIL ? TypeInt.TRUE : TypeNil.XNIL;
       }
       return TypeInt.BOOL;
     }
@@ -1854,11 +1835,10 @@ public class HM {
 
     // True if any portion allows for nil
     boolean has_nil() {
-      //if(  _flow  !=null &&  _flow.must_nil() ) return true;
-      //if( _eflow  !=null && _eflow.must_nil() ) return true;
-      //if( _may_nil                            ) return true;
-      //return false;
-      throw unimpl();
+      if(  _flow instanceof TypeNil tn && tn.must_nil() ) return true;
+      if( _eflow instanceof TypeNil tn && tn.must_nil() ) return true;
+      if( _may_nil                                      ) return true;
+      return false;
     }
 
     // Strip off nil
@@ -1916,7 +1896,7 @@ public class HM {
         return TypeMemPtr.make(_may_nil,aliases,tstr);
       }
       if( is_nil() )
-        return arg("?")._as_flow(deep).meet(TypeNil.NIL);
+        return arg("?")._as_flow(deep).meet(TypeNil.AND_XSCALAR);
       if( is_fun() ) {
         // all escaping fidxs that are compatible
         BitsFun fidxs = BitsFun.EMPTY;

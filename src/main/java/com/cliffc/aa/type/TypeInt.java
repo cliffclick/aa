@@ -46,6 +46,7 @@ public class TypeInt extends TypeNil<TypeInt> {
     case  "int64" ->  INT64;
     case  "int8"  ->  INT8 ;
     case  "int1"  -> BOOL;
+    case "nint8"  -> NINT8 ;
     default       -> null;
     };
   }
@@ -69,12 +70,13 @@ public class TypeInt extends TypeNil<TypeInt> {
   public  static final TypeInt INT32 = make(false,false,false,32,0);
   public  static final TypeInt INT16 = make(false,false,false,16,0);
   public  static final TypeInt INT8  = make(false,false,false, 8,0);
+  public  static final TypeInt NINT8 = make(false,false,true , 8,0);
   public  static final TypeInt BOOL  = make(false,false,false, 1,0);
   public  static final TypeNil FALSE = TypeNil.XNIL;
   public  static final TypeInt TRUE  = con(1);
   public  static final TypeInt C3    = con(3);
   public  static final TypeInt C123  = con(123456789L);
-  static final TypeInt[] TYPES = new TypeInt[]{INT64,NINT64,INT32,INT16,INT8,BOOL,TRUE,C3,C123};
+  static final TypeInt[] TYPES = new TypeInt[]{INT64,NINT64,INT32,INT16,INT8,NINT8,BOOL,TRUE,C3,C123};
   static void init1( HashMap<String,Type> types ) {
     types.put("bool" ,BOOL);
     types.put("int1" ,BOOL);

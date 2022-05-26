@@ -9,14 +9,14 @@ import java.util.HashMap;
 import static com.cliffc.aa.AA.unimpl;
 
 public class TypeNil<N extends TypeNil<N>> extends Type<N> {
-  boolean _any;     // any vs all
+  public boolean _any;  // any vs all
   // OR  =   nil &  sub // NIL choice and subclass choice
   // YES =   nil & !sub // YES nil and ignore/no subclass
   // NO  =  !nil &  sub // NO nil and use the subclass
   // AND =  !nil & !sub // no-nil-choice and no-subclass-choice so must have both nil and subclass
 
-  boolean _nil; // true for OR-NIL and YES-NIL.  False for AND-NIL, NOT-NIL
-  boolean _sub; // true for OR-NIL and NOT-NIL.  False for AND-NIL, YES-NIL
+  public boolean _nil; // true for OR-NIL and YES-NIL.  False for AND-NIL, NOT-NIL
+  public boolean _sub; // true for OR-NIL and NOT-NIL.  False for AND-NIL, YES-NIL
 
   N init( boolean any, boolean nil, boolean sub ) {
     super.init();
@@ -105,12 +105,14 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   public static final TypeNil XNSCALR= (TypeNil)NSCALR.dual();
   public static final TypeNil  NIL = make(false,true,false); // One of many nil choices
   public static final TypeNil XNIL = make(true ,true,false); // One of many nil choices
+  public static final TypeNil AND_XSCALAR = make(true,false,false); // Odd choice: 0&~Scalar
   // Collection of sample types for checking type lattice properties.
   static final TypeNil[] TYPES = new TypeNil[]{SCALAR,NSCALR,NIL};
   static Type valueOfNil(String cid) {
     return switch(cid) {
     case  "Scalar" ->  SCALAR;
     case "~Scalar" -> XSCALAR;
+    case "nScalar" -> NSCALR;
     default        -> null;
     };
   }
@@ -161,13 +163,16 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     return make(any,nil,sub);
   }
 
+  // Type must support a nil
+  public boolean must_nil() { return !_sub; }
+
   @Override public boolean above_center() { return _any; }
 
   @Override public Type widen() {
-    //if( _type==TSCALAR || _type==TXSCALAR ) return SCALAR;
-    //if( _type==TNIL ) return NIL;
-    //throw typerr(null);         // Override in subclasses
-    throw unimpl();
+    if( this==SCALAR || this==XSCALAR ) return SCALAR;
+    if( this==NSCALR ) return SCALAR;
+    if( this==NIL || this==XNIL ) return NIL;
+    throw typerr(null);         // Override in subclasses
   }
 
   // Parser init
