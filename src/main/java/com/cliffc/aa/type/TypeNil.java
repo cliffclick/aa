@@ -46,9 +46,10 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   }
 
   @Override long static_hash() { return
-      (_any ? (1L<<16):0) |
-      (_sub ? (1L<<19):0) |
-      (_nil ? (1L<<21):0) ;
+      super.static_hash() ^
+      (_any ? (1L<<16):1) |
+      (_sub ? (1L<<19):1) |
+      (_nil ? (1L<<21):1) ;
   }
 
   @Override public boolean equals( Object o ) {
@@ -106,6 +107,13 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
   public static final TypeNil XNIL = make(true ,true,false); // One of many nil choices
   // Collection of sample types for checking type lattice properties.
   static final TypeNil[] TYPES = new TypeNil[]{SCALAR,NSCALR,NIL};
+  static Type valueOfNil(String cid) {
+    return switch(cid) {
+    case  "Scalar" ->  SCALAR;
+    case "~Scalar" -> XSCALAR;
+    default        -> null;
+    };
+  }
 
   // duals:
   //  xs +0 <->  s &0
@@ -139,7 +147,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     boolean sub = _sub & tn._sub;
     if( !_any ) return make(any,nil,sub); // Falling past 'tn' to a low TypeNil
     // If would fall to subtype YES-nil, fall to AND-nil instead
-    if( !sub ) nil=false; 
+    if( !sub ) nil=false;
     return tn.make_from(any,nil,sub);
   }
 

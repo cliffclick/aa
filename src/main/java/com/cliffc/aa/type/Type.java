@@ -790,7 +790,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         if( Util.eq(id,STRS[i]) )
           return Type.make((byte)i);
       // Various names for integer and float
-      Type t = TypeInt.valueOfInt(id);
+      Type t = TypeNil.valueOfNil(id);
+      if( t!=null ) return t;
+      t = TypeInt.valueOfInt(id);
       if( t!=null ) return t;
       t = TypeFlt.valueOfFlt(id);
       if( t!=null ) return t;
