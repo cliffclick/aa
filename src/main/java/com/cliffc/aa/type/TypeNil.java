@@ -57,6 +57,8 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     if( !(o instanceof TypeNil tn) || _type != tn._type ) return false;
     return _any==tn._any && _sub ==tn._sub && _nil ==tn._nil;
   }
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
+
   // Static properties equals; edges are IGNORED.  Already known to be the same
   // class and not-equals.
   boolean static_eq(N t) { return equals(t); }
@@ -113,6 +115,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
     case  "Scalar" ->  SCALAR;
     case "~Scalar" -> XSCALAR;
     case "nScalar" -> NSCALR;
+    case "xnil"    -> XNIL;
     default        -> null;
     };
   }
@@ -168,12 +171,7 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
 
   @Override public boolean above_center() { return _any; }
 
-  @Override public Type widen() {
-    if( this==SCALAR || this==XSCALAR ) return SCALAR;
-    if( this==NSCALR ) return SCALAR;
-    if( this==NIL || this==XNIL ) return NIL;
-    throw typerr(null);         // Override in subclasses
-  }
+  @Override public Type widen() { return this; }
 
   // Parser init
   public static void init0( HashMap<String,Type> types ) {

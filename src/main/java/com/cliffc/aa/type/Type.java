@@ -97,7 +97,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   static private int CNT=1;
   public int _uid;       // Unique ID, will have gaps, used to uniquely order Types
   public long _hash, _cyc_hash; // Hash for this Type; built recursively except around cycles
-  byte _type;            // Simple types use a simple enum
+  public byte _type;            // Simple types use a simple enum
   private Type _cyclic;  // Type is cyclic, and this is the canonical cycle leader.
   T _dual; // All types support a dual notion, eagerly computed and cached here
 

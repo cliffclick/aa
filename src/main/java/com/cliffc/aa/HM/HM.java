@@ -121,6 +121,7 @@ public class HM {
   static boolean DO_GCP;
 
   static boolean HM_FREEZE;
+  static boolean FAST_PATH_LIFT=false;
   static boolean DO_LIFT=true;
   public static Root hm( String sprog, int rseed, boolean do_hm, boolean do_gcp ) {
     Type.RECURSIVE_MEET=0;      // Reset between failed tests
@@ -153,6 +154,7 @@ public class HM {
     // Pass 2: GCP types continue to run downhill.
     work_cnt+=main_work_loop(prog,work);
     assert prog.more_work(work);
+    Root.escapes(prog._flow,work); // Add any fresh escapes
 
     // Error propagation, no types change.
     pass_err(prog);
@@ -328,7 +330,7 @@ public class HM {
     return s;
   }
   private static Syntax number() {
-    if( BUF[X]=='0' ) { X++; return new Con(TypeNil.NIL); }
+    if( BUF[X]=='0' ) { X++; return new Con(TypeNil.XNIL); }
     int sum=0;
     while( X<BUF.length && isDigit(BUF[X]) )
       sum = sum*10+BUF[X++]-'0';
@@ -479,7 +481,7 @@ public class HM {
     }
     abstract SB p1(SB sb, VBitSet dups); // Self short print
     abstract SB p2(SB sb, VBitSet dups); // Recursion print
-    static void reset() { CNT=0; }
+    static void reset() { CNT=1; }
   }
 
   static class Con extends Syntax {
@@ -493,7 +495,7 @@ public class HM {
     @Override void add_hm_work( @NotNull Work<Syntax> work) { }
     @Override int prep_tree( Syntax par, VStack nongen, Work<Syntax> work ) {
       // A '0' turns into a nilable leaf.
-      T2 base = _con==TypeNil.NIL
+      T2 base = _con==TypeNil.XNIL
         ? T2.make_nil(T2.make_leaf())
         : (_con instanceof TypeMemPtr cptr && cptr.is_str() ? T2.make_str(cptr) : T2.make_base(_con));
       prep_tree_impl(par, nongen, work, base);
@@ -744,6 +746,8 @@ public class HM {
     final Syntax _fun;
     final Syntax[] _args;
     private Type _old_lift = Type.ANY; // Assert that apply-lift is monotonic
+    private final HashMap<T2,Type> _old_t2map = new HashMap<>(); // Assert that apply-lift is monotonic
+
     Apply(Syntax fun, Syntax... args) { _fun = fun; _args = args; }
     @Override SB str(SB sb) {
       _fun.str(sb.p("(")).p(" ");
@@ -837,14 +841,15 @@ public class HM {
       return lifted;
     }
 
+    // Gate around apply_lift.  Assert monotonic lifting and apply the lift.
     Type do_apply_lift(T2 rezt2, Type ret, boolean test) {
       if( !DO_LIFT || !DO_HM ) return ret;
-      if( ret==TypeNil.XSCALAR ) return ret; // Nothing to lift
-      Type lift = hm_apply_lift(rezt2,ret, !rezt2._is_copy, test);
-      if( lift != _old_lift ) {
-        assert _old_lift.isa(lift);   // Lift is monotonic
-        if( !test ) _old_lift=lift;
-      }
+      if( FAST_PATH_LIFT && ret==TypeNil.XSCALAR ) return ret; // Nothing to lift
+      Type lift = hm_apply_lift(rezt2, ret, test);
+      assert _old_lift.isa(lift); // Lift is monotonic
+      _old_lift=lift;             // Record updated lift
+      _old_t2map.clear();
+      _old_t2map.putAll(T2.T2MAP);
       if( lift==ret ) return ret; // No change
       if( !test ) rezt2.push_update(this);
       return ret.join(lift);    // Lifted result
@@ -853,14 +858,35 @@ public class HM {
     // Walk the input HM type and CCP flow type in parallel and create a
     // mapping.  Then walk the output HM type and CCP flow type in parallel,
     // and join output CCP types with the matching input CCP type.
-    Type hm_apply_lift(T2 rezt2, Type ret, boolean widen, boolean test) {
+    Type hm_apply_lift(T2 rezt2, Type ret, boolean test) {
       // Walk the input types, finding all the Leafs.  Repeats of the same Leaf
       // has its flow Types MEETed.
+      T2.T2_NEW_LEAF = false; // Assume new leafs can appear
       T2.T2MAP.clear();
       for( Syntax arg : _args )
         { T2.WDUPS.clear(true); arg.find().walk_types_in(arg._flow); }
-      if( widen )
-        T2.T2MAP.replaceAll((k,v)-> v.widen());
+      // Assert monotonic inputs
+      assert monotonic_inputs(); 
+
+      T2.T2JOIN_LEAF = TypeNil.SCALAR;
+      T2.T2JOIN_BASE = TypeNil.SCALAR;
+      T2.T2JOIN_LEAFS.clear();
+      T2.T2JOIN_BASES.clear();
+      // Pre-freeze, might unify with anything compatible
+      if( !HM_FREEZE ) {
+        // Lift by all other compatible T2 base types, since might unify later.
+        // Ignore incompatible ones, since if they unify we'll get an error
+        for( Map.Entry<T2,Type> e : T2.T2MAP.entrySet() ) {
+          T2 t2 = e.getKey();  Type flow = e.getValue();
+          if( !t2._is_copy ) flow = flow.widen();
+          T2.T2JOIN_LEAF = T2.T2JOIN_LEAF.join(flow); // Self is a leaf, so always
+          if( t2._is_copy) T2.T2JOIN_LEAFS.add(t2);
+          if( t2.is_base() || t2.is_leaf() ) {
+            T2.T2JOIN_BASE = T2.T2JOIN_BASE.join(flow); // Self and t2 is a base, or t2 is a leaf
+            if( t2._is_copy) T2.T2JOIN_BASES.add(t2);
+          }
+        }
+      }
 
       // Then walk the output types, building a corresponding flow Type, but
       // matching against input Leafs.  If HM_FREEZE Leafs must match
@@ -868,6 +894,49 @@ public class HM {
       // Type.  If !HM_FREEZE, replace with a join of flow types.
       T2.WDUPS.clear(true);
       return rezt2.walk_types_out(ret, this, test);
+    }
+
+
+    // Assert monotonic inputs.  Walk the prior set of inputs, and find them in
+    // the current T2MAP and assert their Flow types are monotonic.  Due to
+    // Leaf expansions, new inputs might appear.  Due to unification some
+    // several prior inputs might now be the same.
+    private boolean monotonic_inputs() {
+      if( _old_t2map.isEmpty() ) return true;
+      for( Map.Entry<T2,Type> e : _old_t2map.entrySet() ) {
+        T2 t2 = e.getKey().find(), t3=t2;
+        Type t = e.getValue();
+        Type tnew = T2.T2MAP.get(t2);
+        // Try again, allowing a nil - commonly the HM type picks up a nil
+        if( tnew==null && !t2._may_nil ) {
+          t3 = t2.copy();
+          t3._may_nil=true;
+          tnew = T2.T2MAP.get(t3);
+        }
+        // Try again with cyclic equals, might have a more complex equality
+        if( tnew==null )
+          for( Map.Entry<T2,Type> e2 : T2.T2MAP.entrySet() ) {
+            if( e2.getKey().cycle_equals(t2) ) { tnew = e2.getValue(); break; }
+            if( e2.getKey().cycle_equals(t3) ) { tnew = e2.getValue(); break; }
+          }
+        // Try again widening base; the HMT type '1' might expand to 'int8'
+        if( tnew==null && t2.is_base() )
+          for( Map.Entry<T2,Type> e2 : T2.T2MAP.entrySet() )
+            if( e2.getKey().is_base() && t2._flow.isa(e2.getKey()._flow) )
+              { tnew = e2.getValue();  break; }
+        // Try again as a lost field.  Some structs can lose fields, and these
+        // are "as if" Scalar or Error and can not lift, so OK to lose.  Since
+        // the old_t2map is not a deep defensive copy, we lost the record of
+        // the previous fields ; just assume it's ok.  This weakens this
+        // assert a fair amount if fields are being removed.
+        if( tnew==null )
+          for( Map.Entry<T2,Type> e2 : T2.T2MAP.entrySet() )
+            if( e2.getKey().is_ptr() )
+              { tnew = TypeNil.SCALAR; break; }
+        if( !t.isa(tnew) )      // Fails NPE if tnew misses
+          return false;
+      }
+      return true;
     }
 
     @Override void add_val_work( Syntax child, @NotNull Work<Syntax> work) {
@@ -1309,7 +1378,19 @@ public class HM {
 
     @Override boolean more_work(Work<Syntax> work) { return more_work_impl(work); }
     @Override SB str(SB sb){ return sb.p(name()); }
-    @Override SB p1(SB sb, VBitSet dups) { return sb.p(name()); }
+
+    @Override SB p1(SB sb, VBitSet dups) {
+      if( _args.length==0 ) return sb.p(name());
+      sb.p(name()).p("={ ").nl().i().p("  ");
+      for( int i=0; i<_args.length; i++ ) {
+        sb.p(_args[i]);
+        if( DO_HM  ) _targs[i].str(sb.p(", HMT=" ),new VBitSet(),dups,true);
+        if( DO_GCP ) sb.p(", GCP=").p(_types[i]);
+        sb.nl().i().p("  ");
+      }
+      return sb.unchar(2).p("} ");
+    }
+
     @Override SB p2(SB sb, VBitSet dups) { return sb; }
   }
 
@@ -1366,7 +1447,7 @@ public class HM {
     @Override Type apply(Type[] flows) { return TypeMemPtr.make(_alias,TypeStruct.ISUSED);  }
   }
 
-  // Special form of a Lambda body for IF which changes the H-M rules.
+  // Special form of a Lambda body for IF, which changes the H-M rules.
   // None-executing paths do not unify args.
   static class If extends PrimSyn {
     @Override String name() { return "if"; }
@@ -1378,8 +1459,8 @@ public class HM {
       if( DO_GCP ) {            // Doing GCP during HM
         Type pred = _types[0];
         if( pred instanceof TypeNil tn ) {
-          if( tn._nil ) return !tn._sub && rez.unify(targ(1), work);
-          if( tn._sub ) return rez.unify(targ(2),work);
+          if( tn._nil ) return !tn._sub && rez.unify(targ(2), work);
+          if( tn._sub ) return rez.unify(targ(1),work);
         } else if( pred.above_center() ) return false;
       }
       // Unify both sides with the result.
@@ -1393,8 +1474,8 @@ public class HM {
       Type t2  = flows[2];
       // Conditional Constant Propagation: only prop types from executable sides
       if( !(pred instanceof TypeNil tn) ) return pred.oob(TypeNil.SCALAR);
-      if( tn._nil ) return tn._sub ? TypeNil.XSCALAR : t1; // OR, YES
-      else          return tn._sub ? t2              : t1.meet(t2); // NO, AND
+      if( tn._nil ) return tn._sub ? TypeNil.XSCALAR : t2; // OR, YES
+      else          return tn._sub ? t1              : t1.meet(t2); // NO, AND
     }
   }
 
@@ -1429,8 +1510,8 @@ public class HM {
     @Override Type apply( Type[] flows) {
       Type pred = flows[0];
       if( !(pred instanceof TypeNil tn) ) return pred.oob();
-      if( tn._nil ) return tn._sub ? TypeInt.BOOL.dual() : TypeInt.TRUE; // OR, YES
-      else          return tn._sub ? TypeInt.FALSE       : TypeInt.BOOL; // NO, AND
+      if( tn._nil ) return tn._sub ? TypeInt.XSCALAR : TypeInt.TRUE; // OR, YES
+      else          return tn._sub ? TypeNil.XNIL    : TypeInt.BOOL; // NO, AND
     }
   }
 
@@ -1810,8 +1891,8 @@ public class HM {
       // Nested nilable-and-not-leaf, need to fixup the nilable
       if( n.is_base() ) {
         _may_nil=false;
-        _flow = n._flow.meet(TypeNil.NIL);
-        if( n._eflow!=null ) _eflow = n._eflow.meet(TypeNil.NIL);
+        _flow = n._flow.meet(TypeNil.XNIL);
+        if( n._eflow!=null ) _eflow = n._eflow.meet(TypeNil.XNIL);
       }
       if( n.is_ptr() ) {
         if( _args==null ) _args = new NonBlockingHashMap<>();
@@ -1850,7 +1931,7 @@ public class HM {
     }
     // Add nil
     void add_nil() {
-      if(  _flow!=null ) _flow =  _flow.meet(TypeNil.NIL);
+      if(  _flow!=null ) _flow =   _flow.meet(TypeNil.NIL);
       if( _eflow!=null ) _eflow = _eflow.meet(TypeNil.NIL);
       _may_nil = true;
     }
@@ -1869,6 +1950,11 @@ public class HM {
           hash += key.hashCode();
       return hash;
     }
+    // CANNOT override equals: require REFERENCE EQUALITY not CYCLE_EQUALS
+    //@Override public boolean equals(Object o) {
+    //  if( o instanceof T2 t2 ) return cycle_equals(t2);
+    //  return false;
+    //}
 
     // -----------------
     // Worse-case arguments that the Root/Universe can call with.  Must be
@@ -2153,7 +2239,7 @@ public class HM {
     // the same as calling 'fresh' then 'unify', without the clone of 'this'.
     // Returns progress.
     // If work is null, we are testing only and make no changes.
-    static private final HashMap<T2,T2> VARS = new HashMap<>();
+    static private final IdentityHashMap<T2,T2> VARS = new IdentityHashMap<>();
     // Outer version, wraps a VARS check around other work
     boolean fresh_unify(T2 that, VStack nongen, Work<Syntax> work) {
       assert VARS.isEmpty() && DUPS.isEmpty();
@@ -2187,9 +2273,9 @@ public class HM {
       // Special handling for nilable
       boolean progress = false;
       if( this.is_nil() && !that.is_nil() ) {
-        Type mt  = that. _flow==null ? null : that. _flow.meet(TypeNil.NIL);
+        Type mt  = that. _flow==null ? null : that. _flow.meet(TypeNil.XNIL);
         if(  mt!=that. _flow ) { if( work==null ) return true; progress = true; that._flow  = mt; }
-        Type emt = that._eflow==null ? null : that._eflow.meet(TypeNil.NIL);
+        Type emt = that._eflow==null ? null : that._eflow.meet(TypeNil.XNIL);
         if( emt!=that._eflow ) { if( work==null ) return true; progress = true; that._eflow =emt; }
         if( !that._may_nil && !that.is_base() ) { if( work==null ) return true; progress = that._may_nil = true; }
         if( progress ) that.add_deps_work(work);
@@ -2327,7 +2413,7 @@ public class HM {
 
     // -----------------
     // Test for structural equivalence, including cycles
-    static private final HashMap<T2,T2> CDUPS = new HashMap<>();
+    static private final NonBlockingHashMapLong<T2> CDUPS = new NonBlockingHashMapLong<>();
     boolean cycle_equals(T2 t) {
       assert CDUPS.isEmpty();
       boolean rez = _cycle_equals(t);
@@ -2347,9 +2433,9 @@ public class HM {
       if( size() != t.size() ) return false;      // Mismatched sizes
       if( _args==t._args ) return true;           // Same arrays (generally both null)
       // Cycles stall the equal/unequal decision until we see a difference.
-      T2 tc = CDUPS.get(this);
+      T2 tc = CDUPS.get(_uid);
       if( tc!=null )  return tc==t; // Cycle check; true if both cycling the same
-      CDUPS.put(this,t);
+      CDUPS.put(_uid,t);
       for( String key : _args.keySet() ) {
         T2 arg = t.arg(key);
         if( arg==null || !arg(key)._cycle_equals(arg) )
@@ -2359,7 +2445,12 @@ public class HM {
     }
 
     // -----------------
-    static private final HashMap<T2,Type> T2MAP = new HashMap<>();
+    // T2MAP allows cycle_equals, not identity equals
+    static private final IdentityHashMap<T2,Type> T2MAP = new IdentityHashMap<>();
+    static private boolean T2_NEW_LEAF;
+    static private Type T2JOIN_LEAF, T2JOIN_BASE;
+    static private final Ary<T2> T2JOIN_LEAFS = new Ary<>(T2.class);
+    static private final Ary<T2> T2JOIN_BASES = new Ary<>(T2.class);
     static final NonBlockingHashMapLong<Type> WDUPS = new NonBlockingHashMapLong<>();
 
     // Lift the flow Type of an Apply, according to its inputs.  This is to
@@ -2371,49 +2462,36 @@ public class HM {
     // Walk a T2 and a matching flow-type, and build a map from T2 to flow-types.
     // Stop if either side loses corresponding structure.  This operation must be
     // monotonic because the result is JOINd with GCP types.
-    Type walk_types_in(Type t ) {     //noinspection UnusedReturnValue
+    void walk_types_in(Type t ) {
       long duid = dbl_uid(t._uid);
-      if( WDUPS.putIfAbsent(duid,TypeStruct.ISUSED)!=null ) return t;
+      if( WDUPS.putIfAbsent(duid,TypeStruct.ISUSED)!=null ) return;
       assert !unified();
-      // Free variables keep the input flow type.
-      if( is_leaf() ) { T2MAP.merge(this, t, Type::meet); return t; }
-      // Bases can (sorta) act like a leaf: they can keep their polymorphic "shape" and induce it on the result
-      if( is_base() ) { T2MAP.merge(this, t, Type::meet); return t; }
-      if( is_ptr() ) {
+      if( !is_obj() )
         T2MAP.merge(this, t, Type::meet);
-        return t instanceof TypeMemPtr tmp ?  arg("*").walk_types_in(tmp._obj)  : t;
+      // Free variables keep the input flow type.
+      if( is_leaf() ) {
+        if( t.above_center() || t instanceof TypeFunPtr || t instanceof TypeMemPtr )
+          T2_NEW_LEAF = true;   // Might expand to a new leaf later
       }
-      // Nilable
+      // Bases can (sorta) act like a leaf: they can keep their polymorphic "shape" and induce it on the result
+      //if( is_base() ) return t;
+      // Pointers recurse on their object
+      if( is_ptr() )
+        arg("*").walk_types_in(t instanceof TypeMemPtr tmp ? tmp._obj : t);
+      // Nilable, recurse on the not-nil
       if( is_nil() )
-        return arg("?").walk_types_in(t.join(TypeNil.NSCALR));
-      if( is_fun() ) {          // Walk returns not arguments
-        T2 t2ret = arg("ret");
-        Type fret = t instanceof TypeFunPtr tfp ? tfp._ret : t.oob(TypeNil.SCALAR);
-        if( fret == Type.ANY ) fret = TypeNil.XSCALAR;
-        if( fret == Type.ALL ) fret = TypeNil.SCALAR;
-        // Cannot lift any function input, since the input will dominate the
-        // replacement in a (possibly cyclic) type.  Could unroll the function
-        // to get a tiny bit more precision.
-        // Eg:       A:( V2?, { V2? -> A$ } ), with a T2MAP of V2==nil.
-        // Lifts to: A:( nil, {any,1-> A$ } )
-        // But this makes A.1 be a function which returns ALWAYS returns a nil,
-        // instead one which returns a tuple with the input (whatever it is) in
-        // slot 0.
+        arg("?").walk_types_in(t.join(TypeNil.NSCALR));
+      // Walk return not arguments
+      if( is_fun() )
+        arg("ret").walk_types_in(t instanceof TypeFunPtr tfp ? tfp._ret : t.oob(TypeNil.SCALAR));
+      // Objects walk all fields
+      if( is_obj() && _args != null ) {
         for( String id : _args.keySet() )
-          if( !Util.eq(id,"ret") )
-            { T2MAP.merge(arg(id), TypeNil.SCALAR, Type::meet); }
-
-        return t2ret.walk_types_in(fret);
-      }
-
-      if( is_obj() ) {       // Walk all fields
-        if( _args!=null )
-          for( String id : _args.keySet() )
+          if( !id.endsWith(":") ) // No lifting from class args
             arg(id).walk_types_in(at_fld(t, id));
-        return t;
+        if( is_open() && t.above_center() ) T2_NEW_LEAF = true; // Can add a new leaf later
       }
 
-      throw unimpl();
     }
 
     private static Type at_fld(Type t, String id) { // TODO: FAILURE TO SHARPEN
@@ -2426,41 +2504,62 @@ public class HM {
     // stronger flow types from the matching input types.
     Type walk_types_out( Type t, Apply apply, boolean test ) {
       assert !unified();
-      if( t == TypeNil.XSCALAR ) return t; // No lift, do not bother
-
       if( is_err() ) return TypeNil.SCALAR; // Do not attempt lift
 
-      if( is_leaf() ) {
-        // Pre-freeze, take the union of mappings.
-        // Post-freeze, take direct hits only.
-        Type tx = T2MAP.get(this);
-        if( HM_FREEZE && tx==null ) return TypeNil.SCALAR;
-        Type lt = HM_FREEZE ? tx : TypeNil.XSCALAR;
-        if( lt==TypeNil.SCALAR || lt==t ) return lt; // No mapping, no lift
-        if( !test )
-          Root.EXT_DEPS.add(apply); //push_update(apply); // Apply depends on this leaf
-          //if( !HM_FREEZE ) // Apply depends on ALL leafs
-          //  for( T2 t2 : T2.T2MAP.keySet() )
-          //    if( t2.is_leaf() || t2.is_base() )
-          //      t2.push_update(apply);
-        return lt;
+      // Fast-path cutout
+      if( t==TypeNil.XSCALAR || t==TypeNil.XNSCALR )
+        return TypeNil.XSCALAR; // No lift, do not bother
+
+      // Check for a direct hit
+      Type tmap = T2MAP.get(this);
+      if( tmap!=null ) {
+        Type tw = tmap.widen();
+        if( _is_copy ) {        // Is_copy, so do not widen
+          if( tw != tmap ) push_update(apply); // If is_copy falls, then widen applies and needs a revisit
+        } else
+          tmap = tw;            // Not a direct copy, so widen
+        return tmap;
       }
 
-      if( is_base() ) return _is_copy ? _flow : widen();
+      // Check for some future leaf appearing with XSCALAR
+      Type tjn = !HM_FREEZE && !is_obj() && T2_NEW_LEAF
+        ? TypeNil.XSCALAR
+        // Lift the internal parts
+        : _walk_types_out(t,apply,test);
+
+      // Add to EXT_DEPS if getting any lift
+      if( !HM_FREEZE && !test && tjn.join(t)!=t )
+        Root.EXT_DEPS.add(apply); // Add to external deps; when HM_FREEZE flips this needs to be visited
+
+      return tjn;
+    }
+
+    private Type _walk_types_out( Type t, Apply apply, boolean test ) {
+      // If Leaf with a structured Flow type, max lift until the Leaf expands.
+      //if( is_leaf() && (t instanceof TypeFunPtr || t instanceof TypeMemPtr) )
+      //  return TypeNil.XSCALAR;
+
+      // Leaf/base computes join of existing compatible leafs.  No new leafs
+      // can appear (already checked).
+      if( is_leaf() || is_base() ) {
+        if( HM_FREEZE ) return TypeNil.SCALAR; // Post-free, no lift (and no direct hits)
+        // Pre-freeze, might unify with anything compatible
+        Type trez = is_leaf() ? T2JOIN_LEAF : T2JOIN_BASE;
+        if( is_base() && !_is_copy ) trez = trez.widen();
+        Type lift = t.join(trez);
+        if( lift != t )
+          for( T2 t2 : (is_leaf() ? T2JOIN_LEAFS : T2JOIN_BASES) ) t2.push_update(apply);
+        return lift;
+      }
       if( is_ptr() ) {
-        if( t==TypeNil.NIL || t==TypeNil.NIL ) return t; // Keep a nil
-        if( !(t instanceof TypeMemPtr tmp) ) {
-          Type tx = T2MAP.get(this);
-          return tx!=null ? tx : t.oob(TypeMemPtr.ISUSED);
-        }
-        // TODO CNC: simple type in, so simple out
+        if( t==TypeNil.NIL || t==TypeNil.XNIL ) return t; // Keep a nil
+        if( !(t instanceof TypeMemPtr tmp) ) return TypeNil.XSCALAR;
         return tmp.make_from((TypeStruct)arg("*").walk_types_out(tmp._obj,apply,test));
       }
 
       if( is_nil() ) { // The wrapped leaf gets lifted, then nil is added
-        //Type tnil = arg("?").walk_types_out(t.remove_nil(),apply, test);
-        //return tnil.meet(TypeNil.NIL);
-        throw unimpl();
+        Type tnil = arg("?").walk_types_out(t.join(TypeNil.XNIL),apply, test);
+        return tnil.meet(TypeNil.XNIL);
       }
 
       if( is_fun() ) {          // Walk returns not arguments
@@ -2561,7 +2660,7 @@ public class HM {
     @Override public String toString() { return str(new SB(), new VBitSet(), get_dups(), true ).toString(); }
     public String p() { VCNT=0; VNAMES.clear(); return str(new SB(), new VBitSet(), get_dups(), false ).toString(); }
     private static int VCNT;
-    private static final HashMap<T2,String> VNAMES = new HashMap<>();
+    private static final NonBlockingHashMapLong<String> VNAMES = new NonBlockingHashMapLong<>();
 
 
     // Fancy print for Debuggers - includes explicit U-F re-direction.
@@ -2656,7 +2755,8 @@ public class HM {
 
     private void vname( SB sb, boolean debug) {
       final boolean vuid = debug && (unified()||is_leaf());
-      sb.p(VNAMES.computeIfAbsent(this, (k -> vuid ? ((is_leaf() ? "V" : "X") + k._uid) : ((++VCNT) - 1 + 'A' < 'V' ? ("" + (char) ('A' + VCNT - 1)) : ("V" + VCNT)))));
+      sb.p(VNAMES.computeIfAbsent(Long.valueOf(_uid),
+                                  (k -> vuid ? ((is_leaf() ? "V" : "X") + k) : ((++VCNT) - 1 + 'A' < 'V' ? ("" + (char) ('A' + VCNT - 1)) : ("V" + VCNT)))));
     }
     private boolean is_tup() { return _args==null || _args.isEmpty() || _args.containsKey("0"); }
     private Collection<String> sorted_flds() { return new TreeMap<>(_args).keySet(); }

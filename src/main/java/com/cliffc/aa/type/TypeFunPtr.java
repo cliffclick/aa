@@ -290,7 +290,8 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   public        TypeFunPtr make_from( BitsFun fidxs  ) { return fidxs==_fidxs ? this : make( fidxs,_nargs,_dsp,_ret); }
   public        TypeFunPtr make_from( Type dsp, Type ret ) { return dsp==_dsp && ret==_ret ? this : make(_fidxs,_nargs, dsp,ret); }
   @Override TypeFunPtr make_from( boolean any, boolean nil, boolean sub ) {
-    return malloc(any,nil,sub,_fidxs,_nargs,_dsp,_ret).hashcons_free();
+    if( any == _any && nil == _nil && sub == _sub ) return this;
+    return makex(any,nil,sub,_fidxs,_nargs,_dsp,_ret);
   }
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NALL ,1,Type.ALL,Type.ALL);

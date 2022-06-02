@@ -2,6 +2,7 @@ package com.cliffc.aa.HM;
 
 import com.cliffc.aa.HM.HM.Root;
 import com.cliffc.aa.type.*;
+import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -12,6 +13,23 @@ import static org.junit.Assert.assertEquals;
  */
 
 public class TestHM {
+
+  // Set to TRUE to run one test once, with fixed arguments.
+  // Set to FALSE for each test to all combinations of HMT and GCP, with a bunch of random seeds.
+  private static boolean JIG=false, DO_HMT=false, DO_GCP=false;
+  private static int RSEED=0;
+
+  @BeforeClass public static void jig_setup() {
+    JIG=false;
+  }
+  @Ignore @Test public void testJig() {
+    JIG=true;
+
+    DO_HMT=true;
+    DO_GCP=true;
+    RSEED=45;
+    test40();
+  }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
     HM.reset();
@@ -30,37 +48,41 @@ public class TestHM {
     }
   }
 
-  private static final int[] rseeds = new int[]{0,1,2,3};
   private void _run1s( String prog, String rez_hm, String frez_gcp, String esc_ptrs, String esc_funs ) {
-    //for( int rseed : rseeds )
-    for( int rseed=0; rseed<64; rseed++ )
-      _run0s(prog,rez_hm,frez_gcp,rseed,esc_ptrs,esc_funs);
+    if( JIG )
+      _run0s(prog,rez_hm,frez_gcp,RSEED,esc_ptrs,esc_funs);
+    else
+      for( int rseed=0; rseed<4; rseed++ )
+        _run0s(prog,rez_hm,frez_gcp,rseed,esc_ptrs,esc_funs);
   }
 
   // Run same program in all 3 combinations, but answers vary across combos
   private void run( String prog, String rez_hm_gcp, String rez_hm_alone, String frez_gcp_hm, String frez_gcp_alone ) {
-    _run1s(prog,rez_hm_alone,null          , null, null);
-    _run1s(prog,null        ,frez_gcp_alone, null, null);
-    _run1s(prog,rez_hm_gcp  ,frez_gcp_hm   , null, null);
+    rune(prog,rez_hm_gcp,rez_hm_alone,frez_gcp_hm,frez_gcp_alone,null,null);
   }
   private void rune( String prog, String rez_hm_gcp, String rez_hm_alone, String frez_gcp_hm, String frez_gcp_alone, String esc_ptrs, String esc_funs ) {
-    _run1s(prog,rez_hm_alone,null          , esc_ptrs, esc_funs);
-    _run1s(prog,null        ,frez_gcp_alone, esc_ptrs, esc_funs);
-    _run1s(prog,rez_hm_gcp  ,frez_gcp_hm   , esc_ptrs, esc_funs);
+    if( JIG ) {
+      _run1s(prog,
+             DO_HMT ? (DO_GCP ?  rez_hm_gcp :  rez_hm_alone ) : null,
+             DO_GCP ? (DO_HMT ? frez_gcp_hm : frez_gcp_alone) : null, esc_ptrs, esc_funs);
+    } else {
+      _run1s(prog,rez_hm_alone,null          , esc_ptrs, esc_funs);
+      _run1s(prog,null        ,frez_gcp_alone, esc_ptrs, esc_funs);
+      _run1s(prog,rez_hm_gcp  ,frez_gcp_hm   , esc_ptrs, esc_funs);
+    }
   }
-  private void run( String prog, String rez_hm, String frez_gcp ) {
-    _run1s(prog,rez_hm,null    , null, null);
-    _run1s(prog,null  ,frez_gcp, null, null);
-    _run1s(prog,rez_hm,frez_gcp, null, null);
-  }
+  private void run ( String prog, String rez_hm, String frez_gcp ) { rune(prog,rez_hm,frez_gcp,null,null); }
   private void rune( String prog, String rez_hm, String frez_gcp, String esc_ptrs, String esc_funs ) {
-    _run1s(prog,rez_hm,null    , esc_ptrs, esc_funs);
-    _run1s(prog,null  ,frez_gcp, esc_ptrs, esc_funs);
-    _run1s(prog,rez_hm,frez_gcp, esc_ptrs, esc_funs);
+    if( JIG ) {
+      _run1s(prog,DO_HMT ? rez_hm : null,DO_GCP ? frez_gcp : null, esc_ptrs, esc_funs);
+    } else {
+      _run1s(prog,rez_hm,null    , esc_ptrs, esc_funs);
+      _run1s(prog,null  ,frez_gcp, esc_ptrs, esc_funs);
+      _run1s(prog,rez_hm,frez_gcp, esc_ptrs, esc_funs);
+    }
   }
 
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
-
 
   @Test(expected = RuntimeException.class)
   public void test00() { run( "fred","","all"); }
@@ -90,6 +112,8 @@ public class TestHM {
   @Test public void test05() {
     rune("({ id -> (pair (id 3) (id 5)) } {x->x})",
          "*( nint8, nint8)",
+         "*( nint8, nint8)",
+         "*[7](^=any, 3, 5)",
          "*[7](^=any, nint8, nint8)",
           "[7]",null);
   }
@@ -359,7 +383,7 @@ map ={fun parg -> (fun (cdr parg))};
   // 'v', and also a function type - specifically disallowed in 'aa'.
   @Test public void test38() { rune("{ x -> y = ( x x.v ); 0}",
                                     "{ Cannot unify {A->B} and *@{ v=A; ...} -> C? }",
-                                    "[17]{any,3 ->nil }",
+                                    "[17]{any,3 ->xnil }",
                                     "[4,10]","[17,19]");
   }
 
