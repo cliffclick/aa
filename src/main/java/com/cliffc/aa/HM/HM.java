@@ -108,7 +108,6 @@ import static com.cliffc.aa.AA.DSP_IDX;
 //    Multiple stacked T????s collapse
 //
 
-
 public class HM {
   // Mapping from primitive name to PrimSyn
   static final HashMap<String,PrimSyn> PRIMSYNS = new HashMap<>();
@@ -862,14 +861,14 @@ public class HM {
       // Walk the input types, finding all the Leafs.  Repeats of the same Leaf
       // has its flow Types MEETed.
       T2.T2_NEW_LEAF = false; // Assume new leafs can appear
-      T2.T2MAP.clear();
-      for( Syntax arg : _args )
-        { T2.WDUPS.clear(true); arg.find().walk_types_in(arg._flow); }
-      // Assert monotonic inputs
-      assert monotonic_inputs(); 
-
       T2.T2JOIN_LEAF = TypeNil.SCALAR;
       T2.T2JOIN_BASE = TypeNil.SCALAR;
+      T2.T2MAP.clear();
+      for( Syntax arg : _args )
+        { T2.WDUPS.clear(true); arg.find().walk_types_in(arg._flow,true); }
+      // Assert monotonic inputs
+      assert monotonic_inputs();
+
       T2.T2JOIN_LEAFS.clear();
       T2.T2JOIN_BASES.clear();
       // Pre-freeze, might unify with anything compatible
@@ -1549,7 +1548,7 @@ public class HM {
       // Already an expanded nilable with base
       if( arg.is_base() && ret.is_base() ) {
         assert !arg.is_open() && !ret.is_open();
-        assert arg._flow == ret._flow.meet(TypeNil.NIL);
+        assert arg._flow == ret._flow.meet(TypeNil.XNIL);
         return false;
       }
       // Already an expanded nilable with ptr
@@ -1931,8 +1930,8 @@ public class HM {
     }
     // Add nil
     void add_nil() {
-      if(  _flow!=null ) _flow =   _flow.meet(TypeNil.NIL);
-      if( _eflow!=null ) _eflow = _eflow.meet(TypeNil.NIL);
+      if(  _flow!=null ) _flow =   _flow.meet(TypeNil.XNIL);
+      if( _eflow!=null ) _eflow = _eflow.meet(TypeNil.XNIL);
       _may_nil = true;
     }
 
@@ -2186,6 +2185,7 @@ public class HM {
       // Structural recursion unification.
       if( (is_obj() && that.is_obj()) ||
           (is_fun() && that.is_fun()) ||
+          (is_nil() && that.is_nil()) ||
           (is_ptr() && that.is_ptr()) )
         unify_flds(this,that,work);
       // Union the top-level part
@@ -2462,33 +2462,38 @@ public class HM {
     // Walk a T2 and a matching flow-type, and build a map from T2 to flow-types.
     // Stop if either side loses corresponding structure.  This operation must be
     // monotonic because the result is JOINd with GCP types.
-    void walk_types_in(Type t ) {
+    void walk_types_in(Type t, boolean has_t2 ) {
       long duid = dbl_uid(t._uid);
       if( WDUPS.putIfAbsent(duid,TypeStruct.ISUSED)!=null ) return;
       assert !unified();
-      if( !is_obj() )
+      if( has_t2 && !is_obj() )
         T2MAP.merge(this, t, Type::meet);
       // Free variables keep the input flow type.
       if( is_leaf() ) {
-        if( t.above_center() || t instanceof TypeFunPtr || t instanceof TypeMemPtr )
+        if( t.above_center() || t instanceof TypeFunPtr || (t instanceof TypeMemPtr tmp && tmp._obj.above_center()) )
           T2_NEW_LEAF = true;   // Might expand to a new leaf later
+        if( !has_t2 && !(t instanceof TypeStruct) )
+          T2.T2JOIN_LEAF = T2.T2JOIN_LEAF.join(t); // NO leaf, but might be one later
+        // Walk structure on flow type, to compute JOIN_LEAF
+        if( t instanceof TypeFunPtr tfp ) walk_types_in(tfp._ret,false);
+        if( t instanceof TypeMemPtr tmp ) walk_types_in(tmp._obj,false);
       }
       // Bases can (sorta) act like a leaf: they can keep their polymorphic "shape" and induce it on the result
       //if( is_base() ) return t;
       // Pointers recurse on their object
       if( is_ptr() )
-        arg("*").walk_types_in(t instanceof TypeMemPtr tmp ? tmp._obj : t);
+        arg("*").walk_types_in(t instanceof TypeMemPtr tmp ? tmp._obj : t, true);
       // Nilable, recurse on the not-nil
       if( is_nil() )
-        arg("?").walk_types_in(t.join(TypeNil.NSCALR));
+        arg("?").walk_types_in(t.join(TypeNil.NSCALR), true);
       // Walk return not arguments
       if( is_fun() )
-        arg("ret").walk_types_in(t instanceof TypeFunPtr tfp ? tfp._ret : t.oob(TypeNil.SCALAR));
+        arg("ret").walk_types_in(t instanceof TypeFunPtr tfp ? tfp._ret : t.oob(TypeNil.SCALAR), true);
       // Objects walk all fields
       if( is_obj() && _args != null ) {
         for( String id : _args.keySet() )
           if( !id.endsWith(":") ) // No lifting from class args
-            arg(id).walk_types_in(at_fld(t, id));
+            arg(id).walk_types_in(at_fld(t, id), true);
         if( is_open() && t.above_center() ) T2_NEW_LEAF = true; // Can add a new leaf later
       }
 
@@ -2522,10 +2527,14 @@ public class HM {
       }
 
       // Check for some future leaf appearing with XSCALAR
-      Type tjn = !HM_FREEZE && !is_obj() && T2_NEW_LEAF
-        ? TypeNil.XSCALAR
+      Type tjn;
+      if( !HM_FREEZE && !is_obj() && T2_NEW_LEAF ) {
+        T2.push_updates(T2JOIN_LEAFS,apply); // Result is kept high by some leaf
+        tjn = TypeNil.XSCALAR;
+      } else {
         // Lift the internal parts
-        : _walk_types_out(t,apply,test);
+        tjn = _walk_types_out(t,apply,test);
+      }
 
       // Add to EXT_DEPS if getting any lift
       if( !HM_FREEZE && !test && tjn.join(t)!=t )
@@ -2559,7 +2568,8 @@ public class HM {
 
       if( is_nil() ) { // The wrapped leaf gets lifted, then nil is added
         Type tnil = arg("?").walk_types_out(t.join(TypeNil.XNIL),apply, test);
-        return tnil.meet(TypeNil.XNIL);
+        //return tnil.meet(TypeNil.XNIL);
+        return tnil;
       }
 
       if( is_fun() ) {          // Walk returns not arguments
@@ -2614,6 +2624,7 @@ public class HM {
         for( T2 t2 : _args.values() )
           t2.debug_find().push_update_impl(a);
     }
+    static void push_updates( Ary<T2> t2s, Syntax a ) { for( T2 t2 : t2s ) t2.push_update(a);  }
 
     // Recursively add-deps to worklist
     void add_deps_work( Work<Syntax> work ) { UPDATE_VISIT.clear(); add_deps_work_impl(work); }

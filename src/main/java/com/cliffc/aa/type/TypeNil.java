@@ -171,6 +171,8 @@ public class TypeNil<N extends TypeNil<N>> extends Type<N> {
 
   @Override public boolean above_center() { return _any; }
 
+  @Override public boolean is_con() { return this==XNIL || this==NIL; }
+  
   @Override public Type widen() { return this; }
 
   // Parser init

@@ -255,7 +255,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
     tfp._dual = tfp.xdual();                       // Install dual in a self-cycle
     tfp._dual._dual = tfp;
     tfp._dual._ret = tfp._dual;
-    tfp._dual._hash = ~tfp._hash;
+    tfp._dual._hash = tfp._dual.compute_hash();
     return tfp.retern()._dual.retern().dual();     // Install self-cycle
   }
 

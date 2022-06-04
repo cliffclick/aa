@@ -52,7 +52,7 @@ public class TestHM {
     if( JIG )
       _run0s(prog,rez_hm,frez_gcp,RSEED,esc_ptrs,esc_funs);
     else
-      for( int rseed=0; rseed<4; rseed++ )
+      for( int rseed=0; rseed<32; rseed++ )
         _run0s(prog,rez_hm,frez_gcp,rseed,esc_ptrs,esc_funs);
   }
 
@@ -472,7 +472,7 @@ loop = { name cnt ->
 """,
         "*str:(nint8)?",      // Both HM and GCP
         "Cannot unify int8 and *str:(nint8)?", // HM alone cannot do this one
-        "*[4]str:(nint8)",    // Both HM and GCP
+        "*[4]str:(100)",      // Both HM and GCP
         "nScalar");           // GCP alone gets a very weak answer
   }
 
