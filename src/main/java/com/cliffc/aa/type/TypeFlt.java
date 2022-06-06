@@ -42,6 +42,7 @@ public class TypeFlt extends TypeNil<TypeFlt> {
     return switch(cid) {
     case "flt64"  -> FLT64;
     case "flt32"  -> FLT32;
+    case "nflt32" -> NFLT32;
     default       -> null;
     };
   }
@@ -61,9 +62,10 @@ public class TypeFlt extends TypeNil<TypeFlt> {
 
   public static final TypeFlt FLT64 = make(false,false,false,64,0);
   public static final TypeFlt FLT32 = make(false,false,false,32,0);
+  public static final TypeFlt NFLT32= make(false,false,true ,32,0);
   public static final TypeFlt PI    = con(Math.PI);
   public static final TypeFlt HALF  = con(0.5);
-  public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,PI,FLT32,HALF};
+  public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,PI,FLT32,NFLT32,HALF};
   static void init1( HashMap<String,Type> types ) {
     types.put("flt32",FLT32);
     types.put("flt64",FLT64);

@@ -613,8 +613,11 @@ public class HM {
       // The normal lambda work
       T2 old = find();
       boolean progress = false;
-      for( int i=0; i<_targs.length; i++ )
-        progress |= old.arg(ARGNAMES[i]).unify(targ(i),work);
+      for( int i=0; i<_targs.length; i++ ) {
+        T2 formal = old.arg(ARGNAMES[i]);
+        if( formal!=null )      // Can be null if some apply has arg counts wrong
+          progress |= formal.unify(targ(i),work);
+      }
       progress |= old.arg("ret").unify(_body.find(),work);
       return progress;
     }
@@ -803,7 +806,10 @@ public class HM {
     }
     private boolean bad_arg_cnt(Work<Syntax> work) {
       if( find().is_err() ) return false;
-      if( work!=null ) find()._err = "Bad argument count";
+      if( work!=null ) {
+        find()._err = "Bad argument count";
+        find().add_deps_work(work); // Error removes apply_lift
+      }
       return true;
     }
     @Override void add_hm_work( @NotNull Work<Syntax> work) {
@@ -961,6 +967,9 @@ public class HM {
         targs[i] = _args[i].find();
       targs[_args.length] = find(); // Return
       T2 nfun = T2.make_fun(targs);
+      T2 tfun = _fun.find();
+      if( tfun.is_fun() && tfun.size() != nfun.size() )
+        find()._err = "Bad argument count"; // Blame this Apply, not the function later
       _fun.find().unify(nfun, work);
       return cnt;
     }
@@ -1097,9 +1106,11 @@ public class HM {
       return t instanceof TypeMemPtr tmp ? tmp : t.oob(TypeMemPtr.ISUSED);
     }
     // Never fails, since made with a compatible T2 in the first place
-    @Override public Type fld(String id) {
+    @Override public Type fld(String id, Syntax fld) {
       T2 tfld = t2().get("*").arg(id);
-      return tfld==null ? null : tfld.as_flow(false);
+      if( tfld==null ) return null;
+      Root.EXT_DEPS.add(fld);  // Leafs in tfld depend on HM_FREEZE
+      return tfld.as_flow(false);
     }
     @Override public void push(Syntax f) { }
   }
@@ -1186,7 +1197,7 @@ public class HM {
         ts[i] =_flds[i]._flow;
       return _tmp(_alias,_ids,ts);
     }
-    @Override public Type fld(String id) {
+    @Override public Type fld(String id, Syntax fld) {
       int idx = Util.find(_ids,id);
       return idx==-1 ? null : _flds[idx]._flow;
     }
@@ -1319,7 +1330,7 @@ public class HM {
       for( int alias : tmp._aliases ) {
         if( alias==0 ) continue; // May be nil error
         Alloc alloc = ALIASES.at(alias);
-        Type afld = alloc.fld(_id);
+        Type afld = alloc.fld(_id,this);
         if( afld==null ) afld = tmp._obj.oob(TypeNil.SCALAR);
         t = t.meet(afld);
         if( work!=null ) alloc.push(this);
@@ -1415,7 +1426,7 @@ public class HM {
     }
     @Override public T2 t2() { return find().get("ret"); }
     @Override public TypeMemPtr tmp() { return _tmp(_alias,FLDS,_types); }
-    @Override public Type fld(String id) {
+    @Override public Type fld(String id, Syntax fld) {
       int idx = Util.find(FLDS,id);
       return idx==-1 ? null : _types[idx];
     }
@@ -1448,7 +1459,7 @@ public class HM {
     }
     @Override public T2 t2() { return find().get("ret"); }
     @Override public TypeMemPtr tmp() { return _tmp(_alias,FLDS,_types); }
-    @Override public Type fld(String id) {
+    @Override public Type fld(String id, Syntax fld) {
       int idx = Util.find(FLDS,id);
       return idx==-1 ? null : _types[idx];
     }
@@ -1703,7 +1714,7 @@ public class HM {
       return TypeMemPtr.make(alias,TypeStruct.make(TypeFlds.hash_cons(tfs)));
     }
     // Get a flow type from a field id
-    Type fld(String id);
+    Type fld(String id, Syntax foo);
     void push(Syntax fld);
   }
 
@@ -2529,8 +2540,7 @@ public class HM {
       if( is_err() ) return TypeNil.SCALAR; // Do not attempt lift
 
       // Fast-path cutout
-      if( t==TypeNil.XSCALAR || t==TypeNil.XNSCALR )
-        return TypeNil.XSCALAR; // No lift, do not bother
+      if( t==TypeNil.XSCALAR ) return TypeNil.XSCALAR; // No lift, do not bother
 
       // Check for a direct hit
       Type tmap = T2MAP.get(this);
@@ -2547,7 +2557,7 @@ public class HM {
       Type tjn;
       if( !HM_FREEZE && !is_obj() && T2_NEW_LEAF ) {
         T2.push_updates(T2JOIN_LEAFS,apply); // Result is kept high by some leaf
-        tjn = TypeNil.XSCALAR;
+        tjn = T2.T2JOIN_LEAF==TypeNil.XSCALAR ? TypeNil.XSCALAR : TypeNil.XNSCALR; // Future leafs preserve nilability
       } else {
         // Lift the internal parts
         tjn = _walk_types_out(t,apply,test);
