@@ -115,23 +115,23 @@ public interface Cyclic {
       // in a different order on a later install.  Requires 2 passes.
       long cyc_hash=0;
       for( Type c : ts )  cyc_hash ^= c.static_hash(); // Just XOR all the static hashes
-      if( cyc_hash==0 ) cyc_hash = 0xcafebabe;
-      for( Type c : ts )  c._cyc_hash = cyc_hash;
-      for( Type c : ts )  c._hash = c.compute_hash();
+      if( cyc_hash==0 ) cyc_hash = 0xcafebabe;         // Disallow zero hash
+      for( Type c : ts )  c._cyc_hash = cyc_hash;      // Set cyc_hash to the same for all cycle members
+      for( Type c : ts )  c._hash = c.compute_hash();  // Now compute proper hash - depends on cyc_hash plus the member specifics
 
       // Since all hashed (but no duals) can check for a prior intern
       T old = (T)t.intern_get();
       if( old!=null ) {
-        SCC_FREE.addAll(ts); // Free the old, return prior
+        SCC_FREE.addAll(ts);    // Free the old, return prior
         for( Type t2 : ts ) if( t2 instanceof TypeStruct ts2 ) SCC_FREE_FLDS.add(ts2);
-        t=old;
+        t=old;                  // Use the old instead of new-just-hashed
       } else {
         // Keep the entire cycle.  xdual/rdual/hash/retern
         Type.RECURSIVE_MEET++; // Stop xdual interning TypeFlds
-        long dcyc_hash = Util.rot(cyc_hash,32);
+        long dcyc_hash = Util.rot(cyc_hash,32); // Crappy dual-cyc_hash
         for( Type c : ts ) { Type d = c._dual = c.xdual(); d._dual = c; d._cyc_hash = dcyc_hash; }
         Type dleader = leader.dual();
-        dleader.set_cyclic(dleader);
+        dleader.set_cyclic(dleader); // Dual cycle-leader, head of the dual cycle
         for( Type c : ts ) { c.rdual(); c._dual.set_cyclic(dleader); c._dual._hash = c._dual.compute_hash(); }
         for( Type c : ts ) c.retern()._dual.retern();
         Type.RECURSIVE_MEET--; // Allow xdual to intern TypeFlds
@@ -187,8 +187,7 @@ public interface Cyclic {
     ON_REACH.tset(head._uid);
     for( int idx=0; idx < REACHABLE._len; idx++ ) {
       Type t = REACHABLE.at(idx);
-      if( !t.interned() && !(t instanceof Cyclic) )
-        throw unimpl();
+      assert t.interned() || t instanceof Cyclic;
       if( !t.interned() && t instanceof Cyclic cyc )
         t.walk((tc,ignore) -> {
             if( !ON_REACH.tset(tc._uid) && (!tc.interned() || also_interned) )
@@ -549,7 +548,7 @@ public interface Cyclic {
     return err==0;
   }
 
-  // Report a path-difference between two Types.  Usefule for debugging large types.
+  // Report a path-difference between two Types.  Useful for debugging large types.
   final class Link { Link _nxt; int _d; Type _t0,_t1;
     static Link min(Link l0, Link l1) {
       if( l0==null ) return l1;

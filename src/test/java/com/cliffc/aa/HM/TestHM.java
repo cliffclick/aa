@@ -27,8 +27,8 @@ public class TestHM {
 
     DO_HMT=true;
     DO_GCP=true;
-    RSEED=45;
-    test40();
+    RSEED=0;
+    test33();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -66,8 +66,8 @@ public class TestHM {
              DO_HMT ? (DO_GCP ?  rez_hm_gcp :  rez_hm_alone ) : null,
              DO_GCP ? (DO_HMT ? frez_gcp_hm : frez_gcp_alone) : null, esc_ptrs, esc_funs);
     } else {
-      _run1s(prog,rez_hm_alone,null          , esc_ptrs, esc_funs);
       _run1s(prog,null        ,frez_gcp_alone, esc_ptrs, esc_funs);
+      _run1s(prog,rez_hm_alone,null          , esc_ptrs, esc_funs);
       _run1s(prog,rez_hm_gcp  ,frez_gcp_hm   , esc_ptrs, esc_funs);
     }
   }
@@ -76,8 +76,8 @@ public class TestHM {
     if( JIG ) {
       _run1s(prog,DO_HMT ? rez_hm : null,DO_GCP ? frez_gcp : null, esc_ptrs, esc_funs);
     } else {
-      _run1s(prog,rez_hm,null    , esc_ptrs, esc_funs);
       _run1s(prog,null  ,frez_gcp, esc_ptrs, esc_funs);
+      _run1s(prog,rez_hm,null    , esc_ptrs, esc_funs);
       _run1s(prog,rez_hm,frez_gcp, esc_ptrs, esc_funs);
     }
   }
@@ -351,7 +351,6 @@ map ={fun parg -> (fun (cdr parg))};
   }
 
   // try the worse-case expo blow-up test case from SO
-  @Ignore
   @Test public void test35() {
     String rez_hm = "*( *( *( { A B C -> *( A, B, C) }, { D E F -> *( D, E, F) }, { G H I -> *( G, H, I) }), *( { J K L -> *( J, K, L) }, { M N O -> *( M, N, O) }, { P Q R -> *( P, Q, R) }), *( { S T U -> *( S, T, U) }, { V22 V23 V24 -> *( V22, V23, V24) }, { V25 V26 V27 -> *( V25, V26, V27) })), *( *( { V28 V29 V30 -> *( V28, V29, V30) }, { V31 V32 V33 -> *( V31, V32, V33) }, { V34 V35 V36 -> *( V34, V35, V36) }), *( { V37 V38 V39 -> *( V37, V38, V39) }, { V40 V41 V42 -> *( V40, V41, V42) }, { V43 V44 V45 -> *( V43, V44, V45) }), *( { V46 V47 V48 -> *( V46, V47, V48) }, { V49 V50 V51 -> *( V49, V50, V51) }, { V52 V53 V54 -> *( V52, V53, V54) })), *( *( { V55 V56 V57 -> *( V55, V56, V57) }, { V58 V59 V60 -> *( V58, V59, V60) }, { V61 V62 V63 -> *( V61, V62, V63) }), *( { V64 V65 V66 -> *( V64, V65, V66) }, { V67 V68 V69 -> *( V67, V68, V69) }, { V70 V71 V72 -> *( V70, V71, V72) }), *( { V73 V74 V75 -> *( V73, V74, V75) }, { V76 V77 V78 -> *( V76, V77, V78) }, { V79 V80 V81 -> *( V79, V80, V81) })))";
     rune("p0 = { x y z -> (triple x y z) };"+

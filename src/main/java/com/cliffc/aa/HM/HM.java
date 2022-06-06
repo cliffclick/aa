@@ -120,7 +120,6 @@ public class HM {
   static boolean DO_GCP;
 
   static boolean HM_FREEZE;
-  static boolean FAST_PATH_LIFT=false;
   static boolean DO_LIFT=true;
   public static Root hm( String sprog, int rseed, boolean do_hm, boolean do_gcp ) {
     Type.RECURSIVE_MEET=0;      // Reset between failed tests
@@ -136,13 +135,11 @@ public class HM {
 
     // Pass 0: Prep for SSA; pre-gather all the (unique) ids
     Work<Syntax> work = new Work<>(rseed);
-    int cnt_syns = prog.prep_tree(null,null,work);
+    prog.prep_tree(null,null,work);
 
     // Pass 1: Everything starts high/top/leaf and falls; escaping function args are assumed high
-    int work_cnt=0;
-    int init_T2s = T2.CNT;  // Profiling bit
     HM_FREEZE = false;
-    work_cnt+=main_work_loop(prog,work);
+    main_work_loop(prog,work);
     assert prog.more_work(work);
 
     // H-M types freeze, escaping function args are assumed called with lowest H-M compatible
@@ -151,19 +148,17 @@ public class HM {
     work.addAll(Root.EXT_DEPS);
     assert prog.more_work(work);
     // Pass 2: GCP types continue to run downhill.
-    work_cnt+=main_work_loop(prog,work);
+    main_work_loop(prog,work);
     assert prog.more_work(work);
     Root.escapes(prog._flow,work); // Add any fresh escapes
 
     // Error propagation, no types change.
     pass_err(prog);
 
-    // Profiling print
-    //System.out.println("Initial T2s: "+init_T2s+", Prog size: "+cnt_syns+", worklist iters: "+work_cnt+", T2s: "+(T2.CNT-init_T2s));
     return prog;
   }
 
-  static int main_work_loop(Root prog, Work<Syntax> work) {
+  static void main_work_loop( Root prog, Work<Syntax> work) {
 
     int cnt=0;
     while( work.len()>0 ) {     // While work
@@ -193,7 +188,6 @@ public class HM {
       // VERY EXPENSIVE ASSERT: O(n^2).  Every Syntax that makes progress is on the worklist
       assert prog.more_work(work);
     }
-    return cnt;
   }
 
   static void pass_err( Root prog) {
@@ -449,7 +443,7 @@ public class HM {
       _nongen = nongen;
       work.add(this);
     }
-    void prep_lookup_deps(Ident id) {}
+    int prep_lookup_deps(Ident id, Syntax prior) { return -99; }
 
     // Giant Assert: True if OK; all Syntaxs off worklist do not make progress
     abstract boolean more_work(Work<Syntax> work);
@@ -508,7 +502,7 @@ public class HM {
   static class Ident extends Syntax {
     private final String _name; // The identifier name
     private Syntax _def;        // Cached syntax defining point
-    private int _idx;           // Index in Lambda (which arg of many)
+    private int _idx;           // Index in Lambda (which arg of many), or < 0 for Let
     private T2 _idt;            // Cached type var for the name in scope
     private boolean _fresh;     // True if fresh-unify; short-cut for common case of an id inside its def vs in a Let body.
     Ident(String name) { _name=name; }
@@ -537,31 +531,24 @@ public class HM {
           _def instanceof Lambda lam &&
           Root.EXT_FIDXS.test(lam._fidx) ) {
         Type x = lam.targ(_idx).as_flow(false); // Most conservative arg
-        if( x != lam._types[_idx] )
-          lam.arg_meet(_idx, x, work); // Arg_meet for force conservative arg
+        lam.arg_meet(_idx, x, work); // Arg_meet for force conservative arg
       }
       return _def instanceof Let let ? let._def._flow : ((Lambda)_def)._types[_idx];
     }
     @Override int prep_tree( Syntax par, VStack nongen, Work<Syntax> work ) {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
-      for( Syntax syn = _par; syn!=null; syn = syn._par )
-        syn.prep_lookup_deps(this);
-
-      // Lookup, and get the T2 type var and a pointer to the flow type.
-      for( Syntax syn = _par; syn!=null; syn = syn._par ) {
-        if( syn instanceof Lambda lam ) {
-          if( (_idx = Util.find(lam._args,_name)) != -1 )
-            return _init(lam,lam.targ(_idx),false);
-        } else if( syn instanceof Let let ) {
-          _idx=-1;
-          if( Util.eq(let._arg0,_name) )
-            return _init(let,let._targ, !let._targ.nongen_in(nongen));
+      for( Syntax syn = par, prior=this; syn!=null; prior=syn, syn = syn._par )
+        if( (_idx=syn.prep_lookup_deps(this,prior)) != -99 ) {
+          assert (_idx >= 0 && syn instanceof Lambda) ||
+            (_idx <  0 && syn instanceof Let   );
+          _def = syn;
+          _fresh = _idx == -2;  // Fresh in body of Let, not-fresh in Let def or Lambda arg
+          _idt = (syn instanceof Lambda lam) ? lam.targ(_idx) : ((Let)syn).targ();
+          return 1;
         }
-      }
+
       throw new RuntimeException("Parse error, "+_name+" is undefined in "+_par);
     }
-    private int _init(Syntax def,T2 idt, boolean fresh) {
-      _def = def; _idt = idt; _fresh=fresh; return 1; }
     @Override boolean more_work(Work<Syntax> work) { return more_work_impl(work); }
     @Override <T> T visit( Function<Syntax,T> map, BiFunction<T,T,T> reduce ) { return map.apply(this); }
   }
@@ -637,14 +624,15 @@ public class HM {
       return TypeFunPtr.makex(BitsFun.make0(_fidx),_args.length+DSP_IDX,Type.ANY,_body._flow);
     }
     // Meet the formal argument# with a new Apply call site actual arg.
-    @Override public void arg_meet(int argn, Type cflow, Work<Syntax> work) {
-      if( argn >= _types.length ) return; // Bad argument count
+    @Override public boolean arg_meet(int argn, Type cflow, Work<Syntax> work) {
+      if( argn >= _types.length ) return false; // Bad argument count
       Type old = _types[argn];
       Type mt = old.meet(cflow);
-      if( mt==old ) return;     // No change
+      if( mt==old ) return false; // No change
       _types[argn]=mt;          // Yes change, update
       work.add(_refs[argn]);    // And revisit referrers
       if( this instanceof PrimSyn ) work.add(this); // Primitives recompute
+      return true;
     }
 
     // Ignore arguments, and return body type for a particular call site.  Very conservative.
@@ -669,7 +657,7 @@ public class HM {
       find().unify(T2.make_fun(targs),work);
       return cnt;
     }
-    @Override void prep_lookup_deps(Ident id) {
+    @Override int prep_lookup_deps(Ident id, Syntax prior) {
       for( int i=0; i<_args.length; i++ )
         if( Util.eq(_args[i],id._name) ) {
           // Deps are based on T2, and trigger when the HM types change
@@ -680,7 +668,9 @@ public class HM {
           // Hard linear-time append ident to the end.  Should be very limited in size.
           _refs[i] = refs = Arrays.copyOf(refs,refs.length+1);
           refs[refs.length-1] = id;
+          return i;
         }
+      return -99;
     }
     @Override boolean more_work(Work<Syntax> work) {
       if( !more_work_impl(work) ) return false;
@@ -696,12 +686,12 @@ public class HM {
   static class Let extends Syntax {
     final String _arg0;
     final Syntax _def, _body;
-    T2 _targ;
     Syntax[] _refs;               // Identifiers referring here
-    Let(String arg0, Syntax def, Syntax body) { _arg0=arg0; _body=body; _def=def; _targ=T2.make_leaf(); _refs=new Ident[0]; }
+    Let(String arg0, Syntax def, Syntax body) { _arg0=arg0; _body=body; _def=def; _refs=new Ident[0]; }
     @Override SB str(SB sb) { return _body.str(_def.str(sb.p(_arg0).p(" = ")).p("; ")); }
     @Override SB p1(SB sb, VBitSet dups) { return sb.p(_arg0).p(" = ... ; ..."); }
     @Override SB p2(SB sb, VBitSet dups) { _def.p0(sb,dups); return _body.p0(sb,dups); }
+    T2 targ() { return _def.find(); }
     @Override boolean hm(Work<Syntax> work) { return false;  }
     @Override void add_hm_work( @NotNull Work<Syntax> work) { throw unimpl();  }
     @Override Type val(Work<Syntax> work) { return _body._flow; }
@@ -712,22 +702,24 @@ public class HM {
     }
 
     @Override int prep_tree( Syntax par, VStack nongen, Work<Syntax> work ) {
-      prep_tree_impl(par,nongen,work,_body._hmt);
-      int cnt = _body.prep_tree(this,           nongen       ,work) +
-                _def .prep_tree(this,new VStack(nongen,_targ),work);
-      _hmt = _body._hmt;            // Unify 'Let._hmt' with the '_body'
-      _targ.unify(_def.find(),work);
+      prep_tree_impl(par,nongen,work,T2.make_leaf());
+      T2 targ = T2.make_leaf();
+      int cnt = _def .prep_tree(this,new VStack(nongen,targ),work) +
+                _body.prep_tree(this,           nongen      ,work);
+      targ.unify(targ(),work);      // Unify targ with _def._hmt
+      _hmt.unify(_body.find(),work);  // Unify 'Let._hmt' with the '_body'
       return cnt+1;
     }
-    @Override void prep_lookup_deps(Ident id) {
-      if( Util.eq(id._name,_arg0) ) {
-        // Deps are based on T2, and trigger when the HM types change
-        _targ.push_update(id);
-        // Refs are based on Syntax, basically a wimpy SSA for for GCP propagation
-        // Hard linear-time append ident to the end.  Should be very limited in size.
-        _refs = Arrays.copyOf(_refs,_refs.length+1);
-        _refs[_refs.length-1] = id;
-      }
+    @Override int prep_lookup_deps(Ident id, Syntax prior) {
+      if( !Util.eq(id._name,_arg0) ) return -99;
+      // Deps are based on T2, and trigger when the HM types change
+      targ().push_update(id);
+      // Refs are based on Syntax, basically a wimpy SSA for for GCP propagation
+      // Hard linear-time append ident to the end.  Should be very limited in size.
+      _refs = Arrays.copyOf(_refs,_refs.length+1);
+      _refs[_refs.length-1] = id;
+      assert prior==_def || prior==_body;
+      return prior==_def ? -1 : -2;
     }
     @Override boolean more_work(Work<Syntax> work) {
       if( !more_work_impl(work) ) return false;
@@ -824,8 +816,10 @@ public class HM {
       if( !(flow instanceof TypeFunPtr tfp) ) return flow.oob(TypeNil.SCALAR);
       if( tfp._fidxs == BitsFun.EMPTY )  return TypeNil.XSCALAR;  // Nothing being called, stay high
       // Meet all calling arguments over all called function args.
+      // Lazily building a call-graph, needed to track arg_meet.
+      // We got here because, e.g. _fun._flow added some more functions, all those
+      // new functions need the arg_meet.
       if( work!=null )
-        // TODO: REMOVE THIS ALREADY DONE IN ADD_VAL_WORK BEHIND PROGRESS FILTER
         for( int fidx : tfp._fidxs ) {
           Func lambda = Lambda.FUNS.get(fidx);
           // new call site for lambda; all args must meet into this lambda;
@@ -843,7 +837,7 @@ public class HM {
     // Gate around apply_lift.  Assert monotonic lifting and apply the lift.
     Type do_apply_lift(T2 rezt2, Type ret, boolean test) {
       if( !DO_LIFT || !DO_HM ) return ret;
-      if( FAST_PATH_LIFT && ret==TypeNil.XSCALAR ) return ret; // Nothing to lift
+      if( ret==TypeNil.XSCALAR ) return ret; // Nothing to lift
       Type lift = hm_apply_lift(rezt2, ret, test);
       assert _old_lift.isa(lift); // Lift is monotonic
       _old_lift=lift;             // Record updated lift
@@ -946,13 +940,12 @@ public class HM {
       // Check for some Lambdas present
       Type flow = _fun._flow;
       if( !(flow instanceof TypeFunPtr tfp) ) return;
-      if( tfp._fidxs == BitsFun.EMPTY ) return;
+      assert tfp._fidxs != BitsFun.NALL;
 
       // child arg to a call-site changed; find the arg#;
       int argn = Util.find(_args,child);
-
       // visit all Lambdas; meet the child flow into the Lambda arg#
-      if( argn != -1 && tfp._fidxs != BitsFun.NALL )
+      if( argn != -1 )
         for( int fidx : tfp._fidxs )
           Lambda.FUNS.get(fidx).arg_meet(argn,child._flow,work);
     }
@@ -961,6 +954,14 @@ public class HM {
       prep_tree_impl(par,nongen,work,T2.make_leaf());
       int cnt = 1+_fun.prep_tree(this,nongen,work);
       for( Syntax arg : _args ) cnt += arg.prep_tree(this,nongen,work);
+
+      // Unify _fun with appropriate function
+      T2[] targs = new T2[_args.length+1];
+      for( int i=0; i<_args.length; i++ )
+        targs[i] = _args[i].find();
+      targs[_args.length] = find(); // Return
+      T2 nfun = T2.make_fun(targs);
+      _fun.find().unify(nfun, work);
       return cnt;
     }
     @Override boolean more_work(Work<Syntax> work) {
@@ -995,19 +996,23 @@ public class HM {
     static void reset() { EXT_ALIASES = BitsAlias.EMPTY;  EXT_FIDXS = BitsFun.EMPTY; EXT_DEPS = new Work<>();}
     public Root(Syntax body) { super(body); }
     @Override boolean hm(final Work<Syntax> work) {
-      // TODO:  track escapes?
-      // Just unify input and output
-      return find().unify(_fun.find(),work);
+      assert debug_find()==_fun.debug_find();
+      return false;
     }
-    @Override void add_hm_work( @NotNull Work<Syntax> work) { escapes(_flow,work); }
+    @Override void add_hm_work( @NotNull Work<Syntax> work) { throw unimpl(); }
     @Override Type val(Work<Syntax> work) { return _fun._flow; }
     @Override void add_val_work( Syntax child, @NotNull Work<Syntax> work) {
       assert child==_fun;
       work.add(this);
-      _flow = _fun._flow;
-      escapes(_flow,work);
+      escapes(_fun._flow,work);      // Check for more escapes
     }
     Type flow_type() { return sharpen(_flow); }
+    @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
+      prep_tree_impl(par,nongen,work,null);
+      int cnt = 1+_fun.prep_tree(this,nongen,work);
+      _hmt = _fun.find();
+      return cnt;
+    }
 
     // Escape all Root results.  Escaping functions are called with the most
     // conservative HM-compatible arguments.  Escaping Structs are recursively
@@ -1112,7 +1117,7 @@ public class HM {
     @Override public T2 as_fun() { return _t2.find(); }
     @Override public int nargs() { return as_fun().size()-1; }
     @Override public T2 targ(int argn) { throw unimpl(); }
-    @Override public void arg_meet(int argn, Type t, Work<Syntax> work) { }
+    @Override public boolean arg_meet(int argn, Type t, Work<Syntax> work) { return false; }
     @Override public void apply_push(Apply aply) { }
   }
 
@@ -1222,21 +1227,21 @@ public class HM {
       return TypeMemPtr.make(_alias,TypeStruct.ISUSED);
     }
     @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) {
-      work.add(this);
       work.add(_rflds.asAry());
+      // Check for more Root escapes on the changing fields
+      if( Root.EXT_ALIASES.test(_alias) )
+        Root.escapes(_flow,work);
     }
 
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
       T2 hmt = T2.make_open_struct(null,null);
       prep_tree_impl(par, nongen, work, T2.make_ptr(hmt));
       int cnt = 1;              // One for self
-      T2[] t2s = new T2[_ids.length];
       if( _ids.length!=0 ) hmt._args = new NonBlockingHashMap<>();
       assert hmt._deps==null;
       for( int i=0; i<_ids.length; i++ ) { // Prep all sub-fields
         cnt += _flds[i].prep_tree(this,nongen,work);
-        t2s[i] = _flds[i].find();
-        hmt._args.put(_ids[i],t2s[i]);
+        hmt._args.put(_ids[i],_flds[i].find());
       }
       return cnt;
     }
@@ -1417,6 +1422,12 @@ public class HM {
     @Override public void push(Syntax f) { if( _rflds.find(f)==-1 ) _rflds.push(f);  }
     @Override PrimSyn make() { return new Pair(); }
     @Override Type apply(Type[] flows) { return TypeMemPtr.make(_alias,TypeStruct.ISUSED); }
+    @Override public boolean arg_meet(int argn, Type t, Work<Syntax> work) {
+      if( !super.arg_meet(argn,t,work) ) return false;
+      if( Root.EXT_ALIASES.test(_alias) )
+        Root.escapes(tmp(),work);
+      return true;
+    }
   }
 
   // Triple
@@ -1444,6 +1455,12 @@ public class HM {
     @Override public void push(Syntax f) { if( _rflds.find(f)==-1 ) _rflds.push(f);  }
     @Override PrimSyn make() { return new Triple(); }
     @Override Type apply(Type[] flows) { return TypeMemPtr.make(_alias,TypeStruct.ISUSED);  }
+    @Override public boolean arg_meet(int argn, Type t, Work<Syntax> work) {
+      if( !super.arg_meet(argn,t,work) ) return false;
+      if( Root.EXT_ALIASES.test(_alias) )
+        Root.escapes(tmp(),work);
+      return true;
+    }
   }
 
   // Special form of a Lambda body for IF, which changes the H-M rules.
@@ -1698,7 +1715,7 @@ public class HM {
     // Type of an argument
     T2 targ(int argn);
     // Meet into an argument type
-    void arg_meet(int argn, Type cflow, Work<Syntax> work);
+    boolean arg_meet(int argn, Type cflow, Work<Syntax> work);
     // Push Apply onto Applys list
     void apply_push(Apply apl);
   }
@@ -2593,10 +2610,10 @@ public class HM {
     static final VBitSet UPDATE_VISIT  = new VBitSet();
     void clr_cp() { UPDATE_VISIT.clear(); _clr_cp();}
     private void _clr_cp(  ) {
-      T2 ret;
       if( !_is_copy || UPDATE_VISIT.tset(_uid) ) return;
       _is_copy = false;
       if( _deps!=null ) {
+        T2 ret;
         for( Syntax syn : _deps )
           if( syn instanceof Lambda lam && lam.find().arg("ret")==this )
             for( Apply apply : lam._applys )
@@ -2632,7 +2649,7 @@ public class HM {
       work.addAll(_deps);
       if( _deps!=null )
         for( Syntax syn : _deps )
-          if( syn._par instanceof Lambda lam)
+          if( syn._par instanceof Lambda lam )
             work.addAll(lam._applys);
       if( UPDATE_VISIT.tset(_uid) ) return;
       if( _args != null )
