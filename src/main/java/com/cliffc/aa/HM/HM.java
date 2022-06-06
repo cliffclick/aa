@@ -197,7 +197,7 @@ public class HM {
           T2 ptr = fld._ptr.find(), rec;
           if( ptr.is_nil() || ptr._may_nil )
             self._err = "May be nil when loading field "+fld._id;
-          if( self._err==null && ((rec=ptr.arg("*"))==null || rec.arg(fld._id)==null ) )
+          if( self._err!=null && self._err.equals("Missing field") )
             self._err = "Missing field "+fld._id+" in "+ptr;
         }
         if( self.is_err2() && self.has_nil() )
@@ -1312,7 +1312,11 @@ public class HM {
           return true;
         }
       }
-      // Field is missing; error reported after types get stable
+      // Field is missing
+      if( self._err==null ) {
+        self._err = "Missing field";
+        return true;
+      }
       return false;
     }
     @Override void add_hm_work( @NotNull Work<Syntax> work) {
@@ -1321,6 +1325,7 @@ public class HM {
       _ptr.add_hm_work(work);
     }
     @Override Type val(Work<Syntax> work) {
+      if( find().is_err() ) return TypeNil.SCALAR;
       Type trec = _ptr._flow;
       if( trec==TypeNil.NIL ) return TypeNil.XSCALAR; // Field from nil
       if( !(trec instanceof TypeMemPtr tmp) ) return trec.oob(TypeNil.SCALAR);
@@ -1331,11 +1336,28 @@ public class HM {
         if( alias==0 ) continue; // May be nil error
         Alloc alloc = ALIASES.at(alias);
         Type afld = alloc.fld(_id,this);
-        if( afld==null ) afld = tmp._obj.oob(TypeNil.SCALAR);
+        // Field is missing in alias, could be for many reasons
+        if( afld==null ) afld = missing_field(alloc);
         t = t.meet(afld);
         if( work!=null ) alloc.push(this);
       }
       return t;
+    }
+    // Handler for missing field
+    private Type missing_field(Alloc alloc) {
+      T2 t2rec = alloc.t2().get("*");
+      // Not a ptr-to-record on the base alloc
+      if( t2rec == null )
+        return TypeNil.SCALAR; 
+      T2 t2fld = t2rec.arg(_id);
+      // Field from wrong alias (ignore/XSCALAR should not affect GCP field type),
+      if( t2fld==null )
+        return TypeNil.SCALAR.oob(DO_HM);
+      // HMT tells us the field is missing
+      if( t2fld.is_err() ) return TypeNil.SCALAR;
+      // Convert the HM to a flow type; depends on HM_FREEZE
+      Root.EXT_DEPS.add(this);
+      return t2fld.as_flow(false);
     }
     @Override void add_val_work(Syntax child, @NotNull Work<Syntax> work) { work.add(this); }
     @Override int prep_tree(Syntax par, VStack nongen, Work<Syntax> work) {
@@ -2356,11 +2378,13 @@ public class HM {
           T2 rhs = that.arg(key);
           if( rhs==null ) {         // No RHS to unify against
             missing = true;         // Might be missing RHS
-            if( is_open() || that.is_open() || lhs.is_err() ) {
+            if( is_open() || that.is_open() || lhs.is_err() || (is_fun() && that.is_fun()) ) {
               if( work==null ) return true; // Will definitely make progress
               T2 nrhs = lhs._fresh(nongen); // New RHS value
-              if( !that.is_open() )
-                nrhs._err = "Missing field "+key; // TODO: merge errors
+              if( !that.is_open() ) {
+                nrhs._err = "Missing field " + key; // TODO: merge errors
+                this.add_deps_work(work);
+              }
               progress |= that.add_fld(key,nrhs,work);
             } // Else neither side is open, field is not needed in RHS
           } else {
@@ -2512,7 +2536,7 @@ public class HM {
       if( is_ptr() )
         arg("*").walk_types_in(t instanceof TypeMemPtr tmp ? tmp._obj : t, true);
       // Nilable, recurse on the not-nil
-      if( is_nil() )
+      if( is_nil() && !t.isa(TypeNil.XNIL) )
         arg("?").walk_types_in(t.join(TypeNil.NSCALR), true);
       // Walk return not arguments
       if( is_fun() )

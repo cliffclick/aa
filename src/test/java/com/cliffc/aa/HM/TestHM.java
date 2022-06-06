@@ -28,7 +28,7 @@ public class TestHM {
     DO_HMT=true;
     DO_GCP=true;
     RSEED=0;
-    test69();
+    test66();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -141,10 +141,8 @@ public class TestHM {
   }
 
   @Test public void testYcombo() {
-    run( "{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}",
+  run( "{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}",
          "{{ A -> A } -> A }",
-         "{{ A -> A } -> A }",
-         "[20]{any,3 -> Scalar }",
          "[20]{any,3 -> Scalar }");
   }
 
@@ -436,7 +434,7 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
   @Test public void test42() {
     run("pred = 0; s1 = @{ x=\"abc\" }; s2 = @{ y=3.4 }; (if pred s1 s2).y",
         "3.4f",
-        "Missing field y in *( )",
+        "Missing field y in *()",
         "3.4f",
         "3.4f");
   }
@@ -568,7 +566,7 @@ loop = { name cnt ->
          "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
          "*[15]@{FA:^=any; a=nint8 ; b=*[13,14](FA); bool=*[12]@{FA; false=PA:*[8,9]@{FA; and=[17,21]{any,3 ->Scalar }; or=[18,22]{any,3 ->Scalar }; then=[20,24]{any,4 ->Scalar }}; force=[28]{any,3 ->PA }; true=PA}}",
          "*[15]@{FA:^=any; a=Scalar; b=Scalar      ; bool=*[12]@{FA; false=PA:*[8,9]@{FA; and=[17,21]{any,3 ->Scalar }; or=[18,22]{any,3 ->Scalar }; then=[20,24]{any,4 ->Scalar }}; force=[28]{any,3 ->PA }; true=PA}}",
-         "[4,8,9,12,13,14,15]","[17,18,19,20,21,22,23,24,28]");
+         "[4,7,8,9,12,13,14,15]","[17,18,19,20,21,22,23,24,28]");
   }
 
 
@@ -1126,7 +1124,7 @@ A:*@{
   @Test public void test73() { rune(       "{ ptr -> ptr.x }",      "{ *@{x=A; ... } -> A }", "[17]{any,3 -> Scalar}","[4,10]","[17]");  }
   @Test public void test74() { run("(* 2 3)","int64","6");  }
   @Test public void test75() {
-    rune("f0 = { f -> (if (rand) 1 (f (f0 f) 2))}; f0",
+    rune("f0 = { f -> (if (rand 2) 1 (f (f0 f) 2))}; f0",
          "{ { 1 2 -> 1 } -> 1 }","{ { 1 2 -> 1 } -> 1 }",
          "[20]{any,3 ->1 }","[20]{any,3 ->Scalar }",
          null,"[19,20]");
