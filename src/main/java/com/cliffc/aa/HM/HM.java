@@ -1050,8 +1050,10 @@ public class HM {
         // Apply might) with the most conservative flow arguments possible.
         for( int fidx : tfp._fidxs ) {
           if( fidx==0 ) continue;
-          EXT_FIDXS = EXT_FIDXS.set(fidx);
           Func fun = Lambda.FUNS.get(fidx);
+          if( !EXT_FIDXS.test(fidx) )
+            fun.as_fun().add_deps_work(work);
+          EXT_FIDXS = EXT_FIDXS.set(fidx);
           for( int i=0; i<fun.nargs(); i++ ) {
             // One-time make compatible external func/struct for this argument
             Type cflow;

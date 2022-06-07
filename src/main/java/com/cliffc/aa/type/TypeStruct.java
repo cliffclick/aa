@@ -69,7 +69,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   // No instance of the default
   private boolean check() {
     Type def = _any ? ANY : ALL;
-    for( TypeFld fld : _flds ) if( fld._t == def ) return false; // Not canonical
+    for( TypeFld fld : _flds ) if( fld!=null && fld._t == def ) return false; // Not canonical
     return true;
   }
   // Shallow clone, not interned BUT _flds IS INTERNED and cannot be hacked.

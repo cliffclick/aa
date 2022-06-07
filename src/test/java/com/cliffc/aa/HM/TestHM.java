@@ -28,7 +28,7 @@ public class TestHM {
     DO_HMT=true;
     DO_GCP=true;
     RSEED=0;
-    test66();
+    test65();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -918,7 +918,7 @@ three =(n.s two);     // Three is the successor of two
 
   // Regression during the HM/GCP Apply lift.
   @Test public void test65() {
-    run("""
+    rune("""
 all=
   void = @{};
   err  = {unused->(err unused)};
@@ -953,7 +953,7 @@ all=
   @{true=(boolSub 1) false=(boolSub 0) z=z s=s};
 all
 """,
-        """
+         """
 *@{
   false=A:*@{
     and={A->A};
@@ -978,7 +978,7 @@ all
     }
   }
 """,
-        """
+         """
 *@{
   false=A:*@{
     and={A->A};
@@ -1003,30 +1003,30 @@ all
     }
   }
 """,
-        """
-*[13]@{
+         """
+*[14]@{
   FA:^=any;
-  false=PB:*[9,10]@{FA; and=[18,21]{any,3 ->Scalar }; or=[19,22]{any,3 ->Scalar }; then=[20,23]{any,4 ->Scalar }};
-  true=PB;
-  s = [38]{any,3 ->
-    PA:*[12]@{
+  false=PC:*[8,9]@{FA; and=[18,22]{any,3 ->Scalar }; or=[20,24]{any,3 ->Scalar }; then=[21,25]{any,4 ->Scalar }};
+  true =PC;
+  s=[40]{any,3 ->
+    PA:*[13]@{
       FA;
-      add_=[37]{any,3 ->PA };
-      pred=[35]{any,3 ->*[2,11,12]() };
-      succ=[36]{any,3 ->PA };
-      zero=[34]{any,3 ->PB }
+      add_=[39]{any,3 ->PA };
+      pred=[37]{any,3 ->PB:*[10,11,12,13,17,18]@{FA; add_=[31,32,38,39,40]{any,3 ->Scalar }; pred=[17,31,37,38,39,40]{any,3 ->PB }; FB:succ=XA:[31,38,39,40]{any,3 ->*[10,11,13,17,18]@{FA; add_=XA; pred=[31,37,38,39,40]{any,3 ->PB }; FB; FC:zero=[20,22,30,36]{any,3 ->PC }} }; FC} };
+      succ=[38]{any,3 ->PA };
+      zero=[36]{any,3 ->PC }
     }
   };
-  z =*[11]@{
+  z=*[12]@{
     FA;
-    add_=[30]{any,3 ->Scalar };
+    add_=[32]{any,3 ->Scalar };
     pred=[17]{any,3 ->~Scalar };
-    succ=[29]{any,3 ->PA };
-    zero=[28]{any,3 ->PB }
+    succ=[31]{any,3 ->PA };
+    zero=[30]{any,3 ->PC }
   }
 }
 """,
-        """
+         """
 *[14]@{
   FA:^=any;
   false=PA:*[8,9]@{FA; and=[18,22]{any,3 ->Scalar }; or=[20,24]{any,3 ->Scalar }; then=[21,25]{any,4 ->Scalar }};
@@ -1034,8 +1034,10 @@ all
   true=PA;
   z=*[12]@{FA; add_=[32]{any,3 ->Scalar }; pred=[17]{any,3 ->~Scalar }; succ=[31]{any,3 ->Scalar }; zero=[30]{any,3 ->PA }}
 }
-}
-""");
+""",
+         "[4,8,9,10,11,12,13,14,17,18]",
+         "[17,18,19,20,21,22,23,24,25,30,31,32,36,37,38,39,40]"
+         );
   }
 
 
