@@ -922,7 +922,7 @@ public class HM {
         if( tnew==null && t2.is_base() )
           for( Map.Entry<T2,Type> e2 : T2.T2MAP.entrySet() )
             if( e2.getKey().is_base() && t2._flow.isa(e2.getKey()._flow) )
-              { tnew = e2.getValue();  break; }
+              tnew = tnew == null ? e2.getValue() : tnew.meet(e2.getValue());
         // Try again as a lost field.  Some structs can lose fields, and these
         // are "as if" Scalar or Error and can not lift, so OK to lose.  Since
         // the old_t2map is not a deep defensive copy, we lost the record of
@@ -1051,8 +1051,11 @@ public class HM {
         for( int fidx : tfp._fidxs ) {
           if( fidx==0 ) continue;
           Func fun = Lambda.FUNS.get(fidx);
-          if( !EXT_FIDXS.test(fidx) )
-            fun.as_fun().add_deps_work(work);
+          if( !EXT_FIDXS.test(fidx) ) {
+            T2 tfun = fun.as_fun();
+            tfun.add_deps_work(work);
+            tfun.get("ret").clr_cp();
+          }
           EXT_FIDXS = EXT_FIDXS.set(fidx);
           for( int i=0; i<fun.nargs(); i++ ) {
             // One-time make compatible external func/struct for this argument
@@ -1125,6 +1128,7 @@ public class HM {
       _fidx = BitsFun.new_fidx(BitsFun.EXTX);
       Lambda.FUNS.put(_fidx,this);
       Root.EXT_FIDXS = Root.EXT_FIDXS.set(_fidx);
+      t2.get("ret").clr_cp();
     }
     @Override public String toString() { return "ext lambda"; }
     @Override public T2 as_fun() { return _t2.find(); }
@@ -1350,7 +1354,7 @@ public class HM {
       T2 t2rec = alloc.t2().get("*");
       // Not a ptr-to-record on the base alloc
       if( t2rec == null )
-        return TypeNil.SCALAR; 
+        return TypeNil.SCALAR;
       T2 t2fld = t2rec.arg(_id);
       // Field from wrong alias (ignore/XSCALAR should not affect GCP field type),
       if( t2fld==null )
@@ -1939,6 +1943,7 @@ public class HM {
       T2 n = arg("?");
       if( n.is_leaf() ) return this;
       _args.remove("?");  // No longer have the "?" key, not a nilable anymore
+      _args.put("??",n);  // For hm_apply_lift, keep around the prior mapping
       // Nested nilable-and-not-leaf, need to fixup the nilable
       if( n.is_base() ) {
         _may_nil=false;
@@ -1954,10 +1959,8 @@ public class HM {
         throw unimpl();
       }
       if( n.is_obj() ) throw unimpl();
-      if( n.is_nil() ) {        // Peel nested is_nil
+      if( n.is_nil() )          // Peel nested is_nil
         _args.put("?",n.arg("?"));
-      }
-      if( _args.size()==0 ) _args=null;
       n.merge_deps(this,null);
       return this;
     }
@@ -2535,11 +2538,20 @@ public class HM {
       // Bases can (sorta) act like a leaf: they can keep their polymorphic "shape" and induce it on the result
       //if( is_base() ) return t;
       // Pointers recurse on their object
-      if( is_ptr() )
+      if( is_ptr() ) {
         arg("*").walk_types_in(t instanceof TypeMemPtr tmp ? tmp._obj : t, true);
+        T2 nptr = arg("??");
+        if( nptr != null ) // Also map the not-nilable version
+          T2MAP.merge(nptr,t.join(TypeNil.NSCALR),Type::meet);
+      }
       // Nilable, recurse on the not-nil
-      if( is_nil() && !t.isa(TypeNil.XNIL) )
-        arg("?").walk_types_in(t.join(TypeNil.NSCALR), true);
+      if( is_nil() && !t.isa(TypeNil.XNIL) ) {
+        Type tn = t.join(TypeNil.NSCALR);
+        arg("?").walk_types_in(tn, true);
+        T2 nptr = arg("??");
+        if( nptr != null ) // Also map the not-nilable version
+          T2MAP.merge(nptr,tn,Type::meet);
+      }
       // Walk return not arguments
       if( is_fun() )
         arg("ret").walk_types_in(t instanceof TypeFunPtr tfp ? tfp._ret : t.oob(TypeNil.SCALAR), true);
@@ -2715,8 +2727,9 @@ public class HM {
         dups.set(debug_find()._uid);
       } else {
         if( _args!=null )
-          for( T2 t : _args.values() )
-            t._get_dups(visit,dups);
+          for( String key : _args.keySet() )
+            if( !key.equals("??") )
+              _args.get(key)._get_dups(visit,dups);
       }
       return dups;
     }

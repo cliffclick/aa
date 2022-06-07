@@ -28,7 +28,7 @@ public class TestHM {
     DO_HMT=true;
     DO_GCP=true;
     RSEED=0;
-    test65();
+    testYcombo();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -140,10 +140,18 @@ public class TestHM {
           null, "[17,19]" );
   }
 
+  // After some study, I believe the combined result is correct.  Essentially
+  // the 'x' terms take on whatever values are in the induced recursive
+  // functions (e.g. 'int' for a 'fact' function).  With no function passed in
+  // (just the Y-combinator alone), there is no flow constraint placed on the
+  // 'x' terms, and HM "knows" this and "teaches" it to GCP via apply_lift.
   @Test public void testYcombo() {
-  run( "{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}",
+  rune( "{ f -> ({ x -> (f (x x))} { x -> (f (x x))})}",
          "{{ A -> A } -> A }",
-         "[20]{any,3 -> Scalar }");
+         "{{ A -> A } -> A }",
+         "[20]{any,3 -> ~Scalar }",
+         "[20]{any,3 ->  Scalar }",
+         null, "[19,20]");
   }
 
   @Test public void test08() { run( "g = {f -> 5}; (g g)",  "5", "5"); }
@@ -349,7 +357,6 @@ map ={fun parg -> (fun (cdr parg))};
   }
 
   // try the worse-case expo blow-up test case from SO
-  @Ignore
   @Test public void test35() {
     String rez_hm = "*( *( *( { A B C -> *( A, B, C) }, { D E F -> *( D, E, F) }, { G H I -> *( G, H, I) }), *( { J K L -> *( J, K, L) }, { M N O -> *( M, N, O) }, { P Q R -> *( P, Q, R) }), *( { S T U -> *( S, T, U) }, { V22 V23 V24 -> *( V22, V23, V24) }, { V25 V26 V27 -> *( V25, V26, V27) })), *( *( { V28 V29 V30 -> *( V28, V29, V30) }, { V31 V32 V33 -> *( V31, V32, V33) }, { V34 V35 V36 -> *( V34, V35, V36) }), *( { V37 V38 V39 -> *( V37, V38, V39) }, { V40 V41 V42 -> *( V40, V41, V42) }, { V43 V44 V45 -> *( V43, V44, V45) }), *( { V46 V47 V48 -> *( V46, V47, V48) }, { V49 V50 V51 -> *( V49, V50, V51) }, { V52 V53 V54 -> *( V52, V53, V54) })), *( *( { V55 V56 V57 -> *( V55, V56, V57) }, { V58 V59 V60 -> *( V58, V59, V60) }, { V61 V62 V63 -> *( V61, V62, V63) }), *( { V64 V65 V66 -> *( V64, V65, V66) }, { V67 V68 V69 -> *( V67, V68, V69) }, { V70 V71 V72 -> *( V70, V71, V72) }), *( { V73 V74 V75 -> *( V73, V74, V75) }, { V76 V77 V78 -> *( V76, V77, V78) }, { V79 V80 V81 -> *( V79, V80, V81) })))";
     rune("p0 = { x y z -> (triple x y z) };"+
@@ -564,7 +571,7 @@ loop = { name cnt ->
          "",
          "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
          "*@{ a = nint8; b = *( ); bool = *@{ false = A:*@{ and = { A -> A }; or = { A -> A }; then = { { *( ) -> B } { *( ) -> B } -> B }}; force = { C? -> D:*@{ and = { D -> D }; or = { D -> D }; then = { { *( ) -> E } { *( ) -> E } -> E }} }; true = F:*@{ and = { F -> F }; or = { F -> F }; then = { { *( ) -> G } { *( ) -> G } -> G }}}}",
-         "*[15]@{FA:^=any; a=nint8 ; b=*[13,14](FA); bool=*[12]@{FA; false=PA:*[8,9]@{FA; and=[17,21]{any,3 ->Scalar }; or=[18,22]{any,3 ->Scalar }; then=[20,24]{any,4 ->Scalar }}; force=[28]{any,3 ->PA }; true=PA}}",
+         "*[15]@{FA:^=any; a=int64 ; b=*[13,14](FA); bool=*[12]@{FA; false=PA:*[8,9]@{FA; and=[17,21]{any,3 ->Scalar }; or=[18,22]{any,3 ->Scalar }; then=[20,24]{any,4 ->Scalar }}; force=[28]{any,3 ->PA }; true=PA}}",
          "*[15]@{FA:^=any; a=Scalar; b=Scalar      ; bool=*[12]@{FA; false=PA:*[8,9]@{FA; and=[17,21]{any,3 ->Scalar }; or=[18,22]{any,3 ->Scalar }; then=[20,24]{any,4 ->Scalar }}; force=[28]{any,3 ->PA }; true=PA}}",
          "[4,7,8,9,12,13,14,15]","[17,18,19,20,21,22,23,24,28]");
   }
