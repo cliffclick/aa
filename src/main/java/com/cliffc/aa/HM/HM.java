@@ -2609,10 +2609,6 @@ public class HM {
     }
 
     private Type _walk_types_out( Type t, Apply apply, boolean test ) {
-      // If Leaf with a structured Flow type, max lift until the Leaf expands.
-      //if( is_leaf() && (t instanceof TypeFunPtr || t instanceof TypeMemPtr) )
-      //  return TypeNil.XSCALAR;
-
       // Leaf/base computes join of existing compatible leafs.  No new leafs
       // can appear (already checked).
       if( is_leaf() || is_base() ) {
@@ -2631,11 +2627,8 @@ public class HM {
         return tmp.make_from((TypeStruct)arg("*").walk_types_out(tmp._obj,apply,test));
       }
 
-      if( is_nil() ) { // The wrapped leaf gets lifted, then nil is added
-        Type tnil = arg("?").walk_types_out(t.join(TypeNil.XNIL),apply, test);
-        //return tnil.meet(TypeNil.XNIL);
-        return tnil;
-      }
+      if( is_nil() ) // The wrapped leaf gets lifted, then nil is added
+        return arg("?").walk_types_out(t.join(TypeNil.XNIL),apply, test);
 
       if( is_fun() ) {          // Walk returns not arguments
         Type tret = t instanceof TypeFunPtr tfp ? tfp._ret  : t.oob(TypeNil.SCALAR);
