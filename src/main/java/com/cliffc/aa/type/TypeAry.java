@@ -1,7 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.*;
-
+  
 import java.util.function.*;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -52,10 +52,10 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
     return t1.init(len,elem,stor).hashcons_free();
   }
 
-  public static final TypeAry ARY   = make(TypeInt.INT64 ,Type.SCALAR ,TypeStruct.ISUSED );
-  public static final TypeAry ARY0  = make(TypeInt.INT64 ,Type.XNIL   ,TypeStruct.ISUSED );
-  public static final TypeAry BYTES = make(TypeInt.con(3),TypeInt.INT8,TypeStruct.ISUSED );
-  static final TypeAry[] TYPES = new TypeAry[]{ARY,ARY0.dual(),BYTES};
+  public static final TypeAry ARY   = make(TypeInt.INT64 ,TypeNil.SCALAR ,TypeStruct.ISUSED );
+  public static final TypeAry ARY0  = make(TypeInt.INT64 ,TypeNil.NIL    ,TypeStruct.ISUSED );
+  public static final TypeAry BYTES = make(TypeInt.con(3),TypeInt.INT8   ,TypeStruct.ISUSED );
+  static final TypeAry[] TYPES = new TypeAry[]{ARY,ARY0,BYTES};
 
   @Override protected TypeAry xdual() { return POOLS[TARY].<TypeAry>malloc().init(_len.dual(),_elem.dual(),_stor.dual()); }
   @Override void rdual() {
@@ -64,19 +64,6 @@ public class TypeAry extends Type<TypeAry> implements Cyclic {
     _dual._stor = _stor._dual;
   }
   @Override protected Type xmeet( Type t ) {
-    switch( t._type ) {
-    case TARY:   break;
-    case TFLD:
-    case TSTRUCT:
-    case TTUPLE:
-    case TFUNPTR:
-    case TMEMPTR:
-    case TFLT:
-    case TINT:
-    case TRPC:
-    case TMEM:   return ALL;
-    default: throw typerr(t);
-    }
     TypeAry ta = (TypeAry)t;
     TypeInt size = (TypeInt)_len.meet(ta._len);
     Type elem = _elem.meet(ta._elem);

@@ -45,7 +45,7 @@ public final class CallEpiNode extends Node {
     Type tc = call()._val;
     BitsFun fidxs = CallNode.ttfp(tc).fidxs();
     if( fidxs.above_center() ) return true; // No path is taken
-    if( fidxs==BitsFun.ALL0 ) return false; // Some unknown path is unwired
+    if( fidxs==BitsFun.NALL ) return false; // Some unknown path is unwired
     int ncall=0;
     for( int i=0; i<nwired(); i++ )
       if( fidxs.test(wired(i)._fidx) ) // Verify each fidx is wired

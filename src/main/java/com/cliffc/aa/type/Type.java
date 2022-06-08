@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.function.*;
 
 import static com.cliffc.aa.AA.unimpl;
+import static com.cliffc.aa.type.TypeStruct.CANONICAL_INSTANCE;
 
 /** an implementation of language AA
  */
@@ -84,13 +85,19 @@ import static com.cliffc.aa.AA.unimpl;
 // point the nil collapses exactly one of the more refined nils (TypeInt.ZERO,
 // TypeMemPtr.NIL, etc) but until then it is an undistinguished nil.
 
-// Current solution is that nil is signed: XNIL and NIL.
+// Current solution is that nil 2 extra bits on all Types, with 4 states:
+// AND-nil, OR-nil, NOT-nil, YES-nil.  YES-nil is just nil, but with all the
+// other Type info present to preserve the lattice properties.  In this
+// solution, the old nScalar becomes Scalar-NOT-NIL.  Also (unlike most
+// previous attempts) we can represent ~Scalar-AND-NIL: something which
+// definitely can be nil, but we're not yet sure if it is a e.g. pointer
+// (TypeMemPtr) or integer (TypeInt).
 
 public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   static private int CNT=1;
   public int _uid;       // Unique ID, will have gaps, used to uniquely order Types
   public long _hash, _cyc_hash; // Hash for this Type; built recursively except around cycles
-  byte _type;            // Simple types use a simple enum
+  public byte _type;            // Simple types use a simple enum
   private Type _cyclic;  // Type is cyclic, and this is the canonical cycle leader.
   T _dual; // All types support a dual notion, eagerly computed and cached here
 
@@ -102,7 +109,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Type is cyclic.
   // The leader of the Strongly Connected Component this Type is part of or
   // null.  The head is always alive, and always uses the minimal Type UID, and
-  // is effectively the SCC "color".  Two SCCs might abut with only a pointer
+  // is effectively the SCC "color".  Two SCCs might abutt with only a pointer
   // between them (no Type), and the "color" can be used to tell when it's safe
   // to stop a cyclic-equality check or limit a cycle-hash.
   Type cyclic() {
@@ -350,33 +357,28 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   static final byte TANY    = 1; // Top
   static final byte TCTRL   = 2; // Ctrl flow bottom
   static final byte TXCTRL  = 3; // Ctrl flow top (mini-lattice: any-xctrl-ctrl-all)
-  // Scalars; all possible finite types that fit in a machine register;
-  // includes pointers (functions, structs), ints, floats; excludes state of
-  // Memory and Ctrl.  Scalars are stateless and "free" to make copies.
-  static final byte TSCALAR = 4; // Scalars
-  static final byte TXSCALAR= 5; // Invert scalars
-  // Not-nil Scalars.  Same as Scalars above but excludes nil/0.  Note that I
-  // have a doubly represented type: TypeNil.make(SCALAR) would add a nil to a
-  // SCALAR except SCALAR already has a nil.  This means if I define SCALAR as
-  // not having a nil, I could drop TNSCALR and TXNSCALR... but that makes
-  // TypeNil.make(SCALAR) below SCALAR in the lattice, which gets ugly.
-  static final byte TNSCALR = 6; // Scalars-not-nil
-  static final byte TXNSCALR= 7; // Invert Scalars-not-nil
-  static final byte TNIL    = 8; // The Nil-type
-  static final byte TXNIL   = 9; // NIL.dual
-  static final byte TSIMPLE =10; // End of the Simple Types
-  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","nScalar","~nScalar","nil","~nil"};
-  static final byte TINT    =11; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TFLT    =12; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TRPC    =13; // Return PCs; Continuations; call-site return points; see TypeRPC
-  static final byte TTUPLE  =14; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TSTRUCT =15; // Memory Structs; tuples with named fields
-  static final byte TARY    =16; // Tuple of indexed fields; only appears in a TSTRUCT
-  static final byte TFLD    =17; // Fields in structs
-  static final byte TMEM    =18; // Memory type; a map of Alias#s to TOBJs
-  static final byte TMEMPTR =19; // Memory pointer type; a collection of Alias#s
-  static final byte TFUNPTR =20; // Function pointer, refers to a collection of concrete functions
-  static final byte TLAST   =21; // Type check
+  static final byte TSIMPLE = 4; // End of the Simple Types
+  public boolean is_simple() { return _type < TSIMPLE; }
+  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl"};
+  // Nillable Scalars; all possible finite types that fit in a machine
+  // register; includes pointers (to functions, to structs), ints, floats;
+  // excludes state of Memory and Ctrl.  Scalars are stateless and "free" to
+  // make copies.
+  static final byte TNIL    = 5; // Scalars, nil
+  static final byte TINT    = 6; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TFLT    = 7; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TRPC    = 8; // Return PCs; Continuations; call-site return points; see TypeRPC
+  static final byte TMEMPTR = 9; // Memory pointer type; a collection of Alias#s
+  static final byte TFUNPTR =10; // Function pointer, refers to a collection of concrete functions
+  static final byte TNILABLE=11;
+  public boolean is_nil() { return _type < TNILABLE; }
+  // Collections of Scalars, Memory, Fields.  Not Nilable.
+  static final byte TTUPLE  =12; // Tuples; finite collections of unrelated Types, kept in parallel
+  static final byte TSTRUCT =13; // Memory Structs; tuples with named fields
+  static final byte TARY    =14; // Tuple of indexed fields; only appears in a TSTRUCT
+  static final byte TFLD    =15; // Fields in structs
+  static final byte TMEM    =16; // Memory type; a map of Alias#s to TOBJs
+  static final byte TLAST   =17; // Type check
 
   // Object Pooling to handle frequent (re)construction of temp objects being
   // interned.  This is a performance hack and a big one: big because its
@@ -444,15 +446,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   public  static final Type ANY    = make( TANY   ); // Top
   public  static final Type CTRL   = make( TCTRL  ); // Ctrl
   public  static final Type XCTRL  = make(TXCTRL  ); // Ctrl
-  public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
-  public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
-  public  static final Type  NSCALR= make( TNSCALR); // Scalars-not-nil
-  public  static final Type XNSCALR= make(TXNSCALR); // Scalars-not-nil
-  public  static final Type   NIL  = make( TNIL   ); // The Nil.
-  public  static final Type  XNIL  = make(TXNIL   ); // The ~Nil.
 
   // Collection of sample types for checking type lattice properties.
-  private static final Type[] TYPES = new Type[]{ALL,CTRL,SCALAR,NSCALR,NIL};
+  private static final Type[] TYPES = new Type[]{ALL,CTRL};
 
   // The complete list of primitive types that are disjoint and also is-a
   // SCALAR; nothing else is a SCALAR except what is on this list (or
@@ -463,12 +459,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // exactly 1 value.
   private static Type[] SCALAR_PRIMS;
 
-  public boolean is_simple() { return _type < TSIMPLE; }
-  private boolean is_ptr() { byte t = _type;  return t == TFUNPTR || t == TMEMPTR; }
-  private boolean is_num() { byte t = _type;  return t == TINT || t == TFLT; }
-  // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/1,1,1,1,1,1,1,1,1,1,/*TSIMPLE-10*/0, 1,1,1,0,1,0,0,0,1,/*TFUNPTR-20*/1}/*TLAST=21*/;
-  public final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
   // Simplify pointers (lose what they point at).
   public Type simple_ptr() { return this; }
 
@@ -512,16 +502,34 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     // Short-cut for seeing this meet before
     Type mt = Key.get(this,t);
     if( mt != null ) return mt;
-
-    // "Triangulate" the matrix and cut in half the number of cases.
-    // Reverse; xmeet 2nd arg is never "is_simple" and never equal to "this".
-    mt = !is_simple() && t.is_simple() ? t.xmeet(this) : xmeet(t);
-
+    // Compute meet without filtering
+    mt = ymeet(t);
     // Record this meet, to short-cut next time
     if( RECURSIVE_MEET == 0 )   // Only not mid-building recursive types;
       Key.put(this,t,mt);
     return mt;
   }
+
+  // Compute meet without further filtering
+  private Type ymeet( Type t ) {
+    // Same-type is always safe in the subclasses
+    if( _type==t._type ) return xmeet(t);
+
+    // "Triangulate" the matrix and cut in half the number of cases.
+    // Reverse; xmeet 2nd arg is never "is_simple" and never equal to "this".
+    if(   is_simple() ) return this.xmeet(t   );
+    if( t.is_simple() ) return t   .xmeet(this);
+    // Triangulate on is_nil without being the same class
+    if( is_nil() && t.is_nil() ) {
+      TypeNil t0 = (TypeNil)this;
+      TypeNil t1 = (TypeNil)t   ;
+      if( t0._type==TNIL ) return t0.nmeet(t1); // LHS is TypeNil directly
+      if( t1._type==TNIL ) return t1.nmeet(t0);
+      return t0.cross_nil(t1);  // Mis-matched TypeNil subclasses
+    }
+    return Type.ALL;        // Mixing 2 unrelated types not subclassing TypeNil
+  }
+
 
   // Compute meet right now.  Overridden in subclasses.
   // Handles cases where 'this.is_simple()' and unequal to 't'.
@@ -531,49 +539,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     // ANY meet anything is thing; thing meet ALL is ALL
     if( _type==TALL || t._type==TANY ) return this;
     if( _type==TANY || t._type==TALL ) return    t;
-
-    // Ctrl can only meet Ctrl, XCtrl or Top
-    byte type = (byte)(_type|t._type); // the OR is low if both are low
-    if(  type <= TXCTRL ) return _type==TXCTRL && t._type==TXCTRL ? XCTRL : CTRL;
-    if( _type <= TXCTRL || t._type <= TXCTRL ) return ALL;
-
-    // Meet NIL inside
-    if(   _type == TNIL ||   _type == TXNIL ) return t.meet_nil(this);
-    if( t._type == TNIL || t._type == TXNIL ) return   meet_nil(t   );
-
-    // Meeting scalar and non-scalar falls to ALL.  Includes most Memory shapes.
-    if( isa_scalar() ^ t.isa_scalar() ) return ALL;
-
-    // Memory does something complex with memory
-    if( t._type==TMEM ) return t.xmeet(this);
-
-    // Scalar is close to bottom: nearly everything falls to SCALAR, except
-    // Bottom (already handled) and Control (error; already handled).
-    if( _type == TSCALAR || t._type == TSCALAR ) return SCALAR;
-
-    // ~Scalar is close to Top: it falls to nearly anything.
-    if(   _type == TXSCALAR ) return t   ;
-    if( t._type == TXSCALAR ) return this;
-
-    // Not-nil variants
-    if(   _type == TNSCALR ) return t.must_nil() ? SCALAR : NSCALR;
-    if( t._type == TNSCALR ) return   must_nil() ? SCALAR : NSCALR;
-    if(   _type == TXNSCALR) return t.not_nil();
-    if( t._type == TXNSCALR) return   not_nil();
-
-    // Scalar values break out into: nums(reals (int,flt)), GC-ptrs (structs(tuples), arrays(strings)), fun-ptrs, RPC
-    if( t._type == TFUNPTR ||
-        t._type == TMEMPTR ||
-        t._type == TRPC   )
-      return cross_nil(t);
-
-    boolean that_oop = t.is_ptr();
-    assert !(that_oop&&t.is_num());
-
-    // Down to just nums and GC-ptrs
-    if( is_num() && that_oop )
-      return (must_nil() || t.must_nil()) ? SCALAR : NSCALR;
-    throw typerr(t);
+    // 'this' is {CTRL,XCTRL}
+    if( !t.is_simple() ) return ALL;
+    // 't' is {CTRL,XCTRL}
+    if( _type==TCTRL || t._type==TCTRL ) return CTRL;
+    return XCTRL;
   }
 
   // By design in meet, args are already flipped to order _type, which forces
@@ -582,7 +552,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   private boolean check_commute( Type t, Type mt ) {
     if( t==this ) return true;
     if( is_simple() && !t.is_simple() ) return true; // By design, flipped the only allowed order
-    Type mt2 = t.xmeet(this);   // Reverse args and try again
+    Type mt2 = t.meet(this);   // Reverse args and try again
 
     if( mt==mt2 ) return true;
     System.out.println("Meet not commutative: "+this+".meet("+t+")="+mt+",\n but "+t+".meet("+this+")="+mt2);
@@ -607,8 +577,6 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // True if 'this' isa/subtypes 't'.  E.g. Int32-isa-Int64, but not vice-versa
   // E.g. ANY-isa-XSCALAR; XSCALAR-isa-Int(Any); Int(Any)-isa-Int(3)
   public boolean isa( Type t ) { return meet(t)==t; }
-  // True if 'this' isa 't' but is not equal to 't'
-  public boolean above( Type t ) { return t != this && meet(t)==t; }
 
   // Report OOB based on shallowest OOB component.
   public Type       oob( ) { return oob(ALL); }
@@ -618,25 +586,22 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   public TypeMemPtr oob(TypeMemPtr e) { return above_center() ? e.dual() : e; }
   public T oob(boolean b) { return b ? dual() : (T)this; }
 
-  public static void init0( HashMap<String,Type> types ) {
-    types.put("scalar",SCALAR);
-    TypeInt.init1(types);
-    TypeFlt.init1(types);
-    TypeStruct.RECURSIVE_MEET=0;
-  }
+  // Parser init
+  public static void init0( HashMap<String,Type> types ) { TypeNil.init0(types); }
 
   private static Ary<Type> ALL_TYPES; // Used for tests
   public static Ary<Type> ALL_TYPES() {
     if( ALL_TYPES != null ) return ALL_TYPES;
     Ary<Type> ts = new Ary<>(new Type[1],0);
     concat(ts,Type      .TYPES);
+    concat(ts,TypeNil   .TYPES);
     concat(ts,TypeAry   .TYPES);
-    concat(ts,TypeFlt   .TYPES);
-    concat(ts,TypeFunPtr.TYPES);
     concat(ts,TypeInt   .TYPES);
-    concat(ts,TypeMem   .TYPES);
+    concat(ts,TypeFlt   .TYPES);
     concat(ts,TypeMemPtr.TYPES);
+    concat(ts,TypeFunPtr.TYPES);
     concat(ts,TypeRPC   .TYPES);
+    concat(ts,TypeMem   .TYPES);
     concat(ts,TypeStruct.TYPES);
     concat(ts,TypeTuple .TYPES);
     // Partial order Sort, makes for easier tests later.  Arrays.sort requires
@@ -704,7 +669,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
 
     // Check scalar primitives; all are SCALARS and none sub-type each other.
     SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, TypeMemPtr.ISUSED0, TypeFunPtr.GENERIC_FUNPTR, TypeRPC.ALL_CALL };
-    for( Type t : SCALAR_PRIMS ) assert t.isa(SCALAR);
+    for( Type t : SCALAR_PRIMS ) assert t.isa(TypeNil.SCALAR);
     for( int i=0; i<SCALAR_PRIMS.length; i++ )
       for( int j=i+1; j<SCALAR_PRIMS.length; j++ )
         assert !SCALAR_PRIMS[i].isa(SCALAR_PRIMS[j]);
@@ -715,33 +680,21 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // True if value is above the centerline (no definite value, ambiguous)
   public boolean above_center() {
     return switch( _type ) {
-      case TALL, TCTRL, TSCALAR, TNSCALR, TNIL -> false;       // These are all below center
-      case TANY, TXCTRL, TXSCALAR, TXNSCALR, TXNIL -> true;  // These are all above center
+      case TALL,  TCTRL -> false; // These are all below center
+      case TANY, TXCTRL -> true ; // These are all above center
       default -> throw typerr(null);// Overridden in subclass
-    };
-  }
-  // True if value is higher-equal to SOME constant.
-  public boolean may_be_con() {
-    return switch( _type ) {
-      case TALL, TSCALAR, TNSCALR, TXCTRL, TCTRL -> false; // These all include not-constant things
-      case TANY, TXSCALAR, TXNSCALR, TNIL, TXNIL -> true; // These all include some constants
-      default -> throw typerr(null);
     };
   }
   // True if exactly a constant (not higher, not lower)
   public boolean is_con() {
-    return switch( _type ) {
-      case TALL, TCTRL, TNSCALR, TSCALAR, TANY, TXCTRL, TXNSCALR, TXSCALAR -> false; // Not exactly a constant
-      case TNIL, TXNIL -> true;
-      default -> throw typerr(null);// Overridden in subclass
-    };
+    assert is_simple();
+    return false;
   }
-  public Type high() { return above_center() ? this : dual(); }
 
   // Return a long   from a TypeInt constant; assert otherwise.
-  public long   getl() { if( _type==TNIL || _type==TXNIL ) return 0; throw typerr(null); }
+  public long   getl() { throw typerr(null); }
   // Return a double from a TypeFlt constant; assert otherwise.
-  public double getd() { if( _type==TNIL || _type==TXNIL ) return 0.0; throw typerr(null); }
+  public double getd() { throw typerr(null); }
 
   // "widen" a narrow type for primitive type-specialization and H-M
   // unification.  e.g. "3" becomes "int64".
@@ -749,84 +702,14 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   // Example:
   //   5.widen.meet(2.3f) == nint64.meet(2.3f) == nScalar
   //   5.meet(2.3f).widen == nflt32.widen      == nflt64
-  static final NonBlockingHashMapLong<TypeStruct> WIDEN_HASH = new NonBlockingHashMapLong<>();
-  public final Type widen() { WIDEN_HASH.clear(); return _widen(); }
-  Type _widen() {
+  public Type widen() {
     return switch( _type ) {
-    case TSCALAR, TNSCALR -> SCALAR;
-    case TXSCALAR, TXNSCALR -> SCALAR; // Too high
-    case TANY, TALL, TNIL, TXNIL -> this;
     case TCTRL, TXCTRL -> Type.CTRL;
+    case TANY, TALL -> this;
+    case TMEMPTR, TMEM, TFUNPTR, TTUPLE, TSTRUCT -> this; // Do not touch
     default -> throw typerr(null); // Overridden in subclass
     };
   }
-
-  // True if type must include a nil (as opposed to may-nil, which means the
-  // type can choose something other than nil).
-  public boolean must_nil() {
-    return switch( _type ) {
-      case TALL, TSCALAR, TNIL, TCTRL, TXCTRL, TMEM -> true; // These all must include a nil
-      case TANY, TXSCALAR, TXNSCALR, TXNIL, TNSCALR -> false;  // These all may be non-nil
-      default -> throw typerr(null); // Overridden in subclass
-    };
-  }
-  // Mismatched scalar types that can only cross-nils
-  final Type cross_nil(Type t) {
-    if( may_nil() && t.may_nil() ) return Type.XNIL;
-    return must_nil() || t.must_nil() ? SCALAR : NSCALR;
-  }
-
-  // True if type may include a nil (as opposed to must-nil).
-  // True for many above-center or zero values.
-  public boolean may_nil() {
-    return switch( _type ) {
-    case TALL, TSCALAR, TXNSCALR, TNSCALR, TTUPLE, TNIL -> false;
-    case TANY, TXSCALAR, TCTRL, TXCTRL, TMEM, TXNIL -> true;
-    default -> throw typerr(null); // Overridden in subclass
-    };
-  }
-
-  // Return the type without a nil-choice.  Only applies to above_center types,
-  // as these are the only types with a nil-choice.  Only called during meets
-  // with above-center types.  If called with below-center, there is no
-  // nil-choice (might be a must-nil but not a choice-nil), so can return this.
-  T not_nil() {
-    return (T)switch( _type ) {
-      case TANY, TXSCALAR -> XNSCALR;
-      case TXNIL -> NSCALR;
-      case TALL, TSCALAR, TNSCALR, TXNSCALR, TNIL -> this;
-      default -> throw typerr(null); // Overridden in subclass
-    };
-  }
-  // Return the type without a nil.  Only applies to below_center types,
-  // as these are the only types with a nil.
-  public Type remove_nil() {
-    return switch( _type ) {
-      case TNIL -> XNSCALR;
-      case TSCALAR -> NSCALR;
-      case TXNSCALR -> this;  // No nil already
-      case TNSCALR  -> this;  // No nil already
-      case TXSCALAR -> XNSCALR;
-      default -> throw typerr(null);         // Overridden in subclass
-    };
-  }
-  public Type meet_nil(Type nil) {
-    assert nil==NIL || nil==XNIL;
-    return switch( _type ) {
-    case TANY, TXSCALAR ->  nil;
-    case TXNSCALR -> nil==XNIL ? NSCALR : NIL;
-    case TXNIL, TNIL ->  this==nil ? this : SCALAR;
-    case TNSCALR -> nil==XNIL ? NSCALR : SCALAR;
-    case TSCALAR, TCTRL, TXCTRL -> SCALAR; // Mix of XNIL and NIL
-    case TSTRUCT, TARY, TMEM, TALL -> ALL; // Objects and Memory do not mix with any simple type
-    // Scalar flavors already handled in XMEET.
-    default -> throw typerr(null); // Overridden in subclass or already handled
-    };
-  }
-
-  // Is t type contained within this?  Short-circuits on a true
-  public final boolean contains( Type t ) { return contains(t,null); }
-  boolean contains( Type t, VBitSet bs ) { return this==t; }
 
   // Sharpen pointer with memory
   public Type sharptr( Type ptr ) { return this==ANY ? TypeMem.ANYMEM.sharptr(ptr) : ptr; }
@@ -887,8 +770,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         // Lower case types are simple named types: "int:@{x=1}" or "Cat:@{legs=4}"
         if( !isRecur(id) ) {
           String tname = (id+':').intern();
-          if( Util.eq(id,"int") )  yield TypeStruct.make_int((TypeInt)type(null));
-          if( Util.eq(id,"flt") )  yield TypeStruct.make_flt((TypeFlt)type(null));
+          if( Util.eq(id,"int") || Util.eq(id,"flt"))
+            yield TypeStruct.make(tname,false,TypeFld.make(CANONICAL_INSTANCE,type(null)));
           yield ((TypeStruct)type(null)).set_name(tname);
         }
 
@@ -907,7 +790,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         if( Util.eq(id,STRS[i]) )
           return Type.make((byte)i);
       // Various names for integer and float
-      Type t = TypeInt.valueOfInt(id);
+      Type t = TypeNil.valueOfNil(id);
+      if( t!=null ) return t;
+      t = TypeInt.valueOfInt(id);
       if( t!=null ) return t;
       t = TypeFlt.valueOfFlt(id);
       if( t!=null ) return t;
@@ -975,7 +860,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
     }
     @Override public String toString() { return _str.substring(_x); }
   }
-  public static Type valueOf( String str ) { return new Parse(str).type(); }
+  public static Type valueOf( String str ) { return str == null ? null : new Parse(str).type(); }
 
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

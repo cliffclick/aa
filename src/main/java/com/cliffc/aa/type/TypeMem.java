@@ -5,7 +5,6 @@ import com.cliffc.aa.util.*;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
-import java.util.function.*;
 
 import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeFld.Access;
@@ -96,10 +95,6 @@ public class TypeMem extends Type<TypeMem> {
   @Override public long static_hash( ) { throw unimpl(); }
 
   // ----------
-  @Override public TypeMemPtr walk( TypeStrMap map, BinaryOperator<TypeMemPtr> reduce ) { throw unimpl(); }
-  @Override public void walk( TypeStrRun map ) {throw unimpl(); }
-  @Override public void walk_update( TypeMap map ) { throw unimpl(); }
-  @Override public long lwalk( LongStringFunc map, LongOp reduce ) { throw unimpl(); }
   @Override long compute_hash() {
     Util.add_hash(super.static_hash() ^ ((long) _pubs.length <<2));
     for( TypeStruct ts : _pubs )
@@ -250,7 +245,6 @@ public class TypeMem extends Type<TypeMem> {
     return POOLS[TMEM].<TypeMem>malloc().init(pubs);
   }
   @Override protected Type xmeet( Type t ) {
-    if( t._type != TMEM ) return ALL;
     TypeMem tf = (TypeMem)t;
     // Meet of default values, meet of element-by-element.
     TypeStruct[] as = _meet(_pubs,tf._pubs,false);
@@ -290,7 +284,7 @@ public class TypeMem extends Type<TypeMem> {
 
   // Shallow meet of all possible loadable values.  Used in Node.value calls, so must be monotonic.
   public TypeStruct ld( TypeMemPtr ptr ) {
-    if( ptr._aliases == BitsAlias.XNIL || ptr._aliases == BitsAlias.NIL )
+    if( ptr._nil )
       return TypeStruct.UNUSED; // Loading from nil
     if( ptr._aliases == BitsAlias.EMPTY )
       return ptr._obj.oob(TypeStruct.ISUSED);
@@ -314,8 +308,8 @@ public class TypeMem extends Type<TypeMem> {
   // Transitively walk all reachable aliases from this set of aliases, and
   // return the complete set.
   public BitsAlias all_reaching_aliases(BitsAlias aliases) {
-    if( aliases==BitsAlias.NIL  || aliases==BitsAlias.EMPTY ) return BitsAlias.EMPTY;
-    if( aliases==BitsAlias.ALL0 || aliases==BitsAlias.NALL  ) return aliases;
+    if( aliases==BitsAlias.EMPTY ) return BitsAlias.EMPTY;
+    if( aliases==BitsAlias.NALL  ) return aliases;
     AryInt work = new AryInt();
     VBitSet visit = new VBitSet();
     for( int alias : aliases )
@@ -345,7 +339,6 @@ public class TypeMem extends Type<TypeMem> {
             }
       }
     }
-    assert !aliases.may_nil();
     return aliases;
   }
 
@@ -569,27 +562,6 @@ public class TypeMem extends Type<TypeMem> {
     return make0(tos);
   }
 
-  // Recursively widen fields
-  @Override public TypeMem _widen() {
-    TypeStruct[] tos = _pubs.clone();
-    tos[0] = null;
-    for( int i=1; i<tos.length; i++ )
-      if( tos[i]!=null )
-        tos[i] = tos[i]._widen();
-    return make0(tos);
-  }
-
-  @Override public boolean above_center() {
-    for( TypeStruct alias : _pubs )
-      if( alias != null && !alias.above_center() )
-        return false;
-    return true;
-  }
-  @Override public boolean may_be_con()   { return false;}
+  @Override public boolean above_center() { return _pubs[0].above_center(); }
   @Override public boolean is_con()       { return false;}
-  @Override public boolean must_nil() { return false; } // never a nil
-  @Override TypeMem not_nil() { return this; }
-
-  public boolean basic_live() { return _pubs.length==1; }
-
 }

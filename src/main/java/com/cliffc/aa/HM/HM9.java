@@ -229,7 +229,7 @@ public class HM9 {
     return s;
   }
   private static Syntax number() {
-    if( BUF[X]=='0' ) { X++; return new Con(Type.XNIL); }
+    if( BUF[X]=='0' ) { X++; return new Con(TypeNil.NIL); }
     int sum=0;
     while( X<BUF.length && isDigit(BUF[X]) )
       sum = sum*10+BUF[X++]-'0';
@@ -351,7 +351,7 @@ public class HM9 {
     final void prep_tree_impl( Syntax par, VStack nongen, Worklist work, T2 t ) {
       _par = par;
       _hmt = t;
-      _flow= Type.XSCALAR;
+      _flow= TypeNil.XSCALAR;
       _nongen = nongen;
       work.push(this);
     }
@@ -470,7 +470,7 @@ public class HM9 {
       for( int i=0; i<args.length; i++ ) _targs[i] = T2.make_leaf();
       // Flow types for all arguments
       _types = new Type[args.length];
-      for( int i=0; i<args.length; i++ ) _types[i] = Type.XSCALAR;
+      for( int i=0; i<args.length; i++ ) _types[i] = TypeNil.XSCALAR;
       // A unique FIDX for this Lambda
       _fidx = BitsFun.new_fidx();
       FUNS.put(_fidx,this);
@@ -517,7 +517,7 @@ public class HM9 {
       for( int i=0; i<_targs.length; i++ )
         if( targ(i).occurs_in_type(find()) ) work.addAll(targ(i)._deps);
     }
-    @Override Type val(Worklist work) { return TypeFunPtr.make(_fidx,_args.length,Type.ANY,Type.SCALAR); }
+    @Override Type val(Worklist work) { return TypeFunPtr.make(_fidx,_args.length,Type.ANY,TypeNil.SCALAR); }
     // Ignore arguments, and return body type.  Very conservative.
     Type apply(Syntax[] args) { return _body._flow; }
     @Override void add_val_work(Syntax child, Worklist work) {
@@ -627,7 +627,7 @@ public class HM9 {
         for( int i=0; i<_args.length; i++ )
           targs[i] = _args[i].find();
         targs[_args.length] = find(); // Return
-        T2 nfun = T2.make_fun(BitsFun.ALL0,targs);
+        T2 nfun = T2.make_fun(BitsFun.NALL,targs);
         progress = tfun.unify(nfun,work);
         return tfun.find().is_err() ? find().unify(tfun.find(),work) : progress;
       }
@@ -654,16 +654,16 @@ public class HM9 {
     static private final NonBlockingHashMapLong<String> WDUPS = new NonBlockingHashMapLong<>();
     @Override Type val(Worklist work) {
       Type flow = _fun._flow;
-      if( flow.above_center() ) return Type.XSCALAR;
-      if( !(flow instanceof TypeFunPtr) ) return Type.SCALAR;
+      if( flow.above_center() ) return TypeNil.XSCALAR;
+      if( !(flow instanceof TypeFunPtr) ) return TypeNil.SCALAR;
       TypeFunPtr tfp = (TypeFunPtr)flow;
       // Have some functions, meet over their returns.
-      Type rez = Type.XSCALAR;
-      if( tfp._fidxs==BitsFun.ALL0 ) rez = Type.SCALAR;
+      Type rez = TypeNil.XSCALAR;
+      if( tfp._fidxs==BitsFun.NALL ) rez = TypeNil.SCALAR;
       else
         for( int fidx : tfp._fidxs )
           rez = rez.meet(Lambda.FUNS.get(fidx).apply(_args));
-      if( rez==Type.XSCALAR ) // Fast path cutout, no improvement possible
+      if( rez==TypeNil.XSCALAR ) // Fast path cutout, no improvement possible
         return rez;
 
       // Attempt to lift the result, based on HM types.  Walk the input HM type
@@ -741,7 +741,7 @@ public class HM9 {
     // function with the worse-case legal args.
     static Type widen(T2 t2) { return t2.as_flow(); }
     private static Type xval(TypeFunPtr fun) {
-      Type rez = Type.XSCALAR;
+      Type rez = TypeNil.XSCALAR;
       for( int fidx : fun._fidxs )
         rez = rez.meet(Lambda.FUNS.get(fidx).apply(null));
       return rez;
@@ -878,7 +878,7 @@ public class HM9 {
     @Override boolean hm(Worklist work) {
       if( find().is_err() ) return false; // Already an error; no progress
       T2 rec = _rec.find();
-      if( (rec._alias!=null && rec._alias.test(0)) || rec._flow == Type.XNIL )
+      if( (rec._alias!=null && rec._alias.test(0)) || rec._flow == TypeNil.NIL )
         return find().unify(T2.make_err("May be nil when loading field "+_id),work);
       int idx = rec._ids==null ? -1 : Util.find(rec._ids,_id);
       if( idx!= -1 )            // Unify against a pre-existing field
@@ -901,7 +901,7 @@ public class HM9 {
     }
     @Override Type val(Worklist work) {
       Type trec = _rec._flow;
-      if( trec.above_center() ) return Type.XSCALAR;
+      if( trec.above_center() ) return TypeNil.XSCALAR;
       if( trec instanceof TypeMemPtr ) {
         TypeMemPtr tmp = (TypeMemPtr)trec;
         if( tmp._obj instanceof TypeStruct ) {
@@ -910,10 +910,10 @@ public class HM9 {
           //if( idx!=-1 ) return tstr.at(idx); // Field type
           throw unimpl();
         }
-        if( tmp._obj.above_center() ) return Type.XSCALAR;
+        if( tmp._obj.above_center() ) return TypeNil.XSCALAR;
       }
       // TODO: Need an error type here
-      return Type.SCALAR;
+      return TypeNil.SCALAR;
     }
     @Override int prep_tree(Syntax par, VStack nongen, Worklist work) {
       prep_tree_impl(par, nongen, work, T2.make_leaf());
@@ -983,7 +983,7 @@ public class HM9 {
     static private T2 var1,var2;
     static HashMap<Type,Pair1X> PAIR1S = new HashMap<>();
     public Pair1() {
-      super(var1=T2.make_leaf(),T2.make_fun(BitsFun.ANY0,var2=T2.make_leaf(),T2.make_struct(BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{var1,var2})));
+      super(var1=T2.make_leaf(),T2.make_fun(BitsFun.NANY,var2=T2.make_leaf(),T2.make_struct(BitsAlias.make0(PAIR_ALIAS),new String[]{"0","1"},new T2[]{var1,var2})));
     }
     @Override PrimSyn make() { return new Pair1(); }
     @Override Type apply(Syntax[] args) {
@@ -1056,12 +1056,13 @@ public class HM9 {
       // GCP helps HM: do not unify dead control paths
       if( DO_GCP ) {            // Doing GCP during HM
         Type pred = _types[0];
-        if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
+        if( pred == TypeInt.FALSE || pred == TypeNil.NIL || pred==TypeNil.NIL )
           return rez.unify(targ(2),work); // Unify only the false side
         if( pred.above_center() ) // Neither side executes
           return false;           // Unify neither side
-        if( !pred.must_nil() )    // Unify only the true side
-          return rez.unify(targ(1),work);
+        //if( !pred.must_nil() )    // Unify only the true side
+        //  return rez.unify(targ(1),work);
+        throw unimpl();
       }
       // Unify both sides with the result
       return
@@ -1073,14 +1074,15 @@ public class HM9 {
       Type t1  = args[1]._flow;
       Type t2  = args[2]._flow;
       // Conditional Constant Propagation: only prop types from executable sides
-      if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
+      if( pred == TypeInt.FALSE || pred == TypeNil.NIL || pred==TypeNil.NIL )
         return t2;              // False only
       if( pred.above_center() ) // Delay any values
-        return Type.XSCALAR;    // t1.join(t2);     // Join of either
-      if( !pred.must_nil() )    // True only
-        return t1;
-      // Could be either, so meet
-      return t1.meet(t2);
+        return TypeNil.XSCALAR;    // t1.join(t2);     // Join of either
+      //if( !pred.must_nil() )    // True only
+      //  return t1;
+      //// Could be either, so meet
+      //return t1.meet(t2);
+      throw unimpl();
     }
   }
 
@@ -1110,11 +1112,12 @@ public class HM9 {
       Type pred = args[0]._flow;
       if( pred.above_center() ) return TypeInt.BOOL.dual();
       if( pred==Type.ALL ) return TypeInt.BOOL;
-      if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
+      if( pred == TypeInt.FALSE || pred == TypeNil.NIL || pred==TypeNil.NIL )
         return TypeInt.TRUE;
-      if( pred.meet_nil(Type.NIL)!=pred )
-        return TypeInt.FALSE;
-      return TypeInt.BOOL;
+      //if( pred.meet_nil(TypeNil.NIL)!=pred )
+      //  return TypeInt.FALSE;
+      //return TypeInt.BOOL;
+      throw unimpl();
     }
   }
 
@@ -1153,13 +1156,13 @@ public class HM9 {
       // One or the other is a base.  If they are unrelated, strip the nil.
       // If they are forced together, leave the nil.
       if( arg.is_base() || ret.is_base() ) {
-        if( arg.is_base() && ret.is_base() && ret._flow == arg._flow.join(Type.NSCALR) ) return false;
+        if( arg.is_base() && ret.is_base() && ret._flow == arg._flow.join(TypeNil.NSCALR) ) return false;
         if( arg==ret ) return false; // Cannot not-nil from self
         if( work==null ) return true; // Progress will be made
         if( arg.is_leaf() ) { arg.unify(T2.make_base(ret._flow),work); arg = arg.find(); }
         if( ret.is_leaf() ) { ret.unify(T2.make_base(arg._flow),work); ret = ret.find(); }
         assert arg.is_base() && ret.is_base();
-        ret._flow = arg._flow.join(Type.NSCALR); // Strip nil from base
+        ret._flow = arg._flow.join(TypeNil.NSCALR); // Strip nil from base
         return true;
       }
       // One or the other is a function.  Same as structs, can strip the nil from nil-able functions.
@@ -1205,8 +1208,8 @@ public class HM9 {
     }
     @Override Type apply( Syntax[] args) {
       Type val = args[0]._flow;
-      if( val==Type.XNIL ) return Type.XSCALAR; // Weird case of not-nil nil
-      return val.join(Type.NSCALR);
+      if( val==TypeNil.NIL ) return TypeNil.XSCALAR; // Weird case of not-nil nil
+      return val.join(TypeNil.NSCALR);
     }
   }
 
@@ -1221,8 +1224,8 @@ public class HM9 {
       if( t0.above_center() || t1.above_center() )
         return TypeInt.INT64.dual();
       if( t0 instanceof TypeInt && t1 instanceof TypeInt ) {
-        if( t0.is_con() && t0.getl()==0 ) return TypeInt.ZERO;
-        if( t1.is_con() && t1.getl()==0 ) return TypeInt.ZERO;
+        if( t0.is_con() && t0.getl()==0 ) return TypeNil.XNIL;
+        if( t1.is_con() && t1.getl()==0 ) return TypeNil.XNIL;
         if( t0.is_con() && t1.is_con() )
           return TypeInt.con(t0.getl()*t1.getl());
       }
@@ -1390,7 +1393,7 @@ public class HM9 {
     Type _as_flow() {
       assert no_uf();
       if( is_base() ) return _flow;
-      if( is_leaf() ) return Type.SCALAR;
+      if( is_leaf() ) return TypeNil.SCALAR;
       if( is_err()  ) throw unimpl(); //return TypeMemPtr.make(BitsAlias.STRBITS,TypeStr.con(_err));
       if( is_fun()  ) return _flow;
       if( is_struct() ) {
@@ -1502,7 +1505,7 @@ public class HM9 {
       that._ids   = meet_ids  (that);
       that._open  = meet_opens(that);
       that._err   = meet_err  (that);
-      if( this._flow==Type.XNIL && that.is_struct() ) {
+      if( this._flow==TypeNil.NIL && that.is_struct() ) {
         that._alias = that._alias.meet_nil();
         that._flow = null;
       }
@@ -1563,9 +1566,9 @@ public class HM9 {
       if( this.is_leaf() || that.is_err() ) return this.union(that,work);
       if( that.is_leaf() || this.is_err() ) return that.union(this,work);
       // Special case for nil and struct
-      if( this.is_struct() && that.is_base() && that._flow==Type.XNIL )
+      if( this.is_struct() && that.is_base() && that._flow==TypeNil.NIL )
         return that.union(this,work);
-      if( that.is_struct() && this.is_base() && this._flow==Type.XNIL )
+      if( that.is_struct() && this.is_base() && this._flow==TypeNil.NIL )
         return this.union(that,work);
 
       // Cycle check
@@ -1723,17 +1726,17 @@ public class HM9 {
       if( nongen_in(nongen) ) return vput(that,_unify(that,work)); // Famous 'occurs-check', switch to normal unify
 
       // LHS is a nil, RHS is a struct; add nil to RHS
-      if( is_base() && _flow==Type.XNIL && that.is_struct() ) {
+      if( is_base() && _flow==TypeNil.NIL && that.is_struct() ) {
         if( that._alias.test(0) ) return false; // Already nil
         if( work != null )
           that._alias = that._alias.set(0); // Add nil
         return true;
       }
       // If RHS is a nil, LHS is a struct; fresh-clone to RHS and add nil
-      if( that.is_base() && that._flow==Type.XNIL && this.is_struct() ) {
+      if( that.is_base() && that._flow==TypeNil.NIL && this.is_struct() ) {
         if( work==null ) return true;
         T2 t2 = _fresh(nongen);
-        t2._alias = BitsAlias.NIL;
+        t2._alias = BitsAlias.EMPTY;
         return t2._unify(that, work);
       }
 
@@ -1913,7 +1916,7 @@ public class HM9 {
       long duid = dbl_uid(t._uid);
       if( Apply.WDUPS.putIfAbsent(duid,"")!=null ) return t;
       assert no_uf();
-      if( t==Type.SCALAR ) return fput(t); // Will be scalar for all the breakdown types
+      if( t==TypeNil.SCALAR ) return fput(t); // Will be scalar for all the breakdown types
       if( is_err() ) return fput(t); //
       // Base variables (when widened to an HM type) might force a lift.
       if( is_base() ) return fput(_flow.widen().join(t));
@@ -1924,12 +1927,12 @@ public class HM9 {
         // TODO: PAIR1 should report better
         TypeFunPtr tfp = (TypeFunPtr)t;
         T2 ret = args(_args.length-1);
-        if( tfp._fidxs==BitsFun.ALL0        ) return ret.walk_types_in(Type. SCALAR);
-        if( tfp._fidxs==BitsFun.ALL0.dual() ) return ret.walk_types_in(Type.XSCALAR);
+        if( tfp._fidxs==BitsFun.NALL        ) return ret.walk_types_in(TypeNil. SCALAR);
+        if( tfp._fidxs==BitsFun.NALL.dual() ) return ret.walk_types_in(TypeNil.XSCALAR);
         for( int fidx : ((TypeFunPtr)t)._fidxs ) {
           Lambda lambda = Lambda.FUNS.get(fidx);
           Type body = lambda.find().is_err()
-            ? Type.SCALAR           // Error, no lift
+            ? TypeNil.SCALAR           // Error, no lift
             : (lambda._body == null // Null only for primitives
                ? lambda.find().args(lambda._targs.length).as_flow() // Get primitive return type
                : lambda._body._flow); // Else use body type
@@ -1947,7 +1950,7 @@ public class HM9 {
         for( int i=0; i<_args.length; i++ ) {
           //int idx = ts.fld_find(_ids[i]);
           //// Missing fields are walked as SCALAR
-          //args(i).walk_types_in(idx==-1 ? Type.SCALAR : ts.at(idx));
+          //args(i).walk_types_in(idx==-1 ? TypeNil.SCALAR : ts.at(idx));
           throw unimpl();
         }
         return ts;
@@ -1962,7 +1965,7 @@ public class HM9 {
 
     Type walk_types_out(Type t) {
       assert no_uf();
-      if( t == Type.XSCALAR ) return t;  // No lift possible
+      if( t == TypeNil.XSCALAR ) return t;  // No lift possible
       Type tmap = Apply.T2MAP.get(this);
       if( tmap != null ) return tmap;
       if( is_err() ) throw unimpl();

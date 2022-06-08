@@ -295,7 +295,7 @@ public class HM7 {
     @Override boolean hm(Worklist work) { return false; }
     @Override T2 lookup(String name) { throw unimpl("should not reach here"); }
     @Override void add_kids(Worklist work) { }
-    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) { prep_tree_impl(par, nongen, work, _con==Type.NIL ? T2.make_nil() : T2.make_base(_con)); return 1; }
+    @Override int prep_tree( Syntax par, VStack nongen, Worklist work ) { prep_tree_impl(par, nongen, work, _con==TypeNil.NIL ? T2.make_nil() : T2.make_base(_con)); return 1; }
     @Override void prep_lookup_deps(Ident id) { throw unimpl("should not reach here"); }
     @Override boolean more_work(Worklist work) { return more_work_impl(work); }
   }
@@ -469,7 +469,7 @@ public class HM7 {
       if( str!=null && str.is_struct() && str._con==null ) {
         if( work==null ) return true;
         progress = true;
-        str._con = Type.NIL;    // Add nil to a struct
+        str._con = TypeNil.NIL;    // Add nil to a struct
         work.addAll(str._deps);
       }
 
@@ -710,9 +710,9 @@ public class HM7 {
     boolean or0(T2 that, Worklist work) {
       assert is_nil() && that.is_struct();
       if( work==null ) return that._con==null; // Progress if moving from not-nil to nilable
-      if( that._con == Type.NIL ) return false;// Already nilable
+      if( that._con == TypeNil.NIL ) return false;// Already nilable
       _args = new T2[1];                       // Room for U-F
-      that._con=Type.NIL;
+      that._con=TypeNil.NIL;
       return union(that,work);
     }
 
@@ -772,7 +772,7 @@ public class HM7 {
           else args(i)._unify(that.args(idx),work);    // Unify matching field
           that = that.find();                          // Recursively, might have already rolled this up
         }
-        if( _con!=null && that._con==null ) that._con=Type.NIL;
+        if( _con!=null && that._con==null ) that._con=TypeNil.NIL;
         if( this==that ) return true; // Might have unioned this-into-that recursively, exit now with progress
       } else {
         for( int i=0; i<_args.length; i++ ) // For all fields in LHS
@@ -873,7 +873,7 @@ public class HM7 {
       assert is_struct() && that.is_struct();
       if( _con!=null && that._con==null ) {
         if( work==null ) return true; // Will progress
-        that._con = Type.NIL;         // Allow nil
+        that._con = TypeNil.NIL;         // Allow nil
       }
       boolean progress = false;
       for( int i=0; i<_args.length; i++ ) {
@@ -1068,7 +1068,7 @@ public class HM7 {
         for( int i=0; i<_ids.length; i++ )
           str(sb.p(' ').p(_ids[i]).p(" = "),visit,_args[i],dups).p(',');
         sb.unchar().p("}");
-        if( _con==Type.NIL ) sb.p('?');
+        if( _con==TypeNil.NIL ) sb.p('?');
         return sb;
       }
 
@@ -1114,7 +1114,7 @@ public class HM7 {
         for( int i=0; i<_ids.length; i++ )
           args(i)._p(sb.p(' ').p(_ids[i]).p(" = "),visit,dups).p(',');
         sb.unchar().p("}");
-        if( _con==Type.NIL ) sb.p('?');
+        if( _con==TypeNil.NIL ) sb.p('?');
         return sb;
       }
 

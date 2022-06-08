@@ -4,51 +4,68 @@ import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
 
-public class TypeFlt extends Type<TypeFlt> {
-  byte _x;                // -2 bot, -1 not-null, 0 con, +1 not-null-top +2 top
-  byte _z;                // bitsiZe, one of: 32,64
-  double _con;
-  private TypeFlt init(int x, int z, double con ) { super.init(); _x=(byte)x; _z=(byte)z; _con = con; return this; }
-  @Override TypeFlt copy() { return _copy().init(_x,_z,_con); }
+public class TypeFlt extends TypeNil<TypeFlt> {
+  // If z==0, then _con has the constant, and the bitsize comes from that.
+  // Constant int 0 has zero bits then.
+  // If z!=0, then _con is zero and unused; z represents the range.
+  // Bit ranges are 32,64
+  // _any dictates high or low
+  public  byte _z;        // bitsiZe, one of: 32,64
+  private double _con;      // constant
+  private TypeFlt init(boolean any, boolean nil, boolean sub, int z, double con ) {
+    assert con==0 ^ z==0;
+    super.init(any,nil,sub);
+    _z=(byte)z;
+    _con = con;
+    return this;
+  }
+  @Override protected TypeFlt _copy() {
+    TypeFlt tf = super._copy();
+    tf._z = _z;
+    tf._con = _con;
+    return tf;
+  }
   // Hash does not depend on other types
-  @Override long static_hash() { return Util.mix_hash(super.static_hash(),_x,_z,(int)_con); }
+  @Override long static_hash() { return Util.mix_hash(super.static_hash(),_z,(int)_con); }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeFlt t2) ) return false;
-    return super.equals(o) && _x==t2._x && _z==t2._z && _con==t2._con;
+    return super.equals(o) && _z==t2._z && _con==t2._con;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( _x==0 )
-      return ((float)_con)==_con ? sb.p((float)_con).p('f') : sb.p(_con);
-    return sb.p(_x>0?"~":"").p(Math.abs(_x)==1?"n":"").p("flt").p(_z);
+    if( _z==0 )      return ((float)_con)==_con ? sb.p((float)_con).p('f') : sb.p(_con);
+    return _strn(sb).p("flt").p(_z);
   }
 
   static Type valueOfFlt(String cid) {
     return switch(cid) {
-    case "flt64"  ->  FLT64;
+    case "flt64"  -> FLT64;
+    case "flt32"  -> FLT32;
     case "nflt32" -> NFLT32;
-    case "nflt64" -> NFLT64;
     default       -> null;
     };
   }
-
   static { new Pool(TFLT,new TypeFlt()); }
-  public static TypeFlt make( int x, int z, double con ) {
-    //if( x==0 && (double)((long)con)==con ) return TypeInt.con((long)con);
+  public static TypeFlt make( boolean any, boolean nil, boolean sub, int z, double con ) {
+    assert con==0 ^ z==0;
+    if( con!=0 ) {
+      assert !any && !nil;
+      if( !sub ) { z=log(con); con=0; } // constant plus zero is no longer a constant
+    }
     TypeFlt t1 = POOLS[TFLT].malloc();
-    return t1.init(x,z,con).hashcons_free();
+    return t1.init(any,nil,sub,z,con).hashcons_free();
   }
+  @Override TypeFlt make_from( boolean any, boolean nil, boolean sub ) { return make(any,nil,sub,_z,_con); }
 
-  public static TypeFlt con(double con) { return make(0,log(con),con); }
+  public static TypeFlt con(double con) { return make(false,false,true,0,con); }
 
-  public static final TypeFlt FLT64 = make(-2,64,0);
-  public static final TypeFlt FLT32 = make(-2,32,0);
+  public static final TypeFlt FLT64 = make(false,false,false,64,0);
+  public static final TypeFlt FLT32 = make(false,false,false,32,0);
+  public static final TypeFlt NFLT32= make(false,false,true ,32,0);
   public static final TypeFlt PI    = con(Math.PI);
   public static final TypeFlt HALF  = con(0.5);
-  public static final TypeFlt NFLT64= make(-1,64,0);
-  public static final TypeFlt NFLT32= make(-1,32,0);
-  public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,NFLT64,PI,NFLT32,FLT32,HALF};
+  public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,PI,FLT32,NFLT32,HALF};
   static void init1( HashMap<String,Type> types ) {
     types.put("flt32",FLT32);
     types.put("flt64",FLT64);
@@ -58,58 +75,29 @@ public class TypeFlt extends Type<TypeFlt> {
   @Override public double getd() { assert is_con(); return _con; }
   //@Override public long   getl() { assert is_con() && ((long)_con)==_con; return (long)_con; }
 
-  @Override protected TypeFlt xdual() { return _x==0 ? this : POOLS[TFLT].<TypeFlt>malloc().init(-_x,_z,_con); }
-  @Override protected Type xmeet( Type t ) {
-    assert t != this;
-    switch( t._type ) {
-    case TFLT:   break;
-    case TINT:   //return ((TypeInt)t).xmeetf(this); // Not a lattice?
-    case TFUNPTR:
-    case TMEMPTR:
-    case TSTRUCT:
-    case TRPC:   return cross_nil(t);
-    case TARY:
-    case TFLD:
-    case TTUPLE:
-    case TMEM:   return ALL;
-    default: throw typerr(t);
-    }
-    TypeFlt tf = (TypeFlt)t;
-    assert !equals(tf);         // Already covered by interning
-    int maxz = Math.max(_z,tf._z);
-    int minz = Math.min(_z,tf._z);
-    if( _x== 0 && tf._x== 0 && _con==tf._con ) return make(0,maxz,_con);
-    if( _x<= 0 && tf._x<= 0 ) return make(Math.min(nn(),tf.nn()),maxz,0); // Both bottom, widen size
-    if( _x > 0 && tf._x > 0 ) return make(Math.min(_x,tf._x),minz,0); // Both top, narrow size
-    if( _x==-2 && tf._x== 2 ) return this; // Top loses to other guy
-    if( _x== 2 && tf._x==-2 ) return tf;   // Top loses to other guy
-
-    // ttop==+1,+2 and that is 0,-1,-2
-    TypeFlt that = _x>0 ? tf : this;
-    TypeFlt ttop = _x>0 ? this : tf;
-    if( that._x<0 ) return that; // Return low value
-    if( log(that._con) <= ttop._z && (that._con!=0 || ttop._x==2) )
-      return that;            // Keep a fitting constant
-    return make(that.nn(),that._z,0); // No longer a constant
+  @Override protected TypeFlt xdual() {
+    boolean xor = _nil == _sub;
+    return _z==0 ? this : POOLS[TFLT].<TypeFlt>malloc().init(!_any,_nil^xor,_sub^xor,_z,0);
   }
-  private int nn() { assert _x <=0; return _con!=0 || _x== -1 ? -1 : -2; }
+  @Override protected TypeFlt xmeet( Type t ) {
+    TypeFlt ti = (TypeFlt)t;
+    boolean any = _any & ti._any;
+    boolean nil = _nil & ti._nil;
+    boolean sub = _sub & ti._sub;
+    
+    if( !any ) {
+      int lz0 =    _z==0 ? log(   _con) :    _z;
+      int lz1 = ti._z==0 ? log(ti._con) : ti._z;
+      if(    _z==0 && ti._any && (ti._nil || ti._sub) && lz0 <= lz1 ) return this; // Keep a constant
+      if( ti._z==0 &&    _any && (   _nil ||    _sub) && lz1 <= lz0 ) return ti  ; // Keep a constant
+      int nz = _any ? lz1 : (ti._any ? lz0 : Math.max(lz0,lz1));
+      return make(any,nil,sub,nz,0);
+    }
+    // Both are high, not constants.  Narrow size.
+    return make(any,nil,sub,Math.min(_z,ti._z),0);
+  }
   static int log( double con ) { return ((double)(float)con)==con ? 32 : 64; }
 
-  @Override public boolean above_center() { return _x>0; }
-  @Override public boolean may_be_con() { return _x>=0; }
-  @Override public boolean is_con()   { return _x==0; }
-  @Override public boolean must_nil() { return _x==-2; }
-  @Override public boolean  may_nil() { return _x== 2; }
-  @Override TypeFlt not_nil() { return _x==2 ? make(1,_z,_con) : this; }
-  @Override public Type meet_nil(Type nil) {
-    if( nil==Type.XNIL )
-      return _x==2 ? Type.XNIL : (_x==-2 ? Type.SCALAR : Type.NSCALR);
-    return TypeFlt.make(-2,_x<=0?_z:32,0);
-  }
-
-  @Override public Type _widen() {
-    if( _x> 0 ) return this;
-    if( _x==0 ) return _con==0 ? FLT64 : NFLT64;
-    return make(_x,64,0);
-  }
+  @Override public TypeFlt widen() { return FLT64; }
+  @Override public boolean is_con() { return _z==0; }
 }

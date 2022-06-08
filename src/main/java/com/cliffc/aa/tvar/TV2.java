@@ -9,6 +9,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.*;
 
 import static com.cliffc.aa.AA.*;
+import static com.cliffc.aa.type.TypeStruct.CANONICAL_INSTANCE;
 
 /** Hindley-Milner based type variables.
  *
@@ -147,9 +148,10 @@ public class TV2 {
 
   // Accessors
   public boolean is_leaf() { return _args==null && _flow==null && !_is_struct && !_is_fun; }
-  public boolean is_unified(){return arg(">>")!=null; }
-  public boolean is_nil () { return arg("?" )!=null; }
-  public boolean is_base() { return _flow != null; }
+  public boolean is_unified(){return _get(">>")!=null; }
+  public boolean is_nil () { return _get("?" )!=null; }
+  public boolean is_base() { return _flow != null && !(_flow instanceof TypeMemPtr); }
+  public boolean is_ptr () { return _flow instanceof TypeMemPtr; }
   public boolean is_fun () { return _is_fun; }
   public boolean is_obj () { return _is_struct; }
   public boolean is_open() { return _open; }           // Struct-specific
@@ -157,6 +159,7 @@ public class TV2 {
   boolean is_err2()  { return
       (_flow   ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_is_struct
       (_eflow  ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_is_struct
+      (_flow!=null && _args!=null ? 1 : 0) + // Base (flow) and also args
       (_is_fun        ? 1 : 0) +
       (_is_struct     ? 1 : 0) >= 2;
   }
@@ -175,9 +178,10 @@ public class TV2 {
   }
   // Make a new primitive base TV2
   public static TV2 make_base(Type flow, @NotNull String alloc_site) {
-    assert !(flow instanceof TypeFunPtr);
+    assert !(flow instanceof TypeFunPtr) && !(flow instanceof TypeMemPtr);
     TV2 t2 = new TV2(null,alloc_site);
     t2._flow=flow;
+    assert t2.is_base();
     return t2;
   }
   public static TV2 make_fun(@NotNull String alloc_site, TV2... t2s) {
@@ -211,6 +215,14 @@ public class TV2 {
     if( _args==null ) _args = new NonBlockingHashMap<>();
     assert is_obj();
   }
+  public static TV2 make_ptr( TypeMemPtr flow, String alloc_site ) {
+    NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>(){{put("*",make_leaf(alloc_site));}};
+    assert flow instanceof TypeMemPtr;
+    TV2 t2 = new TV2(args,alloc_site);
+    t2._flow=flow;
+    assert t2.is_ptr();
+    return t2;
+  }
 
   // An array, with int length and an element type
   public static TV2 make_ary(NewNode n, Node elem, String alloc_site) {
@@ -232,16 +244,20 @@ public class TV2 {
         args.put(fld._fld,make(fld._t,alloc_site));
       if( ts._clz.length()>0 ) {
         args.put(ts._clz, make_leaf(alloc_site));
-        args.put(" x",make_base(ts._def,alloc_site));
+        //args.put(PRIM_WRAP_FIELD_NAME,make_base(ts._def,alloc_site));
       }
       yield make_struct(args,alloc_site);
     }
     case TypeFlt f -> make_base(t,alloc_site);
     case TypeInt i -> make_base(t,alloc_site);
+    case TypeNil n -> {
+      if( t ==TypeNil.NIL )
+        yield TV2.make_nil(TV2.make_leaf(alloc_site),alloc_site);
+      throw unimpl();
+    }
     case Type tt -> {
       if( t==Type.ANY ) yield make_leaf(alloc_site);
-      if( t == Type.XNIL || t == Type.NIL )
-        yield TV2.make_nil(TV2.make_leaf(alloc_site),alloc_site);
+      if( t==Type.ALL ) yield make_base(t,alloc_site);
       throw unimpl();
     }
     };
@@ -328,8 +344,8 @@ public class TV2 {
     _args.remove("?");  // No longer have the "?" key, not a nilable anymore
     // Nested nilable-and-not-leaf, need to fixup the nilable
     if( n.is_base() ) {
-      _flow = n._flow.meet(Type.NIL);
-      if( n._eflow!=null ) _eflow = n._eflow.meet(Type.NIL);
+      _flow = n._flow.meet(TypeNil.NIL);
+      if( n._eflow!=null ) _eflow = n._eflow.meet(TypeNil.NIL);
       if( !n._is_copy ) clr_cp();
     }
     if( n.is_fun() ) throw unimpl();
@@ -352,25 +368,22 @@ public class TV2 {
   private long dbl_uid(TV2 t) { return dbl_uid(t._uid); }
   private long dbl_uid(long uid) { return ((long)_uid<<32)|uid; }
 
-  // True if any portion allows for nil
-  public boolean has_nil() {
-    if(  _flow !=null &&  _flow.must_nil() ) return true;
-    if( _eflow !=null && _eflow.must_nil() ) return true;
-    if( _may_nil                           ) return true;
-    return false;
-  }
   // Strip off nil
   public TV2 strip_nil() {
-    if(  _flow!=null )  _flow =  _flow.join(Type.NSCALR);
-    if( _eflow!=null ) _eflow = _eflow.join(Type.NSCALR);
+    if(  _flow!=null )  _flow =  _flow.join(TypeNil.NSCALR);
+    if( _eflow!=null ) _eflow = _eflow.join(TypeNil.NSCALR);
+    if( _args!=null )
+      for( TV2 t2 : _args.values() )
+        t2.strip_nil();
     _may_nil = false;
     return this;
   }
   // Add nil
   public void add_nil() {
-    if(  _flow!=null )  _flow =  _flow.meet(Type.NIL);
-    if( _eflow!=null ) _eflow = _eflow.meet(Type.NIL);
+    if(  _flow!=null )  _flow =  _flow.meet(TypeNil.NIL);
+    if( _eflow!=null ) _eflow = _eflow.meet(TypeNil.NIL);
     _may_nil = true;
+    throw unimpl();             // Prims are structs
   }
 
   //// True if 'this isa t2'.  Must be monotonic.
@@ -435,16 +448,17 @@ public class TV2 {
   }
   Type _as_flow() {
     assert !is_unified();
-    if( is_leaf() ) return Type.SCALAR;
+    if( is_leaf() ) return TypeNil.SCALAR;
     if( is_base() ) return _flow;
     if( is_nil()  )
-      return arg("?")._as_flow().meet(Type.NIL);
+      return arg("?")._as_flow().meet(TypeNil.NIL);
     if( is_fun()  ) {
       Type tfun = ADUPS.get(_uid);
       if( tfun != null ) return tfun;  // TODO: Returning recursive flow-type functions
-      ADUPS.put(_uid, Type.XSCALAR);
+      ADUPS.put(_uid, TypeNil.XSCALAR);
       Type rez = arg(" ret")._as_flow();
-      return TypeFunPtr.make(EXT_FIDXS,size()-1,Type.ANY,rez);
+      //return TypeFunPtr.make(EXT_FIDXS,size()-1,Type.ANY,rez);
+      throw unimpl();
     }
     if( is_obj() ) {
       TypeStruct tstr = (TypeStruct)ADUPS.get(_uid);
@@ -469,7 +483,7 @@ public class TV2 {
       // is built around TypeStruct, hence the TMP wrap.
 
       // This is a Root passed-in struct which can have all aliases
-      return TypeMemPtr.make(_may_nil ? EXT_ALIASES.meet_nil() : EXT_ALIASES,tstr);
+      return TypeMemPtr.make(_may_nil,EXT_ALIASES,tstr);
     }
 
     throw unimpl();
@@ -511,7 +525,7 @@ public class TV2 {
   private void union_flow( Type t0 ) {
     if( t0==null ) return;      // Nothing to merge into
     if( _flow==null ) _flow = t0;
-    else if( t0.getClass()== _flow.getClass() || t0==Type.NIL || _flow==Type.NIL || t0==Type.XNIL || _flow==Type.XNIL ) _flow = t0.meet( _flow);
+    else if( t0.getClass()== _flow.getClass() || t0==TypeNil.NIL || _flow==TypeNil.NIL ) _flow = t0.meet( _flow);
     else if( _eflow==null ) _eflow = t0;
     else if( t0.getClass()==_eflow.getClass() ) _eflow = t0.meet(_eflow);
     // Else have both _flow and _eflow AND t0: have 3 unique type classes so
@@ -946,7 +960,7 @@ public class TV2 {
 
   public Type walk_types_out(Type t, CallEpiNode cepi) {
     assert !is_unified();
-    if( t == Type.XSCALAR ) return t;  // No lift possible
+    if( t == TypeNil.XSCALAR ) return t;  // No lift possible
     //Type tmap = T2MAP.get(this);
     //if( is_leaf() || is_err() ) { // If never mapped on input, leaf is unbound by input
     //  if( tmap==null ) return t;
@@ -1006,19 +1020,22 @@ public class TV2 {
   }
 
   // -----------------
+  // Recursively clear _is_copy, through cyclic types.  
   static final VBitSet UPDATE_VISIT  = new VBitSet();
   void clr_cp() { UPDATE_VISIT.clear(); _clr_cp();}
   private void _clr_cp() {
     TV2 ret;
     if( !_is_copy || UPDATE_VISIT.tset(_uid) ) return;
     _is_copy = false;
-    if( _deps!=null )
+    if( _deps!=null ) {
+      //add_deps_flow();
       //for( Syntax syn : _deps )
       //  if( syn instanceof Lambda lam && lam.find().arg("ret")==this )
       //    for( Apply apply : lam._applys )
       //      if( (ret=apply._fun.find().arg("ret"))!=null )
       //        ret._clr_cp();
       throw unimpl();
+    }
     if( _args != null )
       for( TV2 t2 : _args.values() )
         t2._clr_cp();
@@ -1106,6 +1123,7 @@ public class TV2 {
   // If debug is on, does NOT roll-up - no side effects.
   @Override public String toString() { return str(new SB(), new VBitSet(), get_dups(), true ).toString(); }
   public String p() { VCNT=0; VNAMES.clear(); return str(new SB(), new VBitSet(), get_dups(), false ).toString(); }
+  public SB str(SB sb) { VCNT=0; VNAMES.clear(); return str(sb, new VBitSet(), get_dups(), false ); }
   private static int VCNT;
   private static final HashMap<TV2,String> VNAMES = new HashMap<>();
   public SB str(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
@@ -1167,7 +1185,7 @@ public class TV2 {
     if( clz!=null ) {
       sb.p(clz).p(':');
       if( clz.equals("int") || clz.equals("flt"))
-        return sb.p(arg(" x")._flow);
+        return sb.p(arg(CANONICAL_INSTANCE)._flow);
     }
     final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
     sb.p(is_tup ? "(" : "@{");

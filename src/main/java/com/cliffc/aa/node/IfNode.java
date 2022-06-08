@@ -18,7 +18,7 @@ public class IfNode extends Node {
       return set_def(1,Env.ANY); // Kill test; control projections fold up other ways
     // Binary test vs 0?
     if( tst._defs._len==3 &&
-        (tst.val(1)==Type.XNIL || tst.val(2)==Type.XNIL) ) {
+        (tst.val(1)==TypeNil.NIL || tst.val(2)==TypeNil.NIL) ) {
       // Remove leading test-vs-0
       if( tst instanceof PrimNode.EQ_I64 ) throw AA.unimpl();
       if( tst instanceof PrimNode.EQ_F64 ) throw AA.unimpl();
@@ -69,14 +69,29 @@ public class IfNode extends Node {
     if( in(0) instanceof ProjNode && in(0).in(0)==this )
       return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
     Type pred = val(1);
-    if( pred == TypeInt.FALSE || pred == TypeStruct.ZERO || pred == Type.NIL || pred==Type.XNIL )
-      return TypeTuple.IF_FALSE;   // False only
-    if( pred.above_center() ? !pred.may_nil() : !pred.must_nil() )
-      return TypeTuple.IF_TRUE;   // True only
-    if( pred.above_center() ) // Wait until predicate falls
+    if( pred.above_center() )   // Wait until predicate falls
       return TypeTuple.IF_ANY;
+    if( falsey(pred) )           // Simple falsey
+      return TypeTuple.IF_FALSE; // False only
+    // If no field is must_nil
+    if( pred instanceof TypeStruct ts ) {
+      boolean truthy = true, falsey=true;
+      //for( TypeFld fld : ts ) if( fld._t.must_nil() ) truthy=false;
+      //for( TypeFld fld : ts ) if( !falsey(fld._t) )   falsey=false;
+      //if(  falsey && !truthy ) throw unimpl();
+      //if( !falsey && truthy ) return TypeTuple.IF_TRUE;
+      //if(  falsey && truthy ) throw unimpl();
+      throw unimpl();
+    } else {
+      //if( !pred.must_nil() )
+      //  return TypeTuple.IF_TRUE;   // True only
+      throw unimpl();
+    }
+    //return TypeTuple.IF_ALL;
+  }
 
-    return TypeTuple.IF_ALL;
+  private static boolean falsey( Type t ) {
+    return t == TypeNil.NIL || t == TypeNil.XNIL;
   }
 
   @Override public TV2 new_tvar(String alloc_site) { return null; }

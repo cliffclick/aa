@@ -3,9 +3,9 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.tvar.TV2;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeRPC;
+import com.cliffc.aa.type.*;
+
+import static com.cliffc.aa.AA.unimpl;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
@@ -74,9 +74,8 @@ public class PhiNode extends Node {
   }
   // All inputs unify
   @Override public boolean unify( boolean test ) {
-    if( !(in(0) instanceof RegionNode) ) return false; // Dying
+    if( !(in(0) instanceof RegionNode r) ) return false; // Dying
     if( _tvar==null ) return false; // Memory not part of HM
-    RegionNode r = (RegionNode) in(0);
     boolean progress = false;
     for( int i=1; i<_defs._len; i++ ) {
       if( r.val(i)!=Type.XCTRL && r.val(i)!=Type.ANY ) { // Only unify alive paths
@@ -104,9 +103,10 @@ public class PhiNode extends Node {
   }
 
   @Override public ErrMsg err( boolean fast ) {
-    if( _val.contains(Type.SCALAR) ||
-        _val.contains(Type.NSCALR) ) // Cannot have code that deals with unknown-GC-state
-      return ErrMsg.badGC(_badgc);
-    return null;
+    //if( _val.contains(TypeNil.SCALAR) ||
+    //    _val.contains(TypeNil.NSCALR) ) // Cannot have code that deals with unknown-GC-state
+    //  return ErrMsg.badGC(_badgc);
+    //return null;
+    throw unimpl();
   }
 }

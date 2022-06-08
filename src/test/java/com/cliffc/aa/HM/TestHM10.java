@@ -64,17 +64,17 @@ public class TestHM10 {
     //return TypeStruct.make_test(t0,t1,t2);
     throw unimpl();
   }
-  private static final TypeMemPtr tuple2  = TypeMemPtr.make(7,make_tups(Type.SCALAR,   Type.SCALAR   ));
-  private static final TypeMemPtr tuplen2 = TypeMemPtr.make(7,make_tups(Type.NSCALR,   Type.NSCALR   ));
-  private static final TypeMemPtr tuple82 = TypeMemPtr.make(7,make_tups(TypeInt.NINT8, TypeInt.NINT8 ));
+  private static final TypeMemPtr tuple2  = TypeMemPtr.make(7,make_tups(TypeNil.SCALAR,   TypeNil.SCALAR   ));
+  private static final TypeMemPtr tuplen2 = TypeMemPtr.make(7,make_tups(TypeNil.NSCALR,   TypeNil.NSCALR   ));
+  private static final TypeMemPtr tuple82 = TypeMemPtr.make(7,make_tups(TypeInt.INT8, TypeInt.INT8 ));
   private static final TypeMemPtr tuple55 = TypeMemPtr.make(7,make_tups(TypeInt.con(5),TypeInt.con(5)));
   private static final TypeFunPtr ret_tuple2 = tfs(tuple2);
   private static final TypeMemPtr tuple9  = //TypeMemPtr.make(9,TypeStruct.make(NO_DSP,
-                                            //                                  TypeFld.make("x",Type.SCALAR),
-                                            //                                  TypeFld.make("y",Type.SCALAR)));
+                                            //                                  TypeFld.make("x",TypeNil.SCALAR),
+                                            //                                  TypeFld.make("y",TypeNil.SCALAR)));
     null;
-  private static BitsAlias ptr90  () { return BitsAlias.ALL0.make( 9,10); }
-  private static BitsAlias ptr1011() { return BitsAlias.ALL0.make(10,11); }
+  private static BitsAlias ptr90  () { return BitsAlias.NALL.make( 9,10); }
+  private static BitsAlias ptr1011() { return BitsAlias.NALL.make(10,11); }
 
   // Make field holding a pointer to a struct
   private static TypeFld mptr( String fld, int alias, TypeStruct ts ) {
@@ -121,7 +121,7 @@ public class TestHM10 {
                                     "3", TypeInt.con(3));  }
 
   @Test public void test02() { run( "{ x -> (pair 3 x) }" ,
-                                    "{ A -> ( 3, A) }", tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(3),Type.SCALAR)))); }
+                                    "{ A -> ( 3, A) }", tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(3),TypeNil.SCALAR)))); }
 
   @Test public void test03() { run( "{ z -> (pair (z 0) (z \"abc\")) }" ,
                                     "{ { *[0,4]str? -> A } -> ( A, A) }", tfs(tuple2)); }
@@ -132,11 +132,11 @@ public class TestHM10 {
   }
 
   // Because {y->y} is passed in, all 'y' types must agree.
-  // This unifies 3 and 5 which results in 'nint8'
+  // This unifies 3 and 5 which results in 'int8'
   @Test public void test05() {
     run("({ id -> (pair (id 3) (id 5)) } {x->x})",
-        "( nint8, nint8)",
-        "( nint8, nint8)",
+        "( int8, int8)",
+        "( int8, int8)",
         tuple82, //TypeMemPtr.make(7,make_tups(TypeInt.con(3),TypeInt.con(5))),
         tuple82);
   }
@@ -150,7 +150,7 @@ public class TestHM10 {
         // With lift ON
         TypeMemPtr.make(7,make_tups(TypeInt.con(3),TypeMemPtr.make(4,TypeStruct.ISUSED))),
         // With lift OFF
-        //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
+        //TypeMemPtr.make(7,make_tups(TypeNil.NSCALR,TypeNil.NSCALR)),
         // GCP is weaker without HM
         tuplen2);
   }
@@ -160,7 +160,7 @@ public class TestHM10 {
     run( "{ f -> (f f) }",
          // We can argue the pretty-print should print:
          // "  A:{ A -> B }"
-         "{ A:{ A -> B } -> B }", tfs(Type.SCALAR) ); }
+         "{ A:{ A -> B } -> B }", tfs(TypeNil.SCALAR) ); }
 
   @Test public void test08() { run( "g = {f -> 5}; (g g)",
                                     "5", TypeInt.con(5)); }
@@ -170,11 +170,11 @@ public class TestHM10 {
                                     "{ A -> ( A, A) }", ret_tuple2); }
 
   @Test public void test10() { run( "{ f g -> (f g)}",
-                                    "{ { A -> B } A -> B }", tfs(Type.SCALAR) ); }
+                                    "{ { A -> B } A -> B }", tfs(TypeNil.SCALAR) ); }
 
   // Function composition
   @Test public void test11() { run( "{ f g -> { arg -> (g (f arg))} }",
-                                    "{ { A -> B } { B -> C } -> { A -> C } }", tfs(tfs(Type.SCALAR))); }
+                                    "{ { A -> B } { B -> C } -> { A -> C } }", tfs(tfs(TypeNil.SCALAR))); }
 
   // Stacked functions ignoring all function arguments
   @Test public void test12() { run( "map = { fun -> { x -> 2 } }; ((map 3) 5)",
@@ -195,7 +195,7 @@ public class TestHM10 {
         // With lift ON
         TypeMemPtr.make(7,make_tups(TypeMemPtr.ISUSED,TypeFlt.FLT64)),
         // With lift OFF
-        //TypeMemPtr.make(7,make_tups(Type.SCALAR,Type.SCALAR)),
+        //TypeMemPtr.make(7,make_tups(TypeNil.SCALAR,TypeNil.SCALAR)),
         tuple2);
   }
 
@@ -234,9 +234,9 @@ map = { fun x -> (fun x)};
         // With Lift ON
         //tfs(TypeMemPtr.make(7,make_tups(Type.XNSCALR,TypeMemPtr.make(7,make_tups(TypeInt.con(3),Type.XNSCALR))))),
         // With Lift OFF
-        tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(5),Type.SCALAR))),
+        tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(5),TypeNil.SCALAR))),
         // tfs(*[7](^=any, 5, nScalar))
-        tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(5),Type.SCALAR))));
+        tfs(TypeMemPtr.make(7,make_tups(TypeInt.con(5),TypeNil.SCALAR))));
   }
 
   @Test public void test19() { run("cons ={x y-> {cadr -> (cadr x y)}};"+
@@ -306,7 +306,7 @@ all = @{
         // With lift On
         TypeMemPtr.make(7,make_tups(TypeInt.con(3),TypeMemPtr.make(4,TypeStruct.ISUSED))),
         // With lift Off
-        //TypeMemPtr.make(7,make_tups(Type.NSCALR,Type.NSCALR)),
+        //TypeMemPtr.make(7,make_tups(TypeNil.NSCALR,TypeNil.NSCALR)),
         tuplen2);
   }
 
@@ -339,12 +339,12 @@ all = @{
 
   // Basic field test
   @Test public void test27() { run("5.x",
-                                   "Missing field x in 5", Type.SCALAR); }
+                                   "Missing field x in 5", TypeNil.SCALAR); }
 
   // Basic field test.
   @Test public void test28() { run("@{ y =3}.x",
                                    "Missing field x in @{ y = 3}",
-                                   Type.SCALAR); }
+                                   TypeNil.SCALAR); }
 
   @Test public void test29() { run("{ g -> @{x=g, y=g}}",
                                    "{ A -> @{ x = A; y = A} }", tfs(tuple9)); }
@@ -352,8 +352,8 @@ all = @{
   // Load common field 'x', ignoring mismatched fields y and z
   @Test public void test30() {
     run("{ pred -> (if pred @{x=2,y=3} @{x=3,z= \"abc\"}) .x }",
-        "{ A? -> nint8 }",
-        tfs(TypeInt.NINT8));
+        "{ A? -> int8 }",
+        tfs(TypeInt.INT8));
   }
 
   // Load some fields from an unknown struct: area of a rectangle.
@@ -369,7 +369,7 @@ all = @{
   @Test public void test32() {
     //run("map = { fcn lst -> @{ n1 = (map fcn lst.n0), v1 = (fcn lst.v0) } }; map",
     //    "{ { A -> B } C:@{ n0 = C; v0 = A; ...} -> D:@{ n1 = D; v1 = B} }",
-    //    tfs(TypeMemPtr.make(9,TypeStruct.make(NO_DSP,TypeFld.make("n1",Type.SCALAR),TypeFld.make("v1",Type.SCALAR)))));
+    //    tfs(TypeMemPtr.make(9,TypeStruct.make(NO_DSP,TypeFld.make("n1",TypeNil.SCALAR),TypeFld.make("v1",TypeNil.SCALAR)))));
     throw unimpl();
   }
 
@@ -379,7 +379,7 @@ all = @{
   @Test public void test33() {
     //run("map = { fcn lst -> (if lst @{ n1=(map fcn lst.n0), v1=(fcn lst.v0) } 0) }; map",
     //    "{ { A -> B } C:@{ n0 = C; v0 = A; ...}? -> D:@{ n1 = D; v1 = B}? }",
-    //    tfs(TypeMemPtr.make_nil(9,TypeStruct.make(NO_DSP,TypeFld.make("n1",Type.SCALAR),TypeFld.make("v1",Type.SCALAR)))));
+    //    tfs(TypeMemPtr.make_nil(9,TypeStruct.make(NO_DSP,TypeFld.make("n1",TypeNil.SCALAR),TypeFld.make("v1",TypeNil.SCALAR)))));
     throw unimpl();
   }
 
@@ -387,12 +387,12 @@ all = @{
 //  @Test public void test34() {
 //    run("map = { fcn lst -> (if lst @{ n1 = (map fcn lst.n0), v1 = (fcn lst.v0) } 0) }; (map dec @{n0 = 0, v0 = 5})",
 //        "A:@{ n1 = A; v1 = int64}?",
-//        TypeMemPtr.make_nil(9,TypeStruct.make(NO_DSP,TypeFld.make("n1",Type.SCALAR),TypeFld.make("v1",TypeInt.con(4)))));
+//        TypeMemPtr.make_nil(9,TypeStruct.make(NO_DSP,TypeFld.make("n1",TypeNil.SCALAR),TypeFld.make("v1",TypeInt.con(4)))));
 //  }
 //
 //  // try the worse-case expo blow-up test case from SO
 //  @Test public void test35() {
-//    TypeMemPtr tmps = TypeMemPtr.make(8,make_tups(Type.SCALAR,Type.SCALAR,Type.SCALAR));
+//    TypeMemPtr tmps = TypeMemPtr.make(8,make_tups(TypeNil.SCALAR,TypeNil.SCALAR,TypeNil.SCALAR));
 //    run("p0 = { x y z -> (triple x y z) };"+
 //        "p1 = (triple p0 p0 p0);"+
 //        "p2 = (triple p1 p1 p1);"+
@@ -410,7 +410,7 @@ all = @{
 //        // _9567{ -> *[0,10]@{^=any; n1=*[0,9]@{^$; n1=; v1=*[4]str}; v1=*[4]str}}}
 //        ()-> {
 //          TypeFld v1 = TypeFld.make("v1",TypeMemPtr.ISUSED);
-//          TypeStruct ts0 = TypeStruct.make(NO_DSP,TypeFld.make("n1",Type.SCALAR),v1);
+//          TypeStruct ts0 = TypeStruct.make(NO_DSP,TypeFld.make("n1",TypeNil.SCALAR),v1);
 //          TypeStruct ts1 = TypeStruct.make(NO_DSP,TypeFld.make("n1",TypeMemPtr.make_nil(9,ts0)),v1);
 //          return tfs(TypeMemPtr.make_nil(10,ts1));
 //        });
@@ -430,7 +430,7 @@ all = @{
 //  @Test public void test39() {
 //    run("x = { z -> z}; (x { y -> y.u})",
 //        "{ @{ u = A; ...} -> A }",
-//        tfs(Type.SCALAR));
+//        tfs(TypeNil.SCALAR));
 //  }
 //
 //  // Example from SimpleSub requiring 'x' to be both:
@@ -441,8 +441,8 @@ all = @{
 //    run("x = w = (x x); { z -> z}; (x { y -> y.u})",
 //        "A:Cannot unify { A -> A } and @{ u = A; ... }",
 //        "A:Cannot unify { A -> A } and @{ u = A; ... }",
-//        Type.SCALAR,
-//        Type.SCALAR);
+//        TypeNil.SCALAR,
+//        TypeNil.SCALAR);
 //  }
 //
 //  // Example from TestParse.test15:
@@ -514,8 +514,8 @@ all = @{
 //        // With lift ON
 //        TypeMemPtr.make(4,TypeStruct.ISUSED), // Both HM and GCP
 //        // With lift OFF
-//        //Type.NSCALR,
-//        Type.NSCALR);                   // GCP alone gets a very weak answer
+//        //TypeNil.NSCALR,
+//        TypeNil.NSCALR);                   // GCP alone gets a very weak answer
 //  }
 //
 //
@@ -529,7 +529,7 @@ all = @{
 //
 //  // Basic uplifting after check
 //  @Test public void test48() { run("{ pred -> tmp=(if pred @{x=3} 0); (if tmp tmp.x 4) }",
-//                                   "{ A? -> nint8 }", tfs(TypeInt.NINT8)); }
+//                                   "{ A? -> int8 }", tfs(TypeInt.INT8)); }
 //
 //
 //  // map is parametric in nil-ness
@@ -542,8 +542,8 @@ all = @{
 //  )
 //}
 //""",
-//        "{ A? -> ( 3, nint8) }",
-//        tfs(TypeMemPtr.make(7,make_tups(TypeInt.NINT8, TypeInt.NINT8 ))));
+//        "{ A? -> ( 3, int8) }",
+//        tfs(TypeMemPtr.make(7,make_tups(TypeInt.INT8, TypeInt.INT8 ))));
 //  }
 //
 //  // map is parametric in nil-ness.  Verify still nil-checking.
@@ -574,7 +574,7 @@ all = @{
 //        "{ A:@{ size = int64; ...} B:@{ next = B; val = A; ...}? -> int64 }",
 //        "{ A:@{ size = int64; ...} B:@{ next = B; val = A; ...}? -> int64 }",
 //        tfs(TypeInt.INT64),
-//        tfs(Type.SCALAR  ));
+//        tfs(TypeNil.SCALAR  ));
 //  }
 //
 //  // Create a boolean-like structure, and unify.
@@ -601,7 +601,7 @@ all = @{
 //        "",
 //        /*  An indented version of this answer
 //          @{
-//            a = nint8,
+//            a = int8,
 //            b = (),
 //            bool = @{
 //              false =        A:@{ and = { A -> A }, or = { A -> A }, thenElse = { { () -> B } { () -> B } -> B } },
@@ -610,7 +610,7 @@ all = @{
 //            }
 //          }
 //         */
-//        "@{ a = nint8; b = ( ); bool = @{ false = A:@{ and = { A -> A }; or = { A -> A }; thenElse = { { ( ) -> B } { ( ) -> B } -> B }}; force = { C? -> D:@{ and = { D -> D }; or = { D -> D }; thenElse = { { ( ) -> E } { ( ) -> E } -> E }} }; true = F:@{ and = { F -> F }; or = { F -> F }; thenElse = { { ( ) -> G } { ( ) -> G } -> G }}}}",
+//        "@{ a = int8; b = ( ); bool = @{ false = A:@{ and = { A -> A }; or = { A -> A }; thenElse = { { ( ) -> B } { ( ) -> B } -> B }}; force = { C? -> D:@{ and = { D -> D }; or = { D -> D }; thenElse = { { ( ) -> E } { ( ) -> E } -> E }} }; true = F:@{ and = { F -> F }; or = { F -> F }; thenElse = { { ( ) -> G } { ( ) -> G } -> G }}}}",
 //        () -> {
 //          Type tf   = TypeMemPtr.make(ptr1011(),
 //                                      TypeStruct.make(NO_DSP,
@@ -623,11 +623,11 @@ all = @{
 //                                                         mfun(1,"force",tf,23)));
 //          TypeStruct rez = TypeStruct.make(NO_DSP,
 //                                           // With lift ON
-//                                           //TypeFld.make("a", HM.DO_HM ? TypeInt.NINT8 : Type.SCALAR),
-//                                           //TypeFld.make("b", HM.DO_HM ? TypeMemPtr.make(BitsAlias.FULL.make(13,14),TypeStruct.maket()) : Type.SCALAR),
+//                                           //TypeFld.make("a", HM.DO_HM ? TypeInt.INT8 : TypeNil.SCALAR),
+//                                           //TypeFld.make("b", HM.DO_HM ? TypeMemPtr.make(BitsAlias.FULL.make(13,14),TypeStruct.maket()) : TypeNil.SCALAR),
 //                                           // With lift OFF
-//                                           TypeFld.make("a", Type.SCALAR),
-//                                           TypeFld.make("b", Type.SCALAR),
+//                                           TypeFld.make("a", TypeNil.SCALAR),
+//                                           TypeFld.make("b", TypeNil.SCALAR),
 //                                           TypeFld.make("bool",xbool));
 //          return TypeMemPtr.make(15,rez);
 //        }
@@ -637,11 +637,11 @@ all = @{
 //
 //  // Simple nil/default test; takes a nilable but does not return one.
 //  @Test public void test53() { run( "{ x y -> (if x x y) }",
-//                                    "{ A? A -> A }", tfs(Type.SCALAR));  }
+//                                    "{ A? A -> A }", tfs(TypeNil.SCALAR));  }
 //
 //  // Regression test; double nested.  Failed to unify x and y.
 //  @Test public void test54() { run( "{ x y -> (if x (if x x y) y) }",
-//                                    "{ A? A -> A }", tfs(Type.SCALAR));  }
+//                                    "{ A? A -> A }", tfs(TypeNil.SCALAR));  }
 //
 //
 //  // Regression test; was NPE.  Was testMyBoolsNullPException from marco.servetto@gmail.com.
@@ -699,7 +699,7 @@ all = @{
 //        //*[10]@{^=any; n1=*[9]@{^$; n1=; v1=7}; v1$}
 //        ()->{
 //          TypeFld v1 = TypeFld.make("v1",TypeInt.con(7));
-//          TypeStruct ts0 = TypeStruct.make(NO_DSP,TypeFld.make("n1",Type.SCALAR           ),v1);
+//          TypeStruct ts0 = TypeStruct.make(NO_DSP,TypeFld.make("n1",TypeNil.SCALAR           ),v1);
 //          TypeStruct ts1 = TypeStruct.make(NO_DSP,TypeFld.make("n1",TypeMemPtr.make(9,ts0)),v1);
 //          return TypeMemPtr.make(10,ts1);
 //            });
@@ -845,7 +845,7 @@ all = @{
 //         TypeMemPtr z    = TypeMemPtr.make(13,TypeStruct.make(NO_DSP,mfun("add_",23),mfun(1,"pred",Type.XSCALAR,14),mfun(1,"succ",succ,22),mfun(1,"zero",bt._t,21)));
 //         TypeFld n = mptr("n",15,TypeStruct.make(NO_DSP,mfun(1,"s",succ,28),TypeFld.make("z",z)));
 //         TypeFld one     = TypeFld.make("one"  ,succ);
-//         TypeFld two     = TypeFld.make("two"  ,Type.SCALAR);
+//         TypeFld two     = TypeFld.make("two"  ,TypeNil.SCALAR);
 //         TypeFld three   = TypeFld.make("three",succ);
 //         Type rez = TypeMemPtr.make(16,TypeStruct.make(NO_DSP,b,n,one,two,three));
 //         return rez;
@@ -872,7 +872,7 @@ all = @{
 //        "(sx self1)"+
 //        "",
 //        "A:@{ succ=A}",
-//        TypeMemPtr.make(9,TypeStruct.make(NO_DSP,TypeFld.make("succ",Type.SCALAR))));
+//        TypeMemPtr.make(9,TypeStruct.make(NO_DSP,TypeFld.make("succ",TypeNil.SCALAR))));
 //  }
 //
 //  // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
@@ -892,7 +892,7 @@ all = @{
 //  // pass in a field 'a'... and still no error.  Fixed.
 //  @Test public void test62() { run("f = { p1 -> p1.a };"+"(f @{b=2.3})",
 //                                    "Missing field a",
-//                                   Type.SCALAR);  }
+//                                   TypeNil.SCALAR);  }
 //
 //  @Test public void test63() {
 //    run("A=@{x=3, y=3.2};"+
@@ -900,8 +900,8 @@ all = @{
 //        "rez = { pred -> (if pred A B)};"+
 //        "rez"+
 //        "",
-//        "{ A? -> @{x=nint8} }",
-//        () -> tfs(TypeMemPtr.make(ptr90(),TypeStruct.make(NO_DSP,TypeFld.make("x",TypeInt.NINT8)))));
+//        "{ A? -> @{x=int8} }",
+//        () -> tfs(TypeMemPtr.make(ptr90(),TypeStruct.make(NO_DSP,TypeFld.make("x",TypeInt.INT8)))));
 //  }
 //
 //  // Broken from Marco; function 'f' clearly uses 'p2.a' but example 'res1' does not
@@ -914,11 +914,11 @@ all = @{
 //
 //        "@{ f    =  { A:@{ a=B;... } A -> A };"+
 //        "   res1 = @{ a = Missing field a };"+
-//        "   res2 = @{ a=nint8; b=nflt32 }"+
+//        "   res2 = @{ a=int8; b=nflt32 }"+
 //        "}",
 //        "@{ f    =  { A:@{ a=B;... } A -> A };"+
 //        "   res1 = @{ a = Missing field a };"+
-//        "   res2 = @{ a=nint8; b=nflt32 }"+
+//        "   res2 = @{ a=int8; b=nflt32 }"+
 //        "}",
 //        () -> {
 //          //*[13]@{^=any; f=[15]{any }; res1=*[9,10,11,12]($); res2=$}
@@ -927,7 +927,7 @@ all = @{
 //        },
 //        () -> {
 //          //*[13]@{^=any; f=[15]{any }; res1=*[9,10,11,12]($); res2=$}
-//          return TypeMemPtr.make(13, TypeStruct.make(NO_DSP,mfun(2,"f",Type.SCALAR,15),TypeFld.make("res1",Type.SCALAR),TypeFld.make("res2",Type.SCALAR)));
+//          return TypeMemPtr.make(13, TypeStruct.make(NO_DSP,mfun(2,"f",TypeNil.SCALAR,15),TypeFld.make("res1",TypeNil.SCALAR),TypeFld.make("res2",TypeNil.SCALAR)));
 //        });
 //  }
 //
@@ -1055,8 +1055,8 @@ all = @{
 //        TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.ISUSED)),
 //        TypeMemPtr.make(8, make_tups(TypeFlt.NFLT32, TypeFlt.NFLT32, TypeMemPtr.ISUSED)));
 //        // With lift OFF
-//        //TypeMemPtr.make(8, make_tups(Type.SCALAR  , Type.SCALAR  , TypeMemPtr.ISUSED)),
-//        //TypeMemPtr.make(8, make_tups(Type.SCALAR  , Type.SCALAR  , TypeMemPtr.ISUSED)) );
+//        //TypeMemPtr.make(8, make_tups(TypeNil.SCALAR  , TypeNil.SCALAR  , TypeMemPtr.ISUSED)),
+//        //TypeMemPtr.make(8, make_tups(TypeNil.SCALAR  , TypeNil.SCALAR  , TypeMemPtr.ISUSED)) );
 //  }
 
 }

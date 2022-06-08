@@ -2,9 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV2;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.type.*;
 import org.jetbrains.annotations.NotNull;
 
 import static com.cliffc.aa.AA.unimpl;
@@ -90,8 +88,8 @@ public class CastNode extends Node {
       Type omt = maynil._flow;
       Type ont = notnil._flow;
       Type mt = omt.meet(ont);
-      Type mt0 = mt.meet(Type.NIL);
-      Type nt0 = mt.join(Type.NSCALR);
+      Type mt0 = mt.meet(TypeNil.NIL);
+      Type nt0 = mt.join(TypeNil.NSCALR);
       if( mt0!=omt ) { maynil._flow = mt0; progress=true; }
       if( nt0!=ont ) { notnil._flow = nt0; progress=true; }
 
@@ -99,8 +97,8 @@ public class CastNode extends Node {
       Type one = notnil._eflow;
       Type mte = ome==null ? one : (one==null ? ome : ome.meet(one));
       if( mte!=null ) {
-        Type mt1 = mte.meet(Type.NIL);
-        Type nt1 = mte.join(Type.NSCALR);
+        Type mt1 = mte.meet(TypeNil.NIL);
+        Type nt1 = mte.join(TypeNil.NSCALR);
         if( mt1 != ome ) { maynil._eflow = mt1; progress = true; }
         if( nt1 != one ) { notnil._eflow = nt1; progress = true; }
       }

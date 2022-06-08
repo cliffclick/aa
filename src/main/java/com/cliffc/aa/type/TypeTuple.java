@@ -20,7 +20,6 @@ public class TypeTuple extends Type<TypeTuple> {
   // If visit is null, children have had their hash already computed.
   // If visit is not null, children need to be recursively visited.
   @Override public long static_hash( ) { throw unimpl(); }
-  @Override public long lwalk( LongStringFunc map, LongOp reduce ) { throw unimpl(); }
   @Override long compute_hash() {
     Util.add_hash(super.static_hash() ^ (_any?0:2047) ^ ((long) _ts.length <<2));
     for( Type t : _ts )
@@ -92,11 +91,11 @@ public class TypeTuple extends Type<TypeTuple> {
 
   // This is the starting state of the program; CTRL is active and memory is empty.
   public  static final TypeTuple START_STATE = make(CTRL, TypeMem.ANYMEM);
-  public  static final TypeTuple EXIT_STATE = make(Type.SCALAR,TypeFunPtr.GENERIC_FUNPTR);
+  public  static final TypeTuple EXIT_STATE = make(TypeNil.SCALAR,TypeFunPtr.GENERIC_FUNPTR);
   public  static final TypeTuple  RET = make(CTRL, TypeMem.ALLMEM, ALL); // Type of RetNodes
   public  static final TypeTuple CALLE= make(CTRL, TypeMem.ALLMEM, ALL); // Type of CallEpiNodes
-  public  static final TypeTuple TEST0= make(CTRL, TypeMem.ALLMEM, TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
-  public  static final TypeTuple TEST1= make(CTRL, TypeMem.ANYMEM, TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
+  public  static final TypeTuple TEST0= make(CTRL, TypeMem.ALLMEM, TypeFunPtr.GENERIC_FUNPTR, TypeNil.SCALAR); // Call with 1 arg
+  public  static final TypeTuple TEST1= make(CTRL, TypeMem.ANYMEM, TypeFunPtr.GENERIC_FUNPTR, TypeNil.SCALAR); // Call with 1 arg
   // Arguments
   public  static final TypeTuple INT64      = make(CTRL, TypeMem.ALLMEM, TypeStruct.INT); // {int->flt}
   public  static final TypeTuple FLT64      = make(CTRL, TypeMem.ALLMEM, TypeStruct.FLT); // {flt->flt}
@@ -124,7 +123,6 @@ public class TypeTuple extends Type<TypeTuple> {
   // Standard Meet.  Tuples have an infinite extent of 'ALL' for low, or 'ANY'
   // for high.  After the meet, the infinite tail is trimmed.
   @Override protected Type xmeet( Type t ) {
-    if( t._type != TTUPLE ) return ALL; // Tuples are internal types only, not user exposed
     TypeTuple tt = (TypeTuple)t;
     return _ts.length < tt._ts.length ? xmeet1(tt) : tt.xmeet1(this);
   }
@@ -154,20 +152,11 @@ public class TypeTuple extends Type<TypeTuple> {
 
 
   @Override public boolean above_center() { return _any; }
-  // True if all internals may_be_con
-  @Override public boolean may_be_con() {
-    for( Type _t : _ts ) if( !_t.may_be_con() ) return false;
-    return true;
-  }
   // True if all internals is_con
   @Override public boolean is_con() {
     for( Type _t : _ts ) if( !_t.is_con() ) return false;
     return true;
   }
-  @Override public boolean must_nil() { return false; }
-  @Override TypeTuple not_nil() { return this; }
-  @Override public Type meet_nil(Type nil) { return ALL; }
-
   public TypeTuple sharptr( TypeMem mem ) {
     Type[] ts = Types.clone(_ts);
     for( int i=0; i<ts.length; i++ )
@@ -181,10 +170,4 @@ public class TypeTuple extends Type<TypeTuple> {
     return make0(_any,ts);
   }
 
-  @Override TypeTuple _widen() {
-    Type[] ts = Types.get(_ts.length);
-    for( int i=0; i<ts.length; i++ )
-      ts[i] = _ts[i].widen();
-    return make(ts);
-  }
 }

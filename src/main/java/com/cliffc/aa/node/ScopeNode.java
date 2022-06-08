@@ -111,11 +111,12 @@ public class ScopeNode extends Node {
 
     int progress = _defs._len;
     // If the result is never a function
-    if( !TypeFunPtr.GENERIC_FUNPTR.dual().isa(rez._val) || rez._val==Type.XNIL )
+    if( !TypeFunPtr.GENERIC_FUNPTR.dual().isa(rez._val) || rez._val==TypeNil.NIL )
       // Wipe out extra function edges.  They are there to act "as if" the
       // exit-scope calls them; effectively an extra wired call use with the
       // most conservative caller.
-      while( _defs._len > RET_IDX ) pop();
+      //while( _defs._len > RET_IDX ) pop();
+      throw unimpl();
 
     // Some escaping functions are dead
     for( int i=RET_IDX; i<len(); i++ )
@@ -125,7 +126,7 @@ public class ScopeNode extends Node {
     // If the result is a function, wipe out wrong fidxs
     if( rez._val instanceof TypeFunPtr ) {
       BitsFun fidxs = ((TypeFunPtr)rez._val)._fidxs;
-      if( fidxs != BitsFun.ALL0 )
+      if( fidxs != BitsFun.NALL )
         for( int i=RET_IDX; i<_defs._len; i++ )
           if( !fidxs.test(((RetNode)in(i))._fidx) )
             //remove(i--);
@@ -218,12 +219,12 @@ public class ScopeNode extends Node {
   private BitsFun _escache_escs;
   public BitsFun top_escapes() {
     if( _val.above_center() ) return BitsFun.EMPTY;
-    if( is_prim() ) return BitsFun.ALL0; // All the primitives escape
+    if( is_prim() ) return BitsFun.NALL; // All the primitives escape
     Type trez = rez()._val;
     Type tmem = mem()._val;
     if( _escache_trez == trez &&  _escache_tmem == tmem ) return _escache_escs; // Cache hit
     // Cache miss, compute the hard way
-    if( TypeFunPtr.GENERIC_FUNPTR.isa(trez) ) return BitsFun.ALL0; // Can lift to any function
+    if( TypeFunPtr.GENERIC_FUNPTR.isa(trez) ) return BitsFun.NALL; // Can lift to any function
     TypeMem tmem2 = tmem instanceof TypeMem tmem3 ? tmem3 : tmem.oob(TypeMem.ALLMEM);
     BitsFun fidxs = trez.all_reaching_fidxs(tmem2);
     _escache_trez = trez;
@@ -237,7 +238,7 @@ public class ScopeNode extends Node {
   void check_and_wire() {
     if( this==Env.SCP_0 ) return; // Do not wire the escaping primitives?
     BitsFun escs = top_escapes();
-    if( escs==BitsFun.ALL0 ) return; // Error exit
+    if( escs==BitsFun.NALL ) return; // Error exit
     for( int fidx : escs ) {
       boolean found=false;
       for( int i=RET_IDX; i<len(); i++ )

@@ -22,6 +22,7 @@ public class Work<E extends IntSupplier> extends BitSetSparse {
   // Bulk adders
   public void add(E[] es) { if(es!=null) for( E e : es ) add(e); }
   public void addAll(Ary<? extends E> es) { if( es!=null ) for( E e : es ) add(e); }
+  public void addAll(Work<E> work) { for( Object o : work._work ) add((E)o); }
   public boolean on(E e) { return test(e.getAsInt()); }
   // Pull a psuedo-random element.  Order depends on rseed.
   public E pop() {

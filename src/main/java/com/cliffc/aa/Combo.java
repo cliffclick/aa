@@ -214,14 +214,14 @@ public abstract class Combo {
   static private void _walk_root_funs(Type flow) {
     if( RVISIT.tset(flow._uid) ) return;
     // Find any functions
-    if( flow instanceof TypeFunPtr tfp && tfp._fidxs != BitsFun.ALL0 ) {
+    if( flow instanceof TypeFunPtr tfp && tfp._fidxs != BitsFun.NALL ) {
       // Walk all functions; these might be called by external callers
       for( int fidx : tfp._fidxs ) {
         RetNode ret = RetNode.get(fidx);
         Node[] parms = ret.fun().parms();
         for( int i=AA.ARG_IDX; i<parms.length; i++ ) {
           ConNode defalt = (ConNode)parms[i].in(1);
-          Type aflow = AA.DO_HMT ? parms[i].tvar().as_flow() : Type.SCALAR;
+          Type aflow = AA.DO_HMT ? parms[i].tvar().as_flow() : TypeNil.SCALAR;
           Type bflow = aflow.meet(defalt._val);
           if( bflow != defalt._val )
             throw unimpl();            // fun.arg_meet(i,aflow,work);

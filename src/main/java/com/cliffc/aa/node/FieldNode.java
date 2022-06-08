@@ -24,7 +24,6 @@ public class FieldNode extends Node {
     // For named prototypes, if the field load fails, try again in the
     // prototype.  Only valid for final fields.
     Type t = val(0);
-    if( t==Type.NIL || t==Type.XNIL ) t = TypeStruct.ZERO;
     if( !(t instanceof TypeStruct ts) ) return null;
     StructNode clz = proto(ts.clz());
     if( clz==null ) return null;
@@ -40,7 +39,7 @@ public class FieldNode extends Node {
       for( int i=1; i<phi.len(); i++ )
         if( phi.in(i)._op == OP_SETFLD ) fcnt++;
       if( fcnt>0 ) {
-        Node lphi = new PhiNode(Type.SCALAR,phi._badgc,phi.in(0));
+        Node lphi = new PhiNode(TypeNil.SCALAR,phi._badgc,phi.in(0));
         for( int i=1; i<phi.len(); i++ )
           lphi.add_def(Env.GVN.add_work_new(new FieldNode(phi.in(i),_fld)));
         subsume(lphi);
@@ -54,7 +53,6 @@ public class FieldNode extends Node {
 
   @Override public Type value() {
     Type t = val(0);
-    if( t==Type.NIL || t==Type.XNIL ) t = TypeStruct.ZERO;
     if( !(t instanceof TypeStruct ts) )
       return t.oob();           // Input is not a Struct
     TypeFld fld = ts.get(_fld);
@@ -64,7 +62,7 @@ public class FieldNode extends Node {
     StructNode clz = proto(ts.clz());
     if( clz==null ) return t.oob();
     TypeFld pfld = ((TypeStruct) clz._val).get(_fld);
-    if( pfld == null ) return t.oob(Type.SCALAR);
+    if( pfld == null ) return t.oob(TypeNil.SCALAR);
     assert pfld._access == TypeFld.Access.Final;
     // If this is a function, act as-if it was pre-bound to 'this' argument
     if( !(pfld._t instanceof TypeFunPtr tfp) || tfp.has_dsp() )

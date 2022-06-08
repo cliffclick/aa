@@ -44,6 +44,8 @@ public interface Cyclic {
     if( map != null )
       map.replaceAll((k,v) -> v.interned() ? v : v.intern_get());
     // Free anything interned to a previous Type
+    while( SCC_FREE_FLDS._len>0 )
+      SCC_FREE_FLDS.pop().flds_free();
     while( SCC_FREE._len>0 )
       SCC_FREE.pop().free(null);
 
@@ -55,13 +57,14 @@ public interface Cyclic {
 
   // -----------------------------------------------------------------
   // All SCCs are marked and colored (with leader color).
-  // Outside of SCCs, do a normal DAG recursive install.
+  // Outside SCCs, do a normal DAG recursive installation.
   // For an SCC, effectively do the whole SCC as a single lump.
 
   // Passed-in the current SCC color, and SCC-in-progress number.
   // The SCC depth points to an Ary of members.
 
   Ary<Type> SCC_FREE = new Ary<>(Type.class);
+  Ary<TypeStruct> SCC_FREE_FLDS = new Ary<>(TypeStruct.class);
   Ary<Ary<Type>> SCC_MEMBERS = new Ary<Ary<Type>>(new Ary[1],0);
   private static <T extends Type> T dag_install(T t, final int scc_depth, Type scc_leader) {
     if( t.interned() ) return t; // No change to interned already
@@ -112,22 +115,23 @@ public interface Cyclic {
       // in a different order on a later install.  Requires 2 passes.
       long cyc_hash=0;
       for( Type c : ts )  cyc_hash ^= c.static_hash(); // Just XOR all the static hashes
-      if( cyc_hash==0 ) cyc_hash = 0xcafebabe;
-      for( Type c : ts )  c._cyc_hash = cyc_hash;
-      for( Type c : ts )  c._hash = c.compute_hash();
+      if( cyc_hash==0 ) cyc_hash = 0xcafebabe;         // Disallow zero hash
+      for( Type c : ts )  c._cyc_hash = cyc_hash;      // Set cyc_hash to the same for all cycle members
+      for( Type c : ts )  c._hash = c.compute_hash();  // Now compute proper hash - depends on cyc_hash plus the member specifics
 
       // Since all hashed (but no duals) can check for a prior intern
       T old = (T)t.intern_get();
       if( old!=null ) {
-        SCC_FREE.addAll(ts); // Free the old, return prior
-        t=old;
+        SCC_FREE.addAll(ts);    // Free the old, return prior
+        for( Type t2 : ts ) if( t2 instanceof TypeStruct ts2 ) SCC_FREE_FLDS.add(ts2);
+        t=old;                  // Use the old instead of new-just-hashed
       } else {
         // Keep the entire cycle.  xdual/rdual/hash/retern
         Type.RECURSIVE_MEET++; // Stop xdual interning TypeFlds
-        long dcyc_hash = Util.rot(cyc_hash,32);
+        long dcyc_hash = Util.rot(cyc_hash,32); // Crappy dual-cyc_hash
         for( Type c : ts ) { Type d = c._dual = c.xdual(); d._dual = c; d._cyc_hash = dcyc_hash; }
         Type dleader = leader.dual();
-        dleader.set_cyclic(dleader);
+        dleader.set_cyclic(dleader); // Dual cycle-leader, head of the dual cycle
         for( Type c : ts ) { c.rdual(); c._dual.set_cyclic(dleader); c._dual._hash = c._dual.compute_hash(); }
         for( Type c : ts ) c.retern()._dual.retern();
         Type.RECURSIVE_MEET--; // Allow xdual to intern TypeFlds
@@ -183,8 +187,7 @@ public interface Cyclic {
     ON_REACH.tset(head._uid);
     for( int idx=0; idx < REACHABLE._len; idx++ ) {
       Type t = REACHABLE.at(idx);
-      if( !t.interned() && !(t instanceof Cyclic) )
-        throw unimpl();
+      assert t.interned() || t instanceof Cyclic;
       if( !t.interned() && t instanceof Cyclic cyc )
         t.walk((tc,ignore) -> {
             if( !ON_REACH.tset(tc._uid) && (!tc.interned() || also_interned) )
@@ -545,7 +548,7 @@ public interface Cyclic {
     return err==0;
   }
 
-  // Report a path-difference between two Types.  Usefule for debugging large types.
+  // Report a path-difference between two Types.  Useful for debugging large types.
   final class Link { Link _nxt; int _d; Type _t0,_t1;
     static Link min(Link l0, Link l1) {
       if( l0==null ) return l1;

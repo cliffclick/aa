@@ -154,7 +154,7 @@ public class StoreNode extends Node {
     Node adr = adr();
 
     // If Store is of a memory-writer, and the aliases do not overlap, make parallel with a Join
-    if( adr._val instanceof TypeMemPtr tmp && (tmp._aliases!=BitsAlias.NIL.dual()) &&
+    if( adr._val instanceof TypeMemPtr tmp && 
         mem.is_mem() && mem.check_solo_mem_writer(this) ) {
       Node head2=null;
       if( mem instanceof StoreNode ) head2=mem;
@@ -183,13 +183,14 @@ public class StoreNode extends Node {
 
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;
-    if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when writing",null);
-    if( !(tadr instanceof TypeMemPtr ptr) )
-      return bad("Unknown",fast,null); // Not a pointer nor memory, cannot store a field
-    Type tmem = mem()._val;
-    if( tmem.above_center() ) return null;
-    if( !(tmem instanceof TypeMem) ) return bad("Unknown",fast,null);
-    return null;
+    //if( tadr.must_nil() ) return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when writing",null);
+    //if( !(tadr instanceof TypeMemPtr ptr) )
+    //  return bad("Unknown",fast,null); // Not a pointer nor memory, cannot store a field
+    //Type tmem = mem()._val;
+    //if( tmem.above_center() ) return null;
+    //if( !(tmem instanceof TypeMem) ) return bad("Unknown",fast,null);
+    //return null;
+    throw unimpl();
   }
   private ErrMsg bad( String msg, boolean fast, TypeStruct to ) {
     if( fast ) return ErrMsg.FAST;

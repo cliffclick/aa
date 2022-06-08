@@ -100,7 +100,7 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   public static TypeFld malloc( String fld ) { return POOLS[TFLD].<TypeFld>malloc().init(fld,null,Access.Final); }
   public static TypeFld make( String fld, Type t, Access access ) { return malloc(fld,t,access).hashcons_free(); }
   public static TypeFld make( String fld, Type t ) { return make(fld,t,Access.Final); }
-  public static TypeFld make( String fld ) { return make(fld,Type.SCALAR,Access.Final); }
+  public static TypeFld make( String fld ) { return make(fld,TypeNil.SCALAR,Access.Final); }
   public static TypeFld make( Type def ) { return make(fldBot,def,Access.Final); }
   public static TypeFld make_dsp(Type t) { return make("^",t,Access.Final); }
   // Make a not-interned version for building cyclic types
@@ -213,8 +213,6 @@ public class TypeFld extends Type<TypeFld> implements Cyclic {
   @Override public boolean above_center() { return _t.above_center(); }
   @Override public boolean is_con() { return _t.is_con(); }
   @Override public TypeFld simple_ptr() { return make_from(_t.simple_ptr()); }
-  @Override        TypeFld not_nil() { return make_from(_t.not_nil()); }
-  @Override public TypeFld meet_nil(Type nil) { return make_from(_t.meet_nil(nil)); }
 
   // Make a Type, replacing all dull pointers from the matching types in mem.
   @Override public TypeFld make_from(Type head, TypeMem mem, VBitSet visit) {

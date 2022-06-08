@@ -8,6 +8,7 @@ import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.AA.*;
 import static com.cliffc.aa.type.TypeFld.Access;
+import static com.cliffc.aa.type.TypeStruct.CANONICAL_INSTANCE;
 
 // Primitives are nodes to do primitive operations.  Internally they carry a
 // '_formals' to type their arguments.  Similar to functions and FunNodes and
@@ -99,8 +100,8 @@ public abstract class PrimNode extends Node {
     PRIMS = allprims.asAry();
 
     // Build the int and float types and prototypes
-    install("int",INTS);
-    install("flt",FLTS);
+    install("int",INTS,TypeStruct.INT);
+    install("flt",FLTS,TypeStruct.FLT);
 
     // Math package
     install_math(rand);
@@ -112,25 +113,27 @@ public abstract class PrimNode extends Node {
   public static TypeStruct make_flt(double d) { return TypeStruct.make_flt(TypeFlt.con(d)); }
 
   public static TypeStruct make_wrap(Type t) {
-    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",t,TypeFlds.EMPTY);
+    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",false,TypeFld.make(CANONICAL_INSTANCE,t));
   }
-  public static TypeInt unwrap_i(Type t) { return (TypeInt)((TypeStruct)t)._def; }
-  public static TypeFlt unwrap_f(Type t) { return (TypeFlt)((TypeStruct)t)._def; }
-  public static long   unwrap_ii(Type t) { return t==Type.NIL ? 0 : unwrap_i(t).getl(); }
+  public static TypeInt unwrap_i(Type t) { return (TypeInt)((TypeStruct)t).at(CANONICAL_INSTANCE); }
+  public static TypeFlt unwrap_f(Type t) { return (TypeFlt)((TypeStruct)t).at(CANONICAL_INSTANCE); }
+  public static long   unwrap_ii(Type t) { return t==TypeNil.NIL ? 0 : unwrap_i(t).getl(); }
   public static double unwrap_ff(Type t) { return unwrap_f(t).getd(); }
 
-  private static void install( String s, PrimNode[] prims ) {
+  // Make and install a primitive Clazz.
+  private static void install( String s, PrimNode[] prims, TypeStruct canonical_prim ) {
     String tname = (s+":").intern();
     StructNode rec = new StructNode(false,false);
     for( PrimNode prim : prims ) prim.as_fun(rec,true);
     for( Node n : rec._defs )
       if( n instanceof UnresolvedNode unr )
-        Env.GVN.add_work_new(unr.define());
+        Env.GVN.add_work_new(unr.define()); // Flag all overloaded prims as being known
+    rec.add_fld(TypeFld.make(CANONICAL_INSTANCE,canonical_prim),Node.con(canonical_prim),null);
     rec.init();
     rec.close();
-    Env.PROTOS.put(s,rec);
-    Env.SCP_0.add_type(tname,rec);
-    // Inject the primitive class above top-level display
+    Env.PROTOS.put(s,rec);         // clazz String -> clazz Struct mapping, for values
+    Env.SCP_0.add_type(tname,rec); // type  String -> clazz Struct mapping, for types
+    // Inject the primitive class into scope above top-level display
     alloc_inject(rec,s);
   }
 
@@ -170,12 +173,12 @@ public abstract class PrimNode extends Node {
     alloc_inject(rec,"math");
   }
 
-  // Alloc and inject above top display
+  // Allocate and inject above top display
   private static void alloc_inject(StructNode rec, String name) {
     // Inject the primitive class above top-level display
     Node mem = Env.SCP_0.mem();
     NewNode dsp = (NewNode)mem.in(0);
-    NewNode nnn = new NewNode(dsp.mem(),rec).init();
+    NewNode nnn = new NewNode(dsp.mem(),rec).init(); // Allocate primitive clazz; they have memory
     dsp.set_def(MEM_IDX,new MProjNode(nnn).init());
     Node ptr = new ProjNode(nnn,REZ_IDX).init();
     Env.STK_0.add_fld(TypeFld.make(name,ptr._val),ptr,null);
@@ -204,7 +207,7 @@ public abstract class PrimNode extends Node {
       Type tactual = TS[i-DSP_IDX] = val(i-DSP_IDX);
       Type tformal = _formals.at(i);
       Type t = tformal.dual().meet(tactual);
-      if( !t.is_con() && tactual!=Type.NIL ) {
+      if( !t.is_con() ) {
         is_con = false;         // Some non-constant
         if( t.above_center() ) has_high=true;
       }
@@ -232,9 +235,12 @@ public abstract class PrimNode extends Node {
     progress |= atx(tvar(),_ret,test);
     return progress;
   }
-  private static boolean atx(TV2 tv, Type tprim, boolean test) {
-    if( tv.is_base() && tv._flow==tprim ) return false;
-    return tv.unify(TV2.make_base(tprim,"PrimNode"),test);
+  private static boolean atx(TV2 tv, Type tformal, boolean test) {
+    if( tv._flow==tformal ) return false; // ALL-vs-ALL
+    if( tv.is_obj() && tformal instanceof TypeStruct tsp &&
+        tv.arg(CANONICAL_INSTANCE)._flow.isa(tsp.get(CANONICAL_INSTANCE)._t) )
+      return false; // E.g. TypeStruct.INT vs TV2.args("clz")=="int"
+    return tv.unify(TV2.make(tformal,"PrimNode"),test);
   }
 
   @Override public ErrMsg err( boolean fast ) {
@@ -285,14 +291,15 @@ public abstract class PrimNode extends Node {
     @Override public Type value() {
       Type t0 = val(0);
       if( t0==Type.ANY ) return TypeStruct.BOOL.dual();
-      if( t0 == Type.XNIL || t0 == Type. NIL )
+      if( t0 == TypeNil.NIL || t0 == TypeNil.XNIL )
         return make_int(1);     // !nil is 1
       if( t0==Type.ALL ) return TypeStruct.BOOL;
       Type t1 = unwrap_i(t0);
-      if( t1==TypeInt.ZERO ) return make_int(1);
-      if( t1. may_nil() ) return TypeStruct.BOOL.dual();
-      if( t1.must_nil() ) return TypeStruct.BOOL;
-      return Type.NIL;          // Cannot be a nil, so return a nil
+      //if( t1==TypeInt.ZERO ) return make_int(1);
+      //if( t1. may_nil() ) return TypeStruct.BOOL.dual();
+      //if( t1.must_nil() ) return TypeStruct.BOOL;
+      //return Type.NIL;          // Cannot be a nil, so return a nil
+      throw unimpl();
     }
     @Override public Type apply( Type[] args ) { throw AA.unimpl(); }
   }
@@ -313,7 +320,7 @@ public abstract class PrimNode extends Node {
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpF64 extends PrimNode {
     Prim2RelOpF64( String name ) { super(name,TypeTuple.FLT64_FLT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(unwrap_ff(args[0]),unwrap_ff(args[1]))?make_int(1):Type.NIL; }
+    @Override public Type apply( Type[] args ) { return op(unwrap_ff(args[0]),unwrap_ff(args[1]))?make_int(1):TypeNil.NIL; }
     abstract boolean op( double x, double y );
   }
 
@@ -327,7 +334,7 @@ public abstract class PrimNode extends Node {
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpFI64 extends PrimNode {
     Prim2RelOpFI64( String name ) { super(name,TypeTuple.FLT64_INT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(unwrap_ff(args[0]),unwrap_ii(args[1]))?make_int(1):Type.NIL; }
+    @Override public Type apply( Type[] args ) { return op(unwrap_ff(args[0]),unwrap_ii(args[1]))?make_int(1):TypeNil.NIL; }
     abstract boolean op( double x, long y );
   }
 
@@ -380,8 +387,7 @@ public abstract class PrimNode extends Node {
       if( t0==Type.ANY || t1==Type.ANY ) return TypeStruct.INT.dual();
       if( t0==Type.ALL || t1==Type.ALL ) return TypeStruct.INT;
       // 0 AND anything is 0
-      if( t0 == Type. NIL || t1 == Type. NIL ) return Type. NIL;
-      if( t0 == Type.XNIL || t1 == Type.XNIL ) return Type.XNIL;
+      if( t0 == TypeNil.NIL || t1 == TypeNil.NIL ) return TypeNil.NIL;
       // If either is high - results might fall to something reasonable
       t0 = unwrap_i(t0);
       t1 = unwrap_i(t1);
@@ -410,8 +416,8 @@ public abstract class PrimNode extends Node {
       if( t0==Type.ANY || t1==Type.ANY ) return TypeStruct.INT.dual();
       if( t0==Type.ALL || t1==Type.ALL ) return TypeStruct.INT;
       // 0 OR anything is that thing
-      if( t0 == Type.NIL || t0 == Type.XNIL ) return t1;
-      if( t1 == Type.NIL || t1 == Type.XNIL ) return t0;
+      if( t0 == TypeNil.NIL ) return t1;
+      if( t1 == TypeNil.NIL ) return t0;
       t0 = unwrap_i(t0);
       t1 = unwrap_i(t1);
       // If either is high - results might fall to something reasonable
@@ -434,7 +440,7 @@ public abstract class PrimNode extends Node {
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpI64 extends PrimNode {
     Prim2RelOpI64( String name ) { super(name,TypeTuple.INT64_INT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(unwrap_ii(args[0]),unwrap_ii(args[1]))?make_int(1):Type.NIL; }
+    @Override public Type apply( Type[] args ) { return op(unwrap_ii(args[0]),unwrap_ii(args[1]))?make_int(1):TypeNil.NIL; }
     abstract boolean op( long x, long y );
   }
 
@@ -447,7 +453,7 @@ public abstract class PrimNode extends Node {
 
   abstract static class Prim2RelOpIF64 extends PrimNode {
     Prim2RelOpIF64( String name ) { super(name,TypeTuple.INT64_FLT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(unwrap_ii(args[0]),unwrap_ff(args[1]))?make_int(1):Type.NIL; }
+    @Override public Type apply( Type[] args ) { return op(unwrap_ii(args[0]),unwrap_ff(args[1]))?make_int(1):TypeNil.NIL; }
     abstract boolean op( long x, double y );
   }
 
@@ -487,9 +493,10 @@ public abstract class PrimNode extends Node {
     }
     @Override public Type apply( Type[] args ) { throw AA.unimpl(); }
     static Type vs_nil( Type tx, Type t, Type f ) {
-      if( tx==Type.NIL || tx==Type.XNIL ) return t;
-      if( tx.above_center() ) return tx.isa(Type.NIL) ? TypeInt.BOOL.dual() : f;
-      return tx.must_nil() ? TypeInt.BOOL : f;
+      if( tx==TypeNil.NIL ) return t;
+      //if( tx.above_center() ) return tx.isa(TypeNil.NIL) ? TypeInt.BOOL.dual() : f;
+      //return tx.must_nil() ? TypeInt.BOOL : f;
+      throw unimpl();
     }
   }
 
@@ -526,11 +533,11 @@ public abstract class PrimNode extends Node {
   public static class RandI64 extends PrimNode {
     public RandI64() { super("rand",TypeTuple.ALL_INT64,TypeStruct.INT); }
     @Override public Type value() {
-      if( val(1).above_center() ) return TypeInt.BOOL.dual();
+      if( val(1).above_center() ) return make_wrap(TypeInt.BOOL.dual());
       TypeInt t = unwrap_i(val(1));
       if( TypeInt.INT64.dual().isa(t) && t.isa(TypeInt.INT64) )
-        return t.meet(TypeInt.FALSE);
-      return t.oob(TypeInt.INT64);
+        return make_wrap(t.meet(TypeInt.FALSE));
+      return t.oob(TypeStruct.INT);
     }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
     // Rands have hidden internal state; 2 Rands are never equal
