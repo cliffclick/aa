@@ -10,7 +10,7 @@ import java.util.BitSet;
 
 import static org.junit.Assert.*;
 
-// The core Type system is a distributive complete bounded lattice.
+// The core Type system is a distributive, complete, bounded lattice.
 // See: https://en.wikipedia.org/wiki/Lattice_(order)
 
 // This is a series of tests to validate various structures as lattices with
@@ -2182,7 +2182,7 @@ public class TestLattice {
     //// Edge from bottom of ORs to NIL, and NIL to top of ANDs
     //ons[0]._subs.push(nil);
     //nil._subs.push(ans[len-1]);
-    
+
     //----------------------------------
     // Duals, outside-in for ORs and ANDs
     for( int i=0; i<len; i++ ) {
@@ -2200,7 +2200,7 @@ public class TestLattice {
       if( n._dual==n )          // No dual yet, so dual to the matching ons
         n.set_dual(ons[i]);
     }
-    
+
     // Duals outside-in for NOTs, YESs
     for( int i=0; i<nduals; i++ )
       nns[len-1-i].set_dual(nns[i]);
@@ -2274,7 +2274,7 @@ public class TestLattice {
     // Edges from corresponding elements AND is below NOT, NOT is below OR
     add_edge(nns,ans);
     add_edge(ons,nns);
-    
+
     //----------------------------------
     N  nil = new N( "nil");
     N xnil = new N("~nil"); // NO Edge xnil->nil
@@ -2294,7 +2294,7 @@ public class TestLattice {
     //ons[8]._subs.push(xnil);
     //nil._subs.push(ans[1]);
     //nil._subs.push(ans[2]);
-    
+
 
     //----------------------------------
     // Duals, outside-in for ORs and ANDs
@@ -2313,7 +2313,7 @@ public class TestLattice {
       if( n._dual==n )          // No dual yet, so dual to the matching ons
         n.set_dual(ons[i]);
     }
-    
+
     // Duals outside-in for NOTs, YESs
     for( int i=0; i<nduals; i++ )
       nns[len-1-i].set_dual(nns[i]);
