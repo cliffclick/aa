@@ -76,6 +76,8 @@ public class FieldNode extends Node {
     return Env.PROTOS.get(tname);
   }
 
+  @Override public boolean has_tvar() { return true; }
+
   @Override public boolean unify( boolean test ) {
     TV2 self = tvar();
     TV2 rec = tvar(0);

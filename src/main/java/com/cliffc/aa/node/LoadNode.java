@@ -60,6 +60,8 @@ public class LoadNode extends Node {
     return tmem.remove_no_escapes(tptr._aliases);
   }
 
+  @Override public boolean has_tvar() { return true; }
+
   // Standard memory unification; the Load unifies with the loaded field.
   @Override public boolean unify( boolean test ) {
     TV2 self = tvar();

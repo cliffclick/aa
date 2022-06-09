@@ -77,7 +77,7 @@ public class TV2 {
 
   // Unique ID
   private static int UID=1;
-  public final int _uid=UID++;
+  public final int _uid;
 
 
   // Structural parts to unify with, or null.
@@ -127,6 +127,7 @@ public class TV2 {
 
   // Common constructor
   private TV2(NonBlockingHashMap<String,TV2> args, @NotNull String alloc_site) {
+    _uid=UID++;
     _args = args;
     ALLOCS.computeIfAbsent(_alloc_site=alloc_site,e -> new ACnts())._malloc++;
   }
@@ -217,7 +218,6 @@ public class TV2 {
   }
   public static TV2 make_ptr( TypeMemPtr flow, String alloc_site ) {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>(){{put("*",make_leaf(alloc_site));}};
-    assert flow instanceof TypeMemPtr;
     TV2 t2 = new TV2(args,alloc_site);
     t2._flow=flow;
     assert t2.is_ptr();
@@ -251,12 +251,12 @@ public class TV2 {
     case TypeFlt f -> make_base(t,alloc_site);
     case TypeInt i -> make_base(t,alloc_site);
     case TypeNil n -> {
-      if( t ==TypeNil.NIL )
-        yield TV2.make_nil(TV2.make_leaf(alloc_site),alloc_site);
+      if( t == TypeNil.XNIL )
+        yield make_nil(TV2.make_leaf(alloc_site),alloc_site);
       throw unimpl();
     }
     case Type tt -> {
-      if( t==Type.ANY ) yield make_leaf(alloc_site);
+      //if( t==Type.ANY ) yield make_leaf(alloc_site);
       if( t==Type.ALL ) yield make_base(t,alloc_site);
       throw unimpl();
     }
@@ -497,6 +497,7 @@ public class TV2 {
     assert !is_unified() && !that.is_unified();
     if( this==that ) return false;
     if( test ) return true; // Report progress without changing
+    //if( _uid < that._uid ) throw unimpl(); // Reverse UID to keep the Low.
 
     // Merge open
     if( is_obj() )
@@ -1020,7 +1021,7 @@ public class TV2 {
   }
 
   // -----------------
-  // Recursively clear _is_copy, through cyclic types.  
+  // Recursively clear _is_copy, through cyclic types.
   static final VBitSet UPDATE_VISIT  = new VBitSet();
   void clr_cp() { UPDATE_VISIT.clear(); _clr_cp();}
   private void _clr_cp() {

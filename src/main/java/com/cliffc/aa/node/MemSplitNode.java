@@ -57,7 +57,7 @@ public class MemSplitNode extends Node {
     if( join!=null ) Env.GVN.add_flow(join);
   }
 
-  @Override public TV2 new_tvar(String alloc_site) { return null; }
+  @Override public boolean has_tvar() { return false; }
 
   // Find index for alias
   int find_alias_index( int alias ) {

@@ -23,6 +23,8 @@ public final class ErrNode extends Node {
     return t == Type.ANY || t == Type.XCTRL ? Type.ANY : Type.ALL; // For dead data errors return ANY (no error)
   }
   @Override public Type live_use( Node def ) { return Type.ALL; }
+  @Override public boolean has_tvar() { return true; }
+  
   @Override public ErrMsg err( boolean fast ) {
     // While you might think we should ALWAYS report these, as their existence
     // means the program is in-error - the program may have other earlier

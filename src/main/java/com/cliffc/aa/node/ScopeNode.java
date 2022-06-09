@@ -115,8 +115,7 @@ public class ScopeNode extends Node {
       // Wipe out extra function edges.  They are there to act "as if" the
       // exit-scope calls them; effectively an extra wired call use with the
       // most conservative caller.
-      //while( _defs._len > RET_IDX ) pop();
-      throw unimpl();
+      while( _defs._len > RET_IDX ) throw unimpl(); //pop();
 
     // Some escaping functions are dead
     for( int i=RET_IDX; i<len(); i++ )
@@ -256,6 +255,8 @@ public class ScopeNode extends Node {
   // End of dominator tree; do not walk past
   @Override Node walk_dom_last(Predicate<Node> P) { return P.test(this) ? this : null; }
 
+  @Override public boolean has_tvar() { return false; }
+  
   // Create an if-scope and start tracking vars
   public void push_if() {
     if( _ifs == null ) _ifs = new Ary<>(new IfScope[1],0);

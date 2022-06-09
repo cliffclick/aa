@@ -94,7 +94,7 @@ public class IfNode extends Node {
     return t == TypeNil.NIL || t == TypeNil.XNIL;
   }
 
-  @Override public TV2 new_tvar(String alloc_site) { return null; }
+  @Override public boolean has_tvar() { return false; }
 
   @Override public Node is_copy(int idx) {
     if( is_prim() ) return null;

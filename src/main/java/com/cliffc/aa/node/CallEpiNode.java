@@ -464,6 +464,8 @@ public final class CallEpiNode extends Node {
     return _live;
   }
 
+  @Override public boolean has_tvar() { return true; }
+
   // Same as HM.Apply.unify
   @Override public boolean unify( boolean test ) {
     assert !_is_copy;
@@ -507,6 +509,11 @@ public final class CallEpiNode extends Node {
     return progress;
   }
 
+  // Unify trailing result ProjNode with the CallEpi directly.
+  @Override public boolean unify_proj( ProjNode proj, boolean test ) {
+    assert proj._idx==REZ_IDX;
+    return tvar().unify(proj.tvar(),test);
+  }
 
   @Override public void add_work_hm() {
     super.add_work_hm();

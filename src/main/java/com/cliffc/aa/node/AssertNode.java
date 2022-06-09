@@ -111,6 +111,8 @@ public class AssertNode extends Node {
     return ScopeNode.compute_live_mem(null,mem(),arg());
   }
 
+  @Override public boolean has_tvar() { return false; }
+
   // Check TypeNode for being in-error
   @Override public ErrMsg err( boolean fast ) {
     Type arg = arg()._val;

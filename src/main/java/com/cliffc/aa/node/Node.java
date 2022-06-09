@@ -92,9 +92,8 @@ public abstract class Node implements Cloneable, IntSupplier {
     TV2 tv = _tvar.find();     // Do U-F step
     return tv == _tvar ? tv : (_tvar = tv); // Update U-F style in-place.
   }
-  public boolean has_tvar() { return _tvar!=null; }
+  abstract public boolean has_tvar();
   public TV2 tvar(int x) { return in(x).tvar(); } // nth TV2
-  public TV2 new_tvar(String alloc_site) { return TV2.make_leaf(alloc_site); }
 
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)
@@ -520,6 +519,9 @@ public abstract class Node implements Cloneable, IntSupplier {
   // would be made.
   public boolean unify( boolean test ) { return false; }
 
+  // Unify this Proj with the matching TV2 part from the multi-TV2-producing
+  public boolean unify_proj( ProjNode proj, boolean test ) { throw unimpl(); }
+  
   // HM changes; push related neighbors
   public void add_work_hm() { tvar().add_deps_flow(); }
 
@@ -724,12 +726,8 @@ public abstract class Node implements Cloneable, IntSupplier {
     } else {                    // Not doing optimistic GCP...
       assert _val==value() && _live==live();
     }
-    if( AA.DO_HMT ) {
-      _tvar = new_tvar("Combo");
-      //if( this instanceof FreshNode) ((FreshNode)this).id().tvar().push_dep(this);
-      //if( this instanceof ProjNode && ((ProjNode)this)._idx==DSP_IDX && in(0) instanceof CallNode )
-      //  ((CallNode)in(0)).fdx().tvar().push_dep(this);
-    }
+    if( AA.DO_HMT && has_tvar() )
+      _tvar = TV2.make_leaf("Combo");
     // Walk reachable graph
     for( Node def : _defs ) if( def != null ) def.walk_initype();
     for( Node use : _uses )                   use.walk_initype();

@@ -483,7 +483,7 @@ public class CallNode extends Node {
     return proj == null || proj._live == TypeMem.ANYMEM ? TypeMem.ANYMEM : TypeMem.ALLMEM;
   }
 
-  @Override public TV2 new_tvar( String alloc_site) { return null; }
+  @Override public boolean has_tvar() { return false; }
 
   // See if we can resolve an unresolved Call
   @Override public void combo_resolve(WorkNode ambi) {
@@ -498,6 +498,20 @@ public class CallNode extends Node {
     ambi.add(this);
   }
 
+  // Unify ProjNodes with the Call arguments directly.
+  @Override public boolean unify_proj( ProjNode proj, boolean test ) {
+    TV2 tv2 = tvar(proj._idx);
+    if( proj._idx!=DSP_IDX )
+      return proj.tvar().unify(tv2,test); // Unify with Call arguments
+    // Specifically for the function/display, only unify on the display part.
+    if( tv2.is_fun() ) {        // Expecting the call input to be a function
+      TV2 tdsp = tv2.arg("2");  // Unify against the function display
+      //return tdsp != null && tv.unify(tdsp,test);
+      throw unimpl();
+    }
+    return false;
+  }
+  
   @Override public ErrMsg err( boolean fast ) {
     // Expect a function pointer
     TypeFunPtr tfp = ttfp(_val);

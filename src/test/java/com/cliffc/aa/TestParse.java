@@ -3,6 +3,7 @@ package com.cliffc.aa;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
+import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -14,6 +15,23 @@ import static org.junit.Assert.*;
 
 public class TestParse {
   private static final BitsFun TEST_FUNBITS = BitsFun.make0(43);
+
+  // Set to TRUE to run one test once, with fixed arguments.
+  // Set to FALSE for each test to all combinations of HMT and GCP, with a bunch of random seeds.
+  private static boolean JIG=false, DO_HMT=false, DO_GCP=false;
+  private static int RSEED=0;
+  @BeforeClass
+  public static void jig_setup() {
+    JIG=false;
+  }
+  @Ignore @Test public void testJig() {
+    JIG=true;
+
+    DO_HMT=true;
+    DO_GCP=false;
+    RSEED=0;
+    test("1", "int:1", "int:1");
+  }
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
@@ -952,23 +970,28 @@ HashTable = {@{
   private static String stripIndent(String s){ return s.replace("\n","").replace(" ",""); }
 
   // Run a program once-per-rseed
-  private static final int[] rseeds = new int[]{0,1,2,3};
   static private void _test1( String program, String gcp, String formals, String hmt_expect, String err, int cur_off ) {
-    for( int rseed : rseeds )
-    //for( int rseed=0; rseed<32; rseed++ )
-      _test0(program,gcp,formals,hmt_expect,err,cur_off,rseed);
+    if( JIG )
+      _test0(program,gcp,formals,hmt_expect,err,cur_off,RSEED);
+    else
+      for( int rseed=0; rseed<32; rseed++ )
+        _test0(program,gcp,formals,hmt_expect,err,cur_off,rseed);
   }
 
   // Run a program in all 3 modes, with all rseeds
   static private void _test2( String program, String gcp, String formals, String hmt_expect, String err, int cur_off ) {
-    _test1(program,gcp ,formals,null      ,err,cur_off);
-    _test1(program,null,null   ,hmt_expect,err,cur_off);
-    _test1(program,gcp ,formals,hmt_expect,err,cur_off);
+    if( !JIG || ( DO_GCP && !DO_HMT) )  _test1(program,gcp ,formals,null      ,err,cur_off);
+    if( !JIG || (!DO_GCP &&  DO_HMT) )  _test1(program,null,null   ,hmt_expect,err,cur_off);
+    if( !JIG || ( DO_GCP &&  DO_HMT) )  _test1(program,gcp ,formals,hmt_expect,err,cur_off);
   }
 
   // Run a program in all 3 modes, yes function returns, no errors
   private void test( String program, String gcp, String formals, String hmt_expect ) {
     _test2(program,gcp,formals,hmt_expect,null,0);
+  }
+  // Short form test: simple GCP, no formal args
+  private void test( String program, String gcp, String hmt_expect ) {
+    _test2(program,gcp,null,hmt_expect,null,0);
   }
   // Run a program in all 3 modes, yes function returns, no errors
   private void test( String program, Function<Type,Type> gcp_maker, Supplier<TypeStruct> formals_maker, String hmt_expect ) {
@@ -976,10 +999,6 @@ HashTable = {@{
     throw unimpl();
   }
 
-  // Short form test: simple GCP, no formal args
-  private void test( String program, String gcp, String hmt_expect ) {
-    _test2(program,gcp,null,hmt_expect,null,0);
-  }
   // Short form test: simple GCP, no formal args
   private void test( String program, Type gcp, String hmt_expect ) {
     //_test2(program,ignore->gcp,null,hmt_expect,null,0);

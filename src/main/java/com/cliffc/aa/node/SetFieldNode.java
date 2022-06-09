@@ -10,7 +10,10 @@ import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.type.TypeFld.Access;
 
-// Takes a static field name, a TypeStruct, a field value and produces a new TypeStruct.
+// Takes a static field name, a TypeStruct, a field value and produces a new
+// TypeStruct.  This is an incremental TypeStruct producer, and does not update
+// any memory state; the result is a pure value.  Contrast this with StoreNode
+// which takes and produces a new memory state; it also takes in a TypeStruct.
 public class SetFieldNode extends Node {
   final Access _fin;
   final String _fld;
@@ -31,6 +34,8 @@ public class SetFieldNode extends Node {
     if( !(t instanceof TypeStruct ts) ) return t.oob();
     return ts.update(_fin,_fld,val(1));
   }
+
+  @Override public boolean has_tvar() { return true; }
 
   // Unify the named field against a TV2.is_obj same named field.
   // Other fields are just passed through.

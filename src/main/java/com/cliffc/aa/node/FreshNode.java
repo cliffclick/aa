@@ -34,6 +34,8 @@ public class FreshNode extends Node {
     return t instanceof TypeMemPtr tmp && tmp.is_valtype();
   }
 
+  @Override public boolean has_tvar() { return true; }
+
   @Override public boolean unify( boolean test ) {
 
     // If the Fresh is an above-center TypeFunPtr, then it is a function choice

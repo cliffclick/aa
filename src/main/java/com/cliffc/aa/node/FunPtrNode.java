@@ -139,6 +139,8 @@ public final class FunPtrNode extends Node {
     return def==display() ? Type.ANY : Type.ALL;
   }
 
+  @Override public boolean has_tvar() { return true; }
+
   // Implements class HM.Lambda unification.
   @Override public boolean unify( boolean test ) {
     TV2 self = tvar();

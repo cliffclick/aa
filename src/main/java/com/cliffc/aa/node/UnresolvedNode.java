@@ -111,6 +111,8 @@ public class UnresolvedNode extends Node {
   // An UnresolvedNode is its own Leaf, because it might gather fairly unrelated
   // functions - such as integer-add vs string-add, or the 1-argument leading
   // '+' operator vs the more expected binop.
+  @Override public boolean has_tvar() { return true; }
+
   @Override public boolean unify( boolean test ) {
     // Giant assert that all inputs are all Fun or Val constructors, ignoring errors.
     for( int i=1; i<len(); i++ ) {

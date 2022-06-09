@@ -2,8 +2,9 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.tvar.TV2;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeRPC;
 
 import static com.cliffc.aa.AA.unimpl;
 
@@ -68,10 +69,10 @@ public class PhiNode extends Node {
     return t;
   }
 
-
-  @Override public TV2 new_tvar(String alloc_site) {
-    return _t instanceof TypeMem || _t instanceof TypeRPC ? null : super.new_tvar(alloc_site);
-  }
+  // Yes for e.g. ints, flts, memptrs, funptrs.  A Phi corresponds to the
+  // merging HM value in the core AA If.
+  @Override public boolean has_tvar() { return !(_t instanceof TypeMem || _t instanceof TypeRPC); }
+  
   // All inputs unify
   @Override public boolean unify( boolean test ) {
     if( !(in(0) instanceof RegionNode r) ) return false; // Dying

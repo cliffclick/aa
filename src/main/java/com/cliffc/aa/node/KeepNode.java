@@ -8,5 +8,6 @@ public class KeepNode extends Node {
   @Override public Type live () { return Type.ALL; }
   @Override public Type live_use( Node def ) { return Type.ALL; }
   @Override public boolean equals(Object o) { return this==o; }
+  @Override public boolean has_tvar() { return false; }
 }
 

@@ -413,7 +413,7 @@ public class Parse implements Comparable<Parse> {
     }
 
     // Normal statement value parse
-    Node ifex = default_nil ? Env.NIL : ifex(); // Parse an expression for the statement value
+    Node ifex = default_nil ? Env.XNIL : ifex(); // Parse an expression for the statement value
     // Check for no-statement after start of assignment, e.g. "x = ;"
     if( ifex == null ) {        // No statement?
       if( toks._len == 0 ) return null;

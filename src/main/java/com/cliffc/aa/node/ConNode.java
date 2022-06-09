@@ -6,6 +6,8 @@ import com.cliffc.aa.type.*;
 
 import java.util.function.Predicate;
 
+import static com.cliffc.aa.AA.unimpl;
+
 // Constant value nodes; no computation needed.  Hashconsed for unique
 // constants, except for XNIL.  XNIL allows for a TV2 typevar Nilable-Leaf with
 // each Leaf unifying on its own.
@@ -30,17 +32,24 @@ public class ConNode<T extends Type> extends Node {
 
   @Override public Type value() { return _t.simple_ptr(); }
 
-  @Override public TV2 new_tvar(String alloc_site) {
-    if( _t==Type.CTRL || _t==Type.XCTRL || _t instanceof TypeRPC || _t instanceof TypeMem )
-      return null;
-    if( this == Env.XUSE || this == Env.ALL || this==Env.ALL_PARM ) return null;
-    //if( _t == Type.XNIL || _t == Type.NIL )
-    //  return TV2.make_nil(TV2.make_leaf(alloc_site),alloc_site);
-    //if( _t == Type.ANY ) return TV2.make_leaf(alloc_site);
-    return TV2.make(_t, "ConNode");
+  @Override public boolean has_tvar() {
+    if( _t.is_simple() ) return false; // No on CTRL, XCTRL, ANY, ALL
+    if( _t instanceof TypeRPC ) return false; // For now, no closures
+    if( _t.is_nil() ) return true;     // Yes on NIL, INT, FLT, MEMPTR, FUNPTR
+    if( _t instanceof TypeStruct ) return true;
+    if( _t instanceof TypeAry ) throw unimpl(); // Probably yes, undecided
+    // No for TFLD, TMEM
+    return false;
   }
 
-  @Override public boolean unify( boolean test ) { return false; }
+  @Override public boolean unify( boolean test ) {
+    TV2 tv;
+    if( _t==TypeNil.SCALAR ||   // Will be a Leaf anyways
+        _tvar==null ||          // Constant e.g. Memory
+        !(tv=tvar()).is_leaf() )// Got expanded to e.g. a Base already
+      return false;
+    return test || tv.unify(TV2.make(_t, "ConNode"),test);
+  }
 
   @Override public String toString() { return str(); }
   @Override public int hashCode() {

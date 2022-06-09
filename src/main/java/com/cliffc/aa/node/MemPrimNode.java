@@ -115,6 +115,7 @@ public abstract class MemPrimNode extends PrimNode {
   //    return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases,"#", Type.SCALAR);
   //  }
   //
+  //  @Override public boolean has_tvar() { return true; }
   //  @Override public TV2 new_tvar( String alloc_site) { return TV2.make_base(this,TypeInt.INT64,alloc_site); }
   //
   //  @Override public boolean unify( boolean test ) {
@@ -219,6 +220,7 @@ public abstract class MemPrimNode extends PrimNode {
   //    TypeMem tmem2 = tmem.update(tary._aliases,tidx,val);
   //    return tmem2;
   //  }
+  //  @Override public boolean has_tvar() { return true; }
   //  @Override public TV2 new_tvar( String alloc_site) { return null; }
   //  @Override public boolean unify( boolean test ) {
   //    boolean progress = false;
@@ -253,6 +255,7 @@ public abstract class MemPrimNode extends PrimNode {
   //  }
   //
   //  // Unify address as Ary, idx as int64, Ary.elem and val to self.
+  //  @Override public boolean has_tvar() { return true; }
   //  @Override public TV2 new_tvar( String alloc_site) { return null; }
   //  @Override public boolean unify( boolean test ) {
   //    boolean progress = false;

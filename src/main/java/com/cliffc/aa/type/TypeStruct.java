@@ -229,11 +229,12 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public static TypeStruct make_int(TypeNil ti) { return TypeStruct.make("int:",false,TypeFld.make(CANONICAL_INSTANCE,ti)); }
   public static TypeStruct make_flt(TypeFlt tf) { return TypeStruct.make("flt:",false,TypeFld.make(CANONICAL_INSTANCE,tf)); }
 
-  // Add a field to an under construction TypeStruct
+  // Add a field to an under construction TypeStruct; _flds is not interned.
   public TypeStruct add_fld( TypeFld fld ) {
-    assert find(fld._fld)==-1;  // No accidental replacing
-    TypeFld[] old = _flds;
+    assert find(fld._fld)==-1 && !TypeFlds.interned(_flds);  // No accidental replacing, not interned    
+    TypeFld[] old = _flds;      // Keep the old
     _flds = TypeFlds.add(_flds,fld);
+    TypeFlds.free(old);         // Free the old
     return this;
   }
 

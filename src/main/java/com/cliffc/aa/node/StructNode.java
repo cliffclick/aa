@@ -6,8 +6,6 @@ import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
-import java.util.Arrays;
-
 import static com.cliffc.aa.AA.unimpl;
 import static com.cliffc.aa.type.TypeFld.Access;
 
@@ -29,9 +27,11 @@ import static com.cliffc.aa.type.TypeFld.Access;
 // The Parser also uses this for determining where HM FreshNodes go.
 
 // Holds argument-starts for argument tuples, for eventual error reporting.
+
+// Inputs are sorted in the same order as a canonicalizing TypeStruct (alpha
+// within lexical scope; shadowing requires another scope; deBruin numbers).
 public class StructNode extends Node {
 
-  private final Ary<String> _flds; // Field names per node index
   private TypeStruct _ts; // Field names and default types, alpha-sorted.
 
   // Used to distinguish closures from normal structs in the Parser (the "^"
@@ -45,15 +45,14 @@ public class StructNode extends Node {
   private boolean _forward_ref;
 
   // Parser helper for error reports on arg tuples
-  private Parse[] _fld_starts;
+  private Ary<Parse> _fld_starts;
 
   public StructNode(boolean is_closure, boolean forward_ref) {
     super(OP_STRUCT);
     _is_closure = is_closure;
     _forward_ref = forward_ref;
     _ts = TypeStruct.ISUSED;
-    _flds = new Ary<>(String.class);
-    _fld_starts = new Parse[1];
+    _fld_starts = new Ary(Parse.class);
   }
 
   @Override String str() { return _ts.toString(); }
@@ -79,8 +78,8 @@ public class StructNode extends Node {
   }
   public TypeStruct ts() { return _ts; }
 
-  // String-to-node-index, not _ts index
-  public int find(String name) { return _flds.find(name); }
+  // String-to-node-index
+  public int find(String name) { return _ts.find(name); }
   // String-to-Node
   public Node in(String name) { return in(find(name)); } // Error if not found
   // String to TypeFld
@@ -111,20 +110,18 @@ public class StructNode extends Node {
   @Override public boolean is_forward_type() { return _forward_ref; }
 
   // Simple parser helpers
-  public Parse[] fld_starts() { return _fld_starts; }
+  public Parse[] fld_starts() { return _fld_starts.asAry(); }
 
   // Add a field
   public Node add_fld( TypeFld fld, Node val, Parse badt ) {
     assert !_closed;
     int len = len();
-    assert _flds.len()==len;
-    if( badt != null ) {
-      while( _fld_starts.length <= len ) _fld_starts = Arrays.copyOf(_fld_starts,_fld_starts.length<<1);
-      _fld_starts[len] = badt;
-    }
-    add_def(val);
-    _flds.push(fld._fld);
-    return set_ts(_ts.add_fldx(fld)); // Will also assert no-dup field names
+    // Change TypeStruct for fields
+    set_ts(_ts.add_fldx(fld));
+    int idx = _ts.find(fld._fld); // Where inserted
+    insert(idx,val);              // Same place in defs
+    _fld_starts.insert(idx,badt); // Same place in field starts
+    return this;
   }
 
   // Add a named FunPtr to a Struct.  Auto-inflates to an Unresolved as needed.
@@ -137,7 +134,7 @@ public class StructNode extends Node {
       return;
     }
     Node n = in(idx);
-    if( n._val==TypeNil.NIL ) // Stomp over a nil field create
+    if( n._val==TypeNil.XNIL ) // Stomp over a nil field create
       //return set_fld(fld.make_from(fptr._val,fin),fptr);
       throw unimpl();
     // Inflate to unresolved as needed
@@ -146,14 +143,14 @@ public class StructNode extends Node {
       : new UnresolvedNode(name,bad).scoped().add_fun((FunPtrNode)n);
     unr.add_fun(fptr);          // Checks all formals are unambiguous
     set_ts(_ts.replace_fld(_ts.get(name).make_from(unr._val)));
-    set_def(idx,unr);           // No change to _flds
+    set_def(idx,unr);           // No change to def orders
     xval();
   }
 
   // For reseting primitives for multi-testing
   public void pop_fld() {
     pop();
-    _flds.pop();
+    _fld_starts.pop();
     set_ts(_ts.pop_fld(len()));
   }
 
@@ -174,24 +171,23 @@ public class StructNode extends Node {
           throw com.cliffc.aa.AA.unimpl();        // TODO: Access input by field name
         } else {
           // Make field in the parent
-          TypeFld fld = get(_flds.at(i));
-          parent.add_fld(fld, n, null /*TODO: Copy forward the error*/);
+          TypeFld fld = _ts.get(i);
+          parent.add_fld(fld, n, _fld_starts.at(i));
           // Stomp field locally to ANY
           set_def(i,Env.ANY);
-          _ts.replace_fld(TypeFld.make(fld._fld, Type.ANY, TypeFld.Access.Final));
+          set_ts(_ts.replace_fld(TypeFld.make(fld._fld, Type.ANY, TypeFld.Access.Final)));
           Env.GVN.add_flow_uses(this);
         }
       }
     }
   }
 
+  // Gather inputs into a TypeStruct.
   @Override public Type value() {
     assert _defs._len==_ts.len();
     TypeFld[] flds = TypeFlds.get(_ts.len());
-    for( int i=0; i<flds.length; i++ ) {
-      TypeFld fld = _ts.get(i);
-      flds[i] = fld.make_from(in(fld._fld)._val);
-    }
+    for( int i=0; i<flds.length; i++ )
+      flds[i] =_ts.get(i).make_from(in(i)._val);
     return _ts.make_from(flds);
   }
 
@@ -199,21 +195,27 @@ public class StructNode extends Node {
   @Override public Type live_use( Node def ) {
     if( !(_live instanceof TypeStruct ts) ) return _live.oob();
     int idx = _defs.find(def);        // Get Node index
-    TypeFld lfld = ts.get(_flds.at(idx)); // Liveness for this name
+    TypeFld lfld = ts.get(idx);       // Liveness for this index
     return lfld==null ? ts.oob() : lfld._t.oob();
   }
+
+  @Override public boolean has_tvar() { return true; }
 
   @Override public boolean unify( boolean test ) {
     // Force result to be a struct with at least these fields.
     // Do not allocate a TV2 unless we need to pick up fields.
+    boolean progress = false;
     TV2 rec = tvar();
+    if( rec.is_leaf() ) {
+      if( test ) return true;
+      progress = _tvar.unify(rec=TV2.make_struct(this,"init_struct"),test);
+    }
     assert check_fields(rec);
     rec.push_dep(this);
 
     // Unify existing fields.  Ignore extras on either side.
-    boolean progress = false;
-    for( int i=0; i<_flds._len; i++ ) {
-      TV2 fld = rec.arg(_flds.at(i));
+    for( int i=0; i<_ts.len(); i++ ) {
+      TV2 fld = rec.arg(_ts.get(i)._fld);
       if( fld!=null ) progress |= fld.unify(tvar(i),test);
       if( test && progress ) return true;
     }
@@ -222,12 +224,10 @@ public class StructNode extends Node {
   }
   // Extra fields are unified with ERR since they are not created here:
   // error to load from a non-existing field
-  private boolean check_fields(TV2 ptr) {
-    TV2 rec = ptr._args.get("*").debug_find();
-    if( rec==null ) return true;
+  private boolean check_fields(TV2 rec) {
     if( rec._args != null )
       for( String id : rec._args.keySet() )
-        if( _flds.find(id)==-1 && !rec.arg(id).is_err() )
+        if( _ts.find(id)==-1 && !rec.arg(id).is_err() )
           return false;
     return true;
   }

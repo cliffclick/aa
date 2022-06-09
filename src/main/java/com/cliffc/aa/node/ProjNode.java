@@ -1,11 +1,8 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeTuple;
-
-import static com.cliffc.aa.AA.*;
 
 // Proj data
 public class ProjNode extends Node {
@@ -34,28 +31,13 @@ public class ProjNode extends Node {
   // Only called here if alive.
   @Override public Type live_use(Node def ) { return Type.ALL; }
 
+  // Standard data ProjNode has a type variable, Control or Memory projnodes do
+  // not (CProj, CEProj, MProj)
+  @Override public boolean has_tvar() { return getClass()==ProjNode.class; }
+
   // Unify with the parent TVar sub-part
   @Override public boolean unify( boolean test ) {
-    if( _tvar==null ) return false;
-    TV2 tv = tvar();
-    if( in(0) instanceof CallEpiNode ) { // Only DProj#2 and it is the return value
-      assert _idx==REZ_IDX;
-      return tv.unify(tvar(0),test);
-    }
-    if( in(0) instanceof CallNode call ) {
-      TV2 tv2 = call.tvar(_idx);
-      if( _idx==DSP_IDX ) {     // Specifically for the function/display, only unify on the display part.
-        if( tv2.is_fun() ) {    // Expecting the call input to be a function
-          TV2 tdsp = tv2.arg("2"); // Unify against the function display
-          return tdsp != null && tv.unify(tdsp,test);
-        }
-        else return false;
-      }
-      return tv.unify(tv2,test); // Unify with Call arguments
-    }
-    if( in(0) instanceof NewNode nnn )
-      return tv.unify(nnn.rec().tvar(),test);
-    throw unimpl();
+    return _tvar!=null && in(0).unify_proj(this,test);
   }
 
   public static ProjNode proj( Node head, int idx ) {

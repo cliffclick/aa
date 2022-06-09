@@ -88,8 +88,7 @@ public final class RetNode extends Node {
   }
 
   // Funs get special treatment by the H-M algo.
-  @Override public TV2 new_tvar( String alloc_site) { return null; }
-  @Override public boolean unify( boolean test ) { return false; }
+  @Override public boolean has_tvar() { return false; }
 
   @Override public Node ideal_reduce() {
     // If control is dead, but the Ret is alive, we're probably only using the

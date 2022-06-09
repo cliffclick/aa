@@ -50,7 +50,4 @@ public class CEProjNode extends CProjNode {
     }
     return true;
   }
-
-
-  @Override public TV2 new_tvar( String alloc_site) { return null; }
 }

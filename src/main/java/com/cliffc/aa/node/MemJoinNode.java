@@ -152,7 +152,7 @@ public class MemJoinNode extends Node {
   }
   @Override public Type live_use( Node def ) { return _live; }
 
-  @Override public TV2 new_tvar(String alloc_site) { return null; }
+  @Override public boolean has_tvar() { return false; }
 
   // Move the given SESE region just ahead of the split into the join/split
   // area.  The head node has the escape-set.

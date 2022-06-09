@@ -63,6 +63,8 @@ public class CastNode extends Node {
     return def==in(0) ? Type.ALL : _live;
   }
 
+  @Override public boolean has_tvar() { return true; }
+
   // Unifies the input to '(Nil ?:self)'
   @Override public boolean unify( boolean test ) {
     TV2 maynil = tvar(1); // arg in HM

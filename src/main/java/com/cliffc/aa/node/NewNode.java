@@ -88,7 +88,7 @@ public class NewNode extends Node {
 //      Env.GVN.add_reduce(chg);
 //  }
 
-  @Override public TV2 new_tvar( String alloc_site) { return null; }
+  @Override public boolean has_tvar() { return false; }
 
 //  @Override public Node ideal_reduce() {
 //    if( _forward_ref ) return null; // Not defined yet
@@ -160,6 +160,15 @@ public class NewNode extends Node {
 //  //  return true;
 //  //}
 //
+
+
+  // ProjNode after New produces a pointer TV2 from whole cloth
+  @Override public boolean unify_proj( ProjNode proj, boolean test ) {
+    assert proj._idx == REZ_IDX;
+    return false;
+  }
+  
+ 
   // clones during inlining all become unique new sites
   @Override public NewNode copy( boolean copy_edges) {
     // Split the original '_alias' class into 2 sub-aliases

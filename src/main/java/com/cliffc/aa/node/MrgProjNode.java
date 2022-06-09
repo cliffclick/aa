@@ -50,6 +50,7 @@ public class MrgProjNode extends ProjNode {
 //    }
 //  }
 //
+//  @Override public boolean has_tvar() { return false; }
 //  @Override public TV2 new_tvar( String alloc_site) { return null; }
 //
 //  @Override public Node ideal_reduce() {

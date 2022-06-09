@@ -37,7 +37,7 @@ public class Env implements AutoCloseable {
   public static final KeepNode KEEP_ALIVE = new KeepNode();
   public static final ConNode ANY;   // Common ANY / used for dead
   public static final ConNode ALL;   // Common ALL / used for errors
-  public static final ConNode NIL;   // Default 0
+  public static final ConNode XNIL;  // Default 0
   public static final ConNode XCTRL; // Always dead control
   public static final ConNode XUSE;  // Unused objects (dead displays)
   public static final ConNode XMEM;  // Unused whole memory
@@ -71,7 +71,7 @@ public class Env implements AutoCloseable {
     START   = keep(new StartNode());
     ANY     = keep(new ConNode<>(Type.ANY   ));
     ALL     = keep(new ConNode<>(Type.ALL   ));
-    NIL     = keep(new ConNode<>(TypeNil.NIL));
+    XNIL    = keep(new ConNode<>(TypeNil.XNIL));
     XCTRL   = keep(new ConNode<>(Type.XCTRL ));
     XUSE    = keep(new ConNode<>(TypeStruct.UNUSED));
     XMEM    = keep(new ConNode<>(TypeMem.ANYMEM));
@@ -124,7 +124,7 @@ public class Env implements AutoCloseable {
 
   // Top-level Env.  Contains, e.g. the primitives.
   // Above any file-scope level Env.
-  private Env( ) { this(null,null,false,CTL_0,MEM_0,NIL,null); }
+  private Env( ) { this(null,null,false,CTL_0,MEM_0,XNIL,null); }
 
   // Gather and report errors and typing
   TypeEnv gather_errors(ErrMsg err) {
@@ -147,7 +147,7 @@ public class Env implements AutoCloseable {
                        rez._val,
                        formals,
                        mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM),
-                       rez.has_tvar() ? rez.tvar() : null,
+                       AA.DO_HMT && rez.has_tvar() ? rez.tvar() : null,
                        errs0.isEmpty() ? null : errs0);
   }
 

@@ -199,7 +199,8 @@ public class StoreNode extends Node {
     throw unimpl();
   }
 
-  @Override public TV2 new_tvar( String alloc_site) { return null; }
+  @Override public boolean has_tvar() { return false; }
+  
   @Override public boolean unify( boolean test ) {
     TV2 ptr = adr().tvar();
     TV2 rez = rez().tvar();

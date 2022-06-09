@@ -32,6 +32,4 @@ public class CProjNode extends ProjNode {
           Env.GVN.add_flow(fun);
     }
   }
-
-  @Override public TV2 new_tvar(String alloc_site) { return null; }
 }

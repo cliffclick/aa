@@ -145,7 +145,7 @@ public class RegionNode extends Node {
 
   @Override public Type live_use(Node def ) { return Type.ALL; }
 
-  @Override public TV2 new_tvar(String alloc_site) { return null; }
+  @Override public boolean has_tvar() { return false; }
 
   // Complex dominator tree.  Ok to subset, attempt the easy walk
   @Override Node walk_dom_last(Predicate<Node> P) {

@@ -226,6 +226,8 @@ public abstract class PrimNode extends Node {
     throw unimpl();
   }
 
+  @Override public boolean has_tvar() { return true; }
+
   // All primitives are effectively H-M Applies with a hidden internal Lambda.
   @Override public boolean unify( boolean test ) {
     boolean progress = false;
@@ -240,6 +242,7 @@ public abstract class PrimNode extends Node {
     if( tv.is_obj() && tformal instanceof TypeStruct tsp &&
         tv.arg(CANONICAL_INSTANCE)._flow.isa(tsp.get(CANONICAL_INSTANCE)._t) )
       return false; // E.g. TypeStruct.INT vs TV2.args("clz")=="int"
+    if( test ) return true;
     return tv.unify(TV2.make(tformal,"PrimNode"),test);
   }
 
@@ -534,6 +537,7 @@ public abstract class PrimNode extends Node {
     public RandI64() { super("rand",TypeTuple.ALL_INT64,TypeStruct.INT); }
     @Override public Type value() {
       if( val(1).above_center() ) return make_wrap(TypeInt.BOOL.dual());
+      if( val(1)==Type.ALL ) return TypeStruct.INT;
       TypeInt t = unwrap_i(val(1));
       if( TypeInt.INT64.dual().isa(t) && t.isa(TypeInt.INT64) )
         return make_wrap(t.meet(TypeInt.FALSE));
