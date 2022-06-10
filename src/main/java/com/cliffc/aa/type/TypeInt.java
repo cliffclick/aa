@@ -4,8 +4,6 @@ import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
 
-import static com.cliffc.aa.AA.unimpl;
-
 public class TypeInt extends TypeNil<TypeInt> {
   // If z==0, then _con has the constant, and the bitsize comes from that.
   // Constant int 0 has zero bits then.
@@ -122,6 +120,6 @@ public class TypeInt extends TypeNil<TypeInt> {
 
   @Override public TypeInt widen() { return INT64; }
   @Override public boolean is_con()  { return _z==0; }
-  public TypeInt minsize(TypeInt ti) { throw unimpl(); } // smaller size of Prim AND
+  public TypeInt minsize(TypeInt ti) { return (TypeInt)join(ti); } // smaller size of Prim AND
   public TypeInt maxsize(TypeInt ti) { return (TypeInt)meet(ti);  }
 }

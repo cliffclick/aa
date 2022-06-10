@@ -178,7 +178,7 @@ public class FunNode extends RegionNode {
     // True if ANY Call has a fidx INTX/ALL,
     // OR   if escapes the top Scope.
     if( CallNode.ALL_CALLS!=BitsRPC.EMPTY ) return false;
-    if( Env.FILE==null ) return true;
+    if( Env.FILE==null ) return false;
     BitsFun fidxs = Env.FILE._scope.top_escapes();
     if( fidxs.test_recur(_fidx) ) return false; // Escapes the top scope
     return true;

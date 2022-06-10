@@ -297,12 +297,12 @@ public abstract class PrimNode extends Node {
       if( t0 == TypeNil.NIL || t0 == TypeNil.XNIL )
         return make_int(1);     // !nil is 1
       if( t0==Type.ALL ) return TypeStruct.BOOL;
-      Type t1 = unwrap_i(t0);
-      //if( t1==TypeInt.ZERO ) return make_int(1);
-      //if( t1. may_nil() ) return TypeStruct.BOOL.dual();
-      //if( t1.must_nil() ) return TypeStruct.BOOL;
-      //return Type.NIL;          // Cannot be a nil, so return a nil
-      throw unimpl();
+      TypeInt t1 = unwrap_i(t0);
+      if( t1._nil ) {
+        return t1._sub ? TypeStruct.BOOL.dual() : make_int(1);
+      } else {
+        return t1._sub ? TypeNil.XNIL : TypeStruct.BOOL;
+      }
     }
     @Override public Type apply( Type[] args ) { throw AA.unimpl(); }
   }
