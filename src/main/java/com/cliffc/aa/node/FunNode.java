@@ -1,10 +1,10 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.BitSet;
@@ -168,64 +168,12 @@ public class FunNode extends RegionNode {
   // Never inline with a nested function
   @Override @NotNull public FunNode copy( boolean copy_edges) { throw unimpl(); }
 
-  boolean has_unknown_callers() { return len()>1 && in(1)==Env.ALL_CTRL; }
-
-  // True if path1 exists, but is dead because it is an unknown caller and dead,
-  // OR is just normal dead.
-  boolean is_path1_dead() {
-    if( len() <= 1 ) return true; // Actually, not well-defined
-    if( !has_unknown_callers() ) return val(1)!=Type.ANY && val(1)!=Type.CTRL; // Already killed, will never have unknown callers.
-    // True if ANY Call has a fidx INTX/ALL,
-    // OR   if escapes the top Scope.
-    if( CallNode.ALL_CALLS!=BitsRPC.EMPTY ) return false;
-    if( Env.FILE==null ) return false;
-    BitsFun fidxs = Env.FILE._scope.top_escapes();
-    if( fidxs.test_recur(_fidx) ) return false; // Escapes the top scope
-    return true;
-  }
-
   public int nargs() { return _nargs; }
 
   // ----
   // Graph rewriting via general inlining.  All other graph optimizations are
   // already done.
-  @Override public Node ideal_reduce() {
-    // Common Region reductions; killing off dead paths
-    Node rez = super.ideal_reduce();
-    if( rez != null ) return rez;
-    if( is_keep() ) return null; // FunNode still under construction
-    // Check for FunPtr/Ret dead/gone, and the function is no longer callable
-    // from anybody.
-    if( has_unknown_callers() ) {
-      if( ret()==null ) {
-        assert !is_prim();
-        if( _defs._len<= 1 ) return null;
-        for( Node use : _uses ) { // All parms can lift
-          Env.GVN.add_flow(use);
-          Env.GVN.add_flow_defs(use); //
-        }
-        return set_def(1,Env.XCTRL);
-      }
-      // Unknown call edge exists, but can never be taken
-      if( !is_prim() && is_path1_dead() ) {
-        throw unimpl();
-      }
-    }
-    // Backdoor hook to trigger FunPtr dropping a unused display
-    FunPtrNode fptr = fptr();
-    if( parm(DSP_IDX)==null && fptr !=null && !(fptr.display() instanceof ConNode) )
-      Env.GVN.add_reduce(fptr);
-
-    return null;
-  }
-
   public Node ideal_inline(boolean check_progress) {
-    // If no trailing RetNode and hence no FunPtr... function is uncallable
-    // from the unknown caller.
-    RetNode ret = ret();
-    if( has_unknown_callers() && ret == null ) // Dead after construction?
-      return null;
-
     Node[] parms = parms();
     Node rpc_parm = parms[0];
     if( rpc_parm == null ) return null; // Single caller const-folds the RPC, but also inlines in CallNode
@@ -233,7 +181,8 @@ public class FunNode extends RegionNode {
     if( _defs._len <= 2  ) return null; // No need to split callers if only 1
 
     // Every input path is wired to an output path
-    for( int i=1+(has_unknown_callers() ? 1 : 0); i<_defs._len; i++ ) {
+    RetNode ret = ret();
+    for( int i=1; i<_defs._len; i++ ) {
       Node c = in(i);
       if( !(c.in(0) instanceof CallNode call) ) return null; // If this is not a CallNode, just bail
       CallEpiNode cepi = call.cepi();
@@ -267,7 +216,7 @@ public class FunNode extends RegionNode {
     // Split the callers according to the new 'fun'.
     FunNode fun = make_new_fun(ret, path);
     split_callers(ret,fun,body,path);
-    assert Env.START.more_work(true)==0; // Initial conditions are correct
+    assert Env.ROOT.more_work(true)==0; // Initial conditions are correct
     return this;
   }
 
@@ -302,7 +251,6 @@ public class FunNode extends RegionNode {
   // Visit all ParmNodes, looking for unresolved call uses that can be improved
   // by type-splitting
   private int find_type_split_index( Node[] parms ) {
-    assert has_unknown_callers();// Only overly-wide calls.
     for( Node parm : parms )     // For all parms
       if( parm != null )         // (some can be dead)
         for( Node use : parm._uses ) { // See if a parm-user needs a type-specialization split
@@ -330,7 +278,6 @@ public class FunNode extends RegionNode {
 
   // Find types for which splitting appears to help.
   private TypeStruct find_type_split( Node[] parms ) {
-    assert has_unknown_callers(); // Only overly-wide calls.
 
     // Look for splitting to help an Unresolved Call.
     int idx = find_type_split_index(parms);
@@ -450,9 +397,8 @@ public class FunNode extends RegionNode {
   //
   // Same argument for field Loads from unspecialized values.
   private TypeStruct type_special( Node[] parms ) {
-    if( !has_unknown_callers() ) return null; // Only overly-wide calls.
-    TypeStruct formals = find_type_split(parms);
-    if( formals == null ) return null; // No unresolved calls; no point in type-specialization
+    //TypeStruct formals = find_type_split(parms);
+    //if( formals == null ) return null; // No unresolved calls; no point in type-specialization
     //// Make a new function header with new signature
     //if( !formals.isa(_sig._formals) ) return null;    // Fails in error cases
     //return formals == _sig._formals ? null : formals; // Must see improvement
@@ -565,7 +511,7 @@ public class FunNode extends RegionNode {
     // Pick which input to inline.  Only based on having some constant inputs
     // right now.
     int m=-1, mncons = -1;
-    for( int i=has_unknown_callers() ? 2 : 1; i<_defs._len; i++ ) {
+    for( int i=1; i<_defs._len; i++ ) {
       Node call = in(i).in(0);
       if( !(call instanceof CallNode) ) continue; // Not well-formed
       if( ((CallNode)call).nargs() != nargs() ) continue; // Will not inline
@@ -645,8 +591,7 @@ public class FunNode extends RegionNode {
     // unknown-caller, if any.
     CallNode path_call = path < 0 ? null : (CallNode)in(path).in(0);
     Ary<CallEpiNode> unwireds = new Ary<>(new CallEpiNode[1],0);
-    final int zlen = has_unknown_callers() ? 2 : 1;
-    while( _defs._len > zlen ) {             // For all paths (except unknown-caller)
+    while( _defs._len > 1 ) {             // For all paths
       Node ceproj = pop();
       CallNode call = (CallNode)ceproj.in(0); // Unhook without removal
       CallEpiNode cepi = call.cepi();
@@ -739,114 +684,101 @@ public class FunNode extends RegionNode {
       if( e.getKey() instanceof MemSplitNode memsplit )
         memsplit.split_alias(e.getValue(),aliases);
 
-    // Wired Call Handling:
-    if( zlen==2 ) {               // Not called by any unknown caller
-      if( path < 0 ) {            // Type Split
-        // Change the unknown caller parm types to match the new sig.  Default
-        // memory includes the other half of alias splits, which might be
-        // passed in from recursive calls.
-        for( Node p : fun._uses )
-          if( p instanceof ParmNode parm ) {
-            Node defx;
-            if( parm._idx==0 ) defx = Node.con(TypeRPC.ALL_CALL);
-            else if( parm._idx==MEM_IDX ) throw unimpl();
-            else {
-              //Type tx = fun.formal(parm._idx).simple_ptr();
-              //defx = Node.con(tx);
-              throw unimpl();
-            }
-            parm.set_def(1,defx);
-          }
-      } else                     // Path Split
-        fun.set_def(1,Env.XCTRL);
-    }
-
-    // Put all new nodes into the GVN tables and worklist
-    for( Map.Entry<Node,Node> e : map.entrySet() ) {
-      Node oo = e.getKey();     // Old node
-      Node nn = e.getValue();   // New node
-      Type nt = oo._val;        // Generally just copy type from original nodes
-      if( nn instanceof FunPtrNode && (path==0 || path_call.fdx()==nn)) { // FunPtrs pick up the new fidx
-        TypeFunPtr ofptr = (TypeFunPtr)nt;
-        if( ofptr.fidx()==oldret._fidx )
-          nt = ofptr.make_from(BitsFun.make0(newret._fidx));
-      }
-      nn._val = nt;             // Values
-      nn._elock();              // In GVN table
-    }
-
-    // Rewire all unwired calls.
-    for( CallEpiNode cepi : unwireds ) {
-      CallNode call = cepi.call();
-      CallEpiNode cepi2 = (CallEpiNode)map.get(cepi);
-      if( path < 0 ) {          // Type-split, wire both & resolve later
-        BitsFun call_fidxs = ((TypeFunPtr) call.fdx()._val).fidxs();
-        assert call_fidxs.test_recur(    _fidx) ;  cepi.wire1(call,this,oldret,false);
-        if(    call_fidxs.test_recur(fun._fidx) )  cepi.wire1(call, fun,newret,false);
-        if( cepi2!=null ) {
-          // Found an unwired call in original: musta been a recursive self-
-          // call.  wire the clone, same as the original was wired, so the
-          // clone keeps knowledge about its return type.
-          CallNode call2 = cepi2.call();
-          BitsFun call_fidxs2 = ((TypeFunPtr) call2.fdx()._val).fidxs();
-          if(    call_fidxs2.test_recur(    _fidx) )  cepi2.wire1(call2,this,oldret,false);
-          assert call_fidxs2.test_recur(fun._fidx) ;  cepi2.wire1(call2, fun,newret,false);
-        }
-      } else {                  // Non-type split, wire left or right
-        if( call==path_call ) cepi.wire1(call, fun,newret,false);
-        else                  cepi.wire1(call,this,oldret,false);
-        if( cepi2!=null && cepi2.call()!=path_call ) {
-          CallNode call2 = cepi2.call();
-          // Found an unwired call in original: musta been a recursive
-          // self-call.  wire the clone, same as the original was wired, so the
-          // clone keeps knowledge about its return type.
-          //call2.set_fdx(call.fdx());
-          cepi2.wire1(call2,this,oldret,false);
-          call2.xval();
-          Env.GVN.add_flow_uses(this); // This gets wired, that gets wired, revisit all
-        }
-        Env.GVN.add_unuse(cepi);
-      }
-    }
-
-    // Look for wired new not-recursive CallEpis; these will have an outgoing
-    // edge to some other RetNode, but the Call will not be wired.  Wire.
-    for( Node nn : map.values() ) {
-      if( nn instanceof CallEpiNode ncepi ) {
-        for( int i=0; i<ncepi.nwired(); i++ ) {
-          RetNode xxxret = ncepi.wired(i); // Neither newret nor oldret
-          if( xxxret != newret && xxxret != oldret ) { // Not self-recursive
-            ncepi.wire0(ncepi.call(),xxxret.fun(),false);
-          }
-        }
-        // CEProjs from the Call never re-wire, as they are not uniquely
-        // identified by input alone.  Other Projs DO rewire, if any target
-        // function uses them.
-        for( Node use : ncepi.call()._uses )
-          if( use._uses._len==0 ) Env.GVN.add_dead(use);
-      }
-    }
-
-    // Retype memory, so we can everywhere lift the split-alias parents "up and out".
-    GVNGCM.retype_mem(aliases,this.parm(MEM_IDX), oldret, true);
-    GVNGCM.retype_mem(aliases,fun .parm(MEM_IDX), newret, true);
-
-    // Unhook the hooked FunPtrs
-    for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) Env.GVN.add_unuse(GVNGCM.pop(GVNGCM.KEEP_ALIVE._defs._len));
-  }
-
-  // Compute value from inputs.  Simple meet over inputs.
-  @Override public Type value() {
-    // Will be an error eventually, but act like its executed so the trailing
-    // EpilogNode gets visited during GCP
-    if( is_prim() ) return Type.CTRL;
-    if( in(0)==this ) return _defs._len>=2 ? val(1) : Type.XCTRL; // is_copy
-    if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
-    for( int i = is_path1_dead() ? 2 : 1; i<_defs._len; i++ ) {
-      Type c = val(i);
-      if( c == Type.CTRL || c == Type.ALL ) return Type.CTRL; // Valid path
-    }
-    return Type.XCTRL;
+    //// Wired Call Handling:
+    //if( zlen==2 ) {               // Not called by any unknown caller
+    //  if( path < 0 ) {            // Type Split
+    //    // Change the unknown caller parm types to match the new sig.  Default
+    //    // memory includes the other half of alias splits, which might be
+    //    // passed in from recursive calls.
+    //    for( Node p : fun._uses )
+    //      if( p instanceof ParmNode parm ) {
+    //        Node defx;
+    //        if( parm._idx==0 ) defx = Node.con(TypeRPC.ALL_CALL);
+    //        else if( parm._idx==MEM_IDX ) throw unimpl();
+    //        else {
+    //          //Type tx = fun.formal(parm._idx).simple_ptr();
+    //          //defx = Node.con(tx);
+    //          throw unimpl();
+    //        }
+    //        parm.set_def(1,defx);
+    //      }
+    //  } else                     // Path Split
+    //    fun.set_def(1,Env.XCTRL);
+    //}
+    //
+    //// Put all new nodes into the GVN tables and worklist
+    //for( Map.Entry<Node,Node> e : map.entrySet() ) {
+    //  Node oo = e.getKey();     // Old node
+    //  Node nn = e.getValue();   // New node
+    //  Type nt = oo._val;        // Generally just copy type from original nodes
+    //  if( nn instanceof FunPtrNode && (path==0 || path_call.fdx()==nn)) { // FunPtrs pick up the new fidx
+    //    TypeFunPtr ofptr = (TypeFunPtr)nt;
+    //    if( ofptr.fidx()==oldret._fidx )
+    //      nt = ofptr.make_from(BitsFun.make0(newret._fidx));
+    //  }
+    //  nn._val = nt;             // Values
+    //  nn._elock();              // In GVN table
+    //}
+    //
+    //// Rewire all unwired calls.
+    //for( CallEpiNode cepi : unwireds ) {
+    //  CallNode call = cepi.call();
+    //  CallEpiNode cepi2 = (CallEpiNode)map.get(cepi);
+    //  if( path < 0 ) {          // Type-split, wire both & resolve later
+    //    BitsFun call_fidxs = ((TypeFunPtr) call.fdx()._val).fidxs();
+    //    assert call_fidxs.test_recur(    _fidx) ;  cepi.wire1(call,this,oldret,false);
+    //    if(    call_fidxs.test_recur(fun._fidx) )  cepi.wire1(call, fun,newret,false);
+    //    if( cepi2!=null ) {
+    //      // Found an unwired call in original: musta been a recursive self-
+    //      // call.  wire the clone, same as the original was wired, so the
+    //      // clone keeps knowledge about its return type.
+    //      CallNode call2 = cepi2.call();
+    //      BitsFun call_fidxs2 = ((TypeFunPtr) call2.fdx()._val).fidxs();
+    //      if(    call_fidxs2.test_recur(    _fidx) )  cepi2.wire1(call2,this,oldret,false);
+    //      assert call_fidxs2.test_recur(fun._fidx) ;  cepi2.wire1(call2, fun,newret,false);
+    //    }
+    //  } else {                  // Non-type split, wire left or right
+    //    if( call==path_call ) cepi.wire1(call, fun,newret,false);
+    //    else                  cepi.wire1(call,this,oldret,false);
+    //    if( cepi2!=null && cepi2.call()!=path_call ) {
+    //      CallNode call2 = cepi2.call();
+    //      // Found an unwired call in original: musta been a recursive
+    //      // self-call.  wire the clone, same as the original was wired, so the
+    //      // clone keeps knowledge about its return type.
+    //      //call2.set_fdx(call.fdx());
+    //      cepi2.wire1(call2,this,oldret,false);
+    //      call2.xval();
+    //      Env.GVN.add_flow_uses(this); // This gets wired, that gets wired, revisit all
+    //    }
+    //    Env.GVN.add_unuse(cepi);
+    //  }
+    //}
+    //
+    //// Look for wired new not-recursive CallEpis; these will have an outgoing
+    //// edge to some other RetNode, but the Call will not be wired.  Wire.
+    //for( Node nn : map.values() ) {
+    //  if( nn instanceof CallEpiNode ncepi ) {
+    //    for( int i=0; i<ncepi.nwired(); i++ ) {
+    //      RetNode xxxret = ncepi.wired(i); // Neither newret nor oldret
+    //      if( xxxret != newret && xxxret != oldret ) { // Not self-recursive
+    //        ncepi.wire0(ncepi.call(),xxxret.fun(),false);
+    //      }
+    //    }
+    //    // CEProjs from the Call never re-wire, as they are not uniquely
+    //    // identified by input alone.  Other Projs DO rewire, if any target
+    //    // function uses them.
+    //    for( Node use : ncepi.call()._uses )
+    //      if( use._uses._len==0 ) Env.GVN.add_dead(use);
+    //  }
+    //}
+    //
+    //// Retype memory, so we can everywhere lift the split-alias parents "up and out".
+    //GVNGCM.retype_mem(aliases,this.parm(MEM_IDX), oldret, true);
+    //GVNGCM.retype_mem(aliases,fun .parm(MEM_IDX), newret, true);
+    //
+    //// Unhook the hooked FunPtrs
+    //for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) Env.GVN.add_unuse(GVNGCM.pop(GVNGCM.KEEP_ALIVE._defs._len));
+    throw unimpl();
   }
 
   // Funs get special treatment by the H-M algo.

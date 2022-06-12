@@ -69,10 +69,6 @@ physical CG edges as possible calls are discovered.
 GCP discovers functions which escape at the top-most level, and wires the
 RetNode to the top-most Scope to mimic future unknown callers.
 
-GCP resolves all ambiguous (overloaded) calls, using the precise types first,
-and then inserting conversions using a greedy decision.  If this is not
-sufficient to resolve all calls, the program is ambiguous and wrong.
-
 ==============================================================================
 
 Global Optimistic Liveness is also computed.  This is the reverse version of
@@ -129,20 +125,15 @@ their inputs, and so their inputs are treated as dead.
 public abstract class Combo {
   static public boolean HM_FREEZE;
 
-  public static void opto(ScopeNode scope) {
-    if( AA.DO_GCP )
-      CallNode.ALL_CALLS = BitsRPC.EMPTY;
-
+  public static void opto() {
     Env.GVN.flow_clear();       // Will be used as a worklist
 
     // Set all values to ANY and lives to DEAD, their most optimistic types.
     // Set all type-vars to Leafs.
-    Env.START.walk_initype();
+    Env.ROOT.walk_initype();
 
-    //// Make the non-gen set in a pre-pass
-    //for( FunNode fun : FunNode.FUNS ) if( fun!=null ) fun._nongen=null; // Clear old stuff
-    //for( FunNode fun : FunNode.FUNS ) if( fun!=null && !fun.is_dead() ) fun.prep_nongen();// Make new
-    assert Env.START.more_work(false)==0; // Initial conditions are correct
+    // Make the non-gen set in a pre-pass
+    assert Env.ROOT.more_work(false)==0; // Initial conditions are correct
 
     // Init
     HM_FREEZE = false;
@@ -150,23 +141,19 @@ public abstract class Combo {
 
     // Pass 1: Everything starts high/top/leaf and falls; escaping function args are assumed high
     work_cnt += main_work_loop();
-    assert Env.START.more_work(false)==0;
+    //assert Env.ROOT.more_work(false)==0;
 
-    // Pass 2: Give up on the Root GCP arg types.  Drop them to the best Root
-    // approximation and never lift again.
-    update_root_args(scope);
-    work_cnt += main_work_loop();
-    //assert Env.START.more_work(false)==0;
-
-    // Pass 3: H-M types freeze, escaping function args are assumed lowest H-M compatible and
-    // GCP types continue to run downhill.
+    // H-M types freeze, escaping function args are assumed called with lowest H-M compatible
     HM_FREEZE = true;
-    //prog.visit((syn) -> { syn.add_val_work(null,work); return work.add(syn); }, (a,b)->null);
+    Env.GVN.add_flow(Env.ROOT);
+    //assert Env.ROOT.more_work(false)==0;
+
+    // Pass 2: GCP types continue to run downhill.
     work_cnt += main_work_loop();
-    //assert Env.START.more_work(false)==0;
+    assert Env.ROOT.more_work(false)==0;
 
     Node.VALS.clear();
-    Env.START.walk_opt(new VBitSet());
+    Env.ROOT.walk_opt(new VBitSet());
   }
 
   static int main_work_loop( ) {
@@ -193,7 +180,7 @@ public abstract class Combo {
         n.combo_unify();
 
       // Very expensive assert: everything that can make progress is on worklist
-      //assert Env.START.more_work(false)==0;
+      //assert Env.ROOT.more_work(false)==0;
     }
     return cnt;
   }

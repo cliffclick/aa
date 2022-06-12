@@ -90,8 +90,6 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple IF_FALSE= make(CTRL ,XCTRL);
 
   // This is the starting state of the program; CTRL is active and memory is empty.
-  public  static final TypeTuple START_STATE = make(CTRL, TypeMem.ANYMEM);
-  public  static final TypeTuple EXIT_STATE = make(TypeNil.SCALAR,TypeFunPtr.GENERIC_FUNPTR);
   public  static final TypeTuple  RET = make(CTRL, TypeMem.ALLMEM, ALL); // Type of RetNodes
   public  static final TypeTuple CALLE= make(CTRL, TypeMem.ALLMEM, ALL); // Type of CallEpiNodes
   public  static final TypeTuple TEST0= make(CTRL, TypeMem.ALLMEM, TypeFunPtr.GENERIC_FUNPTR, TypeNil.SCALAR); // Call with 1 arg
@@ -108,7 +106,7 @@ public class TypeTuple extends Type<TypeTuple> {
 
   //
   static final TypeTuple[] TYPES = new TypeTuple[]{
-    CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE, TEST0, TEST1,
+    CALLE,IF_ALL, IF_TRUE, IF_FALSE, TEST0, TEST1,
     INT64, FLT64, INT64_INT64, FLT64_FLT64, OOP_OOP
   };
 

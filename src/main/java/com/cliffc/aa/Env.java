@@ -34,23 +34,32 @@ public class Env implements AutoCloseable {
   public static Env TOP,FILE;
   public static final GVNGCM GVN = new GVNGCM(); // Initial GVN
 
+  // KeepNode represents future un-parsed users of a Node.  Removed after parsing.
+  // Semantically, it represents a conservative approximation of ALL uses.
   public static final KeepNode KEEP_ALIVE = new KeepNode();
+
+  // The Root Node.  Program start and exit; the Universe betwixt the end and the beginning
+  public static final   RootNode ROOT;
+  // Program start control and memory.  NOT module-start, this presumes NO prior state.
+  public static final  CProjNode CTL_0; // Program start value control
+  public static final  MProjNode MEM_0; // Program start value memory
+
+  // Short-cuts for common constants Nodes.
   public static final ConNode ANY;   // Common ANY / used for dead
   public static final ConNode ALL;   // Common ALL / used for errors
-  public static final ConNode XNIL;  // Default 0
   public static final ConNode XCTRL; // Always dead control
-  public static final ConNode XUSE;  // Unused objects (dead displays)
+  public static final ConNode XNIL;  // Default 0
+  public static final ConNode INT;   // Default int parameter
+  public static final ConNode FLT;   // Default flt parameter
   public static final ConNode XMEM;  // Unused whole memory
-  public static final ConNode ALL_CTRL; // Always alive control
-  public static final ConNode ALL_MEM;  // Conservative all memory
-  public static final ConNode ALL_PARM; // Default parameter
-  public static final ConNode ALL_CALL; // Common during function call construction
 
-  public static final    StartNode START; // Program start values (control, empty memory, cmd-line args)
-  public static final    CProjNode CTL_0; // Program start value control
-  public static final StartMemNode MEM_0; // Program start value memory
-  public static final   StructNode STK_0; // Program start stack frame (has primitives)
-  public static final    ScopeNode SCP_0; // Program start scope
+  // All possible return addresses (RPCs).
+  public static final ProjNode ALL_CALL;
+
+  // Initial program state.  Includes definitions for int: and flt: clazzes,
+  // which includes most common primitives.
+  public static final StructNode STK_0; // Program start stack frame (has primitives)
+  public static final  ScopeNode SCP_0; // Program start scope
 
   // Global named types.  Type names are ALSO lexically scoped during parsing
   // (dictates visibility of a name).  During semantic analysis a named type
@@ -68,20 +77,24 @@ public class Env implements AutoCloseable {
 
   static {
     // Top-level or common default values
-    START   = keep(new StartNode());
-    ANY     = keep(new ConNode<>(Type.ANY   ));
-    ALL     = keep(new ConNode<>(Type.ALL   ));
-    XNIL    = keep(new ConNode<>(TypeNil.XNIL));
-    XCTRL   = keep(new ConNode<>(Type.XCTRL ));
-    XUSE    = keep(new ConNode<>(TypeStruct.UNUSED));
-    XMEM    = keep(new ConNode<>(TypeMem.ANYMEM));
-    ALL_CTRL= keep(new ConNode<>(Type.CTRL  ));
-    ALL_MEM = keep(new ConNode<>(TypeMem.ALLMEM));
-    ALL_PARM= keep(new ConNode<>(TypeNil.SCALAR));
-    ALL_CALL= keep(new ConNode<>(TypeRPC.ALL_CALL));
+
+    // The Universe outside the parse program
+    ROOT  = keep(new RootNode());
     // Initial control & memory
-    CTL_0  = keep(new    CProjNode(START,0));
-    MEM_0  = keep(new StartMemNode(START  ));
+    CTL_0 = keep(new CProjNode(ROOT,0));
+    MEM_0 = keep(new MProjNode(ROOT,0));
+    // Common constants
+    ANY   = keep(new ConNode<>(Type.ANY   ));
+    ALL   = keep(new ConNode<>(Type.ALL   ));
+    XCTRL = keep(new ConNode<>(Type.XCTRL ));
+    XNIL  = keep(new ConNode<>(TypeNil.XNIL));
+    INT   = keep(new ConNode<>(TypeStruct.INT));
+    FLT   = keep(new ConNode<>(TypeStruct.FLT));
+    XMEM  = keep(new ConNode<>(TypeMem.ANYMEM));
+
+    // All the Calls in the Universe, which might call somebody.
+    ALL_CALL=keep(new ProjNode(ROOT,2));
+
     PROTOS = new HashMap<>();
 
     // The Top-Level environment; holds the primitives.
@@ -117,7 +130,7 @@ public class Env implements AutoCloseable {
     _scope.set_ctrl(ctrl);
     _scope.set_mem (mem);  // Memory includes local stack frame
     _scope.set_ptr (ptr);  // Address for 'nnn', the local stack frame
-    _scope.set_rez (ALL_PARM);
+    _scope.set_rez (XNIL);
     KEEP_ALIVE.add_def(_scope);
     GVN.do_iter();
   }
@@ -132,19 +145,18 @@ public class Env implements AutoCloseable {
     HashSet<ErrMsg> errs = new HashSet<>();
     if( err!= null ) errs.add(err);
     VBitSet bs = new VBitSet();
-    _scope.walkerr_def(errs,bs);
+    Env.ROOT.walkerr_def(errs,bs);
     ArrayList<ErrMsg> errs0 = new ArrayList<>(errs);
     Collections.sort(errs0);
 
-    Node rez = _scope.rez();
-    Type mem = _scope.mem()._val;
+    Node rez = Env.ROOT.in(REZ_IDX);
+    Type mem = Env.ROOT.in(MEM_IDX)._val;
     TypeStruct formals = null;
     if( rez._val instanceof TypeFunPtr tfp ) {
       RetNode ret = RetNode.get(tfp._fidxs);
       if( ret != null ) formals = ret.formals();
     }
-    return new TypeEnv(_scope,
-                       rez._val,
+    return new TypeEnv(rez._val,
                        formals,
                        mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM),
                        AA.DO_HMT && rez.has_tvar() ? rez.tvar() : null,
@@ -162,13 +174,11 @@ public class Env implements AutoCloseable {
     StructNode stk = _scope.stk();
     assert stk.is_closed();
     ScopeNode pscope = _par._scope;
-    if( pscope != null ) {
-      stk.promote_forward(pscope.stk());
-      for( String tname : _scope.typeNames() ) {
-        StructNode n = _scope.get_type(tname);
-        if( n.is_forward_type() )
-          pscope.add_type(tname,n);
-      }
+    stk.promote_forward(pscope.stk());
+    for( String tname : _scope.typeNames() ) {
+      StructNode n = _scope.get_type(tname);
+      if( n.is_forward_type() )
+        pscope.add_type(tname,n);
     }
 
     _scope.set_ptr(null);       // Clear pointer to display
@@ -196,8 +206,7 @@ public class Env implements AutoCloseable {
   // Reset all global statics for the next parse.  Useful during testing when
   // many top-level parses happen in a row.
   public static void top_reset() {
-    // Kill all extra constants and cyclic ConTypeNodes hooked by Start
-    unhook_last(START);
+    ROOT.reset();
     // Kill all undefined values, which promote up to the top level
     Node c;
     while( !(c=STK_0._defs.last()).is_prim() ) {
@@ -206,8 +215,6 @@ public class Env implements AutoCloseable {
       STK_0.pop_fld();
     }
     unhook_last(STK_0);
-    // Unhook all Returns, hooked prior to GCP in case they escape at the top level
-    unhook_rets();
     // Top-level control and memory
     unhook_last(CTL_0);
     unhook_last(MEM_0);
@@ -216,7 +223,7 @@ public class Env implements AutoCloseable {
     TV2.reset_to_init0();
     Node.VALS.clear();          // Clean out hashtable
     GVN.flow_clear();
-    START.walk_reset();         // Clean out any wired prim calls
+    ROOT.walk_reset();          // Clean out any wired prim calls
     KEEP_ALIVE.walk_reset();    // Clean out any wired prim calls
     GVNGCM.KEEP_ALIVE.walk_reset();
     CallNode  .reset_to_init0();
@@ -235,19 +242,9 @@ public class Env implements AutoCloseable {
   static private void unhook_last(Node n) {
     Node c;
     while( !(c=n._uses.last()).is_prim() ) {
-      while( c.len()>0 ) c.pop();
-      GVN.add_dead(c);
-    }
-  }
-
-  // RetNodes are hooked by the top-level scope, in case they escape and have
-  // to be treated as-if called by the unknown caller.
-  public static void unhook_rets() {
-    for( int i=ScopeNode.RET_IDX; i<SCP_0.len(); i++ ) {
-      if( SCP_0.in(i) instanceof RetNode ret && !ret.is_prim() ) {
-        ret.fun().set_def(1,Env.ANY); // Kill the default input
-        SCP_0.remove(i--);
-      }
+    //  while( c.len()>0 ) c.pop();
+    //  GVN.add_dead(c);
+      throw unimpl();
     }
   }
 

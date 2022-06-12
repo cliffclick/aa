@@ -1,13 +1,11 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.node.CallNode;
-import com.cliffc.aa.node.Node;
+import static com.cliffc.aa.AA.*;
 
 /** an implementation of language AA
  */
 
 // A basic implementation of 'eval'.
-// TODO: rename class
 
 public abstract class Exec {
   // Parse and type a file-level string.  Reset back to Env.<clinit> when done.
@@ -17,7 +15,7 @@ public abstract class Exec {
     TypeEnv te = go(Env.TOP,src,str,rseed,do_gcp,do_hmt);
 
     // Kill, cleanup and reset for another parse
-    Env.top_reset();                   // Hard reset
+    Env.top_reset();            // Hard reset
 
     return te;
   }
@@ -33,30 +31,22 @@ public abstract class Exec {
     // Parse a program
     ErrMsg err = new Parse(src,false,e,str).prog();
 
-    // Close file scope; no more program text in this file, so no more fields to add.
-    CallNode.uncall_all(false,0); // Remove the more-unknown-callers hook
-    e._scope.stk().close();
-    int sidx = e._scope.push();// Hook result, not dead
+    // Move final results into Root; close out the top scope
+    Env.ROOT.set_def(CTL_IDX,e._scope.ctrl());
+    Env.ROOT.set_def(MEM_IDX,e._scope.mem ());
+    Env.ROOT.set_def(REZ_IDX,e._scope.rez ());
+    Env.GVN.add_flow(Env.ROOT);
     e.close();      // No more fields added to the parse scope
 
-    Combo.opto(Env.FILE._scope); // Global Constant Propagation and Hindley-Milner Typing
+    Combo.opto(); // Global Constant Propagation and Hindley-Milner Typing
 
     Env.GVN.iter(); // Re-check all ideal calls now that types have been maximally lifted
 
     Env.FILE=null;
 
-    TypeEnv rez = e.gather_errors(err);  // Gather errors and/or program typing
-
-    // Cleanup top (normal user) scope
-    Node scope = Node.pop(sidx);
-    assert scope==rez._scope;
-    // All edges removed, otherwise a self-cycle keeps alive
-    while( scope.len()>0 ) scope.pop();
-    Env.GVN.add_dead(scope);
-
-    return rez;
+    return e.gather_errors(err);  // Gather errors and/or program typing
   }
 
 
-  public static String dump() { return Env.START.dumprpo(false,false,false); } // Debugging hook
+  public static String dump() { return Env.ROOT.dumprpo(false,false,false); } // Debugging hook
 }

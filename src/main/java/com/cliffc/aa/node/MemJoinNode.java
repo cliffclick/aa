@@ -85,7 +85,6 @@ public class MemJoinNode extends Node {
     }
     if( mem instanceof ParmNode ) return null;
     if( mem instanceof PhiNode ) return null;
-    if( mem instanceof StartMemNode ) return null;
     if( mem instanceof ConNode ) return null;
     throw unimpl(); // Break out another SESE split
   }

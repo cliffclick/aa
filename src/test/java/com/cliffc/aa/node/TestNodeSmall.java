@@ -501,8 +501,8 @@ public class TestNodeSmall {
     FunNode fun = new FunNode("fact",ARG_IDX).add_def(ctl).add_def(ctl).init();
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
-    ParmNode parm_mem     = new ParmNode(MEM_IDX,fun,mem).add_def(dsp_file_mem).init();
-    ParmNode parm_dsp_ptr = new ParmNode(DSP_IDX,fun,(ConNode)Node.con(dsp_file_ptr._val)).add_def(dsp_file_ptr).init();
+    ParmNode parm_mem     = new ParmNode(MEM_IDX,fun,null,mem._val,mem).add_def(dsp_file_mem).init();
+    ParmNode parm_dsp_ptr = new ParmNode(DSP_IDX,fun,null,dsp_file_ptr._val,(ConNode)Node.con(dsp_file_ptr._val)).add_def(dsp_file_ptr).init();
     // Close the function up
     RetNode ret = new RetNode(fun,parm_mem,parm_dsp_ptr,rpc,fun).init();
     FunPtrNode fptr = new FunPtrNode(ret,dsp_file_ptr).init();
@@ -532,7 +532,7 @@ public class TestNodeSmall {
     // Now run GCP to closure.  This is the key call being tested.
     DO_GCP=true;
     DO_HMT=false;
-    Combo.opto(env);
+    Combo.opto();
 
     // Validate cyclic display/function type
     TypeFunPtr tfptr0 = (TypeFunPtr) fptr._val;

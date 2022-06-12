@@ -237,7 +237,7 @@ public class TestNode {
     set_type(2,TypeNil.SCALAR);  nnn1.add_fld(TypeFld.make("y"),_ins[2],null);
     test1monotonic(nnn1);
     ((ConNode<Type>)_ins[1])._t = TypeNil.SCALAR; // ParmNode reads this for _alltype
-    test1monotonic(new   ParmNode( 1,(FunNode)_ins[0],(ConNode)_ins[1]).add_def(_ins[2]));
+    test1monotonic(new   ParmNode( 1,(FunNode)_ins[0],null,null,(ConNode)_ins[1]).add_def(_ins[2]));
     test1monotonic(new    PhiNode(TypeNil.SCALAR,null,_ins[0],_ins[1],_ins[2]));
     for( PrimNode prim : PrimNode.PRIMS() )
       test1monotonic_prim(prim,mem);

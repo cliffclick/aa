@@ -84,7 +84,6 @@ import static com.cliffc.aa.Env.GVN;
 // wired_not_typed bits.
 
 public class CallNode extends Node {
-  public static BitsRPC ALL_CALLS = BitsRPC.EMPTY;
   int _rpc;                 // Call-site return PC
   boolean _unpacked;        // One-shot flag; call site allows unpacking a tuple
   boolean _is_copy;         // One-shot flag; Call will collapse
@@ -97,11 +96,9 @@ public class CallNode extends Node {
   public CallNode( boolean unpacked, Parse[] badargs, Node... defs ) {
     super(OP_CALL,defs);
     _rpc = BitsRPC.new_rpc(BitsRPC.ALLX); // Unique call-site index
-    ALL_CALLS = ALL_CALLS.set(_rpc);      // Calls ALL
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
     _badargs = badargs;
   }
-  public static void reset_to_init0() { ALL_CALLS = BitsRPC.EMPTY; }
 
   @Override public String xstr() { return (_is_copy ? "CopyCall" : (is_dead() ? "Xall" : "Call"))+(_not_resolved_by_gcp?"_UNRESOLVED":""); } // Self short name
   String  str() { return xstr(); }       // Inline short name
@@ -379,51 +376,15 @@ public class CallNode extends Node {
     return BitsAlias.EMPTY;
   }
 
-  //@Override BitsAlias escapees() {
-    //BitsAlias esc_in  = tesc(_val)._aliases;
-    //CallEpiNode cepi = cepi();
-    //TypeTuple tcepi = cepi._val instanceof TypeTuple ? (TypeTuple) cepi._val : (TypeTuple) cepi._val.oob(TypeTuple.CALLE);
-    //BitsAlias esc_out = CallEpiNode.esc_out((TypeMem)tcepi.at(1),tcepi.at(2));
-    //TypeMem precall = (TypeMem) mem()._val;
-    //BitsAlias esc_out2 = precall.and_unused(esc_out); // Filter by unused pre-call
-    //return esc_out2.meet(esc_in);
-  //  throw unimpl();
-  //}
   @Override public void add_flow_extra(Type old) {
     if( old==Type.ANY || _val==Type.ANY ||
         (old instanceof TypeTuple && ttfp(old).above_center()) )
       add_flow_defs();      // Args can be more-alive or more-dead
     // If Call flips to being in-error, all incoming args forced live/escape
-    boolean err = err(true)!=null;
-    for( Node def : _defs )
-      if( def!=null && err )
-        GVN.add_flow(def);
-    // If not resolved, might now resolve
-    if( _val instanceof TypeTuple ) {
-      BitsFun fidxs = ttfp(_val)._fidxs;
-      if( fidxs.abit()!=-1 ) GVN.add_reduce(this);
-      // Check that "calls any INTX fidx" matches "rpc in ALL_CALLS".
-      if( fidxs.test_recur(BitsFun.INTX) != ALL_CALLS.test_recur(_rpc) )
-        uncall_all(fidxs.test_recur(BitsFun.INTX),_rpc);
-    }
-    // If escapes lowers, can allow e.g. swapping with New
-    //if( _val instanceof TypeTuple && tesc(old)!=tesc(_val) )
-    //  Env.GVN.add_grow(this);
-  }
-
-  // Flip the ALL_CALLS set membership
-  public static void uncall_all(boolean do_set, int rpc) {
-    BitsRPC oldrpc = ALL_CALLS;
-    // Add or remove the bit
-    ALL_CALLS = do_set ? ALL_CALLS.set(rpc) : ALL_CALLS.clear(rpc);
-    // If flipping BitsRPC from empty or not, all FunNodes default inputs
-    // will change.
-    if(( oldrpc==BitsRPC.EMPTY) != (ALL_CALLS==BitsRPC.EMPTY) ) {
-      Env.unhook_rets();// All FunNodes can drop their unknown input
-      for( Node use : Env.ALL_CTRL._uses )
-        if( use instanceof FunNode )      // Prims included can recompute
-          GVN.add_flow_uses(GVN.add_flow(use)); // Parms on prims
-    }
+     if( err(true)!=null )
+      for( Node def : _defs )
+        if( def!=null )
+          GVN.add_flow(def);
   }
 
   @Override public void add_flow_def_extra(Node chg) {
@@ -485,19 +446,6 @@ public class CallNode extends Node {
 
   @Override public boolean has_tvar() { return false; }
 
-  // See if we can resolve an unresolved Call
-  @Override public void combo_resolve(WorkNode ambi) {
-    if( _live == Type.ANY ) return;
-    // Wait until the Call is reachable
-    if( ctl()._val != Type.CTRL || !(_val instanceof TypeTuple) ) return;
-    // Only ambiguous if FIDXs are both above_center and there are more than one
-    BitsFun fidxs = ttfp(_val).fidxs();
-    if( !fidxs.above_center() || fidxs.abit() != -1 ) return;
-    // Track ambiguous calls: resolve after GCP gets stable, and if we
-    // can resolve we continue to let GCP fall.
-    ambi.add(this);
-  }
-
   // Unify ProjNodes with the Call arguments directly.
   @Override public boolean unify_proj( ProjNode proj, boolean test ) {
     TV2 tv2 = tvar(proj._idx);
@@ -511,7 +459,7 @@ public class CallNode extends Node {
     }
     return false;
   }
-  
+
   @Override public ErrMsg err( boolean fast ) {
     // Expect a function pointer
     TypeFunPtr tfp = ttfp(_val);

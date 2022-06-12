@@ -110,10 +110,10 @@ public final class CallEpiNode extends Node {
 
     // Replace a resolved
     Node fdx = call.fdx();
-    if( fdx instanceof FreshNode ) fdx = ((FreshNode)fdx).id();
-    if( fdx instanceof UnresolvedNode ) {
-      FunPtrNode vfn = ((UnresolvedNode)fdx).resolve_node(tcall._ts);
-      if( vfn !=null ) call.set_fdx(fdx=vfn);
+    if( fdx instanceof FreshNode frsh ) fdx = frsh.id();
+    if( fdx instanceof UnresolvedNode unr ) {
+      FunPtrNode vfn = unr.resolve_node(tcall._ts);
+      if( vfn !=null ) call.set_fdx(vfn);
     }
 
     // Only inline wired single-target function with valid args.  CallNode wires.
@@ -141,8 +141,8 @@ public final class CallEpiNode extends Node {
     if( rmem==null || (rmem instanceof ParmNode && rmem.in(CTL_IDX) == fun) || rmem._val ==TypeMem.ANYMEM )
       rmem = cmem;
     // Check that function return memory and post-call memory are compatible
-    if( !(_val instanceof TypeTuple) ) return null;
-    Type selfmem = ((TypeTuple) _val).at(MEM_IDX);
+    if( !(_val instanceof TypeTuple ttval) ) return null;
+    Type selfmem = ttval.at(MEM_IDX);
     if( !rmem._val.isa( selfmem ) )
       return null;
 
@@ -157,24 +157,22 @@ public final class CallEpiNode extends Node {
 
     // Check for a 1-op body using only constants or parameters and no memory effects.
     // Ok to wrap and unwrap primitives.
-    // TODO: INLINE TRIVIAL PRIMITIVES
-    //boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem && inline;
-    //for( Node parm : rrez._defs )
-    //  if( parm != null && parm != fun &&
-    //      !(parm instanceof ParmNode && parm.in(0) == fun) &&
-    //      !(parm instanceof ConNode) )
-    //    can_inline=false;       // Not trivial
-    //if( can_inline ) {
-    ////  Node irez = rrez.copy(false); // Copy the entire function body
-    ////  ProjNode proj = ProjNode.proj(this,REZ_IDX);
-    ////  irez._live = proj==null ? TypeMem.ALIVE : proj._live; // sharpen liveness to the call-site liveness
-    ////  for( Node in : rrez._defs )
-    ////    irez.add_def((in instanceof ParmNode parm && parm.in(CTL_IDX) == fun) ? ProjNode.proj(call,parm._idx) : in);
-    ////  if( irez instanceof PrimNode prim ) prim._badargs = call._badargs;
-    ////  GVN.add_work_new(irez);
-    ////  return unwire(call,ret).set_is_copy(cctl,cmem,irez);
-    //  throw unimpl();
-    //}
+    boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem && inline;
+    for( Node parm : rrez._defs )
+      if( parm != null && parm != fun &&
+          !(parm instanceof ParmNode && parm.in(0) == fun) &&
+          !(parm instanceof ConNode) )
+        can_inline=false;       // Not trivial
+    if( can_inline ) {
+      Node irez = rrez.copy(false); // Copy the entire function body
+      ProjNode proj = ProjNode.proj(this,REZ_IDX);
+      irez._live = proj==null ? TypeMem.ALLMEM : proj._live; // sharpen liveness to the call-site liveness
+      for( Node in : rrez._defs )
+        irez.add_def((in instanceof ParmNode parm && parm.in(CTL_IDX) == fun) ? ProjNode.proj(call,parm._idx) : in);
+      if( irez instanceof PrimNode prim ) prim._badargs = call._badargs;
+      GVN.add_work_new(irez);
+      return unwire(call,ret).set_is_copy(cctl,cmem,irez);
+    }
 
     return null;
   }

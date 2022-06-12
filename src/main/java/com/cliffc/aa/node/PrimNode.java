@@ -148,11 +148,20 @@ public abstract class PrimNode extends Node {
       }+_name+"_").intern() : _name;
     if( is_oper ) Oper.make(op);
 
-    FunNode fun = (FunNode)Env.GVN.init(new FunNode(this,is_oper ? op : _name).add_def(Env.ALL_CTRL));
-    ParmNode rpc = new ParmNode(0,fun,Env.ALL_CALL).init();
-    for( int i=DSP_IDX; i<_formals.len(); i++ )
+    FunNode fun = new FunNode(this,is_oper ? op : _name);
+    fun.add_def(new CRProjNode(fun._fidx).init()); // Need FIDX to make the default control
+    fun.init();                 // Now register with parser
+    ParmNode rpc = new ParmNode(0,fun,null,TypeRPC.ALL_CALL,Env.ALL_CALL).init();
+    for( int i=DSP_IDX; i<_formals.len(); i++ ) {
       // Make a Parm for every formal
-      add_def(new ParmNode(i,fun,(ConNode)Node.con(_formals.at(i))).init());
+      Type tformal = _formals.at(i);
+      Node nformal;
+      if(      tformal==TypeStruct.INT ) nformal = Env.INT;
+      else if( tformal==TypeStruct.FLT ) nformal = Env.FLT;
+      else if( tformal==Type.ALL       ) nformal = Env.ALL;
+      else throw unimpl();
+      add_def(new ParmNode(i,fun,null,tformal,nformal).init());
+    }
     // The primitive, working on and producing wrapped prims
     init();
     // Return the result

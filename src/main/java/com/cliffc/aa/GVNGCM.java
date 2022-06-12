@@ -129,11 +129,11 @@ public class GVNGCM {
       else if( (n=_work_grow  .pop())!=null ) m = n.do_grow  ();
       else if( (n=_work_inline.pop())!=null ) m = ((FunNode)n).ideal_inline(false);
       else break;
-      ITER_CNT++; assert ITER_CNT < 50000; // Catch infinite ideal-loops
+      ITER_CNT++; assert ITER_CNT < 10000; // Catch infinite ideal-loops
       if( m == null ) ITER_CNT_NOOP++;     // No progress profiling
       else assert m.is_dead() || m.check_vals();
       // VERY EXPENSIVE ASSERT
-      //assert Env.START == null || Env.START.more_work(true) == 0; // Initial conditions are correct
+      //assert Env.ROOT == null || Env.ROOT.more_work(true) == 0; // Initial conditions are correct
     }
   }
 
@@ -155,9 +155,9 @@ public class GVNGCM {
       if( !progress ) break;
     };
     // Expensive assert
-    //assert Env.START.more_work(true)==0;
+    //assert Env.ROOT.more_work(true)==0;
     IDEAL_VISIT.clear();
-    //assert !Env.START.more_ideal(IDEAL_VISIT);
+    //assert !Env.ROOT.more_ideal(IDEAL_VISIT);
   }
 
   // Clear the dead worklist only
@@ -219,7 +219,7 @@ public class GVNGCM {
 
       WORK_RETYPE.add(wrk._uses);
     }
-    //assert Env.START.more_work(true)==0;
+    //assert Env.ROOT.more_work(true)==0;
   }
 
   public class Build<N extends Node> implements AutoCloseable {

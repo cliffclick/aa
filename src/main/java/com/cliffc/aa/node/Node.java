@@ -39,19 +39,18 @@ public abstract class Node implements Cloneable, IntSupplier {
   static final byte OP_PROJ   =20;
   static final byte OP_REGION =21;
   static final byte OP_RET    =22;
-  static final byte OP_SCOPE  =23;
-  static final byte OP_SETFLD =24;
-  static final byte OP_SPLIT  =25;
-  static final byte OP_START  =26;
-  static final byte OP_STMEM  =27;
-  static final byte OP_STORE  =28;
-  static final byte OP_STRUCT =29;
-  static final byte OP_TYPE   =20;
-  static final byte OP_UNR    =31;
-  static final byte OP_VAL    =32;
-  static final byte OP_MAX    =33;
+  static final byte OP_ROOT   =23;
+  static final byte OP_SCOPE  =24;
+  static final byte OP_SETFLD =25;
+  static final byte OP_SPLIT  =26;
+  static final byte OP_STORE  =27;
+  static final byte OP_STRUCT =28;
+  static final byte OP_TYPE   =29;
+  static final byte OP_UNR    =30;
+  static final byte OP_VAL    =31;
+  static final byte OP_MAX    =32;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Field", "Fresh", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","SetFld","Split", "Start", "StartMem", "Store", "Struct", "Type", "Unresolved", "Val" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "ConType", "CProj", "Err", "Field", "Fresh", "Fun", "FunPtr", "If", "Join", "Keep", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Root", "Scope","SetFld","Split", "Store", "Struct", "Type", "Unresolved", "Val" };
   static { assert STRS.length==OP_MAX; }
 
   // Unique dense node-numbering
@@ -234,9 +233,9 @@ public abstract class Node implements Cloneable, IntSupplier {
   // will yet appear.  The Node can otherwise be fully optimized and replaced
   // with equivalents.  The push/pop sequences are strongly asserted for stack
   // order.
-  public int push() { GVNGCM.KEEP_ALIVE.add_def(this); return GVNGCM.KEEP_ALIVE._defs._len-1; }
-  public static Node pop (int idx) { assert idx==GVNGCM.KEEP_ALIVE._defs._len-1;  return GVNGCM.pop(idx+1); }
-  public static Node peek(int idx) { assert idx<GVNGCM.KEEP_ALIVE._defs._len;  return GVNGCM.KEEP_ALIVE.in(idx); }
+  public int push() { return GVNGCM.push(this); }
+  public static Node pop (int idx) { assert idx==GVNGCM.KEEP_ALIVE._defs._len;  return GVNGCM.pop(idx); }
+  public static Node peek(int idx) { assert idx<= GVNGCM.KEEP_ALIVE._defs._len;  return GVNGCM.KEEP_ALIVE.in(idx-1); }
   public static void pops(int nargs) { for( int i=0; i<nargs; i++ ) GVNGCM.KEEP_ALIVE.pop(); }
   public boolean is_keep() {
     for( Node use : _uses ) if( use instanceof KeepNode )  return true;
@@ -351,9 +350,9 @@ public abstract class Node implements Cloneable, IntSupplier {
       return dump(d,sb,plive,ptvar).nl();
     }
   }
-  public boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_NEW || _op==OP_REGION || _op==OP_SPLIT || _op==OP_START; }
+  public boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_NEW || _op==OP_REGION || _op==OP_SPLIT || _op==OP_ROOT; }
   private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ || _op==OP_CPROJ; }
-  boolean is_CFG() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_REGION || _op==OP_START || _op==OP_CPROJ || _op==OP_SCOPE; }
+  boolean is_CFG() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_REGION || _op==OP_ROOT || _op==OP_CPROJ || _op==OP_SCOPE; }
 
   public String dumprpo( boolean prims, boolean plive, boolean ptvar ) {
     Ary<Node> nodes = new Ary<>(new Node[1],0);
@@ -521,7 +520,7 @@ public abstract class Node implements Cloneable, IntSupplier {
 
   // Unify this Proj with the matching TV2 part from the multi-TV2-producing
   public boolean unify_proj( ProjNode proj, boolean test ) { throw unimpl(); }
-  
+
   // HM changes; push related neighbors
   public void add_work_hm() { tvar().add_deps_flow(); }
 
@@ -539,7 +538,6 @@ public abstract class Node implements Cloneable, IntSupplier {
     for( Node use : _uses ) {
       Env.GVN.add_flow(use).add_flow_use_extra(this);
       if( use instanceof CallEpiNode cepi ) cepi.check_and_wire(true);
-      if( use instanceof   ScopeNode scop ) scop.check_and_wire();
     }
     add_flow_extra(oval);
     if( this instanceof CallEpiNode cepi ) cepi.check_and_wire(true);
@@ -576,9 +574,6 @@ public abstract class Node implements Cloneable, IntSupplier {
       add_work_hm();            // Neighbors on worklist
     }
   }
-
-  // See if we can resolve an unresolved Call during the Combined algorithm
-  public void combo_resolve(WorkNode ambi) { }
 
   // Return any type error message, or null if no error
   public ErrMsg err( boolean fast ) { return null; }

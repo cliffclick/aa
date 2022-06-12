@@ -2,10 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.tvar.TV2;
 
 // Proj control
 public class CProjNode extends ProjNode {
@@ -17,6 +14,7 @@ public class CProjNode extends ProjNode {
     return "CProj"+_idx;
   }
   @Override public Type value() {
+    if( in(0)._op==OP_ROOT ) return Type.CTRL; // Program Start
     // Normal projection, except pinch to CTRL.
     Type x = super.value();
     if( x==Type.ANY ) return Type.XCTRL;

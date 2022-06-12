@@ -622,10 +622,10 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
     // Special shortcut for the all-prims display type
-    if(      is_math()    )  sb.p("MATH");
-    else if( is_file_dsp() ) sb.p("FILE_MEM");
-    else if( is_int_clz()  ) sb.p("INT");
-    else if( is_flt_clz()  ) sb.p("FLT");
+    if(      is_math()    ) sb.p("MATH");
+    else if( is_int_clz() ) sb.p("INT");
+    else if( is_flt_clz() ) sb.p("FLT");
+    else if( is_top_dsp() ) sb.p("TOP_DSP");
     else {
       // Set the indent flag once for the entire struct.  Indent if any field is complex.
       boolean ind = false;
@@ -650,7 +650,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   @Override boolean _str_complex0(VBitSet visit, NonBlockingHashMapLong<String> dups) { return true; }
 
   boolean is_math() { return has("pi"); }
-  boolean is_file_dsp() { return has("int") && has("flt") && has("math"); }
+  boolean is_top_dsp() { return has("int") && has("flt") && has("math"); }
   boolean is_int_clz() { return has("!_"); }
   boolean is_flt_clz() { return has("_/_") && at("_/_") instanceof TypeFunPtr; }
 

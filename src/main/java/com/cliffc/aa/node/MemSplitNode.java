@@ -130,7 +130,7 @@ public class MemSplitNode extends Node {
   // New/Mrg pairs are just the Mrg; the New is not part of the SESE region.
   // Call/CallEpi pairs are: MProj->{CallEpi}->Call.
   static Node insert_split(Node tail1, BitsAlias head1_escs, Node head1, Node tail2, Node head2) {
-    assert Env.START.more_work(true)==0;
+    assert Env.ROOT.more_work(true)==0;
     assert tail1.is_mem() && head1.is_mem() && tail2.is_mem() && head2.is_mem();
     //BitsAlias head2_escs = head2.escapees();
     //assert check_split(head1,head1_escs,head1.in(1));

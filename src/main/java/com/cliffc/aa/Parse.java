@@ -214,7 +214,7 @@ public class Parse implements Comparable<Parse> {
     _gvn = Env.GVN;       // Pessimistic during parsing
   }
   String dump() { return scope().dump(99); }// debugging hook
-  String dumprpo() { return Env.START.dumprpo(false,false,false); }// debugging hook
+  String dumprpo() { return Env.ROOT.dumprpo(false,false,false); }// debugging hook
 
   /** Parse a top-level:
    *  prog = stmts END */
@@ -222,8 +222,9 @@ public class Parse implements Comparable<Parse> {
     Node res = stmts();
     if( res == null ) res = Env.ANY;
     scope().set_rez(res);  // Hook result
-    if( skipWS() != -1 ) return ErrMsg.trailingjunk(this);
-    return null;
+    // Close file scope; no more program text in this file, so no more fields to add.
+    scope().stk().close();
+    return skipWS() == -1 ? null : ErrMsg.trailingjunk(this);
   }
 
   /** Parse a list of statements; final semicolon is optional.
@@ -1525,7 +1526,7 @@ public class Parse implements Comparable<Parse> {
   }
 
   // Whack current control with a syntax error
-  private ErrNode err_ctrl1( ErrMsg msg ) { return init(new ErrNode(Env.START,msg)); }
+  private ErrNode err_ctrl1( ErrMsg msg ) { return init(new ErrNode(ctrl(),msg)); }
   private ErrNode err_ctrl2( String msg ) { return init(new ErrNode(ctrl(),errMsg(),msg)); }
   private void err_ctrl0(String s) { err_ctrl3(s,errMsg()); }
   private void err_ctrl3(String s, Parse open) {

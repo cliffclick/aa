@@ -6,8 +6,6 @@ import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeRPC;
 
-import static com.cliffc.aa.AA.unimpl;
-
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
   final Parse _badgc;
@@ -39,10 +37,8 @@ public class PhiNode extends Node {
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
     if( r._val == Type.XCTRL ) return null; // All dead, c-prop will fold up
-    if( r instanceof FunNode fun ) {
-      if( fun.has_unknown_callers() ) return null; // Still finding incoming edges
-      if( fun.noinline() )  return null; // Do not start peeling apart parameters to a no-inline function
-    }
+    if( r instanceof FunNode fun && fun.noinline() )
+      return null; // Do not start peeling apart parameters to a no-inline function
     // If only 1 unique live input, return that
     Node live=null;
     for( int i=1; i<_defs._len; i++ ) {
@@ -72,7 +68,7 @@ public class PhiNode extends Node {
   // Yes for e.g. ints, flts, memptrs, funptrs.  A Phi corresponds to the
   // merging HM value in the core AA If.
   @Override public boolean has_tvar() { return !(_t instanceof TypeMem || _t instanceof TypeRPC); }
-  
+
   // All inputs unify
   @Override public boolean unify( boolean test ) {
     if( !(in(0) instanceof RegionNode r) ) return false; // Dying
@@ -107,7 +103,7 @@ public class PhiNode extends Node {
     //if( _val.contains(TypeNil.SCALAR) ||
     //    _val.contains(TypeNil.NSCALR) ) // Cannot have code that deals with unknown-GC-state
     //  return ErrMsg.badGC(_badgc);
-    //return null;
-    throw unimpl();
+    return null;
+    //throw unimpl();
   }
 }

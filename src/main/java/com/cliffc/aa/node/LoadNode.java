@@ -207,7 +207,6 @@ public class LoadNode extends Node {
       //  else return null;
       //
       } else if( mem instanceof PhiNode || // Would have to match on both sides, and Phi the results'
-                 mem instanceof StartMemNode ||
                  mem instanceof ConNode) {
         return null;
       } else {

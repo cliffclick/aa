@@ -11,6 +11,7 @@ import static com.cliffc.aa.AA.DSP_IDX;
 // turned on or off according to which functions reach a Call or Scope.
 public class CEProjNode extends CProjNode {
   public CEProjNode( Node call ) { super(call); }
+  public CEProjNode( RootNode root, int fidx ) { super(root,fidx); }
   @Override public String xstr() { return "CEProj"; }
 
   @Override public Type value() {

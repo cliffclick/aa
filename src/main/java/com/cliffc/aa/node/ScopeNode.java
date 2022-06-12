@@ -93,46 +93,7 @@ public class ScopeNode extends Node {
   @Override public Node ideal_reduce() {
     Node ctrl = in(0).is_copy(0);
     if( ctrl != null ) { set_ctrl(ctrl); return this; }
-
-    Node mem = mem();
-    Node rez = rez();
-    if( mem!=null && mem!=Env.XMEM &&  // Not already wiped it out
-        // And used memory is dead
-        compute_live_mem(this,mem,rez)==TypeMem.ANYMEM ) {
-      // All default mem-Parms of escaping functions update.
-      for( Node use : _uses )
-        if( use instanceof FunNode )
-          for( Node parm : use._uses )
-            if( parm instanceof ParmNode && ((ParmNode)parm)._idx==MEM_IDX )
-              Env.GVN.add_flow(parm);
-      // Wipe out return memory
-      return set_mem(Env.XMEM);
-    }
-
-    int progress = _defs._len;
-    // If the result is never a function
-    if( !TypeFunPtr.GENERIC_FUNPTR.dual().isa(rez._val) || rez._val==TypeNil.NIL )
-      // Wipe out extra function edges.  They are there to act "as if" the
-      // exit-scope calls them; effectively an extra wired call use with the
-      // most conservative caller.
-      while( _defs._len > RET_IDX ) throw unimpl(); //pop();
-
-    // Some escaping functions are dead
-    for( int i=RET_IDX; i<len(); i++ )
-      if( in(i) instanceof RetNode ret && ret.is_copy() )
-        remove(i--);
-
-    // If the result is a function, wipe out wrong fidxs
-    if( rez._val instanceof TypeFunPtr ) {
-      BitsFun fidxs = ((TypeFunPtr)rez._val)._fidxs;
-      if( fidxs != BitsFun.NALL )
-        for( int i=RET_IDX; i<_defs._len; i++ )
-          if( !fidxs.test(((RetNode)in(i))._fidx) )
-            //remove(i--);
-            throw unimpl();
-    }
-
-    return progress == _defs._len ? null : this;
+    return null;
   }
 
   // Produce a tuple of the return result and a summary of all escaping
@@ -212,42 +173,6 @@ public class ScopeNode extends Node {
     // Merging exit path, or ConType
     return def._live;
   }
-
-  // Set of top-level escaping functions
-  private Type _escache_trez, _escache_tmem; // Small cache has a 50% hit rate
-  private BitsFun _escache_escs;
-  public BitsFun top_escapes() {
-    if( _val.above_center() ) return BitsFun.EMPTY;
-    if( is_prim() ) return BitsFun.NALL; // All the primitives escape
-    Type trez = rez()._val;
-    Type tmem = mem()._val;
-    if( _escache_trez == trez &&  _escache_tmem == tmem ) return _escache_escs; // Cache hit
-    // Cache miss, compute the hard way
-    if( TypeFunPtr.GENERIC_FUNPTR.isa(trez) ) return BitsFun.NALL; // Can lift to any function
-    TypeMem tmem2 = tmem instanceof TypeMem tmem3 ? tmem3 : tmem.oob(TypeMem.ALLMEM);
-    BitsFun fidxs = trez.all_reaching_fidxs(tmem2);
-    _escache_trez = trez;
-    _escache_tmem = tmem;
-    _escache_escs = fidxs;
-    return fidxs;
-  }
-
-  // GCP discovers functions which escape at the top-most level, and wires the
-  // RetNode to the top-most Scope to mimic future unknown callers.
-  void check_and_wire() {
-    if( this==Env.SCP_0 ) return; // Do not wire the escaping primitives?
-    BitsFun escs = top_escapes();
-    if( escs==BitsFun.NALL ) return; // Error exit
-    for( int fidx : escs ) {
-      boolean found=false;
-      for( int i=RET_IDX; i<len(); i++ )
-        if( in(i) instanceof RetNode ret && ret._fidx==fidx )
-          { found=true; break; };
-      if( !found )
-        add_def(RetNode.get(fidx));
-    }
-  }
-
 
   @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal

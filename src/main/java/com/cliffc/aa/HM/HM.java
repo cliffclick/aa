@@ -1066,7 +1066,7 @@ public class HM {
                 EXT_DEPS.add(ids); // Add to external deps; when HM_FREEZE flips these all need to be visited
                 for( Ident id : lam._refs[i] ) EXT_DEPS.add(id._par);
               }
-              T2 t2 = fun.targ(i); // Get HM constraints on the arg
+              T2 t2 = lam.targ(i); // Get HM constraints on the arg
               if( t2.is_fun() && !lam.extsetf(i) ) new EXTLambda(t2); // Make a canonical external function to call
               if( t2.is_ptr() && !lam.extsetp(i) ) new EXTStruct(t2); // Make a canonical external struct for args
               cflow = t2.as_flow(false);

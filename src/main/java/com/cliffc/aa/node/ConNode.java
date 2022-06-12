@@ -14,12 +14,10 @@ import static com.cliffc.aa.AA.unimpl;
 public class ConNode<T extends Type> extends Node {
   T _t;                         // Not final for testing
   public ConNode( T t ) {
-    super(OP_CON,Env.START);
+    super(OP_CON,Env.ROOT);
     _t=t;
   }
   @Override public String xstr() {
-    if( Env.ALL_PARM == this ) return "ALL_PARM";
-    if( Env.ALL_CALL == this ) return "ALL_CALL";
     return _t==null ? "(null)" : _t.toString();
   }
 

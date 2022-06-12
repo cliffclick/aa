@@ -27,10 +27,10 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=true;
-    DO_GCP=false;
+    DO_HMT=false;
+    DO_GCP=true;
     RSEED=0;
-    test("1", "int:1", "int:1");
+    test("!1", "xnil", "xnil");
   }
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests

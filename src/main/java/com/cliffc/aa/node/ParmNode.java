@@ -9,9 +9,6 @@ import com.cliffc.aa.type.TypeFld;
 // numbering matching function arguments, e.g. MEM_IDX for memory.
 public class ParmNode extends PhiNode {
   public final int _idx; // Parameter index, MEM_IDX, DSP_IDX is display, ARG_IDX+ normal args
-  public ParmNode( int idx, FunNode fun, ConNode defalt ) {
-    this(idx,fun,null,defalt._t,defalt);
-  }
   public ParmNode( int idx, FunNode fun, Parse badgc, Type t, Node defalt ) {
     this(idx,fun,badgc,t);
     add_def(defalt);
@@ -57,8 +54,8 @@ public class ParmNode extends PhiNode {
 
     // Merge all live paths
     Type t = Type.ANY;
-    for( int i=fun.is_path1_dead() ? 2 : 1; i<_defs._len; i++ )
-      if( fun.val(i)!=Type.XCTRL && fun.val(i)!=Type.ANY ) // Only meet alive paths
+    for( int i=1; i<_defs._len; i++ )
+      if( fun.val(i)==Type.CTRL ) // Only meet alive paths
         t = t.meet(val(i));
     return t.join(_t);
   }

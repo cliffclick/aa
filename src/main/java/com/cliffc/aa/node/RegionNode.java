@@ -1,9 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
 
 import java.util.function.Predicate;
 
@@ -18,7 +16,7 @@ public class RegionNode extends Node {
   }
 
   @Override public Node ideal_reduce() {
-    // TODO: The unzip xform, especially for funnodes doing type-specialization
+    // TODO: The unzip xform, especially for FunNodes doing type-specialization
     // TODO: treat _cidx like U/F and skip_dead it also
 
     // Fold control-folded paths
@@ -30,17 +28,14 @@ public class RegionNode extends Node {
     // Look for dead paths.  If found, cut dead path out of all Phis and this
     // Node, and return-for-progress.
     for( int i=1; i<_defs._len; i++ )
-      if( val(i)==Type.XCTRL ) {
-        assert in(i)!=Env.ALL_CTRL;
+      if( val(i)==Type.XCTRL && // Dead control flow input
+        // Keep dead input for primitives from Root, so prim is alive for next test
+        !(in(i) instanceof CRProjNode && is_prim()) ) {
         for( Node phi : _uses )
           if( phi instanceof PhiNode )
             Env.GVN.add_flow(phi.remove(i));
         unwire(i);
         remove(i);
-    //    if( this instanceof FunNode && _defs._len==2 && in(1).in(0) instanceof CallNode ) {
-    //      Node cepi = ((CallNode)in(1).in(0)).cepi();
-    //      if( cepi!=null ) Env.GVN.add_reduce(cepi);
-    //    }
         return this; // Progress
       }
 
@@ -125,8 +120,10 @@ public class RegionNode extends Node {
   void unwire(int idx) { }
 
   @Override public Type value() {
-    if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
+    if( in(0)==this )           // is_copy
+      return _defs._len>=2 ? val(1) : Type.XCTRL; 
     for( int i=1; i<_defs._len; i++ ) {
+      if( in(i)==this ) continue; // Ignore self-loop
       Type c = val(i);
       if( c == Type.CTRL || c == Type.ALL )
         return Type.CTRL;
