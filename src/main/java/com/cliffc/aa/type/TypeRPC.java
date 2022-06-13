@@ -8,7 +8,12 @@ import com.cliffc.aa.util.VBitSet;
 public class TypeRPC extends TypeNil<TypeRPC> {
   private BitsRPC _rpcs;         //
 
-  private TypeRPC init( boolean any, boolean nil, boolean sub, BitsRPC rpcs ) { super.init(any,nil,sub); _rpcs = rpcs; return this; }
+  private TypeRPC init( boolean any, boolean nil, boolean sub, BitsRPC rpcs ) {
+    super.init(any,nil,sub);
+    assert _any==rpcs.above_center() || rpcs==BitsRPC.EMPTY;
+    _rpcs = rpcs;
+    return this;
+  }
   @Override public long static_hash( ) { return ((TRPC + _rpcs._hash)<<1)|1; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -18,7 +23,10 @@ public class TypeRPC extends TypeNil<TypeRPC> {
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
 
-  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) { return _str_nil(_rpcs.str(sb.p("#"))); }
+  @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
+    if( _any && _rpcs==BitsRPC.EMPTY ) sb.p('~');
+    return _str_nil(_rpcs.str(sb.p("#")));
+  }
 
   static { new Pool(TRPC,new TypeRPC()); }
   public static TypeRPC make( boolean any, boolean nil, boolean sub, BitsRPC rpcs ) {
@@ -46,7 +54,6 @@ public class TypeRPC extends TypeNil<TypeRPC> {
 
   public int rpc() { return _rpcs.getbit(); }
   public boolean test(int rpc) { return _rpcs.test(rpc); }
-  @Override public boolean above_center() { return _rpcs.above_center(); }
   // RPCs represent *classes* of return pointers and are thus never constants.
   // TODO: This is weak, since call-sites are only rarely cloned so typically a
   // RPC refers to the single call-site - but we can only strengthen this is we

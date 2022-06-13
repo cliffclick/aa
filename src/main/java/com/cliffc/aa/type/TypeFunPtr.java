@@ -36,6 +36,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
   private TypeFunPtr _init(BitsFun fidxs, int nargs, Type dsp, Type ret) {
     assert !fidxs.test(0); // No nil in fidxs, use nil/sub instead
+    assert _any==fidxs.above_center() || fidxs==BitsFun.EMPTY;
     assert !(dsp instanceof TypeFld);
     _fidxs = fidxs; _nargs=nargs; _dsp=dsp; _ret=ret;
     return this;
