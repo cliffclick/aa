@@ -132,7 +132,7 @@ public class TestType {
     TypeStruct  i8 = TypeStruct.make_int(TypeInt.INT8 );
     TypeStruct xi8 = i8.dual();
     TypeStruct xi16= i16.dual();
-    TypeStruct z   = TypeStruct.make_zero();
+    TypeStruct z   = TypeStruct.make_int(TypeInt.con(0));
     TypeStruct o   = TypeStruct.make_int(TypeInt.TRUE );
     assertEquals(xi8,xi8.meet(xi16)); // ~i16-> ~i8
     //assertEquals( z ,z  .meet(xi8 )); // ~i8 ->  0 // No longer applies single redoing nil
@@ -182,7 +182,7 @@ public class TestType {
     Type tup = TypeStruct.ISUSED; // All Structs
 
     Type abc = TypeStruct.NAMEPT; // String constant
-    Type zer = TypeInt  .FALSE;
+    Type zer = TypeNil.XNIL;;
     Type tp0 = TypeStruct.make_test("",zer,TypeFld.Access.Final);  // tuple of a '0'
 
     Type tupX= tup.dual();

@@ -114,7 +114,7 @@ public class Env implements AutoCloseable {
   Env( Env par, FunNode fun, boolean is_closure, Node ctrl, Node mem, Node dsp_ptr, StructNode fref ) {
     _par = par;
     _fun = fun;
-    StructNode dsp = fref==null ? new StructNode(is_closure,false).init() : fref;
+    StructNode dsp = fref==null ? new StructNode(is_closure,false,null).init() : fref;
     dsp.add_fld(TypeFld.make_dsp(dsp_ptr._val),dsp_ptr,null);
     NewNode nnn = new NewNode(mem,dsp).init();
     mem = new MProjNode(nnn).init();
@@ -214,12 +214,11 @@ public class Env implements AutoCloseable {
       GVN.add_dead(c);
       STK_0.pop_fld();
     }
-    unhook_last(STK_0);
-    // Top-level control and memory
-    unhook_last(CTL_0);
-    unhook_last(MEM_0);
     // Clear out the dead before clearing VALS, since they may not be reachable and will blow the elock assert
     GVN.iter_dead();
+    unhook_last(STK_0);
+    unhook_last(CTL_0);
+    unhook_last(MEM_0);
     TV2.reset_to_init0();
     Node.VALS.clear();          // Clean out hashtable
     GVN.flow_clear();

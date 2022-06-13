@@ -231,17 +231,13 @@ public class LoadNode extends Node {
 
   @Override public ErrMsg err( boolean fast ) {
     Type tadr = adr()._val;
-    //if( tadr.must_nil() )
-    //  return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when reading",null);
-    //if( tadr==Type.ANY ) return null; // No error, since might fall to any valid thing
-    //if( !(tadr instanceof TypeMemPtr ptr) )
-    //  return bad(fast,null); // Not a pointer nor memory, cannot load a field
-    //if( ptr.is_valtype() )   // These should always fold
-    //  return bad(fast,ptr._obj);
-    //Type tmem = mem()._val;
-    //if( tmem==Type.ALL ) return bad(fast,null);
-    //return null;
-    throw unimpl();
+    if( !(tadr instanceof TypeMemPtr ptr) )
+      return bad(fast,null); // Not a pointer, cannot load a field
+    if( ptr.must_nil() )
+      return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when reading",null);
+    Type tmem = mem()._val;
+    if( tmem==Type.ALL ) return bad(fast,null);
+    return null;
   }
   private ErrMsg bad( boolean fast, TypeStruct to ) {
     //boolean is_closure = adr() instanceof NewNode nnn && nnn._is_closure;

@@ -1228,7 +1228,7 @@ public class HM10 {
       // GCP helps HM: do not unify dead control paths
       if( DO_GCP ) {            // Doing GCP during HM
         Type pred = _types[0];
-        if( pred == TypeInt.FALSE || pred == TypeNil.NIL )
+        if( pred == TypeNil.XNIL || pred == TypeNil.NIL )
           return rez.unify(targ(2),work); // Unify only the false side
         //if( pred.above_center() ? !pred.may_nil() : !pred.must_nil() )
         //  return rez.unify(targ(1),work);
@@ -1246,7 +1246,7 @@ public class HM10 {
       Type t1  = flows[1];
       Type t2  = flows[2];
       // Conditional Constant Propagation: only prop types from executable sides
-      if( pred == TypeInt.FALSE || pred == TypeNil.NIL )
+      if( pred == TypeNil.XNIL || pred == TypeNil.NIL )
         return t2;              // False only
       if( pred.above_center() ) // Delay any values
         return TypeNil.XSCALAR;    // t1.join(t2);     // Join of either
@@ -1286,10 +1286,10 @@ public class HM10 {
         //return pred.may_nil() ? TypeInt.BOOL.dual() : TypeInt.FALSE;
         throw unimpl();
       if( pred==Type.ALL ) return TypeInt.BOOL;
-      if( pred == TypeInt.FALSE || pred == TypeNil.NIL )
+      if( pred == TypeNil.XNIL || pred == TypeNil.NIL )
         return TypeInt.TRUE;
       if( pred.meet(TypeNil.NIL)!=pred )
-        return TypeInt.FALSE;
+        return TypeNil.XNIL;
       return TypeInt.BOOL;
     }
   }

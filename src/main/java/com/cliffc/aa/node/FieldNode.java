@@ -17,15 +17,50 @@ public class FieldNode extends Node {
 
   @Override public String xstr() { return "."+_fld; }   // Self short name
   String  str() { return xstr(); } // Inline short name
+  
+  @Override public Type value() {
+    Type t = val(0);
+    String sclz=null;
+    if( t==TypeNil.XNIL ) {
+      // TODO: proper semantics?  For now, mimic int
+      sclz="int:";
+    } else {
+      if( !(t instanceof TypeStruct ts) )
+        return t.oob();           // Input is not a Struct
+      TypeFld fld = ts.get(_fld);
+      if( fld!=null ) return fld._t;
+      // For named prototypes, if the field load fails, try again in the
+      // prototype.  Only valid for final fields.
+      sclz = ts.clz();
+    }
+    StructNode clz = proto(sclz);    
+    if( clz==null ) return t.oob();
+    TypeFld pfld = ((TypeStruct) clz._val).get(_fld);
+    if( pfld == null ) return t.oob(TypeNil.SCALAR);
+    assert pfld._access == TypeFld.Access.Final;
+    // If this is a function, act as-if it was pre-bound to 'this' argument
+    if( !(pfld._t instanceof TypeFunPtr tfp) || tfp.has_dsp() )
+      return pfld._t;           // Clazz field type
+    return tfp.make_from(t);
+  }
 
+  private static StructNode proto(String clz) {
+    if( clz.isEmpty() ) return null;
+    String tname = clz.substring(0,clz.length()-1);
+    return Env.PROTOS.get(tname);
+  }
+  
   @Override public Node ideal_reduce() {
     if( (in(0) instanceof StructNode clz) )
       return clz.in_bind(_fld,in(0));
     // For named prototypes, if the field load fails, try again in the
     // prototype.  Only valid for final fields.
+    String sclz=null;
     Type t = val(0);
-    if( !(t instanceof TypeStruct ts) ) return null;
-    StructNode clz = proto(ts.clz());
+    if( t == TypeNil.XNIL ) sclz = "int:";
+    else if( !(t instanceof TypeStruct ts) ) return null;
+    else sclz = ts.clz();
+    StructNode clz = proto(sclz);
     if( clz==null ) return null;
     return clz.in_bind(_fld,in(0));
   }
@@ -48,32 +83,6 @@ public class FieldNode extends Node {
     }
 
     return null;
-  }
-
-
-  @Override public Type value() {
-    Type t = val(0);
-    if( !(t instanceof TypeStruct ts) )
-      return t.oob();           // Input is not a Struct
-    TypeFld fld = ts.get(_fld);
-    if( fld!=null ) return fld._t;
-    // For named prototypes, if the field load fails, try again in the
-    // prototype.  Only valid for final fields.
-    StructNode clz = proto(ts.clz());
-    if( clz==null ) return t.oob();
-    TypeFld pfld = ((TypeStruct) clz._val).get(_fld);
-    if( pfld == null ) return t.oob(TypeNil.SCALAR);
-    assert pfld._access == TypeFld.Access.Final;
-    // If this is a function, act as-if it was pre-bound to 'this' argument
-    if( !(pfld._t instanceof TypeFunPtr tfp) || tfp.has_dsp() )
-      return pfld._t;           // Clazz field type
-    return tfp.make_from(t);
-  }
-
-  private static StructNode proto(String clz) {
-    if( clz.isEmpty() ) return null;
-    String tname = clz.substring(0,clz.length()-1);
-    return Env.PROTOS.get(tname);
   }
 
   @Override public boolean has_tvar() { return true; }

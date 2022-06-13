@@ -237,7 +237,6 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public static final String CANONICAL_INSTANCE = "$";
   public static TypeStruct make_int(TypeInt ti) { return TypeStruct.make("int:",false,!ti.is_con(),TypeFld.make(CANONICAL_INSTANCE,ti)); }
   public static TypeStruct make_flt(TypeFlt tf) { return TypeStruct.make("flt:",false,!tf.is_con(),TypeFld.make(CANONICAL_INSTANCE,tf)); }
-  public static TypeStruct make_zero() { return TypeStruct.make("int:",false,true,TypeFld.make(CANONICAL_INSTANCE,TypeInt.FALSE)); }
 
   // Add a field to an under construction TypeStruct; _flds is not interned.
   public TypeStruct add_fld( TypeFld fld ) {
@@ -276,8 +275,8 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
     TypeFlds.free(flds);
     return fs;
   }
-  static TypeStruct make0(String name, boolean any, boolean nil, TypeFld[] flds) { return make(name,any,nil,TypeFlds.hash_cons(remove_dups(any,flds))); }
-  public TypeStruct make_from(TypeFld[] flds) { return make0(_clz,_any,_nil,flds); }
+  static TypeStruct make0(String name, boolean any, boolean nil, boolean sub, TypeFld[] flds) { return make(name,any,nil,sub,TypeFlds.hash_cons(remove_dups(any,flds))); }
+  public TypeStruct make_from(TypeFld[] flds) { return make0(_clz,_any,_nil,_sub,flds); }
   @Override TypeStruct make_from( boolean any, boolean nil, boolean sub ) { return malloc(_clz,any,nil,sub,_flds).hashcons_free(); }
   public void remove_dups() { _flds = remove_dups(_any,_flds); }
   public void remove_dups_hashcons() { _flds = TypeFlds.hash_cons(remove_dups(_any,_flds)); }
@@ -298,7 +297,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
   public  static final TypeStruct POINT = make(TypeFld.make("x",TypeFlt.FLT64),TypeFld.make("y",TypeFlt.FLT64));
   public  static final TypeStruct NAMEPT= POINT.set_name("Point:");
   public  static final TypeStruct A     = make_test("a",TypeFlt.FLT64,Access.Final);
-  public  static final TypeStruct C0    = make_test("c",TypeInt.FALSE,Access.Final); // @{c:0}
+  public  static final TypeStruct C0    = make_test("c",TypeNil.XNIL,Access.Final); // @{c:0}
   public  static final TypeStruct D1    = make_test("d",TypeInt.TRUE ,Access.Final); // @{d:1}
   public  static final TypeStruct ARW   = make_test("a",TypeFlt.FLT64,Access.RW   );
 
@@ -519,7 +518,7 @@ public class TypeStruct extends TypeNil<TypeStruct> implements Cyclic, Iterable<
       Type t = fld._t.simple_ptr();
       flds[i] = fld._t==t ? fld : fld.make_from(t);
     }
-    return make0(_clz,_any,_nil,flds);
+    return make_from(flds);
   }
 
   // ------ Utilities -------

@@ -113,7 +113,7 @@ public abstract class PrimNode extends Node {
   public static TypeStruct make_flt(double d) { return TypeStruct.make_flt(TypeFlt.con(d)); }
 
   public static TypeStruct make_wrap(Type t) {
-    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",false,false,TypeFld.make(CANONICAL_INSTANCE,t));
+    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",false,!t.is_con(),TypeFld.make(CANONICAL_INSTANCE,t));
   }
   public static TypeInt unwrap_i(Type t) { return (TypeInt)((TypeStruct)t).at(CANONICAL_INSTANCE); }
   public static TypeFlt unwrap_f(Type t) { return (TypeFlt)((TypeStruct)t).at(CANONICAL_INSTANCE); }
@@ -123,7 +123,7 @@ public abstract class PrimNode extends Node {
   // Make and install a primitive Clazz.
   private static void install( String s, PrimNode[] prims, TypeStruct canonical_prim ) {
     String tname = (s+":").intern();
-    StructNode rec = new StructNode(false,false);
+    StructNode rec = new StructNode(false,false,null);
     for( PrimNode prim : prims ) prim.as_fun(rec,true);
     for( Node n : rec._defs )
       if( n instanceof UnresolvedNode unr )
@@ -173,7 +173,7 @@ public abstract class PrimNode extends Node {
 
   // Build and install match package
   private static void install_math(PrimNode rand) {
-    StructNode rec = new StructNode(false,false);
+    StructNode rec = new StructNode(false,false,null);
     rand.as_fun(rec,false);
     Type pi = make_wrap(TypeFlt.PI);
     rec.add_fld(TypeFld.make("pi",pi),Node.con(pi),null);
@@ -216,7 +216,7 @@ public abstract class PrimNode extends Node {
       Type tactual = TS[i-DSP_IDX] = val(i-DSP_IDX);
       Type tformal = _formals.at(i);
       Type t = tformal.dual().meet(tactual);
-      if( !t.is_con() ) {
+      if( tactual != TypeNil.XNIL && !t.is_con() ) {
         is_con = false;         // Some non-constant
         if( t.above_center() ) has_high=true;
       }
@@ -411,7 +411,7 @@ public abstract class PrimNode extends Node {
       // If both are constant ints, return the constant math.
       if( t0.is_con() && t1.is_con() ) {
         long i2 = t0.getl() & t1.getl();
-        return i2==0 ? TypeStruct.make_zero() : make_int(i2);
+        return i2==0 ? TypeNil.XNIL : make_int(i2);
       }
       //if( !(t0 instanceof TypeInt) || !(t1 instanceof TypeInt) )
       //  return TypeStruct.INT;
@@ -454,7 +454,9 @@ public abstract class PrimNode extends Node {
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpI64 extends PrimNode {
     Prim2RelOpI64( String name ) { super(name,TypeTuple.INT64_INT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(unwrap_ii(args[0]),unwrap_ii(args[1]))?make_int(1):TypeNil.XNIL; }
+    @Override public Type apply( Type[] args ) {
+      return op(unwrap_ii(args[0]),unwrap_ii(args[1]))?make_int(1):TypeNil.XNIL;
+    }
     abstract boolean op( long x, long y );
   }
 
@@ -551,7 +553,7 @@ public abstract class PrimNode extends Node {
       if( val(1)==Type.ALL ) return TypeStruct.INT;
       TypeInt t = unwrap_i(val(1));
       if( TypeInt.INT64.dual().isa(t) && t.isa(TypeInt.INT64) )
-        return make_wrap(t.meet(TypeInt.FALSE));
+        return make_wrap(t.meet(TypeNil.XNIL));
       return t.oob(TypeStruct.INT);
     }
     @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }

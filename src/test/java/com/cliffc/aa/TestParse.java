@@ -30,7 +30,7 @@ public class TestParse {
     DO_HMT=false;
     DO_GCP=true;
     RSEED=0;
-    test("!1", "xnil", "A?");
+    test("0== !!1",  "xnil", "A?");
   }
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
@@ -147,9 +147,9 @@ public class TestParse {
     test("1._+_(2;3)", "int:4", "int:4"); // statements in arguments
     // Operators squished together
     test("-1== -1",  "int:1",  "int:1");
-    test("0== !!1",  "nil", "A?");
-    test("2==-1",    "nil", "A?");
-    test("-1==--1",  "nil", "A?");
+    test("0== !!1",  "xnil", "A?");
+    test("2==-1",    "xnil", "A?");
+    test("-1==--1",  "xnil", "A?");
     test("-1==---1", "int:1",  "int:1");
     testerr("-1== --", "Missing term after operator '-_'",7);
   }
@@ -974,7 +974,7 @@ HashTable = {@{
     if( JIG )
       _test0(program,gcp,formals,hmt_expect,err,cur_off,RSEED);
     else
-      for( int rseed=0; rseed<32; rseed++ )
+      for( int rseed=0; rseed<4; rseed++ )
         _test0(program,gcp,formals,hmt_expect,err,cur_off,rseed);
   }
 

@@ -13,7 +13,6 @@ public class TypeInt extends TypeNil<TypeInt> {
   public  byte _z;        // bitsiZe, one of: 1,8,16,32,64
   private long _con;      // constant
   private TypeInt init(boolean any, boolean nil, boolean sub, int z, long con ) {
-    assert con==0 ^ z==0;
     super.init(any,nil,sub);
     _z=(byte)z;
     _con = con;
@@ -50,7 +49,6 @@ public class TypeInt extends TypeNil<TypeInt> {
   }
   static { new Pool(TINT,new TypeInt()); }
   public static TypeInt make( boolean any, boolean nil, boolean sub, int z, long con ) {
-    assert con==0 ^ z==0;
     // Canonicalize
     if( con!=0 ) {
       assert !any && !nil;
@@ -61,7 +59,7 @@ public class TypeInt extends TypeNil<TypeInt> {
   }
   @Override TypeInt make_from( boolean any, boolean nil, boolean sub ) { return make(any,nil,sub,_z,_con); }
 
-  public static TypeInt con(long con) { assert con!=0; return make(false,false,true,0,con); }
+  public static TypeInt con(long con) { return make(false,false,true,0,con); }
 
   public  static final TypeInt NINT64= make(false,false, true,64,0);
   public  static final TypeInt INT64 = make(false,false,false,64,0);
@@ -70,7 +68,7 @@ public class TypeInt extends TypeNil<TypeInt> {
   public  static final TypeInt INT8  = make(false,false,false, 8,0);
   public  static final TypeInt NINT8 = make(false,false,true , 8,0);
   public  static final TypeInt BOOL  = make(false,false,false, 1,0);
-  public  static final TypeNil FALSE = TypeNil.XNIL;
+  public  static final TypeInt ZERO  = con(0);
   public  static final TypeInt TRUE  = con(1);
   public  static final TypeInt C3    = con(3);
   public  static final TypeInt C123  = con(123456789L);

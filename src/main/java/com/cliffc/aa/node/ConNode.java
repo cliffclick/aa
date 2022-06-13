@@ -15,6 +15,7 @@ public class ConNode<T extends Type> extends Node {
   T _t;                         // Not final for testing
   public ConNode( T t ) {
     super(OP_CON,Env.ROOT);
+    assert t.simple_ptr()==t;
     _t=t;
   }
   @Override public String xstr() {
@@ -28,7 +29,7 @@ public class ConNode<T extends Type> extends Node {
     Env.GVN.add_flow(this);
   }
 
-  @Override public Type value() { return _t.simple_ptr(); }
+  @Override public Type value() { return _t; }
 
   @Override public boolean has_tvar() {
     if( _t.is_simple() ) return false; // No on CTRL, XCTRL, ANY, ALL

@@ -673,7 +673,7 @@ public class Parse implements Comparable<Parse> {
       if( op._nargs!=1 ) throw unimpl(); // No binary/trinary allowed here
       // Load field e0.op2_ as TFP, and instance call.
       Node fun = gvn(new FieldNode(e0,op._name));
-      n = do_call(errMsgs(0,oldx),args(fun));
+      n = do_call(errMsgs(oldx,oldx),args(fun));
     } else {
       // Normal leading term
       _x=oldx;
@@ -724,7 +724,6 @@ public class Parse implements Comparable<Parse> {
         if( arg == null )       // tfact but no arg is just the tfact not a function call
           { _x = oldx; return n; }
         Parse[] badargs = arg.fld_starts(); // Args from tuple
-        badargs[0] = errMsg(oldx-1); // Base call error reported at the opening paren
         n = do_call0(false,badargs,args(n,arg)); // Pass the tuple
 
       } else {
@@ -789,7 +788,7 @@ public class Parse implements Comparable<Parse> {
     int nidx = n.push();
     Node plus = gvn(new FieldNode(n,"_+_"));
     Node inc = con(TypeStruct.make_int(TypeInt.con(d)));
-    Node sum = do_call(errMsgs(0,_x,_x), args(plus,inc));
+    Node sum = do_call(errMsgs(_x-2,_x,_x), args(plus,inc));
     Parse bad = errMsg();
     Node stf = gvn(new SetFieldNode(tok,Access.RW,ld,sum,bad));
     // Active memory for the chosen scope, after the call to plus
@@ -892,7 +891,7 @@ public class Parse implements Comparable<Parse> {
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
   private StructNode tuple(int oldx, Node s, int first_arg_start) {
-    StructNode nn = new StructNode(false,false);
+    StructNode nn = new StructNode(false,false,errMsg(oldx));
     // First stmt is parsed already
     Parse bad = errMsg(first_arg_start);
     while( s!= null ) {         // More args
@@ -1207,7 +1206,8 @@ public class Parse implements Comparable<Parse> {
     _x = _pp.getIndex();
     if( n instanceof Long   ) {
       if( _buf[_x-1]=='.' ) _x--; // Java default parser allows "1." as an integer; pushback the '.'
-      return con(PrimNode.make_int(n.longValue()));
+      long l = n.longValue();
+      return l==0 ? Env.XNIL : con(PrimNode.make_int(l));
     }
     if( n instanceof Double ) return con(PrimNode.make_flt(n.doubleValue()));
     throw new RuntimeException(n.getClass().toString()); // Should not happen
@@ -1514,14 +1514,11 @@ public class Parse implements Comparable<Parse> {
   private Node do_call0( boolean unpack, Parse[] bads, Node... args ) {
     CallNode call = (CallNode)gvn(new CallNode(unpack,bads,args));
     CallEpiNode cepi = (CallEpiNode)gvn(new CallEpiNode(call));
-    int cidx = cepi.push();
+    int cidx = cepi.push(); // CallEpi can optimize a lot (e.g. inlining)
     Node ctrl = gvn(new CProjNode(cepi));
     set_ctrl(ctrl);
     set_mem(gvn(new MProjNode(Node.peek(cidx)))); // Return memory from all called functions
-    // As soon as CEPI is unkeep, a whole lotta things are allowed, including
-    // e.g. inlining
-    if( cepi._is_copy ) Env.GVN.add_flow(cepi);
-
+    if( cepi._is_copy ) Env.GVN.add_flow(cepi);   // Clean out from inlining
     return gvn(new ProjNode(Node.pop(cidx),REZ_IDX));
   }
 

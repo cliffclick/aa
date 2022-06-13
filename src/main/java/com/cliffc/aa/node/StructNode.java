@@ -44,15 +44,21 @@ public class StructNode extends Node {
   // True if forward-ref.  Again, helps with the Parser
   private boolean _forward_ref;
 
-  // Parser helper for error reports on arg tuples
+  // Parser helper for error reports on arg tuples, start of tuple/struct is in
+  // slot 0, and the args are +1 from there.
+  // Example: "  ( x,y)\n"
+  // Example:  012345678
+  // _fld_starts[0]==2, offset to the openning paren
+  // _fld_starts[1]==4, offset to start of zeroth arg
+  // _fld_starts[2]==7, offset to start of oneth arg
   private Ary<Parse> _fld_starts;
 
-  public StructNode(boolean is_closure, boolean forward_ref) {
+  public StructNode(boolean is_closure, boolean forward_ref, Parse bad_start) {
     super(OP_STRUCT);
     _is_closure = is_closure;
     _forward_ref = forward_ref;
     _ts = TypeStruct.ISUSED;
-    _fld_starts = new Ary(Parse.class);
+    _fld_starts = new Ary<>(new Parse[]{bad_start});
   }
 
   @Override String str() { return _ts.toString(); }
@@ -118,9 +124,9 @@ public class StructNode extends Node {
     int len = len();
     // Change TypeStruct for fields
     set_ts(_ts.add_fldx(fld));
-    int idx = _ts.find(fld._fld); // Where inserted
-    insert(idx,val);              // Same place in defs
-    _fld_starts.insert(idx,badt); // Same place in field starts
+    int idx = _ts.find(fld._fld);   // Where inserted
+    insert(idx,val);                // Same place in defs
+    _fld_starts.insert(idx+1,badt); // Same place in field starts + 1
     return this;
   }
 
@@ -172,7 +178,7 @@ public class StructNode extends Node {
         } else {
           // Make field in the parent
           TypeFld fld = _ts.get(i);
-          parent.add_fld(fld, n, _fld_starts.at(i));
+          parent.add_fld(fld, n, _fld_starts.at(i+1));
           // Stomp field locally to ANY
           set_def(i,Env.ANY);
           set_ts(_ts.replace_fld(TypeFld.make(fld._fld, Type.ANY, TypeFld.Access.Final)));

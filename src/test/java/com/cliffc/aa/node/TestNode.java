@@ -215,7 +215,7 @@ public class TestNode {
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
     test1monotonic(new CallEpiNode(call,_ins[2])); // CallNode, then some count of RetNode, not flowing
-    test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
+    test1monotonic(new    ConNode<Type>(          TypeNil.XNIL));
     test1monotonic(new    ConNode<Type>(          TypeFlt.FLT64));
     // Cannot cast-to-NIL - can only move away from NIL
     //test1monotonic(new   CastNode(_ins[0],_ins[1],TypeInt.FALSE));
@@ -232,7 +232,7 @@ public class TestNode {
     //test1monotonic_intrinsic(new NewStrNode.ConvertF64Str());
     //test1monotonic_intrinsic(new NewStrNode.AddStrStr());
     test1monotonic(new   LoadNode(_ins[1],_ins[2],null));
-    StructNode nnn1 = new StructNode(false,false);
+    StructNode nnn1 = new StructNode(false,false,null);
     set_type(1,TypeNil.SCALAR);  nnn1.add_fld(TypeFld.make("x"),_ins[1],null);
     set_type(2,TypeNil.SCALAR);  nnn1.add_fld(TypeFld.make("y"),_ins[2],null);
     test1monotonic(nnn1);
@@ -246,8 +246,8 @@ public class TestNode {
     test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],fun_plus)); // ctl,mem,val,rpc,fun
     test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],null));
     //                  ScopeNode has no inputs, and value() call is monotonic
-    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeInt.FALSE    ,null, null));
-    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeFlt.FLT64    ,null, null));
+    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeNil.XNIL   ,null, null));
+    test1monotonic(new AssertNode(_ins[1],_ins[2],TypeFlt.FLT64  ,null, null));
 
     // TODO: Needs a prototype name
     //StructNode nnn2 = new StructNode(false,false,tname._name);
