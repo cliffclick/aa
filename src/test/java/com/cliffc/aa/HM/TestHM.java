@@ -25,10 +25,10 @@ public class TestHM {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=true;
+    DO_HMT=false;
     DO_GCP=true;
     RSEED=0;
-    testYcombo();
+    test01();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {

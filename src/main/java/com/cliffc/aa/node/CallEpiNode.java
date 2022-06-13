@@ -166,7 +166,7 @@ public final class CallEpiNode extends Node {
     if( can_inline ) {
       Node irez = rrez.copy(false); // Copy the entire function body
       ProjNode proj = ProjNode.proj(this,REZ_IDX);
-      irez._live = proj==null ? TypeMem.ALLMEM : proj._live; // sharpen liveness to the call-site liveness
+      irez._live = proj==null ? Type.ALL : proj._live; // sharpen liveness to the call-site liveness
       for( Node in : rrez._defs )
         irez.add_def((in instanceof ParmNode parm && parm.in(CTL_IDX) == fun) ? ProjNode.proj(call,parm._idx) : in);
       if( irez instanceof PrimNode prim ) prim._badargs = call._badargs;

@@ -90,8 +90,7 @@ public class ErrMsg implements Comparable<ErrMsg> {
   }
   @Override public boolean equals(Object obj) {
     if( this==obj ) return true;
-    if( !(obj instanceof ErrMsg) ) return false;
-    ErrMsg err = (ErrMsg)obj;
+    if( !(obj instanceof ErrMsg err) ) return false;
     if( _lvl!=err._lvl || !_msg.equals(err._msg) ) return false;
     // Spread a missing loc; cheaty but only a little bit.
     // TODO: track down missing loc in Parser

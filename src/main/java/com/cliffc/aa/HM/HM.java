@@ -2056,7 +2056,7 @@ public class HM {
         if( tstr==null ) {
           // Returning a high version of struct
           Type.RECURSIVE_MEET++;
-          tstr = TypeStruct.malloc("",is_open(),TypeFlds.EMPTY).add_fld(TypeFld.NO_DISP);
+          tstr = TypeStruct.malloc("",is_open(),false,TypeFlds.get(0)).add_fld(TypeFld.NO_DISP);
           if( _args!=null ) {
             for( String fld : _args.keySet() )
               if( fld.endsWith(":") ) tstr._clz = fld;

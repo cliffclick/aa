@@ -423,10 +423,10 @@ public class CallNode extends Node {
       BitsFun fidxs = tfp.fidxs();
       // If using a specific FunPtr and its in the resolved set, test more precisely
       RetNode ret;
-      if( def instanceof FunPtrNode &&           // Have a FunPtr
-          (ret=((FunPtrNode)def).ret())!=null && // Well-structured function
-          !fidxs.test_recur(ret._fidx) )         // FIDX directly not used
-        //return TypeMem.DEAD;                     // Not in the fidx set.
+      if( def instanceof FunPtrNode fptr &&  // Have a FunPtr
+          (ret=fptr.ret())!=null &&          // Well-structured function
+          !fidxs.test_recur(ret._fidx) )     // FIDX directly not used
+        //return TypeMem.DEAD;                 // Not in the fidx set.
         throw unimpl();    // premature optimization?
       // Otherwise, the FIDX is alive.  Check the display.
       ProjNode dsp = ProjNode.proj(this,DSP_IDX);

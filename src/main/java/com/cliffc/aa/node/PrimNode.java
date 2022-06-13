@@ -113,11 +113,11 @@ public abstract class PrimNode extends Node {
   public static TypeStruct make_flt(double d) { return TypeStruct.make_flt(TypeFlt.con(d)); }
 
   public static TypeStruct make_wrap(Type t) {
-    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",false,TypeFld.make(CANONICAL_INSTANCE,t));
+    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",false,false,TypeFld.make(CANONICAL_INSTANCE,t));
   }
   public static TypeInt unwrap_i(Type t) { return (TypeInt)((TypeStruct)t).at(CANONICAL_INSTANCE); }
   public static TypeFlt unwrap_f(Type t) { return (TypeFlt)((TypeStruct)t).at(CANONICAL_INSTANCE); }
-  public static long   unwrap_ii(Type t) { return t==TypeNil.NIL ? 0 : unwrap_i(t).getl(); }
+  public static long   unwrap_ii(Type t) { return t==TypeNil.XNIL ? 0 : unwrap_i(t).getl(); }
   public static double unwrap_ff(Type t) { return unwrap_f(t).getd(); }
 
   // Make and install a primitive Clazz.
@@ -256,8 +256,8 @@ public abstract class PrimNode extends Node {
   }
 
   @Override public ErrMsg err( boolean fast ) {
-    for( int i=0; i<_defs._len; i++ ) {
-      Type tactual = val(i);
+    for( int i=DSP_IDX; i<_formals.len(); i++ ) {
+      Type tactual = val(i-DSP_IDX);
       Type tformal = _formals.at(i);
       if( !tactual.isa(tformal) )
         return _badargs==null ? ErrMsg.BADARGS : ErrMsg.typerr(_badargs[i],tactual, tformal);
@@ -332,7 +332,7 @@ public abstract class PrimNode extends Node {
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpF64 extends PrimNode {
     Prim2RelOpF64( String name ) { super(name,TypeTuple.FLT64_FLT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(unwrap_ff(args[0]),unwrap_ff(args[1]))?make_int(1):TypeNil.NIL; }
+    @Override public Type apply( Type[] args ) { return op(unwrap_ff(args[0]),unwrap_ff(args[1]))?make_int(1):TypeNil.XNIL; }
     abstract boolean op( double x, double y );
   }
 
@@ -346,7 +346,7 @@ public abstract class PrimNode extends Node {
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpFI64 extends PrimNode {
     Prim2RelOpFI64( String name ) { super(name,TypeTuple.FLT64_INT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(unwrap_ff(args[0]),unwrap_ii(args[1]))?make_int(1):TypeNil.NIL; }
+    @Override public Type apply( Type[] args ) { return op(unwrap_ff(args[0]),unwrap_ii(args[1]))?make_int(1):TypeNil.XNIL; }
     abstract boolean op( double x, long y );
   }
 
@@ -399,7 +399,7 @@ public abstract class PrimNode extends Node {
       if( t0==Type.ANY || t1==Type.ANY ) return TypeStruct.INT.dual();
       if( t0==Type.ALL || t1==Type.ALL ) return TypeStruct.INT;
       // 0 AND anything is 0
-      if( t0 == TypeNil.NIL || t1 == TypeNil.NIL ) return TypeNil.NIL;
+      if( t0 == TypeNil.XNIL || t1 == TypeNil.XNIL ) return TypeNil.XNIL;
       // If either is high - results might fall to something reasonable
       t0 = unwrap_i(t0);
       t1 = unwrap_i(t1);
@@ -409,8 +409,10 @@ public abstract class PrimNode extends Node {
       if( !t0.isa(TypeInt.INT64) || !t1.isa(TypeInt.INT64) )
         return TypeStruct.INT;
       // If both are constant ints, return the constant math.
-      if( t0.is_con() && t1.is_con() )
-        return make_int(t0.getl() & t1.getl());
+      if( t0.is_con() && t1.is_con() ) {
+        long i2 = t0.getl() & t1.getl();
+        return i2==0 ? TypeStruct.make_zero() : make_int(i2);
+      }
       //if( !(t0 instanceof TypeInt) || !(t1 instanceof TypeInt) )
       //  return TypeStruct.INT;
       // Preserve width
@@ -428,8 +430,8 @@ public abstract class PrimNode extends Node {
       if( t0==Type.ANY || t1==Type.ANY ) return TypeStruct.INT.dual();
       if( t0==Type.ALL || t1==Type.ALL ) return TypeStruct.INT;
       // 0 OR anything is that thing
-      if( t0 == TypeNil.NIL ) return t1;
-      if( t1 == TypeNil.NIL ) return t0;
+      if( t0 == TypeNil.XNIL ) return t1;
+      if( t1 == TypeNil.XNIL ) return t0;
       t0 = unwrap_i(t0);
       t1 = unwrap_i(t1);
       // If either is high - results might fall to something reasonable
@@ -452,7 +454,7 @@ public abstract class PrimNode extends Node {
   // 2RelOps have uniform input types, and bool output
   abstract static class Prim2RelOpI64 extends PrimNode {
     Prim2RelOpI64( String name ) { super(name,TypeTuple.INT64_INT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(unwrap_ii(args[0]),unwrap_ii(args[1]))?make_int(1):TypeNil.NIL; }
+    @Override public Type apply( Type[] args ) { return op(unwrap_ii(args[0]),unwrap_ii(args[1]))?make_int(1):TypeNil.XNIL; }
     abstract boolean op( long x, long y );
   }
 
@@ -465,7 +467,7 @@ public abstract class PrimNode extends Node {
 
   abstract static class Prim2RelOpIF64 extends PrimNode {
     Prim2RelOpIF64( String name ) { super(name,TypeTuple.INT64_FLT64,TypeStruct.BOOL); }
-    @Override public Type apply( Type[] args ) { return op(unwrap_ii(args[0]),unwrap_ff(args[1]))?make_int(1):TypeNil.NIL; }
+    @Override public Type apply( Type[] args ) { return op(unwrap_ii(args[0]),unwrap_ff(args[1]))?make_int(1):TypeNil.XNIL; }
     abstract boolean op( long x, double y );
   }
 
@@ -505,8 +507,8 @@ public abstract class PrimNode extends Node {
     }
     @Override public Type apply( Type[] args ) { throw AA.unimpl(); }
     static Type vs_nil( Type tx, Type t, Type f ) {
-      if( tx==TypeNil.NIL ) return t;
-      //if( tx.above_center() ) return tx.isa(TypeNil.NIL) ? TypeInt.BOOL.dual() : f;
+      if( tx==TypeNil.XNIL ) return t;
+      //if( tx.above_center() ) return tx.isa(TypeNil.XNIL) ? TypeInt.BOOL.dual() : f;
       //return tx.must_nil() ? TypeInt.BOOL : f;
       throw unimpl();
     }

@@ -370,11 +370,11 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   static final byte TRPC    = 8; // Return PCs; Continuations; call-site return points; see TypeRPC
   static final byte TMEMPTR = 9; // Memory pointer type; a collection of Alias#s
   static final byte TFUNPTR =10; // Function pointer, refers to a collection of concrete functions
-  static final byte TNILABLE=11;
+  static final byte TSTRUCT =11; // Memory Structs; tuples with named fields
+  static final byte TNILABLE=12;
   public boolean is_nil() { return _type < TNILABLE; }
   // Collections of Scalars, Memory, Fields.  Not Nilable.
-  static final byte TTUPLE  =12; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TSTRUCT =13; // Memory Structs; tuples with named fields
+  static final byte TTUPLE  =13; // Tuples; finite collections of unrelated Types, kept in parallel
   static final byte TARY    =14; // Tuple of indexed fields; only appears in a TSTRUCT
   static final byte TFLD    =15; // Fields in structs
   static final byte TMEM    =16; // Memory type; a map of Alias#s to TOBJs
@@ -771,7 +771,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         if( !isRecur(id) ) {
           String tname = (id+':').intern();
           if( Util.eq(id,"int") || Util.eq(id,"flt"))
-            yield TypeStruct.make(tname,false,TypeFld.make(CANONICAL_INSTANCE,type(null)));
+            yield TypeStruct.make(tname,false,false,TypeFld.make(CANONICAL_INSTANCE,type(null)));
           yield ((TypeStruct)type(null)).set_name(tname);
         }
 

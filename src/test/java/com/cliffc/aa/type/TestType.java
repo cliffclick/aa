@@ -12,14 +12,11 @@ import static org.junit.Assert.assertTrue;
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
-    Type t0 = TypeInt.INT64.dual();
-    Type t1 = TypeFlt.FLT64.dual();
-    Type t2 = TypeNil.XNIL;
-    Type t01 = t0.meet(t1);
-    Type t12 = t1.meet(t2);
-    Type t01_2 = t01.meet(t2);
-    Type t0_12 = t0.meet(t12);
-    assertEquals(t01_2,t0_12);
+    Type t0 = TypeNil.XNIL;
+    assertTrue(t0.isa(TypeInt.INT64));
+    Type t1 = TypeStruct.INT;
+    Type mt = t0.meet(t1);
+    assertEquals(t1,mt);
   }
 
   @Test public void testTFPChain() {
@@ -135,7 +132,7 @@ public class TestType {
     TypeStruct  i8 = TypeStruct.make_int(TypeInt.INT8 );
     TypeStruct xi8 = i8.dual();
     TypeStruct xi16= i16.dual();
-    TypeStruct z   = TypeStruct.make_int(TypeInt.FALSE);
+    TypeStruct z   = TypeStruct.make_zero();
     TypeStruct o   = TypeStruct.make_int(TypeInt.TRUE );
     assertEquals(xi8,xi8.meet(xi16)); // ~i16-> ~i8
     //assertEquals( z ,z  .meet(xi8 )); // ~i8 ->  0 // No longer applies single redoing nil
@@ -412,18 +409,18 @@ public class TestType {
     // AS0AS0AS0AS0AS0AS0...
     final int alias2 = BitsAlias.new_alias(BitsAlias.ALLX);
     TypeMemPtr tptr2= TypeMemPtr.make_nil(alias2,TypeStruct.ISUSED); // *[0,2]
-    TypeStruct ta2 = TypeStruct.make("A:",false,TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
+    TypeStruct ta2 = TypeStruct.make("A:",false,false,TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
 
     // Peel A once without the nil: Memory#3: A:@{n:*[2],v:int}
     // ASAS0AS0AS0AS0AS0AS0...
     final int alias3 = BitsAlias.new_alias(BitsAlias.ALLX);
     TypeMemPtr tptr3= TypeMemPtr.make(alias3,TypeStruct.ISUSED); // *[3]
-    TypeStruct ta3 = TypeStruct.make("A:",false,TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
+    TypeStruct ta3 = TypeStruct.make("A:",false,false,TypeFld.make("n",tptr2),fldv); // @{n:*[0,2],v:int}
 
     // Peel A twice without the nil: Memory#4: A:@{n:*[3],v:int}
     // ASASAS0AS0AS0AS0AS0AS0...
     final int alias4 = BitsAlias.new_alias(BitsAlias.ALLX);
-    TypeStruct ta4 = TypeStruct.make("A:",false,TypeFld.make("n",tptr3),fldv); // @{n:*[3],v:int}
+    TypeStruct ta4 = TypeStruct.make("A:",false,false,TypeFld.make("n",tptr3),fldv); // @{n:*[3],v:int}
 
     // Then make a MemPtr{3,4}, and ld - should be a PeelOnce
     // Starting with the Struct not the A we get:
@@ -443,12 +440,12 @@ public class TestType {
     Type mta = mem234.ld(ptr34);
     //assertEquals(ta3,mta);
     TypeMemPtr ptr023 = (TypeMemPtr)TypeMemPtr.make_nil(alias2,TypeStruct.ISUSED).meet(TypeMemPtr.make(alias3,TypeStruct.ISUSED));
-    TypeStruct xta = TypeStruct.make("A:",false,TypeFld.make("n",ptr023),fldv);
+    TypeStruct xta = TypeStruct.make("A:",false,false,TypeFld.make("n",ptr023),fldv);
     assertEquals(xta,mta);
 
     // Mismatched Names in a cycle; force a new cyclic type to appear
     final int alias5 = BitsAlias.new_alias(BitsAlias.ALLX);
-    TypeStruct tfb = TypeStruct.make("B:",false,TypeFld.make("n",TypeMemPtr.make_nil(alias5,TypeStruct.ISUSED)),TypeFld.make("v",TypeFlt.FLT64));
+    TypeStruct tfb = TypeStruct.make("B:",false,false,TypeFld.make("n",TypeMemPtr.make_nil(alias5,TypeStruct.ISUSED)),TypeFld.make("v",TypeFlt.FLT64));
     Type mtab = ta2.meet(tfb);
 
     // TODO: Needs a way to easily test simple recursive types

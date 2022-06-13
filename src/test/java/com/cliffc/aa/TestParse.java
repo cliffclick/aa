@@ -30,7 +30,7 @@ public class TestParse {
     DO_HMT=false;
     DO_GCP=true;
     RSEED=0;
-    test("!1", "xnil", "xnil");
+    test("!1", "xnil", "A?");
   }
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
@@ -92,22 +92,22 @@ public class TestParse {
     test("1", "int:1", "int:1");
     // Unary operator
     test("-1", "int:-1", "int:-1");
-    test("!1", "nil", "A?");
+    test("!1", "xnil", "A?");
     // Binary operators
     test("1+2", "int:3", "int:3");
     test("1-2", "int:-1",  "int:-1");
     test("1+2*3", "int:7", "int:7");
     test("1  < 2", "int:1", "int:1");
     test("1  <=2", "int:1", "int:1");
-    test("1  > 2", "nil", "A?");
-    test("1  >=2", "nil", "A?");
-    test("1  ==2", "nil", "A?");
+    test("1  > 2", "xnil", "A?");
+    test("1  >=2", "xnil", "A?");
+    test("1  ==2", "xnil", "A?");
     test("1  !=2", "int:1", "int:1");
     test("1.2< 2", "int:1", "int:1");
     test("1.2<=2", "int:1", "int:1");
-    test("1.2> 2", "nil", "A?");
-    test("1.2>=2", "nil", "A?");
-    test("1.2==2", "nil", "A?");
+    test("1.2> 2", "xnil", "A?");
+    test("1.2>=2", "xnil", "A?");
+    test("1.2==2", "xnil", "A?");
     test("1.2!=2", "int:1", "int:1");
 
     // Binary with precedence check

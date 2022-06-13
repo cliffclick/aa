@@ -136,8 +136,10 @@ public interface Cyclic {
         for( Type c : ts ) c.retern()._dual.retern();
         Type.RECURSIVE_MEET--; // Allow xdual to intern TypeFlds
         for( Type c : ts )     // Now that all fields are interned, we can intern the TypeFld[]
-          if( c instanceof TypeStruct tst )
+          if( c instanceof TypeStruct tst ) {
             tst.remove_dups_hashcons();
+            tst._dual.remove_dups_hashcons();
+          }
       }
     } // else same SCC, no change
     return t;

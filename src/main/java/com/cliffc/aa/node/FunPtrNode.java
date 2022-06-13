@@ -134,7 +134,7 @@ public final class FunPtrNode extends Node {
 
   @Override public Type live_use(Node def ) {
     if( _live==Type.ALL ) return Type.ALL;
-    // GENERIC_FUNPTR is a sentinal for "display is dead but function is alive"
+    // GENERIC_FUNPTR is a sentinel for "display is dead but function is alive"
     assert _live==TypeFunPtr.GENERIC_FUNPTR;
     return def==display() ? Type.ANY : Type.ALL;
   }
