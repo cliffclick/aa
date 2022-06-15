@@ -370,10 +370,10 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
   static final byte TRPC    = 8; // Return PCs; Continuations; call-site return points; see TypeRPC
   static final byte TMEMPTR = 9; // Memory pointer type; a collection of Alias#s
   static final byte TFUNPTR =10; // Function pointer, refers to a collection of concrete functions
-  static final byte TSTRUCT =11; // Memory Structs; tuples with named fields
-  static final byte TNILABLE=12;
+  static final byte TNILABLE=11;
   public boolean is_nil() { return _type < TNILABLE; }
   // Collections of Scalars, Memory, Fields.  Not Nilable.
+  static final byte TSTRUCT =12; // Memory Structs; tuples with named fields
   static final byte TTUPLE  =13; // Tuples; finite collections of unrelated Types, kept in parallel
   static final byte TARY    =14; // Tuple of indexed fields; only appears in a TSTRUCT
   static final byte TFLD    =15; // Fields in structs
@@ -527,6 +527,9 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       if( t1._type==TNIL ) return t1.nmeet(t0);
       return t0.cross_nil(t1);  // Mis-matched TypeNil subclasses
     }
+    // Spray TypeNil across fields in a TypeStruct
+    //if( this instanceof TypeNil tn && t    instanceof TypeStruct ts ) return ts.nmeet(tn);
+    //if( t    instanceof TypeNil tn && this instanceof TypeStruct ts ) return ts.nmeet(tn);
     return Type.ALL;        // Mixing 2 unrelated types not subclassing TypeNil
   }
 
@@ -771,7 +774,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         if( !isRecur(id) ) {
           String tname = (id+':').intern();
           if( Util.eq(id,"int") || Util.eq(id,"flt"))
-            yield TypeStruct.make(tname,false,false,TypeFld.make(CANONICAL_INSTANCE,type(null)));
+            yield TypeStruct.make(tname,false,TypeFld.make(CANONICAL_INSTANCE,type(null)));
           yield ((TypeStruct)type(null)).set_name(tname);
         }
 

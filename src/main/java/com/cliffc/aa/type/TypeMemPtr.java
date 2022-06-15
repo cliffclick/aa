@@ -132,7 +132,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
   public static TypeMemPtr make_str(Type t) { return make_str(BitsAlias.make0(STR_ALIAS),t); }
   public static TypeMemPtr make_str(BitsAlias aliases, Type t) {
     TypeFld c0 = TypeFld.make_tup(t,ARG_IDX);
-    TypeStruct ts = TypeStruct.make("str:",false,false,c0);
+    TypeStruct ts = TypeStruct.make("str:",false,c0);
     return TypeMemPtr.make(aliases.test(0),aliases.clear(0),ts);
   }
   public boolean is_str() { return Util.eq(_obj._clz,"str:"); }
@@ -150,7 +150,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     TypeStruct.RECURSIVE_MEET++;
     TypeFld[] flds = TypeFlds.make(DISP_FLD);
     TypeStruct.RECURSIVE_MEET--;
-    DISPLAY = TypeStruct.malloc("",false,false,flds);
+    DISPLAY = TypeStruct.malloc("",false,flds);
     DISPLAY_PTR = malloc(false,BitsAlias.NALL,DISPLAY);
     DISP_FLD.setX(DISPLAY_PTR);
     TypeStruct ds = Cyclic.install(DISPLAY);

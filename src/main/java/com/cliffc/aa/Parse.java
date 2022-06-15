@@ -357,7 +357,7 @@ public class Parse implements Comparable<Parse> {
   private Node stmt(boolean lookup_current_scope_only) {
     if( peek('^') ) {           // Early function exit
       Node ifex = ifex();
-      if( ifex==null ) ifex=con(TypeNil.NIL);
+      if( ifex==null ) ifex = Env.XNIL;
       if( _e._par._par==null )
         return err_ctrl1(ErrMsg.syntax(this,"Function exit but outside any function"));
       return _e.early_exit(this,ifex);
@@ -485,7 +485,7 @@ public class Parse implements Comparable<Parse> {
     scope().flip_if();       // Flip side of tracking new defs
     set_mem(omem);           // Reset memory to before the IF for the other arm
     set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch
-    Node f_exp = peek(':') ? stmt(false) : con(TypeNil.NIL);
+    Node f_exp = peek(':') ? stmt(false) : Env.XNIL;
     if( f_exp == null ) f_exp = err_ctrl2("missing expr after ':'");
     Node f_ctl = ctrl();
     Node f_mem = mem ();
@@ -1323,7 +1323,7 @@ public class Parse implements Comparable<Parse> {
   private Type ttuple() {
     int oldx = _x;
     peek('(');
-    TypeStruct ts = TypeStruct.malloc("",false,false,TypeFlds.EMPTY);
+    TypeStruct ts = TypeStruct.malloc("",false,TypeFlds.EMPTY);
     while(true) {
       Type t = type(false,null);
       if( t==null ) { _x=oldx; return ts.free(null); }
