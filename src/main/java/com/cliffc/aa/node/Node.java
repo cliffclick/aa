@@ -93,6 +93,7 @@ public abstract class Node implements Cloneable, IntSupplier {
   }
   abstract public boolean has_tvar();
   public TV2 tvar(int x) { return in(x).tvar(); } // nth TV2
+  TV2 new_tvar() { return TV2.make_leaf("new_tvar"); }
 
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)
@@ -722,7 +723,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       assert _val==value() && _live==live();
     }
     if( AA.DO_HMT && has_tvar() )
-      _tvar = TV2.make_leaf("Combo");
+      _tvar = new_tvar();
     // Walk reachable graph
     for( Node def : _defs ) if( def != null ) def.walk_initype();
     for( Node use : _uses )                   use.walk_initype();

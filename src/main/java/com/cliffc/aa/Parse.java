@@ -444,7 +444,7 @@ public class Parse implements Comparable<Parse> {
       scope = scope();          // Create in the current scope
       StructNode stk = scope.stk();
       TypeFld fld = TypeFld.make(tok,t,Access.RW);
-      stk.add_fld(fld, con(TypeNil.NIL),badf); // Create at top of scope as undefined
+      stk.add_fld(fld, con(TypeNil.XNIL),badf); // Create at top of scope as undefined
       scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
     }
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
@@ -769,7 +769,7 @@ public class Parse implements Comparable<Parse> {
     ScopeNode scope = lookup_scope(tok=tok.intern(),false); // Find prior scope of token
     // Need a load/call/store sensible options
     if( scope==null ) {         // Token not already bound to a value
-      do_store(null,con(TypeNil.NIL),Access.RW,tok,null,TypeNil.SCALAR,null);
+      do_store(null,con(TypeNil.XNIL),Access.RW,tok,null,TypeNil.SCALAR,null);
       scope = scope();
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
@@ -1079,7 +1079,7 @@ public class Parse implements Comparable<Parse> {
     val .add_def(rez   );
     set_ctrl(Env.XCTRL);
     set_mem (con(TypeMem.ANYMEM));
-    return con(TypeNil.NIL);
+    return con(TypeNil.XNIL);
   }
 
   /** A balanced operator as a fact().  Any balancing token can be used.

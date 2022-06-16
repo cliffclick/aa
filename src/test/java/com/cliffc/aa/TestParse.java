@@ -27,10 +27,10 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=false;
-    DO_GCP=true;
+    DO_HMT=true;
+    DO_GCP=false;
     RSEED=0;
-    test("0== !!1",  "xnil", "A?");
+    test   ("math.rand(1) ? 1 : 2","int:nint8", "int:nint8"); // no ambiguity between conditionals and type annotations
   }
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
@@ -155,7 +155,6 @@ public class TestParse {
   }
 
   @Test public void testParse01() {
-    test   ("math.rand(1)?1","int:int1","int:int1"); // Missing optional else defaults to nil
     // Syntax for variable assignment
     test("x=1", "int:1", "int:1");
     test("x=y=1", "int:1", "int:1");
@@ -170,7 +169,7 @@ public class TestParse {
     test("x:=1;x++"  ,"int:1", "int:1");
     test("x:=1;x++;x","int:2", "int:2");
     test("x:=1;x++ + x--","int:3", "int:3");
-    test("x++","nil", "A?");
+    test("x++","xnil", "A?");
     test("x++;x","int:1", "int:1");
 
     // Conditional:
@@ -192,10 +191,7 @@ public class TestParse {
     test   ("math.rand(1)?1","int:int1","int:int1"); // Missing optional else defaults to nil
     test   ("x:=0;math.rand(1)?(x:=1);x",":int1","int:1");
     testerr("a.b.c();","Unknown ref 'a'",0);
-    //test   ("math.rand(1)?@{}",
-    //  (ignore->TypeMemPtr.make_nil(8,TypeStruct.make(TypeFld.NO_DISP))),
-    //  null, "@{^=A;}?" );
-    throw unimpl();
+    test   ("math.rand(1)?@{}","","");
   }
 
   // Short-circuit tests

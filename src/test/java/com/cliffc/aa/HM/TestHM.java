@@ -52,7 +52,7 @@ public class TestHM {
     if( JIG )
       _run0s(prog,rez_hm,frez_gcp,RSEED,esc_ptrs,esc_funs);
     else
-      for( int rseed=0; rseed<32; rseed++ )
+      for( int rseed=0; rseed<4; rseed++ )
         _run0s(prog,rez_hm,frez_gcp,rseed,esc_ptrs,esc_funs);
   }
 

@@ -41,18 +41,13 @@ public class ConNode<T extends Type> extends Node {
     return false;
   }
 
+  @Override TV2 new_tvar() {
+    return _t==TypeNil.XNIL
+      ? TV2.make_nil(TV2.make_leaf("ConNode_notnil"),"ConNode_nilable")
+      : TV2.make(_t, "ConNode_base");
+  }
+  
   @Override public boolean unify( boolean test ) {
-    if( !has_tvar() ) return false;
-    TV2 self = tvar();
-
-    if( _t==TypeNil.XNIL ) {
-      if( self.may_nil() ) return false; // Already nilable
-      return test || self.unify(TV2.make_nil(TV2.make_leaf("ConNode_create"),"ConNode_create"),test);
-    }
-
-    if( self.is_leaf() )
-      return test || self.unify(TV2.make(_t, "ConNode"),test);
-
     return false;
   }
 

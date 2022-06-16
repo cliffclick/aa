@@ -70,13 +70,16 @@ public class IfNode extends Node {
     if( in(0) instanceof ProjNode && in(0).in(0)==this )
       return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
     Type pred = val(1);
+
+    // Handle predicates, especially XNIL and wrapped ints (TypeStruct with
+    // perhaps constant fields).
+    if( pred == TypeNil.XNIL    ) return TypeTuple.IF_FALSE; // The One True Zero
+    if( !TypeNil.XNIL.isa(pred) ) return TypeTuple.IF_TRUE; // missing zero, so TRUE
+
+    // Handle e.g. TMP and TFP nil checks
     if( !(pred instanceof TypeNil tn) ) return (TypeTuple)pred.oob(TypeTuple.IF_ALL);
     if( tn._nil ) return tn._sub ? TypeTuple.IF_ANY  : TypeTuple.IF_FALSE;
     else          return tn._sub ? TypeTuple.IF_TRUE : TypeTuple.IF_ALL;
-  }
-
-  private static boolean falsey( Type t ) {
-    return t == TypeNil.NIL || t == TypeNil.XNIL;
   }
 
   @Override public boolean has_tvar() { return false; }

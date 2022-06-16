@@ -199,7 +199,8 @@ public class TV2 {
   public static TV2 make_struct( StructNode rec, String alloc_site ) {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
     for( int i=0; i<rec._defs._len; i++ )
-      args.put(rec.ts().get(i)._fld,rec.tvar(i));
+      if( rec.in(i).has_tvar() )
+        args.put(rec.ts().get(i)._fld,rec.tvar(i));
     return make_struct(args,alloc_site);
   }
   private static TV2 make_struct( NonBlockingHashMap<String,TV2> args, String alloc_site ) {
@@ -648,7 +649,7 @@ public class TV2 {
       if( fthat==null ) {        // Missing field in that
         if( that.is_open() ) that.add_fld(key,fthis); // Add to RHS
         else                 thsi.del_fld(key); // Remove from LHS
-      } else fthis.unify(fthat,test);           // Normal matching field unification
+      } else fthis._unify(fthat,test);          // Normal matching field unification
       // Progress may require another find()
       thsi=thsi.find();
       that=that.find();
