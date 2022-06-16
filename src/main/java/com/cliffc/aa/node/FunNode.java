@@ -803,11 +803,11 @@ public class FunNode extends RegionNode {
         return (ParmNode)use;
     return null;
   }
-  public Node[] parms() {
-    Node[] parms = new Node[nargs()];
+  public ParmNode[] parms() {
+    ParmNode[] parms = new ParmNode[nargs()];
     for( Node use : _uses )
-      if( use instanceof ParmNode )
-        parms[((ParmNode)use)._idx] = use;
+      if( use instanceof ParmNode parm)
+        parms[parm._idx] = parm;
     return parms;
   }
   public RetNode ret() {

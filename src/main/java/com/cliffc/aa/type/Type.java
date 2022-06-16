@@ -528,8 +528,8 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
       return t0.cross_nil(t1);  // Mis-matched TypeNil subclasses
     }
     // Spray TypeNil across fields in a TypeStruct
-    //if( this instanceof TypeNil tn && t    instanceof TypeStruct ts ) return ts.nmeet(tn);
-    //if( t    instanceof TypeNil tn && this instanceof TypeStruct ts ) return ts.nmeet(tn);
+    if( this instanceof TypeNil tn && t    instanceof TypeStruct ts ) return ts.nmeet(tn);
+    if( t    instanceof TypeNil tn && this instanceof TypeStruct ts ) return ts.nmeet(tn);
     return Type.ALL;        // Mixing 2 unrelated types not subclassing TypeNil
   }
 
@@ -774,7 +774,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         if( !isRecur(id) ) {
           String tname = (id+':').intern();
           if( Util.eq(id,"int") || Util.eq(id,"flt"))
-            yield TypeStruct.make(tname,false,TypeFld.make(CANONICAL_INSTANCE,type(null)));
+            yield TypeStruct.make(tname,ALL,TypeFld.make(CANONICAL_INSTANCE,type(null)));
           yield ((TypeStruct)type(null)).set_name(tname);
         }
 

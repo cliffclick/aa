@@ -1949,6 +1949,7 @@ public class HM {
         _may_nil=false;
         _flow = n._flow.meet(TypeNil.XNIL);
         if( n._eflow!=null ) _eflow = n._eflow.meet(TypeNil.XNIL);
+        if( !n._is_copy ) clr_cp();
       }
       if( n.is_ptr() ) {
         if( _args==null ) _args = new NonBlockingHashMap<>();
@@ -2056,7 +2057,7 @@ public class HM {
         if( tstr==null ) {
           // Returning a high version of struct
           Type.RECURSIVE_MEET++;
-          tstr = TypeStruct.malloc("",is_open(),TypeFlds.get(0)).add_fld(TypeFld.NO_DISP);
+          tstr = TypeStruct.malloc("",is_open() ? Type.ANY : Type.ALL,TypeFlds.get(0)).add_fld(TypeFld.NO_DISP);
           if( _args!=null ) {
             for( String fld : _args.keySet() )
               if( fld.endsWith(":") ) tstr._clz = fld;
@@ -2797,12 +2798,12 @@ public class HM {
     }
     private SB str_obj(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
       if( is_prim() ) return sb.p("@{PRIMS}");
-      final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
       String is_clz = null;
       if( _args!=null )
         for( String fld : _args.keySet() )
           if( fld.endsWith(":") )
             sb.p(is_clz = fld);
+      final boolean is_tup = is_tup(); // Distinguish tuple from struct during printing
       sb.p(is_tup ? "(" : "@{");
       if( _args==null ) sb.p(" ");
       else {

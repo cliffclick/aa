@@ -467,44 +467,64 @@ public final class CallEpiNode extends Node {
   // Same as HM.Apply.unify
   @Override public boolean unify( boolean test ) {
     assert !_is_copy;
-    CallNode call = call();
-    Node fdx = call.fdx();
-    // TODO: Can i do this without GCP?  Will never get a TFP
-    int nargs = call.nargs();
-    TV2 tfun = fdx.tvar();
     boolean progress = false;
+    CallNode call = call();
+    int nargs = call.nargs();
+    Node fdx = call.fdx();
+    TV2 tfun = fdx.tvar();
     if( !tfun.is_fun() ) {
       if( test ) return true;
-      TV2[] tv2s = new TV2[nargs];
-      tv2s[DSP_IDX] = TV2.make_leaf("CallEpi_unify");
-      for( int i=ARG_IDX; i<nargs; i++ ) tv2s[i] = call.tvar(i);
-      tv2s[0] = tvar();         // Backdoor the return in slot 0
-      TypeFunPtr tfp = fdx._val instanceof TypeFunPtr tfp2 ? tfp2 : TypeFunPtr.GENERIC_FUNPTR;
-      TV2 nfun = TV2.make_fun("CallEpi_unify", tv2s);
+      TV2[] targs = new TV2[nargs+1];
+      targs[DSP_IDX] = TV2.make_leaf("CallEpi_unify");
+      for( int i=ARG_IDX; i<nargs; i++ ) targs[i] = call.tvar(i);
+      targs[nargs] = tvar();    // Return
+      TV2 nfun = TV2.make_fun("CallEpi_unify", targs);
       progress = tfun.unify(nfun,test);
-      tfun = nfun;
-    }
+    } else {
 
-    // Check for progress amongst args
-    for( int i=ARG_IDX; i<nargs; i++ ) {
-      TV2 actual = call.tvar(i);
-      TV2 formal = tfun.arg(TV2.argname(i));
-      if( actual.unify(formal,test) ) {
-        if( test ) return true; // Early exit
-        progress=true;
-        tfun=tfun.find();
+      // Check for progress amongst args
+      int miss=0;
+      for( int i=ARG_IDX; i<nargs; i++ ) {
+        TV2 formal = tfun.arg(TV2.argname(i));
+        if( formal == null ) {      // No matching formal (too many args pass)
+          miss++;
+          progress |= bad_arg_cnt(test);
+        } else {
+          TV2 actual = call.tvar(i);
+          progress |= actual.unify(formal, test);
+          if( progress && test ) return true; // Early exit
+          tfun = tfun.find();
+        }
       }
+      // Too few args passed, some formals missed
+      if( (tfun.size()-1)-(nargs-miss) > 0 && !tfun.is_err() )
+        progress |= bad_arg_cnt(test);
+      // Check for progress on the return
+      progress |= tvar().unify(tfun.arg(" ret"),test);
     }
-    TV2 self = tvar();
-    //if( nargs != cargs && !tfun.is_err() && self._err==null ) { //
-    //  if( test ) return true;
-    //  progress = true;
-    //  self._err = call.err_arg_cnt(FunPtrNode.get(tfp._fidxs).name(),tfp);
-    //}
 
-    // Check for progress on the return
-    progress |= self.unify(tfun.arg(" ret"),test);
+    // Flag HMT result as widening, if GCP falls to a TFP which widens in HMT.
+    TV2 tret = tfun.find().arg(" ret");
+    if( tret.is_copy() && fdx._val instanceof TypeFunPtr tfp ) {
+      for( int fidx : tfp._fidxs )
+        if( fidx!=0 && !RetNode.FUNS.at(fidx).funptr().tvar().arg(" ret").is_copy() ) {
+          if( !test ) tret.clr_cp();
+          return true;
+        }
+    }
+
     return progress;
+  }
+
+  private boolean bad_arg_cnt(boolean test) {
+    TV2 self = tvar();
+    if( self.is_err() ) return false;
+    if( !test ) {
+      //self._err = "Bad argument count";
+      //self.add_deps_work(work); // Error removes apply_lift
+      throw unimpl();
+    }
+    return true;
   }
 
   // Unify trailing result ProjNode with the CallEpi directly.

@@ -42,12 +42,18 @@ public class ConNode<T extends Type> extends Node {
   }
 
   @Override public boolean unify( boolean test ) {
-    TV2 tv;
-    if( _t==TypeNil.SCALAR ||   // Will be a Leaf anyways
-        _tvar==null ||          // Constant e.g. Memory
-        !(tv=tvar()).is_leaf() )// Got expanded to e.g. a Base already
-      return false;
-    return test || tv.unify(TV2.make(_t, "ConNode"),test);
+    if( !has_tvar() ) return false;
+    TV2 self = tvar();
+
+    if( _t==TypeNil.XNIL ) {
+      if( self.may_nil() ) return false; // Already nilable
+      return test || self.unify(TV2.make_nil(TV2.make_leaf("ConNode_create"),"ConNode_create"),test);
+    }
+
+    if( self.is_leaf() )
+      return test || self.unify(TV2.make(_t, "ConNode"),test);
+
+    return false;
   }
 
   @Override public String toString() { return str(); }

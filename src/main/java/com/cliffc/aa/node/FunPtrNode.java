@@ -143,42 +143,41 @@ public final class FunPtrNode extends Node {
 
   // Implements class HM.Lambda unification.
   @Override public boolean unify( boolean test ) {
-    TV2 self = tvar();
-    if( self.is_err() ) return false;
     RetNode ret = ret();
     if( ret.is_copy() ) return false; // GENSYM
     FunNode fun = ret.fun();
-    int nargs = fun.nargs();
+    ParmNode[] parms = fun.parms();
+    TV2 self = tvar();
 
-    boolean progress = false;
     if( !self.is_fun() ) {      // Force a function if not already
       if( test ) return true;
-      TV2[] tv2s = new TV2[nargs];
-      for( Node use : fun._uses )
-        if( use instanceof ParmNode parm && parm.has_tvar() )
-          tv2s[parm._idx] = parm.tvar();
-      assert tv2s[0]==null;
-      tv2s[0] = ret.rez().tvar(); // Return in slot 0
-      progress = self.unify(TV2.make_fun("FunPtr_unify",tv2s),test);
-      self = self.find();
-      assert self.is_fun();
-    }
-
+      TV2[] tv2s = new TV2[parms.length+1];
+      for( int i=DSP_IDX; i<parms.length; i++ )
+        if( parms[i]!=null ) {
+          assert parms[i]._idx==i && parms[i].has_tvar();
+          tv2s[i] = parms[i].tvar();
+        }
+      tv2s[parms.length] = ret.rez().tvar(); // Return last slot
+      self.unify(TV2.make_fun("FunPtr_unify",tv2s),test);
+      assert self.debug_find().is_fun();
+      return true;
+    } 
+    
     // Each normal argument from the parms directly
-    Node[] parms = fun.parms();  assert parms.length==nargs;
-    for( int i=DSP_IDX; i<nargs; i++ )
+    boolean progress = false;
+    for( int i=DSP_IDX; i<parms.length; i++ )
       if( parms[i]!=null ) {
         if( self.arg(TV2.argname(i)).unify(parms[i].tvar(), test) ) {
           if( test ) return true;
           progress = true;
-          self = self.find();
+          assert !self.is_unified(); // Probably need a FIND here
         }
       }
     progress |= self.arg(" ret").unify(ret.rez().tvar(),test);
 
     // FunPtr also does Apply unification, for JUST the display argument.
     if( display().has_tvar() )
-      progress |= self.arg("2").unify(display().tvar(),test);
+      progress |= self.arg(TV2.argname(DSP_IDX)).unify(display().tvar(),test);
 
     return progress;
   }

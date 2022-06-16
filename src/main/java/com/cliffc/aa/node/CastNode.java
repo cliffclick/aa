@@ -105,7 +105,8 @@ public class CastNode extends Node {
         if( nt1 != one ) { notnil._eflow = nt1; progress = true; }
       }
       // Also check that the fields align
-      return TV2.unify_flds(maynil,notnil,test,true) | progress;
+      //return TV2.unify_flds(maynil,notnil,test) | progress;
+      throw unimpl();           // TODO: top-level distinction removed, 
     }
 
     // All other paths may progress

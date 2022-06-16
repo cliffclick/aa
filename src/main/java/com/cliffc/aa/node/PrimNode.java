@@ -113,7 +113,7 @@ public abstract class PrimNode extends Node {
   public static TypeStruct make_flt(double d) { return TypeStruct.make_flt(TypeFlt.con(d)); }
 
   public static TypeStruct make_wrap(Type t) {
-    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",false,TypeFld.make(CANONICAL_INSTANCE,t));
+    return TypeStruct.make(t instanceof TypeInt ? "int:" : "flt:",Type.ALL,TypeFld.make(CANONICAL_INSTANCE,t));
   }
   public static TypeInt unwrap_i(Type t) { return (TypeInt)((TypeStruct)t).at(CANONICAL_INSTANCE); }
   public static TypeFlt unwrap_f(Type t) { return (TypeFlt)((TypeStruct)t).at(CANONICAL_INSTANCE); }
@@ -237,14 +237,14 @@ public abstract class PrimNode extends Node {
 
   @Override public boolean has_tvar() { return true; }
 
-  // All primitives are effectively H-M Applies with a hidden internal Lambda.
+  // In the test HM, All primitives are effectively H-M Applies with a hidden
+  // internal Lambda.  Here there is already a wrapper Lambda, and the
+  // primitive computes a result.
   @Override public boolean unify( boolean test ) {
-    boolean progress = false;
-    int i = in(0)==Env.ALL ? 1 : 0; // Starting point; skip first arg for static calls, e.g. math.rand
-    for( ; i<len(); i++ )
-      progress |= atx(tvar(i),_formals.at(i+DSP_IDX),test);
-    progress |= atx(tvar(),_ret,test);
-    return progress;
+    TV2 self = tvar();
+    if( self.is_base() && !self.is_copy() ) return false;
+    if( test ) return true;
+    return self.unify(TV2.make_base(_tfp._ret,"PrimNode_create").clr_cp(),test);
   }
   private static boolean atx(TV2 tv, Type tformal, boolean test) {
     if( tv._flow==tformal ) return false; // ALL-vs-ALL

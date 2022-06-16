@@ -73,12 +73,10 @@ public class TV2 {
   // All the aliases and fidxs that escape outside of Root, and might be called
   // with anything or appear on any Root input.
   private static BitsAlias EXT_ALIASES = BitsAlias.EXT;
-  private static BitsFun EXT_FIDXS = BitsFun.EXT;
 
   // Unique ID
   private static int UID=1;
   public final int _uid;
-
 
   // Structural parts to unify with, or null.
   // If Leaf   , then null and _flow is null.
@@ -109,7 +107,7 @@ public class TV2 {
 
   // Contains the set of aliased Structs, or null if not a Struct.
   // If set, then keys for field names may appear.
-  boolean _is_struct;
+  boolean _is_obj;
   // Structs allow more fields.  Not quite the same as TypeStruct._open field.
   boolean _open;
 
@@ -139,7 +137,7 @@ public class TV2 {
     t._eflow = _eflow;
     t._may_nil = _may_nil;
     t._is_fun = _is_fun;
-    t._is_struct = _is_struct;
+    t._is_obj = _is_obj;
     t._open = _open;
     t._is_copy = _is_copy;
     t._deps = _deps;
@@ -148,22 +146,24 @@ public class TV2 {
   }
 
   // Accessors
-  public boolean is_leaf() { return _args==null && _flow==null && !_is_struct && !_is_fun; }
+  public boolean is_leaf() { return _args==null && _flow==null && !_is_obj && !_is_fun; }
   public boolean is_unified(){return _get(">>")!=null; }
   public boolean is_nil () { return _get("?" )!=null; }
   public boolean is_base() { return _flow != null && !(_flow instanceof TypeMemPtr); }
   public boolean is_ptr () { return _flow instanceof TypeMemPtr; }
   public boolean is_fun () { return _is_fun; }
-  public boolean is_obj () { return _is_struct; }
+  public boolean is_obj () { return _is_obj; }
   public boolean is_open() { return _open; }           // Struct-specific
   public boolean is_err () { return _err!=null || is_err2(); }
   boolean is_err2()  { return
-      (_flow   ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_is_struct
-      (_eflow  ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_is_struct
+      (_flow   ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_is_obj
+      (_eflow  ==null ? 0 : 1) + // Any 2 or more set of _flow,_is_fun,_is_obj
       (_flow!=null && _args!=null ? 1 : 0) + // Base (flow) and also args
       (_is_fun        ? 1 : 0) +
-      (_is_struct     ? 1 : 0) >= 2;
+      (_is_obj     ? 1 : 0) >= 2;
   }
+  public boolean is_copy() { return _is_copy; }
+  public boolean may_nil() { return _may_nil; }
 
   public int size() { return _args==null ? 0 : _args.size(); }
 
@@ -187,9 +187,9 @@ public class TV2 {
   }
   public static TV2 make_fun(@NotNull String alloc_site, TV2... t2s) {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
-    for( int i=DSP_IDX; i<t2s.length; i++ )
+    for( int i=DSP_IDX; i<t2s.length-1; i++ )
       if( t2s[i]!=null ) args.put(argname(i), t2s[i]);
-    args.put(" ret",t2s[0]); // Backdoor the return in slot 0
+    args.put(" ret",t2s[t2s.length-1]);
     TV2 t2 = new TV2(args,alloc_site);
     t2._is_fun = true;
     t2._may_nil = false;
@@ -204,14 +204,14 @@ public class TV2 {
   }
   private static TV2 make_struct( NonBlockingHashMap<String,TV2> args, String alloc_site ) {
     TV2 t2 = new TV2(args,alloc_site);
-    t2._is_struct = true;
+    t2._is_obj = true;
     t2._may_nil = false;
     t2._open = false;
     return t2;
   }
   public void make_struct_from() {
     assert !is_obj();           // If error, might also be is_fun or is_base
-    _is_struct = true;
+    _is_obj = true;
     _open = true;
     if( _args==null ) _args = new NonBlockingHashMap<>();
     assert is_obj();
@@ -266,7 +266,6 @@ public class TV2 {
   public static void reset_to_init0() {
     UID=1;
     EXT_ALIASES = BitsAlias.EXT;
-    EXT_FIDXS = BitsFun.EXT;
   }
 
   public void free() {
@@ -300,11 +299,6 @@ public class TV2 {
     if( tv == tv2 ) return tv;
     _args.put(key,tv2);
     return tv2;
-  }
-  // Get at a key, withOUT U-F rollup
-  TV2 debug_arg( String key ) {
-    TV2 tv = _get(key);
-    return tv==null ? null : tv.debug_find();
   }
 
   // Tarjan U-F find, without the roll-up.  Used for debug printing and asserts
@@ -342,26 +336,37 @@ public class TV2 {
     TV2 n = arg("?");
     if( n.is_leaf() ) return this;
     _args.remove("?");  // No longer have the "?" key, not a nilable anymore
+    _args.put("??",n);  // For hm_apply_lift, keep around the prior mapping
+    _add_nil(n);
+    if( _args.size()==0 ) _args=null;
+    n.merge_deps(this);
+    return this;
+  }
+  private TV2 _add_nil(TV2 n) {
+    if( n.is_leaf() ) ;
     // Nested nilable-and-not-leaf, need to fixup the nilable
-    if( n.is_base() ) {
-      _flow = n._flow.meet(TypeNil.NIL);
-      if( n._eflow!=null ) _eflow = n._eflow.meet(TypeNil.NIL);
+    else if( n.is_base() ) {
+      _flow = n._flow.meet(TypeNil.XNIL);
+      if( n._eflow!=null ) _eflow = n._eflow.meet(TypeNil.XNIL);
       if( !n._is_copy ) clr_cp();
     }
-    if( n.is_fun() ) throw unimpl();
-    if( n.is_obj() ) {
-      if( n._args!=null )     // Shallow copy fields
-        for( String key : n._args.keySet() )
-          _args.put(key,n.arg(key));
-      _is_struct = true;
+    else if( n.is_ptr() ) {
+      if( _args==null ) _args = new NonBlockingHashMap<>();
+      _args.put("*",n.arg("*"));
+    }
+    else if( n.is_fun() ) throw unimpl();
+    else if( n.is_obj() ) {
+      // Recursively add-nil the fields
+      for( String key : n._args.keySet() ) {
+        TV2 arg = n.arg(key);
+        _args.put(key,arg.copy("add_nil")._add_nil(arg));
+      }
+      _is_obj = true;
       _may_nil = true;
       _open = n._open;
     }
-    if( n.is_nil() ) {
+    else if( n.is_nil() )       // Peel nested is_nil
       _args.put("?",n.arg("?"));
-    }
-    if( _args.size()==0 ) _args=null;
-    n.merge_deps(this);
     return this;
   }
 
@@ -378,36 +383,6 @@ public class TV2 {
     _may_nil = false;
     return this;
   }
-  // Add nil
-  public void add_nil() {
-    if(  _flow!=null )  _flow =  _flow.meet(TypeNil.NIL);
-    if( _eflow!=null ) _eflow = _eflow.meet(TypeNil.NIL);
-    _may_nil = true;
-    throw unimpl();             // Prims are structs
-  }
-
-  //// True if 'this isa t2'.  Must be monotonic.
-  //boolean isa( TV2 t2 ) {
-  //  // Leaf can "fall" (unify, expand) into anything.
-  //  // Conversely, nothing can "fall" into a Leaf
-  //  if(    is_leaf() ) return true;
-  //  if( t2.is_leaf() ) return false;
-  //  // Structurally equal
-  //  if( eq(t2) ) return true;
-  //
-  //  // Structural breakdown
-  //  // Check base terms
-  //  if( not_isa( _flow, t2. _flow) ) return false;
-  //  if( not_isa(_eflow, t2._eflow) ) return false;
-  //  // Check argument names.  Defensive copy did not go deep, and the
-  //  // lifting does the recursion, so we only need to check shallow here.
-  //  if( _args!=null ) throw unimpl();
-  //  // All parts isa
-  //  return true;
-  //}
-  //private static boolean not_isa( Type t0, Type t1 ) {
-  //  return (t0 != null || t1 != null) && (t0 == null || t1 == null || !t0.isa(t1));
-  //}
 
   // Varies as unification happens; not suitable for a HashMap/HashSet unless
   // unchanging (e.g. defensive clone)
@@ -417,7 +392,7 @@ public class TV2 {
     if(   _eflow!=null ) hash+=   _eflow._hash;
     if( _is_fun ) hash = (hash+ 7)*13;
     if( _may_nil) hash = (hash+13)*23;
-    if( _is_struct ) hash = (hash+23)*29;
+    if( _is_obj ) hash = (hash+23)*29;
     if( _args!=null )
       for( String key : _args.keySet() )
         hash ^= key.hashCode();
@@ -499,9 +474,13 @@ public class TV2 {
     if( test ) return true; // Report progress without changing
     //if( _uid < that._uid ) throw unimpl(); // Reverse UID to keep the Low.
 
-    // Merge open
-    if( is_obj() )
-      that._open = that.is_obj() ? that._open & _open : _open;
+    // Merge all the hard bits
+    that._is_fun  |= _is_fun;
+    that._may_nil |= _may_nil;
+    if( _is_obj ) {
+      that._open = that._is_obj ? (that._open & _open) : _open;
+      that._is_obj = true;
+    }
     // Merge all the hard bits
     that.union_flow(_flow);
     that.union_flow(_eflow);
@@ -526,11 +505,12 @@ public class TV2 {
   private void union_flow( Type t0 ) {
     if( t0==null ) return;      // Nothing to merge into
     if( _flow==null ) _flow = t0;
-    else if( t0.getClass()== _flow.getClass() || t0==TypeNil.NIL || _flow==TypeNil.NIL ) _flow = t0.meet( _flow);
+    else if( t0.getClass()== _flow.getClass() || t0==TypeNil.XNIL || _flow==TypeNil.XNIL ) _flow = t0.meet( _flow);
     else if( _eflow==null ) _eflow = t0;
     else if( t0.getClass()==_eflow.getClass() ) _eflow = t0.meet(_eflow);
     // Else have both _flow and _eflow AND t0: have 3 unique type classes so
     // drop t0, and only report the first two.
+    // TODO: Probably have to keep them sorted to be canonical during errors
   }
 
   // Union this into that; this can already be unified (if rolling up).
@@ -543,7 +523,8 @@ public class TV2 {
     else _args = new NonBlockingHashMap<>();
     _args.put(">>", that);
     _flow = _eflow = null;
-    _open = false;
+    _is_fun = _is_obj = _may_nil = _open = false;
+    _is_copy = true;
     _deps = null;
     _err = null;
     assert is_unified();
@@ -630,6 +611,11 @@ public class TV2 {
     if( is_base() && that.is_base() )
       return _uid<that._uid ? that.union(this,test) : this.union(that,test);
 
+    // Mismatched error pointers require a hard sub-part unify
+    TV2 ptr0 = arg("*"), ptr1 = that.arg("*");
+    if( ptr0!=null && ptr1 != null )
+      throw unimpl(); //ptr0._unify(ptr1,test);
+
     // Special case for nilable union something
     if( this.is_nil() && !that.is_nil() ) return that.unify_nil(this,test);
     if( that.is_nil() && !this.is_nil() ) return this.unify_nil(that,test);
@@ -645,26 +631,24 @@ public class TV2 {
 
     // Structural recursion unification.
     if( (is_obj() && that.is_obj()) ||
-        (is_fun() && that.is_fun()) )
-      unify_flds(this,that,test,false);
+        (is_fun() && that.is_fun()) ||
+        (is_nil() && that.is_nil()) ||
+        (is_ptr() && that.is_ptr()) )
+      unify_flds(this,that,test);
     return find().union(that.find(),test);
   }
 
   // Structural recursion unification.  Called nested, and called by NotNil
   // at the top-level directly.
-  public static boolean unify_flds(TV2 thsi, TV2 that, boolean test, boolean top_level) {
-    if( thsi._args==that._args ) return false;  // Already equal (and probably both nil)
-    boolean progress = false;
+  static void unify_flds(TV2 thsi, TV2 that, boolean test) {
+    if( thsi._args==that._args ) return;  // Already equal (and probably both nil)
     for( String key : thsi._args.keySet() ) {
       TV2 fthis = thsi.arg(key); // Field of this
       TV2 fthat = that.arg(key); // Field of that
       if( fthat==null ) {        // Missing field in that
-        progress = true;
         if( that.is_open() ) that.add_fld(key,fthis); // Add to RHS
-        else                 thsi.del_fld(key, test); // Remove from LHS
-      } else progress |= top_level         // Matching fields unify directly
-               ? fthis. unify(fthat,test)  // Top-level requires some setup
-               : fthis._unify(fthat,test); // Recursive skips the setup
+        else                 thsi.del_fld(key); // Remove from LHS
+      } else fthis.unify(fthat,test);           // Normal matching field unification
       // Progress may require another find()
       thsi=thsi.find();
       that=that.find();
@@ -673,28 +657,25 @@ public class TV2 {
     if( that._args!=null )
       for( String key : that._args.keySet() )
         if( thsi.arg(key)==null ) { // Missing field in this
-          progress = true;
           if( thsi.is_open() )  thsi.add_fld(key,that.arg(key)); // Add to LHS
-          else                  that.del_fld(key, test);         // Drop from RHS
+          else                  that.del_fld(key);  // Drop from RHS
         }
 
     if( that.debug_find() != that ) throw unimpl(); // Missing a find
-    return progress;
   }
 
   // Insert a new field
-  public boolean add_fld( String id, TV2 fld) {
-    assert is_obj();
+  public void add_fld( String id, TV2 fld) {
     if( _args==null ) _args = new NonBlockingHashMap<>();
     fld.push_deps(_deps);
     _args.put(id,fld);
     add_deps_flow();
-    return true;
   }
   // Delete a field
-  private void del_fld( String fld, boolean test) {
+  private void del_fld( String id ) {
+    if( Util.eq("*",id) ) return; // Do not break ptr-ness, instead keep field and will be an error
     add_deps_flow();
-    _args.remove(fld);
+    _args.remove(id);
     if( _args.size()==0 )  _args=null;
   }
 
@@ -718,7 +699,6 @@ public class TV2 {
 
   // Apply 'this' structure on 'that'; no modifications to 'this'.  VARS maps
   // from the cloned LHS to the RHS replacement.
-  @SuppressWarnings("unchecked")
   private boolean _fresh_unify(TV2 that, TV2[] nongen, boolean test ) {
     assert !is_unified() && !that.is_unified();
 
@@ -1023,7 +1003,7 @@ public class TV2 {
   // -----------------
   // Recursively clear _is_copy, through cyclic types.
   static final VBitSet UPDATE_VISIT  = new VBitSet();
-  void clr_cp() { UPDATE_VISIT.clear(); _clr_cp();}
+  public TV2 clr_cp() { UPDATE_VISIT.clear(); _clr_cp(); return this;}
   private void _clr_cp() {
     TV2 ret;
     if( !_is_copy || UPDATE_VISIT.tset(_uid) ) return;
@@ -1085,26 +1065,6 @@ public class TV2 {
   private void merge_deps( TV2 that ) { that.push_deps(_deps); }
 
   // --------------------------------------------
-  // Recursively unbox
-  public TV2 unbox() {
-    assert DUPS.isEmpty();
-    TV2 tv = _unbox();
-    DUPS.clear();
-    return tv;
-  }
-  private TV2 _unbox() {
-    TV2 tv = DUPS.get(_uid);
-    if( tv!=null ) return tv;
-    if( is_obj() ) {
-      String tname = ((TypeMemPtr)_flow)._obj._clz;
-      if( tname!=null )
-        return arg("_val");     // Unbox ints and flts
-      throw unimpl();
-    }
-    return this;
-  }
-
-  // --------------------------------------------
   // Pretty print
 
   // Look for dups, in a tree or even a forest (which Syntax.p() does)
@@ -1114,8 +1074,9 @@ public class TV2 {
       dups.set(debug_find()._uid);
     } else {
       if( _args!=null )
-        for( TV2 t : _args.values() )
-          t._get_dups(visit,dups);
+        for( String key : _args.keySet() )
+          if( !key.equals("??") )
+            _args.get(key)._get_dups(visit,dups);
     }
     return dups;
   }
@@ -1127,9 +1088,13 @@ public class TV2 {
   public SB str(SB sb) { VCNT=0; VNAMES.clear(); return str(sb, new VBitSet(), get_dups(), false ); }
   private static int VCNT;
   private static final HashMap<TV2,String> VNAMES = new HashMap<>();
+
+  // Fancy print for Debuggers - includes explicit U-F re-direction.
+  // Does NOT roll-up U-F, has no side-effects.
   public SB str(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     boolean dup = dups.get(_uid);
     if( !debug && is_unified() ) return find().str(sb,visit,dups,debug);
+    if( debug && !_is_copy ) sb.p('%');
 
     if( is_unified() || (is_leaf() && _err==null) ) {
       vname(sb,debug);
@@ -1147,17 +1112,19 @@ public class TV2 {
     if( is_err() ) {
       if( is_err2() ) {
         sb.p("Cannot unify ");
-        if( is_fun   () ) str_fun   (sb,visit,dups,debug).p(" and ");
-        if( is_base  () ) str_base  (sb)                 .p(" and ");
-        if( _eflow!=null) sb.p(_eflow)                   .p(" and ");
-        if( is_obj() ) str_struct(sb,visit,dups,debug).p(" and ");
+        if( is_fun () ) str_fun (sb,visit,dups,debug).p(" and ");
+        if( is_base() ) str_base(sb)                 .p(" and ");
+        if( is_ptr () ) str_ptr (sb,visit,dups,debug).p(" and ");
+        if( _eflow!=null) sb.p(_eflow)               .p(" and ");
+        if( is_obj () ) str_obj (sb,visit,dups,debug).p(" and ");
         return sb.unchar(5);
       }
       return sb.p(_err);      // Just a simple error
     }
 
     if( is_base() ) return str_base(sb);
-    if( is_obj () ) return str_struct(sb,visit,dups,debug);
+    if( is_ptr () ) return str_ptr(sb,visit,dups,debug);
+    if( is_obj () ) return str_obj(sb,visit,dups,debug);
     if( is_fun () ) return str_fun(sb,visit,dups,debug);
     if( is_nil () ) return str0(sb,visit,arg("?"),dups,debug).p('?');
 
@@ -1170,16 +1137,22 @@ public class TV2 {
   }
   static private SB str0(SB sb, VBitSet visit, TV2 t, VBitSet dups, boolean debug) { return t==null ? sb.p("_") : t.str(sb,visit,dups,debug); }
   private SB str_base(SB sb) { return sb.p(_flow); }
+  private SB str_ptr(SB sb, VBitSet visit, VBitSet dups, boolean debug ) {
+    TV2 obj = _args==null ? null : _args.get("*");
+    str0(sb.p('*'),visit,obj,dups,debug);
+    if( _may_nil ) sb.p('?');
+    return sb;
+  }
   private SB str_fun(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     sb.p("{ ");
     for( String fld : sorted_flds() ) {
-      if( !Util.eq(" ret",fld) )
+      if( Util.find(ARGS,fld)!=-1 ) // Just the argnames; skip others happens in error cases
         str0(sb,visit,_args.get(fld),dups,debug).p(' ');
     }
-    return str0(sb.p("-> "),visit,_args.get(" ret"),dups,debug).p(" }");
+    return str0(sb.p("-> "),visit,_args.get(" ret"),dups,debug).p(" }").p(_may_nil ? "?" : "");
   }
 
-  private SB str_struct(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
+  private SB str_obj(SB sb, VBitSet visit, VBitSet dups, boolean debug) {
     if( is_math() ) return sb.p("@{MATH}");
     // The struct contains a clz field, print as "klazz:@{fields}"
     String clz = is_clz();
@@ -1197,12 +1170,13 @@ public class TV2 {
         // structs and functions
         if( fld.charAt(0)==' ' ) continue;
         // Skip klazz name, already pre-printed ahead of struct
-        if( clz!=null && fld.charAt(fld.length()-1)==':' ) continue;
+        if( clz!=null && Util.eq(fld,clz) ) continue;
         // Skip field names in a tuple
         str0(is_tup ? sb.p(' ') : sb.p(' ').p(fld).p(" = "),visit,_args.get(fld),dups,debug).p(is_tup ? ',' : ';');
       }
     }
     if( is_open() ) sb.p(" ...,");
+    if( _args!=null && _args.size() > 0 ) sb.unchar();
     sb.p(!is_tup ? "}" : ")");
     if( _may_nil ) sb.p("?");
     return sb;
@@ -1222,11 +1196,14 @@ public class TV2 {
   }
   private boolean is_tup() {  return _args==null || _args.isEmpty() || _args.containsKey("0"); }
   boolean is_math() { return is_obj() && _args!=null && _args.containsKey("pi"); }
+  // True if string is a clazz string (which ends in ':')
+  static boolean is_clz(String fld) { return fld.charAt(fld.length()-1)==':'; }
+  // Null if not a clazz object, or the clazz string otherwise
   String is_clz() {
     if( _args==null ) return null;
     String clz=null;
     for( String arg : _args.keySet() )
-      if( arg.indexOf(':')!=-1 ) // Is clazz marker field?
+      if( is_clz(arg) )          // Is clazz marker field?
         if( clz==null ) clz=arg; // Found clazz marker field
         else return null;        // Tooo many marker fields
     if( clz==null ) return null;

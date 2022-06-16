@@ -2187,7 +2187,7 @@ public class HM10 {
         TypeStruct ts = WDUPS.get(_uid);
         if( ts != null ) return t; // Recursive, stop cycles
         Type.RECURSIVE_MEET++;
-        ts = TypeStruct.malloc("",false,TypeFlds.EMPTY);
+        ts = TypeStruct.malloc("",Type.ALL,TypeFlds.EMPTY);
 
         // Add fields.  Common to both are easy, and will be walked (recursive,
         // cyclic).  Solo fields in GCP are kept, and lifted "as if" an HM
