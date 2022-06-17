@@ -15,7 +15,6 @@ public class RootNode extends Node {
   // [program exit control, program exit memory, program exit value, escaping RetNodes... ]
   public RootNode() { super(OP_ROOT, null, null, null); }
 
-
   private Type _cache_key;
   private TypeTuple _cache_val;
 

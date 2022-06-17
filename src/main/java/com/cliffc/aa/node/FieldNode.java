@@ -17,7 +17,7 @@ public class FieldNode extends Node {
 
   @Override public String xstr() { return "."+_fld; }   // Self short name
   String  str() { return xstr(); } // Inline short name
-  
+
   @Override public Type value() {
     Type t = val(0);
     String sclz=null;
@@ -33,7 +33,7 @@ public class FieldNode extends Node {
       // prototype.  Only valid for final fields.
       sclz = ts.clz();
     }
-    StructNode clz = proto(sclz);    
+    StructNode clz = proto(sclz);
     if( clz==null ) return t.oob();
     TypeFld pfld = ((TypeStruct) clz._val).get(_fld);
     if( pfld == null ) return t.oob(TypeNil.SCALAR);
@@ -49,13 +49,13 @@ public class FieldNode extends Node {
     String tname = clz.substring(0,clz.length()-1);
     return Env.PROTOS.get(tname);
   }
-  
+
   @Override public Node ideal_reduce() {
     if( (in(0) instanceof StructNode clz) )
       return clz.in_bind(_fld,in(0));
     // For named prototypes, if the field load fails, try again in the
     // prototype.  Only valid for final fields.
-    String sclz=null;
+    String sclz;
     Type t = val(0);
     if( t == TypeNil.XNIL ) sclz = "int:";
     else if( !(t instanceof TypeStruct ts) ) return null;

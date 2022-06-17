@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.tvar.TV2;
 
 import static com.cliffc.aa.AA.*;
 
@@ -41,7 +40,7 @@ public class NewNode extends Node {
   public Node ctl() { return in(CTL_IDX); }
   public Node mem() { return in(MEM_IDX); }
   public StructNode rec() { return (StructNode)in(REZ_IDX); }
-  
+
   @Override public Type value() { return TypeTuple.make(Type.CTRL,memval(),_tptr); }
   // Construct the memory value
   private TypeMem memval() {
@@ -52,7 +51,7 @@ public class NewNode extends Node {
     return tmem.make_from(_alias,ts);
   }
 
- 
+
 //  // Liveness changes in NewNode, impacts value in NewNode and MrgProj
 //  @Override public void add_flow_extra(Type old) {
 //    if( old instanceof TypeMem ) { // Must be a liveness change
@@ -167,8 +166,8 @@ public class NewNode extends Node {
     assert proj._idx == REZ_IDX;
     return false;
   }
-  
- 
+
+
   // clones during inlining all become unique new sites
   @Override public NewNode copy( boolean copy_edges) {
     // Split the original '_alias' class into 2 sub-aliases
