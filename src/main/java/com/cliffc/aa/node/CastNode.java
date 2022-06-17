@@ -83,31 +83,9 @@ public class CastNode extends Node {
       //return false;
       throw unimpl(); //
 
-    // Two structs, one nilable.  Nilable is moved into the alias, but also
-    // need to align the fields.
-    if( maynil.is_obj() && notnil.is_obj() ) {
-      boolean progress = false;
-      Type omt = maynil._flow;
-      Type ont = notnil._flow;
-      Type mt = omt.meet(ont);
-      Type mt0 = mt.meet(TypeNil.NIL);
-      Type nt0 = mt.join(TypeNil.NSCALR);
-      if( mt0!=omt ) { maynil._flow = mt0; progress=true; }
-      if( nt0!=ont ) { notnil._flow = nt0; progress=true; }
-
-      Type ome = maynil._eflow;
-      Type one = notnil._eflow;
-      Type mte = ome==null ? one : (one==null ? ome : ome.meet(one));
-      if( mte!=null ) {
-        Type mt1 = mte.meet(TypeNil.NIL);
-        Type nt1 = mte.join(TypeNil.NSCALR);
-        if( mt1 != ome ) { maynil._eflow = mt1; progress = true; }
-        if( nt1 != one ) { notnil._eflow = nt1; progress = true; }
-      }
-      // Also check that the fields align
-      //return TV2.unify_flds(maynil,notnil,test) | progress;
-      throw unimpl();           // TODO: top-level distinction removed, 
-    }
+    // Already an expanded nilable with ptr
+    if( maynil.is_ptr() && notnil.is_ptr() )
+      return maynil.arg("*").unify(notnil.arg("*"),test);
 
     // All other paths may progress
     if( test ) return true;

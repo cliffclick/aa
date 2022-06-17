@@ -1,10 +1,9 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.tvar.TV2;
+import com.cliffc.aa.type.*;
 
 import static com.cliffc.aa.AA.*;
 
@@ -65,7 +64,10 @@ public class LoadNode extends Node {
   // Standard memory unification; the Load unifies with the loaded field.
   @Override public boolean unify( boolean test ) {
     TV2 self = tvar();
-    TV2 rec = adr().tvar();
+    TV2 ptr = adr().tvar();
+    TV2 rec = ptr.arg("*");
+    if( rec==null )
+      ptr.add_fld("*",rec = TV2.make_leaf("Load_unify"));
     return self.unify(rec,test);
   }
   public void add_work_hm() {
@@ -164,15 +166,14 @@ public class LoadNode extends Node {
       cnt++; assert cnt < 100; // Infinite loop?
       if( mem instanceof StoreNode st ) {
         if( st.adr()==adr ) return st.err(true)== null ? st : null; // Exact matching store
-        //  // Wrong address.  Look for no-overlap in aliases
-        //  Type tst = st.adr()._val;
-        //  if( !(tst instanceof TypeMemPtr) ) return null; // Store has weird address
-        //  BitsAlias st_alias = ((TypeMemPtr)tst)._aliases;
-        //  if( aliases.join(st_alias) != BitsAlias.EMPTY )
-        //    return null;        // Aliases not disjoint, might overlap but wrong address
-        //if( mem == st.mem() ) return null;
-        //mem = st.mem(); // Advance past
-        throw unimpl();
+        // Wrong address.  Look for no-overlap in aliases
+        Type tst = st.adr()._val;
+        if( !(tst instanceof TypeMemPtr tmp) ) return null; // Store has weird address
+        BitsAlias st_alias = tmp._aliases;
+          if( aliases.join(st_alias) != BitsAlias.EMPTY )
+            return null;        // Aliases not disjoint, might overlap but wrong address
+        if( mem == st.mem() ) return null;
+        mem = st.mem(); // Advance past
 
       //} else if( mem instanceof MemPrimNode.LValueWrite ) {
       //  // Array stores and field loads never alias
@@ -180,23 +181,17 @@ public class LoadNode extends Node {
 
       } else if( mem instanceof MProjNode ) {
         Node mem0 = mem.in(0);
-        if( mem0 instanceof NewNode nnn ) {
-          if( adr.in(0)==nnn ) return nnn.rec();
+        switch( mem0 ) {
+        case NewNode nnn -> {
+          if( adr.in(0) == nnn ) return nnn.rec();
           if( aliases.test_recur(nnn._alias) ) return null; // Overlapping, but wrong address - dunno, so must fail
           mem = nnn.mem(); // Advance past
-        } else if( mem0 instanceof CallEpiNode ) { // Bypass an entire function call
-          if( ((CallEpiNode)mem0)._is_copy ) return null;
-          Type tmem0 = mem._val;
-          Type tmem1 = ((CallEpiNode)mem0).call().mem()._val;
-          if( !(tmem0 instanceof TypeMem) || !(tmem1 instanceof TypeMem) ) return null;
-          mem = _find_previous_store_call(aliases,(TypeMem)tmem0,(TypeMem)tmem1,(CallEpiNode)mem0,is_load);
-          if( mem==null ) return null;
-        } else if( mem0 instanceof MemSplitNode ) { // Lifting out of a split/join region
-          mem = ((MemSplitNode)mem0).mem();
-        } else if( mem0 instanceof CallNode ) { // Lifting out of a Call
-          mem = ((CallNode)mem0).mem();
-        } else {
-          throw unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
+        }
+        case CallEpiNode  node -> { return null; } // TODO: Bypass entire function call
+        case MemSplitNode node -> mem = node.mem(); // Lifting out of a split/join region
+        case CallNode     node -> mem = node.mem(); // Lifting out of a Call
+
+        case null, default -> throw unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
         }
       //} else if( mem instanceof MemJoinNode ) {
       //  Node jmem = ((MemJoinNode)mem).can_bypass(aliases);
@@ -213,35 +208,5 @@ public class LoadNode extends Node {
         throw unimpl(); // decide cannot be equal, and advance, or maybe-equal and return null
       }
     }
-  }
-
-  // Can bypass call?  Return null if cannot or call.mem if can.
-  static private Node _find_previous_store_call( BitsAlias aliases, TypeMem tmem0, TypeMem tmem1, CallEpiNode cepi, boolean is_load ) {
-    // TODO: Strengthen this.  Global no-esc can bypass, IF during inline/clone
-    // each clone body updates both aliases everywhere.
-    if( !is_load ) return null; // For now, Store types NEVER bypass a call.
-    //CallNode call = cepi.call();
-    //if( tmem0.fld_not_mod(aliases, fld) && tmem1.fld_not_mod(aliases, fld) )
-    //  return call.mem(); // Loads from final memory can bypass calls.  Stores cannot, store-over-final is in error.
-    //TypeMemPtr escs = CallNode.tesc(call._val);
-    //if( escs._aliases.join(aliases)==BitsAlias.EMPTY )
-    //  return call.mem(); // Load from call; if memory is made *in* the call this will fail later on an address mismatch.
-    return null;         // Stuck behind call
-  }
-
-  @Override public ErrMsg err( boolean fast ) {
-    Type tadr = adr()._val;
-    if( !(tadr instanceof TypeMemPtr ptr) )
-      return bad(fast,null); // Not a pointer, cannot load a field
-    if( ptr.must_nil() )
-      return fast ? ErrMsg.FAST : ErrMsg.niladr(_bad,"Struct might be nil when reading",null);
-    Type tmem = mem()._val;
-    if( tmem==Type.ALL ) return bad(fast,null);
-    return null;
-  }
-  private ErrMsg bad( boolean fast, TypeStruct to ) {
-    //boolean is_closure = adr() instanceof NewNode nnn && nnn._is_closure;
-    //return fast ? ErrMsg.FAST : ErrMsg.field(_bad,"Unknown",_fld,is_closure,to);
-    throw unimpl();
   }
 }

@@ -451,7 +451,7 @@ public class Parse implements Comparable<Parse> {
     Node mem = mem();
     Node stk = gvn(new LoadNode(mem,ptr,badf));
     Node stk2 = gvn(new SetFieldNode(tok,mutable,stk,Node.peek(iidx),badf));
-    StoreNode st = new StoreNode(mem,ptr,stk2,badf);
+    Node st = new StoreNode(mem,ptr,stk2,badf);
     scope.replace_mem(st);
     if( !create )               // Note 1-side-of-if update
       scope.def_if(tok,mutable,false);
@@ -487,18 +487,24 @@ public class Parse implements Comparable<Parse> {
     set_ctrl(gvn(new CProjNode(ifex,0))); // Control for false branch
     Node f_exp = peek(':') ? stmt(false) : Env.XNIL;
     if( f_exp == null ) f_exp = err_ctrl2("missing expr after ':'");
-    Node f_ctl = ctrl();
-    Node f_mem = mem ();
-
-    Node t_mem = Node.pop(t_mem_x);
-    Node t_ctl = Node.pop(t_ctl_x);
-    t_exp      = Node.pop(t_exp_x);
 
     Node ptr = get_display_ptr(scope()); // Pointer, possibly loaded up the display-display
     Parse bad = errMsg();
+
+    Node t_mem = Node.peek(t_mem_x);
+    Node t_ctl = Node.peek(t_ctl_x);
+    t_exp      = Node.peek(t_exp_x);
+    Node f_mem = mem ();
+    Node f_ctl = ctrl();
+    int f_exp_x = f_exp.push();
+
     t_mem = scope().check_if(true ,ptr,bad,t_ctl,t_mem); // Insert errors if created only 1 side
     f_mem = scope().check_if(false,ptr,bad,f_ctl,f_mem); // Insert errors if created only 1 side
     scope().pop_if();         // Pop the if-scope
+    f_exp = Node.pop(f_exp_x);
+    t_mem = Node.pop(t_mem_x);
+    t_ctl = Node.pop(t_ctl_x);
+    t_exp = Node.pop(t_exp_x);
 
     // Merge results
     RegionNode r = set_ctrl(init(new RegionNode(null,t_ctl,f_ctl)));
@@ -1491,7 +1497,10 @@ public class Parse implements Comparable<Parse> {
     Node mmem = mem();
     while( true ) {
       if( scope == e._scope ) return ptr;
-      StructNode dsp = (StructNode)gvn(new LoadNode(mmem,ptr,null)); // Gen linked-list walk code, walking display slot
+      Node dsp = gvn(new LoadNode(mmem,ptr,null)); // Gen linked-list walk code, walking display slot
+      while( dsp instanceof SetFieldNode ) // Bypass partial frame updates
+        dsp = dsp.in(0); // Never set the display, so bypass
+      assert dsp instanceof StructNode;
       ptr = (ProjNode)gvn(new FieldNode(dsp,"^"));
       e = e._par;                                 // Walk linked-list in parser also
     }

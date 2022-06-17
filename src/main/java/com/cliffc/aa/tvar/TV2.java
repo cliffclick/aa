@@ -149,8 +149,8 @@ public class TV2 {
   public boolean is_leaf() { return _args==null && _flow==null && !_is_obj && !_is_fun; }
   public boolean is_unified(){return _get(">>")!=null; }
   public boolean is_nil () { return _get("?" )!=null; }
-  public boolean is_base() { return _flow != null && !(_flow instanceof TypeMemPtr); }
-  public boolean is_ptr () { return _flow instanceof TypeMemPtr; }
+  public boolean is_base() { return _flow != null; }
+  public boolean is_ptr () { return _get("*")!=null; }
   public boolean is_fun () { return _is_fun; }
   public boolean is_obj () { return _is_obj; }
   public boolean is_open() { return _open; }           // Struct-specific
@@ -337,7 +337,7 @@ public class TV2 {
     TV2 n = arg("?");
     if( n.is_leaf() ) return this;
     _args.remove("?");  // No longer have the "?" key, not a nilable anymore
-    _args.put("??",n);  // For hm_apply_lift, keep around the prior mapping
+    //_args.put("??",n);  // For hm_apply_lift, keep around the prior mapping
     _add_nil(n);
     if( _args.size()==0 ) _args=null;
     n.merge_deps(this);

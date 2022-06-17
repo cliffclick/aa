@@ -50,7 +50,7 @@ public class StructNode extends Node {
   // Example:  012345678
   // _fld_starts[0]==2, offset to the openning paren
   // _fld_starts[1]==4, offset to start of zeroth arg
-  // _fld_starts[2]==7, offset to start of oneth arg
+  // _fld_starts[2]==6, offset to start of oneth arg
   private Ary<Parse> _fld_starts;
 
   public StructNode(boolean is_closure, boolean forward_ref, Parse bad_start) {
@@ -92,7 +92,7 @@ public class StructNode extends Node {
   public TypeFld get(String name) { return _ts.get(name); }
 
   // String to a BOUND node: if field name maps to a FunPtrNode or an
-  // UnresolvedNode, return the bound version instead.  Otherwise
+  // UnresolvedNode, return the bound version instead.  Otherwise,
   // return the Node as-is, or null if the name misses.
   public Node in_bind( String fld, Node clz ) {
     int idx = find(fld);
@@ -101,7 +101,7 @@ public class StructNode extends Node {
     if( n instanceof FunPtrNode fptr )
       return new FunPtrNode(fptr._name,fptr.ret(),clz).init();
     else if( n instanceof UnresolvedNode unr )
-      return ((UnresolvedNode)unr.copy(true)).set_bad(null).set_def(0,clz);
+      return ((UnresolvedNode)unr.copy(true)).set_def(0,clz);
     // No binding to address, e.g. loading a global constant
     return n;
   }
@@ -160,6 +160,25 @@ public class StructNode extends Node {
     set_ts(_ts.pop_fld(len()));
   }
 
+  // Remove a field, preserving order.  For reseting primitives for multi-testing
+  public void remove_fld(int idx) {
+    set_ts(_ts.remove_fld(idx));
+    remove(idx);
+    _fld_starts.remove(idx+1);
+  }
+
+  // Set a replacement field in a Struct.  Fails if trying to replace a final
+  // field.
+  boolean set_fld(String id, Access access, Node val) {
+    int idx = find(id);
+    TypeFld fld = _ts.get(idx);
+    if( fld._access == Access.Final ) return false;
+    TypeStruct ts = _ts.replace_fld(fld.make_from(fld._t,access));
+    set_ts(ts);
+    set_def(idx,val);
+    return true;
+  }
+
   // The current local scope ends, no more names will appear.  Forward refs
   // first found in this scope are assumed to be defined in some outer scope
   // and get promoted.  Other locals are no longer kept alive, but live or die
@@ -212,10 +231,11 @@ public class StructNode extends Node {
     // Do not allocate a TV2 unless we need to pick up fields.
     boolean progress = false;
     TV2 rec = tvar();
-    if( rec.is_leaf() ) {
+    if( !rec.is_obj() ) {
       if( test ) return true;
-      progress = _tvar.unify(rec=TV2.make_struct(this,"init_struct"),test);
+      progress = rec.unify(rec=TV2.make_struct(this,"init_struct"),test);
     }
+
     assert check_fields(rec);
     rec.push_dep(this);
 

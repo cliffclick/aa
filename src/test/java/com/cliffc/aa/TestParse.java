@@ -27,10 +27,10 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=true;
-    DO_GCP=false;
+    DO_HMT=false;
+    DO_GCP=true;
     RSEED=0;
-    test   ("math.rand(1) ? 1 : 2","int:nint8", "int:nint8"); // no ambiguity between conditionals and type annotations
+    test   ("math.rand(1)?@{}","@{^=@{^=*[5]()?}}","@{^=@{^=A}?}?");
   }
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
@@ -189,9 +189,9 @@ public class TestParse {
     testerr("math.rand(1)?1: :2:int","missing expr after ':'",16); // missing type
     testerr("math.rand(1)?1::2:int","missing expr after ':'",15); // missing type
     test   ("math.rand(1)?1","int:int1","int:int1"); // Missing optional else defaults to nil
-    test   ("x:=0;math.rand(1)?(x:=1);x",":int1","int:1");
+    test   ("x:=0;math.rand(1)?(x:=1);x","int:int1","int:int1");
     testerr("a.b.c();","Unknown ref 'a'",0);
-    test   ("math.rand(1)?@{}","","");
+    test   ("math.rand(1)?@{}","@{^=@{^=*[5]()?}}","@{^=@{^=A}?}?");
   }
 
   // Short-circuit tests
@@ -960,6 +960,13 @@ HashTable = {@{
         TV2 actual = te._hmt;
         String actual_str = actual.p();
         assertEquals(stripIndent(hmt_expect),stripIndent(actual_str));
+      }
+      // Track expected Root escapes
+      if( gcp != null && hmt_expect != null ) {
+        BitsFun   fidxs   = BitsFun  .EMPTY;
+        BitsAlias aliases = BitsAlias.EMPTY;
+        assertEquals(fidxs  ,te._fidxs  );
+        assertEquals(aliases,te._aliases);
       }
     }
   }

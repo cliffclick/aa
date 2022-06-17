@@ -36,7 +36,7 @@ public class UnresolvedNode extends Node {
     };
     return s+_name;
   }
-  UnresolvedNode set_bad(Parse bad) { assert _bad==null; _bad=bad; return this; }
+  UnresolvedNode set_bad(Parse bad) { _bad=bad; return this; }
 
   @Override public Type value() {
     if( is_forward_ref() ) return TypeFunPtr.GENERIC_FUNPTR;

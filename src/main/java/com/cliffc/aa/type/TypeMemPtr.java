@@ -93,6 +93,8 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
     TypeMemPtr tmp = malloc(aliases.test(0),aliases.clear(0),null);
     if( cid!=null ) P._dups.put(cid,tmp);
     tmp._obj = (TypeStruct)P.type();
+    if( P.peek('?') )
+      tmp = (TypeMemPtr)tmp.meet(TypeNil.XNIL);
     return tmp;
   }
 

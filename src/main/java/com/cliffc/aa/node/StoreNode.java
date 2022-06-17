@@ -80,7 +80,7 @@ public class StoreNode extends Node {
     // Is this Store dead from below?
     if( mem==this ) return null; // Dead self-cycle
     if( ta.above_center() ) return mem; // All memory is high, so dead
-    if( tmp!=null && mem._val instanceof TypeMem tvm ) {
+    if( tmp!=null && mem._val instanceof TypeMem ) {
       TypeStruct ts0 = (_live instanceof TypeMem tm ? tm : _live.oob(TypeMem.ALLMEM)).ld(tmp);
       if( ts0.above_center() )  // Dead from below
         return mem;
@@ -102,16 +102,15 @@ public class StoreNode extends Node {
     //// Happens inside value constructors.
     //if( adr instanceof NewNode nnn && nnn._is_val && _fold(nnn) )
     //  return mem;
-    //
-    //// Store into a NewNode, same memory and address
-    //if( mem instanceof MrgProjNode mrg && mrg.nnn() == adr &&
-    //    // Do not bypass a parallel writer
-    //    mem.check_solo_mem_writer(this) &&
-    //    // Test for folding
-    //    _fold(mrg.nnn()) ) {
-    //  mem.xval();
-    //  return mem;
-    //}
+
+    // Store into a NewNode, same memory and address
+    if( mem instanceof MProjNode && adr instanceof ProjNode && mem.in(0) == adr.in(0) && mem.in(0) instanceof NewNode nnn &&
+        // Do not bypass a parallel writer
+        mem.check_solo_mem_writer(this) ) {
+      StructNode st = _fold(rez());
+      Env.GVN.revalive(st,mem.in(0),mem);
+      return st==null ? null : mem;
+    }
     //
     //// If Store is of a MemJoin and it can enter the split region, do so.
     //// Requires no other memory *reader* (or writer), as the reader will
@@ -128,26 +127,16 @@ public class StoreNode extends Node {
     return null;
   }
 
-  // See if we can fold this Store into this New.
-  private boolean _fold( StructNode nnn ) {
-    // Find the field being updated
-    //TypeFld tfld = nnn.get(_fld);
-    //if( tfld== null ) return false;
-    //// Folding unambiguous functions?
-    //if( rez() instanceof FunPtrNode || rez() instanceof UnresolvedNode ) {
-    //  if( rez().is_forward_ref() ) return false;
-    //  nnn.add_fun(_fld, _fin, (FunPtrNode) rez(), _bad); // Stacked FunPtrs into an Unresolved
-    //  // Field is modifiable; update New directly.
-    //} else if( tfld._access==Access.RW )
-    //  //nnn.set_fld(tfld.make_from(tfld._t,_fin),rez()); // Update the value, and perhaps the final field
-    //  throw unimpl();
-    //else  return false;      // Cannot fold
-    //nnn.xval();
-    //Env.GVN.add_flow_uses(this);
-    //add_reduce_extra();     // Folding in allows store followers to fold in
-    //return true;            // Folded.
-    throw unimpl();
+  // Recursively collapse a set of SetFields into a single-use StructNode
+  static StructNode _fold(Node rez) {
+    if( rez instanceof StructNode st ) return st;
+    SetFieldNode sfn = (SetFieldNode)rez;
+    StructNode st = _fold(sfn.in(0));
+    if( st==null || !st.set_fld(sfn._fld,sfn._fin,sfn.in(1)) )
+      return null;
+    return st;
   }
+
 
   @Override public Node ideal_grow() {
     Node mem = mem();

@@ -91,6 +91,37 @@ public class SetFieldNode extends Node {
     return ErrMsg.field(_badf,msg,_fld,false,to);
   }
 
+  @Override public Node ideal_reduce() {
+    Node in0 = in(0);
+    // SetField directly against a Struct; just use the Struct.
+    if( in0 instanceof StructNode st ) {
+      int idx = st.find(_fld);
+      if( in(1) == st.in(idx) ) return st; // Storing same over same, no change
+
+      // TODO: When profitable to replicate a StructNode ?
+    }
+    
+    //// Find the field being updated
+    //StructNode rec = nnn.rec();
+    //TypeFld tfld = rec.get(_fld);
+    //if( tfld== null ) return false;
+    //// Folding unambiguous functions?
+    //if( rez() instanceof FunPtrNode || rez() instanceof UnresolvedNode ) {
+    //  if( rez().is_forward_ref() ) return false;
+    //  nnn.add_fun(_fld, _fin, (FunPtrNode) rez(), _bad); // Stacked FunPtrs into an Unresolved
+    //  // Field is modifiable; update New directly.
+    //} else if( tfld._access==Access.RW )
+    //  //nnn.set_fld(tfld.make_from(tfld._t,_fin),rez()); // Update the value, and perhaps the final field
+    //  throw unimpl();
+    //else  return false;      // Cannot fold
+    //nnn.xval();
+    //Env.GVN.add_flow_uses(this);
+    //add_reduce_extra();     // Folding in allows store followers to fold in
+    //return true;            // Folded.
+    return null;
+  }
+
+
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode()+_fin.hashCode(); }
   // Stores are can be CSE/equal, and we might force a partial execution to
   // become a total execution (require a store on some path it didn't happen).

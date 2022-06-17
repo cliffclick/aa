@@ -182,4 +182,10 @@ public class TypeFlds {
   public static TypeFld[] pop( TypeFld[] flds ) {
     return hash_cons(copyOf(flds,flds.length-1));
   }
+  public static TypeFld[] remove( TypeFld[] flds, int idx ) {
+    TypeFld[] fs = get(flds.length-1);
+    if( idx >= 0 ) System.arraycopy(flds, 0, fs, 0, idx);
+    for( int i=idx+1; i<flds.length; i++ ) fs[i-1] = flds[i];
+    return hash_cons(fs);
+  }
 }

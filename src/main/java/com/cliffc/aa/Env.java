@@ -156,7 +156,12 @@ public class Env implements AutoCloseable {
       RetNode ret = RetNode.get(tfp._fidxs);
       if( ret != null ) formals = ret.formals();
     }
+    TypeTuple ttroot = (TypeTuple)Env.ROOT._val;
+    BitsFun   fidxs   = ((TypeFunPtr)ttroot.at(0))._fidxs  ;
+    BitsAlias aliases = ((TypeMemPtr)ttroot.at(1))._aliases;
     return new TypeEnv(rez._val,
+                       fidxs,   // Escaping FIDXS
+                       aliases, // Escaping ALIASES
                        formals,
                        mem instanceof TypeMem ? (TypeMem)mem : mem.oob(TypeMem.ALLMEM),
                        AA.DO_HMT && rez.has_tvar() ? rez.tvar() : null,
@@ -208,11 +213,12 @@ public class Env implements AutoCloseable {
   public static void top_reset() {
     ROOT.reset();
     // Kill all undefined values, which promote up to the top level
-    Node c;
-    while( !(c=STK_0._defs.last()).is_prim() ) {
-      while( c.len()>0 ) c.pop();
-      GVN.add_dead(c);
-      STK_0.pop_fld();
+    for( int i=0; i<STK_0.len(); i++ ) {
+      Node c = STK_0.in(i);
+      if( !c.is_prim() ) {
+        GVN.add_dead(c);
+        STK_0.remove_fld(i--);
+      }
     }
     // Clear out the dead before clearing VALS, since they may not be reachable and will blow the elock assert
     GVN.iter_dead();

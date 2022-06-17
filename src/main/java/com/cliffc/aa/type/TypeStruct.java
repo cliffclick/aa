@@ -729,6 +729,9 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     assert idx==_flds.length-1;
     return make_from(TypeFlds.pop(_flds));
   }
+  public TypeStruct remove_fld(int idx) {
+    return make_from(TypeFlds.remove(_flds,idx));
+  }
 
   // Update (approximately) the current TypeStruct.  Updates the named field.
   public TypeStruct update(Access fin, String name, Type val) {

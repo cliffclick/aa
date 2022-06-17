@@ -237,10 +237,10 @@ public class ScopeNode extends Node {
       for( String name : vars.keySet() ) {
         String msg = "'"+name+"' not defined on "+arm+" arm of trinary";
         // Exactly like a parser store of an error, on the missing side
-        Node ld  = new LoadNode(mem,ptr,bad).init();
-        Node err = new ErrNode(ctrl,bad,msg).init();
-        Node setf= new SetFieldNode(name,Access.Final,ld,err,bad).init();
-        mem = new StoreNode(mem,ptr,setf,bad).init();
+        Node ld  = Env.GVN.xform(new LoadNode(mem,ptr,bad));
+        Node err = Env.GVN.xform(new ErrNode(ctrl,bad,msg));
+        Node setf= Env.GVN.xform(new SetFieldNode(name,Access.Final,ld,err,bad));
+        mem = Env.GVN.xform(new StoreNode(mem,ptr,setf,bad));
       }
       return mem;
     }
