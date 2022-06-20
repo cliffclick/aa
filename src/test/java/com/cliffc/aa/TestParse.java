@@ -30,7 +30,7 @@ public class TestParse {
     DO_HMT=false;
     DO_GCP=true;
     RSEED=0;
-    test("1 && 2", "int:2","int:2");
+    testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
   }
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
@@ -197,22 +197,21 @@ public class TestParse {
   @Test public void testParse01a() {
     test("0 && 0", "xnil","A?");
     test("1 && 2", "int:2","int:2");
-    test("0 && 2", TypeNil.NIL);
-    test("0 || 0", TypeNil.NIL);
-    test("0 || 2", TypeInt.con(2));
-    test("1 || 2", TypeInt.con(1));
-    test("0 && 1 || 2 && 3", TypeInt.con(3));    // Precedence
+    test("0 && 2", "xnil","A?");
+    test("0 || 0", "xnil","A?");
+    test("0 || 2", "int:2","int:2");
+    test("1 || 2", "int:1","int:1");
+    test("0 && 1 || 2 && 3", "int:3","int:3");    // Precedence
 
-    //test_obj("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
-    //         TypeStruct.make_test(TypeInt.con(1),TypeNil.NIL,TypeNil.NIL));
-    //test_obj("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
-    //         TypeStruct.make_test(TypeInt.con(2),TypeInt.con(1),TypeNil.NIL));
-    //test("(x=1) && x+2", TypeInt.con(3)); // Def x in 1st position
-    //
-    //testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
-    //testerr("0 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x definitely not alive
-    //test("math.rand(1) && (x=2;x*x) || 3 && 4", TypeInt.INT8); // local use of x in short-circuit; requires unzip to find 4
-    throw unimpl();
+    test("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
+         "(int:1, xnil,xnil)","(int:1,A?,B?)");
+    test("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
+         "(int:2, int:1, xnil)","(int:2,int:1,A?)");
+    test("(x=1) && x+2", "int:3", "int:3"); // Def x in 1st position
+
+    testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
+    testerr("0 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x definitely not alive
+    test("math.rand(1) && (x=2;x*x) || 3 && 4", "int:int8", "int:int8"); // local use of x in short-circuit; requires unzip to find 4
   }
 
   @Test public void testParse02() {

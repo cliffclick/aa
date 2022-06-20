@@ -81,11 +81,6 @@ public class Env implements AutoCloseable {
   static {
     // Top-level or common default values
 
-    // The Universe outside the parse program
-    ROOT  = keep(new RootNode());
-    // Initial control & memory
-    CTL_0 = keep(new CProjNode(ROOT,0));
-    MEM_0 = keep(new MProjNode(ROOT,MEM_IDX));
     // Common constants
     ANY   = keep(new ConNode<>(Type.ANY   ));
     ALL   = keep(new ConNode<>(Type.ALL   ));
@@ -97,6 +92,12 @@ public class Env implements AutoCloseable {
     UNUSED= keep(new ConNode<>(TypeStruct.UNUSED));
     ALLMEM= keep(new ConNode<>(TypeMem.ALLMEM));
     XMEM  = keep(new ConNode<>(TypeMem.ANYMEM));
+
+    // The Universe outside the parse program
+    ROOT  = keep(new RootNode());
+    // Initial control & memory
+    CTL_0 = keep(new CProjNode(ROOT,0));
+    MEM_0 = keep(new MProjNode(ROOT,MEM_IDX));
 
     // All the Calls in the Universe, which might call somebody.
     ALL_CALL=keep(new ProjNode(ROOT,2));
@@ -218,6 +219,7 @@ public class Env implements AutoCloseable {
   // many top-level parses happen in a row.
   public static void top_reset() {
     ROOT.reset();
+    unhook_last(ROOT);
     // Kill all undefined values, which promote up to the top level
     for( int i=0; i<STK_0.len(); i++ ) {
       Node c = STK_0.in(i);
@@ -227,10 +229,10 @@ public class Env implements AutoCloseable {
       }
     }
     // Clear out the dead before clearing VALS, since they may not be reachable and will blow the elock assert
-    GVN.iter_dead();
     unhook_last(STK_0);
     unhook_last(CTL_0);
     unhook_last(MEM_0);
+    GVN.iter_dead();
     TV2.reset_to_init0();
     Node.VALS.clear();          // Clean out hashtable
     GVN.flow_clear();
@@ -253,9 +255,8 @@ public class Env implements AutoCloseable {
   static private void unhook_last(Node n) {
     Node c;
     while( !(c=n._uses.last()).is_prim() ) {
-    //  while( c.len()>0 ) c.pop();
-    //  GVN.add_dead(c);
-      throw unimpl();
+      while( c.len()>0 ) c.pop();
+      GVN.add_dead(c);
     }
   }
 

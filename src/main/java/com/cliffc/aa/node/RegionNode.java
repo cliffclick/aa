@@ -5,6 +5,8 @@ import com.cliffc.aa.type.Type;
 
 import java.util.function.Predicate;
 
+import static com.cliffc.aa.AA.DSP_IDX;
+
 // Merge results.  Supports many merging paths; used by FunNode and LoopNode.
 public class RegionNode extends Node {
   public RegionNode( Node... ctrls) { super(OP_REGION,ctrls); }
@@ -76,6 +78,15 @@ public class RegionNode extends Node {
       if( this instanceof FunNode && ((FunNode)this).ret()==null )
         Env.GVN.add_reduce(this);
     }
+    // Dropped a display Parm from a function, all FunPtrs might want to drop
+    // their display input as being dead.
+    if( chg instanceof ParmNode parm && parm._idx==DSP_IDX ) {
+      RetNode ret = ((FunNode)this).ret();
+      if( ret != null )
+        for( Node fptr : ret._uses )
+          if( fptr instanceof FunPtrNode )
+            Env.GVN.add_reduce(fptr);
+    }
   }
 
   // Collapse stacked regions.
@@ -121,7 +132,7 @@ public class RegionNode extends Node {
 
   @Override public Type value() {
     if( in(0)==this )           // is_copy
-      return _defs._len>=2 ? val(1) : Type.XCTRL; 
+      return _defs._len>=2 ? val(1) : Type.XCTRL;
     for( int i=1; i<_defs._len; i++ ) {
       if( in(i)==this ) continue; // Ignore self-loop
       Type c = val(i);

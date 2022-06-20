@@ -22,13 +22,6 @@ public class ConNode<T extends Type> extends Node {
     return _t==null ? "(null)" : _t.toString();
   }
 
-  @SuppressWarnings("unchecked")
-  public void set_alias(int alias,TypeStruct ts) {
-    unelock();                  // Changing hash
-    _t = (T)((TypeMem)_t).make_from(alias,ts);
-    Env.GVN.add_flow(this);
-  }
-
   @Override public Type value() { return _t; }
 
   @Override public boolean has_tvar() {

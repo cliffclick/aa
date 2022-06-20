@@ -72,6 +72,7 @@ public class StoreNode extends Node {
   }
 
   @Override public Node ideal_reduce() {
+    if( _live == Type.ANY ) return null; // Dead from below; nothing fancy just await removal
     Node mem = mem();
     Node adr = adr();
     Type ta = adr._val;

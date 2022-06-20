@@ -66,7 +66,7 @@ public abstract class PrimNode extends Node {
       new EQ_I64 (), new NE_I64 (),
       new EQ_IF64(), new NE_IF64(),
       new AndI64 (), new AndThen(),
-      new OrI64  (),
+      new OrI64  (), new OrElse(),
     };
 
     PrimNode[] FLTS = new PrimNode[]{
@@ -232,17 +232,6 @@ public abstract class PrimNode extends Node {
       }
     }
     return is_con ? apply(TS) : (has_high ? _ret.dual() : _ret);
-  }
-
-  @Override public Node ideal_reduce() {
-    if( _live != Type.ANY ) return null;
-    //Node progress=null;
-    //for( int i=DSP_IDX; i<_defs._len; i++ )
-    //  if( in(i)!=Env.ANY ) progress=set_def(i,Env.ANY);
-    //return progress;
-
-    // Kill prim inputs if dead??? Expect this to be dead-from-below?
-    throw unimpl();
   }
 
   @Override public boolean has_tvar() { return true; }
@@ -579,17 +568,12 @@ public abstract class PrimNode extends Node {
     public AndThen() { super("&&",true/*lazy*/,ANDTHEN,TypeTuple.RET); }
     @Override public Type apply(Type[] ts) { throw unimpl(); }
     @Override public Type value() { return TypeTuple.RET; }
-  //  @Override public TypeMem live_use(Node def ) {
-  //    if( def==in(0) ) return TypeMem.ALIVE; // Control
-  //    if( def==in(1) ) return TypeMem.ALLMEM; // Force maximal liveness, since will inline
-  //    return TypeMem.ALIVE; // Force maximal liveness, since will inline
-  //  }
-
     // Expect this to inline everytime
     @Override public Node ideal_grow() {
       // Do not expand the base primitive, only clones.  This allows the base
       // primitive to inline as a primitive in all contexts.
       if( is_prim() ) return null; // Do not expand the base primitive, only clones
+      if( len() <= ARG_IDX ) return null; // Already expanded
       // Once inlined, replace with an if/then/else diamond.
       Node ctl = in(CTL_IDX);
       Node mem = in(MEM_IDX);
@@ -615,8 +599,6 @@ public abstract class PrimNode extends Node {
         set_def(MEM_IDX,phim);
         set_def(REZ_IDX,phi );
         pop();                  // Remove args, trigger is_copy
-        //X.init(this);
-        for( Node use : _uses ) Env.GVN.add_reduce(use);
         return this;
       }
     }
@@ -630,60 +612,57 @@ public abstract class PrimNode extends Node {
       return _defs._len==ARG_IDX+1 ? null : in(idx);
     }
   }
-  //
-  //// Classic '||' short-circuit.  The RHS is a *Thunk* not a value.  Inlines
-  //// immediate into the operators' wrapper function, which in turn aggressively
-  //// inlines during parsing.
-  //public static class OrElse extends PrimNode {
-  //  private static final TypeStruct ORELSE = TypeStruct.make2flds("pred",Type.SCALAR,"thunk",Type.SCALAR);
-  //  // Takes a value on the LHS, and a THUNK on the RHS.
-  //  public OrElse() { super("||",ORELSE,Type.SCALAR); _thunk_rhs=true; }
-  //  // Expect this to inline everytime
-  //  @Override public Node ideal_grow() {
-  //    if( _defs._len != ARG_IDX+1 ) return null; // Already did this
-  //    try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
-  //      Node ctl = in(CTL_IDX);
-  //      Node mem = in(MEM_IDX);
-  //      Node lhs = in(DSP_IDX);
-  //      Node rhs = in(ARG_IDX);
-  //      // Expand to if/then/else
-  //      Node iff = X.xform(new IfNode(ctl,lhs));
-  //      Node fal = X.xform(new CProjNode(iff,0));
-  //      Node tru = X.xform(new CProjNode(iff,1));
-  //      // Call on false branch; if true do not call.
-  //      Node cal = X.xform(new CallNode(true,_badargs,fal,mem,rhs));
-  //      //Node cep = X.xform(new CallEpiNode(cal,Env.DEFMEM));
-  //      //Node ccc = X.xform(new CProjNode(cep));
-  //      //Node memc= X.xform(new MProjNode(cep));
-  //      //Node rez = X.xform(new  ProjNode(cep,AA.REZ_IDX));
-  //      //// Region merging results
-  //      //Node reg = X.xform(new RegionNode(null,tru,ccc));
-  //      //Node phi = X.xform(new PhiNode(Type.SCALAR,null,reg,lhs,rez ));
-  //      //Node phim= X.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
-  //      //// Plug into self & trigger is_copy
-  //      //set_def(0,reg );
-  //      //set_def(1,phim);
-  //      //set_def(2,phi );
-  //      //pop();   pop();     // Remove args, trigger is_copy
-  //      //X.add(this);
-  //      //for( Node use : _uses ) X.add(use);
-  //      //return null;
-  //      throw unimpl();
-  //    }
-  //  }
-  //  @Override public Type value() {
-  //    return TypeTuple.RET;
-  //  }
-  //  @Override public TypeMem live_use(Node def ) {
-  //    if( def==in(0) ) return TypeMem.ALIVE; // Control
-  //    if( def==in(1) ) return TypeMem.ALLMEM; // Force maximal liveness, since will inline
-  //    return TypeMem.ALIVE; // Force maximal liveness, since will inline
-  //  }
-  //  //@Override public TV2 new_tvar(String alloc_site) { return TV2.make("Thunk",this,alloc_site); }
-  //  @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
-  //  @Override public Node is_copy(int idx) {
-  //    return _defs._len==ARG_IDX+2 ? null : in(idx);
-  //  }
-  //}
+
+  // Classic '||' short-circuit.  Lazy in the RHS, so passed a 'thunk', a
+  // zero-argument function to be evaluated if the LHS is false.
+  public static class OrElse extends PrimNode {
+    private static final TypeTuple ORELSE = TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, Type.ALL, TypeFunPtr.THUNK); // {val tfp -> val }
+    // Takes a value on the LHS, and a THUNK on the RHS.
+    public OrElse() { super("||",true/*lazy*/,ORELSE,TypeTuple.RET); }
+    @Override public Type apply(Type[] ts) { throw unimpl(); }
+    @Override public Type value() { return TypeTuple.RET; }
+    // Expect this to inline everytime
+    @Override public Node ideal_grow() {
+      // Do not expand the base primitive, only clones.  This allows the base
+      // primitive to inline as a primitive in all contexts.
+      if( is_prim() ) return null; // Do not expand the base primitive, only clones
+      if( len() <= ARG_IDX ) return null; // Already expanded
+      Node ctl = in(CTL_IDX);
+      Node mem = in(MEM_IDX);
+      Node lhs = in(DSP_IDX);
+      Node rhs = in(ARG_IDX);
+      // Expand to if/then/else
+      try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
+        // Expand to if/then/else
+        Node iff = X.xform(new IfNode(ctl,lhs));
+        Node fal = X.xform(new CProjNode(iff,0));
+        Node tru = X.xform(new CProjNode(iff,1));
+        // Call on false branch; if true do not call.
+        Node cal = X.xform(new CallNode(true,_badargs,fal,mem,rhs));
+        Node cep = X.xform(new CallEpiNode(cal));
+        Node ccc = X.xform(new CProjNode(cep));
+        Node memc= X.xform(new MProjNode(cep));
+        Node rez = X.xform(new  ProjNode(cep,AA.REZ_IDX));
+        // Region merging results
+        Node reg = X.init(new RegionNode(null,tru,ccc));
+        Node phi = X.init(new PhiNode(Type.ALL,null,reg,lhs,rez ));
+        Node phim= X.init(new PhiNode(TypeMem.ALLMEM,null,reg,mem,memc ));
+        // Plug into self & trigger is_copy
+        set_def(CTL_IDX,reg );
+        set_def(MEM_IDX,phim);
+        set_def(REZ_IDX,phi );
+        pop();                // Remove args, trigger is_copy
+        return this;
+      }
+    }
+    // Unify trailing result ProjNode with the AndTHen directly.
+    @Override public boolean unify_proj( ProjNode proj, boolean test ) {
+      assert proj._idx==REZ_IDX;
+      return tvar().unify(proj.tvar(),test);
+    }
+    @Override public Node is_copy(int idx) {
+      return _defs._len==ARG_IDX+1 ? null : in(idx);
+    }
+  }
 
 }

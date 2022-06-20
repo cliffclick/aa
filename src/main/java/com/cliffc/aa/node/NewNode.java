@@ -48,7 +48,7 @@ public class NewNode extends Node {
     Type t  = rec()._val;
     if( !(tm instanceof TypeMem tmem ) ) return tm.oob(TypeMem.ALLMEM);
     if( !(t  instanceof TypeStruct ts) ) return t .oob(TypeMem.ALLMEM);
-    return tmem.make_from(_alias,ts);
+    return tmem.make_from_unused(_alias,ts);
   }
 
 

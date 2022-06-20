@@ -447,7 +447,7 @@ public class Parse implements Comparable<Parse> {
       scope = scope();          // Create in the current scope
       StructNode stk = scope.stk();
       TypeFld fld = TypeFld.make(tok,t,Access.RW);
-      stk.add_fld(fld, con(TypeNil.XNIL),badf); // Create at top of scope as undefined
+      stk.add_fld(fld, Env.XNIL,badf); // Create at top of scope as undefined
       scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
     }
     Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
@@ -600,6 +600,7 @@ public class Parse implements Comparable<Parse> {
   // Parse a RHS operand into a 'thunk', a zero-arg function.
   // Function takes in memory, display
   private Node _lazy_expr(Oper op) {
+    int rhsx = _x;
     Env outer = _e;
     FunNode fun = new FunNode(3); // ctrl, mem, display
     init(fun.add_def(init(new CRProjNode(fun._fidx))));
@@ -632,6 +633,17 @@ public class Parse implements Comparable<Parse> {
       // The FunPtr builds a real display; any up-scope references are passed in now.
       Node fptr = gvn(new FunPtrNode(ret,outer._scope.ptr()));
       fptr_idx = fptr.push(); // Return function; close-out and DCE 'e'
+
+      // Extra variables in the short-circuit are not available afterwards.
+      // Set them to Err.
+      for( int i=1; i<stk._defs._len; i++ ) {
+        String fname = stk.get(i)._fld;
+        String msg = "'"+fname+"' not defined prior to the short-circuit";
+        Parse bad = errMsg(rhsx);
+        Node err = gvn(new ErrNode(ctrl(),bad,msg));
+        do_store(null,err,Access.Final,fname,bad,TypeNil.SCALAR,bad);
+      }
+
     }
     return Node.pop(fptr_idx);
   }
@@ -776,6 +788,7 @@ public class Parse implements Comparable<Parse> {
     // Now properly load from the display.
     Node ptr = get_display_ptr(scope);
     Node ld = gvn(new LoadNode(mem(),ptr,null));
+    int ld_x = ld.push();
     Node n = gvn(new FieldNode(ld,tok));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl1(ErrMsg.forward_ref(this,((FunPtrNode)n)));
@@ -785,10 +798,13 @@ public class Parse implements Comparable<Parse> {
     Node inc = con(TypeStruct.make_int(TypeInt.con(d)));
     Node sum = do_call(errMsgs(_x-2,_x,_x), args(plus,inc));
     Parse bad = errMsg();
-    Node stf = gvn(new SetFieldNode(tok,Access.RW,ld,sum,bad));
+    Node stf = gvn(new SetFieldNode(tok,Access.RW,Node.peek(ld_x),sum,bad));
     // Active memory for the chosen scope, after the call to plus
     scope().replace_mem(new StoreNode(mem(),ptr,stf,bad));
-    return Node.pop(nidx);      // Return pre-increment value
+    n = Node.pop(nidx); // Pre-increment value
+    Env.GVN.add_reduce(n);
+    Node.pop(ld_x);     // No longer need
+    return n;      // Return pre-increment value
   }
 
 
@@ -882,7 +898,7 @@ public class Parse implements Comparable<Parse> {
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
   private StructNode tuple(int oldx, Node s, int first_arg_start) {
-    StructNode nn = new StructNode(false,false,errMsg(oldx));
+    StructNode nn = new StructNode(false,false,errMsg(oldx)).init();
     // First stmt is parsed already
     Parse bad = errMsg(first_arg_start);
     while( s!= null ) {         // More args
@@ -891,7 +907,9 @@ public class Parse implements Comparable<Parse> {
       if( !peek(',') ) break;   // Final comma is optional
       skipWS();                 // Skip to arg start before recording arg start
       bad = errMsg();           // Record arg start
+      int nn_x = nn.push();
       s = stmts();              // Parse arg
+      nn = (StructNode)Node.pop(nn_x);
     }
     require(')',oldx);          // Balanced closing paren
     return init(nn.close());    // No more field, init and return
@@ -1410,7 +1428,7 @@ public class Parse implements Comparable<Parse> {
     // Display is a linked list of displays, and we already checked that token
     // exists at scope up in the display.
     Env e = _e;
-    ProjNode ptr = e._scope.ptr();
+    Node ptr = e._scope.ptr();
     Node mmem = mem();
     while( true ) {
       if( scope == e._scope ) return ptr;
@@ -1418,7 +1436,7 @@ public class Parse implements Comparable<Parse> {
       while( dsp instanceof SetFieldNode ) // Bypass partial frame updates
         dsp = dsp.in(0); // Never set the display, so bypass
       assert dsp instanceof StructNode;
-      ptr = (ProjNode)gvn(new FieldNode(dsp,"^"));
+      ptr = gvn(new FieldNode(dsp,"^"));
       e = e._par;                                 // Walk linked-list in parser also
     }
   }

@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.ErrMsg;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
 
 /** Error nodes.  If any remain in the program after optimization, the program
  *  is not well-typed. */
@@ -24,7 +23,7 @@ public final class ErrNode extends Node {
   }
   @Override public Type live_use( Node def ) { return Type.ALL; }
   @Override public boolean has_tvar() { return true; }
-  
+
   @Override public ErrMsg err( boolean fast ) {
     // While you might think we should ALWAYS report these, as their existence
     // means the program is in-error - the program may have other earlier

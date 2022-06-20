@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
@@ -468,7 +469,7 @@ public class FunNode extends RegionNode {
   // without a full GCP pass - which means we split_size but then cannot inline
   // in CEPI because the Ret memory type will never lift to the default memory.
   private int split_size( Ary<Node> body, Node[] parms ) {
-    if( _defs._len <= 1 ) return -1; // No need to split callers if only 2
+    if( _defs._len <= 1 ) return -1; // No need to split callers if only 1
     boolean self_recursive=false;
 
     // Count function body size.  Requires walking the function body and
@@ -587,11 +588,10 @@ public class FunNode extends RegionNode {
   // Then rewire all calls that were unwired; for a type-split wire both targets
   // with an Unresolved.  For a path-split rewire left-or-right by path.
   private void split_callers( RetNode oldret, FunNode fun, Ary<Node> body, int path ) {
-    // Unwire this function and collect unwired calls.  Leave the
-    // unknown-caller, if any.
+    // Unwire this function and collect unwired calls.  Leave a Root caller, if any.
     CallNode path_call = path < 0 ? null : (CallNode)in(path).in(0);
     Ary<CallEpiNode> unwireds = new Ary<>(new CallEpiNode[1],0);
-    while( _defs._len > 1 && !(in(_defs._len-1) instanceof CRProjNode) ) {             // For all paths
+    while( _defs._len > 1 && !(in(_defs._len-1) instanceof CRProjNode) ) { // For all paths except Root
       Node ceproj = pop();
       CallNode call = (CallNode)ceproj.in(0); // Unhook without removal
       CallEpiNode cepi = call.cepi();
@@ -684,9 +684,9 @@ public class FunNode extends RegionNode {
       if( e.getKey() instanceof MemSplitNode memsplit )
         memsplit.split_alias(e.getValue(),aliases);
 
-    //// Wired Call Handling:
-    //if( zlen==2 ) {               // Not called by any unknown caller
-    //  if( path < 0 ) {            // Type Split
+    // Wired Call Handling:
+    if( len()==2 ) {            // Called by root
+      if( path < 0 ) {          // Type Split
     //    // Change the unknown caller parm types to match the new sig.  Default
     //    // memory includes the other half of alias splits, which might be
     //    // passed in from recursive calls.
@@ -702,83 +702,85 @@ public class FunNode extends RegionNode {
     //        }
     //        parm.set_def(1,defx);
     //      }
-    //  } else                     // Path Split
-    //    fun.set_def(1,Env.XCTRL);
-    //}
-    //
-    //// Put all new nodes into the GVN tables and worklist
-    //for( Map.Entry<Node,Node> e : map.entrySet() ) {
-    //  Node oo = e.getKey();     // Old node
-    //  Node nn = e.getValue();   // New node
-    //  Type nt = oo._val;        // Generally just copy type from original nodes
-    //  if( nn instanceof FunPtrNode && (path==0 || path_call.fdx()==nn)) { // FunPtrs pick up the new fidx
-    //    TypeFunPtr ofptr = (TypeFunPtr)nt;
-    //    if( ofptr.fidx()==oldret._fidx )
-    //      nt = ofptr.make_from(BitsFun.make0(newret._fidx));
-    //  }
-    //  nn._val = nt;             // Values
-    //  nn._elock();              // In GVN table
-    //}
-    //
-    //// Rewire all unwired calls.
-    //for( CallEpiNode cepi : unwireds ) {
-    //  CallNode call = cepi.call();
-    //  CallEpiNode cepi2 = (CallEpiNode)map.get(cepi);
-    //  if( path < 0 ) {          // Type-split, wire both & resolve later
-    //    BitsFun call_fidxs = ((TypeFunPtr) call.fdx()._val).fidxs();
-    //    assert call_fidxs.test_recur(    _fidx) ;  cepi.wire1(call,this,oldret,false);
-    //    if(    call_fidxs.test_recur(fun._fidx) )  cepi.wire1(call, fun,newret,false);
-    //    if( cepi2!=null ) {
-    //      // Found an unwired call in original: musta been a recursive self-
-    //      // call.  wire the clone, same as the original was wired, so the
-    //      // clone keeps knowledge about its return type.
-    //      CallNode call2 = cepi2.call();
-    //      BitsFun call_fidxs2 = ((TypeFunPtr) call2.fdx()._val).fidxs();
-    //      if(    call_fidxs2.test_recur(    _fidx) )  cepi2.wire1(call2,this,oldret,false);
-    //      assert call_fidxs2.test_recur(fun._fidx) ;  cepi2.wire1(call2, fun,newret,false);
-    //    }
-    //  } else {                  // Non-type split, wire left or right
-    //    if( call==path_call ) cepi.wire1(call, fun,newret,false);
-    //    else                  cepi.wire1(call,this,oldret,false);
-    //    if( cepi2!=null && cepi2.call()!=path_call ) {
-    //      CallNode call2 = cepi2.call();
-    //      // Found an unwired call in original: musta been a recursive
-    //      // self-call.  wire the clone, same as the original was wired, so the
-    //      // clone keeps knowledge about its return type.
-    //      //call2.set_fdx(call.fdx());
-    //      cepi2.wire1(call2,this,oldret,false);
-    //      call2.xval();
-    //      Env.GVN.add_flow_uses(this); // This gets wired, that gets wired, revisit all
-    //    }
-    //    Env.GVN.add_unuse(cepi);
-    //  }
-    //}
-    //
-    //// Look for wired new not-recursive CallEpis; these will have an outgoing
-    //// edge to some other RetNode, but the Call will not be wired.  Wire.
-    //for( Node nn : map.values() ) {
-    //  if( nn instanceof CallEpiNode ncepi ) {
-    //    for( int i=0; i<ncepi.nwired(); i++ ) {
-    //      RetNode xxxret = ncepi.wired(i); // Neither newret nor oldret
-    //      if( xxxret != newret && xxxret != oldret ) { // Not self-recursive
-    //        ncepi.wire0(ncepi.call(),xxxret.fun(),false);
-    //      }
-    //    }
-    //    // CEProjs from the Call never re-wire, as they are not uniquely
-    //    // identified by input alone.  Other Projs DO rewire, if any target
-    //    // function uses them.
-    //    for( Node use : ncepi.call()._uses )
-    //      if( use._uses._len==0 ) Env.GVN.add_dead(use);
-    //  }
-    //}
-    //
-    //// Retype memory, so we can everywhere lift the split-alias parents "up and out".
+        throw unimpl();
+      } else                      // Path Split
+        fun.set_def(1,Env.XCTRL); // Kill Root path in clone
+    }
+
+    // Put all new nodes into the GVN tables and worklist
+    for( Map.Entry<Node,Node> e : map.entrySet() ) {
+      Node oo = e.getKey();     // Old node
+      Node nn = e.getValue();   // New node
+      Type nt = oo._val;        // Generally just copy type from original nodes
+      if( nn instanceof FunPtrNode fptr && fptr.ret()==newret ) { // FunPtr(s) pick up the new fidx
+        TypeFunPtr ofptr = (TypeFunPtr)nt;
+        assert ofptr.fidx()==oldret._fidx;
+        nt = ofptr.make_from(BitsFun.make0(newret._fidx));
+      }
+      nn._val = nt;             // Values
+      nn._elock();              // In GVN table
+    }
+
+    // Rewire all unwired calls.
+    for( CallEpiNode cepi : unwireds ) {
+      CallNode call = cepi.call();
+      CallEpiNode cepi2 = (CallEpiNode)map.get(cepi);
+      if( path < 0 ) {          // Type-split, wire both & resolve later
+        BitsFun call_fidxs = ((TypeFunPtr) call.fdx()._val).fidxs();
+        assert call_fidxs.test_recur(    _fidx) ;  cepi.wire1(call,this,oldret,false);
+        if(    call_fidxs.test_recur(fun._fidx) )  cepi.wire1(call, fun,newret,false);
+        if( cepi2!=null ) {
+          // Found an unwired call in original: musta been a recursive self-
+          // call.  wire the clone, same as the original was wired, so the
+          // clone keeps knowledge about its return type.
+          CallNode call2 = cepi2.call();
+          BitsFun call_fidxs2 = ((TypeFunPtr) call2.fdx()._val).fidxs();
+          if(    call_fidxs2.test_recur(    _fidx) )  cepi2.wire1(call2,this,oldret,false);
+          assert call_fidxs2.test_recur(fun._fidx) ;  cepi2.wire1(call2, fun,newret,false);
+        }
+      } else {                  // Non-type split, wire left or right
+        if( call==path_call ) cepi.wire1(call, fun,newret,false);
+        else                  cepi.wire1(call,this,oldret,false);
+        if( cepi2!=null && cepi2.call()!=path_call ) {
+          CallNode call2 = cepi2.call();
+          // Found an unwired call in original: musta been a recursive
+          // self-call.  wire the clone, same as the original was wired, so the
+          // clone keeps knowledge about its return type.
+          //call2.set_fdx(call.fdx());
+          cepi2.wire1(call2,this,oldret,false);
+          call2.xval();
+          Env.GVN.add_flow_uses(this); // This gets wired, that gets wired, revisit all
+        }
+        Env.GVN.add_unuse(cepi);
+      }
+    }
+
+    // Look for wired new not-recursive CallEpis; these will have an outgoing
+    // edge to some other RetNode, but the Call will not be wired.  Wire.
+    for( Node nn : map.values() ) {
+      if( nn instanceof CallEpiNode ncepi ) {
+        for( int i=0; i<ncepi.nwired(); i++ ) {
+          RetNode xxxret = ncepi.wired(i); // Neither newret nor oldret
+          if( xxxret != newret && xxxret != oldret ) { // Not self-recursive
+            ncepi.wire0(ncepi.call(),xxxret.fun(),false);
+          }
+        }
+        // CEProjs from the Call never re-wire, as they are not uniquely
+        // identified by input alone.  Other Projs DO rewire, if any target
+        // function uses them.
+        for( Node use : ncepi.call()._uses )
+          if( use._uses._len==0 ) Env.GVN.add_dead(use);
+      }
+    }
+
+    // Retype memory, so we can everywhere lift the split-alias parents "up and out".
     //GVNGCM.retype_mem(aliases,this.parm(MEM_IDX), oldret, true);
     //GVNGCM.retype_mem(aliases,fun .parm(MEM_IDX), newret, true);
-    //
-    //// Unhook the hooked FunPtrs
-    //for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) Env.GVN.add_unuse(GVNGCM.pop(GVNGCM.KEEP_ALIVE._defs._len));
-    throw unimpl();
+
+    // Unhook the hooked FunPtrs
+    for( Node use : oldret._uses )
+      if( use instanceof FunPtrNode )
+        Env.GVN.add_unuse(GVNGCM.pop(GVNGCM.KEEP_ALIVE._defs._len));
   }
 
   // Funs get special treatment by the H-M algo.

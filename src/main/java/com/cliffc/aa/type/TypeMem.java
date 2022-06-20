@@ -217,10 +217,13 @@ public class TypeMem extends Type<TypeMem> {
         as[alias] = oop;
     return make0(as);
   }
-  public TypeMem make_from(int alias, TypeStruct oop) {
+  // Set 'alias' to 'oop', and all parent aliases to unused in this memory.
+  public TypeMem make_from_unused(int alias, TypeStruct oop) {
     TypeStruct[] as = Arrays.copyOf(_pubs,Math.max(_pubs.length,alias+1));
     as[0] = null;
     as[alias] = oop;
+    for( int par = BitsAlias.TREE.parent(alias); par!=1; par = BitsAlias.TREE.parent(par) )
+      as[par] = TypeStruct.UNUSED;
     return make0(as);
   }
 

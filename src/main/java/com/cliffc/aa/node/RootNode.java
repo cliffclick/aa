@@ -26,7 +26,7 @@ public class RootNode extends Node {
     Node rez = in(REZ_IDX);
     if( in(MEM_IDX) == null || rez == null )
       // No top-level return yet, so return most conservative answer
-      return TypeTuple.ROOT0;
+      rez = Env.ALL;
     // Check the cache
     if( rez._val==_cache_key && _def_mem == _cache_val.at(MEM_IDX) )
       return _cache_val;
@@ -47,7 +47,7 @@ public class RootNode extends Node {
   }
 
   public void kill_alias( int alias ) {
-    _def_mem = _def_mem.make_from(alias,TypeStruct.UNUSED);
+    _def_mem = _def_mem.make_from_unused(alias,TypeStruct.UNUSED);
     Env.GVN.add_flow(this);
   }
 

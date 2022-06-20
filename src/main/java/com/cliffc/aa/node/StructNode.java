@@ -51,7 +51,7 @@ public class StructNode extends Node {
   // _fld_starts[0]==2, offset to the openning paren
   // _fld_starts[1]==4, offset to start of zeroth arg
   // _fld_starts[2]==6, offset to start of oneth arg
-  private Ary<Parse> _fld_starts;
+  private final Ary<Parse> _fld_starts;
 
   public StructNode(boolean is_closure, boolean forward_ref, Parse bad_start) {
     super(OP_STRUCT);
@@ -90,6 +90,7 @@ public class StructNode extends Node {
   public Node in(String name) { return in(find(name)); } // Error if not found
   // String to TypeFld
   public TypeFld get(String name) { return _ts.get(name); }
+  public TypeFld get(int idx) { return _ts.get(idx); }
 
   // String to a BOUND node: if field name maps to a FunPtrNode or an
   // UnresolvedNode, return the bound version instead.  Otherwise,

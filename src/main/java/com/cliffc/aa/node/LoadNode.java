@@ -120,11 +120,10 @@ public class LoadNode extends Node {
       throw unimpl();
 
     // Load can bypass a New or Store if the address does not depend on the New/St.
-    if( mem instanceof MProjNode && mem.in(0) instanceof NewNode && aliases != null ) {
-    //  NewNode nnn = ((MrgProjNode)mem).nnn();
-    //  // Bypass if aliases do not overlap
-    //  if( !aliases.test_recur(nnn._alias) )
-    //    return set_mem(mem.in(1));
+    if( mem instanceof MProjNode mprj && mem.in(0) instanceof NewNode nnn && aliases != null ) {
+      // Bypass if aliases do not overlap
+      if( !aliases.test_recur(nnn._alias) )
+        return set_mem(nnn.mem());
     //  // Also bypass if address predates the allocation.  Here we just see that
     //  // the address comes from the function Parm, and the New is made in the
     //  // function.

@@ -678,12 +678,13 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     TypeStruct ts = malloc("",any ? ANY : ALL,TypeFlds.get(0));
     if( cid!=null ) P._dups.put(cid,ts);
     if( P.peek(!is_tup ? '}' : ')') ) return ts;
+    int fnum=0;
 
     int aidx=DSP_IDX;
     do {
       TypeFld fld=null;
       int oldx = P._x;
-      String fid = P.id();
+      String fid = is_tup ? ""+('0'+fnum++) : P.id();
       Type dup = P._dups.get(fid);
       if( dup==null ) {
         // Check for a leading repeat name, even on a tuple: "FA:^=any"
@@ -775,7 +776,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   @Override public boolean above_center() { return _def.above_center(); }
   @Override public boolean is_con() {
-    //if( !_def.is_con() ) return false;
+    //if( _def != Type.ANY ) return false;
     for( TypeFld fld : _flds )
       if( !fld.is_con() )
         return false;

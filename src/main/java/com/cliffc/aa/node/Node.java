@@ -685,11 +685,12 @@ public abstract class Node implements Cloneable, IntSupplier {
         (this instanceof FunPtrNode && _val.is_con()) || // Already a constant
         this instanceof ErrNode || // Never touch an ErrNode
         this instanceof FreshNode ||// These modify the TVars but not the constant flows
-        is_prim() )                // Never touch a Primitive
+        (this instanceof StructNode st && !st.is_closed()) || // Struct is in-progress
+        is_prim() )                 // Never touch a Primitive
       return false; // Already a constant, or never touch an ErrNode
     // Constant argument to call: keep for call resolution.
     // Call can always inline to fold constant.
-    if( this instanceof ProjNode && in(0) instanceof CallNode && ((ProjNode)this)._idx>0 )
+    if( this instanceof ProjNode prj && in(0) instanceof CallNode && prj._idx>0 )
       return false;
     // Is a constant and not in error?  Do not remove the error.
     return t.is_con() && err(true) == null;
