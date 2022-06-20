@@ -12,10 +12,13 @@ public class CRProjNode extends CEProjNode {
     return "CRProj["+_idx+"]";
   }
   @Override public Type value() {
+    // Before Combo runs, calls might yet wire.  The default path cannot die
+    // until wiring is done.
+    if( in(0).in(0)==null ) return Type.CTRL;
     if( val(0)==Type.ANY ) return Type.XCTRL;
     // Compute liveness from Root value
     TypeTuple tt = (TypeTuple)val(0);
-    TypeFunPtr tfp = (TypeFunPtr)tt.at(0);
+    TypeFunPtr tfp = (TypeFunPtr)tt.at(3);
     // On or off, according to if the fidx escaped.
     return Type.XCTRL.oob(tfp._fidxs.test_recur(_idx));
   }

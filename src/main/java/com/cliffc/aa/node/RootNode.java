@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
+import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.VBitSet;
 
@@ -13,20 +14,22 @@ import static com.cliffc.aa.AA.*;
 public class RootNode extends Node {
   // Inputs are:
   // [program exit control, program exit memory, program exit value, escaping RetNodes... ]
-  public RootNode() { super(OP_ROOT, null, null, null); }
+  public RootNode() { super(OP_ROOT, null, null, null); _def_mem = TypeMem.ALLMEM; }
 
+  private TypeMem _def_mem;
   private Type _cache_key;
   private TypeTuple _cache_val;
 
   // Output value is:
-  // [escaped_fidxs, escaped_aliases, TypeRPC.ALL_CALL]
+  // [Ctrl,All_Mem_Minus_Dead,TypeRPC.ALL_CALL,escaped_fidxs, escaped_aliases,]
   @Override public TypeTuple value() {
     Node rez = in(REZ_IDX);
     if( in(MEM_IDX) == null || rez == null )
       // No top-level return yet, so return most conservative answer
       return TypeTuple.ROOT0;
     // Check the cache
-    if( rez._val==_cache_key ) return _cache_val;
+    if( rez._val==_cache_key && _def_mem == _cache_val.at(MEM_IDX) )
+      return _cache_val;
 
     // Reset for walking
     ESCF.clear();
@@ -36,7 +39,16 @@ public class RootNode extends Node {
     _escapes(rez._val);
     // Fill cache after walking
     _cache_key = rez._val;
-    return (_cache_val = TypeTuple.make(TypeFunPtr.make(EXT_FIDXS,1),TypeMemPtr.make(false,EXT_ALIASES,TypeStruct.ISUSED),TypeRPC.ALL_CALL));
+    return (_cache_val = TypeTuple.make(Type.CTRL,
+                                        _def_mem,
+                                        TypeRPC.ALL_CALL,
+                                        TypeFunPtr.make(EXT_FIDXS,1),
+                                        TypeMemPtr.make(false,EXT_ALIASES,TypeStruct.ISUSED)));
+  }
+
+  public void kill_alias( int alias ) {
+    _def_mem = _def_mem.make_from(alias,TypeStruct.UNUSED);
+    Env.GVN.add_flow(this);
   }
 
   // Escape all Root results.  Escaping functions are called with the most
@@ -47,6 +59,10 @@ public class RootNode extends Node {
   private static BitsFun EXT_FIDXS;
 
   private static void _escapes(Type t) {
+    if( t == Type.ALL ) {
+      EXT_ALIASES = BitsAlias.NALL;
+      EXT_FIDXS = BitsFun.NALL;
+    }
     if( t instanceof TypeMemPtr tmp ) {
       // Add to the set of escaped structures
       for( int alias : tmp._aliases ) {
@@ -68,10 +84,12 @@ public class RootNode extends Node {
         if( fidx==0 ) continue;
         RetNode ret = RetNode.FUNS.at(fidx);
         if( ret!=null && !EXT_FIDXS.test(fidx) ) {
-          throw unimpl();
-        //  T2 tfun = fun.as_fun();
-        //  tfun.add_deps_work(work);
-        //  tfun.get("ret").clr_cp();
+          FunPtrNode fptr = ret.funptr();
+          if( fptr !=null && fptr._tvar!=null ) {
+            TV2 tfun = ret.funptr().tvar();
+            //  tfun.add_deps_work(work);
+            tfun.arg(" ret").clr_cp();
+          }
         }
         EXT_FIDXS = EXT_FIDXS.set(fidx);
         //for( int i=0; i<fun.nargs(); i++ ) {
@@ -125,5 +143,6 @@ public class RootNode extends Node {
     set_def(REZ_IDX,null);
     while( len() > REZ_IDX+1 )
       pop();
+    _def_mem = TypeMem.ALLMEM;
   }
 }

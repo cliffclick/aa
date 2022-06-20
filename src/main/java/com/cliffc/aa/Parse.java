@@ -5,7 +5,6 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.lang.reflect.Field;
 import java.text.NumberFormat;
 import java.text.ParsePosition;
 import java.util.BitSet;
@@ -47,9 +46,13 @@ import static com.cliffc.aa.type.TypeStruct.CANONICAL_INSTANCE;
  *  fact = (tuple)                 // Tuple builder
  *  fact = func                    // Anonymous function declaration
  *  struct=@{ stmts }              // Anonymous struct declaration, assignments define fields
- *  fact = struct                  // A fact is also a struct
  *  tuple= (stmts,[stmts,])        // Tuple; final comma is optional, first comma is required
- *  alloc= * [ tuple, struct ]     // Stuff a struct/tuple into memory and get a pointer
+// In progress ideas
+// *  fact = struct                  // A fact is also a struct
+// *  fact = tuple                   // A fact is also a tuple
+// *  fact = ptr                     // A fact is a ptr
+// *  ptr  = &tuple, &struct         // Allocation; stuff a struct/tuple into memory and get a pointer
+// *  fact = *ptr                    // Prefix ptr-deref; produces a LHS...
  *  binop= +-*%&|/<>!= [ ]=        // etc; primitive lookup; can determine infix binop at parse-time
  *  uniop= -!~# a                  // etc; primitive lookup; can determine infix uniop at parse-time
  *  bop+ = [                       // Balanced/split operator open
@@ -455,7 +458,7 @@ public class Parse implements Comparable<Parse> {
     scope.replace_mem(st);
     if( !create )               // Note 1-side-of-if update
       scope.def_if(tok,mutable,false);
-    if( mutable==Access.Final ) Oper.make(tok);
+    if( mutable==Access.Final ) Oper.make(tok,false);
     return Node.pop(iidx);
   }
 
@@ -493,7 +496,6 @@ public class Parse implements Comparable<Parse> {
 
     Node t_mem = Node.peek(t_mem_x);
     Node t_ctl = Node.peek(t_ctl_x);
-    t_exp      = Node.peek(t_exp_x);
     Node f_mem = mem ();
     Node f_ctl = ctrl();
     int f_exp_x = f_exp.push();
@@ -575,7 +577,10 @@ public class Parse implements Comparable<Parse> {
       // Get the oper function to call
       Node opfun = gvn(new FieldNode(lhs,binop._name));
       int fidx = opfun.push();
-      Node rhs = _expr_higher_require(binop);
+      // Parse the RHS operand
+      Node rhs = binop._lazy
+        ? _lazy_expr(binop)
+        : _expr_higher_require(binop);
       // Emit the call to both terms
       // LHS in unhooked prior to optimizing/replacing.
       lhs = do_call(errMsgs(opx,lhsx,rhsx), args(Node.pop(fidx),rhs));
@@ -592,59 +597,43 @@ public class Parse implements Comparable<Parse> {
     return rhs==null ? err_ctrl2("Missing term after '"+op._name+"'") : rhs;
   }
 
-  // Short-circuit 'thunks' the RHS operator and passes it to a thunk-aware
-  // primitive.  The primitive is required to fully inline & optimize out the
-  // Thunk before we exit here.  However, the primitive can do pretty much what
-  // it wants with the Thunk (currently nil-check LHS, then optionally Call the
-  // thunk).
-  private Node _short_circuit_expr(Node lhs, int prec, String bintok, Node op, int opx, int lhsx, int rhsx) {
-    // Capture state so we can unwind after parsing delayed execution
-    StructNode stk = scope().stk(); // Display
-    Node old_ctrl = ctrl().keep(2);
-    Node old_mem  = mem ().keep(2);
-    op.keep(2);
-    //TypeStruct old_ts = stk._ts;
-    //Ary<Node> old_defs = stk._defs.deepCopy();
-    //lhs.keep(2);
+  // Parse a RHS operand into a 'thunk', a zero-arg function.
+  // Function takes in memory, display
+  private Node _lazy_expr(Oper op) {
+    Env outer = _e;
+    FunNode fun = new FunNode(3); // ctrl, mem, display
+    init(fun.add_def(init(new CRProjNode(fun._fidx))));
+    int fun_idx = fun.push();
+    NewNode nnn = scope().dsp();
+    // Build Parms for system incoming values
+    int rpc_idx = init(new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL,Env.ALL_CALL)).push();
+    int clo_idx = init(new ParmNode(DSP_IDX,fun,null,nnn._tptr       ,scope().ptr())).push();
+    Node mem    = init(new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM  ,mem()));
+    int fptr_idx;
+    try( Env e = new Env(_e, fun, true, fun, mem, scope().ptr(), null) ) { // Nest an environment for the local vars
+      _e = e;                   // Push nested environment
+      // Display is special: the default is simply the outer lexical scope.
+      // But here, in a function, the display is actually passed in as a hidden
+      // extra argument and replaces the default.
+      StructNode stk = e._scope.stk();
+      stk.set_fld("^",Access.Final,Node.pop(clo_idx),true);
+      // Parse body
+      Node rez = _expr_higher_require(op);
+      // Normal exit (no early-exit?)
+      stk.close();
+      assert e._scope.is_closure();
+      // Standard return; function control, memory, result, RPC.  Plus a hook
+      // to the function for faster access.
+      Node xrpc = Node.pop(rpc_idx);
+      Node xfun = Node.pop(fun_idx); assert xfun == fun;
+      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
 
-    // TODO: Drop thunk/thret.  Use "lazy arg" flag model.  Normal calls.
-
-    // Insert a thunk header to capture the delayed execution
-    //ThunkNode thunk = (ThunkNode)gvn(new ThunkNode(mem()));
-    //set_ctrl(thunk);
-    //set_mem (gvn(new ParmNode(MEM_IDX,"mem",thunk.keep(2),TypeMem.MEM,Env.DEFMEM,null)));
-    //
-    //// Delayed execution parse of RHS
-    //Node rhs = _expr_higher_require(prec,bintok,lhs);
-    //
-    //// Insert thunk tail, unwind memory state
-    //ThretNode thet = gvn(new ThretNode(ctrl(),mem(),rhs,Env.GVN.add_flow(thunk.unkeep(2)))).keep(2);
-    //set_ctrl(old_ctrl.unkeep(2));
-    //set_mem (old_mem .unkeep(2));
-    //for( int i=0; i<old_defs._len; i++ )
-    //  assert old_defs.at(i)==stk._defs.at(i); // Nothing peeked thru the Thunk & updated outside
-    //
-    //// Emit the call to both terms.  Both the emitted call and the thunk MUST
-    //// inline right now.
-    //lhs = do_call(errMsgs(opx,lhsx,rhsx), args(op.unkeep(2),lhs.unkeep(2),thet.unkeep(2)));
-    //assert thunk.is_dead() && thet.is_dead(); // Thunk, in fact, inlined
-    //
-    //// Extra variables in the thunk not available after the thunk.
-    //// Set them to Err.
-    //if( stk._ts != old_ts ) {
-    //  lhs.keep(2);
-    //  for( int i=old_defs._len; i<stk._defs._len; i++ ) {
-    //    // TODO: alignment between old_defs and struct fields
-    //    String fname = stk._ts.fld_idx(i)._fld;
-    //    String msg = "'"+fname+"' not defined prior to the short-circuit";
-    //    Parse bad = errMsg(rhsx);
-    //    Node err = gvn(new ErrNode(ctrl(),bad,msg));
-    //    set_mem(gvn(new StoreNode(mem(),scope().ptr(),err,Access.Final,fname,bad)));
-    //  }
-    //  lhs.unkeep(2);
-    //}
-    //return lhs;
-    throw unimpl();
+      _e = e._par;            // Pop nested environment
+      // The FunPtr builds a real display; any up-scope references are passed in now.
+      Node fptr = gvn(new FunPtrNode(ret,outer._scope.ptr()));
+      fptr_idx = fptr.push(); // Return function; close-out and DCE 'e'
+    }
+    return Node.pop(fptr_idx);
   }
 
   /** Any number field-lookups or function applications, then an optional assignment
@@ -834,7 +823,6 @@ public class Parse implements Comparable<Parse> {
    *  fact = {func}    // Anonymous function declaration
    *  fact = @{ stmts }// Anonymous struct declaration, assignments define fields
    *  fact = id        // variable lookup
-   *  fact = $$java_class
    */
   private Node fact() {
     if( skipWS() == -1 ) return null;
@@ -859,9 +847,6 @@ public class Parse implements Comparable<Parse> {
 
     // Anonymous struct
     if( peek2(c,"@{") ) return struct();
-
-    // Primitive parsing only, directly get a Java intrinsic implementation
-    if( _prims && peek2(c,"$$") ) return java_class_node();
 
     // Check for a valid 'id'
     String tok = token0();
@@ -1106,72 +1091,6 @@ public class Parse implements Comparable<Parse> {
     throw unimpl();
   }
 
-  // Must be a valid java class name on the current class path that subclasses
-  // Node.  Must have a no-arg constructor.  Returned node must be valid in the
-  // aa context.
-  @SuppressWarnings("unchecked")
-  private Node java_class_node() throws RuntimeException {
-    int x = _x;
-    while( isJava(_buf[_x]) ) _x++;
-    String str = "com.cliffc.aa.node."+new String(_buf,x,_x-x);
-    try {
-      Class clazz = Class.forName(str);
-      Node n = (Node)clazz.getConstructor().newInstance();
-
-      // Common primitive shortcut: if followed by a '(' assume a full normal
-      // function call, which will just normally inlines to a direct prim use.
-      // Go ahead and directly build the primitive.  Only works if the
-      // primitive does return memory.
-      skipWS();
-      int oldx = _x;
-      if( peek('(') ) {
-        PrimNode p = (PrimNode)n;
-        int nargs = p._tfp.nargs();
-        boolean  read_mem = false; //np != null && np._reads;
-        boolean write_mem = false; //np!=null;
-        int nidx = Env.GVN.add_flow(n).push();
-        n.add_def(null);        // No control
-        n.add_def(read_mem ? mem() : null);
-        for( int i=DSP_IDX; i<nargs; i++ ) {
-          n.add_def(stmts());
-          if( i<nargs-1 ) require(',',oldx);
-        }
-        Node xn = Env.GVN.add_flow(Node.pop(nidx));
-        assert xn==n;
-        if( write_mem ) {
-          //set_mem(init(new MrgProjNode((NewNode)n,mem())));
-          //n = init(new ProjNode(n,REZ_IDX));
-          throw unimpl();
-        }
-        require(')',oldx);
-        return n;
-      }
-
-      // Else build a function which calls the primitive, and return a
-      // FunPtrNode - which must be in a valid aa context for a fptr.
-      return n.clazz_node();
-    } catch( Exception e ) {
-      System.err.println("Did not find a public no-arg constructor in a public class for "+str);
-      throw new RuntimeException(e); // Unrecoverable
-    }
-  }
-
-  // Must be a valid java class name on the current class path with the named
-  // Field of type "Type".  Returns the field contents.
-  private Type java_class_type() throws RuntimeException {
-    int x = _x;
-    while( isJava(_buf[_x]) ) _x++;
-    String[] strs = new String(_buf,x,_x-x).split("\\$");
-    String sclz = "com.cliffc.aa.type."+strs[0];
-    String sfld = strs[1];
-    try {
-      Class clazz = Class.forName(sclz);
-      Field f = clazz.getDeclaredField(sfld);
-      return (Type)f.get(null);
-    } catch( Exception e ) { throw new RuntimeException(e); } // Unrecoverable
-  }
-
-
   private String token() { skipWS();  return token0(); }
   // Lexical tokens.  Any alpha, followed by any alphanumerics is a alpha-
   // token; alpha-tokens end with WS or any operator character.  Any collection
@@ -1194,7 +1113,6 @@ public class Parse implements Comparable<Parse> {
   static boolean isOp(String s, boolean prims) {
     if( s==null || s.isEmpty() ) return false;
     byte c = (byte)s.charAt(0);
-    if( prims && c=='$' ) return false; // Disallow $$ operator during prim parsing; ambiguous with $$java_class_name
     if( !Oper.isOp0(c) && (c!='_' || !Oper.isOp0((byte)s.charAt(1))) ) return false;
     for( int i=1; i<s.length(); i++ )
       if( !Oper.isOp1((byte)s.charAt(i)) ) return false;
@@ -1266,7 +1184,6 @@ public class Parse implements Comparable<Parse> {
    *  tfld = id [:type | tcon]       // Field name, option type or const-expr
    */
   private Type type(boolean allow_fref, StructNode proto) {
-    if( _prims && peek("$#") ) return java_class_type();
 
     // First character to split type out:
     return switch( skipWS() ) {
@@ -1297,7 +1214,7 @@ public class Parse implements Comparable<Parse> {
         access = Access.Final;
         val = tcon();           // Arbitrary AA const-expr, not a type
         t = val._val;           // Type from the parse-time node type.
-        Oper.make(tok);
+        Oper.make(tok,false);
         if( val instanceof FunPtrNode fptr )
           fptr.bind(tok);       // Debug only: give name to function
       } else {
@@ -1509,8 +1426,6 @@ public class Parse implements Comparable<Parse> {
   // Wiring for call arguments
   private Node[] args(Node a0                           ) { return _args(new Node[]{null,null,a0}); }
   private Node[] args(Node a0, Node a1                  ) { return _args(new Node[]{null,null,a0,a1}); }
-  private Node[] args(Node a0, Node a1, Node a2         ) { return _args(new Node[]{null,null,a0,a1,a2}); }
-  //private Node[] args(Node a0, Node a1, Node a2, Node a3) { return _args(new Node[]{null,null,a0,a1,a2,a3}); }
   private Node[] _args(Node[] args) {
     args[CTL_IDX] = ctrl();     // Always control
     args[MEM_IDX] = mem();      // Always memory
@@ -1589,8 +1504,7 @@ public class Parse implements Comparable<Parse> {
   @Override public String toString() { return new String(_buf,_x,_buf.length-_x); }
   @Override public boolean equals(Object loc) {
     if( this==loc ) return true;
-    if( !(loc instanceof Parse) ) return false;
-    Parse p = (Parse)loc;
+    if( !(loc instanceof Parse p) ) return false;
     return _x==p._x && _src.equals(p._src);
   }
   @Override public int hashCode() {

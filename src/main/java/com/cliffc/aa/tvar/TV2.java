@@ -195,6 +195,16 @@ public class TV2 {
     t2._may_nil = false;
     return t2;
   }
+  public static TV2 make_fun(@NotNull String alloc_site, TypeFunPtr tfp) {
+    NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
+    for( int i=DSP_IDX; i<tfp.nargs(); i++ )
+      args.put(argname(i), make_leaf(alloc_site));
+    args.put(" ret",make_leaf(alloc_site));
+    TV2 t2 = new TV2(args,alloc_site);
+    t2._is_fun = true;
+    t2._may_nil = false;
+    return t2;
+  }
   // A struct with fields
   public static TV2 make_struct( StructNode rec, String alloc_site ) {
     NonBlockingHashMap<String,TV2> args = new NonBlockingHashMap<>();
@@ -251,6 +261,8 @@ public class TV2 {
     }
     case TypeFlt f -> make_base(t,alloc_site);
     case TypeInt i -> make_base(t,alloc_site);
+    case TypeFunPtr tfp ->
+      make_fun(alloc_site,tfp);
     case TypeNil n -> {
       if( t == TypeNil.XNIL )
         yield make_nil(TV2.make_leaf(alloc_site),alloc_site);

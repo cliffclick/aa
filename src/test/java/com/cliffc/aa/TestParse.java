@@ -30,7 +30,7 @@ public class TestParse {
     DO_HMT=false;
     DO_GCP=true;
     RSEED=0;
-    test   ("math.rand(1)?@{}","@{^=@{^=*[5]()?}}","@{^=@{^=A}?}?");
+    test("1 && 2", "int:2","int:2");
   }
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
@@ -191,13 +191,12 @@ public class TestParse {
     test   ("math.rand(1)?1","int:int1","int:int1"); // Missing optional else defaults to nil
     test   ("x:=0;math.rand(1)?(x:=1);x","int:int1","int:int1");
     testerr("a.b.c();","Unknown ref 'a'",0);
-    test   ("math.rand(1)?@{}","@{^=@{^=*[5]()?}}","@{^=@{^=A}?}?");
   }
 
   // Short-circuit tests
   @Test public void testParse01a() {
-    test("0 && 0", TypeNil.NIL);
-    test("1 && 2", TypeInt.con(2));
+    test("0 && 0", "xnil","A?");
+    test("1 && 2", "int:2","int:2");
     test("0 && 2", TypeNil.NIL);
     test("0 || 0", TypeNil.NIL);
     test("0 || 2", TypeInt.con(2));
@@ -361,6 +360,8 @@ public class TestParse {
     test("(0,\"abc\")","*(0, *\"abc\")","(0,*\"abc\")");
     test("(1,\"abc\").0", "int:1", "int:1");
     test("(1,\"abc\").1", TypeStruct.ISUSED);
+
+    test   ("math.rand(1)?@{}","@{^=@{^=*[5]()?}}","@{^=@{^=A}?}?");
 
     // Named type variables
     //test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(82),4, TypeMemPtr.NO_DISP, TypeFlt.FLT64.set_name("gal:")));

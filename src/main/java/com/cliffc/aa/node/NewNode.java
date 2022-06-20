@@ -39,7 +39,7 @@ public class NewNode extends Node {
 
   public Node ctl() { return in(CTL_IDX); }
   public Node mem() { return in(MEM_IDX); }
-  public StructNode rec() { return (StructNode)in(REZ_IDX); }
+  public Node rec() { return in(REZ_IDX); }
 
   @Override public Type value() { return TypeTuple.make(Type.CTRL,memval(),_tptr); }
   // Construct the memory value
@@ -88,6 +88,16 @@ public class NewNode extends Node {
 //  }
 
   @Override public boolean has_tvar() { return false; }
+
+  @Override public Node ideal_reduce() {
+    // NewNode is dead (no pointer use), so kill the struct ref.  When the
+    // memory states align, the trailing MProj will kill the NewNode also.
+    if( _uses._len==1 && _uses.at(0) instanceof MProjNode && rec()!=Env.UNUSED ) {
+      Env.ROOT.kill_alias(_alias);
+      return set_def(2,Env.UNUSED);
+    }
+    return null;
+  }
 
 //  @Override public Node ideal_reduce() {
 //    if( _forward_ref ) return null; // Not defined yet

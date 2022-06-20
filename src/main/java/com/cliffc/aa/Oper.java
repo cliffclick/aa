@@ -10,7 +10,7 @@ No leading expr, but required trailing expr e1:
 
   - Normal uni-op parse; no other uni-op chars allowed.  No trailing suffix can
     match another uniop.  Disallowed: "#!" as a uniop because suffix "!" is
-    already a uniop.  Similarly disallowed: "++", "--", "!!", etc.   
+    already a uniop.  Similarly disallowed: "++", "--", "!!", etc.
   - Examples:  ~e1     ;  +3     ;  -2     ;  !7    ;  ~##e1
     Called as:  e1.~_();   3.+_();   2.-_();  7.!_();  e1.~##_()
 
@@ -44,6 +44,13 @@ Trinary, 3 exprs
   - Examples:   ary[idx]=val      ;  dict["key"]=val      ;  e0 %{% e1 %}=% e2
     Called as:  ary._[_]=(idx,val);  dict._[_]=("key",val);  e0._%{%_%}=%_(e1,e2)
 
+Lazy operands:
+  - The 2nd or later operands (not the first) can be computed lazily.
+  - Indicated when Oper is built.
+  - Parser thunks the operand, and passes the thunk.
+  - Example:    a && b
+  - Called as:  a._&&_( { -> b } )
+
  */
 
 // Opers are added to the oper table when I see a final field store with a
@@ -54,7 +61,7 @@ public class Oper {
   public final String _name;    // Full name, with '_' where arguments go
   public final byte _prec;      // Precedence.  Not set for uniops and balanced ops.  Always > 0 for infix binary ops.
   public final int _nargs;      // Count of '_' same as count of arguments, including any 'self'
-  public boolean _prim;         // In the primitives
+  public final boolean _lazy;   // Bin op, with lazy 2nd arg
 
   static boolean isOp0(byte c) { return "!#$%*+-.=<>^[]~/&|".indexOf(c) != -1; }
   static boolean isOp1(byte c) { return isOp0(c) || ":?_{}".indexOf(c) != -1; }
@@ -77,7 +84,7 @@ public class Oper {
   public static boolean is_open( String name ) { return name.indexOf('[')>=0 || name.indexOf('{')>=2 || name.indexOf('<')>=2; }
   public boolean is_open() { return is_open(_name); }
 
-  private Oper(String name, int prec) {
+  private Oper(String name, int prec, boolean lazy ) {
     char c0 = name.charAt(0), c1 = name.charAt(1);
     assert c0!='{' &&  (c0!='_' || c1!='{'); // Too confusing
     // Count '_' for nargs
@@ -86,27 +93,29 @@ public class Oper {
       nargs++;
     // Binary operators always have a precedence, other ops always have prec==0
     assert (c0=='_' && name.charAt(name.length()-1)=='_' && nargs==2) == (prec>0);
+    assert !lazy || prec>0;     // Binary ops can have lazy 2nd arg
     _name=name.intern();
     _prec=(byte)prec;
-    _nargs=nargs;
+    _nargs = nargs;
+    _lazy = lazy;
   }
 
   @Override public String toString() { return _name; }
 
   // Opers added to the OPERS table when a final field store is made.
   // This filters the string for non-opers, and publishes Opers.
-  public static boolean make(String tok) {
+  public static boolean make(String tok, boolean lazy) {
     String[] ss = tok.split("_",-99);
-    if( ss.length==1 ) return false; // Gotta have an '_' to be an operator
+    if( ss.length==1 ) return false; // Got to have an '_' to be an operator
     if( ss[0].length()>0 ) {    // Must be a uni-op or leading bal-op
       byte c = (byte)ss[0].charAt(0);
       if( !isOp0(c) ) return false;
       if( is_leading_ambiguous(ss[0]) ) return false;
-      if( ss.length==2 && ss[1].length()==0 ) return install(tok,0); // Valid unary op
+      if( ss.length==2 && ss[1].length()==0 ) return install(tok,0,false); // Valid unary op
       if( is_bal_op(ss[0],ss[1]) ) return false; // Not a matching balanced pair
       if( ss.length==2 ||                        // E.g. [_] for array alloc
           (ss.length==3 && ss[2].length()==0) )  // %{ e0 }%= e1
-        return install(tok,0);
+        return install(tok,0,false);
       throw unimpl(); // return false; // Too many args? "[_]=_?_"
     }
     // Leading expr.
@@ -114,7 +123,7 @@ public class Oper {
       byte c = (byte)ss[1].charAt(0);
       if( !isOp0(c) ) return false;
       if( ss[2].length()==0 ) // Standard binary op
-        return install(tok,prec(ss[1].charAt(0)));
+        return install(tok,prec(ss[1].charAt(0)),lazy);
       throw unimpl();
     }
     // TODO: check for valid balanced unary, binary, trinary
@@ -122,12 +131,14 @@ public class Oper {
     // be shared amongst several balanced ops.
     throw unimpl();
   }
-  private static boolean install(String tok, int prec) { OPERS.put(tok,new Oper(tok,prec)); return true; }
+  private static boolean install(String tok, int prec, boolean lazy) { OPERS.put(tok,new Oper(tok,prec,lazy)); return true; }
 
   // Require that the all trailing substrings of 's' do not exist as leading
-  // Opers already.  So a balanced unary op: "[-_-]" fails because the leading
-  // part "[-" has a trailing substring "-" which is already an oper.  I.e.
-  // should "[-7-]" parse as "[-" "7" "-]" OR as "[" "-7" "-]".
+  // Opers already.  i.e. for an oper token "abc_def", the leading part is
+  // "abc" and it has trailing parts "bc" and "c" which cannot themselves lead
+  // another oper.  Example: a balanced unary op: "[-_-]" fails because the
+  // leading part "[-" has a trailing substring "-" which is already an oper.
+  // I.e. "[-7-]" could parse as "[-" "7" "-]" OR as "[" "-" "7" "-]".
   private static boolean is_leading_ambiguous(String s) {
     // Check that the remaining chars in ss[0] are not a hit for the leading
     // char of any other leading op.
@@ -185,6 +196,6 @@ public class Oper {
 
   // Chosen op can be shorter than tok, adjust Parsers _x
   int adjustx(String tok) {
-    return tok.length() - (_name.length()-_nargs); 
+    return tok.length() - (_name.length()-_nargs);
   }
 }

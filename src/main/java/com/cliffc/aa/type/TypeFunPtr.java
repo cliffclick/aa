@@ -297,6 +297,7 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NALL ,1,Type.ALL,Type.ALL);
   public  static final TypeFunPtr ARG2   =         make(BitsFun.NALL ,2,Type.ALL,Type.ALL);
+  public  static final TypeFunPtr THUNK  = (TypeFunPtr)make(BitsFun.NALL ,3,Type.ALL,Type.ALL).meet(TypeNil.XNIL); // zero-arg function (plus ctrl, mem, display)
   public  static final TypeFunPtr EMPTY  =         make(BitsFun.EMPTY,1,Type.ANY,Type.ANY);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,ARG2};
 

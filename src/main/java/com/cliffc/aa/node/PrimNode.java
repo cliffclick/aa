@@ -37,10 +37,13 @@ public abstract class PrimNode extends Node {
   public final TypeFunPtr _tfp; // FIDX, nargs, display argument, WRAPPED primitive return type
   public final TypeTuple _formals; // Formals are indexed by order NOT name and are wrapped prims.
   public final Type _ret;       // Wrapped primitive return
+  public final boolean _is_lazy;// 2nd arg is lazy (thunked by parser)
   Parse[] _badargs;             // Filled in when inlined in CallNode
-  public PrimNode( String name, TypeTuple formals, Type ret ) {
+  public PrimNode( String name, TypeTuple formals, Type ret ) { this(name,false,formals,ret); }
+  public PrimNode( String name, boolean is_lazy, TypeTuple formals, Type ret ) {
     super(OP_PRIM);
     _name = name;
+    _is_lazy = is_lazy;
     int fidx = BitsFun.new_fidx();
     _formals = formals;
     _ret = ret;
@@ -62,7 +65,7 @@ public abstract class PrimNode extends Node {
       new LT_IF64(), new LE_IF64(), new GT_IF64(), new GE_IF64(),
       new EQ_I64 (), new NE_I64 (),
       new EQ_IF64(), new NE_IF64(),
-      new AndI64 (),
+      new AndI64 (), new AndThen(),
       new OrI64  (),
     };
 
@@ -146,26 +149,33 @@ public abstract class PrimNode extends Node {
       case ARG_IDX   -> "";
       default -> throw unimpl();
       }+_name+"_").intern() : _name;
-    if( is_oper ) Oper.make(op);
+    if( is_oper ) Oper.make(op,_is_lazy);
 
     FunNode fun = new FunNode(this,is_oper ? op : _name);
     fun.add_def(new CRProjNode(fun._fidx).init()); // Need FIDX to make the default control
     fun.init();                 // Now register with parser
+    if( _is_lazy ) add_def(fun); // Ctrl in slot 0
     ParmNode rpc = new ParmNode(0,fun,null,TypeRPC.ALL_CALL,Env.ALL_CALL).init();
-    for( int i=DSP_IDX; i<_formals.len(); i++ ) {
+    for( int i=_is_lazy ? MEM_IDX : DSP_IDX; i<_formals.len(); i++ ) {
       // Make a Parm for every formal
       Type tformal = _formals.at(i);
       Node nformal;
       if(      tformal==TypeStruct.INT ) nformal = Env.INT;
       else if( tformal==TypeStruct.FLT ) nformal = Env.FLT;
       else if( tformal==Type.ALL       ) nformal = Env.ALL;
+      else if( tformal==TypeFunPtr.THUNK)nformal = Env.THUNK;
+      else if( tformal==TypeMem.ALLMEM ) nformal = Env.ALLMEM;
       else throw unimpl();
       add_def(new ParmNode(i,fun,null,tformal,nformal).init());
     }
     // The primitive, working on and producing wrapped prims
     init();
+    // If lazy, need control and memory results
+    Node zctrl = _is_lazy ? new CProjNode(this).init() : fun;
+    Node zmem  = _is_lazy ? new MProjNode(this).init() : null;
+    Node zrez  = _is_lazy ? new  ProjNode(this,REZ_IDX).init() : this;
     // Return the result
-    RetNode ret = new RetNode(fun,null,this,rpc,fun).init();
+    RetNode ret = new RetNode(zctrl,zmem,zrez,rpc,fun).init();
     // FunPtr is UNBOUND here, will be bound when loaded thru a named struct to the Clazz.
     FunPtrNode fptr = new FunPtrNode(op,ret,Env.ALL).init();
     rec.add_fun(op,Access.Final,fptr,null);
@@ -561,60 +571,65 @@ public abstract class PrimNode extends Node {
     @Override public boolean equals(Object o) { return this==o; }
   }
 
-  //// Classic '&&' short-circuit.  The RHS is a *Thunk* not a value.  Inlines
-  //// immediate into the operators' wrapper function, which in turn aggressively
-  //// inlines during parsing.
-  //public static class AndThen extends PrimNode {
-  //  private static final TypeStruct ANDTHEN = TypeStruct.make2flds("pred",Type.SCALAR,"thunk",Type.SCALAR);
-  //  // Takes a value on the LHS, and a THUNK on the RHS.
-  //  public AndThen() { super("&&",ANDTHEN,Type.SCALAR); _thunk_rhs=true; }
-  //  // Expect this to inline everytime
-  //  @Override public Node ideal_grow() {
-  //    if( _defs._len != ARG_IDX+1 ) return null; // Already did this
-  //    try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
-  //      Node ctl = in(CTL_IDX);
-  //      Node mem = in(MEM_IDX);
-  //      Node lhs = in(DSP_IDX);
-  //      Node rhs = in(ARG_IDX);
-  //      // Expand to if/then/else
-  //      Node iff = X.xform(new IfNode(ctl,lhs));
-  //      Node fal = X.xform(new CProjNode(iff,0));
-  //      Node tru = X.xform(new CProjNode(iff,1));
-  //      // Call on true branch; if false do not call.
-  //      Node cal = X.xform(new CallNode(true,_badargs,tru,mem,rhs));
-  //      //Node cep = X.xform(new CallEpiNode(cal,Env.DEFMEM));
-  //      //Node ccc = X.xform(new CProjNode(cep));
-  //      //Node memc= X.xform(new MProjNode(cep));
-  //      //Node rez = X.xform(new  ProjNode(cep,AA.REZ_IDX));
-  //      //// Region merging results
-  //      //Node reg = X.xform(new RegionNode(null,fal,ccc));
-  //      //Node phi = X.xform(new PhiNode(Type.SCALAR,null,reg,Node.con(Type.XNIL),rez ));
-  //      //Node phim= X.xform(new PhiNode(TypeMem.MEM,null,reg,mem,memc ));
-  //      //// Plug into self & trigger is_copy
-  //      //set_def(0,reg );
-  //      //set_def(1,phim);
-  //      //set_def(2,phi );
-  //      //pop();   pop();     // Remove args, trigger is_copy
-  //      //X.add(this);
-  //      //for( Node use : _uses ) X.add(use);
-  //      //return null;
-  //      throw unimpl();
-  //    }
-  //  }
-  //  @Override public Type value() {
-  //    return TypeTuple.RET;
-  //  }
+  // Classic '&&' short-circuit.  Lazy in the RHS, so passed a 'thunk', a
+  // zero-argument function to be evaluated if the LHS is true.
+  public static class AndThen extends PrimNode {
+    private static final TypeTuple ANDTHEN = TypeTuple.make(Type.CTRL, TypeMem.ALLMEM, Type.ALL, TypeFunPtr.THUNK); // {val tfp -> val }
+    // Takes a value on the LHS, and a THUNK on the RHS.
+    public AndThen() { super("&&",true/*lazy*/,ANDTHEN,TypeTuple.RET); }
+    @Override public Type apply(Type[] ts) { throw unimpl(); }
+    @Override public Type value() { return TypeTuple.RET; }
   //  @Override public TypeMem live_use(Node def ) {
   //    if( def==in(0) ) return TypeMem.ALIVE; // Control
   //    if( def==in(1) ) return TypeMem.ALLMEM; // Force maximal liveness, since will inline
   //    return TypeMem.ALIVE; // Force maximal liveness, since will inline
   //  }
-  //  //@Override public TV2 new_tvar(String alloc_site) { return TV2.make("Thunk",this,alloc_site); }
-  //  @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
-  //  @Override public Node is_copy(int idx) {
-  //    return _defs._len==ARG_IDX+2 ? null : in(idx);
-  //  }
-  //}
+
+    // Expect this to inline everytime
+    @Override public Node ideal_grow() {
+      // Do not expand the base primitive, only clones.  This allows the base
+      // primitive to inline as a primitive in all contexts.
+      if( is_prim() ) return null; // Do not expand the base primitive, only clones
+      // Once inlined, replace with an if/then/else diamond.
+      Node ctl = in(CTL_IDX);
+      Node mem = in(MEM_IDX);
+      Node lhs = in(DSP_IDX);
+      Node rhs = in(ARG_IDX);
+      // Expand to if/then/else
+      try(GVNGCM.Build<Node> X = Env.GVN.new Build<>()) {
+        Node iff = X.xform(new IfNode(ctl,lhs));
+        Node fal = X.xform(new CProjNode(iff,0));
+        Node tru = X.xform(new CProjNode(iff,1));
+        // Call on true branch; if false do not call.
+        Node cal = X.xform(new CallNode(true,_badargs,tru,mem,rhs));
+        Node cep = X.xform(new CallEpiNode(cal));
+        Node ccc = X.xform(new CProjNode(cep));
+        Node memc= X.xform(new MProjNode(cep));
+        Node rez = X.xform(new  ProjNode(cep,AA.REZ_IDX));
+        // Region merging results
+        Node reg = X.init(new RegionNode(null,fal,ccc));
+        Node phi = X.init(new PhiNode(Type.ALL,null,reg,Env.XNIL,rez ));
+        Node phim= X.init(new PhiNode(TypeMem.ALLMEM,null,reg,mem,memc ));
+        // Plug into self & trigger is_copy
+        set_def(CTL_IDX,reg );
+        set_def(MEM_IDX,phim);
+        set_def(REZ_IDX,phi );
+        pop();                  // Remove args, trigger is_copy
+        //X.init(this);
+        for( Node use : _uses ) Env.GVN.add_reduce(use);
+        return this;
+      }
+    }
+
+    // Unify trailing result ProjNode with the AndTHen directly.
+    @Override public boolean unify_proj( ProjNode proj, boolean test ) {
+      assert proj._idx==REZ_IDX;
+      return tvar().unify(proj.tvar(),test);
+    }
+    @Override public Node is_copy(int idx) {
+      return _defs._len==ARG_IDX+1 ? null : in(idx);
+    }
+  }
   //
   //// Classic '||' short-circuit.  The RHS is a *Thunk* not a value.  Inlines
   //// immediate into the operators' wrapper function, which in turn aggressively

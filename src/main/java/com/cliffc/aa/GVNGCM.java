@@ -222,29 +222,26 @@ public class GVNGCM {
     //assert Env.ROOT.more_work(true)==0;
   }
 
+  // Limited optimizations on nodes built in this region, and all are forced
+  // alive to avoid having to track individual liveness.
   public class Build<N extends Node> implements AutoCloseable {
     Ary<Node> _tmps = new Ary<>(new Node[1],0);
     public N _ret;
     public Node xform( Node n ) {
-      Node x = n.do_reduce();   // Attempt to reduce
-      return init(x==null ? n : x);
+      Node x = n.do_reduce();       // Attempt to reduce
+      return init(x==null ? n : x); // Value call.  No DCE.
     }
     public Node init( Node n ) {
       assert _tmps._len<16;             // Time for a BitSet
       if( _tmps.find(n)!=-1 ) return n; // Already flowed & keeped
-      n.keep().do_flow(); // Update types, and future Parser uses, so always alive
-      return _tmps.push(n);
+      n.push();                         // Force alive for the duration
+      n.do_flow();                      // Update types
+      return _tmps.push(n);             // Track, for untracking at close
     }
-    public Node add( Node n ) {
-      assert _tmps._len<16;             // Time for a BitSet
-      if( _tmps.find(n)!=-1 ) return n; // Already flowed & keeped
-      return _tmps.push(n.keep());
-    }
-    @SuppressWarnings("unchecked")
-    public <M extends Node> M init2( M n ) { return (M)init(n); }
     @Override public void close() {
-      for( Node tmp : _tmps )
-        add_unuse(tmp.unkeep()); // Needs proper liveness at least
+      for( Node tmp : _tmps )   // Bulk unuse, and allow opts
+        add_unuse(tmp);
+      Node.pops(_tmps._len);
     }
   }
 }

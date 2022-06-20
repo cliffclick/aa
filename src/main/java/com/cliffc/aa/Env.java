@@ -51,6 +51,9 @@ public class Env implements AutoCloseable {
   public static final ConNode XNIL;  // Default 0
   public static final ConNode INT;   // Default int parameter
   public static final ConNode FLT;   // Default flt parameter
+  public static final ConNode THUNK; // Default thunk parameter
+  public static final ConNode UNUSED;// Dead alias
+  public static final ConNode ALLMEM;//   Used whole memory
   public static final ConNode XMEM;  // Unused whole memory
 
   // All possible return addresses (RPCs).
@@ -82,7 +85,7 @@ public class Env implements AutoCloseable {
     ROOT  = keep(new RootNode());
     // Initial control & memory
     CTL_0 = keep(new CProjNode(ROOT,0));
-    MEM_0 = keep(new MProjNode(ROOT,0));
+    MEM_0 = keep(new MProjNode(ROOT,MEM_IDX));
     // Common constants
     ANY   = keep(new ConNode<>(Type.ANY   ));
     ALL   = keep(new ConNode<>(Type.ALL   ));
@@ -90,6 +93,9 @@ public class Env implements AutoCloseable {
     XNIL  = keep(new ConNode<>(TypeNil.XNIL));
     INT   = keep(new ConNode<>(TypeStruct.INT));
     FLT   = keep(new ConNode<>(TypeStruct.FLT));
+    THUNK = keep(new ConNode<>(TypeFunPtr.THUNK));
+    UNUSED= keep(new ConNode<>(TypeStruct.UNUSED));
+    ALLMEM= keep(new ConNode<>(TypeMem.ALLMEM));
     XMEM  = keep(new ConNode<>(TypeMem.ANYMEM));
 
     // All the Calls in the Universe, which might call somebody.
@@ -157,8 +163,8 @@ public class Env implements AutoCloseable {
       if( ret != null ) formals = ret.formals();
     }
     TypeTuple ttroot = (TypeTuple)Env.ROOT._val;
-    BitsFun   fidxs   = ((TypeFunPtr)ttroot.at(0))._fidxs  ;
-    BitsAlias aliases = ((TypeMemPtr)ttroot.at(1))._aliases;
+    BitsFun   fidxs   = ((TypeFunPtr)ttroot.at(3))._fidxs  ;
+    BitsAlias aliases = ((TypeMemPtr)ttroot.at(4))._aliases;
     return new TypeEnv(rez._val,
                        fidxs,   // Escaping FIDXS
                        aliases, // Escaping ALIASES

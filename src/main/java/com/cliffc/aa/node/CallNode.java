@@ -441,7 +441,7 @@ public class CallNode extends Node {
     // All wired, the arg is dead if the matching projection is dead
     int argn = _defs.find(def);
     ProjNode proj = ProjNode.proj(this, argn);
-    return proj == null || proj._live == TypeMem.ANYMEM ? TypeMem.ANYMEM : TypeMem.ALLMEM;
+    return proj == null ? Type.ANY : proj._live; // Pass through live
   }
 
   @Override public boolean has_tvar() { return false; }

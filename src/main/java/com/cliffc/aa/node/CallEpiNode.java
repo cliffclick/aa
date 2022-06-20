@@ -174,6 +174,34 @@ public final class CallEpiNode extends Node {
       return unwire(call,ret).set_is_copy(cctl,cmem,irez);
     }
 
+    // Check for a 1-op body that uses parms and returns ctrl and memory.
+    if( ret.ctl() instanceof CProjNode ) {
+      can_inline = true;
+      Node prim = ret.ctl().in(0);
+      // Return is all projections from the primitive
+      if( rmem instanceof MProjNode && rmem.in(0)==prim &&
+          rrez instanceof  ProjNode && rrez.in(0)==prim &&
+          prim.in(CTL_IDX) == fun ) {
+        // Prim inputs all from Parms
+        for( int i=MEM_IDX; i<prim.len(); i++ )
+          if( !(prim.in(i) instanceof ParmNode && prim.in(i).in(0)==fun) )
+            { can_inline=false; break; }
+        if( can_inline ) {
+          Node prim2 = prim.copy(false);
+          prim2.add_def(cctl);
+          prim2.add_def(cmem);
+          for( int i=DSP_IDX; i<prim.len(); i++ )
+            prim2.add_def(ProjNode.proj(call,i));
+          prim2.init();
+          Node ctl2 = new CProjNode(prim2).init();
+          Node mem2 = new MProjNode(prim2).init();
+          Node rez2 = new  ProjNode(prim2,REZ_IDX).init();
+          return unwire(call,ret).set_is_copy(ctl2,mem2,rez2);
+        }
+      }
+    }
+
+
     return null;
   }
 

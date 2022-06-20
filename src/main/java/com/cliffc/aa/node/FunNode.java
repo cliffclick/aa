@@ -174,7 +174,7 @@ public class FunNode extends RegionNode {
   // Graph rewriting via general inlining.  All other graph optimizations are
   // already done.
   public Node ideal_inline(boolean check_progress) {
-    Node[] parms = parms();
+    ParmNode[] parms = parms();
     Node rpc_parm = parms[0];
     if( rpc_parm == null ) return null; // Single caller const-folds the RPC, but also inlines in CallNode
     if( !check_callers() ) return null;
@@ -184,6 +184,7 @@ public class FunNode extends RegionNode {
     RetNode ret = ret();
     for( int i=1; i<_defs._len; i++ ) {
       Node c = in(i);
+      if( c instanceof CRProjNode ) continue; // Ignore the default Root
       if( !(c.in(0) instanceof CallNode call) ) return null; // If this is not a CallNode, just bail
       CallEpiNode cepi = call.cepi();
       if( cepi==null ) return null;
@@ -250,12 +251,11 @@ public class FunNode extends RegionNode {
 
   // Visit all ParmNodes, looking for unresolved call uses that can be improved
   // by type-splitting
-  private int find_type_split_index( Node[] parms ) {
+  private int find_type_split_index( ParmNode[] parms ) {
     for( Node parm : parms )     // For all parms
       if( parm != null )         // (some can be dead)
         for( Node use : parm._uses ) { // See if a parm-user needs a type-specialization split
-          if( use instanceof CallNode ) {
-            CallNode call = (CallNode)use;
+          if( use instanceof CallNode call ) {
             Node fdx = call.fdx();
             if( fdx instanceof FreshNode ) fdx = ((FreshNode)fdx).id();
             if( (fdx==parm && !parm._val.isa(TypeFunPtr.GENERIC_FUNPTR) ) ||
@@ -277,7 +277,7 @@ public class FunNode extends RegionNode {
   }
 
   // Find types for which splitting appears to help.
-  private TypeStruct find_type_split( Node[] parms ) {
+  private TypeStruct find_type_split( ParmNode[] parms ) {
 
     // Look for splitting to help an Unresolved Call.
     int idx = find_type_split_index(parms);
@@ -396,9 +396,9 @@ public class FunNode extends RegionNode {
   // on arguments that help immediately.
   //
   // Same argument for field Loads from unspecialized values.
-  private TypeStruct type_special( Node[] parms ) {
-    //TypeStruct formals = find_type_split(parms);
-    //if( formals == null ) return null; // No unresolved calls; no point in type-specialization
+  private TypeStruct type_special( ParmNode[] parms ) {
+    TypeStruct formals = find_type_split(parms);
+    if( formals == null ) return null; // No unresolved calls; no point in type-specialization
     //// Make a new function header with new signature
     //if( !formals.isa(_sig._formals) ) return null;    // Fails in error cases
     //return formals == _sig._formals ? null : formals; // Must see improvement
@@ -591,7 +591,7 @@ public class FunNode extends RegionNode {
     // unknown-caller, if any.
     CallNode path_call = path < 0 ? null : (CallNode)in(path).in(0);
     Ary<CallEpiNode> unwireds = new Ary<>(new CallEpiNode[1],0);
-    while( _defs._len > 1 ) {             // For all paths
+    while( _defs._len > 1 && !(in(_defs._len-1) instanceof CRProjNode) ) {             // For all paths
       Node ceproj = pop();
       CallNode call = (CallNode)ceproj.in(0); // Unhook without removal
       CallEpiNode cepi = call.cepi();
