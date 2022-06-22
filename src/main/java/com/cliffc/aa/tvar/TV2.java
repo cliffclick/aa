@@ -255,6 +255,7 @@ public class TV2 {
         args.put(fld._fld,make(fld._t,alloc_site));
       if( ts._clz.length()>0 ) {
         args.put(ts._clz, make_leaf(alloc_site));
+        args.put(CANONICAL_INSTANCE,make(ts._def,alloc_site));
         //args.put(PRIM_WRAP_FIELD_NAME,make_base(ts._def,alloc_site));
       }
       yield make_struct(args,alloc_site);
@@ -269,7 +270,7 @@ public class TV2 {
       throw unimpl();
     }
     case Type tt -> {
-      //if( t==Type.ANY ) yield make_leaf(alloc_site);
+      if( t==Type.ANY ) yield make_leaf(alloc_site);
       if( t==Type.ALL ) yield make_base(t,alloc_site);
       throw unimpl();
     }

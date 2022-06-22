@@ -27,8 +27,8 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=false;
-    DO_GCP=true;
+    DO_HMT=true;
+    DO_GCP=false;
     RSEED=0;
     testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
   }
@@ -204,7 +204,7 @@ public class TestParse {
     test("0 && 1 || 2 && 3", "int:3","int:3");    // Precedence
 
     test("x:=y:=0; z=x++ && y++;(x,y,z)", // increments x, but it starts zero, so y never increments
-         "(int:1, xnil,xnil)","(int:1,A?,B?)");
+         "(int:1, xnil,xnil)","(int:1,A:B?,A)");
     test("x:=y:=0; x++ && y++; z=x++ && y++; (x,y,z)", // x++; x++; y++; (2,1,0)
          "(int:2, int:1, xnil)","(int:2,int:1,A?)");
     test("(x=1) && x+2", "int:3", "int:3"); // Def x in 1st position

@@ -28,7 +28,7 @@ public class TestHM {
     DO_HMT=false;
     DO_GCP=true;
     RSEED=0;
-    test01();
+    test44();
   }
 
   private void _run0s( String prog, String rez_hm, String frez_gcp, int rseed, String esc_ptrs, String esc_funs  ) {
@@ -124,7 +124,7 @@ public class TestHM {
          "*( 3, *str:(97))",
          "*( 3, *str:(97))",
          // GCP with HM
-         "*[7](^=any, 3, *[4]str:(97))",
+         "*[7](^=any, 3, *[4]str:(, 97))",
          // GCP is weaker without HM
          "*[7](^=any, nScalar, nScalar)",
          "[4,7]", null );
@@ -190,7 +190,7 @@ public class TestHM {
          "(pair ((map str) 5) ((map factor) 2.3))",
          "*( *str:(int8), flt64)",
          "*( *str:(int8), flt64)",
-         "*[7](^=any, *[4]str:(int8), flt64)",
+         "*[7](^=any, *[4]str:(, int8), flt64)",
          "*[7](^=any, Scalar, Scalar)",
          "[4,7]",null);
   }
@@ -249,7 +249,7 @@ map ={fun parg -> (fun (cdr parg))};
 """,
          "*( *str:(int8), int1)",
          "*( *str:(int8), int1)",
-         "*[7](^=any, *[4]str:(int8), int64)",
+         "*[7](^=any, *[4]str:(, int8), int64)",
          "*[7](^=any, Scalar, Scalar)",
          "[4,7]",null );
   }
@@ -418,7 +418,7 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
 """,
          "*( *str:(int8), int1)",
          "*( *str:(int8), int1)",
-         "*[9](^=any, *[4]str:(int8), int64)",
+         "*[9](^=any, *[4]str:(, int8), int64)",
          "*[9](^=any, Scalar, Scalar)",
          "[4,9]",null);
   }
@@ -443,6 +443,7 @@ out_bool= (map in_str { xstr -> (eq xstr "def")});
         "1.2f",
         "Cannot unify 1.2f and *()",
         "1.2f","1.2f");
+
   }
 
   // Requires a combo of HM and GCP to get the good answer
@@ -463,7 +464,7 @@ loop = { name cnt ->
 """,
         "*str:(nint8)?",      // Both HM and GCP
         "Cannot unify int8 and *str:(nint8)?", // HM alone cannot do this one
-        "*[4]str:(100)",      // Both HM and GCP
+        "*[4]str:(, 100)",    // Both HM and GCP
         "nScalar");           // GCP alone gets a very weak answer
   }
 
@@ -1063,8 +1064,8 @@ maybepet = petcage.get;
 """,
          "*(nflt32,nflt32,*str:(nint8))",
          "*(nflt32,nflt32,*str:(nint8))",
-         "*[12](^=any, nflt32, nflt32, *[4]str:(nint8))",
-         "*[12](^=any, Scalar, Scalar, *[4]str:(nint8))",
+         "*[12](^=any, nflt32, nflt32, *[4]str:(, nint8))",
+         "*[12](^=any, Scalar, Scalar, *[4]str:(, nint8))",
          "[4,12]",null);
   }
 
@@ -1084,7 +1085,7 @@ all = @{
     rune("dsp = @{  id = { dsp n -> n}}; (pair (dsp.id dsp 3) (dsp.id dsp \"abc\"))",
          "*( 3, *str:(97))",
          "*( 3, *str:(97))",
-         "*[8](^=any, 3 , *[4]str:(97))",
+         "*[8](^=any, 3 , *[4]str:(, 97))",
          "*[8](^=any, nScalar, nScalar)",
          "[4,8]",null);
   }

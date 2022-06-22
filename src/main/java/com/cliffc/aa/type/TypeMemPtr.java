@@ -3,10 +3,9 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
-import java.util.function.*;
+import java.util.function.BinaryOperator;
 
 import static com.cliffc.aa.AA.unimpl;
-import static com.cliffc.aa.AA.ARG_IDX;
 
 // Pointers-to-memory; these can be both the address and the value part of
 // Loads and Stores.  They carry a set of aliased TypeObjs.
@@ -130,11 +129,10 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
 
   // Legacy constructor for legacy HM tests
   public static final int STR_ALIAS = 4; // Legacy str ptr value
-  public static TypeMemPtr make_str(String s) { return make_str(TypeInt.con(s.charAt(0))); }
+  public static TypeMemPtr make_str(String s) { return make_str(TypeInt.con(s.length()>0 ? s.charAt(0):0)); }
   public static TypeMemPtr make_str(Type t) { return make_str(BitsAlias.make0(STR_ALIAS),t); }
   public static TypeMemPtr make_str(BitsAlias aliases, Type t) {
-    TypeFld c0 = TypeFld.make_tup(t,ARG_IDX);
-    TypeStruct ts = TypeStruct.make("str:",Type.ALL,c0);
+    TypeStruct ts = TypeStruct.make("str:",t);
     return TypeMemPtr.make(aliases.test(0),aliases.clear(0),ts);
   }
   public boolean is_str() { return Util.eq(_obj._clz,"str:"); }
@@ -292,7 +290,7 @@ public final class TypeMemPtr extends TypeNil<TypeMemPtr> implements Cyclic {
         fidxs = fidxs.meet(tmem.at(alias)._all_reaching_fidxs(tmem));
     return fidxs;
   }
-  
+
   @Override public Type widen() { return this; }
 
   // Used for assertions

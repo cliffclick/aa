@@ -448,15 +448,16 @@ public class CallNode extends Node {
 
   // Unify ProjNodes with the Call arguments directly.
   @Override public boolean unify_proj( ProjNode proj, boolean test ) {
-    TV2 tv2 = tvar(proj._idx);
+    TV2 tvp = proj.tvar();     // Projection tvar
+    TV2 tv2 = tvar(proj._idx); // Input tvar matching projection
     if( proj._idx!=DSP_IDX )
-      return proj.tvar().unify(tv2,test); // Unify with Call arguments
+      return tvp.unify(tv2,test); // Unify with Call arguments
     // Specifically for the function/display, only unify on the display part.
     if( tv2.is_fun() ) {        // Expecting the call input to be a function
       TV2 tdsp = tv2.arg("2");  // Unify against the function display
-      //return tdsp != null && tv.unify(tdsp,test);
-      throw unimpl();
+      return tdsp != null && tvp.unify(tdsp,test);
     }
+    tv2.push_dep(proj);         // Proj will unify once tv2 becomes a fun
     return false;
   }
 

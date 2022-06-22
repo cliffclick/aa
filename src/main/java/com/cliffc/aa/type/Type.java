@@ -3,10 +3,10 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.*;
 
 import java.util.HashMap;
-import java.util.function.*;
+import java.util.function.BinaryOperator;
+import java.util.function.IntSupplier;
 
 import static com.cliffc.aa.AA.unimpl;
-import static com.cliffc.aa.type.TypeStruct.CANONICAL_INSTANCE;
 
 /** an implementation of language AA
  */
@@ -774,7 +774,7 @@ public class Type<T extends Type<T>> implements Cloneable, IntSupplier {
         if( !isRecur(id) ) {
           String tname = (id+':').intern();
           if( Util.eq(id,"int") || Util.eq(id,"flt"))
-            yield TypeStruct.make(tname,ALL,TypeFld.make(CANONICAL_INSTANCE,type(null)));
+            yield TypeStruct.make(tname,type(null));
           yield ((TypeStruct)type(null)).set_name(tname);
         }
 

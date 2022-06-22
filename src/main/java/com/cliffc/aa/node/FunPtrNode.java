@@ -89,7 +89,6 @@ public final class FunPtrNode extends Node {
   @Override public Node ideal_reduce() {
     Node dsp = display();
     if( dsp!=Env.ANY ) {
-      Type tdsp = dsp._val;
       FunNode fun;
       // Display is known dead?
       if( _live==Type.ANY ||
@@ -143,6 +142,7 @@ public final class FunPtrNode extends Node {
 
   // Implements class HM.Lambda unification.
   @Override public boolean unify( boolean test ) {
+    boolean progress = false;
     RetNode ret = ret();
     if( ret.is_copy() ) return false; // GENSYM
     FunNode fun = ret.fun();
@@ -159,13 +159,13 @@ public final class FunPtrNode extends Node {
         }
       tv2s[parms.length] = ret.rez().tvar(); // Return last slot
       self.unify(TV2.make_fun("FunPtr_unify",tv2s),test);
-      assert self.debug_find().is_fun();
-      return true;
-    } 
-    
+      self = self.find();
+      assert self.is_fun();
+      progress = true;
+    }
+
     // Each normal argument from the parms directly
-    boolean progress = false;
-    for( int i=DSP_IDX; i<parms.length; i++ )
+    for( int i=ARG_IDX; i<parms.length; i++ )
       if( parms[i]!=null ) {
         if( self.arg(TV2.argname(i)).unify(parms[i].tvar(), test) ) {
           if( test ) return true;
@@ -181,4 +181,12 @@ public final class FunPtrNode extends Node {
 
     return progress;
   }
+
+  // HM changes; push related neighbors
+  public void add_work_hm() {
+    super.add_work_hm();
+    if( display().has_tvar() )
+      Env.GVN.add_flow(display());
+  }
+
 }

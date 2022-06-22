@@ -1435,7 +1435,6 @@ public class Parse implements Comparable<Parse> {
       Node dsp = gvn(new LoadNode(mmem,ptr,null)); // Gen linked-list walk code, walking display slot
       while( dsp instanceof SetFieldNode ) // Bypass partial frame updates
         dsp = dsp.in(0); // Never set the display, so bypass
-      assert dsp instanceof StructNode;
       ptr = gvn(new FieldNode(dsp,"^"));
       e = e._par;                                 // Walk linked-list in parser also
     }

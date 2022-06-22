@@ -1581,8 +1581,8 @@ public class HM {
       Type pred = flows[0];
       if( pred.above_center() ) return TypeNil.XSCALAR;
       if( pred instanceof TypeMemPtr tmp && tmp.is_str() ) {
-        TypeFld fld = tmp._obj.get("0");
-        if( fld!=null ) return fld._t==TypeNil.NIL ? TypeInt.TRUE : TypeNil.XNIL;
+        Type chr = tmp._obj._def;
+        return chr==TypeInt.ZERO ? TypeInt.TRUE : TypeNil.XNIL;
       }
       return TypeInt.BOOL;
     }
@@ -1909,7 +1909,7 @@ public class HM {
     }
     static T2 make_str(TypeMemPtr flow) {
       assert flow.is_str();
-      T2 t2str = make_open_struct(new String[]{"str:","0"},new T2[]{make_leaf(),make_base(flow._obj.get("0")._t)});
+      T2 t2str = make_open_struct(new String[]{"str:","0"},new T2[]{make_leaf(),make_base(flow._obj._def)});
       return make_ptr(t2str);
     }
 

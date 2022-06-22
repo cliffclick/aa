@@ -69,6 +69,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   private static boolean check_name(String n) { return n.isEmpty() || Util.eq(n,"~") || n.charAt(n.length()-1)==':'; }
   // No instance of the default
   private static boolean check(Type def, TypeFld[] flds) {
+    assert !(def instanceof TypeFld);
     for( TypeFld fld : flds ) if( fld!=null && fld._t == def ) return false; // Not canonical
     return true;
   }
@@ -216,7 +217,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   public static TypeStruct make( String clz, Type def, TypeFld[] flds ) { return malloc(clz,def,flds).hashcons_free(); }
   // Make using the fields, with no struct name, low and closed; typical for a
   // well-known structure.
-  public static TypeStruct make( String clz, Type def, TypeFld fld0 ) { return make(clz,def,TypeFlds.make(fld0)); }
+  public static TypeStruct make( String clz, Type def ) { return malloc(clz,def,TypeFlds.EMPTY).hashcons_free(); }
   public static TypeStruct make( TypeFld[] flds ) { return make("",ALL,flds); }
   public static TypeStruct make( TypeFld fld0 ) { return make(TypeFlds.make(fld0)); }
   public static TypeStruct make( TypeFld fld0, TypeFld fld1 ) { return make(TypeFlds.make(fld0,fld1)); }
@@ -227,8 +228,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   // Primitive wrapper field name
   public static final String CANONICAL_INSTANCE = "$";
-  public static TypeStruct make_int(TypeInt ti) { return TypeStruct.make("int:",ALL,TypeFld.make(CANONICAL_INSTANCE,ti)); }
-  public static TypeStruct make_flt(TypeFlt tf) { return TypeStruct.make("flt:",ALL,TypeFld.make(CANONICAL_INSTANCE,tf)); }
+  public static TypeStruct make_int(TypeInt ti) { return make("int:",ti); }
+  public static TypeStruct make_flt(TypeFlt tf) { return make("flt:",tf); }
 
   // Add a field to an under construction TypeStruct; _flds is not interned.
   public TypeStruct add_fld( TypeFld fld ) {
@@ -630,8 +631,8 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   }
 
   @Override SB _str0( VBitSet visit, NonBlockingHashMapLong<String> dups, SB sb, boolean debug, boolean indent ) {
-    if( Util.eq(_clz,"int:") && has(CANONICAL_INSTANCE) ) return at(CANONICAL_INSTANCE)._str(visit,dups,sb,debug,false);
-    if( Util.eq(_clz,"flt:") && has(CANONICAL_INSTANCE) ) return at(CANONICAL_INSTANCE)._str(visit,dups,sb,debug,false);
+    if( Util.eq(_clz,"int:") ) return _def._str(visit,dups,sb,debug,false);
+    if( Util.eq(_clz,"flt:") ) return _def._str(visit,dups,sb,debug,false);
 
     sb.p(_clz);
     boolean is_tup = is_tup();
@@ -677,18 +678,22 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
     else { P.require('@');  P.require('{'); }
     TypeStruct ts = malloc("",any ? ANY : ALL,TypeFlds.get(0));
     if( cid!=null ) P._dups.put(cid,ts);
+    if( P.peek(',') ) {
+      ts._def = P.type();
+      P.require(is_tup ? ')' : '}');
+      return ts;
+    }
     if( P.peek(!is_tup ? '}' : ')') ) return ts;
-    int fnum=0;
 
     int aidx=DSP_IDX;
     do {
       TypeFld fld=null;
       int oldx = P._x;
-      String fid = is_tup ? ""+('0'+fnum++) : P.id();
+      String fid = P.id();
       Type dup = P._dups.get(fid);
       if( dup==null ) {
         // Check for a leading repeat name, even on a tuple: "FA:^=any"
-        if( fid.length()!=0 && P.peek(':') && (!is_tup || aidx==DSP_IDX) )
+        if( fid.length()!=0 && P.peek(':') && (fid!="int" && fid!="flt") && (!is_tup || aidx==DSP_IDX) )
           RECURSIVE_MEET++;     // Start a cyclic field type
         else { P._x = oldx; fid=null; }
         // Check for "^=any" on *tuples* which do not normally print field names
@@ -776,7 +781,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   @Override public boolean above_center() { return _def.above_center(); }
   @Override public boolean is_con() {
-    //if( _def != Type.ANY ) return false;
+    if( !_def.is_con() ) return false;
     for( TypeFld fld : _flds )
       if( !fld.is_con() )
         return false;
