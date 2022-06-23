@@ -27,10 +27,10 @@ public class TestParse {
   @Ignore @Test public void testJig() {
     JIG=true;
 
-    DO_HMT=true;
-    DO_GCP=false;
+    DO_HMT=false;
+    DO_GCP=true;
     RSEED=0;
-    testerr("1 && (x=2;0) || x+3 && x+4", "'x' not defined prior to the short-circuit",5); // x maybe alive
+    testerr("x=(1+(x=2)+x); x", "Cannot re-assign final field '.x' in @{x=2}",0);
   }
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
@@ -215,7 +215,7 @@ public class TestParse {
   }
 
   @Test public void testParse02() {
-    test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2), "2"); // trivially inlined; capture external variable
+    test("x=3; andx={y -> x & y}; andx(2)", "int:2", "int:2"); // trivially inlined; capture external variable
     // Anonymous function definition.  Note: { x -> x&1 }; 'x' can be either an
     // int or any struct with an operator '_&_', which needs to be nil-checked
     // before loading the operator field.

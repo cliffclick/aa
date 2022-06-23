@@ -70,7 +70,7 @@ public class TestLive {
     scope.xliv();
     // Since simple forwards-flow, the default memory is known UNUSED.
     // However, we got provided at least one object.
-    TypeMem expected_live = ((TypeMem) mem._val).flatten_fields();
+    TypeMem expected_live = ((TypeMem) mem._val).flatten_live_fields();
     assertEquals(scope._live,expected_live);
 
     // Check liveness recursive back one step

@@ -33,11 +33,9 @@ public class StoreNode extends Node {
     if( !(tadr instanceof TypeMemPtr tmp) ) return tadr .oob(TypeMem.ALLMEM);
     TypeStruct tvs = tval instanceof TypeStruct ? (TypeStruct)tval : tval.oob(TypeStruct.ISUSED);
 
-    // Struct is dead from below?  Value is always ANY.
-    TypeStruct live = _live instanceof TypeMem tlive ? tlive.ld(tmp) : _live.oob(TypeStruct.ISUSED);
     Node str = LoadNode.find_previous_struct(mem, adr, tmp._aliases, false );
     boolean precise = adr.in(0) instanceof NewNode nnn && (nnn.rec()==str); // Precise is replace, imprecise is MEET
-    return tm.update(tmp._aliases,tvs,precise,live);
+    return tm.update(tmp._aliases,tvs,precise);
   }
   // For most memory-producing Nodes, exactly 1 memory producer follows.
   private Node get_mem_writer() {
@@ -45,19 +43,27 @@ public class StoreNode extends Node {
     return null;
   }
 
-  // Compute the liveness local contribution to def's liveness.  Ignores the
-  // incoming memory types, as this is a backwards propagation of demanded
-  // memory.
+  // Compute the liveness local contribution to def's liveness.  Turns around
+  // value into live: if values are ANY then nothing is demand-able.
   @Override public Type live_use( Node def ) {
-    if( def==mem() ) return _live; // Pass full liveness along
-    assert def==adr() || def==rez();
-    // If this alias is not alive, then neither the address nor value are alive.
-    if( !(_live instanceof TypeMem tmem) ) return _live.oob();
-    Type adr = adr()._val;
-    if( !(adr instanceof TypeMemPtr tmp ) ) return adr.oob();
-    TypeStruct ts = tmem.ld(tmp);
+    if( _live== Type.ANY ) return Type.ANY;
+    if( _live== Type.ALL ) return Type.ALL;
+    Type mval = mem()._val;
+    Type aval = adr()._val;
+    if( mval == Type.ANY ) return Type.ANY;
+    if( aval == Type.ANY ) return Type.ANY;
+    
+    TypeMem tlive = _live==Type.ALL ? TypeMem.ALLMEM    : (TypeMem   )_live; // Assert _live is ANY, ALL or a TypeMem
+    TypeMem tmem  = mval ==Type.ALL ? TypeMem.ALLMEM    : (TypeMem   ) mval; // Assert  mval is ANY, ALL or a TypeMem
+    TypeMemPtr tmp= aval ==Type.ALL ? TypeMemPtr.ISUSED : (TypeMemPtr) aval; // Assert  aval is ANY, ALL or a TypeMemPtr
+    tmem = tmem.widen_mut_fields();
+    TypeMem jmem  = (TypeMem)tlive.join(tmem);
+    // TODO: if aval is precise alias, can remove it also from jmem
+    if( def==mem() ) return jmem;
+    // Available (live) struct
+    TypeStruct ts = jmem.ld(tmp);
     if( def==adr() ) return ts.oob(); // Live-use for the adr(), which is a Type.ANY/ALL
-    return ts;                  // Live-use for the rez() which is a TypeStruct liveness
+    return ts;                  // Live-use for the rez() which is a TypeStruct liveness    
   }
 
   @Override public void add_flow_use_extra(Node chg) {
@@ -107,7 +113,9 @@ public class StoreNode extends Node {
     // Store into a NewNode, same memory and address
     if( mem instanceof MProjNode && adr instanceof ProjNode && mem.in(0) == adr.in(0) && mem.in(0) instanceof NewNode nnn &&
         // Do not bypass a parallel writer
-        mem.check_solo_mem_writer(this) ) {
+        mem.check_solo_mem_writer(this) &&
+        // And liveness aligns
+        _live.isa(mem._live) ) {
       StructNode st = _fold(rez());
       Env.GVN.revalive(st,mem.in(0),mem);
       return st==null ? null : mem;
@@ -192,9 +200,15 @@ public class StoreNode extends Node {
   @Override public boolean has_tvar() { return false; }
 
   @Override public boolean unify( boolean test ) {
-    TV2 ptr = adr().tvar();
-    TV2 rez = rez().tvar();
-    return ptr.unify(rez,test);
+    TV2 ptr = adr().tvar();     // Should be leaf, nilable, or ptr
+    TV2 rez = rez().tvar();     // Should be leaf, or struct
+    assert !ptr.is_obj() && !rez.is_nil() && rez.arg("*")==null;
+    if( ptr.is_nil() ) throw unimpl();
+    TV2 obj = ptr.arg("*");
+    if( obj!=null )
+      return obj.unify(rez,test);
+    ptr.add_fld("*",rez);
+    return true;
   }
 
   @Override public void add_work_hm() {

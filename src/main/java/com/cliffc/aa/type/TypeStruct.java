@@ -670,7 +670,7 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
   boolean is_math() { return has("pi"); }
   boolean is_top_dsp() { return has("int") && has("flt") && has("math"); }
   boolean is_int_clz() { return has("!_"); }
-  boolean is_flt_clz() { return has("_/_") && at("_/_") instanceof TypeFunPtr; }
+  boolean is_flt_clz() { return has("_/_") && !has("!_"); }
 
   // e.g. (), (^=any), (^=any,"abc"), (3.14), (3.14,"abc"), (,,)
   static TypeStruct valueOf(Parse P, String cid, boolean is_tup, boolean any ) {
@@ -752,18 +752,28 @@ public class TypeStruct extends Type<TypeStruct> implements Cyclic, Iterable<Typ
 
   // Update (approximately) the whole current TypeStruct.
   // 'precise' is replace, imprecise is MEET.
-  // 'live' tells if each field is alive or dead
-  public TypeStruct update(TypeStruct ts, boolean precise, TypeStruct live) {
-    return (TypeStruct)(precise ? ts : meet(ts)).join(live);
+  public TypeStruct update(TypeStruct ts, boolean precise) {
+    return (TypeStruct)(precise ? ts : meet(ts));
   }
 
-  public TypeStruct flatten_fields() {
+  // Widen all mutable fields to final ALL, for building default Parm inputs.
+  public TypeStruct widen_mut_fields() {
     TypeFld[] flds = TypeFlds.get(len());
     for( int i=0; i<_flds.length; i++ )
-      flds[i] = _flds[i].make_from(TypeNil.SCALAR.oob(_flds[i]._t == TypeNil.XSCALAR || _flds[i]._t==ANY ), Access.bot());
+      flds[i] = _flds[i]._access==Access.Final
+        ? _flds[i]
+        : _flds[i].make_from(ALL, Access.bot());
     return make_from(flds);
   }
-
+  
+  // Flatten fields for LIVE: only need a per-field any/all indication
+  public TypeStruct flatten_live_fields() {
+    TypeFld[] flds = TypeFlds.get(len());
+    for( int i=0; i<_flds.length; i++ )
+      flds[i] = _flds[i].make_from(_flds[i].oob(), Access.bot());
+    return make_from(flds);
+  }
+  
   // Used during liveness propagation from Loads.
   // Fields not-loaded are not-live.
   TypeStruct remove_other_flds(String name, Type live) {

@@ -152,7 +152,6 @@ public abstract class Combo {
     work_cnt += main_work_loop();
     assert Env.ROOT.more_work(false)==0;
 
-    Node.VALS.clear();
     Env.ROOT.walk_opt(new VBitSet());
   }
 

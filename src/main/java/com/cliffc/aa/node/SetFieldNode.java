@@ -9,6 +9,7 @@ import com.cliffc.aa.type.TypeStruct;
 import com.cliffc.aa.util.Util;
 
 import static com.cliffc.aa.type.TypeFld.Access;
+import static com.cliffc.aa.AA.unimpl;
 
 // Takes a static field name, a TypeStruct, a field value and produces a new
 // TypeStruct.  This is an incremental TypeStruct producer, and does not update
@@ -35,6 +36,21 @@ public class SetFieldNode extends Node {
     return ts.update(_fin,_fld,val(1));
   }
 
+
+  @Override public Type live_use( Node def ) {
+    // If this node is not alive, neither input is
+    if( !(_live instanceof TypeStruct ts) )
+      { assert _live==Type.ANY || _live==Type.ALL; return _live; }
+    TypeFld livefld = ts.get(_fld);
+    if( livefld==null ) {
+      if( ts._def == Type.ANY ) return ts;
+      return ts.add_fldx(TypeFld.make(_fld,Type.ANY));
+    }
+    if( livefld._t==Type.ANY ) return ts;
+    throw unimpl();
+  }
+
+
   @Override public boolean has_tvar() { return true; }
 
   // Unify the named field against a TV2.is_obj same named field.
@@ -43,16 +59,20 @@ public class SetFieldNode extends Node {
     TV2 self = tvar();
     TV2 rec = tvar(0);
     TV2 tvf = tvar(1);
+    assert rec.arg("*")==null && !rec.is_nil() && self.arg("*")==null && !self.is_nil();
 
     // Unify all other fields common to both
     boolean progress = false;
-    if( self.is_obj() && rec.is_obj() )
-      for( String fld : self._args.keySet() )
-        if( !Util.eq(fld,_fld) ) { // All fields except the replaced one
-          TV2 rfld = rec.arg(fld);
-          progress |= rfld!=null && self.arg(fld).unify(rfld,test);
-          if( test && progress ) return true;
-        }
+    if( self.is_obj() )
+      if( rec.is_obj() ) {
+        for( String fld : self._args.keySet() )
+          if( !Util.eq(fld,_fld) ) { // All fields except the replaced one
+            TV2 rfld = rec.arg(fld);
+            progress |= rfld!=null && self.arg(fld).unify(rfld,test);
+            if( test && progress ) return true;
+          }
+      } else
+        rec.push_dep(this);    // When this becomes a obj, need to unify here
 
     // Lookup field in self
     TV2 fld = self.arg(_fld);
@@ -60,7 +80,7 @@ public class SetFieldNode extends Node {
       return fld.unify(tvf,test) | progress;
 
     // Add struct-ness if possible
-    if( !self.is_obj() && !self.is_nil() ) {
+    if( !self.is_obj() ) {
       if( test ) return true;
       self.make_struct_from();
     }
@@ -96,11 +116,12 @@ public class SetFieldNode extends Node {
     // SetField directly against a Struct; just use the Struct.
     if( in0 instanceof StructNode st ) {
       int idx = st.find(_fld);
-      if( in(1) == st.in(idx) ) return st; // Storing same over same, no change
+      if( in(1) == st.in(idx) && st.get(idx)._access == _fin )
+        return st; // Storing same over same, no change
 
       // TODO: When profitable to replicate a StructNode ?
     }
-    
+
     //// Find the field being updated
     //StructNode rec = nnn.rec();
     //TypeFld tfld = rec.get(_fld);

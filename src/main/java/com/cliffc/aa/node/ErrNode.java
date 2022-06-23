@@ -12,7 +12,6 @@ public final class ErrNode extends Node {
   public ErrNode( Node ctrl, ErrMsg err ) {
     super(OP_ERR,ctrl);
     _err = err;
-    _live= Type.ALL;
   }
   @Override public String xstr() { return _err._msg; }
   @Override String str() { return "Err"; }

@@ -3,7 +3,8 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFld;
+import com.cliffc.aa.type.TypeMem;
+
 
 // Function parameter node; almost just a Phi with an order.  There is a dense
 // numbering matching function arguments, e.g. MEM_IDX for memory.
@@ -55,8 +56,16 @@ public class ParmNode extends PhiNode {
     // Merge all live paths
     Type t = Type.ANY;
     for( int i=1; i<_defs._len; i++ )
-      if( fun.val(i)==Type.CTRL ) // Only meet alive paths
-        t = t.meet(val(i));
+      if( fun.val(i)==Type.CTRL ) { // Only meet alive paths
+        Type ti = val(i);
+        // Default memory inputs from future unknown paths are widened to
+        // include everything that might happen on some other path, before
+        // reaching here.  The basic "memory shape" is unchanged - aliases
+        // still exist - but all fields are "as if" stored to by a final error.
+        if( fun.in(i) instanceof CRProjNode && ti instanceof TypeMem tmem )
+          ti = tmem.widen_mut_fields();
+        t = t.meet(ti);
+      }
     return t.join(_t);
   }
 

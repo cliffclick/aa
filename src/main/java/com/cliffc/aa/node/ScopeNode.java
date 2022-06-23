@@ -124,7 +124,7 @@ public class ScopeNode extends Node {
     Type tmem = mem._val;
     Type trez = rez._val;
     if( !(tmem instanceof TypeMem tmem0) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
-    if( TypeMemPtr.ISUSED.isa(trez) ) return tmem0.flatten_fields(); // All possible pointers, so all memory is alive
+    if( TypeMemPtr.ISUSED.isa(trez) ) return tmem0.flatten_live_fields(); // All possible pointers, so all memory is alive
     // For function pointers, all memory returnable from any function is live.
     if( trez instanceof TypeFunPtr tfp && scope != null ) {
       TypeMem tmem3 = TypeMem.ANYMEM;
@@ -145,13 +145,13 @@ public class ScopeNode extends Node {
           tmem3 = (TypeMem)tmem3.meet(cepi_out);
         }
       }
-      return tmem3.flatten_fields();
+      return tmem3.flatten_live_fields();
     }
     if( !(trez instanceof TypeMemPtr) ) return TypeMem.ANYMEM; // Not a pointer, basic live only
     if( trez.above_center() ) return TypeMem.ANYMEM; // Have infinite choices still, report basic live only
     // Find everything reachable from the pointer and memory, and report it all
     BitsAlias aliases = tmem0.all_reaching_aliases(((TypeMemPtr)trez)._aliases);
-    return tmem0.slice_reaching_aliases(aliases).flatten_fields();
+    return tmem0.slice_reaching_aliases(aliases).flatten_live_fields();
   }
 
   @Override public TypeMem live() {

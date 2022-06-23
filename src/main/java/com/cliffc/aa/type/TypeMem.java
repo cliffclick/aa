@@ -487,11 +487,8 @@ public class TypeMem extends Type<TypeMem> {
 
   // Struct store into a conservative set of aliases.
   // 'precise' is replace, imprecise is MEET.
-  // 'live' tells if each field is alive or dead
-  public TypeMem update( BitsAlias aliases, TypeStruct tvs, boolean precise, TypeStruct live ) {
+  public TypeMem update( BitsAlias aliases, TypeStruct tvs, boolean precise ) {
     assert !precise || aliases.abit()!=-1;
-    if( live==TypeStruct.UNUSED )
-      tvs = TypeStruct.UNUSED;  // Since dead from below kill off all fields
     // If precise, just replace whole struct
     if( precise ) return set(aliases.getbit(),tvs);
     // Must do struct-by-struct updates
@@ -499,7 +496,7 @@ public class TypeMem extends Type<TypeMem> {
     for( int alias : aliases )
       if( alias != 0 )
         for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
-          ss.setX(kid,at(kid).update(tvs,precise,live));
+          ss.setX(kid,at(kid).update(tvs,precise));
     return make(_make1(ss.asAry()));
   }
 
@@ -513,15 +510,6 @@ public class TypeMem extends Type<TypeMem> {
           //pubs.setX(kid,at(_pubs,kid).update(idx,val)); // imprecise
           throw unimpl();
     return make(_make1(pubs.asAry()));
-  }
-
-  // Everything NOT in the 'escs' is flattened to UNUSED.
-  // Everything YES in the 'escs' is passed along.
-  public TypeMem remove_no_escapes( BitsAlias escs ) {
-    TypeStruct[] tos = new TypeStruct[Math.max(_pubs.length,escs.max()+1)];
-    for( int i=1; i<tos.length; i++ )
-      tos[i] = escs.test_recur(i) ? at(i) : TypeStruct.UNUSED;
-    return make0(tos);
   }
 
   // Everything in the 'escs' set is flattened to UNUSED.
@@ -547,11 +535,11 @@ public class TypeMem extends Type<TypeMem> {
     return true;                // Not modified in any alias
   }
 
-  // For live-ness purposes, flatten all field contents.
-  public TypeMem flatten_fields() {
+  // For default Parm inputs, widen all non-final fields to final ALL.
+  public TypeMem widen_mut_fields() {
     TypeStruct to, tof=null;
     int i; for( i=1; i< _pubs.length; i++ ) {
-      if( (to = _pubs[i]) != null && (tof = to.flatten_fields())!=to )
+      if( (to = _pubs[i]) != null && (tof = to.widen_mut_fields())!=to )
         break;
     }
     if( i== _pubs.length ) return this;
@@ -561,7 +549,36 @@ public class TypeMem extends Type<TypeMem> {
     tos[i++] = tof;
     for( ; i< _pubs.length; i++ )
       if( tos[i] != null )
-        tos[i] = tos[i].flatten_fields();
+        tos[i] = tos[i].widen_mut_fields();
+    return make0(tos);
+  }
+  
+  // Everything NOT in the 'escs' is flattened to UNUSED.
+  // Everything YES in the 'escs' is flattened for live.
+  public TypeMem remove_no_escapes( BitsAlias escs ) {
+    TypeStruct[] tos = new TypeStruct[Math.max(_pubs.length,escs.max()+1)];
+    for( int i=1; i<tos.length; i++ )
+      tos[i] = escs.test_recur(i) ? at(i).flatten_live_fields() : TypeStruct.UNUSED;
+    return make0(tos);
+  }
+
+
+  // For live-ness purposes, flatten all field contents.
+  // Only need per-field ANY/ALL.
+  public TypeMem flatten_live_fields() {
+    TypeStruct to, tof=null;
+    int i; for( i=1; i< _pubs.length; i++ ) {
+      if( (to = _pubs[i]) != null && (tof = to.flatten_live_fields())!=to )
+        break;
+    }
+    if( i== _pubs.length ) return this;
+
+    TypeStruct[] tos = _pubs.clone();
+    tos[0] = null;
+    tos[i++] = tof;
+    for( ; i< _pubs.length; i++ )
+      if( tos[i] != null )
+        tos[i] = tos[i].flatten_live_fields();
     return make0(tos);
   }
 

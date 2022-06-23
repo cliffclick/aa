@@ -219,9 +219,12 @@ public class StructNode extends Node {
 
   // Return liveness for a field
   @Override public Type live_use( Node def ) {
-    if( !(_live instanceof TypeStruct ts) ) return _live.oob();
+    if( !(_live instanceof TypeStruct ts) )
+      { assert _live==Type.ANY || _live==Type.ALL; return _live; }
     int idx = _defs.find(def);        // Get Node index
-    TypeFld lfld = ts.get(idx);       // Liveness for this index
+    String fld = _ts.get(idx)._fld;   // Get field name
+    // Use name lookup to get liveness for that field
+    TypeFld lfld = ts.get(fld);       // Liveness for this field name
     return lfld==null ? ts.oob() : lfld._t.oob();
   }
 

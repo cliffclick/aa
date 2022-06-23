@@ -51,9 +51,9 @@ public class LoadNode extends Node {
     if( def==adr() ) return Type.ALL;
     Type mem = mem()._val;
     Type ptr = adr()._val;
-    if( !(mem instanceof TypeMem tmem) ) return mem.oob(TypeMem.ALLMEM); // Not a memory?
+    if( !(mem instanceof TypeMem tmem) ) return mem.oob(); // Not a memory?
     if( ptr instanceof TypeStruct ) return ptr.oob(TypeMem.ALLMEM); // Loading from a clazz
-    if( !(ptr instanceof TypeMemPtr tptr) ) return ptr.oob(TypeMem.ALLMEM); // Not a pointer?
+    if( !(ptr instanceof TypeMemPtr tptr) ) return ptr.oob(); // Not a pointer?
     if( tptr.above_center() ) return TypeMem.ANYMEM; // Loaded from nothing
     // Only the named aliases is live.
     return tmem.remove_no_escapes(tptr._aliases);
@@ -65,6 +65,9 @@ public class LoadNode extends Node {
   @Override public boolean unify( boolean test ) {
     TV2 self = tvar();
     TV2 ptr = adr().tvar();
+    assert !ptr.is_obj() && !self.is_nil() && self.arg("*")==null;
+    if( ptr.is_nil() )
+      throw unimpl();
     TV2 rec = ptr.arg("*");
     if( rec==null )
       ptr.add_fld("*",rec = TV2.make_leaf("Load_unify"));
@@ -88,9 +91,13 @@ public class LoadNode extends Node {
     // If we can find an exact previous store, fold immediately to the value.
     Node ps = find_previous_struct(mem(),adr,tmp._aliases,true);
     if( ps!=null ) {
-      if( ps instanceof StoreNode st ) return st.rez();
-      if( ps instanceof StructNode st ) return st;
-      throw unimpl();
+      Node rez = switch(ps) {
+      case StoreNode st -> st.rez();
+      case StructNode st -> st;
+      default -> throw unimpl();
+      };
+      if( !_live.isa(rez._live) ) return null; // Stall until liveness matches
+      return rez;
     }
     return null;
   }

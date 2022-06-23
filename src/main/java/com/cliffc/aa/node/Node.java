@@ -128,7 +128,7 @@ public abstract class Node implements Cloneable, IntSupplier {
       Env.GVN.add_reduce(Env.GVN.add_flow(this));
     }
   }
-  Node _elock() {               // No assert version, used for new nodes
+  public Node _elock() {        // No assert version, used for new nodes
     assert check_vals();        // elock & VALs match
     if( !_elock && VALS.get(this)==null ) { _elock = true; VALS.put(this,this); }
     return this;
@@ -555,6 +555,8 @@ public abstract class Node implements Cloneable, IntSupplier {
   public void combo_backwards() {
     Type oliv = _live;
     Type nliv = live();
+    // TODO: If use._value >= constant, force live-use to ANY.
+    // Not done for ITER, because replace-with constant happens anyways.
     if( oliv == nliv ) return;  // No progress
     assert oliv.isa(nliv);      // Monotonic
     _live = nliv;               // Record progress
@@ -622,8 +624,10 @@ public abstract class Node implements Cloneable, IntSupplier {
 
     // Try general ideal call
     Node x = ideal_reduce();    // Try the general reduction
-    if( x != null )
-      return merge(x);          // Graph replace with x
+    if( x != null ) {
+      assert _live.isa(x._live);
+      return Env.GVN.add_flow(x); // Graph replace with x
+    }
 
     return null;                // No change
   }
@@ -658,6 +662,7 @@ public abstract class Node implements Cloneable, IntSupplier {
         Env.GVN.add_flow(use).add_flow_use_extra(this);
       // Progressing on CFG can mean CFG paths go dead
       if( is_CFG() ) for( Node use : _uses ) if( use.is_CFG() ) Env.GVN.add_reduce(use);
+      if( !(this instanceof ConNode) && nval.is_con() ) Env.GVN.add_reduce(this);// Replace a constant
       add_flow_extra(oval);
     }
     return progress;
@@ -850,7 +855,6 @@ public abstract class Node implements Cloneable, IntSupplier {
   public void walk_opt( VBitSet visit ) {
     assert !is_dead();
     if( visit.tset(_uid) ) return; // Been there, done that
-    _elock = false;                // Removed from VALS
     // Walk reachable graph
     if( is_dead() ) return;
     Env.GVN.add_work_new(this);

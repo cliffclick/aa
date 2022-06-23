@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Util;
 
 // Takes a static field name, a TypeStruct and returns the field value.
 // Basically a ProjNode except it does lookups by field name in TypeStruct
@@ -20,7 +21,7 @@ public class FieldNode extends Node {
 
   @Override public Type value() {
     Type t = val(0);
-    String sclz=null;
+    String sclz;
     if( t==TypeNil.XNIL ) {
       // TODO: proper semantics?  For now, mimic int
       sclz="int:";
@@ -51,18 +52,27 @@ public class FieldNode extends Node {
   }
 
   @Override public Node ideal_reduce() {
-    if( (in(0) instanceof StructNode clz) )
+    if( in(0) instanceof StructNode clz )
       return clz.in_bind(_fld,in(0));
     // For named prototypes, if the field load fails, try again in the
     // prototype.  Only valid for final fields.
-    String sclz;
+    String sclz=null;
     Type t = val(0);
     if( t == TypeNil.XNIL ) sclz = "int:";
-    else if( !(t instanceof TypeStruct ts) ) return null;
-    else sclz = ts.clz();
-    StructNode clz = proto(sclz);
-    if( clz==null ) return null;
-    return clz.in_bind(_fld,in(0));
+    else if( t instanceof TypeStruct ts ) sclz = ts.clz();
+    if( sclz!=null ) {
+      StructNode clz = proto(sclz);
+      if( clz!=null )
+        return clz.in_bind(_fld,in(0));
+    }
+
+    // Back-to-back SetField/Field
+    if( in(0) instanceof SetFieldNode sfn && sfn.err(true)==null )
+      return Util.eq(_fld, sfn._fld)
+        ? sfn.in(1)             // Same field, use same
+        : set_def(0, sfn.in(0)); // Unrelated field, bypass
+
+    return null;
   }
 
   @Override public Node ideal_grow() {
@@ -91,6 +101,7 @@ public class FieldNode extends Node {
     TV2 self = tvar();
     TV2 rec = tvar(0);
     if( !test ) rec.push_dep(this);
+    assert rec.arg("*")==null;  // No ptrs here, just structs
 
     // Look up field
     TV2 fld = rec.arg(_fld);
@@ -98,7 +109,7 @@ public class FieldNode extends Node {
       return fld.unify(self, test);
 
     // Add struct-ness if possible
-    if( !rec.is_obj() && !rec.is_nil() ) {
+    if( !rec.is_obj() ) {
       if( test ) return true;
       rec.make_struct_from();
     }
@@ -109,6 +120,14 @@ public class FieldNode extends Node {
     }
     // Closed/non-record, field is missing
     return self.set_err(("Missing field "+_fld).intern(),test);
+  }
+
+  @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }
+  @Override public boolean equals(Object o) {
+    if( this==o ) return true;
+    if( !super.equals(o) ) return false;
+    if( !(o instanceof FieldNode fld) ) return false;
+    return Util.eq(_fld,fld._fld);
   }
 
 }

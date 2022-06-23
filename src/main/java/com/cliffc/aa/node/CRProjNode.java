@@ -15,6 +15,7 @@ public class CRProjNode extends CEProjNode {
     // Before Combo runs, calls might yet wire.  The default path cannot die
     // until wiring is done.
     if( in(0).in(0)==null ) return Type.CTRL;
+    if( is_prim() ) return Type.CTRL; // Primitives never die
     if( val(0)==Type.ANY ) return Type.XCTRL;
     // Compute liveness from Root value
     TypeTuple tt = (TypeTuple)val(0);

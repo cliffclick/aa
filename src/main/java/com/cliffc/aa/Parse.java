@@ -601,8 +601,7 @@ public class Parse implements Comparable<Parse> {
   // Function takes in memory, display
   private Node _lazy_expr(Oper op) {
     int rhsx = _x;
-    Env outer = _e;
-    FunNode fun = new FunNode(3); // ctrl, mem, display
+    FunNode fun = new FunNode(ARG_IDX); // ctrl, mem, display
     init(fun.add_def(init(new CRProjNode(fun._fidx))));
     int fun_idx = fun.push();
     NewNode nnn = scope().dsp();
@@ -631,7 +630,7 @@ public class Parse implements Comparable<Parse> {
 
       _e = e._par;            // Pop nested environment
       // The FunPtr builds a real display; any up-scope references are passed in now.
-      Node fptr = gvn(new FunPtrNode(ret,outer._scope.ptr()));
+      Node fptr = gvn(new FunPtrNode(ret,_e._scope.ptr()));
       fptr_idx = fptr.push(); // Return function; close-out and DCE 'e'
 
       // Extra variables in the short-circuit are not available afterwards.
@@ -949,106 +948,97 @@ public class Parse implements Comparable<Parse> {
   private Node func() {
     int oldx = _x;              // Past opening '{'
 
-    // Push an extra hidden display argument.  Similar to java inner-class ptr
-    // or when inside a struct definition: 'this'.
-    StructNode par_stk = scope().stk();
-    Node dsp = par_stk;
+    // Incrementally build up the formals, starting with the display
+    Ary<Type> formals = new Ary<>(new Type[]{Type.CTRL,TypeMem.ALLMEM,scope().dsp()._tptr});
+    Ary<Parse> bads= new Ary<>(new Parse [ARG_IDX]);
+    Ary<String> ids= new Ary<>(new String[]{null,null,"^"});
 
-    //// Incrementally build up the formals
-    //TypeStruct formals = TypeStruct.make("",false, TypeFld.make_dsp(par_stk._tptr));
-    //TypeStruct no_args_formals = formals;
-    //Ary<Parse> bads= new Ary<>(new Parse[1],0);
-    //
-    //// Parse arguments
-    //while( true ) {
-    //  skipWS();
-    //  Parse badp = errMsg();   // Capture location in case of parameter error
-    //  String tok = token();
-    //  if( tok == null ) { _x=oldx; break; } // not a "[id]* ->"
-    //  if( Util.eq((tok=tok.intern()),"->") ) break; // End of argument list
-    //  if( !isAlpha0((byte)tok.charAt(0)) ) { _x=oldx; break; } // not a "[id]* ->"
-    //  Type t = Type.SCALAR;    // Untyped, most generic type
-    //  Parse bad = errMsg();    // Capture location in case of type error
-    //  if( peek(':') &&         // Has type annotation?
-    //      (t=type(true,null))==null ) { // Get type
-    //    // If no type, might be "{ x := ...}" or "{ fun arg := ...}" which can
-    //    // be valid stmts, hence this may be a no-arg function.
-    //    if( bads._len-1 <= 2 ) { _x=oldx; break; }
-    //    else {
-    //      // Might be: "{ x y z:bad -> body }" which cannot be any stmt.  This
-    //      // is an error in any case.  Treat as a bad type on a valid function.
-    //      err_ctrl0(peek(',') ? "Bad type arg, found a ',' did you mean to use a ';'?" : "Missing or bad type arg");
-    //      t = Type.SCALAR;
-    //      skipNonWS();         // Skip possible type sig, looking for next arg
-    //    }
-    //  }
-    //  if( formals.get(tok) != null ) err_ctrl3("Duplicate parameter name '" + tok + "'", badp);
-    //  else formals = formals.add_fldx(TypeFld.make(tok,t,args_are_mutable)); // Accumulate args
-    //  bads.add(bad);
-    //}
-    //// If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
-    //// args, and then reset.  Also reset to just the mem & display args.
-    //if( _x == oldx ) { formals = no_args_formals;  bads.set_len(ARG_IDX); }
-    //
-    //// Build the FunNode header
-    //FunNode fun = (FunNode)init(new FunNode(formals.nargs()).add_def(Env.ALL_CTRL));
-    //int fun_idx = fun.push();
-    //
-    //// Record H-M VStack in case we clone
-    ////fun.set_nongens(_e._nongen.compact());
-    //// Build Parms for system incoming values
-    //int rpc_idx = init(new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL,Env.ALL_CALL)).push();
-    //int clo_idx = init(new ParmNode(DSP_IDX,fun,null,par_stk._tptr   ,dsp         )).push();
-    //Node mem    = init(new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM  ,Env.DEF_MEM ));
-    //
-    //// Increase scope depth for function body.
-    //int fidx;
-    //try( Env e = new Env(_e, fun, true, fun, mem, par_stk, null) ) { // Nest an environment for the local vars
-    //  _e = e;                   // Push nested environment
-    //  // Display is special: the default is simply the outer lexical scope.
-    //  // But here, in a function, the display is actually passed in as a hidden
-    //  // extra argument and replaces the default.
-    //  StructNode stk = e._scope.stk();
-    //  stk.set_fld(TypeFld.make_dsp(par_stk._tptr),Node.pop(clo_idx));
-    //  Env.GVN.revalive(stk,stk.mem());
-    //
-    //  // Parms for all arguments
-    //  Parse errmsg = errMsg();  // Lazy error message
-    //  assert fun==_e._fun && fun==_e._scope.ctrl();
-    //  for( int i=ARG_IDX; i<formals.len(); i++ ) { // User parms start
-    //    TypeFld fld = formals.get(i);
-    //    //Node parm = gvn(new ParmNode(i,fld,fun,Env.ALL_PARM,errmsg));
-    //    //scope().stk().add_fld(fld,parm,bads.at(i-ARG_IDX));
-    //    throw unimpl(); // TODO: TypeFld has no order but formals and Parms do
-    //  }
-    //  stk.set_nargs(formals.nargs());
-    //
-    //  // Parse function body
-    //  Node rez = stmts();       // Parse function body
-    //  if( rez == null ) rez = err_ctrl2("Missing function body");
-    //  require('}',oldx-1);      // Matched with opening {}
-    //  stk.close();
-    //
-    //  // Merge normal exit into all early-exit paths
-    //  assert e._scope.is_closure();
-    //  rez = merge_exits(rez);
-    //  // Standard return; function control, memory, result, RPC.  Plus a hook
-    //  // to the function for faster access.
-    //  Node xrpc = Node.pop(rpc_idx);
-    //  Node xfun = Node.pop(fun_idx); assert xfun == fun;
-    //  RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
-    //  // Hook the function at the TOP scope, because it may yet have unwired
-    //  // CallEpis which demand memory.  This hook is removed as part of doing
-    //  // the Combo pass which computes a real Call Graph and all escapes.
-    //  Env.SCP_0.add_def(ret);
-    //  // The FunPtr builds a real display; any up-scope references are passed in now.
-    //  //Node fptr = gvn(new FunPtrNode(null,ret,par_stk._is_val ? Env.ALL : par_stk));
-    //  //
-    //  //_e = e._par;            // Pop nested environment; pops nongen also
-    //  //fidx = fptr.push();     // Return function; close-out and DCE 'e'
-    //}
-    //return Node.pop(fidx);
-    throw unimpl();
+    // Parse arguments
+    while( true ) {
+      skipWS();
+      Parse badp = errMsg();   // Capture location in case of parameter error
+      String tok = token();
+      if( tok == null ) { _x=oldx; break; } // not a "[id]* ->"
+      if( Util.eq((tok=tok.intern()),"->") ) break; // End of argument list
+      if( !isAlpha0((byte)tok.charAt(0)) ) { _x=oldx; break; } // not a "[id]* ->"
+      Type t = TypeNil.SCALAR; // Untyped, most generic type
+      Parse bad = errMsg();    // Capture location in case of type error
+      if( peek(':') &&         // Has type annotation?
+          (t=type(true,null))==null ) { // Get type
+        // If no type, might be "{ x := ...}" or "{ fun arg := ...}" which can
+        // be valid stmts, hence this may be a no-arg function.
+        if( bads._len-1 <= 2 ) { _x=oldx; break; }
+        else {
+          // Might be: "{ x y z:bad -> body }" which cannot be any stmt.  This
+          // is an error in any case.  Treat as a bad type on a valid function.
+          err_ctrl0(peek(',') ? "Bad type arg, found a ',' did you mean to use a ';'?" : "Missing or bad type arg");
+          t = TypeNil.SCALAR;
+          skipNonWS();         // Skip possible type sig, looking for next arg
+        }
+      }
+      if( ids.find(tok) != -1 ) {
+        err_ctrl3("Duplicate parameter name '" + tok + "'", badp);
+        tok = (tok+" dup").intern();
+      }
+      ids.push(tok);
+      formals.push(t); // Accumulate args
+      bads.add(bad);
+    }
+    // If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
+    // args, and then reset.  Also reset to just the mem & display args.
+    if( _x == oldx ) { formals.set_len(ARG_IDX);  ids.set_len(ARG_IDX); bads.set_len(ARG_IDX); }
+
+    // Build the FunNode header
+    FunNode fun = new FunNode(formals.len());
+    init(fun.add_def(init(new CRProjNode(fun._fidx))));
+    int fun_idx = fun.push();
+
+    // Record H-M VStack in case we clone
+    //fun.set_nongens(_e._nongen.compact());
+    // Build Parms for system incoming values
+    int rpc_idx = init(new ParmNode(CTL_IDX,fun,null,TypeRPC.ALL_CALL   ,Env.ALL_CALL)).push();
+    int clo_idx = init(new ParmNode(DSP_IDX,fun,null,scope().dsp()._tptr,scope().ptr())).push();
+    Node mem    = init(new ParmNode(MEM_IDX,fun,null,TypeMem.ALLMEM     ,mem() ));
+
+    // Increase scope depth for function body.
+    int fptr_idx;
+    try( Env e = new Env(_e, fun, true, fun, mem, scope().ptr(), null) ) { // Nest an environment for the local vars
+      _e = e;                   // Push nested environment
+      // Display is special: the default is simply the outer lexical scope.
+      // But here, in a function, the display is actually passed in as a hidden
+      // extra argument and replaces the default.
+      StructNode stk = e._scope.stk();
+      stk.set_fld("^",Access.Final,Node.pop(clo_idx),true);
+
+      // Parms for all arguments
+      Parse errmsg = errMsg();  // Lazy error message
+      assert fun==_e._fun && fun==_e._scope.ctrl();
+      for( int i=ARG_IDX; i<formals.len(); i++ ) { // User parms start
+        Node parm = gvn(new ParmNode(i,fun,errmsg,Type.ALL,Env.ALL));
+        scope().stk().add_fld(TypeFld.make(ids.at(i),formals.at(i),args_are_mutable),parm,bads.at(i-ARG_IDX));
+      }
+
+      // Parse function body
+      Node rez = stmts();       // Parse function body
+      if( rez == null ) rez = err_ctrl2("Missing function body");
+      require('}',oldx-1);      // Matched with opening {}
+      stk.close();
+    
+      // Merge normal exit into all early-exit paths
+      assert e._scope.is_closure();
+      rez = merge_exits(rez);
+      // Standard return; function control, memory, result, RPC.  Plus a hook
+      // to the function for faster access.
+      Node xrpc = Node.pop(rpc_idx);
+      Node xfun = Node.pop(fun_idx); assert xfun == fun;
+      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,xrpc,fun));
+      
+      _e = e._par;            // Pop nested environment; pops nongen also
+      // The FunPtr builds a real display; any up-scope references are passed in now.
+      Node fptr = gvn(new FunPtrNode(ret,_e._scope.ptr()));
+      fptr_idx = fptr.push();   // Return function; close-out and DCE 'e'
+    }
+    return Node.pop(fptr_idx);
   }
 
   private Node merge_exits(Node rez) {

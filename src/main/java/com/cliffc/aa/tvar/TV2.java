@@ -628,7 +628,7 @@ public class TV2 {
     // Mismatched error pointers require a hard sub-part unify
     TV2 ptr0 = arg("*"), ptr1 = that.arg("*");
     if( ptr0!=null && ptr1 != null )
-      throw unimpl(); //ptr0._unify(ptr1,test);
+      ptr0._unify(ptr1,test);
 
     // Special case for nilable union something
     if( this.is_nil() && !that.is_nil() ) return that.unify_nil(this,test);

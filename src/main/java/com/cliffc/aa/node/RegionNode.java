@@ -38,6 +38,9 @@ public class RegionNode extends Node {
             Env.GVN.add_flow(phi.remove(i));
         unwire(i);
         remove(i);
+        if( this instanceof FunNode &&   // Trigger inline single caller
+            len()==2 && in(1).in(0) instanceof CallNode call )
+          Env.GVN.add_reduce(call.cepi());
         return this; // Progress
       }
 
