@@ -154,13 +154,13 @@ public final class TypeFunPtr extends TypeNil<TypeFunPtr> implements Cyclic {
   // repeatedly and must monotonically reach a fixed point.  Doing this by
   // restricting to a single in the return chain is not monotonic:
   //
-  //  INPUT                   WRAP WITH [2]{->}               APPROX
-  // ~scalar          ==>> [2]{-> ~scalar         } ==>> $[2  ]{->~scalar}
-  // $[2  ]{->$[2  ]} ==>> [2]{-> $[2  ]{->$[2  ]}} ==>> $[2  ]{->$[2]   }
-  // $[2,3]{->$[2,3]} ==>> [2]{-> $[2,3]{->$[2,3]}} ==>> $[2,3]{->$[2,3] } \___ NOT MONOTONIC
-  // scalar           ==>> [2]{-> scalar          } ==>> $[2  ]{->scalar } /
+  //  INPUT           WRAP WITH 2 ->        APPROX
+  // ~scalar     ==>> 2 -> ~scalar     ==>> 2   -> ~scalar
+  // 2   -> 2  * ==>> 2 -> 2   -> 2  * ==>> 2   -> 2  *
+  // 2,3 -> 2,3* ==>> 2 -> 2,3 -> 2,3* ==>> 2,3 -> 2,3*   \___ NOT MONOTONIC
+  //  scalar     ==>> 2 ->  scalar     ==>> 2   ->  scalar/
   //
-  // As the input falls from a $[2,3]{->$} cycle to scalar, the output (after
+  // As the input falls from a ->2,3* cycle to scalar, the output (after
   // wrap-and-approximate) is not monotonic.
 
   // Invariant: the fidxes can appear in the return-chain only if they strictly

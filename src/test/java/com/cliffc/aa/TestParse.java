@@ -219,10 +219,7 @@ public class TestParse {
     // Anonymous function definition.  Note: { x -> x&1 }; 'x' can be either an
     // int or any struct with an operator '_&_', which needs to be nil-checked
     // before loading the operator field.
-    //test("{x:int -> x&1}",
-    //     (ignore -> TypeFunPtr.make(38,ARG_IDX+1, TypeMemPtr.NO_DISP, TypeInt.BOOL)),
-    //     ( ()-> TypeStruct.make(TypeFld.make("x",TypeInt.INT64))),
-    //     "{ int64 -> int64 }");
+    test("{x:int -> x&1}","[54]{int64,4 -> int64 }","{int64 -> int64}");
     //test("{5}()", TypeInt.con(5), "5"); // No args nor -> required; this is simply a function returning 5, being executed
     //testerr("{x:flt y -> x+y}", "Unable to resolve _+_",13); // {Scalar Scalar -> Scalar}
     //
@@ -950,8 +947,8 @@ HashTable = {@{
         assertEquals(expect,actual);
         // Also check GCP formals.
         if( expect instanceof TypeFunPtr ) {
-          TypeStruct actual_formals = te._formals;
-          TypeStruct expect_formals = (TypeStruct)Type.valueOf(formals);
+          TypeTuple actual_formals = te._formals;
+          TypeTuple expect_formals = (TypeTuple)Type.valueOf(formals);
           assertEquals(expect_formals,actual_formals);
         } else
           assert formals==null;

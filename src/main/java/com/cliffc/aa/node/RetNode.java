@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
-import com.cliffc.aa.tvar.TV2;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
@@ -57,15 +56,13 @@ public final class RetNode extends Node {
   // TODO: needs to come from both Combo and _t
   Type formal(int idx) { return fun().parm(idx)._t; }
   // Called by testing
-  public TypeStruct formals() {
-    Node[] parms = fun().parms();
-    //TypeStruct ts = TypeStruct.malloc(TypeFld.DEF);
-    //for( int i=DSP_IDX; i<_nargs; i++ )
-    //  if( parms[i]!=null )
-    //    //ts.add_fld(TypeFld.make(((ParmNode)parms[i])._name,((ParmNode)parms[i])._t,TypeFld.Access.Final));
-    //    throw unimpl();
-    //return ts.hashcons_free();
-    throw unimpl();
+  public TypeTuple formals() {
+    ParmNode[] parms = fun().parms();
+    Type[] ts = Types.get(_nargs-DSP_IDX);
+    for( int i=DSP_IDX; i<_nargs; i++ )
+      if( parms[i]!=null )
+        ts[i-DSP_IDX] = parms[i]._t;
+    return TypeTuple.make(ts);
   }
 
 
